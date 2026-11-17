@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import { AdapterError } from "../adapters.js";
 import type { CodeHost, PullRequestSnapshot, Runner, Tracker } from "../adapters.js";
 import {
+  toAgentId,
   toLabelId,
+  toPullRequestId,
   toRepoRef,
   toRunnerProjectId,
   toTicketKey,
@@ -40,7 +42,7 @@ describe("FakeRunner", () => {
       project: app,
       worktreeName: "ENG-1",
       branch: "factory/ENG-1-1",
-      agent: "claude",
+      agent: toAgentId("claude"),
       prompt: "티켓 본문",
     });
 
@@ -60,11 +62,19 @@ describe("FakeRunner", () => {
   it("같은 retryToken으로 다시 시작하면 같은 시작을 돌려준다", async () => {
     const runner = new FakeRunner();
     runner.setProjects([project]);
-    const input = { project: app, worktreeName: "w", branch: "b", agent: "a", prompt: "p" };
+    const input = {
+      project: app,
+      worktreeName: "w",
+      branch: "b",
+      agent: toAgentId("a"),
+      prompt: "p",
+    };
     const first = await runner.startRun(input);
 
     expect(first.retryToken).not.toBeNull();
-    const again = await runner.startRun({ ...input, retryToken: first.retryToken ?? "" });
+    const again = await runner.startRun(
+      first.retryToken === null ? input : { ...input, retryToken: first.retryToken },
+    );
 
     expect(again).toEqual(first);
     expect(runner.worktrees.size).toBe(1);
@@ -77,7 +87,7 @@ describe("FakeRunner", () => {
       project: app,
       worktreeName: "w",
       branch: "b",
-      agent: "a",
+      agent: toAgentId("a"),
       prompt: "p",
     });
     runner.appendLog(worktree, "1", "2", "3");
@@ -100,17 +110,18 @@ describe("FakeRunner", () => {
 describe("FakeCodeHost", () => {
   const repo = toRepoRef("acme/app");
   const pr: PullRequestSnapshot = {
-    number: 7,
+    id: toPullRequestId("pr-7"),
+    displayId: "#7",
     url: "https://example.com/acme/app/pull/7",
     title: "ENG-1 고치기",
     body: "",
     state: "open",
     createdAt: new Date("2026-01-01T00:00:00Z"),
     mergedAt: null,
-    headRefName: "factory/ENG-1-1",
-    headRepository: repo,
-    headSha: "abc",
-    baseRefName: "main",
+    headBranch: "factory/ENG-1-1",
+    sourceRepo: repo,
+    headCommit: "abc",
+    baseBranch: "main",
     ci: "pending",
   };
 
@@ -120,12 +131,12 @@ describe("FakeCodeHost", () => {
 
     expect(codeHost.repoOf(app)).toBe(repo);
     expect(codeHost.repoOf(toRunnerProjectId("other:acme/app"))).toBeNull();
-    await expect(codeHost.findPullRequestsByBranch(repo, pr.headRefName)).resolves.toEqual([pr]);
+    await expect(codeHost.findPullRequestsByBranch(repo, pr.headBranch)).resolves.toEqual([pr]);
     await expect(codeHost.findPullRequestsByTicketKey(repo, toTicketKey("ENG-1"))).resolves.toEqual(
       [pr],
     );
-    await expect(codeHost.getPullRequest(repo, 7)).resolves.toEqual(pr);
-    await expect(codeHost.getPullRequest(repo, 8)).resolves.toBeNull();
+    await expect(codeHost.getPullRequest(repo, toPullRequestId("pr-7"))).resolves.toEqual(pr);
+    await expect(codeHost.getPullRequest(repo, toPullRequestId("pr-8"))).resolves.toBeNull();
   });
 });
 

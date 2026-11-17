@@ -14,9 +14,14 @@
  * 실제 열거값과 신호는 검증 티켓(0009~0012) 뒤 0037에서 맞춘다.
  */
 import type {
+  AgentId,
   CodeHostKind,
+  CommentId,
+  DeliveryId,
   LabelId,
+  PullRequestId,
   RepoRef,
+  RetryToken,
   RunnerKind,
   RunnerProjectId,
   TicketKey,
@@ -54,7 +59,11 @@ export interface Paged<T> {
 
 // ---------- Tracker ----------
 
-/** 트래커 상태의 분류. 상태 이름은 트래커·팀마다 다르므로 분류로 뜻을 본다. */
+/**
+ * 트래커 상태의 분류. 상태 이름은 트래커·팀마다 다르므로 분류로 뜻을 본다.
+ * core가 정한 중립 분류이고, 어댑터가 자기 트래커의 상태를 여기에 맞춰 넣는다.
+ * 맞는 분류가 없으면 트래커 값을 그대로 넣어도 된다.
+ */
 export type TrackerStateCategory =
   | "triage"
   | "backlog"
@@ -88,7 +97,7 @@ export interface TrackerTicket {
 }
 
 export interface TrackerComment {
-  id: string;
+  id: CommentId;
   body: string;
   createdAt: Date;
   author: string | null;
@@ -103,7 +112,7 @@ export interface TrackerProject {
 /** 서명·타임스탬프 검증을 통과한 webhook 하나. 검증 실패는 이 타입이 되지 못한다. */
 export interface TrackerEvent {
   /** 중복 제거 키(Linear는 Linear-Delivery) */
-  deliveryId: string;
+  deliveryId: DeliveryId;
   kind: "ticket.created" | "ticket.updated" | "ticket.removed" | "other";
   ticketKey: TicketKey | null;
   projectId: TrackerProjectId | null;
@@ -153,7 +162,7 @@ export interface Tracker {
   listStates(projectId: TrackerProjectId): Promise<ReadonlyArray<TrackerState>>;
 
   setState(key: TicketKey, stateId: TrackerStateId): Promise<void>;
-  addComment(key: TicketKey, body: string): Promise<{ id: string; url: string }>;
+  addComment(key: TicketKey, body: string): Promise<{ id: CommentId; url: string }>;
 }
 
 // ---------- Runner ----------
@@ -168,7 +177,7 @@ export type RunnerErrorDetail =
   /** 러너 도구가 돌려준 오류. code는 도구의 값 그대로 */
   | { kind: "runner-error"; code: string; message: string }
   /** 시작 요청의 결과를 모름. retryToken으로 같은 시작을 다시 보낸다 */
-  | { kind: "start-outcome-unknown"; retryToken: string }
+  | { kind: "start-outcome-unknown"; retryToken: RetryToken }
   | { kind: "malformed-output"; raw: string };
 
 /** 러너가 런을 돌리려면 갖춰야 하는 것 하나(예: Orca 상시 서비스). 온보딩이 안내한다. */
@@ -205,20 +214,20 @@ export interface StartRunInput {
   branch: string;
   baseBranch?: string;
   /** 러너 도구의 에이전트 ID. 예: "claude", "codex" */
-  agent: string;
+  agent: AgentId;
   /** 티켓 내용만(GLOSSARY Agent) */
   prompt: string;
   /** 러너 도구가 티켓과 잇는 데 쓸 수 있다(예: Orca --linear-issue) */
   ticket?: { key: TicketKey; url: string };
   /** 응답을 잃었을 때 같은 시작을 다시 보내기 위한 값(StartedRun.retryToken) */
-  retryToken?: string;
+  retryToken?: RetryToken;
 }
 
 export interface StartedRun {
   worktree: WorktreeRef;
   branch: string;
   /** 다시 보내기에 쓸 값(Orca operationId). 러너 도구가 지원하지 않으면 null */
-  retryToken: string | null;
+  retryToken: RetryToken | null;
   promptDelivered: boolean;
 }
 
@@ -252,28 +261,27 @@ export interface Runner {
 
 // ---------- Code host ----------
 
-export type CiState =
-  | "success"
-  | "failure"
-  | "pending"
-  | "error"
-  | "expected"
-  | "none"
-  | (string & {});
+/** CI 상태의 중립 분류. 어댑터가 자기 코드 호스트의 값을 여기에 맞춰 넣는다. */
+export type CiState = "success" | "failure" | "pending" | "none" | (string & {});
 
 export interface PullRequestSnapshot {
-  number: number;
+  id: PullRequestId;
+  /** 화면에 보일 짧은 이름. 예: "#7" */
+  displayId: string;
   url: string;
   title: string;
   body: string;
   state: "open" | "closed" | "merged" | (string & {});
   createdAt: Date;
   mergedAt: Date | null;
-  headRefName: string;
-  /** head 브랜치가 있는 저장소. 포크에서 온 PR을 거르는 데 쓴다. 저장소가 지워졌으면 null */
-  headRepository: RepoRef | null;
-  headSha: string;
-  baseRefName: string;
+  /** 변경을 담은 브랜치 */
+  headBranch: string;
+  /** 변경을 담은 브랜치가 있는 저장소. 포크에서 온 PR을 거르는 데 쓴다. 저장소가 지워졌으면 null */
+  sourceRepo: RepoRef | null;
+  /** head 커밋. CI 상태를 볼 때 쓴다 */
+  headCommit: string;
+  /** 병합할 대상 브랜치 */
+  baseBranch: string;
   /** PR 상태에는 쓰지 않는 화면 보조 정보다(research 0002 C.4). */
   ci: CiState;
 }
@@ -301,8 +309,8 @@ export interface CodeHost {
     repo: RepoRef,
     ticketKey: TicketKey,
   ): Promise<ReadonlyArray<PullRequestSnapshot>>;
-  /** PR 번호로 조회한다. 이후 PR 상태와 CI 상태 폴링에 쓴다. */
-  getPullRequest(repo: RepoRef, number: number): Promise<PullRequestSnapshot | null>;
+  /** PR 하나를 다시 조회한다. 이후 PR 상태와 CI 상태 폴링에 쓴다. */
+  getPullRequest(repo: RepoRef, id: PullRequestId): Promise<PullRequestSnapshot | null>;
   /** 남은 요청 예산. 개념이 없는 코드 호스트는 null */
   rateLimit(): Promise<{ limit: number; remaining: number; resetAt: Date } | null>;
 }

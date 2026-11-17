@@ -32,11 +32,22 @@ import type {
   TrackerTicket,
   WebhookVerifyError,
 } from "../adapters.js";
-import { toCodeHostKind, toRepoRef, toRunnerKind, toTrackerKind, toWorktreeRef } from "../ids.js";
+import {
+  toCodeHostKind,
+  toCommentId,
+  toRepoRef,
+  toRetryToken,
+  toRunnerKind,
+  toTrackerKind,
+  toWorktreeRef,
+} from "../ids.js";
 import type {
   CodeHostKind,
+  CommentId,
   LabelId,
+  PullRequestId,
   RepoRef,
+  RetryToken,
   RunnerKind,
   RunnerProjectId,
   TicketKey,
@@ -144,11 +155,11 @@ export class FakeTracker implements Tracker {
     return Promise.resolve();
   }
 
-  addComment(key: TicketKey, body: string): Promise<{ id: string; url: string }> {
+  addComment(key: TicketKey, body: string): Promise<{ id: CommentId; url: string }> {
     const ticket = this.tickets.get(key);
     if (ticket === undefined) return Promise.reject(new AdapterError({ kind: "not-found" }));
     this.commentSeq += 1;
-    const id = `comment-${this.commentSeq}`;
+    const id = toCommentId(`comment-${this.commentSeq}`);
     const list = this.comments.get(key) ?? [];
     list.push({ id, body, createdAt: new Date(), author: null });
     this.comments.set(key, list);
@@ -180,7 +191,7 @@ export class FakeRunner implements Runner {
     { id: "fake-service", name: "fake service", satisfied: true, hint: null },
   ];
   projects: RunnerProject[] = [];
-  private readonly started = new Map<string, StartedRun>();
+  private readonly started = new Map<RetryToken, StartedRun>();
   private worktreeSeq = 0;
 
   constructor(kind: RunnerKind = toRunnerKind("fake")) {
@@ -235,7 +246,7 @@ export class FakeRunner implements Runner {
         });
       }
       this.worktreeSeq += 1;
-      const retryToken = input.retryToken ?? `op-${this.worktreeSeq}`;
+      const retryToken = input.retryToken ?? toRetryToken(`op-${this.worktreeSeq}`);
       const worktree = toWorktreeRef(`fake::/fake/${input.worktreeName}-${this.worktreeSeq}`);
       this.worktrees.set(worktree, {
         input,
@@ -328,9 +339,9 @@ export class FakeCodeHost implements CodeHost {
     this.projectPrefix = projectPrefix;
   }
 
-  /** 같은 번호의 PR이 있으면 바꾼다. 병합·닫힘 같은 이후 변화도 이것으로 정한다. */
+  /** 같은 id의 PR이 있으면 바꾼다. 병합·닫힘 같은 이후 변화도 이것으로 정한다. */
   putPullRequest(repo: RepoRef, pr: PullRequestSnapshot): void {
-    const list = (this.prs.get(repo) ?? []).filter((p) => p.number !== pr.number);
+    const list = (this.prs.get(repo) ?? []).filter((p) => p.id !== pr.id);
     list.push(pr);
     this.prs.set(repo, list);
   }
@@ -349,7 +360,7 @@ export class FakeCodeHost implements CodeHost {
     repo: RepoRef,
     branch: string,
   ): Promise<ReadonlyArray<PullRequestSnapshot>> {
-    return Promise.resolve(this.list(repo).filter((pr) => pr.headRefName === branch));
+    return Promise.resolve(this.list(repo).filter((pr) => pr.headBranch === branch));
   }
 
   findPullRequestsByTicketKey(
@@ -361,8 +372,8 @@ export class FakeCodeHost implements CodeHost {
     );
   }
 
-  getPullRequest(repo: RepoRef, number: number): Promise<PullRequestSnapshot | null> {
-    return Promise.resolve(this.list(repo).find((pr) => pr.number === number) ?? null);
+  getPullRequest(repo: RepoRef, id: PullRequestId): Promise<PullRequestSnapshot | null> {
+    return Promise.resolve(this.list(repo).find((pr) => pr.id === id) ?? null);
   }
 
   rateLimit(): Promise<{ limit: number; remaining: number; resetAt: Date } | null> {

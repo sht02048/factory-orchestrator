@@ -1,15 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import type { CodeHost, Runner } from "./adapters.js";
+import { checkAutoAssignment } from "./assignment.js";
 import type { RunnerSnapshot } from "./assignment.js";
 import {
+  toAgentId,
   toCodeHostKind,
+  toLabelId,
+  toPullRequestId,
   toRunId,
   toRunnerId,
   toRunnerKind,
   toRunnerProjectId,
   toTicketKey,
+  toTrackerConnectionId,
   toTrackerKind,
+  toTrackerProjectId,
+  toTrackerStateId,
 } from "./ids.js";
 import type { RunnerId, RunnerProjectId } from "./ids.js";
 import { decidePrState } from "./pr-state.js";
@@ -45,6 +52,58 @@ describe("AdapterRegistry", () => {
 });
 
 describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 규칙은 그대로다", () => {
+  it("트래커 두 종류에서 같은 키의 티켓을 연결별로 가르고 자동 할당 조건이 같은 규칙으로 돈다", async () => {
+    const trackersA = fakeTrackerFactory(toTrackerKind("tracker-a"));
+    const trackersB = fakeTrackerFactory(toTrackerKind("tracker-b"));
+    const registry = new AdapterRegistry()
+      .registerTracker(trackersA.factory)
+      .registerTracker(trackersB.factory);
+
+    // DB에 저장된 Tracker Connection이라고 본다: 연결 ID, 종류, 그 종류만 아는 설정.
+    const connections = [
+      { id: toTrackerConnectionId("conn-a"), kind: toTrackerKind("tracker-a") },
+      { id: toTrackerConnectionId("conn-b"), kind: toTrackerKind("tracker-b") },
+    ];
+    const auto = toLabelId("auto");
+    const key = toTicketKey("ENG-1");
+    for (const connection of connections) {
+      registry.createTracker(connection.kind, { apiKey: "adapter-only" });
+    }
+    for (const fake of [...trackersA.created, ...trackersB.created]) {
+      fake.addTicket({
+        key,
+        title: "같은 키",
+        body: "",
+        url: "https://example.com/ENG-1",
+        labels: [{ id: auto, name: "auto" }],
+        project: { id: toTrackerProjectId("p"), name: "p" },
+        state: { id: toTrackerStateId("s"), name: "Todo", category: "unstarted" },
+        updatedAt: new Date(1),
+      });
+    }
+
+    // conn-a의 ENG-1에만 도는 런이 있다.
+    const runs = [{ ticket: { connection: connections[0]!.id, key }, state: "running" as const }];
+    const trackers = [trackersA.created[0]!, trackersB.created[0]!];
+    const results = [];
+    for (const [index, tracker] of trackers.entries()) {
+      const [ticket] = await tracker.listLabeledTickets({
+        labelId: auto,
+        updatedSince: new Date(0),
+      });
+      results.push(
+        checkAutoAssignment({
+          labelIds: ticket!.labels.map((label) => label.id),
+          autoAssignLabelId: auto,
+          ticket: { connection: connections[index]!.id, key: ticket!.key },
+          runs,
+        }),
+      );
+    }
+
+    expect(results).toEqual([{ ok: false, reason: "active-run" }, { ok: true }]);
+  });
+
   it("러너·코드 호스트 두 종류에서 대기열·다시 연결·PR 상태·요약 계산이 같은 규칙으로 돈다", async () => {
     // 새 종류는 core를 고치지 않고 factory를 한 줄씩 등록해 더한다.
     const runnersA = fakeRunnerFactory(toRunnerKind("runner-a"));
@@ -126,7 +185,7 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
         project,
         worktreeName: `ENG-${index}`,
         branch,
-        agent: "agent",
+        agent: toAgentId("agent"),
         prompt: "티켓",
       });
       const fake = (index === 0 ? runnersA : runnersB).created[0]!;
@@ -135,17 +194,18 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
       const codeHost = codeHosts.find((host) => host.repoOf(project) !== null)!;
       const repo = codeHost.repoOf(project)!;
       (index === 0 ? hostsA : hostsB).created[0]!.putPullRequest(repo, {
-        number: 1,
+        id: toPullRequestId(`pr-${index}`),
+        displayId: "#1",
         url: "https://example.com/pr/1",
         title: `ENG-${index}`,
         body: "",
         state: index === 0 ? "merged" : "open",
         createdAt: new Date("2026-01-01T01:00:00Z"),
         mergedAt: null,
-        headRefName: branch,
-        headRepository: repo,
-        headSha: "abc",
-        baseRefName: "main",
+        headBranch: branch,
+        sourceRepo: repo,
+        headCommit: "abc",
+        baseBranch: "main",
         ci: "none",
       });
 

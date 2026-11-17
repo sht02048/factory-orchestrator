@@ -1,3 +1,14 @@
+import type {
+  AgentId,
+  RunId,
+  RunnerId,
+  RunnerProjectId,
+  TicketKey,
+  TrackerConnectionId,
+  TrackerProjectId,
+  WorktreeRef,
+} from "./ids.js";
+
 /**
  * 런의 상태와 두 축(에이전트 결과, PR 상태), 요약 결과.
  * 이름과 뜻은 GLOSSARY, 표는 스펙 4.1·4.2를 따른다.
@@ -69,3 +80,49 @@ export const WORKTREE_DISPOSITIONS = [
   "nothing-to-remove",
 ] as const;
 export type WorktreeDisposition = (typeof WORKTREE_DISPOSITIONS)[number];
+
+/** 트래커 연결과 묶은 티켓. 티켓 키는 트래커 연결 하나 안에서만 유일하다. */
+export interface TicketRef {
+  connection: TrackerConnectionId;
+  key: TicketKey;
+}
+
+export function sameTicket(a: TicketRef, b: TicketRef): boolean {
+  return a.connection === b.connection && a.key === b.key;
+}
+
+interface RunBase {
+  id: RunId;
+  ticket: TicketRef;
+  trackerProject: TrackerProjectId;
+  runnerProject: RunnerProjectId;
+  agent: AgentId;
+  /** 오케스트레이터가 정한 브랜치(Q40) */
+  branch: string;
+  /** 대기열 순서이기도 하다(Q73) */
+  assignedAt: Date;
+}
+
+/**
+ * 런 하나. 상태에 따라 갖는 값이 다르다.
+ * - Queued: 러너를 정하지 못했거나 비웠으면 runnerId가 null이다(Q65·Q72). 아직 시작하지 않았다.
+ * - Running·Waiting for Input·Disconnected: 러너와 워크트리가 있다.
+ * - Ended: 에이전트 결과와 PR 상태 두 축이 붙는다. 요약 결과는 붙이지 않고 summarizeRunOutcome으로 계산한다.
+ */
+export type Run =
+  | (RunBase & { state: "queued"; runnerId: RunnerId | null })
+  | (RunBase & {
+      state: "running" | "waiting-for-input" | "disconnected";
+      runnerId: RunnerId;
+      worktree: WorktreeRef;
+      startedAt: Date;
+    })
+  | (RunBase & {
+      state: "ended";
+      runnerId: RunnerId;
+      worktree: WorktreeRef;
+      startedAt: Date;
+      endedAt: Date;
+      agentResult: AgentResult;
+      prState: PrState;
+    });

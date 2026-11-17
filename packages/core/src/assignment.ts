@@ -1,6 +1,6 @@
 import type { LabelId, RunnerId, RunnerProjectId } from "./ids.js";
-import { ACTIVE_RUN_STATES, CAPACITY_OCCUPYING_STATES } from "./run.js";
-import type { RunState } from "./run.js";
+import { ACTIVE_RUN_STATES, CAPACITY_OCCUPYING_STATES, sameTicket } from "./run.js";
+import type { RunState, TicketRef } from "./run.js";
 
 /** 할당과 대기열 판단에 쓰는 러너 하나의 모습 */
 export interface RunnerSnapshot {
@@ -23,12 +23,16 @@ export type AssignmentCheck =
 
 /**
  * 티켓당 동시에 도는 런은 하나다(Q45·Q74). 수동 할당과 자동 할당이 함께 쓴다.
- * Queued, Running, Waiting for Input, Disconnected 런이 있으면 할당하지 않는다.
+ * 같은 티켓(트래커 연결과 티켓 키가 모두 같음)에 Queued, Running, Waiting for Input,
+ * Disconnected 런이 있으면 할당하지 않는다. 다른 트래커 연결의 같은 키는 다른 티켓이다.
  */
 export function checkAssignment(input: {
-  runsForTicket: ReadonlyArray<{ state: RunState }>;
+  ticket: TicketRef;
+  runs: ReadonlyArray<{ ticket: TicketRef; state: RunState }>;
 }): AssignmentCheck {
-  const hasActiveRun = input.runsForTicket.some((run) => ACTIVE_RUN_STATES.has(run.state));
+  const hasActiveRun = input.runs.some(
+    (run) => sameTicket(run.ticket, input.ticket) && ACTIVE_RUN_STATES.has(run.state),
+  );
   return hasActiveRun ? { ok: false, reason: "active-run" } : { ok: true };
 }
 
@@ -36,7 +40,8 @@ export function checkAssignment(input: {
 export function checkAutoAssignment(input: {
   labelIds: ReadonlyArray<LabelId>;
   autoAssignLabelId: LabelId;
-  runsForTicket: ReadonlyArray<{ state: RunState }>;
+  ticket: TicketRef;
+  runs: ReadonlyArray<{ ticket: TicketRef; state: RunState }>;
 }): AssignmentCheck {
   if (!input.labelIds.includes(input.autoAssignLabelId)) {
     return { ok: false, reason: "no-auto-assign-label" };

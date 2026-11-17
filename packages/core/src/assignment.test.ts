@@ -7,7 +7,13 @@ import {
   remainingCapacity,
 } from "./assignment.js";
 import type { RunnerSnapshot } from "./assignment.js";
-import { toLabelId, toRunnerId, toRunnerProjectId } from "./ids.js";
+import {
+  toLabelId,
+  toRunnerId,
+  toRunnerProjectId,
+  toTicketKey,
+  toTrackerConnectionId,
+} from "./ids.js";
 import { RUN_STATES } from "./run.js";
 import type { RunState } from "./run.js";
 
@@ -16,6 +22,8 @@ const web = toRunnerProjectId("github:acme/web");
 const r1 = toRunnerId("r1");
 const r2 = toRunnerId("r2");
 const r3 = toRunnerId("r3");
+const ticket = { connection: toTrackerConnectionId("c1"), key: toTicketKey("ENG-1") };
+const on = (state: RunState) => ({ ticket, state });
 
 function runner(overrides: Partial<RunnerSnapshot> & Pick<RunnerSnapshot, "id">): RunnerSnapshot {
   return { online: true, capacity: 2, projects: [app], ...overrides };
@@ -26,7 +34,7 @@ describe("checkAutoAssignment", () => {
 
   it("Auto-assign Label이 있고 동시에 도는 런이 없으면 할당한다", () => {
     expect(
-      checkAutoAssignment({ labelIds: [label], autoAssignLabelId: label, runsForTicket: [] }),
+      checkAutoAssignment({ labelIds: [label], autoAssignLabelId: label, ticket, runs: [] }),
     ).toEqual({ ok: true });
   });
 
@@ -35,7 +43,8 @@ describe("checkAutoAssignment", () => {
       checkAutoAssignment({
         labelIds: [toLabelId("other")],
         autoAssignLabelId: label,
-        runsForTicket: [],
+        ticket,
+        runs: [],
       }),
     ).toEqual({ ok: false, reason: "no-auto-assign-label" });
   });
@@ -47,7 +56,8 @@ describe("checkAutoAssignment", () => {
       checkAutoAssignment({
         labelIds: [label],
         autoAssignLabelId: label,
-        runsForTicket: [{ state }],
+        ticket,
+        runs: [on(state)],
       }),
     ).toEqual(expected);
   });
@@ -57,7 +67,8 @@ describe("checkAutoAssignment", () => {
       checkAutoAssignment({
         labelIds: [label],
         autoAssignLabelId: label,
-        runsForTicket: [{ state: "ended" }, { state: "disconnected" }],
+        ticket,
+        runs: [on("ended"), on("disconnected")],
       }),
     ).toEqual({ ok: false, reason: "active-run" });
   });
@@ -65,10 +76,20 @@ describe("checkAutoAssignment", () => {
 
 describe("checkAssignment", () => {
   it("수동 할당은 라벨 없이 티켓당 런 하나 규칙만 본다", () => {
-    expect(checkAssignment({ runsForTicket: [{ state: "ended" }] })).toEqual({ ok: true });
-    expect(checkAssignment({ runsForTicket: [{ state: "queued" }] })).toEqual({
+    expect(checkAssignment({ ticket, runs: [on("ended")] })).toEqual({ ok: true });
+    expect(checkAssignment({ ticket, runs: [on("queued")] })).toEqual({
       ok: false,
       reason: "active-run",
+    });
+  });
+});
+
+describe("티켓 구분", () => {
+  it("다른 트래커 연결의 같은 티켓 키는 다른 티켓이라 할당을 막지 않는다", () => {
+    const other = { connection: toTrackerConnectionId("c2"), key: ticket.key };
+
+    expect(checkAssignment({ ticket, runs: [{ ticket: other, state: "running" }] })).toEqual({
+      ok: true,
     });
   });
 });

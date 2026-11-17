@@ -17,7 +17,9 @@ export type RunnerKind = Brand<string, "RunnerKind">;
 /** 코드 호스트 어댑터 종류. 예: "github" */
 export type CodeHostKind = Brand<string, "CodeHostKind">;
 
-/** 트래커의 티켓 키. 사람이 읽는 값, 예: "ENG-123" */
+/** 오케스트레이터에 등록한 Tracker Connection 하나의 ID */
+export type TrackerConnectionId = Brand<string, "TrackerConnectionId">;
+/** 트래커의 티켓 키. 사람이 읽는 값, 예: "ENG-123". 트래커 연결 하나 안에서만 유일하다 */
 export type TicketKey = Brand<string, "TicketKey">;
 /** 트래커 프로젝트 ID */
 export type TrackerProjectId = Brand<string, "TrackerProjectId">;
@@ -25,6 +27,10 @@ export type TrackerProjectId = Brand<string, "TrackerProjectId">;
 export type LabelId = Brand<string, "LabelId">;
 /** 트래커 상태(워크플로 상태) ID */
 export type TrackerStateId = Brand<string, "TrackerStateId">;
+/** 트래커 댓글 ID */
+export type CommentId = Brand<string, "CommentId">;
+/** webhook 배달 하나의 중복 제거 키 */
+export type DeliveryId = Brand<string, "DeliveryId">;
 
 /** 오케스트레이터가 등록한 러너 하나의 ID */
 export type RunnerId = Brand<string, "RunnerId">;
@@ -34,9 +40,15 @@ export type RunnerProjectId = Brand<string, "RunnerProjectId">;
 export type WorktreeRef = Brand<string, "WorktreeRef">;
 /** 오케스트레이터가 만든 런 하나의 ID */
 export type RunId = Brand<string, "RunId">;
+/** 러너 도구의 에이전트 ID. 예: "claude", "codex" */
+export type AgentId = Brand<string, "AgentId">;
+/** 응답을 잃은 런 시작을 다시 보낼 때 쓰는 값. 러너 어댑터가 정한다 */
+export type RetryToken = Brand<string, "RetryToken">;
 
 /** 코드 호스트의 저장소 하나. 코드 호스트 어댑터가 정규화한 값이라 문자열 비교로 같은지 본다 */
 export type RepoRef = Brand<string, "RepoRef">;
+/** 코드 호스트 안의 PR 하나. 코드 호스트 어댑터가 정하고 core는 뜻을 해석하지 않는다 */
+export type PullRequestId = Brand<string, "PullRequestId">;
 
 function isNonEmpty<B extends string>(value: string): value is Brand<string, B> {
   return value.length > 0;
@@ -52,6 +64,13 @@ function brand<B extends string>(kind: B, value: string): Brand<string, B> {
 export const toTrackerKind = (value: string): TrackerKind => brand("TrackerKind", value);
 export const toRunnerKind = (value: string): RunnerKind => brand("RunnerKind", value);
 export const toCodeHostKind = (value: string): CodeHostKind => brand("CodeHostKind", value);
+export const toTrackerConnectionId = (value: string): TrackerConnectionId =>
+  brand("TrackerConnectionId", value);
+export const toCommentId = (value: string): CommentId => brand("CommentId", value);
+export const toDeliveryId = (value: string): DeliveryId => brand("DeliveryId", value);
+export const toAgentId = (value: string): AgentId => brand("AgentId", value);
+export const toRetryToken = (value: string): RetryToken => brand("RetryToken", value);
+export const toPullRequestId = (value: string): PullRequestId => brand("PullRequestId", value);
 export const toTicketKey = (value: string): TicketKey => brand("TicketKey", value);
 export const toTrackerProjectId = (value: string): TrackerProjectId =>
   brand("TrackerProjectId", value);
