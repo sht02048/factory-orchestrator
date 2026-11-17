@@ -66,7 +66,7 @@
 | 다른 서버의 터미널 핸들 또는 없는 핸들              | `terminal_handle_stale` | 1         |
 | 모르는 `--environment` 이름                         | `invalid_argument`      | 1         |
 
-성공은 종료 코드 0이다 **[실행]**. 이 밖에 문서화된 종료 코드는 명령별 `notes`에 있다. `orchestration worker-start`는 실패·결과 불명에 1 **[스키마]**, `orca serve`는 이미 다른 Orca가 이 프로필을 서빙 중이면 3 **[스키마]**, plugin 명령은 0/1/2/3 **[스키마]**(`orca skills get orca-cli --full`)이다.
+성공은 종료 코드 0이다 **[실행]**. 이 밖에 문서화된 종료 코드는 명령별 `notes`에 있다. `orchestration worker-start`는 실패·결과 불명에 1 **[스키마]**, `orca serve`는 이미 다른 Orca가 이 프로필을 서빙 중이면 3 **[스키마]**, plugin 명령은 0/1/2/3 **[문서]**(`orca skills get orca-cli --full`)이다.
 
 어댑터는 종료 코드만으로 판단하지 말고 stdout JSON의 `ok`와 `error.code`로 분기해야 한다. 예를 들어 `worktree current`는 Orca 워크트리 밖에서 `ok: false`, `selector_not_found`로 종료 코드 1을 낸다 **[실행]**. 오류 JSON은 stdout으로 나오고, 일부 명령은 stderr에 `error: <code>: <message>` 한 줄을 함께 쓴다 **[실행]**.
 
@@ -179,6 +179,8 @@ orca worktree create --name <name>
   [--parent-worktree <selector>] [--no-parent] [--activate] [--retry-launch <operationId>] [--json]
 ```
 
+위 usage는 어댑터에 필요한 플래그만 남긴 것이다. 실제 usage에는 `--reference <url-or-jira-key>...`, `--reference-site <id>`, `--issue <number>`, `--gitlab-issue`, `--gitlab-mr`, `--run-hooks`도 있다 **[스키마]**.
+
 **[스키마]** 핵심 notes:
 
 - 새 체크아웃을 만든다. 이미 있는 워크트리에 에이전트만 띄우려면 `orca agent launch`를 쓴다.
@@ -268,12 +270,12 @@ orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--mode
 
 - 해당 워크트리 행의 모든 `agents[].state`가 `done`이고 일정 시간 유지됨.
 - `liveTerminalCount: 0` 또는 `terminalVerdict: "none"`(에이전트 프로세스가 끝남).
-- 워크트리 행이 사라짐(누군가 지움) → Failed 후보.
+- 워크트리 행이 사라짐(누군가 지움) → Failed 후보. 단, `worktree ps`에는 워크트리별 필터가 없고 `--limit`으로 잘린다. 응답이 `truncated: false`이고 `hostScope.hostIds`에 `local`이 있을 때만 "없음"을 증거로 쓴다. 그 밖에는 `worktree show --worktree <selector> --json`의 `selector_not_found`로 다시 확인한다.
 
 ### A.7 워크트리 조회와 정리
 
 - `orca worktree list [--repo <selector>] [--limit <n>] --json` **[스키마]**. 행에 `id`(`<repoId>::<path>`), `identity.key`(`wt2:<host>:<instanceId>`), `repoId`, `projectId`, `hostId`, `path`, `head`, `branch`, `displayName`, `linkedLinearIssue`, `linkedPR`, `linkedItems`, `workspaceStatus`, `isArchived`, `lastActivityAt` 등 **[실행]**.
-- `orca worktree show --worktree <selector> --json` **[스키마]**. 선택자는 `id:<repo-id>::<absolute-path>`, `path:`, `name:`, `branch:`, `identity:`, `issue:`, `current`, `active` **[실행]**(오류의 `validSelectorForms`). 어댑터는 이름 대신 `create` 결과의 전체 `id`나 `identity.key`를 저장해 쓰는 편이 안전하다. 이름·브랜치는 겹칠 수 있다.
+- `orca worktree show --worktree <selector> --json` **[스키마]**. 선택자는 `id:<repo-id>::<absolute-path>`, `path:`, `name:`, `branch:`, `identity:`, `issue:`, `current`, `active` **[실행]**(오류의 `validSelectorForms`). 어댑터는 이름 대신 `create` 결과의 전체 `id`(`<repoId>::<path>`)를 저장해 쓰는 편이 안전하다. 이름·브랜치는 겹칠 수 있다. `worktree ps` 행에는 `identity`가 없고 `worktreeId`(같은 `<repoId>::<path>`)와 `worktreeInstanceId`가 있으므로 **[실행]**, `worktreeId`로 저장하면 `ps` 행과 바로 맞출 수 있다.
 - `orca worktree rm --worktree <selector> [--force] [--delete-branch] [--run-hooks] [--allow-failed-archive-hook] --json` **[스키마]**. **실행하지 않았다.** 새 호스트에서는 로컬 브랜치를 기본으로 남기고, `--delete-branch`를 줘도 병합이 증명되지 않은 브랜치는 남긴다. `--run-hooks`일 때 archive hook이 실패하면 `worktree_archive_hook_failed`로 아무것도 지우지 않는다.
 
 정리 시점은 런이 끝나고 PR 상태를 판정한 뒤다. PR이 열린 채(Human Check) 끝난 런의 워크트리를 지울지는 제품 결정이다.
@@ -283,7 +285,7 @@ orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--mode
 - **PATH.** macOS 앱 설치에서 `orca`는 `/Applications/Orca.app/Contents/Resources/bin/orca`에 있고 **[실행]** `/usr/local/bin`·`/opt/homebrew/bin`에는 링크가 없었다 **[실행]**. Orca가 띄운 터미널에서만 PATH에 이 경로가 들어간다. 빈 환경으로 띄운 `zsh -c`, `bash -c`, `zsh -lc` 모두 `orca`를 찾지 못했다 **[실행]**. ssh 비대화형 명령도 같은 처지일 가능성이 높다. 러너 등록 때 `orca` 실행 파일 경로를 설정으로 받고, 기본값을 차례로 시도하는 편이 낫다. 가이드는 개발 빌드가 `/usr/local/bin` 심볼릭 링크를 쓰기도 한다고 적는다 **[문서]**(`orca skills get orca-cli`). Linux 설치 경로는 확인하지 못했다.
 - **런처 스크립트.** `orca`는 bash 스크립트이고 Electron 바이너리를 `ELECTRON_RUN_AS_NODE=1`로 띄워 CLI를 실행한다 **[실행]**. 원격에 bash가 필요하다.
 - **런타임.** help의 Behavior 절: "Most commands require a running Orca runtime. If Orca is not open yet, run `orca open` first." **[실행]**(`orca --help`). `orca open`은 데스크톱 앱을 띄우므로 GUI 세션이 없는 ssh에서는 실패할 수 있다. 창 없는 러너는 `orca serve`(서비스 등록 권장)로 런타임을 상시 띄워 두는 구성이 맞다 **[스키마]**.
-- **원격 런타임 대안.** Orca는 자체 원격 연결도 지원한다. 다른 기계의 `orca serve`와 페어링(`orca environment add --pairing-code`)한 뒤 `--environment <name>`이나 `ORCA_ENVIRONMENT`·`ORCA_PAIRING_CODE` 환경 변수로 명령을 그 서버로 보낼 수 있다 **[실행]**(`orca --help`). ADR 0002는 ssh를 택했지만, 오케스트레이터 기계에 Orca를 설치하지 않는다는 전제가 바뀌면 다시 볼 만한 선택지다.
+- **원격 런타임 대안.** Orca는 자체 원격 연결도 지원한다. 다른 기계의 `orca serve`와 페어링(`orca environment add --pairing-code`)한 뒤 `--environment <name>`이나 `ORCA_ENVIRONMENT`·`ORCA_PAIRING_CODE` 환경 변수로 명령을 그 서버로 보낼 수 있다 **[실행]**(`orca --help`). ADR 0002는 ssh를 택했지만, 오케스트레이터 기계에 Orca를 설치하지 않는다는 전제가 바뀌면 다시 볼 만한 선택지다. Orca 런타임 자신도 ssh 대상을 등록해 쓸 수 있다(`orca host list`의 `--host ssh:<target-id>`, `worktree create --host`) **[스키마]**. 이 역시 오케스트레이터 쪽에 Orca 런타임이 있어야 한다.
 - **호스트 범위.** `worktree list`·`worktree ps`는 그 런타임이 닿는 호스트만 덮고, 못 덮은 호스트를 `hostScope.omittedHostIds`로 알린다 **[스키마]**. ssh로 러너에서 직접 실행하면 그 러너의 `local` 호스트가 기준이다.
 - **인자 전달.** 원격 명령 문자열은 원격 셸이 한 번 더 해석한다. 인자 하나를 따옴표로 묶어 넘기지 않으면 `Unknown command: project list` 같은 오류가 난다(로컬 재현) **[실행]**.
 
@@ -303,10 +305,11 @@ orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--mode
 
 **셀프호스팅에 맞는 쪽.** 1단계는 개인 API 키를 권한다. 근거는 다음과 같다.
 
-- OAuth는 redirect URI가 필요하고, 앱을 Linear에 등록해 client id/secret을 받아야 한다. 설치마다 운영자가 OAuth 앱을 만들어야 해서 온보딩 단계가 늘어난다(ADR 0005의 "Linear 연결" 단계).
-- 액세스 토큰 24시간·refresh 30일이라, 오케스트레이터가 30일 넘게 쉬면 다시 인증해야 한다.
+- OAuth는 어느 방식이든 앱을 Linear에 등록해 client id/secret을 받아야 한다. 셀프호스팅이라 설치마다 운영자가 OAuth 앱을 만들어야 하고, 온보딩 단계가 늘어난다(ADR 0005의 "Linear 연결" 단계).
+- authorization code 방식은 redirect URI가 필요하고, 액세스 토큰 24시간·refresh 30일이라 오케스트레이터가 30일 넘게 쉬면 다시 인증해야 한다.
+- client credentials 방식(`actor=app`)은 사용자 흐름과 redirect URI가 없고, 30일짜리 토큰을 앱이 client id/secret으로 다시 받으면 된다 **[문서]**. 다만 앱에서 이 방식을 먼저 켜야 하고, 앱 등록 부담은 그대로다. 변경이 앱 이름으로 남는 장점이 있어, 다중 사용자나 봇 표기가 필요해지면 다시 볼 후보다.
 - 개인 API 키는 붙여 넣기 하나로 끝나고, DB에 암호화해 저장하면 된다(ADR 0005).
-- 단점: 상태 변경·댓글이 운영자 본인 이름으로 남고, 요청 한도가 OAuth보다 낮다(B.4).
+- 단점: 상태 변경·댓글이 운영자 본인 이름으로 남고, 요청 수 한도가 OAuth보다 낮다(2,500 대 5,000/시간). 복잡도 한도는 API 키가 더 높다(3,000,000 대 2,000,000/시간, B.4).
 
 webhook을 API로 만들려면 워크스페이스 관리자이거나 `admin` 스코프 OAuth 앱이어야 한다 **[문서]**("Only workspace admins, or OAuth applications with the `admin` scope, can create or read webhooks."). 운영자가 관리자가 아닐 수 있으므로, 온보딩은 Settings > API에서 webhook을 손으로 만들게 안내하고 signing secret을 붙여 넣게 하는 편이 단순하다.
 
@@ -534,6 +537,10 @@ query RunPr($owner: String!, $repo: String!, $branch: String!) {
         headRefName
         headRefOid
         baseRefName
+        isCrossRepository
+        headRepository {
+          nameWithOwner
+        }
         mergeStateStatus
         commits(last: 1) {
           nodes {
@@ -583,7 +590,7 @@ query RunPr($owner: String!, $repo: String!, $branch: String!) {
 - `StatusState`(statusCheckRollup.state): `EXPECTED`, `ERROR`, `FAILURE`, `PENDING`, `SUCCESS`
 - `CheckStatusState`: `REQUESTED`, `QUEUED`, `IN_PROGRESS`, `COMPLETED`, `WAITING`, `PENDING`
 - `CheckConclusionState`: `ACTION_REQUIRED`, `TIMED_OUT`, `CANCELLED`, `FAILURE`, `SUCCESS`, `NEUTRAL`, `SKIPPED`, `STARTUP_FAILURE`, `STALE`
-- `MergeStateStatus`: `DIRTY`, `UNKNOWN`, `BLOCKED`, `BEHIND`, `UNSTABLE`, `HAS_HOOKS`, `CLEAN`
+- `MergeStateStatus`: `DIRTY`, `UNKNOWN`, `BLOCKED`, `BEHIND`, `UNSTABLE`, `HAS_HOOKS`, `CLEAN`, 그리고 deprecated된 `DRAFT`(`includeDeprecated: true`일 때만 보인다)
 
 병합된 PR의 `mergeStateStatus`는 `UNKNOWN`으로 왔다 **[실행]**. 판정에는 `state`/`merged`만 쓴다.
 
@@ -596,7 +603,7 @@ query RunPr($owner: String!, $repo: String!, $branch: String!) {
 | PR 없음                          | Failed                                                       |
 | `state: CLOSED`, 병합 안 됨      | 정의되지 않음. GLOSSARY에 없는 경우다(아래 "아직 모르는 것") |
 
-같은 브랜치로 PR이 여러 개면(닫고 다시 연 경우) 가장 최근 것을 쓴다. `headRefName`은 포크까지 구분하지 않으므로, `baseRefName`과 `headRepository`가 대상 저장소인지 함께 확인하면 안전하다.
+같은 브랜치로 PR이 여러 개면(닫고 다시 연 경우) 가장 최근 것을 쓴다. `headRefName`은 포크까지 구분하지 않으므로, `isCrossRepository: false`이고 `headRepository.nameWithOwner`가 대상 저장소인지, `baseRefName`이 기대한 브랜치인지 함께 확인한다. 이 두 필드는 위 응답 예시에는 없지만, 같은 PR로 따로 조회해 `isCrossRepository: false`와 `headRepository.nameWithOwner` 값을 확인했다 **[실행]**.
 
 ### C.3 REST로 조회 (대안)
 
@@ -665,7 +672,7 @@ type Brand<T, B extends string> = T & { readonly __brand: B };
 type TicketKey = Brand<string, "TicketKey">; // Linear identifier, 예: "ENG-123"
 type RunnerId = Brand<string, "RunnerId">;
 type RunnerProjectId = Brand<string, "RunnerProjectId">; // Orca projectId, 예: "github:acme/app"
-type WorktreeRef = Brand<string, "WorktreeRef">; // Orca worktree id "<repoId>::<path>" 또는 identity key
+type WorktreeRef = Brand<string, "WorktreeRef">; // Orca worktree id "<repoId>::<path>" (worktree ps의 worktreeId와 같은 값)
 
 // ---------- Tracker (Linear) ----------
 interface TrackerTicket {
