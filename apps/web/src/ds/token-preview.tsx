@@ -5,9 +5,12 @@ import {
   fonts,
   fontSize,
   fontWeight,
+  letterSpacing,
+  lineHeight,
   motion,
   radius,
   shadow,
+  size,
   space,
 } from "@factory/ui/tokens.stylex";
 import { useEffect, useState, type ReactNode } from "react";
@@ -49,6 +52,46 @@ const colorGroups = [
 const spaceKeys = ["px2", "s1", "px6", "s2", "s3", "s4", "s5", "s6", "s8", "s10"] as const;
 const radiusKeys = ["sm", "md", "full"] as const;
 const motionKeys = ["easeOut", "durationFast", "durationToast"] as const;
+const fontSizeKeys = ["page", "panel", "body", "ui", "small", "label", "input"] as const;
+const fontWeightKeys = ["regular", "medium", "semibold"] as const;
+const lineHeightKeys = ["tight", "snug", "normal", "relaxed"] as const;
+const letterSpacingKeys = ["page", "panel", "label"] as const;
+const fontKeys = ["sans", "mono"] as const;
+const sizeKeys = [
+  "sidebarWidth",
+  "panelWidth",
+  "control",
+  "input",
+  "rowMinHeight",
+  "dot",
+  "icon",
+] as const;
+
+/** 값만 보이는 토큰 줄 목록. 왼쪽 칸에는 견본 대신 빈 자리를 둔다. */
+function PlainTokens({
+  title,
+  prefix,
+  entries,
+}: {
+  title: string;
+  prefix: string;
+  entries: ReadonlyArray<readonly [string, string]>;
+}) {
+  return (
+    <div>
+      <Text variant="label" as="h3">
+        {title}
+      </Text>
+      <div {...stylex.props(styles.tokenList)}>
+        {entries.map(([key, token]) => (
+          <TokenRow key={key} name={`${prefix}.${key}`} token={token}>
+            <span {...stylex.props(styles.swatchSpacer)} />
+          </TokenRow>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /**
  * 토큰 변수의 실제 값을 읽어 보인다. 서버 HTML 에는 비워 두고, 하이드레이션 뒤에 채운다.
@@ -104,43 +147,70 @@ export function TokenSections() {
         <Section title={t("nav.typography")} note={t("typography.note")}>
           <div {...stylex.props(styles.typeLevels)}>
             <TypeLevel title={t("typography.level1")}>
-              <TypeSample spec="page · 22 / 600">
+              <TypeSample spec="page">
                 <Text variant="page" as="p">
                   {t("typography.samplePage")}
                 </Text>
               </TypeSample>
-              <TypeSample spec="panel · 17 / 600">
+              <TypeSample spec="panel">
                 <Text variant="panel" as="p">
                   {t("typography.samplePanel")}
                 </Text>
               </TypeSample>
             </TypeLevel>
             <TypeLevel title={t("typography.level2")}>
-              <TypeSample spec="section · 14 / 600">
+              <TypeSample spec="section">
                 <Text variant="section" as="p">
                   {t("typography.sampleSection")}
                 </Text>
               </TypeSample>
-              <TypeSample spec="title · 14 / 500">
+              <TypeSample spec="title">
                 <Text variant="title">{t("typography.sampleTitle")}</Text>
               </TypeSample>
-              <TypeSample spec="body · 14 / 400">
+              <TypeSample spec="body">
                 <Text variant="body">{t("typography.sampleBody")}</Text>
               </TypeSample>
             </TypeLevel>
             <TypeLevel title={t("typography.level3")}>
-              <TypeSample spec="ui · 13 / 400">
+              <TypeSample spec="ui">
                 <Text variant="ui">{t("typography.sampleUi")}</Text>
               </TypeSample>
-              <TypeSample spec="meta · 13 / 400">
+              <TypeSample spec="meta">
                 <Text variant="meta" numeric>
                   {t("typography.sampleMeta")}
                 </Text>
               </TypeSample>
-              <TypeSample spec="label · 12 / 500">
+              <TypeSample spec="label">
                 <Text variant="label">{t("typography.sampleLabel")}</Text>
               </TypeSample>
             </TypeLevel>
+          </div>
+          <div {...stylex.props(styles.colorGroups, styles.typeTokens)}>
+            <PlainTokens
+              title={t("typography.fontSize")}
+              prefix="fontSize"
+              entries={fontSizeKeys.map((k) => [k, fontSize[k]] as const)}
+            />
+            <PlainTokens
+              title={t("typography.fontWeight")}
+              prefix="fontWeight"
+              entries={fontWeightKeys.map((k) => [k, fontWeight[k]] as const)}
+            />
+            <PlainTokens
+              title={t("typography.lineHeight")}
+              prefix="lineHeight"
+              entries={lineHeightKeys.map((k) => [k, lineHeight[k]] as const)}
+            />
+            <PlainTokens
+              title={t("typography.letterSpacing")}
+              prefix="letterSpacing"
+              entries={letterSpacingKeys.map((k) => [k, letterSpacing[k]] as const)}
+            />
+            <PlainTokens
+              title={t("typography.fonts")}
+              prefix="fonts"
+              entries={fontKeys.map((k) => [k, fonts[k]] as const)}
+            />
           </div>
         </Section>
       </div>
@@ -156,6 +226,16 @@ export function TokenSections() {
               </TokenRow>
             ))}
           </div>
+        </Section>
+      </div>
+
+      <div id="size">
+        <Section title={t("nav.size")} note={t("size.note")}>
+          <PlainTokens
+            title={t("size.layout")}
+            prefix="size"
+            entries={sizeKeys.map((k) => [k, size[k]] as const)}
+          />
         </Section>
       </div>
 
@@ -253,7 +333,10 @@ const styles = stylex.create({
     color: colors.textTertiary,
     fontSize: fontSize.small,
     fontVariantNumeric: "tabular-nums",
+    maxWidth: 220,
+    overflow: "hidden",
     whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
   },
   swatch: {
     width: 40,
@@ -292,6 +375,7 @@ const styles = stylex.create({
     borderTopStyle: "solid",
     borderTopColor: colors.borderSubtle,
   },
+  typeTokens: { marginTop: space.s6 },
   typeText: { minWidth: 0, fontWeight: fontWeight.regular },
   motionDemo: {
     display: "flex",

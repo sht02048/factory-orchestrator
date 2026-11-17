@@ -13,6 +13,7 @@
     "documentTitle": "디자인 시스템 · Factory Orchestrator",
     "subtitle": "packages/ui 의 토큰과 컴포넌트예요. 규칙은 packages/ui/DESIGN.md 에 있어요.",
     "theme": "다크",
+    "brandMark": "F",
     "nav": {
       "label": "디자인 시스템 목차",
       "tokens": "토큰",
@@ -20,6 +21,7 @@
       "colors": "색",
       "typography": "글자",
       "space": "간격",
+      "size": "크기",
       "radius": "반경",
       "shadow": "그림자",
       "motion": "모션",
@@ -55,10 +57,19 @@
       "sampleBody": "PR이 열려 있지만 병합되지 않았어요. CI는 통과했고 리뷰를 기다려요.",
       "sampleUi": "runner-a에서 Claude Code가 처리했어요",
       "sampleMeta": "ACME-123 · 12분 전",
-      "sampleLabel": "열 머리글"
+      "sampleLabel": "열 머리글",
+      "fontSize": "크기 fontSize",
+      "fontWeight": "굵기 fontWeight",
+      "lineHeight": "줄 높이 lineHeight",
+      "letterSpacing": "자간 letterSpacing",
+      "fonts": "글꼴 fonts"
     },
     "space": {
       "note": "4px 단위예요. 2px·6px는 아이콘과 글 사이처럼 좁은 틈에만 써요."
+    },
+    "size": {
+      "note": "화면 틀과 컨트롤의 고정 크기예요.",
+      "layout": "size"
     },
     "radius": {
       "note": "버튼·입력은 md, 메뉴 항목은 sm, 점은 full을 써요."
@@ -145,11 +156,16 @@
       "ciRunning": "도는 중"
     },
     "menu": {
-      "note": "사이드바 Workspace 전환기처럼 하나를 고르는 메뉴예요.",
+      "note": "위는 Workspace 전환기처럼 하나를 고르는 메뉴, 아래는 행동 메뉴예요.",
       "label": "Workspace",
       "commerce": "Acme Commerce",
       "labs": "Acme Labs",
-      "all": "전체"
+      "all": "전체",
+      "actionsTrigger": "런 작업",
+      "retry": "새 런 시작",
+      "cancel": "런 멈추기",
+      "openLog": "로그 보기",
+      "picked": "{action} 메뉴를 골랐어요"
     },
     "form": {
       "note": "라벨은 위, 도움말은 아래예요. 오류는 입력 아래 빨간 글로 보여요.",

@@ -28,6 +28,7 @@ describe("/ds 서버 렌더", () => {
       "colors",
       "typography",
       "space",
+      "size",
       "radius",
       "shadow",
       "motion",

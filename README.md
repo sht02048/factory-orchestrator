@@ -35,7 +35,7 @@ pnpm install   # lefthook pre-commit 훅도 함께 설치된다
 | `pnpm check:colors` | `packages/ui` 밖의 색 값 직접 사용 검사  |
 | `pnpm build`        | 웹 앱 프로덕션 빌드                      |
 
-웹 앱은 `pnpm --filter @factory/web dev`로 띄우고 `http://127.0.0.1:3000/ds`에서 디자인 시스템을 본다. 프로덕션 빌드는 `pnpm --filter @factory/web start`로 실행하고, 기본으로 `127.0.0.1`에만 바인딩한다(`WEB_HOST`, `WEB_PORT`로 바꾼다).
+웹 앱은 `pnpm --filter @factory/web dev`로 띄우고 `http://127.0.0.1:3000/ds`에서 디자인 시스템을 본다. 프로덕션 빌드는 `pnpm --filter @factory/web start`로 실행하고, 기본으로 `127.0.0.1`에만 바인딩한다. 바꾸려면 셸 환경 변수 `WEB_HOST`, `WEB_PORT`를 준다(예: `WEB_PORT=4000 pnpm --filter @factory/web start`).
 
 pre-commit 훅은 lint, format check, typecheck, 색 리터럴 검사를 돌린다. CI(GitHub Actions)는 pull request와 `main` push에서 typecheck → lint → 색 리터럴 검사 → format check → test → build 순으로 돈다.
 

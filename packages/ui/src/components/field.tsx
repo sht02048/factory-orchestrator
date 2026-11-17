@@ -25,7 +25,7 @@ export interface FieldProps {
 const InvalidContext = createContext(false);
 
 export function Field({ label, description, error, children }: FieldProps) {
-  const invalid = error !== undefined && error !== null && error !== false;
+  const invalid = error !== undefined && error !== null && error !== false && error !== "";
   return (
     <SdkField invalid={invalid} className={cx(styles.field)}>
       <FieldLabel className={cx(styles.label)}>{label}</FieldLabel>
@@ -38,13 +38,9 @@ export function Field({ label, description, error, children }: FieldProps) {
   );
 }
 
-export interface InputProps {
+interface InputBaseProps {
   name?: string;
-  value?: string;
-  defaultValue?: string;
-  onValueChange?: (value: string) => void;
   placeholder?: string;
-  readOnly?: boolean;
   disabled?: boolean;
   required?: boolean;
   type?: "text" | "url" | "password" | "email" | "search";
@@ -52,6 +48,27 @@ export interface InputProps {
   /** 경로·주소·키처럼 그대로 옮겨 쓸 값. 고정폭 글꼴로 보인다. */
   mono?: boolean;
 }
+
+/**
+ * 값을 쥐는 방식은 셋 중 하나다. value 를 주면 onValueChange 나 readOnly 가 함께 있어야 한다
+ * (둘 다 없으면 입력이 잠기고 React 가 경고한다).
+ */
+export type InputProps = InputBaseProps &
+  (
+    | {
+        value?: never;
+        defaultValue?: string;
+        onValueChange?: (value: string) => void;
+        readOnly?: boolean;
+      }
+    | {
+        value: string;
+        onValueChange: (value: string) => void;
+        readOnly?: boolean;
+        defaultValue?: never;
+      }
+    | { value: string; readOnly: true; onValueChange?: never; defaultValue?: never }
+  );
 
 export function Input({ mono, onValueChange, ...props }: InputProps) {
   const invalid = use(InvalidContext);

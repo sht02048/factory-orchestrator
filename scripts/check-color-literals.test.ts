@@ -37,8 +37,46 @@ describe("findColorLiterals", () => {
       "const f = textColor(value);",
       "const g = label(1);",
       'const h = "redirect";',
+      "const i = `PR #418 열기`;",
     ].join("\n");
 
+    expect(findColorLiterals(source)).toEqual([]);
+  });
+
+  it("테두리·그림자 값 안의 hex 와 이름 색을 찾는다", () => {
+    const source = [
+      'const a = { border: "1px solid red" };',
+      'const b = { border: "1px solid #000" };',
+      "const c = `0 0 0 1px ${x}, #000`;",
+    ].join("\n");
+    expect(findColorLiterals(source).map((f) => [f.line, f.text])).toEqual([
+      [1, "red"],
+      [2, "#000"],
+      [3, "#000"],
+    ]);
+  });
+
+  it("CSS 파일은 선언 값의 hex 와 이름 색을 모두 찾고 주석은 건너뛴다", () => {
+    const css = [
+      "/* #000 red 는 주석 */",
+      "body { background: #000; }",
+      "a { color: red; border: 1px solid white }",
+      "html { color-scheme: dark; }",
+    ].join("\n");
+    expect(findColorLiterals(css, "css").map((f) => [f.line, f.text])).toEqual([
+      [2, "#000"],
+      [3, "red"],
+      [3, "white"],
+    ]);
+  });
+
+  it("메서드 호출과 값이 아닌 이름은 색으로 보지 않는다", () => {
+    const source = [
+      "const a = d3.color(x);",
+      "const b = chalk.color(y);",
+      'const plans = ["gold", "tan", "navy"];',
+      'const tone = "red";',
+    ].join("\n");
     expect(findColorLiterals(source)).toEqual([]);
   });
 

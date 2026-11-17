@@ -11,6 +11,7 @@ import {
   Field,
   Input,
   Menu,
+  MenuItem,
   MenuRadio,
   MenuRadioOption,
   MenuSeparator,
@@ -306,6 +307,26 @@ export function ComponentSections() {
                   <MenuSeparator />
                   <MenuRadioOption value="all">{t("menu.all")}</MenuRadioOption>
                 </MenuRadio>
+              </Menu>
+            </div>
+            <div {...stylex.props(styles.narrow)}>
+              <Menu trigger={t("menu.actionsTrigger")}>
+                <MenuItem
+                  value="retry"
+                  onSelect={() => showToast(t("menu.picked", { action: t("menu.retry") }))}
+                >
+                  {t("menu.retry")}
+                </MenuItem>
+                <MenuItem
+                  value="log"
+                  onSelect={() => showToast(t("menu.picked", { action: t("menu.openLog") }))}
+                >
+                  {t("menu.openLog")}
+                </MenuItem>
+                <MenuSeparator />
+                <MenuItem value="cancel" disabled>
+                  {t("menu.cancel")}
+                </MenuItem>
               </Menu>
             </div>
           </Demo>
