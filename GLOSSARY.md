@@ -69,7 +69,7 @@ _Avoid_: Trigger
 런의 상태는 Queued, Running, Waiting for Input, Ended 넷이다. 할당된 런은 Queued로 시작하고(남은 capacity가 있으면 바로 Running), Running과 Waiting for Input을 오가다 Ended가 된다. Ended에만 결과(Merged, Human Check, Failed)가 붙는다.
 
 **Queued**:
-할당은 됐지만 맞는 러너에 남은 capacity가 없어 시작을 기다리는 런의 상태.
+할당은 됐지만 맞는 러너에 남은 capacity가 없거나 맞는 러너가 모두 Offline이라 시작을 기다리는 런의 상태.
 _Avoid_: Pending, Waiting
 
 **Running**:
