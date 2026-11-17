@@ -52,6 +52,8 @@ export interface RunsScreenProps {
   onFilterChange: (filter: RunFilter) => void;
   onSelect: (runId: string) => void;
   onPickWorkspace: (workspaceId: string) => void;
+  /** 런의 Run 상세 주소 */
+  runHref: (runId: string) => string;
 }
 
 /** Runs: 런 목록 + 오른쪽 상세 패널(ADR 0007, 시안 B) */
@@ -116,6 +118,7 @@ function RunsList({
   selectedId,
   onFilterChange,
   onSelect,
+  runHref,
   workspaceName,
 }: RunsScreenProps & { workspaceName: string }) {
   const t = useTranslations("runs");
@@ -174,7 +177,7 @@ function RunsList({
       panel={
         selected === undefined ? null : (
           <section aria-label={t("panel.label")}>
-            <RunPanel run={selected} />
+            <RunPanel run={selected} detailHref={runHref(selected.id)} />
           </section>
         )
       }
@@ -213,7 +216,7 @@ function RunRow({ run }: { run: RunView }) {
   );
 }
 
-function RunPanel({ run }: { run: RunView }) {
+function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
   const t = useTranslations("runs.panel");
   const domain = useTranslations("domain");
   const duration = useFormatDuration();
@@ -261,13 +264,16 @@ function RunPanel({ run }: { run: RunView }) {
         }
         reason={reason}
       />
-      {pr === null ? null : (
-        <Actions>
+      <Actions>
+        <a href={detailHref} {...stylex.props(styles.link)}>
+          {t("openDetail")}
+        </a>
+        {pr === null ? null : (
           <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
             {t("openPr", { pr: pr.displayId })}
           </a>
-        </Actions>
-      )}
+        )}
+      </Actions>
       <DefinitionList>
         <DefinitionItem label={t("state")}>{domain(`runState.${run.state}`)}</DefinitionItem>
         <DefinitionItem label={t("summary")} empty={ended === null}>

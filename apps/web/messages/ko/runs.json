@@ -43,6 +43,7 @@
     "notEnded": "런이 끝나면 기록해요",
     "noRunner": "아직 정하지 않았어요",
     "runnerOffline": "Offline",
+    "openDetail": "자세히 보기",
     "openPr": "PR {pr} 열기",
     "reason": {
       "running": "러너에서 에이전트가 티켓을 처리하고 있어요.",

@@ -1,0 +1,156 @@
+{
+  "documentTitle": "{ticket} 런 · Factory Orchestrator",
+  "documentTitleNotFound": "런 · Factory Orchestrator",
+  "crumb": {
+    "label": "위치",
+    "runs": "Runs",
+    "run": "{ticket} 런"
+  },
+  "notFound": {
+    "title": "런을 찾을 수 없어요",
+    "body": "지워졌거나 주소가 잘못됐어요. Runs에서 다시 골라 주세요.",
+    "back": "Runs로 가기"
+  },
+  "when": {
+    "waitingFor": "{duration}째 기다리는 중",
+    "elapsedFor": "{duration}째",
+    "endedAfter": "{duration} 만에 끝났어요",
+    "endedBeforeStart": "시작하지 않고 {duration} 기다린 뒤 끝났어요"
+  },
+  "cancelPending": "취소 중",
+  "reason": {
+    "running": "러너에서 에이전트가 티켓을 처리하고 있어요.",
+    "question": "에이전트가 질문했어요. 답하면 worker가 에이전트에게 보내요. 최대 실행 시간은 이 동안에도 흘러요.",
+    "permission": "에이전트가 권한 허용을 기다리고 있어요. 최대 실행 시간은 이 동안에도 흘러요.",
+    "waiting-unknown": "에이전트가 사람 입력을 기다리고 있어요. 최대 실행 시간은 이 동안에도 흘러요.",
+    "disconnected": "런 중 러너에 5분 넘게 닿지 않았어요. 다시 닿으면 실제 상태를 확인해요. 최대 실행 시간은 이 동안에도 흘러요.",
+    "disconnectedSince": "{time}부터 러너에 닿지 않아요. 다시 닿으면 실제 상태를 확인해요. 최대 실행 시간은 이 동안에도 흘러요.",
+    "merged": "에이전트가 완료 보고를 보냈고 PR이 병합됐어요.",
+    "human-check": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
+    "failed": "에이전트 결과와 PR 상태 때문에 Failed예요. 자동으로 다시 시도하지 않아요.",
+    "canceled": "운영자가 취소한 런이에요. 손댈 일에 올리지 않아요.",
+    "answered": "질문에 답했어요. worker가 에이전트에게 답을 보내면 다시 실행해요.",
+    "denied": "권한 요청을 거절했어요. worker가 에이전트에게 거절을 보내요."
+  },
+  "next": {
+    "title": "다음 행동",
+    "queued": "할 일이 없어요. 러너가 비면 worker가 시작해요.",
+    "running": "할 일이 없어요. 에이전트가 끝나면 결과를 기록해요.",
+    "question": "아래에서 질문에 답해 주세요.",
+    "permission": "러너 화면에서 허용해 주세요. 허용하지 않으려면 여기서 거절할 수 있어요.",
+    "waiting-unknown": "worker가 무엇을 기다리는지 확인하고 있어요.",
+    "disconnected": "러너가 켜져 있고 ssh로 닿는지 확인해 주세요.",
+    "merged": "할 일이 없어요.",
+    "human-check": "PR을 확인하고 병합하거나 닫아 주세요.",
+    "failed": "원인을 확인하고, 필요하면 티켓을 다시 할당해 주세요.",
+    "manualRemoval": "러너가 돌아오면 러너에서 워크트리를 직접 지워 주세요.",
+    "canceled": "할 일이 없어요. 필요하면 티켓을 다시 할당해 주세요.",
+    "answered": "할 일이 없어요. worker가 답을 보내요.",
+    "denied": "할 일이 없어요. worker가 거절을 보내요."
+  },
+  "manualRemoval": "사람이 지워야 함",
+  "openPr": "PR {pr} 열기",
+  "question": {
+    "title": "에이전트 질문",
+    "answerLabel": "답",
+    "answerHelp": "답하면 worker가 러너의 에이전트에게 보내요.",
+    "choicesLabel": "선택지",
+    "submit": "답 보내기",
+    "submitting": "보내는 중",
+    "sent": "답을 남겼어요. worker가 보내요.",
+    "empty": "답을 써 주세요."
+  },
+  "permission": {
+    "title": "권한 대기",
+    "body": "러너 화면에서 허용해 주세요. 오케스트레이터에서는 허용할 수 없어요.",
+    "deny": "거절",
+    "denied": "거절을 남겼어요. worker가 보내요.",
+    "reasonLabel": "거절 이유",
+    "reasonHelp": "에이전트가 대신 할 일을 적으면 함께 전해요. 비워 둬도 돼요.",
+    "denying": "거절하는 중"
+  },
+  "cancel": {
+    "trigger": "런 취소",
+    "title": "이 런을 취소할까요?",
+    "body": "worker가 에이전트를 멈추고 런을 끝내요. 끝낸 런은 되돌릴 수 없어요.",
+    "confirm": "취소하기",
+    "dismiss": "닫기",
+    "requested": "취소를 요청했어요."
+  },
+  "actionFailed": "요청을 남기지 못했어요. 잠시 뒤 다시 해 주세요.",
+  "timeline": {
+    "title": "타임라인",
+    "assigned": "할당",
+    "started": "시작",
+    "waiting-for-input": "입력 기다림",
+    "resumed": "다시 실행",
+    "question": "질문",
+    "answer": "답",
+    "permission": "권한 대기",
+    "unreachable": "ssh 실패 시작",
+    "disconnected": "연결 끊김",
+    "reconnected": "다시 연결",
+    "cancel-requested": "취소 요청",
+    "ended": "종료",
+    "later-pr": "이후 PR 상태",
+    "denied": "거절"
+  },
+  "report": {
+    "title": "완료 보고",
+    "none": "에이전트가 보낸 완료 보고가 없어요."
+  },
+  "log": {
+    "title": "로그 꼬리",
+    "none": "아직 시작하지 않아 로그가 없어요.",
+    "pending": "러너에서 로그를 가져오고 있어요.",
+    "failed": "로그를 가져오지 못했어요: {error}",
+    "empty": "로그가 비어 있어요.",
+    "stored": "끝날 때 저장한 마지막 {count}줄",
+    "fetched": "{time}에 가져온 {count}줄",
+    "refresh": "다시 가져오기"
+  },
+  "props": {
+    "label": "런 정보",
+    "ticket": "티켓",
+    "state": "상태",
+    "summary": "요약 결과",
+    "agentResult": "에이전트 결과",
+    "prState": "PR 상태",
+    "laterPrState": "이후 PR 상태",
+    "runner": "러너",
+    "agent": "에이전트",
+    "waited": "대기 시간",
+    "executed": "실행 시간",
+    "pr": "PR",
+    "ci": "CI",
+    "branch": "브랜치",
+    "worktree": "워크트리",
+    "workspace": "Workspace",
+    "notEnded": "런이 끝나면 기록해요",
+    "notStarted": "아직 시작하지 않았어요",
+    "none": "없음",
+    "noRunner": "아직 정하지 않았어요",
+    "runnerOffline": "Offline",
+    "laterPr": "{state} · {time}"
+  },
+  "ci": {
+    "success": "통과",
+    "failure": "실패",
+    "pending": "도는 중",
+    "none": "CI 없음",
+    "unavailable": "CI 상태를 볼 수 없어요",
+    "unknown": "알 수 없는 값"
+  },
+  "laterPr": {
+    "merged": "병합됨",
+    "closed": "닫힘"
+  },
+  "otherRuns": {
+    "title": "같은 티켓의 다른 런",
+    "item": "{time} · {state}"
+  },
+  "startError": {
+    "title": "시작 오류",
+    "body": "러너가 시작 명령에 낸 마지막 오류예요. 같은 이름으로 다시 시도해도 실패해 시작할 수 없음으로 끝냈어요."
+  }
+}

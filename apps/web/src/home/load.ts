@@ -151,7 +151,7 @@ export function loadHomePage(db: Database, ws: string | undefined, now: Date): H
  * 보내지 않은 권한 대기 가운데 먼저 받은 것이다. 답이나 거절을 남겼지만 worker 가 아직 보내지 않았으면
  * answered·denied 다. worker 가 아직 아무것도 쓰지 않았으면 null 이다.
  */
-function pendingInput(db: Database, runId: RunId): InputWait | null {
+export function pendingInput(db: Database, runId: RunId): InputWait | null {
   const inputs: Array<{ at: Date; input: InputWait }> = [];
   for (const q of listRunQuestions(db, runId)) {
     if (q.answer !== null && q.answer.sentAt !== null) continue;
