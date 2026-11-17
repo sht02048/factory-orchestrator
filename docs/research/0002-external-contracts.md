@@ -169,7 +169,7 @@ orca status [--json]
 
 ### A.5 워크트리 만들기와 에이전트 시작
 
-**실행하지 않고 스키마와 help로만 확인했다.**
+**첫판은 스키마와 help로만 확인했다.** 실제 출력은 [research 0004](0004-orca-run-contract.md) 4절에 있다.
 
 ```
 orca worktree create --name <name>
@@ -254,7 +254,7 @@ orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--mode
 - `agents[].programStatus.state`: `working`, `done`, `blocked`, 없음(null)
 - `terminalVerdict`: `live`, `none`
 
-전체 열거값은 문서·스키마에 없다. 관측한 값만으로 상태 기계를 닫지 말고, 모르는 값은 "진행 중"으로 다루는 편이 안전하다.
+전체 열거값은 문서·스키마에 없다. 앱 번들 소스에서 `agents[].state`, `programStatus.state`, `terminalVerdict`의 닫힌 목록을 찾았다([research 0004](0004-orca-run-contract.md) 2절). 행 `status`는 닫힌 목록을 찾지 못했으므로, 모르는 값은 "진행 중"으로 다루는 편이 안전하다.
 
 `--agent-wait`를 주면 사람만 답할 수 있는 프롬프트(권한 메뉴 등)에 멈춘 에이전트를 행마다 `agentWait`로 표시한다 **[스키마]**. 권한 대기에 걸린 런을 Human Check로 넘길지 판단하는 데 쓸 수 있다.
 
@@ -267,10 +267,10 @@ orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--mode
 
 **3) `orca orchestration` task/dispatch** **[스키마]**. Orca 자체의 코디네이터·워커 메일박스 모델(Run, Task, Dispatch, `worker_done`)이다. 워커가 `orca orchestration send --type worker_done`으로 스스로 끝을 알려야 하고, 호출자는 Run에 묶인 코디네이터여야 한다. 실제로 워커 맥락에서 `orchestration task-list`를 부르면 `run_required` 오류가 났다 **[실행]**. 이 모델은 에이전트에게 오케스트레이션 프로토콜을 지시로 줘야 하는데, 이는 "에이전트에게는 티켓만 지시로 준다"(GLOSSARY Agent, ADR 0004)와 맞지 않는다. 용어도 겹친다(Orca의 Run·Dispatch와 이 제품의 Run·Assignment). 1단계 어댑터에는 쓰지 않는 쪽을 권한다.
 
-**종료 판정 제안.** ADR 0004에 따라 오케스트레이터는 "런이 끝났는지"만 알면 되고 결과는 GitHub PR 상태로 정한다. 끝남의 신호 후보는 다음과 같다. 어느 조합이 믿을 만한지는 실제 런으로 확인해야 한다.
+**종료 판정 제안.** ADR 0004에 따라 오케스트레이터는 "런이 끝났는지"만 알면 되고 결과는 GitHub PR 상태로 정한다. 끝남의 신호 후보는 다음과 같다. 어느 조합이 믿을 만한지는 실제 런으로 확인해야 한다. 실제 런의 결과는 [research 0004](0004-orca-run-contract.md) 3절에 있다. 대화형 에이전트는 일을 마쳐도 프로세스가 끝나지 않고, 끝나도 셸 터미널이 남아 아래 둘째 후보는 에이전트 종료 신호가 아니었다.
 
 - 해당 워크트리 행의 모든 `agents[].state`가 `done`이고 일정 시간 유지됨.
-- `liveTerminalCount: 0` 또는 `terminalVerdict: "none"`(에이전트 프로세스가 끝남).
+- ~~`liveTerminalCount: 0` 또는 `terminalVerdict: "none"`(에이전트 프로세스가 끝남).~~ 에이전트가 끝나도 띄운 셸이 남아 `live`였다. 에이전트 종료는 행의 `agents`에서 그 에이전트가 사라지는 것으로 보인다 **[실행]**(research 0004).
 - 워크트리 행이 사라짐(누군가 지움) → Failed 후보. 단, `worktree ps`에는 워크트리별 필터가 없고 `--limit`으로 잘린다. 응답이 `truncated: false`이고 `hostScope.hostIds`에 `local`이 있을 때만 "없음"을 증거로 쓴다. 그 밖에는 `worktree show --worktree <selector> --json`의 `selector_not_found`로 다시 확인한다.
 
 ### A.7 워크트리 조회와 정리
@@ -866,13 +866,13 @@ type JudgeRunOutcome = (prs: ReadonlyArray<PullRequestSnapshot>) => RunOutcome;
 **Orca**
 
 1. ~~런타임이 꺼져 있을 때 `orca status --json`과 다른 명령의 `error.code`·종료 코드.~~ [research 0003](0003-orca-runner-contract.md) 1절에서 확인했다.
-2. `worktree ps`의 `status`, `agents[].state`, `programStatus.state`, `terminalVerdict` 전체 열거값. 관측한 값만 적었다.
-3. 에이전트가 할 일을 마쳤다는 가장 믿을 만한 신호. `agents[].state: "done"`이 에이전트 프로세스가 살아 있어도 턴 사이에 잠깐 찍히는지, 끝난 에이전트 CLI가 프로세스까지 종료하는지(`liveTerminalCount`) 실제 런으로 봐야 한다.
-4. `worktree create --agent --prompt --json`의 실제 출력 전체(`result.worktree` 필드, `launch`, `prompt.outcome` 값 목록). 상태를 바꾸는 명령이라 실행하지 않았다.
-5. `--prompt` 길이 제한과 줄바꿈·특수 문자가 ssh 인용을 거쳐 그대로 전달되는지.
+2. ~~`worktree ps`의 `status`, `agents[].state`, `programStatus.state`, `terminalVerdict` 전체 열거값.~~ [research 0004](0004-orca-run-contract.md) 2절. 행 `status`·`sidebarStatus`의 닫힌 목록은 남았다.
+3. ~~에이전트가 할 일을 마쳤다는 가장 믿을 만한 신호.~~ [research 0004](0004-orca-run-contract.md) 3절. 대화형 에이전트는 일을 마쳐도 끝나지 않고 종료 코드는 Orca가 주지 않는다. 런 끝남과 정상·오류 종료를 무엇으로 정할지는 0037에서 정한다.
+4. ~~`worktree create --agent --prompt --json`의 실제 출력 전체.~~ [research 0004](0004-orca-run-contract.md) 4절.
+5. ~~`--prompt` 길이 제한과 줄바꿈·특수 문자가 ssh 인용을 거쳐 그대로 전달되는지.~~ [research 0004](0004-orca-run-contract.md) 5절. 인자마다 작은따옴표로 인용하면 그대로 가고, ssh 명령 문자열은 약 256 KiB가 한계다.
 6. ~~ssh 비대화형 셸에서 `orca`가 런타임에 닿는지.~~ [research 0003](0003-orca-runner-contract.md) 6절에서 확인했다. 절대 경로로 부르면 닿고 ssh 세션 쪽에는 GUI 세션이 필요 없다. 콘솔 로그인 세션이 없을 때 서비스가 뜨는지는 남았다(0003 「아직 모르는 것」 7).
 7. Linux 러너의 `orca` 설치 경로와 `orca serve` 서비스 구성. research 0003에서도 남았다(Linux 러너 준비 전).
-8. 터미널이 아닌 chat(`structured`)으로 뜬 에이전트의 진행 감지 방법. `--surface terminal`을 강제하면 피할 수 있는지.
+8. ~~터미널이 아닌 chat(`structured`)으로 뜬 에이전트의 진행 감지 방법.~~ `--surface terminal`이면 terminal로 뜨고 `worktree ps`로 진행이 보였다([research 0004](0004-orca-run-contract.md) 8절). chat 경우는 확인하지 않았다.
 9. `worktree rm` 출력과, 에이전트가 아직 도는 워크트리를 지울 때의 동작. 출력과 `--force` 동작은 [research 0003](0003-orca-runner-contract.md) 9절에서 확인했다. 턴이 끝나고 백그라운드 셸이 돌던 에이전트에만 시험했고, 턴 도중의 에이전트는 남았다(0003 「아직 모르는 것」 6).
 
 **Linear**

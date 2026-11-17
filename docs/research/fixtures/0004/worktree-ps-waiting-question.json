@@ -1,0 +1,112 @@
+{
+  "id": "00000000-0000-4000-8000-000000000026",
+  "ok": true,
+  "result": {
+    "worktrees": [
+      {
+        "workspaceKind": "git",
+        "worktreeId": "00000000-0000-4000-8000-000000000011::<path>/workspaces/sandbox/fo-verify-w2",
+        "repoId": "00000000-0000-4000-8000-000000000011",
+        "hostId": "local",
+        "identity": {
+          "key": "wt2:local:00000000-0000-4000-8000-000000000012",
+          "executionHostId": "local",
+          "instanceId": "00000000-0000-4000-8000-000000000012"
+        },
+        "terminalPlatform": "darwin",
+        "repo": "sandbox",
+        "path": "<path>/workspaces/sandbox/fo-verify-w2",
+        "branch": "refs/heads/acme/fo-verify-w2",
+        "isArchived": false,
+        "isMainWorktree": false,
+        "hasHostSidebarActivity": true,
+        "defaultBranch": false,
+        "cliCreated": true,
+        "worktreeInstanceId": "00000000-0000-4000-8000-000000000012",
+        "parentWorktreeId": null,
+        "childWorktreeIds": [],
+        "workspaceLineage": null,
+        "displayName": "fo-verify-w2",
+        "workspaceStatus": "in-progress",
+        "sortOrder": 1790000151885,
+        "lastActivityAt": 1790000151911,
+        "createdAt": 1790000151885,
+        "creatorProvenance": {
+          "kind": "host"
+        },
+        "linkedIssue": null,
+        "linkedPR": null,
+        "linkedLinearIssue": null,
+        "linkedGitLabMR": null,
+        "linkedGitLabIssue": null,
+        "linkedItems": [],
+        "comment": "",
+        "isPinned": false,
+        "isActive": false,
+        "unread": false,
+        "liveTerminalCount": 1,
+        "hasAttachedPty": true,
+        "unverifiableTerminalCount": 0,
+        "lastOutputAt": 1790000160061,
+        "preview": "view/cc8a9fc408a86adc9e1e/orca-agent-view' '--dangerously-skip-permissions' '--model' 'haiku'\nEnter to select · ↑/↓ to navigate · Esc to  ancel",
+        "status": "permission",
+        "agents": [
+          {
+            "paneKey": "00000000-0000-4000-8000-000000000008:00000000-0000-4000-8000-000000000027",
+            "parentPaneKey": null,
+            "state": "waiting",
+            "agentType": "claude",
+            "prompt": "<pasted_content id=\"0d23\"> Context line 0000: this is filler text for a prompt length test. Ignore it. Context line 0001: this is filler text for a prompt length test. Ignore it. Context line 0002: th",
+            "taskTitle": null,
+            "displayName": null,
+            "conversationName": "Prompt length test filler text",
+            "lastAssistantMessage": null,
+            "toolName": "AskUserQuestion",
+            "toolInput": null,
+            "interrupted": false,
+            "mainAgent": {
+              "state": "waiting",
+              "stateStartedAt": 1790000159981
+            },
+            "stateStartedAt": 1790000159981,
+            "updatedAt": 1790000160075,
+            "hasLivePty": true,
+            "programStatus": {
+              "state": "blocked",
+              "kind": "question",
+              "message": "answer: Red or blue? (Red · Blue)",
+              "observedAt": 1790000160057
+            },
+            "agentWait": {
+              "source": "hook",
+              "since": 1790000160075
+            }
+          }
+        ],
+        "sidebarStatus": "permission",
+        "terminalVerdict": "live",
+        "environment": {
+          "id": "local",
+          "name": "local"
+        },
+        "parent": null,
+        "address": {
+          "environment": "local",
+          "worktree": "identity:wt2:local:00000000-0000-4000-8000-000000000012",
+          "line": "--environment local --worktree identity:wt2:local:00000000-0000-4000-8000-000000000012"
+        }
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "totalCount": 1,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "00000000-0000-4000-8000-000000000003"
+  }
+}
