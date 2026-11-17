@@ -1,0 +1,49 @@
+{
+  "id": "b8a1e210-ccee-4e0e-819b-a12eb17d7eba",
+  "ok": true,
+  "result": {
+    "runId": "run_493ebb2f403d",
+    "messages": [
+      {
+        "id": "msg_49acb8390fb2",
+        "run_id": "run_493ebb2f403d",
+        "delivery_contract": "current_delivery",
+        "from_handle": "dispatch:ctx_a6e6a23a7132",
+        "to_handle": "run:run_493ebb2f403d",
+        "subject": "Question",
+        "body": "Pick one: A or B? (quotes ' \" and $HOME stay literal)",
+        "type": "question",
+        "priority": "normal",
+        "thread_id": "msg_49acb8390fb2",
+        "payload": "{\"taskId\":\"task_43a3a070dc4c\",\"dispatchId\":\"ctx_a6e6a23a7132\",\"question\":\"Pick one: A or B? (quotes ' \\\" and $HOME stay literal)\",\"options\":[]}",
+        "created_at": "2026-11-17T16:07:58Z",
+        "delivered_at": null
+      },
+      {
+        "id": "msg_3945c098377b",
+        "run_id": "run_493ebb2f403d",
+        "delivery_contract": "current_delivery",
+        "from_handle": "term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b",
+        "to_handle": "run:run_493ebb2f403d",
+        "subject": "probe done",
+        "body": "I asked the coordinator the A or B question and received an answer. The exact answer text received was: A\nsecond line: it's \"quoted\" $HOME `echo x` \\\\ !x. Nothing else is left, and this is reported as failed because the task asked for that outcome.",
+        "type": "worker_done",
+        "priority": "normal",
+        "thread_id": null,
+        "payload": "{\"taskId\":\"task_43a3a070dc4c\",\"dispatchId\":\"ctx_a6e6a23a7132\",\"outcome\":\"failed\"}",
+        "created_at": "2026-11-17T16:08:28Z",
+        "delivered_at": null,
+        "follow_up": {
+          "kind": "send",
+          "dispatchId": "ctx_a6e6a23a7132",
+          "active": false
+        }
+      }
+    ],
+    "count": 2,
+    "acknowledged": null
+  },
+  "_meta": {
+    "runtimeId": "d8374bf0-adca-4823-960e-46489e547cad"
+  }
+}

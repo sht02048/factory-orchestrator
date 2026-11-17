@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "result": {
+    "installed": true,
+    "manager": "launchd",
+    "name": "com.stablyai.orca.serve",
+    "unitPath": "<path>/Library/LaunchAgents/com.stablyai.orca.serve.plist",
+    "gaveUp": null,
+    "verdict": "live",
+    "pid": 33858,
+    "detail": "running"
+  }
+}

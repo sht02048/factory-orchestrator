@@ -1,0 +1,37 @@
+{
+  "id": "local-status",
+  "ok": true,
+  "result": {
+    "target": {
+      "kind": "local"
+    },
+    "app": {
+      "running": true,
+      "pid": 33867,
+      "desktopWindowStatus": "openable"
+    },
+    "runtime": {
+      "state": "ready",
+      "reachable": true,
+      "connectionState": "connected",
+      "runtimeId": "d8374bf0-adca-4823-960e-46489e547cad",
+      "appVersion": "1.4.258",
+      "remoteUpdateSupport": {
+        "installMode": "supervised-headless-serve",
+        "automatic": true,
+        "reason": "available"
+      },
+      "capabilities": [
+        "emulator.opening-preferences.v1",
+        "agent-session.saved-resume-origin.v1",
+        "runtime.status.compat.v1"
+      ]
+    },
+    "graph": {
+      "state": "ready"
+    }
+  },
+  "_meta": {
+    "runtimeId": "d8374bf0-adca-4823-960e-46489e547cad"
+  }
+}

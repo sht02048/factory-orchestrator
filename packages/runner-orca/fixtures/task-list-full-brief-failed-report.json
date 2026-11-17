@@ -1,0 +1,32 @@
+{
+  "id": "50d8d990-c2b5-42a7-8e21-9423d5cf930d",
+  "ok": true,
+  "result": {
+    "runId": "run_493ebb2f403d",
+    "legacyReadOnly": false,
+    "tasks": [
+      {
+        "id": "task_43a3a070dc4c",
+        "run_id": "run_493ebb2f403d",
+        "parent_id": null,
+        "created_by_terminal_handle": "term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7",
+        "created_by_pane_key": "2092fc19-7a77-4be0-b79a-624e536c006d:e8ec8706-3804-4457-b807-074b33c45d3d",
+        "created_by_process_incarnation": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::<path>/sandbox@@e0526823:1b00b4cd-cbef-4a8c-a653-7d8c172b8686",
+        "created_by_run_generation": 1,
+        "task_title": "fo-t0013-probe1",
+        "display_name": "fo-t0013-probe1",
+        "spec": "Sandbox verification task for an adapter test. Do not edit, commit, or push anything. 1. Ask your coordinator one question using the orca orchestration ask com…",
+        "status": "failed",
+        "deps": "[]",
+        "result": "{\"provenance\":\"worker_report\",\"outcome\":\"failed\",\"messageId\":\"msg_3945c098377b\",\"reportedBy\":\"term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b\",\"subject\":\"probe done\",\"body\":\"I asked the coordinator the A or B question and received an answer. The exact answer text received was: A\\nsecond line: it's \\\"quoted\\\" $HOME `echo x` \\\\\\\\ !x. Nothing else is left, and this is reported as failed because the task asked for that outcome.\",\"completedBy\":\"term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b\",\"filesModified\":[],\"reportPath\":null,\"completedAt\":\"2026-11-17T16:08:28.349Z\"}",
+        "created_at": "2026-11-17 16:07:46",
+        "completed_at": "2026-11-17T16:08:28.349Z",
+        "spec_truncated": true
+      }
+    ],
+    "count": 1
+  },
+  "_meta": {
+    "runtimeId": "d8374bf0-adca-4823-960e-46489e547cad"
+  }
+}

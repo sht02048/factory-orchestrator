@@ -1,0 +1,260 @@
+{
+  "ok": true,
+  "result": {
+    "dispatchId": "ctx_a6e6a23a7132",
+    "source": "transcript",
+    "sourceIdentity": "-BEFWiz1DYBpFdrE5Jx0LM3yLQYRjCVH",
+    "provider": "claude",
+    "transcript": {
+      "messages": [
+        {
+          "id": "51b56085-ab37-48e1-a57a-ba9b4f87a881",
+          "role": "user",
+          "blocks": [
+            {
+              "type": "text",
+              "text": "Please carry out this task from my Orca coordinator by following the brief I pasted below. \n\n<pasted_content id=\"755d\">\nYou are working inside Orca, a multi-agent IDE. You are a dispatched worker.\nYour coordinator's terminal handle is: term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7\nYour task ID is: task_43a3a070dc4c\n\nThe coordinator cannot see this terminal. Reach it with the `orca orchestration` commands\nbelow, and message it only to ask, report a blocker, or finish; it needs no progress updates\nunless the task asks.\nDo only this task, yourself: no subagents or helper workers unless the task asks.\n\n=== CLI COMMANDS ===\n\n```sh\n  # Ask the coordinator, then end your turn; Orca wakes you with the answer.\n  # Never use a local question prompt such as AskUserQuestion; the\n  # coordinator cannot see or answer it.\n  orca orchestration ask --from term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b --question \"<your question>\"\n\n  # Blocked, and the coordinator must act before you can continue:\n  orca orchestration send --from term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b --type escalation --subject \"Blocked: <reason>\" --body \"<details>\" --task-id task_43a3a070dc4c --dispatch-id ctx_a6e6a23a7132\n\n  # Finish: \n… (truncated)"
+            }
+          ],
+          "timestamp": 1794931671760,
+          "source": "transcript",
+          "parentId": "e5405184-dc88-4ac0-8654-da93b4272343"
+        },
+        {
+          "id": "73cf93ed-dd9a-4b5b-8f6f-813bd3da6e6f",
+          "role": "assistant",
+          "blocks": [
+            {
+              "type": "tool-call",
+              "name": "Bash",
+              "input": {
+                "command": "orca orchestration ask --from term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b --question 'Pick one: A or B? (quotes '\\'' \" and $HOME stay literal)'",
+                "description": "Ask coordinator the A or B question via Orca"
+              },
+              "callId": "toolu_01L3RgrkGScY4mVm67qy2WSm"
+            }
+          ],
+          "timestamp": 1794931678196,
+          "source": "transcript",
+          "parentId": "14ec7b43-b33b-42d5-98d9-effd0755543a"
+        },
+        {
+          "id": "c7d251d0-3fa6-4d81-91ae-2d8c6eb86b22",
+          "role": "tool",
+          "blocks": [
+            {
+              "type": "tool-result",
+              "output": "Question msg_49acb8390fb2 sent.\nNext: End your turn; Orca wakes you with the answer.",
+              "callId": "toolu_01L3RgrkGScY4mVm67qy2WSm"
+            }
+          ],
+          "timestamp": 1794931678891,
+          "source": "transcript",
+          "parentId": "73cf93ed-dd9a-4b5b-8f6f-813bd3da6e6f"
+        },
+        {
+          "id": "efba5fd4-2f05-464a-93a8-c532b3387af0",
+          "role": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "text": "I sent the question to the coordinator (message `msg_49acb8390fb2`). Orca will wake me with the answer, so I'm ending my turn here until it arrives."
+            }
+          ],
+          "timestamp": 1794931681624,
+          "source": "transcript",
+          "parentId": "569cddb1-04d8-4a53-9cb7-cbd1ae742d72"
+        },
+        {
+          "id": "7bff2f3a-2caa-443c-89b4-d98cdda607ed",
+          "role": "user",
+          "blocks": [
+            {
+              "type": "text",
+              "text": "\nYou have 1 orchestration message. Run `orca orchestration check`."
+            }
+          ],
+          "timestamp": 1794931695636,
+          "source": "transcript",
+          "parentId": "a5f4041f-7f69-4526-a9ac-37684b92c8de"
+        },
+        {
+          "id": "a3d5c475-445a-4bfb-a29b-3bc21efa0c3a",
+          "role": "assistant",
+          "blocks": [
+            {
+              "type": "tool-call",
+              "name": "Bash",
+              "input": {
+                "command": "orca orchestration check --from term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b",
+                "description": "Check Orca orchestration messages for coordinator answer"
+              },
+              "callId": "toolu_01FEitcrJjvPoKgAsbV64hG2"
+            }
+          ],
+          "timestamp": 1794931699394,
+          "source": "transcript",
+          "parentId": "de5e79a0-2289-4558-9a37-f9d4860ae98a"
+        },
+        {
+          "id": "16c2e658-acdd-40de-92b8-086ae8d22ce4",
+          "role": "tool",
+          "blocks": [
+            {
+              "type": "tool-result",
+              "output": "Exit code 1\nNext step: Did you mean: --terminal, --full, --json\nNext step: Valid flags: --ack, --all, --environment, --format, --full, --help, --json, --pairing-code, --peek, --retry-request, --run, --terminal, --timeout-ms, --types, --unread, --wait\nerror: invalid_argument: Unknown flag --from for command: orchestration check",
+              "callId": "toolu_01FEitcrJjvPoKgAsbV64hG2",
+              "isError": true
+            }
+          ],
+          "timestamp": 1794931699721,
+          "source": "transcript",
+          "parentId": "a3d5c475-445a-4bfb-a29b-3bc21efa0c3a"
+        },
+        {
+          "id": "8f5f236d-51ee-4c0a-bde0-dac09d574968",
+          "role": "assistant",
+          "blocks": [
+            {
+              "type": "tool-call",
+              "name": "Bash",
+              "input": {
+                "command": "orca orchestration check --terminal term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b --full",
+                "description": "Check orchestration messages for this terminal with full output"
+              },
+              "callId": "toolu_01My4UCA4wz3shFqG6tT31q2"
+            }
+          ],
+          "timestamp": 1794931702093,
+          "source": "transcript",
+          "parentId": "211c3ef5-0361-4964-9899-e75ece6dcb60"
+        },
+        {
+          "id": "57bf1e77-4ebf-43c8-987b-af53f7bfd7e6",
+          "role": "tool",
+          "blocks": [
+            {
+              "type": "tool-result",
+              "output": "Delivery delivery_69f4abceeb7c\nmsg_48315b89bf6a [status] from=run:run_493ebb2f403d\n[subject]\n  Re: Question\n[body]\n  A\n  second line: it's \"quoted\" $HOME `echo x` \\\\ !x\n[Reply: orca orchestration reply --id msg_48315b89bf6a --body \"...\"]",
+              "callId": "toolu_01My4UCA4wz3shFqG6tT31q2"
+            }
+          ],
+          "timestamp": 1794931702405,
+          "source": "transcript",
+          "parentId": "8f5f236d-51ee-4c0a-bde0-dac09d574968"
+        },
+        {
+          "id": "b9bc282c-7525-4b35-8acb-2500d259a160",
+          "role": "assistant",
+          "blocks": [
+            {
+              "type": "tool-call",
+              "name": "Bash",
+              "input": {
+                "command": "orca orchestration send --from term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b --type worker_done --subject \"probe done\" --body $'I asked the coordinator the A or B question and received an answer. The exact answer text received was: A\\nsecond line: it\\'s \"quoted\" $HOME `echo x` \\\\\\\\ !x. Nothing else is left, and this is reported as failed because the task asked for that outcome.' --task-id task_43a3a070dc4c --dispatch-id ctx_a6e6a23a7132 --outcome failed",
+                "description": "Send worker_done with the received answer to coordinator"
+              },
+              "callId": "toolu_011vDu4mFeF2yMGdCQ54rYvd"
+            }
+          ],
+          "timestamp": 1794931708115,
+          "source": "transcript",
+          "parentId": "a29b85b2-de1d-428b-ad62-c33afbf0e77e"
+        },
+        {
+          "id": "0cf98d24-006c-4b17-a7dd-69b07aa8fca7",
+          "role": "tool",
+          "blocks": [
+            {
+              "type": "tool-result",
+              "output": "messageId=msg_3945c098377b lifecycle=failed\nNext: Recorded. End your turn.",
+              "callId": "toolu_011vDu4mFeF2yMGdCQ54rYvd"
+            }
+          ],
+          "timestamp": 1794931708436,
+          "source": "transcript",
+          "parentId": "b9bc282c-7525-4b35-8acb-2500d259a160"
+        },
+        {
+          "id": "c46fef12-8905-411e-a255-c5fa8e5e6bd6",
+          "role": "assistant",
+          "blocks": [
+            {
+              "type": "text",
+              "text": "The coordinator's answer came back and I reported it. I sent `worker_done` with outcome `failed` and subject \"probe done\", as the task asked (message `msg_3945c098377b`).\n\nThe answer text, exactly as received, was:\n\n```\nA\nsecond line: it's \"quoted\" $HOME `echo x` \\\\ !x\n```\n\nTwo things about the run:\n- The `ask` command has no `--options` flag, so I sent the question without the `\"A,B\"` options.\n- `orca orchestration check` rejected `--from`. I used `--terminal <my terminal> --full` to read the message.\n\nI made no edits, commits, or pushes."
+            }
+          ],
+          "timestamp": 1794931711583,
+          "source": "transcript",
+          "parentId": "4a0e8b26-801f-40a8-bf28-49d2fe41f0e7"
+        }
+      ],
+      "nextCursor": "owr1_eyJ2IjoxLCJkIjoiY3R4X2E2ZTZhMjNhNzEzMiIsInMiOiJ0cmFuc2NyaXB0IiwiaSI6Ii1CRUZXaXoxRFlCcEZkckU1SngwTE0zeUxRWVJqQ1ZIIiwicCI6NzE2MzE4LCJjIjoiU0lyWWM1SE1OVENtRHg0SWgzQzJ6YTFBVFZKTVNnMloifQ",
+      "limited": true,
+      "returnedMessageCount": 12
+    },
+    "cursor": "owr1_eyJ2IjoxLCJkIjoiY3R4X2E2ZTZhMjNhNzEzMiIsInMiOiJ0cmFuc2NyaXB0IiwiaSI6Ii1CRUZXaXoxRFlCcEZkckU1SngwTE0zeUxRWVJqQ1ZIIiwicCI6NzE2MzE4LCJjIjoiU0lyWWM1SE1OVENtRHg0SWgzQzJ6YTFBVFZKTVNnMloifQ",
+    "status": {
+      "worker": "failed",
+      "terminal": "running",
+      "liveness": "live"
+    },
+    "fallbackReason": null,
+    "warnings": ["Oversized transcript text was clipped."],
+    "sourceExact": true,
+    "contentComplete": false,
+    "clipping": ["transcript_payload"],
+    "projection": {
+      "id": "ctx_a6e6a23a7132",
+      "dispatchId": "ctx_a6e6a23a7132",
+      "taskId": "task_43a3a070dc4c",
+      "runId": "run_493ebb2f403d",
+      "role": "worker",
+      "parent": null,
+      "provider": {
+        "id": "claude",
+        "model": null
+      },
+      "host": {
+        "kind": "local",
+        "id": "local"
+      },
+      "workspace": {
+        "id": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::<path>/workspaces/sandbox/fo-t0013-probe1",
+        "kind": "folder_or_worktree"
+      },
+      "stage": {
+        "worker": "failed",
+        "dispatch": "failed",
+        "detail": "settled",
+        "activity": "done"
+      },
+      "outcome": "failed",
+      "liveness": {
+        "verdict": "live",
+        "observedAt": 1794931713663,
+        "source": "agent_status"
+      },
+      "evidence": {
+        "durable": true,
+        "liveStatus": "fresh",
+        "lastObservedAt": 1794931713663
+      },
+      "resource": {
+        "state": "owned",
+        "id": "wtr_17877f782bf7",
+        "ownerDispatchId": "ctx_a6e6a23a7132",
+        "releaseState": "retained",
+        "terminalState": "retained"
+      },
+      "nextAction": {
+        "kind": "none",
+        "argv": []
+      },
+      "attention": {
+        "categories": ["failure"],
+        "requiresAction": true
+      }
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "exitCode": 255,
+  "stdout": "",
+  "stderr": "ssh: Could not resolve hostname runner.invalid: nodename nor servname provided, or not known\n"
+}

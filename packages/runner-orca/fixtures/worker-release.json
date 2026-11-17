@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "result": {
+    "dispatchId": "ctx_a6e6a23a7132",
+    "state": "released",
+    "processAction": "closed_agent_terminal",
+    "archive": "transcript [captured]"
+  }
+}

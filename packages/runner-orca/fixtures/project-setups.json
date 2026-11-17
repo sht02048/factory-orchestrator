@@ -1,0 +1,24 @@
+{
+  "id": "6a219421-4530-4858-8f4e-bead0aed20c9",
+  "ok": true,
+  "result": {
+    "setups": [
+      {
+        "id": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9",
+        "projectId": "github:acme/sandbox",
+        "hostId": "local",
+        "repoId": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9",
+        "path": "<path>/sandbox",
+        "displayName": "sandbox",
+        "kind": "git",
+        "setupState": "ready",
+        "setupMethod": "legacy-repo",
+        "createdAt": 1794919840312,
+        "updatedAt": 1794919840312
+      }
+    ]
+  },
+  "_meta": {
+    "runtimeId": "d8374bf0-adca-4823-960e-46489e547cad"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "d87d7452-39c9-42e8-8c08-3a8f9bd43a8a",
+  "ok": true,
+  "result": {
+    "runId": "run_493ebb2f403d",
+    "messages": [
+      {
+        "id": "msg_49acb8390fb2",
+        "run_id": "run_493ebb2f403d",
+        "delivery_contract": "current_delivery",
+        "from_handle": "dispatch:ctx_a6e6a23a7132",
+        "to_handle": "run:run_493ebb2f403d",
+        "subject": "Question",
+        "body": "Pick one: A or B? (quotes ' \" and $HOME stay literal)",
+        "type": "question",
+        "priority": "normal",
+        "thread_id": "msg_49acb8390fb2",
+        "payload": "{\"taskId\":\"task_43a3a070dc4c\",\"dispatchId\":\"ctx_a6e6a23a7132\",\"question\":\"Pick one: A or B? (quotes ' \\\" and $HOME stay literal)\",\"options\":[]}",
+        "created_at": "2026-11-17T16:07:58Z",
+        "delivered_at": null
+      }
+    ],
+    "count": 1,
+    "acknowledged": null
+  },
+  "_meta": {
+    "runtimeId": "d8374bf0-adca-4823-960e-46489e547cad"
+  }
+}
