@@ -1,0 +1,32 @@
+{
+  "ok": true,
+  "result": {
+    "messages": [
+      {
+        "id": "msg_000000000003",
+        "type": "worker_done",
+        "from": "term_00000000-0000-4000-8000-000000000002",
+        "to": "run:run_000000000001",
+        "subject": "Verification PR opened",
+        "handled": false,
+        "body": "Coordinator answered A, so I appended 'Verified by an orchestration run.' as the last line of README.md, committed it as 'docs: add verification line', and pushed acme/fo-orch-r1 to origin. I open… (truncated; --full)",
+        "payload": {
+          "taskId": "task_000000000001",
+          "dispatchId": "ctx_000000000001"
+        }
+      },
+      {
+        "id": "msg_000000000001",
+        "type": "question",
+        "from": "ctx_000000000001",
+        "to": "run:run_000000000001",
+        "handled": false,
+        "body": "Which line should I add to README.md? A: 'Verified by an orchestration run.' B: 'Orchestration check passed.'",
+        "payload": {
+          "taskId": "task_000000000001",
+          "dispatchId": "ctx_000000000001"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "ok": true,
+    "result": {
+      "dispatchId": "ctx_000000000001",
+      "state": "released",
+      "processAction": "closed_agent_terminal",
+      "archive": "transcript [captured]"
+    }
+  },
+  {
+    "ok": true,
+    "result": {
+      "dispatchId": "ctx_000000000002",
+      "state": "released",
+      "processAction": "none",
+      "archive": "transcript [captured]"
+    }
+  },
+  {
+    "ok": true,
+    "result": {
+      "dispatchId": "ctx_000000000003",
+      "state": "released",
+      "processAction": "closed_exited_terminal",
+      "archive": "terminal [empty]"
+    }
+  }
+]

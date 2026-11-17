@@ -1,0 +1,31 @@
+{
+  "id": "10000000-0000-4000-8000-000000000012",
+  "ok": true,
+  "result": {
+    "runId": "run_000000000001",
+    "legacyReadOnly": false,
+    "tasks": [
+      {
+        "id": "task_000000000001",
+        "run_id": "run_000000000001",
+        "parent_id": null,
+        "created_by_terminal_handle": "term_00000000-0000-4000-8000-000000000001",
+        "created_by_pane_key": "10000000-0000-4000-8000-000000000002:10000000-0000-4000-8000-000000000003",
+        "created_by_process_incarnation": "10000000-0000-4000-8000-000000000004::<path>/sandbox@@<pty>:10000000-0000-4000-8000-000000000005",
+        "created_by_run_generation": 1,
+        "task_title": "fo-orch-r1",
+        "display_name": "fo-orch-r1",
+        "spec": "Sandbox verification task. This repository is a disposable sandbox. Keep it short.\n\n1. Before editing anything, ask your coordinator which line to add, using exactly:\n   orca orchestration ask --question \"Which line should I add to README.md? A: 'Verified by an orchestration run.' B: 'Orchestration check passed.'\" --options \"A,B\"\n   (use the same orca executable and --from value your preamble shows). Then end your turn and wait; Orca wakes you with the answer.\n2. Append the chosen line (text only, without the letter) as the last line of README.md.\n3. Commit it on your current branch with the message \"docs: add verification line\", push the branch to origin, and open a pull request against main with `gh pr create --title \"Verification PR (will be closed)\" --body \"Disposable verification PR.\"`.\n4. Finish with worker_done, outcome succeeded, and put the PR URL in the body. If any step fails, finish with outcome failed and say which step.\nDo not do anything else.\n",
+        "status": "completed",
+        "deps": "[]",
+        "result": "{\"provenance\":\"worker_report\",\"outcome\":\"succeeded\",\"messageId\":\"msg_000000000003\",\"reportedBy\":\"term_00000000-0000-4000-8000-000000000002\",\"subject\":\"Verification PR opened\",\"body\":\"Coordinator answered A, so I appended 'Verified by an orchestration run.' as the last line of README.md, committed it as 'docs: add verification line', and pushed acme/fo-orch-r1 to origin. I opened PR https://github.com/acme/sandbox/pull/17 against main with the requested title and body. Nothing is left except closing the disposable PR, which the task did not ask for.\",\"completedBy\":\"term_00000000-0000-4000-8000-000000000002\",\"filesModified\":[\"README.md\"],\"reportPath\":\"https://github.com/acme/sandbox/pull/17\",\"completedAt\":\"2026-11-17T14:08:38.076Z\"}",
+        "created_at": "2026-11-17 14:07:27",
+        "completed_at": "2026-11-17T14:08:38.077Z"
+      }
+    ],
+    "count": 1
+  },
+  "_meta": {
+    "runtimeId": "10000000-0000-4000-8000-000000000006"
+  }
+}

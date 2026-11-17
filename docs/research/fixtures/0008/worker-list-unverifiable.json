@@ -1,0 +1,50 @@
+{
+  "ok": true,
+  "result": {
+    "workers": [
+      {
+        "dispatchId": "ctx_000000000003",
+        "taskId": "task_000000000003",
+        "state": "ready",
+        "outcome": "in_progress",
+        "liveness": "unverifiable",
+        "terminal": "term_00000000-0000-4000-8000-000000000004",
+        "terminalState": "retained",
+        "workspace": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r3",
+        "host": "local",
+        "attention": [
+          "unverifiable"
+        ]
+      },
+      {
+        "dispatchId": "ctx_000000000002",
+        "taskId": "task_000000000002",
+        "state": "stopped",
+        "outcome": "failed",
+        "liveness": "exited",
+        "terminal": "term_00000000-0000-4000-8000-000000000003",
+        "terminalState": "retained",
+        "workspace": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r2",
+        "host": "local",
+        "attention": [
+          "failure"
+        ]
+      },
+      {
+        "dispatchId": "ctx_000000000001",
+        "taskId": "task_000000000001",
+        "state": "succeeded",
+        "liveness": "live",
+        "agent": "claude",
+        "terminal": "term_00000000-0000-4000-8000-000000000002",
+        "terminalState": "retained",
+        "workspace": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r1",
+        "host": "local"
+      }
+    ],
+    "scope": {
+      "run": "run_000000000001",
+      "source": "flag"
+    }
+  }
+}

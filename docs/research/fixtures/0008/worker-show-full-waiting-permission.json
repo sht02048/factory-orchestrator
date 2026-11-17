@@ -1,0 +1,89 @@
+{
+  "ok": true,
+  "result": {
+    "observation": {
+      "status": "live",
+      "exactWorker": true,
+      "agentWait": {
+        "source": "hook",
+        "since": 1794924577389
+      }
+    },
+    "projection": {
+      "id": "ctx_000000000002",
+      "dispatchId": "ctx_000000000002",
+      "taskId": "task_000000000002",
+      "runId": "run_000000000001",
+      "role": "worker",
+      "parent": null,
+      "provider": {
+        "id": "claude",
+        "model": null
+      },
+      "host": {
+        "kind": "local",
+        "id": "local"
+      },
+      "workspace": {
+        "id": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r2",
+        "kind": "folder_or_worktree"
+      },
+      "stage": {
+        "worker": "ready",
+        "dispatch": "dispatched",
+        "detail": "input_accepted",
+        "activity": "waiting"
+      },
+      "outcome": "in_progress",
+      "liveness": {
+        "verdict": "live",
+        "observedAt": 1794924577389,
+        "source": "agent_status"
+      },
+      "evidence": {
+        "durable": true,
+        "liveStatus": "fresh",
+        "lastObservedAt": 1794924577389
+      },
+      "resource": {
+        "state": "owned",
+        "id": "wtr_000000000002",
+        "ownerDispatchId": "ctx_000000000002",
+        "releaseState": "retained",
+        "terminalState": "retained"
+      },
+      "nextAction": {
+        "kind": "none",
+        "argv": []
+      },
+      "attention": {
+        "categories": [],
+        "requiresAction": false
+      }
+    },
+    "terminal": {
+      "handle": "term_00000000-0000-4000-8000-000000000003",
+      "ptyId": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r2@@<pty>",
+      "incarnationId": "10000000-0000-4000-8000-000000000013",
+      "orphaned": false,
+      "worktreeId": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r2",
+      "worktreePath": "<path>/workspaces/sandbox/fo-orch-r2",
+      "branch": "refs/heads/acme/fo-orch-r2",
+      "tabId": "10000000-0000-4000-8000-000000000014",
+      "leafId": "10000000-0000-4000-8000-000000000015",
+      "title": "Orca sandbox permission verification",
+      "connected": true,
+      "writable": true,
+      "lastOutputAt": 1794924600239,
+      "preview": "Ask rule Bash(touch:*) overrides auto mode for this command.\n/permissions to let auto mode decide\nDo you want to proceed?\n❯ 1. Yes\n2. No\nEsc to cancel · Tab to amend",
+      "executionHostId": "local",
+      "agentIdentity": "claude",
+      "paneRuntimeId": -1,
+      "rendererGraphEpoch": 0,
+      "agentWait": {
+        "source": "hook",
+        "since": 1794924577389
+      }
+    }
+  }
+}

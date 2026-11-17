@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "result": {
+    "dispatchId": "ctx_000000000002",
+    "taskId": "task_000000000002",
+    "runId": "run_000000000001",
+    "state": "stopped",
+    "stage": "process_stopped",
+    "liveness": "exited",
+    "terminal": "term_00000000-0000-4000-8000-000000000003",
+    "terminalState": "retained",
+    "workspace": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r2",
+    "attention": [
+      "failure"
+    ],
+    "waitingOnHuman": "unknown"
+  }
+}

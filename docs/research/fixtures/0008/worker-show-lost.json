@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "result": {
+    "dispatchId": "ctx_000000000003",
+    "taskId": "task_000000000003",
+    "runId": "run_000000000001",
+    "state": "failed",
+    "stage": "process_exited",
+    "liveness": "exited",
+    "terminal": "term_00000000-0000-4000-8000-000000000004",
+    "terminalState": "retained",
+    "workspace": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r3",
+    "attention": [
+      "failure",
+      "interruption"
+    ],
+    "waitingOnHuman": "unknown",
+    "lastError": "Terminal closed by operator request"
+  }
+}
