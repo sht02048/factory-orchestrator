@@ -17,7 +17,7 @@ _Avoid_: Ticket source, 이슈 트래커
 ### 실행
 
 **Runner**:
-티켓을 처리하는 실행 환경 하나. 1단계에서 러너는 Tailscale 안의 Orca 환경이며, 여러 개를 등록할 수 있다.
+티켓을 처리하는 실행 환경 하나. 1단계에서 러너는 ssh로 닿는 Orca 환경이며, 여러 개를 등록할 수 있다.
 _Avoid_: Worker, Agent, Host, Machine
 
 **Capacity**:
@@ -76,5 +76,5 @@ _Avoid_: Error, Crashed
 ### 사람
 
 **Operator**:
-오케스트레이터를 쓰는 단 한 사람. 1단계에는 다중 사용자 개념이 없다.
+오케스트레이터 설치 하나를 운영하는 사람. 설치 하나에 운영자는 한 명이며, 1단계에는 다중 사용자 개념이 없다.
 _Avoid_: User, Admin
