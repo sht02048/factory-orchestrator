@@ -1,0 +1,75 @@
+/**
+ * CLI가 터미널에 쓰는 문구. 코드에 직접 쓰지 않고 여기에만 둔다(ADR 0005).
+ * CLI는 설치·운영 문서와 함께 읽는 사용자 문서 쪽이라 영어로 쓴다(ADR 0005: 사용자 문서는 영어).
+ */
+export const messages = {
+  usage: `Usage: factory-orchestrator <command> [options]
+
+Commands:
+  init                 Write boot settings (.env) with a new encryption key.
+                       Leaves an existing .env untouched.
+  start                Apply database migrations, then run the web server and the worker.
+  service install      Register start as a background service (launchd on macOS, systemd on Linux).
+  service uninstall    Stop and remove the background service.
+
+Options:
+  --home <dir>         Installation folder for .env, data, and logs
+                       (default: $FACTORY_HOME, or ~/.factory-orchestrator)
+  --host <address>     init: address the web server binds to (default: 127.0.0.1)
+  --port <port>        init: port the web server listens on (default: 3000)
+  --database-path <p>  init: SQLite file (default: <home>/data/factory-orchestrator.db)
+  --dry-run            service: print what would be written and run, and change nothing
+  -h, --help           Show this help`,
+
+  init: {
+    created: (envFile: string) => `Wrote boot settings to ${envFile} with a new encryption key.`,
+    summary: (host: string, port: number, databasePath: string) =>
+      `  web: ${host}:${port}\n  database: ${databasePath}`,
+    exists: (envFile: string) =>
+      `Boot settings already exist at ${envFile}. Left them unchanged, including the encryption key.`,
+    next: "Next: run `factory-orchestrator start`, then open the web address to finish onboarding.",
+  },
+
+  start: {
+    config: (envFile: string, databasePath: string) =>
+      `Boot settings: ${envFile}\nDatabase: ${databasePath}`,
+    migrated: (names: ReadonlyArray<string>) =>
+      names.length === 0
+        ? "Database is up to date."
+        : `Applied ${names.length} database migration(s): ${names.join(", ")}`,
+    ready: (url: string) => `Web is listening at ${url}. The worker is running.`,
+    stopping: (signal: string) => `${signal} received, stopping the web server and the worker.`,
+    stopped: "Stopped.",
+    childFailed: (reason: string) => `Stopping because ${reason}.`,
+  },
+
+  service: {
+    unsupported: (platform: string) =>
+      `Service registration supports macOS (launchd) and Linux (systemd), not ${platform}.`,
+    dryRunHeader: "Dry run: nothing was written or run.",
+    wouldCreateDirectories: "Would create these folders if missing:",
+    wouldWrite: (path: string) => `Would write ${path}:`,
+    wouldRun: "Would run:",
+    wouldRunBeforeRemove: "Would run:",
+    wouldRemove: (path: string) => `Would remove ${path}`,
+    wouldRunAfterRemove: "Then would run:",
+    installed: (path: string) => `Installed and started the service from ${path}.`,
+    nodeNote: (nodePath: string) =>
+      `The service runs ${nodePath}. If you remove or upgrade this Node installation, run service uninstall and service install again.`,
+    launchdLogs: (logDir: string) => `Logs: ${logDir}`,
+    systemdLogs: (unit: string) => `Logs: journalctl --user -u ${unit}`,
+    linger:
+      "systemd stops user services when you log out. To keep it running, run: loginctl enable-linger",
+    notInstalled: (path: string) => `No service is installed (${path} does not exist).`,
+    uninstalled: (path: string) => `Stopped the service and removed ${path}.`,
+    commandFailed: (command: string, output: string) =>
+      `Warning: ${command} failed:\n${output.trim()}`,
+    needsInit: "Run `factory-orchestrator init` before installing the service.",
+  },
+
+  errors: {
+    unknownCommand: (command: string) => `Unknown command: ${command}`,
+    missingEnvFile: (envFile: string) =>
+      `Boot settings not found at ${envFile}. Run \`factory-orchestrator init\` first.`,
+  },
+} as const;

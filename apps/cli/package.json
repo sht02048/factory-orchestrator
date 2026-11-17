@@ -1,0 +1,20 @@
+{
+  "name": "@factory/cli",
+  "version": "0.0.0",
+  "private": true,
+  "bin": {
+    "factory-orchestrator": "./dist/bin/cli.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "cli": "node dist/bin/cli.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@factory/db": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "8.3.8"
+  }
+}
