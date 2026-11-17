@@ -105,7 +105,7 @@ orca status [--json]
 }
 ```
 
-러너의 Online 판정은 "ssh 성공 + `ok: true` + `runtime.reachable: true` + `runtime.state: "ready"`"로 잡을 수 있다. `runtime.capabilities`는 기능 문자열 목록이라, 필요한 기능이 있는지 확인하는 데 쓸 수 있다. 런타임이 꺼져 있을 때 `status --json`은 `ok: true`, 종료 코드 0에 `runtime.reachable: false`, `state: "not_running"`을 낸다. 다른 명령은 `runtime_unavailable`로 실패한다([research 0003](0003-orca-runner-contract.md) 1절).
+러너의 Online 판정은 "ssh 성공 + `ok: true` + `runtime.reachable: true` + `runtime.state: "ready"`"로 잡을 수 있다. `runtime.capabilities`는 기능 문자열 목록이라, 필요한 기능이 있는지 확인하는 데 쓸 수 있다. 런타임이 꺼져 있을 때 `status --json`은 `ok: true`, 종료 코드 0에 `runtime.reachable: false`, `state: "not_running"`을 낸다. 다른 명령은 `runtime_unavailable`로 실패한다 **[실행]**([research 0003](0003-orca-runner-contract.md) 1절).
 
 창 없이 런타임을 띄우는 방법도 있다 **[스키마]**:
 
@@ -870,10 +870,10 @@ type JudgeRunOutcome = (prs: ReadonlyArray<PullRequestSnapshot>) => RunOutcome;
 3. 에이전트가 할 일을 마쳤다는 가장 믿을 만한 신호. `agents[].state: "done"`이 에이전트 프로세스가 살아 있어도 턴 사이에 잠깐 찍히는지, 끝난 에이전트 CLI가 프로세스까지 종료하는지(`liveTerminalCount`) 실제 런으로 봐야 한다.
 4. `worktree create --agent --prompt --json`의 실제 출력 전체(`result.worktree` 필드, `launch`, `prompt.outcome` 값 목록). 상태를 바꾸는 명령이라 실행하지 않았다.
 5. `--prompt` 길이 제한과 줄바꿈·특수 문자가 ssh 인용을 거쳐 그대로 전달되는지.
-6. ~~ssh 비대화형 셸에서 `orca`가 런타임에 닿는지.~~ [research 0003](0003-orca-runner-contract.md) 6절에서 확인했다. 절대 경로로 부르면 닿는다.
+6. ~~ssh 비대화형 셸에서 `orca`가 런타임에 닿는지.~~ [research 0003](0003-orca-runner-contract.md) 6절에서 확인했다. 절대 경로로 부르면 닿고 ssh 세션 쪽에는 GUI 세션이 필요 없다. 콘솔 로그인 세션이 없을 때 서비스가 뜨는지는 남았다(0003 「아직 모르는 것」 7).
 7. Linux 러너의 `orca` 설치 경로와 `orca serve` 서비스 구성. research 0003에서도 남았다(Linux 러너 준비 전).
 8. 터미널이 아닌 chat(`structured`)으로 뜬 에이전트의 진행 감지 방법. `--surface terminal`을 강제하면 피할 수 있는지.
-9. ~~`worktree rm` 출력과, 에이전트가 아직 도는 워크트리를 지울 때의 동작.~~ [research 0003](0003-orca-runner-contract.md) 9절에서 확인했다.
+9. `worktree rm` 출력과, 에이전트가 아직 도는 워크트리를 지울 때의 동작. 출력과 `--force` 동작은 [research 0003](0003-orca-runner-contract.md) 9절에서 확인했다. 턴이 끝나고 백그라운드 셸이 돌던 에이전트에만 시험했고, 턴 도중의 에이전트는 남았다(0003 「아직 모르는 것」 6).
 
 **Linear**
 

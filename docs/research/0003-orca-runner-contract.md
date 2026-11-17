@@ -5,9 +5,9 @@
 출처 표시는 research 0002를 따른다.
 
 - **[실행]** 테스트 러너에서 직접 돌린 명령의 결과. macOS(arm64) 러너, Orca 1.4.258, 오케스트레이터 기계에서 비대화형 `ssh <host> '<command>'`로 실행했다.
-- **[스키마]** `orca <command> --help`와 `orca agent-context --json`.
+- **[스키마]** `orca <command> --help`와 `orca agent-context --json`. 0002는 `--help` 출력을 **[실행]**으로 적은 곳도 있으나, 이 문서는 명령 정의(usage·notes)를 인용할 때 **[스키마]**로 적는다.
 
-테스트 저장소는 버려도 되는 비공개 저장소 하나를 러너에 clone해 Orca 프로젝트로 등록했고, 워크트리 넷(W1~W4)에 Claude Code를 하나씩 짧게 띄웠다. 이 문서에 쓴 것은 W1(에이전트가 끝난 뒤 `rm`), W2(입력 기다리는 에이전트에 `terminal close`), W4(에이전트가 도는 중에 `rm`)다. W3(0이 아닌 종료 코드)는 티켓 0010의 결과 문서(research 0004)에 쓴다. 런은 0010 검증과 같은 세션에서 돌려 에이전트를 띄운 횟수를 줄였다. 확인이 끝난 뒤 워크트리와 브랜치를 모두 지웠다.
+테스트 저장소는 버려도 되는 비공개 저장소 하나를 러너에 clone해 Orca 프로젝트로 등록했고, 워크트리 넷(W1~W4)에 Claude Code를 하나씩 짧게 띄웠다. 이 문서에 쓴 것은 W1(에이전트가 끝난 뒤 `rm`), W2(입력 기다리는 에이전트에 `terminal close`), W4(에이전트가 도는 중에 `rm`)다. W3(0이 아닌 종료 코드)는 티켓 0010의 결과 문서(research 0004)에 쓴다. 런은 0010 검증과 같은 세션에서 돌려 에이전트를 띄운 횟수를 줄였다. 확인이 끝난 뒤 워크트리와 브랜치를 모두 지웠다. 순서는 1번(런타임 끄고 다시 설치) 다음에 W1~W4다. 그래서 런타임이 켜진 픽스처는 모두 다시 뜬 런타임 하나의 `runtimeId`를 쓴다.
 
 예시와 픽스처의 로컬 경로, 호스트명, 사용자명, 계정은 `<path>`, `<host>`, `<user>`, `acme`로 바꿨다. UUID와 시각은 순서만 남긴 가상 값이다. 픽스처는 [`fixtures/0003/`](fixtures/0003/)에 있다.
 
@@ -158,6 +158,10 @@ W4는 에이전트의 턴이 끝나고 에이전트가 띄운 `sleep 120`이 백
 - `--delete-branch` 없이(W1): 브랜치가 남아 손으로 지웠다. help대로다 **[스키마]**.
 - `--delete-branch`(W2, W3, W4): 기준 브랜치에서 커밋이 늘지 않은 브랜치는 모두 지워졌다. 병합되지 않은 커밋이 있는 브랜치는 시험하지 않았다. help는 병합이 증명되지 않은 브랜치는 남긴다고 적는다 **[스키마]**.
 
+### `worktree ps` 행의 `identity`
+
+1.4.258의 `worktree ps` 행에는 `worktreeId`, `worktreeInstanceId`와 함께 `identity`(`key`, `executionHostId`, `instanceId`)와 `address`가 있다. 픽스처는 `--agent-wait`로 받았고, `--agent-wait` 없이 부른 `worktree ps --json`에서도 행(저장소의 기본 워크트리)에 `identity`, `worktreeInstanceId`, `address`가 있었다 **[실행]**. 0002 A.7의 "`ps` 행에는 `identity`가 없다"는 이 버전에서 맞지 않는다.
+
 ### 어댑터에 주는 뜻
 
 - 런 로그(마지막 줄)는 지우기 전에 `terminal read`로 읽어 둔다. 지운 뒤에는 비어 있다.
@@ -201,9 +205,10 @@ orca terminal close ([--terminal <handle>] [--tab] | --worktree <selector> --all
 
 ### 결론: 에이전트 멈추기는 `terminal close`로 한다
 
-Runner 어댑터의 "에이전트 멈추기"는 `orca terminal close --worktree id:<repoId>::<path> --all --json`으로 한다.
+Runner 어댑터의 "에이전트 멈추기"는 `orca terminal close`로 한다. 핸들이 없어도 되는 `--worktree id:<repoId>::<path> --all --json`이 후보다.
 
 - 워크트리 선택자만으로 부를 수 있어, 런 레코드에 터미널 핸들이 없거나 런타임이 다시 떠 핸들이 바뀐 경우에도 쓸 수 있다. 에이전트가 띄운 다른 터미널도 함께 멈춘다.
+- `--all`은 help상 탭·레이아웃·재개 기록까지 지운다. 멈춘 에이전트 세션을 사람이 Orca에서 이어 보게 하려면 `--terminal <handle>`이 낫다. 어느 형태를 쓸지는 0013에서 정한다.
 - `--all` 형태는 실행하지 않았다. 같은 명령의 `--terminal <handle>` 형태로 멈춤을 확인했다. 0013에서 `--all` 출력을 확인하고, 필요하면 `worktree create` 결과의 `launch.outcome.handle`로 `--terminal` 형태를 쓴다.
 - 멈추기 전에 `terminal read`로 로그 꼬리를 읽어 둔다. `terminal close` 뒤에는 같은 핸들의 `tail`이 비어 있었다([`terminal-read-after-close.json`](fixtures/0003/terminal-read-after-close.json)). 런의 마지막 로그(스펙 7절)는 이 순서로만 얻는다.
 - `worktree rm --force`로 갈음하지 않는다. 시간 초과 런도 PR 상태를 판정하고 사람이 볼 수 있어야 하며, 워크트리 정리는 런이 끝나고 PR 상태를 판정한 뒤의 일이다(0002 A.7).
