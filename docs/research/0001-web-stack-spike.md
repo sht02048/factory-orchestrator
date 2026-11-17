@@ -6,15 +6,15 @@
 
 조합은 함께 돈다. 막힌 곳은 없고, 우회가 필요한 곳이 다섯 군데 있다.
 
-| #   | 질문                                                                                       | 결과                                                              |
-| --- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| 1   | TanStack Start 최소 앱(라우트 2개, server function, server route, dev, 프로덕션 빌드·실행) | 된다                                                              |
-| 2   | StyleX `defineVars` 토큰과 컴포넌트 스타일, SSR 깜박임, CSS 추출                           | 된다                                                              |
-| 3   | UI SDK 메뉴를 StyleX로 스타일링, SSR·하이드레이션 경고                                     | 된다                                                              |
-| 4   | `tsc --noEmit`(TS 7)가 strict 옵션 세트에서 통과                                           | 우회하면 된다(웹 앱만 모듈 해석 옵션 변경, strict 계열 완화 없음) |
-| 5   | oxlint type-aware, oxfmt 통과                                                              | 우회하면 된다(StyleX 플러그인 `any` 반환, 생성 파일 포맷 제외)    |
-| 6   | 타입 안전한 i18n 메시지 키                                                                 | 된다(키), 우회 필요(ICU 인자 타입)                                |
-| 7   | `apps/worker` Node 데몬이 같은 tsconfig·빌드 체계에서 동작                                 | 된다                                                              |
+| #   | 질문                                                                                       | 결과                                                                                          |
+| --- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| 1   | TanStack Start 최소 앱(라우트 2개, server function, server route, dev, 프로덕션 빌드·실행) | 된다                                                                                          |
+| 2   | StyleX `defineVars` 토큰과 컴포넌트 스타일, SSR 깜박임, CSS 추출                           | 된다                                                                                          |
+| 3   | UI SDK 메뉴를 StyleX로 스타일링, SSR·하이드레이션 경고                                     | 된다                                                                                          |
+| 4   | `tsc --noEmit`(TS 7)가 strict 옵션 세트에서 통과                                           | 우회하면 된다(웹 앱만 모듈 해석 옵션 변경, 라이브러리 `.d.ts`는 기존 `skipLibCheck`로 건너뜀) |
+| 5   | oxlint type-aware, oxfmt 통과                                                              | 우회하면 된다(StyleX 플러그인 `any` 반환, 생성 파일 포맷 제외)                                |
+| 6   | 타입 안전한 i18n 메시지 키                                                                 | 된다(키), 우회 필요(ICU 인자 타입)                                                            |
+| 7   | `apps/worker` Node 데몬이 같은 tsconfig·빌드 체계에서 동작                                 | 된다                                                                                          |
 
 ADR 0002·0003을 바꿀 근거는 찾지 못했다. 다만 ADR 0005의 "npm 패키지 하나로 배포"와 엮인 후속 결정이 하나 생겼다(아래 "남은 위험").
 
@@ -79,15 +79,16 @@ ADR 0002·0003을 바꿀 근거는 찾지 못했다. 다만 ADR 0005의 "npm 패
 - dev에서는 StyleX가 `/virtual:stylex.css`를 제공한다. 루트 셸의 `<head>`에 dev 전용 링크를 직접 넣어야 한다.
 
   ```tsx
-  {
-    import.meta.env.DEV ? <link rel="stylesheet" href="/virtual:stylex.css" /> : null;
-  }
+  <head>
+    <HeadContent />
+    {import.meta.env.DEV ? <link rel="stylesheet" href="/virtual:stylex.css" /> : null}
+  </head>
   ```
 
 - 프로덕션에서는 StyleX CSS가 앱의 CSS 자산(`app.css?url`을 루트 `head().links`로 연결)에 덧붙어 `dist/client/assets/app-*.css`로 나온다. 덧붙일 CSS 자산이 하나는 있어야 하므로 빈에 가까운 `app.css`를 둔다. `useCSSLayers: true`로 `@layer priority1..` 순서가 생긴다.
 - 깜박임 없음: SSR HTML의 `<head>`에 스타일시트 링크가 있고, JS를 끈 브라우저 컨텍스트에서도 트리거 버튼 배경색이 토큰 값으로 계산됐다.
 - dev 빌드는 디버그용 클래스(`__root__styles.body`)와 `data-style-src` 속성을 붙인다. 프로덕션에는 없다.
-- 확인할 점: 기본 lightningcss 설정이 OKLCH 토큰을 hex + `lab()` 폴백으로 바꾼다. 색이 틀리지는 않지만 결과 CSS에 `oklch()`가 남지 않는다. 0003 디자인 시스템에서 OKLCH를 그대로 내보내려면 `lightningcssOptions.targets`를 정해야 한다.
+- 확인할 점: 기본 lightningcss 설정이 OKLCH 토큰을 hex + `lab()` 폴백으로 바꾼다. 색이 틀리지는 않지만 결과 CSS에 `oklch()`가 남지 않는다. 티켓 0003(디자인 시스템)에서 OKLCH를 그대로 내보내려면 `lightningcssOptions.targets`를 정해야 한다.
 
 ### 3. UI SDK — 된다
 
@@ -105,7 +106,7 @@ ADR 0002·0003을 바꿀 근거는 찾지 못했다. 다만 ADR 0005의 "npm 패
 
 ### 4. TS 7 typecheck — 우회하면 된다
 
-strict 계열 옵션(`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `verbatimModuleSyntax`, `noPropertyAccessFromIndexSignature`, `isolatedModules`)은 하나도 완화하지 않고 통과했다. 대신 `apps/web/tsconfig.json`에서 아래를 덮어써야 한다.
+strict 계열 옵션(`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `verbatimModuleSyntax`, `noPropertyAccessFromIndexSignature`, `isolatedModules`)은 하나도 완화하지 않고 앱 코드가 통과했다. 단, 라이브러리 선언 파일(`.d.ts`)은 `tsconfig.base.json`에 원래 있던 `skipLibCheck: true`로 검사하지 않는다. 대신 `apps/web/tsconfig.json`에서 아래를 덮어써야 한다.
 
 ```json
 {
@@ -124,7 +125,9 @@ strict 계열 옵션(`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropert
 
 - `moduleResolution: nodenext`를 그대로 두면 실패한다. 생성되는 `routeTree.gen.ts`와 Start 관례가 확장자 없는 상대 import(`./routes/index`)를 쓰고, `@stylexjs/unplugin`의 타입도 nodenext로는 `vite` 속성을 찾지 못한다. 번들러가 해석하는 웹 앱이라 `bundler`가 맞다. 완화가 아니라 실행 환경에 맞춘 변경으로 본다.
 - `routeTree.gen.ts`는 파일 맨 위에 `// @ts-nocheck`가 있어 그 자체는 검사되지 않는다. 대신 `Register` 보강으로 라우트 경로·params·loader 데이터 타입이 앱 코드에 이어지고, 그쪽은 검사된다.
-- 걸린 것: `stylex.props`가 오버로드라 `Parameters<typeof stylex.props>`가 `never`가 된다. 도우미 인자 타입은 `ReadonlyArray<stylex.StyleXStyles | false>`처럼 직접 쓴다.
+- **`skipLibCheck`를 끄면 실패한다.** `--skipLibCheck false`로 돌리면 `@ui-sdk/core`의 선언 파일(accordion, checkbox-group, listbox, tabs, slider, tree, trigger-menu 등)이 `TS2344: ... does not satisfy the constraint 'Primitive'`로 실패한다. `--exactOptionalPropertyTypes false`를 더하면 UI SDK 오류는 사라진다. UI SDK 선언 파일이 이 저장소의 `exactOptionalPropertyTypes`와 맞지 않는다는 뜻이다. 나머지 오류는 `unplugin`, `@babel/*`, `@stylexjs/babel-plugin` 같은 빌드 도구 의존성의 implicit any다. `skipLibCheck: true`를 유지하는 한 앱 코드는 영향이 없다. UI SDK 부품을 쓸 때 그 부품의 props 타입이 앱 코드 쪽에서 `exactOptionalPropertyTypes` 오류를 낼 수 있으니 티켓 0003에서 부품마다 확인한다.
+- 생성기 대안: 설치된 `@tanstack/router-generator`에는 `addExtensions` 옵션이 있어 `routeTree.gen.ts`의 import에 확장자를 붙일 수 있다. 그래도 `@stylexjs/unplugin` 타입이 nodenext에서 깨지고 앱 코드의 모든 상대 import(`.stylex` 토큰 파일 포함)에 확장자를 붙여야 하므로, 웹 앱은 `bundler`로 둔다.
+- 걸린 것: `stylex.props`는 `this: null | undefined | unknown` 매개변수를 가진 선언이라 `Parameters<typeof stylex.props>`가 `never`가 된다. 도우미 인자 타입은 `ReadonlyArray<stylex.StyleXStyles | false>`처럼 직접 쓴다.
 
 ### 5. oxlint type-aware, oxfmt — 우회하면 된다
 
@@ -195,7 +198,8 @@ declare module "use-intl" {
 
 - **배포 형태(ADR 0005)**: Node는 `node_modules` 안의 `.ts` 파일에 타입 스트리핑을 하지 않는다. 지금 worker는 워크스페이스 안이라 돌지만, npm 패키지로 배포하면 worker와 공유 패키지를 JS로 빌드하는 단계가 필요하다. 웹은 이미 `dist`로 빌드된다. 릴리스 티켓에서 worker 번들러(Rolldown 등)를 정해야 한다.
 - **서버 바인딩**: `srvx`가 기본으로 모든 인터페이스에서 듣는다. 셀프호스팅 설정에서 바인딩 주소를 정해야 한다(webhook을 밖에 여는 방식은 ADR 0005대로 운영자가 고른다).
-- **`packages/ui` 밖 색 값 금지**: oxlint에는 StyleX 규칙이 없다. 0003의 "밖에서 색 값을 쓰면 실패" 조건은 별도 검사(oxlint JS 플러그인, 커스텀 스크립트 등)로 만들어야 한다.
+- **`packages/ui` 밖 색 값 금지**: oxlint에는 StyleX 규칙이 없다. 티켓 0003의 "밖에서 색 값을 쓰면 실패" 조건은 별도 검사(oxlint JS 플러그인, 커스텀 스크립트 등)로 만들어야 한다.
+- **UI SDK 타입과 strict 세트**: `@ui-sdk/core` 선언 파일이 `exactOptionalPropertyTypes`에서 실패한다(질문 4). 지금은 `skipLibCheck: true`에 기대고 있으므로 이 옵션을 끄면 안 되고, UI SDK를 올릴 때 다시 확인한다. 상위 저장소에 이슈로 알릴 만하다.
 - **UI SDK 베타**: 0.1.0-beta.7이 이미 나왔다. 버전 고정과 `packages/ui` 격리(ADR 0003)가 그대로 필요하다.
 - `@tanstack/react-start`가 RSC를 쓰지 않아도 `@tanstack/react-start-rsc`를 전이 의존성으로 설치한다. 기능에는 영향이 없다.
 - 확인하지 않은 것: HMR 중 StyleX CSS 갱신의 세부 동작, 다크 모드 테마(`createTheme`), 실제 Linear webhook 서명 검증, CI(ubuntu)에서의 웹 빌드.
