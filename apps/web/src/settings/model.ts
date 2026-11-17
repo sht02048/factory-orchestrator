@@ -108,6 +108,8 @@ export interface PrerequisiteView {
   name: string;
   satisfied: boolean | null;
   hint: string | null;
+  /** GitHub push 항목의 러너 쪽 프로젝트 표시 이름. 그 밖의 항목이거나 찾지 못하면 null */
+  project: string | null;
   /** 깨지면 할당에서 빠지는 조건(1단계는 GitHub 인증, Q82.14) */
   blocksAssignment: boolean;
 }

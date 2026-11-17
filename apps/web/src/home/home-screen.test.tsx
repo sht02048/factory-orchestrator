@@ -99,6 +99,19 @@ describe("홈 화면", () => {
     ]);
   });
 
+  it("에이전트는 ID 대신 공용 에이전트 이름으로 보인다", () => {
+    const { db, ids } = seedDatabase();
+    const html = render(loadHomePage(db, "ws-commerce", now), `run:${ids.get("ACME-10") ?? ""}`);
+    expect(sectionRows(html, homeJson.section.running).get("ACME-10")).toContain(
+      domain.agent.claude,
+    );
+    expect(sectionRows(html, homeJson.section.queued).get("ACME-13")).toContain(
+      domain.agent.claude,
+    );
+    expect(panelText(html)).toContain(domain.agent.claude);
+    expect(domain.agent.claude).toBe("Claude Code");
+  });
+
   it("Queued 런에 순서에서 빠진 이유를 보인다(Q68)", () => {
     const { db } = seedDatabase();
     const queued = sectionRows(

@@ -126,10 +126,17 @@ describe("loadRunnersPage", () => {
     expect(a.assignmentBlocked).toBe(true);
     // 할당을 막지 않는 필수 조건(상시 서비스)은 담지 않는다
     expect(a.githubAuth).toEqual([
-      { id: "github-push:github:acme/web", name: "GitHub push access: acme/web", satisfied: false },
+      {
+        id: "github-push:github:acme/web",
+        name: "GitHub push access: acme/web",
+        project: "github:acme/web",
+        satisfied: false,
+      },
       {
         id: "github-push:github:acme/docs",
         name: "GitHub push access: acme/docs",
+        // runner-a 의 러너 쪽 프로젝트에 없다
+        project: null,
         satisfied: true,
       },
     ]);

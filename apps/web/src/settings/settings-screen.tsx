@@ -25,6 +25,7 @@ import {
 import { colors, space } from "@factory/ui/tokens.stylex";
 import { useEffect, useState, type ReactNode } from "react";
 import { useFormatter, useTranslations } from "use-intl";
+import { prerequisiteHint, useAgentName, usePrerequisiteName } from "../labels";
 import {
   INSTALL_ITEMS,
   MAX_RUN_MINUTES,
@@ -733,19 +734,6 @@ function MappingRow({
   );
 }
 
-function useAgentName(): (agent: string) => string {
-  const t = useTranslations("settings.agents");
-  return (agent) => {
-    switch (agent) {
-      case "claude":
-      case "codex":
-        return t(agent);
-      default:
-        return agent;
-    }
-  };
-}
-
 /** 저장된 값이 목록에 없어도(러너에서 사라짐 등) 그 값을 고른 채로 보이게 더한다 */
 function withCurrent(
   options: ReadonlyArray<{ value: string; label: string }>,
@@ -1407,12 +1395,14 @@ export function useRunnerErrorName(): (kind: string) => string {
 
 function Prerequisite({ prerequisite }: { prerequisite: PrerequisiteView }) {
   const t = useTranslations("settings.runners.check");
+  const prerequisiteName = usePrerequisiteName();
   const broken = prerequisite.satisfied === false;
+  const hint = prerequisiteHint(prerequisite);
   return (
     <li {...stylex.props(styles.item, styles.prerequisite)}>
       <span {...stylex.props(styles.inline)}>
         <Dot tone={broken ? "failed" : "neutral"} />
-        <span {...stylex.props(styles.primaryText)}>{prerequisite.name}</span>
+        <span {...stylex.props(styles.primaryText)}>{prerequisiteName(prerequisite)}</span>
         <Text variant="meta">
           {prerequisite.satisfied === null
             ? t("unknown")
@@ -1421,9 +1411,9 @@ function Prerequisite({ prerequisite }: { prerequisite: PrerequisiteView }) {
               : t("unsatisfied")}
         </Text>
       </span>
-      {broken && prerequisite.hint !== null ? (
+      {broken && hint !== null ? (
         <Text variant="meta" mono>
-          {prerequisite.hint}
+          {hint}
         </Text>
       ) : null}
       {broken && prerequisite.blocksAssignment ? (

@@ -26,6 +26,7 @@ import { colors, fontSize, fontWeight, lineHeight, space } from "@factory/ui/tok
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useFormatDuration } from "../format/duration";
+import { useAgentName } from "../labels";
 import type { WorkspaceSummary } from "../shell/model";
 import { useDayLabel } from "./dates";
 import { STATS_DAYS, STATS_DIMENSIONS, percent } from "./model";
@@ -121,6 +122,7 @@ function StatsView({
   onSelect,
   workspaceName,
 }: Omit<StatsScreenProps, "page"> & { page: LoadedStatsPage; workspaceName: string }) {
+  const groupName = useGroupName(dimension);
   const t = useTranslations("stats");
   const dayLabel = useDayLabel();
   const duration = useFormatDuration();
@@ -208,9 +210,9 @@ function StatsView({
                   onValueChange={onSelect}
                 >
                   {groups.map((group) => (
-                    <TableRow key={group.key} value={group.key} label={group.name}>
+                    <TableRow key={group.key} value={group.key} label={groupName(group)}>
                       <TableCell>
-                        <RowTitle>{group.name}</RowTitle>
+                        <RowTitle>{groupName(group)}</RowTitle>
                       </TableCell>
                       <TableCell align="end" numeric>
                         {group.runs}
@@ -339,6 +341,12 @@ function Figure({ value, label }: { value: ReactNode; label: ReactNode }) {
   );
 }
 
+/** 묶음 이름. 에이전트는 ID 대신 공용 에이전트 이름으로 보인다 */
+function useGroupName(dimension: StatsDimension): (group: StatsGroup) => string {
+  const agentName = useAgentName();
+  return (group) => (dimension === "agent" ? agentName(group.key) : group.name);
+}
+
 /** Failed 조합 목록. 조합 이름이 길어 정의 목록의 고정 라벨 폭 대신 내용 폭에 맞춘다 */
 function FailedCombinations({ combinations }: { combinations: ReadonlyArray<FailedCombination> }) {
   const t = useTranslations("stats.failedCombinations");
@@ -361,6 +369,7 @@ function FailedCombinations({ combinations }: { combinations: ReadonlyArray<Fail
 }
 
 function GroupPanel({ group, dimension }: { group: StatsGroup; dimension: StatsDimension }) {
+  const groupName = useGroupName(dimension);
   const t = useTranslations("stats");
   const duration = useFormatDuration();
   const { outcomes, humanCheck, durations } = group;
@@ -381,7 +390,7 @@ function GroupPanel({ group, dimension }: { group: StatsGroup; dimension: StatsD
             {t("panel.context", { dimension: t(`dimension.${dimension}`), days: STATS_DAYS })}
           </Text>
         }
-        title={group.name}
+        title={groupName(group)}
         reason={
           group.rated === 0
             ? t("panel.whyOnlyCanceled", { canceled: outcomes.canceled })

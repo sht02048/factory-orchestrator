@@ -604,6 +604,66 @@ describe("러너 확인", () => {
     expect(text).toContain("GitHub용 ssh 키");
   });
 
+  it("runner-orca 의 확인 항목은 id 종류로 메시지를 골라 보이고 모르는 종류는 어댑터 이름을 보인다", async () => {
+    const f = fixture();
+    const runnerId = addRunner(f);
+    recordRunnerCheck(f.context.db, {
+      runnerId,
+      online: true,
+      checkedAt: now,
+      error: null,
+      projects: [{ id: repo, displayName: "acme/web", setupState: "ready" }],
+      assignmentBlocked: true,
+    });
+    // 이름과 안내는 runner-orca 어댑터가 주는 영어 문자열 그대로다
+    const page = await checked(f, runnerId, {
+      result: health({
+        prerequisites: [
+          {
+            id: "orca-service",
+            name: "Orca background service",
+            satisfied: false,
+            hint: "/usr/local/bin/orca serve service install",
+            blocksAssignment: false,
+          },
+          {
+            id: `github-push:${repo}`,
+            name: "GitHub push access: acme/web",
+            satisfied: false,
+            hint: "Run `gh auth login --insecure-storage` and `gh auth setup-git` on the runner.",
+            blocksAssignment: true,
+          },
+          {
+            id: "github-push:github:acme/gone",
+            name: "GitHub push access: acme/gone",
+            satisfied: true,
+            hint: null,
+            blocksAssignment: true,
+          },
+          {
+            id: "disk-space",
+            name: "Disk space",
+            satisfied: true,
+            hint: null,
+            blocksAssignment: false,
+          },
+        ],
+      }),
+    });
+    const text = panelText(render(page, "runners"));
+    expect(text).toContain("Orca 상시 서비스 갖추지 못했어요");
+    // 설치 명령은 언어가 없는 명령이라 그대로 보인다
+    expect(text).toContain("/usr/local/bin/orca serve service install");
+    // 러너 쪽 프로젝트 표시 이름을 넣고, 찾지 못하면 프로젝트 ID 를 넣는다
+    expect(text).toContain("GitHub push 권한: acme/web 갖추지 못했어요");
+    expect(text).toContain("GitHub push 권한: github:acme/gone 갖췄어요");
+    expect(text).toContain("Disk space 갖췄어요");
+    expect(text).not.toContain("Orca background service");
+    expect(text).not.toContain("GitHub push access");
+    expect(text).not.toContain("Run `gh auth login");
+    expect(text).toContain("gh auth login --insecure-storage");
+  });
+
   it("러너에 닿지 않은 결과와 확인 오류를 실패로 보인다", async () => {
     const f = fixture();
     const runnerId = addRunner(f);
