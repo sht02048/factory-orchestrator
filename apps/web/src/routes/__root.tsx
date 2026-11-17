@@ -1,12 +1,23 @@
 import * as stylex from "@stylexjs/stylex";
 import { Toaster } from "@factory/ui";
 import { colors, fonts, fontSize, lineHeight } from "@factory/ui/tokens.stylex";
-import { HeadContent, Outlet, Scripts, createRootRoute, redirect } from "@tanstack/react-router";
+import {
+  HeadContent,
+  Outlet,
+  Scripts,
+  createRootRoute,
+  redirect,
+  rootRouteId,
+  useRouter,
+} from "@tanstack/react-router";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
-import { appMessages, defaultLocale, t, timeZone } from "../i18n";
+import { appMessages, defaultLocale, t } from "../i18n";
 import { ONBOARDING_PATH, isOpenPath, onboardingRedirect } from "../onboarding/model";
+import { getTimeZone } from "../server/functions";
 import { getOnboardingComplete } from "../server/onboarding-functions";
+import { localTimeZone, timeZoneCookie } from "../time-zone";
 import appCss from "../styles/app.css?url";
 
 /**
@@ -26,6 +37,12 @@ export const Route = createRootRoute({
     if (onboardingRedirect(location.pathname, complete) !== null)
       throw redirect({ to: ONBOARDING_PATH });
   },
+  /**
+   * 화면 시각을 그리는 시간대(0044). 서버가 요청의 쿠키로 읽어 서버 렌더링과 hydration 이 같은 값을 쓴다.
+   * 브라우저 시간대가 바뀌면 TimeZoneSync 가 다시 읽게 한다.
+   */
+  loader: () => getTimeZone(),
+  shouldReload: false,
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -58,12 +75,32 @@ function RootDocument({ children }: { children: ReactNode }) {
 }
 
 function RootLayout() {
+  const timeZone = Route.useLoaderData();
   return (
     <IntlProvider locale={defaultLocale} messages={appMessages} timeZone={timeZone}>
+      <TimeZoneSync timeZone={timeZone} />
       <Outlet />
       <AppToaster />
     </IntlProvider>
   );
+}
+
+/**
+ * 브라우저 시간대가 서버가 그린 시간대와 다르면(첫 방문, 시간대를 옮김) 쿠키에 남기고, 시간대를 쓰는
+ * 데이터(루트의 시간대, Stats 날짜 구간)를 다시 읽는다. hydration 이 끝난 뒤에 돌아 서버 렌더링과
+ * 어긋나지 않는다. 쿠키를 남길 수 없으면 서버가 계속 UTC 를 돌려주고, 같은 값이라 다시 돌지 않는다.
+ */
+function TimeZoneSync({ timeZone }: { timeZone: string }) {
+  const router = useRouter();
+  useEffect(() => {
+    const local = localTimeZone();
+    if (local === timeZone) return;
+    document.cookie = timeZoneCookie(local);
+    void router.invalidate({
+      filter: (match) => match.routeId === rootRouteId || match.routeId === "/_app/stats",
+    });
+  }, [router, timeZone]);
+  return null;
 }
 
 function AppToaster() {

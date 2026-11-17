@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { IntlProvider, createTranslator, useMessages } from "use-intl";
+import { IntlProvider, createTranslator, useMessages, useTimeZone } from "use-intl";
 import domain from "../messages/ko/domain.json" with { type: "json" };
 import shell from "../messages/ko/shell.json" with { type: "json" };
+import { DEFAULT_TIME_ZONE } from "./time-zone";
 
 /*
  * 화면 문구는 messages/{locale}/{파일}.json 에만 둔다(ADR 0005). 지금은 한국어만 채운다.
@@ -25,7 +26,6 @@ export interface AppMessages {
 }
 
 export const defaultLocale = "ko";
-export const timeZone = "UTC";
 
 /** 루트에 싣는 공용 메시지 */
 export const appMessages = { shell, domain };
@@ -40,7 +40,7 @@ declare module "use-intl" {
 /** 라우트 head 처럼 React 밖에서 쓰는 공용 번역 함수 */
 export const t = createTranslator({ locale: defaultLocale, messages: appMessages });
 
-/** 화면 하나의 메시지 파일을 바깥 메시지에 더해 싣는다. */
+/** 화면 하나의 메시지 파일을 바깥 메시지에 더해 싣는다. 시간대는 바깥(루트)의 것을 그대로 쓴다. */
 export function ScreenMessages({
   messages,
   children,
@@ -49,6 +49,8 @@ export function ScreenMessages({
   children: ReactNode;
 }) {
   const parent = useMessages();
+  // 루트는 언제나 시간대를 준다. 없으면 UTC 로 그린다.
+  const timeZone = useTimeZone() ?? DEFAULT_TIME_ZONE;
   return (
     <IntlProvider locale={defaultLocale} timeZone={timeZone} messages={{ ...parent, ...messages }}>
       {children}

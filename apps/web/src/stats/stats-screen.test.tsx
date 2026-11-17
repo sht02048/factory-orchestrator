@@ -55,7 +55,7 @@ function panelText(html: string): string {
 
 describe("Stats 화면", () => {
   it("기간 요약에 끝난 런, Merged 비율, 손댈 일, 리드 타임, Human Check 뒤 병합을 보인다", () => {
-    const html = text(render(loadStatsPage(seedStatsDatabase(), undefined, now)));
+    const html = text(render(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC")));
     expect(html).toContain("Acme Commerce · 최근 14일(11월 4일–11월 17일)");
     expect(html).toContain("9 끝난 런");
     expect(html).toContain("22% Merged");
@@ -65,14 +65,14 @@ describe("Stats 화면", () => {
   });
 
   it("Failed 조합을 에이전트 결과 · PR 상태로 보인다", () => {
-    const html = text(render(loadStatsPage(seedStatsDatabase(), undefined, now)));
+    const html = text(render(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC")));
     expect(html).toContain("완료 보고(실패) · PR 없음 2개");
     expect(html).toContain("완료 보고(성공) · PR 닫힘 1개");
     expect(html).toContain("시간 초과 · PR 열림 1개");
   });
 
   it("날짜별 처리량 막대에 날마다 요약 결과 수를 단다", () => {
-    const html = render(loadStatsPage(seedStatsDatabase(), undefined, now));
+    const html = render(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
     expect(html).toContain(
       "<title>11월 16일: Merged 1 · Human Check 1 · Failed 0 · 취소 0</title>",
     );
@@ -80,7 +80,7 @@ describe("Stats 화면", () => {
   });
 
   it("나눠 보기 행에 런, Merged 비율, Human Check, Failed, 취소, 리드 타임을 보인다", () => {
-    const page = loadStatsPage(seedStatsDatabase(), undefined, now);
+    const page = loadStatsPage(seedStatsDatabase(), undefined, now, "UTC");
     expect(rowTexts(render(page))).toEqual([
       ["runner-a", "5", "40%", "2", "1", "0", "22분"],
       ["runner-b", "4", "0%", "1", "3", "0", "18분"],
@@ -92,7 +92,7 @@ describe("Stats 화면", () => {
   });
 
   it("고른 묶음의 요약을 패널에 보인다. 고르지 않았으면 첫 행이다", () => {
-    const page = loadStatsPage(seedStatsDatabase(), undefined, now);
+    const page = loadStatsPage(seedStatsDatabase(), undefined, now, "UTC");
     const first = panelText(render(page));
     expect(first).toContain("러너별 · 최근 14일");
     expect(first).toContain("runner-a");
@@ -108,7 +108,12 @@ describe("Stats 화면", () => {
   });
 
   it("기간에 끝난 런이 없으면 빈 목록 문구를 보이고 패널을 비운다", () => {
-    const page = loadStatsPage(seedStatsDatabase(), undefined, new Date("2027-01-01T00:00:00Z"));
+    const page = loadStatsPage(
+      seedStatsDatabase(),
+      undefined,
+      new Date("2027-01-01T00:00:00Z"),
+      "UTC",
+    );
     const html = render(page);
     expect(text(html)).toContain("최근 14일 동안 끝난 런이 없어요.");
     expect(text(html)).toContain("이 기간에 Failed 런이 없어요.");
@@ -116,7 +121,7 @@ describe("Stats 화면", () => {
   });
 
   it("전체 보기에서는 Workspace 를 고르라고 안내한다", () => {
-    const html = text(render(loadStatsPage(seedStatsDatabase(), "all", now)));
+    const html = text(render(loadStatsPage(seedStatsDatabase(), "all", now, "UTC")));
     expect(html).toContain("통계는 Workspace마다 봐요.");
     expect(html).toContain("Acme Labs 보기");
   });
@@ -125,7 +130,7 @@ describe("Stats 화면", () => {
     const page = () => {
       const db = seedStatsDatabase();
       addRunDecisionCases(db);
-      return loadStatsPage(db, undefined, now);
+      return loadStatsPage(db, undefined, now, "UTC");
     };
 
     it("기간 요약은 취소를 따로 보이고 Merged 비율에서 뺀다", () => {
