@@ -66,10 +66,10 @@ _Avoid_: Route, Binding
 _Avoid_: Trigger
 
 **Run 상태**:
-런의 상태는 Queued, Running, Waiting for Input, Disconnected, Ended 다섯이다. 할당된 런은 Queued로 시작하고(대기열 순서가 오고 남은 capacity가 있으면 바로 Running), Running·Waiting for Input·Disconnected를 오가다 Ended가 된다. Ended에만 에이전트 결과와 PR 상태가 붙는다.
+런의 상태는 Queued, Running, Waiting for Input, Disconnected, Ended 다섯이다. 할당된 런은 Queued로 시작하고(대기열 순서가 오고 남은 capacity가 있으면 바로 Running), Running·Waiting for Input·Disconnected를 오가다 Ended가 된다. 운영자가 취소하면 Queued에서 바로 Ended가 될 수도 있다. Ended에만 에이전트 결과와 PR 상태가 붙는다.
 
 **Queued**:
-할당은 됐지만 아직 시작하지 않은 런의 상태. 대기열에서 앞 런이 시작하기를 기다리거나, 할당 때 정한 러너에 남은 capacity가 없거나, 맞는 러너가 모두 Offline이라 러너를 정하지 못한 경우다(할당 때 정한 러너가 Offline이 돼 러너를 비운 경우 포함). 마지막 경우는 대기열 순서에서 빠져 뒤 런을 막지 않는다.
+할당은 됐지만 아직 시작하지 않은 런의 상태. 대기열에서 앞 런이 시작하기를 기다리거나, 할당 때 정한 러너에 남은 capacity가 없거나, 맞는 러너가 모두 Offline이라 러너를 정하지 못한 경우다(할당 때 정한 러너가 Offline이 됐거나 그 러너에서 런의 러너 쪽 프로젝트가 사라져 러너를 비운 경우 포함). 마지막 경우는 대기열 순서에서 빠져 뒤 런을 막지 않는다.
 _Avoid_: Pending, Waiting(단독으로. Waiting for Input은 다른 상태다)
 
 **Running**:
@@ -83,7 +83,7 @@ _Avoid_: Pending, Waiting(단독으로. Waiting for Input은 다른 상태다)
 _Avoid_: Offline(러너의 연결 여부이지 런의 상태가 아니다), Lost
 
 **Ended**:
-런이 끝나 에이전트 결과와 PR 상태가 붙은 상태. 에이전트 프로세스 종료, 최대 실행 시간 초과, 워크트리 사라짐으로 Ended가 된다.
+런이 끝나 에이전트 결과와 PR 상태가 붙은 상태. 에이전트 프로세스 종료, 최대 실행 시간 초과, 워크트리 사라짐, 운영자 취소로 Ended가 된다.
 
 ### 결과
 
@@ -91,7 +91,7 @@ _Avoid_: Offline(러너의 연결 여부이지 런의 상태가 아니다), Lost
 런이 만든 변경을 담은 PR. 모든 런의 변경은 PR을 거치며, 기본 브랜치에 직접 push하지 않는다.
 
 **에이전트 결과**:
-Ended 런에서 에이전트 쪽이 어떻게 끝났는지. 런이 끝날 때 한 번 기록한다. 여섯 가지다.
+Ended 런에서 에이전트 쪽이 어떻게 끝났는지. 런이 끝날 때 한 번 기록한다. 일곱 가지다.
 
 - **정상 종료**: 에이전트가 종료 코드 0으로 끝났다.
 - **오류 종료**: 에이전트가 0이 아닌 종료 코드로 끝났다.
@@ -99,6 +99,7 @@ Ended 런에서 에이전트 쪽이 어떻게 끝났는지. 런이 끝날 때 �
 - **입력 기다리다 멈춤**: Waiting for Input 중에 최대 실행 시간을 넘겨 오케스트레이터가 에이전트를 멈췄다.
 - **러너 연결 끊김**: Disconnected인 채 최대 실행 시간이 지났다. 러너에 닿지 않아 에이전트를 멈추지 못했다.
 - **워크트리 없음**: 런 중(Disconnected에서 다시 닿았을 때 포함) 워크트리가 사라졌다.
+- **운영자가 취소함**: 운영자가 Queued나 Running 런을 취소했다. Queued 런은 바로 끝내고, Running 런은 오케스트레이터가 에이전트를 멈춘 뒤 끝낸다.
 
 _Avoid_: 종료 사유, Exit status
 
@@ -117,7 +118,7 @@ _Avoid_: Review, Approval
 에이전트가 스스로 끝났고(정상 종료, 오류 종료) PR이 병합된 요약 결과. 에이전트가 CI 통과를 확인하고 PR을 머지 커밋으로 직접 병합한 경우다.
 
 **Failed**:
-Merged와 Human Check가 아닌 모든 요약 결과. 에이전트 결과가 시간 초과·입력 기다리다 멈춤·러너 연결 끊김·워크트리 없음이거나, 에이전트가 스스로 끝났는데 PR이 없거나 닫혔다. 왜 Failed인지는 두 축으로 보이며 따로 저장하는 사유는 없다. 자동으로 다시 시도하지 않는다.
+Merged와 Human Check가 아닌 모든 요약 결과. 에이전트 결과가 시간 초과·입력 기다리다 멈춤·러너 연결 끊김·워크트리 없음·운영자가 취소함이거나, 에이전트가 스스로 끝났는데 PR이 없거나 닫혔다. 왜 Failed인지는 두 축으로 보이며 따로 저장하는 사유는 없다. 자동으로 다시 시도하지 않는다.
 _Avoid_: Error, Crashed, Failed 사유(저장값처럼 들린다. 두 축으로 말한다)
 
 ### 사람
