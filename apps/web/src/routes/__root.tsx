@@ -4,7 +4,7 @@ import { colors, fonts, fontSize, lineHeight } from "@factory/ui/tokens.stylex";
 import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
-import { defaultLocale, messages, t, timeZone } from "../i18n";
+import { appMessages, defaultLocale, t, timeZone } from "../i18n";
 import appCss from "../styles/app.css?url";
 
 export const Route = createRootRoute({
@@ -12,7 +12,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: t("app.title") },
+      { title: t("shell.documentTitle") },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -41,7 +41,7 @@ function RootDocument({ children }: { children: ReactNode }) {
 
 function RootLayout() {
   return (
-    <IntlProvider locale={defaultLocale} messages={messages} timeZone={timeZone}>
+    <IntlProvider locale={defaultLocale} messages={appMessages} timeZone={timeZone}>
       <Outlet />
       <AppToaster />
     </IntlProvider>
@@ -49,8 +49,8 @@ function RootLayout() {
 }
 
 function AppToaster() {
-  const tApp = useTranslations("app");
-  return <Toaster label={tApp("toastRegion")} />;
+  const tShell = useTranslations("shell");
+  return <Toaster label={tShell("toastRegion")} />;
 }
 
 const styles = stylex.create({

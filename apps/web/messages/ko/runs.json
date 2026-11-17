@@ -1,0 +1,56 @@
+{
+  "documentTitle": "Runs · Factory Orchestrator",
+  "title": "Runs",
+  "subtitle": "{workspace}의 런이에요. 새 것부터 보여 줘요.",
+  "filter": {
+    "label": "상태로 거르기",
+    "all": "전체"
+  },
+  "columns": {
+    "ticket": "티켓",
+    "state": "상태",
+    "agentResult": "에이전트 결과",
+    "prState": "PR 상태",
+    "runner": "러너",
+    "agent": "에이전트",
+    "elapsed": "경과"
+  },
+  "listLabel": "런 목록",
+  "empty": "이 조건에 맞는 런이 없어요.",
+  "noRuns": "아직 런이 없어요. 티켓을 할당하면 여기에 보여요.",
+  "notApplicable": "—",
+  "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 런이 보여요.",
+  "allWorkspaces": {
+    "body": "전체에서는 모든 Workspace의 손댈 일만 모아 봐요. 런은 Workspace를 골라야 보여요.",
+    "pick": "{name} 보기"
+  },
+  "panel": {
+    "label": "고른 런 요약",
+    "subtitle": "{project} · {branch}",
+    "elapsedFor": "{duration}째",
+    "waitingFor": "{duration}째 기다리는 중",
+    "endedAfter": "{duration} 만에 끝났어요",
+    "state": "상태",
+    "summary": "요약 결과",
+    "agentResult": "에이전트 결과",
+    "prState": "PR 상태",
+    "runner": "러너",
+    "agent": "에이전트",
+    "elapsed": "경과 시간",
+    "waited": "기다린 시간",
+    "pr": "PR",
+    "none": "없음",
+    "notEnded": "런이 끝나면 기록해요",
+    "noRunner": "아직 정하지 않았어요",
+    "runnerOffline": "Offline",
+    "openPr": "PR {pr} 열기",
+    "reason": {
+      "running": "러너에서 에이전트가 티켓을 처리하고 있어요.",
+      "waiting-for-input": "에이전트가 사람 입력을 기다리고 있어요. 최대 실행 시간은 이 동안에도 흘러요.",
+      "disconnected": "런 중 러너에 5분 넘게 닿지 않았어요. 다시 닿으면 실제 상태를 확인해요. 최대 실행 시간은 이 동안에도 흘러요.",
+      "merged": "에이전트가 스스로 끝냈고 PR이 병합됐어요.",
+      "human-check": "에이전트가 스스로 끝냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
+      "failed": "에이전트 결과와 PR 상태 때문에 Failed예요. 자동으로 다시 시도하지 않아요."
+    }
+  }
+}

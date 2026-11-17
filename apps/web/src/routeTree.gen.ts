@@ -9,12 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as DsRouteImport } from './routes/ds'
+import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppRunnersRouteImport } from './routes/_app/runners'
+import { Route as AppRunsRouteImport } from './routes/_app/runs'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppStatsRouteImport } from './routes/_app/stats'
+import { Route as AppTicketsRouteImport } from './routes/_app/tickets'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DsRoute = DsRouteImport.update({
@@ -22,40 +27,96 @@ const DsRoute = DsRouteImport.update({
   path: '/ds',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRunnersRoute = AppRunnersRouteImport.update({
+  id: '/runners',
+  path: '/runners',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRunsRoute = AppRunsRouteImport.update({
+  id: '/runs',
+  path: '/runs',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStatsRoute = AppStatsRouteImport.update({
+  id: '/stats',
+  path: '/stats',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTicketsRoute = AppTicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
   '/ds': typeof DsRoute
+  '/runners': typeof AppRunnersRoute
+  '/runs': typeof AppRunsRoute
+  '/settings': typeof AppSettingsRoute
+  '/stats': typeof AppStatsRoute
+  '/tickets': typeof AppTicketsRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/ds': typeof DsRoute
+  '/runners': typeof AppRunnersRoute
+  '/runs': typeof AppRunsRoute
+  '/settings': typeof AppSettingsRoute
+  '/stats': typeof AppStatsRoute
+  '/tickets': typeof AppTicketsRoute
+  '/': typeof AppIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
   '/ds': typeof DsRoute
+  '/_app/runners': typeof AppRunnersRoute
+  '/_app/runs': typeof AppRunsRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_app/stats': typeof AppStatsRoute
+  '/_app/tickets': typeof AppTicketsRoute
+  '/_app/': typeof AppIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/ds'
+  fullPaths:
+    '/' | '/ds' | '/runners' | '/runs' | '/settings' | '/stats' | '/tickets'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/ds'
-  id: '__root__' | '/' | '/ds'
+  to: '/ds' | '/runners' | '/runs' | '/settings' | '/stats' | '/tickets' | '/'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/ds'
+    | '/_app/runners'
+    | '/_app/runs'
+    | '/_app/settings'
+    | '/_app/stats'
+    | '/_app/tickets'
+    | '/_app/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
   DsRoute: typeof DsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ds': {
@@ -65,11 +126,73 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/': {
+      id: '/_app/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/runners': {
+      id: '/_app/runners'
+      path: '/runners'
+      fullPath: '/runners'
+      preLoaderRoute: typeof AppRunnersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/runs': {
+      id: '/_app/runs'
+      path: '/runs'
+      fullPath: '/runs'
+      preLoaderRoute: typeof AppRunsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/stats': {
+      id: '/_app/stats'
+      path: '/stats'
+      fullPath: '/stats'
+      preLoaderRoute: typeof AppStatsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/tickets': {
+      id: '/_app/tickets'
+      path: '/tickets'
+      fullPath: '/tickets'
+      preLoaderRoute: typeof AppTicketsRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppRunnersRoute: typeof AppRunnersRoute
+  AppRunsRoute: typeof AppRunsRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppStatsRoute: typeof AppStatsRoute
+  AppTicketsRoute: typeof AppTicketsRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppRunnersRoute: AppRunnersRoute,
+  AppRunsRoute: AppRunsRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppStatsRoute: AppStatsRoute,
+  AppTicketsRoute: AppTicketsRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
   DsRoute: DsRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,24 +1,14 @@
-import { renderToString } from "react-dom/server";
-import { IntlProvider } from "use-intl";
 import { describe, expect, it } from "vitest";
 
-import { defaultLocale, messages, timeZone } from "../i18n";
+import { renderWithMessages } from "../testing/render";
+import { dsMessages } from "./messages";
 import { DesignSystemPage } from "./page";
 
+const messages = dsMessages;
+
 function renderPage(): string {
-  return renderToString(
-    <IntlProvider
-      locale={defaultLocale}
-      messages={messages}
-      timeZone={timeZone}
-      onError={(error) => {
-        // 메시지 키가 없거나 인자가 틀리면 테스트를 깨뜨린다.
-        throw error;
-      }}
-    >
-      <DesignSystemPage />
-    </IntlProvider>,
-  );
+  // 메시지 키가 없거나 인자가 틀리면 테스트를 깨뜨린다.
+  return renderWithMessages(<DesignSystemPage />, dsMessages);
 }
 
 describe("/ds 서버 렌더", () => {
