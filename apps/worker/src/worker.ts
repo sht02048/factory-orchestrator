@@ -275,7 +275,8 @@ function toQueuedRun(run: StoredRun): QueuedRun[] {
  * 러너에서 시작한 뒤 DB 쓰기만 실패하면 시작 결과를 메모리에 두고 다음 바퀴에 기록만 다시 한다.
  *
  * 알려진 한계: 러너의 응답을 받은 뒤 DB에 쓰기 전에 데몬이 죽으면 다시 띄웠을 때 시작을 새로 보낸다.
- * 지금 Runner 계약에서는 시작 전에 둘 멱등 키가 없다.
+ * 지금 Runner 계약에서는 시작 전에 둘 멱등 키가 없다. 0037에서 결정적 워크트리 이름·브랜치(Q40)를 멱등 키로
+ * 쓰고, 재시작 때 러너 어댑터가 그 이름으로 이미 시작한 런을 찾아 이어 붙이는 계약을 core에 더한다.
  */
 async function startQueuedRun(context: TickContext, choice: RunnerChoice): Promise<boolean> {
   const { db } = context;
