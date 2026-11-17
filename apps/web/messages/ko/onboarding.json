@@ -1,0 +1,72 @@
+{
+  "documentTitle": "처음 설정 · Factory Orchestrator",
+  "progress": "{total}단계 중 {step}단계",
+  "back": "이전",
+  "next": "다음",
+  "finish": "설정 마치기",
+  "nextLocked": "확인이 끝나야 다음으로 갈 수 있어요.",
+  "steps": {
+    "tracker": {
+      "title": "트래커를 연결해요",
+      "description": "티켓을 읽어 올 Linear 조직의 API 키를 넣어요. 넣으면 바로 연결을 확인하고, 확인되면 저장해요."
+    },
+    "github": {
+      "title": "GitHub 토큰을 넣어요",
+      "description": "런이 연 PR의 상태를 읽을 때 써요. 넣으면 바로 GitHub에 연결을 확인하고, 확인되면 암호화해서 저장해요."
+    },
+    "runner": {
+      "title": "첫 러너를 등록해요",
+      "description": "ssh로 닿는 Orca 환경이 러너예요. 등록하면 worker가 ssh로 접속해 러너가 런을 돌릴 준비가 됐는지 확인해요."
+    },
+    "workspace": {
+      "title": "첫 Workspace를 만들어요",
+      "description": "함께 볼 트래커 프로젝트를 골라 묶어요. 홈·Tickets·Stats는 Workspace 단위로 보여요."
+    },
+    "mapping": {
+      "title": "티켓을 누가 처리할지 정해요",
+      "description": "트래커 프로젝트마다 러너 쪽 프로젝트와 에이전트를 골라요. 하나 이상 정하면 설정을 마칠 수 있어요."
+    }
+  },
+  "webhook": {
+    "title": "Linear에서 webhook 만들기",
+    "intro": "티켓이 바뀌면 바로 알 수 있게 Linear가 이 오케스트레이터로 이벤트를 보내게 해요.",
+    "stepOpen": "Linear 설정의 API 화면에서 새 webhook을 만들어요.",
+    "stepUrl": "URL에는 밖에서 이 오케스트레이터에 닿는 공개 주소 뒤에 아래 경로를 붙여 넣어요.",
+    "stepEvents": "받을 이벤트는 Issues를 골라요.",
+    "stepSecret": "만든 뒤 보이는 signing secret을 이 연결의 Webhook signing secret 칸에 넣고 저장해요.",
+    "url": "Webhook 주소 예",
+    "urlDescription": "지금 접속한 주소로 만든 예예요. 공개 주소는 Tailscale Funnel, Cloudflare Tunnel, 리버스 프록시처럼 고른 방법에 따라 달라요."
+  },
+  "runner": {
+    "beforeTitle": "등록하기 전에 러너에서 해 둘 일",
+    "beforeService": "Orca 상시 서비스를 설치해요. 러너가 꺼졌다 켜져도 Orca가 다시 떠요.",
+    "pathPlaceholder": "orca 절대 경로",
+    "beforeAuth": "비대화형 ssh 세션에서도 GitHub에 push할 수 있게 인증해 둬요. 에이전트가 러너에서 push하고 PR을 열어야 PR 상태를 정할 수 있어요.",
+    "waiting": "확인 결과를 기다리고 있어요.",
+    "passed": "러너가 준비됐어요. 다음으로 가요.",
+    "offline": "러너에 닿지 않았어요. ssh 대상과 orca 실행 파일 경로를 확인하고 저장하면 다시 확인해요.",
+    "serviceTitle": "Orca 상시 서비스가 없어요",
+    "serviceBody": "러너에서 아래 명령으로 서비스를 설치한 뒤 다시 확인해요. PATH에 orca가 없어도 되게 등록한 경로를 넣었어요.",
+    "serviceLinux": "Linux 러너는 CLI 이름이 orca-ide일 수 있어요. 러너에서 which로 찾은 절대 경로를 넣어요.",
+    "authTitle": "러너의 GitHub 인증이 안 돼요",
+    "authBody": "러너 쪽 프로젝트 저장소에 git push --dry-run이 실패했어요. 흔한 원인은 이래요.",
+    "authCauseToken": "gh 토큰이 만료되거나 무효예요.",
+    "authCauseKeychain": "macOS 키체인이 잠겨 비대화형 ssh 세션에서 자격 증명을 읽지 못해요.",
+    "authCauseSshKey": "GitHub용 ssh 키가 러너에 없어요.",
+    "otherTitle": "갖추지 못한 조건이 있어요",
+    "otherBody": "아래 확인 결과의 안내를 따라 갖춘 뒤 다시 확인해요.",
+    "errorTitle": "러너 확인 중 오류가 났어요",
+    "errorBody": "러너에는 닿았지만 확인을 끝내지 못했어요({reason}). 러너의 Orca 상태를 확인하고 다시 확인해요.",
+    "pushUncheckedTitle": "GitHub 인증을 아직 확인하지 못했어요",
+    "pushUncheckedBody": "준비된 러너 쪽 프로젝트가 없어 git push --dry-run을 해 보지 못했어요. 러너의 Orca에 프로젝트 저장소를 추가하고 준비한 뒤 다시 확인해요."
+  },
+  "workspace": {
+    "name": "Workspace 이름",
+    "namePlaceholder": "예: Acme Commerce",
+    "create": "만들기",
+    "creating": "만드는 중",
+    "current": "{name} Workspace",
+    "pickHint": "트래커 프로젝트를 하나 이상 넣어요.",
+    "failed": "만들지 못했어요. 다시 해 주세요."
+  }
+}
