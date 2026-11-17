@@ -202,6 +202,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@factory/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@factory/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@factory/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -223,6 +229,9 @@ importers:
       use-intl:
         specifier: 4.15.1
         version: 4.15.1(@types/react@19.3.0)(react@19.3.1)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       '@stylexjs/unplugin':
         specifier: 0.19.2

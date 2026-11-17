@@ -1,8 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createTranslator } from "use-intl";
 import { DesignSystemPage } from "../ds/page";
-import { t } from "../i18n";
+import { dsMessages } from "../ds/messages";
+import { ScreenMessages, defaultLocale } from "../i18n";
+
+const t = createTranslator({ locale: defaultLocale, messages: dsMessages, namespace: "ds" });
 
 export const Route = createFileRoute("/ds")({
-  head: () => ({ meta: [{ title: t("ds.documentTitle") }] }),
-  component: DesignSystemPage,
+  head: () => ({ meta: [{ title: t("documentTitle") }] }),
+  component: () => (
+    <ScreenMessages messages={dsMessages}>
+      <DesignSystemPage />
+    </ScreenMessages>
+  ),
 });

@@ -1,0 +1,27 @@
+{
+  "documentTitle": "Factory Orchestrator",
+  "toastRegion": "알림",
+  "brand": "Factory Orchestrator",
+  "brandMark": "F",
+  "workspace": {
+    "label": "Workspace",
+    "all": "전체",
+    "none": "Workspace 없음"
+  },
+  "nav": {
+    "label": "화면",
+    "home": "홈",
+    "tickets": "Tickets",
+    "runs": "Runs",
+    "runners": "Runners",
+    "stats": "Stats",
+    "settings": "Settings"
+  },
+  "runners": {
+    "title": "Runners",
+    "load": "{running}/{capacity}",
+    "online": "Online",
+    "offline": "Offline",
+    "empty": "등록한 러너가 없어요"
+  }
+}

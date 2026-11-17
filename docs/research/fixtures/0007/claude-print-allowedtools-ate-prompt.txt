@@ -1,0 +1,2 @@
+"Test task. Do not push and do not open …" was read as a value of --allowedTools, not as a prompt · put a prompt before --allowedTools or after --
+Error: Input must be provided either through stdin or as a prompt argument when using --print
