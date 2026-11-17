@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  getAutoAssignLabel,
   getMapping,
   listCodeHostConnections,
   listRunners,
@@ -22,13 +23,19 @@ import type { SetupCounts } from "./model";
  */
 
 export function loadSetupCounts(db: Database, secretBox: SecretBox): SetupCounts {
+  const mapped = listWorkspaceTrackerProjects(db).filter(
+    (project) => getMapping(db, project.connection, project.projectId) !== null,
+  );
   return {
     trackerConnections: listTrackerConnections(db, secretBox).length,
     githubTokens: listCodeHostConnections(db, secretBox).length,
     runners: listRunners(db).length,
     workspaces: listWorkspaces(db).length,
-    mappings: listWorkspaceTrackerProjects(db).filter(
-      (project) => getMapping(db, project.connection, project.projectId) !== null,
+    mappings: mapped.length,
+    autoAssignReady: mapped.filter(
+      (project) =>
+        project.inProgressStateId !== null &&
+        getAutoAssignLabel(db, project.workspaceId, project.connection) !== null,
     ).length,
   };
 }
