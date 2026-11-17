@@ -1,0 +1,45 @@
+/*
+ * 전역 CSS. StyleX 가 생성 CSS 를 이 자산에 덧붙인다(docs/research/0001).
+ * 색·간격 값은 여기 쓰지 않고 StyleX 토큰(@factory/ui/tokens.stylex)으로 쓴다.
+ */
+
+/* UI SDK 가 넣는 CSS 보다 앱 스타일이 이기도록 레이어를 맨 앞에 선언한다. */
+@layer ui-sdk;
+
+@layer ui-sdk {
+  :where([data-slot][hidden]:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+p,
+dl,
+dd,
+ol,
+ul {
+  margin: 0;
+}
+
+ol,
+ul {
+  padding: 0;
+  list-style: none;
+}

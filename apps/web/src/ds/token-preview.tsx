@@ -1,0 +1,326 @@
+import * as stylex from "@stylexjs/stylex";
+import { Button, Section, Text } from "@factory/ui";
+import {
+  colors,
+  fonts,
+  fontSize,
+  fontWeight,
+  motion,
+  radius,
+  shadow,
+  space,
+} from "@factory/ui/tokens.stylex";
+import { useEffect, useState, type ReactNode } from "react";
+import { useTranslations } from "use-intl";
+
+type ColorKey = Exclude<keyof typeof colors, `__${string}`>;
+
+const colorGroups = [
+  {
+    id: "background",
+    keys: [
+      "bgCanvas",
+      "bgSidebar",
+      "bgPanel",
+      "bgRaised",
+      "bgRaisedHover",
+      "bgHover",
+      "bgSelected",
+      "bgInset",
+      "backdrop",
+    ],
+  },
+  { id: "border", keys: ["borderSubtle", "borderDefault", "borderStrong"] },
+  {
+    id: "text",
+    keys: ["textPrimary", "textSecondary", "textTertiary", "textDisabled", "textOnAccent"],
+  },
+  { id: "accent", keys: ["accent", "accentHover", "accentText", "accentSoft"] },
+  {
+    id: "attention",
+    keys: ["check", "checkSoft", "failed", "failedSoft", "failedBorder"],
+  },
+  { id: "runner", keys: ["online", "onlineRing"] },
+] as const satisfies ReadonlyArray<{
+  id: "background" | "border" | "text" | "accent" | "attention" | "runner";
+  keys: ReadonlyArray<ColorKey>;
+}>;
+
+const spaceKeys = ["px2", "s1", "px6", "s2", "s3", "s4", "s5", "s6", "s8", "s10"] as const;
+const radiusKeys = ["sm", "md", "full"] as const;
+const motionKeys = ["easeOut", "durationFast", "durationToast"] as const;
+
+/**
+ * 토큰 변수의 실제 값을 읽어 보인다. 서버 HTML 에는 비워 두고, 하이드레이션 뒤에 채운다.
+ */
+function TokenValue({ token }: { token: string }) {
+  const [value, setValue] = useState("");
+  useEffect(() => {
+    const name = /var\((--[^),]+)/.exec(token)?.[1];
+    if (name !== undefined) {
+      setValue(getComputedStyle(document.documentElement).getPropertyValue(name).trim());
+    }
+  }, [token]);
+  return <span {...stylex.props(styles.value)}>{value}</span>;
+}
+
+function TokenRow({ name, token, children }: { name: string; token: string; children: ReactNode }) {
+  return (
+    <div {...stylex.props(styles.tokenRow)}>
+      {children}
+      <span {...stylex.props(styles.tokenName)}>{name}</span>
+      <TokenValue token={token} />
+    </div>
+  );
+}
+
+export function TokenSections() {
+  const t = useTranslations("ds");
+  const [moved, setMoved] = useState(false);
+  return (
+    <>
+      <div id="colors">
+        <Section title={t("nav.colors")} note={t("colors.note")}>
+          <div {...stylex.props(styles.colorGroups)}>
+            {colorGroups.map((group) => (
+              <div key={group.id}>
+                <Text variant="label" as="h3">
+                  {t(`colors.${group.id}`)}
+                </Text>
+                <div {...stylex.props(styles.tokenList)}>
+                  {group.keys.map((key) => (
+                    <TokenRow key={key} name={key} token={colors[key]}>
+                      <span {...stylex.props(styles.swatch, styles.swatchColor(colors[key]))} />
+                    </TokenRow>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      </div>
+
+      <div id="typography">
+        <Section title={t("nav.typography")} note={t("typography.note")}>
+          <div {...stylex.props(styles.typeLevels)}>
+            <TypeLevel title={t("typography.level1")}>
+              <TypeSample spec="page · 22 / 600">
+                <Text variant="page" as="p">
+                  {t("typography.samplePage")}
+                </Text>
+              </TypeSample>
+              <TypeSample spec="panel · 17 / 600">
+                <Text variant="panel" as="p">
+                  {t("typography.samplePanel")}
+                </Text>
+              </TypeSample>
+            </TypeLevel>
+            <TypeLevel title={t("typography.level2")}>
+              <TypeSample spec="section · 14 / 600">
+                <Text variant="section" as="p">
+                  {t("typography.sampleSection")}
+                </Text>
+              </TypeSample>
+              <TypeSample spec="title · 14 / 500">
+                <Text variant="title">{t("typography.sampleTitle")}</Text>
+              </TypeSample>
+              <TypeSample spec="body · 14 / 400">
+                <Text variant="body">{t("typography.sampleBody")}</Text>
+              </TypeSample>
+            </TypeLevel>
+            <TypeLevel title={t("typography.level3")}>
+              <TypeSample spec="ui · 13 / 400">
+                <Text variant="ui">{t("typography.sampleUi")}</Text>
+              </TypeSample>
+              <TypeSample spec="meta · 13 / 400">
+                <Text variant="meta" numeric>
+                  {t("typography.sampleMeta")}
+                </Text>
+              </TypeSample>
+              <TypeSample spec="label · 12 / 500">
+                <Text variant="label">{t("typography.sampleLabel")}</Text>
+              </TypeSample>
+            </TypeLevel>
+          </div>
+        </Section>
+      </div>
+
+      <div id="space">
+        <Section title={t("nav.space")} note={t("space.note")}>
+          <div {...stylex.props(styles.tokenList)}>
+            {spaceKeys.map((key) => (
+              <TokenRow key={key} name={key} token={space[key]}>
+                <span {...stylex.props(styles.spaceCell)}>
+                  <span {...stylex.props(styles.spaceBar, styles.spaceWidth(space[key]))} />
+                </span>
+              </TokenRow>
+            ))}
+          </div>
+        </Section>
+      </div>
+
+      <div id="radius">
+        <Section title={t("nav.radius")} note={t("radius.note")}>
+          <div {...stylex.props(styles.inlineTokens)}>
+            {radiusKeys.map((key) => (
+              <TokenRow key={key} name={key} token={radius[key]}>
+                <span {...stylex.props(styles.radiusBox, styles.radiusValue(radius[key]))} />
+              </TokenRow>
+            ))}
+          </div>
+        </Section>
+      </div>
+
+      <div id="shadow">
+        <Section title={t("nav.shadow")} note={t("shadow.note")}>
+          <TokenRow name="popover" token={shadow.popover}>
+            <span {...stylex.props(styles.shadowBox)} />
+          </TokenRow>
+        </Section>
+      </div>
+
+      <div id="motion">
+        <Section title={t("nav.motion")} note={t("motion.note")}>
+          <div {...stylex.props(styles.motionDemo)}>
+            <div {...stylex.props(styles.track)}>
+              <span {...stylex.props(styles.puck, moved && styles.puckMoved)} />
+            </div>
+            <Button variant="ghost" onClick={() => setMoved((m) => !m)}>
+              {t("motion.replay")}
+            </Button>
+          </div>
+          <div {...stylex.props(styles.tokenList)}>
+            {motionKeys.map((key) => (
+              <TokenRow key={key} name={key} token={motion[key]}>
+                <span {...stylex.props(styles.swatchSpacer)} />
+              </TokenRow>
+            ))}
+          </div>
+        </Section>
+      </div>
+    </>
+  );
+}
+
+function TypeLevel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div {...stylex.props(styles.typeLevel)}>
+      <Text variant="label" as="h3">
+        {title}
+      </Text>
+      {children}
+    </div>
+  );
+}
+
+function TypeSample({ spec, children }: { spec: string; children: ReactNode }) {
+  return (
+    <div {...stylex.props(styles.typeSample)}>
+      <span {...stylex.props(styles.tokenName)}>{spec}</span>
+      <div {...stylex.props(styles.typeText)}>{children}</div>
+    </div>
+  );
+}
+
+const styles = stylex.create({
+  colorGroups: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+    gap: space.s6,
+  },
+  tokenList: {
+    display: "flex",
+    flexDirection: "column",
+    marginTop: space.s2,
+  },
+  inlineTokens: { display: "flex", flexDirection: "column" },
+  tokenRow: {
+    display: "grid",
+    gridTemplateColumns: "56px minmax(0, 1fr) auto",
+    alignItems: "center",
+    columnGap: space.s3,
+    minHeight: 40,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.borderSubtle,
+  },
+  tokenName: {
+    color: colors.textSecondary,
+    fontFamily: fonts.mono,
+    fontSize: fontSize.small,
+  },
+  value: {
+    color: colors.textTertiary,
+    fontSize: fontSize.small,
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
+  },
+  swatch: {
+    width: 40,
+    height: 24,
+    borderRadius: radius.sm,
+    boxShadow: `inset 0 0 0 1px ${colors.borderDefault}`,
+  },
+  swatchColor: (color: string) => ({ backgroundColor: color }),
+  swatchSpacer: { width: 40 },
+  spaceCell: { display: "flex", alignItems: "center", height: 24 },
+  spaceBar: { height: 12, borderRadius: 2, backgroundColor: colors.accentSoft },
+  spaceWidth: (width: string) => ({ width }),
+  radiusBox: {
+    width: 40,
+    height: 24,
+    backgroundColor: colors.bgRaised,
+    boxShadow: `inset 0 0 0 1px ${colors.borderStrong}`,
+  },
+  radiusValue: (value: string) => ({ borderRadius: value }),
+  shadowBox: {
+    width: 40,
+    height: 24,
+    borderRadius: radius.md,
+    backgroundColor: colors.bgRaised,
+    boxShadow: shadow.popover,
+  },
+  typeLevels: { display: "flex", flexDirection: "column", gap: space.s6 },
+  typeLevel: { display: "flex", flexDirection: "column", gap: space.s2 },
+  typeSample: {
+    display: "grid",
+    gridTemplateColumns: "160px minmax(0, 1fr)",
+    alignItems: "baseline",
+    columnGap: space.s4,
+    paddingBlock: space.s2,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: colors.borderSubtle,
+  },
+  typeText: { minWidth: 0, fontWeight: fontWeight.regular },
+  motionDemo: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s4,
+    marginBottom: space.s2,
+  },
+  track: {
+    position: "relative",
+    width: 240,
+    height: 24,
+    borderRadius: radius.full,
+    backgroundColor: colors.bgInset,
+    boxShadow: `inset 0 0 0 1px ${colors.borderSubtle}`,
+  },
+  puck: {
+    position: "absolute",
+    top: 4,
+    left: 4,
+    width: 16,
+    height: 16,
+    borderRadius: radius.full,
+    backgroundColor: colors.accentText,
+    transitionProperty: "transform",
+    transitionDuration: {
+      default: motion.durationToast,
+      "@media (prefers-reduced-motion: reduce)": "0s",
+    },
+    transitionTimingFunction: motion.easeOut,
+  },
+  puckMoved: { transform: "translateX(216px)" },
+});

@@ -1,6 +1,7 @@
 .omc/
 node_modules/
 dist/
+.tanstack/
 .turbo/
 coverage/
 *.tsbuildinfo

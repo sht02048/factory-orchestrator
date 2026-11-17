@@ -12,7 +12,7 @@ Software factory의 관제탑. 트래커의 티켓을 러너에 맡기고, 러�
 | `packages/db`   | SQLite(WAL) 스키마와 접근                                   |
 | `packages/ui`   | 디자인 시스템 (StyleX + UI SDK)                             |
 
-지금은 품질 도구만 갖춘 빈 패키지다.
+`packages/ui`에는 디자인 시스템(토큰, 컴포넌트, 쓰는 규칙 [`packages/ui/DESIGN.md`](./packages/ui/DESIGN.md))이 있다. `apps/web`은 아직 디자인 시스템 미리보기(`/ds`)만 있고, 나머지 패키지는 비어 있다.
 
 ## 시작하기
 
@@ -32,8 +32,12 @@ pnpm install   # lefthook pre-commit 훅도 함께 설치된다
 | `pnpm format`       | oxfmt로 포맷                             |
 | `pnpm format:check` | 포맷 검사                                |
 | `pnpm test`         | Vitest 실행                              |
+| `pnpm check:colors` | `packages/ui` 밖의 색 값 직접 사용 검사  |
+| `pnpm build`        | 웹 앱 프로덕션 빌드                      |
 
-pre-commit 훅은 lint, format check, typecheck를 돌린다. CI(GitHub Actions)는 pull request와 `main` push에서 typecheck → lint → format check → test 순으로 돈다.
+웹 앱은 `pnpm --filter @factory/web dev`로 띄우고 `http://127.0.0.1:3000/ds`에서 디자인 시스템을 본다. 프로덕션 빌드는 `pnpm --filter @factory/web start`로 실행하고, 기본으로 `127.0.0.1`에만 바인딩한다(`WEB_HOST`, `WEB_PORT`로 바꾼다).
+
+pre-commit 훅은 lint, format check, typecheck, 색 리터럴 검사를 돌린다. CI(GitHub Actions)는 pull request와 `main` push에서 typecheck → lint → 색 리터럴 검사 → format check → test → build 순으로 돈다.
 
 ## 셀프호스팅
 
