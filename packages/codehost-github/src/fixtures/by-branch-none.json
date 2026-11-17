@@ -1,0 +1,27 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-github-media-type": "github.v4; format=json",
+    "x-ratelimit-limit": "5000",
+    "x-ratelimit-remaining": "4931",
+    "x-ratelimit-reset": "1794934437",
+    "x-ratelimit-resource": "graphql",
+    "x-ratelimit-used": "69"
+  },
+  "body": {
+    "data": {
+      "repository": {
+        "pullRequests": {
+          "nodes": []
+        }
+      },
+      "rateLimit": {
+        "limit": 5000,
+        "cost": 1,
+        "remaining": 4931,
+        "resetAt": "2026-11-17T16:53:57Z"
+      }
+    }
+  }
+}

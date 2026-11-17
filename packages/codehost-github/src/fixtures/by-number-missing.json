@@ -1,0 +1,38 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-github-media-type": "github.v4; format=json",
+    "x-ratelimit-limit": "5000",
+    "x-ratelimit-remaining": "4970",
+    "x-ratelimit-reset": "1794933198",
+    "x-ratelimit-resource": "graphql",
+    "x-ratelimit-used": "30"
+  },
+  "body": {
+    "data": {
+      "repository": {
+        "pullRequest": null
+      },
+      "rateLimit": {
+        "limit": 5000,
+        "cost": 1,
+        "remaining": 4970,
+        "resetAt": "2026-11-17T16:33:18Z"
+      }
+    },
+    "errors": [
+      {
+        "type": "NOT_FOUND",
+        "path": ["repository", "pullRequest"],
+        "locations": [
+          {
+            "line": 3,
+            "column": 5
+          }
+        ],
+        "message": "Could not resolve to a PullRequest with the number of 99999."
+      }
+    ]
+  }
+}
