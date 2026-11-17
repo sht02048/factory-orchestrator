@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { answerInput, denyInput, submitAnswer, submitDenial } from "../home/actions";
 import { loadHomePage } from "../home/load";
+import { cancelRunRequest } from "../run-detail/actions";
 import { loadRunDetail, requestRunLogTail } from "../run-detail/load";
 import { loadRunnersPage } from "../runners/load";
 import { loadRunsPage } from "../runs/load";
@@ -51,3 +52,8 @@ export const getRunDetail = createServerFn({ method: "GET" })
 export const requestRunLog = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string() }))
   .handler(({ data }) => requestRunLogTail(getDatabase(), data.runId, new Date()));
+
+/** 런 취소를 요청한다. worker 가 처리한다(Q77·Q82.8) */
+export const cancelRun = createServerFn({ method: "POST" })
+  .validator(z.object({ runId: z.string() }))
+  .handler(({ data }) => cancelRunRequest(getDatabase(), data.runId, new Date()));

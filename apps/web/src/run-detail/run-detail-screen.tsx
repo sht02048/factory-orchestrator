@@ -97,7 +97,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
           {run.ticketKey}
         </Text>
         <Text variant="meta">
-          {run.trackerProject} · {run.branch}
+          {run.branch === null ? run.trackerProject : `${run.trackerProject} · ${run.branch}`}
         </Text>
         <Text variant="body">
           <Reason run={run} />
@@ -125,6 +125,15 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
       <Section title={t("timeline.title")}>
         <Timeline events={run.timeline} />
       </Section>
+
+      {run.startError === null ? null : (
+        <Section title={t("startError.title")}>
+          <div {...stylex.props(styles.stack)}>
+            <Text variant="body">{t("startError.body")}</Text>
+            <pre {...stylex.props(styles.pre)}>{run.startError}</pre>
+          </div>
+        </Section>
+      )}
 
       {run.status.state === "ended" ? (
         <Section title={t("report.title")}>
@@ -164,7 +173,9 @@ function Reason({ run }: { run: RunDetail }) {
   }
 }
 
-function inputKey(input: PendingInput): "question" | "permission" | "waiting-unknown" {
+function inputKey(
+  input: PendingInput,
+): "question" | "permission" | "answer-sending" | "waiting-unknown" {
   return input.kind === "unknown" ? "waiting-unknown" : input.kind;
 }
 
@@ -212,6 +223,7 @@ function InputBlock({
       return <QuestionForm question={input} onAnswer={onAnswer} />;
     case "permission":
       return <PermissionWait onDeny={onDeny} />;
+    case "answer-sending":
     case "unknown":
       return null;
   }
@@ -518,8 +530,12 @@ function Properties({ run, runHref }: { run: RunDetail; runHref: (runId: string)
           <DefinitionItem label={t("executed")} empty={run.executionMs === null}>
             {run.executionMs === null ? t("notStarted") : duration(run.executionMs)}
           </DefinitionItem>
-          <DefinitionItem label={t("branch")}>
-            <span {...stylex.props(styles.mono)}>{run.branch}</span>
+          <DefinitionItem label={t("branch")} empty={run.branch === null}>
+            {run.branch === null ? (
+              t("notStarted")
+            ) : (
+              <span {...stylex.props(styles.mono)}>{run.branch}</span>
+            )}
           </DefinitionItem>
           <DefinitionItem label={t("worktree")} empty={run.worktree === null}>
             {run.worktree === null ? (
@@ -566,6 +582,7 @@ function summaryTone(summary: SummaryOutcome): StatusTone {
     case "failed":
       return "failed";
     case "merged":
+    case "canceled":
       return "neutral";
   }
 }

@@ -1,4 +1,10 @@
-import { completeLogTailRequest, updateRunRecords } from "@factory/db";
+import { toQuestionId } from "@factory/core";
+import {
+  completeLogTailRequest,
+  recordRunQuestions,
+  recordStartFailure,
+  updateRunRecords,
+} from "@factory/db";
 import type { Database } from "@factory/db";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
@@ -9,6 +15,8 @@ import { loadRunDetail, requestRunLogTail } from "./load";
 import { runMessages } from "./messages";
 import type { RunDetail, RunDetailPage } from "./model";
 import { RunDetailScreen } from "./run-detail-screen";
+import { addExtraEnded, assign, extraEndedCases, walk } from "./testing";
+import { cancelRunRequest } from "./actions";
 
 const resolved = () => Promise.resolve();
 
@@ -35,6 +43,12 @@ function text(html: string): string {
     .replace(/\s+/g, " ");
 }
 
+/** 속성 칸 하나의 값(dt 다음 dd 의 글) */
+function valueOf(html: string, label: string): string | undefined {
+  const after = html.split(`>${label}</dt>`)[1];
+  return after === undefined ? undefined : text(after.split("</dd>")[0] ?? "").trim();
+}
+
 function page(db: Database, id: string | undefined): RunDetailPage {
   if (id === undefined) throw new Error("no run id");
   return loadRunDetail(db, id, now);
@@ -47,18 +61,46 @@ function found(db: Database, id: string | undefined): RunDetail {
 }
 
 describe("Run 상세 화면", () => {
-  it("Ended 런은 에이전트 결과와 PR 상태를 각각 보이고 요약 결과는 계산 표대로다", () => {
+  it("에이전트 결과 아홉과 PR 상태 넷이 각각의 칸에, 요약 결과(Canceled 포함)가 계산 표대로 보인다", () => {
     const { db, ids } = seedDatabase();
-    for (const c of endedCases) {
-      const body = text(render(page(db, ids.get(c.key))));
-      expect({ key: c.key, agent: body.includes(domain.agentResult[c.agentResult]) }).toEqual({
+    const extra = addExtraEnded(db);
+    const cases = [
+      ...endedCases.map((c) => ({ ...c, id: ids.get(c.key) })),
+      ...extraEndedCases.map((c) => ({ ...c, id: extra.get(c.key) })),
+    ];
+    for (const c of cases) {
+      const html = render(page(db, c.id));
+      expect({
         key: c.key,
-        agent: true,
+        agent: valueOf(html, runJson.props.agentResult),
+        pr: valueOf(html, runJson.props.prState),
+        summary: text(html).includes(domain.summary[c.summary]),
+        reason: text(html).includes(runJson.reason[c.summary]),
+      }).toEqual({
+        key: c.key,
+        agent: domain.agentResult[c.agentResult],
+        pr: domain.prState[c.prState],
+        summary: true,
+        reason: true,
       });
-      expect(body).toContain(domain.prState[c.prState]);
-      expect(body).toContain(domain.summary[c.summary]);
-      expect(body).toContain(runJson.reason[c.summary]);
     }
+  });
+
+  it("러너에 닿지 못한 채 끝난 취소 런도 사람이 지워야 함을 보인다", () => {
+    const { db } = seedDatabase();
+    const extra = addExtraEnded(db);
+    expect(text(render(page(db, extra.get("ACME-22"))))).toContain(runJson.manualRemoval);
+    expect(text(render(page(db, extra.get("ACME-21"))))).not.toContain(runJson.manualRemoval);
+  });
+
+  it("시작할 수 없음 런은 시작 오류를 보인다", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-30", 60);
+    recordStartFailure(db, id, { failures: 3, error: "worker-start: project not found" });
+    walk(db, id, 60, [{ to: "ended", agentResult: "could-not-start", prState: "none" }]);
+    const body = text(render(page(db, id)));
+    expect(body).toContain(runJson.startError.title);
+    expect(body).toContain("worker-start: project not found");
   });
 
   it("Disconnected 런은 연결 끊김과 ssh 가 실패하기 시작한 시각을 보인다", () => {
@@ -93,31 +135,27 @@ describe("Run 상세 화면", () => {
     for (const c of endedCases) {
       expect(render(page(db, ids.get(c.key)))).not.toContain(runJson.cancel.trigger);
     }
-    const running = found(db, ids.get("ACME-10"));
-    const pending = render({ kind: "found", run: { ...running, cancelPending: true } });
+    const running = ids.get("ACME-10");
+    if (running === undefined) throw new Error("no ACME-10");
+    expect(cancelRunRequest(db, running, minutes(100))).toEqual({ ok: true });
+    const pending = render(page(db, running));
     expect(pending).toContain(runJson.cancelPending);
     expect(pending).not.toContain(runJson.cancel.trigger);
   });
 
   it("질문으로 기다리는 런은 질문 내용, 선택지, 답하기 칸을 보인다", () => {
     const { db, ids } = seedDatabase();
-    const run = found(db, ids.get("ACME-11"));
-    const html = render({
-      kind: "found",
-      run: {
-        ...run,
-        status: {
-          state: "waiting-for-input",
-          input: {
-            kind: "question",
-            questionId: "q-1",
-            body: "마이그레이션을 지금 돌릴까요?",
-            choices: ["돌려 주세요", "멈춰 주세요"],
-            askedAt: minutes(50).toISOString(),
-          },
-        },
+    const id = ids.get("ACME-11");
+    if (id === undefined) throw new Error("no ACME-11");
+    recordRunQuestions(db, id, [
+      {
+        id: toQuestionId("q-1"),
+        body: "마이그레이션을 지금 돌릴까요?",
+        options: ["돌려 주세요", "멈춰 주세요"],
+        askedAt: minutes(50),
       },
-    });
+    ]);
+    const html = render(page(db, id));
     const body = text(html);
     expect(body).toContain("마이그레이션을 지금 돌릴까요?");
     expect(body).toContain("돌려 주세요");

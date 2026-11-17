@@ -5,7 +5,10 @@ import {
   getRun,
   getRunWithRecords,
   getWorkspaceTrackerProject,
+  hasPendingCancelRequest,
+  listPendingCancelRequests,
   listRunPlacements,
+  listRunQuestions,
   listRunStateChanges,
   listRunnerSnapshots,
   listRunners,
@@ -13,13 +16,20 @@ import {
   listWorkspaces,
   requestLogTail,
 } from "@factory/db";
-import type { Database, RunRecords, RunStateChangeRecord, StoredRun } from "@factory/db";
+import type {
+  Database,
+  RunRecords,
+  RunStateChangeRecord,
+  StoredRun,
+  StoredRunQuestion,
+} from "@factory/db";
 import type { QueuedReason } from "../runs/model";
 import { explainQueue } from "../runs/queue-reasons";
 import type {
   CiView,
   LogTailView,
   OtherRun,
+  PendingInput,
   RunDetail,
   RunDetailPage,
   RunDetailStatus,
@@ -42,6 +52,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
   const endedAt = run.state === "ended" ? run.endedAt : null;
   const durations = runDurations({ assignedAt: run.assignedAt, startedAt, endedAt, now });
   const pr = records.pullRequest;
+  const questions = listRunQuestions(db, run.id);
 
   const detail: RunDetail = {
     id: run.id,
@@ -50,7 +61,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
       getWorkspaceTrackerProject(db, run.ticket.connection, run.trackerProject)?.name ??
       run.trackerProject,
     workspace: { id: run.workspaceId, name: workspace?.name ?? run.workspaceId },
-    branch: run.branch,
+    branch: run.state === "queued" ? null : run.branch,
     worktree: run.state === "queued" ? null : run.worktree,
     runner: runner === undefined ? null : { name: runner.name, online: runner.online },
     agent: run.agent,
@@ -59,14 +70,22 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     endedAt: endedAt?.toISOString() ?? null,
     waitMs: durations.waitMs ?? 0,
     executionMs: durations.executionMs,
-    status: statusOf(db, run, records),
+    status: statusOf(db, run, records, questions),
     pullRequest:
       pr === null || !isWebUrl(pr.url)
         ? null
         : { displayId: pr.displayId, url: pr.url, ci: toCiView(pr.ci) },
-    report: null,
-    cancelPending: false,
-    timeline: timelineOf(run, records, listRunStateChanges(db, run.id)),
+    report: records.reportBody,
+    startError:
+      run.state === "ended" && run.agentResult === "could-not-start" ? records.startError : null,
+    cancelPending: hasPendingCancelRequest(db, run.id),
+    timeline: timelineOf(
+      run,
+      records,
+      listRunStateChanges(db, run.id),
+      questions,
+      cancelRequestedAt(db, run.id),
+    ),
     log: logOf(db, run, records),
     otherRuns: otherRunsOf(db, run),
   };
@@ -85,21 +104,26 @@ export function requestRunLogTail(db: Database, runId: string, now: Date): boole
   return true;
 }
 
-function statusOf(db: Database, run: StoredRun, records: RunRecords): RunDetailStatus {
+function statusOf(
+  db: Database,
+  run: StoredRun,
+  records: RunRecords,
+  questions: ReadonlyArray<StoredRunQuestion>,
+): RunDetailStatus {
   switch (run.state) {
     case "queued":
       return { state: "queued", queuedReason: queuedReasonOf(db, run.id) };
     case "running":
       return { state: "running" };
     case "waiting-for-input":
-      return { state: "waiting-for-input", input: { kind: "unknown" } };
+      return { state: "waiting-for-input", input: pendingInputOf(questions) };
     case "disconnected":
       return {
         state: "disconnected",
         unreachableSince: records.unreachableSince?.toISOString() ?? null,
       };
     case "ended": {
-      const outcome = summarizeRunOutcome(run.agentResult, run.prState);
+      const outcome = summarizeRunOutcome(run);
       return {
         state: "ended",
         agentResult: run.agentResult,
@@ -127,6 +151,8 @@ function queuedReasonOf(db: Database, runId: RunId): QueuedReason {
               assignedAt: run.assignedAt,
               project: run.runnerProject,
               runnerId: run.runnerId,
+              // 영영 시작할 수 없는 런은 worker 가 다음 바퀴에 끝낸다. 화면은 순서만 본다(Runs 와 같다).
+              unstartable: false,
             },
           ]
         : [],
@@ -148,11 +174,26 @@ function timelineOf(
   run: StoredRun,
   records: RunRecords,
   changes: ReadonlyArray<RunStateChangeRecord>,
+  questions: ReadonlyArray<StoredRunQuestion>,
+  cancelRequestedAt: Date | null,
 ): TimelineEvent[] {
   const events: TimelineEvent[] = [];
   for (const change of changes) {
     const event = changeEvent(run, change);
     if (event !== null) events.push(event);
+  }
+  for (const question of questions) {
+    events.push({ kind: "question", body: question.body, at: question.askedAt.toISOString() });
+    if (question.answer !== null) {
+      events.push({
+        kind: "answer",
+        body: question.answer.text,
+        at: question.answer.answeredAt.toISOString(),
+      });
+    }
+  }
+  if (cancelRequestedAt !== null) {
+    events.push({ kind: "cancel-requested", at: cancelRequestedAt.toISOString() });
   }
   if (records.unreachableSince !== null) {
     events.push({ kind: "unreachable", at: records.unreachableSince.toISOString() });
@@ -189,6 +230,30 @@ function changeEvent(run: StoredRun, change: RunStateChangeRecord): TimelineEven
   }
 }
 
+/**
+ * Waiting for Input 런이 무엇을 기다리는지(Q82.3). 답하지 않은 첫 질문이 있으면 그 질문이고,
+ * 질문에 모두 답했는데 아직 기다리면 worker 가 답을 보내기 전이다.
+ */
+function pendingInputOf(questions: ReadonlyArray<StoredRunQuestion>): PendingInput {
+  const open = questions.find((q) => q.answer === null);
+  if (open !== undefined) {
+    return {
+      kind: "question",
+      questionId: open.id,
+      body: open.body,
+      choices: [...open.options],
+      askedAt: open.askedAt.toISOString(),
+    };
+  }
+  const unsent = questions.some((q) => q.answer !== null && q.answer.sentAt === null);
+  return { kind: unsent ? "answer-sending" : "unknown" };
+}
+
+/** 처리하지 않은 취소 요청의 시각. 처리한 요청은 런의 종료(운영자가 취소함)로 타임라인에 남는다 */
+function cancelRequestedAt(db: Database, runId: RunId): Date | null {
+  return listPendingCancelRequests(db).find((r) => r.runId === runId)?.requestedAt ?? null;
+}
+
 function logOf(db: Database, run: StoredRun, records: RunRecords): LogTailView {
   if (run.state === "queued") return { kind: "none" };
   if (run.state === "ended") return { kind: "stored", lines: records.lastLog ?? [] };
@@ -212,16 +277,13 @@ function otherRunsOf(db: Database, run: StoredRun): OtherRun[] {
       id: other.id,
       assignedAt: other.assignedAt.toISOString(),
       state: other.state,
-      summary:
-        other.state === "ended"
-          ? summarizeRunOutcome(other.agentResult, other.prState).outcome
-          : null,
+      summary: other.state === "ended" ? summarizeRunOutcome(other).outcome : null,
     }));
 }
 
 /** 코드 호스트가 준 CI 값을 화면 값으로 옮긴다. 모르는 값은 unknown 이다(Q79). */
 export function toCiView(ci: CiState): CiView {
-  const known: ReadonlyArray<CiView> = ["success", "failure", "pending", "none"];
+  const known: ReadonlyArray<CiView> = ["success", "failure", "pending", "none", "unavailable"];
   return known.find((value) => value === ci) ?? "unknown";
 }
 

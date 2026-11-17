@@ -42,11 +42,13 @@ export type TimelineEvent = { at: string } & (
  * 에이전트가 사람 입력을 기다리는 까닭(Q82.3·Q82.4). Waiting for Input 런에만 있다.
  * - question: 에이전트가 질문했다. 답하기 칸을 보이고, 선택지가 있으면 선택지를 보인다
  * - permission: 권한 프롬프트에서 허용을 기다린다. 허용은 러너 화면에서만 할 수 있고 여기서는 거절만 둔다
+ * - answer-sending: 질문에 모두 답했고 worker 가 답을 보내기 전이다
  * - unknown: 아직 worker 가 까닭을 기록하지 않았다
  */
 export type PendingInput =
   | { kind: "question"; questionId: string; body: string; choices: string[]; askedAt: string }
   | { kind: "permission"; since: string }
+  | { kind: "answer-sending" }
   | { kind: "unknown" };
 
 /**
@@ -100,7 +102,8 @@ export interface RunDetail {
   /** 트래커 프로젝트 이름. Workspace 에서 뺀 트래커 프로젝트면 ID */
   trackerProject: string;
   workspace: { id: string; name: string };
-  branch: string;
+  /** 러너에서 받은 실제 브랜치(Q82.6). 시작하지 않은 런이면 null */
+  branch: string | null;
   /** 러너의 워크트리 참조. 시작하지 않았으면 null */
   worktree: string | null;
   runner: { name: string; online: boolean } | null;
@@ -117,6 +120,8 @@ export interface RunDetail {
   pullRequest: { displayId: string; url: string; ci: CiView } | null;
   /** 에이전트가 보낸 완료 보고 본문(Q82.2). 없으면 null */
   report: string | null;
+  /** 시작할 수 없음으로 끝난 런의 마지막 시작 오류(Q86). 그 밖은 null */
+  startError: string | null;
   /** 처리되지 않은 취소 요청이 있다(Q82.21). 런 상태가 아니라 화면 표시다 */
   cancelPending: boolean;
   timeline: TimelineEvent[];
