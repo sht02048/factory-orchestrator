@@ -79,19 +79,3 @@ await ssh(target, ["orca", "worktree", "create", "--prompt", ticket.body]);
 이유: 원격 명령 문자열은 원격 셸이 한 번 더 해석한다. 티켓 본문의 따옴표·백틱·줄바꿈이 명령을 깨거나 원격에서 실행된다.
 
 근거: `docs/research/0002-external-contracts.md` A.5(`--prompt` 이스케이프), A.8(인자 전달)
-
-## 색 값은 디자인 토큰으로 쓴다
-
-`packages/ui` 밖에서는 색 값(hex, `rgb()`, `oklch()` 등)을 직접 쓰지 않고 `packages/ui`의 토큰을 쓴다.
-
-```ts
-// 피한다
-const styles = stylex.create({ failed: { color: "#e5484d" } });
-
-// 이렇게 쓴다
-const styles = stylex.create({ failed: { color: colors.failed } });
-```
-
-이유: 색이 흩어지면 라이트·다크 테마와 "색은 손댈 일에만 쓴다"(ADR 0007) 규칙을 한곳에서 지킬 수 없다.
-
-근거: ADR 0003, 티켓 0003. 티켓 0003의 검사가 생기면 이 규칙을 지운다.
