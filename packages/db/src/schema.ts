@@ -20,6 +20,7 @@ import type {
   LabelId,
   MailboxRef,
   PullRequestId,
+  PermissionRequestId,
   QuestionId,
   RunId,
   RunnerId,
@@ -450,6 +451,43 @@ export const runQuestions = sqliteTable(
     index("run_questions_unsent")
       .on(t.answeredAt)
       .where(sql`${t.answer} IS NOT NULL AND ${t.answerSentAt} IS NULL`),
+  ],
+);
+
+/**
+ * 에이전트 권한 대기와 운영자 거절(Q82.4·Q82.5). 허용은 러너 화면에서 사람만 하고, 오케스트레이터는 거절만
+ * 한다. worker가 폴링에서 본 대기를 쓰고(0016), 더 이상 열려 있지 않으면 resolved_at을 쓴다. web이 거절을
+ * 남기면(거절 요청, denied_at) worker가 러너에 보낸 뒤 deny_sent_at을 한 번만 쓴다.
+ */
+export const runPermissionWaits = sqliteTable(
+  "run_permission_waits",
+  {
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    permissionId: text("permission_id").notNull().$type<PermissionRequestId>(),
+    /** 무엇을 허용하려는지. 러너가 준 글 그대로 */
+    detail: text("detail").notNull(),
+    requestedAt: timeMs("requested_at").notNull(),
+    /** 폴링에서 더 이상 열려 있지 않은 것을 본 시각(러너에서 허용했거나 거절이 닿았다) */
+    resolvedAt: timeMs("resolved_at"),
+    /** 운영자가 남긴 거절 이유. 거절 요청이다. 빈 글일 수 있다 */
+    denyReason: text("deny_reason"),
+    deniedAt: timeMs("denied_at"),
+    /** worker가 러너에 거절을 보낸 시각. 처리 표시다 */
+    denySentAt: timeMs("deny_sent_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.runId, t.permissionId] }),
+    check("run_permission_waits_denied", sql`(${t.denyReason} IS NULL) = (${t.deniedAt} IS NULL)`),
+    check(
+      "run_permission_waits_sent_after_deny",
+      sql`${t.denySentAt} IS NULL OR ${t.deniedAt} IS NOT NULL`,
+    ),
+    index("run_permission_waits_unsent")
+      .on(t.deniedAt)
+      .where(sql`${t.deniedAt} IS NOT NULL AND ${t.denySentAt} IS NULL`),
   ],
 );
 

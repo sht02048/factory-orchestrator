@@ -1,0 +1,29 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-complexity": "6"
+  },
+  "body": {
+    "data": {
+      "issue": {
+        "comments": {
+          "nodes": [
+            {
+              "id": "00000000-0000-4000-8000-000000000100",
+              "body": "Example comment.",
+              "createdAt": "2026-11-17T16:06:00.169Z",
+              "user": {
+                "name": "Jane Doe"
+              }
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "00000000-0000-4000-8000-000000000100"
+          }
+        }
+      }
+    }
+  }
+}

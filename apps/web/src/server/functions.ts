@@ -1,5 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { answerInput, denyInput, submitAnswer, submitDenial } from "../home/actions";
+import { loadHomePage } from "../home/load";
+import { cancelRunRequest } from "../run-detail/actions";
+import { loadRunDetail, requestRunLogTail } from "../run-detail/load";
 import { loadRunnersPage } from "../runners/load";
 import { loadRunsPage } from "../runs/load";
 import { loadShell } from "../shell/load";
@@ -18,6 +22,20 @@ export const getRunnersPage = createServerFn({ method: "GET" }).handler(() =>
   loadRunnersPage(getDatabase(), new Date()),
 );
 
+export const getHomePage = createServerFn({ method: "GET" })
+  .validator(z.object({ ws: z.string().optional() }))
+  .handler(({ data }) => loadHomePage(getDatabase(), data.ws, new Date()));
+
+/** 손댈 일의 질문에 답을 남긴다. worker 가 러너에 보낸다(Q61·Q82.3) */
+export const answerQuestion = createServerFn({ method: "POST" })
+  .validator(answerInput)
+  .handler(({ data }) => submitAnswer(getDatabase(), data, new Date()));
+
+/** 손댈 일의 권한 대기 거절을 남긴다. 허용은 러너 화면에서만 한다(Q82.4) */
+export const denyPermission = createServerFn({ method: "POST" })
+  .validator(denyInput)
+  .handler(({ data }) => submitDenial(getDatabase(), data, new Date()));
+
 export const getRunsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
   .handler(({ data }) => loadRunsPage(getDatabase(), data.ws, new Date()));
@@ -25,3 +43,17 @@ export const getRunsPage = createServerFn({ method: "GET" })
 export const getStatsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
   .handler(({ data }) => loadStatsPage(getDatabase(), data.ws, new Date()));
+
+export const getRunDetail = createServerFn({ method: "GET" })
+  .validator(z.object({ runId: z.string() }))
+  .handler(({ data }) => loadRunDetail(getDatabase(), data.runId, new Date()));
+
+/** Run 상세를 열 때 로그 꼬리를 요청한다. worker 가 ssh 로 가져와 DB 에 쓴다(Q46·Q61) */
+export const requestRunLog = createServerFn({ method: "POST" })
+  .validator(z.object({ runId: z.string() }))
+  .handler(({ data }) => requestRunLogTail(getDatabase(), data.runId, new Date()));
+
+/** 런 취소를 요청한다. worker 가 처리한다(Q77·Q82.8) */
+export const cancelRun = createServerFn({ method: "POST" })
+  .validator(z.object({ runId: z.string() }))
+  .handler(({ data }) => cancelRunRequest(getDatabase(), data.runId, new Date()));

@@ -1,0 +1,29 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-complexity": "51"
+  },
+  "body": {
+    "errors": [
+      {
+        "message": "Entity not found: Project",
+        "path": ["project"],
+        "locations": [
+          {
+            "line": 1,
+            "column": 36
+          }
+        ],
+        "extensions": {
+          "type": "invalid input",
+          "code": "INPUT_ERROR",
+          "statusCode": 400,
+          "userError": true,
+          "userPresentableMessage": "Could not find referenced Project."
+        }
+      }
+    ],
+    "data": null
+  }
+}

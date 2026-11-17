@@ -32,6 +32,7 @@ import {
   sentQuestionIds,
 } from "./questions.js";
 import {
+  getRunCancelRequest,
   hasPendingCancelRequest,
   listPendingCancelRequests,
   markCancelRequestProcessed,
@@ -562,8 +563,13 @@ describe("런 취소 요청 (Q77·Q82.8)", () => {
     });
     expect(listPendingCancelRequests(db)).toEqual([{ runId: id, requestedAt: first }]);
 
-    expect(markCancelRequestProcessed(db, id)).toBe(true);
+    expect(getRunCancelRequest(db, id)).toEqual({ requestedAt: first, processedAt: null });
+    const processedAt = new Date("2026-11-17T03:00:00Z");
+    expect(markCancelRequestProcessed(db, id, processedAt)).toBe(true);
     expect(markCancelRequestProcessed(db, id)).toBe(false);
+    // 처리한 요청도 남아 Run 상세 타임라인이 요청 시각을 읽는다
+    expect(getRunCancelRequest(db, id)).toEqual({ requestedAt: first, processedAt });
+    expect(getRunCancelRequest(db, toRunId("missing"))).toBeNull();
     expect(listPendingCancelRequests(db)).toEqual([]);
     expect(hasPendingCancelRequest(db, id)).toBe(false);
   });

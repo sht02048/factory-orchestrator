@@ -27,7 +27,7 @@ export const Route = createFileRoute("/_app/runs")({
 function RunsRoute() {
   const page = Route.useLoaderData();
   const shell = appRoute.useLoaderData();
-  const { f, sel } = Route.useSearch();
+  const { f, sel, ws } = Route.useSearch();
   const navigate = Route.useNavigate();
   return (
     <ScreenMessages messages={runsMessages}>
@@ -45,9 +45,12 @@ function RunsRoute() {
         onSelect={(id) => {
           void navigate({ search: (prev) => ({ ...prev, sel: id }), replace: true });
         }}
-        onPickWorkspace={(ws) => {
-          void navigate({ search: (prev) => ({ ...prev, ws, sel: undefined }) });
+        onPickWorkspace={(next) => {
+          void navigate({ search: (prev) => ({ ...prev, ws: next, sel: undefined }) });
         }}
+        runHref={(id) =>
+          `/runs/${encodeURIComponent(id)}${ws === undefined ? "" : `?ws=${encodeURIComponent(ws)}`}`
+        }
       />
     </ScreenMessages>
   );

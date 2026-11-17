@@ -1,0 +1,36 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-github-media-type": "github.v4; format=json",
+    "x-ratelimit-limit": "5000",
+    "x-ratelimit-remaining": "4927",
+    "x-ratelimit-reset": "1794934437",
+    "x-ratelimit-resource": "graphql",
+    "x-ratelimit-used": "73"
+  },
+  "body": {
+    "data": {
+      "repository": null,
+      "rateLimit": {
+        "limit": 5000,
+        "cost": 1,
+        "remaining": 4927,
+        "resetAt": "2026-11-17T16:53:57Z"
+      }
+    },
+    "errors": [
+      {
+        "type": "NOT_FOUND",
+        "path": ["repository"],
+        "locations": [
+          {
+            "line": 2,
+            "column": 3
+          }
+        ],
+        "message": "Could not resolve to a Repository with the name 'acme/private-app'."
+      }
+    ]
+  }
+}

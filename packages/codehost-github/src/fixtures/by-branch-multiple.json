@@ -1,0 +1,60 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-github-media-type": "github.v4; format=json",
+    "x-ratelimit-limit": "5000",
+    "x-ratelimit-remaining": "4971",
+    "x-ratelimit-reset": "1794933198",
+    "x-ratelimit-resource": "graphql",
+    "x-ratelimit-used": "29"
+  },
+  "body": {
+    "data": {
+      "repository": {
+        "pullRequests": {
+          "nodes": [
+            {
+              "number": 19,
+              "url": "https://github.com/acme/app/pull/19",
+              "title": "ENG-130: second attempt",
+              "body": "Second PR on the same branch after closing the first.",
+              "state": "OPEN",
+              "createdAt": "2026-11-17T16:06:25Z",
+              "mergedAt": null,
+              "headRefName": "factory/ENG-130-1",
+              "headRefOid": "3333333333333333333333333333333333333333",
+              "baseRefName": "main",
+              "isCrossRepository": false,
+              "headRepository": {
+                "nameWithOwner": "acme/app"
+              }
+            },
+            {
+              "number": 18,
+              "url": "https://github.com/acme/app/pull/18",
+              "title": "ENG-130: first attempt",
+              "body": "First PR on the same branch.",
+              "state": "CLOSED",
+              "createdAt": "2026-11-17T16:06:18Z",
+              "mergedAt": null,
+              "headRefName": "factory/ENG-130-1",
+              "headRefOid": "3333333333333333333333333333333333333333",
+              "baseRefName": "main",
+              "isCrossRepository": false,
+              "headRepository": {
+                "nameWithOwner": "acme/app"
+              }
+            }
+          ]
+        }
+      },
+      "rateLimit": {
+        "limit": 5000,
+        "cost": 1,
+        "remaining": 4971,
+        "resetAt": "2026-11-17T16:33:18Z"
+      }
+    }
+  }
+}

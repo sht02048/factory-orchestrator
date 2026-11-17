@@ -5,6 +5,7 @@
 - 파일 이름: `NNNN-slug.md`
 - frontmatter: `status: todo | doing | done`, 선행 티켓은 `blocked_by`
 - 용어는 루트의 `GLOSSARY.md`를 따른다.
+- 오케스트레이션으로 이 저장소를 만들며 배운 점과 제품 반영 후보는 [`docs/research/0010-dogfooding-lessons.md`](../research/0010-dogfooding-lessons.md)에 모은다.
 
 ## 순서도
 

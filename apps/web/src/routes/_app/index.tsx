@@ -1,44 +1,45 @@
-import * as stylex from "@stylexjs/stylex";
-import { Actions, PageHeader } from "@factory/ui";
-import { colors, space } from "@factory/ui/tokens.stylex";
-import { Link, createFileRoute } from "@tanstack/react-router";
-import { useTranslations } from "use-intl";
-import home from "../../../messages/ko/home.json" with { type: "json" };
-import { ScreenMessages } from "../../i18n";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createTranslator } from "use-intl";
+import { z } from "zod";
+import { HomeScreen } from "../../home/home-screen";
+import { homeMessages } from "../../home/messages";
+import { ScreenMessages, defaultLocale } from "../../i18n";
+import { answerQuestion, denyPermission, getHomePage } from "../../server/functions";
 
-// 홈의 빈 자리. 홈 화면은 티켓 0020 이 만든다.
-declare module "../../i18n" {
-  interface AppMessages {
-    home: typeof home;
-  }
-}
+const t = createTranslator({ locale: defaultLocale, messages: homeMessages, namespace: "home" });
 
+/** 홈: 현재 Workspace 의 손댈 일, 실행 중, Queued. 고른 행(sel)은 주소에 남는다 */
 export const Route = createFileRoute("/_app/")({
-  component: () => (
-    <ScreenMessages messages={{ home }}>
-      <Home />
-    </ScreenMessages>
-  ),
+  validateSearch: z.object({ sel: z.string().optional() }),
+  loaderDeps: ({ search }) => ({ ws: search.ws }),
+  loader: ({ deps }) => getHomePage({ data: { ws: deps.ws } }),
+  head: () => ({ meta: [{ title: t("documentTitle") }] }),
+  component: HomeRoute,
 });
 
-function Home() {
-  const t = useTranslations("home");
+function HomeRoute() {
+  const page = Route.useLoaderData();
+  const { sel } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const router = useRouter();
   return (
-    <div {...stylex.props(styles.page)}>
-      <PageHeader title={t("title")} subtitle={t("subtitle")} />
-      <Actions>
-        <Link to="/runs" {...stylex.props(styles.link)}>
-          {t("toRuns")}
-        </Link>
-        <Link to="/ds" {...stylex.props(styles.link)}>
-          {t("toDs")}
-        </Link>
-      </Actions>
-    </div>
+    <ScreenMessages messages={homeMessages}>
+      <HomeScreen
+        page={page}
+        selectedKey={sel}
+        onSelect={(key) => {
+          void navigate({ search: (prev) => ({ ...prev, sel: key }), replace: true });
+        }}
+        onAnswer={async (input) => {
+          await answerQuestion({ data: input });
+          // 답했음(answered)을 다시 읽어 답하기 칸을 닫는다
+          await router.invalidate();
+        }}
+        onDeny={async (input) => {
+          await denyPermission({ data: input });
+          await router.invalidate();
+        }}
+      />
+    </ScreenMessages>
   );
 }
-
-const styles = stylex.create({
-  page: { paddingTop: space.s8, paddingInline: space.s8, paddingBottom: space.s10 },
-  link: { color: colors.accentText, textUnderlineOffset: 3 },
-});

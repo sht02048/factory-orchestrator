@@ -1,0 +1,40 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-github-media-type": "github.v4; format=json",
+    "x-ratelimit-limit": "5000",
+    "x-ratelimit-remaining": "4969",
+    "x-ratelimit-reset": "1794933198",
+    "x-ratelimit-resource": "graphql",
+    "x-ratelimit-used": "31"
+  },
+  "body": {
+    "data": {
+      "repository": {
+        "pullRequest": {
+          "number": 16,
+          "url": "https://github.com/acme/app/pull/16",
+          "title": "ENG-131: follow-up",
+          "body": "Verification PR. Will be closed.",
+          "state": "MERGED",
+          "createdAt": "2026-11-17T13:16:47Z",
+          "mergedAt": "2026-11-17T13:16:55Z",
+          "headRefName": "factory/ENG-131-2",
+          "headRefOid": "4444444444444444444444444444444444444444",
+          "baseRefName": "main",
+          "isCrossRepository": false,
+          "headRepository": {
+            "nameWithOwner": "acme/app"
+          }
+        }
+      },
+      "rateLimit": {
+        "limit": 5000,
+        "cost": 1,
+        "remaining": 4969,
+        "resetAt": "2026-11-17T16:33:18Z"
+      }
+    }
+  }
+}

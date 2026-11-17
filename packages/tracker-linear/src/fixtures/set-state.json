@@ -1,0 +1,14 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-complexity": "2"
+  },
+  "body": {
+    "data": {
+      "issueUpdate": {
+        "success": true
+      }
+    }
+  }
+}

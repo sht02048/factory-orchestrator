@@ -1,6 +1,104 @@
 {
+  "documentTitle": "홈 · Factory Orchestrator",
   "title": "홈",
-  "subtitle": "아직 홈 화면이 없어요. Runs에서 런을 볼 수 있어요.",
-  "toRuns": "Runs 보기",
-  "toDs": "디자인 시스템 보기"
+  "subtitle": "{workspace} · 실행 중 {running} · Queued {queued}",
+  "subtitleAll": "모든 Workspace에서 손댈 일만 모았어요.",
+  "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 런이 보여요.",
+  "notApplicable": "—",
+  "cancelling": "취소 중",
+  "section": {
+    "attention": "손댈 일",
+    "running": "실행 중",
+    "queued": "Queued",
+    "queuedNote": "들어온 순서대로 시작해요"
+  },
+  "empty": {
+    "attention": "손댈 일이 없어요.",
+    "running": "실행 중인 런이 없어요.",
+    "queued": "기다리는 런이 없어요."
+  },
+  "columns": {
+    "ticket": "티켓",
+    "state": "상태",
+    "agentResult": "에이전트 결과",
+    "prState": "PR 상태",
+    "runner": "러너",
+    "agent": "에이전트",
+    "workspace": "Workspace",
+    "elapsed": "경과",
+    "waited": "기다린 시간"
+  },
+  "row": {
+    "question": "질문: {body}",
+    "permission": "권한 허용을 기다려요",
+    "inputUnknown": "에이전트가 사람 입력을 기다려요",
+    "unreachableFor": "러너에 {duration}째 닿지 않아요",
+    "unreachable": "러너에 닿지 않아요",
+    "human-check": "PR이 열려 있어요. 사람이 확인해야 해요",
+    "failed": "Failed로 끝났어요. 자동으로 다시 시도하지 않아요",
+    "runnerAuth": "GitHub 인증이 깨져 할당에서 뺐어요",
+    "runnerAuthState": "인증 깨짐"
+  },
+  "panel": {
+    "label": "고른 항목 요약",
+    "subtitle": "{project} · {workspace}",
+    "elapsedFor": "{duration}째",
+    "waitingFor": "{duration}째 기다리는 중",
+    "endedAfter": "{duration} 만에 끝났어요",
+    "state": "상태",
+    "summary": "요약 결과",
+    "agentResult": "에이전트 결과",
+    "prState": "PR 상태",
+    "runner": "러너",
+    "agent": "에이전트",
+    "elapsed": "경과 시간",
+    "waited": "기다린 시간",
+    "pr": "PR",
+    "none": "없음",
+    "notEnded": "런이 끝나면 기록해요",
+    "noRunner": "아직 정하지 않았어요",
+    "runnerOffline": "Offline",
+    "toRuns": "Runs에서 보기",
+    "reason": {
+      "running": "러너에서 에이전트가 티켓을 처리하고 있어요.",
+      "question": "에이전트가 질문했어요. 답하면 worker가 에이전트에게 전해요. 최대 실행 시간은 이 동안에도 흘러요.",
+      "permission": "에이전트가 권한 허용을 기다려요. 허용은 러너 화면에서만 할 수 있어요. 최대 실행 시간은 이 동안에도 흘러요.",
+      "inputUnknown": "에이전트가 사람 입력을 기다려요. 최대 실행 시간은 이 동안에도 흘러요.",
+      "disconnected": "런 중 러너에 5분 넘게 닿지 않았어요. 다시 닿으면 실제 상태를 확인해요. 최대 실행 시간은 이 동안에도 흘러요.",
+      "human-check": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
+      "failed": "에이전트 결과와 PR 상태 때문에 Failed예요. 자동으로 다시 시도하지 않아요.",
+      "cancelling": "취소를 요청했어요. worker가 에이전트를 멈추면 끝나요.",
+      "canceled": "운영자가 취소한 런이에요."
+    }
+  },
+  "question": {
+    "title": "질문",
+    "choices": "선택지",
+    "answerLabel": "답",
+    "answerPlaceholder": "에이전트에게 보낼 답을 써 주세요",
+    "send": "답 보내기",
+    "sending": "보내는 중…",
+    "answered": "답을 남겼어요. worker가 에이전트에게 전해요.",
+    "failed": "답을 남기지 못했어요. 다시 해 주세요."
+  },
+  "permission": {
+    "title": "권한 대기",
+    "allowOnRunner": "러너 화면에서 허용해 주세요.",
+    "reasonLabel": "거절 이유",
+    "reasonDescription": "에이전트가 대신 할 일을 적으면 함께 전해요",
+    "deny": "거절",
+    "denying": "거절하는 중…",
+    "denied": "거절을 남겼어요. worker가 에이전트에게 전해요.",
+    "failed": "거절을 남기지 못했어요. 다시 해 주세요."
+  },
+  "runnerAuth": {
+    "state": "인증 깨짐",
+    "subtitle": "러너",
+    "reason": "이 러너에서 GitHub 인증이 깨져 할당에서 뺐어요. Online/Offline은 그대로이고, 이 러너로 정한 Queued 런은 러너를 비워 기다려요.",
+    "fixTitle": "해결 방법",
+    "fixToken": "러너에서 gh auth login --insecure-storage로 토큰을 파일에 저장하고, gh auth setup-git으로 git 자격 증명 도우미를 gh로 바꿔요.",
+    "fixSsh": "또는 러너에 GitHub용 ssh 키를 둬요.",
+    "fixCheck": "고친 뒤 다음 러너 확인에서 인증이 돌아오면 다시 할당해요.",
+    "toRunners": "Runners에서 보기"
+  }
 }
