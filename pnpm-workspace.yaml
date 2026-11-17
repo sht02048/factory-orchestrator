@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+  - packages/*
+
+# lefthook 훅 설치는 루트 prepare 스크립트(lefthook install)가 맡는다.
+allowBuilds:
+  lefthook: false
