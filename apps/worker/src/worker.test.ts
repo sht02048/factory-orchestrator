@@ -4,7 +4,7 @@ import { getRun, getRunWithRecords } from "@factory/db";
 import type { StoredRun } from "@factory/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Harness, projectA, projectB, projectC } from "./test-fixtures.js";
-import { startWorker } from "./worker.js";
+import { START_UNREACHABLE_RETRY_MS, startWorker } from "./worker.js";
 
 let h: Harness;
 
@@ -457,7 +457,8 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
       startRequestedAt: null,
     });
 
-    // 맞는 러너가 닿으면 원래 자리로 돌아와 시작한다.
+    // 다시 해 볼 시각이 지나 맞는 러너가 닿으면 원래 자리로 돌아와 시작한다.
+    h.advance(START_UNREACHABLE_RETRY_MS);
     await worker.tick();
     expect(current(head)).toMatchObject({ state: "running", runnerId: runnerA });
   });
@@ -515,6 +516,28 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
   });
 
+  it("닿지 않는 러너가 DB에 Online으로 남아도 같은 러너의 뒤 런이 다른 러너의 런을 막지 않는다 (Q86)", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
+    const first = h.assign("ENG-1", projectA);
+    const second = h.assign("ENG-2", projectA);
+    const other = h.assign("ENG-3", projectB);
+    h.runner(runnerA).online = false;
+    const worker = h.worker();
+
+    await worker.tick();
+    await worker.tick();
+    expect(current(other)).toMatchObject({ state: "running", runnerId: runnerB });
+    expect([stateOf(first), stateOf(second)]).toEqual(["queued", "queued"]);
+
+    // 다시 해 볼 시각이 지나고 러너가 돌아오면 원래 순서로 시작한다.
+    h.runner(runnerA).online = true;
+    h.advance(START_UNREACHABLE_RETRY_MS);
+    await worker.tick();
+    expect(current(first)).toMatchObject({ state: "running", runnerId: runnerA });
+    expect(stateOf(second)).toBe("queued");
+  });
+
   it("이미 시작을 보낸 런이 러너에 닿지 못해도 다른 러너에서 다시 시작하지 않는다", async () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
@@ -533,6 +556,7 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     expect(h.runner(runnerB).startCalls).toHaveLength(0);
 
     fakeA.online = true;
+    h.advance(START_UNREACHABLE_RETRY_MS);
     await worker.tick();
     expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
     expect(fakeA.startCalls).toHaveLength(1);

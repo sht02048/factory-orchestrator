@@ -118,6 +118,7 @@ export function createWorker(options: WorkerOptions): Worker {
     adapters,
     pendingStarts: new Map(),
     mailboxes: new Map(),
+    unreachableUntil: new Map(),
   };
   let running: Promise<void> | null = null;
   let closed = false;
@@ -149,6 +150,11 @@ interface TickContext {
   pendingStarts: Map<RunId, PendingStart>;
   /** 이번 바퀴에 확인한 러너별 우편함. 바퀴마다 비운다 */
   mailboxes: Map<RunnerId, MailboxRef>;
+  /**
+   * 시작할 때 닿지 않은 러너와 다시 해 볼 시각. 그때까지 대기열 판단에서 Offline으로 본다(Q86). 러너 확인이
+   * Offline을 적기 전에도 닿지 않는 러너가 capacity를 잡아 뒤 런을 막지 않게 한다. 메모리에만 둔다.
+   */
+  unreachableUntil: Map<RunnerId, number>;
 }
 
 interface PendingStart {
@@ -309,7 +315,11 @@ async function processQueue(context: TickContext): Promise<void> {
   const plan = inTransaction(db, () => {
     const queued = listRuns(db, { states: ["queued"] });
     if (queued.length === 0) return null;
-    const runners = listRunnerSnapshots(db);
+    const runners = listRunnerSnapshots(db).map((runner) =>
+      (context.unreachableUntil.get(runner.id) ?? 0) > now().getTime()
+        ? { ...runner, online: false }
+        : runner,
+    );
     const snapshots = new Map(runners.map((runner) => [runner.id, runner]));
     const bound = boundRunners(context, queued);
     const runs = listRunPlacements(db);
@@ -482,6 +492,7 @@ async function startOnRunner(
     logger.warn("could not prepare the runner's mailbox", { runId: run.id, error });
     if (!isOfflineLike(error)) return { kind: "blocked" };
     // Offline 예외처럼 순서에서 뺀다. 결과를 모르는 시작이 없으면 러너를 비워 맞는 러너를 다시 고른다.
+    markUnreachable(context, runnerId);
     if (!unverified) tryWrite(context, run.id, () => setQueuedRunRunner(db, run.id, null));
     return { kind: "skipped" };
   }
@@ -489,7 +500,10 @@ async function startOnRunner(
     if (unverified) {
       const existing = await findStarted(context, run, runner, mailbox);
       // 확인하지 못했으면 러너를 비우지 않고 이번 순서에서만 뺀다(닿지 않으면 뒤 런을 막지 않는다).
-      if (existing === "unreachable") return { kind: "skipped" };
+      if (existing === "unreachable") {
+        markUnreachable(context, runnerId);
+        return { kind: "skipped" };
+      }
       if (existing === "unknown") return { kind: "blocked" };
       if (existing !== null) return { kind: "started", started: existing };
       unverified = false;
@@ -543,6 +557,13 @@ async function findStarted(
   }
 }
 
+/** 시작할 때 러너를 다시 해 보기까지 기다리는 시간(Q86). 그동안 그 러너를 Offline으로 본다. */
+export const START_UNREACHABLE_RETRY_MS = 60_000;
+
+function markUnreachable(context: TickContext, runnerId: RunnerId): void {
+  context.unreachableUntil.set(runnerId, context.now().getTime() + START_UNREACHABLE_RETRY_MS);
+}
+
 /** 러너에 닿지 못했거나 런을 돌릴 준비가 안 된 오류인지(core decideStartFailure의 wait-like-offline). */
 function isOfflineLike(error: unknown): boolean {
   const detail = runnerErrorDetail(error);
@@ -577,6 +598,7 @@ function handleStartFailure(
   const decision = decideStartFailure(detail, previousFailures);
   switch (decision.action) {
     case "wait-like-offline":
+      markUnreachable(context, runnerId);
       // Offline 예외처럼 순서에서 뺀다. 결과를 모르는 시작이 없으면 러너를 비워 맞는 러너를 다시 고른다.
       if (!unverified) {
         tryWrite(context, run.id, () =>
