@@ -61,7 +61,7 @@ ADR 0002·0003을 바꿀 근거는 찾지 못했다. 다만 ADR 0005의 "npm 패
 
 - server route는 `createFileRoute`의 `server.handlers`로 만든다. `curl -X POST -d hello`에 `hello`가 돌아왔다.
 - server function의 **출력** 타입은 클라이언트까지 이어진다. loader 결과의 `at`은 `Date`로, `pid`는 `number`로 추론되고, 없는 속성을 읽으면 `tsc`가 실패한다.
-- **입력** 타입은 검증기에 달렸다. 검증 함수의 인자가 `unknown`이면 호출부의 잘못된 입력(`name: 1`)을 잡지 못한다. 검증기로 zod 스키마(Standard Schema)를 넘기면 입력 타입도 호출부까지 이어져 `tsc`가 잡는다.
+- **입력** 타입은 검증기에 달렸다. 검증 함수의 인자가 `unknown`이면 호출부의 잘못된 입력(`name: 1`)을 잡지 못한다. 검증 함수의 인자 타입을 직접 지정하거나, zod 같은 Standard Schema를 검증기로 넘기면 입력 타입이 호출부까지 이어져 `tsc`가 잡는다. 스파이크에서는 zod로 확인했다. 런타임 검증까지 하려면 스키마 쪽이 편하다.
 
   ```ts
   const GreetInput = z.object({ name: z.string(), times: z.number().int().positive() });
@@ -85,10 +85,10 @@ ADR 0002·0003을 바꿀 근거는 찾지 못했다. 다만 ADR 0005의 "npm 패
   </head>
   ```
 
-- 프로덕션에서는 StyleX CSS가 앱의 CSS 자산(`app.css?url`을 루트 `head().links`로 연결)에 덧붙어 `dist/client/assets/app-*.css`로 나온다. 덧붙일 CSS 자산이 하나는 있어야 하므로 빈에 가까운 `app.css`를 둔다. `useCSSLayers: true`로 `@layer priority1..` 순서가 생긴다.
+- 프로덕션에서는 StyleX CSS가 앱의 CSS 자산(`app.css?url`을 루트 `head().links`로 연결)에 덧붙어 `dist/client/assets/app-*.css`로 나온다. 덧붙일 CSS 자산이 하나는 있어야 하므로 빈에 가까운 `app.css`를 둔다. CSS 자산이 없으면 플러그인이 아무 데서도 링크하지 않는 `assets/stylex.css`를 따로 쓴다. 플러그인은 `index-*.css`·`style-*.css`, 없으면 첫 CSS 자산을 고르므로, 라우트별 CSS가 생겨 자산이 여러 개가 되면 모든 페이지에서 로드되지 않는 파일에 붙을 수 있다. 그때는 `cssInjectionTarget` 옵션으로 대상을 고정한다. `useCSSLayers: true`로 `@layer priority1..` 순서가 생긴다.
 - 깜박임 없음: SSR HTML의 `<head>`에 스타일시트 링크가 있고, JS를 끈 브라우저 컨텍스트에서도 트리거 버튼 배경색이 토큰 값으로 계산됐다.
 - dev 빌드는 디버그용 클래스(`__root__styles.body`)와 `data-style-src` 속성을 붙인다. 프로덕션에는 없다.
-- 확인할 점: 기본 lightningcss 설정이 OKLCH 토큰을 hex + `lab()` 폴백으로 바꾼다. 색이 틀리지는 않지만 결과 CSS에 `oklch()`가 남지 않는다. 티켓 0003(디자인 시스템)에서 OKLCH를 그대로 내보내려면 `lightningcssOptions.targets`를 정해야 한다.
+- 확인할 점: 기본 lightningcss 설정이 OKLCH 토큰을 hex + `lab()` 폴백으로 바꾼다. 색이 틀리지는 않지만 결과 CSS에 `oklch()`가 남지 않는다. 티켓 0003(디자인 시스템)에서 OKLCH를 그대로 내보내려면 대상 브라우저를 정해야 한다. 플러그인은 프로젝트의 browserslist 설정에서 lightningcss `targets`를 만들므로, `lightningcssOptions.targets`와 browserslist 설정을 함께 본다.
 
 ### 3. UI SDK — 된다
 
@@ -125,7 +125,7 @@ strict 계열 옵션(`strict`, `noUncheckedIndexedAccess`, `exactOptionalPropert
 
 - `moduleResolution: nodenext`를 그대로 두면 실패한다. 생성되는 `routeTree.gen.ts`와 Start 관례가 확장자 없는 상대 import(`./routes/index`)를 쓰고, `@stylexjs/unplugin`의 타입도 nodenext로는 `vite` 속성을 찾지 못한다. 번들러가 해석하는 웹 앱이라 `bundler`가 맞다. 완화가 아니라 실행 환경에 맞춘 변경으로 본다.
 - `routeTree.gen.ts`는 파일 맨 위에 `// @ts-nocheck`가 있어 그 자체는 검사되지 않는다. 대신 `Register` 보강으로 라우트 경로·params·loader 데이터 타입이 앱 코드에 이어지고, 그쪽은 검사된다.
-- **`skipLibCheck`를 끄면 실패한다.** `--skipLibCheck false`로 돌리면 `@ui-sdk/core`의 선언 파일(accordion, checkbox-group, listbox, tabs, slider, tree, trigger-menu 등)이 `TS2344: ... does not satisfy the constraint 'Primitive'`로 실패한다. `--exactOptionalPropertyTypes false`를 더하면 UI SDK 오류는 사라진다. UI SDK 선언 파일이 이 저장소의 `exactOptionalPropertyTypes`와 맞지 않는다는 뜻이다. 나머지 오류는 `unplugin`, `@babel/*`, `@stylexjs/babel-plugin` 같은 빌드 도구 의존성의 implicit any다. `skipLibCheck: true`를 유지하는 한 앱 코드는 영향이 없다. UI SDK 부품을 쓸 때 그 부품의 props 타입이 앱 코드 쪽에서 `exactOptionalPropertyTypes` 오류를 낼 수 있으니 티켓 0003에서 부품마다 확인한다.
+- **`skipLibCheck`를 끄면 실패한다.** `--skipLibCheck false`로 돌리면 `@ui-sdk/core`의 선언 파일(accordion, checkbox-group, listbox, tabs, slider, tree, trigger-menu 등)이 `TS2344: ... does not satisfy the constraint 'Primitive'`로 실패한다. `--exactOptionalPropertyTypes false`를 더하면 UI SDK 오류는 사라진다. UI SDK 선언 파일이 이 저장소의 `exactOptionalPropertyTypes`와 맞지 않는다는 뜻이다. 나머지 오류는 빌드 도구 의존성에서 나온다. `unplugin` 선언 파일이 설치하지 않은 선택 peer(webpack, rollup, esbuild, rspack 등)를 찾지 못하는 TS2307과, `@babel/*` 타입이 없어 생기는 TS7016이 대부분이다. `skipLibCheck`를 끄려면 `@types/babel__*` 설치만으로는 부족하고 선택 peer 타입도 메워야 한다. `skipLibCheck: true`를 유지하는 한 앱 코드는 영향이 없다. UI SDK 부품을 쓸 때 그 부품의 props 타입이 앱 코드 쪽에서 `exactOptionalPropertyTypes` 오류를 낼 수 있으니 티켓 0003에서 부품마다 확인한다.
 - 생성기 대안: 설치된 `@tanstack/router-generator`에는 `addExtensions` 옵션이 있어 `routeTree.gen.ts`의 import에 확장자를 붙일 수 있다. 그래도 `@stylexjs/unplugin` 타입이 nodenext에서 깨지고 앱 코드의 모든 상대 import(`.stylex` 토큰 파일 포함)에 확장자를 붙여야 하므로, 웹 앱은 `bundler`로 둔다.
 - 걸린 것: `stylex.props`는 `this: null | undefined | unknown` 매개변수를 가진 선언이라 `Parameters<typeof stylex.props>`가 `never`가 된다. 도우미 인자 타입은 `ReadonlyArray<stylex.StyleXStyles | false>`처럼 직접 쓴다.
 
@@ -182,17 +182,17 @@ declare module "use-intl" {
 
 ## 막힌 곳과 우회법 요약
 
-| 막힌 곳                                              | 우회                                                       |
-| ---------------------------------------------------- | ---------------------------------------------------------- |
-| `.inputValidator()`가 1.169.5에 없음                 | `.validator()`를 쓴다                                      |
-| 검증 함수 인자가 `unknown`이면 입력 타입이 안 이어짐 | zod 같은 Standard Schema를 검증기로 넘긴다                 |
-| `nodenext`로는 웹 앱 typecheck 실패                  | `apps/web`만 `module: esnext`, `moduleResolution: bundler` |
-| `@stylexjs/unplugin`의 `vite()`가 `any` 반환         | `PluginOption`을 반환하는 함수 타입으로 단언               |
-| oxfmt가 `routeTree.gen.ts`를 포맷하려 함             | `.oxfmtrc.json` `ignorePatterns`에 추가                    |
-| StyleX가 `data-*` 상태 선택자를 쓰기 어려움          | UI SDK `className` 상태 함수로 StyleX 클래스 선택          |
-| dev에서 StyleX CSS가 자동으로 안 붙음                | 루트 셸 `<head>`에 dev 전용 `/virtual:stylex.css` 링크     |
-| pnpm `minimumReleaseAge`가 새 UI SDK 베타를 막음     | 하루 기다리거나 `minimumReleaseAgeExclude`에 버전 명시     |
-| JSON 메시지는 ICU 인자 타입을 못 잡음                | TS 메시지 파일 또는 Paraglide                              |
+| 막힌 곳                                              | 우회                                                              |
+| ---------------------------------------------------- | ----------------------------------------------------------------- |
+| `.inputValidator()`가 1.169.5에 없음                 | `.validator()`를 쓴다                                             |
+| 검증 함수 인자가 `unknown`이면 입력 타입이 안 이어짐 | 검증 함수 인자 타입을 지정하거나 Standard Schema(zod 등)를 넘긴다 |
+| `nodenext`로는 웹 앱 typecheck 실패                  | `apps/web`만 `module: esnext`, `moduleResolution: bundler`        |
+| `@stylexjs/unplugin`의 `vite()`가 `any` 반환         | `PluginOption`을 반환하는 함수 타입으로 단언                      |
+| oxfmt가 `routeTree.gen.ts`를 포맷하려 함             | `.oxfmtrc.json` `ignorePatterns`에 추가                           |
+| StyleX가 `data-*` 상태 선택자를 쓰기 어려움          | UI SDK `className` 상태 함수로 StyleX 클래스 선택                 |
+| dev에서 StyleX CSS가 자동으로 안 붙음                | 루트 셸 `<head>`에 dev 전용 `/virtual:stylex.css` 링크            |
+| pnpm `minimumReleaseAge`가 새 UI SDK 베타를 막음     | 하루 기다리거나 `minimumReleaseAgeExclude`에 버전 명시            |
+| JSON 메시지는 ICU 인자 타입을 못 잡음                | TS 메시지 파일 또는 Paraglide                                     |
 
 ## 남은 위험
 
@@ -202,4 +202,5 @@ declare module "use-intl" {
 - **UI SDK 타입과 strict 세트**: `@ui-sdk/core` 선언 파일이 `exactOptionalPropertyTypes`에서 실패한다(질문 4). 지금은 `skipLibCheck: true`에 기대고 있으므로 이 옵션을 끄면 안 되고, UI SDK를 올릴 때 다시 확인한다. 상위 저장소에 이슈로 알릴 만하다.
 - **UI SDK 베타**: 0.1.0-beta.7이 이미 나왔다. 버전 고정과 `packages/ui` 격리(ADR 0003)가 그대로 필요하다.
 - `@tanstack/react-start`가 RSC를 쓰지 않아도 `@tanstack/react-start-rsc`를 전이 의존성으로 설치한다. 기능에는 영향이 없다.
+- **`packages/ui` 배치는 시험하지 않았다.** ADR 0003·티켓 0003은 토큰, StyleX 컴포넌트, UI SDK 사용을 `packages/ui`에 두지만 스파이크는 모두 `apps/web`에 두었다. `packages/ui`는 기본 `nodenext`라 확장자 없는 `.stylex` import에서 같은 모듈 해석 문제를 만난다(질문 4). `bundler`로 바꿀지, 확장자를 붙일지 티켓 0003 첫머리에 정한다. 원본 `.ts`를 export하는 워크스페이스 패키지의 `defineVars`·`create`를 StyleX가 웹 빌드에서 컴파일하는지(`unstable_moduleResolution` 같은 설정 필요 여부)도 확인하지 않았다.
 - 확인하지 않은 것: HMR 중 StyleX CSS 갱신의 세부 동작, 다크 모드 테마(`createTheme`), 실제 Linear webhook 서명 검증, CI(ubuntu)에서의 웹 빌드.
