@@ -36,7 +36,7 @@
   "dimension": {
     "label": "나눠 보기",
     "runner": "러너별",
-    "project": "트래커 프로젝트별",
+    "trackerProject": "트래커 프로젝트별",
     "agent": "에이전트별"
   },
   "columns": {

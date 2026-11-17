@@ -95,7 +95,12 @@ describe("loadStatsPage", () => {
     });
     expect(page.groups.runner.map((g) => g.name)).toEqual(["runner-a", "runner-b"]);
 
-    const projects = byName(page.groups.project);
+    const projects = byName(page.groups.trackerProject);
+    // 고른 묶음은 주소(sel)에 남으므로 키는 주소에 안전한 글자만 쓴다
+    expect(page.groups.trackerProject.map((g) => g.key).toSorted()).toEqual([
+      "conn-acme:tp-api",
+      "conn-acme:tp-web",
+    ]);
     expect(projects.get("Web")).toMatchObject({
       runs: 6,
       outcomes: { merged: 2, "human-check": 2, failed: 2 },
@@ -146,7 +151,7 @@ describe("loadStatsPage", () => {
   it("다른 Workspace 를 고르면 그 Workspace 의 런만 센다", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), "ws-labs", now));
     expect(page.total.runs).toBe(1);
-    expect(page.groups.project.map((g) => g.name)).toEqual(["Lab"]);
+    expect(page.groups.trackerProject.map((g) => g.name)).toEqual(["Lab"]);
   });
 
   it("전체 보기와 Workspace 가 없을 때는 통계를 읽지 않는다", () => {

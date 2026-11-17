@@ -20,7 +20,7 @@ import type { WorkspaceChoice } from "../shell/model";
 export const STATS_DAYS = 14;
 
 /** 나눠 보기(티켓 0002): 러너별, 트래커 프로젝트별, 에이전트별 */
-export const STATS_DIMENSIONS = ["runner", "project", "agent"] as const;
+export const STATS_DIMENSIONS = ["runner", "trackerProject", "agent"] as const;
 export type StatsDimension = (typeof STATS_DIMENSIONS)[number];
 
 export type OutcomeCounts = Record<SummaryOutcome, number>;
@@ -28,7 +28,7 @@ export type OutcomeCounts = Record<SummaryOutcome, number>;
 /** 런 하나를 통계에 넣을 때 쓰는 값. Ended 런만 넣는다 */
 export interface StatsRun {
   runner: GroupKey;
-  project: GroupKey;
+  trackerProject: GroupKey;
   agent: GroupKey;
   agentResult: AgentResult;
   prState: PrState;

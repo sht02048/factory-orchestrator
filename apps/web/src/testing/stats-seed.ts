@@ -206,12 +206,10 @@ const otherWorkspace: StatsCase = {
 
 /**
  * Stats 테스트 DB 를 만든다. path 를 주면 그 파일에 쓴다(화면을 눈으로 볼 때).
- * shift 를 주면 모든 시각을 그만큼 옮긴다(오늘 날짜로 화면을 볼 때).
  */
-export function seedStatsDatabase(options: { path?: string; shiftMs?: number } = {}): Database {
-  const shift = options.shiftMs ?? 0;
+export function seedStatsDatabase(options: { path?: string } = {}): Database {
   const at = (iso: string, plusMinutes = 0) =>
-    new Date(new Date(iso).getTime() + shift + plusMinutes * 60_000);
+    new Date(new Date(iso).getTime() + plusMinutes * 60_000);
   const db = openDatabase(options.path ?? ":memory:");
   migrate(db);
   saveTrackerConnection(db, new SecretBox(new Uint8Array(32).fill(7)), {

@@ -26,7 +26,7 @@ export function loadStatsPage(db: Database, ws: string | undefined, now: Date): 
   const runnerNames = new Map(listRunners(db).map((r) => [r.id, r.name]));
   const projectNames = new Map<string, string>();
   const projectName = (run: StoredRun): string => {
-    const key = `${run.ticket.connection}\u0000${run.trackerProject}`;
+    const key = trackerProjectKey(run);
     let name = projectNames.get(key);
     if (name === undefined) {
       // Workspace 에서 뺀 트래커 프로젝트도 지난 런은 남는다. 이름을 모르면 ID 로 보인다.
@@ -50,8 +50,8 @@ export function loadStatsPage(db: Database, ws: string | undefined, now: Date): 
     return [
       {
         runner: { key: run.runnerId, name: runnerNames.get(run.runnerId) ?? run.runnerId },
-        project: {
-          key: `${run.ticket.connection}\u0000${run.trackerProject}`,
+        trackerProject: {
+          key: trackerProjectKey(run),
           name: projectName(run),
         },
         agent: { key: run.agent, name: run.agent },
@@ -72,8 +72,16 @@ export function loadStatsPage(db: Database, ws: string | undefined, now: Date): 
     daily: dailyThroughput(runs, period),
     groups: {
       runner: groupStats(runs, "runner"),
-      project: groupStats(runs, "project"),
+      trackerProject: groupStats(runs, "trackerProject"),
       agent: groupStats(runs, "agent"),
     },
   };
+}
+
+/**
+ * 트래커 프로젝트 묶음 키. 트래커 프로젝트 ID 는 트래커 연결 안에서만 유일해 연결과 잇는다.
+ * 고른 묶음으로 주소(sel)에 남으므로 주소에 안전한 글자만 쓴다.
+ */
+function trackerProjectKey(run: StoredRun): string {
+  return `${encodeURIComponent(run.ticket.connection)}:${encodeURIComponent(run.trackerProject)}`;
 }
