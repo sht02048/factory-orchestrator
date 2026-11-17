@@ -1,0 +1,32 @@
+{
+  "id": "00000000-0000-4000-8000-000000000019",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_00000000-0000-4000-8000-000000000020",
+      "ptyId": "00000000-0000-4000-8000-000000000005::<path>/workspaces/sandbox/fo-headless-h1@@<hex>",
+      "incarnationId": "00000000-0000-4000-8000-000000000021",
+      "orphaned": false,
+      "worktreeId": "00000000-0000-4000-8000-000000000005::<path>/workspaces/sandbox/fo-headless-h1",
+      "worktreePath": "<path>/workspaces/sandbox/fo-headless-h1",
+      "branch": "refs/heads/fo-headless-h1",
+      "tabId": "00000000-0000-4000-8000-000000000022",
+      "leafId": "00000000-0000-4000-8000-000000000023",
+      "title": "fo-e2",
+      "connected": false,
+      "writable": false,
+      "lastOutputAt": 1790000122085,
+      "preview": "<runDir>/exit-code; exit $c\n__FO_EXIT__=7",
+      "exitCause": {
+        "kind": "unknown",
+        "reason": "host_status_unavailable"
+      },
+      "executionHostId": "local",
+      "paneRuntimeId": -1,
+      "rendererGraphEpoch": 0
+    }
+  },
+  "_meta": {
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
+  }
+}

@@ -226,6 +226,13 @@ Runner 어댑터의 "에이전트 멈추기"는 `orca terminal close`로 한다.
 - 러너의 필수 조건에 "에이전트가 비대화형 세션에서 push·PR을 할 수 있는 GitHub 인증"이 들어가야 한다.
 - 온보딩 러너 확인 단계에서 이를 점검해야 한다. 예: ssh로 `git ls-remote <저장소>`와 `gh auth status`(gh를 쓰는 에이전트라면)를 부른다. 점검 방법은 아직 정하지 않았다(아래 "아직 모르는 것").
 
+### 해결(2026-11-17, research 0007 검증 중)
+
+운영자가 키체인 대신 파일에 토큰을 저장하도록 `gh auth login --insecure-storage`로 다시 로그인하고, `gh auth setup-git`으로 git의 github.com 자격 증명 도우미를 `gh auth git-credential`로 바꿔 해결했다. 비대화형 ssh에서 `gh auth status`가 로그인됨(토큰 저장 위치는 `<path>/.config/gh/hosts.yml`)을 보였고, 테스트 저장소의 `git ls-remote`가 성공했다 **[실행]**. `gh api user`와 `git push --dry-run`이 통과한 것은 코디네이터가 확인했다. 에이전트가 실제로 push·PR까지 하는 런은 돌리지 않았다.
+
+- 토큰이 키체인이 아니라 러너의 파일에 평문으로 남는다. 러너 사용자 계정에 접근할 수 있는 사람은 토큰을 읽을 수 있다.
+- 러너 필수 조건과 온보딩 점검 후보: 비대화형 ssh에서 `gh auth status`와 `git ls-remote <저장소>`.
+
 ## 아직 모르는 것
 
 1. Linux 러너의 `orca` 설치 경로, CLI 이름, 서비스 구성(7번). Linux 테스트 러너가 준비되면 확인한다.

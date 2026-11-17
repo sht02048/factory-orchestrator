@@ -1,0 +1,23 @@
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "processId": 63982,
+      "handle": "term_00000000-0000-4000-8000-000000000002",
+      "tabId": "00000000-0000-4000-8000-000000000003",
+      "paneKey": "00000000-0000-4000-8000-000000000003:00000000-0000-4000-8000-000000000004",
+      "ptyId": "00000000-0000-4000-8000-000000000005::<path>/workspaces/sandbox/fo-headless-h1@@<hex>",
+      "worktreeId": "00000000-0000-4000-8000-000000000005::<path>/workspaces/sandbox/fo-headless-h1",
+      "title": "fo-a1b",
+      "executionHostId": "local",
+      "incarnationId": "00000000-0000-4000-8000-000000000006",
+      "hostPlatform": "darwin",
+      "surface": "background",
+      "warning": "Terminal term_00000000-0000-4000-8000-000000000002 is running, but Orca could not make it discoverable. Run `orca terminal focus --terminal term_00000000-0000-4000-8000-000000000002` to reveal and focus it."
+    }
+  },
+  "_meta": {
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
+  }
+}
