@@ -1,0 +1,26 @@
+{
+  "id": "00000000-0000-4000-8000-000000000008",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_00000000-0000-4000-8000-000000000009",
+      "status": "running",
+      "tail": [
+        "<user>@<host> fo-headless-h1 % claude --fo-bogus-flag; echo __FO_EXIT__=$?",
+        "error: unknown option '--fo-bogus-flag'",
+        "__FO_EXIT__=1",
+        "<user>@<host> fo-headless-h1 %"
+      ],
+      "truncated": false,
+      "limited": false,
+      "oldestCursor": "0",
+      "nextCursor": "3",
+      "latestCursor": "3",
+      "returnedLineCount": 4,
+      "source": "stream"
+    }
+  },
+  "_meta": {
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
+  }
+}
