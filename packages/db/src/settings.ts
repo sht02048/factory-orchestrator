@@ -387,6 +387,58 @@ export function getWorkspaceTrackerProject(
   return row ?? null;
 }
 
+/**
+ * Workspace에 묶인 트래커 프로젝트. `workspaceId`를 주면 그 Workspace 것만, 없으면 모든 Workspace 것을
+ * 돌려준다. 묶은 순서가 아니라 트래커 연결, 이름 순서다.
+ */
+export function listWorkspaceTrackerProjects(
+  db: Database,
+  workspaceId?: WorkspaceId,
+): StoredWorkspaceTrackerProject[] {
+  return db
+    .select({
+      workspaceId: workspaceTrackerProjects.workspaceId,
+      connection: workspaceTrackerProjects.trackerConnectionId,
+      projectId: workspaceTrackerProjects.trackerProjectId,
+      name: workspaceTrackerProjects.name,
+      inProgressStateId: workspaceTrackerProjects.inProgressStateId,
+    })
+    .from(workspaceTrackerProjects)
+    .where(
+      workspaceId === undefined ? undefined : eq(workspaceTrackerProjects.workspaceId, workspaceId),
+    )
+    .orderBy(
+      asc(workspaceTrackerProjects.trackerConnectionId),
+      asc(workspaceTrackerProjects.name),
+      asc(workspaceTrackerProjects.trackerProjectId),
+    )
+    .all();
+}
+
+/**
+ * 트래커 프로젝트를 Workspace에서 뺀다. 그 Workspace에 묶여 있을 때만 빼고 true를 돌려준다.
+ * 그 트래커 프로젝트의 Mapping은 외래 키로 함께 지워진다. 런은 트래커 프로젝트를 외래 키로 묶지 않아
+ * 지난 런과 통계는 남는다(schema `runs.trackerProjectId`). 그 Mapping을 쓰던 Queued 런은 대기열 맨 앞에
+ * 오면 시작할 수 없음으로 끝난다(Q82.16).
+ */
+export function removeWorkspaceTrackerProject(
+  db: Database,
+  input: { workspaceId: WorkspaceId; connection: TrackerConnectionId; projectId: TrackerProjectId },
+): boolean {
+  return (
+    db
+      .delete(workspaceTrackerProjects)
+      .where(
+        and(
+          eq(workspaceTrackerProjects.workspaceId, input.workspaceId),
+          eq(workspaceTrackerProjects.trackerConnectionId, input.connection),
+          eq(workspaceTrackerProjects.trackerProjectId, input.projectId),
+        ),
+      )
+      .run().changes > 0
+  );
+}
+
 export interface StoredMapping {
   connection: TrackerConnectionId;
   trackerProject: TrackerProjectId;
