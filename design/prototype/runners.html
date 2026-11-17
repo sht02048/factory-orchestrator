@@ -1,212 +1,152 @@
 <!doctype html>
-<html lang="ko" data-theme="dark">
+<html lang="ko">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Runners · factory-orchestrator</title>
-    <script>
-      try {
-        var t = localStorage.getItem("fo-theme");
-        if (t) document.documentElement.setAttribute("data-theme", t);
-      } catch (e) {}
-    </script>
+    <link rel="icon" href="data:," />
     <link rel="stylesheet" href="styles.css" />
     <style>
-      .runner-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-        gap: var(--space-4);
-        align-items: start;
+      .table.runners {
+        --cols: minmax(0, 1fr) 96px 120px 96px 104px;
       }
-
-      .runner-card {
-        scroll-margin-top: 72px;
-      }
-
-      .runner-card[data-offline] .runner-name {
-        color: var(--text-secondary);
-      }
-
-      .runner-name {
-        font-size: var(--text-body);
-        font-weight: var(--weight-semibold);
-      }
-
-      .runner-host {
-        color: var(--text-tertiary);
-        font-family: var(--font-mono);
-        font-size: 12px;
-        overflow-wrap: anywhere;
-      }
-
-      .capacity {
+      .slots {
         display: flex;
         flex-direction: column;
-        gap: var(--space-2);
-        padding: var(--space-4);
-        border-bottom: 1px solid var(--border-subtle);
       }
-
-      .capacity-row {
-        display: flex;
-        align-items: baseline;
-        gap: var(--space-2);
-      }
-
-      .capacity-value {
-        font-size: 22px;
-        font-weight: var(--weight-semibold);
-        font-variant-numeric: tabular-nums;
-        line-height: 1.2;
-      }
-
-      .capacity .meter {
-        height: 8px;
-      }
-
-      .section-label {
-        padding: var(--space-3) var(--space-4) var(--space-1);
-        color: var(--text-tertiary);
-        font-size: var(--text-caption);
-        font-weight: var(--weight-medium);
-      }
-
-      .list {
-        list-style: none;
-        margin: 0;
-        padding: 0 0 var(--space-2);
-      }
-
-      .list li {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        min-height: 34px;
-        padding: 0 var(--space-4);
-      }
-
-      .list .end {
-        margin-inline-start: auto;
-        color: var(--text-tertiary);
-        font-size: var(--text-caption);
-        white-space: nowrap;
-      }
-
-      .runner-foot {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-1) var(--space-3);
-        padding: var(--space-3) var(--space-4);
+      .slot {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        gap: var(--space-3);
+        padding: var(--space-2) 0;
         border-top: 1px solid var(--border-subtle);
-        color: var(--text-tertiary);
-        font-size: var(--text-caption);
       }
-
-      .runner-foot .page-actions {
-        margin-inline-start: auto;
+      .slot:first-child {
+        border-top: 0;
+      }
+      .slot-n {
+        color: var(--text-tertiary);
+        font-variant-numeric: tabular-nums;
+      }
+      .slot-title {
+        display: block;
+        overflow: hidden;
+        color: var(--text-primary);
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      a.slot-title:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        text-decoration-color: var(--border-strong);
+      }
+      .slot-meta {
+        color: var(--text-tertiary);
+      }
+      .slot[data-empty] .slot-title {
+        color: var(--text-tertiary);
+      }
+      .bar {
+        display: inline-flex;
+        gap: 3px;
+        vertical-align: middle;
+        margin-inline-end: var(--space-2);
+      }
+      .bar i {
+        width: 10px;
+        height: 6px;
+        border-radius: 1px;
+        background: var(--border-default);
+      }
+      .bar i[data-on] {
+        background: var(--text-secondary);
+      }
+      .projects li {
+        padding: 6px 0;
+        border-top: 1px solid var(--border-subtle);
+        color: var(--text-secondary);
+      }
+      .projects li:first-child {
+        border-top: 0;
       }
     </style>
   </head>
-  <body>
-    <a class="skip-link" href="#page">본문으로 건너뛰기</a>
+  <body data-page="runners">
     <div class="app" id="app">
-      <main class="main" id="page">
-        <header class="page-header">
-          <h1 class="page-title">Runners</h1>
-          <span class="page-subtitle" id="sub"></span>
-          <div class="page-actions">
-            <a class="btn" href="settings.html#connection" id="add"></a>
-          </div>
-        </header>
-        <div class="page-body">
-          <div class="stat-row" id="stats"></div>
-          <div class="runner-grid" id="grid"></div>
-        </div>
-      </main>
+      <main class="main split" id="page"></main>
     </div>
     <script src="data.js"></script>
     <script src="app.js"></script>
     <script>
       (function () {
-        const { esc, runBadge, minutes, agents, icon } = FO;
-        FO.mountShell("runners");
-        document.getElementById("add").innerHTML = `${icon.plus}<span>러너 추가하기</span>`;
+        const FO = window.FO;
+        const page = document.getElementById("page");
+        const busy = (id) => FO.runs.filter((r) => r.state === "running" && r.runner === id);
+        const waiting = (id) => FO.runs.filter((r) => r.state === "queued" && r.runner === id);
+        const bar = (n, cap) => `<span class="bar" aria-hidden="true">${Array.from({ length: cap }, (_, i) => `<i${i < n ? " data-on" : ""}></i>`).join("")}</span>`;
 
-        const online = FO.runners.filter((r) => r.online);
-        const totalCap = online.reduce((n, r) => n + r.capacity, 0);
-        const used = online.reduce((n, r) => n + r.running, 0);
-        const queued = FO.runs.filter((r) => r.state === "queued").length;
-        document.getElementById("sub").textContent = `${FO.runners.length}대 중 ${online.length}대 Online`;
+        function row(r) {
+          const n = busy(r.id).length;
+          const q = waiting(r.id).length;
+          return `<button class="row" type="button" role="option" aria-selected="false" data-key="runner:${r.id}">
+            <span class="cell"><span class="row-title">${r.id}</span><span class="row-why">${r.host}</span></span>
+            <span class="cell"><span class="dot" data-tone="${r.online ? "online" : "offline"}" aria-hidden="true"></span> <span class="${r.online ? "secondary" : ""}">${r.online ? "Online" : "Offline"}</span></span>
+            <span class="cell num">${r.online ? `${bar(n, r.capacity)}${n}/${r.capacity}` : `${bar(0, r.capacity)}—/${r.capacity}`}</span>
+            <span class="cell num">${q ? `${q}개` : "—"}</span>
+            <span class="cell num r">${r.lastSeen}</span>
+          </button>`;
+        }
 
-        document.getElementById("stats").innerHTML = [
-          ["Online 러너", `${online.length}<span class="muted" style="font-size:14px"> / ${FO.runners.length}</span>`, `Offline ${FO.runners.length - online.length}대`],
-          ["쓰는 capacity", `${used}<span class="muted" style="font-size:14px"> / ${totalCap}</span>`, "Online 러너 기준"],
-          ["Queued 런", queued, "capacity가 나면 시작해요"],
-          ["프로젝트", FO.runners.reduce((n, r) => n + r.projects.length, 0), "러너 3대에 등록됨"],
-        ]
-          .map(([l, v, d]) => `<div class="card stat"><span class="stat-label">${l}</span><span class="stat-value">${v}</span><span class="stat-delta">${d}</span></div>`)
-          .join("");
+        function panel(id) {
+          const r = FO.runner(id);
+          const runs = busy(id);
+          const q = waiting(id);
+          const free = r.capacity - runs.length;
+          const why = !r.online
+            ? `${r.lastSeen}부터 응답이 없어요. 이 러너로 가는 런 ${q.length}개가 Queued로 기다려요. ssh 연결을 확인해 보세요.`
+            : free === 0
+              ? `capacity ${r.capacity}개를 모두 쓰고 있어요.${q.length ? ` 런 ${q.length}개가 자리를 기다려요.` : ""}`
+              : `capacity ${r.capacity}개 중 ${free}개가 비어 있어요.`;
+          const slots = Array.from({ length: r.capacity }, (_, i) => {
+            const run = runs[i];
+            if (!run) return `<li class="slot" data-empty><span class="slot-n">${i + 1}</span><span class="slot-title">${r.online ? "비어 있어요" : "쓸 수 없어요"}</span></li>`;
+            const t = FO.ticket(run.ticket);
+            return `<li class="slot"><span class="slot-n">${i + 1}</span><div style="min-width:0"><a class="slot-title" href="run.html?id=${run.id}">${FO.esc(t.title)}</a><span class="slot-meta num">${FO.esc(FO.workspaceOfRun(run).name)} · ${run.ticket} · ${FO.minutes(run.elapsed)}째</span></div></li>`;
+          }).join("");
+          return `<div class="panel-inner">
+            <div class="panel-head">
+              <p class="panel-state"><span class="dot" data-tone="${r.online ? "online" : "offline"}" aria-hidden="true"></span><span class="state" data-tone="neutral">${r.online ? "Online" : "Offline"}</span><span class="muted">${r.lastSeen} 응답</span></p>
+              <h2 class="panel-title">${r.id}</h2>
+              <p class="panel-sub">${r.user}@${r.host}</p>
+            </div>
+            <p class="panel-why">${why}</p>
+            <div class="actions"><button class="btn ${r.online ? "" : "btn-primary"}" type="button" data-toast="${r.online ? `${r.id}에 ssh로 연결했어요` : `${r.id}에 아직 닿지 않아요`}">ssh 연결 확인</button></div>
+            <div><h3 class="panel-block-title">슬롯 ${runs.length}/${r.capacity}</h3>${r.online ? `<ol class="slots">${slots}</ol>` : `<p class="muted">Offline이라 슬롯 ${r.capacity}개를 모두 쓸 수 없어요.</p>`}</div>
+            ${q.length ? `<div><h3 class="panel-block-title">기다리는 런 ${q.length}</h3><ol class="events">${q.map((x) => `<li class="event"><time class="num">${x.queued}</time><a href="run.html?id=${x.id}">${FO.esc(FO.ticket(x.ticket).title)}</a></li>`).join("")}</ol></div>` : ""}
+            <div><h3 class="panel-block-title">프로젝트 ${r.projects.length}</h3><ul class="projects">${r.projects.map((p) => `<li>${p}</li>`).join("")}</ul></div>
+            <dl class="props">
+              <dt>Orca</dt><dd>${r.orca}</dd>
+              <dt>실행 파일</dt><dd class="mono">${r.orcaPath}</dd>
+              <dt>OS</dt><dd>${r.os}</dd>
+            </dl>
+          </div>`;
+        }
 
-        document.getElementById("grid").innerHTML = FO.runners
-          .map((rn) => {
-            const running = FO.runs.filter((r) => r.runner === rn.id && r.state === "running");
-            const waiting = FO.runs.filter((r) => r.runner === rn.id && r.state === "queued");
-            const mappedBy = (p) => FO.mappings.filter((m) => m.runner === rn.id && m.project === p).map((m) => `${m.tracker} → ${agents[m.agent].name}`);
-            const offlineNote = rn.online
-              ? ""
-              : `<div class="callout" data-tone="failed" style="margin:var(--space-3) var(--space-4) 0">
-                  <div class="callout-body"><strong>${rn.lastSeen}부터 응답이 없어요</strong>
-                  <span class="secondary">Tailscale 연결과 Orca가 켜져 있는지 확인해 주세요. 이 러너로 가는 런 ${waiting.length}개가 Queued로 기다리고 있어요.</span></div>
-                </div>`;
-            const runList = running.length
-              ? `<ul class="list">${running
-                  .map((r) => `<li><a class="ticket-id" href="run.html?id=${r.id}">${r.ticket}</a><span class="cell-title" style="max-width:180px">${esc(FO.ticket(r.ticket).title)}</span><span class="end num">${minutes(r.elapsed)}째</span></li>`)
-                  .join("")}</ul>`
-              : `<p class="muted" style="padding:0 var(--space-4) var(--space-3)">${rn.online ? "지금 도는 런이 없어요." : "Offline이라 런을 시작하지 않아요."}</p>`;
-            const queueList = waiting.length
-              ? `<div class="section-label">Queued ${waiting.length}</div><ul class="list">${waiting
-                  .map((r) => `<li><a class="ticket-id" href="run.html?id=${r.id}">${r.ticket}</a><span class="cell-title" style="max-width:180px">${esc(FO.ticket(r.ticket).title)}</span><span class="end num">${r.queuedFor}분째</span></li>`)
-                  .join("")}</ul>`
-              : "";
-            return `<section class="card runner-card" id="${rn.id}"${rn.online ? "" : " data-offline"} aria-labelledby="${rn.id}-name">
-              <div class="card-header" style="align-items:flex-start;padding-block:var(--space-3)">
-                <span class="dot" data-tone="${rn.online ? "online" : "offline"}" style="margin-top:7px"></span>
-                <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-                  <h2 class="runner-name" id="${rn.id}-name">${rn.id}</h2>
-                  <span class="runner-host">${rn.host}</span>
-                </div>
-                <div class="page-actions"><span class="badge" data-tone="${rn.online ? "plain" : "queued"}" style="${rn.online ? "background:transparent;color:var(--status-online-text);box-shadow:inset 0 0 0 1px currentColor" : ""}">${rn.online ? "Online" : "Offline"}</span></div>
+        function render() {
+          const online = FO.runners.filter((r) => r.online).length;
+          page.innerHTML = `<div class="split-list">
+              <div class="page-head"><div><h1 class="page-title">Runners</h1><p class="page-sub">모든 Workspace가 함께 쓰는 러너예요. ${FO.runners.length}대 중 ${online}대가 Online이에요.</p></div>
+              <a class="btn" href="settings.html?sel=runners">${FO.icon.plus}러너 등록</a></div>
+              <div class="table runners">
+                ${FO.thead([{ label: "러너" }, { label: "상태" }, { label: "사용 중" }, { label: "대기" }, { label: "마지막 응답", r: true }])}
+                <div class="rows" role="listbox" aria-label="러너">${FO.runners.map(row).join("")}</div>
               </div>
-              ${offlineNote}
-              <div class="capacity">
-                <div class="capacity-row">
-                  <span class="capacity-value">${rn.online ? running.length : "—"}<span class="muted" style="font-size:14px"> / ${rn.capacity}</span></span>
-                  <span class="muted">capacity</span>
-                  <span class="muted" style="margin-inline-start:auto">${rn.online ? (rn.capacity - running.length ? `${rn.capacity - running.length}개 남았어요` : "모두 쓰고 있어요") : "쓸 수 없어요"}</span>
-                </div>
-                <div class="meter"${rn.online ? "" : " data-offline"}>${Array.from({ length: rn.capacity }, (_, i) => `<span${rn.online && i < running.length ? " data-on" : ""}></span>`).join("")}</div>
-              </div>
-              <div class="section-label">진행 중 ${running.length}</div>
-              ${runList}
-              ${queueList}
-              <div class="section-label" style="border-top:1px solid var(--border-subtle)">프로젝트 ${rn.projects.length}</div>
-              <ul class="list">${rn.projects
-                .map((p) => {
-                  const m = mappedBy(p.name);
-                  return `<li><span class="mono">${p.name}</span>${m.length ? `<span class="tag">${esc(m.join(", "))}</span>` : '<span class="muted" style="font-size:12px">매핑 없음</span>'}<span class="end num">워크트리 ${p.worktrees}</span></li>`;
-                })
-                .join("")}</ul>
-              <div class="runner-foot">
-                <span>${rn.os}</span><span>${rn.orca}</span><span>마지막 응답 ${rn.lastSeen}</span>
-                <div class="page-actions">${rn.online ? "" : `<button class="btn btn-sm" type="button" data-ping="${rn.id}">연결 다시 확인하기</button>`}</div>
-              </div>
-            </section>`;
-          })
-          .join("");
+            </div>
+            <aside class="panel" aria-live="polite" aria-label="고른 러너 요약"></aside>`;
+          FO.bindSplit(page.querySelector(".split-list"), page.querySelector(".panel"), { runner: panel }, "runner:runner-a");
+        }
 
-        document.querySelectorAll("[data-ping]").forEach((b) =>
-          b.addEventListener("click", () => FO.toast(`${b.dataset.ping}에 아직 닿지 않아요. 1분 뒤에 다시 확인할게요.`))
-        );
+        FO.mount("runners", render);
       })();
     </script>
   </body>

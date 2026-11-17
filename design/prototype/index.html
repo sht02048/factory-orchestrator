@@ -3,10 +3,59 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="refresh" content="0; url=tickets.html" />
-    <title>factory-orchestrator 시안</title>
+    <title>홈 · factory-orchestrator</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
-    <p><a href="tickets.html">Tickets 화면으로 가기</a></p>
+  <body data-page="home">
+    <div class="app" id="app">
+      <main class="main split" id="page"></main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const FO = window.FO;
+        const page = document.getElementById("page");
+
+        function section(title, runs, opts, note) {
+          const body = runs.length
+            ? `<div class="rows" role="listbox" aria-label="${title}">${runs.map((r) => FO.runRow(r, opts)).join("")}</div>`
+            : `<p class="empty">${opts.empty}</p>`;
+          return `<section class="section table">
+            <div class="section-head"><h2 class="section-title">${title}</h2><span class="section-count">${runs.length}</span>${note ? `<span class="section-note">${note}</span>` : ""}</div>
+            ${runs.length && opts.head ? FO.thead(FO.runCols(opts)) : ""}
+            ${body}
+          </section>`;
+        }
+
+        function render() {
+          const all = FO.ws === "all";
+          const todo = FO.attention();
+          const running = FO.runs.filter((r) => r.state === "running" && FO.inWs(r));
+          const queued = FO.runs.filter((r) => r.state === "queued" && FO.inWs(r)).sort((a, b) => a.position - b.position);
+          const doneToday = FO.runs.filter((r) => r.state === "done" && FO.inWs(r));
+          const merged = doneToday.filter((r) => r.result === "merged").length;
+
+          const sub = all
+            ? "모든 Workspace에서 손댈 일만 모았어요."
+            : `실행 중 ${running.length} · 대기 ${queued.length} · 오늘 Merged ${merged}`;
+
+          let html = `<div class="page-head"><div><h1 class="page-title">오늘</h1><p class="page-sub num">${sub}</p></div></div>`;
+          html += section("손댈 일", todo, { why: true, head: true, wsCol: all, empty: "손댈 일이 없어요. 모두 잘 돌고 있어요." });
+          if (!all) {
+            html += section("실행 중", running, { why: false, empty: "실행 중인 런이 없어요." });
+            if (queued.length) html += section("Queued", queued, { why: true }, "들어온 순서대로 시작해요");
+            html += `<p class="list-foot">오늘 끝난 런 ${doneToday.length}개는 <a class="link" href="runs.html">Runs</a>에서 볼 수 있어요.</p>`;
+          }
+
+          page.innerHTML = `<div class="split-list">${html}</div><aside class="panel" aria-live="polite" aria-label="고른 런 요약"></aside>`;
+          const first = page.querySelector(".row[data-key]");
+          FO.bindSplit(page.querySelector(".split-list"), page.querySelector(".panel"), { run: (id) => FO.runPanel(FO.run(id)) }, first && first.dataset.key);
+        }
+
+        FO.mount("home", render);
+      })();
+    </script>
   </body>
 </html>

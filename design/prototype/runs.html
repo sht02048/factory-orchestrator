@@ -1,367 +1,71 @@
 <!doctype html>
-<html lang="ko" data-theme="dark">
+<html lang="ko">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Runs · factory-orchestrator</title>
-    <script>
-      try {
-        var t = localStorage.getItem("fo-theme");
-        if (t) document.documentElement.setAttribute("data-theme", t);
-      } catch (e) {}
-    </script>
+    <link rel="icon" href="data:," />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="picker.css" />
-    <style>
-      .summary {
-        display: flex;
-        flex-wrap: wrap;
-        gap: var(--space-2) var(--space-5);
-        align-items: center;
-        color: var(--text-secondary);
-      }
-
-      .summary strong {
-        color: var(--text-primary);
-        font-variant-numeric: tabular-nums;
-        font-weight: var(--weight-semibold);
-      }
-
-      /* 안 1: 상태 칸반 */
-      .board {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(200px, 1fr));
-        gap: var(--space-3);
-        align-items: start;
-        overflow-x: auto;
-      }
-
-      .column {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-        min-height: 320px;
-        padding: var(--space-2);
-        border-radius: var(--radius-lg);
-        background: var(--bg-inset);
-      }
-
-      .column-header {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        height: 28px;
-        padding: 0 var(--space-1);
-        font-weight: var(--weight-semibold);
-      }
-
-      .column-header .num {
-        color: var(--text-tertiary);
-        font-weight: var(--weight-regular);
-      }
-
-      .column-hint {
-        padding: 0 var(--space-1) var(--space-1);
-        color: var(--text-tertiary);
-        font-size: var(--text-caption);
-        text-wrap: pretty;
-      }
-
-      /* 안 2: 러너 레인 */
-      .lanes {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-3);
-      }
-
-      .lane {
-        display: grid;
-        grid-template-columns: 200px minmax(0, 1fr);
-        overflow: hidden;
-      }
-
-      .lane-head {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-        padding: var(--space-3) var(--space-4);
-        border-inline-end: 1px solid var(--border-subtle);
-      }
-
-      .lane-name {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        font-weight: var(--weight-semibold);
-      }
-
-      .lane-slots {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-        gap: var(--space-2);
-        padding: var(--space-3);
-      }
-
-      .slot-empty {
-        display: grid;
-        place-items: center;
-        min-height: 96px;
-        border: 1px dashed var(--border-default);
-        border-radius: var(--radius-md);
-        color: var(--text-tertiary);
-        font-size: var(--text-caption);
-      }
-
-      .lane[data-offline] .lane-slots {
-        background: repeating-linear-gradient(
-          -45deg,
-          transparent 0 8px,
-          color-mix(in oklch, var(--border-subtle) 60%, transparent) 8px 9px
-        );
-      }
-
-      .queue-strip {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: var(--space-2);
-        padding: var(--space-2) var(--space-3);
-        border-top: 1px solid var(--border-subtle);
-        grid-column: 2;
-        color: var(--text-tertiary);
-        font-size: var(--text-caption);
-      }
-
-      .queue-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        height: 24px;
-        padding: 0 var(--space-2);
-        border: 1px solid var(--border-default);
-        border-radius: var(--radius-sm);
-        color: var(--text-secondary);
-      }
-
-      /* 안 3: 타임라인 표 */
-      .gantt-axis {
-        position: relative;
-        height: 16px;
-        color: var(--text-tertiary);
-        font-size: 11px;
-        font-variant-numeric: tabular-nums;
-      }
-
-      .gantt-axis span {
-        position: absolute;
-        transform: translateX(-50%);
-      }
-
-      .gantt {
-        position: relative;
-        height: 14px;
-        min-width: 260px;
-        border-radius: 2px;
-        background: repeating-linear-gradient(
-          90deg,
-          var(--border-subtle) 0 1px,
-          transparent 1px calc(100% / 13)
-        );
-      }
-
-      .gantt-bar {
-        position: absolute;
-        top: 3px;
-        height: 8px;
-        border-radius: 2px;
-      }
-
-      .gantt-bar[data-queued] {
-        background: transparent;
-        box-shadow: inset 0 0 0 1px var(--status-queued-solid);
-      }
-
-      .gantt-now {
-        position: absolute;
-        top: -2px;
-        bottom: -2px;
-        width: 1px;
-        background: var(--accent);
-      }
-    </style>
   </head>
-  <body>
-    <a class="skip-link" href="#page">본문으로 건너뛰기</a>
+  <body data-page="runs">
     <div class="app" id="app">
-      <main class="main" id="page">
-        <header class="page-header">
-          <h1 class="page-title">Runs</h1>
-          <span class="page-subtitle">오늘 08:00부터 · 14:20 기준</span>
-          <div class="page-actions">
-            <a class="btn" href="tickets.html">티켓에서 할당하기</a>
-          </div>
-        </header>
-        <div class="page-body">
-          <div class="summary" id="summary"></div>
-          <div id="stage"></div>
-        </div>
-      </main>
+      <main class="main split" id="page"></main>
     </div>
     <script src="data.js"></script>
     <script src="app.js"></script>
     <script>
       (function () {
-        const { esc, runBadge, minutes, agents } = FO;
-        FO.mountShell("runs");
+        const FO = window.FO;
+        const page = document.getElementById("page");
+        const filters = [
+          { key: "all", label: "전체", test: () => true },
+          { key: "todo", label: "손댈 일", test: (r) => FO.attention().includes(r), attention: true },
+          { key: "running", label: "실행 중", test: (r) => r.state === "running" },
+          { key: "queued", label: "Queued", test: (r) => r.state === "queued" },
+          { key: "merged", label: "Merged", test: (r) => r.result === "merged" },
+        ];
+        let current = new URLSearchParams(location.search).get("f") || "all";
 
-        const running = FO.runs.filter((r) => r.state === "running");
-        const queued = FO.runs.filter((r) => r.state === "queued");
-        const done = FO.runs.filter((r) => r.state === "done");
-        const by = (res) => done.filter((r) => r.result === res);
-
-        document.getElementById("summary").innerHTML = `
-          <span>진행 중 <strong>${running.length}</strong></span>
-          <span>Queued <strong>${queued.length}</strong></span>
-          <span>오늘 끝난 런 <strong>${done.length}</strong></span>
-          <span class="legend">
-            <span class="legend-item"><span class="legend-swatch fill-merged"></span>Merged ${by("merged").length}</span>
-            <span class="legend-item"><span class="legend-swatch fill-check"></span>Human Check ${by("check").length}</span>
-            <span class="legend-item"><span class="legend-swatch fill-failed"></span>Failed ${by("failed").length}</span>
-          </span>`;
-
-        function meta(run) {
-          if (run.state === "queued") return `<span>${run.runner}</span><span class="num">${run.queuedFor}분째 기다리는 중</span>`;
-          if (run.state === "running") return `<span>${run.runner}</span><span>${agents[run.agent].name}</span><span class="num">${minutes(run.elapsed)}째</span>`;
-          const pr = run.pr ? `<span class="num">PR #${run.pr.number}</span>` : `<span>${FO.failReasonLabel[run.failReason]}</span>`;
-          return `<span>${run.runner}</span>${pr}<span class="num">${run.ended}에 끝남</span>`;
-        }
-
-        function card(run) {
-          const t = FO.ticket(run.ticket);
-          const progress = run.state === "running" ? `<div class="progress" aria-label="${run.step}"><span style="width:${Math.round(run.progress * 100)}%"></span></div><span class="muted" style="font-size:12px">${run.step}</span>` : "";
-          const reason = run.state === "queued" ? `<span class="muted" style="font-size:12px;text-wrap:pretty">${esc(run.queueReason)}</span>` : "";
-          return `<a class="run-card" href="run.html?id=${run.id}">
-            <div class="run-card-top"><span class="ticket-id">${run.ticket}</span><span class="mono muted">#${run.id}</span>${runBadge(run)}</div>
-            <div class="run-card-title">${esc(t.title)}</div>
-            ${progress}${reason}
-            <div class="run-card-meta">${meta(run)}</div>
-          </a>`;
-        }
-
-        // 안 1: 상태 칸반
-        function kanban() {
-          const cols = [
-            { name: "Queued", hint: "capacity가 나면 순서대로 시작해요", runs: queued },
-            { name: "진행 중", hint: "에이전트가 티켓을 처리하고 있어요", runs: running },
-            { name: "Human Check", hint: "PR이 열려 있어요. 사람이 확인해야 해요", runs: by("check") },
-            { name: "Merged", hint: "에이전트가 CI 통과 뒤 직접 병합했어요", runs: by("merged") },
-            { name: "Failed", hint: "PR 없이 끝났어요. 자동으로 다시 시도하지 않아요", runs: by("failed") },
-          ];
-          return `<div class="board">${cols
-            .map(
-              (c) => `<section class="column" aria-label="${c.name}">
-                <div class="column-header">${c.name}<span class="num">${c.runs.length}</span></div>
-                <p class="column-hint">${c.hint}</p>
-                ${c.runs.map(card).join("")}
-              </section>`
-            )
-            .join("")}</div>`;
-        }
-
-        // 안 2: 러너 레인
-        function lanes() {
-          const finishedRows = done
-            .map((r) => `<tr>
-              <td class="mono muted col-shrink"><a href="run.html?id=${r.id}">#${r.id}</a></td>
-              <td class="ticket-id col-shrink">${r.ticket}</td>
-              <td><span class="cell-title">${esc(FO.ticket(r.ticket).title)}</span></td>
-              <td class="col-shrink">${runBadge(r)}</td>
-              <td class="col-shrink secondary">${r.runner}</td>
-              <td class="col-shrink num secondary">${r.ended}</td>
-            </tr>`)
-            .join("");
-          return `<div class="lanes">${FO.runners
-            .map((rn) => {
-              const mine = running.filter((r) => r.runner === rn.id);
-              const waiting = queued.filter((r) => r.runner === rn.id);
-              const empties = rn.online ? Math.max(0, rn.capacity - mine.length) : rn.capacity;
-              const slots =
-                mine.map(card).join("") +
-                Array.from({ length: empties }, () => `<div class="slot-empty">${rn.online ? "비어 있어요" : "Offline이라 쓸 수 없어요"}</div>`).join("");
-              const queue = waiting.length
-                ? `<div class="queue-strip">Queued ${waiting.length} ${waiting
-                    .map((r) => `<a class="queue-chip" href="run.html?id=${r.id}"><span class="ticket-id">${r.ticket}</span><span class="num">${r.queuedFor}분</span></a>`)
-                    .join("")}</div>`
-                : "";
-              return `<section class="card lane"${rn.online ? "" : " data-offline"} aria-label="${rn.id}">
-                <div class="lane-head">
-                  <div class="lane-name"><span class="dot" data-tone="${rn.online ? "online" : "offline"}"></span>${rn.id}</div>
-                  <div class="meter"${rn.online ? "" : " data-offline"}>${Array.from({ length: rn.capacity }, (_, i) => `<span${i < mine.length ? " data-on" : ""}></span>`).join("")}</div>
-                  <span class="muted num">${rn.online ? `capacity ${mine.length}/${rn.capacity}` : `Offline · ${rn.lastSeen}에 마지막 응답`}</span>
-                </div>
-                <div class="lane-slots">${slots}</div>
-                ${queue}
-              </section>`;
-            })
-            .join("")}
-            <section class="card">
-              <div class="card-header"><h2 class="card-title">오늘 끝난 런</h2><span class="muted num">${done.length}개</span></div>
-              <div class="table-wrap"><table class="table"><tbody>${finishedRows}</tbody></table></div>
-            </section>
-          </div>`;
-        }
-
-        // 안 3: 타임라인 표 (08:00–14:30)
-        function timeline() {
-          const start = 8 * 60;
-          const span = 6.5 * 60;
-          const toMin = (hhmm) => {
-            const [h, m] = hhmm.split(":").map(Number);
-            return h * 60 + m;
-          };
-          const nowMin = 14 * 60 + 20;
-          const pct = (m) => ((m - start) / span) * 100;
-          const ticks = Array.from({ length: 7 }, (_, i) => `<span style="left:${pct(start + i * 60)}%">${String(8 + i).padStart(2, "0")}:00</span>`).join("");
-          const order = [...queued, ...running, ...done];
-          const rows = order
-            .map((r) => {
-              let bar;
-              if (r.state === "queued") {
-                const from = nowMin - r.queuedFor;
-                bar = `<span class="gantt-bar" data-queued style="left:${pct(from)}%;width:${pct(nowMin) - pct(from)}%"></span>`;
-              } else {
-                const from = toMin(r.started);
-                const cls = r.state === "running" ? "fill-running" : `fill-${r.result}`;
-                bar = `<span class="gantt-bar ${cls}" style="left:${pct(from)}%;width:${Math.max(0.6, pct(from + r.elapsed) - pct(from))}%"></span>`;
-              }
-              const pr = r.pr ? `<span class="num">#${r.pr.number}</span>` : r.state === "done" ? `<span class="muted">${FO.failReasonLabel[r.failReason]}</span>` : '<span class="muted">—</span>';
-              const time = r.state === "queued" ? `<span class="muted">${r.queuedFor}분 대기</span>` : minutes(r.elapsed);
-              return `<tr>
-                <td class="col-shrink mono"><a href="run.html?id=${r.id}">#${r.id}</a></td>
-                <td class="col-shrink ticket-id">${r.ticket}</td>
-                <td><span class="cell-title" style="max-width:220px" title="${esc(FO.ticket(r.ticket).title)}">${esc(FO.ticket(r.ticket).title)}</span></td>
-                <td class="col-shrink">${runBadge(r)}</td>
-                <td class="col-shrink secondary">${r.runner}</td>
-                <td class="col-shrink secondary">${agents[r.agent].name}</td>
-                <td class="col-shrink col-num">${time}</td>
-                <td class="col-shrink">${pr}</td>
-                <td style="width:34%"><div class="gantt">${bar}<span class="gantt-now" style="left:${pct(nowMin)}%" aria-hidden="true"></span></div></td>
-              </tr>`;
+        function render() {
+          if (FO.ws === "all") {
+            page.innerHTML = FO.allNotice("Runs");
+            return;
+          }
+          const mine = FO.runs.filter(FO.inWs).sort((a, b) => b.id - a.id);
+          const f = filters.find((x) => x.key === current) || filters[0];
+          const rows = mine.filter(f.test);
+          const tabs = filters
+            .map((x) => {
+              const n = mine.filter(x.test).length;
+              return `<button class="filter" type="button" role="tab" data-f="${x.key}" aria-selected="${x.key === f.key}"${x.attention && n ? " data-attention" : ""}>${x.label}<span class="n">${n}</span></button>`;
             })
             .join("");
-          return `<section class="card"><div class="table-wrap"><table class="table">
-            <thead><tr>
-              <th>런</th><th>티켓</th><th>제목</th><th>상태</th><th>러너</th><th>에이전트</th><th class="col-num">걸린 시간</th><th>PR</th>
-              <th><div class="gantt-axis">${ticks}</div></th>
-            </tr></thead>
-            <tbody>${rows}</tbody></table></div></section>`;
+          const list = rows.length
+            ? `${FO.thead(FO.runCols({ statusCol: true }))}<div class="rows" role="listbox" aria-label="런">${rows.map((r) => FO.runRow(r, { statusCol: true, why: false })).join("")}</div>`
+            : `<p class="empty">이 조건에 맞는 런이 없어요.</p>`;
+          page.innerHTML = `<div class="split-list">
+              <div class="page-head"><div><h1 class="page-title">Runs</h1><p class="page-sub">오늘 ${FO.wsName(FO.ws)}의 런이에요. 새 것부터 보여 줘요.</p></div></div>
+              <div class="filters" role="tablist" aria-label="상태로 거르기">${tabs}</div>
+              <div class="table with-status">${list}</div>
+            </div>
+            <aside class="panel" aria-live="polite" aria-label="고른 런 요약"></aside>`;
+          const first = page.querySelector(".row[data-key]");
+          FO.bindSplit(page.querySelector(".split-list"), page.querySelector(".panel"), { run: (id) => FO.runPanel(FO.run(id)) }, first && first.dataset.key);
         }
 
-        FO.picker(document.getElementById("stage"), [
-          { name: "상태 칸반", render: kanban },
-          { name: "러너 레인", render: lanes },
-          { name: "타임라인 표", render: timeline },
-        ]);
+        page.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-f]");
+          if (!b) return;
+          current = b.dataset.f;
+          const url = new URL(location.href);
+          url.searchParams.set("f", current);
+          url.searchParams.delete("sel");
+          history.replaceState(null, "", url);
+          render();
+          page.querySelector(`[data-f="${current}"]`).focus();
+        });
+
+        FO.mount("runs", render);
       })();
     </script>
   </body>

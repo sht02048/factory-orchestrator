@@ -1,189 +1,169 @@
 <!doctype html>
-<html lang="ko" data-theme="dark">
+<html lang="ko">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Tickets · factory-orchestrator</title>
-    <script>
-      try {
-        var t = localStorage.getItem("fo-theme");
-        if (t) document.documentElement.setAttribute("data-theme", t);
-      } catch (e) {}
-    </script>
+    <link rel="icon" href="data:," />
     <link rel="stylesheet" href="styles.css" />
+    <style>
+      .table.tickets {
+        --cols: minmax(0, 1fr) 84px 100px 96px 120px;
+      }
+      .tag {
+        color: var(--text-tertiary);
+      }
+      .tag[data-auto] {
+        color: var(--accent-text);
+      }
+      .history {
+        display: flex;
+        flex-direction: column;
+      }
+      .history a {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr) auto;
+        gap: var(--space-3);
+        padding: var(--space-2) 0;
+        border-top: 1px solid var(--border-subtle);
+        color: var(--text-tertiary);
+      }
+      .history a:first-child {
+        border-top: 0;
+      }
+      .history a:hover .h-id {
+        color: var(--text-primary);
+      }
+      .h-id {
+        color: var(--text-secondary);
+      }
+    </style>
   </head>
-  <body>
-    <a class="skip-link" href="#page">본문으로 건너뛰기</a>
+  <body data-page="tickets">
     <div class="app" id="app">
-      <main class="main" id="page">
-        <header class="page-header">
-          <h1 class="page-title">Tickets</h1>
-          <span class="page-subtitle">Linear 기준 · 14:20에 맞췄어요</span>
-          <div class="page-actions">
-            <button class="btn" type="button" id="sync"></button>
-          </div>
-        </header>
-        <div class="page-body">
-          <div class="toolbar">
-            <label class="search">
-              <span class="visually-hidden">티켓 검색</span>
-              <span id="search-icon"></span>
-              <input class="input" id="q" type="search" placeholder="ID나 제목으로 찾기" autocomplete="off" spellcheck="false" />
-            </label>
-            <div class="segmented" role="group" aria-label="프로젝트" id="project-filter"></div>
-            <div class="segmented" role="group" aria-label="할당 방식" id="mode-filter"></div>
-            <span class="spacer"></span>
-            <label class="secondary" style="display: inline-flex; align-items: center; gap: 6px">
-              <input type="checkbox" id="show-done" /> Done 티켓도 보기
-            </label>
-          </div>
-
-          <section class="card" aria-labelledby="tickets-title">
-            <div class="card-header">
-              <h2 class="card-title" id="tickets-title">티켓</h2>
-              <span class="muted num" id="count"></span>
-              <div class="page-actions legend">
-                <span class="legend-item"><span class="tag" data-auto>factory</span> 자동 할당 라벨이 붙은 티켓은 운영자 없이 할당해요</span>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th class="col-shrink">ID</th>
-                    <th>제목</th>
-                    <th class="col-shrink">프로젝트</th>
-                    <th class="col-shrink">Linear 상태</th>
-                    <th class="col-shrink">라벨 · 할당</th>
-                    <th class="col-shrink">최근 런</th>
-                    <th class="col-shrink">러너</th>
-                    <th class="col-shrink"><span class="visually-hidden">동작</span></th>
-                  </tr>
-                </thead>
-                <tbody id="rows"></tbody>
-              </table>
-            </div>
-            <div class="empty" id="empty" hidden>
-              <strong>조건에 맞는 티켓이 없어요</strong>
-              <span>검색어를 지우거나 다른 프로젝트를 골라 보세요.</span>
-            </div>
-          </section>
-        </div>
-      </main>
+      <main class="main split" id="page"></main>
     </div>
     <script src="data.js"></script>
     <script src="app.js"></script>
     <script>
       (function () {
-        const { icon, esc, runBadge } = FO;
-        FO.mountShell("tickets");
-        document.getElementById("search-icon").outerHTML = icon.search;
-        document.getElementById("sync").innerHTML = `${icon.refresh}<span>Linear에서 다시 불러오기</span>`;
-        document.getElementById("sync").addEventListener("click", () => FO.toast("Linear에서 티켓 19개를 다시 불러왔어요."));
+        const FO = window.FO;
+        const page = document.getElementById("page");
+        const last = (t) => FO.runsFor(t.id)[0];
+        const isTodo = (t) => {
+          const r = last(t);
+          return r && r.state === "done" && r.result !== "merged";
+        };
+        const filters = [
+          { key: "all", label: "전체", test: () => true },
+          { key: "todo", label: "손댈 일", test: isTodo, attention: true },
+          { key: "unassigned", label: "할당 전", test: (t) => !last(t) },
+          { key: "active", label: "실행 중", test: (t) => last(t) && last(t).state !== "done" },
+          { key: "merged", label: "Merged", test: (t) => last(t) && last(t).result === "merged" },
+        ];
+        let current = new URLSearchParams(location.search).get("f") || "all";
 
-        const state = { q: "", project: "전체", mode: "전체", showDone: false };
-        const assignedNow = new Set();
-
-        const projects = ["전체", ...FO.trackerProjects.map((p) => p.name)];
-        const modes = ["전체", "자동", "직접", "할당 전"];
-
-        function segmented(el, values, key) {
-          el.innerHTML = values.map((v) => `<button type="button" aria-pressed="${state[key] === v}">${v}</button>`).join("");
-          el.querySelectorAll("button").forEach((b, i) =>
-            b.addEventListener("click", () => {
-              state[key] = values[i];
-              segmented(el, values, key);
-              render();
-            })
-          );
-        }
-
-        function modeOf(t) {
-          const runs = FO.runsFor(t.id);
-          if (!runs.length && !assignedNow.has(t.id)) return "할당 전";
-          return t.labels.includes(FO.AUTO_LABEL) ? "자동" : "직접";
+        function lastCell(t) {
+          const r = last(t);
+          if (!r) return `<span class="muted">할당 전</span>`;
+          const dot = r.result === "check" || r.result === "failed" ? `<span class="dot" data-tone="${r.result}" aria-hidden="true"></span> ` : "";
+          return `${dot}${FO.stateText(r)}`;
         }
 
         function row(t) {
-          const runs = FO.runsFor(t.id);
-          const latest = runs[0];
-          const mapping = FO.mappingFor(t.project);
-          const auto = t.labels.includes(FO.AUTO_LABEL);
-          const labels = t.labels
-            .map((l) => `<span class="tag"${l === FO.AUTO_LABEL ? " data-auto" : ""}>${esc(l)}</span>`)
-            .join(" ");
+          return `<button class="row" type="button" role="option" aria-selected="false" data-key="ticket:${t.id}">
+            <span class="cell"><span class="row-title">${FO.esc(t.title)}</span></span>
+            <span class="cell id">${t.id}</span>
+            <span class="cell">${FO.esc(t.project)}</span>
+            <span class="cell">${t.trackerState}</span>
+            <span class="cell">${lastCell(t)}</span>
+          </button>`;
+        }
 
-          let runCell = '<span class="muted">—</span>';
-          let action = "";
-          if (assignedNow.has(t.id)) {
-            runCell = '<span class="badge" data-tone="queued">Queued</span>';
-            action = '<span class="muted">맡겼어요</span>';
-          } else if (latest) {
-            const more = runs.length > 1 ? ` <span class="muted num">외 ${runs.length - 1}</span>` : "";
-            runCell = `<a href="run.html?id=${latest.id}" style="display:inline-flex;align-items:center;gap:6px">${runBadge(latest)} <span class="mono muted">#${latest.id}</span></a>${more}`;
-            if (latest.state === "done" && latest.result === "failed") {
-              action = `<button class="btn btn-sm" type="button" data-assign="${t.id}">다시 할당하기</button>`;
-            } else if (latest.state === "done" && latest.result === "check") {
-              action = `<a class="btn btn-sm" href="https://github.com" target="_blank" rel="noreferrer">PR 확인하기</a>`;
-            }
-          } else if (t.trackerState !== "Done") {
-            action = `<button class="btn btn-sm" type="button" data-assign="${t.id}">할당하기</button>`;
+        function panel(id) {
+          const t = FO.ticket(id);
+          const runs = FO.runsFor(id);
+          const r = runs[0];
+          const m = FO.mappingFor(t.project);
+          const mapping = m ? `${m.runner} · ${m.project} · ${FO.agents[m.agent]}` : '<span class="muted">Mapping이 없어요</span>';
+          let why, act;
+          if (!r) {
+            why = m ? `아직 런이 없어요. 할당하면 ${m.runner}에서 ${FO.agents[m.agent]}가 처리해요.` : "이 프로젝트에 Mapping이 없어 할당할 수 없어요.";
+            act = m ? `<button class="btn btn-primary" type="button" data-toast="${id}를 할당했어요">할당하기</button>` : `<a class="btn" href="settings.html?sel=mapping">Mapping 만들기</a>`;
+          } else {
+            why = FO.longWhy(r);
+            act =
+              r.result === "check"
+                ? `<a class="btn btn-primary" href="https://github.example.com/acme/pull/${r.pr.number}" target="_blank" rel="noreferrer">PR #${r.pr.number} 열기${FO.icon.external}</a><button class="btn" type="button" data-toast="새 런을 시작했어요">새 런 시작</button>`
+                : r.result === "failed"
+                  ? `<button class="btn btn-primary" type="button" data-toast="새 런을 시작했어요">새 런 시작</button>`
+                  : `<a class="btn" href="run.html?id=${r.id}">런 보기</a>`;
           }
-
-          const who = latest ? latest.runner : mapping.runner;
-          const agent = FO.agents[latest ? latest.agent : mapping.agent].name;
-          const runner = FO.runner(who);
-
-          return `<tr>
-            <td class="ticket-id">${t.id}</td>
-            <td><span class="cell-title" style="max-width:280px" title="${esc(t.title)}">${esc(t.title)}</span></td>
-            <td class="secondary" style="white-space:nowrap">${esc(t.project)}</td>
-            <td><span class="tag">${t.trackerState}</span></td>
-            <td style="white-space:nowrap">${labels}${auto ? "" : ` <span class="muted">· ${runs.length || assignedNow.has(t.id) ? "직접" : "할당 전"}</span>`}</td>
-            <td style="white-space:nowrap">${runCell}</td>
-            <td style="white-space:nowrap" title="${agent}"><span style="display:inline-flex;align-items:center;gap:6px"><span class="dot" data-tone="${runner.online ? "online" : "offline"}"></span>${who}</span></td>
-            <td style="text-align:end">${action}</td>
-          </tr>`;
+          const dot = r && (r.result === "check" || r.result === "failed") ? `<span class="dot" data-tone="${r.result}" aria-hidden="true"></span>` : "";
+          const labels = t.labels.length ? t.labels.map((l) => `<span class="tag"${l === FO.AUTO_LABEL ? " data-auto" : ""}>${l}</span>`).join(", ") : '<span class="muted">없음</span>';
+          const history = runs.length
+            ? `<div><h3 class="panel-block-title">런 ${runs.length}개</h3><div class="history">${runs
+                .map((x) => `<a href="run.html?id=${x.id}"><span class="h-id num">Run ${x.id}</span><span>${FO.stateText(x)}</span><span class="num">${x.state === "queued" ? x.queued : x.started}</span></a>`)
+                .join("")}</div></div>`
+            : "";
+          return `<div class="panel-inner">
+            <div class="panel-head">
+              <p class="panel-state">${r ? `${dot}${FO.stateText(r)}<span class="muted">마지막 런</span>` : '<span class="state" data-tone="neutral">할당 전</span>'}</p>
+              <h2 class="panel-title">${FO.esc(t.title)}</h2>
+              <p class="panel-sub num">${t.id} · ${FO.esc(t.project)} · ${t.trackerState}</p>
+            </div>
+            <p class="panel-why">${FO.esc(why)}</p>
+            <div class="actions">${act}</div>
+            <dl class="props">
+              <dt>트래커 상태</dt><dd>${t.trackerState}<span class="muted">Linear 기준</span></dd>
+              <dt>라벨</dt><dd>${labels}</dd>
+              <dt>Mapping</dt><dd>${mapping}</dd>
+            </dl>
+            ${history}
+            <div class="panel-foot"><a class="link" href="https://linear.example.com/acme/issue/${t.id}" target="_blank" rel="noreferrer">Linear에서 열기</a></div>
+          </div>`;
         }
 
         function render() {
-          const q = state.q.trim().toLowerCase();
-          const list = FO.tickets.filter((t) => {
-            if (!state.showDone && t.trackerState === "Done") return false;
-            if (state.project !== "전체" && t.project !== state.project) return false;
-            if (state.mode !== "전체" && modeOf(t) !== state.mode) return false;
-            if (q && !(t.id.toLowerCase().includes(q) || t.title.toLowerCase().includes(q))) return false;
-            return true;
-          });
-          document.getElementById("rows").innerHTML = list.map(row).join("");
-          document.getElementById("count").textContent = `${list.length}개`;
-          document.getElementById("empty").hidden = list.length > 0;
-          document.querySelectorAll("[data-assign]").forEach((b) =>
-            b.addEventListener("click", () => {
-              const t = FO.ticket(b.dataset.assign);
-              const m = FO.mappingFor(t.project);
-              assignedNow.add(t.id);
-              render();
-              FO.toast(`${t.id} 티켓을 ${m.runner}에 맡겼어요.`);
+          if (FO.ws === "all") {
+            page.innerHTML = FO.allNotice("Tickets");
+            return;
+          }
+          const mine = FO.tickets.filter(FO.ticketInWs);
+          const f = filters.find((x) => x.key === current) || filters[0];
+          const rows = mine.filter(f.test);
+          const tabs = filters
+            .map((x) => {
+              const n = mine.filter(x.test).length;
+              return `<button class="filter" type="button" role="tab" data-f="${x.key}" aria-selected="${x.key === f.key}"${x.attention && n ? " data-attention" : ""}>${x.label}<span class="n">${n}</span></button>`;
             })
-          );
+            .join("");
+          const list = rows.length
+            ? `${FO.thead([{ label: "제목" }, { label: "티켓" }, { label: "프로젝트" }, { label: "트래커 상태" }, { label: "마지막 런" }])}<div class="rows" role="listbox" aria-label="티켓">${rows.map(row).join("")}</div>`
+            : `<p class="empty">이 조건에 맞는 티켓이 없어요.</p>`;
+          page.innerHTML = `<div class="split-list">
+              <div class="page-head"><div><h1 class="page-title">Tickets</h1><p class="page-sub">Linear 티켓이에요. <span class="tag" data-auto>${FO.AUTO_LABEL}</span> 라벨이 붙으면 자동으로 할당해요.</p></div></div>
+              <div class="filters" role="tablist" aria-label="티켓 거르기">${tabs}</div>
+              <div class="table tickets">${list}</div>
+            </div>
+            <aside class="panel" aria-live="polite" aria-label="고른 티켓 요약"></aside>`;
+          const first = page.querySelector(".row[data-key]");
+          FO.bindSplit(page.querySelector(".split-list"), page.querySelector(".panel"), { ticket: panel }, first && first.dataset.key);
         }
 
-        segmented(document.getElementById("project-filter"), projects, "project");
-        segmented(document.getElementById("mode-filter"), modes, "mode");
-        let debounce;
-        document.getElementById("q").addEventListener("input", (e) => {
-          clearTimeout(debounce);
-          debounce = setTimeout(() => {
-            state.q = e.target.value;
-            render();
-          }, 150);
-        });
-        document.getElementById("show-done").addEventListener("change", (e) => {
-          state.showDone = e.target.checked;
+        page.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-f]");
+          if (!b) return;
+          current = b.dataset.f;
+          const url = new URL(location.href);
+          url.searchParams.set("f", current);
+          url.searchParams.delete("sel");
+          history.replaceState(null, "", url);
           render();
+          page.querySelector(`[data-f="${current}"]`).focus();
         });
-        render();
+
+        FO.mount("tickets", render);
       })();
     </script>
   </body>
