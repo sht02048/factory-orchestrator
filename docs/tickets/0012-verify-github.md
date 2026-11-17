@@ -16,8 +16,10 @@ GitHub 어댑터를 짓기 전에, 스펙 10절의 GitHub 사실을 실제 토�
   - 17: 에이전트가 브랜치를 바꾸거나 다른 브랜치로 PR을 연 경우. Q40의 티켓 키 보조 검색이 충분한지
   - 18: GitHub GraphQL 요청에 ETag/304가 적용되는지
   - 20: PR 제목·본문의 티켓 키로 PR을 찾는 쿼리(검색 API 등)와 그 rate limit
-- 결과는 `docs/research/NNNN-github-contract.md`에 쓴다. 응답은 가상 값으로 바꿔 어댑터 테스트 픽스처로 남긴다.
+- 결과는 `docs/research/0006-github-contract.md`에 쓴다. 응답은 가상 값으로 바꿔 어댑터 테스트 픽스처로 남긴다.
 - 운영자 준비가 필요하다: 읽기 권한(Metadata, Pull requests, Commit statuses)만 준 fine-grained PAT와, check run이 도는 테스트 저장소. 운영자 환경 값은 문서에 넣지 않는다(ADR 0005).
+
+- 함께 도는 검증 티켓끼리 번호가 겹치지 않게 research 번호는 0006으로 정해 둔다. 픽스처는 `docs/research/fixtures/0006/`에 둔다.
 
 ## 완료 조건
 
