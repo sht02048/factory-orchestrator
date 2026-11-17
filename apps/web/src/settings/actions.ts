@@ -31,6 +31,7 @@ import type { WorkspaceId } from "@factory/db";
 import { z } from "zod";
 import { remoteErrorOf, remoteErrorOfDetail } from "./load";
 import type { SettingsContext } from "./load";
+import { MAX_RUN_MINUTES } from "./model";
 import type { ConnectionSaveReason, RemoteError, SaveResult } from "./model";
 
 /*
@@ -50,9 +51,6 @@ function workspaceOf(context: SettingsContext, ws: string): WorkspaceId | null {
 }
 
 // ---------- 이 Workspace ----------
-
-/** 최대 실행 시간 상한. 일주일이면 넉넉하다 */
-const MAX_RUN_MINUTES = 7 * 24 * 60;
 
 export const generalInput = z.object({
   ws: id,
@@ -352,7 +350,16 @@ export const runnerInput = z.object({
   /** 없으면 새 러너 */
   id: id.optional(),
   name,
-  sshTarget: z.string().trim().min(1).max(500),
+  /**
+   * ssh 에 그대로 넘기는 대상. "-" 로 시작하면 ssh 옵션으로 읽히므로(-oProxyCommand 등) 거절하고,
+   * 공백·제어 문자도 받지 않는다.
+   */
+  sshTarget: z
+    .string()
+    .trim()
+    .min(1)
+    .max(500)
+    .regex(/^[^-\s][^\s]*$/),
   orcaPath: z.string().trim().min(1).max(1000),
   capacity: z.number().int().min(1).max(100),
 });

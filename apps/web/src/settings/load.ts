@@ -4,6 +4,7 @@ import {
   getAutoAssignLabel,
   getMapping,
   getRunnerCheckRequest,
+  listPendingRunnerCheckRequests,
   listCodeHostConnections,
   listRunners,
   listRuns,
@@ -301,6 +302,14 @@ async function loadWorkspaceSettings(
     bound,
     labels,
   };
+}
+
+/**
+ * 결과를 기다리는 러너 확인 요청이 있는지. 화면은 기다리는 동안 이것만 다시 읽고(DB만 읽음),
+ * 결과가 오면 그때 화면 전체를 다시 읽는다. 전체를 다시 읽으면 트래커 API 를 부르기 때문이다.
+ */
+export function hasPendingRunnerChecks(db: Database): boolean {
+  return listPendingRunnerCheckRequests(db).length > 0;
 }
 
 /** 러너 확인 요청과 그 결과(worker 가 씀, Q61) */

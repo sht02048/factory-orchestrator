@@ -25,7 +25,13 @@ import {
 import { colors, space } from "@factory/ui/tokens.stylex";
 import { useEffect, useState, type ReactNode } from "react";
 import { useFormatter, useTranslations } from "use-intl";
-import { INSTALL_ITEMS, WORKSPACE_ITEMS } from "./model";
+import {
+  INSTALL_ITEMS,
+  MAX_RUN_MINUTES,
+  RUNNER_CHECK_POLL_LIMIT_MS,
+  RUNNER_CHECK_POLL_MS,
+  WORKSPACE_ITEMS,
+} from "./model";
 import type {
   BoundProject,
   Choice,
@@ -85,8 +91,11 @@ export interface SettingsActions {
     capacity: number;
   }) => Promise<ActionResult>;
   recheckRunner: (input: { id: string }) => Promise<ActionResult>;
-  /** 러너 확인 결과를 기다리는 동안 화면 값을 다시 읽는다 */
-  refresh: () => Promise<void>;
+  /**
+   * 러너 확인 결과를 기다리는 동안 부른다. 아직 기다리면 true 다. 결과가 오면 화면 값을 다시 읽는다.
+   * 트래커를 부르지 않는 가벼운 읽기여야 한다.
+   */
+  pollRunnerChecks: () => Promise<boolean>;
 }
 
 export interface SettingsScreenProps {
@@ -96,9 +105,6 @@ export interface SettingsScreenProps {
   onSelect: (item: SettingsItem) => void;
   actions: SettingsActions;
 }
-
-/** 러너 확인 결과를 기다리는 동안 다시 읽는 간격 */
-export const RUNNER_CHECK_POLL_MS = 3000;
 
 /** Settings: 왼쪽 항목 목록 + 오른쪽 편집 영역(ADR 0007, 시안 B). 이 Workspace / 설치 전체로 나눈다(ADR 0006) */
 export function SettingsScreen({ page, selected, onSelect, actions }: SettingsScreenProps) {
@@ -110,14 +116,7 @@ export function SettingsScreen({ page, selected, onSelect, actions }: SettingsSc
     items.find((item) => item === selected) ?? (workspace === null ? "connections" : "general");
 
   const pending = page.install.runners.some((r) => r.check?.status === "pending");
-  const { refresh } = actions;
-  useEffect(() => {
-    if (!pending) return undefined;
-    const timer = setInterval(() => {
-      void refresh();
-    }, RUNNER_CHECK_POLL_MS);
-    return () => clearInterval(timer);
-  }, [pending, refresh]);
+  const workerSilent = useRunnerCheckPolling(pending, actions.pollRunnerChecks);
 
   return (
     <SplitView
@@ -171,12 +170,45 @@ export function SettingsScreen({ page, selected, onSelect, actions }: SettingsSc
               item={current}
               page={page}
               actions={actions}
+              workerSilent={workerSilent}
             />
           </DetailPanel>
         </section>
       }
     />
   );
+}
+
+/**
+ * 러너 확인 결과를 기다리는 동안 요청 상태만 다시 읽는다. RUNNER_CHECK_POLL_LIMIT_MS 가 지나도 결과가 없으면
+ * 그만 읽고 true(worker 가 응답하지 않음)를 돌려준다.
+ */
+function useRunnerCheckPolling(pending: boolean, poll: () => Promise<boolean>): boolean {
+  const [silent, setSilent] = useState(false);
+  useEffect(() => {
+    setSilent(false);
+    if (!pending) return undefined;
+    const started = Date.now();
+    let stopped = false;
+    const timer = setInterval(() => {
+      if (Date.now() - started > RUNNER_CHECK_POLL_LIMIT_MS) {
+        clearInterval(timer);
+        setSilent(true);
+        return;
+      }
+      poll().then(
+        (still) => {
+          if (!still && !stopped) clearInterval(timer);
+        },
+        () => {},
+      );
+    }, RUNNER_CHECK_POLL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [pending, poll]);
+  return silent;
 }
 
 function isWorkspaceItem(item: SettingsItem): boolean {
@@ -282,10 +314,12 @@ function ItemPanel({
   item,
   page,
   actions,
+  workerSilent,
 }: {
   item: SettingsItem;
   page: SettingsPage;
   actions: SettingsActions;
+  workerSilent: boolean;
 }) {
   const workspace = page.workspace;
   switch (item) {
@@ -294,7 +328,14 @@ function ItemPanel({
     case "github":
       return <GitHubPanel saved={page.install.githubToken} actions={actions} />;
     case "runners":
-      return <RunnersPanel runners={page.install.runners} actions={actions} />;
+      return (
+        <RunnersPanel
+          runners={page.install.runners}
+          actions={actions}
+          workerSilent={workerSilent}
+          workspaceId={workspace?.general.id ?? null}
+        />
+      );
     case "general":
     case "projects":
     case "mapping":
@@ -387,7 +428,7 @@ function GeneralPanel({
   const submit = useSubmit();
   const minutes = parseWholeNumber(maxRun);
   const nameOk = name.trim() !== "";
-  const maxRunOk = minutes !== null && minutes >= 1 && minutes <= 10_080;
+  const maxRunOk = minutes !== null && minutes >= 1 && minutes <= MAX_RUN_MINUTES;
   return (
     <form
       {...stylex.props(styles.form)}
@@ -1004,7 +1045,7 @@ function ConnectionForm({
           type="password"
           value={apiKey}
           onValueChange={setApiKey}
-          autoComplete="off"
+          autoComplete="new-password"
           mono
         />
       </Field>
@@ -1019,7 +1060,7 @@ function ConnectionForm({
           type="password"
           value={webhookSecret}
           onValueChange={setWebhookSecret}
-          autoComplete="off"
+          autoComplete="new-password"
           mono
         />
       </Field>
@@ -1084,7 +1125,7 @@ function GitHubPanel({ saved, actions }: { saved: boolean; actions: SettingsActi
             type="password"
             value={token}
             onValueChange={setToken}
-            autoComplete="off"
+            autoComplete="new-password"
             mono
           />
         </Field>
@@ -1102,16 +1143,25 @@ function GitHubPanel({ saved, actions }: { saved: boolean; actions: SettingsActi
 function RunnersPanel({
   runners,
   actions,
+  workerSilent,
+  workspaceId,
 }: {
   runners: RunnerSettingsView[];
   actions: SettingsActions;
+  workerSilent: boolean;
+  /** Runners 로 가도 사이드바의 Workspace 를 이어 가게 주소에 남긴다 */
+  workspaceId: string | null;
 }) {
   const t = useTranslations("settings.runners");
+  const runnersHref =
+    workspaceId === null
+      ? "/runners"
+      : `/runners?${new URLSearchParams({ ws: workspaceId }).toString()}`;
   return (
     <>
       <Text variant="body">
         {t("hint")}{" "}
-        <a href="/runners" {...stylex.props(styles.link)}>
+        <a href={runnersHref} {...stylex.props(styles.link)}>
           {t("toRunners")}
         </a>
       </Text>
@@ -1119,7 +1169,7 @@ function RunnersPanel({
         <ul {...stylex.props(styles.list)}>
           {runners.map((runner) => (
             <li key={runner.id} {...stylex.props(styles.item)}>
-              <RunnerCheck runner={runner} actions={actions} />
+              <RunnerCheck runner={runner} actions={actions} workerSilent={workerSilent} />
               <RunnerForm runner={runner} actions={actions} />
             </li>
           ))}
@@ -1236,9 +1286,11 @@ function RunnerForm({
 function RunnerCheck({
   runner,
   actions,
+  workerSilent,
 }: {
   runner: RunnerSettingsView;
   actions: SettingsActions;
+  workerSilent: boolean;
 }) {
   const t = useTranslations("settings.runners");
   const submit = useSubmit();
@@ -1264,21 +1316,28 @@ function RunnerCheck({
       </div>
       <SubmitError state={submit.state} />
       <PanelBlock title={t("check.title")}>
-        <CheckResult check={check} />
+        <CheckResult check={check} workerSilent={workerSilent} />
       </PanelBlock>
     </div>
   );
 }
 
-function CheckResult({ check }: { check: RunnerCheckView | null }) {
+function CheckResult({
+  check,
+  workerSilent,
+}: {
+  check: RunnerCheckView | null;
+  workerSilent: boolean;
+}) {
   const t = useTranslations("settings.runners.check");
+  const runnerError = useRunnerErrorName();
   const format = useFormatter();
   if (check === null) return <Text variant="meta">{t("never")}</Text>;
   switch (check.status) {
     case "pending":
       return (
         <p role="status" {...stylex.props(styles.secondaryText, styles.para)}>
-          {t("pending")}
+          {workerSilent ? t("workerSilent") : t("pending")}
         </p>
       );
     case "failed":
@@ -1296,7 +1355,7 @@ function CheckResult({ check }: { check: RunnerCheckView | null }) {
                 : t("onlineVersion", { version: check.version })
               : check.error === null
                 ? t("offline")
-                : t("offlineReason", { reason: check.error })}
+                : t("offlineReason", { reason: runnerError(check.error) })}
           </span>
           {check.prerequisites.length === 0 ? null : (
             <ul {...stylex.props(styles.list)}>
@@ -1316,6 +1375,25 @@ function CheckResult({ check }: { check: RunnerCheckView | null }) {
         </div>
       );
   }
+}
+
+/** 러너 오류 종류(core RunnerErrorDetail.kind)를 문구로 바꾼다. 모르는 종류는 그대로 보인다 */
+function useRunnerErrorName(): (kind: string) => string {
+  const t = useTranslations("settings.runners.check.errorKind");
+  return (kind) => {
+    switch (kind) {
+      case "unreachable":
+      case "not-installed":
+      case "not-ready":
+      case "mailbox-missing":
+      case "runner-error":
+      case "start-outcome-unknown":
+      case "malformed-output":
+        return t(kind);
+      default:
+        return kind;
+    }
+  };
 }
 
 function Prerequisite({ prerequisite }: { prerequisite: PrerequisiteView }) {

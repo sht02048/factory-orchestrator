@@ -37,9 +37,10 @@ import {
   saveLabel,
   saveMappingSetting,
   saveRunnerSetting,
+  runnerInput,
   saveTrackerConnectionSetting,
 } from "./actions";
-import { loadSettingsPage } from "./load";
+import { hasPendingRunnerChecks, loadSettingsPage } from "./load";
 import type { SettingsContext } from "./load";
 import { settingsMessages } from "./messages";
 import type { SettingsItem, SettingsPage } from "./model";
@@ -144,7 +145,7 @@ const noopActions: SettingsActions = {
   checkGitHubToken: () => Promise.resolve({ ok: true }),
   saveRunner: () => Promise.resolve({ ok: true }),
   recheckRunner: () => Promise.resolve({ ok: true }),
-  refresh: () => Promise.resolve(),
+  pollRunnerChecks: () => Promise.resolve(false),
 };
 
 function render(page: SettingsPage, selected: SettingsItem): string {
@@ -497,6 +498,27 @@ describe("러너 확인", () => {
     expect(text).toContain("worker가 러너를 확인하고 있어요");
   });
 
+  it("기다리는 동안 읽는 요청 상태는 결과가 오면 거짓이 되고 트래커를 부르지 않는다", async () => {
+    const f = fixture();
+    const runnerId = addRunner(f);
+    expect(hasPendingRunnerChecks(f.context.db)).toBe(true);
+    await checked(f, runnerId, { result: health() });
+    expect(hasPendingRunnerChecks(f.context.db)).toBe(false);
+    // 연결이 없으니 트래커 어댑터를 만든 적이 없다(가벼운 읽기는 DB 만 본다)
+    expect(f.trackerConfigs).toEqual([]);
+  });
+
+  it("ssh 옵션으로 읽힐 대상(- 로 시작)과 공백이 든 대상은 받지 않는다", () => {
+    const base = { name: "runner-a", orcaPath: "/usr/local/bin/orca", capacity: 1 };
+    expect(
+      runnerInput.safeParse({ ...base, sshTarget: "factory@runner-a.example.com" }).success,
+    ).toBe(true);
+    expect(runnerInput.safeParse({ ...base, sshTarget: "-oProxyCommand=touch x" }).success).toBe(
+      false,
+    );
+    expect(runnerInput.safeParse({ ...base, sshTarget: "host other" }).success).toBe(false);
+  });
+
   it("결과를 넣으면 성공이 보이고 필수 조건을 하나씩 보인다", async () => {
     const f = fixture();
     const runnerId = addRunner(f);
@@ -556,7 +578,9 @@ describe("러너 확인", () => {
         error: { kind: "unreachable", detail: "ssh: connect timed out" },
       }),
     });
-    expect(panelText(render(offline, "runners"))).toContain("러너에 닿지 않았어요 (unreachable)");
+    expect(panelText(render(offline, "runners"))).toContain(
+      "러너에 닿지 않았어요 (ssh로 닿지 않음)",
+    );
 
     requestRunnerCheckSetting(f.context, { id: runnerId }, new Date(now.getTime() + 10_000));
     const failed = await checked(f, runnerId, { error: "ssh failed" });

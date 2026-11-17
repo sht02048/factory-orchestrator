@@ -156,6 +156,16 @@
       "title": "러너 확인",
       "never": "아직 확인하지 않았어요.",
       "pending": "worker가 러너를 확인하고 있어요. 결과가 오면 여기에 보여요.",
+      "workerSilent": "2분이 지나도 결과가 오지 않았어요. worker가 돌고 있는지 확인하고 다시 확인해 주세요.",
+      "errorKind": {
+        "unreachable": "ssh로 닿지 않음",
+        "not-installed": "orca가 없음",
+        "not-ready": "Orca 런타임이 준비되지 않음",
+        "mailbox-missing": "우편함 터미널이 없음",
+        "runner-error": "러너 도구 오류",
+        "start-outcome-unknown": "결과를 알 수 없음",
+        "malformed-output": "러너 출력을 읽지 못함"
+      },
       "failed": "러너를 확인하지 못했어요. {error}",
       "unreadable": "확인 결과를 읽지 못했어요. 다시 확인해 주세요.",
       "online": "러너에 닿았어요",

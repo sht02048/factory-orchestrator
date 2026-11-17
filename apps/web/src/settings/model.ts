@@ -155,6 +155,13 @@ export interface SettingsPage {
   agents: string[];
 }
 
+/** 최대 실행 시간 상한(분). 일주일이면 넉넉하다. 화면과 서버가 함께 쓴다 */
+export const MAX_RUN_MINUTES = 7 * 24 * 60;
+
+/** 러너 확인 결과를 기다리는 동안 상태만 다시 읽는 간격과, 그만 기다리는 시간 */
+export const RUNNER_CHECK_POLL_MS = 3000;
+export const RUNNER_CHECK_POLL_LIMIT_MS = 2 * 60 * 1000;
+
 /** 이미 아는 에이전트(GLOSSARY Agent). 화면 이름은 메시지 파일에 있다. 저장된 다른 값도 고를 수 있게 남긴다 */
 export const KNOWN_AGENTS = ["claude", "codex"] as const;
 
