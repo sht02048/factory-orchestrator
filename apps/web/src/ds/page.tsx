@@ -1,0 +1,165 @@
+import * as stylex from "@stylexjs/stylex";
+import { PageHeader, Text } from "@factory/ui";
+import {
+  colors,
+  fontSize,
+  fontWeight,
+  letterSpacing,
+  motion,
+  radius,
+  size,
+  space,
+} from "@factory/ui/tokens.stylex";
+import type { ReactNode } from "react";
+import { useTranslations } from "use-intl";
+import { ComponentSections } from "./component-preview";
+import { TokenSections } from "./token-preview";
+
+// /ds: packages/ui 의 모든 토큰과 컴포넌트 미리보기. 시안 B 처럼 사이드바 | 본문 틀을 쓴다.
+
+const tokenLinks = ["colors", "typography", "space", "size", "radius", "shadow", "motion"] as const;
+const componentLinks = [
+  "buttons",
+  "status",
+  "tabs",
+  "table",
+  "definitions",
+  "menu",
+  "form",
+  "tooltip",
+  "dialog",
+  "toast",
+] as const;
+
+export function DesignSystemPage() {
+  const tDs = useTranslations("ds");
+  return (
+    <div {...stylex.props(styles.app)}>
+      <nav aria-label={tDs("nav.label")} {...stylex.props(styles.sidebar)}>
+        <div {...stylex.props(styles.brand)}>
+          <span aria-hidden="true" {...stylex.props(styles.brandMark)}>
+            {tDs("brandMark")}
+          </span>
+          {tDs("title")}
+        </div>
+        <NavGroup title={tDs("nav.tokens")}>
+          {tokenLinks.map((id) => (
+            <NavLink key={id} id={id} label={tDs(`nav.${id}`)} />
+          ))}
+        </NavGroup>
+        <NavGroup title={tDs("nav.components")}>
+          {componentLinks.map((id) => (
+            <NavLink key={id} id={id} label={tDs(`nav.${id}`)} />
+          ))}
+        </NavGroup>
+      </nav>
+      <main {...stylex.props(styles.main)}>
+        <div {...stylex.props(styles.content)}>
+          <PageHeader
+            title={tDs("title")}
+            subtitle={tDs("subtitle")}
+            actions={<Text variant="meta">{tDs("theme")}</Text>}
+          />
+          <div {...stylex.props(styles.sections)}>
+            <TokenSections />
+            <ComponentSections />
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function NavGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div {...stylex.props(styles.navGroup)}>
+      <span {...stylex.props(styles.navLabel)}>{title}</span>
+      <ul {...stylex.props(styles.navList)}>{children}</ul>
+    </div>
+  );
+}
+
+function NavLink({ id, label }: { id: string; label: string }) {
+  return (
+    <li>
+      <a href={`#${id}`} {...stylex.props(styles.navLink)}>
+        {label}
+      </a>
+    </li>
+  );
+}
+
+const styles = stylex.create({
+  app: {
+    display: "grid",
+    gridTemplateColumns: `${size.sidebarWidth} minmax(0, 1fr)`,
+    height: "100dvh",
+  },
+  sidebar: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s4,
+    height: "100dvh",
+    paddingBlock: space.s3,
+    paddingInline: space.s2,
+    overflow: "auto",
+    backgroundColor: colors.bgSidebar,
+    borderInlineEndWidth: 1,
+    borderInlineEndStyle: "solid",
+    borderInlineEndColor: colors.borderSubtle,
+  },
+  brand: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s2,
+    paddingBlock: space.s1,
+    paddingInline: space.s2,
+    color: colors.textPrimary,
+    fontSize: fontSize.body,
+    fontWeight: fontWeight.semibold,
+  },
+  brandMark: {
+    display: "grid",
+    placeItems: "center",
+    width: 22,
+    height: 22,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accent,
+    color: colors.textOnAccent,
+    fontSize: fontSize.small,
+  },
+  navGroup: { display: "flex", flexDirection: "column", gap: space.s1 },
+  navLabel: {
+    paddingInline: space.s2,
+    color: colors.textTertiary,
+    fontSize: fontSize.label,
+    fontWeight: fontWeight.medium,
+    letterSpacing: letterSpacing.label,
+    textTransform: "uppercase",
+  },
+  navList: { display: "flex", flexDirection: "column", gap: space.px2 },
+  navLink: {
+    display: "flex",
+    alignItems: "center",
+    height: 30,
+    paddingInline: space.s2,
+    borderRadius: radius.md,
+    backgroundColor: { default: "transparent", ":hover": colors.bgHover },
+    color: { default: colors.textSecondary, ":hover": colors.textPrimary },
+    fontWeight: fontWeight.medium,
+    textDecoration: "none",
+    transitionProperty: "background-color, color",
+    transitionDuration: motion.durationFast,
+    transitionTimingFunction: motion.easeOut,
+    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
+    outlineOffset: -2,
+  },
+  main: { minWidth: 0, height: "100dvh", overflow: "auto", scrollBehavior: "smooth" },
+  content: {
+    maxWidth: 1120,
+    paddingTop: space.s8,
+    paddingInline: space.s8,
+    paddingBottom: space.s10,
+  },
+  sections: { display: "flex", flexDirection: "column", gap: space.s10 },
+});
