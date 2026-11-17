@@ -144,15 +144,19 @@ window.FO = (function () {
     },
   };
 
-  /* Stats: 최근 14일 [merged, check, failed] */
+  /*
+   * Stats: 최근 14일 [merged, check, failed].
+   * 트래커 프로젝트 하나에 Mapping 하나(러너·에이전트 하나)라서, 러너별·에이전트별 수는
+   * 위 mappings를 따라 트래커 프로젝트별 수를 더한 값이다. 일별 합도 트래커 프로젝트별 합과 같다.
+   */
   const days = ["11/4", "11/5", "11/6", "11/7", "11/8", "11/9", "11/10", "11/11", "11/12", "11/13", "11/14", "11/15", "11/16", "11/17"];
   const stats = {
     commerce: {
       daily: [[5, 2, 1], [7, 1, 1], [6, 2, 0], [7, 2, 2], [2, 1, 0], [2, 0, 0], [8, 2, 1], [9, 2, 1], [7, 2, 1], [9, 1, 1], [8, 3, 1], [3, 1, 0], [2, 0, 1], [4, 2, 2]],
       lead: { p50: 29, p90: 58 },
       runner: [
-        { name: "runner-a", merged: 42, check: 9, failed: 3, p50: 26 },
-        { name: "runner-b", merged: 24, check: 8, failed: 4, p50: 33 },
+        { name: "runner-a", merged: 40, check: 8, failed: 3, p50: 24 },
+        { name: "runner-b", merged: 26, check: 9, failed: 4, p50: 35 },
         { name: "runner-c", merged: 13, check: 4, failed: 5, p50: 31 },
       ],
       project: [
@@ -161,24 +165,24 @@ window.FO = (function () {
         { name: "Billing", merged: 13, check: 4, failed: 5, p50: 31 },
       ],
       agent: [
-        { name: "Claude Code", merged: 64, check: 16, failed: 7, p50: 28 },
-        { name: "Codex", merged: 15, check: 5, failed: 5, p50: 31 },
+        { name: "Claude Code", merged: 66, check: 17, failed: 7, p50: 28 },
+        { name: "Codex", merged: 13, check: 4, failed: 5, p50: 31 },
       ],
     },
     labs: {
       daily: [[1, 0, 0], [1, 0, 0], [1, 1, 0], [2, 0, 0], [1, 0, 0], [0, 0, 1], [2, 0, 0], [2, 1, 0], [2, 0, 1], [3, 0, 0], [2, 1, 0], [1, 0, 0], [1, 0, 0], [1, 1, 1]],
       lead: { p50: 27, p90: 49 },
       runner: [
-        { name: "runner-a", merged: 16, check: 3, failed: 1, p50: 27 },
-        { name: "runner-b", merged: 4, check: 1, failed: 2, p50: 25 },
+        { name: "runner-a", merged: 15, check: 3, failed: 1, p50: 28 },
+        { name: "runner-b", merged: 5, check: 1, failed: 2, p50: 22 },
       ],
       project: [
         { name: "Platform", merged: 15, check: 3, failed: 1, p50: 28 },
         { name: "Research", merged: 5, check: 1, failed: 2, p50: 22 },
       ],
       agent: [
-        { name: "Codex", merged: 14, check: 3, failed: 1, p50: 29 },
-        { name: "Claude Code", merged: 6, check: 1, failed: 2, p50: 24 },
+        { name: "Codex", merged: 15, check: 3, failed: 1, p50: 28 },
+        { name: "Claude Code", merged: 5, check: 1, failed: 2, p50: 22 },
       ],
     },
   };
