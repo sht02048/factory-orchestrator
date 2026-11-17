@@ -12,12 +12,13 @@ blocked_by: [0007]
 ## 범위
 
 - 이 티켓은 `apps/web`의 홈 라우트와 그 화면 메시지만 고친다. 앱 셸은 고치지 않는다(0007).
-- 손댈 일: Human Check, Failed, Waiting for Input 런과 이유 한 줄(Q52). 실행 중: Running. Queued: 들어온 순서.
+- 손댈 일: 요약 결과가 Human Check·Failed인 런, Waiting for Input·Disconnected("연결 끊김") 런과 이유 한 줄(Q52·Q67). Ended 런은 에이전트 결과와 PR 상태 두 칸을 나란히 보인다(Q66). 요약 결과는 core 요약 계산 함수로 계산한다. 실행 중: Running. Queued: 엄격한 순서(들어온 순서)로 보이고, 순서에서 빠진 런은 "맞는 러너가 Offline이라 기다리는 중"을 함께 보인다(Q68).
 - "전체" Workspace에서는 모든 Workspace의 손댈 일만 보인다(ADR 0006).
 - 목록 + 오른쪽 상세 패널(ADR 0007, 시안 B).
 
 ## 완료 조건
 
 - 테스트 DB의 런이 세 구역에 맞게 나뉘고, Queued가 들어온 순서로 보인다는 테스트가 통과한다.
-- Waiting for Input 런이 손댈 일에 "입력 기다림"으로 보인다는 테스트가 통과한다.
+- Waiting for Input 런이 손댈 일에 "입력 기다림"으로, Disconnected 런이 "연결 끊김"으로 보인다는 테스트가 통과한다.
+- 손댈 일의 Ended 런에 에이전트 결과와 PR 상태가 따로 보인다(예: 오류 종료 + 열림)는 테스트가 통과한다.
 - "전체"에서 손댈 일만 보인다는 테스트가 통과한다.

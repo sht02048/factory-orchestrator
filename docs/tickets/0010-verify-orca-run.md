@@ -13,7 +13,7 @@ Runner 어댑터의 런 시작·진행 폴링을 짓기 전에, 스펙 10절의 
 
 - 스펙 10절 2, 3, 4, 5, 8번:
   - 2: `worktree ps`의 `status`, `agents[].state`, `programStatus.state`, `terminalVerdict` 열거값
-  - 3: 에이전트 프로세스 종료의 가장 믿을 만한 신호, 에이전트 종료 코드를 읽는 방법(Q49 에이전트 오류), 입력 기다림 신호(`--agent-wait`의 `agentWait`, Q52)
+  - 3: 에이전트 프로세스 종료의 가장 믿을 만한 신호, 에이전트 종료 코드를 읽는 방법(Q49·Q70 정상·오류 종료 구분), 입력 기다림 신호(`--agent-wait`의 `agentWait`, Q52)
   - 4: `worktree create --agent --prompt --json`의 실제 출력 전체
   - 5: `--prompt` 길이 제한과 줄바꿈·특수 문자의 ssh 인용 통과
   - 8: `--surface terminal`로 띄운 에이전트의 진행 감지

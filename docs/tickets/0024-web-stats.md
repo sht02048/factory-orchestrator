@@ -7,14 +7,14 @@ blocked_by: [0007]
 
 ## 목표
 
-현재 Workspace의 처리량, 결과 분포, 리드 타임, Human Check 뒤 병합 비율을 본다.
+현재 Workspace의 처리량, 요약 결과 분포, 리드 타임, Human Check 뒤 병합 비율을 본다.
 
 ## 범위
 
 - 이 티켓은 `apps/web`의 Stats 라우트와 그 화면 메시지만 고친다. 리드 타임 계산은 core 함수(0004)를 쓴다.
-- 처리량, 결과 분포(Merged / Human Check / Failed), Failed 사유별 수.
+- 처리량, 요약 결과 분포(Merged / Human Check / Failed, core 요약 계산 함수로 계산), Failed 런의 에이전트 결과 × PR 상태 조합별 수(Q71).
 - 리드 타임은 할당(Queued 포함)부터 런 종료까지이고, 대기 시간과 실행 시간을 나눠 보인다(Q59).
-- Human Check 뒤 병합 비율: Human Check 런 중 이후 사람이 병합한 비율(Q54).
+- Human Check 뒤 병합 비율: Human Check 런 중 이후 PR 상태가 병합됨인 비율(Q54·Q69).
 - 러너·트래커 프로젝트·에이전트별 보기(티켓 0002).
 
 ## 완료 조건
