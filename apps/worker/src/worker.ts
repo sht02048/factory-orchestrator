@@ -3,6 +3,7 @@ import {
   canRunnerTake,
   decidePrState,
   decideStartFailure,
+  MAX_START_RETRIES,
   planQueue,
   resolveRunProgress,
 } from "@factory/core";
@@ -317,6 +318,9 @@ async function processQueue(context: TickContext): Promise<void> {
     }
     const candidates = queued
       .flatMap((run) => toQueuedRun(context, run))
+      // 결과를 모르는 시작이 있는 런은 그 러너에서 확인하기 전에 시작할 수 없음으로 끝내지 않는다.
+      // 에이전트가 이미 돌고 있을 수 있다.
+      .map((run) => (bound.has(run.id) ? { ...run, unstartable: false } : run))
       .filter((run) => {
         const runnerId = bound.get(run.id);
         if (runnerId === undefined) return true;
@@ -476,9 +480,7 @@ async function startOnRunner(
   } catch (error) {
     // 시작 명령 전의 실패라 시도 횟수에 넣지 않는다. 닿지 않으면 Offline처럼 순서에서만 뺀다.
     logger.warn("could not prepare the runner's mailbox", { runId: run.id, error });
-    return runnerErrorDetail(error)?.kind === "unreachable"
-      ? { kind: "skipped" }
-      : { kind: "blocked" };
+    return isOfflineLike(error) ? { kind: "skipped" } : { kind: "blocked" };
   }
   try {
     if (unverified) {
@@ -488,6 +490,8 @@ async function startOnRunner(
       if (existing === "unknown") return { kind: "blocked" };
       if (existing !== null) return { kind: "started", started: existing };
       unverified = false;
+      // 읽을 수 없는 출력으로 다시 시도를 다 쓴 런은 시작하지 않았음을 확인한 지금 끝낸다(Q86).
+      if (records.startFailures > MAX_START_RETRIES) return endCouldNotStart(context, run);
     }
     const prompt = await promptFor(context, run);
     if (prompt === null) return { kind: "blocked" };
@@ -526,8 +530,14 @@ async function findStarted(
     return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
   } catch (error) {
     context.logger.warn("could not look up a started run", { runId: run.id, error });
-    return runnerErrorDetail(error)?.kind === "unreachable" ? "unreachable" : "unknown";
+    return isOfflineLike(error) ? "unreachable" : "unknown";
   }
+}
+
+/** 러너에 닿지 못했거나 런을 돌릴 준비가 안 된 오류인지(core decideStartFailure의 wait-like-offline). */
+function isOfflineLike(error: unknown): boolean {
+  const detail = runnerErrorDetail(error);
+  return detail !== null && decideStartFailure(detail, 0).action === "wait-like-offline";
 }
 
 /**
@@ -547,10 +557,13 @@ function handleStartFailure(
 ): StartAttempt {
   const detail = runnerErrorDetail(error);
   if (detail === null) return { kind: "blocked" };
-  const { db, now } = context;
+  const { db } = context;
   const { runnerId, unverified } = target;
+  // 러너가 닿지 않았거나 오류로 답했으면 시작한 런이 남지 않았다(core RunnerErrorDetail). 읽을 수 없는
+  // 출력은 명령이 돈 뒤일 수 있어 지우지 않고, 다음 바퀴에 같은 이름으로 먼저 찾는다.
+  const definite = detail.kind !== "malformed-output";
   const forget = (): void => {
-    if (!unverified) clearStartRequested(db, run.id);
+    if (!unverified && definite) clearStartRequested(db, run.id);
   };
   const decision = decideStartFailure(detail, previousFailures);
   switch (decision.action) {
@@ -580,21 +593,34 @@ function handleStartFailure(
       );
       return { kind: "blocked" };
     case "could-not-start": {
-      const ended = tryWrite(context, run.id, () =>
-        inTransaction(db, () => {
-          recordStartFailure(db, run.id, { failures: decision.failures, error: describe(detail) });
-          return changeRunState(
-            db,
-            run.id,
-            { to: "ended", agentResult: "could-not-start", prState: "none" },
-            now(),
-          );
-        }),
+      const error = describe(detail);
+      if (!definite) {
+        // 시작했는지 모른다. 횟수만 적고, 다음 바퀴에 찾아서 없으면 그때 끝낸다.
+        tryWrite(context, run.id, () =>
+          recordStartFailure(db, run.id, { failures: decision.failures, error }),
+        );
+        return { kind: "blocked" };
+      }
+      tryWrite(context, run.id, () =>
+        recordStartFailure(db, run.id, { failures: decision.failures, error }),
       );
-      if (ended !== undefined) reportFailure(context.logger, run.id, ended);
-      return { kind: ended?.ok === true ? "skipped" : "blocked" };
+      return endCouldNotStart(context, run);
     }
   }
+}
+
+/** 시작할 수 없음으로 끝낸다(Q86). PR을 찾지 않아 PR 상태는 없음이다. */
+function endCouldNotStart(context: TickContext, run: QueuedStoredRun): StartAttempt {
+  const ended = tryWrite(context, run.id, () =>
+    changeRunState(
+      context.db,
+      run.id,
+      { to: "ended", agentResult: "could-not-start", prState: "none" },
+      context.now(),
+    ),
+  );
+  if (ended !== undefined) reportFailure(context.logger, run.id, ended);
+  return { kind: ended?.ok === true ? "skipped" : "blocked" };
 }
 
 type QueuedStoredRun = Extract<StoredRun, { state: "queued" }>;

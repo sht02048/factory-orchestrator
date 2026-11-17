@@ -1,4 +1,4 @@
-import { MAX_START_RETRIES, summarizeRunOutcome } from "@factory/core";
+import { AdapterError, MAX_START_RETRIES, summarizeRunOutcome } from "@factory/core";
 import type { CompletionReport, PrState, WorktreeRef } from "@factory/core";
 import { getRun, getRunWithRecords } from "@factory/db";
 import type { StoredRun } from "@factory/db";
@@ -374,6 +374,57 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     expect(fake.startCalls.filter((c) => c.worktreeName === head.worktreeName)).toHaveLength(
       MAX_START_RETRIES + 1,
     );
+  });
+
+  it("읽을 수 없는 출력 뒤에는 같은 이름으로 먼저 찾아 이어 붙이고 다시 보내지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    const fakeA = h.runner(runnerA);
+    // 러너는 시작했지만 출력을 읽을 수 없었던 경우를 흉내 낸다.
+    fakeA.loseNextStartResponse = true;
+    const startRun = fakeA.startRun.bind(fakeA);
+    let first = true;
+    fakeA.startRun = async (input) => {
+      try {
+        return await startRun(input);
+      } catch (error) {
+        if (!first) throw error;
+        first = false;
+        throw new AdapterError({ kind: "malformed-output", raw: "{" });
+      }
+    };
+    const worker = h.worker();
+
+    await worker.tick();
+    expect(getRunWithRecords(h.db, run.id)?.records).toMatchObject({ startFailures: 1 });
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
+    expect(fakeA.startCalls).toHaveLength(1);
+  });
+
+  it("결과를 모르는 시작이 있는 런은 Mapping이 지워져도 확인 전에 시작할 수 없음으로 끝내지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    h.runner(runnerA).loseNextStartResponse = true;
+    const worker = h.worker();
+
+    await worker.tick();
+    h.db.$client.prepare("DELETE FROM mappings").run();
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
+  });
+
+  it("런타임이 꺼진 러너(not-ready)는 우편함 준비에서 실패해도 뒤 런을 막지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
+    const head = h.assign("ENG-1", projectA);
+    const behind = h.assign("ENG-2", projectB);
+    h.runner(runnerA).ensureMailbox = () =>
+      Promise.reject(new AdapterError({ kind: "not-ready", detail: "runtime down" }));
+
+    await h.worker().tick();
+    expect(current(head)).toMatchObject({ state: "queued" });
+    expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
   });
 
   it("시작 때 러너에 닿지 못하면 순서에서 빼 뒤 런을 막지 않고, 시도 횟수에 넣지 않는다", async () => {
