@@ -1,21 +1,10 @@
-import {
-  AdapterError,
-  canRunnerTake,
-  decidePrState,
-  decideStartFailure,
-  MAX_START_RETRIES,
-  planQueue,
-  resolveRunProgress,
-} from "@factory/core";
+import { canRunnerTake, decideStartFailure, MAX_START_RETRIES, planQueue } from "@factory/core";
 import type {
   AdapterRegistry,
   MailboxRef,
-  PermissionRequestId,
-  PrStateDecision,
   QueuedRun,
   Runner,
   RunnerChoice,
-  RunnerErrorDetail,
   RunId,
   RunnerId,
   StartedRun,
@@ -23,30 +12,37 @@ import type {
 } from "@factory/core";
 import {
   changeRunState,
+  clearStartRequested,
   getMapping,
   getRun,
   getRunWithRecords,
   inTransaction,
+  listPendingCancelRequests,
   listRunPlacements,
   listRunnerSnapshots,
-  listRunners,
   listRuns,
+  markCancelRequestProcessed,
   openDatabase,
-  clearStartRequested,
   recordStartFailure,
   recordStartRequested,
-  sentQuestionIds,
   setQueuedRunRunner,
   setRunnerMailbox,
-  updateRunRecords,
 } from "@factory/db";
-import type { Database, SecretBox, StoredRun, StoredRunner } from "@factory/db";
+import type { SecretBox, StoredRun } from "@factory/db";
 import { WorkerAdapters } from "./adapters.js";
+import {
+  describe,
+  findRunner,
+  mailboxFor,
+  reportFailure,
+  runnerErrorDetail,
+  tryWrite,
+} from "./context.js";
+import type { QueuedStoredRun, TickContext, WorkerLogger } from "./context.js";
+import { checkRunners } from "./runner-check.js";
+import { watchActiveRuns } from "./watch.js";
 
-/** worker가 남기는 기록. 런 하나의 실패는 루프를 멈추지 않고 여기로 보낸다. */
-export interface WorkerLogger {
-  warn(message: string, fields?: Readonly<Record<string, unknown>>): void;
-}
+export type { WorkerLogger } from "./context.js";
 
 export interface WorkerOptions {
   /** web과 함께 쓰는 SQLite 파일(ADR 0002). 마이그레이션은 부르는 쪽이 먼저 돌린다. */
@@ -60,7 +56,10 @@ export interface WorkerOptions {
 }
 
 export interface Worker {
-  /** 폴링 한 바퀴: Running 런을 보고 끝난 런의 두 축을 기록한 뒤, 대기열에서 런을 시작한다. */
+  /**
+   * 폴링 한 바퀴: 러너를 확인하고, 끝나지 않은 런을 감시해 끝난 런의 두 축을 기록하고, Queued 런의 취소를
+   * 처리한 뒤 대기열에서 런을 시작한다.
+   */
   tick(): Promise<void>;
   /** DB를 닫는다. 돌던 tick이 끝나기를 기다린다. */
   close(): Promise<void>;
@@ -119,6 +118,7 @@ export function createWorker(options: WorkerOptions): Worker {
     pendingStarts: new Map(),
     mailboxes: new Map(),
     unreachableUntil: new Map(),
+    unmarkedAnswers: new Set(),
   };
   let running: Promise<void> | null = null;
   let closed = false;
@@ -141,153 +141,73 @@ export function createWorker(options: WorkerOptions): Worker {
   };
 }
 
-interface TickContext {
-  db: Database;
-  now: () => Date;
-  logger: WorkerLogger;
-  adapters: WorkerAdapters;
-  /** 러너에 시작했다고 답을 받았지만 Running을 쓰지 못한 런. 다음 바퀴에 기록만 다시 한다. */
-  pendingStarts: Map<RunId, PendingStart>;
-  /** 이번 바퀴에 확인한 러너별 우편함. 바퀴마다 비운다 */
-  mailboxes: Map<RunnerId, MailboxRef>;
-  /**
-   * 시작할 때 닿지 않은 러너와 다시 해 볼 시각. 그때까지 대기열 판단에서 Offline으로 본다(Q86). 러너 확인이
-   * Offline을 적기 전에도 닿지 않는 러너가 capacity를 잡아 뒤 런을 막지 않게 한다. 메모리에만 둔다.
-   */
-  unreachableUntil: Map<RunnerId, number>;
-}
-
-interface PendingStart {
-  runnerId: RunnerId;
-  started: StartedRun;
-}
-
 async function tick(context: TickContext): Promise<void> {
   context.mailboxes.clear();
+  // 대기열 판단이 이번 바퀴의 러너 상태(Online, 프로젝트, GitHub 인증)를 보도록 먼저 확인한다.
+  await checkRunners(context);
   // 끝난 런이 내놓은 capacity를 같은 바퀴의 대기열이 쓰도록 먼저 본다.
-  await pollActiveRuns(context);
+  await watchActiveRuns(context);
+  await cancelQueuedRuns(context);
   await processQueue(context);
 }
 
-// ---------- Running 런 ----------
+// ---------- Queued 런 취소 ----------
 
 /**
- * Running·Waiting for Input 런의 실제 상태를 읽는다. 에이전트가 끝났으면 PR 상태를 정하고
- * 두 축을 한 번 기록한다(ADR 0004, Q66). 입력 기다림·시간 초과·연결 끊김 처리는 0016이 더한다.
+ * 처리하지 않은 취소 요청 중 Queued 런을 끝낸다(Q82.10). 에이전트 결과는 운영자가 취소함이고 PR을 찾지 않아
+ * PR 상태는 없음이다. 끝내는 쓰기와 요청 처리 표시는 한 트랜잭션이라 요청은 한 번만 처리한다. 시작한 런의
+ * 취소는 감시(watch.ts)가 하고, 이미 Ended인 런의 요청은 처리하지 않는다.
+ *
+ * 러너에 시작을 보낸 적이 있는 런은 에이전트가 이미 돌고 있을 수 있다. 같은 이름으로 시작한 런을 먼저 찾아
+ * 있으면 Running으로 기록해 다음 바퀴에 시작한 런으로 취소하고, 없음을 확인했을 때만 바로 끝낸다.
  */
-async function pollActiveRuns(context: TickContext): Promise<void> {
+async function cancelQueuedRuns(context: TickContext): Promise<void> {
   const { db, logger } = context;
-  const runnersById = new Map(listRunners(db).map((runner) => [runner.id, runner]));
-  for (const run of listRuns(db, { states: ["running", "waiting-for-input"] })) {
-    if (run.state !== "running" && run.state !== "waiting-for-input") continue;
-    try {
-      await pollRun(context, run, runnersById.get(run.runnerId));
-    } catch (error) {
-      // 이번 바퀴에 읽지 못했으면 다음 바퀴에 다시 본다.
-      logger.warn("could not poll run", { runId: run.id, error });
+  for (const request of listPendingCancelRequests(db)) {
+    const found = getRunWithRecords(db, request.runId);
+    if (found?.run.state !== "queued") continue;
+    const { run, records } = found;
+    // 러너에서 시작했지만 Running을 쓰지 못한 런. 기록한 뒤 시작한 런으로 취소한다.
+    if (context.pendingStarts.has(run.id)) continue;
+    if (records.startRequestedAt !== null && run.runnerId !== null) {
+      const existing = await findStartedForCancel(context, run, run.runnerId);
+      if (existing === "unknown") continue;
+      if (existing !== null) {
+        tryWrite(context, run.id, () => recordStart(context, run.id, existing));
+        continue;
+      }
     }
+    const endedAt = context.now();
+    tryWrite(context, run.id, () =>
+      inTransaction(db, () => {
+        const result = changeRunState(
+          db,
+          run.id,
+          { to: "ended", agentResult: "canceled", prState: "none" },
+          endedAt,
+        );
+        reportFailure(logger, run.id, result);
+        if (result.ok) markCancelRequestProcessed(db, run.id, endedAt);
+      }),
+    );
   }
 }
 
-/** 러너와 워크트리가 있고 아직 끝나지 않은 런 */
-type ActiveRun = Exclude<StoredRun, { state: "queued" | "ended" }>;
-
-async function pollRun(
+async function findStartedForCancel(
   context: TickContext,
-  run: ActiveRun,
-  storedRunner: StoredRunner | undefined,
-): Promise<void> {
-  const { db, now, logger, adapters } = context;
-  if (storedRunner === undefined) {
-    logger.warn("run's runner is not registered", { runId: run.id, runnerId: run.runnerId });
-    return;
+  run: QueuedStoredRun,
+  runnerId: RunnerId,
+): Promise<StartedRun | null | "unknown"> {
+  const storedRunner = findRunner(context.db, runnerId);
+  if (storedRunner === undefined) return "unknown";
+  const runner = context.adapters.runner(storedRunner);
+  try {
+    const mailbox = await mailboxFor(context, storedRunner, runner);
+    return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
+  } catch (error) {
+    context.logger.warn("could not look up a started run to cancel", { runId: run.id, error });
+    return "unknown";
   }
-
-  const runner = adapters.runner(storedRunner);
-  const mailbox = await mailboxFor(context, storedRunner, runner);
-  const progress = await runner.pollRun({
-    mailbox,
-    worktree: run.worktree,
-    agentRef: run.agentRef,
-  });
-  // 질문 기록과 답 보내기, 권한 거절은 0016이 더한다. 지금은 DB에 보낸 답만 거른다.
-  const resolution = resolveRunProgress(progress, {
-    answered: sentQuestionIds(db, run.id),
-    denied: new Set<PermissionRequestId>(),
-  });
-  if (resolution.kind === "continue") {
-    if (resolution.state !== run.state) {
-      reportFailure(logger, run.id, changeRunState(db, run.id, { to: resolution.state }, now()));
-    }
-    return;
-  }
-
-  // PR을 찾지 못하면(코드 호스트 오류) 끝내지 않고 다음 바퀴에 다시 본다. 두 축은 한 번만 기록한다.
-  const decision = await decideRunPrState(context, run);
-  const endedAt = now();
-  inTransaction(db, () => {
-    const result = changeRunState(
-      db,
-      run.id,
-      {
-        to: "ended",
-        agentResult: resolution.agentResult,
-        prState: decision.prState,
-        ...(resolution.report === null ? {} : { reportBody: resolution.report.body }),
-      },
-      endedAt,
-    );
-    if (!result.ok) {
-      reportFailure(logger, run.id, result);
-      return;
-    }
-    if (decision.pr !== null) {
-      const { id, displayId, url, ci } = decision.pr;
-      updateRunRecords(db, run.id, {
-        pullRequest: { id, displayId, url, ci, checkedAt: endedAt },
-      });
-    }
-  });
-}
-
-/**
- * 런과 이어진 PR을 코드 호스트에서 찾아 core decidePrState로 PR 상태를 정한다(Q40·Q82.6).
- * 1순위는 시작 때 러너에서 받은 실제 브랜치, 2순위는 런 시작 뒤에 만든 PR의 티켓 키다.
- * 런의 러너 쪽 프로젝트를 저장소로 읽는 코드 호스트가 없으면 이을 PR이 없으니 없음이다.
- * 다만 어댑터를 만들지 못한 코드 호스트 연결이 있으면 그 연결이 이 저장소를 읽을 수 있으니,
- * 없음으로 확정하지 않고 던져 다음 바퀴에 다시 본다(두 축은 한 번만 기록한다, Q69).
- */
-async function decideRunPrState(context: TickContext, run: ActiveRun): Promise<PrStateDecision> {
-  let unavailable = 0;
-  const codeHosts = context.adapters.allCodeHosts(context.db, (connectionId, error) => {
-    unavailable += 1;
-    context.logger.warn("could not create code host adapter", { connectionId, error });
-  });
-  for (const codeHost of codeHosts) {
-    const repo = codeHost.repoOf(run.runnerProject);
-    if (repo === null) continue;
-    const [byBranch, byTicketKey] = await Promise.all([
-      codeHost.findPullRequestsByBranch(repo, run.branch),
-      codeHost.findPullRequestsByTicketKey(repo, run.ticket.key, { createdSince: run.startedAt }),
-    ]);
-    return decidePrState({
-      repo,
-      ticketKey: run.ticket.key,
-      runStartedAt: run.startedAt,
-      byBranch,
-      byTicketKey,
-    });
-  }
-  if (unavailable > 0) {
-    throw new Error(
-      "no code host reads the run's project while some code host adapters are unavailable",
-    );
-  }
-  context.logger.warn("no code host reads the run's project; recording no pull request", {
-    runId: run.id,
-    runnerProject: run.runnerProject,
-  });
-  return { prState: "none", pr: null };
 }
 
 // ---------- 대기열 ----------
@@ -499,12 +419,13 @@ async function startOnRunner(
   try {
     if (unverified) {
       const existing = await findStarted(context, run, runner, mailbox);
-      // 확인하지 못했으면 러너를 비우지 않고 이번 순서에서만 뺀다(닿지 않으면 뒤 런을 막지 않는다).
+      // 확인하지 못했으면 러너를 비우지 않고 이번 순서에서만 뺀다. 닿지 않거나 찾기 오류가 이어져도
+      // 맨 앞에서 뒤 런을 막지 않는다. 결과를 모르는 동안 다시 보내지는 않는다.
       if (existing === "unreachable") {
         markUnreachable(context, runnerId);
         return { kind: "skipped" };
       }
-      if (existing === "unknown") return { kind: "blocked" };
+      if (existing === "unknown") return { kind: "skipped" };
       if (existing !== null) return { kind: "started", started: existing };
       unverified = false;
       // 시작하지 않았음을 확인했다. 읽을 수 없는 출력으로 다시 시도를 다 썼거나(Q86) 그사이 Mapping이
@@ -518,6 +439,16 @@ async function startOnRunner(
     }
     const prompt = await promptFor(context, run);
     if (prompt === null) return { kind: "blocked" };
+    if (prompt === "ticket-gone") {
+      // 트래커에서 티켓이 지워졌다. 영영 시작할 수 없으니 끝내 뒤 런을 막지 않는다(Q82.16).
+      tryWrite(context, run.id, () =>
+        recordStartFailure(db, run.id, {
+          failures: records.startFailures,
+          error: describe({ kind: "ticket-not-found", ticketKey: run.ticket.key }),
+        }),
+      );
+      return endCouldNotStart(context, run);
+    }
     // 보내기 직전에 쓴다. 쓰지 못하면 보내지 않는다(다시 띄웠을 때 이미 보냈는지 알 수 없게 된다).
     if (
       tryWrite(context, run.id, () => recordStartRequested(db, run.id, context.now())) === undefined
@@ -654,13 +585,14 @@ function endCouldNotStart(context: TickContext, run: QueuedStoredRun): StartAtte
   return { kind: ended?.ok === true ? "skipped" : "blocked" };
 }
 
-type QueuedStoredRun = Extract<StoredRun, { state: "queued" }>;
-
-/** 에이전트에게 줄 지시. 티켓만이다(GLOSSARY Agent). 티켓을 찾지 못하면 null이다. */
+/**
+ * 에이전트에게 줄 지시. 티켓만이다(GLOSSARY Agent). 트래커 연결이 없으면 null, 트래커에서 티켓이 지워졌으면
+ * "ticket-gone"이다.
+ */
 async function promptFor(
   context: TickContext,
   run: QueuedStoredRun,
-): Promise<{ text: string; ticket: { key: TicketKey; url: string } } | null> {
+): Promise<{ text: string; ticket: { key: TicketKey; url: string } } | null | "ticket-gone"> {
   const tracker = context.adapters.tracker(context.db, run.ticket.connection);
   if (tracker === null) {
     context.logger.warn("run's tracker connection is not registered", { runId: run.id });
@@ -669,31 +601,12 @@ async function promptFor(
   const ticket = await tracker.getTicket(run.ticket.key);
   if (ticket === null) {
     context.logger.warn("run's ticket was not found in the tracker", { runId: run.id });
-    return null;
+    return "ticket-gone";
   }
   return {
     text: `${ticket.title}\n\n${ticket.body}`,
     ticket: { key: ticket.key, url: ticket.url },
   };
-}
-
-/**
- * 러너의 우편함을 확인하고(없거나 사라졌으면 어댑터가 다시 만든다, Q82.1) 바뀌었으면 DB에 쓴다.
- * 바퀴마다 러너당 한 번만 확인한다.
- */
-async function mailboxFor(
-  context: TickContext,
-  storedRunner: StoredRunner,
-  runner: Runner,
-): Promise<MailboxRef> {
-  const cached = context.mailboxes.get(storedRunner.id);
-  if (cached !== undefined) return cached;
-  const mailbox = await runner.ensureMailbox(storedRunner.mailbox);
-  if (mailbox !== storedRunner.mailbox) {
-    setRunnerMailbox(context.db, storedRunner.id, mailbox);
-  }
-  context.mailboxes.set(storedRunner.id, mailbox);
-  return mailbox;
 }
 
 /** 시작한 런을 Running으로 쓴다. 런이 더는 Queued가 아니면 false다. */
@@ -702,55 +615,4 @@ function recordStart(context: TickContext, runId: RunId, started: StartedRun): b
   const result = changeRunState(db, runId, { to: "running", started }, now());
   reportFailure(logger, runId, result);
   return result.ok;
-}
-
-/** DB 쓰기. 실패하면(쓰기 잠금 시간 초과 등) 알리고 undefined를 돌려준다. */
-function tryWrite<T>(context: TickContext, runId: RunId, write: () => T): T | undefined {
-  try {
-    return write();
-  } catch (error) {
-    context.logger.warn("could not write run", { runId, error });
-    return undefined;
-  }
-}
-
-function findRunner(db: Database, id: RunnerId): StoredRunner | undefined {
-  return listRunners(db).find((runner) => runner.id === id);
-}
-
-/** 러너 어댑터가 던진 오류의 종류. 어댑터 오류가 아니면(트래커 오류 등) null이다. */
-function runnerErrorDetail(error: unknown): RunnerErrorDetail | null {
-  if (!(error instanceof AdapterError)) return null;
-  const detail: unknown = error.detail;
-  if (typeof detail !== "object" || detail === null || !("kind" in detail)) return null;
-  switch (detail.kind) {
-    case "unreachable":
-    case "not-installed":
-    case "not-ready":
-    case "mailbox-missing":
-    case "start-outcome-unknown":
-      return { kind: detail.kind, detail: describe(detail) };
-    case "malformed-output":
-      return { kind: "malformed-output", raw: describe(detail) };
-    case "runner-error":
-      return {
-        kind: "runner-error",
-        code: "code" in detail && typeof detail.code === "string" ? detail.code : "unknown",
-        message: describe(detail),
-      };
-    default:
-      return null;
-  }
-}
-
-function describe(detail: object): string {
-  return JSON.stringify(detail);
-}
-
-function reportFailure(
-  logger: WorkerLogger,
-  runId: RunId,
-  result: ReturnType<typeof changeRunState>,
-): void {
-  if (!result.ok) logger.warn("could not change run state", { runId, error: result.error });
 }
