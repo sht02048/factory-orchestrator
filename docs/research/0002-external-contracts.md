@@ -110,7 +110,7 @@ orca status [--json]
 창 없이 런타임을 띄우는 방법도 있다 **[스키마]**:
 
 - `orca serve`: 데스크톱 창 없이 런타임 서버를 포그라운드로 띄운다. 같은 프로필을 이미 서빙 중이면 종료 코드 3.
-- `orca serve service install|status|uninstall`: launchd·systemd 서비스로 등록한다. 서비스는 늘 `orca serve --supervise --no-pairing`을 돌려 서버가 멈추면 스스로 다시 띄운다. 1.4.258의 `install`에는 `--supervise` 플래그가 없고, PATH에 `orca`가 없으면 `--command <절대 경로>`가 필요하다([research 0003](0003-orca-runner-contract.md) 6절).
+- `orca serve service install|status|uninstall`: launchd·systemd 서비스로 등록한다. 서비스는 늘 `orca serve --supervise --no-pairing`을 돌려 서버가 멈추면 스스로 다시 띄운다. 1.4.258의 `install`에는 `--supervise` 플래그가 없고, `--command`의 기본값은 PATH의 `orca`라 비대화형 PATH에 없으면 절대 경로를 줘야 한다([research 0003](0003-orca-runner-contract.md) 6절).
 - `orca serve service status --json` **[실행]**: `{ installed, manager: "launchd", name, unitPath, gaveUp, verdict: "live"|"exited"|"unverifiable", pid, detail }`.
 
 ### A.4 러너의 프로젝트 목록
@@ -263,7 +263,7 @@ orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--mode
 - `orca terminal list [--worktree <selector>] --json`: `terminals[]`에 `handle`, `worktreeId`, `tabId`, `leafId`, `connected`, `lastOutputAt`, `agentIdentity` 등 **[실행]**.
 - `worktree ps`의 `agents[].paneKey`(`<tabId>:<leafId>`)를 `terminal list`의 `tabId`·`leafId`와 이어야 특정 에이전트의 핸들을 얻는다 **[문서]**(`orca skills get orca-cli`, "Terminals").
 - `orca terminal wait --terminal <handle> --for exit|tui-idle --timeout-ms <ms> --json`: 에이전트 CLI에는 `tui-idle`을 쓰고 `--timeout-ms`를 반드시 준다 **[문서]**. 블로킹 호출이라 ssh 세션을 오래 잡는다. 폴링 설계(ADR 0002)와는 `worktree ps`가 더 맞다.
-- `orca terminal read --terminal <handle> [--cursor <n>] [--limit <n>] [--screen] --json`: `result.terminal`에 `handle`, `status`(`running|exited|unknown`), `tail`, `truncated`, `nextCursor` 등 **[스키마]**. 실패 사유를 런 로그로 남길 때 쓸 수 있다.
+- `orca terminal read --terminal <handle> [--cursor <n>] [--limit <n>] [--screen] --json`: `result.terminal`에 `handle`, `status`(`running|exited|unknown`), `tail`, `truncated`, `nextCursor` 등 **[스키마]**. 실패 사유를 런 로그로 남길 때 쓸 수 있다. 단, `terminal close`나 `worktree rm --force`로 터미널을 끝낸 뒤에는 같은 핸들의 `tail`이 비므로 멈추거나 지우기 전에 읽어야 한다 **[실행]**([research 0003](0003-orca-runner-contract.md) 19절).
 
 **3) `orca orchestration` task/dispatch** **[스키마]**. Orca 자체의 코디네이터·워커 메일박스 모델(Run, Task, Dispatch, `worker_done`)이다. 워커가 `orca orchestration send --type worker_done`으로 스스로 끝을 알려야 하고, 호출자는 Run에 묶인 코디네이터여야 한다. 실제로 워커 맥락에서 `orchestration task-list`를 부르면 `run_required` 오류가 났다 **[실행]**. 이 모델은 에이전트에게 오케스트레이션 프로토콜을 지시로 줘야 하는데, 이는 "에이전트에게는 티켓만 지시로 준다"(GLOSSARY Agent, ADR 0004)와 맞지 않는다. 용어도 겹친다(Orca의 Run·Dispatch와 이 제품의 Run·Assignment). 1단계 어댑터에는 쓰지 않는 쪽을 권한다.
 
