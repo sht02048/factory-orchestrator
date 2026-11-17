@@ -6,21 +6,20 @@
 
 - **[실행]** 테스트 러너에서 직접 돌린 명령의 결과. macOS(arm64) 러너, Orca 1.4.258, 오케스트레이터 기계에서 비대화형 `ssh <host> '<command>'`로 실행했다.
 - **[스키마]** `orca <command> --help`와 `orca agent-context --json`.
-- **[소스]** 러너에 설치된 Orca 앱 번들의 CLI 소스(`Orca.app/Contents/Resources/app.asar.unpacked/out/`).
 
-테스트 저장소는 버려도 되는 비공개 저장소 하나를 러너에 clone해 Orca 프로젝트로 등록했고, 워크트리 넷(W1~W4)에 Claude Code를 하나씩 짧게 띄웠다. 런은 0010 검증과 같은 세션에서 돌려 에이전트를 띄운 횟수를 줄였다. 확인이 끝난 뒤 워크트리와 브랜치를 모두 지웠다.
+테스트 저장소는 버려도 되는 비공개 저장소 하나를 러너에 clone해 Orca 프로젝트로 등록했고, 워크트리 넷(W1~W4)에 Claude Code를 하나씩 짧게 띄웠다. 이 문서에 쓴 것은 W1(에이전트가 끝난 뒤 `rm`), W2(입력 기다리는 에이전트에 `terminal close`), W4(에이전트가 도는 중에 `rm`)다. W3(0이 아닌 종료 코드)는 research 0004에 쓴다. 런은 0010 검증과 같은 세션에서 돌려 에이전트를 띄운 횟수를 줄였다. 확인이 끝난 뒤 워크트리와 브랜치를 모두 지웠다.
 
 예시와 픽스처의 로컬 경로, 호스트명, 사용자명, 계정은 `<path>`, `<host>`, `<user>`, `acme`로 바꿨다. UUID와 시각은 순서만 남긴 가상 값이다. 픽스처는 [`fixtures/0003/`](fixtures/0003/)에 있다.
 
 ## 요약
 
-| #   | 항목                         | 결론                                                                                                                                  |
-| --- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 런타임이 꺼졌을 때           | `status --json`은 `ok: true`·종료 코드 0에 `runtime.reachable: false`. 런타임이 필요한 명령은 `runtime_unavailable`·종료 코드 1       |
-| 6   | ssh 비대화형 셸              | `orca`가 PATH에 없다(종료 코드 127). 절대 경로로 부르면 런타임에 닿는다. 특별한 환경 변수나 GUI 세션은 필요 없다                      |
-| 7   | Linux 러너                   | **남음.** Linux 러너가 아직 없다. help가 적은 것만 옮겼다                                                                             |
-| 9   | `worktree rm`                | 에이전트가 돈 워크트리는 untracked 파일 때문에 `--force` 없이는 `runtime_error`로 실패한다. `--force`는 도는 에이전트를 멈추고 지운다 |
-| 19  | 시간 초과 때 에이전트 멈추기 | `orca terminal close`로 멈춘다. 워크트리는 남는다. `worktree rm --force`로 갈음하지 않는다                                            |
+| #   | 항목                         | 결론                                                                                                                                         |
+| --- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 런타임이 꺼졌을 때           | `status --json`은 `ok: true`·종료 코드 0에 `runtime.reachable: false`. 런타임이 필요한 명령은 `runtime_unavailable`·종료 코드 1              |
+| 6   | ssh 비대화형 셸              | `orca`가 PATH에 없다(종료 코드 127). 절대 경로로 부르면 런타임에 닿는다. 특별한 환경 변수나 GUI 세션은 필요 없다                             |
+| 7   | Linux 러너                   | **남음.** Linux 러너가 아직 없다. help가 적은 것만 옮겼다                                                                                    |
+| 9   | `worktree rm`                | 이번 러너에서는 에이전트가 남긴 untracked 파일 때문에 `--force` 없이는 `runtime_error`로 실패했다. `--force`는 도는 에이전트를 멈추고 지운다 |
+| 19  | 시간 초과 때 에이전트 멈추기 | `orca terminal close`로 멈춘다. 워크트리는 남는다. `worktree rm --force`로 갈음하지 않는다                                                   |
 
 이 밖에 러너의 GitHub 인증이 비대화형 ssh 세션에서 동작하지 않는 경우를 만났다(아래 "러너의 GitHub 인증").
 
@@ -123,13 +122,13 @@
   "ok": false,
   "error": {
     "code": "runtime_error",
-    "message": "Failed to delete worktree at <path>/workspaces/sandbox/fo-verify-w1. ?? .omc/project-memory.json\n?? ...\n?? note.txt"
+    "message": "Failed to delete worktree at <path>/workspaces/sandbox/fo-verify-w1. ?? <agent-plugin-state>\n?? note.txt"
   },
   "_meta": { "runtimeId": "<uuid>" }
 }
 ```
 
-- 원인은 untracked 파일이다. 메시지에 `git status --short` 줄이 붙는다. 에이전트가 만든 파일(`note.txt`)뿐 아니라 러너의 에이전트 플러그인이 세션마다 쓰는 상태 파일(`.omc/`)도 걸렸다. 에이전트가 한 번이라도 돈 워크트리는 `--force` 없이는 지워지지 않는다고 봐야 한다.
+- 원인은 untracked 파일이다. 메시지에 `git status --short` 줄이 붙는다. 에이전트가 만든 파일(`note.txt`)뿐 아니라 러너의 에이전트 플러그인이 세션마다 쓰는 상태 파일도 걸렸다(픽스처에서는 `<agent-plugin-state>` 한 줄로 줄였다). W4는 플러그인 상태 파일만으로 실패했다. 플러그인이 없고 에이전트가 변경을 모두 커밋하는 러너라면 `--force` 없이 지워질 수 있지만, 러너 구성에 기대지 않으려면 `--force`를 늘 준다.
 - `error.code`가 일반적인 `runtime_error`라 "더러워서 못 지움"을 코드로 가를 수 없다.
 - 실패한 `rm`은 아무것도 멈추지 않았다. 터미널은 `connected: true`로 남고, 에이전트 셸과 `sleep`도 살아 있었다 **[실행]**.
 
@@ -144,7 +143,7 @@
 }
 ```
 
-종료 코드 0 **[실행]**. 픽스처: [`worktree-rm-force.json`](fixtures/0003/worktree-rm-force.json), [`worktree-rm-force-delete-branch.json`](fixtures/0003/worktree-rm-force-delete-branch.json). 지우기 직전 W4 행은 [`worktree-ps-before-rm-working.json`](fixtures/0003/worktree-ps-before-rm-working.json)이다(`status: "working"`, `agents[0].state: "working"`, `programStatus.message: "1 shell still running"`).
+종료 코드 0 **[실행]**. 픽스처: [`worktree-rm-force.json`](fixtures/0003/worktree-rm-force.json)(W1, 에이전트가 끝나 셸만 남은 상태, `--delete-branch` 없이), [`worktree-rm-force-delete-branch.json`](fixtures/0003/worktree-rm-force-delete-branch.json). 지우기 직전 W4 행은 [`worktree-ps-before-rm-working.json`](fixtures/0003/worktree-ps-before-rm-working.json)이다(`status: "working"`, `agents[0].state: "working"`, `programStatus.message: "1 shell still running"`).
 
 에이전트가 `sleep 120`을 돌리는 중에 `rm --force --delete-branch`를 부르자 다음이 일어났다 **[실행]**.
 
@@ -154,8 +153,8 @@
 
 결과에는 브랜치 정보가 없다. 브랜치는 다음과 같았다 **[실행]**.
 
-- `--delete-branch` 없이: 브랜치가 남았다. help대로다 **[스키마]**.
-- `--delete-branch`: 기준 브랜치에서 커밋이 늘지 않은 브랜치는 지워졌다. 병합되지 않은 커밋이 있는 브랜치는 시험하지 않았다. help는 병합이 증명되지 않은 브랜치는 남긴다고 적는다 **[스키마]**.
+- `--delete-branch` 없이(W1): 브랜치가 남아 손으로 지웠다. help대로다 **[스키마]**.
+- `--delete-branch`(W2, W3, W4): 기준 브랜치에서 커밋이 늘지 않은 브랜치는 모두 지워졌다. 병합되지 않은 커밋이 있는 브랜치는 시험하지 않았다. help는 병합이 증명되지 않은 브랜치는 남긴다고 적는다 **[스키마]**.
 
 ### 어댑터에 주는 뜻
 
@@ -238,7 +237,7 @@ Runner 어댑터의 "에이전트 멈추기"는 `orca terminal close --worktree 
 | `serve-service-status-uninstalled.json` | 서비스를 지운 뒤 `serve service status --json`          |
 | `worktree-rm-dirty-error.json`          | 에이전트가 끝난 워크트리에 `rm`(`--force` 없이)         |
 | `worktree-rm-while-working-error.json`  | 에이전트가 도는 워크트리에 `rm`(`--force` 없이)         |
-| `worktree-rm-force.json`                | `rm --force`                                            |
+| `worktree-rm-force.json`                | 에이전트가 끝난 워크트리에 `rm --force`                 |
 | `worktree-rm-force-delete-branch.json`  | 에이전트가 도는 워크트리에 `rm --force --delete-branch` |
 | `worktree-ps-before-rm-working.json`    | 그 직전 `worktree ps` 행                                |
 | `terminal-close.json`                   | 입력 기다리는 에이전트에 `terminal close`               |

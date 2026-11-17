@@ -1,17 +1,17 @@
 {
-  "id": "<uuid>",
+  "id": "00000000-0000-4000-8000-000000000010",
   "ok": true,
   "result": {
     "worktrees": [
       {
         "workspaceKind": "git",
-        "worktreeId": "00000000-0000-4000-8000-000000000010::<path>/workspaces/sandbox/fo-verify-w2",
-        "repoId": "00000000-0000-4000-8000-000000000010",
+        "worktreeId": "00000000-0000-4000-8000-000000000011::<path>/workspaces/sandbox/fo-verify-w2",
+        "repoId": "00000000-0000-4000-8000-000000000011",
         "hostId": "local",
         "identity": {
-          "key": "wt2:local:00000000-0000-4000-8000-000000000011",
+          "key": "wt2:local:00000000-0000-4000-8000-000000000012",
           "executionHostId": "local",
-          "instanceId": "00000000-0000-4000-8000-000000000011"
+          "instanceId": "00000000-0000-4000-8000-000000000012"
         },
         "terminalPlatform": "darwin",
         "repo": "sandbox",
@@ -22,7 +22,7 @@
         "hasHostSidebarActivity": false,
         "defaultBranch": false,
         "cliCreated": true,
-        "worktreeInstanceId": "00000000-0000-4000-8000-000000000011",
+        "worktreeInstanceId": "00000000-0000-4000-8000-000000000012",
         "parentWorktreeId": null,
         "childWorktreeIds": [],
         "workspaceLineage": null,
@@ -60,19 +60,21 @@
         "parent": null,
         "address": {
           "environment": "local",
-          "worktree": "identity:wt2:local:00000000-0000-4000-8000-000000000011",
-          "line": "--environment local --worktree identity:wt2:local:00000000-0000-4000-8000-000000000011"
+          "worktree": "identity:wt2:local:00000000-0000-4000-8000-000000000012",
+          "line": "--environment local --worktree identity:wt2:local:00000000-0000-4000-8000-000000000012"
         }
       }
     ],
     "hostScope": {
-      "hostIds": ["local"],
+      "hostIds": [
+        "local"
+      ],
       "omittedHostIds": []
     },
     "totalCount": 1,
     "truncated": false
   },
   "_meta": {
-    "runtimeId": "<uuid>"
+    "runtimeId": "00000000-0000-4000-8000-000000000003"
   }
 }

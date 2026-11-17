@@ -3,7 +3,7 @@
   "ok": false,
   "error": {
     "code": "runtime_error",
-    "message": "Failed to delete worktree at <path>/workspaces/sandbox/fo-verify-w1. ?? .omc/project-memory.json\n?? .omc/state/agent-replay-00000000-0000-4000-8000-000000000002.jsonl\n?? .omc/state/idle-notif-cooldown.json\n?? .omc/state/session-end-jobs/00000000-0000-4000-8000-000000000002.json\n?? .omc/state/session-end-jobs/discovery.json\n?? .omc/state/sessions/00000000-0000-4000-8000-000000000002/hud-stdin-cache.json\n?? .omc/state/sessions/00000000-0000-4000-8000-000000000002/pre-tool-advisory-throttle.json\n?? .omc/state/sessions/00000000-0000-4000-8000-000000000002/session-started.json\n?? .omc/state/sessions/00000000-0000-4000-8000-000000000002/subagent-tracking-state.json\n?? note.txt"
+    "message": "Failed to delete worktree at <path>/workspaces/sandbox/fo-verify-w1. ?? <agent-plugin-state>\n?? note.txt"
   },
   "_meta": {
     "runtimeId": "00000000-0000-4000-8000-000000000003"

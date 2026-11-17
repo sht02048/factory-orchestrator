@@ -1,17 +1,17 @@
 {
-  "id": "<uuid>",
+  "id": "00000000-0000-4000-8000-000000000016",
   "ok": true,
   "result": {
     "worktrees": [
       {
         "workspaceKind": "git",
-        "worktreeId": "00000000-0000-4000-8000-000000000010::<path>/workspaces/sandbox/fo-verify-w4",
-        "repoId": "00000000-0000-4000-8000-000000000010",
+        "worktreeId": "00000000-0000-4000-8000-000000000011::<path>/workspaces/sandbox/fo-verify-w4",
+        "repoId": "00000000-0000-4000-8000-000000000011",
         "hostId": "local",
         "identity": {
-          "key": "wt2:local:00000000-0000-4000-8000-000000000015",
+          "key": "wt2:local:00000000-0000-4000-8000-000000000017",
           "executionHostId": "local",
-          "instanceId": "00000000-0000-4000-8000-000000000015"
+          "instanceId": "00000000-0000-4000-8000-000000000017"
         },
         "terminalPlatform": "darwin",
         "repo": "sandbox",
@@ -22,15 +22,15 @@
         "hasHostSidebarActivity": true,
         "defaultBranch": false,
         "cliCreated": true,
-        "worktreeInstanceId": "00000000-0000-4000-8000-000000000015",
+        "worktreeInstanceId": "00000000-0000-4000-8000-000000000017",
         "parentWorktreeId": null,
         "childWorktreeIds": [],
         "workspaceLineage": null,
         "displayName": "fo-verify-w4",
         "workspaceStatus": "in-progress",
-        "sortOrder": 1794920047815,
-        "lastActivityAt": 1794920047833,
-        "createdAt": 1794920047815,
+        "sortOrder": 1790000247815,
+        "lastActivityAt": 1790000247833,
+        "createdAt": 1790000247815,
         "creatorProvenance": {
           "kind": "host"
         },
@@ -47,12 +47,12 @@
         "liveTerminalCount": 1,
         "hasAttachedPty": true,
         "unverifiableTerminalCount": 0,
-        "lastOutputAt": 1794920059018,
+        "lastOutputAt": 1790000259018,
         "preview": "un exactly this one Bash command and nothing else: sleep 120. Then reply DONE.'\n↓ to manag",
         "status": "working",
         "agents": [
           {
-            "paneKey": "00000000-0000-4000-8000-000000000016:00000000-0000-4000-8000-000000000017",
+            "paneKey": "00000000-0000-4000-8000-000000000018:00000000-0000-4000-8000-000000000019",
             "parentPaneKey": null,
             "state": "working",
             "workingMode": "monitoring",
@@ -67,15 +67,15 @@
             "interrupted": false,
             "mainAgent": {
               "state": "done",
-              "stateStartedAt": 1794920058900
+              "stateStartedAt": 1790000258900
             },
-            "stateStartedAt": 1794920049042,
-            "updatedAt": 1794920060962,
+            "stateStartedAt": 1790000249042,
+            "updatedAt": 1790000260962,
             "hasLivePty": true,
             "programStatus": {
               "state": "working",
               "message": "1 shell still running",
-              "observedAt": 1794920059018
+              "observedAt": 1790000259018
             },
             "agentWait": null
           }
@@ -90,19 +90,21 @@
         "parent": null,
         "address": {
           "environment": "local",
-          "worktree": "identity:wt2:local:00000000-0000-4000-8000-000000000015",
-          "line": "--environment local --worktree identity:wt2:local:00000000-0000-4000-8000-000000000015"
+          "worktree": "identity:wt2:local:00000000-0000-4000-8000-000000000017",
+          "line": "--environment local --worktree identity:wt2:local:00000000-0000-4000-8000-000000000017"
         }
       }
     ],
     "hostScope": {
-      "hostIds": ["local"],
+      "hostIds": [
+        "local"
+      ],
       "omittedHostIds": []
     },
     "totalCount": 1,
     "truncated": false
   },
   "_meta": {
-    "runtimeId": "<uuid>"
+    "runtimeId": "00000000-0000-4000-8000-000000000003"
   }
 }
