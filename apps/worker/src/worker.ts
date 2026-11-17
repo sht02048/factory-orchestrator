@@ -287,7 +287,7 @@ async function decideRunPrState(context: TickContext, run: ActiveRun): Promise<P
  * 엄격한 FIFO 대기열(ADR 0006). 이번에 할 일은 core planQueue가 정하고 worker는 그대로 옮긴다.
  * 러너를 비우고 정하는 것(Q65·Q68·Q72·Q73·Q78·Q82.22)과 맨 앞에서 영영 시작할 수 없는 런을 끝내는 것
  * (Q82.16)은 한 쓰기 트랜잭션에서 쓰고, 시작은 들어온 순서로 한다. 앞 런이 시작하지 못하면 뒤 런도
- * 이번 바퀴에는 시작하지 않는다(Q63 개정). 다만 러너에 닿지 못해 러너를 비운 런과 시작할 수 없음으로
+ * 이번 바퀴에는 시작하지 않는다(Q63 개정). 다만 시작 때 러너에 닿지 못한 런과 시작할 수 없음으로
  * 끝낸 런은 순서에서 빠지므로 뒤 런을 이어서 시작한다(Q86).
  *
  * 예외: 러너에 시작을 보낸 적이 있는 런(시작 요청 시각이 있음)은 그 러너에 묶어 둔다. 첫 시작이 실제로
@@ -399,7 +399,7 @@ function toQueuedRun(context: TickContext, run: StoredRun): QueuedRun[] {
 /**
  * Queued 런 하나를 러너에서 시작하고 Running으로 바꾼다.
  * - started: 시작했다.
- * - skipped: 순서에서 빠졌다(러너에 닿지 못해 러너를 비움, 시작할 수 없음으로 끝냄). 뒤 런은 이어서 본다.
+ * - skipped: 순서에서 빠졌다(러너에 닿지 못함, 시작할 수 없음으로 끝냄). 뒤 런은 이어서 본다.
  * - blocked: 시작하지 못했고 이 런이 맨 앞에 남는다. 뒤 런은 이번 바퀴에 시작하지 않는다.
  *
  * 시작 멱등(0037): 결정적 워크트리 이름(Run.worktreeName)이 멱등 키다. 러너에 시작을 처음 보내기 직전에
@@ -461,7 +461,8 @@ async function startOnRunner(
   try {
     const mailbox = await mailboxFor(context, storedRunner, runner);
     if (records.startRequestedAt !== null) {
-      const existing = await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
+      const existing = await findStarted(context, run, runner, mailbox);
+      if (existing === "unknown") return { kind: "blocked" };
       if (existing !== null) return { kind: "started", started: existing };
     }
     const prompt = await promptFor(context, run);
@@ -487,6 +488,24 @@ async function startOnRunner(
   }
 }
 
+/**
+ * 같은 이름으로 이미 시작한 런을 찾는다. 찾지 못했으면(오류) "unknown"이고 시작을 보내지 않는다.
+ * 찾기 오류는 시작 명령의 오류가 아니라 시도 횟수에 넣지 않는다.
+ */
+async function findStarted(
+  context: TickContext,
+  run: QueuedStoredRun,
+  runner: Runner,
+  mailbox: MailboxRef,
+): Promise<StartedRun | null | "unknown"> {
+  try {
+    return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
+  } catch (error) {
+    context.logger.warn("could not look up a started run", { runId: run.id, error });
+    return "unknown";
+  }
+}
+
 /** 시작 실패를 core decideStartFailure대로 처리한다(Q86). */
 function handleStartFailure(
   context: TickContext,
@@ -500,8 +519,8 @@ function handleStartFailure(
   const { db, now } = context;
   const decision = decideStartFailure(detail, previousFailures);
   switch (decision.action) {
-    case "clear-runner":
-      tryWrite(context, run.id, () => setQueuedRunRunner(db, run.id, null));
+    case "wait-like-offline":
+      // 러너를 비우지 않는다. 이미 보냈을 수 있는 시작을 다른 러너에서 다시 하지 않기 위해서다.
       return { kind: "skipped" };
     case "find-then-retry":
       return { kind: "blocked" };

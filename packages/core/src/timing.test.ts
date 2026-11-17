@@ -194,9 +194,9 @@ describe("resolveRunProgress", () => {
 });
 
 describe("decideStartFailure (Q86)", () => {
-  it("러너에 닿지 못하면 Offline 예외처럼 러너를 비우고 시도 횟수에 넣지 않는다", () => {
+  it("러너에 닿지 못하면 Offline 예외처럼 순서에서 빼고 시도 횟수에 넣지 않는다", () => {
     expect(decideStartFailure({ kind: "unreachable", detail: "ssh" }, 2)).toEqual({
-      action: "clear-runner",
+      action: "wait-like-offline",
     });
   });
 
@@ -204,8 +204,12 @@ describe("decideStartFailure (Q86)", () => {
     expect(decideStartFailure({ kind: "start-outcome-unknown", detail: "lost" }, 0)).toEqual({
       action: "find-then-retry",
     });
-    expect(decideStartFailure({ kind: "malformed-output", raw: "?" }, 0)).toEqual({
-      action: "find-then-retry",
+  });
+
+  it("읽을 수 없는 출력은 러너 오류처럼 세어 대기열이 끝없이 막히지 않는다", () => {
+    expect(decideStartFailure({ kind: "malformed-output", raw: "?" }, 3)).toEqual({
+      action: "could-not-start",
+      failures: 4,
     });
   });
 

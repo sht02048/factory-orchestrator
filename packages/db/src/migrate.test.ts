@@ -152,6 +152,7 @@ describe("migrate", () => {
       INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
         runner_project_id, agent_id, branch, state, runner_id, assigned_at)
         VALUES ('queued', 'c', 'ENG-1', 'w', 'tp', 'rp', 'a', 'factory/ENG-1-1', 'queued', NULL, 1);
+      UPDATE runs SET retry_token = 'op-1' WHERE id = 'queued';
       INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
         runner_project_id, agent_id, branch, state, runner_id, assigned_at, started_at, ended_at,
         worktree_ref, agent_result, pr_state)
@@ -162,7 +163,7 @@ describe("migrate", () => {
     migrate(db);
     const rows = db.$client
       .prepare(
-        "SELECT id, worktree_name, branch, agent_ref, agent_result, runner_unreached FROM runs ORDER BY id",
+        "SELECT id, worktree_name, branch, agent_ref, agent_result, runner_unreached, start_requested_at FROM runs ORDER BY id",
       )
       .all();
     expect(rows).toEqual([
@@ -173,6 +174,7 @@ describe("migrate", () => {
         agent_ref: "repo::/wt",
         agent_result: "reported-failure",
         runner_unreached: 0,
+        start_requested_at: null,
       },
       {
         id: "queued",
@@ -181,6 +183,7 @@ describe("migrate", () => {
         agent_ref: null,
         agent_result: null,
         runner_unreached: 0,
+        start_requested_at: 1,
       },
     ]);
   });

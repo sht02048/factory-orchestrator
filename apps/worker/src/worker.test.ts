@@ -376,17 +376,48 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     );
   });
 
-  it("시작 때 러너에 닿지 못하면 러너를 비워 순서에서 빼고 뒤 런을 막지 않는다", async () => {
+  it("시작 때 러너에 닿지 못하면 순서에서 빼 뒤 런을 막지 않고, 시도 횟수에 넣지 않는다", async () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
     const head = h.assign("ENG-1", projectA);
     const behind = h.assign("ENG-2", projectB);
     h.runner(runnerA).failNextStart = { kind: "unreachable", detail: "ssh: timeout" };
+    const worker = h.worker();
 
-    await h.worker().tick();
-    expect(current(head)).toMatchObject({ state: "queued", runnerId: null });
+    await worker.tick();
+    expect(current(head)).toMatchObject({ state: "queued", runnerId: runnerA });
     expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
     expect(getRunWithRecords(h.db, head.id)?.records.startFailures).toBe(0);
+
+    // 러너 확인이 Offline으로 적으면 대기열이 러너를 비우고, 돌아오면 원래 자리로 시작한다.
+    h.setRunnerOnline(runnerA, false);
+    await worker.tick();
+    h.setRunnerOnline(runnerA, true);
+    await worker.tick();
+    expect(current(head)).toMatchObject({ state: "running", runnerId: runnerA });
+  });
+
+  it("이미 시작을 보낸 런이 러너에 닿지 못해도 다른 러너에서 다시 시작하지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    expect(current(run)).toMatchObject({ runnerId: runnerA });
+    const fakeA = h.runner(runnerA);
+    const worker = h.worker();
+
+    // 러너 A는 시작했지만 응답을 잃었다. 다음 바퀴에는 A에 닿지 않는다(DB에는 아직 Online).
+    fakeA.loseNextStartResponse = true;
+    await worker.tick();
+    fakeA.online = false;
+    await worker.tick();
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "queued", runnerId: runnerA });
+    expect(h.runner(runnerB).startCalls).toHaveLength(0);
+
+    fakeA.online = true;
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
+    expect(fakeA.startCalls).toHaveLength(1);
   });
 
   it("맨 앞 런의 Mapping이 지워졌으면 시작할 수 없음으로 끝내 뒤 런이 막히지 않는다", async () => {

@@ -143,19 +143,21 @@ export const MAX_START_RETRIES = 3;
 
 /**
  * 시작 명령(Runner.startRun)이 실패했을 때 할 일(Q86).
- * - clear-runner: 러너에 닿지 못했다. Offline 예외(Q72)처럼 러너를 비워 순서에서 빼고, 맞는 러너가
- *   생기면 원래 자리로 돌아간다. 시도 횟수에 넣지 않는다.
- * - find-then-retry: 결과를 모른다. 다음에 같은 이름으로 findStartedRun을 불러 이미 시작했는지 본 뒤에만
- *   다시 보낸다. 시도 횟수에 넣지 않는다.
+ * - wait-like-offline: 러너에 닿지 못했다. Offline 예외(Q72)처럼 이번 순서에서 빼 뒤 런을 막지 않고, 러너는
+ *   그대로 둔다. 이미 보냈을 수 있는 시작을 다른 러너에서 다시 하지 않기 위해서다. 러너 확인이 그 러너를
+ *   Offline으로 적으면 대기열이 러너를 비우고, 돌아오면 원래 자리로 돌아간다. 시도 횟수에 넣지 않는다.
+ * - find-then-retry: 결과를 모른다(응답을 잃음). 다음에 같은 이름으로 findStartedRun을 불러 이미 시작했는지
+ *   본 뒤에만 다시 보낸다. 시도 횟수에 넣지 않는다.
  * - recreate-mailbox: 우편함 터미널이 사라졌다. 다시 만든 뒤 다시 보낸다. 시도 횟수에 넣지 않는다.
- * - retry: 러너가 오류를 냈다. 같은 이름으로 다시 시도한다. `failures`는 이번 실패를 넣은 수다.
+ * - retry: 러너가 오류를 냈거나 읽을 수 없는 출력을 냈다. 같은 이름으로 다시 시도한다(다시 보내기 전에
+ *   findStartedRun으로 이미 시작했는지 본다). `failures`는 이번 실패를 넣은 수다.
  * - could-not-start: 다시 시도를 MAX_START_RETRIES번 다 했는데도 오류다. 에이전트 결과 시작할 수 없음으로
  *   끝내고 오류 내용을 런에 남긴다.
  *
  * @param previousFailures 이 런에서 이미 센 오류 수
  */
 export type StartFailureDecision =
-  | { action: "clear-runner" | "find-then-retry" | "recreate-mailbox" }
+  | { action: "wait-like-offline" | "find-then-retry" | "recreate-mailbox" }
   | { action: "retry" | "could-not-start"; failures: number };
 
 export function decideStartFailure(
@@ -164,14 +166,14 @@ export function decideStartFailure(
 ): StartFailureDecision {
   switch (error.kind) {
     case "unreachable":
-      return { action: "clear-runner" };
+      return { action: "wait-like-offline" };
     case "start-outcome-unknown":
-    case "malformed-output":
       return { action: "find-then-retry" };
     case "mailbox-missing":
       return { action: "recreate-mailbox" };
     case "not-installed":
     case "not-ready":
+    case "malformed-output":
     case "runner-error": {
       const failures = previousFailures + 1;
       return { action: failures > MAX_START_RETRIES ? "could-not-start" : "retry", failures };
