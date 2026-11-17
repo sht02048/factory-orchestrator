@@ -123,7 +123,7 @@ describe("수동 할당 폼", () => {
     expect(input).toContain('value="github:acme/web"');
     expect(input).toContain("readOnly");
     expect(text(html)).toContain("할당 때 자동으로 고르기");
-    expect(text(html)).toContain("claude");
+    expect(text(html)).toContain("Claude Code");
   });
 
   it("러너 목록: 자동 고르기가 맨 앞, 그 프로젝트가 있는 러너만, 인증이 깨진 러너는 비활성+이유", () => {

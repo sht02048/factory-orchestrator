@@ -93,12 +93,14 @@ describe("Runners 화면", () => {
     expect(rowTexts(html).get("runner-b")).not.toContain(runnersJson.assignmentBlocked);
     const text = panelText(html);
     expect(text).toContain(runnersJson.panel.reason.assignmentBlocked);
+    // 어댑터의 영어 이름 대신 메시지로 보인다. 러너 쪽 프로젝트에 없는 항목은 프로젝트 ID 를 넣는다
     expect(text).toContain(
-      `GitHub push access: acme/web ${runnersJson.panel.githubAuth.state.broken}`,
+      `GitHub push 권한: github:acme/web ${runnersJson.panel.githubAuth.state.broken}`,
     );
     expect(text).toContain(
-      `GitHub push access: acme/docs ${runnersJson.panel.githubAuth.state.ok}`,
+      `GitHub push 권한: github:acme/docs ${runnersJson.panel.githubAuth.state.ok}`,
     );
+    expect(text).not.toContain("GitHub push access");
     // 어댑터의 영어 해결 방법은 한국어 안내와 겹쳐 보이지 않는다
     expect(text).not.toContain("Run `gh auth login");
     expect(text).toContain("gh auth login --insecure-storage");

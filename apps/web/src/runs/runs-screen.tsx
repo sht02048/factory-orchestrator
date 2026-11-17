@@ -27,6 +27,7 @@ import { colors, space } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useFormatDuration } from "../format/duration";
+import { useAgentName } from "../labels";
 import type { WorkspaceSummary } from "../shell/model";
 import { RUN_FILTERS, elapsedMs, filterKeyOf, matchesFilter } from "./model";
 import type { RunFilter, RunView, RunsPage } from "./model";
@@ -186,6 +187,7 @@ function RunsList({
 }
 
 function RunRow({ run }: { run: RunView }) {
+  const agentName = useAgentName();
   const t = useTranslations("runs");
   const domain = useTranslations("domain");
   const duration = useFormatDuration();
@@ -213,7 +215,7 @@ function RunRow({ run }: { run: RunView }) {
         {run.state === "ended" ? domain(`prState.${run.prState}`) : t("notApplicable")}
       </TableCell>
       <TableCell>{run.runner?.name ?? t("notApplicable")}</TableCell>
-      <TableCell>{run.agent}</TableCell>
+      <TableCell>{agentName(run.agent)}</TableCell>
       <TableCell align="end" numeric>
         {duration(elapsedMs(run))}
       </TableCell>
@@ -222,6 +224,7 @@ function RunRow({ run }: { run: RunView }) {
 }
 
 function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
+  const agentName = useAgentName();
   const t = useTranslations("runs.panel");
   const domain = useTranslations("domain");
   const duration = useFormatDuration();
@@ -309,7 +312,7 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
             </span>
           )}
         </DefinitionItem>
-        <DefinitionItem label={t("agent")}>{run.agent}</DefinitionItem>
+        <DefinitionItem label={t("agent")}>{agentName(run.agent)}</DefinitionItem>
         {run.state === "queued" ? (
           <DefinitionItem label={t("waited")}>{duration(run.waitMs)}</DefinitionItem>
         ) : (

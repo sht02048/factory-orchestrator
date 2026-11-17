@@ -35,10 +35,6 @@
     "githubUnset": "아직 없어요",
     "runners": "{count, plural, =0 {아직 없어요} other {#대}}"
   },
-  "agents": {
-    "claude": "Claude Code",
-    "codex": "Codex"
-  },
   "remoteError": {
     "unauthorized": "키나 토큰이 맞지 않아요. 새로 만들어 넣어 주세요.",
     "rate-limited": "요청이 많아 잠시 막혔어요. 조금 뒤에 다시 해 주세요.",

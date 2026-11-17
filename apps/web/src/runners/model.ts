@@ -48,7 +48,10 @@ export interface LeftWorktree {
  */
 export interface GitHubAuthCheck {
   id: string;
+  /** 어댑터가 준 이름. 모르는 종류의 항목에만 보인다 */
   name: string;
+  /** 러너 쪽 프로젝트 표시 이름. 찾지 못하면 null */
+  project: string | null;
   /** 통과하면 true, 깨졌으면 false, 확인하지 못했으면 null */
   satisfied: boolean | null;
 }

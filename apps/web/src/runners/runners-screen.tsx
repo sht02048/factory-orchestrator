@@ -22,6 +22,7 @@ import { colors, fonts, space } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useFormatDuration } from "../format/duration";
+import { usePrerequisiteName } from "../labels";
 import type { GitHubAuthCheck, RunWorkspace, RunnerView, RunnersPage } from "./model";
 
 // 러너 | 상태 | 사용 중 | Queued | 남은 워크트리 | 마지막 확인
@@ -289,10 +290,11 @@ function GitHubAuthBlock({ runner }: { runner: RunnerView }) {
 
 function GitHubAuthItem({ check }: { check: GitHubAuthCheck }) {
   const t = useTranslations("runners.panel.githubAuth");
+  const prerequisiteName = usePrerequisiteName();
   const state = check.satisfied === null ? "unknown" : check.satisfied ? "ok" : "broken";
   return (
     <li {...stylex.props(styles.item, styles.authRow)}>
-      <span {...stylex.props(styles.authName)}>{check.name}</span>
+      <span {...stylex.props(styles.authName)}>{prerequisiteName(check)}</span>
       <Text variant="meta">{t(`state.${state}`)}</Text>
     </li>
   );

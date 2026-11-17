@@ -32,6 +32,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useFormatDuration } from "../format/duration";
+import { useAgentName } from "../labels";
 import type { AttentionItem, BrokenAuthRunner, HomePage, HomeRun, InputWait } from "./model";
 import type { QueuedReason } from "../runs/model";
 import { attentionKey, runKey } from "./model";
@@ -206,6 +207,7 @@ function AttentionTable({
 }
 
 function AttentionRunRow({ run, all }: { run: HomeRun; all: boolean }) {
+  const agentName = useAgentName();
   const t = useTranslations("home");
   const domain = useTranslations("domain");
   const duration = useFormatDuration();
@@ -228,7 +230,7 @@ function AttentionRunRow({ run, all }: { run: HomeRun; all: boolean }) {
         {run.state === "ended" ? domain(`prState.${run.prState}`) : t("notApplicable")}
       </TableCell>
       <TableCell>{run.runner?.name ?? t("notApplicable")}</TableCell>
-      <TableCell>{all ? run.workspace.name : run.agent}</TableCell>
+      <TableCell>{all ? run.workspace.name : agentName(run.agent)}</TableCell>
       <TableCell align="end" numeric>
         {duration(run.executionMs ?? run.waitMs)}
       </TableCell>
@@ -265,6 +267,7 @@ function RunningTable({
   value: string | null;
   onSelect: (key: string) => void;
 }) {
+  const agentName = useAgentName();
   const t = useTranslations("home");
   const duration = useFormatDuration();
   return (
@@ -288,7 +291,7 @@ function RunningTable({
                 </span>
               </TableCell>
               <TableCell>{run.runner?.name ?? t("notApplicable")}</TableCell>
-              <TableCell>{run.agent}</TableCell>
+              <TableCell>{agentName(run.agent)}</TableCell>
               <TableCell align="end" numeric>
                 {duration(run.executionMs ?? 0)}
               </TableCell>
@@ -309,6 +312,7 @@ function QueuedTable({
   value: string | null;
   onSelect: (key: string) => void;
 }) {
+  const agentName = useAgentName();
   const t = useTranslations("home");
   const duration = useFormatDuration();
   const queuedReason = useQueuedReason();
@@ -336,7 +340,7 @@ function QueuedTable({
                 ) : null}
               </TableCell>
               <TableCell>{run.runner?.name ?? t("notApplicable")}</TableCell>
-              <TableCell>{run.agent}</TableCell>
+              <TableCell>{agentName(run.agent)}</TableCell>
               <TableCell align="end" numeric>
                 {duration(run.waitMs)}
               </TableCell>
@@ -377,6 +381,7 @@ function RunPanel({
   onAnswer: HomeScreenProps["onAnswer"];
   onDeny: HomeScreenProps["onDeny"];
 }) {
+  const agentName = useAgentName();
   const t = useTranslations("home.panel");
   const domain = useTranslations("domain");
   const duration = useFormatDuration();
@@ -450,7 +455,7 @@ function RunPanel({
             </span>
           )}
         </DefinitionItem>
-        <DefinitionItem label={t("agent")}>{run.agent}</DefinitionItem>
+        <DefinitionItem label={t("agent")}>{agentName(run.agent)}</DefinitionItem>
         {run.state === "queued" ? (
           <DefinitionItem label={t("waited")}>{duration(run.waitMs)}</DefinitionItem>
         ) : (

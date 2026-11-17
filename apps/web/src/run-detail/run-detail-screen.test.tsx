@@ -88,6 +88,11 @@ describe("Run 상세 화면", () => {
     }
   });
 
+  it("에이전트는 ID 대신 공용 에이전트 이름으로 보인다", () => {
+    const { db, ids } = seedDatabase();
+    expect(valueOf(render(page(db, ids.get("ACME-2"))), runJson.props.agent)).toBe("Claude Code");
+  });
+
   it("러너에 닿지 못한 채 끝난 취소 런도 사람이 지워야 함을 보인다", () => {
     const { db } = seedDatabase();
     const extra = addExtraEnded(db);
