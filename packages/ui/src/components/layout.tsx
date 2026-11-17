@@ -21,13 +21,25 @@ export interface SplitViewProps {
   panel: ReactNode;
   /** 화면 높이를 채울지. 미리보기처럼 다른 내용 안에 넣을 때 false. */
   fill?: boolean;
+  /**
+   * list: 넓은 목록 + `panelWidth` 상세 패널(운영 화면).
+   * editor: 좁은 항목 목록 + 넓은 편집 영역(Settings, ADR 0007). 편집 영역은 화면 바탕과 같은 색이다.
+   */
+  variant?: "list" | "editor";
 }
 
-export function SplitView({ list, panel, fill = true }: SplitViewProps) {
+export function SplitView({ list, panel, fill = true, variant = "list" }: SplitViewProps) {
+  const editor = variant === "editor";
   return (
-    <div {...stylex.props(styles.split, fill ? styles.fill : styles.contained)}>
-      <div {...stylex.props(styles.list)}>{list}</div>
-      <aside {...stylex.props(styles.panel)}>{panel}</aside>
+    <div
+      {...stylex.props(
+        styles.split,
+        editor && styles.splitEditor,
+        fill ? styles.fill : styles.contained,
+      )}
+    >
+      <div {...stylex.props(styles.list, editor && styles.listEditor)}>{list}</div>
+      <aside {...stylex.props(styles.panel, editor && styles.panelEditor)}>{panel}</aside>
     </div>
   );
 }
@@ -126,6 +138,7 @@ const styles = stylex.create({
     gridTemplateColumns: `minmax(0, 1fr) ${size.panelWidth}`,
     minHeight: 0,
   },
+  splitEditor: { gridTemplateColumns: `${size.editorListWidth} minmax(0, 1fr)` },
   fill: { height: "100dvh" },
   contained: { height: "100%" },
   list: {
@@ -135,6 +148,8 @@ const styles = stylex.create({
     paddingInline: space.s8,
     paddingBottom: space.s10,
   },
+  listEditor: { paddingInline: space.s6 },
+  panelEditor: { backgroundColor: colors.bgCanvas },
   panel: {
     minWidth: 0,
     overflow: "auto",

@@ -12,6 +12,7 @@ import {
   Menu,
   MenuItem,
   Select,
+  SplitView,
   Status,
   Tab,
   Table,
@@ -148,5 +149,13 @@ describe("서버 렌더", () => {
     );
     expect(html.match(/<dt/g)).toHaveLength(2);
     expect(html.match(/<dd/g)).toHaveLength(2);
+  });
+
+  it("SplitView editor 는 목록 변형과 다른 열 배치를 쓴다", () => {
+    const list = renderToString(<SplitView list="목록" panel="패널" />);
+    const editor = renderToString(<SplitView variant="editor" list="목록" panel="패널" />);
+    expect(editor).toContain("목록");
+    expect(editor).toContain("패널");
+    expect(editor).not.toEqual(list);
   });
 });
