@@ -103,6 +103,12 @@ export const runners = sqliteTable(
      * (Q82.14). 참이면 러너 고르기에서 빠지지만 online은 바꾸지 않는다.
      */
     assignmentBlocked: integer("assignment_blocked", { mode: "boolean" }).notNull().default(false),
+    /**
+     * 마지막으로 읽은 러너 필수 조건(core RunnerPrerequisite[] JSON). 1단계는 Orca 상시 서비스와 프로젝트별
+     * GitHub 인증(`git push --dry-run`, Q82.15)이다. Runners 화면이 어느 프로젝트가 깨졌는지 보인다.
+     * 아직 읽지 못했으면 NULL
+     */
+    prerequisites: text("prerequisites"),
     /** 러너 어댑터가 만든 우편함(core MailboxRef, Q82.1·Q82.7). 아직 만들지 않았으면 NULL */
     mailboxRef: text("mailbox_ref").$type<MailboxRef>(),
     /** 마지막 상태 확인 시각. 확인한 적 없으면 NULL */
@@ -117,6 +123,10 @@ export const runners = sqliteTable(
     check("runners_online", sql`${t.online} IN (0, 1)`),
     check("runners_assignment_blocked", sql`${t.assignmentBlocked} IN (0, 1)`),
     check("runners_check_error_json", sql`${t.checkError} IS NULL OR json_valid(${t.checkError})`),
+    check(
+      "runners_prerequisites_json",
+      sql`${t.prerequisites} IS NULL OR json_valid(${t.prerequisites})`,
+    ),
   ],
 );
 

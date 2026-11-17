@@ -691,6 +691,9 @@ describe("러너 상태 확인", () => {
     await worker.tick();
     expect(stored()).toMatchObject({ online: true, assignmentBlocked: true, checkedAt: h.now });
     expect(stored()?.projects.map((p) => p.id)).toEqual([projectA, projectB]);
+    // 어느 필수 조건이 깨졌는지 하나하나 남긴다(Runners 화면, Q82.15)
+    const brokenAuth = stored()?.prerequisites?.filter((p) => p.blocksAssignment);
+    expect(brokenAuth?.map((p) => p.satisfied)).toEqual([false]);
 
     cutSsh(runnerId);
     h.advance(RUNNER_CHECK_INTERVAL_MS);
@@ -698,6 +701,7 @@ describe("러너 상태 확인", () => {
     // 닿지 않으면 Offline이고, 읽지 못한 프로젝트와 인증은 이전 값을 남긴다.
     expect(stored()).toMatchObject({ online: false, assignmentBlocked: true, checkedAt: h.now });
     expect(stored()?.projects.map((p) => p.id)).toEqual([projectA, projectB]);
+    expect(stored()?.prerequisites?.filter((p) => p.blocksAssignment)).toEqual(brokenAuth);
   });
 
   it("정한 러너에서 러너 쪽 프로젝트가 사라진 Queued 런은 러너를 비우고 순서에서 빠진다(Q78)", async () => {

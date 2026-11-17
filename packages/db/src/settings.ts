@@ -6,6 +6,7 @@ import type {
   RunnerErrorDetail,
   RunnerId,
   RunnerKind,
+  RunnerPrerequisite,
   RunnerProject,
   RunnerProjectId,
   RunnerSnapshot,
@@ -15,6 +16,7 @@ import type {
   TrackerStateId,
 } from "@factory/core";
 import { and, asc, eq, sql } from "drizzle-orm";
+import { z } from "zod";
 import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";
 import type { CodeHostConnectionId, WorkspaceId } from "./ids.js";
@@ -179,6 +181,11 @@ export interface StoredRunner {
   online: boolean;
   /** 할당을 막는 필수 조건이 깨졌는지(1단계는 GitHub 인증, Q82.14) */
   assignmentBlocked: boolean;
+  /**
+   * 마지막으로 읽은 러너 필수 조건(1단계는 Orca 상시 서비스와 프로젝트별 GitHub 인증, Q82.15).
+   * 아직 읽지 못했거나 저장한 값을 읽을 수 없으면 null
+   */
+  prerequisites: RunnerPrerequisite[] | null;
   /** 러너 어댑터가 만든 우편함. 아직 없으면 null(Q82.1) */
   mailbox: MailboxRef | null;
   checkedAt: Date | null;
@@ -204,10 +211,29 @@ export function saveRunner(
     .run();
 }
 
+/** 저장한 필수 조건(core RunnerPrerequisite) 하나. 읽을 때 모양을 확인한다 */
+const storedPrerequisites = z.array(
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    satisfied: z.boolean().nullable(),
+    hint: z.string().nullable(),
+    blocksAssignment: z.boolean(),
+  }),
+);
+
+function readPrerequisites(text: string | null): RunnerPrerequisite[] | null {
+  if (text === null) return null;
+  const parsed = storedPrerequisites.safeParse(parseJson(text));
+  return parsed.success ? parsed.data : null;
+}
+
 /**
  * 러너 상태 확인 결과를 쓴다(0016). Online 여부, 확인 시각, 오류, 러너 쪽 프로젝트 목록,
- * 할당을 막는 필수 조건이 깨졌는지(core isAssignmentBlocked, Q82.14)를 바꾼다.
- * 러너에 닿지 못해 프로젝트 목록이나 필수 조건을 읽지 못했으면 null로 줘 이전 값을 남긴다.
+ * 할당을 막는 필수 조건이 깨졌는지(core isAssignmentBlocked, Q82.14)와 필수 조건 하나하나의 결과
+ * (프로젝트별 GitHub 인증, Q82.15)를 바꾼다. 러너에 닿지 못해 프로젝트 목록이나 필수 조건을 읽지
+ * 못했으면 null로 줘 이전 값을 남긴다. `prerequisites`를 주지 않아도 이전 값을 남긴다.
+ * `assignmentBlocked`는 `prerequisites`로 계산한 값(core isAssignmentBlocked)을 준다.
  */
 export function recordRunnerCheck(
   db: Database,
@@ -218,6 +244,7 @@ export function recordRunnerCheck(
     error: RunnerErrorDetail | null;
     projects: ReadonlyArray<RunnerProject> | null;
     assignmentBlocked: boolean | null;
+    prerequisites?: ReadonlyArray<RunnerPrerequisite> | null;
   },
 ): void {
   inTransaction(db, () => {
@@ -227,6 +254,9 @@ export function recordRunnerCheck(
         checkedAt: input.checkedAt,
         checkError: input.error === null ? null : toJson(input.error, "runner check error"),
         ...(input.assignmentBlocked === null ? {} : { assignmentBlocked: input.assignmentBlocked }),
+        ...(input.prerequisites === undefined || input.prerequisites === null
+          ? {}
+          : { prerequisites: toJson(input.prerequisites, "runner prerequisites") }),
       })
       .where(eq(runners.id, input.runnerId))
       .run();
@@ -265,6 +295,7 @@ export function listRunners(db: Database): StoredRunner[] {
       capacity: row.capacity,
       online: row.online,
       assignmentBlocked: row.assignmentBlocked,
+      prerequisites: readPrerequisites(row.prerequisites),
       mailbox: row.mailboxRef,
       checkedAt: row.checkedAt,
       checkError: row.checkError === null ? null : parseJson(row.checkError),

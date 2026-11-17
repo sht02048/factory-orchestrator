@@ -75,8 +75,10 @@ export async function checkRunner(
     checkedAt: context.now(),
     error: health.error,
     projects,
-    // 닿지 않았으면 필수 조건을 확인하지 못했으니 이전 값을 남긴다.
+    // 닿지 않았으면 필수 조건을 확인하지 못했으니 이전 값을 남긴다. 프로젝트별 결과는 Runners 화면이
+    // 어느 프로젝트의 GitHub 인증이 깨졌는지 보이는 데 쓴다(Q82.14·Q82.15).
     assignmentBlocked: health.online ? isAssignmentBlocked(health) : null,
+    prerequisites: health.online ? health.prerequisites : null,
   });
   if (health.online) {
     // 확인 결과는 이미 썼다. 워크트리 확인이 실패해도 확인 자체는 성공으로 돌려준다.
