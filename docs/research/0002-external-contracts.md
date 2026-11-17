@@ -594,14 +594,14 @@ query RunPr($owner: String!, $repo: String!, $branch: String!) {
 
 병합된 PR의 `mergeStateStatus`는 `UNKNOWN`으로 왔다 **[실행]**. 판정에는 `state`/`merged`만 쓴다.
 
-판정 규칙 제안:
+판정 규칙:
 
-| PR 조회 결과                     | 런 결과                                                      |
-| -------------------------------- | ------------------------------------------------------------ |
-| `state: MERGED` (`merged: true`) | Merged                                                       |
-| `state: OPEN`                    | Human Check                                                  |
-| PR 없음                          | Failed                                                       |
-| `state: CLOSED`, 병합 안 됨      | 정의되지 않음. GLOSSARY에 없는 경우다(아래 "아직 모르는 것") |
+| PR 조회 결과                     | 런 결과                                        |
+| -------------------------------- | ---------------------------------------------- |
+| `state: MERGED` (`merged: true`) | Merged                                         |
+| `state: OPEN`                    | Human Check                                    |
+| PR 없음                          | Failed                                         |
+| `state: CLOSED`, 병합 안 됨      | Failed(사유: PR이 닫힘). ADR 0004에서 결정했다 |
 
 같은 브랜치로 PR이 여러 개면(닫고 다시 연 경우) 가장 최근 것을 쓴다. `headRefName`은 포크까지 구분하지 않으므로, `isCrossRepository: false`이고 `headRepository.nameWithOwner`가 대상 저장소인지, `baseRefName`이 기대한 브랜치인지 함께 확인한다. 이 두 필드는 위 응답 예시에는 없지만, 같은 PR로 따로 조회해 `isCrossRepository: false`와 `headRepository.nameWithOwner` 값을 확인했다 **[실행]**.
 
@@ -856,7 +856,7 @@ interface CodeHost {
   rateLimit(): Promise<{ limit: number; remaining: number; resetAt: Date }>;
 }
 
-/** 순수 함수: ADR 0004 판정. closed-unmerged를 Failed로 둘지는 미정. */
+/** 순수 함수: ADR 0004 판정. closed-unmerged는 Failed다. */
 type JudgeRunOutcome = (prs: ReadonlyArray<PullRequestSnapshot>) => RunOutcome;
 ```
 
@@ -885,6 +885,6 @@ type JudgeRunOutcome = (prs: ReadonlyArray<PullRequestSnapshot>) => RunOutcome;
 **GitHub**
 
 15. fine-grained PAT로 GraphQL `statusCheckRollup`이 check run 결과까지 돌려주는지. 문서는 fine-grained PAT의 Checks API 사용을 한계로 적는다. 이번 실행은 다른 종류의 토큰이었다.
-16. 런의 PR이 병합 없이 닫힌 경우(`CLOSED`)의 결과. GLOSSARY의 Merged·Human Check·Failed 어디에도 딱 맞지 않는다. 제품 결정이 필요하다.
+16. ~~런의 PR이 병합 없이 닫힌 경우(`CLOSED`)의 결과.~~ ADR 0004에서 Failed로 결정했다(사유: PR이 닫힘).
 17. 에이전트가 브랜치 이름을 바꾸거나 다른 브랜치로 PR을 연 경우 런과 PR을 잇는 방법. 브랜치 외에 PR 본문의 티켓 키나 Linear 첨부로 보강할지.
 18. GitHub GraphQL 요청에 ETag/304가 적용되는지. GraphQL 한도 문서에 언급이 없다.
