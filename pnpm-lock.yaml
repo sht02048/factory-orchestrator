@@ -269,6 +269,9 @@ importers:
       '@factory/db':
         specifier: workspace:*
         version: link:../packages/db
+      '@factory/web':
+        specifier: workspace:*
+        version: link:../apps/web
       '@factory/worker':
         specifier: workspace:*
         version: link:../apps/worker

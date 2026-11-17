@@ -17,7 +17,7 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
 } from "@factory/core";
-import type { AgentResult, PrState, RunId, SummaryOutcome } from "@factory/core";
+import type { AgentResult, PrState, RunId, SummaryOutcome, TicketKey } from "@factory/core";
 import { FakeCodeHost, FakeRunner, FakeTracker } from "@factory/core/testing";
 import {
   SecretBox,
@@ -70,7 +70,7 @@ const encryptionKey = new Uint8Array(32).fill(7);
 
 /** 시나리오 하나: 에이전트가 끝난 방식과 그때의 PR, 기대하는 두 축과 요약 결과 */
 interface Scenario {
-  key: string;
+  key: TicketKey;
   exitCode: number;
   pr: "open" | "merged" | "closed" | null;
   agentResult: AgentResult;
@@ -80,7 +80,7 @@ interface Scenario {
 
 const scenarios: ReadonlyArray<Scenario> = [
   {
-    key: "ACME-1",
+    key: toTicketKey("ACME-1"),
     exitCode: 0,
     pr: "merged",
     agentResult: "exited-normally",
@@ -88,7 +88,7 @@ const scenarios: ReadonlyArray<Scenario> = [
     summary: "merged",
   },
   {
-    key: "ACME-2",
+    key: toTicketKey("ACME-2"),
     exitCode: 1,
     pr: "open",
     agentResult: "exited-with-error",
@@ -96,7 +96,7 @@ const scenarios: ReadonlyArray<Scenario> = [
     summary: "human-check",
   },
   {
-    key: "ACME-3",
+    key: toTicketKey("ACME-3"),
     exitCode: 0,
     pr: null,
     agentResult: "exited-normally",
@@ -193,9 +193,11 @@ describe("끝에서 끝까지 얇은 경로", () => {
         domain.prState[scenario.prState],
       ]);
       const panel = panelText(html);
+      expect(panel).toContain(scenario.key);
       expect(panel).toContain(domain.summary[scenario.summary]);
       expect(panel).toContain(domain.agentResult[scenario.agentResult]);
       expect(panel).toContain(domain.prState[scenario.prState]);
+      expect(panel.includes("#pr")).toBe(scenario.pr !== null);
     });
   }
 
@@ -249,13 +251,12 @@ function seed(db: Database): void {
 }
 
 /** 트래커에 티켓을 넣고 Mapping 대로 db 할당 진입점(assignRun)으로 런을 만든다. */
-function assign(key: string): StoredRun {
-  const ticketKey = toTicketKey(key);
+function assign(ticketKey: TicketKey): StoredRun {
   tracker.addTicket({
     key: ticketKey,
-    title: `Ticket ${key}`,
+    title: `Ticket ${ticketKey}`,
     body: "Do the thing.",
-    url: `https://tracker.example.com/${key}`,
+    url: `https://tracker.example.com/${ticketKey}`,
     labels: [],
     project: { id: trackerProject, name: "Web" },
     state: { id: toTrackerStateId("todo"), name: "Todo", category: "unstarted" },
@@ -269,7 +270,7 @@ function assign(key: string): StoredRun {
     runnerProject: mapping.runnerProject,
     agent: mapping.agent,
   });
-  if (!result.ok) throw new Error(`assign ${key} failed: ${result.reason}`);
+  if (!result.ok) throw new Error(`assign ${ticketKey} failed: ${result.reason}`);
   return result.run;
 }
 
@@ -330,8 +331,8 @@ function rowCells(html: string, key: string): string[] | undefined {
   return undefined;
 }
 
-/** 상세 패널(aside) 안의 글 */
+/** 상세 패널 안의 글. 앞의 aside 는 앱 셸 사이드바라 마지막 aside(목록 + 상세 패널의 패널)만 읽는다. */
 function panelText(html: string): string {
-  const panel = html.split("<aside")[1] ?? "";
+  const panel = html.split("<aside").at(-1)?.split("</aside>")[0] ?? "";
   return panel.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 }
