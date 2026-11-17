@@ -146,7 +146,7 @@ A1b는 `__FO_EXIT__=0`, A2는 `terminal show`의 `preview` 끝에 `__FO_EXIT__=1
 
 - 셸이 입력된 명령을 다시 찍으므로 `__FO_EXIT__=$c` 같은 원문도 `tail`에 있다. 줄 전체가 `^__FO_EXIT__=(\d+)$`인 것만 읽는다.
 - 셸을 끝내면 `tail`이 비어 `terminal show`의 `preview`에만 남는다. `preview`는 앞이 잘린 짧은 글이다.
-- 긴 줄은 화면 폭에서 접혀 `tail`에 여러 줄로 올 수 있다(`tailRows[].wrapped`). 마커는 짧아 접히지 않을 것으로 보지만 확인하지 않았다.
+- 긴 줄은 화면 폭에서 접혀 `tail`에 여러 줄로 올 수 있다(`tailRows[].wrapped`). E1의 `terminal read`(`source: "stream"`)에는 `tailRows`가 오지 않았다. 마커는 짧아 접히지 않을 것으로 보지만 확인하지 않았다.
 
 마커는 사람이 터미널에서 보기 좋은 보조 수단이다. 터미널 출력에 기대므로 어댑터의 기본 경로로는 약하다.
 
@@ -231,7 +231,7 @@ Test task. Do not push and do not open a PR. Keep it short.
 
 `claude -p ... < <runDir>/prompt.md`로 넘기자 에이전트가 만든 `note.txt`가 ``a `b` $HOME 'c' "d" \\ !x``로 프롬프트와 글자 하나까지 같았다 **[실행]**. A2의 `-- "$(cat <runDir>/prompt.md)"`도 프롬프트가 갔다(에이전트가 도구를 부르다 턴 상한에 걸렸다) **[실행]**.
 
-- stdin이 더 낫다. `$(cat ...)`는 끝의 줄바꿈을 지우고, 인자 하나가 되어 러너의 `ARG_MAX`(1 MiB, research 0004)에 걸리며, 1절의 가변 인자 플래그와 부딪힌다.
+- stdin이 더 낫다. `$(cat ...)`는 끝의 줄바꿈을 지우고, 인자 하나가 되어 러너의 `ARG_MAX`(1 MiB, research 0004)에 걸리며, 4절의 가변 인자 플래그와 부딪힌다.
 - `terminal create --command` 문자열에는 고정된 경로와 플래그만 들어간다. 티켓 본문이 ssh 명령 문자열이나 로그인 셸의 명령 줄을 거치지 않는다. 경로에 공백이 있을 수 있으므로 경로는 인용한다.
 
 ## 제안: Q82 방식의 런 구현
@@ -253,7 +253,7 @@ c=$?; printf '%s' "$c" > "<runDir>/exit-code.tmp" && mv "<runDir>/exit-code.tmp"
 echo "__FO_EXIT__=$c"; exit "$c"
 ```
 
-A1b에서 확인한 모양(stdin, `--allowedTools`)이다. 이 문자열은 원격 ssh 셸과 러너 로그인 셸을 두 번 거치므로, 어댑터는 감싼 명령도 인자 배열로 만들고 이스케이프 함수 한 곳에서 두 겹 인용을 맡긴다(CODING_STANDARDS의 ssh 명령 규칙). 허용 규칙을 `--settings <runDir>/settings.json`으로 넘기려면 2단계에서 그 파일도 같은 방식으로 올린다(시험하지 않았다).
+A1b에서 확인한 모양(stdin, `--allowedTools`)이다. 큰따옴표는 자리를 보이려는 것이고 실제 인용은 아래 이스케이프 함수가 만든다. 이 문자열은 원격 ssh 셸과 러너 로그인 셸을 두 번 거치므로, 어댑터는 감싼 명령도 인자 배열로 만들고 이스케이프 함수 한 곳에서 두 겹 인용을 맡긴다(CODING_STANDARDS의 ssh 명령 규칙). 허용 규칙을 `--settings <runDir>/settings.json`으로 넘기려면 2단계에서 그 파일도 같은 방식으로 올린다(시험하지 않았다).
 
 에이전트 종류마다 이 명령 틀을 설정으로 두면 Codex(`codex exec`) 같은 다른 에이전트도 같은 길로 띄울 수 있다. Codex는 확인하지 않았다.
 
@@ -271,7 +271,7 @@ A1b에서 확인한 모양(stdin, `--allowedTools`)이다. 이 문자열은 원�
 ### GLOSSARY와 맞지 않는 점
 
 - 비대화형에서는 권한 질문이 거절로 끝나 Waiting for Input이 거의 오지 않는다. `AskUserQuestion`을 쓰려 할 때 어떻게 되는지는 확인하지 않았다.
-- 3절의 "파일 없이 터미널이 사라짐"은 에이전트 결과 여섯 가지에 들지 않는다.
+- 위 `pollRun`의 "파일 없이 터미널이 사라짐"은 에이전트 결과 여섯 가지에 들지 않는다.
 
 ## 아직 모르는 것
 
