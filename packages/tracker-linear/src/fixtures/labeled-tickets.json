@@ -1,0 +1,67 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-complexity": "9"
+  },
+  "body": {
+    "data": {
+      "issues": {
+        "nodes": [
+          {
+            "identifier": "ENG-124",
+            "title": "Example ticket",
+            "description": "Example description.",
+            "url": "https://linear.app/acme/issue/ENG-124/example-ticket",
+            "updatedAt": "2026-11-09T01:25:01.173Z",
+            "state": {
+              "id": "00000000-0000-4000-8000-000000000101",
+              "name": "Backlog",
+              "type": "backlog"
+            },
+            "project": {
+              "id": "00000000-0000-4000-8000-000000000102",
+              "name": "Example project"
+            },
+            "labels": {
+              "nodes": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000103",
+                  "name": "ready-for-agent"
+                }
+              ]
+            }
+          },
+          {
+            "identifier": "ENG-125",
+            "title": "Example ticket",
+            "description": "Example description.",
+            "url": "https://linear.app/acme/issue/ENG-125/example-ticket",
+            "updatedAt": "2026-11-09T01:24:57.710Z",
+            "state": {
+              "id": "00000000-0000-4000-8000-000000000101",
+              "name": "Backlog",
+              "type": "backlog"
+            },
+            "project": {
+              "id": "00000000-0000-4000-8000-000000000102",
+              "name": "Example project"
+            },
+            "labels": {
+              "nodes": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000103",
+                  "name": "ready-for-agent"
+                }
+              ]
+            }
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": true,
+          "endCursor": "00000000-0000-4000-8000-000000000104"
+        }
+      }
+    }
+  }
+}

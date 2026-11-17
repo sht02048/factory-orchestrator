@@ -1,0 +1,18 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-complexity": "3"
+  },
+  "body": {
+    "data": {
+      "commentCreate": {
+        "success": true,
+        "comment": {
+          "id": "00000000-0000-4000-8000-000000000100",
+          "url": "https://linear.app/acme/issue/ENG-123/example-ticket#comment-00000000"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-complexity": "650"
+  },
+  "body": {
+    "data": {
+      "workflowStates": {
+        "nodes": [
+          {
+            "id": "00000000-0000-4000-8000-000000000114",
+            "name": "In Review",
+            "type": "started",
+            "position": 1002
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000115",
+            "name": "Duplicate",
+            "type": "duplicate",
+            "position": 5
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000116",
+            "name": "Canceled",
+            "type": "canceled",
+            "position": 4
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000101",
+            "name": "Backlog",
+            "type": "backlog",
+            "position": 0
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000117",
+            "name": "In Progress",
+            "type": "started",
+            "position": 2
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000118",
+            "name": "Done",
+            "type": "completed",
+            "position": 3
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000119",
+            "name": "Todo",
+            "type": "unstarted",
+            "position": 1
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "00000000-0000-4000-8000-000000000119"
+        }
+      }
+    }
+  }
+}
