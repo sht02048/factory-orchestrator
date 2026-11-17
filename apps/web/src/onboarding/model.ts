@@ -129,11 +129,11 @@ export function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
-const SERVICE_INSTALL = "orca serve service install --command";
+const SERVICE_INSTALL = "orca serve service install --bind 127.0.0.1 --refuse-public --command";
 
 /**
- * Orca 상시 서비스 설치 명령(research 0003 6·7절). 비대화형 ssh 의 PATH 에 orca 가 없을 수 있어
- * 늘 --command 로 절대 경로를 준다. Orca 1.4.258 에는 --supervise 플래그가 없다.
+ * Orca 상시 서비스 설치 명령(research 0003 6·7절, runner-orca 의 안내와 같은 플래그). 비대화형 ssh 의 PATH 에
+ * orca 가 없을 수 있어 늘 --command 로 절대 경로를 준다. Orca 1.4.258 에는 --supervise 플래그가 없다.
  */
 export function serviceInstallCommand(orcaPath: string): string {
   return `${SERVICE_INSTALL} ${shellQuote(orcaPath)}`;

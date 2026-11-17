@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Actions, Button, Field, Input, PanelBlock, Text } from "@factory/ui";
-import { colors, radius, space } from "@factory/ui/tokens.stylex";
+import { colors, fonts, radius, space } from "@factory/ui/tokens.stylex";
 import { useEffect, useState } from "react";
 import { useTranslations } from "use-intl";
 import {
@@ -260,14 +260,16 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
       </p>
     );
   }
-  if (!check.online) {
+  // Orca 상시 서비스가 없으면 러너 런타임이 준비되지 않아 Offline 으로도 온다. 아는 원인을 먼저 안내한다
+  const problems = runnerProblems(runner);
+  const known = problems.service || problems.githubAuth;
+  if (!known && !check.online) {
     return (
       <p role="alert" {...stylex.props(styles.error)}>
         {t("offline")}
       </p>
     );
   }
-  const problems = runnerProblems(runner);
   return (
     <div role="alert" {...stylex.props(styles.stack)}>
       {problems.service ? (
@@ -289,7 +291,7 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
           </ul>
         </div>
       ) : null}
-      {problems.service || problems.githubAuth ? null : (
+      {known ? null : (
         <div {...stylex.props(styles.stack)}>
           <p {...stylex.props(styles.error)}>{t("otherTitle")}</p>
           <Text variant="body">{t("otherBody")}</Text>
@@ -299,12 +301,21 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
   );
 }
 
-/** 러너에서 그대로 붙여 넣을 명령. 복사만 하는 값이라 읽기 전용 입력칸에 둔다(DESIGN.md Field) */
+/**
+ * 러너에서 그대로 붙여 넣을 명령. 길어도 잘리지 않게 줄을 바꾸되, `--command` 의 하이픈 뒤처럼
+ * 낱말 가운데서는 바꾸지 않고 낱말 사이에서만 바꾼다.
+ */
 function Command({ value }: { value: string }) {
+  const words = value.split(" ");
   return (
-    <span {...stylex.props(styles.command)}>
-      <Input value={value} readOnly mono />
-    </span>
+    <code {...stylex.props(styles.command)}>
+      {words.map((word, i) => (
+        // 같은 낱말이 되풀이될 수 있어 자리로 가린다. 명령은 바뀌지 않는다
+        <span key={i} {...stylex.props(styles.word)}>
+          {i === 0 ? word : ` ${word}`}
+        </span>
+      ))}
+    </code>
   );
 }
 
@@ -434,7 +445,20 @@ const styles = stylex.create({
     gap: space.s1,
     color: colors.textSecondary,
   },
-  command: { display: "block" },
+  command: {
+    display: "block",
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.borderDefault,
+    borderRadius: radius.md,
+    backgroundColor: colors.bgInset,
+    color: colors.textPrimary,
+    fontFamily: fonts.mono,
+    overflowWrap: "anywhere",
+  },
+  word: { whiteSpace: "pre" },
   ok: { margin: 0, color: colors.textPrimary },
   error: { margin: 0, color: colors.failed },
 });

@@ -174,6 +174,26 @@ const health = (
   ],
 });
 
+/**
+ * Orca 상시 서비스가 없을 때 runner-orca 가 돌려주는 모양. 런타임이 준비되지 않아 Offline(not-ready)이고,
+ * 러너 쪽 프로젝트를 읽지 못해 GitHub 인증 조건은 없다.
+ */
+const serviceMissing: RunnerHealth = {
+  online: false,
+  version: "1.4.258",
+  checkedAt: now,
+  error: { kind: "not-ready", detail: "runtime state: stopped" },
+  prerequisites: [
+    {
+      id: "orca-service",
+      name: "Orca background service",
+      satisfied: false,
+      hint: null,
+      blocksAssignment: false,
+    },
+  ],
+};
+
 /** worker 가 러너 확인을 마친 것처럼 결과를 쓴다(Q61) */
 function finishCheck(f: Fixture, runnerId: RunnerId, result: RunnerHealth): void {
   const request = listPendingRunnerCheckRequests(f.context.db).find((r) => r.runnerId === runnerId);
@@ -274,7 +294,7 @@ describe("확인이 실패한 단계", () => {
   });
 
   it("Orca 상시 서비스가 없으면 설치 명령을 안내하고 다음으로 갈 수 없다", async () => {
-    const { settings, html } = await runnerStep(health({ service: false, push: true }));
+    const { settings, html } = await runnerStep(serviceMissing);
     expect(stepPassed(settings, "runner")).toBe(false);
     expect(resolveStep(settings, 5)).toBe(2);
     expect(isDisabled(nextButton(html, "다음"))).toBe(true);
@@ -282,9 +302,12 @@ describe("확인이 실패한 단계", () => {
     expect(shown).toContain("Orca 상시 서비스가 없어요");
     // PATH 에 orca 가 없어도 되게 등록한 경로를 --command 로 넣는다. --supervise 는 없다
     expect(serviceInstallCommand(orcaPath)).toBe(
-      "orca serve service install --command /opt/orca/bin/orca",
+      "orca serve service install --bind 127.0.0.1 --refuse-public --command /opt/orca/bin/orca",
     );
-    expect(html).toContain(`value="orca serve service install --command /opt/orca/bin/orca"`);
+    expect(shown).toContain(serviceInstallCommand(orcaPath));
+    expect(serviceInstallCommand("/opt/my tools/orca")).toContain("--command '/opt/my tools/orca'");
+    // Offline 이어도 원인을 아는 경우에는 닿지 않았다는 일반 안내 대신 원인을 보인다
+    expect(shown).not.toContain("ssh 대상과 orca 실행 파일 경로를 확인하고");
     expect(shown).not.toContain("--supervise");
     expect(shown).not.toContain("러너의 GitHub 인증이 안 돼요");
   });
