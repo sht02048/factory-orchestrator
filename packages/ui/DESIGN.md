@@ -7,7 +7,7 @@
 1. **색 값을 직접 쓰지 않는다.** `packages/ui` 밖에서 hex, `rgb()`, `hsl()`, `oklch()`, `color-mix()`, `"red"` 같은 이름 색을 쓰면 `pnpm check:colors`(pre-commit, CI)가 실패한다. 색은 `@factory/ui/tokens.stylex`의 `colors`로만 쓴다. `transparent`, `currentColor`, `inherit`는 괜찮다.
 2. **UI SDK(`@ui-sdk/react`)는 `packages/ui` 안에서만 import 한다.** 앱은 `@factory/ui`의 컴포넌트를 쓴다. 필요한 동작이 없으면 `packages/ui`에 컴포넌트를 더한다(ADR 0003).
 3. **스타일은 StyleX로 쓴다.** `stylex.create` + `stylex.props`. 간격·글자·반경·모션도 토큰을 먼저 쓴다. 토큰에 없는 값(열 폭, 고정 높이)만 숫자로 쓴다.
-4. **화면 문구는 컴포넌트에 쓰지 않는다.** 모든 글은 `apps/web/messages/ko.json`에 두고 `useTranslations`로 가져온다. 접근 가능한 이름(`label`, `aria-label`)도 메시지에서 온다. `packages/ui` 컴포넌트는 문구를 props로만 받는다(ADR 0005).
+4. **화면 문구는 컴포넌트에 쓰지 않는다.** 모든 글은 `apps/web/messages/ko/*.json`에 두고 `useTranslations`로 가져온다. 접근 가능한 이름(`label`, `aria-label`)도 메시지에서 온다. `packages/ui` 컴포넌트는 문구를 props로만 받는다(ADR 0005).
 5. **색은 손댈 일에만 쓴다.** Human Check는 `check`(주황), Failed는 `failed`(빨강)다. 나머지 상태는 무채색이고, 강조는 포인트 파랑(`accent*`) 하나다. 러너 Online 점만 `online`(초록)을 쓴다(ADR 0007).
 6. **카드와 배지를 쓰지 않는다.** 구역은 옅은 선(`borderSubtle`)과 여백으로 나눈다. 상태는 배지 대신 `Status`(점 + 글)로 보인다.
 7. **변형을 새로 만들지 않는다.** 아래 표에 없는 변형이 필요하면 먼저 이 문서와 컴포넌트에 더하고, `/ds`에 미리보기를 넣는다.
