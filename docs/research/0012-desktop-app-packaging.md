@@ -1,0 +1,124 @@
+# 데스크톱 앱 패키징 검토 (Electron vs Tauri)
+
+조사일 2026-11-18. 티켓 없음. 운영자가 이 제품을 데스크톱 앱으로 묶는 방법을 Electron과 Tauri 중에서 검토하려 한다. 이 문서는 데스크톱 앱이 이 제품 구조에서 무엇을 맡을 수 있는지, 두 도구가 우리 런타임 요구(Node 24, `node:sqlite`, web + worker 두 프로세스)를 채우는지, 배포에 무엇이 드는지를 사실로 정리한다. 제품 코드는 바꾸지 않았다. 결정은 운영자 몫이라 ADR은 쓰지 않고 권장안과 남은 결정만 적는다.
+
+출처 표시는 research 0004·0009를 따른다.
+
+- **[문서]** 공식 문서와 공식 릴리스 목록. 링크를 문장 옆에 단다. 2026-11-18에 읽었다.
+- **[실행]** 오케스트레이터 기계(macOS 26.5.1, arm64, Node 24.22.3)에서 직접 돌린 결과. 스파이크는 저장소 밖 임시 폴더에서 했고 커밋하지 않았다. 산출물은 보고 전에 지웠다.
+- **[추정]** 문서나 실행으로 확인하지 않은 판단. 그렇다고 적는다.
+
+## 요약
+
+| #   | 질문      | 결론                                                                                                                                                                                                                                                                                                           |
+| --- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 구조 맞춤 | 데스크톱 앱은 "늘 켜져 있어야 하는 서버"와 맞지 않는다. 앱을 닫거나 노트북이 잠들면 (A) 올인원은 런·webhook·다른 기기 접속이 모두 멈춘다. 서버는 지금처럼 CLI·서비스로 두고, 앱은 주소를 여는 얇은 클라이언트(B)로 두는 편이 구조에 맞다                                                                       |
+| 2   | Electron  | 안정 버전 45.3.4가 Node 24.22.3을 싣는다 **[문서][실행]**. `node:sqlite`가 플래그 없이 main 프로세스와 `ELECTRON_RUN_AS_NODE` 자식에서 돈다 **[실행]**. 빌드한 CLI `start`를 Electron 안에서 고치지 않고 띄워 창에 온보딩 화면을 열었다 **[실행]**. 빈 셸만 macOS arm64 .app 약 250MB, zip 약 120MB **[실행]** |
+| 3   | Tauri     | Node 서버는 sidecar(Node 실행 파일 동봉 또는 SEA)로 넣어야 한다 **[문서]**. Node 24 SEA 안에서 `node:sqlite`가 돈다 **[실행]**. 그래도 Node 실행 파일(약 117MB)을 실어야 해 (A)에서는 크기 이득이 작다. (B)에서는 Node가 필요 없어 작다 **[추정]**. Tauri 빌드는 돌리지 않았다                                 |
+| 4   | 배포 비용 | macOS 서명·공증에 Apple Developer Program(연 99 USD)이 필요하고, 개인으로 가입하면 서명에 법적 실명이 실린다 **[문서]**. ADR 0005의 "실명을 넣지 않는다"와 부딪힌다. Windows는 SignPath Foundation 같은 무료 OSS 서명이 있다 **[문서]**. Linux는 서명 없이 배포할 수 있다                                      |
+| 5   | 스파이크  | Electron (A)로 약 10분. 자식 프로세스 방식은 바로 됐고, `utilityProcess` 방식은 CLI가 `process.execPath`로 자식을 띄우는 탓에 실패했다 **[실행]**                                                                                                                                                              |
+| 6   | 권장안    | 지금은 데스크톱 앱을 만들지 않는다. 먼저 0029(npm 패키지)로 서버 배포물을 만들고, 앱이 필요하면 그 뒤 (B) 얇은 클라이언트를 새 티켓으로 한다. 도구는 (B)면 Tauri, (A)를 고르면 Electron이다                                                                                                                    |
+
+## 1. 구조 맞춤
+
+이 제품은 운영자의 상시 머신 한 대에서 web(TanStack Start)과 worker 데몬이 SQLite 파일 하나를 공유하며 늘 돈다(ADR 0002). Linear webhook을 밖에서 받고, 운영자는 다른 기기(휴대폰, 다른 맥)의 브라우저로 붙는다(ADR 0005). 지금 배포 형태는 CLI `init`·`start`와 launchd·systemd 사용자 서비스다(README, `apps/cli/src/service.ts`).
+
+데스크톱 앱이 맡을 수 있는 것은 셋이다. 서버 프로세스를 띄우고 지키는 일, 창(웹뷰)으로 화면을 여는 일, OS와 붙는 일(트레이·메뉴 막대, 알림, 로그인 때 실행, 서비스 켜고 끄기). 형태별로 비교한다.
+
+| 형태                                                     | 앱이 맡는 것                                                 | 앱을 닫으면                                                                                                                            | 노트북이 잠들면                                   | 다른 기기 접속                                                          |
+| -------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- |
+| (A) 올인원: 앱이 서버와 worker를 띄운다                  | 서버 수명, 창, OS 연동                                       | 서버도 멈춘다. 런 폴링·자동 할당이 멈추고 webhook은 연결 실패로 잃는다. 트레이에 남기면 피할 수 있지만 운영자가 "끝내기"를 누르면 같다 | 서버가 함께 멈춘다                                | 앱이 떠 있고 깨어 있을 때만 된다. 바인드 주소를 바꾸는 설정은 따로 필요 |
+| (B) 얇은 클라이언트: 서버는 CLI·서비스, 앱은 주소를 연다 | 창, 트레이·알림, 서비스 켜고 끄기(`service install` 등 호출) | 서버는 계속 돈다. 런·webhook·다른 기기 접속에 영향 없다                                                                                | 서버가 돌던 기계가 잠들면 멈춘다. 형태와 상관없다 | 지금과 같다                                                             |
+| (C) 앱 없이 PWA                                          | 창(브라우저의 설치형 웹앱)만                                 | 서버와 무관하다                                                                                                                        | (B)와 같다                                        | 지금과 같다. 같은 웹을 휴대폰에도 설치할 수 있다                        |
+
+- **잠들기는 어느 형태로도 못 막는다 [추정].** 상시 머신이 잠들면 web도 worker도 멈춘다. 이것은 앱 문제가 아니라 설치 기계 선택의 문제다. Electron의 `powerSaveBlocker`는 앱 일시 중지나 화면 꺼짐을 막을 뿐 노트북 덮개를 닫을 때의 잠들기는 막지 못한다 **[문서]**([powerSaveBlocker](https://www.electronjs.org/docs/latest/api/power-save-blocker)). 상시 머신은 맥미니 같은 데스크톱이나 리눅스 서버가 맞다.
+- **(A)는 "서비스가 다시 띄운다"는 지금의 보장을 잃는다.** `start`는 자식 하나가 죽으면 둘 다 멈추고 0이 아닌 코드로 끝나 launchd·systemd가 다시 띄우게 설계했다(`apps/cli/src/start.ts`). (A)에서는 앱이 그 감시자 노릇까지 해야 한다. 로그인 때 실행도 앱이 따로 등록해야 한다.
+- **(A)는 설치가 둘로 갈린다.** 같은 기계에서 서비스와 앱이 같은 home(`~/.factory-orchestrator`)과 SQLite를 쓰면 프로세스가 두 벌 뜰 수 있다. 하나만 돌게 막는 장치가 필요하다 **[추정]**.
+- **(C)의 한계 [문서·추정].** 설치형 PWA는 보안 컨텍스트(HTTPS 또는 localhost)에서만 서비스 워커를 쓴다([MDN: Secure contexts](https://developer.mozilla.org/en-US/docs/Web/Security/Secure_Contexts)). 다른 기기에서 `http://<호스트>:3000`으로 붙는 지금 구성에서는 설치형 앱 기능이 제한되고, HTTPS를 앞에 두어야 한다(Tailscale Serve, 리버스 프록시 등. ADR 0005가 webhook 노출에 이미 같은 선택지를 둔다). 트레이와 서비스 켜고 끄기는 PWA로 할 수 없다.
+
+## 2. Electron
+
+| 항목                    | 결과                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 안정 버전과 Node        | npm `latest` 45.3.4(2026-11-17), Node 24.22.3, Chromium 156 **[문서]**([releases.electronjs.org](https://releases.electronjs.org/)). `electron --version`과 `process.versions.node`로 같은 값을 확인했다 **[실행]**. 44.x·43.x도 Node 24다                                                                                                                                                           |
+| 우리 `engines`와의 차이 | 루트 `engines`는 `>=24 <25`다. Electron 45의 Node 24.22.3은 이 범위 안이고, 저장소 `.nvmrc`로 쓰는 Node와 같은 줄이다. 다만 Electron이 Node를 올리는 시점은 Electron 릴리스(8주 주기)를 따르므로, Node 25·26으로 옮길 때 Electron이 먼저 올라가 있어야 한다 **[추정]**                                                                                                                               |
+| `node:sqlite`           | main 프로세스에서 `require("node:sqlite")`가 플래그 없이 되고 SQLite 3.54.1이다(같은 Node 24.22.3과 같다) **[실행]**. `ELECTRON_RUN_AS_NODE=1` 자식에서도 WAL 모드로 열었다 **[실행]**. 빌드한 CLI가 `utilityProcess` 안에서 마이그레이션을 돌린 것으로 그쪽도 된다 **[실행]**. 네이티브 모듈이 없어 Electron용 다시 빌드(`@electron/rebuild`)가 필요 없다                                           |
+| 서버를 어디서 돌리나    | 아래 「어디서 돌리나」                                                                                                                                                                                                                                                                                                                                                                               |
+| 크기                    | 빈 셸을 `@electron/packager`로 darwin-arm64 패키징하면 .app 277MB 중 Electron 프레임워크가 252MB, zip으로 129MB였다(스파이크 의존성 26MB 포함) **[실행]**. 우리 web의 운영 의존성은 `pnpm deploy --prod`로 125MB였다(정리 안 한 값. drizzle-orm 29MB, prettier 11MB 등) **[실행]**. 빌드 산출물은 web 2.6MB, worker 0.7MB, CLI 0.5MB다. (A)는 정리 전 기준 약 380MB, 정리하면 그보다 작다 **[추정]** |
+| 자동 업데이트           | 공개 GitHub 저장소와 GitHub Releases를 쓰는 오픈소스 앱은 무료 서비스 `update.electronjs.org`와 `update-electron-app`을 쓸 수 있다. macOS·Windows만이고, macOS는 서명한 앱이어야 Squirrel.Mac이 동작한다 **[문서]**([Updating Applications](https://www.electronjs.org/docs/latest/tutorial/updates), [Code Signing](https://www.electronjs.org/docs/latest/tutorial/code-signing))                  |
+
+### 어디서 돌리나
+
+| 위치                                 | 결과                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| main 프로세스                        | 쓰지 않는다. 서버 이벤트 루프가 창·메뉴와 같은 스레드를 쓰고, 서버가 죽으면 앱이 함께 죽는다 **[추정]**. 우리 `start`는 이미 web과 worker를 자식 프로세스로 띄우므로 main에 둘 이유가 없다                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 자식 프로세스(`child_process.spawn`) | **됐다 [실행].** `spawn(process.execPath, [cli.js, "start", "--home", <home>], { env: { ELECTRON_RUN_AS_NODE: "1" } })`로 고치지 않은 CLI를 띄웠다. 환경 변수가 손자(web·worker)에게 이어져 `process.execPath`(Electron 실행 파일)가 Node로 돈다. 단, 보안상 권장되는 `runAsNode` fuse를 끄면 이 방법이 막힌다 **[문서]**([Electron Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses))                                                                                                                                                                                                                      |
+| `utilityProcess.fork`                | **CLI를 고쳐야 된다 [실행].** Electron이 권장하는 방식이다 **[문서]**([utilityProcess](https://www.electronjs.org/docs/latest/api/utility-process)). CLI 자체는 utility 프로세스에서 돌아 마이그레이션까지 했지만, `workspaceLayout`이 web·worker를 `process.execPath`로 띄우는데 utility 프로세스의 `execPath`는 `Electron Helper`라 "helper executable … cannot be launched directly"로 끝났다. `ELECTRON_RUN_AS_NODE=1`을 utility 프로세스에 넘기면 Helper가 자기 실행 인자를 거부해 utility 프로세스부터 뜨지 않았다. 쓰려면 `AppLayout`이 Node 명령을 받게 하거나 web·worker를 각각 utility 프로세스로 띄워야 한다 |
+
+### 스파이크 기록 (Electron, 형태 A)
+
+- 준비: 임시 폴더에 `electron@45.3.4`, `@electron/packager` 설치 3초. Electron 실행 파일은 첫 실행 때 내려받았다(`Downloading Electron binary...`). 저장소는 `main`을 `pnpm build`로 빌드했다.
+- `ELECTRON_RUN_AS_NODE=1 electron apps/cli/dist/bin/cli.js init --home <임시> --port 3971`로 `.env`를 썼다.
+- main 프로세스가 위 자식 프로세스 방식으로 `start`를 띄우고 `BrowserWindow`로 `http://127.0.0.1:3971/`을 열었다. 마이그레이션 5개를 적용했고, srvx가 `node 24.22.3`으로 떴다고 출력했다. 앱 준비부터 첫 응답(307)까지 0.4초, 창에서 `/onboarding`("처음 설정 · Factory Orchestrator")이 그려지기까지 2초였다. 화면은 브라우저와 같았다(StyleX 스타일, 한국어 문구).
+- 앱이 자식에 `SIGTERM`을 보내자 web과 worker가 함께 멈추고 `start`가 0으로 끝났다(1초).
+- `@electron/packager`로 .app을 만드는 데 5초였다. 서명은 ad-hoc(링커 서명)뿐이라 다른 기계로 옮기면 Gatekeeper가 막는다 **[추정]**.
+- 막힌 점: (1) `utilityProcess` 방식은 위처럼 CLI 수정이 필요하다. (2) 패키징한 .app 안에 web 운영 의존성을 넣는 일은 하지 않았다. web 서버 빌드가 `react`, `@tanstack/react-router`, `use-intl`, `zod`, `@stylexjs/stylex` 등을 `node_modules`에서 불러, 0029가 풀 "의존성을 묶는 방법"을 먼저 정해야 한다. 그래서 패키징한 앱으로 서버를 띄우는 것은 확인하지 못했다.
+- 걸린 시간: 설치부터 패키징까지 약 10분.
+
+## 3. Tauri
+
+Tauri 빌드는 돌리지 않았다. Rust 툴체인(1.99.1)은 있었지만 형태 (A)의 핵심 질문(Node 서버를 실을 수 있나)은 Tauri 셸 없이 Node SEA로 확인할 수 있었고, 시간을 Electron 스파이크에 썼다. 아래 Tauri 항목은 [문서]와 [추정]이다.
+
+| 항목                     | 결과                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 버전                     | `@tauri-apps/cli` 2.12.5 **[실행: npm view]**                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Node 서버를 넣는 방법    | `bundle.externalBin`에 대상 triple 접미사가 붙은 실행 파일(예: `binaries/server-aarch64-apple-darwin`)을 두고, shell 플러그인 권한(`shell:allow-execute`, sidecar)으로 띄운다 **[문서]**([Embedding External Binaries](https://v2.tauri.app/develop/sidecar/)). 공식 가이드는 JS를 단일 실행 파일로 묶는 방법을 쓰고, Node 런타임 자체를 싣고 JS를 리소스로 넣는 방법도 있지만 더 크다고 적는다 **[문서]**([Node.js as a sidecar](https://v2.tauri.app/learn/sidecar-nodejs/)) |
+| Node SEA와 `node:sqlite` | Node 24.22.3에서 `--experimental-sea-config` + postject로 만든 SEA 안에서 `node:sqlite`가 WAL 파일 DB를 열었다(SQLite 3.54.1, `isSea() === true`) **[실행]**. 한 단계 빌드 `--build-sea`는 Node 25.5에 생겼고 24.22.3에는 없다 **[실행][문서]**([Node.js 25.5.0](https://nodejs.org/en/blog/release/v25.5.0)). SEA는 Node 실행 파일(이 기계에서 117MB)에 스크립트를 얹은 것이라 크기가 거의 Node와 같다                                                                        |
+| 우리 구조와 SEA          | SEA는 진입 스크립트 하나를 돈다. 우리 `start`는 `process.execPath`로 srvx와 worker 스크립트를 따로 띄우는데, SEA의 `execPath`는 SEA 자신이라 다른 스크립트를 돌릴 수 없다 **[추정]**. SEA로 가려면 web·worker·CLI를 한 번들로 묶고 자기 자신을 역할 인자로 다시 띄우게 바꿔야 한다. Node 실행 파일을 그대로 sidecar로 싣고 JS를 리소스로 두는 편이 지금 구조를 덜 바꾼다 **[추정]**                                                                                            |
+| 네이티브 모듈            | 우리는 `node:sqlite`(내장)라 네이티브 모듈이 없다(`packages/db/src/database.ts`). 이 점은 두 도구 모두에서 이점이다                                                                                                                                                                                                                                                                                                                                                            |
+| 크기                     | Tauri 셸 자체는 OS 웹뷰를 써서 작다 **[문서]**. 그러나 (A)는 Node 실행 파일(약 117MB) + 운영 의존성을 실어야 해 Electron(A)과 차이가 셸 크기(약 250MB 대 수 MB)만큼만 난다 **[추정]**. (B)는 Node가 필요 없어 작다 **[추정]**                                                                                                                                                                                                                                                  |
+| 자동 업데이트            | updater 플러그인은 서명을 끌 수 없다. Tauri CLI로 만든 키쌍의 공개 키를 `plugins.updater.pubkey`에 두고 비밀 키는 `TAURI_SIGNING_PRIVATE_KEY`로 빌드 때 넘긴다. 비밀 키를 잃으면 기존 설치에 업데이트를 낼 수 없다 **[문서]**([Updater](https://v2.tauri.app/plugin/updater/)). OS 코드 서명과는 별개다                                                                                                                                                                        |
+| 웹뷰 차이                | macOS는 WKWebView(OS 업데이트로만 갱신), Windows는 WebView2(Chromium, 스스로 갱신), Linux는 webkit2gtk다 **[문서]**([Webview Versions](https://v2.tauri.app/reference/webview-versions/)). StyleX는 빌드 때 만든 정적 CSS라 엔진을 타지 않지만, UI SDK 컴포넌트와 CSS 기능은 WebKit에서 따로 확인해야 한다. web의 `browserslist`에 `safari >= 17.5`가 있고 휴대폰 접속은 어차피 Safari라 같은 확인이 이미 필요하다. 다만 e2e 브라우저 시험은 Chrome만 돈다 **[추정]**          |
+
+## 4. 배포 비용
+
+| 플랫폼  | 필요한 것                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS   | 인터넷에서 받은 앱을 Gatekeeper가 막지 않으려면 Developer ID 서명과 공증이 필요하고, Developer ID 인증서는 Apple Developer Program(연 99 USD) 회원만 받는다 **[문서]**([Enrollment](https://developer.apple.com/help/account/membership/program-enrollment/), [Notarization](https://developer.apple.com/news/?id=04102019a)). 공증 자체에는 추가 비용이 없다 **[문서]**. Electron 자동 업데이트도 서명이 전제다 |
+| Windows | Authenticode 서명이 없으면 SmartScreen 경고가 뜬다 **[추정]**. 공개 저장소, OSI 라이선스(MIT), CI 자동 빌드를 갖춘 프로젝트는 SignPath Foundation의 무료 서명을 받을 수 있고, 이때 게시자는 SignPath Foundation이 된다 **[문서]**([SignPath for Open Source](https://about.signpath.io/product/open-source)). ADR 0005의 지원 대상은 macOS·Linux라 Windows는 범위 밖이다                                         |
+| Linux   | AppImage·deb는 서명 없이 배포할 수 있다. Tauri는 webkit2gtk 4.1을 요구한다 **[문서]**([Prerequisites](https://v2.tauri.app/start/prerequisites/))                                                                                                                                                                                                                                                                |
+
+### 공개 저장소에서 서명 키를 두는 방식
+
+- GitHub Actions 저장소 시크릿에 인증서(.p12)와 암호, 공증용 App Store Connect API 키(또는 Apple ID 앱 암호)를 두고, 태그 push로 도는 릴리스 워크플로에서만 쓴다 **[추정: 일반 관행]**. 시크릿은 fork에서 온 PR 워크플로에 넘어가지 않는다 **[문서]**([GitHub: Using secrets](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions)). 시크릿 이름과 워크플로만 공개되고 값은 공개되지 않는다.
+- Tauri updater 비밀 키도 같은 방식으로 둔다. 잃으면 업데이트 경로가 끊기므로 시크릿 밖에도 백업이 필요하다 **[문서]**.
+
+### ADR 0005와 부딪히는 점
+
+- **실명이 배포물에 실린다.** Apple Developer Program에 개인으로 가입하면 Developer ID 인증서의 이름이 가입자 법적 이름이고, 서명한 앱을 받은 누구나 `codesign -dv`로 볼 수 있다 **[문서·추정]**. ADR 0005는 실명을 저장소에 넣지 않는다고 정했는데, 저장소는 아니어도 공개 배포물에 실명이 들어간다. 피하려면 조직으로 가입해야 하고, 조직 가입에는 D-U-N-S 번호 같은 법인 정보가 필요하다 **[문서]**([Enrollment](https://developer.apple.com/help/account/membership/program-enrollment/)).
+- **서명하지 않으면** macOS 운영자가 "확인되지 않은 개발자" 경고를 직접 풀어야 하고, Electron 자동 업데이트가 macOS에서 돌지 않는다 **[문서]**. CLI(npm 패키지)는 이 문제가 없다. npm 게시자 이름은 계정 이름이라 실명이 아니어도 된다.
+
+## 5. 권장안
+
+**지금은 데스크톱 앱을 만들지 않는다.** 이 제품의 가치는 늘 도는 서버에 있고, 데스크톱 앱은 그 서버를 대신하지 못한다. 앱이 주는 이득(독립 창, 트레이, 알림)은 서버 배포물이 있어야 의미가 있는데, 그 배포물(0029)이 보류다.
+
+1. **서버 배포가 먼저다.** (A)든 (B)든 운영자가 저장소를 빌드하지 않고 서버를 설치할 길이 필요하다. (A)의 앱 패키징은 0029가 풀 "web 운영 의존성을 묶는 방법"을 그대로 다시 풀어야 한다(스파이크에서 막힌 지점). 그래서 0029 보류를 풀거나, 앱을 원하면 0029를 그 전제로 먼저 한다.
+2. **앱이 필요하면 형태는 (B), 도구는 Tauri를 권한다.** 서버는 지금처럼 `service install`로 돌고, 앱은 설정한 주소를 창으로 열고 트레이에서 서비스 상태를 보이고 켜고 끈다. 앱을 닫거나 지워도 런·webhook·다른 기기 접속이 그대로다. (B)에는 Node가 필요 없어 Tauri의 크기 이점이 그대로 산다 **[추정]**. WebKit 확인은 휴대폰 Safari 때문에 어차피 해야 한다.
+3. **(A)를 고른다면 Electron이다.** Node 24와 `node:sqlite`가 그대로 돌고 지금 CLI `start`를 고치지 않고 띄웠다 **[실행]**. 대신 서비스 감시·로그인 실행·두 벌 실행 막기를 앱이 다시 해야 하고, 셸만 약 250MB다.
+4. **(C) PWA는 값싼 첫걸음이다.** 웹 매니페스트와 아이콘만 더하면 데스크톱 Chrome·휴대폰에서 독립 창으로 연다. HTTPS 구성이 있어야 제대로 설치된다 **[문서]**. 앱 티켓 전에 시도해 볼 수 있다.
+5. **티켓 순서.** 0029(npm 패키지) → (선택) PWA 매니페스트 티켓 → (선택) 데스크톱 셸 (B) 티켓. 데스크톱 앱 배포는 0031(릴리스)과 같은 릴리스 흐름(GitHub Releases, 태그)을 쓰므로 0031 뒤에 둔다. 새 티켓 번호는 이 문서에서 정하지 않는다.
+
+### 운영자가 정할 것
+
+- 데스크톱 앱을 만들지, 만든다면 (A)·(B)·(C) 중 무엇인지.
+- 0029·0031 보류를 언제 풀지. 앱은 둘 다에 기댄다.
+- macOS 서명을 할지. 한다면 개인 가입(배포물에 실명)과 조직 가입(법인 정보) 중 무엇인지. 하지 않으면 경고를 감수하고 자동 업데이트를 포기하는지.
+- 지원 플랫폼. ADR 0005는 macOS·Linux다. Windows를 넣을지.
+- (C)나 (B)로 다른 기기에서 붙을 때 HTTPS를 권장 구성으로 문서에 넣을지.
+
+## 남은 위험
+
+- Tauri 빌드와 WKWebView에서의 화면은 실제로 돌려 보지 않았다. (B)를 고르면 첫 티켓에서 확인한다.
+- 패키징한 Electron 앱 안에서 서버를 띄우는 것은 확인하지 못했다(운영 의존성 묶기 미해결). 개발 실행(`electron .`)에서만 확인했다.
+- 크기 숫자는 macOS arm64 한 기계 기준이고, 운영 의존성 125MB는 정리하지 않은 값이다.
+- Electron `runAsNode` fuse를 끄면 스파이크의 자식 프로세스 방식이 막힌다. (A)로 가면 `utilityProcess` 쪽으로 CLI 배치(`AppLayout`)를 바꿔야 한다.
