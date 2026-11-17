@@ -57,7 +57,7 @@ type TrackerStateType = "backlog" | "started" | "completed" | (string & {});
 const outcome = run.prState === "merged" ? "merged" : "human-check";
 
 // 이렇게 쓴다
-const { outcome } = summarizeRunOutcome(run.agentResult, run.prState);
+const { outcome } = summarizeRunOutcome(run.agentResult, run.prState, run.endedWithoutRunner);
 ```
 
 이유: 요약 계산 표(스펙 4.2)가 여러 곳에 흩어지면 한쪽만 바뀌어 통계와 화면이 어긋난다.

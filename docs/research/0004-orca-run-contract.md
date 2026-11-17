@@ -1,5 +1,7 @@
 # Orca 런 계약 검증: 런 시작과 진행 감지
 
+> 아래 「아직 모르는 것」 1번의 비대화형 실행(Q82)은 운영자가 고쳤다. 대화형 에이전트를 Orca 오케스트레이션으로 맡긴다(Q82 개정, [ADR 0009](../adr/0009-run-via-orca-orchestration.md), [research 0008](0008-orca-orchestration-run.md)).
+
 조사일 2026-11-17. 티켓 0010. 스펙 10절 2, 3, 4, 5, 8번을 실제 런으로 확인한다. Runner 어댑터의 `startRun`, `pollRun`과 worker의 종료·입력 기다림 감지가 기댈 사실이다.
 
 출처 표시는 research 0002를 따르고 하나를 더한다.
