@@ -1,8 +1,14 @@
-import { isAssignmentBlocked } from "@factory/core";
-import type { RunnerErrorDetail, RunnerHealth, RunnerProject } from "@factory/core";
-import { listRunners, recordRunnerCheck } from "@factory/db";
+import { isAssignmentBlocked, summarizeRunOutcome } from "@factory/core";
+import type { Runner, RunnerErrorDetail, RunnerHealth, RunnerProject } from "@factory/core";
+import {
+  getRunWithRecords,
+  listRuns,
+  recordRunnerCheck,
+  listRunners,
+  updateRunRecords,
+} from "@factory/db";
 import type { StoredRunner } from "@factory/db";
-import { describe, runnerErrorDetail } from "./context.js";
+import { describe, runnerErrorDetail, tryWrite } from "./context.js";
 import type { TickContext } from "./context.js";
 
 /** 러너 상태를 다시 확인하는 간격. 마지막 확인 시각은 DB에 있어 재시작해도 간격이 이어진다. */
@@ -30,7 +36,14 @@ export async function checkRunners(context: TickContext): Promise<void> {
   }
 }
 
-async function checkRunner(context: TickContext, stored: StoredRunner): Promise<void> {
+/**
+ * 러너 하나를 확인하고 결과를 DB에 쓴다. 주기적 확인과 web의 러너 확인 요청(Q61)이 함께 쓴다. 닿았으면
+ * 사람이 지워야 하는 워크트리가 러너에서 사라졌는지도 본다(Q75). 확인 결과나 확인하지 못한 오류를 돌려준다.
+ */
+export async function checkRunner(
+  context: TickContext,
+  stored: StoredRunner,
+): Promise<{ ok: true; health: RunnerHealth } | { ok: false; error: RunnerErrorDetail }> {
   const runner = context.adapters.runner(stored);
   let health: RunnerHealth;
   try {
@@ -45,7 +58,7 @@ async function checkRunner(context: TickContext, stored: StoredRunner): Promise<
       projects: null,
       assignmentBlocked: null,
     });
-    return;
+    return { ok: false, error: checkError(error) };
   }
 
   let projects: ReadonlyArray<RunnerProject> | null = null;
@@ -65,6 +78,39 @@ async function checkRunner(context: TickContext, stored: StoredRunner): Promise<
     // 닿지 않았으면 필수 조건을 확인하지 못했으니 이전 값을 남긴다.
     assignmentBlocked: health.online ? isAssignmentBlocked(health) : null,
   });
+  if (health.online) await confirmRemovedWorktrees(context, stored, runner);
+  return { ok: true, health };
+}
+
+/**
+ * 자동으로 지우지 않는 워크트리(요약 계산 함수의 워크트리 처리가 사람이 정함: 러너 연결 끊김, 러너에 닿지
+ * 못한 채 끝난 운영자가 취소함)를 사람이 러너에서 지웠는지 본다. 사라졌으면 지운 시각을 기록한다(Q75).
+ * worker는 이 워크트리를 지우지 않는다.
+ */
+async function confirmRemovedWorktrees(
+  context: TickContext,
+  stored: StoredRunner,
+  runner: Runner,
+): Promise<void> {
+  for (const run of listRuns(context.db, { states: ["ended"] })) {
+    if (run.state !== "ended" || run.worktree === null || run.runnerId !== stored.id) continue;
+    if (summarizeRunOutcome(run).worktree !== "operator-decides") continue;
+    if (getRunWithRecords(context.db, run.id)?.records.worktreeRemovedAt !== null) continue;
+    let exists: boolean;
+    try {
+      exists = await runner.worktreeExists(run.worktree);
+    } catch (error) {
+      context.logger.warn("could not check whether a kept worktree still exists", {
+        runId: run.id,
+        error,
+      });
+      continue;
+    }
+    if (exists) continue;
+    tryWrite(context, run.id, () =>
+      updateRunRecords(context.db, run.id, { worktreeRemovedAt: context.now() }),
+    );
+  }
 }
 
 function checkError(error: unknown): RunnerErrorDetail {

@@ -11,6 +11,7 @@ import type {
 } from "@factory/core";
 import {
   DEFAULT_MAX_RUN_MS,
+  LAST_LOG_LINES,
   changeRunState,
   getRunWithRecords,
   hasPendingCancelRequest,
@@ -49,7 +50,7 @@ import type { ActiveRun, PendingEnding, TickContext } from "./context.js";
  *    쓰고, 운영자가 남긴 답을 보낸다.
  * 2. 끝낼지 정한다. 처리하지 않은 취소 요청이 있으면 취소가 이긴다(운영자가 취소함). 그다음은 실제 상태가
  *    끝났는지(완료 보고, 보고 없이 사라짐, 워크트리 사라짐), 그다음은 최대 실행 시간이다(core decideTimeout).
- * 3. 끝내면 PR 상태를 정하고, 에이전트를 멈추거나 닫은 뒤 두 축을 한 번 기록한다. PR을 찾지 못했거나
+ * 3. 끝내면 PR 상태를 정하고, 마지막 로그를 읽은 뒤(Q46) 에이전트를 멈추거나 닫고 두 축을 한 번 기록한다. PR을 찾지 못했거나
  *    에이전트를 멈추지 못하면 기록하지 않고 다음 바퀴에 다시 한다(취소면 화면은 "취소 중", Q82.11).
  * 4. 끝내지 않으면 실제 상태로 Running·Waiting for Input을 오간다. Disconnected에서 다시 닿았을 때도 같다(Q67).
  *
@@ -162,7 +163,7 @@ async function watchRun(
           cancelRequested,
           maxRunMs: settings.maxRunMs,
         })
-      : { ...pending, agent: "none" as const };
+      : { agentResult: pending.agentResult, report: pending.report, agent: "none" as const };
   if (ending === null) {
     if (resolution.kind === "continue" && resolution.state !== run.state) {
       reportFailure(
@@ -176,15 +177,23 @@ async function watchRun(
 
   // PR을 찾지 못하면(코드 호스트 오류) 에이전트를 건드리지 않고 다음 바퀴에 다시 본다.
   const decision = await decideRunPrState(context, run);
+  // 에이전트를 멈추거나 닫으면 출력이 사라질 수 있어 그 전에 읽는다(Q46).
+  const lastLog =
+    pending === undefined ? await readLastLog(context, run, runner, onRunner) : pending.lastLog;
   // 멈추거나 닫지 못하면 던져 기록하지 않는다. 다음 바퀴에 다시 해 본다(Q82.11).
   if (ending.agent === "stop") await runner.stopAgent(onRunner);
   if (ending.agent === "close") await runner.closeAgent(onRunner);
-  context.pendingEndings.set(run.id, { agentResult: ending.agentResult, report: ending.report });
+  context.pendingEndings.set(run.id, {
+    agentResult: ending.agentResult,
+    report: ending.report,
+    lastLog,
+  });
   const recorded = endRun(context, run, {
     agentResult: ending.agentResult,
     decision,
     runnerUnreached: false,
     report: ending.report,
+    lastLog,
   });
   if (recorded) context.pendingEndings.delete(run.id);
 }
@@ -219,14 +228,17 @@ async function endWithoutProgress(
   if (ending.stopAgent && !context.pendingEndings.has(run.id)) {
     const mailbox = context.mailboxes.get(storedRunner.id) ?? storedRunner.mailbox;
     if (mailbox === null) return false;
-    await runner.stopAgent({ mailbox, worktree: run.worktree, agentRef: run.agentRef });
-    context.pendingEndings.set(run.id, { agentResult: ending.agentResult, report: null });
+    const onRunner = { mailbox, worktree: run.worktree, agentRef: run.agentRef };
+    const lastLog = await readLastLog(context, run, runner, onRunner);
+    await runner.stopAgent(onRunner);
+    context.pendingEndings.set(run.id, { agentResult: ending.agentResult, report: null, lastLog });
   }
   const recorded = endRun(context, run, {
     agentResult: ending.agentResult,
     decision,
     runnerUnreached: ending.runnerUnreached,
     report: null,
+    lastLog: context.pendingEndings.get(run.id)?.lastLog ?? null,
   });
   if (recorded) context.pendingEndings.delete(run.id);
   return recorded;
@@ -247,15 +259,35 @@ async function endIfTimedOut(
   });
   if (timeout === null) return;
   const decision = await decideRunPrState(context, run);
+  // 러너에 닿지 않아 로그를 읽지 못한다.
   endRun(context, run, {
     agentResult: timeout.agentResult,
     decision,
     runnerUnreached: timeout.runnerUnreached,
     report: null,
+    lastLog: null,
   });
 }
 
-interface Ending extends PendingEnding {
+/**
+ * 런이 끝날 때 저장할 마지막 로그(Q46). 저장은 덤이라 읽지 못해도 런을 끝내는 일을 막지 않는다. 보고 없이
+ * 사라진 런이나 워크트리가 사라진 런은 읽을 것이 없을 수 있다(research 0008 6절).
+ */
+async function readLastLog(
+  context: TickContext,
+  run: ActiveRun,
+  runner: Runner,
+  onRunner: RunOnRunner,
+): Promise<ReadonlyArray<string> | null> {
+  try {
+    return await runner.readLogTail(onRunner, { lines: LAST_LOG_LINES });
+  } catch (error) {
+    context.logger.warn("could not read the last log of an ending run", { runId: run.id, error });
+    return null;
+  }
+}
+
+interface Ending extends Omit<PendingEnding, "lastLog"> {
   /** 기록 전에 에이전트에게 할 일. 멈추기는 아직 도는 에이전트를, 닫기는 완료 보고를 보낸 에이전트를 끝낸다 */
   agent: "stop" | "close" | "none";
 }
@@ -330,7 +362,8 @@ async function whileUnreachable(
 
 /**
  * 두 축을 한 번 기록한다(ADR 0004, Q69). 운영자가 취소함이면 같은 트랜잭션에서 취소 요청을 처리했다고
- * 표시한다(한 번만). 워크트리 처리는 요약 계산 함수가 정하고 뒤처리는 0017이 한다.
+ * 표시한다(한 번만). 마지막 로그(Q46)도 같은 트랜잭션에서 쓴다. 워크트리 처리는 요약 계산 함수가 정하고
+ * 뒤처리(after-run.ts)가 따른다.
  */
 function endRun(
   context: TickContext,
@@ -340,6 +373,7 @@ function endRun(
     decision: PrStateDecision;
     runnerUnreached: boolean;
     report: CompletionReport | null;
+    lastLog: ReadonlyArray<string> | null;
   },
 ): boolean {
   const { db, logger } = context;
@@ -364,6 +398,7 @@ function endRun(
     if (input.agentResult === "canceled") markCancelRequestProcessed(db, run.id, endedAt);
     // 끝난 런의 권한 대기는 더 이상 열려 있지 않다. 손댈 일에 남지 않게 닫는다.
     resolvePermissionWaits(db, run.id, [], endedAt);
+    if (input.lastLog !== null) updateRunRecords(db, run.id, { lastLog: [...input.lastLog] });
     if (input.decision.pr !== null) {
       const { id, displayId, url, ci } = input.decision.pr;
       updateRunRecords(db, run.id, {

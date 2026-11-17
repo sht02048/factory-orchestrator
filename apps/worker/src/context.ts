@@ -1,6 +1,7 @@
 import { AdapterError, decidePrState } from "@factory/core";
 import type {
   AgentResult,
+  CommentId,
   CompletionReport,
   MailboxRef,
   PermissionRequestId,
@@ -48,11 +49,22 @@ export interface TickContext {
    * 데몬이 살아 있는 동안만 이어진다.
    */
   pendingEndings: Map<RunId, PendingEnding>;
+  /** 런마다 마지막으로 PR·CI 상태를 폴링한 시각(epoch 밀리초). 다시 띄우면 한 번 더 폴링할 뿐이라 메모리에 둔다. */
+  prPolledAt: Map<RunId, number>;
+  /**
+   * 트래커에 결과 댓글을 달았지만 DB에 쓰지 못한 런과 그 댓글. 데몬이 살아 있는 동안 다시 달지 않고 다음 바퀴에
+   * 기록만 다시 한다. 다시 띄운 뒤에는 트래커의 댓글에서 런 ID를 찾아 다시 달지 않는다.
+   */
+  unrecordedComments: Map<RunId, { id: CommentId; at: Date }>;
+  /** 결과 댓글을 달려 했는데 트래커에서 티켓을 찾지 못한 런. 데몬이 살아 있는 동안 다시 해 보지 않는다. */
+  ticketsGone: Set<RunId>;
 }
 
 export interface PendingEnding {
   agentResult: AgentResult;
   report: CompletionReport | null;
+  /** 에이전트를 멈추거나 닫기 전에 읽은 마지막 로그(Q46). 읽지 못했으면 null */
+  lastLog: ReadonlyArray<string> | null;
 }
 
 export interface PendingStart {
@@ -70,6 +82,9 @@ export function denialKey(runId: RunId, permissionId: PermissionRequestId): stri
 
 /** 러너와 워크트리가 있고 아직 끝나지 않은 런 */
 export type ActiveRun = Exclude<StoredRun, { state: "queued" | "ended" }>;
+
+/** 러너에서 시작한 런(끝났든 아니든). 러너·워크트리·브랜치·시작 시각이 있다 */
+export type StartedStoredRun = Extract<StoredRun, { startedAt: Date }>;
 
 export type QueuedStoredRun = Extract<StoredRun, { state: "queued" }>;
 
@@ -101,7 +116,7 @@ export async function mailboxFor(
  */
 export async function decideRunPrState(
   context: TickContext,
-  run: ActiveRun,
+  run: StartedStoredRun,
 ): Promise<PrStateDecision> {
   let unavailable = 0;
   const codeHosts = context.adapters.allCodeHosts(context.db, (connectionId, error) => {
