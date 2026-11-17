@@ -4,7 +4,7 @@
 
 ## 방법
 
-- 워크스페이스 관리자의 개인 API 키로 GraphQL API(`https://api.linear.app/graphql`)를 불렀다.
+- Linear 워크스페이스 관리자의 개인 API 키로 GraphQL API(`https://api.linear.app/graphql`)를 불렀다.
 - 팀 하나에 webhook을 만들었다(`resourceTypes: ["Issue", "IssueLabel", "Comment"]`, `secret` 지정). 받는 쪽은 로컬 수신 서버였고, 계정 없는 임시 터널(`cloudflared tunnel --url`)로 공개 주소를 열었다. 수신 서버는 원문 본문 바이트와 헤더, 받은 시각을 파일로 남기고 200을 돌려줬다.
 - 검증용 라벨 둘(아래에서 `auto-assign`, `bug`로 부른다)과 검증용 티켓 하나를 새로 만들고, 아래 순서로 바꾸며 받은 이벤트를 기록했다. 끝난 뒤 티켓은 보관하고 라벨과 webhook은 지웠다.
 
@@ -29,7 +29,7 @@
 | --- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 10  | `Issue` update의 `updatedFrom`에 `labelIds`·`stateId`가 담기는가, `data` 필드 | 담긴다. 바뀐 필드의 이전 값만 담기고, `labelIds`는 이전 배열 전체다. `data` 필드는 아래 목록                                                          |
 | 11  | 라벨 추가가 `Issue` update로 오는가, `IssueLabel` 이벤트로도 오는가           | `Issue` update로 언제나 온다. `IssueLabel` update도 올 때가 있지만 티켓을 가리키지 않고, 라벨을 바꾼 방법에 따라 오지 않는다. 할당 판단에 쓰지 않는다 |
-| 12  | 최대 페이지 크기                                                              | `first`·`last` 모두 1~250. 벗어나면 `INVALID_INPUT` 오류                                                                                              |
+| 12  | 최대 페이지 크기                                                              | `first`는 1~250, `last`는 최대 250. 벗어나면 `INVALID_INPUT` 오류                                                                                     |
 | 13  | 개인 API 키 변경과 Linear GitHub 연동 자동 상태 전환의 충돌                   | 확인하지 못했다. 운영자 준비 후 확인                                                                                                                  |
 | 14  | `attachmentLinkGitHubPR`와 Linear GitHub 연동 링크의 중복                     | 확인하지 못했다. 운영자 준비 후 확인                                                                                                                  |
 
@@ -71,14 +71,14 @@
 
 ### `data` 필드(`Issue`)
 
-`create`, `update`, `remove` 모두 같은 필드 목록이었다.
+`create`, `update`, `remove`에서 늘 온 필드는 다음과 같다. 값이 있을 때만 오는 필드는 그 아래에 따로 적었다.
 
 `addedToTeamAt`, `botActor`, `createdAt`, `creatorId`, `description`, `descriptionData`, `id`, `identifier`, `inheritsSharedAccess`, `labelIds`, `labels`, `number`, `previousIdentifiers`, `priority`, `priorityLabel`, `prioritySortOrder`, `reactionData`, `releases`, `slaType`, `sortOrder`, `state`, `stateId`, `subscriberIds`, `team`, `teamId`, `title`, `updatedAt`, `url`.
 
 - `labels`는 `{ id, color, name }` 배열, `state`는 `{ id, color, name, type }`, `team`은 `{ id, key, name }`이다. 라벨 이름과 상태 `type`을 따로 조회하지 않아도 된다.
-- `projectId`·`project`는 이번 티켓이 Tracker Project에 속하지 않아 본문에 없었다. 값이 없는 필드는 빠지는 것으로 보이며, Tracker Project에 속한 티켓의 필드는 확인하지 않았다. 매핑이 Tracker Project 기준이므로 어댑터는 `projectId`가 없을 수 있다고 보고 파싱해야 한다.
+- 값이 있을 때만 온 필드: `startedAt`(started 상태일 때), `archivedAt`(보관한 티켓의 update). `projectId`·`project`는 이번 티켓이 Tracker Project에 속하지 않아 본문에 없었다. 값이 없는 필드는 빠지는 것으로 보이며, Tracker Project에 속한 티켓의 필드는 확인하지 않았다. 매핑이 Tracker Project 기준이므로 어댑터는 `projectId`가 없을 수 있다고 보고 파싱해야 한다.
 - `description`은 마크다운 문자열이고, `descriptionData`는 에디터 문서를 JSON 문자열로 한 번 더 감싼 값이다.
-- 보관(`issueArchive`)은 `Issue remove`로 왔고, `data`에 `archivedAt`이 없었다. 보관과 삭제를 본문으로 가르지 못한다. 그 티켓의 댓글은 `Comment remove`로 함께 왔다.
+- 보관(`issueArchive`)은 `Issue remove`로 왔고, 그 `data`에는 `archivedAt`이 없었다(뒤이어 온 그 티켓의 update에는 있었다). 보관과 삭제를 본문으로 가르지 못한다. 그 티켓의 댓글은 `Comment remove`로 함께 왔다.
 
 다른 모델의 `data` 필드도 기록해 둔다.
 
@@ -101,7 +101,7 @@
 `issues`, `issueLabels`, 중첩 `comments`에서 `first`를 바꿔 불렀다.
 
 - `first: 250`은 된다. `first: 251`과 `first: 1000`은 오류다. `last`도 251에서 같은 오류다.
-- `first: 0`, `first: -1`도 오류다(`first must not be less than 1`).
+- `first: 0`, `first: -1`도 오류다(`first must not be less than 1`). `last`의 하한은 시험하지 않았다.
 - 오류는 HTTP 200에 `data: null`과 다음 `errors[]`로 온다.
 
 ```json
@@ -122,7 +122,7 @@
 ```
 
 - 응답 헤더 `x-ratelimit-requests-limit: 2500`, `x-ratelimit-complexity-limit: 3000000`은 research 0002 B.4와 같다.
-- 쿼리 하나의 복잡도 상한(10,000점)은 확인하지 못했다. 이 워크스페이스는 티켓이 적어, `issues(first: 250) { nodes { comments(first: 250) … } }`도 통과했고 `issues(first: 250)` 목록 쿼리의 `x-complexity`는 5였다. 복잡도가 `first` 값이 아니라 실제로 돌려준 노드 수로 매겨지는 것으로 보이나, 티켓이 많은 워크스페이스에서는 다시 볼 일이다.
+- 쿼리 하나의 복잡도 상한(10,000점)은 확인하지 못했다. 이 Linear 워크스페이스는 티켓이 적어, `issues(first: 250) { nodes { comments(first: 250) … } }`도 통과했고 `issues(first: 250)` 목록 쿼리의 `x-complexity`는 5였다. 복잡도가 `first` 값이 아니라 실제로 돌려준 노드 수로 매겨지는 것으로 보이나, 티켓이 많은 Linear 워크스페이스에서는 다시 볼 일이다.
 
 ## 13·14. Linear GitHub 연동
 
@@ -152,7 +152,7 @@
 | `issuelabel-update-applied`    | A    | 같은 라벨 추가로 함께 온 `IssueLabel update`             |
 | `issue-remove-archived`        | 정리 | 보관으로 온 `Issue remove`                               |
 
-- 바꾼 값: 모든 UUID(`00000000-0000-4000-8000-00000000000N`로, 파일끼리 같은 대상은 같은 값), 사람 이름·이메일·프로필 URL, 워크스페이스 URL 조각(`acme`), 팀 키·이름(`ENG`, `Engineering`), 티켓 번호·제목·본문, 라벨 이름. 시각, 필드 순서, 그 밖의 값은 받은 그대로다.
+- 바꾼 값: 모든 UUID(`00000000-0000-4000-8000-` 뒤 12자리에 1부터 매긴 번호로, 파일끼리 같은 대상은 같은 값), 사람 이름·이메일·프로필 URL, Linear 워크스페이스 URL 조각(`acme`), 팀 키·이름(`ENG`, `Engineering`), 티켓 번호·제목·본문, 라벨 이름. 시각, 필드 순서, 그 밖의 값은 받은 그대로다.
 - 바꾼 본문을 signing secret `fixture-signing-secret`으로 다시 서명해 `linear-signature`에 넣었다. `linear-timestamp`는 원래 값이라, 테스트는 시각을 고정하거나 1분 검사를 따로 다뤄야 한다.
 - 본문 파일은 서명한 바이트 그대로다. 줄 끝 개행이 없고, 포매터가 고치지 않게 `.oxfmtrc.json`에서 이 폴더를 뺐다. 파일을 고치면 서명이 맞지 않는다.
 
