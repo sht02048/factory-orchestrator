@@ -4,7 +4,7 @@
     {
       "type": "agent-review",
       "name": "독립 리뷰",
-      "instructions": "Find correctness bugs, security issues, and unmet requirements. Ignore style."
+      "instructions": "Find correctness bugs, security issues, and unmet requirements; report these as blocking. Then compare the diff against CODING_STANDARDS.md and report each violation as non-blocking, citing the rule title. Apply the standards only to lines the diff adds or changes. Do not comment on style."
     }
   ]
 }
