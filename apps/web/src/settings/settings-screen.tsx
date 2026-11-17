@@ -186,7 +186,7 @@ export function SettingsScreen({ page, selected, onSelect, actions }: SettingsSc
  * 새 요청이 생기면 처음부터 다시 기다린다. 앞 읽기가 끝난 뒤에만 다음 읽기를 걸어 겹치지 않는다.
  * RUNNER_CHECK_POLL_LIMIT_MS 가 지나도 결과가 없으면 그만 읽고 true(worker 가 응답하지 않음)를 돌려준다.
  */
-function useRunnerCheckPolling(pendingKey: string, poll: () => Promise<boolean>): boolean {
+export function useRunnerCheckPolling(pendingKey: string, poll: () => Promise<boolean>): boolean {
   const [silent, setSilent] = useState(false);
   useEffect(() => {
     setSilent(false);
@@ -476,7 +476,7 @@ function GeneralPanel({
   );
 }
 
-function ProjectsPanel({
+export function ProjectsPanel({
   workspace,
   actions,
 }: {
@@ -620,7 +620,7 @@ function ProjectHeading({ bound }: { bound: BoundProject }) {
   );
 }
 
-function MappingPanel({
+export function MappingPanel({
   workspace,
   page,
   actions,
@@ -965,7 +965,7 @@ function ConnectionsPanel({
 }
 
 /** 연결 하나를 고치거나(connection) 새로 더한다(null) */
-function ConnectionForm({
+export function ConnectionForm({
   connection,
   actions,
 }: {
@@ -1087,7 +1087,7 @@ function ConnectionForm({
   );
 }
 
-function GitHubPanel({ saved, actions }: { saved: boolean; actions: SettingsActions }) {
+export function GitHubPanel({ saved, actions }: { saved: boolean; actions: SettingsActions }) {
   const t = useTranslations("settings");
   const [token, setToken] = useState("");
   const submit = useSubmit();
@@ -1191,7 +1191,7 @@ function RunnersPanel({
   );
 }
 
-function RunnerForm({
+export function RunnerForm({
   runner,
   actions,
 }: {
@@ -1292,7 +1292,7 @@ function RunnerForm({
 }
 
 /** 러너 확인 요청과 worker 가 쓴 결과. 필수 조건을 하나씩 보인다(스펙 9절) */
-function RunnerCheck({
+export function RunnerCheck({
   runner,
   actions,
   workerSilent,
