@@ -12,8 +12,13 @@ import type { Database } from "@factory/db";
 import { LINEAR_TRACKER_KIND, linearTrackerFactory } from "@factory/tracker-linear";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { MAX_WEBHOOK_REQUEST_BYTES, receiveTrackerWebhook } from "./receive";
-import type { WebhookContext, WebhookRequest } from "./receive";
+import {
+  MAX_WEBHOOK_REQUEST_BYTES,
+  WEBHOOK_BODY_TIMEOUT_MS,
+  receiveTrackerWebhook,
+  rejectTrackerWebhook,
+} from "./receive";
+import type { WebhookContext, WebhookLogger, WebhookRequest } from "./receive";
 
 /**
  * research 0005 픽스처(0011이 받은 webhook 본문을 가상 값으로 바꾸고 `fixture-signing-secret`으로
@@ -39,7 +44,20 @@ const labelAdded = fixture("issue-update-label-added");
 /** 픽스처의 보낸 시각(본문 webhookTimestamp와 같다) 0.5초 뒤에 받은 것으로 한다. */
 const receivedAt = new Date(Number(labelAdded.headers["linear-timestamp"]) + 500);
 
-function setup(): WebhookContext {
+interface LogEntry {
+  message: string;
+  fields: Readonly<Record<string, unknown>>;
+}
+
+function memoryLogger(): WebhookLogger & { entries: LogEntry[] } {
+  const entries: LogEntry[] = [];
+  return { entries, warn: (message, fields = {}) => entries.push({ message, fields }) };
+}
+
+/** 테스트에서 본문 시간 제한. 실제 기본값(5초)을 기다리지 않는다. */
+const TEST_BODY_TIMEOUT_MS = 50;
+
+function setup(): WebhookContext & { logger: ReturnType<typeof memoryLogger> } {
   const db: Database = openDatabase(":memory:");
   migrate(db);
   const secretBox = new SecretBox(new Uint8Array(32).fill(7));
@@ -54,7 +72,13 @@ function setup(): WebhookContext {
   };
   save(acme, SECRET);
   save(other, "another-signing-secret");
-  return { db, secretBox, registry: new AdapterRegistry().registerTracker(linearTrackerFactory) };
+  return {
+    db,
+    secretBox,
+    registry: new AdapterRegistry().registerTracker(linearTrackerFactory),
+    logger: memoryLogger(),
+    bodyTimeoutMs: TEST_BODY_TIMEOUT_MS,
+  };
 }
 
 function request(
@@ -86,6 +110,37 @@ function endlessBody(chunkBytes: number) {
       seen.pulled += chunkBytes;
       controller.enqueue(new Uint8Array(chunkBytes).fill(0x20));
     },
+    cancel() {
+      seen.canceled = true;
+    },
+  });
+  return { body, seen };
+}
+
+/** 조각을 `intervalMs`마다 1바이트씩 끝없이 흘려 보내는 본문(느린 요청). */
+function tricklingBody(intervalMs: number) {
+  const seen = { pulled: 0, canceled: false };
+  const body = new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        seen.pulled += 1;
+        controller.enqueue(new Uint8Array([0x20]));
+      },
+      cancel() {
+        seen.canceled = true;
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return { body, seen };
+}
+
+/** 헤더만 보내고 본문 바이트를 하나도 보내지 않는 요청. */
+function silentBody() {
+  const seen = { canceled: false };
+  const body = new ReadableStream<Uint8Array>({
+    pull: () => new Promise<void>(() => undefined),
     cancel() {
       seen.canceled = true;
     },
@@ -152,7 +207,13 @@ describe("receiveTrackerWebhook", () => {
     const response = await send(context, acme, request(tampered, labelAdded.headers));
 
     expect(response.status).toBe(401);
-    expect(await response.text()).toBe("bad-signature");
+    expect(await response.text()).toBe("unauthorized");
+    expect(context.logger.entries).toEqual([
+      {
+        message: "rejected a tracker webhook",
+        fields: { connectionId: acme, reason: "bad-signature" },
+      },
+    ]);
     expect(stored(context)).toEqual([]);
   });
 
@@ -196,56 +257,111 @@ describe("receiveTrackerWebhook", () => {
     );
 
     expect(response.status).toBe(401);
-    expect(await response.text()).toBe("stale-timestamp");
+    expect(await response.text()).toBe("unauthorized");
+    expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual([
+      "stale-timestamp",
+    ]);
     expect(stored(context)).toEqual([]);
   });
 
-  it("등록하지 않은 연결의 주소면 404로 응답하고 본문을 읽지 않는다", async () => {
+  it("등록하지 않은 연결의 주소면 본문을 읽지 않고 끊은 뒤 401로 응답하고 이유를 기록한다", async () => {
     const context = setup();
     const { body, seen } = endlessBody(1024);
+    const missing = toTrackerConnectionId("conn-missing");
 
-    const response = await send(context, toTrackerConnectionId("conn-missing"), {
+    const response = await send(context, missing, {
       headers: new Headers(labelAdded.headers),
       body,
     });
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(401);
+    expect(seen.canceled).toBe(true);
     expect(seen.pulled).toBeLessThanOrEqual(1024);
+    expect(context.logger.entries).toEqual([
+      {
+        message: "rejected a tracker webhook",
+        fields: { connectionId: missing, reason: "unknown-connection" },
+      },
+    ]);
     expect(stored(context)).toEqual([]);
   });
 
-  it("본문이 5MiB를 넘으면 읽는 도중에 끊고 413으로 응답하며 기록하지 않는다", async () => {
+  it("없는 연결과 서명 실패는 바깥에서 같은 응답이다", async () => {
+    const context = setup();
+    const tampered = new TextEncoder().encode(
+      new TextDecoder().decode(labelAdded.rawBody).replace("ENG-123", "ENG-124"),
+    );
+
+    const missing = await send(
+      context,
+      toTrackerConnectionId("conn-missing"),
+      request(labelAdded.rawBody, labelAdded.headers),
+    );
+    const badSignature = await send(context, acme, request(tampered, labelAdded.headers));
+    const stale = await send(
+      context,
+      acme,
+      request(labelAdded.rawBody, labelAdded.headers),
+      new Date(receivedAt.getTime() + 61_000),
+    );
+
+    const outside = async (response: Response) => ({
+      status: response.status,
+      headers: Object.fromEntries(response.headers),
+      body: await response.text(),
+    });
+    const expected = await outside(missing);
+    expect(await outside(badSignature)).toEqual(expected);
+    expect(await outside(stale)).toEqual(expected);
+    // 안쪽 기록은 이유를 구분한다.
+    expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual([
+      "unknown-connection",
+      "bad-signature",
+      "stale-timestamp",
+    ]);
+  });
+
+  it("본문이 5MiB를 넘으면 읽는 도중에 끊고 401로 응답하며 이벤트를 쓰지 않는다", async () => {
     const context = setup();
     const chunk = 64 * 1024;
     const { body, seen } = endlessBody(chunk);
 
     const response = await send(context, acme, { headers: new Headers(labelAdded.headers), body });
 
-    expect(response.status).toBe(413);
-    expect(await response.text()).toBe("body-too-large");
+    // 연결이 없을 때와 구별되지 않게 다른 검증 실패와 같은 401이다. 이유는 기록에 남는다.
+    expect(response.status).toBe(401);
+    expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual([
+      "body-too-large",
+    ]);
     expect(seen.canceled).toBe(true);
     // 상한을 넘긴 조각에서 멈춘다. 스트림이 미리 당겨 둔 조각 몇 개만 더 읽힐 수 있다.
     expect(seen.pulled).toBeLessThanOrEqual(MAX_WEBHOOK_REQUEST_BYTES + 4 * chunk);
     expect(stored(context)).toEqual([]);
   });
 
-  it("Content-Length가 5MiB를 넘으면 본문을 읽지 않고 413으로 응답한다", async () => {
-    const context = setup();
-    const { body, seen } = endlessBody(1024);
+  it.each([
+    ["등록한 연결", acme],
+    ["없는 연결", toTrackerConnectionId("conn-missing")],
+  ])(
+    "Content-Length가 5MiB를 넘으면 본문을 읽지 않고 413으로 응답한다(%s)",
+    async (_, connection) => {
+      const context = setup();
+      const { body, seen } = endlessBody(1024);
 
-    const response = await send(context, acme, {
-      headers: new Headers({
-        ...labelAdded.headers,
-        "content-length": String(MAX_WEBHOOK_REQUEST_BYTES + 1),
-      }),
-      body,
-    });
+      const response = await send(context, connection, {
+        headers: new Headers({
+          ...labelAdded.headers,
+          "content-length": String(MAX_WEBHOOK_REQUEST_BYTES + 1),
+        }),
+        body,
+      });
 
-    expect(response.status).toBe(413);
-    expect(seen.canceled).toBe(true);
-    expect(seen.pulled).toBeLessThanOrEqual(1024);
-    expect(stored(context)).toEqual([]);
-  });
+      expect(response.status).toBe(413);
+      expect(seen.canceled).toBe(true);
+      expect(seen.pulled).toBeLessThanOrEqual(1024);
+      expect(stored(context)).toEqual([]);
+    },
+  );
 
   it("상한과 같은 크기의 본문은 끊지 않고 검증으로 넘긴다", async () => {
     const context = setup();
@@ -256,6 +372,115 @@ describe("receiveTrackerWebhook", () => {
 
     // 공백을 덧붙여 서명이 맞지 않는다. 크기에서 막히지 않고 서명 검사까지 갔다는 뜻이다.
     expect(response.status).toBe(401);
-    expect(await response.text()).toBe("bad-signature");
+    expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual([
+      "bad-signature",
+    ]);
+  });
+
+  it("본문 시간 제한의 기본값은 트래커가 응답을 기다리는 5초다", () => {
+    expect(WEBHOOK_BODY_TIMEOUT_MS).toBe(5_000);
+  });
+
+  it("본문을 조금씩 흘려 보내면 시간 제한에서 끊고 401로 응답한다", async () => {
+    const context = setup();
+    const { body, seen } = tricklingBody(5);
+    const started = Date.now();
+
+    const response = await send(context, acme, { headers: new Headers(labelAdded.headers), body });
+
+    expect(response.status).toBe(401);
+    expect(seen.canceled).toBe(true);
+    // 조각이 계속 와도 시간이 늘지 않는다. 본문 전체에 시간을 준다.
+    expect(Date.now() - started).toBeLessThan(TEST_BODY_TIMEOUT_MS * 10);
+    expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual(["body-timeout"]);
+    expect(stored(context)).toEqual([]);
+  });
+
+  it("본문 바이트를 보내지 않으면 시간 제한에서 끊고 401로 응답한다", async () => {
+    const context = setup();
+    const { body, seen } = silentBody();
+
+    const response = await send(context, acme, { headers: new Headers(labelAdded.headers), body });
+
+    expect(response.status).toBe(401);
+    expect(seen.canceled).toBe(true);
+    expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual(["body-timeout"]);
+  });
+
+  it("보내는 쪽이 본문 도중에 끊으면 서버 오류가 아니라 401로 답하고 이유를 기록한다", async () => {
+    const context = setup();
+    let sent = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent) {
+          controller.error(new Error("connection reset"));
+          return;
+        }
+        sent = true;
+        controller.enqueue(new Uint8Array([0x20]));
+      },
+    });
+
+    const response = await send(context, acme, { headers: new Headers(labelAdded.headers), body });
+
+    expect(response.status).toBe(401);
+    expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual(["body-aborted"]);
+    expect(stored(context)).toEqual([]);
+  });
+
+  it("연결의 비밀값을 열지 못하면 기록하고 내용 없는 500으로 응답한다", async () => {
+    const context = setup();
+    // 다른 암호화 키로 연다. 키를 바꾼 뒤 옛 DB를 쓰는 경우다.
+    const wrongKey = { ...context, secretBox: new SecretBox(new Uint8Array(32).fill(9)) };
+    const { body, seen } = endlessBody(1024);
+
+    const response = await send(wrongKey, acme, { headers: new Headers(labelAdded.headers), body });
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe("error");
+    expect(seen.canceled).toBe(true);
+    expect(context.logger.entries.map((entry) => entry.message)).toEqual([
+      "could not handle a tracker webhook",
+    ]);
+    expect(context.logger.entries[0]?.fields["error"]).toBeInstanceOf(Error);
+    expect(stored(context)).toEqual([]);
+  });
+
+  it("연결 종류의 어댑터를 만들지 못하면 기록하고 내용 없는 500으로 응답한다", async () => {
+    const context = setup();
+    // 등록표에 그 종류가 없다. 어댑터 설정 오류도 같은 길로 간다.
+    const noAdapters = { ...context, registry: new AdapterRegistry() };
+
+    const response = await send(noAdapters, acme, request(labelAdded.rawBody, labelAdded.headers));
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe("error");
+    expect(context.logger.entries.map((entry) => entry.message)).toEqual([
+      "could not handle a tracker webhook",
+    ]);
+    expect(stored(context)).toEqual([]);
+  });
+
+  it("처리 전에 서버 설정 오류가 나면 기록하고 본문을 끊은 뒤 500으로 응답한다", async () => {
+    const logger = memoryLogger();
+    const { body, seen } = endlessBody(1024);
+    const failure = new Error("bad boot config");
+
+    const response = await rejectTrackerWebhook(
+      logger,
+      acme,
+      { headers: new Headers(), body },
+      failure,
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe("error");
+    expect(seen.canceled).toBe(true);
+    expect(logger.entries).toEqual([
+      {
+        message: "could not handle a tracker webhook",
+        fields: { connectionId: acme, error: failure },
+      },
+    ]);
   });
 });
