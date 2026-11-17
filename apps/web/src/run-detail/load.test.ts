@@ -1,19 +1,30 @@
-import { AGENT_RESULTS, toPullRequestId, toQuestionId } from "@factory/core";
+import { AGENT_RESULTS, toPermissionRequestId, toPullRequestId, toQuestionId } from "@factory/core";
 import type { RunId } from "@factory/core";
+import type { Database } from "@factory/db";
 import {
   changeRunState,
   completeLogTailRequest,
   getLogTailRequest,
+  listRunPermissionWaits,
   listRunQuestions,
   markAnswerSent,
   markCancelRequestProcessed,
+  recordPermissionWaits,
   recordRunQuestions,
   recordStartFailure,
   updateRunRecords,
 } from "@factory/db";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { endedCases, minutes, now, seedDatabase } from "../testing/seed";
-import { answerQuestion, cancelRunRequest } from "./actions";
+import {
+  AnswerRejectedError,
+  answerInput,
+  denyInput,
+  submitAnswer,
+  submitDenial,
+} from "../home/actions";
+import { cancelRunRequest } from "./actions";
 import { loadRunDetail, requestRunLogTail, toCiView } from "./load";
 import { addExtraEnded, assign, extraEndedCases, startedOn, walk } from "./testing";
 import type { RunDetail } from "./model";
@@ -310,6 +321,11 @@ describe("질문과 답(Q82.3)", () => {
     return { db, id };
   }
 
+  /** server function 과 같은 경계 검증을 거쳐 답한다 */
+  function answer(db: Database, runId: string, questionId: string, text: string, at: number) {
+    submitAnswer(db, answerInput.parse({ runId, questionId, answer: text }), minutes(at));
+  }
+
   it("질문으로 기다리는 런은 질문 내용과 선택지를 담는다", () => {
     const { db, id } = waitingWithQuestion();
     expect(detail(db, id).status).toEqual({
@@ -319,30 +335,23 @@ describe("질문과 답(Q82.3)", () => {
         questionId: "q-1",
         body: "마이그레이션을 지금 돌릴까요?",
         choices: ["돌려 주세요", "멈춰 주세요"],
-        askedAt: minutes(60).toISOString(),
+        answered: false,
       },
     });
   });
 
   it("답하면 DB 에 답이 하나 생기고, 지난 질문과 답은 타임라인에 남는다", () => {
     const { db, id } = waitingWithQuestion();
-    expect(
-      answerQuestion(db, { runId: id, questionId: "q-1", answer: " 돌려 주세요 " }, minutes(61)),
-    ).toEqual({
-      ok: true,
-    });
+    answer(db, id, "q-1", " 돌려 주세요 ", 61);
     expect(listRunQuestions(db, id).map((q) => q.answer)).toEqual([
       { text: "돌려 주세요", answeredAt: minutes(61), sentAt: null },
     ]);
     // 한 질문에 답은 하나다
-    expect(
-      answerQuestion(db, { runId: id, questionId: "q-1", answer: "멈춰 주세요" }, minutes(62)),
-    ).toEqual({
-      ok: false,
-      reason: "already-answered",
-    });
+    expect(() => answer(db, id, "q-1", "멈춰 주세요", 62)).toThrow(AnswerRejectedError);
+    expect(listRunQuestions(db, id)).toHaveLength(1);
+
     const run = detail(db, id);
-    expect(run.status).toEqual({ state: "waiting-for-input", input: { kind: "answer-sending" } });
+    expect(run.status).toMatchObject({ input: { kind: "question", answered: true } });
     expect(run.timeline.filter((e) => e.kind === "question" || e.kind === "answer")).toEqual([
       { kind: "question", body: "마이그레이션을 지금 돌릴까요?", at: minutes(60).toISOString() },
       { kind: "answer", body: "돌려 주세요", at: minutes(61).toISOString() },
@@ -356,19 +365,56 @@ describe("질문과 답(Q82.3)", () => {
 
   it("빈 답과 모르는 질문은 받지 않는다", () => {
     const { db, id } = waitingWithQuestion();
-    expect(answerQuestion(db, { runId: id, questionId: "q-1", answer: "  " }, minutes(61))).toEqual(
-      {
-        ok: false,
-        reason: "empty",
-      },
-    );
-    expect(answerQuestion(db, { runId: id, questionId: "q-9", answer: "네" }, minutes(61))).toEqual(
-      {
-        ok: false,
-        reason: "not-found",
-      },
-    );
+    expect(() => answer(db, id, "q-1", "  ", 61)).toThrow(z.ZodError);
+    expect(() => answer(db, id, "q-9", "네", 61)).toThrow(AnswerRejectedError);
     expect(listRunQuestions(db, id)[0]?.answer).toBeNull();
+  });
+});
+
+describe("권한 대기(Q82.4)", () => {
+  function waitingForPermission() {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-11");
+    if (id === undefined) throw new Error("no ACME-11");
+    recordPermissionWaits(db, id, [
+      {
+        id: toPermissionRequestId("perm-1"),
+        detail: "Bash: rm -rf node_modules",
+        requestedAt: minutes(60),
+      },
+    ]);
+    return { db, id };
+  }
+
+  it("권한 대기 런은 무엇을 허용하려는지 담는다", () => {
+    const { db, id } = waitingForPermission();
+    expect(detail(db, id).status).toEqual({
+      state: "waiting-for-input",
+      input: {
+        kind: "permission",
+        promptId: "perm-1",
+        detail: "Bash: rm -rf node_modules",
+        denied: false,
+      },
+    });
+  });
+
+  it("거절하면 DB 에 거절이 하나 생기고 타임라인에 남는다", () => {
+    const { db, id } = waitingForPermission();
+    submitDenial(
+      db,
+      denyInput.parse({ runId: id, promptId: "perm-1", reason: "지우지 말고 캐시만 비워 주세요" }),
+      minutes(61),
+    );
+    expect(listRunPermissionWaits(db, id).map((w) => w.denial)).toEqual([
+      { reason: "지우지 말고 캐시만 비워 주세요", deniedAt: minutes(61), sentAt: null },
+    ]);
+    const run = detail(db, id);
+    expect(run.status).toMatchObject({ input: { kind: "permission", denied: true } });
+    expect(run.timeline.filter((e) => e.kind === "permission" || e.kind === "denied")).toEqual([
+      { kind: "permission", body: "Bash: rm -rf node_modules", at: minutes(60).toISOString() },
+      { kind: "denied", body: "지우지 말고 캐시만 비워 주세요", at: minutes(61).toISOString() },
+    ]);
   });
 });
 

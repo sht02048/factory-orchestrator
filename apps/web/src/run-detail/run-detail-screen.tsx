@@ -29,8 +29,8 @@ import type { LogTailView, PendingInput, RunDetail, RunDetailPage, TimelineEvent
 export interface RunDetailActions {
   /** 질문에 답한다. 답을 DB 에 남기고 worker 가 보낸다(Q82.3) */
   onAnswer: (questionId: string, body: string) => Promise<void>;
-  /** 권한 대기를 거절한다(Q82.4). 허용은 러너 화면에서만 한다 */
-  onDeny: () => Promise<void>;
+  /** 권한 대기를 거절한다(Q82.4). 허용은 러너 화면에서만 한다. 이유는 비어도 된다 */
+  onDeny: (promptId: string, reason: string) => Promise<void>;
   /** 취소를 요청한다(Q77·Q82.8) */
   onCancel: () => Promise<void>;
   /** 로그 꼬리를 다시 요청한다 */
@@ -175,8 +175,15 @@ function Reason({ run }: { run: RunDetail }) {
 
 function inputKey(
   input: PendingInput,
-): "question" | "permission" | "answer-sending" | "waiting-unknown" {
-  return input.kind === "unknown" ? "waiting-unknown" : input.kind;
+): "question" | "answered" | "permission" | "denied" | "waiting-unknown" {
+  switch (input.kind) {
+    case "question":
+      return input.answered ? "answered" : "question";
+    case "permission":
+      return input.denied ? "denied" : "permission";
+    case "unknown":
+      return "waiting-unknown";
+  }
 }
 
 function NextAction({ run }: { run: RunDetail }) {
@@ -220,10 +227,9 @@ function InputBlock({
 }) {
   switch (input.kind) {
     case "question":
-      return <QuestionForm question={input} onAnswer={onAnswer} />;
+      return input.answered ? null : <QuestionForm question={input} onAnswer={onAnswer} />;
     case "permission":
-      return <PermissionWait onDeny={onDeny} />;
-    case "answer-sending":
+      return input.denied ? null : <PermissionWait wait={input} onDeny={onDeny} />;
     case "unknown":
       return null;
   }
@@ -306,30 +312,44 @@ function QuestionForm({
   );
 }
 
-function PermissionWait({ onDeny }: { onDeny: RunDetailActions["onDeny"] }) {
+function PermissionWait({
+  wait,
+  onDeny,
+}: {
+  wait: Extract<PendingInput, { kind: "permission" }>;
+  onDeny: RunDetailActions["onDeny"];
+}) {
   const t = useTranslations("run");
+  const [reason, setReason] = useState("");
   const [submit, setSubmit] = useState<Submit>({ kind: "idle" });
   return (
     <Section title={t("permission.title")}>
       <div {...stylex.props(styles.stack)}>
+        <pre {...stylex.props(styles.question)}>{wait.detail}</pre>
         <Text variant="body">{t("permission.body")}</Text>
         {submit.kind === "sent" ? (
           <Text variant="body">{t("permission.denied")}</Text>
         ) : (
-          <Actions>
-            <Button
-              disabled={submit.kind === "sending"}
-              onClick={() => {
-                setSubmit({ kind: "sending" });
-                onDeny().then(
-                  () => setSubmit({ kind: "sent" }),
-                  () => setSubmit({ kind: "failed" }),
-                );
-              }}
-            >
-              {t("permission.deny")}
-            </Button>
-          </Actions>
+          <form
+            {...stylex.props(styles.stack)}
+            onSubmit={(event) => {
+              event.preventDefault();
+              setSubmit({ kind: "sending" });
+              onDeny(wait.promptId, reason).then(
+                () => setSubmit({ kind: "sent" }),
+                () => setSubmit({ kind: "failed" }),
+              );
+            }}
+          >
+            <Field label={t("permission.reasonLabel")} description={t("permission.reasonHelp")}>
+              <Input name="reason" value={reason} onValueChange={setReason} autoComplete="off" />
+            </Field>
+            <Actions>
+              <Button type="submit" disabled={submit.kind === "sending"}>
+                {submit.kind === "sending" ? t("permission.denying") : t("permission.deny")}
+              </Button>
+            </Actions>
+          </form>
         )}
         {submit.kind === "failed" ? <Text variant="body">{t("actionFailed")}</Text> : null}
       </div>
@@ -376,7 +396,10 @@ function Timeline({ events }: { events: ReadonlyArray<TimelineEvent> }) {
     switch (event.kind) {
       case "question":
       case "answer":
+      case "permission":
         return event.body;
+      case "denied":
+        return event.body === "" ? null : event.body;
       case "ended":
         return domain(`agentResult.${event.agentResult}`);
       case "later-pr":
@@ -388,7 +411,6 @@ function Timeline({ events }: { events: ReadonlyArray<TimelineEvent> }) {
       case "unreachable":
       case "disconnected":
       case "reconnected":
-      case "permission":
       case "cancel-requested":
         return null;
     }

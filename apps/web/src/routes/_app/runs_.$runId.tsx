@@ -5,13 +5,15 @@ import { ScreenMessages, defaultLocale } from "../../i18n";
 import { runMessages } from "../../run-detail/messages";
 import { RunDetailScreen } from "../../run-detail/run-detail-screen";
 import type { RunActionResult } from "../../run-detail/actions";
-import { answerRunQuestion, cancelRun, getRunDetail, requestRunLog } from "../../server/functions";
+import {
+  answerQuestion,
+  cancelRun,
+  denyPermission,
+  getRunDetail,
+  requestRunLog,
+} from "../../server/functions";
 
 const t = createTranslator({ locale: defaultLocale, messages: runMessages, namespace: "run" });
-
-// 작업 중: 권한 대기·거절 표는 0020 이 packages/db 에 더한다. 그 뒤 server function 으로 바꾼다.
-const denyNotStored = (): Promise<RunActionResult> =>
-  Promise.resolve({ ok: false, reason: "not-available" });
 
 /** 행동이 거절되면 화면이 실패를 보이도록 던진다 */
 function expectOk(result: RunActionResult): void {
@@ -67,11 +69,11 @@ function RunDetailRoute() {
         runsHref={`/runs${search}`}
         runHref={(id) => `/runs/${encodeURIComponent(id)}${search}`}
         onAnswer={async (questionId, answer) => {
-          expectOk(await answerRunQuestion({ data: { runId, questionId, answer } }));
+          await answerQuestion({ data: { runId, questionId, answer } });
           await reload();
         }}
-        onDeny={async () => {
-          expectOk(await denyNotStored());
+        onDeny={async (promptId, reason) => {
+          await denyPermission({ data: { runId, promptId, reason } });
           await reload();
         }}
         onCancel={async () => {

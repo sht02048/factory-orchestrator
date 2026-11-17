@@ -1,6 +1,7 @@
-import { toQuestionId } from "@factory/core";
+import { toPermissionRequestId, toQuestionId } from "@factory/core";
 import {
   completeLogTailRequest,
+  recordPermissionWaits,
   recordRunQuestions,
   recordStartFailure,
   updateRunRecords,
@@ -16,6 +17,7 @@ import { runMessages } from "./messages";
 import type { RunDetail, RunDetailPage } from "./model";
 import { RunDetailScreen } from "./run-detail-screen";
 import { addExtraEnded, assign, extraEndedCases, walk } from "./testing";
+import { answerInput, submitAnswer } from "../home/actions";
 import { cancelRunRequest } from "./actions";
 
 const resolved = () => Promise.resolve();
@@ -167,23 +169,40 @@ describe("Run 상세 화면", () => {
 
   it("권한 대기 런은 러너 화면에서 허용하라고 안내하고 거절만 둔다", () => {
     const { db, ids } = seedDatabase();
-    const run = found(db, ids.get("ACME-11"));
-    const body = text(
-      render({
-        kind: "found",
-        run: {
-          ...run,
-          status: {
-            state: "waiting-for-input",
-            input: { kind: "permission", since: minutes(50).toISOString() },
-          },
-        },
-      }),
-    );
+    const id = ids.get("ACME-11");
+    if (id === undefined) throw new Error("no ACME-11");
+    recordPermissionWaits(db, id, [
+      {
+        id: toPermissionRequestId("perm-1"),
+        detail: "Bash: rm -rf node_modules",
+        requestedAt: minutes(50),
+      },
+    ]);
+    const html = render(page(db, id));
+    const body = text(html);
+    expect(body).toContain("Bash: rm -rf node_modules");
     expect(body).toContain(runJson.permission.body);
     expect(body).toContain(runJson.permission.deny);
     expect(body).not.toContain("허용하기");
+    expect(html).not.toMatch(/<button[^>]*>[^<]*허용/);
     expect(body).not.toContain(runJson.question.submit);
+  });
+
+  it("답이나 거절을 남긴 뒤에는 입력 칸을 닫고 worker 가 보낸다고 보인다", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-11");
+    if (id === undefined) throw new Error("no ACME-11");
+    recordRunQuestions(db, id, [
+      { id: toQuestionId("q-1"), body: "계속할까요?", options: [], askedAt: minutes(50) },
+    ]);
+    submitAnswer(
+      db,
+      answerInput.parse({ runId: id, questionId: "q-1", answer: "네" }),
+      minutes(51),
+    );
+    const html = render(page(db, id));
+    expect(html).not.toContain('name="answer"');
+    expect(text(html)).toContain(runJson.next.answered);
   });
 
   it("CI 상태를 볼 수 없으면 그렇게 보이고 요약 결과는 그대로다(Q79)", () => {

@@ -8,6 +8,7 @@ import {
   hasPendingCancelRequest,
   listPendingCancelRequests,
   listRunPlacements,
+  listRunPermissionWaits,
   listRunQuestions,
   listRunStateChanges,
   listRunnerSnapshots,
@@ -21,15 +22,16 @@ import type {
   RunRecords,
   RunStateChangeRecord,
   StoredRun,
+  StoredPermissionWait,
   StoredRunQuestion,
 } from "@factory/db";
+import { pendingInput } from "../home/load";
 import type { QueuedReason } from "../runs/model";
 import { explainQueue } from "../runs/queue-reasons";
 import type {
   CiView,
   LogTailView,
   OtherRun,
-  PendingInput,
   RunDetail,
   RunDetailPage,
   RunDetailStatus,
@@ -53,6 +55,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
   const durations = runDurations({ assignedAt: run.assignedAt, startedAt, endedAt, now });
   const pr = records.pullRequest;
   const questions = listRunQuestions(db, run.id);
+  const permissionWaits = listRunPermissionWaits(db, run.id);
 
   const detail: RunDetail = {
     id: run.id,
@@ -70,7 +73,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     endedAt: endedAt?.toISOString() ?? null,
     waitMs: durations.waitMs ?? 0,
     executionMs: durations.executionMs,
-    status: statusOf(db, run, records, questions),
+    status: statusOf(db, run, records),
     pullRequest:
       pr === null || !isWebUrl(pr.url)
         ? null
@@ -84,6 +87,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
       records,
       listRunStateChanges(db, run.id),
       questions,
+      permissionWaits,
       cancelRequestedAt(db, run.id),
     ),
     log: logOf(db, run, records),
@@ -104,19 +108,17 @@ export function requestRunLogTail(db: Database, runId: string, now: Date): boole
   return true;
 }
 
-function statusOf(
-  db: Database,
-  run: StoredRun,
-  records: RunRecords,
-  questions: ReadonlyArray<StoredRunQuestion>,
-): RunDetailStatus {
+function statusOf(db: Database, run: StoredRun, records: RunRecords): RunDetailStatus {
   switch (run.state) {
     case "queued":
       return { state: "queued", queuedReason: queuedReasonOf(db, run.id) };
     case "running":
       return { state: "running" };
     case "waiting-for-input":
-      return { state: "waiting-for-input", input: pendingInputOf(questions) };
+      return {
+        state: "waiting-for-input",
+        input: pendingInput(db, run.id) ?? { kind: "unknown" },
+      };
     case "disconnected":
       return {
         state: "disconnected",
@@ -175,6 +177,7 @@ function timelineOf(
   records: RunRecords,
   changes: ReadonlyArray<RunStateChangeRecord>,
   questions: ReadonlyArray<StoredRunQuestion>,
+  permissionWaits: ReadonlyArray<StoredPermissionWait>,
   cancelRequestedAt: Date | null,
 ): TimelineEvent[] {
   const events: TimelineEvent[] = [];
@@ -189,6 +192,16 @@ function timelineOf(
         kind: "answer",
         body: question.answer.text,
         at: question.answer.answeredAt.toISOString(),
+      });
+    }
+  }
+  for (const wait of permissionWaits) {
+    events.push({ kind: "permission", body: wait.detail, at: wait.requestedAt.toISOString() });
+    if (wait.denial !== null) {
+      events.push({
+        kind: "denied",
+        body: wait.denial.reason,
+        at: wait.denial.deniedAt.toISOString(),
       });
     }
   }
@@ -228,25 +241,6 @@ function changeEvent(run: StoredRun, change: RunStateChangeRecord): TimelineEven
     case "ended":
       return run.state === "ended" ? { kind: "ended", agentResult: run.agentResult, at } : null;
   }
-}
-
-/**
- * Waiting for Input 런이 무엇을 기다리는지(Q82.3). 답하지 않은 첫 질문이 있으면 그 질문이고,
- * 질문에 모두 답했는데 아직 기다리면 worker 가 답을 보내기 전이다.
- */
-function pendingInputOf(questions: ReadonlyArray<StoredRunQuestion>): PendingInput {
-  const open = questions.find((q) => q.answer === null);
-  if (open !== undefined) {
-    return {
-      kind: "question",
-      questionId: open.id,
-      body: open.body,
-      choices: [...open.options],
-      askedAt: open.askedAt.toISOString(),
-    };
-  }
-  const unsent = questions.some((q) => q.answer !== null && q.answer.sentAt === null);
-  return { kind: unsent ? "answer-sending" : "unknown" };
 }
 
 /** 처리하지 않은 취소 요청의 시각. 처리한 요청은 런의 종료(운영자가 취소함)로 타임라인에 남는다 */

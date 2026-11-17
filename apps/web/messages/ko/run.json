@@ -27,8 +27,9 @@
     "merged": "에이전트가 완료 보고를 보냈고 PR이 병합됐어요.",
     "human-check": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
     "failed": "에이전트 결과와 PR 상태 때문에 Failed예요. 자동으로 다시 시도하지 않아요.",
-    "answer-sending": "질문에 답했어요. worker가 에이전트에게 답을 보내면 다시 실행해요.",
-    "canceled": "운영자가 취소한 런이에요. 손댈 일에 올리지 않아요."
+    "canceled": "운영자가 취소한 런이에요. 손댈 일에 올리지 않아요.",
+    "answered": "질문에 답했어요. worker가 에이전트에게 답을 보내면 다시 실행해요.",
+    "denied": "권한 요청을 거절했어요. worker가 에이전트에게 거절을 보내요."
   },
   "next": {
     "title": "다음 행동",
@@ -42,8 +43,9 @@
     "human-check": "PR을 확인하고 병합하거나 닫아 주세요.",
     "failed": "원인을 확인하고, 필요하면 티켓을 다시 할당해 주세요.",
     "manualRemoval": "러너가 돌아오면 러너에서 워크트리를 직접 지워 주세요.",
-    "answer-sending": "할 일이 없어요. worker가 답을 보내요.",
-    "canceled": "할 일이 없어요. 필요하면 티켓을 다시 할당해 주세요."
+    "canceled": "할 일이 없어요. 필요하면 티켓을 다시 할당해 주세요.",
+    "answered": "할 일이 없어요. worker가 답을 보내요.",
+    "denied": "할 일이 없어요. worker가 거절을 보내요."
   },
   "manualRemoval": "사람이 지워야 함",
   "openPr": "PR {pr} 열기",
@@ -61,7 +63,10 @@
     "title": "권한 대기",
     "body": "러너 화면에서 허용해 주세요. 오케스트레이터에서는 허용할 수 없어요.",
     "deny": "거절",
-    "denied": "거절을 남겼어요. worker가 보내요."
+    "denied": "거절을 남겼어요. worker가 보내요.",
+    "reasonLabel": "거절 이유",
+    "reasonHelp": "에이전트가 대신 할 일을 적으면 함께 전해요. 비워 둬도 돼요.",
+    "denying": "거절하는 중"
   },
   "cancel": {
     "trigger": "런 취소",
@@ -86,7 +91,8 @@
     "reconnected": "다시 연결",
     "cancel-requested": "취소 요청",
     "ended": "종료",
-    "later-pr": "이후 PR 상태"
+    "later-pr": "이후 PR 상태",
+    "denied": "거절"
   },
   "report": {
     "title": "완료 보고",

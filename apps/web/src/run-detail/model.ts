@@ -1,4 +1,5 @@
 import type { AgentResult, PrState, RunState, SummaryOutcome } from "@factory/core";
+import type { InputWait } from "../home/model";
 import type { QueuedReason } from "../runs/model";
 
 /*
@@ -20,7 +21,7 @@ export type CiView = "success" | "failure" | "pending" | "none" | "unavailable" 
  * - started: 러너에서 시작
  * - waiting-for-input: 입력을 기다리기 시작
  * - question / answer: 에이전트 질문과 운영자 답(Q82.3)
- * - permission: 권한 대기(Q82.4)
+ * - permission / denied: 권한 대기와 운영자 거절(Q82.4)
  * - unreachable: ssh 가 실패하기 시작(연결 끊김 판단의 시작, Q50)
  * - disconnected / reconnected: 연결 끊김과 다시 연결(Q67)
  * - resumed: 입력 기다림에서 다시 실행
@@ -30,9 +31,9 @@ export type CiView = "success" | "failure" | "pending" | "none" | "unavailable" 
  */
 export type TimelineEvent = { at: string } & (
   | { kind: "assigned" | "started" | "waiting-for-input" | "resumed" }
-  | { kind: "unreachable" | "disconnected" | "reconnected" | "permission" }
-  | { kind: "question"; body: string }
-  | { kind: "answer"; body: string }
+  | { kind: "unreachable" | "disconnected" | "reconnected" }
+  | { kind: "question" | "answer" | "permission"; body: string }
+  | { kind: "denied"; body: string }
   | { kind: "cancel-requested" }
   | { kind: "ended"; agentResult: AgentResult }
   | { kind: "later-pr"; state: "merged" | "closed" }
@@ -40,16 +41,9 @@ export type TimelineEvent = { at: string } & (
 
 /**
  * 에이전트가 사람 입력을 기다리는 까닭(Q82.3·Q82.4). Waiting for Input 런에만 있다.
- * - question: 에이전트가 질문했다. 답하기 칸을 보이고, 선택지가 있으면 선택지를 보인다
- * - permission: 권한 프롬프트에서 허용을 기다린다. 허용은 러너 화면에서만 할 수 있고 여기서는 거절만 둔다
- * - answer-sending: 질문에 모두 답했고 worker 가 답을 보내기 전이다
- * - unknown: 아직 worker 가 까닭을 기록하지 않았다
+ * 질문과 권한 대기는 홈의 손댈 일과 같은 값이다(home InputWait). unknown 은 worker 가 아직 기록하지 않았다.
  */
-export type PendingInput =
-  | { kind: "question"; questionId: string; body: string; choices: string[]; askedAt: string }
-  | { kind: "permission"; since: string }
-  | { kind: "answer-sending" }
-  | { kind: "unknown" };
+export type PendingInput = InputWait | { kind: "unknown" };
 
 /**
  * 로그 꼬리(Q46·Q61). web 은 ssh 를 쓰지 않고 DB 에 요청을 남기고 worker 가 쓴 결과를 읽는다.
