@@ -11,7 +11,9 @@ import type {
   QueuedRun,
   RetryToken,
   RunnerChoice,
+  RunId,
   RunnerId,
+  StartedRun,
 } from "@factory/core";
 import {
   changeRunState,
@@ -96,7 +98,7 @@ export function createWorker(options: WorkerOptions): Worker {
   const now = options.now ?? (() => new Date());
   const logger = options.logger ?? consoleLogger;
   const adapters = new WorkerAdapters(options.registry, options.secretBox);
-  const context: TickContext = { db, now, logger, adapters };
+  const context: TickContext = { db, now, logger, adapters, startedNotRecorded: new Map() };
   let running: Promise<void> | null = null;
   let closed = false;
 
@@ -123,6 +125,11 @@ interface TickContext {
   now: () => Date;
   logger: WorkerLogger;
   adapters: WorkerAdapters;
+  /**
+   * 러너에서 시작했지만 Running을 DB에 쓰지 못한 런(쓰기 잠금 시간 초과 등). 다음 바퀴에 러너에 다시
+   * 보내지 않고 이 결과로 기록만 다시 한다.
+   */
+  startedNotRecorded: Map<RunId, StartedRun>;
 }
 
 async function tick(context: TickContext): Promise<void> {
@@ -265,69 +272,119 @@ function toQueuedRun(run: StoredRun): QueuedRun[] {
  * 대기열에 없어 다시 시작하지 않는다. 러너가 시작 결과를 모른다고 답하면(start-outcome-unknown)
  * 러너가 준 다시 보내기 값(retryToken)을 DB에 써 두고, 다음 바퀴에(데몬을 다시 띄운 뒤라도) 그 값으로
  * 같은 시작을 다시 보낸다. 다시 보내기 값은 러너가 발급한 것만 보낸다(core StartRunInput).
+ * 러너에서 시작한 뒤 DB 쓰기만 실패하면 시작 결과를 메모리에 두고 다음 바퀴에 기록만 다시 한다.
+ *
+ * 알려진 한계: 러너의 응답을 받은 뒤 DB에 쓰기 전에 데몬이 죽으면 다시 띄웠을 때 시작을 새로 보낸다.
+ * 지금 Runner 계약에서는 시작 전에 둘 멱등 키가 없다.
  */
 async function startQueuedRun(context: TickContext, choice: RunnerChoice): Promise<boolean> {
-  const { db, now, logger, adapters } = context;
+  const { db } = context;
   const found = getRunWithRecords(db, choice.runId);
   if (found === null) return false;
   const { run, records } = found;
-  if (run.state !== "queued" || run.runnerId !== choice.runnerId) return false;
-
-  const storedRunner = findRunner(db, choice.runnerId);
-  if (storedRunner === undefined) return false;
-
-  try {
-    const tracker = adapters.tracker(db, run.ticket.connection);
-    if (tracker === null) {
-      logger.warn("run's tracker connection is not registered", { runId: run.id });
-      return false;
-    }
-    const ticket = await tracker.getTicket(run.ticket.key);
-    if (ticket === null) {
-      logger.warn("run's ticket was not found in the tracker", { runId: run.id });
-      return false;
-    }
-
-    const started = await adapters.runner(storedRunner).startRun({
-      project: run.runnerProject,
-      worktreeName: run.branch.replaceAll("/", "-"),
-      branch: run.branch,
-      agent: run.agent,
-      // 에이전트에게는 티켓만 지시로 준다(GLOSSARY Agent).
-      prompt: `${ticket.title}\n\n${ticket.body}`,
-      ticket: { key: ticket.key, url: ticket.url },
-      ...(records.retryToken === null ? {} : { retryToken: records.retryToken }),
-    });
-    if (started.branch !== run.branch) {
-      // PR 1순위 찾기는 런의 브랜치로 한다(Q40). 러너가 다른 브랜치를 쓰면 티켓 키로만 잇는다.
-      logger.warn("runner started the run on another branch", {
-        runId: run.id,
-        expected: run.branch,
-        actual: started.branch,
-      });
-    }
-
-    return inTransaction(db, () => {
-      const result = changeRunState(
-        db,
-        run.id,
-        { to: "running", worktree: started.worktree },
-        now(),
-      );
-      if (!result.ok) {
-        reportFailure(logger, run, result);
-        return false;
-      }
-      if (started.retryToken !== null) {
-        updateRunRecords(db, run.id, { retryToken: started.retryToken });
-      }
-      return true;
-    });
-  } catch (error) {
-    const retryToken = startOutcomeUnknownToken(error);
-    if (retryToken !== null) updateRunRecords(db, run.id, { retryToken });
-    logger.warn("could not start run", { runId: run.id, error });
+  if (run.state !== "queued" || run.runnerId !== choice.runnerId) {
+    context.startedNotRecorded.delete(choice.runId);
     return false;
+  }
+
+  const started =
+    context.startedNotRecorded.get(run.id) ??
+    (await startOnRunner(context, run, choice.runnerId, records.retryToken));
+  if (started === null) return false;
+  context.startedNotRecorded.set(run.id, started);
+
+  const recorded = tryWrite(context, run, () => recordStart(context, run, started));
+  if (recorded !== undefined) context.startedNotRecorded.delete(run.id);
+  return recorded === true;
+}
+
+/**
+ * 러너에 시작을 보낸다. 시작하지 못했으면 null이다. 러너가 결과를 모른다고 답하면 러너가 준
+ * 다시 보내기 값을 DB에 써 둔다.
+ */
+async function startOnRunner(
+  context: TickContext,
+  run: Extract<StoredRun, { state: "queued" }>,
+  runnerId: RunnerId,
+  retryToken: RetryToken | null,
+): Promise<StartedRun | null> {
+  try {
+    return await sendStart(context, run, runnerId, retryToken);
+  } catch (error) {
+    context.logger.warn("could not start run", { runId: run.id, error });
+    const issued = startOutcomeUnknownToken(error);
+    if (issued !== null) {
+      tryWrite(context, run, () => updateRunRecords(context.db, run.id, { retryToken: issued }));
+    }
+    return null;
+  }
+}
+
+/** 러너에 시작을 보낸다. 티켓·러너를 찾지 못하면 null이다. */
+async function sendStart(
+  context: TickContext,
+  run: Extract<StoredRun, { state: "queued" }>,
+  runnerId: RunnerId,
+  retryToken: RetryToken | null,
+): Promise<StartedRun | null> {
+  const { db, logger, adapters } = context;
+  const storedRunner = findRunner(db, runnerId);
+  if (storedRunner === undefined) return null;
+  const tracker = adapters.tracker(db, run.ticket.connection);
+  if (tracker === null) {
+    logger.warn("run's tracker connection is not registered", { runId: run.id });
+    return null;
+  }
+  const ticket = await tracker.getTicket(run.ticket.key);
+  if (ticket === null) {
+    logger.warn("run's ticket was not found in the tracker", { runId: run.id });
+    return null;
+  }
+
+  const started = await adapters.runner(storedRunner).startRun({
+    project: run.runnerProject,
+    worktreeName: run.branch.replaceAll("/", "-"),
+    branch: run.branch,
+    agent: run.agent,
+    // 에이전트에게는 티켓만 지시로 준다(GLOSSARY Agent).
+    prompt: `${ticket.title}\n\n${ticket.body}`,
+    ticket: { key: ticket.key, url: ticket.url },
+    ...(retryToken === null ? {} : { retryToken }),
+  });
+  if (started.branch !== run.branch) {
+    // PR 1순위 찾기는 런의 브랜치로 한다(Q40). 러너가 다른 브랜치를 쓰면 티켓 키로만 잇는다.
+    logger.warn("runner started the run on another branch", {
+      runId: run.id,
+      expected: run.branch,
+      actual: started.branch,
+    });
+  }
+  return started;
+}
+
+/** 시작한 런을 Running으로 쓴다. 런이 더는 Queued가 아니면 false다. */
+function recordStart(context: TickContext, run: StoredRun, started: StartedRun): boolean {
+  const { db, now, logger } = context;
+  return inTransaction(db, () => {
+    const result = changeRunState(db, run.id, { to: "running", worktree: started.worktree }, now());
+    if (!result.ok) {
+      reportFailure(logger, run, result);
+      return false;
+    }
+    if (started.retryToken !== null) {
+      updateRunRecords(db, run.id, { retryToken: started.retryToken });
+    }
+    return true;
+  });
+}
+
+/** DB 쓰기. 실패하면(쓰기 잠금 시간 초과 등) 알리고 undefined를 돌려준다. */
+function tryWrite<T>(context: TickContext, run: StoredRun, write: () => T): T | undefined {
+  try {
+    return write();
+  } catch (error) {
+    context.logger.warn("could not write run", { runId: run.id, error });
+    return undefined;
   }
 }
 
