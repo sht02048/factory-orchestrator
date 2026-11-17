@@ -475,19 +475,27 @@ export interface StoredMapping {
   trackerProject: TrackerProjectId;
   runnerProject: RunnerProjectId;
   agent: AgentId;
+  /** 에이전트 모델(0043). null 이면 정하지 않았다(러너 설정, 그다음 러너 도구의 기본값) */
+  model: string | null;
 }
 
-export function saveMapping(db: Database, mapping: StoredMapping): void {
+/** Mapping 을 저장한다. model 을 주지 않으면 정하지 않은 것(null)으로 저장한다 */
+export function saveMapping(
+  db: Database,
+  input: Omit<StoredMapping, "model"> & { model?: string | null },
+): void {
+  const model = input.model ?? null;
   db.insert(mappings)
     .values({
-      trackerConnectionId: mapping.connection,
-      trackerProjectId: mapping.trackerProject,
-      runnerProjectId: mapping.runnerProject,
-      agentId: mapping.agent,
+      trackerConnectionId: input.connection,
+      trackerProjectId: input.trackerProject,
+      runnerProjectId: input.runnerProject,
+      agentId: input.agent,
+      model,
     })
     .onConflictDoUpdate({
       target: [mappings.trackerConnectionId, mappings.trackerProjectId],
-      set: { runnerProjectId: mapping.runnerProject, agentId: mapping.agent },
+      set: { runnerProjectId: input.runnerProject, agentId: input.agent, model },
     })
     .run();
 }
@@ -503,6 +511,7 @@ export function getMapping(
       trackerProject: mappings.trackerProjectId,
       runnerProject: mappings.runnerProjectId,
       agent: mappings.agentId,
+      model: mappings.model,
     })
     .from(mappings)
     .where(

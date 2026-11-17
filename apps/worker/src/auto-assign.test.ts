@@ -5,13 +5,14 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
 } from "@factory/core";
-import type { LabelId, TrackerEvent, TrackerProjectId } from "@factory/core";
+import type { LabelId, RunnerId, TrackerEvent, TrackerProjectId } from "@factory/core";
 import {
   listRuns,
   listUnprocessedTrackerEvents,
   recordTrackerEvent,
   requestRunCancel,
   saveAutoAssignLabel,
+  saveMapping,
   saveWorkspaceTrackerProject,
 } from "@factory/db";
 import type { StoredRun } from "@factory/db";
@@ -33,9 +34,11 @@ const unmappedProject = toTrackerProjectId("tp-unmapped");
 let h: Harness;
 let deliverySeq = 0;
 
+let runnerA: RunnerId;
+
 beforeEach(() => {
   h = new Harness();
-  h.addRunner({ id: "runner-a", capacity: 2, projects: [projectA] });
+  runnerA = h.addRunner({ id: "runner-a", capacity: 2, projects: [projectA] });
   saveAutoAssignLabel(h.db, { workspaceId, connection, labelId: autoLabel });
 });
 
@@ -103,6 +106,33 @@ describe("webhook 이벤트로 자동 할당", () => {
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ state: "running", runnerProject: projectA, agent });
     expect(listUnprocessedTrackerEvents(h.db)).toEqual([]);
+  });
+
+  it("Mapping에 모델을 정했으면 런에 적고 러너 시작에 넘긴다(0043)", async () => {
+    saveMapping(h.db, {
+      connection,
+      trackerProject,
+      runnerProject: projectA,
+      agent,
+      model: "sonnet",
+    });
+    webhook("ENG-1", { labelIds: [autoLabel], previousLabelIds: [] });
+
+    await h.worker().tick();
+
+    expect(runsOf("ENG-1")[0]).toMatchObject({ state: "running", model: "sonnet" });
+    expect(h.runner(runnerA).startCalls.map((call) => call.model)).toEqual(["sonnet"]);
+  });
+
+  it("Mapping에 모델을 정하지 않았으면 러너 시작에 모델을 넘기지 않는다(0043)", async () => {
+    webhook("ENG-1", { labelIds: [autoLabel], previousLabelIds: [] });
+
+    await h.worker().tick();
+
+    expect(runsOf("ENG-1")[0]).toMatchObject({ state: "running", model: null });
+    const [call] = h.runner(runnerA).startCalls;
+    expect(call).toBeDefined();
+    expect(call !== undefined && "model" in call).toBe(false);
   });
 
   it("같은 webhook 이벤트가 두 번 와도 런이 하나만 생긴다", async () => {

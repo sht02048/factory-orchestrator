@@ -357,6 +357,41 @@ describe("startRun", () => {
     );
   });
 
+  describe("--model (0043)", () => {
+    async function startCommand(
+      runInput: typeof input & { model?: string },
+      config: { model?: string } = {},
+    ): Promise<string | undefined> {
+      const exec = withProjects(
+        new ScriptedExec()
+          .orca("orchestration worker-start", stdout(own("worker-start-spec-stdin.json")))
+          .orca("worktree show", stdout(own("worktree-show.json"))),
+      );
+      await runnerWith(exec, config).startRun(runInput);
+      return exec.calls.find((c) => c.command.includes("worker-start"))?.command;
+    }
+
+    test("passes the run's model (the Mapping's) to worker-start", async () => {
+      expect(await startCommand({ ...input, model: "sonnet" })).toContain(
+        " --agent claude --model sonnet --comment ",
+      );
+    });
+
+    test("the run's model wins over the runner configuration's model", async () => {
+      const command = await startCommand({ ...input, model: "sonnet" }, { model: "opus" });
+      expect(command).toContain(" --model sonnet ");
+      expect(command).not.toContain("opus");
+    });
+
+    test("without the run's model, uses the runner configuration's model", async () => {
+      expect(await startCommand(input, { model: "opus" })).toContain(" --model opus ");
+    });
+
+    test("without either, does not pass --model so the runner's Orca default applies", async () => {
+      expect(await startCommand(input)).not.toContain("--model");
+    });
+  });
+
   test("a sender identity error means the mailbox is missing", async () => {
     const exec = withProjects(
       new ScriptedExec().orca(

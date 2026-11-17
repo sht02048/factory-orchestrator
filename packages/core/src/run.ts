@@ -112,6 +112,11 @@ interface RunBase {
   runnerProject: RunnerProjectId;
   agent: AgentId;
   /**
+   * 에이전트 모델. 할당 때 Mapping 에서 옮겨 적는다(0043). null 이면 정하지 않은 것이라 러너 설정의 모델을,
+   * 그것도 없으면 러너 도구의 기본값을 쓴다.
+   */
+  model: string | null;
+  /**
    * 오케스트레이터가 할당 때 정하는 결정적 워크트리 이름. 시작 전에 저장하고 시작 멱등 키로 쓴다
    * (Runner.findStartedRun). 브랜치는 러너가 정하므로 멱등 키가 아니다(Q82.6).
    */

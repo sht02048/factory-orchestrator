@@ -489,6 +489,7 @@ async function startOnRunner(
       project: run.runnerProject,
       worktreeName: run.worktreeName,
       agent: run.agent,
+      ...(run.model === null ? {} : { model: run.model }),
       prompt: prompt.text,
       ticket: prompt.ticket,
     });

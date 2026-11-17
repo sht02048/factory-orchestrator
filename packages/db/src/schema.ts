@@ -183,7 +183,7 @@ export const workspaceTrackerProjects = sqliteTable(
   ],
 );
 
-/** Mapping: 트래커 프로젝트 → 러너 쪽 프로젝트·에이전트. 러너는 고르지 않는다(Q53). */
+/** Mapping: 트래커 프로젝트 → 러너 쪽 프로젝트·에이전트(와 그 모델). 러너는 고르지 않는다(Q53). */
 export const mappings = sqliteTable(
   "mappings",
   {
@@ -191,6 +191,8 @@ export const mappings = sqliteTable(
     trackerProjectId: text("tracker_project_id").notNull().$type<TrackerProjectId>(),
     runnerProjectId: text("runner_project_id").notNull().$type<RunnerProjectId>(),
     agentId: text("agent_id").notNull().$type<AgentId>(),
+    /** 에이전트 모델(0043). NULL 이면 러너 설정의 모델, 그것도 없으면 러너 도구의 기본값을 쓴다 */
+    model: text("model"),
   },
   (t) => [
     primaryKey({ columns: [t.trackerConnectionId, t.trackerProjectId] }),
@@ -240,6 +242,8 @@ export const runs = sqliteTable(
     trackerProjectId: text("tracker_project_id").notNull().$type<TrackerProjectId>(),
     runnerProjectId: text("runner_project_id").notNull().$type<RunnerProjectId>(),
     agentId: text("agent_id").notNull().$type<AgentId>(),
+    /** 할당 때 Mapping 에서 옮겨 적은 에이전트 모델(0043). NULL 이면 정하지 않았다 */
+    model: text("model"),
     /** 할당 때 정한 결정적 워크트리 이름. 시작 전에 쓰고 시작 멱등 키로 쓴다(core Run.worktreeName) */
     worktreeName: text("worktree_name").notNull(),
     /** 러너에서 받은 실제 브랜치(Q82.6). 시작한 런에만 있다 */
