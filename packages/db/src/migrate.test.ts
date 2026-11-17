@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "./database.js";
 import type { Database } from "./database.js";
 import { MigrationError, loadMigrations, migrate } from "./migrate.js";
-import { tempDatabasePath } from "./test-fixtures.js";
+import { seededDatabase, tempDatabasePath } from "./test-fixtures.js";
 
 function schemaDump(db: Database): unknown[] {
   return db.$client.prepare("SELECT type, name, sql FROM sqlite_schema ORDER BY type, name").all();
@@ -97,5 +97,43 @@ describe("migrate", () => {
       db.$client.prepare("SELECT name FROM sqlite_schema WHERE name IN ('runs', 'extra')").get(),
     ).toBeUndefined();
     expect(migrate(db)).toEqual(loadMigrations().map((m) => m.name));
+  });
+
+  it("테이블을 다시 만드는 마이그레이션(drizzle-kit 방식)이 자식 행을 지우지 않는다", () => {
+    const db = seededDatabase();
+    const children = () =>
+      db.$client.prepare("SELECT count(*) AS n FROM workspace_tracker_projects").get()?.["n"];
+    expect(children()).toBe(1);
+
+    // drizzle-kit이 SQLite 컬럼·제약을 바꿀 때 만드는 모양
+    const recreate = {
+      name: "99990101000000_recreate_workspaces",
+      hash: "recreate",
+      sql: [
+        "PRAGMA foreign_keys=OFF",
+        `CREATE TABLE __new_workspaces (
+          id text PRIMARY KEY, name text NOT NULL,
+          max_run_ms integer DEFAULT 7200000 NOT NULL, created_at integer NOT NULL)`,
+        "INSERT INTO __new_workspaces SELECT id, name, max_run_ms, created_at FROM workspaces",
+        "DROP TABLE workspaces",
+        "ALTER TABLE __new_workspaces RENAME TO workspaces",
+        "PRAGMA foreign_keys=ON",
+      ],
+    };
+    expect(migrate(db, [...loadMigrations(), recreate])).toEqual([recreate.name]);
+    expect(children()).toBe(1);
+    expect(db.$client.prepare("PRAGMA foreign_keys").get()?.["foreign_keys"]).toBe(1);
+  });
+
+  it("외래 키를 어기는 마이그레이션은 되돌린다", () => {
+    const db = seededDatabase();
+    const orphan = {
+      name: "99990101000000_orphan",
+      hash: "orphan",
+      sql: ["DELETE FROM workspaces"],
+    };
+    expect(() => migrate(db, [...loadMigrations(), orphan])).toThrow(/foreign key/);
+    expect(db.$client.prepare("SELECT count(*) AS n FROM workspaces").get()?.["n"]).toBe(1);
+    expect(db.$client.prepare("PRAGMA foreign_keys").get()?.["foreign_keys"]).toBe(1);
   });
 });

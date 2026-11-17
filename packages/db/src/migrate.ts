@@ -41,6 +41,10 @@ const appliedRow = z.object({ name: z.string(), hash: z.string() });
  * - DB에 이 코드가 모르는 마이그레이션이 있으면(다운그레이드) 거부한다. 이미 적용한 마이그레이션의
  *   SQL이 바뀌었어도 거부한다.
  *
+ * - 외래 키 검사를 트랜잭션 밖에서 끄고 돌린다. drizzle-kit은 SQLite 테이블을 바꿀 때 새 테이블을 만들고
+ *   옛 테이블을 지우는데, 트랜잭션 안의 `PRAGMA foreign_keys=OFF`는 듣지 않아 `DROP TABLE`이
+ *   ON DELETE CASCADE로 자식 행을 지운다. 대신 커밋 전에 `foreign_key_check`로 위반이 없는지 본다.
+ *
  * Drizzle의 migrate()는 BEGIN(지연 잠금)을 쓰고 다운그레이드를 막지 않아 쓰지 않는다.
  *
  * @returns 이번에 돌린 마이그레이션 이름
@@ -50,6 +54,21 @@ export function migrate(
   migrations: ReadonlyArray<Migration> = loadMigrations(),
   now: Date = new Date(),
 ): string[] {
+  const client = db.$client;
+  if (client.isTransaction) {
+    // 트랜잭션 안에서는 외래 키 검사를 끌 수 없다.
+    throw new MigrationError("migrate() must not run inside a transaction");
+  }
+  const foreignKeys = client.prepare("PRAGMA foreign_keys").get()?.["foreign_keys"] === 1;
+  client.exec("PRAGMA foreign_keys = OFF");
+  try {
+    return runPending(db, migrations, now);
+  } finally {
+    if (foreignKeys) client.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
+function runPending(db: Database, migrations: ReadonlyArray<Migration>, now: Date): string[] {
   const client = db.$client;
   return inTransaction(db, () => {
     client.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -92,6 +111,12 @@ export function migrate(
       }
       record.run(migration.name, migration.hash, now.getTime());
       ran.push(migration.name);
+    }
+    const violations = client.prepare("PRAGMA foreign_key_check").all();
+    if (violations.length > 0) {
+      throw new MigrationError(
+        `migrations left ${violations.length} foreign key violation(s): ${JSON.stringify(violations.slice(0, 5))}`,
+      );
     }
     return ran;
   });
