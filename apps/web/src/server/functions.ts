@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { answerInput, denyInput, submitAnswer, submitDenial } from "../home/actions";
 import { loadHomePage } from "../home/load";
+import { loadRunDetail, requestRunLogTail } from "../run-detail/load";
 import { loadRunnersPage } from "../runners/load";
 import { loadRunsPage } from "../runs/load";
 import { loadShell } from "../shell/load";
@@ -41,3 +42,12 @@ export const getRunsPage = createServerFn({ method: "GET" })
 export const getStatsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
   .handler(({ data }) => loadStatsPage(getDatabase(), data.ws, new Date()));
+
+export const getRunDetail = createServerFn({ method: "GET" })
+  .validator(z.object({ runId: z.string() }))
+  .handler(({ data }) => loadRunDetail(getDatabase(), data.runId, new Date()));
+
+/** Run 상세를 열 때 로그 꼬리를 요청한다. worker 가 ssh 로 가져와 DB 에 쓴다(Q46·Q61) */
+export const requestRunLog = createServerFn({ method: "POST" })
+  .validator(z.object({ runId: z.string() }))
+  .handler(({ data }) => requestRunLogTail(getDatabase(), data.runId, new Date()));
