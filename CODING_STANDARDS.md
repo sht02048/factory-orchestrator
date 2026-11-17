@@ -13,7 +13,7 @@
 
 ## ID는 branded type으로 쓴다
 
-티켓 키, 러너 ID, 러너 쪽 프로젝트 ID, 워크트리 참조처럼 뜻이 다른 문자열 ID는 각자 branded type으로 둔다. 맨 `string`으로 주고받지 않는다. branded 값은 외부 입력을 파싱하는 곳에서만 만든다.
+티켓 키, 러너 ID, 러너 쪽 프로젝트 ID, 워크트리 참조처럼 뜻이 다른 문자열 ID는 각자 branded type으로 둔다. 맨 `string`으로 주고받지 않는다.
 
 ```ts
 // 피한다
@@ -23,6 +23,7 @@ function startRun(runner: string, project: string, ticket: string) {}
 type Brand<T, B extends string> = T & { readonly __brand: B };
 type TicketKey = Brand<string, "TicketKey">;
 type RunnerId = Brand<string, "RunnerId">;
+type RunnerProjectId = Brand<string, "RunnerProjectId">;
 
 function startRun(runner: RunnerId, project: RunnerProjectId, ticket: TicketKey) {}
 ```
@@ -33,7 +34,7 @@ function startRun(runner: RunnerId, project: RunnerProjectId, ticket: TicketKey)
 
 ## 외부 열거값은 모르는 값이 와도 깨지지 않게 둔다
 
-Orca, Linear, GitHub가 주는 상태·종류 값은 관측한 값만으로 닫힌 유니온을 만들지 않는다. 모르는 값을 받는 자리를 타입에 열어 두고, 처리할 때는 모르는 값을 안전한 쪽(예: 런은 "진행 중")으로 보낸다.
+Orca와 Linear가 주는 상태·종류 값은 관측한 값만으로 닫힌 유니온을 만들지 않는다. 모르는 값을 받는 자리를 타입에 열어 두고, 처리할 때는 모르는 값을 안전한 쪽(예: 런은 "진행 중")으로 보낸다.
 
 ```ts
 // 피한다: 문서에 없던 값이 오면 파싱이 실패하거나 분기에서 빠진다
