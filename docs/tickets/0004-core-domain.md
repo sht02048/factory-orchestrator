@@ -13,7 +13,7 @@ blocked_by: [0001]
 
 - 이 티켓은 `packages/core`만 고친다.
 - 도메인 타입: Run, Run 상태(Queued, Running, Waiting for Input, Disconnected, Ended), 에이전트 결과 여섯(정상 종료, 오류 종료, 시간 초과, 입력 기다리다 멈춤, 러너 연결 끊김, 워크트리 없음), PR 상태 넷(없음, 열림, 병합됨, 닫힘), 요약 결과(Merged, Human Check, Failed). Failed 사유 타입은 두지 않는다(Q71). 이름은 GLOSSARY를 따른다.
-- 상태 전이 함수: 허용하지 않는 전이를 거부한다. Running·Waiting for Input ⇄ Disconnected를 포함한다(스펙 4.1, Q67).
+- 상태 전이 함수: 허용하지 않는 전이를 거부한다. Running·Waiting for Input → Disconnected와 Disconnected → Running을 포함한다. Disconnected에서 Waiting for Input으로 바로 가지 않고 Running을 거친다(스펙 4.1, Q67).
 - PR 상태 정하기: 런과 이어진 PR 목록에서 PR 상태 하나를 정한다(같은 브랜치에 여럿이면 가장 최근 것, 스펙 4.2).
 - 요약 계산 함수(`summarizeRunOutcome`): 에이전트 결과와 PR 상태를 받아 스펙 4.2 요약 계산 표 그대로 요약 결과와 워크트리 처리(바로 지움, PR이 병합되거나 닫힐 때까지 남김, 사람이 정함, 지울 것 없음)를 돌려준다(Q51·Q66·Q71·Q75). CODING_STANDARDS 「요약 결과는 계산 함수 하나로만 정한다」.
 - 할당 조건(Auto-assign Label, 티켓당 진행 중(Running, Waiting for Input, Disconnected)이거나 Queued인 런 하나, Q45·Q74), 할당 때의 러너 고르기(러너 쪽 프로젝트가 있는 Online 러너 중 남은 capacity가 가장 많은 러너, Q53. 그런 러너가 없으면 러너를 정하지 않은 Queued로 두고 맞는 러너가 Online이 될 때 같은 규칙으로 고른다, Q65), 엄격한 FIFO 대기열 꺼내기(ADR 0006). 맨 앞 런이 시작될 때까지 뒤 런은 러너와 상관없이 기다린다(Q63 개정). 러너 없는 Queued 런은 순서에서 빠지고, 할당 때 정한 러너가 Offline이 된 Queued 런은 러너를 비워 같이 다루며, 맞는 러너가 Online이 되면 러너를 정해 원래 들어온 자리로 돌아간다(Q68·Q72·Q73). Disconnected 런은 capacity를 차지한다(Q74).
