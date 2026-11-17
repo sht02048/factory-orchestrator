@@ -1,7 +1,8 @@
 /*
  * 시안 B 목 데이터. 용어는 GLOSSARY.md를 따른다. 값은 모두 가상이다.
  * 기준 시각: 2026-11-17(화) 14:20.
- * 결과 판정(ADR 0004): PR 병합 → Merged, PR 열림 → Human Check, PR 없음·닫힘 → Failed.
+ * 요약 결과(ADR 0004): 에이전트가 스스로 끝났으면(정상 종료, 오류 종료) PR 병합됨 → Merged,
+ * 열림 → Human Check, 없음·닫힘 → Failed. 그 밖의 에이전트 결과는 PR과 상관없이 Failed.
  */
 window.FO = (function () {
   const AUTO_LABEL = "factory";
@@ -61,7 +62,8 @@ window.FO = (function () {
 
   /*
    * state: queued | running | done, result: merged | check | failed
-   * failReason: agent | runner | closed
+   * failCase(Failed 런의 두 축 조합): agent = 오류 종료 · PR 없음,
+   *   runner = 러너 연결 끊김 · PR 없음, closed = 정상 종료 · PR 닫힘
    */
   const runs = [
     { id: 1052, ticket: "ACME-418", state: "running", runner: "runner-a", agent: "claude", started: "14:02", elapsed: 18, step: "테스트를 돌리고 있어요", pr: null },
@@ -74,16 +76,16 @@ window.FO = (function () {
     { id: 1057, ticket: "ACME-134", state: "queued", runner: "runner-c", agent: "codex", queued: "14:16", waited: 4, position: 3, reason: "runner-c가 Offline이에요" },
 
     { id: 1051, ticket: "ACME-416", state: "done", result: "check", runner: "runner-a", agent: "claude", started: "13:21", elapsed: 41, ended: "14:02", pr: { number: 1187, state: "open", ci: "failed" }, note: "CI의 e2e 테스트가 실패해 PR을 열어 둔 채 끝냈어요." },
-    { id: 1049, ticket: "ACME-129", state: "done", result: "failed", failReason: "runner", runner: "runner-c", agent: "codex", started: "13:11", elapsed: 27, ended: "13:38", pr: null, note: "러너 연결이 끊겨 PR을 남기지 못했어요." },
+    { id: 1049, ticket: "ACME-129", state: "done", result: "failed", failCase: "runner", runner: "runner-c", agent: "codex", started: "13:11", elapsed: 27, ended: "13:38", pr: null, note: "러너 연결이 끊긴 채 끝났어요. 워크트리는 러너가 돌아온 뒤 사람이 정해요." },
     { id: 1048, ticket: "ACME-199", state: "done", result: "merged", runner: "runner-b", agent: "claude", started: "12:40", elapsed: 36, ended: "13:16", pr: { number: 342, state: "merged", ci: "passed" } },
     { id: 1047, ticket: "ACME-412", state: "done", result: "merged", runner: "runner-a", agent: "claude", started: "12:05", elapsed: 24, ended: "12:29", pr: { number: 1184, state: "merged", ci: "passed" } },
     { id: 1046, ticket: "ACME-85", state: "done", result: "check", runner: "runner-a", agent: "codex", started: "11:30", elapsed: 52, ended: "12:22", pr: { number: 211, state: "open", ci: "passed" }, note: "마이그레이션이 있어 사람이 확인하도록 PR을 열어 뒀어요." },
-    { id: 1045, ticket: "ACME-197", state: "done", result: "failed", failReason: "agent", runner: "runner-b", agent: "claude", started: "11:02", elapsed: 15, ended: "11:17", pr: null, note: "에이전트가 빌드 오류를 고치지 못하고 멈췄어요." },
+    { id: 1045, ticket: "ACME-197", state: "done", result: "failed", failCase: "agent", runner: "runner-b", agent: "claude", started: "11:02", elapsed: 15, ended: "11:17", pr: null, note: "에이전트가 빌드 오류를 고치지 못하고 멈췄어요." },
     { id: 1044, ticket: "ACME-409", state: "done", result: "merged", runner: "runner-a", agent: "claude", started: "10:14", elapsed: 19, ended: "10:33", pr: { number: 1181, state: "merged", ci: "passed" } },
     { id: 1043, ticket: "ACME-127", state: "done", result: "merged", runner: "runner-c", agent: "codex", started: "09:50", elapsed: 33, ended: "10:23", pr: { number: 508, state: "merged", ci: "passed" } },
     { id: 1042, ticket: "ACME-83", state: "done", result: "merged", runner: "runner-a", agent: "codex", started: "09:12", elapsed: 28, ended: "09:40", pr: { number: 209, state: "merged", ci: "passed" } },
     { id: 1041, ticket: "ACME-197", state: "done", result: "check", runner: "runner-b", agent: "claude", started: "08:31", elapsed: 47, ended: "09:18", pr: { number: 339, state: "open", ci: "failed" }, note: "CI의 iOS 스냅숏 테스트가 실패했어요." },
-    { id: 1040, ticket: "ACME-302", state: "done", result: "failed", failReason: "closed", runner: "runner-b", agent: "claude", started: "08:05", elapsed: 22, ended: "08:27", pr: { number: 41, state: "closed", ci: "passed" }, note: "누군가 PR #41을 닫아서 병합하지 못했어요." },
+    { id: 1040, ticket: "ACME-302", state: "done", result: "failed", failCase: "closed", runner: "runner-b", agent: "claude", started: "08:05", elapsed: 22, ended: "08:27", pr: { number: 41, state: "closed", ci: "passed" }, note: "누군가 PR #41을 닫아서 병합하지 못했어요." },
   ];
 
   const tickets = [
