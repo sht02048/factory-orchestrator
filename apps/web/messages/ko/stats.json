@@ -14,6 +14,7 @@
   "figures": {
     "label": "기간 요약",
     "ended": "끝난 런",
+    "canceled": "취소 {count}개는 비율에서 빼요",
     "merged": "Merged",
     "attention": "Human Check <check>{checkCount}</check> · Failed <failed>{failedCount}</failed>",
     "leadTime": "리드 타임 중앙값 · p90 {p90}",
@@ -24,7 +25,7 @@
   "throughput": {
     "title": "날짜별 처리량",
     "chartLabel": "날짜별로 끝난 런 수. 요약 결과로 나눠 쌓았어요.",
-    "day": "{day}: Merged {merged} · Human Check {check} · Failed {failed}"
+    "day": "{day}: Merged {merged} · Human Check {check} · Failed {failed} · 취소 {canceled}"
   },
   "failedCombinations": {
     "title": "Failed 조합",
@@ -45,6 +46,7 @@
     "merged": "Merged",
     "check": "Human Check",
     "failed": "Failed",
+    "canceled": "취소",
     "leadTime": "리드 타임"
   },
   "listLabel": "{dimension} 통계",
@@ -53,11 +55,16 @@
     "label": "고른 항목 요약",
     "context": "{dimension} · 최근 {days}일",
     "why": "런 {runs}개 중 {merged}개를 에이전트가 병합까지 끝냈어요. {attention}개는 사람이 손대야 했어요.",
+    "whyWithCanceled": "취소를 뺀 런 {runs}개 중 {merged}개를 에이전트가 병합까지 끝냈어요. {attention}개는 사람이 손대야 했어요. 취소한 {canceled}개는 비율에서 뺐어요.",
+    "whyOnlyCanceled": "끝난 런 {canceled}개가 모두 취소예요. 취소는 비율에서 빼요.",
     "runs": "끝난 런",
     "merged": "Merged",
     "check": "Human Check",
     "failed": "Failed",
     "countPercent": "{count}개 · {percent}%",
+    "count": "{count}개",
+    "canceled": "취소",
+    "canceledCount": "{count}개 · 비율에서 빼요",
     "leadTime": "리드 타임 중앙값",
     "leadTimeP90": "리드 타임 p90",
     "wait": "대기 시간 중앙값",
