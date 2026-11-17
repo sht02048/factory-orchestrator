@@ -33,11 +33,13 @@
 
   /* ---------- Workspace ---------- */
   const WS_KEY = "fo-b-ws";
+  const validWs = (id) => id === "all" || FO.workspaces.some((w) => w.id === id);
   function readWs() {
     const q = new URLSearchParams(location.search).get("ws");
-    if (q) return q;
+    if (validWs(q)) return q;
     try {
-      return localStorage.getItem(WS_KEY) || "commerce";
+      const saved = localStorage.getItem(WS_KEY);
+      return validWs(saved) ? saved : "commerce";
     } catch (e) {
       return "commerce";
     }
@@ -408,9 +410,8 @@
   Object.assign(FO, {
     icon, esc, minutes, tone, label, stateText, shortWhy, longWhy, failLabel, resultLabel, ciLabel, prLabel,
     attention, latestByTicket, runRow, runCols, thead, runPanel, events, bindSplit, mount, allNotice, toast, runningOn,
-    get ws() {
-      return ws;
-    },
     inWs, ticketInWs, wsName,
   });
+  /* Object.assign은 getter 값을 한 번만 복사하므로 ws는 따로 정의한다 */
+  Object.defineProperty(FO, "ws", { get: () => ws });
 })();
