@@ -8,7 +8,7 @@
   "steps": {
     "tracker": {
       "title": "트래커를 연결해요",
-      "description": "티켓을 읽어 올 Linear 조직의 API 키를 넣어요. 넣으면 바로 연결을 확인하고, 확인되면 저장해요."
+      "description": "티켓을 읽어 올 Linear 조직의 API 키를 넣어요. 넣으면 바로 연결을 확인하고, 확인되면 저장해요. signing secret은 저장한 뒤 webhook을 만들면 받으니 지금은 비워 둬도 돼요."
     },
     "github": {
       "title": "GitHub 토큰을 넣어요",
@@ -33,9 +33,12 @@
     "stepOpen": "Linear 설정의 API 화면에서 새 webhook을 만들어요.",
     "stepUrl": "URL에는 밖에서 이 오케스트레이터에 닿는 공개 주소 뒤에 아래 경로를 붙여 넣어요.",
     "stepEvents": "받을 이벤트는 Issues를 골라요.",
-    "stepSecret": "만든 뒤 보이는 signing secret을 이 연결의 Webhook signing secret 칸에 넣고 저장해요.",
+    "stepSecret": "만든 뒤 보이는 signing secret을 위 연결의 Webhook signing secret 칸에 넣고 저장해요.",
     "url": "Webhook 주소 예",
-    "urlDescription": "지금 접속한 주소로 만든 예예요. 공개 주소는 Tailscale Funnel, Cloudflare Tunnel, 리버스 프록시처럼 고른 방법에 따라 달라요."
+    "urlDescription": "지금 접속한 주소로 만든 예예요. 공개 주소는 Tailscale Funnel, Cloudflare Tunnel, 리버스 프록시처럼 고른 방법에 따라 달라요.",
+    "secretSaved": "signing secret을 저장했어요. 다음으로 가요.",
+    "secretMissingTitle": "아직 signing secret이 없어요",
+    "secretMissingBody": "이대로 다음으로 가도 되지만, Linear가 보낸 webhook이 서명 검증에 실패해 티켓 변경을 바로 알지 못해요. 그동안은 5분마다 트래커를 다시 읽어 할당해요."
   },
   "runner": {
     "beforeTitle": "등록하기 전에 러너에서 해 둘 일",

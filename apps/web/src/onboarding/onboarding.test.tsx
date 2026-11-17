@@ -40,6 +40,7 @@ import {
   resolveStep,
   serviceInstallCommand,
   stepPassed,
+  stepToPin,
 } from "./model";
 import type { OnboardingStep } from "./model";
 import { OnboardingScreen } from "./onboarding-screen";
@@ -453,5 +454,53 @@ describe("다섯 단계를 마치기", () => {
     expect(shown).toContain("Linear에서 webhook 만들기");
     expect(shown).toContain("Issues");
     expect(render(settings, "tracker")).toContain(connection.webhookPath);
+  });
+
+  it("단계 없는 주소로 들어와 트래커 연결을 저장하면 1단계에 머물고 webhook 경로가 보인다", async () => {
+    const f = fixture();
+    // 단계 없는 주소(/onboarding)로 들어오면 라우트가 지금 단계(1)를 주소에 넣어 다시 보낸다
+    const step = stepToPin(await page(f), undefined);
+    expect(step).toBe(1);
+    expect(stepToPin(await page(f), step ?? undefined)).toBeNull();
+
+    // 저장하면 화면 값을 다시 읽는다. 주소에 남은 단계로 고르므로 2단계로 넘어가지 않는다
+    await connectTracker(f);
+    const settings = await page(f);
+    const index = resolveStep(settings, step ?? undefined);
+    expect(index).toBe(0);
+    expect(stepToPin(settings, step ?? undefined)).toBeNull();
+    const connection = settings.install.connections[0];
+    if (connection === undefined) throw new Error("no connection");
+    const html = render(settings, ONBOARDING_STEPS[index] ?? "github");
+    expect(text(html)).toContain("Linear에서 webhook 만들기");
+    expect(html).toContain(connection.webhookPath);
+    // 다음으로 가는 것은 운영자가 다음을 눌러서다
+    expect(isDisabled(nextButton(html, "다음"))).toBe(false);
+  });
+
+  it("signing secret 없이 저장한 연결이면 1단계에 그 사실을 알리고, 다음으로 가는 것은 막지 않는다", async () => {
+    const f = fixture();
+    await connectTracker(f);
+    const withoutSecret = await page(f);
+    expect(withoutSecret.install.connections[0]?.hasWebhookSecret).toBe(false);
+    const html = render(withoutSecret, "tracker");
+    expect(text(html)).toContain("아직 signing secret이 없어요");
+    expect(text(html)).toContain("서명 검증에 실패");
+    expect(isDisabled(nextButton(html, "다음"))).toBe(false);
+
+    // webhook 을 만든 뒤 signing secret 을 넣고 저장하면 알림이 사라진다
+    const id = withoutSecret.install.connections[0]?.id ?? "";
+    expect(
+      await saveTrackerConnectionSetting(
+        f.context,
+        { id, name: "Acme", apiKey: "", webhookSecret: "lin_wh_example" },
+        now,
+      ),
+    ).toEqual({ ok: true });
+    const withSecret = await page(f);
+    expect(withSecret.install.connections[0]?.hasWebhookSecret).toBe(true);
+    const shown = text(render(withSecret, "tracker"));
+    expect(shown).not.toContain("아직 signing secret이 없어요");
+    expect(shown).toContain("signing secret을 저장했어요");
   });
 });
