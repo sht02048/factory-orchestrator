@@ -276,4 +276,22 @@ describe("WorkerAdapters: 오류 종류에 맞춰 연결을 쉰다", () => {
       codeHost.findPullRequestsByTicketKey(repo, ticket, { createdSince: now }),
     ).resolves.toEqual([]);
   });
+
+  it("코드 호스트의 인증 실패는 저장소 하나의 권한 문제일 수 있어 쉬지 않는다", async () => {
+    saveCodeHost("token-1");
+    const [codeHost] = codeHosts();
+    const inner = factories.codeHosts[0]?.adapter;
+    if (codeHost === undefined || inner === undefined) throw new Error("code host not created");
+    const forbidden = toRepoRef("acme/private");
+    const open = toRepoRef("acme/web");
+    const original = inner.findPullRequestsByBranch.bind(inner);
+    inner.findPullRequestsByBranch = (repo, branch) =>
+      repo === forbidden
+        ? Promise.reject(new AdapterError({ kind: "unauthorized" }))
+        : original(repo, branch);
+    await expect(codeHost.findPullRequestsByBranch(forbidden, "b")).rejects.toMatchObject({
+      detail: { kind: "unauthorized" },
+    });
+    await expect(codeHost.findPullRequestsByBranch(open, "b")).resolves.toEqual([]);
+  });
 });

@@ -60,7 +60,7 @@ export class WorkerAdapters {
       () =>
         new PausableTracker(
           this.registry.createTracker(stored.kind, config),
-          new ConnectionPause(this.now),
+          new ConnectionPause(this.now, { pauseOnUnauthorized: true }),
         ),
     );
   }
@@ -89,7 +89,9 @@ export class WorkerAdapters {
             () =>
               new PausableCodeHost(
                 this.registry.createCodeHost(stored.kind, config),
-                new ConnectionPause(this.now),
+                // GitHub은 저장소 하나의 권한 부족(403, GraphQL FORBIDDEN)도 unauthorized로 낸다. 연결 전체를
+                // 쉬면 같은 토큰의 다른 저장소 PR 폴링까지 멈추므로 코드 호스트는 rate limit에만 쉰다.
+                new ConnectionPause(this.now, { pauseOnUnauthorized: false }),
               ),
           ),
         ];
@@ -146,16 +148,19 @@ export class ConnectionPausedError extends AdapterError<{ kind: string }> {
 }
 
 /**
- * 연결 하나의 쉬는 상태. 어댑터와 함께 만들고 함께 버린다. 인증 실패(`unauthorized`)와
- * rate limit(`rate-limited`)만 쉬게 한다. 없는 대상·네트워크 오류는 다음 바퀴에 그대로 다시 한다.
+ * 연결 하나의 쉬는 상태. 어댑터와 함께 만들고 함께 버린다. 인증 실패(`unauthorized`, 연결 전체의 토큰
+ * 문제일 때만 `pauseOnUnauthorized`)와 rate limit(`rate-limited`)만 쉬게 한다. 없는 대상·네트워크 오류는
+ * 다음 바퀴에 그대로 다시 한다.
  */
 export class ConnectionPause {
   private readonly now: () => Date;
+  private readonly pauseOnUnauthorized: boolean;
   private until = 0;
   private detail: { kind: string } | null = null;
 
-  constructor(now: () => Date) {
+  constructor(now: () => Date, options: { pauseOnUnauthorized: boolean }) {
     this.now = now;
+    this.pauseOnUnauthorized = options.pauseOnUnauthorized;
   }
 
   async run<T>(call: () => Promise<T>): Promise<T> {
@@ -174,8 +179,10 @@ export class ConnectionPause {
     if (!(error instanceof AdapterError) || error instanceof ConnectionPausedError) return;
     const detail: unknown = error.detail;
     const now = this.now().getTime();
+    if (typeof detail !== "object" || detail === null || !("kind" in detail)) return;
+    if (!this.pauseOnUnauthorized && detail.kind === "unauthorized") return;
     const ms = pauseMs(detail, now);
-    if (ms === null || typeof detail !== "object" || detail === null || !("kind" in detail)) return;
+    if (ms === null) return;
     this.detail = { kind: String(detail.kind) };
     this.until = now + Math.min(Math.max(ms, 0), MAX_PAUSE_MS);
   }
