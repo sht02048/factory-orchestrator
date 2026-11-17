@@ -76,6 +76,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const status = useStatusLine();
   const { tone, label, when } = status(run);
   const pr = run.pullRequest;
+  const cancelable = canCancel(run) && !run.cancelPending;
 
   return (
     <div {...stylex.props(styles.main)}>
@@ -102,14 +103,14 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
         <Text variant="body">
           <Reason run={run} />
         </Text>
-        {pr === null && !canCancel(run) ? null : (
+        {pr === null && !cancelable ? null : (
           <Actions>
             {pr === null ? null : (
               <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
                 {t("openPr", { pr: pr.displayId })}
               </a>
             )}
-            {canCancel(run) && !run.cancelPending ? <CancelRun onCancel={props.onCancel} /> : null}
+            {cancelable ? <CancelRun onCancel={props.onCancel} /> : null}
           </Actions>
         )}
       </header>
@@ -460,7 +461,8 @@ function LogTail({ log, onRefresh }: { log: LogTailView; onRefresh: () => void }
       body = <LogLines lines={log.lines} />;
       break;
   }
-  const live = log.kind === "done" || log.kind === "failed";
+  // 기다리는 중에도 다시 요청할 수 있게 둔다. worker 가 늦으면 화면이 다시 읽기를 멈춘다.
+  const live = log.kind !== "none" && log.kind !== "stored";
   return (
     <Section title={t("title")} {...(note === undefined ? {} : { note })}>
       <div {...stylex.props(styles.stack)}>
