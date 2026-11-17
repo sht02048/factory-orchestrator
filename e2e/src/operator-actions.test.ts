@@ -219,6 +219,54 @@ describe("운영자 핵심 동작(브라우저)", () => {
   });
 });
 
+describe("화면 시각의 시간대(브라우저, 0044)", () => {
+  it("브라우저 시간대로 시각을 그리고, 쿠키를 남긴 뒤에는 서버 렌더링부터 그 시간대다", async () => {
+    const context = await browser.newContext({
+      baseURL: baseUrl,
+      locale: "ko-KR",
+      timezoneId: "Asia/Seoul",
+    });
+    const seoul = await context.newPage();
+    seoul.setDefaultTimeout(30_000);
+    const consoleErrors: string[] = [];
+    seoul.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
+    const assignedAt = runsOf(toTicketKey("ACME-1"))[0]?.assignedAt;
+    if (assignedAt === undefined) throw new Error("no ACME-1 run");
+    const timeIn = (timeZone: string) =>
+      new Intl.DateTimeFormat("ko-KR", {
+        timeZone,
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).format(assignedAt);
+    const path = `/runs/${questionRun}?ws=${workspaceId}`;
+
+    try {
+      // 첫 방문: 쿠키가 없어 서버는 UTC 로 그리고, 브라우저가 시간대를 남긴 뒤 서울 시각으로 다시 그린다.
+      const first = await seoul.goto(path);
+      expect(await first?.text()).toContain(timeIn("UTC"));
+      await hydrated(seoul);
+      await seoul.getByText(timeIn("Asia/Seoul")).first().waitFor();
+      const cookies = await context.cookies();
+      expect(cookies.find((c) => c.name === "tz")?.value).toBe("Asia/Seoul");
+
+      // 다시 방문: 서버가 쿠키의 시간대로 그려 hydration 과 어긋나지 않는다.
+      const again = await seoul.goto(path);
+      const html = (await again?.text()) ?? "";
+      expect(html).toContain(timeIn("Asia/Seoul"));
+      expect(html).not.toContain(timeIn("UTC"));
+      await hydrated(seoul);
+      expect(consoleErrors.filter((text) => /hydrat/i.test(text))).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
 function seed(db: Database): void {
   saveTrackerConnection(db, new SecretBox(encryptionKey), {
     id: connection,

@@ -22,7 +22,7 @@ import { cancelRunRequest } from "./actions";
 
 const resolved = () => Promise.resolve();
 
-function render(page: RunDetailPage): string {
+function render(page: RunDetailPage, timeZone?: string): string {
   return renderWithMessages(
     <RunDetailScreen
       page={page}
@@ -34,6 +34,7 @@ function render(page: RunDetailPage): string {
       onRefreshLog={() => {}}
     />,
     runMessages,
+    timeZone,
   );
 }
 
@@ -137,6 +138,18 @@ describe("Run 상세 화면", () => {
     // T0 + 40분 = 09:40 (UTC)
     expect(body).toContain("09:40부터 러너에 닿지 않아요");
     expect(body).toContain(runJson.timeline.unreachable);
+  });
+
+  it("같은 런의 타임라인 시각을 운영자 시간대로 보인다(0044)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-12");
+    if (id === undefined) throw new Error("no ACME-12");
+    updateRunRecords(db, id, { unreachableSince: minutes(40) });
+    const detail = page(db, id);
+    // T0 + 40분 = UTC 09:40 = 서울 18:40 = 로스앤젤레스 01:40
+    expect(text(render(detail))).toContain("09:40부터 러너에 닿지 않아요");
+    expect(text(render(detail, "Asia/Seoul"))).toContain("18:40부터 러너에 닿지 않아요");
+    expect(text(render(detail, "America/Los_Angeles"))).toContain("01:40부터 러너에 닿지 않아요");
   });
 
   it("워크트리를 지우지 않은 러너 연결 끊김 런은 사람이 지워야 함을 보이고 지우기 버튼은 없다", () => {
