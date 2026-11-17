@@ -1,16 +1,27 @@
+import { fileURLToPath } from "node:url";
+import { readMigrationFiles } from "drizzle-orm/migrator";
 import { z } from "zod";
 import { inTransaction } from "./database.js";
 import type { Database } from "./database.js";
-import { sql as initial } from "./migrations/0001-initial.js";
 
+/** drizzle-kit이 만든 마이그레이션 하나(`drizzle/<시각>_<이름>/migration.sql`) */
 export interface Migration {
-  version: number;
+  /** 폴더 이름. 시각으로 시작해 순서를 정한다 */
   name: string;
-  sql: string;
+  /** SQL 파일의 해시. 이미 적용한 마이그레이션을 고쳤는지 본다 */
+  hash: string;
+  /** `--> statement-breakpoint`로 나눈 문장 */
+  sql: ReadonlyArray<string>;
 }
 
-/** 순서대로 쌓는다. 이미 배포한 마이그레이션은 고치지 않고 새 버전을 더한다. */
-export const MIGRATIONS: ReadonlyArray<Migration> = [{ version: 1, name: "initial", sql: initial }];
+export const MIGRATIONS_FOLDER = fileURLToPath(new URL("../drizzle", import.meta.url));
+
+/** 이 패키지에 든 마이그레이션. 이미 배포한 것은 고치지 않고 `db:generate`로 새로 더한다. */
+export function loadMigrations(folder: string = MIGRATIONS_FOLDER): Migration[] {
+  return readMigrationFiles({ migrationsFolder: folder })
+    .toSorted((a, b) => a.folderMillis - b.folderMillis || a.name.localeCompare(b.name))
+    .map((m) => ({ name: m.name, hash: m.hash, sql: m.sql }));
+}
 
 export class MigrationError extends Error {
   constructor(message: string) {
@@ -19,50 +30,69 @@ export class MigrationError extends Error {
   }
 }
 
-const versionRow = z.object({ version: z.number().int() });
+const appliedRow = z.object({ name: z.string(), hash: z.string() });
 
 /**
  * 아직 돌지 않은 마이그레이션을 차례로 돌린다(ADR 0005: 업데이트 때 자동으로 돈다).
- * 여러 번 불러도 안전하다. web과 worker가 함께 띄워도 쓰기 잠금으로 한쪽만 돌린다.
- * DB가 이 코드보다 새 버전이면 거부한다(다운그레이드로 스키마를 잘못 읽지 않게).
  *
- * @returns 이번에 돌린 버전
+ * - 여러 번 불러도 안전하다. 적용한 것은 `schema_migrations`에 이름과 해시로 남긴다.
+ * - 한 번에 돌리는 마이그레이션 전부가 BEGIN IMMEDIATE 하나 안에서 돈다. 하나라도 실패하면 아무것도
+ *   남기지 않고, web과 worker가 함께 띄워도 쓰기 잠금으로 한쪽만 돌린다.
+ * - DB에 이 코드가 모르는 마이그레이션이 있으면(다운그레이드) 거부한다. 이미 적용한 마이그레이션의
+ *   SQL이 바뀌었어도 거부한다.
+ *
+ * Drizzle의 migrate()는 BEGIN(지연 잠금)을 쓰고 다운그레이드를 막지 않아 쓰지 않는다.
+ *
+ * @returns 이번에 돌린 마이그레이션 이름
  */
 export function migrate(
   db: Database,
-  migrations: ReadonlyArray<Migration> = MIGRATIONS,
+  migrations: ReadonlyArray<Migration> = loadMigrations(),
   now: Date = new Date(),
-): number[] {
+): string[] {
+  const client = db.$client;
   return inTransaction(db, () => {
-    db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-      version INTEGER PRIMARY KEY,
-      name TEXT NOT NULL,
+    client.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+      name TEXT PRIMARY KEY,
+      hash TEXT NOT NULL,
       applied_at INTEGER NOT NULL
     )`);
-    const done = new Set(
-      db
-        .prepare("SELECT version FROM schema_migrations")
+    const applied = new Map(
+      client
+        .prepare("SELECT name, hash FROM schema_migrations")
         .all()
-        .map((row) => versionRow.parse(row).version),
+        .map((raw) => {
+          const row = appliedRow.parse(raw);
+          return [row.name, row.hash] as const;
+        }),
     );
-    const known = new Set(migrations.map((m) => m.version));
-    const unknown = [...done].filter((v) => !known.has(v));
+    const known = new Map(migrations.map((m) => [m.name, m.hash]));
+
+    const unknown = [...applied.keys()].filter((name) => !known.has(name));
     if (unknown.length > 0) {
       throw new MigrationError(
         `database has migrations this version does not know: ${unknown.join(", ")}`,
       );
     }
-
-    const applied: number[] = [];
-    const record = db.prepare(
-      "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
-    );
-    for (const migration of migrations.toSorted((a, b) => a.version - b.version)) {
-      if (done.has(migration.version)) continue;
-      db.exec(migration.sql);
-      record.run(migration.version, migration.name, now.getTime());
-      applied.push(migration.version);
+    const changed = [...applied].filter(([name, hash]) => known.get(name) !== hash);
+    if (changed.length > 0) {
+      throw new MigrationError(
+        `applied migrations were edited: ${changed.map(([name]) => name).join(", ")}`,
+      );
     }
-    return applied;
+
+    const ran: string[] = [];
+    const record = client.prepare(
+      "INSERT INTO schema_migrations (name, hash, applied_at) VALUES (?, ?, ?)",
+    );
+    for (const migration of migrations) {
+      if (applied.has(migration.name)) continue;
+      for (const statement of migration.sql) {
+        if (statement.trim().length > 0) client.exec(statement);
+      }
+      record.run(migration.name, migration.hash, now.getTime());
+      ran.push(migration.name);
+    }
+    return ran;
   });
 }

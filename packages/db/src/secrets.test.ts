@@ -55,7 +55,7 @@ describe("토큰 암호화 저장", () => {
     for (const secret of [API_KEY, WEBHOOK_SECRET, GITHUB_TOKEN]) {
       expect(fileBytes(temp.path)).not.toContain(secret);
     }
-    db.close();
+    db.$client.close();
     for (const secret of [API_KEY, WEBHOOK_SECRET, GITHUB_TOKEN]) {
       expect(fileBytes(temp.path)).not.toContain(secret);
     }
@@ -73,7 +73,7 @@ describe("토큰 암호화 저장", () => {
 
     const otherKey = new SecretBox(new Uint8Array(32).fill(9));
     expect(() => getTrackerConnection(reopened, otherKey, connectionId)).toThrow(SecretBoxError);
-    reopened.close();
+    reopened.$client.close();
   });
 
   it("봉한 값을 다른 행으로 옮기면 열리지 않는다", () => {

@@ -1,7 +1,7 @@
-import { toRunId, toRunnerId } from "@factory/core";
 import type { RunId, RunnerHealth, RunnerId } from "@factory/core";
-import { z } from "zod";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import type { Database } from "./database.js";
+import { logTailRequests, runnerCheckRequests } from "./schema.js";
 
 // ---------- web이 남기는 요청(Q61) ----------
 
@@ -14,45 +14,39 @@ export type RequestStatus<T> =
   | { status: "done"; requestedAt: Date; completedAt: Date; result: T }
   | { status: "failed"; requestedAt: Date; completedAt: Date; error: string };
 
-const requestRow = z.object({
-  requested_at: z.number().int(),
-  completed_at: z.number().int().nullable(),
-  payload: z.string().nullable(),
-  error: z.string().nullable(),
-});
-
-function readRequest<T>(raw: unknown, parse: (payload: string) => T): RequestStatus<T> {
-  const row = requestRow.parse(raw);
-  const requestedAt = new Date(row.requested_at);
-  if (row.completed_at === null) return { status: "pending", requestedAt };
-  const completedAt = new Date(row.completed_at);
+function toStatus<T>(row: {
+  requestedAt: Date;
+  completedAt: Date | null;
+  error: string | null;
+  result: T;
+}): RequestStatus<T> {
+  const { requestedAt, completedAt } = row;
+  if (completedAt === null) return { status: "pending", requestedAt };
   if (row.error !== null) return { status: "failed", requestedAt, completedAt, error: row.error };
-  return { status: "done", requestedAt, completedAt, result: parse(row.payload ?? "null") };
+  return { status: "done", requestedAt, completedAt, result: row.result };
 }
 
 /** Run 상세가 로그 꼬리를 요청한다(0022). 결과를 지우고 다시 기다린다. */
 export function requestLogTail(db: Database, runId: RunId, now: Date = new Date()): void {
-  db.prepare(
-    `INSERT INTO log_tail_requests (run_id, requested_at) VALUES (?, ?)
-     ON CONFLICT (run_id) DO UPDATE SET
-       requested_at = excluded.requested_at, completed_at = NULL, lines = NULL, error = NULL`,
-  ).run(runId, now.getTime());
+  db.insert(logTailRequests)
+    .values({ runId, requestedAt: now })
+    .onConflictDoUpdate({
+      target: logTailRequests.runId,
+      set: { requestedAt: now, completedAt: null, lines: null, error: null },
+    })
+    .run();
 }
 
 /** 처리할 로그 꼬리 요청(0017) */
 export function listPendingLogTailRequests(
   db: Database,
 ): Array<{ runId: RunId; requestedAt: Date }> {
-  const row = z.object({ run_id: z.string(), requested_at: z.number().int() });
   return db
-    .prepare(
-      "SELECT run_id, requested_at FROM log_tail_requests WHERE completed_at IS NULL ORDER BY requested_at",
-    )
-    .all()
-    .map((raw) => {
-      const r = row.parse(raw);
-      return { runId: toRunId(r.run_id), requestedAt: new Date(r.requested_at) };
-    });
+    .select({ runId: logTailRequests.runId, requestedAt: logTailRequests.requestedAt })
+    .from(logTailRequests)
+    .where(isNull(logTailRequests.completedAt))
+    .orderBy(asc(logTailRequests.requestedAt))
+    .all();
 }
 
 /**
@@ -67,53 +61,51 @@ export function completeLogTailRequest(
 ): boolean {
   return (
     db
-      .prepare(
-        `UPDATE log_tail_requests SET completed_at = ?, lines = ?, error = ?
-         WHERE run_id = ? AND requested_at = ? AND completed_at IS NULL`,
+      .update(logTailRequests)
+      .set({
+        completedAt: input.completedAt,
+        lines: "lines" in input ? [...input.lines] : null,
+        error: "error" in input ? input.error : null,
+      })
+      .where(
+        and(
+          eq(logTailRequests.runId, input.runId),
+          eq(logTailRequests.requestedAt, input.requestedAt),
+          isNull(logTailRequests.completedAt),
+        ),
       )
-      .run(
-        input.completedAt.getTime(),
-        "lines" in input ? JSON.stringify(input.lines) : null,
-        "error" in input ? input.error : null,
-        input.runId,
-        input.requestedAt.getTime(),
-      ).changes > 0
+      .run().changes > 0
   );
 }
 
-const lines = z.array(z.string());
-
 export function getLogTailRequest(db: Database, runId: RunId): RequestStatus<string[]> | null {
-  const raw = db
-    .prepare(
-      "SELECT requested_at, completed_at, lines AS payload, error FROM log_tail_requests WHERE run_id = ?",
-    )
-    .get(runId);
-  return raw === undefined ? null : readRequest(raw, (p) => lines.parse(JSON.parse(p)));
+  const row = db.select().from(logTailRequests).where(eq(logTailRequests.runId, runId)).get();
+  return row === undefined ? null : toStatus({ ...row, result: row.lines ?? [] });
 }
 
 /** 온보딩·Settings가 러너 확인을 요청한다(0025·0026). */
 export function requestRunnerCheck(db: Database, runnerId: RunnerId, now: Date = new Date()): void {
-  db.prepare(
-    `INSERT INTO runner_check_requests (runner_id, requested_at) VALUES (?, ?)
-     ON CONFLICT (runner_id) DO UPDATE SET
-       requested_at = excluded.requested_at, completed_at = NULL, result = NULL, error = NULL`,
-  ).run(runnerId, now.getTime());
+  db.insert(runnerCheckRequests)
+    .values({ runnerId, requestedAt: now })
+    .onConflictDoUpdate({
+      target: runnerCheckRequests.runnerId,
+      set: { requestedAt: now, completedAt: null, result: null, error: null },
+    })
+    .run();
 }
 
 export function listPendingRunnerCheckRequests(
   db: Database,
 ): Array<{ runnerId: RunnerId; requestedAt: Date }> {
-  const row = z.object({ runner_id: z.string(), requested_at: z.number().int() });
   return db
-    .prepare(
-      "SELECT runner_id, requested_at FROM runner_check_requests WHERE completed_at IS NULL ORDER BY requested_at",
-    )
-    .all()
-    .map((raw) => {
-      const r = row.parse(raw);
-      return { runnerId: toRunnerId(r.runner_id), requestedAt: new Date(r.requested_at) };
-    });
+    .select({
+      runnerId: runnerCheckRequests.runnerId,
+      requestedAt: runnerCheckRequests.requestedAt,
+    })
+    .from(runnerCheckRequests)
+    .where(isNull(runnerCheckRequests.completedAt))
+    .orderBy(asc(runnerCheckRequests.requestedAt))
+    .all();
 }
 
 export function completeRunnerCheckRequest(
@@ -125,37 +117,37 @@ export function completeRunnerCheckRequest(
 ): boolean {
   return (
     db
-      .prepare(
-        `UPDATE runner_check_requests SET completed_at = ?, result = ?, error = ?
-         WHERE runner_id = ? AND requested_at = ? AND completed_at IS NULL`,
+      .update(runnerCheckRequests)
+      .set({
+        completedAt: input.completedAt,
+        result: "result" in input ? JSON.stringify(input.result) : null,
+        error: "error" in input ? input.error : null,
+      })
+      .where(
+        and(
+          eq(runnerCheckRequests.runnerId, input.runnerId),
+          eq(runnerCheckRequests.requestedAt, input.requestedAt),
+          isNull(runnerCheckRequests.completedAt),
+        ),
       )
-      .run(
-        input.completedAt.getTime(),
-        "result" in input ? JSON.stringify(input.result) : null,
-        "error" in input ? input.error : null,
-        input.runnerId,
-        input.requestedAt.getTime(),
-      ).changes > 0
+      .run().changes > 0
   );
 }
 
 /**
  * 러너 확인 결과. 결과는 JSON으로 저장한 RunnerHealth이고, 날짜는 문자열로 돌아온다.
- * 화면이 쓰는 형태로 파싱하는 일은 읽는 쪽이 맡는다.
+ * 화면이 쓰는 형태로 파싱하는 일은 읽는 쪽이 맡는다(경계 파싱).
  */
 export function getRunnerCheckRequest(
   db: Database,
   runnerId: RunnerId,
 ): RequestStatus<unknown> | null {
-  const raw = db
-    .prepare(
-      "SELECT requested_at, completed_at, result AS payload, error FROM runner_check_requests WHERE runner_id = ?",
-    )
-    .get(runnerId);
-  return raw === undefined
-    ? null
-    : readRequest(raw, (p): unknown => {
-        const value: unknown = JSON.parse(p);
-        return value;
-      });
+  const row = db
+    .select()
+    .from(runnerCheckRequests)
+    .where(eq(runnerCheckRequests.runnerId, runnerId))
+    .get();
+  if (row === undefined) return null;
+  const result: unknown = row.result === null ? null : JSON.parse(row.result);
+  return toStatus({ ...row, result });
 }

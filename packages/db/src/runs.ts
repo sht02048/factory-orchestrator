@@ -1,23 +1,5 @@
 import { randomUUID } from "node:crypto";
-import {
-  AGENT_RESULTS,
-  PR_STATES,
-  RUN_STATES,
-  checkAssignment,
-  pickRunner,
-  toAgentId,
-  toCommentId,
-  toPullRequestId,
-  toRetryToken,
-  toRunId,
-  toRunnerId,
-  toRunnerProjectId,
-  toTicketKey,
-  toTrackerConnectionId,
-  toTrackerProjectId,
-  toWorktreeRef,
-  transitionRun,
-} from "@factory/core";
+import { checkAssignment, pickRunner, toRunId, transitionRun } from "@factory/core";
 import type {
   AgentId,
   AgentResult,
@@ -37,11 +19,13 @@ import type {
   TrackerProjectId,
   WorktreeRef,
 } from "@factory/core";
-import { z } from "zod";
+import { and, asc, count, eq, inArray, ne } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";
-import { toWorkspaceId } from "./ids.js";
 import type { WorkspaceId } from "./ids.js";
+import { runStateChanges, runners, runs } from "./schema.js";
+import type { LATER_PR_STATES } from "./schema.js";
 import { getWorkspaceTrackerProject, listRunnerSnapshots } from "./settings.js";
 
 /** 저장한 런. core Run에 Workspace를 더한다. */
@@ -57,7 +41,7 @@ export interface RunRecords {
     ci: CiState;
     checkedAt: Date;
   } | null;
-  laterPrState: { state: "merged" | "closed"; at: Date } | null;
+  laterPrState: { state: (typeof LATER_PR_STATES)[number]; at: Date } | null;
   worktreeRemovedAt: Date | null;
   trackerStateSetAt: Date | null;
   trackerComment: { id: CommentId; at: Date } | null;
@@ -68,88 +52,42 @@ export interface RunRecords {
 /** 런이 끝날 때 저장하는 로그 줄 수(Q46) */
 export const LAST_LOG_LINES = 200;
 
-// ---------- 행 파싱 ----------
-
-const time = z
-  .number()
-  .int()
-  .transform((ms) => new Date(ms));
-
-const runRow = z.object({
-  id: z.string().transform(toRunId),
-  tracker_connection_id: z.string().transform(toTrackerConnectionId),
-  ticket_key: z.string().transform(toTicketKey),
-  workspace_id: z.string().transform(toWorkspaceId),
-  tracker_project_id: z.string().transform(toTrackerProjectId),
-  runner_project_id: z.string().transform(toRunnerProjectId),
-  agent_id: z.string().transform(toAgentId),
-  branch: z.string(),
-  state: z.enum(RUN_STATES),
-  runner_id: z.string().transform(toRunnerId).nullable(),
-  assigned_at: time,
-  started_at: time.nullable(),
-  ended_at: time.nullable(),
-  worktree_ref: z.string().transform(toWorktreeRef).nullable(),
-  agent_result: z.enum(AGENT_RESULTS).nullable(),
-  pr_state: z.enum(PR_STATES).nullable(),
-  retry_token: z.string().transform(toRetryToken).nullable(),
-  pr_id: z.string().transform(toPullRequestId).nullable(),
-  pr_display_id: z.string().nullable(),
-  pr_url: z.string().nullable(),
-  pr_ci_state: z.string().nullable(),
-  pr_checked_at: time.nullable(),
-  later_pr_state: z.enum(["merged", "closed"]).nullable(),
-  later_pr_state_at: time.nullable(),
-  worktree_removed_at: time.nullable(),
-  tracker_state_set_at: time.nullable(),
-  tracker_comment_id: z.string().transform(toCommentId).nullable(),
-  tracker_commented_at: time.nullable(),
-  unreachable_since: time.nullable(),
-  last_log: z
-    .string()
-    .nullable()
-    .transform((text, ctx) => {
-      if (text === null) return null;
-      const parsed = z.array(z.string()).safeParse(JSON.parse(text));
-      if (!parsed.success) {
-        ctx.addIssue({ code: "custom", message: "last_log is not a string array" });
-        return z.NEVER;
-      }
-      return parsed.data;
-    }),
-});
-type RunRow = z.infer<typeof runRow>;
+type RunRow = typeof runs.$inferSelect;
 
 /** DB의 런 행이 core Run 모양을 지키지 않음. CHECK 제약이 막으므로 생기면 버그다. */
 export class RunRowError extends Error {
-  constructor(runId: string, message: string) {
+  constructor(runId: RunId, message: string) {
     super(`run ${runId}: ${message}`);
     this.name = "RunRowError";
   }
 }
 
+/**
+ * 행을 core Run으로 바꾼다. 컬럼 타입은 Drizzle 추론 타입이 이미 core 타입이고(schema-types.ts),
+ * 상태마다 어느 값이 있어야 하는지만 여기서 확인한다(타입이 표현하지 못하는 행 사이 조건).
+ */
 function toStoredRun(row: RunRow): StoredRun {
   const base = {
     id: row.id,
-    workspaceId: row.workspace_id,
-    ticket: { connection: row.tracker_connection_id, key: row.ticket_key },
-    trackerProject: row.tracker_project_id,
-    runnerProject: row.runner_project_id,
-    agent: row.agent_id,
+    workspaceId: row.workspaceId,
+    ticket: { connection: row.trackerConnectionId, key: row.ticketKey },
+    trackerProject: row.trackerProjectId,
+    runnerProject: row.runnerProjectId,
+    agent: row.agentId,
     branch: row.branch,
-    assignedAt: row.assigned_at,
+    assignedAt: row.assignedAt,
   };
   if (row.state === "queued") {
-    return { ...base, state: row.state, runnerId: row.runner_id };
+    return { ...base, state: row.state, runnerId: row.runnerId };
   }
-  const { runner_id: runnerId, worktree_ref: worktree, started_at: startedAt } = row;
+  const { runnerId, worktreeRef: worktree, startedAt } = row;
   if (runnerId === null || worktree === null || startedAt === null) {
     throw new RunRowError(row.id, `${row.state} run without runner, worktree or start time`);
   }
   if (row.state !== "ended") {
     return { ...base, state: row.state, runnerId, worktree, startedAt };
   }
-  const { ended_at: endedAt, agent_result: agentResult, pr_state: prState } = row;
+  const { endedAt, agentResult, prState } = row;
   if (endedAt === null || agentResult === null || prState === null) {
     throw new RunRowError(row.id, "ended run without end time or the two axes");
   }
@@ -167,47 +105,49 @@ function toStoredRun(row: RunRow): StoredRun {
 
 function toRunRecords(row: RunRow): RunRecords {
   return {
-    retryToken: row.retry_token,
+    retryToken: row.retryToken,
     pullRequest:
-      row.pr_id === null || row.pr_checked_at === null
+      row.prId === null || row.prCheckedAt === null
         ? null
         : {
-            id: row.pr_id,
-            displayId: row.pr_display_id ?? "",
-            url: row.pr_url ?? "",
-            ci: row.pr_ci_state ?? "none",
-            checkedAt: row.pr_checked_at,
+            id: row.prId,
+            displayId: row.prDisplayId ?? "",
+            url: row.prUrl ?? "",
+            ci: row.prCiState ?? "none",
+            checkedAt: row.prCheckedAt,
           },
     laterPrState:
-      row.later_pr_state === null || row.later_pr_state_at === null
+      row.laterPrState === null || row.laterPrStateAt === null
         ? null
-        : { state: row.later_pr_state, at: row.later_pr_state_at },
-    worktreeRemovedAt: row.worktree_removed_at,
-    trackerStateSetAt: row.tracker_state_set_at,
+        : { state: row.laterPrState, at: row.laterPrStateAt },
+    worktreeRemovedAt: row.worktreeRemovedAt,
+    trackerStateSetAt: row.trackerStateSetAt,
     trackerComment:
-      row.tracker_comment_id === null || row.tracker_commented_at === null
+      row.trackerCommentId === null || row.trackerCommentedAt === null
         ? null
-        : { id: row.tracker_comment_id, at: row.tracker_commented_at },
-    unreachableSince: row.unreachable_since,
-    lastLog: row.last_log,
+        : { id: row.trackerCommentId, at: row.trackerCommentedAt },
+    unreachableSince: row.unreachableSince,
+    lastLog: row.lastLog,
   };
 }
 
 // ---------- 읽기 ----------
 
+function getRunRow(db: Database, id: RunId): RunRow | undefined {
+  return db.select().from(runs).where(eq(runs.id, id)).get();
+}
+
 export function getRun(db: Database, id: RunId): StoredRun | null {
-  const raw = db.prepare("SELECT * FROM runs WHERE id = ?").get(id);
-  return raw === undefined ? null : toStoredRun(runRow.parse(raw));
+  const row = getRunRow(db, id);
+  return row === undefined ? null : toStoredRun(row);
 }
 
 export function getRunWithRecords(
   db: Database,
   id: RunId,
 ): { run: StoredRun; records: RunRecords } | null {
-  const raw = db.prepare("SELECT * FROM runs WHERE id = ?").get(id);
-  if (raw === undefined) return null;
-  const row = runRow.parse(raw);
-  return { run: toStoredRun(row), records: toRunRecords(row) };
+  const row = getRunRow(db, id);
+  return row === undefined ? null : { run: toStoredRun(row), records: toRunRecords(row) };
 }
 
 /** 런 목록. 할당 순서(대기열 순서)로 돌려준다. */
@@ -215,42 +155,30 @@ export function listRuns(
   db: Database,
   filter: { states?: ReadonlyArray<RunState>; ticket?: TicketRef; workspaceId?: WorkspaceId } = {},
 ): StoredRun[] {
-  const where: string[] = [];
-  const params: string[] = [];
-  if (filter.states !== undefined) {
-    if (filter.states.length === 0) return [];
-    where.push(`state IN (${filter.states.map(() => "?").join(", ")})`);
-    params.push(...filter.states);
-  }
+  if (filter.states?.length === 0) return [];
+  const conditions: SQL[] = [];
+  if (filter.states !== undefined) conditions.push(inArray(runs.state, [...filter.states]));
   if (filter.ticket !== undefined) {
-    where.push("tracker_connection_id = ? AND ticket_key = ?");
-    params.push(filter.ticket.connection, filter.ticket.key);
+    conditions.push(eq(runs.trackerConnectionId, filter.ticket.connection));
+    conditions.push(eq(runs.ticketKey, filter.ticket.key));
   }
-  if (filter.workspaceId !== undefined) {
-    where.push("workspace_id = ?");
-    params.push(filter.workspaceId);
-  }
-  const clause = where.length === 0 ? "" : `WHERE ${where.join(" AND ")}`;
+  if (filter.workspaceId !== undefined) conditions.push(eq(runs.workspaceId, filter.workspaceId));
   return db
-    .prepare(`SELECT * FROM runs ${clause} ORDER BY assigned_at, rowid`)
-    .all(...params)
-    .map((raw) => toStoredRun(runRow.parse(raw)));
+    .select()
+    .from(runs)
+    .where(and(...conditions))
+    .orderBy(asc(runs.assignedAt), asc(runs.id))
+    .all()
+    .map(toStoredRun);
 }
-
-const placementRow = z.object({
-  runner_id: z.string().transform(toRunnerId).nullable(),
-  state: z.enum(RUN_STATES),
-});
 
 /** capacity를 셀 런(Ended 빼고). core remainingCapacity·pickRunner·planQueue에 넘긴다. */
 export function listRunPlacements(db: Database): RunPlacement[] {
   return db
-    .prepare("SELECT runner_id, state FROM runs WHERE state <> 'ended'")
-    .all()
-    .map((raw) => {
-      const row = placementRow.parse(raw);
-      return { runnerId: row.runner_id, state: row.state };
-    });
+    .select({ runnerId: runs.runnerId, state: runs.state })
+    .from(runs)
+    .where(ne(runs.state, "ended"))
+    .all();
 }
 
 // ---------- 할당 진입점 ----------
@@ -292,8 +220,10 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
     const project = getWorkspaceTrackerProject(db, input.ticket.connection, input.trackerProject);
     if (project === null) return { ok: false, reason: "unknown-tracker-project" };
 
-    const ticketRuns = listRuns(db, { ticket: input.ticket });
-    const check = checkAssignment({ ticket: input.ticket, runs: ticketRuns });
+    const check = checkAssignment({
+      ticket: input.ticket,
+      runs: listRuns(db, { ticket: input.ticket }),
+    });
     if (!check.ok) return { ok: false, reason: "active-run" };
 
     let runnerId: RunnerId | null;
@@ -304,34 +234,35 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
         runs: listRunPlacements(db),
       });
     } else {
-      const exists = db.prepare("SELECT 1 FROM runners WHERE id = ?").get(input.runnerId);
+      const exists = db
+        .select({ id: runners.id })
+        .from(runners)
+        .where(eq(runners.id, input.runnerId))
+        .get();
       if (exists === undefined) return { ok: false, reason: "unknown-runner" };
       runnerId = input.runnerId;
     }
 
-    const id = toRunId(randomUUID());
     // 런 번호는 트래커 연결과 상관없이 티켓 키로 센다. 두 연결에 같은 키가 있어도 브랜치가 겹치지 않는다.
-    const sameKeyRuns = db
-      .prepare("SELECT count(*) AS n FROM runs WHERE ticket_key = ?")
-      .get(input.ticket.key)?.["n"];
-    const branch = `factory/${input.ticket.key}-${Number(sameKeyRuns ?? 0) + 1}`;
-    db.prepare(
-      `INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
-         runner_project_id, agent_id, branch, state, runner_id, assigned_at)
-       VALUES (:id, :connection, :key, :workspace, :trackerProject,
-         :runnerProject, :agent, :branch, 'queued', :runner, :now)`,
-    ).run({
-      id,
-      connection: input.ticket.connection,
-      key: input.ticket.key,
-      workspace: project.workspaceId,
-      trackerProject: input.trackerProject,
-      runnerProject: input.runnerProject,
-      agent: input.agent,
-      branch,
-      runner: runnerId,
-      now: now.getTime(),
-    });
+    const sameKeyRuns =
+      db.select({ n: count() }).from(runs).where(eq(runs.ticketKey, input.ticket.key)).get()?.n ??
+      0;
+    const id = toRunId(randomUUID());
+    db.insert(runs)
+      .values({
+        id,
+        trackerConnectionId: input.ticket.connection,
+        ticketKey: input.ticket.key,
+        workspaceId: project.workspaceId,
+        trackerProjectId: input.trackerProject,
+        runnerProjectId: input.runnerProject,
+        agentId: input.agent,
+        branch: `factory/${input.ticket.key}-${sameKeyRuns + 1}`,
+        state: "queued",
+        runnerId,
+        assignedAt: now,
+      })
+      .run();
     recordStateChange(db, id, null, "queued", now);
 
     const run = getRun(db, id);
@@ -362,7 +293,7 @@ export type ChangeRunStateResult =
 
 /**
  * 런 상태를 바꾼다. 허용하는 전이인지는 core transitionRun이 정한다(스펙 4.1).
- * 이력에 바뀐 시각을 남긴다. 읽은 상태가 그 사이 바뀌었으면 쓰지 않는다.
+ * 이력에 바뀐 시각을 남긴다. 읽기와 쓰기가 한 쓰기 트랜잭션 안이라 그 사이 다른 쪽이 바꾸지 못한다.
  */
 export function changeRunState(
   db: Database,
@@ -376,27 +307,29 @@ export function changeRunState(
     const transition = transitionRun(current.state, change.to);
     if (!transition.ok) return { ok: false, error: transition.error };
 
-    const at = now.getTime();
+    const where = and(eq(runs.id, runId), eq(runs.state, current.state));
     if (current.state === "queued") {
       // 전이 표에서 Queued의 다음은 Running뿐이다.
       if (current.runnerId === null) return { ok: false, error: { kind: "no-runner" } };
       if (change.to !== "running" || change.worktree === undefined) {
         return { ok: false, error: { kind: "no-worktree" } };
       }
-      db.prepare(
-        "UPDATE runs SET state = 'running', started_at = ?, worktree_ref = ? WHERE id = ? AND state = 'queued'",
-      ).run(at, change.worktree, runId);
+      db.update(runs)
+        .set({ state: "running", startedAt: now, worktreeRef: change.worktree })
+        .where(where)
+        .run();
     } else if (change.to === "ended") {
-      db.prepare(
-        `UPDATE runs SET state = 'ended', ended_at = ?, agent_result = ?, pr_state = ?
-         WHERE id = ? AND state = ?`,
-      ).run(at, change.agentResult, change.prState, runId, current.state);
+      db.update(runs)
+        .set({
+          state: "ended",
+          endedAt: now,
+          agentResult: change.agentResult,
+          prState: change.prState,
+        })
+        .where(where)
+        .run();
     } else {
-      db.prepare("UPDATE runs SET state = ? WHERE id = ? AND state = ?").run(
-        change.to,
-        runId,
-        current.state,
-      );
+      db.update(runs).set({ state: change.to }).where(where).run();
     }
     recordStateChange(db, runId, current.state, change.to, now);
 
@@ -412,8 +345,10 @@ export function changeRunState(
  */
 export function setQueuedRunRunner(db: Database, runId: RunId, runnerId: RunnerId | null): boolean {
   const result = db
-    .prepare("UPDATE runs SET runner_id = ? WHERE id = ? AND state = 'queued'")
-    .run(runnerId, runId);
+    .update(runs)
+    .set({ runnerId })
+    .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
+    .run();
   return result.changes > 0;
 }
 
@@ -424,9 +359,7 @@ function recordStateChange(
   to: RunState,
   now: Date,
 ): void {
-  db.prepare(
-    "INSERT INTO run_state_changes (run_id, from_state, to_state, changed_at) VALUES (?, ?, ?, ?)",
-  ).run(runId, from, to, now.getTime());
+  db.insert(runStateChanges).values({ runId, fromState: from, toState: to, changedAt: now }).run();
 }
 
 export interface RunStateChangeRecord {
@@ -435,23 +368,18 @@ export interface RunStateChangeRecord {
   at: Date;
 }
 
-const stateChangeRow = z.object({
-  from_state: z.enum(RUN_STATES).nullable(),
-  to_state: z.enum(RUN_STATES),
-  changed_at: time,
-});
-
 /** 런의 상태 변경 이력(Run 상세 타임라인, 0022). 오래된 것부터 */
 export function listRunStateChanges(db: Database, runId: RunId): RunStateChangeRecord[] {
   return db
-    .prepare(
-      "SELECT from_state, to_state, changed_at FROM run_state_changes WHERE run_id = ? ORDER BY id",
-    )
-    .all(runId)
-    .map((raw) => {
-      const row = stateChangeRow.parse(raw);
-      return { from: row.from_state, to: row.to_state, at: row.changed_at };
-    });
+    .select({
+      from: runStateChanges.fromState,
+      to: runStateChanges.toState,
+      at: runStateChanges.changedAt,
+    })
+    .from(runStateChanges)
+    .where(eq(runStateChanges.runId, runId))
+    .orderBy(asc(runStateChanges.id))
+    .all();
 }
 
 // ---------- 그 밖의 기록 ----------
@@ -461,46 +389,31 @@ export function listRunStateChanges(db: Database, runId: RunId): RunStateChangeR
  * 이후 PR 상태는 Ended 런에만 적힌다(CHECK 제약).
  */
 export function updateRunRecords(db: Database, runId: RunId, patch: Partial<RunRecords>): boolean {
-  const sets: string[] = [];
-  const params: Array<string | number | null> = [];
-  const set = (column: string, value: string | number | null): void => {
-    sets.push(`${column} = ?`);
-    params.push(value);
-  };
-  const ms = (date: Date | null): number | null => (date === null ? null : date.getTime());
-
-  if (patch.retryToken !== undefined) set("retry_token", patch.retryToken);
+  const set: Partial<typeof runs.$inferInsert> = {};
+  if (patch.retryToken !== undefined) set.retryToken = patch.retryToken;
   if (patch.pullRequest !== undefined) {
     const pr = patch.pullRequest;
-    set("pr_id", pr?.id ?? null);
-    set("pr_display_id", pr?.displayId ?? null);
-    set("pr_url", pr?.url ?? null);
-    set("pr_ci_state", pr?.ci ?? null);
-    set("pr_checked_at", ms(pr?.checkedAt ?? null));
+    set.prId = pr?.id ?? null;
+    set.prDisplayId = pr?.displayId ?? null;
+    set.prUrl = pr?.url ?? null;
+    set.prCiState = pr?.ci ?? null;
+    set.prCheckedAt = pr?.checkedAt ?? null;
   }
   if (patch.laterPrState !== undefined) {
-    set("later_pr_state", patch.laterPrState?.state ?? null);
-    set("later_pr_state_at", ms(patch.laterPrState?.at ?? null));
+    set.laterPrState = patch.laterPrState?.state ?? null;
+    set.laterPrStateAt = patch.laterPrState?.at ?? null;
   }
-  if (patch.worktreeRemovedAt !== undefined)
-    set("worktree_removed_at", ms(patch.worktreeRemovedAt));
-  if (patch.trackerStateSetAt !== undefined)
-    set("tracker_state_set_at", ms(patch.trackerStateSetAt));
+  if (patch.worktreeRemovedAt !== undefined) set.worktreeRemovedAt = patch.worktreeRemovedAt;
+  if (patch.trackerStateSetAt !== undefined) set.trackerStateSetAt = patch.trackerStateSetAt;
   if (patch.trackerComment !== undefined) {
-    set("tracker_comment_id", patch.trackerComment?.id ?? null);
-    set("tracker_commented_at", ms(patch.trackerComment?.at ?? null));
+    set.trackerCommentId = patch.trackerComment?.id ?? null;
+    set.trackerCommentedAt = patch.trackerComment?.at ?? null;
   }
-  if (patch.unreachableSince !== undefined) set("unreachable_since", ms(patch.unreachableSince));
+  if (patch.unreachableSince !== undefined) set.unreachableSince = patch.unreachableSince;
   if (patch.lastLog !== undefined) {
-    set(
-      "last_log",
-      patch.lastLog === null ? null : JSON.stringify(patch.lastLog.slice(-LAST_LOG_LINES)),
-    );
+    set.lastLog = patch.lastLog === null ? null : patch.lastLog.slice(-LAST_LOG_LINES);
   }
-  if (sets.length === 0) return false;
+  if (Object.keys(set).length === 0) return false;
 
-  const result = db
-    .prepare(`UPDATE runs SET ${sets.join(", ")} WHERE id = ?`)
-    .run(...params, runId);
-  return result.changes > 0;
+  return db.update(runs).set(set).where(eq(runs.id, runId)).run().changes > 0;
 }

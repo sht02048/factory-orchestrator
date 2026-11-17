@@ -1,0 +1,1483 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "id": "2b61a887-5d71-4ed3-b5cc-f319291d5b9c",
+  "prevIds": ["00000000-0000-0000-0000-000000000000"],
+  "ddl": [
+    {
+      "name": "auto_assign_labels",
+      "entityType": "tables"
+    },
+    {
+      "name": "code_host_connections",
+      "entityType": "tables"
+    },
+    {
+      "name": "log_tail_requests",
+      "entityType": "tables"
+    },
+    {
+      "name": "mappings",
+      "entityType": "tables"
+    },
+    {
+      "name": "run_state_changes",
+      "entityType": "tables"
+    },
+    {
+      "name": "runner_check_requests",
+      "entityType": "tables"
+    },
+    {
+      "name": "runner_projects",
+      "entityType": "tables"
+    },
+    {
+      "name": "runners",
+      "entityType": "tables"
+    },
+    {
+      "name": "runs",
+      "entityType": "tables"
+    },
+    {
+      "name": "tracker_connections",
+      "entityType": "tables"
+    },
+    {
+      "name": "tracker_events",
+      "entityType": "tables"
+    },
+    {
+      "name": "workspace_tracker_projects",
+      "entityType": "tables"
+    },
+    {
+      "name": "workspaces",
+      "entityType": "tables"
+    },
+    {
+      "table": "auto_assign_labels",
+      "name": "workspace_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "auto_assign_labels",
+      "name": "tracker_connection_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "auto_assign_labels",
+      "name": "label_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "code_host_connections",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "code_host_connections",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "code_host_connections",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "code_host_connections",
+      "name": "config",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "code_host_connections",
+      "name": "secrets",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "code_host_connections",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "log_tail_requests",
+      "name": "run_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "log_tail_requests",
+      "name": "requested_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "log_tail_requests",
+      "name": "completed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "log_tail_requests",
+      "name": "lines",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "log_tail_requests",
+      "name": "error",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "mappings",
+      "name": "tracker_connection_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "mappings",
+      "name": "tracker_project_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "mappings",
+      "name": "runner_project_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "mappings",
+      "name": "agent_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_state_changes",
+      "name": "id",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": true,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_state_changes",
+      "name": "run_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_state_changes",
+      "name": "from_state",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_state_changes",
+      "name": "to_state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_state_changes",
+      "name": "changed_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runner_check_requests",
+      "name": "runner_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runner_check_requests",
+      "name": "requested_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runner_check_requests",
+      "name": "completed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runner_check_requests",
+      "name": "result",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runner_check_requests",
+      "name": "error",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runner_projects",
+      "name": "runner_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runner_projects",
+      "name": "project_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runner_projects",
+      "name": "display_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runner_projects",
+      "name": "setup_state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runners",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runners",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runners",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runners",
+      "name": "config",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runners",
+      "name": "capacity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runners",
+      "name": "online",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runners",
+      "name": "checked_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runners",
+      "name": "check_error",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runners",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "tracker_connection_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "ticket_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "workspace_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "tracker_project_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "runner_project_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "agent_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "branch",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "runner_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "assigned_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "started_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "ended_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "worktree_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "retry_token",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "agent_result",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "pr_state",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "pr_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "pr_display_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "pr_url",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "pr_ci_state",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "pr_checked_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "later_pr_state",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "later_pr_state_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "worktree_removed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "tracker_state_set_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "tracker_comment_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "tracker_commented_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "unreachable_since",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "last_log",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_connections",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_connections",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_connections",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_connections",
+      "name": "config",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'{}'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_connections",
+      "name": "secrets",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_connections",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_events",
+      "name": "tracker_connection_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_events",
+      "name": "delivery_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_events",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_events",
+      "name": "tracker_project_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_events",
+      "name": "ticket_key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_events",
+      "name": "label_ids",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_events",
+      "name": "received_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracker_events",
+      "name": "processed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "workspace_tracker_projects",
+      "name": "tracker_connection_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "workspace_tracker_projects",
+      "name": "tracker_project_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "workspace_tracker_projects",
+      "name": "workspace_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "workspace_tracker_projects",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "workspace_tracker_projects",
+      "name": "in_progress_state_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "workspaces",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "workspaces",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "workspaces",
+      "name": "max_run_ms",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "7200000",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "workspaces",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_state_changes",
+      "name": "run_state_changes_run",
+      "columns": [
+        {
+          "value": "run_id",
+          "isExpression": false
+        },
+        {
+          "value": "id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "runs",
+      "name": "runs_one_active_per_ticket",
+      "columns": [
+        {
+          "value": "tracker_connection_id",
+          "isExpression": false
+        },
+        {
+          "value": "ticket_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"runs\".\"state\" <> 'ended'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "runs",
+      "name": "runs_ticket",
+      "columns": [
+        {
+          "value": "tracker_connection_id",
+          "isExpression": false
+        },
+        {
+          "value": "ticket_key",
+          "isExpression": false
+        },
+        {
+          "value": "assigned_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "runs",
+      "name": "runs_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "assigned_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "runs",
+      "name": "runs_workspace",
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false
+        },
+        {
+          "value": "assigned_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "tracker_events",
+      "name": "tracker_events_unprocessed",
+      "columns": [
+        {
+          "value": "received_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "\"tracker_events\".\"processed_at\" IS NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "workspace_tracker_projects",
+      "name": "workspace_tracker_projects_workspace",
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "auto_assign_labels",
+      "name": "fk_auto_assign_labels_workspace_id_workspaces_id_fk",
+      "columns": ["workspace_id"],
+      "tableTo": "workspaces",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "auto_assign_labels",
+      "name": "fk_auto_assign_labels_tracker_connection_id_tracker_connections_id_fk",
+      "columns": ["tracker_connection_id"],
+      "tableTo": "tracker_connections",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "log_tail_requests",
+      "name": "fk_log_tail_requests_run_id_runs_id_fk",
+      "columns": ["run_id"],
+      "tableTo": "runs",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "mappings",
+      "name": "fk_mappings_tracker_connection_id_tracker_project_id_workspace_tracker_projects_tracker_connection_id_tracker_project_id_fk",
+      "columns": ["tracker_connection_id", "tracker_project_id"],
+      "tableTo": "workspace_tracker_projects",
+      "columnsTo": ["tracker_connection_id", "tracker_project_id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "run_state_changes",
+      "name": "fk_run_state_changes_run_id_runs_id_fk",
+      "columns": ["run_id"],
+      "tableTo": "runs",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "runner_check_requests",
+      "name": "fk_runner_check_requests_runner_id_runners_id_fk",
+      "columns": ["runner_id"],
+      "tableTo": "runners",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "runner_projects",
+      "name": "fk_runner_projects_runner_id_runners_id_fk",
+      "columns": ["runner_id"],
+      "tableTo": "runners",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "runs",
+      "name": "fk_runs_tracker_connection_id_tracker_connections_id_fk",
+      "columns": ["tracker_connection_id"],
+      "tableTo": "tracker_connections",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "runs",
+      "name": "fk_runs_workspace_id_workspaces_id_fk",
+      "columns": ["workspace_id"],
+      "tableTo": "workspaces",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "runs",
+      "name": "fk_runs_runner_id_runners_id_fk",
+      "columns": ["runner_id"],
+      "tableTo": "runners",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "tracker_events",
+      "name": "fk_tracker_events_tracker_connection_id_tracker_connections_id_fk",
+      "columns": ["tracker_connection_id"],
+      "tableTo": "tracker_connections",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "workspace_tracker_projects",
+      "name": "fk_workspace_tracker_projects_tracker_connection_id_tracker_connections_id_fk",
+      "columns": ["tracker_connection_id"],
+      "tableTo": "tracker_connections",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "workspace_tracker_projects",
+      "name": "fk_workspace_tracker_projects_workspace_id_workspaces_id_fk",
+      "columns": ["workspace_id"],
+      "tableTo": "workspaces",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "auto_assign_labels",
+      "name": "auto_assign_labels_pk",
+      "columns": ["workspace_id", "tracker_connection_id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "mappings",
+      "name": "mappings_pk",
+      "columns": ["tracker_connection_id", "tracker_project_id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "runner_projects",
+      "name": "runner_projects_pk",
+      "columns": ["runner_id", "project_id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "tracker_events",
+      "name": "tracker_events_pk",
+      "columns": ["tracker_connection_id", "delivery_id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "workspace_tracker_projects",
+      "name": "workspace_tracker_projects_pk",
+      "columns": ["tracker_connection_id", "tracker_project_id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "code_host_connections",
+      "name": "code_host_connections_pk",
+      "columns": ["id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "log_tail_requests",
+      "name": "log_tail_requests_pk",
+      "columns": ["run_id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "run_state_changes",
+      "name": "run_state_changes_pk",
+      "columns": ["id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "runner_check_requests",
+      "name": "runner_check_requests_pk",
+      "columns": ["runner_id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "runners",
+      "name": "runners_pk",
+      "columns": ["id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_pk",
+      "columns": ["id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "tracker_connections",
+      "name": "tracker_connections_pk",
+      "columns": ["id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "workspaces",
+      "name": "workspaces_pk",
+      "columns": ["id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "code_host_connections",
+      "name": "code_host_connections_config_json",
+      "value": "json_valid(\"config\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "log_tail_requests",
+      "name": "log_tail_requests_lines_json",
+      "value": "\"lines\" IS NULL OR json_valid(\"lines\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "runner_check_requests",
+      "name": "runner_check_requests_result_json",
+      "value": "\"result\" IS NULL OR json_valid(\"result\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "runners",
+      "name": "runners_config_json",
+      "value": "json_valid(\"config\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "runners",
+      "name": "runners_capacity",
+      "value": "\"capacity\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "runners",
+      "name": "runners_online",
+      "value": "\"online\" IN (0, 1)",
+      "entityType": "checks"
+    },
+    {
+      "table": "runners",
+      "name": "runners_check_error_json",
+      "value": "\"check_error\" IS NULL OR json_valid(\"check_error\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_state",
+      "value": "\"state\" IN ('queued', 'running', 'waiting-for-input', 'disconnected', 'ended')",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_agent_result",
+      "value": "\"agent_result\" IN ('exited-normally', 'exited-with-error', 'timed-out', 'stopped-waiting-for-input', 'runner-disconnected', 'worktree-missing')",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_pr_state",
+      "value": "\"pr_state\" IN ('none', 'open', 'merged', 'closed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_later_pr_state",
+      "value": "\"later_pr_state\" IN ('merged', 'closed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_last_log_json",
+      "value": "\"last_log\" IS NULL OR json_valid(\"last_log\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_started_iff_not_queued",
+      "value": "(\"state\" = 'queued') = (\"started_at\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_runner_and_worktree_once_started",
+      "value": "\"state\" = 'queued' OR (\"runner_id\" IS NOT NULL AND \"worktree_ref\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_ended_at_iff_ended",
+      "value": "(\"state\" = 'ended') = (\"ended_at\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_agent_result_iff_ended",
+      "value": "(\"state\" = 'ended') = (\"agent_result\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_pr_state_iff_ended",
+      "value": "(\"state\" = 'ended') = (\"pr_state\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_later_pr_state_ended",
+      "value": "\"later_pr_state\" IS NULL OR \"state\" = 'ended'",
+      "entityType": "checks"
+    },
+    {
+      "table": "tracker_connections",
+      "name": "tracker_connections_config_json",
+      "value": "json_valid(\"config\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "tracker_events",
+      "name": "tracker_events_label_ids_json",
+      "value": "\"label_ids\" IS NULL OR json_valid(\"label_ids\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "workspaces",
+      "name": "workspaces_max_run_ms",
+      "value": "\"max_run_ms\" > 0",
+      "entityType": "checks"
+    }
+  ],
+  "renames": []
+}

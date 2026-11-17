@@ -132,7 +132,7 @@ describe("assignRun", () => {
       moveTo(db, id, state);
 
       expect(assign(db, "ENG-1")).toEqual({ ok: false, reason: "active-run" });
-      const count = db.prepare("SELECT count(*) AS n FROM runs").get()?.["n"];
+      const count = db.$client.prepare("SELECT count(*) AS n FROM runs").get()?.["n"];
       expect(count).toBe(1);
     },
   );
@@ -182,7 +182,7 @@ describe("assignRun", () => {
     const db = seededDatabase();
     const id = assignOk(db, "ENG-1");
     expect(() =>
-      db
+      db.$client
         .prepare(
           `INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
              runner_project_id, agent_id, branch, state, assigned_at)
@@ -222,7 +222,7 @@ describe("assignRun", () => {
 describe("Run 테이블과 두 축", () => {
   it("요약 결과·Failed 사유·워크트리 처리 컬럼이 없다", () => {
     const db = seededDatabase();
-    const columns = db
+    const columns = db.$client
       .prepare("SELECT name FROM pragma_table_info('runs')")
       .all()
       .map((row) => String(row["name"]));
@@ -254,7 +254,7 @@ describe("Run 테이블과 두 축", () => {
     const db = seededDatabase();
     const id = assignOk(db, "ENG-1");
     expect(() =>
-      db.prepare("UPDATE runs SET agent_result = 'exited-normally' WHERE id = ?").run(id),
+      db.$client.prepare("UPDATE runs SET agent_result = 'exited-normally' WHERE id = ?").run(id),
     ).toThrow(/CHECK/);
   });
 });
@@ -357,9 +357,14 @@ describe("updateRunRecords", () => {
   it("이후 PR 상태는 Ended 런에만 적는다", () => {
     const db = seededDatabase();
     const id = assignOk(db, "ENG-1");
-    expect(() =>
-      updateRunRecords(db, id, { laterPrState: { state: "merged", at: new Date() } }),
-    ).toThrow(/CHECK/);
+    let caught: unknown;
+    try {
+      updateRunRecords(db, id, { laterPrState: { state: "merged", at: new Date() } });
+    } catch (error) {
+      caught = error;
+    }
+    // Drizzle은 SQLite 오류를 cause에 담아 다시 던진다.
+    expect(caught instanceof Error ? String(caught.cause) : "").toMatch(/CHECK/);
   });
 });
 
@@ -396,7 +401,7 @@ describe("inTransaction", () => {
       ).toThrow("inner");
     });
     expect(
-      db
+      db.$client
         .prepare("SELECT ticket_key FROM runs")
         .all()
         .map((r) => r["ticket_key"]),

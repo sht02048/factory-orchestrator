@@ -1,15 +1,3 @@
-import {
-  toAgentId,
-  toCodeHostKind,
-  toLabelId,
-  toRunnerId,
-  toRunnerKind,
-  toRunnerProjectId,
-  toTrackerConnectionId,
-  toTrackerKind,
-  toTrackerProjectId,
-  toTrackerStateId,
-} from "@factory/core";
 import type {
   AgentId,
   CodeHostKind,
@@ -25,11 +13,20 @@ import type {
   TrackerProjectId,
   TrackerStateId,
 } from "@factory/core";
-import { z } from "zod";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";
-import { toCodeHostConnectionId, toWorkspaceId } from "./ids.js";
 import type { CodeHostConnectionId, WorkspaceId } from "./ids.js";
+import {
+  autoAssignLabels,
+  codeHostConnections,
+  mappings,
+  runnerProjects,
+  runners,
+  trackerConnections,
+  workspaceTrackerProjects,
+  workspaces,
+} from "./schema.js";
 import type { SecretBox } from "./secret-box.js";
 
 /**
@@ -37,15 +34,17 @@ import type { SecretBox } from "./secret-box.js";
  * 넣는다. db는 그 안을 해석하지 않고, 어댑터 factory가 경계에서 스키마로 파싱한다(core registry).
  */
 
-const jsonText = z.string().transform((text, ctx): unknown => {
-  try {
-    const value: unknown = JSON.parse(text);
-    return value;
-  } catch {
-    ctx.addIssue({ code: "custom", message: "not JSON" });
-    return z.NEVER;
-  }
-});
+function parseJson(text: string): unknown {
+  const value: unknown = JSON.parse(text);
+  return value;
+}
+
+function toJson(value: unknown, what: string): string {
+  const text = JSON.stringify(value);
+  // JSON.stringify(undefined)는 문자열이 아니다. 쓰기 전에 막는다.
+  if (typeof text !== "string") throw new TypeError(`${what} must be JSON`);
+  return text;
+}
 
 // ---------- 연결(트래커, 코드 호스트) ----------
 
@@ -67,71 +66,11 @@ export interface ConnectionInput<Id, Kind> {
   secrets: unknown;
 }
 
-type ConnectionTable = "tracker_connections" | "code_host_connections";
-
-const connectionRow = z.object({
-  id: z.string(),
-  kind: z.string(),
-  name: z.string(),
-  config: jsonText,
-  secrets: z.string(),
-});
-
-type ConnectionId = TrackerConnectionId | CodeHostConnectionId;
-
-function sealContext(table: ConnectionTable, id: string): string {
-  return `${table}:${id}`;
-}
-
-function saveConnection(
-  db: Database,
-  box: SecretBox,
-  table: ConnectionTable,
-  input: {
-    id: ConnectionId;
-    kind: TrackerKind | CodeHostKind;
-    name: string;
-    config: unknown;
-    secrets: unknown;
-  },
-  now: Date,
-): void {
-  const secrets = JSON.stringify(input.secrets);
-  // JSON.stringify(undefined)는 문자열이 아니다. 봉하기 전에 막는다.
-  if (typeof secrets !== "string") throw new TypeError("connection secrets must be JSON");
-  const sealed = box.seal(secrets, sealContext(table, input.id));
-  db.prepare(
-    `INSERT INTO ${table} (id, kind, name, config, secrets, created_at)
-     VALUES (:id, :kind, :name, :config, :secrets, :now)
-     ON CONFLICT (id) DO UPDATE SET
-       kind = excluded.kind, name = excluded.name,
-       config = excluded.config, secrets = excluded.secrets`,
-  ).run({
-    id: input.id,
-    kind: input.kind,
-    name: input.name,
-    config: JSON.stringify(input.config),
-    secrets: sealed,
-    now: now.getTime(),
-  });
-}
-
-function readConnections(
-  db: Database,
-  box: SecretBox,
-  table: ConnectionTable,
-  id: ConnectionId | null,
-): Array<Omit<z.infer<typeof connectionRow>, "secrets"> & { secrets: unknown }> {
-  const rows =
-    id === null
-      ? db.prepare(`SELECT * FROM ${table} ORDER BY created_at, id`).all()
-      : db.prepare(`SELECT * FROM ${table} WHERE id = ?`).all(id);
-  return rows.map((raw) => {
-    const row = connectionRow.parse(raw);
-    const secrets: unknown = JSON.parse(box.open(row.secrets, sealContext(table, row.id)));
-    return { ...row, secrets };
-  });
-}
+/** 봉한 값이 묶이는 자리. 한 행의 값을 다른 행에 옮겨 붙이면 열리지 않는다. */
+const sealContext = (
+  table: "tracker_connections" | "code_host_connections",
+  id: TrackerConnectionId | CodeHostConnectionId,
+) => `${table}:${id}`;
 
 export type StoredTrackerConnection = StoredConnection<TrackerConnectionId, TrackerKind>;
 
@@ -141,11 +80,29 @@ export function saveTrackerConnection(
   input: ConnectionInput<TrackerConnectionId, TrackerKind>,
   now: Date = new Date(),
 ): void {
-  saveConnection(db, box, "tracker_connections", input, now);
+  const values = {
+    id: input.id,
+    kind: input.kind,
+    name: input.name,
+    config: toJson(input.config, "connection config"),
+    secrets: box.seal(
+      toJson(input.secrets, "connection secrets"),
+      sealContext("tracker_connections", input.id),
+    ),
+  };
+  db.insert(trackerConnections)
+    .values({ ...values, createdAt: now })
+    .onConflictDoUpdate({ target: trackerConnections.id, set: values })
+    .run();
 }
 
 export function listTrackerConnections(db: Database, box: SecretBox): StoredTrackerConnection[] {
-  return readConnections(db, box, "tracker_connections", null).map(toTrackerConnection);
+  return db
+    .select()
+    .from(trackerConnections)
+    .orderBy(asc(trackerConnections.createdAt), asc(trackerConnections.id))
+    .all()
+    .map((row) => openTrackerConnection(box, row));
 }
 
 export function getTrackerConnection(
@@ -153,18 +110,21 @@ export function getTrackerConnection(
   box: SecretBox,
   id: TrackerConnectionId,
 ): StoredTrackerConnection | null {
-  const [row] = readConnections(db, box, "tracker_connections", id).map(toTrackerConnection);
-  return row ?? null;
+  const row = db.select().from(trackerConnections).where(eq(trackerConnections.id, id)).get();
+  return row === undefined ? null : openTrackerConnection(box, row);
 }
 
-function toTrackerConnection(row: {
-  id: string;
-  kind: string;
-  name: string;
-  config: unknown;
-  secrets: unknown;
-}): StoredTrackerConnection {
-  return { ...row, id: toTrackerConnectionId(row.id), kind: toTrackerKind(row.kind) };
+function openTrackerConnection(
+  box: SecretBox,
+  row: typeof trackerConnections.$inferSelect,
+): StoredTrackerConnection {
+  return {
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    config: parseJson(row.config),
+    secrets: parseJson(box.open(row.secrets, sealContext("tracker_connections", row.id))),
+  };
 }
 
 export type StoredCodeHostConnection = StoredConnection<CodeHostConnectionId, CodeHostKind>;
@@ -175,15 +135,35 @@ export function saveCodeHostConnection(
   input: ConnectionInput<CodeHostConnectionId, CodeHostKind>,
   now: Date = new Date(),
 ): void {
-  saveConnection(db, box, "code_host_connections", input, now);
+  const values = {
+    id: input.id,
+    kind: input.kind,
+    name: input.name,
+    config: toJson(input.config, "connection config"),
+    secrets: box.seal(
+      toJson(input.secrets, "connection secrets"),
+      sealContext("code_host_connections", input.id),
+    ),
+  };
+  db.insert(codeHostConnections)
+    .values({ ...values, createdAt: now })
+    .onConflictDoUpdate({ target: codeHostConnections.id, set: values })
+    .run();
 }
 
 export function listCodeHostConnections(db: Database, box: SecretBox): StoredCodeHostConnection[] {
-  return readConnections(db, box, "code_host_connections", null).map((row) => ({
-    ...row,
-    id: toCodeHostConnectionId(row.id),
-    kind: toCodeHostKind(row.kind),
-  }));
+  return db
+    .select()
+    .from(codeHostConnections)
+    .orderBy(asc(codeHostConnections.createdAt), asc(codeHostConnections.id))
+    .all()
+    .map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      name: row.name,
+      config: parseJson(row.config),
+      secrets: parseJson(box.open(row.secrets, sealContext("code_host_connections", row.id))),
+    }));
 }
 
 // ---------- 러너 ----------
@@ -201,43 +181,22 @@ export interface StoredRunner {
   projects: RunnerProject[];
 }
 
-const runnerRow = z.object({
-  id: z.string().transform(toRunnerId),
-  kind: z.string().transform(toRunnerKind),
-  name: z.string(),
-  config: jsonText,
-  capacity: z.number().int(),
-  online: z.union([z.literal(0), z.literal(1)]).transform((v) => v === 1),
-  checked_at: z.number().nullable(),
-  check_error: jsonText.nullable(),
-});
-
-const runnerProjectRow = z.object({
-  runner_id: z.string().transform(toRunnerId),
-  project_id: z.string().transform(toRunnerProjectId),
-  display_name: z.string(),
-  setup_state: z.string(),
-});
-
 export function saveRunner(
   db: Database,
   input: { id: RunnerId; kind: RunnerKind; name: string; config: unknown; capacity: number },
   now: Date = new Date(),
 ): void {
-  db.prepare(
-    `INSERT INTO runners (id, kind, name, config, capacity, created_at)
-     VALUES (:id, :kind, :name, :config, :capacity, :now)
-     ON CONFLICT (id) DO UPDATE SET
-       kind = excluded.kind, name = excluded.name,
-       config = excluded.config, capacity = excluded.capacity`,
-  ).run({
+  const values = {
     id: input.id,
     kind: input.kind,
     name: input.name,
-    config: JSON.stringify(input.config),
+    config: toJson(input.config, "runner config"),
     capacity: input.capacity,
-    now: now.getTime(),
-  });
+  };
+  db.insert(runners)
+    .values({ ...values, createdAt: now })
+    .onConflictDoUpdate({ target: runners.id, set: values })
+    .run();
 }
 
 /**
@@ -255,51 +214,54 @@ export function recordRunnerCheck(
   },
 ): void {
   inTransaction(db, () => {
-    db.prepare("UPDATE runners SET online = ?, checked_at = ?, check_error = ? WHERE id = ?").run(
-      input.online ? 1 : 0,
-      input.checkedAt.getTime(),
-      input.error === null ? null : JSON.stringify(input.error),
-      input.runnerId,
-    );
+    db.update(runners)
+      .set({
+        online: input.online,
+        checkedAt: input.checkedAt,
+        checkError: input.error === null ? null : toJson(input.error, "runner check error"),
+      })
+      .where(eq(runners.id, input.runnerId))
+      .run();
     if (input.projects === null) return;
-    db.prepare("DELETE FROM runner_projects WHERE runner_id = ?").run(input.runnerId);
-    const insert = db.prepare(
-      "INSERT INTO runner_projects (runner_id, project_id, display_name, setup_state) VALUES (?, ?, ?, ?)",
-    );
-    for (const project of input.projects) {
-      insert.run(input.runnerId, project.id, project.displayName, project.setupState);
-    }
+    db.delete(runnerProjects).where(eq(runnerProjects.runnerId, input.runnerId)).run();
+    if (input.projects.length === 0) return;
+    db.insert(runnerProjects)
+      .values(
+        input.projects.map((project) => ({
+          runnerId: input.runnerId,
+          projectId: project.id,
+          displayName: project.displayName,
+          setupState: project.setupState,
+        })),
+      )
+      .run();
   });
 }
 
 export function listRunners(db: Database): StoredRunner[] {
   const projects = db
-    .prepare("SELECT * FROM runner_projects ORDER BY runner_id, project_id")
-    .all()
-    .map((raw) => runnerProjectRow.parse(raw));
+    .select()
+    .from(runnerProjects)
+    .orderBy(asc(runnerProjects.runnerId), asc(runnerProjects.projectId))
+    .all();
   return db
-    .prepare("SELECT * FROM runners ORDER BY created_at, id")
+    .select()
+    .from(runners)
+    .orderBy(asc(runners.createdAt), asc(runners.id))
     .all()
-    .map((raw) => {
-      const row = runnerRow.parse(raw);
-      return {
-        id: row.id,
-        kind: row.kind,
-        name: row.name,
-        config: row.config,
-        capacity: row.capacity,
-        online: row.online,
-        checkedAt: row.checked_at === null ? null : new Date(row.checked_at),
-        checkError: row.check_error,
-        projects: projects
-          .filter((p) => p.runner_id === row.id)
-          .map((p) => ({
-            id: p.project_id,
-            displayName: p.display_name,
-            setupState: p.setup_state,
-          })),
-      };
-    });
+    .map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      name: row.name,
+      config: parseJson(row.config),
+      capacity: row.capacity,
+      online: row.online,
+      checkedAt: row.checkedAt,
+      checkError: row.checkError === null ? null : parseJson(row.checkError),
+      projects: projects
+        .filter((p) => p.runnerId === row.id)
+        .map((p) => ({ id: p.projectId, displayName: p.displayName, setupState: p.setupState })),
+    }));
 }
 
 /** core 할당·대기열 판단에 넘기는 러너 모습 */
@@ -316,70 +278,30 @@ export function listRunnerSnapshots(db: Database): RunnerSnapshot[] {
 
 export const DEFAULT_MAX_RUN_MS = 2 * 60 * 60 * 1000;
 
-export function saveWorkspace(
-  db: Database,
-  input: { id: WorkspaceId; name: string; maxRunMs?: number },
-  now: Date = new Date(),
-): void {
-  db.prepare(
-    `INSERT INTO workspaces (id, name, max_run_ms, created_at) VALUES (?, ?, ?, ?)
-     ON CONFLICT (id) DO UPDATE SET name = excluded.name, max_run_ms = excluded.max_run_ms`,
-  ).run(input.id, input.name, input.maxRunMs ?? DEFAULT_MAX_RUN_MS, now.getTime());
-}
-
 export interface StoredWorkspace {
   id: WorkspaceId;
   name: string;
   maxRunMs: number;
 }
 
-const workspaceRow = z.object({
-  id: z.string().transform(toWorkspaceId),
-  name: z.string(),
-  max_run_ms: z.number().int(),
-});
+export function saveWorkspace(
+  db: Database,
+  input: { id: WorkspaceId; name: string; maxRunMs?: number },
+  now: Date = new Date(),
+): void {
+  const values = { name: input.name, maxRunMs: input.maxRunMs ?? DEFAULT_MAX_RUN_MS };
+  db.insert(workspaces)
+    .values({ id: input.id, ...values, createdAt: now })
+    .onConflictDoUpdate({ target: workspaces.id, set: values })
+    .run();
+}
 
 export function listWorkspaces(db: Database): StoredWorkspace[] {
   return db
-    .prepare("SELECT id, name, max_run_ms FROM workspaces ORDER BY created_at, id")
-    .all()
-    .map((raw) => {
-      const row = workspaceRow.parse(raw);
-      return { id: row.id, name: row.name, maxRunMs: row.max_run_ms };
-    });
-}
-
-/**
- * 트래커 프로젝트를 Workspace에 묶는다. 이미 다른 Workspace에 묶인 트래커 프로젝트면 false를
- * 돌려주고 바꾸지 않는다(ADR 0006). 같은 Workspace면 이름과 "In Progress" 상태를 고친다.
- */
-export function saveWorkspaceTrackerProject(
-  db: Database,
-  input: {
-    workspaceId: WorkspaceId;
-    connection: TrackerConnectionId;
-    projectId: TrackerProjectId;
-    name: string;
-    inProgressStateId: TrackerStateId | null;
-  },
-): boolean {
-  const result = db
-    .prepare(
-      `INSERT INTO workspace_tracker_projects
-         (tracker_connection_id, tracker_project_id, workspace_id, name, in_progress_state_id)
-       VALUES (:connection, :project, :workspace, :name, :state)
-       ON CONFLICT (tracker_connection_id, tracker_project_id) DO UPDATE SET
-         name = excluded.name, in_progress_state_id = excluded.in_progress_state_id
-       WHERE workspace_tracker_projects.workspace_id = excluded.workspace_id`,
-    )
-    .run({
-      connection: input.connection,
-      project: input.projectId,
-      workspace: input.workspaceId,
-      name: input.name,
-      state: input.inProgressStateId,
-    });
-  return result.changes > 0;
+    .select({ id: workspaces.id, name: workspaces.name, maxRunMs: workspaces.maxRunMs })
+    .from(workspaces)
+    .orderBy(asc(workspaces.createdAt), asc(workspaces.id))
+    .all();
 }
 
 export interface StoredWorkspaceTrackerProject {
@@ -390,33 +312,57 @@ export interface StoredWorkspaceTrackerProject {
   inProgressStateId: TrackerStateId | null;
 }
 
-const workspaceTrackerProjectRow = z.object({
-  workspace_id: z.string().transform(toWorkspaceId),
-  tracker_connection_id: z.string().transform(toTrackerConnectionId),
-  tracker_project_id: z.string().transform(toTrackerProjectId),
-  name: z.string(),
-  in_progress_state_id: z.string().transform(toTrackerStateId).nullable(),
-});
+/**
+ * 트래커 프로젝트를 Workspace에 묶는다. 이미 다른 Workspace에 묶인 트래커 프로젝트면 false를
+ * 돌려주고 바꾸지 않는다(ADR 0006). 같은 Workspace면 이름과 "In Progress" 상태를 고친다.
+ */
+export function saveWorkspaceTrackerProject(
+  db: Database,
+  input: StoredWorkspaceTrackerProject,
+): boolean {
+  const result = db
+    .insert(workspaceTrackerProjects)
+    .values({
+      trackerConnectionId: input.connection,
+      trackerProjectId: input.projectId,
+      workspaceId: input.workspaceId,
+      name: input.name,
+      inProgressStateId: input.inProgressStateId,
+    })
+    .onConflictDoUpdate({
+      target: [
+        workspaceTrackerProjects.trackerConnectionId,
+        workspaceTrackerProjects.trackerProjectId,
+      ],
+      set: { name: input.name, inProgressStateId: input.inProgressStateId },
+      setWhere: sql`${workspaceTrackerProjects.workspaceId} = excluded.workspace_id`,
+    })
+    .run();
+  return result.changes > 0;
+}
 
 export function getWorkspaceTrackerProject(
   db: Database,
   connection: TrackerConnectionId,
   projectId: TrackerProjectId,
 ): StoredWorkspaceTrackerProject | null {
-  const raw = db
-    .prepare(
-      "SELECT * FROM workspace_tracker_projects WHERE tracker_connection_id = ? AND tracker_project_id = ?",
+  const row = db
+    .select({
+      workspaceId: workspaceTrackerProjects.workspaceId,
+      connection: workspaceTrackerProjects.trackerConnectionId,
+      projectId: workspaceTrackerProjects.trackerProjectId,
+      name: workspaceTrackerProjects.name,
+      inProgressStateId: workspaceTrackerProjects.inProgressStateId,
+    })
+    .from(workspaceTrackerProjects)
+    .where(
+      and(
+        eq(workspaceTrackerProjects.trackerConnectionId, connection),
+        eq(workspaceTrackerProjects.trackerProjectId, projectId),
+      ),
     )
-    .get(connection, projectId);
-  if (raw === undefined) return null;
-  const row = workspaceTrackerProjectRow.parse(raw);
-  return {
-    workspaceId: row.workspace_id,
-    connection: row.tracker_connection_id,
-    projectId: row.tracker_project_id,
-    name: row.name,
-    inProgressStateId: row.in_progress_state_id,
-  };
+    .get();
+  return row ?? null;
 }
 
 export interface StoredMapping {
@@ -427,60 +373,74 @@ export interface StoredMapping {
 }
 
 export function saveMapping(db: Database, mapping: StoredMapping): void {
-  db.prepare(
-    `INSERT INTO mappings (tracker_connection_id, tracker_project_id, runner_project_id, agent_id)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT (tracker_connection_id, tracker_project_id) DO UPDATE SET
-       runner_project_id = excluded.runner_project_id, agent_id = excluded.agent_id`,
-  ).run(mapping.connection, mapping.trackerProject, mapping.runnerProject, mapping.agent);
+  db.insert(mappings)
+    .values({
+      trackerConnectionId: mapping.connection,
+      trackerProjectId: mapping.trackerProject,
+      runnerProjectId: mapping.runnerProject,
+      agentId: mapping.agent,
+    })
+    .onConflictDoUpdate({
+      target: [mappings.trackerConnectionId, mappings.trackerProjectId],
+      set: { runnerProjectId: mapping.runnerProject, agentId: mapping.agent },
+    })
+    .run();
 }
-
-const mappingRow = z.object({
-  tracker_connection_id: z.string().transform(toTrackerConnectionId),
-  tracker_project_id: z.string().transform(toTrackerProjectId),
-  runner_project_id: z.string().transform(toRunnerProjectId),
-  agent_id: z.string().transform(toAgentId),
-});
 
 export function getMapping(
   db: Database,
   connection: TrackerConnectionId,
   trackerProject: TrackerProjectId,
 ): StoredMapping | null {
-  const raw = db
-    .prepare("SELECT * FROM mappings WHERE tracker_connection_id = ? AND tracker_project_id = ?")
-    .get(connection, trackerProject);
-  if (raw === undefined) return null;
-  const row = mappingRow.parse(raw);
-  return {
-    connection: row.tracker_connection_id,
-    trackerProject: row.tracker_project_id,
-    runnerProject: row.runner_project_id,
-    agent: row.agent_id,
-  };
+  const row = db
+    .select({
+      connection: mappings.trackerConnectionId,
+      trackerProject: mappings.trackerProjectId,
+      runnerProject: mappings.runnerProjectId,
+      agent: mappings.agentId,
+    })
+    .from(mappings)
+    .where(
+      and(
+        eq(mappings.trackerConnectionId, connection),
+        eq(mappings.trackerProjectId, trackerProject),
+      ),
+    )
+    .get();
+  return row ?? null;
 }
 
 export function saveAutoAssignLabel(
   db: Database,
   input: { workspaceId: WorkspaceId; connection: TrackerConnectionId; labelId: LabelId },
 ): void {
-  db.prepare(
-    `INSERT INTO auto_assign_labels (workspace_id, tracker_connection_id, label_id) VALUES (?, ?, ?)
-     ON CONFLICT (workspace_id, tracker_connection_id) DO UPDATE SET label_id = excluded.label_id`,
-  ).run(input.workspaceId, input.connection, input.labelId);
+  db.insert(autoAssignLabels)
+    .values({
+      workspaceId: input.workspaceId,
+      trackerConnectionId: input.connection,
+      labelId: input.labelId,
+    })
+    .onConflictDoUpdate({
+      target: [autoAssignLabels.workspaceId, autoAssignLabels.trackerConnectionId],
+      set: { labelId: input.labelId },
+    })
+    .run();
 }
-
-const labelRow = z.object({ label_id: z.string().transform(toLabelId) });
 
 export function getAutoAssignLabel(
   db: Database,
   workspaceId: WorkspaceId,
   connection: TrackerConnectionId,
 ): LabelId | null {
-  const raw = db
-    .prepare(
-      "SELECT label_id FROM auto_assign_labels WHERE workspace_id = ? AND tracker_connection_id = ?",
+  const row = db
+    .select({ labelId: autoAssignLabels.labelId })
+    .from(autoAssignLabels)
+    .where(
+      and(
+        eq(autoAssignLabels.workspaceId, workspaceId),
+        eq(autoAssignLabels.trackerConnectionId, connection),
+      ),
     )
-    .get(workspaceId, connection);
-  return raw === undefined ? null : labelRow.parse(raw).label_id;
+    .get();
+  return row?.labelId ?? null;
 }
