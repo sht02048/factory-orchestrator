@@ -7,6 +7,10 @@ import {
   toTicketKey,
   toTrackerConnectionId,
   toTrackerKind,
+  toAgentRef,
+  toLabelId,
+  toQuestionId,
+  toRunId,
   toTrackerProjectId,
   toWorktreeRef,
 } from "@factory/core";
@@ -20,10 +24,26 @@ import {
   recordTrackerEvent,
 } from "./events.js";
 import {
+  answerRunQuestion,
+  listRunQuestions,
+  listUnsentAnswers,
+  markAnswerSent,
+  recordRunQuestions,
+  sentQuestionIds,
+} from "./questions.js";
+import {
+  hasPendingCancelRequest,
+  listPendingCancelRequests,
+  markCancelRequestProcessed,
+  requestRunCancel,
+} from "./requests.js";
+import {
   assignRun,
   changeRunState,
   getRunWithRecords,
   listRunStateChanges,
+  recordStartFailure,
+  recordStartRequested,
   setQueuedRunRunner,
   updateRunRecords,
 } from "./runs.js";
@@ -44,6 +64,7 @@ import {
 
 const ticket = (key: string): TicketRef => ({ connection, key: toTicketKey(key) });
 const worktree = toWorktreeRef("repo::/wt/1");
+const started = { worktree, branch: "acme/factory-ENG-1-1", agentRef: toAgentRef("agent-1") };
 
 function assign(
   db: Database,
@@ -73,10 +94,10 @@ function change(db: Database, id: RunId, to: RunStateChange): void {
 /** 런을 원하는 상태까지 옮긴다 */
 function moveTo(db: Database, id: RunId, state: RunState): void {
   if (state === "queued") return;
-  change(db, id, { to: "running", worktree });
+  change(db, id, { to: "running", started });
   if (state === "waiting-for-input" || state === "disconnected") change(db, id, { to: state });
   if (state === "ended")
-    change(db, id, { to: "ended", agentResult: "exited-normally", prState: "merged" });
+    change(db, id, { to: "ended", agentResult: "reported-success", prState: "merged" });
 }
 
 describe("assignRun", () => {
@@ -104,7 +125,7 @@ describe("assignRun", () => {
       state: "queued",
       runnerId: roomy,
       workspaceId: "ws-1",
-      branch: "factory/ENG-1-1",
+      worktreeName: "factory-ENG-1-1",
     });
   });
 
@@ -121,6 +142,24 @@ describe("assignRun", () => {
     const chosen = addRunner(db, { id: "chosen", capacity: 1, online: false, projects: [] });
     const result = assign(db, "ENG-1", { runnerId: chosen });
     expect(result.ok && result.run.runnerId).toBe(chosen);
+  });
+
+  it("GitHub 인증이 깨진 러너는 고르지 않고, 운영자도 고를 수 없다 (Q82.14·Q87)", () => {
+    const db = seededDatabase();
+    const broken = addRunner(db, {
+      id: "broken",
+      capacity: 9,
+      online: true,
+      projects: [repoA],
+      assignmentBlocked: true,
+    });
+
+    // 맞는 러너가 모두 인증이 깨졌어도 할당은 받아 러너 없이 Queued로 둔다(Q87).
+    expect(assign(db, "ENG-1")).toMatchObject({ ok: true, run: { runnerId: null } });
+    expect(assign(db, "ENG-2", { runnerId: broken })).toEqual({
+      ok: false,
+      reason: "runner-assignment-blocked",
+    });
   });
 
   it.each<RunState>(["queued", "running", "waiting-for-input", "disconnected"])(
@@ -142,7 +181,7 @@ describe("assignRun", () => {
     addRunner(db, { id: "r", capacity: 5, online: true, projects: [repoA] });
     moveTo(db, assignOk(db, "ENG-1"), "ended");
     const result = assign(db, "ENG-1");
-    expect(result.ok && result.run.branch).toBe("factory/ENG-1-2");
+    expect(result.ok && result.run.worktreeName).toBe("factory-ENG-1-2");
   });
 
   it("다른 트래커 연결이나 다른 티켓의 런은 막지 않는다", () => {
@@ -151,7 +190,7 @@ describe("assignRun", () => {
     expect(assign(db, "ENG-2").ok).toBe(true);
   });
 
-  it("다른 트래커 연결의 같은 티켓 키도 브랜치가 겹치지 않는다", () => {
+  it("다른 트래커 연결의 같은 티켓 키도 워크트리 이름이 겹치지 않는다", () => {
     const db = seededDatabase();
     const other = toTrackerConnectionId("conn-2");
     saveTrackerConnection(db, new SecretBox(KEY), {
@@ -175,7 +214,7 @@ describe("assignRun", () => {
       runnerProject: repoA,
       agent,
     });
-    expect(result.ok && result.run.branch).toBe("factory/ENG-1-2");
+    expect(result.ok && result.run.worktreeName).toBe("factory-ENG-1-2");
   });
 
   it("DB도 티켓당 Ended가 아닌 런을 하나로 막는다", () => {
@@ -185,7 +224,7 @@ describe("assignRun", () => {
       db.$client
         .prepare(
           `INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
-             runner_project_id, agent_id, branch, state, assigned_at)
+             runner_project_id, agent_id, worktree_name, state, assigned_at)
            SELECT 'dup', tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
              runner_project_id, agent_id, 'b', 'queued', 0 FROM runs WHERE id = ?`,
         )
@@ -233,28 +272,135 @@ describe("Run 테이블과 두 축", () => {
   });
 
   it.each(
-    AGENT_RESULTS.flatMap((agentResult) => PR_STATES.map((prState) => ({ agentResult, prState }))),
-  )("두 축 $agentResult + $prState 을 저장하고 읽는다", ({ agentResult, prState }) => {
+    AGENT_RESULTS.filter((r) => r !== "could-not-start").flatMap((agentResult) =>
+      PR_STATES.map((prState) => ({ agentResult, prState })),
+    ),
+  )("시작한 런의 두 축 $agentResult + $prState 을 저장하고 읽는다", ({ agentResult, prState }) => {
     const db = seededDatabase();
     addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
     const id = assignOk(db, "ENG-1");
-    change(db, id, { to: "running", worktree });
+    change(db, id, { to: "running", started });
     change(db, id, { to: "ended", agentResult, prState });
 
     const stored = getRunWithRecords(db, id)?.run;
-    expect(stored).toMatchObject({ state: "ended", agentResult, prState });
+    expect(stored).toMatchObject({
+      state: "ended",
+      agentResult,
+      prState,
+      runnerUnreached: false,
+      ...started,
+    });
     if (stored?.state !== "ended") throw new Error("not ended");
     // 요약 결과는 저장하지 않고 core 계산 함수로 얻는다.
-    expect(summarizeRunOutcome(stored.agentResult, stored.prState)).toEqual(
-      summarizeRunOutcome(agentResult, prState),
+    expect(summarizeRunOutcome(stored)).toEqual(
+      summarizeRunOutcome({ agentResult, prState, runnerUnreached: false }),
     );
+  });
+
+  it("Queued에서 취소해 러너·워크트리·시작 시각 없이 PR 상태 없음으로 끝난 런을 저장한다 (Q77·Q82.10)", () => {
+    const db = seededDatabase();
+    const id = assignOk(db, "ENG-1");
+    change(db, id, { to: "ended", agentResult: "canceled", prState: "none" });
+    expect(changeRunState(db, id, { to: "running" })).toMatchObject({ ok: false });
+
+    const stored = getRunWithRecords(db, id)?.run;
+    expect(stored).toMatchObject({
+      state: "ended",
+      runnerId: null,
+      worktree: null,
+      branch: null,
+      agentRef: null,
+      startedAt: null,
+      agentResult: "canceled",
+      prState: "none",
+      runnerUnreached: false,
+    });
+    expect(stored?.state === "ended" && stored.endedAt).toBeInstanceOf(Date);
+    if (stored?.state !== "ended") throw new Error("not ended");
+    expect(summarizeRunOutcome(stored)).toEqual({ outcome: "canceled", worktree: "remove-now" });
+  });
+
+  it("시작할 수 없음으로 끝낸 런은 시작 오류를 남긴다 (Q82.16·Q86)", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    expect(recordStartFailure(db, id, { failures: 4, error: "runner_error: boom" })).toBe(true);
+    change(db, id, { to: "ended", agentResult: "could-not-start", prState: "none" });
+
+    const found = getRunWithRecords(db, id);
+    expect(found?.run).toMatchObject({ agentResult: "could-not-start", startedAt: null });
+    expect(found?.records).toMatchObject({ startFailures: 4, startError: "runner_error: boom" });
+  });
+
+  it("시작하지 않은 런을 시작한 런의 결과로 끝내거나, 시작한 런을 시작할 수 없음으로 끝낼 수 없다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 2, online: true, projects: [repoA] });
+    const queued = assignOk(db, "ENG-1");
+    for (const bad of [
+      { agentResult: "timed-out", prState: "none" },
+      { agentResult: "canceled", prState: "open" },
+    ] as const) {
+      expect(changeRunState(db, queued, { to: "ended", ...bad })).toEqual({
+        ok: false,
+        error: { kind: "axes-mismatch" },
+      });
+    }
+    const running = assignOk(db, "ENG-2");
+    moveTo(db, running, "running");
+    expect(
+      changeRunState(db, running, { to: "ended", agentResult: "could-not-start", prState: "none" }),
+    ).toEqual({ ok: false, error: { kind: "axes-mismatch" } });
+    expect(
+      changeRunState(db, running, {
+        to: "ended",
+        agentResult: "runner-disconnected",
+        prState: "none",
+        runnerUnreached: true,
+      }),
+    ).toEqual({ ok: false, error: { kind: "axes-mismatch" } });
+  });
+
+  it("러너에 닿지 못한 채 끝난 취소 런을 기록한다 (Q82.21)", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    moveTo(db, id, "disconnected");
+    change(db, id, {
+      to: "ended",
+      agentResult: "canceled",
+      prState: "open",
+      runnerUnreached: true,
+    });
+
+    const stored = getRunWithRecords(db, id)?.run;
+    if (stored?.state !== "ended") throw new Error("not ended");
+    expect(stored.runnerUnreached).toBe(true);
+    expect(summarizeRunOutcome(stored)).toEqual({
+      outcome: "canceled",
+      worktree: "operator-decides",
+    });
+  });
+
+  it("완료 보고 본문을 함께 남긴다 (Q82.2)", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    moveTo(db, id, "running");
+    change(db, id, {
+      to: "ended",
+      agentResult: "reported-failure",
+      prState: "open",
+      reportBody: "테스트가 깨져 멈췄어요",
+    });
+
+    expect(getRunWithRecords(db, id)?.records.reportBody).toBe("테스트가 깨져 멈췄어요");
   });
 
   it("Ended가 아닌 런에는 두 축을 넣을 수 없다", () => {
     const db = seededDatabase();
     const id = assignOk(db, "ENG-1");
     expect(() =>
-      db.$client.prepare("UPDATE runs SET agent_result = 'exited-normally' WHERE id = ?").run(id),
+      db.$client.prepare("UPDATE runs SET agent_result = 'reported-success' WHERE id = ?").run(id),
     ).toThrow(/CHECK/);
   });
 });
@@ -275,7 +421,7 @@ describe("changeRunState", () => {
   it("러너가 없는 Queued 런은 시작하지 않는다", () => {
     const db = seededDatabase();
     const id = assignOk(db, "ENG-1");
-    expect(changeRunState(db, id, { to: "running", worktree })).toEqual({
+    expect(changeRunState(db, id, { to: "running", started })).toEqual({
       ok: false,
       error: { kind: "no-runner" },
     });
@@ -286,14 +432,14 @@ describe("changeRunState", () => {
     addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
     const id = assignOk(db, "ENG-1");
     const at = (minute: number) => new Date(Date.UTC(2026, 10, 17, 0, minute));
-    changeRunState(db, id, { to: "running", worktree }, at(1));
+    changeRunState(db, id, { to: "running", started }, at(1));
     changeRunState(db, id, { to: "waiting-for-input" }, at(2));
     changeRunState(db, id, { to: "disconnected" }, at(3));
     changeRunState(db, id, { to: "running" }, at(4));
     changeRunState(
       db,
       id,
-      { to: "ended", agentResult: "exited-with-error", prState: "open" },
+      { to: "ended", agentResult: "reported-failure", prState: "open" },
       at(5),
     );
 
@@ -368,6 +514,110 @@ describe("updateRunRecords", () => {
   });
 });
 
+describe("recordStartRequested", () => {
+  it("시작을 처음 보내기 직전에 한 번만 적는다(시작 멱등)", () => {
+    const db = seededDatabase();
+    const id = assignOk(db, "ENG-1");
+    const first = new Date("2026-11-17T01:00:00Z");
+    expect(recordStartRequested(db, id, first)).toBe(true);
+    expect(recordStartRequested(db, id, new Date("2026-11-17T02:00:00Z"))).toBe(false);
+    expect(getRunWithRecords(db, id)?.records.startRequestedAt).toEqual(first);
+  });
+});
+
+describe("런 취소 요청 (Q77·Q82.8)", () => {
+  it.each<RunState>(["queued", "running", "waiting-for-input", "disconnected"])(
+    "%s 런의 취소 요청은 받아들인다",
+    (state) => {
+      const db = seededDatabase();
+      addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+      const id = assignOk(db, "ENG-1");
+      moveTo(db, id, state);
+      const at = new Date("2026-11-17T01:00:00Z");
+
+      expect(requestRunCancel(db, id, at)).toEqual({ ok: true, requestedAt: at });
+      expect(hasPendingCancelRequest(db, id)).toBe(true);
+    },
+  );
+
+  it("Ended 런의 취소 요청은 거부한다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    moveTo(db, id, "ended");
+
+    expect(requestRunCancel(db, id)).toEqual({ ok: false, reason: "already-ended" });
+    expect(listPendingCancelRequests(db)).toEqual([]);
+  });
+
+  it("요청을 남기고 한 번만 꺼내 처리 표시를 한다", () => {
+    const db = seededDatabase();
+    const id = assignOk(db, "ENG-1");
+    const first = new Date("2026-11-17T01:00:00Z");
+    requestRunCancel(db, id, first);
+    // 처리 전 두 번째 요청은 처음 요청 시각을 남긴다.
+    expect(requestRunCancel(db, id, new Date("2026-11-17T02:00:00Z"))).toEqual({
+      ok: true,
+      requestedAt: first,
+    });
+    expect(listPendingCancelRequests(db)).toEqual([{ runId: id, requestedAt: first }]);
+
+    expect(markCancelRequestProcessed(db, id)).toBe(true);
+    expect(markCancelRequestProcessed(db, id)).toBe(false);
+    expect(listPendingCancelRequests(db)).toEqual([]);
+    expect(hasPendingCancelRequest(db, id)).toBe(false);
+  });
+
+  it("없는 런의 취소는 거부한다", () => {
+    const db = seededDatabase();
+    expect(requestRunCancel(db, toRunId("missing"))).toEqual({ ok: false, reason: "not-found" });
+  });
+});
+
+describe("질문과 답 요청 (Q82.3·Q82.5)", () => {
+  it("질문을 한 번만 쓰고, 답을 남기고, 보낼 답을 한 번만 꺼내 처리 표시를 한다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    moveTo(db, id, "waiting-for-input");
+    const q = toQuestionId("msg-1");
+    const askedAt = new Date("2026-11-17T01:00:00Z");
+    const question = { id: q, body: "A와 B 중 무엇?", options: ["A", "B"], askedAt };
+
+    expect(recordRunQuestions(db, id, [question])).toBe(1);
+    // 러너는 메일을 소비하지 않아 같은 질문이 다시 온다.
+    expect(recordRunQuestions(db, id, [question])).toBe(0);
+    expect(listUnsentAnswers(db)).toEqual([]);
+
+    const answeredAt = new Date("2026-11-17T01:05:00Z");
+    expect(answerRunQuestion(db, { runId: id, questionId: q, answer: "A" }, answeredAt)).toEqual({
+      ok: true,
+    });
+    expect(answerRunQuestion(db, { runId: id, questionId: q, answer: "B" })).toEqual({
+      ok: false,
+      reason: "already-answered",
+    });
+    expect(listUnsentAnswers(db)).toEqual([{ runId: id, questionId: q, answer: "A", answeredAt }]);
+    expect(sentQuestionIds(db, id).size).toBe(0);
+
+    expect(markAnswerSent(db, { runId: id, questionId: q })).toBe(true);
+    expect(markAnswerSent(db, { runId: id, questionId: q })).toBe(false);
+    expect(listUnsentAnswers(db)).toEqual([]);
+    expect([...sentQuestionIds(db, id)]).toEqual([q]);
+    expect(listRunQuestions(db, id)).toMatchObject([
+      { id: q, body: "A와 B 중 무엇?", options: ["A", "B"], answer: { text: "A", answeredAt } },
+    ]);
+  });
+
+  it("받지 않은 질문에는 답할 수 없다", () => {
+    const db = seededDatabase();
+    const id = assignOk(db, "ENG-1");
+    expect(
+      answerRunQuestion(db, { runId: id, questionId: toQuestionId("x"), answer: "A" }),
+    ).toEqual({ ok: false, reason: "not-found" });
+  });
+});
+
 describe("recordTrackerEvent", () => {
   it("같은 중복 제거 키는 한 번만 기록한다", () => {
     const db = seededDatabase();
@@ -376,13 +626,15 @@ describe("recordTrackerEvent", () => {
       kind: "ticket.updated" as const,
       ticketKey: toTicketKey("ENG-1"),
       projectId: trackerProject,
-      labelIds: null,
-      previous: null,
+      labelIds: [toLabelId("auto")],
+      previousLabelIds: [],
       receivedAt: new Date(0),
     };
     expect(recordTrackerEvent(db, connection, event)).toBe("recorded");
     expect(recordTrackerEvent(db, connection, event)).toBe("duplicate");
-    expect(listUnprocessedTrackerEvents(db)).toHaveLength(1);
+    expect(listUnprocessedTrackerEvents(db)).toMatchObject([
+      { labelIds: ["auto"], previousLabelIds: [] },
+    ]);
     expect(markTrackerEventProcessed(db, connection, event.deliveryId)).toBe(true);
     expect(listUnprocessedTrackerEvents(db)).toHaveLength(0);
   });

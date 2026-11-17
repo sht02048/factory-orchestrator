@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { PullRequestSnapshot } from "./adapters.js";
-import { toPullRequestId, toRepoRef } from "./ids.js";
-import { decidePrState } from "./pr-state.js";
+import { toPullRequestId, toRepoRef, toTicketKey } from "./ids.js";
+import { decidePrState, mentionsTicketKey } from "./pr-state.js";
 
 const repo = toRepoRef("acme/app");
 const runStartedAt = new Date("2026-01-01T00:00:00Z");
@@ -36,6 +36,7 @@ const decide = (
 ) =>
   decidePrState({
     repo,
+    ticketKey: toTicketKey("ENG-1"),
     runStartedAt,
     byBranch,
     byTicketKey,
@@ -109,5 +110,53 @@ describe("decidePrState", () => {
 
   it("모르는 PR state는 열림으로 다뤄 워크트리를 지우지 않는다", () => {
     expect(decide([pr({ number: 1, state: "draft-ish" })]).prState).toBe("open");
+  });
+
+  it("브랜치로 찾은 PR이 닫힘뿐이면 티켓 키로 찾은 PR을 본다: 브랜치 이름을 바꿔 다시 연 PR (research 0006 17절)", () => {
+    const renamedAway = pr({ number: 1, state: "closed" });
+    const reopened = pr({
+      number: 2,
+      state: "open",
+      headBranch: "renamed",
+      createdAt: new Date("2026-01-01T02:00:00Z"),
+    });
+
+    expect(decide([renamedAway], [reopened])).toEqual({ prState: "open", pr: reopened });
+  });
+
+  it("브랜치로 찾은 PR이 닫힘이고 티켓 키로도 찾지 못하면 닫힘이다", () => {
+    const closed = pr({ number: 1, state: "closed" });
+
+    expect(decide([closed], [])).toEqual({ prState: "closed", pr: closed });
+  });
+
+  it("티켓 키로 찾은 PR 중 제목에 키가 있는 PR을 본문에만 있는 PR보다 먼저 쓴다 (research 0006 17절)", () => {
+    const inTitle = pr({ number: 1, title: "ENG-1 고치기", headBranch: "a" });
+    const bodyOnly = pr({
+      number: 2,
+      title: "고치기",
+      body: "ENG-1",
+      headBranch: "b",
+      createdAt: new Date("2026-01-01T03:00:00Z"),
+    });
+
+    expect(decide([], [bodyOnly, inTitle]).pr).toBe(inTitle);
+  });
+
+  it("CI 상태(볼 수 없음 포함)는 PR 상태를 바꾸지 않는다 (Q79)", () => {
+    for (const ci of ["unavailable", "none", "failure", "success"] as const) {
+      expect(decide([pr({ number: 1, state: "merged", ci })]).prState).toBe("merged");
+    }
+  });
+});
+
+describe("mentionsTicketKey", () => {
+  it("키를 낱말 경계로 대소문자 없이 찾는다 (research 0006 20절)", () => {
+    const key = toTicketKey("ENG-123");
+
+    expect(mentionsTicketKey("fix eng-123 now", key)).toBe(true);
+    expect(mentionsTicketKey("[ENG-123]", key)).toBe(true);
+    expect(mentionsTicketKey("ENG-1234", key)).toBe(false);
+    expect(mentionsTicketKey("ENG cleanup for 123 items", key)).toBe(false);
   });
 });

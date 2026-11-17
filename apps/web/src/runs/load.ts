@@ -37,6 +37,8 @@ export function loadRunsPage(db: Database, ws: string | undefined, now: Date): R
               assignedAt: run.assignedAt,
               project: run.runnerProject,
               runnerId: run.runnerId,
+              // 영영 시작할 수 없는 런은 worker 가 다음 바퀴에 끝낸다. 화면은 순서만 본다.
+              unstartable: false,
             },
           ]
         : [],
@@ -81,7 +83,7 @@ export function loadRunsPage(db: Database, ws: string | undefined, now: Date): R
         id: run.id,
         ticketKey: run.ticket.key,
         trackerProject: projectName(run),
-        branch: run.branch,
+        branch: run.state === "queued" ? null : run.branch,
         runner: runner === undefined ? null : { name: runner.name, online: runner.online },
         agent: run.agent,
         waitMs: durations.waitMs ?? 0,
@@ -104,7 +106,7 @@ export function loadRunsPage(db: Database, ws: string | undefined, now: Date): R
             state: run.state,
             agentResult: run.agentResult,
             prState: run.prState,
-            summary: summarizeRunOutcome(run.agentResult, run.prState).outcome,
+            summary: summarizeRunOutcome(run).outcome,
           };
       }
     });

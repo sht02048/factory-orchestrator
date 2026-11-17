@@ -17,6 +17,7 @@ const queued = (
   assignedAt: new Date(minute * 60_000),
   project,
   runnerId: runnerId === null ? null : toRunnerId(runnerId),
+  unstartable: false,
 });
 
 const runner = (
@@ -27,6 +28,7 @@ const runner = (
 ): RunnerSnapshot => ({
   id: toRunnerId(id),
   online,
+  assignmentBlocked: false,
   capacity,
   projects,
 });
@@ -69,5 +71,25 @@ describe("explainQueue", () => {
       runs: [{ runnerId: runnerA, state: "running" }],
     });
     expect(reasons.get(toRunId("r1"))).toEqual({ kind: "no-capacity", runnerId: runnerA });
+  });
+
+  it("러너에서 프로젝트가 빠졌거나 GitHub 인증이 깨져 러너를 비운 런은 그 이유로 순서에서 빠진다(Q78·Q82.13·Q87)", () => {
+    const projectGone = explainQueue({
+      queued: [queued("r1", 1, "runner-a")],
+      runners: [runner("runner-a", true, 1, [other])],
+      runs: [],
+    });
+    expect(projectGone.get(toRunId("r1"))).toEqual({ kind: "project-missing" });
+
+    const authBroken = explainQueue({
+      queued: [queued("r1", 1, "runner-a"), queued("r2", 2, "runner-b", other)],
+      runners: [
+        { ...runner("runner-a", true, 1), assignmentBlocked: true },
+        runner("runner-b", true, 1, [other]),
+      ],
+      runs: [],
+    });
+    expect(authBroken.get(toRunId("r1"))).toEqual({ kind: "assignment-blocked" });
+    expect(authBroken.get(toRunId("r2"))).toEqual({ kind: "starting" });
   });
 });

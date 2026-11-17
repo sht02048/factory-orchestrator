@@ -42,8 +42,20 @@ export type WorktreeRef = Brand<string, "WorktreeRef">;
 export type RunId = Brand<string, "RunId">;
 /** 러너 도구의 에이전트 ID. 예: "claude", "codex" */
 export type AgentId = Brand<string, "AgentId">;
-/** 응답을 잃은 런 시작을 다시 보낼 때 쓰는 값. 러너 어댑터가 정한다 */
-export type RetryToken = Brand<string, "RetryToken">;
+/**
+ * 러너 안에서 런 하나의 에이전트를 가리키는 값. 러너 어댑터가 시작할 때 정하고(예: Orca 오케스트레이션의
+ * 식별자 묶음) core는 뜻을 해석하지 않는다. 런 레코드에 저장해 진행 폴링·답하기·멈추기에 다시 넘긴다.
+ */
+export type AgentRef = Brand<string, "AgentRef">;
+/**
+ * 러너의 우편함 터미널(GLOSSARY Mailbox Terminal)과 그에 묶인 메일함을 가리키는 값. 러너 어댑터가 만들고
+ * 정한다(Q82.1·Q82.7). 러너마다 하나이고 오케스트레이터 DB에 둔다.
+ */
+export type MailboxRef = Brand<string, "MailboxRef">;
+/** 에이전트가 보낸 질문 메일 하나. 러너 어댑터가 정한 불투명한 메일 ID다(Q82.3·Q82.5) */
+export type QuestionId = Brand<string, "QuestionId">;
+/** 에이전트의 권한 대기 하나. 러너 어댑터가 정한 불투명한 값이다(Q82.4) */
+export type PermissionRequestId = Brand<string, "PermissionRequestId">;
 
 /** 코드 호스트의 저장소 하나. 코드 호스트 어댑터가 정규화한 값이라 문자열 비교로 같은지 본다 */
 export type RepoRef = Brand<string, "RepoRef">;
@@ -69,7 +81,11 @@ export const toTrackerConnectionId = (value: string): TrackerConnectionId =>
 export const toCommentId = (value: string): CommentId => brand("CommentId", value);
 export const toDeliveryId = (value: string): DeliveryId => brand("DeliveryId", value);
 export const toAgentId = (value: string): AgentId => brand("AgentId", value);
-export const toRetryToken = (value: string): RetryToken => brand("RetryToken", value);
+export const toAgentRef = (value: string): AgentRef => brand("AgentRef", value);
+export const toMailboxRef = (value: string): MailboxRef => brand("MailboxRef", value);
+export const toQuestionId = (value: string): QuestionId => brand("QuestionId", value);
+export const toPermissionRequestId = (value: string): PermissionRequestId =>
+  brand("PermissionRequestId", value);
 export const toPullRequestId = (value: string): PullRequestId => brand("PullRequestId", value);
 export const toTicketKey = (value: string): TicketKey => brand("TicketKey", value);
 export const toTrackerProjectId = (value: string): TrackerProjectId =>

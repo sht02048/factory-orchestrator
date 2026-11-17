@@ -1,22 +1,27 @@
 import {
   AdapterError,
   decidePrState,
+  decideStartFailure,
   planQueue,
   resolveRunProgress,
-  toRetryToken,
 } from "@factory/core";
 import type {
   AdapterRegistry,
+  MailboxRef,
+  PermissionRequestId,
   PrStateDecision,
   QueuedRun,
-  RetryToken,
+  Runner,
   RunnerChoice,
+  RunnerErrorDetail,
   RunId,
   RunnerId,
   StartedRun,
+  TicketKey,
 } from "@factory/core";
 import {
   changeRunState,
+  getMapping,
   getRun,
   getRunWithRecords,
   inTransaction,
@@ -25,7 +30,11 @@ import {
   listRunners,
   listRuns,
   openDatabase,
+  recordStartFailure,
+  recordStartRequested,
+  sentQuestionIds,
   setQueuedRunRunner,
+  setRunnerMailbox,
   updateRunRecords,
 } from "@factory/db";
 import type { Database, SecretBox, StoredRun, StoredRunner } from "@factory/db";
@@ -99,7 +108,14 @@ export function createWorker(options: WorkerOptions): Worker {
   const now = options.now ?? (() => new Date());
   const logger = options.logger ?? consoleLogger;
   const adapters = new WorkerAdapters(options.registry, options.secretBox);
-  const context: TickContext = { db, now, logger, adapters, pendingStarts: new Map() };
+  const context: TickContext = {
+    db,
+    now,
+    logger,
+    adapters,
+    pendingStarts: new Map(),
+    mailboxes: new Map(),
+  };
   let running: Promise<void> | null = null;
   let closed = false;
 
@@ -126,22 +142,19 @@ interface TickContext {
   now: () => Date;
   logger: WorkerLogger;
   adapters: WorkerAdapters;
-  /** 러너에 보냈지만 Running이 되지 않은 시작. 러너 하나에 묶인다. */
+  /** 러너에 시작했다고 답을 받았지만 Running을 쓰지 못한 런. 다음 바퀴에 기록만 다시 한다. */
   pendingStarts: Map<RunId, PendingStart>;
+  /** 이번 바퀴에 확인한 러너별 우편함. 바퀴마다 비운다 */
+  mailboxes: Map<RunnerId, MailboxRef>;
 }
 
-/**
- * 러너에 보낸 시작 중 아직 Running을 쓰지 못한 것.
- * - started: 러너가 시작했다고 답했지만 DB 쓰기가 실패했다. 다음 바퀴에 기록만 다시 한다.
- * - retryToken: 러너가 결과를 모른다고 답하며 준 다시 보내기 값. DB에 쓰지 못했어도 이 값으로 다시 보낸다.
- */
 interface PendingStart {
   runnerId: RunnerId;
-  started: StartedRun | null;
-  retryToken: RetryToken | null;
+  started: StartedRun;
 }
 
 async function tick(context: TickContext): Promise<void> {
+  context.mailboxes.clear();
   // 끝난 런이 내놓은 capacity를 같은 바퀴의 대기열이 쓰도록 먼저 본다.
   await pollActiveRuns(context);
   await processQueue(context);
@@ -181,11 +194,21 @@ async function pollRun(
     return;
   }
 
-  const progress = await adapters.runner(storedRunner).pollRun(run.worktree);
-  const resolution = resolveRunProgress(progress);
+  const runner = adapters.runner(storedRunner);
+  const mailbox = await mailboxFor(context, storedRunner, runner);
+  const progress = await runner.pollRun({
+    mailbox,
+    worktree: run.worktree,
+    agentRef: run.agentRef,
+  });
+  // 질문 기록과 답 보내기, 권한 거절은 0016이 더한다. 지금은 DB에 보낸 답만 거른다.
+  const resolution = resolveRunProgress(progress, {
+    answered: sentQuestionIds(db, run.id),
+    denied: new Set<PermissionRequestId>(),
+  });
   if (resolution.kind === "continue") {
     if (resolution.state !== run.state) {
-      reportFailure(logger, run, changeRunState(db, run.id, { to: resolution.state }, now()));
+      reportFailure(logger, run.id, changeRunState(db, run.id, { to: resolution.state }, now()));
     }
     return;
   }
@@ -197,11 +220,16 @@ async function pollRun(
     const result = changeRunState(
       db,
       run.id,
-      { to: "ended", agentResult: resolution.agentResult, prState: decision.prState },
+      {
+        to: "ended",
+        agentResult: resolution.agentResult,
+        prState: decision.prState,
+        ...(resolution.report === null ? {} : { reportBody: resolution.report.body }),
+      },
       endedAt,
     );
     if (!result.ok) {
-      reportFailure(logger, run, result);
+      reportFailure(logger, run.id, result);
       return;
     }
     if (decision.pr !== null) {
@@ -214,7 +242,8 @@ async function pollRun(
 }
 
 /**
- * 런과 이어진 PR을 코드 호스트에서 찾아 core decidePrState로 PR 상태를 정한다(Q40).
+ * 런과 이어진 PR을 코드 호스트에서 찾아 core decidePrState로 PR 상태를 정한다(Q40·Q82.6).
+ * 1순위는 시작 때 러너에서 받은 실제 브랜치, 2순위는 런 시작 뒤에 만든 PR의 티켓 키다.
  * 런의 러너 쪽 프로젝트를 저장소로 읽는 코드 호스트가 없으면 이을 PR이 없으니 없음이다.
  * 다만 어댑터를 만들지 못한 코드 호스트 연결이 있으면 그 연결이 이 저장소를 읽을 수 있으니,
  * 없음으로 확정하지 않고 던져 다음 바퀴에 다시 본다(두 축은 한 번만 기록한다, Q69).
@@ -230,9 +259,15 @@ async function decideRunPrState(context: TickContext, run: ActiveRun): Promise<P
     if (repo === null) continue;
     const [byBranch, byTicketKey] = await Promise.all([
       codeHost.findPullRequestsByBranch(repo, run.branch),
-      codeHost.findPullRequestsByTicketKey(repo, run.ticket.key),
+      codeHost.findPullRequestsByTicketKey(repo, run.ticket.key, { createdSince: run.startedAt }),
     ]);
-    return decidePrState({ repo, runStartedAt: run.startedAt, byBranch, byTicketKey });
+    return decidePrState({
+      repo,
+      ticketKey: run.ticket.key,
+      runStartedAt: run.startedAt,
+      byBranch,
+      byTicketKey,
+    });
   }
   if (unavailable > 0) {
     throw new Error(
@@ -250,10 +285,12 @@ async function decideRunPrState(context: TickContext, run: ActiveRun): Promise<P
 
 /**
  * 엄격한 FIFO 대기열(ADR 0006). 이번에 할 일은 core planQueue가 정하고 worker는 그대로 옮긴다.
- * 러너를 비우고 정하는 것(Q65·Q68·Q72·Q73)은 한 쓰기 트랜잭션에서 쓰고, 시작은 들어온 순서로 한다.
- * 앞 런이 시작하지 못하면 뒤 런도 이번 바퀴에는 시작하지 않는다(Q63 개정).
+ * 러너를 비우고 정하는 것(Q65·Q68·Q72·Q73·Q78·Q82.22)과 맨 앞에서 영영 시작할 수 없는 런을 끝내는 것
+ * (Q82.16)은 한 쓰기 트랜잭션에서 쓰고, 시작은 들어온 순서로 한다. 앞 런이 시작하지 못하면 뒤 런도
+ * 이번 바퀴에는 시작하지 않는다(Q63 개정). 다만 러너에 닿지 못해 러너를 비운 런과 시작할 수 없음으로
+ * 끝낸 런은 순서에서 빠지므로 뒤 런을 이어서 시작한다(Q86).
  *
- * 예외: 러너에 보낸 시작의 결과를 아직 모르는 런(boundRunners)은 그 러너에 묶어 둔다. 첫 시작이 실제로
+ * 예외: 러너에 시작을 보낸 적이 있는 런(시작 요청 시각이 있음)은 그 러너에 묶어 둔다. 첫 시작이 실제로
  * 됐다면 다른 러너에서 다시 시작할 때 에이전트가 둘 생기기 때문이다.
  * - 묶인 러너가 Online이면 그대로 planQueue에 넣는다. 러너가 정해져 있어 그 러너에서만 시작한다.
  * - 묶인 러너가 Online이 아니면 planQueue에 넣지 않는다. 러너를 비우거나 다른 러너를 고르지 않고,
@@ -262,7 +299,7 @@ async function decideRunPrState(context: TickContext, run: ActiveRun): Promise<P
  *   planQueue에 넣지 않고 그 러너의 capacity를 차지한 것으로 센다.
  */
 async function processQueue(context: TickContext): Promise<void> {
-  const { db, pendingStarts } = context;
+  const { db, pendingStarts, now } = context;
   recordPendingStarts(context);
 
   const plan = inTransaction(db, () => {
@@ -273,42 +310,58 @@ async function processQueue(context: TickContext): Promise<void> {
     const bound = boundRunners(context, queued);
     const runs = listRunPlacements(db);
     for (const pending of pendingStarts.values()) {
-      if (pending.started !== null) runs.push({ runnerId: pending.runnerId, state: "running" });
+      runs.push({ runnerId: pending.runnerId, state: "running" });
     }
-    const candidates = queued.flatMap(toQueuedRun).filter((run) => {
-      const runnerId = bound.get(run.id);
-      if (runnerId === undefined) return true;
-      return (pendingStarts.get(run.id)?.started ?? null) === null && online.has(runnerId);
-    });
+    const candidates = queued
+      .flatMap((run) => toQueuedRun(context, run))
+      .filter((run) => {
+        const runnerId = bound.get(run.id);
+        if (runnerId === undefined) return true;
+        return !pendingStarts.has(run.id) && online.has(runnerId);
+      });
 
     const result = planQueue({ queued: candidates, runners, runs });
-    for (const runId of result.cleared) setQueuedRunRunner(db, runId, null);
+    for (const { runId } of result.cleared) setQueuedRunRunner(db, runId, null);
     for (const choice of result.assigned) setQueuedRunRunner(db, choice.runId, choice.runnerId);
+    for (const runId of result.couldNotStart) {
+      // 맨 앞 런이 영영 시작할 수 없다(Mapping 삭제 등, Q82.16). PR을 찾지 않아 PR 상태는 없음이다.
+      reportFailure(
+        context.logger,
+        runId,
+        changeRunState(
+          db,
+          runId,
+          { to: "ended", agentResult: "could-not-start", prState: "none" },
+          now(),
+        ),
+      );
+    }
     return result.start;
   });
 
   for (const choice of plan ?? []) {
-    if (!(await startQueuedRun(context, choice))) return;
+    const outcome = await startQueuedRun(context, choice);
+    if (outcome === "blocked") return;
   }
 }
 
 /** 러너에서 시작했지만 Running을 쓰지 못한 런을 다시 기록한다. */
 function recordPendingStarts(context: TickContext): void {
   for (const [runId, pending] of context.pendingStarts) {
-    const { started } = pending;
-    if (started === null) continue;
     const run = getRun(context.db, runId);
     if (run?.state !== "queued") {
       context.pendingStarts.delete(runId);
       continue;
     }
-    if (tryWrite(context, run, () => recordStart(context, run, started)) !== undefined) {
+    if (
+      tryWrite(context, run.id, () => recordStart(context, run.id, pending.started)) !== undefined
+    ) {
       context.pendingStarts.delete(runId);
     }
   }
 }
 
-/** 러너에 보낸 시작의 결과를 아직 모르는 Queued 런과 그 러너 */
+/** 러너에 시작을 보낸 적이 있어 그 러너에 묶인 Queued 런과 그 러너 */
 function boundRunners(
   context: TickContext,
   queued: ReadonlyArray<StoredRun>,
@@ -321,156 +374,220 @@ function boundRunners(
       continue;
     }
     if (run.state !== "queued" || run.runnerId === null) continue;
-    if ((getRunWithRecords(context.db, run.id)?.records.retryToken ?? null) !== null) {
+    if ((getRunWithRecords(context.db, run.id)?.records.startRequestedAt ?? null) !== null) {
       bound.set(run.id, run.runnerId);
     }
   }
   return bound;
 }
 
-function toQueuedRun(run: StoredRun): QueuedRun[] {
+/** 대기열 판단에 넘기는 모양. 그 런의 Mapping이 지워졌으면 영영 시작할 수 없다(Q82.16). */
+function toQueuedRun(context: TickContext, run: StoredRun): QueuedRun[] {
   if (run.state !== "queued") return [];
+  const mapping = getMapping(context.db, run.ticket.connection, run.trackerProject);
   return [
-    { id: run.id, assignedAt: run.assignedAt, project: run.runnerProject, runnerId: run.runnerId },
+    {
+      id: run.id,
+      assignedAt: run.assignedAt,
+      project: run.runnerProject,
+      runnerId: run.runnerId,
+      unstartable: mapping === null,
+    },
   ];
 }
 
 /**
- * Queued 런 하나를 러너에서 시작하고 Running으로 바꾼다. 시작했으면 true다.
+ * Queued 런 하나를 러너에서 시작하고 Running으로 바꾼다.
+ * - started: 시작했다.
+ * - skipped: 순서에서 빠졌다(러너에 닿지 못해 러너를 비움, 시작할 수 없음으로 끝냄). 뒤 런은 이어서 본다.
+ * - blocked: 시작하지 못했고 이 런이 맨 앞에 남는다. 뒤 런은 이번 바퀴에 시작하지 않는다.
  *
- * 재시작 안전(ADR 0002·0005): 상태는 DB에만 있다. Running을 쓴 뒤에 데몬이 죽으면 다시 떠도 그 런은
- * 대기열에 없어 다시 시작하지 않는다. 러너가 시작 결과를 모른다고 답하면(start-outcome-unknown)
- * 러너가 준 다시 보내기 값(retryToken)을 DB에 써 두고, 다음 바퀴에(데몬을 다시 띄운 뒤라도) 그 값으로
- * 같은 시작을 다시 보낸다. 다시 보내기 값은 러너가 발급한 것만 보낸다(core StartRunInput).
- * 데몬이 살아 있는 동안 DB 쓰기만 실패하면 시작 결과나 다시 보내기 값을 메모리(pendingStarts)에 두고
- * 다음 바퀴에 쓴다.
+ * 시작 멱등(0037): 결정적 워크트리 이름(Run.worktreeName)이 멱등 키다. 러너에 시작을 처음 보내기 직전에
+ * 시작 요청 시각을 DB에 쓰고, 그 시각이 있는 런은 보내기 전에 같은 이름으로 이미 시작한 런을 찾아
+ * (Runner.findStartedRun) 있으면 이어 붙인다. 러너의 응답을 받은 뒤 Running을 쓰기 전에 데몬이 죽어도
+ * 다시 띄웠을 때 새로 시작하지 않는다. 데몬이 살아 있는 동안 DB 쓰기만 실패하면 시작 결과를
+ * 메모리(pendingStarts)에 두고 다음 바퀴에 쓴다.
  *
- * 알려진 한계: 러너의 응답을 받은 뒤 DB에 쓰기 전에 데몬이 죽으면 다시 띄웠을 때 시작을 새로 보낸다.
- * 지금 Runner 계약에서는 시작 전에 둘 멱등 키가 없다. 0037에서 결정적 워크트리 이름·브랜치(Q40)를 멱등 키로
- * 쓰고, 재시작 때 러너 어댑터가 그 이름으로 이미 시작한 런을 찾아 이어 붙이는 계약을 core에 더한다.
+ * 시작 실패(Q86)는 core decideStartFailure를 따른다.
  */
-async function startQueuedRun(context: TickContext, choice: RunnerChoice): Promise<boolean> {
+async function startQueuedRun(
+  context: TickContext,
+  choice: RunnerChoice,
+): Promise<"started" | "skipped" | "blocked"> {
   const { db, pendingStarts } = context;
   const found = getRunWithRecords(db, choice.runId);
-  if (found === null) {
+  if (found?.run.state !== "queued") {
     pendingStarts.delete(choice.runId);
-    return false;
+    return "skipped";
   }
   const { run, records } = found;
-  if (run.state !== "queued") {
-    pendingStarts.delete(choice.runId);
-    return false;
-  }
   const pending = pendingStarts.get(run.id);
   if (
     run.runnerId !== choice.runnerId ||
     (pending !== undefined && pending.runnerId !== choice.runnerId)
   ) {
-    return false;
+    return "blocked";
   }
 
-  const started =
-    pending?.started ??
-    (await startOnRunner(context, run, choice.runnerId, pending?.retryToken ?? records.retryToken));
-  if (started === null) return false;
-  pendingStarts.set(run.id, { runnerId: choice.runnerId, started, retryToken: started.retryToken });
+  let started = pending?.started ?? null;
+  if (started === null) {
+    const attempt = await startOnRunner(context, run, choice.runnerId, records);
+    if (attempt.kind !== "started") return attempt.kind;
+    started = attempt.started;
+  }
+  pendingStarts.set(run.id, { runnerId: choice.runnerId, started });
 
-  const recorded = tryWrite(context, run, () => recordStart(context, run, started));
+  const recorded = tryWrite(context, run.id, () => recordStart(context, run.id, started));
   if (recorded !== undefined) pendingStarts.delete(run.id);
-  return recorded === true;
+  return recorded === true ? "started" : "blocked";
 }
 
-/**
- * 러너에 시작을 보낸다. 시작하지 못했으면 null이다. 러너가 결과를 모른다고 답하면 러너가 준
- * 다시 보내기 값을 DB에 써 둔다.
- */
+type StartAttempt = { kind: "started"; started: StartedRun } | { kind: "skipped" | "blocked" };
+
+/** 러너에 시작을 보낸다. 이미 보낸 적이 있으면 먼저 같은 이름으로 이미 시작한 런을 찾는다. */
 async function startOnRunner(
   context: TickContext,
-  run: Extract<StoredRun, { state: "queued" }>,
+  run: QueuedStoredRun,
   runnerId: RunnerId,
-  retryToken: RetryToken | null,
-): Promise<StartedRun | null> {
-  try {
-    return await sendStart(context, run, runnerId, retryToken);
-  } catch (error) {
-    context.logger.warn("could not start run", { runId: run.id, error });
-    const issued = startOutcomeUnknownToken(error);
-    if (issued !== null) {
-      // DB에 쓰지 못해도 다시 보낼 수 있게 먼저 메모리에 둔다.
-      context.pendingStarts.set(run.id, { runnerId, started: null, retryToken: issued });
-      tryWrite(context, run, () => updateRunRecords(context.db, run.id, { retryToken: issued }));
-    }
-    return null;
-  }
-}
-
-/** 러너에 시작을 보낸다. 티켓·러너를 찾지 못하면 null이다. */
-async function sendStart(
-  context: TickContext,
-  run: Extract<StoredRun, { state: "queued" }>,
-  runnerId: RunnerId,
-  retryToken: RetryToken | null,
-): Promise<StartedRun | null> {
+  records: { startRequestedAt: Date | null; startFailures: number },
+): Promise<StartAttempt> {
   const { db, logger, adapters } = context;
   const storedRunner = findRunner(db, runnerId);
   if (storedRunner === undefined) {
     logger.warn("run's runner is not registered", { runId: run.id, runnerId });
-    return null;
+    return { kind: "blocked" };
   }
-  const tracker = adapters.tracker(db, run.ticket.connection);
+  const runner = adapters.runner(storedRunner);
+  try {
+    const mailbox = await mailboxFor(context, storedRunner, runner);
+    if (records.startRequestedAt !== null) {
+      const existing = await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
+      if (existing !== null) return { kind: "started", started: existing };
+    }
+    const prompt = await promptFor(context, run);
+    if (prompt === null) return { kind: "blocked" };
+    // 보내기 직전에 쓴다. 쓰지 못하면 보내지 않는다(다시 띄웠을 때 이미 보냈는지 알 수 없게 된다).
+    if (
+      tryWrite(context, run.id, () => recordStartRequested(db, run.id, context.now())) === undefined
+    ) {
+      return { kind: "blocked" };
+    }
+    const started = await runner.startRun({
+      mailbox,
+      project: run.runnerProject,
+      worktreeName: run.worktreeName,
+      agent: run.agent,
+      prompt: prompt.text,
+      ticket: prompt.ticket,
+    });
+    return { kind: "started", started };
+  } catch (error) {
+    logger.warn("could not start run", { runId: run.id, error });
+    return handleStartFailure(context, run, runnerId, records.startFailures, error);
+  }
+}
+
+/** 시작 실패를 core decideStartFailure대로 처리한다(Q86). */
+function handleStartFailure(
+  context: TickContext,
+  run: QueuedStoredRun,
+  runnerId: RunnerId,
+  previousFailures: number,
+  error: unknown,
+): StartAttempt {
+  const detail = runnerErrorDetail(error);
+  if (detail === null) return { kind: "blocked" };
+  const { db, now } = context;
+  const decision = decideStartFailure(detail, previousFailures);
+  switch (decision.action) {
+    case "clear-runner":
+      tryWrite(context, run.id, () => setQueuedRunRunner(db, run.id, null));
+      return { kind: "skipped" };
+    case "find-then-retry":
+      return { kind: "blocked" };
+    case "recreate-mailbox":
+      context.mailboxes.delete(runnerId);
+      tryWrite(context, run.id, () => setRunnerMailbox(db, runnerId, null));
+      return { kind: "blocked" };
+    case "retry":
+      tryWrite(context, run.id, () =>
+        recordStartFailure(db, run.id, { failures: decision.failures, error: describe(detail) }),
+      );
+      return { kind: "blocked" };
+    case "could-not-start": {
+      const ended = tryWrite(context, run.id, () =>
+        inTransaction(db, () => {
+          recordStartFailure(db, run.id, { failures: decision.failures, error: describe(detail) });
+          return changeRunState(
+            db,
+            run.id,
+            { to: "ended", agentResult: "could-not-start", prState: "none" },
+            now(),
+          );
+        }),
+      );
+      if (ended !== undefined) reportFailure(context.logger, run.id, ended);
+      return { kind: ended?.ok === true ? "skipped" : "blocked" };
+    }
+  }
+}
+
+type QueuedStoredRun = Extract<StoredRun, { state: "queued" }>;
+
+/** 에이전트에게 줄 지시. 티켓만이다(GLOSSARY Agent). 티켓을 찾지 못하면 null이다. */
+async function promptFor(
+  context: TickContext,
+  run: QueuedStoredRun,
+): Promise<{ text: string; ticket: { key: TicketKey; url: string } } | null> {
+  const tracker = context.adapters.tracker(context.db, run.ticket.connection);
   if (tracker === null) {
-    logger.warn("run's tracker connection is not registered", { runId: run.id });
+    context.logger.warn("run's tracker connection is not registered", { runId: run.id });
     return null;
   }
   const ticket = await tracker.getTicket(run.ticket.key);
   if (ticket === null) {
-    logger.warn("run's ticket was not found in the tracker", { runId: run.id });
+    context.logger.warn("run's ticket was not found in the tracker", { runId: run.id });
     return null;
   }
-
-  const started = await adapters.runner(storedRunner).startRun({
-    project: run.runnerProject,
-    worktreeName: run.branch.replaceAll("/", "-"),
-    branch: run.branch,
-    agent: run.agent,
-    // 에이전트에게는 티켓만 지시로 준다(GLOSSARY Agent).
-    prompt: `${ticket.title}\n\n${ticket.body}`,
+  return {
+    text: `${ticket.title}\n\n${ticket.body}`,
     ticket: { key: ticket.key, url: ticket.url },
-    ...(retryToken === null ? {} : { retryToken }),
-  });
-  if (started.branch !== run.branch) {
-    // PR 1순위 찾기는 런의 브랜치로 한다(Q40). 러너가 다른 브랜치를 쓰면 티켓 키로만 잇는다.
-    logger.warn("runner started the run on another branch", {
-      runId: run.id,
-      expected: run.branch,
-      actual: started.branch,
-    });
+  };
+}
+
+/**
+ * 러너의 우편함을 확인하고(없거나 사라졌으면 어댑터가 다시 만든다, Q82.1) 바뀌었으면 DB에 쓴다.
+ * 바퀴마다 러너당 한 번만 확인한다.
+ */
+async function mailboxFor(
+  context: TickContext,
+  storedRunner: StoredRunner,
+  runner: Runner,
+): Promise<MailboxRef> {
+  const cached = context.mailboxes.get(storedRunner.id);
+  if (cached !== undefined) return cached;
+  const mailbox = await runner.ensureMailbox(storedRunner.mailbox);
+  if (mailbox !== storedRunner.mailbox) {
+    setRunnerMailbox(context.db, storedRunner.id, mailbox);
   }
-  return started;
+  context.mailboxes.set(storedRunner.id, mailbox);
+  return mailbox;
 }
 
 /** 시작한 런을 Running으로 쓴다. 런이 더는 Queued가 아니면 false다. */
-function recordStart(context: TickContext, run: StoredRun, started: StartedRun): boolean {
+function recordStart(context: TickContext, runId: RunId, started: StartedRun): boolean {
   const { db, now, logger } = context;
-  return inTransaction(db, () => {
-    const result = changeRunState(db, run.id, { to: "running", worktree: started.worktree }, now());
-    if (!result.ok) {
-      reportFailure(logger, run, result);
-      return false;
-    }
-    if (started.retryToken !== null) {
-      updateRunRecords(db, run.id, { retryToken: started.retryToken });
-    }
-    return true;
-  });
+  const result = changeRunState(db, runId, { to: "running", started }, now());
+  reportFailure(logger, runId, result);
+  return result.ok;
 }
 
 /** DB 쓰기. 실패하면(쓰기 잠금 시간 초과 등) 알리고 undefined를 돌려준다. */
-function tryWrite<T>(context: TickContext, run: StoredRun, write: () => T): T | undefined {
+function tryWrite<T>(context: TickContext, runId: RunId, write: () => T): T | undefined {
   try {
     return write();
   } catch (error) {
-    context.logger.warn("could not write run", { runId: run.id, error });
+    context.logger.warn("could not write run", { runId, error });
     return undefined;
   }
 }
@@ -479,28 +596,39 @@ function findRunner(db: Database, id: RunnerId): StoredRunner | undefined {
   return listRunners(db).find((runner) => runner.id === id);
 }
 
-/** 러너가 시작 결과를 모른다고 답했으면 다시 보낼 값을 꺼낸다. */
-function startOutcomeUnknownToken(error: unknown): RetryToken | null {
+/** 러너 어댑터가 던진 오류의 종류. 어댑터 오류가 아니면(트래커 오류 등) null이다. */
+function runnerErrorDetail(error: unknown): RunnerErrorDetail | null {
   if (!(error instanceof AdapterError)) return null;
   const detail: unknown = error.detail;
-  if (
-    typeof detail === "object" &&
-    detail !== null &&
-    "kind" in detail &&
-    detail.kind === "start-outcome-unknown" &&
-    "retryToken" in detail &&
-    typeof detail.retryToken === "string" &&
-    detail.retryToken.length > 0
-  ) {
-    return toRetryToken(detail.retryToken);
+  if (typeof detail !== "object" || detail === null || !("kind" in detail)) return null;
+  switch (detail.kind) {
+    case "unreachable":
+    case "not-installed":
+    case "not-ready":
+    case "mailbox-missing":
+    case "start-outcome-unknown":
+      return { kind: detail.kind, detail: describe(detail) };
+    case "malformed-output":
+      return { kind: "malformed-output", raw: describe(detail) };
+    case "runner-error":
+      return {
+        kind: "runner-error",
+        code: "code" in detail && typeof detail.code === "string" ? detail.code : "unknown",
+        message: describe(detail),
+      };
+    default:
+      return null;
   }
-  return null;
+}
+
+function describe(detail: object): string {
+  return JSON.stringify(detail);
 }
 
 function reportFailure(
   logger: WorkerLogger,
-  run: StoredRun,
+  runId: RunId,
   result: ReturnType<typeof changeRunState>,
 ): void {
-  if (!result.ok) logger.warn("could not change run state", { runId: run.id, error: result.error });
+  if (!result.ok) logger.warn("could not change run state", { runId, error: result.error });
 }

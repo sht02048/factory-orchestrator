@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { isAssignmentBlocked } from "./adapters.js";
 import type { CodeHost, Runner } from "./adapters.js";
 import { checkAutoAssignment } from "./assignment.js";
 import type { RunnerSnapshot } from "./assignment.js";
@@ -83,7 +84,15 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
     }
 
     // conn-a의 ENG-1에만 도는 런이 있다.
-    const runs = [{ ticket: { connection: connections[0]!.id, key }, state: "running" as const }];
+    const runs = [
+      {
+        ticket: { connection: connections[0]!.id, key },
+        state: "running" as const,
+        assignedAt: new Date(1),
+        agentResult: null,
+        endedAt: null,
+      },
+    ];
     const trackers = [trackersA.created[0]!, trackersB.created[0]!];
     const results = [];
     for (const [index, tracker] of trackers.entries()) {
@@ -95,6 +104,7 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
         checkAutoAssignment({
           labelIds: ticket!.labels.map((label) => label.id),
           autoAssignLabelId: auto,
+          labelAttachedAt: null,
           ticket: { connection: connections[index]!.id, key: ticket!.key },
           runs,
         }),
@@ -143,6 +153,7 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
       snapshots.push({
         id,
         online: health.online,
+        assignmentBlocked: isAssignmentBlocked(health),
         capacity: 1,
         projects: projects.map((p) => p.id),
       });
@@ -154,12 +165,14 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
           assignedAt: new Date(1),
           project: registered[0]!.project,
           runnerId: null,
+          unstartable: false,
         },
         {
           id: toRunId("run-b"),
           assignedAt: new Date(2),
           project: registered[1]!.project,
           runnerId: null,
+          unstartable: false,
         },
       ],
       runners: snapshots,
@@ -180,16 +193,17 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
     for (const [index, start] of plan.start.entries()) {
       const runner = runners.get(start.runnerId)!;
       const project = registered[index]!.project;
-      const branch = `factory/ENG-${index}-1`;
+      const mailbox = await runner.ensureMailbox(null);
       const started = await runner.startRun({
+        mailbox,
         project,
-        worktreeName: `ENG-${index}`,
-        branch,
+        worktreeName: `factory-ENG-${index}-1`,
         agent: toAgentId("agent"),
         prompt: "티켓",
       });
+      const branch = started.branch;
       const fake = (index === 0 ? runnersA : runnersB).created[0]!;
-      fake.setProgress(started.worktree, { kind: "finished", exitCode: index });
+      fake.report(started.worktree, { outcome: index === 0 ? "succeeded" : "failed" });
 
       const codeHost = codeHosts.find((host) => host.repoOf(project) !== null)!;
       const repo = codeHost.repoOf(project)!;
@@ -209,15 +223,26 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
         ci: "none",
       });
 
-      const resolution = resolveRunProgress(await runner.pollRun(started.worktree));
+      const progress = await runner.pollRun({ mailbox, ...started });
+      const resolution = resolveRunProgress(progress, { answered: new Set(), denied: new Set() });
       if (resolution.kind !== "end") throw new Error("런이 끝나야 한다");
+      const ticketKey = toTicketKey(`ENG-${index}`);
       const { prState } = decidePrState({
         repo,
+        ticketKey,
         runStartedAt,
         byBranch: await codeHost.findPullRequestsByBranch(repo, branch),
-        byTicketKey: await codeHost.findPullRequestsByTicketKey(repo, toTicketKey(`ENG-${index}`)),
+        byTicketKey: await codeHost.findPullRequestsByTicketKey(repo, ticketKey, {
+          createdSince: runStartedAt,
+        }),
       });
-      outcomes.push(summarizeRunOutcome(resolution.agentResult, prState));
+      outcomes.push(
+        summarizeRunOutcome({
+          agentResult: resolution.agentResult,
+          prState,
+          runnerUnreached: false,
+        }),
+      );
     }
 
     expect(outcomes).toEqual([

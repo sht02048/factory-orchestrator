@@ -5,6 +5,7 @@ import {
   toRunnerProjectId,
   toTicketKey,
   toTrackerProjectId,
+  toAgentRef,
   toWorktreeRef,
 } from "@factory/core";
 import { assignRun, changeRunState, saveRunner, updateRunRecords } from "@factory/db";
@@ -44,7 +45,7 @@ function addRunsOnOfflineRunner(db: Database): void {
     if (!assigned.ok) throw new Error(assigned.reason);
     const id = assigned.run.id;
     const steps = [
-      { to: "running", worktree: toWorktreeRef(`wt-${key}`) },
+      { to: "running", started: startedOn(`wt-${key}`) },
       { to: "disconnected" },
       ...(end
         ? [{ to: "ended", agentResult: "runner-disconnected", prState: "none" } as const]
@@ -89,7 +90,7 @@ describe("loadRunnersPage", () => {
   it("남은 워크트리는 PR 이 정해질 때까지 남기거나 사람이 정할 Ended 런이다(Q44·Q51·Q75·Q77)", () => {
     const { db } = seedDatabase();
     addRunsOnOfflineRunner(db);
-    // ACME-2: 오류 종료 · PR 열림 → PR 이 정해질 때까지 남김
+    // ACME-2: 완료 보고(실패) · PR 열림 → PR 이 정해질 때까지 남김
     // ACME-5: 러너 연결 끊김 → 사람이 정함. 그 밖의 Ended 런은 바로 지우거나 지울 것이 없다
     expect(runner(db, "runner-a").leftWorktrees.map((w) => [w.ticketKey, w.worktree])).toEqual([
       ["ACME-2", "keep-until-pr-settles"],
@@ -162,3 +163,12 @@ describe("Workspace 범위(ADR 0006)", () => {
     expect(reloadOnEnter({ cause: "stay" })).toBe(false);
   });
 });
+
+/** 시작한 런이 러너에서 받는 값(워크트리, 실제 브랜치, 에이전트 참조) */
+function startedOn(worktree: string) {
+  return {
+    worktree: toWorktreeRef(worktree),
+    branch: `acme/${worktree}`,
+    agentRef: toAgentRef(`agent-${worktree}`),
+  };
+}

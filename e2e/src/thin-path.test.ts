@@ -68,10 +68,10 @@ const repo = toRepoRef("acme/web");
 const runnerId = toRunnerId("runner-a");
 const encryptionKey = new Uint8Array(32).fill(7);
 
-/** 시나리오 하나: 에이전트가 끝난 방식과 그때의 PR, 기대하는 두 축과 요약 결과 */
+/** 시나리오 하나: 에이전트의 완료 보고와 그때의 PR, 기대하는 두 축과 요약 결과 */
 interface Scenario {
   key: TicketKey;
-  exitCode: number;
+  report: "succeeded" | "failed";
   pr: "open" | "merged" | "closed" | null;
   agentResult: AgentResult;
   prState: PrState;
@@ -81,25 +81,25 @@ interface Scenario {
 const scenarios: ReadonlyArray<Scenario> = [
   {
     key: toTicketKey("ACME-1"),
-    exitCode: 0,
+    report: "succeeded",
     pr: "merged",
-    agentResult: "exited-normally",
+    agentResult: "reported-success",
     prState: "merged",
     summary: "merged",
   },
   {
     key: toTicketKey("ACME-2"),
-    exitCode: 1,
+    report: "failed",
     pr: "open",
-    agentResult: "exited-with-error",
+    agentResult: "reported-failure",
     prState: "open",
     summary: "human-check",
   },
   {
     key: toTicketKey("ACME-3"),
-    exitCode: 0,
+    report: "succeeded",
     pr: null,
-    agentResult: "exited-normally",
+    agentResult: "reported-success",
     prState: "none",
     summary: "failed",
   },
@@ -169,9 +169,9 @@ describe("끝에서 끝까지 얇은 경로", () => {
       const running = await waitForRun(assigned.id, (run) => run.state === "running");
       if (running.state !== "running") throw new Error("unreachable");
 
-      // 에이전트가 PR 을 남기고(또는 남기지 않고) 끝난다.
+      // 에이전트가 PR 을 남기고(또는 남기지 않고) 완료 보고를 보낸다.
       if (scenario.pr !== null) putPullRequest(running, scenario.pr);
-      runner.setProgress(running.worktree, { kind: "finished", exitCode: scenario.exitCode });
+      runner.report(running.worktree, { outcome: scenario.report, body: "done" });
 
       // worker 가 두 축을 한 번 기록한다.
       const ended = await waitForRun(assigned.id, (run) => run.state === "ended");
@@ -247,6 +247,7 @@ function seed(db: Database): void {
     checkedAt: new Date(),
     error: null,
     projects,
+    assignmentBlocked: false,
   });
 }
 
@@ -274,8 +275,9 @@ function assign(ticketKey: TicketKey): StoredRun {
   return result.run;
 }
 
-/** 런의 브랜치로 PR 을 둔다. 에이전트가 PR 을 열고, 병합하거나 닫은 결과를 흉내 낸다. */
+/** 런 시작 때 러너에서 받은 브랜치로 PR 을 둔다. 에이전트가 PR 을 열고, 병합하거나 닫은 결과를 흉내 낸다. */
 function putPullRequest(run: StoredRun, state: "open" | "merged" | "closed"): void {
+  if (run.state === "queued" || run.branch === null) throw new Error("run has not started");
   const now = new Date();
   codeHost.putPullRequest(repo, {
     id: toPullRequestId(`pr-${run.ticket.key}`),

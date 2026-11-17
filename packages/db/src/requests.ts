@@ -1,7 +1,9 @@
+import { planCancel } from "@factory/core";
 import type { RunId, RunnerHealth, RunnerId } from "@factory/core";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { Database } from "./database.js";
-import { logTailRequests, runnerCheckRequests } from "./schema.js";
+import { inTransaction } from "./database.js";
+import { logTailRequests, runCancelRequests, runnerCheckRequests, runs } from "./schema.js";
 
 // ---------- web이 남기는 요청(Q61) ----------
 
@@ -150,4 +152,76 @@ export function getRunnerCheckRequest(
   if (row === undefined) return null;
   const result: unknown = row.result === null ? null : JSON.parse(row.result);
   return toStatus({ ...row, result });
+}
+
+// ---------- 런 취소 요청(Q77·Q82.8) ----------
+
+export type RequestRunCancelResult =
+  | { ok: true; requestedAt: Date }
+  | { ok: false; reason: "not-found" | "already-ended" };
+
+/**
+ * 운영자가 런 취소를 요청한다(web, 스펙 3절 6번). 끝나지 않은 런(Queued·Running·Waiting for Input·
+ * Disconnected)이면 받아들이고, Ended 런이면 거부한다(core planCancel). 이미 처리하지 않은 요청이 있으면
+ * 그 요청을 그대로 둔다(처음 요청 시각을 남긴다).
+ */
+export function requestRunCancel(
+  db: Database,
+  runId: RunId,
+  now: Date = new Date(),
+): RequestRunCancelResult {
+  return inTransaction(db, (): RequestRunCancelResult => {
+    const run = db.select({ state: runs.state }).from(runs).where(eq(runs.id, runId)).get();
+    if (run === undefined) return { ok: false, reason: "not-found" };
+    const plan = planCancel(run.state);
+    if (!plan.ok) return { ok: false, reason: plan.reason };
+    db.insert(runCancelRequests).values({ runId, requestedAt: now }).onConflictDoNothing().run();
+    const stored = db
+      .select({ requestedAt: runCancelRequests.requestedAt })
+      .from(runCancelRequests)
+      .where(eq(runCancelRequests.runId, runId))
+      .get();
+    return { ok: true, requestedAt: stored?.requestedAt ?? now };
+  });
+}
+
+/** 처리하지 않은 취소 요청. 요청 순서다(worker, 0016). 화면의 "취소 중"도 이것으로 안다(Q82.21). */
+export function listPendingCancelRequests(
+  db: Database,
+): Array<{ runId: RunId; requestedAt: Date }> {
+  return db
+    .select({ runId: runCancelRequests.runId, requestedAt: runCancelRequests.requestedAt })
+    .from(runCancelRequests)
+    .where(isNull(runCancelRequests.processedAt))
+    .orderBy(asc(runCancelRequests.requestedAt), asc(runCancelRequests.runId))
+    .all();
+}
+
+/** 런에 처리하지 않은 취소 요청이 있는지(취소 중). */
+export function hasPendingCancelRequest(db: Database, runId: RunId): boolean {
+  return (
+    db
+      .select({ runId: runCancelRequests.runId })
+      .from(runCancelRequests)
+      .where(and(eq(runCancelRequests.runId, runId), isNull(runCancelRequests.processedAt)))
+      .get() !== undefined
+  );
+}
+
+/**
+ * 취소 요청을 처리했다고 표시한다. 한 번만 참이다: 이미 표시했거나 요청이 없으면 false라, 둘이 함께
+ * 처리하려 해도 한쪽만 처리한다. 런을 끝낸 쓰기와 같은 트랜잭션에서 부른다.
+ */
+export function markCancelRequestProcessed(
+  db: Database,
+  runId: RunId,
+  now: Date = new Date(),
+): boolean {
+  return (
+    db
+      .update(runCancelRequests)
+      .set({ processedAt: now })
+      .where(and(eq(runCancelRequests.runId, runId), isNull(runCancelRequests.processedAt)))
+      .run().changes > 0
+  );
 }

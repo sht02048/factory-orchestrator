@@ -67,7 +67,13 @@ export function seededDatabase(): Database {
 
 export function addRunner(
   db: Database,
-  input: { id: string; capacity: number; online: boolean; projects: RunnerProjectId[] },
+  input: {
+    id: string;
+    capacity: number;
+    online: boolean;
+    projects: RunnerProjectId[];
+    assignmentBlocked?: boolean;
+  },
 ): RunnerId {
   const id = toRunnerId(input.id);
   saveRunner(db, {
@@ -83,6 +89,7 @@ export function addRunner(
     checkedAt: new Date(0),
     error: null,
     projects: input.projects.map((p) => ({ id: p, displayName: p, setupState: "ready" })),
+    assignmentBlocked: input.assignmentBlocked ?? false,
   });
   return id;
 }

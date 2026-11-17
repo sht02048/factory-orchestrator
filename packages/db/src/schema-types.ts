@@ -4,6 +4,7 @@
  */
 import type {
   AgentId,
+  AgentRef,
   AgentResult,
   PrState,
   Run,
@@ -43,6 +44,10 @@ export type SchemaMatchesCore = [
   Assert<Equals<RunRow["agentId"], AgentId>>,
   Assert<Equals<RunRow["runnerId"], RunnerId | null>>,
   Assert<Equals<RunRow["worktreeRef"], WorktreeRef | null>>,
+  Assert<Equals<RunRow["agentRef"], AgentRef | null>>,
+  Assert<Equals<RunRow["worktreeName"], Run["worktreeName"]>>,
+  Assert<Equals<RunRow["branch"], EndedRun["branch"]>>,
+  Assert<Equals<RunRow["runnerUnreached"], EndedRun["runnerUnreached"]>>,
   // 시각은 Date로 읽힌다.
   Assert<Equals<RunRow["assignedAt"], Date>>,
   Assert<Equals<RunRow["startedAt"], Date | null>>,

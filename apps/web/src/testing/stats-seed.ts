@@ -7,6 +7,7 @@ import {
   toTrackerConnectionId,
   toTrackerKind,
   toTrackerProjectId,
+  toAgentRef,
   toWorktreeRef,
 } from "@factory/core";
 import type { AgentResult, PrState, RunnerId } from "@factory/core";
@@ -71,7 +72,7 @@ export const statsCases: ReadonlyArray<StatsCase> = [
     project: "Web",
     runner: "runner-a",
     agent: "claude",
-    agentResult: "exited-normally",
+    agentResult: "reported-success",
     prState: "merged",
     laterPrState: null,
     assignedAt: "2026-11-16T09:00:00Z",
@@ -83,7 +84,7 @@ export const statsCases: ReadonlyArray<StatsCase> = [
     project: "Web",
     runner: "runner-a",
     agent: "claude",
-    agentResult: "exited-with-error",
+    agentResult: "reported-failure",
     prState: "open",
     laterPrState: "merged",
     assignedAt: "2026-11-16T10:00:00Z",
@@ -95,7 +96,7 @@ export const statsCases: ReadonlyArray<StatsCase> = [
     project: "Web",
     runner: "runner-b",
     agent: "codex",
-    agentResult: "exited-normally",
+    agentResult: "reported-success",
     prState: "open",
     laterPrState: "closed",
     assignedAt: "2026-11-15T09:00:00Z",
@@ -107,7 +108,7 @@ export const statsCases: ReadonlyArray<StatsCase> = [
     project: "API",
     runner: "runner-a",
     agent: "codex",
-    agentResult: "exited-normally",
+    agentResult: "reported-success",
     prState: "open",
     laterPrState: null,
     assignedAt: "2026-11-15T10:00:00Z",
@@ -131,7 +132,7 @@ export const statsCases: ReadonlyArray<StatsCase> = [
     project: "API",
     runner: "runner-b",
     agent: "claude",
-    agentResult: "exited-with-error",
+    agentResult: "reported-failure",
     prState: "none",
     laterPrState: null,
     assignedAt: "2026-11-10T09:00:00Z",
@@ -143,7 +144,7 @@ export const statsCases: ReadonlyArray<StatsCase> = [
     project: "Web",
     runner: "runner-a",
     agent: "codex",
-    agentResult: "exited-normally",
+    agentResult: "reported-success",
     prState: "closed",
     laterPrState: null,
     assignedAt: "2026-11-03T23:55:00Z",
@@ -155,7 +156,7 @@ export const statsCases: ReadonlyArray<StatsCase> = [
     project: "Web",
     runner: "runner-a",
     agent: "claude",
-    agentResult: "exited-normally",
+    agentResult: "reported-success",
     prState: "merged",
     laterPrState: null,
     assignedAt: "2026-11-17T09:00:00Z",
@@ -167,7 +168,7 @@ export const statsCases: ReadonlyArray<StatsCase> = [
     project: "Web",
     runner: "runner-b",
     agent: "claude",
-    agentResult: "exited-with-error",
+    agentResult: "reported-failure",
     prState: "none",
     laterPrState: null,
     assignedAt: "2026-11-12T09:00:00Z",
@@ -182,7 +183,7 @@ const beforePeriod: StatsCase = {
   project: "Web",
   runner: "runner-a",
   agent: "claude",
-  agentResult: "exited-normally",
+  agentResult: "reported-success",
   prState: "merged",
   laterPrState: null,
   assignedAt: "2026-11-03T20:00:00Z",
@@ -196,7 +197,7 @@ const otherWorkspace: StatsCase = {
   project: "Lab",
   runner: "runner-a",
   agent: "claude",
-  agentResult: "exited-normally",
+  agentResult: "reported-success",
   prState: "merged",
   laterPrState: null,
   assignedAt: "2026-11-16T09:00:00Z",
@@ -254,7 +255,7 @@ export function seedStatsDatabase(options: { path?: string } = {}): Database {
       changeRunState(
         db,
         run.id,
-        { to: "running", worktree: toWorktreeRef(`wt-${c.key}`) },
+        { to: "running", started: startedOn(`wt-${c.key}`) },
         at(c.assignedAt, c.waitMinutes),
       ),
     );
@@ -291,7 +292,7 @@ export function seedStatsDatabase(options: { path?: string } = {}): Database {
     changeRunState(
       db,
       active.id,
-      { to: "running", worktree: toWorktreeRef("wt-C-10") },
+      { to: "running", started: startedOn("wt-C-10") },
       at("2026-11-17T11:01:00Z"),
     ),
   );
@@ -306,10 +307,20 @@ function addRunner(db: Database, id: RunnerId, at: Date): void {
     checkedAt: at,
     error: null,
     projects: [{ id: repo, displayName: repo, setupState: "ready" }],
+    assignmentBlocked: false,
   });
 }
 
 function mustRun<R>(result: { ok: true; run: R } | { ok: false }): R {
   if (!result.ok) throw new Error(`seed failed: ${JSON.stringify(result)}`);
   return result.run;
+}
+
+/** 시작한 런이 러너에서 받는 값(워크트리, 실제 브랜치, 에이전트 참조) */
+function startedOn(worktree: string) {
+  return {
+    worktree: toWorktreeRef(worktree),
+    branch: `acme/${worktree}`,
+    agentRef: toAgentRef(`agent-${worktree}`),
+  };
 }

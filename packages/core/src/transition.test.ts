@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { RUN_STATES } from "./run.js";
 import type { RunState } from "./run.js";
-import { canTransitionRun, transitionRun } from "./transition.js";
+import { canTransitionRun, planCancel, transitionRun } from "./transition.js";
 
 // 스펙 4.1 상태 그림의 화살표를 그대로 적은 것. 여기 없는 쌍은 모두 거부한다.
 const ALLOWED: ReadonlyArray<readonly [RunState, RunState]> = [
@@ -16,6 +16,8 @@ const ALLOWED: ReadonlyArray<readonly [RunState, RunState]> = [
   ["running", "ended"],
   ["waiting-for-input", "ended"],
   ["disconnected", "ended"],
+  // 운영자 취소와 시작할 수 없음(Q77·Q82.8·Q82.16)
+  ["queued", "ended"],
 ];
 
 const isAllowed = (from: RunState, to: RunState): boolean =>
@@ -40,13 +42,30 @@ describe("transitionRun", () => {
     });
   });
 
-  it("Queued는 시작하지 않고 Ended가 되지 않는다", () => {
-    expect(canTransitionRun("queued", "ended")).toBe(false);
+  it("Ended가 아닌 모든 상태에서 Ended로 갈 수 있다(취소, Q82.8)", () => {
+    for (const from of RUN_STATES.filter((state) => state !== "ended")) {
+      expect(canTransitionRun(from, "ended")).toBe(true);
+    }
   });
 
   it("Ended에서는 어디로도 가지 않는다", () => {
     for (const to of RUN_STATES) {
       expect(canTransitionRun("ended", to)).toBe(false);
     }
+  });
+});
+
+describe("planCancel", () => {
+  it.each([
+    ["queued", "end-now"],
+    ["running", "stop-agent-then-end"],
+    ["waiting-for-input", "stop-agent-then-end"],
+    ["disconnected", "wait-for-reconnect"],
+  ] as const)("%s 런의 취소는 받아들인다: %s (Q82.8·Q82.10·Q82.11)", (state, action) => {
+    expect(planCancel(state)).toEqual({ ok: true, action });
+  });
+
+  it("Ended 런의 취소는 거부한다 (Q82.8)", () => {
+    expect(planCancel("ended")).toEqual({ ok: false, reason: "already-ended" });
   });
 });

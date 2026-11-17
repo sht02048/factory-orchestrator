@@ -87,7 +87,7 @@ describe("Runs 화면", () => {
       render(loadRunsPage(db, undefined, now), { selectedId: ids.get("ACME-2") }),
     );
     expect(text).toContain(domain.summary["human-check"]);
-    expect(text).toContain(domain.agentResult["exited-with-error"]);
+    expect(text).toContain(domain.agentResult["reported-failure"]);
     expect(text).toContain(domain.prState.open);
     expect(text).toContain(runsJson.panel.reason["human-check"]);
     expect(text).toContain("runner-a");
