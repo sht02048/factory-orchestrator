@@ -1,0 +1,36 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "nodes": [
+          {
+            "number": 7,
+            "url": "https://github.com/acme/app/pull/7",
+            "state": "CLOSED",
+            "merged": false,
+            "mergedAt": null,
+            "closedAt": "2026-11-17T12:39:49Z",
+            "headRefName": "factory/ENG-126-1",
+            "headRefOid": "1111111111111111111111111111111111111111",
+            "baseRefName": "main",
+            "isCrossRepository": false,
+            "headRepository": {
+              "nameWithOwner": "acme/app"
+            },
+            "timelineItems": {
+              "nodes": [
+                {
+                  "__typename": "ClosedEvent"
+                },
+                {
+                  "__typename": "HeadRefDeletedEvent",
+                  "headRefName": "factory/ENG-126-1"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

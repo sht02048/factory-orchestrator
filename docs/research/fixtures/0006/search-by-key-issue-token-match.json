@@ -1,0 +1,60 @@
+{
+  "data": {
+    "search": {
+      "issueCount": 3,
+      "nodes": [
+        {
+          "number": 1,
+          "url": "https://github.com/acme/app/pull/1",
+          "title": "ENG-123: add a (edited)",
+          "body": "Baseline PR on orchestrator branch.",
+          "state": "OPEN",
+          "merged": false,
+          "createdAt": "2026-11-17T12:37:04Z",
+          "headRefName": "factory/ENG-123-1",
+          "baseRefName": "main",
+          "isCrossRepository": false,
+          "headRepository": {
+            "nameWithOwner": "acme/app"
+          }
+        },
+        {
+          "number": 8,
+          "url": "https://github.com/acme/app/pull/8",
+          "title": "ENG cleanup for 123 items",
+          "body": "Words only.",
+          "state": "OPEN",
+          "merged": false,
+          "createdAt": "2026-11-17T12:37:50Z",
+          "headRefName": "misc/cleanup",
+          "baseRefName": "main",
+          "isCrossRepository": false,
+          "headRepository": {
+            "nameWithOwner": "acme/app"
+          }
+        },
+        {
+          "number": 6,
+          "url": "https://github.com/acme/app/pull/6",
+          "title": "Docs notes",
+          "body": "Related to ENG-123, see that ticket.",
+          "state": "OPEN",
+          "merged": false,
+          "createdAt": "2026-11-17T12:37:18Z",
+          "headRefName": "docs/notes",
+          "baseRefName": "main",
+          "isCrossRepository": false,
+          "headRepository": {
+            "nameWithOwner": "acme/app"
+          }
+        }
+      ]
+    },
+    "rateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "remaining": 4989,
+      "resetAt": "2026-11-17T13:00:00Z"
+    }
+  }
+}
