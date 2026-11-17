@@ -115,8 +115,10 @@ export function SettingsScreen({ page, selected, onSelect, actions }: SettingsSc
   const current: SettingsItem =
     items.find((item) => item === selected) ?? (workspace === null ? "connections" : "general");
 
-  const pending = page.install.runners.some((r) => r.check?.status === "pending");
-  const workerSilent = useRunnerCheckPolling(pending, actions.pollRunnerChecks);
+  const pendingKey = page.install.runners
+    .flatMap((r) => (r.check?.status === "pending" ? [`${r.id}@${r.check.requestedAt}`] : []))
+    .join(",");
+  const workerSilent = useRunnerCheckPolling(pendingKey, actions.pollRunnerChecks);
 
   return (
     <SplitView
@@ -180,34 +182,41 @@ export function SettingsScreen({ page, selected, onSelect, actions }: SettingsSc
 }
 
 /**
- * 러너 확인 결과를 기다리는 동안 요청 상태만 다시 읽는다. RUNNER_CHECK_POLL_LIMIT_MS 가 지나도 결과가 없으면
- * 그만 읽고 true(worker 가 응답하지 않음)를 돌려준다.
+ * 러너 확인 결과를 기다리는 동안 요청 상태만 다시 읽는다. `pendingKey` 는 기다리는 요청들(러너와 요청 시각)이라
+ * 새 요청이 생기면 처음부터 다시 기다린다. 앞 읽기가 끝난 뒤에만 다음 읽기를 걸어 겹치지 않는다.
+ * RUNNER_CHECK_POLL_LIMIT_MS 가 지나도 결과가 없으면 그만 읽고 true(worker 가 응답하지 않음)를 돌려준다.
  */
-function useRunnerCheckPolling(pending: boolean, poll: () => Promise<boolean>): boolean {
+function useRunnerCheckPolling(pendingKey: string, poll: () => Promise<boolean>): boolean {
   const [silent, setSilent] = useState(false);
   useEffect(() => {
     setSilent(false);
-    if (!pending) return undefined;
+    if (pendingKey === "") return undefined;
     const started = Date.now();
     let stopped = false;
-    const timer = setInterval(() => {
-      if (Date.now() - started > RUNNER_CHECK_POLL_LIMIT_MS) {
-        clearInterval(timer);
-        setSilent(true);
-        return;
-      }
-      poll().then(
-        (still) => {
-          if (!still && !stopped) clearInterval(timer);
-        },
-        () => {},
-      );
-    }, RUNNER_CHECK_POLL_MS);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const next = () => {
+      timer = setTimeout(() => {
+        if (stopped) return;
+        if (Date.now() - started > RUNNER_CHECK_POLL_LIMIT_MS) {
+          setSilent(true);
+          return;
+        }
+        poll().then(
+          (still) => {
+            if (still && !stopped) next();
+          },
+          () => {
+            if (!stopped) next();
+          },
+        );
+      }, RUNNER_CHECK_POLL_MS);
+    };
+    next();
     return () => {
       stopped = true;
-      clearInterval(timer);
+      if (timer !== undefined) clearTimeout(timer);
     };
-  }, [pending, poll]);
+  }, [pendingKey, poll]);
   return silent;
 }
 
@@ -1306,7 +1315,7 @@ function RunnerCheck({
         </span>
         <Button
           variant="ghost"
-          disabled={submit.sending || check?.status === "pending"}
+          disabled={submit.sending || (check?.status === "pending" && !workerSilent)}
           onClick={() =>
             submit.run(() => actions.recheckRunner({ id: runner.id }), t("checkRequested"))
           }

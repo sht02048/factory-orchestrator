@@ -9,7 +9,7 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
 } from "@factory/core";
-import type { ConnectionCheck, RunnerKind } from "@factory/core";
+import type { ConnectionCheck, RunnerId, RunnerKind } from "@factory/core";
 import {
   getTrackerConnection,
   getWorkspaceTrackerProject,
@@ -359,7 +359,7 @@ export const runnerInput = z.object({
     .trim()
     .min(1)
     .max(500)
-    .regex(/^[^-\s][^\s]*$/),
+    .regex(/^[^-\s\p{Cc}][^\s\p{Cc}]*$/u),
   orcaPath: z.string().trim().min(1).max(1000),
   capacity: z.number().int().min(1).max(100),
 });
@@ -372,7 +372,7 @@ export function saveRunnerSetting(
   context: SettingsContext,
   input: z.infer<typeof runnerInput>,
   now: Date,
-): { ok: true; runnerId: string } | { ok: false; reason: "not-found" } {
+): { ok: true; runnerId: RunnerId } | { ok: false; reason: "not-found" } {
   const existing =
     input.id === undefined ? undefined : listRunners(context.db).find((r) => r.id === input.id);
   if (input.id !== undefined && existing === undefined) return { ok: false, reason: "not-found" };
@@ -383,13 +383,23 @@ export function saveRunnerSetting(
       id: runnerId,
       kind: existing?.kind ?? RUNNER_KIND,
       name: input.name,
-      config: { sshTarget: input.sshTarget, orcaPath: input.orcaPath },
+      // Settings 가 고치지 않는 설정 키는 남긴다
+      config: {
+        ...looseConfig(existing?.config),
+        sshTarget: input.sshTarget,
+        orcaPath: input.orcaPath,
+      },
       capacity: input.capacity,
     },
     now,
   );
   requestRunnerCheck(context.db, runnerId, now);
   return { ok: true, runnerId };
+}
+
+function looseConfig(config: unknown): Record<string, unknown> {
+  const parsed = z.record(z.string(), z.unknown()).safeParse(config);
+  return parsed.success ? parsed.data : {};
 }
 
 export const runnerIdInput = z.object({ id });

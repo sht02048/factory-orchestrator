@@ -65,17 +65,17 @@
     "inOther": "{workspace}에 있어요",
     "add": "넣기",
     "remove": "빼기",
-    "removeTitle": "이 Workspace에서 {project} 프로젝트를 뺄까요?",
+    "removeTitle": "{project} 트래커 프로젝트를 이 Workspace에서 뺄까요?",
     "removeBody": "{mappings, plural, =0 {Mapping은 없어요.} other {Mapping #개도 함께 지워요.}} 지난 런과 통계는 남아요.",
     "removeQueued": "이 트래커 프로젝트의 Queued 런 {count}개는 시작하지 않고 \"시작할 수 없음\"으로 끝나요.",
     "cancel": "그대로 두기",
-    "added": "{project} 프로젝트를 넣었어요",
-    "removed": "{project} 프로젝트를 뺐어요"
+    "added": "{project} 트래커 프로젝트를 넣었어요",
+    "removed": "{project} 트래커 프로젝트를 뺐어요"
   },
   "mapping": {
     "hint": "트래커 프로젝트의 티켓을 어느 러너 쪽 프로젝트에서 어떤 에이전트가 처리할지 정해요. 러너는 할당할 때 그 프로젝트가 있는 러너 중에서 골라요.",
-    "permissionHint": "에이전트가 쓸 권한은 그 프로젝트의 에이전트 설정에서 미리 허용해 두세요. 오케스트레이터 화면에서는 권한 프롬프트를 허용할 수 없어요.",
-    "prTitleHint": "에이전트가 PR 제목에 티켓 키를 넣도록 프로젝트의 에이전트 지침에 적어 두기를 권해요. 그래야 브랜치가 바뀌어도 PR을 찾을 수 있어요.",
+    "permissionHint": "에이전트가 쓸 권한은 그 러너 쪽 프로젝트의 에이전트 설정에서 미리 허용해 두세요. 오케스트레이터 화면에서는 권한 프롬프트를 허용할 수 없어요.",
+    "prTitleHint": "에이전트가 PR 제목에 티켓 키를 넣도록 러너 쪽 프로젝트의 에이전트 지침에 적어 두기를 권해요. 그래야 브랜치가 바뀌어도 PR을 찾을 수 있어요.",
     "noProjects": "이 Workspace에 트래커 프로젝트가 없어요. 트래커 프로젝트를 먼저 넣어 주세요.",
     "noRunnerProjects": "고를 러너 쪽 프로젝트가 없어요. 러너를 등록하고 확인하면 러너의 프로젝트가 보여요.",
     "runnerProject": "러너 쪽 프로젝트",

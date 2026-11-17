@@ -3,6 +3,7 @@ import {
   toAgentId,
   toCodeHostKind,
   toLabelId,
+  toRunnerKind,
   toRunnerProjectId,
   toTicketKey,
   toTrackerKind,
@@ -21,6 +22,7 @@ import {
   migrate,
   openDatabase,
   recordRunnerCheck,
+  saveRunner,
   saveWorkspace,
   schema,
   toWorkspaceId,
@@ -508,6 +510,39 @@ describe("러너 확인", () => {
     expect(f.trackerConfigs).toEqual([]);
   });
 
+  it("러너를 고쳐 저장해도 Settings 가 고치지 않는 설정 키는 남긴다", () => {
+    const f = fixture();
+    const runnerId = addRunner(f);
+    saveRunner(f.context.db, {
+      id: runnerId,
+      kind: toRunnerKind("orca"),
+      name: "runner-a",
+      config: {
+        sshTarget: "factory@runner-a.example.com",
+        orcaPath: "/usr/local/bin/orca",
+        extra: 1,
+      },
+      capacity: 3,
+    });
+    const saved = saveRunnerSetting(
+      f.context,
+      {
+        id: runnerId,
+        name: "runner-a",
+        sshTarget: "factory@a.example.com",
+        orcaPath: "/opt/orca",
+        capacity: 2,
+      },
+      now,
+    );
+    expect(saved).toEqual({ ok: true, runnerId });
+    expect(listRunners(f.context.db)[0]?.config).toEqual({
+      sshTarget: "factory@a.example.com",
+      orcaPath: "/opt/orca",
+      extra: 1,
+    });
+  });
+
   it("ssh 옵션으로 읽힐 대상(- 로 시작)과 공백이 든 대상은 받지 않는다", () => {
     const base = { name: "runner-a", orcaPath: "/usr/local/bin/orca", capacity: 1 };
     expect(
@@ -517,6 +552,7 @@ describe("러너 확인", () => {
       false,
     );
     expect(runnerInput.safeParse({ ...base, sshTarget: "host other" }).success).toBe(false);
+    expect(runnerInput.safeParse({ ...base, sshTarget: "host\u0001" }).success).toBe(false);
   });
 
   it("결과를 넣으면 성공이 보이고 필수 조건을 하나씩 보인다", async () => {
