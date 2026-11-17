@@ -93,5 +93,4 @@ graph LR
 검증 티켓에서 운영자가 준비해야 확인할 수 있는 항목이다. 번호는 스펙 10절의 번호다.
 
 - 0011의 13·14: Linear GitHub 연동을 켠 테스트 저장소([research 0005](../research/0005-linear-contract.md)).
-- 0012의 15: 읽기 권한(Metadata, Pull requests, Commit statuses)만 준 fine-grained PAT([research 0006](../research/0006-github-contract.md)).
 - 0009의 7: ssh로 닿는 Linux 테스트 러너.

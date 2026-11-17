@@ -13,6 +13,7 @@ blocked_by: [0025]
 
 - 이 티켓은 `apps/web`의 온보딩 라우트, 그 화면 메시지, 루트 라우트(`__root.tsx`)에 온보딩이 끝나지 않았으면 온보딩으로 보내는 처리만 고친다. 앱 셸 중 이 처리만 0007 밖에서 더한다. 입력 폼과 연결 확인은 Settings(0025)의 것을 다시 쓴다.
 - 트래커 연결 → GitHub 토큰 → 첫 러너 등록과 ssh 확인 → 첫 Workspace(트래커 프로젝트 고르기) → 첫 Mapping. 모든 단계가 필수이고 확인이 성공해야 다음으로 간다(ADR 0005·0007).
+- GitHub 토큰 단계는 필수 권한(Metadata, Pull requests 읽기)을 안내하고 확인한다. Actions 읽기는 선택이며, 더하면 Run 상세에서 CI 상태를 볼 수 있다고 안내한다(Q79). 선택 권한이 없어도 다음 단계로 간다.
 - 러너 단계는 스펙 9절의 러너 필수 조건을 확인한다(Q43). 확인은 worker가 한다(Q61).
   - Orca 상시 서비스가 없으면 설치 명령 `orca serve service install`을 안내한다. 러너의 PATH에 `orca`가 없으면 `--command <orca 절대 경로>`를 함께 안내한다. Orca 1.4.258에는 `--supervise` 플래그가 없다.
   - 비대화형 ssh 세션에서 러너의 GitHub 인증이 동작하는지 확인하고, 안 되면 그 사실과 흔한 원인(gh 토큰 무효, macOS 키체인 잠김, GitHub용 ssh 키 없음)을 보인다. 에이전트가 러너에서 push·PR을 해야 PR 상태를 정할 수 있다.
