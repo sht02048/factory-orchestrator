@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "gates": [
+    {
+      "type": "agent-review",
+      "name": "독립 리뷰",
+      "instructions": "Find correctness bugs, security issues, and unmet requirements. Ignore style."
+    }
+  ]
+}
