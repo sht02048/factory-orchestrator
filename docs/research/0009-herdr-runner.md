@@ -2,7 +2,7 @@
 
 조사일 2026-11-18. 티켓 없음. 운영자가 Orca 다음의 두 번째 러너 종류로 herdr(<https://herdr.dev/>)를 검토하려 한다([ADR 0008](../adr/0008-pluggable-tracker-runner-codehost.md)). 이 문서는 herdr가 무엇이고 우리 Runner 계약을 얼마나 채우는지 사실로 정리한다. 1단계 범위가 아니어서 구현하지 않는다. 결정은 운영자 몫으로 남긴다.
 
-비교 기준은 main의 `packages/core/src/adapters.ts` `Runner` 인터페이스와 [research 0008](0008-orca-orchestration-run.md)의 「제안: Runner 어댑터 계약」이다. 인터페이스는 0037에서 갱신 중이라 둘을 함께 본다.
+비교 기준은 main의 `packages/core/src/adapters.ts` `Runner` 인터페이스와 [research 0008](0008-orca-orchestration-run.md)의 「제안: Runner 어댑터 계약」이다. 인터페이스는 티켓 0037에서 갱신할 예정이라 둘을 함께 본다.
 
 출처 표시는 research 0004를 따른다.
 
@@ -15,27 +15,28 @@
 
 herdr의 낱말은 이 저장소의 낱말과 겹친다. 이 문서에서는 다음처럼 가른다.
 
-| 이 문서의 표기     | 뜻                                                                                              |
-| ------------------ | ----------------------------------------------------------------------------------------------- |
-| 런, Run            | GLOSSARY의 Run                                                                                  |
-| herdr 워크스페이스 | herdr TUI의 `workspace`. 탭과 pane을 묶는 화면 단위다. GLOSSARY의 Workspace와 상관없다          |
-| 워크트리           | GLOSSARY의 Worktree. herdr TUI의 `worktree`는 git 워크트리를 herdr 워크스페이스로 연 것이다     |
-| 터미널             | hc의 terminal(`t7` 같은 주소, `--name`으로 붙인 이름). herdr TUI에서는 pane                     |
-| 상태 보고          | 프로그램이 OSC 7501(Program Status Protocol)로 알리는 `idle`·`working`·`done`·`blocked`·`error` |
-| 에이전트           | GLOSSARY의 Agent. 터미널 안에서 도는 코딩 에이전트                                              |
+| 이 문서의 표기     | 뜻                                                                                                                                                    |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 런, Run            | GLOSSARY의 Run                                                                                                                                        |
+| herdr 워크스페이스 | herdr TUI의 `workspace`. 탭과 pane을 묶는 화면 단위다. GLOSSARY의 Workspace와 상관없다                                                                |
+| 워크트리           | GLOSSARY의 Worktree. herdr TUI의 `worktree`는 git 워크트리를 herdr 워크스페이스로 연 것이다                                                           |
+| 터미널             | hc의 terminal(`t7` 같은 주소, `--name`으로 붙인 이름). herdr TUI에서는 pane                                                                           |
+| 상태 보고          | 프로그램이 OSC 7501(Program Status Protocol)로 알리는 `idle`·`working`·`done`·`blocked`·`error`                                                       |
+| 에이전트           | GLOSSARY의 Agent. 터미널 안에서 도는 코딩 에이전트                                                                                                    |
+| 보고 터미널        | hc에서 에이전트의 보고 글을 받으려고 띄우는 에이전트 없는 터미널. 이 문서가 붙인 이름이다. GLOSSARY의 Mailbox Terminal(Orca 코디네이터 신원)과 다르다 |
 
 ## 요약
 
-| #   | 항목                    | 결론                                                                                                                                                                                                                                                                                           |
-| --- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 무엇인가                | 이름이 같은 세 프로그램이다. 오래된 터미널 앱 **herdr TUI**(`herdr`, v0.9.5), 2026-10에 새로 나온 헤드리스 런타임 **herdr-core**(`hc`, 0.1.21, API는 preview), 그 위의 데스크톱 앱 **Herdr app**. 모두 Apache-2.0. TUI와 core는 에이전트를 공유하지 않는다                                     |
-| 2   | 원격 제어               | 둘 다 CLI가 파이프에서 JSON을 내고, 오류는 stderr의 JSON과 0이 아닌 종료 코드다 **[실행]**. hc는 `ssh <host> hc connect`로 JSON-RPC를 그대로 실을 수 있다 **[문서]**                                                                                                                           |
-| 3   | 진행 관측               | hc는 화면을 읽지 않고 프로그램의 상태 보고만 쓴다. Claude Code 2.1.326은 스스로 상태를 보고했다(`blocked`의 `kind: "permission"`·`"question"`과 질문 본문, `done`, `idle`) **[실행]**. herdr TUI는 화면을 규칙으로 읽고, 모르는 화면은 `idle`로 떨어진다 **[실행]**                            |
-| 4   | 질문과 답               | 오케스트레이션 메일함이 없다. 질문은 터미널 상태(`blocked`, `kind: "question"`, `msg`)로만 보이고, 답은 키 입력(`hc keys`)이나 붙여 넣기(`hc send`)다. 질문 id와 처리됨 표시는 없다 **[실행]**                                                                                                 |
-| 5   | 완료 보고               | 구조화된 완료 보고와 outcome이 없다. `done`은 "턴이 끝났다"는 뜻이다. 에이전트가 `hc send <우편함> '<보고>'`로 글을 보내게 하는 약속을 만들어야 한다. 그렇게 하면 우편함 터미널 화면에 글이 찍힌다 **[실행]**                                                                                  |
-| 6   | 권한 대기               | `blocked`의 `kind: "permission"`과 무엇을 허용할지가 보인다. `hc send`는 `blocked`인 터미널에 입력을 거절한다(종료 코드 9). 하지만 `hc keys`로는 거절(`esc`)뿐 아니라 허용도 칠 수 있다 **[실행]**. Orca와 달리 허용을 막는 것은 오케스트레이터 정책이다                                       |
-| 7   | 워크트리·이름·멱등      | hc에는 워크트리 명령이 없다. herdr TUI는 `worktree create --branch`로 정한 브랜치 이름 그대로 만들고, 같은 브랜치로 다시 부르면 실패하지만 `worktree open --branch`로 찾는다 **[실행]**. 이름은 둘 다 살아 있는 것끼리만 유일하다. 시작 재시도 토큰은 없다                                     |
-| 8   | 멈추기·정리·로그·서비스 | `hc kill` → `state: "finished"`, `reason: "killed"` **[실행]**. 에이전트가 스스로 끝나도 `finished`에 `exit_code`·`signal`·`reason`이 남는다 **[문서]**. `hc read --lines N`이 로그 꼬리다. core는 CLI가 처음 부를 때 스스로 뜬다 **[실행]**. 재부팅에는 프로그램이 살아남지 않는다 **[문서]** |
+| #   | 항목                    | 결론                                                                                                                                                                                                                                                                                                         |
+| --- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | 무엇인가                | 이름이 같은 세 프로그램이다. 오래된 터미널 앱 **herdr TUI**(`herdr`, v0.9.5), 2026-10에 새로 나온 헤드리스 런타임 **herdr-core**(`hc`, 0.1.21, API는 preview), 그 위의 데스크톱 앱 **Herdr app**. 모두 Apache-2.0. TUI와 core는 에이전트를 공유하지 않는다                                                   |
+| 2   | 원격 제어               | 둘 다 CLI가 파이프에서 JSON을 내고, 오류는 stderr의 JSON과 0이 아닌 종료 코드다 **[실행]**. hc는 `ssh <host> hc connect`로 JSON-RPC를 그대로 실을 수 있다 **[문서]**                                                                                                                                         |
+| 3   | 진행 관측               | hc는 화면을 읽지 않고 프로그램의 상태 보고만 쓴다. Claude Code 2.1.326은 스스로 상태를 보고했다(`blocked`의 `kind: "permission"`·`"question"`과 질문 본문, `done`, `idle`) **[실행]**. herdr TUI는 화면을 규칙으로 읽고, 모르는 화면은 `idle`로 떨어진다 **[실행]**                                          |
+| 4   | 질문과 답               | 오케스트레이션 메일함이 없다. 질문은 터미널 상태(`blocked`, `kind: "question"`, `msg`)로만 보이고, 답은 키 입력(`hc keys`)이나 붙여 넣기(`hc send`)다. 질문 id와 처리됨 표시는 없다 **[실행]**                                                                                                               |
+| 5   | 완료 보고               | 구조화된 완료 보고와 outcome이 없다. `done`은 "턴이 끝났다"는 뜻이다. 에이전트가 `hc send <보고 터미널> '<보고>'`로 글을 보내게 하는 약속을 만들어야 한다. 그렇게 하면 보고 터미널 화면에 글이 찍힌다 **[실행]**. 보낸 쪽 신원은 없다                                                                        |
+| 6   | 권한 대기               | `blocked`의 `kind: "permission"`과 무엇을 허용할지가 보인다. `hc send`는 `blocked`인 터미널에 입력을 거절한다(종료 코드 9). 하지만 `hc keys`로는 거절(`esc`)뿐 아니라 허용도 칠 수 있다 **[실행]**. core는 같은 계정의 모든 클라이언트를 믿으므로, 러너 안의 다른 에이전트도 허용 키를 칠 수 있다 **[문서]** |
+| 7   | 워크트리·이름·멱등      | hc에는 워크트리 명령이 없다. herdr TUI는 `worktree create --branch`로 정한 브랜치 이름 그대로 만들고, 같은 브랜치로 다시 부르면 실패하지만 `worktree open --branch`로 찾는다 **[실행]**. 이름은 둘 다 살아 있는 것끼리만 유일하다. 시작 재시도 토큰은 없다                                                   |
+| 8   | 멈추기·정리·로그·서비스 | `hc kill` → `state: "finished"`, `reason: "killed"` **[실행]**. 에이전트가 스스로 끝나도 `finished`에 `exit_code`·`signal`·`reason`이 남는다 **[문서]**. `hc read --lines N`이 로그 꼬리다. core는 CLI가 처음 부를 때 스스로 뜬다 **[실행]**. 재부팅에는 프로그램이 살아남지 않는다 **[문서]**               |
 
 ## 1. herdr가 무엇인가
 
@@ -110,7 +111,7 @@ GitHub API로 2026-11-18에 읽었다 **[문서]**.
 
 ## 3. Runner 계약 항목별 대응
 
-판정은 **채움**(도구 기능으로 그대로), **우회**(어댑터가 약속이나 다른 명령으로 메워야 함), **빠짐**(맞는 기능이 없음)이다. Orca 칸은 research 0008의 제안이다.
+판정은 **채움**(도구 기능으로 그대로), **우회**(어댑터가 약속이나 다른 명령으로 메워야 함), **빠짐**(맞는 기능이 없음)이다. Orca 칸은 research 0008의 제안이고, `operationId`는 research 0004에서 왔다.
 
 | 계약 항목                      | Orca(research 0008)                            | hc                                                                                                                                                     | herdr TUI                                                                                                                                   | 판정(hc / TUI) |
 | ------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
@@ -123,7 +124,7 @@ GitHub API로 2026-11-18에 읽었다 **[문서]**.
 | 진행 상태 관측                 | `task-list`, `worker-show`, `check --peek`     | `hc get --json`의 `state`(`live`·`finished`)와 `status`(상태 보고), `hc events` **[실행]**                                                             | `agent get`의 `agent_status`. 화면 규칙으로 정한다 **[문서]**                                                                               | 채움 / 우회    |
 | 질문(ask) 읽기                 | `question` 메일(`id`, `body`, `options`)       | `status.state: "blocked"`, `kind: "question"`, `msg`에 질문과 선택지 **[실행]**. 메일 id 없음                                                          | `blocked`. 내용은 `agent read`로 화면을 읽어야 한다                                                                                         | 우회 / 우회    |
 | 답하기(reply)                  | `reply --id <msgId> --body`                    | 선택지는 `hc keys <t> down enter`, 글은 `hc send <t> "<답>"`(`blocked`면 `--force`) **[실행]**                                                         | `agent send-keys`, `agent prompt`(`blocked`면 `agent_blocked`로 거절) **[문서]**                                                            | 우회 / 우회    |
-| 완료 보고                      | `worker_done --outcome`                        | 없음. `status: "done"`은 턴 끝. 에이전트가 `hc send <우편함> '<보고>'`를 부르게 하는 약속으로 메운다 **[실행]**                                        | 없음. `done`은 "idle but not yet marked seen"                                                                                               | 우회 / 우회    |
+| 완료 보고                      | `worker_done --outcome`                        | 없음. `status: "done"`은 턴 끝. 에이전트가 `hc send <보고 터미널> '<보고>'`를 부르게 하는 약속으로 메운다 **[실행]**                                   | 없음. `done`은 "idle but not yet marked seen"                                                                                               | 우회 / 우회    |
 | 권한 대기                      | `needs-input` escalation, `deny`만             | `blocked`, `kind: "permission"`, `msg: "approve Bash: touch ..."` **[실행]**. `hc keys <t> esc`로 거절했다. 허용 키도 칠 수 있다                       | `blocked`(화면 규칙). `agent send-keys`                                                                                                     | 채움 / 우회    |
 | 보고 없이 사라짐               | `lost` escalation, `liveness`                  | `state: "finished"`, `reason`, `exit_code`, `signal`(schema/README.md의 `finished` 이벤트) **[문서]**. `hc kill`로 끝낸 경우만 실행했다                | 에이전트가 목록에서 빠지고 pane이 셸로 돌아간다 **[문서]**                                                                                  | 채움 / 우회    |
 | 멈추기(`stopAgent`)            | `worker-stop`                                  | `hc kill <t>` → `reason: "killed"`, `exit_code: 129` **[실행]**. `hc interrupt`는 멈춤 키를 누른다                                                     | `pane close`, `agent send-keys ctrl+c` **[실행]**·**[문서]**                                                                                | 채움 / 채움    |
@@ -149,7 +150,7 @@ Claude Code는 hc 안에서 스스로 OSC 7501을 보냈다(`reported: true`) **
 
 ### 실행에서 본 완료 보고 우회
 
-에이전트 없는 터미널 `mbox`(`cat`)를 우편함으로 띄우고, 에이전트를 `--parent mbox`로 띄워 "끝나면 `hc send mbox 'DONE run=42 outcome=succeeded'`를 부르라"고 지시했다 **[실행]**.
+에이전트 없는 터미널 `mbox`(`cat`)를 보고 터미널로 띄우고, 에이전트를 `--parent mbox`로 띄워 "끝나면 `hc send mbox 'DONE run=42 outcome=succeeded'`를 부르라"고 지시했다 **[실행]**.
 
 - `hc read mbox`에 `DONE run=42 outcome=succeeded`가 찍혔다. 터미널 에코와 `cat` 출력으로 같은 줄이 두 번 보였다.
 - 에이전트 쪽 `hc send` 응답은 `{"started":null,"status":null,"turn":0}`이었다. 보낸 쪽은 받았는지 알 수 없다.
@@ -168,7 +169,7 @@ Claude Code는 hc 안에서 스스로 OSC 7501을 보냈다(`reported: true`) **
 
 1. **운영자가 오케스트레이터 화면에서 질문에 답하기(ADR 0009).** 흐름은 만들 수 있다. 질문은 `blocked`+`kind: "question"`의 `msg`로 읽고, 답은 `hc keys`나 `hc send --force`로 보낸다. 하지만 Orca와 달리 질문은 메시지가 아니라 터미널 상태다. 질문 id가 없어 "이 질문에 답했다"를 상태 시각(`status_ms`)과 `turn`으로 오케스트레이터가 지어야 한다. 선택지 질문의 답은 UI 키 입력이라 선택지 순서와 화면 모양에 기댄다. 에이전트가 AskUserQuestion이 아니라 평문으로 묻고 턴을 끝내면 상태는 `done`이고, 질문과 완료를 가를 수 없다.
 2. **완료 보고와 outcome(GLOSSARY 「완료 보고」).** 도구에 없다. `done`은 턴 끝이라, ADR 0009가 기각한 "`done`인 채 N분이면 끝" 문제가 그대로 돌아온다. 에이전트에게 정한 형식으로 보고하라고 지시하는 약속이 필요하다. 보고하지 않고 쉬는 에이전트는 Orca의 아직 모르는 것 1번과 같은 문제다.
-3. **권한은 사람만 허용(ADR 0009).** Orca는 ssh로 `deny`만 됐다. hc·herdr TUI는 키 입력이라 허용도 칠 수 있다. `hc send`는 `blocked`에 입력을 거절하지만 `--force`와 `hc keys`는 막지 않는다. 지금 결정을 지키려면 어댑터가 권한 대기에서는 거절 키만 보내도록 스스로 막아야 한다.
+3. **권한은 사람만 허용(ADR 0009).** Orca는 ssh로 `deny`만 됐다. hc·herdr TUI는 키 입력이라 허용도 칠 수 있다. `hc send`는 `blocked`에 입력을 거절하지만 `--force`와 `hc keys`는 막지 않는다. 어댑터가 권한 대기에서 거절 키만 보내도록 스스로 막을 수는 있다. 하지만 그것으로 결정이 지켜지지는 않는다. hc 문서는 "A status of blocked can prevent a normal send, but it is not an access boundary against another client", "There is no separate API password or per-client permission check", "It is not a sandbox or a permission broker for agents"라고 적는다([security.md](https://github.com/herdrdev/herdr-core/blob/master/docs/security.md)) **[문서]**. 같은 계정으로 도는 에이전트는 core에 닿아 `hc keys`를 부를 수 있으므로, 한 런의 에이전트가 다른 런 에이전트의 권한 프롬프트를 허용할 수 있다. 같은 이유로 보고 터미널에 찍힌 완료 보고는 보낸 쪽 신원이 없어, 다른 런의 에이전트가 아무 런의 보고를 꾸밀 수 있다. Orca에서 이것이 막히는지는 이 문서에서 확인하지 않았다.
 4. **비대화형 ssh에서 GitHub 인증(스펙 9절).** 러너 환경의 문제라 Orca와 같다. 더할 점이 둘이다.
    - macOS에서 ssh나 백그라운드 작업으로 띄운 herdr 서버는 키체인에 닿지 못할 수 있다고 문서가 적는다([troubleshooting](https://herdr.dev/tui/docs/troubleshooting/), herdr 저장소 #966) **[문서]**. hc도 "on macOS, whether it starts from SSH or launchd"를 띄운 쪽이 정한다(README) **[문서]**. research 0003의 우회(`gh auth login --insecure-storage`)가 그대로 필요할 것으로 보이지만 러너에서 확인하지 않았다.
    - core는 처음 띄운 프로세스의 환경을 계속 쓴다(README "Updates and `hc server restart` keep the environment the core started with") **[문서]**. 실행에서 hc 안의 Claude Code가 core를 띄운 이 세션의 환경 변수를 물려받아 "Transcript saving is off — inherited CLAUDE_CODE_CHILD_SESSION marker"를 띄웠다 **[실행]**. 러너에서 오케스트레이터의 ssh가 core를 처음 띄우면 비대화형 ssh 환경이 모든 런에 남는다. Linux에서는 ssh로 띄운 core가 로그인 셸의 비대화형 환경을 한 번 읽는다(SKILL.md) **[문서]**.
@@ -183,7 +184,7 @@ Claude Code는 hc 안에서 스스로 OSC 7501을 보냈다(`reported: true`) **
 | 상태 근거         | Orca의 관측(`liveness`, `activity`)                       | 에이전트의 OSC 7501 보고. 보고하지 않는 에이전트는 상태가 없다     |
 | 권한              | `deny`만                                                  | 키 입력. 허용도 가능                                               |
 | 워크트리          | Orca가 만든다(브랜치에 접두사)                            | 없음(herdr TUI는 정한 브랜치 그대로)                               |
-| 우편함 신원       | 필요(ssh 호출자에 신원이 없음)                            | 필요 없음. 보고를 받을 터미널은 약속으로 둔다                      |
+| 우편함 신원       | 필요(ssh 호출자에 신원이 없음)                            | 필요 없음. 보고 터미널은 약속으로 두고, 보낸 쪽 신원은 없다        |
 | 지울 수 없는 기록 | 오케스트레이션 Run·`Task`가 쌓인다                        | `hc rm`으로 끝난 터미널을 지운다                                   |
 | 성숙도            | Orca 1.4.x                                                | 0.1.x, API preview                                                 |
 
@@ -194,7 +195,7 @@ ADR 0008대로 어댑터 패키지(예: `packages/runner-herdr`)와 등록 한 �
 1. **질문 식별자.** 계약이 질문을 러너의 메시지 id(`msgId`)로 다루면 hc에는 맞는 값이 없다. 질문 식별자는 어댑터가 만드는 불투명한 값으로 두고(hc는 터미널+`status_ms`+`turn` 같은 조합), "답했음"은 지금처럼 오케스트레이터 DB가 기준이어야 한다.
 2. **답의 모양.** Orca는 글 하나(`--body`)를 보낸다. hc에서 선택지 질문은 키 입력이다. 계약의 답은 글로 두고, 선택지를 키로 바꾸는 일은 어댑터 몫으로 둔다. 화면에 보일 선택지가 계약에 있으면(`options`) hc는 `msg`를 파싱해야 한다.
 3. **완료 보고의 출처.** 계약은 "에이전트가 outcome과 함께 완료를 알렸다"만 말하고, 그것이 도구 기능(Orca)인지 어댑터의 약속(hc)인지는 묻지 않아야 한다. 어댑터가 첫 지시에 보고 약속을 덧붙이므로, `StartRunInput.prompt`가 티켓 내용만이라는 GLOSSARY 규칙과 어떻게 맞출지 정해야 한다(Orca도 사양에 보고 규칙이 들어간다).
-4. **권한 처리.** 계약을 "거절만"으로 두면 hc에서도 그대로 지킬 수 있다. 허용까지 열지는 정책 결정이다.
+4. **권한 처리.** 계약을 "거절만"으로 두면 오케스트레이터가 부르는 쪽은 거절만 하게 할 수 있다. 하지만 hc는 같은 계정의 클라이언트를 가르지 않으므로(4절 3번), 러너 안의 다른 에이전트가 허용하는 것은 계약으로 막을 수 없다. 이 경계를 러너 종류의 성질로 계약 문서에 적어야 한다.
 5. **러너 필수 조건.** hc 러너는 "에이전트가 OSC 7501을 보고한다"가 필수 조건이 된다(에이전트와 버전). `RunnerPrerequisite`로 담을 수 있다. 우편함 터미널·오케스트레이션 Run은 Orca 어댑터 안에만 두면 된다.
 6. **`RunProgress.finished.exitCode`.** main의 `finished`는 종료 코드를 가진다. hc는 프로세스가 끝나면 `exit_code`·`signal`·`reason`을 주므로 "보고 없이 사라짐"을 가르는 데 쓸 수 있다. 0037에서 이 자리를 완료 보고로 바꿀 때 hc의 값도 담을 수 있게 둔다.
 7. **`listProjects`.** hc에는 저장소 등록이 없다. 러너 쪽 프로젝트 목록을 러너 설정(어댑터 config)에서 읽어도 되도록, 이 메서드가 러너에 물어야 한다고 가정하지 않는다.
@@ -209,8 +210,8 @@ ADR 0008대로 어댑터 패키지(예: `packages/runner-herdr`)와 등록 한 �
 ## 운영자가 정할 것
 
 1. **어느 herdr인가.** 헤드리스 런타임 hc(상태 보고 기반, 0.1.x preview, 워크트리 없음)인지, herdr TUI 서버(화면 감지, 워크트리 명령, 더 오래됨)인지. 사이트의 중심이 app·core로 옮겨 간 점도 함께 본다.
-2. **완료 보고 약속.** 에이전트가 무엇으로 보고하는지(우편함 터미널에 `hc send`, 워크트리의 보고 파일 등)와 그 지시를 첫 지시에 넣는 방식.
-3. **권한 정책.** 키 입력으로 허용까지 할 수 있는 러너에서도 "허용은 사람만"을 지킬지.
+2. **완료 보고 약속.** 에이전트가 무엇으로 보고하는지(보고 터미널에 `hc send`, 워크트리의 보고 파일 등)와 그 지시를 첫 지시에 넣는 방식. 보고에 보낸 쪽 신원이 없다는 점을 받아들일지도 함께 정한다.
+3. **권한 정책.** 같은 계정의 어느 클라이언트든 허용 키를 칠 수 있는 러너(hc)를 "허용은 사람만"(ADR 0009)과 함께 받아들일지.
 4. **상태를 보고하지 않는 에이전트.** hc에서는 상태가 없다. 그런 에이전트를 막을지, 끝(`finished`)만 보는 약한 모드로 받을지.
 
 ## 아직 모르는 것
@@ -220,8 +221,9 @@ ADR 0008대로 어댑터 패키지(예: `packages/runner-herdr`)와 등록 한 �
 3. Linux 러너. systemd lingering(`keeps_running_after_logout`)과 Linux의 상태 보고.
 4. Codex 등 다른 에이전트가 OSC 7501을 보고하는지. hc 매뉴얼은 Codex를 `--no-daemon`으로 띄우라고 한다 **[문서]**.
 5. Claude Code가 `error` 상태를 언제 보고하는지, 평문으로 묻고 턴을 끝낼 때 `done`과 구별할 길이 있는지.
-6. 부모 메모(`<hc from=...>`)가 언제 우편함에 찍히는지. 이번 시험에서는 보지 못했다.
+6. 부모 메모(`<hc from=...>`)가 언제 보고 터미널에 찍히는지. 이번 시험에서는 보지 못했다.
 7. 선택지 질문에 자유 글로 답하기(`Type something` 고른 뒤 `hc send --force`).
 8. core·러너 재부팅 뒤의 상태. 문서상 프로그램은 살아남지 않고, hc `--keep`은 새 셸만 띄운다. herdr TUI는 공식 통합을 깔면 `claude --resume`으로 대화를 잇는다 **[문서]**.
 9. hc의 `hc events` 스트림을 ssh로 오래 붙잡을 때의 끊김과 재연결.
 10. 0.1.x에서 API가 깨지지 않는다는 약속이 실제로 지켜지는지.
+11. 한 런의 에이전트가 다른 런 에이전트의 권한 프롬프트를 허용하거나 다른 런의 완료 보고를 꾸미는 일을 실제로 막을 길(계정 분리, 런마다 다른 `HC_SESSION`과 소켓 권한 등). hc 문서는 세션도 보안 경계가 아니라고 적는다 **[문서]**.
