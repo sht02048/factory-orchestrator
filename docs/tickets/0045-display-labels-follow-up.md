@@ -13,7 +13,7 @@ blocked_by: []
 
 완료 기준 시험(research [0011](../research/0011-acceptance-run.md))에서 두 가지를 봤다.
 
-- 온보딩 러너 단계와 Runners 화면에 러너 확인 항목 이름이 영어로 보였다("Orca background service", "GitHub push access: <프로젝트>"). 러너 어댑터(packages/runner-orca `orca-runner.ts`)가 만든 `name`·`hint` 문자열을 그대로 그린다. 안내(`hint`)도 영어다.
+- 온보딩 러너 단계와 Runners 화면에 러너 확인 항목 이름이 영어로 보였다("Orca background service", "GitHub push access: <프로젝트>"). 러너 어댑터(packages/runner-orca `orca-runner.ts`)가 만든 `name`·`hint` 문자열을 그대로 그린다. GitHub push 항목의 안내(`hint`)도 영어다.
 - 에이전트가 Mapping에서는 "Claude Code"로 보이지만 홈·Runs·Run 상세에서는 ID `claude`로 보인다(Stats는 확인하지 않았다).
 
 ## 범위
