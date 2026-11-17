@@ -18,8 +18,12 @@ _Avoid_: Ticket source, 이슈 트래커
 오케스트레이터가 트래커 조직 하나에 닿는 연결(API 키, webhook). 설치 단위 자원이라 여러 개를 등록할 수 있고(예: 회사 Linear 조직과 개인 Linear 조직), 모든 Workspace가 함께 쓴다.
 _Avoid_: Integration, Account
 
+**Tracker Project**:
+트래커 안에서 티켓을 묶는 프로젝트 하나(Linear 프로젝트). 운영자는 트래커 프로젝트를 골라 Workspace에 묶는다. 러너 쪽 코드 저장소인 Project와 다르다.
+_Avoid_: Project(단독으로), Linear 프로젝트
+
 **Workspace**:
-운영자가 트래커 프로젝트 여러 개를 골라 묶은 단위. 트래커 조직(Linear 워크스페이스)과 1:1이 아니며, 어느 트래커 연결의 프로젝트든 골라 묶을 수 있다. 한 트래커 프로젝트는 Workspace 하나에만 속한다. 매핑은 Workspace 안에 있고, 러너와 트래커 연결은 Workspace 밖에 있다.
+운영자가 트래커 프로젝트 여러 개를 골라 묶은 단위. 트래커 조직(Linear 워크스페이스)과 1:1이 아니며, 어느 트래커 연결의 트래커 프로젝트든 골라 묶을 수 있다. 한 트래커 프로젝트는 Workspace 하나에만 속한다. 매핑은 Workspace 안에 있고, 러너와 트래커 연결은 Workspace 밖에 있다.
 _Avoid_: Team, Org, Space, Organization
 
 ### 실행
@@ -36,7 +40,7 @@ _Avoid_: Slot, Concurrency
 오케스트레이터가 러너에 닿는지 여부.
 
 **Project**:
-러너 안에 등록된 코드 저장소 하나. 한 러너는 여러 프로젝트를 가진다.
+러너 안에 등록된 코드 저장소 하나. 한 러너는 여러 프로젝트를 가진다. 트래커 쪽 프로젝트는 Tracker Project로 따로 부른다.
 _Avoid_: Repo
 
 **Worktree**:
