@@ -1,0 +1,11 @@
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "ok": false,
+  "error": {
+    "code": "runtime_error",
+    "message": "Failed to delete worktree at <path>/workspaces/sandbox/fo-verify-w1. ?? <agent-plugin-state>\n?? note.txt"
+  },
+  "_meta": {
+    "runtimeId": "00000000-0000-4000-8000-000000000003"
+  }
+}
