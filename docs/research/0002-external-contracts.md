@@ -270,7 +270,7 @@ orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--mode
 **종료 판정 제안.** ADR 0004에 따라 오케스트레이터는 "런이 끝났는지"만 알면 되고 결과는 GitHub PR 상태로 정한다. 끝남의 신호 후보는 다음과 같다. 어느 조합이 믿을 만한지는 실제 런으로 확인해야 한다. 실제 런의 결과는 [research 0004](0004-orca-run-contract.md) 3절에 있다. 대화형 에이전트는 일을 마쳐도 프로세스가 끝나지 않고, 끝나도 셸 터미널이 남아 아래 둘째 후보는 에이전트 종료 신호가 아니었다.
 
 - 해당 워크트리 행의 모든 `agents[].state`가 `done`이고 일정 시간 유지됨.
-- ~~`liveTerminalCount: 0` 또는 `terminalVerdict: "none"`(에이전트 프로세스가 끝남).~~ 에이전트가 끝나도 띄운 셸이 남아 `live`였다. 에이전트 종료는 행의 `agents`에서 그 에이전트가 사라지는 것으로 보인다 **[실행]**(research 0004).
+- ~~`liveTerminalCount: 0` 또는 `terminalVerdict: "none"`(에이전트 프로세스가 끝남).~~ 에이전트가 끝나도 띄운 셸이 남아 `live`였다. 에이전트 종료는 행의 `agents`에서 전에 본 그 에이전트가 사라지는 것으로 보인다 **[실행]**([research 0004](0004-orca-run-contract.md) 3절, 조건 포함).
 - 워크트리 행이 사라짐(누군가 지움) → Failed 후보. 단, `worktree ps`에는 워크트리별 필터가 없고 `--limit`으로 잘린다. 응답이 `truncated: false`이고 `hostScope.hostIds`에 `local`이 있을 때만 "없음"을 증거로 쓴다. 그 밖에는 `worktree show --worktree <selector> --json`의 `selector_not_found`로 다시 확인한다.
 
 ### A.7 워크트리 조회와 정리

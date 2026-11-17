@@ -19,7 +19,7 @@
 
 러너의 GitHub 인증이 비대화형 세션에서 동작하지 않아([research 0003](0003-orca-runner-contract.md)) 에이전트에게 push·PR을 시키지 않았다. 확인이 끝난 뒤 워크트리와 브랜치를 모두 지웠다.
 
-예시와 픽스처의 로컬 경로, 호스트명, 사용자명, 계정은 `<path>`, `<host>`, `<user>`, `acme`로 바꿨다. UUID는 가상 값이고, 같은 대상은 파일끼리 같은 값을 쓴다(번호는 시간 순서가 아니다). 시각은 실제 간격을 남긴 채 옮긴 값이다. 픽스처는 [`fixtures/0004/`](fixtures/0004/)에 있다.
+예시와 픽스처의 로컬 경로, 호스트명, 사용자명, 계정은 `<path>`, `<host>`, `<user>`, `acme`로 바꿨다. UUID는 가상 값이고, 같은 대상은 `fixtures/0004/` 파일끼리 같은 값을 쓴다(번호는 시간 순서가 아니다). research 0003의 `fixtures/0003/`과는 따로 바꿔 같은 런타임·워크트리라도 값이 다르고 번호가 겹치기도 하므로, 두 폴더의 픽스처를 한 테스트에 섞지 않는다. 시각은 실제 간격을 남긴 채 옮긴 값이다. 픽스처는 [`fixtures/0004/`](fixtures/0004/)에 있다.
 
 ## 요약
 
@@ -28,7 +28,7 @@
 | 2   | `worktree ps` 열거값       | `agents[].state`, `programStatus.state`, `terminalVerdict`는 소스에서 닫힌 목록을 찾았다. 행 `status`는 닫힌 목록을 찾지 못했다                                                                           |
 | 3   | 종료·종료 코드·입력 기다림 | 대화형 에이전트는 일을 마쳐도 스스로 끝나지 않는다(`state: done`). 끝나면 `agents[]`에서 빠지고 셸 터미널은 남는다. 종료 코드는 Orca가 주지 않는다. 입력 기다림은 `state: waiting`과 `agentWait`로 보인다 |
 | 4   | `worktree create` 출력     | 전체 출력을 픽스처로 남겼다. `launch.outcome.handle`, `launch.prompt.outcome: "handed-to-terminal"`                                                                                                       |
-| 5   | 프롬프트 길이와 인용       | 인자마다 작은따옴표로 인용하면 줄바꿈·특수 문자가 그대로 간다. 30,528바이트는 그대로 갔다. ssh 명령 문자열은 약 256 KiB가 한계다                                                                          |
+| 5   | 프롬프트 길이와 인용       | 인자마다 작은따옴표로 인용하면 줄바꿈·특수 문자가 그대로 간다. `--prompt`는 30,528바이트까지 그대로 가는 것을 확인했다. ssh 명령 문자열은 약 256 KiB가 한계다. 30 KB~200 KB 프롬프트는 확인하지 않았다    |
 | 8   | `--surface terminal` 진행  | terminal로 뜨고, `worktree ps`가 working·waiting·done을 보여 준다                                                                                                                                         |
 
 ## 4. `worktree create --agent --prompt --json` 출력
@@ -108,7 +108,7 @@ Then reply DONE. 한국어 줄: 끝나면 멈춰요.
 ### 길이
 
 - W2의 30,528바이트(400줄) 프롬프트는 끝까지 갔다. 에이전트 세션 기록의 첫 사용자 메시지가 마지막 줄로 끝났고, 에이전트는 마지막 줄의 지시대로 질문했다 **[실행]**.
-- 한계는 ssh 쪽에 있다. 인자 하나의 길이를 바꿔 가며 `worktree set --comment <text>`를 ssh로 보냈다(에이전트를 띄우지 않으려고 `--prompt` 대신 썼다) **[실행]**.
+- `--prompt`로 실제 보낸 것은 30,528바이트까지다. 그보다 긴 인자는 ssh 쪽 한계만 쟀다. 인자 하나의 길이를 바꿔 가며 `worktree set --comment <text>`를 ssh로 보냈다(에이전트를 띄우지 않으려고 `--prompt` 대신 썼다) **[실행]**.
 
 | 인자 길이(바이트) | 결과                                      |
 | ----------------- | ----------------------------------------- |
@@ -117,21 +117,21 @@ Then reply DONE. 한국어 줄: 끝나면 멈춰요.
 | 262,000           | `Connection reset by peer`, ssh 연결 끊김 |
 | 1,100,000         | 로컬에서 `argument list too long`         |
 
-255,000바이트 인자는 됐고 262,000바이트 인자는 원격 sshd가 연결을 끊었다. 명령 문자열에는 `orca` 경로와 다른 인자가 더 붙으므로, 문턱은 명령 문자열 전체 256 KiB(262,144바이트) 언저리로 본다(OpenSSH의 패킷 크기 한계로 보이나 정확한 값은 재지 않았다). 러너의 `ARG_MAX`는 1,048,576이라 ssh 한계가 먼저 온다. `worktree create`와 `agent launch`에는 파일·stdin 입력이 없으므로(0002 A.5), 한계는 프롬프트가 아니라 인용을 거친 원격 명령 문자열 전체의 바이트 수에 걸린다. 작은따옴표 하나는 인용하면 4바이트(`'\''`)가 되고 한국어 한 글자는 UTF-8로 3바이트다. 어댑터는 인용한 뒤의 명령 문자열 전체 바이트를 재고, 여유를 두어 200 KiB(204,800바이트)를 넘으면 런을 시작하지 않고 거절한다.
+255,000바이트 인자는 됐고 262,000바이트 인자는 원격 sshd가 연결을 끊었다. 명령 문자열에는 `orca` 경로와 다른 인자가 더 붙으므로, 문턱은 명령 문자열 전체 256 KiB(262,144바이트) 언저리로 본다(OpenSSH의 패킷 크기 한계로 보이나 정확한 값은 재지 않았다). 러너의 `ARG_MAX`는 1,048,576이라 ssh 한계가 먼저 온다. `worktree create`와 `agent launch`에는 파일·stdin 입력이 없으므로(0002 A.5), 한계는 프롬프트가 아니라 인용을 거친 원격 명령 문자열 전체의 바이트 수에 걸린다. 작은따옴표 하나는 인용하면 4바이트(`'\''`)가 되고 한국어 한 글자는 UTF-8로 3바이트다. 어댑터는 인용한 뒤의 명령 문자열 전체 바이트를 재고, 여유를 두어 200 KiB(204,800바이트)를 넘으면 런을 시작하지 않고 거절한다. 다만 30 KB를 넘는 프롬프트가 Orca 런타임과 에이전트 입력(붙여넣기)을 거쳐 그대로 가는지는 재지 않았으므로, 이 상한은 ssh 한계만 반영한다.
 
 - `worktree ps`의 `agents[].prompt`는 200자로 잘리고 줄바꿈이 공백으로 바뀐다 **[실행]**. 긴 프롬프트(W2)는 Claude Code가 붙여넣기 블록으로 받아 `prompt`가 `<pasted_content id="...">`로 시작했다 **[실행]**. 어느 쪽이든 전달 확인에 쓸 수 없다.
 
 ## 2. `worktree ps` 열거값
 
-| 필드                        | 소스의 목록 **[소스]**                        | 관측 **[실행]**                                                                              |
-| --------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `agents[].state`            | `working`, `blocked`, `waiting`, `done`       | `working`, `waiting`, `done`                                                                 |
-| `programStatus.state`       | `idle`, `working`, `done`, `blocked`, `error` | `working`, `done`, `blocked`                                                                 |
-| `programStatus.kind`        | `permission`, `question`, `auth`              | `question`                                                                                   |
-| `terminalVerdict`           | `live`, `unverifiable`, `none`                | `live`, `none`(`none`은 0002 첫판 관측)                                                      |
-| 행 `status`                 | 닫힌 목록 못 찾음                             | `active`, `working`, `permission`, `inactive`([research 0003](0003-orca-runner-contract.md)) |
-| `sidebarStatus`             | 닫힌 목록 못 찾음                             | `active`, `monitoring`, `done`, `permission`, `inactive`(`inactive`는 research 0003)         |
-| `agentWait`(`--agent-wait`) | -                                             | `null`, `{ "source": "hook", "since": <ms> }`                                                |
+| 필드                        | 소스의 목록 **[소스]**                        | 관측 **[실행]**                                                                                                               |
+| --------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `agents[].state`            | `working`, `blocked`, `waiting`, `done`       | `working`, `waiting`, `done`                                                                                                  |
+| `programStatus.state`       | `idle`, `working`, `done`, `blocked`, `error` | `working`, `done`, `blocked`, 없음(0002 첫판)                                                                                 |
+| `programStatus.kind`        | `permission`, `question`, `auth`              | `question`                                                                                                                    |
+| `terminalVerdict`           | `live`, `unverifiable`, `none`                | `live`, `none`(`none`은 0002 첫판 관측)                                                                                       |
+| 행 `status`                 | 닫힌 목록 못 찾음                             | `active`, `working`, `permission`, `inactive`([research 0003](0003-orca-runner-contract.md))                                  |
+| `sidebarStatus`             | 닫힌 목록 못 찾음                             | `active`, `working`(0002 첫판), `monitoring`, `done`, `permission`, `inactive`([research 0003](0003-orca-runner-contract.md)) |
+| `agentWait`(`--agent-wait`) | -                                             | `null`, `{ "source": "hook", "since": <ms> }`                                                                                 |
 
 출처:
 
@@ -166,7 +166,7 @@ Claude Code를 terminal로 띄우면 대화형 TUI가 뜬다. 지시를 마치�
 }
 ```
 
-`state: done`은 "턴이 끝났다"는 뜻이지 프로세스 종료가 아니다. 에이전트는 이 상태로 사람의 다음 입력을 기다린다. GLOSSARY는 "에이전트 프로세스 종료로 Ended가 된다"고 두고 종료 코드로 정상·오류 종료를 가르는데(Q49·Q70), 대화형 에이전트는 스스로 프로세스를 끝내지 않는다. 티켓 0037에서 다음 중 하나를 정해야 한다.
+`state: done`은 "턴이 끝났다"는 뜻이지 프로세스 종료가 아니다. 에이전트는 이 상태로 사람의 다음 입력을 기다린다. GLOSSARY는 "에이전트 프로세스 종료로 Ended가 된다"고 두고 종료 코드로 정상·오류 종료를 가르는데(Q49·Q70), 대화형 에이전트는 스스로 프로세스를 끝내지 않는다. GLOSSARY·스펙의 정의와 맞지 않는 사실이라 운영자 결정이 필요할 수 있다. 티켓 0037(core 인터페이스) 전에 다음 중 하나를 정해야 한다.
 
 - `agents[].state: done`이 일정 시간 유지되면 끝난 것으로 보고, 오케스트레이터가 에이전트를 멈춘다([research 0003](0003-orca-runner-contract.md)의 `terminal close`). 이때 종료 코드는 없다.
 - 에이전트를 비대화형으로 띄워 일을 마치면 끝나게 한다. `worktree create --agent`는 "known TUI agent"를 띄우므로 Orca의 에이전트 설정이나 다른 실행 경로가 필요하다. 확인하지 않았다.
@@ -179,7 +179,7 @@ W1은 터미널에 `/exit`를 보내(`terminal send --text "/exit" --enter`) 끝
 - 행의 `agents`가 빈 배열이 되고 `status`·`sidebarStatus`는 `active`다.
 - 두 경우의 행이 같다. [`worktree-ps-after-exit-0.json`](fixtures/0004/worktree-ps-after-exit-0.json), [`worktree-ps-after-exit-143.json`](fixtures/0004/worktree-ps-after-exit-143.json).
 
-그래서 0002 A.6의 후보 가운데 `liveTerminalCount: 0`·`terminalVerdict: "none"`은 에이전트 종료 신호가 아니다. 터미널을 닫은 경우에만 그렇게 된다([research 0003](0003-orca-runner-contract.md)). 에이전트 프로세스 종료의 신호는 "그 워크트리 행의 `agents`에서 에이전트(`paneKey`)가 사라짐"이다.
+그래서 0002 A.6의 후보 가운데 `liveTerminalCount: 0`·`terminalVerdict: "none"`은 에이전트 종료 신호가 아니다. 터미널을 닫은 경우에만 그렇게 된다([research 0003](0003-orca-runner-contract.md)). 에이전트 프로세스 종료의 신호는 "그 워크트리 행의 `agents`에서, 전에 본 그 에이전트(`create` 결과의 `launch.outcome.paneKey`)가 사라짐"이다. 에이전트를 본 적이 없는 `agents: []`는 끝남으로 보지 않는다. 상태가 에이전트 훅으로 들어오므로, `create` 직후 훅이 에이전트를 올리기 전이나 훅이 꺼진 러너에서는 에이전트가 돌아도 `agents`가 빌 수 있다. 이번 런에서는 `create` 뒤 약 15~20초 만의 첫 폴링에 에이전트가 있었고, 그 전 구간과 훅이 꺼진 경우는 확인하지 않았다.
 
 ### 종료 코드
 
@@ -263,10 +263,13 @@ W4는 에이전트가 `sleep 120`을 백그라운드로 띄운 상태였다 **[�
 6. 에이전트 훅이 꺼진 러너에서의 진행 감지.
 7. 행 `status`·`sidebarStatus`의 닫힌 목록.
 8. `launch.outcome.kind`와 `launch.prompt.outcome`의 전체 값. `terminal`, `handed-to-terminal`만 관측했다. 0002 A.5가 적은 `structured`, `journaled`도 있으므로 닫힌 목록으로 다루지 않는다.
+9. `create` 직후 에이전트가 `agents`에 오르기 전 구간의 길이, 훅이 꺼진 러너에서 `agents`가 비는지.
+10. 30 KB~200 KB 프롬프트가 Orca 런타임과 에이전트 입력을 거쳐 그대로 가는지.
+11. `terminal read`의 `source`가 `stream`과 `screen` 가운데 무엇으로 정해지는지. 같은 명령(`--screen` 없음)에서 둘 다 왔다.
 
 ## 픽스처
 
-[`fixtures/0004/`](fixtures/0004/)의 파일은 실제 출력에서 값만 바꿨다. `worktree-ps-*` 파일은 `worktree ps --agent-wait --json` 결과에서 테스트 워크트리 행만 남기고 봉투를 다시 만들었다(`totalCount`는 남긴 행 수). `terminal-read-exit-*`는 받은 `tail`과 커서로 봉투를 다시 만들었다.
+[`fixtures/0004/`](fixtures/0004/)의 파일은 실제 출력에서 값만 바꿨다. `worktree-ps-*` 파일은 `worktree ps --agent-wait --json` 결과에서 테스트 워크트리 행만 남기고 봉투를 다시 만들었다(`totalCount`는 남긴 행 수). `terminal-read-exit-*`는 받은 `tail`과 커서로 봉투를 다시 만들었다. 그래서 `terminal-read-exit-*`에는 실제 출력에 있는 `tailRows`가 없다.
 
 | 파일                                | 상황                                           |
 | ----------------------------------- | ---------------------------------------------- |
