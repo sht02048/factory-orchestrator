@@ -42,9 +42,8 @@
   --failed: oklch(0.7 0.18 25);
   --failed-soft: oklch(0.28 0.06 25);
 
-  /* 러너 Online 점(PR #3 사이드바)과 연결 확인 성공 */
+  /* 러너 Online 점에만(PR #3 사이드바). 연결 확인 성공은 무채색이다 */
   --status-online: oklch(0.72 0.15 150);
-  --ok: oklch(0.76 0.13 150);
 
   --shadow-popover:
     0 0 0 1px var(--border-default),
@@ -1035,7 +1034,7 @@ a.link:hover {
 }
 
 .result[data-tone="ok"] svg {
-  color: var(--ok);
+  color: var(--text-secondary);
 }
 
 .result[data-tone="failed"] {
