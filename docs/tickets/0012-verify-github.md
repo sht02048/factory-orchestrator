@@ -25,3 +25,7 @@ GitHub 어댑터를 짓기 전에, 스펙 10절의 GitHub 사실을 실제 토�
 
 - 네 항목마다 확인한 사실과 근거가 research 문서에 있고, 확인하지 못한 항목은 이유와 함께 남아 있다.
 - 20번의 답으로 GitHub 어댑터가 티켓 키로 PR을 찾을 쿼리가 정해져 있다.
+
+## 진행
+
+부분 완료: 15 남음. 17, 18, 20은 [`docs/research/0006-github-contract.md`](../research/0006-github-contract.md)에 확인했다. 15는 읽기 권한만 준 fine-grained PAT가 아직 없어 확인하지 못했다. 운영자가 PAT를 만든 뒤 `docs/research/fixtures/0006/check-status-rollup.sh`로 확인하고 research 0006의 15절을 채운다.
