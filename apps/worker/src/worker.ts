@@ -49,7 +49,7 @@ import { watchActiveRuns } from "./watch.js";
 export type { WorkerLogger } from "./context.js";
 
 export interface WorkerOptions {
-  /** web과 함께 쓰는 SQLite 파일(ADR 0002). 마이그레이션은 부르는 쪽이 먼저 돌린다. */
+  /** web과 함께 쓰는 SQLite 파일(ADR 0002). 마이그레이션은 부르는 쪽이 먼저 돌린다(bootWorker). */
   dbPath: string;
   /** 어댑터 factory를 등록한 registry. 저장한 종류로 어댑터를 만든다. */
   registry: AdapterRegistry;
@@ -113,7 +113,7 @@ export function createWorker(options: WorkerOptions): Worker {
   const db = openDatabase(options.dbPath);
   const now = options.now ?? (() => new Date());
   const logger = options.logger ?? consoleLogger;
-  const adapters = new WorkerAdapters(options.registry, options.secretBox);
+  const adapters = new WorkerAdapters(options.registry, options.secretBox, now);
   const context: TickContext = {
     db,
     now,
