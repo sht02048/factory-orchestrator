@@ -73,6 +73,9 @@ export const terminalShowResultSchema = z.object({
 
 export const runBindResultSchema = z.object({ runId: text });
 
+/** 이 터미널이 코디네이터로 묶인 Run. 묶이지 않았으면 null이다(fixtures/run-current-*.json) */
+export const runCurrentResultSchema = z.object({ runId: optionalText });
+
 // ---------- 시작 ----------
 
 export const workerStartResultSchema = z.object({

@@ -31,6 +31,7 @@ import {
   projectSetupsResultSchema,
   replyResultSchema,
   runBindResultSchema,
+  runCurrentResultSchema,
   serviceStatusResultSchema,
   statusResultSchema,
   taskListResultSchema,
@@ -187,6 +188,8 @@ export class OrcaRunner implements Runner {
         "push",
         "--dry-run",
         "--porcelain",
+        // 프로젝트의 pre-push 훅(테스트·lint)을 돌리지 않는다. 훅 실패를 인증 실패로 읽지 않게 한다.
+        "--no-verify",
         project.remoteName,
         PUSH_CHECK_REF,
       ]);
@@ -222,7 +225,15 @@ export class OrcaRunner implements Runner {
 
   async ensureMailbox(current: MailboxRef | null): Promise<MailboxRef> {
     const known = current === null ? null : decodeMailbox(current);
-    if (current !== null && known !== null && (await this.mailboxAlive(known))) return current;
+    if (current !== null && known !== null) {
+      const state = await this.mailboxState(known);
+      if (state === "alive") return current;
+      if (state === "unbound") {
+        // 터미널은 살아 있는데 Run에 묶이지 않았다. 같은 터미널을 다시 묶는다.
+        const runId = await this.bindRun(known.terminal, known.runId);
+        return encodeMailbox({ terminal: known.terminal, runId });
+      }
+    }
 
     const handle = await this.createMailboxTerminal();
     try {
@@ -237,17 +248,26 @@ export class OrcaRunner implements Runner {
     }
   }
 
-  private async mailboxAlive(mailbox: OrcaMailbox): Promise<boolean> {
+  /**
+   * 우편함 터미널이 살아 있고 저장한 Run에 묶여 있는지. 살아 있어도 묶임을 잃으면(`consumer_fenced`,
+   * `no_active_sender_terminal`) 우편함 명령이 실패하므로 `run-current`로 함께 본다.
+   */
+  private async mailboxState(mailbox: OrcaMailbox): Promise<"alive" | "unbound" | "dead"> {
     const shown = await this.orcaOutcome(
       ["terminal", "show", "--terminal", mailbox.terminal],
       terminalShowResultSchema,
     );
     if (!shown.ok) {
-      if (shown.code === "terminal_handle_stale") return false;
+      if (shown.code === "terminal_handle_stale") return "dead";
       throw this.errorFor(shown, {});
     }
     // 닫힌 터미널도 `terminal show`는 ok이고 connected가 false다(fixtures/terminal-show-closed.json).
-    return shown.result.terminal.connected === true;
+    if (shown.result.terminal.connected !== true) return "dead";
+    const current = await this.orca(
+      ["orchestration", "run-current", "--from", mailbox.terminal],
+      runCurrentResultSchema,
+    );
+    return current.runId === mailbox.runId ? "alive" : "unbound";
   }
 
   /** 우편함 터미널은 러너 쪽 프로젝트의 등록 저장소에 띄운다. 워크트리 없이 만들 수 없다. */

@@ -20,6 +20,8 @@ Local paths, host names, user names and accounts are replaced with `<path>`, `<h
 | `terminal-show-stale.json`                | `terminal show` on an unknown handle (`terminal_handle_stale`)                |
 | `terminal-close.json`                     | `terminal close`                                                              |
 | `run-create.json`                         | `orchestration run-create --from <mailbox>`                                   |
+| `run-current-unbound.json`                | `orchestration run-current --from` on a terminal bound to no Run              |
+| `run-current-bound.json`                  | the same after `run-use`                                                      |
 | `run-use.json`                            | `orchestration run-use` of the same Run from a new mailbox terminal           |
 | `check-peek-empty.json`                   | `orchestration check --peek` with no mail                                     |
 | `check-peek-full-question.json`           | `check --peek --full` with one question                                       |

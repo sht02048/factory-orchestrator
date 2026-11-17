@@ -108,7 +108,7 @@ describe("checkHealth", () => {
     expect(isAssignmentBlocked(health)).toBe(false);
     const push = exec.commands().find((c) => c.startsWith("env "));
     expect(push).toBe(
-      "env 'GIT_TERMINAL_PROMPT=0' 'GIT_SSH_COMMAND=ssh -o BatchMode=yes' git -C '<path>/sandbox' push --dry-run --porcelain origin HEAD:refs/heads/factory-orchestrator/push-check",
+      "env 'GIT_TERMINAL_PROMPT=0' 'GIT_SSH_COMMAND=ssh -o BatchMode=yes' git -C '<path>/sandbox' push --dry-run --porcelain --no-verify origin HEAD:refs/heads/factory-orchestrator/push-check",
     );
   });
 
@@ -225,9 +225,23 @@ describe("ensureMailbox", () => {
   });
 
   test("keeps a live mailbox as it is", async () => {
-    const exec = new ScriptedExec().orca("terminal show", stdout(own("terminal-show-live.json")));
+    const exec = new ScriptedExec()
+      .orca("terminal show", stdout(own("terminal-show-live.json")))
+      .orca("orchestration run-current", stdout(own("run-current-bound.json")));
     expect(await runnerWith(exec).ensureMailbox(MAILBOX)).toBe(MAILBOX);
-    expect(exec.commands()).toHaveLength(1);
+    expect(exec.commands()).toHaveLength(2);
+  });
+
+  test("binds a live mailbox terminal that lost its Run again instead of making a new one", async () => {
+    const exec = new ScriptedExec()
+      .orca("terminal show", stdout(own("terminal-show-live.json")))
+      .orca("orchestration run-current", stdout(own("run-current-unbound.json")))
+      .orca("orchestration run-use", stdout(own("run-use.json")));
+    expect(await runnerWith(exec).ensureMailbox(MAILBOX)).toBe(MAILBOX);
+    expect(exec.commands()).toContain(
+      "/Applications/Orca.app/Contents/Resources/bin/orca orchestration run-use --id run_493ebb2f403d --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --json",
+    );
+    expect(exec.commands().some((c) => c.includes("terminal create"))).toBe(false);
   });
 
   test("recreates a closed mailbox terminal and keeps using the same Run", async () => {
