@@ -123,6 +123,13 @@
       .checks [data-state="failed"] svg {
         color: var(--failed);
       }
+      .running-mark {
+        width: 8px;
+        height: 8px;
+        margin-inline-start: 3px;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1.5px var(--text-tertiary);
+      }
       .checks .num {
         color: var(--text-tertiary);
       }
@@ -172,7 +179,11 @@
         function genericDetail(run) {
           const branch = `factory/${run.ticket.toLowerCase()}`;
           const checks = run.pr
-            ? ["lint", "typecheck", "unit", "build"].map((n) => ({ name: n, state: run.pr.ci === "running" && n === "build" ? "running" : "passed", time: "1분 10초" }))
+            ? ["lint", "typecheck", "unit", "build", "e2e"].map((n) => {
+                /* CI 목록은 PR의 CI 상태(run.pr.ci)와 같아야 한다: 실패면 e2e 하나가 실패, 도는 중이면 build 이후가 도는 중 */
+                const state = run.pr.ci === "failed" && n === "e2e" ? "failed" : run.pr.ci === "running" && (n === "build" || n === "e2e") ? "running" : "passed";
+                return { name: n, state, time: state === "running" ? "도는 중" : "1분 10초" };
+              })
             : [];
           const log =
             run.state === "queued"
@@ -215,9 +226,12 @@
             .map((e) => `<li data-tone="${e.tone || ""}"><time>${e.time}</time><span class="mark" aria-hidden="true"></span><div><p class="t-label">${FO.esc(e.label)}</p>${e.detail ? `<p class="t-detail">${FO.esc(e.detail)}</p>` : ""}</div></li>`)
             .join("");
           const failedChecks = d.checks.filter((c) => c.state === "failed").length;
+          const runningChecks = d.checks.filter((c) => c.state === "running").length;
+          const ciSum = failedChecks ? `${failedChecks}개 실패` : runningChecks ? `${runningChecks}개 도는 중` : "모두 통과";
+          const ciIcon = (c) => (c.state === "failed" ? FO.icon.x : c.state === "running" ? '<span class="running-mark" aria-hidden="true"></span>' : FO.icon.check);
           const checks = d.checks.length
-            ? `<section class="block"><div class="block-head"><h2 class="block-title">CI</h2><span class="muted num">${d.checks.length}개 중 ${failedChecks ? `${failedChecks}개 실패` : "모두 통과"}</span></div><ul class="checks">${d.checks
-                .map((c) => `<li data-state="${c.state}">${c.state === "failed" ? FO.icon.x : FO.icon.check}<span>${FO.esc(c.name)}</span><span class="num">${c.time}</span></li>`)
+            ? `<section class="block"><div class="block-head"><h2 class="block-title">CI</h2><span class="muted num">${d.checks.length}개 중 ${ciSum}</span></div><ul class="checks">${d.checks
+                .map((c) => `<li data-state="${c.state}">${ciIcon(c)}<span>${FO.esc(c.name)}<span class="visually-hidden"> ${FO.ciLabel[c.state] || ""}</span></span><span class="num">${c.time}</span></li>`)
                 .join("")}</ul></section>`
             : "";
           const log = `<section class="block"><div class="block-head"><h2 class="block-title">로그 꼬리</h2><span class="muted">마지막 ${d.log.length}줄</span></div><pre class="log">${d.log
@@ -253,7 +267,7 @@
               <div class="panel-inner">
                 <div class="panel-head">
                   <p class="panel-block-title" style="margin:0">티켓</p>
-                  <a class="link num" href="tickets.html?sel=${run.ticket}">${run.ticket}</a>
+                  <a class="link num" href="tickets.html?ws=${FO.workspaceOfRun(run).id}&sel=${run.ticket}">${run.ticket}</a>
                 </div>
                 <dl class="props">${props.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
                 ${
