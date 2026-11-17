@@ -6,6 +6,7 @@ import {
   AdapterRegistry,
   toAgentId,
   toCodeHostKind,
+  toLabelId,
   toPullRequestId,
   toRepoRef,
   toRunnerId,
@@ -29,6 +30,7 @@ import {
   migrate,
   openDatabase,
   recordRunnerCheck,
+  saveAutoAssignLabel,
   saveCodeHostConnection,
   saveMapping,
   saveRunner,
@@ -228,9 +230,11 @@ function seed(db: Database): void {
     connection,
     projectId: trackerProject,
     name: "Web",
-    inProgressStateId: null,
+    // 온보딩은 "In Progress" 상태와 Auto-assign Label 까지 정해야 마친다(0042)
+    inProgressStateId: toTrackerStateId("in-progress"),
   });
   saveMapping(db, { connection, trackerProject, runnerProject, agent: toAgentId("claude") });
+  saveAutoAssignLabel(db, { workspaceId, connection, labelId: toLabelId("factory") });
 
   const projects = [{ id: runnerProject, displayName: "acme/web", setupState: "ready" as const }];
   runner.setProjects(projects);

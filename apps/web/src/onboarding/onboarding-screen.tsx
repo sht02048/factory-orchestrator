@@ -6,7 +6,9 @@ import { useTranslations } from "use-intl";
 import {
   ConnectionForm,
   GitHubPanel,
+  LabelPanel,
   MappingPanel,
+  ProgressPanel,
   ProjectsPanel,
   RunnerCheck,
   RunnerForm,
@@ -14,9 +16,16 @@ import {
   useRunnerErrorName,
 } from "../settings/settings-screen";
 import type { ActionResult, SettingsActions } from "../settings/settings-screen";
-import type { RunnerSettingsView, SettingsPage, TrackerConnectionView } from "../settings/model";
+import type {
+  RunnerSettingsView,
+  SettingsPage,
+  TrackerConnectionView,
+  WorkspaceSettings,
+} from "../settings/model";
 import {
+  MAPPING_PARTS,
   ONBOARDING_STEPS,
+  missingMappingParts,
   runnerPassed,
   runnerProblems,
   serviceInstallCommand,
@@ -145,9 +154,58 @@ function StepBody({
       return <WorkspaceStep page={page} actions={actions} />;
     case "mapping":
       return page.workspace === null ? null : (
-        <MappingPanel workspace={page.workspace} page={page} actions={actions} />
+        <MappingStep workspace={page.workspace} page={page} actions={actions} />
       );
   }
+}
+
+// ---------- 첫 Mapping ----------
+
+/**
+ * Mapping 단계(0042). Mapping 과 함께 "In Progress" 상태와 Auto-assign Label 을 정한다. 셋 다 필수다
+ * (스펙 3절 1번). 입력 폼과 저장은 Settings 의 것을 그대로 쓴다.
+ */
+function MappingStep({
+  workspace,
+  page,
+  actions,
+}: {
+  workspace: WorkspaceSettings;
+  page: SettingsPage;
+  actions: SettingsActions;
+}) {
+  const t = useTranslations("onboarding.mapping");
+  const missing = missingMappingParts(workspace);
+  return (
+    <>
+      {MAPPING_PARTS.map((part) => (
+        <section key={part} {...stylex.props(styles.section)}>
+          <Text variant="title">{t(`parts.${part}`)}</Text>
+          {part === "mapping" ? (
+            <MappingPanel workspace={workspace} page={page} actions={actions} />
+          ) : part === "progress" ? (
+            <ProgressPanel workspace={workspace} actions={actions} />
+          ) : (
+            <LabelPanel workspace={workspace} actions={actions} />
+          )}
+        </section>
+      ))}
+      {missing.length === 0 ? (
+        <p role="status" {...stylex.props(styles.ok)}>
+          {t("ready")}
+        </p>
+      ) : (
+        <div role="status" {...stylex.props(styles.stack)}>
+          <Text variant="body">{t("missingTitle")}</Text>
+          <ul {...stylex.props(styles.bullets)}>
+            {missing.map((part) => (
+              <li key={part}>{t(`missing.${part}`)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  );
 }
 
 // ---------- 트래커 연결 ----------
@@ -453,6 +511,15 @@ const styles = stylex.create({
     borderTopColor: colors.borderSubtle,
   },
   stack: { display: "flex", flexDirection: "column", gap: space.s3, margin: 0 },
+  section: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s3,
+    paddingTop: { default: space.s6, ":first-child": 0 },
+    borderTopWidth: { default: 1, ":first-child": 0 },
+    borderTopStyle: "solid",
+    borderTopColor: colors.borderSubtle,
+  },
   list: { margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column" },
   item: {
     display: "flex",

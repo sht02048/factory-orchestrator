@@ -88,6 +88,7 @@ function toStoredRun(row: RunRow): StoredRun {
     trackerProject: row.trackerProjectId,
     runnerProject: row.runnerProjectId,
     agent: row.agentId,
+    model: row.model,
     worktreeName: row.worktreeName,
     assignedAt: row.assignedAt,
   };
@@ -237,6 +238,8 @@ export interface AssignRunInput {
   trackerProject: TrackerProjectId;
   runnerProject: RunnerProjectId;
   agent: AgentId;
+  /** 에이전트 모델(Mapping 값, 0043). 없거나 null 이면 정하지 않은 것이다 */
+  model?: string | null;
   /** 운영자가 고른 러너(수동 할당, Q53·Q60). 없으면 core 규칙으로 고른다 */
   runnerId?: RunnerId;
   now?: Date;
@@ -309,6 +312,7 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
         trackerProjectId: input.trackerProject,
         runnerProjectId: input.runnerProject,
         agentId: input.agent,
+        model: input.model ?? null,
         worktreeName: `factory-${input.ticket.key}-${sameKeyRuns + 1}`,
         state: "queued",
         runnerId,

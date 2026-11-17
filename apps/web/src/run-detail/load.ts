@@ -68,6 +68,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     worktree: run.state === "queued" ? null : run.worktree,
     runner: runner === undefined ? null : { name: runner.name, online: runner.online },
     agent: run.agent,
+    model: run.model,
     assignedAt: run.assignedAt.toISOString(),
     startedAt: startedAt?.toISOString() ?? null,
     endedAt: endedAt?.toISOString() ?? null,

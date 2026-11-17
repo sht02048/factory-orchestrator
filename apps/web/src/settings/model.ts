@@ -72,7 +72,8 @@ export interface ConnectionProjects {
 export interface BoundProject {
   connection: Choice;
   project: Choice;
-  mapping: { runnerProject: string; agent: string } | null;
+  /** model 이 null 이면 정하지 않았다(러너 설정, 그다음 러너 Orca 의 기본값, 0043) */
+  mapping: { runnerProject: string; agent: string; model: string | null } | null;
   inProgressStateId: string | null;
   /** 그 트래커 프로젝트의 상태(트래커에서 읽음) */
   states: Remote<Choice>;
@@ -166,6 +167,9 @@ export const RUNNER_CHECK_POLL_LIMIT_MS = 2 * 60 * 1000;
 
 /** 이미 아는 에이전트(GLOSSARY Agent). 화면 이름은 메시지 파일에 있다. 저장된 다른 값도 고를 수 있게 남긴다 */
 export const KNOWN_AGENTS = ["claude", "codex"] as const;
+
+/** 에이전트 모델 이름 길이 상한. 화면과 서버가 함께 쓴다 */
+export const MAX_MODEL_LENGTH = 200;
 
 /** 저장 결과. 실패 까닭은 화면이 문구로 바꾼다 */
 export type SaveResult<R extends string = never> = { ok: true } | { ok: false; reason: R };

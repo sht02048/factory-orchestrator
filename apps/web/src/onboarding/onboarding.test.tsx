@@ -2,8 +2,10 @@ import {
   AdapterRegistry,
   toCodeHostKind,
   toRunnerProjectId,
+  toLabelId,
   toTrackerKind,
   toTrackerProjectId,
+  toTrackerStateId,
 } from "@factory/core";
 import type { RunnerHealth, RunnerId } from "@factory/core";
 import { FakeCodeHost, FakeTracker } from "@factory/core/testing";
@@ -22,6 +24,8 @@ import { describe, expect, it } from "vitest";
 import {
   addTrackerProject,
   saveGitHubToken,
+  saveInProgressState,
+  saveLabel,
   saveMappingSetting,
   saveRunnerSetting,
   saveTrackerConnectionSetting,
@@ -29,6 +33,8 @@ import {
 import { loadSettingsPage } from "../settings/load";
 import type { SettingsContext } from "../settings/load";
 import type { SettingsPage } from "../settings/model";
+import { settingsMessages } from "../settings/messages";
+import { SettingsScreen } from "../settings/settings-screen";
 import { renderWithMessages } from "../testing/render";
 import { createFirstWorkspace, isOnboardingComplete } from "./load";
 import { onboardingMessages } from "./messages";
@@ -36,6 +42,7 @@ import {
   HOME_PATH,
   ONBOARDING_PATH,
   ONBOARDING_STEPS,
+  missingMappingParts,
   onboardingRedirect,
   resolveStep,
   serviceInstallCommand,
@@ -67,6 +74,11 @@ function fixture(): Fixture {
   migrate(db);
   const tracker = new FakeTracker(toTrackerKind("fake"));
   tracker.projects.push({ id: webProject, name: "Web", url: "https://tracker.example.com/web" });
+  tracker.states.set(webProject, [
+    { id: toTrackerStateId("st-todo"), name: "Todo", category: "unstarted" },
+    { id: toTrackerStateId("st-doing"), name: "In Progress", category: "started" },
+  ]);
+  tracker.labels.set(webProject, [{ id: toLabelId("lb-auto"), name: "factory" }]);
   const codeHost = new FakeCodeHost(toCodeHostKind("fake-host"));
   const registry = new AdapterRegistry()
     .registerTracker({ kind: tracker.kind, create: () => tracker })
@@ -401,17 +413,56 @@ describe("다섯 단계를 마치기", () => {
     expect(addTrackerProject(f.context, { ...project, name: "Web" })).toEqual({ ok: true });
     expect(await reached()).toBe(4);
 
-    // 마지막 단계는 Mapping 을 저장하기 전에는 마칠 수 없다
-    expect(isDisabled(nextButton(render(await page(f), "mapping"), "설정 마치기"))).toBe(true);
-    expect(isOnboardingComplete(f.context.db, f.context.secretBox)).toBe(false);
+    // 마지막 단계는 Mapping, "In Progress" 상태, Auto-assign Label 을 모두 저장하기 전에는 마칠 수 없다(0042)
+    const locked = async (missing: string[]) => {
+      const html = render(await page(f), "mapping");
+      expect(isDisabled(nextButton(html, "설정 마치기"))).toBe(true);
+      expect(isOnboardingComplete(f.context.db, f.context.secretBox)).toBe(false);
+      const shown = text(html);
+      for (const part of ["mapping", "progress", "label"] as const) {
+        const guide = onboardingMessages.onboarding.mapping.missing[part];
+        expect({ part, shown: shown.includes(guide) }).toEqual({
+          part,
+          shown: missing.includes(part),
+        });
+      }
+    };
+    await locked(["mapping", "progress", "label"]);
+    // 세 칸을 한 단계에서 고른다
+    const shown = text(render(await page(f), "mapping"));
+    expect(shown).toContain("러너 쪽 프로젝트");
+    expect(shown).toContain('"In Progress" 상태');
+    expect(shown).toContain("Auto-assign Label");
 
     expect(
       saveMappingSetting(f.context, { ...project, runnerProjectId: repo, agentId: "claude" }),
     ).toEqual({ ok: true });
+    // Mapping 만 정하면 라벨로 할당되지 않고 티켓 상태도 바뀌지 않으니 아직 마칠 수 없다
+    await locked(["progress", "label"]);
+    expect(saveInProgressState(f.context, { ...project, stateId: "st-doing" })).toEqual({
+      ok: true,
+    });
+    await locked(["label"]);
+    expect(saveLabel(f.context, { ws, connectionId, labelId: "lb-auto" })).toEqual({ ok: true });
+
     const settings = await page(f);
+    expect(text(render(settings, "mapping"))).toContain(
+      onboardingMessages.onboarding.mapping.ready,
+    );
     expect(ONBOARDING_STEPS.every((step) => stepPassed(settings, step))).toBe(true);
     expect(isDisabled(nextButton(render(settings, "mapping"), "설정 마치기"))).toBe(false);
     expect(HOME_PATH).toBe("/");
+    // 온보딩에서 고른 값이 Settings 에 1/1 로 보인다
+    const settingsHtml = renderWithMessages(
+      <SettingsScreen
+        page={settings}
+        selected="progress"
+        onSelect={() => {}}
+        actions={noopActions}
+      />,
+      settingsMessages,
+    );
+    expect(text(settingsHtml).match(/1\/1개 정함/g)).toHaveLength(3);
 
     // 마친 뒤에는 어느 화면에 들어가도 온보딩으로 보내지 않는다
     const complete = isOnboardingComplete(f.context.db, f.context.secretBox);
@@ -430,6 +481,37 @@ describe("다섯 단계를 마치기", () => {
     });
     expect(listRunners(f.context.db)[0]?.online).toBe(false);
     expect(isOnboardingComplete(f.context.db, f.context.secretBox)).toBe(true);
+  });
+
+  it("Mapping 보다 라벨과 상태를 먼저 정하면 Mapping 만 남았다고 안내한다(0042)", () => {
+    const choice = { id: "c-1", name: "Acme" };
+    const bound = {
+      connection: choice,
+      project: { id: "tp-web", name: "Web" },
+      mapping: null,
+      inProgressStateId: "st-doing",
+      states: { ok: true as const, items: [] },
+    };
+    const workspace = {
+      general: { id: "ws-1", name: "Acme", maxRunMinutes: 120 },
+      trackerProjects: [],
+      bound: [bound],
+      labels: [
+        { connection: choice, labelId: "lb-auto", labels: { ok: true as const, items: [] } },
+      ],
+    };
+    expect(missingMappingParts(workspace)).toEqual(["mapping"]);
+    expect(missingMappingParts({ ...workspace, bound: [] })).toEqual([
+      "mapping",
+      "progress",
+      "label",
+    ]);
+    expect(
+      missingMappingParts({
+        ...workspace,
+        bound: [{ ...bound, mapping: { runnerProject: "r", agent: "claude", model: null } }],
+      }),
+    ).toEqual([]);
   });
 
   it("이전 단계로 돌아갈 수 있다", async () => {

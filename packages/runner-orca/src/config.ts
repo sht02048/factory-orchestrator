@@ -16,7 +16,10 @@ export const orcaRunnerConfigSchema = z.object({
     .refine((value) => !value.startsWith("-"), { error: "must not start with '-'" }),
   /** 러너의 orca 실행 파일 절대 경로 */
   orcaPath: z.string().trim().min(1).default(DEFAULT_ORCA_PATH),
-  /** 에이전트 모델. 없으면 러너의 Orca 설정을 따른다(`worker-start --model`) */
+  /**
+   * 에이전트 모델(`worker-start --model`). 런의 모델(Mapping 값, 0043)이 있으면 그것이 이긴다.
+   * 둘 다 없으면 `--model` 을 넘기지 않아 러너의 Orca 설정을 따른다.
+   */
   model: z.string().trim().min(1).optional(),
   /** ssh 연결 제한 시간(초) */
   connectTimeoutSeconds: z.number().int().positive().default(10),

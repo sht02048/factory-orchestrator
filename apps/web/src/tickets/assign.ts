@@ -73,6 +73,9 @@ export function submitAssignment(db: Database, input: AssignInput, now: Date): A
     trackerProject,
     runnerProject: mapping.runnerProject,
     agent: toAgentId(input.agent),
+    // 모델은 수동 할당에서 바꾸지 않는다(0043). Mapping 의 모델은 그 에이전트의 모델 이름이라, 운영자가
+    // 에이전트를 바꿨으면 넘기지 않고 러너 설정(없으면 러너 도구의 기본값)을 따른다.
+    model: input.agent === mapping.agent ? mapping.model : null,
     ...(input.runnerId === null ? {} : { runnerId: toRunnerId(input.runnerId) }),
     now,
   });

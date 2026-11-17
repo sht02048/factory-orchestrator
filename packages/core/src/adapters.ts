@@ -271,6 +271,11 @@ export interface StartRunInput {
   baseBranch?: string;
   /** 러너 도구의 에이전트 ID. 예: "claude", "codex" */
   agent: AgentId;
+  /**
+   * 에이전트 모델(Mapping 값, 0043). 있으면 러너 설정의 모델보다 앞선다. 없으면 러너 설정의 모델을,
+   * 그것도 없으면 러너 도구의 기본값을 쓴다.
+   */
+  model?: string;
   /** 에이전트에게 주는 지시. 티켓 내용만이다(GLOSSARY Agent) */
   prompt: string;
   /** 러너 도구가 티켓과 잇는 데 쓸 수 있다 */

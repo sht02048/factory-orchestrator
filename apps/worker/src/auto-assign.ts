@@ -276,6 +276,7 @@ function assign(
     trackerProject,
     runnerProject: mapping.runnerProject,
     agent: mapping.agent,
+    model: mapping.model,
     now: context.now(),
   });
   // 같은 티켓에 끝나지 않은 런이 이미 있으면(수동 할당과 엇갈림 등) 할당하지 않은 것이 맞다.

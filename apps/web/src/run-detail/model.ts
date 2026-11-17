@@ -102,6 +102,8 @@ export interface RunDetail {
   worktree: string | null;
   runner: { name: string; online: boolean } | null;
   agent: string;
+  /** 할당 때 Mapping 에서 옮겨 적은 에이전트 모델(0043). 정하지 않았으면 null */
+  model: string | null;
   assignedAt: string;
   startedAt: string | null;
   endedAt: string | null;

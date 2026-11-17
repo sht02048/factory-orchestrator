@@ -66,7 +66,7 @@ _Avoid_: Coordinator terminal, Inbox
 _Avoid_: Dispatch
 
 **Mapping**:
-Workspace 안에서 트래커 프로젝트와 러너 쪽 프로젝트·에이전트를 잇는 규칙. 티켓이 어디서 누구에게 처리될지 정한다. 러너는 고르지 않는다. 할당 때 그 러너 쪽 프로젝트가 있는 러너 중 Online이고 GitHub 인증이 깨지지 않았으며 남은 capacity가 가장 많은 러너를 고른다.
+Workspace 안에서 트래커 프로젝트와 러너 쪽 프로젝트·에이전트를 잇는 규칙. 티켓이 어디서 누구에게 처리될지 정한다. 에이전트 모델도 고를 수 있고, 비우면 러너 설정이나 러너 도구의 기본값을 쓴다. 러너는 고르지 않는다. 할당 때 그 러너 쪽 프로젝트가 있는 러너 중 Online이고 GitHub 인증이 깨지지 않았으며 남은 capacity가 가장 많은 러너를 고른다.
 _Avoid_: Route, Binding
 
 **Auto-assign Label**:

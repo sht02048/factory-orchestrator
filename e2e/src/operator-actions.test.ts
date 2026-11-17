@@ -6,11 +6,13 @@ import {
   toAgentId,
   toAgentRef,
   toCodeHostKind,
+  toLabelId,
   toQuestionId,
   toRunnerId,
   toRunnerKind,
   toRunnerProjectId,
   toTicketKey,
+  toTrackerStateId,
   toWorktreeRef,
 } from "@factory/core";
 import type { RunId, TicketKey } from "@factory/core";
@@ -25,6 +27,7 @@ import {
   openDatabase,
   recordRunQuestions,
   recordRunnerCheck,
+  saveAutoAssignLabel,
   saveCodeHostConnection,
   saveMapping,
   saveRunner,
@@ -286,9 +289,11 @@ function seed(db: Database): void {
     connection,
     projectId: trackerProject,
     name: "Web",
-    inProgressStateId: null,
+    // 온보딩은 "In Progress" 상태와 Auto-assign Label 까지 정해야 마친다(0042)
+    inProgressStateId: toTrackerStateId("in-progress"),
   });
   saveMapping(db, { connection, trackerProject, runnerProject, agent });
+  saveAutoAssignLabel(db, { workspaceId, connection, labelId: toLabelId("factory") });
 
   const projects = [{ id: runnerProject, displayName: "acme/web", setupState: "ready" as const }];
   saveRunner(db, { id: runnerId, kind: runnerKind, name: "runner-a", config: {}, capacity: 4 });

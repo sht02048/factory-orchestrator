@@ -119,6 +119,7 @@
     "laterPrState": "이후 PR 상태",
     "runner": "러너",
     "agent": "에이전트",
+    "model": "모델",
     "waited": "대기 시간",
     "executed": "실행 시간",
     "pr": "PR",
@@ -130,6 +131,7 @@
     "notStarted": "아직 시작하지 않았어요",
     "none": "없음",
     "noRunner": "아직 정하지 않았어요",
+    "defaultModel": "러너 기본값을 써요",
     "runnerOffline": "Offline",
     "laterPr": "{state} · {time}"
   },

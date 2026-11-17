@@ -31,7 +31,7 @@ import type { WorkspaceId } from "@factory/db";
 import { z } from "zod";
 import { remoteErrorOf, remoteErrorOfDetail } from "./load";
 import type { SettingsContext } from "./load";
-import { MAX_RUN_MINUTES } from "./model";
+import { MAX_MODEL_LENGTH, MAX_RUN_MINUTES } from "./model";
 import type { ConnectionSaveReason, RemoteError, SaveResult } from "./model";
 
 /*
@@ -141,9 +141,19 @@ function boundProject(context: SettingsContext, input: z.infer<typeof trackerPro
 export const mappingInput = trackerProjectInput.extend({
   runnerProjectId: id,
   agentId: id,
+  /**
+   * 에이전트 모델(0043). 비우면 정하지 않은 것이다. `worker-start --model` 값으로 넘기므로 러너 CLI 의
+   * 옵션으로 읽히지 않게 `-`로 시작하지 못하고, 공백·제어 문자를 넣지 못한다.
+   */
+  model: z
+    .string()
+    .trim()
+    .max(MAX_MODEL_LENGTH)
+    .refine((value) => value === "" || /^[^\s\p{Cc}-][^\s\p{Cc}]*$/u.test(value))
+    .optional(),
 });
 
-/** Mapping 을 저장한다. 러너는 고르지 않는다(Q53) */
+/** Mapping 을 저장한다. 러너는 고르지 않는다(Q53). 모델을 비우면 정하지 않은 것(null)으로 저장한다 */
 export function saveMappingSetting(
   context: SettingsContext,
   input: z.infer<typeof mappingInput>,
@@ -155,6 +165,7 @@ export function saveMappingSetting(
     trackerProject: project.projectId,
     runnerProject: toRunnerProjectId(input.runnerProjectId),
     agent: toAgentId(input.agentId),
+    model: input.model === undefined || input.model === "" ? null : input.model,
   });
   return { ok: true };
 }

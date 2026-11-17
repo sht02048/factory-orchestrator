@@ -1,4 +1,4 @@
-import type { RunnerSettingsView, SettingsPage } from "../settings/model";
+import type { RunnerSettingsView, SettingsPage, WorkspaceSettings } from "../settings/model";
 
 /*
  * 온보딩(0026). 첫 진입 때 사이드바 없는 전체 화면에서 필수 설정을 끝낸다(ADR 0005·0007).
@@ -44,6 +44,11 @@ export interface SetupCounts {
   runners: number;
   workspaces: number;
   mappings: number;
+  /**
+   * 라벨만 붙이면 할당되고 런이 시작하면 티켓이 "In Progress"가 되는 트래커 프로젝트 수(0042).
+   * Mapping, "In Progress" 상태, 그 트래커 연결의 Auto-assign Label 을 모두 정한 것만 센다.
+   */
+  autoAssignReady: number;
 }
 
 /** 다섯 단계의 결과가 모두 저장돼 있으면 온보딩을 마친 것이다 */
@@ -53,8 +58,42 @@ export function isSetupComplete(counts: SetupCounts): boolean {
     counts.githubTokens > 0 &&
     counts.runners > 0 &&
     counts.workspaces > 0 &&
-    counts.mappings > 0
+    counts.mappings > 0 &&
+    counts.autoAssignReady > 0
   );
+}
+
+/**
+ * Mapping 단계에서 정할 세 가지(0042). 스펙 3절 1번대로 모두 필수다. Mapping 만 정하면 라벨을 붙여도
+ * 할당되지 않고(Auto-assign Label 없음), 런이 시작해도 티켓 상태가 바뀌지 않는다("In Progress" 없음).
+ */
+export const MAPPING_PARTS = ["mapping", "progress", "label"] as const;
+export type MappingPart = (typeof MAPPING_PARTS)[number];
+
+/**
+ * 세 가지를 모두 정한 트래커 프로젝트가 있으면 빈 배열이다. 없으면 가장 많이 정한 트래커 프로젝트에서 빠진
+ * 것을 돌려준다. 같으면 Mapping 을 정한 것을 앞세운다. 트래커 프로젝트가 없으면 셋 다다.
+ */
+export function missingMappingParts(workspace: WorkspaceSettings): MappingPart[] {
+  const labeled = new Set(
+    workspace.labels.flatMap((l) => (l.labelId === null ? [] : [l.connection.id])),
+  );
+  let best: MappingPart[] = [...MAPPING_PARTS];
+  let bestMapped = false;
+  for (const bound of workspace.bound) {
+    const mapped = bound.mapping !== null;
+    const missing = MAPPING_PARTS.filter(
+      (part) =>
+        (part === "mapping" && !mapped) ||
+        (part === "progress" && bound.inProgressStateId === null) ||
+        (part === "label" && !labeled.has(bound.connection.id)),
+    );
+    if (missing.length < best.length || (missing.length === best.length && mapped && !bestMapped)) {
+      best = missing;
+      bestMapped = mapped;
+    }
+  }
+  return best;
 }
 
 /**
@@ -86,7 +125,7 @@ export function stepPassed(page: SettingsPage, step: OnboardingStep): boolean {
     case "workspace":
       return page.workspace !== null && page.workspace.bound.length > 0;
     case "mapping":
-      return page.workspace?.bound.some((b) => b.mapping !== null) ?? false;
+      return page.workspace !== null && missingMappingParts(page.workspace).length === 0;
   }
 }
 
