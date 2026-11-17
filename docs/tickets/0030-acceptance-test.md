@@ -11,7 +11,7 @@ blocked_by: [0029]
 
 ## 범위
 
-- 0029의 패키지 파일을 새 머신(또는 새 사용자)에 npm으로 설치하고 CLI로 띄운다.
+- 0029의 패키지 파일을 새 환경(또는 새 사용자)에 npm으로 설치하고 CLI로 띄운다.
 - 온보딩을 끝까지 하고, 테스트 Linear 워크스페이스의 티켓 하나에 Auto-assign Label만 붙인다.
 - 그 런이 러너에서 처리되고 Merged / Human Check / Failed 중 하나로 판정돼 홈·Runs·Run 상세·Stats에 나타나는지 본다.
 - 운영자 준비가 필요하다: 테스트용 Linear 워크스페이스와 webhook 공개 URL, fine-grained GitHub 토큰, Orca 상시 서비스가 있는 테스트 러너, 에이전트가 CI 통과 뒤 병합하도록 설정된 테스트 저장소(ADR 0004).

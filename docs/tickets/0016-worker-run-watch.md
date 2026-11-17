@@ -1,6 +1,6 @@
 ---
 status: todo
-blocked_by: [0006]
+blocked_by: [0037]
 ---
 
 # worker 런 감시: 입력 기다림, 시간 초과, 러너 연결 끊김

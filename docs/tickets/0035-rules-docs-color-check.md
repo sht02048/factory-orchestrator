@@ -1,6 +1,6 @@
 ---
 status: todo
-blocked_by: [0003]
+blocked_by: [0003, 0032]
 ---
 
 # 규칙 문서를 색 검사와 CI 단계에 맞추기
