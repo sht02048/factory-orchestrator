@@ -71,22 +71,27 @@ export const MAPPING_PARTS = ["mapping", "progress", "label"] as const;
 export type MappingPart = (typeof MAPPING_PARTS)[number];
 
 /**
- * 세 가지를 모두 정한 트래커 프로젝트가 있으면 빈 배열이다. 없으면 Mapping 을 정한 트래커 프로젝트 가운데
- * 가장 많이 정한 것에서 빠진 것을 돌려준다(Mapping 이 하나도 없으면 셋 다).
+ * 세 가지를 모두 정한 트래커 프로젝트가 있으면 빈 배열이다. 없으면 가장 많이 정한 트래커 프로젝트에서 빠진
+ * 것을 돌려준다. 같으면 Mapping 을 정한 것을 앞세운다. 트래커 프로젝트가 없으면 셋 다다.
  */
 export function missingMappingParts(workspace: WorkspaceSettings): MappingPart[] {
   const labeled = new Set(
     workspace.labels.flatMap((l) => (l.labelId === null ? [] : [l.connection.id])),
   );
   let best: MappingPart[] = [...MAPPING_PARTS];
+  let bestMapped = false;
   for (const bound of workspace.bound) {
-    if (bound.mapping === null) continue;
+    const mapped = bound.mapping !== null;
     const missing = MAPPING_PARTS.filter(
       (part) =>
+        (part === "mapping" && !mapped) ||
         (part === "progress" && bound.inProgressStateId === null) ||
         (part === "label" && !labeled.has(bound.connection.id)),
     );
-    if (missing.length < best.length) best = missing;
+    if (missing.length < best.length || (missing.length === best.length && mapped && !bestMapped)) {
+      best = missing;
+      bestMapped = mapped;
+    }
   }
   return best;
 }

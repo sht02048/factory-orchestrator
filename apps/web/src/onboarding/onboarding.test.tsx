@@ -42,6 +42,7 @@ import {
   HOME_PATH,
   ONBOARDING_PATH,
   ONBOARDING_STEPS,
+  missingMappingParts,
   onboardingRedirect,
   resolveStep,
   serviceInstallCommand,
@@ -480,6 +481,37 @@ describe("다섯 단계를 마치기", () => {
     });
     expect(listRunners(f.context.db)[0]?.online).toBe(false);
     expect(isOnboardingComplete(f.context.db, f.context.secretBox)).toBe(true);
+  });
+
+  it("Mapping 보다 라벨과 상태를 먼저 정하면 Mapping 만 남았다고 안내한다(0042)", () => {
+    const choice = { id: "c-1", name: "Acme" };
+    const bound = {
+      connection: choice,
+      project: { id: "tp-web", name: "Web" },
+      mapping: null,
+      inProgressStateId: "st-doing",
+      states: { ok: true as const, items: [] },
+    };
+    const workspace = {
+      general: { id: "ws-1", name: "Acme", maxRunMinutes: 120 },
+      trackerProjects: [],
+      bound: [bound],
+      labels: [
+        { connection: choice, labelId: "lb-auto", labels: { ok: true as const, items: [] } },
+      ],
+    };
+    expect(missingMappingParts(workspace)).toEqual(["mapping"]);
+    expect(missingMappingParts({ ...workspace, bound: [] })).toEqual([
+      "mapping",
+      "progress",
+      "label",
+    ]);
+    expect(
+      missingMappingParts({
+        ...workspace,
+        bound: [{ ...bound, mapping: { runnerProject: "r", agent: "claude", model: null } }],
+      }),
+    ).toEqual([]);
   });
 
   it("이전 단계로 돌아갈 수 있다", async () => {

@@ -839,7 +839,6 @@ export const orcaRunnerFactory: RunnerFactory = {
   },
 };
 
-/** `refs/heads/<name>`에서 브랜치 이름을 꺼낸다. Orca가 러너의 접두사를 붙여 정한 이름이다(Q82.6). */
 /**
  * `worker-start --model` 인자. 런의 모델(Mapping 값)이 러너 설정의 모델보다 앞서고(0043), 둘 다 없으면
  * 넘기지 않아 러너의 Orca 설정을 따른다.
@@ -848,6 +847,7 @@ function modelArgs(model: string | undefined): string[] {
   return model === undefined ? [] : ["--model", model];
 }
 
+/** `refs/heads/<name>`에서 브랜치 이름을 꺼낸다. Orca가 러너의 접두사를 붙여 정한 이름이다(Q82.6). */
 function branchName(ref: string | null | undefined, worktree: string): string {
   if (ref === null || ref === undefined || ref.length === 0) {
     throw new AdapterError<RunnerErrorDetail>({
