@@ -1,0 +1,18 @@
+{
+  "status": 404,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-accepted-github-permissions": "actions=read",
+    "x-github-media-type": "github.v3; format=json",
+    "x-ratelimit-limit": "5000",
+    "x-ratelimit-remaining": "4945",
+    "x-ratelimit-reset": "1794932803",
+    "x-ratelimit-resource": "core",
+    "x-ratelimit-used": "55"
+  },
+  "body": {
+    "message": "Not Found",
+    "documentation_url": "https://docs.github.com/rest/actions/workflow-runs#list-workflow-runs-for-a-repository",
+    "status": "404"
+  }
+}
