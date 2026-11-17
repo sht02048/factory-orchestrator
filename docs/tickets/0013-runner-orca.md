@@ -16,7 +16,7 @@ core의 `Runner` 인터페이스를 ssh로 원격 `orca`를 실행해 구현한�
 - `--json` 봉투(`ok`, `result`, `error.code`)를 경계에서 스키마로 파싱한다. 모르는 열거값은 열어 두고 모르는 런 상태는 Running으로 다룬다.
 - 런은 Orca 오케스트레이션 명령으로 돌린다(ADR [0009](../adr/0009-run-via-orca-orchestration.md), research [0008](../research/0008-orca-orchestration-run.md) 「제안: Runner 어댑터 계약」). `worktree create --agent --prompt`로 시작하지 않는다.
   - 우편함 터미널: 러너마다 하나를 자동으로 만들고(`terminal create`), 사라졌으면 다시 만든다. 그 핸들을 `--from`으로 쓴다(Q82.1). 러너마다 오래 쓰는 오케스트레이션 Run 하나를 쓴다(Q82.7).
-  - 시작: `orchestration worker-start --name <결정적 이름>`. 결과의 식별자와 워크트리, 러너에서 받은 실제 브랜치 이름을 돌려준다(Q82.6). 같은 이름으로 이미 시작한 런을 찾아 이어 붙일 수 있게 한다(0037 시작 멱등).
+  - 시작: `orchestration worker-start --name <결정적 이름>`. 결과의 식별자와 워크트리, 러너에서 받은 실제 브랜치 이름을 돌려준다(Q82.6). 같은 이름으로 이미 시작한 런을 찾아 이어 붙일 수 있게 한다(0037 시작 멱등). 시작 명령이 실패했을 때 돌려줄 결과는 스펙 11절 질문 10의 답을 따르고, 답 전에는 정하지 않는다.
   - 진행 폴링: `task-list`·`worker-show`·`check --peek`·`worktree ps --agent-wait`로 질문, 권한 대기, 완료 보고(outcome), 보고 없이 사라짐(`lost` 등 escalation, 터미널 사라짐, 셸만 남고 에이전트가 사라짐), 워크트리 사라짐을 돌려준다. 메일은 소비하지 않는다(Q82.2·Q82.3·Q82.5·Q82.19).
   - 질문에 답하기(`reply`), 권한 거절(`deny`). 허용은 없다(Q82.3).
   - 에이전트 멈추기(`worker-stop`), 완료 보고 뒤 에이전트 닫기와 정리(`worker-release` → `worktree rm --force`, 브랜치는 남김), 로그 꼬리(`worker-read`, 놓기 전에 읽음).
