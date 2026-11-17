@@ -1,0 +1,48 @@
+# AGENTS.md
+
+트래커의 티켓을 러너에 맡기고 런의 현황과 통계를 보여 주는 셀프호스팅 오케스트레이터 저장소다. 구조와 명령은 [README.md](README.md), 용어는 [GLOSSARY.md](GLOSSARY.md), 주요 결정은 [`docs/adr/`](docs/adr/)를 본다.
+
+## 작업 근거
+
+- 작업 전에 README, 대상 코드, 관련 테스트와 ADR을 확인한다. 현재 동작은 코드와 테스트로 확인하고, 설계 의도나 완료 상태를 추측해 단정하지 않는다.
+- 용어는 GLOSSARY를 따르고 `_Avoid_`에 적힌 낱말은 쓰지 않는다. 같은 것을 여러 이름으로 부르면 코드와 화면이 어긋난다.
+- 보고에는 확인한 코드 경로, 실행한 명령과 실제 결과를 남기고 확인하지 못한 것을 따로 적는다.
+
+## 문서 위치
+
+- 낱말 정의는 [GLOSSARY.md](GLOSSARY.md)에 둔다.
+- 되돌리기 어려운 결정과 그 이유는 `docs/adr/NNNN-slug.md`에 둔다.
+- 조사·스파이크 결과는 `docs/research/NNNN-slug.md`에 둔다.
+- 일감은 트래커가 아니라 `docs/tickets/NNNN-slug.md` 로컬 티켓으로 관리한다. 형식은 [`docs/tickets/README.md`](docs/tickets/README.md)를 따른다.
+- 내부 설계 문서(GLOSSARY, ADR, 티켓)는 한국어로, README와 사용자 문서는 영어로 쓴다(ADR 0005).
+
+## 공개 저장소
+
+이 저장소는 공개 오픈소스이고, 다른 사람이 설치해 자기 환경으로 설정해 쓰는 제품이다(ADR 0005).
+
+- 실명, 이메일, 호스트명, tailnet 주소, 기기 이름, 계정, 로컬 경로, 토큰을 코드·문서·설정·커밋 메시지 어디에도 넣지 않는다. 공개 이력에 한 번 들어간 값은 지우기 어렵다.
+- 환경 값은 설정으로 받는다. 예시에는 가상 값(`example.com`, `acme`)을 쓴다.
+
+## 작업 흐름
+
+- `main`은 PR 머지로만 바꾼다. 직접 push하지 않는다.
+- 작업은 최신 `main`에서 짧게 사는 기능 브랜치로 한다.
+- PR은 머지 커밋으로 병합한다. squash·rebase 병합은 쓰지 않는다.
+- `main`에 머지하려면 CI `check`가 통과해야 한다. CI는 typecheck → lint → format check → test를 돈다.
+- 커밋 훅(lefthook pre-commit: lint, format check, typecheck)을 우회하지 않는다. `--no-verify`를 쓰지 않는다.
+- 새 워크트리에서는 커밋 전에 `pnpm install`을 돌린다. 훅이 `node_modules`의 도구를 쓴다.
+
+## TypeScript와 워크스페이스
+
+- Node 24(`.nvmrc`, `engines`)와 `package.json` `packageManager`의 pnpm을 쓴다.
+- pnpm 워크스페이스다. 앱은 `apps/*`(`web`, `worker`), 공유 패키지는 `packages/*`(`core`, `db`, `ui`)에 둔다. 패키지별 typecheck는 Turborepo가 돌린다.
+- 공용 설정 `tsconfig.base.json`은 `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `verbatimModuleSyntax`, `noPropertyAccessFromIndexSignature`를 켠다. 패키지 설정에서 끄지 않는다.
+- oxlint type-aware 모드가 `no-explicit-any`, `no-unsafe-*`, `no-floating-promises`, `switch-exhaustiveness-check`를 error로 막는다. 경고도 실패다.
+- 외부 입력(webhook, ssh로 받은 출력, API 응답, 환경 변수)은 경계에서 스키마로 파싱해 타입을 얻는다. `as` 단언으로 타입을 붙이지 않는다. 단언은 검증 없이 타입만 바꿔 잘못된 값이 안쪽까지 들어온다. 스키마 검증기는 스파이크에서 zod로 확인했다([`docs/research/0001`](docs/research/0001-web-stack-spike.md)).
+
+## UI
+
+- 화면 구조는 목록 + 오른쪽 상세 패널이다(ADR 0007).
+- 화면 문구는 컴포넌트에 직접 쓰지 않고 메시지 파일로 분리한다(ADR 0005). 나중에 뽑아내는 일은 화면이 늘수록 비싸진다.
+- 한국어 문구는 해요체 UX 라이팅으로 쓴다.
+- 디자인 시스템(`packages/ui`)이 생기면 토큰과 컴포넌트를 거기서 먼저 찾아 쓴다(ADR 0003).
