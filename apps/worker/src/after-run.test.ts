@@ -190,6 +190,22 @@ describe("워크트리 정리", () => {
     expect(h.runner(runnerId).removed).toHaveLength(1);
   });
 
+  it("트래커가 실패해도 워크트리는 지우고, 댓글은 다음 바퀴에 단다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const spy = vi
+      .spyOn(h.tracker, "listComments")
+      .mockRejectedValueOnce(new Error("unauthorized"));
+    report(run, runnerId);
+    await worker.tick();
+    expect(ended(run).agentResult).toBe("reported-success");
+    expect(h.runner(runnerId).removed).toHaveLength(1);
+    expect(recordsOf(run).trackerComment).toBeNull();
+
+    await worker.tick();
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(h.tracker.comments.get(run.ticket.key)).toHaveLength(1);
+  });
+
   it("러너가 Offline이면 지우지 않고 돌아오면 지운다", async () => {
     const { run, runnerId, worker } = await startOne();
     report(run, runnerId, "failed");

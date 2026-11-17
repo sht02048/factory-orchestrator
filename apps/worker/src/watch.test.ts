@@ -26,6 +26,7 @@ let h: Harness;
 
 beforeEach(() => {
   h = new Harness();
+  agents.clear();
 });
 
 afterEach(async () => {

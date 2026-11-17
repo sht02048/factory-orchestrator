@@ -50,13 +50,39 @@ async function afterRun(
   if (run.state === "queued") return;
   const records = getRunWithRecords(context.db, run.id)?.records;
   if (records === undefined) return;
+  // 트래커 갱신과 워크트리·PR 일은 서로 막지 않는다. 트래커가 실패해도(토큰 폐기, 장애) 워크트리는 정리한다.
   if (run.state !== "ended") {
-    await markInProgress(context, run, records);
-    await pollActivePullRequest(context, run);
+    await attempt(context, run, "could not update the tracker", () =>
+      markInProgress(context, run, records),
+    );
+    await attempt(context, run, "could not poll the run's pull request", () =>
+      pollActivePullRequest(context, run),
+    );
     return;
   }
-  await commentResult(context, run, records);
-  if (run.startedAt !== null) await followWorktree(context, run, records, runnersById);
+  await attempt(context, run, "could not comment the run result", () =>
+    commentResult(context, run, records),
+  );
+  if (run.startedAt !== null) {
+    await attempt(context, run, "could not follow up the run's worktree", () =>
+      followWorktree(context, run, records, runnersById),
+    );
+  } else {
+    context.prPolledAt.delete(run.id);
+  }
+}
+
+async function attempt(
+  context: TickContext,
+  run: StoredRun,
+  message: string,
+  work: () => Promise<void>,
+): Promise<void> {
+  try {
+    await work();
+  } catch (error) {
+    context.logger.warn(message, { runId: run.id, error });
+  }
 }
 
 // ---------- 트래커 갱신(Q41) ----------
@@ -235,8 +261,12 @@ async function followWorktree(
   records: RunRecords,
   runnersById: ReadonlyMap<StoredRunner["id"], StoredRunner>,
 ): Promise<void> {
-  if (records.worktreeRemovedAt !== null) return;
   const disposition = summarizeRunOutcome(run).worktree;
+  // 더 폴링하지 않는 런의 폴링 시각은 잊는다.
+  if (records.worktreeRemovedAt !== null || disposition !== "keep-until-pr-settles") {
+    context.prPolledAt.delete(run.id);
+  }
+  if (records.worktreeRemovedAt !== null) return;
   switch (disposition) {
     case "remove-now":
       await removeWorktree(context, run, runnersById.get(run.runnerId));

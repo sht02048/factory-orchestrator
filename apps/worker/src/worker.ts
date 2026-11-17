@@ -153,14 +153,16 @@ async function tick(context: TickContext): Promise<void> {
   context.mailboxes.clear();
   // 대기열 판단이 이번 바퀴의 러너 상태(Online, 프로젝트, GitHub 인증)를 보도록 먼저 확인한다.
   await checkRunners(context);
-  // web이 남긴 러너 확인 요청도 대기열 판단 전에 처리한다.
-  await processWebRequests(context);
+  // web이 남긴 러너 확인 요청은 대기열 판단 전에 처리한다.
+  await processWebRequests(context, "runner-check");
   // 끝난 런이 내놓은 capacity를 같은 바퀴의 대기열이 쓰도록 먼저 본다.
   await watchActiveRuns(context);
   await cancelQueuedRuns(context);
   await processQueue(context);
   // 이번 바퀴에 시작하거나 끝난 런의 트래커 갱신과 워크트리 정리를 같은 바퀴에 한다.
   await processAfterRuns(context);
+  // 로그 꼬리는 닿지 않는 러너에서 오래 걸릴 수 있어 런 감시와 대기열을 늦추지 않게 마지막에 한다.
+  await processWebRequests(context, "log-tail");
 }
 
 // ---------- Queued 런 취소 ----------

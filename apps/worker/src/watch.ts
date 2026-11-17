@@ -399,12 +399,14 @@ function endRun(
     // 끝난 런의 권한 대기는 더 이상 열려 있지 않다. 손댈 일에 남지 않게 닫는다.
     resolvePermissionWaits(db, run.id, [], endedAt);
     if (input.lastLog !== null) updateRunRecords(db, run.id, { lastLog: [...input.lastLog] });
-    if (input.decision.pr !== null) {
-      const { id, displayId, url, ci } = input.decision.pr;
-      updateRunRecords(db, run.id, {
-        pullRequest: { id, displayId, url, ci, checkedAt: endedAt },
-      });
-    }
+    // 런이 끝난 때의 PR로 맞춘다. 진행 중 폴링이 써 둔 PR이 PR 상태와 어긋나지 않게 없음이면 지운다.
+    const pr = input.decision.pr;
+    updateRunRecords(db, run.id, {
+      pullRequest:
+        pr === null
+          ? null
+          : { id: pr.id, displayId: pr.displayId, url: pr.url, ci: pr.ci, checkedAt: endedAt },
+    });
     return true;
   });
 }

@@ -78,7 +78,14 @@ export async function checkRunner(
     // 닿지 않았으면 필수 조건을 확인하지 못했으니 이전 값을 남긴다.
     assignmentBlocked: health.online ? isAssignmentBlocked(health) : null,
   });
-  if (health.online) await confirmRemovedWorktrees(context, stored, runner);
+  if (health.online) {
+    // 확인 결과는 이미 썼다. 워크트리 확인이 실패해도 확인 자체는 성공으로 돌려준다.
+    try {
+      await confirmRemovedWorktrees(context, stored, runner);
+    } catch (error) {
+      context.logger.warn("could not confirm removed worktrees", { runnerId: stored.id, error });
+    }
+  }
   return { ok: true, health };
 }
 

@@ -18,9 +18,17 @@ import { checkRunner } from "./runner-check.js";
  *
  * 실패는 결과의 `error`에 JSON(`{"kind": ...}`)으로 쓴다. 러너 어댑터 오류는 core RunnerErrorDetail 그대로다.
  */
-export async function processWebRequests(context: TickContext): Promise<void> {
-  await processLogTailRequests(context);
-  await processRunnerCheckRequests(context);
+export async function processWebRequests(
+  context: TickContext,
+  kind: "log-tail" | "runner-check",
+): Promise<void> {
+  try {
+    if (kind === "log-tail") await processLogTailRequests(context);
+    else await processRunnerCheckRequests(context);
+  } catch (error) {
+    // 요청 목록을 읽지 못해도 바퀴의 다른 일은 이어 간다.
+    context.logger.warn("could not process web requests", { kind, error });
+  }
 }
 
 /**
