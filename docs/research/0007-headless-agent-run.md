@@ -18,7 +18,7 @@ research 0004와 같은 버려도 되는 테스트 저장소에 워크트리 하
 | A1b  | `claude -p ... --allowedTools Write < <runDir>/prompt.md > <runDir>/a1-out.json ...`           | 정상 종료(0), 권한 거절, `worktree ps` 진행        |
 | A2   | `claude -p ... --max-turns 1 --allowedTools Write -- "$(cat <runDir>/prompt.md)" ...; exit $c` | 에이전트가 낸 0이 아닌 종료(1), 셸 종료            |
 
-`<runDir>`은 러너 홈 아래 워크트리 밖에 만든 임시 폴더다. 러너의 GitHub 인증이 비대화형 ssh에서 동작하지 않아([research 0003](0003-orca-runner-contract.md)) push·PR은 하지 않았다. 확인이 끝난 뒤 터미널, 워크트리, 브랜치, `<runDir>`을 모두 지웠다.
+`<runDir>`은 러너 홈 아래 워크트리 밖에 만든 임시 폴더다. 검증을 시작할 때 러너의 GitHub 인증이 비대화형 ssh에서 동작하지 않아 push·PR은 하지 않았다. 검증 중에 운영자가 `gh auth login --insecure-storage`와 `gh auth setup-git`으로 고쳤다([research 0003](0003-orca-runner-contract.md) "러너의 GitHub 인증"). 에이전트가 push·PR까지 하는 런은 돌리지 않았다. 확인이 끝난 뒤 터미널, 워크트리, 브랜치, `<runDir>`을 모두 지웠다.
 
 예시와 픽스처의 로컬 경로, 호스트명, 사용자명은 `<path>`, `<runDir>`, `<host>`, `<user>`로 바꿨다. 저장소 이름은 research 0004처럼 `sandbox`로 썼다. UUID는 가상 값이고 같은 대상은 `fixtures/0007/` 파일끼리 같은 값을 쓴다. research 0003·0004의 픽스처와는 따로 바꿨으므로 한 테스트에 섞지 않는다. 시각(ms)은 실제 간격을 남긴 채 옮긴 값이다. 픽스처는 [`fixtures/0007/`](fixtures/0007/)에 있다.
 
