@@ -65,6 +65,7 @@
 | 없는 워크트리 선택자                                | `selector_not_found`    | 1         |
 | 다른 서버의 터미널 핸들 또는 없는 핸들              | `terminal_handle_stale` | 1         |
 | 모르는 `--environment` 이름                         | `invalid_argument`      | 1         |
+| 런타임이 꺼짐(research 0003)                        | `runtime_unavailable`   | 1         |
 
 성공은 종료 코드 0이다 **[실행]**. 이 밖에 문서화된 종료 코드는 명령별 `notes`에 있다. `orchestration worker-start`는 실패·결과 불명에 1 **[스키마]**, `orca serve`는 이미 다른 Orca가 이 프로필을 서빙 중이면 3 **[스키마]**, plugin 명령은 0/1/2/3 **[문서]**(`orca skills get orca-cli --full`)이다.
 
@@ -104,12 +105,12 @@ orca status [--json]
 }
 ```
 
-러너의 Online 판정은 "ssh 성공 + `ok: true` + `runtime.reachable: true` + `runtime.state: "ready"`"로 잡을 수 있다. `runtime.capabilities`는 기능 문자열 목록이라, 필요한 기능이 있는지 확인하는 데 쓸 수 있다. 런타임이 꺼져 있을 때의 정확한 출력은 확인하지 못했다(아래 "아직 모르는 것").
+러너의 Online 판정은 "ssh 성공 + `ok: true` + `runtime.reachable: true` + `runtime.state: "ready"`"로 잡을 수 있다. `runtime.capabilities`는 기능 문자열 목록이라, 필요한 기능이 있는지 확인하는 데 쓸 수 있다. 런타임이 꺼져 있을 때 `status --json`은 `ok: true`, 종료 코드 0에 `runtime.reachable: false`, `state: "not_running"`을 낸다. 다른 명령은 `runtime_unavailable`로 실패한다 **[실행]**([research 0003](0003-orca-runner-contract.md) 1절).
 
 창 없이 런타임을 띄우는 방법도 있다 **[스키마]**:
 
 - `orca serve`: 데스크톱 창 없이 런타임 서버를 포그라운드로 띄운다. 같은 프로필을 이미 서빙 중이면 종료 코드 3.
-- `orca serve service install|status|uninstall`: launchd·systemd 서비스로 등록한다. `--supervise`면 서버가 멈췄을 때 스스로 다시 띄운다.
+- `orca serve service install|status|uninstall`: launchd·systemd 서비스로 등록한다. 서비스는 늘 `orca serve --supervise --no-pairing`을 돌려 서버가 멈추면 스스로 다시 띄운다. 1.4.258의 `install`에는 `--supervise` 플래그가 없고, `--command`의 기본값은 PATH의 `orca`라 비대화형 PATH에 없으면 절대 경로를 줘야 한다([research 0003](0003-orca-runner-contract.md) 6절).
 - `orca serve service status --json` **[실행]**: `{ installed, manager: "launchd", name, unitPath, gaveUp, verdict: "live"|"exited"|"unverifiable", pid, detail }`.
 
 ### A.4 러너의 프로젝트 목록
@@ -262,7 +263,7 @@ orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--mode
 - `orca terminal list [--worktree <selector>] --json`: `terminals[]`에 `handle`, `worktreeId`, `tabId`, `leafId`, `connected`, `lastOutputAt`, `agentIdentity` 등 **[실행]**.
 - `worktree ps`의 `agents[].paneKey`(`<tabId>:<leafId>`)를 `terminal list`의 `tabId`·`leafId`와 이어야 특정 에이전트의 핸들을 얻는다 **[문서]**(`orca skills get orca-cli`, "Terminals").
 - `orca terminal wait --terminal <handle> --for exit|tui-idle --timeout-ms <ms> --json`: 에이전트 CLI에는 `tui-idle`을 쓰고 `--timeout-ms`를 반드시 준다 **[문서]**. 블로킹 호출이라 ssh 세션을 오래 잡는다. 폴링 설계(ADR 0002)와는 `worktree ps`가 더 맞다.
-- `orca terminal read --terminal <handle> [--cursor <n>] [--limit <n>] [--screen] --json`: `result.terminal`에 `handle`, `status`(`running|exited|unknown`), `tail`, `truncated`, `nextCursor` 등 **[스키마]**. 실패 사유를 런 로그로 남길 때 쓸 수 있다.
+- `orca terminal read --terminal <handle> [--cursor <n>] [--limit <n>] [--screen] --json`: `result.terminal`에 `handle`, `status`(`running|exited|unknown`), `tail`, `truncated`, `nextCursor` 등 **[스키마]**. 실패 사유를 런 로그로 남길 때 쓸 수 있다. 단, `terminal close`나 `worktree rm --force`로 터미널을 끝낸 뒤에는 같은 핸들의 `tail`이 비므로 멈추거나 지우기 전에 읽어야 한다 **[실행]**([research 0003](0003-orca-runner-contract.md) 19절).
 
 **3) `orca orchestration` task/dispatch** **[스키마]**. Orca 자체의 코디네이터·워커 메일박스 모델(Run, Task, Dispatch, `worker_done`)이다. 워커가 `orca orchestration send --type worker_done`으로 스스로 끝을 알려야 하고, 호출자는 Run에 묶인 코디네이터여야 한다. 실제로 워커 맥락에서 `orchestration task-list`를 부르면 `run_required` 오류가 났다 **[실행]**. 이 모델은 에이전트에게 오케스트레이션 프로토콜을 지시로 줘야 하는데, 이는 "에이전트에게는 티켓만 지시로 준다"(GLOSSARY Agent, ADR 0004)와 맞지 않는다. 용어도 겹친다(Orca의 Run·Dispatch와 이 제품의 Run·Assignment). 1단계 어댑터에는 쓰지 않는 쪽을 권한다.
 
@@ -275,14 +276,14 @@ orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--mode
 ### A.7 워크트리 조회와 정리
 
 - `orca worktree list [--repo <selector>] [--limit <n>] --json` **[스키마]**. 행에 `id`(`<repoId>::<path>`), `identity.key`(`wt2:<host>:<instanceId>`), `repoId`, `projectId`, `hostId`, `path`, `head`, `branch`, `displayName`, `linkedLinearIssue`, `linkedPR`, `linkedItems`, `workspaceStatus`, `isArchived`, `lastActivityAt` 등 **[실행]**.
-- `orca worktree show --worktree <selector> --json` **[스키마]**. 선택자는 `id:<repo-id>::<absolute-path>`, `path:`, `name:`, `branch:`, `identity:`, `issue:`, `current`, `active` **[실행]**(오류의 `validSelectorForms`). 어댑터는 이름 대신 `create` 결과의 전체 `id`(`<repoId>::<path>`)를 저장해 쓰는 편이 안전하다. 이름·브랜치는 겹칠 수 있다. `worktree ps` 행에는 `identity`가 없고 `worktreeId`(같은 `<repoId>::<path>`)와 `worktreeInstanceId`가 있으므로 **[실행]**, `worktreeId`로 저장하면 `ps` 행과 바로 맞출 수 있다.
-- `orca worktree rm --worktree <selector> [--force] [--delete-branch] [--run-hooks] [--allow-failed-archive-hook] --json` **[스키마]**. **실행하지 않았다.** 새 호스트에서는 로컬 브랜치를 기본으로 남기고, `--delete-branch`를 줘도 병합이 증명되지 않은 브랜치는 남긴다. `--run-hooks`일 때 archive hook이 실패하면 `worktree_archive_hook_failed`로 아무것도 지우지 않는다.
+- `orca worktree show --worktree <selector> --json` **[스키마]**. 선택자는 `id:<repo-id>::<absolute-path>`, `path:`, `name:`, `branch:`, `identity:`, `issue:`, `current`, `active` **[실행]**(오류의 `validSelectorForms`). 어댑터는 이름 대신 `create` 결과의 전체 `id`(`<repoId>::<path>`)를 저장해 쓰는 편이 안전하다. 이름·브랜치는 겹칠 수 있다. `worktree ps` 행에도 `worktreeId`(같은 `<repoId>::<path>`), `worktreeInstanceId`, `identity`가 있으므로 **[실행]**, `worktreeId`로 저장하면 `ps` 행과 바로 맞출 수 있다. 첫판은 `ps` 행에 `identity`가 없다고 적었으나 1.4.258에서는 `--agent-wait` 유무와 상관없이 있었다([research 0003](0003-orca-runner-contract.md)).
+- `orca worktree rm --worktree <selector> [--force] [--delete-branch] [--run-hooks] [--allow-failed-archive-hook] --json` **[스키마]**. 새 호스트에서는 로컬 브랜치를 기본으로 남기고, `--delete-branch`를 줘도 병합이 증명되지 않은 브랜치는 남긴다. `--run-hooks`일 때 archive hook이 실패하면 `worktree_archive_hook_failed`로 아무것도 지우지 않는다. 실행 결과는 [research 0003](0003-orca-runner-contract.md) 9절에 있다. 에이전트가 남긴 untracked 파일이 있으면 `--force` 없이 지워지지 않는다.
 
 정리 시점은 런이 끝나고 PR 상태를 판정한 뒤다. PR이 열린 채(Human Check) 끝난 런의 워크트리를 지울지는 제품 결정이다.
 
 ### A.8 ssh 원격 실행 시 주의점
 
-- **PATH.** macOS 앱 설치에서 `orca`는 `/Applications/Orca.app/Contents/Resources/bin/orca`에 있고 **[실행]** `/usr/local/bin`·`/opt/homebrew/bin`에는 링크가 없었다 **[실행]**. Orca가 띄운 터미널에서만 PATH에 이 경로가 들어간다. 빈 환경으로 띄운 `zsh -c`, `bash -c`, `zsh -lc` 모두 `orca`를 찾지 못했다 **[실행]**. ssh 비대화형 명령도 같은 처지일 가능성이 높다. 러너 등록 때 `orca` 실행 파일 경로를 설정으로 받고, 기본값을 차례로 시도하는 편이 낫다. 가이드는 개발 빌드가 `/usr/local/bin` 심볼릭 링크를 쓰기도 한다고 적는다 **[문서]**(`orca skills get orca-cli`). Linux 설치 경로는 확인하지 못했다.
+- **PATH.** macOS 앱 설치에서 `orca`는 `/Applications/Orca.app/Contents/Resources/bin/orca`에 있고 **[실행]** `/usr/local/bin`·`/opt/homebrew/bin`에는 링크가 없었다 **[실행]**. Orca가 띄운 터미널에서만 PATH에 이 경로가 들어간다. 빈 환경으로 띄운 `zsh -c`, `bash -c`, `zsh -lc` 모두 `orca`를 찾지 못했다 **[실행]**. ssh 비대화형 명령도 같았다(종료 코드 127, [research 0003](0003-orca-runner-contract.md) 6절). 러너 등록 때 `orca` 실행 파일 경로를 설정으로 받고, 기본값을 차례로 시도하는 편이 낫다. 가이드는 개발 빌드가 `/usr/local/bin` 심볼릭 링크를 쓰기도 한다고 적는다 **[문서]**(`orca skills get orca-cli`). Linux 설치 경로는 확인하지 못했다.
 - **런처 스크립트.** `orca`는 bash 스크립트이고 Electron 바이너리를 `ELECTRON_RUN_AS_NODE=1`로 띄워 CLI를 실행한다 **[실행]**. 원격에 bash가 필요하다.
 - **런타임.** help의 Behavior 절: "Most commands require a running Orca runtime. If Orca is not open yet, run `orca open` first." **[실행]**(`orca --help`). `orca open`은 데스크톱 앱을 띄우므로 GUI 세션이 없는 ssh에서는 실패할 수 있다. 창 없는 러너는 `orca serve`(서비스 등록 권장)로 런타임을 상시 띄워 두는 구성이 맞다 **[스키마]**.
 - **원격 런타임 대안.** Orca는 자체 원격 연결도 지원한다. 다른 기계의 `orca serve`와 페어링(`orca environment add --pairing-code`)한 뒤 `--environment <name>`이나 `ORCA_ENVIRONMENT`·`ORCA_PAIRING_CODE` 환경 변수로 명령을 그 서버로 보낼 수 있다 **[실행]**(`orca --help`). ADR 0002는 ssh를 택했지만, 오케스트레이터 기계에 Orca를 설치하지 않는다는 전제가 바뀌면 다시 볼 만한 선택지다. Orca 런타임 자신도 ssh 대상을 등록해 쓸 수 있다(`orca host list`의 `--host ssh:<target-id>`, `worktree create --host`) **[스키마]**. 이 역시 오케스트레이터 쪽에 Orca 런타임이 있어야 한다.
@@ -864,15 +865,15 @@ type JudgeRunOutcome = (prs: ReadonlyArray<PullRequestSnapshot>) => RunOutcome;
 
 **Orca**
 
-1. 런타임이 꺼져 있을 때(앱도 `serve`도 없음) `orca status --json`과 다른 명령의 `error.code`·종료 코드. 런타임을 끄는 것은 상태를 바꾸는 일이라 이번에 실행하지 않았다. 확인 방법: 테스트 러너에서 Orca를 끈 채 `orca status --json`.
+1. ~~런타임이 꺼져 있을 때 `orca status --json`과 다른 명령의 `error.code`·종료 코드.~~ [research 0003](0003-orca-runner-contract.md) 1절에서 확인했다.
 2. `worktree ps`의 `status`, `agents[].state`, `programStatus.state`, `terminalVerdict` 전체 열거값. 관측한 값만 적었다.
 3. 에이전트가 할 일을 마쳤다는 가장 믿을 만한 신호. `agents[].state: "done"`이 에이전트 프로세스가 살아 있어도 턴 사이에 잠깐 찍히는지, 끝난 에이전트 CLI가 프로세스까지 종료하는지(`liveTerminalCount`) 실제 런으로 봐야 한다.
 4. `worktree create --agent --prompt --json`의 실제 출력 전체(`result.worktree` 필드, `launch`, `prompt.outcome` 값 목록). 상태를 바꾸는 명령이라 실행하지 않았다.
 5. `--prompt` 길이 제한과 줄바꿈·특수 문자가 ssh 인용을 거쳐 그대로 전달되는지.
-6. ssh 비대화형 셸에서 `orca`가 런타임에 닿는지. 런타임 접속에 GUI 로그인 세션이나 특정 환경 변수가 필요한지 확인하지 않았다(빈 환경 셸에서 PATH 문제만 확인했다).
-7. Linux 러너의 `orca` 설치 경로와 `orca serve` 서비스 구성.
+6. ~~ssh 비대화형 셸에서 `orca`가 런타임에 닿는지.~~ [research 0003](0003-orca-runner-contract.md) 6절에서 확인했다. 절대 경로로 부르면 닿고 ssh 세션 쪽에는 GUI 세션이 필요 없다. 콘솔 로그인 세션이 없을 때 서비스가 뜨는지는 남았다(0003 「아직 모르는 것」 7).
+7. Linux 러너의 `orca` 설치 경로와 `orca serve` 서비스 구성. research 0003에서도 남았다(Linux 러너 준비 전).
 8. 터미널이 아닌 chat(`structured`)으로 뜬 에이전트의 진행 감지 방법. `--surface terminal`을 강제하면 피할 수 있는지.
-9. `worktree rm` 출력과, 에이전트가 아직 도는 워크트리를 지울 때의 동작.
+9. `worktree rm` 출력과, 에이전트가 아직 도는 워크트리를 지울 때의 동작. 출력과 `--force` 동작은 [research 0003](0003-orca-runner-contract.md) 9절에서 확인했다. 턴이 끝나고 백그라운드 셸이 돌던 에이전트에만 시험했고, 턴 도중의 에이전트는 남았다(0003 「아직 모르는 것」 6).
 
 **Linear**
 
