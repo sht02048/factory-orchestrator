@@ -371,7 +371,8 @@ export interface Runner {
    */
   startRun(input: StartRunInput): Promise<StartedRun>;
   /**
-   * 시작 멱등: 같은 결정적 워크트리 이름으로 이미 시작한 런을 찾는다. 없으면 null이다.
+   * 시작 멱등: 같은 결정적 워크트리 이름으로 이미 시작한 런을 찾는다. 없으면 null이다. 우편함을 다시
+   * 만들었어도 이전 우편함으로 시작한 런을 찾아야 하므로 이름으로 찾고 우편함으로 좁히지 않는다.
    * 데몬이 러너의 응답을 받은 뒤 Running을 쓰기 전에 죽었을 때 이어 붙이는 데 쓴다.
    */
   findStartedRun(input: { mailbox: MailboxRef; worktreeName: string }): Promise<StartedRun | null>;

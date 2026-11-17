@@ -414,6 +414,20 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
   });
 
+  it("결과를 모르는 런이 시작하지 않았다고 확인됐는데 Mapping이 지워졌으면 새로 시작하지 않고 시작할 수 없음으로 끝낸다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    const fakeA = h.runner(runnerA);
+    fakeA.failNextStart = { kind: "start-outcome-unknown", detail: "lost" };
+    const worker = h.worker();
+
+    await worker.tick();
+    h.db.$client.prepare("DELETE FROM mappings").run();
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "ended", agentResult: "could-not-start" });
+    expect(fakeA.startCalls).toHaveLength(1);
+  });
+
   it("런타임이 꺼진 러너(not-ready)는 우편함 준비에서 실패해도 뒤 런을 막지 않는다", async () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });

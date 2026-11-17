@@ -480,7 +480,10 @@ async function startOnRunner(
   } catch (error) {
     // 시작 명령 전의 실패라 시도 횟수에 넣지 않는다. 닿지 않으면 Offline처럼 순서에서만 뺀다.
     logger.warn("could not prepare the runner's mailbox", { runId: run.id, error });
-    return isOfflineLike(error) ? { kind: "skipped" } : { kind: "blocked" };
+    if (!isOfflineLike(error)) return { kind: "blocked" };
+    // Offline 예외처럼 순서에서 뺀다. 결과를 모르는 시작이 없으면 러너를 비워 맞는 러너를 다시 고른다.
+    if (!unverified) tryWrite(context, run.id, () => setQueuedRunRunner(db, run.id, null));
+    return { kind: "skipped" };
   }
   try {
     if (unverified) {
@@ -490,8 +493,14 @@ async function startOnRunner(
       if (existing === "unknown") return { kind: "blocked" };
       if (existing !== null) return { kind: "started", started: existing };
       unverified = false;
-      // 읽을 수 없는 출력으로 다시 시도를 다 쓴 런은 시작하지 않았음을 확인한 지금 끝낸다(Q86).
-      if (records.startFailures > MAX_START_RETRIES) return endCouldNotStart(context, run);
+      // 시작하지 않았음을 확인했다. 읽을 수 없는 출력으로 다시 시도를 다 썼거나(Q86) 그사이 Mapping이
+      // 지워져 영영 시작할 수 없게 됐으면(Q82.16) 지금 끝낸다.
+      if (
+        records.startFailures > MAX_START_RETRIES ||
+        getMapping(db, run.ticket.connection, run.trackerProject) === null
+      ) {
+        return endCouldNotStart(context, run);
+      }
     }
     const prompt = await promptFor(context, run);
     if (prompt === null) return { kind: "blocked" };
