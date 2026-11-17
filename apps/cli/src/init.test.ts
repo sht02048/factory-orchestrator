@@ -31,6 +31,15 @@ describe("init", () => {
     expect(readBootEnv(envFile, {})["ENCRYPTION_KEY"]).toBe(firstKey);
   });
 
+  it("이미 있으면 주어진 값이 틀려도 검사하지 않고 그대로 둔다", () => {
+    const home = join(dir, "home");
+    init({ home });
+    expect(init({ home, port: "abc" })).toEqual({
+      created: false,
+      envFile: homePaths(home).envFile,
+    });
+  });
+
   it("start가 읽는 규칙으로 통과하는 부팅 설정을 운영자만 읽게 만든다", () => {
     const home = join(dir, "home");
     init({ home });

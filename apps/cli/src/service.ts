@@ -216,7 +216,10 @@ export function installService(plan: ServicePlan, run: CommandRunner): void {
   for (const command of plan.install) {
     const result = run(command);
     if (!result.ok) {
+      // 앞 명령이 남긴 등록(systemd enable의 링크 등)까지 되돌린다. 되돌리는 명령의 실패는 무시한다.
+      for (const undo of plan.stop) run(undo);
       rmSync(plan.file.path, { force: true });
+      for (const undo of plan.cleanup) run(undo);
       throw new ServiceError(`${formatCommand(command)} failed:\n${result.output}`);
     }
   }
@@ -224,7 +227,8 @@ export function installService(plan: ServicePlan, run: CommandRunner): void {
 
 /**
  * 서비스를 멈추고 파일을 지운다. 멈추는 명령이 실패해도(이미 멈춘 경우 등) 파일은 지우고, 실패한 명령을
- * 돌려준다. 파일이 없으면 등록하지 않은 것으로 보고 아무것도 돌리지 않는다.
+ * 돌려준다. 파일이 없어도 서비스 관리자에 등록이 남아 있을 수 있어(파일을 손으로 지운 경우) 멈추는 명령은
+ * 돌리되, 그때의 실패는 등록이 없다는 뜻이라 알리지 않는다.
  *
  * @returns 설치돼 있었는지와 실패한 명령
  */
@@ -232,7 +236,10 @@ export function uninstallService(
   plan: ServicePlan,
   run: CommandRunner,
 ): { installed: boolean; failed: Array<{ command: string; output: string }> } {
-  if (!existsSync(plan.file.path)) return { installed: false, failed: [] };
+  if (!existsSync(plan.file.path)) {
+    for (const command of plan.stop) run(command);
+    return { installed: false, failed: [] };
+  }
   const failed: Array<{ command: string; output: string }> = [];
   const runAll = (commands: string[][]): void => {
     for (const command of commands) {

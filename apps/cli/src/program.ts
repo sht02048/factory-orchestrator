@@ -64,6 +64,22 @@ export async function runProgram(
     return command === undefined && !values.help ? 2 : 0;
   }
   const home = resolveHome(values.home, context.env, context.userHome);
+  const allowed: ReadonlyArray<string> =
+    command === "init"
+      ? ["home", "host", "port", "database-path"]
+      : command === "service"
+        ? ["home", "dry-run"]
+        : ["home"];
+  const given = Object.entries(values)
+    .filter(([name, value]) => name !== "help" && value !== undefined && value !== false)
+    .map(([name]) => name);
+  const misplaced = given.filter((name) => !allowed.includes(name));
+  if (misplaced.length > 0) {
+    context.err(
+      `${messages.errors.optionNotFor(misplaced.map((name) => `--${name}`).join(", "), command)}\n\n${messages.usage}`,
+    );
+    return 2;
+  }
 
   try {
     if (command === "init" && subcommand === undefined) {
@@ -127,6 +143,11 @@ async function runStart(context: ProgramContext, home: string): Promise<number> 
       return 0;
     }
     throw error;
+  }
+  if (abort.signal.aborted) {
+    await started.stop();
+    context.out(messages.start.stopped);
+    return 0;
   }
   context.out(messages.start.ready(started.url));
 
@@ -208,12 +229,16 @@ function runServiceUninstall(context: ProgramContext, home: string, dryRun: bool
     return 0;
   }
   const result = uninstallService(plan, context.runCommand);
+  for (const failure of result.failed) {
+    context.err(messages.service.commandFailed(failure.command, failure.output));
+  }
   if (!result.installed) {
     context.out(messages.service.notInstalled(plan.file.path));
     return 0;
   }
-  for (const failure of result.failed) {
-    context.err(messages.service.commandFailed(failure.command, failure.output));
+  if (result.failed.length > 0) {
+    context.err(messages.service.removedWithWarnings(plan.file.path));
+    return 1;
   }
   context.out(messages.service.uninstalled(plan.file.path));
   return 0;

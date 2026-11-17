@@ -62,6 +62,8 @@ Options:
       "systemd stops user services when you log out. To keep it running, run: loginctl enable-linger",
     notInstalled: (path: string) => `No service is installed (${path} does not exist).`,
     uninstalled: (path: string) => `Stopped the service and removed ${path}.`,
+    removedWithWarnings: (path: string) =>
+      `Removed ${path}, but stopping the service failed (see above). Check it with launchctl or systemctl.`,
     commandFailed: (command: string, output: string) =>
       `Warning: ${command} failed:\n${output.trim()}`,
     needsInit: "Run `factory-orchestrator init` before installing the service.",
@@ -69,6 +71,7 @@ Options:
 
   errors: {
     unknownCommand: (command: string) => `Unknown command: ${command}`,
+    optionNotFor: (options: string, command: string) => `${options} cannot be used with ${command}`,
     missingEnvFile: (envFile: string) =>
       `Boot settings not found at ${envFile}. Run \`factory-orchestrator init\` first.`,
   },

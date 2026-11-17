@@ -148,6 +148,22 @@ describe("start", () => {
     await expect(pending).rejects.toThrow("stopped before web responded: stop requested");
   });
 
+  it("web이 응답하는 중에 신호를 받으면 뜬 것으로 치지 않고 멈춘다", async () => {
+    const home = join(dir, "home");
+    init({ home, port: String(await freePort()) });
+    const abort = new AbortController();
+    // web 자리는 바로 응답하므로, 마이그레이션 직후 신호를 보내 첫 응답보다 먼저 닿게 한다.
+    const pending = start({
+      home,
+      env: {},
+      layout: fakeLayout(),
+      onOutput: quiet,
+      signal: abort.signal,
+      onMigrated: () => abort.abort(),
+    });
+    await expect(pending).rejects.toThrow("stop requested");
+  });
+
   it(".env가 없으면 init을 먼저 하라고 실패한다", async () => {
     await expect(
       start({ home: join(dir, "none"), env: {}, layout: fakeLayout(), onOutput: quiet }),

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { isDeepStrictEqual, parseEnv } from "node:util";
 import { BOOT_ENV, ENCRYPTION_KEY_BYTES, parseBootConfig } from "@factory/db";
@@ -37,6 +37,8 @@ export class EnvFileFormatError extends Error {
  */
 export function init(options: InitOptions): InitResult {
   const paths = homePaths(options.home);
+  // 이미 있으면 주어진 값을 검사하지도 않고 그대로 둔다. 동시에 도는 경우는 아래 `wx`가 막는다.
+  if (existsSync(paths.envFile)) return { created: false, envFile: paths.envFile };
   const values = {
     [BOOT_ENV.host]: options.host ?? "127.0.0.1",
     [BOOT_ENV.port]: options.port ?? "3000",

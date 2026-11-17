@@ -110,6 +110,24 @@ describe("runProgram", () => {
     ]);
   });
 
+  it("해제할 때 멈추는 명령이 실패하면 파일은 지우되 1로 끝낸다", async () => {
+    await runProgram(["init"], context());
+    await runProgram(["service", "install"], context());
+    const failing = context({ runCommand: () => ({ ok: false, output: "Boot-out failed: 5" }) });
+    expect(await runProgram(["service", "uninstall"], failing)).toBe(1);
+    expect(err.join("\n")).toContain("stopping the service failed");
+    expect(existsSync(join(dir, "Library", "LaunchAgents", "factory-orchestrator.plist"))).toBe(
+      false,
+    );
+  });
+
+  it("명령에 맞지 않는 옵션은 무시하지 않고 2로 끝낸다", async () => {
+    expect(await runProgram(["start", "--port", "4000"], context())).toBe(2);
+    expect(err.join("\n")).toContain("--port cannot be used with start");
+    expect(await runProgram(["init", "--dry-run"], context())).toBe(2);
+    expect(existsSync(join(dir, ".factory-orchestrator"))).toBe(false);
+  });
+
   it("지원하지 않는 OS에서는 서비스를 등록하지 않는다", async () => {
     expect(await runProgram(["service", "install"], context({ platform: "win32" }))).toBe(1);
     expect(err.join("\n")).toContain("not win32");

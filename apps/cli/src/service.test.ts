@@ -197,8 +197,28 @@ describe("installService, uninstallService", () => {
     expect(existsSync(p.file.path)).toBe(false);
   });
 
-  it("등록하지 않았으면 해제할 때 아무것도 돌리지 않는다", () => {
-    expect(uninstallService(plan(), ok)).toEqual({ installed: false, failed: [] });
-    expect(ran).toEqual([]);
+  it("파일이 없어도 남은 등록을 멈추는 명령은 돌리고, 그 실패는 알리지 않는다", () => {
+    const failing: CommandRunner = (command) => {
+      ran.push(formatCommand(command));
+      return { ok: false, output: "Could not find service" };
+    };
+    expect(uninstallService(plan(), failing)).toEqual({ installed: false, failed: [] });
+    expect(ran).toEqual(["launchctl bootout gui/501/factory-orchestrator"]);
+  });
+
+  it("systemd 등록이 중간에 실패하면 앞 명령이 남긴 등록도 되돌린다", () => {
+    const p = servicePlan({ ...base, manager: "systemd", userHome: dir, factoryHome: dir });
+    const failOnEnable: CommandRunner = (command) => {
+      ran.push(formatCommand(command));
+      return command.includes("enable") ? { ok: false, output: "start failed" } : { ok: true };
+    };
+    expect(() => installService(p, failOnEnable)).toThrow("start failed");
+    expect(existsSync(p.file.path)).toBe(false);
+    expect(ran).toEqual([
+      "systemctl --user daemon-reload",
+      "systemctl --user enable --now factory-orchestrator.service",
+      "systemctl --user disable --now factory-orchestrator.service",
+      "systemctl --user daemon-reload",
+    ]);
   });
 });

@@ -195,17 +195,23 @@ async function waitForWeb(
 ): Promise<void> {
   let failure: string | undefined;
   void failed.then((reason) => (failure = reason));
+  // 기다리는 동안 바뀌는 값이라 매번 새로 읽는다.
+  const stopRequested = (): boolean => signal?.aborted === true;
+  const stopped = () => new StartError("stopped before web responded: stop requested");
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (failure !== undefined) throw new StartError(`stopped before web responded: ${failure}`);
-    if (signal?.aborted === true)
-      throw new StartError("stopped before web responded: stop requested");
+    if (stopRequested()) throw stopped();
     try {
       await fetch(url, { signal: AbortSignal.timeout(2_000) });
-      return;
     } catch {
       await new Promise((resolve) => setTimeout(resolve, 250));
+      continue;
     }
+    // 응답을 기다리는 동안 멈추라는 신호가 왔으면 뜬 것으로 치지 않는다.
+    if (stopRequested()) throw stopped();
+    return;
   }
+  if (stopRequested()) throw stopped();
   throw new StartError(`web did not respond at ${url} within ${timeoutMs} ms`);
 }
