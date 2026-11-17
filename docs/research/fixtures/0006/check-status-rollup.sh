@@ -47,11 +47,18 @@ query='query($owner: String!, $repo: String!, $number: Int!) {
 body=$(jq -n --arg q "$query" --arg owner "$owner" --arg repo "$repo" --argjson number "$number" \
   '{query: $q, variables: {owner: $owner, repo: $repo, number: $number}}')
 
-curl -sS -X POST https://api.github.com/graphql \
-  -H "Authorization: bearer ${GITHUB_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -D /dev/stderr \
-  -d "$body" 2> >(grep -iE '^(HTTP|x-accepted-github-permissions|x-ratelimit-)' >&2) | jq .
+hdr=$(mktemp)
+trap 'rm -f "$hdr"' EXIT
+
+# 토큰은 프로세스 인자에 남지 않게 stdin으로 헤더를 넘긴다.
+printf 'Authorization: bearer %s\n' "$GITHUB_TOKEN" |
+  curl -sS -X POST https://api.github.com/graphql \
+    -H @- \
+    -H "Content-Type: application/json" \
+    -D "$hdr" \
+    -d "$body" | jq .
+
+grep -iE '^(HTTP|x-accepted-github-permissions|x-ratelimit-)' "$hdr" >&2 || true
 
 # 읽는 법:
 # - contexts.nodes에 __typename "CheckRun"이 status/conclusion과 함께 오면 15번은 "온다"다.

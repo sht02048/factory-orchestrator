@@ -155,7 +155,7 @@ repo:<owner>/<repo> is:pr "<티켓 키>" in:title,body created:>=<런 시작 시
 
 받은 뒤 어댑터가 할 일:
 
-1. 제목·본문에서 키를 낱말 경계로 다시 찾는다. 예: 대소문자 무시 `(?<![A-Za-z0-9])ENG-123(?![0-9])`. 검색 문법이 바뀌거나 `ISSUE` 검색으로 돌아가도 거짓 양성(#8)이 판정까지 들어오지 않는다.
+1. 제목·본문에서 키를 낱말 경계로 다시 찾는다. 예: 대소문자 무시 `(?<![A-Za-z0-9])ENG-123(?![A-Za-z0-9])`. 검색 문법이 바뀌거나 `ISSUE` 검색으로 돌아가도 거짓 양성(#8)이 판정까지 들어오지 않는다.
 2. research 0002 C.2처럼 `isCrossRepository: false`, `headRepository.nameWithOwner`, `baseRefName`을 확인한다.
 3. 17절 규칙대로 고른다.
 
