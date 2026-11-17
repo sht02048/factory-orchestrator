@@ -3,11 +3,11 @@ status: todo
 blocked_by: [0005]
 ---
 
-# worker 얇은 경로: 대기열에서 판정까지
+# worker 얇은 경로: 대기열에서 결과 기록까지
 
 ## 목표
 
-가짜 어댑터로 할당 → Queued → Running → Ended(판정)까지 한 번에 도는 worker 데몬 뼈대를 만든다. 이후 worker 티켓은 이 루프에 살을 붙인다.
+가짜 어댑터로 할당 → Queued → Running → Ended(두 축 기록)까지 한 번에 도는 worker 데몬 뼈대를 만든다. 이후 worker 티켓은 이 루프에 살을 붙인다.
 
 ## 범위
 
