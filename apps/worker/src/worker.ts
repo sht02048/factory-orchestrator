@@ -40,6 +40,8 @@ import {
   tryWrite,
 } from "./context.js";
 import type { QueuedStoredRun, TickContext, WorkerLogger } from "./context.js";
+import { processAfterRuns } from "./after-run.js";
+import { processWebRequests } from "./requests.js";
 import { checkRunners } from "./runner-check.js";
 import { watchActiveRuns } from "./watch.js";
 
@@ -58,8 +60,8 @@ export interface WorkerOptions {
 
 export interface Worker {
   /**
-   * 폴링 한 바퀴: 러너를 확인하고, 끝나지 않은 런을 감시해 끝난 런의 두 축을 기록하고, Queued 런의 취소를
-   * 처리한 뒤 대기열에서 런을 시작한다.
+   * 폴링 한 바퀴: 러너를 확인하고 web 요청을 처리한 뒤, 끝나지 않은 런을 감시해 끝난 런의 두 축을 기록하고,
+   * Queued 런의 취소를 처리하고, 대기열에서 런을 시작한 뒤 런 시작·종료 뒤처리를 한다.
    */
   tick(): Promise<void>;
   /** DB를 닫는다. 돌던 tick이 끝나기를 기다린다. */
@@ -122,6 +124,9 @@ export function createWorker(options: WorkerOptions): Worker {
     unmarkedAnswers: new Set(),
     unmarkedDenials: new Set(),
     pendingEndings: new Map(),
+    prPolledAt: new Map(),
+    unrecordedComments: new Map(),
+    ticketsGone: new Set(),
   };
   let running: Promise<void> | null = null;
   let closed = false;
@@ -148,10 +153,16 @@ async function tick(context: TickContext): Promise<void> {
   context.mailboxes.clear();
   // 대기열 판단이 이번 바퀴의 러너 상태(Online, 프로젝트, GitHub 인증)를 보도록 먼저 확인한다.
   await checkRunners(context);
+  // web이 남긴 러너 확인 요청은 대기열 판단 전에 처리한다.
+  await processWebRequests(context, "runner-check");
   // 끝난 런이 내놓은 capacity를 같은 바퀴의 대기열이 쓰도록 먼저 본다.
   await watchActiveRuns(context);
   await cancelQueuedRuns(context);
   await processQueue(context);
+  // 이번 바퀴에 시작하거나 끝난 런의 트래커 갱신과 워크트리 정리를 같은 바퀴에 한다.
+  await processAfterRuns(context);
+  // 로그 꼬리는 닿지 않는 러너에서 오래 걸릴 수 있어 런 감시와 대기열을 늦추지 않게 마지막에 한다.
+  await processWebRequests(context, "log-tail");
 }
 
 // ---------- Queued 런 취소 ----------
@@ -202,7 +213,15 @@ async function findStartedForCancel(
   runnerId: RunnerId,
 ): Promise<StartedRun | null | "unknown"> {
   const storedRunner = findRunner(context.db, runnerId);
-  if (storedRunner === undefined) return "unknown";
+  if (storedRunner === undefined) {
+    // 러너가 등록에서 빠졌다. 시작했는지 영영 확인할 수 없고 그 러너에 명령할 수도 없으니, 시작하지 않은
+    // 런으로 보고 취소를 끝낸다. 기다리면 취소 요청이 끝나지 않는다.
+    context.logger.warn("canceling a queued run whose runner is not registered", {
+      runId: run.id,
+      runnerId,
+    });
+    return null;
+  }
   const runner = context.adapters.runner(storedRunner);
   try {
     const mailbox = await mailboxFor(context, storedRunner, runner);

@@ -20,11 +20,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Harness, projectA, projectB } from "./test-fixtures.js";
 import { RUNNER_CHECK_INTERVAL_MS } from "./runner-check.js";
 import type { Worker } from "./worker.js";
+import type { FakeRunnerRun } from "@factory/core/testing";
 
 let h: Harness;
 
 beforeEach(() => {
   h = new Harness();
+  agents.clear();
 });
 
 afterEach(async () => {
@@ -66,11 +68,19 @@ async function startOne(): Promise<{ run: StoredRun; runnerId: RunnerId; worker:
   const worker = h.worker();
   await worker.tick();
   expect(stateOf(run)).toBe("running");
+  agentOf(run, runnerId);
   return { run, runnerId, worker };
 }
 
-function agentOf(run: StoredRun, runnerId: RunnerId) {
-  return h.runner(runnerId).runAt(worktreeOf(run));
+/** 런이 끝나면 worker가 워크트리를 지워 가짜 러너에서 런이 빠지므로 처음 찾은 것을 기억한다. */
+const agents = new Map<string, FakeRunnerRun>();
+
+function agentOf(run: StoredRun, runnerId: RunnerId): FakeRunnerRun {
+  const known = agents.get(run.id);
+  if (known !== undefined) return known;
+  const agent = h.runner(runnerId).runAt(worktreeOf(run));
+  agents.set(run.id, agent);
+  return agent;
 }
 
 /** 러너에 ssh가 닿지 않게 한다. DB의 러너 상태는 바꾸지 않는다(연결 끊김은 런 감시가 판단한다). */

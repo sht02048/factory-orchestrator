@@ -70,7 +70,9 @@ describe("대기열과 capacity", () => {
       "running",
       "running",
     ]);
-    expect(h.runner(runnerA).runs.size).toBe(3);
+    // 끝난 런의 워크트리는 지웠다(요약 Failed, PR 없음).
+    expect(h.runner(runnerA).startCalls).toHaveLength(3);
+    expect(h.runner(runnerA).runs.size).toBe(2);
   });
 });
 
@@ -119,11 +121,12 @@ describe("두 축 기록", () => {
     h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
     const worker = h.worker();
+    // 만든 어댑터는 다시 쓰므로 처음 만들 때부터 실패하게 둔다(시작한 바퀴에도 PR을 폴링한다).
+    h.codeHostBroken = true;
     await worker.tick();
     h.putPullRequest(current(run), "open");
     finish(run);
 
-    h.codeHostBroken = true;
     await worker.tick();
     expect(stateOf(run)).toBe("running");
 
