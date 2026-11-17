@@ -7,6 +7,15 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@factory/core": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.5",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "drizzle-kit": "1.0.0-rc.5"
   }
 }

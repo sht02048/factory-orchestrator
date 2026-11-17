@@ -1,0 +1,34 @@
+{
+  "id": "00000000-0000-4000-8000-000000000029",
+  "ok": true,
+  "result": {
+    "repo": {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "path": "<path>/sandbox",
+      "displayName": "sandbox",
+      "badgeColor": "#737373",
+      "addedAt": 1790000040312,
+      "kind": "git",
+      "externalWorktreeVisibilityLegacy": false,
+      "gitRemoteIdentity": {
+        "canonicalKey": "github.com/acme/sandbox",
+        "remoteName": "origin",
+        "remoteUrl": "https://github.com/acme/sandbox.git"
+      },
+      "gitUsername": "",
+      "hookSettings": {
+        "mode": "auto",
+        "setupRunPolicy": "run-by-default",
+        "setupAgentStartupPolicy": "start-immediately",
+        "scripts": {
+          "setup": "",
+          "archive": ""
+        }
+      },
+      "externalWorktreeVisibility": "hide"
+    }
+  },
+  "_meta": {
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
+  }
+}

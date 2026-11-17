@@ -1,0 +1,110 @@
+{
+  "id": "00000000-0000-4000-8000-000000000025",
+  "ok": true,
+  "result": {
+    "worktrees": [
+      {
+        "workspaceKind": "git",
+        "worktreeId": "00000000-0000-4000-8000-000000000002::<path>/workspaces/sandbox/fo-verify-w4",
+        "repoId": "00000000-0000-4000-8000-000000000002",
+        "hostId": "local",
+        "identity": {
+          "key": "wt2:local:00000000-0000-4000-8000-000000000026",
+          "executionHostId": "local",
+          "instanceId": "00000000-0000-4000-8000-000000000026"
+        },
+        "terminalPlatform": "darwin",
+        "repo": "sandbox",
+        "path": "<path>/workspaces/sandbox/fo-verify-w4",
+        "branch": "refs/heads/acme/fo-verify-w4",
+        "isArchived": false,
+        "isMainWorktree": false,
+        "hasHostSidebarActivity": true,
+        "defaultBranch": false,
+        "cliCreated": true,
+        "worktreeInstanceId": "00000000-0000-4000-8000-000000000026",
+        "parentWorktreeId": null,
+        "childWorktreeIds": [],
+        "workspaceLineage": null,
+        "displayName": "fo-verify-w4",
+        "workspaceStatus": "in-progress",
+        "sortOrder": 1790000247815,
+        "lastActivityAt": 1790000247833,
+        "createdAt": 1790000247815,
+        "creatorProvenance": {
+          "kind": "host"
+        },
+        "linkedIssue": null,
+        "linkedPR": null,
+        "linkedLinearIssue": null,
+        "linkedGitLabMR": null,
+        "linkedGitLabIssue": null,
+        "linkedItems": [],
+        "comment": "",
+        "isPinned": false,
+        "isActive": false,
+        "unread": false,
+        "liveTerminalCount": 1,
+        "hasAttachedPty": true,
+        "unverifiableTerminalCount": 0,
+        "lastOutputAt": 1790000259018,
+        "preview": "un exactly this one Bash command and nothing else: sleep 120. Then reply DONE.'\n↓ to manag",
+        "status": "working",
+        "agents": [
+          {
+            "paneKey": "00000000-0000-4000-8000-000000000027:00000000-0000-4000-8000-000000000028",
+            "parentPaneKey": null,
+            "state": "working",
+            "workingMode": "monitoring",
+            "agentType": "claude",
+            "prompt": "Throwaway sandbox test. Run exactly this one Bash command and nothing else: sleep 120. Then reply DONE.",
+            "taskTitle": null,
+            "displayName": null,
+            "conversationName": "Sandbox sleep test",
+            "lastAssistantMessage": "The `sleep 120` is running in the background, so I'll reply DONE once it finishes.",
+            "toolName": "Bash",
+            "toolInput": "sleep 120",
+            "interrupted": false,
+            "mainAgent": {
+              "state": "done",
+              "stateStartedAt": 1790000258900
+            },
+            "stateStartedAt": 1790000249042,
+            "updatedAt": 1790000260962,
+            "hasLivePty": true,
+            "programStatus": {
+              "state": "working",
+              "message": "1 shell still running",
+              "observedAt": 1790000259018
+            },
+            "agentWait": null
+          }
+        ],
+        "workingMode": "monitoring",
+        "sidebarStatus": "monitoring",
+        "terminalVerdict": "live",
+        "environment": {
+          "id": "local",
+          "name": "local"
+        },
+        "parent": null,
+        "address": {
+          "environment": "local",
+          "worktree": "identity:wt2:local:00000000-0000-4000-8000-000000000026",
+          "line": "--environment local --worktree identity:wt2:local:00000000-0000-4000-8000-000000000026"
+        }
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "totalCount": 1,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
+  }
+}

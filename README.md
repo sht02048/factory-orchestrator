@@ -10,7 +10,7 @@ The control tower of a software factory. It assigns tickets from a tracker to ru
 | `apps/worker`              | Long-running daemon for the assignment queue, runner commands, and run and PR polling     | Stub    |
 | `apps/cli`                 | `init`, `start`, and launchd/systemd service registration                                 | Planned |
 | `packages/core`            | Domain logic and the Tracker, Runner, and CodeHost adapter interfaces                     | Stub    |
-| `packages/db`              | SQLite (WAL) schema, access, and migrations                                               | Stub    |
+| `packages/db`              | SQLite (WAL) schema, access, and migrations                                               | Started |
 | `packages/ui`              | Design system (StyleX + UI SDK)                                                           | Started |
 | `packages/tracker-linear`  | Tracker adapter for Linear (GraphQL API and webhooks)                                     | Planned |
 | `packages/runner-orca`     | Runner adapter that runs `orca` on a remote runner over ssh                               | Planned |
@@ -53,7 +53,7 @@ The orchestrator is a self-hosted tool. One operator runs one installation on th
 - A runner is an Orca environment that the orchestrator can reach over ssh.
 - The orchestrator does not change your projects' agent settings. We recommend adding a rule to each project's agent instructions (for example, `AGENTS.md`) to put the ticket key in the pull request title. Otherwise, if an agent opens the pull request from a branch other than the one the orchestrator created (including by renaming that branch), the orchestrator may not find it and may record the run's pull request as missing or closed.
 - Tracker connections, the GitHub token, runners, workspaces, and mappings are set up in web onboarding on first launch. Tokens are stored encrypted in the database.
-- `.env` holds only the minimum values needed to boot: port, bind address, data path, and encryption key. Copy [`.env.example`](./.env.example) to `.env` and replace the values with your own. No code reads `.env` yet, and the token variables still listed in `.env.example` will be removed when boot configuration is implemented.
+- `.env` holds only the minimum values needed to boot: port, bind address, data path, and encryption key. Copy [`.env.example`](./.env.example) to `.env` and replace the values with your own. Generate the encryption key with `openssl rand -base64 32`. `packages/db` parses these values from the shell environment (`parseBootConfig`), but nothing loads `.env` automatically yet.
 
 ## Work items
 

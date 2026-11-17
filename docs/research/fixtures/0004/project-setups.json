@@ -1,0 +1,24 @@
+{
+  "id": "00000000-0000-4000-8000-000000000031",
+  "ok": true,
+  "result": {
+    "setups": [
+      {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "projectId": "github:acme/sandbox",
+        "hostId": "local",
+        "repoId": "00000000-0000-4000-8000-000000000002",
+        "path": "<path>/sandbox",
+        "displayName": "sandbox",
+        "kind": "git",
+        "setupState": "ready",
+        "setupMethod": "legacy-repo",
+        "createdAt": 1790000040312,
+        "updatedAt": 1790000040312
+      }
+    ]
+  },
+  "_meta": {
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
+  }
+}
