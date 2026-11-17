@@ -42,7 +42,7 @@ window.FO = (function () {
     {
       id: "runner-b", host: "runner-b.example.com", user: "factory", online: true, capacity: 2, lastSeen: "12초 전",
       os: "macOS 26.1", orca: "Orca 1.14.2", orcaPath: "/opt/homebrew/bin/orca",
-      projects: ["acme/mobile", "acme/web"],
+      projects: ["acme/mobile", "acme/web", "acme/research"],
     },
     {
       id: "runner-c", host: "runner-c.example.com", user: "factory", online: false, capacity: 4, lastSeen: "42분 전",
@@ -69,8 +69,8 @@ window.FO = (function () {
     { id: 1054, ticket: "ACME-421", state: "running", runner: "runner-a", agent: "claude", started: "14:11", elapsed: 9, step: "코드를 읽고 있어요", pr: null },
     { id: 1055, ticket: "ACME-203", state: "running", runner: "runner-b", agent: "claude", started: "13:48", elapsed: 32, step: "PR을 열고 있어요", pr: null },
 
-    { id: 1056, ticket: "ACME-425", state: "queued", runner: "runner-a", agent: "claude", queued: "14:14", waited: 6, position: 1, reason: "runner-a의 capacity 3개를 모두 쓰고 있어요" },
-    { id: 1050, ticket: "ACME-131", state: "queued", runner: "runner-c", agent: "codex", queued: "13:42", waited: 38, position: 2, reason: "runner-c가 Offline이에요" },
+    { id: 1056, ticket: "ACME-425", state: "queued", runner: "runner-a", agent: "claude", queued: "14:14", waited: 6, position: 2, reason: "runner-a의 capacity 3개를 모두 쓰고 있어요" },
+    { id: 1050, ticket: "ACME-131", state: "queued", runner: "runner-c", agent: "codex", queued: "13:42", waited: 38, position: 1, reason: "runner-c가 Offline이에요" },
     { id: 1057, ticket: "ACME-134", state: "queued", runner: "runner-c", agent: "codex", queued: "14:16", waited: 4, position: 3, reason: "runner-c가 Offline이에요" },
 
     { id: 1051, ticket: "ACME-416", state: "done", result: "check", runner: "runner-a", agent: "claude", started: "13:21", elapsed: 41, ended: "14:02", pr: { number: 1187, state: "open", ci: "failed" }, note: "CI의 e2e 테스트가 실패해 PR을 열어 둔 채 끝냈어요." },
@@ -148,37 +148,37 @@ window.FO = (function () {
   const days = ["11/4", "11/5", "11/6", "11/7", "11/8", "11/9", "11/10", "11/11", "11/12", "11/13", "11/14", "11/15", "11/16", "11/17"];
   const stats = {
     commerce: {
-      daily: [[5, 2, 1], [7, 1, 1], [6, 2, 0], [7, 2, 2], [2, 1, 0], [2, 0, 0], [8, 2, 1], [9, 2, 1], [7, 2, 1], [9, 1, 1], [8, 3, 1], [3, 1, 0], [2, 0, 1], [4, 1, 2]],
+      daily: [[5, 2, 1], [7, 1, 1], [6, 2, 0], [7, 2, 2], [2, 1, 0], [2, 0, 0], [8, 2, 1], [9, 2, 1], [7, 2, 1], [9, 1, 1], [8, 3, 1], [3, 1, 0], [2, 0, 1], [4, 2, 2]],
       lead: { p50: 29, p90: 58 },
       runner: [
         { name: "runner-a", merged: 42, check: 9, failed: 3, p50: 26 },
-        { name: "runner-b", merged: 24, check: 7, failed: 4, p50: 33 },
+        { name: "runner-b", merged: 24, check: 8, failed: 4, p50: 33 },
         { name: "runner-c", merged: 13, check: 4, failed: 5, p50: 31 },
       ],
       project: [
         { name: "Web Console", merged: 40, check: 8, failed: 3, p50: 24 },
-        { name: "Mobile", merged: 26, check: 8, failed: 4, p50: 35 },
+        { name: "Mobile", merged: 26, check: 9, failed: 4, p50: 35 },
         { name: "Billing", merged: 13, check: 4, failed: 5, p50: 31 },
       ],
       agent: [
-        { name: "Claude Code", merged: 64, check: 15, failed: 7, p50: 28 },
+        { name: "Claude Code", merged: 64, check: 16, failed: 7, p50: 28 },
         { name: "Codex", merged: 15, check: 5, failed: 5, p50: 31 },
       ],
     },
     labs: {
-      daily: [[1, 0, 0], [1, 0, 0], [1, 1, 0], [2, 0, 0], [1, 0, 0], [0, 0, 1], [2, 0, 0], [2, 1, 0], [2, 0, 1], [3, 0, 0], [2, 1, 0], [1, 0, 0], [1, 0, 0], [1, 2, 0]],
+      daily: [[1, 0, 0], [1, 0, 0], [1, 1, 0], [2, 0, 0], [1, 0, 0], [0, 0, 1], [2, 0, 0], [2, 1, 0], [2, 0, 1], [3, 0, 0], [2, 1, 0], [1, 0, 0], [1, 0, 0], [1, 1, 1]],
       lead: { p50: 27, p90: 49 },
       runner: [
-        { name: "runner-a", merged: 16, check: 4, failed: 1, p50: 27 },
-        { name: "runner-b", merged: 4, check: 1, failed: 1, p50: 25 },
+        { name: "runner-a", merged: 16, check: 3, failed: 1, p50: 27 },
+        { name: "runner-b", merged: 4, check: 1, failed: 2, p50: 25 },
       ],
       project: [
-        { name: "Platform", merged: 15, check: 4, failed: 1, p50: 28 },
-        { name: "Research", merged: 5, check: 1, failed: 1, p50: 22 },
+        { name: "Platform", merged: 15, check: 3, failed: 1, p50: 28 },
+        { name: "Research", merged: 5, check: 1, failed: 2, p50: 22 },
       ],
       agent: [
-        { name: "Codex", merged: 14, check: 4, failed: 1, p50: 29 },
-        { name: "Claude Code", merged: 6, check: 1, failed: 1, p50: 24 },
+        { name: "Codex", merged: 14, check: 3, failed: 1, p50: 29 },
+        { name: "Claude Code", merged: 6, check: 1, failed: 2, p50: 24 },
       ],
     },
   };

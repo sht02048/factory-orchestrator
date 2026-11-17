@@ -170,7 +170,7 @@
               const rows = wsObj()
                 .projects.map((p) => {
                   const m = FO.mappingFor(p);
-                  return `<span class="proj">${esc(p)}</span>${sel(FO.runners.map((r) => r.id), m && m.runner, `${p} 러너`)}${sel(runnerProjects.concat(["acme/research"]), m && m.project, `${p} 러너 프로젝트`)}${sel(Object.values(FO.agents), m && FO.agents[m.agent], `${p} 에이전트`)}`;
+                  return `<span class="proj">${esc(p)}</span>${sel(FO.runners.map((r) => r.id), m && m.runner, `${p} 러너`)}${sel(runnerProjects, m && m.project, `${p} 러너 프로젝트`)}${sel(Object.values(FO.agents), m && FO.agents[m.agent], `${p} 에이전트`)}`;
                 })
                 .join("");
               return `<form class="form" style="max-width:none" data-msg="Mapping을 저장했어요">
@@ -225,7 +225,7 @@
             group: "install",
             title: "러너 등록",
             sum: () => `${FO.runners.length}대 · ${FO.runners.filter((r) => !r.online).length}대 Offline`,
-            body: () => `<p class="hint" style="margin-bottom:var(--space-4)">러너는 모든 Workspace가 함께 써요. 상태와 슬롯은 <a class="link" href="runners.html">Runners</a>에서 봐요.</p>
+            body: () => `<p class="hint" style="margin-bottom:var(--space-4)">러너는 모든 Workspace가 함께 써요. 상태와 capacity는 <a class="link" href="runners.html">Runners</a>에서 봐요.</p>
                 <form class="form" data-msg="runner-d에 연결했어요. 러너를 등록했어요">
                 <div class="field-row">
                   <div class="field"><label for="nr-host">ssh 주소</label><input class="input mono" id="nr-host" placeholder="factory@runner-d.example.com" autocomplete="off" spellcheck="false" /></div>
