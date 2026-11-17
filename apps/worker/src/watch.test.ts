@@ -436,6 +436,35 @@ describe("연결 끊김", () => {
   });
 });
 
+describe("실제 상태를 읽지 못함", () => {
+  it("러너에 닿는데 폴링 오류가 이어져도 최대 실행 시간이 지나면 에이전트를 멈추고 시간 초과로 끝낸다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    vi.spyOn(fake, "pollRun").mockRejectedValue(
+      new AdapterError<RunnerErrorDetail>({ kind: "malformed-output", raw: "?" }),
+    );
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+
+    h.advance(DEFAULT_MAX_RUN_MS);
+    await worker.tick();
+    expect(ended(run).agentResult).toBe("timed-out");
+    expect(agentOf(run, runnerId).agentStopped).toBe(true);
+  });
+
+  it("폴링 오류가 이어져도 취소 요청은 에이전트를 멈추고 끝낸다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    vi.spyOn(h.runner(runnerId), "pollRun").mockRejectedValue(
+      new AdapterError<RunnerErrorDetail>({ kind: "malformed-output", raw: "?" }),
+    );
+    requestRunCancel(h.db, run.id, h.now);
+    await worker.tick();
+    expect(ended(run).agentResult).toBe("canceled");
+    expect(agentOf(run, runnerId).agentStopped).toBe(true);
+    expect(hasPendingCancelRequest(h.db, run.id)).toBe(false);
+  });
+});
+
 describe("취소", () => {
   it("PR이 열린 Running 런은 에이전트를 멈춘 뒤 운영자가 취소함으로 끝내고 PR 상태를 기록한다", async () => {
     const { run, runnerId, worker } = await startOne();

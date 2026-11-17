@@ -84,13 +84,15 @@ async function watchRun(
   settings: WatchSettings,
 ): Promise<void> {
   const { db, logger, adapters } = context;
-  if (storedRunner === undefined) {
-    logger.warn("run's runner is not registered", { runId: run.id, runnerId: run.runnerId });
-    return;
-  }
   const records = getRunWithRecords(db, run.id)?.records;
   if (records === undefined) return;
   const cancelRequested = hasPendingCancelRequest(db, run.id);
+  if (storedRunner === undefined) {
+    // 러너가 등록에서 빠졌다. 러너에 명령할 수 없으니 닿지 않는 러너처럼 최대 실행 시간이 지나면 끝낸다.
+    logger.warn("run's runner is not registered", { runId: run.id, runnerId: run.runnerId });
+    await endIfTimedOut(context, run, { ...settings, cancelRequested, state: "disconnected" });
+    return;
+  }
   const runner = adapters.runner(storedRunner);
 
   let onRunner: RunOnRunner;
@@ -105,6 +107,13 @@ async function watchRun(
       if (records.unreachableSince !== null) {
         tryWrite(context, run.id, () => updateRunRecords(db, run.id, { unreachableSince: null }));
       }
+      // 실제 상태를 읽지 못해도 최대 실행 시간과 취소는 처리한다. 읽기 오류가 이어져도 런이 끝나지 않고
+      // capacity를 잡고 있지 않게 한다.
+      const ended = await endWithoutProgress(context, run, storedRunner, runner, {
+        ...settings,
+        cancelRequested,
+      });
+      if (ended) return;
       throw error;
     }
     await whileUnreachable(context, run, records, { ...settings, cancelRequested });
@@ -165,13 +174,75 @@ async function watchRun(
   if (ending.agent === "stop") await runner.stopAgent(onRunner);
   if (ending.agent === "close") await runner.closeAgent(onRunner);
   context.pendingEndings.set(run.id, { agentResult: ending.agentResult, report: ending.report });
-  endRun(context, run, {
+  const recorded = endRun(context, run, {
     agentResult: ending.agentResult,
     decision,
     runnerUnreached: false,
     report: ending.report,
   });
-  context.pendingEndings.delete(run.id);
+  if (recorded) context.pendingEndings.delete(run.id);
+}
+
+/**
+ * 러너에는 닿는데 실제 상태를 읽지 못할 때(출력 오류 등). 최대 실행 시간이 지났거나 취소 중이면 지금 상태의
+ * 규칙으로 에이전트를 멈춘 뒤 끝낸다(core decideTimeout). Disconnected면 러너에 명령하지 않는다. 끝냈으면
+ * 참이다. 멈추지 못하면 던져 다음 바퀴에 다시 해 본다.
+ */
+async function endWithoutProgress(
+  context: TickContext,
+  run: ActiveRun,
+  storedRunner: StoredRunner,
+  runner: Runner,
+  input: WatchSettings & { cancelRequested: boolean },
+): Promise<boolean> {
+  const timeout = decideTimeout({
+    state: run.state,
+    startedAt: run.startedAt,
+    now: context.now(),
+    maxRunMs: input.maxRunMs,
+    cancelRequested: input.cancelRequested,
+  });
+  const ending =
+    timeout ??
+    (input.cancelRequested && run.state !== "disconnected"
+      ? { agentResult: "canceled" as const, stopAgent: true, runnerUnreached: false }
+      : null);
+  if (ending === null) return false;
+  if (ending.stopAgent) {
+    const mailbox = context.mailboxes.get(storedRunner.id) ?? storedRunner.mailbox;
+    if (mailbox === null) return false;
+    await runner.stopAgent({ mailbox, worktree: run.worktree, agentRef: run.agentRef });
+  }
+  const decision = await decideRunPrState(context, run);
+  return endRun(context, run, {
+    agentResult: ending.agentResult,
+    decision,
+    runnerUnreached: ending.runnerUnreached,
+    report: null,
+  });
+}
+
+/** 러너에 명령하지 않고 최대 실행 시간이 지났으면 끝낸다(Disconnected 규칙, core decideTimeout). */
+async function endIfTimedOut(
+  context: TickContext,
+  run: ActiveRun,
+  input: WatchSettings & { cancelRequested: boolean; state: "disconnected" },
+): Promise<void> {
+  const timeout = decideTimeout({
+    state: input.state,
+    startedAt: run.startedAt,
+    now: context.now(),
+    maxRunMs: input.maxRunMs,
+    cancelRequested: input.cancelRequested,
+  });
+  if (timeout === null) return;
+  const decision = await decideRunPrState(context, run);
+  endRun(context, run, {
+    agentResult: timeout.agentResult,
+    decision,
+    runnerUnreached: timeout.runnerUnreached,
+    report: null,
+  });
 }
 
 interface Ending extends PendingEnding {
@@ -234,21 +305,7 @@ async function whileUnreachable(
 ): Promise<void> {
   const { db, logger, now } = context;
   if (run.state === "disconnected") {
-    const timeout = decideTimeout({
-      state: run.state,
-      startedAt: run.startedAt,
-      now: now(),
-      maxRunMs: input.maxRunMs,
-      cancelRequested: input.cancelRequested,
-    });
-    if (timeout === null) return;
-    const decision = await decideRunPrState(context, run);
-    endRun(context, run, {
-      agentResult: timeout.agentResult,
-      decision,
-      runnerUnreached: timeout.runnerUnreached,
-      report: null,
-    });
+    await endIfTimedOut(context, run, { ...input, state: run.state });
     return;
   }
 
@@ -274,10 +331,10 @@ function endRun(
     runnerUnreached: boolean;
     report: CompletionReport | null;
   },
-): void {
+): boolean {
   const { db, logger } = context;
   const endedAt = context.now();
-  inTransaction(db, () => {
+  return inTransaction(db, () => {
     const result = changeRunState(
       db,
       run.id,
@@ -292,7 +349,7 @@ function endRun(
     );
     if (!result.ok) {
       reportFailure(logger, run.id, result);
-      return;
+      return false;
     }
     if (input.agentResult === "canceled") markCancelRequestProcessed(db, run.id, endedAt);
     // 끝난 런의 권한 대기는 더 이상 열려 있지 않다. 손댈 일에 남지 않게 닫는다.
@@ -303,6 +360,7 @@ function endRun(
         pullRequest: { id, displayId, url, ci, checkedAt: endedAt },
       });
     }
+    return true;
   });
 }
 
