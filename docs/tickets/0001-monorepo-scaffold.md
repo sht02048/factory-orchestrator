@@ -20,7 +20,8 @@ blocked_by: []
 - Vitest 설정과 예제 테스트 하나
 - GitHub Actions: typecheck → lint → format check → test
 - MIT 라이선스, README 초안
-- GitHub 개인 계정에 public 저장소 `factory-orchestrator` 생성, main에 CI 필수 검사 branch protection
+- main에 CI 필수 검사 branch protection(저장소는 이미 있다). 병합 방식은 머지 커밋만 허용
+- `.agents/pr-gates.json`: CI와 독립 에이전트 리뷰를 게이트로 둔다
 
 ## 완료 조건
 
