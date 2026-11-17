@@ -297,6 +297,15 @@ importers:
         specifier: 1.0.0-rc.5
         version: 1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(zod@4.6.7))
 
+  packages/runner-orca:
+    dependencies:
+      '@factory/core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
   packages/ui:
     dependencies:
       '@stylexjs/stylex':
