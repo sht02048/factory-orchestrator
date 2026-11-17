@@ -7,7 +7,7 @@ The control tower of a software factory. It assigns tickets from a tracker to ru
 | Path                       | Role                                                                                      | Status  |
 | -------------------------- | ----------------------------------------------------------------------------------------- | ------- |
 | `apps/web`                 | UI, server functions, and the Linear webhook receiver (TanStack Start)                    | Started |
-| `apps/worker`              | Long-running daemon for the assignment queue, runner commands, and run and PR polling     | Stub    |
+| `apps/worker`              | Long-running daemon for the assignment queue, runner commands, and run and PR polling     | Started |
 | `apps/cli`                 | `init`, `start`, and launchd/systemd service registration                                 | Planned |
 | `packages/core`            | Domain logic and the Tracker, Runner, and CodeHost adapter interfaces                     | Stub    |
 | `packages/db`              | SQLite (WAL) schema, access, and migrations                                               | Started |
@@ -44,6 +44,8 @@ pnpm install   # also installs the lefthook pre-commit hook
 The browser tests in `e2e` drive the Google Chrome installed on the machine through `playwright-core`; they do not download a browser. GitHub's Ubuntu runners already have Chrome. When a browser test fails, a screenshot of the page is saved to `e2e/test-results/`, and CI uploads it as an artifact.
 
 Start the web app with `pnpm --filter @factory/web dev` and open `http://127.0.0.1:3000/ds` to see the design system. Run the production build with `pnpm --filter @factory/web start`. It binds to `127.0.0.1` by default. To change that, set the shell environment variables `WEB_HOST` and `WEB_PORT` (for example, `WEB_PORT=4000 pnpm --filter @factory/web start`).
+
+Build the worker with `pnpm --filter @factory/worker build` and start it with `pnpm --filter @factory/worker start`. It reads `DATABASE_PATH` and `ENCRYPTION_KEY` from the shell environment, applies pending database migrations, and then polls until it receives `SIGINT` or `SIGTERM`. It builds adapters from the runners, tracker connections, and code host connections stored in the database, and rebuilds an adapter when its settings change.
 
 The pre-commit hook runs lint, format check, typecheck, and the color literal check. CI (GitHub Actions) runs on pull requests and on pushes to `main`, in this order: typecheck → lint → color literal check → format check → test → build → web production smoke test.
 
