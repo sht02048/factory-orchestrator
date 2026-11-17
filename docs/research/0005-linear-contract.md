@@ -76,7 +76,7 @@
 `addedToTeamAt`, `botActor`, `createdAt`, `creatorId`, `description`, `descriptionData`, `id`, `identifier`, `inheritsSharedAccess`, `labelIds`, `labels`, `number`, `previousIdentifiers`, `priority`, `priorityLabel`, `prioritySortOrder`, `reactionData`, `releases`, `slaType`, `sortOrder`, `state`, `stateId`, `subscriberIds`, `team`, `teamId`, `title`, `updatedAt`, `url`.
 
 - `labels`는 `{ id, color, name }` 배열, `state`는 `{ id, color, name, type }`, `team`은 `{ id, key, name }`이다. 라벨 이름과 상태 `type`을 따로 조회하지 않아도 된다.
-- `projectId`·`project`는 이번 티켓에 프로젝트가 없어 본문에 없었다. 값이 없는 필드는 빠지는 것으로 보이며, 프로젝트가 있는 티켓의 필드는 확인하지 않았다. 매핑이 Tracker Project 기준이므로 어댑터는 `projectId`가 없을 수 있다고 보고 파싱해야 한다.
+- `projectId`·`project`는 이번 티켓이 Tracker Project에 속하지 않아 본문에 없었다. 값이 없는 필드는 빠지는 것으로 보이며, Tracker Project에 속한 티켓의 필드는 확인하지 않았다. 매핑이 Tracker Project 기준이므로 어댑터는 `projectId`가 없을 수 있다고 보고 파싱해야 한다.
 - `description`은 마크다운 문자열이고, `descriptionData`는 에디터 문서를 JSON 문자열로 한 번 더 감싼 값이다.
 - 보관(`issueArchive`)은 `Issue remove`로 왔고, `data`에 `archivedAt`이 없었다. 보관과 삭제를 본문으로 가르지 못한다. 그 티켓의 댓글은 `Comment remove`로 함께 왔다.
 
@@ -138,7 +138,7 @@
 - **Auto-assign Label 감지(0014, 0027).** `type: "Issue"`, `action: "update"`에서 `updatedFrom`에 `labelIds` 키가 있고, Auto-assign Label이 `data.labelIds`에는 있고 `updatedFrom.labelIds`에는 없으면 "방금 붙었다"다. `IssueLabel` 이벤트는 쓰지 않는다. research 0002의 "`data.labelIds`에 있고 진행 중인 런이 없다" 조건은 폴링 보정에 그대로 쓴다. 다른 필드(예: 제목)만 바뀐 update에서도 `data.labelIds`에는 라벨이 남아 있으므로, webhook 경로는 `updatedFrom` 차이로 거르는 편이 런 중복 생성을 덜 부른다.
 - **상태 변경 감지.** 같은 방법으로 `updatedFrom.stateId`가 있으면 상태가 바뀐 것이고, 새 상태의 `type`은 `data.state.type`에서 바로 읽는다.
 - **보관·삭제.** `Issue remove`는 보관과 삭제를 가르지 못한다. 둘 다 "더 이상 할당 대상이 아님"으로 다룬다.
-- **서명 검증.** 원문 바이트로 HMAC을 계산한다(research 0002 B.2). 시각은 헤더 `linear-timestamp`와 본문 `webhookTimestamp` 어느 쪽을 써도 같았다.
+- **서명 검증.** 원문 바이트로 HMAC을 계산한다(research 0002 B.2). 재전송 검사(1분)는 본문 `webhookTimestamp`로 한다. 관측값은 헤더 `linear-timestamp`와 같았지만, 서명은 본문 바이트만 덮어 헤더는 서명되지 않는다. 헤더 시각으로 검사하면 가로챈 본문을 헤더만 바꿔 다시 보낼 수 있다.
 - **목록 조회.** 페이지 크기는 250까지 쓸 수 있다. 다만 중첩 connection은 복잡도를 키우므로 목록에서는 중첩을 빼고, 필요한 티켓만 따로 조회한다.
 
 ## 픽스처
