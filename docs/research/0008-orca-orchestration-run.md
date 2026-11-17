@@ -42,7 +42,7 @@ research 0004·0007과 같은 버려도 되는 테스트 저장소(`sandbox`)에
 | 1   | 시작          | ssh 호출자는 Orca 터미널 밖이라 `worker-start`·`run-create`가 `no_active_sender_terminal`로 거절된다. 러너에 셸 터미널 하나(우편함 터미널)를 띄워 그 핸들을 `--from`으로 주면 된다. `worker-start`가 오케스트레이션 Run을 만들고 `dispatchId`·`taskId`·`runId`·`terminal`·`workspace`를 준다 |
 | 2   | 질문과 답     | `check --terminal <우편함> --peek`과 `inbox --terminal run:<runId>`는 메일을 소비하지 않는다. `--peek` 없는 `check`는 FIFO 묶음을 처리됨으로 바꾼다. 답은 `reply --from <우편함> --id <msgId> --body <답>`. 답해도 질문은 처리됨이 되지 않는다                                               |
 | 3   | 끝            | 성공 `worker_done`이 오면 `Task` `status`가 `completed`가 되고(실패 보고 때 값은 미확인), `task-list --full`의 `result`에 `outcome`·보고 본문·`filesModified`·`reportPath`가 남는다. 에이전트 프로세스는 끝나지 않는다                                                                       |
-| 4   | 권한 프롬프트 | 이 러너의 Orca는 Claude Code를 권한 우회로 띄운다. 우회를 막아 띄우자 Orca가 `stopReason: "needs-input"`과 `approval`이 든 escalation을 보냈다. ssh로는 `deny`만 된다. 허용은 사람만 한다                                                                                                    |
+| 4   | 권한 프롬프트 | 이 러너의 Orca는 Claude Code를 권한 우회로 띄운다. 프로젝트 설정으로 우회를 막자(실행 인자는 그대로) Orca가 `stopReason: "needs-input"`과 `approval`이 든 escalation을 보냈다. ssh로는 `deny`만 된다. 허용은 사람만 한다                                                                     |
 | 5   | 이상 종료     | 에이전트만 죽고 셸이 남으면 약 3분 동안 escalation이 없고 `liveness: "unverifiable"`이다. 터미널까지 끝나면 `stopReason: "lost"` escalation이 오고 `Task`가 `ready`로 돌아간다                                                                                                               |
 | 6   | 멈추기        | `worker-stop --dispatch <id>`가 `--from` 없이 에이전트 터미널을 닫는다. `Task`는 `blocked`, `Dispatch`는 `stopped`. 메일은 오지 않는다                                                                                                                                                       |
 | 7   | 정리, push·PR | `worker-release` → `worktree rm --force` → 로컬 브랜치 지우기. 오케스트레이션 Run 기록 하나만 지울 명령은 없다. 에이전트가 러너의 비대화형 세션에서 push하고 `gh pr create`로 PR을 열었다                                                                                                    |
@@ -162,7 +162,7 @@ R1은 시작 약 8초 뒤 `orca orchestration ask --question "..." --options "A,
 
 - `--full`의 `payload`는 JSON이 든 **문자열**이다. 한 번 더 파싱한다. `--full` 없는 `inbox`와 `check`는 `payload`를 객체로 준다 **[실행]**.
 - `options`는 `ask --options`로 준 선택지다. 화면에서 버튼으로 보일 수 있다.
-- 기다리는 동안 `worker-show`는 `activity: "idle"`, `attention: ["input"]`이고 `agentWait`는 `null`이다 **[실행]**([`worker-show-asked.json`](fixtures/0008/worker-show-asked.json)). 같은 때 `--full`의 `projection.stage.activity`는 `"done"`이었다([`worker-show-full-asked.json`](fixtures/0008/worker-show-full-asked.json)). 간단 출력과 `--full`이 다른 값을 주므로 어댑터는 한쪽을 기준으로 정해 읽는다. `ask`로 묻고 턴을 끝낸 에이전트는 권한 프롬프트(4절)와 달리 "사람 입력 대기"로 보이지 않는다. 질문 대기는 메일로 판단한다.
+- 기다리는 동안 `worker-show`는 `activity: "idle"`, `attention: ["input"]`이다 **[실행]**([`worker-show-asked.json`](fixtures/0008/worker-show-asked.json)). `--full`의 `observation.agentWait`는 `null`이다(간단 출력에는 이 필드가 없다). 같은 때 `--full`의 `projection.stage.activity`는 `"done"`이었다([`worker-show-full-asked.json`](fixtures/0008/worker-show-full-asked.json)). 간단 출력과 `--full`이 다른 값을 주므로 어댑터는 한쪽을 기준으로 정해 읽는다. `ask`로 묻고 턴을 끝낸 에이전트는 권한 프롬프트(4절)와 달리 "사람 입력 대기"로 보이지 않는다. 질문 대기는 메일로 판단한다.
 
 ### 읽는 방법: 무엇이 메일을 소비하는가
 
@@ -363,7 +363,7 @@ orca orchestration worker-stop --dispatch ctx_… --json
 - 워크트리는 남는다. help는 "Never deletes the worktree"라고 적는다 **[스키마]**. research 0003의 `terminal close`와 같은 성격이고, 시간 초과 런도 PR 상태를 판정할 수 있다.
 - 멈출 수 없음을 증명하지 못하면 `stop_unknown`, 종료 코드 1이다 **[스키마]**. 관측하지 못했다.
 
-`worker-stop` 전에 로그를 남기려면 `worker-read --dispatch <id>`를 먼저 부른다. 다만 `worker-read`는 터미널을 놓은 뒤에도 보관본을 읽는다고 help가 적는다 **[스키마]**. `worker-release`의 결과도 `archive: "transcript [captured]"`였다 **[실행]**.
+`worker-stop` 전에 로그를 남기려면 `worker-read --dispatch <id>`를 먼저 부른다. 다만 `worker-read`는 터미널을 놓은 뒤에도 보관본을 읽는다고 help가 적는다 **[스키마]**. `worker-release`의 결과는 R1·R2가 `archive: "transcript [captured]"`, R3(에이전트가 보고 없이 죽은 런)가 `archive: "terminal [empty]"`였다 **[실행]**. 이상 종료 런은 보관본이 비어 있을 수 있으므로 놓기 전에 `worker-read`로 읽어 둔다.
 
 ### 그 밖의 멈춤 명령
 
@@ -410,13 +410,13 @@ R1은 답대로 README에 한 줄을 더해 커밋하고, 브랜치를 push하�
 | 멈추기     | `worker-stop --dispatch <id> --json`                                                                                                                                                                                                                                           | `state: "stopped"`, `processAction`. `stop_unknown`(종료 코드 1)이면 `worker-show`로 확인하고 런 상세에 남긴다                                   |
 | 정리       | `worker-release --dispatch <id> --json` → `worktree rm --worktree <workspace 선택자> --force --json` → (선택) 로컬 브랜치 지우기                                                                                                                                               | `state: "released"`, `removed: true`                                                                                                             |
 
-로그 꼬리는 `worker-read --dispatch <id> --limit <n> --json`이 transcript(에이전트 대화)나 터미널 출력을 준다 **[실행]**. 터미널을 놓은 뒤에도 읽힌다 **[스키마]**.
+로그 꼬리는 `worker-read --dispatch <id> --limit <n> --json`이 transcript(에이전트 대화)나 터미널 출력을 준다 **[실행]**. 터미널을 놓은 뒤에도 읽힌다고 help가 적지만 **[스키마]**, R3는 보관본이 비어 있었다(`terminal [empty]`) **[실행]**. 그래서 `worker-release`·`worker-stop` 전에 읽어 런 레코드에 둔다.
 
 ### `pollRun` 판정 순서(제안)
 
 1. `Task`의 `result.provenance`가 `"worker_report"`이고 `result.outcome`이 있음 → Ended(`outcome: "succeeded"`일 때 `status`는 `completed`였다. `"failed"`일 때의 `status`는 확인하지 않았다). 에이전트 결과는 아래 대응표.
 2. 새 `escalation` 메일 중 `stopReason: "lost"`(또는 `exited`) → 에이전트가 보고 없이 사라졌다. Ended.
-3. `stopReason: "needs-input"` escalation(답이 오지 않음) 또는 처리하지 않은 `question` 메일 → Waiting for Input.
+3. `stopReason: "needs-input"` escalation(답이 오지 않음) 또는 오케스트레이터 DB에 답했음이 기록되지 않은 `question` 메일 → Waiting for Input. Orca의 `handled`는 답해도 바뀌지 않으므로 기준으로 쓰지 않는다.
 4. `worker-show` `liveness: "unverifiable"`이고 `worktree ps` 행에서 전에 본 에이전트가 사라짐 → 에이전트가 보고 없이 죽고 셸이 남았다. Orca는 알리지 않으므로 오케스트레이터가 판정한다. 이 경우 Ended로 볼지, 터미널을 닫아 `lost`를 받을지는 정할 것이다.
 5. 그 밖 → Running. 모르는 값은 research 0004대로 진행 중으로 본다.
 
@@ -424,13 +424,13 @@ R1은 답대로 README에 한 줄을 더해 커밋하고, 브랜치를 push하�
 
 ### 런 상태
 
-| GLOSSARY 상태     | 오케스트레이션에서 본 신호                                                                                                                                                               | 비고                                                                                                        |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Queued            | `worker-start` 전                                                                                                                                                                        | Orca 쪽 `Task`는 아직 없다                                                                                  |
-| Running           | `Task` `status: "dispatched"`, `worker-show` `state: "ready"`, `activity: "working"`                                                                                                     |                                                                                                             |
-| Waiting for Input | ① 처리하지 않은 `question` 메일(`worker-show` `activity: "idle"`, `attention: ["input"]`) ② `needs-input` escalation과 `approval.state: "open"`(`activity: "waiting"`, `waitingOnHuman`) | GLOSSARY는 "권한 프롬프트 등"이라 둘 다 들어간다. ①은 오케스트레이터 화면에서 답할 수 있고, ②는 거절만 된다 |
-| Disconnected      | ssh 실패                                                                                                                                                                                 | 오케스트레이션과 상관없다. 다시 닿으면 위 판정으로 돌아간다                                                 |
-| Ended             | `Task` `result`의 `worker_report`(성공 때 `completed`), `lost`/`exited` escalation, `worker-stop`, 시간 초과, 워크트리 사라짐                                                            |                                                                                                             |
+| GLOSSARY 상태     | 오케스트레이션에서 본 신호                                                                                                                                                                                            | 비고                                                                                                        |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Queued            | `worker-start` 전                                                                                                                                                                                                     | Orca 쪽 `Task`는 아직 없다                                                                                  |
+| Running           | `Task` `status: "dispatched"`, `worker-show` `state: "ready"`, `activity: "working"`                                                                                                                                  |                                                                                                             |
+| Waiting for Input | ① 오케스트레이터 DB에 답했음이 기록되지 않은 `question` 메일(`worker-show` `activity: "idle"`, `attention: ["input"]`) ② `needs-input` escalation과 `approval.state: "open"`(`activity: "waiting"`, `waitingOnHuman`) | GLOSSARY는 "권한 프롬프트 등"이라 둘 다 들어간다. ①은 오케스트레이터 화면에서 답할 수 있고, ②는 거절만 된다 |
+| Disconnected      | ssh 실패                                                                                                                                                                                                              | 오케스트레이션과 상관없다. 다시 닿으면 위 판정으로 돌아간다                                                 |
+| Ended             | `Task` `result`의 `worker_report`(성공 때 `completed`), `lost`/`exited` escalation, `worker-stop`, 시간 초과, 워크트리 사라짐                                                                                         |                                                                                                             |
 
 ### 에이전트 결과
 
