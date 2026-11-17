@@ -3,6 +3,7 @@ import type {
   AgentResult,
   CompletionReport,
   MailboxRef,
+  PermissionRequestId,
   PrStateDecision,
   QuestionId,
   RunId,
@@ -40,6 +41,8 @@ export interface TickContext {
    * 다음 바퀴에 표시만 다시 쓴다.
    */
   unmarkedAnswers: Set<string>;
+  /** 러너에 보냈지만 보냈다고 DB에 쓰지 못한 권한 거절(`<런 ID>\n<권한 대기 ID>`). 답과 같이 다룬다. */
+  unmarkedDenials: Set<string>;
   /**
    * 에이전트를 멈추거나 닫았지만 두 축을 쓰지 못한 런과 그때 정한 결과. 다음 바퀴에 기록만 다시 한다.
    * 데몬이 살아 있는 동안만 이어진다.
@@ -59,6 +62,10 @@ export interface PendingStart {
 
 export function answerKey(runId: RunId, questionId: QuestionId): string {
   return `${runId}\n${questionId}`;
+}
+
+export function denialKey(runId: RunId, permissionId: PermissionRequestId): string {
+  return `${runId}\n${permissionId}`;
 }
 
 /** 러너와 워크트리가 있고 아직 끝나지 않은 런 */

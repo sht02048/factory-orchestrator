@@ -120,6 +120,7 @@ export function createWorker(options: WorkerOptions): Worker {
     mailboxes: new Map(),
     unreachableUntil: new Map(),
     unmarkedAnswers: new Set(),
+    unmarkedDenials: new Set(),
     pendingEndings: new Map(),
   };
   let running: Promise<void> | null = null;

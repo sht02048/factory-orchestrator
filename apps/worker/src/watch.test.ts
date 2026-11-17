@@ -4,9 +4,11 @@ import {
   DEFAULT_MAX_RUN_MS,
   answerRunQuestion,
   changeRunState,
+  denyPermissionWait,
   getRun,
   getRunWithRecords,
   hasPendingCancelRequest,
+  listRunPermissionWaits,
   listRunQuestions,
   listRunners,
   listRunStateChanges,
@@ -132,16 +134,55 @@ describe("입력 기다림", () => {
     expect(stateOf(run)).toBe("running");
   });
 
-  it("권한 대기면 Waiting for Input으로 바꾸고, 러너 화면에서 허용하면 Running으로 돌아간다", async () => {
+  it("권한 대기를 DB에 쓰고 Waiting for Input으로 바꾸며, 러너 화면에서 허용하면 닫고 Running으로 돌아간다", async () => {
     const { run, runnerId, worker } = await startOne();
-    const permissionId = h.runner(runnerId).requestPermission(worktreeOf(run), "Bash: rm -rf dist");
+    const permissionId = h
+      .runner(runnerId)
+      .requestPermission(worktreeOf(run), "Bash: rm -rf dist", h.now);
 
     await worker.tick();
     expect(stateOf(run)).toBe("waiting-for-input");
+    expect(listRunPermissionWaits(h.db, run.id)).toEqual([
+      expect.objectContaining({ id: permissionId, detail: "Bash: rm -rf dist", resolvedAt: null }),
+    ]);
 
     h.runner(runnerId).allowPermission(worktreeOf(run), permissionId);
     await worker.tick();
     expect(stateOf(run)).toBe("running");
+    expect(listRunPermissionWaits(h.db, run.id)[0]?.resolvedAt).toEqual(h.now);
+  });
+
+  it("운영자의 거절을 한 번만 보내고, 데몬을 다시 띄워도 다시 보내지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const permissionId = h.runner(runnerId).requestPermission(worktreeOf(run), "Bash: curl");
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+
+    expect(
+      denyPermissionWait(h.db, { runId: run.id, permissionId, reason: "필요 없어요" }, h.now),
+    ).toEqual({ ok: true });
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).denials).toEqual([{ permissionId, reason: "필요 없어요" }]);
+    expect(listRunPermissionWaits(h.db, run.id)[0]?.denial?.sentAt).toEqual(h.now);
+    await worker.close();
+
+    const restarted = h.worker();
+    await restarted.tick();
+    expect(agentOf(run, runnerId).denials).toHaveLength(1);
+    expect(listRunPermissionWaits(h.db, run.id)[0]?.resolvedAt).not.toBeNull();
+  });
+
+  it("런이 끝나면 열린 권한 대기를 닫는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.runner(runnerId).requestPermission(worktreeOf(run), "Bash: make");
+    await worker.tick();
+    expect(listRunPermissionWaits(h.db, run.id)[0]?.resolvedAt).toBeNull();
+
+    h.advance(DEFAULT_MAX_RUN_MS);
+    await worker.tick();
+    expect(ended(run).agentResult).toBe("stopped-waiting-for-input");
+    expect(listRunPermissionWaits(h.db, run.id)[0]?.resolvedAt).toEqual(h.now);
   });
 });
 

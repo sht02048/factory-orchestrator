@@ -18,10 +18,15 @@ import {
   listRunners,
   listRuns,
   listUnsentAnswers,
+  listUnsentDenials,
   listWorkspaces,
   markAnswerSent,
+  markDenialSent,
   markCancelRequestProcessed,
+  recordPermissionWaits,
   recordRunQuestions,
+  resolvePermissionWaits,
+  sentDenialIds,
   sentQuestionIds,
   updateRunRecords,
 } from "@factory/db";
@@ -29,6 +34,7 @@ import type { RunRecords, StoredRunner } from "@factory/db";
 import {
   answerKey,
   decideRunPrState,
+  denialKey,
   isUnreachable,
   mailboxFor,
   reportFailure,
@@ -112,13 +118,23 @@ async function watchRun(
   if (progress.kind === "active") {
     tryWrite(context, run.id, () => recordRunQuestions(db, run.id, progress.questions));
     await sendAnswers(context, run, runner, onRunner);
-    // 권한 대기(Q82.4)는 지금 Waiting for Input 상태로만 DB에 남는다. 대기 내용과 거절 요청을 담는 표는
-    // 0020이 packages/db에 더한다.
+    tryWrite(context, run.id, () =>
+      inTransaction(db, () => {
+        recordPermissionWaits(db, run.id, progress.permissionWaits);
+        resolvePermissionWaits(
+          db,
+          run.id,
+          progress.permissionWaits.map((wait) => wait.id),
+          context.now(),
+        );
+      }),
+    );
+    await sendDenials(context, run, runner, onRunner);
   }
 
   const resolution = resolveRunProgress(progress, {
     answered: answeredQuestions(context, run),
-    denied: new Set<PermissionRequestId>(),
+    denied: deniedPermissions(context, run),
   });
   // 앞 바퀴에 에이전트를 멈추거나 닫았는데 기록하지 못했으면 그때 정한 결과로 기록만 다시 한다. 멈춘 뒤의
   // 실제 상태(보고 없이 사라짐)로 다시 정하면 에이전트 결과가 바뀐다.
@@ -279,6 +295,8 @@ function endRun(
       return;
     }
     if (input.agentResult === "canceled") markCancelRequestProcessed(db, run.id, endedAt);
+    // 끝난 런의 권한 대기는 더 이상 열려 있지 않다. 손댈 일에 남지 않게 닫는다.
+    resolvePermissionWaits(db, run.id, [], endedAt);
     if (input.decision.pr !== null) {
       const { id, displayId, url, ci } = input.decision.pr;
       updateRunRecords(db, run.id, {
@@ -324,6 +342,57 @@ async function sendAnswers(
     );
     if (marked !== undefined) unmarkedAnswers.delete(key);
   }
+}
+
+/**
+ * 운영자가 web에서 남긴 권한 거절을 러너에 보낸다(Q82.4). 답 보내기와 같이 보낸 뒤 한 번만 표시하고, 표시를
+ * 쓰지 못하면 데몬이 살아 있는 동안 메모리에 두어 다시 보내지 않는다. 허용은 러너 화면에서 사람만 한다.
+ */
+async function sendDenials(
+  context: TickContext,
+  run: ActiveRun,
+  runner: Runner,
+  onRunner: RunOnRunner,
+): Promise<void> {
+  const { db, logger, unmarkedDenials } = context;
+  for (const denial of listUnsentDenials(db)) {
+    if (denial.runId !== run.id) continue;
+    const key = denialKey(run.id, denial.permissionId);
+    if (!unmarkedDenials.has(key)) {
+      try {
+        await runner.denyPermission(onRunner, {
+          permissionId: denial.permissionId,
+          reason: denial.reason,
+        });
+      } catch (error) {
+        logger.warn("could not send a permission denial", {
+          runId: run.id,
+          permissionId: denial.permissionId,
+          error,
+        });
+        continue;
+      }
+      unmarkedDenials.add(key);
+    }
+    const marked = tryWrite(context, run.id, () =>
+      markDenialSent(db, { runId: run.id, permissionId: denial.permissionId }, context.now()),
+    );
+    if (marked !== undefined) unmarkedDenials.delete(key);
+  }
+}
+
+/** 거절을 보낸 권한 대기. DB에 표시한 것과 보냈지만 아직 표시하지 못한 것이다. */
+function deniedPermissions(context: TickContext, run: ActiveRun): Set<PermissionRequestId> {
+  const denied = sentDenialIds(context.db, run.id);
+  for (const denial of listUnsentDenials(context.db)) {
+    if (
+      denial.runId === run.id &&
+      context.unmarkedDenials.has(denialKey(run.id, denial.permissionId))
+    ) {
+      denied.add(denial.permissionId);
+    }
+  }
+  return denied;
 }
 
 /** 답을 보낸 질문. DB에 표시한 것과 보냈지만 아직 표시하지 못한 것이다. */
