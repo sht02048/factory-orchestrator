@@ -46,7 +46,7 @@ describe("decideConnection", () => {
     expect(
       decideConnection({
         state: "running",
-        sshFailingSince: start,
+        unreachableSince: start,
         now: at(4 * MINUTE + 59 * SECOND),
       }),
     ).toBe("keep-watching");
@@ -56,14 +56,14 @@ describe("decideConnection", () => {
     "%s 런은 ssh가 5분 동안 계속 실패하면 Disconnected가 된다 (Q67)",
     (state) => {
       expect(
-        decideConnection({ state, sshFailingSince: start, now: at(DISCONNECT_AFTER_MS) }),
+        decideConnection({ state, unreachableSince: start, now: at(DISCONNECT_AFTER_MS) }),
       ).toBe("disconnect");
       expect(DISCONNECT_AFTER_MS).toBe(5 * MINUTE);
     },
   );
 
   it("ssh가 실패하고 있지 않으면 이어서 본다", () => {
-    expect(decideConnection({ state: "running", sshFailingSince: null, now: at(HOUR) })).toBe(
+    expect(decideConnection({ state: "running", unreachableSince: null, now: at(HOUR) })).toBe(
       "keep-watching",
     );
   });
@@ -71,7 +71,7 @@ describe("decideConnection", () => {
   it.each(["queued", "disconnected", "ended"] as const)(
     "%s 런은 연결 끊김으로 바꾸지 않는다",
     (state) => {
-      expect(decideConnection({ state, sshFailingSince: start, now: at(HOUR) })).toBe(
+      expect(decideConnection({ state, unreachableSince: start, now: at(HOUR) })).toBe(
         "keep-watching",
       );
     },
@@ -80,7 +80,7 @@ describe("decideConnection", () => {
 
 describe("resolveRunProgress", () => {
   it("다시 연결했을 때 에이전트가 돌고 있으면 Running으로 돌아간다", () => {
-    expect(resolveRunProgress({ kind: "running", agentStates: [], lastOutputAt: null })).toEqual({
+    expect(resolveRunProgress({ kind: "running", lastOutputAt: null })).toEqual({
       kind: "continue",
       state: "running",
     });

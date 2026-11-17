@@ -1,7 +1,7 @@
 import type { RunProgress } from "./adapters.js";
 import type { AgentResult, RunState } from "./run.js";
 
-/** 런 중 ssh가 이 시간 동안 계속 실패하면 Disconnected가 된다(Q50·Q67). */
+/** 런 중 러너에 이 시간 동안 계속 닿지 않으면(1단계는 ssh 실패) Disconnected가 된다(Q50·Q67). */
 export const DISCONNECT_AFTER_MS = 5 * 60 * 1000;
 
 export interface TimeoutDecision {
@@ -39,18 +39,18 @@ export function decideTimeout(input: {
 }
 
 /**
- * 연결 끊김 판단(Q50·Q67). Running·Waiting for Input 런의 ssh가 5분 동안 계속 실패했으면
+ * 연결 끊김 판단(Q50·Q67). Running·Waiting for Input 런의 러너에 5분 동안 계속 닿지 않았으면
  * Disconnected로 바꾼다. 5분 안이면 상태를 바꾸지 않고 이어서 본다.
- * `sshFailingSince`는 연속 실패가 시작된 시각이고, 한 번이라도 닿으면 null로 되돌린다.
+ * `unreachableSince`는 연속으로 닿지 않기 시작한 시각이고, 한 번이라도 닿으면 null로 되돌린다.
  */
 export function decideConnection(input: {
   state: RunState;
-  sshFailingSince: Date | null;
+  unreachableSince: Date | null;
   now: Date;
 }): "disconnect" | "keep-watching" {
   if (input.state !== "running" && input.state !== "waiting-for-input") return "keep-watching";
-  if (input.sshFailingSince === null) return "keep-watching";
-  const failingMs = input.now.getTime() - input.sshFailingSince.getTime();
+  if (input.unreachableSince === null) return "keep-watching";
+  const failingMs = input.now.getTime() - input.unreachableSince.getTime();
   return failingMs >= DISCONNECT_AFTER_MS ? "disconnect" : "keep-watching";
 }
 

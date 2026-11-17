@@ -3,6 +3,7 @@ export * from "./assignment.js";
 export * from "./ids.js";
 export * from "./pr-state.js";
 export * from "./queue.js";
+export * from "./registry.js";
 export * from "./run.js";
 export * from "./summary.js";
 export * from "./timing.js";

@@ -1,6 +1,10 @@
 /**
  * 테스트용 가짜 어댑터. 메모리 안에서 동작하고, 테스트가 응답을 정할 수 있다.
  * worker 시험(0006·0016)과 끝에서 끝까지 얇은 경로(0008)가 이것으로 돈다.
+ *
+ * 각 가짜는 종류(kind)를 받아 만들 수 있어, 서로 다른 종류의 트래커·러너·코드 호스트가 함께
+ * 등록된 경우도 시험할 수 있다. factory를 AdapterRegistry에 등록하면 만든 어댑터를
+ * factory의 `created`에서 꺼내 응답을 정한다.
  */
 import { AdapterError } from "../adapters.js";
 import type {
@@ -10,12 +14,11 @@ import type {
   Page,
   Paged,
   PullRequestSnapshot,
-  RepoRef,
   RunProgress,
   Runner,
-  RunnerConnection,
   RunnerErrorDetail,
   RunnerHealth,
+  RunnerPrerequisite,
   RunnerProject,
   StartRunInput,
   StartedRun,
@@ -23,13 +26,26 @@ import type {
   TrackerComment,
   TrackerErrorDetail,
   TrackerEvent,
+  TrackerLabel,
   TrackerProject,
   TrackerState,
   TrackerTicket,
   WebhookVerifyError,
 } from "../adapters.js";
-import { toWorktreeRef } from "../ids.js";
-import type { TicketKey, WorktreeRef } from "../ids.js";
+import { toCodeHostKind, toRepoRef, toRunnerKind, toTrackerKind, toWorktreeRef } from "../ids.js";
+import type {
+  CodeHostKind,
+  LabelId,
+  RepoRef,
+  RunnerKind,
+  RunnerProjectId,
+  TicketKey,
+  TrackerKind,
+  TrackerProjectId,
+  TrackerStateId,
+  WorktreeRef,
+} from "../ids.js";
+import type { CodeHostFactory, RunnerFactory, TrackerFactory } from "../registry.js";
 
 function paginate<T>(all: ReadonlyArray<T>, page: Page | undefined): Paged<T> {
   const start = page?.after === undefined ? 0 : Number(page.after);
@@ -45,12 +61,14 @@ function paginate<T>(all: ReadonlyArray<T>, page: Page | undefined): Paged<T> {
 type WebhookResult = { ok: true; event: TrackerEvent } | { ok: false; error: WebhookVerifyError };
 
 export class FakeTracker implements Tracker {
+  readonly kind: TrackerKind;
   readonly tickets = new Map<TicketKey, TrackerTicket>();
   readonly comments = new Map<TicketKey, TrackerComment[]>();
   readonly projects: TrackerProject[] = [];
-  readonly states = new Map<string, TrackerState[]>();
+  readonly labels = new Map<TrackerProjectId, TrackerLabel[]>();
+  readonly states = new Map<TrackerProjectId, TrackerState[]>();
   /** setState 호출 기록 */
-  readonly stateChanges: Array<{ key: TicketKey; stateId: string }> = [];
+  readonly stateChanges: Array<{ key: TicketKey; stateId: TrackerStateId }> = [];
   connection: ConnectionCheck<TrackerErrorDetail> = { ok: true };
   /** verifyWebhook이 돌려줄 값. 따로 정하지 않으면 malformed다. */
   verifyWebhookWith: (input: { rawBody: Uint8Array; now: Date }) => WebhookResult = () => ({
@@ -58,6 +76,10 @@ export class FakeTracker implements Tracker {
     error: "malformed",
   });
   private commentSeq = 0;
+
+  constructor(kind: TrackerKind = toTrackerKind("fake")) {
+    this.kind = kind;
+  }
 
   addTicket(ticket: TrackerTicket): void {
     this.tickets.set(ticket.key, ticket);
@@ -79,19 +101,19 @@ export class FakeTracker implements Tracker {
     return Promise.resolve(this.tickets.get(key) ?? null);
   }
 
-  listProjectTickets(projectId: string, page?: Page): Promise<Paged<TrackerTicket>> {
+  listProjectTickets(projectId: TrackerProjectId, page?: Page): Promise<Paged<TrackerTicket>> {
     const all = [...this.tickets.values()].filter((ticket) => ticket.project?.id === projectId);
     return Promise.resolve(paginate(all, page));
   }
 
   listLabeledTickets(input: {
-    labelName: string;
+    labelId: LabelId;
     updatedSince: Date;
   }): Promise<ReadonlyArray<TrackerTicket>> {
     return Promise.resolve(
       [...this.tickets.values()].filter(
         (ticket) =>
-          ticket.labels.some((label) => label.name === input.labelName) &&
+          ticket.labels.some((label) => label.id === input.labelId) &&
           ticket.updatedAt.getTime() >= input.updatedSince.getTime(),
       ),
     );
@@ -105,11 +127,15 @@ export class FakeTracker implements Tracker {
     return Promise.resolve(this.projects);
   }
 
-  listStates(teamId: string): Promise<ReadonlyArray<TrackerState>> {
-    return Promise.resolve(this.states.get(teamId) ?? []);
+  listLabels(projectId: TrackerProjectId): Promise<ReadonlyArray<TrackerLabel>> {
+    return Promise.resolve(this.labels.get(projectId) ?? []);
   }
 
-  setState(key: TicketKey, stateId: string): Promise<void> {
+  listStates(projectId: TrackerProjectId): Promise<ReadonlyArray<TrackerState>> {
+    return Promise.resolve(this.states.get(projectId) ?? []);
+  }
+
+  setState(key: TicketKey, stateId: TrackerStateId): Promise<void> {
     const ticket = this.tickets.get(key);
     if (ticket === undefined) return Promise.reject(new AdapterError({ kind: "not-found" }));
     const state = [...this.states.values()].flat().find((s) => s.id === stateId);
@@ -132,14 +158,7 @@ export class FakeTracker implements Tracker {
 
 // ---------- Runner ----------
 
-interface FakeRunnerHost {
-  online: boolean;
-  serviceInstalled: boolean | null;
-  projects: RunnerProject[];
-}
-
 interface FakeWorktree {
-  sshTarget: string;
   input: StartRunInput;
   progress: RunProgress;
   log: string[];
@@ -147,36 +166,29 @@ interface FakeWorktree {
 }
 
 /**
- * 러너는 RunnerConnection.sshTarget으로 가른다. 따로 정하지 않은 러너는 Online이고
- * 상시 서비스가 설치돼 있으며, `setProjects`로 넣은 러너 쪽 프로젝트를 가진다고 답한다.
- * Offline 러너에 닿는 메서드는 ssh-failed AdapterError로 실패한다.
+ * 러너 하나. 따로 정하지 않으면 Online이고 갖춰야 할 것을 모두 갖췄으며,
+ * `setProjects`로 넣은 러너 쪽 프로젝트를 가진다고 답한다.
+ * Offline이면 러너에 닿는 메서드가 unreachable AdapterError로 실패한다.
  */
 export class FakeRunner implements Runner {
+  readonly kind: RunnerKind;
   readonly worktrees = new Map<WorktreeRef, FakeWorktree>();
   /** removeWorktree 호출 기록 */
   readonly removed: Array<{ worktree: WorktreeRef; force: boolean }> = [];
-  private readonly hosts = new Map<string, FakeRunnerHost>();
+  online = true;
+  prerequisites: RunnerPrerequisite[] = [
+    { id: "fake-service", name: "fake service", satisfied: true, hint: null },
+  ];
+  projects: RunnerProject[] = [];
+  private readonly started = new Map<string, StartedRun>();
   private worktreeSeq = 0;
 
-  private host(sshTarget: string): FakeRunnerHost {
-    let host = this.hosts.get(sshTarget);
-    if (host === undefined) {
-      host = { online: true, serviceInstalled: true, projects: [] };
-      this.hosts.set(sshTarget, host);
-    }
-    return host;
+  constructor(kind: RunnerKind = toRunnerKind("fake")) {
+    this.kind = kind;
   }
 
-  setOnline(sshTarget: string, online: boolean): void {
-    this.host(sshTarget).online = online;
-  }
-
-  setServiceInstalled(sshTarget: string, installed: boolean | null): void {
-    this.host(sshTarget).serviceInstalled = installed;
-  }
-
-  setProjects(sshTarget: string, projects: ReadonlyArray<RunnerProject>): void {
-    this.host(sshTarget).projects = [...projects];
+  setProjects(projects: ReadonlyArray<RunnerProject>): void {
+    this.projects = [...projects];
   }
 
   /** 런의 진행을 테스트가 정한다(입력 기다림, 끝남, 사라짐 등). */
@@ -185,99 +197,97 @@ export class FakeRunner implements Runner {
       this.worktrees.delete(worktree);
       return;
     }
-    const entry = this.mustGet(worktree);
-    entry.progress = progress;
+    this.mustGet(worktree).progress = progress;
   }
 
   appendLog(worktree: WorktreeRef, ...lines: string[]): void {
     this.mustGet(worktree).log.push(...lines);
   }
 
-  checkHealth(conn: RunnerConnection): Promise<RunnerHealth> {
-    const host = this.host(conn.sshTarget);
+  checkHealth(): Promise<RunnerHealth> {
     return Promise.resolve({
-      online: host.online,
-      orcaVersion: host.online ? "fake" : null,
-      runtimeState: host.online ? "ready" : null,
-      serviceInstalled: host.online ? host.serviceInstalled : null,
+      online: this.online,
+      version: this.online ? "fake" : null,
+      prerequisites: this.online
+        ? this.prerequisites
+        : this.prerequisites.map((p) => ({ ...p, satisfied: null })),
       checkedAt: new Date(),
-      error: host.online ? null : sshFailed(),
+      error: this.online ? null : unreachable(),
     });
   }
 
-  listProjects(conn: RunnerConnection): Promise<ReadonlyArray<RunnerProject>> {
-    return this.reach(conn, (host) => host.projects);
+  listProjects(): Promise<ReadonlyArray<RunnerProject>> {
+    return this.reach(() => this.projects);
   }
 
-  startRun(conn: RunnerConnection, input: StartRunInput): Promise<StartedRun> {
-    return this.reach(conn, (host) => {
-      if (!host.projects.some((project) => project.id === input.project)) {
+  startRun(input: StartRunInput): Promise<StartedRun> {
+    return this.reach(() => {
+      // 같은 retryToken으로 다시 보내면 실제 러너처럼 같은 시작을 돌려준다.
+      const retried =
+        input.retryToken === undefined ? undefined : this.started.get(input.retryToken);
+      if (retried !== undefined) return retried;
+
+      if (!this.projects.some((project) => project.id === input.project)) {
         throw new AdapterError<RunnerErrorDetail>({
-          kind: "orca-error",
+          kind: "runner-error",
           code: "project_not_found",
           message: `unknown project ${input.project}`,
         });
       }
       this.worktreeSeq += 1;
-      const operationId = input.retryOperationId ?? `op-${this.worktreeSeq}`;
-      const worktree = toWorktreeRef(`fake-repo::/fake/${input.worktreeName}-${this.worktreeSeq}`);
+      const retryToken = input.retryToken ?? `op-${this.worktreeSeq}`;
+      const worktree = toWorktreeRef(`fake::/fake/${input.worktreeName}-${this.worktreeSeq}`);
       this.worktrees.set(worktree, {
-        sshTarget: conn.sshTarget,
         input,
-        progress: { kind: "running", agentStates: ["working"], lastOutputAt: null },
+        progress: { kind: "running", lastOutputAt: null },
         log: [],
         agentStopped: false,
       });
-      return {
+      const started: StartedRun = {
         worktree,
         branch: input.branch,
-        agentHandle: `term-${this.worktreeSeq}`,
-        operationId,
+        retryToken,
         promptDelivered: true,
       };
+      this.started.set(retryToken, started);
+      return started;
     });
   }
 
-  pollRun(conn: RunnerConnection, worktree: WorktreeRef): Promise<RunProgress> {
-    return this.reach(conn, () => this.worktrees.get(worktree)?.progress ?? { kind: "gone" });
+  pollRun(worktree: WorktreeRef): Promise<RunProgress> {
+    return this.reach(() => this.worktrees.get(worktree)?.progress ?? { kind: "gone" });
   }
 
-  stopAgent(conn: RunnerConnection, worktree: WorktreeRef): Promise<void> {
-    return this.reach(conn, () => {
+  stopAgent(worktree: WorktreeRef): Promise<void> {
+    return this.reach(() => {
       const entry = this.mustGet(worktree);
       entry.agentStopped = true;
       entry.progress = { kind: "finished", exitCode: null };
     });
   }
 
-  readLogTail(
-    conn: RunnerConnection,
-    worktree: WorktreeRef,
-    opts: { lines: number },
-  ): Promise<ReadonlyArray<string>> {
-    return this.reach(conn, () => this.mustGet(worktree).log.slice(-opts.lines));
+  readLogTail(worktree: WorktreeRef, opts: { lines: number }): Promise<ReadonlyArray<string>> {
+    return this.reach(() => {
+      const log = this.mustGet(worktree).log;
+      return opts.lines <= 0 ? [] : log.slice(-opts.lines);
+    });
   }
 
-  worktreeExists(conn: RunnerConnection, worktree: WorktreeRef): Promise<boolean> {
-    return this.reach(conn, () => this.worktrees.has(worktree));
+  worktreeExists(worktree: WorktreeRef): Promise<boolean> {
+    return this.reach(() => this.worktrees.has(worktree));
   }
 
-  removeWorktree(
-    conn: RunnerConnection,
-    worktree: WorktreeRef,
-    opts: { force: boolean },
-  ): Promise<void> {
-    return this.reach(conn, () => {
+  removeWorktree(worktree: WorktreeRef, opts: { force: boolean }): Promise<void> {
+    return this.reach(() => {
       this.worktrees.delete(worktree);
       this.removed.push({ worktree, force: opts.force });
     });
   }
 
-  private reach<T>(conn: RunnerConnection, fn: (host: FakeRunnerHost) => T): Promise<T> {
-    const host = this.host(conn.sshTarget);
-    if (!host.online) return Promise.reject(new AdapterError(sshFailed()));
+  private reach<T>(fn: () => T): Promise<T> {
+    if (!this.online) return Promise.reject(new AdapterError(unreachable()));
     try {
-      return Promise.resolve(fn(host));
+      return Promise.resolve(fn());
     } catch (error) {
       return Promise.reject(error instanceof Error ? error : new Error(String(error)));
     }
@@ -287,8 +297,8 @@ export class FakeRunner implements Runner {
     const entry = this.worktrees.get(worktree);
     if (entry === undefined) {
       throw new AdapterError<RunnerErrorDetail>({
-        kind: "orca-error",
-        code: "selector_not_found",
+        kind: "runner-error",
+        code: "worktree_not_found",
         message: `unknown worktree ${worktree}`,
       });
     }
@@ -296,27 +306,43 @@ export class FakeRunner implements Runner {
   }
 }
 
-function sshFailed(): RunnerErrorDetail {
-  return { kind: "ssh-failed", exitCode: 255, stderr: "fake runner is offline" };
+function unreachable(): RunnerErrorDetail {
+  return { kind: "unreachable", detail: "fake runner is offline" };
 }
 
 // ---------- CodeHost ----------
 
-/** PR은 저장소별로 넣는다. 브랜치·티켓 키 찾기는 넣은 PR에서 고른다. */
+/**
+ * PR은 저장소별로 넣는다. 브랜치·티켓 키 찾기는 넣은 PR에서 고른다.
+ * 러너 쪽 프로젝트 ID "<prefix><저장소>"를 저장소로 읽는다(기본 prefix "fake:").
+ */
 export class FakeCodeHost implements CodeHost {
+  readonly kind: CodeHostKind;
   connection: ConnectionCheck<CodeHostErrorDetail> = { ok: true };
-  rateLimitValue = { limit: 5000, remaining: 5000, resetAt: new Date(0) };
-  private readonly prs = new Map<string, PullRequestSnapshot[]>();
+  rateLimitValue: { limit: number; remaining: number; resetAt: Date } | null = null;
+  private readonly prs = new Map<RepoRef, PullRequestSnapshot[]>();
+  private readonly projectPrefix: string;
+
+  constructor(kind: CodeHostKind = toCodeHostKind("fake"), projectPrefix = "fake:") {
+    this.kind = kind;
+    this.projectPrefix = projectPrefix;
+  }
 
   /** 같은 번호의 PR이 있으면 바꾼다. 병합·닫힘 같은 이후 변화도 이것으로 정한다. */
   putPullRequest(repo: RepoRef, pr: PullRequestSnapshot): void {
-    const list = (this.prs.get(repoKey(repo)) ?? []).filter((p) => p.number !== pr.number);
+    const list = (this.prs.get(repo) ?? []).filter((p) => p.number !== pr.number);
     list.push(pr);
-    this.prs.set(repoKey(repo), list);
+    this.prs.set(repo, list);
   }
 
   checkConnection(): Promise<ConnectionCheck<CodeHostErrorDetail>> {
     return Promise.resolve(this.connection);
+  }
+
+  repoOf(project: RunnerProjectId): RepoRef | null {
+    if (!project.startsWith(this.projectPrefix)) return null;
+    const name = project.slice(this.projectPrefix.length);
+    return name.length === 0 ? null : toRepoRef(name);
   }
 
   findPullRequestsByBranch(
@@ -339,15 +365,71 @@ export class FakeCodeHost implements CodeHost {
     return Promise.resolve(this.list(repo).find((pr) => pr.number === number) ?? null);
   }
 
-  rateLimit(): Promise<{ limit: number; remaining: number; resetAt: Date }> {
+  rateLimit(): Promise<{ limit: number; remaining: number; resetAt: Date } | null> {
     return Promise.resolve(this.rateLimitValue);
   }
 
   private list(repo: RepoRef): ReadonlyArray<PullRequestSnapshot> {
-    return this.prs.get(repoKey(repo)) ?? [];
+    return this.prs.get(repo) ?? [];
   }
 }
 
-function repoKey(repo: RepoRef): string {
-  return `${repo.owner}/${repo.name}`.toLowerCase();
+// ---------- Factories ----------
+
+/** 등록할 수 있는 가짜 factory. create로 만든 어댑터를 `created`에 순서대로 모은다. */
+export interface FakeFactory<F, A> {
+  readonly factory: F;
+  readonly created: A[];
+}
+
+export function fakeTrackerFactory(
+  kind: TrackerKind = toTrackerKind("fake"),
+): FakeFactory<TrackerFactory, FakeTracker> {
+  const created: FakeTracker[] = [];
+  return {
+    created,
+    factory: {
+      kind,
+      create: () => {
+        const tracker = new FakeTracker(kind);
+        created.push(tracker);
+        return tracker;
+      },
+    },
+  };
+}
+
+export function fakeRunnerFactory(
+  kind: RunnerKind = toRunnerKind("fake"),
+): FakeFactory<RunnerFactory, FakeRunner> {
+  const created: FakeRunner[] = [];
+  return {
+    created,
+    factory: {
+      kind,
+      create: () => {
+        const runner = new FakeRunner(kind);
+        created.push(runner);
+        return runner;
+      },
+    },
+  };
+}
+
+export function fakeCodeHostFactory(
+  kind: CodeHostKind = toCodeHostKind("fake"),
+  projectPrefix = "fake:",
+): FakeFactory<CodeHostFactory, FakeCodeHost> {
+  const created: FakeCodeHost[] = [];
+  return {
+    created,
+    factory: {
+      kind,
+      create: () => {
+        const codeHost = new FakeCodeHost(kind, projectPrefix);
+        created.push(codeHost);
+        return codeHost;
+      },
+    },
+  };
 }

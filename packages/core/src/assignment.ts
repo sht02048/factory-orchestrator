@@ -1,4 +1,4 @@
-import type { RunnerId, RunnerProjectId } from "./ids.js";
+import type { LabelId, RunnerId, RunnerProjectId } from "./ids.js";
 import { ACTIVE_RUN_STATES, CAPACITY_OCCUPYING_STATES } from "./run.js";
 import type { RunState } from "./run.js";
 
@@ -34,8 +34,8 @@ export function checkAssignment(input: {
 
 /** 자동 할당 조건: 티켓에 Auto-assign Label이 있고 동시에 도는 런이 없다(스펙 3.2). */
 export function checkAutoAssignment(input: {
-  labelIds: ReadonlyArray<string>;
-  autoAssignLabelId: string;
+  labelIds: ReadonlyArray<LabelId>;
+  autoAssignLabelId: LabelId;
   runsForTicket: ReadonlyArray<{ state: RunState }>;
 }): AssignmentCheck {
   if (!input.labelIds.includes(input.autoAssignLabelId)) {

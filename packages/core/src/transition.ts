@@ -5,7 +5,7 @@ import type { RunState } from "./run.js";
  *
  * ```
  * Queued ──► Running ⇄ Waiting for Input
- * Running | Waiting for Input ──(ssh 5분 연속 실패)──► Disconnected
+ * Running | Waiting for Input ──(러너에 5분 연속 닿지 않음)──► Disconnected
  * Disconnected ──(다시 연결)──► Running | Waiting for Input
  * Running | Waiting for Input | Disconnected ──► Ended
  * ```

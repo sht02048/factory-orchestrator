@@ -7,7 +7,7 @@ import {
   remainingCapacity,
 } from "./assignment.js";
 import type { RunnerSnapshot } from "./assignment.js";
-import { toRunnerId, toRunnerProjectId } from "./ids.js";
+import { toLabelId, toRunnerId, toRunnerProjectId } from "./ids.js";
 import { RUN_STATES } from "./run.js";
 import type { RunState } from "./run.js";
 
@@ -22,7 +22,7 @@ function runner(overrides: Partial<RunnerSnapshot> & Pick<RunnerSnapshot, "id">)
 }
 
 describe("checkAutoAssignment", () => {
-  const label = "label-auto";
+  const label = toLabelId("label-auto");
 
   it("Auto-assign Label이 있고 동시에 도는 런이 없으면 할당한다", () => {
     expect(
@@ -32,7 +32,11 @@ describe("checkAutoAssignment", () => {
 
   it("Auto-assign Label이 없으면 할당하지 않는다", () => {
     expect(
-      checkAutoAssignment({ labelIds: ["other"], autoAssignLabelId: label, runsForTicket: [] }),
+      checkAutoAssignment({
+        labelIds: [toLabelId("other")],
+        autoAssignLabelId: label,
+        runsForTicket: [],
+      }),
     ).toEqual({ ok: false, reason: "no-auto-assign-label" });
   });
 
