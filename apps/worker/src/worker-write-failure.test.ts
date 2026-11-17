@@ -57,7 +57,7 @@ describe("러너에서 시작한 뒤 DB 쓰기 실패", () => {
     expect(h.runner(runnerA).worktrees.size).toBe(1);
   });
 
-  it("기록 전에 러너가 Offline이 되어도 다른 러너에서 다시 시작하지 않는다", async () => {
+  it("기록 전에 러너가 Offline이 되어도 다른 러너에서 다시 시작하지 않고 시작한 러너로 기록한다", async () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
@@ -66,15 +66,32 @@ describe("러너에서 시작한 뒤 DB 쓰기 실패", () => {
 
     failure.changeRunStateFailures = 1;
     await worker.tick();
+    expect(getRun(h.db, run.id)?.state).toBe("queued");
+
     h.setRunnerOnline(runnerA, false);
     await worker.tick();
-    expect(getRun(h.db, run.id)).toMatchObject({ state: "queued", runnerId: runnerA });
-    expect(h.runner(runnerB).worktrees.size).toBe(0);
-
-    h.setRunnerOnline(runnerA, true);
-    await worker.tick();
     expect(getRun(h.db, run.id)).toMatchObject({ state: "running", runnerId: runnerA });
+    expect(h.runner(runnerB).worktrees.size).toBe(0);
     expect(startRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("기록하지 못한 시작은 그 러너의 capacity를 차지한다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const first = h.assign("ENG-1", projectA);
+    const second = h.assign("ENG-2", projectA);
+    const worker = h.worker();
+
+    // 첫 런의 Running 쓰기가 두 번(시작 직후, 다음 바퀴 첫 기록) 실패한다.
+    failure.changeRunStateFailures = 2;
+    await worker.tick();
+    await worker.tick();
+    expect(getRun(h.db, first.id)?.state).toBe("queued");
+    expect(getRun(h.db, second.id)?.state).toBe("queued");
+    expect(h.runner(runnerA).worktrees.size).toBe(1);
+
+    await worker.tick();
+    expect(getRun(h.db, first.id)?.state).toBe("running");
+    expect(getRun(h.db, second.id)?.state).toBe("queued");
   });
 
   it("다시 보내기 값을 DB에 쓰지 못해도 다음 바퀴에 그 값으로 다시 보낸다", async () => {

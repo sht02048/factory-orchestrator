@@ -17,6 +17,7 @@ import type {
 } from "@factory/core";
 import {
   changeRunState,
+  getRun,
   getRunWithRecords,
   inTransaction,
   listRunPlacements,
@@ -191,12 +192,13 @@ async function pollRun(
 
   // PR을 찾지 못하면(코드 호스트 오류) 끝내지 않고 다음 바퀴에 다시 본다. 두 축은 한 번만 기록한다.
   const decision = await decideRunPrState(context, run);
+  const endedAt = now();
   inTransaction(db, () => {
     const result = changeRunState(
       db,
       run.id,
       { to: "ended", agentResult: resolution.agentResult, prState: decision.prState },
-      now(),
+      endedAt,
     );
     if (!result.ok) {
       reportFailure(logger, run, result);
@@ -205,7 +207,7 @@ async function pollRun(
     if (decision.pr !== null) {
       const { id, displayId, url, ci } = decision.pr;
       updateRunRecords(db, run.id, {
-        pullRequest: { id, displayId, url, ci, checkedAt: now() },
+        pullRequest: { id, displayId, url, ci, checkedAt: endedAt },
       });
     }
   });
@@ -214,11 +216,15 @@ async function pollRun(
 /**
  * 런과 이어진 PR을 코드 호스트에서 찾아 core decidePrState로 PR 상태를 정한다(Q40).
  * 런의 러너 쪽 프로젝트를 저장소로 읽는 코드 호스트가 없으면 이을 PR이 없으니 없음이다.
+ * 다만 어댑터를 만들지 못한 코드 호스트 연결이 있으면 그 연결이 이 저장소를 읽을 수 있으니,
+ * 없음으로 확정하지 않고 던져 다음 바퀴에 다시 본다(두 축은 한 번만 기록한다, Q69).
  */
 async function decideRunPrState(context: TickContext, run: ActiveRun): Promise<PrStateDecision> {
-  const codeHosts = context.adapters.allCodeHosts(context.db, (connectionId, error) =>
-    context.logger.warn("could not create code host adapter", { connectionId, error }),
-  );
+  let unavailable = 0;
+  const codeHosts = context.adapters.allCodeHosts(context.db, (connectionId, error) => {
+    unavailable += 1;
+    context.logger.warn("could not create code host adapter", { connectionId, error });
+  });
   for (const codeHost of codeHosts) {
     const repo = codeHost.repoOf(run.runnerProject);
     if (repo === null) continue;
@@ -227,6 +233,11 @@ async function decideRunPrState(context: TickContext, run: ActiveRun): Promise<P
       codeHost.findPullRequestsByTicketKey(repo, run.ticket.key),
     ]);
     return decidePrState({ repo, runStartedAt: run.startedAt, byBranch, byTicketKey });
+  }
+  if (unavailable > 0) {
+    throw new Error(
+      "no code host reads the run's project while some code host adapters are unavailable",
+    );
   }
   context.logger.warn("no code host reads the run's project; recording no pull request", {
     runId: run.id,
@@ -242,34 +253,58 @@ async function decideRunPrState(context: TickContext, run: ActiveRun): Promise<P
  * 러너를 비우고 정하는 것(Q65·Q68·Q72·Q73)은 한 쓰기 트랜잭션에서 쓰고, 시작은 들어온 순서로 한다.
  * 앞 런이 시작하지 못하면 뒤 런도 이번 바퀴에는 시작하지 않는다(Q63 개정).
  *
- * 예외: 러너에 보낸 시작의 결과를 아직 모르는 런(boundRunners)은 그 러너에 묶어 둔다. 그 러너가 Offline이
- * 되어도 러너를 비우거나 다른 러너에서 시작하지 않는다. 첫 시작이 실제로 됐다면 에이전트가 둘 생기기
- * 때문이다. 그동안 planQueue는 이 런을 러너 없는 런처럼 순서에서 빼므로 뒤 런을 막지 않는다.
+ * 예외: 러너에 보낸 시작의 결과를 아직 모르는 런(boundRunners)은 그 러너에 묶어 둔다. 첫 시작이 실제로
+ * 됐다면 다른 러너에서 다시 시작할 때 에이전트가 둘 생기기 때문이다.
+ * - 묶인 러너가 Online이면 그대로 planQueue에 넣는다. 러너가 정해져 있어 그 러너에서만 시작한다.
+ * - 묶인 러너가 Online이 아니면 planQueue에 넣지 않는다. 러너를 비우거나 다른 러너를 고르지 않고,
+ *   Offline 예외(Q68)처럼 순서에서 빠져 뒤 런을 막지 않는다. 러너가 돌아오면 원래 자리로 돌아간다.
+ * - 러너에서 시작했지만 Running을 쓰지 못한 런은 판단 전에 기록을 다시 해 본다. 그래도 못 쓰면
+ *   planQueue에 넣지 않고 그 러너의 capacity를 차지한 것으로 센다.
  */
 async function processQueue(context: TickContext): Promise<void> {
-  const { db } = context;
+  const { db, pendingStarts } = context;
+  recordPendingStarts(context);
+
   const plan = inTransaction(db, () => {
     const queued = listRuns(db, { states: ["queued"] });
     if (queued.length === 0) return null;
+    const runners = listRunnerSnapshots(db);
+    const online = new Set(runners.filter((runner) => runner.online).map((runner) => runner.id));
     const bound = boundRunners(context, queued);
-    const result = planQueue({
-      queued: queued.flatMap(toQueuedRun),
-      runners: listRunnerSnapshots(db),
-      runs: listRunPlacements(db),
+    const runs = listRunPlacements(db);
+    for (const pending of pendingStarts.values()) {
+      if (pending.started !== null) runs.push({ runnerId: pending.runnerId, state: "running" });
+    }
+    const candidates = queued.flatMap(toQueuedRun).filter((run) => {
+      const runnerId = bound.get(run.id);
+      if (runnerId === undefined) return true;
+      return (pendingStarts.get(run.id)?.started ?? null) === null && online.has(runnerId);
     });
-    for (const runId of result.cleared) {
-      if (!bound.has(runId)) setQueuedRunRunner(db, runId, null);
-    }
-    for (const choice of result.assigned) {
-      if (!bound.has(choice.runId)) setQueuedRunRunner(db, choice.runId, choice.runnerId);
-    }
-    return result.start.filter(
-      (choice) => (bound.get(choice.runId) ?? choice.runnerId) === choice.runnerId,
-    );
+
+    const result = planQueue({ queued: candidates, runners, runs });
+    for (const runId of result.cleared) setQueuedRunRunner(db, runId, null);
+    for (const choice of result.assigned) setQueuedRunRunner(db, choice.runId, choice.runnerId);
+    return result.start;
   });
 
   for (const choice of plan ?? []) {
     if (!(await startQueuedRun(context, choice))) return;
+  }
+}
+
+/** 러너에서 시작했지만 Running을 쓰지 못한 런을 다시 기록한다. */
+function recordPendingStarts(context: TickContext): void {
+  for (const [runId, pending] of context.pendingStarts) {
+    const { started } = pending;
+    if (started === null) continue;
+    const run = getRun(context.db, runId);
+    if (run?.state !== "queued") {
+      context.pendingStarts.delete(runId);
+      continue;
+    }
+    if (tryWrite(context, run, () => recordStart(context, run, started)) !== undefined) {
+      context.pendingStarts.delete(runId);
+    }
   }
 }
 
@@ -317,7 +352,10 @@ function toQueuedRun(run: StoredRun): QueuedRun[] {
 async function startQueuedRun(context: TickContext, choice: RunnerChoice): Promise<boolean> {
   const { db, pendingStarts } = context;
   const found = getRunWithRecords(db, choice.runId);
-  if (found === null) return false;
+  if (found === null) {
+    pendingStarts.delete(choice.runId);
+    return false;
+  }
   const { run, records } = found;
   if (run.state !== "queued") {
     pendingStarts.delete(choice.runId);

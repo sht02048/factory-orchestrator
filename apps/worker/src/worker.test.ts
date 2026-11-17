@@ -116,6 +116,24 @@ describe("두 축 기록", () => {
     },
   );
 
+  it("코드 호스트 어댑터를 만들지 못하면 PR 상태를 없음으로 확정하지 않고 다음 바퀴에 다시 본다", async () => {
+    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    const worker = h.worker();
+    await worker.tick();
+    h.putPullRequest(current(run), "open");
+    finish(run, 0);
+
+    h.codeHostBroken = true;
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+
+    h.codeHostBroken = false;
+    await worker.tick();
+    const ended = current(run);
+    expect(ended.state === "ended" && ended.prState).toBe("open");
+  });
+
   it("코드 호스트가 실패하면 끝내지 않고 다음 바퀴에 다시 기록한다", async () => {
     h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
@@ -275,9 +293,9 @@ describe("결과를 모르는 시작", () => {
     expect(sent).toHaveLength(2);
   });
 
-  it("묶인 런은 뒤 런을 막지 않는다", async () => {
+  it("묶인 런은 맞는 다른 러너의 capacity를 차지하지 않고 뒤 런을 막지 않는다", async () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
-    h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
+    h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA, projectB] });
     const bound = h.assign("ENG-1", projectA);
     const behind = h.assign("ENG-2", projectB);
 

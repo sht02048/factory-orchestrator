@@ -74,6 +74,8 @@ export class Harness {
   readonly registry: AdapterRegistry;
   readonly warnings: Array<{ message: string; fields: unknown }> = [];
   now = new Date("2026-11-17T00:00:00Z");
+  /** true면 코드 호스트 factory가 던진다(설정 오류 등). */
+  codeHostBroken = false;
   private readonly dir: string;
   private readonly workers: Worker[] = [];
   private prSeq = 0;
@@ -110,7 +112,13 @@ export class Harness {
 
     this.registry = new AdapterRegistry()
       .registerTracker({ kind: toTrackerKind(fakeKind), create: () => this.tracker })
-      .registerCodeHost({ kind: toCodeHostKind(fakeKind), create: () => this.codeHost })
+      .registerCodeHost({
+        kind: toCodeHostKind(fakeKind),
+        create: () => {
+          if (this.codeHostBroken) throw new Error("code host config is broken");
+          return this.codeHost;
+        },
+      })
       .registerRunner({
         kind: toRunnerKind(fakeKind),
         create: (config) => this.wrapRunner(this.runnerFromConfig(config)),
