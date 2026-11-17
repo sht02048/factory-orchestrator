@@ -10,24 +10,24 @@
 
 환경:
 
-- 버리는 비공개 테스트 저장소 `<owner>/<repo>` 하나. 기본 브랜치 `main`, PR마다 도는 GitHub Actions 잡 `check` 하나.
-- 토큰은 classic 계열의 넓은 권한 토큰이다. 읽기 권한만 준 fine-grained PAT는 아직 없다.
+- 버리는 테스트 저장소 `<owner>/<repo>` 하나. 기본 브랜치 `main`, PR마다 도는 GitHub Actions 잡 `check` 하나. 17·18·20절은 비공개일 때 돌렸고, 15절은 공개로 바꾼 뒤 돌렸다.
+- 17·18·20절의 토큰은 classic 계열의 넓은 권한 토큰이다. 15절은 이 저장소 하나에만 Metadata, Pull requests, Commit statuses 읽기를 준 fine-grained PAT로 돌렸다.
 - 티켓 키는 가상 값 `ENG-123` 꼴을 썼다. 저장소 이름과 계정은 `<owner>/<repo>`로, 픽스처에서는 `acme/app`으로 바꿨다. 커밋 SHA도 가상 값으로 바꿨다.
 
 ## 요약
 
-| #   | 확인할 사실                                                   | 결과                                                                                                                                                                         |
-| --- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 15  | fine-grained PAT로 `statusCheckRollup`이 check run까지 오는지 | **미확인.** fine-grained PAT가 없다. 운영자가 PAT를 만든 뒤 [스크립트](fixtures/0006/check-status-rollup.sh)로 확인한다. classic 계열 토큰으로는 check run이 온다.           |
-| 17  | 에이전트가 브랜치를 바꾼 경우 키 보조 검색이 충분한지         | **조건부로 충분하다.** 키가 PR 제목이나 본문에 있으면 찾는다. 브랜치 이름에만 있으면 못 찾는다. 브랜치 이름을 바꾸면 원래 PR이 닫혀 1순위 조회가 닫힌 PR을 돌려준다.         |
-| 18  | GraphQL에 ETag/304가 적용되는지                               | **적용되지 않는다.** GraphQL POST 응답에 ETag가 없고 `If-None-Match`를 무시한다. REST PR 목록은 304를 주고 304는 한도에서 빠진다.                                            |
-| 20  | 티켓 키로 PR을 찾는 쿼리와 rate limit                         | **정했다.** GraphQL `search(type: ISSUE_ADVANCED)`에 따옴표 친 키. 1점, GraphQL 5,000점/시간 한도를 쓰고 REST 검색 한도(30회/분)를 쓰지 않는다. 받은 뒤 키를 다시 걸러 낸다. |
+| #   | 확인할 사실                                                   | 결과                                                                                                                                                                            |
+| --- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 15  | fine-grained PAT로 `statusCheckRollup`이 check run까지 오는지 | **공개 저장소에서는 온다.** 이름·상태·결론까지 온다. 비공개 저장소는 확인하지 못했다. fine-grained PAT에는 Checks 권한이 없어 비공개에서는 막힐 수 있다. 대안은 Actions 읽기다. |
+| 17  | 에이전트가 브랜치를 바꾼 경우 키 보조 검색이 충분한지         | **조건부로 충분하다.** 키가 PR 제목이나 본문에 있으면 찾는다. 브랜치 이름에만 있으면 못 찾는다. 브랜치 이름을 바꾸면 원래 PR이 닫혀 1순위 조회가 닫힌 PR을 돌려준다.            |
+| 18  | GraphQL에 ETag/304가 적용되는지                               | **적용되지 않는다.** GraphQL POST 응답에 ETag가 없고 `If-None-Match`를 무시한다. REST PR 목록은 304를 주고 304는 한도에서 빠진다.                                               |
+| 20  | 티켓 키로 PR을 찾는 쿼리와 rate limit                         | **정했다.** GraphQL `search(type: ISSUE_ADVANCED)`에 따옴표 친 키. 1점, GraphQL 5,000점/시간 한도를 쓰고 REST 검색 한도(30회/분)를 쓰지 않는다. 받은 뒤 키를 다시 걸러 낸다.    |
 
 ## 15. fine-grained PAT와 `statusCheckRollup`
 
-확인하지 못했다. 읽기 권한(Metadata, Pull requests, Commit statuses)만 준 fine-grained PAT가 아직 없다. 티켓은 이 항목이 남은 채 `todo`로 둔다.
+### 결과: 공개 저장소에서는 온다
 
-classic 계열 토큰으로는 check run이 이름·상태·결론까지 온다 **[실행]**. 같은 쿼리를 fine-grained PAT로 돌려 비교하면 된다.
+테스트 저장소 하나에만 Metadata, Pull requests, Commit statuses 읽기를 준 fine-grained PAT로 [스크립트](fixtures/0006/check-status-rollup.sh)를 돌렸다. 대상은 GitHub Actions 잡 `check`가 통과한 PR이다. check run이 이름·상태·결론까지 왔다 **[실행]**. classic 계열 토큰의 응답([`status-check-rollup-classic-token.json`](fixtures/0006/status-check-rollup-classic-token.json))과 모양이 같다.
 
 ```json
 "statusCheckRollup": {
@@ -39,20 +39,28 @@ classic 계열 토큰으로는 check run이 이름·상태·결론까지 온다 
 }
 ```
 
-전체 응답: [`fixtures/0006/status-check-rollup-classic-token.json`](fixtures/0006/status-check-rollup-classic-token.json).
+전체 응답: [`fixtures/0006/status-check-rollup-fine-grained-pat.json`](fixtures/0006/status-check-rollup-fine-grained-pat.json). GraphQL 응답에는 `x-accepted-github-permissions` 헤더가 없었다 **[실행]**.
 
-운영자가 할 일:
+### 한계: 권한 때문에 온 것이 아니다
 
-1. 테스트 저장소 하나에만 Metadata, Pull requests, Commit statuses 읽기를 준 fine-grained PAT를 만든다.
-2. check run이 끝난 PR 하나를 골라 스크립트를 돌린다. 토큰은 환경 변수로만 넘긴다.
+이 결과는 저장소가 공개라서 나왔을 수 있다. 근거:
 
-   ```sh
-   GITHUB_TOKEN=<fine-grained PAT> docs/research/fixtures/0006/check-status-rollup.sh <owner> <repo> <pr-number>
-   ```
+- 같은 PAT로, PAT의 저장소 선택에 **넣지 않은** 다른 공개 저장소의 PR을 조회해도 check run이 왔다 **[실행]**. 공개 저장소의 check run은 권한 없이도 읽힌다.
+- fine-grained PAT의 저장소 권한 목록에 **Checks가 없다** **[문서]** <https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens>. 이 문서는 권한이 비공개 자원에 필요하고 일부 엔드포인트는 공개 자원을 권한 없이 읽는다고 적는다.
+- REST `GET /repos/{owner}/{repo}/commits/{ref}/check-runs`는 응답 헤더로 `x-accepted-github-permissions: checks=read`를 요구한다고 알렸다 **[실행]**. 이 PAT에는 없는 권한인데 공개 저장소라 `200`이 왔다.
+- Commit statuses 권한으로 읽는 `GET .../commits/{ref}/status`(`statuses=read`)는 같은 커밋에 `total_count: 0`, `state: "pending"`을 돌려줬다 **[실행]**. GitHub Actions 잡은 commit status가 아니라 check run이라 이 경로로는 CI 결과가 보이지 않는다.
 
-3. `contexts.nodes`에 `__typename: "CheckRun"`이 `status`·`conclusion`과 함께 오면 "온다"다. `statusCheckRollup`이 `null`이거나, `StatusContext`만 오거나, `errors`에 권한 오류가 있으면 "안 온다"다. `repository`나 `pullRequest`가 `null`이고 `NOT_FOUND` 오류가 오면 check run 문제가 아니라 PAT의 저장소 선택에 대상 저장소가 빠진 것이므로 그것부터 고친다. 스크립트는 응답 헤더 중 `x-accepted-github-permissions`도 보여 준다. 이 헤더는 REST 응답에 오는 것으로 문서화돼 있어 GraphQL 응답에는 오지 않을 수 있다. 결과를 이 절에 적는다.
+그래서 **비공개 저장소에서 fine-grained PAT로 check run이 오는지는 확인하지 못했다.** 비공개에서는 `statusCheckRollup`이 `StatusContext`만 돌려주거나 check run을 빼고 줄 수 있다(추정). 확인하려면 테스트 저장소를 잠시 비공개로 돌리고 같은 스크립트를 다시 돌린다.
 
-판정은 PR 상태만 쓰므로 이 항목은 판정을 막지 않는다. 막는 것은 화면의 CI 보조 정보와 온보딩의 토큰 권한 안내다(research 0002 C.4).
+### 대안
+
+비공개 저장소에서 check run이 빠지면 다음 순서로 고른다.
+
+1. **Actions 읽기 권한을 더한다.** `GET /repos/{owner}/{repo}/actions/runs?head_sha=<sha>`는 `x-accepted-github-permissions: actions=read`를 요구하고, 워크플로 런의 `status`·`conclusion`을 돌려줬다 **[실행]**. fine-grained PAT 권한 목록에 Actions(`GET /repos/{owner}/{repo}/actions/runs`, read)가 있다 **[문서]**. GitHub Actions 결과만 보이고 외부 CI 앱의 check run은 보이지 않는다.
+2. **REST commit status만 쓴다.** 지금 권한(Commit statuses 읽기)으로 된다. 외부 CI가 commit status를 쓰는 경우만 보이고 GitHub Actions는 보이지 않는다.
+3. **classic PAT(`repo` 범위)를 쓴다.** check run까지 오지만 권한이 넓다.
+
+판정은 PR 상태만 쓰므로 이 항목은 판정을 막지 않는다. 영향은 화면의 CI 보조 정보와 온보딩의 토큰 권한 안내다(research 0002 C.4). 온보딩은 "비공개 저장소에서 CI 결과를 보려면 Actions 읽기를 더한다"를 안내 후보로 둔다.
 
 ## 17. 에이전트가 브랜치를 바꾼 경우
 
@@ -233,17 +241,18 @@ GraphQL에도 분당 2,000점 secondary limit이 있다(research 0002 C.5). 이 
 
 `docs/research/fixtures/0006/`에 둔다. 값은 가상 값으로 바꿨다.
 
-| 파일                                     | 내용                                                                                |
-| ---------------------------------------- | ----------------------------------------------------------------------------------- |
-| `search-by-key-advanced.json`            | 20절 쿼리 응답. 진짜 대상(#1)과 본문 언급 거짓 양성(#6)                             |
-| `search-by-key-issue-token-match.json`   | `ISSUE` 검색 응답. 낱말 일치 거짓 양성(#8)까지 포함                                 |
-| `pr-by-branch-after-rename.json`         | 브랜치 이름을 바꾼 뒤 옛 이름으로 조회한 닫힌 PR. 17절 `PrByBranchAfterRename` 응답 |
-| `status-check-rollup-classic-token.json` | classic 계열 토큰의 `statusCheckRollup` 응답(15절 비교 기준)                        |
-| `check-status-rollup.sh`                 | 15절 확인 스크립트. 토큰은 `GITHUB_TOKEN` 환경 변수로 받는다                        |
+| 파일                                        | 내용                                                                                |
+| ------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `search-by-key-advanced.json`               | 20절 쿼리 응답. 진짜 대상(#1)과 본문 언급 거짓 양성(#6)                             |
+| `search-by-key-issue-token-match.json`      | `ISSUE` 검색 응답. 낱말 일치 거짓 양성(#8)까지 포함                                 |
+| `pr-by-branch-after-rename.json`            | 브랜치 이름을 바꾼 뒤 옛 이름으로 조회한 닫힌 PR. 17절 `PrByBranchAfterRename` 응답 |
+| `status-check-rollup-classic-token.json`    | classic 계열 토큰의 `statusCheckRollup` 응답(15절 비교 기준)                        |
+| `status-check-rollup-fine-grained-pat.json` | 읽기 권한만 준 fine-grained PAT의 `statusCheckRollup` 응답(15절, 공개 저장소)       |
+| `check-status-rollup.sh`                    | 15절 확인 스크립트. 토큰은 `GITHUB_TOKEN` 환경 변수로 받는다                        |
 
 ## 남은 것
 
-- 15: 운영자가 fine-grained PAT를 만든 뒤 위 스크립트로 확인한다.
+- 15: 비공개 저장소에서 fine-grained PAT로 check run이 오는지. 테스트 저장소를 잠시 비공개로 돌리고 같은 스크립트로 확인한다.
 - 17의 위험: 에이전트가 PR 제목·본문에 키를 쓰지 않으면 "PR 없음"이 된다. 막을 방법은 core 판정과 함께 0037에서 정한다.
 
-테스트 저장소의 PR은 모두 닫고 이 조사에서 만든 브랜치는 지웠다.
+테스트 저장소의 PR은 모두 닫고 이 조사에서 만든 브랜치는 지웠다. 15절에서 만든 PR도 확인 뒤 닫고 브랜치를 지웠다.

@@ -1,0 +1,37 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 10,
+        "state": "OPEN",
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "2222222222222222222222222222222222222222",
+                "statusCheckRollup": {
+                  "state": "SUCCESS",
+                  "contexts": {
+                    "totalCount": 1,
+                    "nodes": [
+                      {
+                        "__typename": "CheckRun",
+                        "name": "check",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "rateLimit": {
+      "cost": 1,
+      "remaining": 4905
+    }
+  }
+}
