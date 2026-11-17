@@ -3,6 +3,7 @@ import { z } from "zod";
 import { loadRunnersPage } from "../runners/load";
 import { loadRunsPage } from "../runs/load";
 import { loadShell } from "../shell/load";
+import { loadStatsPage } from "../stats/load";
 import { getDatabase } from "./database";
 
 /*
@@ -20,3 +21,7 @@ export const getRunnersPage = createServerFn({ method: "GET" }).handler(() =>
 export const getRunsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
   .handler(({ data }) => loadRunsPage(getDatabase(), data.ws, new Date()));
+
+export const getStatsPage = createServerFn({ method: "GET" })
+  .validator(z.object({ ws: z.string().optional() }))
+  .handler(({ data }) => loadStatsPage(getDatabase(), data.ws, new Date()));
