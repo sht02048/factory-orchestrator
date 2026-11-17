@@ -24,6 +24,8 @@ import { popupStyles } from "./popup-styles";
 export interface SelectOption {
   value: string;
   label: string;
+  /** 목록에 보이지만 고를 수 없는 항목. 왜 못 고르는지를 label 에 함께 쓴다. */
+  disabled?: boolean;
 }
 
 export interface SelectProps {
@@ -70,11 +72,13 @@ export function Select({
           <SelectItem
             key={o.value}
             value={o.value}
+            {...(o.disabled === true ? { disabled: true } : {})}
             className={(s) =>
               cx(
                 popupStyles.item,
                 s.highlighted && popupStyles.highlighted,
                 s.selected && popupStyles.selected,
+                o.disabled === true && styles.disabledItem,
               )
             }
           >
@@ -98,6 +102,7 @@ const styles = stylex.create({
     cursor: "pointer",
   },
   placeholder: { color: colors.textDisabled },
+  disabledItem: { color: colors.textDisabled, cursor: "not-allowed" },
   value: {
     minWidth: 0,
     overflow: "hidden",

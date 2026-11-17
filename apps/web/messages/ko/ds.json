@@ -171,6 +171,7 @@
     "agentPlaceholder": "에이전트를 골라 주세요",
     "agentClaude": "Claude Code",
     "agentCodex": "Codex",
+    "agentDisabled": "Gemini · 이 러너에 없어 고를 수 없어요",
     "webhookLabel": "Webhook 주소"
   },
   "tooltip": {
