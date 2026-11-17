@@ -381,6 +381,7 @@ export function ComponentSections() {
                   options={[
                     { value: "claude", label: t("form.agentClaude") },
                     { value: "codex", label: t("form.agentCodex") },
+                    { value: "gemini", label: t("form.agentDisabled"), disabled: true },
                   ]}
                 />
               </Field>
