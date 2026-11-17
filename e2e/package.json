@@ -11,6 +11,7 @@
     "@factory/db": "workspace:*",
     "@factory/web": "workspace:*",
     "@factory/worker": "workspace:*",
+    "playwright-core": "1.65.0",
     "vite": "8.3.8"
   }
 }

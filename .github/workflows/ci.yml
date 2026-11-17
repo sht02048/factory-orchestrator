@@ -35,6 +35,14 @@ jobs:
         run: pnpm run format:check
       - name: Test
         run: pnpm run test
+      # 브라우저 시험(e2e)이 실패하면 그때의 화면을 남긴다.
+      - name: Upload browser test screenshots
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-test-screenshots
+          path: e2e/test-results/
+          if-no-files-found: ignore
       - name: Build
         run: pnpm run build
       - name: Web production smoke test

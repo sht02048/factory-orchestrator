@@ -4,6 +4,7 @@ dist/
 .tanstack/
 .turbo/
 coverage/
+e2e/test-results/
 *.tsbuildinfo
 .DS_Store
 
