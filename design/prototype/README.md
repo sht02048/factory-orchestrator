@@ -35,7 +35,7 @@ factory-orchestrator의 화면 방향을 잡으려고 만든 정적 시안이다
 
 ## 요약 결과
 
-런이 끝나면 에이전트 결과와 PR 상태 두 축을 기록하고, 요약 결과(Merged / Human Check / Failed)는 두 축에서 계산한다(ADR 0004, GLOSSARY). 에이전트가 스스로 끝났으면(정상 종료, 오류 종료) PR이 병합됨이면 Merged, 열림이면 Human Check, 없음·닫힘이면 Failed다. 에이전트 결과가 시간 초과, 입력 기다리다 멈춤, 러너 연결 끊김, 워크트리 없음이면 PR과 상관없이 Failed다. Failed가 된 까닭은 따로 저장하는 사유 없이 두 축으로 보이고, 자동으로 다시 시도하지 않는다. 계산 표는 [1단계 스펙](../../docs/spec/0001-phase-1.md) 4.2에 있다.
+런이 끝나면 에이전트 결과와 PR 상태 두 축을 기록하고, 요약 결과(Merged / Human Check / Failed)는 두 축에서 계산한다(ADR 0004, GLOSSARY). 에이전트가 스스로 끝났으면(정상 종료, 오류 종료) PR이 병합됨이면 Merged, 열림이면 Human Check, 없음·닫힘이면 Failed다. 에이전트 결과가 시간 초과, 입력 기다리다 멈춤, 러너 연결 끊김, 워크트리 없음, 운영자가 취소함이면 PR과 상관없이 Failed다. Failed가 된 까닭은 따로 저장하는 사유 없이 두 축으로 보이고, 자동으로 다시 시도하지 않는다. 계산 표는 [1단계 스펙](../../docs/spec/0001-phase-1.md) 4.2에 있다.
 
 시안의 목 데이터에는 Failed 조합이 셋 있다(`data.js`의 `failCase`).
 
