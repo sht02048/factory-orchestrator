@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { answerInput, submitAnswer } from "../home/actions";
 import { loadHomePage } from "../home/load";
 import { loadRunnersPage } from "../runners/load";
 import { loadRunsPage } from "../runs/load";
@@ -22,6 +23,11 @@ export const getRunnersPage = createServerFn({ method: "GET" }).handler(() =>
 export const getHomePage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
   .handler(({ data }) => loadHomePage(getDatabase(), data.ws, new Date()));
+
+/** 손댈 일의 질문에 답을 남긴다. worker 가 러너에 보낸다(Q61·Q82.3) */
+export const answerQuestion = createServerFn({ method: "POST" })
+  .validator(answerInput)
+  .handler(({ data }) => submitAnswer(getDatabase(), data, new Date()));
 
 export const getRunsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))

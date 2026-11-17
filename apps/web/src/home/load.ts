@@ -2,6 +2,8 @@ import { runDurations, summarizeRunOutcome } from "@factory/core";
 import type { QueuedRun, RunId } from "@factory/core";
 import {
   getRunWithRecords,
+  listPendingCancelRequests,
+  listRunQuestions,
   getWorkspaceTrackerProject,
   listRunPlacements,
   listRunnerSnapshots,
@@ -14,7 +16,8 @@ import type { Database, StoredRun } from "@factory/db";
 import { explainQueue } from "../runs/queue-reasons";
 import { isWebUrl } from "../format/url";
 import { resolveWorkspace } from "../shell/model";
-import type { HomePage, HomeQueuedReason, HomeRun } from "./model";
+import type { QueuedReason } from "../runs/model";
+import type { HomePage, HomeRun, InputWait } from "./model";
 import { partitionHome } from "./model";
 
 /**
@@ -44,6 +47,8 @@ export function loadHomePage(db: Database, ws: string | undefined, now: Date): H
               assignedAt: run.assignedAt,
               project: run.runnerProject,
               runnerId: run.runnerId,
+              // 영영 시작할 수 없는 런은 worker 가 다음 바퀴에 끝낸다. 화면은 순서만 본다.
+              unstartable: false,
             },
           ]
         : [],
@@ -51,7 +56,9 @@ export function loadHomePage(db: Database, ws: string | undefined, now: Date): H
     runners: listRunnerSnapshots(db),
     runs: listRunPlacements(db),
   });
-  const queuedReason = (id: RunId): HomeQueuedReason => {
+  const cancelling = new Set<string>(listPendingCancelRequests(db).map((r) => r.runId));
+
+  const queuedReason = (id: RunId): QueuedReason => {
     const code = queueReasons.get(id) ?? { kind: "behind" };
     if (code.kind !== "no-capacity") return code;
     return { kind: "no-capacity", runner: runners.get(code.runnerId)?.name ?? code.runnerId };
@@ -96,7 +103,7 @@ export function loadHomePage(db: Database, ws: string | undefined, now: Date): H
         pr === null || pr === undefined || !isWebUrl(pr.url)
           ? null
           : { displayId: pr.displayId, url: pr.url },
-      cancelling: false,
+      cancelling: cancelling.has(run.id),
     };
     switch (run.state) {
       case "queued":
@@ -104,7 +111,7 @@ export function loadHomePage(db: Database, ws: string | undefined, now: Date): H
       case "running":
         return { ...base, state: run.state };
       case "waiting-for-input":
-        return { ...base, state: run.state, input: null };
+        return { ...base, state: run.state, input: pendingQuestion(db, run.id) };
       case "disconnected": {
         const since = records?.unreachableSince ?? null;
         return {
@@ -119,7 +126,7 @@ export function loadHomePage(db: Database, ws: string | undefined, now: Date): H
           state: run.state,
           agentResult: run.agentResult,
           prState: run.prState,
-          summary: summarizeRunOutcome(run.agentResult, run.prState).outcome,
+          summary: summarizeRunOutcome(run).outcome,
           prSettledLater: (records?.laterPrState ?? null) !== null,
         };
     }
@@ -131,6 +138,27 @@ export function loadHomePage(db: Database, ws: string | undefined, now: Date): H
       ticket: `${run.ticket.connection}\u0000${run.ticket.key}`,
       run: toView(run),
     })),
-    brokenAuthRunners: [],
+    // 러너는 Workspace 밖 자원이라 어느 Workspace 의 홈에서든 보인다(ADR 0006)
+    brokenAuthRunners: [...runners.values()]
+      .filter((runner) => runner.assignmentBlocked)
+      .map((runner) => ({ id: runner.id, name: runner.name })),
   });
+}
+
+/**
+ * 입력 기다림 런이 기다리는 질문. 아직 러너에 보내지 않은 질문 가운데 먼저 받은 것이다(Q82.3·Q82.5).
+ * 답을 남겼지만 worker 가 아직 보내지 않았으면 answered 다. worker 가 질문을 아직 쓰지 않았으면 null 이다.
+ */
+function pendingQuestion(db: Database, runId: RunId): InputWait | null {
+  const question = listRunQuestions(db, runId).find(
+    (q) => q.answer === null || q.answer.sentAt === null,
+  );
+  if (question === undefined) return null;
+  return {
+    kind: "question",
+    questionId: question.id,
+    body: question.body,
+    choices: question.options,
+    answered: question.answer !== null,
+  };
 }

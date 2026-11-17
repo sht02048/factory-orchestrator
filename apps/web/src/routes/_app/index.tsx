@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { HomeScreen } from "../../home/home-screen";
 import { homeMessages } from "../../home/messages";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { getHomePage } from "../../server/functions";
+import { answerQuestion, getHomePage } from "../../server/functions";
 
 const t = createTranslator({ locale: defaultLocale, messages: homeMessages, namespace: "home" });
 
@@ -21,6 +21,7 @@ function HomeRoute() {
   const page = Route.useLoaderData();
   const { sel } = Route.useSearch();
   const navigate = Route.useNavigate();
+  const router = useRouter();
   return (
     <ScreenMessages messages={homeMessages}>
       <HomeScreen
@@ -29,7 +30,11 @@ function HomeRoute() {
         onSelect={(key) => {
           void navigate({ search: (prev) => ({ ...prev, sel: key }), replace: true });
         }}
-        onAnswer={() => Promise.reject(new Error("not wired"))}
+        onAnswer={async (input) => {
+          await answerQuestion({ data: input });
+          // 답했음(answered)을 다시 읽어 답하기 칸을 닫는다
+          await router.invalidate();
+        }}
         onDeny={() => Promise.reject(new Error("not wired"))}
       />
     </ScreenMessages>

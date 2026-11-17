@@ -32,14 +32,8 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useFormatDuration } from "../format/duration";
-import type {
-  AttentionItem,
-  BrokenAuthRunner,
-  HomePage,
-  HomeQueuedReason,
-  HomeRun,
-  InputWait,
-} from "./model";
+import type { AttentionItem, BrokenAuthRunner, HomePage, HomeRun, InputWait } from "./model";
+import type { QueuedReason } from "../runs/model";
 import { attentionKey, runKey } from "./model";
 
 // 손댈 일: 티켓(+이유) | 상태 | 에이전트 결과 | PR 상태 | 러너 | 에이전트 또는 Workspace | 경과
@@ -597,6 +591,7 @@ function PermissionBlock({
   return (
     <PanelBlock title={t("title")}>
       <div {...stylex.props(styles.stack)}>
+        <Text variant="body">{permission.detail}</Text>
         <Text variant="body">{t("allowOnRunner")}</Text>
         {permission.denied ? (
           <Text variant="meta">{t("denied")}</Text>
@@ -678,6 +673,7 @@ function summaryTone(summary: SummaryOutcome): StatusTone {
     case "failed":
       return "failed";
     case "merged":
+    case "canceled":
       return "neutral";
   }
 }
@@ -716,7 +712,7 @@ function useRowReason(): (run: HomeRun) => ReactNode {
           ? t("unreachable")
           : t("unreachableFor", { duration: duration(run.unreachableMs) });
       case "ended":
-        return run.summary === "merged" ? null : t(run.summary);
+        return run.summary === "merged" || run.summary === "canceled" ? null : t(run.summary);
       case "queued":
         return queuedReason(run.queuedReason);
       case "running":
@@ -725,22 +721,12 @@ function useRowReason(): (run: HomeRun) => ReactNode {
   };
 }
 
-function useQueuedReason(): (reason: HomeQueuedReason) => string {
-  const t = useTranslations("home.queuedReason");
+function useQueuedReason(): (reason: QueuedReason) => string {
   const domain = useTranslations("domain.queuedReason");
-  return (reason) => {
-    switch (reason.kind) {
-      case "no-capacity":
-        return domain("no-capacity", { runner: reason.runner });
-      case "starting":
-      case "behind":
-      case "runner-offline":
-        return domain(reason.kind);
-      case "project-removed":
-      case "runner-auth-broken":
-        return t(reason.kind);
-    }
-  };
+  return (reason) =>
+    reason.kind === "no-capacity"
+      ? domain("no-capacity", { runner: reason.runner })
+      : domain(reason.kind);
 }
 
 const styles = stylex.create({

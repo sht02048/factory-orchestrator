@@ -8,13 +8,6 @@ import type { WorkspaceChoice, WorkspaceSummary } from "../shell/model";
  */
 
 /**
- * 홈의 Queued 이유. Runs 의 이유에 러너를 비운 까닭 둘을 더한다.
- * - project-removed: 정한 러너에서 런의 러너 쪽 프로젝트가 빠져 다시 고르는 중(Q78·Q82.13)
- * - runner-auth-broken: 정한 러너의 GitHub 인증이 깨져 기다리는 중(Q82.22·Q87)
- */
-export type HomeQueuedReason = QueuedReason | { kind: "project-removed" | "runner-auth-broken" };
-
-/**
  * Waiting for Input 런이 무엇을 기다리는지(GLOSSARY Waiting for Input, Q82.3·Q82.4).
  * - question: 에이전트의 질문. 운영자가 답하면 DB 에 답을 남기고 worker 가 보낸다
  * - permission: 권한 프롬프트. 허용은 러너 화면에서만 하고, 여기서는 거절만 한다
@@ -32,6 +25,8 @@ export type InputWait =
   | {
       kind: "permission";
       promptId: string;
+      /** 무엇을 허용하려는지. 러너가 준 글 그대로 */
+      detail: string;
       /** 운영자가 거절을 남겼고 worker 가 아직 보내지 않았다 */
       denied: boolean;
     };
@@ -55,7 +50,7 @@ interface HomeRunBase {
 }
 
 export type HomeRun =
-  | (HomeRunBase & { state: "queued"; queuedReason: HomeQueuedReason })
+  | (HomeRunBase & { state: "queued"; queuedReason: QueuedReason })
   | (HomeRunBase & { state: "running" })
   | (HomeRunBase & {
       state: "waiting-for-input";

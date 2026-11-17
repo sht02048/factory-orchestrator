@@ -94,7 +94,7 @@ describe("홈 화면", () => {
     expect(attention.get("ACME-2")?.slice(1, 5)).toEqual([
       homeJson.row["human-check"],
       domain.summary["human-check"],
-      domain.agentResult["exited-with-error"],
+      domain.agentResult["reported-failure"],
       domain.prState.open,
     ]);
   });
@@ -135,9 +135,11 @@ describe("홈 화면", () => {
     const page = withInput(loadHomePage(db, "ws-commerce", now), {
       kind: "permission",
       promptId: "p-1",
+      detail: "Bash(touch notes.txt)",
       denied: false,
     });
     const panel = panelText(render(page, `run:${ids.get("ACME-11") ?? ""}`));
+    expect(panel).toContain("Bash(touch notes.txt)");
     expect(panel).toContain(homeJson.permission.allowOnRunner);
     expect(panel).toContain(homeJson.permission.deny);
     expect(panel).not.toContain("허용하기");

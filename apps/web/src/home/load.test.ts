@@ -1,11 +1,23 @@
 import {
   toAgentId,
+  toAgentRef,
+  toQuestionId,
+  toRunnerId,
   toRunnerProjectId,
   toTicketKey,
   toTrackerProjectId,
   toWorktreeRef,
 } from "@factory/core";
-import { assignRun, changeRunState, updateRunRecords } from "@factory/db";
+import type { RunId } from "@factory/core";
+import {
+  answerRunQuestion,
+  assignRun,
+  changeRunState,
+  recordRunQuestions,
+  recordRunnerCheck,
+  requestRunCancel,
+  updateRunRecords,
+} from "@factory/db";
 import type { Database } from "@factory/db";
 import { describe, expect, it } from "vitest";
 import {
@@ -24,23 +36,47 @@ const keys = (runs: ReadonlyArray<HomeRun>) => runs.map((run) => run.ticketKey);
 const attentionKeys = (items: ReadonlyArray<AttentionItem>) =>
   items.map((item) => (item.kind === "run" ? item.run.ticketKey : `runner:${item.runner.id}`));
 
-/** ws-labs 에 Failed 로 끝난 런 하나를 더한다 */
-function addLabsFailedRun(db: Database): void {
+/** 런을 시작해 끝낸다 */
+function addEndedRun(
+  db: Database,
+  input: { key: string; trackerProject: string; agentResult: "timed-out" | "canceled" },
+): RunId {
   const result = assignRun(db, {
-    ticket: { connection, key: toTicketKey("LAB-2") },
-    trackerProject: toTrackerProjectId("tp-lab"),
+    ticket: { connection, key: toTicketKey(input.key) },
+    trackerProject: toTrackerProjectId(input.trackerProject),
     runnerProject: toRunnerProjectId("github:acme/web"),
     agent: toAgentId("claude"),
     now: minutes(60),
   });
   if (!result.ok) throw new Error(result.reason);
   const { id } = result.run;
+  const started = {
+    worktree: toWorktreeRef(`wt-${input.key}`),
+    branch: `acme/${input.key}`,
+    agentRef: toAgentRef(`agent-${input.key}`),
+  };
   for (const change of [
-    changeRunState(db, id, { to: "running", worktree: toWorktreeRef("wt-LAB-2") }, minutes(61)),
-    changeRunState(db, id, { to: "ended", agentResult: "timed-out", prState: "none" }, minutes(90)),
+    changeRunState(db, id, { to: "running", started }, minutes(61)),
+    changeRunState(
+      db,
+      id,
+      { to: "ended", agentResult: input.agentResult, prState: "open" },
+      minutes(90),
+    ),
   ]) {
     if (!change.ok) throw new Error(JSON.stringify(change));
   }
+  return id;
+}
+
+/** ws-labs 에 Failed 로 끝난 런 하나를 더한다 */
+function addLabsFailedRun(db: Database): void {
+  addEndedRun(db, { key: "LAB-2", trackerProject: "tp-lab", agentResult: "timed-out" });
+}
+
+function runOf(items: ReadonlyArray<AttentionItem>, key: string): HomeRun | undefined {
+  for (const item of items) if (item.kind === "run" && item.run.ticketKey === key) return item.run;
+  return undefined;
 }
 
 describe("loadHomePage", () => {
@@ -100,7 +136,7 @@ describe("loadHomePage", () => {
       kind: "run",
       run: {
         state: "ended",
-        agentResult: "exited-with-error",
+        agentResult: "reported-failure",
         prState: "open",
         summary: "human-check",
       },
@@ -134,6 +170,81 @@ describe("loadHomePage", () => {
     if (failedId === undefined) throw new Error("ACME-5 missing");
     updateRunRecords(db, failedId, { laterPrState: { state: "closed", at: minutes(110) } });
     expect(attentionKeys(loadHomePage(db, "ws-commerce", now).attention)).toContain("ACME-5");
+  });
+
+  it("Canceled 런은 PR 이 열려 있어도 손댈 일에 없다(Q82.9)", () => {
+    const { db } = seedDatabase();
+    addEndedRun(db, { key: "ACME-30", trackerProject: "tp-web", agentResult: "canceled" });
+    const page = loadHomePage(db, "ws-commerce", now);
+    expect(attentionKeys(page.attention)).not.toContain("ACME-30");
+    expect(keys(page.running)).not.toContain("ACME-30");
+    expect(attentionKeys(loadHomePage(db, "all", now).attention)).not.toContain("ACME-30");
+  });
+
+  it("질문으로 기다리는 런에 worker 가 쓴 질문과 선택지를 담고, 답을 남기면 answered 가 된다", () => {
+    const { db, ids } = seedDatabase();
+    const runId = ids.get("ACME-11");
+    if (runId === undefined) throw new Error("ACME-11 missing");
+    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+      state: "waiting-for-input",
+      input: null,
+    });
+
+    recordRunQuestions(db, runId, [
+      {
+        id: toQuestionId("q-1"),
+        body: "어느 쪽으로 할까요?",
+        options: ["A", "B"],
+        askedAt: minutes(100),
+      },
+    ]);
+    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+      input: {
+        kind: "question",
+        questionId: "q-1",
+        body: "어느 쪽으로 할까요?",
+        choices: ["A", "B"],
+        answered: false,
+      },
+    });
+
+    answerRunQuestion(db, { runId, questionId: toQuestionId("q-1"), answer: "A" }, minutes(101));
+    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+      input: { kind: "question", answered: true },
+    });
+  });
+
+  it("처리되지 않은 취소 요청이 있는 런은 취소 중이다(Q82.21)", () => {
+    const { db, ids } = seedDatabase();
+    const runId = ids.get("ACME-10");
+    if (runId === undefined) throw new Error("ACME-10 missing");
+    expect(requestRunCancel(db, runId, minutes(110)).ok).toBe(true);
+    const page = loadHomePage(db, "ws-commerce", now);
+    expect(page.running.find((run) => run.ticketKey === "ACME-10")?.cancelling).toBe(true);
+    expect(page.queued.every((run) => !run.cancelling)).toBe(true);
+  });
+
+  it("GitHub 인증이 깨진 러너는 손댈 일 맨 앞에 오고, 그 러너로 정한 Queued 런은 이유를 담는다(Q82.14·Q87)", () => {
+    const { db } = seedDatabase();
+    recordRunnerCheck(db, {
+      runnerId: toRunnerId("runner-a"),
+      online: true,
+      checkedAt: minutes(115),
+      error: null,
+      assignmentBlocked: true,
+      projects: null,
+    });
+    const page = loadHomePage(db, "ws-commerce", now);
+    expect(page.attention[0]).toEqual({
+      kind: "runner-auth",
+      runner: { id: "runner-a", name: "runner-a" },
+    });
+    expect(page.queued.find((run) => run.ticketKey === "ACME-13")).toMatchObject({
+      queuedReason: { kind: "assignment-blocked" },
+    });
+    // 러너는 Workspace 밖 자원이라 다른 Workspace 와 전체에서도 보인다
+    expect(attentionKeys(loadHomePage(db, labs, now).attention)).toContain("runner:runner-a");
+    expect(attentionKeys(loadHomePage(db, "all", now).attention)).toContain("runner:runner-a");
   });
 
   it("전체에서는 모든 Workspace 의 손댈 일만 담는다(ADR 0006)", () => {

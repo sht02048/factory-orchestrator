@@ -39,10 +39,6 @@
     "runnerAuth": "GitHub 인증이 깨져 할당에서 뺐어요",
     "runnerAuthState": "인증 깨짐"
   },
-  "queuedReason": {
-    "project-removed": "러너에서 프로젝트가 빠져 다시 고르는 중",
-    "runner-auth-broken": "러너의 GitHub 인증이 깨져 기다리는 중"
-  },
   "panel": {
     "label": "고른 항목 요약",
     "subtitle": "{project} · {workspace}",
@@ -71,7 +67,8 @@
       "disconnected": "런 중 러너에 5분 넘게 닿지 않았어요. 다시 닿으면 실제 상태를 확인해요. 최대 실행 시간은 이 동안에도 흘러요.",
       "human-check": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
       "failed": "에이전트 결과와 PR 상태 때문에 Failed예요. 자동으로 다시 시도하지 않아요.",
-      "cancelling": "취소를 요청했어요. worker가 에이전트를 멈추면 끝나요."
+      "cancelling": "취소를 요청했어요. worker가 에이전트를 멈추면 끝나요.",
+      "canceled": "운영자가 취소한 런이에요."
     }
   },
   "question": {
