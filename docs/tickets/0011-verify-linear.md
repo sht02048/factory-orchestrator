@@ -27,3 +27,7 @@ Tracker 어댑터와 자동 할당을 짓기 전에, 스펙 10절의 Linear 사�
 
 - 다섯 항목마다 확인한 사실과 근거가 research 문서에 있고, 확인하지 못한 항목은 이유와 함께 남아 있다.
 - 라벨 추가 webhook 본문 픽스처가 저장소에 있다.
+
+## 진행
+
+- 부분 완료: 13·14 남음. 10~12번과 픽스처는 [`docs/research/0005-linear-contract.md`](../research/0005-linear-contract.md)에 남겼다. 13·14번은 Linear GitHub 연동과 테스트 저장소를 운영자가 준비한 뒤 확인한다.

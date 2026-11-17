@@ -1,0 +1,8 @@
+{
+  "content-type": "application/json; charset=utf-8",
+  "linear-delivery": "00000000-0000-4000-8000-000000000013",
+  "linear-event": "Issue",
+  "linear-signature": "98d7a70837bb22f3ac7f70d47ec4e70a6f6ecb89f47b9a0fb30457f289bd2183",
+  "linear-timestamp": "1794919079792",
+  "user-agent": "Linear-Webhook"
+}
