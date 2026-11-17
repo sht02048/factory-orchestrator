@@ -80,6 +80,65 @@ describe("findColorLiterals", () => {
     expect(findColorLiterals(source)).toEqual([]);
   });
 
+  it("JSX 색 속성의 이름 색을 찾는다", () => {
+    const source = [
+      "<circle fill=\"red\" stroke='navy' />",
+      '<stop stopColor="white" />',
+      '<path fill={"black"} />',
+      '<Icon color={active ? "green" : "gray"} />',
+    ].join("\n");
+    expect(findColorLiterals(source).map((f) => [f.line, f.column, f.text])).toEqual([
+      [1, 15, "red"],
+      [1, 28, "navy"],
+      [2, 18, "white"],
+      [3, 14, "black"],
+      [4, 24, "green"],
+      [4, 34, "gray"],
+    ]);
+  });
+
+  it("삼항식의 두 분기 모두에서 이름 색을 찾는다", () => {
+    const source = [
+      'const a = { color: active ? "red" : "blue" };',
+      "const b = {",
+      "  backgroundColor: selected",
+      '    ? "white"',
+      '    : "black",',
+      "};",
+    ].join("\n");
+    expect(findColorLiterals(source).map((f) => [f.line, f.text])).toEqual([
+      [1, "red"],
+      [1, "blue"],
+      [4, "white"],
+      [5, "black"],
+    ]);
+  });
+
+  it("gradient 안의 이름 색을 찾는다", () => {
+    const source = [
+      'const a = { backgroundImage: "linear-gradient(to right, red, blue 50%)" };',
+      "const b = `radial-gradient(circle, ${colors.red}, white)`;",
+      "const c = 'repeating-conic-gradient(gold 0 10deg, transparent 0 20deg)';",
+    ].join("\n");
+    expect(findColorLiterals(source).map((f) => [f.line, f.text])).toEqual([
+      [1, "red"],
+      [1, "blue"],
+      [2, "white"],
+      [3, "gold"],
+    ]);
+  });
+
+  it("색이 아닌 속성의 색 이름 값은 놓아준다", () => {
+    const source = [
+      "const a = { plan: 'gold', tier: \"silver\" };",
+      'const b = <Badge tone="red" data-plan="gold" />;',
+      'const c = isPremium ? "gold" : "silver";',
+      'const d = { "plan-name": "navy" };',
+      'const color = "red";',
+    ].join("\n");
+    expect(findColorLiterals(source)).toEqual([]);
+  });
+
   it("줄과 열을 1부터 센다", () => {
     expect(findColorLiterals('\n  x: "#abc"')).toEqual([{ line: 2, column: 7, text: "#abc" }]);
   });
