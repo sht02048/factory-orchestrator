@@ -1,4 +1,4 @@
-import { getRun, getRunWithRecords } from "@factory/db";
+import { DEFAULT_MAX_RUN_MS, getRun, getRunWithRecords } from "@factory/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Harness, projectA } from "./test-fixtures.js";
 
@@ -107,5 +107,26 @@ describe("러너에서 시작한 뒤 DB 쓰기 실패", () => {
     expect(getRun(h.db, run.id)?.state).toBe("running");
     expect(getRunWithRecords(h.db, run.id)?.records.startRequestedAt).not.toBeNull();
     expect(h.runner(runnerA).startCalls).toHaveLength(1);
+  });
+});
+
+describe("에이전트를 멈춘 뒤 DB 쓰기 실패", () => {
+  it("다음 바퀴에 실제 상태로 다시 정하지 않고 멈출 때 정한 에이전트 결과로 기록한다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    const worker = h.worker();
+    await worker.tick();
+    const stopAgent = vi.spyOn(h.runner(runnerA), "stopAgent");
+
+    h.advance(DEFAULT_MAX_RUN_MS);
+    failure.changeRunStateFailures = 1;
+    await worker.tick();
+    expect(getRun(h.db, run.id)?.state).toBe("running");
+    expect(stopAgent).toHaveBeenCalledTimes(1);
+
+    // 멈춘 에이전트는 러너에서 보고 없이 사라진 것으로 보인다.
+    await worker.tick();
+    expect(getRun(h.db, run.id)).toMatchObject({ state: "ended", agentResult: "timed-out" });
+    expect(stopAgent).toHaveBeenCalledTimes(1);
   });
 });

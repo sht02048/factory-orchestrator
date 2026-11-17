@@ -120,7 +120,10 @@ export class Harness {
       });
   }
 
-  /** 러너 상태 확인(0016) 전까지 러너의 Online 상태와 프로젝트 목록은 시험이 DB에 직접 넣는다. */
+  /**
+   * 러너를 등록하고 가짜 러너와 DB의 러너 확인 결과를 함께 맞춘다. worker의 주기적 러너 확인은 마지막 확인에서
+   * 간격이 지난 뒤에 가짜 러너를 다시 읽는다.
+   */
   addRunner(input: {
     id: string;
     capacity: number;
@@ -156,6 +159,10 @@ export class Harness {
   ): void {
     const fake = this.runner(id);
     fake.online = online;
+    if (projects !== null) {
+      fake.setProjects(projects.map((p) => ({ id: p, displayName: p, setupState: "ready" })));
+    }
+    if (assignmentBlocked !== null) this.setPushAuth(id, !assignmentBlocked);
     recordRunnerCheck(this.db, {
       runnerId: id,
       online,
@@ -167,6 +174,14 @@ export class Harness {
           : projects.map((p) => ({ id: p, displayName: p, setupState: "ready" })),
       assignmentBlocked,
     });
+  }
+
+  /** 가짜 러너의 GitHub 인증(할당을 막는 필수 조건)을 정한다. DB에는 다음 러너 확인이 쓴다. */
+  setPushAuth(id: RunnerId, ok: boolean): void {
+    const fake = this.runner(id);
+    fake.prerequisites = fake.prerequisites.map((p) =>
+      p.blocksAssignment ? { ...p, satisfied: ok } : p,
+    );
   }
 
   runner(id: RunnerId): FakeRunner {
