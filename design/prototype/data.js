@@ -76,7 +76,7 @@ window.FO = (function () {
     { id: 1057, ticket: "ACME-134", state: "queued", runner: "runner-c", agent: "codex", queued: "14:16", waited: 4, position: 3, reason: "runner-c가 Offline이에요" },
 
     { id: 1051, ticket: "ACME-416", state: "done", result: "check", runner: "runner-a", agent: "claude", started: "13:21", elapsed: 41, ended: "14:02", pr: { number: 1187, state: "open", ci: "failed" }, note: "CI의 e2e 테스트가 실패해 PR을 열어 둔 채 끝냈어요." },
-    { id: 1049, ticket: "ACME-129", state: "done", result: "failed", failCase: "runner", runner: "runner-c", agent: "codex", started: "13:11", elapsed: 27, ended: "13:38", pr: null, note: "러너 연결이 끊긴 채 끝났어요. 워크트리는 러너가 돌아온 뒤 사람이 정해요." },
+    { id: 1049, ticket: "ACME-129", state: "done", result: "failed", failCase: "runner", runner: "runner-c", agent: "codex", started: "11:38", elapsed: 120, ended: "13:38", pr: null, note: "러너 연결이 끊긴 채 끝났어요. 워크트리는 러너가 돌아온 뒤 사람이 정해요." },
     { id: 1048, ticket: "ACME-199", state: "done", result: "merged", runner: "runner-b", agent: "claude", started: "12:40", elapsed: 36, ended: "13:16", pr: { number: 342, state: "merged", ci: "passed" } },
     { id: 1047, ticket: "ACME-412", state: "done", result: "merged", runner: "runner-a", agent: "claude", started: "12:05", elapsed: 24, ended: "12:29", pr: { number: 1184, state: "merged", ci: "passed" } },
     { id: 1046, ticket: "ACME-85", state: "done", result: "check", runner: "runner-a", agent: "codex", started: "11:30", elapsed: 52, ended: "12:22", pr: { number: 211, state: "open", ci: "passed" }, note: "마이그레이션이 있어 사람이 확인하도록 PR을 열어 뒀어요." },

@@ -192,7 +192,7 @@
                 ? [
                     [`${run.ended}:02`, "info", "ssh factory@runner-c.example.com orca status"],
                     [`${run.ended}:14`, "error", "ssh: connect to host runner-c.example.com port 22: Operation timed out"],
-                    [`${run.ended}:15`, "info", "run ended · agent=러너 연결 끊김 · pr=없음 → Failed"],
+                    [`${run.ended}:15`, "info", "disconnected past max run time · agent=러너 연결 끊김 · pr=없음 → Failed"],
                   ]
                 : run.failCase === "agent"
                   ? [
