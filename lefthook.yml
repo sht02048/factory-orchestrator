@@ -7,3 +7,5 @@ pre-commit:
       run: pnpm run format:check
     - name: typecheck
       run: pnpm run typecheck
+    - name: color-literals
+      run: pnpm run check:colors
