@@ -58,7 +58,7 @@
           { key: "all", label: "전체", test: () => true },
           { key: "todo", label: "손댈 일", test: isTodo, attention: true },
           { key: "unassigned", label: "할당 전", test: (t) => !last(t) },
-          { key: "active", label: "실행 중", test: (t) => last(t) && last(t).state !== "done" },
+          { key: "active", label: "실행 중", test: (t) => last(t) && last(t).state === "running" },
           { key: "merged", label: "Merged", test: (t) => last(t) && last(t).result === "merged" },
         ];
         let current = new URLSearchParams(location.search).get("f") || "all";
@@ -88,8 +88,8 @@
           const mapping = m ? `${m.runner} · ${m.project} · ${FO.agents[m.agent]}` : '<span class="muted">Mapping이 없어요</span>';
           let why, act;
           if (!r) {
-            why = m ? `아직 런이 없어요. 할당하면 ${m.runner}에서 ${FO.agents[m.agent]}가 처리해요.` : "이 트래커 프로젝트에 Mapping이 없어 할당할 수 없어요.";
-            act = m ? `<button class="btn btn-primary" type="button" data-toast="${id}를 할당했어요">할당하기</button>` : `<a class="btn" href="settings.html?sel=mapping">Mapping 만들기</a>`;
+            why = m ? `아직 런이 없어요. 할당하면 ${m.runner}에서 ${FO.josa(FO.agents[m.agent], "이/가")} 처리해요.` : "이 트래커 프로젝트에 Mapping이 없어 할당할 수 없어요.";
+            act = m ? `<button class="btn btn-primary" type="button" data-toast="${FO.josa(id, "을/를")} 할당했어요">할당하기</button>` : `<a class="btn" href="settings.html?sel=mapping">Mapping 만들기</a>`;
           } else {
             why = FO.longWhy(r);
             act =

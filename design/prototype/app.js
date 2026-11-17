@@ -31,6 +31,27 @@
     return r ? `${h}시간 ${r}분` : `${h}시간`;
   }
 
+  /*
+   * 값 뒤 조사: 마지막 글자의 받침으로 고른다. 한글 음절과 숫자(읽는 소리)만 보고,
+   * 그 밖의 글자(영문 등)는 받침 없음으로 본다.
+   * pair는 "을/를", "이/가", "은/는", "과/와", "으로/로"처럼 받침 있을 때/없을 때 순서다.
+   */
+  const DIGIT_FINAL = { 0: 21, 1: 8, 2: 0, 3: 16, 4: 0, 5: 0, 6: 1, 7: 8, 8: 8, 9: 0 };
+  function finalOf(word) {
+    const ch = String(word).trim().slice(-1);
+    const code = ch.charCodeAt(0);
+    if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28;
+    if (ch >= "0" && ch <= "9") return DIGIT_FINAL[ch];
+    return 0;
+  }
+  function josa(word, pair) {
+    const [withFinal, without] = pair.split("/");
+    const f = finalOf(word);
+    /* 으로/로: 받침이 없거나 ㄹ이면 '로' */
+    const useWithout = withFinal === "으로" ? f === 0 || f === 8 : f === 0;
+    return `${word}${useWithout ? without : withFinal}`;
+  }
+
   /* ---------- Workspace ---------- */
   const WS_KEY = "fo-b-ws";
   const validWs = (id) => id === "all" || FO.workspaces.some((w) => w.id === id);
@@ -77,7 +98,7 @@
   function longWhy(run) {
     if (run.state === "running") return `${run.step}. ${run.started}에 시작했어요.`;
     if (run.state === "queued") return `${run.reason}. 들어온 순서대로 시작하고, 지금 대기열 ${run.position}번째예요.`;
-    if (run.result === "merged") return `에이전트가 CI 통과를 확인하고 PR #${run.pr.number}를 병합했어요.`;
+    if (run.result === "merged") return `에이전트가 CI 통과를 확인하고 ${josa(`PR #${run.pr.number}`, "을/를")} 병합했어요.`;
     return run.note;
   }
 
@@ -145,10 +166,10 @@
       return list;
     }
     list.push({ time: run.started, label: "에이전트를 시작했어요", detail: `${FO.agents[run.agent]} · ${run.runner}` });
-    if (run.pr) list.push({ time: "", label: `PR #${run.pr.number}을 열었어요`, detail: "" });
+    if (run.pr) list.push({ time: "", label: `${josa(`PR #${run.pr.number}`, "을/를")} 열었어요`, detail: "" });
     if (run.state === "running") list.push({ time: "지금", label: run.step, detail: "" });
     if (run.state === "done") {
-      const tail = { merged: "PR을 병합하고 끝났어요", check: "PR이 열린 채 끝났어요", failed: `${failLabel[run.failReason]}로 끝났어요` }[run.result];
+      const tail = { merged: "PR을 병합하고 끝났어요", check: "PR이 열린 채 끝났어요", failed: `${josa(failLabel[run.failReason], "으로/로")} 끝났어요` }[run.result];
       list.push({ time: run.ended, label: tail, detail: "", tone: run.result === "merged" ? "" : run.result });
     }
     return list;
@@ -382,7 +403,7 @@
   function allNotice(title) {
     return `<div class="split-list" style="grid-column: 1 / -1">
       <div class="page-head"><div><h1 class="page-title">${title}</h1>
-      <p class="page-sub">전체에서는 모든 Workspace의 손댈 일만 모아 봐요. ${title}는 Workspace를 골라야 보여요.</p></div></div>
+      <p class="page-sub">전체에서는 모든 Workspace의 손댈 일만 모아 봐요. ${josa(title, "은/는")} Workspace를 골라야 보여요.</p></div></div>
       <div class="actions">${FO.workspaces.map((w) => `<button class="btn" type="button" data-pick-ws="${w.id}">${esc(w.name)} 보기</button>`).join("")}
       <a class="btn btn-ghost" href="index.html">손댈 일 보기</a></div>
     </div>`;
@@ -408,7 +429,7 @@
   }
 
   Object.assign(FO, {
-    icon, esc, minutes, tone, label, stateText, shortWhy, longWhy, failLabel, resultLabel, ciLabel, prLabel,
+    icon, esc, minutes, josa, tone, label, stateText, shortWhy, longWhy, failLabel, resultLabel, ciLabel, prLabel,
     attention, latestByTicket, runRow, runCols, thead, runPanel, events, bindSplit, mount, allNotice, toast, runningOn,
     inWs, ticketInWs, wsName,
   });
