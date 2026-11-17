@@ -86,8 +86,8 @@ describe("Stats 화면", () => {
       ["runner-b", "4", "0%", "1", "3", "0", "18분"],
     ]);
     expect(rowTexts(render(page, { dimension: "agent" })).map((r) => r[0])).toEqual([
-      "claude",
-      "codex",
+      "Claude Code",
+      "Codex",
     ]);
   });
 

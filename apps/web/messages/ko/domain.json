@@ -42,5 +42,13 @@
     "minutes": "{minutes}분",
     "hours": "{hours}시간",
     "hoursMinutes": "{hours}시간 {minutes}분"
+  },
+  "agent": {
+    "claude": "Claude Code",
+    "codex": "Codex"
+  },
+  "runnerPrerequisite": {
+    "orca-service": "Orca 상시 서비스",
+    "github-push": "GitHub push 권한: {project}"
   }
 }

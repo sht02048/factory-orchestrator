@@ -23,6 +23,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useFormatter, useTranslations } from "use-intl";
 import { useFormatDuration } from "../format/duration";
+import { useAgentName } from "../labels";
 import { canCancel } from "./model";
 import type { LogTailView, PendingInput, RunDetail, RunDetailPage, TimelineEvent } from "./model";
 
@@ -486,6 +487,7 @@ function LogLines({ lines }: { lines: ReadonlyArray<string> }) {
 }
 
 function Properties({ run, runHref }: { run: RunDetail; runHref: (runId: string) => string }) {
+  const agentName = useAgentName();
   const t = useTranslations("run.props");
   const domain = useTranslations("domain");
   const ci = useTranslations("run.ci");
@@ -549,7 +551,7 @@ function Properties({ run, runHref }: { run: RunDetail; runHref: (runId: string)
               </span>
             )}
           </DefinitionItem>
-          <DefinitionItem label={t("agent")}>{run.agent}</DefinitionItem>
+          <DefinitionItem label={t("agent")}>{agentName(run.agent)}</DefinitionItem>
           <DefinitionItem label={t("waited")}>{duration(run.waitMs)}</DefinitionItem>
           <DefinitionItem label={t("executed")} empty={run.executionMs === null}>
             {run.executionMs === null ? t("notStarted") : duration(run.executionMs)}

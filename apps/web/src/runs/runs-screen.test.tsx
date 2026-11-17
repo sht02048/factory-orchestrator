@@ -116,7 +116,8 @@ describe("Runs 화면", () => {
     expect(text).toContain(domain.prState.open);
     expect(text).toContain(runsJson.panel.reason["human-check"]);
     expect(text).toContain("runner-a");
-    expect(text).toContain("claude");
+    // 에이전트는 ID(claude) 대신 공용 에이전트 이름으로 보인다
+    expect(text).toContain(domain.agent.claude);
     expect(text).toContain("29분");
     expect(text).toContain("#2");
   });

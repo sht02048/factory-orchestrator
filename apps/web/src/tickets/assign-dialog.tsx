@@ -4,6 +4,7 @@ import type { SelectOption } from "@factory/ui";
 import { colors, space } from "@factory/ui/tokens.stylex";
 import { useState } from "react";
 import { useTranslations } from "use-intl";
+import { useAgentName } from "../labels";
 import type { AssignInput, AssignResult } from "./assign";
 import { agentsFor, runnersFor } from "./model";
 import type { AssignDefaults, RunnerChoice, TicketView } from "./model";
@@ -156,9 +157,10 @@ export function AssignForm({
     offline: (name) => t("runnerOffline", { name }),
     blocked: (name) => t("runnerBlocked", { name }),
   });
+  const agentName = useAgentName();
   const agentOptions: SelectOption[] = agentsFor(agents, defaults.agent).map((a) => ({
     value: a,
-    label: a,
+    label: agentName(a),
   }));
   return (
     <div {...stylex.props(styles.form)}>

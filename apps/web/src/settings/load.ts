@@ -14,6 +14,7 @@ import {
 } from "@factory/db";
 import type { Database, SecretBox, StoredTrackerConnection, WorkspaceId } from "@factory/db";
 import { z } from "zod";
+import { prerequisiteProject } from "../labels";
 import { resolveWorkspace } from "../shell/model";
 import { KNOWN_AGENTS } from "./model";
 import type {
@@ -171,7 +172,7 @@ export async function loadSettingsPage(
           sshTarget: config.success ? config.data.sshTarget : "",
           orcaPath: config.success ? config.data.orcaPath : "",
           capacity: runner.capacity,
-          check: runnerCheckView(db, runner.id),
+          check: runnerCheckView(db, runner.id, runner.projects),
         };
       }),
     },
@@ -313,7 +314,11 @@ export function hasPendingRunnerChecks(db: Database): boolean {
 }
 
 /** 러너 확인 요청과 그 결과(worker 가 씀, Q61) */
-function runnerCheckView(db: Database, runnerId: RunnerId): RunnerCheckView | null {
+function runnerCheckView(
+  db: Database,
+  runnerId: RunnerId,
+  projects: ReadonlyArray<{ id: string; displayName: string }>,
+): RunnerCheckView | null {
   const request = getRunnerCheckRequest(db, runnerId);
   if (request === null) return null;
   switch (request.status) {
@@ -334,7 +339,10 @@ function runnerCheckView(db: Database, runnerId: RunnerId): RunnerCheckView | nu
         completedAt,
         online: parsed.data.online,
         version: parsed.data.version,
-        prerequisites: parsed.data.prerequisites,
+        prerequisites: parsed.data.prerequisites.map((p) => ({
+          ...p,
+          project: prerequisiteProject(p.id, projects),
+        })),
         error: parsed.data.error?.kind ?? null,
       };
     }
