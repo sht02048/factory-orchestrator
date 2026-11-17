@@ -26,6 +26,7 @@ function render(
       onFilterChange={noop}
       onSelect={noop}
       onPickWorkspace={noop}
+      runHref={(id) => `/runs/${id}`}
     />,
     runsMessages,
   );
@@ -94,6 +95,14 @@ describe("Runs 화면", () => {
     expect(text).toContain("claude");
     expect(text).toContain("29분");
     expect(text).toContain("#2");
+  });
+
+  it("패널에 Run 상세로 가는 링크를 둔다", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-2");
+    const html = render(loadRunsPage(db, undefined, now), { selectedId: id });
+    expect(html).toContain(`href="/runs/${id ?? ""}"`);
+    expect(panelText(html)).toContain(runsJson.panel.openDetail);
   });
 
   it("Queued 런의 패널에 기다리는 이유를 보인다(Q65·Q68)", () => {
