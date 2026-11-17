@@ -1,6 +1,6 @@
 ---
 status: todo
-blocked_by: [0007, 0014, 0015]
+blocked_by: [0007, 0015, 0027]
 ---
 
 # web Settings 화면
@@ -11,7 +11,7 @@ blocked_by: [0007, 0014, 0015]
 
 ## 범위
 
-- 이 티켓은 `apps/web`의 Settings 라우트와 그 화면 메시지만 고친다.
+- 이 티켓은 `apps/web`의 Settings 라우트, 그 화면 메시지, web 서버가 DB 설정에서 codehost-github를 만드는 코드만 고친다.
 - 이 Workspace: 이름, 트래커 프로젝트, Mapping(트래커 프로젝트 → 러너 쪽 프로젝트·에이전트, 러너는 고르지 않음, Q53), Auto-assign Label, 최대 실행 시간, "In Progress" 상태(ADR 0006·0007, Q39·Q41).
 - 설치 전체: Tracker Connection(API 키, webhook signing secret), GitHub 토큰, 러너 등록(ssh 대상, orca 경로, capacity).
 - 연결 확인: Linear와 GitHub는 server function이 어댑터로 바로 확인한다. 러너 확인은 DB에 요청을 남기고 worker가 쓴 결과를 보인다(Q61).

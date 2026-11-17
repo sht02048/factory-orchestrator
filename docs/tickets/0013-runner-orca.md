@@ -1,6 +1,6 @@
 ---
 status: todo
-blocked_by: [0004, 0009, 0010]
+blocked_by: [0037]
 ---
 
 # Runner 어댑터: runner-orca
@@ -11,7 +11,7 @@ core의 `Runner` 인터페이스를 ssh로 원격 `orca`를 실행해 구현한�
 
 ## 범위
 
-- 이 티켓은 새 패키지 `packages/runner-orca`만 만든다(Q56). 검증 결과로 core 인터페이스를 바꿔야 하면 그 변경만 `packages/core`에 더하고 PR에 적는다.
+- 이 티켓은 새 패키지 `packages/runner-orca`만 만든다(Q56). `packages/core`는 고치지 않는다. 검증 결과에 따른 인터페이스 변경은 0037이 먼저 한다.
 - ssh 실행: 러너 설정의 ssh 대상과 orca 실행 파일 경로를 쓴다. `--prompt` 등 인자는 원격 셸에 맞게 이스케이프한다(스펙 8절).
 - `--json` 봉투(`ok`, `result`, `error.code`)를 경계에서 스키마로 파싱한다. 모르는 열거값은 열어 두고 모르는 런 상태는 Running으로 다룬다.
 - 상태 확인, 프로젝트 목록, 워크트리 만들기와 에이전트 시작(`--surface terminal`, `--retry-launch`), 진행 폴링(입력 기다림, 에이전트 종료 코드, 워크트리 사라짐), 에이전트 멈추기(0009 19번 결과), 로그 꼬리, 워크트리 지우기(브랜치는 남김).
