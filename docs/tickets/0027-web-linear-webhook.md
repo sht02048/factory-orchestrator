@@ -1,6 +1,6 @@
 ---
 status: todo
-blocked_by: [0005, 0014]
+blocked_by: [0005, 0007, 0014]
 ---
 
 # web Linear webhook 수신
