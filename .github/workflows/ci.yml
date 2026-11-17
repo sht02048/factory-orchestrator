@@ -47,3 +47,5 @@ jobs:
         run: pnpm run build
       - name: Web production smoke test
         run: pnpm run smoke:web
+      - name: CLI smoke test
+        run: pnpm run smoke:cli

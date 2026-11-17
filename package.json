@@ -9,6 +9,7 @@
     "build": "turbo run build",
     "check:colors": "node scripts/check-color-literals.ts",
     "smoke:web": "node scripts/smoke-web-prod.ts",
+    "smoke:cli": "node scripts/smoke-cli.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && turbo run typecheck",
     "lint": "oxlint --type-aware --deny-warnings",
     "format": "oxfmt",
