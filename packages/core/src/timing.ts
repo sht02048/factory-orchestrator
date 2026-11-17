@@ -143,7 +143,7 @@ export const MAX_START_RETRIES = 3;
 
 /**
  * 시작 명령(Runner.startRun)이 실패했을 때 할 일(Q86).
- * - wait-like-offline: 러너에 닿지 못했다. Offline 예외(Q72)처럼 러너를 비워 순서에서 빼 뒤 런을 막지 않고,
+ * - wait-like-offline: 러너에 닿지 못했거나 닿았어도 런을 돌릴 준비가 안 됐다(not-ready·not-installed). Offline 예외(Q72)처럼 러너를 비워 순서에서 빼 뒤 런을 막지 않고,
  *   맞는 러너가 생기면 원래 자리로 돌아간다. 다만 앞서 보낸 시작의 결과를 아직 모르는 런은 다른 러너에서
  *   다시 시작하면 에이전트가 둘 생길 수 있어, 러너를 비우지 않고 그 러너에서 확인할 때까지 순서에서만 뺀다.
  *   시도 횟수에 넣지 않는다.
@@ -166,14 +166,16 @@ export function decideStartFailure(
   previousFailures: number,
 ): StartFailureDecision {
   switch (error.kind) {
+    // 닿았지만 런타임이 꺼졌거나 도구가 없으면 러너 확인에서 Offline이 되는 상태라(RunnerHealth.online)
+    // 닿지 않음과 같이 다룬다. 잠깐 재시작하는 동안 다시 시도 횟수를 써 버리지 않게 한다.
     case "unreachable":
+    case "not-ready":
+    case "not-installed":
       return { action: "wait-like-offline" };
     case "start-outcome-unknown":
       return { action: "find-then-retry" };
     case "mailbox-missing":
       return { action: "recreate-mailbox" };
-    case "not-installed":
-    case "not-ready":
     case "malformed-output":
     case "runner-error": {
       const failures = previousFailures + 1;

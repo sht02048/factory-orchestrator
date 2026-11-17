@@ -412,6 +412,27 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     expect(current(run)).toMatchObject({ state: "running", runnerId: runnerB });
   });
 
+  it("결과를 모르는 런은 묶인 러너의 GitHub 인증이 깨져도 다른 러너에서 다시 시작하지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    expect(current(run)).toMatchObject({ runnerId: runnerA });
+    h.runner(runnerA).loseNextStartResponse = true;
+    const worker = h.worker();
+
+    await worker.tick();
+    h.setRunnerOnline(runnerA, true, null, true);
+    await worker.tick();
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "queued", runnerId: runnerA });
+    expect(h.runner(runnerB).startCalls).toHaveLength(0);
+
+    h.setRunnerOnline(runnerA, true, null, false);
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
+    expect(h.runner(runnerA).startCalls).toHaveLength(1);
+  });
+
   it("결과를 모르는 시작을 확인하려다 러너에 닿지 않으면 뒤 런을 막지 않는다", async () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });

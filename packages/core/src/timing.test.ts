@@ -194,11 +194,16 @@ describe("resolveRunProgress", () => {
 });
 
 describe("decideStartFailure (Q86)", () => {
-  it("러너에 닿지 못하면 Offline 예외처럼 순서에서 빼고 시도 횟수에 넣지 않는다", () => {
-    expect(decideStartFailure({ kind: "unreachable", detail: "ssh" }, 2)).toEqual({
-      action: "wait-like-offline",
-    });
-  });
+  it.each([
+    { kind: "unreachable", detail: "ssh" },
+    { kind: "not-ready", detail: "runtime down" },
+    { kind: "not-installed", detail: "no orca" },
+  ] as const)(
+    "러너에 닿지 못하거나 준비가 안 됐으면($kind) Offline 예외처럼 다루고 시도 횟수에 넣지 않는다",
+    (error) => {
+      expect(decideStartFailure(error, 2)).toEqual({ action: "wait-like-offline" });
+    },
+  );
 
   it("결과를 모르면 같은 이름으로 이미 시작했는지 찾은 뒤에만 다시 보낸다", () => {
     expect(decideStartFailure({ kind: "start-outcome-unknown", detail: "lost" }, 0)).toEqual({

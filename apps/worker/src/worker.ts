@@ -1,5 +1,6 @@
 import {
   AdapterError,
+  canRunnerTake,
   decidePrState,
   decideStartFailure,
   planQueue,
@@ -293,8 +294,9 @@ async function decideRunPrState(context: TickContext, run: ActiveRun): Promise<P
  *
  * 예외: 러너에 시작을 보낸 적이 있는 런(시작 요청 시각이 있음)은 그 러너에 묶어 둔다. 첫 시작이 실제로
  * 됐다면 다른 러너에서 다시 시작할 때 에이전트가 둘 생기기 때문이다.
- * - 묶인 러너가 Online이면 그대로 planQueue에 넣는다. 러너가 정해져 있어 그 러너에서만 시작한다.
- * - 묶인 러너가 Online이 아니면 planQueue에 넣지 않는다. 러너를 비우거나 다른 러너를 고르지 않고,
+ * - 묶인 러너가 그 런을 받을 수 있으면(core canRunnerTake) 그대로 planQueue에 넣는다. 러너가 정해져 있어
+ *   그 러너에서만 시작한다.
+ * - 받을 수 없으면(Offline, GitHub 인증 깨짐, 프로젝트 빠짐) planQueue에 넣지 않는다. 러너를 비우거나 다른 러너를 고르지 않고,
  *   Offline 예외(Q68)처럼 순서에서 빠져 뒤 런을 막지 않는다. 러너가 돌아오면 원래 자리로 돌아간다.
  * - 러너에서 시작했지만 Running을 쓰지 못한 런은 판단 전에 기록을 다시 해 본다. 그래도 못 쓰면
  *   planQueue에 넣지 않고 그 러너의 capacity를 차지한 것으로 센다.
@@ -307,7 +309,7 @@ async function processQueue(context: TickContext): Promise<void> {
     const queued = listRuns(db, { states: ["queued"] });
     if (queued.length === 0) return null;
     const runners = listRunnerSnapshots(db);
-    const online = new Set(runners.filter((runner) => runner.online).map((runner) => runner.id));
+    const snapshots = new Map(runners.map((runner) => [runner.id, runner]));
     const bound = boundRunners(context, queued);
     const runs = listRunPlacements(db);
     for (const pending of pendingStarts.values()) {
@@ -318,7 +320,14 @@ async function processQueue(context: TickContext): Promise<void> {
       .filter((run) => {
         const runnerId = bound.get(run.id);
         if (runnerId === undefined) return true;
-        return !pendingStarts.has(run.id) && online.has(runnerId);
+        // 묶인 러너가 그 런을 받을 수 없으면(Offline, 인증 깨짐, 프로젝트 빠짐) planQueue에 넣지 않는다.
+        // 넣으면 planQueue가 러너를 비우고 다른 러너를 정해 에이전트가 둘 생길 수 있다.
+        const snapshot = snapshots.get(runnerId);
+        return (
+          !pendingStarts.has(run.id) &&
+          snapshot !== undefined &&
+          canRunnerTake(snapshot, run.project)
+        );
       });
 
     const result = planQueue({ queued: candidates, runners, runs });
@@ -461,8 +470,17 @@ async function startOnRunner(
   const runner = adapters.runner(storedRunner);
   // 앞서 보낸 시작의 결과를 아직 확인하지 못했는지. 참이면 이 러너에서 확인할 때까지 묶어 둔다.
   let unverified = records.startRequestedAt !== null;
+  let mailbox: MailboxRef;
   try {
-    const mailbox = await mailboxFor(context, storedRunner, runner);
+    mailbox = await mailboxFor(context, storedRunner, runner);
+  } catch (error) {
+    // 시작 명령 전의 실패라 시도 횟수에 넣지 않는다. 닿지 않으면 Offline처럼 순서에서만 뺀다.
+    logger.warn("could not prepare the runner's mailbox", { runId: run.id, error });
+    return runnerErrorDetail(error)?.kind === "unreachable"
+      ? { kind: "skipped" }
+      : { kind: "blocked" };
+  }
+  try {
     if (unverified) {
       const existing = await findStarted(context, run, runner, mailbox);
       // 확인하지 못했으면 러너를 비우지 않고 이번 순서에서만 뺀다(닿지 않으면 뒤 런을 막지 않는다).
