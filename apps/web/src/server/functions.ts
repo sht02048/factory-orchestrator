@@ -8,6 +8,9 @@ import { loadRunnersPage } from "../runners/load";
 import { loadRunsPage } from "../runs/load";
 import { loadShell } from "../shell/load";
 import { loadStatsPage } from "../stats/load";
+import { assignInput, submitAssignment } from "../tickets/assign";
+import { loadTicketsPage } from "../tickets/load";
+import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
 
 /*
@@ -57,3 +60,18 @@ export const requestRunLog = createServerFn({ method: "POST" })
 export const cancelRun = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string() }))
   .handler(({ data }) => cancelRunRequest(getDatabase(), data.runId, new Date()));
+
+/** Tickets: 현재 Workspace 트래커 프로젝트의 티켓을 트래커 어댑터로 읽는다(0021, Q61) */
+export const getTicketsPage = createServerFn({ method: "GET" })
+  .validator(z.object({ ws: z.string().optional() }))
+  .handler(({ data }) =>
+    loadTicketsPage(
+      { db: getDatabase(), secretBox: getSecretBox(), registry: getAdapterRegistry() },
+      data.ws,
+    ),
+  );
+
+/** 수동 할당. Queued 런을 DB 에 만들고 시작은 worker 가 한다(Q53·Q60·Q61) */
+export const assignTicket = createServerFn({ method: "POST" })
+  .validator(assignInput)
+  .handler(({ data }) => submitAssignment(getDatabase(), data, new Date()));

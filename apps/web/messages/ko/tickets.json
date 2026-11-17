@@ -1,0 +1,89 @@
+{
+  "documentTitle": "Tickets · Factory Orchestrator",
+  "title": "Tickets",
+  "subtitle": "{workspace}에 묶은 트래커 프로젝트의 티켓이에요. 자동 할당 라벨이 붙으면 운영자 없이 할당해요.",
+  "filter": {
+    "label": "티켓 거르기",
+    "all": "전체",
+    "attention": "손댈 일",
+    "unassigned": "할당 전",
+    "running": "실행 중",
+    "merged": "Merged"
+  },
+  "columns": {
+    "title": "제목",
+    "ticket": "티켓",
+    "trackerProject": "트래커 프로젝트",
+    "trackerState": "트래커 상태",
+    "lastRun": "마지막 런"
+  },
+  "listLabel": "티켓 목록",
+  "empty": "이 조건에 맞는 티켓이 없어요.",
+  "noTickets": "아직 티켓이 없어요. 트래커 프로젝트에 티켓을 만들면 여기에 보여요.",
+  "noProjects": "이 Workspace에 묶은 트래커 프로젝트가 없어요. Settings에서 트래커 프로젝트를 묶으면 티켓이 보여요.",
+  "unassigned": "할당 전",
+  "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 티켓이 보여요.",
+  "allWorkspaces": {
+    "body": "전체에서는 모든 Workspace의 손댈 일만 모아 봐요. 티켓은 Workspace를 골라야 보여요.",
+    "pick": "{name} 보기"
+  },
+  "loadError": {
+    "unauthorized": "{project} 티켓을 읽지 못했어요. 트래커가 API 키를 받지 않았어요. Settings에서 연결을 확인해 주세요.",
+    "rate-limited": "{project} 티켓을 읽지 못했어요. 트래커 요청 한도를 넘었어요. 잠시 뒤 다시 열어 주세요.",
+    "not-found": "{project} 티켓을 읽지 못했어요. 트래커에 이 프로젝트가 없어요.",
+    "network": "{project} 티켓을 읽지 못했어요. 트래커에 닿지 않았어요.",
+    "unknown-connection": "{project} 티켓을 읽지 못했어요. 묶인 트래커 연결이 없어졌어요.",
+    "failed": "{project} 티켓을 읽지 못했어요. 트래커가 알 수 없는 오류를 냈어요."
+  },
+  "panel": {
+    "label": "고른 티켓 요약",
+    "lastRun": "마지막 런",
+    "subtitle": "{key} · {project} · {state}",
+    "reason": {
+      "unassigned": "아직 런이 없어요. 할당하면 Mapping이 정한 러너 쪽 프로젝트와 에이전트로 처리해요.",
+      "active-run": "진행 중이거나 Queued인 런이 있어 새로 할당할 수 없어요. 그 런이 끝나면 할 수 있어요.",
+      "no-mapping": "이 트래커 프로젝트에 Mapping이 없어 할당할 수 없어요. Settings에서 Mapping을 만들면 할당할 수 있어요.",
+      "merged": "에이전트가 완료 보고를 보냈고 PR이 병합됐어요.",
+      "human-check": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
+      "failed": "마지막 런이 Failed예요. 자동으로 다시 시도하지 않아요. 새 런을 시작할 수 있어요.",
+      "canceled": "운영자가 취소한 런이에요. 새 런을 시작할 수 있어요."
+    },
+    "assign": "할당하기",
+    "reassign": "새 런 시작",
+    "openRun": "런 보기",
+    "trackerState": "트래커 상태",
+    "trackerStateNote": "트래커 기준",
+    "labels": "라벨",
+    "autoAssign": "자동 할당",
+    "mapping": "Mapping",
+    "mappingValue": "{project} · {agent}",
+    "none": "없음",
+    "noMapping": "Mapping이 없어요",
+    "history": "런 {count}개",
+    "openInTracker": "트래커에서 열기"
+  },
+  "assign": {
+    "title": "{key} 티켓을 할당할까요?",
+    "description": "Mapping 기본값으로 채웠어요. 러너와 에이전트만 바꿀 수 있어요.",
+    "project": "러너 쪽 프로젝트",
+    "projectHint": "Mapping이 정한 값이라 여기서 바꿀 수 없어요.",
+    "runner": "러너",
+    "runnerAuto": "할당 때 자동으로 고르기",
+    "runnerHint": "자동으로 고르면 이 프로젝트가 있는 Online 러너 중 남은 capacity가 가장 많은 러너를 골라요.",
+    "runnerOffline": "{name} · Offline",
+    "runnerBlocked": "{name} · GitHub 인증이 깨져 고를 수 없어요",
+    "agent": "에이전트",
+    "cancel": "취소",
+    "submit": "할당하기",
+    "submitting": "할당하는 중…",
+    "done": "{key} 티켓을 할당했어요",
+    "error": {
+      "active-run": "그사이 이 티켓에 진행 중인 런이 생겼어요. 목록을 다시 열어 확인해 주세요.",
+      "no-mapping": "이 트래커 프로젝트의 Mapping이 없어졌어요.",
+      "unknown-agent": "Mapping에 쓰인 에이전트만 고를 수 있어요.",
+      "unknown-runner": "고른 러너가 없어졌거나 이 프로젝트가 빠졌어요. 다른 러너를 골라 주세요.",
+      "runner-assignment-blocked": "고른 러너의 GitHub 인증이 깨졌어요. 다른 러너를 골라 주세요.",
+      "failed": "할당하지 못했어요. 다시 시도해 주세요."
+    }
+  }
+}

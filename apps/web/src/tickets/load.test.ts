@@ -1,0 +1,133 @@
+import { describe, expect, it } from "vitest";
+import { loadTicketsPage, ticketId } from "./load";
+import { TICKET_FILTERS, lastRun, matchesFilter } from "./model";
+import type { TicketFilter, TicketView, TicketsPage } from "./model";
+import { connection, labs, setupTickets } from "./test-fixtures";
+
+function byKey(page: TicketsPage, key: string): TicketView {
+  const found = page.tickets.find((t) => t.key === key);
+  if (found === undefined) throw new Error(`no ticket ${key}`);
+  return found;
+}
+
+function keysIn(page: TicketsPage, filter: TicketFilter): string[] {
+  return page.tickets.filter((t) => matchesFilter(t, filter)).map((t) => t.key);
+}
+
+describe("Tickets 읽기", () => {
+  it("가짜 Tracker 의 티켓을 Workspace 트래커 프로젝트마다 읽고 마지막 런의 요약 결과를 붙인다", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined);
+
+    expect(page.workspace.kind).toBe("one");
+    // 다른 Workspace(ws-labs)의 LAB-1 은 없고, 트래커에서 마지막으로 바뀐 것부터
+    expect(page.tickets.map((t) => t.key)).toEqual([
+      "ACME-6",
+      "ACME-5",
+      "ACME-4",
+      "ACME-3",
+      "ACME-2",
+      "ACME-1",
+      "DOC-1",
+    ]);
+    expect(lastRun(byKey(page, "ACME-1"))).toMatchObject({
+      state: "ended",
+      agentResult: "reported-success",
+      prState: "merged",
+      summary: "merged",
+    });
+    expect(lastRun(byKey(page, "ACME-2"))).toMatchObject({
+      state: "ended",
+      summary: "human-check",
+    });
+    expect(lastRun(byKey(page, "ACME-3"))).toMatchObject({ state: "running" });
+    expect(lastRun(byKey(page, "ACME-4"))).toMatchObject({ state: "queued" });
+    expect(lastRun(byKey(page, "ACME-6"))).toBeUndefined();
+  });
+
+  it("런 이력은 새 것부터 둔다", async () => {
+    const { context, ids } = setupTickets();
+    const page = await loadTicketsPage(context, undefined);
+    const runs = byKey(page, "ACME-1").runs;
+    expect(runs.map((r) => r.id)).toEqual([ids.get("ACME-1"), ids.get("ACME-1:first")]);
+    expect(runs[1]).toMatchObject({ summary: "failed", agentResult: "timed-out" });
+  });
+
+  it("티켓 정보와 자동 할당 라벨, Mapping 기본값을 담는다", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined);
+    const ticket = byKey(page, "ACME-6");
+    expect(ticket).toMatchObject({
+      id: ticketId(connection, "ACME-6"),
+      title: "ACME-6 제목",
+      url: "https://linear.example.com/acme/issue/ACME-6",
+      trackerProject: { id: "tp-web", name: "Web" },
+      trackerState: { name: "Todo", category: "unstarted" },
+      labels: [
+        { name: "factory", autoAssign: true },
+        { name: "bug", autoAssign: false },
+      ],
+      assignability: {
+        kind: "ready",
+        defaults: { runnerProject: "github:acme/web", agent: "claude" },
+      },
+    });
+    expect(byKey(page, "DOC-1").assignability).toEqual({ kind: "no-mapping" });
+  });
+
+  it("진행 중이거나 Queued 인 런이 있는 티켓은 할당할 수 없다고 표시한다", async () => {
+    const { context, ids } = setupTickets();
+    const page = await loadTicketsPage(context, undefined);
+    for (const key of ["ACME-3", "ACME-4", "ACME-5"]) {
+      expect(byKey(page, key).assignability).toEqual({ kind: "active-run", runId: ids.get(key) });
+    }
+    // Ended 뒤에는 새 런을 시작할 수 있다(Q45)
+    expect(byKey(page, "ACME-1").assignability.kind).toBe("ready");
+  });
+
+  it("한 트래커 프로젝트를 읽지 못해도 나머지는 보이고 이유를 남긴다", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined);
+    expect(page.errors).toEqual([{ trackerProject: "Broken", reason: "unauthorized" }]);
+    expect(page.tickets.length).toBe(7);
+  });
+
+  it("필터: 실행 중에는 Running 만 들고 Queued 는 넣지 않는다", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined);
+    expect(Object.fromEntries(TICKET_FILTERS.map((f) => [f, keysIn(page, f)]))).toEqual({
+      all: ["ACME-6", "ACME-5", "ACME-4", "ACME-3", "ACME-2", "ACME-1", "DOC-1"],
+      attention: ["ACME-5", "ACME-2"],
+      unassigned: ["ACME-6", "DOC-1"],
+      running: ["ACME-3"],
+      merged: ["ACME-1"],
+    });
+  });
+
+  it("러너는 Workspace 와 상관없이 모두, 에이전트는 모든 Mapping 에서 모은다", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, labs);
+    expect(page.tickets.map((t) => t.key)).toEqual(["LAB-1"]);
+    expect(page.runners.map((r) => [r.id, r.online, r.assignmentBlocked])).toEqual([
+      ["runner-a", true, false],
+      ["runner-b", false, false],
+      ["runner-c", true, true],
+      ["runner-d", true, false],
+    ]);
+    expect(page.agents).toEqual(["claude", "codex"]);
+  });
+
+  it('"전체"에서는 트래커를 읽지 않는다', async () => {
+    const { context, tracker } = setupTickets();
+    let calls = 0;
+    const original = tracker.listProjectTickets.bind(tracker);
+    tracker.listProjectTickets = (...args) => {
+      calls += 1;
+      return original(...args);
+    };
+    const page = await loadTicketsPage(context, "all");
+    expect(page.workspace.kind).toBe("all");
+    expect(page.tickets).toEqual([]);
+    expect(calls).toBe(0);
+  });
+});
