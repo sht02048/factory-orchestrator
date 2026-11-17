@@ -1,9 +1,9 @@
 ---
-status: todo
+status: done
 blocked_by: []
 ---
 
-# HTML 시안 6개 화면
+# HTML 시안 7개 화면
 
 ## 목표
 
@@ -12,7 +12,7 @@ blocked_by: []
 ## 범위
 
 - `design/prototype/`에 정적 HTML + CSS(React·StyleX 없이)
-- emil 스킬(design-foundations, color, typography, ui-polish) 적용
+- 시각 디자인 원칙(위계, 색, 타이포그래피, 마감 디테일) 적용
 - 다크 모드 우선, 라이트 모드 지원. 밀도 높은 운영 도구 톤
 - 화면
   1. Tickets: Linear 티켓 목록, 할당, 자동 할당 여부
@@ -21,10 +21,11 @@ blocked_by: []
   4. Runners: Online/Offline, capacity 사용량, 프로젝트 목록
   5. Stats: 처리량, 결과 분포(Merged / Human Check / Failed), 리드 타임, 러너·프로젝트·에이전트별 보기
   6. Settings: Mapping(트래커 프로젝트 → 러너 프로젝트 + 에이전트), Auto-assign Label, 연결 정보
-- 목 데이터와 라벨은 `GLOSSARY.md` 용어만 쓴다. UI 문구는 한국어 해요체(토스 UX 라이팅)
+  7. 온보딩: 첫 실행 설정(Linear 연결과 webhook 공개 방법, GitHub 토큰, 첫 러너 등록과 ssh 연결 확인, 첫 Mapping, 완료)
+- 목 데이터와 라벨은 `GLOSSARY.md` 용어만 쓴다. UI 문구는 한국어 해요체 UX 라이팅. 러너·프로젝트·티켓 키 같은 목 데이터는 가상 값
 - 방향이 갈리는 화면은 2~3개 안을 나란히 두고 고른다
 
 ## 완료 조건
 
-- 6개 화면을 브라우저로 열어 오갈 수 있다
+- 7개 화면을 브라우저로 열어 오갈 수 있다
 - 운영자가 방향을 확정했다
