@@ -121,7 +121,7 @@
             </div>
             <p class="panel-why">${why}</p>
             <div class="actions"><button class="btn ${r.online ? "" : "btn-primary"}" type="button" data-toast="${r.online ? `${r.id}에 ssh로 연결했어요` : `${r.id}에 아직 닿지 않아요`}">ssh 연결 확인</button></div>
-            <div><h3 class="panel-block-title">슬롯 ${runs.length}/${r.capacity}</h3>${r.online ? `<ol class="slots">${slots}</ol>` : `<p class="muted">Offline이라 슬롯 ${r.capacity}개를 모두 쓸 수 없어요.</p>`}</div>
+            <div><h3 class="panel-block-title">capacity ${runs.length}/${r.capacity}</h3>${r.online ? `<ol class="slots">${slots}</ol>` : `<p class="muted">Offline이라 capacity ${r.capacity}개를 모두 쓸 수 없어요.</p>`}</div>
             ${q.length ? `<div><h3 class="panel-block-title">기다리는 런 ${q.length}</h3><ol class="events">${q.map((x) => `<li class="event"><time class="num">${x.queued}</time><a href="run.html?id=${x.id}">${FO.esc(FO.ticket(x.ticket).title)}</a></li>`).join("")}</ol></div>` : ""}
             <div><h3 class="panel-block-title">프로젝트 ${r.projects.length}</h3><ul class="projects">${r.projects.map((p) => `<li>${p}</li>`).join("")}</ul></div>
             <dl class="props">
