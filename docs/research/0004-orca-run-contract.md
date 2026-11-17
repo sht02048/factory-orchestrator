@@ -17,7 +17,7 @@
 | W3       | `kill -TERM $PPID` 실행                                   | 0이 아닌 종료(143)                      |
 | W4       | `sleep 120` 실행                                          | 진행 중(`working`)                      |
 
-러너의 GitHub 인증이 비대화형 세션에서 동작하지 않아(research 0003) 에이전트에게 push·PR을 시키지 않았다. 확인이 끝난 뒤 워크트리와 브랜치를 모두 지웠다.
+러너의 GitHub 인증이 비대화형 세션에서 동작하지 않아([research 0003](0003-orca-runner-contract.md)) 에이전트에게 push·PR을 시키지 않았다. 확인이 끝난 뒤 워크트리와 브랜치를 모두 지웠다.
 
 예시와 픽스처의 로컬 경로, 호스트명, 사용자명, 계정은 `<path>`, `<host>`, `<user>`, `acme`로 바꿨다. UUID는 가상 값이고, 같은 대상은 파일끼리 같은 값을 쓴다(번호는 시간 순서가 아니다). 시각은 실제 간격을 남긴 채 옮긴 값이다. 픽스처는 [`fixtures/0004/`](fixtures/0004/)에 있다.
 
@@ -84,7 +84,7 @@ orca worktree create --repo id:<repoId> --name fo-verify-w1 --no-parent \
 ```
 
 - `result.worktree.id`(`<repoId>::<path>`)가 `worktree ps` 행의 `worktreeId`와 같다. 런 레코드에는 이 값을 워크트리 참조로 둔다.
-- `launch.outcome.handle`은 에이전트 터미널 핸들, `launch.outcome.paneKey`는 `worktree ps`의 `agents[].paneKey`와 같다. 핸들은 로그 꼬리(`terminal read`)와 멈추기(`terminal close`, research 0003)에 쓴다.
+- `launch.outcome.handle`은 에이전트 터미널 핸들, `launch.outcome.paneKey`는 `worktree ps`의 `agents[].paneKey`와 같다. 핸들은 로그 꼬리(`terminal read`)와 멈추기(`terminal close`, [research 0003](0003-orca-runner-contract.md))에 쓴다.
 - 워크트리 경로는 등록한 저장소 옆이 아니라 Orca가 관리하는 폴더(`<path>/workspaces/<repo>/<name>`, 폴더 이름이 `workspaces`다)에 생긴다.
 - `--branch`를 주지 않으면 브랜치는 `<접두사>/<name>`이다. 이 러너의 접두사는 GitHub 계정 이름이었다. 런의 PR을 브랜치로 찾으려면(spec Q40) `--branch`로 이름을 정해 주는 편이 낫다.
 - 응답을 잃었을 때 다시 보낼 `operationId`는 성공 응답에도 온다.
@@ -123,15 +123,15 @@ Then reply DONE. 한국어 줄: 끝나면 멈춰요.
 
 ## 2. `worktree ps` 열거값
 
-| 필드                        | 소스의 목록 **[소스]**                        | 관측 **[실행]**                                                                      |
-| --------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `agents[].state`            | `working`, `blocked`, `waiting`, `done`       | `working`, `waiting`, `done`                                                         |
-| `programStatus.state`       | `idle`, `working`, `done`, `blocked`, `error` | `working`, `done`, `blocked`                                                         |
-| `programStatus.kind`        | `permission`, `question`, `auth`              | `question`                                                                           |
-| `terminalVerdict`           | `live`, `unverifiable`, `none`                | `live`, `none`(`none`은 0002 첫판 관측)                                              |
-| 행 `status`                 | 닫힌 목록 못 찾음                             | `active`, `working`, `permission`, `inactive`(research 0003)                         |
-| `sidebarStatus`             | 닫힌 목록 못 찾음                             | `active`, `monitoring`, `done`, `permission`, `inactive`(`inactive`는 research 0003) |
-| `agentWait`(`--agent-wait`) | -                                             | `null`, `{ "source": "hook", "since": <ms> }`                                        |
+| 필드                        | 소스의 목록 **[소스]**                        | 관측 **[실행]**                                                                              |
+| --------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `agents[].state`            | `working`, `blocked`, `waiting`, `done`       | `working`, `waiting`, `done`                                                                 |
+| `programStatus.state`       | `idle`, `working`, `done`, `blocked`, `error` | `working`, `done`, `blocked`                                                                 |
+| `programStatus.kind`        | `permission`, `question`, `auth`              | `question`                                                                                   |
+| `terminalVerdict`           | `live`, `unverifiable`, `none`                | `live`, `none`(`none`은 0002 첫판 관측)                                                      |
+| 행 `status`                 | 닫힌 목록 못 찾음                             | `active`, `working`, `permission`, `inactive`([research 0003](0003-orca-runner-contract.md)) |
+| `sidebarStatus`             | 닫힌 목록 못 찾음                             | `active`, `monitoring`, `done`, `permission`, `inactive`(`inactive`는 research 0003)         |
+| `agentWait`(`--agent-wait`) | -                                             | `null`, `{ "source": "hook", "since": <ms> }`                                                |
 
 출처:
 
@@ -166,9 +166,9 @@ Claude Code를 terminal로 띄우면 대화형 TUI가 뜬다. 지시를 마치�
 }
 ```
 
-`state: done`은 "턴이 끝났다"는 뜻이지 프로세스 종료가 아니다. 에이전트는 이 상태로 사람의 다음 입력을 기다린다. GLOSSARY는 "에이전트 프로세스 종료"를 런이 끝나는 사유로 두고 종료 코드로 정상·오류 종료를 가르는데(Q49·Q70), 대화형 에이전트는 스스로 프로세스를 끝내지 않는다. 0037에서 다음 중 하나를 정해야 한다.
+`state: done`은 "턴이 끝났다"는 뜻이지 프로세스 종료가 아니다. 에이전트는 이 상태로 사람의 다음 입력을 기다린다. GLOSSARY는 "에이전트 프로세스 종료로 Ended가 된다"고 두고 종료 코드로 정상·오류 종료를 가르는데(Q49·Q70), 대화형 에이전트는 스스로 프로세스를 끝내지 않는다. 티켓 0037에서 다음 중 하나를 정해야 한다.
 
-- `agents[].state: done`이 일정 시간 유지되면 끝난 것으로 보고, 오케스트레이터가 에이전트를 멈춘다(research 0003의 `terminal close`). 이때 종료 코드는 없다.
+- `agents[].state: done`이 일정 시간 유지되면 끝난 것으로 보고, 오케스트레이터가 에이전트를 멈춘다([research 0003](0003-orca-runner-contract.md)의 `terminal close`). 이때 종료 코드는 없다.
 - 에이전트를 비대화형으로 띄워 일을 마치면 끝나게 한다. `worktree create --agent`는 "known TUI agent"를 띄우므로 Orca의 에이전트 설정이나 다른 실행 경로가 필요하다. 확인하지 않았다.
 
 ### 에이전트 프로세스가 끝났을 때
@@ -179,7 +179,7 @@ W1은 터미널에 `/exit`를 보내(`terminal send --text "/exit" --enter`) 끝
 - 행의 `agents`가 빈 배열이 되고 `status`·`sidebarStatus`는 `active`다.
 - 두 경우의 행이 같다. [`worktree-ps-after-exit-0.json`](fixtures/0004/worktree-ps-after-exit-0.json), [`worktree-ps-after-exit-143.json`](fixtures/0004/worktree-ps-after-exit-143.json).
 
-그래서 0002 A.6의 후보 가운데 `liveTerminalCount: 0`·`terminalVerdict: "none"`은 에이전트 종료 신호가 아니다. 터미널을 닫은 경우에만 그렇게 된다(research 0003). 에이전트 프로세스 종료의 신호는 "그 워크트리 행의 `agents`에서 에이전트(`paneKey`)가 사라짐"이다.
+그래서 0002 A.6의 후보 가운데 `liveTerminalCount: 0`·`terminalVerdict: "none"`은 에이전트 종료 신호가 아니다. 터미널을 닫은 경우에만 그렇게 된다([research 0003](0003-orca-runner-contract.md)). 에이전트 프로세스 종료의 신호는 "그 워크트리 행의 `agents`에서 에이전트(`paneKey`)가 사라짐"이다.
 
 ### 종료 코드
 
@@ -187,7 +187,7 @@ W1은 터미널에 `/exit`를 보내(`terminal send --text "/exit" --enter`) 끝
 
 남은 셸에 `echo "FO_EXIT=$?"`를 보내고(`terminal send --text ... --enter`) `terminal read`로 읽으면 종료 코드가 나온다 **[실행]**. W1(`/exit`)은 `FO_EXIT=0`, W3(`SIGTERM`)은 `FO_EXIT=143`이었다. 픽스처: [`terminal-read-exit-0.json`](fixtures/0004/terminal-read-exit-0.json), [`terminal-read-exit-143.json`](fixtures/0004/terminal-read-exit-143.json).
 
-이 방법은 사용자 셸이 zsh·bash 같은 POSIX 셸이고, 에이전트가 끝난 바로 뒤 셸에 다른 명령이 들어가지 않았다는 전제에 기댄다. 터미널에 입력을 보내는 일이라 어댑터의 기본 경로로 삼기에는 약하다. 위의 "끝나지 않는다" 문제와 함께 0037에서 정한다.
+이 방법은 사용자 셸이 zsh·bash 같은 POSIX 셸이고, 에이전트가 끝난 바로 뒤 셸에 다른 명령이 들어가지 않았다는 전제에 기댄다. 터미널에 입력을 보내는 일이라 어댑터의 기본 경로로 삼기에는 약하다. 위의 "끝나지 않는다" 문제와 함께 티켓 0037에서 정한다.
 
 ### 입력 기다림
 
@@ -218,7 +218,7 @@ W2는 `AskUserQuestion`으로 질문하고 답을 기다렸다 **[실행]**. [`w
 
 Waiting for Input 판정은 `agents[].state`가 `waiting` 또는 `blocked`이거나 `programStatus.state`가 `blocked`일 때로 한다. `agents[].state: "blocked"`는 관측하지 못했지만 소스 목록에 있고, 권한 프롬프트처럼 관측하지 못한 경우에 올 수 있어 함께 넣는다. `agentWait`는 `--agent-wait`를 줄 때만 오므로 보조로 쓴다.
 
-관측하지 못한 나머지 값은 다음처럼 다루는 것을 제안한다. 0037에서 정한다.
+관측하지 못한 나머지 값은 다음처럼 다루는 것을 제안한다. 티켓 0037에서 정한다.
 
 - `programStatus.state: "error"`: 에이전트가 스스로 알린 오류 상태다. 프로세스가 살아 있으면 Running으로 두고, 끝남 판정은 위 신호(행의 `agents`에서 빠짐)를 따른다.
 - `terminalVerdict: "unverifiable"`: 런타임이 터미널 생사를 확인하지 못한다는 뜻이다. 런 상태를 바꾸지 않고 다음 폴링에서 다시 본다.
@@ -240,7 +240,7 @@ W4는 에이전트가 `sleep 120`을 백그라운드로 띄운 상태였다 **[�
 `terminal read --terminal <handle> --limit 60 --json`의 결과는 `result.terminal`에 `handle`, `status`(`running`), `tail`(줄 배열), `tailRows`(줄마다 `wrapped`, `trailingSpaces`), `truncated`, `limited`, `oldestCursor`, `nextCursor`, `latestCursor`, `returnedLineCount`, `source`가 있다 **[실행]**. `source`는 `stream`(터미널 출력 흐름)과 `screen`(화면 상태) 둘 다 왔다. `terminal-read-agent-done.json`은 `screen`이고, 에이전트 입력란에 미리 채워진 글자를 담은 `draft`(`"cat note.txt"`, 에이전트의 입력 제안으로 보인다)도 있었다. [`terminal-read-agent-done.json`](fixtures/0004/terminal-read-agent-done.json)은 W1이 일을 마친 직후다. 에이전트 TUI의 상태 표시 줄 몇 줄(러너의 플러그인과 요금제 표시)은 픽스처에서 뺐다.
 
 - `tail`은 화면에 그려진 줄이라 TUI 장식(박스 문자, 구분선)이 섞인다. 마크다운 백틱처럼 TUI가 바꿔 그린 글자는 원문과 다르다.
-- 터미널을 닫거나 워크트리를 지운 뒤에는 `tail`이 빈다(research 0003). 런의 마지막 로그는 그 전에 읽는다.
+- 터미널을 닫거나 워크트리를 지운 뒤에는 `tail`이 빈다([research 0003](0003-orca-runner-contract.md)). 런의 마지막 로그는 그 전에 읽는다.
 
 ### 터미널 입력: `terminal send`
 
@@ -255,13 +255,14 @@ W4는 에이전트가 `sleep 120`을 백그라운드로 띄운 상태였다 **[�
 
 ## 아직 모르는 것
 
-1. 대화형 에이전트가 일을 마쳐도 끝나지 않는 문제를 어떻게 다룰지, 에이전트 결과의 정상·오류 종료를 무엇으로 정할지. 0037에서 정한다.
+1. 대화형 에이전트가 일을 마쳐도 끝나지 않는 문제를 어떻게 다룰지, 에이전트 결과의 정상·오류 종료를 무엇으로 정할지. 티켓 0037에서 정한다.
 2. 비대화형 실행(일을 마치면 프로세스가 끝나는 실행)을 Orca로 띄울 수 있는지.
 3. 권한 프롬프트로 멈춘 에이전트의 `worktree ps` 행. 이 러너는 권한을 묻지 않게 띄웠다.
 4. chat(`structured`)으로 뜬 에이전트의 진행 감지. `--surface terminal`을 늘 주므로 1단계에는 필요 없다.
 5. Codex 등 다른 에이전트의 상태 값. Claude Code만 띄웠다.
 6. 에이전트 훅이 꺼진 러너에서의 진행 감지.
 7. 행 `status`·`sidebarStatus`의 닫힌 목록.
+8. `launch.outcome.kind`와 `launch.prompt.outcome`의 전체 값. `terminal`, `handed-to-terminal`만 관측했다. 0002 A.5가 적은 `structured`, `journaled`도 있으므로 닫힌 목록으로 다루지 않는다.
 
 ## 픽스처
 
