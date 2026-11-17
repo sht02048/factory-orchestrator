@@ -16,6 +16,7 @@ import type {
 import { changeRunState, listRunners, setRunnerMailbox } from "@factory/db";
 import type { Database, StoredRun, StoredRunner } from "@factory/db";
 import type { WorkerAdapters } from "./adapters.js";
+import type { AutoAssignState } from "./auto-assign.js";
 
 /** worker가 남기는 기록. 런 하나의 실패는 루프를 멈추지 않고 여기로 보낸다. */
 export interface WorkerLogger {
@@ -58,6 +59,8 @@ export interface TickContext {
   unrecordedComments: Map<RunId, { id: CommentId; at: Date }>;
   /** 결과 댓글을 달려 했는데 트래커에서 티켓을 찾지 못한 런. 데몬이 살아 있는 동안 다시 해 보지 않는다. */
   ticketsGone: Set<RunId>;
+  /** 자동 할당의 폴링 보정 시각. 메모리에만 둔다 */
+  autoAssign: AutoAssignState;
 }
 
 export interface PendingEnding {

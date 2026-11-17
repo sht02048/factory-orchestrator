@@ -45,7 +45,7 @@ export const projectB = toRunnerProjectId("fake:acme/b");
 export const projectC = toRunnerProjectId("fake:acme/c");
 
 const fakeKind = "fake";
-const workspaceId = toWorkspaceId("ws-1");
+export const workspaceId = toWorkspaceId("ws-1");
 
 /** 러너 쪽 프로젝트 ID "fake:<저장소>"에서 FakeCodeHost가 읽는 저장소 */
 export function repoOf(project: RunnerProjectId) {

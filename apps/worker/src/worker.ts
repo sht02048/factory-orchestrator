@@ -41,6 +41,7 @@ import {
 } from "./context.js";
 import type { QueuedStoredRun, TickContext, WorkerLogger } from "./context.js";
 import { processAfterRuns } from "./after-run.js";
+import { assignAutomatically, createAutoAssignState } from "./auto-assign.js";
 import { processWebRequests } from "./requests.js";
 import { checkRunners } from "./runner-check.js";
 import { watchActiveRuns } from "./watch.js";
@@ -61,7 +62,7 @@ export interface WorkerOptions {
 export interface Worker {
   /**
    * 폴링 한 바퀴: 러너를 확인하고 web 요청을 처리한 뒤, 끝나지 않은 런을 감시해 끝난 런의 두 축을 기록하고,
-   * Queued 런의 취소를 처리하고, 대기열에서 런을 시작한 뒤 런 시작·종료 뒤처리를 한다.
+   * Queued 런의 취소를 처리하고, 자동 할당을 한 뒤 대기열에서 런을 시작하고 런 시작·종료 뒤처리를 한다.
    */
   tick(): Promise<void>;
   /** DB를 닫는다. 돌던 tick이 끝나기를 기다린다. */
@@ -127,6 +128,7 @@ export function createWorker(options: WorkerOptions): Worker {
     prPolledAt: new Map(),
     unrecordedComments: new Map(),
     ticketsGone: new Set(),
+    autoAssign: createAutoAssignState(),
   };
   let running: Promise<void> | null = null;
   let closed = false;
@@ -158,6 +160,8 @@ async function tick(context: TickContext): Promise<void> {
   // 끝난 런이 내놓은 capacity를 같은 바퀴의 대기열이 쓰도록 먼저 본다.
   await watchActiveRuns(context);
   await cancelQueuedRuns(context);
+  // 자동으로 할당한 런을 같은 바퀴의 대기열이 시작하도록 대기열 앞에서 한다.
+  await assignAutomatically(context);
   await processQueue(context);
   // 이번 바퀴에 시작하거나 끝난 런의 트래커 갱신과 워크트리 정리를 같은 바퀴에 한다.
   await processAfterRuns(context);

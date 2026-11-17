@@ -1,8 +1,21 @@
-import { DEFAULT_MAX_RUN_MS, getRun, getRunWithRecords } from "@factory/db";
+import { toDeliveryId, toLabelId, toTicketKey } from "@factory/core";
+import {
+  DEFAULT_MAX_RUN_MS,
+  getRun,
+  getRunWithRecords,
+  listRuns,
+  listUnprocessedTrackerEvents,
+  recordTrackerEvent,
+  saveAutoAssignLabel,
+} from "@factory/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Harness, projectA } from "./test-fixtures.js";
+import { Harness, connection, projectA, trackerProject, workspaceId } from "./test-fixtures.js";
 
-const failure = vi.hoisted(() => ({ changeRunStateFailures: 0, recordStartRequestedFailures: 0 }));
+const failure = vi.hoisted(() => ({
+  changeRunStateFailures: 0,
+  recordStartRequestedFailures: 0,
+  markTrackerEventProcessedFailures: 0,
+}));
 
 // 정한 횟수만큼 DB 쓰기를 실패하게 한다(쓰기 잠금 시간 초과 같은 경우).
 vi.mock("@factory/db", async (importOriginal) => {
@@ -23,6 +36,13 @@ vi.mock("@factory/db", async (importOriginal) => {
       }
       return actual.recordStartRequested(...args);
     },
+    markTrackerEventProcessed: (...args: Parameters<typeof actual.markTrackerEventProcessed>) => {
+      if (failure.markTrackerEventProcessedFailures > 0) {
+        failure.markTrackerEventProcessedFailures -= 1;
+        throw new Error("database is locked");
+      }
+      return actual.markTrackerEventProcessed(...args);
+    },
   };
 });
 
@@ -32,6 +52,7 @@ beforeEach(() => {
   h = new Harness();
   failure.changeRunStateFailures = 0;
   failure.recordStartRequestedFailures = 0;
+  failure.markTrackerEventProcessedFailures = 0;
 });
 
 afterEach(async () => {
@@ -128,5 +149,33 @@ describe("에이전트를 멈춘 뒤 DB 쓰기 실패", () => {
     await worker.tick();
     expect(getRun(h.db, run.id)).toMatchObject({ state: "ended", agentResult: "timed-out" });
     expect(stopAgent).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("webhook 이벤트 처리 표시 쓰기 실패", () => {
+  it("할당도 되돌려 런을 남기지 않고, 다음 바퀴에 같은 이벤트로 런을 하나만 만든다", async () => {
+    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const label = toLabelId("label-auto");
+    saveAutoAssignLabel(h.db, { workspaceId, connection, labelId: label });
+    recordTrackerEvent(h.db, connection, {
+      deliveryId: toDeliveryId("delivery-1"),
+      kind: "ticket.updated",
+      ticketKey: toTicketKey("ENG-1"),
+      projectId: trackerProject,
+      labelIds: [label],
+      previousLabelIds: [],
+      receivedAt: h.now,
+    });
+    const worker = h.worker();
+
+    failure.markTrackerEventProcessedFailures = 1;
+    await worker.tick();
+    expect(listRuns(h.db)).toEqual([]);
+    expect(h.warnings.map((w) => w.message)).toContain("could not process tracker event");
+
+    await worker.tick();
+    await worker.tick();
+    expect(listRuns(h.db)).toHaveLength(1);
+    expect(listUnprocessedTrackerEvents(h.db)).toEqual([]);
   });
 });
