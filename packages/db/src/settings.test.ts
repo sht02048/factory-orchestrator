@@ -4,7 +4,9 @@ import { toWorkspaceId } from "./ids.js";
 import { assignRun, changeRunState, getRun, listRuns } from "./runs.js";
 import {
   getMapping,
+  listRunners,
   listWorkspaceTrackerProjects,
+  recordRunnerCheck,
   removeWorkspaceTrackerProject,
   saveWorkspace,
   saveWorkspaceTrackerProject,
@@ -99,5 +101,49 @@ describe("removeWorkspaceTrackerProject", () => {
       removeWorkspaceTrackerProject(db, { workspaceId, connection, projectId: otherProject }),
     ).toBe(false);
     expect(listWorkspaceTrackerProjects(db, otherWorkspace)).toHaveLength(1);
+  });
+});
+
+describe("recordRunnerCheck 필수 조건", () => {
+  const prerequisites = [
+    { id: "service", name: "Orca service", satisfied: true, hint: null, blocksAssignment: false },
+    {
+      id: "push:github:acme/web",
+      name: "acme/web",
+      satisfied: false,
+      hint: "gh auth setup-git",
+      blocksAssignment: true,
+    },
+  ];
+
+  it("러너 필수 조건 하나하나(프로젝트별 GitHub 인증, Q82.15)를 저장하고 읽는다", () => {
+    const db = seededDatabase();
+    const id = addRunner(db, { id: "runner-1", capacity: 1, online: true, projects: [repoA] });
+    expect(listRunners(db)[0]?.prerequisites).toBeNull();
+    recordRunnerCheck(db, {
+      runnerId: id,
+      online: true,
+      checkedAt: new Date(1),
+      error: null,
+      projects: null,
+      assignmentBlocked: true,
+      prerequisites,
+    });
+    expect(listRunners(db)[0]).toMatchObject({ assignmentBlocked: true, prerequisites });
+  });
+
+  it("필수 조건을 읽지 못한 확인(null 이나 생략)은 이전 값을 남긴다", () => {
+    const db = seededDatabase();
+    const id = addRunner(db, { id: "runner-1", capacity: 1, online: true, projects: [repoA] });
+    const check = { runnerId: id, checkedAt: new Date(1), error: null, projects: null };
+    recordRunnerCheck(db, { ...check, online: true, assignmentBlocked: true, prerequisites });
+    recordRunnerCheck(db, {
+      ...check,
+      online: false,
+      assignmentBlocked: null,
+      prerequisites: null,
+    });
+    recordRunnerCheck(db, { ...check, online: false, assignmentBlocked: null });
+    expect(listRunners(db)[0]).toMatchObject({ online: false, prerequisites });
   });
 });

@@ -3,6 +3,7 @@ import type { QueuedRun, RunId } from "@factory/core";
 import {
   getRunWithRecords,
   getWorkspaceTrackerProject,
+  listPendingCancelRequests,
   listRunPlacements,
   listRunnerSnapshots,
   listRuns,
@@ -28,6 +29,7 @@ export function loadRunsPage(db: Database, ws: string | undefined, now: Date): R
   if (workspace.kind !== "one") return { workspace, runs: [] };
 
   const runners = new Map(listRunners(db).map((r) => [r.id, r]));
+  const cancelling = new Set<RunId>(listPendingCancelRequests(db).map((r) => r.runId));
   const queueReasons = explainQueue({
     // 대기열은 설치 전체에 하나다. 다른 Workspace 의 Queued 런도 순서에 든다(ADR 0006).
     queued: listRuns(db, { states: ["queued"] }).flatMap((run): QueuedRun[] =>
@@ -96,11 +98,16 @@ export function loadRunsPage(db: Database, ws: string | undefined, now: Date): R
       };
       switch (run.state) {
         case "queued":
-          return { ...base, state: run.state, queuedReason: queuedReason(run.id) };
+          return {
+            ...base,
+            state: run.state,
+            queuedReason: queuedReason(run.id),
+            cancelling: cancelling.has(run.id),
+          };
         case "running":
         case "waiting-for-input":
         case "disconnected":
-          return { ...base, state: run.state };
+          return { ...base, state: run.state, cancelling: cancelling.has(run.id) };
         case "ended":
           return {
             ...base,

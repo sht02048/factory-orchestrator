@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import runnersJson from "../../messages/ko/runners.json" with { type: "json" };
 import { renderWithMessages } from "../testing/render";
-import { now, seedDatabase } from "../testing/seed";
+import { addUnreachedCanceledRun, breakGitHubAuth, now, seedDatabase } from "../testing/seed";
 import { loadRunnersPage } from "./load";
 import { runnersMessages } from "./messages";
 import type { RunnersPage } from "./model";
@@ -80,6 +80,46 @@ describe("Runners 화면", () => {
     const { db } = seedDatabase();
     const page = loadRunnersPage(db, now);
     expect(panelText(render(page, "nope"))).toContain("capacity 4/10");
+  });
+
+  it("GitHub 인증이 깨진 러너는 할당에서 빠졌다고 보이고 깨진 프로젝트와 해결 방법을 보인다(Q82.14·Q82.15)", () => {
+    const { db } = seedDatabase();
+    breakGitHubAuth(db);
+    const html = render(loadRunnersPage(db, now), "runner-a");
+    expect(rowTexts(html).get("runner-a")?.slice(1, 3)).toEqual([
+      "Online",
+      runnersJson.assignmentBlocked,
+    ]);
+    expect(rowTexts(html).get("runner-b")).not.toContain(runnersJson.assignmentBlocked);
+    const text = panelText(html);
+    expect(text).toContain(runnersJson.panel.reason.assignmentBlocked);
+    expect(text).toContain(
+      `GitHub push access: acme/web ${runnersJson.panel.githubAuth.state.broken}`,
+    );
+    expect(text).toContain(
+      `GitHub push access: acme/docs ${runnersJson.panel.githubAuth.state.ok}`,
+    );
+    // 어댑터의 영어 해결 방법은 한국어 안내와 겹쳐 보이지 않는다
+    expect(text).not.toContain("Run `gh auth login");
+    expect(text).toContain("gh auth login --insecure-storage");
+    expect(text).toContain("gh auth setup-git");
+  });
+
+  it("인증을 아직 확인하지 않은 러너는 그렇다고 보이고 해결 방법은 보이지 않는다", () => {
+    const { db } = seedDatabase();
+    const text = panelText(render(loadRunnersPage(db, now), "runner-a"));
+    expect(text).toContain(runnersJson.panel.githubAuth.neverChecked);
+    expect(text).not.toContain("gh auth login");
+  });
+
+  it("러너에 닿지 못한 채 끝난 취소 런을 남은 워크트리 수에 넣는다(Q82.21)", () => {
+    const { db } = seedDatabase();
+    addUnreachedCanceledRun(db, "ACME-22");
+    const html = render(loadRunnersPage(db, now), "runner-b");
+    expect(rowTexts(html).get("runner-b")?.[4]).toBe("1개");
+    expect(panelText(html)).toContain(
+      `ACME-22 Acme Commerce · ${runnersJson.panel.worktree["operator-decides"]}`,
+    );
   });
 
   it("러너가 없으면 빈 목록 문구를 보인다", () => {

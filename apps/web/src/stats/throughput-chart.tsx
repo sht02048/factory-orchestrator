@@ -13,14 +13,15 @@ const LEFT = 24;
 const GRID_LINES = 4;
 
 /**
- * 날짜별 처리량: 날마다 끝난 런 수를 요약 결과로 나눠 쌓는다(아래부터 Merged, Human Check, Failed).
- * 색은 손댈 일(Human Check, Failed)에만 쓰고 Merged 는 무채색이다(ADR 0007).
+ * 날짜별 처리량: 날마다 끝난 런 수를 요약 결과로 나눠 쌓는다(아래부터 Merged, Human Check, Failed, 취소).
+ * 색은 손댈 일(Human Check, Failed)에만 쓰고 Merged 와 취소는 무채색이다(ADR 0007). 취소는 Merged 보다
+ * 옅게 그려 따로 센 것이 보이게 한다(Q82.18).
  */
 export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughput> }) {
   const t = useTranslations("stats.throughput");
   const dayLabel = useDayLabel();
   const totals = daily.map(
-    (d) => d.outcomes.merged + d.outcomes["human-check"] + d.outcomes.failed,
+    (d) => d.outcomes.merged + d.outcomes["human-check"] + d.outcomes.failed + d.outcomes.canceled,
   );
   const max = Math.max(0, ...totals);
   // 눈금은 짝수 간격 네 칸. 런이 없어도 0~4 눈금을 그린다.
@@ -53,6 +54,7 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
           { key: "merged", value: d.outcomes.merged, style: styles.merged },
           { key: "check", value: d.outcomes["human-check"], style: styles.check },
           { key: "failed", value: d.outcomes.failed, style: styles.failed },
+          { key: "canceled", value: d.outcomes.canceled, style: styles.canceled },
         ];
         let y = HEIGHT - BOTTOM;
         const label = dayLabel(d.day);
@@ -64,6 +66,7 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
                 merged: d.outcomes.merged,
                 check: d.outcomes["human-check"],
                 failed: d.outcomes.failed,
+                canceled: d.outcomes.canceled,
               })}
             </title>
             {segments.map((segment) => {
@@ -100,7 +103,7 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
 }
 
 /** 범례의 색 견본. 막대와 같은 색이다 */
-export function LegendSwatch({ outcome }: { outcome: "merged" | "check" | "failed" }) {
+export function LegendSwatch({ outcome }: { outcome: "merged" | "check" | "failed" | "canceled" }) {
   return <i aria-hidden {...stylex.props(styles.swatch, swatchFill[outcome])} />;
 }
 
@@ -115,6 +118,7 @@ const styles = stylex.create({
   merged: { fill: colors.textDisabled },
   check: { fill: colors.check },
   failed: { fill: colors.failed },
+  canceled: { fill: colors.borderStrong },
   swatch: { display: "inline-block", width: 8, height: 8, borderRadius: 2 },
 });
 
@@ -122,4 +126,5 @@ const swatchFill = stylex.create({
   merged: { backgroundColor: colors.textDisabled },
   check: { backgroundColor: colors.check },
   failed: { backgroundColor: colors.failed },
+  canceled: { backgroundColor: colors.borderStrong },
 });

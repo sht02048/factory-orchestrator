@@ -216,3 +216,63 @@ function startedOn(worktree: string) {
     agentRef: toAgentRef(`agent-${worktree}`),
   };
 }
+
+/**
+ * runner-a 의 GitHub 인증 확인 결과를 넣는다(Q82.14·Q82.15). acme/web 은 깨졌고 acme/docs 는 통과한다.
+ * 할당에서 빠지지만 Online 은 그대로다.
+ */
+export function breakGitHubAuth(db: Database): void {
+  recordRunnerCheck(db, {
+    runnerId: toRunnerId("runner-a"),
+    online: true,
+    checkedAt: T0,
+    error: null,
+    projects: null,
+    assignmentBlocked: true,
+    prerequisites: [
+      { id: "service", name: "Orca service", satisfied: true, hint: null, blocksAssignment: false },
+      // 이름과 해결 방법은 runner-orca 어댑터가 주는 모양을 따른다
+      {
+        id: "github-push:github:acme/web",
+        name: "GitHub push access: acme/web",
+        satisfied: false,
+        hint: "Run `gh auth login --insecure-storage` and `gh auth setup-git` on the runner.",
+        blocksAssignment: true,
+      },
+      {
+        id: "github-push:github:acme/docs",
+        name: "GitHub push access: acme/docs",
+        satisfied: true,
+        hint: null,
+        blocksAssignment: true,
+      },
+    ],
+  });
+}
+
+/**
+ * runner-b 에서 시작한 뒤 취소했지만 러너에 닿지 못한 채 끝난 런을 더한다(Q82.21). 워크트리는 사람이 정한다.
+ */
+export function addUnreachedCanceledRun(db: Database, key: string): RunId {
+  const assigned = assignRun(db, {
+    ticket: { connection, key: toTicketKey(key) },
+    trackerProject: webProject,
+    runnerProject: labRepo,
+    agent,
+    runnerId: toRunnerId("runner-b"),
+    now: minutes(60),
+  });
+  if (!assigned.ok) throw new Error(assigned.reason);
+  const id = assigned.run.id;
+  expectOk(changeRunState(db, id, { to: "running", started: startedOn(`wt-${key}`) }, minutes(61)));
+  expectOk(changeRunState(db, id, { to: "disconnected" }, minutes(62)));
+  expectOk(
+    changeRunState(
+      db,
+      id,
+      { to: "ended", agentResult: "canceled", prState: "none", runnerUnreached: true },
+      minutes(90),
+    ),
+  );
+  return id;
+}

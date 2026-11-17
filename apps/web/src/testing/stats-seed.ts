@@ -324,3 +324,43 @@ function startedOn(worktree: string) {
     agentRef: toAgentRef(`agent-${worktree}`),
   };
 }
+
+/**
+ * 런 실행 결정(Q82)으로 생긴 결과를 ws-commerce 에 더한다(티켓 0038). 모두 11월 17일에 끝난다.
+ *
+ * - 에이전트 aider: 시작하지 않고 끝난 런 둘.
+ *   X-1 Queued 에서 취소(할당 10:00, 끝 10:20) → 취소. X-2 시작할 수 없음(할당 10:00, 끝 10:05) → Failed
+ * - 에이전트 gemini: runner-a 에서 시작한 런 둘(대기 1분, 실행 10분)
+ *   X-3 비정상 종료 · PR 없음 → Failed. X-4 운영자가 취소함 · PR 열림 → 취소
+ */
+export function addRunDecisionCases(db: Database): void {
+  const at = (hhmm: string) => new Date(`2026-11-17T${hhmm}:00Z`);
+  const assign = (key: string, agent: string) =>
+    mustRun(
+      assignRun(db, {
+        ticket: { connection, key: toTicketKey(key) },
+        trackerProject: projects.Web,
+        runnerProject: repo,
+        agent: toAgentId(agent),
+        runnerId: runnerIds["runner-a"],
+        now: at("10:00"),
+      }),
+    );
+  for (const [key, agentResult, end] of [
+    ["X-1", "canceled", "10:20"],
+    ["X-2", "could-not-start", "10:05"],
+  ] as const) {
+    const run = assign(key, "aider");
+    mustRun(changeRunState(db, run.id, { to: "ended", agentResult, prState: "none" }, at(end)));
+  }
+  for (const [key, agentResult, prState] of [
+    ["X-3", "ended-without-report", "none"],
+    ["X-4", "canceled", "open"],
+  ] as const) {
+    const run = assign(key, "gemini");
+    mustRun(
+      changeRunState(db, run.id, { to: "running", started: startedOn(`wt-${key}`) }, at("10:01")),
+    );
+    mustRun(changeRunState(db, run.id, { to: "ended", agentResult, prState }, at("10:11")));
+  }
+}

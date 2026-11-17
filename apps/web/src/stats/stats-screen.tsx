@@ -39,7 +39,7 @@ import type {
 import { LegendSwatch, ThroughputChart } from "./throughput-chart";
 
 // 이름 | 런 | Merged(%) | Human Check | Failed | 리드 타임(중앙값)
-const columns = "minmax(0, 1fr) 56px 72px 104px 64px 88px";
+const columns = "minmax(0, 1fr) 56px 72px 104px 64px 56px 88px";
 
 export interface StatsScreenProps {
   page: StatsPage;
@@ -157,6 +157,10 @@ function StatsView({
                   <LegendSwatch outcome="failed" />
                   {t("columns.failed")}
                 </span>
+                <span {...stylex.props(styles.legendItem)}>
+                  <LegendSwatch outcome="canceled" />
+                  {t("columns.canceled")}
+                </span>
               </span>
             }
           >
@@ -192,6 +196,7 @@ function StatsView({
                 <TableHeader align="end">{t("columns.merged")}</TableHeader>
                 <TableHeader align="end">{t("columns.check")}</TableHeader>
                 <TableHeader align="end">{t("columns.failed")}</TableHeader>
+                <TableHeader align="end">{t("columns.canceled")}</TableHeader>
                 <TableHeader align="end">{t("columns.leadTime")}</TableHeader>
               </TableHead>
               {groups.length === 0 ? (
@@ -211,13 +216,16 @@ function StatsView({
                         {group.runs}
                       </TableCell>
                       <TableCell align="end" numeric>
-                        <PercentText part={group.outcomes.merged} whole={group.runs} />
+                        <PercentText part={group.outcomes.merged} whole={group.rated} />
                       </TableCell>
                       <TableCell align="end" numeric>
                         {group.outcomes["human-check"]}
                       </TableCell>
                       <TableCell align="end" numeric>
                         {group.outcomes.failed}
+                      </TableCell>
+                      <TableCell align="end" numeric>
+                        {group.outcomes.canceled}
                       </TableCell>
                       <TableCell align="end" numeric>
                         {group.durations === null
@@ -256,9 +264,22 @@ function Figures({ total }: { total: StatsSummary }) {
   const mergedAfterCheck = percent(check.merged, check.humanCheck);
   return (
     <section aria-label={t("figures.label")} {...stylex.props(styles.figures)}>
-      <Figure value={total.runs} label={t("figures.ended")} />
       <Figure
-        value={<PercentText part={total.outcomes.merged} whole={total.runs} />}
+        value={total.runs}
+        label={
+          total.outcomes.canceled === 0 ? (
+            t("figures.ended")
+          ) : (
+            <>
+              {t("figures.ended")}
+              <br />
+              {t("figures.canceled", { count: total.outcomes.canceled })}
+            </>
+          )
+        }
+      />
+      <Figure
+        value={<PercentText part={total.outcomes.merged} whole={total.rated} />}
         label={t("figures.merged")}
       />
       <Figure
@@ -343,8 +364,13 @@ function GroupPanel({ group, dimension }: { group: StatsGroup; dimension: StatsD
   const t = useTranslations("stats");
   const duration = useFormatDuration();
   const { outcomes, humanCheck, durations } = group;
-  const share = (count: number) =>
-    t("panel.countPercent", { count, percent: percent(count, group.runs) ?? 0 });
+  // 비율은 취소를 뺀 런으로 나눈다(Q82.9·Q82.18). 취소는 개수만 보인다.
+  const share = (count: number) => {
+    const value = percent(count, group.rated);
+    return value === null
+      ? t("panel.count", { count })
+      : t("panel.countPercent", { count, percent: value });
+  };
   const mergedAfterCheck = percent(humanCheck.merged, humanCheck.humanCheck);
 
   return (
@@ -356,11 +382,22 @@ function GroupPanel({ group, dimension }: { group: StatsGroup; dimension: StatsD
           </Text>
         }
         title={group.name}
-        reason={t("panel.why", {
-          runs: group.runs,
-          merged: outcomes.merged,
-          attention: outcomes["human-check"] + outcomes.failed,
-        })}
+        reason={
+          group.rated === 0
+            ? t("panel.whyOnlyCanceled", { canceled: outcomes.canceled })
+            : outcomes.canceled === 0
+              ? t("panel.why", {
+                  runs: group.rated,
+                  merged: outcomes.merged,
+                  attention: outcomes["human-check"] + outcomes.failed,
+                })
+              : t("panel.whyWithCanceled", {
+                  runs: group.rated,
+                  merged: outcomes.merged,
+                  attention: outcomes["human-check"] + outcomes.failed,
+                  canceled: outcomes.canceled,
+                })
+        }
       />
       <DefinitionList>
         <DefinitionItem label={t("panel.runs")}>{group.runs}</DefinitionItem>
@@ -374,6 +411,9 @@ function GroupPanel({ group, dimension }: { group: StatsGroup; dimension: StatsD
           <span {...stylex.props(outcomes.failed > 0 && styles.failedText)}>
             {share(outcomes.failed)}
           </span>
+        </DefinitionItem>
+        <DefinitionItem label={t("panel.canceled")}>
+          {t("panel.canceledCount", { count: outcomes.canceled })}
         </DefinitionItem>
         <DefinitionItem label={t("panel.leadTime")}>
           {durations === null ? t("notApplicable") : duration(durations.leadP50Ms)}

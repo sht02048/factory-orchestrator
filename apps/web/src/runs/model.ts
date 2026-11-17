@@ -39,9 +39,17 @@ interface RunViewBase {
   pullRequest: { displayId: string; url: string } | null;
 }
 
+/**
+ * 처리되지 않은 취소 요청이 있는지(취소 중, Q82.21). 런 상태가 아니라 끝나지 않은 런의 화면 표시다.
+ * Ended 런에는 없다.
+ */
+interface Cancellable {
+  cancelling: boolean;
+}
+
 export type RunView =
-  | (RunViewBase & { state: "queued"; queuedReason: QueuedReason })
-  | (RunViewBase & { state: "running" | "waiting-for-input" | "disconnected" })
+  | (RunViewBase & Cancellable & { state: "queued"; queuedReason: QueuedReason })
+  | (RunViewBase & Cancellable & { state: "running" | "waiting-for-input" | "disconnected" })
   | (RunViewBase & {
       state: "ended";
       agentResult: AgentResult;

@@ -19,6 +19,7 @@
   "empty": "이 조건에 맞는 런이 없어요.",
   "noRuns": "아직 런이 없어요. 티켓을 할당하면 여기에 보여요.",
   "notApplicable": "—",
+  "cancelling": "취소 중",
   "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 런이 보여요.",
   "allWorkspaces": {
     "body": "전체에서는 모든 Workspace의 손댈 일만 모아 봐요. 런은 Workspace를 골라야 보여요.",
@@ -45,6 +46,8 @@
     "runnerOffline": "Offline",
     "openDetail": "자세히 보기",
     "openPr": "PR {pr} 열기",
+    "cancelling": "취소 중",
+    "cancellingReason": "취소를 요청했어요. 오케스트레이터가 처리하면 런이 끝나요.",
     "reason": {
       "running": "러너에서 에이전트가 티켓을 처리하고 있어요.",
       "waiting-for-input": "에이전트가 사람 입력을 기다리고 있어요. 최대 실행 시간은 이 동안에도 흘러요.",

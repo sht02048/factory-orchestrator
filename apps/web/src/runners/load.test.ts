@@ -12,7 +12,14 @@ import { assignRun, changeRunState, saveRunner, updateRunRecords } from "@factor
 import type { Database } from "@factory/db";
 import { describe, expect, it } from "vitest";
 import { Route, reloadOnEnter } from "../routes/_app/runners";
-import { connection, minutes, now, seedDatabase } from "../testing/seed";
+import {
+  addUnreachedCanceledRun,
+  breakGitHubAuth,
+  connection,
+  minutes,
+  now,
+  seedDatabase,
+} from "../testing/seed";
 import { loadRunnersPage } from "./load";
 import type { RunnerView } from "./model";
 
@@ -99,6 +106,32 @@ describe("loadRunnersPage", () => {
     // 러너 연결 끊김 런은 Offline 러너에도 남는다
     expect(runner(db, "runner-b").leftWorktrees.map((w) => [w.ticketKey, w.worktree])).toEqual([
       ["ACME-21", "operator-decides"],
+    ]);
+  });
+
+  it("러너에 닿지 못한 채 끝난 취소 런은 사람이 정할 남은 워크트리로 센다(Q82.21)", () => {
+    const { db } = seedDatabase();
+    addUnreachedCanceledRun(db, "ACME-22");
+    expect(runner(db, "runner-b").leftWorktrees.map((w) => [w.ticketKey, w.worktree])).toEqual([
+      ["ACME-22", "operator-decides"],
+    ]);
+  });
+
+  it("GitHub 인증이 깨진 러너는 할당에서 빠졌다고 담고 프로젝트별 결과를 담는다(Q82.14·Q82.15)", () => {
+    const { db } = seedDatabase();
+    expect(runner(db, "runner-a")).toMatchObject({ assignmentBlocked: false, githubAuth: null });
+    breakGitHubAuth(db);
+    const a = runner(db, "runner-a");
+    expect(a.online).toBe(true);
+    expect(a.assignmentBlocked).toBe(true);
+    // 할당을 막지 않는 필수 조건(상시 서비스)은 담지 않는다
+    expect(a.githubAuth).toEqual([
+      { id: "github-push:github:acme/web", name: "GitHub push access: acme/web", satisfied: false },
+      {
+        id: "github-push:github:acme/docs",
+        name: "GitHub push access: acme/docs",
+        satisfied: true,
+      },
     ]);
   });
 

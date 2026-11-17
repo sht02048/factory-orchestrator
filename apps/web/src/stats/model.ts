@@ -75,6 +75,11 @@ export interface HumanCheckFollowUp {
 
 export interface StatsSummary {
   runs: number;
+  /**
+   * 성공·실패율의 분모: Canceled 를 뺀 끝난 런. Canceled 는 운영자가 스스로 멈춘 런이라 따로 세고
+   * 비율에 넣지 않는다(GLOSSARY Canceled, Q82.9·Q82.18)
+   */
+  rated: number;
   outcomes: OutcomeCounts;
   durations: DurationStats | null;
   humanCheck: HumanCheckFollowUp;
@@ -179,6 +184,7 @@ export function summarizeStats(runs: ReadonlyArray<StatsRun>): StatsSummary {
   const executionSorted = sortedNumbers(execution);
   return {
     runs: runs.length,
+    rated: runs.length - outcomes.canceled,
     outcomes,
     durations:
       leadSorted.length === 0 || waitSorted.length === 0 || executionSorted.length === 0

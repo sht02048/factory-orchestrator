@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { now, seedStatsDatabase } from "../testing/stats-seed";
+import { addRunDecisionCases, now, seedStatsDatabase } from "../testing/stats-seed";
 import { loadStatsPage } from "./load";
 import { STATS_DIMENSIONS } from "./model";
 import type { StatsGroup, StatsPage, StatsSummary } from "./model";
@@ -165,6 +165,7 @@ describe("loadStatsPage", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, later));
     expect(page.total).toEqual({
       runs: 0,
+      rated: 0,
       outcomes: { merged: 0, "human-check": 0, failed: 0, canceled: 0 },
       durations: null,
       humanCheck: { humanCheck: 0, merged: 0, closed: 0 },
@@ -172,5 +173,54 @@ describe("loadStatsPage", () => {
     });
     expect(page.groups.runner).toEqual([]);
     expect(page.daily).toHaveLength(14);
+  });
+
+  describe("런 실행 결정(Q82)", () => {
+    const withDecisions = () => {
+      const db = seedStatsDatabase();
+      addRunDecisionCases(db);
+      return loaded(loadStatsPage(db, undefined, now));
+    };
+
+    it("Canceled 런은 취소로 따로 세고 성공·실패율의 분모에서 뺀다(Q82.9·Q82.18)", () => {
+      const page = withDecisions();
+      // 기존 아홉 + X-1~X-4. 취소 둘(X-1, X-4), Failed 둘 더(X-2, X-3)
+      expect(page.total.runs).toBe(13);
+      expect(page.total.outcomes).toEqual({ merged: 2, "human-check": 3, failed: 6, canceled: 2 });
+      expect(page.total.rated).toBe(11);
+      const gemini = byName(page.groups.agent).get("gemini");
+      expect(gemini).toMatchObject({ runs: 2, rated: 1 });
+      expect(gemini?.outcomes).toEqual({ merged: 0, "human-check": 0, failed: 1, canceled: 1 });
+      // 취소 런은 Failed 조합에 들지 않는다
+      expect(gemini?.failedCombinations).toEqual([
+        { agentResult: "ended-without-report", prState: "none", runs: 1 },
+      ]);
+    });
+
+    it("시작하지 않고 끝난 런의 대기 시간은 할당부터 끝낸 시각까지이고 실행 시간은 0이다(Q82.9·Q82.20)", () => {
+      const aider = byName(withDecisions().groups.agent).get("aider");
+      // X-1 대기 20분, X-2 대기 5분. 둘 다 실행 0
+      expect(aider?.durations).toEqual({
+        leadP50Ms: 5 * min,
+        leadP90Ms: 20 * min,
+        waitP50Ms: 5 * min,
+        executionP50Ms: 0,
+      });
+    });
+
+    it("Failed 조합에 비정상 종료와 시작할 수 없음이 보인다(Q82.2·Q82.16·Q82.19)", () => {
+      expect(withDecisions().total.failedCombinations).toEqual([
+        { agentResult: "reported-failure", prState: "none", runs: 2 },
+        { agentResult: "reported-success", prState: "closed", runs: 1 },
+        { agentResult: "ended-without-report", prState: "none", runs: 1 },
+        { agentResult: "timed-out", prState: "open", runs: 1 },
+        { agentResult: "could-not-start", prState: "none", runs: 1 },
+      ]);
+    });
+
+    it("날짜별 처리량에 취소를 따로 센다", () => {
+      const day = withDecisions().daily.at(-1);
+      expect(day?.outcomes).toEqual({ merged: 1, "human-check": 0, failed: 2, canceled: 2 });
+    });
   });
 });
