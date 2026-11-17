@@ -25,13 +25,13 @@
 
 ## 결론
 
-| #   | 질문                                                                          | 결과                                                                                                                                                  |
-| --- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 10  | `Issue` update의 `updatedFrom`에 `labelIds`·`stateId`가 담기는가, `data` 필드 | 담긴다. 바뀐 필드의 이전 값만 담기고, `labelIds`는 이전 배열 전체다. `data` 필드는 아래 목록                                                          |
-| 11  | 라벨 추가가 `Issue` update로 오는가, `IssueLabel` 이벤트로도 오는가           | `Issue` update로 언제나 온다. `IssueLabel` update도 올 때가 있지만 티켓을 가리키지 않고, 라벨을 바꾼 방법에 따라 오지 않는다. 할당 판단에 쓰지 않는다 |
-| 12  | 최대 페이지 크기                                                              | `first`는 1~250, `last`는 최대 250. 벗어나면 `INVALID_INPUT` 오류                                                                                     |
-| 13  | 개인 API 키 변경과 Linear GitHub 연동 자동 상태 전환의 충돌                   | 확인하지 못했다. 운영자 준비 후 확인                                                                                                                  |
-| 14  | `attachmentLinkGitHubPR`와 Linear GitHub 연동 링크의 중복                     | 확인하지 못했다. 운영자 준비 후 확인                                                                                                                  |
+| #   | 질문                                                                          | 결과                                                                                                                                                   |
+| --- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 10  | `Issue` update의 `updatedFrom`에 `labelIds`·`stateId`가 담기는가, `data` 필드 | 담긴다. 바뀐 필드의 이전 값만 담기고, `labelIds`는 이전 배열 전체다. `data` 필드는 아래 목록                                                           |
+| 11  | 라벨 추가가 `Issue` update로 오는가, `IssueLabel` 이벤트로도 오는가           | `Issue` update로 언제나 온다. `IssueLabel` update도 올 때가 있지만 티켓을 가리키지 않고, 라벨을 바꾼 방법에 따라 오지 않는다. 할당 판단에 쓰지 않는다  |
+| 12  | 최대 페이지 크기                                                              | `first`는 1~250, `last`는 최대 250. 벗어나면 `INVALID_INPUT` 오류                                                                                      |
+| 13  | 개인 API 키 변경과 Linear GitHub 연동 자동 상태 전환의 충돌                   | 충돌하지 않는다. API로 바꾼 In Progress와 댓글은 연동의 Done 전환을 막거나 덮어쓰지 않았다. 연동은 PR을 `closes`로 붙였을 때만 병합 뒤 Done으로 옮긴다 |
+| 14  | `attachmentLinkGitHubPR`와 Linear GitHub 연동 링크의 중복                     | 중복되지 않는다. 같은 URL이면 `INPUT_ERROR` 오류가 오고 첨부는 하나다. 순서가 반대여도 연동이 같은 첨부를 고친다                                       |
 
 ## 10. `Issue` update 본문
 
@@ -126,12 +126,74 @@
 
 ## 13·14. Linear GitHub 연동
 
-확인하지 못했다. Linear 워크스페이스에 GitHub 연동을 켜고 테스트 저장소를 이어야 하는데, 이번에는 그 준비가 없었다. 운영자가 준비한 뒤 확인한다.
+2026-11-17에 10~12번과 다른 Linear 워크스페이스에서 확인했다. 이 Linear 워크스페이스에는 워크스페이스 GitHub 연동(`integrations`의 `service: "github"`)이 켜져 있고, 공개 테스트 저장소 하나를 보고 있었다. 팀 키는 아래에서 `ENG`로 쓴다.
 
-- 13: 개인 API 키로 상태를 바꾸거나 댓글을 쓴 티켓의 PR을 병합했을 때, Linear 연동의 자동 상태 전환(예: Done)과 순서가 엇갈리거나 서로 덮어쓰는지 본다.
-- 14: Linear 연동이 PR 링크를 붙인 티켓에 `attachmentLinkGitHubPR`로 같은 PR을 붙였을 때 첨부가 둘이 되는지 본다.
+### 방법
 
-확인 전까지 worker는 Linear 연동이 켜져 있을 수 있다고 보고, PR 링크를 붙이기 전에 그 티켓의 첨부에 같은 URL이 있는지 먼저 보는 편이 안전하다.
+- 관리자의 개인 API 키로 GraphQL API를 불렀다. GitHub 쪽은 같은 사람의 GitHub 계정(`gh` 로그인)으로 브랜치를 push하고 PR을 열고 병합했다. 연동은 이 GitHub 계정을 같은 Linear 사용자로 잇고 있었다.
+- 연동 설정은 읽기만 했다. API로 읽을 수 있는 것은 팀의 `gitAutomationStates`였고(`Integration`에는 설정 필드가 없다), 값은 다음과 같았다. `branchPattern`과 `targetBranch`는 모두 `null`이었다.
+
+  | `event`  | 옮길 상태(`type`)      |
+  | -------- | ---------------------- |
+  | `start`  | In Progress(`started`) |
+  | `review` | In Review(`started`)   |
+  | `merge`  | Done(`completed`)      |
+
+- 제목이 `[fo-verify]`로 시작하는 검증 티켓 다섯(A~E)을 새로 만들어 아래 순서로 바꿨다. 오케스트레이터 동작(런 시작 때 In Progress, 끝날 때 결과 댓글)은 API 호출로 흉내 냈다.
+
+| 티켓   | PR 브랜치 / 제목                               | 한 일(순서대로)                                                                                                          | 결과                                                                                                                       |
+| ------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| A      | `factory/ENG-1-1` / `ENG-1: …`                 | API로 Todo → In Progress, PR 열기, API 댓글, `attachmentLinkGitHubPR`·`attachmentLinkURL`(같은 URL), 병합, API 결과 댓글 | 연동이 PR을 6초쯤 뒤 붙였다(`linkKind: "closes"`). API 링크 둘은 오류. 병합 3초 뒤 Done. 결과 댓글 뒤에도 Done             |
+| B      | 키 없는 브랜치 / 키 없는 제목                  | API로 In Progress, PR 열기, `attachmentLinkGitHubPR`(`linkKind` 생략), 병합                                              | 연동은 붙이지 않았다. API 링크는 `linkKind: "links"`. 병합해도 In Progress 그대로                                          |
+| C      | `factory/ENG-3-1` / `Untitled`                 | API로 In Progress, PR 열기, 병합                                                                                         | 키가 브랜치 이름에만 있어도 연동이 붙였다(`closes`). 병합 뒤 Done                                                          |
+| D      | 키 없는 브랜치 / 키 없는 제목                  | API로 In Progress, PR 열기, `attachmentLinkGitHubPR(linkKind: closes)`, 병합                                             | 병합 뒤 Done                                                                                                               |
+| E      | 키 없는 브랜치 / 키 없는 제목 → 제목에 키 넣기 | API로 In Progress, PR 열기, `attachmentLinkGitHubPR`(`links`), PR 제목에 `ENG-5:` 넣기, 병합                             | 연동이 새 첨부를 만들지 않고 API가 만든 첨부(같은 `id`)의 `linkKind`를 `closes`로, 제목을 새 제목으로 바꿨다. 병합 뒤 Done |
+| B 다시 | `factory/ENG-2-2` / `ENG-2: …`(만든 지 7분 뒤) | 새 PR 열기, 병합, 20초 뒤 API 결과 댓글                                                                                  | 연동이 붙이고 병합 3초 뒤 Done. 결과 댓글 뒤에도 Done. 이 티켓은 상태 이력이 남았다(아래)                                  |
+
+### 13. 상태 변경·댓글과 자동 상태 전환
+
+**충돌하지 않는다.** API로 바꾼 In Progress와 연동의 Done 전환은 서로 덮어쓰지 않았고, 순서도 엇갈리지 않았다.
+
+- 런 시작에 해당하는 API 상태 변경(Todo → In Progress)은 PR이 열리기 전에 일어나므로, 연동이 끼어들 틈이 없다. PR을 연 뒤에도 연동은 상태를 바꾸지 않았다(이미 In Progress였다).
+- 리뷰를 요청하지 않은 일반 PR을 열었을 때 In Review로 가지 않았다. `review` 전환은 이번 순서로는 일어나지 않았고, 무엇이 그것을 일으키는지는 확인하지 않았다.
+- 연동이 PR을 붙인 티켓은 PR 병합 3초쯤 뒤 Done이 됐다(A·C·E·B 다시). 그 사이와 그 뒤에 쓴 API 댓글은 상태를 바꾸지 않았다. 런 종료 결과 댓글은 대개 병합 뒤에 달리므로 Done인 티켓에 댓글만 더하는 셈이다.
+- 연동은 Linear 티켓에도 GitHub PR에도 댓글을 쓰지 않았다. 결과 댓글이 연동 댓글과 겹치지 않는다.
+- 연동이 PR을 붙일 때 담당자가 없던 티켓을 PR 작성자에 이어진 Linear 사용자에게 할당했다(A·C·E·B 다시. API로만 링크한 D는 할당되지 않았다). 이번에는 webhook을 걸지 않아 확인하지 않았지만, 담당자 변경이므로 `Issue update`(`updatedFrom.assigneeId`)로 올 것으로 본다.
+- 연동의 Done 전환은 상태 이력에 봇이 아니라 사람으로 남았다. B 다시의 이력은 `fromState: In Progress → toState: Done`, `actorId`가 GitHub 계정에 이어진 Linear 사용자, `botActor: null`이었다. PR을 붙인 기록만 `botActor: { type: "workflow", name: "Linear" }`였다. 그래서 actor로는 오케스트레이터(같은 사람의 API 키일 때)가 바꾼 것과 연동이 바꾼 것을 가르지 못한다.
+- 티켓을 만든 지 몇 분 안에 일어난 상태 변경은 이력(`history`)에 남지 않았다. A·C·D·E는 만든 뒤 1~2분 안에 In Progress와 Done을 거쳤는데, 몇 분 뒤에 다시 봐도 이력에는 첨부 기록만 있었다. 이 티켓들의 Done 시각은 `completedAt`으로 확인했다. 만든 지 7분 뒤에 일어난 B 다시의 Done 전환은 남았다.
+
+### 14. `attachmentLinkGitHubPR`와 연동 링크의 중복
+
+**중복되지 않는다. 대신 오류가 온다.** 연동이 이미 붙인 PR URL을 다시 붙이면 첨부가 둘이 되지 않고 HTTP 200에 `data: null`과 다음 오류가 온다.
+
+| mutation                 | `message`                                | `extensions.userPresentableMessage`               |
+| ------------------------ | ---------------------------------------- | ------------------------------------------------- |
+| `attachmentLinkGitHubPR` | `Duplicate attachment for duplicate url` | `An attachment with the same URL already exists.` |
+| `attachmentLinkURL`      | `Unable to create issue attachment`      | `This URL has already been linked with ENG-1.`    |
+
+두 오류 모두 `extensions.code`는 `INPUT_ERROR`, `type`은 `invalid input`, `statusCode`는 400, `userError`는 `true`다.
+
+순서가 반대여도(E: API로 먼저 붙이고 연동이 나중에 알아봄) 연동은 첨부를 새로 만들지 않고 같은 첨부를 고쳤다. 어느 순서든 같은 PR의 첨부는 하나다.
+
+`linkKind`가 상태 전환을 가른다. `GitGitHubPR`의 `linkKind`는 `closes`, `contributes`, `links` 셋이다(`GitLinkKind`).
+
+- 연동이 키로 알아본 PR은 `closes`였고, 병합하면 Done이 됐다.
+- `attachmentLinkGitHubPR`에서 `linkKind`를 빼면 `links`였고, 병합해도 상태가 바뀌지 않았다(B). `closes`를 주면 Done이 됐다(D). `contributes`는 시험하지 않았다.
+- 연동은 PR 제목과 브랜치 이름에서 키를 찾았다. 본문만의 키는 시험하지 않았다.
+
+### Q41 방식에 대한 결론
+
+Q41(런 시작 때 In Progress, 끝날 때 결과 댓글, 그 뒤 상태는 연동에 맡김)은 **그대로 써도 된다.** 오케스트레이터의 두 갱신은 연동의 자동 상태 전환과 부딪히지 않았다. 다음 조건과 함께 둔다.
+
+- Done 전환은 연동이 그 PR을 `closes`로 붙였을 때만 일어난다. 오케스트레이터 브랜치 `factory/<티켓 키>-<런 번호>`(Q40)에는 키가 있으므로 그 브랜치로 연 PR은 제목에 키가 없어도 연동이 붙인다(C). 에이전트가 키 없는 브랜치에 키 없는 제목으로 PR을 열면 연동도 붙이지 않아 Done이 되지 않는다. 이 경우는 research 0006 17절 #4처럼 오케스트레이터도 PR을 찾지 못하는 경우와 같다.
+- 오케스트레이터가 PR을 첨부로 붙일 필요는 없다. 결과 댓글에 PR 링크가 들어가고, 오케스트레이터가 찾는 PR(브랜치나 제목·본문의 키로 찾은 PR)은 연동이 이미 붙인다. 붙이더라도 첨부가 둘이 되지는 않는다.
+- 연동은 PR 작성자에게 티켓을 할당하고, 그 전환을 사람 actor로 남긴다. Auto-assign Label 감지는 `updatedFrom.labelIds` 차이로 하므로(10번) 이 update에 걸리지 않는다.
+- In Review는 이번에 일어나지 않았다. "In Review로 간다"를 런 결과 판정이나 화면에서 기대하지 않는다.
+
+운영자가 정할 제안(결정하지 않았다).
+
+- 첨부를 붙이기로 한다면 `INPUT_ERROR`의 같은 URL 오류를 성공으로 다룬다. `linkKind`를 무엇으로 줄지도 정해야 한다. `closes`를 주면 연동이 못 알아본 PR(키 없는 브랜치·제목)도 병합 때 Done이 되지만, 그것은 Q41이 연동에 맡긴 상태 전환을 오케스트레이터가 일으키는 셈이다. 생략하면(`links`) 상태에 손대지 않는다.
+- 연동의 상태 전환 규칙은 팀 `gitAutomationStates`로 읽을 수 있다. Settings나 온보딩에서 "In Progress" 상태를 고를 때 이 값을 함께 보여 줄 수 있다.
 
 ## 설계에 주는 뜻
 
@@ -159,3 +221,5 @@
 ## 정리 기록
 
 검증에 쓴 것은 모두 치웠다. 만든 티켓 하나는 보관했고, 만든 라벨 둘과 webhook 하나는 지웠다. 지운 뒤 `webhooks`와 `issueLabels(filter: { name: { startsWith: … } })` 조회가 빈 목록인 것을 확인했다. 기존 티켓·라벨·상태는 읽기만 했다. 터널과 수신 서버는 껐다.
+
+13·14번 검증에서는 만든 티켓 다섯을 모두 보관했고, `issues(filter: { title: { startsWith: "[fo-verify]" } })`가 빈 목록인 것을 확인했다. 테스트 저장소의 PR 여섯은 모두 병합으로 닫혔고, 그 head 브랜치 여섯은 지웠다. 병합 커밋은 테스트 저장소 기본 브랜치에 남았다. 연동 설정과 기존 티켓·라벨·상태는 읽기만 했다(목록 조회로 다른 티켓의 상태 이력을 읽은 것 포함).
