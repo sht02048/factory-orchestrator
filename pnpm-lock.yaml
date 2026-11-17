@@ -260,12 +260,25 @@ importers:
 
   apps/worker:
     dependencies:
+      '@factory/codehost-github':
+        specifier: workspace:*
+        version: link:../../packages/codehost-github
       '@factory/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@factory/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@factory/runner-orca':
+        specifier: workspace:*
+        version: link:../../packages/runner-orca
+      '@factory/tracker-linear':
+        specifier: workspace:*
+        version: link:../../packages/tracker-linear
+    devDependencies:
+      vite:
+        specifier: 8.3.8
+        version: 8.3.8(@types/node@24.19.2)(jiti@2.7.0)
 
   e2e:
     dependencies:

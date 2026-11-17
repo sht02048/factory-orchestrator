@@ -7,10 +7,18 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "build": "vite build",
+    "start": "node dist/server/main.js",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@factory/codehost-github": "workspace:*",
     "@factory/core": "workspace:*",
-    "@factory/db": "workspace:*"
+    "@factory/db": "workspace:*",
+    "@factory/runner-orca": "workspace:*",
+    "@factory/tracker-linear": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "8.3.8"
   }
 }
