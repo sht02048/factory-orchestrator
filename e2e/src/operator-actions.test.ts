@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   toAgentId,
   toAgentRef,
+  toCodeHostKind,
   toQuestionId,
   toRunnerId,
   toRunnerKind,
@@ -24,11 +25,13 @@ import {
   openDatabase,
   recordRunQuestions,
   recordRunnerCheck,
+  saveCodeHostConnection,
   saveMapping,
   saveRunner,
   saveTrackerConnection,
   saveWorkspace,
   saveWorkspaceTrackerProject,
+  toCodeHostConnectionId,
 } from "@factory/db";
 import type { Database } from "@factory/db";
 import { chromium } from "playwright-core";
@@ -220,6 +223,14 @@ function seed(db: Database): void {
     name: "Acme",
     config: {},
     secrets: { apiKey: "secret" },
+  });
+  // 온보딩(0026)을 마친 설치로 둔다. GitHub 토큰이 없으면 모든 화면이 온보딩으로 간다
+  saveCodeHostConnection(db, new SecretBox(encryptionKey), {
+    id: toCodeHostConnectionId("github"),
+    kind: toCodeHostKind("github"),
+    name: "github",
+    config: {},
+    secrets: { token: "github_pat_example" },
   });
   saveWorkspace(db, { id: workspaceId, name: "Acme" });
   saveWorkspaceTrackerProject(db, {
