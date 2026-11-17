@@ -86,3 +86,11 @@ graph LR
 - 생성 파일 `routeTree.gen.ts`, 각 앱의 `package.json` 의존성, `pnpm-lock.yaml`은 함께 도는 티켓끼리 겹칠 수 있다. 병합할 때 다시 생성하거나 다시 설치해 맞춘다.
 - 검증 결과에 따른 core 인터페이스 변경은 0037 하나로 모은다. 어댑터 티켓(0013~0015)은 `packages/core`를 고치지 않아 함께 돌 수 있다. 0037은 바뀐 인터페이스를 부르는 worker 코드도 고치므로, 다른 worker 티켓이 돌지 않는 0006·0008과 0016 사이에 둔다.
 - 검증 티켓(0009~0012)과 0019·0030·0031은 운영자가 준비할 테스트 환경이나 계정이 필요하다. 필요한 것은 각 티켓에 적었다.
+
+## 운영자 준비 대기
+
+검증 티켓에서 운영자가 준비해야 확인할 수 있는 항목이다. 번호는 스펙 10절의 번호다.
+
+- 0011의 13·14: Linear GitHub 연동을 켠 테스트 저장소([research 0005](../research/0005-linear-contract.md)).
+- 0012의 15: 읽기 권한(Metadata, Pull requests, Commit statuses)만 준 fine-grained PAT([research 0006](../research/0006-github-contract.md)).
+- 0009의 7: ssh로 닿는 Linux 테스트 러너.
