@@ -10,7 +10,7 @@ import {
 import { assignRun, changeRunState, saveRunner, updateRunRecords } from "@factory/db";
 import type { Database } from "@factory/db";
 import { describe, expect, it } from "vitest";
-import { Route } from "../routes/_app/runners";
+import { Route, reloadOnEnter } from "../routes/_app/runners";
 import { connection, minutes, now, seedDatabase } from "../testing/seed";
 import { loadRunnersPage } from "./load";
 import type { RunnerView } from "./model";
@@ -74,7 +74,7 @@ describe("loadRunnersPage", () => {
     expect(keys(a.occupying).toSorted()).toEqual(["ACME-10", "ACME-11", "ACME-12", "LAB-1"]);
     expect(a.occupying.find((run) => run.ticketKey === "ACME-12")?.state).toBe("disconnected");
     // Queued 와 Ended 런은 capacity 를 쓰지 않는다
-    expect(keys(a.waiting)).toEqual(["ACME-13"]);
+    expect(keys(a.queued)).toEqual(["ACME-13"]);
   });
 
   it("Offline 러너의 Disconnected 런도 capacity 를 차지한다(Q74)", () => {
@@ -147,7 +147,7 @@ describe("Workspace 범위(ADR 0006)", () => {
   it("러너는 Workspace 밖 자원이라 모든 Workspace 의 런을 한 목록에 담는다", () => {
     const { db } = seedDatabase();
     const page = loadRunnersPage(db, now);
-    const all = page.runners.flatMap((r) => [...r.occupying, ...r.waiting, ...r.leftWorktrees]);
+    const all = page.runners.flatMap((r) => [...r.occupying, ...r.queued, ...r.leftWorktrees]);
     expect(new Set(all.map((run) => run.workspace.id))).toEqual(
       new Set(["ws-commerce", "ws-labs"]),
     );
@@ -156,6 +156,9 @@ describe("Workspace 범위(ADR 0006)", () => {
   it("라우트 loader 는 ws 에 기대지 않아 Workspace 를 바꿔도 같은 러너 목록을 보인다", () => {
     // ws 가 loaderDeps 에 없으면 Workspace 를 바꿔도 같은 loader 결과를 쓴다(Runs 는 ws 를 deps 로 둔다).
     expect(Route.options.loaderDeps).toBeUndefined();
-    expect(Route.options.shouldReload).toBe(false);
+    // 화면에 다시 들어오면 새로 읽고, 머무는 동안(행 고르기, Workspace 바꾸기)은 다시 읽지 않는다
+    expect(Route.options.shouldReload).toBe(reloadOnEnter);
+    expect(reloadOnEnter({ cause: "enter" })).toBe(true);
+    expect(reloadOnEnter({ cause: "stay" })).toBe(false);
   });
 });

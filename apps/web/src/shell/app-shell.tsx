@@ -96,7 +96,7 @@ export function AppShell({
                 <li key={runner.id}>
                   <Link
                     to="/runners"
-                    search={(prev) => ({ ...prev, sel: runner.id })}
+                    search={(prev) => ({ ws: prev.ws, sel: runner.id })}
                     {...stylex.props(styles.runner)}
                   >
                     {runner.online ? (

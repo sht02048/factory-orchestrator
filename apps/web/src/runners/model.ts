@@ -21,7 +21,7 @@ export interface OccupyingRun {
 }
 
 /** 이 러너로 정한 Queued 런 */
-export interface WaitingRun {
+export interface QueuedRunView {
   id: string;
   ticketKey: string;
   workspace: RunWorkspace;
@@ -52,7 +52,7 @@ export interface RunnerView {
   /** 시작한 순서. 모든 Workspace 의 런이다 */
   occupying: OccupyingRun[];
   /** 대기열 순서. 모든 Workspace 의 런이다 */
-  waiting: WaitingRun[];
+  queued: QueuedRunView[];
   /** 할당 순서 */
   leftWorktrees: LeftWorktree[];
   /** 러너 쪽 프로젝트 이름 */

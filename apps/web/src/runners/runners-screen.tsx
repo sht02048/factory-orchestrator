@@ -54,7 +54,7 @@ export function RunnersScreen({ page, selectedId, onSelect }: RunnersScreenProps
               <TableHeader>{t("columns.runner")}</TableHeader>
               <TableHeader>{t("columns.state")}</TableHeader>
               <TableHeader align="end">{t("columns.occupied")}</TableHeader>
-              <TableHeader align="end">{t("columns.waiting")}</TableHeader>
+              <TableHeader align="end">{t("columns.queued")}</TableHeader>
               <TableHeader align="end">{t("columns.leftWorktrees")}</TableHeader>
               <TableHeader align="end">{t("columns.checked")}</TableHeader>
             </TableHead>
@@ -108,7 +108,7 @@ function RunnerRow({ runner }: { runner: RunnerView }) {
         {t("load", { occupied: runner.occupying.length, capacity: runner.capacity })}
       </TableCell>
       <TableCell align="end" numeric>
-        {count(runner.waiting.length)}
+        {count(runner.queued.length)}
       </TableCell>
       <TableCell align="end" numeric>
         {count(runner.leftWorktrees.length)}
@@ -178,21 +178,21 @@ function RunnerPanel({ runner }: { runner: RunnerView }) {
           ))}
           {free === 0 ? null : (
             <li {...stylex.props(styles.item, styles.muted)}>
-              {runner.online ? t("freeSlots", { count: free }) : t("noFreeSlots")}
+              {runner.online ? t("freeCapacity", { count: free }) : t("noFreeCapacity")}
             </li>
           )}
         </ol>
       </PanelBlock>
-      {runner.waiting.length === 0 ? null : (
-        <PanelBlock title={t("waiting", { count: runner.waiting.length })}>
+      {runner.queued.length === 0 ? null : (
+        <PanelBlock title={t("queued", { count: runner.queued.length })}>
           <ol {...stylex.props(styles.list)}>
-            {runner.waiting.map((run) => (
+            {runner.queued.map((run) => (
               <RunItem
                 key={run.id}
                 ticketKey={run.ticketKey}
                 runId={run.id}
                 workspace={run.workspace}
-                meta={t("waitingMeta", {
+                meta={t("queuedMeta", {
                   workspace: run.workspace.name,
                   duration: duration(run.waitMs),
                 })}

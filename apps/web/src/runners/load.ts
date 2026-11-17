@@ -8,7 +8,7 @@ import type {
   RunWorkspace,
   RunnerView,
   RunnersPage,
-  WaitingRun,
+  QueuedRunView,
 } from "./model";
 
 /**
@@ -30,7 +30,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
     workspaces.get(run.workspaceId) ?? { id: run.workspaceId, name: run.workspaceId };
 
   const occupying = new Map<string, OccupyingRun[]>();
-  const waiting = new Map<string, WaitingRun[]>();
+  const queued = new Map<string, QueuedRunView[]>();
   const leftWorktrees = new Map<string, LeftWorktree[]>();
   const push = <T>(map: Map<string, T[]>, runnerId: string, item: T) => {
     const list = map.get(runnerId);
@@ -44,7 +44,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
     const base = { id: run.id, ticketKey: run.ticket.key, workspace: workspaceOf(run) };
     switch (run.state) {
       case "queued":
-        push(waiting, run.runnerId, { ...base, waitMs: now.getTime() - run.assignedAt.getTime() });
+        push(queued, run.runnerId, { ...base, waitMs: now.getTime() - run.assignedAt.getTime() });
         break;
       // capacity 를 차지하는 상태(core CAPACITY_OCCUPYING_STATES). Disconnected 도 센다(Q74).
       case "running":
@@ -77,7 +77,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
       checkedAgoMs: runner.checkedAt === null ? null : now.getTime() - runner.checkedAt.getTime(),
       capacity: runner.capacity,
       occupying: (occupying.get(runner.id) ?? []).toSorted((a, b) => b.executionMs - a.executionMs),
-      waiting: waiting.get(runner.id) ?? [],
+      queued: queued.get(runner.id) ?? [],
       leftWorktrees: leftWorktrees.get(runner.id) ?? [],
       projects: runner.projects.map((p) => p.displayName),
       sshTarget: config.sshTarget ?? null,

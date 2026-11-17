@@ -13,7 +13,7 @@
     "runner": "러너",
     "state": "상태",
     "occupied": "사용 중",
-    "waiting": "Queued",
+    "queued": "Queued",
     "leftWorktrees": "남은 워크트리",
     "checked": "마지막 확인"
   },
@@ -29,11 +29,11 @@
       "free": "capacity {capacity}개 중 {free}개가 비어 있어요."
     },
     "capacity": "capacity {occupied}/{capacity}",
-    "freeSlots": "{count}개 비어 있어요",
-    "noFreeSlots": "Offline이라 남은 capacity를 쓸 수 없어요",
+    "freeCapacity": "{count}개 비어 있어요",
+    "noFreeCapacity": "Offline이라 남은 capacity를 쓸 수 없어요",
     "runMeta": "{workspace} · {state} · {duration}째",
-    "waiting": "기다리는 런 {count}",
-    "waitingMeta": "{workspace} · {duration}째 기다리는 중",
+    "queued": "기다리는 런 {count}",
+    "queuedMeta": "{workspace} · {duration}째 기다리는 중",
     "leftWorktrees": "남은 워크트리 {count}",
     "worktree": {
       "keep-until-pr-settles": "PR이 병합되거나 닫힐 때까지 남겨요",

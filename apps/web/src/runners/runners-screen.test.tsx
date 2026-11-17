@@ -72,7 +72,7 @@ describe("Runners 화면", () => {
     const { db } = seedDatabase();
     const text = panelText(render(loadRunnersPage(db, now), "runner-b"));
     expect(text).toContain(runnersJson.panel.reason.offline);
-    expect(text).toContain(runnersJson.panel.noFreeSlots);
+    expect(text).toContain(runnersJson.panel.noFreeCapacity);
     expect(text).toContain(runnersJson.panel.notConfigured);
   });
 
