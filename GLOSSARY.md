@@ -70,7 +70,7 @@ _Avoid_: Trigger
 
 **Queued**:
 할당은 됐지만 맞는 러너에 남은 capacity가 없거나 맞는 러너가 모두 Offline이라 시작을 기다리는 런의 상태.
-_Avoid_: Pending, Waiting
+_Avoid_: Pending, Waiting(단독으로. Waiting for Input은 다른 상태다)
 
 **Running**:
 러너에서 에이전트가 티켓을 처리하고 있는 런의 상태. 화면에서는 "실행 중"으로 쓴다.

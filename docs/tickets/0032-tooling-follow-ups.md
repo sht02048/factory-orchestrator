@@ -1,6 +1,6 @@
 ---
 status: todo
-blocked_by: [0003]
+blocked_by: [0003, 0005]
 ---
 
 # 0001 리뷰 후속: CI·도구 설정
@@ -11,7 +11,7 @@ blocked_by: [0003]
 
 ## 범위
 
-- 이 티켓은 루트 설정(`.github/workflows/ci.yml`, `vitest.config.ts`, `lefthook.yml`, `pnpm-workspace.yaml`, `package.json`, 필요하면 새 `.npmrc`)만 고친다. 0003이 루트 설정을 고쳐서 0003 뒤에 한다.
+- 이 티켓은 루트 설정(`.github/workflows/ci.yml`, `vitest.config.ts`, `lefthook.yml`, `pnpm-workspace.yaml`, `package.json`, 필요하면 새 `.npmrc`)만 고친다. 0003이 루트 설정을 고쳤고 0005가 `pnpm-workspace.yaml`을 고칠 수 있어 둘 뒤에 한다.
 - CI `concurrency`의 `cancel-in-progress`가 `main` push에도 걸려 연속 병합 때 앞 커밋의 CI가 취소된다. pull request에서만 취소한다.
 - 0001 리뷰는 Vitest `include`가 `*.test.ts`만 잡는다고 지적했다. 0003이 Vitest를 패키지별 `projects`로 바꿨으니, `.test.tsx`가 잡히는지 확인하고 빠졌으면 더한다. 루트 `e2e/`는 0008이 더한다.
 - `engines`가 `engine-strict` 없이 경고만 낸다. Node 24 밖에서 설치가 실패하게 한다. 이 저장소는 pnpm 설정을 `pnpm-workspace.yaml`에 두고 `packageManager`가 pnpm 12이므로, 그 버전이 이 설정을 어느 파일에서 읽는지 확인해 그곳에 둔다.
