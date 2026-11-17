@@ -109,12 +109,14 @@ export function resolveStep(page: SettingsPage, requested: number | undefined): 
 }
 
 /**
- * 주소에 단계가 없을 때 넣을 단계(1부터). 단계가 있으면 null 이다.
- * 보는 단계를 주소에 남겨 두어야 저장 뒤 화면 값을 다시 읽어도 지금 단계에 머문다. 단계 없이 다시 읽으면
- * 끝내지 않은 첫 단계로 넘어가, 트래커 연결을 저장하자마자 webhook 안내를 지나친다(0041).
+ * 주소의 단계가 보일 단계와 다를 때 주소에 넣을 단계(1부터). 같으면 null 이다.
+ * 보는 단계를 주소에 그대로 남겨 두어야 저장 뒤 화면 값을 다시 읽어도 지금 단계에 머문다. 단계가 없거나
+ * 갈 수 없는 뒤 단계인 채로 다시 읽으면 저장으로 갈 수 있게 된 다음 단계로 넘어가, 트래커 연결을 저장하자마자
+ * webhook 안내를 지나친다(0041).
  */
 export function stepToPin(page: SettingsPage, requested: number | undefined): number | null {
-  return requested === undefined ? resolveStep(page, undefined) + 1 : null;
+  const shown = resolveStep(page, requested) + 1;
+  return requested === shown ? null : shown;
 }
 
 /** 러너 확인에서 갖추지 못한 조건을 안내 종류로 나눈다(스펙 9절, Q43) */

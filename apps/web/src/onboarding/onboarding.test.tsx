@@ -478,6 +478,15 @@ describe("다섯 단계를 마치기", () => {
     expect(isDisabled(nextButton(html, "다음"))).toBe(false);
   });
 
+  it("갈 수 없는 뒤 단계 주소로 들어와도 보이는 단계를 주소에 넣어, 저장 뒤 1단계에 머문다", async () => {
+    const f = fixture();
+    // /onboarding?step=3 으로 들어오면 1단계를 보이고 주소도 1단계로 바꾼다
+    const step = stepToPin(await page(f), 3);
+    expect(step).toBe(1);
+    await connectTracker(f);
+    expect(resolveStep(await page(f), step ?? undefined)).toBe(0);
+  });
+
   it("signing secret 없이 저장한 연결이면 1단계에 그 사실을 알리고, 다음으로 가는 것은 막지 않는다", async () => {
     const f = fixture();
     await connectTracker(f);
