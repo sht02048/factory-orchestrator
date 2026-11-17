@@ -48,21 +48,21 @@ type TrackerStateType = "backlog" | "started" | "completed" | (string & {});
 
 근거: `docs/research/0002-external-contracts.md` A.6(관측한 값만으로 상태 기계를 닫지 않는다), 「어댑터 인터페이스 초안」
 
-## 런 결과는 판정 함수 하나로만 정한다
+## 요약 결과는 계산 함수 하나로만 정한다
 
-런이 끝났을 때 PR 상태로 Merged·Human Check·Failed를 정하는 일은 순수 함수 하나가 맡는다. 다른 곳에서 PR 상태를 직접 보고 결과를 정하지 않는다.
+런이 끝날 때 기록한 두 축(에이전트 결과, PR 상태)에서 요약 결과(Merged·Human Check·Failed)와 워크트리를 남길지를 정하는 일은 순수 함수 하나가 맡는다. 다른 곳에서 두 축을 직접 보고 요약 결과를 정하지 않는다. 요약 결과는 저장하지 않고 필요할 때 이 함수로 계산한다.
 
 ```ts
-// 피한다: 화면·폴러가 각자 PR 상태를 해석한다
-const outcome = pr.state === "merged" ? "merged" : "human-check";
+// 피한다: 화면·통계·폴러가 각자 두 축을 해석한다
+const outcome = run.prState === "merged" ? "merged" : "human-check";
 
 // 이렇게 쓴다
-const outcome = judgeRunOutcome(prs);
+const { outcome } = summarizeRunOutcome(run.agentResult, run.prState);
 ```
 
-이유: 판정 규칙(병합됨 → Merged, 열림 → Human Check, PR 없음·병합 없이 닫힘 → Failed)이 여러 곳에 흩어지면 한쪽만 바뀌어 통계와 화면이 어긋난다.
+이유: 요약 계산 표(스펙 4.2)가 여러 곳에 흩어지면 한쪽만 바뀌어 통계와 화면이 어긋난다.
 
-근거: ADR 0004, `docs/research/0002-external-contracts.md` `JudgeRunOutcome`
+근거: ADR 0004, `docs/spec/0001-phase-1.md` 4.2
 
 ## ssh로 보내는 명령은 인자 배열로 만들고 한 곳에서 이스케이프한다
 
