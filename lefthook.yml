@@ -1,11 +1,20 @@
+# 훅은 git 공통 hooks 폴더에 설치돼 모든 워크트리에서 돈다. node_modules 가 없는 워크트리에서는
+# 도구를 못 찾아 알아보기 어려운 오류가 나므로, 설치 여부를 먼저 확인하고 안내와 함께 멈춘다.
+# .modules.yaml 은 pnpm install 이 끝나면 만드는 파일이다.
 pre-commit:
-  parallel: true
+  piped: true
   jobs:
-    - name: lint
-      run: pnpm run lint
-    - name: format
-      run: pnpm run format:check
-    - name: typecheck
-      run: pnpm run typecheck
-    - name: color-literals
-      run: pnpm run check:colors
+    - name: dependencies
+      run: test -f node_modules/.modules.yaml
+      fail_text: "node_modules 가 없어요. 이 워크트리에서 pnpm install 을 실행한 뒤 다시 커밋해요."
+    - group:
+        parallel: true
+        jobs:
+          - name: lint
+            run: pnpm run lint
+          - name: format
+            run: pnpm run format:check
+          - name: typecheck
+            run: pnpm run typecheck
+          - name: color-literals
+            run: pnpm run check:colors
