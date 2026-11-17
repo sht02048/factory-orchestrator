@@ -39,10 +39,11 @@ pnpm install   # also installs the lefthook pre-commit hook
 | `pnpm test`         | Runs Vitest                                         |
 | `pnpm check:colors` | Checks for raw color values outside `packages/ui`   |
 | `pnpm build`        | Builds the web app for production                   |
+| `pnpm smoke:web`    | Starts the production web build and checks a page   |
 
 Start the web app with `pnpm --filter @factory/web dev` and open `http://127.0.0.1:3000/ds` to see the design system. Run the production build with `pnpm --filter @factory/web start`. It binds to `127.0.0.1` by default. To change that, set the shell environment variables `WEB_HOST` and `WEB_PORT` (for example, `WEB_PORT=4000 pnpm --filter @factory/web start`).
 
-The pre-commit hook runs lint, format check, typecheck, and the color literal check. CI (GitHub Actions) runs on pull requests and on pushes to `main`, in this order: typecheck → lint → color literal check → format check → test → build.
+The pre-commit hook runs lint, format check, typecheck, and the color literal check. CI (GitHub Actions) runs on pull requests and on pushes to `main`, in this order: typecheck → lint → color literal check → format check → test → build → web production smoke test.
 
 ## Self-hosting
 

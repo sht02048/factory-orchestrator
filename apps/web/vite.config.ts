@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { bundleMigrations } from "@factory/db/bundle-migrations";
 import stylex from "@stylexjs/unplugin";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
@@ -21,5 +22,7 @@ export default defineConfig({
     }),
     tanstackStart(),
     viteReact(),
+    // 프로덕션 server 번들이 DB 마이그레이션 SQL을 찾도록 산출물에 함께 싣는다.
+    bundleMigrations(),
   ],
 });

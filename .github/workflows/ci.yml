@@ -37,3 +37,5 @@ jobs:
         run: pnpm run test
       - name: Build
         run: pnpm run build
+      - name: Web production smoke test
+        run: pnpm run smoke:web
