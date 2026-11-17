@@ -47,7 +47,8 @@ export type GraphqlError = z.infer<typeof graphqlErrors>[number];
  * GitHub GraphQL·REST 호출과 오류 분류를 한 곳에 둔다(research 0002 C.5, research 0006).
  *
  * - 401 → unauthorized
- * - 403·429에 `x-ratelimit-remaining: 0`이나 `retry-after`가 있으면 → rate-limited. 그 밖의 403 → unauthorized
+ * - 429 → rate-limited. 403은 `x-ratelimit-remaining: 0`이나 `retry-after`가 있거나 본문이 rate limit을
+ *   말하면 → rate-limited, 그 밖의 403 → unauthorized
  * - GraphQL은 한도를 넘어도 200에 `RATE_LIMITED` 오류가 온다 → rate-limited
  * - 연결 실패, 시간 초과, 5xx, 읽을 수 없는 응답 → network(코드 호스트에서 쓸 수 있는 답을 받지 못함)
  */
@@ -107,8 +108,9 @@ export class GitHubHttp {
   /** 2xx가 아닌 응답을 오류로 바꾼다. */
   httpError(res: RestResponse): GitHubError {
     if (res.status === 401) return new GitHubError({ kind: "unauthorized" });
-    if (res.status === 403 || res.status === 429) {
-      if (isRateLimited(res.headers)) {
+    if (res.status === 429 || res.status === 403) {
+      // 429는 언제나 한도 초과다. secondary limit의 403은 헤더 없이 본문으로만 알릴 수 있다(research 0002 C.5).
+      if (res.status === 429 || isRateLimited(res.headers) || mentionsRateLimit(res.body)) {
         return new GitHubError({ kind: "rate-limited", resetAt: this.resetAt(res.headers) });
       }
       return new GitHubError({ kind: "unauthorized" });
@@ -155,6 +157,11 @@ export class GitHubHttp {
 
 function isRateLimited(headers: Headers): boolean {
   return headers.get("x-ratelimit-remaining") === "0" || headers.has("retry-after");
+}
+
+function mentionsRateLimit(body: unknown): boolean {
+  const parsed = z.object({ message: z.string() }).safeParse(body);
+  return parsed.success && /rate limit/i.test(parsed.data.message);
 }
 
 function numberHeader(headers: Headers, name: string): number | null {

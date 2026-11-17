@@ -220,13 +220,29 @@ describe("티켓 키로 PR 찾기", () => {
     ).toBe("#1");
   });
 
+  it("목록의 null 노드는 버린다", async () => {
+    const withNull = fixture("by-branch-multiple");
+    const nodes: unknown = Reflect.get(
+      Reflect.get(
+        Reflect.get(Reflect.get(Object(withNull.body), "data"), "repository"),
+        "pullRequests",
+      ),
+      "nodes",
+    );
+    if (!Array.isArray(nodes)) throw new Error("fixture shape");
+    nodes.push(null);
+    const { codeHost } = host(route({ graphql: withNull, actions: fixture("actions-runs-none") }));
+
+    expect(await codeHost.findPullRequestsByBranch(repo, "factory/ENG-130-1")).toHaveLength(2);
+  });
+
   it("PR이 아닌 검색 노드는 버린다", async () => {
     const withIssue = fixture("by-search");
     const search: unknown = Reflect.get(Reflect.get(Object(withIssue.body), "data"), "search");
     const nodes: unknown = Reflect.get(Object(search), "nodes");
     if (!Array.isArray(nodes)) throw new Error("fixture shape");
     expect(nodes).toHaveLength(2);
-    nodes.push({ __typename: "Issue", number: 99, title: "ENG-123 issue" });
+    nodes.push({ __typename: "Issue", number: 99, title: "ENG-123 issue" }, null);
     const { codeHost } = host(route({ graphql: withIssue, actions: fixture("actions-runs-none") }));
 
     const prs = await codeHost.findPullRequestsByTicketKey(repo, key, {
@@ -281,6 +297,7 @@ describe("PR 번호로 조회", () => {
     const { codeHost, sent } = host(route({ graphql: fixture("by-number") }));
 
     expect(await codeHost.getPullRequest(repo, toPullRequestId("PR_kwDO"))).toBeNull();
+    expect(await codeHost.getPullRequest(repo, toPullRequestId("99999999999"))).toBeNull();
     expect(sent).toHaveLength(0);
   });
 });
@@ -351,6 +368,8 @@ describe("CI 상태", () => {
     [[{ status: "queued", conclusion: null }], "pending"],
     [[{ status: "waiting", conclusion: null }], "pending"],
     [[{ status: "some_new_status", conclusion: null }], "pending"],
+    [[{ status: "completed", conclusion: "stale" }], "pending"],
+    [[{ status: "completed", conclusion: "some_new_conclusion" }], "pending"],
     [[{ status: "completed", conclusion: "timed_out" }], "failure"],
     [[{ status: "completed", conclusion: "cancelled" }], "failure"],
     [
@@ -384,6 +403,31 @@ describe("오류", () => {
     expect(await errorOf(fixture("rest-rate-limited"))).toMatchObject({
       detail: { kind: "rate-limited", resetAt: new Date(1794931676 * 1000) },
     });
+  });
+
+  it("헤더 없는 429와 본문으로만 알리는 secondary limit 403도 rate-limited다", async () => {
+    expect(
+      await errorOf({ status: 429, headers: {}, body: { message: "Too Many Requests" } }),
+    ).toMatchObject({
+      detail: { kind: "rate-limited", resetAt: null },
+    });
+    expect(
+      await errorOf({
+        status: 403,
+        headers: {},
+        body: {
+          message:
+            "You have exceeded a secondary rate limit. Please wait a few minutes before you try again.",
+        },
+      }),
+    ).toMatchObject({ detail: { kind: "rate-limited", resetAt: null } });
+    expect(
+      await errorOf({
+        status: 403,
+        headers: {},
+        body: { message: "Resource not accessible by personal access token" },
+      }),
+    ).toMatchObject({ detail: { kind: "unauthorized" } });
   });
 
   it("retry-after가 있으면 그만큼 뒤를 푸는 시각으로 쓴다", async () => {

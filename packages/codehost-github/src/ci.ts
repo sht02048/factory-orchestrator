@@ -11,7 +11,10 @@ const workflowRuns = z.object({
   ),
 });
 
-/** 끝났지만 통과하지 못한 워크플로 런의 결론. 그 밖의 결론(success, neutral, skipped 등)은 막지 않는다. */
+/** 끝나 통과한 워크플로 런의 결론. */
+const PASSED_CONCLUSIONS = new Set(["success", "neutral", "skipped"]);
+
+/** 끝났지만 통과하지 못한 워크플로 런의 결론. 그 밖의 결론(stale, 모르는 값)은 pending으로 둔다. */
 const FAILED_CONCLUSIONS = new Set([
   "failure",
   "timed_out",
@@ -52,8 +55,8 @@ export async function readCiState(
  * 워크플로 런 목록을 CI 상태 하나로 줄인다.
  * - 런이 없으면 none
  * - 하나라도 통과하지 못하고 끝났으면 failure
- * - 그 밖에 끝나지 않은 런이 있으면 pending(모르는 status 포함)
- * - 모두 끝나 통과했으면 success
+ * - 모두 끝나 통과했으면(success, neutral, skipped) success
+ * - 그 밖에는 pending(끝나지 않은 런, 모르는 status·conclusion, stale). 모르는 값을 성공으로 보이지 않는다
  */
 export function summarizeRuns(
   runs: ReadonlyArray<{ status: string | null; conclusion: string | null }>,
@@ -62,6 +65,8 @@ export function summarizeRuns(
   if (runs.some((r) => r.status === "completed" && FAILED_CONCLUSIONS.has(r.conclusion ?? ""))) {
     return "failure";
   }
-  if (runs.some((r) => r.status !== "completed")) return "pending";
-  return "success";
+  const passed = runs.every(
+    (r) => r.status === "completed" && PASSED_CONCLUSIONS.has(r.conclusion ?? ""),
+  );
+  return passed ? "success" : "pending";
 }

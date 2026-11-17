@@ -51,16 +51,21 @@ const rateLimit = z.object({
   resetAt: isoDate,
 });
 
+/** GraphQL connection의 `nodes` 항목은 nullable이다. 권한 등으로 빠진 항목(null)은 버린다. */
+const pullRequestNodes = z
+  .array(pullRequestNode.nullable())
+  .transform((nodes) => nodes.filter((node) => node !== null));
+
 const byBranch = z.object({
-  repository: z.object({ pullRequests: z.object({ nodes: z.array(pullRequestNode) }) }).nullable(),
+  repository: z.object({ pullRequests: z.object({ nodes: pullRequestNodes }) }).nullable(),
 });
 
 const bySearch = z.object({
   search: z.object({
-    // is:pr로 PR만 찾지만, 다른 노드가 와도 버리고 넘어간다. PR 노드의 모양이 틀리면 파싱이 실패한다.
+    // is:pr로 PR만 찾지만, 다른 노드나 null이 와도 버리고 넘어간다. PR 노드의 모양이 틀리면 파싱이 실패한다.
     nodes: z
-      .array(z.looseObject({ __typename: z.string() }))
-      .transform((nodes) => nodes.filter((node) => node.__typename === "PullRequest"))
+      .array(z.looseObject({ __typename: z.string() }).nullable())
+      .transform((nodes) => nodes.filter((node) => node?.__typename === "PullRequest"))
       .pipe(z.array(pullRequestNode.extend({ __typename: z.string() }))),
   }),
 });
@@ -151,7 +156,8 @@ export class GitHubCodeHost implements CodeHost {
   /** PR 번호로 하나 조회한다. 그 번호의 PR이 없으면 null, 저장소에 닿지 못하면 not-found를 던진다. */
   async getPullRequest(repo: RepoRef, id: PullRequestId): Promise<PullRequestSnapshot | null> {
     const { owner, name } = this.split(repo);
-    if (!/^[1-9][0-9]*$/.test(id)) return null;
+    // GraphQL Int는 32비트다. 범위를 넘는 번호의 PR은 없다.
+    if (!/^[1-9][0-9]*$/.test(id) || Number(id) > 2_147_483_647) return null;
     const { data, errors } = await this.http.graphql(
       PULL_REQUEST_BY_NUMBER,
       { owner, repo: name, number: Number(id) },
