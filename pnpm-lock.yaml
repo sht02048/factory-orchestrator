@@ -252,7 +252,14 @@ importers:
         specifier: 8.3.8
         version: 8.3.8(@types/node@24.19.2)(jiti@2.7.0)
 
-  apps/worker: {}
+  apps/worker:
+    dependencies:
+      '@factory/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@factory/db':
+        specifier: workspace:*
+        version: link:../../packages/db
 
   packages/core: {}
 
