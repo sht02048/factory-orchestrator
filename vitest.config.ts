@@ -5,6 +5,7 @@ export default defineConfig({
     projects: [
       "packages/*",
       "apps/*",
+      "e2e",
       { test: { name: "scripts", include: ["scripts/**/*.test.ts"] } },
     ],
   },
