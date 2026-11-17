@@ -27,7 +27,7 @@
 - `main`은 PR 머지로만 바꾼다. 직접 push하지 않는다.
 - 작업은 최신 `main`에서 짧게 사는 기능 브랜치로 한다.
 - PR은 머지 커밋으로 병합한다. squash·rebase 병합은 쓰지 않는다.
-- `main`에 머지하려면 CI `check`가 통과해야 한다. CI는 typecheck → lint → 색 검사(`pnpm run check:colors`) → format check → test(e2e 시험과 브라우저 시험 포함) → 웹 build → 웹 프로덕션 실행 시험(`pnpm run smoke:web`)을 돈다.
+- `main`에 머지하려면 CI `check`가 통과해야 한다. CI는 typecheck → lint → 색 검사(`pnpm run check:colors`) → format check → test(e2e 시험과 브라우저 시험 포함) → build → 웹 프로덕션 실행 시험(`pnpm run smoke:web`) → CLI 실행 시험(`pnpm run smoke:cli`)을 돈다.
 - PR 본문의 머지 위험이 one-way이고 blast radius가 큼인 PR은 자동으로 병합하지 않고 사람이 직접 병합한다. 그 밖의 PR은 게이트(독립 리뷰와 CI `check`)를 통과한 뒤 병합할 수 있다.
 - 커밋 훅(lefthook pre-commit: lint, format check, typecheck, 색 검사)을 우회하지 않는다. `--no-verify`를 쓰지 않는다.
 - 새 워크트리에서는 커밋 전에 `pnpm install`을 돌린다. 훅이 `node_modules`의 도구를 쓴다.
@@ -35,7 +35,7 @@
 ## TypeScript와 워크스페이스
 
 - Node 24(`.nvmrc`, `engines`)와 `package.json` `packageManager`의 pnpm을 쓴다.
-- pnpm 워크스페이스다. 앱은 `apps/*`(`web`, `worker`), 공유 패키지는 `packages/*`(`core`, `db`, `ui`)에 둔다. 패키지별 typecheck는 Turborepo가 돌린다.
+- pnpm 워크스페이스다. 앱은 `apps/*`(`web`, `worker`, `cli`), 공유 패키지는 `packages/*`(`core`, `db`, `ui`)에 둔다. 패키지별 typecheck는 Turborepo가 돌린다.
 - 공용 설정 `tsconfig.base.json`은 `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `verbatimModuleSyntax`, `noPropertyAccessFromIndexSignature`를 켠다. 패키지 설정에서 끄지 않는다.
 - oxlint type-aware 모드가 `no-explicit-any`, `no-unsafe-*`, `no-floating-promises`, `switch-exhaustiveness-check`를 error로 막는다. 경고도 실패다.
 - 외부 입력(webhook, ssh로 받은 출력, API 응답, 환경 변수)은 경계에서 스키마로 파싱해 타입을 얻는다. `as` 단언으로 타입을 붙이지 않는다. 단언은 검증 없이 타입만 바꿔 잘못된 값이 안쪽까지 들어온다. 스키마 검증기는 스파이크에서 zod로 확인했다([`docs/research/0001`](docs/research/0001-web-stack-spike.md)).

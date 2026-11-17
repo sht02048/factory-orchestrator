@@ -8,7 +8,7 @@ The control tower of a software factory. It assigns tickets from a tracker to ru
 | -------------------------- | ----------------------------------------------------------------------------------------- | ------- |
 | `apps/web`                 | UI, server functions, and the Linear webhook receiver (TanStack Start)                    | Started |
 | `apps/worker`              | Long-running daemon for the assignment queue, runner commands, and run and PR polling     | Started |
-| `apps/cli`                 | `init`, `start`, and launchd/systemd service registration                                 | Planned |
+| `apps/cli`                 | `init`, `start`, and launchd/systemd service registration                                 | Started |
 | `packages/core`            | Domain logic and the Tracker, Runner, and CodeHost adapter interfaces                     | Stub    |
 | `packages/db`              | SQLite (WAL) schema, access, and migrations                                               | Started |
 | `packages/ui`              | Design system (StyleX + UI SDK)                                                           | Started |
@@ -30,16 +30,17 @@ pnpm install   # also installs the lefthook pre-commit hook
 
 ## Commands
 
-| Command             | What it does                                        |
-| ------------------- | --------------------------------------------------- |
-| `pnpm typecheck`    | Type-checks every package with TypeScript 7 (`tsc`) |
-| `pnpm lint`         | Runs oxlint in type-aware mode                      |
-| `pnpm format`       | Formats with oxfmt                                  |
-| `pnpm format:check` | Checks formatting                                   |
-| `pnpm test`         | Runs Vitest (browser tests need Google Chrome)      |
-| `pnpm check:colors` | Checks for raw color values outside `packages/ui`   |
-| `pnpm build`        | Builds the web app for production                   |
-| `pnpm smoke:web`    | Starts the production web build and checks a page   |
+| Command             | What it does                                              |
+| ------------------- | --------------------------------------------------------- |
+| `pnpm typecheck`    | Type-checks every package with TypeScript 7 (`tsc`)       |
+| `pnpm lint`         | Runs oxlint in type-aware mode                            |
+| `pnpm format`       | Formats with oxfmt                                        |
+| `pnpm format:check` | Checks formatting                                         |
+| `pnpm test`         | Runs Vitest (browser tests need Google Chrome)            |
+| `pnpm check:colors` | Checks for raw color values outside `packages/ui`         |
+| `pnpm build`        | Builds the web app, the worker, and the CLI               |
+| `pnpm smoke:web`    | Starts the production web build and checks a page         |
+| `pnpm smoke:cli`    | Runs the built CLI's `init` and `start` and checks a page |
 
 The browser tests in `e2e` drive the Google Chrome installed on the machine through `playwright-core`; they do not download a browser. GitHub's Ubuntu runners already have Chrome. When a browser test fails, a screenshot of the page is saved to `e2e/test-results/`, and CI uploads it as an artifact.
 
@@ -47,11 +48,11 @@ Start the web app with `pnpm --filter @factory/web dev` and open `http://127.0.0
 
 Build the worker with `pnpm --filter @factory/worker build` and start it with `pnpm --filter @factory/worker start`. It reads `DATABASE_PATH` and `ENCRYPTION_KEY` from the shell environment, applies pending database migrations, and then polls until it receives `SIGINT` or `SIGTERM`. It builds adapters from the runners, tracker connections, and code host connections stored in the database, and rebuilds an adapter when its settings change.
 
-The pre-commit hook runs lint, format check, typecheck, and the color literal check. CI (GitHub Actions) runs on pull requests and on pushes to `main`, in this order: typecheck → lint → color literal check → format check → test → build → web production smoke test.
+The pre-commit hook runs lint, format check, typecheck, and the color literal check. CI (GitHub Actions) runs on pull requests and on pushes to `main`, in this order: typecheck → lint → color literal check → format check → test → build → web production smoke test → CLI smoke test.
 
 ## Self-hosting
 
-> There is nothing to run yet. Installation and upgrade steps will be added here once there is.
+> The npm package is not published yet. Until it is, build from a clone of this repository with `pnpm install && pnpm build` and run the CLI with `node apps/cli/dist/bin/cli.js <command>` (or `pnpm --filter @factory/cli cli <command>`). The commands below are written as `factory-orchestrator <command>`.
 
 The orchestrator is a self-hosted tool. One operator runs one installation on their own machine. The planned setup:
 
@@ -59,7 +60,29 @@ The orchestrator is a self-hosted tool. One operator runs one installation on th
 - A runner is an Orca environment that the orchestrator can reach over ssh.
 - The orchestrator does not change your projects' agent settings. We recommend adding a rule to each project's agent instructions (for example, `AGENTS.md`) to put the ticket key in the pull request title. Otherwise, if an agent opens the pull request from a branch other than the one the orchestrator created (including by renaming that branch), the orchestrator may not find it and may record the run's pull request as missing or closed.
 - Tracker connections, the GitHub token, runners, workspaces, and mappings are set up in web onboarding on first launch. Tokens are stored encrypted in the database.
-- `.env` holds only the minimum values needed to boot: port, bind address, data path, and encryption key. Copy [`.env.example`](./.env.example) to `.env` and replace the values with your own. Generate the encryption key with `openssl rand -base64 32`. `packages/db` parses these values from the shell environment (`parseBootConfig`), but nothing loads `.env` automatically yet.
+- `.env` holds only the minimum values needed to boot: port, bind address, data path, and encryption key. `factory-orchestrator init` writes it, as described below.
+
+### Set up and start
+
+The CLI keeps its files in one installation folder: `~/.factory-orchestrator` by default, or the folder in `--home <dir>` or the `FACTORY_HOME` environment variable.
+
+```sh
+factory-orchestrator init     # writes <home>/.env with a new encryption key
+factory-orchestrator start    # applies database migrations, then runs the web server and the worker
+```
+
+- `init` writes `<home>/.env` (readable only by you) with the bind address `127.0.0.1`, port `3000`, the database `<home>/data/factory-orchestrator.db`, and a newly generated encryption key. Change them with `--host`, `--port`, and `--database-path`, or edit the file later. If `.env` already exists, `init` leaves it unchanged, so the encryption key never changes by accident. If you lose or change the key, you have to enter the tokens again.
+- `start` reads `<home>/.env`. Shell environment variables with the same names (`WEB_HOST`, `WEB_PORT`, `DATABASE_PATH`, `ENCRYPTION_KEY`) override it. It applies pending database migrations, starts the web server and the worker, and prints the web address once it responds. If either process exits, `start` stops the other one and exits with an error, so a service manager can restart both. `SIGINT` or `SIGTERM` stops both.
+- After an upgrade, run `start` again (or restart the service). It applies new migrations before anything else starts.
+
+### Run as a service
+
+`factory-orchestrator service install` registers `start` as a background service for your user account: a launchd agent on macOS (`~/Library/LaunchAgents/factory-orchestrator.plist`) and a systemd user service on Linux (`~/.config/systemd/user/factory-orchestrator.service`). It starts at login and restarts after a failure. `factory-orchestrator service uninstall` stops it and removes the file.
+
+- Add `--dry-run` to either command to print the file and the commands without changing anything.
+- Run `init` first. `service install` refuses to register a service that would fail to boot, and refuses to overwrite an existing service file.
+- The service runs the Node and CLI paths you installed it with, and uses your current `PATH`. After you move or upgrade Node, run `service uninstall` and `service install` again.
+- On macOS, logs go to `<home>/logs/factory-orchestrator.log`. On Linux, read them with `journalctl --user -u factory-orchestrator.service`, and run `loginctl enable-linger` once so the service keeps running after you log out.
 
 ## Work items
 
