@@ -117,21 +117,21 @@ Then reply DONE. 한국어 줄: 끝나면 멈춰요.
 | 262,000           | `Connection reset by peer`, ssh 연결 끊김 |
 | 1,100,000         | 로컬에서 `argument list too long`         |
 
-원격 명령 문자열 전체가 약 256 KiB를 넘으면 원격 sshd가 연결을 끊는다. 러너의 `ARG_MAX`는 1,048,576이라 ssh 한계가 먼저 온다. `worktree create`와 `agent launch`에는 파일·stdin 입력이 없으므로(0002 A.5), 어댑터는 프롬프트를 약 200 KiB 아래로 자르거나 거절한다.
+원격 명령 문자열 전체가 약 256 KiB를 넘으면 원격 sshd가 연결을 끊는다. 러너의 `ARG_MAX`는 1,048,576이라 ssh 한계가 먼저 온다. `worktree create`와 `agent launch`에는 파일·stdin 입력이 없으므로(0002 A.5), 한계는 프롬프트가 아니라 인용을 거친 원격 명령 문자열 전체의 바이트 수에 걸린다. 작은따옴표 하나는 인용하면 4바이트(`'\''`)가 되고 한국어 한 글자는 UTF-8로 3바이트다. 어댑터는 인용한 뒤의 명령 문자열 전체 바이트를 재고, 여유를 두어 200 KiB(204,800바이트)를 넘으면 런을 시작하지 않고 거절한다.
 
 - `worktree ps`의 `agents[].prompt`는 200자로 잘리고 줄바꿈이 공백으로 바뀐다 **[실행]**. 전달 확인에 쓸 수 없다.
 
 ## 2. `worktree ps` 열거값
 
-| 필드                        | 소스의 목록 **[소스]**                        | 관측 **[실행]**                                              |
-| --------------------------- | --------------------------------------------- | ------------------------------------------------------------ |
-| `agents[].state`            | `working`, `blocked`, `waiting`, `done`       | `working`, `waiting`, `done`                                 |
-| `programStatus.state`       | `idle`, `working`, `done`, `blocked`, `error` | `working`, `done`, `blocked`                                 |
-| `programStatus.kind`        | `permission`, `question`, `auth`              | `question`                                                   |
-| `terminalVerdict`           | `live`, `unverifiable`, `none`                | `live`, `none`                                               |
-| 행 `status`                 | 닫힌 목록 못 찾음                             | `active`, `working`, `permission`, `inactive`(research 0003) |
-| `sidebarStatus`             | 닫힌 목록 못 찾음                             | `active`, `monitoring`, `done`, `permission`, `inactive`     |
-| `agentWait`(`--agent-wait`) | -                                             | `null`, `{ "source": "hook", "since": <ms> }`                |
+| 필드                        | 소스의 목록 **[소스]**                        | 관측 **[실행]**                                                                      |
+| --------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `agents[].state`            | `working`, `blocked`, `waiting`, `done`       | `working`, `waiting`, `done`                                                         |
+| `programStatus.state`       | `idle`, `working`, `done`, `blocked`, `error` | `working`, `done`, `blocked`                                                         |
+| `programStatus.kind`        | `permission`, `question`, `auth`              | `question`                                                                           |
+| `terminalVerdict`           | `live`, `unverifiable`, `none`                | `live`, `none`(`none`은 research 0003)                                               |
+| 행 `status`                 | 닫힌 목록 못 찾음                             | `active`, `working`, `permission`, `inactive`(research 0003)                         |
+| `sidebarStatus`             | 닫힌 목록 못 찾음                             | `active`, `monitoring`, `done`, `permission`, `inactive`(`inactive`는 research 0003) |
+| `agentWait`(`--agent-wait`) | -                                             | `null`, `{ "source": "hook", "since": <ms> }`                                        |
 
 출처:
 
@@ -140,7 +140,7 @@ Then reply DONE. 한국어 줄: 끝나면 멈춰요.
 - `terminalVerdict`: `cli/worktree-ps-terminal-verdict.js`. `liveTerminalCount > 0`이면 `live`, `unverifiableTerminalCount`가 없거나 0보다 크면 `unverifiable`, 그 밖에는 `none`.
 - 행 `status`: 앱 번들의 계산 함수는 에이전트 행이 있으면 `permission`(하나라도 권한·질문 대기) > `working` > `active` 순으로 고르고, 에이전트가 없으면 `working`·`permission`을 `active`로 바꾼다. 그 밖의 값은 바탕 상태를 그대로 넘겨 닫힌 목록을 찾지 못했다.
 
-행 `status`와 `sidebarStatus`는 화면용 요약이다. 어댑터는 `agents[]`의 `state`·`programStatus`와 `terminalVerdict`로 판단하고, 모르는 값은 "진행 중"으로 다룬다(0002 A.6과 같다). `--agent-wait`를 주지 않으면 `agentWait` 키 자체가 없다 **[실행]**.
+행 `status`와 `sidebarStatus`는 화면용 요약이다. 어댑터는 `agents[]`의 `state`·`programStatus`와 `terminalVerdict`로 판단한다. 소스에서 닫힌 목록을 찾은 필드도 다음 버전에서 값이 늘 수 있으므로, 모든 필드에서 모르는 값은 "진행 중"으로 다룬다(0002 A.6과 같다). `--agent-wait`를 주지 않으면 `agentWait` 키 자체가 없다 **[실행]**.
 
 ## 3. 끝남, 종료 코드, 입력 기다림
 

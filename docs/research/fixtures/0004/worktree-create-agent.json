@@ -1,24 +1,24 @@
 {
-  "id": "00000000-0000-4000-8000-000000000020",
+  "id": "00000000-0000-4000-8000-000000000001",
   "ok": true,
   "result": {
     "worktree": {
-      "id": "00000000-0000-4000-8000-000000000011::<path>/workspaces/sandbox/fo-verify-w1",
+      "id": "00000000-0000-4000-8000-000000000002::<path>/workspaces/sandbox/fo-verify-w1",
       "identity": {
-        "key": "wt2:local:00000000-0000-4000-8000-000000000021",
+        "key": "wt2:local:00000000-0000-4000-8000-000000000003",
         "executionHostId": "local",
-        "instanceId": "00000000-0000-4000-8000-000000000021"
+        "instanceId": "00000000-0000-4000-8000-000000000003"
       },
-      "instanceId": "00000000-0000-4000-8000-000000000021",
-      "repoId": "00000000-0000-4000-8000-000000000011",
+      "instanceId": "00000000-0000-4000-8000-000000000003",
+      "repoId": "00000000-0000-4000-8000-000000000002",
       "projectId": "github:acme/sandbox",
       "hostId": "local",
-      "projectHostSetupId": "00000000-0000-4000-8000-000000000011",
+      "projectHostSetupId": "00000000-0000-4000-8000-000000000002",
       "creatorProvenance": {
         "kind": "host"
       },
       "path": "<path>/workspaces/sandbox/fo-verify-w1",
-      "head": "22b2e989b2dcabf2f01d1cfbcb39a1da6e919b15",
+      "head": "0000000000000000000000000000000000000000",
       "branch": "refs/heads/acme/fo-verify-w1",
       "isBare": false,
       "isMainWorktree": false,
@@ -56,7 +56,7 @@
       "lineage": null,
       "git": {
         "path": "<path>/workspaces/sandbox/fo-verify-w1",
-        "head": "22b2e989b2dcabf2f01d1cfbcb39a1da6e919b15",
+        "head": "0000000000000000000000000000000000000000",
         "branch": "refs/heads/acme/fo-verify-w1",
         "isBare": false,
         "isMainWorktree": false
@@ -70,10 +70,10 @@
     "launch": {
       "outcome": {
         "kind": "terminal",
-        "handle": "term_00000000-0000-4000-8000-000000000022",
-        "paneKey": "00000000-0000-4000-8000-000000000023:00000000-0000-4000-8000-000000000024"
+        "handle": "term_00000000-0000-4000-8000-000000000004",
+        "paneKey": "00000000-0000-4000-8000-000000000005:00000000-0000-4000-8000-000000000006"
       },
-      "worktreeId": "00000000-0000-4000-8000-000000000011::<path>/workspaces/sandbox/fo-verify-w1",
+      "worktreeId": "00000000-0000-4000-8000-000000000002::<path>/workspaces/sandbox/fo-verify-w1",
       "receipt": {
         "mode": "terminal",
         "preferred": "terminal",
@@ -84,10 +84,10 @@
         "delivery": "submit",
         "outcome": "handed-to-terminal"
       },
-      "operationId": "1790000051690-e1ca50784cfa4204afc491cbd87cf489"
+      "operationId": "1790000051690-00000000000000000000000000000000"
     }
   },
   "_meta": {
-    "runtimeId": "00000000-0000-4000-8000-000000000003"
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
   }
 }

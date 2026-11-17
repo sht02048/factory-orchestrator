@@ -254,7 +254,7 @@ orca agent launch --agent <id> [--worktree <selector>] [--prompt <text>] [--mode
 - `agents[].programStatus.state`: `working`, `done`, `blocked`, 없음(null)
 - `terminalVerdict`: `live`, `none`
 
-전체 열거값은 문서·스키마에 없다. 앱 번들 소스에서 `agents[].state`, `programStatus.state`, `terminalVerdict`의 닫힌 목록을 찾았다([research 0004](0004-orca-run-contract.md) 2절). 행 `status`는 닫힌 목록을 찾지 못했으므로, 모르는 값은 "진행 중"으로 다루는 편이 안전하다.
+전체 열거값은 문서·스키마에 없다. 앱 번들 소스에서 `agents[].state`, `programStatus.state`, `terminalVerdict`의 닫힌 목록을 찾았다([research 0004](0004-orca-run-contract.md) 2절). 행 `status`는 닫힌 목록을 찾지 못했다. 소스의 목록도 다음 버전에서 늘 수 있으므로 어느 필드든 모르는 값은 "진행 중"으로 다루는 편이 안전하다.
 
 `--agent-wait`를 주면 사람만 답할 수 있는 프롬프트(권한 메뉴 등)에 멈춘 에이전트를 행마다 `agentWait`로 표시한다 **[스키마]**. 권한 대기에 걸린 런을 Human Check로 넘길지 판단하는 데 쓸 수 있다.
 

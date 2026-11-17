@@ -1,17 +1,17 @@
 {
-  "id": "00000000-0000-4000-8000-000000000016",
+  "id": "00000000-0000-4000-8000-000000000025",
   "ok": true,
   "result": {
     "worktrees": [
       {
         "workspaceKind": "git",
-        "worktreeId": "00000000-0000-4000-8000-000000000011::<path>/workspaces/sandbox/fo-verify-w4",
-        "repoId": "00000000-0000-4000-8000-000000000011",
+        "worktreeId": "00000000-0000-4000-8000-000000000002::<path>/workspaces/sandbox/fo-verify-w4",
+        "repoId": "00000000-0000-4000-8000-000000000002",
         "hostId": "local",
         "identity": {
-          "key": "wt2:local:00000000-0000-4000-8000-000000000017",
+          "key": "wt2:local:00000000-0000-4000-8000-000000000026",
           "executionHostId": "local",
-          "instanceId": "00000000-0000-4000-8000-000000000017"
+          "instanceId": "00000000-0000-4000-8000-000000000026"
         },
         "terminalPlatform": "darwin",
         "repo": "sandbox",
@@ -22,7 +22,7 @@
         "hasHostSidebarActivity": true,
         "defaultBranch": false,
         "cliCreated": true,
-        "worktreeInstanceId": "00000000-0000-4000-8000-000000000017",
+        "worktreeInstanceId": "00000000-0000-4000-8000-000000000026",
         "parentWorktreeId": null,
         "childWorktreeIds": [],
         "workspaceLineage": null,
@@ -52,7 +52,7 @@
         "status": "working",
         "agents": [
           {
-            "paneKey": "00000000-0000-4000-8000-000000000018:00000000-0000-4000-8000-000000000019",
+            "paneKey": "00000000-0000-4000-8000-000000000027:00000000-0000-4000-8000-000000000028",
             "parentPaneKey": null,
             "state": "working",
             "workingMode": "monitoring",
@@ -90,8 +90,8 @@
         "parent": null,
         "address": {
           "environment": "local",
-          "worktree": "identity:wt2:local:00000000-0000-4000-8000-000000000017",
-          "line": "--environment local --worktree identity:wt2:local:00000000-0000-4000-8000-000000000017"
+          "worktree": "identity:wt2:local:00000000-0000-4000-8000-000000000026",
+          "line": "--environment local --worktree identity:wt2:local:00000000-0000-4000-8000-000000000026"
         }
       }
     ],
@@ -105,6 +105,6 @@
     "truncated": false
   },
   "_meta": {
-    "runtimeId": "00000000-0000-4000-8000-000000000003"
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
   }
 }

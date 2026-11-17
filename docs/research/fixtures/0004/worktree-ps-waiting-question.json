@@ -1,17 +1,17 @@
 {
-  "id": "00000000-0000-4000-8000-000000000026",
+  "id": "00000000-0000-4000-8000-000000000016",
   "ok": true,
   "result": {
     "worktrees": [
       {
         "workspaceKind": "git",
-        "worktreeId": "00000000-0000-4000-8000-000000000011::<path>/workspaces/sandbox/fo-verify-w2",
-        "repoId": "00000000-0000-4000-8000-000000000011",
+        "worktreeId": "00000000-0000-4000-8000-000000000002::<path>/workspaces/sandbox/fo-verify-w2",
+        "repoId": "00000000-0000-4000-8000-000000000002",
         "hostId": "local",
         "identity": {
-          "key": "wt2:local:00000000-0000-4000-8000-000000000012",
+          "key": "wt2:local:00000000-0000-4000-8000-000000000017",
           "executionHostId": "local",
-          "instanceId": "00000000-0000-4000-8000-000000000012"
+          "instanceId": "00000000-0000-4000-8000-000000000017"
         },
         "terminalPlatform": "darwin",
         "repo": "sandbox",
@@ -22,7 +22,7 @@
         "hasHostSidebarActivity": true,
         "defaultBranch": false,
         "cliCreated": true,
-        "worktreeInstanceId": "00000000-0000-4000-8000-000000000012",
+        "worktreeInstanceId": "00000000-0000-4000-8000-000000000017",
         "parentWorktreeId": null,
         "childWorktreeIds": [],
         "workspaceLineage": null,
@@ -48,11 +48,11 @@
         "hasAttachedPty": true,
         "unverifiableTerminalCount": 0,
         "lastOutputAt": 1790000160061,
-        "preview": "view/cc8a9fc408a86adc9e1e/orca-agent-view' '--dangerously-skip-permissions' '--model' 'haiku'\nEnter to select · ↑/↓ to navigate · Esc to  ancel",
+        "preview": "view/<hash>/orca-agent-view' '--dangerously-skip-permissions' '--model' 'haiku'\nEnter to select · ↑/↓ to navigate · Esc to  ancel",
         "status": "permission",
         "agents": [
           {
-            "paneKey": "00000000-0000-4000-8000-000000000008:00000000-0000-4000-8000-000000000027",
+            "paneKey": "00000000-0000-4000-8000-000000000018:00000000-0000-4000-8000-000000000019",
             "parentPaneKey": null,
             "state": "waiting",
             "agentType": "claude",
@@ -92,8 +92,8 @@
         "parent": null,
         "address": {
           "environment": "local",
-          "worktree": "identity:wt2:local:00000000-0000-4000-8000-000000000012",
-          "line": "--environment local --worktree identity:wt2:local:00000000-0000-4000-8000-000000000012"
+          "worktree": "identity:wt2:local:00000000-0000-4000-8000-000000000017",
+          "line": "--environment local --worktree identity:wt2:local:00000000-0000-4000-8000-000000000017"
         }
       }
     ],
@@ -107,6 +107,6 @@
     "truncated": false
   },
   "_meta": {
-    "runtimeId": "00000000-0000-4000-8000-000000000003"
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
   }
 }
