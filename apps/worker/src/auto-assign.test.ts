@@ -160,6 +160,18 @@ describe("webhook 이벤트로 자동 할당", () => {
     expect(listUnprocessedTrackerEvents(h.db)).toEqual([]);
   });
 
+  it("쌓인 이벤트 중 뒤 이벤트가 티켓 보관·삭제면 앞의 붙임 이벤트로 할당하지 않는다", async () => {
+    webhook("ENG-1", { labelIds: [autoLabel], previousLabelIds: [] });
+    h.advance(1000);
+    webhook("ENG-1", { kind: "ticket.removed", labelIds: [autoLabel], previousLabelIds: null });
+    // 지운 티켓은 트래커 조회에도 나오지 않는다.
+    h.tracker.tickets.delete(toTicketKey("ENG-1"));
+
+    await h.worker().tick();
+
+    expect(runsOf("ENG-1")).toEqual([]);
+  });
+
   it("라벨이 붙었지만 Mapping이 없는 트래커 프로젝트의 티켓에는 런이 생기지 않는다", async () => {
     saveWorkspaceTrackerProject(h.db, {
       workspaceId,

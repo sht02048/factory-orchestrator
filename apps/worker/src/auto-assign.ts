@@ -67,15 +67,18 @@ export async function assignAutomatically(context: TickContext): Promise<void> {
  * 처리 표시가 남지 않아 다음 바퀴에 다시 본다.
  *
  * 이벤트가 쌓여 있으면(worker가 멈췄던 동안 등) 같은 티켓의 마지막 이벤트가 지금 라벨에 가장 가깝다. 그래서
- * 라벨이 방금 붙은 이벤트라도 뒤 이벤트에서 라벨이 없으면 할당하지 않는다.
+ * 라벨이 방금 붙은 이벤트라도 뒤 이벤트에서 라벨이 없거나 티켓이 보관·삭제됐으면(ticket.removed) 할당하지 않는다.
  */
 function processTrackerEvents(context: TickContext): void {
   const { db, now, logger } = context;
   const events = listUnprocessedTrackerEvents(db);
   const latestLabels = new Map<string, ReadonlyArray<LabelId>>();
   for (const event of events) {
-    if (event.ticketKey === null || event.labelIds === null) continue;
-    latestLabels.set(`${event.connection}\n${event.ticketKey}`, event.labelIds);
+    if (event.ticketKey === null) continue;
+    const key = `${event.connection}\n${event.ticketKey}`;
+    // 보관·삭제한 티켓은 라벨이 남아 있어도 더 이상 할당 대상이 아니다(core TrackerEvent).
+    if (event.kind === "ticket.removed") latestLabels.set(key, []);
+    else if (event.labelIds !== null) latestLabels.set(key, event.labelIds);
   }
   for (const event of events) {
     try {
