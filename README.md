@@ -35,6 +35,16 @@ pnpm install   # lefthook pre-commit 훅도 함께 설치된다
 
 pre-commit 훅은 lint, format check, typecheck를 돌린다. CI(GitHub Actions)는 pull request와 `main` push에서 typecheck → lint → format check → test 순으로 돈다.
 
+## 셀프호스팅
+
+> 아직 실행할 기능이 없다. 기능이 생기면 이 절을 채운다.
+
+오케스트레이터는 운영자 한 사람이 자기 머신에서 띄워 쓰는 도구다. 큰 흐름은 이렇게 잡혀 있다.
+
+- `apps/web`과 `apps/worker`를 같은 머신에서 띄우고, 둘이 SQLite 파일 하나를 공유한다.
+- 러너는 오케스트레이터가 ssh로 닿을 수 있는 Orca 환경이다.
+- 호스트, 포트, 토큰 같은 환경 값은 모두 `.env`로 받는다. [`.env.example`](./.env.example)을 `.env`로 복사해 자기 값으로 바꾼다.
+
 ## 일감
 
 트래커 대신 [`docs/tickets/`](./docs/tickets/)의 로컬 티켓으로 관리한다.
