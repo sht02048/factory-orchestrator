@@ -94,9 +94,13 @@ describe("Runners 화면", () => {
     const text = panelText(html);
     expect(text).toContain(runnersJson.panel.reason.assignmentBlocked);
     expect(text).toContain(
-      `github:acme/web ${runnersJson.panel.githubAuth.state.broken} gh auth setup-git`,
+      `GitHub push access: acme/web ${runnersJson.panel.githubAuth.state.broken}`,
     );
-    expect(text).toContain(`github:acme/docs ${runnersJson.panel.githubAuth.state.ok}`);
+    expect(text).toContain(
+      `GitHub push access: acme/docs ${runnersJson.panel.githubAuth.state.ok}`,
+    );
+    // 어댑터의 영어 해결 방법은 한국어 안내와 겹쳐 보이지 않는다
+    expect(text).not.toContain("Run `gh auth login");
     expect(text).toContain("gh auth login --insecure-storage");
     expect(text).toContain("gh auth setup-git");
   });

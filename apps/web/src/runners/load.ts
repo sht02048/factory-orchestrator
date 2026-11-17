@@ -80,7 +80,8 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
           ? null
           : runner.prerequisites
               .filter((p) => p.blocksAssignment)
-              .map((p) => ({ id: p.id, name: p.name, satisfied: p.satisfied, hint: p.hint })),
+              // 해결 방법은 어댑터 문구 대신 화면 메시지로 한 번 보인다.
+              .map((p) => ({ id: p.id, name: p.name, satisfied: p.satisfied })),
       checkedAgoMs: runner.checkedAt === null ? null : now.getTime() - runner.checkedAt.getTime(),
       capacity: runner.capacity,
       occupying: (occupying.get(runner.id) ?? []).toSorted((a, b) => b.executionMs - a.executionMs),

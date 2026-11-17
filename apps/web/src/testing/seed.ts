@@ -231,16 +231,17 @@ export function breakGitHubAuth(db: Database): void {
     assignmentBlocked: true,
     prerequisites: [
       { id: "service", name: "Orca service", satisfied: true, hint: null, blocksAssignment: false },
+      // 이름과 해결 방법은 runner-orca 어댑터가 주는 모양을 따른다
       {
-        id: "push:github:acme/web",
-        name: "github:acme/web",
+        id: "github-push:github:acme/web",
+        name: "GitHub push access: acme/web",
         satisfied: false,
-        hint: "gh auth setup-git",
+        hint: "Run `gh auth login --insecure-storage` and `gh auth setup-git` on the runner.",
         blocksAssignment: true,
       },
       {
-        id: "push:github:acme/docs",
-        name: "github:acme/docs",
+        id: "github-push:github:acme/docs",
+        name: "GitHub push access: acme/docs",
         satisfied: true,
         hint: null,
         blocksAssignment: true,

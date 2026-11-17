@@ -291,16 +291,9 @@ function GitHubAuthItem({ check }: { check: GitHubAuthCheck }) {
   const t = useTranslations("runners.panel.githubAuth");
   const state = check.satisfied === null ? "unknown" : check.satisfied ? "ok" : "broken";
   return (
-    <li {...stylex.props(styles.item, styles.run)}>
-      <span {...stylex.props(styles.authRow)}>
-        <span {...stylex.props(styles.authName)}>{check.name}</span>
-        <Text variant="meta">{t(`state.${state}`)}</Text>
-      </span>
-      {state === "broken" && check.hint !== null ? (
-        <Text variant="meta" mono truncate>
-          {check.hint}
-        </Text>
-      ) : null}
+    <li {...stylex.props(styles.item, styles.authRow)}>
+      <span {...stylex.props(styles.authName)}>{check.name}</span>
+      <Text variant="meta">{t(`state.${state}`)}</Text>
     </li>
   );
 }

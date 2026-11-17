@@ -51,8 +51,6 @@ export interface GitHubAuthCheck {
   name: string;
   /** 통과하면 true, 깨졌으면 false, 확인하지 못했으면 null */
   satisfied: boolean | null;
-  /** 러너 어댑터가 준 해결 방법. 없으면 null */
-  hint: string | null;
 }
 
 export interface RunnerView {

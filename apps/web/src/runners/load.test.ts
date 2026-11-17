@@ -126,13 +126,12 @@ describe("loadRunnersPage", () => {
     expect(a.assignmentBlocked).toBe(true);
     // 할당을 막지 않는 필수 조건(상시 서비스)은 담지 않는다
     expect(a.githubAuth).toEqual([
+      { id: "github-push:github:acme/web", name: "GitHub push access: acme/web", satisfied: false },
       {
-        id: "push:github:acme/web",
-        name: "github:acme/web",
-        satisfied: false,
-        hint: "gh auth setup-git",
+        id: "github-push:github:acme/docs",
+        name: "GitHub push access: acme/docs",
+        satisfied: true,
       },
-      { id: "push:github:acme/docs", name: "github:acme/docs", satisfied: true, hint: null },
     ]);
   });
 
