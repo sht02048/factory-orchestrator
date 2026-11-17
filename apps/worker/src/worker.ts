@@ -211,7 +211,15 @@ async function findStartedForCancel(
   runnerId: RunnerId,
 ): Promise<StartedRun | null | "unknown"> {
   const storedRunner = findRunner(context.db, runnerId);
-  if (storedRunner === undefined) return "unknown";
+  if (storedRunner === undefined) {
+    // 러너가 등록에서 빠졌다. 시작했는지 영영 확인할 수 없고 그 러너에 명령할 수도 없으니, 시작하지 않은
+    // 런으로 보고 취소를 끝낸다. 기다리면 취소 요청이 끝나지 않는다.
+    context.logger.warn("canceling a queued run whose runner is not registered", {
+      runId: run.id,
+      runnerId,
+    });
+    return null;
+  }
   const runner = context.adapters.runner(storedRunner);
   try {
     const mailbox = await mailboxFor(context, storedRunner, runner);
