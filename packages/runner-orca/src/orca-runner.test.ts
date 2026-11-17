@@ -12,7 +12,13 @@ import {
 import type { RunOnRunner } from "@factory/core";
 import { describe, expect, test } from "vitest";
 import { OrcaRunnerConfigError } from "./config.js";
-import { MAILBOX_TITLE, ORCA_RUNNER_KIND, orcaRunnerFactory } from "./orca-runner.js";
+import {
+  LOG_CUT_MARKER,
+  LOG_MAX_PAGES,
+  MAILBOX_TITLE,
+  ORCA_RUNNER_KIND,
+  orcaRunnerFactory,
+} from "./orca-runner.js";
 import { decodeAgent, decodeMailbox, encodeAgent, encodeMailbox } from "./refs.js";
 import {
   ScriptedExec,
@@ -752,6 +758,35 @@ describe("stopAgent, closeAgent and readLogTail", () => {
     const lines = await runnerWith(exec).readLogTail(RUN, { lines: 2 });
     expect(lines).toEqual(["[assistant] line 128", "[assistant] line 129"]);
     expect(exec.calls).toHaveLength(2);
+  });
+
+  test("marks the tail as cut when the transcript is longer than the page limit", async () => {
+    let n = 0;
+    const exec = new ScriptedExec().orca("orchestration worker-read", () => {
+      n += 1;
+      return stdout(
+        JSON.stringify({
+          ok: true,
+          result: {
+            source: "transcript",
+            transcript: {
+              messages: Array.from({ length: 100 }, (_, i) => ({
+                role: "assistant",
+                blocks: [{ type: "text", text: `page ${n} line ${i}` }],
+              })),
+              nextCursor: `c${n}`,
+            },
+          },
+        }),
+      );
+    });
+    const lines = await runnerWith(exec).readLogTail(RUN, { lines: 3 });
+    expect(exec.calls).toHaveLength(LOG_MAX_PAGES);
+    expect(lines).toEqual([
+      LOG_CUT_MARKER,
+      `[assistant] page ${LOG_MAX_PAGES} line 98`,
+      `[assistant] page ${LOG_MAX_PAGES} line 99`,
+    ]);
   });
 
   test("an archived empty terminal gives no lines; broken output is malformed", async () => {

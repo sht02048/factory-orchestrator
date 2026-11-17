@@ -64,7 +64,9 @@ export const PUSH_CHECK_REF = "HEAD:refs/heads/factory-orchestrator/push-check";
 const WORKTREE_PS_LIMIT = 500;
 /** worker-read 한 쪽의 메시지 수와 끝까지 읽을 때의 쪽 수 상한 */
 const LOG_PAGE_SIZE = 100;
-const LOG_MAX_PAGES = 20;
+/** 끝까지 읽을 쪽 수의 안전 상한(메시지 2만 개). 닿으면 꼬리가 아니라는 줄을 맨 앞에 둔다 */
+export const LOG_MAX_PAGES = 200;
+export const LOG_CUT_MARKER = `[log tail cut: the transcript is longer than ${LOG_PAGE_SIZE * LOG_MAX_PAGES} messages, so these are not its last lines]`;
 /** 오류에 남길 출력의 최대 길이 */
 const RAW_LIMIT = 4000;
 
@@ -175,7 +177,10 @@ export class OrcaRunner implements Runner {
       hint: "Run `gh auth login --insecure-storage` and `gh auth setup-git` on the runner, or add a GitHub SSH key for the runner user.",
       blocksAssignment: true,
     };
-    if (project.setup === null) return { ...base, satisfied: null };
+    // 준비되지 않은 프로젝트는 체크아웃이 없거나 망가졌을 수 있다. 인증을 확인한 것이 아니므로 모름으로 둔다.
+    if (project.setup === null || project.setup.setupState !== "ready") {
+      return { ...base, satisfied: null };
+    }
     let result: RemoteResult;
     try {
       result = await this.run([
@@ -263,11 +268,16 @@ export class OrcaRunner implements Runner {
     }
     // 닫힌 터미널도 `terminal show`는 ok이고 connected가 false다(fixtures/terminal-show-closed.json).
     if (shown.result.terminal.connected !== true) return "dead";
-    const current = await this.orca(
+    const current = await this.orcaOutcome(
       ["orchestration", "run-current", "--from", mailbox.terminal],
       runCurrentResultSchema,
     );
-    return current.runId === mailbox.runId ? "alive" : "unbound";
+    if (!current.ok) {
+      // 두 호출 사이에 터미널이 사라졌다.
+      if (current.code === "terminal_handle_stale") return "dead";
+      throw this.errorFor(current, {});
+    }
+    return current.result.runId === mailbox.runId ? "alive" : "unbound";
   }
 
   /** 우편함 터미널은 러너 쪽 프로젝트의 등록 저장소에 띄운다. 워크트리 없이 만들 수 없다. */
@@ -632,6 +642,7 @@ export class OrcaRunner implements Runner {
       lines = [...lines, ...workerReadLines(result)].slice(-opts.lines);
       const transcript = result.transcript;
       const next = transcript?.nextCursor ?? null;
+      // 끝에 닿아도 nextCursor가 오므로(fixtures/worker-read-transcript.json) 한 쪽을 다 채우지 못하면 끝이다.
       if (
         transcript === null ||
         transcript === undefined ||
@@ -639,11 +650,12 @@ export class OrcaRunner implements Runner {
         next === cursor ||
         transcript.messages.length < LOG_PAGE_SIZE
       ) {
-        break;
+        return lines;
       }
       cursor = next;
     }
-    return lines;
+    // 상한에 닿았다. 줄 수를 지키며 맨 앞에 잘렸다는 표시를 둔다.
+    return [LOG_CUT_MARKER, ...(opts.lines > 1 ? lines.slice(-(opts.lines - 1)) : [])];
   }
 
   async worktreeExists(worktree: WorktreeRef): Promise<boolean> {
