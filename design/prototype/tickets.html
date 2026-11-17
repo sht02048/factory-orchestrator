@@ -58,7 +58,7 @@
           { key: "all", label: "전체", test: () => true },
           { key: "todo", label: "손댈 일", test: isTodo, attention: true },
           { key: "unassigned", label: "할당 전", test: (t) => !last(t) },
-          { key: "active", label: "실행 중", test: (t) => last(t) && last(t).state !== "done" },
+          { key: "active", label: "실행 중", test: (t) => last(t) && last(t).state === "running" },
           { key: "merged", label: "Merged", test: (t) => last(t) && last(t).result === "merged" },
         ];
         let current = new URLSearchParams(location.search).get("f") || "all";
