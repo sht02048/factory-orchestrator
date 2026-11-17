@@ -197,6 +197,25 @@ export function listPendingCancelRequests(
     .all();
 }
 
+/**
+ * 런의 취소 요청. 처리했든 안 했든 돌려준다(Run 상세 타임라인, 0022). 요청이 없으면 null이다.
+ */
+export function getRunCancelRequest(
+  db: Database,
+  runId: RunId,
+): { requestedAt: Date; processedAt: Date | null } | null {
+  return (
+    db
+      .select({
+        requestedAt: runCancelRequests.requestedAt,
+        processedAt: runCancelRequests.processedAt,
+      })
+      .from(runCancelRequests)
+      .where(eq(runCancelRequests.runId, runId))
+      .get() ?? null
+  );
+}
+
 /** 런에 처리하지 않은 취소 요청이 있는지(취소 중). */
 export function hasPendingCancelRequest(db: Database, runId: RunId): boolean {
   return (

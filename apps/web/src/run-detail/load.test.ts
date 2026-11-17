@@ -460,10 +460,29 @@ describe("취소(Q77·Q82.8·Q82.21)", () => {
     const run = detail(db, id);
     expect(run.cancelPending).toBe(false);
     expect(run.status).toMatchObject({ agentResult: "canceled", summary: "canceled" });
-    expect(run.timeline.at(-1)).toEqual({
-      kind: "ended",
-      agentResult: "canceled",
-      at: minutes(101).toISOString(),
-    });
+    // 처리한 뒤에도 언제 취소를 요청했는지 타임라인에 남는다
+    expect(run.timeline.slice(-2)).toEqual([
+      { kind: "cancel-requested", at: minutes(100).toISOString() },
+      { kind: "ended", agentResult: "canceled", at: minutes(101).toISOString() },
+    ]);
+  });
+
+  it("다른 결과로 끝나 처리되지 않은 요청이 남아도 Ended 런은 취소 중이 아니다(Q82.21)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    cancelRunRequest(db, id, minutes(100));
+    const ended = changeRunState(
+      db,
+      id,
+      { to: "ended", agentResult: "reported-success", prState: "merged" },
+      minutes(101),
+    );
+    if (!ended.ok) throw new Error(JSON.stringify(ended));
+    const run = detail(db, id);
+    expect(run.cancelPending).toBe(false);
+    expect(run.timeline.filter((e) => e.kind === "cancel-requested")).toEqual([
+      { kind: "cancel-requested", at: minutes(100).toISOString() },
+    ]);
   });
 });

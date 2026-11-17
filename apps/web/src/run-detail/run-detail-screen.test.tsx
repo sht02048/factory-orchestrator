@@ -95,6 +95,14 @@ describe("Run 상세 화면", () => {
     expect(text(render(page(db, extra.get("ACME-21"))))).not.toContain(runJson.manualRemoval);
   });
 
+  it("시작하지 않고 끝난 런은 0초 만에 끝났다고 하지 않는다", () => {
+    const { db } = seedDatabase();
+    const extra = addExtraEnded(db);
+    const body = text(render(page(db, extra.get("ACME-23"))));
+    expect(body).toContain("시작하지 않고 1분 기다린 뒤 끝났어요");
+    expect(body).not.toContain("만에 끝났어요");
+  });
+
   it("시작할 수 없음 런은 시작 오류를 보인다", () => {
     const { db } = seedDatabase();
     const id = assign(db, "ACME-30", 60);

@@ -623,7 +623,10 @@ function useStatusLine(): (run: RunDetail) => { tone: StatusTone; label: string;
         return {
           tone: summaryTone(status.summary),
           label: domain(`summary.${status.summary}`),
-          when: t("endedAfter", { duration: duration(run.executionMs ?? 0) }),
+          when:
+            run.startedAt === null
+              ? t("endedBeforeStart", { duration: duration(run.waitMs) })
+              : t("endedAfter", { duration: duration(run.executionMs ?? 0) }),
         };
       case "queued":
         return {

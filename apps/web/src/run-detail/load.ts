@@ -5,8 +5,7 @@ import {
   getRun,
   getRunWithRecords,
   getWorkspaceTrackerProject,
-  hasPendingCancelRequest,
-  listPendingCancelRequests,
+  getRunCancelRequest,
   listRunPlacements,
   listRunPermissionWaits,
   listRunQuestions,
@@ -56,6 +55,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
   const pr = records.pullRequest;
   const questions = listRunQuestions(db, run.id);
   const permissionWaits = listRunPermissionWaits(db, run.id);
+  const cancelRequest = getRunCancelRequest(db, run.id);
 
   const detail: RunDetail = {
     id: run.id,
@@ -81,14 +81,16 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     report: records.reportBody,
     startError:
       run.state === "ended" && run.agentResult === "could-not-start" ? records.startError : null,
-    cancelPending: hasPendingCancelRequest(db, run.id),
+    // 취소 중은 끝나지 않은 런의 표시다(Q82.21). 이미 끝났으면 worker 가 그 요청을 처리하지 않는다.
+    cancelPending:
+      run.state !== "ended" && cancelRequest !== null && cancelRequest.processedAt === null,
     timeline: timelineOf(
       run,
       records,
       listRunStateChanges(db, run.id),
       questions,
       permissionWaits,
-      cancelRequestedAt(db, run.id),
+      cancelRequest?.requestedAt ?? null,
     ),
     log: logOf(db, run, records),
     otherRuns: otherRunsOf(db, run),
@@ -241,11 +243,6 @@ function changeEvent(run: StoredRun, change: RunStateChangeRecord): TimelineEven
     case "ended":
       return run.state === "ended" ? { kind: "ended", agentResult: run.agentResult, at } : null;
   }
-}
-
-/** 처리하지 않은 취소 요청의 시각. 처리한 요청은 런의 종료(운영자가 취소함)로 타임라인에 남는다 */
-function cancelRequestedAt(db: Database, runId: RunId): Date | null {
-  return listPendingCancelRequests(db).find((r) => r.runId === runId)?.requestedAt ?? null;
 }
 
 function logOf(db: Database, run: StoredRun, records: RunRecords): LogTailView {
