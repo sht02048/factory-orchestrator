@@ -115,10 +115,9 @@ Tauri 빌드는 돌리지 않았다. Rust 툴체인(1.99.1)은 있었지만 형�
 선택지는 둘이고 운영자가 정한다. 서명 키·팀 ID 같은 값은 어느 쪽이든 저장소에 넣지 않는다.
 
 - **로컬 서명.** 운영자가 자기 기계에서 빌드·서명·공증한 설치 파일을 Releases에 올린다. 키가 기계 밖으로 나가지 않지만, 릴리스가 운영자 기계에 기대고 CI 빌드와 올린 파일이 같은지 따로 보장해야 한다 **[추정]**.
-- **CI 서명.** 아래처럼 공개 저장소의 Actions 시크릿에 둔다.
-
-- GitHub Actions 저장소 시크릿에 인증서(.p12)와 암호, 공증용 App Store Connect API 키(또는 Apple ID 앱 암호)를 두고, 태그 push로 도는 릴리스 워크플로에서만 쓴다 **[추정: 일반 관행]**. 시크릿은 fork에서 온 PR 워크플로에 넘어가지 않는다 **[문서]**([GitHub: Using secrets](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions)). 시크릿 이름과 워크플로만 공개되고 값은 공개되지 않는다.
-- Tauri updater 비밀 키도 같은 방식으로 둔다. 잃으면 업데이트 경로가 끊기므로 시크릿 밖에도 백업이 필요하다 **[문서]**.
+- **CI 서명.** 공개 저장소의 Actions 시크릿에 둔다.
+  - GitHub Actions 저장소 시크릿에 인증서(.p12)와 암호, 공증용 App Store Connect API 키(또는 Apple ID 앱 암호)를 두고, 태그 push로 도는 릴리스 워크플로에서만 쓴다 **[추정: 일반 관행]**. 시크릿은 fork에서 온 PR 워크플로에 넘어가지 않는다 **[문서]**([GitHub: Using secrets](https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions)). 시크릿 이름과 워크플로만 공개되고 값은 공개되지 않는다.
+  - Tauri updater 비밀 키도 같은 방식으로 둔다. 잃으면 업데이트 경로가 끊기므로 시크릿 밖에도 백업이 필요하다 **[문서]**.
 
 ### ADR 0005와 부딪히는 점
 
