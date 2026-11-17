@@ -1,11 +1,11 @@
 ---
-status: todo
+status: done
 blocked_by: []
 ---
 
 # 검증: Orca 러너 상태 확인과 정리 계약
 
-> 부분 완료: 7 남음. 1, 6, 9, 19번은 macOS 러너에서 확인해 [research 0003](../research/0003-orca-runner-contract.md)에 적었다. 7번은 Linux 테스트 러너가 준비되면 확인한다. 9번의 턴 도중 에이전트, 19번의 `--all` 형태처럼 확인하지 못한 세부는 research 0003 「아직 모르는 것」에 있다.
+> 완료. 1, 6, 9, 19번은 macOS 러너에서 확인해 [research 0003](../research/0003-orca-runner-contract.md)에 적었다. 7번은 1단계 이후로 미뤘다(운영자 결정 Q82.17, 스펙 2절). 9번의 턴 도중 에이전트, 19번의 `--all` 형태처럼 확인하지 못한 세부는 research 0003 「아직 모르는 것」에 있다.
 
 ## 목표
 
@@ -16,7 +16,7 @@ Runner 어댑터의 상태 확인·멈추기·정리 부분을 짓기 전에, �
 - 스펙 10절 1, 6, 7, 9, 19번:
   - 1: 런타임이 꺼졌을 때 `orca status --json`과 다른 명령의 `error.code`·종료 코드
   - 6: ssh 비대화형 셸에서 `orca`가 런타임에 닿는지
-  - 7: Linux 러너의 `orca` 설치 경로와 `orca serve` 서비스 구성
+  - 7: Linux 러너의 `orca` 설치 경로와 `orca serve` 서비스 구성(1단계 이후로 미룸, Q82.17)
   - 9: `worktree rm` 출력과 에이전트가 도는 워크트리를 지울 때의 동작
   - 19: 시간 초과 때 에이전트를 멈추는 명령(`worktree rm --force`로 갈음할지, 다른 명령이 있는지)
 - 결과는 research 0002와 같은 형식(출처 표시 **[실행]**·**[문서]**)으로 `docs/research/0003-orca-runner-contract.md`에 쓴다. 실제 출력은 가상 값으로 바꿔 어댑터 테스트 픽스처로 쓸 수 있게 둔다.
