@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as DsRouteImport } from './routes/ds'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppRunnersRouteImport } from './routes/_app/runners'
 import { Route as AppRunsRouteImport } from './routes/_app/runs'
@@ -27,6 +28,11 @@ const AppRoute = AppRouteImport.update({
 const DsRoute = DsRouteImport.update({
   id: '/ds',
   path: '/ds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppIndexRoute = AppIndexRouteImport.update({
@@ -74,6 +80,7 @@ const ApiWebhooksTrackerConnectionIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/ds': typeof DsRoute
+  '/onboarding': typeof OnboardingRoute
   '/runners': typeof AppRunnersRoute
   '/runs': typeof AppRunsRoute
   '/settings': typeof AppSettingsRoute
@@ -84,6 +91,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/ds': typeof DsRoute
+  '/onboarding': typeof OnboardingRoute
   '/runners': typeof AppRunnersRoute
   '/runs': typeof AppRunsRoute
   '/settings': typeof AppSettingsRoute
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/ds': typeof DsRoute
+  '/onboarding': typeof OnboardingRoute
   '/_app/runners': typeof AppRunnersRoute
   '/_app/runs': typeof AppRunsRoute
   '/_app/settings': typeof AppSettingsRoute
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ds'
+    | '/onboarding'
     | '/runners'
     | '/runs'
     | '/settings'
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/ds'
+    | '/onboarding'
     | '/runners'
     | '/runs'
     | '/settings'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/ds'
+    | '/onboarding'
     | '/_app/runners'
     | '/_app/runs'
     | '/_app/settings'
@@ -146,6 +158,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   DsRoute: typeof DsRoute
+  OnboardingRoute: typeof OnboardingRoute
   ApiWebhooksTrackerConnectionIdRoute: typeof ApiWebhooksTrackerConnectionIdRoute
 }
 
@@ -163,6 +176,13 @@ declare module '@tanstack/react-router' {
       path: '/ds'
       fullPath: '/ds'
       preLoaderRoute: typeof DsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app/': {
@@ -249,6 +269,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   DsRoute: DsRoute,
+  OnboardingRoute: OnboardingRoute,
   ApiWebhooksTrackerConnectionIdRoute: ApiWebhooksTrackerConnectionIdRoute,
 }
 export const routeTree = rootRouteImport
