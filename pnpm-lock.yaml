@@ -261,6 +261,24 @@ importers:
         specifier: workspace:*
         version: link:../../packages/db
 
+  e2e:
+    dependencies:
+      '@factory/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@factory/db':
+        specifier: workspace:*
+        version: link:../packages/db
+      '@factory/web':
+        specifier: workspace:*
+        version: link:../apps/web
+      '@factory/worker':
+        specifier: workspace:*
+        version: link:../apps/worker
+      vite:
+        specifier: 8.3.8
+        version: 8.3.8(@types/node@24.19.2)(jiti@2.7.0)
+
   packages/core: {}
 
   packages/db:

@@ -1,0 +1,16 @@
+{
+  "name": "@factory/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@factory/core": "workspace:*",
+    "@factory/db": "workspace:*",
+    "@factory/web": "workspace:*",
+    "@factory/worker": "workspace:*",
+    "vite": "8.3.8"
+  }
+}

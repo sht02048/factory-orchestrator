@@ -15,6 +15,7 @@ The control tower of a software factory. It assigns tickets from a tracker to ru
 | `packages/tracker-linear`  | Tracker adapter for Linear (GraphQL API and webhooks)                                     | Planned |
 | `packages/runner-orca`     | Runner adapter that runs `orca` on a remote runner over ssh                               | Planned |
 | `packages/codehost-github` | Code host adapter for GitHub (finding pull requests and reading their state and CI state) | Planned |
+| `e2e`                      | End-to-end test of the thin path with fake adapters (assignment → run → Runs screen)      | Started |
 
 "Planned" paths do not exist in the repository yet. `packages/ui` holds the design system: tokens, components, and the usage rules in [`packages/ui/DESIGN.md`](./packages/ui/DESIGN.md). `apps/web` only has a design system preview (`/ds`) so far, and the stub packages have no real code yet.
 
