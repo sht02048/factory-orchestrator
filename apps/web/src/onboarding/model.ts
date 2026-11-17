@@ -57,14 +57,20 @@ export function isSetupComplete(counts: SetupCounts): boolean {
   );
 }
 
-/** 러너 확인이 성공했는지. 닿았고 갖추지 못한 필수 조건이 없다(확인하지 못한 조건은 깨졌다는 증거가 없다) */
+/**
+ * 러너 확인이 성공했는지. 오류 없이 닿았고, 갖추지 못한 필수 조건이 없고, GitHub 인증(할당에서 빼는 조건)을
+ * 적어도 한 러너 쪽 프로젝트에서 실제로 확인했다(Q82.15). 프로젝트를 읽지 못했거나 준비된 프로젝트가 없으면
+ * push 를 확인하지 못한 것이라 아직 성공이 아니다.
+ */
 export function runnerPassed(runner: RunnerSettingsView): boolean {
   const check = runner.check;
   return (
     check !== null &&
     check.status === "done" &&
     check.online &&
-    check.prerequisites.every((p) => p.satisfied !== false)
+    check.error === null &&
+    check.prerequisites.every((p) => p.satisfied !== false) &&
+    check.prerequisites.some((p) => p.blocksAssignment && p.satisfied === true)
   );
 }
 
@@ -104,6 +110,10 @@ export function resolveStep(page: SettingsPage, requested: number | undefined): 
 
 /** 러너 확인에서 갖추지 못한 조건을 안내 종류로 나눈다(스펙 9절, Q43) */
 export interface RunnerProblems {
+  /** 러너에는 닿았지만 확인 중 오류가 났다(예: 러너 쪽 프로젝트를 읽지 못함) */
+  error: string | null;
+  /** 오류 없이 끝났지만 GitHub 인증을 확인한 프로젝트가 없다(프로젝트가 없거나 준비되지 않음) */
+  pushUnchecked: boolean;
   /**
    * Orca 상시 서비스처럼 없으면 런을 돌릴 수 없는 조건. 1단계에서 할당에서 빼지 않는 조건이 이것이다
    * (core RunnerPrerequisite.blocksAssignment 가 거짓).
@@ -115,11 +125,19 @@ export interface RunnerProblems {
 
 export function runnerProblems(runner: RunnerSettingsView): RunnerProblems {
   const check = runner.check;
-  if (check === null || check.status !== "done") return { service: false, githubAuth: false };
+  if (check === null || check.status !== "done") {
+    return { error: null, pushUnchecked: false, service: false, githubAuth: false };
+  }
   const broken = check.prerequisites.filter((p) => p.satisfied === false);
+  const githubAuth = broken.some((p) => p.blocksAssignment);
   return {
+    error: check.online ? check.error : null,
+    pushUnchecked:
+      check.online &&
+      !githubAuth &&
+      !check.prerequisites.some((p) => p.blocksAssignment && p.satisfied === true),
     service: broken.some((p) => !p.blocksAssignment),
-    githubAuth: broken.some((p) => p.blocksAssignment),
+    githubAuth,
   };
 }
 
@@ -129,20 +147,18 @@ export function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
-const SERVICE_INSTALL = "orca serve service install --bind 127.0.0.1 --refuse-public --command";
+const SERVICE_INSTALL = "serve service install --bind 127.0.0.1 --refuse-public --command";
 
 /**
- * Orca 상시 서비스 설치 명령(research 0003 6·7절, runner-orca 의 안내와 같은 플래그). 비대화형 ssh 의 PATH 에
- * orca 가 없을 수 있어 늘 --command 로 절대 경로를 준다. Orca 1.4.258 에는 --supervise 플래그가 없다.
+ * Orca 상시 서비스 설치 명령(research 0003 6·7절, runner-orca 의 안내와 같은 명령). 러너의 PATH 에 orca 가
+ * 없을 수 있어 실행 파일과 --command 모두 등록한 절대 경로를 쓴다. Orca 1.4.258 에는 --supervise 플래그가 없다.
  */
 export function serviceInstallCommand(orcaPath: string): string {
-  return `${SERVICE_INSTALL} ${shellQuote(orcaPath)}`;
+  const path = shellQuote(orcaPath);
+  return `${path} ${SERVICE_INSTALL} ${path}`;
 }
 
 /** 경로를 아직 모를 때 보이는 설치 명령. 자리 표시 글은 화면이 메시지에서 넣는다 */
 export function serviceInstallTemplate(placeholder: string): string {
-  return `${SERVICE_INSTALL} <${placeholder}>`;
+  return `orca ${SERVICE_INSTALL} <${placeholder}>`;
 }
-
-/** 러너의 GitHub 인증을 고치는 명령(Q82.15). 토큰을 파일에 저장해 키체인이 잠겨도 읽게 한다 */
-export const GH_AUTH_COMMANDS = ["gh auth login --insecure-storage", "gh auth setup-git"] as const;

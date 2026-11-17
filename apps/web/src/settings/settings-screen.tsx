@@ -1387,7 +1387,7 @@ function CheckResult({
 }
 
 /** 러너 오류 종류(core RunnerErrorDetail.kind)를 문구로 바꾼다. 모르는 종류는 그대로 보인다 */
-function useRunnerErrorName(): (kind: string) => string {
+export function useRunnerErrorName(): (kind: string) => string {
   const t = useTranslations("settings.runners.check.errorKind");
   return (kind) => {
     switch (kind) {

@@ -302,10 +302,12 @@ describe("확인이 실패한 단계", () => {
     expect(shown).toContain("Orca 상시 서비스가 없어요");
     // PATH 에 orca 가 없어도 되게 등록한 경로를 --command 로 넣는다. --supervise 는 없다
     expect(serviceInstallCommand(orcaPath)).toBe(
-      "orca serve service install --bind 127.0.0.1 --refuse-public --command /opt/orca/bin/orca",
+      "/opt/orca/bin/orca serve service install --bind 127.0.0.1 --refuse-public --command /opt/orca/bin/orca",
     );
     expect(shown).toContain(serviceInstallCommand(orcaPath));
-    expect(serviceInstallCommand("/opt/my tools/orca")).toContain("--command '/opt/my tools/orca'");
+    expect(serviceInstallCommand("/opt/my tools/orca")).toBe(
+      "'/opt/my tools/orca' serve service install --bind 127.0.0.1 --refuse-public --command '/opt/my tools/orca'",
+    );
     // Offline 이어도 원인을 아는 경우에는 닿지 않았다는 일반 안내 대신 원인을 보인다
     expect(shown).not.toContain("ssh 대상과 orca 실행 파일 경로를 확인하고");
     expect(shown).not.toContain("--supervise");
@@ -331,6 +333,32 @@ describe("확인이 실패한 단계", () => {
     expect(stepPassed(settings, "runner")).toBe(false);
     expect(isDisabled(nextButton(html, "다음"))).toBe(true);
     expect(text(html)).toContain("러너에 닿지 않았어요");
+  });
+
+  it("러너에 닿았지만 확인 중 오류가 나면 다음으로 갈 수 없다", async () => {
+    // runner-orca 는 러너 쪽 프로젝트를 읽지 못하면 GitHub 인증을 확인하지 않고 오류와 함께 돌려준다
+    const { settings, html } = await runnerStep({
+      ...serviceMissing,
+      online: true,
+      error: { kind: "runner-error", code: "repo_list_failed", message: "project list failed" },
+      prerequisites: [{ ...serviceMissing.prerequisites[0]!, satisfied: true }],
+    });
+    expect(stepPassed(settings, "runner")).toBe(false);
+    expect(isDisabled(nextButton(html, "다음"))).toBe(true);
+    expect(text(html)).toContain("러너 확인 중 오류가 났어요");
+  });
+
+  it("GitHub 인증을 확인한 프로젝트가 없으면 다음으로 갈 수 없다", async () => {
+    const result = health({ service: true, push: true });
+    const { settings, html } = await runnerStep({
+      ...result,
+      prerequisites: result.prerequisites.map((p) =>
+        p.blocksAssignment ? { ...p, satisfied: null } : p,
+      ),
+    });
+    expect(stepPassed(settings, "runner")).toBe(false);
+    expect(isDisabled(nextButton(html, "다음"))).toBe(true);
+    expect(text(html)).toContain("GitHub 인증을 아직 확인하지 못했어요");
   });
 
   it("러너 확인이 성공하면 다음으로 갈 수 있다", async () => {

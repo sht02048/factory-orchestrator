@@ -11,6 +11,7 @@ import {
   RunnerCheck,
   RunnerForm,
   useRunnerCheckPolling,
+  useRunnerErrorName,
 } from "../settings/settings-screen";
 import type { ActionResult, SettingsActions } from "../settings/settings-screen";
 import type { RunnerSettingsView, SettingsPage, TrackerConnectionView } from "../settings/model";
@@ -248,6 +249,7 @@ function RunnerBefore() {
 /** 러너 확인 결과에 따라 다음 할 일을 안내한다. 필수 조건별 상태는 RunnerCheck 가 보인다 */
 function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
   const t = useTranslations("onboarding.runner");
+  const runnerError = useRunnerErrorName();
   const check = runner.check;
   if (check === null || check.status === "pending") {
     return check === null ? null : <Text variant="meta">{t("waiting")}</Text>;
@@ -262,7 +264,8 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
   }
   // Orca 상시 서비스가 없으면 러너 런타임이 준비되지 않아 Offline 으로도 온다. 아는 원인을 먼저 안내한다
   const problems = runnerProblems(runner);
-  const known = problems.service || problems.githubAuth;
+  const known =
+    problems.service || problems.githubAuth || problems.error !== null || problems.pushUnchecked;
   if (!known && !check.online) {
     return (
       <p role="alert" {...stylex.props(styles.error)}>
@@ -289,6 +292,18 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
             <li>{t("authCauseKeychain")}</li>
             <li>{t("authCauseSshKey")}</li>
           </ul>
+        </div>
+      ) : null}
+      {problems.error === null ? null : (
+        <div {...stylex.props(styles.stack)}>
+          <p {...stylex.props(styles.error)}>{t("errorTitle")}</p>
+          <Text variant="body">{t("errorBody", { reason: runnerError(problems.error) })}</Text>
+        </div>
+      )}
+      {problems.pushUnchecked && problems.error === null ? (
+        <div {...stylex.props(styles.stack)}>
+          <p {...stylex.props(styles.error)}>{t("pushUncheckedTitle")}</p>
+          <Text variant="body">{t("pushUncheckedBody")}</Text>
         </div>
       ) : null}
       {known ? null : (
