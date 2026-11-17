@@ -8,6 +8,7 @@ import {
   toRemoteCommand,
 } from "./shell.js";
 
+const leadingEquals = "=5";
 const tricky = `A\nsecond line: it's "quoted" $HOME \`echo x\` \\\\ !x $(rm -rf /)`;
 
 describe("quoteArg", () => {
@@ -25,12 +26,21 @@ describe("quoteArg", () => {
     expect(quoteArg("cat > /dev/null")).toBe("'cat > /dev/null'");
   });
 
+  test("quotes a word starting with = so zsh does not expand it to a command path", () => {
+    expect(quoteArg(leadingEquals)).toBe("'=5'");
+    expect(quoteArg("A=1")).toBe("'A=1'");
+  });
+
   // 원격 셸(zsh, bash, sh)이 인용한 인자를 글자 그대로 받는지 로컬 셸로 확인한다.
   for (const shell of ["/bin/sh", "/bin/bash", "/bin/zsh"].filter((path) => existsSync(path))) {
     test(`${shell} reads the quoted argument back unchanged`, () => {
-      const out = spawnSync(shell, ["-c", `printf '%s' ${quoteArg(tricky)}`], { encoding: "utf8" });
-      expect(out.status).toBe(0);
-      expect(out.stdout).toBe(tricky);
+      for (const value of [tricky, leadingEquals]) {
+        const out = spawnSync(shell, ["-c", `printf '%s' ${quoteArg(value)}`], {
+          encoding: "utf8",
+        });
+        expect(out.status).toBe(0);
+        expect(out.stdout).toBe(value);
+      }
     });
   }
 });

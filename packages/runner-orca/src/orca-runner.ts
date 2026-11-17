@@ -351,22 +351,31 @@ export class OrcaRunner implements Runner {
     } catch (error) {
       // 명령을 보낸 뒤 연결이 끊기면 러너에서 돌았는지 모른다(core start-outcome-unknown).
       const detail = detailOf(error);
-      if (detail.kind === "unreachable") {
+      // 출력이 깨진 것도 명령이 돈 뒤일 수 있어 같이 다룬다.
+      if (detail.kind === "unreachable" || detail.kind === "malformed-output") {
         throw new AdapterError<RunnerErrorDetail>(
-          { kind: "start-outcome-unknown", detail: detail.detail },
+          {
+            kind: "start-outcome-unknown",
+            detail: detail.kind === "unreachable" ? detail.detail : detail.raw,
+          },
           { cause: error },
         );
       }
       throw error;
     }
     if (started.state !== "ready") {
+      // 실패로 확인된 값만 런이 남지 않았다고 본다. 모르는 값은 결과 모름으로 보내 findStartedRun을 먼저
+      // 거치게 한다(CODING_STANDARDS 「외부 열거값은 모르는 값이 와도 깨지지 않게 둔다」).
       throw new AdapterError<RunnerErrorDetail>(
-        started.state === "outcome_unknown"
-          ? { kind: "start-outcome-unknown", detail: "worker-start reported outcome_unknown" }
-          : {
+        started.state === "failed"
+          ? {
               kind: "runner-error",
-              code: `worker_start_${started.state}`,
-              message: `worker-start ended in state ${started.state}`,
+              code: "worker_start_failed",
+              message: "worker-start ended in state failed",
+            }
+          : {
+              kind: "start-outcome-unknown",
+              detail: `worker-start ended in state ${started.state}`,
             },
       );
     }
@@ -404,6 +413,7 @@ export class OrcaRunner implements Runner {
     const worktree = shown.result.worktree;
     // ssh 호출자에는 묶인 Run이 없어 `--run` 없이 부르면 모든 Run의 에이전트가 온다. 우편함으로 좁히지 않는다.
     const { workers } = await this.orca(["orchestration", "worker-list"], workerListResultSchema);
+    // worker-list는 최근 것부터 준다. 같은 워크트리에 여러 번 시작했으면 가장 최근 것을 고른다.
     const worker = workers.find((w) => w.workspace === worktree.id);
     if (worker === undefined) return null;
     const shownWorker = await this.orca(
@@ -541,6 +551,7 @@ export class OrcaRunner implements Runner {
     const agent = this.agentOf(run);
     const mailbox = this.mailboxOf(run.mailbox);
     await this.orca(
+      // deny에는 `--run`이 없다(orca help). Dispatch로 대상을 정한다.
       [
         "orchestration",
         "deny",

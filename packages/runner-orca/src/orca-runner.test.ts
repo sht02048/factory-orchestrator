@@ -108,7 +108,7 @@ describe("checkHealth", () => {
     expect(isAssignmentBlocked(health)).toBe(false);
     const push = exec.commands().find((c) => c.startsWith("env "));
     expect(push).toBe(
-      "env GIT_TERMINAL_PROMPT=0 'GIT_SSH_COMMAND=ssh -o BatchMode=yes' git -C '<path>/sandbox' push --dry-run --porcelain origin HEAD:refs/heads/factory-orchestrator/push-check",
+      "env 'GIT_TERMINAL_PROMPT=0' 'GIT_SSH_COMMAND=ssh -o BatchMode=yes' git -C '<path>/sandbox' push --dry-run --porcelain origin HEAD:refs/heads/factory-orchestrator/push-check",
     );
   });
 
@@ -376,6 +376,28 @@ describe("startRun", () => {
     });
   });
 
+  test("an unknown state or broken output after sending is an unknown outcome; failed is not", async () => {
+    const odd = withProjects(
+      new ScriptedExec().orca(
+        "orchestration worker-start",
+        stdout(JSON.stringify({ ok: true, result: { ...startResult(), state: "setting_up" } }), 1),
+      ),
+    );
+    expect(await adapterError(runnerWith(odd).startRun(input))).toMatchObject({
+      kind: "start-outcome-unknown",
+    });
+    const failed = withProjects(
+      new ScriptedExec().orca(
+        "orchestration worker-start",
+        stdout(JSON.stringify({ ok: true, result: { ...startResult(), state: "failed" } }), 1),
+      ),
+    );
+    expect(await adapterError(runnerWith(failed).startRun(input))).toMatchObject({
+      kind: "runner-error",
+      code: "worker_start_failed",
+    });
+  });
+
   test("an unreachable runner before the start is sent stays unreachable", async () => {
     const exec = new ScriptedExec().orca(
       "project list",
@@ -387,10 +409,10 @@ describe("startRun", () => {
     expect(exec.commands().some((c) => c.includes("worker-start"))).toBe(false);
   });
 
-  test("broken output is malformed", async () => {
+  test("broken output after sending the start is an unknown outcome", async () => {
     const exec = withProjects(new ScriptedExec().orca("orchestration worker-start", BROKEN));
     expect(await adapterError(runnerWith(exec).startRun(input))).toMatchObject({
-      kind: "malformed-output",
+      kind: "start-outcome-unknown",
     });
   });
 
