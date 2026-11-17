@@ -21,6 +21,7 @@ import {
   Tabs,
   Text,
 } from "@factory/ui";
+import type { SummaryOutcome } from "@factory/core";
 import type { StatusTone } from "@factory/ui";
 import { colors, space } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
@@ -253,7 +254,11 @@ function RunPanel({ run }: { run: RunView }) {
           </>
         }
         title={run.ticketKey}
-        subtitle={t("subtitle", { project: run.trackerProject, branch: run.branch })}
+        subtitle={
+          run.branch === null
+            ? run.trackerProject
+            : t("subtitle", { project: run.trackerProject, branch: run.branch })
+        }
         reason={reason}
       />
       {pr === null ? null : (
@@ -308,13 +313,14 @@ function RunPanel({ run }: { run: RunView }) {
   );
 }
 
-function summaryTone(summary: "merged" | "human-check" | "failed"): StatusTone {
+function summaryTone(summary: SummaryOutcome): StatusTone {
   switch (summary) {
     case "human-check":
       return "check";
     case "failed":
       return "failed";
     case "merged":
+    case "canceled":
       return "neutral";
   }
 }
@@ -351,6 +357,7 @@ function useFilterLabel(): (filter: RunFilter) => string {
       case "merged":
       case "human-check":
       case "failed":
+      case "canceled":
         return domain(`summary.${filter}`);
     }
   };

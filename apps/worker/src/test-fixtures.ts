@@ -2,7 +2,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  AdapterError,
   AdapterRegistry,
   toAgentId,
   toCodeHostKind,
@@ -17,14 +16,7 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
 } from "@factory/core";
-import type {
-  PullRequestSnapshot,
-  RetryToken,
-  Runner,
-  RunnerErrorDetail,
-  RunnerId,
-  RunnerProjectId,
-} from "@factory/core";
+import type { PullRequestSnapshot, Runner, RunnerId, RunnerProjectId } from "@factory/core";
 import { FakeCodeHost, FakeRunner, FakeTracker } from "@factory/core/testing";
 import {
   SecretBox,
@@ -33,6 +25,7 @@ import {
   openDatabase,
   recordRunnerCheck,
   saveCodeHostConnection,
+  saveMapping,
   saveRunner,
   saveTrackerConnection,
   saveWorkspace,
@@ -79,7 +72,7 @@ export class Harness {
   private readonly dir: string;
   private readonly workers: Worker[] = [];
   private prSeq = 0;
-  /** startRun을 감쌀 때 쓴다(데몬이 죽는 때를 흉내 낸다). */
+  /** 러너 어댑터를 감쌀 때 쓴다. */
   wrapRunner: (runner: FakeRunner) => Runner = (runner) => runner;
 
   constructor() {
@@ -109,6 +102,8 @@ export class Harness {
       name: "Web",
       inProgressStateId: null,
     });
+    // 할당은 런마다 러너 쪽 프로젝트를 받는다. Mapping은 런을 시작할 수 있는지(Q82.16)만 본다.
+    saveMapping(this.db, { connection, trackerProject, runnerProject: projectA, agent });
 
     this.registry = new AdapterRegistry()
       .registerTracker({ kind: toTrackerKind(fakeKind), create: () => this.tracker })
@@ -131,6 +126,7 @@ export class Harness {
     capacity: number;
     online?: boolean;
     projects: RunnerProjectId[];
+    assignmentBlocked?: boolean;
   }): RunnerId {
     const id = toRunnerId(input.id);
     const fake = new FakeRunner(toRunnerKind(fakeKind));
@@ -143,11 +139,21 @@ export class Harness {
       config: { id: input.id },
       capacity: input.capacity,
     });
-    this.setRunnerOnline(id, input.online ?? true, input.projects);
+    this.setRunnerOnline(
+      id,
+      input.online ?? true,
+      input.projects,
+      input.assignmentBlocked ?? false,
+    );
     return id;
   }
 
-  setRunnerOnline(id: RunnerId, online: boolean, projects: RunnerProjectId[] | null = null): void {
+  setRunnerOnline(
+    id: RunnerId,
+    online: boolean,
+    projects: RunnerProjectId[] | null = null,
+    assignmentBlocked: boolean | null = null,
+  ): void {
     const fake = this.runner(id);
     fake.online = online;
     recordRunnerCheck(this.db, {
@@ -159,6 +165,7 @@ export class Harness {
         projects === null
           ? null
           : projects.map((p) => ({ id: p, displayName: p, setupState: "ready" })),
+      assignmentBlocked,
     });
   }
 
@@ -193,8 +200,9 @@ export class Harness {
     return result.run;
   }
 
-  /** 런의 브랜치로 PR을 넣는다. */
+  /** 시작한 런의 실제 브랜치로 PR을 넣는다. */
   putPullRequest(run: StoredRun, state: PullRequestSnapshot["state"]): void {
+    if (run.state === "queued" || run.branch === null) throw new Error("run has not started");
     this.prSeq += 1;
     const repo = repoOf(run.runnerProject);
     this.codeHost.putPullRequest(repo, {
@@ -247,42 +255,4 @@ export class Harness {
     if (typeof id !== "string") throw new TypeError("fake runner config id must be a string");
     return this.runner(toRunnerId(id));
   }
-}
-
-/** startRun에 보낸 다시 보내기 값을 모은다. */
-export function recordingStarts(runner: Runner, sent: Array<RetryToken | undefined>): Runner {
-  return delegate(runner, (input) => {
-    sent.push(input.retryToken);
-    return runner.startRun(input);
-  });
-}
-
-/** 러너가 시작은 했지만 응답을 잃어 결과를 모른다고 답한 경우(start-outcome-unknown). */
-export function outcomeUnknownAfterStart(
-  runner: Runner,
-  sent: Array<RetryToken | undefined>,
-): Runner {
-  return delegate(runner, async (input) => {
-    sent.push(input.retryToken);
-    const started = await runner.startRun(input);
-    if (started.retryToken === null) throw new Error("fake runner gave no retry token");
-    throw new AdapterError<RunnerErrorDetail>({
-      kind: "start-outcome-unknown",
-      retryToken: started.retryToken,
-    });
-  });
-}
-
-function delegate(runner: Runner, startRun: Runner["startRun"]): Runner {
-  return {
-    kind: runner.kind,
-    checkHealth: () => runner.checkHealth(),
-    listProjects: () => runner.listProjects(),
-    startRun,
-    pollRun: (worktree) => runner.pollRun(worktree),
-    stopAgent: (worktree) => runner.stopAgent(worktree),
-    readLogTail: (worktree, opts) => runner.readLogTail(worktree, opts),
-    worktreeExists: (worktree) => runner.worktreeExists(worktree),
-    removeWorktree: (worktree, opts) => runner.removeWorktree(worktree, opts),
-  };
 }

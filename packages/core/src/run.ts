@@ -1,5 +1,6 @@
 import type {
   AgentId,
+  AgentRef,
   RunId,
   RunnerId,
   RunnerProjectId,
@@ -40,30 +41,43 @@ export const CAPACITY_OCCUPYING_STATES: ReadonlySet<RunState> = new Set([
 ]);
 
 /**
- * 에이전트 결과 여섯(GLOSSARY 「에이전트 결과」).
- * - exited-normally: 정상 종료(종료 코드 0)
- * - exited-with-error: 오류 종료(0이 아닌 종료 코드)
+ * 에이전트 결과 아홉(GLOSSARY 「에이전트 결과」, 스펙 4.2). 종료 코드는 쓰지 않는다(Q82.2).
+ * - reported-success: 완료 보고(성공). outcome 성공인 완료 보고를 보냈다
+ * - reported-failure: 완료 보고(실패). outcome 실패인 완료 보고를 보냈다
+ * - ended-without-report: 비정상 종료. 완료 보고 없이 에이전트가 사라졌다(Q82.19)
  * - timed-out: 시간 초과(Running 중 최대 실행 시간 초과)
  * - stopped-waiting-for-input: 입력 기다리다 멈춤(Waiting for Input 중 초과)
  * - runner-disconnected: 러너 연결 끊김(Disconnected인 채 초과)
  * - worktree-missing: 워크트리 없음
+ * - canceled: 운영자가 취소함(Q77·Q82.8)
+ * - could-not-start: 시작할 수 없음(Q82.16·Q86)
  */
 export const AGENT_RESULTS = [
-  "exited-normally",
-  "exited-with-error",
+  "reported-success",
+  "reported-failure",
+  "ended-without-report",
   "timed-out",
   "stopped-waiting-for-input",
   "runner-disconnected",
   "worktree-missing",
+  "canceled",
+  "could-not-start",
 ] as const;
 export type AgentResult = (typeof AGENT_RESULTS)[number];
+
+/**
+ * 시작하지 않고 끝날 수 있는 에이전트 결과. Queued에서 취소했거나(Q82.10) 시작할 수 없어 끝낸
+ * 런(Q82.16·Q82.20)이다. 이런 런은 워크트리와 시작 시각이 없고 PR 상태가 늘 없음이다.
+ */
+export const NOT_STARTED_AGENT_RESULTS = ["canceled", "could-not-start"] as const;
+export type NotStartedAgentResult = (typeof NOT_STARTED_AGENT_RESULTS)[number];
 
 /** PR 상태 넷: 없음, 열림, 병합됨, 닫힘(병합 없이) */
 export const PR_STATES = ["none", "open", "merged", "closed"] as const;
 export type PrState = (typeof PR_STATES)[number];
 
-/** 요약 결과 셋. 저장하지 않고 summarizeRunOutcome으로만 계산한다. */
-export const SUMMARY_OUTCOMES = ["merged", "human-check", "failed"] as const;
+/** 요약 결과 넷. 저장하지 않고 summarizeRunOutcome으로만 계산한다. */
+export const SUMMARY_OUTCOMES = ["merged", "human-check", "failed", "canceled"] as const;
 export type SummaryOutcome = (typeof SUMMARY_OUTCOMES)[number];
 
 /**
@@ -97,32 +111,76 @@ interface RunBase {
   trackerProject: TrackerProjectId;
   runnerProject: RunnerProjectId;
   agent: AgentId;
-  /** 오케스트레이터가 정한 브랜치(Q40) */
-  branch: string;
+  /**
+   * 오케스트레이터가 할당 때 정하는 결정적 워크트리 이름. 시작 전에 저장하고 시작 멱등 키로 쓴다
+   * (Runner.findStartedRun). 브랜치는 러너가 정하므로 멱등 키가 아니다(Q82.6).
+   */
+  worktreeName: string;
   /** 대기열 순서이기도 하다(Q73) */
   assignedAt: Date;
 }
 
+/** 러너에서 시작한 런이 갖는 값 */
+interface StartedRunFields {
+  runnerId: RunnerId;
+  worktree: WorktreeRef;
+  /** 러너에서 받은 실제 브랜치 이름. PR 찾기 1순위다(Q82.6) */
+  branch: string;
+  /** 러너 안에서 이 런의 에이전트를 가리키는 값 */
+  agentRef: AgentRef;
+  startedAt: Date;
+}
+
+/**
+ * 요약 결과와 워크트리 처리를 정하는 입력(스펙 4.2). Ended 런이 그대로 이 모양을 가진다.
+ * `runnerUnreached`는 운영자가 취소함으로 끝난 런이 러너에 닿지 못한 채 끝났는지다(Q82.21).
+ * 시작한 뒤 취소한 런이 다시 닿지 못한 채 최대 실행 시간이 지나 끝난 경우만 참이고, 그 밖은 늘 거짓이다.
+ */
+export interface RunAxes {
+  agentResult: AgentResult;
+  prState: PrState;
+  runnerUnreached: boolean;
+}
+
+/** Ended 런 가운데 러너에서 시작한 런 */
+export type StartedEndedRun = RunBase &
+  StartedRunFields &
+  RunAxes & {
+    state: "ended";
+    endedAt: Date;
+  };
+
+/**
+ * Ended 런 가운데 시작하지 않고 끝난 런(Queued에서 취소, 시작할 수 없음). 워크트리·브랜치·시작 시각이
+ * 없고 PR 상태가 없음으로 고정된다(Q82.10·Q82.20). 러너는 Queued 때 정한 것이 있으면 남는다.
+ */
+export type NotStartedEndedRun = RunBase & {
+  state: "ended";
+  runnerId: RunnerId | null;
+  worktree: null;
+  branch: null;
+  agentRef: null;
+  startedAt: null;
+  endedAt: Date;
+  agentResult: NotStartedAgentResult;
+  prState: "none";
+  runnerUnreached: false;
+};
+
+export type EndedRun = StartedEndedRun | NotStartedEndedRun;
+
 /**
  * 런 하나. 상태에 따라 갖는 값이 다르다.
- * - Queued: 러너를 정하지 못했거나 비웠으면 runnerId가 null이다(Q65·Q72). 아직 시작하지 않았다.
- * - Running·Waiting for Input·Disconnected: 러너와 워크트리가 있다.
+ * - Queued: 러너를 정하지 못했거나 비웠으면 runnerId가 null이다(Q65·Q72·Q78·Q82.22). 아직 시작하지 않았다.
+ * - Running·Waiting for Input·Disconnected: 러너, 워크트리, 실제 브랜치, 에이전트 참조가 있다.
  * - Ended: 에이전트 결과와 PR 상태 두 축이 붙는다. 요약 결과는 붙이지 않고 summarizeRunOutcome으로 계산한다.
+ *   시작하지 않고 끝난 런은 NotStartedEndedRun이다.
+ * 취소 중(처리되지 않은 취소 요청이 있음)은 런 상태가 아니라 DB의 요청으로 안다(Q82.21).
  */
 export type Run =
   | (RunBase & { state: "queued"; runnerId: RunnerId | null })
-  | (RunBase & {
-      state: "running" | "waiting-for-input" | "disconnected";
-      runnerId: RunnerId;
-      worktree: WorktreeRef;
-      startedAt: Date;
-    })
-  | (RunBase & {
-      state: "ended";
-      runnerId: RunnerId;
-      worktree: WorktreeRef;
-      startedAt: Date;
-      endedAt: Date;
-      agentResult: AgentResult;
-      prState: PrState;
-    });
+  | (RunBase &
+      StartedRunFields & {
+        state: "running" | "waiting-for-input" | "disconnected";
+      })
+  | EndedRun;

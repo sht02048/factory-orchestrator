@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   checkAssignment,
   checkAutoAssignment,
+  checkManualRunnerChoice,
   pickRunner,
   remainingCapacity,
 } from "./assignment.js";
@@ -15,7 +16,7 @@ import {
   toTrackerConnectionId,
 } from "./ids.js";
 import { RUN_STATES } from "./run.js";
-import type { RunState } from "./run.js";
+import type { AgentResult, RunState } from "./run.js";
 
 const app = toRunnerProjectId("github:acme/app");
 const web = toRunnerProjectId("github:acme/web");
@@ -23,10 +24,24 @@ const r1 = toRunnerId("r1");
 const r2 = toRunnerId("r2");
 const r3 = toRunnerId("r3");
 const ticket = { connection: toTrackerConnectionId("c1"), key: toTicketKey("ENG-1") };
-const on = (state: RunState) => ({ ticket, state });
+const at = (minute: number) => new Date(Date.UTC(2026, 10, 17, 9, minute));
+const on = (state: RunState) => ({
+  ticket,
+  state,
+  assignedAt: at(0),
+  agentResult: state === "ended" ? ("reported-success" as const) : null,
+  endedAt: state === "ended" ? at(1) : null,
+});
+const endedWith = (agentResult: AgentResult, assigned: number, ended: number) => ({
+  ticket,
+  state: "ended" as const,
+  assignedAt: at(assigned),
+  agentResult,
+  endedAt: at(ended),
+});
 
 function runner(overrides: Partial<RunnerSnapshot> & Pick<RunnerSnapshot, "id">): RunnerSnapshot {
-  return { online: true, capacity: 2, projects: [app], ...overrides };
+  return { online: true, assignmentBlocked: false, capacity: 2, projects: [app], ...overrides };
 }
 
 describe("checkAutoAssignment", () => {
@@ -34,7 +49,13 @@ describe("checkAutoAssignment", () => {
 
   it("Auto-assign Label이 있고 동시에 도는 런이 없으면 할당한다", () => {
     expect(
-      checkAutoAssignment({ labelIds: [label], autoAssignLabelId: label, ticket, runs: [] }),
+      checkAutoAssignment({
+        labelIds: [label],
+        autoAssignLabelId: label,
+        labelAttachedAt: null,
+        ticket,
+        runs: [],
+      }),
     ).toEqual({ ok: true });
   });
 
@@ -43,6 +64,7 @@ describe("checkAutoAssignment", () => {
       checkAutoAssignment({
         labelIds: [toLabelId("other")],
         autoAssignLabelId: label,
+        labelAttachedAt: null,
         ticket,
         runs: [],
       }),
@@ -56,6 +78,7 @@ describe("checkAutoAssignment", () => {
       checkAutoAssignment({
         labelIds: [label],
         autoAssignLabelId: label,
+        labelAttachedAt: null,
         ticket,
         runs: [on(state)],
       }),
@@ -67,10 +90,58 @@ describe("checkAutoAssignment", () => {
       checkAutoAssignment({
         labelIds: [label],
         autoAssignLabelId: label,
+        labelAttachedAt: null,
         ticket,
         runs: [on("ended"), on("disconnected")],
       }),
     ).toEqual({ ok: false, reason: "active-run" });
+  });
+});
+
+describe("운영자가 취소한 티켓 (Q82.12)", () => {
+  const label = toLabelId("label-auto");
+  const check = (labelAttachedAt: Date | null, runs: ReturnType<typeof endedWith>[]) =>
+    checkAutoAssignment({
+      labelIds: [label],
+      autoAssignLabelId: label,
+      labelAttachedAt,
+      ticket,
+      runs,
+    });
+
+  it("마지막 런을 취소한 티켓은 라벨이 남아 있어도 자동 할당하지 않는다", () => {
+    // 라벨은 취소 전(5분)에 붙었고 그대로 남아 있다.
+    expect(check(at(5), [endedWith("canceled", 10, 20)])).toEqual({
+      ok: false,
+      reason: "canceled-by-operator",
+    });
+  });
+
+  it("라벨이 언제 붙었는지 모르면(폴링 보정) 다시 붙었다는 증거가 없어 할당하지 않는다", () => {
+    expect(check(null, [endedWith("canceled", 10, 20)])).toEqual({
+      ok: false,
+      reason: "canceled-by-operator",
+    });
+  });
+
+  it("취소 뒤 라벨이 다시 붙으면 할당한다", () => {
+    expect(check(at(30), [endedWith("canceled", 10, 20)])).toEqual({ ok: true });
+  });
+
+  it("취소 뒤 수동 할당한 런이 끝났으면 마지막 런이 취소가 아니라 다시 자동 할당 대상이다", () => {
+    expect(
+      check(at(5), [endedWith("canceled", 10, 20), endedWith("reported-success", 30, 40)]),
+    ).toEqual({ ok: true });
+  });
+
+  it("다른 결과로 끝난 런은 이 규칙에 걸리지 않는다", () => {
+    expect(check(null, [endedWith("timed-out", 10, 20)])).toEqual({ ok: true });
+  });
+
+  it("수동 할당은 취소한 티켓도 막지 않는다", () => {
+    expect(checkAssignment({ ticket, runs: [endedWith("canceled", 10, 20)] })).toEqual({
+      ok: true,
+    });
   });
 });
 
@@ -140,9 +211,34 @@ describe("pickRunner", () => {
     );
   });
 
+  it("GitHub 인증이 깨진 러너는 남은 capacity가 많아도 고르지 않는다 (Q82.14)", () => {
+    const runners = [
+      runner({ id: r1, capacity: 9, assignmentBlocked: true }),
+      runner({ id: r2, capacity: 1 }),
+    ];
+
+    expect(pickRunner({ project: app, runners, runs: [] })).toBe(r2);
+  });
+
+  it("맞는 러너가 모두 인증이 깨졌으면 러너를 정하지 않는다 (Q87)", () => {
+    const runners = [runner({ id: r1, assignmentBlocked: true })];
+
+    expect(pickRunner({ project: app, runners, runs: [] })).toBeNull();
+  });
+
   it("맞는 러너가 모두 Offline이면 러너를 정하지 않는다 (Q65)", () => {
     const runners = [runner({ id: r1, online: false }), runner({ id: r2, projects: [web] })];
 
     expect(pickRunner({ project: app, runners, runs: [] })).toBeNull();
+  });
+});
+
+describe("checkManualRunnerChoice", () => {
+  it("수동 할당에서 인증이 깨진 러너는 고를 수 없고, Offline 러너는 고를 수 있다 (Q87)", () => {
+    expect(checkManualRunnerChoice(runner({ id: r1, assignmentBlocked: true }))).toEqual({
+      ok: false,
+      reason: "assignment-blocked",
+    });
+    expect(checkManualRunnerChoice(runner({ id: r2, online: false }))).toEqual({ ok: true });
   });
 });

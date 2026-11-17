@@ -28,14 +28,14 @@ describe("loadStatsPage", () => {
   it("처리량과 요약 결과 분포를 core 요약 계산으로 센다", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now));
     expect(page.total.runs).toBe(9);
-    expect(page.total.outcomes).toEqual({ merged: 2, "human-check": 3, failed: 4 });
+    expect(page.total.outcomes).toEqual({ merged: 2, "human-check": 3, failed: 4, canceled: 0 });
   });
 
   it("Failed 런을 에이전트 결과 × PR 상태 조합별로 센다(Q71)", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now));
     expect(page.total.failedCombinations).toEqual([
-      { agentResult: "exited-with-error", prState: "none", runs: 2 },
-      { agentResult: "exited-normally", prState: "closed", runs: 1 },
+      { agentResult: "reported-failure", prState: "none", runs: 2 },
+      { agentResult: "reported-success", prState: "closed", runs: 1 },
       { agentResult: "timed-out", prState: "open", runs: 1 },
     ]);
   });
@@ -66,13 +66,13 @@ describe("loadStatsPage", () => {
         .map((d) => [new Date(d.day).toISOString().slice(0, 10), d.outcomes]),
     );
     expect(nonZero).toEqual({
-      "2026-11-04": { merged: 0, "human-check": 0, failed: 1 },
-      "2026-11-10": { merged: 0, "human-check": 0, failed: 1 },
-      "2026-11-12": { merged: 0, "human-check": 0, failed: 1 },
-      "2026-11-14": { merged: 0, "human-check": 0, failed: 1 },
-      "2026-11-15": { merged: 0, "human-check": 2, failed: 0 },
-      "2026-11-16": { merged: 1, "human-check": 1, failed: 0 },
-      "2026-11-17": { merged: 1, "human-check": 0, failed: 0 },
+      "2026-11-04": { merged: 0, "human-check": 0, failed: 1, canceled: 0 },
+      "2026-11-10": { merged: 0, "human-check": 0, failed: 1, canceled: 0 },
+      "2026-11-12": { merged: 0, "human-check": 0, failed: 1, canceled: 0 },
+      "2026-11-14": { merged: 0, "human-check": 0, failed: 1, canceled: 0 },
+      "2026-11-15": { merged: 0, "human-check": 2, failed: 0, canceled: 0 },
+      "2026-11-16": { merged: 1, "human-check": 1, failed: 0, canceled: 0 },
+      "2026-11-17": { merged: 1, "human-check": 0, failed: 0, canceled: 0 },
     });
   });
 
@@ -82,14 +82,14 @@ describe("loadStatsPage", () => {
     // runner-a: C-1 C-2 C-4 C-7 C-8, 리드 타임 15 20 22 30 34 → 중앙값 22
     expect(runners.get("runner-a")).toMatchObject({
       runs: 5,
-      outcomes: { merged: 2, "human-check": 2, failed: 1 },
+      outcomes: { merged: 2, "human-check": 2, failed: 1, canceled: 0 },
       humanCheck: { humanCheck: 2, merged: 1, closed: 0 },
       durations: { leadP50Ms: 22 * min },
     });
     // runner-b: C-3 C-5 C-6 C-9, 리드 타임 10 18 50 121 → 중앙값 2번째 18
     expect(runners.get("runner-b")).toMatchObject({
       runs: 4,
-      outcomes: { merged: 0, "human-check": 1, failed: 3 },
+      outcomes: { merged: 0, "human-check": 1, failed: 3, canceled: 0 },
       humanCheck: { humanCheck: 1, merged: 0, closed: 1 },
       durations: { leadP50Ms: 18 * min },
     });
@@ -103,21 +103,21 @@ describe("loadStatsPage", () => {
     ]);
     expect(projects.get("Web")).toMatchObject({
       runs: 6,
-      outcomes: { merged: 2, "human-check": 2, failed: 2 },
+      outcomes: { merged: 2, "human-check": 2, failed: 2, canceled: 0 },
     });
     expect(projects.get("API")).toMatchObject({
       runs: 3,
-      outcomes: { merged: 0, "human-check": 1, failed: 2 },
+      outcomes: { merged: 0, "human-check": 1, failed: 2, canceled: 0 },
     });
 
     const agents = byName(page.groups.agent);
     expect(agents.get("claude")).toMatchObject({
       runs: 6,
-      outcomes: { merged: 2, "human-check": 1, failed: 3 },
+      outcomes: { merged: 2, "human-check": 1, failed: 3, canceled: 0 },
     });
     expect(agents.get("codex")).toMatchObject({
       runs: 3,
-      outcomes: { merged: 0, "human-check": 2, failed: 1 },
+      outcomes: { merged: 0, "human-check": 2, failed: 1, canceled: 0 },
     });
   });
 
@@ -165,7 +165,7 @@ describe("loadStatsPage", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, later));
     expect(page.total).toEqual({
       runs: 0,
-      outcomes: { merged: 0, "human-check": 0, failed: 0 },
+      outcomes: { merged: 0, "human-check": 0, failed: 0, canceled: 0 },
       durations: null,
       humanCheck: { humanCheck: 0, merged: 0, closed: 0 },
       failedCombinations: [],

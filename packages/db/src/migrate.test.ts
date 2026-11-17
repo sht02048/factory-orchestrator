@@ -30,6 +30,8 @@ describe("migrate", () => {
         "code_host_connections",
         "log_tail_requests",
         "mappings",
+        "run_cancel_requests",
+        "run_questions",
         "run_state_changes",
         "runner_check_requests",
         "runner_projects",
@@ -135,5 +137,54 @@ describe("migrate", () => {
     expect(() => migrate(db, [...loadMigrations(), orphan])).toThrow(/foreign key/);
     expect(db.$client.prepare("SELECT count(*) AS n FROM workspaces").get()?.["n"]).toBe(1);
     expect(db.$client.prepare("PRAGMA foreign_keys").get()?.["foreign_keys"]).toBe(1);
+  });
+
+  it("0037 마이그레이션이 옛 런을 결정적 워크트리 이름·실제 브랜치·완료 보고 결과로 옮긴다", () => {
+    const db = openDatabase(":memory:");
+    const all = loadMigrations();
+    const before = all.findIndex((m) => m.name.endsWith("_core_contracts"));
+    expect(before).toBeGreaterThan(0);
+    migrate(db, all.slice(0, before));
+    db.$client.exec(`
+      INSERT INTO tracker_connections (id, kind, name, secrets, created_at) VALUES ('c', 'fake', 'c', '{}', 0);
+      INSERT INTO workspaces (id, name, created_at) VALUES ('w', 'w', 0);
+      INSERT INTO runners (id, kind, name, capacity, created_at) VALUES ('r', 'fake', 'r', 1, 0);
+      INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
+        runner_project_id, agent_id, branch, state, runner_id, assigned_at)
+        VALUES ('queued', 'c', 'ENG-1', 'w', 'tp', 'rp', 'a', 'factory/ENG-1-1', 'queued', NULL, 1);
+      UPDATE runs SET retry_token = 'op-1' WHERE id = 'queued';
+      INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
+        runner_project_id, agent_id, branch, state, runner_id, assigned_at, started_at, ended_at,
+        worktree_ref, agent_result, pr_state)
+        VALUES ('ended', 'c', 'ENG-2', 'w', 'tp', 'rp', 'a', 'factory/ENG-2-1', 'ended', 'r', 1, 2, 3,
+          'repo::/wt', 'exited-with-error', 'open');
+    `);
+
+    migrate(db);
+    const rows = db.$client
+      .prepare(
+        "SELECT id, worktree_name, branch, agent_ref, agent_result, runner_unreached, start_requested_at FROM runs ORDER BY id",
+      )
+      .all();
+    expect(rows).toEqual([
+      {
+        id: "ended",
+        worktree_name: "factory-ENG-2-1",
+        branch: "factory/ENG-2-1",
+        agent_ref: "repo::/wt",
+        agent_result: "reported-failure",
+        runner_unreached: 0,
+        start_requested_at: null,
+      },
+      {
+        id: "queued",
+        worktree_name: "factory-ENG-1-1",
+        branch: null,
+        agent_ref: null,
+        agent_result: null,
+        runner_unreached: 0,
+        start_requested_at: 1,
+      },
+    ]);
   });
 });

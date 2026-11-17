@@ -14,30 +14,34 @@ const r1 = toRunnerId("r1");
 const r2 = toRunnerId("r2");
 
 function runner(overrides: Partial<RunnerSnapshot> & Pick<RunnerSnapshot, "id">): RunnerSnapshot {
-  return { online: true, capacity: 1, projects: [app], ...overrides };
+  return { online: true, assignmentBlocked: false, capacity: 1, projects: [app], ...overrides };
 }
 
 let minute = 0;
-function queued(id: string, project: typeof app, runnerId: RunnerId | null): QueuedRun {
+function queued(
+  id: string,
+  project: typeof app,
+  runnerId: RunnerId | null,
+  unstartable = false,
+): QueuedRun {
   minute += 1;
   return {
     id: toRunId(id),
     project,
     runnerId,
     assignedAt: new Date(Date.UTC(2026, 0, 1, 0, minute)),
+    unstartable,
   };
 }
+
+const EMPTY_PLAN = { cleared: [], assigned: [], unplaced: [], couldNotStart: [], start: [] };
 
 const busy = (runnerId: RunnerId, state: RunState = "running") => ({ runnerId, state });
 const ids = (...values: string[]): RunId[] => values.map(toRunId);
 
 describe("planQueue", () => {
   it("빈 대기열은 아무것도 하지 않는다", () => {
-    expect(planQueue({ queued: [], runners: [runner({ id: r1 })], runs: [] })).toEqual({
-      cleared: [],
-      assigned: [],
-      start: [],
-    });
+    expect(planQueue({ queued: [], runners: [runner({ id: r1 })], runs: [] })).toEqual(EMPTY_PLAN);
   });
 
   it("들어온 순서대로 남은 capacity만큼 시작한다", () => {
@@ -88,7 +92,10 @@ describe("planQueue", () => {
 
     const run = queued("a", app, null);
     const stillOffline = planQueue({ queued: [run], runners: offline, runs: [] });
-    expect(stillOffline).toEqual({ cleared: [], assigned: [], start: [] });
+    expect(stillOffline).toEqual({
+      ...EMPTY_PLAN,
+      unplaced: [{ runId: run.id, reason: "runner-offline" }],
+    });
 
     const online = planQueue({ queued: [run], runners: [runner({ id: r1 })], runs: [] });
     expect(online.assigned).toEqual([{ runId: run.id, runnerId: r1 }]);
@@ -119,7 +126,8 @@ describe("planQueue", () => {
       runs: [],
     });
 
-    expect(plan.cleared).toEqual(ids("head"));
+    expect(plan.cleared).toEqual([{ runId: head.id, reason: "runner-offline" }]);
+    expect(plan.unplaced).toEqual([{ runId: head.id, reason: "runner-offline" }]);
     expect(plan.start).toEqual([{ runId: behind.id, runnerId: r2 }]);
   });
 
@@ -128,7 +136,7 @@ describe("planQueue", () => {
 
     const plan = planQueue({ queued: [head], runners: [runner({ id: r1 })], runs: [] });
 
-    expect(plan.cleared).toEqual(ids("head"));
+    expect(plan.cleared.map((c) => c.runId)).toEqual(ids("head"));
     expect(plan.assigned).toEqual([{ runId: head.id, runnerId: r1 }]);
   });
 
@@ -141,7 +149,7 @@ describe("planQueue", () => {
       runs: [],
     });
 
-    expect(plan.cleared).toEqual(ids("head"));
+    expect(plan.cleared.map((c) => c.runId)).toEqual(ids("head"));
     expect(plan.assigned).toEqual([{ runId: head.id, runnerId: r2 }]);
     expect(plan.start).toEqual([{ runId: head.id, runnerId: r2 }]);
   });
@@ -193,5 +201,99 @@ describe("planQueue", () => {
       { runId: a.id, runnerId: r1 },
       { runId: b.id, runnerId: r2 },
     ]);
+  });
+
+  it("정한 러너에서 러너 쪽 프로젝트가 사라진 Queued 런은 러너를 비우고 순서에서 빠졌다가, 맞는 러너가 생기면 원래 자리로 돌아온다 (Q78)", () => {
+    const head = queued("head", app, r1);
+    const behind = queued("behind", web, r2);
+    const projectGone = [runner({ id: r1, projects: [web] }), runner({ id: r2, projects: [web] })];
+
+    const gone = planQueue({ queued: [head, behind], runners: projectGone, runs: [] });
+    expect(gone.cleared).toEqual([{ runId: head.id, reason: "project-missing" }]);
+    expect(gone.unplaced).toEqual([{ runId: head.id, reason: "project-missing" }]);
+    expect(gone.start).toEqual([{ runId: behind.id, runnerId: r2 }]);
+
+    // 다음 판단: head는 러너가 비었고 behind보다 먼저 들어왔다. r2에 프로젝트가 생겼다.
+    const later = queued("later", web, r2);
+    const back = planQueue({
+      queued: [later, { ...head, runnerId: null }],
+      runners: [runner({ id: r1, projects: [web] }), runner({ id: r2, projects: [app, web] })],
+      runs: [],
+    });
+    expect(back.assigned).toEqual([{ runId: head.id, runnerId: r2 }]);
+    expect(back.start[0]).toEqual({ runId: head.id, runnerId: r2 });
+  });
+
+  it("GitHub 인증이 깨진 러너는 고르지 않고, 그 러너로 정한 Queued 런은 러너를 비우고 순서에서 빠진다 (Q82.14·Q82.22)", () => {
+    const head = queued("head", app, r1);
+    const behind = queued("behind", web, r2);
+
+    const plan = planQueue({
+      queued: [head, behind],
+      runners: [runner({ id: r1, assignmentBlocked: true }), runner({ id: r2, projects: [web] })],
+      runs: [],
+    });
+
+    expect(plan.cleared).toEqual([{ runId: head.id, reason: "assignment-blocked" }]);
+    expect(plan.unplaced).toEqual([{ runId: head.id, reason: "assignment-blocked" }]);
+    expect(plan.assigned).toEqual([]);
+    expect(plan.start).toEqual([{ runId: behind.id, runnerId: r2 }]);
+  });
+
+  it("인증이 깨진 러너로 정한 런은 인증이 멀쩡한 다른 맞는 러너로 다시 정한다 (Q82.22·Q73)", () => {
+    const head = queued("head", app, r1);
+
+    const plan = planQueue({
+      queued: [head],
+      runners: [runner({ id: r1, assignmentBlocked: true }), runner({ id: r2 })],
+      runs: [],
+    });
+
+    expect(plan.assigned).toEqual([{ runId: head.id, runnerId: r2 }]);
+    expect(plan.start).toEqual([{ runId: head.id, runnerId: r2 }]);
+  });
+
+  it("순서에서 빠진 이유를 맞는 러너의 상태로 가른다 (Q68·Q82.13·Q87)", () => {
+    const a = queued("a", app, null);
+    const reasonWith = (runners: RunnerSnapshot[]) =>
+      planQueue({ queued: [a], runners, runs: [] }).unplaced;
+
+    expect(reasonWith([runner({ id: r1, online: false })])).toEqual([
+      { runId: a.id, reason: "runner-offline" },
+    ]);
+    expect(
+      reasonWith([runner({ id: r1, online: false }), runner({ id: r2, assignmentBlocked: true })]),
+    ).toEqual([{ runId: a.id, reason: "assignment-blocked" }]);
+    expect(reasonWith([runner({ id: r1, projects: [web] })])).toEqual([
+      { runId: a.id, reason: "project-missing" },
+    ]);
+  });
+
+  it("맨 앞 런이 영영 시작할 수 없으면 시작할 수 없음으로 끝내 뒤 런이 막히지 않는다 (Q82.16)", () => {
+    const head = queued("head", app, r1, true);
+    const behind = queued("behind", app, r1);
+
+    const plan = planQueue({
+      queued: [head, behind],
+      runners: [runner({ id: r1 })],
+      runs: [],
+    });
+
+    expect(plan.couldNotStart).toEqual(ids("head"));
+    expect(plan.start).toEqual([{ runId: behind.id, runnerId: r1 }]);
+  });
+
+  it("시작할 수 없는 런도 앞 런이 막혀 있으면 맨 앞이 될 때까지 기다린다", () => {
+    const head = queued("head", app, r1);
+    const stuck = queued("stuck", app, r1, true);
+
+    const plan = planQueue({
+      queued: [head, stuck],
+      runners: [runner({ id: r1 })],
+      runs: [busy(r1)],
+    });
+
+    expect(plan.couldNotStart).toEqual([]);
+    expect(plan.start).toEqual([]);
   });
 });

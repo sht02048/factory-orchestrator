@@ -6,4 +6,4 @@ export {
   fakeRunnerFactory,
   fakeTrackerFactory,
 } from "./fakes.js";
-export type { FakeFactory } from "./fakes.js";
+export type { FakeFactory, FakeRunnerRun } from "./fakes.js";

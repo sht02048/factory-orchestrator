@@ -1,17 +1,10 @@
-import { summarizeRunOutcome } from "@factory/core";
-import type { PrState, RetryToken, WorktreeRef } from "@factory/core";
+import { AdapterError, MAX_START_RETRIES, summarizeRunOutcome } from "@factory/core";
+import type { CompletionReport, PrState, WorktreeRef } from "@factory/core";
 import { getRun, getRunWithRecords } from "@factory/db";
 import type { StoredRun } from "@factory/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  Harness,
-  outcomeUnknownAfterStart,
-  projectA,
-  projectB,
-  projectC,
-  recordingStarts,
-} from "./test-fixtures.js";
-import { startWorker } from "./worker.js";
+import { Harness, projectA, projectB, projectC } from "./test-fixtures.js";
+import { START_UNREACHABLE_RETRY_MS, startWorker } from "./worker.js";
 
 let h: Harness;
 
@@ -35,14 +28,19 @@ function stateOf(run: StoredRun): string {
 
 function worktreeOf(run: StoredRun): WorktreeRef {
   const found = current(run);
-  if (found.state === "queued") throw new Error(`run ${run.id} has not started`);
+  if (found.state === "queued" || found.worktree === null) {
+    throw new Error(`run ${run.id} has not started`);
+  }
   return found.worktree;
 }
 
-function finish(run: StoredRun, exitCode: number): void {
+/** 에이전트가 완료 보고를 보낸다(Q82.2). */
+function finish(run: StoredRun, outcome: CompletionReport["outcome"] = "succeeded"): void {
   const found = current(run);
-  if (found.state === "queued") throw new Error(`run ${run.id} has not started`);
-  h.runner(found.runnerId).setProgress(found.worktree, { kind: "finished", exitCode });
+  if (found.state === "queued" || found.runnerId === null || found.worktree === null) {
+    throw new Error(`run ${run.id} has not started`);
+  }
+  h.runner(found.runnerId).report(found.worktree, { outcome, body: `보고: ${outcome}` });
 }
 
 describe("대기열과 capacity", () => {
@@ -59,42 +57,42 @@ describe("대기열과 capacity", () => {
       "running",
       "queued",
     ]);
-    expect(h.runner(runnerA).worktrees.size).toBe(2);
+    expect(h.runner(runnerA).runs.size).toBe(2);
 
     // 다음 바퀴에도 capacity가 차 있으면 시작하지 않는다.
     await worker.tick();
     expect(stateOf(third)).toBe("queued");
 
-    finish(first, 0);
+    finish(first);
     await worker.tick();
     expect([stateOf(first), stateOf(second), stateOf(third)]).toEqual([
       "ended",
       "running",
       "running",
     ]);
-    expect(h.runner(runnerA).worktrees.size).toBe(3);
+    expect(h.runner(runnerA).runs.size).toBe(3);
   });
 });
 
 describe("두 축 기록", () => {
   const cases: Array<{
-    exitCode: number;
+    report: "succeeded" | "failed";
     pr: PrState;
     agentResult: string;
     outcome: string;
   }> = [
-    { exitCode: 0, pr: "merged", agentResult: "exited-normally", outcome: "merged" },
-    { exitCode: 1, pr: "merged", agentResult: "exited-with-error", outcome: "merged" },
-    { exitCode: 0, pr: "open", agentResult: "exited-normally", outcome: "human-check" },
-    { exitCode: 1, pr: "open", agentResult: "exited-with-error", outcome: "human-check" },
-    { exitCode: 0, pr: "closed", agentResult: "exited-normally", outcome: "failed" },
-    { exitCode: 0, pr: "none", agentResult: "exited-normally", outcome: "failed" },
-    { exitCode: 2, pr: "none", agentResult: "exited-with-error", outcome: "failed" },
+    { report: "succeeded", pr: "merged", agentResult: "reported-success", outcome: "merged" },
+    { report: "failed", pr: "merged", agentResult: "reported-failure", outcome: "merged" },
+    { report: "succeeded", pr: "open", agentResult: "reported-success", outcome: "human-check" },
+    { report: "failed", pr: "open", agentResult: "reported-failure", outcome: "human-check" },
+    { report: "succeeded", pr: "closed", agentResult: "reported-success", outcome: "failed" },
+    { report: "succeeded", pr: "none", agentResult: "reported-success", outcome: "failed" },
+    { report: "failed", pr: "none", agentResult: "reported-failure", outcome: "failed" },
   ];
 
   it.each(cases)(
-    "종료 코드 $exitCode, PR $pr → 에이전트 결과 $agentResult, 요약 $outcome",
-    async ({ exitCode, pr, agentResult, outcome }) => {
+    "완료 보고 $report, PR $pr → 에이전트 결과 $agentResult, 요약 $outcome",
+    async ({ report, pr, agentResult, outcome }) => {
       h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
       const run = h.assign("ENG-1", projectA);
       const worker = h.worker();
@@ -103,7 +101,7 @@ describe("두 축 기록", () => {
 
       h.advance(60_000);
       if (pr !== "none") h.putPullRequest(current(run), pr);
-      finish(run, exitCode);
+      finish(run, report);
       await worker.tick();
 
       const found = getRunWithRecords(h.db, run.id);
@@ -111,8 +109,9 @@ describe("두 축 기록", () => {
       expect(found.run.agentResult).toBe(agentResult);
       expect(found.run.prState).toBe(pr);
       expect(found.run.endedAt).toEqual(h.now);
-      expect(summarizeRunOutcome(found.run.agentResult, found.run.prState).outcome).toBe(outcome);
+      expect(summarizeRunOutcome(found.run).outcome).toBe(outcome);
       expect(found.records.pullRequest === null).toBe(pr === "none");
+      expect(found.records.reportBody).toBe(`보고: ${report}`);
     },
   );
 
@@ -122,7 +121,7 @@ describe("두 축 기록", () => {
     const worker = h.worker();
     await worker.tick();
     h.putPullRequest(current(run), "open");
-    finish(run, 0);
+    finish(run);
 
     h.codeHostBroken = true;
     await worker.tick();
@@ -140,7 +139,7 @@ describe("두 축 기록", () => {
     const worker = h.worker();
     await worker.tick();
     h.putPullRequest(current(run), "open");
-    finish(run, 0);
+    finish(run);
 
     const spy = vi
       .spyOn(h.codeHost, "findPullRequestsByBranch")
@@ -168,9 +167,9 @@ describe("엄격한 FIFO", () => {
     const behind = h.assign("ENG-3", projectB);
     await worker.tick();
     expect([stateOf(head), stateOf(behind)]).toEqual(["queued", "queued"]);
-    expect(h.runner(runnerB).worktrees.size).toBe(0);
+    expect(h.runner(runnerB).runs.size).toBe(0);
 
-    finish(busy, 0);
+    finish(busy);
     await worker.tick();
     expect([stateOf(busy), stateOf(head), stateOf(behind)]).toEqual([
       "ended",
@@ -220,7 +219,18 @@ describe("엄격한 FIFO", () => {
   });
 });
 
-describe("재시작 안전", () => {
+describe("시작 멱등과 실제 브랜치 (Q82.6)", () => {
+  it("결정적 워크트리 이름으로 시작하고 러너에서 받은 실제 브랜치를 저장한다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    await h.worker().tick();
+
+    expect(h.runner(runnerA).startCalls.map((call) => call.worktreeName)).toEqual([
+      "factory-ENG-1-1",
+    ]);
+    expect(current(run)).toMatchObject({ state: "running", branch: "fake/factory-ENG-1-1" });
+  });
+
   it("런 시작 직후 데몬을 멈췄다 다시 띄워도 런이 하나만 시작된다", async () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 2, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
@@ -235,62 +245,67 @@ describe("재시작 안전", () => {
     await second.tick();
     expect(stateOf(run)).toBe("running");
     expect(worktreeOf(run)).toBe(worktree);
-    expect(h.runner(runnerA).worktrees.size).toBe(1);
+    expect(h.runner(runnerA).runs.size).toBe(1);
   });
 
-  it("러너가 시작 결과를 모른다고 답하면 데몬을 다시 띄운 뒤 러너가 준 값으로 같은 시작을 다시 보낸다", async () => {
+  it("러너가 응답한 뒤 Running을 쓰기 전에 데몬이 죽으면, 다시 띄웠을 때 같은 이름으로 이미 시작한 런을 찾아 이어 붙인다", async () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 2, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
-    const sent: Array<RetryToken | undefined> = [];
 
-    h.wrapRunner = (fake) => outcomeUnknownAfterStart(fake, sent);
+    // 러너는 시작했지만 응답이 데몬에 닿지 않았다.
+    h.runner(runnerA).loseNextStartResponse = true;
     const first = h.worker();
     await first.tick();
     await first.close();
     expect(stateOf(run)).toBe("queued");
-    expect(h.runner(runnerA).worktrees.size).toBe(1);
-    const [startedWorktree] = h.runner(runnerA).worktrees.keys();
-    const saved = getRunWithRecords(h.db, run.id)?.records.retryToken ?? null;
-    expect(saved).not.toBeNull();
+    expect(getRunWithRecords(h.db, run.id)?.records.startRequestedAt).not.toBeNull();
+    const startedWorktree = h.runner(runnerA).runs.get("factory-ENG-1-1")?.started.worktree;
 
-    h.wrapRunner = (fake) => recordingStarts(fake, sent);
     const second = h.worker();
     await second.tick();
     expect(stateOf(run)).toBe("running");
     expect(worktreeOf(run)).toBe(startedWorktree);
-    expect(h.runner(runnerA).worktrees.size).toBe(1);
-    // 첫 시작에는 다시 보내기 값을 보내지 않고, 다시 보낼 때만 러너가 준 값을 보낸다.
-    expect(sent).toEqual([undefined, saved]);
+    expect(h.runner(runnerA).runs.size).toBe(1);
+    expect(h.runner(runnerA).startCalls).toHaveLength(1);
   });
-});
 
-describe("결과를 모르는 시작", () => {
-  it("러너가 Offline이 되어도 다른 러너에서 다시 시작하지 않고, 돌아오면 그 러너에 다시 보낸다", async () => {
+  it("시작을 보냈는데 러너에 그 이름의 런이 없으면 같은 이름으로 다시 보낸다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    h.runner(runnerA).failNextStart = { kind: "start-outcome-unknown", detail: "lost" };
+    const worker = h.worker();
+
+    await worker.tick();
+    expect(stateOf(run)).toBe("queued");
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(h.runner(runnerA).startCalls.map((call) => call.worktreeName)).toEqual([
+      "factory-ENG-1-1",
+      "factory-ENG-1-1",
+    ]);
+  });
+
+  it("시작을 보낸 런은 러너가 Offline이 되어도 다른 러너에서 다시 시작하지 않고, 돌아오면 이어 붙인다", async () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
     expect(current(run)).toMatchObject({ runnerId: runnerA });
-    const sent: Array<RetryToken | undefined> = [];
 
-    h.wrapRunner = (fake) => outcomeUnknownAfterStart(fake, sent);
+    h.runner(runnerA).loseNextStartResponse = true;
     const first = h.worker();
     await first.tick();
     await first.close();
-    const [startedWorktree] = h.runner(runnerA).worktrees.keys();
 
-    h.wrapRunner = (fake) => recordingStarts(fake, sent);
     h.setRunnerOnline(runnerA, false);
     const second = h.worker();
     await second.tick();
     expect(current(run)).toMatchObject({ state: "queued", runnerId: runnerA });
-    expect(h.runner(runnerB).worktrees.size).toBe(0);
+    expect(h.runner(runnerB).runs.size).toBe(0);
 
     h.setRunnerOnline(runnerA, true);
     await second.tick();
     expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
-    expect(worktreeOf(run)).toBe(startedWorktree);
-    expect(h.runner(runnerA).worktrees.size).toBe(1);
-    expect(sent).toHaveLength(2);
+    expect(h.runner(runnerA).startCalls).toHaveLength(1);
   });
 
   it("묶인 런은 맞는 다른 러너의 capacity를 차지하지 않고 뒤 런을 막지 않는다", async () => {
@@ -299,15 +314,284 @@ describe("결과를 모르는 시작", () => {
     const bound = h.assign("ENG-1", projectA);
     const behind = h.assign("ENG-2", projectB);
 
-    h.wrapRunner = (fake) => outcomeUnknownAfterStart(fake, []);
+    h.runner(runnerA).loseNextStartResponse = true;
     const first = h.worker();
     await first.tick();
     await first.close();
 
-    h.wrapRunner = (fake) => fake;
     h.setRunnerOnline(runnerA, false);
     await h.worker().tick();
     expect([stateOf(bound), stateOf(behind)]).toEqual(["queued", "running"]);
+  });
+
+  it("우편함이 사라졌으면 다시 만들고 저장한다 (Q82.1)", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 2, projects: [projectA] });
+    const first = h.assign("ENG-1", projectA);
+    const worker = h.worker();
+    await worker.tick();
+    const mailboxOf = () =>
+      h.db.$client.prepare("SELECT mailbox_ref AS m FROM runners WHERE id = ?").get(runnerA)?.["m"];
+    const before = mailboxOf();
+    expect(before).toBeTruthy();
+    expect(h.runner(runnerA).startCalls[0]?.mailbox).toBe(before);
+
+    h.runner(runnerA).dropMailbox(h.runner(runnerA).startCalls[0]!.mailbox);
+    const second = h.assign("ENG-2", projectA);
+    await worker.tick();
+    expect(stateOf(second)).toBe("running");
+    expect(mailboxOf()).not.toBe(before);
+    expect(stateOf(first)).toBe("running");
+  });
+});
+
+describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
+  it("러너가 시작 명령에 오류를 내면 같은 이름으로 3번까지 다시 시도하고, 그래도 안 되면 시작할 수 없음으로 끝내 뒤 런을 막지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 2, projects: [projectA] });
+    const head = h.assign("ENG-1", projectA);
+    const behind = h.assign("ENG-2", projectA);
+    const fake = h.runner(runnerA);
+    const worker = h.worker();
+
+    // 첫 시도와 다시 시도 셋. 실패하는 동안 맨 앞 런이 뒤 런을 막는다.
+    const behindStates: string[] = [];
+    for (let attempt = 0; attempt <= MAX_START_RETRIES; attempt += 1) {
+      fake.failNextStart = { kind: "runner-error", code: "boom", message: "boom" };
+      await worker.tick();
+      behindStates.push(stateOf(behind));
+    }
+    expect(behindStates).toEqual(["queued", "queued", "queued", "running"]);
+
+    const found = getRunWithRecords(h.db, head.id);
+    expect(found?.run).toMatchObject({
+      state: "ended",
+      agentResult: "could-not-start",
+      prState: "none",
+      startedAt: null,
+    });
+    expect(found?.records.startFailures).toBe(MAX_START_RETRIES + 1);
+    expect(found?.records.startError).toContain("boom");
+    expect(stateOf(behind)).toBe("running");
+    expect(fake.startCalls.filter((c) => c.worktreeName === head.worktreeName)).toHaveLength(
+      MAX_START_RETRIES + 1,
+    );
+  });
+
+  it("읽을 수 없는 출력 뒤에는 같은 이름으로 먼저 찾아 이어 붙이고 다시 보내지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    const fakeA = h.runner(runnerA);
+    // 러너는 시작했지만 출력을 읽을 수 없었던 경우를 흉내 낸다.
+    fakeA.loseNextStartResponse = true;
+    const startRun = fakeA.startRun.bind(fakeA);
+    let first = true;
+    fakeA.startRun = async (input) => {
+      try {
+        return await startRun(input);
+      } catch (error) {
+        if (!first) throw error;
+        first = false;
+        throw new AdapterError({ kind: "malformed-output", raw: "{" });
+      }
+    };
+    const worker = h.worker();
+
+    await worker.tick();
+    expect(getRunWithRecords(h.db, run.id)?.records).toMatchObject({ startFailures: 1 });
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
+    expect(fakeA.startCalls).toHaveLength(1);
+  });
+
+  it("결과를 모르는 시작이 있는 런은 Mapping이 지워져도 확인 전에 시작할 수 없음으로 끝내지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    h.runner(runnerA).loseNextStartResponse = true;
+    const worker = h.worker();
+
+    await worker.tick();
+    h.db.$client.prepare("DELETE FROM mappings").run();
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
+  });
+
+  it("결과를 모르는 런이 시작하지 않았다고 확인됐는데 Mapping이 지워졌으면 새로 시작하지 않고 시작할 수 없음으로 끝낸다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    const fakeA = h.runner(runnerA);
+    fakeA.failNextStart = { kind: "start-outcome-unknown", detail: "lost" };
+    const worker = h.worker();
+
+    await worker.tick();
+    h.db.$client.prepare("DELETE FROM mappings").run();
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "ended", agentResult: "could-not-start" });
+    expect(fakeA.startCalls).toHaveLength(1);
+  });
+
+  it("런타임이 꺼진 러너(not-ready)는 우편함 준비에서 실패해도 뒤 런을 막지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
+    const head = h.assign("ENG-1", projectA);
+    const behind = h.assign("ENG-2", projectB);
+    h.runner(runnerA).ensureMailbox = () =>
+      Promise.reject(new AdapterError({ kind: "not-ready", detail: "runtime down" }));
+
+    await h.worker().tick();
+    expect(current(head)).toMatchObject({ state: "queued" });
+    expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
+  });
+
+  it("시작 때 러너에 닿지 못하면 순서에서 빼 뒤 런을 막지 않고, 시도 횟수에 넣지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
+    const head = h.assign("ENG-1", projectA);
+    const behind = h.assign("ENG-2", projectB);
+    h.runner(runnerA).failNextStart = { kind: "unreachable", detail: "ssh: timeout" };
+    const worker = h.worker();
+
+    await worker.tick();
+    expect(current(head)).toMatchObject({ state: "queued", runnerId: null });
+    expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
+    expect(getRunWithRecords(h.db, head.id)?.records).toMatchObject({
+      startFailures: 0,
+      startRequestedAt: null,
+    });
+
+    // 다시 해 볼 시각이 지나 맞는 러너가 닿으면 원래 자리로 돌아와 시작한다.
+    h.advance(START_UNREACHABLE_RETRY_MS);
+    await worker.tick();
+    expect(current(head)).toMatchObject({ state: "running", runnerId: runnerA });
+  });
+
+  it("시작 때 러너에 닿지 못한 런은 맞는 다른 러너가 있으면 그 러너에서 시작한다 (Q86)", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    expect(current(run)).toMatchObject({ runnerId: runnerA });
+    h.runner(runnerA).online = false;
+    const worker = h.worker();
+
+    await worker.tick();
+    // 러너 확인 전이라 DB에는 A가 아직 Online이다. 다시 A를 고를 수 있지만, 닿지 않으면 다시 비운다.
+    h.setRunnerOnline(runnerA, false);
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "running", runnerId: runnerB });
+  });
+
+  it("결과를 모르는 런은 묶인 러너의 GitHub 인증이 깨져도 다른 러너에서 다시 시작하지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    expect(current(run)).toMatchObject({ runnerId: runnerA });
+    h.runner(runnerA).loseNextStartResponse = true;
+    const worker = h.worker();
+
+    await worker.tick();
+    h.setRunnerOnline(runnerA, true, null, true);
+    await worker.tick();
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "queued", runnerId: runnerA });
+    expect(h.runner(runnerB).startCalls).toHaveLength(0);
+
+    h.setRunnerOnline(runnerA, true, null, false);
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
+    expect(h.runner(runnerA).startCalls).toHaveLength(1);
+  });
+
+  it("결과를 모르는 시작을 확인하려다 러너에 닿지 않으면 뒤 런을 막지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
+    const head = h.assign("ENG-1", projectA);
+    const fakeA = h.runner(runnerA);
+    const worker = h.worker();
+
+    fakeA.loseNextStartResponse = true;
+    await worker.tick();
+    fakeA.online = false;
+    const behind = h.assign("ENG-2", projectB);
+    await worker.tick();
+    await worker.tick();
+    expect(current(head)).toMatchObject({ state: "queued", runnerId: runnerA });
+    expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
+  });
+
+  it("닿지 않는 러너가 DB에 Online으로 남아도 같은 러너의 뒤 런이 다른 러너의 런을 막지 않는다 (Q86)", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
+    const first = h.assign("ENG-1", projectA);
+    const second = h.assign("ENG-2", projectA);
+    const other = h.assign("ENG-3", projectB);
+    h.runner(runnerA).online = false;
+    const worker = h.worker();
+
+    await worker.tick();
+    await worker.tick();
+    expect(current(other)).toMatchObject({ state: "running", runnerId: runnerB });
+    expect([stateOf(first), stateOf(second)]).toEqual(["queued", "queued"]);
+
+    // 다시 해 볼 시각이 지나고 러너가 돌아오면 원래 순서로 시작한다.
+    h.runner(runnerA).online = true;
+    h.advance(START_UNREACHABLE_RETRY_MS);
+    await worker.tick();
+    expect(current(first)).toMatchObject({ state: "running", runnerId: runnerA });
+    expect(stateOf(second)).toBe("queued");
+  });
+
+  it("이미 시작을 보낸 런이 러너에 닿지 못해도 다른 러너에서 다시 시작하지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    expect(current(run)).toMatchObject({ runnerId: runnerA });
+    const fakeA = h.runner(runnerA);
+    const worker = h.worker();
+
+    // 러너 A는 시작했지만 응답을 잃었다. 다음 바퀴에는 A에 닿지 않는다(DB에는 아직 Online).
+    fakeA.loseNextStartResponse = true;
+    await worker.tick();
+    fakeA.online = false;
+    await worker.tick();
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "queued", runnerId: runnerA });
+    expect(h.runner(runnerB).startCalls).toHaveLength(0);
+
+    fakeA.online = true;
+    h.advance(START_UNREACHABLE_RETRY_MS);
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
+    expect(fakeA.startCalls).toHaveLength(1);
+  });
+
+  it("맨 앞 런의 Mapping이 지워졌으면 시작할 수 없음으로 끝내 뒤 런이 막히지 않는다", async () => {
+    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const head = h.assign("ENG-1", projectA);
+    h.db.$client.prepare("DELETE FROM mappings").run();
+
+    await h.worker().tick();
+    expect(current(head)).toMatchObject({
+      state: "ended",
+      agentResult: "could-not-start",
+      prState: "none",
+    });
+  });
+});
+
+describe("러너 쪽 변화로 러너를 비움 (Q78·Q82.22)", () => {
+  it("GitHub 인증이 깨진 러너로 정한 Queued 런은 러너를 비우고 순서에서 빠진다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
+    const busy = h.assign("ENG-1", projectA);
+    const worker = h.worker();
+    await worker.tick();
+    const waiting = h.assign("ENG-2", projectA);
+    const behind = h.assign("ENG-3", projectB);
+    expect(current(waiting)).toMatchObject({ runnerId: runnerA });
+
+    h.setRunnerOnline(runnerA, true, null, true);
+    await worker.tick();
+    expect(current(waiting)).toMatchObject({ state: "queued", runnerId: null });
+    expect(stateOf(behind)).toBe("running");
+    expect(stateOf(busy)).toBe("running");
   });
 });
 
@@ -325,7 +609,7 @@ describe("startWorker", () => {
     });
     try {
       await vi.waitFor(() => expect(stateOf(run)).toBe("running"));
-      finish(run, 0);
+      finish(run);
       await vi.waitFor(() => expect(stateOf(run)).toBe("ended"));
     } finally {
       await worker.stop();

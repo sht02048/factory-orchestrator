@@ -66,8 +66,8 @@ describe("Stats 화면", () => {
 
   it("Failed 조합을 에이전트 결과 · PR 상태로 보인다", () => {
     const html = text(render(loadStatsPage(seedStatsDatabase(), undefined, now)));
-    expect(html).toContain("오류 종료 · PR 없음 2개");
-    expect(html).toContain("정상 종료 · PR 닫힘 1개");
+    expect(html).toContain("완료 보고(실패) · PR 없음 2개");
+    expect(html).toContain("완료 보고(성공) · PR 닫힘 1개");
     expect(html).toContain("시간 초과 · PR 열림 1개");
   });
 
@@ -102,7 +102,7 @@ describe("Stats 화면", () => {
     const second = panelText(render(page, { selectedKey: "runner-b" }));
     expect(second).toContain("Failed 3개 · 75%");
     expect(second).toContain("Human Check 뒤 병합 0/1개 · 0%");
-    expect(second).toContain("오류 종료 · PR 없음 2개");
+    expect(second).toContain("완료 보고(실패) · PR 없음 2개");
   });
 
   it("기간에 끝난 런이 없으면 빈 목록 문구를 보이고 패널을 비운다", () => {

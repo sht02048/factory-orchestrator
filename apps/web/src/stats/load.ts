@@ -49,7 +49,11 @@ export function loadStatsPage(db: Database, ws: string | undefined, now: Date): 
     const later = getRunWithRecords(db, run.id)?.records.laterPrState ?? null;
     return [
       {
-        runner: { key: run.runnerId, name: runnerNames.get(run.runnerId) ?? run.runnerId },
+        // 러너를 정하지 않은 채 끝난 런(Queued에서 취소, 시작할 수 없음)은 러너 없음으로 묶는다.
+        runner:
+          run.runnerId === null
+            ? { key: "", name: "—" }
+            : { key: run.runnerId, name: runnerNames.get(run.runnerId) ?? run.runnerId },
         trackerProject: {
           key: trackerProjectKey(run),
           name: projectName(run),
@@ -57,6 +61,7 @@ export function loadStatsPage(db: Database, ws: string | undefined, now: Date): 
         agent: { key: run.agent, name: run.agent },
         agentResult: run.agentResult,
         prState: run.prState,
+        runnerUnreached: run.runnerUnreached,
         laterPrState: later?.state ?? null,
         assignedAt: run.assignedAt,
         startedAt: run.startedAt,

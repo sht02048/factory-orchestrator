@@ -32,10 +32,13 @@ export interface StatsRun {
   agent: GroupKey;
   agentResult: AgentResult;
   prState: PrState;
+  /** 운영자가 취소함이 러너에 닿지 못한 채 끝났는지(Q82.21) */
+  runnerUnreached: boolean;
   /** 이후 PR 상태(Q54·Q69). 런이 끝난 뒤 사람이 병합하거나 닫지 않았으면 null */
   laterPrState: "merged" | "closed" | null;
   assignedAt: Date;
-  startedAt: Date;
+  /** 시작하지 않고 끝난 런(Queued에서 취소, 시작할 수 없음)은 null(Q82.9·Q82.20) */
+  startedAt: Date | null;
   endedAt: Date;
 }
 
@@ -116,7 +119,7 @@ export function statsPeriod(now: Date): { firstDay: number; lastDay: number } {
 }
 
 function emptyOutcomes(): OutcomeCounts {
-  return { merged: 0, "human-check": 0, failed: 0 };
+  return { merged: 0, "human-check": 0, failed: 0, canceled: 0 };
 }
 
 /**
@@ -144,7 +147,7 @@ export function summarizeStats(runs: ReadonlyArray<StatsRun>): StatsSummary {
   const execution: number[] = [];
 
   for (const run of runs) {
-    const { outcome } = summarizeRunOutcome(run.agentResult, run.prState);
+    const { outcome } = summarizeRunOutcome(run);
     outcomes[outcome] += 1;
     if (outcome === "human-check") {
       humanCheck.humanCheck += 1;
@@ -222,12 +225,12 @@ export function dailyThroughput(
   for (const run of runs) {
     const entry = days[(utcDay(run.endedAt) - period.firstDay) / DAY_MS];
     if (entry === undefined) continue;
-    entry.outcomes[summarizeRunOutcome(run.agentResult, run.prState).outcome] += 1;
+    entry.outcomes[summarizeRunOutcome(run).outcome] += 1;
   }
   return days;
 }
 
-/** 요약 결과 셋을 정해진 순서로 돈다(Merged, Human Check, Failed) */
+/** 요약 결과 넷을 정해진 순서로 돈다(Merged, Human Check, Failed, Canceled) */
 export const OUTCOME_ORDER: ReadonlyArray<SummaryOutcome> = SUMMARY_OUTCOMES;
 
 /** 비율을 정수 퍼센트로. 분모가 0 이면 null */

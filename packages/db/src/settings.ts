@@ -2,6 +2,7 @@ import type {
   AgentId,
   CodeHostKind,
   LabelId,
+  MailboxRef,
   RunnerErrorDetail,
   RunnerId,
   RunnerKind,
@@ -176,6 +177,10 @@ export interface StoredRunner {
   config: unknown;
   capacity: number;
   online: boolean;
+  /** 할당을 막는 필수 조건이 깨졌는지(1단계는 GitHub 인증, Q82.14) */
+  assignmentBlocked: boolean;
+  /** 러너 어댑터가 만든 우편함. 아직 없으면 null(Q82.1) */
+  mailbox: MailboxRef | null;
   checkedAt: Date | null;
   checkError: unknown;
   projects: RunnerProject[];
@@ -200,8 +205,9 @@ export function saveRunner(
 }
 
 /**
- * 러너 상태 확인 결과를 쓴다(0016). Online 여부, 확인 시각, 오류, 러너 쪽 프로젝트 목록을 바꾼다.
- * 러너에 닿지 못해 프로젝트 목록을 읽지 못했으면 `projects`를 null로 줘 이전 목록을 남긴다.
+ * 러너 상태 확인 결과를 쓴다(0016). Online 여부, 확인 시각, 오류, 러너 쪽 프로젝트 목록,
+ * 할당을 막는 필수 조건이 깨졌는지(core isAssignmentBlocked, Q82.14)를 바꾼다.
+ * 러너에 닿지 못해 프로젝트 목록이나 필수 조건을 읽지 못했으면 null로 줘 이전 값을 남긴다.
  */
 export function recordRunnerCheck(
   db: Database,
@@ -211,6 +217,7 @@ export function recordRunnerCheck(
     checkedAt: Date;
     error: RunnerErrorDetail | null;
     projects: ReadonlyArray<RunnerProject> | null;
+    assignmentBlocked: boolean | null;
   },
 ): void {
   inTransaction(db, () => {
@@ -219,6 +226,7 @@ export function recordRunnerCheck(
         online: input.online,
         checkedAt: input.checkedAt,
         checkError: input.error === null ? null : toJson(input.error, "runner check error"),
+        ...(input.assignmentBlocked === null ? {} : { assignmentBlocked: input.assignmentBlocked }),
       })
       .where(eq(runners.id, input.runnerId))
       .run();
@@ -256,6 +264,8 @@ export function listRunners(db: Database): StoredRunner[] {
       config: parseJson(row.config),
       capacity: row.capacity,
       online: row.online,
+      assignmentBlocked: row.assignmentBlocked,
+      mailbox: row.mailboxRef,
       checkedAt: row.checkedAt,
       checkError: row.checkError === null ? null : parseJson(row.checkError),
       projects: projects
@@ -264,11 +274,23 @@ export function listRunners(db: Database): StoredRunner[] {
     }));
 }
 
+/**
+ * 러너 어댑터가 만들거나 확인한 우편함을 쓴다(core Runner.ensureMailbox, Q82.1). 바뀌었을 때만 쓰면 된다.
+ */
+export function setRunnerMailbox(
+  db: Database,
+  runnerId: RunnerId,
+  mailbox: MailboxRef | null,
+): void {
+  db.update(runners).set({ mailboxRef: mailbox }).where(eq(runners.id, runnerId)).run();
+}
+
 /** core 할당·대기열 판단에 넘기는 러너 모습 */
 export function listRunnerSnapshots(db: Database): RunnerSnapshot[] {
   return listRunners(db).map((runner) => ({
     id: runner.id,
     online: runner.online,
+    assignmentBlocked: runner.assignmentBlocked,
     capacity: runner.capacity,
     projects: runner.projects.map((p) => p.id),
   }));

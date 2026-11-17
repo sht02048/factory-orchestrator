@@ -28,6 +28,7 @@ export function recordTrackerEvent(
       trackerProjectId: event.projectId,
       ticketKey: event.ticketKey,
       labelIds: event.labelIds === null ? null : [...event.labelIds],
+      previousLabelIds: event.previousLabelIds === null ? null : [...event.previousLabelIds],
       receivedAt: event.receivedAt,
     })
     .onConflictDoNothing({ target: [trackerEvents.trackerConnectionId, trackerEvents.deliveryId] })
@@ -42,6 +43,8 @@ export interface StoredTrackerEvent {
   projectId: TrackerProjectId | null;
   ticketKey: TicketKey | null;
   labelIds: LabelId[] | null;
+  /** 이 이벤트로 라벨이 바뀌었으면 바뀌기 전 라벨 전부. core labelJustAttached로 본다 */
+  previousLabelIds: LabelId[] | null;
   receivedAt: Date;
 }
 
@@ -55,6 +58,7 @@ export function listUnprocessedTrackerEvents(db: Database): StoredTrackerEvent[]
       projectId: trackerEvents.trackerProjectId,
       ticketKey: trackerEvents.ticketKey,
       labelIds: trackerEvents.labelIds,
+      previousLabelIds: trackerEvents.previousLabelIds,
       receivedAt: trackerEvents.receivedAt,
     })
     .from(trackerEvents)

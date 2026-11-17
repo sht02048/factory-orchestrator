@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { toPermissionRequestId, toQuestionId } from "./ids.js";
+import type { PermissionRequestId, QuestionId } from "./ids.js";
 import {
   DISCONNECT_AFTER_MS,
+  MAX_START_RETRIES,
   decideConnection,
+  decideStartFailure,
   decideTimeout,
   resolveRunProgress,
   runDurations,
@@ -17,27 +21,44 @@ const SECOND = 1000;
 describe("decideTimeout", () => {
   const maxRunMs = 2 * HOUR;
 
+  const base = { startedAt: start, maxRunMs, cancelRequested: false };
+
   it.each([
-    ["running", { agentResult: "timed-out", stopAgent: true }],
-    ["waiting-for-input", { agentResult: "stopped-waiting-for-input", stopAgent: true }],
-    ["disconnected", { agentResult: "runner-disconnected", stopAgent: false }],
+    ["running", { agentResult: "timed-out", stopAgent: true, runnerUnreached: false }],
+    [
+      "waiting-for-input",
+      { agentResult: "stopped-waiting-for-input", stopAgent: true, runnerUnreached: false },
+    ],
+    [
+      "disconnected",
+      { agentResult: "runner-disconnected", stopAgent: false, runnerUnreached: false },
+    ],
   ] as const)(
     "%s 상태에서 최대 실행 시간이 지나면 멈출 때의 상태로 에이전트 결과를 가른다 (Q39·Q52·Q67·Q70)",
     (state, expected) => {
-      expect(decideTimeout({ state, startedAt: start, now: at(maxRunMs), maxRunMs })).toEqual(
+      expect(decideTimeout({ ...base, state, now: at(maxRunMs) })).toEqual(expected);
+    },
+  );
+
+  it.each([
+    ["running", { agentResult: "canceled", stopAgent: true, runnerUnreached: false }],
+    ["waiting-for-input", { agentResult: "canceled", stopAgent: true, runnerUnreached: false }],
+    ["disconnected", { agentResult: "canceled", stopAgent: false, runnerUnreached: true }],
+  ] as const)(
+    "취소 중인 %s 런의 최대 실행 시간이 지나면 운영자가 취소함으로 끝낸다 (Q82.11·Q82.21)",
+    (state, expected) => {
+      expect(decideTimeout({ ...base, cancelRequested: true, state, now: at(maxRunMs) })).toEqual(
         expected,
       );
     },
   );
 
   it("최대 실행 시간 전이면 끝내지 않는다", () => {
-    expect(
-      decideTimeout({ state: "running", startedAt: start, now: at(maxRunMs - 1), maxRunMs }),
-    ).toBeNull();
+    expect(decideTimeout({ ...base, state: "running", now: at(maxRunMs - 1) })).toBeNull();
   });
 
   it.each(["queued", "ended"] as const)("%s 런은 시간 초과를 보지 않는다", (state) => {
-    expect(decideTimeout({ state, startedAt: start, now: at(10 * maxRunMs), maxRunMs })).toBeNull();
+    expect(decideTimeout({ ...base, state, now: at(10 * maxRunMs) })).toBeNull();
   });
 });
 
@@ -79,40 +100,137 @@ describe("decideConnection", () => {
 });
 
 describe("resolveRunProgress", () => {
-  it("다시 연결했을 때 에이전트가 돌고 있으면 Running으로 돌아간다", () => {
-    expect(resolveRunProgress({ kind: "running", lastOutputAt: null })).toEqual({
+  const q1 = toQuestionId("q1");
+  const q2 = toQuestionId("q2");
+  const p1 = toPermissionRequestId("p1");
+  const nothingHandled = {
+    answered: new Set<QuestionId>(),
+    denied: new Set<PermissionRequestId>(),
+  };
+  const question = (id: QuestionId) => ({
+    id,
+    body: "A와 B 중 무엇?",
+    options: ["A", "B"],
+    askedAt: start,
+  });
+  const active = (questions: QuestionId[], permissions: PermissionRequestId[]) =>
+    ({
+      kind: "active",
+      questions: questions.map(question),
+      permissionWaits: permissions.map((id) => ({ id, detail: "touch", requestedAt: start })),
+    }) as const;
+
+  it("에이전트가 돌고 있고 기다리는 입력이 없으면 Running이다", () => {
+    expect(resolveRunProgress(active([], []), nothingHandled)).toEqual({
       kind: "continue",
       state: "running",
     });
   });
 
-  it("다시 연결했을 때 입력을 기다리고 있으면 바로 Waiting for Input으로 돌아간다 (Q67)", () => {
-    expect(resolveRunProgress({ kind: "waiting-for-input", detail: "권한 프롬프트" })).toEqual({
+  it("답하지 않은 질문이 있으면 Waiting for Input이다 (Q82.3·Q67)", () => {
+    expect(resolveRunProgress(active([q1], []), nothingHandled)).toEqual({
       kind: "continue",
       state: "waiting-for-input",
+      questions: [q1],
+      permissionWaits: [],
     });
   });
 
+  it("러너는 답한 질문도 다시 돌려주므로 DB에 답했다고 기록한 질문은 거른다 (Q82.5)", () => {
+    const handled = { ...nothingHandled, answered: new Set([q1]) };
+
+    expect(resolveRunProgress(active([q1], []), handled)).toEqual({
+      kind: "continue",
+      state: "running",
+    });
+    expect(resolveRunProgress(active([q1, q2], []), handled)).toMatchObject({
+      state: "waiting-for-input",
+      questions: [q2],
+    });
+  });
+
+  it("권한 대기는 질문과 따로 Waiting for Input으로 돌려주고, 거절한 대기는 거른다 (Q82.4)", () => {
+    expect(resolveRunProgress(active([], [p1]), nothingHandled)).toEqual({
+      kind: "continue",
+      state: "waiting-for-input",
+      questions: [],
+      permissionWaits: [p1],
+    });
+    expect(
+      resolveRunProgress(active([], [p1]), { ...nothingHandled, denied: new Set([p1]) }),
+    ).toEqual({ kind: "continue", state: "running" });
+  });
+
   it.each([
-    [0, "exited-normally"],
-    [1, "exited-with-error"],
-    [137, "exited-with-error"],
-    [null, "exited-with-error"],
+    ["succeeded", "reported-success"],
+    ["failed", "reported-failure"],
+    ["something-new", "reported-failure"],
   ] as const)(
-    "다시 연결했을 때 에이전트가 종료 코드 %s 로 끝났으면 %s 로 끝낸다",
-    (exitCode, agentResult) => {
-      expect(resolveRunProgress({ kind: "finished", exitCode })).toEqual({
+    "완료 보고 outcome %s 는 %s 로 끝내고 보고를 함께 준다 (Q82.2)",
+    (outcome, agentResult) => {
+      const report = { outcome, body: "PR을 열었어요", reportedAt: null };
+
+      expect(resolveRunProgress({ kind: "reported", report }, nothingHandled)).toEqual({
         kind: "end",
         agentResult,
+        report,
       });
     },
   );
 
-  it("다시 연결했을 때 워크트리가 사라졌으면 워크트리 없음으로 끝낸다 (Q49·Q67)", () => {
-    expect(resolveRunProgress({ kind: "gone" })).toEqual({
+  it("보고 없이 사라졌으면 비정상 종료로 끝낸다 (Q82.19)", () => {
+    expect(
+      resolveRunProgress({ kind: "ended-without-report", detail: "lost" }, nothingHandled),
+    ).toEqual({ kind: "end", agentResult: "ended-without-report", report: null });
+  });
+
+  it("워크트리가 사라졌으면 워크트리 없음으로 끝낸다 (Q49·Q67)", () => {
+    expect(resolveRunProgress({ kind: "worktree-gone" }, nothingHandled)).toEqual({
       kind: "end",
       agentResult: "worktree-missing",
+      report: null,
     });
+  });
+});
+
+describe("decideStartFailure (Q86)", () => {
+  it.each([
+    { kind: "unreachable", detail: "ssh" },
+    { kind: "not-ready", detail: "runtime down" },
+    { kind: "not-installed", detail: "no orca" },
+  ] as const)(
+    "러너에 닿지 못하거나 준비가 안 됐으면($kind) Offline 예외처럼 다루고 시도 횟수에 넣지 않는다",
+    (error) => {
+      expect(decideStartFailure(error, 2)).toEqual({ action: "wait-like-offline" });
+    },
+  );
+
+  it("결과를 모르면 같은 이름으로 이미 시작했는지 찾은 뒤에만 다시 보낸다", () => {
+    expect(decideStartFailure({ kind: "start-outcome-unknown", detail: "lost" }, 0)).toEqual({
+      action: "find-then-retry",
+    });
+  });
+
+  it("읽을 수 없는 출력은 러너 오류처럼 세어 대기열이 끝없이 막히지 않는다", () => {
+    expect(decideStartFailure({ kind: "malformed-output", raw: "?" }, 3)).toEqual({
+      action: "could-not-start",
+      failures: 4,
+    });
+  });
+
+  it("우편함이 사라졌으면 다시 만든 뒤 보낸다", () => {
+    expect(decideStartFailure({ kind: "mailbox-missing", detail: "gone" }, 0)).toEqual({
+      action: "recreate-mailbox",
+    });
+  });
+
+  it("러너가 오류를 내면 같은 이름으로 3번까지 다시 시도하고, 그래도 안 되면 시작할 수 없음이다", () => {
+    const error = { kind: "runner-error", code: "boom", message: "boom" } as const;
+    expect(MAX_START_RETRIES).toBe(3);
+
+    expect(decideStartFailure(error, 0)).toEqual({ action: "retry", failures: 1 });
+    expect(decideStartFailure(error, 2)).toEqual({ action: "retry", failures: 3 });
+    expect(decideStartFailure(error, 3)).toEqual({ action: "could-not-start", failures: 4 });
   });
 });
 
@@ -151,4 +269,21 @@ describe("runDurations", () => {
       executionMs: null,
     });
   });
+
+  it.each([
+    ["Queued에서 취소", 7 * MINUTE],
+    ["시작할 수 없음", 0],
+  ])(
+    "시작하지 않고 끝난 런(%s)은 대기 시간이 할당부터 끝낸 시각까지이고 실행 시간은 0이다 (Q82.9·Q82.20)",
+    (_case, waited) => {
+      expect(
+        runDurations({
+          assignedAt: start,
+          startedAt: null,
+          endedAt: at(waited),
+          now: at(HOUR),
+        }),
+      ).toEqual({ leadTimeMs: waited, waitMs: waited, executionMs: 0 });
+    },
+  );
 });

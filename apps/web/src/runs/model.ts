@@ -12,9 +12,13 @@ import type { WorkspaceChoice } from "../shell/model";
  * - no-capacity: 맨 앞 런인데 정한 러너에 남은 capacity 가 없다(뒤 런을 막는다)
  * - behind: 앞 런이 시작하기를 기다린다(엄격한 FIFO, Q63 개정)
  * - runner-offline: 맞는 러너가 모두 Offline 이라 러너를 정하지 못했다. 순서에서 빠진다(Q68·Q72)
+ * - project-missing: 러너에서 그 런의 러너 쪽 프로젝트가 빠져 러너를 다시 고른다. 순서에서 빠진다(Q78·Q82.13)
+ * - assignment-blocked: 맞는 러너의 GitHub 인증이 깨져 기다린다. 순서에서 빠진다(Q82.22·Q87)
  */
 export type QueuedReason =
-  | { kind: "starting" | "behind" | "runner-offline" }
+  | {
+      kind: "starting" | "behind" | "runner-offline" | "project-missing" | "assignment-blocked";
+    }
   | { kind: "no-capacity"; runner: string };
 
 interface RunViewBase {
@@ -22,7 +26,8 @@ interface RunViewBase {
   ticketKey: string;
   /** 트래커 프로젝트 이름. Workspace 에서 뺀 트래커 프로젝트면 ID */
   trackerProject: string;
-  branch: string;
+  /** 러너에서 받은 실제 브랜치(Q82.6). 시작하지 않은 런이면 null */
+  branch: string | null;
   /** 러너. Queued 에서 아직 정하지 않았으면 null */
   runner: { name: string; online: boolean } | null;
   agent: string;
@@ -51,7 +56,7 @@ export interface RunsPage {
   runs: RunView[];
 }
 
-/** 상태 필터(Q66·Q67): Ended 가 아닌 상태 넷과 Ended 의 요약 결과 셋 */
+/** 상태 필터(Q66·Q67): Ended 가 아닌 상태 넷과 Ended 의 요약 결과 넷 */
 export const RUN_FILTERS = [
   "all",
   "queued",
@@ -61,6 +66,7 @@ export const RUN_FILTERS = [
   "merged",
   "human-check",
   "failed",
+  "canceled",
 ] as const;
 export type RunFilter = (typeof RUN_FILTERS)[number];
 

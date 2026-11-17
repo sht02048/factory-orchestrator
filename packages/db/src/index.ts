@@ -3,6 +3,7 @@ export * from "./database.js";
 export * from "./events.js";
 export * from "./ids.js";
 export * from "./migrate.js";
+export * from "./questions.js";
 export * from "./requests.js";
 export * from "./runs.js";
 export * as schema from "./schema.js";

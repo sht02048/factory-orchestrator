@@ -58,7 +58,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
         break;
       case "ended": {
         // 워크트리를 남길지는 요약 계산 함수만 정한다(CODING_STANDARDS).
-        const { worktree } = summarizeRunOutcome(run.agentResult, run.prState);
+        const { worktree } = summarizeRunOutcome(run);
         if (worktree !== "keep-until-pr-settles" && worktree !== "operator-decides") break;
         if (getRunWithRecords(db, run.id)?.records.worktreeRemovedAt !== null) break;
         push(leftWorktrees, run.runnerId, { ...base, worktree });

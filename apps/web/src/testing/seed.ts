@@ -8,6 +8,7 @@ import {
   toTrackerConnectionId,
   toTrackerKind,
   toTrackerProjectId,
+  toAgentRef,
   toWorktreeRef,
 } from "@factory/core";
 import type { AgentResult, PrState, RunId, RunnerId, RunnerProjectId } from "@factory/core";
@@ -58,13 +59,13 @@ export interface EndedCase {
 
 /** Ended 런. 에이전트 결과 여섯과 PR 상태 넷이 모두 나온다 */
 export const endedCases: ReadonlyArray<EndedCase> = [
-  { key: "ACME-1", agentResult: "exited-normally", prState: "merged", summary: "merged" },
-  { key: "ACME-2", agentResult: "exited-with-error", prState: "open", summary: "human-check" },
+  { key: "ACME-1", agentResult: "reported-success", prState: "merged", summary: "merged" },
+  { key: "ACME-2", agentResult: "reported-failure", prState: "open", summary: "human-check" },
   { key: "ACME-3", agentResult: "timed-out", prState: "closed", summary: "failed" },
   { key: "ACME-4", agentResult: "stopped-waiting-for-input", prState: "none", summary: "failed" },
   { key: "ACME-5", agentResult: "runner-disconnected", prState: "open", summary: "failed" },
   { key: "ACME-6", agentResult: "worktree-missing", prState: "none", summary: "failed" },
-  { key: "ACME-7", agentResult: "exited-normally", prState: "closed", summary: "failed" },
+  { key: "ACME-7", agentResult: "reported-success", prState: "closed", summary: "failed" },
 ];
 
 /** Ended 가 아닌 런과 그 상태 */
@@ -136,7 +137,7 @@ export function seedDatabase(options: { path?: string; origin?: Date } = {}): {
       changeRunState(
         db,
         id,
-        { to: "running", worktree: toWorktreeRef(`wt-${key}`) },
+        { to: "running", started: startedOn(`wt-${key}`) },
         minutes(clock + 1),
       ),
     );
@@ -197,6 +198,7 @@ function addRunner(
     online: input.online,
     checkedAt: at,
     error: null,
+    assignmentBlocked: false,
     projects: input.projects.map((p) => ({ id: p, displayName: p, setupState: "ready" })),
   });
   return id;
@@ -204,4 +206,13 @@ function addRunner(
 
 function expectOk(result: { ok: boolean }): void {
   if (!result.ok) throw new Error(`state change failed: ${JSON.stringify(result)}`);
+}
+
+/** 시작한 런이 러너에서 받는 값(워크트리, 실제 브랜치, 에이전트 참조) */
+function startedOn(worktree: string) {
+  return {
+    worktree: toWorktreeRef(worktree),
+    branch: `acme/${worktree}`,
+    agentRef: toAgentRef(`agent-${worktree}`),
+  };
 }

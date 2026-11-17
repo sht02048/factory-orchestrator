@@ -8,12 +8,16 @@
  */
 import { AdapterError } from "../adapters.js";
 import type {
+  AgentQuestion,
   CodeHost,
   CodeHostErrorDetail,
+  CompletionReport,
   ConnectionCheck,
   Page,
   Paged,
+  PermissionWait,
   PullRequestSnapshot,
+  RunOnRunner,
   RunProgress,
   Runner,
   RunnerErrorDetail,
@@ -33,10 +37,13 @@ import type {
   WebhookVerifyError,
 } from "../adapters.js";
 import {
+  toAgentRef,
   toCodeHostKind,
   toCommentId,
+  toMailboxRef,
+  toPermissionRequestId,
+  toQuestionId,
   toRepoRef,
-  toRetryToken,
   toRunnerKind,
   toTrackerKind,
   toWorktreeRef,
@@ -45,9 +52,11 @@ import type {
   CodeHostKind,
   CommentId,
   LabelId,
+  MailboxRef,
+  PermissionRequestId,
   PullRequestId,
+  QuestionId,
   RepoRef,
-  RetryToken,
   RunnerKind,
   RunnerProjectId,
   TicketKey,
@@ -56,6 +65,7 @@ import type {
   TrackerStateId,
   WorktreeRef,
 } from "../ids.js";
+import { mentionsTicketKey } from "../pr-state.js";
 import type { CodeHostFactory, RunnerFactory, TrackerFactory } from "../registry.js";
 
 function paginate<T>(all: ReadonlyArray<T>, page: Page | undefined): Paged<T> {
@@ -169,30 +179,65 @@ export class FakeTracker implements Tracker {
 
 // ---------- Runner ----------
 
-interface FakeWorktree {
+/** 가짜 러너 안의 런 하나. 테스트가 질문·권한 대기·완료 보고·사라짐을 일으킨다. */
+export interface FakeRunnerRun {
   input: StartRunInput;
-  progress: RunProgress;
-  log: string[];
+  started: StartedRun;
+  questions: AgentQuestion[];
+  /** answerQuestion으로 받은 답. 같은 질문에 두 번 오면 둘 다 남는다 */
+  answers: Array<{ questionId: QuestionId; answer: string }>;
+  /** 아직 열린 권한 대기 */
+  permissionWaits: PermissionWait[];
+  /** denyPermission으로 받은 거절 */
+  denials: Array<{ permissionId: PermissionRequestId; reason: string }>;
+  report: CompletionReport | null;
+  /** 보고 없이 사라졌으면 그 설명 */
+  endedWithoutReport: string | null;
   agentStopped: boolean;
+  agentClosed: boolean;
+  log: string[];
 }
 
 /**
  * 러너 하나. 따로 정하지 않으면 Online이고 갖춰야 할 것을 모두 갖췄으며,
  * `setProjects`로 넣은 러너 쪽 프로젝트를 가진다고 답한다.
  * Offline이면 러너에 닿는 메서드가 unreachable AdapterError로 실패한다.
+ *
+ * 실제 러너처럼 질문 메일은 답한 뒤에도 남는다(Q82.5). 답했는지는 부르는 쪽이 DB로 거른다.
+ * 같은 워크트리 이름으로 다시 시작하면 runner-error로 거절한다. 이미 시작했는지는 findStartedRun으로 본다.
  */
 export class FakeRunner implements Runner {
   readonly kind: RunnerKind;
-  readonly worktrees = new Map<WorktreeRef, FakeWorktree>();
+  /** 워크트리 이름으로 찾는 런 */
+  readonly runs = new Map<string, FakeRunnerRun>();
   /** removeWorktree 호출 기록 */
-  readonly removed: Array<{ worktree: WorktreeRef; force: boolean }> = [];
+  readonly removed: WorktreeRef[] = [];
+  /** startRun 호출 기록(실패 포함) */
+  readonly startCalls: StartRunInput[] = [];
   online = true;
   prerequisites: RunnerPrerequisite[] = [
-    { id: "fake-service", name: "fake service", satisfied: true, hint: null },
+    {
+      id: "fake-service",
+      name: "fake service",
+      satisfied: true,
+      hint: null,
+      blocksAssignment: false,
+    },
+    {
+      id: "fake-push-auth",
+      name: "fake push auth",
+      satisfied: true,
+      hint: null,
+      blocksAssignment: true,
+    },
   ];
   projects: RunnerProject[] = [];
-  private readonly started = new Map<RetryToken, StartedRun>();
-  private worktreeSeq = 0;
+  /** 다음 startRun을 이 오류로 실패시킨다. 한 번 쓰면 비운다. */
+  failNextStart: RunnerErrorDetail | null = null;
+  /** 다음 startRun은 런을 시작하지만 응답을 잃는다(start-outcome-unknown). 한 번 쓰면 거짓이 된다. */
+  loseNextStartResponse = false;
+  private readonly mailboxes = new Set<MailboxRef>();
+  private seq = 0;
 
   constructor(kind: RunnerKind = toRunnerKind("fake")) {
     this.kind = kind;
@@ -202,17 +247,78 @@ export class FakeRunner implements Runner {
     this.projects = [...projects];
   }
 
-  /** 런의 진행을 테스트가 정한다(입력 기다림, 끝남, 사라짐 등). */
-  setProgress(worktree: WorktreeRef, progress: RunProgress): void {
-    if (progress.kind === "gone") {
-      this.worktrees.delete(worktree);
-      return;
+  /** 우편함 터미널이 사라진 것처럼 만든다. 그 우편함을 쓰는 호출은 mailbox-missing으로 실패한다. */
+  dropMailbox(mailbox: MailboxRef): void {
+    this.mailboxes.delete(mailbox);
+  }
+
+  /** 워크트리로 런을 찾는다. 없으면 던진다. */
+  runAt(worktree: WorktreeRef): FakeRunnerRun {
+    for (const run of this.runs.values()) {
+      if (run.started.worktree === worktree) return run;
     }
-    this.mustGet(worktree).progress = progress;
+    throw new AdapterError<RunnerErrorDetail>({
+      kind: "runner-error",
+      code: "worktree_not_found",
+      message: `unknown worktree ${worktree}`,
+    });
+  }
+
+  /** 에이전트가 질문한다(Q82.3). 질문 ID를 돌려준다. */
+  ask(
+    worktree: WorktreeRef,
+    question: { body: string; options?: string[]; at?: Date },
+  ): QuestionId {
+    const run = this.runAt(worktree);
+    const id = toQuestionId(`fake-question-${this.next()}`);
+    run.questions.push({
+      id,
+      body: question.body,
+      options: question.options ?? [],
+      askedAt: question.at ?? new Date(),
+    });
+    return id;
+  }
+
+  /** 에이전트가 권한 프롬프트에서 허용을 기다린다(Q82.4). 대기 ID를 돌려준다. */
+  requestPermission(worktree: WorktreeRef, detail: string, at?: Date): PermissionRequestId {
+    const id = toPermissionRequestId(`fake-permission-${this.next()}`);
+    this.runAt(worktree).permissionWaits.push({ id, detail, requestedAt: at ?? new Date() });
+    return id;
+  }
+
+  /** 사람이 러너 화면에서 권한을 허용한 것처럼 대기를 닫는다. */
+  allowPermission(worktree: WorktreeRef, id: PermissionRequestId): void {
+    const run = this.runAt(worktree);
+    run.permissionWaits = run.permissionWaits.filter((p) => p.id !== id);
+  }
+
+  /** 에이전트가 완료 보고를 보낸다(Q82.2). 에이전트는 닫을 때까지 살아 있다. */
+  report(
+    worktree: WorktreeRef,
+    report: { outcome: CompletionReport["outcome"]; body?: string; at?: Date },
+  ): void {
+    this.runAt(worktree).report = {
+      outcome: report.outcome,
+      body: report.body ?? "",
+      reportedAt: report.at ?? null,
+    };
+  }
+
+  /** 에이전트가 완료 보고 없이 사라진다(Q82.19). */
+  vanish(worktree: WorktreeRef, detail = "agent terminal is gone"): void {
+    this.runAt(worktree).endedWithoutReport = detail;
+  }
+
+  /** 사람이 러너에서 워크트리를 지운 것처럼 만든다. */
+  deleteWorktree(worktree: WorktreeRef): void {
+    for (const [name, run] of this.runs) {
+      if (run.started.worktree === worktree) this.runs.delete(name);
+    }
   }
 
   appendLog(worktree: WorktreeRef, ...lines: string[]): void {
-    this.mustGet(worktree).log.push(...lines);
+    this.runAt(worktree).log.push(...lines);
   }
 
   checkHealth(): Promise<RunnerHealth> {
@@ -231,13 +337,31 @@ export class FakeRunner implements Runner {
     return this.reach(() => this.projects);
   }
 
+  ensureMailbox(current: MailboxRef | null): Promise<MailboxRef> {
+    return this.reach(() => {
+      if (current !== null && this.mailboxes.has(current)) return current;
+      const mailbox = toMailboxRef(`fake-mailbox-${this.next()}`);
+      this.mailboxes.add(mailbox);
+      return mailbox;
+    });
+  }
+
   startRun(input: StartRunInput): Promise<StartedRun> {
     return this.reach(() => {
-      // 같은 retryToken으로 다시 보내면 실제 러너처럼 같은 시작을 돌려준다.
-      const retried =
-        input.retryToken === undefined ? undefined : this.started.get(input.retryToken);
-      if (retried !== undefined) return retried;
-
+      this.startCalls.push(input);
+      const failure = this.failNextStart;
+      if (failure !== null) {
+        this.failNextStart = null;
+        throw new AdapterError(failure);
+      }
+      this.mustHaveMailbox(input.mailbox);
+      if (this.runs.has(input.worktreeName)) {
+        throw new AdapterError<RunnerErrorDetail>({
+          kind: "runner-error",
+          code: "worktree_exists",
+          message: `worktree ${input.worktreeName} already exists`,
+        });
+      }
       if (!this.projects.some((project) => project.id === input.project)) {
         throw new AdapterError<RunnerErrorDetail>({
           kind: "runner-error",
@@ -245,54 +369,138 @@ export class FakeRunner implements Runner {
           message: `unknown project ${input.project}`,
         });
       }
-      this.worktreeSeq += 1;
-      const retryToken = input.retryToken ?? toRetryToken(`op-${this.worktreeSeq}`);
-      const worktree = toWorktreeRef(`fake::/fake/${input.worktreeName}-${this.worktreeSeq}`);
-      this.worktrees.set(worktree, {
-        input,
-        progress: { kind: "running", lastOutputAt: null },
-        log: [],
-        agentStopped: false,
-      });
+      const n = this.next();
       const started: StartedRun = {
-        worktree,
-        branch: input.branch,
-        retryToken,
-        promptDelivered: true,
+        worktree: toWorktreeRef(`fake::/fake/${input.worktreeName}`),
+        // 실제 러너처럼 브랜치는 러너가 접두사를 붙여 정한다(Q82.6).
+        branch: `fake/${input.worktreeName}`,
+        agentRef: toAgentRef(`fake-agent-${n}`),
       };
-      this.started.set(retryToken, started);
+      this.runs.set(input.worktreeName, {
+        input,
+        started,
+        questions: [],
+        answers: [],
+        permissionWaits: [],
+        denials: [],
+        report: null,
+        endedWithoutReport: null,
+        agentStopped: false,
+        agentClosed: false,
+        log: [],
+      });
+      if (this.loseNextStartResponse) {
+        this.loseNextStartResponse = false;
+        throw new AdapterError<RunnerErrorDetail>({
+          kind: "start-outcome-unknown",
+          detail: "fake runner lost the response",
+        });
+      }
       return started;
     });
   }
 
-  pollRun(worktree: WorktreeRef): Promise<RunProgress> {
-    return this.reach(() => this.worktrees.get(worktree)?.progress ?? { kind: "gone" });
+  findStartedRun(input: { mailbox: MailboxRef; worktreeName: string }): Promise<StartedRun | null> {
+    return this.reach(() => this.runs.get(input.worktreeName)?.started ?? null);
   }
 
-  stopAgent(worktree: WorktreeRef): Promise<void> {
-    return this.reach(() => {
-      const entry = this.mustGet(worktree);
-      entry.agentStopped = true;
-      entry.progress = { kind: "finished", exitCode: null };
+  pollRun(run: RunOnRunner): Promise<RunProgress> {
+    return this.reach((): RunProgress => {
+      const found = this.find(run.worktree);
+      if (found === null) return { kind: "worktree-gone" };
+      if (found.report !== null) return { kind: "reported", report: found.report };
+      if (found.endedWithoutReport !== null) {
+        return { kind: "ended-without-report", detail: found.endedWithoutReport };
+      }
+      return {
+        kind: "active",
+        questions: [...found.questions],
+        permissionWaits: [...found.permissionWaits],
+      };
     });
   }
 
-  readLogTail(worktree: WorktreeRef, opts: { lines: number }): Promise<ReadonlyArray<string>> {
+  answerQuestion(
+    run: RunOnRunner,
+    input: { questionId: QuestionId; answer: string },
+  ): Promise<void> {
     return this.reach(() => {
-      const log = this.mustGet(worktree).log;
+      this.mustHaveMailbox(run.mailbox);
+      const found = this.runAt(run.worktree);
+      if (!found.questions.some((q) => q.id === input.questionId)) {
+        throw new AdapterError<RunnerErrorDetail>({
+          kind: "runner-error",
+          code: "message_not_found",
+          message: `unknown question ${input.questionId}`,
+        });
+      }
+      found.answers.push({ ...input });
+    });
+  }
+
+  denyPermission(
+    run: RunOnRunner,
+    input: { permissionId: PermissionRequestId; reason: string },
+  ): Promise<void> {
+    return this.reach(() => {
+      this.mustHaveMailbox(run.mailbox);
+      const found = this.runAt(run.worktree);
+      found.permissionWaits = found.permissionWaits.filter((p) => p.id !== input.permissionId);
+      found.denials.push({ ...input });
+    });
+  }
+
+  stopAgent(run: RunOnRunner): Promise<void> {
+    return this.reach(() => {
+      const found = this.runAt(run.worktree);
+      found.agentStopped = true;
+      found.endedWithoutReport ??= "stopped by the orchestrator";
+    });
+  }
+
+  closeAgent(run: RunOnRunner): Promise<void> {
+    return this.reach(() => {
+      this.runAt(run.worktree).agentClosed = true;
+    });
+  }
+
+  readLogTail(run: RunOnRunner, opts: { lines: number }): Promise<ReadonlyArray<string>> {
+    return this.reach(() => {
+      const log = this.runAt(run.worktree).log;
       return opts.lines <= 0 ? [] : log.slice(-opts.lines);
     });
   }
 
   worktreeExists(worktree: WorktreeRef): Promise<boolean> {
-    return this.reach(() => this.worktrees.has(worktree));
+    return this.reach(() => this.find(worktree) !== null);
   }
 
-  removeWorktree(worktree: WorktreeRef, opts: { force: boolean }): Promise<void> {
+  removeWorktree(worktree: WorktreeRef): Promise<void> {
     return this.reach(() => {
-      this.worktrees.delete(worktree);
-      this.removed.push({ worktree, force: opts.force });
+      this.deleteWorktree(worktree);
+      this.removed.push(worktree);
     });
+  }
+
+  private find(worktree: WorktreeRef): FakeRunnerRun | null {
+    for (const run of this.runs.values()) {
+      if (run.started.worktree === worktree) return run;
+    }
+    return null;
+  }
+
+  private mustHaveMailbox(mailbox: MailboxRef): void {
+    if (!this.mailboxes.has(mailbox)) {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "mailbox-missing",
+        detail: `unknown mailbox ${mailbox}`,
+      });
+    }
+  }
+
+  private next(): number {
+    this.seq += 1;
+    return this.seq;
   }
 
   private reach<T>(fn: () => T): Promise<T> {
@@ -302,18 +510,6 @@ export class FakeRunner implements Runner {
     } catch (error) {
       return Promise.reject(error instanceof Error ? error : new Error(String(error)));
     }
-  }
-
-  private mustGet(worktree: WorktreeRef): FakeWorktree {
-    const entry = this.worktrees.get(worktree);
-    if (entry === undefined) {
-      throw new AdapterError<RunnerErrorDetail>({
-        kind: "runner-error",
-        code: "worktree_not_found",
-        message: `unknown worktree ${worktree}`,
-      });
-    }
-    return entry;
   }
 }
 
@@ -363,12 +559,18 @@ export class FakeCodeHost implements CodeHost {
     return Promise.resolve(this.list(repo).filter((pr) => pr.headBranch === branch));
   }
 
+  /** 실제 어댑터처럼 키를 낱말 경계로 찾고 `createdSince` 이후에 만든 PR만 돌려준다(research 0006 20절). */
   findPullRequestsByTicketKey(
     repo: RepoRef,
     ticketKey: TicketKey,
+    opts: { createdSince: Date },
   ): Promise<ReadonlyArray<PullRequestSnapshot>> {
     return Promise.resolve(
-      this.list(repo).filter((pr) => pr.title.includes(ticketKey) || pr.body.includes(ticketKey)),
+      this.list(repo).filter(
+        (pr) =>
+          (mentionsTicketKey(pr.title, ticketKey) || mentionsTicketKey(pr.body, ticketKey)) &&
+          pr.createdAt.getTime() >= opts.createdSince.getTime(),
+      ),
     );
   }
 

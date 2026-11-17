@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AdapterError } from "../adapters.js";
+import { AdapterError, isAssignmentBlocked } from "../adapters.js";
 import type { CodeHost, PullRequestSnapshot, Runner, Tracker } from "../adapters.js";
 import {
   toAgentId,
@@ -12,6 +12,8 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
 } from "../ids.js";
+import type { PermissionRequestId, QuestionId } from "../ids.js";
+import { resolveRunProgress } from "../timing.js";
 import { FakeCodeHost, FakeRunner, FakeTracker } from "./index.js";
 
 // 가짜 어댑터 셋이 인터페이스를 만족하는지 typecheck로 확인한다.
@@ -22,78 +24,210 @@ const _codeHost: CodeHost = new FakeCodeHost();
 const app = toRunnerProjectId("fake:acme/app");
 const project = { id: app, displayName: "app", setupState: "ready" };
 
+const handled = (answered: QuestionId[] = [], denied: PermissionRequestId[] = []) => ({
+  answered: new Set(answered),
+  denied: new Set(denied),
+});
+
+async function startOne(runner: FakeRunner, worktreeName = "factory-ENG-1-1") {
+  const mailbox = await runner.ensureMailbox(null);
+  const started = await runner.startRun({
+    mailbox,
+    project: app,
+    worktreeName,
+    agent: toAgentId("claude"),
+    prompt: "티켓 본문",
+  });
+  return { mailbox, started, run: { mailbox, ...started } };
+}
+
 describe("FakeRunner", () => {
   it("따로 정하지 않으면 Online이고 테스트가 넣은 러너 쪽 프로젝트를 가진다고 답한다", async () => {
     const runner = new FakeRunner();
     runner.setProjects([project]);
 
-    await expect(runner.checkHealth()).resolves.toMatchObject({
-      online: true,
-      prerequisites: [{ satisfied: true }],
-      error: null,
-    });
+    const health = await runner.checkHealth();
+    expect(health).toMatchObject({ online: true, error: null });
+    expect(isAssignmentBlocked(health)).toBe(false);
     await expect(runner.listProjects()).resolves.toEqual([project]);
   });
 
-  it("런을 시작하고 테스트가 정한 진행을 돌려주며, 사라진 워크트리는 gone이다", async () => {
+  it("push 인증 항목이 깨지면 Online이어도 할당을 막는다 (Q82.14)", async () => {
     const runner = new FakeRunner();
-    runner.setProjects([project]);
-    const started = await runner.startRun({
-      project: app,
-      worktreeName: "ENG-1",
-      branch: "factory/ENG-1-1",
-      agent: toAgentId("claude"),
-      prompt: "티켓 본문",
-    });
+    runner.prerequisites = runner.prerequisites.map((p) =>
+      p.blocksAssignment ? { ...p, satisfied: false } : p,
+    );
 
-    await expect(runner.pollRun(started.worktree)).resolves.toMatchObject({ kind: "running" });
-
-    runner.setProgress(started.worktree, { kind: "finished", exitCode: 0 });
-    await expect(runner.pollRun(started.worktree)).resolves.toEqual({
-      kind: "finished",
-      exitCode: 0,
-    });
-
-    await runner.removeWorktree(started.worktree, { force: false });
-    await expect(runner.worktreeExists(started.worktree)).resolves.toBe(false);
-    await expect(runner.pollRun(started.worktree)).resolves.toEqual({ kind: "gone" });
+    const health = await runner.checkHealth();
+    expect(health.online).toBe(true);
+    expect(isAssignmentBlocked(health)).toBe(true);
   });
 
-  it("같은 retryToken으로 다시 시작하면 같은 시작을 돌려준다", async () => {
+  it("우편함은 살아 있으면 그대로 돌려주고, 사라지면 다시 만든다 (Q82.1)", async () => {
+    const runner = new FakeRunner();
+    const first = await runner.ensureMailbox(null);
+
+    await expect(runner.ensureMailbox(first)).resolves.toBe(first);
+    runner.dropMailbox(first);
+    const second = await runner.ensureMailbox(first);
+    expect(second).not.toBe(first);
+  });
+
+  it("사라진 우편함으로 시작하면 mailbox-missing으로 실패한다", async () => {
     const runner = new FakeRunner();
     runner.setProjects([project]);
+    const mailbox = await runner.ensureMailbox(null);
+    runner.dropMailbox(mailbox);
+
+    const error = await runner
+      .startRun({ mailbox, project: app, worktreeName: "w", agent: toAgentId("a"), prompt: "p" })
+      .catch((e: unknown) => e);
+    expect(error).toMatchObject({ detail: { kind: "mailbox-missing" } });
+  });
+
+  it("시작하면 러너가 정한 실제 브랜치와 에이전트 참조를 돌려준다 (Q82.6)", async () => {
+    const runner = new FakeRunner();
+    runner.setProjects([project]);
+    const { started } = await startOne(runner);
+
+    expect(started.branch).toBe("fake/factory-ENG-1-1");
+    expect(started.agentRef).toBeTruthy();
+  });
+
+  it("시작 멱등: 같은 워크트리 이름은 다시 시작하지 않고 findStartedRun으로 이어 붙인다", async () => {
+    const runner = new FakeRunner();
+    runner.setProjects([project]);
+    runner.loseNextStartResponse = true;
+    const mailbox = await runner.ensureMailbox(null);
     const input = {
+      mailbox,
       project: app,
-      worktreeName: "w",
-      branch: "b",
+      worktreeName: "factory-ENG-1-1",
       agent: toAgentId("a"),
       prompt: "p",
     };
-    const first = await runner.startRun(input);
 
-    expect(first.retryToken).not.toBeNull();
-    const again = await runner.startRun(
-      first.retryToken === null ? input : { ...input, retryToken: first.retryToken },
-    );
+    const lost = await runner.startRun(input).catch((e: unknown) => e);
+    expect(lost).toMatchObject({ detail: { kind: "start-outcome-unknown" } });
+    const found = await runner.findStartedRun({ mailbox, worktreeName: input.worktreeName });
+    expect(found).not.toBeNull();
+    const again = await runner.startRun(input).catch((e: unknown) => e);
+    expect(again).toMatchObject({ detail: { kind: "runner-error", code: "worktree_exists" } });
+    await expect(runner.findStartedRun({ mailbox, worktreeName: "other" })).resolves.toBeNull();
+  });
 
-    expect(again).toEqual(first);
-    expect(runner.worktrees.size).toBe(1);
+  it("테스트가 정한 오류로 시작을 한 번 실패시킨다", async () => {
+    const runner = new FakeRunner();
+    runner.setProjects([project]);
+    runner.failNextStart = { kind: "runner-error", code: "boom", message: "boom" };
+
+    const error = await startOne(runner).catch((e: unknown) => e);
+    expect(error).toMatchObject({ detail: { kind: "runner-error", code: "boom" } });
+    await expect(startOne(runner)).resolves.toBeTruthy();
+    expect(runner.startCalls).toHaveLength(2);
+  });
+
+  it("질문 → 답하기: 질문은 답한 뒤에도 남고, DB에 답했다고 기록하면 Running으로 본다 (Q82.3·Q82.5)", async () => {
+    const runner = new FakeRunner();
+    runner.setProjects([project]);
+    const { run, started } = await startOne(runner);
+
+    const id = runner.ask(started.worktree, { body: "A와 B 중 무엇?", options: ["A", "B"] });
+    const asked = await runner.pollRun(run);
+    expect(asked).toMatchObject({
+      kind: "active",
+      questions: [{ id, body: "A와 B 중 무엇?", options: ["A", "B"] }],
+    });
+    expect(resolveRunProgress(asked, handled())).toMatchObject({ state: "waiting-for-input" });
+
+    await runner.answerQuestion(run, { questionId: id, answer: "A" });
+    expect(runner.runAt(started.worktree).answers).toEqual([{ questionId: id, answer: "A" }]);
+    const after = await runner.pollRun(run);
+    expect(after).toMatchObject({ kind: "active", questions: [{ id }] });
+    expect(resolveRunProgress(after, handled([id]))).toEqual({
+      kind: "continue",
+      state: "running",
+    });
+  });
+
+  it("권한 대기 → 거절: 거절하면 대기가 닫힌다. 허용은 러너 화면에서만 한다 (Q82.4)", async () => {
+    const runner = new FakeRunner();
+    runner.setProjects([project]);
+    const { run, started } = await startOne(runner);
+
+    const id = runner.requestPermission(started.worktree, "Bash(touch x)");
+    const waiting = await runner.pollRun(run);
+    expect(resolveRunProgress(waiting, handled())).toMatchObject({
+      state: "waiting-for-input",
+      permissionWaits: [id],
+    });
+
+    await runner.denyPermission(run, { permissionId: id, reason: "운영자가 거절했어요" });
+    expect(runner.runAt(started.worktree).denials).toHaveLength(1);
+    expect(resolveRunProgress(await runner.pollRun(run), handled())).toEqual({
+      kind: "continue",
+      state: "running",
+    });
+  });
+
+  it.each([
+    ["succeeded", "reported-success"],
+    ["failed", "reported-failure"],
+  ] as const)(
+    "완료 보고(%s) → %s 로 끝나고, 보고 뒤에도 살아 있는 에이전트를 닫을 수 있다 (Q82.2·Q82.19)",
+    async (outcome, agentResult) => {
+      const runner = new FakeRunner();
+      runner.setProjects([project]);
+      const { run, started } = await startOne(runner);
+
+      runner.report(started.worktree, { outcome, body: "PR을 열었어요" });
+      const progress = await runner.pollRun(run);
+      expect(progress).toEqual({
+        kind: "reported",
+        report: { outcome, body: "PR을 열었어요", reportedAt: null },
+      });
+      expect(resolveRunProgress(progress, handled())).toMatchObject({ kind: "end", agentResult });
+
+      await runner.closeAgent(run);
+      expect(runner.runAt(started.worktree).agentClosed).toBe(true);
+    },
+  );
+
+  it("보고 없이 사라짐 → 비정상 종료 (Q82.19)", async () => {
+    const runner = new FakeRunner();
+    runner.setProjects([project]);
+    const { run, started } = await startOne(runner);
+
+    runner.vanish(started.worktree);
+    const progress = await runner.pollRun(run);
+    expect(progress).toMatchObject({ kind: "ended-without-report" });
+    expect(resolveRunProgress(progress, handled())).toMatchObject({
+      kind: "end",
+      agentResult: "ended-without-report",
+    });
+  });
+
+  it("멈춘 에이전트와 지운 워크트리를 돌려준다", async () => {
+    const runner = new FakeRunner();
+    runner.setProjects([project]);
+    const { run, started } = await startOne(runner);
+
+    await runner.stopAgent(run);
+    expect(runner.runAt(started.worktree).agentStopped).toBe(true);
+    await runner.removeWorktree(started.worktree);
+    expect(runner.removed).toEqual([started.worktree]);
+    await expect(runner.worktreeExists(started.worktree)).resolves.toBe(false);
+    await expect(runner.pollRun(run)).resolves.toEqual({ kind: "worktree-gone" });
   });
 
   it("로그 꼬리는 요청한 줄 수만큼 돌려주고 0줄이면 비어 있다", async () => {
     const runner = new FakeRunner();
     runner.setProjects([project]);
-    const { worktree } = await runner.startRun({
-      project: app,
-      worktreeName: "w",
-      branch: "b",
-      agent: toAgentId("a"),
-      prompt: "p",
-    });
-    runner.appendLog(worktree, "1", "2", "3");
+    const { run, started } = await startOne(runner);
+    runner.appendLog(started.worktree, "1", "2", "3");
 
-    await expect(runner.readLogTail(worktree, { lines: 2 })).resolves.toEqual(["2", "3"]);
-    await expect(runner.readLogTail(worktree, { lines: 0 })).resolves.toEqual([]);
+    await expect(runner.readLogTail(run, { lines: 2 })).resolves.toEqual(["2", "3"]);
+    await expect(runner.readLogTail(run, { lines: 0 })).resolves.toEqual([]);
   });
 
   it("Offline 러너에 닿는 호출은 unreachable로 실패한다", async () => {
@@ -132,9 +266,28 @@ describe("FakeCodeHost", () => {
     expect(codeHost.repoOf(app)).toBe(repo);
     expect(codeHost.repoOf(toRunnerProjectId("other:acme/app"))).toBeNull();
     await expect(codeHost.findPullRequestsByBranch(repo, pr.headBranch)).resolves.toEqual([pr]);
-    await expect(codeHost.findPullRequestsByTicketKey(repo, toTicketKey("ENG-1"))).resolves.toEqual(
-      [pr],
-    );
+    const since = (iso: string) => ({ createdSince: new Date(iso) });
+    await expect(
+      codeHost.findPullRequestsByTicketKey(
+        repo,
+        toTicketKey("ENG-1"),
+        since("2025-12-31T00:00:00Z"),
+      ),
+    ).resolves.toEqual([pr]);
+    await expect(
+      codeHost.findPullRequestsByTicketKey(
+        repo,
+        toTicketKey("ENG-1"),
+        since("2026-01-02T00:00:00Z"),
+      ),
+    ).resolves.toEqual([]);
+    await expect(
+      codeHost.findPullRequestsByTicketKey(
+        repo,
+        toTicketKey("ENG-12"),
+        since("2025-01-01T00:00:00Z"),
+      ),
+    ).resolves.toEqual([]);
     await expect(codeHost.getPullRequest(repo, toPullRequestId("pr-7"))).resolves.toEqual(pr);
     await expect(codeHost.getPullRequest(repo, toPullRequestId("pr-8"))).resolves.toBeNull();
   });
