@@ -85,13 +85,15 @@ describe.skipIf(!enabled)("orca runner on a real runner", () => {
 
       const reported = await pollUntil(runner, run, (p) => p.kind !== "active");
       expect(reported).toMatchObject({ kind: "reported", report: { outcome: "succeeded" } });
+      // 답이 원격 셸을 거쳐도 그대로 갔는지. 에이전트가 옮겨 적으므로 특수 문자가 든 부분만 본다.
+      expect(reported.kind === "reported" ? reported.report.body : "").toContain("$HOME");
 
       expect((await runner.readLogTail(run, { lines: 50 })).length).toBeGreaterThan(0);
       await runner.closeAgent(run);
       await runner.removeWorktree(started.worktree);
       expect(await runner.worktreeExists(started.worktree)).toBe(false);
     } finally {
-      await cleanUp(runner, exec, mailbox, started);
+      await cleanUp(runner, exec, mailbox, started, worktreeName);
     }
   });
 });
@@ -121,9 +123,17 @@ async function cleanUp(
   runner: OrcaRunner,
   exec: ReturnType<typeof sshExec>,
   mailbox: MailboxRef | null,
-  started: StartedRun | null,
+  startedRun: StartedRun | null,
+  worktreeName: string,
 ): Promise<void> {
   const ignore = (): undefined => undefined;
+  // startRun이 시작 명령을 보낸 뒤 던졌으면(결과 모름 등) 에이전트가 떠 있을 수 있어 이름으로 다시 찾는다.
+  const started =
+    startedRun ??
+    (mailbox === null
+      ? null
+      : await runner.findStartedRun({ mailbox, worktreeName }).catch(ignore)) ??
+    null;
   if (started !== null && mailbox !== null) {
     const run = { mailbox, worktree: started.worktree, agentRef: started.agentRef };
     await runner.stopAgent(run).catch(ignore);

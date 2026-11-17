@@ -16,6 +16,9 @@ import { ScriptedExec, peekOf, research, runnerWith, stdout } from "./test-suppo
  * 가상 ID가 달라 각자 따로 쓴다. research 픽스처에 없는 명령(project setups, worktree show)의 출력만 0008의
  * 같은 값으로 만든다.
  *
+ * readLogTail(`worker-read`)과 worktreeExists의 성공 경로는 research 픽스처가 없어 이 티켓이 러너에서 받은
+ * 출력(fixtures/)으로 orca-runner.test.ts에서 시험한다.
+ *
  * 0008의 대상: `term_…01`이 우편함, `run_000000000001`이 Run, R1(`ctx_…01`) 질문·완료 보고,
  * R2(`ctx_…02`) 권한 대기·거절·멈추기, R3(`ctx_…03`) 보고 없이 사라짐.
  */
