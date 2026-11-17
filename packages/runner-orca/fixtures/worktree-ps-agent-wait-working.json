@@ -1,0 +1,104 @@
+{
+  "id": "4369ae03-8181-4a86-89cf-bbcb4b5fa722",
+  "ok": true,
+  "result": {
+    "worktrees": [
+      {
+        "workspaceKind": "git",
+        "worktreeId": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::<path>/workspaces/sandbox/fo-t0013-probe1",
+        "repoId": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9",
+        "hostId": "local",
+        "identity": {
+          "key": "wt2:local:9235c942-6c76-456d-b8df-671bade8a7e6",
+          "executionHostId": "local",
+          "instanceId": "9235c942-6c76-456d-b8df-671bade8a7e6"
+        },
+        "terminalPlatform": "darwin",
+        "repo": "sandbox",
+        "path": "<path>/workspaces/sandbox/fo-t0013-probe1",
+        "branch": "refs/heads/acme/fo-t0013-probe1",
+        "isArchived": false,
+        "isMainWorktree": false,
+        "hasHostSidebarActivity": true,
+        "defaultBranch": false,
+        "worktreeInstanceId": "9235c942-6c76-456d-b8df-671bade8a7e6",
+        "parentWorktreeId": null,
+        "childWorktreeIds": [],
+        "workspaceLineage": null,
+        "displayName": "fo-t0013-probe1",
+        "workspaceStatus": "in-progress",
+        "sortOrder": 1794931667496,
+        "lastActivityAt": 1794931667512,
+        "createdAt": 1794931667496,
+        "creatorProvenance": {
+          "kind": "host"
+        },
+        "linkedIssue": null,
+        "linkedPR": null,
+        "linkedLinearIssue": null,
+        "linkedGitLabMR": null,
+        "linkedGitLabIssue": null,
+        "linkedItems": [],
+        "comment": "",
+        "isPinned": false,
+        "isActive": false,
+        "unread": false,
+        "liveTerminalCount": 1,
+        "hasAttachedPty": true,
+        "unverifiableTerminalCount": 0,
+        "lastOutputAt": 1794931709656,
+        "preview": "nt-view/cc8a9fc408a86adc9e1e/orca-agent-view' '--dangerously-skip-permissions' '--model' 'haiku'\nBooping…   4",
+        "status": "working",
+        "agents": [
+          {
+            "paneKey": "2f589a01-9739-411e-b3fa-a8b2fe700ded:3537e82f-b8dd-4318-88b7-250f7590b749",
+            "parentPaneKey": "2092fc19-7a77-4be0-b79a-624e536c006d:e8ec8706-3804-4457-b807-074b33c45d3d",
+            "state": "working",
+            "agentType": "claude",
+            "prompt": "You have 1 orchestration message. Run `orca orchestration check`.",
+            "taskTitle": "fo-t0013-probe1",
+            "displayName": "fo-t0013-probe1",
+            "lastAssistantMessage": "Exit code 1\nNext step: Did you mean: --terminal, --full, --json\nNext step: Valid flags: --ack, --all, --environment, --format, --full, --help, --json, --pairing-code, --peek, --retry-request, --run, --terminal, --timeout-ms, --types, --unread, --wait\nerror: invalid_argument: Unknown flag --from for command: orchestration check",
+            "toolName": "Bash",
+            "toolInput": "orca orchestration send --from term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b --type worker_done --subject \"probe done\" --body $'I asked the coordinator the A or B q",
+            "interrupted": false,
+            "mainAgent": {
+              "state": "working",
+              "stateStartedAt": 1794931695671
+            },
+            "stateStartedAt": 1794931695671,
+            "updatedAt": 1794931708459,
+            "hasLivePty": true,
+            "programStatus": {
+              "state": "working",
+              "message": "Sending worker_done with the received answer to coordinator",
+              "observedAt": 1794931708138
+            },
+            "agentWait": null
+          }
+        ],
+        "sidebarStatus": "working",
+        "terminalVerdict": "live",
+        "environment": {
+          "id": "local",
+          "name": "local"
+        },
+        "parent": null,
+        "address": {
+          "environment": "local",
+          "worktree": "identity:wt2:local:9235c942-6c76-456d-b8df-671bade8a7e6",
+          "line": "--environment local --worktree identity:wt2:local:9235c942-6c76-456d-b8df-671bade8a7e6"
+        }
+      }
+    ],
+    "hostScope": {
+      "hostIds": ["local"],
+      "omittedHostIds": []
+    },
+    "totalCount": 1,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "d8374bf0-adca-4823-960e-46489e547cad"
+  }
+}

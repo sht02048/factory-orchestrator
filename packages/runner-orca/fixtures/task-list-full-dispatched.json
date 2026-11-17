@@ -1,0 +1,33 @@
+{
+  "id": "78f11c87-2904-46ad-a988-d4ec2881e706",
+  "ok": true,
+  "result": {
+    "runId": "run_493ebb2f403d",
+    "legacyReadOnly": false,
+    "tasks": [
+      {
+        "id": "task_43a3a070dc4c",
+        "run_id": "run_493ebb2f403d",
+        "parent_id": null,
+        "created_by_terminal_handle": "term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7",
+        "created_by_pane_key": "2092fc19-7a77-4be0-b79a-624e536c006d:e8ec8706-3804-4457-b807-074b33c45d3d",
+        "created_by_process_incarnation": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::<path>/sandbox@@e0526823:1b00b4cd-cbef-4a8c-a653-7d8c172b8686",
+        "created_by_run_generation": 1,
+        "task_title": "fo-t0013-probe1",
+        "display_name": "fo-t0013-probe1",
+        "spec": "Sandbox verification task for an adapter test. Do not edit, commit, or push anything.\n\n1. Ask your coordinator one question using the orca orchestration ask command from your preamble:\n   question: \"Pick one: A or B? (quotes ' \\\" and $HOME stay literal)\"  options: \"A,B\"\n   Then end your turn and wait for the answer.\n2. When the answer arrives, finish with worker_done, outcome failed, subject \"probe done\", and put the exact answer text you received in the body.\nDo nothing else.\n",
+        "status": "dispatched",
+        "deps": "[]",
+        "result": null,
+        "created_at": "2026-11-17 16:07:46",
+        "completed_at": null,
+        "assignee_handle": "term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b",
+        "dispatch_id": "ctx_a6e6a23a7132"
+      }
+    ],
+    "count": 1
+  },
+  "_meta": {
+    "runtimeId": "d8374bf0-adca-4823-960e-46489e547cad"
+  }
+}

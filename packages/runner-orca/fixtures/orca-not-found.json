@@ -1,0 +1,5 @@
+{
+  "exitCode": 127,
+  "stdout": "",
+  "stderr": "zsh:1: no such file or directory: /Applications/Orca.app/Contents/Resources/bin/orca\n"
+}

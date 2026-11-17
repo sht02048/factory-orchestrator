@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "result": {
+    "workers": [
+      {
+        "dispatchId": "ctx_a6e6a23a7132",
+        "taskId": "task_43a3a070dc4c",
+        "state": "ready",
+        "outcome": "in_progress",
+        "liveness": "live",
+        "agent": "claude",
+        "terminal": "term_b1a7ea8e-2d89-4a5a-ab7b-7a4e5d2e748b",
+        "terminalState": "retained",
+        "workspace": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::<path>/workspaces/sandbox/fo-t0013-probe1",
+        "host": "local"
+      }
+    ],
+    "scope": {
+      "run": "run_493ebb2f403d",
+      "source": "flag"
+    }
+  }
+}

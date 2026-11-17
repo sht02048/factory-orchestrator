@@ -1,0 +1,23 @@
+{
+  "id": "ebe8563a-61ee-448f-82e3-9cc7e0c5c48f",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "processId": 90728,
+      "handle": "term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7",
+      "tabId": "2092fc19-7a77-4be0-b79a-624e536c006d",
+      "paneKey": "2092fc19-7a77-4be0-b79a-624e536c006d:e8ec8706-3804-4457-b807-074b33c45d3d",
+      "ptyId": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::<path>/sandbox@@e0526823",
+      "worktreeId": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::<path>/sandbox",
+      "title": "fo-t0013-mailbox",
+      "executionHostId": "local",
+      "incarnationId": "1b00b4cd-cbef-4a8c-a653-7d8c172b8686",
+      "hostPlatform": "darwin",
+      "surface": "background",
+      "warning": "Terminal term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 is running, but Orca could not make it discoverable. Run `orca terminal focus --terminal term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7` to reveal and focus it."
+    }
+  },
+  "_meta": {
+    "runtimeId": "d8374bf0-adca-4823-960e-46489e547cad"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "ok": true,
+  "result": {
+    "dispatchId": "ctx_38082ab12146",
+    "source": "terminal",
+    "sourceIdentity": "GQsNena7mVa6r-MiV3fg74mr6R88u5fJ",
+    "terminal": {
+      "handle": "term_fdd102bd-f2ec-41c9-adf6-e71d7e3d0020",
+      "status": "exited",
+      "tail": [],
+      "truncated": false,
+      "nextCursor": null,
+      "returnedLineCount": 0
+    },
+    "cursor": null,
+    "status": {
+      "worker": "failed",
+      "terminal": "exited",
+      "liveness": "exited"
+    },
+    "fallbackReason": "session_not_reported",
+    "sourceExact": false,
+    "contentComplete": false,
+    "clipping": ["terminal_fallback"],
+    "warnings": [
+      "The current terminal screen was unavailable; only retained stream output could be preserved.",
+      "The live terminal buffer was empty at release; structured transcript output was unavailable."
+    ],
+    "archived": true,
+    "projection": {
+      "id": "ctx_38082ab12146",
+      "dispatchId": "ctx_38082ab12146",
+      "taskId": "task_a07c077b297c",
+      "runId": "run_780cdf7f4dce",
+      "role": "worker",
+      "parent": null,
+      "provider": null,
+      "host": {
+        "kind": "local",
+        "id": "local"
+      },
+      "workspace": {
+        "id": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::<path>/workspaces/sandbox/fo-orch-r3",
+        "kind": "folder_or_worktree"
+      },
+      "stage": {
+        "worker": "failed",
+        "dispatch": "failed",
+        "detail": "process_exited",
+        "activity": "unknown"
+      },
+      "outcome": "failed",
+      "liveness": {
+        "verdict": "exited",
+        "source": "resource_release"
+      },
+      "evidence": {
+        "durable": true,
+        "liveStatus": "unavailable",
+        "lastObservedAt": null
+      },
+      "resource": {
+        "state": "released",
+        "id": "wtr_12522fa9c16b",
+        "ownerDispatchId": "ctx_38082ab12146",
+        "releaseState": "released",
+        "terminalState": "released"
+      },
+      "nextAction": {
+        "kind": "none",
+        "argv": []
+      },
+      "attention": {
+        "categories": ["failure", "interruption"],
+        "requiresAction": true
+      }
+    }
+  }
+}

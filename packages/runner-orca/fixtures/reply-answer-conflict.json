@@ -1,0 +1,22 @@
+{
+  "ok": false,
+  "error": {
+    "code": "answer_conflict",
+    "message": "Question msg_49acb8390fb2 already has a different answer. Orchestration mutation request ID: b21e9842-296f-4bb2-aac2-d7d57061e87d.",
+    "data": {
+      "orchestrationRequestId": "b21e9842-296f-4bb2-aac2-d7d57061e87d",
+      "originalCommand": [
+        "orca",
+        "orchestration",
+        "reply",
+        "--from",
+        "term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7",
+        "--id",
+        "msg_49acb8390fb2",
+        "--body",
+        "x",
+        "--json"
+      ]
+    }
+  }
+}

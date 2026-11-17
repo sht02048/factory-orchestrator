@@ -1,0 +1,29 @@
+{
+  "id": "f7754e3d-ad54-47c0-bf6a-2deab623b3dc",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7",
+      "ptyId": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::<path>/sandbox@@e0526823",
+      "incarnationId": "1b00b4cd-cbef-4a8c-a653-7d8c172b8686",
+      "orphaned": false,
+      "worktreeId": "527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::<path>/sandbox",
+      "worktreePath": "<path>/sandbox",
+      "branch": "refs/heads/main",
+      "tabId": "2092fc19-7a77-4be0-b79a-624e536c006d",
+      "leafId": "e8ec8706-3804-4457-b807-074b33c45d3d",
+      "title": "fo-t0013-mailbox",
+      "connected": true,
+      "writable": true,
+      "lastOutputAt": 1794931652400,
+      "preview": "<user>@<host> sandbox % cat > /dev/null",
+      "executionHostId": "local",
+      "paneRuntimeId": -1,
+      "rendererGraphEpoch": 0,
+      "agentWait": null
+    }
+  },
+  "_meta": {
+    "runtimeId": "d8374bf0-adca-4823-960e-46489e547cad"
+  }
+}
