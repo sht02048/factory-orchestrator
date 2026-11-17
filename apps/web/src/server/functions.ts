@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { answerInput, denyInput, submitAnswer, submitDenial } from "../home/actions";
+import { loadHomePage } from "../home/load";
 import { loadRunnersPage } from "../runners/load";
 import { loadRunsPage } from "../runs/load";
 import { loadShell } from "../shell/load";
@@ -17,6 +19,20 @@ export const getShell = createServerFn({ method: "GET" }).handler(() => loadShel
 export const getRunnersPage = createServerFn({ method: "GET" }).handler(() =>
   loadRunnersPage(getDatabase(), new Date()),
 );
+
+export const getHomePage = createServerFn({ method: "GET" })
+  .validator(z.object({ ws: z.string().optional() }))
+  .handler(({ data }) => loadHomePage(getDatabase(), data.ws, new Date()));
+
+/** 손댈 일의 질문에 답을 남긴다. worker 가 러너에 보낸다(Q61·Q82.3) */
+export const answerQuestion = createServerFn({ method: "POST" })
+  .validator(answerInput)
+  .handler(({ data }) => submitAnswer(getDatabase(), data, new Date()));
+
+/** 손댈 일의 권한 대기 거절을 남긴다. 허용은 러너 화면에서만 한다(Q82.4) */
+export const denyPermission = createServerFn({ method: "POST" })
+  .validator(denyInput)
+  .handler(({ data }) => submitDenial(getDatabase(), data, new Date()));
 
 export const getRunsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
