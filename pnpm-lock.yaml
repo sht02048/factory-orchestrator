@@ -208,6 +208,9 @@ importers:
       '@factory/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@factory/tracker-linear':
+        specifier: workspace:*
+        version: link:../../packages/tracker-linear
       '@factory/ui':
         specifier: workspace:*
         version: link:../../packages/ui

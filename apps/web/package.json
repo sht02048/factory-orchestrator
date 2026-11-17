@@ -12,6 +12,7 @@
   "dependencies": {
     "@factory/core": "workspace:*",
     "@factory/db": "workspace:*",
+    "@factory/tracker-linear": "workspace:*",
     "@factory/ui": "workspace:*",
     "@stylexjs/stylex": "0.19.2",
     "@tanstack/react-router": "1.170.46",
