@@ -64,6 +64,8 @@ export const PUSH_CHECK_REF = "HEAD:refs/heads/factory-orchestrator/push-check";
 const WORKTREE_PS_LIMIT = 500;
 /** worker-read 한 쪽의 메시지 수와 끝까지 읽을 때의 쪽 수 상한 */
 const LOG_PAGE_SIZE = 100;
+/** worker-list를 넘길 쪽 수의 안전 상한(에이전트 5천 개) */
+const WORKER_LIST_MAX_PAGES = 50;
 /** 끝까지 읽을 쪽 수의 안전 상한(메시지 2만 개). 닿으면 꼬리가 아니라는 줄을 맨 앞에 둔다 */
 export const LOG_MAX_PAGES = 200;
 export const LOG_CUT_MARKER = `[log tail cut: the transcript is longer than ${LOG_PAGE_SIZE * LOG_MAX_PAGES} messages, so these are not its last lines]`;
@@ -441,11 +443,21 @@ export class OrcaRunner implements Runner {
       throw this.errorFor(shown, {});
     }
     const worktree = shown.result.worktree;
-    // ssh 호출자에는 묶인 Run이 없어 `--run` 없이 부르면 모든 Run의 에이전트가 온다. 우편함으로 좁히지 않는다.
-    const { workers } = await this.orca(["orchestration", "worker-list"], workerListResultSchema);
-    // worker-list는 최근 것부터 준다. 같은 워크트리에 여러 번 시작했으면 가장 최근 것을 고른다.
-    const worker = workers.find((w) => w.workspace === worktree.id);
-    if (worker === undefined) return null;
+    // 우편함의 Run에서 먼저 찾고, 없으면(우편함을 다시 만들며 Run이 바뀐 경우) 모든 Run에서 찾는다. ssh
+    // 호출자에는 묶인 Run이 없어 `--run` 없이 부르면 모든 Run의 에이전트가 온다. 둘 다 끝까지 넘긴다.
+    const mailbox = decodeMailbox(input.mailbox);
+    const worker =
+      (mailbox === null ? undefined : await this.findWorker(worktree.id, mailbox.runId)) ??
+      (await this.findWorker(worktree.id, null));
+    if (worker === undefined) {
+      // 이름의 워크트리는 있는데 에이전트를 찾지 못했다. 없다고(null) 답하면 같은 이름으로 다시 시작해
+      // 에이전트가 둘 생길 수 있으므로 오류로 알린다. worker는 시작 오류처럼 다시 시도하다 끝낸다(Q86).
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "worktree_without_agent",
+        message: `worktree ${input.worktreeName} exists but no agent was found for it`,
+      });
+    }
     const shownWorker = await this.orca(
       ["orchestration", "worker-show", "--dispatch", worker.dispatchId],
       workerShowResultSchema,
@@ -459,6 +471,33 @@ export class OrcaRunner implements Runner {
         runId: shownWorker.runId,
       }),
     };
+  }
+
+  /** worker-list를 끝까지 넘기며 그 워크트리의 가장 최근 에이전트를 찾는다(최근 것부터 온다). */
+  private async findWorker(
+    worktreeId: string,
+    runId: string | null,
+  ): Promise<{ dispatchId: string; taskId: string } | undefined> {
+    let cursor: string | null = null;
+    for (let page = 0; page < WORKER_LIST_MAX_PAGES; page += 1) {
+      const result: z.infer<typeof workerListResultSchema> = await this.orca(
+        [
+          "orchestration",
+          "worker-list",
+          ...(runId === null ? [] : ["--run", runId]),
+          "--limit",
+          "100",
+          ...(cursor === null ? [] : ["--cursor", cursor]),
+        ],
+        workerListResultSchema,
+      );
+      const found = result.workers.find((w) => w.workspace === worktreeId);
+      if (found !== undefined) return found;
+      const next = result.nextCursor ?? null;
+      if (next === null || next === cursor || result.workers.length === 0) return undefined;
+      cursor = next;
+    }
+    return undefined;
   }
 
   private async startedRunAt(selector: string, agent: OrcaAgent): Promise<StartedRun> {

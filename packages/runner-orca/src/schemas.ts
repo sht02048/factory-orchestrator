@@ -93,6 +93,8 @@ export const worktreeShowResultSchema = z.object({
 
 export const workerListResultSchema = z.object({
   workers: z.array(z.object({ dispatchId: text, taskId: text, workspace: optionalText })),
+  /** 다음 쪽. 한 번에 최대 100행이다(orca help) */
+  nextCursor: optionalText,
 });
 
 // ---------- 진행 ----------

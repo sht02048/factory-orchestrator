@@ -156,6 +156,16 @@ describe("checkHealth", () => {
     ]);
   });
 
+  test("ok: false from status is reported as the runner error", async () => {
+    const exec = new ScriptedExec().orca(
+      "status",
+      stdout(research("0003/worktree-ps-runtime-off.json"), 1),
+    );
+    const health = await runnerWith(exec).checkHealth();
+    expect(health.online).toBe(false);
+    expect(health.error).toMatchObject({ kind: "not-ready" });
+  });
+
   test("tells an unreachable runner, a missing orca and broken output apart", async () => {
     const unreachable = new ScriptedExec().orca(
       "status",
@@ -469,13 +479,51 @@ describe("findStartedRun", () => {
       branch: "acme/fo-t0013-probe1",
       agentRef: RUN.agentRef,
     });
-    expect(exec.commands()[0]).toBe(
+    expect(exec.commands().slice(0, 2)).toEqual([
       "/Applications/Orca.app/Contents/Resources/bin/orca worktree show --worktree name:fo-t0013-probe1 --json",
+      "/Applications/Orca.app/Contents/Resources/bin/orca orchestration worker-list --run run_493ebb2f403d --limit 100 --json",
+    ]);
+  });
+
+  test("looks through every Run and page when the mailbox Run does not have it", async () => {
+    const empty = stdout(JSON.stringify({ ok: true, result: { workers: [] } }));
+    const other = stdout(
+      JSON.stringify({
+        ok: true,
+        result: {
+          workers: [{ dispatchId: "ctx_other", taskId: "task_other", workspace: "x::/y" }],
+          nextCursor: "p2",
+        },
+      }),
     );
-    // 우편함의 Run으로 좁히지 않는다
-    expect(exec.commands()[1]).toBe(
-      "/Applications/Orca.app/Contents/Resources/bin/orca orchestration worker-list --json",
-    );
+    const exec = new ScriptedExec()
+      .orca("worktree show", stdout(own("worktree-show.json")))
+      .orca("orchestration worker-list --run", empty)
+      .orca("orchestration worker-list --limit 100 --json", other)
+      .orca(
+        "orchestration worker-list --limit 100 --cursor p2",
+        stdout(own("worker-list-run.json")),
+      )
+      .orca("orchestration worker-show", stdout(own("worker-show-working.json")));
+    const found = await runnerWith(exec).findStartedRun({
+      mailbox: MAILBOX,
+      worktreeName: "fo-t0013-probe1",
+    });
+    expect(found?.agentRef).toBe(RUN.agentRef);
+  });
+
+  test("a named worktree without an agent is an error, not 'not started'", async () => {
+    const exec = new ScriptedExec()
+      .orca("worktree show", stdout(own("worktree-show.json")))
+      .orca(
+        "orchestration worker-list",
+        stdout(JSON.stringify({ ok: true, result: { workers: [] } })),
+      );
+    expect(
+      await adapterError(
+        runnerWith(exec).findStartedRun({ mailbox: MAILBOX, worktreeName: "fo-t0013-probe1" }),
+      ),
+    ).toMatchObject({ kind: "runner-error", code: "worktree_without_agent" });
   });
 
   test("is null when no worktree has that name", async () => {
@@ -676,6 +724,21 @@ describe("answerQuestion and denyPermission", () => {
     expect(exec.calls).toHaveLength(0);
   });
 
+  test("ok: false and broken output from deny become error kinds", async () => {
+    const input = { permissionId: toPermissionRequestId("apr_1"), reason: "no" };
+    const off = new ScriptedExec().orca(
+      "orchestration deny",
+      stdout(research("0003/worktree-ps-runtime-off.json"), 1),
+    );
+    expect(await adapterError(runnerWith(off).denyPermission(RUN, input))).toMatchObject({
+      kind: "not-ready",
+    });
+    const broken = new ScriptedExec().orca("orchestration deny", BROKEN);
+    expect(await adapterError(runnerWith(broken).denyPermission(RUN, input))).toMatchObject({
+      kind: "malformed-output",
+    });
+  });
+
   test("denies a permission prompt with a reason", async () => {
     const exec = new ScriptedExec().orca("orchestration deny", stdout(research("0008/deny.json")));
     await runnerWith(exec).denyPermission(RUN, {
@@ -713,6 +776,25 @@ describe("stopAgent, closeAgent and readLogTail", () => {
     const broken = new ScriptedExec().orca("orchestration worker-release", BROKEN);
     expect(await adapterError(runnerWith(broken).closeAgent(RUN))).toMatchObject({
       kind: "malformed-output",
+    });
+  });
+
+  test("ok: false from release and log reads become error kinds", async () => {
+    const release = new ScriptedExec().orca(
+      "orchestration worker-release",
+      stdout(JSON.stringify({ ok: false, error: { code: "release_unknown", message: "x" } }), 1),
+    );
+    expect(await adapterError(runnerWith(release).closeAgent(RUN))).toMatchObject({
+      kind: "runner-error",
+      code: "release_unknown",
+    });
+    const read = new ScriptedExec().orca(
+      "orchestration worker-read",
+      stdout(own("worker-read-terminal-released-error.json"), 1),
+    );
+    expect(await adapterError(runnerWith(read).readLogTail(RUN, { lines: 5 }))).toMatchObject({
+      kind: "runner-error",
+      code: "runtime_error",
     });
   });
 
