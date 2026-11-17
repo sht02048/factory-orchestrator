@@ -15,10 +15,10 @@ function issuesOf(env: Record<string, string | undefined>): Array<{ variable: st
 
 describe("parseBootConfig", () => {
   it("넷을 읽고, 바인딩 주소와 포트는 기본값이 있다", () => {
-    const config = parseBootConfig({ DATABASE_PATH: "./data/f.db", ENCRYPTION_KEY: VALID_KEY });
+    const config = parseBootConfig({ DATABASE_PATH: "/data/f.db", ENCRYPTION_KEY: VALID_KEY });
     expect(config.host).toBe("127.0.0.1");
     expect(config.port).toBe(3000);
-    expect(config.databasePath).toBe("./data/f.db");
+    expect(config.databasePath).toBe("/data/f.db");
     expect(config.encryptionKey).toEqual(new Uint8Array(32).fill(1));
   });
 
@@ -47,16 +47,17 @@ describe("parseBootConfig", () => {
     ["WEB_PORT", { WEB_PORT: "0" }],
     ["WEB_PORT", { WEB_PORT: "70000" }],
     ["WEB_HOST", { WEB_HOST: "" }],
+    ["DATABASE_PATH", { DATABASE_PATH: "./data/f.db" }],
     ["ENCRYPTION_KEY", { ENCRYPTION_KEY: "not base64!" }],
     ["ENCRYPTION_KEY", { ENCRYPTION_KEY: Buffer.alloc(16).toString("base64") }],
   ])("형식이 틀린 %s를 알린다", (variable, override) => {
-    const env = { DATABASE_PATH: "./f.db", ENCRYPTION_KEY: VALID_KEY, ...override };
+    const env = { DATABASE_PATH: "/f.db", ENCRYPTION_KEY: VALID_KEY, ...override };
     expect(issuesOf(env)).toEqual([expect.objectContaining({ variable })]);
   });
 
   it("오류 메시지에 암호화 키 값을 넣지 않는다", () => {
     const badKey = Buffer.alloc(16, 5).toString("base64");
-    const parse = () => parseBootConfig({ DATABASE_PATH: "./f.db", ENCRYPTION_KEY: badKey });
+    const parse = () => parseBootConfig({ DATABASE_PATH: "/f.db", ENCRYPTION_KEY: badKey });
     expect(parse).toThrow(BootConfigError);
     expect(parse).toThrow(/ENCRYPTION_KEY/);
     expect(parse).not.toThrow(badKey);

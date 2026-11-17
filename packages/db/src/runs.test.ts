@@ -5,11 +5,14 @@ import {
   toDeliveryId,
   toPullRequestId,
   toTicketKey,
+  toTrackerConnectionId,
+  toTrackerKind,
   toTrackerProjectId,
   toWorktreeRef,
 } from "@factory/core";
 import type { RunId, RunState, TicketRef } from "@factory/core";
 import { describe, expect, it } from "vitest";
+import { inTransaction } from "./database.js";
 import type { Database } from "./database.js";
 import {
   listUnprocessedTrackerEvents,
@@ -24,8 +27,11 @@ import {
   setQueuedRunRunner,
   updateRunRecords,
 } from "./runs.js";
+import { SecretBox } from "./secret-box.js";
+import { saveTrackerConnection, saveWorkspaceTrackerProject } from "./settings.js";
 import type { RunStateChange } from "./runs.js";
 import {
+  KEY,
   addRunner,
   agent,
   connection,
@@ -33,6 +39,7 @@ import {
   repoB,
   seededDatabase,
   trackerProject,
+  workspaceId,
 } from "./test-fixtures.js";
 
 const ticket = (key: string): TicketRef => ({ connection, key: toTicketKey(key) });
@@ -142,6 +149,33 @@ describe("assignRun", () => {
     const db = seededDatabase();
     assignOk(db, "ENG-1");
     expect(assign(db, "ENG-2").ok).toBe(true);
+  });
+
+  it("다른 트래커 연결의 같은 티켓 키도 브랜치가 겹치지 않는다", () => {
+    const db = seededDatabase();
+    const other = toTrackerConnectionId("conn-2");
+    saveTrackerConnection(db, new SecretBox(KEY), {
+      id: other,
+      kind: toTrackerKind("fake"),
+      name: "Other",
+      config: {},
+      secrets: {},
+    });
+    saveWorkspaceTrackerProject(db, {
+      workspaceId,
+      connection: other,
+      projectId: trackerProject,
+      name: "Other web",
+      inProgressStateId: null,
+    });
+    assignOk(db, "ENG-1");
+    const result = assignRun(db, {
+      ticket: { connection: other, key: toTicketKey("ENG-1") },
+      trackerProject,
+      runnerProject: repoA,
+      agent,
+    });
+    expect(result.ok && result.run.branch).toBe("factory/ENG-1-2");
   });
 
   it("DB도 티켓당 Ended가 아닌 런을 하나로 막는다", () => {
@@ -346,5 +380,26 @@ describe("recordTrackerEvent", () => {
     expect(listUnprocessedTrackerEvents(db)).toHaveLength(1);
     expect(markTrackerEventProcessed(db, connection, event.deliveryId)).toBe(true);
     expect(listUnprocessedTrackerEvents(db)).toHaveLength(0);
+  });
+});
+
+describe("inTransaction", () => {
+  it("중첩하면 안쪽 실패만 되돌리고 바깥은 이어 간다", () => {
+    const db = seededDatabase();
+    inTransaction(db, () => {
+      assignOk(db, "ENG-1");
+      expect(() =>
+        inTransaction(db, () => {
+          assignOk(db, "ENG-2");
+          throw new Error("inner");
+        }),
+      ).toThrow("inner");
+    });
+    expect(
+      db
+        .prepare("SELECT ticket_key FROM runs")
+        .all()
+        .map((r) => r["ticket_key"]),
+    ).toEqual(["ENG-1"]);
   });
 });

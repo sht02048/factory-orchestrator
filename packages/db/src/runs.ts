@@ -310,7 +310,11 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
     }
 
     const id = toRunId(randomUUID());
-    const branch = `factory/${input.ticket.key}-${ticketRuns.length + 1}`;
+    // 런 번호는 트래커 연결과 상관없이 티켓 키로 센다. 두 연결에 같은 키가 있어도 브랜치가 겹치지 않는다.
+    const sameKeyRuns = db
+      .prepare("SELECT count(*) AS n FROM runs WHERE ticket_key = ?")
+      .get(input.ticket.key)?.["n"];
+    const branch = `factory/${input.ticket.key}-${Number(sameKeyRuns ?? 0) + 1}`;
     db.prepare(
       `INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
          runner_project_id, agent_id, branch, state, runner_id, assigned_at)

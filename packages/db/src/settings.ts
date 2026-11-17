@@ -77,6 +77,8 @@ const connectionRow = z.object({
   secrets: z.string(),
 });
 
+type ConnectionId = TrackerConnectionId | CodeHostConnectionId;
+
 function sealContext(table: ConnectionTable, id: string): string {
   return `${table}:${id}`;
 }
@@ -85,10 +87,19 @@ function saveConnection(
   db: Database,
   box: SecretBox,
   table: ConnectionTable,
-  input: { id: string; kind: string; name: string; config: unknown; secrets: unknown },
+  input: {
+    id: ConnectionId;
+    kind: TrackerKind | CodeHostKind;
+    name: string;
+    config: unknown;
+    secrets: unknown;
+  },
   now: Date,
 ): void {
-  const sealed = box.seal(JSON.stringify(input.secrets), sealContext(table, input.id));
+  const secrets = JSON.stringify(input.secrets);
+  // JSON.stringify(undefined)는 문자열이 아니다. 봉하기 전에 막는다.
+  if (typeof secrets !== "string") throw new TypeError("connection secrets must be JSON");
+  const sealed = box.seal(secrets, sealContext(table, input.id));
   db.prepare(
     `INSERT INTO ${table} (id, kind, name, config, secrets, created_at)
      VALUES (:id, :kind, :name, :config, :secrets, :now)
@@ -109,7 +120,7 @@ function readConnections(
   db: Database,
   box: SecretBox,
   table: ConnectionTable,
-  id: string | null,
+  id: ConnectionId | null,
 ): Array<Omit<z.infer<typeof connectionRow>, "secrets"> & { secrets: unknown }> {
   const rows =
     id === null

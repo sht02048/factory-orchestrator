@@ -1,3 +1,4 @@
+import { isAbsolute } from "node:path";
 import { z } from "zod";
 
 /**
@@ -8,7 +9,7 @@ import { z } from "zod";
  * | ---------------- | ----------------------- | ------------- |
  * | `WEB_HOST`       | web 서버 바인딩 주소    | `127.0.0.1`   |
  * | `WEB_PORT`       | web 서버 포트           | `3000`        |
- * | `DATABASE_PATH`  | SQLite 파일 경로        | 없음(필수)    |
+ * | `DATABASE_PATH`  | SQLite 파일 절대 경로   | 없음(필수)    |
  * | `ENCRYPTION_KEY` | 토큰 암호화 키(base64)  | 없음(필수)    |
  */
 export interface BootConfig {
@@ -47,7 +48,8 @@ export class BootConfigError extends Error {
   }
 }
 
-const required = () => z.string({ error: "is required" }).trim().min(1, { error: "is required" });
+const required = () =>
+  z.string({ error: "is required" }).trim().min(1, { error: "is required", abort: true });
 
 const envSchema = z.object({
   [BOOT_ENV.host]: z
@@ -70,7 +72,8 @@ const envSchema = z.object({
     )
     .optional()
     .default(3000),
-  [BOOT_ENV.databasePath]: required(),
+  // web과 worker가 cwd가 달라도 같은 파일을 열도록 절대 경로만 받는다(ADR 0002).
+  [BOOT_ENV.databasePath]: required().refine(isAbsolute, { error: "must be an absolute path" }),
   [BOOT_ENV.encryptionKey]: required()
     .regex(/^[A-Za-z0-9+/]+={0,2}$/, {
       error: `must be base64 (generate one with: openssl rand -base64 ${ENCRYPTION_KEY_BYTES})`,

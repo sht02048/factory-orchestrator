@@ -23,18 +23,26 @@ export function openDatabase(path: string): Database {
   return db;
 }
 
+let savepointCounter = 0;
+
 /**
  * 쓰기 잠금을 먼저 잡는 트랜잭션(BEGIN IMMEDIATE). 읽고 판단한 뒤 쓰는 일(할당, 마이그레이션)이
  * 다른 프로세스와 엇갈리지 않게 한다. 안에서 던지면 되돌린다.
+ * 이미 트랜잭션 안이면 SAVEPOINT로 중첩해, 부르는 쪽이 여러 함수를 한 트랜잭션으로 묶을 수 있다.
  */
 export function inTransaction<T>(db: Database, fn: () => T): T {
-  db.exec("BEGIN IMMEDIATE");
+  const nested = db.isTransaction;
+  const savepoint = `tx_${(savepointCounter += 1)}`;
+  db.exec(nested ? `SAVEPOINT ${savepoint}` : "BEGIN IMMEDIATE");
   try {
     const result = fn();
-    db.exec("COMMIT");
+    db.exec(nested ? `RELEASE ${savepoint}` : "COMMIT");
     return result;
   } catch (error) {
-    db.exec("ROLLBACK");
+    // SQLite가 이미 되돌렸으면 ROLLBACK이 실패한다. 원래 오류를 가리지 않는다.
+    if (db.isTransaction) {
+      db.exec(nested ? `ROLLBACK TO ${savepoint}; RELEASE ${savepoint}` : "ROLLBACK");
+    }
     throw error;
   }
 }
