@@ -1,5 +1,7 @@
 import { AdapterError, decidePrState } from "@factory/core";
 import type {
+  AgentResult,
+  CompletionReport,
   MailboxRef,
   PrStateDecision,
   QuestionId,
@@ -38,6 +40,16 @@ export interface TickContext {
    * 다음 바퀴에 표시만 다시 쓴다.
    */
   unmarkedAnswers: Set<string>;
+  /**
+   * 에이전트를 멈추거나 닫았지만 두 축을 쓰지 못한 런과 그때 정한 결과. 다음 바퀴에 기록만 다시 한다.
+   * 데몬이 살아 있는 동안만 이어진다.
+   */
+  pendingEndings: Map<RunId, PendingEnding>;
+}
+
+export interface PendingEnding {
+  agentResult: AgentResult;
+  report: CompletionReport | null;
 }
 
 export interface PendingStart {

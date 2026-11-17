@@ -34,7 +34,7 @@ import {
   reportFailure,
   tryWrite,
 } from "./context.js";
-import type { ActiveRun, TickContext } from "./context.js";
+import type { ActiveRun, PendingEnding, TickContext } from "./context.js";
 
 /**
  * Running·Waiting for Input·Disconnected 런을 감시한다(스펙 3절 5·6번). 런마다 아래 순서로 본다.
@@ -94,7 +94,13 @@ async function watchRun(
     onRunner = { mailbox, worktree: run.worktree, agentRef: run.agentRef };
     progress = await runner.pollRun(onRunner);
   } catch (error) {
-    if (!isUnreachable(error)) throw error;
+    if (!isUnreachable(error)) {
+      // 러너에는 닿았다(출력 오류 등). 연속으로 닿지 않은 것이 아니니 5분 시계를 되돌린다(Q50).
+      if (records.unreachableSince !== null) {
+        tryWrite(context, run.id, () => updateRunRecords(db, run.id, { unreachableSince: null }));
+      }
+      throw error;
+    }
     await whileUnreachable(context, run, records, { ...settings, cancelRequested });
     return;
   }
@@ -114,12 +120,18 @@ async function watchRun(
     answered: answeredQuestions(context, run),
     denied: new Set<PermissionRequestId>(),
   });
-  const ending = decideEnding(context, run, {
-    progress,
-    resolution,
-    cancelRequested,
-    maxRunMs: settings.maxRunMs,
-  });
+  // 앞 바퀴에 에이전트를 멈추거나 닫았는데 기록하지 못했으면 그때 정한 결과로 기록만 다시 한다. 멈춘 뒤의
+  // 실제 상태(보고 없이 사라짐)로 다시 정하면 에이전트 결과가 바뀐다.
+  const pending = context.pendingEndings.get(run.id);
+  const ending =
+    pending === undefined
+      ? decideEnding(context, run, {
+          progress,
+          resolution,
+          cancelRequested,
+          maxRunMs: settings.maxRunMs,
+        })
+      : { ...pending, agent: "none" as const };
   if (ending === null) {
     if (resolution.kind === "continue" && resolution.state !== run.state) {
       reportFailure(
@@ -136,19 +148,19 @@ async function watchRun(
   // 멈추거나 닫지 못하면 던져 기록하지 않는다. 다음 바퀴에 다시 해 본다(Q82.11).
   if (ending.agent === "stop") await runner.stopAgent(onRunner);
   if (ending.agent === "close") await runner.closeAgent(onRunner);
+  context.pendingEndings.set(run.id, { agentResult: ending.agentResult, report: ending.report });
   endRun(context, run, {
     agentResult: ending.agentResult,
     decision,
     runnerUnreached: false,
     report: ending.report,
   });
+  context.pendingEndings.delete(run.id);
 }
 
-interface Ending {
-  agentResult: AgentResult;
+interface Ending extends PendingEnding {
   /** 기록 전에 에이전트에게 할 일. 멈추기는 아직 도는 에이전트를, 닫기는 완료 보고를 보낸 에이전트를 끝낸다 */
   agent: "stop" | "close" | "none";
-  report: CompletionReport | null;
 }
 
 function decideEnding(
@@ -168,7 +180,7 @@ function decideEnding(
     return {
       agentResult: "canceled",
       agent: progress.kind === "active" ? "stop" : progress.kind === "reported" ? "close" : "none",
-      report: null,
+      report: progress.kind === "reported" ? progress.report : null,
     };
   }
   if (resolution.kind === "end") {

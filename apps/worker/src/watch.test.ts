@@ -266,6 +266,25 @@ describe("연결 끊김", () => {
     expect(stateOf(run)).toBe("running");
   });
 
+  it("ssh가 닿았는데 출력 오류면 연속 실패가 아니라 5분 시계를 되돌린다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    cutSsh(runnerId);
+    await worker.tick();
+    h.advance(3 * MINUTE);
+    cutSsh(runnerId, false);
+    vi.spyOn(h.runner(runnerId), "pollRun").mockRejectedValueOnce(
+      new AdapterError<RunnerErrorDetail>({ kind: "malformed-output", raw: "?" }),
+    );
+    await worker.tick();
+    expect(unreachableSince(run)).toBeNull();
+
+    cutSsh(runnerId);
+    await worker.tick();
+    h.advance(3 * MINUTE);
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+  });
+
   it("ssh가 5분 동안 계속 실패하면 끝내지 않고 Disconnected로 바꾸며 워크트리를 건드리지 않는다", async () => {
     const { run, runnerId, worker } = await startOne();
     await disconnect(run, runnerId, worker);
@@ -481,6 +500,41 @@ describe("취소", () => {
       worktree: "operator-decides",
     });
     expect(hasPendingCancelRequest(h.db, run.id)).toBe(false);
+  });
+
+  it("취소 중에 완료 보고가 오면 에이전트를 닫고 운영자가 취소함으로 끝내며 보고 본문을 남긴다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    requestRunCancel(h.db, run.id, h.now);
+    h.runner(runnerId).report(worktreeOf(run), { outcome: "succeeded", body: "다 했어요" });
+
+    await worker.tick();
+    expect(ended(run).agentResult).toBe("canceled");
+    expect(getRunWithRecords(h.db, run.id)?.records.reportBody).toBe("다 했어요");
+    expect(agentOf(run, runnerId)).toMatchObject({ agentClosed: true, agentStopped: false });
+  });
+
+  it("시작을 보낸 Queued 런의 취소는 시작했는지 확인하지 못해도 다시 시작을 보내지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    const fake = h.runner(runnerA);
+    fake.failNextStart = { kind: "start-outcome-unknown", detail: "lost" };
+    const worker = h.worker();
+    await worker.tick();
+    expect(stateOf(run)).toBe("queued");
+    expect(fake.startCalls).toHaveLength(1);
+
+    requestRunCancel(h.db, run.id, h.now);
+    // 취소 처리의 확인은 실패하고, 대기열의 확인은 성공해 시작하지 않았다고 본다.
+    vi.spyOn(fake, "findStartedRun")
+      .mockRejectedValueOnce(new AdapterError(runnerError("busy")))
+      .mockResolvedValue(null);
+    await worker.tick();
+    expect(stateOf(run)).toBe("queued");
+    expect(fake.startCalls).toHaveLength(1);
+
+    await worker.tick();
+    expect(ended(run)).toMatchObject({ agentResult: "canceled", prState: "none" });
+    expect(fake.startCalls).toHaveLength(1);
   });
 
   it("이미 Ended인 런의 요청은 처리하지 않는다", async () => {

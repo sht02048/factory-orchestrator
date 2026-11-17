@@ -16,6 +16,7 @@ import {
   getMapping,
   getRun,
   getRunWithRecords,
+  hasPendingCancelRequest,
   inTransaction,
   listPendingCancelRequests,
   listRunPlacements,
@@ -119,6 +120,7 @@ export function createWorker(options: WorkerOptions): Worker {
     mailboxes: new Map(),
     unreachableUntil: new Map(),
     unmarkedAnswers: new Set(),
+    pendingEndings: new Map(),
   };
   let running: Promise<void> | null = null;
   let closed = false;
@@ -251,6 +253,9 @@ async function processQueue(context: TickContext): Promise<void> {
       // 결과를 모르는 시작이 있는 런은 그 러너에서 확인하기 전에 시작할 수 없음으로 끝내지 않는다.
       // 에이전트가 이미 돌고 있을 수 있다.
       .map((run) => (bound.has(run.id) ? { ...run, unstartable: false } : run))
+      // 취소를 요청한 런은 시작하지 않는다. 아직 끝내지 못했으면(결과를 모르는 시작 확인 실패 등)
+      // 다음 바퀴의 취소 처리를 기다린다.
+      .filter((run) => !hasPendingCancelRequest(db, run.id))
       .filter((run) => {
         const runnerId = bound.get(run.id);
         if (runnerId === undefined) return true;
