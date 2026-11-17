@@ -1,8 +1,19 @@
+import { toAgentId, toRunnerProjectId, toTicketKey, toTrackerProjectId } from "@factory/core";
+import { assignRun, changeRunState, requestRunCancel } from "@factory/db";
+import type { Database } from "@factory/db";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import runsJson from "../../messages/ko/runs.json" with { type: "json" };
 import { renderWithMessages } from "../testing/render";
-import { endedCases, labs, now, offlineQueuedKey, seedDatabase } from "../testing/seed";
+import {
+  connection,
+  endedCases,
+  labs,
+  minutes,
+  now,
+  offlineQueuedKey,
+  seedDatabase,
+} from "../testing/seed";
 import { loadRunsPage } from "./load";
 import { runsMessages } from "./messages";
 import type { RunFilter, RunsPage } from "./model";
@@ -51,6 +62,19 @@ function rowTexts(html: string): Map<string, string[]> {
 function panelText(html: string): string {
   const panel = html.split("<aside")[1] ?? "";
   return panel.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+}
+
+/** 어느 러너에도 없는 러너 쪽 프로젝트로 Queued 런을 하나 더한다(러너에서 프로젝트가 빠짐, Q78) */
+function addProjectMissingRun(db: Database, key: string): string {
+  const result = assignRun(db, {
+    ticket: { connection, key: toTicketKey(key) },
+    trackerProject: toTrackerProjectId("tp-web"),
+    runnerProject: toRunnerProjectId("github:acme/gone"),
+    agent: toAgentId("claude"),
+    now: minutes(100),
+  });
+  if (!result.ok) throw new Error(result.reason);
+  return result.run.id;
 }
 
 describe("Runs 화면", () => {
@@ -130,6 +154,60 @@ describe("Runs 화면", () => {
     expect([...waiting.keys()]).toEqual(["ACME-11"]);
     const queued = rowTexts(render(page, { filter: "queued" }));
     expect([...queued.keys()].sort()).toEqual(["ACME-13", offlineQueuedKey].sort());
+  });
+
+  it('Canceled 필터는 운영자가 취소한 런만 "취소"로 보인다(Q82.18)', () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-13");
+    if (id === undefined) throw new Error("seed");
+    const ended = changeRunState(
+      db,
+      id,
+      { to: "ended", agentResult: "canceled", prState: "none" },
+      minutes(110),
+    );
+    expect(ended.ok).toBe(true);
+    const page = loadRunsPage(db, undefined, now);
+    const canceled = rowTexts(render(page, { filter: "canceled" }));
+    expect([...canceled.keys()]).toEqual(["ACME-13"]);
+    expect(canceled.get("ACME-13")?.slice(1, 4)).toEqual([
+      domain.summary.canceled,
+      domain.agentResult.canceled,
+      domain.prState.none,
+    ]);
+    // Failed 에는 들지 않는다
+    expect(rowTexts(render(page, { filter: "failed" })).has("ACME-13")).toBe(false);
+  });
+
+  it("Offline 과 러너에서 프로젝트가 빠짐의 Queued 이유를 다른 문구로 보인다(Q68·Q82.13)", () => {
+    const { db, ids } = seedDatabase();
+    const missing = addProjectMissingRun(db, "ACME-15");
+    const page = loadRunsPage(db, undefined, now);
+    const offlineText = panelText(render(page, { selectedId: ids.get(offlineQueuedKey) }));
+    const missingText = panelText(render(page, { selectedId: missing }));
+    expect(offlineText).toContain(domain.queuedReason["runner-offline"]);
+    expect(offlineText).not.toContain(domain.queuedReason["project-missing"]);
+    expect(missingText).toContain(domain.queuedReason["project-missing"]);
+    expect(missingText).not.toContain(domain.queuedReason["runner-offline"]);
+    expect(domain.queuedReason["project-missing"]).not.toBe(domain.queuedReason["runner-offline"]);
+  });
+
+  it("처리되지 않은 취소 요청이 있는 런에 취소 중을 보인다(Q82.21)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("seed");
+    expect(requestRunCancel(db, id, minutes(110)).ok).toBe(true);
+    const page = loadRunsPage(db, undefined, now);
+    const rows = rowTexts(render(page));
+    expect(rows.get("ACME-10")?.slice(1, 3)).toEqual([
+      domain.runState.running,
+      runsJson.cancelling,
+    ]);
+    // 런 상태는 그대로다
+    expect(rows.get("ACME-11")).not.toContain(runsJson.cancelling);
+    const text = panelText(render(page, { selectedId: id }));
+    expect(text).toContain(runsJson.panel.cancelling);
+    expect(text).toContain(runsJson.panel.cancellingReason);
   });
 
   it("Workspace 를 바꾸면 그 Workspace 의 런만 보인다", () => {

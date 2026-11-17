@@ -197,9 +197,14 @@ function RunRow({ run }: { run: RunView }) {
         <RowTitle>{run.ticketKey}</RowTitle>
       </TableCell>
       <TableCell>
-        <Status tone={tone} dot={false}>
-          {label}
-        </Status>
+        <span {...stylex.props(styles.inline)}>
+          <Status tone={tone} dot={false}>
+            {label}
+          </Status>
+          {run.state !== "ended" && run.cancelling ? (
+            <Text variant="meta">{t("cancelling")}</Text>
+          ) : null}
+        </span>
       </TableCell>
       <TableCell>
         {run.state === "ended" ? domain(`agentResult.${run.agentResult}`) : t("notApplicable")}
@@ -244,6 +249,8 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
       reason = t(`reason.${run.summary}`);
       break;
   }
+  // 취소 중이면 그 까닭보다 취소를 먼저 알린다(Q82.21).
+  if (run.state !== "ended" && run.cancelling) reason = t("cancellingReason");
 
   const ended = run.state === "ended" ? run : null;
   const pr = run.pullRequest;
@@ -253,6 +260,9 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
         status={
           <>
             <Status tone={tone}>{label}</Status>
+            {run.state !== "ended" && run.cancelling ? (
+              <Text variant="meta">{t("cancelling")}</Text>
+            ) : null}
             <Text variant="meta">{when}</Text>
           </>
         }
