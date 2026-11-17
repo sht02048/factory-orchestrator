@@ -12,7 +12,7 @@ import type { Database, SecretBox } from "@factory/db";
  *
  * 이 주소는 Funnel 등으로 밖에 열린다(스펙 8절). 그래서(0040):
  * - 검증을 통과하지 못한 요청은 이유와 상관없이 같은 401로 답한다. 없는 연결, 서명 실패, 타임스탬프,
- *   읽는 도중 상한을 넘은 본문, 시간 안에 오지 않은 본문을 바깥에서 구별할 수 없게 해 연결 ID가 있는지
+ *   읽는 도중 상한을 넘은 본문, 시간 안에 오지 않거나 도중에 끊긴 본문을 바깥에서 구별할 수 없게 해 연결 ID가 있는지
  *   드러내지 않는다. 이유는 안쪽 기록에 남긴다.
  * - 본문은 정해진 시간 안에 다 와야 한다. 아주 느리게 보내는 요청이 연결을 붙잡지 않게 한다.
  * - 연결 복호화·어댑터 설정 오류는 기록하고 일반 500으로 답한다. 오류 내용은 응답에 싣지 않는다.
@@ -62,6 +62,7 @@ export type WebhookOutcome =
   | "unknown-connection"
   | "declared-too-large"
   | "body-timeout"
+  | "body-aborted"
   | "internal-error"
   | WebhookVerifyError;
 
@@ -88,6 +89,8 @@ function replyFor(outcome: WebhookOutcome): WebhookReply {
     case "stale-timestamp":
     case "body-too-large":
     case "body-timeout":
+    // 보내는 쪽이 끊었다. 서버 오류가 아니다.
+    case "body-aborted":
       return "unauthorized";
     // 선언한 길이만 보고 연결을 찾기 전에 막는다. 연결이 있든 없든 같은 응답이다.
     case "declared-too-large":
@@ -156,7 +159,7 @@ async function handle(
       MAX_WEBHOOK_REQUEST_BYTES,
       context.bodyTimeoutMs ?? WEBHOOK_BODY_TIMEOUT_MS,
     );
-    if (!read.ok) return read.reason === "too-large" ? "body-too-large" : "body-timeout";
+    if (!read.ok) return BODY_OUTCOME[read.reason];
 
     const tracker = context.registry.createTracker(connection.kind, {
       config: connection.config,
@@ -170,7 +173,7 @@ async function handle(
     if (!result.ok) return result.error;
     return recordTrackerEvent(context.db, connection.id, result.event);
   } catch (error) {
-    // 연결 복호화, 어댑터 설정, DB 쓰기, 본문 스트림 오류. 내용은 응답에 싣지 않고 기록에만 남긴다.
+    // 연결 복호화, 어댑터 설정, DB 쓰기 오류. 내용은 응답에 싣지 않고 기록에만 남긴다.
     context.logger.warn("could not handle a tracker webhook", { connectionId, error });
     await cancelBody(request);
     return "internal-error";
@@ -191,7 +194,13 @@ async function cancelBody(request: WebhookRequest): Promise<void> {
 
 export type BodyRead =
   | { ok: true; body: Uint8Array }
-  | { ok: false; reason: "too-large" | "timeout" };
+  | { ok: false; reason: "too-large" | "timeout" | "aborted" };
+
+const BODY_OUTCOME: Record<"too-large" | "timeout" | "aborted", WebhookOutcome> = {
+  "too-large": "body-too-large",
+  timeout: "body-timeout",
+  aborted: "body-aborted",
+};
 
 /**
  * 본문을 읽되 상한을 넘거나 시간이 다 되는 순간 스트림을 끊는다. 다 읽은 뒤에 재지 않는다.
@@ -221,12 +230,19 @@ export async function readBodyWithin(
   let total = 0;
   try {
     for (;;) {
-      const { done, value } = await reader.read();
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch {
+        // 보내는 쪽이 연결을 끊었거나 스트림이 깨졌다.
+        return { ok: false, reason: timedOut ? "timeout" : "aborted" };
+      }
+      const { done, value } = chunk;
       if (timedOut) return { ok: false, reason: "timeout" };
       if (done) break;
       total += value.byteLength;
       if (total > limit) {
-        await reader.cancel();
+        await reader.cancel().catch(() => undefined);
         return { ok: false, reason: "too-large" };
       }
       chunks.push(value);

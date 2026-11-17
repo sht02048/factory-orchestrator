@@ -407,6 +407,27 @@ describe("receiveTrackerWebhook", () => {
     expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual(["body-timeout"]);
   });
 
+  it("보내는 쪽이 본문 도중에 끊으면 서버 오류가 아니라 401로 답하고 이유를 기록한다", async () => {
+    const context = setup();
+    let sent = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent) {
+          controller.error(new Error("connection reset"));
+          return;
+        }
+        sent = true;
+        controller.enqueue(new Uint8Array([0x20]));
+      },
+    });
+
+    const response = await send(context, acme, { headers: new Headers(labelAdded.headers), body });
+
+    expect(response.status).toBe(401);
+    expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual(["body-aborted"]);
+    expect(stored(context)).toEqual([]);
+  });
+
   it("연결의 비밀값을 열지 못하면 기록하고 내용 없는 500으로 응답한다", async () => {
     const context = setup();
     // 다른 암호화 키로 연다. 키를 바꾼 뒤 옛 DB를 쓰는 경우다.
