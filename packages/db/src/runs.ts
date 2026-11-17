@@ -427,6 +427,20 @@ export function recordStartRequested(db: Database, runId: RunId, now: Date = new
   );
 }
 
+/**
+ * 시작 요청 시각을 지운다. 러너가 닿지 않았거나 오류로 답해 시작한 런이 남지 않았다고 확실할 때만 부른다.
+ * 그러면 그 런은 러너에 묶이지 않아 맞는 러너를 다시 고를 수 있다(Q86).
+ */
+export function clearStartRequested(db: Database, runId: RunId): boolean {
+  return (
+    db
+      .update(runs)
+      .set({ startRequestedAt: null })
+      .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
+      .run().changes > 0
+  );
+}
+
 /** 시작 명령의 오류를 센다(Q86, core decideStartFailure의 failures). Queued가 아니면 false다. */
 export function recordStartFailure(
   db: Database,

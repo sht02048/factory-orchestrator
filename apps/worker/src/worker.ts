@@ -30,6 +30,7 @@ import {
   listRunners,
   listRuns,
   openDatabase,
+  clearStartRequested,
   recordStartFailure,
   recordStartRequested,
   sentQuestionIds,
@@ -458,12 +459,17 @@ async function startOnRunner(
     return { kind: "blocked" };
   }
   const runner = adapters.runner(storedRunner);
+  // 앞서 보낸 시작의 결과를 아직 확인하지 못했는지. 참이면 이 러너에서 확인할 때까지 묶어 둔다.
+  let unverified = records.startRequestedAt !== null;
   try {
     const mailbox = await mailboxFor(context, storedRunner, runner);
-    if (records.startRequestedAt !== null) {
+    if (unverified) {
       const existing = await findStarted(context, run, runner, mailbox);
+      // 확인하지 못했으면 러너를 비우지 않고 이번 순서에서만 뺀다(닿지 않으면 뒤 런을 막지 않는다).
+      if (existing === "unreachable") return { kind: "skipped" };
       if (existing === "unknown") return { kind: "blocked" };
       if (existing !== null) return { kind: "started", started: existing };
+      unverified = false;
     }
     const prompt = await promptFor(context, run);
     if (prompt === null) return { kind: "blocked" };
@@ -484,43 +490,62 @@ async function startOnRunner(
     return { kind: "started", started };
   } catch (error) {
     logger.warn("could not start run", { runId: run.id, error });
-    return handleStartFailure(context, run, runnerId, records.startFailures, error);
+    return handleStartFailure(context, run, { runnerId, unverified }, records.startFailures, error);
   }
 }
 
 /**
- * 같은 이름으로 이미 시작한 런을 찾는다. 찾지 못했으면(오류) "unknown"이고 시작을 보내지 않는다.
- * 찾기 오류는 시작 명령의 오류가 아니라 시도 횟수에 넣지 않는다.
+ * 같은 이름으로 이미 시작한 런을 찾는다. 찾지 못했으면(오류) 시작을 보내지 않는다. 러너에 닿지 않았으면
+ * "unreachable", 그 밖의 오류는 "unknown"이다. 찾기 오류는 시작 명령의 오류가 아니라 시도 횟수에 넣지 않는다.
  */
 async function findStarted(
   context: TickContext,
   run: QueuedStoredRun,
   runner: Runner,
   mailbox: MailboxRef,
-): Promise<StartedRun | null | "unknown"> {
+): Promise<StartedRun | null | "unreachable" | "unknown"> {
   try {
     return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
   } catch (error) {
     context.logger.warn("could not look up a started run", { runId: run.id, error });
-    return "unknown";
+    return runnerErrorDetail(error)?.kind === "unreachable" ? "unreachable" : "unknown";
   }
 }
 
-/** 시작 실패를 core decideStartFailure대로 처리한다(Q86). */
+/**
+ * 시작 실패를 core decideStartFailure대로 처리한다(Q86).
+ *
+ * `unverified`는 앞서 보낸 시작의 결과를 아직 확인하지 못했다는 뜻이다. 그때는 다른 러너에서 다시 시작하면
+ * 에이전트가 둘 생길 수 있어, 러너를 비우거나 시작 요청 시각을 지우지 않고 그 러너에 묶어 둔다.
+ * 확인했으면(또는 처음 보냈으면) 러너가 닿지 않았거나 오류로 답한 시작은 시작한 런을 남기지 않았으므로
+ * (core RunnerErrorDetail) 시작 요청 시각을 지운다.
+ */
 function handleStartFailure(
   context: TickContext,
   run: QueuedStoredRun,
-  runnerId: RunnerId,
+  target: { runnerId: RunnerId; unverified: boolean },
   previousFailures: number,
   error: unknown,
 ): StartAttempt {
   const detail = runnerErrorDetail(error);
   if (detail === null) return { kind: "blocked" };
   const { db, now } = context;
+  const { runnerId, unverified } = target;
+  const forget = (): void => {
+    if (!unverified) clearStartRequested(db, run.id);
+  };
   const decision = decideStartFailure(detail, previousFailures);
   switch (decision.action) {
     case "wait-like-offline":
-      // 러너를 비우지 않는다. 이미 보냈을 수 있는 시작을 다른 러너에서 다시 하지 않기 위해서다.
+      // Offline 예외처럼 순서에서 뺀다. 결과를 모르는 시작이 없으면 러너를 비워 맞는 러너를 다시 고른다.
+      if (!unverified) {
+        tryWrite(context, run.id, () =>
+          inTransaction(db, () => {
+            forget();
+            setQueuedRunRunner(db, run.id, null);
+          }),
+        );
+      }
       return { kind: "skipped" };
     case "find-then-retry":
       return { kind: "blocked" };
@@ -530,7 +555,10 @@ function handleStartFailure(
       return { kind: "blocked" };
     case "retry":
       tryWrite(context, run.id, () =>
-        recordStartFailure(db, run.id, { failures: decision.failures, error: describe(detail) }),
+        inTransaction(db, () => {
+          forget();
+          recordStartFailure(db, run.id, { failures: decision.failures, error: describe(detail) });
+        }),
       );
       return { kind: "blocked" };
     case "could-not-start": {

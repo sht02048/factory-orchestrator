@@ -385,16 +385,48 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     const worker = h.worker();
 
     await worker.tick();
-    expect(current(head)).toMatchObject({ state: "queued", runnerId: runnerA });
+    expect(current(head)).toMatchObject({ state: "queued", runnerId: null });
     expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
-    expect(getRunWithRecords(h.db, head.id)?.records.startFailures).toBe(0);
+    expect(getRunWithRecords(h.db, head.id)?.records).toMatchObject({
+      startFailures: 0,
+      startRequestedAt: null,
+    });
 
-    // 러너 확인이 Offline으로 적으면 대기열이 러너를 비우고, 돌아오면 원래 자리로 시작한다.
-    h.setRunnerOnline(runnerA, false);
-    await worker.tick();
-    h.setRunnerOnline(runnerA, true);
+    // 맞는 러너가 닿으면 원래 자리로 돌아와 시작한다.
     await worker.tick();
     expect(current(head)).toMatchObject({ state: "running", runnerId: runnerA });
+  });
+
+  it("시작 때 러너에 닿지 못한 런은 맞는 다른 러너가 있으면 그 러너에서 시작한다 (Q86)", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    expect(current(run)).toMatchObject({ runnerId: runnerA });
+    h.runner(runnerA).online = false;
+    const worker = h.worker();
+
+    await worker.tick();
+    // 러너 확인 전이라 DB에는 A가 아직 Online이다. 다시 A를 고를 수 있지만, 닿지 않으면 다시 비운다.
+    h.setRunnerOnline(runnerA, false);
+    await worker.tick();
+    expect(current(run)).toMatchObject({ state: "running", runnerId: runnerB });
+  });
+
+  it("결과를 모르는 시작을 확인하려다 러너에 닿지 않으면 뒤 런을 막지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
+    const head = h.assign("ENG-1", projectA);
+    const fakeA = h.runner(runnerA);
+    const worker = h.worker();
+
+    fakeA.loseNextStartResponse = true;
+    await worker.tick();
+    fakeA.online = false;
+    const behind = h.assign("ENG-2", projectB);
+    await worker.tick();
+    await worker.tick();
+    expect(current(head)).toMatchObject({ state: "queued", runnerId: runnerA });
+    expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
   });
 
   it("이미 시작을 보낸 런이 러너에 닿지 못해도 다른 러너에서 다시 시작하지 않는다", async () => {

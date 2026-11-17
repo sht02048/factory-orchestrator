@@ -198,7 +198,10 @@ export interface Tracker {
 // ---------- Runner ----------
 
 export type RunnerErrorDetail =
-  /** 러너에 닿지 못함(ssh 실패 등). 연결 끊김 시계와 시작 실패 판단(Q86)의 근거다 */
+  /**
+   * 러너에 닿지 못함(ssh 실패 등). 연결 끊김 시계와 시작 실패 판단(Q86)의 근거다. startRun이 이것을 던지면
+   * 시작 명령이 러너에서 돌지 않았다는 뜻이다. 돌았는지 모르면 start-outcome-unknown을 던진다.
+   */
   | { kind: "unreachable"; detail: string }
   /** 러너에 실행 도구가 없음(예: orca 실행 파일) */
   | { kind: "not-installed"; detail: string }
@@ -206,7 +209,7 @@ export type RunnerErrorDetail =
   | { kind: "not-ready"; detail: string }
   /** 우편함 터미널이 사라짐. ensureMailbox로 다시 만든 뒤 다시 부른다(Q82.1) */
   | { kind: "mailbox-missing"; detail: string }
-  /** 러너 도구가 돌려준 오류. code는 도구의 값 그대로 */
+  /** 러너 도구가 돌려준 오류. code는 도구의 값 그대로. startRun에서는 시작한 런이 남지 않았다는 뜻이다 */
   | { kind: "runner-error"; code: string; message: string }
   /**
    * 시작 요청의 결과를 모름(응답을 잃음 등). 같은 워크트리 이름으로 findStartedRun을 불러 이미 시작했는지
