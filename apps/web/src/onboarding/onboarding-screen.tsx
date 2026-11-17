@@ -195,14 +195,14 @@ function WebhookGuide({ connection }: { connection: TrackerConnectionView }) {
         <Field label={t("url")} description={t("urlDescription")}>
           <Input value={`${origin}${connection.webhookPath}`} readOnly mono />
         </Field>
-        {/* 다음으로 가는 것은 막지 않는다. webhook 없이도 5분 폴링 보정으로 할당한다(ADR 0001) */}
+        {/* 다음으로 가는 것은 막지 않는다. webhook 없이도 폴링 보정으로 할당한다(ADR 0001). 실패가 아니니 실패 색을 쓰지 않는다 */}
         {connection.hasWebhookSecret ? (
           <p role="status" {...stylex.props(styles.ok)}>
             {t("secretSaved")}
           </p>
         ) : (
           <div role="status" {...stylex.props(styles.stack)}>
-            <p {...stylex.props(styles.error)}>{t("secretMissingTitle")}</p>
+            <p {...stylex.props(styles.ok)}>{t("secretMissingTitle")}</p>
             <Text variant="body">{t("secretMissingBody")}</Text>
           </div>
         )}
