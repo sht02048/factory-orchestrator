@@ -18,7 +18,7 @@ function byName(groups: ReadonlyArray<StatsGroup>): Map<string, StatsGroup> {
 /*
  * 손으로 계산한 값. 런과 시간은 testing/stats-seed.ts 의 statsCases 에 있다.
  *
- * 기간(11월 4일~17일 UTC)에 끝난 ws-commerce 런 아홉:
+ * 기간(11월 4일~17일, UTC 로 자를 때)에 끝난 ws-commerce 런 아홉:
  *   Merged C-1, C-8 / Human Check C-2(이후 병합), C-3(이후 닫힘), C-4 / Failed C-5, C-6, C-7, C-9
  * 리드 타임(분, 대기 + 실행): 10 15 18 20 22 30 34 50 121 → 중앙값 5번째 22, p90 9번째 121
  * 대기(분): 1 2 2 3 4 5 6 8 10 → 중앙값 4 / 실행(분): 8 10 12 15 20 24 30 40 120 → 중앙값 20
@@ -26,13 +26,13 @@ function byName(groups: ReadonlyArray<StatsGroup>): Map<string, StatsGroup> {
  */
 describe("loadStatsPage", () => {
   it("처리량과 요약 결과 분포를 core 요약 계산으로 센다", () => {
-    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now));
+    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
     expect(page.total.runs).toBe(9);
     expect(page.total.outcomes).toEqual({ merged: 2, "human-check": 3, failed: 4, canceled: 0 });
   });
 
   it("Failed 런을 에이전트 결과 × PR 상태 조합별로 센다(Q71)", () => {
-    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now));
+    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
     expect(page.total.failedCombinations).toEqual([
       { agentResult: "reported-failure", prState: "none", runs: 2 },
       { agentResult: "reported-success", prState: "closed", runs: 1 },
@@ -41,7 +41,7 @@ describe("loadStatsPage", () => {
   });
 
   it("리드 타임은 할당부터 종료까지이고 대기 시간과 실행 시간을 나눠 잰다(Q59)", () => {
-    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now));
+    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
     expect(page.total.durations).toEqual({
       leadP50Ms: 22 * min,
       leadP90Ms: 121 * min,
@@ -51,12 +51,12 @@ describe("loadStatsPage", () => {
   });
 
   it("Human Check 뒤 병합 비율은 Human Check 런 중 이후 PR 상태가 병합됨인 것이다(Q54·Q69)", () => {
-    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now));
+    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
     expect(page.total.humanCheck).toEqual({ humanCheck: 3, merged: 1, closed: 1 });
   });
 
   it("날짜별 처리량은 끝난 날(UTC)로 센다. 할당이 기간 전이어도 기간 안에 끝났으면 넣는다", () => {
-    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now));
+    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
     expect(page.daily).toHaveLength(14);
     expect(new Date(page.period.firstDay).toISOString()).toBe("2026-11-04T00:00:00.000Z");
     expect(new Date(page.period.lastDay).toISOString()).toBe("2026-11-17T00:00:00.000Z");
@@ -76,8 +76,36 @@ describe("loadStatsPage", () => {
     });
   });
 
+  it("날짜는 운영자 시간대로 자른다: 날짜 경계를 넘는 런은 그 시간대의 날짜로 묶인다(0044)", () => {
+    // now 는 서울 11월 17일 21:00, 로스앤젤레스 11월 17일 04:00 이라 두 곳 다 기간은 11월 4일~17일이다.
+    // OLD-1 은 UTC 11월 3일 20:11 에 끝나 서울로는 11월 4일 05:11 이다. 서울에서는 기간 안이다.
+    const seoul = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "Asia/Seoul"));
+    expect(seoul.total.runs).toBe(10);
+    const seoulDay = (date: string) =>
+      seoul.daily.find((d) => new Date(d.day).toISOString().slice(0, 10) === date)?.outcomes;
+    expect(seoulDay("2026-11-04")).toEqual({
+      merged: 1,
+      "human-check": 0,
+      failed: 1,
+      canceled: 0,
+    });
+    // C-7 은 UTC 11월 4일 00:10 에 끝나 로스앤젤레스로는 11월 3일 16:10 이다. 기간 밖이다.
+    const la = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "America/Los_Angeles"));
+    expect(new Date(la.period.firstDay).toISOString()).toBe("2026-11-04T00:00:00.000Z");
+    expect(la.total.runs).toBe(8);
+    expect(la.daily[0]?.outcomes).toEqual({ merged: 0, "human-check": 0, failed: 0, canceled: 0 });
+  });
+
+  it("기간의 오늘은 운영자 시간대의 오늘이다", () => {
+    const late = new Date("2026-11-17T17:44:00Z");
+    const seoul = loaded(loadStatsPage(seedStatsDatabase(), undefined, late, "Asia/Seoul"));
+    expect(new Date(seoul.period.lastDay).toISOString()).toBe("2026-11-18T00:00:00.000Z");
+    const utc = loaded(loadStatsPage(seedStatsDatabase(), undefined, late, "UTC"));
+    expect(new Date(utc.period.lastDay).toISOString()).toBe("2026-11-17T00:00:00.000Z");
+  });
+
   it("러너·트래커 프로젝트·에이전트별 값을 손으로 계산한 값과 맞춘다", () => {
-    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now));
+    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
     const runners = byName(page.groups.runner);
     // runner-a: C-1 C-2 C-4 C-7 C-8, 리드 타임 15 20 22 30 34 → 중앙값 22
     expect(runners.get("runner-a")).toMatchObject({
@@ -122,7 +150,7 @@ describe("loadStatsPage", () => {
   });
 
   it.each(STATS_DIMENSIONS)("%s별 합이 전체와 같다", (dimension) => {
-    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now));
+    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
     const groups = page.groups[dimension];
     expect(groups.length).toBeGreaterThan(1);
     const sum = (pick: (s: StatsSummary) => number) =>
@@ -140,7 +168,7 @@ describe("loadStatsPage", () => {
   });
 
   it("날짜별 처리량의 합이 전체와 같다", () => {
-    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now));
+    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
     const daily = page.daily.reduce(
       (n, d) => n + d.outcomes.merged + d.outcomes["human-check"] + d.outcomes.failed,
       0,
@@ -149,20 +177,20 @@ describe("loadStatsPage", () => {
   });
 
   it("다른 Workspace 를 고르면 그 Workspace 의 런만 센다", () => {
-    const page = loaded(loadStatsPage(seedStatsDatabase(), "ws-labs", now));
+    const page = loaded(loadStatsPage(seedStatsDatabase(), "ws-labs", now, "UTC"));
     expect(page.total.runs).toBe(1);
     expect(page.groups.trackerProject.map((g) => g.name)).toEqual(["Lab"]);
   });
 
   it("전체 보기와 Workspace 가 없을 때는 통계를 읽지 않는다", () => {
-    expect(loadStatsPage(seedStatsDatabase(), "all", now)).toEqual({
+    expect(loadStatsPage(seedStatsDatabase(), "all", now, "UTC")).toEqual({
       workspace: { kind: "all" },
     });
   });
 
   it("기간에 끝난 런이 없으면 0 과 빈 묶음이다", () => {
     const later = new Date("2027-01-01T00:00:00Z");
-    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, later));
+    const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, later, "UTC"));
     expect(page.total).toEqual({
       runs: 0,
       rated: 0,
@@ -179,7 +207,7 @@ describe("loadStatsPage", () => {
     const withDecisions = () => {
       const db = seedStatsDatabase();
       addRunDecisionCases(db);
-      return loaded(loadStatsPage(db, undefined, now));
+      return loaded(loadStatsPage(db, undefined, now, "UTC"));
     };
 
     it("Canceled 런은 취소로 따로 세고 성공·실패율의 분모에서 뺀다(Q82.9·Q82.18)", () => {

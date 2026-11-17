@@ -17,9 +17,15 @@ describe("percentile", () => {
 
 describe("statsPeriod", () => {
   it("오늘(UTC)을 넣어 14일이다", () => {
-    const period = statsPeriod(new Date("2026-11-17T23:59:59Z"));
+    const period = statsPeriod(new Date("2026-11-17T23:59:59Z"), "UTC");
     expect(new Date(period.firstDay).toISOString()).toBe("2026-11-04T00:00:00.000Z");
     expect(new Date(period.lastDay).toISOString()).toBe("2026-11-17T00:00:00.000Z");
+  });
+
+  it("운영자 시간대의 오늘을 넣는다", () => {
+    const period = statsPeriod(new Date("2026-11-17T23:59:59Z"), "Asia/Seoul");
+    expect(new Date(period.firstDay).toISOString()).toBe("2026-11-05T00:00:00.000Z");
+    expect(new Date(period.lastDay).toISOString()).toBe("2026-11-18T00:00:00.000Z");
   });
 });
 

@@ -7,6 +7,7 @@ import {
 } from "@factory/core";
 import type { AgentResult, PrState, SummaryOutcome } from "@factory/core";
 import type { WorkspaceChoice } from "../shell/model";
+import { DAY_MS, calendarDay } from "../time-zone";
 
 /*
  * Stats 화면이 보이는 값과 그 계산. server function 이 돌려주고 화면이 그린다. DB 를 들여오지 않는다.
@@ -16,7 +17,7 @@ import type { WorkspaceChoice } from "../shell/model";
  * - 리드 타임·대기 시간·실행 시간은 core runDurations 로 잰다(Q59).
  */
 
-/** 통계를 보는 기간. 오늘(UTC)을 넣어 이 날 수만큼 거슬러 끝난 런을 센다 */
+/** 통계를 보는 기간. 운영자 시간대의 오늘을 넣어 이 날 수만큼 거슬러 끝난 런을 센다 */
 export const STATS_DAYS = 14;
 
 /** 나눠 보기(티켓 0002): 러너별, 트래커 프로젝트별, 에이전트별 */
@@ -93,7 +94,7 @@ export interface StatsGroup extends StatsSummary {
 }
 
 export interface DailyThroughput {
-  /** UTC 날짜의 0시(epoch 밀리초) */
+  /** 운영자 시간대의 날짜. 그 날 UTC 0시의 epoch 밀리초로 나타낸다(time-zone.ts calendarDay) */
   day: number;
   outcomes: OutcomeCounts;
 }
@@ -102,7 +103,7 @@ export type StatsPage =
   | { workspace: Exclude<WorkspaceChoice, { kind: "one" }> }
   | {
       workspace: Extract<WorkspaceChoice, { kind: "one" }>;
-      /** 기간: 첫날 0시와 마지막 날 0시(UTC, epoch 밀리초) */
+      /** 기간: 첫날과 마지막 날(운영자 시간대의 날짜, calendarDay 와 같은 나타냄) */
       period: { firstDay: number; lastDay: number };
       total: StatsSummary;
       /** 기간의 날마다 하나, 오래된 날부터 */
@@ -110,16 +111,9 @@ export type StatsPage =
       groups: Record<StatsDimension, StatsGroup[]>;
     };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** 그 시각이 든 UTC 날짜의 0시 */
-export function utcDay(at: Date): number {
-  return Math.floor(at.getTime() / DAY_MS) * DAY_MS;
-}
-
-/** 오늘(UTC)까지 STATS_DAYS 일. 이 기간에 끝난 런을 센다 */
-export function statsPeriod(now: Date): { firstDay: number; lastDay: number } {
-  const lastDay = utcDay(now);
+/** 운영자 시간대의 오늘까지 STATS_DAYS 일. 이 기간에 끝난 런을 센다 */
+export function statsPeriod(now: Date, timeZone: string): { firstDay: number; lastDay: number } {
+  const lastDay = calendarDay(now, timeZone);
   return { firstDay: lastDay - (STATS_DAYS - 1) * DAY_MS, lastDay };
 }
 
@@ -219,17 +213,18 @@ export function groupStats(runs: ReadonlyArray<StatsRun>, dimension: StatsDimens
     .toSorted((a, b) => b.runs - a.runs || a.name.localeCompare(b.name));
 }
 
-/** 날마다 끝난 런 수(처리량)를 요약 결과로 나눈다. 런이 없는 날도 0 으로 둔다 */
+/** 날마다(운영자 시간대) 끝난 런 수(처리량)를 요약 결과로 나눈다. 런이 없는 날도 0 으로 둔다 */
 export function dailyThroughput(
   runs: ReadonlyArray<StatsRun>,
   period: { firstDay: number; lastDay: number },
+  timeZone: string,
 ): DailyThroughput[] {
   const days: DailyThroughput[] = [];
   for (let day = period.firstDay; day <= period.lastDay; day += DAY_MS) {
     days.push({ day, outcomes: emptyOutcomes() });
   }
   for (const run of runs) {
-    const entry = days[(utcDay(run.endedAt) - period.firstDay) / DAY_MS];
+    const entry = days[(calendarDay(run.endedAt, timeZone) - period.firstDay) / DAY_MS];
     if (entry === undefined) continue;
     entry.outcomes[summarizeRunOutcome(run).outcome] += 1;
   }

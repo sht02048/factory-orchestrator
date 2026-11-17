@@ -8,21 +8,27 @@ import {
 } from "@factory/db";
 import type { Database, StoredRun } from "@factory/db";
 import { resolveWorkspace } from "../shell/model";
-import { dailyThroughput, groupStats, statsPeriod, summarizeStats, utcDay } from "./model";
+import { calendarDay } from "../time-zone";
+import { dailyThroughput, groupStats, statsPeriod, summarizeStats } from "./model";
 import type { StatsPage, StatsRun } from "./model";
 
 /**
- * Stats 화면이 보일 값을 DB 에서 읽는다. 현재 Workspace(주소의 ws)에서 기간(오늘까지 14일, UTC) 안에
- * 끝난 런만 센다. 요약 결과와 시간은 저장하지 않으므로 core 함수로 계산한다(model.ts).
+ * Stats 화면이 보일 값을 DB 에서 읽는다. 현재 Workspace(주소의 ws)에서 기간(오늘까지 14일) 안에
+ * 끝난 런만 센다. 날짜는 운영자 시간대(timeZone)로 자른다. 요약 결과와 시간은 저장하지 않으므로 core 함수로 계산한다(model.ts).
  */
-export function loadStatsPage(db: Database, ws: string | undefined, now: Date): StatsPage {
+export function loadStatsPage(
+  db: Database,
+  ws: string | undefined,
+  now: Date,
+  timeZone: string,
+): StatsPage {
   const workspace = resolveWorkspace(
     listWorkspaces(db).map((w) => ({ id: w.id, name: w.name })),
     ws,
   );
   if (workspace.kind !== "one") return { workspace };
 
-  const period = statsPeriod(now);
+  const period = statsPeriod(now, timeZone);
   const runnerNames = new Map(listRunners(db).map((r) => [r.id, r.name]));
   const projectNames = new Map<string, string>();
   const projectName = (run: StoredRun): string => {
@@ -44,7 +50,7 @@ export function loadStatsPage(db: Database, ws: string | undefined, now: Date): 
   }).flatMap((run): StatsRun[] => {
     if (run.state !== "ended") return [];
     // 기간 밖의 런은 빼서 날짜별 처리량의 합이 전체와 같게 한다.
-    const day = utcDay(run.endedAt);
+    const day = calendarDay(run.endedAt, timeZone);
     if (day < period.firstDay || day > period.lastDay) return [];
     const later = getRunWithRecords(db, run.id)?.records.laterPrState ?? null;
     return [
@@ -74,7 +80,7 @@ export function loadStatsPage(db: Database, ws: string | undefined, now: Date): 
     workspace,
     period,
     total: summarizeStats(runs),
-    daily: dailyThroughput(runs, period),
+    daily: dailyThroughput(runs, period, timeZone),
     groups: {
       runner: groupStats(runs, "runner"),
       trackerProject: groupStats(runs, "trackerProject"),
