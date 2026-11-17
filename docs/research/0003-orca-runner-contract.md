@@ -13,13 +13,13 @@
 
 ## 요약
 
-| #   | 항목                         | 결론                                                                                                                                         |
-| --- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | 런타임이 꺼졌을 때           | `status --json`은 `ok: true`·종료 코드 0에 `runtime.reachable: false`. 런타임이 필요한 명령은 `runtime_unavailable`·종료 코드 1              |
-| 6   | ssh 비대화형 셸              | `orca`가 PATH에 없다(종료 코드 127). 절대 경로로 부르면 런타임에 닿는다. 특별한 환경 변수나 GUI 세션은 필요 없다                             |
-| 7   | Linux 러너                   | **남음.** Linux 러너가 아직 없다. help가 적은 것만 옮겼다                                                                                    |
-| 9   | `worktree rm`                | 이번 러너에서는 에이전트가 남긴 untracked 파일 때문에 `--force` 없이는 `runtime_error`로 실패했다. `--force`는 도는 에이전트를 멈추고 지운다 |
-| 19  | 시간 초과 때 에이전트 멈추기 | `orca terminal close`로 멈춘다. 워크트리는 남는다. `worktree rm --force`로 갈음하지 않는다                                                   |
+| #   | 항목                         | 결론                                                                                                                                             |
+| --- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | 런타임이 꺼졌을 때           | `status --json`은 `ok: true`·종료 코드 0에 `runtime.reachable: false`. 런타임이 필요한 명령은 `runtime_unavailable`·종료 코드 1                  |
+| 6   | ssh 비대화형 셸              | `orca`가 PATH에 없다(종료 코드 127). 절대 경로로 부르면 런타임에 닿는다. ssh 세션 쪽에는 특별한 환경 변수나 GUI 세션이 필요 없다                 |
+| 7   | Linux 러너                   | **남음.** Linux 러너가 아직 없다. help가 적은 것만 옮겼다                                                                                        |
+| 9   | `worktree rm`                | 이번 러너에서는 에이전트가 남긴 untracked 파일 때문에 `--force` 없이는 `runtime_error`로 실패했다. `--force`는 에이전트 프로세스를 멈추고 지운다 |
+| 19  | 시간 초과 때 에이전트 멈추기 | `orca terminal close`로 멈춘다. 워크트리는 남는다. `worktree rm --force`로 갈음하지 않는다                                                       |
 
 이 밖에 러너의 GitHub 인증이 비대화형 ssh 세션에서 동작하지 않는 경우를 만났다(아래 "러너의 GitHub 인증").
 
@@ -82,21 +82,21 @@
 
 - 비대화형 ssh 셸(러너 사용자의 로그인 셸은 zsh)의 PATH는 `/usr/bin:/bin:/usr/sbin:/sbin`이었다. `orca status --json`은 `zsh:1: command not found: orca`, 종료 코드 127이다 **[실행]**.
 - 절대 경로 `/Applications/Orca.app/Contents/Resources/bin/orca`로 부르면 `runtime.reachable: true`, `state: "ready"`이고 워크트리 만들기부터 지우기까지 모든 명령이 됐다 **[실행]**.
-- ssh 세션의 환경 변수는 `HOME`, `LANG`, `LOGNAME`, `PATH`, `PWD`, `SHELL`, `SHLVL`, `SSH_CLIENT`, `SSH_CONNECTION`, `TMPDIR`, `USER`뿐이었다 **[실행]**. Orca 전용 환경 변수나 GUI 로그인 세션 없이 런타임에 닿는다. 런타임은 상시 서비스(아래)로 떠 있었다.
-- 원격 셸이 zsh면 변수 하나에 담은 명령 문자열이 낱말로 쪼개지지 않는다. `"$c"`에 `status --json`을 넣어 부르자 `Unknown command: status --json`이 났다 **[실행]**. 어댑터는 인자마다 따로 셸 인용을 해서 이어 붙인 명령 문자열을 보낸다.
+- ssh 세션의 환경 변수는 `HOME`, `LANG`, `LOGNAME`, `PATH`, `PWD`, `SHELL`, `SHLVL`, `SSH_CLIENT`, `SSH_CONNECTION`, `TMPDIR`, `USER`뿐이었다 **[실행]**. ssh 세션 쪽에는 Orca 전용 환경 변수나 GUI 로그인 세션이 필요 없었다. 런타임은 사용자 LaunchAgent(아래)로 떠 있었고, 러너에 콘솔 로그인 세션이 없을 때(재부팅 직후 등) 서비스가 뜨는지는 시험하지 않았다.
+- 원격 셸이 zsh면 따옴표 없는 변수도 낱말로 쪼개지지 않는다(bash와 다르다). `$c`에 `status --json`을 넣어 `$O $c`로 부르자 `Unknown command: status --json`이 났다 **[실행]**. 어댑터는 인자마다 따로 셸 인용을 해서 이어 붙인 명령 문자열을 보낸다.
 
 러너 설정에는 `orca` 실행 파일 경로를 두고, 기본값은 macOS 앱 경로로 한다. 0002 A.8의 판단과 같다.
 
 ### 상시 서비스 구성(macOS)
 
-코디네이터가 `orca serve service install --bind 127.0.0.1 --refuse-public --command <orca 절대 경로>`로 설치했다. 설치된 LaunchAgent는 다음과 같다 **[실행]**.
+검증 전에 러너를 준비하며 `orca serve service install --bind 127.0.0.1 --refuse-public --command <orca 절대 경로>`로 설치했다. 설치된 LaunchAgent는 다음과 같다 **[실행]**.
 
 - 위치 `<path>/LaunchAgents/com.stablyai.orca.serve.plist`, 이름 `com.stablyai.orca.serve`.
 - `ProgramArguments`: `<orca> serve --supervise --no-pairing --bind 127.0.0.1 --refuse-public`.
 - `EnvironmentVariables`: `PATH=/usr/bin:/bin:/usr/sbin:/sbin`, `ORCA_USER_DATA_PATH`.
 - `RunAtLoad: true`, `KeepAlive.SuccessfulExit: false`, `ThrottleInterval: 10`, 로그는 `<path>/Logs/Orca/com.stablyai.orca.serve.log`.
 
-1.4.258의 `serve service install`에는 `--supervise` 플래그가 없다. usage는 `[--port] [--bind] [--pairing-address] [--allow-public | --refuse-public] [--command <path>] [--dry-run] [--json]`이고, 서비스가 늘 `orca serve --supervise --no-pairing`을 돌린다 **[스키마]**. PATH에 `orca`가 없으면 `cli_not_found`로 실패해 `--command <절대 경로>`가 필요했다 **[실행]**(코디네이터가 설치 때 관찰).
+1.4.258의 `serve service install`에는 `--supervise` 플래그가 없다. usage는 `[--port] [--bind] [--pairing-address] [--allow-public | --refuse-public] [--command <path>] [--dry-run] [--json]`이고, 서비스가 늘 `orca serve --supervise --no-pairing`을 돌린다 **[스키마]**. PATH에 `orca`가 없으면 `cli_not_found`로 실패해 `--command <절대 경로>`가 필요했다(러너를 준비할 때 관찰, 출력은 남기지 않음).
 
 서비스의 PATH는 좁지만 에이전트는 러너 사용자의 로그인 셸 터미널 안에서 뜬다. 에이전트가 끝난 뒤 그 터미널에 zsh 프롬프트가 남았고, `~/.local/bin`에 있는 `claude`를 찾아 실행했다 **[실행]**. 에이전트 실행 파일은 사용자 셸 설정의 PATH로 찾는다.
 
@@ -114,7 +114,7 @@
 
 ### `--force` 없이: 에이전트가 돈 워크트리는 지워지지 않는다
 
-에이전트가 끝난 워크트리(W1)와 에이전트가 `sleep 120`을 돌리던 워크트리(W4) 모두에서 실패했다 **[실행]**. 종료 코드 1. 픽스처: [`worktree-rm-dirty-error.json`](fixtures/0003/worktree-rm-dirty-error.json), [`worktree-rm-while-working-error.json`](fixtures/0003/worktree-rm-while-working-error.json).
+에이전트가 끝난 워크트리(W1)와 에이전트가 띄운 `sleep 120`이 돌던 워크트리(W4) 모두에서 실패했다 **[실행]**. 종료 코드 1. 픽스처: [`worktree-rm-dirty-error.json`](fixtures/0003/worktree-rm-dirty-error.json), [`worktree-rm-while-working-error.json`](fixtures/0003/worktree-rm-while-working-error.json).
 
 ```json
 {
@@ -132,7 +132,7 @@
 - `error.code`가 일반적인 `runtime_error`라 "더러워서 못 지움"을 코드로 가를 수 없다.
 - 실패한 `rm`은 아무것도 멈추지 않았다. 터미널은 `connected: true`로 남고, 에이전트 셸과 `sleep`도 살아 있었다 **[실행]**.
 
-### `--force`: 도는 에이전트를 멈추고 지운다
+### `--force`: 에이전트 프로세스를 멈추고 지운다
 
 ```json
 {
@@ -145,7 +145,7 @@
 
 종료 코드 0 **[실행]**. 픽스처: [`worktree-rm-force.json`](fixtures/0003/worktree-rm-force.json)(W1, 에이전트가 끝나 셸만 남은 상태, `--delete-branch` 없이), [`worktree-rm-force-delete-branch.json`](fixtures/0003/worktree-rm-force-delete-branch.json). 지우기 직전 W4 행은 [`worktree-ps-before-rm-working.json`](fixtures/0003/worktree-ps-before-rm-working.json)이다(`status: "working"`, `agents[0].state: "working"`, `programStatus.message: "1 shell still running"`).
 
-에이전트가 `sleep 120`을 돌리는 중에 `rm --force --delete-branch`를 부르자 다음이 일어났다 **[실행]**.
+W4는 에이전트의 턴이 끝나고 에이전트가 띄운 `sleep 120`이 백그라운드로 돌던 상태였다(`agents[0].state: "working"`, `mainAgent.state: "done"`). 턴 도중의 에이전트에는 시험하지 않았다. 이 상태에서 `rm --force --delete-branch`를 부르자 다음이 일어났다 **[실행]**.
 
 - 에이전트 터미널이 끝났다. `terminal read`는 `status: "exited"`, 빈 `tail`을 낸다.
 - 에이전트 프로세스와 그 자식(`sleep`)이 사라졌다. 워크트리를 작업 디렉터리로 쓰는 프로세스는 에이전트 플러그인의 세션 종료 훅 워커만 잠깐 남았다가 끝났다.
@@ -224,6 +224,8 @@ Runner 어댑터의 "에이전트 멈추기"는 `orca terminal close --worktree 
 3. 런타임이 다시 뜬 뒤 예전 터미널 핸들로 부른 명령의 동작(`terminal_handle_stale`인지).
 4. 병합되지 않은 커밋이 있는 브랜치에 `worktree rm --delete-branch`를 줄 때의 동작.
 5. 러너의 GitHub 인증을 온보딩에서 무엇으로 점검할지. 에이전트마다 쓰는 인증(`gh`, git 자격 증명 도우미, ssh 키)이 달라 명령 하나로 덮기 어렵다.
+6. 턴 도중의 에이전트에 `--delete-branch` 없는 `worktree rm --force`를 줄 때의 동작. 이번에는 턴이 끝나고 백그라운드 셸이 돌던 에이전트에 `--force --delete-branch`만 줬다.
+7. 러너에 콘솔 로그인 세션이 없을 때(재부팅 직후 등) macOS LaunchAgent 서비스가 뜨는지.
 
 ## 픽스처
 
