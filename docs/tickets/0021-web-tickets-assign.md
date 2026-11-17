@@ -12,9 +12,9 @@ blocked_by: [0007, 0027]
 ## 범위
 
 - 이 티켓은 `apps/web`의 Tickets 라우트와 그 화면 메시지만 고친다.
-- 티켓 목록은 server function이 0027의 tracker-linear 생성 코드로 조회한다(web은 ssh만 쓰지 않는다, Q61). 마지막 런 결과를 함께 보인다.
+- 티켓 목록은 server function이 0027의 tracker-linear 생성 코드로 조회한다(web은 ssh만 쓰지 않는다, Q61). 마지막 런의 요약 결과(core 요약 계산 함수)를 함께 보인다.
 - 수동 할당: Mapping 기본값(러너 쪽 프로젝트, 에이전트)을 채워 보여 주고, 운영자는 러너와 에이전트만 바꿀 수 있다(Q53·Q60). 러너의 기본값은 할당 때 자동으로 고르기다(Q53). 확인하면 db의 할당 진입점(0005)으로 런을 만든다.
-- 진행 중이거나 Queued인 런이 있는 티켓은 할당할 수 없다(Q45).
+- 진행 중(Running, Waiting for Input, Disconnected)이거나 Queued인 런이 있는 티켓은 할당할 수 없다(Q45·Q74).
 - 필터는 시안 B를 따르되, "실행 중"에 Queued 티켓을 넣지 않는다(0034와 같은 지적).
 
 ## 완료 조건
