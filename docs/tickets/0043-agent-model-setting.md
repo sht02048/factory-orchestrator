@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 blocked_by: []
 ---
 
@@ -15,14 +15,19 @@ blocked_by: []
 
 ## 범위
 
-- 모델을 어디에 둘지(러너마다, Mapping마다, 에이전트마다) 정해야 한다. 지금 설정은 러너마다이지만, 같은 러너에서 Claude Code와 Codex를 함께 쓰면 모델 이름이 에이전트마다 다르다. 운영자 결정 전에는 정하지 않는다.
-- 결정에 따라 `apps/web` 폼과 메시지, 필요하면 `packages/core`·`packages/db`·`packages/runner-orca`를 고친다.
+- 모델은 Mapping마다 둔다(아래 운영자 결정). `apps/web`의 Mapping 폼(온보딩·Settings)과 메시지, `packages/core`·`packages/db`(마이그레이션 `mapping_model`)·`packages/runner-orca`·`apps/worker`를 고친다.
+- 할당 때 Mapping의 모델을 런에 옮겨 적고, 시작할 때 `worker-start --model`로 넘긴다. 우선순위는 런의 모델(Mapping 값) → 러너 설정의 `model` → 러너 Orca의 기본값이다(스펙 3절 4번).
+- 수동 할당에서 운영자가 에이전트를 바꾸면 Mapping의 모델은 다른 에이전트의 모델 이름이라 런에 적지 않는다.
+- Run 상세에 런의 모델을 보인다. 같은 Mapping이라도 모델을 바꾸면 런마다 쓴 모델이 다를 수 있어서다.
 
 ## 완료 조건
 
 - 화면에서 정한 모델이 `worker-start --model`로 넘어간다는 테스트가 통과한다.
 - 비워 두면 `--model`을 넘기지 않는다는 테스트가 통과한다.
 
-## 운영자 결정 필요
+## 운영자 결정(2026-11-18)
 
-- 모델을 러너, Mapping, 에이전트 중 어디에 둘지.
+- 에이전트 모델은 Mapping마다 둔다. 선택 칸이고 비우면 러너 Orca 기본값(`--model`을 넘기지 않음)이다. 같은 러너에서 에이전트마다 모델 이름이 다르기 때문이다. 온보딩 Mapping 단계와 Settings Mapping 폼 둘 다에 둔다.
+- 수동 할당 창에서는 바꾸지 않는다(기존 규칙대로 러너·에이전트만 바꿈).
+- 러너 설정의 `model`은 남기되 Mapping 값이 있으면 그것이 이긴다.
+- 런에는 쓴 모델을 기록한다.
