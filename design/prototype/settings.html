@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Settings · factory-orchestrator</title>
+    <script>
+      try {
+        var t = localStorage.getItem("fo-theme");
+        if (t) document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .settings {
+        display: grid;
+        grid-template-columns: 180px minmax(0, 1fr);
+        gap: var(--space-6);
+        align-items: start;
+      }
+
+      .settings-nav {
+        position: sticky;
+        top: 72px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .settings-nav a {
+        display: flex;
+        align-items: center;
+        height: 30px;
+        padding: 0 var(--space-2);
+        border-radius: var(--radius-md);
+        color: var(--text-secondary);
+      }
+
+      .settings-nav a:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+        text-decoration: none;
+      }
+
+      .settings-sections {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-6);
+        max-width: 960px;
+      }
+
+      .settings-section {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        scroll-margin-top: 72px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: flex-end;
+        gap: var(--space-3);
+      }
+
+      .section-head h2 {
+        font-size: var(--text-title);
+      }
+
+      .section-head p {
+        max-width: 65ch;
+        color: var(--text-tertiary);
+        text-wrap: pretty;
+      }
+
+      .section-head .page-actions {
+        margin-inline-start: auto;
+      }
+
+      .arrow {
+        color: var(--text-tertiary);
+      }
+
+      .form-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: var(--space-3);
+      }
+
+      .form-row .input {
+        width: 240px;
+      }
+
+      .kv-table td:first-child {
+        width: 180px;
+        color: var(--text-tertiary);
+      }
+
+      .env {
+        color: var(--text-tertiary);
+        font-family: var(--font-mono);
+        font-size: 12px;
+      }
+
+      @media (max-width: 960px) {
+        .settings {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .settings-nav {
+          position: static;
+          flex-direction: row;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#page">본문으로 건너뛰기</a>
+    <div class="app" id="app">
+      <main class="main" id="page">
+        <header class="page-header">
+          <h1 class="page-title">Settings</h1>
+          <span class="page-subtitle">연결 값은 .env에서 읽어요. 화면에서는 확인만 할 수 있어요</span>
+          <div class="page-actions"><a class="btn" href="onboarding.html">첫 실행 설정 다시 하기</a></div>
+        </header>
+        <div class="page-body">
+          <div class="settings">
+            <nav class="settings-nav" aria-label="설정 항목">
+              <a href="#mapping">Mapping</a>
+              <a href="#auto-assign">Auto-assign Label</a>
+              <a href="#connection">연결 정보</a>
+            </nav>
+            <div class="settings-sections">
+              <section class="settings-section" id="mapping" aria-labelledby="mapping-title">
+                <div class="section-head">
+                  <div>
+                    <h2 id="mapping-title">Mapping</h2>
+                    <p>Linear 프로젝트의 티켓을 어느 러너의 어떤 프로젝트에서, 어떤 에이전트로 처리할지 정해요.</p>
+                  </div>
+                  <div class="page-actions"><button class="btn" type="button" id="add-mapping"></button></div>
+                </div>
+                <div class="callout" data-tone="failed" id="mapping-warning"></div>
+                <section class="card">
+                  <div class="table-wrap">
+                    <table class="table">
+                      <thead>
+                        <tr>
+                          <th>Linear 프로젝트</th>
+                          <th class="col-shrink"></th>
+                          <th>러너</th>
+                          <th>러너 프로젝트</th>
+                          <th>에이전트</th>
+                          <th class="col-num">오늘 런</th>
+                          <th class="col-shrink"><span class="visually-hidden">동작</span></th>
+                        </tr>
+                      </thead>
+                      <tbody id="mapping-rows"></tbody>
+                    </table>
+                  </div>
+                </section>
+              </section>
+
+              <section class="settings-section" id="auto-assign" aria-labelledby="auto-title">
+                <div class="section-head">
+                  <div>
+                    <h2 id="auto-title">Auto-assign Label</h2>
+                    <p>이 라벨이 붙은 티켓은 운영자 없이 매핑대로 할당해요. 라벨을 떼도 이미 시작한 런은 멈추지 않아요.</p>
+                  </div>
+                </div>
+                <section class="card card-body">
+                  <form class="form-row" id="label-form">
+                    <div class="field">
+                      <label for="label-input">Linear 라벨 이름</label>
+                      <input class="input mono" id="label-input" name="label" value="factory" autocomplete="off" spellcheck="false" />
+                    </div>
+                    <button class="btn btn-primary" type="submit">라벨 저장하기</button>
+                    <span class="field-hint" id="label-hint">지금 이 라벨이 붙은 열린 티켓은 <span id="label-count" class="num"></span>개예요.</span>
+                  </form>
+                </section>
+              </section>
+
+              <section class="settings-section" id="connection" aria-labelledby="conn-title">
+                <div class="section-head">
+                  <div>
+                    <h2 id="conn-title">연결 정보</h2>
+                    <p>값은 서버의 환경 변수로 넣어요. 바꾸려면 .env를 고치고 오케스트레이터를 다시 시작하면 돼요.</p>
+                  </div>
+                </div>
+                <section class="card">
+                  <div class="card-header"><h3 class="card-title">Linear</h3><span class="badge" data-tone="plain" style="background:transparent;color:var(--status-online-text);box-shadow:inset 0 0 0 1px currentColor">연결됨</span></div>
+                  <table class="table kv-table">
+                    <tbody>
+                      <tr><td>워크스페이스</td><td class="mono">acme</td><td class="env">LINEAR_WORKSPACE</td></tr>
+                      <tr><td>API 키</td><td class="mono">lin_api_••••••••3f2a</td><td class="env">LINEAR_API_KEY</td></tr>
+                      <tr><td>Webhook 주소</td><td class="mono">https://orchestrator.example.com/api/linear/webhook</td><td class="env">PUBLIC_BASE_URL</td></tr>
+                      <tr><td>마지막 webhook</td><td class="num">14:18 · Issue updated (ACME-425)</td><td></td></tr>
+                      <tr><td>보정 폴링</td><td class="num">5분마다 · 마지막 14:15</td><td class="env">LINEAR_POLL_INTERVAL</td></tr>
+                    </tbody>
+                  </table>
+                </section>
+                <section class="card">
+                  <div class="card-header"><h3 class="card-title">GitHub</h3><span class="badge" data-tone="plain" style="background:transparent;color:var(--status-online-text);box-shadow:inset 0 0 0 1px currentColor">연결됨</span></div>
+                  <table class="table kv-table">
+                    <tbody>
+                      <tr><td>토큰</td><td class="mono">ghp_••••••••9c1d</td><td class="env">GITHUB_TOKEN</td></tr>
+                      <tr><td>쓰임</td><td>런이 끝났을 때 PR 상태를 읽어 결과를 판정해요</td><td></td></tr>
+                    </tbody>
+                  </table>
+                </section>
+                <section class="card">
+                  <div class="card-header">
+                    <h3 class="card-title">러너 접속</h3>
+                    <span class="env">RUNNERS_FILE=runners.yaml</span>
+                    <div class="page-actions"><button class="btn btn-sm" type="button" id="check-all">모두 다시 확인하기</button></div>
+                  </div>
+                  <div class="table-wrap">
+                    <table class="table">
+                      <thead><tr><th>러너</th><th>ssh 주소</th><th class="col-num">capacity</th><th>상태</th></tr></thead>
+                      <tbody id="runner-rows"></tbody>
+                    </table>
+                  </div>
+                </section>
+              </section>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const { esc, agents, icon } = FO;
+        FO.mountShell("settings");
+        document.getElementById("add-mapping").innerHTML = `${icon.plus}<span>매핑 추가하기</span>`;
+        document.getElementById("add-mapping").addEventListener("click", () => FO.toast("시안에서는 매핑을 추가하지 않아요."));
+
+        const offline = FO.mappings.filter((m) => !FO.runner(m.runner).online);
+        const warn = document.getElementById("mapping-warning");
+        if (offline.length) {
+          warn.innerHTML = `<div class="callout-body"><strong>${offline.map((m) => m.tracker).join(", ")} 티켓이 Offline 러너로 가요</strong>
+            <span class="secondary">${offline[0].runner}가 돌아오기 전까지 이 프로젝트의 런은 Queued로 기다려요. 다른 러너로 바꾸려면 매핑을 고치면 돼요.</span></div>`;
+        } else warn.hidden = true;
+
+        document.getElementById("mapping-rows").innerHTML = FO.mappings
+          .map((m) => {
+            const rn = FO.runner(m.runner);
+            const today = FO.runs.filter((r) => FO.ticket(r.ticket).project === m.tracker).length;
+            return `<tr>
+              <td>${esc(m.tracker)}</td>
+              <td class="arrow" aria-hidden="true">→</td>
+              <td><span style="display:inline-flex;align-items:center;gap:6px"><span class="dot" data-tone="${rn.online ? "online" : "offline"}"></span>${rn.id}</span>${rn.online ? "" : ' <span class="muted">Offline</span>'}</td>
+              <td class="mono">${m.project}</td>
+              <td>${agents[m.agent].name}</td>
+              <td class="col-num">${today}</td>
+              <td><button class="btn btn-sm btn-ghost" type="button" data-edit="${esc(m.tracker)}">고치기</button></td>
+            </tr>`;
+          })
+          .join("");
+        document.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => FO.toast(`시안에서는 ${b.dataset.edit} 매핑을 고치지 않아요.`)));
+
+        document.getElementById("runner-rows").innerHTML = FO.runners
+          .map(
+            (r) => `<tr>
+              <td><a href="runners.html#${r.id}">${r.id}</a></td>
+              <td class="mono">orca@${r.host}</td>
+              <td class="col-num">${r.capacity}</td>
+              <td><span style="display:inline-flex;align-items:center;gap:6px"><span class="dot" data-tone="${r.online ? "online" : "offline"}"></span>${r.online ? "Online" : `Offline · ${r.lastSeen}`}</span></td>
+            </tr>`
+          )
+          .join("");
+        document.getElementById("check-all").addEventListener("click", () => FO.toast("러너 3대 중 2대에 닿았어요."));
+
+        const input = document.getElementById("label-input");
+        function count() {
+          const v = input.value.trim();
+          document.getElementById("label-count").textContent = FO.tickets.filter((t) => t.trackerState !== "Done" && t.labels.includes(v)).length;
+        }
+        input.addEventListener("input", count);
+        count();
+        document.getElementById("label-form").addEventListener("submit", (e) => {
+          e.preventDefault();
+          const v = input.value.trim();
+          if (!v) {
+            input.setAttribute("aria-invalid", "true");
+            FO.toast("라벨 이름을 적어 주세요.");
+            return;
+          }
+          input.removeAttribute("aria-invalid");
+          FO.toast(`자동 할당 라벨을 ${v}로 저장했어요.`);
+        });
+      })();
+    </script>
+  </body>
+</html>

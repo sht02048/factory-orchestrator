@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>첫 실행 설정 · factory-orchestrator</title>
+    <script>
+      try {
+        var t = localStorage.getItem("fo-theme");
+        if (t) document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .ob {
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .ob-top {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        height: 52px;
+        padding: 0 var(--space-6);
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .ob-top .page-actions {
+        margin-inline-start: auto;
+      }
+
+      .ob-main {
+        display: grid;
+        grid-template-columns: 240px minmax(0, 640px);
+        gap: var(--space-8);
+        justify-content: center;
+        padding: var(--space-8) var(--space-6) 96px;
+      }
+
+      .steps {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        position: sticky;
+        top: var(--space-8);
+        align-self: start;
+      }
+
+      .step-link {
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
+        gap: var(--space-3);
+        align-items: center;
+        width: 100%;
+        min-height: 40px;
+        padding: var(--space-1) var(--space-2);
+        border: 0;
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--text-tertiary);
+        font: inherit;
+        text-align: start;
+        cursor: pointer;
+        transition: background-color var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+      }
+
+      .step-link:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+      }
+
+      .step-link[aria-current="step"] {
+        background: var(--bg-selected);
+        color: var(--text-primary);
+      }
+
+      .step-num {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1.5px var(--border-strong);
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .step-link[aria-current="step"] .step-num {
+        background: var(--accent);
+        box-shadow: none;
+        color: var(--text-on-accent);
+      }
+
+      .step-link[data-done] .step-num {
+        background: var(--status-online-solid);
+        box-shadow: none;
+        color: var(--bg-canvas);
+      }
+
+      .step-link[data-done] .step-num svg {
+        width: 13px;
+        height: 13px;
+      }
+
+      .step-label {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.35;
+      }
+
+      .step-label small {
+        color: var(--text-tertiary);
+        font-size: var(--text-caption);
+      }
+
+      .panel {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-5);
+      }
+
+      .panel-head {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+
+      .panel-head .eyebrow {
+        color: var(--text-tertiary);
+        font-size: var(--text-caption);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .panel-head h1 {
+        font-size: var(--text-display);
+        letter-spacing: -0.015em;
+        line-height: 1.15;
+      }
+
+      .panel-head p {
+        max-width: 60ch;
+        color: var(--text-secondary);
+        font-size: var(--text-body);
+        text-wrap: pretty;
+      }
+
+      .form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        padding: var(--space-5);
+      }
+
+      .form .input,
+      .form .select {
+        height: 36px;
+        font-size: var(--text-body);
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-4);
+      }
+
+      .field-error {
+        display: none;
+        align-items: center;
+        gap: 6px;
+        color: var(--status-failed-text);
+        font-size: var(--text-caption);
+      }
+
+      .field-error svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      .field[data-invalid] .field-error {
+        display: inline-flex;
+      }
+
+      .field[data-invalid] .input {
+        border-color: var(--status-failed-solid);
+      }
+
+      .choices {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--space-2);
+        border: 0;
+        margin: 0;
+        padding: 0;
+      }
+
+      .choices legend {
+        margin-bottom: 6px;
+        padding: 0;
+        color: var(--text-secondary);
+        font-weight: var(--weight-medium);
+      }
+
+      .choice {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: var(--space-3);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: border-color var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+      }
+
+      .choice:hover {
+        border-color: var(--border-strong);
+      }
+
+      .choice:has(input:checked) {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+
+      .choice:has(input:focus-visible) {
+        outline: 2px solid var(--text-secondary);
+        outline-offset: 2px;
+      }
+
+      .choice input {
+        position: absolute;
+        opacity: 0;
+      }
+
+      .choice strong {
+        font-weight: var(--weight-medium);
+      }
+
+      .choice span {
+        color: var(--text-tertiary);
+        font-size: var(--text-caption);
+        text-wrap: pretty;
+      }
+
+      .guide {
+        margin: 0;
+        padding: var(--space-3) var(--space-4) var(--space-3) var(--space-8);
+        border-radius: var(--radius-md);
+        background: var(--bg-inset);
+        color: var(--text-secondary);
+        line-height: 1.7;
+      }
+
+      .guide code,
+      .copy-row code {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-primary);
+      }
+
+      .copy-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-md);
+        background: var(--bg-inset);
+      }
+
+      .copy-row code {
+        flex: 1;
+        overflow-wrap: anywhere;
+      }
+
+      .ssh-result {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+
+      .ssh-checks {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .ssh-checks li {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+
+      .ssh-checks svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .ssh-checks .ok {
+        color: var(--status-online-text);
+      }
+
+      .ssh-checks .bad {
+        color: var(--status-failed-text);
+      }
+
+      .ssh-checks .skip {
+        color: var(--text-tertiary);
+      }
+
+      .demo-switch {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        color: var(--text-tertiary);
+        font-size: var(--text-caption);
+      }
+
+      .nav-row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+
+      .nav-row .spacer {
+        flex: 1;
+      }
+
+      .summary-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .summary-list li {
+        display: grid;
+        grid-template-columns: 24px 120px minmax(0, 1fr);
+        gap: var(--space-3);
+        align-items: center;
+        min-height: 44px;
+        padding: 0 var(--space-5);
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .summary-list li:last-child {
+        border-bottom: 0;
+      }
+
+      .summary-list svg {
+        width: 14px;
+        height: 14px;
+        color: var(--status-online-text);
+      }
+
+      @media (max-width: 900px) {
+        .ob-main {
+          grid-template-columns: minmax(0, 1fr);
+          padding-inline: var(--space-4);
+        }
+
+        .steps {
+          position: static;
+        }
+
+        .choices,
+        .form-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="ob">
+      <header class="ob-top">
+        <div class="brand" style="padding:0"><span class="brand-mark" aria-hidden="true">F</span>factory-orchestrator</div>
+        <span class="muted">첫 실행 설정</span>
+        <div class="page-actions">
+          <button class="btn btn-ghost" type="button" id="theme-toggle"></button>
+          <a class="btn btn-ghost" href="tickets.html">나중에 하기</a>
+        </div>
+      </header>
+      <main class="ob-main" id="page">
+        <nav aria-label="설정 단계"><ol class="steps" id="steps"></ol></nav>
+        <div class="panel" id="panel"></div>
+      </main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const { icon, esc, agents } = FO;
+
+        // 테마 토글(셸 없이)
+        const themeBtn = document.getElementById("theme-toggle");
+        function paintTheme() {
+          const dark = document.documentElement.getAttribute("data-theme") !== "light";
+          themeBtn.innerHTML = dark ? `${icon.sun}<span>라이트 모드로 보기</span>` : `${icon.moon}<span>다크 모드로 보기</span>`;
+        }
+        themeBtn.addEventListener("click", () => {
+          const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+          document.documentElement.classList.add("theme-switching");
+          document.documentElement.setAttribute("data-theme", next);
+          try {
+            localStorage.setItem("fo-theme", next);
+          } catch (e) {}
+          paintTheme();
+          requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.classList.remove("theme-switching")));
+        });
+        paintTheme();
+
+        const params = new URLSearchParams(location.search);
+        const state = {
+          step: Math.min(5, Math.max(1, parseInt(params.get("step"), 10) || 1)),
+          done: new Set(),
+          linearKey: "",
+          expose: "funnel",
+          baseUrl: "https://orchestrator.example.com",
+          githubToken: "",
+          runnerName: "runner-a",
+          sshHost: "runner-a.example.com",
+          sshUser: "orca",
+          capacity: 3,
+          ssh: params.get("ssh") || null, // null | ok | fail
+          mapTracker: "Web Console",
+          mapProject: "acme/web",
+          mapAgent: "claude",
+          label: "factory",
+        };
+        // 화면 확인용: ?step=3 처럼 바로 열면 앞 단계는 끝낸 것으로 본다
+        for (let i = 1; i < state.step; i++) state.done.add(i);
+        if (state.step > 1) {
+          state.linearKey = "lin_api_example";
+          state.githubToken = "ghp_example";
+        }
+        if (state.step > 3 && !state.ssh) state.ssh = "ok";
+
+        const steps = [
+          { title: "Linear 연결", sub: "API 키와 webhook" },
+          { title: "GitHub 토큰", sub: "PR 상태 읽기" },
+          { title: "첫 러너 등록", sub: "ssh 연결 확인" },
+          { title: "첫 Mapping", sub: "티켓이 갈 곳 정하기" },
+          { title: "완료", sub: "" },
+        ];
+
+        const errorIcon = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 4.75v3.75M8 11h.01"/></svg>';
+
+        function field(id, label, value, opts = {}) {
+          return `<div class="field" id="f-${id}">
+            <label for="${id}">${label}</label>
+            <input class="input${opts.mono ? " mono" : ""}" id="${id}" name="${id}" type="${opts.type || "text"}" value="${esc(value)}" ${opts.placeholder ? `placeholder="${esc(opts.placeholder)}"` : ""} autocomplete="off" spellcheck="false" ${opts.attrs || ""} aria-describedby="${id}-hint ${id}-err" />
+            ${opts.hint ? `<span class="field-hint" id="${id}-hint">${opts.hint}</span>` : ""}
+            <span class="field-error" id="${id}-err">${errorIcon}${opts.error || ""}</span>
+          </div>`;
+        }
+
+        const exposeGuide = {
+          funnel: ["러너와 같은 tailnet이라면 가장 간단해요.", "<li>오케스트레이터가 도는 기기에서 <code>tailscale funnel 3000</code>을 실행해요.</li><li>나온 <code>https://…ts.net</code> 주소를 아래 공개 주소에 넣어요.</li>"],
+          cloudflare: ["도메인이 Cloudflare에 있다면 포트를 열지 않고 공개할 수 있어요.", "<li><code>cloudflared tunnel create orchestrator</code>로 터널을 만들어요.</li><li>터널을 <code>http://localhost:3000</code>에 잇고, 연결한 호스트 이름을 아래에 넣어요.</li>"],
+          proxy: ["이미 nginx나 Caddy 같은 리버스 프록시를 쓰고 있다면 골라요.", "<li><code>/api/linear/webhook</code> 경로를 <code>http://localhost:3000</code>으로 넘겨요.</li><li>HTTPS 주소를 아래 공개 주소에 넣어요.</li>"],
+        };
+
+        function step1() {
+          const g = exposeGuide[state.expose];
+          return `<section class="card form">
+              ${field("linearKey", "Linear API 키", state.linearKey, { type: "password", mono: true, placeholder: "lin_api_로 시작해요", hint: "Linear 설정 → API → Personal API keys에서 만들 수 있어요. 서버의 .env에 LINEAR_API_KEY로 저장해요.", error: "API 키를 넣어 주세요." })}
+            </section>
+            <section class="card form">
+              <fieldset class="choices">
+                <legend>webhook을 받을 공개 주소를 어떻게 만들까요?</legend>
+                ${[
+                  ["funnel", "Tailscale Funnel", "tailnet 기기를 바로 공개해요"],
+                  ["cloudflare", "Cloudflare Tunnel", "포트를 열지 않아요"],
+                  ["proxy", "리버스 프록시", "이미 쓰는 서버가 있을 때"],
+                ]
+                  .map(([v, t, s]) => `<label class="choice"><input type="radio" name="expose" value="${v}"${state.expose === v ? " checked" : ""} /><strong>${t}</strong><span>${s}</span></label>`)
+                  .join("")}
+              </fieldset>
+              <p class="secondary">${g[0]}</p>
+              <ol class="guide">${g[1]}</ol>
+              ${field("baseUrl", "공개 주소", state.baseUrl, { mono: true, placeholder: "https://", hint: "PUBLIC_BASE_URL로 저장해요.", error: "https://로 시작하는 주소를 넣어 주세요." })}
+              <div class="field">
+                <span class="secondary" style="font-weight:500">Linear webhook에 넣을 주소</span>
+                <div class="copy-row"><code id="hook-url">${esc(state.baseUrl.replace(/\/$/, ""))}/api/linear/webhook</code><button class="btn btn-sm" type="button" id="copy-hook">복사하기</button></div>
+                <span class="field-hint">Linear 설정 → API → Webhooks에서 Issues 이벤트로 추가해요.</span>
+              </div>
+            </section>`;
+        }
+
+        function step2() {
+          return `<section class="card form">
+            ${field("githubToken", "GitHub 토큰", state.githubToken, { type: "password", mono: true, placeholder: "ghp_ 또는 github_pat_로 시작해요", hint: "런이 끝났을 때 PR이 병합됐는지 읽는 데만 써요. Pull requests 읽기 권한이면 충분해요. .env에 GITHUB_TOKEN으로 저장해요.", error: "토큰을 넣어 주세요." })}
+          </section>`;
+        }
+
+        function sshResult() {
+          if (!state.ssh) return "";
+          const ok = state.ssh === "ok";
+          const rows = ok
+            ? [["ok", `ssh ${esc(state.sshUser)}@${esc(state.sshHost)}에 닿았어요`], ["ok", "Orca 1.14.2를 찾았어요"], ["ok", "프로젝트 3개를 찾았어요: acme/web, acme/platform, acme/design-tokens"]]
+            : [["bad", `ssh ${esc(state.sshUser)}@${esc(state.sshHost)}에 닿지 않았어요 (22번 포트 연결 시간 초과)`], ["skip", "Orca 버전 확인은 건너뛰었어요"], ["skip", "프로젝트 찾기는 건너뛰었어요"]];
+          return `<div class="callout" data-tone="${ok ? "merged" : "failed"}" style="${ok ? "background:color-mix(in oklch, var(--status-online-solid) 12%, var(--bg-surface));border-color:color-mix(in oklch, var(--status-online-solid) 40%, transparent)" : ""}">
+            <div class="callout-body ssh-result">
+              <strong>${ok ? "연결을 확인했어요" : "러너에 연결하지 못했어요"}</strong>
+              <ul class="ssh-checks">${rows
+                .map(([k, t]) => `<li><span class="${k}">${k === "ok" ? icon.check : k === "bad" ? icon.x : "–"}</span><span>${t}</span></li>`)
+                .join("")}</ul>
+              ${ok ? "" : '<span class="secondary">러너에서 Tailscale이 켜져 있는지, 이 서버의 공개 키가 authorized_keys에 있는지 확인해 주세요. 고친 뒤 다시 확인하면 돼요.</span>'}
+            </div>
+          </div>`;
+        }
+
+        function step3() {
+          return `<section class="card form">
+              <div class="form-grid">
+                ${field("runnerName", "러너 이름", state.runnerName, { mono: true, hint: "화면에 보일 이름이에요.", error: "이름을 넣어 주세요." })}
+                ${field("capacity", "Capacity", state.capacity, { type: "number", attrs: 'min="1" max="16" inputmode="numeric"', hint: "동시에 돌릴 런 수예요.", error: "1에서 16 사이로 넣어 주세요." })}
+                ${field("sshHost", "ssh 호스트", state.sshHost, { mono: true, hint: "Tailscale MagicDNS 이름이나 IP를 넣어요.", error: "호스트를 넣어 주세요." })}
+                ${field("sshUser", "ssh 사용자", state.sshUser, { mono: true, hint: "Orca를 실행하는 계정이에요.", error: "사용자를 넣어 주세요." })}
+              </div>
+              <div class="nav-row">
+                <button class="btn" type="button" id="ssh-check">${icon.refresh}<span>연결 확인하기</span></button>
+                <span class="spacer"></span>
+                <span class="demo-switch">시안용 결과 보기
+                  <span class="segmented" role="group" aria-label="연결 결과 미리 보기">
+                    <button type="button" data-ssh="ok" aria-pressed="${state.ssh === "ok"}">성공</button>
+                    <button type="button" data-ssh="fail" aria-pressed="${state.ssh === "fail"}">실패</button>
+                  </span>
+                </span>
+              </div>
+              <div id="ssh-slot">${sshResult()}</div>
+            </section>`;
+        }
+
+        function options(list, current) {
+          return list.map(([v, l]) => `<option value="${esc(v)}"${v === current ? " selected" : ""}>${esc(l)}</option>`).join("");
+        }
+
+        function step4() {
+          return `<section class="card form">
+              <div class="form-grid">
+                <div class="field"><label for="mapTracker">Linear 프로젝트</label><select class="select" id="mapTracker">${options(FO.trackerProjects.map((p) => [p.name, p.name]), state.mapTracker)}</select></div>
+                <div class="field"><label for="mapRunner">러너</label><select class="select" id="mapRunner"><option>${esc(state.runnerName)}</option></select></div>
+                <div class="field"><label for="mapProject">러너 프로젝트</label><select class="select mono" id="mapProject">${options([["acme/web", "acme/web"], ["acme/platform", "acme/platform"], ["acme/design-tokens", "acme/design-tokens"]], state.mapProject)}</select><span class="field-hint">${esc(state.runnerName)}에서 찾은 프로젝트예요.</span></div>
+                <div class="field"><label for="mapAgent">에이전트</label><select class="select" id="mapAgent">${options(Object.values(agents).map((a) => [a.id, a.name]), state.mapAgent)}</select><span class="field-hint">에이전트에게는 티켓만 지시로 넘겨요.</span></div>
+              </div>
+              ${field("label", "Auto-assign Label", state.label, { mono: true, hint: "이 라벨이 붙은 티켓은 운영자 없이 할당해요. 비워 두면 직접 할당만 해요." })}
+            </section>
+            <p class="muted">매핑은 나중에 Settings에서 더 만들 수 있어요.</p>`;
+        }
+
+        function step5() {
+          const rows = [
+            ["Linear", `연결했어요 · webhook ${esc(state.baseUrl.replace(/\/$/, ""))}/api/linear/webhook`],
+            ["GitHub", "토큰을 저장했어요"],
+            ["러너", `${esc(state.runnerName)} · capacity ${esc(state.capacity)} · Online`],
+            ["Mapping", `${esc(state.mapTracker)} → ${esc(state.runnerName)} · ${esc(state.mapProject)} · ${agents[state.mapAgent].name}`],
+            ["Auto-assign Label", state.label ? `<span class="tag" data-auto>${esc(state.label)}</span>` : "쓰지 않아요"],
+          ];
+          return `<section class="card"><ul class="summary-list">${rows.map(([k, v]) => `<li>${icon.check}<span class="muted">${k}</span><span>${v}</span></li>`).join("")}</ul></section>
+            <p class="secondary">이제 ${esc(state.mapTracker)} 티켓에 <span class="mono">${esc(state.label || "라벨")}</span> 라벨을 붙이거나 Tickets에서 직접 할당하면 런이 시작해요.</p>`;
+        }
+
+        const renderers = [step1, step2, step3, step4, step5];
+        const titles = ["Linear를 연결해요", "GitHub 토큰을 넣어요", "첫 러너를 등록해요", "첫 Mapping을 만들어요", "준비를 마쳤어요"];
+        const descs = [
+          "티켓 상태의 기준은 Linear예요. 할당은 webhook으로 바로 알아채고, 놓친 이벤트는 5분마다 맞춰요.",
+          "런이 끝났을 때의 PR 상태로 결과를 정해요. 병합됐으면 Merged, 열려 있으면 Human Check, PR이 없으면 Failed예요.",
+          "러너는 Orca가 도는 기기예요. 이 서버에서 ssh로 명령을 보내니, 러너에 따로 설치할 것은 없어요.",
+          "어느 Linear 프로젝트의 티켓을 어느 러너 프로젝트에서, 어떤 에이전트로 처리할지 정해요.",
+          "입력한 값은 서버의 .env에 저장했어요. Settings에서 언제든 확인할 수 있어요.",
+        ];
+
+        function paintSteps() {
+          document.getElementById("steps").innerHTML = steps
+            .map((s, i) => {
+              const n = i + 1;
+              const current = n === state.step;
+              const done = state.done.has(n) && !current;
+              const reachable = n <= Math.max(...state.done, 0) + 1;
+              return `<li><button class="step-link" type="button" data-go="${n}"${current ? ' aria-current="step"' : ""}${done ? " data-done" : ""}${reachable ? "" : " disabled"}>
+                <span class="step-num">${done ? icon.check : n}</span>
+                <span class="step-label"><span>${s.title}</span>${s.sub ? `<small>${s.sub}</small>` : ""}</span>
+              </button></li>`;
+            })
+            .join("");
+          document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => go(parseInt(b.dataset.go, 10))));
+        }
+
+        function readInputs() {
+          document.querySelectorAll("#panel input, #panel select").forEach((el) => {
+            if (el.name === "expose") {
+              if (el.checked) state.expose = el.value;
+            } else if (el.id && el.id in state) state[el.id] = el.id === "capacity" ? parseInt(el.value, 10) || "" : el.value.trim();
+          });
+        }
+
+        function invalid(id, bad) {
+          const f = document.getElementById("f-" + id);
+          if (!f) return bad;
+          f.toggleAttribute("data-invalid", bad);
+          f.querySelector("input").setAttribute("aria-invalid", String(bad));
+          return bad;
+        }
+
+        function validate() {
+          readInputs();
+          let bad = false;
+          if (state.step === 1) {
+            bad = invalid("linearKey", !state.linearKey) | bad;
+            bad = invalid("baseUrl", !/^https:\/\//.test(state.baseUrl)) | bad;
+          } else if (state.step === 2) {
+            bad = invalid("githubToken", !state.githubToken) | bad;
+          } else if (state.step === 3) {
+            bad = invalid("runnerName", !state.runnerName) | bad;
+            bad = invalid("sshHost", !state.sshHost) | bad;
+            bad = invalid("sshUser", !state.sshUser) | bad;
+            bad = invalid("capacity", !(state.capacity >= 1 && state.capacity <= 16)) | bad;
+            if (!bad && state.ssh !== "ok") {
+              FO.toast(state.ssh === "fail" ? "연결을 확인한 뒤 다음으로 갈 수 있어요." : "먼저 연결을 확인해 주세요.");
+              return false;
+            }
+          }
+          if (bad) {
+            const first = document.querySelector("[data-invalid] input");
+            if (first) first.focus();
+          }
+          return !bad;
+        }
+
+        function go(n) {
+          if (n > state.step) {
+            if (!validate()) return;
+            for (let i = state.step; i < n; i++) state.done.add(i);
+          } else readInputs();
+          state.step = n;
+          render();
+          document.getElementById("panel").querySelector("h1").focus();
+        }
+
+        function render() {
+          paintSteps();
+          const n = state.step;
+          const last = n === steps.length;
+          document.getElementById("panel").innerHTML = `
+            <div class="panel-head">
+              <span class="eyebrow">${n} / ${steps.length}</span>
+              <h1 tabindex="-1">${titles[n - 1]}</h1>
+              <p>${descs[n - 1]}</p>
+            </div>
+            ${renderers[n - 1]()}
+            <div class="nav-row">
+              ${n > 1 && !last ? '<button class="btn btn-ghost" type="button" id="prev">이전</button>' : ""}
+              <span class="spacer"></span>
+              ${last ? '<a class="btn btn-primary" href="tickets.html">대시보드로 가기</a>' : `<button class="btn btn-primary" type="button" id="next">${n === 4 ? "매핑 만들기" : "다음"}</button>`}
+            </div>`;
+          wire();
+        }
+
+        function wire() {
+          const prev = document.getElementById("prev");
+          const next = document.getElementById("next");
+          if (prev) prev.addEventListener("click", () => go(state.step - 1));
+          if (next) next.addEventListener("click", () => go(state.step + 1));
+          document.querySelectorAll('input[name="expose"]').forEach((r) =>
+            r.addEventListener("change", () => {
+              readInputs();
+              render();
+            })
+          );
+          const base = document.getElementById("baseUrl");
+          if (base)
+            base.addEventListener("input", () => {
+              document.getElementById("hook-url").textContent = base.value.trim().replace(/\/$/, "") + "/api/linear/webhook";
+            });
+          const copy = document.getElementById("copy-hook");
+          if (copy)
+            copy.addEventListener("click", () => {
+              const text = document.getElementById("hook-url").textContent;
+              if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+              copy.textContent = "복사했어요";
+              setTimeout(() => (copy.textContent = "복사하기"), 1500);
+            });
+          const check = document.getElementById("ssh-check");
+          if (check)
+            check.addEventListener("click", () => {
+              readInputs();
+              check.disabled = true;
+              check.querySelector("span").textContent = "확인하는 중…";
+              setTimeout(() => {
+                state.ssh = "ok";
+                render();
+              }, 700);
+            });
+          document.querySelectorAll("[data-ssh]").forEach((b) =>
+            b.addEventListener("click", () => {
+              readInputs();
+              state.ssh = b.dataset.ssh;
+              render();
+            })
+          );
+          document.querySelectorAll("#panel .input").forEach((el) =>
+            el.addEventListener("input", () => {
+              const f = el.closest(".field");
+              if (f && f.hasAttribute("data-invalid")) {
+                f.removeAttribute("data-invalid");
+                el.setAttribute("aria-invalid", "false");
+              }
+            })
+          );
+        }
+
+        render();
+      })();
+    </script>
+  </body>
+</html>

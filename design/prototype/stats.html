@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stats · factory-orchestrator</title>
+    <script>
+      try {
+        var t = localStorage.getItem("fo-theme");
+        if (t) document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="picker.css" />
+    <style>
+      .grid-2 {
+        display: grid;
+        grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+        gap: var(--space-4);
+        align-items: start;
+      }
+
+      .columns {
+        display: grid;
+        grid-template-columns: repeat(14, minmax(0, 1fr));
+        gap: 6px;
+        align-items: end;
+        height: 180px;
+        padding: 0 var(--space-4);
+      }
+
+      .col {
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 1px;
+        height: 100%;
+        justify-content: flex-start;
+      }
+
+      .col span:first-child {
+        border-radius: 0 0 2px 2px;
+      }
+
+      .col span:last-child {
+        border-radius: 2px 2px 0 0;
+      }
+
+      .col-labels {
+        display: grid;
+        grid-template-columns: repeat(14, minmax(0, 1fr));
+        gap: 6px;
+        padding: var(--space-2) var(--space-4) var(--space-4);
+        color: var(--text-tertiary);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        text-align: center;
+      }
+
+      .dist {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        padding: var(--space-4);
+      }
+
+      .dist .stack-bar {
+        height: 12px;
+      }
+
+      .dist-row {
+        display: grid;
+        grid-template-columns: 12px minmax(0, 1fr) auto auto;
+        gap: var(--space-2);
+        align-items: center;
+      }
+
+      .dist-row .num {
+        text-align: end;
+        min-width: 3ch;
+      }
+
+      .bar-cell {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        min-width: 220px;
+      }
+
+      .bar-cell .stack-bar {
+        flex: 1;
+      }
+
+      .range {
+        position: relative;
+        height: 18px;
+        min-width: 240px;
+      }
+
+      .range::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 8px;
+        height: 2px;
+        background: var(--border-subtle);
+      }
+
+      .range-bar {
+        position: absolute;
+        top: 6px;
+        height: 6px;
+        border-radius: 3px;
+        background: color-mix(in oklch, var(--accent) 45%, transparent);
+      }
+
+      .range-p50 {
+        position: absolute;
+        top: 3px;
+        width: 2px;
+        height: 12px;
+        border-radius: 1px;
+        background: var(--accent-text);
+      }
+
+      .hist {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        gap: 4px;
+        align-items: end;
+        height: 140px;
+        padding: 0 var(--space-4);
+      }
+
+      .hist span {
+        border-radius: 2px 2px 0 0;
+        background: var(--accent);
+      }
+
+      .hist-labels {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        gap: 4px;
+        padding: var(--space-2) var(--space-4) var(--space-4);
+        color: var(--text-tertiary);
+        font-size: 11px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .line-chart {
+        display: block;
+        width: 100%;
+        height: 180px;
+      }
+
+      @media (max-width: 1100px) {
+        .grid-2 {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#page">본문으로 건너뛰기</a>
+    <div class="app" id="app">
+      <main class="main" id="page">
+        <header class="page-header">
+          <h1 class="page-title">Stats</h1>
+          <span class="page-subtitle">11월 4일 – 11월 17일 · 리드 타임은 할당부터 런이 끝날 때까지예요</span>
+          <div class="page-actions">
+            <div class="segmented" role="group" aria-label="기간" id="period"></div>
+          </div>
+        </header>
+        <div class="page-body" id="stage"></div>
+      </main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const { esc, minutes } = FO;
+        FO.mountShell("stats");
+
+        const periods = ["7일", "14일", "30일"];
+        const periodEl = document.getElementById("period");
+        let period = "14일";
+        function paintPeriod() {
+          periodEl.innerHTML = periods.map((p) => `<button type="button" aria-pressed="${p === period}">${p}</button>`).join("");
+          periodEl.querySelectorAll("button").forEach((b, i) =>
+            b.addEventListener("click", () => {
+              period = periods[i];
+              paintPeriod();
+              if (period !== "14일") FO.toast("시안에는 14일 데이터만 있어요.");
+            })
+          );
+        }
+        paintPeriod();
+
+        const daily = FO.daily;
+        const total = daily.reduce((a, d) => ({ merged: a.merged + d.merged, check: a.check + d.check, failed: a.failed + d.failed }), { merged: 0, check: 0, failed: 0 });
+        const all = total.merged + total.check + total.failed;
+        const pct = (n, of = all) => Math.round((n / of) * 100);
+        const lead = [...FO.leadTimes].sort((a, b) => a - b);
+        const p50 = lead[Math.floor(lead.length / 2)];
+        const dims = { runner: "러너", project: "프로젝트", agent: "에이전트" };
+        let dim = "runner";
+
+        function stackBar(r) {
+          const n = r.merged + r.check + r.failed;
+          return `<div class="stack-bar" role="img" aria-label="Merged ${r.merged}, Human Check ${r.check}, Failed ${r.failed}">
+            <span class="fill-merged" style="flex:${r.merged}"></span><span class="fill-check" style="flex:${r.check}"></span><span class="fill-failed" style="flex:${r.failed}"></span>
+          </div>`;
+        }
+
+        const legend = `<div class="legend">
+          <span class="legend-item"><span class="legend-swatch fill-merged"></span>Merged</span>
+          <span class="legend-item"><span class="legend-swatch fill-check"></span>Human Check</span>
+          <span class="legend-item"><span class="legend-swatch fill-failed"></span>Failed</span>
+        </div>`;
+
+        function kpis() {
+          return `<div class="stat-row">${[
+            ["끝난 런", all, `하루 평균 ${(all / 14).toFixed(1)}개`],
+            ["Merged", `${pct(total.merged)}%`, `${total.merged}개 · 사람 손 없이 병합했어요`],
+            ["Human Check", `${pct(total.check)}%`, `${total.check}개 · PR이 열린 채 끝났어요`],
+            ["Failed", `${pct(total.failed)}%`, `${total.failed}개 · PR 없이 끝났어요`],
+            ["리드 타임 중앙값", minutes(p50), `p90 ${minutes(lead[Math.floor(lead.length * 0.9)])}`],
+          ]
+            .map(([l, v, d]) => `<div class="card stat"><span class="stat-label">${l}</span><span class="stat-value">${v}</span><span class="stat-delta">${d}</span></div>`)
+            .join("")}</div>`;
+        }
+
+        function dimTabs(id) {
+          return `<div class="segmented" role="group" aria-label="나눠 보기" data-dimtabs="${id}">${Object.entries(dims)
+            .map(([k, v]) => `<button type="button" data-dim="${k}" aria-pressed="${k === dim}">${v}별</button>`)
+            .join("")}</div>`;
+        }
+
+        function wireDimTabs(stage, rerender) {
+          stage.querySelectorAll("[data-dim]").forEach((b) =>
+            b.addEventListener("click", () => {
+              dim = b.dataset.dim;
+              rerender(stage);
+            })
+          );
+        }
+
+        function breakdownTable(compact) {
+          const rows = FO.breakdowns[dim]
+            .map((r) => {
+              const n = r.merged + r.check + r.failed;
+              return `<tr>
+                <td class="${dim === "agent" ? "" : "mono"}">${esc(r.name)}</td>
+                <td class="col-num">${n}</td>
+                <td><div class="bar-cell">${stackBar(r)}</div></td>
+                <td class="col-num">${pct(r.merged, n)}%</td>
+                ${compact ? "" : `<td class="col-num">${r.check}</td><td class="col-num">${r.failed}</td>`}
+                <td class="col-num">${minutes(r.p50)}</td>
+                ${compact ? "" : `<td class="col-num">${minutes(r.p90)}</td>`}
+              </tr>`;
+            })
+            .join("");
+          return `<div class="table-wrap"><table class="table">
+            <thead><tr><th>${dims[dim]}</th><th class="col-num">런</th><th>결과 분포</th><th class="col-num">Merged</th>
+            ${compact ? "" : '<th class="col-num">Human Check</th><th class="col-num">Failed</th>'}
+            <th class="col-num">리드 타임 p50</th>${compact ? "" : '<th class="col-num">p90</th>'}</tr></thead>
+            <tbody>${rows}</tbody></table></div>`;
+        }
+
+        // 안 1: 요약 대시보드
+        function overview() {
+          const max = Math.max(...daily.map((d) => d.merged + d.check + d.failed));
+          const cols = daily
+            .map((d) => {
+              const h = (n) => `${(n / max) * 100}%`;
+              return `<div class="col" role="img" aria-label="${d.day}: Merged ${d.merged}, Human Check ${d.check}, Failed ${d.failed}" title="${d.day} · Merged ${d.merged} · Human Check ${d.check} · Failed ${d.failed}">
+                <span class="fill-merged" style="height:${h(d.merged)}"></span><span class="fill-check" style="height:${h(d.check)}"></span><span class="fill-failed" style="height:${h(d.failed)}"></span>
+              </div>`;
+            })
+            .join("");
+          return `${kpis()}
+            <div class="grid-2">
+              <section class="card">
+                <div class="card-header"><h2 class="card-title">날짜별 처리량</h2><div class="page-actions">${legend}</div></div>
+                <div style="padding-top:var(--space-4)"><div class="columns">${cols}</div></div>
+                <div class="col-labels">${daily.map((d) => `<span>${d.day.split("/")[1]}</span>`).join("")}</div>
+              </section>
+              <section class="card">
+                <div class="card-header"><h2 class="card-title">결과 분포</h2></div>
+                <div class="dist">
+                  ${stackBar(total)}
+                  ${[["merged", "Merged"], ["check", "Human Check"], ["failed", "Failed"]]
+                    .map(([k, l]) => `<div class="dist-row"><span class="legend-swatch fill-${k}"></span><span>${l}</span><span class="num">${total[k]}</span><span class="num muted">${pct(total[k])}%</span></div>`)
+                    .join("")}
+                  <p class="muted" style="text-wrap:pretty">런이 끝났을 때 PR이 병합됐으면 Merged, 열려 있으면 Human Check, PR이 없으면 Failed예요.</p>
+                </div>
+              </section>
+            </div>
+            <section class="card">
+              <div class="card-header"><h2 class="card-title">나눠 보기</h2><div class="page-actions">${dimTabs("o")}</div></div>
+              ${breakdownTable(true)}
+            </section>`;
+        }
+
+        // 안 2: 비교 표
+        function compare() {
+          return `<div class="toolbar">${dimTabs("c")}<span class="spacer"></span>${legend}</div>
+            <section class="card">${breakdownTable(false)}</section>
+            <section class="card">
+              <div class="card-header"><h2 class="card-title">전체</h2><span class="muted num">${all}개</span></div>
+              <div class="card-body" style="display:flex;flex-direction:column;gap:var(--space-3)">
+                ${stackBar(total)}
+                <div class="legend"><span class="num">Merged ${total.merged} (${pct(total.merged)}%)</span><span class="num">Human Check ${total.check} (${pct(total.check)}%)</span><span class="num">Failed ${total.failed} (${pct(total.failed)}%)</span><span class="num">리드 타임 p50 ${minutes(p50)}</span></div>
+              </div>
+            </section>`;
+        }
+
+        // 안 3: 리드 타임 중심
+        function leadTime() {
+          const w = 700;
+          const h = 160;
+          const pad = 24;
+          const maxL = 50;
+          const pts = FO.leadTimes.map((v, i) => [pad + (i * (w - pad * 2)) / 13, h - pad - (v / maxL) * (h - pad * 2)]);
+          const grid = [0, 25, 50]
+            .map((v) => {
+              const y = h - pad - (v / maxL) * (h - pad * 2);
+              return `<line x1="${pad}" x2="${w - pad}" y1="${y}" y2="${y}" stroke="var(--border-subtle)"/><text x="0" y="${y + 4}" fill="var(--text-tertiary)" font-size="11">${v}분</text>`;
+            })
+            .join("");
+          const buckets = [
+            ["~10", 4], ["10–20", 24], ["20–30", 46], ["30–40", 30], ["40–50", 16], ["50–60", 9], ["60–90", 6], ["90~", 3],
+          ];
+          const bmax = Math.max(...buckets.map((b) => b[1]));
+          const allRanges = FO.breakdowns[dim];
+          const scale = 90;
+          const ranges = allRanges
+            .map(
+              (r) => `<tr>
+                <td class="${dim === "agent" ? "" : "mono"}">${esc(r.name)}</td>
+                <td class="col-num">${minutes(r.p50)}</td>
+                <td class="col-num">${minutes(r.p90)}</td>
+                <td><div class="range" role="img" aria-label="p50 ${r.p50}분, p90 ${r.p90}분">
+                  <span class="range-bar" style="left:${(r.p50 / scale) * 100}%;width:${((r.p90 - r.p50) / scale) * 100}%"></span>
+                  <span class="range-p50" style="left:${(r.p50 / scale) * 100}%"></span>
+                </div></td>
+              </tr>`
+            )
+            .join("");
+          return `${kpis()}
+            <div class="grid-2">
+              <section class="card">
+                <div class="card-header"><h2 class="card-title">날짜별 리드 타임 중앙값</h2></div>
+                <div class="card-body">
+                  <svg class="line-chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="날짜별 리드 타임 중앙값, 24분에서 41분 사이">
+                    ${grid}
+                    <polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="var(--accent-text)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                    ${pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="var(--bg-surface)" stroke="var(--accent-text)" stroke-width="1.5"><title>${daily[i].day} · ${FO.leadTimes[i]}분</title></circle>`).join("")}
+                    ${daily.map((d, i) => `<text x="${pts[i][0]}" y="${h - 4}" fill="var(--text-tertiary)" font-size="11" text-anchor="middle">${d.day.split("/")[1]}</text>`).join("")}
+                  </svg>
+                </div>
+              </section>
+              <section class="card">
+                <div class="card-header"><h2 class="card-title">리드 타임 분포</h2><span class="muted">런 ${all}개</span></div>
+                <div style="padding-top:var(--space-4)"><div class="hist">${buckets.map(([l, n]) => `<span style="height:${(n / bmax) * 100}%" title="${l}분 · ${n}개"></span>`).join("")}</div></div>
+                <div class="hist-labels">${buckets.map(([l]) => `<span>${l}</span>`).join("")}</div>
+              </section>
+            </div>
+            <section class="card">
+              <div class="card-header"><h2 class="card-title">p50–p90 범위</h2><div class="page-actions">${dimTabs("l")}</div></div>
+              <div class="table-wrap"><table class="table">
+                <thead><tr><th>${dims[dim]}</th><th class="col-num">p50</th><th class="col-num">p90</th><th>0 – 90분</th></tr></thead>
+                <tbody>${ranges}</tbody>
+              </table></div>
+            </section>`;
+        }
+
+        function withTabs(render) {
+          return {
+            render,
+            after(stage) {
+              wireDimTabs(stage, (s) => {
+                s.innerHTML = render();
+                this.after(s);
+              });
+            },
+          };
+        }
+
+        FO.picker(document.getElementById("stage"), [
+          { name: "요약 대시보드", ...withTabs(overview) },
+          { name: "비교 표", ...withTabs(compare) },
+          { name: "리드 타임", ...withTabs(leadTime) },
+        ]);
+      })();
+    </script>
+  </body>
+</html>

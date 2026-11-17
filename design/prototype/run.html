@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Run 상세 · factory-orchestrator</title>
+    <script>
+      try {
+        var t = localStorage.getItem("fo-theme");
+        if (t) document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .detail {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: var(--space-4);
+        align-items: start;
+      }
+
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        min-width: 0;
+      }
+
+      .run-title {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2) var(--space-3);
+      }
+
+      .run-title h2 {
+        font-size: var(--text-heading);
+        letter-spacing: -0.01em;
+        line-height: 1.3;
+      }
+
+      .timeline {
+        list-style: none;
+        margin: 0;
+        padding: var(--space-4);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .timeline li {
+        position: relative;
+        display: grid;
+        grid-template-columns: 48px 16px minmax(0, 1fr);
+        gap: var(--space-3);
+        padding-bottom: var(--space-4);
+      }
+
+      .timeline li:last-child {
+        padding-bottom: 0;
+      }
+
+      .timeline li::before {
+        content: "";
+        position: absolute;
+        left: calc(48px + var(--space-3) + 7px);
+        top: 18px;
+        bottom: 0;
+        width: 2px;
+        background: var(--border-subtle);
+      }
+
+      .timeline li:last-child::before {
+        display: none;
+      }
+
+      .timeline time {
+        color: var(--text-tertiary);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .timeline .marker {
+        width: 10px;
+        height: 10px;
+        margin: 5px 3px 0;
+        border-radius: 50%;
+        background: var(--status-queued-solid);
+      }
+
+      .timeline .marker[data-tone="running"] {
+        background: var(--status-running-solid);
+      }
+
+      .timeline .marker[data-tone="check"] {
+        background: var(--status-check-solid);
+      }
+
+      .timeline .marker[data-tone="merged"] {
+        background: var(--status-merged-solid);
+      }
+
+      .timeline .marker[data-tone="failed"] {
+        background: var(--status-failed-solid);
+      }
+
+      .timeline strong {
+        font-weight: var(--weight-medium);
+      }
+
+      .log {
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        max-height: 320px;
+        overflow: auto;
+        background: var(--bg-inset);
+        border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--text-secondary);
+      }
+
+      .log::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      .log::-webkit-scrollbar-thumb {
+        background: var(--border-default);
+        border-radius: 4px;
+      }
+
+      .log-line {
+        display: grid;
+        grid-template-columns: 64px 48px minmax(0, 1fr);
+        gap: var(--space-2);
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      .log-line time {
+        color: var(--text-tertiary);
+      }
+
+      .log-line[data-level="error"] {
+        color: var(--status-failed-text);
+      }
+
+      .log-line[data-level="agent"] {
+        color: var(--text-primary);
+      }
+
+      .log-level {
+        color: var(--text-tertiary);
+      }
+
+      .kv {
+        display: grid;
+        grid-template-columns: 88px minmax(0, 1fr);
+        gap: var(--space-2) var(--space-3);
+        margin: 0;
+        padding: var(--space-4);
+      }
+
+      .kv dt {
+        color: var(--text-tertiary);
+      }
+
+      .kv dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .checks {
+        list-style: none;
+        margin: 0;
+        padding: var(--space-2) 0;
+      }
+
+      .checks li {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        height: 32px;
+        padding: 0 var(--space-4);
+      }
+
+      .checks svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .checks .ok {
+        color: var(--status-online-text);
+      }
+
+      .checks .bad {
+        color: var(--status-failed-text);
+      }
+
+      .checks .wait {
+        color: var(--status-running-text);
+      }
+
+      .checks .time {
+        margin-inline-start: auto;
+        color: var(--text-tertiary);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .other-runs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        padding: 0 var(--space-4) var(--space-4);
+      }
+
+      @media (max-width: 1100px) {
+        .detail {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#page">본문으로 건너뛰기</a>
+    <div class="app" id="app">
+      <main class="main" id="page">
+        <header class="page-header">
+          <nav class="breadcrumb" aria-label="위치">
+            <a href="runs.html">Runs</a><span aria-hidden="true">/</span><span class="mono" id="crumb"></span>
+          </nav>
+          <div class="page-actions" id="actions"></div>
+        </header>
+        <div class="page-body" id="body"></div>
+      </main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const { esc, runBadge, minutes, agents, icon } = FO;
+        FO.mountShell("run");
+
+        const id = parseInt(new URLSearchParams(location.search).get("id"), 10) || 1051;
+        const run = FO.runs.find((r) => r.id === id) || FO.runs.find((r) => r.id === 1051);
+        const t = FO.ticket(run.ticket);
+        const mapping = FO.mappingFor(t.project);
+        const runner = FO.runner(run.runner);
+        const slug = run.ticket.toLowerCase();
+        document.title = `#${run.id} ${run.ticket} · factory-orchestrator`;
+        document.getElementById("crumb").textContent = `#${run.id}`;
+
+        // 상세가 따로 없는 런은 상태로 타임라인을 만든다
+        function generated() {
+          const auto = t.labels.includes(FO.AUTO_LABEL);
+          const tl = [{ time: run.started || "14:" + String(20 - run.queuedFor).padStart(2, "0"), label: "할당했어요", detail: auto ? "자동 할당 라벨 factory로 시작했어요" : "운영자가 직접 할당했어요", tone: "queued" }];
+          const log = [];
+          if (run.state === "queued") {
+            tl.push({ time: "14:20", label: "Queued", detail: run.queueReason, tone: "queued" });
+            return { tl, log, branch: "—", worktree: "아직 만들지 않았어요" };
+          }
+          tl.push({ time: run.started, label: "워크트리를 만들었어요", detail: `${mapping.project} · factory/${slug}`, tone: "running" });
+          tl.push({ time: run.started, label: "에이전트를 시작했어요", detail: `${agents[run.agent].name} · 티켓 본문만 지시로 넘겼어요`, tone: "running" });
+          log.push([run.started + ":04", "info", `orca worktree create ${mapping.project} factory/${slug}`]);
+          log.push([run.started + ":11", "info", `${run.agent === "claude" ? "claude" : "codex"} --task ${run.ticket}`]);
+          if (run.state === "running") {
+            tl.push({ time: "14:20", label: run.step, detail: `${minutes(run.elapsed)}째 진행 중이에요`, tone: "running" });
+            log.push(["14:19:52", "agent", `${run.step}…`]);
+          } else if (run.result === "merged") {
+            tl.push({ time: run.ended, label: `PR #${run.pr.number}을 열고 CI를 기다렸어요`, detail: "checks 모두 통과", tone: "running" });
+            tl.push({ time: run.ended, label: "Merged로 끝났어요", detail: "에이전트가 머지 커밋으로 병합했어요", tone: "merged" });
+            log.push([run.ended + ":02", "info", `gh pr merge ${run.pr.number} --merge`]);
+            log.push([run.ended + ":09", "info", "run finished · pr=merged → Merged"]);
+          } else if (run.result === "check") {
+            tl.push({ time: run.ended, label: `PR #${run.pr.number}을 열었어요`, detail: run.note, tone: "running" });
+            tl.push({ time: run.ended, label: "Human Check로 끝났어요", detail: "PR이 열린 채 런이 끝났어요", tone: "check" });
+            log.push([run.ended + ":05", "agent", run.note + "."]);
+            log.push([run.ended + ":09", "info", "run finished · pr=open → Human Check"]);
+          } else {
+            tl.push({ time: run.ended, label: "Failed로 끝났어요", detail: `${FO.failReasonLabel[run.failReason]} · ${run.note}`, tone: "failed" });
+            if (run.failReason === "runner") {
+              log.push([run.ended + ":00", "error", `ssh ${runner.host}: connection lost`]);
+              log.push([run.ended + ":30", "info", "run finished · pr=none → Failed (러너 연결 끊김)"]);
+            } else {
+              log.push([run.ended + ":00", "error", "build failed: 3 errors"]);
+              log.push([run.ended + ":12", "agent", "같은 오류를 세 번 고치지 못해 멈출게요."]);
+              log.push([run.ended + ":15", "info", "run finished · pr=none → Failed (에이전트 오류)"]);
+            }
+          }
+          return { tl, log, branch: `factory/${slug}`, worktree: `worktrees/${mapping.project.replace("/", "-")}/${slug}` };
+        }
+
+        const d = FO.runDetails[run.id];
+        const timeline = d ? d.timeline : null;
+        const g = d ? null : generated();
+        const tl = timeline || g.tl;
+        const log = d ? d.log : g.log;
+        const branch = d ? d.branch : g.branch;
+        const worktree = d ? d.worktree : g.worktree;
+
+        const checks =
+          (d && d.checks) ||
+          (run.pr
+            ? ["lint", "typecheck", "unit", "build"].map((n, i) => ({
+                name: n,
+                state: run.pr.ci === "running" && i === 3 ? "running" : run.pr.ci === "failed" && i === 3 ? "failed" : "passed",
+                time: ["41초", "1분 8초", "2분 2초", "3분 31초"][i],
+              }))
+            : []);
+
+        // 결과 설명
+        const callouts = {
+          check: { title: "PR이 열려 있어요. 사람이 확인해야 해요", body: run.note ? run.note + "." : "", action: run.pr ? `<a class="btn btn-primary" href="https://github.com" target="_blank" rel="noreferrer">${icon.pr}PR #${run.pr.number} 확인하기</a>` : "" },
+          merged: { title: "에이전트가 CI 통과를 확인하고 병합했어요", body: "따로 할 일은 없어요.", action: "" },
+          failed: { title: `PR 없이 끝났어요 · ${FO.failReasonLabel[run.failReason] || ""}`, body: (run.note ? run.note + ". " : "") + "Failed는 자동으로 다시 시도하지 않아요. 원인을 확인한 뒤 다시 할당할 수 있어요.", action: '<button class="btn btn-primary" type="button" id="reassign">다시 할당하기</button>' },
+          running: { title: `${run.step || ""}이에요`, body: `${runner.id}에서 ${run.elapsed}분째 진행하고 있어요.`, action: "" },
+          queued: { title: "capacity가 나면 시작해요", body: run.queueReason ? run.queueReason + "." : "", action: '<a class="btn" href="runners.html">러너 상태 보기</a>' },
+        };
+        const tone = FO.runTone(run);
+        const c = callouts[tone];
+
+        const otherRuns = FO.runsFor(run.ticket).filter((r) => r.id !== run.id);
+
+        document.getElementById("actions").innerHTML = `<a class="btn btn-ghost" href="https://linear.app" target="_blank" rel="noreferrer">${icon.external}Linear에서 보기</a>`;
+
+        document.getElementById("body").innerHTML = `
+          <div class="run-title">
+            <span class="ticket-id" style="font-size:13px">${run.ticket}</span>
+            <h2>${esc(t.title)}</h2>
+            ${runBadge(run)}
+          </div>
+
+          <div class="callout" data-tone="${tone}">
+            <div class="callout-body">
+              <strong>${esc(c.title)}</strong>
+              ${c.body ? `<span class="secondary">${esc(c.body)}</span>` : ""}
+            </div>
+            ${c.action ? `<div class="page-actions">${c.action}</div>` : ""}
+          </div>
+
+          <div class="detail">
+            <div class="stack">
+              <section class="card" aria-labelledby="tl-title">
+                <div class="card-header"><h3 class="card-title" id="tl-title">타임라인</h3></div>
+                <ol class="timeline">${tl
+                  .map((e) => `<li><time>${e.time}</time><span class="marker" data-tone="${e.tone}" aria-hidden="true"></span><div><strong>${esc(e.label)}</strong><div class="muted">${esc(e.detail)}</div></div></li>`)
+                  .join("")}</ol>
+              </section>
+              <section class="card" aria-labelledby="log-title">
+                <div class="card-header">
+                  <h3 class="card-title" id="log-title">로그 꼬리</h3>
+                  <span class="muted">마지막 ${log.length}줄</span>
+                  <div class="page-actions"><button class="btn btn-sm" type="button" id="full-log">전체 로그 보기</button></div>
+                </div>
+                ${
+                  log.length
+                    ? `<pre class="log">${log
+                        .map(([time, level, text]) => `<div class="log-line" data-level="${level}"><time>${time}</time><span class="log-level">${level}</span><span>${esc(text)}</span></div>`)
+                        .join("")}</pre>`
+                    : '<div class="empty"><strong>아직 로그가 없어요</strong><span>런이 시작하면 로그가 여기에 쌓여요.</span></div>'
+                }
+              </section>
+            </div>
+
+            <div class="stack">
+              <section class="card" aria-labelledby="pr-title">
+                <div class="card-header">
+                  <h3 class="card-title" id="pr-title">Pull Request · CI</h3>
+                  ${run.pr ? `<span class="badge" data-tone="${run.pr.state === "merged" ? "merged" : "running"}">${run.pr.state === "merged" ? "병합됨" : "열림"}</span>` : ""}
+                </div>
+                ${
+                  run.pr
+                    ? `<div class="kv" style="padding-bottom:0"><dt>PR</dt><dd><a href="https://github.com" target="_blank" rel="noreferrer" class="num">#${run.pr.number}</a></dd><dt>브랜치</dt><dd class="mono">${esc(branch)}</dd></div>
+                       <ul class="checks">${checks
+                         .map((ch) => {
+                           const ic = ch.state === "passed" ? `<span class="ok">${icon.check}</span>` : ch.state === "failed" ? `<span class="bad">${icon.x}</span>` : `<span class="badge" data-tone="running" style="padding:0;background:none"></span>`;
+                           const label = ch.state === "passed" ? "통과" : ch.state === "failed" ? "실패" : "도는 중";
+                           return `<li>${ic}<span class="mono">${esc(ch.name)}</span><span class="visually-hidden">${label}</span><span class="time">${ch.time}</span></li>`;
+                         })
+                         .join("")}</ul>`
+                    : `<div class="empty" style="padding:var(--space-5) var(--space-4)"><strong>PR이 없어요</strong><span>${run.state === "done" ? "PR 없이 끝난 런은 Failed로 판정해요." : "에이전트가 PR을 열면 여기에 보여요."}</span></div>`
+                }
+              </section>
+
+              <section class="card" aria-labelledby="info-title">
+                <div class="card-header"><h3 class="card-title" id="info-title">런 정보</h3></div>
+                <dl class="kv">
+                  <dt>러너</dt><dd><span style="display:inline-flex;align-items:center;gap:6px"><span class="dot" data-tone="${runner.online ? "online" : "offline"}"></span><a href="runners.html#${runner.id}">${runner.id}</a></span></dd>
+                  <dt>프로젝트</dt><dd class="mono">${mapping.project}</dd>
+                  <dt>에이전트</dt><dd>${agents[run.agent].name}</dd>
+                  <dt>워크트리</dt><dd class="mono">${esc(worktree)}</dd>
+                  <dt>시작</dt><dd class="num">${run.started || "—"}</dd>
+                  <dt>걸린 시간</dt><dd class="num">${run.elapsed ? minutes(run.elapsed) : `${run.queuedFor}분째 기다리는 중`}</dd>
+                  <dt>트래커</dt><dd>${esc(t.project)} · ${t.trackerState}</dd>
+                </dl>
+                ${
+                  otherRuns.length
+                    ? `<div class="card-header" style="border-top:1px solid var(--border-subtle)"><h3 class="card-title">이 티켓의 다른 런</h3></div>
+                       <div class="other-runs" style="padding-top:var(--space-3)">${otherRuns.map((r) => `<a href="run.html?id=${r.id}" style="display:inline-flex;gap:6px;align-items:center"><span class="mono">#${r.id}</span>${runBadge(r)}</a>`).join("")}</div>`
+                    : ""
+                }
+              </section>
+            </div>
+          </div>`;
+
+        const reassign = document.getElementById("reassign");
+        if (reassign)
+          reassign.addEventListener("click", () => {
+            reassign.disabled = true;
+            reassign.textContent = "맡겼어요";
+            FO.toast(`${run.ticket} 티켓을 ${mapping.runner}에 다시 맡겼어요.`);
+          });
+        document.getElementById("full-log").addEventListener("click", () => FO.toast("시안에서는 로그 꼬리만 보여요."));
+      })();
+    </script>
+  </body>
+</html>
