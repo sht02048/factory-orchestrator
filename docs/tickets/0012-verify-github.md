@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 blocked_by: []
 ---
 
@@ -28,4 +28,4 @@ GitHub 어댑터를 짓기 전에, 스펙 10절의 GitHub 사실을 실제 토�
 
 ## 진행
 
-부분 완료: 15 남음. 17, 18, 20은 [`docs/research/0006-github-contract.md`](../research/0006-github-contract.md)에 확인했다. 15는 읽기 권한만 준 fine-grained PAT가 아직 없어 확인하지 못했다. 운영자가 PAT를 만든 뒤 `docs/research/fixtures/0006/check-status-rollup.sh`로 확인하고 research 0006의 15절을 채운다.
+완료. 15, 17, 18, 20을 [`docs/research/0006-github-contract.md`](../research/0006-github-contract.md)에 확인했다. 15는 공개 저장소에서 fine-grained PAT로 check run까지 온다. 비공개 저장소는 확인하지 못했고, fine-grained PAT에 Checks 권한이 없어 막힐 수 있다는 근거와 대안(Actions 읽기 권한)을 15절에 남겼다.
