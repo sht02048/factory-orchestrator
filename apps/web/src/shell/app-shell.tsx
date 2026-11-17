@@ -94,7 +94,11 @@ export function AppShell({
             <ul {...stylex.props(styles.navList)}>
               {shell.runners.map((runner) => (
                 <li key={runner.id}>
-                  <Link to="/runners" {...stylex.props(styles.runner)}>
+                  <Link
+                    to="/runners"
+                    search={(prev) => ({ ...prev, sel: runner.id })}
+                    {...stylex.props(styles.runner)}
+                  >
                     {runner.online ? (
                       <Dot tone="online" label={t("runners.online")} />
                     ) : (

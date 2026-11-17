@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { loadRunnersPage } from "../runners/load";
 import { loadRunsPage } from "../runs/load";
 import { loadShell } from "../shell/load";
 import { getDatabase } from "./database";
@@ -10,6 +11,11 @@ import { getDatabase } from "./database";
  */
 
 export const getShell = createServerFn({ method: "GET" }).handler(() => loadShell(getDatabase()));
+
+/** 러너는 Workspace 밖 자원이라 ws 를 받지 않는다(ADR 0006) */
+export const getRunnersPage = createServerFn({ method: "GET" }).handler(() =>
+  loadRunnersPage(getDatabase(), new Date()),
+);
 
 export const getRunsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))

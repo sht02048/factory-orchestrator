@@ -1,0 +1,48 @@
+{
+  "documentTitle": "Runners · Factory Orchestrator",
+  "title": "Runners",
+  "subtitle": "모든 Workspace가 함께 쓰는 러너예요. {total}대 중 {online}대가 Online이에요.",
+  "noRunners": "등록한 러너가 없어요. Settings에서 러너를 등록하면 여기에 보여요.",
+  "listLabel": "러너 목록",
+  "notApplicable": "—",
+  "online": "Online",
+  "offline": "Offline",
+  "checkedAgo": "{duration} 전",
+  "neverChecked": "확인 전",
+  "columns": {
+    "runner": "러너",
+    "state": "상태",
+    "occupied": "사용 중",
+    "waiting": "Queued",
+    "leftWorktrees": "남은 워크트리",
+    "checked": "마지막 확인"
+  },
+  "load": "{occupied}/{capacity}",
+  "count": "{count}개",
+  "panel": {
+    "label": "고른 러너 요약",
+    "checkedAgo": "{duration} 전 확인",
+    "neverChecked": "아직 확인하지 않았어요",
+    "reason": {
+      "offline": "오케스트레이터가 이 러너에 닿지 않아요. 다시 닿을 때까지 이 러너에서 런을 시작하지 않아요.",
+      "full": "capacity {capacity}개를 모두 쓰고 있어요.",
+      "free": "capacity {capacity}개 중 {free}개가 비어 있어요."
+    },
+    "capacity": "capacity {occupied}/{capacity}",
+    "freeSlots": "{count}개 비어 있어요",
+    "noFreeSlots": "Offline이라 남은 capacity를 쓸 수 없어요",
+    "runMeta": "{workspace} · {state} · {duration}째",
+    "waiting": "기다리는 런 {count}",
+    "waitingMeta": "{workspace} · {duration}째 기다리는 중",
+    "leftWorktrees": "남은 워크트리 {count}",
+    "worktree": {
+      "keep-until-pr-settles": "PR이 병합되거나 닫힐 때까지 남겨요",
+      "operator-decides": "사람이 지워야 해요"
+    },
+    "worktreeMeta": "{workspace} · {reason}",
+    "projects": "프로젝트 {count}",
+    "noProjects": "러너에서 찾은 프로젝트가 없어요",
+    "orcaPath": "orca 경로",
+    "notConfigured": "설정에 없어요"
+  }
+}
