@@ -202,6 +202,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@factory/codehost-github':
+        specifier: workspace:*
+        version: link:../../packages/codehost-github
       '@factory/core':
         specifier: workspace:*
         version: link:../../packages/core

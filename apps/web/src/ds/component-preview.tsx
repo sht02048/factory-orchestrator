@@ -270,6 +270,36 @@ export function ComponentSections() {
               }
             />
           </div>
+          <Text variant="meta">{t("table.editorNote")}</Text>
+          <div {...stylex.props(styles.frame)}>
+            <SplitView
+              fill={false}
+              variant="editor"
+              list={
+                <Table columns="minmax(0, 1fr)">
+                  <TableRows
+                    label={t("table.editorListLabel")}
+                    value="general"
+                    onValueChange={() => {}}
+                  >
+                    <TableRow value="general">
+                      <TableCell>
+                        <RowTitle>{t("table.editorItem")}</RowTitle>
+                      </TableCell>
+                    </TableRow>
+                  </TableRows>
+                </Table>
+              }
+              panel={
+                <DetailPanel>
+                  <PanelHeader title={t("table.editorItem")} />
+                  <Field label={t("table.editorField")}>
+                    <Input defaultValue="Acme Commerce" />
+                  </Field>
+                </DetailPanel>
+              }
+            />
+          </div>
         </Section>
       </div>
 

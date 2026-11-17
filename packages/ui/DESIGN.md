@@ -59,7 +59,7 @@
 - `radius`: `sm 4`(메뉴 항목), `md 6`(버튼, 입력, 팝업), `full`(점).
 - `shadow.popover`: 떠 있는 면(메뉴, Select 목록, 툴팁, 다이얼로그, 토스트)에만. 구역에는 그림자를 쓰지 않는다.
 - `motion`: `easeOut`, `durationFast 150ms`(hover·팝업), `durationToast 180ms`. 상태가 바뀔 때만 짧게 움직이고, `prefers-reduced-motion`에서는 끈다.
-- `size`: `sidebarWidth 216`, `panelWidth 384`, `control 32`(버튼), `input 36`, `rowMinHeight 52`, `dot 7`.
+- `size`: `sidebarWidth 216`, `panelWidth 384`, `editorListWidth 320`, `control 32`(버튼), `input 36`, `rowMinHeight 52`, `dot 7`.
 
 ### 테마
 
@@ -71,13 +71,13 @@
 
 ### 화면 틀
 
-| 컴포넌트                                                              | 언제                                                                                                                 |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `SplitView`                                                           | 운영 화면의 기본 틀. 왼쪽 목록, 오른쪽 `panelWidth` 상세 패널(ADR 0007). 홈, Tickets, Runs, Runners, Stats, Settings |
-| `PageHeader`                                                          | 목록 위 페이지 제목·부제·오른쪽 행동                                                                                 |
-| `Section`                                                             | 목록 화면의 구역(손댈 일, 실행 중, Queued). 제목 + 개수 + 오른쪽 흐린 메모                                           |
-| `DetailPanel` > `PanelHeader`, `Actions`, `PanelBlock`, `PanelFooter` | 상세 패널 안. 상태 줄 → 제목 → 흐린 부제 → 이유 → 버튼 → 속성 블록 → 바닥 순서                                       |
-| `Actions`                                                             | 버튼 줄. 주 버튼을 맨 앞에                                                                                           |
+| 컴포넌트                                                              | 언제                                                                                                                                                                                               |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SplitView`                                                           | 운영 화면의 기본 틀. 왼쪽 목록, 오른쪽 `panelWidth` 상세 패널(ADR 0007). 홈, Tickets, Runs, Runners, Stats. Settings는 `variant="editor"`(왼쪽 `editorListWidth` 항목 목록, 오른쪽 넓은 편집 영역) |
+| `PageHeader`                                                          | 목록 위 페이지 제목·부제·오른쪽 행동                                                                                                                                                               |
+| `Section`                                                             | 목록 화면의 구역(손댈 일, 실행 중, Queued). 제목 + 개수 + 오른쪽 흐린 메모                                                                                                                         |
+| `DetailPanel` > `PanelHeader`, `Actions`, `PanelBlock`, `PanelFooter` | 상세 패널 안. 상태 줄 → 제목 → 흐린 부제 → 이유 → 버튼 → 속성 블록 → 바닥 순서                                                                                                                     |
+| `Actions`                                                             | 버튼 줄. 주 버튼을 맨 앞에                                                                                                                                                                         |
 
 ### 목록
 

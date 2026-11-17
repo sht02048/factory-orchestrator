@@ -121,6 +121,8 @@ export const motion = stylex.defineVars({
 export const size = stylex.defineVars({
   sidebarWidth: "216px",
   panelWidth: "384px",
+  /** Settings 처럼 편집 영역이 넓은 화면의 왼쪽 항목 목록 폭(SplitView editor) */
+  editorListWidth: "320px",
   control: "32px",
   input: "36px",
   rowMinHeight: "52px",
