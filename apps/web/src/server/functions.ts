@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { loadRunsPage } from "../runs/load";
 import { loadShell } from "../shell/load";
+import { loadStatsPage } from "../stats/load";
 import { getDatabase } from "./database";
 
 /*
@@ -14,3 +15,7 @@ export const getShell = createServerFn({ method: "GET" }).handler(() => loadShel
 export const getRunsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
   .handler(({ data }) => loadRunsPage(getDatabase(), data.ws, new Date()));
+
+export const getStatsPage = createServerFn({ method: "GET" })
+  .validator(z.object({ ws: z.string().optional() }))
+  .handler(({ data }) => loadStatsPage(getDatabase(), data.ws, new Date()));
