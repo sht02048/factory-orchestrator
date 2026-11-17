@@ -188,22 +188,22 @@
           const log =
             run.state === "queued"
               ? [["--:--:--", "info", "아직 시작하지 않았어요. 로그가 없어요."]]
-              : run.failReason === "runner"
+              : run.failCase === "runner"
                 ? [
                     [`${run.ended}:02`, "info", "ssh factory@runner-c.example.com orca status"],
                     [`${run.ended}:14`, "error", "ssh: connect to host runner-c.example.com port 22: Operation timed out"],
-                    [`${run.ended}:15`, "info", "run finished · pr=none → Failed (러너 연결 끊김)"],
+                    [`${run.ended}:15`, "info", "disconnected past max run time · agent=러너 연결 끊김 · pr=없음 → Failed"],
                   ]
-                : run.failReason === "agent"
+                : run.failCase === "agent"
                   ? [
                       [`${run.ended}:01`, "error", "error TS2345: Argument of type 'string | undefined' is not assignable"],
                       [`${run.ended}:20`, "agent", "같은 빌드 오류를 세 번 고치지 못했어요. 여기서 멈출게요."],
-                      [`${run.ended}:21`, "info", "run finished · pr=none → Failed (에이전트 오류)"],
+                      [`${run.ended}:21`, "info", "run ended · agent=오류 종료 · pr=없음 → Failed"],
                     ]
-                  : run.failReason === "closed"
+                  : run.failCase === "closed"
                     ? [
                         [`${run.ended}:00`, "info", `gh pr view ${run.pr.number} --json state → CLOSED`],
-                        [`${run.ended}:01`, "info", "run finished · pr=closed → Failed (PR이 닫힘)"],
+                        [`${run.ended}:01`, "info", "run ended · agent=정상 종료 · pr=닫힘 → Failed"],
                       ]
                     : [
                         [`${run.started}:10`, "info", `orca worktree create ${branch}`],
@@ -254,7 +254,7 @@
           page.innerHTML = `<div class="split-list">
               <nav class="crumb" aria-label="위치"><a href="runs.html">Runs</a><span aria-hidden="true">/</span><span class="num">Run ${run.id}</span></nav>
               <header class="run-head">
-                <p class="panel-state">${dot}${FO.stateText(run)}<span class="muted">${when}</span>${run.failReason ? `<span class="muted">· ${FO.failLabel[run.failReason]}</span>` : ""}</p>
+                <p class="panel-state">${dot}${FO.stateText(run)}<span class="muted">${when}</span>${run.failCase ? `<span class="muted">· ${FO.failLabel[run.failCase]}</span>` : ""}</p>
                 <h1 class="page-title">${FO.esc(t.title)}</h1>
                 <p class="panel-why">${FO.esc(FO.longWhy(run))}</p>
                 ${actions ? `<div class="actions">${actions}</div>` : ""}
