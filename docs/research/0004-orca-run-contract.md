@@ -8,7 +8,7 @@
 - **[스키마]** `orca <command> --help`와 `orca agent-context --json`.
 - **[소스]** 러너에 설치된 Orca 앱 번들의 JavaScript(`Orca.app/Contents/Resources/app.asar`와 `app.asar.unpacked/out/`). 문서·스키마에 없는 열거값을 찾으려고 읽었다. 다음 버전에서 바뀔 수 있다.
 
-티켓 0009와 같은 세션에서 버려도 되는 테스트 저장소에 워크트리 넷을 만들고 Claude Code(Haiku 모델)를 하나씩 짧게 띄웠다. 에이전트를 띄운 횟수를 줄이려고 0009와 런을 함께 썼다.
+티켓 0009와 같은 세션에서 버려도 되는 테스트 저장소에 워크트리 넷을 만들고 Claude Code(Haiku 모델)를 하나씩 짧게 띄웠다. 에이전트를 띄운 횟수를 줄이려고 0009와 같은 에이전트 실행을 함께 썼다.
 
 | 워크트리 | 프롬프트                                                  | 이 문서에서 본 것                       |
 | -------- | --------------------------------------------------------- | --------------------------------------- |
@@ -19,7 +19,7 @@
 
 러너의 GitHub 인증이 비대화형 세션에서 동작하지 않아(research 0003) 에이전트에게 push·PR을 시키지 않았다. 확인이 끝난 뒤 워크트리와 브랜치를 모두 지웠다.
 
-예시와 픽스처의 로컬 경로, 호스트명, 사용자명, 계정은 `<path>`, `<host>`, `<user>`, `acme`로 바꿨다. UUID와 시각은 순서만 남긴 가상 값이다. 픽스처는 [`fixtures/0004/`](fixtures/0004/)에 있다.
+예시와 픽스처의 로컬 경로, 호스트명, 사용자명, 계정은 `<path>`, `<host>`, `<user>`, `acme`로 바꿨다. UUID는 가상 값이고, 같은 대상은 파일끼리 같은 값을 쓴다(번호는 시간 순서가 아니다). 시각은 실제 간격을 남긴 채 옮긴 값이다. 픽스처는 [`fixtures/0004/`](fixtures/0004/)에 있다.
 
 ## 요약
 
@@ -85,7 +85,7 @@ orca worktree create --repo id:<repoId> --name fo-verify-w1 --no-parent \
 
 - `result.worktree.id`(`<repoId>::<path>`)가 `worktree ps` 행의 `worktreeId`와 같다. 런 레코드에는 이 값을 워크트리 참조로 둔다.
 - `launch.outcome.handle`은 에이전트 터미널 핸들, `launch.outcome.paneKey`는 `worktree ps`의 `agents[].paneKey`와 같다. 핸들은 로그 꼬리(`terminal read`)와 멈추기(`terminal close`, research 0003)에 쓴다.
-- 워크트리 경로는 등록한 저장소 옆이 아니라 Orca의 워크스페이스 폴더(`<path>/workspaces/<repo>/<name>`)에 생긴다.
+- 워크트리 경로는 등록한 저장소 옆이 아니라 Orca가 관리하는 폴더(`<path>/workspaces/<repo>/<name>`, 폴더 이름이 `workspaces`다)에 생긴다.
 - `--branch`를 주지 않으면 브랜치는 `<접두사>/<name>`이다. 이 러너의 접두사는 GitHub 계정 이름이었다. 런의 PR을 브랜치로 찾으려면(spec Q40) `--branch`로 이름을 정해 주는 편이 낫다.
 - 응답을 잃었을 때 다시 보낼 `operationId`는 성공 응답에도 온다.
 
@@ -117,9 +117,9 @@ Then reply DONE. 한국어 줄: 끝나면 멈춰요.
 | 262,000           | `Connection reset by peer`, ssh 연결 끊김 |
 | 1,100,000         | 로컬에서 `argument list too long`         |
 
-원격 명령 문자열 전체가 약 256 KiB를 넘으면 원격 sshd가 연결을 끊는다. 러너의 `ARG_MAX`는 1,048,576이라 ssh 한계가 먼저 온다. `worktree create`와 `agent launch`에는 파일·stdin 입력이 없으므로(0002 A.5), 한계는 프롬프트가 아니라 인용을 거친 원격 명령 문자열 전체의 바이트 수에 걸린다. 작은따옴표 하나는 인용하면 4바이트(`'\''`)가 되고 한국어 한 글자는 UTF-8로 3바이트다. 어댑터는 인용한 뒤의 명령 문자열 전체 바이트를 재고, 여유를 두어 200 KiB(204,800바이트)를 넘으면 런을 시작하지 않고 거절한다.
+255,000바이트 인자는 됐고 262,000바이트 인자는 원격 sshd가 연결을 끊었다. 명령 문자열에는 `orca` 경로와 다른 인자가 더 붙으므로, 문턱은 명령 문자열 전체 256 KiB(262,144바이트) 언저리로 본다(OpenSSH의 패킷 크기 한계로 보이나 정확한 값은 재지 않았다). 러너의 `ARG_MAX`는 1,048,576이라 ssh 한계가 먼저 온다. `worktree create`와 `agent launch`에는 파일·stdin 입력이 없으므로(0002 A.5), 한계는 프롬프트가 아니라 인용을 거친 원격 명령 문자열 전체의 바이트 수에 걸린다. 작은따옴표 하나는 인용하면 4바이트(`'\''`)가 되고 한국어 한 글자는 UTF-8로 3바이트다. 어댑터는 인용한 뒤의 명령 문자열 전체 바이트를 재고, 여유를 두어 200 KiB(204,800바이트)를 넘으면 런을 시작하지 않고 거절한다.
 
-- `worktree ps`의 `agents[].prompt`는 200자로 잘리고 줄바꿈이 공백으로 바뀐다 **[실행]**. 전달 확인에 쓸 수 없다.
+- `worktree ps`의 `agents[].prompt`는 200자로 잘리고 줄바꿈이 공백으로 바뀐다 **[실행]**. 긴 프롬프트(W2)는 Claude Code가 붙여넣기 블록으로 받아 `prompt`가 `<pasted_content id="...">`로 시작했다 **[실행]**. 어느 쪽이든 전달 확인에 쓸 수 없다.
 
 ## 2. `worktree ps` 열거값
 
@@ -128,7 +128,7 @@ Then reply DONE. 한국어 줄: 끝나면 멈춰요.
 | `agents[].state`            | `working`, `blocked`, `waiting`, `done`       | `working`, `waiting`, `done`                                                         |
 | `programStatus.state`       | `idle`, `working`, `done`, `blocked`, `error` | `working`, `done`, `blocked`                                                         |
 | `programStatus.kind`        | `permission`, `question`, `auth`              | `question`                                                                           |
-| `terminalVerdict`           | `live`, `unverifiable`, `none`                | `live`, `none`(`none`은 research 0003)                                               |
+| `terminalVerdict`           | `live`, `unverifiable`, `none`                | `live`, `none`(`none`은 0002 첫판 관측)                                              |
 | 행 `status`                 | 닫힌 목록 못 찾음                             | `active`, `working`, `permission`, `inactive`(research 0003)                         |
 | `sidebarStatus`             | 닫힌 목록 못 찾음                             | `active`, `monitoring`, `done`, `permission`, `inactive`(`inactive`는 research 0003) |
 | `agentWait`(`--agent-wait`) | -                                             | `null`, `{ "source": "hook", "since": <ms> }`                                        |
@@ -216,7 +216,12 @@ W2는 `AskUserQuestion`으로 질문하고 답을 기다렸다 **[실행]**. [`w
 - `terminal show --json`의 `result.terminal.agentWait`에도 같은 값이 있다 **[실행]**.
 - 권한 프롬프트로 멈추는 경우는 보지 못했다. 이 러너의 Orca는 Claude Code를 `--dangerously-skip-permissions`로 띄웠다(터미널 미리보기의 실행 인자) **[실행]**. 이것이 Orca 기본값인지 러너 설정인지는 확인하지 않았다. 소스의 `kind`에 `permission`이 있으므로 같은 모양으로 올 것으로 본다.
 
-Waiting for Input 판정은 `agents[].state === "waiting"` 또는 `programStatus.state === "blocked"`로 한다. `agentWait`는 `--agent-wait`를 줄 때만 오므로 보조로 쓴다.
+Waiting for Input 판정은 `agents[].state`가 `waiting` 또는 `blocked`이거나 `programStatus.state`가 `blocked`일 때로 한다. `agents[].state: "blocked"`는 관측하지 못했지만 소스 목록에 있고, 권한 프롬프트처럼 관측하지 못한 경우에 올 수 있어 함께 넣는다. `agentWait`는 `--agent-wait`를 줄 때만 오므로 보조로 쓴다.
+
+관측하지 못한 나머지 값은 다음처럼 다루는 것을 제안한다. 0037에서 정한다.
+
+- `programStatus.state: "error"`: 에이전트가 스스로 알린 오류 상태다. 프로세스가 살아 있으면 Running으로 두고, 끝남 판정은 위 신호(행의 `agents`에서 빠짐)를 따른다.
+- `terminalVerdict: "unverifiable"`: 런타임이 터미널 생사를 확인하지 못한다는 뜻이다. 런 상태를 바꾸지 않고 다음 폴링에서 다시 본다.
 
 ### 진행 중
 
@@ -232,7 +237,7 @@ W4는 에이전트가 `sleep 120`을 백그라운드로 띄운 상태였다 **[�
 
 ### 로그 꼬리: `terminal read`
 
-`terminal read --terminal <handle> --limit 60 --json`의 결과는 `result.terminal`에 `handle`, `status`(`running`), `tail`(줄 배열), `tailRows`(줄마다 `wrapped`, `trailingSpaces`), `truncated`, `limited`, `oldestCursor`, `nextCursor`, `latestCursor`, `returnedLineCount`, `source: "stream"`이 있다 **[실행]**. [`terminal-read-agent-done.json`](fixtures/0004/terminal-read-agent-done.json)은 W1이 일을 마친 직후다. 에이전트 TUI의 상태 표시 줄 몇 줄(러너의 플러그인과 요금제 표시)은 픽스처에서 뺐다.
+`terminal read --terminal <handle> --limit 60 --json`의 결과는 `result.terminal`에 `handle`, `status`(`running`), `tail`(줄 배열), `tailRows`(줄마다 `wrapped`, `trailingSpaces`), `truncated`, `limited`, `oldestCursor`, `nextCursor`, `latestCursor`, `returnedLineCount`, `source`가 있다 **[실행]**. `source`는 `stream`(터미널 출력 흐름)과 `screen`(화면 상태) 둘 다 왔다. `terminal-read-agent-done.json`은 `screen`이고, 에이전트 입력란에 미리 채워진 글자를 담은 `draft`(`"cat note.txt"`, 에이전트의 입력 제안으로 보인다)도 있었다. [`terminal-read-agent-done.json`](fixtures/0004/terminal-read-agent-done.json)은 W1이 일을 마친 직후다. 에이전트 TUI의 상태 표시 줄 몇 줄(러너의 플러그인과 요금제 표시)은 픽스처에서 뺐다.
 
 - `tail`은 화면에 그려진 줄이라 TUI 장식(박스 문자, 구분선)이 섞인다. 마크다운 백틱처럼 TUI가 바꿔 그린 글자는 원문과 다르다.
 - 터미널을 닫거나 워크트리를 지운 뒤에는 `tail`이 빈다(research 0003). 런의 마지막 로그는 그 전에 읽는다.
