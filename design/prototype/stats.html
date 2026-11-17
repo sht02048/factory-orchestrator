@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stats · factory-orchestrator</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .figures {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--space-6);
+        margin-bottom: var(--space-10);
+      }
+      .figure-n {
+        display: block;
+        font-size: var(--fs-page);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.2;
+      }
+      .figure-n small {
+        margin-inline-start: 2px;
+        color: var(--text-tertiary);
+        font-size: var(--fs-body);
+        font-weight: 400;
+      }
+      .figure-label {
+        color: var(--text-tertiary);
+      }
+      .chart {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .chart text {
+        fill: var(--text-tertiary);
+        font-size: 11px;
+        font-family: var(--font-sans);
+        font-variant-numeric: tabular-nums;
+      }
+      .chart .grid {
+        stroke: var(--border-subtle);
+      }
+      .s-merged {
+        fill: oklch(0.5 0.012 260);
+      }
+      .s-check {
+        fill: var(--check);
+      }
+      .s-failed {
+        fill: var(--failed);
+      }
+      .legend {
+        display: flex;
+        gap: var(--space-4);
+        color: var(--text-tertiary);
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .legend i {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+      }
+      .table.stats {
+        --cols: minmax(0, 1fr) 64px 72px 96px 64px 72px;
+      }
+      .split-bar {
+        display: flex;
+        height: 8px;
+        gap: 2px;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .split-bar i {
+        display: block;
+      }
+      .c-check {
+        color: var(--check);
+      }
+      .c-failed {
+        color: var(--failed);
+      }
+    </style>
+  </head>
+  <body data-page="stats">
+    <div class="app" id="app">
+      <main class="main split" id="page"></main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const FO = window.FO;
+        const page = document.getElementById("page");
+        const dims = [
+          { key: "runner", label: "러너별" },
+          { key: "project", label: "트래커 프로젝트별" },
+          { key: "agent", label: "에이전트별" },
+        ];
+        let dim = new URLSearchParams(location.search).get("by") || "runner";
+        const total = (x) => x.merged + x.check + x.failed;
+        const pct = (a, b) => Math.round((a / b) * 100);
+
+        function chart(daily) {
+          const W = 720, H = 168, top = 8, bottom = 22, left = 24;
+          const max = Math.max(...daily.map((d) => d[0] + d[1] + d[2]));
+          const step = Math.ceil(max / 4 / 2) * 2 || 1;
+          const scale = (H - top - bottom) / (step * 4);
+          const bw = (W - left) / daily.length;
+          let g = "";
+          for (let i = 0; i <= 4; i++) {
+            const y = H - bottom - i * step * scale;
+            g += `<line class="grid" x1="${left}" x2="${W}" y1="${y}" y2="${y}"/><text x="0" y="${y + 4}">${i * step}</text>`;
+          }
+          daily.forEach((d, i) => {
+            const x = left + i * bw + bw * 0.22;
+            const w = bw * 0.56;
+            let y = H - bottom;
+            [["merged", d[0]], ["check", d[1]], ["failed", d[2]]].forEach(([k, v]) => {
+              if (!v) return;
+              const h = v * scale;
+              y -= h;
+              g += `<rect class="s-${k}" x="${x}" y="${y + 1}" width="${w}" height="${h - 1}" rx="1"/>`;
+            });
+            if (i % 2 === 1 || i === daily.length - 1) g += `<text x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${FO.days[i]}</text>`;
+          });
+          return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="날짜별 처리량">${g}</svg>`;
+        }
+
+        function panel(key) {
+          const s = FO.stats[FO.ws];
+          const x = s[dim].find((r) => r.name === key);
+          const n = total(x);
+          return `<div class="panel-inner">
+            <div class="panel-head">
+              <p class="panel-state muted">${dims.find((d) => d.key === dim).label} · 최근 14일</p>
+              <h2 class="panel-title">${FO.esc(x.name)}</h2>
+            </div>
+            <p class="panel-why">런 ${n}개 중 ${pct(x.merged, n)}%를 에이전트가 병합까지 끝냈어요. ${x.check + x.failed}개는 사람이 손대야 했어요.</p>
+            <div class="split-bar" aria-hidden="true"><i class="s-merged" style="flex:${x.merged};background:oklch(0.5 0.012 260)"></i><i style="flex:${x.check};background:var(--check)"></i><i style="flex:${x.failed};background:var(--failed)"></i></div>
+            <dl class="props">
+              <dt>Merged</dt><dd>${x.merged}<span class="muted">${pct(x.merged, n)}%</span></dd>
+              <dt>Human Check</dt><dd class="c-check">${x.check}<span class="muted">${pct(x.check, n)}%</span></dd>
+              <dt>Failed</dt><dd class="c-failed">${x.failed}<span class="muted">${pct(x.failed, n)}%</span></dd>
+              <dt>리드 타임</dt><dd>${FO.minutes(x.p50)}<span class="muted">중앙값</span></dd>
+            </dl>
+            <div class="panel-foot"><a class="link" href="runs.html">이 Workspace의 런 보기</a></div>
+          </div>`;
+        }
+
+        function render() {
+          if (FO.ws === "all") {
+            page.innerHTML = FO.allNotice("Stats");
+            return;
+          }
+          const s = FO.stats[FO.ws];
+          const sum = s.daily.reduce((a, d) => [a[0] + d[0], a[1] + d[1], a[2] + d[2]], [0, 0, 0]);
+          const n = sum[0] + sum[1] + sum[2];
+          const rows = s[dim];
+          const tabs = dims.map((d) => `<button class="filter" type="button" role="tab" data-by="${d.key}" aria-selected="${d.key === dim}">${d.label}</button>`).join("");
+          page.innerHTML = `<div class="split-list">
+              <div class="page-head"><div><h1 class="page-title">Stats</h1><p class="page-sub">${FO.wsName(FO.ws)} · 최근 14일(11월 4일–17일)</p></div></div>
+              <div class="figures">
+                <div><span class="figure-n">${n}</span><span class="figure-label">끝난 런</span></div>
+                <div><span class="figure-n">${pct(sum[0], n)}<small>%</small></span><span class="figure-label">Merged</span></div>
+                <div><span class="figure-n">${sum[1] + sum[2]}</span><span class="figure-label">Human Check <span class="c-check">${sum[1]}</span> · Failed <span class="c-failed">${sum[2]}</span></span></div>
+                <div><span class="figure-n">${s.lead.p50}<small>분</small></span><span class="figure-label">리드 타임 중앙값 · p90 ${s.lead.p90}분</span></div>
+              </div>
+              <section class="section">
+                <div class="section-head"><h2 class="section-title">날짜별 처리량</h2>
+                  <span class="section-note legend"><span><i class="s-merged" style="background:oklch(0.5 0.012 260)"></i>Merged</span><span><i style="background:var(--check)"></i>Human Check</span><span><i style="background:var(--failed)"></i>Failed</span></span></div>
+                ${chart(s.daily)}
+              </section>
+              <section class="section">
+                <div class="filters" role="tablist" aria-label="나눠 보기">${tabs}</div>
+                <div class="table stats">
+                  ${FO.thead([{ label: "이름" }, { label: "런", r: true }, { label: "Merged", r: true }, { label: "Human Check", r: true }, { label: "Failed", r: true }, { label: "리드 타임", r: true }])}
+                  <div class="rows" role="listbox" aria-label="${dims.find((d) => d.key === dim).label}">${rows
+                    .map(
+                      (x) => `<button class="row" type="button" role="option" aria-selected="false" data-key="stat:${x.name}">
+                      <span class="cell"><span class="row-title">${FO.esc(x.name)}</span></span>
+                      <span class="cell num r">${total(x)}</span>
+                      <span class="cell num r">${pct(x.merged, total(x))}%</span>
+                      <span class="cell num r">${x.check}</span>
+                      <span class="cell num r">${x.failed}</span>
+                      <span class="cell num r">${x.p50}분</span>
+                    </button>`
+                    )
+                    .join("")}</div>
+                </div>
+              </section>
+            </div>
+            <aside class="panel" aria-live="polite" aria-label="고른 항목 요약"></aside>`;
+          FO.bindSplit(page.querySelector(".split-list"), page.querySelector(".panel"), { stat: panel }, `stat:${rows[0].name}`);
+        }
+
+        page.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-by]");
+          if (!b) return;
+          dim = b.dataset.by;
+          const url = new URL(location.href);
+          url.searchParams.set("by", dim);
+          url.searchParams.delete("sel");
+          history.replaceState(null, "", url);
+          render();
+          page.querySelector(`[data-by="${dim}"]`).focus();
+        });
+
+        FO.mount("stats", render);
+      })();
+    </script>
+  </body>
+</html>

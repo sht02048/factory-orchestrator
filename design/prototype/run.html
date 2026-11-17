@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Run 상세 · factory-orchestrator</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .crumb {
+        display: flex;
+        gap: 6px;
+        margin-bottom: var(--space-4);
+        color: var(--text-tertiary);
+      }
+      .crumb a:hover {
+        color: var(--text-primary);
+      }
+      .run-head {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        max-width: 680px;
+        padding-bottom: var(--space-8);
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      .run-head .page-title {
+        line-height: 1.3;
+      }
+      .run-head .panel-why {
+        font-size: 15px;
+      }
+      .block {
+        max-width: 760px;
+        padding-top: var(--space-8);
+      }
+      .block-title {
+        margin-bottom: var(--space-3);
+        font-size: var(--fs-body);
+        font-weight: 600;
+      }
+      .timeline {
+        display: flex;
+        flex-direction: column;
+      }
+      .timeline li {
+        display: grid;
+        grid-template-columns: 56px 16px minmax(0, 1fr);
+        gap: var(--space-3);
+        padding-bottom: var(--space-4);
+        position: relative;
+      }
+      .timeline time {
+        color: var(--text-tertiary);
+        font-variant-numeric: tabular-nums;
+      }
+      .timeline .mark {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        padding-top: 6px;
+      }
+      .timeline .mark::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--text-tertiary);
+        position: relative;
+        z-index: 1;
+      }
+      .timeline li:not(:last-child) .mark::after {
+        content: "";
+        position: absolute;
+        top: 14px;
+        bottom: calc(var(--space-4) * -1 + 2px);
+        width: 1px;
+        background: var(--border-default);
+      }
+      .timeline [data-tone="check"] .mark::before {
+        background: var(--check);
+      }
+      .timeline [data-tone="failed"] .mark::before {
+        background: var(--failed);
+      }
+      .timeline [data-tone="check"] .t-label {
+        color: var(--check);
+      }
+      .timeline [data-tone="failed"] .t-label {
+        color: var(--failed);
+      }
+      .t-label {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .t-detail {
+        color: var(--text-tertiary);
+      }
+      .checks {
+        display: flex;
+        flex-direction: column;
+      }
+      .checks li {
+        display: grid;
+        grid-template-columns: 18px minmax(0, 1fr) auto;
+        gap: var(--space-2);
+        align-items: center;
+        height: 36px;
+        border-top: 1px solid var(--border-subtle);
+        color: var(--text-secondary);
+      }
+      .checks li:first-child {
+        border-top: 0;
+      }
+      .checks svg {
+        width: 14px;
+        height: 14px;
+        color: var(--text-tertiary);
+      }
+      .checks [data-state="failed"] {
+        color: var(--text-primary);
+      }
+      .checks [data-state="failed"] svg {
+        color: var(--failed);
+      }
+      .running-mark {
+        width: 8px;
+        height: 8px;
+        margin-inline-start: 3px;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1.5px var(--text-tertiary);
+      }
+      .checks .num {
+        color: var(--text-tertiary);
+      }
+      .log {
+        margin: 0;
+        padding: var(--space-4);
+        overflow: auto;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        background: var(--bg-inset);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--text-secondary);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .log .t {
+        color: var(--text-disabled);
+      }
+      .log .error {
+        color: var(--failed);
+      }
+      .log .agent {
+        color: var(--text-primary);
+      }
+      .block-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+    </style>
+  </head>
+  <body data-page="run">
+    <div class="app" id="app">
+      <main class="main split" id="page"></main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const FO = window.FO;
+        const page = document.getElementById("page");
+        const asked = Number(new URLSearchParams(location.search).get("id"));
+        const id = FO.run(asked) ? asked : 1051;
+
+        function genericDetail(run) {
+          const branch = `factory/${run.ticket.toLowerCase()}`;
+          const checks = run.pr
+            ? ["lint", "typecheck", "unit", "build", "e2e"].map((n) => {
+                /* CI 목록은 PR의 CI 상태(run.pr.ci)와 같아야 한다: 실패면 e2e 하나가 실패, 도는 중이면 build 이후가 도는 중 */
+                const state = run.pr.ci === "failed" && n === "e2e" ? "failed" : run.pr.ci === "running" && (n === "build" || n === "e2e") ? "running" : "passed";
+                return { name: n, state, time: state === "running" ? "도는 중" : "1분 10초" };
+              })
+            : [];
+          const log =
+            run.state === "queued"
+              ? [["--:--:--", "info", "아직 시작하지 않았어요. 로그가 없어요."]]
+              : run.failReason === "runner"
+                ? [
+                    [`${run.ended}:02`, "info", "ssh factory@runner-c.example.com orca status"],
+                    [`${run.ended}:14`, "error", "ssh: connect to host runner-c.example.com port 22: Operation timed out"],
+                    [`${run.ended}:15`, "info", "run finished · pr=none → Failed (러너 연결 끊김)"],
+                  ]
+                : run.failReason === "agent"
+                  ? [
+                      [`${run.ended}:01`, "error", "error TS2345: Argument of type 'string | undefined' is not assignable"],
+                      [`${run.ended}:20`, "agent", "같은 빌드 오류를 세 번 고치지 못했어요. 여기서 멈출게요."],
+                      [`${run.ended}:21`, "info", "run finished · pr=none → Failed (에이전트 오류)"],
+                    ]
+                  : run.failReason === "closed"
+                    ? [
+                        [`${run.ended}:00`, "info", `gh pr view ${run.pr.number} --json state → CLOSED`],
+                        [`${run.ended}:01`, "info", "run finished · pr=closed → Failed (PR이 닫힘)"],
+                      ]
+                    : [
+                        [`${run.started}:10`, "info", `orca worktree create ${branch}`],
+                        [`${run.started}:40`, "agent", run.step || "티켓을 읽고 변경 범위를 정했어요."],
+                      ];
+          return { branch, worktree: `${(FO.mappingFor(FO.ticket(run.ticket).project) || { project: "—" }).project} · ${run.ticket.toLowerCase()}`, timeline: FO.events(run), checks, log };
+        }
+
+        function render() {
+          const run = FO.run(id);
+          const t = FO.ticket(run.ticket);
+          const d = FO.runDetails[id] || genericDetail(run);
+          const dot = run.result === "check" || run.result === "failed" ? `<span class="dot" data-tone="${run.result}" aria-hidden="true"></span>` : "";
+          const when = run.state === "done" ? `${run.ended}에 끝났어요` : run.state === "running" ? `${FO.minutes(run.elapsed)}째` : `${FO.minutes(run.waited)}째 기다리는 중`;
+          const rerun = `<button class="btn ${run.result === "failed" ? "btn-primary" : ""}" type="button" data-toast="새 런을 시작했어요. 대기열에 넣었어요">새 런 시작</button>`;
+          const pr = run.pr ? `<a class="btn ${run.result === "check" ? "btn-primary" : ""}" href="https://github.example.com/acme/pull/${run.pr.number}" target="_blank" rel="noreferrer">PR #${run.pr.number} 열기${FO.icon.external}</a>` : "";
+          const actions = run.state === "done" && run.result !== "merged" ? (run.result === "check" ? pr + rerun : rerun) : pr;
+
+          const timeline = d.timeline
+            .map((e) => `<li data-tone="${e.tone || ""}"><time>${e.time}</time><span class="mark" aria-hidden="true"></span><div><p class="t-label">${FO.esc(e.label)}</p>${e.detail ? `<p class="t-detail">${FO.esc(e.detail)}</p>` : ""}</div></li>`)
+            .join("");
+          const failedChecks = d.checks.filter((c) => c.state === "failed").length;
+          const runningChecks = d.checks.filter((c) => c.state === "running").length;
+          const ciSum = failedChecks ? `${failedChecks}개 실패` : runningChecks ? `${runningChecks}개 도는 중` : "모두 통과";
+          const ciIcon = (c) => (c.state === "failed" ? FO.icon.x : c.state === "running" ? '<span class="running-mark" aria-hidden="true"></span>' : FO.icon.check);
+          const checks = d.checks.length
+            ? `<section class="block"><div class="block-head"><h2 class="block-title">CI</h2><span class="muted num">${d.checks.length}개 중 ${ciSum}</span></div><ul class="checks">${d.checks
+                .map((c) => `<li data-state="${c.state}">${ciIcon(c)}<span>${FO.esc(c.name)}<span class="visually-hidden"> ${FO.ciLabel[c.state] || ""}</span></span><span class="num">${c.time}</span></li>`)
+                .join("")}</ul></section>`
+            : "";
+          const log = `<section class="block"><div class="block-head"><h2 class="block-title">로그 꼬리</h2><span class="muted">마지막 ${d.log.length}줄</span></div><pre class="log">${d.log
+            .map(([time, kind, text]) => `<span class="t">${time}</span>  <span class="${kind}">${FO.esc(text)}</span>`)
+            .join("\n")}</pre></section>`;
+
+          const others = FO.runsFor(run.ticket).filter((r) => r.id !== run.id);
+          const props = [
+            ["러너", `${run.runner}${FO.runner(run.runner).online ? "" : '<span class="muted">Offline</span>'}`],
+            ["에이전트", FO.agents[run.agent]],
+            ["시작", run.started ? `${run.started}${run.ended ? `<span class="muted">→ ${run.ended}</span>` : ""}` : `<span class="none">아직</span>`],
+            [run.state === "queued" ? "기다린 시간" : "경과 시간", FO.minutes(run.state === "queued" ? run.waited : run.elapsed)],
+            ["PR", run.pr ? `#${run.pr.number}<span class="muted">${FO.prLabel[run.pr.state]}</span>` : '<span class="none">없음</span>'],
+            ["CI", run.pr ? FO.ciLabel[run.pr.ci] : '<span class="none">—</span>'],
+            ["브랜치", `<span class="mono">${FO.esc(d.branch)}</span>`],
+            ["Worktree", FO.esc(d.worktree)],
+            ["Workspace", `${FO.esc(FO.workspaceOfRun(run).name)}<span class="muted">${FO.esc(t.project)}</span>`],
+          ];
+
+          page.innerHTML = `<div class="split-list">
+              <nav class="crumb" aria-label="위치"><a href="runs.html">Runs</a><span aria-hidden="true">/</span><span class="num">Run ${run.id}</span></nav>
+              <header class="run-head">
+                <p class="panel-state">${dot}${FO.stateText(run)}<span class="muted">${when}</span>${run.failReason ? `<span class="muted">· ${FO.failLabel[run.failReason]}</span>` : ""}</p>
+                <h1 class="page-title">${FO.esc(t.title)}</h1>
+                <p class="panel-why">${FO.esc(FO.longWhy(run))}</p>
+                ${actions ? `<div class="actions">${actions}</div>` : ""}
+              </header>
+              <section class="block"><h2 class="block-title">타임라인</h2><ol class="timeline">${timeline}</ol></section>
+              ${checks}
+              ${log}
+            </div>
+            <aside class="panel" aria-label="런 정보">
+              <div class="panel-inner">
+                <div class="panel-head">
+                  <p class="panel-block-title" style="margin:0">티켓</p>
+                  <a class="link num" href="tickets.html?ws=${FO.workspaceOfRun(run).id}&sel=${run.ticket}">${run.ticket}</a>
+                </div>
+                <dl class="props">${props.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
+                ${
+                  others.length
+                    ? `<div><h3 class="panel-block-title">같은 티켓의 다른 런</h3><ol class="events">${others
+                        .map((o) => `<li class="event"><time>${o.started || o.queued}</time><a href="run.html?id=${o.id}">Run ${o.id} · ${FO.stateText(o)}</a></li>`)
+                        .join("")}</ol></div>`
+                    : ""
+                }
+              </div>
+            </aside>`;
+          document.title = `Run ${run.id} · factory-orchestrator`;
+        }
+
+        FO.mount("run", render);
+      })();
+    </script>
+  </body>
+</html>

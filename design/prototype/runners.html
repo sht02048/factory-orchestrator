@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Runners · factory-orchestrator</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .table.runners {
+        --cols: minmax(0, 1fr) 96px 120px 96px 104px;
+      }
+      .slots {
+        display: flex;
+        flex-direction: column;
+      }
+      .slot {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        gap: var(--space-3);
+        padding: var(--space-2) 0;
+        border-top: 1px solid var(--border-subtle);
+      }
+      .slot:first-child {
+        border-top: 0;
+      }
+      .slot-n {
+        color: var(--text-tertiary);
+        font-variant-numeric: tabular-nums;
+      }
+      .slot-title {
+        display: block;
+        overflow: hidden;
+        color: var(--text-primary);
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+      a.slot-title:hover {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        text-decoration-color: var(--border-strong);
+      }
+      .slot-meta {
+        color: var(--text-tertiary);
+      }
+      .slot[data-empty] .slot-title {
+        color: var(--text-tertiary);
+      }
+      .bar {
+        display: inline-flex;
+        gap: 3px;
+        vertical-align: middle;
+        margin-inline-end: var(--space-2);
+      }
+      .bar i {
+        width: 10px;
+        height: 6px;
+        border-radius: 1px;
+        background: var(--border-default);
+      }
+      .bar i[data-on] {
+        background: var(--text-secondary);
+      }
+      .projects li {
+        padding: 6px 0;
+        border-top: 1px solid var(--border-subtle);
+        color: var(--text-secondary);
+      }
+      .projects li:first-child {
+        border-top: 0;
+      }
+    </style>
+  </head>
+  <body data-page="runners">
+    <div class="app" id="app">
+      <main class="main split" id="page"></main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const FO = window.FO;
+        const page = document.getElementById("page");
+        const busy = (id) => FO.runs.filter((r) => r.state === "running" && r.runner === id);
+        const waiting = (id) => FO.runs.filter((r) => r.state === "queued" && r.runner === id);
+        const bar = (n, cap) => `<span class="bar" aria-hidden="true">${Array.from({ length: cap }, (_, i) => `<i${i < n ? " data-on" : ""}></i>`).join("")}</span>`;
+
+        function row(r) {
+          const n = busy(r.id).length;
+          const q = waiting(r.id).length;
+          return `<button class="row" type="button" role="option" aria-selected="false" data-key="runner:${r.id}">
+            <span class="cell"><span class="row-title">${r.id}</span><span class="row-why">${r.host}</span></span>
+            <span class="cell"><span class="dot" data-tone="${r.online ? "online" : "offline"}" aria-hidden="true"></span> <span class="${r.online ? "secondary" : ""}">${r.online ? "Online" : "Offline"}</span></span>
+            <span class="cell num">${r.online ? `${bar(n, r.capacity)}${n}/${r.capacity}` : `${bar(0, r.capacity)}—/${r.capacity}`}</span>
+            <span class="cell num">${q ? `${q}개` : "—"}</span>
+            <span class="cell num r">${r.lastSeen}</span>
+          </button>`;
+        }
+
+        function panel(id) {
+          const r = FO.runner(id);
+          const runs = busy(id);
+          const q = waiting(id);
+          const free = r.capacity - runs.length;
+          const why = !r.online
+            ? `${r.lastSeen}부터 응답이 없어요. 이 러너로 가는 런 ${q.length}개가 Queued로 기다려요. ssh 연결을 확인해 보세요.`
+            : free === 0
+              ? `capacity ${r.capacity}개를 모두 쓰고 있어요.${q.length ? ` 런 ${q.length}개가 자리를 기다려요.` : ""}`
+              : `capacity ${r.capacity}개 중 ${free}개가 비어 있어요.`;
+          const slots = Array.from({ length: r.capacity }, (_, i) => {
+            const run = runs[i];
+            if (!run) return `<li class="slot" data-empty><span class="slot-n">${i + 1}</span><span class="slot-title">${r.online ? "비어 있어요" : "쓸 수 없어요"}</span></li>`;
+            const t = FO.ticket(run.ticket);
+            return `<li class="slot"><span class="slot-n">${i + 1}</span><div style="min-width:0"><a class="slot-title" href="run.html?id=${run.id}">${FO.esc(t.title)}</a><span class="slot-meta num">${FO.esc(FO.workspaceOfRun(run).name)} · ${run.ticket} · ${FO.minutes(run.elapsed)}째</span></div></li>`;
+          }).join("");
+          return `<div class="panel-inner">
+            <div class="panel-head">
+              <p class="panel-state"><span class="dot" data-tone="${r.online ? "online" : "offline"}" aria-hidden="true"></span><span class="state" data-tone="neutral">${r.online ? "Online" : "Offline"}</span><span class="muted">${r.lastSeen} 응답</span></p>
+              <h2 class="panel-title">${r.id}</h2>
+              <p class="panel-sub">${r.user}@${r.host}</p>
+            </div>
+            <p class="panel-why">${why}</p>
+            <div class="actions"><button class="btn ${r.online ? "" : "btn-primary"}" type="button" data-toast="${r.online ? `${r.id}에 ssh로 연결했어요` : `${r.id}에 아직 닿지 않아요`}">ssh 연결 확인</button></div>
+            <div><h3 class="panel-block-title">capacity ${runs.length}/${r.capacity}</h3>${r.online ? `<ol class="slots">${slots}</ol>` : `<p class="muted">Offline이라 capacity ${r.capacity}개를 모두 쓸 수 없어요.</p>`}</div>
+            ${q.length ? `<div><h3 class="panel-block-title">기다리는 런 ${q.length}</h3><ol class="events">${q.map((x) => `<li class="event"><time class="num">${x.queued}</time><a href="run.html?id=${x.id}">${FO.esc(FO.ticket(x.ticket).title)}</a></li>`).join("")}</ol></div>` : ""}
+            <div><h3 class="panel-block-title">프로젝트 ${r.projects.length}</h3><ul class="projects">${r.projects.map((p) => `<li>${p}</li>`).join("")}</ul></div>
+            <dl class="props">
+              <dt>Orca</dt><dd>${r.orca}</dd>
+              <dt>실행 파일</dt><dd class="mono">${r.orcaPath}</dd>
+              <dt>OS</dt><dd>${r.os}</dd>
+            </dl>
+          </div>`;
+        }
+
+        function render() {
+          const online = FO.runners.filter((r) => r.online).length;
+          page.innerHTML = `<div class="split-list">
+              <div class="page-head"><div><h1 class="page-title">Runners</h1><p class="page-sub">모든 Workspace가 함께 쓰는 러너예요. ${FO.runners.length}대 중 ${online}대가 Online이에요.</p></div>
+              <a class="btn" href="settings.html?sel=runners">${FO.icon.plus}러너 등록</a></div>
+              <div class="table runners">
+                ${FO.thead([{ label: "러너" }, { label: "상태" }, { label: "사용 중" }, { label: "Queued" }, { label: "마지막 응답", r: true }])}
+                <div class="rows" role="listbox" aria-label="러너">${FO.runners.map(row).join("")}</div>
+              </div>
+            </div>
+            <aside class="panel" aria-live="polite" aria-label="고른 러너 요약"></aside>`;
+          FO.bindSplit(page.querySelector(".split-list"), page.querySelector(".panel"), { runner: panel }, "runner:runner-a");
+        }
+
+        FO.mount("runners", render);
+      })();
+    </script>
+  </body>
+</html>

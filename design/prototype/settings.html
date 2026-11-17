@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Settings · factory-orchestrator</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      /* Settings는 목록이 좁고 편집 영역이 넓다. 구조(목록 → 고른 항목)는 다른 화면과 같다 */
+      .split.settings {
+        grid-template-columns: 320px minmax(0, 1fr);
+      }
+      .settings .split-list {
+        padding-inline: var(--space-6);
+        background: var(--bg-canvas);
+      }
+      .settings .panel {
+        background: var(--bg-canvas);
+      }
+      .settings .panel-inner {
+        max-width: 760px;
+        padding: var(--space-8) var(--space-10) var(--space-10);
+      }
+      .group + .group {
+        margin-top: var(--space-8);
+      }
+      .group-title {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-2);
+        margin-bottom: var(--space-2);
+        padding: 0 var(--space-3);
+        font-size: var(--fs-ui);
+        font-weight: 600;
+      }
+      .group-title .muted {
+        font-weight: 400;
+      }
+      .settings .row {
+        grid-template-columns: minmax(0, 1fr);
+        min-height: 56px;
+      }
+      .settings .rows .row:first-child {
+        border-top: 0;
+      }
+      .scope {
+        color: var(--text-tertiary);
+      }
+      .map {
+        display: grid;
+        grid-template-columns: 140px repeat(3, minmax(0, 1fr));
+        gap: var(--space-2) var(--space-3);
+        align-items: center;
+      }
+      .map .th {
+        color: var(--text-tertiary);
+        font-size: var(--fs-small);
+      }
+      .map .proj {
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .conn {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+        padding: var(--space-4) 0;
+        border-top: 1px solid var(--border-subtle);
+      }
+      .conn:first-of-type {
+        border-top: 0;
+        padding-top: 0;
+      }
+      .conn-head {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-2);
+      }
+      .conn-head strong {
+        font-size: var(--fs-body);
+        font-weight: 600;
+      }
+      .conn-head .btn {
+        margin-inline-start: auto;
+      }
+      .copy {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: var(--space-2);
+      }
+      .danger {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-4);
+        margin-top: var(--space-6);
+        padding-top: var(--space-6);
+        border-top: 1px solid var(--border-subtle);
+      }
+      .add-form {
+        margin-top: var(--space-6);
+        padding-top: var(--space-6);
+        border-top: 1px solid var(--border-subtle);
+      }
+      .form-actions {
+        display: flex;
+        gap: var(--space-2);
+      }
+    </style>
+  </head>
+  <body data-page="settings">
+    <div class="app" id="app">
+      <main class="main split settings" id="page"></main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const FO = window.FO;
+        const page = document.getElementById("page");
+        const esc = FO.esc;
+        const wsObj = () => FO.workspaces.find((w) => w.id === FO.ws);
+        const save = (msg) => `<div class="form-actions"><button class="btn btn-primary" type="submit">저장하기</button></div>`;
+
+        const items = {
+          general: {
+            group: "ws",
+            title: "일반",
+            sum: () => wsObj().name,
+            body: () => `<form class="form" data-msg="Workspace 이름을 바꿨어요">
+                <div class="field"><label for="ws-name">Workspace 이름</label>
+                <input class="input" id="ws-name" value="${esc(wsObj().name)}" autocomplete="off" spellcheck="false" /></div>
+                ${save()}
+              </form>
+              <div class="danger"><div><p class="secondary">이 Workspace 지우기</p><p class="hint">티켓과 런 기록은 트래커와 러너에 그대로 남아요.</p></div>
+              <button class="btn" type="button" data-toast="시안이라 지우지 않았어요">지우기</button></div>`,
+          },
+          projects: {
+            group: "ws",
+            title: "트래커 프로젝트",
+            sum: () => `${wsObj().projects.length}개 · ${wsObj().projects.join(", ")}`,
+            body: () => {
+              const groups = FO.connections
+                .map((c) => {
+                  const rows = FO.trackerProjects
+                    .filter((p) => p.connection === c.id)
+                    .map((p) => {
+                      const owner = FO.workspaceOfProject(p.name);
+                      const mine = owner && owner.id === FO.ws;
+                      const other = owner && !mine;
+                      return `<label class="check-row"><input type="checkbox" name="proj" value="${esc(p.name)}"${mine ? " checked" : ""}${other ? " disabled" : ""} /><span class="${other ? "muted" : ""}">${esc(p.name)}</span>${other ? `<span class="muted">${esc(owner.name)}에 있어요</span>` : ""}</label>`;
+                    })
+                    .join("");
+                  return `<div class="field"><span class="label">${esc(c.name)} <span class="muted">Linear · ${c.org}</span></span><div class="check-list">${rows}</div></div>`;
+                })
+                .join("");
+              return `<form class="form" data-msg="트래커 프로젝트를 저장했어요">
+                <p class="hint">한 트래커 프로젝트는 Workspace 하나에만 넣을 수 있어요.</p>
+                ${groups}${save()}</form>`;
+            },
+          },
+          mapping: {
+            group: "ws",
+            title: "Mapping",
+            sum: () => `${FO.mappings.filter((m) => wsObj().projects.includes(m.tracker)).length}개`,
+            body: () => {
+              const sel = (opts, v, label) => `<select class="select" aria-label="${label}">${opts.map((o) => `<option${o === v ? " selected" : ""}>${o}</option>`).join("")}</select>`;
+              const runnerProjects = [...new Set(FO.runners.flatMap((r) => r.projects))];
+              const rows = wsObj()
+                .projects.map((p) => {
+                  const m = FO.mappingFor(p);
+                  return `<span class="proj">${esc(p)}</span>${sel(FO.runners.map((r) => r.id), m && m.runner, `${p} 러너`)}${sel(runnerProjects, m && m.project, `${p} 러너 프로젝트`)}${sel(Object.values(FO.agents), m && FO.agents[m.agent], `${p} 에이전트`)}`;
+                })
+                .join("");
+              return `<form class="form" style="max-width:none" data-msg="Mapping을 저장했어요">
+                <p class="hint">트래커 프로젝트의 티켓을 어느 러너의 어느 프로젝트에서, 어떤 에이전트가 처리할지 정해요.</p>
+                <div class="map"><span class="th">트래커 프로젝트</span><span class="th">러너</span><span class="th">러너 프로젝트</span><span class="th">에이전트</span>${rows}</div>
+                ${save()}</form>`;
+            },
+          },
+          label: {
+            group: "ws",
+            title: "Auto-assign Label",
+            sum: () => FO.AUTO_LABEL,
+            body: () => `<form class="form" data-msg="Auto-assign Label을 바꿨어요">
+                <div class="field"><label for="label">라벨 이름</label>
+                <input class="input mono" id="label" value="${FO.AUTO_LABEL}" autocomplete="off" spellcheck="false" />
+                <p class="hint">이 라벨이 붙은 티켓은 운영자 없이 바로 할당해요. 라벨이 없는 티켓은 Tickets에서 직접 할당해요.</p></div>
+                ${save()}</form>`,
+          },
+          connections: {
+            group: "install",
+            title: "트래커 연결",
+            sum: () => `${FO.connections.length}개 · ${FO.connections.map((c) => c.name).join(", ")}`,
+            body: () =>
+              `<p class="hint" style="margin-bottom:var(--space-4)">모든 Workspace가 함께 써요. Workspace는 어느 연결의 트래커 프로젝트든 고를 수 있어요.</p>` +
+              FO.connections
+                .map(
+                  (c) => `<div class="conn">
+                  <div class="conn-head"><strong>${esc(c.name)}</strong><span class="muted">Linear · ${c.org} · 트래커 프로젝트 ${c.projects}개 · 마지막 이벤트 ${c.lastEvent}</span>
+                  <button class="btn btn-ghost" type="button" data-toast="${esc(c.name)} 연결을 확인했어요">연결 확인</button></div>
+                  <div class="field"><label for="wh-${c.id}">Webhook 주소</label>
+                  <div class="copy"><input class="input mono" id="wh-${c.id}" value="${c.webhook}" readonly /><button class="btn" type="button" data-toast="주소를 복사했어요">복사</button></div></div>
+                </div>`
+                )
+                .join("") +
+              `<form class="form add-form" data-msg="연결을 추가했어요"><h3 class="section-title">연결 추가</h3>
+                <div class="field"><label for="new-conn">연결 이름</label><input class="input" id="new-conn" placeholder="예: 개인" autocomplete="off" spellcheck="false" /></div>
+                <div class="field"><label for="new-key">Linear API 키</label><input class="input mono" id="new-key" type="password" autocomplete="off" /><p class="hint">Linear 설정 → API에서 만들 수 있어요. 암호화해서 저장해요.</p></div>
+                <div class="form-actions"><button class="btn" type="submit">연결 확인하고 추가</button></div></form>`,
+          },
+          github: {
+            group: "install",
+            title: "GitHub 토큰",
+            sum: () => "repo, workflow 권한 · 확인됨",
+            body: () => `<form class="form" data-msg="토큰을 바꿨어요">
+                <div class="field"><label for="gh">토큰</label>
+                <input class="input mono" id="gh" type="password" value="ghp_example000000000000000000003f2a" autocomplete="off" />
+                <p class="hint">PR과 CI 상태를 읽는 데 써요. 암호화해서 저장해요.</p></div>
+                <div class="result" data-tone="ok">${FO.icon.check}<div><p class="result-title">repo, workflow 권한이 있어요</p><p class="result-body">11월 17일 09:02에 확인했어요.</p></div></div>
+                ${save()}</form>`,
+          },
+          runners: {
+            group: "install",
+            title: "러너 등록",
+            sum: () => `${FO.runners.length}대 · ${FO.runners.filter((r) => !r.online).length}대 Offline`,
+            body: () => `<p class="hint" style="margin-bottom:var(--space-4)">러너는 모든 Workspace가 함께 써요. 상태와 capacity는 <a class="link" href="runners.html">Runners</a>에서 봐요.</p>
+                <form class="form" data-msg="runner-d에 연결했어요. 러너를 등록했어요">
+                <div class="field-row">
+                  <div class="field"><label for="nr-host">ssh 주소</label><input class="input mono" id="nr-host" placeholder="factory@runner-d.example.com" autocomplete="off" spellcheck="false" /></div>
+                  <div class="field"><label for="nr-cap">Capacity</label><input class="input mono" id="nr-cap" inputmode="numeric" value="3" autocomplete="off" /></div>
+                </div>
+                <div class="field"><label for="nr-orca">orca 실행 파일 경로</label><input class="input mono" id="nr-orca" value="/usr/local/bin/orca" autocomplete="off" spellcheck="false" />
+                <p class="hint">러너에서 <code class="mono">which orca</code>로 나온 경로를 넣어요.</p></div>
+                <div class="form-actions"><button class="btn btn-primary" type="submit">ssh 연결 확인하고 등록</button></div></form>`,
+          },
+        };
+
+        function row(key) {
+          const it = items[key];
+          return `<button class="row" type="button" role="option" aria-selected="false" data-key="set:${key}">
+            <span class="cell"><span class="row-title">${it.title}</span><span class="row-why">${esc(it.sum())}</span></span>
+          </button>`;
+        }
+
+        function panel(key) {
+          const it = items[key];
+          const scope = it.group === "ws" ? `${esc(wsObj().name)} Workspace` : "설치 전체";
+          return `<div class="panel-inner">
+            <div class="panel-head"><p class="scope">${scope}</p><h2 class="page-title">${it.title}</h2></div>
+            <div>${it.body()}</div>
+          </div>`;
+        }
+
+        function render() {
+          const keys = Object.keys(items);
+          const wsKeys = keys.filter((k) => items[k].group === "ws");
+          const installKeys = keys.filter((k) => items[k].group === "install");
+          const wsGroup =
+            FO.ws === "all"
+              ? `<p class="empty" style="border:0;padding-top:0">Workspace를 고르면 그 Workspace의 설정을 바꿀 수 있어요.</p>`
+              : `<div class="rows" role="listbox" aria-label="Workspace 설정">${wsKeys.map(row).join("")}</div>`;
+          page.innerHTML = `<div class="split-list">
+              <div class="page-head"><h1 class="page-title">Settings</h1></div>
+              <section class="group"><h2 class="group-title">이 Workspace <span class="muted">${esc(FO.wsName(FO.ws))}</span></h2>${wsGroup}</section>
+              <section class="group"><h2 class="group-title">설치 전체 <span class="muted">모든 Workspace</span></h2>
+              <div class="rows" role="listbox" aria-label="설치 설정">${installKeys.map(row).join("")}</div></section>
+            </div>
+            <section class="panel" aria-label="고른 설정"></section>`;
+          FO.bindSplit(page.querySelector(".split-list"), page.querySelector(".panel"), { set: panel }, FO.ws === "all" ? "set:connections" : "set:general");
+        }
+
+        page.addEventListener("submit", (e) => {
+          e.preventDefault();
+          FO.toast(e.target.dataset.msg || "저장했어요");
+        });
+
+        FO.mount("settings", render);
+      })();
+    </script>
+  </body>
+</html>

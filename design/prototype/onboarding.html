@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>첫 실행 설정 · factory-orchestrator</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      /*
+       * 첫 진입 전용 전체 화면. 설정을 마치기 전에는 앱으로 들어갈 수 없어서 사이드바가 없다.
+       * 가운데 좁은 한 열에 한 단계씩: 큰 제목 + 짧은 설명 + 입력 + 주 버튼 하나.
+       * 모든 단계가 필수이고, 확인이 성공해야 다음으로 간다. 이전 단계로는 돌아갈 수 있다.
+       */
+      body {
+        min-height: 100dvh;
+      }
+      .top {
+        position: fixed;
+        inset: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 56px;
+        padding: 0 var(--space-6);
+      }
+      .back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        padding: 0 var(--space-2);
+        border: 0;
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--text-tertiary);
+        font: inherit;
+        cursor: pointer;
+        transition:
+          background-color var(--duration-fast) var(--ease-out),
+          color var(--duration-fast) var(--ease-out);
+      }
+      .back:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+      }
+      .back svg {
+        width: 14px;
+        height: 14px;
+        transform: scaleX(-1);
+      }
+      .column {
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+        padding: 18vh var(--space-4) var(--space-10);
+      }
+      .progress {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: var(--space-6);
+      }
+      .progress i {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--border-default);
+      }
+      .progress i[data-done] {
+        background: var(--text-tertiary);
+      }
+      .progress i[data-current] {
+        width: 18px;
+        border-radius: 3px;
+        background: var(--text-primary);
+      }
+      .progress span {
+        margin-inline-start: var(--space-2);
+        color: var(--text-tertiary);
+        font-size: var(--fs-small);
+        font-variant-numeric: tabular-nums;
+      }
+      .title {
+        font-size: 26px;
+        line-height: 1.25;
+        letter-spacing: -0.015em;
+      }
+      .title:focus {
+        outline: none;
+      }
+      .desc {
+        margin-top: var(--space-2);
+        color: var(--text-secondary);
+        font-size: var(--fs-body);
+        text-wrap: pretty;
+      }
+      .step-form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        margin-top: var(--space-8);
+      }
+      .step-form .input {
+        height: 40px;
+      }
+      .primary {
+        width: 100%;
+        height: 40px;
+        margin-top: var(--space-2);
+        font-size: var(--fs-body);
+      }
+      .primary[disabled] {
+        border-color: var(--border-subtle);
+      }
+      .note {
+        display: flex;
+        gap: var(--space-2);
+        align-items: flex-start;
+        font-size: var(--fs-ui);
+        color: var(--text-primary);
+      }
+      .note svg {
+        flex: none;
+        width: 14px;
+        height: 14px;
+        margin-top: 3px;
+      }
+      .note[data-tone="ok"] svg {
+        color: var(--text-secondary);
+      }
+      .note[data-tone="failed"] svg {
+        color: var(--failed);
+      }
+      .note .muted {
+        display: block;
+      }
+      .note code {
+        font-family: var(--font-mono);
+        font-size: 0.92em;
+      }
+      .pick {
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+      }
+      .map-row {
+        display: grid;
+        gap: 6px;
+        padding: var(--space-3) 0;
+        border-top: 1px solid var(--border-subtle);
+      }
+      .map-row:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+      .map-row .pair {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+        gap: var(--space-2);
+      }
+      .summary li {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: var(--space-3);
+        padding: var(--space-2) 0;
+        border-top: 1px solid var(--border-subtle);
+      }
+      .summary li:first-child {
+        border-top: 0;
+      }
+      .kbd {
+        margin-top: var(--space-3);
+        color: var(--text-tertiary);
+        font-size: var(--fs-small);
+        text-align: center;
+      }
+      .proto-toggle {
+        position: fixed;
+        right: var(--space-6);
+        bottom: var(--space-6);
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        border-radius: var(--radius-md);
+        background: var(--bg-raised);
+        box-shadow: var(--shadow-popover);
+      }
+      .proto-toggle span {
+        align-self: center;
+        padding: 0 var(--space-2);
+        color: var(--text-tertiary);
+        font-size: var(--fs-small);
+      }
+      .proto-toggle button {
+        height: 26px;
+        padding: 0 var(--space-2);
+        border: 0;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-secondary);
+        font: inherit;
+        font-size: var(--fs-small);
+        cursor: pointer;
+      }
+      .proto-toggle button[aria-pressed="true"] {
+        background: var(--bg-selected);
+        color: var(--text-primary);
+      }
+    </style>
+  </head>
+  <body data-page="onboarding">
+    <header class="top">
+      <span class="brand"><span class="brand-mark" aria-hidden="true">F</span>factory-orchestrator</span>
+      <span id="back-slot"></span>
+    </header>
+    <main class="column" id="app"></main>
+    <div id="proto"></div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const FO = window.FO;
+        const esc = FO.esc;
+        const app = document.getElementById("app");
+        const q = new URLSearchParams(location.search);
+        const TOTAL = 6;
+        let step = Math.min(Math.max(Number(q.get("step")) || 1, 1), TOTAL);
+
+        /* 확인이 필요한 단계의 상태: none | checking | ok | fail. 시안에서는 ?check= 로 현재 단계 상태를 고른다 */
+        const check = { 1: "none", 2: "none", 3: "none" };
+        for (let i = 1; i < step; i++) if (check[i]) check[i] = "ok";
+        if (check[step] && ["none", "ok", "fail"].includes(q.get("check"))) check[step] = q.get("check");
+
+        const values = {
+          apiKey: "lin_api_example0000000000",
+          publicUrl: "https://factory.example.com",
+          gh: "ghp_example000000000000000000003f2a",
+          ssh: "factory@runner-a.example.com",
+          orca: "/usr/local/bin/orca",
+          wsName: "Acme Commerce",
+          projects: ["Web Console", "Billing", "Mobile"],
+        };
+        const allProjects = ["Web Console", "Billing", "Mobile", "Platform", "Design System"];
+
+        const field = (id, label, input, hint) =>
+          `<div class="field"><label for="${id}">${label}</label>${input}${hint ? `<p class="hint" id="${id}-hint">${hint}</p>` : ""}</div>`;
+
+        function note(state, okHtml, failHtml) {
+          if (state === "ok") return `<p class="note" data-tone="ok" role="status">${FO.icon.check}<span>${okHtml}</span></p>`;
+          if (state === "fail") return `<p class="note" data-tone="failed" role="alert">${FO.icon.x}<span>${failHtml}</span></p>`;
+          return "";
+        }
+
+        /* 확인이 필요한 단계: 버튼이 먼저 '확인', 성공하면 '다음' */
+        function checkButton(n, label) {
+          const s = check[n];
+          if (s === "ok") return `<button class="btn btn-primary primary" type="submit">다음</button>`;
+          if (s === "checking") return `<button class="btn btn-primary primary" type="submit" disabled>확인하는 중…</button>`;
+          return `<button class="btn btn-primary primary" type="submit">${s === "fail" ? "다시 확인" : label}</button>`;
+        }
+
+        const steps = {
+          1: () => ({
+            title: "Linear를 연결해요",
+            desc: "티켓을 읽어 올 Linear 조직의 API 키와, Linear가 이벤트를 보낼 공개 주소를 넣어요.",
+            body: `${field("apiKey", "Linear API 키", `<input class="input mono" id="apiKey" name="apiKey" type="password" value="${values.apiKey}" autocomplete="off" />`, "Linear 설정 → API에서 만들 수 있어요.")}
+              ${field("publicUrl", "공개 주소", `<input class="input mono" id="publicUrl" name="publicUrl" type="url" value="${esc(values.publicUrl)}" autocomplete="off" spellcheck="false" />`, "Tailscale Funnel, Cloudflare Tunnel, 리버스 프록시 중 편한 방법으로 연 주소예요.")}
+              ${note(check[1], `acme 조직에 연결했어요<span class="muted">트래커 프로젝트 5개 · webhook을 받을 준비가 됐어요</span>`, `API 키가 맞지 않아요<span class="muted">Linear에서 키를 다시 복사해 넣어 주세요.</span>`)}
+              ${checkButton(1, "연결 확인")}`,
+          }),
+          2: () => ({
+            title: "GitHub 토큰을 넣어요",
+            desc: "런이 연 PR과 CI 상태를 읽을 때 써요. 암호화해서 저장해요.",
+            body: `${field("gh", "GitHub 토큰", `<input class="input mono" id="gh" name="gh" type="password" value="${values.gh}" autocomplete="off" />`, "repo, workflow 권한이 필요해요.")}
+              ${note(check[2], "repo, workflow 권한이 있어요", `workflow 권한이 없어요<span class="muted">토큰에 권한을 더해 다시 넣어 주세요.</span>`)}
+              ${checkButton(2, "권한 확인")}`,
+          }),
+          3: () => ({
+            title: "첫 러너를 등록해요",
+            desc: "ssh로 닿는 Orca 환경이 러너예요. 지금 이 컴퓨터에서 ssh로 접속해 확인해요.",
+            body: `${field("ssh", "ssh 주소", `<input class="input mono" id="ssh" name="ssh" value="${esc(values.ssh)}" autocomplete="off" spellcheck="false" />`)}
+              ${field(
+                "orca",
+                "orca 실행 파일 경로",
+                `<input class="input mono" id="orca" name="orca" value="${esc(values.orca)}" autocomplete="off" spellcheck="false" aria-describedby="orca-hint"${check[3] === "fail" ? ' aria-invalid="true"' : ""} />`,
+                `러너에서 <code class="mono">which orca</code>로 나온 경로예요. capacity는 3으로 시작하고 Settings에서 바꿀 수 있어요.`
+              )}
+              ${note(
+                check[3],
+                `runner-a에 연결했어요<span class="muted">Orca 1.14.2 · 프로젝트 3개를 찾았어요</span>`,
+                `orca 실행 파일을 찾지 못했어요<span class="muted">ssh 접속은 됐지만 <code>${esc(values.orca)}</code>에 파일이 없어요.</span>`
+              )}
+              ${checkButton(3, "ssh 연결 확인")}`,
+          }),
+          4: () => ({
+            title: "첫 Workspace를 만들어요",
+            desc: "함께 볼 트래커 프로젝트를 골라 묶어요. 홈·Tickets·Stats는 Workspace 단위로 보여요.",
+            body: `${field("wsName", "이름", `<input class="input" id="wsName" name="wsName" value="${esc(values.wsName)}" autocomplete="off" spellcheck="false" />`)}
+              <div class="field"><span class="label">트래커 프로젝트 <span class="muted">하나 이상</span></span><div class="pick">${allProjects
+                .map((p) => `<label class="check-row"><input type="checkbox" name="proj" value="${p}"${values.projects.includes(p) ? " checked" : ""} /><span>${p}</span></label>`)
+                .join("")}</div></div>
+              <button class="btn btn-primary primary" type="submit"${values.projects.length && values.wsName.trim() ? "" : " disabled"}>다음</button>`,
+          }),
+          5: () => {
+            const target = { "Web Console": "acme/web", Billing: "acme/platform", Mobile: "acme/web", Platform: "acme/platform", "Design System": "acme/design-tokens" };
+            const rows = values.projects
+              .map(
+                (p) => `<div class="map-row"><span>${p}</span><div class="pair">
+                  <select class="select" aria-label="${p} 티켓을 처리할 러너 프로젝트">${["acme/web", "acme/platform", "acme/design-tokens"].map((o) => `<option${o === target[p] ? " selected" : ""}>runner-a · ${o}</option>`).join("")}</select>
+                  <select class="select" aria-label="${p} 티켓을 처리할 에이전트"><option>Claude Code</option><option>Codex</option></select></div></div>`
+              )
+              .join("");
+            return {
+              title: "티켓을 누가 처리할지 정해요",
+              desc: "트래커 프로젝트마다 러너 프로젝트와 에이전트를 골라요. factory 라벨이 붙은 티켓은 바로 할당해요.",
+              body: `<div>${rows}</div><button class="btn btn-primary primary" type="submit">설정 마치기</button>`,
+            };
+          },
+          6: () => ({
+            title: "준비됐어요",
+            desc: "factory 라벨을 붙인 티켓부터 runner-a가 처리해요. 설정은 Settings에서 바꿀 수 있어요.",
+            body: `<ul class="summary">
+                <li><span class="muted">트래커</span><span>Linear · acme</span></li>
+                <li><span class="muted">러너</span><span>runner-a · capacity 3</span></li>
+                <li><span class="muted">Workspace</span><span>${esc(values.wsName)} · 트래커 프로젝트 ${values.projects.length}개</span></li>
+              </ul>
+              <a class="btn btn-primary primary" href="index.html">홈으로 가기</a>`,
+          }),
+        };
+
+        function render(focusFirst) {
+          const s = steps[step]();
+          const dots = Array.from({ length: TOTAL }, (_, i) => `<i${i + 1 < step ? " data-done" : ""}${i + 1 === step ? " data-current" : ""}></i>`).join("");
+          app.innerHTML = `<div class="progress" role="img" aria-label="${TOTAL}단계 중 ${step}단계">${dots}<span aria-hidden="true">${step} / ${TOTAL}</span></div>
+            <h1 class="title" tabindex="-1">${s.title}</h1>
+            <p class="desc">${s.desc}</p>
+            <form class="step-form" id="step-form" novalidate>${s.body}</form>
+            ${step < TOTAL ? `<p class="kbd">Enter를 눌러도 돼요</p>` : ""}`;
+          document.getElementById("back-slot").innerHTML =
+            step > 1 && step < TOTAL ? `<button class="back" type="button" id="back">${FO.icon.arrow}이전</button>` : "";
+          document.getElementById("proto").innerHTML = check[step]
+            ? `<div class="proto-toggle" role="group" aria-label="시안: 확인 결과"><span>시안</span>${["none", "ok", "fail"]
+                .map((k) => `<button type="button" data-check="${k}" aria-pressed="${check[step] === k}">${{ none: "확인 전", ok: "성공", fail: "실패" }[k]}</button>`)
+                .join("")}</div>`
+            : "";
+          if (focusFirst && !("ontouchstart" in window)) {
+            const first = app.querySelector("input, select");
+            if (first) first.focus();
+          }
+        }
+
+        function sync() {
+          const url = new URL(location.href);
+          url.searchParams.set("step", step);
+          if (check[step]) url.searchParams.set("check", check[step] === "checking" ? "none" : check[step]);
+          else url.searchParams.delete("check");
+          try {
+            history.replaceState(null, "", url);
+          } catch (e) {
+            /* file:// */
+          }
+        }
+
+        function go(n) {
+          step = n;
+          sync();
+          render(true);
+        }
+
+        /* 입력을 바꾸면 그 단계는 다시 확인해야 한다 */
+        app.addEventListener("input", (e) => {
+          const t = e.target;
+          if (t.name === "proj") values.projects = [...app.querySelectorAll('input[name="proj"]:checked')].map((x) => x.value);
+          else if (t.name in values) values[t.name] = t.value;
+          if (check[step] && check[step] !== "none") {
+            check[step] = "none";
+            sync();
+            const pos = t.selectionStart;
+            render(false);
+            const again = document.getElementById(t.id);
+            again.focus();
+            if (pos != null && again.setSelectionRange) again.setSelectionRange(pos, pos);
+          } else if (step === 4) {
+            app.querySelector(".primary").disabled = !(values.projects.length && values.wsName.trim());
+          }
+        });
+
+        app.addEventListener("submit", (e) => {
+          e.preventDefault();
+          if (check[step] === "checking") return;
+          if (check[step] && check[step] !== "ok") {
+            const n = step;
+            check[n] = "checking";
+            render(false);
+            setTimeout(() => {
+              check[n] = n === 3 && values.orca.trim() !== "/usr/local/bin/orca" ? "fail" : "ok";
+              sync();
+              render(false);
+              app.querySelector(".primary").focus();
+            }, 800);
+            return;
+          }
+          if (step === 4 && !(values.projects.length && values.wsName.trim())) return;
+          if (step < TOTAL) go(step + 1);
+        });
+
+        document.addEventListener("click", (e) => {
+          if (e.target.closest("#back")) {
+            go(step - 1);
+            return;
+          }
+          const t = e.target.closest("[data-check]");
+          if (t) {
+            check[step] = t.dataset.check;
+            sync();
+            render(false);
+          }
+        });
+
+        render(false);
+      })();
+    </script>
+  </body>
+</html>

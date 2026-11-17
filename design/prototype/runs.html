@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Runs · factory-orchestrator</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-page="runs">
+    <div class="app" id="app">
+      <main class="main split" id="page"></main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const FO = window.FO;
+        const page = document.getElementById("page");
+        const filters = [
+          { key: "all", label: "전체", test: () => true },
+          { key: "todo", label: "손댈 일", test: (r) => FO.attention().includes(r), attention: true },
+          { key: "running", label: "실행 중", test: (r) => r.state === "running" },
+          { key: "queued", label: "Queued", test: (r) => r.state === "queued" },
+          { key: "merged", label: "Merged", test: (r) => r.result === "merged" },
+        ];
+        let current = new URLSearchParams(location.search).get("f") || "all";
+
+        function render() {
+          if (FO.ws === "all") {
+            page.innerHTML = FO.allNotice("Runs");
+            return;
+          }
+          const mine = FO.runs.filter(FO.inWs).sort((a, b) => b.id - a.id);
+          const f = filters.find((x) => x.key === current) || filters[0];
+          const rows = mine.filter(f.test);
+          const tabs = filters
+            .map((x) => {
+              const n = mine.filter(x.test).length;
+              return `<button class="filter" type="button" role="tab" data-f="${x.key}" aria-selected="${x.key === f.key}"${x.attention && n ? " data-attention" : ""}>${x.label}<span class="n">${n}</span></button>`;
+            })
+            .join("");
+          const list = rows.length
+            ? `${FO.thead(FO.runCols({ statusCol: true }))}<div class="rows" role="listbox" aria-label="런">${rows.map((r) => FO.runRow(r, { statusCol: true, why: false })).join("")}</div>`
+            : `<p class="empty">이 조건에 맞는 런이 없어요.</p>`;
+          page.innerHTML = `<div class="split-list">
+              <div class="page-head"><div><h1 class="page-title">Runs</h1><p class="page-sub">오늘 ${FO.wsName(FO.ws)}의 런이에요. 새 것부터 보여 줘요.</p></div></div>
+              <div class="filters" role="tablist" aria-label="상태로 거르기">${tabs}</div>
+              <div class="table with-status">${list}</div>
+            </div>
+            <aside class="panel" aria-live="polite" aria-label="고른 런 요약"></aside>`;
+          const first = page.querySelector(".row[data-key]");
+          FO.bindSplit(page.querySelector(".split-list"), page.querySelector(".panel"), { run: (id) => FO.runPanel(FO.run(id)) }, first && first.dataset.key);
+        }
+
+        page.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-f]");
+          if (!b) return;
+          current = b.dataset.f;
+          const url = new URL(location.href);
+          url.searchParams.set("f", current);
+          url.searchParams.delete("sel");
+          history.replaceState(null, "", url);
+          render();
+          page.querySelector(`[data-f="${current}"]`).focus();
+        });
+
+        FO.mount("runs", render);
+      })();
+    </script>
+  </body>
+</html>

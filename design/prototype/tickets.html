@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tickets · factory-orchestrator</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .table.tickets {
+        --cols: minmax(0, 1fr) 84px 100px 96px 120px;
+      }
+      .tag {
+        color: var(--text-tertiary);
+      }
+      .tag[data-auto] {
+        color: var(--accent-text);
+      }
+      .history {
+        display: flex;
+        flex-direction: column;
+      }
+      .history a {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr) auto;
+        gap: var(--space-3);
+        padding: var(--space-2) 0;
+        border-top: 1px solid var(--border-subtle);
+        color: var(--text-tertiary);
+      }
+      .history a:first-child {
+        border-top: 0;
+      }
+      .history a:hover .h-id {
+        color: var(--text-primary);
+      }
+      .h-id {
+        color: var(--text-secondary);
+      }
+    </style>
+  </head>
+  <body data-page="tickets">
+    <div class="app" id="app">
+      <main class="main split" id="page"></main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+    <script>
+      (function () {
+        const FO = window.FO;
+        const page = document.getElementById("page");
+        const last = (t) => FO.runsFor(t.id)[0];
+        const isTodo = (t) => {
+          const r = last(t);
+          return r && r.state === "done" && r.result !== "merged";
+        };
+        const filters = [
+          { key: "all", label: "전체", test: () => true },
+          { key: "todo", label: "손댈 일", test: isTodo, attention: true },
+          { key: "unassigned", label: "할당 전", test: (t) => !last(t) },
+          { key: "active", label: "실행 중", test: (t) => last(t) && last(t).state !== "done" },
+          { key: "merged", label: "Merged", test: (t) => last(t) && last(t).result === "merged" },
+        ];
+        let current = new URLSearchParams(location.search).get("f") || "all";
+
+        function lastCell(t) {
+          const r = last(t);
+          if (!r) return `<span class="muted">할당 전</span>`;
+          const dot = r.result === "check" || r.result === "failed" ? `<span class="dot" data-tone="${r.result}" aria-hidden="true"></span> ` : "";
+          return `${dot}${FO.stateText(r)}`;
+        }
+
+        function row(t) {
+          return `<button class="row" type="button" role="option" aria-selected="false" data-key="ticket:${t.id}">
+            <span class="cell"><span class="row-title">${FO.esc(t.title)}</span></span>
+            <span class="cell id">${t.id}</span>
+            <span class="cell">${FO.esc(t.project)}</span>
+            <span class="cell">${t.trackerState}</span>
+            <span class="cell">${lastCell(t)}</span>
+          </button>`;
+        }
+
+        function panel(id) {
+          const t = FO.ticket(id);
+          const runs = FO.runsFor(id);
+          const r = runs[0];
+          const m = FO.mappingFor(t.project);
+          const mapping = m ? `${m.runner} · ${m.project} · ${FO.agents[m.agent]}` : '<span class="muted">Mapping이 없어요</span>';
+          let why, act;
+          if (!r) {
+            why = m ? `아직 런이 없어요. 할당하면 ${m.runner}에서 ${FO.agents[m.agent]}가 처리해요.` : "이 트래커 프로젝트에 Mapping이 없어 할당할 수 없어요.";
+            act = m ? `<button class="btn btn-primary" type="button" data-toast="${id}를 할당했어요">할당하기</button>` : `<a class="btn" href="settings.html?sel=mapping">Mapping 만들기</a>`;
+          } else {
+            why = FO.longWhy(r);
+            act =
+              r.result === "check"
+                ? `<a class="btn btn-primary" href="https://github.example.com/acme/pull/${r.pr.number}" target="_blank" rel="noreferrer">PR #${r.pr.number} 열기${FO.icon.external}</a><button class="btn" type="button" data-toast="새 런을 시작했어요">새 런 시작</button>`
+                : r.result === "failed"
+                  ? `<button class="btn btn-primary" type="button" data-toast="새 런을 시작했어요">새 런 시작</button>`
+                  : `<a class="btn" href="run.html?id=${r.id}">런 보기</a>`;
+          }
+          const dot = r && (r.result === "check" || r.result === "failed") ? `<span class="dot" data-tone="${r.result}" aria-hidden="true"></span>` : "";
+          const labels = t.labels.length ? t.labels.map((l) => `<span class="tag"${l === FO.AUTO_LABEL ? " data-auto" : ""}>${l}</span>`).join(", ") : '<span class="muted">없음</span>';
+          const history = runs.length
+            ? `<div><h3 class="panel-block-title">런 ${runs.length}개</h3><div class="history">${runs
+                .map((x) => `<a href="run.html?id=${x.id}"><span class="h-id num">Run ${x.id}</span><span>${FO.stateText(x)}</span><span class="num">${x.state === "queued" ? x.queued : x.started}</span></a>`)
+                .join("")}</div></div>`
+            : "";
+          return `<div class="panel-inner">
+            <div class="panel-head">
+              <p class="panel-state">${r ? `${dot}${FO.stateText(r)}<span class="muted">마지막 런</span>` : '<span class="state" data-tone="neutral">할당 전</span>'}</p>
+              <h2 class="panel-title">${FO.esc(t.title)}</h2>
+              <p class="panel-sub num">${t.id} · ${FO.esc(t.project)} · ${t.trackerState}</p>
+            </div>
+            <p class="panel-why">${FO.esc(why)}</p>
+            <div class="actions">${act}</div>
+            <dl class="props">
+              <dt>트래커 상태</dt><dd>${t.trackerState}<span class="muted">Linear 기준</span></dd>
+              <dt>라벨</dt><dd>${labels}</dd>
+              <dt>Mapping</dt><dd>${mapping}</dd>
+            </dl>
+            ${history}
+            <div class="panel-foot"><a class="link" href="https://linear.example.com/acme/issue/${t.id}" target="_blank" rel="noreferrer">Linear에서 열기</a></div>
+          </div>`;
+        }
+
+        function render() {
+          if (FO.ws === "all") {
+            page.innerHTML = FO.allNotice("Tickets");
+            return;
+          }
+          const mine = FO.tickets.filter(FO.ticketInWs);
+          const f = filters.find((x) => x.key === current) || filters[0];
+          const rows = mine.filter(f.test);
+          const tabs = filters
+            .map((x) => {
+              const n = mine.filter(x.test).length;
+              return `<button class="filter" type="button" role="tab" data-f="${x.key}" aria-selected="${x.key === f.key}"${x.attention && n ? " data-attention" : ""}>${x.label}<span class="n">${n}</span></button>`;
+            })
+            .join("");
+          const list = rows.length
+            ? `${FO.thead([{ label: "제목" }, { label: "티켓" }, { label: "트래커 프로젝트" }, { label: "트래커 상태" }, { label: "마지막 런" }])}<div class="rows" role="listbox" aria-label="티켓">${rows.map(row).join("")}</div>`
+            : `<p class="empty">이 조건에 맞는 티켓이 없어요.</p>`;
+          page.innerHTML = `<div class="split-list">
+              <div class="page-head"><div><h1 class="page-title">Tickets</h1><p class="page-sub">Linear 티켓이에요. <span class="tag" data-auto>${FO.AUTO_LABEL}</span> 라벨이 붙으면 자동으로 할당해요.</p></div></div>
+              <div class="filters" role="tablist" aria-label="티켓 거르기">${tabs}</div>
+              <div class="table tickets">${list}</div>
+            </div>
+            <aside class="panel" aria-live="polite" aria-label="고른 티켓 요약"></aside>`;
+          const first = page.querySelector(".row[data-key]");
+          FO.bindSplit(page.querySelector(".split-list"), page.querySelector(".panel"), { ticket: panel }, first && first.dataset.key);
+        }
+
+        page.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-f]");
+          if (!b) return;
+          current = b.dataset.f;
+          const url = new URL(location.href);
+          url.searchParams.set("f", current);
+          url.searchParams.delete("sel");
+          history.replaceState(null, "", url);
+          render();
+          page.querySelector(`[data-f="${current}"]`).focus();
+        });
+
+        FO.mount("tickets", render);
+      })();
+    </script>
+  </body>
+</html>
