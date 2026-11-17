@@ -93,6 +93,15 @@ describe("Run 상세 화면", () => {
     expect(valueOf(render(page(db, ids.get("ACME-2"))), runJson.props.agent)).toBe("Claude Code");
   });
 
+  it("런에 적은 모델을 보이고, 정하지 않았으면 러너 기본값을 쓴다고 보인다(0043)", () => {
+    const { db, ids } = seedDatabase();
+    expect(valueOf(render(page(db, ids.get("ACME-2"))), runJson.props.model)).toBe(
+      runJson.props.defaultModel,
+    );
+    const id = assign(db, "ACME-90", 500, "sonnet");
+    expect(valueOf(render(page(db, id)), runJson.props.model)).toBe("sonnet");
+  });
+
   it("러너에 닿지 못한 채 끝난 취소 런도 사람이 지워야 함을 보인다", () => {
     const { db } = seedDatabase();
     const extra = addExtraEnded(db);

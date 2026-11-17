@@ -261,7 +261,13 @@ async function loadWorkspaceSettings(
         connection: connectionChoice(project.connection),
         project: { id: project.projectId, name: project.name },
         mapping:
-          mapping === null ? null : { runnerProject: mapping.runnerProject, agent: mapping.agent },
+          mapping === null
+            ? null
+            : {
+                runnerProject: mapping.runnerProject,
+                agent: mapping.agent,
+                model: mapping.model,
+              },
         inProgressStateId: project.inProgressStateId,
         states:
           tracker === null

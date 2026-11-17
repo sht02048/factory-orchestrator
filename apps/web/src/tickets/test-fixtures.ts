@@ -142,6 +142,7 @@ export function setupTickets(): TicketsFixture {
     trackerProject: webProject,
     runnerProject: webRepo,
     agent: toAgentId("claude"),
+    model: "sonnet",
   });
   saveMapping(db, {
     connection,

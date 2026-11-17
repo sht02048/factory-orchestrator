@@ -76,6 +76,9 @@
     "noRunnerProjects": "고를 러너 쪽 프로젝트가 없어요. 러너를 등록하고 확인하면 러너의 프로젝트가 보여요.",
     "runnerProject": "러너 쪽 프로젝트",
     "agent": "에이전트",
+    "model": "모델",
+    "modelDescription": "에이전트에 넘길 모델 이름이에요. 비우면 러너 설정의 모델을, 그것도 없으면 러너 Orca의 기본값을 써요.",
+    "modelPlaceholder": "비우면 기본값",
     "choose": "골라 주세요",
     "projectMeta": "{connection}"
   },

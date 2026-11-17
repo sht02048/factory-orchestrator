@@ -41,6 +41,7 @@ import {
   saveRunnerSetting,
   runnerInput,
   saveTrackerConnectionSetting,
+  mappingInput,
 } from "./actions";
 import { hasPendingRunnerChecks, loadSettingsPage } from "./load";
 import type { SettingsContext } from "./load";
@@ -190,7 +191,12 @@ describe("Settings 저장하고 다시 열기", () => {
     });
     expect(addTrackerProject(f.context, { ...project, name: "Web" })).toEqual({ ok: true });
     expect(
-      saveMappingSetting(f.context, { ...project, runnerProjectId: repo, agentId: "codex" }),
+      saveMappingSetting(f.context, {
+        ...project,
+        runnerProjectId: repo,
+        agentId: "codex",
+        model: "gpt-example",
+      }),
     ).toEqual({ ok: true });
     expect(saveInProgressState(f.context, { ...project, stateId: "st-doing" })).toEqual({
       ok: true,
@@ -215,7 +221,7 @@ describe("Settings 저장하고 다시 열기", () => {
       {
         connection: { id: connection, name: "Acme" },
         project: { id: webProject, name: "Web" },
-        mapping: { runnerProject: repo, agent: "codex" },
+        mapping: { runnerProject: repo, agent: "codex", model: "gpt-example" },
         inProgressStateId: "st-doing",
         states: {
           ok: true,
@@ -348,6 +354,33 @@ describe("Settings 저장하고 다시 열기", () => {
     expect(text).toContain("에이전트 설정에서 미리 허용해 두세요");
     expect(text).toContain("러너 쪽 프로젝트");
     expect(text).not.toContain("러너 이름");
+    // 모델은 선택 칸이고, 비우면 러너 설정이나 러너 Orca 의 기본값을 쓴다고 안내한다(0043)
+    expect(text).toContain("모델");
+    expect(text).toContain("러너 Orca의 기본값");
+  });
+
+  it("Mapping 의 모델은 비우면 정하지 않은 것으로 저장하고, 러너 CLI 옵션으로 읽힐 값은 받지 않는다(0043)", async () => {
+    const f = fixture();
+    const connectionId = await addConnection(f);
+    const project = { ws: commerce, connectionId, projectId: webProject };
+    addTrackerProject(f.context, { ...project, name: "Web" });
+    const mapping = { ...project, runnerProjectId: repo, agentId: "claude" };
+    const saved = async () => (await loadSettingsPage(f.context, commerce)).workspace?.bound[0];
+
+    expect(saveMappingSetting(f.context, { ...mapping, model: "sonnet" })).toEqual({ ok: true });
+    expect((await saved())?.mapping?.model).toBe("sonnet");
+    // 지우고 저장하면 정하지 않은 것으로 돌아간다
+    expect(saveMappingSetting(f.context, { ...mapping, model: "" })).toEqual({ ok: true });
+    expect((await saved())?.mapping?.model).toBeNull();
+
+    expect(mappingInput.safeParse({ ...mapping, model: " sonnet " }).data?.model).toBe("sonnet");
+    expect(mappingInput.safeParse(mapping).success).toBe(true);
+    for (const model of ["--dangerously-skip-permissions", "a b", "a\u0001", "x".repeat(201)]) {
+      expect({ model, ok: mappingInput.safeParse({ ...mapping, model }).success }).toEqual({
+        model,
+        ok: false,
+      });
+    }
   });
 });
 

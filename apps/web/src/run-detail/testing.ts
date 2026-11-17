@@ -28,12 +28,13 @@ export function startedOn(key: string): Extract<RunStateChange, { to: "running" 
 }
 
 /** 티켓 하나를 할당한다. 시각은 seed 의 T0 + at 분 */
-export function assign(db: Database, key: string, at: number): RunId {
+export function assign(db: Database, key: string, at: number, model: string | null = null): RunId {
   const result = assignRun(db, {
     ticket: { connection, key: toTicketKey(key) },
     trackerProject: toTrackerProjectId("tp-web"),
     runnerProject: toRunnerProjectId("github:acme/web"),
     agent: toAgentId("claude"),
+    model,
     now: minutes(at),
   });
   if (!result.ok) throw new Error(`assign ${key}: ${result.reason}`);

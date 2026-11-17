@@ -53,6 +53,19 @@ describe("수동 할당", () => {
     });
   });
 
+  it("Mapping 의 모델을 런에 적고, 에이전트를 바꾸면 모델을 넘기지 않는다(0043)", () => {
+    const { db } = setupTickets();
+    expect(assignedRun(db, submitAssignment(db, base, now)).model).toBe("sonnet");
+    // Mapping 의 모델은 그 에이전트의 모델 이름이라 다른 에이전트에 넘기지 않는다
+    const changed = assignedRun(
+      db,
+      submitAssignment(db, { ...base, ticketKey: "ACME-7", agent: "codex" }, now),
+    );
+    expect(changed).toMatchObject({ agent: "codex", model: null });
+    // 입력에 모델을 넣어도 받지 않는다. 수동 할당에서는 러너와 에이전트만 바꾼다(Q53·Q60)
+    expect(assignInput.parse({ ...base, model: "opus" })).not.toHaveProperty("model");
+  });
+
   it("러너 쪽 프로젝트는 바꿀 수 없다: 입력에 넣어도 버리고 Mapping 값을 쓴다", () => {
     const { db } = setupTickets();
     const input = assignInput.parse({ ...base, runnerProject: "github:acme/lab" });

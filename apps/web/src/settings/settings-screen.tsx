@@ -67,7 +67,7 @@ export interface SettingsActions {
   addProject: (input: ProjectRef & { name: string }) => Promise<ActionResult>;
   removeProject: (input: ProjectRef) => Promise<ActionResult>;
   saveMapping: (
-    input: ProjectRef & { runnerProjectId: string; agentId: string },
+    input: ProjectRef & { runnerProjectId: string; agentId: string; model: string },
   ) => Promise<ActionResult>;
   saveInProgress: (input: ProjectRef & { stateId: string }) => Promise<ActionResult>;
   saveLabel: (input: {
@@ -676,6 +676,7 @@ function MappingRow({
   const agentName = useAgentName();
   const [runnerProject, setRunnerProject] = useState(bound.mapping?.runnerProject ?? null);
   const [agent, setAgent] = useState(bound.mapping?.agent ?? null);
+  const [model, setModel] = useState(bound.mapping?.model ?? "");
   const submit = useSubmit();
   const projectOptions = withCurrent(
     runnerProjects.map((p) => ({ value: p.id, label: p.name })),
@@ -696,6 +697,7 @@ function MappingRow({
                 projectId: bound.project.id,
                 runnerProjectId: runnerProject,
                 agentId: agent,
+                model: model.trim(),
               }),
             t("saved"),
           );
@@ -720,6 +722,16 @@ function MappingRow({
             />
           </Field>
         </div>
+        <Field label={t("mapping.model")} description={t("mapping.modelDescription")}>
+          <Input
+            name="model"
+            value={model}
+            onValueChange={setModel}
+            placeholder={t("mapping.modelPlaceholder")}
+            autoComplete="off"
+            mono
+          />
+        </Field>
         <SubmitError state={submit.state} />
         <Actions>
           <Button
@@ -745,7 +757,7 @@ function withCurrent(
   return [...options, { value: current, label: current }];
 }
 
-function ProgressPanel({
+export function ProgressPanel({
   workspace,
   actions,
 }: {
@@ -835,7 +847,7 @@ function ProgressRow({
   );
 }
 
-function LabelPanel({
+export function LabelPanel({
   workspace,
   actions,
 }: {

@@ -552,6 +552,9 @@ function Properties({ run, runHref }: { run: RunDetail; runHref: (runId: string)
             )}
           </DefinitionItem>
           <DefinitionItem label={t("agent")}>{agentName(run.agent)}</DefinitionItem>
+          <DefinitionItem label={t("model")} empty={run.model === null}>
+            {run.model ?? t("defaultModel")}
+          </DefinitionItem>
           <DefinitionItem label={t("waited")}>{duration(run.waitMs)}</DefinitionItem>
           <DefinitionItem label={t("executed")} empty={run.executionMs === null}>
             {run.executionMs === null ? t("notStarted") : duration(run.executionMs)}
