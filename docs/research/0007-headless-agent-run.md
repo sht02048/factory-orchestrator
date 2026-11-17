@@ -1,6 +1,6 @@
 # 비대화형 에이전트 실행 검증: Orca 터미널에서 끝남과 종료 코드
 
-조사일 2026-11-17. 티켓 없음. [research 0004](0004-orca-run-contract.md)의 "아직 모르는 것" 1, 2번을 보강한다. 대화형 TUI 에이전트는 일을 마쳐도 끝나지 않고 종료 코드도 없어서([research 0004](0004-orca-run-contract.md) 3절), 운영자는 에이전트를 비대화형(한 번 실행하고 끝나는 모드)으로 띄우는 방식을 골랐다(Q82). 이 문서는 그 방식이 Orca 러너에서 되는지, 런의 끝·종료 코드·프롬프트 전달을 어떻게 얻는지 확인한다.
+조사일 2026-11-17. 티켓 없음. [research 0004](0004-orca-run-contract.md)의 "아직 모르는 것" 1, 2번을 보강한다. 대화형 TUI 에이전트는 일을 마쳐도 끝나지 않고 종료 코드도 없어서([research 0004](0004-orca-run-contract.md) 3절), 운영자는 에이전트를 비대화형(한 번 실행하고 끝나는 모드)으로 띄우는 방식을 골랐다(운영자 결정 Q82, 2026-11-17. 코디네이터 대화에서 정했고 spec에는 아직 기록하지 않았다). 이 문서는 그 방식이 Orca 러너에서 되는지, 런의 끝·종료 코드·프롬프트 전달을 어떻게 얻는지 확인한다.
 
 출처 표시는 research 0004를 따른다.
 
@@ -12,7 +12,7 @@ research 0004와 같은 버려도 되는 테스트 저장소에 워크트리 하
 
 | 실행 | `--command`에 넣은 명령(요약)                                                                  | 이 문서에서 본 것                                  |
 | ---- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| E1   | `claude --fo-bogus-flag; echo __FO_EXIT__=$?`                                                  | 에이전트 없이 만든 0이 아닌 종료(1), 셸은 남음     |
+| E1   | `claude --fo-bogus-flag; echo __FO_EXIT__=$?`                                                  | 모델 호출 없이 인자 오류로 낸 종료(1), 셸은 남음   |
 | E2   | `sh -c 'exit 7'; c=$?; echo __FO_EXIT__=$c; printf %s $c > <runDir>/exit-code; exit $c`        | 셸까지 끝냈을 때 Orca가 보여 주는 것               |
 | A1   | `claude -p ... --allowedTools Write "$(cat <runDir>/prompt.md)" ...`                           | `--allowedTools`가 프롬프트를 삼킴. 모델 호출 없음 |
 | A1b  | `claude -p ... --allowedTools Write < <runDir>/prompt.md > <runDir>/a1-out.json ...`           | 정상 종료(0), 권한 거절, `worktree ps` 진행        |
@@ -152,7 +152,7 @@ A1b는 `__FO_EXIT__=0`, A2는 `terminal show`의 `preview` 끝에 `__FO_EXIT__=1
 
 ### 워크트리 밖 파일
 
-감싼 명령이 종료 코드를 `<runDir>/exit-code`에 쓰게 하고 ssh로 `cat`했다 **[실행]**. E2는 `7`, A1b는 `0`, A2는 `1`로 셸이 받은 값과 같았다.
+감싼 명령이 종료 코드를 `<runDir>`의 파일(E2는 `exit-code`, A1b는 `a1-exit`, A2는 `a2-exit`)에 쓰게 하고 ssh로 `cat`했다 **[실행]**. E2는 `7`, A1b는 `0`, A2는 `1`로 셸이 받은 값과 같았다.
 
 - 터미널 출력, 셸 종료 여부, `terminal close`와 상관없이 남는다.
 - 워크트리 밖에 두어 워크트리를 더럽히지 않는다. 워크트리 안의 untracked 파일은 `worktree rm`을 `--force` 없이 실패하게 한다([research 0003](0003-orca-runner-contract.md) 9절).
@@ -167,7 +167,7 @@ A1b는 `__FO_EXIT__=0`, A2는 `terminal show`의 `preview` 끝에 `__FO_EXIT__=1
 | `subtype`            | `success`            | `error_max_turns`                         |
 | `is_error`           | `false`              | `true`                                    |
 | `terminal_reason`    | `completed`          | `max_turns`                               |
-| `result`             | 에이전트의 마지막 답 | `null`                                    |
+| `result`             | 에이전트의 마지막 답 | 없음(키가 없다)                           |
 | `errors`             | 없음                 | `["Reached maximum number of turns (1)"]` |
 | `permission_denials` | Bash 하나            | `[]`                                      |
 
@@ -247,11 +247,13 @@ Test task. Do not push and do not open a PR. Keep it short.
 감싼 명령(Claude Code의 예):
 
 ```sh
-claude -p --model <model> --output-format json --settings <runDir>/settings.json \
-  < <runDir>/prompt.md > <runDir>/result.json 2> <runDir>/stderr.txt
-c=$?; printf '%s' "$c" > <runDir>/exit-code.tmp && mv <runDir>/exit-code.tmp <runDir>/exit-code
+claude -p --model "<model>" --output-format json --allowedTools "<tools>" \
+  < "<runDir>/prompt.md" > "<runDir>/result.json" 2> "<runDir>/stderr.txt"
+c=$?; printf '%s' "$c" > "<runDir>/exit-code.tmp" && mv "<runDir>/exit-code.tmp" "<runDir>/exit-code"
 echo "__FO_EXIT__=$c"; exit "$c"
 ```
+
+A1b에서 확인한 모양(stdin, `--allowedTools`)이다. 이 문자열은 원격 ssh 셸과 러너 로그인 셸을 두 번 거치므로, 어댑터는 감싼 명령도 인자 배열로 만들고 이스케이프 함수 한 곳에서 두 겹 인용을 맡긴다(CODING_STANDARDS의 ssh 명령 규칙). 허용 규칙을 `--settings <runDir>/settings.json`으로 넘기려면 2단계에서 그 파일도 같은 방식으로 올린다(시험하지 않았다).
 
 에이전트 종류마다 이 명령 틀을 설정으로 두면 Codex(`codex exec`) 같은 다른 에이전트도 같은 길로 띄울 수 있다. Codex는 확인하지 않았다.
 
@@ -260,7 +262,7 @@ echo "__FO_EXIT__=$c"; exit "$c"
 - 끝: `<runDir>/exit-code`가 있으면 Ended다. 종료 코드는 그 파일의 값이다. 0이면 정상 종료, 아니면 오류 종료.
 - 진행: 파일이 없으면 `worktree ps`의 `agents[]`(paneKey로 찾는다)로 Running·Waiting for Input을 가른다(research 0004 3절).
 - 파일이 없는데 터미널이 사라졌으면(`terminal show`가 `connected: false`이거나 행에 터미널이 없음) 셸이 감싼 명령을 마치지 못하고 죽은 것이다. 종료 코드를 모르는 경우라 GLOSSARY의 에이전트 결과 여섯 가지에 딱 맞는 값이 없다. 정할 것으로 남긴다.
-- 시간 초과: research 0003의 `terminal close`로 멈춘다. 그때는 감싼 명령이 파일을 쓰지 못하므로 오케스트레이터가 시간 초과로 기록한다.
+- 시간 초과: research 0003의 `terminal close`로 멈춘다. 셸이 먼저 죽으면 감싼 명령이 파일을 쓰지 못하지만, `claude`만 먼저 죽고 다음 줄이 돌면 파일이 생길 수 있다(비대화형으로 시험하지 않았다). 그래서 오케스트레이터는 멈추기 전에 시간 초과를 먼저 기록하고, 그 뒤 생긴 파일은 무시한다.
 
 ### 로그 꼬리
 

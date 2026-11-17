@@ -16,7 +16,7 @@
       "connected": false,
       "writable": false,
       "lastOutputAt": 1790000122085,
-      "preview": "box/runs/h1/exit-code; exit $c\n__FO_EXIT__=7",
+      "preview": "<runDir>/exit-code; exit $c\n__FO_EXIT__=7",
       "exitCause": {
         "kind": "unknown",
         "reason": "host_status_unavailable"
