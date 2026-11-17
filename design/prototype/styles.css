@@ -584,11 +584,11 @@ a.link:hover {
 
 /* ---------- 표: 정렬된 열 ---------- */
 .table {
-  --cols: minmax(0, 1fr) 80px 76px 108px 64px 56px;
+  --cols: minmax(0, 1fr) 80px 76px 100px 80px 56px;
 }
 
 .table.with-status {
-  --cols: minmax(0, 1fr) 104px 76px 68px 84px 64px 52px;
+  --cols: minmax(0, 1fr) 104px 76px 68px 84px 80px 52px;
 }
 
 .thead,

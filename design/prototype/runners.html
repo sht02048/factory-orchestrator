@@ -138,7 +138,7 @@
               <div class="page-head"><div><h1 class="page-title">Runners</h1><p class="page-sub">모든 Workspace가 함께 쓰는 러너예요. ${FO.runners.length}대 중 ${online}대가 Online이에요.</p></div>
               <a class="btn" href="settings.html?sel=runners">${FO.icon.plus}러너 등록</a></div>
               <div class="table runners">
-                ${FO.thead([{ label: "러너" }, { label: "상태" }, { label: "사용 중" }, { label: "대기" }, { label: "마지막 응답", r: true }])}
+                ${FO.thead([{ label: "러너" }, { label: "상태" }, { label: "사용 중" }, { label: "Queued" }, { label: "마지막 응답", r: true }])}
                 <div class="rows" role="listbox" aria-label="러너">${FO.runners.map(row).join("")}</div>
               </div>
             </div>

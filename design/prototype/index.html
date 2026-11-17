@@ -39,7 +39,7 @@
 
           const sub = all
             ? "모든 Workspace에서 손댈 일만 모았어요."
-            : `실행 중 ${running.length} · 대기 ${queued.length} · 오늘 Merged ${merged}`;
+            : `실행 중 ${running.length} · Queued ${queued.length} · 오늘 Merged ${merged}`;
 
           let html = `<div class="page-head"><div><h1 class="page-title">오늘</h1><p class="page-sub num">${sub}</p></div></div>`;
           html += section("손댈 일", todo, { why: true, head: true, wsCol: all, empty: "손댈 일이 없어요. 모두 잘 돌고 있어요." });

@@ -82,7 +82,7 @@
   }
 
   function timeCell(run) {
-    if (run.state === "queued") return `대기 ${minutes(run.waited)}`;
+    if (run.state === "queued") return `Queued ${minutes(run.waited)}`;
     return minutes(run.elapsed);
   }
 
