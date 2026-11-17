@@ -8,5 +8,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@factory/core": "workspace:*",
+    "zod": "4.6.7"
   }
 }
