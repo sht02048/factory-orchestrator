@@ -21,7 +21,7 @@ factory-orchestrator의 화면 방향을 잡으려고 만든 정적 시안이다
 | `runs.html` | Runs. 전체 런과 상태 필터(`?f=todo` 등) |
 | `run.html` | Run 상세. 결과와 이유, 타임라인, CI, 로그 꼬리(`?id=1051`, Failed는 `1049`·`1045`·`1040`) |
 | `runners.html` | Runners. Online/Offline, capacity를 쓰는 런과 그 Workspace, 프로젝트 |
-| `stats.html` | Stats. 14일 처리량, 결과 분포, 리드 타임, 러너·프로젝트·에이전트별 |
+| `stats.html` | Stats. 14일 처리량, 결과 분포, 리드 타임, 러너·트래커 프로젝트·에이전트별 |
 | `settings.html` | Settings. 이 Workspace / 설치 전체 |
 | `onboarding.html` | 첫 실행 설정 6단계(`?step=3&check=fail`로 ssh 실패 상태) |
 

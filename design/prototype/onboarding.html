@@ -265,7 +265,7 @@
             desc: "티켓을 읽어 올 Linear 조직의 API 키와, Linear가 이벤트를 보낼 공개 주소를 넣어요.",
             body: `${field("apiKey", "Linear API 키", `<input class="input mono" id="apiKey" name="apiKey" type="password" value="${values.apiKey}" autocomplete="off" />`, "Linear 설정 → API에서 만들 수 있어요.")}
               ${field("publicUrl", "공개 주소", `<input class="input mono" id="publicUrl" name="publicUrl" type="url" value="${esc(values.publicUrl)}" autocomplete="off" spellcheck="false" />`, "Tailscale Funnel, Cloudflare Tunnel, 리버스 프록시 중 편한 방법으로 연 주소예요.")}
-              ${note(check[1], `acme 조직에 연결했어요<span class="muted">프로젝트 5개 · webhook을 받을 준비가 됐어요</span>`, `API 키가 맞지 않아요<span class="muted">Linear에서 키를 다시 복사해 넣어 주세요.</span>`)}
+              ${note(check[1], `acme 조직에 연결했어요<span class="muted">트래커 프로젝트 5개 · webhook을 받을 준비가 됐어요</span>`, `API 키가 맞지 않아요<span class="muted">Linear에서 키를 다시 복사해 넣어 주세요.</span>`)}
               ${checkButton(1, "연결 확인")}`,
           }),
           2: () => ({
@@ -322,7 +322,7 @@
             body: `<ul class="summary">
                 <li><span class="muted">트래커</span><span>Linear · acme</span></li>
                 <li><span class="muted">러너</span><span>runner-a · capacity 3</span></li>
-                <li><span class="muted">Workspace</span><span>${esc(values.wsName)} · 프로젝트 ${values.projects.length}개</span></li>
+                <li><span class="muted">Workspace</span><span>${esc(values.wsName)} · 트래커 프로젝트 ${values.projects.length}개</span></li>
               </ul>
               <a class="btn btn-primary primary" href="index.html">홈으로 가기</a>`,
           }),

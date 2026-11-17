@@ -88,7 +88,7 @@
           const mapping = m ? `${m.runner} · ${m.project} · ${FO.agents[m.agent]}` : '<span class="muted">Mapping이 없어요</span>';
           let why, act;
           if (!r) {
-            why = m ? `아직 런이 없어요. 할당하면 ${m.runner}에서 ${FO.agents[m.agent]}가 처리해요.` : "이 프로젝트에 Mapping이 없어 할당할 수 없어요.";
+            why = m ? `아직 런이 없어요. 할당하면 ${m.runner}에서 ${FO.agents[m.agent]}가 처리해요.` : "이 트래커 프로젝트에 Mapping이 없어 할당할 수 없어요.";
             act = m ? `<button class="btn btn-primary" type="button" data-toast="${id}를 할당했어요">할당하기</button>` : `<a class="btn" href="settings.html?sel=mapping">Mapping 만들기</a>`;
           } else {
             why = FO.longWhy(r);
@@ -139,7 +139,7 @@
             })
             .join("");
           const list = rows.length
-            ? `${FO.thead([{ label: "제목" }, { label: "티켓" }, { label: "프로젝트" }, { label: "트래커 상태" }, { label: "마지막 런" }])}<div class="rows" role="listbox" aria-label="티켓">${rows.map(row).join("")}</div>`
+            ? `${FO.thead([{ label: "제목" }, { label: "티켓" }, { label: "트래커 프로젝트" }, { label: "트래커 상태" }, { label: "마지막 런" }])}<div class="rows" role="listbox" aria-label="티켓">${rows.map(row).join("")}</div>`
             : `<p class="empty">이 조건에 맞는 티켓이 없어요.</p>`;
           page.innerHTML = `<div class="split-list">
               <div class="page-head"><div><h1 class="page-title">Tickets</h1><p class="page-sub">Linear 티켓이에요. <span class="tag" data-auto>${FO.AUTO_LABEL}</span> 라벨이 붙으면 자동으로 할당해요.</p></div></div>

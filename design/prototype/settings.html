@@ -156,7 +156,7 @@
                 })
                 .join("");
               return `<form class="form" data-msg="트래커 프로젝트를 저장했어요">
-                <p class="hint">한 프로젝트는 Workspace 하나에만 넣을 수 있어요.</p>
+                <p class="hint">한 트래커 프로젝트는 Workspace 하나에만 넣을 수 있어요.</p>
                 ${groups}${save()}</form>`;
             },
           },
@@ -194,11 +194,11 @@
             title: "트래커 연결",
             sum: () => `${FO.connections.length}개 · ${FO.connections.map((c) => c.name).join(", ")}`,
             body: () =>
-              `<p class="hint" style="margin-bottom:var(--space-4)">모든 Workspace가 함께 써요. Workspace는 어느 연결의 프로젝트든 고를 수 있어요.</p>` +
+              `<p class="hint" style="margin-bottom:var(--space-4)">모든 Workspace가 함께 써요. Workspace는 어느 연결의 트래커 프로젝트든 고를 수 있어요.</p>` +
               FO.connections
                 .map(
                   (c) => `<div class="conn">
-                  <div class="conn-head"><strong>${esc(c.name)}</strong><span class="muted">Linear · ${c.org} · 프로젝트 ${c.projects}개 · 마지막 이벤트 ${c.lastEvent}</span>
+                  <div class="conn-head"><strong>${esc(c.name)}</strong><span class="muted">Linear · ${c.org} · 트래커 프로젝트 ${c.projects}개 · 마지막 이벤트 ${c.lastEvent}</span>
                   <button class="btn btn-ghost" type="button" data-toast="${esc(c.name)} 연결을 확인했어요">연결 확인</button></div>
                   <div class="field"><label for="wh-${c.id}">Webhook 주소</label>
                   <div class="copy"><input class="input mono" id="wh-${c.id}" value="${c.webhook}" readonly /><button class="btn" type="button" data-toast="주소를 복사했어요">복사</button></div></div>
