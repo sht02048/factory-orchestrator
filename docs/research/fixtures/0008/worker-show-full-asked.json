@@ -1,0 +1,235 @@
+{
+  "id": "10000000-0000-4000-8000-000000000008",
+  "ok": true,
+  "result": {
+    "dispatch": {
+      "id": "ctx_000000000001",
+      "runId": "run_000000000001",
+      "taskId": "task_000000000001",
+      "task_id": "task_000000000001",
+      "contractVersion": 1,
+      "assigneeHandle": "term_00000000-0000-4000-8000-000000000002",
+      "assigneePaneKey": "10000000-0000-4000-8000-000000000009:10000000-0000-4000-8000-000000000010",
+      "processIncarnation": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r1@@<pty>:10000000-0000-4000-8000-000000000011",
+      "capabilityRevokedAt": null,
+      "retryOfDispatchId": null,
+      "creatorDispatchId": null,
+      "followUpOf": null,
+      "hostScope": {
+        "kind": "local",
+        "hostId": "local"
+      },
+      "status": "dispatched",
+      "failureCount": 0,
+      "lastFailure": null,
+      "terminationReason": null,
+      "depth": 1,
+      "dispatchedAt": "2026-11-17 14:07:27",
+      "completedAt": null,
+      "createdAt": "2026-11-17 14:07:27",
+      "lastHeartbeatAt": null
+    },
+    "worker": {
+      "dispatchId": "ctx_000000000001",
+      "runtimeEpoch": "10000000-0000-4000-8000-000000000006",
+      "state": "ready",
+      "stage": "input_accepted",
+      "worktreeId": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r1",
+      "agentTerminalHandle": "term_00000000-0000-4000-8000-000000000002",
+      "setupState": "not_configured",
+      "effects": [
+        {
+          "kind": "worktree",
+          "action": "created_top_level",
+          "id": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r1",
+          "name": "fo-orch-r1"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "created",
+          "id": "term_00000000-0000-4000-8000-000000000002",
+          "tabId": "10000000-0000-4000-8000-000000000009",
+          "leafId": "10000000-0000-4000-8000-000000000010"
+        },
+        {
+          "kind": "setup",
+          "action": "run",
+          "requested": "inherit",
+          "effective": "run",
+          "source": "orchestration_default",
+          "hookFound": false,
+          "startupPolicy": "start-immediately",
+          "state": "not_configured"
+        },
+        {
+          "kind": "dispatch_input",
+          "role": "agent",
+          "id": "term_00000000-0000-4000-8000-000000000002",
+          "state": "accepted"
+        }
+      ],
+      "residualResources": [
+        {
+          "kind": "worktree",
+          "action": "created_top_level",
+          "id": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r1",
+          "name": "fo-orch-r1"
+        },
+        {
+          "kind": "terminal",
+          "role": "agent",
+          "action": "created",
+          "id": "term_00000000-0000-4000-8000-000000000002",
+          "tabId": "10000000-0000-4000-8000-000000000009",
+          "leafId": "10000000-0000-4000-8000-000000000010"
+        }
+      ],
+      "startOptions": {
+        "worktree": "new-top-level",
+        "mode": {
+          "mode": "terminal",
+          "preferred": "terminal",
+          "reason": "user_default",
+          "detail": "Started a terminal agent worker, the default for new agent tabs in your settings."
+        },
+        "resolvedWorktreeId": null,
+        "name": "fo-orch-r1",
+        "repo": "id:10000000-0000-4000-8000-000000000004",
+        "baseBranch": null,
+        "terminal": null,
+        "agent": "claude",
+        "launch": {
+          "requested": {
+            "agent": "claude",
+            "model": "haiku",
+            "effort": null
+          },
+          "effective": {
+            "agent": "claude",
+            "model": "haiku",
+            "effort": null
+          }
+        },
+        "timeoutMs": 60000,
+        "setup": "run",
+        "setupSource": "orchestration_default"
+      },
+      "lastError": null,
+      "createdAt": "2026-11-17 14:07:27",
+      "updatedAt": "2026-11-17 14:07:28"
+    },
+    "projection": {
+      "id": "ctx_000000000001",
+      "dispatchId": "ctx_000000000001",
+      "taskId": "task_000000000001",
+      "runId": "run_000000000001",
+      "role": "worker",
+      "parent": null,
+      "provider": {
+        "id": "claude",
+        "model": null
+      },
+      "host": {
+        "kind": "local",
+        "id": "local"
+      },
+      "workspace": {
+        "id": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r1",
+        "kind": "folder_or_worktree"
+      },
+      "stage": {
+        "worker": "ready",
+        "dispatch": "dispatched",
+        "detail": "input_accepted",
+        "activity": "done"
+      },
+      "outcome": "in_progress",
+      "liveness": {
+        "verdict": "live",
+        "observedAt": 1794924462138,
+        "source": "agent_status"
+      },
+      "evidence": {
+        "durable": true,
+        "liveStatus": "fresh",
+        "lastObservedAt": 1794924462138
+      },
+      "resource": {
+        "state": "owned",
+        "id": "wtr_000000000001",
+        "ownerDispatchId": "ctx_000000000001",
+        "releaseState": "retained",
+        "terminalState": "retained"
+      },
+      "nextAction": {
+        "kind": "inspect",
+        "argv": [
+          "orchestration",
+          "worker-show",
+          "--dispatch",
+          "ctx_000000000001"
+        ]
+      },
+      "attention": {
+        "categories": [
+          "input"
+        ],
+        "requiresAction": true
+      }
+    },
+    "terminal": {
+      "handle": "term_00000000-0000-4000-8000-000000000002",
+      "ptyId": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r1@@<pty>",
+      "incarnationId": "10000000-0000-4000-8000-000000000011",
+      "orphaned": false,
+      "worktreeId": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r1",
+      "worktreePath": "<path>/workspaces/sandbox/fo-orch-r1",
+      "branch": "refs/heads/acme/fo-orch-r1",
+      "tabId": "10000000-0000-4000-8000-000000000009",
+      "leafId": "10000000-0000-4000-8000-000000000010",
+      "title": "Orchestration verification README PR",
+      "connected": true,
+      "writable": true,
+      "lastOutputAt": 1794924458959,
+      "preview": "───────────────────────────────────────────────────────────────────────────\nbranch:acme/fo-orch-r1 (wt:fo-orch-r1) | ?1\n<agent-status-line>\nctx:[----------]0%\n⏵⏵ bypass permissions on (shift+tab to cycle)",
+      "executionHostId": "local",
+      "agentIdentity": "claude",
+      "paneRuntimeId": -1,
+      "rendererGraphEpoch": 0,
+      "agentWait": null
+    },
+    "observation": {
+      "status": "live",
+      "exactWorker": true,
+      "agentWait": null
+    },
+    "terminalResource": {
+      "id": "wtr_000000000001",
+      "ownershipState": "owned",
+      "releaseState": "retained",
+      "retainedReason": "user_requested",
+      "terminalHandle": "term_00000000-0000-4000-8000-000000000002",
+      "worktreeId": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r1",
+      "endpointId": "10000000-0000-4000-8000-000000000006",
+      "endpointIncarnation": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r1@@<pty>:10000000-0000-4000-8000-000000000011",
+      "originDispatchId": "ctx_000000000001",
+      "ownerDispatchId": "ctx_000000000001",
+      "releaseRequestedAt": null,
+      "releaseCompletedAt": null,
+      "releaseError": null,
+      "recoveryAttemptCount": 0,
+      "lastRecoveryAt": null,
+      "autoReleaseAt": null,
+      "archive": {
+        "source": null,
+        "status": null
+      }
+    },
+    "autoReleaseAt": null,
+    "coordinatedFrom": null
+  },
+  "_meta": {
+    "runtimeId": "10000000-0000-4000-8000-000000000006"
+  }
+}

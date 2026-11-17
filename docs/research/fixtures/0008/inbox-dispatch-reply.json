@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "result": {
+    "messages": [
+      {
+        "id": "msg_000000000002",
+        "type": "status",
+        "from": "run:run_000000000001",
+        "to": "dispatch:ctx_000000000001",
+        "subject": "Re: Question",
+        "handled": true,
+        "body": "A"
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "result": {
+    "messages": [
+      {
+        "id": "msg_000000000001",
+        "type": "question",
+        "from": "ctx_000000000001",
+        "body": "Which line should I add to README.md? A: 'Verified by an orchestration run.' B: 'Orchestration check passed.'",
+        "payload": {
+          "taskId": "task_000000000001",
+          "dispatchId": "ctx_000000000001",
+          "options": [
+            "A",
+            "B"
+          ]
+        }
+      }
+    ]
+  }
+}

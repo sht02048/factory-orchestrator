@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "result": {
+    "dispatchId": "ctx_000000000002",
+    "state": "stopped",
+    "alreadySettled": false,
+    "processAction": "closed_agent_terminal",
+    "close": {
+      "handle": "term_00000000-0000-4000-8000-000000000003",
+      "tabId": "10000000-0000-4000-8000-000000000014",
+      "ptyKilled": true
+    },
+    "mutation": {
+      "requestId": "10000000-0000-4000-8000-000000000017",
+      "replayed": false
+    }
+  }
+}

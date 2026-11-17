@@ -1,0 +1,26 @@
+{
+  "ok": false,
+  "error": {
+    "code": "invalid_argument",
+    "message": "Unknown flag --from for command: orchestration worker-stop",
+    "data": {
+      "validFlags": [
+        "dispatch",
+        "environment",
+        "full",
+        "help",
+        "json",
+        "pairing-code",
+        "retry-request"
+      ],
+      "suggestions": [
+        "full",
+        "json"
+      ],
+      "nextSteps": [
+        "Did you mean: --full, --json",
+        "Valid flags: --dispatch, --environment, --full, --help, --json, --pairing-code, --retry-request"
+      ]
+    }
+  }
+}

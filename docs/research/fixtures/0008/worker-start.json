@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "result": {
+    "dispatchId": "ctx_000000000001",
+    "taskId": "task_000000000001",
+    "runId": "run_000000000001",
+    "runCreated": true,
+    "state": "ready",
+    "agent": "claude",
+    "model": "haiku",
+    "mode": "terminal",
+    "terminal": "term_00000000-0000-4000-8000-000000000002",
+    "workspace": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r1",
+    "keptOpen": true,
+    "next": "Orca wakes you when workers report; end your turn when you're done."
+  }
+}

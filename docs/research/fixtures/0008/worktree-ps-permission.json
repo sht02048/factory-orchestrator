@@ -1,0 +1,100 @@
+{
+  "ok": true,
+  "result": {
+    "worktrees": [
+      {
+        "workspaceKind": "git",
+        "worktreeId": "10000000-0000-4000-8000-000000000004::<path>/workspaces/sandbox/fo-orch-r2",
+        "repoId": "10000000-0000-4000-8000-000000000004",
+        "hostId": "local",
+        "identity": {
+          "key": "wt2:local:10000000-0000-4000-8000-000000000016",
+          "executionHostId": "local",
+          "instanceId": "10000000-0000-4000-8000-000000000016"
+        },
+        "terminalPlatform": "darwin",
+        "repo": "sandbox",
+        "path": "<path>/workspaces/sandbox/fo-orch-r2",
+        "branch": "refs/heads/acme/fo-orch-r2",
+        "isArchived": false,
+        "isMainWorktree": false,
+        "hasHostSidebarActivity": true,
+        "defaultBranch": false,
+        "worktreeInstanceId": "10000000-0000-4000-8000-000000000016",
+        "parentWorktreeId": null,
+        "childWorktreeIds": [],
+        "workspaceLineage": null,
+        "displayName": "fo-orch-r2",
+        "workspaceStatus": "in-progress",
+        "sortOrder": 1794924570969,
+        "lastActivityAt": 1794924570985,
+        "createdAt": 1794924570969,
+        "creatorProvenance": {
+          "kind": "host"
+        },
+        "linkedIssue": null,
+        "linkedPR": null,
+        "linkedLinearIssue": null,
+        "linkedGitLabMR": null,
+        "linkedGitLabIssue": null,
+        "linkedItems": [],
+        "comment": "",
+        "isPinned": false,
+        "isActive": false,
+        "unread": false,
+        "liveTerminalCount": 1,
+        "hasAttachedPty": true,
+        "unverifiableTerminalCount": 0,
+        "lastOutputAt": 1794924600239,
+        "preview": "ew/<hash>/orca-agent-view' '--dangerously-skip-permissions' '--model' 'haiku'",
+        "status": "permission",
+        "agents": [
+          {
+            "paneKey": "10000000-0000-4000-8000-000000000014:10000000-0000-4000-8000-000000000015",
+            "parentPaneKey": "10000000-0000-4000-8000-000000000002:10000000-0000-4000-8000-000000000003",
+            "state": "waiting",
+            "agentType": "claude",
+            "prompt": "You are working inside Orca, a multi-agent IDE. Your task ID is: task_000000000002 === TASK === Sandbox verification task. This repository is a disposable sandbox. Keep it short.",
+            "taskTitle": "fo-orch-r2",
+            "displayName": "fo-orch-r2",
+            "conversationName": "Orca sandbox permission verification",
+            "lastAssistantMessage": null,
+            "toolName": "Bash",
+            "toolInput": "touch perm-test.txt",
+            "interrupted": false,
+            "mainAgent": {
+              "state": "waiting",
+              "stateStartedAt": 1794924577389
+            },
+            "stateStartedAt": 1794924577389,
+            "updatedAt": 1794924577389,
+            "hasLivePty": true,
+            "programStatus": {
+              "state": "blocked",
+              "kind": "permission",
+              "message": "approve Bash: touch perm-test.txt",
+              "observedAt": 1794924577384
+            },
+            "agentWait": {
+              "source": "hook",
+              "since": 1794924577389
+            }
+          }
+        ],
+        "sidebarStatus": "permission",
+        "terminalVerdict": "live",
+        "environment": {
+          "id": "local",
+          "name": "local"
+        },
+        "parent": null,
+        "address": {
+          "environment": "local",
+          "worktree": "identity:wt2:local:10000000-0000-4000-8000-000000000016",
+          "line": "--environment local --worktree identity:wt2:local:10000000-0000-4000-8000-000000000016"
+        }
+      }
+    ],
+    "totalCount": 1
+  }
+}

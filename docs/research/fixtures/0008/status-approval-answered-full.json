@@ -1,0 +1,21 @@
+{
+  "id": "msg_stop_000000000000000000000002",
+  "run_id": "run_000000000001",
+  "delivery_contract": "current_delivery",
+  "from_handle": "term_00000000-0000-4000-8000-000000000003",
+  "to_handle": "run:run_000000000001",
+  "subject": "Worker approval answered",
+  "body": "Denied by the coordinator: approval apr_0000000000000001 of worker term_00000000-0000-4000-8000-000000000003 (Allow Bash?).\nReason: Denied by the verification run. Skip step 1 and continue.\nNothing to do unless the worker stays stuck.",
+  "type": "status",
+  "priority": "normal",
+  "thread_id": null,
+  "payload": "{\"taskId\":\"task_000000000002\",\"dispatchId\":\"ctx_000000000002\",\"handle\":\"term_00000000-0000-4000-8000-000000000003\",\"approval\":{\"v\":1,\"approvalId\":\"apr_0000000000000001\",\"state\":\"answered\",\"worker\":{\"handle\":\"term_00000000-0000-4000-8000-000000000003\",\"dispatchId\":\"ctx_000000000002\",\"taskId\":\"task_000000000002\"},\"summary\":{\"title\":\"Allow Bash?\",\"detail\":\"touch perm-test.txt\",\"reason\":null},\"allowedActions\":[],\"outcome\":{\"by\":\"coordinator\",\"decision\":\"deny\",\"reason\":\"Denied by the verification run. Skip step 1 and continue.\",\"reasonDelivered\":true}}}",
+  "read": 0,
+  "sequence": 5,
+  "created_at": "2026-11-17T14:10:09Z",
+  "delivered_at": null,
+  "sender_pane_key": null,
+  "pointer_enter_pending": 0,
+  "pointer_pty_id": null,
+  "pointer_process_incarnation": null
+}

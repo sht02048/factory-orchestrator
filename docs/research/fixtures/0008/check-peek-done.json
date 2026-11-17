@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "result": {
+    "messages": [
+      {
+        "id": "msg_000000000001",
+        "type": "question",
+        "from": "ctx_000000000001",
+        "body": "Which line should I add to README.md? A: 'Verified by an orchestration run.' B: 'Orchestration check passed.'",
+        "payload": {
+          "taskId": "task_000000000001",
+          "dispatchId": "ctx_000000000001",
+          "options": [
+            "A",
+            "B"
+          ]
+        }
+      },
+      {
+        "id": "msg_000000000003",
+        "type": "worker_done",
+        "from": "term_00000000-0000-4000-8000-000000000002",
+        "subject": "Verification PR opened",
+        "body": "Coordinator answered A, so I appended 'Verified by an orchestration run.' as the last line of README.md, committed it as 'docs: add verification line', and pushed acme/fo-orch-r1 to origin. I opened PR https://github.com/acme/sandbox/pull/17 against main with the requested title and body. Nothing is left except closing the disposable PR, which the task did not ask for.",
+        "followUp": "To give this worker more work: orca orchestration send --to dispatch:ctx_000000000001 --subject \"...\" --body \"...\"",
+        "payload": {
+          "taskId": "task_000000000001",
+          "dispatchId": "ctx_000000000001",
+          "outcome": "succeeded",
+          "filesModified": [
+            "README.md"
+          ],
+          "reportPath": "https://github.com/acme/sandbox/pull/17"
+        }
+      }
+    ]
+  }
+}
