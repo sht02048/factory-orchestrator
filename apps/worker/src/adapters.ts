@@ -7,7 +7,7 @@ import type {
   Tracker,
   TrackerConnectionId,
 } from "@factory/core";
-import { getTrackerConnection, listCodeHostConnections } from "@factory/db";
+import { getTrackerConnection, listCodeHostConnections, listTrackerConnections } from "@factory/db";
 import type { CodeHostConnectionId, Database, SecretBox, StoredRunner } from "@factory/db";
 
 /**
@@ -44,6 +44,11 @@ export class WorkerAdapters {
     return reuse(this.trackers, stored.id, { kind: stored.kind, config }, () =>
       this.registry.createTracker(stored.kind, config),
     );
+  }
+
+  /** 등록한 트래커 연결의 ID. 만든 순서다(폴링 보정). */
+  trackerConnectionIds(db: Database): TrackerConnectionId[] {
+    return listTrackerConnections(db, this.secretBox).map((stored) => stored.id);
   }
 
   /**
