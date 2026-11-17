@@ -1,8 +1,20 @@
-import { toQuestionId } from "@factory/core";
-import { listRunQuestions, recordRunQuestions } from "@factory/db";
+import { toPermissionRequestId, toQuestionId } from "@factory/core";
+import {
+  listRunPermissionWaits,
+  listRunQuestions,
+  recordPermissionWaits,
+  recordRunQuestions,
+} from "@factory/db";
 import { describe, expect, it } from "vitest";
 import { minutes, now, seedDatabase } from "../testing/seed";
-import { AnswerRejectedError, answerInput, submitAnswer } from "./actions";
+import {
+  AnswerRejectedError,
+  DenyRejectedError,
+  answerInput,
+  denyInput,
+  submitAnswer,
+  submitDenial,
+} from "./actions";
 
 function seedQuestion() {
   const { db, ids } = seedDatabase();
@@ -45,5 +57,34 @@ describe("submitAnswer", () => {
     expect(answerInput.safeParse({ runId: "r", questionId: "q", answer: "  " }).success).toBe(
       false,
     );
+  });
+});
+
+describe("submitDenial", () => {
+  function seedPermission() {
+    const { db, ids } = seedDatabase();
+    const runId = ids.get("ACME-11");
+    if (runId === undefined) throw new Error("ACME-11 missing");
+    recordPermissionWaits(db, runId, [
+      { id: toPermissionRequestId("apr-1"), detail: "Bash(touch a)", requestedAt: minutes(100) },
+    ]);
+    return { db, runId };
+  }
+
+  it("권한 대기 런에서 거절하면 DB 에 거절 요청이 하나 생긴다(Q82.4)", () => {
+    const { db, runId } = seedPermission();
+    submitDenial(db, denyInput.parse({ runId, promptId: "apr-1", reason: " 읽기만 " }), now);
+    expect(listRunPermissionWaits(db, runId).map((w) => w.denial)).toEqual([
+      { reason: "읽기만", deniedAt: now, sentAt: null },
+    ]);
+    expect(() => submitDenial(db, { runId, promptId: "apr-1", reason: "" }, now)).toThrow(
+      new DenyRejectedError("already-denied"),
+    );
+  });
+
+  it("이유 없이도 거절할 수 있다", () => {
+    const { db, runId } = seedPermission();
+    submitDenial(db, denyInput.parse({ runId, promptId: "apr-1", reason: "" }), now);
+    expect(listRunPermissionWaits(db, runId)[0]?.denial?.reason).toBe("");
   });
 });

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { answerInput, submitAnswer } from "../home/actions";
+import { answerInput, denyInput, submitAnswer, submitDenial } from "../home/actions";
 import { loadHomePage } from "../home/load";
 import { loadRunnersPage } from "../runners/load";
 import { loadRunsPage } from "../runs/load";
@@ -28,6 +28,11 @@ export const getHomePage = createServerFn({ method: "GET" })
 export const answerQuestion = createServerFn({ method: "POST" })
   .validator(answerInput)
   .handler(({ data }) => submitAnswer(getDatabase(), data, new Date()));
+
+/** 손댈 일의 권한 대기 거절을 남긴다. 허용은 러너 화면에서만 한다(Q82.4) */
+export const denyPermission = createServerFn({ method: "POST" })
+  .validator(denyInput)
+  .handler(({ data }) => submitDenial(getDatabase(), data, new Date()));
 
 export const getRunsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))

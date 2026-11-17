@@ -1,6 +1,7 @@
 import {
   toAgentId,
   toAgentRef,
+  toPermissionRequestId,
   toQuestionId,
   toRunnerId,
   toRunnerProjectId,
@@ -11,9 +12,12 @@ import {
 import type { RunId } from "@factory/core";
 import {
   answerRunQuestion,
+  denyPermissionWait,
   assignRun,
   changeRunState,
+  recordPermissionWaits,
   recordRunQuestions,
+  resolvePermissionWaits,
   recordRunnerCheck,
   requestRunCancel,
   updateRunRecords,
@@ -211,6 +215,34 @@ describe("loadHomePage", () => {
     answerRunQuestion(db, { runId, questionId: toQuestionId("q-1"), answer: "A" }, minutes(101));
     expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
       input: { kind: "question", answered: true },
+    });
+  });
+
+  it("권한 대기 런에 worker 가 쓴 대기를 담고, 거절을 남기면 denied, 닫히면 빠진다", () => {
+    const { db, ids } = seedDatabase();
+    const runId = ids.get("ACME-11");
+    if (runId === undefined) throw new Error("ACME-11 missing");
+    const permissionId = toPermissionRequestId("apr-1");
+    recordPermissionWaits(db, runId, [
+      { id: permissionId, detail: "Bash(touch notes.txt)", requestedAt: minutes(100) },
+    ]);
+    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+      input: {
+        kind: "permission",
+        promptId: "apr-1",
+        detail: "Bash(touch notes.txt)",
+        denied: false,
+      },
+    });
+
+    denyPermissionWait(db, { runId, permissionId, reason: "" }, minutes(101));
+    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+      input: { kind: "permission", denied: true },
+    });
+
+    resolvePermissionWaits(db, runId, [], minutes(102));
+    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+      input: null,
     });
   });
 

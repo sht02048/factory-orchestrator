@@ -4,7 +4,7 @@ import { z } from "zod";
 import { HomeScreen } from "../../home/home-screen";
 import { homeMessages } from "../../home/messages";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { answerQuestion, getHomePage } from "../../server/functions";
+import { answerQuestion, denyPermission, getHomePage } from "../../server/functions";
 
 const t = createTranslator({ locale: defaultLocale, messages: homeMessages, namespace: "home" });
 
@@ -35,7 +35,10 @@ function HomeRoute() {
           // 답했음(answered)을 다시 읽어 답하기 칸을 닫는다
           await router.invalidate();
         }}
-        onDeny={() => Promise.reject(new Error("not wired"))}
+        onDeny={async (input) => {
+          await denyPermission({ data: input });
+          await router.invalidate();
+        }}
       />
     </ScreenMessages>
   );
