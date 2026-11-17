@@ -1,9 +1,16 @@
-import { AdapterError, summarizeRunOutcome } from "@factory/core";
-import type { PrState, RetryToken, Runner, RunnerErrorDetail, WorktreeRef } from "@factory/core";
+import { summarizeRunOutcome } from "@factory/core";
+import type { PrState, RetryToken, WorktreeRef } from "@factory/core";
 import { getRun, getRunWithRecords } from "@factory/db";
 import type { StoredRun } from "@factory/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Harness, projectA, projectB, projectC } from "./test-fixtures.js";
+import {
+  Harness,
+  outcomeUnknownAfterStart,
+  projectA,
+  projectB,
+  projectC,
+  recordingStarts,
+} from "./test-fixtures.js";
 import { startWorker } from "./worker.js";
 
 let h: Harness;
@@ -239,6 +246,53 @@ describe("재시작 안전", () => {
   });
 });
 
+describe("결과를 모르는 시작", () => {
+  it("러너가 Offline이 되어도 다른 러너에서 다시 시작하지 않고, 돌아오면 그 러너에 다시 보낸다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    expect(current(run)).toMatchObject({ runnerId: runnerA });
+    const sent: Array<RetryToken | undefined> = [];
+
+    h.wrapRunner = (fake) => outcomeUnknownAfterStart(fake, sent);
+    const first = h.worker();
+    await first.tick();
+    await first.close();
+    const [startedWorktree] = h.runner(runnerA).worktrees.keys();
+
+    h.wrapRunner = (fake) => recordingStarts(fake, sent);
+    h.setRunnerOnline(runnerA, false);
+    const second = h.worker();
+    await second.tick();
+    expect(current(run)).toMatchObject({ state: "queued", runnerId: runnerA });
+    expect(h.runner(runnerB).worktrees.size).toBe(0);
+
+    h.setRunnerOnline(runnerA, true);
+    await second.tick();
+    expect(current(run)).toMatchObject({ state: "running", runnerId: runnerA });
+    expect(worktreeOf(run)).toBe(startedWorktree);
+    expect(h.runner(runnerA).worktrees.size).toBe(1);
+    expect(sent).toHaveLength(2);
+  });
+
+  it("묶인 런은 뒤 런을 막지 않는다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
+    const bound = h.assign("ENG-1", projectA);
+    const behind = h.assign("ENG-2", projectB);
+
+    h.wrapRunner = (fake) => outcomeUnknownAfterStart(fake, []);
+    const first = h.worker();
+    await first.tick();
+    await first.close();
+
+    h.wrapRunner = (fake) => fake;
+    h.setRunnerOnline(runnerA, false);
+    await h.worker().tick();
+    expect([stateOf(bound), stateOf(behind)]).toEqual(["queued", "running"]);
+  });
+});
+
 describe("startWorker", () => {
   it("멈출 때까지 tick을 이어서 돈다", async () => {
     h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
@@ -260,38 +314,3 @@ describe("startWorker", () => {
     }
   });
 });
-
-/** startRun에 보낸 다시 보내기 값을 모은다. */
-function recordingStarts(runner: Runner, sent: Array<RetryToken | undefined>): Runner {
-  return delegate(runner, (input) => {
-    sent.push(input.retryToken);
-    return runner.startRun(input);
-  });
-}
-
-/** 러너가 시작은 했지만 응답을 잃어 결과를 모른다고 답한 경우(start-outcome-unknown). */
-function outcomeUnknownAfterStart(runner: Runner, sent: Array<RetryToken | undefined>): Runner {
-  return delegate(runner, async (input) => {
-    sent.push(input.retryToken);
-    const started = await runner.startRun(input);
-    if (started.retryToken === null) throw new Error("fake runner gave no retry token");
-    throw new AdapterError<RunnerErrorDetail>({
-      kind: "start-outcome-unknown",
-      retryToken: started.retryToken,
-    });
-  });
-}
-
-function delegate(runner: Runner, startRun: Runner["startRun"]): Runner {
-  return {
-    kind: runner.kind,
-    checkHealth: () => runner.checkHealth(),
-    listProjects: () => runner.listProjects(),
-    startRun,
-    pollRun: (worktree) => runner.pollRun(worktree),
-    stopAgent: (worktree) => runner.stopAgent(worktree),
-    readLogTail: (worktree, opts) => runner.readLogTail(worktree, opts),
-    worktreeExists: (worktree) => runner.worktreeExists(worktree),
-    removeWorktree: (worktree, opts) => runner.removeWorktree(worktree, opts),
-  };
-}

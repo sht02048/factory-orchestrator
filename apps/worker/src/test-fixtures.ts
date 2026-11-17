@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  AdapterError,
   AdapterRegistry,
   toAgentId,
   toCodeHostKind,
@@ -16,7 +17,14 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
 } from "@factory/core";
-import type { PullRequestSnapshot, Runner, RunnerId, RunnerProjectId } from "@factory/core";
+import type {
+  PullRequestSnapshot,
+  RetryToken,
+  Runner,
+  RunnerErrorDetail,
+  RunnerId,
+  RunnerProjectId,
+} from "@factory/core";
 import { FakeCodeHost, FakeRunner, FakeTracker } from "@factory/core/testing";
 import {
   SecretBox,
@@ -231,4 +239,42 @@ export class Harness {
     if (typeof id !== "string") throw new TypeError("fake runner config id must be a string");
     return this.runner(toRunnerId(id));
   }
+}
+
+/** startRun에 보낸 다시 보내기 값을 모은다. */
+export function recordingStarts(runner: Runner, sent: Array<RetryToken | undefined>): Runner {
+  return delegate(runner, (input) => {
+    sent.push(input.retryToken);
+    return runner.startRun(input);
+  });
+}
+
+/** 러너가 시작은 했지만 응답을 잃어 결과를 모른다고 답한 경우(start-outcome-unknown). */
+export function outcomeUnknownAfterStart(
+  runner: Runner,
+  sent: Array<RetryToken | undefined>,
+): Runner {
+  return delegate(runner, async (input) => {
+    sent.push(input.retryToken);
+    const started = await runner.startRun(input);
+    if (started.retryToken === null) throw new Error("fake runner gave no retry token");
+    throw new AdapterError<RunnerErrorDetail>({
+      kind: "start-outcome-unknown",
+      retryToken: started.retryToken,
+    });
+  });
+}
+
+function delegate(runner: Runner, startRun: Runner["startRun"]): Runner {
+  return {
+    kind: runner.kind,
+    checkHealth: () => runner.checkHealth(),
+    listProjects: () => runner.listProjects(),
+    startRun,
+    pollRun: (worktree) => runner.pollRun(worktree),
+    stopAgent: (worktree) => runner.stopAgent(worktree),
+    readLogTail: (worktree, opts) => runner.readLogTail(worktree, opts),
+    worktreeExists: (worktree) => runner.worktreeExists(worktree),
+    removeWorktree: (worktree, opts) => runner.removeWorktree(worktree, opts),
+  };
 }

@@ -98,7 +98,7 @@ export function createWorker(options: WorkerOptions): Worker {
   const now = options.now ?? (() => new Date());
   const logger = options.logger ?? consoleLogger;
   const adapters = new WorkerAdapters(options.registry, options.secretBox);
-  const context: TickContext = { db, now, logger, adapters, startedNotRecorded: new Map() };
+  const context: TickContext = { db, now, logger, adapters, pendingStarts: new Map() };
   let running: Promise<void> | null = null;
   let closed = false;
 
@@ -125,11 +125,19 @@ interface TickContext {
   now: () => Date;
   logger: WorkerLogger;
   adapters: WorkerAdapters;
-  /**
-   * 러너에서 시작했지만 Running을 DB에 쓰지 못한 런(쓰기 잠금 시간 초과 등). 다음 바퀴에 러너에 다시
-   * 보내지 않고 이 결과로 기록만 다시 한다.
-   */
-  startedNotRecorded: Map<RunId, StartedRun>;
+  /** 러너에 보냈지만 Running이 되지 않은 시작. 러너 하나에 묶인다. */
+  pendingStarts: Map<RunId, PendingStart>;
+}
+
+/**
+ * 러너에 보낸 시작 중 아직 Running을 쓰지 못한 것.
+ * - started: 러너가 시작했다고 답했지만 DB 쓰기가 실패했다. 다음 바퀴에 기록만 다시 한다.
+ * - retryToken: 러너가 결과를 모른다고 답하며 준 다시 보내기 값. DB에 쓰지 못했어도 이 값으로 다시 보낸다.
+ */
+interface PendingStart {
+  runnerId: RunnerId;
+  started: StartedRun | null;
+  retryToken: RetryToken | null;
 }
 
 async function tick(context: TickContext): Promise<void> {
@@ -233,29 +241,56 @@ async function decideRunPrState(context: TickContext, run: ActiveRun): Promise<P
  * 엄격한 FIFO 대기열(ADR 0006). 이번에 할 일은 core planQueue가 정하고 worker는 그대로 옮긴다.
  * 러너를 비우고 정하는 것(Q65·Q68·Q72·Q73)은 한 쓰기 트랜잭션에서 쓰고, 시작은 들어온 순서로 한다.
  * 앞 런이 시작하지 못하면 뒤 런도 이번 바퀴에는 시작하지 않는다(Q63 개정).
+ *
+ * 예외: 러너에 보낸 시작의 결과를 아직 모르는 런(boundRunners)은 그 러너에 묶어 둔다. 그 러너가 Offline이
+ * 되어도 러너를 비우거나 다른 러너에서 시작하지 않는다. 첫 시작이 실제로 됐다면 에이전트가 둘 생기기
+ * 때문이다. 그동안 planQueue는 이 런을 러너 없는 런처럼 순서에서 빼므로 뒤 런을 막지 않는다.
  */
 async function processQueue(context: TickContext): Promise<void> {
   const { db } = context;
   const plan = inTransaction(db, () => {
     const queued = listRuns(db, { states: ["queued"] });
     if (queued.length === 0) return null;
+    const bound = boundRunners(context, queued);
     const result = planQueue({
       queued: queued.flatMap(toQueuedRun),
       runners: listRunnerSnapshots(db),
       runs: listRunPlacements(db),
     });
     for (const runId of result.cleared) {
-      setQueuedRunRunner(db, runId, null);
-      // 시작 다시 보내기 값은 그 러너에만 뜻이 있다.
-      updateRunRecords(db, runId, { retryToken: null });
+      if (!bound.has(runId)) setQueuedRunRunner(db, runId, null);
     }
-    for (const choice of result.assigned) setQueuedRunRunner(db, choice.runId, choice.runnerId);
-    return result;
+    for (const choice of result.assigned) {
+      if (!bound.has(choice.runId)) setQueuedRunRunner(db, choice.runId, choice.runnerId);
+    }
+    return result.start.filter(
+      (choice) => (bound.get(choice.runId) ?? choice.runnerId) === choice.runnerId,
+    );
   });
 
-  for (const choice of plan?.start ?? []) {
+  for (const choice of plan ?? []) {
     if (!(await startQueuedRun(context, choice))) return;
   }
+}
+
+/** 러너에 보낸 시작의 결과를 아직 모르는 Queued 런과 그 러너 */
+function boundRunners(
+  context: TickContext,
+  queued: ReadonlyArray<StoredRun>,
+): Map<RunId, RunnerId> {
+  const bound = new Map<RunId, RunnerId>();
+  for (const run of queued) {
+    const pending = context.pendingStarts.get(run.id);
+    if (pending !== undefined) {
+      bound.set(run.id, pending.runnerId);
+      continue;
+    }
+    if (run.state !== "queued" || run.runnerId === null) continue;
+    if ((getRunWithRecords(context.db, run.id)?.records.retryToken ?? null) !== null) {
+      bound.set(run.id, run.runnerId);
+    }
+  }
+  return bound;
 }
 
 function toQueuedRun(run: StoredRun): QueuedRun[] {
@@ -272,30 +307,38 @@ function toQueuedRun(run: StoredRun): QueuedRun[] {
  * 대기열에 없어 다시 시작하지 않는다. 러너가 시작 결과를 모른다고 답하면(start-outcome-unknown)
  * 러너가 준 다시 보내기 값(retryToken)을 DB에 써 두고, 다음 바퀴에(데몬을 다시 띄운 뒤라도) 그 값으로
  * 같은 시작을 다시 보낸다. 다시 보내기 값은 러너가 발급한 것만 보낸다(core StartRunInput).
- * 러너에서 시작한 뒤 DB 쓰기만 실패하면 시작 결과를 메모리에 두고 다음 바퀴에 기록만 다시 한다.
+ * 데몬이 살아 있는 동안 DB 쓰기만 실패하면 시작 결과나 다시 보내기 값을 메모리(pendingStarts)에 두고
+ * 다음 바퀴에 쓴다.
  *
  * 알려진 한계: 러너의 응답을 받은 뒤 DB에 쓰기 전에 데몬이 죽으면 다시 띄웠을 때 시작을 새로 보낸다.
  * 지금 Runner 계약에서는 시작 전에 둘 멱등 키가 없다. 0037에서 결정적 워크트리 이름·브랜치(Q40)를 멱등 키로
  * 쓰고, 재시작 때 러너 어댑터가 그 이름으로 이미 시작한 런을 찾아 이어 붙이는 계약을 core에 더한다.
  */
 async function startQueuedRun(context: TickContext, choice: RunnerChoice): Promise<boolean> {
-  const { db } = context;
+  const { db, pendingStarts } = context;
   const found = getRunWithRecords(db, choice.runId);
   if (found === null) return false;
   const { run, records } = found;
-  if (run.state !== "queued" || run.runnerId !== choice.runnerId) {
-    context.startedNotRecorded.delete(choice.runId);
+  if (run.state !== "queued") {
+    pendingStarts.delete(choice.runId);
+    return false;
+  }
+  const pending = pendingStarts.get(run.id);
+  if (
+    run.runnerId !== choice.runnerId ||
+    (pending !== undefined && pending.runnerId !== choice.runnerId)
+  ) {
     return false;
   }
 
   const started =
-    context.startedNotRecorded.get(run.id) ??
-    (await startOnRunner(context, run, choice.runnerId, records.retryToken));
+    pending?.started ??
+    (await startOnRunner(context, run, choice.runnerId, pending?.retryToken ?? records.retryToken));
   if (started === null) return false;
-  context.startedNotRecorded.set(run.id, started);
+  pendingStarts.set(run.id, { runnerId: choice.runnerId, started, retryToken: started.retryToken });
 
   const recorded = tryWrite(context, run, () => recordStart(context, run, started));
-  if (recorded !== undefined) context.startedNotRecorded.delete(run.id);
+  if (recorded !== undefined) pendingStarts.delete(run.id);
   return recorded === true;
 }
 
@@ -315,6 +358,8 @@ async function startOnRunner(
     context.logger.warn("could not start run", { runId: run.id, error });
     const issued = startOutcomeUnknownToken(error);
     if (issued !== null) {
+      // DB에 쓰지 못해도 다시 보낼 수 있게 먼저 메모리에 둔다.
+      context.pendingStarts.set(run.id, { runnerId, started: null, retryToken: issued });
       tryWrite(context, run, () => updateRunRecords(context.db, run.id, { retryToken: issued }));
     }
     return null;
@@ -330,7 +375,10 @@ async function sendStart(
 ): Promise<StartedRun | null> {
   const { db, logger, adapters } = context;
   const storedRunner = findRunner(db, runnerId);
-  if (storedRunner === undefined) return null;
+  if (storedRunner === undefined) {
+    logger.warn("run's runner is not registered", { runId: run.id, runnerId });
+    return null;
+  }
   const tracker = adapters.tracker(db, run.ticket.connection);
   if (tracker === null) {
     logger.warn("run's tracker connection is not registered", { runId: run.id });
