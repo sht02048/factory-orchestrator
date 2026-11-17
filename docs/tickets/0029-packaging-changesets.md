@@ -19,5 +19,5 @@ npm 패키지 하나로 설치해 CLI가 도는 배포물을 만든다. 아직 �
 
 ## 완료 조건
 
-- `npm pack`으로 만든 파일을 새 임시 폴더에 설치해 CLI `init`·`start`가 돌고 web이 응답한다는 시험이 CI에서 통과한다.
+- `npm pack`으로 만든 파일을 새 임시 폴더에 설치해 CLI `init`·`start`가 돌고 web이 응답하며, worker가 가짜가 아닌 실제 어댑터 설정으로 떠서 DB에 러너 상태 확인 기록을 남긴다는 시험이 CI에서 통과한다(러너는 닿지 않아 Offline으로 기록돼도 된다).
 - `changeset status`가 0.1.0을 보여 준다.
