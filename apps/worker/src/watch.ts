@@ -138,7 +138,13 @@ async function watchRun(
         );
       }),
     );
-    await sendDenials(context, run, runner, onRunner);
+    await sendDenials(
+      context,
+      run,
+      runner,
+      onRunner,
+      new Set(progress.permissionWaits.map((wait) => wait.id)),
+    );
   }
 
   const resolution = resolveRunProgress(progress, {
@@ -208,18 +214,22 @@ async function endWithoutProgress(
       ? { agentResult: "canceled" as const, stopAgent: true, runnerUnreached: false }
       : null);
   if (ending === null) return false;
-  if (ending.stopAgent) {
+  // 주 경로(watchRun)와 같이 PR을 먼저 찾고, 멈춘 뒤에는 정한 결과를 지켜 기록한다.
+  const decision = await decideRunPrState(context, run);
+  if (ending.stopAgent && !context.pendingEndings.has(run.id)) {
     const mailbox = context.mailboxes.get(storedRunner.id) ?? storedRunner.mailbox;
     if (mailbox === null) return false;
     await runner.stopAgent({ mailbox, worktree: run.worktree, agentRef: run.agentRef });
+    context.pendingEndings.set(run.id, { agentResult: ending.agentResult, report: null });
   }
-  const decision = await decideRunPrState(context, run);
-  return endRun(context, run, {
+  const recorded = endRun(context, run, {
     agentResult: ending.agentResult,
     decision,
     runnerUnreached: ending.runnerUnreached,
     report: null,
   });
+  if (recorded) context.pendingEndings.delete(run.id);
+  return recorded;
 }
 
 /** 러너에 명령하지 않고 최대 실행 시간이 지났으면 끝낸다(Disconnected 규칙, core decideTimeout). */
@@ -411,10 +421,12 @@ async function sendDenials(
   run: ActiveRun,
   runner: Runner,
   onRunner: RunOnRunner,
+  open: ReadonlySet<PermissionRequestId>,
 ): Promise<void> {
   const { db, logger, unmarkedDenials } = context;
   for (const denial of listUnsentDenials(db)) {
-    if (denial.runId !== run.id) continue;
+    // 러너 화면에서 이미 허용돼 닫힌 대기에는 보내지 않는다.
+    if (denial.runId !== run.id || !open.has(denial.permissionId)) continue;
     const key = denialKey(run.id, denial.permissionId);
     if (!unmarkedDenials.has(key)) {
       try {

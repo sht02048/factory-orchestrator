@@ -173,6 +173,18 @@ describe("입력 기다림", () => {
     expect(listRunPermissionWaits(h.db, run.id)[0]?.resolvedAt).not.toBeNull();
   });
 
+  it("거절을 남긴 뒤 러너 화면에서 허용돼 닫힌 대기에는 거절을 보내지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const permissionId = h.runner(runnerId).requestPermission(worktreeOf(run), "Bash: ls");
+    await worker.tick();
+    denyPermissionWait(h.db, { runId: run.id, permissionId, reason: "아니요" }, h.now);
+    h.runner(runnerId).allowPermission(worktreeOf(run), permissionId);
+
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).denials).toEqual([]);
+  });
+
   it("런이 끝나면 열린 권한 대기를 닫는다", async () => {
     const { run, runnerId, worker } = await startOne();
     h.runner(runnerId).requestPermission(worktreeOf(run), "Bash: make");
@@ -450,6 +462,31 @@ describe("실제 상태를 읽지 못함", () => {
     await worker.tick();
     expect(ended(run).agentResult).toBe("timed-out");
     expect(agentOf(run, runnerId).agentStopped).toBe(true);
+  });
+
+  it("폴링 오류 중 멈춘 뒤 기록하지 못해도 다음 바퀴에 시간 초과로 기록한다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const poll = vi
+      .spyOn(h.runner(runnerId), "pollRun")
+      .mockRejectedValueOnce(
+        new AdapterError<RunnerErrorDetail>({ kind: "malformed-output", raw: "?" }),
+      );
+    h.advance(DEFAULT_MAX_RUN_MS);
+    const stop = vi.spyOn(h.runner(runnerId), "stopAgent");
+    // 멈춘 뒤 두 축 쓰기가 실패한다(쓰기 잠금 등).
+    h.db.$client.exec(
+      "CREATE TRIGGER fail_end BEFORE UPDATE OF state ON runs BEGIN SELECT RAISE(ABORT, 'locked'); END",
+    );
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(stop).toHaveBeenCalledTimes(1);
+
+    h.db.$client.exec("DROP TRIGGER fail_end");
+    poll.mockRestore();
+    // 멈춘 에이전트는 러너에서 보고 없이 사라진 것으로 보인다.
+    await worker.tick();
+    expect(ended(run).agentResult).toBe("timed-out");
+    expect(stop).toHaveBeenCalledTimes(1);
   });
 
   it("폴링 오류가 이어져도 취소 요청은 에이전트를 멈추고 끝낸다", async () => {
