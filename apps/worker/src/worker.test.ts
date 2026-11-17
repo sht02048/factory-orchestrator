@@ -1,5 +1,5 @@
-import { summarizeRunOutcome } from "@factory/core";
-import type { PrState, Runner, WorktreeRef } from "@factory/core";
+import { AdapterError, summarizeRunOutcome } from "@factory/core";
+import type { PrState, RetryToken, Runner, RunnerErrorDetail, WorktreeRef } from "@factory/core";
 import { getRun, getRunWithRecords } from "@factory/db";
 import type { StoredRun } from "@factory/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -213,24 +213,29 @@ describe("재시작 안전", () => {
     expect(h.runner(runnerA).worktrees.size).toBe(1);
   });
 
-  it("러너에 시작을 보낸 뒤 Running을 쓰기 전에 죽어도 다시 띄우면 같은 시작을 잇는다", async () => {
+  it("러너가 시작 결과를 모른다고 답하면 데몬을 다시 띄운 뒤 러너가 준 값으로 같은 시작을 다시 보낸다", async () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 2, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
+    const sent: Array<RetryToken | undefined> = [];
 
-    h.wrapRunner = (fake) => diesAfterStart(fake);
+    h.wrapRunner = (fake) => outcomeUnknownAfterStart(fake, sent);
     const first = h.worker();
     await first.tick();
     await first.close();
     expect(stateOf(run)).toBe("queued");
     expect(h.runner(runnerA).worktrees.size).toBe(1);
     const [startedWorktree] = h.runner(runnerA).worktrees.keys();
+    const saved = getRunWithRecords(h.db, run.id)?.records.retryToken ?? null;
+    expect(saved).not.toBeNull();
 
-    h.wrapRunner = (fake) => fake;
+    h.wrapRunner = (fake) => recordingStarts(fake, sent);
     const second = h.worker();
     await second.tick();
     expect(stateOf(run)).toBe("running");
     expect(worktreeOf(run)).toBe(startedWorktree);
     expect(h.runner(runnerA).worktrees.size).toBe(1);
+    // 첫 시작에는 다시 보내기 값을 보내지 않고, 다시 보낼 때만 러너가 준 값을 보낸다.
+    expect(sent).toEqual([undefined, saved]);
   });
 });
 
@@ -256,16 +261,33 @@ describe("startWorker", () => {
   });
 });
 
-/** 러너에 시작을 보내고 응답을 DB에 쓰기 전에 데몬이 죽은 것처럼 던진다. */
-function diesAfterStart(runner: Runner): Runner {
+/** startRun에 보낸 다시 보내기 값을 모은다. */
+function recordingStarts(runner: Runner, sent: Array<RetryToken | undefined>): Runner {
+  return delegate(runner, (input) => {
+    sent.push(input.retryToken);
+    return runner.startRun(input);
+  });
+}
+
+/** 러너가 시작은 했지만 응답을 잃어 결과를 모른다고 답한 경우(start-outcome-unknown). */
+function outcomeUnknownAfterStart(runner: Runner, sent: Array<RetryToken | undefined>): Runner {
+  return delegate(runner, async (input) => {
+    sent.push(input.retryToken);
+    const started = await runner.startRun(input);
+    if (started.retryToken === null) throw new Error("fake runner gave no retry token");
+    throw new AdapterError<RunnerErrorDetail>({
+      kind: "start-outcome-unknown",
+      retryToken: started.retryToken,
+    });
+  });
+}
+
+function delegate(runner: Runner, startRun: Runner["startRun"]): Runner {
   return {
     kind: runner.kind,
     checkHealth: () => runner.checkHealth(),
     listProjects: () => runner.listProjects(),
-    startRun: async (input) => {
-      await runner.startRun(input);
-      throw new Error("worker died before writing Running");
-    },
+    startRun,
     pollRun: (worktree) => runner.pollRun(worktree),
     stopAgent: (worktree) => runner.stopAgent(worktree),
     readLogTail: (worktree, opts) => runner.readLogTail(worktree, opts),

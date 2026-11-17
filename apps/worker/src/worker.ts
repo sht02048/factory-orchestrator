@@ -110,6 +110,7 @@ export function createWorker(options: WorkerOptions): Worker {
       return running;
     },
     close: async () => {
+      if (closed) return;
       closed = true;
       if (running !== null) await running.catch(() => undefined);
       db.$client.close();
@@ -200,7 +201,10 @@ async function pollRun(
  * 런의 러너 쪽 프로젝트를 저장소로 읽는 코드 호스트가 없으면 이을 PR이 없으니 없음이다.
  */
 async function decideRunPrState(context: TickContext, run: ActiveRun): Promise<PrStateDecision> {
-  for (const codeHost of context.adapters.allCodeHosts(context.db)) {
+  const codeHosts = context.adapters.allCodeHosts(context.db, (connectionId, error) =>
+    context.logger.warn("could not create code host adapter", { connectionId, error }),
+  );
+  for (const codeHost of codeHosts) {
     const repo = codeHost.repoOf(run.runnerProject);
     if (repo === null) continue;
     const [byBranch, byTicketKey] = await Promise.all([
@@ -257,10 +261,10 @@ function toQueuedRun(run: StoredRun): QueuedRun[] {
 /**
  * Queued 런 하나를 러너에서 시작하고 Running으로 바꾼다. 시작했으면 true다.
  *
- * 재시작 안전(ADR 0002·0005): 러너에 시작을 보내기 전에 다시 보내기 값(retryToken)을 DB에 먼저 쓴다.
- * 시작을 보낸 뒤 Running을 쓰기 전에 데몬이 죽으면, 다음 바퀴에 런은 아직 Queued이고 같은 값으로
- * 다시 보내 러너가 같은 시작을 돌려준다. 러너가 결과를 모른다고 답하면(start-outcome-unknown)
- * 러너가 준 값으로 바꿔 두고 다음 바퀴에 다시 보낸다.
+ * 재시작 안전(ADR 0002·0005): 상태는 DB에만 있다. Running을 쓴 뒤에 데몬이 죽으면 다시 떠도 그 런은
+ * 대기열에 없어 다시 시작하지 않는다. 러너가 시작 결과를 모른다고 답하면(start-outcome-unknown)
+ * 러너가 준 다시 보내기 값(retryToken)을 DB에 써 두고, 다음 바퀴에(데몬을 다시 띄운 뒤라도) 그 값으로
+ * 같은 시작을 다시 보낸다. 다시 보내기 값은 러너가 발급한 것만 보낸다(core StartRunInput).
  */
 async function startQueuedRun(context: TickContext, choice: RunnerChoice): Promise<boolean> {
   const { db, now, logger, adapters } = context;
@@ -271,21 +275,18 @@ async function startQueuedRun(context: TickContext, choice: RunnerChoice): Promi
 
   const storedRunner = findRunner(db, choice.runnerId);
   if (storedRunner === undefined) return false;
-  const tracker = adapters.tracker(db, run.ticket.connection);
-  if (tracker === null) {
-    logger.warn("run's tracker connection is not registered", { runId: run.id });
-    return false;
-  }
 
   try {
+    const tracker = adapters.tracker(db, run.ticket.connection);
+    if (tracker === null) {
+      logger.warn("run's tracker connection is not registered", { runId: run.id });
+      return false;
+    }
     const ticket = await tracker.getTicket(run.ticket.key);
     if (ticket === null) {
       logger.warn("run's ticket was not found in the tracker", { runId: run.id });
       return false;
     }
-
-    const retryToken = records.retryToken ?? toRetryToken(`run-${run.id}`);
-    if (records.retryToken === null) updateRunRecords(db, run.id, { retryToken });
 
     const started = await adapters.runner(storedRunner).startRun({
       project: run.runnerProject,
@@ -295,8 +296,16 @@ async function startQueuedRun(context: TickContext, choice: RunnerChoice): Promi
       // 에이전트에게는 티켓만 지시로 준다(GLOSSARY Agent).
       prompt: `${ticket.title}\n\n${ticket.body}`,
       ticket: { key: ticket.key, url: ticket.url },
-      retryToken,
+      ...(records.retryToken === null ? {} : { retryToken: records.retryToken }),
     });
+    if (started.branch !== run.branch) {
+      // PR 1순위 찾기는 런의 브랜치로 한다(Q40). 러너가 다른 브랜치를 쓰면 티켓 키로만 잇는다.
+      logger.warn("runner started the run on another branch", {
+        runId: run.id,
+        expected: run.branch,
+        actual: started.branch,
+      });
+    }
 
     return inTransaction(db, () => {
       const result = changeRunState(

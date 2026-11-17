@@ -1,12 +1,14 @@
+import { createHash } from "node:crypto";
 import type {
   AdapterRegistry,
   CodeHost,
   Runner,
+  RunnerId,
   Tracker,
   TrackerConnectionId,
 } from "@factory/core";
 import { getTrackerConnection, listCodeHostConnections } from "@factory/db";
-import type { Database, SecretBox, StoredRunner } from "@factory/db";
+import type { CodeHostConnectionId, Database, SecretBox, StoredRunner } from "@factory/db";
 
 /**
  * DB에 저장한 설정으로 어댑터를 만들고 들고 있는다. 어느 종류의 어댑터를 만들지는 저장한 종류(kind)로
@@ -19,9 +21,9 @@ import type { Database, SecretBox, StoredRunner } from "@factory/db";
 export class WorkerAdapters {
   private readonly registry: AdapterRegistry;
   private readonly secretBox: SecretBox;
-  private readonly runners = new Map<string, Cached<Runner>>();
-  private readonly trackers = new Map<string, Cached<Tracker>>();
-  private readonly codeHosts = new Map<string, Cached<CodeHost>>();
+  private readonly runners = new Map<RunnerId, Cached<Runner>>();
+  private readonly trackers = new Map<TrackerConnectionId, Cached<Tracker>>();
+  private readonly codeHosts = new Map<CodeHostConnectionId, Cached<CodeHost>>();
 
   constructor(registry: AdapterRegistry, secretBox: SecretBox) {
     this.registry = registry;
@@ -44,13 +46,26 @@ export class WorkerAdapters {
     );
   }
 
-  /** 등록한 코드 호스트 연결 전부. 만든 순서다. */
-  allCodeHosts(db: Database): CodeHost[] {
-    return listCodeHostConnections(db, this.secretBox).map((stored) => {
+  /**
+   * 등록한 코드 호스트 연결 전부. 만든 순서다. 어댑터를 만들지 못한 연결(등록하지 않은 종류,
+   * 설정 오류)은 `onError`로 알리고 건너뛰어 다른 연결로 PR을 찾게 한다.
+   */
+  allCodeHosts(
+    db: Database,
+    onError: (id: CodeHostConnectionId, error: unknown) => void,
+  ): CodeHost[] {
+    return listCodeHostConnections(db, this.secretBox).flatMap((stored) => {
       const config = { config: stored.config, secrets: stored.secrets };
-      return reuse(this.codeHosts, stored.id, { kind: stored.kind, config }, () =>
-        this.registry.createCodeHost(stored.kind, config),
-      );
+      try {
+        return [
+          reuse(this.codeHosts, stored.id, { kind: stored.kind, config }, () =>
+            this.registry.createCodeHost(stored.kind, config),
+          ),
+        ];
+      } catch (error) {
+        onError(stored.id, error);
+        return [];
+      }
     });
   }
 }
@@ -60,13 +75,14 @@ interface Cached<A> {
   adapter: A;
 }
 
-function reuse<A>(
-  cache: Map<string, Cached<A>>,
-  id: string,
+function reuse<Id extends string, A>(
+  cache: Map<Id, Cached<A>>,
+  id: Id,
   settings: { kind: string; config: unknown },
   create: () => A,
 ): A {
-  const key = JSON.stringify(settings);
+  // 설정에 복호화한 비밀값이 들어 있어 원문 대신 해시로 비교한다.
+  const key = createHash("sha256").update(JSON.stringify(settings)).digest("hex");
   const cached = cache.get(id);
   if (cached?.key === key) return cached.adapter;
   const adapter = create();
