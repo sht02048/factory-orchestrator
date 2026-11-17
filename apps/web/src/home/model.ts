@@ -73,6 +73,8 @@ export type HomeRun =
       prState: PrState;
       /** core summarizeRunOutcome 으로 계산한 값 */
       summary: SummaryOutcome;
+      /** 런이 끝난 뒤 사람이 PR 을 병합하거나 닫았다(이후 PR 상태, Q54·Q69) */
+      prSettledLater: boolean;
     });
 
 /** GitHub 인증이 깨져 할당에서 빠진 러너(Q82.14·Q82.15) */
@@ -111,7 +113,8 @@ export function needsAttention(run: HomeRun): boolean {
     case "disconnected":
       return true;
     case "ended":
-      return run.summary === "human-check" || run.summary === "failed";
+      // Human Check 런은 사람이 PR 을 병합하거나 닫으면 뺀다. 요약 결과는 그대로다(Q54·Q89).
+      return (run.summary === "human-check" && !run.prSettledLater) || run.summary === "failed";
     case "queued":
     case "running":
       return false;
@@ -122,7 +125,7 @@ export function needsAttention(run: HomeRun): boolean {
  * 홈의 세 구역으로 나눈다.
  *
  * - 손댈 일: GitHub 인증이 깨진 러너, 입력 기다림·연결 끊김 런, 요약 결과가 Human Check·Failed 인 Ended 런.
- *   Ended 런은 티켓마다 마지막 런만 본다(시안 B). 같은 티켓에 새 런이 있으면 지난 결과는 손댈 일이 아니다.
+ *   Ended 런은 티켓마다 마지막 런만 본다(시안 B, Q88). 같은 티켓에 새 런이 있으면 지난 결과는 손댈 일이 아니다.
  * - 실행 중: Running 런
  * - Queued: Queued 런, 들어온 순서
  *

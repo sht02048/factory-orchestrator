@@ -120,6 +120,7 @@ export function loadHomePage(db: Database, ws: string | undefined, now: Date): H
           agentResult: run.agentResult,
           prState: run.prState,
           summary: summarizeRunOutcome(run.agentResult, run.prState).outcome,
+          prSettledLater: (records?.laterPrState ?? null) !== null,
         };
     }
   };

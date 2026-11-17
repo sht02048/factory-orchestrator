@@ -5,7 +5,7 @@ import {
   toTrackerProjectId,
   toWorktreeRef,
 } from "@factory/core";
-import { assignRun, changeRunState } from "@factory/db";
+import { assignRun, changeRunState, updateRunRecords } from "@factory/db";
 import type { Database } from "@factory/db";
 import { describe, expect, it } from "vitest";
 import {
@@ -120,6 +120,20 @@ describe("loadHomePage", () => {
     const page = loadHomePage(db, "ws-commerce", now);
     expect(attentionKeys(page.attention)).not.toContain("ACME-3");
     expect(keys(page.queued)).toContain("ACME-3");
+  });
+
+  it("Human Check 런은 사람이 PR 을 병합하거나 닫으면 손댈 일에서 빠진다(Q89)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-2");
+    if (id === undefined) throw new Error("ACME-2 missing");
+    updateRunRecords(db, id, { laterPrState: { state: "merged", at: minutes(110) } });
+    const page = loadHomePage(db, "ws-commerce", now);
+    expect(attentionKeys(page.attention)).not.toContain("ACME-2");
+    // Failed 런은 이후 PR 상태와 상관없이 남는다
+    const failedId = ids.get("ACME-5");
+    if (failedId === undefined) throw new Error("ACME-5 missing");
+    updateRunRecords(db, failedId, { laterPrState: { state: "closed", at: minutes(110) } });
+    expect(attentionKeys(loadHomePage(db, "ws-commerce", now).attention)).toContain("ACME-5");
   });
 
   it("전체에서는 모든 Workspace 의 손댈 일만 담는다(ADR 0006)", () => {
