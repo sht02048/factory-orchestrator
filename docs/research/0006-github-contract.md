@@ -50,7 +50,7 @@ classic 계열 토큰으로는 check run이 이름·상태·결론까지 온다 
    GITHUB_TOKEN=<fine-grained PAT> docs/research/fixtures/0006/check-status-rollup.sh <owner> <repo> <pr-number>
    ```
 
-3. `contexts.nodes`에 `__typename: "CheckRun"`이 `status`·`conclusion`과 함께 오면 "온다"다. `statusCheckRollup`이 `null`이거나, `StatusContext`만 오거나, `errors`에 권한 오류가 있으면 "안 온다"다. 스크립트는 응답 헤더 중 `x-accepted-github-permissions`도 보여 준다. 결과를 이 절에 적는다.
+3. `contexts.nodes`에 `__typename: "CheckRun"`이 `status`·`conclusion`과 함께 오면 "온다"다. `statusCheckRollup`이 `null`이거나, `StatusContext`만 오거나, `errors`에 권한 오류가 있으면 "안 온다"다. `repository`나 `pullRequest`가 `null`이고 `NOT_FOUND` 오류가 오면 check run 문제가 아니라 PAT의 저장소 선택에 대상 저장소가 빠진 것이므로 그것부터 고친다. 스크립트는 응답 헤더 중 `x-accepted-github-permissions`도 보여 준다. 이 헤더는 REST 응답에 오는 것으로 문서화돼 있어 GraphQL 응답에는 오지 않을 수 있다. 결과를 이 절에 적는다.
 
 판정은 PR 상태만 쓰므로 이 항목은 판정을 막지 않는다. 막는 것은 화면의 CI 보조 정보와 온보딩의 토큰 권한 안내다(research 0002 C.4).
 
@@ -76,7 +76,42 @@ classic 계열 토큰으로는 check run이 이름·상태·결론까지 온다 
 
 - **`headRefName`은 정확히 일치해야 한다** **[실행]**. 에이전트가 오케스트레이터 브랜치를 push하지 않고 다른 브랜치로 PR을 열면(#2~#4) 1순위는 빈 목록이다.
 - **키 검색은 PR 제목과 본문만 본다** **[실행]**. 키가 브랜치 이름에만 있으면(#9의 `ENG-127`) 검색 결과가 없다. 브랜치는 `head:` 한정자로 따로 찾을 수 있지만 접두어 일치다(`head:factory`가 `factory/...` 셋을, `head:factory/ENG-123`이 `factory/ENG-123-1`을 찾았다). 접두어 일치라 `head:factory/ENG-12`가 `ENG-123`도 찾게 되므로 키 검색에 쓰지 않는다.
-- **브랜치 이름을 바꾸면 원래 PR이 닫힌다** **[실행]**. API(`POST /repos/{owner}/{repo}/branches/{branch}/rename`)로 head 브랜치 이름을 바꾸자 PR #7에 `HeadRefDeletedEvent`와 `ClosedEvent`가 붙고 `state: CLOSED`, `merged: false`가 됐다. `headRefName`은 옛 이름으로 남아, 옛 이름으로 조회하면 닫힌 PR이 나오고 새 이름으로는 아무것도 안 나온다. 응답: [`fixtures/0006/pr-by-branch-after-rename.json`](fixtures/0006/pr-by-branch-after-rename.json). 로컬에서 `git branch -m` 후 새 이름을 push하고 옛 브랜치를 지워도 head 브랜치가 지워지는 것은 같으므로 같은 결과로 본다(이 경로는 따로 돌리지 않았다).
+- **브랜치 이름을 바꾸면 원래 PR이 닫힌다** **[실행]**. API(`POST /repos/{owner}/{repo}/branches/{branch}/rename`)로 head 브랜치 이름을 바꾸자 PR #7에 `HeadRefDeletedEvent`와 `ClosedEvent`가 붙고 `state: CLOSED`, `merged: false`가 됐다. `headRefName`은 옛 이름으로 남아, 옛 이름으로 조회하면 닫힌 PR이 나오고 새 이름으로는 아무것도 안 나온다. 응답: [`fixtures/0006/pr-by-branch-after-rename.json`](fixtures/0006/pr-by-branch-after-rename.json). 이 픽스처는 research 0002 C.2 `RunPr` 응답이 아니라, 닫힌 까닭을 보려고 따로 보낸 아래 쿼리의 응답이다. `commits`·`mergeStateStatus`·`rateLimit`은 묻지 않았다.
+
+```graphql
+query PrByBranchAfterRename($owner: String!, $repo: String!, $branch: String!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(headRefName: $branch, first: 5, orderBy: { field: CREATED_AT, direction: DESC }) {
+      nodes {
+        number
+        url
+        state
+        merged
+        mergedAt
+        closedAt
+        headRefName
+        headRefOid
+        baseRefName
+        isCrossRepository
+        headRepository {
+          nameWithOwner
+        }
+        timelineItems(last: 2, itemTypes: [CLOSED_EVENT, HEAD_REF_DELETED_EVENT]) {
+          nodes {
+            __typename
+            ... on HeadRefDeletedEvent {
+              headRefName
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+로컬에서 `git branch -m` 후 새 이름을 push하고 옛 브랜치를 지워도 head 브랜치가 지워지는 것은 같으므로 같은 결과로 본다(이 경로는 따로 돌리지 않았다).
+
 - **본문 언급은 거짓 양성이 된다** **[실행]**. 다른 일을 하는 PR이 본문에서 키를 언급하면(#6) 검색에 걸린다. 제목에 키가 있는 PR과 본문에만 있는 PR은 검색 결과만으로 구분할 수 없다.
 
 ### 충분한가
@@ -157,7 +192,7 @@ repo:<owner>/<repo> is:pr "<티켓 키>" in:title,body created:>=<런 시작 시
 
 1. 제목·본문에서 키를 낱말 경계로 다시 찾는다. 예: 대소문자 무시 `(?<![A-Za-z0-9])ENG-123(?![A-Za-z0-9])`. 검색 문법이 바뀌거나 `ISSUE` 검색으로 돌아가도 거짓 양성(#8)이 판정까지 들어오지 않는다.
 2. research 0002 C.2처럼 `isCrossRepository: false`, `headRepository.nameWithOwner`, `baseRefName`을 확인한다.
-3. 17절 규칙대로 고른다.
+3. 검색 결과는 관련도 순이므로 `createdAt`으로 다시 정렬한 뒤 17절 규칙대로 고른다.
 
 응답 예: [`fixtures/0006/search-by-key-advanced.json`](fixtures/0006/search-by-key-advanced.json).
 
@@ -198,13 +233,13 @@ GraphQL에도 분당 2,000점 secondary limit이 있다(research 0002 C.5). 이 
 
 `docs/research/fixtures/0006/`에 둔다. 값은 가상 값으로 바꿨다.
 
-| 파일                                     | 내용                                                         |
-| ---------------------------------------- | ------------------------------------------------------------ |
-| `search-by-key-advanced.json`            | 20절 쿼리 응답. 진짜 대상(#1)과 본문 언급 거짓 양성(#6)      |
-| `search-by-key-issue-token-match.json`   | `ISSUE` 검색 응답. 낱말 일치 거짓 양성(#8)까지 포함          |
-| `pr-by-branch-after-rename.json`         | 브랜치 이름을 바꾼 뒤 옛 이름으로 조회한 닫힌 PR             |
-| `status-check-rollup-classic-token.json` | classic 계열 토큰의 `statusCheckRollup` 응답(15절 비교 기준) |
-| `check-status-rollup.sh`                 | 15절 확인 스크립트. 토큰은 `GITHUB_TOKEN` 환경 변수로 받는다 |
+| 파일                                     | 내용                                                                                |
+| ---------------------------------------- | ----------------------------------------------------------------------------------- |
+| `search-by-key-advanced.json`            | 20절 쿼리 응답. 진짜 대상(#1)과 본문 언급 거짓 양성(#6)                             |
+| `search-by-key-issue-token-match.json`   | `ISSUE` 검색 응답. 낱말 일치 거짓 양성(#8)까지 포함                                 |
+| `pr-by-branch-after-rename.json`         | 브랜치 이름을 바꾼 뒤 옛 이름으로 조회한 닫힌 PR. 17절 `PrByBranchAfterRename` 응답 |
+| `status-check-rollup-classic-token.json` | classic 계열 토큰의 `statusCheckRollup` 응답(15절 비교 기준)                        |
+| `check-status-rollup.sh`                 | 15절 확인 스크립트. 토큰은 `GITHUB_TOKEN` 환경 변수로 받는다                        |
 
 ## 남은 것
 

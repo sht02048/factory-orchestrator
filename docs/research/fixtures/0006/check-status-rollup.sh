@@ -48,20 +48,27 @@ body=$(jq -n --arg q "$query" --arg owner "$owner" --arg repo "$repo" --argjson 
   '{query: $q, variables: {owner: $owner, repo: $repo, number: $number}}')
 
 hdr=$(mktemp)
-trap 'rm -f "$hdr"' EXIT
+res=$(mktemp)
+trap 'rm -f "$hdr" "$res"' EXIT
 
 # 토큰은 프로세스 인자에 남지 않게 stdin으로 헤더를 넘긴다.
+# 실패해도 헤더와 응답을 먼저 보여 주고 curl 종료 코드로 끝낸다.
+status=0
 printf 'Authorization: bearer %s\n' "$GITHUB_TOKEN" |
   curl -sS -X POST https://api.github.com/graphql \
     -H @- \
     -H "Content-Type: application/json" \
     -D "$hdr" \
-    -d "$body" | jq .
+    -o "$res" \
+    -d "$body" || status=$?
 
 grep -iE '^(HTTP|x-accepted-github-permissions|x-ratelimit-)' "$hdr" >&2 || true
+jq . "$res" 2>/dev/null || cat "$res"
+exit "$status"
 
 # 읽는 법:
 # - contexts.nodes에 __typename "CheckRun"이 status/conclusion과 함께 오면 15번은 "온다"다.
+# - repository나 pullRequest가 null이고 NOT_FOUND 오류가 오면 PAT의 저장소 선택부터 확인한다.
 # - statusCheckRollup이 null이거나, CheckRun 노드 없이 StatusContext만 오거나,
 #   errors에 FORBIDDEN이 있으면 "check run은 안 온다"다. 이때 응답과
 #   x-accepted-github-permissions 헤더를 research 0006 15절에 적는다.
