@@ -1,0 +1,32 @@
+{
+  "id": "00000000-0000-4000-8000-000000000030",
+  "ok": true,
+  "result": {
+    "projects": [
+      {
+        "id": "github:acme/sandbox",
+        "displayName": "sandbox",
+        "badgeColor": "#737373",
+        "kind": "git",
+        "providerIdentity": {
+          "provider": "github",
+          "owner": "acme",
+          "repo": "sandbox"
+        },
+        "gitRemoteIdentity": {
+          "canonicalKey": "github.com/acme/sandbox",
+          "remoteName": "origin",
+          "remoteUrl": "https://github.com/acme/sandbox.git"
+        },
+        "sourceRepoIds": [
+          "00000000-0000-4000-8000-000000000002"
+        ],
+        "createdAt": 1790000040312,
+        "updatedAt": 1790000040312
+      }
+    ]
+  },
+  "_meta": {
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
+  }
+}

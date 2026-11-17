@@ -1,0 +1,105 @@
+{
+  "id": "00000000-0000-4000-8000-000000000009",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_00000000-0000-4000-8000-000000000004",
+      "status": "running",
+      "tail": [
+        " ▐▛███▛█   Claude Code v2.1.319",
+        " ▝▝   ▝▝   <path>/workspaces/sandbox/fo-verify-w1",
+        "❯ Test task. Do not push and do not open a PR.",
+        "  Run exactly this Bash command: echo \"a b $HOME 'c' \\\\ !x\" > note.txt",
+        "  Then reply DONE. 한국어 줄: 끝나면 멈춰요.",
+        "  Ran 1 shell command",
+        "⏺ DONE",
+        "  The Bash command ran, but the shell reported (eval):1: command not found: b. The backticks around b in the",
+        "  double-quoted string were run as a command substitution, so b was executed and failed. note.txt was still written in",
+        "  the worktree, but it contains the substituted output for `b` (empty) rather than a literal backtick-b. I did not push",
+        "  or open a PR.",
+        "  한국어: 끝났어요. 여기서 멈춥니다.",
+        "✻ Baked for 9s · done <time>",
+        "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "❯",
+        "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+      ],
+      "truncated": false,
+      "limited": false,
+      "oldestCursor": "0",
+      "nextCursor": "1",
+      "latestCursor": "1",
+      "returnedLineCount": 16,
+      "tailRows": [
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 74
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 50
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 76
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        }
+      ],
+      "source": "screen",
+      "draft": "cat note.txt"
+    }
+  },
+  "_meta": {
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
+  }
+}

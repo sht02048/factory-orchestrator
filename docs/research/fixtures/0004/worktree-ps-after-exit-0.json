@@ -1,0 +1,80 @@
+{
+  "id": "00000000-0000-4000-8000-000000000013",
+  "ok": true,
+  "result": {
+    "worktrees": [
+      {
+        "workspaceKind": "git",
+        "worktreeId": "00000000-0000-4000-8000-000000000002::<path>/workspaces/sandbox/fo-verify-w1",
+        "repoId": "00000000-0000-4000-8000-000000000002",
+        "hostId": "local",
+        "identity": {
+          "key": "wt2:local:00000000-0000-4000-8000-000000000003",
+          "executionHostId": "local",
+          "instanceId": "00000000-0000-4000-8000-000000000003"
+        },
+        "terminalPlatform": "darwin",
+        "repo": "sandbox",
+        "path": "<path>/workspaces/sandbox/fo-verify-w1",
+        "branch": "refs/heads/acme/fo-verify-w1",
+        "isArchived": false,
+        "isMainWorktree": false,
+        "hasHostSidebarActivity": true,
+        "defaultBranch": false,
+        "cliCreated": true,
+        "worktreeInstanceId": "00000000-0000-4000-8000-000000000003",
+        "parentWorktreeId": null,
+        "childWorktreeIds": [],
+        "workspaceLineage": null,
+        "displayName": "fo-verify-w1",
+        "workspaceStatus": "in-progress",
+        "sortOrder": 1790000053391,
+        "lastActivityAt": 1790000053443,
+        "createdAt": 1790000053390,
+        "creatorProvenance": {
+          "kind": "host"
+        },
+        "linkedIssue": null,
+        "linkedPR": null,
+        "linkedLinearIssue": null,
+        "linkedGitLabMR": null,
+        "linkedGitLabIssue": null,
+        "linkedItems": [],
+        "comment": "",
+        "isPinned": false,
+        "isActive": false,
+        "unread": false,
+        "liveTerminalCount": 1,
+        "hasAttachedPty": true,
+        "unverifiableTerminalCount": 0,
+        "lastOutputAt": 1790000100578,
+        "preview": "sh'\n/exitBB\nResume this session with:\nclaude --resume 00000000-0000-4000-8000-000000000014\n<user>@<host> fo-verify-w1 %",
+        "status": "active",
+        "agents": [],
+        "sidebarStatus": "active",
+        "terminalVerdict": "live",
+        "environment": {
+          "id": "local",
+          "name": "local"
+        },
+        "parent": null,
+        "address": {
+          "environment": "local",
+          "worktree": "identity:wt2:local:00000000-0000-4000-8000-000000000003",
+          "line": "--environment local --worktree identity:wt2:local:00000000-0000-4000-8000-000000000003"
+        }
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "totalCount": 1,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "00000000-0000-4000-8000-000000000007"
+  }
+}
