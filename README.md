@@ -51,6 +51,7 @@ The orchestrator is a self-hosted tool. One operator runs one installation on th
 
 - `apps/web` and `apps/worker` run on the same machine and share one SQLite file.
 - A runner is an Orca environment that the orchestrator can reach over ssh.
+- The orchestrator does not change your projects' agent settings. We recommend adding a rule to each project's agent instructions (for example, `AGENTS.md`) to put the ticket key in the pull request title. Otherwise, if an agent opens the pull request from a branch other than the one the orchestrator created (including by renaming that branch), the orchestrator may not find it and may record the run's pull request as missing or closed.
 - Tracker connections, the GitHub token, runners, workspaces, and mappings are set up in web onboarding on first launch. Tokens are stored encrypted in the database.
 - `.env` holds only the minimum values needed to boot: port, bind address, data path, and encryption key. Copy [`.env.example`](./.env.example) to `.env` and replace the values with your own. Generate the encryption key with `openssl rand -base64 32`. `packages/db` parses these values from the shell environment (`parseBootConfig`), but nothing loads `.env` automatically yet.
 

@@ -71,7 +71,8 @@
   const ticketInWs = (t) => ws === "all" || FO.workspaceOfProject(t.project).id === ws;
 
   /* ---------- 런 상태 ---------- */
-  const failLabel = { agent: "에이전트 오류", runner: "러너 연결 끊김", closed: "PR이 닫힘" };
+  /* Failed가 된 까닭은 두 축(에이전트 결과 · PR 상태)으로 보인다 */
+  const failLabel = { agent: "오류 종료 · PR 없음", runner: "러너 연결 끊김 · PR 없음", closed: "정상 종료 · PR 닫힘" };
   const resultLabel = { merged: "Merged", check: "Human Check", failed: "Failed" };
 
   function tone(run) {
@@ -82,14 +83,14 @@
 
   function label(run) {
     if (run.state === "queued") return "Queued";
-    if (run.state === "running") return "진행 중";
+    if (run.state === "running") return "실행 중";
     return resultLabel[run.result];
   }
 
   /* 행 아래 한 줄 이유 */
   function shortWhy(run) {
     if (run.result === "check") return run.pr.ci === "failed" ? `PR #${run.pr.number} 열림 · CI 실패` : `PR #${run.pr.number} 열림 · 확인이 필요해요`;
-    if (run.result === "failed") return failLabel[run.failReason];
+    if (run.result === "failed") return failLabel[run.failCase];
     if (run.state === "running") return run.step;
     if (run.state === "queued") return run.reason;
     return `PR #${run.pr.number} 병합`;
@@ -169,8 +170,8 @@
     if (run.pr) list.push({ time: "", label: `${josa(`PR #${run.pr.number}`, "을/를")} 열었어요`, detail: "" });
     if (run.state === "running") list.push({ time: "지금", label: run.step, detail: "" });
     if (run.state === "done") {
-      const tail = { merged: "PR을 병합하고 끝났어요", check: "PR이 열린 채 끝났어요", failed: `${josa(failLabel[run.failReason], "으로/로")} 끝났어요` }[run.result];
-      list.push({ time: run.ended, label: tail, detail: "", tone: run.result === "merged" ? "" : run.result });
+      const tail = { merged: "PR을 병합하고 끝났어요", check: "PR이 열린 채 끝났어요", failed: "Failed로 끝났어요" }[run.result];
+      list.push({ time: run.ended, label: tail, detail: run.result === "failed" ? failLabel[run.failCase] : "", tone: run.result === "merged" ? "" : run.result });
     }
     return list;
   }
@@ -179,7 +180,7 @@
     const prBtn = (primary) => `<a class="btn ${primary ? "btn-primary" : ""}" href="https://github.example.com/acme/pull/${run.pr.number}" target="_blank" rel="noreferrer">PR #${run.pr.number} 열기${icon.external}</a>`;
     const rerun = (primary) => `<button class="btn ${primary ? "btn-primary" : ""}" type="button" data-toast="새 런을 시작했어요. 대기열에 넣었어요">새 런 시작</button>`;
     if (run.result === "check") return prBtn(true) + rerun(false);
-    if (run.result === "failed") return rerun(true) + (run.failReason === "runner" ? `<a class="btn" href="runners.html?sel=${run.runner}">${run.runner} 보기</a>` : "");
+    if (run.result === "failed") return rerun(true) + (run.failCase === "runner" ? `<a class="btn" href="runners.html?sel=${run.runner}">${run.runner} 보기</a>` : "");
     if (run.state === "queued" && !FO.runner(run.runner).online) return `<a class="btn" href="runners.html?sel=${run.runner}">${run.runner} 보기</a>`;
     if (run.result === "merged") return prBtn(false);
     if (run.state === "running" && run.pr) return prBtn(false);
