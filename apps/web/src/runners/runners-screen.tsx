@@ -18,14 +18,14 @@ import {
   TableRows,
   Text,
 } from "@factory/ui";
-import { colors, space } from "@factory/ui/tokens.stylex";
+import { colors, fonts, space } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useFormatDuration } from "../format/duration";
-import type { RunWorkspace, RunnerView, RunnersPage } from "./model";
+import type { GitHubAuthCheck, RunWorkspace, RunnerView, RunnersPage } from "./model";
 
 // 러너 | 상태 | 사용 중 | Queued | 남은 워크트리 | 마지막 확인
-const columns = "minmax(0, 1fr) 96px 80px 72px 104px 96px";
+const columns = "minmax(0, 1fr) 112px 80px 72px 104px 96px";
 
 export interface RunnersScreenProps {
   page: RunnersPage;
@@ -102,7 +102,14 @@ function RunnerRow({ runner }: { runner: RunnerView }) {
         </span>
       </TableCell>
       <TableCell>
-        <OnlineState online={runner.online} />
+        <span {...stylex.props(styles.titleCell)}>
+          <OnlineState online={runner.online} />
+          {runner.assignmentBlocked ? (
+            <Text variant="meta" truncate>
+              {t("assignmentBlocked")}
+            </Text>
+          ) : null}
+        </span>
       </TableCell>
       <TableCell align="end" numeric>
         {t("load", { occupied: runner.occupying.length, capacity: runner.capacity })}
@@ -141,6 +148,7 @@ function RunnerPanel({ runner }: { runner: RunnerView }) {
 
   let reason: string;
   if (!runner.online) reason = t("reason.offline");
+  else if (runner.assignmentBlocked) reason = t("reason.assignmentBlocked");
   else if (free === 0) reason = t("reason.full", { capacity: runner.capacity });
   else reason = t("reason.free", { capacity: runner.capacity, free });
 
@@ -219,6 +227,7 @@ function RunnerPanel({ runner }: { runner: RunnerView }) {
           </ul>
         </PanelBlock>
       )}
+      <GitHubAuthBlock runner={runner} />
       <PanelBlock title={t("projects", { count: runner.projects.length })}>
         {runner.projects.length === 0 ? (
           <Text variant="meta">{t("noProjects")}</Text>
@@ -244,6 +253,55 @@ function RunnerPanel({ runner }: { runner: RunnerView }) {
         </DefinitionItem>
       </DefinitionList>
     </DetailPanel>
+  );
+}
+
+/**
+ * 러너 쪽 GitHub 인증(프로젝트마다 `git push --dry-run`, Q82.15). 깨졌으면 할당에서 빠졌다는 것과
+ * 해결 방법을 보인다(Q82.14).
+ */
+function GitHubAuthBlock({ runner }: { runner: RunnerView }) {
+  const t = useTranslations("runners.panel.githubAuth");
+  const checks = runner.githubAuth;
+  return (
+    <PanelBlock title={t("title")}>
+      {checks === null ? (
+        <Text variant="meta">{t("neverChecked")}</Text>
+      ) : checks.length === 0 ? (
+        <Text variant="meta">{t("noChecks")}</Text>
+      ) : (
+        <ul {...stylex.props(styles.list)}>
+          {checks.map((check) => (
+            <GitHubAuthItem key={check.id} check={check} />
+          ))}
+        </ul>
+      )}
+      {runner.assignmentBlocked ? (
+        <p {...stylex.props(styles.guide)}>
+          {t.rich("fix", {
+            code: (chunks) => <code {...stylex.props(styles.code)}>{chunks}</code>,
+          })}
+        </p>
+      ) : null}
+    </PanelBlock>
+  );
+}
+
+function GitHubAuthItem({ check }: { check: GitHubAuthCheck }) {
+  const t = useTranslations("runners.panel.githubAuth");
+  const state = check.satisfied === null ? "unknown" : check.satisfied ? "ok" : "broken";
+  return (
+    <li {...stylex.props(styles.item, styles.run)}>
+      <span {...stylex.props(styles.authRow)}>
+        <span {...stylex.props(styles.authName)}>{check.name}</span>
+        <Text variant="meta">{t(`state.${state}`)}</Text>
+      </span>
+      {state === "broken" && check.hint !== null ? (
+        <Text variant="meta" mono truncate>
+          {check.hint}
+        </Text>
+      ) : null}
+    </li>
   );
 }
 
@@ -288,6 +346,22 @@ const styles = stylex.create({
   run: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   muted: { color: colors.textTertiary },
   secondary: { color: colors.textSecondary },
+  authRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    gap: space.s2,
+    minWidth: 0,
+  },
+  authName: {
+    color: colors.textPrimary,
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  guide: { margin: 0, paddingTop: space.s2, color: colors.textSecondary },
+  code: { fontFamily: fonts.mono },
   runLink: {
     color: colors.textPrimary,
     textDecoration: { default: "none", ":hover": "underline" },
