@@ -1,0 +1,15 @@
+# Workspace는 트래커 프로젝트 묶음이고, 러너는 Workspace 밖에 둔다
+
+Workspace는 운영자가 트래커 프로젝트 여러 개를 골라 묶는 단위다. 트래커 조직(Linear 워크스페이스)과 1:1이 아니어서, 같은 Linear 조직 안에서 Workspace "A"는 프로젝트 A·B를, Workspace "B"는 C·D를 볼 수 있다. 일을 나누는 경계는 운영자가 정하는 것이지 트래커 조직 구조가 정하는 것이 아니기 때문이다.
+
+- **트래커 프로젝트 하나는 Workspace 하나에만 속한다.** 여러 Workspace에 걸치면 그 티켓을 어느 Workspace의 매핑으로 할당하고 어느 통계에 넣을지가 모호해진다.
+- **트래커 연결(Linear API 키, webhook)은 설치 단위 자원이고 여러 개 등록할 수 있다.** 회사 Linear 조직과 개인 Linear 조직을 한 설치에서 함께 쓸 수 있고, Workspace는 어느 연결의 트래커 프로젝트든 골라 묶는다. 매핑은 Workspace 안에 있다.
+- **러너는 설치 전체가 공유하는 자원이고 Workspace에 속하지 않는다.** capacity는 러너가 도는 환경의 물리적 한계라 Workspace로 나눌 수 있는 값이 아니다. 모든 Workspace의 런이 같은 capacity를 함께 쓴다.
+- **대기열은 1단계에서 들어온 순서(FIFO) 하나다.** Workspace별 비율·우선순위는 나중으로 미룬다.
+- **화면은 Workspace 단위로 나눈다.** 사이드바 위 전환기로 Workspace를 고르고, 티켓·런·통계·설정은 현재 Workspace 범위다. 러너는 공용 화면이다. "전체" 보기 하나가 모든 Workspace에서 손댈 것(Human Check, Failed 등)만 모아 보여 준다.
+- **용어 충돌을 정리한다.** Orca는 워크트리를 "workspace"라 부른다. 이 저장소에서 Workspace는 위 뜻으로만 쓰고, Orca 쪽 작업 공간은 Worktree로만 부른다.
+
+## Considered Options
+
+- **Linear 조직 = Workspace**: 같은 Linear 조직의 프로젝트를 Workspace 여러 개로 나눠 볼 수 없어 기각했다. 나누려면 운영자가 트래커 조직부터 쪼개야 한다.
+- **러너를 Workspace별로 소유**: capacity는 러너에 묶인 한계라 Workspace마다 러너를 나누면 한쪽 러너는 놀고 다른 쪽은 대기열이 쌓인다. 같은 러너를 여러 Workspace에 등록하면 capacity를 이중으로 셈해 기각했다.
