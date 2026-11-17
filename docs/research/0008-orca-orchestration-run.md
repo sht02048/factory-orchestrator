@@ -11,15 +11,15 @@
 
 Orca 오케스트레이션의 낱말은 이 저장소의 낱말과 겹친다. 이 문서에서는 다음처럼 가른다.
 
-| 이 문서의 표기     | 뜻                                                                                                                 |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| 런, Run            | GLOSSARY의 Run. 티켓 하나를 러너에 맡긴 한 번의 시도                                                               |
-| 오케스트레이션 Run | Orca의 `Run`(`run_…`). 메일함 하나와 `Task` 묶음의 이름공간. 스케줄링은 하지 않는다 **[스키마]**                   |
-| `Task`             | Orca의 오케스트레이션 작업 단위(`task_…`). 사양(spec)과 상태, `worker_done` 보고를 담는다                          |
-| `Dispatch`         | Orca가 `Task`를 에이전트 터미널 하나에 맡긴 한 번의 시도(`ctx_…`). GLOSSARY는 Run의 뜻으로 이 낱말을 피하라고 한다 |
-| 워커               | `worker-start`로 뜬 에이전트. GLOSSARY의 Agent다                                                                   |
-| 코디네이터         | `Task`를 만들고 메일을 받는 쪽. 이 방식에서는 오케스트레이터다                                                     |
-| 우편함 터미널      | 이 검증에서 오케스트레이터가 코디네이터 신원으로 쓰려고 러너에 띄운 셸 터미널(1절)                                 |
+| 이 문서의 표기     | 뜻                                                                                                                            |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| 런, Run            | GLOSSARY의 Run. 티켓 하나를 러너에 맡긴 한 번의 시도                                                                          |
+| 오케스트레이션 Run | Orca의 `Run`(`run_…`). 메일함 하나와 `Task` 묶음의 이름공간. 스케줄링은 하지 않는다 **[스키마]**                              |
+| `Task`             | Orca의 오케스트레이션 작업 단위(`task_…`). 사양(spec)과 상태, `worker_done` 보고를 담는다                                     |
+| `Dispatch`         | Orca가 `Task`를 에이전트 터미널 하나에 맡긴 한 번의 시도(`ctx_…`). GLOSSARY는 Run의 뜻으로 이 낱말을 피하라고 한다            |
+| 에이전트           | `worker-start`로 뜬 코딩 에이전트(GLOSSARY의 Agent). Orca는 worker라 부르지만 이 문서는 명령·필드 이름 밖에서 에이전트로 쓴다 |
+| 코디네이터         | `Task`를 만들고 메일을 받는 쪽. 이 방식에서는 오케스트레이터다                                                                |
+| 우편함 터미널      | 이 검증에서 오케스트레이터가 코디네이터 신원으로 쓰려고 러너에 띄운 셸 터미널(1절)                                            |
 
 ### 실행
 
@@ -41,9 +41,9 @@ research 0004·0007과 같은 버려도 되는 테스트 저장소(`sandbox`)에
 | --- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | 시작          | ssh 호출자는 Orca 터미널 밖이라 `worker-start`·`run-create`가 `no_active_sender_terminal`로 거절된다. 러너에 셸 터미널 하나(우편함 터미널)를 띄워 그 핸들을 `--from`으로 주면 된다. `worker-start`가 오케스트레이션 Run을 만들고 `dispatchId`·`taskId`·`runId`·`terminal`·`workspace`를 준다 |
 | 2   | 질문과 답     | `check --terminal <우편함> --peek`과 `inbox --terminal run:<runId>`는 메일을 소비하지 않는다. `--peek` 없는 `check`는 FIFO 묶음을 처리됨으로 바꾼다. 답은 `reply --from <우편함> --id <msgId> --body <답>`. 답해도 질문은 처리됨이 되지 않는다                                               |
-| 3   | 끝            | `worker_done`이 오면 `Task` `status`가 `completed`(또는 보고한 실패)가 되고, `task-list --full`의 `result`에 `outcome`·보고 본문·`filesModified`·`reportPath`가 남는다. 에이전트 프로세스는 끝나지 않는다                                                                                    |
+| 3   | 끝            | 성공 `worker_done`이 오면 `Task` `status`가 `completed`가 되고(실패 보고 때 값은 미확인), `task-list --full`의 `result`에 `outcome`·보고 본문·`filesModified`·`reportPath`가 남는다. 에이전트 프로세스는 끝나지 않는다                                                                       |
 | 4   | 권한 프롬프트 | 이 러너의 Orca는 Claude Code를 권한 우회로 띄운다. 우회를 막아 띄우자 Orca가 `stopReason: "needs-input"`과 `approval`이 든 escalation을 보냈다. ssh로는 `deny`만 된다. 허용은 사람만 한다                                                                                                    |
-| 5   | 이상 종료     | 에이전트만 죽고 셸이 남으면 3분 넘게 escalation이 없고 `liveness: "unverifiable"`이다. 터미널까지 끝나면 `stopReason: "lost"` escalation이 오고 `Task`가 `ready`로 돌아간다                                                                                                                  |
+| 5   | 이상 종료     | 에이전트만 죽고 셸이 남으면 약 3분 동안 escalation이 없고 `liveness: "unverifiable"`이다. 터미널까지 끝나면 `stopReason: "lost"` escalation이 오고 `Task`가 `ready`로 돌아간다                                                                                                               |
 | 6   | 멈추기        | `worker-stop --dispatch <id>`가 `--from` 없이 에이전트 터미널을 닫는다. `Task`는 `blocked`, `Dispatch`는 `stopped`. 메일은 오지 않는다                                                                                                                                                       |
 | 7   | 정리, push·PR | `worker-release` → `worktree rm --force` → 로컬 브랜치 지우기. 오케스트레이션 Run 기록 하나만 지울 명령은 없다. 에이전트가 러너의 비대화형 세션에서 push하고 `gh pr create`로 PR을 열었다                                                                                                    |
 
@@ -84,7 +84,7 @@ orca terminal create --worktree path:<path>/sandbox --title fo-orch-mailbox --co
 
 - `cat > /dev/null`은 터미널에 무언가 입력되더라도 셸 명령으로 돌지 않게 하려고 골랐다. 검증 내내(약 7분, `run:` 메일함에 메일 다섯 통) 이 터미널의 `terminal read` `tail`에는 처음 명령 줄 하나만 있었다 **[실행]**. Orca가 ssh 코디네이터를 깨우려고 터미널에 무언가를 입력하는 일은 보지 못했다.
 - 우편함 터미널을 `terminal close`로 닫은 뒤에도 `check --terminal <그 핸들> --peek`이 메일을 돌려줬다 **[실행]**. 메일함은 핸들 문자열에 묶인다. 닫힌 핸들로 `worker-start`·`reply`를 부르는 경우는 시험하지 않았다.
-- 워커의 머리말(preamble)은 우편함 터미널 핸들을 "coordinator's terminal handle"로 적는다 **[실행]**(`worker-read`로 읽은 첫 사용자 메시지).
+- 에이전트가 받는 머리말(preamble)은 우편함 터미널 핸들을 "coordinator's terminal handle"로 적는다 **[실행]**(`worker-read`로 읽은 첫 사용자 메시지).
 - 우편함 터미널에 `cat` 말고 무엇을 띄울지, 런타임이 다시 떠 핸들이 바뀌면 어떻게 할지는 정하지 않았다(아래 "아직 모르는 것").
 
 ### `worker-start` 결과
@@ -119,7 +119,7 @@ orca orchestration worker-start --from <우편함 핸들> --spec-file <runDir>/r
 - 묶인 오케스트레이션 Run이 없어서 하나를 만들었다(`runCreated: true`). Run의 `objective`는 첫 `Task` 제목(`fo-orch-r1`)이 됐다 **[실행]**. 같은 우편함으로 R2·R3를 시작할 때 `--run run_…`을 줬고 같은 Run에 들어갔다.
 - `workspace`는 `worktree ps`의 `worktreeId`와 같은 `<repoId>::<path>` 형태다. `terminal`은 에이전트 터미널 핸들이다.
 - `state: "ready"`는 사양이 에이전트 입력으로 들어갔다는 뜻이다(`worker-show`의 `stage: "input_accepted"`) **[실행]**. help는 `ready`면 종료 코드 0, 실패·`outcome_unknown`이면 1이라고 적는다 **[스키마]**.
-- `new-top-level`로 만든 워커는 늘 열린 채 남는다(`keptOpen: true`). `worker_done` 뒤에도 에이전트 프로세스가 살아 있다 **[실행]**(3절). 그래서 7절의 `worker-release`가 필요하다.
+- `new-top-level`로 띄운 에이전트는 늘 열린 채 남는다(`keptOpen: true`). `worker_done` 뒤에도 에이전트 프로세스가 살아 있다 **[실행]**(3절). 그래서 7절의 `worker-release`가 필요하다.
 - 에이전트는 Orca 설정의 기본 권한(`full-access`)대로 `--dangerously-skip-permissions`로 떴다(4절) **[실행]**.
 - `--model haiku`는 `worker-show --full`의 `startOptions.launch.effective.model`에 그대로 남았다 **[실행]**.
 
@@ -127,7 +127,7 @@ orca orchestration worker-start --from <우편함 핸들> --spec-file <runDir>/r
 
 - 워크트리 폴더와 표시 이름은 `--name` 값(`fo-orch-r1`)이었다. `worktree show --worktree name:fo-orch-r1`이 그 워크트리를 돌려줬고, `worktree rm --worktree name:fo-orch-r1`도 됐다 **[실행]**.
 - 브랜치는 `<접두사>/<name>`(`acme/fo-orch-r1`)이다. research 0004와 같다. `worker-start`에는 `worktree create`의 `--branch`가 없다 **[스키마]**. 브랜치 이름을 정확히 정하려면 러너의 접두사 설정에 기대거나, `--name`에 접두사를 넣고 PR을 브랜치가 아닌 다른 길(티켓 키)로 찾아야 한다. 0006의 PR 찾기(브랜치 이름 1순위)와 맞추려면 정할 것이 남는다.
-- 런 레코드에는 `runId`(오케스트레이션 Run), `taskId`, `dispatchId`, `workspace`, `terminal`을 둔다. 다시 찾는 열쇠는 `dispatchId`(워커 명령의 기준)와 `--name`(워크트리)이다.
+- 런 레코드에는 `runId`(오케스트레이션 Run), `taskId`, `dispatchId`, `workspace`, `terminal`을 둔다. 다시 찾는 열쇠는 `dispatchId`(`worker-*` 명령의 기준)와 `--name`(워크트리)이다.
 
 ### 호출자 신원이 필요한 명령
 
@@ -162,7 +162,7 @@ R1은 시작 약 8초 뒤 `orca orchestration ask --question "..." --options "A,
 
 - `--full`의 `payload`는 JSON이 든 **문자열**이다. 한 번 더 파싱한다. `--full` 없는 `inbox`와 `check`는 `payload`를 객체로 준다 **[실행]**.
 - `options`는 `ask --options`로 준 선택지다. 화면에서 버튼으로 보일 수 있다.
-- 기다리는 동안 `worker-show`는 `activity: "idle"`, `attention: ["input"]`이고 `agentWait`는 `null`이다 **[실행]**([`worker-show-asked.json`](fixtures/0008/worker-show-asked.json)). `ask`로 묻고 턴을 끝낸 에이전트는 권한 프롬프트(4절)와 달리 "사람 입력 대기"로 보이지 않는다. 질문 대기는 메일로 판단한다.
+- 기다리는 동안 `worker-show`는 `activity: "idle"`, `attention: ["input"]`이고 `agentWait`는 `null`이다 **[실행]**([`worker-show-asked.json`](fixtures/0008/worker-show-asked.json)). 같은 때 `--full`의 `projection.stage.activity`는 `"done"`이었다([`worker-show-full-asked.json`](fixtures/0008/worker-show-full-asked.json)). 간단 출력과 `--full`이 다른 값을 주므로 어댑터는 한쪽을 기준으로 정해 읽는다. `ask`로 묻고 턴을 끝낸 에이전트는 권한 프롬프트(4절)와 달리 "사람 입력 대기"로 보이지 않는다. 질문 대기는 메일로 판단한다.
 
 ### 읽는 방법: 무엇이 메일을 소비하는가
 
@@ -173,7 +173,7 @@ R1은 시작 약 8초 뒤 `orca orchestration ask --question "..." --options "A,
 | `inbox ... --full --json`                         | 안 함      | 메일 행 전체(`read`, `sequence`, `created_at`, `payload` 문자열)                                    | **[실행]** [`inbox-question-full.json`](fixtures/0008/inbox-question-full.json)                                                                     |
 | `check --terminal <우편함> --all --json`          | 안 함      | 처리 여부와 상관없이 최근 메일                                                                      | **[실행]**, **[스키마]**                                                                                                                            |
 | `check --terminal <우편함> --json`                | **소비함** | 가장 오래된 미처리 FIFO 묶음 전체. 돌려준 묶음을 처리됨으로 바꾼다. 다음 `check`·`--peek`은 빈 목록 | **[실행]** [`check-consume.json`](fixtures/0008/check-consume.json), [`check-peek-after-consume.json`](fixtures/0008/check-peek-after-consume.json) |
-| `task-list --run <runId>`, `worker-show`          | 안 함      | `Task`·워커 상태. 질문 본문은 없다                                                                  | **[실행]**                                                                                                                                          |
+| `task-list --run <runId>`, `worker-show`          | 안 함      | `Task`·에이전트 상태. 질문 본문은 없다                                                              | **[실행]**                                                                                                                                          |
 
 소비한 뒤 `inbox`의 `handled`가 두 메일 모두 `true`가 됐다 **[실행]**. help와 가이드는 "watch 스크립트의 plain `check`는 에이전트가 볼 메일을 가져간다. 지켜보기만 하는 스크립트는 `--peek`(`--peek --wait` 포함)만 쓰고 `--ack`하지 않는다"고 적는다 **[스키마]**. `--peek --wait`는 시험하지 않았다(ssh를 붙잡으므로 폴링에는 맞지 않는다).
 
@@ -201,7 +201,7 @@ orca orchestration reply --from <우편함 핸들> --id msg_000000000001 --body 
 
 R1은 `send --type worker_done --outcome succeeded`를 보냈다 **[실행]**. 관측한 것:
 
-- `task-list --run <runId>`: `status: "completed"`([`task-list-full-done.json`](fixtures/0008/task-list-full-done.json)).
+- `task-list --run <runId> --full`: `status: "completed"`([`task-list-full-done.json`](fixtures/0008/task-list-full-done.json)).
 - `task-list --run <runId> --full --json`의 `tasks[].result`(JSON이 든 문자열)에 보고 전체가 남는다.
 
 ```json
@@ -228,7 +228,7 @@ R1은 `send --type worker_done --outcome succeeded`를 보냈다 **[실행]**. �
 
 ### 이 러너는 권한을 묻지 않게 띄운다
 
-러너 Orca 설정에 `agentPermissionDefault: "full-access"`가 있고, 워커 Claude Code는 `--dangerously-skip-permissions`로 떴다 **[실행]**(R1 터미널 미리보기 `bypass permissions on`, R3 터미널의 실행 인자). research 0007이 소스에서 찾은 예전 기본값(`yolo`)과 같은 결과다. 설정은 러너 전체에 걸리고 사람이 그 러너에서 띄우는 에이전트도 바뀐다.
+러너 Orca 설정에 `agentPermissionDefault: "full-access"`가 있고, Claude Code는 `--dangerously-skip-permissions`로 떴다 **[실행]**(R1 터미널 미리보기 `bypass permissions on`, R3 터미널의 실행 인자). research 0007이 소스에서 찾은 예전 기본값(`yolo`)과 같은 결과다. 설정은 러너 전체에 걸리고 사람이 그 러너에서 띄우는 에이전트도 바뀐다.
 
 ### 재현: 프로젝트 설정으로 우회를 끔
 
@@ -275,7 +275,7 @@ R1은 `send --type worker_done --outcome succeeded`를 보냈다 **[실행]**. �
 (`payload`는 `--full`에서 문자열이다. 위는 파싱한 모양이다.)
 
 - 메일 id가 `msg_stop_`로 시작한다. 본문에 에이전트 화면이 붙는다. "No one has been shown this prompt in Orca"는 러너에서 Orca 화면을 보는 사람이 없었다는 뜻으로 보인다.
-- 같은 때 `worker-show`: `activity: "waiting"`, `waitingOnHuman: "interactive prompt (via hook)"`, `--full`의 `observation.agentWait: { "source": "hook", "since": <ms> }` **[실행]**([`worker-show-full-waiting-permission.json`](fixtures/0008/worker-show-full-waiting-permission.json)).
+- 같은 때 `worker-show`: `activity: "waiting"`, `waitingOnHuman: "interactive prompt (via hook)"`(간단 출력, 픽스처 없음), `--full`의 `observation.agentWait: { "source": "hook", "since": <ms> }` **[실행]**([`worker-show-full-waiting-permission.json`](fixtures/0008/worker-show-full-waiting-permission.json)).
 - 같은 때 `worktree ps --agent-wait`: 행 `status: "permission"`, `agents[0].state: "waiting"`, `programStatus: { "state": "blocked", "kind": "permission" }` **[실행]**([`worktree-ps-permission.json`](fixtures/0008/worktree-ps-permission.json)). research 0004에서 보지 못한 `kind: "permission"`을 관측했다.
 
 ### ssh로 할 수 있는 일: `deny`만
@@ -288,7 +288,7 @@ orca orchestration deny --from <우편함 핸들> --dispatch ctx_… --prompt ap
 
 - 에이전트의 도구 호출이 `--reason` 문자열을 결과로 받아 실패했고, 에이전트는 다음 단계로 갔다 **[실행]**(`worker-read`의 transcript).
 - `run:` 메일함에 `type: "status"`, `subject: "Worker approval answered"`, `approval.state: "answered"` 메일이 왔다 **[실행]**([`status-approval-answered-full.json`](fixtures/0008/status-approval-answered-full.json)). escalation 본문의 "You'll get a message when it's answered"가 이것이다.
-- 허용은 CLI에 없다. help는 "Only a person can allow a prompt; agents can only deny one"이라고 적는다 **[스키마]**. 허용하려면 사람이 러너의 Orca 화면이나 에이전트 터미널에서 눌러야 한다. 터미널에 키를 보내는 것(`terminal send`)은 가이드가 막는 "워커 터미널로 조종하기"다. 시험하지 않았다.
+- 허용은 CLI에 없다. help는 "Only a person can allow a prompt; agents can only deny one"이라고 적는다 **[스키마]**. 허용하려면 사람이 러너의 Orca 화면이나 에이전트 터미널에서 눌러야 한다. 터미널에 키를 보내는 것(`terminal send`)은 가이드가 막는 "에이전트 터미널로 조종하기"(Steer through a worker's terminal)다. 시험하지 않았다.
 
 Waiting for Input의 원래 뜻(권한 프롬프트 등)에서 오케스트레이터 화면이 할 수 있는 것은 "거절하고 이렇게 하라"뿐이다. "허용"을 화면에서 하려면 권한을 미리 허용해 프롬프트가 뜨지 않게 하는 쪽이 현실적이다.
 
@@ -385,7 +385,7 @@ R1은 답대로 README에 한 줄을 더해 커밋하고, 브랜치를 push하�
 | 3    | 러너 등록 저장소에서 `git branch -D <접두사>/<name>`  | 로컬 브랜치 셋을 지웠다. `worktree rm`은 `--delete-branch` 없이 브랜치를 남긴다                                                                                                                    |
 | 4    | `terminal close --terminal <우편함 핸들>`             | 우편함 터미널을 닫았다                                                                                                                                                                             |
 
-- `worker_done` 뒤에는 `autoReleaseAt`(약 2분 뒤 자동 놓기)이 붙는다고 help가 적지만 **[스키마]**, `new-top-level` 워커는 열린 채 남는다 **[스키마]**. R1은 `worker_done` 뒤 약 6분 동안 `worker-show`·`worker-list`에 `autoReleaseAt`이 보이지 않았고, 1번을 부를 때까지 에이전트 터미널이 열려 있었다(`processAction: "closed_agent_terminal"`) **[실행]**. 그래서 1번을 직접 부른다.
+- `worker_done` 뒤에는 `autoReleaseAt`(약 2분 뒤 자동 놓기)이 붙는다고 help가 적지만 **[스키마]**, `new-top-level`로 띄운 에이전트는 열린 채 남는다 **[스키마]**. R1은 `worker_done` 뒤 약 6분 동안 `worker-show`·`worker-list`에 `autoReleaseAt`이 보이지 않았고, 1번을 부를 때까지 에이전트 터미널이 열려 있었다(`processAction: "closed_agent_terminal"`) **[실행]**. 그래서 1번을 직접 부른다.
 - 오케스트레이션 Run 기록은 남는다. 하나만 지우는 명령이 없고, `orchestration reset --all|--tasks|--messages`는 러너 전체의 오케스트레이션 상태를 지운다 **[스키마]**. 다른 코디네이터의 상태까지 지우므로 쓰지 않았다. 워크트리를 지운 뒤에도 `run-list`에 Run이, `task-list --run`에 `Task` 셋이 남았다 **[실행]**. 쌓이는 기록을 어떻게 다룰지는 정할 것으로 남긴다.
 
 ## 제안: Runner 어댑터 계약
@@ -406,7 +406,7 @@ R1은 답대로 README에 한 줄을 더해 커밋하고, 브랜치를 push하�
 | 질문 읽기  | `check --terminal <mailbox> --peek --json`에서 `type: "question"`, `payload.dispatchId`가 이 런인 메일                                                                                                                                                                         | `id`, `body`, `payload.options`. 본 id를 DB에 두고 거른다                                                                                        |
 | 답하기     | `reply --from <mailbox> --id <msgId> --body <답> --json`                                                                                                                                                                                                                       | `messageId`. 답했음은 DB에 기록한다(Orca의 질문은 `handled: false`로 남는다)                                                                     |
 | 권한 거절  | `deny --from <mailbox> --dispatch <id> --prompt <approvalId> --reason <사유> --json`                                                                                                                                                                                           | `denied`. 허용은 없다                                                                                                                            |
-| 끝         | `Task` `status`가 `completed`(또는 실패 보고)이고 `result.provenance: "worker_report"`                                                                                                                                                                                         | `result.outcome`, `body`, `reportPath`, `filesModified`, `completedAt`                                                                           |
+| 끝         | `Task`의 `result.provenance: "worker_report"`(성공 보고 때 `status: "completed"`, 실패 보고 때 `status`는 미확인)                                                                                                                                                              | `result.outcome`, `body`, `reportPath`, `filesModified`, `completedAt`                                                                           |
 | 멈추기     | `worker-stop --dispatch <id> --json`                                                                                                                                                                                                                                           | `state: "stopped"`, `processAction`. `stop_unknown`(종료 코드 1)이면 `worker-show`로 확인하고 런 상세에 남긴다                                   |
 | 정리       | `worker-release --dispatch <id> --json` → `worktree rm --worktree <workspace 선택자> --force --json` → (선택) 로컬 브랜치 지우기                                                                                                                                               | `state: "released"`, `removed: true`                                                                                                             |
 
@@ -414,7 +414,7 @@ R1은 답대로 README에 한 줄을 더해 커밋하고, 브랜치를 push하�
 
 ### `pollRun` 판정 순서(제안)
 
-1. `Task` `status`가 `completed`·`failed`(보고) → Ended. 에이전트 결과는 아래 대응표.
+1. `Task`의 `result.provenance`가 `"worker_report"`이고 `result.outcome`이 있음 → Ended(`outcome: "succeeded"`일 때 `status`는 `completed`였다. `"failed"`일 때의 `status`는 확인하지 않았다). 에이전트 결과는 아래 대응표.
 2. 새 `escalation` 메일 중 `stopReason: "lost"`(또는 `exited`) → 에이전트가 보고 없이 사라졌다. Ended.
 3. `stopReason: "needs-input"` escalation(답이 오지 않음) 또는 처리하지 않은 `question` 메일 → Waiting for Input.
 4. `worker-show` `liveness: "unverifiable"`이고 `worktree ps` 행에서 전에 본 에이전트가 사라짐 → 에이전트가 보고 없이 죽고 셸이 남았다. Orca는 알리지 않으므로 오케스트레이터가 판정한다. 이 경우 Ended로 볼지, 터미널을 닫아 `lost`를 받을지는 정할 것이다.
@@ -430,7 +430,7 @@ R1은 답대로 README에 한 줄을 더해 커밋하고, 브랜치를 push하�
 | Running           | `Task` `status: "dispatched"`, `worker-show` `state: "ready"`, `activity: "working"`                                                                                                     |                                                                                                             |
 | Waiting for Input | ① 처리하지 않은 `question` 메일(`worker-show` `activity: "idle"`, `attention: ["input"]`) ② `needs-input` escalation과 `approval.state: "open"`(`activity: "waiting"`, `waitingOnHuman`) | GLOSSARY는 "권한 프롬프트 등"이라 둘 다 들어간다. ①은 오케스트레이터 화면에서 답할 수 있고, ②는 거절만 된다 |
 | Disconnected      | ssh 실패                                                                                                                                                                                 | 오케스트레이션과 상관없다. 다시 닿으면 위 판정으로 돌아간다                                                 |
-| Ended             | `Task` `completed`·실패 보고, `lost`/`exited` escalation, `worker-stop`, 시간 초과, 워크트리 사라짐                                                                                      |                                                                                                             |
+| Ended             | `Task` `result`의 `worker_report`(성공 때 `completed`), `lost`/`exited` escalation, `worker-stop`, 시간 초과, 워크트리 사라짐                                                            |                                                                                                             |
 
 ### 에이전트 결과
 
@@ -441,7 +441,7 @@ R1은 답대로 README에 한 줄을 더해 커밋하고, 브랜치를 push하�
 | 시간 초과              | Running 중 최대 실행 시간 → `worker-stop`                                                       |                                                                                                                                              |
 | 입력 기다리다 멈춤     | Waiting for Input 중 최대 실행 시간 → `worker-stop`                                             |                                                                                                                                              |
 | 러너 연결 끊김         | ssh                                                                                             | 오케스트레이션과 상관없다                                                                                                                    |
-| 워크트리 없음          | `worktree ps`·`worktree show`로 판단                                                            | 워커가 있는 워크트리를 지울 때 Orca가 무엇을 알리는지는 확인하지 않았다                                                                      |
+| 워크트리 없음          | `worktree ps`·`worktree show`로 판단                                                            | 에이전트가 도는 워크트리를 지울 때 Orca가 무엇을 알리는지는 확인하지 않았다                                                                  |
 | 운영자가 취소함        | `worker-stop`                                                                                   | Q77은 Queued·Running만 취소할 수 있다. 질문에 답하지 않고 취소하고 싶은 Waiting for Input은 spec 열린 질문 1번과 같다                        |
 
 ## 운영자가 정할 것
@@ -461,7 +461,7 @@ R1은 답대로 README에 한 줄을 더해 커밋하고, 브랜치를 push하�
 4. 닫힌 우편함 핸들로 `worker-start`·`reply`를 부를 때의 동작.
 5. `.claude/settings.json`의 `permissions.allow`로 미리 허용했을 때 프롬프트 없이 지나가는지, `disableBypassPermissionsMode`와 `ask` 가운데 무엇이 이번 프롬프트를 띄웠는지.
 6. 사람이 러너 화면에서 권한을 허용했을 때 오는 메일(`approval.state`).
-7. 워커가 도는 워크트리를 지웠을 때(워크트리 없음)의 escalation.
+7. 에이전트가 도는 워크트리를 지웠을 때(워크트리 없음)의 escalation.
 8. `check --peek --wait`의 동작. ssh를 붙잡으므로 폴링에는 쓰지 않을 생각이라 시험하지 않았다.
 9. Codex 등 다른 에이전트. Claude Code만 띄웠다.
 10. Linux 러너.
@@ -476,7 +476,7 @@ R1은 답대로 README에 한 줄을 더해 커밋하고, 브랜치를 push하�
 | `run-create-no-from-error.json`            | ssh에서 `--from` 없이 `run-create`                      |
 | `mailbox-terminal-create.json`             | 우편함 터미널 만들기                                    |
 | `worker-start.json`                        | `worker-start --from <우편함>` 결과(R1)                 |
-| `worker-show-asked.json`                   | `ask`하고 답을 기다리는 워커                            |
+| `worker-show-asked.json`                   | `ask`하고 답을 기다리는 에이전트                        |
 | `worker-show-full-asked.json`              | 같은 때 `worker-show --full`                            |
 | `task-list-dispatched.json`                | 같은 때 `task-list`                                     |
 | `inbox-question.json`                      | 질문이 온 `inbox`(소비 안 함)                           |
@@ -485,7 +485,7 @@ R1은 답대로 README에 한 줄을 더해 커밋하고, 브랜치를 push하�
 | `check-peek-run-error.json`                | `--terminal` 없이 `check --run --peek`                  |
 | `reply.json`                               | `reply --from <우편함>`                                 |
 | `inbox-after-reply.json`                   | 답한 뒤에도 `handled: false`인 질문                     |
-| `inbox-dispatch-reply.json`                | 워커 메일함의 답(`Re: Question`)                        |
+| `inbox-dispatch-reply.json`                | 에이전트 메일함(`dispatch:`)의 답(`Re: Question`)       |
 | `task-list-full-done.json`                 | `worker_done` 뒤 `task-list --full`(보고 본문)          |
 | `worker-show-done.json`                    | `worker_done` 뒤 `worker-show`                          |
 | `inbox-done.json`                          | `worker_done` 메일이 온 `inbox`                         |
@@ -506,4 +506,4 @@ R1은 답대로 README에 한 줄을 더해 커밋하고, 브랜치를 push하�
 | `escalation-lost-full.json`                | 터미널을 닫은 뒤 `lost` escalation                      |
 | `worker-show-lost.json`                    | 같은 때 `worker-show`                                   |
 | `task-list-after-lost.json`                | 같은 때 `task-list`(`ready`)                            |
-| `worker-release.json`                      | 세 워커의 `worker-release`                              |
+| `worker-release.json`                      | 세 에이전트의 `worker-release`                          |
