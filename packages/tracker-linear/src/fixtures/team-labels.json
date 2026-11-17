@@ -1,0 +1,59 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-complexity": "625"
+  },
+  "body": {
+    "data": {
+      "issueLabels": {
+        "nodes": [
+          {
+            "id": "00000000-0000-4000-8000-000000000105",
+            "name": "wontfix",
+            "isGroup": false
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000106",
+            "name": "ready-for-human",
+            "isGroup": false
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000103",
+            "name": "ready-for-agent",
+            "isGroup": false
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000107",
+            "name": "needs-info",
+            "isGroup": false
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000108",
+            "name": "needs-triage",
+            "isGroup": false
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000109",
+            "name": "Bug",
+            "isGroup": false
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000110",
+            "name": "Improvement",
+            "isGroup": false
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000111",
+            "name": "Feature",
+            "isGroup": false
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "00000000-0000-4000-8000-000000000111"
+        }
+      }
+    }
+  }
+}

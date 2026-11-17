@@ -1,0 +1,29 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-complexity": "3"
+  },
+  "body": {
+    "errors": [
+      {
+        "message": "issue not found",
+        "path": ["commentCreate"],
+        "locations": [
+          {
+            "line": 1,
+            "column": 58
+          }
+        ],
+        "extensions": {
+          "type": "invalid input",
+          "code": "INPUT_ERROR",
+          "statusCode": 400,
+          "userError": true,
+          "userPresentableMessage": "Issue 'ENG-999999' not found."
+        }
+      }
+    ],
+    "data": null
+  }
+}

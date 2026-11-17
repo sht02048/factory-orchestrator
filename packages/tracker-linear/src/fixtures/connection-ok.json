@@ -1,0 +1,14 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-complexity": "1"
+  },
+  "body": {
+    "data": {
+      "viewer": {
+        "id": "00000000-0000-4000-8000-000000000120"
+      }
+    }
+  }
+}

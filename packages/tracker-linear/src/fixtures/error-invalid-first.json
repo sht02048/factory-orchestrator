@@ -1,0 +1,41 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-complexity": "352"
+  },
+  "body": {
+    "errors": [
+      {
+        "message": "Argument Validation Error",
+        "path": ["projects"],
+        "locations": [
+          {
+            "line": 1,
+            "column": 48
+          }
+        ],
+        "extensions": {
+          "code": "INVALID_INPUT",
+          "validationErrors": [
+            {
+              "target": {
+                "first": 251
+              },
+              "value": 251,
+              "property": "first",
+              "children": [],
+              "constraints": {
+                "max": "first must not be greater than 250"
+              }
+            }
+          ],
+          "type": "invalid input",
+          "userError": true,
+          "userPresentableMessage": "first must not be greater than 250."
+        }
+      }
+    ],
+    "data": null
+  }
+}
