@@ -50,8 +50,13 @@ export function createAutoAssignState(): AutoAssignState {
  * 놓친 할당을 맞춘다(ADR 0001). 할당은 db 할당 진입점(assignRun)으로 하고 러너는 진입점이 고른다(Q53).
  */
 export async function assignAutomatically(context: TickContext): Promise<void> {
-  processTrackerEvents(context);
-  await correctByPolling(context);
+  // 자동 할당의 실패(DB 읽기 등)가 같은 바퀴의 대기열과 뒤처리를 막지 않게 여기서 멈춘다.
+  try {
+    processTrackerEvents(context);
+    await correctByPolling(context);
+  } catch (error) {
+    context.logger.warn("could not assign automatically", { error });
+  }
 }
 
 // ---------- webhook 이벤트 ----------
@@ -60,13 +65,26 @@ export async function assignAutomatically(context: TickContext): Promise<void> {
  * 처리하지 않은 webhook 이벤트를 받은 순서로 본다. 할당과 처리 표시는 한 트랜잭션이라, 같은 이벤트로 런이
  * 두 번 생기지 않는다. 같은 `Linear-Delivery`는 web이 한 번만 쓴다(recordTrackerEvent). 쓰지 못한 이벤트는
  * 처리 표시가 남지 않아 다음 바퀴에 다시 본다.
+ *
+ * 이벤트가 쌓여 있으면(worker가 멈췄던 동안 등) 같은 티켓의 마지막 이벤트가 지금 라벨에 가장 가깝다. 그래서
+ * 라벨이 방금 붙은 이벤트라도 뒤 이벤트에서 라벨이 없으면 할당하지 않는다.
  */
 function processTrackerEvents(context: TickContext): void {
   const { db, now, logger } = context;
-  for (const event of listUnprocessedTrackerEvents(db)) {
+  const events = listUnprocessedTrackerEvents(db);
+  const latestLabels = new Map<string, ReadonlyArray<LabelId>>();
+  for (const event of events) {
+    if (event.ticketKey === null || event.labelIds === null) continue;
+    latestLabels.set(`${event.connection}\n${event.ticketKey}`, event.labelIds);
+  }
+  for (const event of events) {
     try {
       inTransaction(db, () => {
-        assignForEvent(context, event);
+        const latest =
+          event.ticketKey === null
+            ? undefined
+            : latestLabels.get(`${event.connection}\n${event.ticketKey}`);
+        assignForEvent(context, event, latest ?? null);
         markTrackerEventProcessed(db, event.connection, event.deliveryId, now());
       });
     } catch (error) {
@@ -84,12 +102,17 @@ function processTrackerEvents(context: TickContext): void {
  * 이벤트(제목만 바뀜 등)는 라벨이 남아 있어도 할당하지 않는다. 라벨을 단 채 만든 티켓은 tracker 어댑터가
  * 이전 라벨을 빈 배열로 주므로 방금 붙은 것이다(0014). 라벨이 붙은 시각은 이벤트를 받은 시각으로 본다.
  */
-function assignForEvent(context: TickContext, event: StoredTrackerEvent): void {
+function assignForEvent(
+  context: TickContext,
+  event: StoredTrackerEvent,
+  latestLabelIds: ReadonlyArray<LabelId> | null,
+): void {
   if (event.kind !== "ticket.created" && event.kind !== "ticket.updated") return;
   if (event.ticketKey === null || event.projectId === null || event.labelIds === null) return;
   const target = autoAssignTarget(context, event.connection, event.projectId);
   if (target === null) return;
   if (!labelJustAttached(event, target.labelId)) return;
+  if (latestLabelIds !== null && !latestLabelIds.includes(target.labelId)) return;
 
   const ticket: TicketRef = { connection: event.connection, key: event.ticketKey };
   const check = checkAutoAssignment({
