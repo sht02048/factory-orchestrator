@@ -31,6 +31,7 @@ describe("migrate", () => {
         "log_tail_requests",
         "mappings",
         "run_cancel_requests",
+        "run_permission_waits",
         "run_questions",
         "run_state_changes",
         "runner_check_requests",
