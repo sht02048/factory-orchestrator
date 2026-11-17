@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TIME_ZONE, calendarDay, parseTimeZone, timeZoneCookie } from "./time-zone";
+import {
+  DEFAULT_TIME_ZONE,
+  calendarDay,
+  parseTimeZone,
+  timeZoneCookie,
+  timeZoneFromCookies,
+} from "./time-zone";
 
 const iso = (day: number) => new Date(day).toISOString().slice(0, 10);
 
@@ -10,7 +16,14 @@ describe("parseTimeZone", () => {
     expect(parseTimeZone("Etc/GMT+9")).toBe("Etc/GMT+9");
   });
 
+  it("Intl 이 쓰는 이름으로 바꿔 같은 시간대는 값 하나다", () => {
+    expect(parseTimeZone("aSiA/sEoUl")).toBe("Asia/Seoul");
+    expect(parseTimeZone("utc")).toBe("UTC");
+  });
+
   it("없거나 시간대 이름이 아니면 UTC 다", () => {
+    expect(parseTimeZone("+09:00")).toBe(DEFAULT_TIME_ZONE);
+    expect(parseTimeZone("-0130")).toBe(DEFAULT_TIME_ZONE);
     expect(parseTimeZone(undefined)).toBe(DEFAULT_TIME_ZONE);
     expect(parseTimeZone("")).toBe(DEFAULT_TIME_ZONE);
     expect(parseTimeZone("Mars/Olympus")).toBe(DEFAULT_TIME_ZONE);
@@ -38,6 +51,14 @@ describe("calendarDay", () => {
     expect(iso(calendarDay(new Date("2026-11-02T08:00:00Z"), "America/Los_Angeles"))).toBe(
       "2026-11-02",
     );
+  });
+});
+
+describe("timeZoneFromCookies", () => {
+  it("쿠키 문자열에서 시간대 쿠키 값을 찾는다", () => {
+    expect(timeZoneFromCookies("a=1; tz=Asia/Seoul; b=2")).toBe("Asia/Seoul");
+    expect(timeZoneFromCookies("xtz=Asia/Seoul")).toBeNull();
+    expect(timeZoneFromCookies("")).toBeNull();
   });
 });
 

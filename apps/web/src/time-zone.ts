@@ -7,25 +7,39 @@ import { z } from "zod";
  *   그린다. 그래서 서버 렌더링과 hydration 이 같은 값을 그린다.
  * - 쿠키가 없는 첫 방문은 UTC 로 그린 뒤, 브라우저가 쿠키를 남기고 시간대를 쓰는 데이터를 다시 읽는다
  *   (TimeZoneSync, routes/__root.tsx).
- * - 쿠키는 밖에서 온 값이라 IANA 시간대 이름으로 읽히는지 확인한다. 아니면 UTC 로 그린다.
+ * - 쿠키는 밖에서 온 값이라 IANA 시간대 이름으로 읽히는지 확인하고 Intl 이 쓰는 이름으로 바꾼다.
+ *   아니면 UTC 로 그린다. 대소문자만 다른 이름이나 오프셋(+09:00)을 그대로 받으면 서버의 포맷터 캐시가
+ *   요청마다 늘어날 수 있다.
  */
 
 export const DEFAULT_TIME_ZONE = "UTC";
 export const TIME_ZONE_COOKIE = "tz";
 
-/** Intl 이 아는 IANA 시간대 이름인지 */
-function isTimeZone(value: string): boolean {
+/** Intl 이 아는 IANA 시간대 이름이면 Intl 이 쓰는 이름(aSiA/sEoUl → Asia/Seoul), 아니면 null */
+function canonicalTimeZone(value: string): string | null {
   try {
-    new Intl.DateTimeFormat("en-US", { timeZone: value });
-    return true;
+    const name = new Intl.DateTimeFormat("en-US", { timeZone: value }).resolvedOptions().timeZone;
+    // 오프셋(+09:00)은 IANA 이름이 아니다. 브라우저는 이름을 준다.
+    return /^[A-Za-z]/.test(name) ? name : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-const timeZoneSchema = z.string().min(1).max(64).refine(isTimeZone);
+const timeZoneSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .transform((value, context) => {
+    const name = canonicalTimeZone(value);
+    if (name === null) {
+      context.addIssue({ code: "custom", message: "not an IANA time zone" });
+      return z.NEVER;
+    }
+    return name;
+  });
 
-/** 밖에서 온 시간대 값을 읽는다. 시간대 이름이 아니면 UTC 다 */
+/** 밖에서 온 시간대 값을 읽어 Intl 이 쓰는 이름으로 바꾼다. 시간대 이름이 아니면 UTC 다 */
 export function parseTimeZone(value: unknown): string {
   const parsed = timeZoneSchema.safeParse(value);
   return parsed.success ? parsed.data : DEFAULT_TIME_ZONE;
@@ -34,6 +48,15 @@ export function parseTimeZone(value: unknown): string {
 /** 이 브라우저(또는 프로세스)의 시간대 */
 export function localTimeZone(): string {
   return parseTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+}
+
+/** document.cookie 같은 쿠키 문자열에서 시간대 쿠키 값. 없으면 null */
+export function timeZoneFromCookies(cookies: string): string | null {
+  for (const pair of cookies.split(";")) {
+    const [name, value] = pair.trim().split("=", 2);
+    if (name === TIME_ZONE_COOKIE && value !== undefined) return value;
+  }
+  return null;
 }
 
 /**
