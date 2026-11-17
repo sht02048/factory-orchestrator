@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 blocked_by: []
 ---
 
@@ -30,4 +30,4 @@ Tracker 어댑터와 자동 할당을 짓기 전에, 스펙 10절의 Linear 사�
 
 ## 진행
 
-- 부분 완료: 13·14 남음. 10~12번과 픽스처는 [`docs/research/0005-linear-contract.md`](../research/0005-linear-contract.md)에 남겼다. 13·14번은 Linear GitHub 연동과 테스트 저장소를 운영자가 준비한 뒤 확인한다.
+- 완료. 10~12번과 픽스처, 13·14번(Linear GitHub 연동을 켠 Linear 워크스페이스와 테스트 저장소에서 확인)을 [`docs/research/0005-linear-contract.md`](../research/0005-linear-contract.md)에 남겼다. Q41 방식은 그대로 써도 된다는 결론이고, PR 첨부를 붙일지와 `linkKind`는 운영자가 정할 제안으로 남겼다.
