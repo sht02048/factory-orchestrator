@@ -15,11 +15,11 @@ _Avoid_: Issue, Task, 이슈
 _Avoid_: Ticket source, 이슈 트래커
 
 **Tracker Connection**:
-오케스트레이터 설치 하나가 트래커에 닿는 연결(API 키, webhook). 설치 전체에 하나 있고 모든 Workspace가 함께 쓴다.
+오케스트레이터가 트래커 조직 하나에 닿는 연결(API 키, webhook). 설치 단위 자원이라 여러 개를 등록할 수 있고(예: 회사 Linear 조직과 개인 Linear 조직), 모든 Workspace가 함께 쓴다.
 _Avoid_: Integration, Account
 
 **Workspace**:
-운영자가 트래커 프로젝트 여러 개를 골라 묶은 단위. 트래커 조직(Linear 워크스페이스)과 1:1이 아니다. 한 트래커 프로젝트는 Workspace 하나에만 속한다. 매핑은 Workspace 안에 있고, 러너와 트래커 연결은 Workspace 밖에 있다.
+운영자가 트래커 프로젝트 여러 개를 골라 묶은 단위. 트래커 조직(Linear 워크스페이스)과 1:1이 아니며, 어느 트래커 연결의 프로젝트든 골라 묶을 수 있다. 한 트래커 프로젝트는 Workspace 하나에만 속한다. 매핑은 Workspace 안에 있고, 러너와 트래커 연결은 Workspace 밖에 있다.
 _Avoid_: Team, Org, Space, Organization
 
 ### 실행
@@ -41,7 +41,6 @@ _Avoid_: Repo
 
 **Worktree**:
 프로젝트 안에서 티켓 하나를 처리하려고 만든 격리된 작업 공간. Orca가 workspace라 부르는 것이며, 이 저장소에서는 Workspace와 구분해 Worktree로만 부른다.
-_Avoid_: workspace
 
 **Run**:
 티켓 하나를 러너에 맡겨 에이전트가 처리하는 한 번의 시도. 같은 티켓에 여러 런이 있을 수 있다.
