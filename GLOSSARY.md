@@ -69,7 +69,7 @@ _Avoid_: Trigger
 런의 상태는 Queued, Running, Waiting for Input, Disconnected, Ended 다섯이다. 할당된 런은 Queued로 시작하고(대기열 순서가 오고 남은 capacity가 있으면 바로 Running), Running·Waiting for Input·Disconnected를 오가다 Ended가 된다. 운영자가 취소하면 Queued에서 바로 Ended가 될 수도 있다. Ended에만 에이전트 결과와 PR 상태가 붙는다.
 
 **Queued**:
-할당은 됐지만 아직 시작하지 않은 런의 상태. 대기열에서 앞 런이 시작하기를 기다리거나, 할당 때 정한 러너에 남은 capacity가 없거나, 맞는 러너가 모두 Offline이라 러너를 정하지 못한 경우다(할당 때 정한 러너가 Offline이 됐거나 그 러너에서 런의 러너 쪽 프로젝트가 사라져 러너를 비운 경우 포함). 마지막 경우는 대기열 순서에서 빠져 뒤 런을 막지 않는다.
+할당은 됐지만 아직 시작하지 않은 런의 상태. 대기열에서 앞 런이 시작하기를 기다리거나, 할당 때 정한 러너에 남은 capacity가 없거나, 맞는 러너가 모두 Offline이라 러너를 정하지 못한 경우다(할당 때 정한 러너가 Offline이 돼 러너를 비운 경우 포함). 할당 때 정한 러너에서 런의 러너 쪽 프로젝트가 사라져 러너를 비운 경우도 마지막 경우와 같이 다룬다(그 러너가 Online이어도). 마지막 경우는 대기열 순서에서 빠져 뒤 런을 막지 않는다.
 _Avoid_: Pending, Waiting(단독으로. Waiting for Input은 다른 상태다)
 
 **Running**:
