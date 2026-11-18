@@ -8,22 +8,50 @@ import { toRunnerId } from "@factory/core";
 import { addUnreachedCanceledRun, breakGitHubAuth, now, seedDatabase } from "../testing/seed";
 import { loadRunnersPage } from "./load";
 import { runnersMessages } from "./messages";
-import type { RunnersPage } from "./model";
+import { failedChecksFirst, problemRunnersFirst } from "./model";
+import type { RunnerView, RunnersPage } from "./model";
 import { addRunnerHref, RunnersScreen } from "./runners-screen";
+import type { RunnerActions } from "./runners-screen";
 
-const card = runnersJson.card;
+const panel = runnersJson.panel;
+
+const noActions: RunnerActions = {
+  recheck: () => Promise.resolve({ ok: true }),
+  pollChecks: () => Promise.resolve(false),
+};
 
 function render(page: RunnersPage, selectedId?: string, ws?: string) {
   return renderWithMessages(
-    <RunnersScreen page={page} selectedId={selectedId} ws={ws} />,
+    <RunnersScreen
+      page={page}
+      selectedId={selectedId}
+      ws={ws}
+      onSelect={() => undefined}
+      actions={noActions}
+    />,
     runnersMessages,
   );
 }
 
-function cardHtml(html: string, name: string): string {
-  const start = html.indexOf(`<section aria-label="${name} 러너"`);
-  if (start === -1) throw new Error(`no card ${name}`);
-  return html.slice(start, html.indexOf("</section>", start));
+function rowsOf(html: string): { name: string; html: string; selected: boolean }[] {
+  return html
+    .split('role="option"')
+    .slice(1)
+    .map((chunk) => {
+      const end = chunk.indexOf("<aside");
+      const row = end === -1 ? chunk : chunk.slice(0, end);
+      return {
+        name: /id="runner-([^"]+)"/.exec(row)?.[1] ?? "",
+        html: row,
+        selected: /^[^>]*aria-selected="true"/.test(row),
+      };
+    });
+}
+
+function panelHtml(html: string): string {
+  const start = html.indexOf(`<section aria-label="${panel.label}"`);
+  if (start === -1) throw new Error("no panel");
+  return html.slice(start);
 }
 
 function textOf(html: string): string {
@@ -37,22 +65,114 @@ function variantsOf(html: string): string[] {
   return [...html.matchAll(/data-variant="([^"]+)"/g)].map((m) => m[1] ?? "");
 }
 
-describe("Runners 화면", () => {
-  it('러너마다 카드를 그리고 Online·Offline 알약과 capacity "n/m"을 보인다', () => {
-    const { db } = seedDatabase();
-    const html = render(loadRunnersPage(db, now));
-    const a = cardHtml(html, "runner-a");
-    expect(pillsOf(a)[0]).toEqual({ status: "online", label: domain.runnerState.online });
-    expect(textOf(a)).toContain(`${card.capacity} 4/10`);
-    const b = cardHtml(html, "runner-b");
-    expect(pillsOf(b)[0]).toEqual({ status: "offline", label: domain.runnerState.offline });
-    expect(textOf(b)).toContain(`${card.capacity} 0/1`);
+function runner(overrides: Partial<RunnerView> & { id: string }): RunnerView {
+  return {
+    name: overrides.id,
+    online: true,
+    assignmentBlocked: false,
+    checks: null,
+    checked: null,
+    capacity: 2,
+    occupying: [],
+    queued: [],
+    leftWorktrees: [],
+    sshTarget: null,
+    ...overrides,
+  };
+}
+
+const callout = /<section aria-labelledby=/;
+
+describe("Runners 목록", () => {
+  it("문제 있는 러너(Offline·Runner Issue)를 Online 러너보다 위에 두고 그 안의 순서는 지킨다", () => {
+    const page: RunnersPage = {
+      runners: [
+        runner({ id: "ok-1" }),
+        runner({ id: "down", online: false }),
+        runner({ id: "ok-2" }),
+        runner({ id: "auth", assignmentBlocked: true }),
+      ],
+    };
+    expect(rowsOf(render(page)).map((r) => r.name)).toEqual(["down", "auth", "ok-1", "ok-2"]);
+    expect(problemRunnersFirst(page.runners).map((r) => r.id)).toEqual([
+      "down",
+      "auth",
+      "ok-1",
+      "ok-2",
+    ]);
   });
 
-  it("제목 아래 한 줄 요약에 새 런을 받을 수 있는 러너 수와 문제가 있는 러너 수를 보인다", () => {
+  it("행마다 상태 알약은 하나다: Offline 이면 Offline, 인증이 깨지면 Runner Issue, 아니면 Online", () => {
     const { db } = seedDatabase();
-    const text = textOf(render(loadRunnersPage(db, now)));
-    expect(text).toContain("2대 중 1대가 새 런을 받을 수 있어요. 1대는 문제가 있어요.");
+    breakGitHubAuth(db);
+    const page = loadRunnersPage(db, now);
+    page.runners.push(runner({ id: "runner-c" }));
+    const rows = rowsOf(render(page));
+    expect(rows.map((r) => [r.name, pillsOf(r.html)])).toEqual([
+      ["runner-a", [{ status: "runner-issue", label: domain.attention["runner-issue"] }]],
+      ["runner-b", [{ status: "offline", label: domain.runnerState.offline }]],
+      ["runner-c", [{ status: "online", label: domain.runnerState.online }]],
+    ]);
+  });
+
+  it('행에 이름·주소와 capacity 막대 "n/m", 그 아래 무엇이 문제인지 한 문장을 보인다', () => {
+    const { db } = seedDatabase();
+    breakGitHubAuth(db);
+    const rows = rowsOf(render(loadRunnersPage(db, now)));
+    const a = rows.find((r) => r.name === "runner-a")?.html ?? "";
+    expect(a).toMatch(/role="meter"[^>]*aria-valuetext="4\/10"/);
+    expect(a).toContain('data-tone="problem"');
+    expect(textOf(a)).toContain(`runner-a ${runnersJson.row.assignmentBlocked}`);
+    const b = rows.find((r) => r.name === "runner-b")?.html ?? "";
+    expect(textOf(b)).toContain(runnersJson.row.offline);
+  });
+
+  it("꽉 찬 러너는 자리를 기다리는 런 수를, 빈자리가 있으면 빈자리 수를 한 문장으로 보인다", () => {
+    const occupying = [
+      {
+        id: "r1",
+        ticketKey: "ACME-1",
+        workspace: { id: "ws", name: "Acme" },
+        state: "running" as const,
+        executionMs: 1000,
+      },
+    ];
+    const queued = [
+      { id: "q1", ticketKey: "ACME-2", workspace: { id: "ws", name: "Acme" }, waitMs: 1000 },
+      { id: "q2", ticketKey: "ACME-3", workspace: { id: "ws", name: "Acme" }, waitMs: 1000 },
+    ];
+    const rows = rowsOf(
+      render({
+        runners: [
+          runner({
+            id: "full",
+            capacity: 1,
+            occupying,
+            queued,
+            sshTarget: "dev@runner.example.com",
+          }),
+          runner({ id: "free", capacity: 3, occupying }),
+        ],
+      }),
+    );
+    expect(textOf(rows[0]?.html ?? "")).toContain("꽉 찼어요. 런 2개가 자리를 기다려요.");
+    expect(rows[0]?.html).toContain("dev@runner.example.com");
+    expect(rows[0]?.html).toContain('data-tone="progress"');
+    expect(textOf(rows[1]?.html ?? "")).toContain("2자리가 비어 있어요.");
+  });
+
+  it("제목 아래 한 줄 요약에 문제 있는 러너 수와 새 런을 받을 수 있는 러너 수를 보인다", () => {
+    const { db } = seedDatabase();
+    expect(textOf(render(loadRunnersPage(db, now)))).toContain(
+      "2대 중 1대에 문제가 있어요. 1대가 지금 새 런을 받을 수 있어요.",
+    );
+    breakGitHubAuth(db);
+    expect(textOf(render(loadRunnersPage(db, now)))).toContain(
+      "2대 중 2대에 문제가 있어요. 지금 새 런을 받을 수 있는 러너가 없어요.",
+    );
+    expect(textOf(render({ runners: [runner({ id: "ok" })] }))).toContain(
+      "러너 1대 모두 문제가 없어요. 1대가 지금 새 런을 받을 수 있어요.",
+    );
   });
 
   it("파란 주 버튼은 러너 추가 하나이고 Settings 의 러너 등록으로 간다(ADR 0010 6번)", () => {
@@ -61,7 +181,6 @@ describe("Runners 화면", () => {
     const html = render(loadRunnersPage(db, now));
     expect(variantsOf(html).filter((v) => v === "primary")).toHaveLength(1);
     expect(html).toContain(`<a href="/settings?sel=runners" data-variant="primary"`);
-    expect(textOf(html)).toContain(runnersJson.add);
   });
 
   it("러너 추가 링크는 보던 Workspace(ws)를 이어 간다", () => {
@@ -72,7 +191,148 @@ describe("Runners 화면", () => {
     );
   });
 
-  it("Online 러너의 할당을 막지 않는 항목이 깨지면 깨짐 아이콘과 어댑터의 해결 안내를 보인다", () => {
+  it("러너가 없으면 빈 상태로 안내하고 목록과 패널 내용은 그리지 않는다", () => {
+    const html = render({ runners: [] });
+    const text = textOf(html);
+    expect(text).toContain(runnersJson.empty.title);
+    expect(text).toContain(runnersJson.empty.body);
+    expect(/<header[^]*?<\/header>/.exec(html)?.[0]).not.toContain("<p");
+    expect(html).not.toContain('role="listbox"');
+    expect(variantsOf(html)).toEqual(["primary"]);
+  });
+});
+
+describe("Runners 고른 러너 패널", () => {
+  it("sel 로 고른 러너를 고르고, sel 이 없으면 맨 위 러너를 고른다", () => {
+    const { db } = seedDatabase();
+    const page = loadRunnersPage(db, now);
+    const chosen = rowsOf(render(page, "runner-a")).filter((r) => r.selected);
+    expect(chosen.map((r) => r.name)).toEqual(["runner-a"]);
+    expect(render(page, "runner-a")).toMatch(/<h2[^>]*>runner-a<\/h2>/);
+    expect(
+      rowsOf(render(page))
+        .filter((r) => r.selected)
+        .map((r) => r.name),
+    ).toEqual(["runner-b"]);
+    expect(
+      rowsOf(render(page, "missing"))
+        .filter((r) => r.selected)
+        .map((r) => r.name),
+    ).toEqual(["runner-b"]);
+  });
+
+  it("해결 상자는 문제 있는 러너에만 보이고 제목·번호 단계·다시 확인 버튼을 담는다", () => {
+    const { db } = seedDatabase();
+    const page = loadRunnersPage(db, now);
+    const offline = panelHtml(render(page, "runner-b"));
+    expect(offline).toMatch(callout);
+    expect(textOf(offline)).toContain(panel.fix.offline.title);
+    expect(offline).toMatch(/<ol[^>]*><li[^]*?1<\/span>[^]*?2<\/span>[^]*?3<\/span>/);
+    expect(textOf(offline)).toContain(panel.fix.offline.steps["1"]);
+    expect(offline).toMatch(new RegExp(`data-variant="secondary"[^>]*>${panel.recheck}</button>`));
+
+    const online = panelHtml(render(page, "runner-a"));
+    expect(online).not.toMatch(callout);
+    expect(textOf(online)).not.toContain(panel.recheck);
+  });
+
+  it("GitHub 인증이 깨진 러너의 해결 상자는 gh 명령을 모노 글로 단계에 담는다", () => {
+    const { db } = seedDatabase();
+    breakGitHubAuth(db);
+    const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
+    expect(a).toMatch(callout);
+    expect(textOf(a)).toContain(panel.fix.assignmentBlocked.title);
+    expect(a).toMatch(/<code[^>]*>gh auth login --insecure-storage<\/code>/);
+    expect(a).toMatch(/<code[^>]*>gh auth setup-git<\/code>/);
+  });
+
+  it("상태 알약·확인 시각, 제목 이름과 주소를 패널 머리에 둔다", () => {
+    const html = panelHtml(
+      render({
+        runners: [
+          runner({
+            id: "r",
+            name: "build-1",
+            sshTarget: "dev@runner.example.com",
+            checked: { at: now.toISOString(), agoMs: 2 * 60 * 60 * 1000 },
+          }),
+        ],
+      }),
+    );
+    expect(pillsOf(html)[0]).toEqual({ status: "online", label: domain.runnerState.online });
+    expect(textOf(html)).toContain("2시간 전 확인했어요");
+    expect(html).toMatch(/<h2[^>]*>build-1<\/h2>/);
+    expect(html).toMatch(/<p[^>]*>dev@runner.example.com<\/p>/);
+  });
+
+  it("지금 하는 런 블록은 n/capacity 와 쓰는 런·기다리는 런을 Run 상세 링크로 보인다", () => {
+    const { db, ids } = seedDatabase();
+    const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
+    expect(textOf(a)).toContain("지금 하는 런 · 4/10");
+    const statuses = pillsOf(a).map((p) => p.status);
+    expect(statuses).toContain("running");
+    expect(statuses).toContain("disconnected");
+    expect(statuses).toContain("queued");
+    expect(textOf(a)).toContain("ACME-12 Acme Commerce");
+    const id = ids.get("LAB-1") ?? "";
+    expect(a).toMatch(
+      new RegExp(
+        `<a href="/runs/${id}\\?ws=ws-labs"[^>]*>(?:(?!</a>)[^])*LAB-1(?:(?!</a>)[^])*</a>`,
+      ),
+    );
+    expect(textOf(panelHtml(render(loadRunnersPage(db, now), "runner-b")))).toContain(panel.noRuns);
+  });
+
+  it("확인 항목은 통과 수/전체를 제목에 두고 깨진 항목을 먼저 보인다", () => {
+    const { db } = seedDatabase();
+    breakGitHubAuth(db);
+    const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
+    expect(textOf(a)).toContain("확인 항목 · 2/3 통과");
+    const states = [...a.matchAll(/data-check="([^"]+)"/g)].map((m) => m[1]);
+    expect(states).toEqual(["broken", "ok", "ok"]);
+    expect(a).toMatch(
+      new RegExp(
+        `data-check="broken"[^]*?${panel.check.broken}[^]*?GitHub push 권한: github:acme/web<`,
+      ),
+    );
+    expect(textOf(a)).not.toContain("GitHub push access");
+    const lines = [...a.matchAll(/<li data-check="([^"]+)"[^]*?<\/li>/g)].map((m) => [
+      m[1],
+      textOf(m[0]).trim(),
+    ]);
+    expect(lines).toEqual([
+      ["broken", `${panel.check.broken} GitHub push 권한: github:acme/web`],
+      ["ok", "Orca service"],
+      ["ok", "GitHub push 권한: github:acme/docs"],
+    ]);
+    expect(a).not.toContain('data-status="online" data-tone');
+  });
+
+  it("확인하지 못한 항목은 그렇다고 글로 보인다", () => {
+    const html = panelHtml(
+      render({
+        runners: [
+          runner({
+            id: "r",
+            checks: [
+              {
+                id: "x",
+                name: "Orca service",
+                project: null,
+                satisfied: null,
+                blocksAssignment: false,
+                hint: null,
+              },
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(textOf(html)).toContain("확인 항목 · 0/1 통과");
+    expect(html).toMatch(new RegExp(`data-check="unknown"[^]*?${panel.check.unknown}`));
+  });
+
+  it("깨진 항목 아래에 어댑터의 해결 안내를 보인다", () => {
     const { db } = seedDatabase();
     recordRunnerCheck(db, {
       runnerId: toRunnerId("runner-a"),
@@ -91,145 +351,47 @@ describe("Runners 화면", () => {
         },
       ],
     });
-    const a = cardHtml(render(loadRunnersPage(db, now)), "runner-a");
-    expect(a).toMatch(new RegExp(`aria-label="${card.check.broken}"[^]*?Orca 상시 서비스<`));
-    expect(textOf(a)).toContain("orca serve service install");
+    const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
+    expect(textOf(a)).toContain("확인 항목 · 0/1 통과");
+    expect(textOf(a)).toContain("Orca 상시 서비스 orca serve service install");
+    expect(a).not.toMatch(callout);
   });
 
-  it("주소로 고른 러너 카드를 표시한다", () => {
+  it("Offline 러너는 확인 항목 대신 ssh로 닿지 않는다고 보인다", () => {
     const { db } = seedDatabase();
-    const html = render(loadRunnersPage(db, now), "runner-b");
-    expect(html).toMatch(/<li id="runner-runner-b" aria-current="true" tabindex="-1"/);
-    expect(html).not.toMatch(/<li id="runner-runner-a" aria-current/);
-    expect(html).not.toMatch(/<li id="runner-runner-a"[^>]*tabindex/);
+    const b = panelHtml(render(loadRunnersPage(db, now), "runner-b"));
+    expect(textOf(b)).toContain(`${panel.checksTitle} ${panel.check.broken} ${panel.unreachable}`);
   });
 
-  it("러너가 없으면 빈 상태 블록에서 안내하고 주 버튼은 하나다", () => {
-    const html = render({ runners: [] });
-    const text = textOf(html);
-    expect(text).toContain(runnersJson.empty.title);
-    expect(text).toContain(runnersJson.empty.body);
-    expect(/<header[^]*?<\/header>/.exec(html)?.[0]).not.toContain("<p");
-    expect(html).not.toContain(`aria-label="${runnersJson.listLabel}"`);
-    expect(variantsOf(html)).toEqual(["primary"]);
-  });
-
-  it("capacity 를 쓰는 런과 기다리는 런을 상태 알약·Workspace 와 함께 보인다", () => {
+  it("확인 항목을 아직 읽지 않은 러너는 그렇다고 보인다", () => {
     const { db } = seedDatabase();
-    const a = cardHtml(render(loadRunnersPage(db, now)), "runner-a");
-    const statuses = pillsOf(a).map((p) => p.status);
-    expect(statuses).toContain("running");
-    expect(statuses).toContain("disconnected");
-    expect(statuses).toContain("queued");
-    expect(textOf(a)).toContain("ACME-12 Acme Commerce");
-    expect(textOf(a)).toContain("6자리가 비어 있어요.");
-  });
-
-  it("런 행 전체가 그 런의 Workspace 로 연 Run 상세 링크다(0050 5번)", () => {
-    const { db, ids } = seedDatabase();
-    const a = cardHtml(render(loadRunnersPage(db, now)), "runner-a");
-    const id = ids.get("LAB-1") ?? "";
-    const link = new RegExp(
-      `<a href="/runs/${id}\\?ws=ws-labs"[^>]*>(?:(?!</a>)[^])*data-status="[^"]+"(?:(?!</a>)[^])*LAB-1(?:(?!</a>)[^])*</a>`,
-    );
-    expect(a).toMatch(link);
-    expect(a).not.toMatch(/<a [^>]*>(?:(?!<\/a>)[^])*<a /);
-  });
-
-  it("긴 프로젝트 이름의 확인 항목을 이름 전체로 그린다", () => {
-    const { db } = seedDatabase();
-    const project = "github:acme/a-very-long-repository-name-that-does-not-fit-in-a-card";
-    recordRunnerCheck(db, {
-      runnerId: toRunnerId("runner-a"),
-      online: true,
-      checkedAt: now,
-      error: null,
-      projects: null,
-      assignmentBlocked: false,
-      prerequisites: [
-        {
-          id: `github-push:${project}`,
-          name: `GitHub push access: ${project}`,
-          satisfied: false,
-          hint: null,
-          blocksAssignment: false,
-        },
-      ],
-    });
-    const a = cardHtml(render(loadRunnersPage(db, now)), "runner-a");
-    expect(a).toMatch(
-      new RegExp(`aria-label="${card.check.broken}"[^]*?>GitHub push 권한: ${project}</span>`),
-    );
+    const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
+    expect(textOf(a)).toContain(`${panel.checksTitle} ${panel.noChecks}`);
   });
 
   it("남은 워크트리와 그 까닭을 보인다", () => {
     const { db } = seedDatabase();
-    const text = textOf(cardHtml(render(loadRunnersPage(db, now)), "runner-a"));
+    const text = textOf(panelHtml(render(loadRunnersPage(db, now), "runner-a")));
     expect(text).toContain("남은 워크트리 2");
-    expect(text).toContain(card.worktree["operator-decides"]);
-    expect(text).toContain(card.worktree["keep-until-pr-settles"]);
-  });
-
-  it("Offline 러너는 닿지 않는다는 것과 해결 안내를 보이고 막대를 빨갛게 그린다", () => {
-    const { db } = seedDatabase();
-    const b = cardHtml(render(loadRunnersPage(db, now)), "runner-b");
-    const text = textOf(b);
-    expect(text).toContain(card.summary.offline);
-    expect(text).toContain(card.unreachable);
-    expect(text).toContain(card.fixTitle);
-    expect(text).toContain(card.fix.offline);
-    expect(pillsOf(b).map((p) => p.status)).toEqual(["offline"]);
-  });
-
-  it("GitHub 인증이 깨진 러너는 Online 과 Runner Issue 알약, 깨진 프로젝트, 해결 방법을 보인다(Q82.14·Q82.15)", () => {
-    const { db } = seedDatabase();
-    breakGitHubAuth(db);
-    const html = render(loadRunnersPage(db, now));
-    const a = cardHtml(html, "runner-a");
-    expect(pillsOf(a).slice(0, 2)).toEqual([
-      { status: "online", label: domain.runnerState.online },
-      { status: "runner-issue", label: domain.attention["runner-issue"] },
-    ]);
-    const text = textOf(a);
-    expect(text).toContain(card.summary.assignmentBlocked);
-    expect(a).toMatch(
-      new RegExp(`aria-label="${card.check.broken}"[^]*?GitHub push 권한: github:acme/web<`),
-    );
-    expect(a).toMatch(
-      new RegExp(`aria-label="${card.check.ok}"[^]*?GitHub push 권한: github:acme/docs<`),
-    );
-    expect(text).not.toContain("GitHub push access");
-    expect(text).not.toContain("Run `gh auth login");
-    expect(text).toContain("gh auth login --insecure-storage");
-    expect(text).toContain("gh auth setup-git");
-    expect(pillsOf(cardHtml(html, "runner-b")).map((p) => p.status)).toEqual(["offline"]);
-  });
-
-  it("확인 항목을 아직 읽지 않은 러너는 그렇다고 보이고 해결 방법은 보이지 않는다", () => {
-    const { db } = seedDatabase();
-    const text = textOf(cardHtml(render(loadRunnersPage(db, now)), "runner-a"));
-    expect(text).toContain(card.noChecks);
-    expect(text).not.toContain(card.fixTitle);
-  });
-
-  it("마지막 확인을 상대 시간으로 보인다", () => {
-    const { db } = seedDatabase();
-    const text = textOf(cardHtml(render(loadRunnersPage(db, now)), "runner-a"));
-    expect(text).toContain("2시간 전 확인했어요");
+    expect(text).toContain(panel.worktree["operator-decides"]);
+    expect(text).toContain(panel.worktree["keep-until-pr-settles"]);
   });
 
   it("러너에 닿지 못한 채 끝난 취소 런을 남은 워크트리에 넣는다(Q82.21)", () => {
     const { db } = seedDatabase();
     addUnreachedCanceledRun(db, "ACME-22");
-    const text = textOf(cardHtml(render(loadRunnersPage(db, now)), "runner-b"));
+    const text = textOf(panelHtml(render(loadRunnersPage(db, now), "runner-b")));
     expect(text).toContain("남은 워크트리 1");
-    expect(text).toContain(`ACME-22 Acme Commerce · ${card.worktree["operator-decides"]}`);
+    expect(text).toContain(`ACME-22 Acme Commerce · ${panel.worktree["operator-decides"]}`);
   });
 
-  it("카드마다 주소로 고를 수 있는 id 를 단다", () => {
-    const { db } = seedDatabase();
-    const html = render(loadRunnersPage(db, now), "runner-b");
-    expect(html).toContain('id="runner-runner-a"');
-    expect(html).toContain('id="runner-runner-b"');
+  it("확인 항목 정렬은 깨짐, 모름, 통과 순이다", () => {
+    expect(
+      failedChecksFirst([
+        { id: "a", satisfied: true },
+        { id: "b", satisfied: null },
+        { id: "c", satisfied: false },
+      ]).map((c) => c.id),
+    ).toEqual(["c", "b", "a"]);
   });
 });

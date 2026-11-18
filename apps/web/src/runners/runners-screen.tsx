@@ -1,14 +1,34 @@
 import * as stylex from "@stylexjs/stylex";
-import { Card, PageHeader, Row, StatusPill, Text, buttonStyles } from "@factory/ui";
-import { colors, fontSize, fontWeight, fonts, radius, space } from "@factory/ui/tokens.stylex";
-import { useEffect } from "react";
+import {
+  Button,
+  CapacityBar,
+  DetailPanel,
+  PageHeader,
+  PanelBlock,
+  ProblemCallout,
+  Row,
+  RowTitle,
+  SplitView,
+  StatusPill,
+  Table,
+  TableCell,
+  TableRow,
+  TableRows,
+  Text,
+  buttonStyles,
+  textStyles,
+} from "@factory/ui";
+import { fonts, space } from "@factory/ui/tokens.stylex";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { usePrerequisiteName } from "../labels";
-import { runnerIssueCause } from "../shell/model";
+import { useRunnerCheckPolling } from "../settings/settings-screen";
+import type { ActionResult } from "../settings/settings-screen";
 import { useStatusName } from "../status";
-import type { RunWorkspace, RunnerCheckItem, RunnerView, RunnersPage } from "./model";
+import { failedChecksFirst, problemRunnersFirst, runnerRowStatus } from "./model";
+import type { RunnerCheckItem, RunnerView, RunnersPage } from "./model";
 
 export function addRunnerHref(ws: string | undefined): string {
   const search = new URLSearchParams(ws === undefined ? {} : { ws });
@@ -16,138 +36,143 @@ export function addRunnerHref(ws: string | undefined): string {
   return `/settings?${search.toString()}`;
 }
 
-const MAX_SEGMENTS = 12;
+export interface RunnerActions {
+  recheck: (input: { id: string }) => Promise<ActionResult>;
+  pollChecks: () => Promise<boolean>;
+}
 
 export interface RunnersScreenProps {
   page: RunnersPage;
   selectedId: string | undefined;
   ws: string | undefined;
+  onSelect: (id: string) => void;
+  actions: RunnerActions;
 }
 
-export function RunnersScreen({ page, selectedId, ws }: RunnersScreenProps) {
+const columns = "112px minmax(0, 1fr) 160px";
+
+export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: RunnersScreenProps) {
   const t = useTranslations("runners");
-  const { runners } = page;
-  const issues = runners.filter((r) => runnerIssueCause(r) !== null).length;
+  const runners = problemRunnersFirst(page.runners);
+  const issues = runners.filter((r) => runnerRowStatus(r) !== "online").length;
   const available = runners.filter(
-    (r) => runnerIssueCause(r) === null && r.occupying.length < r.capacity,
+    (r) => runnerRowStatus(r) === "online" && r.occupying.length < r.capacity,
   ).length;
+  const selected = runners.find((r) => r.id === selectedId) ?? runners[0];
 
   useEffect(() => {
     if (selectedId === undefined) return;
-    const card = document.getElementById(cardId(selectedId));
-    if (card === null) return;
-    card.scrollIntoView({ block: "nearest" });
-    card.focus({ preventScroll: true });
+    const option = document.getElementById(rowMarkerId(selectedId))?.closest('[role="option"]');
+    if (!(option instanceof HTMLElement) || option.contains(document.activeElement)) return;
+    option.scrollIntoView({ block: "nearest" });
+    option.focus({ preventScroll: true });
   }, [selectedId]);
 
   return (
-    <div {...stylex.props(styles.page)}>
-      <PageHeader
-        title={t("title")}
-        subtitle={
-          runners.length === 0
-            ? undefined
-            : t("subtitle", { total: runners.length, available, issues })
-        }
-        actions={
-          <a
-            href={addRunnerHref(ws)}
-            data-variant="primary"
-            {...stylex.props(...buttonStyles("primary"))}
-          >
-            {t("add")}
-          </a>
-        }
-      />
-      {runners.length === 0 ? (
-        <EmptyRunners />
-      ) : (
-        <ul aria-label={t("listLabel")} {...stylex.props(styles.grid)}>
-          {runners.map((runner) => (
-            <li
-              key={runner.id}
-              id={cardId(runner.id)}
-              aria-current={runner.id === selectedId ? "true" : undefined}
-              tabIndex={runner.id === selectedId ? -1 : undefined}
-              {...stylex.props(styles.cell, runner.id === selectedId && styles.selected)}
-            >
-              <RunnerCard runner={runner} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <SplitView
+      list={
+        <>
+          <PageHeader
+            title={t("title")}
+            subtitle={
+              runners.length === 0
+                ? undefined
+                : t("subtitle", { total: runners.length, available, issues })
+            }
+            actions={
+              <a
+                href={addRunnerHref(ws)}
+                data-variant="primary"
+                {...stylex.props(...buttonStyles("primary"))}
+              >
+                {t("add")}
+              </a>
+            }
+          />
+          {runners.length === 0 ? (
+            <EmptyRunners />
+          ) : (
+            <Table columns={columns}>
+              <TableRows
+                label={t("listLabel")}
+                value={selected?.id ?? null}
+                onValueChange={onSelect}
+              >
+                {runners.map((runner) => (
+                  <RunnerRow key={runner.id} runner={runner} />
+                ))}
+              </TableRows>
+            </Table>
+          )}
+        </>
+      }
+      panel={
+        <section aria-label={t("panel.label")}>
+          {selected === undefined ? (
+            <DetailPanel>
+              {runners.length === 0 ? null : <Text variant="meta">{t("panel.empty")}</Text>}
+            </DetailPanel>
+          ) : (
+            <RunnerPanel key={selected.id} runner={selected} actions={actions} />
+          )}
+        </section>
+      }
+    />
   );
 }
 
 function EmptyRunners() {
   const t = useTranslations("runners.empty");
   return (
-    <Card>
+    <div {...stylex.props(styles.stack)}>
       <Text variant="title">{t("title")}</Text>
       <Text variant="body">{t("body")}</Text>
-    </Card>
+    </div>
   );
 }
 
-function cardId(runnerId: string): string {
+export function rowMarkerId(runnerId: string): string {
   return `runner-${runnerId}`;
 }
 
-function RunnerCard({ runner }: { runner: RunnerView }) {
-  const t = useTranslations("runners.card");
+function RunnerRow({ runner }: { runner: RunnerView }) {
+  const t = useTranslations("runners");
   const statusName = useStatusName();
-  const { ago } = useTime();
-  const cause = runnerIssueCause(runner);
-  const online = runner.online ? "online" : "offline";
+  const status = runnerRowStatus(runner);
   return (
-    <Card label={t("label", { name: runner.name })}>
-      <div {...stylex.props(styles.head)}>
-        <div {...stylex.props(styles.name)}>
-          <h2 {...stylex.props(styles.title)}>{runner.name}</h2>
-          {runner.sshTarget === null ? null : (
-            <Text variant="meta" mono truncate>
-              {runner.sshTarget}
-            </Text>
-          )}
-        </div>
-        <div {...stylex.props(styles.pills)}>
-          <StatusPill status={online}>{statusName(online)}</StatusPill>
-          {cause === "auth" ? (
-            <StatusPill status="runner-issue">{statusName("runner-issue")}</StatusPill>
-          ) : null}
-        </div>
-      </div>
-      <Text variant="body">
-        <Summary runner={runner} />
-      </Text>
-      <CapacityBar runner={runner} />
-      <RunList runner={runner} />
-      <CheckList runner={runner} />
-      {cause === null ? null : (
-        <div role="note" {...stylex.props(styles.fix)}>
-          <Text variant="label">{t("fixTitle")}</Text>
-          <p {...stylex.props(styles.fixBody)}>
-            {cause === "offline"
-              ? t("fix.offline")
-              : t.rich("fix.assignmentBlocked", {
-                  code: (chunks) => <code {...stylex.props(styles.code)}>{chunks}</code>,
-                })}
-          </p>
-        </div>
-      )}
-      <LeftWorktrees runner={runner} />
-      <Text variant="meta">
-        {runner.checked === null
-          ? t("neverChecked")
-          : t("checkedAgo", { time: ago(runner.checked.at, runner.checked.agoMs) })}
-      </Text>
-    </Card>
+    <TableRow value={runner.id} label={runner.name}>
+      <TableCell>
+        <StatusPill status={status}>{statusName(status)}</StatusPill>
+      </TableCell>
+      <TableCell>
+        <span id={rowMarkerId(runner.id)} {...stylex.props(styles.rowText)}>
+          <span {...stylex.props(styles.rowHead)}>
+            <RowTitle>{runner.name}</RowTitle>
+            {runner.sshTarget === null ? null : (
+              <Text variant="meta" mono truncate>
+                {runner.sshTarget}
+              </Text>
+            )}
+          </span>
+          <Text variant="meta" truncate>
+            <RowSentence runner={runner} />
+          </Text>
+        </span>
+      </TableCell>
+      <TableCell>
+        <CapacityBar
+          used={runner.occupying.length}
+          total={runner.capacity}
+          label={t("capacityLabel", { name: runner.name })}
+          tone={status === "online" ? "progress" : "problem"}
+        />
+      </TableCell>
+    </TableRow>
   );
 }
 
-function Summary({ runner }: { runner: RunnerView }) {
-  const t = useTranslations("runners.card.summary");
+function RowSentence({ runner }: { runner: RunnerView }) {
+  const t = useTranslations("runners.row");
   const free = Math.max(0, runner.capacity - runner.occupying.length);
   if (!runner.online) return t("offline");
   if (runner.assignmentBlocked) return t("assignmentBlocked");
@@ -155,136 +180,233 @@ function Summary({ runner }: { runner: RunnerView }) {
   return runner.queued.length === 0 ? t("full") : t("fullWaiting", { count: runner.queued.length });
 }
 
-function CapacityBar({ runner }: { runner: RunnerView }) {
-  const t = useTranslations("runners.card");
-  const occupied = Math.min(runner.occupying.length, runner.capacity);
-  const segments = runner.capacity <= MAX_SEGMENTS;
-  const fill = runner.online ? styles.fillOnline : styles.fillOffline;
+function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerActions }) {
+  const t = useTranslations("runners.panel");
+  const statusName = useStatusName();
+  const { ago } = useTime();
+  const status = runnerRowStatus(runner);
+  const recheck = useRecheck(runner.id, actions);
   return (
-    <div {...stylex.props(styles.capacity)}>
-      <div {...stylex.props(styles.capacityHead)}>
-        <span>{t("capacity")}</span>
-        <span {...stylex.props(styles.numeric)}>
-          {t("load", { occupied: runner.occupying.length, capacity: runner.capacity })}
-        </span>
+    <DetailPanel>
+      <div {...stylex.props(styles.panelHead)}>
+        <div {...stylex.props(styles.statusLine)}>
+          <StatusPill status={status}>{statusName(status)}</StatusPill>
+          <Text variant="meta">
+            {runner.checked === null
+              ? t("neverChecked")
+              : t("checkedAgo", { time: ago(runner.checked.at, runner.checked.agoMs) })}
+          </Text>
+        </div>
+        <div {...stylex.props(styles.wrap)}>
+          <Text variant="heading">{runner.name}</Text>
+          {runner.sshTarget === null ? null : (
+            <Text variant="meta" as="p" mono>
+              {runner.sshTarget}
+            </Text>
+          )}
+        </div>
+        <p
+          ref={recheck.statusRef}
+          role="status"
+          tabIndex={-1}
+          {...stylex.props(textStyles("meta"))}
+        >
+          {recheck.message === null ? null : t(`recheckStatus.${recheck.message}`)}
+        </p>
       </div>
-      <div aria-hidden="true" {...stylex.props(styles.bar)}>
-        {segments ? (
-          Array.from({ length: runner.capacity }, (_, i) => (
-            <span key={i} {...stylex.props(styles.segment, i < occupied && fill)} />
-          ))
-        ) : (
-          <span {...stylex.props(styles.segment)}>
-            <span
-              {...stylex.props(
-                styles.track,
-                fill,
-                styles.trackWidth(`${(occupied / runner.capacity) * 100}%`),
-              )}
-            />
-          </span>
-        )}
-      </div>
-    </div>
+      {status === "online" ? null : (
+        <FixCallout
+          cause={status === "offline" ? "offline" : "assignmentBlocked"}
+          checking={recheck.checking}
+          onRecheck={recheck.request}
+        />
+      )}
+      <RunList runner={runner} />
+      <CheckList runner={runner} />
+      <LeftWorktrees runner={runner} />
+    </DetailPanel>
+  );
+}
+
+type RecheckPhase = "idle" | "sending" | "requested" | "done" | "failed";
+type RecheckMessage = "requested" | "done" | "failed" | "silent";
+
+function useRecheck(runnerId: string, { recheck, pollChecks }: RunnerActions) {
+  const [phase, setPhase] = useState<RecheckPhase>("idle");
+  const [pendingKey, setPendingKey] = useState("");
+  const statusRef = useRef<HTMLParagraphElement>(null);
+
+  const focusStatusIfLost = useCallback(() => {
+    const active = document.activeElement;
+    if (active === null || active === document.body) statusRef.current?.focus();
+  }, []);
+
+  const poll = useCallback(async () => {
+    const still = await pollChecks();
+    if (!still) {
+      setPhase("done");
+      setPendingKey("");
+      focusStatusIfLost();
+    }
+    return still;
+  }, [pollChecks, focusStatusIfLost]);
+  const silent = useRunnerCheckPolling(pendingKey, poll);
+
+  const request = () => {
+    setPhase("sending");
+    recheck({ id: runnerId }).then(
+      (result) => {
+        if (result.ok) {
+          setPhase("requested");
+          setPendingKey(`${runnerId}:${String(Date.now())}`);
+        } else {
+          setPhase("failed");
+        }
+        focusStatusIfLost();
+      },
+      () => {
+        setPhase("failed");
+        focusStatusIfLost();
+      },
+    );
+  };
+
+  return {
+    statusRef,
+    request,
+    checking: phase === "sending" || (phase === "requested" && !silent),
+    message: recheckMessage(phase, silent),
+  };
+}
+
+function recheckMessage(phase: RecheckPhase, silent: boolean): RecheckMessage | null {
+  switch (phase) {
+    case "idle":
+    case "sending":
+      return null;
+    case "requested":
+      return silent ? "silent" : "requested";
+    case "done":
+    case "failed":
+      return phase;
+  }
+}
+
+function FixCallout({
+  cause,
+  checking,
+  onRecheck,
+}: {
+  cause: "offline" | "assignmentBlocked";
+  checking: boolean;
+  onRecheck: () => void;
+}) {
+  const t = useTranslations("runners.panel");
+  const code = (chunks: ReactNode) => <code {...stylex.props(styles.code)}>{chunks}</code>;
+  return (
+    <ProblemCallout
+      title={t(`fix.${cause}.title`)}
+      steps={(["1", "2", "3"] as const).map((step) =>
+        t.rich(`fix.${cause}.steps.${step}`, { code }),
+      )}
+      actions={
+        <Button disabled={checking} onClick={onRecheck}>
+          {checking ? t("checking") : t("recheck")}
+        </Button>
+      }
+    >
+      {t(`fix.${cause}.body`)}
+    </ProblemCallout>
   );
 }
 
 function RunList({ runner }: { runner: RunnerView }) {
-  const t = useTranslations("runners.card");
+  const t = useTranslations("runners.panel");
   const statusName = useStatusName();
   const { elapsed, duration } = useTime();
-  if (runner.occupying.length === 0 && runner.queued.length === 0) return null;
+  const empty = runner.occupying.length === 0 && runner.queued.length === 0;
   return (
-    <ol aria-label={t("runs")} {...stylex.props(styles.list)}>
-      {runner.occupying.map((run) => (
-        <li key={run.id}>
-          <RunRowLink runId={run.id} workspace={run.workspace}>
-            <Row
-              leading={<StatusPill status={run.state}>{statusName(run.state)}</StatusPill>}
-              trailing={elapsed(run.executionMs)}
-            >
-              <RunLabel ticketKey={run.ticketKey} workspace={run.workspace} />
-            </Row>
-          </RunRowLink>
-        </li>
-      ))}
-      {runner.queued.map((run) => (
-        <li key={run.id}>
-          <RunRowLink runId={run.id} workspace={run.workspace}>
-            <Row
-              leading={<StatusPill status="queued">{statusName("queued")}</StatusPill>}
-              trailing={t("queuedFor", { duration: duration(run.waitMs) })}
-            >
-              <RunLabel ticketKey={run.ticketKey} workspace={run.workspace} />
-            </Row>
-          </RunRowLink>
-        </li>
-      ))}
-    </ol>
+    <PanelBlock title={t("runs", { occupied: runner.occupying.length, capacity: runner.capacity })}>
+      {empty ? (
+        <Text variant="meta">{t("noRuns")}</Text>
+      ) : (
+        <ol {...stylex.props(styles.list)}>
+          {runner.occupying.map((run) => (
+            <li key={run.id}>
+              <Row
+                href={runHref(run.workspace.id, run.id)}
+                leading={<StatusPill status={run.state}>{statusName(run.state)}</StatusPill>}
+                trailing={elapsed(run.executionMs)}
+              >
+                <RunLabel ticketKey={run.ticketKey} meta={run.workspace.name} />
+              </Row>
+            </li>
+          ))}
+          {runner.queued.map((run) => (
+            <li key={run.id}>
+              <Row
+                href={runHref(run.workspace.id, run.id)}
+                leading={<StatusPill status="queued">{statusName("queued")}</StatusPill>}
+                trailing={t("queuedFor", { duration: duration(run.waitMs) })}
+              >
+                <RunLabel ticketKey={run.ticketKey} meta={run.workspace.name} />
+              </Row>
+            </li>
+          ))}
+        </ol>
+      )}
+    </PanelBlock>
   );
 }
 
-function RunRowLink({
-  runId,
-  workspace,
-  children,
-}: {
-  runId: string;
-  workspace: RunWorkspace;
-  children: ReactNode;
-}) {
-  return (
-    <a href={runHref(workspace.id, runId)} {...stylex.props(styles.rowLink)}>
-      {children}
-    </a>
-  );
-}
-
-function RunLabel({
-  ticketKey,
-  workspace,
-  meta,
-}: {
-  ticketKey: string;
-  workspace: RunWorkspace;
-  meta?: ReactNode;
-}) {
+function RunLabel({ ticketKey, meta }: { ticketKey: string; meta: string }) {
   return (
     <span {...stylex.props(styles.runLabel)}>
-      <span {...stylex.props(styles.ticketKey)}>{ticketKey}</span>
+      <Text variant="title" numeric>
+        {ticketKey}
+      </Text>
       <Text variant="meta" truncate>
-        {meta ?? workspace.name}
+        {meta}
       </Text>
     </span>
   );
 }
 
 function CheckList({ runner }: { runner: RunnerView }) {
-  const t = useTranslations("runners.card");
+  const t = useTranslations("runners.panel");
   const prerequisiteName = usePrerequisiteName();
   if (!runner.online) {
     return (
-      <ul aria-label={t("checks")} {...stylex.props(styles.list)}>
-        <CheckLine state="broken">{t("unreachable")}</CheckLine>
-      </ul>
+      <PanelBlock title={t("checksTitle")}>
+        <ul {...stylex.props(styles.list)}>
+          <CheckLine state="broken">{t("unreachable")}</CheckLine>
+        </ul>
+      </PanelBlock>
     );
   }
   const checks = runner.checks;
   if (checks === null || checks.length === 0) {
-    return <Text variant="meta">{t("noChecks")}</Text>;
+    return (
+      <PanelBlock title={t("checksTitle")}>
+        <Text variant="meta">{t("noChecks")}</Text>
+      </PanelBlock>
+    );
   }
+  const passed = checks.filter((check) => check.satisfied === true).length;
   return (
-    <ul aria-label={t("checks")} {...stylex.props(styles.list)}>
-      {checks.map((check) => (
-        <CheckLine
-          key={check.id}
-          state={checkState(check)}
-          hint={check.satisfied === false ? check.hint : null}
-        >
-          {prerequisiteName(check)}
-        </CheckLine>
-      ))}
-    </ul>
+    <PanelBlock title={t("checks", { passed, total: checks.length })}>
+      <ul {...stylex.props(styles.list)}>
+        {failedChecksFirst(checks).map((check) => (
+          <CheckLine
+            key={check.id}
+            state={checkState(check)}
+            hint={check.satisfied === false ? check.hint : null}
+          >
+            {prerequisiteName(check)}
+          </CheckLine>
+        ))}
+      </ul>
+    </PanelBlock>
   );
 }
 
@@ -304,53 +426,45 @@ function CheckLine({
   hint?: string | null;
   children: ReactNode;
 }) {
-  const t = useTranslations("runners.card.check");
+  const t = useTranslations("runners.panel.check");
   return (
-    <li {...stylex.props(styles.check)}>
-      <span
-        role="img"
-        aria-label={t(state)}
-        {...stylex.props(
-          styles.checkIcon,
-          state === "ok" && styles.ok,
-          state === "broken" && styles.broken,
+    <li data-check={state} {...stylex.props(styles.check)}>
+      {state === "ok" ? null : <Text variant="meta">{t(state)}</Text>}
+      <span {...stylex.props(styles.checkText, styles.wrap)}>
+        <Text variant="body" as="span">
+          {children}
+        </Text>
+        {hint === null ? null : (
+          <Text variant="meta" mono>
+            {hint}
+          </Text>
         )}
-      >
-        {checkIcons[state]}
-      </span>
-      <span {...stylex.props(styles.checkText)}>
-        <span {...stylex.props(styles.checkName)}>{children}</span>
-        {hint === null ? null : <code {...stylex.props(styles.hint)}>{hint}</code>}
       </span>
     </li>
   );
 }
 
 function LeftWorktrees({ runner }: { runner: RunnerView }) {
-  const t = useTranslations("runners.card");
+  const t = useTranslations("runners.panel");
   if (runner.leftWorktrees.length === 0) return null;
   return (
-    <div {...stylex.props(styles.capacity)}>
-      <Text variant="label">{t("leftWorktrees", { count: runner.leftWorktrees.length })}</Text>
+    <PanelBlock title={t("leftWorktrees", { count: runner.leftWorktrees.length })}>
       <ul {...stylex.props(styles.list)}>
         {runner.leftWorktrees.map((run) => (
           <li key={run.id}>
-            <RunRowLink runId={run.id} workspace={run.workspace}>
-              <Row>
-                <RunLabel
-                  ticketKey={run.ticketKey}
-                  workspace={run.workspace}
-                  meta={t("worktreeMeta", {
-                    workspace: run.workspace.name,
-                    reason: t(`worktree.${run.worktree}`),
-                  })}
-                />
-              </Row>
-            </RunRowLink>
+            <Row href={runHref(run.workspace.id, run.id)}>
+              <RunLabel
+                ticketKey={run.ticketKey}
+                meta={t("worktreeMeta", {
+                  workspace: run.workspace.name,
+                  reason: t(`worktree.${run.worktree}`),
+                })}
+              />
+            </Row>
           </li>
         ))}
       </ul>
-    </div>
+    </PanelBlock>
   );
 }
 
@@ -358,99 +472,13 @@ function runHref(workspaceId: string, runId: string): string {
   return `/runs/${encodeURIComponent(runId)}?${new URLSearchParams({ ws: workspaceId }).toString()}`;
 }
 
-function Icon({ children }: { children: ReactNode }) {
-  return (
-    <svg
-      aria-hidden="true"
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="8" cy="8" r="6.25" />
-      {children}
-    </svg>
-  );
-}
-
-const checkIcons: Record<CheckState, ReactNode> = {
-  ok: (
-    <Icon>
-      <path d="m5.5 8.2 1.7 1.7 3.3-3.6" />
-    </Icon>
-  ),
-  broken: (
-    <Icon>
-      <path d="M8 4.8v3.6M8 11h.01" />
-    </Icon>
-  ),
-  unknown: (
-    <Icon>
-      <path d="M6.5 6.4a1.6 1.6 0 1 1 2.2 1.5c-.5.2-.7.6-.7 1.1M8 11h.01" />
-    </Icon>
-  ),
-};
-
 const styles = stylex.create({
-  page: {
-    height: "100%",
-    overflow: "auto",
-    paddingTop: space.s8,
-    paddingInline: space.s8,
-    paddingBottom: space.s10,
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-    alignItems: "start",
-    gap: space.s4,
-    margin: 0,
-    padding: 0,
-    listStyle: "none",
-  },
-  cell: { minWidth: 0, borderRadius: radius.card, outline: "none" },
-  selected: { outline: `2px solid ${colors.accentText}`, outlineOffset: 2 },
-  head: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: space.s3,
-    minWidth: 0,
-  },
-  name: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  title: {
-    margin: 0,
-    color: colors.textPrimary,
-    fontSize: fontSize.panel,
-    fontWeight: fontWeight.semibold,
-    overflowWrap: "anywhere",
-  },
-  pills: { display: "flex", flexShrink: 0, gap: space.s1 },
-  capacity: { display: "flex", flexDirection: "column", gap: space.s2 },
-  capacityHead: {
-    display: "flex",
-    justifyContent: "space-between",
-    color: colors.textTertiary,
-    fontSize: fontSize.ui,
-  },
-  numeric: { color: colors.textSecondary, fontVariantNumeric: "tabular-nums" },
-  bar: { display: "flex", gap: space.s1, height: 6 },
-  segment: {
-    position: "relative",
-    flexGrow: 1,
-    flexBasis: 0,
-    overflow: "hidden",
-    borderRadius: radius.full,
-    backgroundColor: colors.bgControl,
-  },
-  track: { position: "absolute", insetBlock: 0, insetInlineStart: 0 },
-  trackWidth: (width: string) => ({ width }),
-  fillOnline: { backgroundColor: colors.progress },
-  fillOffline: { backgroundColor: colors.problem },
+  stack: { display: "flex", flexDirection: "column", gap: space.s2 },
+  rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
+  rowHead: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
+  panelHead: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
+  statusLine: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
+  wrap: { minWidth: 0, overflowWrap: "anywhere" },
   list: {
     display: "flex",
     flexDirection: "column",
@@ -461,39 +489,7 @@ const styles = stylex.create({
     minWidth: 0,
   },
   runLabel: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
-  rowLink: {
-    display: "block",
-    borderRadius: radius.control,
-    color: "inherit",
-    textDecoration: "none",
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
-  },
-  ticketKey: {
-    flexShrink: 0,
-    color: colors.textPrimary,
-    fontVariantNumeric: "tabular-nums",
-  },
-  check: { display: "flex", alignItems: "flex-start", gap: space.s2, minWidth: 0 },
-  checkText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  hint: {
-    color: colors.textTertiary,
-    fontFamily: fonts.mono,
-    fontSize: fontSize.small,
-    overflowWrap: "anywhere",
-  },
-  checkIcon: { display: "inline-flex", flexShrink: 0, color: colors.textTertiary },
-  ok: { color: colors.progress },
-  broken: { color: colors.problem },
-  checkName: { minWidth: 0, color: colors.textSecondary, overflowWrap: "anywhere" },
-  fix: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-    padding: space.s4,
-    borderRadius: radius.control,
-    backgroundColor: colors.bgInset,
-  },
-  fixBody: { margin: 0, color: colors.textSecondary, overflowWrap: "anywhere" },
+  check: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
+  checkText: { display: "flex", flexDirection: "column", gap: space.px2 },
   code: { fontFamily: fonts.mono },
 });
