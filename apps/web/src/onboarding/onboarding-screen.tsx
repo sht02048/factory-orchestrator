@@ -1305,6 +1305,12 @@ function MappingRow({
   };
   const project = bound.project.name;
   const done = mappingRowComplete(bound);
+  const missingPair =
+    runnerProject !== null && agent === null
+      ? t("needAgent")
+      : runnerProject === null && agent !== null
+        ? t("needRunnerProject")
+        : null;
   const failed =
     mapping.state.kind === "failed" || progress.state.kind === "failed" || !bound.states.ok;
   return (
@@ -1367,10 +1373,11 @@ function MappingRow({
           <Tick done={done} label={done ? t("rowDone") : t("rowEmpty")} />
         </td>
       </tr>
-      {failed ? (
+      {failed || missingPair !== null ? (
         <tr>
           <td colSpan={5} {...stylex.props(styles.tdError)}>
             <div {...stylex.props(styles.stackTight)}>
+              {missingPair === null ? null : <Text variant="meta">{missingPair}</Text>}
               <SubmitError state={mapping.state} />
               <SubmitError state={progress.state} />
               {bound.states.ok ? null : (

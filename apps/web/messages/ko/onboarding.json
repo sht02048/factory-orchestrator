@@ -127,6 +127,8 @@
     "cellLabel": "{project}의 {column}",
     "rowDone": "다 채웠어요",
     "rowEmpty": "아직 비어 있어요",
+    "needAgent": "에이전트도 골라야 저장해요.",
+    "needRunnerProject": "러너 쪽 프로젝트도 골라야 저장해요.",
     "labelTitle": "Auto-assign Label",
     "labelHint": "이 라벨이 붙은 티켓은 운영자 없이 할당해요. 라벨이 없는 티켓은 Tickets에서 직접 할당해요.",
     "labelSelect": "{connection}의 Auto-assign Label",

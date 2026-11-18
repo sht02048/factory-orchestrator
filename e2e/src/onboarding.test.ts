@@ -172,11 +172,13 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
 
     await page.getByRole("combobox", { name: "Web의 러너 쪽 프로젝트" }).click();
     await page.getByRole("option", { name: "acme/web", exact: true }).click();
+    await page.getByText(onboarding.mapping.needAgent).waitFor();
     await page.getByRole("combobox", { name: "Web의 에이전트" }).click();
     await page.getByRole("option", { name: "Claude Code", exact: true }).click();
     await expect
       .poll(() => getMapping(db, connectionId(), trackerProject)?.runnerProject ?? null)
       .toBe("github:acme/web");
+    await page.getByText(onboarding.mapping.needAgent).waitFor({ state: "detached" });
   });
 
   it("수정 폼을 저장해 닫으면 포커스가 body 가 아니라 요약에 남는다", async () => {
