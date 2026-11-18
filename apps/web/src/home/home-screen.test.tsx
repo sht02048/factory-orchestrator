@@ -34,6 +34,13 @@ function text(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 }
 
+/** 지금 일어나는 일(aside)의 HTML */
+function feed(html: string): string {
+  const start = html.indexOf("<aside");
+  if (start < 0) return "";
+  return html.slice(start, html.indexOf("</aside>", start));
+}
+
 /** 버튼과 버튼 모양 링크의 변형 */
 function variants(html: string): string[] {
   return [...html.matchAll(/data-variant="([^"]+)"/g)].map((m) => m[1] ?? "");
@@ -150,6 +157,21 @@ describe("Home", () => {
     const q = card(html, "Question ACME-11");
     expect(text(q)).toContain(homeJson.question.answered);
     expect(variants(q)).toEqual([]);
+    // 결과 문장은 화면 읽기가 알리고 보낸 뒤 포커스를 받는다(티켓 0050)
+    expect(q).toMatch(/<div role="status" tabindex="-1"[^>]*>.*답을 남겼어요/);
+  });
+
+  it("거절을 남긴 권한 대기는 결과 문장을 status 로 보인다(티켓 0050)", () => {
+    const html = render(
+      withInput(seededPage(), {
+        kind: "permission",
+        promptId: "p-1",
+        detail: "git push --force",
+        denied: true,
+      }),
+    );
+    const p = card(html, "Permission ACME-11");
+    expect(p).toMatch(/<div role="status" tabindex="-1"[^>]*>.*거절을 남겼어요/);
   });
 
   it("Offline 러너는 Runner Issue 카드로 까닭과 해결 방법 링크를 보인다(ADR 0010 1번)", () => {
@@ -182,10 +204,29 @@ describe("Home", () => {
 
   it("지금 일어나는 일은 회색 키, 사건 문장, 상대 시간으로 보인다(ADR 0010 7번)", () => {
     const html = render(seededPage());
-    const feed = text(card(html, homeJson.activity.title));
+    const activity = text(feed(html));
     // 가장 최근: ACME-7 이 Failed 로 끝남(120분 - 37분 = 83분 전 → 1시간 전)
-    expect(feed).toContain("ACME-7 Failed로 끝났어요 1시간 전");
-    expect(feed).toContain("ACME-12 러너와 연결이 끊겼어요");
+    expect(activity).toContain("ACME-7 Failed로 끝났어요 1시간 전");
+    expect(activity).toContain("ACME-12 러너와 연결이 끊겼어요");
+  });
+
+  it("지금 일어나는 일의 행은 그 런의 Run 상세 링크다(티켓 0050)", () => {
+    const page = seededPage();
+    const html = feed(render(page));
+    const links = [...html.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1]);
+    expect(page.activity.length).toBeGreaterThan(0);
+    expect(links).toEqual(
+      page.activity.map((item) => `/runs/${item.runId}?ws=${item.workspace.id}`),
+    );
+  });
+
+  it("지금 일어나는 일은 제목 한 곳에서만 이름을 받고 구역을 겹치지 않는다(티켓 0050)", () => {
+    const html = feed(render(seededPage()));
+    const id = /<aside aria-labelledby="([^"]+)"/.exec(html)?.[1];
+    expect(id).toBeDefined();
+    expect(html).toContain(`<h2 id="${id}"`);
+    expect(html).not.toContain("<section");
+    expect(html).not.toContain(`aria-label="${homeJson.activity.title}"`);
   });
 
   it("취소를 요청한 런에는 '취소 중'을 함께 보인다(Q82.21)", () => {

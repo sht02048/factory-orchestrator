@@ -158,6 +158,8 @@ const styles = stylex.create({
   },
   pageHead: {
     display: "flex",
+    // 좁은 화면에서 오른쪽 행동(개수 타일 등)이 제목·요약을 짓누르지 않고 다음 줄로 내려간다.
+    flexWrap: "wrap",
     alignItems: "flex-end",
     justifyContent: "space-between",
     gap: space.s4,
