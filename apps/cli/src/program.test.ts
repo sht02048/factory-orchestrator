@@ -1,9 +1,10 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { homePaths } from "./home.js";
-import type { AppLayout } from "./layout.js";
+import type { AppLayout, ProcessSpec } from "./layout.js";
 import { runProgram } from "./program.js";
 import type { ProgramContext } from "./program.js";
 
@@ -34,6 +35,7 @@ function context(overrides: Partial<ProgramContext> = {}): ProgramContext {
       ran.push([...command]);
       return { ok: true };
     },
+    holdSleepAssertion: () => ({ exited: new Promise(() => undefined), release: () => undefined }),
     out: (line) => out.push(line),
     err: (line) => err.push(line),
     onStopSignal: () => undefined,
@@ -136,6 +138,66 @@ describe("runProgram", () => {
     expect(err.join("\n")).toContain("Unknown command: serve");
     expect(await runProgram(["--help"], context())).toBe(0);
     expect(out.join("\n")).toContain("Usage: ganger");
+  });
+
+  it("start는 서버가 도는 동안 이 프로세스 pid로 잠자기 방지를 걸고, 멈추면 푼다", async () => {
+    const port = await new Promise<number>((resolve) => {
+      const probe = createServer();
+      probe.listen(0, "127.0.0.1", () => {
+        const address = probe.address();
+        probe.close(() =>
+          resolve(typeof address === "object" && address !== null ? address.port : 0),
+        );
+      });
+    });
+    const home = join(dir, "home");
+    expect(await runProgram(["init", "--home", home, "--port", String(port)], context())).toBe(0);
+    const script = (name: ProcessSpec["name"], source: string): ProcessSpec => {
+      const file = join(dir, `${name}.mjs`);
+      writeFileSync(file, source);
+      return { name, command: process.execPath, args: [file], cwd: dir, requires: [file] };
+    };
+    const layout: AppLayout = {
+      web: () =>
+        script(
+          "web",
+          `import { createServer } from "node:http";
+const server = createServer((_req, res) => res.end("ok"));
+server.listen(Number(process.env.WEB_PORT), process.env.WEB_HOST);
+process.on("SIGTERM", () => server.close(() => process.exit(0)));`,
+        ),
+      worker: () =>
+        script(
+          "worker",
+          `const timer = setInterval(() => undefined, 1000);
+process.on("SIGTERM", () => { clearInterval(timer); process.exit(0); });`,
+        ),
+    };
+    const assertions: string[] = [];
+    let stop: (signal: NodeJS.Signals) => void = () => undefined;
+    const running = runProgram(
+      ["start", "--home", home],
+      context({
+        layout,
+        holdSleepAssertion: (pid) => {
+          assertions.push(`hold ${pid}`);
+          return {
+            exited: new Promise(() => undefined),
+            release: () => assertions.push("release"),
+          };
+        },
+        onStopSignal: (handler) => {
+          stop = handler;
+        },
+      }),
+    );
+    while (!out.some((line) => line.startsWith("Web is listening"))) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(assertions).toEqual([`hold ${process.pid}`]);
+    stop("SIGTERM");
+    expect(await running).toBe(0);
+    expect(assertions).toEqual([`hold ${process.pid}`, "release"]);
   });
 
   it("start는 .env가 없으면 init을 먼저 하라고 알린다", async () => {

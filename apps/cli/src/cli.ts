@@ -1,5 +1,6 @@
 import { realpathSync } from "node:fs";
 import { homedir } from "node:os";
+import { caffeinate } from "./keep-awake.js";
 import { appLayout } from "./layout.js";
 import { runCommand, runProgram } from "./program.js";
 
@@ -13,6 +14,7 @@ process.exitCode = await runProgram(process.argv.slice(2), {
   cliEntry: entry === undefined ? "" : realpathSync(entry),
   layout: appLayout(),
   runCommand,
+  holdSleepAssertion: caffeinate,
   out: (line) => console.log(line),
   err: (line) => console.error(line),
   onStopSignal: (handler) => {
