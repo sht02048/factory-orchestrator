@@ -70,6 +70,27 @@ describe("색 토큰", () => {
   });
 });
 
+describe("브랜드 그림 토큰(티켓 0077)", () => {
+  const entries = block("brand");
+  const value = (key: string): string => entries.find(([k]) => k === key)?.[1] ?? "";
+
+  it("화면 색(colors)과 따로 두고 OKLCH 로 쓴다", () => {
+    expect(entries.map(([key]) => key)).toEqual(["yellow", "ink", "paper", "body", "eye", "snore"]);
+    expect(entries.filter(([, v]) => !OKLCH.test(v))).toEqual([]);
+    expect(block("colors").map(([, v]) => v)).not.toContain(value("yellow"));
+  });
+
+  it("채도 있는 색은 Ganger Yellow 하나다(ADR 0010 5번 브랜드 예외)", () => {
+    expect(value("yellow")).toBe("oklch(0.84 0.15 75)");
+    expect(entries.filter(([, v]) => parts(v).c > 0.03).map(([key]) => key)).toEqual(["yellow"]);
+  });
+
+  it("Ink 와 Paper 는 운영자가 고른 값이다", () => {
+    expect(value("ink")).toBe("oklch(0.14 0 0)");
+    expect(value("paper")).toBe("oklch(0.97 0.003 85)");
+  });
+});
+
 describe("둥글기 토큰", () => {
   it("카드 12, 버튼·행·입력 8, 알약 6 이다(ADR 0010 10번)", () => {
     expect(Object.fromEntries(block("radius"))).toEqual({
