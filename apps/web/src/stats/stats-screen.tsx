@@ -38,7 +38,7 @@ import type {
 } from "./model";
 import { LegendSwatch, ThroughputChart } from "./throughput-chart";
 
-// 이름 | 런 | Merged(%) | Human Check | Failed | 리드 타임(중앙값)
+// 이름 | 런 | Merged(%) | Human Check | Failed | Canceled | 리드 타임(중앙값)
 const columns = "minmax(0, 1fr) 56px 72px 104px 64px 56px 88px";
 
 export interface StatsScreenProps {
@@ -465,7 +465,8 @@ const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
   figures: {
     display: "grid",
-    gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+    // 좁은 폭에서는 다음 줄로 접는다.
+    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
     gap: space.s6,
     marginBottom: space.s10,
   },
@@ -485,7 +486,12 @@ const styles = stylex.create({
     lineHeight: lineHeight.snug,
   },
   breakdown: { marginTop: space.s10 },
-  legend: { display: "inline-flex", gap: space.s4 },
+  legend: {
+    display: "inline-flex",
+    flexWrap: "wrap",
+    columnGap: space.s4,
+    rowGap: space.s1,
+  },
   legendItem: { display: "inline-flex", alignItems: "center", gap: space.px6 },
   combinations: {
     display: "grid",

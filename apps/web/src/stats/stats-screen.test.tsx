@@ -71,12 +71,26 @@ describe("Stats 화면", () => {
     expect(html).toContain("시간 초과 · PR 열림 1개");
   });
 
-  it("날짜별 처리량 막대에 날마다 요약 결과 수를 단다", () => {
+  it("날짜별 처리량 막대에 마우스로 볼 날마다 요약 결과 수를 단다", () => {
     const html = render(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
-    expect(html).toContain(
-      "<title>11월 16일: Merged 1 · Human Check 1 · Failed 0 · 취소 0</title>",
-    );
-    expect(html.match(/<title>/g)).toHaveLength(14);
+    expect(html).toContain('title="11월 16일: Merged 1 · Human Check 1 · Failed 0 · Canceled 0"');
+    expect(html.match(/title="[^"]*: Merged/g)).toHaveLength(14);
+  });
+
+  it("날짜별 값을 차트와 이은 표로 접근성 트리에 둔다", () => {
+    const html = render(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
+    const tableId = /<table id="([^"]+)"/.exec(html)?.[1];
+    expect(tableId).toBeDefined();
+    // 차트는 role="img" 라 자식을 읽지 않는다. 표를 가리킨다.
+    expect(html).toMatch(new RegExp(`role="img"[^>]*aria-details="${tableId ?? ""}"`));
+    const table = html.slice(html.indexOf("<table"), html.indexOf("</table>"));
+    expect(table).toContain("<caption");
+    expect(text(table)).toContain("날짜별로 끝난 런 수 날짜 Merged Human Check Failed Canceled");
+    expect(table.match(/<th scope="row"/g)).toHaveLength(14);
+    expect(text(table)).toContain("11월 16일 1 1 0 0");
+    // 표는 처음에 화면에서만 숨긴다. hidden·display:none 이 아니라 접근성 트리에 남는다.
+    expect(table).not.toMatch(/\shidden|display:\s*none|aria-hidden/);
+    expect(html).toContain("표로 보기");
   });
 
   it("나눠 보기 행에 런, Merged 비율, Human Check, Failed, 취소, 리드 타임을 보인다", () => {
@@ -117,6 +131,9 @@ describe("Stats 화면", () => {
     const html = render(page);
     expect(text(html)).toContain("최근 14일 동안 끝난 런이 없어요.");
     expect(text(html)).toContain("이 기간에 Failed 런이 없어요.");
+    // 14일 내내 0이면 빈 격자 대신 문구를 보인다.
+    expect(html).not.toContain('role="img"');
+    expect(html).not.toContain("<table");
     expect(panelText(html).trim()).toBe("");
   });
 
@@ -143,9 +160,7 @@ describe("Stats 화면", () => {
       expect(text(html)).toContain("13 끝난 런 취소 2개는 비율에서 빼요");
       // Merged 2 / (13 - 취소 2)
       expect(text(html)).toContain("18% Merged");
-      expect(html).toContain(
-        "<title>11월 17일: Merged 1 · Human Check 0 · Failed 2 · 취소 2</title>",
-      );
+      expect(html).toContain('title="11월 17일: Merged 1 · Human Check 0 · Failed 2 · Canceled 2"');
     });
 
     it("나눠 보기 행과 패널의 비율은 취소를 뺀 런으로 나눈다", () => {
