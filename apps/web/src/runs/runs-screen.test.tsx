@@ -232,7 +232,7 @@ describe("Runs 화면", () => {
     expect([...queued.keys()].sort()).toEqual(["ACME-13", offlineQueuedKey].sort());
   });
 
-  it("손댈 일 칩과 머리글 수는 Home 의 손댈 일 런과 같다(티켓마다 마지막 런)", () => {
+  it("처리할 일 칩과 머리글 수는 Dashboard 의 To do 런과 같다(티켓마다 마지막 런)", () => {
     const { db, ids } = seedDatabase();
     const homeRunIds = (): string[] =>
       loadHomePage(db, "ws-commerce", now, "UTC")
@@ -250,7 +250,7 @@ describe("Runs 화면", () => {
     expect(attentionIds(page)).toEqual(homeRunIds());
     expect(homeRunIds().length).toBeGreaterThan(0);
     expect(render(page)).toContain(
-      `${page.runs.length}개 중 ${homeRunIds().length}개가 손댈 일이에요.`,
+      `${page.runs.length}개 중 ${homeRunIds().length}개가 처리할 일이에요.`,
     );
 
     const failedKey = endedCases.find((c) => c.summary === "failed")?.key;

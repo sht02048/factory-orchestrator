@@ -3,7 +3,9 @@ import { join, relative } from "node:path";
 import { PILL_STATUSES, type PillStatus } from "@factory/ui";
 import { describe, expect, it } from "vitest";
 import domain from "../messages/ko/domain.json" with { type: "json" };
+import ds from "../messages/ko/ds.json" with { type: "json" };
 import home from "../messages/ko/home.json" with { type: "json" };
+import run from "../messages/ko/run.json" with { type: "json" };
 import runners from "../messages/ko/runners.json" with { type: "json" };
 import runs from "../messages/ko/runs.json" with { type: "json" };
 import settings from "../messages/ko/settings.json" with { type: "json" };
@@ -40,7 +42,7 @@ const TERM_NAMES = new Set(Object.values(TERMS));
 const SCREENS = ["Dashboard", "Tickets", "Runs", "Runners", "Stats", "Settings"];
 
 describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
-  it("런 상태·요약 결과·러너 상태·손댈 일 종류는 GLOSSARY 영어 용어다", () => {
+  it("런 상태·요약 결과·러너 상태·To do 종류는 GLOSSARY 영어 용어다", () => {
     expect(domain.runState).toEqual({
       queued: TERMS.queued,
       running: TERMS.running,
@@ -73,6 +75,18 @@ describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
 
   it("화면 메시지의 상태 이름 자리도 영어 용어다", () => {
     expect(stats.throughput.columns.canceled).toBe(TERMS.canceled);
+  });
+
+  it("To do 는 이름 자리에서 To do, 필터와 문장 안에서는 처리할 일이다(ADR 0010 0068 갱신)", () => {
+    expect([ds.typography.sampleSection, ds.tabs.todo]).toEqual([
+      home.section.todo,
+      home.section.todo,
+    ]);
+    expect(runs.filter.attention).toBe(tickets.filter.todo);
+    expect([run.reason.canceled, runs.panel.reason.canceled]).toEqual([
+      "운영자가 취소한 런이에요. 처리할 일에 올리지 않아요.",
+      "운영자가 취소한 런이에요. 처리할 일에 올리지 않아요.",
+    ]);
   });
 
   it("useStatusName 은 상태 값마다 그 영어 용어를 준다", () => {

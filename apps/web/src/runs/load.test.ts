@@ -173,7 +173,7 @@ describe("끝난 런 상한", () => {
     expect(loadRunsPage(db, undefined, now, endedKeys.length).moreEnded).toBe(false);
   });
 
-  it("상한 밖의 끝난 런도 손댈 일이면 담는다(Home 과 같다)", () => {
+  it("상한 밖의 끝난 런도 To do면 담는다(Dashboard 와 같다)", () => {
     const { db } = seedDatabase();
     const attentionKeys = (runs: ReadonlyArray<RunView>) =>
       runs.filter((run) => run.attention).map((run) => run.ticketKey);
@@ -310,7 +310,7 @@ describe("조건으로 거르기(0075)", () => {
     expect(page.runs.map((run) => run.ticketKey)).not.toContain(offlineQueuedKey);
   });
 
-  it("조건으로 걸러도 손댈 일은 그 티켓의 마지막 런에만 붙는다", () => {
+  it("조건으로 걸러도 To do는 그 티켓의 마지막 런에만 붙는다", () => {
     const { db } = seedDatabase();
     const failedKey = endedCases.find((c) => c.summary === "failed")?.key ?? "";
     const assigned = assignRun(db, {
