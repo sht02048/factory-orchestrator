@@ -13,6 +13,7 @@ import {
   Menu,
   MenuItem,
   PILL_STATUSES,
+  Popover,
   Row,
   Select,
   SplitView,
@@ -274,6 +275,31 @@ describe("서버 렌더", () => {
     expect(html).toContain("골라 주세요");
     expect(html).toContain("지우기");
     expect(html).not.toContain("지울까요?");
+  });
+
+  it("Popover 는 닫힌 채 버튼 모양 트리거만 보이고, 열면 제목과 닫기 버튼을 그린다", () => {
+    const closed = renderToString(
+      <Popover trigger="답하기" title="질문" closeLabel="닫기" open={false} onOpenChange={noop}>
+        <p>내용</p>
+      </Popover>,
+    );
+    expect(closed).toMatch(/<button[^>]*data-variant="secondary"[^>]*>답하기<\/button>/);
+    expect(closed).toContain('aria-expanded="false"');
+    expect(closed).not.toContain("내용");
+
+    const danger = renderToString(
+      <Popover
+        trigger="거절하기"
+        triggerVariant="danger"
+        title="권한"
+        closeLabel="닫기"
+        open={false}
+        onOpenChange={noop}
+      >
+        <p>내용</p>
+      </Popover>,
+    );
+    expect(danger).toContain('data-variant="danger"');
   });
 
   it("DefinitionList 는 dt·dd 짝을 만든다", () => {

@@ -31,6 +31,7 @@ export {
   type MenuProps,
   type MenuRadioProps,
 } from "./components/menu";
+export { Popover, type PopoverProps } from "./components/popover";
 export { Select, type SelectOption, type SelectProps } from "./components/select";
 export {
   PILL_STATUSES,
