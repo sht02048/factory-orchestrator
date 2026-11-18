@@ -24,7 +24,18 @@
   "throughput": {
     "title": "날짜별 처리량",
     "chartLabel": "날짜별로 끝난 런 수. 요약 결과로 나눠 쌓았어요.",
-    "day": "{day}: Merged {merged} · Human Check {check} · Failed {failed} · 취소 {canceled}"
+    "day": "{day}: Merged {merged} · Human Check {check} · Failed {failed} · Canceled {canceled}",
+    "empty": "최근 {days}일 동안 끝난 런이 없어요.",
+    "showTable": "표로 보기",
+    "hideTable": "표 접기",
+    "tableCaption": "날짜별로 끝난 런 수",
+    "columns": {
+      "day": "날짜",
+      "merged": "Merged",
+      "check": "Human Check",
+      "failed": "Failed",
+      "canceled": "Canceled"
+    }
   },
   "failedCombinations": {
     "title": "Failed 조합",
