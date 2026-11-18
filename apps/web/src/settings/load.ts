@@ -183,66 +183,18 @@ async function loadWorkspaceSettings(
   const { db } = context;
   const allBound = listWorkspaceTrackerProjects(db);
   const mine = allBound.filter((p) => p.workspaceId === workspace.id);
-  const workspaceName = new Map(workspaces.map((w) => [w.id, w.name]));
-  const queued = listRuns(db, { states: ["queued"], workspaceId: workspace.id });
   const trackers = new Map(connections.map((c) => [c.id, trackerOf(context, c)]));
   const connectionChoice = (id: TrackerConnectionId): Choice => ({
     id,
     name: connections.find((c) => c.id === id)?.name ?? id,
   });
 
-  const trackerProjects = await Promise.all(
-    connections.map(async (connection): Promise<ConnectionProjects> => {
-      const tracker = trackers.get(connection.id) ?? null;
-      const listed: Remote<{ id: string; name: string }> =
-        tracker === null
-          ? { ok: false, error: "invalid" }
-          : await remote(() => tracker.listProjects());
-      const seen = new Map<string, { id: string; name: string }>();
-      for (const project of listed.ok ? listed.items : []) seen.set(project.id, project);
-      for (const project of mine) {
-        if (project.connection === connection.id && !seen.has(project.projectId))
-          seen.set(project.projectId, { id: project.projectId, name: project.name });
-      }
-      const projects = [...seen.values()].map((project): TrackerProjectChoice => {
-        const bound = allBound.find(
-          (p) => p.connection === connection.id && p.projectId === project.id,
-        );
-        const owner: TrackerProjectChoice["owner"] =
-          bound === undefined
-            ? { kind: "free" }
-            : bound.workspaceId === workspace.id
-              ? { kind: "this" }
-              : {
-                  kind: "other",
-                  workspace: {
-                    id: bound.workspaceId,
-                    name: workspaceName.get(bound.workspaceId) ?? bound.workspaceId,
-                  },
-                };
-        const isMine = owner.kind === "this";
-        return {
-          id: project.id,
-          name: project.name,
-          owner,
-          mappings:
-            isMine && getMapping(db, connection.id, toTrackerProjectId(project.id)) !== null
-              ? 1
-              : 0,
-          queuedRuns: isMine
-            ? queued.filter(
-                (run) =>
-                  run.ticket.connection === connection.id && run.trackerProject === project.id,
-              ).length
-            : 0,
-        };
-      });
-      return {
-        connection: toChoice(connection),
-        error: listed.ok ? null : listed.error,
-        projects,
-      };
-    }),
+  const trackerProjects = await trackerProjectChoices(
+    context,
+    workspace.id,
+    connections,
+    workspaces,
+    trackers,
   );
 
   const bound = await Promise.all(
@@ -301,6 +253,87 @@ async function loadWorkspaceSettings(
     bound,
     labels,
   };
+}
+
+export async function loadTrackerProjectChoices(
+  context: SettingsContext,
+  workspaceId: WorkspaceId | null,
+): Promise<ConnectionProjects[]> {
+  const connections = listTrackerConnections(context.db, context.secretBox);
+  return trackerProjectChoices(
+    context,
+    workspaceId,
+    connections,
+    listWorkspaces(context.db),
+    new Map(connections.map((c) => [c.id, trackerOf(context, c)])),
+  );
+}
+
+async function trackerProjectChoices(
+  context: SettingsContext,
+  workspaceId: WorkspaceId | null,
+  connections: ReadonlyArray<StoredTrackerConnection>,
+  workspaces: ReadonlyArray<{ id: WorkspaceId; name: string }>,
+  trackers: ReadonlyMap<string, Tracker | null>,
+): Promise<ConnectionProjects[]> {
+  const { db } = context;
+  const allBound = listWorkspaceTrackerProjects(db);
+  const mine = allBound.filter((p) => p.workspaceId === workspaceId);
+  const workspaceName = new Map(workspaces.map((w) => [w.id, w.name]));
+  const queued = workspaceId === null ? [] : listRuns(db, { states: ["queued"], workspaceId });
+  return Promise.all(
+    connections.map(async (connection): Promise<ConnectionProjects> => {
+      const tracker = trackers.get(connection.id) ?? null;
+      const listed: Remote<{ id: string; name: string }> =
+        tracker === null
+          ? { ok: false, error: "invalid" }
+          : await remote(() => tracker.listProjects());
+      const seen = new Map<string, { id: string; name: string }>();
+      for (const project of listed.ok ? listed.items : []) seen.set(project.id, project);
+      for (const project of mine) {
+        if (project.connection === connection.id && !seen.has(project.projectId))
+          seen.set(project.projectId, { id: project.projectId, name: project.name });
+      }
+      const projects = [...seen.values()].map((project): TrackerProjectChoice => {
+        const bound = allBound.find(
+          (p) => p.connection === connection.id && p.projectId === project.id,
+        );
+        const owner: TrackerProjectChoice["owner"] =
+          bound === undefined
+            ? { kind: "free" }
+            : bound.workspaceId === workspaceId
+              ? { kind: "this" }
+              : {
+                  kind: "other",
+                  workspace: {
+                    id: bound.workspaceId,
+                    name: workspaceName.get(bound.workspaceId) ?? bound.workspaceId,
+                  },
+                };
+        const isMine = owner.kind === "this";
+        return {
+          id: project.id,
+          name: project.name,
+          owner,
+          mappings:
+            isMine && getMapping(db, connection.id, toTrackerProjectId(project.id)) !== null
+              ? 1
+              : 0,
+          queuedRuns: isMine
+            ? queued.filter(
+                (run) =>
+                  run.ticket.connection === connection.id && run.trackerProject === project.id,
+              ).length
+            : 0,
+        };
+      });
+      return {
+        connection: toChoice(connection),
+        error: listed.ok ? null : listed.error,
+        projects,
+      };
+    }),
+  );
 }
 
 export function hasPendingRunnerChecks(db: Database): boolean {
