@@ -5,7 +5,7 @@ import { parseArgs } from "node:util";
 import { findBundleProblems } from "./bundle-check.ts";
 
 const REPO = resolve(import.meta.dirname, "..");
-const NAME = "factory-orchestrator";
+const NAME = "ganger";
 
 const { values } = parseArgs({ options: { "out-dir": { type: "string" } } });
 const outDir = resolve(values["out-dir"] ?? join(REPO, "dist"));
