@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { toDeliveryId, toPullRequestId, toRepoRef, toTicketKey } from "@factory/core";
-import type { TrackerConnectionId, TrackerTicket, WorktreeRef } from "@factory/core";
+import type {
+  RunnerProjectId,
+  TicketKey,
+  TrackerConnectionId,
+  TrackerTicket,
+  WorktreeRef,
+} from "@factory/core";
 import type { FakeRunner, FakeRunnerRun, FakeTracker } from "@factory/core/testing";
 import {
   listRunners,
@@ -71,7 +77,8 @@ export class DemoLife {
   private readonly now: () => Date;
   private readonly tracked = new Map<WorktreeRef, Tracked>();
   /** 병합할 열린 PR: 저장소, 런 키, 병합할 시각 */
-  private readonly toMerge: Array<{ repo: string; worktree: WorktreeRef; at: number }> = [];
+  private readonly toMerge: Array<{ repo: RunnerProjectId; worktree: WorktreeRef; at: number }> =
+    [];
   private lastTick: number | null = null;
   private lastNewWork = 0;
   private ticketSeq = 1000;
@@ -151,7 +158,7 @@ export class DemoLife {
       const pr = pullRequestOf(
         {
           headCommit: `demo-${hash(run.input.worktreeName).toString(16)}`,
-          ticketKey: toTicketKey(key),
+          ticketKey: key,
           runnerProject: repo,
           startedAt: new Date(this.now().getTime() - 5 * 60_000),
           branch: run.started.branch,
@@ -200,7 +207,10 @@ export class DemoLife {
               mergedAt: this.now(),
             });
           }
-        });
+        })
+        .catch((error: unknown) =>
+          console.warn("[dev] could not merge a fake pull request", error),
+        );
     }
   }
 
@@ -210,7 +220,7 @@ export class DemoLife {
    * Auto-assign Label 이 없는 티켓 하나에 라벨을 붙이고 webhook 이 온 것처럼 이벤트를 쓴다. worker 의 자동 할당이
    * 다음 바퀴에 런을 만든다. 붙인 티켓 키를 돌려준다. 붙일 티켓이 없으면 새로 만든다.
    */
-  labelTicket(): string | null {
+  labelTicket(): TicketKey | null {
     const target = this.trackerConnections()[0];
     if (target === undefined) return null;
     const busy = new Set(
@@ -328,8 +338,8 @@ function branchOf(world: DemoWorld, worktree: WorktreeRef): string {
 }
 
 /** 워크트리 이름(factory-ACME-1-1)에서 티켓 키를 꺼낸다 */
-function ticketKeyOf(worktreeName: string): string {
-  return worktreeName.replace(/^factory-/, "").replace(/-\d+$/, "");
+function ticketKeyOf(worktreeName: string): TicketKey {
+  return toTicketKey(worktreeName.replace(/^factory-/, "").replace(/-\d+$/, ""));
 }
 
 /** 워크트리 이름마다 정해진 계획. 다시 띄워도 같은 런은 같게 움직인다 */

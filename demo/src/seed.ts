@@ -1,5 +1,6 @@
 import {
   isAssignmentBlocked,
+  summarizeRunOutcome,
   toAgentId,
   toAgentRef,
   toCommentId,
@@ -71,34 +72,43 @@ export async function seedDemo(
   world: DemoWorld,
   now: Date,
 ): Promise<SeededRuns> {
-  seedSettings(db, box, now);
-  // 지난 런은 러너 상태와 상관없이 고른 러너로 만든다. 그동안은 모든 러너를 멀쩡하게 두고, 뒤에 실제 확인 결과를 쓴다.
-  for (const runner of seededRunners) {
-    recordRunnerCheck(db, {
-      runnerId: runner.id,
-      online: true,
-      checkedAt: now,
-      error: null,
-      projects: RUNNER_PROJECTS,
-      assignmentBlocked: false,
-    });
-  }
-  inTransaction(db, () => seedHistory(db, now));
-  const active = inTransaction(db, () => seedActive(db, now));
-  for (const runner of seededRunners) {
-    const fake = world.runner(runner.sshTarget);
-    const health = await fake.checkHealth();
-    recordRunnerCheck(db, {
-      runnerId: runner.id,
-      online: health.online,
-      checkedAt: now,
-      error: health.error,
-      projects: health.online ? await fake.listProjects() : null,
-      assignmentBlocked: isAssignmentBlocked(health),
-      prerequisites: health.prerequisites,
-    });
-  }
-  return active;
+  // 가짜 러너 확인은 비동기라 먼저 읽고, 쓰기는 한 트랜잭션으로 한다. 중간에 실패하면 아무것도 남지 않아
+  // 다음 실행이 반쯤 채운 DB 를 시드를 마친 것으로 보지 않는다.
+  const checks = await Promise.all(
+    seededRunners.map(async (runner) => {
+      const fake = world.runner(runner.sshTarget);
+      const health = await fake.checkHealth();
+      return { runner, health, projects: health.online ? await fake.listProjects() : null };
+    }),
+  );
+  return inTransaction(db, () => {
+    seedSettings(db, box, now);
+    // 지난 런은 러너 상태와 상관없이 고른 러너로 만든다. 그동안은 모든 러너를 멀쩡하게 두고, 뒤에 실제 확인 결과를 쓴다.
+    for (const runner of seededRunners) {
+      recordRunnerCheck(db, {
+        runnerId: runner.id,
+        online: true,
+        checkedAt: now,
+        error: null,
+        projects: RUNNER_PROJECTS,
+        assignmentBlocked: false,
+      });
+    }
+    seedHistory(db, now);
+    const active = seedActive(db, now);
+    for (const { runner, health, projects } of checks) {
+      recordRunnerCheck(db, {
+        runnerId: runner.id,
+        online: health.online,
+        checkedAt: now,
+        error: health.error,
+        projects: projects === null ? null : [...projects],
+        assignmentBlocked: isAssignmentBlocked(health),
+        prerequisites: health.prerequisites,
+      });
+    }
+    return active;
+  });
 }
 
 function seedSettings(db: Database, box: SecretBox, now: Date): void {
@@ -233,8 +243,6 @@ function ok(result: { ok: true } | { ok: false; error: unknown }): void {
 interface Ending {
   agentResult: AgentResult;
   prState: PrState;
-  /** PR 이 병합되거나 닫히기 전까지 워크트리를 남기는지 */
-  keepWorktree: boolean;
 }
 
 /** 시작한 런을 끝내고 worker 뒤처리(댓글, PR, 워크트리 정리)를 마친 것으로 기록한다 */
@@ -261,7 +269,12 @@ function end(
   );
   updateRunRecords(db, runId, {
     trackerComment: { id: toCommentId(`demo-comment-${runId}`), at },
-    worktreeRemovedAt: ending.keepWorktree ? null : at,
+    // 워크트리를 남길지는 요약 계산 함수가 정한다(CODING_STANDARDS). 남기는 런만 지운 시각이 없다.
+    worktreeRemovedAt:
+      summarizeRunOutcome({ ...ending, runnerUnreached: false }).worktree ===
+      "keep-until-pr-settles"
+        ? null
+        : at,
     lastLog: ["$ pnpm test", "✓ 42 tests passed", "$ git push", "done"],
     ...(ending.prState === "none"
       ? {}
@@ -321,18 +334,18 @@ function seedHistory(db: Database, now: Date): void {
       const roll = random();
       const ending: Ending =
         roll < 0.58
-          ? { agentResult: "reported-success", prState: "merged", keepWorktree: false }
+          ? { agentResult: "reported-success", prState: "merged" }
           : roll < 0.68 && daysAgo <= 2
-            ? { agentResult: "reported-success", prState: "open", keepWorktree: true }
+            ? { agentResult: "reported-success", prState: "open" }
             : roll < 0.74
-              ? { agentResult: "reported-failure", prState: "none", keepWorktree: false }
+              ? { agentResult: "reported-failure", prState: "none" }
               : roll < 0.8
-                ? { agentResult: "ended-without-report", prState: "none", keepWorktree: false }
+                ? { agentResult: "ended-without-report", prState: "none" }
                 : roll < 0.85
-                  ? { agentResult: "timed-out", prState: "none", keepWorktree: false }
+                  ? { agentResult: "timed-out", prState: "none" }
                   : roll < 0.9
-                    ? { agentResult: "reported-success", prState: "closed", keepWorktree: false }
-                    : { agentResult: "canceled", prState: "none", keepWorktree: false };
+                    ? { agentResult: "reported-success", prState: "closed" }
+                    : { agentResult: "canceled", prState: "none" };
       start(db, run.id, run.worktreeName, startedAt);
       prNumber += 1;
       end(db, run.id, { ending, at: endedAt, prNumber, repo: t.project.repo });
@@ -387,10 +400,10 @@ function seedActive(db: Database, now: Date): SeededRuns {
 
   // 오늘 끝난 런: 요약 결과 넷
   const endings: Array<[number, Ending]> = [
-    [4, { agentResult: "reported-success", prState: "merged", keepWorktree: false }],
-    [5, { agentResult: "reported-success", prState: "open", keepWorktree: true }],
-    [6, { agentResult: "ended-without-report", prState: "none", keepWorktree: false }],
-    [7, { agentResult: "canceled", prState: "none", keepWorktree: false }],
+    [4, { agentResult: "reported-success", prState: "merged" }],
+    [5, { agentResult: "reported-success", prState: "open" }],
+    [6, { agentResult: "ended-without-report", prState: "none" }],
+    [7, { agentResult: "canceled", prState: "none" }],
   ];
   let prNumber = 900;
   for (const [n, ending] of endings) {

@@ -56,6 +56,11 @@ describe("pnpm dev", () => {
       }
       const home = await (await fetch(dev.url + "/")).text();
       expect(home).toContain("ACME-2");
+      // 개발 데이터를 막으려고 더한 차단 목록이 vite 기본 목록(.env.* 등)을 지우지 않는다.
+      for (const file of [".env.example"]) {
+        const response = await fetch(`${dev.url}/@fs${join(repoRoot, file)}`);
+        expect([file, response.status]).toEqual([file, 403]);
+      }
     } finally {
       code = await dev.stop();
     }

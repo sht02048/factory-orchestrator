@@ -69,8 +69,22 @@ const server = await createServer({
     host,
     port,
     strictPort: true,
-    // 개발 데이터(암호화 키, DB)는 저장소 안에 있어도 개발 서버가 파일로 내주지 않는다.
-    fs: { deny: [".dev/**", "**/encryption-key", "**/*.db", "**/*.db-*"] },
+    // 개발 데이터(암호화 키, DB)는 저장소 안에 있어도 개발 서버가 파일로 내주지 않는다. deny 를 주면 vite 의
+    // 기본 목록을 바꾸므로(덧붙이지 않는다) 기본 목록(vite 8 serverConfigDefaults.fs.deny)을 함께 적는다.
+    fs: {
+      deny: [
+        ".env",
+        ".env.*",
+        "*.{crt,pem,key,p12,pfx,cer,der}",
+        ".npmrc",
+        ".yarnrc.yml",
+        "**/.git/**",
+        "**/.dev/**",
+        "**/encryption-key",
+        "**/*.db",
+        "**/*.db-*",
+      ],
+    },
   },
 });
 
