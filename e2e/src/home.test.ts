@@ -80,7 +80,7 @@ let baseUrl: string;
 let browser: Browser;
 let context: BrowserContext;
 let page: Page;
-let questionRun: RunId;
+const runIds = new Map<string, RunId>();
 
 /** web 의 server/adapters.ts 를 가짜 트래커 등록표로 바꾼다. 제품 코드는 고치지 않는다 */
 const fakeAdapters: Plugin = {
@@ -179,7 +179,7 @@ describe("Home 접근성(브라우저, 0050)", () => {
 
   it("답을 남기면 결과 문장이 status 로 보이고 포커스를 받는다", async () => {
     await openHome(page);
-    const card = questionCard(page, "ACME-1");
+    const card = questionCard(page, "ACME-4");
     await card.getByRole("button", { name: home.question.write }).click();
     await card.getByLabel(home.question.answerLabel).fill("Use SQLite.");
     await page.keyboard.press("Enter");
@@ -190,7 +190,7 @@ describe("Home 접근성(브라우저, 0050)", () => {
 
   it("거절을 남기면 결과 문장이 status 로 보이고 포커스를 받는다", async () => {
     await openHome(page);
-    const card = permissionCard(page, "ACME-2");
+    const card = permissionCard(page, "ACME-5");
     await card.getByRole("button", { name: home.permission.deny, exact: true }).click();
     await card.getByRole("button", { name: home.permission.send }).click();
     const status = card.getByRole("status");
@@ -263,8 +263,17 @@ describe("Home 접근성(브라우저, 0050)", () => {
   it("지금 일어나는 일의 행은 그 런의 Run 상세로 가는 링크다", async () => {
     await openHome(page);
     const feed = page.getByRole("complementary", { name: home.activity.title });
-    const link = feed.getByRole("link").filter({ hasText: "ACME-1" }).first();
-    expect(await link.getAttribute("href")).toBe(`/runs/${questionRun}?ws=${workspaceId}`);
+    const links = await feed
+      .getByRole("link")
+      .evaluateAll((els) =>
+        els.map((el) => ({ text: el.textContent ?? "", href: el.getAttribute("href") })),
+      );
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      const key = /ACME-\d+/.exec(link.text)?.[0];
+      expect(key).toBeDefined();
+      expect(link.href).toBe(`/runs/${runIds.get(key ?? "")}?ws=${workspaceId}`);
+    }
   });
 
   it("새로 고치지 않아도 새 손댈 일이 보인다", async () => {
@@ -279,6 +288,28 @@ describe("Home 접근성(브라우저, 0050)", () => {
     ]);
     // 15초 주기로 다시 읽는다
     await card.getByText("Ship it?").waitFor({ timeout: 25_000 });
+  });
+
+  it("다시 읽기가 실패해도 지금 화면과 열린 폼, 쓰던 답을 그대로 둔다", async () => {
+    await openHome(page);
+    const card = questionCard(page, "ACME-3");
+    await card.getByRole("button", { name: home.question.write }).click();
+    const input = card.getByLabel(home.question.answerLabel);
+    await input.fill("half-written answer");
+
+    // 서버 함수 요청을 모두 실패시키고, 문서가 다시 보인 것처럼 곧바로 다시 읽게 한다
+    let failed = 0;
+    await page.route("**/_serverFn/**", async (route) => {
+      failed += 1;
+      await route.abort();
+    });
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await page.waitForTimeout(1_000);
+    await page.unroute("**/_serverFn/**");
+
+    expect(failed).toBeGreaterThan(0);
+    expect(await input.inputValue()).toBe("half-written answer");
+    expect(await page.getByRole("heading", { level: 1, name: home.title }).count()).toBe(1);
   });
 
   it("375px 폭에서 머리 영역이 넘치지 않는다", async () => {
@@ -333,8 +364,8 @@ function seed(db: Database): void {
     assignmentBlocked: false,
   });
 
-  // 질문을 기다리는 런 둘: 포커스·답 시험(ACME-1), 글자 크기 시험(ACME-3)
-  questionRun = startRun(toTicketKey("ACME-1"));
+  // 질문을 기다리는 런 둘: 포커스 시험(ACME-1), 글자 크기 시험(ACME-3)
+  const questionRun = startRun(toTicketKey("ACME-1"));
   ok(changeRunState(db, questionRun, { to: "waiting-for-input" }));
   recordRunQuestions(db, questionRun, [
     {
@@ -350,7 +381,19 @@ function seed(db: Database): void {
     { id: toQuestionId("q-3"), body: "Rename the module?", options: [], askedAt: new Date() },
   ]);
 
-  // 권한 허용을 기다리는 런: 거절 시험
+  // 시험마다 다른 런을 쓴다. 답·거절을 남기는 시험이 포커스 시험의 런을 바꾸지 않게 한다
+  const answerRun = startRun(toTicketKey("ACME-4"));
+  ok(changeRunState(db, answerRun, { to: "waiting-for-input" }));
+  recordRunQuestions(db, answerRun, [
+    { id: toQuestionId("q-4"), body: "Add a retry?", options: [], askedAt: new Date() },
+  ]);
+  const denyRun = startRun(toTicketKey("ACME-5"));
+  ok(changeRunState(db, denyRun, { to: "waiting-for-input" }));
+  recordPermissionWaits(db, denyRun, [
+    { id: toPermissionRequestId("p-5"), detail: "rm -rf build", requestedAt: new Date() },
+  ]);
+
+  // 권한 허용을 기다리는 런: 거절 포커스 시험
   const permissionRun = startRun(toTicketKey("ACME-2"));
   ok(changeRunState(db, permissionRun, { to: "waiting-for-input" }));
   recordPermissionWaits(db, permissionRun, [
@@ -379,6 +422,7 @@ function startRun(key: TicketKey): RunId {
       },
     }),
   );
+  runIds.set(key, assigned.run.id);
   return assigned.run.id;
 }
 

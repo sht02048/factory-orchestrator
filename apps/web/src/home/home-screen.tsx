@@ -406,7 +406,8 @@ function QuestionBody({
           {form.open ? (
             <form
               {...stylex.props(styles.form)}
-              onKeyDown={form.onKeyDown}
+              // 보내는 동안에는 닫지 않는다(결과 문장·실패 문구와 포커스 복귀가 폼을 기다린다)
+              onKeyDown={sending ? undefined : form.onKeyDown}
               onSubmit={(event) => {
                 event.preventDefault();
                 send(answer, null);
@@ -477,7 +478,7 @@ function PermissionBody({
           {form.open ? (
             <form
               {...stylex.props(styles.form)}
-              onKeyDown={form.onKeyDown}
+              onKeyDown={sending ? undefined : form.onKeyDown}
               onSubmit={(event) => {
                 event.preventDefault();
                 if (sending) return;
