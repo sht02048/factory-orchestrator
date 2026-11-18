@@ -74,7 +74,7 @@ The orchestrator is a self-hosted tool. One operator runs one installation on th
 - A runner is an Orca environment that the orchestrator can reach over ssh.
 - The orchestrator does not change your projects' agent settings. We recommend adding a rule to each project's agent instructions (for example, `AGENTS.md`) to put the ticket key in the pull request title. Otherwise, if an agent opens the pull request from a branch other than the one the orchestrator created (including by renaming that branch), the orchestrator may not find it and may record the run's pull request as missing or closed.
 - Tracker connections, the GitHub token, runners, workspaces, and mappings are set up in web onboarding on first launch. Tokens are stored encrypted in the database.
-- `.env` holds only the minimum values needed to boot: port, bind address, data path, and encryption key. `factory-orchestrator init` writes it, as described below.
+- `.env` holds only the minimum values needed to boot: port, bind address, data path, and encryption key. `factory-orchestrator init` writes it, as described below. The addresses that other devices and your tracker use are set in Settings, as described in [Open it from other devices](#open-it-from-other-devices).
 
 ### Build a server bundle
 
@@ -114,6 +114,13 @@ factory-orchestrator start    # applies database migrations, then runs the web s
 ### Open it from other devices
 
 The web app has no login. Anyone who can reach its address can change settings and send commands to your runners. Keep it on `127.0.0.1` or inside a private network such as a Tailscale tailnet, and never expose the whole app to the public internet; open only the webhook path (`/api/webhooks/...`) publicly. If you share your tailnet with other people, use Tailscale ACLs to limit which users and devices can reach the orchestrator's machine.
+
+The server accepts a request only when its host name is one it knows, which blocks DNS rebinding and requests that other sites make from your browser. `127.0.0.1`, `localhost`, and `[::1]` always work, and so does the bind address (`WEB_HOST`) when it is a specific address rather than `0.0.0.0`. To use any other name, set it in Settings > Addresses (open Settings at `http://127.0.0.1:<port>` on the server machine the first time):
+
+- **Web address**: where you open the app from other devices, for example the Tailscale Serve address `https://server.example.ts.net`. Requests to this host name reach the whole app.
+- **Webhook address**: the public address your tracker sends webhooks to, for example a Tailscale Funnel or Cloudflare Tunnel address. Onboarding builds the webhook URL from it, and browser requests to this host name reach only the webhook path.
+
+Requests that change data (including server functions) must also come from a page on an allowed host (the `Origin` header), except the webhook path, which checks the tracker's signature instead. Rejected requests get `403` and a line in the web server log. If you upgrade an installation that you already open by another name, such as a tailnet name with `WEB_HOST=0.0.0.0`, that name is blocked until you add it as the web address. The host check protects you from web pages in your browser; it is not access control, because any other client can send whatever host name it likes. So still publish only the webhook path through your tunnel (for example, a Tailscale Funnel or Cloudflare Tunnel route for `/api/webhooks/` only). `GET /api/identity` answers on any host name with the product name, version, and installation ID, so a client can tell this server apart from other machines.
 
 ### Run as a service
 

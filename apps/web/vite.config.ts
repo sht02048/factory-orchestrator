@@ -24,6 +24,7 @@ export default defineConfig(({ command }) => ({
       runtimeInjection: false,
       unstable_moduleResolution: { type: "commonJS", rootDir: repoRoot },
     }),
+    // 서버 진입은 src/server.ts 다. 모든 요청을 라우터 앞에서 거른다(Host·Origin 검사, 티켓 0048).
     tanstackStart(),
     viteReact(),
     // 프로덕션 server 번들이 DB 마이그레이션 SQL을 찾도록 산출물에 함께 싣는다.

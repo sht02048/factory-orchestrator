@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import { toWorkspaceId } from "./ids.js";
 import { assignRun, changeRunState, getRun, listRuns } from "./runs.js";
 import {
+  getInstallSettings,
   getMapping,
   listRunners,
   listWorkspaceTrackerProjects,
   recordRunnerCheck,
   removeWorkspaceTrackerProject,
+  saveInstallAddresses,
   saveWorkspace,
   saveWorkspaceTrackerProject,
 } from "./settings.js";
@@ -145,5 +147,30 @@ describe("recordRunnerCheck 필수 조건", () => {
     });
     recordRunnerCheck(db, { ...check, online: false, assignmentBlocked: null });
     expect(listRunners(db)[0]).toMatchObject({ online: false, prerequisites });
+  });
+});
+
+describe("설치 설정(0048)", () => {
+  it("처음 읽을 때 설치 ID를 만들고, 다시 읽어도 같은 ID다", () => {
+    const db = seededDatabase();
+    const first = getInstallSettings(db);
+    expect(first.instanceId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(first.webAddress).toBeNull();
+    expect(getInstallSettings(db).instanceId).toBe(first.instanceId);
+  });
+
+  it("주소를 저장해도 설치 ID는 그대로다", () => {
+    const db = seededDatabase();
+    const { instanceId } = getInstallSettings(db);
+    saveInstallAddresses(
+      db,
+      { webAddress: "https://server.example.ts.net", webhookAddress: null },
+      new Date("2026-11-18T00:00:00Z"),
+    );
+    expect(getInstallSettings(db)).toEqual({
+      instanceId,
+      webAddress: "https://server.example.ts.net",
+      webhookAddress: null,
+    });
   });
 });

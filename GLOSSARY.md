@@ -146,6 +146,18 @@ _Avoid_: Aborted, Stopped
 저장소 클론·pnpm 빌드 없이 도는 web·worker·CLI 한 덩어리. 운영 의존성까지 묶은 JS 폴더와 그 tarball이고, Node는 싣지 않는다(티켓 0029). 헤드리스 서비스와 데스크톱 앱(0046)이 같은 배포물을 띄운다. 화면·README에서는 "server bundle"로 쓴다.
 _Avoid_: 패키지(npm 패키지와 헷갈린다), 빌드 산출물(앱 하나의 `dist`를 가리킨다)
 
+**다른 기기에서 열 주소**:
+운영자가 노트북·휴대폰에서 이 서버의 화면을 여는 주소(예: Tailscale Serve 주소). Settings의 주소에서 정하고 DB 설치 설정에 둔다. 서버는 이 주소의 호스트와 127.0.0.1·localhost·바인드 주소로 온 요청만 받는다(Host 검사, 티켓 0048). 화면·README에서는 "web address"로 쓴다.
+_Avoid_: 바인드 주소(`WEB_HOST`, 서버가 듣는 인터페이스다), 공개 주소
+
+**webhook 공개 주소**:
+트래커가 webhook을 보내는 공개 인터넷 주소(예: Tailscale Funnel, Cloudflare Tunnel). Settings의 주소와 온보딩 1단계에서 정한다. 이 주소의 호스트로는 webhook 경로만 받고, 온보딩은 이 주소 뒤에 webhook 경로를 붙여 보인다. 화면·README에서는 "webhook address"로 쓴다.
+_Avoid_: 공개 주소(어느 주소인지 흐리다), 터널 주소
+
+**신원 확인 경로**:
+`GET /api/identity`. 인증 없이 제품 이름·버전·설치 ID와 요청한 Host로 화면을 열 수 있는지를 돌려주는 경로다. 데스크톱 앱(0046)이 tailnet 기기 중 오케스트레이터를 가려내는 데 쓴다. Host 검사를 받지 않는다. 계약은 티켓 0048.
+_Avoid_: health 경로(살아 있는지만 묻는 것처럼 들린다)
+
 ### 사람
 
 **Operator**:

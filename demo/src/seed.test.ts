@@ -5,6 +5,7 @@ import { summarizeRunOutcome } from "@factory/core";
 import {
   SecretBox,
   getAutoAssignLabel,
+  getInstallSettings,
   getMapping,
   listCodeHostConnections,
   listTrackerConnections,
@@ -58,6 +59,10 @@ describe("seedDemo", () => {
     expect(listTrackerConnections(db, box)).toHaveLength(2);
     expect(listCodeHostConnections(db, box)).toHaveLength(1);
     expect(listWorkspaces(db)).toHaveLength(2);
+    expect(getInstallSettings(db)).toMatchObject({
+      webAddress: "https://orchestrator.example.ts.net",
+      webhookAddress: "https://hooks.example.com",
+    });
     for (const project of listWorkspaceTrackerProjects(db)) {
       expect(getMapping(db, project.connection, project.projectId)).not.toBeNull();
       expect(project.inProgressStateId).not.toBeNull();

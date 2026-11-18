@@ -22,7 +22,8 @@
     "label": "Auto-assign Label",
     "connections": "트래커 연결",
     "github": "GitHub 토큰",
-    "runners": "러너 등록"
+    "runners": "러너 등록",
+    "addresses": "주소"
   },
   "summary": {
     "general": "최대 실행 시간 {minutes}분",
@@ -33,7 +34,8 @@
     "connections": "{count, plural, =0 {아직 없어요} other {#개}}",
     "githubSet": "저장했어요",
     "githubUnset": "아직 없어요",
-    "runners": "{count, plural, =0 {아직 없어요} other {#대}}"
+    "runners": "{count, plural, =0 {아직 없어요} other {#대}}",
+    "addresses": "{set, plural, =0 {아직 없어요} other {2개 중 #개 정했어요}}"
   },
   "remoteError": {
     "unauthorized": "키나 토큰이 맞지 않아요. 새로 만들어 넣어 주세요.",
@@ -179,6 +181,23 @@
       "fixToken": "러너에서 gh auth login --insecure-storage로 토큰을 파일에 저장하고, gh auth setup-git으로 git 자격 증명 도우미를 gh로 바꿔요.",
       "fixSsh": "또는 러너에 GitHub용 ssh 키를 둬요.",
       "checkedAt": "{time}에 확인했어요"
+    }
+  },
+  "addresses": {
+    "intro": "서버는 아래 주소의 이름으로 온 요청만 받아요. 다른 사이트가 이 서버를 몰래 부르지 못하게 하려는 거예요.",
+    "loopback": "이 기계에서 http://127.0.0.1 로 연 화면은 주소와 상관없이 늘 열려요. 잘못 넣었으면 거기서 고치면 돼요.",
+    "web": "다른 기기에서 열 주소",
+    "webDescription": "노트북·휴대폰에서 이 서버를 여는 주소예요. 예: Tailscale Serve 주소. 비워 두면 이 기계에서만 열려요.",
+    "webPlaceholder": "https://server.example.ts.net",
+    "webhook": "Webhook 공개 주소",
+    "webhookDescription": "트래커가 webhook을 보내는 공개 주소예요. 예: Tailscale Funnel, Cloudflare Tunnel 주소. 이 주소로는 webhook 경로만 받아요.",
+    "webhookPlaceholder": "https://hooks.example.com",
+    "save": "저장",
+    "saveWebhook": "공개 주소 저장",
+    "error": {
+      "invalid-web-address": "다른 기기에서 열 주소를 https://server.example.ts.net 처럼 경로 없이 넣어 주세요.",
+      "invalid-webhook-address": "Webhook 공개 주소를 https://hooks.example.com 처럼 경로 없이 넣어 주세요.",
+      "locks-out": "저장하면 지금 보는 이 화면의 주소가 막혀요. 지금 주소를 다른 기기에서 열 주소에 넣거나, 이 기계의 http://127.0.0.1 에서 바꿔 주세요."
     }
   }
 }

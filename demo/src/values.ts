@@ -12,6 +12,10 @@ export const FAIL_NO_ORCA = "no-orca";
 /** ssh 대상에 이 낱말이 있으면 가짜 러너의 GitHub 인증이 깨졌다 */
 export const FAIL_PUSH_AUTH = "push-auth";
 
+/** 미리 채운 모드의 다른 기기에서 열 주소와 webhook 공개 주소(티켓 0048). 가상 주소다 */
+export const DEMO_WEB_ADDRESS = "https://orchestrator.example.ts.net";
+export const DEMO_WEBHOOK_ADDRESS = "https://hooks.example.com";
+
 /** 입력 칸 name 마다 채울 가짜 값. 모두 확인을 통과한다 */
 export const PREFILL: Readonly<Record<string, string>> = {
   name: "Acme",
@@ -21,6 +25,9 @@ export const PREFILL: Readonly<Record<string, string>> = {
   sshTarget: "runner-a.example.com",
   orcaPath: "orca",
   capacity: "4",
+  // 주소(티켓 0048). 가상 주소라 이 이름으로는 닿지 않는다. 개발 서버는 127.0.0.1·WEB_HOST 로 연다.
+  webAddress: DEMO_WEB_ADDRESS,
+  webhookAddress: DEMO_WEBHOOK_ADDRESS,
 };
 
 /** 러너 폼(ssh 대상 칸이 있는 폼)의 이름 칸에 넣을 값 */

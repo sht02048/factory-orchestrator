@@ -7,6 +7,7 @@ import {
   getRunnerChecksPending,
   removeWorkspaceTrackerProject,
   requestRunnerCheckNow,
+  saveAddressesSetting,
   saveGitHubTokenSetting,
   saveRunnerSettings,
   saveTrackerConnection,
@@ -58,6 +59,7 @@ export function useSettingsActions(): SettingsActions {
       checkGitHubToken: () => checkGitHubTokenNow(),
       saveRunner: then((data) => saveRunnerSettings({ data })),
       recheckRunner: then((data) => requestRunnerCheckNow({ data })),
+      saveAddresses: then((data) => saveAddressesSetting({ data })),
       // 기다리는 동안은 요청 상태만 읽고, 결과가 오면 화면 전체를 다시 읽는다(트래커 API 를 아낀다)
       pollRunnerChecks: async () => {
         const pending = await getRunnerChecksPending();

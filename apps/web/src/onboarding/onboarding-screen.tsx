@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { Actions, Button, Field, Input, PanelBlock, Text } from "@factory/ui";
 import { colors, fonts, radius, space } from "@factory/ui/tokens.stylex";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslations } from "use-intl";
 import {
   ConnectionForm,
@@ -12,11 +12,13 @@ import {
   ProjectsPanel,
   RunnerCheck,
   RunnerForm,
+  WebhookAddressForm,
   useRunnerCheckPolling,
   useRunnerErrorName,
 } from "../settings/settings-screen";
 import type { ActionResult, SettingsActions } from "../settings/settings-screen";
 import type {
+  AddressesView,
   RunnerSettingsView,
   SettingsPage,
   TrackerConnectionView,
@@ -143,7 +145,13 @@ function StepBody({
 }) {
   switch (step) {
     case "tracker":
-      return <TrackerStep connections={page.install.connections} actions={actions} />;
+      return (
+        <TrackerStep
+          connections={page.install.connections}
+          addresses={page.install.addresses}
+          actions={actions}
+        />
+      );
     case "github":
       return <GitHubPanel saved={page.install.githubToken} actions={actions} />;
     case "runner":
@@ -212,34 +220,42 @@ function MappingStep({
 
 function TrackerStep({
   connections,
+  addresses,
   actions,
 }: {
   connections: TrackerConnectionView[];
+  addresses: AddressesView;
   actions: SettingsActions;
 }) {
   if (connections.length === 0) return <ConnectionForm connection={null} actions={actions} />;
   return (
-    <ul {...stylex.props(styles.list)}>
-      {connections.map((connection) => (
-        <li key={connection.id} {...stylex.props(styles.item)}>
-          <ConnectionForm connection={connection} actions={actions} />
-          <WebhookGuide connection={connection} />
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul {...stylex.props(styles.list)}>
+        {connections.map((connection) => (
+          <li key={connection.id} {...stylex.props(styles.item)}>
+            <ConnectionForm connection={connection} actions={actions} />
+            <WebhookGuide connection={connection} webhookAddress={addresses.webhookAddress} />
+          </li>
+        ))}
+      </ul>
+      <WebhookAddressForm addresses={addresses} actions={actions} />
+    </>
   );
 }
 
 /**
- * Linear webhook 을 운영자가 만드는 방법(research 0002 B.2). 밖에서 닿는 공개 주소는 운영자가 고른 방법에
- * 달려 있어(ADR 0005) 지금 접속한 주소를 예로 보인다. 주소는 브라우저에서만 알 수 있어 그린 뒤에 채운다.
+ * Linear webhook 을 운영자가 만드는 방법(research 0002 B.2). webhook 주소는 설정한 webhook 공개 주소로 그린다
+ * (0048). 브라우저 주소창의 주소는 tailnet·127.0.0.1 이라 트래커가 닿지 못한다. 공개 주소가 없으면 경로와
+ * 정하는 방법을 보인다.
  */
-function WebhookGuide({ connection }: { connection: TrackerConnectionView }) {
+function WebhookGuide({
+  connection,
+  webhookAddress,
+}: {
+  connection: TrackerConnectionView;
+  webhookAddress: string | null;
+}) {
   const t = useTranslations("onboarding.webhook");
-  const [origin, setOrigin] = useState("");
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
   return (
     <PanelBlock title={t("title")}>
       <div {...stylex.props(styles.stack)}>
@@ -250,9 +266,21 @@ function WebhookGuide({ connection }: { connection: TrackerConnectionView }) {
           <li>{t("stepEvents")}</li>
           <li>{t("stepSecret")}</li>
         </ol>
-        <Field label={t("url")} description={t("urlDescription")}>
-          <Input value={`${origin}${connection.webhookPath}`} readOnly mono />
-        </Field>
+        {webhookAddress === null ? (
+          <>
+            <div role="status" {...stylex.props(styles.stack)}>
+              <p {...stylex.props(styles.ok)}>{t("addressMissingTitle")}</p>
+              <Text variant="body">{t("addressMissingBody")}</Text>
+            </div>
+            <Field label={t("path")}>
+              <Input value={connection.webhookPath} readOnly mono />
+            </Field>
+          </>
+        ) : (
+          <Field label={t("url")} description={t("urlDescription")}>
+            <Input value={`${webhookAddress}${connection.webhookPath}`} readOnly mono />
+          </Field>
+        )}
         {/* 다음으로 가는 것은 막지 않는다. webhook 없이도 폴링 보정으로 할당한다(ADR 0001). 실패가 아니니 실패 색을 쓰지 않는다 */}
         {connection.hasWebhookSecret ? (
           <p role="status" {...stylex.props(styles.ok)}>
