@@ -3,12 +3,11 @@ import {
   toCodeHostKind,
   toRunnerProjectId,
   toLabelId,
-  toTrackerConnectionId,
   toTrackerKind,
   toTrackerProjectId,
   toTrackerStateId,
 } from "@factory/core";
-import type { RunnerHealth, RunnerId } from "@factory/core";
+import type { RunnerHealth, RunnerId, TrackerConnectionId } from "@factory/core";
 import { FakeCodeHost, FakeTracker } from "@factory/core/testing";
 import {
   SecretBox,
@@ -157,8 +156,10 @@ async function connectTracker(f: Fixture): Promise<void> {
   ).toEqual({ ok: true });
 }
 
-function connectionId(f: Fixture): string {
-  return listTrackerConnections(f.context.db, f.context.secretBox)[0]?.id ?? "";
+function connectionId(f: Fixture): TrackerConnectionId {
+  const found = listTrackerConnections(f.context.db, f.context.secretBox)[0];
+  if (found === undefined) throw new Error("no tracker connection");
+  return found.id;
 }
 
 function setUpWorkspace(f: Fixture, name = "Acme Commerce") {
@@ -788,7 +789,7 @@ describe("다섯 단계를 마치기", () => {
     saveWorkspace(f.context.db, { id: toWorkspaceId("ws-labs"), name: "Acme Labs" }, now);
     saveWorkspaceTrackerProject(f.context.db, {
       workspaceId: toWorkspaceId("ws-labs"),
-      connection: toTrackerConnectionId(connectionId(f)),
+      connection: connectionId(f),
       projectId: taken,
       name: "Taken",
       inProgressStateId: null,

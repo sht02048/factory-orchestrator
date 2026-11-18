@@ -85,7 +85,7 @@ describe("pnpm dev", () => {
       await next.click();
       await fill.click();
       await page.getByRole("button", { name: settings.runners.add }).click();
-      await page.getByText("runner-a 러너가 준비됐어요").waitFor();
+      await page.getByText(onboarding.runner.ready.replace("{name}", "runner-a")).waitFor();
       await next.click();
       await fill.click();
       await page.getByRole("checkbox", { name: "Web" }).click();
