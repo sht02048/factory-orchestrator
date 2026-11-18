@@ -117,7 +117,14 @@ beforeAll(async () => {
   baseUrl = `http://127.0.0.1:${address.port}`;
 
   browser = await chromium.launch({ channel: "chrome" });
-}, 120_000);
+
+  // 개발 서버는 화면 모듈을 처음 요청할 때 변환한다. CI 에서는 다른 브라우저 시험과 함께 돌아 첫 화면이
+  // 시험 하나의 대기 시간(30초)을 넘길 수 있어, 여기서 Home 을 한 번 열어 변환을 끝내 둔다.
+  const warm = await browser.newPage({ baseURL: baseUrl, locale: "ko-KR" });
+  warm.setDefaultTimeout(110_000);
+  await openHome(warm);
+  await warm.close();
+}, 240_000);
 
 afterAll(async () => {
   await browser?.close();
