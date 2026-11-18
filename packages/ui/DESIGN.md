@@ -15,7 +15,7 @@
 9. **HTML 요소를 직접 쓰지 않는다.** `apps/web`에서 `button`, `input`, `select`, `textarea`, `table`, `h1`~`h3`을 쓰면 lint(`react/forbid-elements`)가 실패한다. `Button`, `Input`, `Textarea`, `RadioOption`, `Select`, `DataTable`·`Table`, `Text`(`as="h2"` 등)를 쓴다. 공용 컴포넌트에 없는 속성이 필요하면 `packages/ui`를 넓힌다.
 10. **길이 값을 직접 쓰지 않는다.** `apps/web` 스타일에서 여백·간격·둥글기·폭·위치에 px 숫자(단위 없는 숫자 포함)나 rem·em 숫자를 쓰면 `pnpm check:lengths`(pre-commit, CI)가 실패한다. 여백은 `space`, 폭·높이는 뜻에 맞는 `size` 토큰, 미디어·컨테이너 쿼리는 `breakpoints`로 쓴다. 값이 우연히 같다고 다른 뜻의 토큰을 빌려 쓰지 않는다. 없으면 뜻을 이름에 담은 토큰을 더한다.
 
-`/ds`(`apps/web/src/ds/`)는 토큰 자체를 보여 주는 곳이라 토큰 import와 길이 값 검사에서 뺀다. HTML 요소 검사는 받는다. 시험 파일(`*.test.ts(x)`)은 세 검사에서 뺀다.
+`/ds`(`apps/web/src/ds/`)는 토큰 자체를 보여 주는 곳이라 토큰 import와 길이 값 검사에서 뺀다. HTML 요소 검사는 받는다. 시험 파일(`*.test.ts(x)`)은 HTML 요소 검사와 길이 값 검사에서 뺀다. 토큰 import 검사는 시험 파일에도 걸린다.
 
 ## 토큰
 
@@ -87,7 +87,7 @@
 - `radius`(ADR 0010 10번): `card 12`(카드, 다이얼로그), `control 8`(버튼, 행, 입력, 메뉴·팝업), `pill 6`(알약, 팝업 항목, 툴팁), `full`(점). `tokens.test.ts`가 값을 검사한다.
 - `shadow.popover`: 떠 있는 면(메뉴, Select 목록, 툴팁, 다이얼로그, 토스트)에만. 구역에는 그림자를 쓰지 않는다.
 - `motion`: `easeOut`, `durationFast 150ms`(hover·팝업), `durationToast 180ms`. 상태가 바뀔 때만 짧게 움직이고, `prefers-reduced-motion`에서는 끈다.
-- `size`: `sidebarWidth 216`, `railWidth 84`(아이콘 레일), `panelWidth 384`, `editorListWidth 320`, `control 32`(버튼), `input 36`, `rowMinHeight 52`, `dot 6`(알약 점), `pill 22`(알약 높이·단계 표시), `icon 14`, `tick 18`(확인 표시), `markerLarge 28`(끝난 표시).
+- `size`: `sidebarWidth 216`, `railWidth 84`(아이콘 레일), `railAvatar 36`·`railIcon 24`·`issueBadge 16`(레일 Workspace 글자·메뉴 아이콘 칸·문제 수 점), `panelWidth 384`, `editorListWidth 320`, `control 32`(버튼), `input 36`, `rowMinHeight 52`, `dot 6`(알약 점), `pill 22`(알약 높이·단계 표시), `icon 14`, `tick 18`(확인 표시), `markerLarge 28`(끝난 표시).
   - 화면 틀: `noticeWidth 720`(공지·빈 화면), `formWidth 640`(설정 폼·목록), `detailPageWidth 1280`·`detailAsideWidth 360`(Run 상세), `logMaxHeight 480`, `stepNavWidth 240`·`stepContentWidth 760`(온보딩), `dashboardSideWidth 340`, `todoTextMinWidth 256`, `searchMinWidth 216`·`searchMaxWidth 320`, `textareaMinHeight 72`.
   - 표 열: `ticketKeyColumn 112`, `projectColumn 128`, `lastRunColumn 160`, `runStatusColumn 160`, `elapsedColumn 88`, `runnerStatusColumn 112`, `capacityColumn 160`, `mappingTableMinWidth 640`, `mappingCellMinWidth 140`. 자동 맞춤 격자 최소 폭은 `fieldMinWidth 200`, `compareMinWidth 220`, 라벨 행은 `labelTextMinWidth 280`·`labelSelectWidth 240`.
 - `breakpoints`(`stylex.defineConsts`): `narrowScreen`(600), `stepsStacked`(900), `detailStacked`(960), `dashboardOneColumn`(컨테이너 719), `statTilesStacked`(컨테이너 704). `[breakpoints.이름]: 값`으로 쓴다.
