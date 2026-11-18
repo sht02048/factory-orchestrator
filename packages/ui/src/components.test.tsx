@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   Button,
   Card,
+  Checkbox,
   DefinitionItem,
   DefinitionList,
   Dialog,
@@ -300,6 +301,40 @@ describe("서버 렌더", () => {
       </Popover>,
     );
     expect(danger).toContain('data-variant="danger"');
+  });
+
+  it("Checkbox 는 라벨 안에 체크 상태와 설명을 갖고, 고를 수 없으면 disabled 를 넘긴다", () => {
+    const html = renderToString(
+      <>
+        <Checkbox label="Web" checked onCheckedChange={noop} />
+        <Checkbox
+          label="API"
+          description="다른 Workspace에 있어요"
+          checked={false}
+          disabled
+          onCheckedChange={noop}
+        />
+      </>,
+    );
+    const [web, api] = html.split("API");
+    expect(web).toMatch(/<label[^>]*>.*role="checkbox"/s);
+    expect(web).toContain('aria-checked="true"');
+    expect(html).toContain('aria-checked="false"');
+    expect(html).toContain("다른 Workspace에 있어요");
+    expect(api).toBeDefined();
+    expect(html.match(/disabled=""/g)?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it("Select 는 aria-label 을 트리거에 붙인다", () => {
+    const html = renderToString(
+      <Select
+        aria-label="Web의 에이전트"
+        value={null}
+        onValueChange={noop}
+        options={[{ value: "a", label: "A" }]}
+      />,
+    );
+    expect(html).toContain('aria-label="Web의 에이전트"');
   });
 
   it("DefinitionList 는 dt·dd 짝을 만든다", () => {

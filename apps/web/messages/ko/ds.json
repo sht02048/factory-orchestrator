@@ -22,7 +22,7 @@
     "table": "Table과 상세 패널",
     "definitions": "DefinitionList",
     "menu": "Menu",
-    "form": "Field·Input·Select",
+    "form": "Field·Input·Select·Checkbox",
     "tooltip": "Tooltip",
     "dialog": "Dialog",
     "toast": "Toast"
@@ -187,7 +187,11 @@
     "agentClaude": "Claude Code",
     "agentCodex": "Codex",
     "agentDisabled": "Gemini · 이 러너에 없어 고를 수 없어요",
-    "webhookLabel": "Webhook 주소"
+    "webhookLabel": "Webhook 주소",
+    "checkWeb": "Web",
+    "checkApi": "API",
+    "checkMobile": "Mobile",
+    "checkMobileHint": "Acme Labs에 있어 고를 수 없어요"
   },
   "tooltip": {
     "note": "아이콘 버튼의 이름이나 잘린 값의 전체를 보일 때만 써요.",
