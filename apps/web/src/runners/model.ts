@@ -43,17 +43,18 @@ export interface LeftWorktree {
 }
 
 /**
- * 러너 쪽 GitHub 인증 확인 하나(core RunnerPrerequisite 중 할당을 막는 것, Q82.14·Q82.15). 1단계는
- * 프로젝트 저장소마다 `git push --dry-run`이라 이름이 그 프로젝트를 가리킨다.
+ * 러너 확인 항목 하나(core RunnerPrerequisite, 스펙 9절). Orca 상시 서비스와 프로젝트마다의 GitHub push
+ * (`git push --dry-run`, Q82.15)가 있다. GitHub push 처럼 깨지면 할당에서 빼는 항목은 `blocksAssignment`다(Q82.14).
  */
-export interface GitHubAuthCheck {
+export interface RunnerCheckItem {
   id: string;
   /** 어댑터가 준 이름. 모르는 종류의 항목에만 보인다 */
   name: string;
-  /** 러너 쪽 프로젝트 표시 이름. 찾지 못하면 null */
+  /** github-push 항목의 러너 쪽 프로젝트 표시 이름. 찾지 못하거나 다른 종류면 null */
   project: string | null;
   /** 통과하면 true, 깨졌으면 false, 확인하지 못했으면 null */
   satisfied: boolean | null;
+  blocksAssignment: boolean;
 }
 
 export interface RunnerView {
@@ -62,8 +63,8 @@ export interface RunnerView {
   online: boolean;
   /** GitHub 인증이 깨져 할당에서 빠졌는지(Q82.14). Online/Offline 은 바꾸지 않는다 */
   assignmentBlocked: boolean;
-  /** 마지막으로 읽은 GitHub 인증 결과. 아직 읽지 못했으면 null */
-  githubAuth: GitHubAuthCheck[] | null;
+  /** 마지막으로 읽은 러너 확인 항목. 아직 읽지 못했으면 null */
+  checks: RunnerCheckItem[] | null;
   /** 마지막 상태 확인의 때와 그때부터 지금까지. 확인한 적 없으면 null */
   checked: { at: string; agoMs: number } | null;
   capacity: number;
@@ -73,12 +74,8 @@ export interface RunnerView {
   queued: QueuedRunView[];
   /** 할당 순서 */
   leftWorktrees: LeftWorktree[];
-  /** 러너 쪽 프로젝트 이름 */
-  projects: string[];
   /** 러너 설정의 ssh 대상. 설정에 없으면 null */
   sshTarget: string | null;
-  /** 러너 설정의 orca 실행 파일 경로. 설정에 없으면 null */
-  orcaPath: string | null;
 }
 
 export interface RunnersPage {

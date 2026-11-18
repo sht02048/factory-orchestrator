@@ -18,7 +18,6 @@ import type {
  */
 const runnerConfigSchema = z.object({
   sshTarget: z.string().min(1).optional().catch(undefined),
-  orcaPath: z.string().min(1).optional().catch(undefined),
 });
 
 /**
@@ -76,18 +75,15 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
       name: runner.name,
       online: runner.online,
       assignmentBlocked: runner.assignmentBlocked,
-      githubAuth:
-        runner.prerequisites === null
-          ? null
-          : runner.prerequisites
-              .filter((p) => p.blocksAssignment)
-              // 해결 방법은 어댑터 문구 대신 화면 메시지로 한 번 보인다.
-              .map((p) => ({
-                id: p.id,
-                name: p.name,
-                project: prerequisiteProject(p.id, runner.projects),
-                satisfied: p.satisfied,
-              })),
+      // 해결 방법은 어댑터 문구 대신 화면 메시지로 한 번 보인다.
+      checks:
+        runner.prerequisites?.map((p) => ({
+          id: p.id,
+          name: p.name,
+          project: prerequisiteProject(p.id, runner.projects),
+          satisfied: p.satisfied,
+          blocksAssignment: p.blocksAssignment,
+        })) ?? null,
       checked:
         runner.checkedAt === null
           ? null
@@ -99,9 +95,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
       occupying: (occupying.get(runner.id) ?? []).toSorted((a, b) => b.executionMs - a.executionMs),
       queued: queued.get(runner.id) ?? [],
       leftWorktrees: leftWorktrees.get(runner.id) ?? [],
-      projects: runner.projects.map((p) => p.displayName),
       sshTarget: config.sshTarget ?? null,
-      orcaPath: config.orcaPath ?? null,
     };
   });
   return { runners };

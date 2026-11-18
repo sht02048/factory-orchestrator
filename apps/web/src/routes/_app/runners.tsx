@@ -19,12 +19,12 @@ export function reloadOnEnter({ cause }: { cause: "preload" | "enter" | "stay" }
 
 /**
  * Runners: 모든 러너. 러너는 Workspace 밖 자원이라 loader 가 ws 에 기대지 않는다(ADR 0006).
- * 고른 러너(sel)는 주소에 남는다.
+ * 주소의 러너(sel, Home 의 Runner Issue 카드가 건다)가 있으면 그 카드로 스크롤한다.
  */
 export const Route = createFileRoute("/_app/runners")({
   validateSearch: z.object({ sel: z.string().optional() }),
   loader: () => getRunnersPage(),
-  // 화면에 들어올 때마다 새로 읽는다. 행을 고르거나 Workspace 를 바꿀 때(stay)는 같은 러너 목록이라 다시 읽지 않는다.
+  // 화면에 들어올 때마다 새로 읽는다. Workspace 를 바꿀 때(stay)는 같은 러너 목록이라 다시 읽지 않는다.
   shouldReload: reloadOnEnter,
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: RunnersRoute,
@@ -33,16 +33,9 @@ export const Route = createFileRoute("/_app/runners")({
 function RunnersRoute() {
   const page = Route.useLoaderData();
   const { sel } = Route.useSearch();
-  const navigate = Route.useNavigate();
   return (
     <ScreenMessages messages={runnersMessages}>
-      <RunnersScreen
-        page={page}
-        selectedId={sel}
-        onSelect={(id) => {
-          void navigate({ search: (prev) => ({ ...prev, sel: id }), replace: true });
-        }}
-      />
+      <RunnersScreen page={page} selectedId={sel} />
     </ScreenMessages>
   );
 }

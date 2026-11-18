@@ -1,130 +1,161 @@
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import runnersJson from "../../messages/ko/runners.json" with { type: "json" };
+import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
 import { addUnreachedCanceledRun, breakGitHubAuth, now, seedDatabase } from "../testing/seed";
 import { loadRunnersPage } from "./load";
 import { runnersMessages } from "./messages";
 import type { RunnersPage } from "./model";
-import { RunnersScreen } from "./runners-screen";
+import { ADD_RUNNER_HREF, RunnersScreen } from "./runners-screen";
 
-const noop = () => {};
+const card = runnersJson.card;
 
 function render(page: RunnersPage, selectedId?: string) {
-  return renderWithMessages(
-    <RunnersScreen page={page} selectedId={selectedId} onSelect={noop} />,
-    runnersMessages,
-  );
+  return renderWithMessages(<RunnersScreen page={page} selectedId={selectedId} />, runnersMessages);
 }
 
-/** 목록의 행 하나(role="option")의 글. 태그를 지우고 칸을 나눈다 */
-function rowTexts(html: string): Map<string, string[]> {
-  const rows = new Map<string, string[]>();
-  for (const chunk of html.split('role="option"').slice(1)) {
-    // 마지막 행 뒤의 패널(aside)은 뺀다
-    const cells = (chunk.split("<aside")[0] ?? "")
-      .split(/<[^>]+>/)
-      .map((s) => s.trim())
-      .filter((s) => s !== "" && !s.includes("="));
-    const key = cells[0];
-    if (key !== undefined) rows.set(key, cells);
-  }
-  return rows;
+/** 러너 카드 하나(section)의 HTML */
+function cardHtml(html: string, name: string): string {
+  const start = html.indexOf(`<section aria-label="${name} 러너"`);
+  if (start === -1) throw new Error(`no card ${name}`);
+  return html.slice(start, html.indexOf("</section>", start));
 }
 
-/** 상세 패널(aside) 안의 글 */
-function panelText(html: string): string {
-  const panel = html.split("<aside")[1] ?? "";
-  return panel.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+/** 태그를 지운 글 */
+function textOf(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&#x27;/g, "'")
+    .replace(/\s+/g, " ");
+}
+
+/** 렌더한 버튼(과 버튼 모양 링크)의 변형 */
+function variantsOf(html: string): string[] {
+  return [...html.matchAll(/data-variant="([^"]+)"/g)].map((m) => m[1] ?? "");
 }
 
 describe("Runners 화면", () => {
-  it("행마다 Online/Offline, capacity 사용량, Queued 수, 남은 워크트리 수, 마지막 확인을 보인다", () => {
+  it('러너마다 카드를 그리고 Online·Offline 알약과 capacity "n/m"을 보인다', () => {
     const { db } = seedDatabase();
-    const rows = rowTexts(render(loadRunnersPage(db, now)));
-    expect(rows.get("runner-a")).toEqual(["runner-a", "Online", "4/10", "1개", "2개", "2시간 전"]);
-    expect(rows.get("runner-b")).toEqual(["runner-b", "Offline", "0/1", "—", "—", "2시간 전"]);
+    const html = render(loadRunnersPage(db, now));
+    const a = cardHtml(html, "runner-a");
+    expect(pillsOf(a)[0]).toEqual({ status: "online", label: domain.runnerState.online });
+    expect(textOf(a)).toContain(`${card.capacity} 4/10`);
+    const b = cardHtml(html, "runner-b");
+    expect(pillsOf(b)[0]).toEqual({ status: "offline", label: domain.runnerState.offline });
+    expect(textOf(b)).toContain(`${card.capacity} 0/1`);
   });
 
-  it("패널에 capacity 를 쓰는 런과 그 Workspace, 기다리는 런, 남은 워크트리, 프로젝트를 보인다", () => {
+  it("제목 아래 한 줄 요약에 새 런을 받을 수 있는 러너 수와 문제가 있는 러너 수를 보인다", () => {
     const { db } = seedDatabase();
-    const text = panelText(render(loadRunnersPage(db, now), "runner-a"));
-    expect(text).toContain("capacity 4/10");
-    expect(text).toContain("6개 비어 있어요");
-    expect(text).toContain(`Acme Labs · ${domain.runState.running}`);
-    // Disconnected 런은 "연결 끊김"으로 보인다
-    expect(text).toContain(`ACME-12 Acme Commerce · ${domain.runState.disconnected}`);
-    expect(text).toContain("기다리는 런 1");
-    expect(text).toContain("남은 워크트리 2");
-    expect(text).toContain(runnersJson.panel.worktree["operator-decides"]);
-    expect(text).toContain(runnersJson.panel.worktree["keep-until-pr-settles"]);
-    expect(text).toContain("프로젝트 1");
-    expect(text).toContain("github:acme/web");
+    const text = textOf(render(loadRunnersPage(db, now)));
+    expect(text).toContain("2대 중 1대가 새 런을 받을 수 있어요. 1대는 문제가 있어요.");
+  });
+
+  it("파란 주 버튼은 러너 추가 하나이고 Settings 의 러너 등록으로 간다(ADR 0010 6번)", () => {
+    const { db } = seedDatabase();
+    breakGitHubAuth(db);
+    const html = render(loadRunnersPage(db, now));
+    expect(variantsOf(html).filter((v) => v === "primary")).toHaveLength(1);
+    expect(html).toContain(`<a href="${ADD_RUNNER_HREF}" data-variant="primary"`);
+    expect(textOf(html)).toContain(runnersJson.add);
+  });
+
+  it("러너가 없어도 주 버튼은 하나다", () => {
+    const html = render({ runners: [] });
+    expect(textOf(html)).toContain(runnersJson.noRunners);
+    expect(variantsOf(html)).toEqual(["primary"]);
+  });
+
+  it("capacity 를 쓰는 런과 기다리는 런을 상태 알약·Workspace 와 함께 보인다", () => {
+    const { db } = seedDatabase();
+    const a = cardHtml(render(loadRunnersPage(db, now)), "runner-a");
+    const statuses = pillsOf(a).map((p) => p.status);
+    expect(statuses).toContain("running");
+    expect(statuses).toContain("disconnected");
+    expect(statuses).toContain("queued");
+    expect(textOf(a)).toContain("ACME-12 Acme Commerce");
+    expect(textOf(a)).toContain("6자리가 비어 있어요.");
   });
 
   it("런 줄은 그 런의 Workspace 로 연 Runs 로 이어진다", () => {
     const { db, ids } = seedDatabase();
-    const html = render(loadRunnersPage(db, now), "runner-a");
+    const html = render(loadRunnersPage(db, now));
     expect(html).toContain(`href="/runs?ws=ws-labs&amp;sel=${ids.get("LAB-1") ?? ""}"`);
   });
 
-  it("Offline 러너는 남은 capacity 를 쓸 수 없다고 보인다", () => {
+  it("남은 워크트리와 그 까닭을 보인다", () => {
     const { db } = seedDatabase();
-    const text = panelText(render(loadRunnersPage(db, now), "runner-b"));
-    expect(text).toContain(runnersJson.panel.reason.offline);
-    expect(text).toContain(runnersJson.panel.noFreeCapacity);
-    expect(text).toContain(runnersJson.panel.notConfigured);
+    const text = textOf(cardHtml(render(loadRunnersPage(db, now)), "runner-a"));
+    expect(text).toContain("남은 워크트리 2");
+    expect(text).toContain(card.worktree["operator-decides"]);
+    expect(text).toContain(card.worktree["keep-until-pr-settles"]);
   });
 
-  it("고른 러너가 없거나 모르는 값이면 첫 러너를 보인다", () => {
+  it("Offline 러너는 닿지 않는다는 것과 해결 안내를 보이고 막대를 빨갛게 그린다", () => {
     const { db } = seedDatabase();
-    const page = loadRunnersPage(db, now);
-    expect(panelText(render(page, "nope"))).toContain("capacity 4/10");
+    const b = cardHtml(render(loadRunnersPage(db, now)), "runner-b");
+    const text = textOf(b);
+    expect(text).toContain(card.summary.offline);
+    expect(text).toContain(card.unreachable);
+    expect(text).toContain(card.fixTitle);
+    expect(text).toContain(card.fix.offline);
+    // Offline 은 Offline 알약 하나로 보인다. Runner Issue 알약을 겹쳐 달지 않는다
+    expect(pillsOf(b).map((p) => p.status)).toEqual(["offline"]);
   });
 
-  it("GitHub 인증이 깨진 러너는 할당에서 빠졌다고 보이고 깨진 프로젝트와 해결 방법을 보인다(Q82.14·Q82.15)", () => {
+  it("GitHub 인증이 깨진 러너는 Online 과 Runner Issue 알약, 깨진 프로젝트, 해결 방법을 보인다(Q82.14·Q82.15)", () => {
     const { db } = seedDatabase();
     breakGitHubAuth(db);
-    const html = render(loadRunnersPage(db, now), "runner-a");
-    expect(rowTexts(html).get("runner-a")?.slice(1, 3)).toEqual([
-      "Online",
-      runnersJson.assignmentBlocked,
+    const html = render(loadRunnersPage(db, now));
+    const a = cardHtml(html, "runner-a");
+    expect(pillsOf(a).slice(0, 2)).toEqual([
+      { status: "online", label: domain.runnerState.online },
+      { status: "runner-issue", label: domain.attention["runner-issue"] },
     ]);
-    expect(rowTexts(html).get("runner-b")).not.toContain(runnersJson.assignmentBlocked);
-    const text = panelText(html);
-    expect(text).toContain(runnersJson.panel.reason.assignmentBlocked);
-    // 어댑터의 영어 이름 대신 메시지로 보인다. 러너 쪽 프로젝트에 없는 항목은 프로젝트 ID 를 넣는다
-    expect(text).toContain(
-      `GitHub push 권한: github:acme/web ${runnersJson.panel.githubAuth.state.broken}`,
+    const text = textOf(a);
+    expect(text).toContain(card.summary.assignmentBlocked);
+    // 항목마다 통과·깨짐을 아이콘 이름으로 보인다. 어댑터의 영어 이름 대신 메시지로 보인다
+    expect(a).toMatch(
+      new RegExp(`aria-label="${card.check.broken}"[^]*?GitHub push 권한: github:acme/web<`),
     );
-    expect(text).toContain(
-      `GitHub push 권한: github:acme/docs ${runnersJson.panel.githubAuth.state.ok}`,
+    expect(a).toMatch(
+      new RegExp(`aria-label="${card.check.ok}"[^]*?GitHub push 권한: github:acme/docs<`),
     );
     expect(text).not.toContain("GitHub push access");
     // 어댑터의 영어 해결 방법은 한국어 안내와 겹쳐 보이지 않는다
     expect(text).not.toContain("Run `gh auth login");
     expect(text).toContain("gh auth login --insecure-storage");
     expect(text).toContain("gh auth setup-git");
+    expect(pillsOf(cardHtml(html, "runner-b")).map((p) => p.status)).toEqual(["offline"]);
   });
 
-  it("인증을 아직 확인하지 않은 러너는 그렇다고 보이고 해결 방법은 보이지 않는다", () => {
+  it("확인 항목을 아직 읽지 않은 러너는 그렇다고 보이고 해결 방법은 보이지 않는다", () => {
     const { db } = seedDatabase();
-    const text = panelText(render(loadRunnersPage(db, now), "runner-a"));
-    expect(text).toContain(runnersJson.panel.githubAuth.neverChecked);
-    expect(text).not.toContain("gh auth login");
+    const text = textOf(cardHtml(render(loadRunnersPage(db, now)), "runner-a"));
+    expect(text).toContain(card.noChecks);
+    expect(text).not.toContain(card.fixTitle);
   });
 
-  it("러너에 닿지 못한 채 끝난 취소 런을 남은 워크트리 수에 넣는다(Q82.21)", () => {
+  it("마지막 확인을 상대 시간으로 보인다", () => {
+    const { db } = seedDatabase();
+    const text = textOf(cardHtml(render(loadRunnersPage(db, now)), "runner-a"));
+    expect(text).toContain("2시간 전 확인했어요");
+  });
+
+  it("러너에 닿지 못한 채 끝난 취소 런을 남은 워크트리에 넣는다(Q82.21)", () => {
     const { db } = seedDatabase();
     addUnreachedCanceledRun(db, "ACME-22");
-    const html = render(loadRunnersPage(db, now), "runner-b");
-    expect(rowTexts(html).get("runner-b")?.[4]).toBe("1개");
-    expect(panelText(html)).toContain(
-      `ACME-22 Acme Commerce · ${runnersJson.panel.worktree["operator-decides"]}`,
-    );
+    const text = textOf(cardHtml(render(loadRunnersPage(db, now)), "runner-b"));
+    expect(text).toContain("남은 워크트리 1");
+    expect(text).toContain(`ACME-22 Acme Commerce · ${card.worktree["operator-decides"]}`);
   });
 
-  it("러너가 없으면 빈 목록 문구를 보인다", () => {
-    expect(render({ runners: [] })).toContain(runnersJson.noRunners);
+  it("카드마다 주소로 고를 수 있는 id 를 단다", () => {
+    const { db } = seedDatabase();
+    const html = render(loadRunnersPage(db, now), "runner-b");
+    expect(html).toContain('id="runner-runner-a"');
+    expect(html).toContain('id="runner-runner-b"');
   });
 });
