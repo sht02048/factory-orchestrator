@@ -123,7 +123,9 @@ export class LocalServer {
     const record = this.ownRecord();
     const lock = readLiveServerLock(this.home);
     if (lock !== undefined) {
-      const owner: Owner = record?.pid === lock.pid ? "app" : "external";
+      // pid 만 같으면 안 된다. 재부팅 뒤 ③이 앱이 기록한 pid 를 다시 받았을 수 있다.
+      const owner: Owner =
+        record !== undefined && record.pid === lock.pid && recordAlive(record) ? "app" : "external";
       const probed = await this.probe(lock.url, 1_000);
       if (probed.kind === "ours") {
         return { state: "running", owner, pid: lock.pid, url: lock.url, identity: probed.identity };

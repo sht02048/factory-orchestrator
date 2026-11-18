@@ -244,6 +244,38 @@ describe("LocalServer", () => {
     expect(alive(stranger.pid)).toBe(true);
   });
 
+  it("재부팅 뒤 ③이 앱이 기록한 pid 를 다시 받아 잠금을 쥐면 ③으로 보고 멈추거나 바꾸지 않는다", async () => {
+    mkdirSync(home, { recursive: true });
+    spawnSync(process.execPath, [FAKE_CLI, "init", "--home", home], {
+      env: { ...process.env, FAKE_PORT: String(port) },
+    });
+    const service = spawn(process.execPath, [FAKE_CLI, "start", "--home", home], {
+      stdio: "ignore",
+    });
+    others.push(service);
+    while (!(await responds())) await sleep(50);
+    if (service.pid === undefined) throw new Error("no pid");
+    // 앱이 예전(재부팅 전)에 같은 pid 로 ②를 띄웠다는 기록. 서버 코드도 달라 버전 교체 조건에 걸린다.
+    const records = fileRecordStore(join(dir, "app", "server-process.json"));
+    records.write({
+      pid: service.pid,
+      buildId: "old-build",
+      home,
+      spawnedAt: "2000-01-01T00:00:00.000Z",
+      root: dirname(FAKE_CLI),
+    });
+    const local = server({ records });
+    expect(await local.status()).toMatchObject({ state: "running", owner: "external" });
+    expect(await local.ensureRunning()).toMatchObject({
+      kind: "running",
+      replaced: false,
+      status: { owner: "external", pid: service.pid },
+    });
+    expect(await local.stop()).toEqual({ ok: false, reason: "not-owned" });
+    expect(alive(service.pid)).toBe(true);
+    expect(events("start")).toEqual([service.pid]);
+  });
+
   it("뜨지 못하고 끝나면 실패를 알린다", async () => {
     mkdirSync(home, { recursive: true });
     writeFileSync(join(home, ".env"), 'WEB_PORT="not-a-port"\n');
