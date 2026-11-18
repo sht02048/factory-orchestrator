@@ -112,6 +112,16 @@ describe("LocalServer", () => {
     );
   });
 
+  it("②를 잠자기 방지를 거는 CLI start 로 띄워, 앱이 따로 잠자기 방지를 걸지 않는다", async () => {
+    await server().ensureRunning();
+    const [pid] = events("start");
+    if (pid === undefined) throw new Error("start missing");
+    const command = spawnSync("ps", ["-o", "command=", "-p", String(pid)], {
+      encoding: "utf8",
+    }).stdout.trim();
+    expect(command).toBe(`${process.execPath} ${FAKE_CLI} start --home ${home}`);
+  });
+
   it("앱을 다시 열면 도는 같은 ②에 붙고 새로 띄우지 않는다(pid 가 그대로다)", async () => {
     const first = await server().ensureRunning();
     if (first.kind !== "running") throw new Error(JSON.stringify(first));

@@ -445,3 +445,14 @@ export function saveAddresses(
   saveInstallAddresses(context.db, { webAddress, webhookAddress }, now);
   return { ok: true };
 }
+
+export const powerInput = z.object({ preventSleep: z.boolean() });
+
+export function savePowerSetting(
+  context: SettingsContext,
+  input: z.infer<typeof powerInput>,
+): SaveResult<"unavailable"> {
+  if (context.power === undefined) return { ok: false, reason: "unavailable" };
+  context.power.write({ preventSleep: input.preventSleep });
+  return { ok: true };
+}

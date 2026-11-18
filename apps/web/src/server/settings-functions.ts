@@ -14,6 +14,7 @@ import {
   inProgressInput,
   labelInput,
   mappingInput,
+  powerInput,
   removeTrackerProject,
   requestRunnerCheckSetting,
   runnerIdInput,
@@ -24,6 +25,7 @@ import {
   saveInProgressState,
   saveLabel,
   saveMappingSetting,
+  savePowerSetting,
   saveRunnerSetting,
   saveTrackerConnectionSetting,
   trackerConnectionInput,
@@ -33,9 +35,16 @@ import { hasPendingRunnerChecks, loadSettingsPage } from "../settings/load";
 import type { SettingsContext } from "../settings/load";
 import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
+import { installPowerSettings } from "./power-settings";
 
 function context(): SettingsContext {
-  return { db: getDatabase(), secretBox: getSecretBox(), registry: getAdapterRegistry() };
+  const power = installPowerSettings(process.env);
+  return {
+    db: getDatabase(),
+    secretBox: getSecretBox(),
+    registry: getAdapterRegistry(),
+    ...(power === undefined ? {} : { power }),
+  };
 }
 
 export const getSettingsPage = createServerFn({ method: "GET" })
@@ -102,3 +111,7 @@ export const saveAddressesSetting = createServerFn({ method: "POST" })
       bindHost: parseBootConfig(process.env).host,
     }),
   );
+
+export const savePowerSettings = createServerFn({ method: "POST" })
+  .validator(powerInput)
+  .handler(({ data }) => savePowerSetting(context(), data));

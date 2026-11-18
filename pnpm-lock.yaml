@@ -270,6 +270,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ganger/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@ganger/codehost-github':
         specifier: workspace:*
         version: link:../../packages/codehost-github

@@ -1,7 +1,7 @@
 import type { WorkspaceId } from "@ganger/db";
 
 export const WORKSPACE_ITEMS = ["general", "projects", "mapping", "progress", "label"] as const;
-export const INSTALL_ITEMS = ["connections", "github", "runners", "addresses"] as const;
+export const INSTALL_ITEMS = ["connections", "github", "runners", "addresses", "power"] as const;
 export type WorkspaceItem = (typeof WORKSPACE_ITEMS)[number];
 export type InstallItem = (typeof INSTALL_ITEMS)[number];
 export type SettingsItem = WorkspaceItem | InstallItem;
@@ -112,11 +112,17 @@ export interface AddressesView {
   webhookAddress: string | null;
 }
 
+export interface PowerView {
+  available: boolean;
+  preventSleep: boolean;
+}
+
 export interface InstallSettings {
   connections: TrackerConnectionView[];
   githubToken: boolean;
   runners: RunnerSettingsView[];
   addresses: AddressesView;
+  power: PowerView;
 }
 
 export interface SettingsPage {

@@ -7,7 +7,9 @@ import { loadMigrations, openDatabase } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MissingEnvFileError } from "./home.js";
 import { init } from "./init.js";
+import type { HoldSleepAssertion } from "./keep-awake.js";
 import type { AppLayout, ProcessSpec } from "./layout.js";
+import { writePowerSettings } from "./power-settings.js";
 import { readServerLock, serverLockPath } from "./server-lock.js";
 import { StartError, start, webUrl } from "./start.js";
 import type { Started } from "./start.js";
@@ -255,6 +257,89 @@ describe("start", () => {
       StartError,
     );
     expect(existsSync(setup.databasePath)).toBe(false);
+  });
+});
+
+describe("start의 잠자기 방지", () => {
+  function recordingHold() {
+    const events: string[] = [];
+    const hold: HoldSleepAssertion = (pid) => {
+      events.push(`hold ${pid}`);
+      return {
+        exited: new Promise(() => undefined),
+        release: () => events.push("release"),
+      };
+    };
+    return { events, hold };
+  }
+
+  it("서버가 도는 동안 CLI pid로 잠자기 방지를 걸고, 서버가 끝나면 푼다", async () => {
+    const home = join(dir, "home");
+    init({ home, port: String(await freePort()) });
+    const { events, hold } = recordingHold();
+    started = await start({
+      home,
+      env: {},
+      layout: fakeLayout(),
+      onOutput: quiet,
+      keepAwake: { platform: "darwin", hold, warn: quiet },
+    });
+    expect(events).toEqual([`hold ${process.pid}`]);
+    await started.stop();
+    expect(events).toEqual([`hold ${process.pid}`, "release"]);
+  });
+
+  it("한쪽이 먼저 끝나 서버가 멈춰도 푼다", async () => {
+    const home = join(dir, "home");
+    init({ home, port: String(await freePort()) });
+    const crashTrigger = join(dir, "crash-worker");
+    const { events, hold } = recordingHold();
+    started = await start({
+      home,
+      env: {},
+      layout: fakeLayout(workerExitingOnceExists(crashTrigger)),
+      onOutput: quiet,
+      keepAwake: { platform: "darwin", hold, warn: quiet },
+    });
+    writeFileSync(crashTrigger, "");
+    await started.exited;
+    expect(events).toEqual([`hold ${process.pid}`, "release"]);
+  });
+
+  it("설정을 끄면 걸지 않는다", async () => {
+    const home = join(dir, "home");
+    init({ home, port: String(await freePort()) });
+    writePowerSettings(home, { preventSleep: false });
+    const { events, hold } = recordingHold();
+    started = await start({
+      home,
+      env: {},
+      layout: fakeLayout(),
+      onOutput: quiet,
+      keepAwake: { platform: "darwin", hold, warn: quiet },
+    });
+    expect(events).toEqual([]);
+  });
+
+  it("web에 설치 폴더를 넘겨 Settings가 설정 파일을 찾게 한다", async () => {
+    const home = join(dir, "home");
+    init({ home, port: String(await freePort()) });
+    const layout = fakeLayout();
+    const homeEchoWeb = join(dir, "home-echo-web.mjs");
+    writeFileSync(
+      homeEchoWeb,
+      FAKE_WEB.replace("databasePath: process.env.DATABASE_PATH", "home: process.env.GANGER_HOME"),
+    );
+    started = await start({
+      home,
+      env: {},
+      layout: {
+        web: (config) => ({ ...layout.web(config), args: [homeEchoWeb], requires: [homeEchoWeb] }),
+        worker: () => layout.worker(),
+      },
+      onOutput: quiet,
+    });
+    expect(await (await fetch(started.url)).json()).toEqual({ home });
   });
 });
 

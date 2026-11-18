@@ -2,8 +2,11 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { BOOT_ENV, migrate, openDatabase, parseBootConfig } from "@ganger/db";
 import type { BootConfig } from "@ganger/db";
-import { homePaths, readBootEnv } from "./home.js";
+import { HOME_ENV, homePaths, readBootEnv } from "./home.js";
+import { keepAwake } from "./keep-awake.js";
+import type { KeepAwakeOptions } from "./keep-awake.js";
 import type { AppLayout, ProcessSpec } from "./layout.js";
+import { readPowerSettings } from "./power-settings.js";
 import { ServerAlreadyRunningError, acquireServerLock } from "./server-lock.js";
 import { webUrl } from "./web-url.js";
 
@@ -21,6 +24,7 @@ export interface StartOptions {
   signal?: AbortSignal;
   readyTimeoutMs?: number;
   stopTimeoutMs?: number;
+  keepAwake?: Omit<KeepAwakeOptions, "serverPid" | "readSettings">;
 }
 
 export interface Started {
@@ -72,6 +76,7 @@ export async function start(options: StartOptions): Promise<Started> {
 
   const childEnv: Record<string, string | undefined> = {
     ...options.env,
+    [HOME_ENV]: options.home,
     [BOOT_ENV.host]: config.host,
     [BOOT_ENV.port]: String(config.port),
     [BOOT_ENV.databasePath]: config.databasePath,
@@ -82,7 +87,18 @@ export async function start(options: StartOptions): Promise<Started> {
     options.stopTimeoutMs ?? STOP_TIMEOUT_MS,
   );
 
-  const exited = group.exited.finally(() => lock.release());
+  const awake =
+    options.keepAwake === undefined
+      ? undefined
+      : keepAwake({
+          ...options.keepAwake,
+          serverPid: process.pid,
+          readSettings: () => readPowerSettings(options.home),
+        });
+  const exited = group.exited.finally(() => {
+    awake?.stop();
+    lock.release();
+  });
   try {
     await waitForWeb(
       url,

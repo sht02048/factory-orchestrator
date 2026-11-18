@@ -3,6 +3,7 @@ import { parseArgs } from "node:util";
 import { BootConfigError, parseBootConfig } from "@ganger/db";
 import { MissingEnvFileError, homePaths, readBootEnv, resolveHome } from "./home.js";
 import { EnvFileFormatError, init } from "./init.js";
+import type { HoldSleepAssertion } from "./keep-awake.js";
 import type { AppLayout } from "./layout.js";
 import { messages } from "./messages.js";
 import {
@@ -27,6 +28,7 @@ export interface ProgramContext {
   cliEntry: string;
   layout: AppLayout;
   runCommand: CommandRunner;
+  holdSleepAssertion: HoldSleepAssertion;
   out(line: string): void;
   err(line: string): void;
   onStopSignal(handler: (signal: NodeJS.Signals) => void): void;
@@ -128,6 +130,11 @@ async function runStart(context: ProgramContext, home: string): Promise<number> 
       env: context.env,
       layout: context.layout,
       signal: abort.signal,
+      keepAwake: {
+        platform: context.platform,
+        hold: context.holdSleepAssertion,
+        warn: (line) => context.err(line),
+      },
       onMigrated: (config, migrated) => {
         context.out(messages.start.config(homePaths(home).envFile, config.databasePath));
         context.out(messages.start.migrated(migrated));

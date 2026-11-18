@@ -2,6 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
+  Checkbox,
   DetailPanel,
   Dialog,
   DialogClose,
@@ -56,6 +57,7 @@ import type {
   Choice,
   ConnectionLabel,
   ConnectionProjects,
+  PowerView,
   PrerequisiteView,
   RunnerCheckView,
   RunnerSettingsView,
@@ -109,6 +111,7 @@ export interface SettingsActions {
   }) => Promise<ActionResult>;
   recheckRunner: (input: { id: string }) => Promise<ActionResult>;
   saveAddresses: (input: { webAddress: string; webhookAddress: string }) => Promise<ActionResult>;
+  savePower: (input: { preventSleep: boolean }) => Promise<ActionResult>;
   pollRunnerChecks: () => Promise<boolean>;
 }
 
@@ -352,6 +355,7 @@ function WorkspaceSummary({
     case "github":
     case "runners":
     case "addresses":
+    case "power":
       return null;
   }
 }
@@ -370,6 +374,11 @@ function InstallSummary({ item, page }: { item: SettingsItem; page: SettingsPage
       return t("addresses", {
         set: [webAddress, webhookAddress].filter((a) => a !== null).length,
       });
+    }
+    case "power": {
+      const { available, preventSleep } = page.install.power;
+      if (!available) return t("powerUnavailable");
+      return preventSleep ? t("powerOn") : t("powerOff");
     }
     case "general":
     case "projects":
@@ -411,6 +420,8 @@ function ItemPanel({
       );
     case "addresses":
       return <AddressesPanel addresses={page.install.addresses} actions={actions} />;
+    case "power":
+      return <PowerPanel power={page.install.power} actions={actions} />;
     case "general":
     case "projects":
     case "mapping":
@@ -474,6 +485,8 @@ export function useReason(): (reason: string) => string {
       case "invalid-webhook-address":
       case "locks-out":
         return t(`addresses.error.${reason}`);
+      case "unavailable":
+        return t("power.unavailable");
       default:
         return t("failed");
     }
@@ -1286,6 +1299,52 @@ function AddressesPanel({
         <SubmitError state={submit.state} />
         <Actions>
           <Button variant="primary" type="submit" disabled={submit.sending}>
+            {submit.sending ? ts("saving") : t("save")}
+          </Button>
+        </Actions>
+      </form>
+    </>
+  );
+}
+
+function PowerPanel({ power, actions }: { power: PowerView; actions: SettingsActions }) {
+  const t = useTranslations("settings.power");
+  const ts = useTranslations("settings");
+  const [preventSleep, setPreventSleep] = useState(power.preventSleep);
+  const [submitted, setSubmitted] = useState(power.preventSleep);
+  const submit = useSubmit();
+  useReportUnsaved(preventSleep !== submitted);
+  return (
+    <>
+      <PanelBlock>
+        <ul {...stylex.props(textStyles("ui"), styles.bullets)}>
+          <li>{t("intro")}</li>
+          <li>{t("lid")}</li>
+          <li>{t("runners")}</li>
+        </ul>
+      </PanelBlock>
+      <form
+        {...stylex.props(styles.form)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit.run(
+            () => actions.savePower({ preventSleep }),
+            ts("saved"),
+            () => setSubmitted(preventSleep),
+          );
+        }}
+      >
+        <Checkbox
+          name="preventSleep"
+          label={t("toggle")}
+          description={power.available ? t("toggleDescription") : t("unavailable")}
+          checked={preventSleep}
+          onCheckedChange={setPreventSleep}
+          disabled={!power.available}
+        />
+        <SubmitError state={submit.state} />
+        <Actions>
+          <Button variant="primary" type="submit" disabled={!power.available || submit.sending}>
             {submit.sending ? ts("saving") : t("save")}
           </Button>
         </Actions>
