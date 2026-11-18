@@ -723,6 +723,7 @@ function RunnerStep({
 }) {
   const added = useFocusWhenAdded(runners.length);
   const newest = runners.at(-1)?.id;
+  const stepPassedHere = runners.some(runnerPassed);
   return (
     <ul {...stylex.props(styles.list)}>
       {runners.length === 0 ? (
@@ -742,6 +743,7 @@ function RunnerStep({
               actions={actions}
               workerSilent={workerSilent}
               focusRef={runner.id === newest ? added : undefined}
+              primary={!stepPassedHere && runner.id === newest}
             />
           </li>
         ))
@@ -755,11 +757,13 @@ function RunnerItem({
   actions,
   workerSilent,
   focusRef,
+  primary,
 }: {
   runner: RunnerSettingsView;
   actions: SettingsActions;
   workerSilent: boolean;
   focusRef: RefObject<HTMLSpanElement | null> | undefined;
+  primary: boolean;
 }) {
   const t = useTranslations("onboarding");
   const ts = useTranslations("settings.runners");
@@ -827,7 +831,12 @@ function RunnerItem({
           }
         >
           <div {...stylex.props(styles.stack)}>
-            <RunnerCheck runner={runner} actions={actions} workerSilent={workerSilent} primary />
+            <RunnerCheck
+              runner={runner}
+              actions={actions}
+              workerSilent={workerSilent}
+              primary={primary}
+            />
             <RunnerGuide runner={runner} />
           </div>
         </PanelBlock>

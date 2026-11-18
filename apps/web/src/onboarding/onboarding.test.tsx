@@ -20,6 +20,7 @@ import {
   migrate,
   openDatabase,
   recordRunnerCheck,
+  requestRunnerCheck,
   saveWorkspace,
   saveWorkspaceTrackerProject,
   toWorkspaceId,
@@ -378,6 +379,32 @@ describe("확인이 실패한 단계", () => {
     expect(stepPassed(settings, "runner")).toBe(false);
     expect(isDisabled(nextButton(html, "다음"))).toBe(true);
     expect(text(html)).toContain("GitHub 인증을 아직 확인하지 못했어요");
+  });
+
+  it("러너가 여럿이어도 주 버튼은 하나다: 마치기 전에는 가장 최근 러너의 다시 확인, 마친 뒤에는 다음", async () => {
+    const f = fixture();
+    await connectTracker(f);
+    expect(await saveGitHubToken(f.context, { token: "github_pat_example" }, now)).toEqual({
+      ok: true,
+    });
+    const first = registerRunner(f);
+    finishCheck(f, first, health({ service: true, push: false }));
+    const second = saveRunnerSetting(
+      f.context,
+      { name: "runner-b", sshTarget: "factory@runner-b.example.com", orcaPath, capacity: 1 },
+      now,
+    );
+    if (!second.ok) throw new Error(second.reason);
+    finishCheck(f, second.runnerId, health({ service: true, push: false }));
+    const primaries = async () =>
+      buttonsOf(render(await page(f), "runner"))
+        .filter((b) => b.variant === "primary")
+        .map((b) => b.label);
+    expect(await primaries()).toEqual(["다시 확인"]);
+
+    requestRunnerCheck(f.context.db, first, now);
+    finishCheck(f, first, health({ service: true, push: true }));
+    expect(await primaries()).toEqual(["다음"]);
   });
 
   it("러너 확인이 성공하면 폼을 접어 요약과 확인 목록을 보이고 다음으로 갈 수 있다", async () => {
