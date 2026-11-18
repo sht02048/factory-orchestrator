@@ -72,7 +72,7 @@ describe("홈 화면", () => {
     expect(html).toContain(homeJson.section.queuedNote);
   });
 
-  it("입력 기다림 런은 '입력 기다림', 연결 끊김 런은 '연결 끊김'으로 손댈 일에 보인다", () => {
+  it("Waiting for Input·Disconnected 런은 GLOSSARY 영어 이름으로 손댈 일에 보인다(ADR 0010)", () => {
     const { db } = seedDatabase();
     const attention = sectionRows(
       render(loadHomePage(db, "ws-commerce", now)),
@@ -80,8 +80,8 @@ describe("홈 화면", () => {
     );
     expect(attention.get("ACME-11")).toContain(domain.runState["waiting-for-input"]);
     expect(attention.get("ACME-12")).toContain(domain.runState.disconnected);
-    expect(domain.runState["waiting-for-input"]).toBe("입력 기다림");
-    expect(domain.runState.disconnected).toBe("연결 끊김");
+    expect(domain.runState["waiting-for-input"]).toBe("Waiting for Input");
+    expect(domain.runState.disconnected).toBe("Disconnected");
   });
 
   it("손댈 일의 Ended 런은 에이전트 결과와 PR 상태를 두 칸에 따로 보인다", () => {

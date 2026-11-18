@@ -56,7 +56,7 @@ const styles = stylex.create({
     gap: space.s2,
     paddingBlock: space.s2,
     paddingInline: space.s4,
-    borderRadius: radius.md,
+    borderRadius: radius.control,
     backgroundColor: colors.bgRaised,
     boxShadow: shadow.popover,
     color: colors.textPrimary,

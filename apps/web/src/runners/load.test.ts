@@ -68,7 +68,7 @@ describe("loadRunnersPage", () => {
   it("러너를 등록한 순서로 담고 Online/Offline 과 마지막 확인부터 지난 시간을 담는다", () => {
     const { db } = seedDatabase();
     const page = loadRunnersPage(db, now);
-    expect(page.runners.map((r) => [r.name, r.online, r.checkedAgoMs])).toEqual([
+    expect(page.runners.map((r) => [r.name, r.online, r.checked?.agoMs ?? null])).toEqual([
       ["runner-a", true, 120 * 60_000],
       ["runner-b", false, 120 * 60_000],
     ]);

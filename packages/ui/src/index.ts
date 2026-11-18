@@ -2,6 +2,7 @@
 // 쓰는 규칙은 DESIGN.md 에 있다.
 
 export { Button, type ButtonProps, type ButtonVariant } from "./components/button";
+export { Card, Row, type CardProps, type RowProps } from "./components/card";
 export {
   DefinitionItem,
   DefinitionList,
@@ -35,13 +36,17 @@ export {
 } from "./components/menu";
 export { Select, type SelectOption, type SelectProps } from "./components/select";
 export {
-  Dot,
-  Status,
-  type DotProps,
-  type DotTone,
-  type StatusProps,
+  PILL_STATUSES,
+  StatusPill,
+  statusTone,
+  type AttentionStatus,
+  type PillStatus,
+  type RunStateStatus,
+  type RunnerStatus,
+  type StatusPillProps,
   type StatusTone,
-} from "./components/status";
+  type SummaryStatus,
+} from "./components/status-pill";
 export {
   RowReason,
   RowTitle,

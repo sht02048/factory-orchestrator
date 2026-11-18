@@ -160,7 +160,7 @@ describe("Stats 화면", () => {
         "취소를 뺀 런 1개 중 0개를 에이전트가 병합까지 끝냈어요. 1개는 사람이 손대야 했어요. 취소한 1개는 비율에서 뺐어요.",
       );
       expect(panel).toContain("Failed 1개 · 100%");
-      expect(panel).toContain("취소 1개 · 비율에서 빼요");
+      expect(panel).toContain("Canceled 1개 · 비율에서 빼요");
       expect(panel).toContain("비정상 종료 · PR 없음 1개");
     });
 

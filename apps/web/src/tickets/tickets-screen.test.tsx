@@ -52,9 +52,9 @@ describe("Tickets 화면", () => {
     const rows = rowTexts(render(await loadTicketsPage(context, undefined)));
     expect(rows.get("ACME-1")).toContain("Merged");
     expect(rows.get("ACME-2")).toContain("Human Check");
-    expect(rows.get("ACME-3")).toContain("실행 중");
+    expect(rows.get("ACME-3")).toContain("Running");
     expect(rows.get("ACME-4")).toContain("Queued");
-    expect(rows.get("ACME-5")).toContain("입력 기다림");
+    expect(rows.get("ACME-5")).toContain("Waiting for Input");
     expect(rows.get("ACME-6")).toContain("할당 전");
     expect(rows.get("ACME-6")).toContain("Web");
     expect(rows.get("ACME-6")).toContain("Todo");

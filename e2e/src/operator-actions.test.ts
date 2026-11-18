@@ -234,15 +234,15 @@ describe("화면 시각의 시간대(브라우저, 0044)", () => {
     });
     const assignedAt = runsOf(toTicketKey("ACME-1"))[0]?.assignedAt;
     if (assignedAt === undefined) throw new Error("no ACME-1 run");
-    const timeIn = (timeZone: string) =>
+    // 타임라인은 시각("10:45")으로 그린다(ADR 0010 7번). 짧은 글이라 <time> 요소 안의 것만 본다.
+    const clockIn = (timeZone: string) =>
       new Intl.DateTimeFormat("ko-KR", {
         timeZone,
-        month: "numeric",
-        day: "numeric",
         hour: "2-digit",
         minute: "2-digit",
         hourCycle: "h23",
       }).format(assignedAt);
+    const timeIn = (timeZone: string) => `>${clockIn(timeZone)}</time>`;
     const path = `/runs/${questionRun}?ws=${workspaceId}`;
 
     try {
@@ -250,7 +250,7 @@ describe("화면 시각의 시간대(브라우저, 0044)", () => {
       const first = await seoul.goto(path);
       expect(await first?.text()).toContain(timeIn("UTC"));
       await hydrated(seoul);
-      await seoul.getByText(timeIn("Asia/Seoul")).first().waitFor();
+      await seoul.locator("time").getByText(clockIn("Asia/Seoul")).first().waitFor();
       const cookies = await context.cookies();
       expect(cookies.find((c) => c.name === "tz")?.value).toBe("Asia/Seoul");
 
