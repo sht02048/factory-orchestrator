@@ -24,7 +24,7 @@ export interface DevRuntime {
 }
 
 declare global {
-  var __factoryDev:
+  var __gangerDev:
     | { start(options: DevStartOptions): Promise<DevRuntime>; runtime?: DevRuntime }
     | undefined;
 }
@@ -66,8 +66,8 @@ async function start(options: DevStartOptions): Promise<DevRuntime> {
       db.$client.close();
     },
   };
-  if (globalThis.__factoryDev !== undefined) globalThis.__factoryDev.runtime = runtime;
+  if (globalThis.__gangerDev !== undefined) globalThis.__gangerDev.runtime = runtime;
   return runtime;
 }
 
-globalThis.__factoryDev ??= { start };
+globalThis.__gangerDev ??= { start };

@@ -224,9 +224,9 @@ describe("시작 멱등과 실제 브랜치 (Q82.6)", () => {
     await h.worker().tick();
 
     expect(h.runner(runnerA).startCalls.map((call) => call.worktreeName)).toEqual([
-      "factory-ENG-1-1",
+      "ganger-ENG-1-1",
     ]);
-    expect(current(run)).toMatchObject({ state: "running", branch: "fake/factory-ENG-1-1" });
+    expect(current(run)).toMatchObject({ state: "running", branch: "fake/ganger-ENG-1-1" });
   });
 
   it("런 시작 직후 데몬을 멈췄다 다시 띄워도 런이 하나만 시작된다", async () => {
@@ -256,7 +256,7 @@ describe("시작 멱등과 실제 브랜치 (Q82.6)", () => {
     await first.close();
     expect(stateOf(run)).toBe("queued");
     expect(getRunWithRecords(h.db, run.id)?.records.startRequestedAt).not.toBeNull();
-    const startedWorktree = h.runner(runnerA).runs.get("factory-ENG-1-1")?.started.worktree;
+    const startedWorktree = h.runner(runnerA).runs.get("ganger-ENG-1-1")?.started.worktree;
 
     const second = h.worker();
     await second.tick();
@@ -277,8 +277,8 @@ describe("시작 멱등과 실제 브랜치 (Q82.6)", () => {
     await worker.tick();
     expect(stateOf(run)).toBe("running");
     expect(h.runner(runnerA).startCalls.map((call) => call.worktreeName)).toEqual([
-      "factory-ENG-1-1",
-      "factory-ENG-1-1",
+      "ganger-ENG-1-1",
+      "ganger-ENG-1-1",
     ]);
   });
 

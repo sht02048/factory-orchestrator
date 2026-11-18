@@ -308,7 +308,7 @@ function branchOf(world: DemoWorld, worktree: WorktreeRef): string {
 }
 
 function ticketKeyOf(worktreeName: string): TicketKey {
-  return toTicketKey(worktreeName.replace(/^factory-/, "").replace(/-\d+$/, ""));
+  return toTicketKey(worktreeName.replace(/^ganger-/, "").replace(/-\d+$/, ""));
 }
 
 export function planFor(worktreeName: string): Plan {

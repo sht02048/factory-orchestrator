@@ -50,7 +50,7 @@ export function migrationOutputs(
 
 export function bundleMigrations() {
   return {
-    name: "factory-bundle-migrations",
+    name: "ganger-bundle-migrations",
     generateBundle(this: EmitContext, _options: unknown, bundle: Record<string, BundleOutput>) {
       for (const { fileName, source } of migrationOutputs(bundle)) {
         this.emitFile({ type: "asset", fileName, source: readFileSync(source) });

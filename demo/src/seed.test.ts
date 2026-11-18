@@ -33,8 +33,8 @@ let dbPath: string;
 let db: Database;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "factory-dev-seed-"));
-  dbPath = join(dir, "factory.db");
+  dir = mkdtempSync(join(tmpdir(), "ganger-dev-seed-"));
+  dbPath = join(dir, "ganger.db");
   db = openDatabase(dbPath);
   migrate(db);
 });

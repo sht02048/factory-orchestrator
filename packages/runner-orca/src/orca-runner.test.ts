@@ -110,7 +110,7 @@ describe("checkHealth", () => {
     expect(isAssignmentBlocked(health)).toBe(false);
     const push = exec.commands().find((c) => c.startsWith("env "));
     expect(push).toBe(
-      "env 'GIT_TERMINAL_PROMPT=0' 'GIT_SSH_COMMAND=ssh -o BatchMode=yes' git -C '<path>/sandbox' push --dry-run --porcelain --no-verify origin HEAD:refs/heads/factory-orchestrator/push-check",
+      "env 'GIT_TERMINAL_PROMPT=0' 'GIT_SSH_COMMAND=ssh -o BatchMode=yes' git -C '<path>/sandbox' push --dry-run --porcelain --no-verify origin HEAD:refs/heads/ganger/push-check",
     );
   });
 
@@ -232,7 +232,7 @@ describe("ensureMailbox", () => {
       `/Applications/Orca.app/Contents/Resources/bin/orca terminal create --worktree 'path:<path>/sandbox' --title ${MAILBOX_TITLE} --command 'cat > /dev/null' --json`,
     );
     expect(exec.commands()).toContain(
-      "/Applications/Orca.app/Contents/Resources/bin/orca orchestration run-create --objective factory-orchestrator --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --json",
+      "/Applications/Orca.app/Contents/Resources/bin/orca orchestration run-create --objective ganger --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --json",
     );
   });
 

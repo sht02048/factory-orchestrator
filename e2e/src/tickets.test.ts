@@ -47,8 +47,8 @@ const runnerProject = toRunnerProjectId("fake:acme/web");
 const agent = toAgentId("claude");
 const encryptionKey = new Uint8Array(32).fill(7);
 const trackerReadLimit = 1000;
-const registryKey = "__factoryE2eTicketsRegistry";
-const secretBoxKey = "__factoryE2eTicketsSecretBox";
+const registryKey = "__gangerE2eTicketsRegistry";
+const secretBoxKey = "__gangerE2eTicketsSecretBox";
 const virtualAdapters = "\0e2e-tickets-adapters";
 
 let dir: string;
@@ -75,8 +75,8 @@ const fakeAdapters: Plugin = {
 };
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "factory-tickets-"));
-  const dbPath = join(dir, "factory.db");
+  dir = mkdtempSync(join(tmpdir(), "ganger-tickets-"));
+  const dbPath = join(dir, "ganger.db");
   db = openDatabase(dbPath);
   migrate(db);
   seed(db);

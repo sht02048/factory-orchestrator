@@ -68,8 +68,8 @@ export class Harness {
   wrapRunner: (runner: FakeRunner) => Runner = (runner) => runner;
 
   constructor() {
-    this.dir = mkdtempSync(join(tmpdir(), "factory-worker-"));
-    this.dbPath = join(this.dir, "factory.db");
+    this.dir = mkdtempSync(join(tmpdir(), "ganger-worker-"));
+    this.dbPath = join(this.dir, "ganger.db");
     this.db = openDatabase(this.dbPath);
     migrate(this.db);
     saveTrackerConnection(this.db, this.secretBox, {

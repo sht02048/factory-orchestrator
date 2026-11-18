@@ -23,7 +23,7 @@ export interface RestResponse {
 
 const API_URL = "https://api.github.com";
 const TIMEOUT_MS = 30_000;
-const USER_AGENT = "factory-orchestrator";
+const USER_AGENT = "ganger";
 
 const graphqlErrors = z.array(
   z.object({

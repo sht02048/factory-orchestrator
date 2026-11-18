@@ -381,7 +381,7 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
         runnerProjectId: input.runnerProject,
         agentId: input.agent,
         model: input.model ?? null,
-        worktreeName: `factory-${input.ticket.key}-${sameKeyRuns + 1}`,
+        worktreeName: `ganger-${input.ticket.key}-${sameKeyRuns + 1}`,
         state: "queued",
         runnerId,
         assignedAt: now,

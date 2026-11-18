@@ -34,9 +34,9 @@ export const repoB = toRunnerProjectId("github:acme/b");
 export const agent = toAgentId("claude");
 
 export function tempDatabasePath(): { path: string; cleanup: () => void } {
-  const dir = mkdtempSync(join(tmpdir(), "factory-db-"));
+  const dir = mkdtempSync(join(tmpdir(), "ganger-db-"));
   return {
-    path: join(dir, "data", "factory.db"),
+    path: join(dir, "data", "ganger.db"),
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }

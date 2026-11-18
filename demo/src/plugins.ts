@@ -12,7 +12,7 @@ const prefill = fileURLToPath(new URL("./client/prefill.ts", import.meta.url));
 
 export function swapWebAdapters(): Plugin {
   return {
-    name: "factory-dev-adapters",
+    name: "ganger-dev-adapters",
     enforce: "pre",
     async resolveId(source, importer, options) {
       if (importer === undefined || !source.endsWith("/adapters")) return null;
@@ -24,7 +24,7 @@ export function swapWebAdapters(): Plugin {
 
 export function injectDevTools(): Plugin {
   return {
-    name: "factory-dev-tools",
+    name: "ganger-dev-tools",
     transform(code, id) {
       if (id !== webRouter || this.environment.name !== "client") return null;
       return { code: `${code}\nimport ${JSON.stringify(`/@fs${prefill}`)};\n`, map: null };
@@ -34,7 +34,7 @@ export function injectDevTools(): Plugin {
 
 export function devPageRoutes(): Plugin {
   return {
-    name: "factory-dev-page",
+    name: "ganger-dev-page",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = new URL(req.url ?? "/", "http://localhost");
@@ -49,7 +49,7 @@ export function devPageRoutes(): Plugin {
 }
 
 function handle(req: IncomingMessage, res: ServerResponse, path: string): void {
-  const life = globalThis.__factoryDev?.runtime?.life;
+  const life = globalThis.__gangerDev?.runtime?.life;
   if (req.method === "GET" && path === "/__dev") {
     res.setHeader("content-type", "text/html; charset=utf-8");
     res.end(devPage(life?.enabled ?? false));

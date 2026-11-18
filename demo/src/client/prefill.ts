@@ -7,7 +7,7 @@ import {
   PREFILL_RUNNER_NAME,
 } from "../values.ts";
 
-const ROOT_ID = "factory-dev-tools";
+const ROOT_ID = "ganger-dev-tools";
 
 function setValue(input: HTMLInputElement, value: string): void {
   Reflect.set(HTMLInputElement.prototype, "value", value, input);

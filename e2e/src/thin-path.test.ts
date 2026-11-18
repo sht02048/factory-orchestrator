@@ -103,8 +103,8 @@ const runner = new FakeRunner(toRunnerKind(fakeKind));
 const warnings: unknown[] = [];
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "factory-e2e-"));
-  const dbPath = join(dir, "factory.db");
+  dir = mkdtempSync(join(tmpdir(), "ganger-e2e-"));
+  const dbPath = join(dir, "ganger.db");
   db = openDatabase(dbPath);
   migrate(db);
   seed(db);

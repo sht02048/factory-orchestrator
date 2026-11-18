@@ -11,7 +11,7 @@ const key = Buffer.alloc(32, 5).toString("base64");
 let dir: string;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "factory-worker-boot-"));
+  dir = mkdtempSync(join(tmpdir(), "ganger-worker-boot-"));
 });
 
 afterEach(() => {
@@ -20,7 +20,7 @@ afterEach(() => {
 
 describe("bootWorker", () => {
   it("띄우기 전에 마이그레이션을 돌리고, 다시 띄우면 돌릴 것이 없다 (ADR 0005)", async () => {
-    const env = { DATABASE_PATH: join(dir, "data", "factory.db"), ENCRYPTION_KEY: key };
+    const env = { DATABASE_PATH: join(dir, "data", "ganger.db"), ENCRYPTION_KEY: key };
     const quiet = { warn: () => undefined };
     const first = bootWorker({ env, registry: new AdapterRegistry(), logger: quiet });
     expect(first.migrated).toEqual(loadMigrations().map((m) => m.name));

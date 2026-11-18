@@ -108,10 +108,10 @@ export function stringAt(value: unknown, ...path: string[]): string {
 }
 
 declare global {
-  var __factoryDemoWorld: DemoWorld | undefined;
+  var __gangerDemoWorld: DemoWorld | undefined;
 }
 
 export function demoWorld(): DemoWorld {
-  globalThis.__factoryDemoWorld ??= new DemoWorld();
-  return globalThis.__factoryDemoWorld;
+  globalThis.__gangerDemoWorld ??= new DemoWorld();
+  return globalThis.__gangerDemoWorld;
 }

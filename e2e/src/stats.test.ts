@@ -68,8 +68,8 @@ const fakeAdapters: Plugin = {
 };
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "factory-stats-"));
-  const dbPath = join(dir, "factory.db");
+  dir = mkdtempSync(join(tmpdir(), "ganger-stats-"));
+  const dbPath = join(dir, "ganger.db");
   db = openDatabase(dbPath);
   migrate(db);
   seed(db);

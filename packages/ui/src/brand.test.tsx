@@ -10,8 +10,8 @@ const sourceFile = (name: string) => readFileSync(new URL(name, brandDir), "utf8
 
 describe("호루라기 기호", () => {
   it("이름을 주면 그림으로 읽히고, 주지 않으면 화면 읽기에서 숨는다", () => {
-    expect(renderToString(<GangerMark label="Factory Orchestrator" />)).toMatch(
-      /^<svg[^>]*role="img"[^>]*aria-label="Factory Orchestrator"/,
+    expect(renderToString(<GangerMark label="Ganger" />)).toMatch(
+      /^<svg[^>]*role="img"[^>]*aria-label="Ganger"/,
     );
     expect(renderToString(<GangerMark />)).toMatch(/^<svg[^>]*aria-hidden="true"/);
   });
