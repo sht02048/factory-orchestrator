@@ -65,6 +65,8 @@ export class Controller {
   private serverUrl: string | undefined;
   private readonly watch: ServerWatch;
   private readonly diff = new AttentionDiff();
+  /** 알림 기준(diff)이 어느 서버의 것인가 */
+  private diffUrl: string | undefined;
   private attentionTimer: NodeJS.Timeout | undefined;
   private remoteTimer: NodeJS.Timeout | undefined;
   private found: FoundServer[] = [];
@@ -299,8 +301,8 @@ export class Controller {
     const window = this.window;
     if (window === undefined || window.isDestroyed()) return;
     if (this.serverUrl !== undefined) {
+      // 알림 기준은 그대로 둔다. 같은 서버를 다시 열면 그사이 생긴 사건을 알린다(openServer 는 다른 서버일 때만 지운다).
       this.serverUrl = undefined;
-      this.diff.reset();
       void window.loadFile(this.options.rendererFile);
       return;
     }
@@ -308,7 +310,10 @@ export class Controller {
   }
 
   private openServer(url: string, path = "/"): void {
-    if (this.serverUrl !== url) this.diff.reset();
+    if (this.diffUrl !== url) {
+      this.diff.reset();
+      this.diffUrl = url;
+    }
     this.serverUrl = url;
     this.refreshMenus();
     void this.pollAttention();
