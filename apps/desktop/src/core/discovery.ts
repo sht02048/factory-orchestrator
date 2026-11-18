@@ -30,15 +30,26 @@ export async function probeDevice(
 ): Promise<FoundServer | undefined> {
   for (const origin of deviceOrigins(device.host, options.port)) {
     const result = await options.probe(origin, options.timeoutMs);
-    if (result.kind === "ours") {
-      return {
-        instanceId: result.identity.instanceId,
-        name: device.name,
-        url: origin,
-        version: result.identity.version,
-        webAccess: result.identity.webAccess,
-      };
+    if (result.kind !== "ours") continue;
+    const found: FoundServer = {
+      instanceId: result.identity.instanceId,
+      name: device.name,
+      url: origin,
+      version: result.identity.version,
+      webAccess: result.identity.webAccess,
+    };
+    if (found.webAccess === "allowed" || device.ipv4 === undefined) return found;
+    const byIp = new URL(origin);
+    byIp.hostname = device.ipv4;
+    const retry = await options.probe(byIp.origin, options.timeoutMs);
+    if (
+      retry.kind === "ours" &&
+      retry.identity.instanceId === found.instanceId &&
+      retry.identity.webAccess === "allowed"
+    ) {
+      return { ...found, url: byIp.origin, version: retry.identity.version, webAccess: "allowed" };
     }
+    return found;
   }
   return undefined;
 }
