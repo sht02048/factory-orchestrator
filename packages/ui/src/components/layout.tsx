@@ -31,15 +31,11 @@ export interface SplitViewProps {
 export function SplitView({ list, panel, fill = true, variant = "list" }: SplitViewProps) {
   const editor = variant === "editor";
   return (
-    <div
-      {...stylex.props(
-        styles.split,
-        editor && styles.splitEditor,
-        fill ? styles.fill : styles.contained,
-      )}
-    >
-      <div {...stylex.props(styles.list, editor && styles.listEditor)}>{list}</div>
-      <aside {...stylex.props(styles.panel, editor && styles.panelEditor)}>{panel}</aside>
+    <div {...stylex.props(styles.frame, fill ? styles.fill : styles.contained)}>
+      <div {...stylex.props(styles.split, editor && styles.splitEditor)}>
+        <div {...stylex.props(styles.list, editor && styles.listEditor)}>{list}</div>
+        <aside {...stylex.props(styles.panel, editor && styles.panelEditor)}>{panel}</aside>
+      </div>
     </div>
   );
 }
@@ -132,13 +128,33 @@ export function Actions({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.actions)}>{children}</div>;
 }
 
+const LIST_STACKED = "@container (max-width: 959px)";
+const EDITOR_STACKED = "@container (max-width: 679px)";
+
 const styles = stylex.create({
+  frame: { containerType: "inline-size", minHeight: 0 },
   split: {
     display: "grid",
-    gridTemplateColumns: `minmax(0, 1fr) ${size.panelWidth}`,
+    gridTemplateColumns: {
+      default: `minmax(0, 1fr) ${size.panelWidth}`,
+      [LIST_STACKED]: "minmax(0, 1fr)",
+    },
+    gridTemplateRows: { default: null, [LIST_STACKED]: "minmax(0, 1fr) minmax(0, 1fr)" },
+    height: "100%",
     minHeight: 0,
   },
-  splitEditor: { gridTemplateColumns: `${size.editorListWidth} minmax(0, 1fr)` },
+  splitEditor: {
+    gridTemplateColumns: {
+      default: `${size.editorListWidth} minmax(0, 1fr)`,
+      [LIST_STACKED]: null,
+      [EDITOR_STACKED]: "minmax(0, 1fr)",
+    },
+    gridTemplateRows: {
+      default: null,
+      [LIST_STACKED]: null,
+      [EDITOR_STACKED]: "minmax(0, 2fr) minmax(0, 3fr)",
+    },
+  },
   fill: { height: "100dvh" },
   contained: { height: "100%" },
   list: {
