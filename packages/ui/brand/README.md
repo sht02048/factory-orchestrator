@@ -12,10 +12,10 @@ Some rules also live elsewhere, and this page links to them instead of repeating
 
 Ganger has two symbols. Each one has its own places, and they do not swap.
 
-| Symbol                   | What it is                                                                                   | Where it goes                                                                                                        |
-| ------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| **The whistle** (mark)   | A round body with a hole and a rounded mouthpiece. The yellow mouthpiece is the only detail. | Places that point at "this product": app icon, favicon, top of the rail, menu bar (tray) icon, next to the wordmark. |
-| **The foreman** (mascot) | A white round body under a yellow-brimmed cap. Only the eyes change.                         | Empty states, loading, 404, disconnected screens, onboarding, and the README header.                                 |
+| Symbol                   | What it is                                                                                   | Where it goes                                                                                                                          |
+| ------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **The whistle** (mark)   | A round body with a hole and a rounded mouthpiece. The yellow mouthpiece is the only detail. | Places that point at "this product": app icon, favicon, top of the rail, menu bar (tray) icon, next to the wordmark.                   |
+| **The foreman** (mascot) | A white round body under a yellow-brimmed cap. Only the eyes change.                         | Empty states, loading, 404, disconnected screens, onboarding, and the root README header (added with the product rename, ticket 0078). |
 
 The mascot has four moods:
 
@@ -40,7 +40,7 @@ The brand has three colors.
 
 How the app uses them (ticket 0080):
 
-- Backgrounds and surfaces are Ink, with only the lightness raised for raised surfaces (`colors.bg*`, `colors.border*`).
+- Backgrounds and surfaces are Ink with only the lightness changed (`colors.bg*`, `colors.border*`): raised surfaces are lighter, insets and the backdrop are darker. The selected surface (`colors.bgSelected`) carries a faint yellow tint.
 - Text is Paper, with only the lightness lowered for secondary text (`colors.text*`).
 - Ganger Yellow is the one accent (`colors.accent*`): the primary button, links, the selected row, tab, and rail item, the focus ring, the whistle's mouthpiece, and the mascot's cap.
 - Text on yellow is Ink (`colors.textOnAccent`).
@@ -61,7 +61,7 @@ In app code, use the tokens above and never a literal color. The SVG files in th
 - **Horizontal lockup** ([`logo-horizontal.svg`](logo-horizontal.svg)): the mark to the left of the wordmark. Use it in wide places such as headers.
 - **Vertical lockup** ([`logo-vertical.svg`](logo-vertical.svg)): the mark above the wordmark. Use it in square or centered places.
 - **Clear space**: keep at least one mouthpiece of empty space around the mark on every side. The mouthpiece is the small yellow rounded rectangle.
-- **Minimum size**: the mark alone goes down to 16px. At 16 and 32px (favicon, tray) use the dedicated small version ([`mark-favicon.svg`](mark-favicon.svg)), which has a larger body and a larger hole. A lockup goes down to 20px tall.
+- **Minimum size**: the mark alone goes down to 16px. At 16 and 32px (favicon, tray) use the dedicated small version ([`mark-favicon.svg`](mark-favicon.svg)), which has a larger body and a larger mouthpiece. A lockup goes down to 20px tall.
 
 ## Don't
 
