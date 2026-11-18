@@ -1,6 +1,6 @@
-# Factory Orchestrator
+# Ganger
 
-Software factory의 관제탑. 트래커의 티켓을 러너에 맡기고, 러너의 에이전트가 티켓을 처리한 현황과 통계를 보여 준다.
+Software factory의 관제탑. 트래커의 티켓을 러너에 맡기고, 러너의 에이전트가 티켓을 처리한 현황과 통계를 보여 준다. 옛 이름은 Factory Orchestrator(`factory-orchestrator`)이고, 이름을 바꾸는 표와 옮기기 규칙은 [ADR 0011](docs/adr/0011-product-name-ganger.md)에 있다.
 
 ## Language
 
