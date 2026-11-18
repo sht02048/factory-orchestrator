@@ -3,7 +3,7 @@ import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
 import { runsMessages } from "../../runs/messages";
-import { RUN_FILTERS } from "../../runs/model";
+import { ENDED_RUNS_PAGE_SIZE, MAX_ENDED_RUNS, RUN_FILTERS } from "../../runs/model";
 import { RunsScreen } from "../../runs/runs-screen";
 import { getRunsPage } from "../../server/functions";
 
@@ -15,9 +15,11 @@ export const Route = createFileRoute("/_app/runs")({
   validateSearch: z.object({
     f: z.enum(RUN_FILTERS).optional().catch(undefined),
     sel: z.string().optional(),
+    ended: z.number().int().min(1).max(MAX_ENDED_RUNS).optional().catch(undefined),
   }),
-  loaderDeps: ({ search }) => ({ ws: search.ws }),
-  loader: ({ deps }) => getRunsPage({ data: { ws: deps.ws } }),
+  loaderDeps: ({ search }) => ({ ws: search.ws, ended: search.ended }),
+  loader: ({ deps }) =>
+    getRunsPage({ data: { ws: deps.ws, ended: deps.ended ?? ENDED_RUNS_PAGE_SIZE } }),
   // 필터·행을 고를 때마다 다시 읽지 않는다. Workspace 를 바꾸면 deps 가 바뀌어 새로 읽는다.
   shouldReload: false,
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
@@ -27,7 +29,7 @@ export const Route = createFileRoute("/_app/runs")({
 function RunsRoute() {
   const page = Route.useLoaderData();
   const shell = appRoute.useLoaderData();
-  const { f, sel, ws } = Route.useSearch();
+  const { f, sel, ws, ended } = Route.useSearch();
   const navigate = Route.useNavigate();
   return (
     <ScreenMessages messages={runsMessages}>
@@ -49,7 +51,19 @@ function RunsRoute() {
           void navigate({ to: "/runs/$runId", params: { runId: id }, search: { ws } });
         }}
         onPickWorkspace={(next) => {
-          void navigate({ search: (prev) => ({ ...prev, ws: next, sel: undefined }) });
+          void navigate({
+            search: (prev) => ({ ...prev, ws: next, sel: undefined, ended: undefined }),
+          });
+        }}
+        onShowMoreEnded={() => {
+          void navigate({
+            search: (prev) => ({
+              ...prev,
+              ended: (ended ?? ENDED_RUNS_PAGE_SIZE) + ENDED_RUNS_PAGE_SIZE,
+            }),
+            replace: true,
+            resetScroll: false,
+          });
         }}
         runHref={(id) =>
           `/runs/${encodeURIComponent(id)}${ws === undefined ? "" : `?ws=${encodeURIComponent(ws)}`}`

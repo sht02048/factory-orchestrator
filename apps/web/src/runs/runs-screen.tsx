@@ -20,14 +20,22 @@ import {
   Tabs,
   Text,
 } from "@factory/ui";
-import { colors, space } from "@factory/ui/tokens.stylex";
-import type { ReactNode } from "react";
+import { colors, fontSize, space } from "@factory/ui/tokens.stylex";
+import { useEffect, useRef } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { useAgentName } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import type { WorkspaceSummary } from "../shell/model";
-import { RUN_FILTERS, elapsedMs, filterKeyOf, matchesFilter, needsAttention } from "./model";
+import {
+  ENDED_RUNS_PAGE_SIZE,
+  RUN_FILTERS,
+  elapsedMs,
+  filterKeyOf,
+  matchesFilter,
+  needsAttention,
+} from "./model";
 import type { RunFilter, RunView, RunsPage } from "./model";
 
 // 티켓(키 + 흐린 줄) | 상태 알약 | 시간
@@ -45,6 +53,7 @@ export interface RunsScreenProps {
   /** 행을 연다(두 번 누르기, Enter): Run 상세로 간다(ADR 0010) */
   onOpen: (runId: string) => void;
   onPickWorkspace: (workspaceId: string) => void;
+  onShowMoreEnded?: () => void;
   /** 런의 Run 상세 주소 */
   runHref: (runId: string) => string;
 }
@@ -112,6 +121,7 @@ function RunsList({
   onFilterChange,
   onSelect,
   onOpen,
+  onShowMoreEnded,
   runHref,
 }: RunsScreenProps) {
   const t = useTranslations("runs");
@@ -127,6 +137,15 @@ function RunsList({
     const key = filterKeyOf(run);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
+  const endedShown = page.runs.filter((run) => run.state === "ended").length;
+  const showMoreButton = useRef<HTMLButtonElement>(null);
+  const endedStatus = useRef<HTMLParagraphElement>(null);
+  const focusAfterMore = useRef(false);
+  useEffect(() => {
+    if (!focusAfterMore.current) return;
+    focusAfterMore.current = false;
+    (showMoreButton.current ?? endedStatus.current)?.focus();
+  }, [page]);
 
   return (
     <SplitView
@@ -134,7 +153,10 @@ function RunsList({
         <>
           <PageHeader
             title={t("title")}
-            subtitle={t("subtitle", { total: page.runs.length, attention })}
+            subtitle={t(page.moreEnded ? "subtitleRecent" : "subtitle", {
+              total: page.runs.length,
+              attention,
+            })}
           />
           <Tabs<RunFilter>
             value={filter}
@@ -170,14 +192,42 @@ function RunsList({
               )}
             </Table>
           </Card>
+          {page.moreEnded || endedShown > ENDED_RUNS_PAGE_SIZE ? (
+            <div {...stylex.props(styles.more)}>
+              <p ref={endedStatus} role="status" tabIndex={-1} {...stylex.props(styles.moreStatus)}>
+                {page.moreEnded
+                  ? t("ended.partial", { count: endedShown })
+                  : t("ended.all", { count: endedShown })}
+              </p>
+              {page.moreEnded && onShowMoreEnded !== undefined ? (
+                <Button
+                  ref={showMoreButton}
+                  onClick={() => {
+                    focusAfterMore.current = true;
+                    onShowMoreEnded();
+                  }}
+                >
+                  {t("ended.showMore")}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </>
       }
       panel={
-        selected === undefined ? null : (
-          <section aria-label={t("panel.label")}>
-            <RunPanel run={selected} detailHref={runHref(selected.id)} />
-          </section>
-        )
+        <section aria-label={t("panel.label")}>
+          {selected === undefined ? (
+            <DetailPanel>
+              <Text variant="meta">{t("panel.empty")}</Text>
+            </DetailPanel>
+          ) : (
+            <RunPanel
+              run={selected}
+              detailHref={runHref(selected.id)}
+              onOpenDetail={() => onOpen(selected.id)}
+            />
+          )}
+        </section>
       }
     />
   );
@@ -231,7 +281,15 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
   );
 }
 
-function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
+function RunPanel({
+  run,
+  detailHref,
+  onOpenDetail,
+}: {
+  run: RunView;
+  detailHref: string;
+  onOpenDetail: () => void;
+}) {
   const agentName = useAgentName();
   const t = useTranslations("runs.panel");
   const domain = useTranslations("domain");
@@ -286,7 +344,15 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
         reason={reason}
       />
       <Actions>
-        <a href={detailHref} {...stylex.props(styles.link)}>
+        <a
+          href={detailHref}
+          onClick={(event) => {
+            if (!isPlainClick(event)) return;
+            event.preventDefault();
+            onOpenDetail();
+          }}
+          {...stylex.props(styles.link)}
+        >
           {t("openDetail")}
         </a>
         {pr === null ? null : (
@@ -316,16 +382,13 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
           ) : (
             <span {...stylex.props(styles.inline)}>
               {run.runner.name}
-              {run.runner.online ? null : <Text variant="meta">{t("runnerOffline")}</Text>}
+              {run.runner.online ? null : (
+                <StatusPill status="offline">{statusName("offline")}</StatusPill>
+              )}
             </span>
           )}
         </DefinitionItem>
         <DefinitionItem label={t("agent")}>{agentName(run.agent)}</DefinitionItem>
-        {run.state === "queued" ? (
-          <DefinitionItem label={t("waited")}>{duration(run.waitMs)}</DefinitionItem>
-        ) : (
-          <DefinitionItem label={t("elapsed")}>{duration(run.executionMs ?? 0)}</DefinitionItem>
-        )}
         <DefinitionItem label={t("pr")} empty={pr === null}>
           {pr === null ? (
             t("none")
@@ -338,6 +401,10 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
       </DefinitionList>
     </DetailPanel>
   );
+}
+
+function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 }
 
 function useFilterLabel(): (filter: RunFilter) => string {
@@ -354,7 +421,21 @@ const styles = stylex.create({
     paddingBottom: space.s10,
   },
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
-  inline: { display: "inline-flex", alignItems: "baseline", gap: space.s2 },
+  inline: { display: "inline-flex", alignItems: "center", gap: space.s2 },
+  more: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.s3,
+    marginTop: space.s4,
+  },
+  moreStatus: {
+    margin: 0,
+    color: colors.textTertiary,
+    fontSize: fontSize.ui,
+    outline: "none",
+  },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   link: {
     color: colors.accentText,

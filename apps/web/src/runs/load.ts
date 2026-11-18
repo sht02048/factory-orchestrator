@@ -1,19 +1,20 @@
 import { runDurations, summarizeRunOutcome } from "@factory/core";
 import type { QueuedRun, RunId } from "@factory/core";
 import {
-  getRunWithRecords,
   getWorkspaceTrackerProject,
   listPendingCancelRequests,
   listRunPlacements,
   listRunnerSnapshots,
   listRuns,
+  listRunsWithRecords,
   listRunners,
   listWorkspaces,
   toWorkspaceId,
 } from "@factory/db";
-import type { Database, StoredRun } from "@factory/db";
+import type { Database, RunRecords, StoredRun } from "@factory/db";
 import { isWebUrl } from "../format/url";
 import { resolveWorkspace } from "../shell/model";
+import { ENDED_RUNS_PAGE_SIZE } from "./model";
 import type { QueuedReason, RunView, RunsPage } from "./model";
 import { explainQueue } from "./queue-reasons";
 
@@ -21,12 +22,17 @@ import { explainQueue } from "./queue-reasons";
  * Runs 화면이 보일 값을 DB 에서 읽는다. 현재 Workspace(주소의 ws)의 런만 담고, 새 것부터 둔다.
  * 요약 결과는 저장하지 않으므로 core summarizeRunOutcome 으로 계산한다(Q66·Q76).
  */
-export function loadRunsPage(db: Database, ws: string | undefined, now: Date): RunsPage {
+export function loadRunsPage(
+  db: Database,
+  ws: string | undefined,
+  now: Date,
+  endedLimit: number = ENDED_RUNS_PAGE_SIZE,
+): RunsPage {
   const workspace = resolveWorkspace(
     listWorkspaces(db).map((w) => ({ id: w.id, name: w.name })),
     ws,
   );
-  if (workspace.kind !== "one") return { workspace, runs: [] };
+  if (workspace.kind !== "one") return { workspace, runs: [], moreEnded: false };
 
   const runners = new Map(listRunners(db).map((r) => [r.id, r]));
   const cancelling = new Set<RunId>(listPendingCancelRequests(db).map((r) => r.runId));
@@ -69,14 +75,22 @@ export function loadRunsPage(db: Database, ws: string | undefined, now: Date): R
     return { kind: "no-capacity", runner: runners.get(code.runnerId)?.name ?? code.runnerId };
   };
 
-  const stored = listRuns(db, { workspaceId: toWorkspaceId(workspace.workspace.id) });
+  const workspaceId = toWorkspaceId(workspace.workspace.id);
+  const active = listRunsWithRecords(db, { workspaceId, states: ACTIVE_STATES, order: "newest" });
+  const ended = listRunsWithRecords(db, {
+    workspaceId,
+    states: ["ended"],
+    order: "newest",
+    limit: endedLimit + 1,
+  });
+  const moreEnded = ended.length > endedLimit;
+  const stored = [...active, ...ended.slice(0, endedLimit)].toSorted(newestFirst);
   // 티켓마다 마지막 런. 같은 티켓에 새 런이 있으면 지난 결과는 손댈 일이 아니다(Home 과 같다, Q88).
   const latestByTicket = new Map<string, RunId>();
-  for (const run of stored)
+  for (const { run } of stored.toReversed())
     latestByTicket.set(`${run.ticket.connection}\u0000${run.ticket.key}`, run.id);
 
-  const runs = stored.toReversed().map((run): RunView => {
-    const records = getRunWithRecords(db, run.id)?.records;
+  const runs = stored.map(({ run, records }): RunView => {
     const runner = run.runnerId === null ? undefined : runners.get(run.runnerId);
     const startedAt = run.state === "queued" ? null : run.startedAt;
     const durations = runDurations({
@@ -85,7 +99,7 @@ export function loadRunsPage(db: Database, ws: string | undefined, now: Date): R
       endedAt: run.state === "ended" ? run.endedAt : null,
       now,
     });
-    const pr = records?.pullRequest;
+    const pr = records.pullRequest;
     const base = {
       id: run.id,
       ticketKey: run.ticket.key,
@@ -134,12 +148,22 @@ export function loadRunsPage(db: Database, ws: string | undefined, now: Date): R
           // Human Check 런은 사람이 PR 을 병합하거나 닫으면 뺀다(Q54·Q89).
           attention:
             latest &&
-            (summary === "failed" ||
-              (summary === "human-check" && (records?.laterPrState ?? null) === null)),
+            (summary === "failed" || (summary === "human-check" && records.laterPrState === null)),
         };
       }
     }
   });
 
-  return { workspace, runs };
+  return { workspace, runs, moreEnded };
+}
+
+const ACTIVE_STATES = ["queued", "running", "waiting-for-input", "disconnected"] as const;
+
+function newestFirst(
+  a: { run: StoredRun; records: RunRecords },
+  b: { run: StoredRun; records: RunRecords },
+): number {
+  const byTime = b.run.assignedAt.getTime() - a.run.assignedAt.getTime();
+  if (byTime !== 0) return byTime;
+  return a.run.id < b.run.id ? 1 : a.run.id > b.run.id ? -1 : 0;
 }
