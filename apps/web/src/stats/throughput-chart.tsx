@@ -90,7 +90,8 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
                     segment.value === 0 ? null : (
                       <span
                         key={segment.key}
-                        style={{ height: `${(segment.value / top) * 100}%` }}
+                        // 조각 사이 1px 틈(marginTop)을 높이에서 빼 막대가 맨 위 눈금을 넘지 않게 한다.
+                        style={{ height: `calc(${(segment.value / top) * 100}% - 1px)` }}
                         {...stylex.props(styles.segment, fill[segment.key])}
                       />
                     ),

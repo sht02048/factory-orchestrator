@@ -143,25 +143,28 @@ function StatsView({
           <Figures total={page.total} />
           <Section
             title={t("throughput.title")}
+            // 끝난 런이 없으면 차트 대신 문구만 보여 범례도 뺀다.
             note={
-              <span {...stylex.props(styles.legend)}>
-                <span {...stylex.props(styles.legendItem)}>
-                  <LegendSwatch outcome="merged" />
-                  {t("columns.merged")}
+              page.total.runs === 0 ? undefined : (
+                <span {...stylex.props(styles.legend)}>
+                  <span {...stylex.props(styles.legendItem)}>
+                    <LegendSwatch outcome="merged" />
+                    {t("columns.merged")}
+                  </span>
+                  <span {...stylex.props(styles.legendItem)}>
+                    <LegendSwatch outcome="check" />
+                    {t("columns.check")}
+                  </span>
+                  <span {...stylex.props(styles.legendItem)}>
+                    <LegendSwatch outcome="failed" />
+                    {t("columns.failed")}
+                  </span>
+                  <span {...stylex.props(styles.legendItem)}>
+                    <LegendSwatch outcome="canceled" />
+                    {t("columns.canceled")}
+                  </span>
                 </span>
-                <span {...stylex.props(styles.legendItem)}>
-                  <LegendSwatch outcome="check" />
-                  {t("columns.check")}
-                </span>
-                <span {...stylex.props(styles.legendItem)}>
-                  <LegendSwatch outcome="failed" />
-                  {t("columns.failed")}
-                </span>
-                <span {...stylex.props(styles.legendItem)}>
-                  <LegendSwatch outcome="canceled" />
-                  {t("columns.canceled")}
-                </span>
-              </span>
+              )
             }
           >
             <ThroughputChart daily={page.daily} />

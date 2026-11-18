@@ -134,6 +134,9 @@ describe("Stats 화면", () => {
     // 14일 내내 0이면 빈 격자 대신 문구를 보인다.
     expect(html).not.toContain('role="img"');
     expect(html).not.toContain("<table");
+    // 범례도 뺀다.
+    const throughput = text(html).split("날짜별 처리량")[1]?.split("Failed 조합")[0] ?? "";
+    expect(throughput.trim()).toBe("최근 14일 동안 끝난 런이 없어요.");
     expect(panelText(html).trim()).toBe("");
   });
 
