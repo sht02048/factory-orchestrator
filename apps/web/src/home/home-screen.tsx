@@ -257,14 +257,16 @@ function RunKey({ run, all }: { run: HomeRun | DoneRun; all: boolean }) {
           {run.ticketKey}
         </Text>
       ) : (
-        <>
-          <Text variant="meta" numeric>
-            {run.ticketKey}
-          </Text>
+        <span {...stylex.props(styles.titleLine)}>
+          <span {...stylex.props(styles.keyPart)}>
+            <Text variant="meta" numeric>
+              {run.ticketKey}
+            </Text>
+          </span>
           <Text variant="title" truncate>
             {run.ticketTitle}
           </Text>
-        </>
+        </span>
       )}
       {all ? <Text variant="meta">{run.workspace.name}</Text> : null}
     </span>
@@ -864,6 +866,14 @@ const styles = stylex.create({
     columnGap: space.s2,
     minWidth: 0,
   },
+  titleLine: {
+    display: "flex",
+    alignItems: "baseline",
+    columnGap: space.s2,
+    minWidth: 0,
+    maxWidth: "100%",
+  },
+  keyPart: { flexShrink: 0, whiteSpace: "nowrap" },
   runnerName: { display: "flex", flexDirection: "column", minWidth: 0 },
   runnerLine: {
     display: "grid",
