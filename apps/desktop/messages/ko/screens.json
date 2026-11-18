@@ -10,19 +10,21 @@
     },
     "remote": {
       "title": "다른 서버에 붙기",
-      "body": "상시 켜 두는 기계에서 도는 서버를 tailnet 에서 찾거나 주소로 열어요.",
+      "body": "상시 켜 두는 기계에서 도는 서버를 tailnet에서 찾거나 주소로 열어요.",
+      "note": "이 기계에는 서버를 설치하지 않아요.",
       "action": "서버 찾기"
     }
   },
   "local": {
     "startingTitle": "서버를 띄우고 있어요",
-    "startingSummary": "처음에는 데이터베이스를 준비하느라 조금 걸려요.",
+    "startingSummary": "처음에는 데이터베이스를 준비하느라 조금 걸려요. 뜨면 바로 열어요.",
     "stoppedTitle": "서버를 멈췄어요",
     "stoppedSummary": "다시 켜면 멈춘 자리에서 이어서 돌아요.",
     "start": "서버 켜기",
     "failedTitle": "서버를 띄우지 못했어요",
-    "failedSummary": "로그를 확인하고 다시 시도해 주세요.",
-    "log": "로그: {path}",
+    "failedSummary": "로그에 이유가 있어요. 확인하고 다시 시도해 주세요.",
+    "logLabel": "로그 파일",
+    "openLog": "로그 열기",
     "retry": "다시 시도",
     "serviceTitle": "이 기계의 서비스가 아직 뜨지 않았어요",
     "serviceSummary": "이 기계에는 헤드리스 서비스가 등록돼 있어 앱이 서버를 따로 띄우지 않아요. 서비스가 뜨면 바로 열어요.",
@@ -30,43 +32,54 @@
   },
   "find": {
     "title": "서버 찾기",
+    "back": "처음으로",
     "searching": "tailnet 에서 서버를 찾고 있어요.",
-    "found": "{count, plural, other {서버 #개를 찾았어요. 하나를 누르면 바로 열어요.}}",
-    "online": "Online",
-    "version": "버전 {version}",
-    "versionDiffers": "앱과 버전이 달라요",
-    "hostNotAllowed": "이 주소로는 열 수 없어요. 그 서버의 Settings > 주소에서 다른 기기에서 열 주소를 정하세요.",
-    "connect": "연결",
+    "found": "{count, plural, other {서버 #개를 찾았어요. 열 서버를 골라 주세요.}}",
     "missing": "Tailscale 을 찾지 못했어요. 주소로 연결할 수 있어요.",
     "stopped": "Tailscale 을 켜면 서버를 찾을 수 있어요.",
     "unreadable": "Tailscale 상태를 읽지 못했어요. 주소로 연결할 수 있어요.",
     "noneFound": "서버를 찾지 못했어요. 서버 기기의 Settings > 주소에서 주소를 복사해 넣어 주세요.",
-    "retry": "다시 찾기",
+    "listLabel": "tailnet에서 찾은 서버",
+    "refresh": "다시 찾기",
+    "empty": "찾은 서버가 없어요.",
+    "online": "Online",
+    "version": "버전 {version}",
+    "versionDiffers": "앱과 버전이 달라요",
+    "open": "열기",
+    "openByAddress": "주소로 열기",
+    "hostNotAllowed": "이 이름으로는 열 수 없어요. 서버의 Settings › 주소에서 열 주소를 정하면 바로 열려요.",
+    "notListed": "찾는 서버가 없나요?",
+    "byAddress": "주소로 연결하기",
+    "otherPort": "다른 포트로 찾기",
     "port": "서버 포트",
     "portDescription": "서버를 3000 이 아닌 포트로 띄웠다면 그 포트로 찾아요.",
-    "byAddress": "주소로 연결하기",
-    "back": "처음으로"
+    "searchPort": "이 포트로 찾기"
   },
   "address": {
     "title": "주소로 연결하기",
+    "back": "서버 찾기로",
     "summary": "서버 기기의 Settings > 주소에 있는 주소를 넣어 주세요.",
     "label": "서버 주소",
     "placeholder": "https://server.example.ts.net",
+    "hint": "예: https://server.example.ts.net 또는 http://100.64.0.10:3000",
     "connect": "연결 확인",
     "checking": "확인하고 있어요",
     "errors": {
-      "invalid": "주소 모양이 맞지 않아요. 예: https://server.example.ts.net",
-      "unreachable": "그 주소에 닿지 않아요. 서버가 켜져 있는지 확인해 주세요.",
+      "invalid": "주소 모양이 맞지 않아요. 아래 예처럼 넣어 주세요.",
+      "unreachable": "그 주소에 닿지 않아요. 서버가 켜져 있는지, 포트가 맞는지 확인해 주세요.",
       "not-ours": "그 주소는 Factory Orchestrator 서버가 아니에요.",
-      "host-not-allowed": "서버는 찾았지만 이 주소로는 열 수 없어요. 그 서버의 Settings > 주소에서 다른 기기에서 열 주소를 정하세요."
-    },
-    "back": "서버 찾기로"
+      "host-not-allowed": "서버는 찾았지만 이 주소로는 열 수 없어요. 그 서버의 Settings > 주소에서 다른 기기에서 열 주소를 정해 주세요."
+    }
   },
   "unreachable": {
     "title": "{name}에 닿지 않아요",
-    "summary": "서버 기기가 켜져 있고 Tailscale 이 연결됐는지 확인해 주세요. 닿으면 바로 열어요.",
+    "summary": "닿으면 바로 열어요.",
     "checking": "다시 확인하고 있어요",
-    "retry": "다시 시도",
+    "address": "서버 주소",
+    "live": "5초마다 다시 확인하고 있어요",
+    "checkDevice": "서버 기기가 켜져 있는지 확인해 주세요.",
+    "checkTailscale": "이 맥과 서버 기기 모두 Tailscale에 연결돼 있는지 확인해 주세요.",
+    "retry": "지금 다시 확인",
     "other": "다른 서버 고르기"
   }
 }
