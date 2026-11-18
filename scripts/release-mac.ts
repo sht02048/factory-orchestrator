@@ -60,7 +60,12 @@ export function developerIdIdentity(findIdentityOutput: string): string {
 }
 
 export function notaryStatus(output: string): { id: string; status: string } {
-  const parsed: unknown = JSON.parse(output);
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    parsed = null;
+  }
   if (typeof parsed === "object" && parsed !== null && "id" in parsed && "status" in parsed) {
     const { id, status } = parsed;
     if (typeof id === "string" && typeof status === "string") return { id, status };

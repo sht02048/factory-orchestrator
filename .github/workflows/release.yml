@@ -15,7 +15,6 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.plan.outputs.version }}
       prerelease: ${{ steps.plan.outputs.prerelease }}
       notes-start-tag: ${{ steps.plan.outputs.notes-start-tag }}
     steps:
@@ -50,7 +49,6 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Import signing certificate into a temporary keychain
         env:

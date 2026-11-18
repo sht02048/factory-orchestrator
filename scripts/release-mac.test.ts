@@ -76,5 +76,6 @@ describe("notaryStatus", () => {
 
   it("모양이 다르면 멈춘다", () => {
     expect(() => notaryStatus('{"message":"no"}')).toThrow("Unexpected notarytool output");
+    expect(() => notaryStatus("")).toThrow("Unexpected notarytool output");
   });
 });

@@ -105,7 +105,9 @@ const osxSign =
         identity: signIdentity,
         continueOnError: false,
         optionsForFile: (filePath: string) =>
-          filePath.includes(" Helper") ? {} : { entitlements: MAIN_ENTITLEMENTS },
+          basename(filePath).startsWith(`${PRODUCT} Helper`)
+            ? {}
+            : { entitlements: MAIN_ENTITLEMENTS },
         ...(values.keychain === undefined ? {} : { keychain: values.keychain }),
       };
 const [appDir] = await packager({
