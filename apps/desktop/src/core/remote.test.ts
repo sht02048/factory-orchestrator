@@ -60,6 +60,62 @@ describe("Tailscale 상태 읽기", () => {
     });
   });
 
+  it("기기의 Tailscale IPv4 를 함께 읽는다", () => {
+    const status = JSON.stringify({
+      BackendState: "Running",
+      Peer: {
+        "nodekey:a": {
+          HostName: "mini",
+          DNSName: "mini.example.ts.net.",
+          OS: "macOS",
+          Online: true,
+          TailscaleIPs: ["fd7a:115c:a1e0::2", "100.64.0.2"],
+        },
+        "nodekey:b": {
+          HostName: "box",
+          DNSName: "box.example.ts.net.",
+          OS: "linux",
+          Online: true,
+          TailscaleIPs: null,
+        },
+      },
+    });
+    expect(parseTailnetStatus(status)).toEqual({
+      kind: "running",
+      devices: [
+        { name: "mini", host: "mini.example.ts.net", ipv4: "100.64.0.2" },
+        { name: "box", host: "box.example.ts.net" },
+      ],
+    });
+  });
+
+  it("TailscaleIPs 모양이 이상해도 기기 목록은 읽고 IPv4 만 뺀다", () => {
+    const status = JSON.stringify({
+      BackendState: "Running",
+      Peer: {
+        "nodekey:a": {
+          HostName: "mini",
+          DNSName: "mini.example.ts.net.",
+          Online: true,
+          TailscaleIPs: "100.64.0.2",
+        },
+        "nodekey:b": {
+          HostName: "box",
+          DNSName: "box.example.ts.net.",
+          Online: true,
+          TailscaleIPs: [7, null, "100.64.0.3"],
+        },
+      },
+    });
+    expect(parseTailnetStatus(status)).toEqual({
+      kind: "running",
+      devices: [
+        { name: "mini", host: "mini.example.ts.net" },
+        { name: "box", host: "box.example.ts.net", ipv4: "100.64.0.3" },
+      ],
+    });
+  });
+
   it("Running 이 아니면 꺼짐, 모양이 다르면 읽지 못함이다", () => {
     expect(parseTailnetStatus(JSON.stringify({ BackendState: "NeedsLogin", Peer: null }))).toEqual({
       kind: "stopped",
@@ -152,6 +208,103 @@ describe("서버 찾기", () => {
       kind: "found",
       servers: [{ url: "http://mini.example.ts.net:4100" }],
     });
+  });
+
+  it("이름으로 열 수 없는 http 서버는 같은 포트의 Tailscale IPv4 로 다시 묻고, 열리면 그 주소로 보인다", async () => {
+    const result = await discoverServers({
+      tailnet: () =>
+        Promise.resolve({
+          kind: "running",
+          devices: [{ name: "mini", host: "mini.example.ts.net", ipv4: "100.64.0.2" }],
+        }),
+      probe: fakeProbe({
+        "http://mini.example.ts.net:3000": identity("inst-2", { webAccess: "host-not-allowed" }),
+        "http://100.64.0.2:3000": identity("inst-2"),
+      }),
+    });
+    expect(result).toEqual({
+      kind: "found",
+      servers: [
+        {
+          instanceId: "inst-2",
+          name: "mini",
+          url: "http://100.64.0.2:3000",
+          version: "0.1.0",
+          webAccess: "allowed",
+        },
+      ],
+    });
+  });
+
+  it("https(Serve)에서 열 수 없다고 답하면 IP 로 다시 묻지 않는다", async () => {
+    const asked: string[] = [];
+    const result = await discoverServers({
+      tailnet: () =>
+        Promise.resolve({
+          kind: "running",
+          devices: [{ name: "box", host: "box.example.ts.net", ipv4: "100.64.0.3" }],
+        }),
+      probe: fakeProbe(
+        {
+          "https://box.example.ts.net": identity("inst-3", { webAccess: "host-not-allowed" }),
+          "https://100.64.0.3": identity("inst-3"),
+        },
+        asked,
+      ),
+    });
+    expect(result).toMatchObject({
+      kind: "found",
+      servers: [{ url: "https://box.example.ts.net", webAccess: "host-not-allowed" }],
+    });
+    expect(asked.some((origin) => origin.includes("100.64.0.3"))).toBe(false);
+  });
+
+  it("IP 로도 열 수 없거나 다른 서버가 답하면 이름 주소로 열 수 없음을 그대로 보인다", async () => {
+    const asked: string[] = [];
+    const result = await discoverServers({
+      tailnet: () =>
+        Promise.resolve({
+          kind: "running",
+          devices: [
+            { name: "mini", host: "mini.example.ts.net", ipv4: "100.64.0.2" },
+            { name: "box", host: "box.example.ts.net", ipv4: "100.64.0.3" },
+            { name: "nas", host: "nas.example.ts.net" },
+          ],
+        }),
+      probe: fakeProbe(
+        {
+          "http://mini.example.ts.net:3000": identity("inst-2", { webAccess: "host-not-allowed" }),
+          "http://100.64.0.2:3000": identity("inst-2", { webAccess: "host-not-allowed" }),
+          "http://box.example.ts.net:3000": identity("inst-3", { webAccess: "host-not-allowed" }),
+          "http://100.64.0.3:3000": identity("inst-9"),
+          "http://nas.example.ts.net:3000": identity("inst-4", { webAccess: "host-not-allowed" }),
+        },
+        asked,
+      ),
+    });
+    expect(result).toMatchObject({
+      kind: "found",
+      servers: [
+        {
+          instanceId: "inst-3",
+          url: "http://box.example.ts.net:3000",
+          webAccess: "host-not-allowed",
+        },
+        {
+          instanceId: "inst-2",
+          url: "http://mini.example.ts.net:3000",
+          webAccess: "host-not-allowed",
+        },
+        {
+          instanceId: "inst-4",
+          url: "http://nas.example.ts.net:3000",
+          webAccess: "host-not-allowed",
+        },
+      ],
+    });
+    expect(asked.filter((origin) => origin.includes("nas"))).toEqual([
+      "http://nas.example.ts.net:3000",
+    ]);
   });
 
   it("Tailscale 이 없거나 꺼졌으면 그대로 알려 주소 입력으로 넘어가게 한다", async () => {

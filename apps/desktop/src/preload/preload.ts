@@ -29,6 +29,7 @@ if (window.location.protocol === "file:") {
     startLocal: () => invoke("start-local"),
     retry: () => invoke("retry"),
     chooseMode: () => invoke("choose-mode"),
+    openLog: () => invoke("open-log"),
   };
   contextBridge.exposeInMainWorld("desktop", api);
 }
