@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { findBundleProblems, NOTICE_FILE } from "./bundle-check.ts";
 import { copyleftKind, readManifests, renderNotices, THIRD_PARTY_DIR } from "./third-party.ts";
@@ -45,7 +45,7 @@ mkdirSync(bundleDir, { recursive: true });
 for (const part of parts) {
   cpSync(part.from, join(bundleDir, part.dir), {
     recursive: true,
-    filter: (source) => basename(source) !== THIRD_PARTY_DIR,
+    filter: (source) => source !== join(part.from, THIRD_PARTY_DIR),
   });
 }
 cpSync(join(REPO, "LICENSE"), join(bundleDir, "LICENSE"));

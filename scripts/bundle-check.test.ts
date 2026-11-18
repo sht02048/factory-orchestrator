@@ -12,6 +12,8 @@ import {
   packageImports,
 } from "./bundle-check.ts";
 
+const NOTICE = "Ganger includes the following third-party software.\n\nacme 1.0.0\nLicense: MIT\n";
+
 describe("packageImports", () => {
   it("finds package imports and ignores relative paths and Node built-ins", () => {
     const source = [
@@ -71,7 +73,7 @@ describe("findBundleProblems", () => {
   it("passes a bundle that only uses relative imports and built-ins", () => {
     write("cli/bin/cli.js", 'import { x } from "../chunk.js";\nimport fs from "node:fs";');
     write("web/client/app.css", "body {}");
-    write(NOTICE_FILE, "acme 1.0.0\nLicense: MIT\n");
+    write(NOTICE_FILE, NOTICE);
     expect(findBundleProblems(dir)).toEqual([]);
   });
 
@@ -80,8 +82,13 @@ describe("findBundleProblems", () => {
     expect(findBundleProblems(dir)).toEqual([`${NOTICE_FILE} is missing`]);
   });
 
+  it("reports a third-party license notice that lists no packages", () => {
+    write(NOTICE_FILE, "Ganger includes the following third-party software.\n");
+    expect(findBundleProblems(dir)).toEqual([`${NOTICE_FILE} lists no packages`]);
+  });
+
   it("reports absolute paths of the build machine in any text file", () => {
-    write(NOTICE_FILE, "");
+    write(NOTICE_FILE, NOTICE);
     write(
       "web/server/assets/manifest.js",
       'const routes = { __root__: { filePath: "/srv/build/acme/apps/web/src/routes/__root.tsx" } };',
@@ -124,9 +131,10 @@ describe("findAppProblems", () => {
   }
 
   it("passes app resources with notices, a clean app.asar, and a clean server bundle", () => {
-    for (const name of [NOTICE_FILE, ...ELECTRON_LICENSES]) write(name, "");
+    write(NOTICE_FILE, NOTICE);
+    for (const name of ELECTRON_LICENSES) write(name, "");
     write("app.asar", "dist/main/main.js");
-    write(`server/${NOTICE_FILE}`, "");
+    write(`server/${NOTICE_FILE}`, NOTICE);
     write("server/cli/bin/cli.js", "");
     expect(findAppProblems(dir, ["/srv/build/acme"])).toEqual([]);
   });

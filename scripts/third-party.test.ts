@@ -31,7 +31,7 @@ describe("copyleftKind", () => {
   it("separates strong and weak copyleft licenses from permissive ones", () => {
     expect(copyleftKind("GPL-3.0-only")).toBe("strong");
     expect(copyleftKind("(MIT OR AGPL-3.0)")).toBe("strong");
-    expect(copyleftKind("LGPL-2.1")).toBe("strong");
+    expect(copyleftKind("LGPL-2.1")).toBe("weak");
     expect(copyleftKind("MPL-2.0")).toBe("weak");
     expect(copyleftKind("MIT")).toBeNull();
     expect(copyleftKind("Apache-2.0")).toBeNull();
@@ -108,6 +108,36 @@ describe("third-party notices", () => {
     expect(notice).toContain("acme 1.0.0\nLicense: MIT\nSource: https://example.com/acme");
     expect(notice).toContain("Copyright (c) Acme");
     expect(notice).toContain("bare 0.1.0\nLicense: Apache-2.0");
-    expect(notice).toContain("It is licensed under Apache-2.0.");
+    expect(notice).toContain("Copyright (c) the bare authors.");
+    expect(notice).toContain("Apache License\n                           Version 2.0");
+  });
+
+  it("uses the standard MIT text with the package author when no license file ships", () => {
+    addPackage("plain", { version: "1.0.0", license: "MIT", author: { name: "Acme Inc." } }, {});
+    const notice = renderNotices(
+      "Ganger",
+      [{ name: "plain", version: "1.0.0", license: "MIT", dir: "node_modules/plain" }],
+      root,
+    );
+    expect(notice).toContain("Copyright (c) Acme Inc.");
+    expect(notice).toContain("Permission is hereby granted, free of charge");
+  });
+
+  it("refuses a package with no license file and no standard text", () => {
+    addPackage("odd", { version: "1.0.0", license: "SEE LICENSE IN EULA" }, {});
+    expect(() =>
+      renderNotices(
+        "Ganger",
+        [
+          {
+            name: "odd",
+            version: "1.0.0",
+            license: "SEE LICENSE IN EULA",
+            dir: "node_modules/odd",
+          },
+        ],
+        root,
+      ),
+    ).toThrow("odd@1.0.0 ships no license file");
   });
 });

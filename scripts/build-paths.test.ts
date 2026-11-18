@@ -41,6 +41,19 @@ describe("buildMachinePaths", () => {
     expect(buildMachinePaths('"C:\\Users\\example\\a.ts"')).toEqual(["C:\\Users\\example\\"]);
   });
 
+  it("finds home paths inside file URLs but not URL paths on other hosts", () => {
+    expect(buildMachinePaths('"file:///Users/example/a.ts"')).toEqual(["/Users/example/"]);
+    expect(
+      buildMachinePaths(
+        '"https://example.com/home/docs/"; route("/home/settings/"); "/api/users/1/"',
+      ),
+    ).toEqual(["/home/settings/"]);
+  });
+
+  it("treats only paths under the build root as the build root", () => {
+    expect(buildMachinePaths('"/srv/build/acme-other/a.ts"', [ROOT])).toEqual([]);
+  });
+
   it("passes relative paths and URL paths", () => {
     expect(
       buildMachinePaths('filePath: "apps/web/src/routes/__root.tsx"; fetch("/api/users/1")', [

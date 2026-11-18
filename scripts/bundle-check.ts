@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { builtinModules } from "node:module";
-import { join, relative } from "node:path";
+import { basename, join, relative } from "node:path";
 import { buildMachinePaths } from "./build-paths.ts";
 import { REPO_ROOT } from "./third-party.ts";
 
@@ -51,12 +51,19 @@ export function devOnlyMarkers(source: string): string[] {
   return DEV_ONLY_MARKERS.filter((marker) => source.includes(marker));
 }
 
+export function noticeProblems(path: string): string[] {
+  const name = basename(path);
+  if (!existsSync(path)) return [`${name} is missing`];
+  if (!readFileSync(path, "utf8").includes("\nLicense: ")) return [`${name} lists no packages`];
+  return [];
+}
+
 export function findBundleProblems(
   root: string,
   buildRoots: readonly string[] = [REPO_ROOT],
 ): string[] {
   const problems: string[] = [];
-  if (!existsSync(join(root, NOTICE_FILE))) problems.push(`${NOTICE_FILE} is missing`);
+  problems.push(...noticeProblems(join(root, NOTICE_FILE)));
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
@@ -99,7 +106,8 @@ export function findAppProblems(
   buildRoots: readonly string[] = [REPO_ROOT],
 ): string[] {
   const problems: string[] = [];
-  for (const name of [NOTICE_FILE, ...ELECTRON_LICENSES]) {
+  problems.push(...noticeProblems(join(resources, NOTICE_FILE)));
+  for (const name of ELECTRON_LICENSES) {
     if (!existsSync(join(resources, name))) problems.push(`${name} is missing`);
   }
   const asar = join(resources, "app.asar");

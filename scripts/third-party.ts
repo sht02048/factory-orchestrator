@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 export const REPO_ROOT = resolve(import.meta.dirname, "..");
 export const THIRD_PARTY_DIR = "third-party";
@@ -20,10 +20,11 @@ interface WriteBundleContext {
   environment?: { name: string };
 }
 
-const NODE_MODULES = `${sep}node_modules${sep}`;
+const NODE_MODULES = "/node_modules/";
+const STANDARD_LICENSES = join(import.meta.dirname, "licenses");
 const LICENSE_FILE = /^(?:licen[cs]e|copying|notice)(?:[.-].*)?$/i;
-const STRONG_COPYLEFT = /\b(?:A?GPL|LGPL|SSPL|EUPL|OSL|CC-BY-SA)\b/i;
-const WEAK_COPYLEFT = /\b(?:MPL|EPL|CDDL|CPL)\b/i;
+const STRONG_COPYLEFT = /\b(?:A?GPL|SSPL|EUPL|OSL|CC-BY-SA)\b/i;
+const WEAK_COPYLEFT = /\b(?:LGPL|MPL|EPL|CDDL|CPL)\b/i;
 
 function readJsonObject(path: string): Record<string, unknown> {
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
@@ -34,13 +35,13 @@ function readJsonObject(path: string): Record<string, unknown> {
 }
 
 export function packageDirOf(moduleId: string): string | null {
-  const path = moduleId.replace(/^\0+/, "").split("?")[0] ?? "";
+  const path = (moduleId.replace(/^\0+/, "").split("?")[0] ?? "").replaceAll("\\", "/");
   const at = path.lastIndexOf(NODE_MODULES);
   if (at < 0) return null;
-  const rest = path.slice(at + NODE_MODULES.length).split(sep);
+  const rest = path.slice(at + NODE_MODULES.length).split("/");
   const [first, second] = rest;
   if (first === undefined || first === "") return null;
-  const name = first.startsWith("@") && second !== undefined ? `${first}${sep}${second}` : first;
+  const name = first.startsWith("@") && second !== undefined ? `${first}/${second}` : first;
   return path.slice(0, at + NODE_MODULES.length) + name;
 }
 
@@ -159,6 +160,29 @@ export function sourceOf(dir: string): string | null {
   return url.replace(/^git\+/, "").replace(/\.git$/, "");
 }
 
+export function authorOf(dir: string): string | null {
+  const path = join(dir, "package.json");
+  if (!existsSync(path)) return null;
+  const author = readJsonObject(path)["author"];
+  if (typeof author === "string") return author;
+  if (typeof author === "object" && author !== null && "name" in author) {
+    const name: unknown = author.name;
+    if (typeof name === "string") return name;
+  }
+  return null;
+}
+
+export function standardLicense(pkg: ThirdPartyPackage, author: string | null): string {
+  const path = join(STANDARD_LICENSES, `${pkg.license}.txt`);
+  if (!/^[A-Za-z0-9.-]+$/.test(pkg.license) || !existsSync(path)) {
+    throw new Error(
+      `${pkg.name}@${pkg.version} ships no license file and ${pkg.license} has no standard text in scripts/licenses`,
+    );
+  }
+  const holder = author ?? `the ${pkg.name} authors`;
+  return `This package ships no license file. Copyright (c) ${holder}.\n\n${readFileSync(path, "utf8").trim()}`;
+}
+
 export function renderNotices(
   product: string,
   packages: readonly ThirdPartyPackage[],
@@ -171,10 +195,7 @@ export function renderNotices(
     const source = sourceOf(dir);
     const header = [`${pkg.name} ${pkg.version}`, `License: ${pkg.license}`];
     if (source !== null) header.push(`Source: ${source}`);
-    const body =
-      texts.length > 0
-        ? texts.join("\n\n")
-        : `This package ships no license file. It is licensed under ${pkg.license}.`;
+    const body = texts.length > 0 ? texts.join("\n\n") : standardLicense(pkg, authorOf(dir));
     return `${rule}\n${header.join("\n")}\n\n${body}\n`;
   });
   return `${product} includes the following third-party software.\n\n${sections.join("\n")}`;
