@@ -32,20 +32,21 @@ pnpm install   # also installs the lefthook pre-commit hook
 
 ## Commands
 
-| Command             | What it does                                                    |
-| ------------------- | --------------------------------------------------------------- |
-| `pnpm dev`          | Runs the web app (hot reload) and the worker with fake adapters |
-| `pnpm typecheck`    | Type-checks every package with TypeScript 7 (`tsc`)             |
-| `pnpm lint`         | Runs oxlint in type-aware mode                                  |
-| `pnpm format`       | Formats with oxfmt                                              |
-| `pnpm format:check` | Checks formatting                                               |
-| `pnpm test`         | Runs Vitest (browser tests need Google Chrome)                  |
-| `pnpm check:colors` | Checks for raw color values outside `packages/ui`               |
-| `pnpm build`        | Builds the web app, the worker, the CLI, and the desktop app    |
-| `pnpm smoke:web`    | Starts the production web build and checks a page               |
-| `pnpm smoke:cli`    | Runs the built CLI's `init` and `start` and checks a page       |
-| `pnpm bundle`       | Packs the builds into a server bundle in `dist/`                |
-| `pnpm smoke:bundle` | Extracts the server bundle outside the repository and runs it   |
+| Command              | What it does                                                    |
+| -------------------- | --------------------------------------------------------------- |
+| `pnpm dev`           | Runs the web app (hot reload) and the worker with fake adapters |
+| `pnpm typecheck`     | Type-checks every package with TypeScript 7 (`tsc`)             |
+| `pnpm lint`          | Runs oxlint in type-aware mode                                  |
+| `pnpm format`        | Formats with oxfmt                                              |
+| `pnpm format:check`  | Checks formatting                                               |
+| `pnpm test`          | Runs Vitest (browser tests need Google Chrome)                  |
+| `pnpm check:colors`  | Checks for raw color values outside `packages/ui`               |
+| `pnpm check:lengths` | Checks for raw px/rem/em lengths in `apps/web` styles           |
+| `pnpm build`         | Builds the web app, the worker, the CLI, and the desktop app    |
+| `pnpm smoke:web`     | Starts the production web build and checks a page               |
+| `pnpm smoke:cli`     | Runs the built CLI's `init` and `start` and checks a page       |
+| `pnpm bundle`        | Packs the builds into a server bundle in `dist/`                |
+| `pnpm smoke:bundle`  | Extracts the server bundle outside the repository and runs it   |
 
 The browser tests in `e2e` drive the Google Chrome installed on the machine through `playwright-core`; they do not download a browser. GitHub's Ubuntu runners already have Chrome. When a browser test fails, a screenshot of the page is saved to `e2e/test-results/`, and CI uploads it as an artifact.
 

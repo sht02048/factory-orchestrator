@@ -11,7 +11,11 @@
 5. **색 하나에 뜻 하나다(ADR 0010 5번).** 상태 색은 여섯 뜻뿐이다: 보라 `answer`(사람이 답·허용), 청록 `check`(사람이 확인), 빨강 `problem`(문제), 초록 `progress`(진행·정상), 파랑 `merged`(병합), 회색 `idle`(대기·멈춤). 상태 색은 화면이 고르지 않고 `StatusPill`이 상태 값으로 고른다. 그 밖의 강조는 브랜드 노랑 Ganger Yellow(`accent*`) 하나다. 로고 취구·마스코트 모자도 같은 `accent`를 쓴다(티켓 0080).
 6. **상태는 `StatusPill` 하나로만 보인다(ADR 0010 4번).** 점 + GLOSSARY 영어 이름. 예외는 Dashboard다(ADR 0010 0068 갱신). To do는 묶음 머리(`GroupHeader`)의 색 점과 이름이 행마다의 알약을 대신하고, 면 없는 구역(In progress, Runners, Done today)의 행은 알약 대신 상태 점(`StatusDot`) 하나로 상태를 보인다. 영역은 선이 아니라 면으로 나누고, 면은 아래 면 역할로 고른다.
 7. **변형을 새로 만들지 않는다.** 아래 표에 없는 변형이 필요하면 먼저 이 문서와 컴포넌트에 더하고, `/ds`에 미리보기를 넣는다.
-8. **화면은 역할과 컴포넌트만 쓰고 토큰을 직접 쓰지 않는다.** 글자는 `Text` 변형이나 `textStyles(역할)`, 면은 `Card surface`나 `surfaceStyles(역할)`, 구역 제목은 `Section titleRole`로 고른다. `apps/web`에서 `fontSize`·`fontWeight`·`lineHeight`·`letterSpacing`·`radius`·`colors`를 직접 가져와 글자나 면을 만들지 않는다. 배치에 필요한 `space`·`size`만 직접 쓴다. 지금은 방향이고, 검사로 막는 일은 티켓 0074가 한다.
+8. **화면은 역할과 컴포넌트만 쓰고 토큰을 직접 쓰지 않는다.** 글자는 `Text` 변형이나 `textStyles(역할)`, 면은 `Card surface`나 `surfaceStyles(역할)`, 구역 제목은 `Section titleRole`로 고른다. `apps/web`에서 `colors`·`fontSize`·`fontWeight`·`lineHeight`·`letterSpacing`·`radius`·`shadow`·`motion`을 가져오면 lint(`no-restricted-imports`)가 실패한다. 배치에 필요한 `space`·`size`·`breakpoints`만 직접 쓴다(티켓 0074).
+9. **HTML 요소를 직접 쓰지 않는다.** `apps/web`에서 `button`, `input`, `select`, `textarea`, `table`, `h1`~`h3`을 쓰면 lint(`react/forbid-elements`)가 실패한다. `Button`, `Input`, `Textarea`, `RadioOption`, `Select`, `DataTable`·`Table`, `Text`(`as="h2"` 등)를 쓴다. 공용 컴포넌트에 없는 속성이 필요하면 `packages/ui`를 넓힌다.
+10. **길이 값을 직접 쓰지 않는다.** `apps/web` 스타일에서 여백·간격·둥글기·폭·위치에 px 숫자(단위 없는 숫자 포함)나 rem·em 숫자를 쓰면 `pnpm check:lengths`(pre-commit, CI)가 실패한다. 여백은 `space`, 폭·높이는 뜻에 맞는 `size` 토큰, 미디어·컨테이너 쿼리는 `breakpoints`로 쓴다. 값이 우연히 같다고 다른 뜻의 토큰을 빌려 쓰지 않는다. 없으면 뜻을 이름에 담은 토큰을 더한다.
+
+`/ds`(`apps/web/src/ds/`)는 토큰 자체를 보여 주는 곳이라 토큰 import와 길이 값 검사에서 뺀다. HTML 요소 검사는 받는다. 시험 파일(`*.test.ts(x)`)은 세 검사에서 뺀다.
 
 ## 토큰
 
@@ -46,19 +50,22 @@
 
 위계는 세 단계다. 행에서는 제목만 밝고 굵게, ID·러너·시간은 흐리게, 숫자는 `numeric`(tabular-nums)으로 둔다. 역할마다 크기·굵기·줄 높이·자간이 한 묶음이다. `Text variant`로 쓰고, `Text`를 쓸 수 없는 요소(제목 태그를 직접 고르는 컴포넌트, 버튼 안 글자 등)에는 `stylex.props(textStyles(역할))`로 같은 스타일을 입힌다. 역할 목록은 `TEXT_VARIANTS`다.
 
-| 단계          | 역할(`Text` 변형) | 크기 / 굵기 | 기본 요소 | 쓰는 곳                                                                                                        |
-| ------------- | ----------------- | ----------- | --------- | -------------------------------------------------------------------------------------------------------------- |
-| 1 화면을 대표 | `display`         | 26 / 600    | `h2`      | 결론 제목. Dashboard·Stats처럼 결론 문장이 제목인 화면에 하나(ADR 0010 8번, 0068 갱신)                         |
-|               | `page`            | 22 / 600    | `h1`      | 페이지 제목. 화면에 하나                                                                                       |
-|               | `heading`         | 20 / 600    | `h2`      | 주 구역 제목(Dashboard To do·In progress, Stats 구역). `Section titleRole="heading"`                           |
-|               | `panel`           | 17 / 600    | `h2`      | 상세 패널·다이얼로그 제목                                                                                      |
-| 2 읽는 내용   | `subheading`      | 15 / 600    | `h3`      | 보조 구역·카드 제목(Dashboard 오른쪽 열 Runners·Done today). `Section titleRole="subheading"`                  |
-|               | `section`         | 14 / 600    | `h2`      | 목록 구역 제목. 본문과 크기가 같아 구역이 잘 안 보인다. 새 화면은 `heading`·`subheading`을 쓴다(0074에서 정리) |
-|               | `title`           | 14 / 500    | `span`    | 행 제목(`RowTitle`과 같다)                                                                                     |
-|               | `body`            | 14 / 400    | `p`       | 설명 문단, 패널의 이유                                                                                         |
-| 3 흐린 보조   | `ui`              | 13 / 400    | `span`    | 일반 UI 글(본문 기본 크기)                                                                                     |
-|               | `meta`            | 13 / 400    | `span`    | ID, 러너, 시간처럼 흐린 값                                                                                     |
-|               | `label`           | 12 / 500    | `span`    | 열 머리글, 패널 블록 제목, 작은 라벨                                                                           |
+| 단계          | 역할(`Text` 변형) | 크기 / 굵기 | 기본 요소 | 쓰는 곳                                                                                       |
+| ------------- | ----------------- | ----------- | --------- | --------------------------------------------------------------------------------------------- |
+| 1 화면을 대표 | `display`         | 26 / 600    | `h2`      | 결론 제목. Dashboard·Stats처럼 결론 문장이 제목인 화면에 하나(ADR 0010 8번, 0068 갱신)        |
+|               | `page`            | 22 / 600    | `h1`      | 페이지 제목. 화면에 하나                                                                      |
+|               | `heading`         | 20 / 600    | `h2`      | 주 구역 제목(Dashboard To do·In progress, Stats 구역). `Section titleRole="heading"`          |
+|               | `panel`           | 17 / 600    | `h2`      | 상세 패널·다이얼로그 제목                                                                     |
+| 2 읽는 내용   | `subheading`      | 15 / 600    | `h3`      | 보조 구역·카드 제목(Dashboard 오른쪽 열 Runners·Done today). `Section titleRole="subheading"` |
+|               | `title`           | 14 / 500    | `span`    | 행 제목(`RowTitle`과 같다)                                                                    |
+|               | `body`            | 14 / 400    | `p`       | 설명 문단, 패널의 이유                                                                        |
+| 3 흐린 보조   | `ui`              | 13 / 400    | `span`    | 일반 UI 글(본문 기본 크기)                                                                    |
+|               | `meta`            | 13 / 400    | `span`    | ID, 러너, 시간처럼 흐린 값                                                                    |
+|               | `label`           | 12 / 500    | `span`    | 열 머리글, 패널 블록 제목, 작은 라벨                                                          |
+
+예전 `section`(14 / 600) 변형은 `subheading`과 겹쳐 티켓 0074에서 뺐다. `Section`의 기본 제목, `GroupHeader` 제목, Run 상세 블록 제목은 `subheading`이다.
+
+색만 바꿀 때는 `tone`을 준다: `strong`(밝은 글, 이름·값), `muted`(흐린 글), `disabled`(못 쓰는 항목), `problem`(빨강, 오류와 문제 뜻만). `textStyles(역할, tone)`도 같다. 결과 문장처럼 다시 읽은 뒤 포커스를 옮길 글은 `Text`에 `ref`, `role="status"`, `tabIndex={-1}`을 주면 포커스 링이 붙는다. 줄바꿈을 지킬 글은 `wrap="pre"`, 긴 값은 `wrap="anywhere"`다.
 
 토큰: `fontSize`(`display 26`, `page 22`, `heading 20`, `panel 17`, `subheading 15`, `body 14`, `ui 13`, `small 12`, `label 11`, `input 16`), `fontWeight`(`regular`, `medium`, `semibold`), `lineHeight`(`tight`, `snug`, `normal`, `relaxed`), `letterSpacing`(`display`, `page`, `panel`, `label`), `fonts`(`sans`, `mono`). 굵기는 이 세 개만 쓴다. 토큰은 역할과 컴포넌트를 만들 때 `packages/ui` 안에서 쓴다.
 
@@ -80,7 +87,10 @@
 - `radius`(ADR 0010 10번): `card 12`(카드, 다이얼로그), `control 8`(버튼, 행, 입력, 메뉴·팝업), `pill 6`(알약, 팝업 항목, 툴팁), `full`(점). `tokens.test.ts`가 값을 검사한다.
 - `shadow.popover`: 떠 있는 면(메뉴, Select 목록, 툴팁, 다이얼로그, 토스트)에만. 구역에는 그림자를 쓰지 않는다.
 - `motion`: `easeOut`, `durationFast 150ms`(hover·팝업), `durationToast 180ms`. 상태가 바뀔 때만 짧게 움직이고, `prefers-reduced-motion`에서는 끈다.
-- `size`: `sidebarWidth 216`, `panelWidth 384`, `editorListWidth 320`, `control 32`(버튼), `input 36`, `rowMinHeight 52`, `dot 6`(알약 점), `pill 22`(알약 높이).
+- `size`: `sidebarWidth 216`, `railWidth 84`(아이콘 레일), `panelWidth 384`, `editorListWidth 320`, `control 32`(버튼), `input 36`, `rowMinHeight 52`, `dot 6`(알약 점), `pill 22`(알약 높이·단계 표시), `icon 14`, `tick 18`(확인 표시), `markerLarge 28`(끝난 표시).
+  - 화면 틀: `noticeWidth 720`(공지·빈 화면), `formWidth 640`(설정 폼·목록), `detailPageWidth 1280`·`detailAsideWidth 360`(Run 상세), `logMaxHeight 480`, `stepNavWidth 240`·`stepContentWidth 760`(온보딩), `dashboardSideWidth 340`, `todoTextMinWidth 256`, `searchMinWidth 216`·`searchMaxWidth 320`, `textareaMinHeight 72`.
+  - 표 열: `ticketKeyColumn 112`, `projectColumn 128`, `lastRunColumn 160`, `runStatusColumn 160`, `elapsedColumn 88`, `runnerStatusColumn 112`, `capacityColumn 160`, `mappingTableMinWidth 640`, `mappingCellMinWidth 140`. 자동 맞춤 격자 최소 폭은 `fieldMinWidth 200`, `compareMinWidth 220`, 라벨 행은 `labelTextMinWidth 280`·`labelSelectWidth 240`.
+- `breakpoints`(`stylex.defineConsts`): `narrowScreen`(600), `stepsStacked`(900), `detailStacked`(960), `dashboardOneColumn`(컨테이너 719), `statTilesStacked`(컨테이너 704). `[breakpoints.이름]: 값`으로 쓴다.
 
 ### 테마
 
@@ -96,7 +106,7 @@
 | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SplitView`                                                           | 목록 화면의 기본 틀. 왼쪽 목록, 오른쪽 `panelWidth` 상세 패널(ADR 0007). Tickets, Runs, Stats. Settings는 `variant="editor"`(왼쪽 `editorListWidth` 항목 목록, 오른쪽 넓은 편집 영역). Dashboard는 To do·In progress + 오른쪽 Runners·Done today 두 열이다(ADR 0010) |
 | `PageHeader`                                                          | 목록 위 페이지 제목·부제·오른쪽 행동                                                                                                                                                                                                                                 |
-| `Section`                                                             | 화면의 구역. 제목 + 개수 + 오른쪽 흐린 메모(`note`) 또는 링크(`link`). 제목 무게는 `titleRole`로 고른다: 주 구역은 `heading`, 보조 구역·오른쪽 열은 `subheading`, 기본 `section`은 기존 목록 화면용(0074에서 정리)                                                   |
+| `Section`                                                             | 화면의 구역. 제목 + 개수 + 오른쪽 흐린 메모(`note`) 또는 링크(`link`). 제목 무게는 `titleRole`로 고른다: 주 구역은 `heading`, 보조 구역·오른쪽 열과 기본값은 `subheading`                                                                                            |
 | `DetailPanel` > `PanelHeader`, `Actions`, `PanelBlock`, `PanelFooter` | 상세 패널 안. 상태 줄 → 제목 → 흐린 부제 → 이유 → 버튼 → 속성 블록 → 바닥 순서                                                                                                                                                                                       |
 | `Actions`                                                             | 버튼 줄. 주 버튼을 맨 앞에                                                                                                                                                                                                                                           |
 | `Card`                                                                | 면 한 덩어리. 면은 `surface`(위 면 역할, 기본 `card`). Dashboard To do 카드, Run 상세의 정보·타임라인. Runners는 목록 + 상세 패널이라 카드를 쓰지 않는다(ADR 0010 0068 갱신). 이름(`label`)을 주면 `section`. 행을 담으면 `padding="compact"`                        |
@@ -165,8 +175,31 @@
 
 1. 동작은 `@ui-sdk/react`의 부품으로, 스타일은 StyleX와 토큰으로 `src/components/`에 만든다. UI SDK 상태별 스타일은 `className={(s) => cx(...)}`로 고른다(StyleX는 `data-*` 선택자를 쓰기 어렵다).
 2. 문구는 props로 받는다. 기본 문구를 컴포넌트에 넣지 않는다.
-3. `src/index.ts`에서 export 하고, `components.test.tsx`에 서버 렌더 테스트를, `/ds`(`apps/web/src/ds/`)에 미리보기를, 이 문서에 언제 쓰는지를 더한다.
+3. `src/index.ts`에서 export 하고, `components.test.tsx`에 서버 렌더 테스트를, `/ds`(`apps/web/src/ds/`)에 미리보기를, 이 문서에 언제 쓰는지를 더한다. `/ds` 미리보기가 빠지면 `apps/web/src/ds/page.test.tsx`가 실패한다.
 4. UI SDK는 `0.1.0-beta`라 버전을 고정했다. 올릴 때는 `pnpm typecheck`(특히 `exactOptionalPropertyTypes`)와 `/ds`를 다시 확인한다.
+
+### 검사 뒤 공용 블록(티켓 0074)
+
+화면에서 토큰과 HTML 요소로 직접 만들던 것을 옮겼다. 같은 모양이 필요하면 이것을 쓰고 화면에서 다시 만들지 않는다.
+
+| 컴포넌트                                                                                                                 | 언제 쓰는지                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AppFrame` + `RailBrand`, `RailNav`, `RailNavList`, `RailLinkContent`, `railLinkStyles`, `WorkspaceBadge`, `RailStatic`  | 앱 셸. 왼쪽 아이콘 레일과 본문. 라우터 링크에는 `railLinkStyles(current)`를 입힌다. 문서 `body`는 `documentStyles.body`                                                                      |
+| `NoticeLayout`                                                                                                           | Workspace를 고르기 전, 찾지 못함 같은 한 열 공지 화면(`noticeWidth`)                                                                                                                         |
+| `TextLink`, `linkStyles(tone)`                                                                                           | 글 링크. `accent`(기본, 노랑), `quiet`(흐린 뒤로 가기), `action`(밑줄 없는 행동 링크), `plain`(글색 그대로, 표 안 이름). 라우터 링크와 버튼 모양 링크는 `linkStyles`·`buttonStyles`를 입힌다 |
+| `focusStyles`                                                                                                            | `ring`(포커스 링), `ringInset`(안쪽 링), `target`(다시 읽은 뒤 포커스를 받는 머리)                                                                                                           |
+| `VisuallyHidden`, `visuallyHiddenStyles`                                                                                 | 화면 읽기에만 들리는 글                                                                                                                                                                      |
+| `Chip`, `RemovableChip`                                                                                                  | `Chip`은 짧은 표시(필수·선택, `strong`). `RemovableChip`은 지울 수 있는 조건(Runs 조건 줄). 지우기 이름(`removeLabel`)을 준다                                                                |
+| `RadioGroup` + `RadioOption`, `Textarea`                                                                                 | 하나만 고르는 질문 선택지와 여러 줄 답(Dashboard 질문 레이어). `Input`·`Textarea`는 `aria-label`로 이름을 받을 수 있다                                                                       |
+| `CodeBlock`                                                                                                              | 명령·출력·로그. 복사할 명령은 `tone="command"`, 긴 로그는 `scroll`과 `label`                                                                                                                 |
+| `DataTable` + `DataTableHead`, `DataTableHeader`, `DataTableBody`, `DataTableRow`, `DataTableRowHeader`, `DataTableCell` | 고를 수 없는 정적 표(Stats 나눠 보기·날마다 표, 온보딩 매핑 표). 고를 수 있는 목록은 `Table`. 카드 안 넓은 표는 `framed`, 작은 숫자 표는 `density="compact"`                                 |
+| `OutcomeBar`, `FailureBar`, `OutcomeSwatch`, `StackedBarChart`                                                           | Stats의 결과 막대·범례·쌓은 막대 차트. 결과 색은 상태 뜻 그대로                                                                                                                              |
+| `StepNav` + `StepNavItem`, `StepMarker`, `DoneMark`, `NumberedList`, `Checklist` + `ChecklistItem`, `CheckTick`          | 온보딩 단계 목록, 번호 안내, 확인 목록. 끝난 표시는 상태 색이 아니라 강조색(`accentSoft`·`accentText`)이다. 상태 색은 상태에만 쓴다(5번)                                                     |
+| `Disclosure`                                                                                                             | 읽을거리를 접어 두는 카드                                                                                                                                                                    |
+| `DividedList` + `DividedItem`                                                                                            | 선으로 나눈 설정 목록(Settings). 작은 항목은 `tight`                                                                                                                                         |
+| `CheckIcon`, `CloseIcon`, `ChevronDownIcon`                                                                              | 버튼과 표시 안 아이콘                                                                                                                                                                        |
+
+`Button`은 `aria-pressed`, `aria-controls`, `aria-describedby`, `aria-busy`, `aria-disabled`를 받는다. `aria-disabled`이면 못 쓰는 모양이 되지만 포커스는 남는다(작업 중인 새로 고침). `apps/web/src/ds/page.test.tsx`가 `@factory/ui`가 내보내는 컴포넌트마다 `/ds` 미리보기가 있는지 확인한다(앱 루트에 하나만 두는 `Toaster`만 뺀다).
 
 ### 브랜드 그림(티켓 0077)
 
