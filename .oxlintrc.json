@@ -7,7 +7,7 @@
   "options": {
     "typeAware": true
   },
-  "ignorePatterns": ["design/**", "**/dist/**", "**/node_modules/**"],
+  "ignorePatterns": ["design/**", ".claude/worktrees/**", "**/dist/**", "**/node_modules/**"],
   "rules": {
     "typescript/no-explicit-any": "error",
     "typescript/no-floating-promises": "error",
