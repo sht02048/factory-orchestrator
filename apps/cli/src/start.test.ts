@@ -47,7 +47,12 @@ const FAKE_WORKER = `
 const timer = setInterval(() => undefined, 1000);
 process.on("SIGTERM", () => { clearInterval(timer); process.exit(0); });
 `;
-const CRASHING_WORKER = `setTimeout(() => process.exit(3), 300);`;
+function workerExitingOnceExists(trigger: string): string {
+  return `
+import { existsSync } from "node:fs";
+setInterval(() => { if (existsSync(${JSON.stringify(trigger)})) process.exit(3); }, 50);
+`;
+}
 
 function fakeLayout(worker: string = FAKE_WORKER): AppLayout {
   const script = (name: ProcessSpec["name"], source: string): ProcessSpec => {
@@ -101,12 +106,14 @@ describe("start", () => {
   it("한쪽이 먼저 끝나면 다른 쪽도 멈추고 이유를 알린다", async () => {
     const home = join(dir, "home");
     init({ home, port: String(await freePort()) });
+    const crashTrigger = join(dir, "crash-worker");
     started = await start({
       home,
       env: {},
-      layout: fakeLayout(CRASHING_WORKER),
+      layout: fakeLayout(workerExitingOnceExists(crashTrigger)),
       onOutput: quiet,
     });
+    writeFileSync(crashTrigger, "");
     expect(await started.exited).toEqual({ failure: "worker exited with code 3" });
     await expect(fetch(started.url)).rejects.toThrow("fetch failed");
   });
