@@ -226,7 +226,7 @@ export class Controller {
   private async openRemote(saved: SavedServer): Promise<void> {
     this.mode = "remote";
     this.remote = { server: saved, reachable: false };
-    this.setView({ screen: "unreachable", name: saved.name, checking: true });
+    this.setView({ screen: "unreachable", name: saved.name, url: saved.url, checking: true });
     const port = this.options.settings.read().discoveryPort ?? DEFAULT_SERVER_PORT;
     const result = await reopenSaved(saved, {
       probe: (origin, timeoutMs) => probeIdentity(origin, timeoutMs),
@@ -239,7 +239,7 @@ export class Controller {
       return;
     }
     this.remote = { server: saved, reachable: false };
-    this.setView({ screen: "unreachable", name: saved.name, checking: false });
+    this.setView({ screen: "unreachable", name: saved.name, url: saved.url, checking: false });
     this.refreshMenus();
     this.remoteTimer ??= setInterval(() => {
       if (this.view.screen === "unreachable" && !this.view.checking && this.remote !== undefined) {
@@ -388,6 +388,7 @@ export class Controller {
       return this.chooseRemote();
     });
     handle("choose-mode", () => this.chooseMode());
+    handle("open-log", () => shell.openPath(this.options.logFile));
   }
 
   private async pollAttention(): Promise<void> {
