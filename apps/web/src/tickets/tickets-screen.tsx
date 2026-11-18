@@ -2,17 +2,17 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
+  Card,
   DefinitionItem,
   DefinitionList,
   DetailPanel,
+  Input,
   PageHeader,
-  PanelBlock,
   PanelFooter,
-  PanelHeader,
   RowTitle,
+  SegmentedTabs,
   SplitView,
   StatusPill,
-  Tab,
   Table,
   TableCell,
   TableEmpty,
@@ -20,23 +20,28 @@ import {
   TableHeader,
   TableRow,
   TableRows,
-  Tabs,
   Text,
+  buttonStyles,
 } from "@factory/ui";
-import { colors, fontSize, fontWeight, space } from "@factory/ui/tokens.stylex";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { size, space } from "@factory/ui/tokens.stylex";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import type { WorkspaceSummary } from "../shell/model";
 import { runStatus, useStatusName } from "../status";
 import type { AssignInput, AssignResult } from "./assign";
 import { AssignDialog } from "./assign-dialog";
-import { TICKET_FILTERS, lastRun, matchesFilter } from "./model";
-import type { TicketFilter, TicketView, TicketsPage } from "./model";
+import { TICKET_FILTERS, countByFilter, lastRun, matchesFilter, matchesSearch } from "./model";
+import type { TicketFilter, TicketRun, TicketView, TicketsPage } from "./model";
 import { useRowWindow } from "./row-window";
 
-const columns = "minmax(0, 1fr) 128px 104px 160px";
+const LAYOUT = {
+  keyColumn: "112px",
+  trackerProjectColumn: "128px",
+  lastRunColumn: "160px",
+  noticeMaxWidth: "720px",
+} as const;
 
 export interface TicketsScreenProps {
   page: TicketsPage;
@@ -65,7 +70,7 @@ export function TicketsScreen(props: TicketsScreenProps) {
         />
       );
     case "one":
-      return <TicketsList {...props} workspaceName={page.workspace.workspace.name} />;
+      return <TicketsList key={page.workspace.workspace.id} {...props} />;
   }
 }
 
@@ -73,7 +78,7 @@ function Notice({ body }: { body: ReactNode }) {
   const t = useTranslations("tickets");
   return (
     <div {...stylex.props(styles.notice)}>
-      <PageHeader title={t("title")} subtitle={t("summary")} />
+      <PageHeader title={t("title")} subtitle={t("intro")} />
       {body}
     </div>
   );
@@ -106,6 +111,15 @@ function AllWorkspaces({
   );
 }
 
+function tableColumns(showTrackerProject: boolean): string {
+  return [
+    LAYOUT.keyColumn,
+    "minmax(0, 1fr)",
+    ...(showTrackerProject ? [LAYOUT.trackerProjectColumn] : []),
+    LAYOUT.lastRunColumn,
+  ].join(" ");
+}
+
 function TicketsList({
   page,
   filter,
@@ -115,12 +129,15 @@ function TicketsList({
   onOpenRun,
   onAssign,
   onAssigned,
-  workspaceName,
-}: TicketsScreenProps & { workspaceName: string }) {
+}: TicketsScreenProps) {
   const t = useTranslations("tickets");
+  const [query, setQuery] = useState("");
   const visible = useMemo(
-    () => page.tickets.filter((ticket) => matchesFilter(ticket, filter)),
-    [page.tickets, filter],
+    () =>
+      page.tickets.filter(
+        (ticket) => matchesFilter(ticket, filter) && matchesSearch(ticket, query),
+      ),
+    [page.tickets, filter, query],
   );
   const counts = useMemo(() => countByFilter(page.tickets), [page.tickets]);
   const selected =
@@ -128,79 +145,113 @@ function TicketsList({
     page.tickets.find((ticket) => ticket.id === selectedId) ??
     visible[0];
   const selectedIndex = selected === undefined ? -1 : visible.indexOf(selected);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const rows = useRowWindow(listRef, visible.length, selectedIndex);
+  const moreBelow = useMoreBelow(scrollRef, listRef, visible.length);
   const [assignedId, setAssignedId] = useState<string | null>(null);
+  const showTrackerProject = page.trackerProjectCount > 1;
 
   let empty: string;
-  if (page.tickets.length > 0 || page.errors.length > 0) empty = t("empty");
-  else if (!page.hasTrackerProjects) empty = t("noProjects");
+  const filtered = counts[filter] > 0;
+  if (query.trim() !== "" && filtered) empty = t("noMatch", { query: query.trim() });
+  else if (page.tickets.length > 0 || page.errors.length > 0) empty = t("empty");
+  else if (page.trackerProjectCount === 0) empty = t("noProjects");
   else empty = t("noTickets");
 
   return (
     <SplitView
       list={
-        <>
-          <PageHeader title={t("title")} subtitle={t("subtitle", { workspace: workspaceName })} />
-          {page.errors.length === 0 ? null : (
-            <div {...stylex.props(styles.errors)}>
-              {page.errors.map((error) => (
-                <Text key={error.trackerProject} variant="body">
-                  {t(`loadError.${error.reason}`, { project: error.trackerProject })}
-                </Text>
-              ))}
+        <div {...stylex.props(styles.listFrame)}>
+          <div {...stylex.props(styles.listTop)}>
+            <PageHeader title={t("title")} subtitle={t("summary", { count: counts.assignable })} />
+            {page.errors.length === 0 ? null : (
+              <Card surface="problem">
+                <div {...stylex.props(styles.lines)}>
+                  {page.errors.map((error) => (
+                    <Text key={error.trackerProject} variant="body">
+                      {t(`loadError.${error.reason}`, { project: error.trackerProject })}
+                    </Text>
+                  ))}
+                </div>
+              </Card>
+            )}
+            {page.truncated.length === 0 ? null : (
+              <div {...stylex.props(styles.lines)}>
+                {page.truncated.map((cut) => (
+                  <Text key={cut.trackerProject} variant="meta">
+                    {t("truncated", { project: cut.trackerProject, limit: cut.limit })}
+                  </Text>
+                ))}
+              </div>
+            )}
+            <div {...stylex.props(styles.toolbar)}>
+              <SegmentedTabs<TicketFilter>
+                value={filter}
+                onValueChange={onFilterChange}
+                label={t("filter.label")}
+                items={TICKET_FILTERS.map((key) => ({
+                  value: key,
+                  label: t(`filter.${key}`),
+                  count: counts[key],
+                }))}
+              />
+              <label {...stylex.props(styles.search)}>
+                <span {...stylex.props(styles.searchLabel)}>{t("search.label")}</span>
+                <Input
+                  type="search"
+                  value={query}
+                  onValueChange={setQuery}
+                  placeholder={t("search.placeholder")}
+                  autoComplete="off"
+                />
+              </label>
             </div>
-          )}
-          {page.truncated.length === 0 ? null : (
-            <div {...stylex.props(styles.truncated)}>
-              {page.truncated.map((cut) => (
-                <Text key={cut.trackerProject} variant="meta">
-                  {t("truncated", { project: cut.trackerProject, limit: cut.limit })}
-                </Text>
-              ))}
-            </div>
-          )}
-          <Tabs<TicketFilter>
-            value={filter}
-            onValueChange={onFilterChange}
-            label={t("filter.label")}
-          >
-            {TICKET_FILTERS.map((key) => (
-              <Tab key={key} value={key} count={counts[key]} attention={key === "attention"}>
-                {t(`filter.${key}`)}
-              </Tab>
-            ))}
-          </Tabs>
-          <div ref={listRef}>
-            <Table columns={columns}>
+          </div>
+          <div {...stylex.props(styles.tableFrame)}>
+            <Table columns={tableColumns(showTrackerProject)}>
               <TableHead>
-                <TableHeader>{t("columns.ticket")}</TableHeader>
-                <TableHeader>{t("columns.trackerProject")}</TableHeader>
-                <TableHeader>{t("columns.trackerState")}</TableHeader>
+                <TableHeader>{t("columns.key")}</TableHeader>
+                <TableHeader>{t("columns.title")}</TableHeader>
+                {showTrackerProject ? (
+                  <TableHeader>{t("columns.trackerProject")}</TableHeader>
+                ) : null}
                 <TableHeader>{t("columns.lastRun")}</TableHeader>
               </TableHead>
-              {visible.length === 0 ? (
-                <TableEmpty>{empty}</TableEmpty>
-              ) : (
-                <TableRows
-                  label={t("listLabel")}
-                  value={visible[selectedIndex]?.id ?? null}
-                  onValueChange={onSelect}
-                >
-                  {rows.spaceBefore > 0 ? (
-                    <div aria-hidden="true" style={{ height: rows.spaceBefore }} />
-                  ) : null}
-                  {visible.slice(rows.start, rows.end).map((ticket) => (
-                    <TicketRow key={ticket.id} ticket={ticket} />
-                  ))}
-                  {rows.spaceAfter > 0 ? (
-                    <div aria-hidden="true" style={{ height: rows.spaceAfter }} />
-                  ) : null}
-                </TableRows>
-              )}
+              <div
+                ref={scrollRef}
+                data-more-below={moreBelow}
+                {...stylex.props(styles.scroll, moreBelow && styles.fadeBottom)}
+              >
+                <div ref={listRef}>
+                  {visible.length === 0 ? (
+                    <TableEmpty>{empty}</TableEmpty>
+                  ) : (
+                    <TableRows
+                      label={t("listLabel")}
+                      value={visible[selectedIndex]?.id ?? null}
+                      onValueChange={onSelect}
+                    >
+                      {rows.spaceBefore > 0 ? (
+                        <div aria-hidden="true" style={{ height: rows.spaceBefore }} />
+                      ) : null}
+                      {visible.slice(rows.start, rows.end).map((ticket) => (
+                        <TicketRow
+                          key={ticket.id}
+                          ticket={ticket}
+                          showTrackerProject={showTrackerProject}
+                        />
+                      ))}
+                      {rows.spaceAfter > 0 ? (
+                        <div aria-hidden="true" style={{ height: rows.spaceAfter }} />
+                      ) : null}
+                    </TableRows>
+                  )}
+                </div>
+              </div>
             </Table>
           </div>
-        </>
+        </div>
       }
       panel={
         selected === undefined ? null : (
@@ -225,43 +276,89 @@ function TicketsList({
   );
 }
 
-function countByFilter(tickets: ReadonlyArray<TicketView>): Record<TicketFilter, number> {
-  const counts: Record<TicketFilter, number> = {
-    all: 0,
-    attention: 0,
-    unassigned: 0,
-    running: 0,
-    merged: 0,
-  };
-  for (const ticket of tickets) {
-    for (const key of TICKET_FILTERS) if (matchesFilter(ticket, key)) counts[key] += 1;
-  }
-  return counts;
+function useMoreBelow(
+  scrollRef: RefObject<HTMLElement | null>,
+  contentRef: RefObject<HTMLElement | null>,
+  rowCount: number,
+): boolean {
+  const [moreBelow, setMoreBelow] = useState(false);
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    if (scroller === null) return;
+    const update = () => {
+      setMoreBelow(scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - 1);
+    };
+    update();
+    scroller.addEventListener("scroll", update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(scroller);
+    if (contentRef.current !== null) observer.observe(contentRef.current);
+    return () => {
+      scroller.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, [scrollRef, contentRef, rowCount]);
+  return moreBelow;
 }
 
-function TicketRow({ ticket }: { ticket: TicketView }) {
-  const t = useTranslations("tickets");
-  const statusName = useStatusName();
+function TicketRow({
+  ticket,
+  showTrackerProject,
+}: {
+  ticket: TicketView;
+  showTrackerProject: boolean;
+}) {
   const run = lastRun(ticket);
   return (
     <TableRow value={ticket.id} label={`${ticket.key} ${ticket.title}`}>
       <TableCell>
-        <span {...stylex.props(styles.ticketCell)}>
-          <span {...stylex.props(styles.key)}>{ticket.key}</span>
-          <RowTitle>{ticket.title}</RowTitle>
-        </span>
+        <Text variant="meta" numeric>
+          {ticket.key}
+        </Text>
       </TableCell>
-      <TableCell>{ticket.trackerProject.name}</TableCell>
-      <TableCell>{ticket.trackerState.name}</TableCell>
       <TableCell>
-        {run === undefined ? (
-          <Text variant="meta">{t("unassigned")}</Text>
-        ) : (
-          <StatusPill status={runStatus(run)}>{statusName(runStatus(run))}</StatusPill>
-        )}
+        <RowTitle>{ticket.title}</RowTitle>
+      </TableCell>
+      {showTrackerProject ? (
+        <TableCell>
+          <Text variant="meta">{ticket.trackerProject.name}</Text>
+        </TableCell>
+      ) : null}
+      <TableCell>
+        <LastRunStatus run={run} />
       </TableCell>
     </TableRow>
   );
+}
+
+function LastRunStatus({ run }: { run: TicketRun | undefined }) {
+  const t = useTranslations("tickets");
+  const statusName = useStatusName();
+  if (run === undefined) return <Text variant="meta">{t("unassigned")}</Text>;
+  const status = runStatus(run);
+  return <StatusPill status={status}>{statusName(status)}</StatusPill>;
+}
+
+type NextStep =
+  | "unassigned"
+  | "no-mapping"
+  | "queued"
+  | "running"
+  | "waiting-for-input"
+  | "disconnected"
+  | "merged"
+  | "human-check"
+  | "human-check-settled"
+  | "failed"
+  | "canceled";
+
+function nextStepOf(ticket: TicketView): NextStep {
+  const run = lastRun(ticket);
+  if (ticket.assignability.kind === "no-mapping") return "no-mapping";
+  if (run === undefined) return "unassigned";
+  if (run.state !== "ended") return run.state;
+  if (run.summary === "human-check" && run.prSettledLater) return "human-check-settled";
+  return run.summary;
 }
 
 function TicketPanel({
@@ -282,9 +379,6 @@ function TicketPanel({
   onFocusedOpenRun: () => void;
 }) {
   const t = useTranslations("tickets.panel");
-  const tList = useTranslations("tickets");
-  const statusName = useStatusName();
-  const { ago } = useTime();
   const run = lastRun(ticket);
   const { assignability } = ticket;
   const openRunRef = useRef<HTMLSpanElement>(null);
@@ -296,112 +390,88 @@ function TicketPanel({
     onFocusedOpenRun();
   }, [focusOpenRun, assignability.kind, onFocusedOpenRun]);
 
-  let reason: string;
-  if (assignability.kind === "active-run") reason = t("reason.active-run");
-  else if (assignability.kind === "no-mapping") reason = t("reason.no-mapping");
-  else if (run === undefined) reason = t("reason.unassigned");
-  else if (run.state === "ended") reason = t(`reason.${run.summary}`);
-  else reason = t("reason.active-run");
-
+  const openRunId = assignability.kind === "active-run" ? assignability.runId : run?.id;
   const labels = ticket.labels;
   return (
     <DetailPanel>
-      <PanelHeader
-        status={
-          run === undefined ? (
-            <Text variant="meta">{tList("unassigned")}</Text>
-          ) : (
-            <>
-              <StatusPill status={runStatus(run)}>{statusName(runStatus(run))}</StatusPill>
-              <Text variant="meta">{t("lastRun")}</Text>
-            </>
-          )
-        }
-        title={
-          <span {...stylex.props(styles.ticketCell)}>
-            <span {...stylex.props(styles.key, styles.panelKey)}>{ticket.key}</span>
-            <span>{ticket.title}</span>
-          </span>
-        }
-        subtitle={t("subtitle", {
-          project: ticket.trackerProject.name,
-          state: ticket.trackerState.name,
-        })}
-        reason={reason}
-      />
-      <Actions>
-        {assignability.kind === "ready" ? (
-          <AssignDialog
-            ticket={ticket}
-            defaults={assignability.defaults}
-            runners={page.runners}
-            agents={page.agents}
-            triggerLabel={run === undefined ? t("assign") : t("reassign")}
-            onAssign={onAssign}
-            onAssigned={onAssigned}
-          />
-        ) : null}
-        {assignability.kind === "active-run" ? (
-          <span ref={openRunRef} {...stylex.props(styles.contents)}>
-            <Button onClick={() => onOpenRun(assignability.runId)}>{t("openRun")}</Button>
-          </span>
-        ) : null}
-      </Actions>
+      <div {...stylex.props(styles.panelHead)}>
+        <Text variant="meta">
+          {[ticket.key, ticket.trackerProject.name, ticket.trackerState.name].join(" · ")}
+        </Text>
+        <Text variant="heading">{ticket.title}</Text>
+      </div>
+      <Card surface="inset" label={t("lastRun")}>
+        <div {...stylex.props(styles.lastRun)}>
+          <Text variant="label">{t("lastRun")}</Text>
+          <div {...stylex.props(styles.lastRunState)}>
+            <LastRunStatus run={run} />
+            {run === undefined ? null : <RunTiming run={run} />}
+          </div>
+          <Text variant="body">{t(`next.${nextStepOf(ticket)}`)}</Text>
+          <Actions>
+            {assignability.kind === "ready" ? (
+              <AssignDialog
+                ticket={ticket}
+                defaults={assignability.defaults}
+                runners={page.runners}
+                agents={page.agents}
+                triggerLabel={run === undefined ? t("assign") : t("reassign")}
+                onAssign={onAssign}
+                onAssigned={onAssigned}
+              />
+            ) : null}
+            {openRunId === undefined ? null : (
+              <span ref={openRunRef} {...stylex.props(styles.contents)}>
+                <Button onClick={() => onOpenRun(openRunId)}>{t("openRun")}</Button>
+              </span>
+            )}
+          </Actions>
+        </div>
+      </Card>
       <DefinitionList>
-        <DefinitionItem label={t("trackerState")}>
-          <span {...stylex.props(styles.inline)}>
-            {ticket.trackerState.name}
-            <Text variant="meta">{t("trackerStateNote")}</Text>
-          </span>
-        </DefinitionItem>
         <DefinitionItem label={t("labels")} empty={labels.length === 0}>
           {labels.length === 0 ? (
             t("none")
           ) : (
             <span {...stylex.props(styles.labels)}>
-              {labels.map((label) => (
-                <span
-                  key={label.name}
-                  {...stylex.props(label.autoAssign ? styles.autoLabel : styles.label)}
-                >
-                  {label.name}
-                  {label.autoAssign ? ` · ${t("autoAssign")}` : null}
-                </span>
-              ))}
+              {labels.map((label) =>
+                label.autoAssign ? (
+                  <Text key={label.name} variant="ui">
+                    {`${label.name} · ${t("autoAssign")}`}
+                  </Text>
+                ) : (
+                  <Text key={label.name} variant="meta">
+                    {label.name}
+                  </Text>
+                ),
+              )}
             </span>
           )}
         </DefinitionItem>
-        <DefinitionItem label={t("mapping")} empty={assignability.kind === "no-mapping"}>
-          {assignability.kind === "ready"
-            ? t("mappingValue", {
-                project: assignability.defaults.runnerProject,
-                agent: assignability.defaults.agent,
-              })
-            : assignability.kind === "no-mapping"
-              ? t("noMapping")
-              : t("none")}
+        <DefinitionItem label={t("mapping")} empty={ticket.mapping === null}>
+          {ticket.mapping === null
+            ? t("noMapping")
+            : t("mappingValue", {
+                project: ticket.mapping.runnerProject,
+                agent: ticket.mapping.agent,
+              })}
+        </DefinitionItem>
+        <DefinitionItem label={t("runCount")}>
+          {t("runCountValue", { count: ticket.runs.length })}
         </DefinitionItem>
       </DefinitionList>
-      {ticket.runs.length === 0 ? null : (
-        <PanelBlock title={t("history", { count: ticket.runs.length })}>
-          <ol {...stylex.props(styles.history)}>
-            {ticket.runs.map((r) => (
-              <li key={r.id} {...stylex.props(styles.historyRow)}>
-                <StatusPill status={runStatus(r)}>{statusName(runStatus(r))}</StatusPill>
-                <Text variant="meta">
-                  <time dateTime={r.assignedAt}>{ago(r.assignedAt, r.assignedAgoMs)}</time>
-                </Text>
-              </li>
-            ))}
-          </ol>
-        </PanelBlock>
-      )}
       {ticket.url === null ? null : (
         <PanelFooter>
-          <a href={ticket.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
+          <a
+            href={ticket.url}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`${t("openInTracker")} (${t("newTab")})`}
+            data-variant="ghost"
+            {...stylex.props(buttonStyles("ghost"))}
+          >
             {t("openInTracker")}
             <span aria-hidden="true"> ↗</span>
-            <span {...stylex.props(styles.srOnly)}>{` (${t("newTab")})`}</span>
           </a>
         </PanelFooter>
       )}
@@ -409,68 +479,70 @@ function TicketPanel({
   );
 }
 
+function RunTiming({ run }: { run: TicketRun }) {
+  const t = useTranslations("tickets.panel");
+  const { ago, elapsed } = useTime();
+  const time = run.state === "ended" ? ago(run.endedAt, run.endedAgoMs) : elapsed(run.elapsedMs);
+  return (
+    <Text variant="meta">
+      {run.runnerName === null
+        ? t("noRunner", { time })
+        : t("runner", { runner: run.runnerName, time })}
+    </Text>
+  );
+}
+
 const styles = stylex.create({
   notice: {
-    maxWidth: 720,
+    maxWidth: LAYOUT.noticeMaxWidth,
     paddingTop: space.s8,
     paddingInline: space.s8,
     paddingBottom: space.s10,
   },
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
-  errors: {
+  listFrame: {
+    display: "grid",
+    gridTemplateRows: "auto minmax(0, 1fr)",
+    height: "100%",
+    minHeight: 0,
+  },
+  listTop: { display: "flex", flexDirection: "column", gap: space.s4, paddingBottom: space.s4 },
+  lines: { display: "flex", flexDirection: "column", gap: space.s1 },
+  toolbar: {
     display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-    paddingBlock: space.s3,
-    color: colors.problem,
-  },
-  truncated: { display: "flex", flexDirection: "column", gap: space.s1, paddingBlock: space.s3 },
-  contents: { display: "contents" },
-  srOnly: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    padding: 0,
-    margin: -1,
-    overflow: "hidden",
-    clip: "rect(0 0 0 0)",
-    whiteSpace: "nowrap",
-    borderWidth: 0,
-  },
-  inline: { display: "inline-flex", alignItems: "baseline", gap: space.s2 },
-  ticketCell: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
-  key: {
-    flexShrink: 0,
-    color: colors.textTertiary,
-    fontSize: fontSize.ui,
-    fontWeight: fontWeight.regular,
-    fontVariantNumeric: "tabular-nums",
-    whiteSpace: "nowrap",
-  },
-  panelKey: { fontSize: "inherit" },
-  labels: { display: "inline-flex", flexWrap: "wrap", gap: space.s2 },
-  label: { color: colors.textTertiary },
-  autoLabel: { color: colors.accentText },
-  history: {
-    display: "flex",
-    flexDirection: "column",
-    margin: 0,
-    padding: 0,
-    listStyle: "none",
-  },
-  historyRow: {
-    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: space.s3,
-    paddingBlock: space.s2,
-    borderTopWidth: { default: 1, ":first-child": 0 },
-    borderTopStyle: "solid",
-    borderTopColor: colors.borderSubtle,
   },
-  link: {
-    color: colors.accentText,
-    textUnderlineOffset: 3,
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
+  search: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: size.sidebarWidth,
+    maxWidth: size.editorListWidth,
   },
+  searchLabel: {
+    position: "absolute",
+    width: space.px2,
+    height: space.px2,
+    overflow: "hidden",
+    clipPath: "inset(50%)",
+    whiteSpace: "nowrap",
+  },
+  tableFrame: { display: "grid", gridTemplateRows: "minmax(0, 1fr)", minHeight: 0 },
+  scroll: {
+    flexGrow: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+  },
+  fadeBottom: {
+    maskImage: `linear-gradient(to bottom, currentColor calc(100% - ${space.s10}), transparent)`,
+  },
+  contents: { display: "contents" },
+  panelHead: { display: "flex", flexDirection: "column", gap: space.s2 },
+  lastRun: { display: "flex", flexDirection: "column", gap: space.s3 },
+  lastRunState: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
+  labels: { display: "inline-flex", flexWrap: "wrap", gap: space.s2 },
 });
