@@ -2,7 +2,7 @@ import { summarizeRunOutcome } from "@factory/core";
 import { getRunWithRecords, listRunners, listRuns, listWorkspaces } from "@factory/db";
 import type { Database, StoredRun } from "@factory/db";
 import { z } from "zod";
-import { prerequisiteProject } from "../labels";
+import { prerequisiteHint, prerequisiteProject } from "../labels";
 import type {
   LeftWorktree,
   OccupyingRun,
@@ -83,6 +83,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
           project: prerequisiteProject(p.id, runner.projects),
           satisfied: p.satisfied,
           blocksAssignment: p.blocksAssignment,
+          hint: prerequisiteHint(p),
         })) ?? null,
       checked:
         runner.checkedAt === null

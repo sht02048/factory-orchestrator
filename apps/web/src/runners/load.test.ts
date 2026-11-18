@@ -131,6 +131,7 @@ describe("loadRunnersPage", () => {
         project: null,
         satisfied: true,
         blocksAssignment: false,
+        hint: null,
       },
       {
         id: "github-push:github:acme/web",
@@ -138,6 +139,8 @@ describe("loadRunnersPage", () => {
         project: "github:acme/web",
         satisfied: false,
         blocksAssignment: true,
+        // GitHub push 의 해결 방법은 화면 메시지로 보여 어댑터 안내를 담지 않는다
+        hint: null,
       },
       {
         id: "github-push:github:acme/docs",
@@ -146,6 +149,7 @@ describe("loadRunnersPage", () => {
         project: null,
         satisfied: true,
         blocksAssignment: true,
+        hint: null,
       },
     ]);
   });

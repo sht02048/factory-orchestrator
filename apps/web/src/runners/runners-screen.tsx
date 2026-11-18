@@ -10,16 +10,22 @@ import { runnerIssueCause } from "../shell/model";
 import { useStatusName } from "../status";
 import type { RunWorkspace, RunnerCheckItem, RunnerView, RunnersPage } from "./model";
 
-/** 러너 추가는 Settings 의 러너 등록에서 한다 */
-export const ADD_RUNNER_HREF = "/settings?sel=runners";
+/** 러너 추가는 Settings 의 러너 등록에서 한다. 보던 Workspace(ws)를 이어 간다 */
+export function addRunnerHref(ws: string | undefined): string {
+  const search = new URLSearchParams(ws === undefined ? {} : { ws });
+  search.set("sel", "runners");
+  return `/settings?${search.toString()}`;
+}
 
 /** capacity 막대를 칸으로 나눠 그리는 가장 큰 capacity. 넘으면 한 줄 막대로 그린다 */
 const MAX_SEGMENTS = 12;
 
 export interface RunnersScreenProps {
   page: RunnersPage;
-  /** 주소로 고른 러너(Home 의 Runner Issue 카드에서 온다). 그 카드로 스크롤한다 */
+  /** 주소로 고른 러너(Home 의 Runner Issue 카드에서 온다). 그 카드로 스크롤하고 테두리로 보인다 */
   selectedId: string | undefined;
+  /** 보던 Workspace. 러너 추가 링크가 이어 간다 */
+  ws: string | undefined;
 }
 
 /**
@@ -27,7 +33,7 @@ export interface RunnersScreenProps {
  * Workspace 와 상관없는 공용 화면이라 모든 Workspace 의 런을 보인다(ADR 0006).
  * 파란 주 버튼은 "러너 추가" 하나다(ADR 0010 6번).
  */
-export function RunnersScreen({ page, selectedId }: RunnersScreenProps) {
+export function RunnersScreen({ page, selectedId, ws }: RunnersScreenProps) {
   const t = useTranslations("runners");
   const { runners } = page;
   const issues = runners.filter((r) => runnerIssueCause(r) !== null).length;
@@ -51,7 +57,7 @@ export function RunnersScreen({ page, selectedId }: RunnersScreenProps) {
         }
         actions={
           <a
-            href={ADD_RUNNER_HREF}
+            href={addRunnerHref(ws)}
             data-variant="primary"
             {...stylex.props(...buttonStyles("primary"))}
           >
@@ -62,7 +68,12 @@ export function RunnersScreen({ page, selectedId }: RunnersScreenProps) {
       {runners.length === 0 ? null : (
         <ul aria-label={t("listLabel")} {...stylex.props(styles.grid)}>
           {runners.map((runner) => (
-            <li key={runner.id} id={cardId(runner.id)} {...stylex.props(styles.cell)}>
+            <li
+              key={runner.id}
+              id={cardId(runner.id)}
+              aria-current={runner.id === selectedId ? "true" : undefined}
+              {...stylex.props(styles.cell, runner.id === selectedId && styles.selected)}
+            >
               <RunnerCard runner={runner} />
             </li>
           ))}
@@ -248,7 +259,11 @@ function CheckList({ runner }: { runner: RunnerView }) {
   return (
     <ul aria-label={t("checks")} {...stylex.props(styles.list)}>
       {checks.map((check) => (
-        <CheckLine key={check.id} state={checkState(check)}>
+        <CheckLine
+          key={check.id}
+          state={checkState(check)}
+          hint={check.satisfied === false ? check.hint : null}
+        >
           {prerequisiteName(check)}
         </CheckLine>
       ))}
@@ -263,7 +278,16 @@ function checkState(check: RunnerCheckItem): CheckState {
   return check.satisfied ? "ok" : "broken";
 }
 
-function CheckLine({ state, children }: { state: CheckState; children: ReactNode }) {
+function CheckLine({
+  state,
+  hint = null,
+  children,
+}: {
+  state: CheckState;
+  /** 깨진 항목의 해결 안내(Orca 상시 서비스 설치 명령 등) */
+  hint?: string | null;
+  children: ReactNode;
+}) {
   const t = useTranslations("runners.card.check");
   return (
     <li {...stylex.props(styles.check)}>
@@ -278,7 +302,10 @@ function CheckLine({ state, children }: { state: CheckState; children: ReactNode
       >
         {checkIcons[state]}
       </span>
-      <span {...stylex.props(styles.checkName)}>{children}</span>
+      <span {...stylex.props(styles.checkText)}>
+        <span {...stylex.props(styles.checkName)}>{children}</span>
+        {hint === null ? null : <code {...stylex.props(styles.hint)}>{hint}</code>}
+      </span>
     </li>
   );
 }
@@ -369,7 +396,8 @@ const styles = stylex.create({
     padding: 0,
     listStyle: "none",
   },
-  cell: { minWidth: 0 },
+  cell: { minWidth: 0, borderRadius: radius.card },
+  selected: { outline: `2px solid ${colors.accentText}`, outlineOffset: 2 },
   head: {
     display: "flex",
     alignItems: "flex-start",
@@ -428,7 +456,14 @@ const styles = stylex.create({
     outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
     outlineOffset: 2,
   },
-  check: { display: "flex", alignItems: "center", gap: space.s2, minWidth: 0 },
+  check: { display: "flex", alignItems: "flex-start", gap: space.s2, minWidth: 0 },
+  checkText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
+  hint: {
+    color: colors.textTertiary,
+    fontFamily: fonts.mono,
+    fontSize: fontSize.small,
+    overflowWrap: "anywhere",
+  },
   checkIcon: { display: "inline-flex", flexShrink: 0, color: colors.textTertiary },
   ok: { color: colors.progress },
   broken: { color: colors.problem },

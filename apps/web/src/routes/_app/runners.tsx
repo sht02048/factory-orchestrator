@@ -32,10 +32,10 @@ export const Route = createFileRoute("/_app/runners")({
 
 function RunnersRoute() {
   const page = Route.useLoaderData();
-  const { sel } = Route.useSearch();
+  const { sel, ws } = Route.useSearch();
   return (
     <ScreenMessages messages={runnersMessages}>
-      <RunnersScreen page={page} selectedId={sel} />
+      <RunnersScreen page={page} selectedId={sel} ws={ws} />
     </ScreenMessages>
   );
 }

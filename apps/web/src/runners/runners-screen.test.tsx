@@ -3,16 +3,21 @@ import domain from "../../messages/ko/domain.json" with { type: "json" };
 import runnersJson from "../../messages/ko/runners.json" with { type: "json" };
 import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
+import { recordRunnerCheck } from "@factory/db";
+import { toRunnerId } from "@factory/core";
 import { addUnreachedCanceledRun, breakGitHubAuth, now, seedDatabase } from "../testing/seed";
 import { loadRunnersPage } from "./load";
 import { runnersMessages } from "./messages";
 import type { RunnersPage } from "./model";
-import { ADD_RUNNER_HREF, RunnersScreen } from "./runners-screen";
+import { addRunnerHref, RunnersScreen } from "./runners-screen";
 
 const card = runnersJson.card;
 
-function render(page: RunnersPage, selectedId?: string) {
-  return renderWithMessages(<RunnersScreen page={page} selectedId={selectedId} />, runnersMessages);
+function render(page: RunnersPage, selectedId?: string, ws?: string) {
+  return renderWithMessages(
+    <RunnersScreen page={page} selectedId={selectedId} ws={ws} />,
+    runnersMessages,
+  );
 }
 
 /** 러너 카드 하나(section)의 HTML */
@@ -58,8 +63,47 @@ describe("Runners 화면", () => {
     breakGitHubAuth(db);
     const html = render(loadRunnersPage(db, now));
     expect(variantsOf(html).filter((v) => v === "primary")).toHaveLength(1);
-    expect(html).toContain(`<a href="${ADD_RUNNER_HREF}" data-variant="primary"`);
+    expect(html).toContain(`<a href="/settings?sel=runners" data-variant="primary"`);
     expect(textOf(html)).toContain(runnersJson.add);
+  });
+
+  it("러너 추가 링크는 보던 Workspace(ws)를 이어 간다", () => {
+    expect(addRunnerHref("ws-labs")).toBe("/settings?ws=ws-labs&sel=runners");
+    const { db } = seedDatabase();
+    expect(render(loadRunnersPage(db, now), undefined, "ws-labs")).toContain(
+      'href="/settings?ws=ws-labs&amp;sel=runners"',
+    );
+  });
+
+  it("Online 러너의 할당을 막지 않는 항목이 깨지면 깨짐 아이콘과 어댑터의 해결 안내를 보인다", () => {
+    const { db } = seedDatabase();
+    recordRunnerCheck(db, {
+      runnerId: toRunnerId("runner-a"),
+      online: true,
+      checkedAt: now,
+      error: null,
+      projects: null,
+      assignmentBlocked: false,
+      prerequisites: [
+        {
+          id: "orca-service",
+          name: "Orca service",
+          satisfied: false,
+          hint: "orca serve service install",
+          blocksAssignment: false,
+        },
+      ],
+    });
+    const a = cardHtml(render(loadRunnersPage(db, now)), "runner-a");
+    expect(a).toMatch(new RegExp(`aria-label="${card.check.broken}"[^]*?Orca 상시 서비스<`));
+    expect(textOf(a)).toContain("orca serve service install");
+  });
+
+  it("주소로 고른 러너 카드를 표시한다", () => {
+    const { db } = seedDatabase();
+    const html = render(loadRunnersPage(db, now), "runner-b");
+    expect(html).toMatch(/<li id="runner-runner-b" aria-current="true"/);
+    expect(html).not.toMatch(/<li id="runner-runner-a" aria-current/);
   });
 
   it("러너가 없어도 주 버튼은 하나다", () => {

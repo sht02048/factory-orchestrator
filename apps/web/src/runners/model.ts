@@ -55,6 +55,8 @@ export interface RunnerCheckItem {
   /** 통과하면 true, 깨졌으면 false, 확인하지 못했으면 null */
   satisfied: boolean | null;
   blocksAssignment: boolean;
+  /** 깨졌을 때 보일 어댑터 안내(Orca 상시 서비스 설치 명령 등). GitHub push 는 화면 메시지로 안내해 null 이다 */
+  hint: string | null;
 }
 
 export interface RunnerView {
