@@ -388,7 +388,12 @@ export class Controller {
       return this.chooseRemote();
     });
     handle("choose-mode", () => this.chooseMode());
-    handle("open-log", () => shell.openPath(this.options.logFile));
+    handle("open-log", () => this.openLog());
+  }
+
+  private async openLog(): Promise<void> {
+    const error = await shell.openPath(this.options.logFile);
+    if (error !== "") shell.showItemInFolder(this.options.logFile);
   }
 
   private async pollAttention(): Promise<void> {
