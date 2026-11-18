@@ -518,7 +518,7 @@ function TrackerKeyForm({
       </Field>
       <div {...stylex.props(styles.inset)}>
         <span {...stylex.props(styles.insetTitle)}>{t("guideTitle")}</span>
-        <ol {...stylex.props(styles.bullets)}>
+        <ol {...stylex.props(styles.bullets, styles.decimal)}>
           <li>{t("guideStepOpen")}</li>
           <li>{t("guideStepCreate")}</li>
           <li>{t("guideStepPaste")}</li>
@@ -1512,6 +1512,7 @@ const styles = stylex.create({
     gap: space.s1,
     color: colors.textSecondary,
   },
+  decimal: { listStyleType: "decimal" },
   summary: { display: "flex", alignItems: "center", gap: space.s3, minWidth: 0 },
   summaryText: {
     display: "flex",
