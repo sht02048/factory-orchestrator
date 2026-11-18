@@ -4,7 +4,11 @@ import {
   Button,
   CapacityBar,
   Card,
+  GangerMark,
   GroupHeader,
+  MASCOT_MOODS,
+  Mascot,
+  MascotMessage,
   ProblemCallout,
   Row,
   SURFACE_ROLES,
@@ -30,6 +34,7 @@ export const roleSectionIds = [
   "capacity",
   "problem",
   "statTile",
+  "brand",
 ] as const;
 
 type Period = "7d" | "14d" | "30d";
@@ -263,6 +268,42 @@ export function RoleSections() {
           </div>
         </Section>
       </div>
+
+      <div id="brand">
+        <Section title={t("nav.brand")} note={t("brand.note")}>
+          <Demo>
+            <div {...stylex.props(styles.brandRow)}>
+              <figure {...stylex.props(styles.figure)}>
+                <GangerMark tone="mono" size="large" />
+                <Text variant="meta" as="span">
+                  {t("brand.mono")}
+                </Text>
+              </figure>
+              <figure {...stylex.props(styles.figure)}>
+                <GangerMark tone="brand" size="large" />
+                <Text variant="meta" as="span">
+                  {t("brand.color")}
+                </Text>
+              </figure>
+            </div>
+            <div {...stylex.props(styles.brandRow)}>
+              {MASCOT_MOODS.map((mood) => (
+                <figure key={mood} {...stylex.props(styles.figure)}>
+                  <Mascot mood={mood} />
+                  <Text variant="meta" as="span">
+                    {t(`brand.moods.${mood}`)}
+                  </Text>
+                </figure>
+              ))}
+            </div>
+            <MascotMessage mood="resting" size="small">
+              <Text variant="meta" as="p">
+                {t("brand.message")}
+              </Text>
+            </MascotMessage>
+          </Demo>
+        </Section>
+      </div>
     </>
   );
 }
@@ -285,6 +326,15 @@ const styles = stylex.create({
     gap: space.s3,
   },
   capacity: { display: "block", width: 160 },
+  brandRow: { display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: space.s6 },
+  figure: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: space.s2,
+    margin: 0,
+    color: colors.textPrimary,
+  },
   tiles: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",

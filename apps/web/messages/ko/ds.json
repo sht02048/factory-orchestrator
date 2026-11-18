@@ -3,7 +3,6 @@
   "documentTitle": "디자인 시스템 · Factory Orchestrator",
   "subtitle": "packages/ui 의 토큰과 컴포넌트예요. 규칙은 packages/ui/DESIGN.md 에 있어요.",
   "theme": "다크",
-  "brandMark": "F",
   "nav": {
     "label": "디자인 시스템 목차",
     "tokens": "토큰",
@@ -33,7 +32,8 @@
     "groupHeader": "GroupHeader",
     "capacity": "CapacityBar",
     "problem": "ProblemCallout",
-    "statTile": "StatTile"
+    "statTile": "StatTile",
+    "brand": "GangerMark·Mascot"
   },
   "colors": {
     "note": "OKLCH 다크 값이에요. packages/ui 밖에서는 이 토큰만 써요.",
@@ -292,5 +292,17 @@
     "wait": "사람을 기다린 시간",
     "waitDetail": "앞 7일과 같아요",
     "waitValue": "12분"
+  },
+  "brand": {
+    "note": "제품 기호와 반장 마스코트예요. 레일에는 노랑 없는 한 색판을 쓰고, 마스코트는 빈 상태·로딩·404에만 둬요. 마스코트는 장식이라 화면 읽기 프로그램이 건너뛰어요.",
+    "mono": "한 색판",
+    "color": "브랜드판",
+    "moods": {
+      "default": "기본",
+      "signal": "신호 주는 중",
+      "resting": "쉬는 중",
+      "worried": "걱정"
+    },
+    "message": "처리할 일이 없어요"
   }
 }

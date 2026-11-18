@@ -1,8 +1,10 @@
 import * as stylex from "@stylexjs/stylex";
 import {
   Button,
+  buttonStyles,
   CapacityBar,
   DetailPanel,
+  MascotMessage,
   PageHeader,
   PanelBlock,
   ProblemCallout,
@@ -15,7 +17,6 @@ import {
   TableRow,
   TableRows,
   Text,
-  buttonStyles,
   textStyles,
 } from "@factory/ui";
 import { fonts, space } from "@factory/ui/tokens.stylex";
@@ -124,10 +125,10 @@ export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: Runne
 function EmptyRunners() {
   const t = useTranslations("runners.empty");
   return (
-    <div {...stylex.props(styles.stack)}>
+    <MascotMessage mood="resting" align="start">
       <Text variant="title">{t("title")}</Text>
       <Text variant="body">{t("body")}</Text>
-    </div>
+    </MascotMessage>
   );
 }
 
@@ -473,7 +474,6 @@ function runHref(workspaceId: string, runId: string): string {
 }
 
 const styles = stylex.create({
-  stack: { display: "flex", flexDirection: "column", gap: space.s2 },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   rowHead: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
   panelHead: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },

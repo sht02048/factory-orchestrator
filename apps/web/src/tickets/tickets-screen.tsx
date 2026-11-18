@@ -2,11 +2,13 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
+  buttonStyles,
   Card,
   DefinitionItem,
   DefinitionList,
   DetailPanel,
   Input,
+  MascotMessage,
   PageHeader,
   PanelFooter,
   RowTitle,
@@ -21,7 +23,6 @@ import {
   TableRow,
   TableRows,
   Text,
-  buttonStyles,
 } from "@factory/ui";
 import { size, space } from "@factory/ui/tokens.stylex";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -225,7 +226,15 @@ function TicketsList({
               >
                 <div ref={listRef}>
                   {visible.length === 0 ? (
-                    <TableEmpty>{empty}</TableEmpty>
+                    <TableEmpty>
+                      {page.tickets.length === 0 && page.errors.length === 0 ? (
+                        <MascotMessage mood="resting" size="small">
+                          {empty}
+                        </MascotMessage>
+                      ) : (
+                        empty
+                      )}
+                    </TableEmpty>
                   ) : (
                     <TableRows
                       label={t("listLabel")}

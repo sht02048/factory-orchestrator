@@ -14,6 +14,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
 import { appMessages, defaultLocale, t } from "../i18n";
+import { NotFoundScreen } from "../not-found/not-found-screen";
 import { ONBOARDING_PATH, isOpenPath, onboardingRedirect } from "../onboarding/model";
 import { getTimeZone } from "../server/functions";
 import { getOnboardingComplete } from "../server/onboarding-functions";
@@ -40,11 +41,14 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "data:," },
+      { rel: "icon", href: "/favicon.ico", sizes: "32x32" },
+      { rel: "icon", href: "/icon.svg", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootDocument,
   component: RootLayout,
+  notFoundComponent: NotFoundScreen,
 });
 
 function RootDocument({ children }: { children: ReactNode }) {

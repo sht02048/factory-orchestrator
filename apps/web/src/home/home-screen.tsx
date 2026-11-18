@@ -1,11 +1,13 @@
 import * as stylex from "@stylexjs/stylex";
 import {
   Button,
+  buttonStyles,
   CapacityBar,
   Card,
   Field,
   GroupHeader,
   Input,
+  MascotMessage,
   Popover,
   ProblemCallout,
   Row,
@@ -13,7 +15,6 @@ import {
   StatusDot,
   StatusPill,
   Text,
-  buttonStyles,
   textStyles,
 } from "@factory/ui";
 import type { PillStatus } from "@factory/ui";
@@ -164,9 +165,11 @@ function TodoSection({
     <Card label={t("section.todo")}>
       <Section title={t("section.todo")} titleRole="heading" count={total}>
         {groups.length === 0 ? (
-          <Text variant="meta" as="p">
-            {t("empty.todo")}
-          </Text>
+          <MascotMessage mood="resting" size="small">
+            <Text variant="meta" as="p">
+              {t("empty.todo")}
+            </Text>
+          </MascotMessage>
         ) : (
           <div {...stylex.props(styles.groups)}>
             {groups.map((group) => (

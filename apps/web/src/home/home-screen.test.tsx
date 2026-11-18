@@ -297,6 +297,12 @@ describe("To do 묶음", () => {
     const todo = section(render({ ...seededPage(), attention: [] }), "To do");
     expect(text(todo)).toContain(homeJson.empty.todo);
   });
+
+  it("To do 가 비면 쉬는 반장을 장식으로 두고, 할 일이 있으면 두지 않는다(0077)", () => {
+    const empty = section(render({ ...seededPage(), attention: [] }), "To do");
+    expect(empty).toMatch(/<svg[^>]*aria-hidden="true"[^>]*data-mascot="resting"/);
+    expect(render(seededPage())).not.toContain("data-mascot");
+  });
 });
 
 describe("질문 레이어", () => {
