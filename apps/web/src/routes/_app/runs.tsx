@@ -10,7 +10,6 @@ import { getRunsPage } from "../../server/functions";
 const t = createTranslator({ locale: defaultLocale, messages: runsMessages, namespace: "runs" });
 const appRoute = getRouteApi("/_app");
 
-/** Runs: 현재 Workspace 의 런. 필터(f)와 고른 런(sel)은 주소에 남는다 */
 export const Route = createFileRoute("/_app/runs")({
   validateSearch: z.object({
     f: z.enum(RUN_FILTERS).optional().catch(undefined),
@@ -20,7 +19,6 @@ export const Route = createFileRoute("/_app/runs")({
   loaderDeps: ({ search }) => ({ ws: search.ws, ended: search.ended }),
   loader: ({ deps }) =>
     getRunsPage({ data: { ws: deps.ws, ended: deps.ended ?? ENDED_RUNS_PAGE_SIZE } }),
-  // 필터·행을 고를 때마다 다시 읽지 않는다. Workspace 를 바꾸면 deps 가 바뀌어 새로 읽는다.
   shouldReload: false,
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: RunsRoute,

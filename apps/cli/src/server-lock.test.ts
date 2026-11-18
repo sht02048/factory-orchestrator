@@ -11,10 +11,6 @@ import {
   serverLockPath,
 } from "./server-lock.js";
 
-/*
- * 서버 잠금(0046). 같은 home 에 start 가 한 벌만 돈다. start 와 함께 도는 시험은 start.test.ts 에 있다.
- */
-
 let home: string;
 
 beforeEach(() => {
@@ -36,7 +32,6 @@ describe("서버 잠금", () => {
   });
 
   it("pid 가 잠금을 쓴 뒤에 시작한 다른 프로세스에 다시 쓰였으면 낡은 잠금으로 보고 새로 쥔다", () => {
-    // 재부팅 뒤 같은 pid 를 받은 프로세스: 이 시험 프로세스는 2000년 뒤에 시작했다.
     const stale = {
       pid: process.pid,
       url: "http://127.0.0.1:1",
@@ -68,7 +63,6 @@ describe("서버 잠금", () => {
         startedAt: "2000-01-01T00:00:00.000Z",
       }),
     );
-    // 각 프로세스가 같은 규칙(server-lock.ts 와 같은 치우기 파일 절차)으로 잠금을 쥐려 한다.
     const script = `
       import { acquireServerLock } from ${JSON.stringify(new URL("./server-lock.ts", import.meta.url).href)};
       try {

@@ -10,11 +10,6 @@ import { LocalServer, fileRecordStore, sleep } from "./local-server.js";
 import type { LocalServerOptions } from "./local-server.js";
 import { ServerWatch } from "./watch.js";
 
-/*
- * ②의 띄우기·붙기·멈추기·바꾸기·감시를 실제 프로세스로 본다. 서버 배포물의 CLI 자리에 잠금 계약만 흉내 내는
- * 시험용 CLI(testing/fake-server-cli.mjs)를 넣는다. 실제 배포물로 도는 확인은 `pnpm --filter @factory/desktop smoke`.
- */
-
 const FAKE_CLI = fileURLToPath(new URL("./testing/fake-server-cli.mjs", import.meta.url));
 
 let dir: string;
@@ -92,9 +87,7 @@ afterEach(async () => {
     for (const target of [-pid, pid]) {
       try {
         process.kill(target, "SIGKILL");
-      } catch {
-        // 이미 끝났다.
-      }
+      } catch {}
     }
   }
   await sleep(50);
@@ -108,7 +101,6 @@ describe("LocalServer", () => {
     expect(events("init")).toHaveLength(1);
     const [pid] = events("start");
     if (pid === undefined) throw new Error("start missing");
-    // detached: 새 세션의 리더라 그룹 ID 가 자기 pid 다. 앱(이 시험 프로세스)의 그룹과 다르다.
     const pgid = Number(
       spawnSync("ps", ["-o", "pgid=", "-p", String(pid)], { encoding: "utf8" }).stdout,
     );
@@ -124,7 +116,6 @@ describe("LocalServer", () => {
     const first = await server().ensureRunning();
     if (first.kind !== "running") throw new Error(JSON.stringify(first));
 
-    // 앱이 끝났다가 다시 열린 것: 새 LocalServer 가 같은 기록 파일을 읽는다.
     const reopened = await server().ensureRunning();
     expect(reopened).toMatchObject({ kind: "running", replaced: false, status: { owner: "app" } });
     if (reopened.kind !== "running") return;
@@ -138,7 +129,6 @@ describe("LocalServer", () => {
     const [ra, rb] = await Promise.all([a.ensureRunning(), b.ensureRunning()]);
     if (ra.kind !== "running" || rb.kind !== "running") throw new Error(JSON.stringify([ra, rb]));
     expect(ra.status.pid).toBe(rb.status.pid);
-    // 잠금을 쥔 start 만 worker 를 띄운다. 진 쪽은 잠금에서 거절돼 끝났다.
     expect(events("start")).toHaveLength(1);
     expect(workerPids().filter(alive)).toHaveLength(1);
     expect([ra.status.owner, rb.status.owner].toSorted()).toEqual(["app", "external"]);
@@ -198,14 +188,12 @@ describe("LocalServer", () => {
     expect(after.status.pid).not.toBe(oldPid);
     expect(alive(oldPid)).toBe(false);
 
-    // 옛 start 가 멈춘(stop) 뒤에 새 start 가 잠금을 쥐었다(start).
     const log = readFileSync(join(home, "events.log"), "utf8");
     const stopAt = Number(/^stop \d+ (\d+)$/m.exec(log)?.[1]);
     const startAt = Number(new RegExp(`^start ${after.status.pid} (\\d+)$`, "m").exec(log)?.[1]);
     expect(stopAt).toBeLessThanOrEqual(startAt);
     expect(workerPids().filter(alive)).toHaveLength(1);
 
-    // 같은 서버 코드로 다시 열면 바꾸지 않는다.
     expect(
       await server({ bundle: { cliEntry: FAKE_CLI, buildId: "build-b" } }).ensureRunning(),
     ).toMatchObject({ kind: "running", replaced: false, status: { pid: after.status.pid } });
@@ -225,7 +213,6 @@ describe("LocalServer", () => {
       spawnedAt: "2000-01-01T00:00:00.000Z",
       root: dirname(FAKE_CLI),
     });
-    // 전원이 꺼져 남은 잠금도 같은 pid 를 가리킨다.
     mkdirSync(home, { recursive: true });
     writeFileSync(
       join(home, "server.lock"),
@@ -255,7 +242,6 @@ describe("LocalServer", () => {
     others.push(service);
     while (!(await responds())) await sleep(50);
     if (service.pid === undefined) throw new Error("no pid");
-    // 앱이 예전(재부팅 전)에 같은 pid 로 ②를 띄웠다는 기록. 서버 코드도 달라 버전 교체 조건에 걸린다.
     const records = fileRecordStore(join(dir, "app", "server-process.json"));
     records.write({
       pid: service.pid,

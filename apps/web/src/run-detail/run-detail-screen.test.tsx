@@ -40,7 +40,6 @@ function render(page: RunDetailPage, timeZone?: string): string {
   );
 }
 
-/** 태그를 지운 글 */
 function text(html: string): string {
   return html
     .replace(/<[^>]+>/g, " ")
@@ -48,7 +47,6 @@ function text(html: string): string {
     .replace(/\s+/g, " ");
 }
 
-/** 속성 칸 하나의 값(dt 다음 dd 의 글) */
 function valueOf(html: string, label: string): string | undefined {
   const after = html.split(`>${label}</dt>`)[1];
   return after === undefined ? undefined : text(after.split("</dd>")[0] ?? "").trim();
@@ -137,7 +135,6 @@ describe("Run 상세 화면", () => {
     updateRunRecords(db, id, { unreachableSince: minutes(40) });
     const body = text(render(page(db, id)));
     expect(body).toContain(domain.runState.disconnected);
-    // T0 + 40분 = 09:40 (UTC)
     expect(body).toContain("09:40부터 러너에 닿지 않아요");
     expect(body).toContain(runJson.timeline.unreachable);
   });
@@ -148,7 +145,6 @@ describe("Run 상세 화면", () => {
     if (id === undefined) throw new Error("no ACME-12");
     updateRunRecords(db, id, { unreachableSince: minutes(40) });
     const detail = page(db, id);
-    // T0 + 40분 = UTC 09:40 = 서울 18:40 = 로스앤젤레스 01:40
     expect(text(render(detail))).toContain("09:40부터 러너에 닿지 않아요");
     expect(text(render(detail, "Asia/Seoul"))).toContain("18:40부터 러너에 닿지 않아요");
     expect(text(render(detail, "America/Los_Angeles"))).toContain("01:40부터 러너에 닿지 않아요");
@@ -240,7 +236,6 @@ describe("Run 상세 화면", () => {
     const html = render(page(db, id));
     expect(html).not.toContain('name="answer"');
     expect(text(html)).toContain(runJson.next.answered);
-    // 다시 읽어도 카드를 두고 결과 문장을 role="status" 로 알린다(0051)
     expect(html).toMatch(new RegExp(`role="status"[^>]*>${runJson.question.sent}<`));
   });
 
@@ -323,7 +318,6 @@ describe("Run 상세 화면", () => {
     expect(buttons.find((b) => b.label === runJson.cancel.trigger)?.variant).toBe("danger");
     expect(buttons.some((b) => b.variant === "other")).toBe(false);
 
-    // 다른 상태의 런도 주 버튼이 하나를 넘지 않는다.
     const extra = addExtraEnded(db);
     for (const id of [...ids.values(), ...extra.values()]) {
       const primaries = buttonsOf(render(page(db, id))).filter((b) => b.variant === "primary");
@@ -378,9 +372,7 @@ describe("Run 상세 화면", () => {
     recordRunQuestions(db, id, [
       { id: toQuestionId("q-1"), body: "계속할까요?", options: [], askedAt: minutes(50) },
     ]);
-    // 질문은 T0 + 50분, 서버가 읽은 때는 T0 + 120분
     expect(text(render(page(db, id)))).toContain("Question 1시간 10분째 답을 기다려요");
-    // 질문이 둘 기다리면 먼저 받은 질문을 보이고 그 시각부터 잰다
     recordRunQuestions(db, id, [
       { id: toQuestionId("q-2"), body: "나중 질문", options: [], askedAt: minutes(100) },
     ]);

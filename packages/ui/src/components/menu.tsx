@@ -15,21 +15,9 @@ import { colors, fontWeight, motion, radius, space } from "../tokens.stylex";
 import { CheckIcon, ChevronDownIcon } from "./icons";
 import { popupStyles } from "./popup-styles";
 
-/*
- * 메뉴: 누르면 열리는 행동 목록. 사이드바의 Workspace 전환기처럼
- * 하나를 고르는 메뉴는 MenuRadio, 행동 목록은 MenuItem 을 쓴다.
- * 폼 안에서 값을 고르는 곳은 Select 를 쓴다.
- */
-
 export interface MenuProps {
-  /** 트리거 안 내용. 흐린 라벨과 현재 값을 함께 넣을 수 있다. */
   trigger: ReactNode;
-  /** 트리거의 접근 가능한 이름(트리거 글만으로 뜻이 모자랄 때). */
   label?: string;
-  /**
-   * 트리거 모양. default 는 테두리 있는 한 줄과 펼침 화살표.
-   * rail 은 아이콘 레일 맨 위 Workspace 바꾸기(ADR 0010 11번): 테두리·화살표 없이 위아래로 쌓고 메뉴를 오른쪽에 연다.
-   */
   variant?: "default" | "rail";
   children: ReactNode;
 }
@@ -99,7 +87,6 @@ export interface MenuRadioProps<T extends string> {
   children: ReactNode;
 }
 
-/** 하나를 고르는 메뉴 묶음. 고른 항목에 체크 표시가 붙는다. */
 export function MenuRadio<T extends string>({ value, onValueChange, children }: MenuRadioProps<T>) {
   return (
     <MenuRadioGroup<T>

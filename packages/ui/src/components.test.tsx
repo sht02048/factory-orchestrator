@@ -37,7 +37,6 @@ describe("서버 렌더", () => {
     const html = (variant?: "primary" | "secondary" | "danger" | "ghost") =>
       renderToString(<Button {...(variant === undefined ? {} : { variant })}>시작</Button>);
     expect(html("primary")).toContain('type="button"');
-    // 기본은 보조 버튼이다.
     expect(html()).toEqual(html("secondary"));
     const classes = new Set(["primary", "secondary", "danger", "ghost"] as const);
     expect(new Set([...classes].map((v) => html(v))).size).toBe(4);
@@ -70,7 +69,6 @@ describe("서버 렌더", () => {
     expect(html).toContain("Human Check");
     expect(html).toContain('data-tone="check"');
     expect(html).toContain('aria-hidden="true"');
-    // 색이 다르면 클래스가 다르다.
     const failed = renderToString(<StatusPill status="failed">Human Check</StatusPill>);
     expect(failed.replace(/data-[a-z]+="[^"]*"/g, "")).not.toEqual(
       html.replace(/data-[a-z]+="[^"]*"/g, ""),
@@ -99,7 +97,6 @@ describe("서버 렌더", () => {
     const plain = renderToString(<Row interactive={false}>시작했어요</Row>);
     const hover = renderToString(<Row>시작했어요</Row>);
     expect(plain).toMatch(/^<div/);
-    // 기본 행(누를 수 있는 내용을 담은 행)과 누를 수 없는 행은 다른 클래스(hover 면)를 갖는다
     expect(classOf(plain)).not.toEqual(classOf(hover));
   });
 

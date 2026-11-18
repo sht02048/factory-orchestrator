@@ -44,21 +44,11 @@ import { DEMO_WEBHOOK_ADDRESS, DEMO_WEB_ADDRESS, PREFILL } from "./values.js";
 import { CODE_HOST_KIND, RUNNER_KIND, TRACKER_KIND } from "./world.js";
 import type { DemoWorld } from "./world.js";
 
-/*
- * 미리 채운 모드의 시드(티켓 0047). 온보딩을 마친 설치와, 런의 모든 상태와 지난 2주의 끝난 런을 DB 에 쓴다.
- * worker 가 하는 일(시작, 질문 기록, 끝내기)을 db 진입점으로 직접 쓴다. 가짜 러너·코드 호스트의 상태는
- * 쓰지 않는다. 띄울 때마다 DB 에서 다시 만든다(hydrate.ts).
- *
- * 값은 가상 값만 쓰고(ADR 0005), 지난 런은 고정 씨앗의 난수로 만들어 띄울 때마다 같은 모양이다.
- */
-
 const HOUR = 3_600_000;
 const MINUTE = 60_000;
 const DAY = 24 * HOUR;
-/** 통계에 보일 지난 기간 */
 export const HISTORY_DAYS = 14;
 
-/** 시드가 만든 진행 중인 런. 시험과 스크린샷이 찾는다 */
 export interface SeededRuns {
   queued: RunId[];
   running: RunId[];
@@ -73,8 +63,6 @@ export async function seedDemo(
   world: DemoWorld,
   now: Date,
 ): Promise<SeededRuns> {
-  // 가짜 러너 확인은 비동기라 먼저 읽고, 쓰기는 한 트랜잭션으로 한다. 중간에 실패하면 아무것도 남지 않아
-  // 다음 실행이 반쯤 채운 DB 를 시드를 마친 것으로 보지 않는다.
   const checks = await Promise.all(
     seededRunners.map(async (runner) => {
       const fake = world.runner(runner.sshTarget);
@@ -84,7 +72,6 @@ export async function seedDemo(
   );
   return inTransaction(db, () => {
     seedSettings(db, box, now);
-    // 지난 런은 러너 상태와 상관없이 고른 러너로 만든다. 그동안은 모든 러너를 멀쩡하게 두고, 뒤에 실제 확인 결과를 쓴다.
     for (const runner of seededRunners) {
       recordRunnerCheck(db, {
         runnerId: runner.id,
@@ -113,8 +100,6 @@ export async function seedDemo(
 }
 
 function seedSettings(db: Database, box: SecretBox, now: Date): void {
-  // 다른 기기에서 열 주소와 webhook 공개 주소(티켓 0048). 온보딩 1단계·Settings 의 주소가 채워져 보인다.
-  // 가상 주소라 Host 검사는 127.0.0.1·localhost·WEB_HOST(바인드 주소)로 연 개발 서버를 그대로 받는다.
   saveInstallAddresses(
     db,
     { webAddress: DEMO_WEB_ADDRESS, webhookAddress: DEMO_WEBHOOK_ADDRESS },
@@ -183,15 +168,12 @@ function seedSettings(db: Database, box: SecretBox, now: Date): void {
   }
 }
 
-// ---------- 런 만들기 ----------
-
 interface Ticket {
   connection: (typeof seededConnections)[number];
   project: (typeof seededConnections)[number]["spec"]["projects"][number];
   key: TicketKey;
 }
 
-/** 시드 연결의 티켓을 키로 찾는다. 키는 fixtures.ts trackerCatalog 와 같은 규칙이다 */
 function ticket(prefix: string, n: number): Ticket {
   for (const connection of seededConnections) {
     if (connection.spec.keyPrefix !== prefix) continue;
@@ -224,7 +206,6 @@ function assign(
   return { id: result.run.id, worktreeName: result.run.worktreeName };
 }
 
-/** 가짜 러너(FakeRunner.startRun)와 같은 모양으로 시작한 값을 쓴다 */
 function start(db: Database, runId: RunId, worktreeName: string, at: Date): void {
   ok(
     changeRunState(
@@ -253,7 +234,6 @@ interface Ending {
   prState: PrState;
 }
 
-/** 시작한 런을 끝내고 worker 뒤처리(댓글, PR, 워크트리 정리)를 마친 것으로 기록한다 */
 function end(
   db: Database,
   runId: RunId,
@@ -277,7 +257,6 @@ function end(
   );
   updateRunRecords(db, runId, {
     trackerComment: { id: toCommentId(`demo-comment-${runId}`), at },
-    // 워크트리를 남길지는 요약 계산 함수가 정한다(CODING_STANDARDS). 남기는 런만 지운 시각이 없다.
     worktreeRemovedAt:
       summarizeRunOutcome({ ...ending, runnerUnreached: false }).worktree ===
       "keep-until-pr-settles"
@@ -298,7 +277,6 @@ function end(
   });
 }
 
-/** 진행 중인 런(seedActive)이 쓰는 티켓 번호. 지난 런은 이 번호를 쓰지 않는다 */
 const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 21, 22, 23], GLX: [2] };
 const HISTORY_TICKETS = [
   range(1, 35).filter((n) => !ACTIVE_TICKETS.ACME.includes(n)),
@@ -309,7 +287,6 @@ function range(from: number, to: number): number[] {
   return Array.from({ length: to - from + 1 }, (_, i) => from + i);
 }
 
-/** 지난 2주의 끝난 런. 통계(처리량, 결과 비율, 걸린 시간)가 의미 있게 보일 만큼 만든다 */
 function seedHistory(db: Database, now: Date): void {
   const random = mulberry32(47);
   const pick = <T>(items: ReadonlyArray<T>): T => {
@@ -321,7 +298,6 @@ function seedHistory(db: Database, now: Date): void {
   let prNumber = 100;
   for (let daysAgo = HISTORY_DAYS; daysAgo >= 0; daysAgo -= 1) {
     const dayStart = startOfDay(now).getTime() - daysAgo * DAY;
-    // 주말은 적게
     const weekday = new Date(dayStart).getUTCDay();
     const count =
       weekday === 0 || weekday === 6 ? 1 + Math.floor(random() * 2) : 3 + Math.floor(random() * 5);
@@ -329,10 +305,8 @@ function seedHistory(db: Database, now: Date): void {
       const assignedAt = new Date(dayStart + (8 + random() * 10) * HOUR);
       const startedAt = new Date(assignedAt.getTime() + (1 + random() * 6) * MINUTE);
       const endedAt = new Date(startedAt.getTime() + (8 + random() * 80) * MINUTE);
-      // 오늘 아직 오지 않은 시각은 만들지 않는다
       if (endedAt.getTime() > now.getTime() - 30 * MINUTE) continue;
       const prefix = random() < 0.75 ? "ACME" : "GLX";
-      // 진행 중인 런(seedActive)의 티켓은 피한다. 같은 티켓의 지난 PR 이 진행 중인 런의 PR 로 잡힌다.
       const t = ticket(prefix, pick(HISTORY_TICKETS[prefix === "ACME" ? 0 : 1]));
       const run = assign(db, t, {
         at: assignedAt,
@@ -361,18 +335,15 @@ function seedHistory(db: Database, now: Date): void {
   }
 }
 
-/** 진행 중인 런과 오늘 끝난 런. 모든 런 상태와 요약 결과가 하나 이상 있다 */
 function seedActive(db: Database, now: Date): SeededRuns {
   const [runnerA, runnerB, runnerC] = seededRunners;
   const ago = (minutes: number) => new Date(now.getTime() - minutes * MINUTE);
 
-  // Running: runner-a 와, GitHub 인증이 깨지기 전에 시작한 runner-b
   const running = [
     startedRun(db, ticket("ACME", 1), runnerA.id, ago(25), ago(24)),
     startedRun(db, ticket("ACME", 21), runnerB.id, ago(50), ago(48)),
   ];
 
-  // Waiting for Input(질문)
   const question = startedRun(db, ticket("ACME", 2), runnerA.id, ago(40), ago(39));
   ok(changeRunState(db, question, { to: "waiting-for-input" }, ago(12)));
   recordRunQuestions(db, question, [
@@ -384,7 +355,6 @@ function seedActive(db: Database, now: Date): SeededRuns {
     },
   ]);
 
-  // Waiting for Input(권한 대기)
   const permission = startedRun(db, ticket("ACME", 22), runnerA.id, ago(35), ago(34));
   ok(changeRunState(db, permission, { to: "waiting-for-input" }, ago(6)));
   recordPermissionWaits(db, permission, [
@@ -395,18 +365,15 @@ function seedActive(db: Database, now: Date): SeededRuns {
     },
   ]);
 
-  // Disconnected: Offline 러너에서 돌던 런
   const disconnected = startedRun(db, ticket("ACME", 23), runnerC.id, ago(45), ago(44));
   updateRunRecords(db, disconnected, { unreachableSince: ago(20) });
   ok(changeRunState(db, disconnected, { to: "disconnected" }, ago(15)));
 
-  // Queued: runner-a 가 가득 찼고(capacity 3) 다른 러너는 받을 수 없어 기다린다
   const queued = [
     assign(db, ticket("ACME", 3), { at: ago(8), runnerId: null }).id,
     assign(db, ticket("GLX", 2), { at: ago(4), runnerId: null }).id,
   ];
 
-  // 오늘 끝난 런: 요약 결과 넷
   const endings: Array<[number, Ending]> = [
     [4, { agentResult: "reported-success", prState: "merged" }],
     [5, { agentResult: "reported-success", prState: "open" }],
@@ -441,7 +408,6 @@ function startOfDay(date: Date): Date {
   return day;
 }
 
-/** 고정 씨앗 난수(mulberry32). 띄울 때마다 같은 지난 런을 만든다 */
 function mulberry32(seed: number): () => number {
   let a = seed;
   return () => {

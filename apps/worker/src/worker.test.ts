@@ -34,7 +34,6 @@ function worktreeOf(run: StoredRun): WorktreeRef {
   return found.worktree;
 }
 
-/** 에이전트가 완료 보고를 보낸다(Q82.2). */
 function finish(run: StoredRun, outcome: CompletionReport["outcome"] = "succeeded"): void {
   const found = current(run);
   if (found.state === "queued" || found.runnerId === null || found.worktree === null) {
@@ -59,7 +58,6 @@ describe("대기열과 capacity", () => {
     ]);
     expect(h.runner(runnerA).runs.size).toBe(2);
 
-    // 다음 바퀴에도 capacity가 차 있으면 시작하지 않는다.
     await worker.tick();
     expect(stateOf(third)).toBe("queued");
 
@@ -70,7 +68,6 @@ describe("대기열과 capacity", () => {
       "running",
       "running",
     ]);
-    // 끝난 런의 워크트리는 지웠다(요약 Failed, PR 없음).
     expect(h.runner(runnerA).startCalls).toHaveLength(3);
     expect(h.runner(runnerA).runs.size).toBe(2);
   });
@@ -121,7 +118,6 @@ describe("두 축 기록", () => {
     h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
     const worker = h.worker();
-    // 만든 어댑터는 다시 쓰므로 처음 만들 때부터 실패하게 둔다(시작한 바퀴에도 PR을 폴링한다).
     h.codeHostBroken = true;
     await worker.tick();
     h.putPullRequest(current(run), "open");
@@ -217,7 +213,6 @@ describe("엄격한 FIFO", () => {
     await worker.tick();
     expect(current(waiting)).toMatchObject({ state: "queued", runnerId: null });
     expect(stateOf(behind)).toBe("running");
-    // 닿지 않는 러너의 런은 그대로 둔다(연결 끊김 처리는 0016).
     expect(stateOf(busy)).toBe("running");
   });
 });
@@ -255,7 +250,6 @@ describe("시작 멱등과 실제 브랜치 (Q82.6)", () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 2, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
 
-    // 러너는 시작했지만 응답이 데몬에 닿지 않았다.
     h.runner(runnerA).loseNextStartResponse = true;
     const first = h.worker();
     await first.tick();
@@ -355,7 +349,6 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     const fake = h.runner(runnerA);
     const worker = h.worker();
 
-    // 첫 시도와 다시 시도 셋. 실패하는 동안 맨 앞 런이 뒤 런을 막는다.
     const behindStates: string[] = [];
     for (let attempt = 0; attempt <= MAX_START_RETRIES; attempt += 1) {
       fake.failNextStart = { kind: "runner-error", code: "boom", message: "boom" };
@@ -383,7 +376,6 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
     const fakeA = h.runner(runnerA);
-    // 러너는 시작했지만 출력을 읽을 수 없었던 경우를 흉내 낸다.
     fakeA.loseNextStartResponse = true;
     const startRun = fakeA.startRun.bind(fakeA);
     let first = true;
@@ -460,7 +452,6 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
       startRequestedAt: null,
     });
 
-    // 다시 해 볼 시각이 지나 맞는 러너가 닿으면 원래 자리로 돌아와 시작한다.
     h.advance(START_UNREACHABLE_RETRY_MS);
     await worker.tick();
     expect(current(head)).toMatchObject({ state: "running", runnerId: runnerA });
@@ -475,7 +466,6 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     const worker = h.worker();
 
     await worker.tick();
-    // 러너 확인 전이라 DB에는 A가 아직 Online이다. 다시 A를 고를 수 있지만, 닿지 않으면 다시 비운다.
     h.setRunnerOnline(runnerA, false);
     await worker.tick();
     expect(current(run)).toMatchObject({ state: "running", runnerId: runnerB });
@@ -533,7 +523,6 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     expect(current(other)).toMatchObject({ state: "running", runnerId: runnerB });
     expect([stateOf(first), stateOf(second)]).toEqual(["queued", "queued"]);
 
-    // 다시 해 볼 시각이 지나고 러너가 돌아오면 원래 순서로 시작한다.
     h.runner(runnerA).online = true;
     h.advance(START_UNREACHABLE_RETRY_MS);
     await worker.tick();
@@ -549,7 +538,6 @@ describe("시작 실패와 시작할 수 없음 (Q82.16·Q86)", () => {
     const fakeA = h.runner(runnerA);
     const worker = h.worker();
 
-    // 러너 A는 시작했지만 응답을 잃었다. 다음 바퀴에는 A에 닿지 않는다(DB에는 아직 Online).
     fakeA.loseNextStartResponse = true;
     await worker.tick();
     fakeA.online = false;

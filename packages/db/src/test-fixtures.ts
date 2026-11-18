@@ -33,7 +33,6 @@ export const repoA = toRunnerProjectId("github:acme/a");
 export const repoB = toRunnerProjectId("github:acme/b");
 export const agent = toAgentId("claude");
 
-/** 임시 디렉터리의 DB 파일. 테스트가 끝나면 `cleanup`을 부른다. */
 export function tempDatabasePath(): { path: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), "factory-db-"));
   return {
@@ -42,7 +41,6 @@ export function tempDatabasePath(): { path: string; cleanup: () => void } {
   };
 }
 
-/** 마이그레이션한 메모리 DB에 트래커 연결 하나, Workspace 하나, 매핑 하나를 넣는다. */
 export function seededDatabase(): Database {
   const db = openDatabase(":memory:");
   migrate(db);

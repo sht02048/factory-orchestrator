@@ -20,10 +20,6 @@ import {
 } from "./receive";
 import type { WebhookContext, WebhookLogger, WebhookRequest } from "./receive";
 
-/**
- * research 0005 픽스처(0011이 받은 webhook 본문을 가상 값으로 바꾸고 `fixture-signing-secret`으로
- * 다시 서명한 것). 본문은 서명한 바이트 그대로 읽는다.
- */
 const FIXTURE_DIR = new URL("../../../../docs/research/fixtures/0005/", import.meta.url);
 const SECRET = "fixture-signing-secret";
 
@@ -41,7 +37,6 @@ function fixture(name: string): { rawBody: Uint8Array; headers: Record<string, s
 }
 
 const labelAdded = fixture("issue-update-label-added");
-/** 픽스처의 보낸 시각(본문 webhookTimestamp와 같다) 0.5초 뒤에 받은 것으로 한다. */
 const receivedAt = new Date(Number(labelAdded.headers["linear-timestamp"]) + 500);
 
 interface LogEntry {
@@ -54,7 +49,6 @@ function memoryLogger(): WebhookLogger & { entries: LogEntry[] } {
   return { entries, warn: (message, fields = {}) => entries.push({ message, fields }) };
 }
 
-/** 테스트에서 본문 시간 제한. 실제 기본값(5초)을 기다리지 않는다. */
 const TEST_BODY_TIMEOUT_MS = 50;
 
 function setup(): WebhookContext & { logger: ReturnType<typeof memoryLogger> } {
@@ -102,7 +96,6 @@ function request(
   };
 }
 
-/** 끝없이 바이트를 내는 본문. 얼마나 읽혔는지와 끊겼는지를 센다. */
 function endlessBody(chunkBytes: number) {
   const seen = { pulled: 0, canceled: false };
   const body = new ReadableStream<Uint8Array>({
@@ -117,7 +110,6 @@ function endlessBody(chunkBytes: number) {
   return { body, seen };
 }
 
-/** 조각을 `intervalMs`마다 1바이트씩 끝없이 흘려 보내는 본문(느린 요청). */
 function tricklingBody(intervalMs: number) {
   const seen = { pulled: 0, canceled: false };
   const body = new ReadableStream<Uint8Array>(
@@ -136,7 +128,6 @@ function tricklingBody(intervalMs: number) {
   return { body, seen };
 }
 
-/** 헤더만 보내고 본문 바이트를 하나도 보내지 않는 요청. */
 function silentBody() {
   const seen = { canceled: false };
   const body = new ReadableStream<Uint8Array>({
@@ -313,7 +304,6 @@ describe("receiveTrackerWebhook", () => {
     const expected = await outside(missing);
     expect(await outside(badSignature)).toEqual(expected);
     expect(await outside(stale)).toEqual(expected);
-    // 안쪽 기록은 이유를 구분한다.
     expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual([
       "unknown-connection",
       "bad-signature",
@@ -328,13 +318,11 @@ describe("receiveTrackerWebhook", () => {
 
     const response = await send(context, acme, { headers: new Headers(labelAdded.headers), body });
 
-    // 연결이 없을 때와 구별되지 않게 다른 검증 실패와 같은 401이다. 이유는 기록에 남는다.
     expect(response.status).toBe(401);
     expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual([
       "body-too-large",
     ]);
     expect(seen.canceled).toBe(true);
-    // 상한을 넘긴 조각에서 멈춘다. 스트림이 미리 당겨 둔 조각 몇 개만 더 읽힐 수 있다.
     expect(seen.pulled).toBeLessThanOrEqual(MAX_WEBHOOK_REQUEST_BYTES + 4 * chunk);
     expect(stored(context)).toEqual([]);
   });
@@ -370,7 +358,6 @@ describe("receiveTrackerWebhook", () => {
 
     const response = await send(context, acme, request(padded, labelAdded.headers));
 
-    // 공백을 덧붙여 서명이 맞지 않는다. 크기에서 막히지 않고 서명 검사까지 갔다는 뜻이다.
     expect(response.status).toBe(401);
     expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual([
       "bad-signature",
@@ -390,7 +377,6 @@ describe("receiveTrackerWebhook", () => {
 
     expect(response.status).toBe(401);
     expect(seen.canceled).toBe(true);
-    // 조각이 계속 와도 시간이 늘지 않는다. 본문 전체에 시간을 준다.
     expect(Date.now() - started).toBeLessThan(TEST_BODY_TIMEOUT_MS * 10);
     expect(context.logger.entries.map((entry) => entry.fields["reason"])).toEqual(["body-timeout"]);
     expect(stored(context)).toEqual([]);
@@ -430,7 +416,6 @@ describe("receiveTrackerWebhook", () => {
 
   it("연결의 비밀값을 열지 못하면 기록하고 내용 없는 500으로 응답한다", async () => {
     const context = setup();
-    // 다른 암호화 키로 연다. 키를 바꾼 뒤 옛 DB를 쓰는 경우다.
     const wrongKey = { ...context, secretBox: new SecretBox(new Uint8Array(32).fill(9)) };
     const { body, seen } = endlessBody(1024);
 
@@ -448,7 +433,6 @@ describe("receiveTrackerWebhook", () => {
 
   it("연결 종류의 어댑터를 만들지 못하면 기록하고 내용 없는 500으로 응답한다", async () => {
     const context = setup();
-    // 등록표에 그 종류가 없다. 어댑터 설정 오류도 같은 길로 간다.
     const noAdapters = { ...context, registry: new AdapterRegistry() };
 
     const response = await send(noAdapters, acme, request(labelAdded.rawBody, labelAdded.headers));

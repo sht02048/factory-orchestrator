@@ -17,7 +17,6 @@ const failure = vi.hoisted(() => ({
   markTrackerEventProcessedFailures: 0,
 }));
 
-// 정한 횟수만큼 DB 쓰기를 실패하게 한다(쓰기 잠금 시간 초과 같은 경우).
 vi.mock("@factory/db", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@factory/db")>();
   return {
@@ -101,7 +100,6 @@ describe("러너에서 시작한 뒤 DB 쓰기 실패", () => {
     const second = h.assign("ENG-2", projectA);
     const worker = h.worker();
 
-    // 첫 런의 Running 쓰기가 두 번(시작 직후, 다음 바퀴 첫 기록) 실패한다.
     failure.changeRunStateFailures = 2;
     await worker.tick();
     await worker.tick();
@@ -145,7 +143,6 @@ describe("에이전트를 멈춘 뒤 DB 쓰기 실패", () => {
     expect(getRun(h.db, run.id)?.state).toBe("running");
     expect(stopAgent).toHaveBeenCalledTimes(1);
 
-    // 멈춘 에이전트는 러너에서 보고 없이 사라진 것으로 보인다.
     await worker.tick();
     expect(getRun(h.db, run.id)).toMatchObject({ state: "ended", agentResult: "timed-out" });
     expect(stopAgent).toHaveBeenCalledTimes(1);

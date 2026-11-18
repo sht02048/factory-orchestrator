@@ -22,27 +22,12 @@ import {
   space,
 } from "../tokens.stylex";
 
-/*
- * 화면 위에 띄우는 확인 창. 되돌릴 수 없는 행동(지우기, 연결 끊기)을 확인할 때만 쓴다.
- * 편집은 다이얼로그 대신 상세 패널이나 Settings 의 편집 영역에서 한다(ADR 0007).
- *
- * <Dialog
- *   trigger="지우기"
- *   title="Mapping 을 지울까요?"
- *   description="이 Mapping 으로 들어오던 티켓은 더 할당되지 않아요."
- *   actions={<><DialogClose>취소</DialogClose><DialogClose variant="primary" onClick={remove}>지우기</DialogClose></>}
- * />
- */
-
 export interface DialogProps {
-  /** 여는 버튼의 글. */
   trigger: ReactNode;
   triggerVariant?: ButtonVariant;
   title: ReactNode;
   description?: ReactNode;
-  /** 본문(선택). 폼 칸 등. */
   children?: ReactNode;
-  /** 맨 아래 버튼 줄. DialogClose 를 넣는다. 주 버튼을 마지막에 둔다. */
   actions: ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -89,7 +74,6 @@ export interface DialogCloseProps {
   onClick?: () => void;
 }
 
-/** 다이얼로그를 닫는 버튼. onClick 을 먼저 부른 뒤 닫는다. */
 export function DialogClose({ variant = "secondary", children, onClick }: DialogCloseProps) {
   return (
     <SdkDialogClose

@@ -61,7 +61,6 @@ function unreachableSince(run: StoredRun): Date | null {
   return getRunWithRecords(h.db, run.id)?.records.unreachableSince ?? null;
 }
 
-/** 러너 하나에 런 하나를 시작한다. */
 async function startOne(): Promise<{ run: StoredRun; runnerId: RunnerId; worker: Worker }> {
   const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
   const run = h.assign("ENG-1", projectA);
@@ -72,7 +71,6 @@ async function startOne(): Promise<{ run: StoredRun; runnerId: RunnerId; worker:
   return { run, runnerId, worker };
 }
 
-/** 런이 끝나면 worker가 워크트리를 지워 가짜 러너에서 런이 빠지므로 처음 찾은 것을 기억한다. */
 const agents = new Map<string, FakeRunnerRun>();
 
 function agentOf(run: StoredRun, runnerId: RunnerId): FakeRunnerRun {
@@ -83,7 +81,6 @@ function agentOf(run: StoredRun, runnerId: RunnerId): FakeRunnerRun {
   return agent;
 }
 
-/** 러너에 ssh가 닿지 않게 한다. DB의 러너 상태는 바꾸지 않는다(연결 끊김은 런 감시가 판단한다). */
 function cutSsh(runnerId: RunnerId, cut = true): void {
   h.runner(runnerId).online = !cut;
 }
@@ -111,7 +108,6 @@ describe("입력 기다림", () => {
       expect.objectContaining({ id: questionId, body: "어느 쪽으로 할까요?", options: ["A", "B"] }),
     ]);
 
-    // 답이 없으면 계속 기다린다.
     await worker.tick();
     expect(stateOf(run)).toBe("waiting-for-input");
 
@@ -123,7 +119,6 @@ describe("입력 기다림", () => {
     expect(agentOf(run, runnerId).answers).toEqual([{ questionId, answer: "A" }]);
     expect(listRunQuestions(h.db, run.id)[0]?.answer?.sentAt).toEqual(h.now);
 
-    // 러너는 질문 메일을 소비하지 않아 다시 와도 다시 보내지 않는다(Q82.5).
     await worker.tick();
     expect(stateOf(run)).toBe("running");
     expect(agentOf(run, runnerId).answers).toHaveLength(1);
@@ -321,7 +316,6 @@ describe("연결 끊김", () => {
     expect(unreachableSince(run)).toBeNull();
     expect(listRunStateChanges(h.db, run.id).map((c) => c.to)).toEqual(["queued", "running"]);
 
-    // 시계가 처음부터 다시 시작한다.
     cutSsh(runnerId);
     await worker.tick();
     h.advance(4 * MINUTE);
@@ -435,7 +429,6 @@ describe("연결 끊김", () => {
     const remove = vi.spyOn(fake, "removeWorktree");
     await disconnect(run, runnerId, worker);
 
-    // 취소를 요청하고 최대 실행 시간이 지나도 멈추거나 지우지 않는다.
     requestRunCancel(h.db, run.id, h.now);
     await worker.tick();
     h.advance(DEFAULT_MAX_RUN_MS);
@@ -483,7 +476,6 @@ describe("실제 상태를 읽지 못함", () => {
       );
     h.advance(DEFAULT_MAX_RUN_MS);
     const stop = vi.spyOn(h.runner(runnerId), "stopAgent");
-    // 멈춘 뒤 두 축 쓰기가 실패한다(쓰기 잠금 등).
     h.db.$client.exec(
       "CREATE TRIGGER fail_end BEFORE UPDATE OF state ON runs BEGIN SELECT RAISE(ABORT, 'locked'); END",
     );
@@ -493,7 +485,6 @@ describe("실제 상태를 읽지 못함", () => {
 
     h.db.$client.exec("DROP TRIGGER fail_end");
     poll.mockRestore();
-    // 멈춘 에이전트는 러너에서 보고 없이 사라진 것으로 보인다.
     await worker.tick();
     expect(ended(run).agentResult).toBe("timed-out");
     expect(stop).toHaveBeenCalledTimes(1);
@@ -641,7 +632,6 @@ describe("취소", () => {
     expect(fake.startCalls).toHaveLength(1);
 
     requestRunCancel(h.db, run.id, h.now);
-    // 취소 처리의 확인은 실패하고, 대기열의 확인은 성공해 시작하지 않았다고 본다.
     vi.spyOn(fake, "findStartedRun")
       .mockRejectedValueOnce(new AdapterError(runnerError("busy")))
       .mockResolvedValue(null);
@@ -657,7 +647,6 @@ describe("취소", () => {
   it("이미 Ended인 런의 요청은 처리하지 않는다", async () => {
     const { run, runnerId, worker } = await startOne();
     requestRunCancel(h.db, run.id, h.now);
-    // 요청을 처리하기 전에 다른 쪽에서 끝났다고 본다.
     h.runner(runnerId).vanish(worktreeOf(run));
     changeRunState(
       h.db,
@@ -683,7 +672,6 @@ describe("러너 상태 확인", () => {
       { id: projectB, displayName: "b", setupState: "ready" },
     ]);
     h.setPushAuth(runnerId, false);
-    // 간격이 지나지 않았으면 다시 확인하지 않는다.
     await worker.tick();
     expect(stored()?.projects.map((p) => p.id)).toEqual([projectA]);
 
@@ -691,14 +679,12 @@ describe("러너 상태 확인", () => {
     await worker.tick();
     expect(stored()).toMatchObject({ online: true, assignmentBlocked: true, checkedAt: h.now });
     expect(stored()?.projects.map((p) => p.id)).toEqual([projectA, projectB]);
-    // 어느 필수 조건이 깨졌는지 하나하나 남긴다(Runners 화면, Q82.15)
     const brokenAuth = stored()?.prerequisites?.filter((p) => p.blocksAssignment);
     expect(brokenAuth?.map((p) => p.satisfied)).toEqual([false]);
 
     cutSsh(runnerId);
     h.advance(RUNNER_CHECK_INTERVAL_MS);
     await worker.tick();
-    // 닿지 않으면 Offline이고, 읽지 못한 프로젝트와 인증은 이전 값을 남긴다.
     expect(stored()).toMatchObject({ online: false, assignmentBlocked: true, checkedAt: h.now });
     expect(stored()?.projects.map((p) => p.id)).toEqual([projectA, projectB]);
     expect(stored()?.prerequisites?.filter((p) => p.blocksAssignment)).toEqual(brokenAuth);
@@ -771,7 +757,6 @@ describe("대기열 맨 앞이 막히지 않음 (0037 남은 위험)", () => {
     await worker.tick();
     expect(ended(head)).toMatchObject({ agentResult: "could-not-start", prState: "none" });
     expect(getRunWithRecords(h.db, head.id)?.records.startError).toContain("ticket-not-found");
-    // 이번 바퀴에 맨 앞 런 몫으로 잡았던 capacity는 다음 바퀴에 뒤 런이 쓴다.
     await worker.tick();
     expect(stateOf(behind)).toBe("running");
   });

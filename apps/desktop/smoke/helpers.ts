@@ -33,10 +33,6 @@ import {
 } from "@factory/db";
 import type { Database } from "@factory/db";
 
-/*
- * 로컬 smoke 시험(티켓 0046)이 함께 쓰는 것. 가상 값만 쓴다(acme, .invalid).
- */
-
 export function freePort(): Promise<number> {
   return new Promise((resolvePort, reject) => {
     const server = createServer();
@@ -49,7 +45,6 @@ export function freePort(): Promise<number> {
   });
 }
 
-/** Electron 실행 파일을 Node 로 돌리는 환경. 셸의 부팅 값은 home 의 .env 를 덮으므로 뺀다 */
 export function nodeEnv(): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
   for (const name of [
@@ -81,7 +76,6 @@ function withDatabase<T>(home: string, run: (db: Database, key: Uint8Array) => T
   }
 }
 
-/** 트래커 연결·Workspace·매핑·러너(닿지 않는 Orca 러너)를 넣는다. 이미 있으면 그대로 둔다 */
 function ensureBase(db: Database, key: Uint8Array): void {
   if (db.$client.prepare("SELECT 1 FROM runners WHERE id = ?").get(runnerId) !== undefined) return;
   const workspaceId = toWorkspaceId("ws-acme");
@@ -101,7 +95,6 @@ function ensureBase(db: Database, key: Uint8Array): void {
     inProgressStateId: null,
   });
   saveMapping(db, { connection, trackerProject, runnerProject, agent: toAgentId("claude") });
-  // `.invalid` 는 이름이 풀리지 않도록 예약된 최상위 도메인이다. worker 의 확인은 Offline 으로 남는다.
   saveRunner(db, {
     id: runnerId,
     kind: toRunnerKind("orca"),
@@ -141,7 +134,6 @@ function startRun(db: Database, key: string): RunId {
   return assigned.run.id;
 }
 
-/** Running 런 하나를 넣는다 */
 export function seedRunningRun(home: string, key = "ACME-1"): RunId {
   return withDatabase(home, (db, encryptionKey) => {
     ensureBase(db, encryptionKey);
@@ -149,10 +141,6 @@ export function seedRunningRun(home: string, key = "ACME-1"): RunId {
   });
 }
 
-/**
- * 알림 시험용 사건(Q4)을 넣는다. Question·Permission 을 기다리는 런, Human Check·Merged·Failed 로 끝난 런.
- * 러너 Offline 은 worker 가 닿지 않는 러너를 확인하며 기록한다.
- */
 export function seedAttention(home: string): void {
   withDatabase(home, (db, encryptionKey) => {
     ensureBase(db, encryptionKey);

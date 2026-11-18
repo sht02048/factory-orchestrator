@@ -1,9 +1,5 @@
 import type { ButtonVariant } from "@factory/ui";
 
-/*
- * 렌더한 HTML 에서 버튼(<button>)과 그 변형을 읽는다. 버튼·Dialog 트리거·DialogClose 는 data-variant 를 붙인다.
- */
-
 export interface RenderedButton {
   variant: ButtonVariant | "other";
   label: string;

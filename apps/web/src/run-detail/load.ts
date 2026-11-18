@@ -38,10 +38,6 @@ import type {
   TimelineEvent,
 } from "./model";
 
-/**
- * Run 상세가 보일 값을 DB 에서 읽는다. 읽기만 하고 쓰지 않는다. 로그 꼬리 요청은 requestRunLogTail 이 남긴다.
- * 요약 결과와 워크트리 처리는 저장하지 않으므로 core summarizeRunOutcome 으로 계산한다(Q66·Q76).
- */
 export function loadRunDetail(db: Database, runId: string, now: Date): RunDetailPage {
   const found = getRunWithRecords(db, toRunId(runId));
   if (found === null) return { kind: "not-found" };
@@ -84,7 +80,6 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     report: records.reportBody,
     startError:
       run.state === "ended" && run.agentResult === "could-not-start" ? records.startError : null,
-    // 취소 중은 끝나지 않은 런의 표시다(Q82.21). 이미 끝났으면 worker 가 그 요청을 처리하지 않는다.
     cancelPending:
       run.state !== "ended" && cancelRequest !== null && cancelRequest.processedAt === null,
     timeline: timelineOf(
@@ -101,11 +96,6 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
   return { kind: "found", run: detail };
 }
 
-/**
- * Run 상세를 열 때 로그 꼬리를 요청한다(Q46·Q61). worker 가 ssh 로 가져와 결과를 DB 에 쓴다.
- * 러너에서 돌고 있는 런만 요청한다. Queued 런은 로그가 없고, Ended 런은 저장한 마지막 200줄을 보인다.
- * 요청을 남겼으면 true 다.
- */
 export function requestRunLogTail(db: Database, runId: string, now: Date): boolean {
   const run = getRun(db, toRunId(runId));
   if (run === null || run.state === "queued" || run.state === "ended") return false;
@@ -146,7 +136,6 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords): RunDetailS
   }
 }
 
-/** 화면이 보이는 그 질문·권한 대기를 받은 시각. 여럿이 함께 기다려도 보이는 것의 시각이다 */
 function inputSinceOf(db: Database, runId: RunId, input: PendingInput): string | null {
   switch (input.kind) {
     case "question":
@@ -166,7 +155,6 @@ function inputSinceOf(db: Database, runId: RunId, input: PendingInput): string |
   }
 }
 
-/** Queued 이유는 Runs 화면과 같은 판단(core planQueue)으로 정한다. 대기열은 설치 전체에 하나다(ADR 0006). */
 function queuedReasonOf(db: Database, runId: RunId): QueuedReason {
   const reasons = explainQueue({
     queued: listRuns(db, { states: ["queued"] }).flatMap((run): QueuedRun[] =>
@@ -177,7 +165,6 @@ function queuedReasonOf(db: Database, runId: RunId): QueuedReason {
               assignedAt: run.assignedAt,
               project: run.runnerProject,
               runnerId: run.runnerId,
-              // 영영 시작할 수 없는 런은 worker 가 다음 바퀴에 끝낸다. 화면은 순서만 본다(Runs 와 같다).
               unstartable: false,
             },
           ]
@@ -192,10 +179,6 @@ function queuedReasonOf(db: Database, runId: RunId): QueuedReason {
   return { kind: "no-capacity", runner: runner?.name ?? code.runnerId };
 }
 
-/**
- * 상태 변경 이력과 기록에서 타임라인을 만든다(Q67). 오래된 것부터 둔다.
- * 같은 시각이면 이력 순서를 지키고, ssh 가 실패하기 시작한 시각은 그 시각 자리에 끼운다.
- */
 function timelineOf(
   run: StoredRun,
   records: RunRecords,
@@ -242,7 +225,6 @@ function timelineOf(
       at: records.laterPrState.at.toISOString(),
     });
   }
-  // toSorted 는 안정 정렬이라 같은 시각이면 넣은 순서를 지킨다.
   return events.toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }
 
@@ -299,13 +281,11 @@ function otherRunsOf(db: Database, run: StoredRun): OtherRun[] {
     });
 }
 
-/** 코드 호스트가 준 CI 값을 화면 값으로 옮긴다. 모르는 값은 unknown 이다(Q79). */
 export function toCiView(ci: CiState): CiView {
   const known: ReadonlyArray<CiView> = ["success", "failure", "pending", "none", "unavailable"];
   return known.find((value) => value === ci) ?? "unknown";
 }
 
-/** 화면에 링크로 거는 PR 주소. 코드 호스트가 준 값이라 http(s) 주소만 건다(javascript: 등을 막는다). */
 function isWebUrl(value: string): boolean {
   if (!URL.canParse(value)) return false;
   const { protocol } = new URL(value);

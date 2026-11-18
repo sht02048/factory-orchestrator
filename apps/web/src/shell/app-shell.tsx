@@ -8,12 +8,6 @@ import { ALL_WORKSPACES } from "./model";
 import type { ShellData, WorkspaceChoice } from "./model";
 import { navIcons } from "./nav-icons";
 
-/*
- * 앱 셸(시안 B, ADR 0010 11번): 왼쪽 아이콘 레일 | 본문.
- * 레일 맨 위에 Workspace 바꾸기, 가운데 메뉴 Home·Tickets·Runs·Runners·Stats, 맨 아래 Settings.
- * Runners 아이콘에는 Runner Issue 개수 점을 단다. 화면 티켓은 라우트만 더하고 셸을 고치지 않는다.
- */
-
 const RAIL_WIDTH = 84;
 
 const menuItems = [
@@ -29,7 +23,6 @@ type NavKey = (typeof menuItems)[number]["key"] | "settings";
 export interface AppShellProps {
   shell: ShellData;
   workspace: WorkspaceChoice;
-  /** 지금 주소의 경로. 레일에서 현재 화면을 표시한다 */
   pathname: string;
   onWorkspaceChange: (ws: string) => void;
   children: ReactNode;
@@ -92,7 +85,6 @@ function RailLink({
   navKey: NavKey;
   to: string;
   current: boolean;
-  /** 0 보다 크면 아이콘에 문제 개수 점을 단다 */
   issues: number;
 }) {
   const t = useTranslations("shell");
@@ -101,7 +93,6 @@ function RailLink({
     <Link
       to={to}
       {...(current ? { "aria-current": "page" } : {})}
-      // 점의 개수는 화면 읽기에도 이름으로 알린다("Runners, Runner Issue 2개")
       {...(issues > 0 ? { "aria-label": t("nav.withIssues", { name, count: issues }) } : {})}
       {...stylex.props(styles.navLink, current && styles.navLinkCurrent)}
     >
@@ -162,7 +153,6 @@ function WorkspaceSwitcher({
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
-/** Workspace 이름의 첫 글자. 영문은 대문자로 */
 function initialOf(name: string): string {
   const [first] = graphemes.segment(name.trim());
   return first?.segment.toUpperCase() ?? "";

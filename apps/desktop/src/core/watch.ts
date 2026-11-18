@@ -1,14 +1,5 @@
 import type { EnsureResult, LocalServer, LocalStatus, Owner } from "./local-server.js";
 
-/*
- * ②의 감시(티켓 0046). 앱이 열려 있는 동안 앱이 띄운 ②가 실패로 끝나면 앱이 다시 띄운다. 앱이 닫혀 있으면
- * 아무도 다시 띄우지 않는다. 24시간 지켜야 하면 launchd·systemd 가 다시 띄우는 ③을 쓴다(README).
- *
- * - 사람이 멈춘 ②(트레이 "서버 멈추기")는 다시 띄우지 않는다.
- * - ③(external)은 서비스 관리자가 다시 띄우므로 앱이 ②를 대신 띄우지 않는다. 두 벌이 잠금을 다투게 된다.
- * - 짧은 시간에 거듭 실패하면 그만 띄우고 "failed" 로 알린다. 설정이 틀린 ②를 끝없이 다시 띄우지 않는다.
- */
-
 export type WatchState =
   | { kind: "running"; owner: Owner; status: Extract<LocalStatus, { state: "running" }> }
   | { kind: "starting"; owner: Owner }
@@ -17,7 +8,6 @@ export type WatchState =
 
 export interface WatchOptions {
   intervalMs?: number;
-  /** windowMs 안에 이만큼 다시 띄워도 안 되면 멈춘다 */
   maxRestarts?: number;
   windowMs?: number;
   now?: () => number;
@@ -57,7 +47,6 @@ export class ServerWatch {
     this.timer = undefined;
   }
 
-  /** 사람이 켜고 끈 뜻을 적는다. 끄면 다시 띄우지 않는다. 켜면 실패 횟수를 지운다 */
   setWanted(wanted: boolean): void {
     this.wanted = wanted;
     if (!wanted) return;
@@ -65,7 +54,6 @@ export class ServerWatch {
     if (this.state.kind === "failed") this.state = { kind: "stopped", owner: this.lastOwner };
   }
 
-  /** ensureRunning·stop 결과를 감시 상태에 반영한다 */
   adopt(result: EnsureResult): void {
     switch (result.kind) {
       case "running":
@@ -82,7 +70,6 @@ export class ServerWatch {
     }
   }
 
-  /** 한 번 살핀다. 시험은 타이머 없이 이것을 부른다 */
   tick(): Promise<void> {
     this.ticking ??= this.check().finally(() => (this.ticking = undefined));
     return this.ticking;

@@ -61,7 +61,6 @@ interface SampleRun {
   ci: "ciPassed" | "ciRunning" | null;
 }
 
-// 가상 값(ADR 0005): 러너·티켓 키·프로젝트는 예시 이름이다. 고유명이라 메시지 파일에 두지 않는다.
 const runs: ReadonlyArray<SampleRun> = [
   {
     id: "r1051",

@@ -1,5 +1,3 @@
-// 컴포넌트 안에서 쓰는 작은 아이콘. 색은 currentColor 를 따른다.
-
 export function ChevronDownIcon() {
   return (
     <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none">

@@ -25,13 +25,6 @@ import { hydrateWorld } from "./hydrate.js";
 import { HISTORY_DAYS, seedDemo } from "./seed.js";
 import { DemoWorld } from "./world.js";
 
-/*
- * 미리 채운 모드의 시드(티켓 0047). 온보딩을 마친 설치로 보이고, 런의 모든 상태와 요약 결과 넷이 있고,
- * 통계에 쓸 지난 2주 런이 있다. 시드를 쓴 DB 에서 worker 가 한 바퀴 돌아도 진행 중인 런이 그대로인지도 본다
- * (가짜 러너를 DB 에서 되살리지 못하면 worker 가 워크트리 없음으로 끝낸다).
- */
-
-// worker 는 실제 시계로 최대 실행 시간을 보므로 시드도 지금을 기준으로 한다.
 const now = new Date();
 const box = new SecretBox(new Uint8Array(32).fill(5));
 
@@ -54,8 +47,6 @@ afterEach(() => {
 describe("seedDemo", () => {
   it("온보딩을 마친 설치를 만든다", async () => {
     await seedDemo(db, box, new DemoWorld(() => now), now);
-    // 온보딩 5단계의 조건(apps/web/src/onboarding/load.ts): 트래커 연결, GitHub 토큰, 러너, Workspace,
-    // "In Progress" 상태·Auto-assign Label 까지 정한 Mapping. 홈이 온보딩으로 보내지 않는 것은 dev.test.ts 가 본다.
     expect(listTrackerConnections(db, box)).toHaveLength(2);
     expect(listCodeHostConnections(db, box)).toHaveLength(1);
     expect(listWorkspaces(db)).toHaveLength(2);
@@ -82,7 +73,6 @@ describe("seedDemo", () => {
     expect(outcomes).toEqual(new Set(["merged", "human-check", "failed", "canceled"]));
     expect(listRunQuestions(db, seeded.question).filter((q) => q.answer === null)).toHaveLength(1);
     expect(listRunPermissionWaits(db, seeded.permission)).toHaveLength(1);
-    // 지난 런은 진행 중인 런의 티켓을 쓰지 않는다. 쓰면 지난 PR 이 진행 중인 런의 PR 로 잡힌다.
     const active = new Set(runs.filter((r) => r.state !== "ended").map((r) => r.ticket.key));
     expect(runs.filter((r) => r.state === "ended" && active.has(r.ticket.key))).toEqual([]);
   });
@@ -113,7 +103,6 @@ describe("seedDemo", () => {
       .filter((run) => run.state !== "ended" && run.state !== "queued")
       .map((run) => [run.ticket.key, run.state]);
 
-    // 다시 띄운 것처럼 새 세계를 DB 에서 만든다
     const fresh = new DemoWorld(() => now);
     hydrateWorld(db, fresh);
     const worker = createWorker({ dbPath, registry: fresh.registry(), secretBox: box });

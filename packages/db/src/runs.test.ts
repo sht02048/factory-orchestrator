@@ -94,7 +94,6 @@ function change(db: Database, id: RunId, to: RunStateChange): void {
   if (!result.ok) throw new Error(`transition failed: ${JSON.stringify(result.error)}`);
 }
 
-/** 런을 원하는 상태까지 옮긴다 */
 function moveTo(db: Database, id: RunId, state: RunState): void {
   if (state === "queued") return;
   change(db, id, { to: "running", started });
@@ -116,7 +115,6 @@ describe("assignRun", () => {
       projects: [repoA, repoB],
     });
 
-    // busy에 런 둘을 올려 남은 capacity를 1로 만든다(roomy는 2).
     for (const key of ["X-1", "X-2"]) {
       const result = assign(db, key, { runnerId: busy });
       if (!result.ok) throw new Error(result.reason);
@@ -157,7 +155,6 @@ describe("assignRun", () => {
       assignmentBlocked: true,
     });
 
-    // 맞는 러너가 모두 인증이 깨졌어도 할당은 받아 러너 없이 Queued로 둔다(Q87).
     expect(assign(db, "ENG-1")).toMatchObject({ ok: true, run: { runnerId: null } });
     expect(assign(db, "ENG-2", { runnerId: broken })).toEqual({
       ok: false,
@@ -294,7 +291,6 @@ describe("Run 테이블과 두 축", () => {
       ...started,
     });
     if (stored?.state !== "ended") throw new Error("not ended");
-    // 요약 결과는 저장하지 않고 core 계산 함수로 얻는다.
     expect(summarizeRunOutcome(stored)).toEqual(
       summarizeRunOutcome({ agentResult, prState, runnerUnreached: false }),
     );
@@ -512,7 +508,6 @@ describe("updateRunRecords", () => {
     } catch (error) {
       caught = error;
     }
-    // Drizzle은 SQLite 오류를 cause에 담아 다시 던진다.
     expect(caught instanceof Error ? String(caught.cause) : "").toMatch(/CHECK/);
   });
 });
@@ -629,7 +624,6 @@ describe("런 취소 요청 (Q77·Q82.8)", () => {
     const id = assignOk(db, "ENG-1");
     const first = new Date("2026-11-17T01:00:00Z");
     requestRunCancel(db, id, first);
-    // 처리 전 두 번째 요청은 처음 요청 시각을 남긴다.
     expect(requestRunCancel(db, id, new Date("2026-11-17T02:00:00Z"))).toEqual({
       ok: true,
       requestedAt: first,
@@ -640,7 +634,6 @@ describe("런 취소 요청 (Q77·Q82.8)", () => {
     const processedAt = new Date("2026-11-17T03:00:00Z");
     expect(markCancelRequestProcessed(db, id, processedAt)).toBe(true);
     expect(markCancelRequestProcessed(db, id)).toBe(false);
-    // 처리한 요청도 남아 Run 상세 타임라인이 요청 시각을 읽는다
     expect(getRunCancelRequest(db, id)).toEqual({ requestedAt: first, processedAt });
     expect(getRunCancelRequest(db, toRunId("missing"))).toBeNull();
     expect(listPendingCancelRequests(db)).toEqual([]);
@@ -664,7 +657,6 @@ describe("질문과 답 요청 (Q82.3·Q82.5)", () => {
     const question = { id: q, body: "A와 B 중 무엇?", options: ["A", "B"], askedAt };
 
     expect(recordRunQuestions(db, id, [question])).toBe(1);
-    // 러너는 메일을 소비하지 않아 같은 질문이 다시 온다.
     expect(recordRunQuestions(db, id, [question])).toBe(0);
     expect(listUnsentAnswers(db)).toEqual([]);
 

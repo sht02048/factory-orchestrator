@@ -5,10 +5,6 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { MAX_WEBHOOK_BODY_BYTES, verifyLinearWebhook } from "./webhook.js";
 
-/**
- * research 0005 픽스처(0011이 받은 webhook 본문을 가상 값으로 바꾸고 `fixture-signing-secret`으로 다시
- * 서명한 것). 본문은 서명한 바이트 그대로 읽는다.
- */
 const FIXTURE_DIR = new URL("../../../docs/research/fixtures/0005/", import.meta.url);
 const SECRET = "fixture-signing-secret";
 
@@ -22,7 +18,6 @@ function fixture(name: string): { rawBody: Uint8Array; headers: Record<string, s
   return { rawBody, headers };
 }
 
-/** 픽스처의 보낸 시각(본문 webhookTimestamp와 같다) 0.5초 뒤에 받은 것으로 한다. */
 function receivedSoonAfter(headers: Record<string, string>): Date {
   return new Date(Number(headers["linear-timestamp"]) + 500);
 }
@@ -85,7 +80,6 @@ describe("verifyLinearWebhook: 서명 성공", () => {
     expect(result.event.labelIds).toEqual([AUTO_ASSIGN, BUG]);
     expect(result.event.previousLabelIds).toEqual([AUTO_ASSIGN]);
     expect(labelJustAttached(result.event, BUG)).toBe(true);
-    // 이미 붙어 있던 라벨은 다시 붙은 것이 아니다.
     expect(labelJustAttached(result.event, AUTO_ASSIGN)).toBe(false);
   });
 

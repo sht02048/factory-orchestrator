@@ -46,7 +46,6 @@ function render(
   );
 }
 
-/** 목록의 행 하나(role="option")의 글. 태그를 지우고 칸을 | 로 잇는다 */
 function rowTexts(html: string): Map<string, string[]> {
   const rows = new Map<string, string[]>();
   for (const chunk of html.split('role="option"').slice(1)) {
@@ -61,13 +60,11 @@ function rowTexts(html: string): Map<string, string[]> {
   return rows;
 }
 
-/** 상세 패널(aside) 안의 글 */
 function panelText(html: string): string {
   const panel = html.split("<aside")[1] ?? "";
   return panel.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 }
 
-/** 어느 러너에도 없는 러너 쪽 프로젝트로 Queued 런을 하나 더한다(러너에서 프로젝트가 빠짐, Q78) */
 function addProjectMissingRun(db: Database, key: string): string {
   const result = assignRun(db, {
     ticket: { connection, key: toTicketKey(key) },
@@ -81,7 +78,6 @@ function addProjectMissingRun(db: Database, key: string): string {
 }
 
 describe("Runs 화면", () => {
-  // 행의 칸: [키, 흐린 줄(러너 · 에이전트 또는 에이전트 결과 · PR), 상태 알약, 시간]
   it("Ended 런은 알약에 요약 결과, 흐린 줄에 러너와 에이전트 결과를 보인다", () => {
     const { db } = seedDatabase();
     const rows = rowTexts(render(loadRunsPage(db, undefined, now)));
@@ -132,7 +128,6 @@ describe("Runs 화면", () => {
     expect(text).toContain(domain.prState.open);
     expect(text).toContain(runsJson.panel.reason["human-check"]);
     expect(text).toContain("runner-a");
-    // 에이전트는 ID(claude) 대신 공용 에이전트 이름으로 보인다
     expect(text).toContain(domain.agent.claude);
     expect(text).toContain("29분");
     expect(text).toContain("#2");
@@ -236,7 +231,6 @@ describe("Runs 화면", () => {
       `${page.runs.length}개 중 ${homeRunIds().length}개가 손댈 일이에요.`,
     );
 
-    // 끝난 손댈 일 런의 티켓에 새 런을 할당하면 지난 결과는 손댈 일에서 빠진다.
     const failedKey = endedCases.find((c) => c.summary === "failed")?.key;
     if (failedKey === undefined) throw new Error("seed");
     const result = assignRun(db, {
@@ -269,7 +263,6 @@ describe("Runs 화면", () => {
     expect([...canceled.keys()]).toEqual(["ACME-13"]);
     expect(canceled.get("ACME-13")?.[2]).toBe(domain.summary.canceled);
     expect(canceled.get("ACME-13")?.[1]).toContain(domain.agentResult.canceled);
-    // Failed 에는 들지 않는다
     expect(rowTexts(render(page, { filter: "failed" })).has("ACME-13")).toBe(false);
   });
 
@@ -295,7 +288,6 @@ describe("Runs 화면", () => {
     const rows = rowTexts(render(page));
     expect(rows.get("ACME-10")?.[1]).toContain(runsJson.cancelling);
     expect(rows.get("ACME-10")?.[2]).toBe(domain.runState.running);
-    // 런 상태는 그대로다
     expect(rows.get("ACME-11")?.[1]).not.toContain(runsJson.cancelling);
     const text = panelText(render(page, { selectedId: id }));
     expect(text).toContain(runsJson.panel.cancelling);

@@ -7,15 +7,6 @@ import { IntlProvider, useTranslations } from "use-intl";
 import screens from "../../messages/ko/screens.json" with { type: "json" };
 import type { DesktopApi, FindResult, FoundServerView, ViewState } from "../shared/view";
 
-/*
- * 앱이 직접 그리는 화면(티켓 0046). 서버의 web 화면이 아닌 것만 여기 있다: 첫 실행 모드 선택, 서버 찾기, 주소로
- * 연결하기, 닿지 않음, 로컬 서버 상태. 상태는 main 이 정하고 여기서는 그리기만 한다.
- *
- * 모양은 리디자인 방향(운영자 UI 규칙 2026-11-18)을 따른다: 다크, 영역은 선이 아니라 면(배경색)으로 나누고,
- * 카드 12px·행 8px 둥글기, 넉넉한 글자, 제목 아래 한 줄 요약(ADR 0010). 카드·상태 알약·버튼·토큰은 @factory/ui 의
- * 것을 쓴다. 시간 표기는 없다.
- */
-
 declare global {
   interface Window {
     desktop?: DesktopApi;
@@ -235,7 +226,6 @@ function FindServers({
   );
 }
 
-/** 주 버튼은 화면에 하나만 둔다. 서버가 하나면 그 연결이 주 행동이고, 여럿이면 모두 보조 모양이다 */
 function ServerRow({ server, only }: { server: FoundServerView; only: boolean }) {
   const t = useTranslations("screens.find");
   const openable = server.webAccess === "allowed";

@@ -1,9 +1,5 @@
 import type { AgentResult, PrState, SummaryOutcome } from "@factory/core";
 
-/**
- * worker가 트래커에 남기는 문구(ADR 0005). 코드에 직접 쓰지 않고 여기에만 둔다. 지금은 한국어만 채운다.
- * 낱말은 web의 domain 메시지와 같게 쓴다.
- */
 export const messages = {
   resultComment: {
     title: "Factory Orchestrator 런이 끝났어요.",

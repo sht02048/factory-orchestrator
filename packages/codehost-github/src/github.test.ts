@@ -35,10 +35,6 @@ function withRuns(runs: Array<{ status: string | null; conclusion: string | null
   return { ...base, body: { total_count: runs.length, workflow_runs: runs } };
 }
 
-/**
- * research 0006(티켓 0012)의 응답은 그때 쿼리의 필드만 있다. 이 어댑터 쿼리가 더 묻는 필드를 채운다.
- * 값의 뜻(상태, 브랜치, 제목·본문, 저장소)은 바꾸지 않는다.
- */
 function addFields(
   recorded: Recorded,
   pick: (body: unknown) => Array<Record<string, unknown>>,
@@ -442,7 +438,6 @@ describe("오류", () => {
   });
 
   it("GraphQL이 200에 RATE_LIMITED 오류를 주면 rate-limited다", async () => {
-    // research 0002 C.5: GraphQL은 한도를 넘어도 200에 오류가 온다. 문서의 모양으로 만든 응답이다.
     const limited: Recorded = {
       status: 200,
       headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1794931676" },

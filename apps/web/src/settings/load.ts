@@ -33,14 +33,12 @@ import type {
   WorkspaceSettings,
 } from "./model";
 
-/** Settings 가 읽고 쓰는 데 쓰는 것. 테스트는 테스트 DB 와 가짜 어댑터를 등록한 등록표를 넘긴다 */
 export interface SettingsContext {
   db: Database;
   secretBox: SecretBox;
   registry: AdapterRegistry;
 }
 
-/** 트래커 연결의 webhook 수신 경로(routes/api/webhooks/tracker/$connectionId) */
 export function webhookPath(connectionId: string): string {
   return `/api/webhooks/tracker/${encodeURIComponent(connectionId)}`;
 }
@@ -49,16 +47,11 @@ function addressesView(settings: AddressesView): AddressesView {
   return { webAddress: settings.webAddress, webhookAddress: settings.webhookAddress };
 }
 
-/**
- * 러너 설정에서 Settings 가 고치는 값(sshTarget, orcaPath). runners/load.ts 는 sshTarget 만 읽는다.
- * 모양이 다르면 빈 값으로 보인다.
- */
 const runnerConfigSchema = z.object({
   sshTarget: z.string().catch(""),
   orcaPath: z.string().catch(""),
 });
 
-/** 트래커 연결의 비밀값 중 화면에 알릴 것(있는지만) */
 const connectionSecretsSchema = z.object({
   webhookSecret: z.string().min(1).nullish().catch(null),
 });
@@ -68,7 +61,6 @@ function hasWebhookSecret(secrets: unknown): boolean {
   return parsed.success && typeof parsed.data.webhookSecret === "string";
 }
 
-/** 러너 확인 결과(core RunnerHealth 를 JSON 으로 저장한 것). 경계에서 다시 파싱한다 */
 const runnerHealthSchema = z.object({
   online: z.boolean(),
   version: z.string().nullable(),
@@ -88,13 +80,11 @@ const remoteKindSchema = z.object({
   kind: z.enum(["unauthorized", "rate-limited", "not-found", "network"]),
 });
 
-/** 어댑터 오류 종류(core TrackerErrorDetail·CodeHostErrorDetail)를 화면의 까닭으로 바꾼다 */
 export function remoteErrorOfDetail(detail: unknown): RemoteError {
   const parsed = remoteKindSchema.safeParse(detail);
   return parsed.success ? parsed.data.kind : "network";
 }
 
-/** 어댑터 호출에서 던진 오류를 화면의 까닭으로 바꾼다. 설정을 어댑터가 받지 못했으면 invalid 다 */
 export function remoteErrorOf(error: unknown): RemoteError {
   if (error instanceof AdapterError) return remoteErrorOfDetail(error.detail);
   if (error instanceof z.ZodError) return "invalid";
@@ -109,7 +99,6 @@ async function remote<T>(read: () => Promise<ReadonlyArray<T>>): Promise<Remote<
   }
 }
 
-/** 저장된 트래커 연결로 어댑터를 만든다. 만들지 못하면 null */
 export function trackerOf(
   context: SettingsContext,
   connection: StoredTrackerConnection,
@@ -126,11 +115,6 @@ export function trackerOf(
 
 const toChoice = (item: { id: string; name: string }): Choice => ({ id: item.id, name: item.name });
 
-/**
- * Settings 화면이 보일 값. DB 의 설정과, 이 Workspace 의 트래커 프로젝트·상태·라벨처럼 트래커에서 읽어야 하는
- * 목록을 함께 담는다. 트래커에서 읽지 못한 목록은 까닭과 함께 비워 두고 DB 값은 그대로 보인다.
- * `now` 는 서버가 읽은 때다. 러너 확인 시각의 상대 시간("25분 전")을 여기서 정한다.
- */
 export async function loadSettingsPage(
   context: SettingsContext,
   ws: string | undefined,
@@ -216,7 +200,6 @@ async function loadWorkspaceSettings(
           : await remote(() => tracker.listProjects());
       const seen = new Map<string, { id: string; name: string }>();
       for (const project of listed.ok ? listed.items : []) seen.set(project.id, project);
-      // 트래커에서 읽지 못했거나 트래커에서 사라졌어도 이 Workspace 에 묶인 것은 보이고 뺄 수 있다.
       for (const project of mine) {
         if (project.connection === connection.id && !seen.has(project.projectId))
           seen.set(project.projectId, { id: project.projectId, name: project.name });
@@ -320,15 +303,10 @@ async function loadWorkspaceSettings(
   };
 }
 
-/**
- * 결과를 기다리는 러너 확인 요청이 있는지. 화면은 기다리는 동안 이것만 다시 읽고(DB만 읽음),
- * 결과가 오면 그때 화면 전체를 다시 읽는다. 전체를 다시 읽으면 트래커 API 를 부르기 때문이다.
- */
 export function hasPendingRunnerChecks(db: Database): boolean {
   return listPendingRunnerCheckRequests(db).length > 0;
 }
 
-/** 러너 확인 요청과 그 결과(worker 가 씀, Q61) */
 function runnerCheckView(
   db: Database,
   runnerId: RunnerId,

@@ -76,7 +76,6 @@ describe("loadRunsPage", () => {
         summary: c.summary,
       });
     }
-    // 에이전트 결과 여섯과 PR 상태 넷이 모두 나온다
     const ended = page.runs.flatMap((run) => (run.state === "ended" ? [run] : []));
     expect(new Set(ended.map((run) => run.agentResult)).size).toBe(6);
     expect(new Set(ended.map((run) => run.prState)).size).toBe(4);

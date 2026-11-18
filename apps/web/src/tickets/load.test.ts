@@ -37,7 +37,6 @@ describe("Tickets 읽기", () => {
     const page = await loadTicketsPage(context, undefined, now);
 
     expect(page.workspace.kind).toBe("one");
-    // 다른 Workspace(ws-labs)의 LAB-1 은 없고, 트래커에서 마지막으로 바뀐 것부터
     expect(page.tickets.map((t) => t.key)).toEqual([
       "ACME-6",
       "ACME-5",
@@ -106,7 +105,6 @@ describe("Tickets 읽기", () => {
     for (const key of ["ACME-3", "ACME-4", "ACME-5"]) {
       expect(byKey(page, key).assignability).toEqual({ kind: "active-run", runId: ids.get(key) });
     }
-    // Ended 뒤에는 새 런을 시작할 수 있다(Q45)
     expect(byKey(page, "ACME-1").assignability.kind).toBe("ready");
   });
 

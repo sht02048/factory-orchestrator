@@ -11,16 +11,6 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest"
 import onboarding from "../../apps/web/messages/ko/onboarding.json" with { type: "json" };
 import settings from "../../apps/web/messages/ko/settings.json" with { type: "json" };
 
-/*
- * 개발 진입점 `pnpm dev` 실행 시험(티켓 0047). 실제 명령(node demo/src/main.ts)을 임시 개발 폴더로 띄워 본다.
- *
- * - 미리 채운 모드: 홈이 온보딩으로 돌려보내지 않고 200 을 준다.
- * - 온보딩 모드: 홈이 온보딩으로 보내고, 브라우저로 가짜 값을 채워 5단계를 마치면 홈이 열린다.
- * - SIGTERM 을 받으면 web 과 worker 를 내리고 포트를 닫는다.
- *
- * 브라우저는 e2e 처럼 설치된 Google Chrome 을 playwright-core 로 띄운다. 실패하면 화면을 e2e/test-results 에 남긴다.
- */
-
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const main = join(repoRoot, "demo/src/main.ts");
 const resultsDir = join(repoRoot, "e2e/test-results");
@@ -56,7 +46,6 @@ describe("pnpm dev", () => {
       }
       const home = await (await fetch(dev.url + "/")).text();
       expect(home).toContain("ACME-2");
-      // 개발 데이터를 막으려고 더한 차단 목록이 vite 기본 목록(.env.* 등)을 지우지 않는다.
       for (const file of [".env.example"]) {
         const response = await fetch(`${dev.url}/@fs${join(repoRoot, file)}`);
         expect([file, response.status]).toEqual([file, 403]);
@@ -86,28 +75,23 @@ describe("pnpm dev", () => {
       const fill = page.getByRole("button", { name: "가짜 값 채우기" });
       const next = page.getByRole("button", { name: onboarding.next });
 
-      // 1. 트래커
       await fill.click();
       await page.getByRole("button", { name: settings.connections.add }).click();
       await page.getByText(settings.connections.added).waitFor();
       await next.click();
-      // 2. GitHub 토큰
       await fill.click();
       await page.getByRole("button", { name: settings.github.save }).click();
       await enabled(next);
       await next.click();
-      // 3. 러너: worker 가 가짜 러너를 확인한다
       await fill.click();
       await page.getByRole("button", { name: settings.runners.add }).click();
       await page.getByText(onboarding.runner.passed).waitFor();
       await next.click();
-      // 4. Workspace 와 트래커 프로젝트
       await fill.click();
       await page.getByRole("button", { name: onboarding.workspace.create }).click();
       await page.getByRole("button", { name: settings.projects.add }).first().click();
       await enabled(next);
       await next.click();
-      // 5. Mapping, "In Progress" 상태, Auto-assign Label
       const main = page.locator("main");
       const choose = async (index: number, option: string) => {
         await main.getByRole("combobox").nth(index).click();
@@ -198,7 +182,6 @@ async function enabled(locator: ReturnType<Page["getByRole"]>): Promise<void> {
   await locator.and(locator.page().locator(":enabled")).waitFor();
 }
 
-/** 서버 렌더한 화면에 React 가 붙을 때까지 기다린다(e2e operator-actions.test.ts 와 같다) */
 async function hydrated(page: Page): Promise<void> {
   await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
   await page.waitForLoadState("networkidle");

@@ -1,22 +1,10 @@
 import { isAbsolute } from "node:path";
 import { z } from "zod";
 
-/**
- * 부팅 설정. `.env`(셸 환경 변수)에는 이 넷만 둔다(ADR 0005, 스펙 7절, Q58).
- * 토큰은 여기 두지 않고 DB에 암호화해 저장한다.
- *
- * | 환경 변수        | 뜻                      | 기본값        |
- * | ---------------- | ----------------------- | ------------- |
- * | `WEB_HOST`       | web 서버 바인딩 주소    | `127.0.0.1`   |
- * | `WEB_PORT`       | web 서버 포트           | `3000`        |
- * | `DATABASE_PATH`  | SQLite 파일 절대 경로   | 없음(필수)    |
- * | `ENCRYPTION_KEY` | 토큰 암호화 키(base64)  | 없음(필수)    |
- */
 export interface BootConfig {
   host: string;
   port: number;
   databasePath: string;
-  /** AES-256 키 32바이트 */
   encryptionKey: Uint8Array;
 }
 
@@ -30,12 +18,10 @@ export const BOOT_ENV = {
 export const ENCRYPTION_KEY_BYTES = 32;
 
 export interface BootConfigIssue {
-  /** 문제가 있는 환경 변수 이름 */
   variable: string;
   message: string;
 }
 
-/** 부팅 값이 빠지거나 형식이 틀림. 메시지에 값 자체는 넣지 않는다(암호화 키가 로그에 남지 않게). */
 export class BootConfigError extends Error {
   readonly issues: ReadonlyArray<BootConfigIssue>;
 
@@ -72,7 +58,6 @@ const envSchema = z.object({
     )
     .optional()
     .default(3000),
-  // web과 worker가 cwd가 달라도 같은 파일을 열도록 절대 경로만 받는다(ADR 0002).
   [BOOT_ENV.databasePath]: required().refine(isAbsolute, { error: "must be an absolute path" }),
   [BOOT_ENV.encryptionKey]: required()
     .regex(/^[A-Za-z0-9+/]+={0,2}$/, {
@@ -84,7 +69,6 @@ const envSchema = z.object({
     }),
 });
 
-/** 환경 변수에서 부팅 설정을 읽는다. 문제가 있으면 문제가 있는 변수를 모두 담아 BootConfigError를 던진다. */
 export function parseBootConfig(env: Readonly<Record<string, string | undefined>>): BootConfig {
   const result = envSchema.safeParse(env);
   if (!result.success) {

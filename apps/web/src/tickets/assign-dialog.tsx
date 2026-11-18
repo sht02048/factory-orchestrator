@@ -9,7 +9,6 @@ import type { AssignInput, AssignResult } from "./assign";
 import { agentsFor, runnersFor } from "./model";
 import type { AssignDefaults, RunnerChoice, TicketView } from "./model";
 
-/** 러너 Select 에서 "할당 때 자동으로 고르기"를 가리키는 값(Q53). 화면 안에서만 쓰고 서버에는 null 로 보낸다 */
 export const AUTO_RUNNER = "\u0000auto";
 
 type Failure = Extract<AssignResult, { ok: false }>["reason"] | "failed";
@@ -24,10 +23,6 @@ export interface AssignDialogProps {
   onAssigned: () => void;
 }
 
-/**
- * 수동 할당 창(Q53·Q60). Mapping 기본값을 채워 보이고, 러너 쪽 프로젝트는 바꿀 수 없고 러너와 에이전트만 바꾼다.
- * 확인하면 db 할당 진입점으로 Queued 런을 만든다. 실패하면 창을 닫지 않고 이유를 보인다.
- */
 export function AssignDialog({
   ticket,
   defaults,
@@ -120,17 +115,12 @@ export interface AssignFormProps {
   defaults: AssignDefaults;
   runners: ReadonlyArray<RunnerChoice>;
   agents: ReadonlyArray<string>;
-  /** 고른 러너 ID. AUTO_RUNNER 면 할당 때 자동으로 고른다 */
   runner: string;
   agent: string;
   onRunnerChange: (runner: string) => void;
   onAgentChange: (agent: string) => void;
 }
 
-/**
- * 러너 Select 의 항목: 맨 앞에 "할당 때 자동으로 고르기"(Q53), 그 뒤로 Mapping 의 러너 쪽 프로젝트가 있는 러너.
- * GitHub 인증이 깨진 러너는 비활성으로 이유와 함께 보인다(Q87). Offline 러너는 고를 수 있다.
- */
 export function runnerOptionsFor(
   runners: ReadonlyArray<RunnerChoice>,
   runnerProject: string,
@@ -145,7 +135,6 @@ export function runnerOptionsFor(
   ];
 }
 
-/** 할당 창의 칸. 러너 쪽 프로젝트는 읽기 전용이고, 인증이 깨진 러너는 보이되 고를 수 없다(Q87) */
 export function AssignForm({
   defaults,
   runners,

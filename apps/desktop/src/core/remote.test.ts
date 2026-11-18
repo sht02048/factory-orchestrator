@@ -6,11 +6,6 @@ import { identitySchema, probeIdentity } from "./identity.js";
 import { connectAddress, normalizeAddress, reopenSaved } from "./remote.js";
 import { findTailscaleCli, parseTailnetStatus, readTailnet } from "./tailscale.js";
 
-/*
- * 원격 모드의 발견·연결(research 0013, Q13)과 알림 사건 고르기(Q4). Tailscale CLI 출력과 신원 확인 응답은 흉내 낸
- * 값이고 기기 이름은 가상 값(example.ts.net)이다.
- */
-
 const identity = (instanceId: string, extra: Partial<Identity> = {}): ProbeResult => ({
   kind: "ours",
   identity: {
@@ -22,7 +17,6 @@ const identity = (instanceId: string, extra: Partial<Identity> = {}): ProbeResul
   },
 });
 
-/** origin → 응답. 없는 origin 은 닿지 않음 */
 function fakeProbe(answers: Record<string, ProbeResult>, asked: string[] = []): Probe {
   return (origin) => {
     asked.push(origin);
@@ -140,7 +134,6 @@ describe("서버 찾기", () => {
         },
       ],
     });
-    // 3000 에서 찾은 기기는 443 을 묻지 않는다. 휴대폰·오프라인 기기는 묻지 않는다.
     expect(asked).not.toContain("https://mini.example.ts.net");
     expect(asked.some((origin) => origin.includes("phone") || origin.includes("nas"))).toBe(false);
   });
@@ -325,7 +318,6 @@ describe("알림 사건", () => {
     expect(diff.next([question])).toEqual([]);
     expect(diff.next([question, check])).toEqual([check]);
     expect(diff.next([question, check])).toEqual([]);
-    // 러너가 Online 이 됐다가 다시 Offline 이 되면 다시 알린다.
     expect(diff.next([question, check, offline])).toEqual([offline]);
     expect(diff.next([question, check])).toEqual([]);
     expect(diff.next([question, check, offline])).toEqual([offline]);

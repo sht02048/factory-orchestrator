@@ -10,25 +10,13 @@ import { FakeCodeHost, FakeRunner, FakeTracker } from "@factory/core/testing";
 import { RUNNER_PROJECTS, trackerCatalog, trackerSpecFor } from "./fixtures.js";
 import { FAIL_AUTH, FAIL_NO_ORCA, FAIL_OFFLINE, FAIL_PUSH_AUTH } from "./values.js";
 
-/*
- * 개발 진입점의 가짜 세계(티켓 0047). web 과 worker 가 한 프로세스에서 같은 가짜 트래커·러너·코드 호스트를
- * 본다. 어댑터는 core 의 시험용 가짜(@factory/core/testing)를 그대로 쓰고, 저장한 종류(linear·orca·github)로
- * 등록해 화면이 실제 설치처럼 보이게 한다. 이 등록은 개발 진입점에서만 한다. 제품 코드의 등록표
- * (apps/web/src/server/adapters.ts, apps/worker/src/registry.ts)는 실제 어댑터만 등록하고 이 모듈을 모른다.
- *
- * 같은 프로세스지만 web 모듈 그래프(vite SSR)와 이 모듈 그래프가 따로 돌 수 있어, 세계는 globalThis 에 하나만 둔다.
- */
-
 export const TRACKER_KIND = toTrackerKind("linear");
 export const RUNNER_KIND = toRunnerKind("orca");
 export const CODE_HOST_KIND = toCodeHostKind("github");
 
 export class DemoWorld {
-  /** 트래커 연결의 API 키로 찾는다. 같은 키면 같은 가짜 트래커다 */
   readonly trackers = new Map<string, FakeTracker>();
-  /** 러너의 ssh 대상으로 찾는다 */
   readonly runners = new Map<string, FakeRunner>();
-  /** 코드 호스트는 저장소마다 PR 을 둔다. 토큰과 상관없이 하나다 */
   readonly codeHost = new FakeCodeHost(CODE_HOST_KIND, "");
   private readonly badCodeHost = new FakeCodeHost(CODE_HOST_KIND, "");
   private readonly now: () => Date;
@@ -64,7 +52,6 @@ export class DemoWorld {
     const target = sshTarget.toLowerCase();
     runner.setProjects(RUNNER_PROJECTS);
     runner.online = !target.includes(FAIL_OFFLINE);
-    // 실제 Orca 러너와 같은 확인 항목 ID 를 써 화면이 같은 문구를 보인다(apps/web/src/labels.ts).
     runner.prerequisites = [
       {
         id: "orca-service",
@@ -85,12 +72,10 @@ export class DemoWorld {
     return runner;
   }
 
-  /** 러너 쪽 프로젝트 ID 가 곧 저장소 이름이다(acme/web) */
   repoOf(project: RunnerProjectId): RepoRef {
     return toRepoRef(project);
   }
 
-  /** 개발 진입점에서만 쓰는 어댑터 등록표. web 과 worker 가 함께 쓴다 */
   registry(): AdapterRegistry {
     return new AdapterRegistry()
       .registerTracker({
@@ -111,7 +96,6 @@ export class DemoWorld {
   }
 }
 
-/** 설정 JSON 에서 문자열 하나를 꺼낸다. 없으면 빈 문자열이다 */
 export function stringAt(value: unknown, ...path: string[]): string {
   let current: unknown = value;
   for (const key of path) {
@@ -122,11 +106,9 @@ export function stringAt(value: unknown, ...path: string[]): string {
 }
 
 declare global {
-  // 개발 진입점의 가짜 세계. web 모듈 그래프와 함께 쓴다.
   var __factoryDemoWorld: DemoWorld | undefined;
 }
 
-/** 이 프로세스의 가짜 세계. 처음 부를 때 만든다 */
 export function demoWorld(): DemoWorld {
   globalThis.__factoryDemoWorld ??= new DemoWorld();
   return globalThis.__factoryDemoWorld;

@@ -35,19 +35,9 @@ export interface TicketsContext {
   registry: AdapterRegistry;
 }
 
-/** 트래커 프로젝트 하나에서 읽는 쪽 크기와 쪽수. 250 은 Linear 상한이다(research 0005 12절) */
 export const PAGE_SIZE = 250;
 export const MAX_PAGES = 4;
 
-/**
- * Tickets 화면이 보일 값을 읽는다. 티켓은 현재 Workspace 에 묶인 트래커 프로젝트마다 그 트래커 연결의
- * 어댑터로 조회하고(0027 의 AdapterRegistry, web 은 ssh 를 쓰지 않는다 Q61), 런은 DB 에서 읽는다.
- * 요약 결과는 저장하지 않으므로 core summarizeRunOutcome 으로 계산한다(Q66·Q76).
- *
- * `now` 는 서버가 읽은 때다. 런 이력의 상대 시간("25분 전")을 여기서 정한다.
- *
- * 한 트래커 프로젝트를 읽지 못해도 나머지는 보이고, 읽지 못한 것은 errors 에 담는다.
- */
 export async function loadTicketsPage(
   context: TicketsContext,
   ws: string | undefined,
@@ -165,7 +155,6 @@ export async function loadTicketsPage(
   };
 }
 
-/** 트래커 연결과 티켓 키로 만든 티켓 식별값. 다른 연결의 같은 키는 다른 티켓이다 */
 export function ticketId(connection: string, key: string): string {
   return JSON.stringify([connection, key]);
 }
@@ -188,7 +177,6 @@ async function readProjectTickets(
   return { tickets, more: after !== null };
 }
 
-/** 어댑터 오류의 종류. detail 은 어댑터마다 다른 모양이라 kind 만 읽는다 */
 const adapterErrorSchema = z.object({ kind: z.string() });
 
 function loadErrorReason(error: unknown): TrackerLoadError["reason"] {
@@ -208,7 +196,6 @@ function loadErrorReason(error: unknown): TrackerLoadError["reason"] {
   }
 }
 
-/** 할당 순서(오래된 것부터)를 지킨 채 티켓마다 묶는다 */
 function groupRuns(runs: ReadonlyArray<StoredRun>): Map<string, StoredRun[]> {
   const byTicket = new Map<string, StoredRun[]>();
   for (const run of runs) {
@@ -258,10 +245,6 @@ function assignabilityOf(
   };
 }
 
-/**
- * 할당 창의 에이전트 선택지: 설치의 모든 Mapping 에 쓰인 에이전트. 에이전트 목록을 주는 계약이 아직 없어
- * Mapping 에서 모은다(코디네이터 결정). 이름순.
- */
 function mappingAgents(db: Database): string[] {
   const agents = new Set<string>();
   for (const project of listWorkspaceTrackerProjects(db)) {

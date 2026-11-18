@@ -13,15 +13,6 @@ import { probeIdentity } from "../src/core/identity.js";
 import { sleep } from "../src/core/local-server.js";
 import { freePort, nodeEnv, seedRunningRun } from "./helpers.js";
 
-/*
- * ②의 버전 교체를 로컬 패키징 두 번으로 본다(티켓 0046). 서버 버전이 다른 두 앱이 필요하다. CI 에서는 돌지 않는다.
- *
- *   pnpm build && pnpm run bundle && pnpm --filter @factory/desktop run package            # 앱 A
- *   (루트 package.json 의 version 을 잠시 올리고) pnpm build && pnpm run bundle && \
- *     pnpm --filter @factory/desktop run package -- --out dist/app-b                       # 앱 B
- *   SMOKE_APP_B="<앱 B 의 .app>" pnpm --filter @factory/desktop smoke smoke/swap.smoke.ts
- */
-
 const DESKTOP = resolve(import.meta.dirname, "..");
 const APP_A =
   process.env["SMOKE_APP"] ??
@@ -64,7 +55,6 @@ function run(): { state: string; unreachableSince: Date | null } {
   });
 }
 
-/** 이 home 의 worker 프로세스(두 앱 어느 쪽에서 떴든) */
 function workers(): number {
   const out = spawnSync("ps", ["-axo", "command="], { encoding: "utf8" }).stdout;
   return out
@@ -106,9 +96,7 @@ afterAll(async () => {
   if (lock !== undefined) {
     try {
       process.kill(-lock.pid, "SIGTERM");
-    } catch {
-      // 이미 끝났다.
-    }
+    } catch {}
   }
   await sleep(3_000);
   rmSync(dir, { recursive: true, force: true });

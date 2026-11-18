@@ -38,22 +38,18 @@ import type {
 } from "./model";
 import { LegendSwatch, ThroughputChart } from "./throughput-chart";
 
-// 이름 | 런 | Merged(%) | Human Check | Failed | Canceled | 리드 타임(중앙값)
 const columns = "minmax(0, 1fr) 56px 72px 104px 64px 56px 88px";
 
 export interface StatsScreenProps {
   page: StatsPage;
-  /** "전체"에서 고를 Workspace 들 */
   workspaces: ReadonlyArray<WorkspaceSummary>;
   dimension: StatsDimension;
-  /** 고른 묶음. 없거나 목록에 없으면 첫 행을 고른다 */
   selectedKey: string | undefined;
   onDimensionChange: (dimension: StatsDimension) => void;
   onSelect: (key: string) => void;
   onPickWorkspace: (workspaceId: string) => void;
 }
 
-/** Stats: 기간 요약, 날짜별 처리량, Failed 조합, 나눠 보기 목록 + 오른쪽 상세 패널(ADR 0007, 시안 B) */
 export function StatsScreen(props: StatsScreenProps) {
   const { page } = props;
   switch (page.workspace.kind) {
@@ -143,7 +139,6 @@ function StatsView({
           <Figures total={page.total} />
           <Section
             title={t("throughput.title")}
-            // 끝난 런이 없으면 차트 대신 문구만 보여 범례도 뺀다.
             note={
               page.total.runs === 0 ? undefined : (
                 <span {...stylex.props(styles.legend)}>
@@ -342,13 +337,11 @@ function Figure({ value, label }: { value: ReactNode; label: ReactNode }) {
   );
 }
 
-/** 묶음 이름. 에이전트는 ID 대신 공용 에이전트 이름으로 보인다 */
 function useGroupName(dimension: StatsDimension): (group: StatsGroup) => string {
   const agentName = useAgentName();
   return (group) => (dimension === "agent" ? agentName(group.key) : group.name);
 }
 
-/** Failed 조합 목록. 조합 이름이 길어 정의 목록의 고정 라벨 폭 대신 내용 폭에 맞춘다 */
 function FailedCombinations({ combinations }: { combinations: ReadonlyArray<FailedCombination> }) {
   const t = useTranslations("stats.failedCombinations");
   const domain = useTranslations("domain");
@@ -374,7 +367,6 @@ function GroupPanel({ group, dimension }: { group: StatsGroup; dimension: StatsD
   const t = useTranslations("stats");
   const { duration } = useTime();
   const { outcomes, humanCheck, durations } = group;
-  // 비율은 취소를 뺀 런으로 나눈다(Q82.9·Q82.18). 취소는 개수만 보인다.
   const share = (count: number) => {
     const value = percent(count, group.rated);
     return value === null
@@ -468,7 +460,6 @@ const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
   figures: {
     display: "grid",
-    // 좁은 폭에서는 다음 줄로 접는다.
     gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
     gap: space.s6,
     marginBottom: space.s10,

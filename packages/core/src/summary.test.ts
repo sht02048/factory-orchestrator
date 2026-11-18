@@ -25,8 +25,6 @@ const reported: Record<PrState, Cell> = {
   none: ["failed", "remove-now"],
 };
 
-// 스펙 4.2 요약 계산 표를 칸마다 펼쳐 적은 것. 구현의 표와 따로 적어 서로 대조한다.
-// 운영자가 취소함은 러너에 닿지 못함 여부에 따라 둘로 나눠 적는다.
 const EXPECTED: Record<AgentResult, Record<PrState, Cell>> = {
   "reported-success": reported,
   "reported-failure": reported,
@@ -36,18 +34,15 @@ const EXPECTED: Record<AgentResult, Record<PrState, Cell>> = {
   "runner-disconnected": same(["failed", "operator-decides"]),
   "worktree-missing": same(["failed", "nothing-to-remove"]),
   canceled: keepIfOpen("canceled"),
-  // 시작할 수 없음은 PR 상태가 늘 없음이다(Q82.20). 없음만 표에 있다.
   "could-not-start": same(["failed", "nothing-to-remove"]),
 };
 const CANCELED_UNREACHED: Cell = ["canceled", "operator-decides"];
 
-/** 시작할 수 없음은 PR 상태 없음만, 그 밖은 PR 상태 넷 */
 const AXES = AGENT_RESULTS.flatMap((agentResult) =>
   (agentResult === "could-not-start" ? (["none"] as const) : PR_STATES).map(
     (prState) => [agentResult, prState] as const,
   ),
 );
-/** 위 조합에 러너에 닿지 못함 여부(참·거짓)를 곱한 것 */
 const ALL_COMBINATIONS = AXES.flatMap(
   ([agentResult, prState]) =>
     [

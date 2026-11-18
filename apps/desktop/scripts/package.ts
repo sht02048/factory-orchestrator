@@ -1,15 +1,3 @@
-/*
- * 데스크톱 앱을 이 기계에서 서명 없이 패키징한다(티켓 0046). 산출물은 어디에도 올리지 않는다. 서명·공증·자동 업데이트
- * 피드·Releases 업로드는 릴리스 때(티켓 0046 「후속(릴리스 때)」, 0031) 한다.
- *
- * 먼저: 저장소 루트에서 pnpm build && pnpm run bundle (서버 배포물, 0029)
- * 실행: pnpm --filter @factory/desktop run package [--arch arm64|x64] [--bundle <서버 배포물 폴더>] [--out <폴더>]
- * 결과(기본): apps/desktop/dist/app/Factory Orchestrator-darwin-<arch>/Factory Orchestrator.app 과 같은 폴더의 .zip
- *
- * 앱은 node_modules 없이 dist/(main·preload·renderer)와 assets/ 만 싣고, 서버 배포물을 고치지 않고
- * Contents/Resources/server/ 에 싣는다. 도구는 @electron/packager 다(이유는 티켓 0046 「패키징 도구」).
- */
-
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
@@ -94,7 +82,6 @@ writeFileSync(
     2,
   )}\n`,
 );
-// 서버 배포물을 이름만 바꿔 그대로 싣는다.
 cpSync(bundleDir, join(resources, "server"), { recursive: true });
 
 const arch = values.arch ?? process.arch;
@@ -112,7 +99,6 @@ const [appDir] = await packager({
   extraResource: [join(resources, "server")],
   overwrite: true,
   prune: false,
-  // 서명은 하지 않는다(로컬 개발용). 릴리스 때 Developer ID 로 서명·공증한다.
   osxSign: undefined,
 });
 if (appDir === undefined) throw new Error("packager produced nothing");

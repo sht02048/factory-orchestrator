@@ -56,26 +56,18 @@ import {
 } from "./model";
 import type { OnboardingStep } from "./model";
 
-/** 온보딩의 행동. 입력 폼은 Settings 의 행동을 그대로 쓰고, 첫 Workspace 만들기만 더한다 */
 export interface OnboardingActions extends SettingsActions {
   createWorkspace: (input: { name: string }) => Promise<ActionResult>;
 }
 
 export interface OnboardingScreenProps {
   page: SettingsPage;
-  /** 보일 단계(0부터). 라우트가 resolveStep 으로 정한다 */
   index: number;
   onStep: (index: number) => void;
-  /** 마지막 단계를 마쳤을 때. 홈으로 간다 */
   onFinish: () => void;
   actions: OnboardingActions;
 }
 
-/**
- * 온보딩: 사이드바 없는 전체 화면(ADR 0007). 왼쪽 단계 목록, 가운데 입력과 확인 결과(ADR 0010, 시안 B).
- * 입력 폼과 연결 확인은 Settings 의 것을 그대로 쓴다. 단계의 확인이 성공해야 다음으로 간다.
- * 파란 주 버튼은 하나다: 확인이 성공하면 "다음", 그 전에는 단계의 저장 버튼이다(ADR 0010 6번).
- */
 export function OnboardingScreen({
   page,
   index,
@@ -93,7 +85,6 @@ export function OnboardingScreen({
     .join(",");
   const workerSilent = useRunnerCheckPolling(pendingKey, actions.pollRunnerChecks);
 
-  // 단계를 옮기면 누른 단계·이전 버튼이 DOM 에서 빠질 수 있다. 새 단계 제목으로 포커스를 옮겨 열린 단계를 알린다
   const titleRef = useRef<HTMLSpanElement>(null);
   const shownIndex = useRef(index);
   useEffect(() => {
@@ -120,7 +111,6 @@ export function OnboardingScreen({
           </Text>
           <Text variant="body">{t(`steps.${step}.description`)}</Text>
         </div>
-        {/* 단계를 바꾸면 편집 중인 값을 새로 채운다 */}
         <div key={step} {...stylex.props(styles.body)}>
           <StepBody step={step} page={page} actions={actions} workerSilent={workerSilent} />
         </div>
@@ -136,7 +126,6 @@ export function OnboardingScreen({
                 {t("nextLocked")}
               </span>
             )}
-            {/* 막은 까닭을 aria-describedby 로 잇는다. @factory/ui Button 은 이 속성을 받지 않아 버튼 모양만 입힌다 */}
             <button
               type="button"
               data-variant={passed ? "primary" : "secondary"}
@@ -154,10 +143,6 @@ export function OnboardingScreen({
   );
 }
 
-/**
- * 왼쪽 단계 목록. 확인이 성공한 단계는 체크, 지금 단계는 번호를 밝게 보인다.
- * 앞 단계가 모두 성공한 단계까지만 누를 수 있다(resolveStep 과 같은 규칙).
- */
 function StepList({
   page,
   index,
@@ -195,7 +180,6 @@ function StepList({
                 )}
               </span>
               <span>{t(`steps.${step}.name`)}</span>
-              {/* 체크 표시는 aria-hidden 이라 완료를 화면 읽기에만 글로 알린다 */}
               {done && !current ? (
                 <span {...stylex.props(styles.srOnly)}>{t("stepDone")}</span>
               ) : null}
@@ -227,10 +211,6 @@ function StepList({
   );
 }
 
-/**
- * 포커스를 옮겨 받을 제목 글. 탭 순서에는 넣지 않는다(tabIndex -1).
- * 누른 요소가 다시 읽은 뒤 DOM 에서 빠질 때 포커스가 body 로 떨어지지 않게 여기로 옮긴다.
- */
 function FocusTarget({ ref, children }: { ref: Ref<HTMLSpanElement>; children: ReactNode }) {
   return (
     <span ref={ref} tabIndex={-1} {...stylex.props(styles.focusTarget)}>
@@ -239,10 +219,6 @@ function FocusTarget({ ref, children }: { ref: Ref<HTMLSpanElement>; children: R
   );
 }
 
-/**
- * 목록이 늘면(처음 연결·러너·Workspace 를 만든 뒤) 새 항목의 포커스 대상으로 포커스를 옮긴다.
- * 만들기 폼은 성공 뒤 다시 읽으면 새 항목으로 바뀌어 DOM 에서 빠진다.
- */
 function useFocusWhenAdded(count: number): RefObject<HTMLSpanElement | null> {
   const ref = useRef<HTMLSpanElement>(null);
   const seen = useRef(count);
@@ -310,12 +286,6 @@ function StepBody({
   }
 }
 
-// ---------- 첫 Mapping ----------
-
-/**
- * Mapping 단계(0042). Mapping 과 함께 "In Progress" 상태와 Auto-assign Label 을 정한다. 셋 다 필수다
- * (스펙 3절 1번). 입력 폼과 저장은 Settings 의 것을 그대로 쓴다.
- */
 function MappingStep({
   workspace,
   page,
@@ -341,7 +311,6 @@ function MappingStep({
           )}
         </Card>
       ))}
-      {/* status 요소는 하나로 두고 안쪽만 바꾼다. 요소가 통째로 바뀌면 화면 읽기가 바뀐 내용을 놓친다 */}
       <div role="status" {...stylex.props(styles.stack)}>
         {missing.length === 0 ? (
           <p {...stylex.props(styles.ok)}>{t("ready")}</p>
@@ -360,8 +329,6 @@ function MappingStep({
   );
 }
 
-// ---------- 트래커 연결 ----------
-
 function TrackerStep({
   connections,
   addresses,
@@ -371,10 +338,8 @@ function TrackerStep({
   addresses: AddressesView;
   actions: SettingsActions;
 }) {
-  // 첫 연결을 만들면 다음 할 일인 webhook 만들기 안내로 포커스를 옮긴다
   const added = useFocusWhenAdded(connections.length);
   const newest = connections.at(-1)?.id;
-  // 연결이 없을 때도 같은 목록 모양을 쓴다. 만든 뒤에는 항목 key 가 바뀌어 새로 그리므로 포커스는 위에서 옮긴다
   return (
     <>
       <ul {...stylex.props(styles.list)}>
@@ -408,11 +373,6 @@ function TrackerStep({
   );
 }
 
-/**
- * Linear webhook 을 운영자가 만드는 방법(research 0002 B.2). webhook 주소는 설정한 webhook 공개 주소로 그린다
- * (0048). 브라우저 주소창의 주소는 tailnet·127.0.0.1 이라 트래커가 닿지 못한다. 공개 주소가 없으면 경로와
- * 정하는 방법을 보인다.
- */
 function WebhookGuide({
   connection,
   webhookAddress,
@@ -452,7 +412,6 @@ function WebhookGuide({
             <Input value={`${webhookAddress}${connection.webhookPath}`} readOnly mono />
           </Field>
         )}
-        {/* 다음으로 가는 것은 막지 않는다. webhook 없이도 폴링 보정으로 할당한다(ADR 0001). 실패가 아니니 실패 색을 쓰지 않는다 */}
         <div role="status" {...stylex.props(styles.stack)}>
           {connection.hasWebhookSecret ? (
             <p {...stylex.props(styles.ok)}>{t("secretSaved")}</p>
@@ -468,8 +427,6 @@ function WebhookGuide({
   );
 }
 
-// ---------- 러너 ----------
-
 function RunnerStep({
   runners,
   actions,
@@ -480,10 +437,8 @@ function RunnerStep({
   workerSilent: boolean;
 }) {
   const t = useTranslations("onboarding.runner");
-  // 첫 러너를 등록하면 다음 할 일인 러너 확인 카드의 제목으로 포커스를 옮긴다
   const added = useFocusWhenAdded(runners.length);
   const newest = runners.at(-1)?.id;
-  // 러너가 없을 때도 같은 목록 모양을 쓴다. 만든 뒤에는 항목 key 가 바뀌어 새로 그리므로 포커스는 위에서 옮긴다
   return (
     <ul {...stylex.props(styles.list)}>
       {runners.length === 0 ? (
@@ -522,7 +477,6 @@ function RunnerStep({
   );
 }
 
-/** 러너를 등록하기 전에 러너에서 해 둘 일(스펙 9절의 러너 필수 조건, Q43) */
 function RunnerBefore() {
   const t = useTranslations("onboarding.runner");
   return (
@@ -536,7 +490,6 @@ function RunnerBefore() {
   );
 }
 
-/** 러너 확인 결과에 따라 다음 할 일을 안내한다. 필수 조건별 상태는 RunnerCheck 가 보인다 */
 function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
   const t = useTranslations("onboarding.runner");
   const runnerError = useRunnerErrorName();
@@ -552,7 +505,6 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
       </p>
     );
   }
-  // Orca 상시 서비스가 없으면 러너 런타임이 준비되지 않아 Offline 으로도 온다. 아는 원인을 먼저 안내한다
   const problems = runnerProblems(runner);
   const known =
     problems.service || problems.githubAuth || problems.error !== null || problems.pushUnchecked;
@@ -606,16 +558,11 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
   );
 }
 
-/**
- * 러너에서 그대로 붙여 넣을 명령. 길어도 잘리지 않게 줄을 바꾸되, `--command` 의 하이픈 뒤처럼
- * 낱말 가운데서는 바꾸지 않고 낱말 사이에서만 바꾼다.
- */
 function Command({ value }: { value: string }) {
   const words = value.split(" ");
   return (
     <code {...stylex.props(styles.command)}>
       {words.map((word, i) => (
-        // 같은 낱말이 되풀이될 수 있어 자리로 가린다. 명령은 바뀌지 않는다
         <span key={i} {...stylex.props(styles.word)}>
           {i === 0 ? word : ` ${word}`}
         </span>
@@ -624,12 +571,9 @@ function Command({ value }: { value: string }) {
   );
 }
 
-// ---------- 첫 Workspace ----------
-
 function WorkspaceStep({ page, actions }: { page: SettingsPage; actions: OnboardingActions }) {
   const t = useTranslations("onboarding.workspace");
   const workspace = page.workspace;
-  // 만들면 폼이 프로젝트 고르기로 바뀌어 DOM 에서 빠진다. 새 Workspace 제목으로 포커스를 옮긴다
   const added = useFocusWhenAdded(workspace === null ? 0 : 1);
   return (
     <Card>
@@ -741,7 +685,6 @@ const styles = stylex.create({
   },
   stepButton: {
     borderWidth: 0,
-    // 터치 기기에서는 누른 뒤 hover 면이 남지 않게 hover 가 되는 기기에서만 칠한다
     backgroundColor: {
       default: "transparent",
       ":hover": { default: null, "@media (hover: hover)": colors.bgHover },
@@ -752,7 +695,6 @@ const styles = stylex.create({
     outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
   },
   stepDone: { color: colors.textSecondary },
-  // 굵기를 바꾸면 단계를 옮길 때마다 글자 폭이 바뀐다. 색과 면만 바꾼다
   stepCurrent: { backgroundColor: colors.bgCard, color: colors.textPrimary },
   marker: {
     display: "inline-flex",

@@ -13,18 +13,9 @@ import { fieldStyles } from "./field";
 import { CheckIcon, ChevronDownIcon } from "./icons";
 import { popupStyles } from "./popup-styles";
 
-/*
- * 폼 안에서 값 하나를 고른다. Field 안에 두면 Field 의 라벨이 이름이 된다.
- *
- * <Field label="에이전트">
- *   <Select value={agent} onValueChange={setAgent} options={[{ value: "claude", label: "Claude Code" }]} />
- * </Field>
- */
-
 export interface SelectOption {
   value: string;
   label: string;
-  /** 목록에 보이지만 고를 수 없는 항목. 왜 못 고르는지를 label 에 함께 쓴다. */
   disabled?: boolean;
 }
 
@@ -32,7 +23,6 @@ export interface SelectProps {
   options: ReadonlyArray<SelectOption>;
   value: string | null;
   onValueChange: (value: string) => void;
-  /** 아무것도 고르지 않았을 때 보일 글. */
   placeholder?: string;
   name?: string;
   disabled?: boolean;

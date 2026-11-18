@@ -1,8 +1,3 @@
-/*
- * 개발 화면(/__dev, 티켓 0047). 제품 화면이 아니라 개발 진입점에서만 뜨는 도구라 메시지 파일과 디자인 시스템을
- * 쓰지 않고 이 파일에 문구를 둔다. 버튼은 가짜 트래커·러너를 바꿔 worker 와 화면이 반응하는지 보게 한다.
- */
-
 const ACTIONS: ReadonlyArray<{ path: string; label: string; help: string }> = [
   {
     path: "label",

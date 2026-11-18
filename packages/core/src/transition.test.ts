@@ -4,7 +4,6 @@ import { RUN_STATES } from "./run.js";
 import type { RunState } from "./run.js";
 import { canTransitionRun, planCancel, transitionRun } from "./transition.js";
 
-// 스펙 4.1 상태 그림의 화살표를 그대로 적은 것. 여기 없는 쌍은 모두 거부한다.
 const ALLOWED: ReadonlyArray<readonly [RunState, RunState]> = [
   ["queued", "running"],
   ["running", "waiting-for-input"],
@@ -16,7 +15,6 @@ const ALLOWED: ReadonlyArray<readonly [RunState, RunState]> = [
   ["running", "ended"],
   ["waiting-for-input", "ended"],
   ["disconnected", "ended"],
-  // 운영자 취소와 시작할 수 없음(Q77·Q82.8·Q82.16)
   ["queued", "ended"],
 ];
 

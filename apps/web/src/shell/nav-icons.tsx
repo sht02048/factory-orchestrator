@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 
-// 레일 메뉴 아이콘(시안 B). 색은 currentColor 를 따른다.
-
 function Icon({ children }: { children: ReactNode }) {
   return (
     <svg

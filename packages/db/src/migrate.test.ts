@@ -51,7 +51,6 @@ describe("migrate", () => {
     expect(schemaDump(db)).toEqual(first);
     db.$client.close();
 
-    // 다른 연결(다른 프로세스가 다시 띄운 경우)에서 돌려도 같다.
     const again = openDatabase(temp.path);
     expect(migrate(again)).toEqual([]);
     expect(schemaDump(again)).toEqual(first);
@@ -108,7 +107,6 @@ describe("migrate", () => {
       db.$client.prepare("SELECT count(*) AS n FROM workspace_tracker_projects").get()?.["n"];
     expect(children()).toBe(1);
 
-    // drizzle-kit이 SQLite 컬럼·제약을 바꿀 때 만드는 모양
     const recreate = {
       name: "99990101000000_recreate_workspaces",
       hash: "recreate",

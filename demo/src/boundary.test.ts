@@ -5,14 +5,6 @@ import { describe, expect, it } from "vitest";
 import { devOnlyMarkers } from "../../scripts/bundle-check.ts";
 import { PREFILL } from "./values.js";
 
-/*
- * 가짜 어댑터가 제품 코드에 들어가지 않는다는 경계 시험(티켓 0047). 서버 배포물은 배포물 정적 검사
- * (scripts/bundle-check.ts, CI 의 bundle·smoke:bundle)가 보고, 여기서는 빌드 없이 소스의 import 경계를 본다.
- *
- * - 제품 앱(apps/web·worker·cli)과 어댑터 패키지의 시험 아닌 소스가 demo/ 나 @factory/core/testing 을 import 하지 않는다.
- * - 제품 앱의 package.json 이 @factory/demo 에 기대지 않는다.
- */
-
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const PRODUCT_DIRS = [
   "apps/web/src",
@@ -31,7 +23,6 @@ function* sources(dir: string): Generator<string> {
     if (entry.isDirectory()) {
       if (entry.name !== "fixtures") yield* sources(path);
     } else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
-      // 시험 도우미(test-support.ts, test-fixtures.ts)는 시험만 import 한다
       if (!entry.name.startsWith("test-")) yield path;
     }
   }

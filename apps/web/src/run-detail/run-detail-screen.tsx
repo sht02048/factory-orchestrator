@@ -36,28 +36,18 @@ import { canCancel } from "./model";
 import type { LogTailView, PendingInput, RunDetail, RunDetailPage, TimelineEvent } from "./model";
 
 export interface RunDetailActions {
-  /** 질문에 답한다. 답을 DB 에 남기고 worker 가 보낸다(Q82.3) */
   onAnswer: (questionId: string, body: string) => Promise<void>;
-  /** 권한 대기를 거절한다(Q82.4). 허용은 러너 화면에서만 한다. 이유는 비어도 된다 */
   onDeny: (promptId: string, reason: string) => Promise<void>;
-  /** 취소를 요청한다(Q77·Q82.8) */
   onCancel: () => Promise<void>;
-  /** 로그 꼬리를 다시 요청한다. 요청을 남기고 다시 읽으면 끝나고, 실패하면 거절한다 */
   onRefreshLog: () => Promise<void>;
 }
 
 export interface RunDetailScreenProps extends RunDetailActions {
   page: RunDetailPage;
-  /** Runs 목록 주소 */
   runsHref: string;
-  /** 다른 런의 상세 주소 */
   runHref: (runId: string) => string;
 }
 
-/**
- * Run 상세: 전체 화면(ADR 0010). 위에 상태·제목·행동, 그 아래 왼쪽은 질문 카드·지나온 일,
- * 오른쪽은 런 정보·터미널 끝부분·같은 티켓의 다른 런.
- */
 export function RunDetailScreen(props: RunDetailScreenProps) {
   const { page } = props;
   if (page.kind === "not-found") return <NotFound runsHref={props.runsHref} />;
@@ -85,7 +75,6 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const { status, when } = statusLine(run);
   const pr = run.pullRequest;
   const cancelable = canCancel(run) && !run.cancelPending;
-  // 보낸 뒤 누른 요소가 다시 읽은 화면에서 빠지면 포커스를 옮길 곳(티켓 0051)
   const headRef = useRef<HTMLElement>(null);
   const cancelStatusRef = useRef<HTMLSpanElement>(null);
 
@@ -102,7 +91,6 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
         <p {...stylex.props(styles.stateLine)}>
           <StatusPill status={status}>{statusName(status)}</StatusPill>
           <Text variant="meta">{when}</Text>
-          {/* 취소를 요청하면 트리거가 빠지므로 여기로 포커스를 옮기고 알린다. 비어 있어도 둬야 바뀔 때 읽는다 */}
           <span
             ref={cancelStatusRef}
             role="status"
@@ -113,7 +101,6 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
           </span>
         </p>
         <div {...stylex.props(styles.titleRow)}>
-          {/* 티켓 제목을 저장하면 회색 키 + 제목으로 바꾼다(ADR 0010 9번). 지금은 키만 있다. */}
           <Text variant="page" as="h1">
             {run.ticketKey}
           </Text>
@@ -184,7 +171,6 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   );
 }
 
-/** 이름 붙은 카드 하나. 제목 줄 오른쪽에 흐린 값이나 행동을 둘 수 있다 */
 function Block({
   title,
   aside,
@@ -209,7 +195,6 @@ function Block({
   );
 }
 
-/** 화면에 남아 있는 첫 대상에 포커스를 둔다. 다시 읽은 화면에서 빠진 대상은 건너뛴다 */
 function focusFirst(...targets: ReadonlyArray<RefObject<HTMLElement | null>>): void {
   for (const target of targets) {
     const element = target.current;
@@ -220,7 +205,6 @@ function focusFirst(...targets: ReadonlyArray<RefObject<HTMLElement | null>>): v
   }
 }
 
-/** 실패 문구. Home·Tickets·Settings 처럼 alert 로 알리고 문제 색으로 보인다 */
 function ActionFailed() {
   const t = useTranslations("run");
   return (
@@ -230,7 +214,6 @@ function ActionFailed() {
   );
 }
 
-/** 지금 보이는 질문·권한 요청을 받은 때부터 서버가 읽은 때까지 */
 function inputWaitedMs(run: RunDetail): number | null {
   if (run.status.state !== "waiting-for-input" || run.status.inputSince === null) return null;
   return Math.max(0, Date.parse(run.now) - Date.parse(run.status.inputSince));
@@ -292,7 +275,6 @@ function NextAction({ run }: { run: RunDetail }) {
   const manual = status.state === "ended" && status.worktreeNeedsManualRemoval;
   return manual ? (
     <p {...stylex.props(styles.flat)}>
-      {/* 사람이 해야 할 문제라 빨강(ADR 0010 5번)으로 띄운다 */}
       <span {...stylex.props(styles.problemNote)}>{t("manualRemoval")}</span>{" "}
       <Text variant="body">{t("next.manualRemoval")}</Text>
     </p>
@@ -314,7 +296,6 @@ function InputBlock({
   onDeny: RunDetailActions["onDeny"];
   headRef: RefObject<HTMLElement | null>;
 }) {
-  // 답·거절을 남긴 뒤에도 카드를 두고 결과를 알린다. 다시 읽어도 같은 카드라 포커스와 상태가 남는다.
   switch (input.kind) {
     case "question":
       return (
@@ -341,10 +322,6 @@ function InputBlock({
   }
 }
 
-/**
- * 보내기 상태. 성공하면 결과 문장(role="status")에 포커스를 둔다. 카드가 다시 읽은 화면에서 빠졌으면
- * 머리(상태·제목)로 옮긴다. 누른 버튼이 사라져 포커스가 body 로 떨어지지 않게 한다.
- */
 function useSubmit(headRef: RefObject<HTMLElement | null>) {
   const [submit, setSubmit] = useState<Submit>({ kind: "idle" });
   const resultRef = useRef<HTMLParagraphElement>(null);
@@ -353,7 +330,6 @@ function useSubmit(headRef: RefObject<HTMLElement | null>) {
     send().then(
       () => {
         setSubmit({ kind: "sent" });
-        // 카드가 남아 있으면 결과 문장이 그려진 뒤(아래 effect) 포커스를 둔다.
         if (resultRef.current === null || !resultRef.current.isConnected) focusFirst(headRef);
       },
       () => setSubmit({ kind: "failed" }),
@@ -367,7 +343,6 @@ function useSubmit(headRef: RefObject<HTMLElement | null>) {
 
 type Submit = { kind: "idle" } | { kind: "sending" } | { kind: "sent" } | { kind: "failed" };
 
-/** 질문 카드의 머리: 종류 알약 + 기다린 시간 */
 function InputHead({
   kind,
   waitedMs,
@@ -435,7 +410,6 @@ function QuestionForm({
           }}
         >
           {question.choices.length === 0 ? null : (
-            // 선택지는 모두 같은 보조 버튼이다. 추천처럼 칠하지 않는다(ADR 0010 6번).
             <div role="group" aria-label={t("question.choicesLabel")}>
               <Actions>
                 {question.choices.map((choice) => (
@@ -456,12 +430,10 @@ function QuestionForm({
             description={t("question.answerHelp")}
             {...(empty ? { error: t("question.empty") } : {})}
           >
-            {/* 라벨·도움말은 위아래에 두고 입력칸과 버튼만 한 줄에 맞춘다 */}
             <div {...stylex.props(styles.answerRow)}>
               <div {...stylex.props(styles.grow)}>
                 <Input name="answer" value={answer} onValueChange={setAnswer} autoComplete="off" />
               </div>
-              {/* 화면의 주 행동 하나(ADR 0010 6번) */}
               <Button type="submit" variant="primary" disabled={submit.kind === "sending"}>
                 {submit.kind === "sending" ? t("question.submitting") : t("question.submit")}
               </Button>
@@ -532,7 +504,6 @@ function CancelRun({
   focusAfter,
 }: {
   onCancel: RunDetailActions["onCancel"];
-  /** 요청을 남기고 다시 읽은 뒤. 트리거가 빠지므로 상태 줄로 포커스를 옮긴다 */
   focusAfter: () => void;
 }) {
   const t = useTranslations("run");
@@ -657,14 +628,12 @@ function LogTail({
       body = <LogLines lines={log.lines} />;
       break;
   }
-  // 기다리는 중에도 다시 요청할 수 있게 둔다. worker 가 늦으면 화면이 다시 읽기를 멈춘다.
   const live = log.kind !== "none" && log.kind !== "stored";
   return (
     <Block
       title={t("title")}
       aside={
         live ? (
-          // 받는 동안 누를 수 없지만 포커스는 남게 disabled 대신 aria-disabled 를 쓴다
           <button
             type="button"
             data-variant="ghost"
@@ -699,14 +668,12 @@ function LogLines({ lines }: { lines: ReadonlyArray<string> }) {
   const t = useTranslations("run.log");
   const ref = useRef<HTMLPreElement>(null);
   const text = lines.join("\n");
-  // 꼬리라 마지막 줄이 중요하다. 열 때와 줄이 바뀔 때 맨 아래로 내린다.
   useEffect(() => {
     const element = ref.current;
     if (element !== null) element.scrollTop = element.scrollHeight;
   }, [text]);
   if (lines.length === 0) return <Text variant="meta">{t("empty")}</Text>;
   return (
-    // 키보드로도 스크롤할 수 있게 포커스를 받는 구역으로 둔다
     <pre
       ref={ref}
       tabIndex={0}
@@ -803,7 +770,6 @@ function Properties({ run }: { run: RunDetail }) {
   );
 }
 
-/** 같은 티켓의 다른 런: 할당한 때 + 상태 알약 */
 function OtherRuns({ run, runHref }: { run: RunDetail; runHref: (runId: string) => string }) {
   const t = useTranslations("run.otherRuns");
   const { ago } = useTime();
@@ -829,7 +795,6 @@ function OtherRuns({ run, runHref }: { run: RunDetail; runHref: (runId: string) 
   );
 }
 
-/** 상태 줄: Ended 는 요약 결과, 그 밖은 런 상태 */
 function useStatusLine(): (run: RunDetail) => { status: PillStatus; when: string } {
   const t = useTranslations("run.when");
   const { duration, elapsed } = useTime();
@@ -881,7 +846,6 @@ const styles = stylex.create({
     display: "inline-flex",
     alignItems: "center",
     gap: space.s2,
-    // 누르는 영역을 버튼 높이만큼 넓힌다
     minHeight: size.control,
     color: { default: colors.textTertiary, ":hover": colors.textSecondary },
     textDecoration: "none",
@@ -890,7 +854,6 @@ const styles = stylex.create({
     outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
     outlineOffset: 2,
   },
-  // 프로그램으로만 포커스를 받는 머리. 테두리를 그리지 않는다.
   focusTarget: { outline: "none" },
   meta: { color: colors.textTertiary, fontSize: fontSize.ui, lineHeight: lineHeight.normal },
   result: {
@@ -909,7 +872,6 @@ const styles = stylex.create({
     gap: space.s4,
   },
   stateLine: { display: "flex", alignItems: "center", gap: space.s3, margin: 0 },
-  // 왼쪽 질문·지나온 일, 오른쪽 정보·터미널 끝부분. 좁으면 한 열로 쌓는다.
   columns: {
     display: "grid",
     gridTemplateColumns: {
@@ -926,7 +888,6 @@ const styles = stylex.create({
     justifyContent: "space-between",
     gap: space.s3,
   },
-  // 행을 담는 카드는 안쪽 여백이 좁아 제목만 행 글과 줄을 맞춘다.
   blockHeadCompact: { paddingTop: space.s2, paddingInline: space.s3, paddingBottom: space.s1 },
   stack: { display: "flex", flexDirection: "column", gap: space.s3 },
   flat: { margin: 0 },

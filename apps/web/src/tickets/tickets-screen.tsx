@@ -36,15 +36,12 @@ import { TICKET_FILTERS, lastRun, matchesFilter } from "./model";
 import type { TicketFilter, TicketView, TicketsPage } from "./model";
 import { useRowWindow } from "./row-window";
 
-// 티켓(회색 키 + 제목) | 트래커 프로젝트 | 트래커 상태 | 마지막 런 (ADR 0010 9번)
 const columns = "minmax(0, 1fr) 128px 104px 160px";
 
 export interface TicketsScreenProps {
   page: TicketsPage;
-  /** "전체"에서 고를 Workspace 들 */
   workspaces: ReadonlyArray<WorkspaceSummary>;
   filter: TicketFilter;
-  /** 고른 티켓. 없거나 목록에 없으면 첫 행을 고른다 */
   selectedId: string | undefined;
   onFilterChange: (filter: TicketFilter) => void;
   onSelect: (ticketId: string) => void;
@@ -54,7 +51,6 @@ export interface TicketsScreenProps {
   onAssigned: (ticketId: string) => void;
 }
 
-/** Tickets: 현재 Workspace 의 트래커 티켓 목록 + 오른쪽 상세 패널(ADR 0007, 시안 B) */
 export function TicketsScreen(props: TicketsScreenProps) {
   const { page } = props;
   switch (page.workspace.kind) {
@@ -443,7 +439,6 @@ const styles = stylex.create({
   },
   inline: { display: "inline-flex", alignItems: "baseline", gap: space.s2 },
   ticketCell: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
-  // 티켓은 어디서나 회색 키 + 제목(ADR 0010 9번). Home 의 키와 같은 모양
   key: {
     flexShrink: 0,
     color: colors.textTertiary,

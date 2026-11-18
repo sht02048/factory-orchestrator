@@ -7,20 +7,11 @@ import { useTime } from "../format/time";
 import { STATS_DAYS } from "./model";
 import type { DailyThroughput } from "./model";
 
-// 막대 영역 높이(px). 축 글자는 HTML 이라 화면 폭과 상관없이 제 크기로 보인다.
 const PLOT_HEIGHT = 136;
 const GRID_LINES = 4;
 
 type Outcome = "merged" | "check" | "failed" | "canceled";
 
-/**
- * 날짜별 처리량: 날마다 끝난 런 수를 요약 결과로 나눠 쌓는다(아래부터 Merged, Human Check, Failed, Canceled).
- * 색은 상태 알약과 같은 뜻을 쓴다(ADR 0010 5번): Merged 파랑, Human Check 노랑, Failed 빨강, Canceled 회색.
- * Canceled 는 Failed 와 밝기가 비슷해 빗금을 더한다. Canceled 도 따로 세어 쌓는다(Q82.18).
- *
- * 같은 값을 표로도 둔다. 표는 늘 접근성 트리에 있고, "표로 보기"를 누르면 화면에도 보인다.
- * 막대 그림은 role="img" 라 날짜별 값은 표로 읽는다.
- */
 export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughput> }) {
   const t = useTranslations("stats.throughput");
   const { statsDay: dayLabel } = useTime();
@@ -33,7 +24,6 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
 
   if (max === 0) return <Text variant="meta">{t("empty", { days: STATS_DAYS })}</Text>;
 
-  // 눈금은 짝수 간격 네 칸.
   const step = Math.max(1, Math.ceil(max / GRID_LINES / 2) * 2);
   const top = step * GRID_LINES;
   const ticks = Array.from({ length: GRID_LINES + 1 }, (_, i) => i * step);
@@ -90,7 +80,6 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
                     segment.value === 0 ? null : (
                       <span
                         key={segment.key}
-                        // 조각 사이 1px 틈(marginTop)을 높이에서 빼 막대가 맨 위 눈금을 넘지 않게 한다.
                         style={{ height: `calc(${(segment.value / top) * 100}% - 1px)` }}
                         {...stylex.props(styles.segment, fill[segment.key])}
                       />
@@ -114,7 +103,6 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
           {showTable ? t("hideTable") : t("showTable")}
         </Button>
       </div>
-      {/* 표 요소는 width·height 를 최소값으로만 받아, 숨길 때는 감싼 div 를 줄인다 */}
       <div {...stylex.props(!showTable && styles.hidden)}>
         <table id={tableId} {...stylex.props(styles.table)}>
           <caption {...stylex.props(styles.caption)}>{t("tableCaption")}</caption>
@@ -156,12 +144,10 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
   );
 }
 
-/** 범례의 색 견본. 막대와 같은 색과 빗금이다 */
 export function LegendSwatch({ outcome }: { outcome: Outcome }) {
   return <i aria-hidden {...stylex.props(styles.swatch, fill[outcome])} />;
 }
 
-// Canceled 빗금: 회색 바탕 위에 바탕색 줄을 긋는다.
 const hatch = `repeating-linear-gradient(135deg, transparent 0 2px, ${colors.bgCanvas} 2px 3px)`;
 
 const styles = stylex.create({
@@ -171,7 +157,6 @@ const styles = stylex.create({
     gridTemplateRows: `${PLOT_HEIGHT}px auto`,
     columnGap: space.px6,
     rowGap: space.px6,
-    // 맨 위 눈금 글자가 위로 반쯤 나온다.
     paddingTop: space.s2,
   },
   axis: { position: "relative", minWidth: space.s4 },
@@ -200,14 +185,12 @@ const styles = stylex.create({
   segment: {
     display: "block",
     width: "56%",
-    // 큰 값 옆의 1런 조각도 보이게 한다.
     minHeight: 2,
     marginTop: 1,
     borderRadius: 1,
     flexShrink: 0,
   },
   days: { gridColumn: 2, display: "grid" },
-  // 칸보다 긴 날짜는 양옆 빈 칸으로 넘친다(날짜는 두 칸에 하나만 쓴다).
   day: { display: "flex", justifyContent: "center", minWidth: 0, whiteSpace: "nowrap" },
   text: {
     color: colors.textTertiary,
@@ -222,7 +205,6 @@ const styles = stylex.create({
     fontSize: fontSize.ui,
     fontVariantNumeric: "tabular-nums",
   },
-  // 화면에는 숨기고 접근성 트리에는 남긴다.
   hidden: {
     position: "absolute",
     width: 1,

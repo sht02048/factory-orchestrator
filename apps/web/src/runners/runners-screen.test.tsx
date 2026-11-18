@@ -20,14 +20,12 @@ function render(page: RunnersPage, selectedId?: string, ws?: string) {
   );
 }
 
-/** 러너 카드 하나(section)의 HTML */
 function cardHtml(html: string, name: string): string {
   const start = html.indexOf(`<section aria-label="${name} 러너"`);
   if (start === -1) throw new Error(`no card ${name}`);
   return html.slice(start, html.indexOf("</section>", start));
 }
 
-/** 태그를 지운 글 */
 function textOf(html: string): string {
   return html
     .replace(/<[^>]+>/g, " ")
@@ -35,7 +33,6 @@ function textOf(html: string): string {
     .replace(/\s+/g, " ");
 }
 
-/** 렌더한 버튼(과 버튼 모양 링크)의 변형 */
 function variantsOf(html: string): string[] {
   return [...html.matchAll(/data-variant="([^"]+)"/g)].map((m) => m[1] ?? "");
 }
@@ -181,7 +178,6 @@ describe("Runners 화면", () => {
     expect(text).toContain(card.unreachable);
     expect(text).toContain(card.fixTitle);
     expect(text).toContain(card.fix.offline);
-    // Offline 은 Offline 알약 하나로 보인다. Runner Issue 알약을 겹쳐 달지 않는다
     expect(pillsOf(b).map((p) => p.status)).toEqual(["offline"]);
   });
 
@@ -196,7 +192,6 @@ describe("Runners 화면", () => {
     ]);
     const text = textOf(a);
     expect(text).toContain(card.summary.assignmentBlocked);
-    // 항목마다 통과·깨짐을 아이콘 이름으로 보인다. 어댑터의 영어 이름 대신 메시지로 보인다
     expect(a).toMatch(
       new RegExp(`aria-label="${card.check.broken}"[^]*?GitHub push 권한: github:acme/web<`),
     );
@@ -204,7 +199,6 @@ describe("Runners 화면", () => {
       new RegExp(`aria-label="${card.check.ok}"[^]*?GitHub push 권한: github:acme/docs<`),
     );
     expect(text).not.toContain("GitHub push access");
-    // 어댑터의 영어 해결 방법은 한국어 안내와 겹쳐 보이지 않는다
     expect(text).not.toContain("Run `gh auth login");
     expect(text).toContain("gh auth login --insecure-storage");
     expect(text).toContain("gh auth setup-git");

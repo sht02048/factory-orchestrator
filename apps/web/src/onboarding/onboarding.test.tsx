@@ -54,11 +54,6 @@ import type { OnboardingStep } from "./model";
 import { OnboardingScreen } from "./onboarding-screen";
 import type { OnboardingActions } from "./onboarding-screen";
 
-/*
- * 온보딩(0026). 가상 값만 쓴다(acme, example.com).
- * 저장과 연결 확인은 Settings(0025)의 함수를 그대로 부르고, 트래커·코드 호스트는 가짜 어댑터를 쓴다.
- */
-
 const now = new Date("2026-11-18T09:00:00Z");
 const webProject = toTrackerProjectId("tp-web");
 const repo = toRunnerProjectId("github:acme/web");
@@ -134,7 +129,6 @@ function text(html: string): string {
     .replace(/\s+/g, " ");
 }
 
-/** 바닥의 다음(마지막 단계는 설정 마치기) 버튼 태그 */
 function nextButton(html: string, label: string): string {
   const button = html.match(new RegExp(`<button[^>]*>${label}</button>`, "g"))?.at(-1);
   if (button === undefined) throw new Error(`no ${label} button`);
@@ -189,10 +183,6 @@ const health = (
   ],
 });
 
-/**
- * Orca 상시 서비스가 없을 때 runner-orca 가 돌려주는 모양. 런타임이 준비되지 않아 Offline(not-ready)이고,
- * 러너 쪽 프로젝트를 읽지 못해 GitHub 인증 조건은 없다.
- */
 const serviceMissing: RunnerHealth = {
   online: false,
   version: "1.4.258",
@@ -209,7 +199,6 @@ const serviceMissing: RunnerHealth = {
   ],
 };
 
-/** worker 가 러너 확인을 마친 것처럼 결과를 쓴다(Q61) */
 function finishCheck(f: Fixture, runnerId: RunnerId, result: RunnerHealth): void {
   const request = listPendingRunnerCheckRequests(f.context.db).find((r) => r.runnerId === runnerId);
   if (request === undefined) throw new Error("no pending request");
@@ -249,11 +238,9 @@ describe("온보딩으로 보내기", () => {
         to: ONBOARDING_PATH,
       });
     }
-    // 온보딩 자신과 서버 경로(webhook), 디자인 시스템 미리보기는 보내지 않는다
     for (const path of ["/onboarding", "/api/webhooks/tracker/c-1", "/ds"]) {
       expect({ path, to: onboardingRedirect(path, complete) }).toEqual({ path, to: null });
     }
-    // 처음 들어오면 첫 단계(트래커 연결)를 보인다
     expect(resolveStep(await page(f), undefined)).toBe(0);
   });
 });
@@ -272,7 +259,6 @@ describe("확인이 실패한 단계", () => {
     const settings = await page(f);
     expect(stepPassed(settings, "tracker")).toBe(false);
     expect(isDisabled(nextButton(render(settings, "tracker"), "다음"))).toBe(true);
-    // 주소로 뒤 단계를 골라도 끝내지 않은 단계에 머문다
     expect(resolveStep(settings, 4)).toBe(0);
   });
 
@@ -315,7 +301,6 @@ describe("확인이 실패한 단계", () => {
     expect(isDisabled(nextButton(html, "다음"))).toBe(true);
     const shown = text(html);
     expect(shown).toContain("Orca 상시 서비스가 없어요");
-    // PATH 에 orca 가 없어도 되게 등록한 경로를 --command 로 넣는다. --supervise 는 없다
     expect(serviceInstallCommand(orcaPath)).toBe(
       "/opt/orca/bin/orca serve service install --bind 127.0.0.1 --refuse-public --command /opt/orca/bin/orca",
     );
@@ -323,7 +308,6 @@ describe("확인이 실패한 단계", () => {
     expect(serviceInstallCommand("/opt/my tools/orca")).toBe(
       "'/opt/my tools/orca' serve service install --bind 127.0.0.1 --refuse-public --command '/opt/my tools/orca'",
     );
-    // Offline 이어도 원인을 아는 경우에는 닿지 않았다는 일반 안내 대신 원인을 보인다
     expect(shown).not.toContain("ssh 대상과 orca 실행 파일 경로를 확인하고");
     expect(shown).not.toContain("--supervise");
     expect(shown).not.toContain("러너의 GitHub 인증이 안 돼요");
@@ -351,7 +335,6 @@ describe("확인이 실패한 단계", () => {
   });
 
   it("러너에 닿았지만 확인 중 오류가 나면 다음으로 갈 수 없다", async () => {
-    // runner-orca 는 러너 쪽 프로젝트를 읽지 못하면 GitHub 인증을 확인하지 않고 오류와 함께 돌려준다
     const { settings, html } = await runnerStep({
       ...serviceMissing,
       online: true,
@@ -383,10 +366,8 @@ describe("확인이 실패한 단계", () => {
   });
 });
 
-/** 렌더한 버튼(과 버튼 모양 링크) 중 파란 주 버튼 수 */
 const primaryCount = (html: string) => html.match(/data-variant="primary"/g)?.length ?? 0;
 
-/** 다섯 단계를 모두 그려 단계마다 주 버튼 수를 돌려준다 */
 function primaryByStep(settings: SettingsPage): Array<{ step: OnboardingStep; primary: number }> {
   return ONBOARDING_STEPS.map((step) => ({ step, primary: primaryCount(render(settings, step)) }));
 }
@@ -408,10 +389,8 @@ describe("단계 목록과 주 버튼(ADR 0010)", () => {
     await connectTracker(f);
     const html = render(await page(f), "github");
     const nav = html.slice(html.indexOf("<nav"), html.indexOf("</nav>"));
-    // 확인이 성공한 Tracker 는 번호 대신 체크를 보이고, 화면 읽기에는 완료를 글로 알린다(0052)
     expect(text(nav)).toContain("시작하기 1 Tracker 완료 2 GitHub 3 Runner 4 Workspace 5 Mapping");
     expect(nav).toMatch(/aria-current="step"[^>]*>.*?GitHub</);
-    // 확인이 성공한 단계는 눌러 돌아갈 수 있고, 갈 수 없는 뒤 단계는 누를 수 없다
     const buttons = (nav.match(/<button.*?<\/button>/g) ?? []).map(text);
     expect(buttons).toEqual([" 1 Tracker 완료 "]);
     expect(text(html)).toContain("2/5 · GitHub");
@@ -432,7 +411,6 @@ describe("단계 목록과 주 버튼(ADR 0010)", () => {
     });
     await atMostOne();
     const runnerId = registerRunner(f);
-    // 확인을 기다리는 동안
     await atMostOne();
     finishCheck(f, runnerId, health({ service: true, push: true }));
     await atMostOne();
@@ -493,24 +471,20 @@ describe("다섯 단계를 마치기", () => {
     expect(createFirstWorkspace(f.context.db, { name: "Acme Commerce" }, now)).toEqual({
       ok: true,
     });
-    // 두 번 만들어도 첫 Workspace 하나다
     expect(createFirstWorkspace(f.context.db, { name: "Acme Again" }, now)).toEqual({ ok: true });
     const workspaces = listWorkspaces(f.context.db);
     expect(workspaces.map((w) => w.name)).toEqual(["Acme Commerce"]);
     const ws = workspaces[0]?.id ?? "";
     const connectionId = listTrackerConnections(f.context.db, f.context.secretBox)[0]?.id ?? "";
-    // Workspace 만 만들고 트래커 프로젝트를 넣지 않으면 넘어가지 않는다
     expect(await reached()).toBe(3);
     const project = { ws, connectionId, projectId: webProject };
     expect(addTrackerProject(f.context, { ...project, name: "Web" })).toEqual({ ok: true });
     expect(await reached()).toBe(4);
 
-    // 마지막 단계는 Mapping, "In Progress" 상태, Auto-assign Label 을 모두 저장하기 전에는 마칠 수 없다(0042)
     const locked = async (missing: string[]) => {
       const html = render(await page(f), "mapping");
       expect(isDisabled(nextButton(html, "설정 마치기"))).toBe(true);
       expect(isOnboardingComplete(f.context.db, f.context.secretBox)).toBe(false);
-      // 안내는 같은 status 요소 안에서만 바뀐다(0052)
       expect(html).toMatch(/<div role="status"[^>]*><p[^>]*>설정을 마치려면 이것을 정해요.</);
       const shown = text(html);
       for (const part of ["mapping", "progress", "label"] as const) {
@@ -522,7 +496,6 @@ describe("다섯 단계를 마치기", () => {
       }
     };
     await locked(["mapping", "progress", "label"]);
-    // 세 칸을 한 단계에서 고른다
     const shown = text(render(await page(f), "mapping"));
     expect(shown).toContain("러너 쪽 프로젝트");
     expect(shown).toContain('"In Progress" 상태');
@@ -531,7 +504,6 @@ describe("다섯 단계를 마치기", () => {
     expect(
       saveMappingSetting(f.context, { ...project, runnerProjectId: repo, agentId: "claude" }),
     ).toEqual({ ok: true });
-    // Mapping 만 정하면 라벨로 할당되지 않고 티켓 상태도 바뀌지 않으니 아직 마칠 수 없다
     await locked(["progress", "label"]);
     expect(saveInProgressState(f.context, { ...project, stateId: "st-doing" })).toEqual({
       ok: true,
@@ -546,7 +518,6 @@ describe("다섯 단계를 마치기", () => {
     expect(ONBOARDING_STEPS.every((step) => stepPassed(settings, step))).toBe(true);
     expect(isDisabled(nextButton(render(settings, "mapping"), "설정 마치기"))).toBe(false);
     expect(HOME_PATH).toBe("/");
-    // 온보딩에서 고른 값이 Settings 에 1/1 로 보인다
     const settingsHtml = renderWithMessages(
       <SettingsScreen
         page={settings}
@@ -558,13 +529,11 @@ describe("다섯 단계를 마치기", () => {
     );
     expect(text(settingsHtml).match(/1\/1개 정함/g)).toHaveLength(3);
 
-    // 마친 뒤에는 어느 화면에 들어가도 온보딩으로 보내지 않는다
     const complete = isOnboardingComplete(f.context.db, f.context.secretBox);
     expect(complete).toBe(true);
     for (const path of ["/", "/runs", "/settings"]) {
       expect({ path, to: onboardingRedirect(path, complete) }).toEqual({ path, to: null });
     }
-    // 러너가 나중에 Offline 이 돼도 온보딩으로 돌아가지 않는다
     recordRunnerCheck(f.context.db, {
       runnerId,
       online: false,
@@ -636,7 +605,6 @@ describe("다섯 단계를 마치기", () => {
     const f = fixture();
     await connectTracker(f);
     const before = await page(f);
-    // 정하지 않았으면 그 사실과 정하는 방법, 경로를 보인다
     const unset = text(render(before, "tracker"));
     expect(unset).toContain("아직 webhook 공개 주소가 없어요");
     expect(unset).toContain("Tailscale Funnel");
@@ -659,12 +627,10 @@ describe("다섯 단계를 마치기", () => {
 
   it("단계 없는 주소로 들어와 트래커 연결을 저장하면 1단계에 머물고 webhook 경로가 보인다", async () => {
     const f = fixture();
-    // 단계 없는 주소(/onboarding)로 들어오면 라우트가 지금 단계(1)를 주소에 넣어 다시 보낸다
     const step = stepToPin(await page(f), undefined);
     expect(step).toBe(1);
     expect(stepToPin(await page(f), step ?? undefined)).toBeNull();
 
-    // 저장하면 화면 값을 다시 읽는다. 주소에 남은 단계로 고르므로 2단계로 넘어가지 않는다
     await connectTracker(f);
     const settings = await page(f);
     const index = resolveStep(settings, step ?? undefined);
@@ -675,13 +641,11 @@ describe("다섯 단계를 마치기", () => {
     const html = render(settings, ONBOARDING_STEPS[index] ?? "github");
     expect(text(html)).toContain("Linear에서 webhook 만들기");
     expect(html).toContain(connection.webhookPath);
-    // 다음으로 가는 것은 운영자가 다음을 눌러서다
     expect(isDisabled(nextButton(html, "다음"))).toBe(false);
   });
 
   it("갈 수 없는 뒤 단계 주소로 들어와도 보이는 단계를 주소에 넣어, 저장 뒤 1단계에 머문다", async () => {
     const f = fixture();
-    // /onboarding?step=3 으로 들어오면 1단계를 보이고 주소도 1단계로 바꾼다
     const step = stepToPin(await page(f), 3);
     expect(step).toBe(1);
     await connectTracker(f);
@@ -698,7 +662,6 @@ describe("다섯 단계를 마치기", () => {
     expect(text(html)).toContain("서명 검증에 실패");
     expect(isDisabled(nextButton(html, "다음"))).toBe(false);
 
-    // webhook 을 만든 뒤 signing secret 을 넣고 저장하면 알림이 사라진다
     const id = withoutSecret.install.connections[0]?.id ?? "";
     expect(
       await saveTrackerConnectionSetting(

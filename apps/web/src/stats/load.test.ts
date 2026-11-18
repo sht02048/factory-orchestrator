@@ -15,15 +15,6 @@ function byName(groups: ReadonlyArray<StatsGroup>): Map<string, StatsGroup> {
   return new Map(groups.map((g) => [g.name, g]));
 }
 
-/*
- * 손으로 계산한 값. 런과 시간은 testing/stats-seed.ts 의 statsCases 에 있다.
- *
- * 기간(11월 4일~17일, UTC 로 자를 때)에 끝난 ws-commerce 런 아홉:
- *   Merged C-1, C-8 / Human Check C-2(이후 병합), C-3(이후 닫힘), C-4 / Failed C-5, C-6, C-7, C-9
- * 리드 타임(분, 대기 + 실행): 10 15 18 20 22 30 34 50 121 → 중앙값 5번째 22, p90 9번째 121
- * 대기(분): 1 2 2 3 4 5 6 8 10 → 중앙값 4 / 실행(분): 8 10 12 15 20 24 30 40 120 → 중앙값 20
- * 세지 않는 런: OLD-1(11월 3일에 끝남), C-10(실행 중), LAB-1(다른 Workspace)
- */
 describe("loadStatsPage", () => {
   it("처리량과 요약 결과 분포를 core 요약 계산으로 센다", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
@@ -77,8 +68,6 @@ describe("loadStatsPage", () => {
   });
 
   it("날짜는 운영자 시간대로 자른다: 날짜 경계를 넘는 런은 그 시간대의 날짜로 묶인다(0044)", () => {
-    // now 는 서울 11월 17일 21:00, 로스앤젤레스 11월 17일 04:00 이라 두 곳 다 기간은 11월 4일~17일이다.
-    // OLD-1 은 UTC 11월 3일 20:11 에 끝나 서울로는 11월 4일 05:11 이다. 서울에서는 기간 안이다.
     const seoul = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "Asia/Seoul"));
     expect(seoul.total.runs).toBe(10);
     const seoulDay = (date: string) =>
@@ -89,7 +78,6 @@ describe("loadStatsPage", () => {
       failed: 1,
       canceled: 0,
     });
-    // C-7 은 UTC 11월 4일 00:10 에 끝나 로스앤젤레스로는 11월 3일 16:10 이다. 기간 밖이다.
     const la = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "America/Los_Angeles"));
     expect(new Date(la.period.firstDay).toISOString()).toBe("2026-11-04T00:00:00.000Z");
     expect(la.total.runs).toBe(8);
@@ -107,14 +95,12 @@ describe("loadStatsPage", () => {
   it("러너·트래커 프로젝트·에이전트별 값을 손으로 계산한 값과 맞춘다", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
     const runners = byName(page.groups.runner);
-    // runner-a: C-1 C-2 C-4 C-7 C-8, 리드 타임 15 20 22 30 34 → 중앙값 22
     expect(runners.get("runner-a")).toMatchObject({
       runs: 5,
       outcomes: { merged: 2, "human-check": 2, failed: 1, canceled: 0 },
       humanCheck: { humanCheck: 2, merged: 1, closed: 0 },
       durations: { leadP50Ms: 22 * min },
     });
-    // runner-b: C-3 C-5 C-6 C-9, 리드 타임 10 18 50 121 → 중앙값 2번째 18
     expect(runners.get("runner-b")).toMatchObject({
       runs: 4,
       outcomes: { merged: 0, "human-check": 1, failed: 3, canceled: 0 },
@@ -124,7 +110,6 @@ describe("loadStatsPage", () => {
     expect(page.groups.runner.map((g) => g.name)).toEqual(["runner-a", "runner-b"]);
 
     const projects = byName(page.groups.trackerProject);
-    // 고른 묶음은 주소(sel)에 남으므로 키는 주소에 안전한 글자만 쓴다
     expect(page.groups.trackerProject.map((g) => g.key).toSorted()).toEqual([
       "conn-acme:tp-api",
       "conn-acme:tp-web",
@@ -212,14 +197,12 @@ describe("loadStatsPage", () => {
 
     it("Canceled 런은 취소로 따로 세고 성공·실패율의 분모에서 뺀다(Q82.9·Q82.18)", () => {
       const page = withDecisions();
-      // 기존 아홉 + X-1~X-4. 취소 둘(X-1, X-4), Failed 둘 더(X-2, X-3)
       expect(page.total.runs).toBe(13);
       expect(page.total.outcomes).toEqual({ merged: 2, "human-check": 3, failed: 6, canceled: 2 });
       expect(page.total.rated).toBe(11);
       const gemini = byName(page.groups.agent).get("gemini");
       expect(gemini).toMatchObject({ runs: 2, rated: 1 });
       expect(gemini?.outcomes).toEqual({ merged: 0, "human-check": 0, failed: 1, canceled: 1 });
-      // 취소 런은 Failed 조합에 들지 않는다
       expect(gemini?.failedCombinations).toEqual([
         { agentResult: "ended-without-report", prState: "none", runs: 1 },
       ]);
@@ -227,7 +210,6 @@ describe("loadStatsPage", () => {
 
     it("시작하지 않고 끝난 런의 대기 시간은 할당부터 끝낸 시각까지이고 실행 시간은 0이다(Q82.9·Q82.20)", () => {
       const aider = byName(withDecisions().groups.agent).get("aider");
-      // X-1 대기 20분, X-2 대기 5분. 둘 다 실행 0
       expect(aider?.durations).toEqual({
         leadP50Ms: 5 * min,
         leadP90Ms: 20 * min,

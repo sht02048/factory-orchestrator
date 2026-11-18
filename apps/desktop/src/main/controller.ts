@@ -26,15 +26,6 @@ import type { WatchState } from "../core/watch.js";
 import type { FindResult, ViewState } from "../shared/view.js";
 import { IPC_PREFIX, VIEW_CHANNEL } from "../shared/view.js";
 
-/*
- * 앱(①)의 상태와 행동. 창 하나가 앱 화면(renderer)과 서버의 web 화면을 번갈아 연다(Q1). 트레이·메뉴 막대·알림을
- * 여기서 맞춘다.
- *
- * - 로컬 모드: LocalServer 로 ②에 붙거나 띄우고, ServerWatch 가 앱이 열린 동안 ②를 지킨다.
- * - 원격 모드: 저장한 서버를 열고, 닿지 않으면 "닿지 않음" 화면에서 5초마다 다시 본다.
- * - 알림: 연 서버의 `/api/attention` 을 15초마다 폴링한다(로컬·원격 같음).
- */
-
 const t = createTranslator({ locale: "ko", messages: { system }, namespace: "system" });
 
 const ATTENTION_INTERVAL_MS = 15_000;
@@ -43,13 +34,11 @@ const REMOTE_RETRY_MS = 5_000;
 export interface ControllerOptions {
   settings: SettingsStore;
   local: LocalServer;
-  /** 앱에 실린 서버 배포물 버전. ③과 다르면 알린다 */
   serverVersion: string;
   logFile: string;
   rendererFile: string;
   preloadFile: string;
   trayIcon: string;
-  /** 로그인 때 실행으로 열렸다. 창을 띄우지 않는다 */
   openedAtLogin: boolean;
 }
 
@@ -61,11 +50,9 @@ export class Controller {
   private tray: Tray | undefined;
   private view: ViewState = { screen: "choose-mode" };
   private mode: Mode = "choosing";
-  /** 창이 연 서버 주소. 앱 화면을 보이면 undefined */
   private serverUrl: string | undefined;
   private readonly watch: ServerWatch;
   private readonly diff = new AttentionDiff();
-  /** 알림 기준(diff)이 어느 서버의 것인가 */
   private diffUrl: string | undefined;
   private attentionTimer: NodeJS.Timeout | undefined;
   private remoteTimer: NodeJS.Timeout | undefined;
@@ -107,7 +94,6 @@ export class Controller {
     window.focus();
   }
 
-  /** 트레이 "서버도 끄고 종료": 앱이 띄운 ②까지 멈춘다. ③은 멈추지 않는다 */
   async quitWithServer(): Promise<void> {
     this.watch.stop();
     this.watch.setWanted(false);
@@ -115,7 +101,6 @@ export class Controller {
     this.quit();
   }
 
-  /** 트레이 "종료": 앱만 끝낸다. ②는 계속 돈다 */
   quit(): void {
     this.quitting = true;
     this.watch.stop();
@@ -123,8 +108,6 @@ export class Controller {
     this.stopRemoteRetry();
     app.quit();
   }
-
-  // ── 로컬 모드 ──────────────────────────────────────────────
 
   private async startLocal(): Promise<void> {
     this.mode = "local";
@@ -179,8 +162,6 @@ export class Controller {
     }
     this.refreshMenus();
   }
-
-  // ── 원격 모드 ──────────────────────────────────────────────
 
   private async chooseRemote(): Promise<void> {
     this.mode = "remote";
@@ -260,7 +241,6 @@ export class Controller {
     this.remote = { server: saved, reachable: false };
     this.setView({ screen: "unreachable", name: saved.name, checking: false });
     this.refreshMenus();
-    // 닿으면 사람이 누르지 않아도 연다.
     this.remoteTimer ??= setInterval(() => {
       if (this.view.screen === "unreachable" && !this.view.checking && this.remote !== undefined) {
         void this.openRemote(this.remote.server);
@@ -272,8 +252,6 @@ export class Controller {
     if (this.remoteTimer !== undefined) clearInterval(this.remoteTimer);
     this.remoteTimer = undefined;
   }
-
-  // ── 화면 ──────────────────────────────────────────────────
 
   private chooseMode(): void {
     this.mode = "choosing";
@@ -291,7 +269,6 @@ export class Controller {
   }
 
   private applyLoginItem(openAtLogin: boolean): void {
-    // 개발 실행(electron .)에서 등록하면 Electron 실행 파일이 로그인 항목에 남는다. 패키징한 앱에서만 한다.
     if (!app.isPackaged) return;
     app.setLoginItemSettings({ openAtLogin });
   }
@@ -301,7 +278,6 @@ export class Controller {
     const window = this.window;
     if (window === undefined || window.isDestroyed()) return;
     if (this.serverUrl !== undefined) {
-      // 알림 기준은 그대로 둔다. 같은 서버를 다시 열면 그사이 생긴 사건을 알린다(openServer 는 다른 서버일 때만 지운다).
       this.serverUrl = undefined;
       void window.loadFile(this.options.rendererFile);
       return;
@@ -339,13 +315,11 @@ export class Controller {
       },
     });
     window.once("ready-to-show", () => window.show());
-    // 창을 닫아도 앱은 트레이에 남는다(Q5). 끝내기는 트레이·메뉴의 "종료".
     window.on("close", (event) => {
       if (this.quitting) return;
       event.preventDefault();
       window.hide();
     });
-    // 서버 화면 밖으로 나가는 링크(PR, 트래커)는 브라우저로 연다.
     window.webContents.setWindowOpenHandler(({ url }) => {
       if (/^https?:/.test(url)) void shell.openExternal(url);
       return { action: "deny" };
@@ -358,7 +332,6 @@ export class Controller {
       if (/^https?:/.test(url)) void shell.openExternal(url);
     });
     window.webContents.on("did-fail-load", (_event, code, _description, url, isMainFrame) => {
-      // 서버가 멈춘 사이 연 화면이면 상태에 맞는 앱 화면으로 돌린다.
       if (!isMainFrame || code === -3 || this.isAppScreen(url)) return;
       if (this.mode === "remote" && this.remote !== undefined)
         void this.openRemote(this.remote.server);
@@ -417,8 +390,6 @@ export class Controller {
     handle("choose-mode", () => this.chooseMode());
   }
 
-  // ── 알림 ──────────────────────────────────────────────────
-
   private async pollAttention(): Promise<void> {
     const url = this.serverUrl;
     if (url === undefined) return;
@@ -433,7 +404,6 @@ export class Controller {
     const notification = new Notification({ title, body });
     notification.on("click", () => {
       this.showWindow();
-      // 앱 화면을 보이고 있어도 같은 서버의 알림이면 그 화면을 연다.
       if (this.serverUrl === url || (this.serverUrl === undefined && this.diffUrl === url)) {
         this.openServer(url, attentionPath(event));
       }
@@ -449,8 +419,6 @@ export class Controller {
       body: t("notifications.versionDiffers.body", { server, app: this.options.serverVersion }),
     }).show();
   }
-
-  // ── 트레이·메뉴 막대 ──────────────────────────────────────
 
   private refreshMenus(): void {
     const items = this.menuItems();
@@ -481,7 +449,6 @@ export class Controller {
     );
   }
 
-  /** 트레이와 메뉴 막대 "서버" 가 같은 항목을 쓴다. id 는 패키징한 앱 시험이 누른다 */
   private menuItems(): MenuItemConstructorOptions[] {
     const items: MenuItemConstructorOptions[] = [
       { id: "status", label: this.statusLabel(), enabled: false },
@@ -493,7 +460,6 @@ export class Controller {
       { id: "open", label: t("tray.open"), click: () => this.showWindow() },
     );
 
-    // ③(external)에 붙었으면 켜고 끄기를 하지 않는다(Q2, 서비스 관리자가 띄운다).
     const state = this.watch.state;
     const owned = this.mode === "local" && !("owner" in state && state.owner === "external");
     if (owned) {

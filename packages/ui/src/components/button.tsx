@@ -4,26 +4,17 @@ import type { ComponentProps, ReactNode, Ref } from "react";
 import { cx, type StyleArg } from "../cx";
 import { colors, fontWeight, motion, radius, size, space } from "../tokens.stylex";
 
-/**
- * 버튼 위계(ADR 0010 6번).
- * - primary: 파랑. 화면 전체에서 주 행동 하나에만.
- * - secondary: 기본. 카드 행동, 질문 선택지처럼 나머지 행동.
- * - danger: 빨간 글자 보조 버튼. 취소·거절 같은 위험 행동.
- * - ghost: 바탕 없는 덜 중요한 행동(닫기, 접기).
- */
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 
 type SdkButtonProps = ComponentProps<typeof SdkButton>;
 
 export interface ButtonProps {
-  /** 기본은 secondary. primary 는 화면에 하나만 둔다(ADR 0010 6번). */
   variant?: ButtonVariant;
   children: ReactNode;
   disabled?: boolean;
   type?: "button" | "submit" | "reset";
   onClick?: SdkButtonProps["onClick"];
   "aria-label"?: string;
-  /** 연 폼을 닫은 뒤 이 버튼으로 포커스를 돌릴 때 쓴다. */
   ref?: Ref<HTMLButtonElement>;
 }
 
@@ -31,7 +22,6 @@ export function Button({ variant = "secondary", children, onClick, ...props }: B
   return (
     <SdkButton
       {...props}
-      // 화면에 주 버튼이 하나 이하인지 시험이 읽는다(ADR 0010 6번)
       data-variant={variant}
       {...(onClick === undefined ? {} : { onClick })}
       className={(s) => cx(...buttonStyles(variant, s.disabled))}
@@ -41,10 +31,6 @@ export function Button({ variant = "secondary", children, onClick, ...props }: B
   );
 }
 
-/**
- * 버튼 모양을 다른 UI SDK 트리거(DialogTrigger 등)나 링크에 입힐 때 쓴다.
- * 링크에 입히면 `data-variant` 도 함께 붙여 주 버튼 시험이 세게 한다.
- */
 export function buttonStyles(variant: ButtonVariant, disabled = false): ReadonlyArray<StyleArg> {
   return [
     styles.base,
@@ -67,7 +53,6 @@ const styles = stylex.create({
     paddingInline: space.s3,
     borderWidth: 0,
     borderRadius: radius.control,
-    // hover 면은 hover 가 되는 기기에서만 칠한다. 터치 뒤 hover 면이 남지 않게 한다.
     backgroundColor: {
       default: colors.bgControl,
       ":hover": { default: null, "@media (hover: hover)": colors.bgControlHover },
@@ -75,7 +60,6 @@ const styles = stylex.create({
     color: colors.textPrimary,
     font: "inherit",
     fontWeight: fontWeight.medium,
-    // 버튼 모양을 입힌 링크(buttonStyles)에 밑줄이 생기지 않게 한다
     textDecoration: "none",
     whiteSpace: "nowrap",
     cursor: "pointer",
@@ -89,7 +73,6 @@ const styles = stylex.create({
     transitionTimingFunction: motion.easeOut,
     outline: { default: null, ":focus-visible": `2px solid ${colors.accentText}` },
     outlineOffset: 2,
-    // 보이는 높이는 32px 로 두고, 거친 포인터(터치)에서는 누르는 영역을 44×44px 까지 넓힌다.
     "::before": {
       content: { default: null, "@media (pointer: coarse)": "''" },
       position: "absolute",

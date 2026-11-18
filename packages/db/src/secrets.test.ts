@@ -51,7 +51,6 @@ describe("토큰 암호화 저장", () => {
       secrets: { token: GITHUB_TOKEN },
     });
 
-    // 연결을 닫기 전(WAL에만 있을 때)과 닫은 뒤(본 파일로 옮긴 뒤) 모두 본다.
     for (const secret of [API_KEY, WEBHOOK_SECRET, GITHUB_TOKEN]) {
       expect(fileBytes(temp.path)).not.toContain(secret);
     }

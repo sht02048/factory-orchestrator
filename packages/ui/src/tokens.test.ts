@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import { colors, motion, radius, space } from "./tokens.stylex";
 
-// 토큰 값은 컴파일되면 CSS 변수 참조가 되므로, 원본 값은 소스에서 읽는다.
 const source = readFileSync(new URL("./tokens.stylex.ts", import.meta.url), "utf8");
 
 function block(name: string): Array<[string, string]> {
@@ -20,7 +19,6 @@ function parts(value: string): { l: number; c: number; h: number } {
   return { l: Number(groups?.["l"]), c: Number(groups?.["c"]), h: Number(groups?.["h"]) };
 }
 
-// 상태 색의 뜻(ADR 0010 5번). 채도 있는 색은 이 다섯 뜻과 포인트 파랑(accent)에만 있다.
 const MEANINGS = ["answer", "check", "problem", "progress", "merged"] as const;
 const CHROMATIC_GROUP = /^(accent|answer|check|problem|progress|merged)/;
 
@@ -51,7 +49,6 @@ describe("색 토큰", () => {
   });
 
   it("상태 색은 색상(hue)이 서로 멀어 헷갈리지 않는다", () => {
-    // 보라·노랑·빨강·초록·파랑. Human Check(노랑)와 Failed(빨강)를 헷갈렸던 것이 ADR 0010 의 출발이다.
     const hues = MEANINGS.map((m) => parts(value(m)).h);
     for (const [i, a] of hues.entries()) {
       for (const b of hues.slice(i + 1)) {

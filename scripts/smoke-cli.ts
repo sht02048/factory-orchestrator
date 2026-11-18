@@ -1,21 +1,3 @@
-/*
- * 빌드한 CLI로 init과 start를 실제로 돌려 본다. start가 DB 마이그레이션을 돌리고, 빌드한 web이 바인딩 주소에서
- * Runs 화면을 200으로 주고, 빌드한 worker가 뜨고, 실제 어댑터(Orca 러너)로 러너 상태를 확인해 DB에 기록하고,
- * SIGTERM을 받으면 둘을 멈추고 끝나는지 본다. 러너는 닿지 않는 ssh 대상이라 Offline으로 기록된다.
- * vitest의 start 시험은 web·worker 자리에 작은 스크립트를 넣는다. CI는 test 뒤에 build하므로 실제 산출물은 여기서 본다.
- *
- * 실행:
- *   pnpm build 뒤에 node scripts/smoke-cli.ts
- *     저장소에서 빌드한 CLI(apps/cli/dist)를 돌린다.
- *   pnpm build && pnpm run bundle 뒤에 node scripts/smoke-cli.ts --bundle [<tarball>]
- *     서버 배포물 tarball(기본: dist/factory-orchestrator-<version>.tar.gz)을 저장소 밖 새 임시 폴더에 풀고,
- *     정적 검사(scripts/bundle-check.ts) 뒤 그 안의 CLI를 그 폴더에서 돌린다(0029).
- *   --node <실행 파일>을 주면 CLI를 그 실행 파일로 돌린다. web·worker도 같은 실행 파일로 뜬다. 예를 들어
- *     ELECTRON_RUN_AS_NODE=1과 함께 Electron 실행 파일을 주면 데스크톱 앱(0046)의 Node로 띄워 본다.
- *
- * 임시 폴더를 home·설치 폴더로 쓰고 끝나면 치운다. 서비스 등록은 하지 않는다.
- */
-
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
@@ -27,7 +9,6 @@ import { findBundleProblems } from "./bundle-check.ts";
 
 const REPO = join(import.meta.dirname, "..");
 const STARTUP_TIMEOUT_MS = 60_000;
-/** worker는 10초마다 돈다. ssh 연결 제한 시간(아래 러너 설정)까지 더해 넉넉히 기다린다 */
 const RUNNER_CHECK_TIMEOUT_MS = 60_000;
 const STOP_TIMEOUT_MS = 20_000;
 
@@ -66,7 +47,6 @@ function defaultTarball(): string {
   return join(REPO, "dist", `factory-orchestrator-${version}.tar.gz`);
 }
 
-/** 배포물을 새 임시 폴더에 풀고 그 안의 CLI 경로를 돌려준다 */
 function installBundle(installDir: string): string {
   const tarball = resolve(positionals[0] ?? defaultTarball());
   const untar = spawnSync("tar", ["-xzf", tarball, "-C", installDir], { encoding: "utf8" });
@@ -81,8 +61,6 @@ function installBundle(installDir: string): string {
 const home = mkdtempSync(join(tmpdir(), "factory-smoke-cli-"));
 const installDir = values.bundle ? mkdtempSync(join(tmpdir(), "factory-smoke-bundle-")) : null;
 const port = await freePort();
-// 셸에 부팅 값이 남아 있으면 .env를 덮으므로 빼고 돌린다. 배포물은 저장소의 모듈을 찾지 않아야 하므로
-// 모듈 경로를 바꾸는 값도 뺀다.
 const env = { ...process.env };
 for (const name of [
   "WEB_HOST",
@@ -105,7 +83,6 @@ try {
     installDir === null
       ? join(REPO, "apps", "cli", "dist", "bin", "cli.js")
       : installBundle(installDir);
-  // 배포물은 저장소 밖 설치 폴더에서 돌린다.
   const cwd = installDir ?? REPO;
   const init = spawnSync(nodePath, [cli, "init", "--home", home, "--port", String(port)], {
     cwd,
@@ -144,7 +121,6 @@ try {
   const response = await fetch(`http://127.0.0.1:${port}/runs`);
   if (response.status !== 200) throw new Error(`GET /runs returned ${response.status}`);
   console.log(`GET /runs -> ${response.status}`);
-  // 화면이 쓰는 정적 파일(web dist/client)도 나오는지 본다.
   const asset = /(?:src|href)="(\/assets\/[^"]+\.js)"/.exec(await response.text())?.[1];
   if (asset === undefined) throw new Error("GET /runs returned no script asset");
   const assetResponse = await fetch(`http://127.0.0.1:${port}${asset}`);
@@ -159,7 +135,6 @@ try {
     if (typeof applied !== "number" || applied === 0) throw new Error("no migrations were applied");
     console.log(`schema_migrations: ${applied} row(s)`);
 
-    // 실제 Orca 러너 어댑터로 확인하게 한다. `.invalid`는 이름이 풀리지 않도록 예약된 최상위 도메인이다.
     db.prepare(
       "INSERT INTO runners (id, kind, name, config, capacity, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     ).run(

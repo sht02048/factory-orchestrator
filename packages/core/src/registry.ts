@@ -1,10 +1,6 @@
 import type { CodeHost, Runner, Tracker } from "./adapters.js";
 import type { CodeHostKind, RunnerKind, TrackerKind } from "./ids.js";
 
-/**
- * 어댑터 종류 하나를 만드는 factory. 어댑터 패키지가 하나씩 내보낸다.
- * `config`는 DB에 저장한 그 연결·러너의 설정이고, factory가 경계에서 스키마로 파싱한다.
- */
 export interface AdapterFactory<K extends string, A extends { readonly kind: K }> {
   readonly kind: K;
   create(config: unknown): A;
@@ -56,16 +52,6 @@ class FactoryTable<K extends string, A extends { readonly kind: K }> {
   }
 }
 
-/**
- * 어댑터를 등록하는 한 곳. 앱(worker·web)이 시작할 때 하나 만들고 어댑터 패키지의 factory를
- * 등록한 뒤, 저장된 Tracker Connection·Runner·코드 호스트 설정의 종류로 어댑터를 만든다.
- *
- * ```ts
- * const registry = new AdapterRegistry();
- * registry.registerTracker(linearTrackerFactory); // 새 종류는 이 한 줄을 더한다
- * const tracker = registry.createTracker(connection.kind, connection.config);
- * ```
- */
 export class AdapterRegistry {
   private readonly trackers = new FactoryTable<TrackerKind, Tracker>("tracker");
   private readonly runners = new FactoryTable<RunnerKind, Runner>("runner");
@@ -98,7 +84,6 @@ export class AdapterRegistry {
     return this.codeHosts.create(kind, config);
   }
 
-  /** 등록한 종류. 온보딩·Settings에서 고를 목록이다. */
   kinds(): { trackers: TrackerKind[]; runners: RunnerKind[]; codeHosts: CodeHostKind[] } {
     return {
       trackers: this.trackers.kinds(),

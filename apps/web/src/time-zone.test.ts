@@ -44,7 +44,6 @@ describe("calendarDay", () => {
   });
 
   it("서머타임이 바뀌는 날에도 날짜 하나다", () => {
-    // 2026-11-01 은 미국 서머타임이 끝나 25시간인 날이다.
     expect(iso(calendarDay(new Date("2026-11-02T07:59:00Z"), "America/Los_Angeles"))).toBe(
       "2026-11-01",
     );

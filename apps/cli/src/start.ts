@@ -9,21 +9,15 @@ import { webUrl } from "./web-url.js";
 
 export { webUrl };
 
-/** web이 응답하기를 기다리는 시간 */
 export const READY_TIMEOUT_MS = 60_000;
-/** 멈추라고 한 뒤 자식이 끝나기를 기다리는 시간. 넘기면 SIGKILL로 끝낸다 */
 export const STOP_TIMEOUT_MS = 15_000;
 
 export interface StartOptions {
   home: string;
-  /** 셸 환경 변수. 부팅 값은 `.env` 위에 덮고(readBootEnv), 나머지는 자식에게 그대로 넘긴다 */
   env: Readonly<Record<string, string | undefined>>;
   layout: AppLayout;
-  /** 주면 자식 출력을 받아 넘긴다. 없으면 자식이 이 프로세스의 표준 출력·오류에 바로 쓴다 */
   onOutput?: (name: ProcessSpec["name"], chunk: string) => void;
-  /** 마이그레이션을 마치고 자식을 띄우기 직전에 부른다. 자식 출력보다 먼저 알리려고 쓴다 */
   onMigrated?: (config: BootConfig, migrated: ReadonlyArray<string>) => void;
-  /** 뜨는 중에 멈추라는 신호. 받으면 web을 더 기다리지 않고 자식을 멈춘 뒤 StartError를 던진다 */
   signal?: AbortSignal;
   readyTimeoutMs?: number;
   stopTimeoutMs?: number;
@@ -31,16 +25,9 @@ export interface StartOptions {
 
 export interface Started {
   config: BootConfig;
-  /** web에 닿는 주소 */
   url: string;
-  /** 이번에 돌린 마이그레이션 이름 */
   migrated: string[];
-  /** 두 자식을 멈추고 모두 끝날 때까지 기다린다. 여러 번 불러도 된다 */
   stop(): Promise<void>;
-  /**
-   * 두 자식이 모두 끝나면 풀린다. stop() 없이 한쪽이 먼저 끝났으면 그 이유를 담는다(다른 쪽은 멈춘다).
-   * 서비스 관리자가 다시 띄우도록 부르는 쪽은 이때 0이 아닌 코드로 끝낸다.
-   */
   exited: Promise<{ failure?: string }>;
 }
 
@@ -51,13 +38,6 @@ export class StartError extends Error {
   }
 }
 
-/**
- * 부팅 설정을 읽고 home 의 서버 잠금(server-lock.ts)을 쥐고 DB 마이그레이션을 돌린 뒤(ADR 0005: 업데이트 때 자동으로 돈다) web과 worker를
- * 띄운다(ADR 0002). web이 바인딩 주소에서 응답하면 풀린다.
- *
- * 마이그레이션을 여기서 먼저 돌려 실패하면 아무 프로세스도 띄우지 않는다. web과 worker도 띄울 때
- * 마이그레이션을 부르지만 돌 것이 없어 바로 지나간다.
- */
 export async function start(options: StartOptions): Promise<Started> {
   const bootEnv = readBootEnv(homePaths(options.home).envFile, options.env);
   const config = parseBootConfig(bootEnv);
@@ -68,8 +48,6 @@ export async function start(options: StartOptions): Promise<Started> {
   }
 
   const url = webUrl(config);
-  // 같은 home 에 web·worker 가 두 벌 돌지 않게 마이그레이션보다 먼저 잠금을 쥔다(0046). 두 worker 가 같은 DB 를
-  // 폴링하면 할당과 뒤처리가 겹친다. 자식이 모두 끝나면 놓는다.
   let lock;
   try {
     lock = acquireServerLock(options.home, { pid: process.pid, url });
@@ -170,10 +148,6 @@ function spawnChild(
   };
 }
 
-/**
- * 자식이 하나라도 먼저 끝나면 나머지를 멈춘다. 한쪽만 도는 반쪽 설치로 남지 않게 하고, 서비스 관리자가
- * 둘을 함께 다시 띄우게 한다.
- */
 function superviseChildren(children: Child[], stopTimeoutMs: number) {
   let stopping = false;
   let failure: string | undefined;
@@ -217,7 +191,6 @@ async function waitForWeb(
 ): Promise<void> {
   let failure: string | undefined;
   void failed.then((reason) => (failure = reason));
-  // 기다리는 동안 바뀌는 값이라 매번 새로 읽는다.
   const stopRequested = (): boolean => signal?.aborted === true;
   const stopped = () => new StartError("stopped before web responded: stop requested");
   const deadline = Date.now() + timeoutMs;
@@ -230,7 +203,6 @@ async function waitForWeb(
       await new Promise((resolve) => setTimeout(resolve, 250));
       continue;
     }
-    // 응답을 기다리는 동안 멈추라는 신호가 왔으면 뜬 것으로 치지 않는다.
     if (stopRequested()) throw stopped();
     return;
   }

@@ -82,7 +82,6 @@ const sizeKeys = [
   "icon",
 ] as const;
 
-/** 값만 보이는 토큰 줄 목록. 왼쪽 칸에는 견본 대신 빈 자리를 둔다. */
 function PlainTokens({
   title,
   prefix,
@@ -108,9 +107,6 @@ function PlainTokens({
   );
 }
 
-/**
- * 토큰 변수의 실제 값을 읽어 보인다. 서버 HTML 에는 비워 두고, 하이드레이션 뒤에 채운다.
- */
 function TokenValue({ token }: { token: string }) {
   const [value, setValue] = useState("");
   useEffect(() => {

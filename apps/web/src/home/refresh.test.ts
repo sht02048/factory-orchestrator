@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { refreshWhileVisible } from "./refresh";
 import type { VisibilitySource } from "./refresh";
 
-/** visibilityState 를 바꾸고 visibilitychange 를 알리는 가짜 문서 */
 class FakeDocument implements VisibilitySource {
   visibilityState: DocumentVisibilityState = "visible";
   private readonly target = new EventTarget();

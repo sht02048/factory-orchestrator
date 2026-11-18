@@ -11,11 +11,6 @@ import { assignRun, changeRunState } from "@factory/db";
 import type { Database, RunStateChange } from "@factory/db";
 import { connection, minutes } from "../testing/seed";
 
-/*
- * Run 상세 테스트가 seedDatabase 위에 더하는 런. 가상 값만 쓴다.
- */
-
-/** 시작한 런이 러너에서 받는 값 */
 export function startedOn(key: string): Extract<RunStateChange, { to: "running" }> {
   return {
     to: "running",
@@ -27,7 +22,6 @@ export function startedOn(key: string): Extract<RunStateChange, { to: "running" 
   };
 }
 
-/** 티켓 하나를 할당한다. 시각은 seed 의 T0 + at 분 */
 export function assign(db: Database, key: string, at: number, model: string | null = null): RunId {
   const result = assignRun(db, {
     ticket: { connection, key: toTicketKey(key) },
@@ -41,7 +35,6 @@ export function assign(db: Database, key: string, at: number, model: string | nu
   return result.run.id;
 }
 
-/** 상태를 차례로 바꾼다. i 번째 변경은 T0 + at + 1 + i 분 */
 export function walk(
   db: Database,
   id: RunId,
@@ -59,15 +52,10 @@ export interface ExtraEndedCase {
   agentResult: AgentResult;
   prState: PrState;
   runnerUnreached: boolean;
-  /** 시작하지 않고 끝났는지(Queued 에서 취소, 시작할 수 없음) */
   started: boolean;
   summary: SummaryOutcome;
 }
 
-/**
- * seed 의 Ended 런(에이전트 결과 여섯)에 더해 나머지 셋(비정상 종료, 운영자가 취소함, 시작할 수 없음)과
- * 러너에 닿지 못한 채 끝난 취소를 채운다. 둘을 합치면 core 의 에이전트 결과 아홉이 모두 나온다.
- */
 export const extraEndedCases: ReadonlyArray<ExtraEndedCase> = [
   {
     key: "ACME-20",
@@ -111,7 +99,6 @@ export const extraEndedCases: ReadonlyArray<ExtraEndedCase> = [
   },
 ];
 
-/** extraEndedCases 를 DB 에 넣는다. 키 → 런 ID */
 export function addExtraEnded(db: Database): Map<string, RunId> {
   const ids = new Map<string, RunId>();
   extraEndedCases.forEach((c, i) => {

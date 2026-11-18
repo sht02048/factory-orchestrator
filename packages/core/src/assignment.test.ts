@@ -110,7 +110,6 @@ describe("운영자가 취소한 티켓 (Q82.12)", () => {
     });
 
   it("마지막 런을 취소한 티켓은 라벨이 남아 있어도 자동 할당하지 않는다", () => {
-    // 라벨은 취소 전(5분)에 붙었고 그대로 남아 있다.
     expect(check(at(5), [endedWith("canceled", 10, 20)])).toEqual({
       ok: false,
       reason: "canceled-by-operator",
@@ -189,7 +188,6 @@ describe("pickRunner", () => {
     ];
     const runs = [{ runnerId: r2, state: "running" as const }];
 
-    // r1 남은 2, r2 남은 2, r3은 프로젝트가 없다. 같으면 앞에 둔 러너를 고른다.
     expect(pickRunner({ project: app, runners, runs })).toBe(r1);
     expect(pickRunner({ project: app, runners, runs: [] })).toBe(r2);
   });

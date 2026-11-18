@@ -38,27 +38,21 @@ import {
 } from "./model";
 import type { RunFilter, RunView, RunsPage } from "./model";
 
-// 티켓(키 + 흐린 줄) | 상태 알약 | 시간
 const columns = "minmax(0, 1fr) 160px 88px";
 
 export interface RunsScreenProps {
   page: RunsPage;
-  /** "전체"에서 고를 Workspace 들 */
   workspaces: ReadonlyArray<WorkspaceSummary>;
   filter: RunFilter;
-  /** 고른 런. 없거나 목록에 없으면 첫 행을 고른다 */
   selectedId: string | undefined;
   onFilterChange: (filter: RunFilter) => void;
   onSelect: (runId: string) => void;
-  /** 행을 연다(두 번 누르기, Enter): Run 상세로 간다(ADR 0010) */
   onOpen: (runId: string) => void;
   onPickWorkspace: (workspaceId: string) => void;
   onShowMoreEnded?: () => void;
-  /** 런의 Run 상세 주소 */
   runHref: (runId: string) => string;
 }
 
-/** Runs: 런 목록 + 오른쪽 상세 패널(ADR 0007, 시안 B) */
 export function RunsScreen(props: RunsScreenProps) {
   const { page } = props;
   switch (page.workspace.kind) {
@@ -234,7 +228,6 @@ function RunsList({
   );
 }
 
-/** 둥근 행: 키(제목 자리) + 흐린 줄(러너·에이전트), 상태 알약, 경과 또는 상대 시간 */
 function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
   const agentName = useAgentName();
   const t = useTranslations("runs");
@@ -247,9 +240,7 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
     run.runner?.name ?? (run.state === "ended" ? t("noRunnerEnded") : t("noRunner")),
   ];
   if (run.state === "ended") {
-    // 끝난 런은 에이전트 대신 어떻게 끝났는지(에이전트 결과·PR)를 보인다
     meta.push(domain(`agentResult.${run.agentResult}`));
-    // PR 이 있으면 "#128 열림", 없으면 PR 상태가 있을 때만 그 값
     if (run.pullRequest !== null)
       meta.push(
         t("prWithState", {
@@ -267,7 +258,6 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
     <TableRow value={run.id} label={run.ticketKey} onOpen={onOpen}>
       <TableCell>
         <span {...stylex.props(styles.rowText)}>
-          {/* 티켓 제목을 저장하면 회색 키 + 제목으로 바꾼다(ADR 0010 9번). 지금은 키만 있다. */}
           <RowTitle>{run.ticketKey}</RowTitle>
           <Text variant="meta">{meta.join(t("metaSeparator"))}</Text>
         </span>
@@ -319,7 +309,6 @@ function RunPanel({
       reason = t(`reason.${run.summary}`);
       break;
   }
-  // 취소 중이면 그 까닭보다 취소를 먼저 알린다(Q82.21).
   if (run.state !== "ended" && run.cancelling) reason = t("cancellingReason");
 
   const ended = run.state === "ended" ? run : null;

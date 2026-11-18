@@ -36,16 +36,10 @@ export interface DenyInput {
 
 export interface HomeScreenProps {
   page: HomePage;
-  /** 질문에 답을 남긴다. 실패하면 던진다 */
   onAnswer: (input: AnswerInput) => Promise<void>;
-  /** 권한 프롬프트 거절을 남긴다. 실패하면 던진다 */
   onDeny: (input: DenyInput) => Promise<void>;
 }
 
-/**
- * Home(시안 B, ADR 0010): 제목 + 한 줄 요약, 손댈 일 카드, 오른쪽 "지금 일어나는 일" 흐름.
- * 카드 행동과 질문 선택지는 모두 보조 버튼이다. 파란 주 버튼을 두지 않는다(ADR 0010 6번).
- */
 export function HomeScreen({ page, onAnswer, onDeny }: HomeScreenProps) {
   const t = useTranslations("home");
   if (page.workspace.kind === "none") {
@@ -92,8 +86,6 @@ export function HomeScreen({ page, onAnswer, onDeny }: HomeScreenProps) {
   );
 }
 
-// ---------- 머리 ----------
-
 function Counts({ page }: { page: HomePage }) {
   const t = useTranslations("home.counts");
   const statusName = useStatusName();
@@ -117,8 +109,6 @@ function Counts({ page }: { page: HomePage }) {
     </dl>
   );
 }
-
-// ---------- 손댈 일 카드 ----------
 
 function attentionStatus(item: AttentionItem): PillStatus {
   if (item.kind === "runner-issue") return "runner-issue";
@@ -230,12 +220,10 @@ function RunCardBody({
     }
     case "queued":
     case "running":
-      // 손댈 일에 오르지 않는다(needsAttention)
       return null;
   }
 }
 
-/** Run 상세로 가는 보조 버튼 모양 링크 */
 function RunLink({ run }: { run: HomeRun }) {
   const t = useTranslations("home.card");
   return (
@@ -270,10 +258,6 @@ function InputCardBody({
   }
 }
 
-/**
- * 트리거 버튼으로 여는 폼의 포커스(티켓 0050). 열면 입력칸으로, 닫으면 트리거 버튼으로 포커스를 옮긴다.
- * 트리거 버튼은 폼이 열린 동안 DOM 에서 빠지므로 다시 그려진 뒤(effect)에 옮긴다.
- */
 function useFormDisclosure() {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -297,7 +281,6 @@ function useFormDisclosure() {
     close,
     triggerRef,
     inputRef,
-    /** 폼 안에서 Escape 를 누르면 닫는다 */
     onKeyDown: (event: KeyboardEvent<HTMLFormElement>) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
@@ -306,10 +289,6 @@ function useFormDisclosure() {
   };
 }
 
-/**
- * 답·거절을 남긴 뒤 결과 문장으로 포커스를 옮긴다(티켓 0050). 답한 버튼과 폼은 다시 읽은 뒤 DOM 에서
- * 빠진다. 이 화면에서 보낸 것이 받아졌을 때만 옮긴다(다른 사람이 답했을 때는 포커스를 뺏지 않는다).
- */
 function useResultFocus(done: boolean) {
   const resultRef = useRef<HTMLDivElement>(null);
   const awaiting = useRef(false);
@@ -320,18 +299,15 @@ function useResultFocus(done: boolean) {
   }, [done]);
   return {
     resultRef,
-    /** 보내기 직전에 부른다 */
     sending: () => {
       awaiting.current = true;
     },
-    /** 보내기에 실패하면 부른다 */
     failed: () => {
       awaiting.current = false;
     },
   };
 }
 
-/** 답·거절을 남겼다는 결과 문장. 화면 읽기가 알리고(role="status"), 보낸 뒤 포커스를 받는다 */
 function ResultText({
   resultRef,
   children,
@@ -346,7 +322,6 @@ function ResultText({
   );
 }
 
-/** 질문 본문과 선택지. 선택지와 "직접 답하기"는 모두 같은 보조 버튼이다(ADR 0010 6번, Q82.3) */
 function QuestionBody({
   runId,
   question,
@@ -361,7 +336,6 @@ function QuestionBody({
   const result = useResultFocus(question.answered);
   const [answer, setAnswer] = useState("");
   const [state, setState] = useState<SendState>("idle");
-  // 보내는 중인 선택지. 누른 선택지에만 "보내는 중…"을 보인다
   const [sendingChoice, setSendingChoice] = useState<string | null>(null);
   const sending = state === "sending";
   const send = (text: string, choice: string | null) => {
@@ -406,7 +380,6 @@ function QuestionBody({
           {form.open ? (
             <form
               {...stylex.props(styles.form)}
-              // 보내는 동안에는 닫지 않는다(결과 문장·실패 문구와 포커스 복귀가 폼을 기다린다)
               onKeyDown={sending ? undefined : form.onKeyDown}
               onSubmit={(event) => {
                 event.preventDefault();
@@ -444,7 +417,6 @@ function QuestionBody({
   );
 }
 
-/** 권한 대기: 허용은 러너 화면에서만 한다. 여기서는 거절만 둔다(Q82.4) */
 function PermissionBody({
   run,
   permission,
@@ -526,7 +498,6 @@ function PermissionBody({
   );
 }
 
-/** Runner Issue 러너. 까닭은 설명 문장으로, 해결 안내는 Runners 에서 본다 */
 function RunnerIssueBody({ runner }: { runner: RunnerIssue }) {
   const t = useTranslations("home.runnerIssue");
   return (
@@ -549,13 +520,10 @@ function href(path: string, search: Record<string, string>): string {
   return `${path}?${new URLSearchParams(search).toString()}`;
 }
 
-// ---------- 지금 일어나는 일 ----------
-
 function ActivityFeed({ activity, all }: { activity: ReadonlyArray<Activity>; all: boolean }) {
   const t = useTranslations("home.activity");
   const { ago } = useTime();
   const text = useActivityText();
-  // 이름은 제목(h2) 한 곳에서만 준다. 카드에 이름을 또 주면 화면 읽기가 제목을 두 번 읽는다
   const titleId = useId();
   return (
     <aside aria-labelledby={titleId} {...stylex.props(styles.feed)}>
@@ -609,7 +577,6 @@ function useActivityText(): (item: Activity) => string {
   };
 }
 
-/** 오른쪽 흐름 폭(시안 B) */
 const FEED_WIDTH = 380;
 
 const styles = stylex.create({
@@ -617,7 +584,6 @@ const styles = stylex.create({
     height: "100%",
     overflow: "auto",
     paddingTop: space.s8,
-    // 좁은 화면에서는 좌우 여백을 줄여 내용 폭을 확보한다(티켓 0050)
     paddingInline: { default: space.s8, "@media (max-width: 600px)": space.s4 },
     paddingBottom: space.s10,
   },
@@ -651,7 +617,6 @@ const styles = stylex.create({
     fontWeight: fontWeight.semibold,
   },
   form: { display: "flex", flexDirection: "column", gap: space.s3, maxWidth: 560 },
-  // 결과 문장은 보낸 뒤 포커스만 받는다(누를 수 없다). 포커스 링을 그리지 않는다
   result: { outline: "none" },
   error: { margin: 0, color: colors.problem, fontSize: fontSize.ui },
   counts: { display: "flex", flexWrap: "wrap", gap: space.s2, margin: 0 },

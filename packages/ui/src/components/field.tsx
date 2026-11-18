@@ -5,19 +5,9 @@ import { createContext, use, type ReactNode, type Ref } from "react";
 import { cx } from "../cx";
 import { colors, fonts, fontSize, fontWeight, motion, radius, size, space } from "../tokens.stylex";
 
-/*
- * 폼 칸: 라벨, 입력, 도움말, 오류를 잇는다(id·for·aria-describedby 는 UI SDK Field 가 맡는다).
- *
- * <Field label="러너 이름" description="ssh 설정의 Host 이름이에요">
- *   <Input name="host" mono />
- * </Field>
- */
-
 export interface FieldProps {
   label: ReactNode;
-  /** 입력 아래 흐린 도움말. */
   description?: ReactNode;
-  /** 오류 문구. 있으면 입력이 invalid 가 되고 빨간 글로 보인다. */
   error?: ReactNode;
   children: ReactNode;
 }
@@ -46,17 +36,11 @@ interface InputBaseProps {
   type?: "text" | "url" | "password" | "email" | "search";
   autoComplete?: string;
   inputMode?: "text" | "numeric" | "decimal" | "email" | "url" | "search";
-  /** 경로·주소·키처럼 그대로 옮겨 쓸 값. 고정폭 글꼴로 보인다. */
   mono?: boolean;
-  /** 폼을 연 뒤 입력칸으로 포커스를 옮길 때 쓴다. */
   ref?: Ref<HTMLInputElement>;
   [data: `data-${string}`]: string | boolean | undefined;
 }
 
-/**
- * 값을 쥐는 방식은 셋 중 하나다. value 를 주면 onValueChange 나 readOnly 가 함께 있어야 한다
- * (둘 다 없으면 입력이 잠기고 React 가 경고한다).
- */
 export type InputProps = InputBaseProps &
   (
     | {
@@ -112,8 +96,6 @@ export const fieldStyles = stylex.create({
     backgroundColor: colors.bgInset,
     color: colors.textPrimary,
     font: "inherit",
-    // 터치 기기(iPad Safari 포함)는 16px 보다 작은 입력을 포커스 때 확대한다. 그래서 폭이 아니라
-    // 정밀 포인터(마우스·트랙패드)일 때만 본문 크기로 줄인다(티켓 0050).
     fontSize: {
       default: fontSize.input,
       "@media (pointer: fine)": fontSize.body,

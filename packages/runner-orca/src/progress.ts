@@ -3,24 +3,12 @@ import type { AgentQuestion, CompletionReport, PermissionWait, RunProgress } fro
 import { mailPayloadSchema, taskReportSchema } from "./schemas.js";
 import type { MailPayload, MailRow, WorkerShowResult, WorktreePsResult } from "./schemas.js";
 
-/**
- * 러너에서 읽은 출력으로 런의 실제 상태 하나를 고른다(core RunProgress, research 0008 「pollRun 판정 순서」).
- * 순서는 core 계약대로 완료 보고 → 보고 없이 사라짐 → 워크트리 사라짐 → 그 밖(돌고 있음)이다.
- * 모르는 상태 값은 돌고 있음으로 다룬다.
- */
 export interface ProgressInput {
   dispatchId: string;
-  /** 이 런의 Task 행의 `result`. task-list를 읽지 않았거나 없으면 null */
   taskResult: string | Record<string, unknown> | null;
   worker: WorkerShowResult;
-  /** 우편함의 아직 처리되지 않은 메일 전부(check --peek). 이 함수가 이 런의 것만 고른다 */
   mails: ReadonlyArray<MailRow>;
-  /**
-   * 이 런의 워크트리 행(worktree ps --agent-wait). 행이 없으면 null, 목록이 잘려 행이 없다고 말할 수
-   * 없으면 "unknown"이다.
-   */
   worktreeRow: WorktreePsResult["worktrees"][number] | null | "unknown";
-  /** 워크트리가 있는지 따로 확인한 값(worktree show). 확인하지 않았으면 null */
   worktreeExists: boolean | null;
 }
 
@@ -44,7 +32,6 @@ export function decideProgress(input: ProgressInput): RunProgress {
   };
 }
 
-/** Task 결과가 완료 보고(`provenance: "worker_report"`)이고 outcome이 있으면 보고를 돌려준다. */
 export function completionReport(
   result: string | Record<string, unknown> | null,
 ): CompletionReport | null {
@@ -62,12 +49,10 @@ export function completionReport(
   };
 }
 
-/** 에이전트가 완료 보고 없이 사라졌다는 증거(Q82.19). 없으면 null */
 function endedWithoutReport(
   input: ProgressInput,
   mails: ReadonlyArray<{ mail: MailRow; payload: MailPayload | null }>,
 ): string | null {
-  // Orca가 보고 없이 사라졌다고 알렸다(`lost`, `exited`, research 0008 5절).
   const escalation = mails.find(
     ({ mail, payload }) =>
       mail.type === "escalation" &&
@@ -76,12 +61,9 @@ function endedWithoutReport(
   if (escalation !== undefined) {
     return `${escalation.payload?.stopReason ?? "lost"}: ${escalation.mail.subject ?? firstLine(escalation.mail.body)}`;
   }
-  // 에이전트 터미널이 사라졌다(worker-show liveness exited). 완료 보고가 없을 때만 여기 온다.
   if (input.worker.liveness === "exited") {
     return `agent exited: ${input.worker.lastError ?? input.worker.stage ?? input.worker.state}`;
   }
-  // 셸만 남고 에이전트가 워크트리 목록에서 사라졌다. Orca는 이 상태를 알리지 않고 `unverifiable`로 둔다
-  // (research 0008 5절, 0004 3절). 시작 직후 에이전트가 목록에 오르기 전에는 liveness가 live라 걸리지 않는다.
   const row = input.worktreeRow;
   if (
     input.worker.liveness === "unverifiable" &&
@@ -107,10 +89,6 @@ function question(mail: MailRow, payload: MailPayload | null): AgentQuestion[] {
   ];
 }
 
-/**
- * 아직 열린 권한 대기(`needs-input` escalation의 `approval.state: "open"`). 같은 approvalId에 열림이 아닌
- * 상태의 메일(`Worker approval answered`, research 0008 4절)이 오면 닫힌 것으로 본다.
- */
 function openPermissionWaits(
   mails: ReadonlyArray<{ mail: MailRow; payload: MailPayload | null }>,
 ): PermissionWait[] {

@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 import type { ActivityEvent } from "./model";
 
-// "지금 일어나는 일" 사건 아이콘(시안 B). 색은 currentColor 를 따른다. 상태 색은 알약만 쓴다(ADR 0010 4·5번).
-
 function Icon({ children }: { children: ReactNode }) {
   return (
     <svg

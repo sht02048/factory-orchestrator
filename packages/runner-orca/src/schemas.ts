@@ -1,12 +1,5 @@
 import { z } from "zod";
 
-/**
- * orca `--json` 출력의 경계 스키마. 실제 출력(research 0003·0004·0008, fixtures/)에서 어댑터가 쓰는 필드만
- * 읽고 나머지는 버린다. 상태·종류 값은 모르는 값이 와도 깨지지 않게 문자열로 연다(CODING_STANDARDS
- * 「외부 열거값은 모르는 값이 와도 깨지지 않게 둔다」).
- */
-
-/** `--json` 봉투. 성공은 `ok: true`와 `result`, 실패는 `ok: false`와 `error.code`다(research 0002 A.2). */
 export const envelopeSchema = z.union([
   z.object({ ok: z.literal(true), result: z.unknown() }),
   z.object({
@@ -17,8 +10,6 @@ export const envelopeSchema = z.union([
 
 const text = z.string();
 const optionalText = z.string().nullish();
-
-// ---------- 러너 상태 ----------
 
 export const statusResultSchema = z.object({
   runtime: z
@@ -35,8 +26,6 @@ export const serviceStatusResultSchema = z.object({
   verdict: optionalText,
   detail: optionalText,
 });
-
-// ---------- 프로젝트 ----------
 
 export const projectListResultSchema = z.object({
   projects: z.array(
@@ -61,8 +50,6 @@ export const projectSetupsResultSchema = z.object({
   ),
 });
 
-// ---------- 우편함 ----------
-
 export const terminalCreateResultSchema = z.object({
   terminal: z.object({ handle: text }),
 });
@@ -73,16 +60,12 @@ export const terminalShowResultSchema = z.object({
 
 export const runBindResultSchema = z.object({ runId: text });
 
-/** 이 터미널이 코디네이터로 묶인 Run. 묶이지 않았으면 null이다(fixtures/run-current-*.json) */
 export const runCurrentResultSchema = z.object({ runId: optionalText });
-
-// ---------- 시작 ----------
 
 export const workerStartResultSchema = z.object({
   dispatchId: text,
   taskId: text,
   runId: text,
-  /** `ready`면 사양이 에이전트 입력으로 들어갔다. 실패·결과 불명은 다른 값이다(help) */
   state: text,
   workspace: optionalText,
 });
@@ -93,11 +76,8 @@ export const worktreeShowResultSchema = z.object({
 
 export const workerListResultSchema = z.object({
   workers: z.array(z.object({ dispatchId: text, taskId: text, workspace: optionalText })),
-  /** 다음 쪽. 한 번에 최대 100행이다(orca help) */
   nextCursor: optionalText,
 });
-
-// ---------- 진행 ----------
 
 export const workerShowResultSchema = z.object({
   dispatchId: text,
@@ -115,13 +95,11 @@ export const taskListResultSchema = z.object({
     z.object({
       id: text,
       status: text,
-      /** `--full`에서 JSON이 든 문자열이다 */
       result: z.union([z.string(), z.record(z.string(), z.unknown())]).nullish(),
     }),
   ),
 });
 
-/** `Task.result`. 완료 보고면 `provenance: "worker_report"`와 `outcome`이 있다(research 0008 3절). */
 export const taskReportSchema = z.object({
   provenance: optionalText,
   outcome: optionalText,
@@ -130,7 +108,6 @@ export const taskReportSchema = z.object({
   completedAt: optionalText,
 });
 
-/** `check --peek --full`의 메일 행. `payload`는 JSON이 든 문자열이다(research 0008 2절). */
 export const mailRowSchema = z.object({
   id: text,
   type: text,
@@ -167,15 +144,11 @@ export const worktreePsResultSchema = z.object({
   truncated: z.boolean().nullish(),
 });
 
-// ---------- 답하기·멈추기·정리 ----------
-
 export const replyResultSchema = z.object({ messageId: text });
 export const denyResultSchema = z.object({ approvalId: optionalText });
 export const workerStopResultSchema = z.object({ state: text });
 export const workerReleaseResultSchema = z.object({ state: text });
 export const worktreeRmResultSchema = z.object({ removed: z.boolean() });
-
-// ---------- 로그 꼬리 ----------
 
 const transcriptBlockSchema = z.object({
   type: text,

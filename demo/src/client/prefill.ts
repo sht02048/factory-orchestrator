@@ -7,16 +7,9 @@ import {
   PREFILL_RUNNER_NAME,
 } from "../values.ts";
 
-/*
- * 개발 진입점에서만 브라우저에 싣는 작은 도구(티켓 0047, plugins.ts 가 web 의 client 모듈에 붙인다).
- * 오른쪽 아래에 개발 화면(/__dev) 링크와, 입력 칸이 있으면 가짜 값으로 채우는 버튼을 둔다. 제품 화면 코드와
- * 메시지 파일은 고치지 않는다. 프로덕션 빌드에는 이 플러그인이 없어 실리지 않는다.
- */
-
 const ROOT_ID = "factory-dev-tools";
 
 function setValue(input: HTMLInputElement, value: string): void {
-  // React 가 붙은 입력은 value 를 바로 바꾸면 상태가 따라오지 않는다. 원래 setter 로 바꾸고 input 이벤트를 낸다.
   Reflect.set(HTMLInputElement.prototype, "value", value, input);
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
@@ -43,7 +36,6 @@ function mount(): void {
       "font:12px/1.4 system-ui,sans-serif",
   );
   const chip =
-    // 화면 토큰을 쓰지 않는 개발 도구라 시스템 색으로 밝은·어두운 화면에 맞춘다.
     "padding:6px 10px;border-radius:999px;border:1px solid GrayText;background:Canvas;color:CanvasText;" +
     "cursor:pointer;text-decoration:none";
 
@@ -69,7 +61,6 @@ function mount(): void {
   document.body.append(root);
 }
 
-// 서버 렌더한 body 에 React 가 붙기 전에 노드를 더하면 hydration 이 어긋난다. 라우터가 붙은 뒤에 단다.
 const waitForHydration = setInterval(() => {
   if (!("__TSR_ROUTER__" in globalThis)) return;
   clearInterval(waitForHydration);

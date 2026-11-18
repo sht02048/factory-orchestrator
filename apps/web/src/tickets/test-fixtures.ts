@@ -43,18 +43,6 @@ import {
 import type { Database } from "@factory/db";
 import type { TicketsContext } from "./load";
 
-/*
- * Tickets 화면 테스트 DB 와 가짜 Tracker. 가상 값만 쓴다(acme, example.com).
- *
- * - Workspace ws-commerce: 트래커 프로젝트 Web(Mapping: github:acme/web · claude), Docs(Mapping 없음),
- *   Broken(트래커가 인증 오류를 낸다)
- * - Workspace ws-labs: 트래커 프로젝트 Lab, Mapping은 github:acme/lab · codex
- * - 러너: runner-a(Online), runner-b(Offline), runner-c(GitHub 인증 깨짐) 모두 github:acme/web,
- *   runner-d(Online, github:acme/lab)
- * - 티켓: ACME-1(런 둘, 마지막 Merged), ACME-2(Human Check), ACME-3(실행 중), ACME-4(Queued),
- *   ACME-5(입력 기다림), ACME-6(런 없음, 자동 할당 라벨), DOC-1(Mapping 없음)
- */
-
 export const connection = toTrackerConnectionId("conn-acme");
 export const commerce = toWorkspaceId("ws-commerce");
 export const labs = toWorkspaceId("ws-labs");
@@ -72,7 +60,6 @@ export const now = minutes(600);
 
 const fakeKind = toTrackerKind("fake");
 
-/** 트래커 프로젝트 Broken 의 티켓을 읽으면 인증 오류를 낸다 */
 class TicketsTracker extends FakeTracker {
   override listProjectTickets(
     projectId: TrackerProjectId,

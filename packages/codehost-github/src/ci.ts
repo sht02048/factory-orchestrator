@@ -11,10 +11,8 @@ const workflowRuns = z.object({
   ),
 });
 
-/** 끝나 통과한 워크플로 런의 결론. */
 const PASSED_CONCLUSIONS = new Set(["success", "neutral", "skipped"]);
 
-/** 끝났지만 통과하지 못한 워크플로 런의 결론. 그 밖의 결론(stale, 모르는 값)은 pending으로 둔다. */
 const FAILED_CONCLUSIONS = new Set([
   "failure",
   "timed_out",
@@ -23,14 +21,6 @@ const FAILED_CONCLUSIONS = new Set([
   "startup_failure",
 ]);
 
-/**
- * 커밋 하나의 CI 상태를 GitHub Actions 워크플로 런으로 읽는다(research 0006 15절 대안 1, Q79).
- *
- * `GET /repos/{owner}/{repo}/actions/runs?head_sha=`는 Actions 읽기 권한을 요구한다. fine-grained PAT에
- * 그 권한이 없으면 비공개 저장소에서 404가 온다(`x-accepted-github-permissions: actions=read`). CI 상태는
- * 선택 표시라 PR 상태를 막지 않아야 하므로, 200이 아닌 응답과 연결 실패는 모두 "unavailable"(볼 수 없음)로
- * 돌려주고 던지지 않는다.
- */
 export async function readCiState(
   http: GitHubHttp,
   owner: string,
@@ -51,13 +41,6 @@ export async function readCiState(
   return summarizeRuns(parsed.data.workflow_runs);
 }
 
-/**
- * 워크플로 런 목록을 CI 상태 하나로 줄인다.
- * - 런이 없으면 none
- * - 하나라도 통과하지 못하고 끝났으면 failure
- * - 모두 끝나 통과했으면(success, neutral, skipped) success
- * - 그 밖에는 pending(끝나지 않은 런, 모르는 status·conclusion, stale). 모르는 값을 성공으로 보이지 않는다
- */
 export function summarizeRuns(
   runs: ReadonlyArray<{ status: string | null; conclusion: string | null }>,
 ): CiState {
