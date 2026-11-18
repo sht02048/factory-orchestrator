@@ -6,9 +6,7 @@
 
 # Ganger
 
-Ganger is the foreman of your software factory: it hands tracker tickets to coding agents on your own runners and shows how every run is going. The artwork and the rules for using it are in the [brand guide](packages/ui/brand/README.md).
-
-The control tower of a software factory. It assigns tickets from a tracker to runners, and shows the status and statistics of the runs in which the runners' agents work on those tickets. Terms are defined in [`GLOSSARY.md`](./GLOSSARY.md), and key decisions are recorded in [`docs/adr/`](./docs/adr/).
+Ganger is the foreman of your software factory: it hands tracker tickets to coding agents on your own runners and shows the status and statistics of every run. The artwork and the rules for using it are in the [brand guide](packages/ui/brand/README.md). Terms are defined in [`GLOSSARY.md`](./GLOSSARY.md), and key decisions are recorded in [`docs/adr/`](./docs/adr/).
 
 ## Structure
 

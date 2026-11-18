@@ -27,7 +27,7 @@ web과 worker는 SQLite 파일 하나로만 주고받는다(ADR 0002). web이 DB
 - **성공한 요청만 신호를 보낸다(독립 리뷰 반영).** webhook 경로는 webhook 공개 주소로도 받고 Origin을 보지 않는다(`apps/web/src/server/request-guard.ts`). 서명이 틀린 요청도 응답 전까지는 처리되므로, 응답과 상관없이 신호를 보내면 인터넷의 누구나 바퀴를 연달아 돌려 러너에 ssh를 보내게 할 수 있다. 바퀴는 돌 때마다 진행 중인 런마다 러너에 묻는다(`apps/worker/src/watch.ts`). 그래서 응답이 2xx인 요청만 신호를 보낸다. 서명을 통과한 webhook과 바인드 주소에 닿는 클라이언트의 요청만 남는다. 바인드 주소에 닿는 클라이언트는 지금도 할당·취소를 할 수 있어 새로 열리는 것은 없다.
 - **통로: `start`의 IPC 중계.** `start`가 web과 worker를 IPC 통로와 함께 띄우고, web이 보낸 신호를 worker로 넘긴다. CLI `start`, 서비스(launchd·systemd), 데스크톱 앱이 모두 `start`를 거친다. web과 worker를 `start` 없이 따로 띄우면 신호가 없고 지금처럼 폴링으로만 돈다. 유닉스 소켓(`<home>/worker.sock`)은 따로 띄워도 돌지만 남은 소켓 파일과 파일 권한을 관리해야 해서 고르지 않았다. 로컬 HTTP 포트는 포트와 Host 검사가 하나 더 늘고, DB 파일 감시(`fs.watch`)는 macOS에서 믿기 어렵고 worker 자신의 쓰기에도 반응해서 고르지 않았다.
 - **메시지.** `{ type: "wake" }` 하나다. `start`와 worker가 경계에서 zod로 검증하고, 다른 메시지는 조용히 버린다. 신호마다 로그는 남기지 않는다.
-- **`start`가 띄웠을 때만 보낸다(독립 리뷰 반영).** IPC 통로는 `start` 말고도 생긴다(vitest의 fork 풀, pm2 같은 프로세스 관리자). 그 부모에게 신호를 보내지 않게, `start`가 자식 환경에 `FACTORY_WORKER_WAKE=ipc`를 넣고 web과 worker는 이 값이 있을 때만 신호를 주고받는다.
+- **`start`가 띄웠을 때만 보낸다(독립 리뷰 반영).** IPC 통로는 `start` 말고도 생긴다(vitest의 fork 풀, pm2 같은 프로세스 관리자). 그 부모에게 신호를 보내지 않게, `start`가 자식 환경에 `GANGER_WORKER_WAKE=ipc`를 넣고 web과 worker는 이 값이 있을 때만 신호를 주고받는다.
 - **`pnpm dev`.** demo에서도 동작한다. 제품 코드에 개발용 갈래를 넣지 않고 demo의 vite 플러그인이 web 쪽 신호 모듈을 갈아 끼운다.
 - **문서.** ADR 0002에 「기준은 DB, 신호는 잃어도 되는 힌트, 폴링은 유지」 단락을 덧붙이고 새 ADR은 만들지 않는다. 신호를 떼어 내도 동작이 그대로라 되돌리기 어려운 결정이 아니다. ADR 단락은 구현과 같은 PR에 넣는다.
 - **저장소.** Redis 같은 외부 브로커는 쓰지 않는다. 운영자 한 명이 자기 기계에 설치해 쓰는 제품(ADR 0005)에서 운영자가 따로 설치하고 지켜야 할 상시 서비스를 늘리지 않는다.
@@ -56,19 +56,19 @@ web과 worker는 SQLite 파일 하나로만 주고받는다(ADR 0002). web이 DB
 
 - 바퀴가 겹치지 않는 지금 규칙(`createWorker`의 `running ??=`)은 그대로 둔다.
 - `stop()`은 기다리는 중이어도 바로 멈춘다.
-- 진입점(`apps/worker/src/main.ts`)이 `process.on("message")`로 받은 값을 zod로 검증해 `wake()`를 부른다. `FACTORY_WORKER_WAKE=ipc`가 없거나 IPC 통로가 없으면 듣지 않는다.
+- 진입점(`apps/worker/src/main.ts`)이 `process.on("message")`로 받은 값을 zod로 검증해 `wake()`를 부른다. `GANGER_WORKER_WAKE=ipc`가 없거나 IPC 통로가 없으면 듣지 않는다.
 - `apps/worker`에는 아직 zod가 없다. web·cli와 같은 고정 버전(지금 4.6.7)으로 더한다.
 
 ### `start`
 
-- `apps/cli/src/start.ts`의 `spawnChild`가 web과 worker를 `stdio`의 네 번째 자리에 `"ipc"`를 두고 띄운다(`onOutput`이 있을 때와 없을 때 모두). 자식 환경에 `FACTORY_WORKER_WAKE=ipc`를 넣는다.
+- `apps/cli/src/start.ts`의 `spawnChild`가 web과 worker를 `stdio`의 네 번째 자리에 `"ipc"`를 두고 띄운다(`onOutput`이 있을 때와 없을 때 모두). 자식 환경에 `GANGER_WORKER_WAKE=ipc`를 넣는다.
 - web 자식의 `message`를 zod로 검증해 `{ type: "wake" }`만 worker 자식에 `send`한다. worker가 이미 끝났으면(`child.connected`가 거짓) 보내지 않는다.
 - `send`에는 콜백을 넘겨 실패를 거기서 버린다. 콜백이 없으면 실패가 자식의 `'error'` 이벤트로 오는데, `spawnChild`는 그 이벤트를 띄우기 실패로 읽는다(`child.once("error", …)`).
 - `srvx`도 스스로 `process.send?.({ error: "no-entry" })`를 보낼 수 있다(`srvx/dist/cli.mjs:34`). 검증에서 걸러진다.
 
 ### web
 
-- 신호 모듈 하나(예: `apps/web/src/server/worker-wake.ts`)가 신호를 보낸다. `FACTORY_WORKER_WAKE=ipc`가 있고 `process.connected`일 때만 `process.send({ type: "wake" }, () => undefined)`를 부른다. 콜백을 넘기지 않으면 통로가 닫혔을 때(`start`가 먼저 끝난 경우) 실패가 `process`의 `'error'`로 와서 잡히지 않은 예외가 되고, `srvx`가 프로세스를 끝낸다(`srvx/dist/cli.mjs`의 `uncaughtException` 처리). 그 밖에는 아무것도 하지 않고, 실패해도 요청 처리에 영향을 주지 않는다.
+- 신호 모듈 하나(예: `apps/web/src/server/worker-wake.ts`)가 신호를 보낸다. `GANGER_WORKER_WAKE=ipc`가 있고 `process.connected`일 때만 `process.send({ type: "wake" }, () => undefined)`를 부른다. 콜백을 넘기지 않으면 통로가 닫혔을 때(`start`가 먼저 끝난 경우) 실패가 `process`의 `'error'`로 와서 잡히지 않은 예외가 되고, `srvx`가 프로세스를 끝낸다(`srvx/dist/cli.mjs`의 `uncaughtException` 처리). 그 밖에는 아무것도 하지 않고, 실패해도 요청 처리에 영향을 주지 않는다.
 - 부르는 곳은 서버 진입(`apps/web/src/server.ts`) 한 곳이다. 이 진입은 이미 모든 요청(화면, server function, webhook)을 감싸 Host·Origin 검사를 한다. Host·Origin 검사를 통과한 POST 요청에 대해 `handler.fetch`가 2xx 응답을 돌려준 뒤 신호를 보낸다.
   - TanStack Start의 전역 server function 미들웨어(`createStart`의 `functionMiddleware`)는 server function만 감싸고 webhook 서버 라우트는 감싸지 않아 고르지 않았다.
   - 값을 바꾸는 server function은 모두 POST이고, 읽기만 하는 것은 `createServerFn({ method: "GET" })`이다. webhook도 POST다.
@@ -95,7 +95,7 @@ web과 worker는 SQLite 파일 하나로만 주고받는다(ADR 0002). web이 DB
 
 ## 완료 조건
 
-`[unit]`은 CI의 `pnpm test`, `[smoke]`는 로컬 `pnpm --filter @factory/desktop smoke`다.
+`[unit]`은 CI의 `pnpm test`, `[smoke]`는 로컬 `pnpm --filter @ganger/desktop smoke`다.
 
 - [ ] 앞 바퀴가 끝나고 1초가 지난 뒤 쉬는 중에 `wake()`를 부르면 폴링 간격보다 먼저(250ms 뒤) 바퀴가 돈다. `[unit]`
 - [ ] `wake()`가 끊임없이 와도 바퀴 사이에 적어도 1초 쉰다. `[unit]`
@@ -104,7 +104,7 @@ web과 worker는 SQLite 파일 하나로만 주고받는다(ADR 0002). web이 DB
 - [ ] `wake()`를 부르지 않으면 폴링 간격대로 돈다. 바퀴가 실패해도 루프는 이어진다. `[unit]`
 - [ ] 기다리는 중에 `stop()`을 부르면 바로 멈춘다. `[unit]`
 - [ ] `start`에서 web 자식이 보낸 `{ type: "wake" }`가 worker 자식에 닿고, 다른 메시지는 넘기지 않는다. worker가 끝난 뒤 온 신호는 `start`를 멈추거나 띄우기 실패로 기록하지 않는다. 가짜 자식 스크립트로 시험한다. `[unit]`
-- [ ] web 서버 진입은 2xx로 응답한 POST 요청(server function, webhook)에만 신호를 보내고, GET 요청, Host·Origin 검사에서 거절한 요청, 서명이 틀린 webhook, 2xx가 아닌 응답에는 보내지 않는다. `FACTORY_WORKER_WAKE=ipc`가 없거나 통로가 닫혀 있으면 아무것도 보내지 않고 예외도 내지 않는다. `[unit]`
+- [ ] web 서버 진입은 2xx로 응답한 POST 요청(server function, webhook)에만 신호를 보내고, GET 요청, Host·Origin 검사에서 거절한 요청, 서명이 틀린 webhook, 2xx가 아닌 응답에는 보내지 않는다. `GANGER_WORKER_WAKE=ipc`가 없거나 통로가 닫혀 있으면 아무것도 보내지 않고 예외도 내지 않는다. `[unit]`
 - [ ] web을 거친 할당이 폴링을 기다리지 않는다. e2e에서 vite 플러그인으로 web의 신호 모듈을 같은 프로세스 worker의 `wake()`로 갈아 끼우고(demo와 같은 방식), 폴링 간격을 60초로 둔 worker의 첫 바퀴가 끝나기를 기다린 뒤 web의 server function으로 할당한 런이 몇 초 안에 시작되고, 갈아 끼운 `wake()`가 불렸다. 첫 바퀴 전에 할당하면 신호 없이도 시작돼 시험이 아무것도 확인하지 못한다. 지금 e2e 얇은 경로 시험은 DB에 직접 할당해(`e2e/src/thin-path.test.ts`의 `assignRun`) 이 경로를 지나지 않는다. `start`의 중계는 위 `start` 시험이 맡는다. `[unit]`
 - [ ] `ELECTRON_RUN_AS_NODE=1`인 Electron 실행 파일이 같은 방식으로 띄운 자식과 IPC 메시지를 주고받는다. `[smoke]`
 - [ ] ADR 0002 단락과 README 문장이 들어간다.
