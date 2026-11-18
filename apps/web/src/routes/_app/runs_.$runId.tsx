@@ -86,11 +86,11 @@ function RunDetailRoute() {
           expectOk(await cancelRun({ data: { runId } }));
           await reload();
         }}
-        onRefreshLog={() => {
+        onRefreshLog={async () => {
           setPolls(0);
-          requestRunLog({ data: { runId } })
-            .then(reload)
-            .catch(() => undefined);
+          // 실패는 화면이 받아 문구로 보인다
+          await requestRunLog({ data: { runId } });
+          await reload();
         }}
       />
     </ScreenMessages>
