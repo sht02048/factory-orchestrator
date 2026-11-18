@@ -1,0 +1,22 @@
+{
+  "fill": {
+    "solid": "srgb:0.05490,0.05882,0.07059,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "mouthpiece.svg",
+          "name": "mouthpiece"
+        },
+        {
+          "image-name": "body.svg",
+          "name": "body"
+        }
+      ]
+    }
+  ],
+  "supported-platforms": {
+    "squares": ["macOS"]
+  }
+}
