@@ -12,6 +12,7 @@ import {
 } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
+import { BlockSections, blockSectionIds } from "./block-preview";
 import { ComponentSections } from "./component-preview";
 import { RoleSections, roleSectionIds } from "./role-preview";
 import { TokenSections } from "./token-preview";
@@ -30,6 +31,7 @@ const componentLinks = [
   "dialog",
   "toast",
   ...roleSectionIds,
+  ...blockSectionIds,
 ] as const;
 
 export function DesignSystemPage() {
@@ -63,6 +65,7 @@ export function DesignSystemPage() {
             <TokenSections />
             <ComponentSections />
             <RoleSections />
+            <BlockSections />
           </div>
         </div>
       </main>

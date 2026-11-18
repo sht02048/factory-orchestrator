@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from "node:fs";
+import * as ui from "@factory/ui";
 import { describe, expect, it } from "vitest";
 
 import { renderWithMessages } from "../testing/render";
@@ -40,6 +42,18 @@ describe("/ds 서버 렌더", () => {
       "problem",
       "statTile",
       "brand",
+      "shell",
+      "links",
+      "chips",
+      "choices",
+      "codeBlock",
+      "dataTable",
+      "outcomes",
+      "steps",
+      "disclosure",
+      "dividedList",
+      "popover",
+      "icons",
     ];
     expect(ids.filter((id) => !html.includes(`id="${id}"`))).toEqual([]);
     expect(ids.filter((id) => !html.includes(`href="#${id}"`))).toEqual([]);
@@ -62,5 +76,38 @@ describe("/ds 서버 렌더", () => {
     expect(html).toContain(messages.ds.problem.title);
     expect(html).toContain(messages.ds.groupHeader.stuckTitle);
     expect(html).toContain(messages.ds.statTile.doneDetail);
+  });
+});
+
+const RENDERED_ONCE_AT_APP_ROOT = new Set(["Toaster"]);
+
+function exportedComponents(): string[] {
+  return Object.entries(ui)
+    .filter(([name, value]) => /^[A-Z][a-z]/.test(name) && typeof value === "function")
+    .map(([name]) => name)
+    .filter((name) => !RENDERED_ONCE_AT_APP_ROOT.has(name))
+    .sort();
+}
+
+function previewSource(): string {
+  const dir = new URL(".", import.meta.url);
+  return readdirSync(dir)
+    .filter((file) => file.endsWith(".tsx") && !file.endsWith(".test.tsx"))
+    .map((file) => readFileSync(new URL(file, dir), "utf8"))
+    .join("\n");
+}
+
+describe("/ds 빠짐 시험(티켓 0074)", () => {
+  it("packages/ui 가 내보내는 컴포넌트마다 /ds 미리보기가 있다", () => {
+    const source = previewSource();
+    const missing = exportedComponents().filter(
+      (name) => !new RegExp(`<${name}[\\s>/<]`).test(source),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("컴포넌트 목록을 실제로 읽는다", () => {
+    expect(exportedComponents()).toEqual(expect.arrayContaining(["Button", "DataTable", "Chip"]));
+    expect(exportedComponents()).not.toContain("TEXT_VARIANTS");
   });
 });
