@@ -38,11 +38,14 @@ const MAX_PAGES = 4;
  * 어댑터로 조회하고(0027 의 AdapterRegistry, web 은 ssh 를 쓰지 않는다 Q61), 런은 DB 에서 읽는다.
  * 요약 결과는 저장하지 않으므로 core summarizeRunOutcome 으로 계산한다(Q66·Q76).
  *
+ * `now` 는 서버가 읽은 때다. 런 이력의 상대 시간("25분 전")을 여기서 정한다.
+ *
  * 한 트래커 프로젝트를 읽지 못해도 나머지는 보이고, 읽지 못한 것은 errors 에 담는다.
  */
 export async function loadTicketsPage(
   context: TicketsContext,
   ws: string | undefined,
+  now: Date,
 ): Promise<TicketsPage> {
   const { db } = context;
   const workspace = resolveWorkspace(
@@ -128,7 +131,7 @@ export async function loadTicketsPage(
           name: label.name,
           autoAssign: label.id === autoAssign,
         })),
-        runs: runs.toReversed().map((run) => toTicketRun(db, run)),
+        runs: runs.toReversed().map((run) => toTicketRun(db, run, now)),
         assignability: assignabilityOf(db, project, ticket, runs),
       };
     });
@@ -192,12 +195,14 @@ function groupRuns(runs: ReadonlyArray<StoredRun>): Map<string, StoredRun[]> {
   return byTicket;
 }
 
-function toTicketRun(db: Database, run: StoredRun): TicketRun {
+function toTicketRun(db: Database, run: StoredRun, now: Date): TicketRun {
   const assignedAt = run.assignedAt.toISOString();
-  if (run.state !== "ended") return { id: run.id, assignedAt, state: run.state };
+  const assignedAgoMs = Math.max(0, now.getTime() - run.assignedAt.getTime());
+  if (run.state !== "ended") return { id: run.id, assignedAt, assignedAgoMs, state: run.state };
   return {
     id: run.id,
     assignedAt,
+    assignedAgoMs,
     state: run.state,
     agentResult: run.agentResult,
     prState: run.prState,

@@ -1,8 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import { colors, fontSize } from "@factory/ui/tokens.stylex";
 import { useTranslations } from "use-intl";
+import { useTime } from "../format/time";
 import type { DailyThroughput } from "./model";
-import { useDayLabel } from "./dates";
 
 // 시안 B(stats.html)의 막대 그래프 크기. viewBox 단위이고 화면 폭에 맞춰 늘고 준다.
 const WIDTH = 720;
@@ -13,13 +13,13 @@ const LEFT = 24;
 const GRID_LINES = 4;
 
 /**
- * 날짜별 처리량: 날마다 끝난 런 수를 요약 결과로 나눠 쌓는다(아래부터 Merged, Human Check, Failed, 취소).
- * 색은 손댈 일(Human Check, Failed)에만 쓰고 Merged 와 취소는 무채색이다(ADR 0007). 취소는 Merged 보다
- * 옅게 그려 따로 센 것이 보이게 한다(Q82.18).
+ * 날짜별 처리량: 날마다 끝난 런 수를 요약 결과로 나눠 쌓는다(아래부터 Merged, Human Check, Failed, Canceled).
+ * 색은 상태 알약과 같은 뜻을 쓴다(ADR 0010 5번): Merged 파랑, Human Check 노랑, Failed 빨강, Canceled 회색.
+ * Canceled 도 따로 세어 쌓는다(Q82.18).
  */
 export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughput> }) {
   const t = useTranslations("stats.throughput");
-  const dayLabel = useDayLabel();
+  const { statsDay: dayLabel } = useTime();
   const totals = daily.map(
     (d) => d.outcomes.merged + d.outcomes["human-check"] + d.outcomes.failed + d.outcomes.canceled,
   );
@@ -115,16 +115,16 @@ const styles = stylex.create({
     fontSize: fontSize.label,
     fontVariantNumeric: "tabular-nums",
   },
-  merged: { fill: colors.textDisabled },
+  merged: { fill: colors.merged },
   check: { fill: colors.check },
   failed: { fill: colors.problem },
-  canceled: { fill: colors.borderStrong },
+  canceled: { fill: colors.idle },
   swatch: { display: "inline-block", width: 8, height: 8, borderRadius: 2 },
 });
 
 const swatchFill = stylex.create({
-  merged: { backgroundColor: colors.textDisabled },
+  merged: { backgroundColor: colors.merged },
   check: { backgroundColor: colors.check },
   failed: { backgroundColor: colors.problem },
-  canceled: { backgroundColor: colors.borderStrong },
+  canceled: { backgroundColor: colors.idle },
 });

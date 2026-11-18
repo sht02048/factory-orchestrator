@@ -91,7 +91,7 @@ function fixture(): Fixture {
   };
 }
 
-const page = (f: Fixture): Promise<SettingsPage> => loadSettingsPage(f.context, undefined);
+const page = (f: Fixture): Promise<SettingsPage> => loadSettingsPage(f.context, undefined, now);
 
 const reject = () => Promise.reject(new Error("unused"));
 const noopActions: OnboardingActions = {

@@ -120,6 +120,11 @@ describe("Stats 화면", () => {
     expect(panelText(html).trim()).toBe("");
   });
 
+  it("파란 주 버튼이 없다. 보기만 하는 화면이다(ADR 0010 6번)", () => {
+    const html = render(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
+    expect(html).not.toContain('data-variant="primary"');
+  });
+
   it("전체 보기에서는 Workspace 를 고르라고 안내한다", () => {
     const html = text(render(loadStatsPage(seedStatsDatabase(), "all", now, "UTC")));
     expect(html).toContain("통계는 Workspace마다 봐요.");

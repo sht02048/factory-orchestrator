@@ -45,7 +45,7 @@ function context(): SettingsContext {
 
 export const getSettingsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
-  .handler(({ data }) => loadSettingsPage(context(), data.ws));
+  .handler(({ data }) => loadSettingsPage(context(), data.ws, new Date()));
 
 /** 러너 확인 결과를 기다리는 동안 부른다. DB 만 읽고 트래커를 부르지 않는다 */
 export const getRunnerChecksPending = createServerFn({ method: "GET" }).handler(() =>

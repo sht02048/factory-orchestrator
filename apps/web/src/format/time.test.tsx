@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 import { renderWithMessages } from "../testing/render";
 import { useTime, type TimeFormat } from "./time";
@@ -52,9 +54,40 @@ describe("시간 표기(ADR 0010 7번)", () => {
     expect(draw((time) => time.stamp("2026-11-17T23:10:00.000Z", now), "Asia/Seoul")).toBe("08:10");
   });
 
+  it("통계의 하루는 날짜와 눈금으로 쓰고 시간대를 다시 적용하지 않는다", () => {
+    // 운영자 시간대로 이미 나눈 11월 4일을 UTC 자정으로 나타낸 값
+    const day = Date.UTC(2026, 10, 4);
+    expect(draw((time) => time.statsDay(day).long)).toBe("11월 4일");
+    expect(draw((time) => time.statsDay(day).short, "America/New_York")).toBe("11/4");
+  });
+
   it("시간의 양은 단위를 붙여 쓴다", () => {
     expect(draw((time) => time.duration(40 * 1000))).toBe("40초");
     expect(draw((time) => time.duration(12 * MINUTE))).toBe("12분");
     expect(draw((time) => time.duration(2 * HOUR))).toBe("2시간");
+  });
+});
+
+describe("앱 코드는 useTime() 밖에서 시각·날짜를 만들지 않는다(ADR 0010 7번)", () => {
+  const root = new URL("..", import.meta.url).pathname;
+  const files = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) return files(path);
+      return /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : [];
+    });
+  // 날짜·시각 글을 만드는 길: use-intl 포매터, Intl 날짜 포매터, toLocale*String, Date 의 달·날·시·분 읽기
+  const formatting =
+    /useFormatter|\.dateTime\(|\.relativeTime\(|toLocale(?:Date|Time)?String|Intl\.(?:DateTimeFormat|RelativeTimeFormat)|\.get(?:UTC)?(?:Month|Date|Day|Hours|Minutes)\(/;
+  // format/time.ts 가 시간 표기 모듈이다. time-zone.ts 는 운영자 시간대를 읽고 하루를 나누는 서버 쪽 계산이라
+  // 글을 만들지 않는다(티켓 0044).
+  const allowed = new Set(["format/time.ts", "time-zone.ts"]);
+
+  it("format/time.ts 밖의 앱 코드에 날짜 포매터가 없다", () => {
+    const offenders = files(root)
+      .map((file) => relative(root, file))
+      .filter((file) => !allowed.has(file))
+      .filter((file) => formatting.test(readFileSync(join(root, file), "utf8")));
+    expect(offenders).toEqual([]);
   });
 });

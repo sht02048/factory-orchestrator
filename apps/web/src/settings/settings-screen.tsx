@@ -22,9 +22,10 @@ import {
   Text,
   showToast,
 } from "@factory/ui";
-import { colors, space } from "@factory/ui/tokens.stylex";
+import { colors, fontSize, space } from "@factory/ui/tokens.stylex";
 import { useEffect, useState, type ReactNode } from "react";
-import { useFormatter, useTranslations } from "use-intl";
+import { useTranslations } from "use-intl";
+import { useTime } from "../format/time";
 import { prerequisiteHint, useAgentName, usePrerequisiteName } from "../labels";
 import { useStatusName } from "../status";
 import {
@@ -130,7 +131,7 @@ export function SettingsScreen({ page, selected, onSelect, actions }: SettingsSc
       variant="editor"
       list={
         <>
-          <PageHeader title={t("title")} />
+          <PageHeader title={t("title")} subtitle={t("subtitle")} />
           <Section
             title={t("workspaceGroup")}
             {...(workspace === null ? {} : { note: workspace.general.name })}
@@ -583,7 +584,7 @@ function ProjectRow({
         {owner.kind === "this" ? (
           <Dialog
             trigger={t("remove")}
-            triggerVariant="ghost"
+            triggerVariant="danger"
             title={t("removeTitle", { project: project.name })}
             description={
               <>
@@ -597,7 +598,7 @@ function ProjectRow({
               <>
                 <DialogClose>{t("cancel")}</DialogClose>
                 <DialogClose
-                  variant="primary"
+                  variant="danger"
                   onClick={() =>
                     submit.run(
                       () => actions.removeProject(refInput),
@@ -1031,7 +1032,7 @@ export function ConnectionForm({
             </Text>
           </span>
           <Button
-            variant="ghost"
+            variant="secondary"
             disabled={check.sending}
             onClick={() =>
               check.run(
@@ -1235,7 +1236,7 @@ export function GitHubPanel({ saved, actions }: { saved: boolean; actions: Setti
         <Text variant="body">{saved ? t("github.stateSet") : t("github.stateUnset")}</Text>
         {saved ? (
           <Button
-            variant="ghost"
+            variant="secondary"
             disabled={check.sending}
             onClick={() => check.run(() => actions.checkGitHubToken(), t("github.checkOk"))}
           >
@@ -1451,7 +1452,7 @@ export function RunnerCheck({
           </Text>
         </span>
         <Button
-          variant="ghost"
+          variant="secondary"
           disabled={submit.sending || (check?.status === "pending" && !workerSilent)}
           onClick={() =>
             submit.run(() => actions.recheckRunner({ id: runner.id }), t("checkRequested"))
@@ -1478,7 +1479,7 @@ function CheckResult({
   const t = useTranslations("settings.runners.check");
   const runnerError = useRunnerErrorName();
   const statusName = useStatusName();
-  const format = useFormatter();
+  const { ago } = useTime();
   if (check === null) return <Text variant="meta">{t("never")}</Text>;
   switch (check.status) {
     case "pending":
@@ -1514,12 +1515,9 @@ function CheckResult({
             </ul>
           )}
           <Text variant="meta">
-            {t("checkedAt", {
-              time: format.dateTime(new Date(check.completedAt), {
-                dateStyle: "medium",
-                timeStyle: "short",
-              }),
-            })}
+            <time dateTime={check.completedAt}>
+              {t("checkedAt", { time: ago(check.completedAt, check.completedAgoMs) })}
+            </time>
           </Text>
         </div>
       );
@@ -1554,13 +1552,14 @@ function Prerequisite({ prerequisite }: { prerequisite: PrerequisiteView }) {
     <li {...stylex.props(styles.item, styles.prerequisite)}>
       <span {...stylex.props(styles.inline)}>
         <span {...stylex.props(styles.primaryText)}>{prerequisiteName(prerequisite)}</span>
-        <Text variant="meta">
-          {prerequisite.satisfied === null
-            ? t("unknown")
-            : prerequisite.satisfied
-              ? t("satisfied")
-              : t("unsatisfied")}
-        </Text>
+        {broken ? (
+          // 깨진 항목은 문제 색으로 드러낸다(ADR 0010 5번 빨강: 문제)
+          <span {...stylex.props(styles.brokenText)}>{t("unsatisfied")}</span>
+        ) : (
+          <Text variant="meta">
+            {prerequisite.satisfied === null ? t("unknown") : t("satisfied")}
+          </Text>
+        )}
       </span>
       {broken && hint !== null ? (
         <Text variant="meta" mono>
@@ -1628,6 +1627,7 @@ const styles = stylex.create({
   disabledText: { color: colors.textDisabled },
   para: { margin: 0 },
   error: { margin: 0, color: colors.problem },
+  brokenText: { color: colors.problem, fontSize: fontSize.ui },
   fix: { display: "flex", flexDirection: "column", gap: space.s1 },
   bullets: {
     margin: 0,

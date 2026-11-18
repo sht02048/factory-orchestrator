@@ -47,6 +47,7 @@ import {
 import { hasPendingRunnerChecks, loadSettingsPage } from "./load";
 import type { SettingsContext } from "./load";
 import { settingsMessages } from "./messages";
+import { INSTALL_ITEMS, WORKSPACE_ITEMS } from "./model";
 import type { SettingsItem, SettingsPage } from "./model";
 import { SettingsScreen } from "./settings-screen";
 import type { SettingsActions } from "./settings-screen";
@@ -207,7 +208,7 @@ describe("Settings 저장하고 다시 열기", () => {
       ok: true,
     });
 
-    const page = await loadSettingsPage(f.context, ws);
+    const page = await loadSettingsPage(f.context, ws, now);
     expect(page.workspace?.general).toEqual({ id: ws, name: "Acme Store", maxRunMinutes: 90 });
     expect(page.workspace?.trackerProjects).toEqual([
       {
@@ -288,7 +289,7 @@ describe("Settings 저장하고 다시 열기", () => {
     expect(raw).not.toContain("whsec_example");
     expect(raw).not.toContain("github_pat_example");
 
-    const page = JSON.stringify(await loadSettingsPage(f.context, commerce));
+    const page = JSON.stringify(await loadSettingsPage(f.context, commerce, now));
     expect(page).not.toContain("lin_api_example");
     expect(page).not.toContain("github_pat_example");
   });
@@ -327,7 +328,7 @@ describe("Settings 저장하고 다시 열기", () => {
       ok: false,
       reason: "unauthorized",
     });
-    const page = await loadSettingsPage(f.context, commerce);
+    const page = await loadSettingsPage(f.context, commerce, now);
     expect(page.install.connections).toEqual([]);
     expect(page.install.githubToken).toBe(false);
     // 확인할 때 어댑터는 입력한 키를 받았다
@@ -338,7 +339,7 @@ describe("Settings 저장하고 다시 열기", () => {
 
   it("GitHub 토큰 안내에 필수 권한과 선택 권한을 보인다", async () => {
     const f = fixture();
-    const text = panelText(render(await loadSettingsPage(f.context, commerce), "github"));
+    const text = panelText(render(await loadSettingsPage(f.context, commerce, now), "github"));
     expect(text).toContain("필수 권한: Metadata 읽기, Pull requests 읽기");
     expect(text).toContain("선택 권한: Actions 읽기");
   });
@@ -352,7 +353,7 @@ describe("Settings 저장하고 다시 열기", () => {
       projectId: webProject,
       name: "Web",
     });
-    const text = panelText(render(await loadSettingsPage(f.context, commerce), "mapping"));
+    const text = panelText(render(await loadSettingsPage(f.context, commerce, now), "mapping"));
     expect(text).toContain("에이전트 설정에서 미리 허용해 두세요");
     expect(text).toContain("러너 쪽 프로젝트");
     expect(text).not.toContain("러너 이름");
@@ -367,7 +368,8 @@ describe("Settings 저장하고 다시 열기", () => {
     const project = { ws: commerce, connectionId, projectId: webProject };
     addTrackerProject(f.context, { ...project, name: "Web" });
     const mapping = { ...project, runnerProjectId: repo, agentId: "claude" };
-    const saved = async () => (await loadSettingsPage(f.context, commerce)).workspace?.bound[0];
+    const saved = async () =>
+      (await loadSettingsPage(f.context, commerce, now)).workspace?.bound[0];
 
     expect(saveMappingSetting(f.context, { ...mapping, model: "sonnet" })).toEqual({ ok: true });
     expect((await saved())?.mapping?.model).toBe("sonnet");
@@ -391,7 +393,7 @@ describe("주소(0048)", () => {
 
   it("두 주소를 origin 으로 저장하고 다시 열면 보인다. 비우면 정하지 않음이다", async () => {
     const f = fixture();
-    expect((await loadSettingsPage(f.context, undefined)).install.addresses).toEqual({
+    expect((await loadSettingsPage(f.context, undefined, now)).install.addresses).toEqual({
       webAddress: null,
       webhookAddress: null,
     });
@@ -406,7 +408,7 @@ describe("주소(0048)", () => {
         local,
       ),
     ).toEqual({ ok: true });
-    const page = await loadSettingsPage(f.context, undefined);
+    const page = await loadSettingsPage(f.context, undefined, now);
     expect(page.install.addresses).toEqual({
       webAddress: "https://server.example.ts.net",
       webhookAddress: "https://hooks.example.com",
@@ -418,7 +420,7 @@ describe("주소(0048)", () => {
     expect(saveAddresses(f.context, { webAddress: "", webhookAddress: "" }, now, local)).toEqual({
       ok: true,
     });
-    expect((await loadSettingsPage(f.context, undefined)).install.addresses).toEqual({
+    expect((await loadSettingsPage(f.context, undefined, now)).install.addresses).toEqual({
       webAddress: null,
       webhookAddress: null,
     });
@@ -459,7 +461,9 @@ describe("주소(0048)", () => {
         remote,
       ),
     ).toEqual({ ok: false, reason: "locks-out" });
-    expect((await loadSettingsPage(f.context, undefined)).install.addresses.webAddress).toBeNull();
+    expect(
+      (await loadSettingsPage(f.context, undefined, now)).install.addresses.webAddress,
+    ).toBeNull();
     expect(
       saveAddresses(
         f.context,
@@ -504,7 +508,7 @@ describe("트래커 프로젝트는 Workspace 하나에만", () => {
     ).toEqual({ ok: false, reason: "taken" });
 
     // 다른 Workspace 의 화면에는 묶인 Workspace 가 보이고 넣기 버튼이 꺼져 있다
-    const page = await loadSettingsPage(f.context, labs);
+    const page = await loadSettingsPage(f.context, labs, now);
     expect(page.workspace?.trackerProjects[0]?.projects).toEqual([
       {
         id: webProject,
@@ -549,15 +553,19 @@ describe("트래커 프로젝트는 Workspace 하나에만", () => {
       expect(result.ok).toBe(true);
     }
 
-    const before = await loadSettingsPage(f.context, commerce);
+    const before = await loadSettingsPage(f.context, commerce, now);
     expect(before.workspace?.trackerProjects[0]?.projects[0]).toMatchObject({
       id: webProject,
       mappings: 1,
       queuedRuns: 2,
     });
+    // 빼기는 위험 행동이라 빨간 글자 보조 버튼이다(ADR 0010 6번)
+    expect(render(before, "projects")).toMatch(
+      /<button[^>]*data-variant="danger"[^>]*>빼기<\/button>/,
+    );
 
     expect(removeTrackerProject(f.context, project)).toEqual({ ok: true });
-    const after = await loadSettingsPage(f.context, commerce);
+    const after = await loadSettingsPage(f.context, commerce, now);
     expect(after.workspace?.bound).toEqual([]);
     expect(after.workspace?.trackerProjects[0]?.projects[0]).toMatchObject({
       id: webProject,
@@ -608,7 +616,7 @@ describe("러너 확인", () => {
         ...result,
       }),
     ).toBe(true);
-    return loadSettingsPage(f.context, commerce);
+    return loadSettingsPage(f.context, commerce, now);
   }
 
   it("러너를 등록하면 확인 요청이 DB 에 생기고 기다리는 중으로 보인다", async () => {
@@ -625,7 +633,7 @@ describe("러너 확인", () => {
     expect(listPendingRunnerCheckRequests(f.context.db)).toEqual([
       { runnerId, requestedAt: later },
     ]);
-    const text = panelText(render(await loadSettingsPage(f.context, commerce), "runners"));
+    const text = panelText(render(await loadSettingsPage(f.context, commerce, now), "runners"));
     expect(text).toContain("worker가 러너를 확인하고 있어요");
   });
 
@@ -698,6 +706,20 @@ describe("러너 확인", () => {
     expect(text).toContain("Orca 상시 서비스 갖췄어요");
     expect(text).toContain("acme/web GitHub 인증 갖췄어요");
     expect(text).not.toContain("해결 방법");
+  });
+
+  it("확인 시각은 서버가 읽은 때부터의 상대 시간이다(ADR 0010 7번)", async () => {
+    const f = fixture();
+    const runnerId = addRunner(f);
+    await checked(f, runnerId, { result: health() });
+    const later = await loadSettingsPage(
+      f.context,
+      commerce,
+      new Date(now.getTime() + 25 * 60_000),
+    );
+    const check = later.install.runners[0]?.check;
+    expect(check).toMatchObject({ status: "done", completedAgoMs: 25 * 60_000 - 5000 });
+    expect(panelText(render(later, "runners"))).toContain("24분 전 확인");
   });
 
   it("GitHub 인증이 깨진 결과는 실패와 해결 방법을 보인다", async () => {
@@ -818,9 +840,23 @@ describe("러너 확인", () => {
 });
 
 describe("Settings 화면", () => {
+  it("어느 항목을 열어도 파란 주 버튼은 하나 이하다(ADR 0010 6번)", async () => {
+    const f = fixture();
+    const connection = await addConnection(f);
+    const project = { ws: commerce, connectionId: connection, projectId: webProject };
+    addTrackerProject(f.context, { ...project, name: "Web" });
+    saveMappingSetting(f.context, { ...project, runnerProjectId: repo, agentId: "claude" });
+    addRunner(f);
+    const page = await loadSettingsPage(f.context, commerce, now);
+    for (const item of [...WORKSPACE_ITEMS, ...INSTALL_ITEMS]) {
+      const primary = [...render(page, item).matchAll(/data-variant="primary"/g)].length;
+      expect({ item, primary: primary <= 1 }).toEqual({ item, primary: true });
+    }
+  });
+
   it("이 Workspace 와 설치 전체로 나눈다", async () => {
     const f = fixture();
-    const html = render(await loadSettingsPage(f.context, commerce), "general");
+    const html = render(await loadSettingsPage(f.context, commerce, now), "general");
     expect(html).toContain("이 Workspace");
     expect(html).toContain("설치 전체");
     expect(html).toContain("Acme Commerce Workspace");
@@ -830,7 +866,7 @@ describe("Settings 화면", () => {
 
   it("전체 보기에서는 설치 전체만 고칠 수 있다", async () => {
     const f = fixture();
-    const page = await loadSettingsPage(f.context, "all");
+    const page = await loadSettingsPage(f.context, "all", now);
     expect(page.workspace).toBeNull();
     const html = render(page, "general");
     expect(html).toContain("Workspace를 고르면 그 Workspace의 설정을 바꿀 수 있어요.");

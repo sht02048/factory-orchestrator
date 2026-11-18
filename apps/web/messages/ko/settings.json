@@ -1,6 +1,7 @@
 {
   "documentTitle": "Settings · Factory Orchestrator",
   "title": "Settings",
+  "subtitle": "이 Workspace와 설치 전체의 설정을 바꿔요.",
   "workspaceGroup": "이 Workspace",
   "installGroup": "설치 전체",
   "installNote": "모든 Workspace",
@@ -180,7 +181,7 @@
       "fixTitle": "해결 방법",
       "fixToken": "러너에서 gh auth login --insecure-storage로 토큰을 파일에 저장하고, gh auth setup-git으로 git 자격 증명 도우미를 gh로 바꿔요.",
       "fixSsh": "또는 러너에 GitHub용 ssh 키를 둬요.",
-      "checkedAt": "{time}에 확인했어요"
+      "checkedAt": "{time} 확인"
     }
   },
   "addresses": {

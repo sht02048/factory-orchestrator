@@ -84,6 +84,7 @@ export const getTicketsPage = createServerFn({ method: "GET" })
     loadTicketsPage(
       { db: getDatabase(), secretBox: getSecretBox(), registry: getAdapterRegistry() },
       data.ws,
+      new Date(),
     ),
   );
 
