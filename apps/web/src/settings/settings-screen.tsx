@@ -23,7 +23,18 @@ import {
   showToast,
 } from "@factory/ui";
 import { colors, fontSize, space } from "@factory/ui/tokens.stylex";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type ReactNode,
+} from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { prerequisiteHint, useAgentName, usePrerequisiteName } from "../labels";
@@ -110,10 +121,34 @@ export interface SettingsScreenProps {
   selected: string | undefined;
   onSelect: (item: SettingsItem) => void;
   actions: SettingsActions;
+  renderRunnersLink?: (props: RunnersLinkProps) => ReactNode;
+}
+
+export interface RunnersLinkProps {
+  className?: string;
+  style?: CSSProperties;
+  children: ReactNode;
+}
+
+const ReportUnsavedContext = createContext<(formId: string, unsaved: boolean) => void>(() => {});
+
+function useReportUnsaved(unsaved: boolean): void {
+  const report = use(ReportUnsavedContext);
+  const formId = useId();
+  useEffect(() => {
+    report(formId, unsaved);
+  }, [report, formId, unsaved]);
+  useEffect(() => () => report(formId, false), [report, formId]);
 }
 
 /** Settings: 왼쪽 항목 목록 + 오른쪽 편집 영역(ADR 0007, 시안 B). 이 Workspace / 설치 전체로 나눈다(ADR 0006) */
-export function SettingsScreen({ page, selected, onSelect, actions }: SettingsScreenProps) {
+export function SettingsScreen({
+  page,
+  selected,
+  onSelect,
+  actions,
+  renderRunnersLink,
+}: SettingsScreenProps) {
   const t = useTranslations("settings");
   const workspace = page.workspace;
   const items: ReadonlyArray<SettingsItem> =
@@ -125,6 +160,20 @@ export function SettingsScreen({ page, selected, onSelect, actions }: SettingsSc
     .flatMap((r) => (r.check?.status === "pending" ? [`${r.id}@${r.check.requestedAt}`] : []))
     .join(",");
   const workerSilent = useRunnerCheckPolling(pendingKey, actions.pollRunnerChecks);
+
+  const [unsavedForms, setUnsavedForms] = useState<ReadonlySet<string>>(() => new Set());
+  const reportUnsaved = useCallback((formId: string, unsaved: boolean) => {
+    setUnsavedForms((prev) => {
+      if (prev.has(formId) === unsaved) return prev;
+      const next = new Set(prev);
+      if (unsaved) next.add(formId);
+      else next.delete(formId);
+      return next;
+    });
+  }, []);
+  const hasUnsaved = unsavedForms.size > 0;
+  const summaryOrUnsaved = (item: SettingsItem, summary: ReactNode): ReactNode =>
+    hasUnsaved && item === current ? t("unsaved") : summary;
 
   return (
     <SplitView
@@ -144,7 +193,9 @@ export function SettingsScreen({ page, selected, onSelect, actions }: SettingsSc
                 items={WORKSPACE_ITEMS}
                 selected={current}
                 onSelect={onSelect}
-                summary={(item) => <WorkspaceSummary item={item} workspace={workspace} />}
+                summary={(item) =>
+                  summaryOrUnsaved(item, <WorkspaceSummary item={item} workspace={workspace} />)
+                }
               />
             )}
           </Section>
@@ -154,7 +205,7 @@ export function SettingsScreen({ page, selected, onSelect, actions }: SettingsSc
               items={INSTALL_ITEMS}
               selected={current}
               onSelect={onSelect}
-              summary={(item) => <InstallSummary item={item} page={page} />}
+              summary={(item) => summaryOrUnsaved(item, <InstallSummary item={item} page={page} />)}
             />
           </Section>
         </>
@@ -164,22 +215,30 @@ export function SettingsScreen({ page, selected, onSelect, actions }: SettingsSc
           <DetailPanel>
             <PanelHeader
               status={
-                <Text variant="meta">
-                  {workspace !== null && isWorkspaceItem(current)
-                    ? t("scopeWorkspace", { name: workspace.general.name })
-                    : t("scopeInstall")}
-                </Text>
+                <span {...stylex.props(styles.inline)}>
+                  <Text variant="meta">
+                    {workspace !== null && isWorkspaceItem(current)
+                      ? t("scopeWorkspace", { name: workspace.general.name })
+                      : t("scopeInstall")}
+                  </Text>
+                  <span role="status" {...stylex.props(styles.unsaved)}>
+                    {hasUnsaved ? t("unsaved") : null}
+                  </span>
+                </span>
               }
               title={t(`items.${current}`)}
             />
             {/* Workspace 나 항목을 바꾸면 편집 중인 값을 새로 채운다 */}
-            <ItemPanel
-              key={`${workspace?.general.id ?? ""}:${current}`}
-              item={current}
-              page={page}
-              actions={actions}
-              workerSilent={workerSilent}
-            />
+            <ReportUnsavedContext value={reportUnsaved}>
+              <ItemPanel
+                key={`${workspace?.general.id ?? ""}:${current}`}
+                item={current}
+                page={page}
+                actions={actions}
+                workerSilent={workerSilent}
+                renderRunnersLink={renderRunnersLink}
+              />
+            </ReportUnsavedContext>
           </DetailPanel>
         </section>
       }
@@ -337,11 +396,13 @@ function ItemPanel({
   page,
   actions,
   workerSilent,
+  renderRunnersLink,
 }: {
   item: SettingsItem;
   page: SettingsPage;
   actions: SettingsActions;
   workerSilent: boolean;
+  renderRunnersLink: ((props: RunnersLinkProps) => ReactNode) | undefined;
 }) {
   const workspace = page.workspace;
   switch (item) {
@@ -356,6 +417,7 @@ function ItemPanel({
           actions={actions}
           workerSilent={workerSilent}
           workspaceId={workspace?.general.id ?? null}
+          renderLink={renderRunnersLink}
         />
       );
     case "addresses":
@@ -440,6 +502,30 @@ function SubmitError({ state }: { state: SubmitState }) {
   );
 }
 
+function useValidateAfterBlur() {
+  const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
+  const touch = (...inputNames: string[]) => {
+    setTouched((prev) =>
+      inputNames.every((name) => prev.has(name)) ? prev : new Set([...prev, ...inputNames]),
+    );
+  };
+  return {
+    isTouched: (inputName: string) => touched.has(inputName),
+    touch,
+    touchBlurredInput: (event: FocusEvent<HTMLFormElement>) => {
+      const target = event.target;
+      if (target instanceof HTMLInputElement && target.name !== "") touch(target.name);
+    },
+  };
+}
+
+const passwordManagerIgnoredSecretProps = {
+  type: "password",
+  autoComplete: "off",
+  "data-1p-ignore": true,
+  "data-lpignore": "true",
+} as const;
+
 // ---------- 이 Workspace ----------
 
 function GeneralPanel({
@@ -457,11 +543,15 @@ function GeneralPanel({
   const minutes = parseWholeNumber(maxRun);
   const nameOk = name.trim() !== "";
   const maxRunOk = minutes !== null && minutes >= 1 && minutes <= MAX_RUN_MINUTES;
+  const validation = useValidateAfterBlur();
+  useReportUnsaved(name !== general.name || maxRun !== String(general.maxRunMinutes));
   return (
     <form
       {...stylex.props(styles.form)}
+      onBlur={validation.touchBlurredInput}
       onSubmit={(event) => {
         event.preventDefault();
+        validation.touch("name", "maxRunMinutes");
         if (!nameOk || minutes === null || !maxRunOk) return;
         submit.run(
           () => actions.saveGeneral({ ws: general.id, name: name.trim(), maxRunMinutes: minutes }),
@@ -469,19 +559,27 @@ function GeneralPanel({
         );
       }}
     >
-      <Field label={t("general.name")} error={nameOk ? undefined : t("general.nameInvalid")}>
+      <Field
+        label={t("general.name")}
+        error={nameOk || !validation.isTouched("name") ? undefined : t("general.nameInvalid")}
+      >
         <Input name="name" value={name} onValueChange={setName} autoComplete="off" />
       </Field>
       <Field
         label={t("general.maxRun")}
         description={t("general.maxRunDescription")}
-        error={maxRunOk ? undefined : t("general.maxRunInvalid")}
+        error={
+          maxRunOk || !validation.isTouched("maxRunMinutes")
+            ? undefined
+            : t("general.maxRunInvalid")
+        }
       >
         <Input
           name="maxRunMinutes"
           value={maxRun}
           onValueChange={setMaxRun}
           autoComplete="off"
+          inputMode="numeric"
           mono
         />
       </Field>
@@ -552,6 +650,8 @@ function ProjectRows({
   );
 }
 
+type ProjectOwnerKind = TrackerProjectChoice["owner"]["kind"];
+
 function ProjectRow({
   project,
   refInput,
@@ -564,6 +664,15 @@ function ProjectRow({
   const t = useTranslations("settings.projects");
   const submit = useSubmit();
   const owner = project.owner;
+  const actionRef = useRef<HTMLSpanElement>(null);
+  const focusActionOnceOwnerIs = useRef<ProjectOwnerKind | null>(null);
+  const failed = submit.state.kind === "failed";
+  useEffect(() => {
+    if (failed) focusActionOnceOwnerIs.current = null;
+    if (owner.kind !== focusActionOnceOwnerIs.current || submit.sending) return;
+    focusActionOnceOwnerIs.current = null;
+    actionRef.current?.querySelector("button")?.focus();
+  }, [owner.kind, submit.sending, failed]);
   return (
     <li {...stylex.props(styles.item)}>
       <div {...stylex.props(styles.row)}>
@@ -581,49 +690,53 @@ function ProjectRow({
             </Text>
           )}
         </span>
-        {owner.kind === "this" ? (
-          <Dialog
-            trigger={t("remove")}
-            triggerVariant="danger"
-            title={t("removeTitle", { project: project.name })}
-            description={
-              <>
-                {t("removeBody", { mappings: project.mappings })}
-                {project.queuedRuns === 0 ? null : (
-                  <> {t("removeQueued", { count: project.queuedRuns })}</>
-                )}
-              </>
-            }
-            actions={
-              <>
-                <DialogClose>{t("cancel")}</DialogClose>
-                <DialogClose
-                  variant="danger"
-                  onClick={() =>
-                    submit.run(
-                      () => actions.removeProject(refInput),
-                      t("removed", { project: project.name }),
-                    )
-                  }
-                >
-                  {t("remove")}
-                </DialogClose>
-              </>
-            }
-          />
-        ) : (
-          <Button
-            disabled={owner.kind === "other" || submit.sending}
-            onClick={() =>
-              submit.run(
-                () => actions.addProject({ ...refInput, name: project.name }),
-                t("added", { project: project.name }),
-              )
-            }
-          >
-            {t("add")}
-          </Button>
-        )}
+        <span ref={actionRef} {...stylex.props(styles.action)}>
+          {owner.kind === "this" ? (
+            <Dialog
+              trigger={t("remove")}
+              triggerVariant="danger"
+              title={t("removeTitle", { project: project.name })}
+              description={
+                <>
+                  {t("removeBody", { mappings: project.mappings })}
+                  {project.queuedRuns === 0 ? null : (
+                    <> {t("removeQueued", { count: project.queuedRuns })}</>
+                  )}
+                </>
+              }
+              actions={
+                <>
+                  <DialogClose>{t("cancel")}</DialogClose>
+                  <DialogClose
+                    variant="danger"
+                    onClick={() => {
+                      focusActionOnceOwnerIs.current = "free";
+                      submit.run(
+                        () => actions.removeProject(refInput),
+                        t("removed", { project: project.name }),
+                      );
+                    }}
+                  >
+                    {t("remove")}
+                  </DialogClose>
+                </>
+              }
+            />
+          ) : (
+            <Button
+              disabled={owner.kind === "other" || submit.sending}
+              onClick={() => {
+                focusActionOnceOwnerIs.current = "this";
+                submit.run(
+                  () => actions.addProject({ ...refInput, name: project.name }),
+                  t("added", { project: project.name }),
+                );
+              }}
+            >
+              {t("add")}
+            </Button>
+          )}
+        </span>
       </div>
       <SubmitError state={submit.state} />
     </li>
@@ -696,6 +809,11 @@ function MappingRow({
   const [agent, setAgent] = useState(bound.mapping?.agent ?? null);
   const [model, setModel] = useState(bound.mapping?.model ?? "");
   const submit = useSubmit();
+  useReportUnsaved(
+    runnerProject !== (bound.mapping?.runnerProject ?? null) ||
+      agent !== (bound.mapping?.agent ?? null) ||
+      model !== (bound.mapping?.model ?? ""),
+  );
   const projectOptions = withCurrent(
     runnerProjects.map((p) => ({ value: p.id, label: p.name })),
     bound.mapping?.runnerProject,
@@ -817,6 +935,7 @@ function ProgressRow({
   const reason = useReason();
   const [stateId, setStateId] = useState(bound.inProgressStateId);
   const submit = useSubmit();
+  useReportUnsaved(stateId !== bound.inProgressStateId);
   const options = withCurrent(
     bound.states.ok ? bound.states.items.map((s) => ({ value: s.id, label: s.name })) : [],
     bound.inProgressStateId,
@@ -907,6 +1026,7 @@ function LabelRow({
   const reason = useReason();
   const [labelId, setLabelId] = useState(label.labelId);
   const submit = useSubmit();
+  useReportUnsaved(labelId !== label.labelId);
   const options = label.labels.ok
     ? label.labels.items.map((l) => ({ value: l.id, label: l.name }))
     : [];
@@ -998,6 +1118,7 @@ export function ConnectionForm({
   const check = useSubmit();
   const isNew = connection === null;
   const ready = name.trim() !== "" && (!isNew || apiKey.trim() !== "");
+  useReportUnsaved(name !== (connection?.name ?? "") || apiKey !== "" || webhookSecret !== "");
   return (
     <form
       {...stylex.props(styles.form)}
@@ -1069,10 +1190,9 @@ export function ConnectionForm({
       >
         <Input
           name="apiKey"
-          type="password"
+          {...passwordManagerIgnoredSecretProps}
           value={apiKey}
           onValueChange={setApiKey}
-          autoComplete="new-password"
           mono
         />
       </Field>
@@ -1084,10 +1204,9 @@ export function ConnectionForm({
       >
         <Input
           name="webhookSecret"
-          type="password"
+          {...passwordManagerIgnoredSecretProps}
           value={webhookSecret}
           onValueChange={setWebhookSecret}
-          autoComplete="new-password"
           mono
         />
       </Field>
@@ -1123,6 +1242,10 @@ function AddressesPanel({
   const [webAddress, setWebAddress] = useState(addresses.webAddress ?? "");
   const [webhookAddress, setWebhookAddress] = useState(addresses.webhookAddress ?? "");
   const submit = useSubmit();
+  useReportUnsaved(
+    webAddress !== (addresses.webAddress ?? "") ||
+      webhookAddress !== (addresses.webhookAddress ?? ""),
+  );
   return (
     <>
       <PanelBlock>
@@ -1230,6 +1353,7 @@ export function GitHubPanel({ saved, actions }: { saved: boolean; actions: Setti
   const [token, setToken] = useState("");
   const submit = useSubmit();
   const check = useSubmit();
+  useReportUnsaved(token !== "");
   return (
     <>
       <div {...stylex.props(styles.row)}>
@@ -1269,10 +1393,9 @@ export function GitHubPanel({ saved, actions }: { saved: boolean; actions: Setti
         >
           <Input
             name="token"
-            type="password"
+            {...passwordManagerIgnoredSecretProps}
             value={token}
             onValueChange={setToken}
-            autoComplete="new-password"
             mono
           />
         </Field>
@@ -1297,25 +1420,26 @@ function RunnersPanel({
   actions,
   workerSilent,
   workspaceId,
+  renderLink,
 }: {
   runners: RunnerSettingsView[];
   actions: SettingsActions;
   workerSilent: boolean;
   /** Runners 로 가도 사이드바의 Workspace 를 이어 가게 주소에 남긴다 */
   workspaceId: string | null;
+  renderLink: ((props: RunnersLinkProps) => ReactNode) | undefined;
 }) {
   const t = useTranslations("settings.runners");
   const runnersHref =
     workspaceId === null
       ? "/runners"
       : `/runners?${new URLSearchParams({ ws: workspaceId }).toString()}`;
+  const linkProps: RunnersLinkProps = { ...stylex.props(styles.link), children: t("toRunners") };
   return (
     <>
       <Text variant="body">
         {t("hint")}{" "}
-        <a href={runnersHref} {...stylex.props(styles.link)}>
-          {t("toRunners")}
-        </a>
+        {renderLink === undefined ? <a href={runnersHref} {...linkProps} /> : renderLink(linkProps)}
       </Text>
       {runners.length === 0 ? null : (
         <ul {...stylex.props(styles.list)}>
@@ -1352,11 +1476,20 @@ export function RunnerForm({
   const capacityOk = capacityValue !== null && capacityValue >= 1 && capacityValue <= 100;
   const ready =
     name.trim() !== "" && sshTarget.trim() !== "" && orcaPath.trim() !== "" && capacityOk;
+  const validation = useValidateAfterBlur();
+  useReportUnsaved(
+    name !== (runner?.name ?? "") ||
+      sshTarget !== (runner?.sshTarget ?? "") ||
+      orcaPath !== (runner?.orcaPath ?? "") ||
+      capacity !== String(runner?.capacity ?? 1),
+  );
   return (
     <form
       {...stylex.props(styles.form)}
+      onBlur={validation.touchBlurredInput}
       onSubmit={(event) => {
         event.preventDefault();
+        validation.touch("capacity");
         if (!ready || capacityValue === null) return;
         submit.run(
           () =>
@@ -1390,13 +1523,18 @@ export function RunnerForm({
         </Field>
         <Field
           label={t("runners.capacity")}
-          error={capacityOk ? undefined : t("runners.capacityInvalid")}
+          error={
+            capacityOk || !validation.isTouched("capacity")
+              ? undefined
+              : t("runners.capacityInvalid")
+          }
         >
           <Input
             name="capacity"
             value={capacity}
             onValueChange={setCapacity}
             autoComplete="off"
+            inputMode="numeric"
             mono
           />
         </Field>
@@ -1463,7 +1601,7 @@ export function RunnerCheck({
             submit.run(() => actions.recheckRunner({ id: runner.id }), t("checkRequested"))
           }
         >
-          {t("recheck")}
+          {submit.sending ? t("checking") : t("recheck")}
         </Button>
       </div>
       <SubmitError state={submit.state} />
@@ -1627,6 +1765,8 @@ const styles = stylex.create({
   },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   inline: { display: "inline-flex", alignItems: "center", gap: space.px6 },
+  action: { flexShrink: 0 },
+  unsaved: { color: colors.textSecondary, fontSize: fontSize.small },
   primaryText: { color: colors.textPrimary },
   secondaryText: { color: colors.textSecondary },
   disabledText: { color: colors.textDisabled },
@@ -1644,7 +1784,7 @@ const styles = stylex.create({
   },
   link: {
     color: colors.accentText,
-    textDecoration: { default: "none", ":hover": "underline" },
+    textDecoration: "underline",
     textUnderlineOffset: 3,
   },
 });

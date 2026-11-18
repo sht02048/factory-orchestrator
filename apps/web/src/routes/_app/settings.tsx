@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
@@ -40,6 +40,7 @@ function SettingsRoute() {
           void navigate({ search: (prev) => ({ ...prev, sel: item }), replace: true });
         }}
         actions={actions}
+        renderRunnersLink={(props) => <Link to="/runners" {...props} />}
       />
     </ScreenMessages>
   );
