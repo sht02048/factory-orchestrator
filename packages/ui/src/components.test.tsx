@@ -158,6 +158,45 @@ describe("서버 렌더", () => {
     expect(html).toContain(`id="${label}"`);
   });
 
+  it("버튼과 버튼 모양 트리거는 data-variant 로 변형을 드러낸다(주 버튼 하나 시험, ADR 0010 6번)", () => {
+    const html = renderToString(
+      <>
+        <Button variant="primary">시작</Button>
+        <Button>보기</Button>
+        <Button variant="danger">거절</Button>
+        <Dialog
+          trigger="지우기"
+          triggerVariant="danger"
+          title="지울까요?"
+          actions={<DialogClose>취소</DialogClose>}
+        />
+      </>,
+    );
+    expect([...html.matchAll(/data-variant="([^"]+)"/g)].map((m) => m[1])).toEqual([
+      "primary",
+      "secondary",
+      "danger",
+      "danger",
+    ]);
+  });
+
+  it("레일 Menu 는 펼침 화살표 없이 트리거 내용만 그린다", () => {
+    const rail = renderToString(
+      <Menu variant="rail" label="Workspace 바꾸기" trigger="Acme">
+        <MenuItem value="a">A</MenuItem>
+      </Menu>,
+    );
+    const field = renderToString(
+      <Menu trigger="Acme">
+        <MenuItem value="a">A</MenuItem>
+      </Menu>,
+    );
+    expect(rail).toContain('aria-label="Workspace 바꾸기"');
+    expect(rail).toContain("Acme");
+    expect(rail).not.toContain("<svg");
+    expect(field).toContain("<svg");
+  });
+
   it("팝업(Menu·Select·Dialog·Tooltip)은 닫힌 채 트리거만 보인다", () => {
     const html = renderToString(
       <>

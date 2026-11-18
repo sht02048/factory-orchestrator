@@ -159,16 +159,15 @@ describe("운영자 핵심 동작(브라우저)", () => {
   it("answer: 손댈 일에서 에이전트 질문에 답하면 DB 에 답이 하나 남고 화면에 보인다", async () => {
     await page.goto(`/?ws=${workspaceId}`);
     await hydrated(page);
-    await page
-      .getByRole("listbox", { name: home.section.attention })
-      .getByRole("option", { name: "ACME-1" })
-      .click();
-
-    const panel = page.getByRole("region", { name: home.panel.label });
-    await panel.getByText(questionBody).waitFor();
-    await panel.getByLabel(home.question.answerLabel).fill(answerText);
-    await panel.getByRole("button", { name: home.question.send }).click();
-    await panel.getByText(home.question.answered).waitFor();
+    // 질문 카드(종류 알약 + 키). 선택지와 "직접 답하기"는 보조 버튼이다
+    const card = page.getByRole("region", {
+      name: fill(home.card.label, { kind: domain.attention.question, name: "ACME-1" }),
+    });
+    await card.getByText(questionBody).waitFor();
+    await card.getByRole("button", { name: home.question.write }).click();
+    await card.getByLabel(home.question.answerLabel).fill(answerText);
+    await card.getByRole("button", { name: home.question.send }).click();
+    await card.getByText(home.question.answered).waitFor();
 
     const answered = listRunQuestions(db, questionRun).filter((q) => q.answer !== null);
     expect(answered.map((q) => [q.id, q.answer?.text])).toEqual([[questionId, answerText]]);

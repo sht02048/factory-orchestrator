@@ -1,7 +1,7 @@
 // 디자인 시스템 진입점. 토큰은 "@factory/ui/tokens.stylex" 에서 가져온다.
 // 쓰는 규칙은 DESIGN.md 에 있다.
 
-export { Button, type ButtonProps, type ButtonVariant } from "./components/button";
+export { Button, buttonStyles, type ButtonProps, type ButtonVariant } from "./components/button";
 export { Card, Row, type CardProps, type RowProps } from "./components/card";
 export {
   DefinitionItem,

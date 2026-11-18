@@ -2,47 +2,24 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
-  DefinitionItem,
-  DefinitionList,
-  DetailPanel,
+  Card,
   Field,
   Input,
   PageHeader,
-  PanelBlock,
-  PanelFooter,
-  PanelHeader,
-  RowReason,
-  RowTitle,
-  Section,
-  SplitView,
+  Row,
   StatusPill,
-  Table,
-  TableCell,
-  TableEmpty,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableRows,
   Text,
+  buttonStyles,
 } from "@factory/ui";
 import type { PillStatus } from "@factory/ui";
-import { colors, space } from "@factory/ui/tokens.stylex";
+import { colors, fontSize, fontWeight, radius, space } from "@factory/ui/tokens.stylex";
 import { useState } from "react";
-import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { useAgentName } from "../labels";
 import { runStatus, useStatusName } from "../status";
-import type { AttentionItem, BrokenAuthRunner, HomePage, HomeRun, InputWait } from "./model";
-import type { QueuedReason } from "../runs/model";
-import { attentionKey, runKey } from "./model";
-
-// 손댈 일: 티켓(+이유) | 상태 | 에이전트 결과 | PR 상태 | 러너 | 에이전트 또는 Workspace | 경과
-const attentionColumns = "minmax(0, 1fr) 144px 128px 64px 96px 112px 72px";
-// 실행 중: 티켓 | 러너 | 에이전트 | 경과
-const runningColumns = "minmax(0, 1fr) 96px 80px 72px";
-// Queued: 티켓(+이유) | 러너 | 에이전트 | 기다린 시간
-const queuedColumns = "minmax(0, 1fr) 96px 80px 88px";
+import { activityIcons } from "./activity-icons";
+import type { Activity, AttentionItem, HomePage, HomeRun, InputWait, RunnerIssue } from "./model";
+import { attentionKey } from "./model";
 
 export interface AnswerInput {
   runId: string;
@@ -58,313 +35,132 @@ export interface DenyInput {
 
 export interface HomeScreenProps {
   page: HomePage;
-  /** 고른 행(attentionKey·runKey). 없거나 목록에 없으면 첫 행을 고른다 */
-  selectedKey: string | undefined;
-  onSelect: (key: string) => void;
   /** 질문에 답을 남긴다. 실패하면 던진다 */
   onAnswer: (input: AnswerInput) => Promise<void>;
   /** 권한 프롬프트 거절을 남긴다. 실패하면 던진다 */
   onDeny: (input: DenyInput) => Promise<void>;
 }
 
-type Selectable = { key: string; item: AttentionItem };
-
-/** 홈: 손댈 일, 실행 중, Queued + 오른쪽 상세 패널(ADR 0007, 시안 B) */
-export function HomeScreen(props: HomeScreenProps) {
+/**
+ * Home(시안 B, ADR 0010): 제목 + 한 줄 요약, 손댈 일 카드, 오른쪽 "지금 일어나는 일" 흐름.
+ * 카드 행동과 질문 선택지는 모두 보조 버튼이다. 파란 주 버튼을 두지 않는다(ADR 0010 6번).
+ */
+export function HomeScreen({ page, onAnswer, onDeny }: HomeScreenProps) {
   const t = useTranslations("home");
-  const { page } = props;
   if (page.workspace.kind === "none") {
     return (
-      <div {...stylex.props(styles.notice)}>
+      <div {...stylex.props(styles.page)}>
         <PageHeader title={t("title")} />
         <Text variant="body">{t("noWorkspace")}</Text>
       </div>
     );
   }
   const all = page.workspace.kind === "all";
-
-  const selectable: Selectable[] = [
-    ...page.attention.map((item) => ({ key: attentionKey(item), item })),
-    ...[...page.running, ...page.queued].map((run) => ({
-      key: runKey(run),
-      item: { kind: "run", run } satisfies AttentionItem,
-    })),
-  ];
-  const selected = selectable.find((s) => s.key === props.selectedKey) ?? selectable[0];
-  const selectedKey = selected?.key ?? null;
-  const pick = (keys: ReadonlyArray<string>) =>
-    selectedKey !== null && keys.includes(selectedKey) ? selectedKey : null;
-
   return (
-    <SplitView
-      list={
-        <>
-          <PageHeader
-            title={t("title")}
-            subtitle={
-              page.workspace.kind === "all"
-                ? t("subtitleAll")
-                : t("subtitle", {
-                    workspace: page.workspace.workspace.name,
-                    running: page.running.length,
-                    queued: page.queued.length,
-                  })
-            }
-          />
-          <Section title={t("section.attention")} count={page.attention.length}>
-            <AttentionTable
-              items={page.attention}
-              all={all}
-              value={pick(page.attention.map(attentionKey))}
-              onSelect={props.onSelect}
-            />
-          </Section>
-          {all ? null : (
-            <>
-              <Section title={t("section.running")} count={page.running.length}>
-                <RunningTable
-                  runs={page.running}
-                  value={pick(page.running.map(runKey))}
-                  onSelect={props.onSelect}
-                />
-              </Section>
-              <Section
-                title={t("section.queued")}
-                count={page.queued.length}
-                note={t("section.queuedNote")}
-              >
-                <QueuedTable
-                  runs={page.queued}
-                  value={pick(page.queued.map(runKey))}
-                  onSelect={props.onSelect}
-                />
-              </Section>
-            </>
-          )}
-        </>
-      }
-      panel={
-        selected === undefined ? null : (
-          <section aria-label={t("panel.label")}>
-            {selected.item.kind === "run" ? (
-              <RunPanel
-                // 고른 런이 바뀌면 답하기 칸을 비운다
-                key={selected.key}
-                run={selected.item.run}
-                onAnswer={props.onAnswer}
-                onDeny={props.onDeny}
+    <div {...stylex.props(styles.page)}>
+      <PageHeader
+        title={t("title")}
+        subtitle={
+          all
+            ? t("subtitleAll", { count: page.attention.length })
+            : t("subtitle", { count: page.attention.length })
+        }
+        actions={all ? undefined : <Counts page={page} />}
+      />
+      <div {...stylex.props(styles.columns)}>
+        <section aria-label={t("section.attention")} {...stylex.props(styles.cards)}>
+          {page.attention.length === 0 ? (
+            <Card>
+              <Text variant="body">{t("empty.attention")}</Text>
+            </Card>
+          ) : (
+            page.attention.map((item) => (
+              <AttentionCard
+                key={attentionKey(item)}
+                item={item}
+                all={all}
+                onAnswer={onAnswer}
+                onDeny={onDeny}
               />
-            ) : (
-              <RunnerAuthPanel runner={selected.item.runner} />
-            )}
-          </section>
-        )
-      }
-    />
-  );
-}
-
-// ---------- 목록 ----------
-
-function AttentionTable({
-  items,
-  all,
-  value,
-  onSelect,
-}: {
-  items: ReadonlyArray<AttentionItem>;
-  all: boolean;
-  value: string | null;
-  onSelect: (key: string) => void;
-}) {
-  const t = useTranslations("home");
-  return (
-    <Table columns={attentionColumns}>
-      <TableHead>
-        <TableHeader>{t("columns.ticket")}</TableHeader>
-        <TableHeader>{t("columns.state")}</TableHeader>
-        <TableHeader>{t("columns.agentResult")}</TableHeader>
-        <TableHeader>{t("columns.prState")}</TableHeader>
-        <TableHeader>{t("columns.runner")}</TableHeader>
-        <TableHeader>{all ? t("columns.workspace") : t("columns.agent")}</TableHeader>
-        <TableHeader align="end">{t("columns.elapsed")}</TableHeader>
-      </TableHead>
-      {items.length === 0 ? (
-        <TableEmpty>{t("empty.attention")}</TableEmpty>
-      ) : (
-        <TableRows label={t("section.attention")} value={value} onValueChange={onSelect}>
-          {items.map((item) =>
-            item.kind === "run" ? (
-              <AttentionRunRow key={attentionKey(item)} run={item.run} all={all} />
-            ) : (
-              <RunnerAuthRow key={attentionKey(item)} runner={item.runner} />
-            ),
+            ))
           )}
-        </TableRows>
-      )}
-    </Table>
+        </section>
+        <ActivityFeed activity={page.activity} all={all} />
+      </div>
+    </div>
   );
 }
 
-function AttentionRunRow({ run, all }: { run: HomeRun; all: boolean }) {
-  const agentName = useAgentName();
-  const t = useTranslations("home");
-  const domain = useTranslations("domain");
-  const { duration } = useTime();
-  const reason = useRowReason();
+// ---------- 머리 ----------
+
+function Counts({ page }: { page: HomePage }) {
+  const t = useTranslations("home.counts");
+  const statusName = useStatusName();
+  const tiles = [
+    { key: "running", value: page.running.length, label: statusName("running") },
+    { key: "queued", value: page.queued.length, label: statusName("queued") },
+    {
+      key: "merged",
+      value: page.mergedToday,
+      label: t("mergedToday", { merged: statusName("merged") }),
+    },
+  ];
   return (
-    <TableRow value={runKey(run)} label={run.ticketKey}>
-      <TableCell>
-        <RowTitle>{run.ticketKey}</RowTitle>
-        <RowReason>{reason(run)}</RowReason>
-      </TableCell>
-      <TableCell>
-        <StatusWithCancel status={runStatus(run)} cancelling={run.cancelling} />
-      </TableCell>
-      <TableCell>
-        {run.state === "ended" ? domain(`agentResult.${run.agentResult}`) : t("notApplicable")}
-      </TableCell>
-      <TableCell>
-        {run.state === "ended" ? domain(`prState.${run.prState}`) : t("notApplicable")}
-      </TableCell>
-      <TableCell>{run.runner?.name ?? t("notApplicable")}</TableCell>
-      <TableCell>{all ? run.workspace.name : agentName(run.agent)}</TableCell>
-      <TableCell align="end" numeric>
-        {duration(run.executionMs ?? run.waitMs)}
-      </TableCell>
-    </TableRow>
+    <dl aria-label={t("label")} {...stylex.props(styles.counts)}>
+      {tiles.map((tile) => (
+        <div key={tile.key} {...stylex.props(styles.count)}>
+          <dt {...stylex.props(styles.countLabel)}>{tile.label}</dt>
+          <dd {...stylex.props(styles.countValue)}>{tile.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
-function RunnerAuthRow({ runner }: { runner: BrokenAuthRunner }) {
+// ---------- 손댈 일 카드 ----------
+
+function attentionStatus(item: AttentionItem): PillStatus {
+  if (item.kind === "runner-issue") return "runner-issue";
+  const { run } = item;
+  if (run.state === "waiting-for-input" && run.input !== null) return run.input.kind;
+  return runStatus(run.state === "ended" ? run : { state: run.state });
+}
+
+function AttentionCard({
+  item,
+  all,
+  onAnswer,
+  onDeny,
+}: {
+  item: AttentionItem;
+  all: boolean;
+  onAnswer: HomeScreenProps["onAnswer"];
+  onDeny: HomeScreenProps["onDeny"];
+}) {
   const t = useTranslations("home");
   const statusName = useStatusName();
+  const status = attentionStatus(item);
+  const name = item.kind === "run" ? item.run.ticketKey : item.runner.name;
   return (
-    <TableRow value={`runner:${runner.id}`} label={runner.name}>
-      <TableCell>
-        <RowTitle>{runner.name}</RowTitle>
-        <RowReason>{t("row.runnerAuth")}</RowReason>
-      </TableCell>
-      <TableCell>
-        <StatusPill status="runner-issue">{statusName("runner-issue")}</StatusPill>
-      </TableCell>
-      <TableCell>{t("notApplicable")}</TableCell>
-      <TableCell>{t("notApplicable")}</TableCell>
-      <TableCell>{runner.name}</TableCell>
-      <TableCell>{t("notApplicable")}</TableCell>
-      <TableCell align="end">{t("notApplicable")}</TableCell>
-    </TableRow>
-  );
-}
-
-function RunningTable({
-  runs,
-  value,
-  onSelect,
-}: {
-  runs: ReadonlyArray<HomeRun>;
-  value: string | null;
-  onSelect: (key: string) => void;
-}) {
-  const agentName = useAgentName();
-  const t = useTranslations("home");
-  const { elapsed } = useTime();
-  return (
-    <Table columns={runningColumns}>
-      <TableHead>
-        <TableHeader>{t("columns.ticket")}</TableHeader>
-        <TableHeader>{t("columns.runner")}</TableHeader>
-        <TableHeader>{t("columns.agent")}</TableHeader>
-        <TableHeader align="end">{t("columns.elapsed")}</TableHeader>
-      </TableHead>
-      {runs.length === 0 ? (
-        <TableEmpty>{t("empty.running")}</TableEmpty>
+    <Card label={t("card.label", { kind: statusName(status), name })}>
+      <div {...stylex.props(styles.cardHead)}>
+        <StatusPill status={status}>{statusName(status)}</StatusPill>
+        <span {...stylex.props(styles.key)}>{name}</span>
+        {item.kind === "run" && all ? <Text variant="meta">{item.run.workspace.name}</Text> : null}
+        {item.kind === "run" && item.run.cancelling ? (
+          <Text variant="meta">{t("cancelling")}</Text>
+        ) : null}
+      </div>
+      {item.kind === "run" ? (
+        <RunCardBody run={item.run} onAnswer={onAnswer} onDeny={onDeny} />
       ) : (
-        <TableRows label={t("section.running")} value={value} onValueChange={onSelect}>
-          {runs.map((run) => (
-            <TableRow key={run.id} value={runKey(run)} label={run.ticketKey}>
-              <TableCell>
-                <span {...stylex.props(styles.inline)}>
-                  <RowTitle>{run.ticketKey}</RowTitle>
-                  {run.cancelling ? <Text variant="meta">{t("cancelling")}</Text> : null}
-                </span>
-              </TableCell>
-              <TableCell>{run.runner?.name ?? t("notApplicable")}</TableCell>
-              <TableCell>{agentName(run.agent)}</TableCell>
-              <TableCell align="end" numeric>
-                {elapsed(run.executionMs ?? 0)}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableRows>
+        <RunnerIssueBody runner={item.runner} />
       )}
-    </Table>
+    </Card>
   );
 }
 
-function QueuedTable({
-  runs,
-  value,
-  onSelect,
-}: {
-  runs: ReadonlyArray<HomeRun>;
-  value: string | null;
-  onSelect: (key: string) => void;
-}) {
-  const agentName = useAgentName();
-  const t = useTranslations("home");
-  const { duration } = useTime();
-  const queuedReason = useQueuedReason();
-  return (
-    <Table columns={queuedColumns}>
-      <TableHead>
-        <TableHeader>{t("columns.ticket")}</TableHeader>
-        <TableHeader>{t("columns.runner")}</TableHeader>
-        <TableHeader>{t("columns.agent")}</TableHeader>
-        <TableHeader align="end">{t("columns.waited")}</TableHeader>
-      </TableHead>
-      {runs.length === 0 ? (
-        <TableEmpty>{t("empty.queued")}</TableEmpty>
-      ) : (
-        <TableRows label={t("section.queued")} value={value} onValueChange={onSelect}>
-          {runs.map((run) => (
-            <TableRow key={run.id} value={runKey(run)} label={run.ticketKey}>
-              <TableCell>
-                <span {...stylex.props(styles.inline)}>
-                  <RowTitle>{run.ticketKey}</RowTitle>
-                  {run.cancelling ? <Text variant="meta">{t("cancelling")}</Text> : null}
-                </span>
-                {run.state === "queued" ? (
-                  <RowReason>{queuedReason(run.queuedReason)}</RowReason>
-                ) : null}
-              </TableCell>
-              <TableCell>{run.runner?.name ?? t("notApplicable")}</TableCell>
-              <TableCell>{agentName(run.agent)}</TableCell>
-              <TableCell align="end" numeric>
-                {duration(run.waitMs)}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableRows>
-      )}
-    </Table>
-  );
-}
-
-function StatusWithCancel({ status, cancelling }: { status: PillStatus; cancelling: boolean }) {
-  const t = useTranslations("home");
-  const statusName = useStatusName();
-  return (
-    <span {...stylex.props(styles.inline)}>
-      <StatusPill status={status}>{statusName(status)}</StatusPill>
-      {cancelling ? <Text variant="meta">{t("cancelling")}</Text> : null}
-    </span>
-  );
-}
-
-// ---------- 패널 ----------
-
-function RunPanel({
+function RunCardBody({
   run,
   onAnswer,
   onDeny,
@@ -373,130 +169,108 @@ function RunPanel({
   onAnswer: HomeScreenProps["onAnswer"];
   onDeny: HomeScreenProps["onDeny"];
 }) {
-  const agentName = useAgentName();
-  const t = useTranslations("home.panel");
-  const domain = useTranslations("domain");
-  const { duration, elapsed } = useTime();
-  const statusName = useStatusName();
-  const queuedReason = useQueuedReason();
-
-  let when: string;
-  let reason: string;
+  const t = useTranslations("home.card");
+  const { duration } = useTime();
   switch (run.state) {
-    case "queued":
-      when = t("waitingFor", { duration: duration(run.waitMs) });
-      reason = queuedReason(run.queuedReason);
-      break;
-    case "running":
-    case "disconnected":
-      when = elapsed(run.executionMs ?? 0);
-      reason = t(`reason.${run.state}`);
-      break;
     case "waiting-for-input":
-      when = elapsed(run.executionMs ?? 0);
-      reason = t(`reason.${run.input?.kind ?? "inputUnknown"}`);
-      break;
-    case "ended":
-      when = t("endedAfter", { duration: duration(run.executionMs ?? 0) });
-      reason = run.summary === "merged" ? "" : t(`reason.${run.summary}`);
-      break;
-  }
-  if (run.cancelling) reason = t("reason.cancelling");
-
-  const ended = run.state === "ended" ? run : null;
-  const pr = run.pullRequest;
-  return (
-    <DetailPanel>
-      <PanelHeader
-        status={
+      if (run.input === null) {
+        return (
           <>
-            <StatusWithCancel status={runStatus(run)} cancelling={run.cancelling} />
-            <Text variant="meta">{when}</Text>
+            <Text variant="body">{t("inputUnknown")}</Text>
+            <Actions>
+              <RunLink run={run} />
+            </Actions>
           </>
-        }
-        title={run.ticketKey}
-        subtitle={t("subtitle", { project: run.trackerProject, workspace: run.workspace.name })}
-        reason={reason}
-      />
-      {run.state === "waiting-for-input" && run.input !== null ? (
-        <InputBlock runId={run.id} input={run.input} onAnswer={onAnswer} onDeny={onDeny} />
-      ) : null}
-      <DefinitionList>
-        <DefinitionItem label={t("state")}>{domain(`runState.${run.state}`)}</DefinitionItem>
-        <DefinitionItem label={t("summary")} empty={ended === null}>
-          {ended === null ? (
-            t("notEnded")
-          ) : (
-            <StatusPill status={ended.summary}>{statusName(ended.summary)}</StatusPill>
-          )}
-        </DefinitionItem>
-        <DefinitionItem label={t("agentResult")} empty={ended === null}>
-          {ended === null ? t("notEnded") : domain(`agentResult.${ended.agentResult}`)}
-        </DefinitionItem>
-        <DefinitionItem label={t("prState")} empty={ended === null}>
-          {ended === null ? t("notEnded") : domain(`prState.${ended.prState}`)}
-        </DefinitionItem>
-        <DefinitionItem label={t("runner")} empty={run.runner === null}>
-          {run.runner === null ? (
-            t("noRunner")
-          ) : (
-            <span {...stylex.props(styles.inline)}>
-              {run.runner.name}
-              {run.runner.online ? null : <Text variant="meta">{t("runnerOffline")}</Text>}
-            </span>
-          )}
-        </DefinitionItem>
-        <DefinitionItem label={t("agent")}>{agentName(run.agent)}</DefinitionItem>
-        {run.state === "queued" ? (
-          <DefinitionItem label={t("waited")}>{duration(run.waitMs)}</DefinitionItem>
-        ) : (
-          <DefinitionItem label={t("elapsed")}>{duration(run.executionMs ?? 0)}</DefinitionItem>
-        )}
-        <DefinitionItem label={t("pr")} empty={pr === null}>
-          {pr === null ? (
-            t("none")
-          ) : (
-            <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
-              {pr.displayId}
-            </a>
-          )}
-        </DefinitionItem>
-      </DefinitionList>
-      <PanelFooter>
-        <a
-          href={href("/runs", { ws: run.workspace.id, sel: run.id })}
-          {...stylex.props(styles.link)}
-        >
-          {t("toRuns")}
-        </a>
-      </PanelFooter>
-    </DetailPanel>
+        );
+      }
+      return <InputCardBody run={run} input={run.input} onAnswer={onAnswer} onDeny={onDeny} />;
+    case "disconnected": {
+      const runner = run.runner?.name ?? t("noRunner");
+      return (
+        <>
+          <Text variant="body">
+            {run.unreachableMs === null
+              ? t("unreachable", { runner })
+              : t("unreachableFor", { runner, duration: duration(run.unreachableMs) })}
+          </Text>
+          <Actions>
+            <RunLink run={run} />
+          </Actions>
+        </>
+      );
+    }
+    case "ended": {
+      const pr = run.pullRequest;
+      return (
+        <>
+          <Text variant="body">
+            {run.summary === "human-check"
+              ? pr === null
+                ? t("humanCheckNoPr")
+                : t("humanCheck", { pr: pr.displayId })
+              : t("failed")}
+          </Text>
+          <Actions>
+            {pr === null ? null : (
+              <a
+                href={pr.url}
+                target="_blank"
+                rel="noreferrer"
+                data-variant="secondary"
+                {...stylex.props(...buttonStyles("secondary"))}
+              >
+                {t("openPr")}
+              </a>
+            )}
+            <RunLink run={run} />
+          </Actions>
+        </>
+      );
+    }
+    case "queued":
+    case "running":
+      // 손댈 일에 오르지 않는다(needsAttention)
+      return null;
+  }
+}
+
+/** Run 상세로 가는 보조 버튼 모양 링크 */
+function RunLink({ run }: { run: HomeRun }) {
+  const t = useTranslations("home.card");
+  return (
+    <a
+      href={href(`/runs/${encodeURIComponent(run.id)}`, { ws: run.workspace.id })}
+      data-variant="secondary"
+      {...stylex.props(...buttonStyles("secondary"))}
+    >
+      {t("openRun")}
+    </a>
   );
 }
 
 type SendState = "idle" | "sending" | "failed";
 
-function InputBlock({
-  runId,
+function InputCardBody({
+  run,
   input,
   onAnswer,
   onDeny,
 }: {
-  runId: string;
+  run: HomeRun;
   input: InputWait;
   onAnswer: HomeScreenProps["onAnswer"];
   onDeny: HomeScreenProps["onDeny"];
 }) {
   switch (input.kind) {
     case "question":
-      return <QuestionBlock runId={runId} question={input} onAnswer={onAnswer} />;
+      return <QuestionBody runId={run.id} question={input} onAnswer={onAnswer} />;
     case "permission":
-      return <PermissionBlock runId={runId} permission={input} onDeny={onDeny} />;
+      return <PermissionBody run={run} permission={input} onDeny={onDeny} />;
   }
 }
 
-/** 질문 내용과 답하기 칸. 선택지가 있으면 선택지 버튼도 둔다(Q82.3) */
-function QuestionBlock({
+/** 질문 본문과 선택지. 선택지와 "직접 답하기"는 모두 같은 보조 버튼이다(ADR 0010 6번, Q82.3) */
+function QuestionBody({
   runId,
   question,
   onAnswer,
@@ -506,6 +280,7 @@ function QuestionBlock({
   onAnswer: HomeScreenProps["onAnswer"];
 }) {
   const t = useTranslations("home.question");
+  const [writing, setWriting] = useState(false);
   const [answer, setAnswer] = useState("");
   const [state, setState] = useState<SendState>("idle");
   const send = (text: string) => {
@@ -518,142 +293,139 @@ function QuestionBlock({
   };
 
   return (
-    <PanelBlock title={t("title")}>
-      <div {...stylex.props(styles.stack)}>
-        <Text variant="body">{question.body}</Text>
-        {question.answered ? (
-          <Text variant="meta">{t("answered")}</Text>
-        ) : (
-          <form
-            {...stylex.props(styles.stack)}
-            onSubmit={(event) => {
-              event.preventDefault();
-              send(answer);
-            }}
-          >
-            {question.choices.length === 0 ? null : (
-              <div role="group" aria-label={t("choices")}>
-                <Actions>
-                  {question.choices.map((choice) => (
-                    <Button
-                      key={choice}
-                      disabled={state === "sending"}
-                      onClick={() => send(choice)}
-                    >
-                      {choice}
-                    </Button>
-                  ))}
-                </Actions>
-              </div>
-            )}
-            <Field label={t("answerLabel")} error={state === "failed" ? t("failed") : undefined}>
-              <Input
-                name="answer"
-                value={answer}
-                onValueChange={setAnswer}
-                placeholder={t("answerPlaceholder")}
-                autoComplete="off"
-              />
-            </Field>
+    <>
+      <p {...stylex.props(styles.question)}>{question.body}</p>
+      {question.answered ? (
+        <Text variant="meta">{t("answered")}</Text>
+      ) : (
+        <>
+          <div role="group" aria-label={t("choices")}>
             <Actions>
-              <Button
-                variant="primary"
-                type="submit"
-                disabled={state === "sending" || answer.trim() === ""}
-              >
-                {state === "sending" ? t("sending") : t("send")}
-              </Button>
+              {question.choices.map((choice) => (
+                <Button key={choice} disabled={state === "sending"} onClick={() => send(choice)}>
+                  {choice}
+                </Button>
+              ))}
+              {writing ? null : <Button onClick={() => setWriting(true)}>{t("write")}</Button>}
             </Actions>
-          </form>
-        )}
-      </div>
-    </PanelBlock>
+          </div>
+          {writing ? (
+            <form
+              {...stylex.props(styles.form)}
+              onSubmit={(event) => {
+                event.preventDefault();
+                send(answer);
+              }}
+            >
+              <Field label={t("answerLabel")}>
+                <Input
+                  name="answer"
+                  value={answer}
+                  onValueChange={setAnswer}
+                  placeholder={t("answerPlaceholder")}
+                  autoComplete="off"
+                />
+              </Field>
+              <Actions>
+                <Button type="submit" disabled={state === "sending" || answer.trim() === ""}>
+                  {state === "sending" ? t("sending") : t("send")}
+                </Button>
+              </Actions>
+            </form>
+          ) : null}
+          {state === "failed" ? (
+            <p role="alert" {...stylex.props(styles.error)}>
+              {t("failed")}
+            </p>
+          ) : null}
+        </>
+      )}
+    </>
   );
 }
 
 /** 권한 대기: 허용은 러너 화면에서만 한다. 여기서는 거절만 둔다(Q82.4) */
-function PermissionBlock({
-  runId,
+function PermissionBody({
+  run,
   permission,
   onDeny,
 }: {
-  runId: string;
+  run: HomeRun;
   permission: Extract<InputWait, { kind: "permission" }>;
   onDeny: HomeScreenProps["onDeny"];
 }) {
   const t = useTranslations("home.permission");
+  const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [state, setState] = useState<SendState>("idle");
   return (
-    <PanelBlock title={t("title")}>
-      <div {...stylex.props(styles.stack)}>
-        <Text variant="body">{permission.detail}</Text>
-        <Text variant="body">{t("allowOnRunner")}</Text>
-        {permission.denied ? (
-          <Text variant="meta">{t("denied")}</Text>
-        ) : (
-          <form
-            {...stylex.props(styles.stack)}
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (state === "sending") return;
-              setState("sending");
-              onDeny({ runId, promptId: permission.promptId, reason: reason.trim() }).then(
-                () => setState("idle"),
-                () => setState("failed"),
-              );
-            }}
-          >
-            <Field
-              label={t("reasonLabel")}
-              description={t("reasonDescription")}
-              error={state === "failed" ? t("failed") : undefined}
-            >
-              <Input name="reason" value={reason} onValueChange={setReason} autoComplete="off" />
-            </Field>
-            <Actions>
-              <Button type="submit" disabled={state === "sending"}>
-                {state === "sending" ? t("denying") : t("deny")}
+    <>
+      <Text variant="body">{t("detail", { detail: permission.detail })}</Text>
+      {permission.denied ? (
+        <Text variant="meta">{t("denied")}</Text>
+      ) : (
+        <>
+          <Actions>
+            <RunLink run={run} />
+            {open ? null : (
+              <Button variant="danger" onClick={() => setOpen(true)}>
+                {t("deny")}
               </Button>
-            </Actions>
-          </form>
-        )}
-      </div>
-    </PanelBlock>
+            )}
+          </Actions>
+          {open ? (
+            <form
+              {...stylex.props(styles.form)}
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (state === "sending") return;
+                setState("sending");
+                onDeny({
+                  runId: run.id,
+                  promptId: permission.promptId,
+                  reason: reason.trim(),
+                }).then(
+                  () => setState("idle"),
+                  () => setState("failed"),
+                );
+              }}
+            >
+              <Field
+                label={t("reasonLabel")}
+                description={t("reasonDescription")}
+                error={state === "failed" ? t("failed") : undefined}
+              >
+                <Input name="reason" value={reason} onValueChange={setReason} autoComplete="off" />
+              </Field>
+              <Actions>
+                <Button variant="danger" type="submit" disabled={state === "sending"}>
+                  {state === "sending" ? t("denying") : t("send")}
+                </Button>
+              </Actions>
+            </form>
+          ) : null}
+        </>
+      )}
+    </>
   );
 }
 
-/** GitHub 인증이 깨진 러너와 해결 안내(Q82.14·Q82.15) */
-function RunnerAuthPanel({ runner }: { runner: BrokenAuthRunner }) {
-  const t = useTranslations("home.runnerAuth");
-  const statusName = useStatusName();
+/** Runner Issue 러너. 까닭은 설명 문장으로, 해결 안내는 Runners 에서 본다 */
+function RunnerIssueBody({ runner }: { runner: RunnerIssue }) {
+  const t = useTranslations("home.runnerIssue");
   return (
-    <DetailPanel>
-      <PanelHeader
-        status={<StatusPill status="runner-issue">{statusName("runner-issue")}</StatusPill>}
-        title={runner.name}
-        subtitle={t("subtitle")}
-        reason={t("reason")}
-      />
-      <PanelBlock title={t("fixTitle")}>
-        <ol {...stylex.props(styles.steps)}>
-          <li>
-            <Text variant="body">{t("fixToken")}</Text>
-          </li>
-          <li>
-            <Text variant="body">{t("fixSsh")}</Text>
-          </li>
-          <li>
-            <Text variant="body">{t("fixCheck")}</Text>
-          </li>
-        </ol>
-      </PanelBlock>
-      <PanelFooter>
-        <a href={href("/runners", { sel: runner.id })} {...stylex.props(styles.link)}>
-          {t("toRunners")}
+    <>
+      <Text variant="body">{t(runner.cause)}</Text>
+      <Actions>
+        <a
+          href={href("/runners", { sel: runner.id })}
+          data-variant="secondary"
+          {...stylex.props(...buttonStyles("secondary"))}
+        >
+          {t("fix")}
         </a>
-      </PanelFooter>
-    </DetailPanel>
+      </Actions>
+    </>
   );
 }
 
@@ -661,62 +433,153 @@ function href(path: string, search: Record<string, string>): string {
   return `${path}?${new URLSearchParams(search).toString()}`;
 }
 
-// ---------- 문구 ----------
+// ---------- 지금 일어나는 일 ----------
 
-/** 손댈 일 행의 이유 한 줄(ADR 0007) */
-function useRowReason(): (run: HomeRun) => ReactNode {
-  const t = useTranslations("home.row");
-  const { duration } = useTime();
-  const queuedReason = useQueuedReason();
-  return (run) => {
-    switch (run.state) {
-      case "waiting-for-input":
-        if (run.input === null) return t("inputUnknown");
-        return run.input.kind === "question"
-          ? t("question", { body: run.input.body })
-          : t("permission");
+function ActivityFeed({ activity, all }: { activity: ReadonlyArray<Activity>; all: boolean }) {
+  const t = useTranslations("home.activity");
+  const { ago } = useTime();
+  const text = useActivityText();
+  return (
+    <aside {...stylex.props(styles.feed)}>
+      <Card padding="compact" label={t("title")}>
+        <h2 {...stylex.props(styles.feedTitle)}>{t("title")}</h2>
+        {activity.length === 0 ? (
+          <p {...stylex.props(styles.feedEmpty)}>{t("empty")}</p>
+        ) : (
+          <ol {...stylex.props(styles.feedList)}>
+            {activity.map((item) => (
+              <li key={item.key}>
+                <Row
+                  leading={
+                    <span {...stylex.props(styles.feedIcon)}>{activityIcons[item.event.kind]}</span>
+                  }
+                  trailing={<time dateTime={item.at}>{ago(item.at, item.agoMs)}</time>}
+                >
+                  <span {...stylex.props(styles.feedLine)}>
+                    <span {...stylex.props(styles.key)}>{item.ticketKey}</span>
+                    <span {...stylex.props(styles.feedText)}>{text(item)}</span>
+                    {all ? <Text variant="meta">{item.workspace.name}</Text> : null}
+                  </span>
+                </Row>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
+    </aside>
+  );
+}
+
+function useActivityText(): (item: Activity) => string {
+  const t = useTranslations("home.activity");
+  const statusName = useStatusName();
+  return ({ event }) => {
+    switch (event.kind) {
+      case "started":
+      case "question":
+      case "permission":
       case "disconnected":
-        return run.unreachableMs === null
-          ? t("unreachable")
-          : t("unreachableFor", { duration: duration(run.unreachableMs) });
+        return t(event.kind);
       case "ended":
-        return run.summary === "merged" || run.summary === "canceled" ? null : t(run.summary);
-      case "queued":
-        return queuedReason(run.queuedReason);
-      case "running":
-        return null;
+        return t("ended", { summary: statusName(event.summary) });
+      case "later-pr":
+        return t(`laterPr.${event.state}`);
     }
   };
 }
 
-function useQueuedReason(): (reason: QueuedReason) => string {
-  const domain = useTranslations("domain.queuedReason");
-  return (reason) =>
-    reason.kind === "no-capacity"
-      ? domain("no-capacity", { runner: reason.runner })
-      : domain(reason.kind);
-}
+/** 오른쪽 흐름 폭(시안 B) */
+const FEED_WIDTH = 380;
 
 const styles = stylex.create({
-  notice: {
-    maxWidth: 720,
+  page: {
+    height: "100%",
+    overflow: "auto",
     paddingTop: space.s8,
     paddingInline: space.s8,
     paddingBottom: space.s10,
   },
-  stack: { display: "flex", flexDirection: "column", gap: space.s3 },
-  steps: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-    margin: 0,
-    paddingInlineStart: space.s5,
+  columns: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: `minmax(0, 1fr) ${FEED_WIDTH}px`,
+      "@media (max-width: 1100px)": "minmax(0, 1fr)",
+    },
+    alignItems: "start",
+    gap: space.s6,
   },
-  inline: { display: "inline-flex", alignItems: "baseline", gap: space.s2 },
-  link: {
-    color: colors.accentText,
-    textUnderlineOffset: 3,
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
+  cards: { display: "flex", flexDirection: "column", gap: space.s3, minWidth: 0 },
+  cardHead: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: space.s2,
+    minWidth: 0,
+  },
+  key: {
+    color: colors.textTertiary,
+    fontSize: fontSize.ui,
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
+  },
+  question: {
+    margin: 0,
+    color: colors.textPrimary,
+    fontSize: fontSize.panel,
+    fontWeight: fontWeight.semibold,
+  },
+  form: { display: "flex", flexDirection: "column", gap: space.s3, maxWidth: 560 },
+  error: { margin: 0, color: colors.problem, fontSize: fontSize.ui },
+  counts: { display: "flex", gap: space.s2, margin: 0 },
+  count: {
+    display: "flex",
+    flexDirection: "column-reverse",
+    gap: space.s1,
+    minWidth: 80,
+    paddingBlock: space.s3,
+    paddingInline: space.s4,
+    borderRadius: radius.card,
+    backgroundColor: colors.bgCard,
+  },
+  countLabel: { color: colors.textTertiary, fontSize: fontSize.small, whiteSpace: "nowrap" },
+  countValue: {
+    margin: 0,
+    color: colors.textPrimary,
+    fontSize: fontSize.page,
+    fontWeight: fontWeight.semibold,
+    fontVariantNumeric: "tabular-nums",
+  },
+  feed: { minWidth: 0 },
+  feedTitle: {
+    margin: 0,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    color: colors.textPrimary,
+    fontSize: fontSize.body,
+    fontWeight: fontWeight.semibold,
+  },
+  feedEmpty: {
+    margin: 0,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    color: colors.textTertiary,
+  },
+  feedList: { margin: 0, padding: 0, listStyle: "none" },
+  feedIcon: {
+    display: "grid",
+    placeItems: "center",
+    width: 28,
+    height: 28,
+    borderRadius: radius.control,
+    backgroundColor: colors.bgControl,
+    color: colors.textSecondary,
+  },
+  feedLine: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
+  feedText: {
+    minWidth: 0,
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+    color: colors.textPrimary,
   },
 });

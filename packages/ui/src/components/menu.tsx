@@ -26,22 +26,41 @@ export interface MenuProps {
   trigger: ReactNode;
   /** 트리거의 접근 가능한 이름(트리거 글만으로 뜻이 모자랄 때). */
   label?: string;
+  /**
+   * 트리거 모양. default 는 테두리 있는 한 줄과 펼침 화살표.
+   * rail 은 아이콘 레일 맨 위 Workspace 바꾸기(ADR 0010 11번): 테두리·화살표 없이 위아래로 쌓고 메뉴를 오른쪽에 연다.
+   */
+  variant?: "default" | "rail";
   children: ReactNode;
 }
 
-export function Menu({ trigger, label, children }: MenuProps) {
+export function Menu({ trigger, label, variant = "default", children }: MenuProps) {
+  const rail = variant === "rail";
   return (
     <SdkMenu>
       <MenuTrigger
         {...(label === undefined ? {} : { "aria-label": label })}
-        className={(s) => cx(styles.trigger, s.open && styles.triggerOpen)}
+        className={(s) =>
+          cx(styles.trigger, rail && styles.railTrigger, s.open && styles.triggerOpen)
+        }
       >
-        <span {...stylex.props(styles.triggerText)}>{trigger}</span>
-        <span {...stylex.props(styles.chevron)}>
-          <ChevronDownIcon />
-        </span>
+        {rail ? (
+          trigger
+        ) : (
+          <>
+            <span {...stylex.props(styles.triggerText)}>{trigger}</span>
+            <span {...stylex.props(styles.chevron)}>
+              <ChevronDownIcon />
+            </span>
+          </>
+        )}
       </MenuTrigger>
-      <MenuContent side="bottom" align="start" sideOffset={4} className={cx(popupStyles.content)}>
+      <MenuContent
+        side={rail ? "right" : "bottom"}
+        align="start"
+        sideOffset={rail ? 8 : 4}
+        className={cx(popupStyles.content)}
+      >
         {children}
       </MenuContent>
     </SdkMenu>
@@ -142,6 +161,16 @@ const styles = stylex.create({
     transitionTimingFunction: motion.easeOut,
     outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
     outlineOffset: 2,
+  },
+  railTrigger: {
+    flexDirection: "column",
+    justifyContent: "center",
+    gap: space.s1,
+    height: "auto",
+    paddingBlock: space.s2,
+    paddingInline: space.s1,
+    boxShadow: "none",
+    textAlign: "center",
   },
   triggerOpen: { backgroundColor: colors.bgHover },
   triggerText: {

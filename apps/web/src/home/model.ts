@@ -1,6 +1,6 @@
 import type { AgentResult, PrState, SummaryOutcome } from "@factory/core";
 import type { QueuedReason } from "../runs/model";
-import type { WorkspaceChoice, WorkspaceSummary } from "../shell/model";
+import type { RunnerIssueCause, WorkspaceChoice, WorkspaceSummary } from "../shell/model";
 
 /*
  * 홈 화면이 보이는 값. server function 이 돌려주고 화면이 그린다. DB 를 들여오지 않는다.
@@ -72,16 +72,46 @@ export type HomeRun =
       prSettledLater: boolean;
     });
 
-/** GitHub 인증이 깨져 할당에서 빠진 러너(Q82.14·Q82.15) */
-export interface BrokenAuthRunner {
+/**
+ * Runner Issue 인 러너(ADR 0010 1번). 까닭은 설명 문장으로 보인다.
+ * Offline 이거나 GitHub 인증이 깨져 할당에서 빠졌다(Q82.14·Q82.15).
+ */
+export interface RunnerIssue {
   id: string;
   name: string;
+  cause: RunnerIssueCause;
 }
 
-/** 손댈 일 한 줄. 런이거나 러너다 */
+/** 손댈 일 카드 하나. 런이거나 러너다 */
 export type AttentionItem =
   | { kind: "run"; run: HomeRun }
-  | { kind: "runner-auth"; runner: BrokenAuthRunner };
+  | { kind: "runner-issue"; runner: RunnerIssue };
+
+/**
+ * "지금 일어나는 일" 흐름의 사건(ADR 0010 Consequences). DB 에 이미 있는 기록만 쓴다.
+ * - started: 런이 러너에서 시작했다(Queued → Running)
+ * - question / permission: 에이전트가 질문했거나 권한 허용을 기다리기 시작했다
+ * - disconnected: 런 중 러너에 닿지 않아 Disconnected 가 됐다
+ * - ended: 런이 끝났다. 요약 결과를 함께 둔다
+ * - later-pr: 런이 끝난 뒤 사람이 PR 을 병합하거나 닫았다(Q54·Q69)
+ */
+export type ActivityEvent =
+  | { kind: "started" | "question" | "permission" | "disconnected" }
+  | { kind: "ended"; summary: SummaryOutcome }
+  | { kind: "later-pr"; state: "merged" | "closed" };
+
+export interface Activity {
+  /** 흐름 안에서 겹치지 않는 값 */
+  key: string;
+  runId: string;
+  ticketKey: string;
+  /** "전체"에서 어느 Workspace 의 런인지 */
+  workspace: WorkspaceSummary;
+  event: ActivityEvent;
+  at: string;
+  /** 사건부터 서버가 읽은 때까지 */
+  agoMs: number;
+}
 
 export interface HomePage {
   workspace: WorkspaceChoice;
@@ -90,15 +120,14 @@ export interface HomePage {
   running: HomeRun[];
   /** 들어온 순서. "전체"에서는 비어 있다 */
   queued: HomeRun[];
+  /** 오늘(운영자 시간대) Merged 로 끝난 런 수. "전체"에서는 0 이다 */
+  mergedToday: number;
+  /** 지금 일어나는 일. 새 것부터 */
+  activity: Activity[];
 }
 
-/** 손댈 일 행·패널을 고르는 값 */
 export function attentionKey(item: AttentionItem): string {
   return item.kind === "run" ? `run:${item.run.id}` : `runner:${item.runner.id}`;
-}
-
-export function runKey(run: HomeRun): string {
-  return `run:${run.id}`;
 }
 
 /** 손댈 일에 올릴 런인가. Canceled 처럼 여기 없는 요약 결과는 올리지 않는다(Q82.9) */
@@ -117,9 +146,10 @@ export function needsAttention(run: HomeRun): boolean {
 }
 
 /**
- * 홈의 세 구역으로 나눈다.
+ * 홈의 손댈 일과 Running·Queued 수를 나눈다.
  *
- * - 손댈 일: GitHub 인증이 깨진 러너, 입력 기다림·연결 끊김 런, 요약 결과가 Human Check·Failed 인 Ended 런.
+ * - 손댈 일: Runner Issue 러너(Offline, GitHub 인증 깨짐), Waiting for Input·Disconnected 런,
+ *   요약 결과가 Human Check·Failed 인 Ended 런.
  *   Ended 런은 티켓마다 마지막 런만 본다(시안 B, Q88). 같은 티켓에 새 런이 있으면 지난 결과는 손댈 일이 아니다.
  * - 실행 중: Running 런
  * - Queued: Queued 런, 들어온 순서
@@ -130,10 +160,13 @@ export function partitionHome(input: {
   workspace: WorkspaceChoice;
   /** ticket: 트래커 연결과 티켓 키로 만든 티켓 식별값 */
   runs: ReadonlyArray<{ ticket: string; run: HomeRun }>;
-  brokenAuthRunners: ReadonlyArray<BrokenAuthRunner>;
+  runnerIssues: ReadonlyArray<RunnerIssue>;
+  mergedToday: number;
+  activity: Activity[];
 }): HomePage {
-  const { workspace } = input;
-  if (workspace.kind === "none") return { workspace, attention: [], running: [], queued: [] };
+  const { workspace, activity } = input;
+  if (workspace.kind === "none")
+    return { workspace, attention: [], running: [], queued: [], mergedToday: 0, activity: [] };
 
   const latestByTicket = new Map<string, string>();
   for (const { ticket, run } of input.runs) latestByTicket.set(ticket, run.id);
@@ -149,10 +182,11 @@ export function partitionHome(input: {
     .map(({ run }): AttentionItem => ({ kind: "run", run }));
 
   const attention: AttentionItem[] = [
-    ...input.brokenAuthRunners.map((runner): AttentionItem => ({ kind: "runner-auth", runner })),
+    ...input.runnerIssues.map((runner): AttentionItem => ({ kind: "runner-issue", runner })),
     ...attentionRuns,
   ];
-  if (workspace.kind === "all") return { workspace, attention, running: [], queued: [] };
+  if (workspace.kind === "all")
+    return { workspace, attention, running: [], queued: [], mergedToday: 0, activity };
 
   const runs = input.runs.map(({ run }) => run);
   return {
@@ -160,6 +194,8 @@ export function partitionHome(input: {
     attention,
     running: runs.filter((run) => run.state === "running"),
     queued: runs.filter((run) => run.state === "queued"),
+    mergedToday: input.mergedToday,
+    activity,
   };
 }
 

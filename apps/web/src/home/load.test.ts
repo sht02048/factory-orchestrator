@@ -25,6 +25,7 @@ import {
 import type { Database } from "@factory/db";
 import { describe, expect, it } from "vitest";
 import {
+  breakGitHubAuth,
   connection,
   endedCases,
   labs,
@@ -33,6 +34,7 @@ import {
   offlineQueuedKey,
   seedDatabase,
 } from "../testing/seed";
+import { loadShell } from "../shell/load";
 import { loadHomePage } from "./load";
 import type { AttentionItem, HomeRun } from "./model";
 
@@ -86,9 +88,11 @@ function runOf(items: ReadonlyArray<AttentionItem>, key: string): HomeRun | unde
 describe("loadHomePage", () => {
   it("런을 손댈 일, 실행 중, Queued 로 나눈다", () => {
     const { db } = seedDatabase();
-    const page = loadHomePage(db, "ws-commerce", now);
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
 
-    const attention = attentionKeys(page.attention);
+    // 시드의 runner-b 는 Offline 이라 Runner Issue 로 맨 앞에 온다
+    expect(attentionKeys(page.attention)[0]).toBe("runner:runner-b");
+    const attention = attentionKeys(page.attention).filter((key) => !key.startsWith("runner:"));
     // 입력 기다림·연결 끊김이 먼저, 그다음 Human Check·Failed 인 Ended 런(새 것부터)
     expect(attention.slice(0, 2)).toEqual(["ACME-11", "ACME-12"]);
     expect(attention.slice(2).toSorted()).toEqual(
@@ -116,7 +120,7 @@ describe("loadHomePage", () => {
     });
     if (!early.ok) throw new Error(early.reason);
 
-    const page = loadHomePage(db, "ws-commerce", now);
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
     expect(keys(page.queued)).toEqual(["ACME-20", "ACME-13", offlineQueuedKey]);
     const offline = page.queued.find((run) => run.ticketKey === offlineQueuedKey);
     expect(offline).toMatchObject({ queuedReason: { kind: "runner-offline" }, runner: null });
@@ -124,7 +128,7 @@ describe("loadHomePage", () => {
 
   it("입력 기다림과 연결 끊김 런을 상태 그대로 손댈 일에 담는다", () => {
     const { db } = seedDatabase();
-    const page = loadHomePage(db, "ws-commerce", now);
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
     const runs = page.attention.flatMap((item) => (item.kind === "run" ? [item.run] : []));
     expect(runs.find((run) => run.ticketKey === "ACME-11")?.state).toBe("waiting-for-input");
     expect(runs.find((run) => run.ticketKey === "ACME-12")?.state).toBe("disconnected");
@@ -132,7 +136,7 @@ describe("loadHomePage", () => {
 
   it("손댈 일의 Ended 런은 에이전트 결과와 PR 상태를 따로 담는다", () => {
     const { db } = seedDatabase();
-    const page = loadHomePage(db, "ws-commerce", now);
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
     const run = page.attention.find(
       (item) => item.kind === "run" && item.run.ticketKey === "ACME-2",
     );
@@ -157,7 +161,7 @@ describe("loadHomePage", () => {
       now: minutes(100),
     });
     if (!again.ok) throw new Error(again.reason);
-    const page = loadHomePage(db, "ws-commerce", now);
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
     expect(attentionKeys(page.attention)).not.toContain("ACME-3");
     expect(keys(page.queued)).toContain("ACME-3");
   });
@@ -167,29 +171,31 @@ describe("loadHomePage", () => {
     const id = ids.get("ACME-2");
     if (id === undefined) throw new Error("ACME-2 missing");
     updateRunRecords(db, id, { laterPrState: { state: "merged", at: minutes(110) } });
-    const page = loadHomePage(db, "ws-commerce", now);
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
     expect(attentionKeys(page.attention)).not.toContain("ACME-2");
     // Failed 런은 이후 PR 상태와 상관없이 남는다
     const failedId = ids.get("ACME-5");
     if (failedId === undefined) throw new Error("ACME-5 missing");
     updateRunRecords(db, failedId, { laterPrState: { state: "closed", at: minutes(110) } });
-    expect(attentionKeys(loadHomePage(db, "ws-commerce", now).attention)).toContain("ACME-5");
+    expect(attentionKeys(loadHomePage(db, "ws-commerce", now, "UTC").attention)).toContain(
+      "ACME-5",
+    );
   });
 
   it("Canceled 런은 PR 이 열려 있어도 손댈 일에 없다(Q82.9)", () => {
     const { db } = seedDatabase();
     addEndedRun(db, { key: "ACME-30", trackerProject: "tp-web", agentResult: "canceled" });
-    const page = loadHomePage(db, "ws-commerce", now);
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
     expect(attentionKeys(page.attention)).not.toContain("ACME-30");
     expect(keys(page.running)).not.toContain("ACME-30");
-    expect(attentionKeys(loadHomePage(db, "all", now).attention)).not.toContain("ACME-30");
+    expect(attentionKeys(loadHomePage(db, "all", now, "UTC").attention)).not.toContain("ACME-30");
   });
 
   it("질문으로 기다리는 런에 worker 가 쓴 질문과 선택지를 담고, 답을 남기면 answered 가 된다", () => {
     const { db, ids } = seedDatabase();
     const runId = ids.get("ACME-11");
     if (runId === undefined) throw new Error("ACME-11 missing");
-    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+    expect(runOf(loadHomePage(db, "ws-commerce", now, "UTC").attention, "ACME-11")).toMatchObject({
       state: "waiting-for-input",
       input: null,
     });
@@ -202,7 +208,7 @@ describe("loadHomePage", () => {
         askedAt: minutes(100),
       },
     ]);
-    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+    expect(runOf(loadHomePage(db, "ws-commerce", now, "UTC").attention, "ACME-11")).toMatchObject({
       input: {
         kind: "question",
         questionId: "q-1",
@@ -213,7 +219,7 @@ describe("loadHomePage", () => {
     });
 
     answerRunQuestion(db, { runId, questionId: toQuestionId("q-1"), answer: "A" }, minutes(101));
-    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+    expect(runOf(loadHomePage(db, "ws-commerce", now, "UTC").attention, "ACME-11")).toMatchObject({
       input: { kind: "question", answered: true },
     });
   });
@@ -226,7 +232,7 @@ describe("loadHomePage", () => {
     recordPermissionWaits(db, runId, [
       { id: permissionId, detail: "Bash(touch notes.txt)", requestedAt: minutes(100) },
     ]);
-    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+    expect(runOf(loadHomePage(db, "ws-commerce", now, "UTC").attention, "ACME-11")).toMatchObject({
       input: {
         kind: "permission",
         promptId: "apr-1",
@@ -236,12 +242,12 @@ describe("loadHomePage", () => {
     });
 
     denyPermissionWait(db, { runId, permissionId, reason: "" }, minutes(101));
-    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+    expect(runOf(loadHomePage(db, "ws-commerce", now, "UTC").attention, "ACME-11")).toMatchObject({
       input: { kind: "permission", denied: true },
     });
 
     resolvePermissionWaits(db, runId, [], minutes(102));
-    expect(runOf(loadHomePage(db, "ws-commerce", now).attention, "ACME-11")).toMatchObject({
+    expect(runOf(loadHomePage(db, "ws-commerce", now, "UTC").attention, "ACME-11")).toMatchObject({
       input: null,
     });
   });
@@ -251,9 +257,30 @@ describe("loadHomePage", () => {
     const runId = ids.get("ACME-10");
     if (runId === undefined) throw new Error("ACME-10 missing");
     expect(requestRunCancel(db, runId, minutes(110)).ok).toBe(true);
-    const page = loadHomePage(db, "ws-commerce", now);
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
     expect(page.running.find((run) => run.ticketKey === "ACME-10")?.cancelling).toBe(true);
     expect(page.queued.every((run) => !run.cancelling)).toBe(true);
+  });
+
+  it("Offline 러너는 Runner Issue 로 손댈 일에 오르고 Runners 점 개수에 든다(ADR 0010 1·11번)", () => {
+    const { db } = seedDatabase();
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    expect(page.attention[0]).toEqual({
+      kind: "runner-issue",
+      runner: { id: "runner-b", name: "runner-b", cause: "offline" },
+    });
+    // Online 러너(runner-a)는 오르지 않는다
+    expect(attentionKeys(page.attention)).not.toContain("runner:runner-a");
+    expect(loadShell(db).runnerIssues).toBe(1);
+
+    // GitHub 인증까지 깨지면 둘 다 센다
+    breakGitHubAuth(db);
+    expect(loadShell(db).runnerIssues).toBe(2);
+    expect(
+      attentionKeys(loadHomePage(db, "ws-commerce", now, "UTC").attention)
+        .slice(0, 2)
+        .toSorted(),
+    ).toEqual(["runner:runner-a", "runner:runner-b"]);
   });
 
   it("GitHub 인증이 깨진 러너는 손댈 일 맨 앞에 오고, 그 러너로 정한 Queued 런은 이유를 담는다(Q82.14·Q87)", () => {
@@ -266,23 +293,27 @@ describe("loadHomePage", () => {
       assignmentBlocked: true,
       projects: null,
     });
-    const page = loadHomePage(db, "ws-commerce", now);
-    expect(page.attention[0]).toEqual({
-      kind: "runner-auth",
-      runner: { id: "runner-a", name: "runner-a" },
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    expect(page.attention.slice(0, 2)).toContainEqual({
+      kind: "runner-issue",
+      runner: { id: "runner-a", name: "runner-a", cause: "auth" },
     });
     expect(page.queued.find((run) => run.ticketKey === "ACME-13")).toMatchObject({
       queuedReason: { kind: "assignment-blocked" },
     });
     // 러너는 Workspace 밖 자원이라 다른 Workspace 와 전체에서도 보인다
-    expect(attentionKeys(loadHomePage(db, labs, now).attention)).toContain("runner:runner-a");
-    expect(attentionKeys(loadHomePage(db, "all", now).attention)).toContain("runner:runner-a");
+    expect(attentionKeys(loadHomePage(db, labs, now, "UTC").attention)).toContain(
+      "runner:runner-a",
+    );
+    expect(attentionKeys(loadHomePage(db, "all", now, "UTC").attention)).toContain(
+      "runner:runner-a",
+    );
   });
 
   it("전체에서는 모든 Workspace 의 손댈 일만 담는다(ADR 0006)", () => {
     const { db } = seedDatabase();
     addLabsFailedRun(db);
-    const page = loadHomePage(db, "all", now);
+    const page = loadHomePage(db, "all", now, "UTC");
     expect(page.workspace.kind).toBe("all");
     expect(page.running).toEqual([]);
     expect(page.queued).toEqual([]);
@@ -299,9 +330,76 @@ describe("loadHomePage", () => {
   it("Workspace 하나에서는 그 Workspace 의 런만 담는다", () => {
     const { db } = seedDatabase();
     addLabsFailedRun(db);
-    const page = loadHomePage(db, labs, now);
-    expect(attentionKeys(page.attention)).toEqual(["LAB-2"]);
+    const page = loadHomePage(db, labs, now, "UTC");
+    expect(attentionKeys(page.attention)).toEqual(["runner:runner-b", "LAB-2"]);
     expect(keys(page.running)).toEqual(["LAB-1"]);
     expect(page.queued).toEqual([]);
+  });
+
+  it("오늘 Merged 는 운영자 시간대의 오늘 Merged 로 끝난 런만 센다(0044)", () => {
+    const { db } = seedDatabase();
+    // ACME-1 은 2026-11-17 09:31Z 에 Merged 로 끝났고 지금은 11:00Z 다
+    expect(loadHomePage(db, "ws-commerce", now, "UTC").mergedToday).toBe(1);
+    // UTC+14 에서는 끝난 때가 11-17 23:31, 지금이 11-18 01:00 이라 오늘이 아니다
+    expect(loadHomePage(db, "ws-commerce", now, "Pacific/Kiritimati").mergedToday).toBe(0);
+    expect(loadHomePage(db, "all", now, "UTC").mergedToday).toBe(0);
+  });
+
+  it("지금 일어나는 일은 DB 기록으로 새 것부터 8개까지 담는다(ADR 0010)", () => {
+    const { db } = seedDatabase();
+    const { activity } = loadHomePage(db, "ws-commerce", now, "UTC");
+    expect(activity).toHaveLength(8);
+    expect(activity.map((a) => Date.parse(a.at))).toEqual(
+      activity.map((a) => Date.parse(a.at)).toSorted((a, b) => b - a),
+    );
+    // 가장 최근 사건은 ACME-7 이 Failed 로 끝난 것이다
+    expect(activity[0]).toMatchObject({
+      ticketKey: "ACME-7",
+      event: { kind: "ended", summary: "failed" },
+      agoMs: 120 * 60_000 - 37 * 60_000,
+    });
+    expect(new Set(activity.map((a) => a.key)).size).toBe(activity.length);
+  });
+
+  it("지금 일어나는 일에 질문·권한 대기·Disconnected·이후 PR 을 담고, 하루가 지난 일은 뺀다", () => {
+    const { db, ids } = seedDatabase();
+    const waiting = ids.get("ACME-11");
+    const merged = ids.get("ACME-2");
+    if (waiting === undefined || merged === undefined) throw new Error("seed");
+    recordRunQuestions(db, waiting, [
+      {
+        id: toQuestionId("q-new"),
+        body: "어느 쪽으로 할까요?",
+        options: [],
+        askedAt: minutes(118),
+      },
+    ]);
+    recordPermissionWaits(db, waiting, [
+      { id: toPermissionRequestId("p-new"), detail: "git push", requestedAt: minutes(117) },
+    ]);
+    updateRunRecords(db, merged, { laterPrState: { state: "merged", at: minutes(119) } });
+
+    const kinds = loadHomePage(db, "ws-commerce", now, "UTC").activity.map((a) => [
+      a.ticketKey,
+      a.event.kind,
+    ]);
+    expect(kinds.slice(0, 3)).toEqual([
+      ["ACME-2", "later-pr"],
+      ["ACME-11", "question"],
+      ["ACME-11", "permission"],
+    ]);
+    expect(
+      loadHomePage(db, "ws-commerce", minutes(120 + 24 * 60), "UTC").activity.map(
+        (a) => a.event.kind,
+      ),
+    ).toEqual([]);
+  });
+
+  it("Disconnected 와 시작은 상태 바뀜에서 온다", () => {
+    const { db } = seedDatabase();
+    const { activity } = loadHomePage(db, "all", minutes(13), "UTC");
+    const of = (key: string) =>
+      activity.filter((a) => a.ticketKey === key).map((a) => a.event.kind);
+    expect(of("ACME-12")).toEqual(["disconnected", "started"]);
   });
 });

@@ -72,15 +72,12 @@ describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
   });
 
   it("메뉴와 화면 제목은 영어 화면 이름이다", () => {
-    const { label: _label, ...nav } = shell.nav;
+    const { label: _label, withIssues: _withIssues, ...nav } = shell.nav;
     expect(Object.values(nav)).toEqual(SCREENS);
     expect([home, tickets, runs, runners, stats, settings].map((m) => m.title)).toEqual(SCREENS);
   });
 
   it("화면 메시지의 상태 이름 자리도 영어 용어다", () => {
-    expect(home.section.running).toBe(TERMS.running);
-    expect(home.question.title).toBe(TERMS.question);
-    expect(home.permission.title).toBe(TERMS.permission);
     expect(tickets.filter.running).toBe(TERMS.running);
     expect(stats.columns.canceled).toBe(TERMS.canceled);
     expect(stats.panel.canceled).toBe(TERMS.canceled);
@@ -103,9 +100,7 @@ describe("화면의 상태 알약", () => {
       ...pillsOf(
         renderWithMessages(
           <HomeScreen
-            page={loadHomePage(db, "ws-commerce", now)}
-            selectedKey={undefined}
-            onSelect={() => {}}
+            page={loadHomePage(db, "ws-commerce", now, "UTC")}
             onAnswer={() => Promise.resolve()}
             onDeny={() => Promise.resolve()}
           />,
