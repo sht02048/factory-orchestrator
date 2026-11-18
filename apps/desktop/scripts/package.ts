@@ -18,9 +18,16 @@ import { appIconPaths } from "../src/core/app-icon.ts";
 const DESKTOP = resolve(import.meta.dirname, "..");
 const REPO = resolve(DESKTOP, "..", "..");
 const PRODUCT = "Ganger";
+const MAIN_ENTITLEMENTS = join(DESKTOP, "entitlements.mac.plist");
 
 const { values } = parseArgs({
-  options: { arch: { type: "string" }, bundle: { type: "string" }, out: { type: "string" } },
+  options: {
+    arch: { type: "string" },
+    bundle: { type: "string" },
+    out: { type: "string" },
+    "sign-identity": { type: "string" },
+    keychain: { type: "string" },
+  },
 });
 
 function readJson(path: string): Record<string, unknown> {
@@ -96,6 +103,26 @@ const icon = appIconPaths(join(DESKTOP, "icons"), actool.status === 0 ? actool.s
 console.log(`app icon: ${icon.map((path) => basename(path)).join(", ")}`);
 
 const arch = values.arch ?? process.arch;
+const signIdentity = values["sign-identity"];
+const osxSign =
+  signIdentity === undefined
+    ? undefined
+    : {
+        identity: signIdentity,
+        continueOnError: false,
+        optionsForFile: (filePath: string) =>
+          basename(filePath).startsWith(`${PRODUCT} Helper`)
+            ? {}
+            : { entitlements: MAIN_ENTITLEMENTS },
+        ...(values.keychain === undefined ? {} : { keychain: values.keychain }),
+      };
+function copyElectronLicenses({ buildPath }: { buildPath: string }): void {
+  const resources = join(buildPath, `${PRODUCT}.app`, "Contents", "Resources");
+  const [electronLicense, chromiumLicenses] = ELECTRON_LICENSES;
+  cpSync(join(buildPath, "LICENSE"), join(resources, electronLicense));
+  cpSync(join(buildPath, chromiumLicenses), join(resources, chromiumLicenses));
+}
+
 const [appDir] = await packager({
   dir: stage,
   out,
@@ -111,15 +138,13 @@ const [appDir] = await packager({
   extraResource: [join(resources, "server"), join(resources, NOTICE_FILE)],
   overwrite: true,
   prune: false,
-  osxSign: undefined,
+  afterCopyExtraResources: [copyElectronLicenses],
+  osxSign,
 });
 if (appDir === undefined) throw new Error("packager produced nothing");
 
 const appPath = join(appDir, `${PRODUCT}.app`);
 const appResources = join(appPath, "Contents", "Resources");
-const [electronLicense, chromiumLicenses] = ELECTRON_LICENSES;
-cpSync(join(appDir, "LICENSE"), join(appResources, electronLicense));
-cpSync(join(appDir, chromiumLicenses), join(appResources, chromiumLicenses));
 const problems = findAppProblems(appResources);
 if (problems.length > 0) {
   console.error(`app check failed:\n${problems.map((line) => `- ${line}`).join("\n")}`);
