@@ -143,7 +143,7 @@ describe("Dashboard 질문 레이어(브라우저, 0060)", () => {
 
     await trigger.click();
     await layer.waitFor();
-    await page.getByRole("heading", { level: 1, name: home.title }).click();
+    await page.getByRole("heading", { level: 1 }).click();
     await layer.waitFor({ state: "hidden" });
     expect(await focusedSoon(trigger)).toBe(true);
   });
@@ -223,6 +223,60 @@ describe("Dashboard 질문 레이어(브라우저, 0060)", () => {
     expect(primary).toEqual([home.question.send]);
   });
 
+  it("선택지에서 Enter 를 누르면 고르기만 하고 보내지 않는다(0066)", async () => {
+    await openHome(page);
+    const row = todoRow(page, "ACME-1");
+    await row.getByRole("button", { name: home.row.answer }).click();
+    const layer = page.getByRole("dialog");
+    const first = layer.getByRole("radio", { name: "SQLite" });
+    expect(await focusedSoon(first)).toBe(true);
+
+    const posts: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST") posts.push(request.url());
+    });
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(500);
+    expect(posts).toEqual([]);
+    expect(await layer.isVisible()).toBe(true);
+    expect(await layer.getByRole("radio", { name: "In memory" }).isChecked()).toBe(true);
+    expect(unansweredQuestions("ACME-1")).toEqual(["q-1"]);
+  });
+
+  it("보내기에 실패한 뒤 레이어를 닫았다 다시 열면 예전 오류가 없다(0066)", async () => {
+    await openHome(page);
+    await page.route("**/_serverFn/**", async (route) => {
+      if (route.request().method() === "POST") await route.abort();
+      else await route.continue();
+    });
+    const layer = page.getByRole("dialog");
+
+    const answer = todoRow(page, "ACME-1").getByRole("button", { name: home.row.answer });
+    await answer.click();
+    await layer.getByRole("radio", { name: "SQLite" }).check();
+    await layer.getByRole("button", { name: home.question.send }).click();
+    await layer.getByRole("alert").getByText(home.question.failed).waitFor();
+    await page.keyboard.press("Escape");
+    await layer.waitFor({ state: "hidden" });
+    await answer.click();
+    await layer.getByRole("radio", { name: "SQLite" }).waitFor();
+    expect(await layer.getByText(home.question.failed).count()).toBe(0);
+    await page.keyboard.press("Escape");
+    await layer.waitFor({ state: "hidden" });
+
+    const deny = todoRow(page, "ACME-2").getByRole("button", { name: home.row.deny });
+    await deny.click();
+    await layer.getByRole("button", { name: home.permission.send }).click();
+    await layer.getByText(home.permission.failed).waitFor();
+    await page.keyboard.press("Escape");
+    await layer.waitFor({ state: "hidden" });
+    await deny.click();
+    await layer.getByLabel(home.permission.reasonLabel).waitFor();
+    expect(await layer.getByText(home.permission.failed).count()).toBe(0);
+    await page.unroute("**/_serverFn/**");
+  });
+
   it("거절하기는 이유 칸에 포커스를 주고, Escape 로 닫으면 거절하기로, 보내면 결과 status 로 포커스가 간다", async () => {
     await openHome(page);
     const trigger = todoRow(page, "ACME-2").getByRole("button", { name: home.row.deny });
@@ -243,15 +297,42 @@ describe("Dashboard 질문 레이어(브라우저, 0060)", () => {
 });
 
 describe("Dashboard 배치(브라우저, 0060)", () => {
-  it("러너 문제는 To do 에 없고 Runners 카드에 이름 링크로 보인다", async () => {
+  it("러너 문제는 To do 에 없고 Runners 구역의 러너 행과 빨간 상자로 보인다(0069)", async () => {
     await openHome(page);
     const todo = page.getByRole("region", { name: home.section.todo });
     const runners = page.getByRole("region", { name: home.section.runners });
     expect(await todo.getByText("runner-b").count()).toBe(0);
-    expect(await runners.getByRole("link", { name: "runner-b" }).getAttribute("href")).toBe(
-      "/runners?sel=runner-b",
+    const offline = runners.locator('a[href="/runners?sel=runner-b"]');
+    await offline.getByText("runner-b", { exact: true }).waitFor();
+    expect(await offline.getByRole("meter").getAttribute("aria-valuetext")).toBe("0/1");
+    const problem = runners.getByRole("region", {
+      name: home.runners.problemTitle.replace("{count}", "1"),
+    });
+    expect(await problem.getByRole("link", { name: home.runners.fix }).getAttribute("href")).toBe(
+      "/runners",
     );
-    await runners.getByText(home.runners.offline, { exact: true }).waitFor();
+  });
+
+  it("멈췄어요는 3개만 보이고 더 보기를 누르면 모두 펼치고 처음 숨었던 행으로 포커스를 옮긴다", async () => {
+    await openHome(page);
+    const stopped = page.locator('[data-group="stopped"]');
+    expect(await stopped.getByRole("listitem").count()).toBe(3);
+    const more = stopped.getByRole("button", { name: home.group.more.replace("{count}", "1") });
+    await more.click();
+    await stopped.getByRole("listitem").nth(3).waitFor();
+    expect(await stopped.getByRole("listitem").count()).toBe(4);
+    expect(await more.count()).toBe(0);
+    expect(await focusedSoon(stopped.getByRole("listitem").nth(3).getByRole("link"))).toBe(true);
+  });
+
+  it("모든 Workspace 보기에서도 네 구역을 보이고 행에 Workspace 이름을 붙인다(0066)", async () => {
+    await page.goto("/?ws=all");
+    await hydrated(page);
+    for (const name of Object.values(home.section))
+      await page.getByRole("region", { name }).waitFor();
+    const todo = page.getByRole("region", { name: home.section.todo });
+    expect(await todoRow(page, "ACME-1").getByText("Acme", { exact: true }).count()).toBe(1);
+    expect(await todo.getByRole("listitem").count()).toBeGreaterThan(0);
   });
 
   it("375px 폭에서 행과 페이지가 넘치지 않는다", async () => {
@@ -269,12 +350,14 @@ describe("Dashboard 배치(브라우저, 0060)", () => {
     expect(overflow).toEqual({ rows: [], outside: [], page: 0 });
   });
 
-  it("행 제목은 그 런의 Run 상세로 가는 링크이고 행 전체는 링크가 아니다", async () => {
+  it("To do 행은 Run 상세로 가는 링크이고 행동 버튼은 링크 밖에 있다", async () => {
     await openHome(page);
+    const row = todoRow(page, "ACME-2");
+    expect(await row.getByRole("link").getAttribute("href")).toBe(
+      `/runs/${runIds.get("ACME-2")}?ws=${workspaceId}`,
+    );
     const todo = page.getByRole("region", { name: home.section.todo });
-    const link = todo.getByRole("link", { name: "ACME-2", exact: true });
-    expect(await link.getAttribute("href")).toBe(`/runs/${runIds.get("ACME-2")}?ws=${workspaceId}`);
-    expect(await todo.locator("li > a").count()).toBe(0);
+    expect(await todo.locator("a button, a a").count()).toBe(0);
   });
 
   it("글쓰기 칸 글자 크기는 폭이 아니라 포인터로 바뀐다(정밀 14px, 터치 16px)", async () => {
@@ -369,7 +452,7 @@ describe("Dashboard 배치(브라우저, 0060)", () => {
 
     expect(failed).toBeGreaterThan(0);
     expect(await input.inputValue()).toBe("half-written answer");
-    expect(await page.getByRole("heading", { level: 1, name: home.title }).count()).toBe(1);
+    expect(await page.getByRole("heading", { level: 1 }).count()).toBe(1);
   });
 });
 
@@ -442,6 +525,16 @@ function seed(db: Database): void {
     { id: toPermissionRequestId("p-5"), detail: "rm -rf build", requestedAt: new Date() },
   ]);
 
+  for (const key of ["ACME-30", "ACME-31", "ACME-32", "ACME-33"]) {
+    ok(
+      changeRunState(db, startRun(toTicketKey(key)), {
+        to: "ended",
+        agentResult: "timed-out",
+        prState: "none",
+      }),
+    );
+  }
+
   const permissionRun = startRun(toTicketKey("ACME-2"));
   ok(changeRunState(db, permissionRun, { to: "waiting-for-input" }));
   recordPermissionWaits(db, permissionRun, [
@@ -481,7 +574,7 @@ function todoRow(target: Page, key: string): Locator {
   return target
     .getByRole("region", { name: home.section.todo })
     .getByRole("listitem")
-    .filter({ has: target.getByRole("link", { name: key, exact: true }) });
+    .filter({ has: target.getByText(key, { exact: true }) });
 }
 
 function questionsOf(key: string) {
