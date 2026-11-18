@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
-import { Button, Dot, Field, Input, Text } from "@factory/ui";
-import { colors, fonts, fontSize, lineHeight, space } from "@factory/ui/tokens.stylex";
+import { Button, Card, Field, Input, StatusPill, Text } from "@factory/ui";
+import { colors, fonts, fontSize, lineHeight, radius, space } from "@factory/ui/tokens.stylex";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
@@ -12,8 +12,8 @@ import type { DesktopApi, FindResult, FoundServerView, ViewState } from "../shar
  * 연결하기, 닿지 않음, 로컬 서버 상태. 상태는 main 이 정하고 여기서는 그리기만 한다.
  *
  * 모양은 리디자인 방향(운영자 UI 규칙 2026-11-18)을 따른다: 다크, 영역은 선이 아니라 면(배경색)으로 나누고,
- * 카드 12px·행 8px 둥글기, 넉넉한 글자, 제목 아래 한 줄 요약. 색·글자·간격은 @factory/ui 토큰만 쓴다.
- * 둥글기 12·8 은 아직 토큰이 없어(리디자인이 packages/ui 에 더한다) 숫자로 둔다.
+ * 카드 12px·행 8px 둥글기, 넉넉한 글자, 제목 아래 한 줄 요약(ADR 0010). 카드·상태 알약·버튼·토큰은 @factory/ui 의
+ * 것을 쓴다. 시간 표기는 없다.
  */
 
 declare global {
@@ -77,11 +77,7 @@ function Header({ title, summary }: { title: ReactNode; summary: ReactNode }) {
   );
 }
 
-function Card({ children }: { children: ReactNode }) {
-  return <section {...stylex.props(styles.card)}>{children}</section>;
-}
-
-function Row({ children }: { children: ReactNode }) {
+function Actions({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.actions)}>{children}</div>;
 }
 
@@ -103,18 +99,18 @@ function ChooseMode() {
           />
           {t("local.openAtLogin")}
         </label>
-        <Row>
+        <Actions>
           <Button variant="primary" onClick={() => void api().chooseLocal({ openAtLogin })}>
             {t("local.action")}
           </Button>
-        </Row>
+        </Actions>
       </Card>
       <Card>
         <Text variant="panel">{t("remote.title")}</Text>
         <p {...stylex.props(styles.body)}>{t("remote.body")}</p>
-        <Row>
+        <Actions>
           <Button onClick={() => void api().chooseRemote()}>{t("remote.action")}</Button>
-        </Row>
+        </Actions>
       </Card>
     </>
   );
@@ -136,14 +132,14 @@ function LocalState({
       return (
         <>
           <Header title={t("stoppedTitle")} summary={t("stoppedSummary")} />
-          <Row>
+          <Actions>
             <Button variant="primary" onClick={() => void api().startLocal()}>
               {t("start")}
             </Button>
             <Button variant="ghost" onClick={() => void api().chooseMode()}>
               {t("otherMode")}
             </Button>
-          </Row>
+          </Actions>
         </>
       );
     case "local-failed":
@@ -155,25 +151,25 @@ function LocalState({
               {t("log", { path: view.logFile })}
             </Text>
           </Card>
-          <Row>
+          <Actions>
             <Button variant="primary" onClick={() => void api().retry()}>
               {t("retry")}
             </Button>
             <Button variant="ghost" onClick={() => void api().chooseMode()}>
               {t("otherMode")}
             </Button>
-          </Row>
+          </Actions>
         </>
       );
     case "local-service":
       return (
         <>
           <Header title={t("serviceTitle")} summary={t("serviceSummary")} />
-          <Row>
+          <Actions>
             <Button variant="ghost" onClick={() => void api().chooseMode()}>
               {t("otherMode")}
             </Button>
-          </Row>
+          </Actions>
         </>
       );
   }
@@ -215,18 +211,18 @@ function FindServers({
         <Field label={t("port")} description={t("portDescription")}>
           <Input value={portText} onValueChange={setPortText} mono />
         </Field>
-        <Row>
+        <Actions>
           <Button
             disabled={searching || !portValid}
             onClick={() => void api().findServers(nextPort)}
           >
             {t("retry")}
           </Button>
-        </Row>
+        </Actions>
       </Card>
-      <Row>
+      <Actions>
         <Button
-          variant={servers.length > 0 ? "default" : "primary"}
+          variant={servers.length > 0 ? "secondary" : "primary"}
           onClick={() => void api().showAddress()}
         >
           {t("byAddress")}
@@ -234,7 +230,7 @@ function FindServers({
         <Button variant="ghost" onClick={() => void api().chooseMode()}>
           {t("back")}
         </Button>
-      </Row>
+      </Actions>
     </>
   );
 }
@@ -248,10 +244,7 @@ function ServerRow({ server, only }: { server: FoundServerView; only: boolean })
       <div {...stylex.props(styles.rowText)}>
         <Text variant="title">{server.name}</Text>
         <span {...stylex.props(styles.meta)}>
-          <span {...stylex.props(styles.pill)}>
-            <Dot tone="online" />
-            {t("online")}
-          </span>
+          <StatusPill status="online">{t("online")}</StatusPill>
           <Text variant="meta" numeric>
             {t("version", { version: server.version })}
           </Text>
@@ -260,7 +253,7 @@ function ServerRow({ server, only }: { server: FoundServerView; only: boolean })
         {openable ? null : <p {...stylex.props(styles.body)}>{t("hostNotAllowed")}</p>}
       </div>
       <Button
-        variant={only ? "primary" : "default"}
+        variant={only ? "primary" : "secondary"}
         disabled={!openable}
         onClick={() => void api().connectFound(server.instanceId)}
       >
@@ -284,30 +277,32 @@ function EnterAddress({ checking, error }: { checking: boolean; error: string | 
     <>
       <Header title={t("title")} summary={t("summary")} />
       <form
-        {...stylex.props(styles.card)}
+        {...stylex.props(styles.form)}
         onSubmit={(event) => {
           event.preventDefault();
           void api().connectAddress(address);
         }}
       >
-        <Field label={t("label")} {...(errorText === undefined ? {} : { error: errorText })}>
-          <Input
-            type="url"
-            value={address}
-            onValueChange={setAddress}
-            placeholder={t("placeholder")}
-            autoComplete="off"
-            mono
-          />
-        </Field>
-        <Row>
-          <Button variant="primary" type="submit" disabled={checking || address.trim() === ""}>
-            {checking ? t("checking") : t("connect")}
-          </Button>
-          <Button variant="ghost" onClick={() => void api().chooseRemote()}>
-            {t("back")}
-          </Button>
-        </Row>
+        <Card>
+          <Field label={t("label")} {...(errorText === undefined ? {} : { error: errorText })}>
+            <Input
+              type="url"
+              value={address}
+              onValueChange={setAddress}
+              placeholder={t("placeholder")}
+              autoComplete="off"
+              mono
+            />
+          </Field>
+          <Actions>
+            <Button variant="primary" type="submit" disabled={checking || address.trim() === ""}>
+              {checking ? t("checking") : t("connect")}
+            </Button>
+            <Button variant="ghost" onClick={() => void api().chooseRemote()}>
+              {t("back")}
+            </Button>
+          </Actions>
+        </Card>
       </form>
     </>
   );
@@ -318,12 +313,12 @@ function Unreachable({ name, checking }: { name: string; checking: boolean }) {
   return (
     <>
       <Header title={t("title", { name })} summary={checking ? t("checking") : t("summary")} />
-      <Row>
+      <Actions>
         <Button variant="primary" disabled={checking} onClick={() => void api().retry()}>
           {t("retry")}
         </Button>
         <Button onClick={() => void api().chooseRemote()}>{t("other")}</Button>
-      </Row>
+      </Actions>
     </>
   );
 }
@@ -353,14 +348,7 @@ const styles = stylex.create({
     fontSize: fontSize.body,
     lineHeight: lineHeight.relaxed,
   },
-  card: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s4,
-    padding: space.s6,
-    borderRadius: 12,
-    backgroundColor: colors.bgPanel,
-  },
+  form: { display: "contents" },
   body: { margin: 0, color: colors.textSecondary, lineHeight: lineHeight.relaxed },
   actions: { display: "flex", flexWrap: "wrap", gap: space.s2 },
   check: { display: "flex", alignItems: "center", gap: space.s2, color: colors.textPrimary },
@@ -372,8 +360,8 @@ const styles = stylex.create({
     margin: 0,
     padding: space.s2,
     listStyle: "none",
-    borderRadius: 12,
-    backgroundColor: colors.bgPanel,
+    borderRadius: radius.card,
+    backgroundColor: colors.bgCard,
   },
   row: {
     display: "flex",
@@ -381,20 +369,9 @@ const styles = stylex.create({
     gap: space.s4,
     paddingBlock: space.s3,
     paddingInline: space.s4,
-    borderRadius: 8,
-    backgroundColor: { default: "transparent", ":hover": colors.bgHover },
+    borderRadius: radius.control,
+    backgroundColor: { default: "transparent", ":hover": colors.bgCardHover },
   },
   rowText: { display: "flex", flexDirection: "column", gap: space.s1, flexGrow: 1, minWidth: 0 },
   meta: { display: "flex", alignItems: "center", gap: space.s3, flexWrap: "wrap" },
-  pill: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: space.px6,
-    paddingBlock: space.px2,
-    paddingInline: space.s2,
-    borderRadius: 6,
-    backgroundColor: colors.bgRaised,
-    color: colors.textSecondary,
-    fontSize: fontSize.small,
-  },
 });
