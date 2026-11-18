@@ -9,7 +9,7 @@ import { ALL_WORKSPACES } from "../shell/model";
  * 키가 생기면 OS 알림을 띄운다. 알리는 것은 질문 대기, 권한 대기, Human Check, 러너 Offline 넷뿐이다.
  * Merged·Failed 는 담지 않는다.
  *
- * 모양을 바꾸면 apps/desktop 의 attentionSchema 도 함께 바꾼다(계약: docs/tickets/0046 「알림 사건 경로 계약」).
+ * 모양을 바꾸면 apps/desktop 의 attentionSchema 도 함께 바꾼다(계약: docs/tickets/0046 「정한 것」의 「알림(Q4) 받는 방법」).
  * 화면과 같은 Host 검사를 받는다(request-guard). 티켓 키와 러너 이름이 든다.
  */
 

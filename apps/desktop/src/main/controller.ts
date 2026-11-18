@@ -433,7 +433,10 @@ export class Controller {
     const notification = new Notification({ title, body });
     notification.on("click", () => {
       this.showWindow();
-      if (this.serverUrl === url) this.openServer(url, attentionPath(event));
+      // 앱 화면을 보이고 있어도 같은 서버의 알림이면 그 화면을 연다.
+      if (this.serverUrl === url || (this.serverUrl === undefined && this.diffUrl === url)) {
+        this.openServer(url, attentionPath(event));
+      }
     });
     notification.show();
   }
