@@ -331,7 +331,7 @@ describe("Settings 저장하고 다시 열기", () => {
         now,
       ),
     ).toEqual({ ok: true });
-    f.tracker.connection = { ok: true, organizationName: `  ${"a".repeat(250)}  ` };
+    f.tracker.connection = { ok: true, organizationName: `  ${"가😀".repeat(150)}  ` };
     expect(
       await saveTrackerConnectionSetting(
         f.context,
@@ -344,7 +344,7 @@ describe("Settings 저장하고 다시 열기", () => {
       "Acme",
       "Linear",
       "Linear",
-      "a".repeat(200),
+      "가😀".repeat(100),
     ]);
 
     const id = saved.find((c) => c.name === "Acme")?.id ?? "";

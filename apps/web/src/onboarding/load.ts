@@ -17,6 +17,7 @@ import {
 } from "@factory/db";
 import type { Database, SecretBox } from "@factory/db";
 import { z } from "zod";
+import { idSchema, nameSchema } from "../settings/actions";
 import type { SettingsContext } from "../settings/load";
 import type { SaveResult } from "../settings/model";
 import { isSetupComplete } from "./model";
@@ -44,12 +45,11 @@ export function isOnboardingComplete(db: Database, secretBox: SecretBox): boolea
   return isSetupComplete(loadSetupCounts(db, secretBox));
 }
 
-const id = z.string().trim().min(1);
-const name = z.string().trim().min(1).max(200);
-
 export const firstWorkspaceInput = z.object({
-  name,
-  projects: z.array(z.object({ connectionId: id, projectId: id, name })).max(500),
+  name: nameSchema,
+  projects: z
+    .array(z.object({ connectionId: idSchema, projectId: idSchema, name: nameSchema }))
+    .max(500),
 });
 
 class WorkspaceSetupRejected extends Error {
