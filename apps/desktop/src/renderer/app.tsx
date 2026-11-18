@@ -11,7 +11,7 @@ import {
   radius,
   space,
 } from "@factory/ui/tokens.stylex";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
 import screens from "../../messages/ko/screens.json" with { type: "json" };
@@ -104,15 +104,19 @@ function Header({
   title,
   summary,
   centered = false,
+  live = false,
 }: {
   title: ReactNode;
   summary: ReactNode;
   centered?: boolean;
+  live?: boolean;
 }) {
   return (
     <header {...stylex.props(styles.header, centered && styles.centerText)}>
       <Text variant="page">{title}</Text>
-      <p {...stylex.props(styles.summary)}>{summary}</p>
+      <p role={live ? "status" : undefined} {...stylex.props(styles.summary)}>
+        {summary}
+      </p>
     </header>
   );
 }
@@ -123,6 +127,7 @@ function ActionButton({
   wide = false,
   disabled = false,
   type = "button",
+  describedBy,
   onClick,
   children,
 }: {
@@ -131,15 +136,19 @@ function ActionButton({
   wide?: boolean;
   disabled?: boolean;
   type?: "button" | "submit";
+  describedBy?: string;
   onClick?: () => void;
   children: ReactNode;
 }) {
   return (
     <button
       type={type}
-      disabled={disabled}
+      aria-disabled={disabled || undefined}
+      aria-describedby={describedBy}
       data-variant={variant}
-      onClick={onClick}
+      onClick={() => {
+        if (!disabled) onClick?.();
+      }}
       {...stylex.props(
         ...buttonStyles(variant, disabled),
         size === "large" ? styles.buttonLarge : styles.buttonMedium,
@@ -154,16 +163,19 @@ function ActionButton({
 function TextLink({
   onClick,
   expanded,
+  controls,
   children,
 }: {
   onClick: () => void;
   expanded?: boolean;
+  controls?: string;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
       aria-expanded={expanded}
+      aria-controls={controls}
       onClick={onClick}
       {...stylex.props(styles.textButton, styles.textLink)}
     >
@@ -342,6 +354,7 @@ function FindServers({
   const t = useTranslations("screens.find");
   const [portText, setPortText] = useState(String(port));
   const [portOpen, setPortOpen] = useState(false);
+  const portFormId = useId();
   const portInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (portOpen) portInput.current?.focus();
@@ -361,7 +374,7 @@ function FindServers({
   return (
     <Frame width="form">
       <BackLink onClick={() => void api().chooseMode()}>{t("back")}</BackLink>
-      <Header title={t("title")} summary={summary} />
+      <Header title={t("title")} summary={summary} live />
       <Card padding="compact">
         <div {...stylex.props(styles.listHeader)}>
           <Text variant="label" as="h2">
@@ -370,9 +383,11 @@ function FindServers({
           <button
             type="button"
             aria-label={t("refresh")}
-            disabled={searching}
+            aria-disabled={searching || undefined}
             data-variant="ghost"
-            onClick={() => void api().findServers(port)}
+            onClick={() => {
+              if (!searching) void api().findServers(port);
+            }}
             {...stylex.props(...buttonStyles("ghost", searching), styles.iconButton)}
           >
             <RefreshIcon />
@@ -400,43 +415,48 @@ function FindServers({
         <span aria-hidden="true" {...stylex.props(styles.separator)}>
           ·
         </span>
-        <TextLink expanded={portOpen} onClick={() => setPortOpen(true)}>
+        <TextLink
+          expanded={portOpen}
+          controls={portFormId}
+          onClick={() => setPortOpen((open) => !open)}
+        >
           {t("otherPort")}
         </TextLink>
       </div>
-      {portOpen ? (
-        <form
-          {...stylex.props(styles.portForm)}
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!searching && portValid) void api().findServers(nextPort);
-          }}
-        >
-          <Field label={t("port")} description={t("portDescription")}>
-            <div {...stylex.props(styles.portRow)}>
-              <div {...stylex.props(styles.portInput)}>
-                <Input
-                  ref={portInput}
-                  value={portText}
-                  onValueChange={setPortText}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  mono
-                />
-              </div>
-              <ActionButton type="submit" size="medium" disabled={searching || !portValid}>
-                {t("searchPort")}
-              </ActionButton>
+      <form
+        id={portFormId}
+        hidden={!portOpen}
+        {...stylex.props(styles.portForm)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!searching && portValid) void api().findServers(nextPort);
+        }}
+      >
+        <Field label={t("port")} description={t("portDescription")}>
+          <div {...stylex.props(styles.portRow)}>
+            <div {...stylex.props(styles.portInput)}>
+              <Input
+                ref={portInput}
+                value={portText}
+                onValueChange={setPortText}
+                inputMode="numeric"
+                autoComplete="off"
+                mono
+              />
             </div>
-          </Field>
-        </form>
-      ) : null}
+            <ActionButton type="submit" size="medium" disabled={searching || !portValid}>
+              {t("searchPort")}
+            </ActionButton>
+          </div>
+        </Field>
+      </form>
     </Frame>
   );
 }
 
 function ServerRow({ server, primary }: { server: FoundServerView; primary: boolean }) {
   const t = useTranslations("screens.find");
+  const nameId = useId();
   const openable = server.webAccess === "allowed";
   return (
     <li {...stylex.props(styles.row)}>
@@ -445,9 +465,11 @@ function ServerRow({ server, primary }: { server: FoundServerView; primary: bool
           <ServerIcon size={20} />
         </span>
         <div {...stylex.props(styles.rowText)}>
-          <Text variant="title" truncate>
-            {server.name}
-          </Text>
+          <div id={nameId}>
+            <Text variant="title" truncate>
+              {server.name}
+            </Text>
+          </div>
           <span {...stylex.props(styles.meta)}>
             <StatusPill status="online">{t("online")}</StatusPill>
             <Text variant="meta" numeric>
@@ -460,12 +482,13 @@ function ServerRow({ server, primary }: { server: FoundServerView; primary: bool
           <ActionButton
             size="medium"
             variant={primary ? "primary" : "secondary"}
+            describedBy={nameId}
             onClick={() => void api().connectFound(server.instanceId)}
           >
             {t("open")}
           </ActionButton>
         ) : (
-          <ActionButton size="medium" onClick={() => void api().showAddress()}>
+          <ActionButton size="medium" describedBy={nameId} onClick={() => void api().showAddress()}>
             {t("openByAddress")}
           </ActionButton>
         )}
@@ -499,6 +522,7 @@ function EnterAddress({ checking, error }: { checking: boolean; error: string | 
         {...stylex.props(styles.form)}
         onSubmit={(event) => {
           event.preventDefault();
+          if (checking) return;
           if (address.trim() === "") addressInput.current?.focus();
           else void api().connectAddress(address);
         }}
@@ -506,6 +530,7 @@ function EnterAddress({ checking, error }: { checking: boolean; error: string | 
         <Card>
           <Field
             label={t("label")}
+            description={t("hint")}
             error={
               errorText === undefined ? undefined : (
                 <span {...stylex.props(styles.errorLine)}>
@@ -527,9 +552,6 @@ function EnterAddress({ checking, error }: { checking: boolean; error: string | 
               mono
             />
           </Field>
-          <Text variant="meta" as="p">
-            {t("hint")}
-          </Text>
           <div {...stylex.props(styles.actions, styles.formActions)}>
             <ActionButton variant="primary" type="submit" disabled={checking}>
               {checking ? t("checking") : t("connect")}
