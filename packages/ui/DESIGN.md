@@ -84,7 +84,7 @@
 | `DetailPanel` > `PanelHeader`, `Actions`, `PanelBlock`, `PanelFooter` | 상세 패널 안. 상태 줄 → 제목 → 흐린 부제 → 이유 → 버튼 → 속성 블록 → 바닥 순서                                                                                                                                                         |
 | `Actions`                                                             | 버튼 줄. 주 버튼을 맨 앞에                                                                                                                                                                                                             |
 | `Card`                                                                | 면 한 덩어리(둥글기 12). 손댈 일 카드, 러너 카드, Run 상세의 정보·타임라인. 이름(`label`)을 주면 `section`. 행을 담으면 `padding="compact"`                                                                                            |
-| `Row`                                                                 | 카드 안 한 줄(둥글기 8). 앞(`leading`, 아이콘·알약) · 본문 · 뒤(`trailing`, 시간 같은 흐린 값)                                                                                                                                         |
+| `Row`                                                                 | 카드 안 한 줄(둥글기 8). 앞(`leading`, 아이콘·알약) · 본문 · 뒤(`trailing`, 시간 같은 흐린 값). `href`를 주면 행 전체가 링크다. 누를 수 없는 행은 `interactive={false}`로 hover 면을 끈다                                              |
 
 ### 목록
 

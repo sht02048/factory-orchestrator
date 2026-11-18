@@ -92,6 +92,17 @@ describe("서버 렌더", () => {
     expect(row).toContain("10:45");
   });
 
+  it("Row 는 href 를 주면 행 전체가 링크이고, 누를 수 없는 행은 hover 면을 끈다(티켓 0050)", () => {
+    const link = renderToString(<Row href="/runs/run-1?ws=ws-1">시작했어요</Row>);
+    expect(link).toMatch(/^<a href="\/runs\/run-1\?ws=ws-1"/);
+    const classOf = (html: string) => /class="([^"]*)"/.exec(html)?.[1] ?? "";
+    const plain = renderToString(<Row interactive={false}>시작했어요</Row>);
+    const hover = renderToString(<Row>시작했어요</Row>);
+    expect(plain).toMatch(/^<div/);
+    // 기본 행(누를 수 있는 내용을 담은 행)과 누를 수 없는 행은 다른 클래스(hover 면)를 갖는다
+    expect(classOf(plain)).not.toEqual(classOf(hover));
+  });
+
   it("Text 는 변형에 맞는 기본 요소를 쓴다", () => {
     expect(renderToString(<Text variant="page">Runs</Text>)).toMatch(/^<h1/);
     expect(renderToString(<Text variant="panel">제목</Text>)).toMatch(/^<h2/);

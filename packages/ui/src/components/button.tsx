@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Button as SdkButton } from "@ui-sdk/react/button";
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, ReactNode, Ref } from "react";
 import { cx, type StyleArg } from "../cx";
 import { colors, fontWeight, motion, radius, size, space } from "../tokens.stylex";
 
@@ -23,6 +23,8 @@ export interface ButtonProps {
   type?: "button" | "submit" | "reset";
   onClick?: SdkButtonProps["onClick"];
   "aria-label"?: string;
+  /** 연 폼을 닫은 뒤 이 버튼으로 포커스를 돌릴 때 쓴다. */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export function Button({ variant = "secondary", children, onClick, ...props }: ButtonProps) {
@@ -55,6 +57,7 @@ export function buttonStyles(variant: ButtonVariant, disabled = false): Readonly
 
 const styles = stylex.create({
   base: {
+    position: "relative",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -64,7 +67,11 @@ const styles = stylex.create({
     paddingInline: space.s3,
     borderWidth: 0,
     borderRadius: radius.control,
-    backgroundColor: { default: colors.bgControl, ":hover": colors.bgControlHover },
+    // hover 면은 hover 가 되는 기기에서만 칠한다. 터치 뒤 hover 면이 남지 않게 한다.
+    backgroundColor: {
+      default: colors.bgControl,
+      ":hover": { default: null, "@media (hover: hover)": colors.bgControlHover },
+    },
     color: colors.textPrimary,
     font: "inherit",
     fontWeight: fontWeight.medium,
@@ -73,21 +80,43 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     cursor: "pointer",
     userSelect: "none",
-    transform: { default: null, ":active": "scale(0.97)" },
+    transform: {
+      default: null,
+      ":active": { default: "scale(0.97)", "@media (prefers-reduced-motion: reduce)": null },
+    },
     transitionProperty: "background-color, border-color, color, transform",
     transitionDuration: motion.durationFast,
     transitionTimingFunction: motion.easeOut,
     outline: { default: null, ":focus-visible": `2px solid ${colors.accentText}` },
     outlineOffset: 2,
+    // 보이는 높이는 32px 로 두고, 거친 포인터(터치)에서는 누르는 영역을 44×44px 까지 넓힌다.
+    "::before": {
+      content: { default: null, "@media (pointer: coarse)": "''" },
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      width: "max(100%, 44px)",
+      height: "max(100%, 44px)",
+      transform: "translate(-50%, -50%)",
+    },
   },
   primary: {
-    backgroundColor: { default: colors.accent, ":hover": colors.accentHover },
+    backgroundColor: {
+      default: colors.accent,
+      ":hover": { default: null, "@media (hover: hover)": colors.accentHover },
+    },
     color: colors.textOnAccent,
   },
   danger: { color: colors.problem },
   ghost: {
-    backgroundColor: { default: "transparent", ":hover": colors.bgHover },
-    color: { default: colors.textSecondary, ":hover": colors.textPrimary },
+    backgroundColor: {
+      default: "transparent",
+      ":hover": { default: null, "@media (hover: hover)": colors.bgHover },
+    },
+    color: {
+      default: colors.textSecondary,
+      ":hover": { default: null, "@media (hover: hover)": colors.textPrimary },
+    },
   },
   disabled: {
     backgroundColor: { default: colors.bgCard, ":hover": colors.bgCard },

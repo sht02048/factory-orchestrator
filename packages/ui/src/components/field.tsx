@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { Field as SdkField, FieldDescription, FieldError, FieldLabel } from "@ui-sdk/react/field";
 import { Input as SdkInput } from "@ui-sdk/react/input";
-import { createContext, use, type ReactNode } from "react";
+import { createContext, use, type ReactNode, type Ref } from "react";
 import { cx } from "../cx";
 import { colors, fonts, fontSize, fontWeight, motion, radius, size, space } from "../tokens.stylex";
 
@@ -47,6 +47,8 @@ interface InputBaseProps {
   autoComplete?: string;
   /** 경로·주소·키처럼 그대로 옮겨 쓸 값. 고정폭 글꼴로 보인다. */
   mono?: boolean;
+  /** 폼을 연 뒤 입력칸으로 포커스를 옮길 때 쓴다. */
+  ref?: Ref<HTMLInputElement>;
 }
 
 /**
@@ -108,9 +110,11 @@ export const fieldStyles = stylex.create({
     backgroundColor: colors.bgInset,
     color: colors.textPrimary,
     font: "inherit",
+    // 터치 기기(iPad Safari 포함)는 16px 보다 작은 입력을 포커스 때 확대한다. 그래서 폭이 아니라
+    // 정밀 포인터(마우스·트랙패드)일 때만 본문 크기로 줄인다(티켓 0050).
     fontSize: {
       default: fontSize.input,
-      "@media (min-width: 900px)": fontSize.body,
+      "@media (pointer: fine)": fontSize.body,
     },
     transitionProperty: "border-color",
     transitionDuration: motion.durationFast,
