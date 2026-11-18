@@ -16,7 +16,7 @@ let dir: string;
 let started: Started | undefined;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "factory-cli-start-"));
+  dir = mkdtempSync(join(tmpdir(), "ganger-cli-start-"));
 });
 
 afterEach(async () => {

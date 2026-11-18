@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "factory-orchestrator": "./dist/bin/cli.js"
+    "ganger": "./dist/bin/cli.js"
   },
   "type": "module",
   "exports": {

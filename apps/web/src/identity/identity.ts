@@ -1,7 +1,7 @@
 import { z } from "zod";
 import rootPackage from "../../../../package.json" with { type: "json" };
 
-export const PRODUCT_NAME = "factory-orchestrator";
+export const PRODUCT_NAME = "ganger";
 
 export const WEB_ACCESS = ["allowed", "host-not-allowed"] as const;
 export type WebAccess = (typeof WEB_ACCESS)[number];

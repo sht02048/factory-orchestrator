@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { resolveHome } from "@ganger/cli/home";
+import { PRODUCT_DISPLAY_NAME, resolveHome } from "@ganger/cli/home";
 import { app, dialog } from "electron";
 import { z } from "zod";
 import { LocalServer, fileRecordStore } from "../core/local-server.js";
@@ -10,7 +10,7 @@ import { serviceInstalledFor } from "../core/service.js";
 import { fileSettingsStore } from "../core/settings.js";
 import { Controller, appPaths } from "./controller.js";
 
-const USER_DATA_ENV = "FACTORY_DESKTOP_USER_DATA";
+const USER_DATA_ENV = "GANGER_DESKTOP_USER_DATA";
 
 const userData = process.env[USER_DATA_ENV]?.trim();
 if (userData !== undefined && userData.length > 0) app.setPath("userData", resolve(userData));
@@ -32,7 +32,7 @@ if (!app.requestSingleInstanceLock()) {
       bundle = loadServerBundle(serverBundleRoot());
     } catch (error) {
       dialog.showErrorBox(
-        "Factory Orchestrator",
+        PRODUCT_DISPLAY_NAME,
         error instanceof Error ? error.message : String(error),
       );
       app.exit(1);
@@ -70,15 +70,11 @@ function serverBundleRoot(): string {
   const version = z
     .object({ version: z.string() })
     .safeParse(JSON.parse(readFileSync(join(repo, "package.json"), "utf8")));
-  const named = join(
-    repo,
-    "dist",
-    `factory-orchestrator-${version.success ? version.data.version : "0.0.0"}`,
-  );
+  const named = join(repo, "dist", `ganger-${version.success ? version.data.version : "0.0.0"}`);
   if (existsSync(named)) return named;
   const any = existsSync(join(repo, "dist"))
     ? readdirSync(join(repo, "dist")).find(
-        (name) => /^factory-orchestrator-[^/]+$/.test(name) && !name.endsWith(".tar.gz"),
+        (name) => /^ganger-[^/]+$/.test(name) && !name.endsWith(".tar.gz"),
       )
     : undefined;
   return any === undefined ? named : join(repo, "dist", any);

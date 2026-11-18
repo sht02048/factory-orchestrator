@@ -76,7 +76,7 @@ async function responds(): Promise<boolean> {
 }
 
 beforeEach(async () => {
-  dir = mkdtempSync(join(tmpdir(), "factory-desktop-"));
+  dir = mkdtempSync(join(tmpdir(), "ganger-desktop-"));
   home = join(dir, "home");
   port = await freePort();
 });

@@ -19,7 +19,7 @@ const { values } = parseArgs({
 });
 
 const mode: DevMode = values.onboarding ? "onboarding" : "seeded";
-const devRoot = resolve(process.env["FACTORY_DEV_DIR"] ?? join(repoRoot, ".dev"));
+const devRoot = resolve(process.env["GANGER_DEV_DIR"] ?? join(repoRoot, ".dev"));
 const dataDir = join(devRoot, mode);
 if (values.reset && existsSync(dataDir)) {
   rmSync(dataDir, { recursive: true, force: true });
@@ -32,7 +32,7 @@ if (!existsSync(keyFile)) {
   writeFileSync(keyFile, randomBytes(32).toString("base64"), { mode: 0o600 });
 }
 const encryptionKeyText = readFileSync(keyFile, "utf8").trim();
-const databasePath = join(dataDir, "factory-orchestrator.db");
+const databasePath = join(dataDir, "ganger.db");
 const host = process.env["WEB_HOST"] ?? "127.0.0.1";
 const portText = process.env["WEB_PORT"] ?? "3000";
 const port = Number(portText);
@@ -71,7 +71,7 @@ const server = await createServer({
 });
 
 await server.ssrLoadModule(join(import.meta.dirname, "runtime.ts"));
-const dev = globalThis.__factoryDev;
+const dev = globalThis.__gangerDev;
 if (dev === undefined) throw new Error("dev runtime did not load");
 const runtime = await dev.start({
   mode,

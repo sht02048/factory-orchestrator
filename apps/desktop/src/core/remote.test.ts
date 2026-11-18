@@ -9,7 +9,7 @@ import { findTailscaleCli, parseTailnetStatus, readTailnet } from "./tailscale.j
 const identity = (instanceId: string, extra: Partial<Identity> = {}): ProbeResult => ({
   kind: "ours",
   identity: {
-    product: "factory-orchestrator",
+    product: "ganger",
     version: "0.1.0",
     instanceId,
     webAccess: "allowed",
@@ -163,7 +163,7 @@ describe("Tailscale 상태 읽기", () => {
     expect(findTailscaleCli({ env, exists: (p) => p === "/opt/homebrew/bin/tailscale" })).toBe(
       "/opt/homebrew/bin/tailscale",
     );
-    expect(findTailscaleCli({ env: { FACTORY_TAILSCALE_CLI: "/x/ts" }, exists: () => true })).toBe(
+    expect(findTailscaleCli({ env: { GANGER_TAILSCALE_CLI: "/x/ts" }, exists: () => true })).toBe(
       "/x/ts",
     );
     expect(await readTailnet({ env, exists: () => false, run: () => Promise.resolve("") })).toEqual(
@@ -426,14 +426,14 @@ describe("신원 확인", () => {
   it("계약 모양을 읽고, 모르는 webAccess 는 열 수 없음으로 읽는다", () => {
     expect(
       identitySchema.parse({
-        product: "factory-orchestrator",
+        product: "ganger",
         version: "1",
         instanceId: "x",
         webAccess: "new",
         more: 1,
       }),
     ).toEqual({
-      product: "factory-orchestrator",
+      product: "ganger",
       version: "1",
       instanceId: "x",
       webAccess: "host-not-allowed",

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PRODUCT_NAME = "factory-orchestrator";
+export const PRODUCT_NAME = "ganger";
 
 export const identitySchema = z.object({
   product: z.literal(PRODUCT_NAME),

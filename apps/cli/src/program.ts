@@ -170,7 +170,7 @@ function planFor(context: ProgramContext, home: string): ServicePlan | undefined
     ...(xdgConfigHome === undefined || xdgConfigHome === "" ? {} : { xdgConfigHome }),
     nodePath: context.nodePath,
     cliEntry: context.cliEntry,
-    factoryHome: home,
+    gangerHome: home,
     path: context.env["PATH"] ?? "/usr/bin:/bin",
   });
 }

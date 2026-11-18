@@ -62,7 +62,7 @@ export function renderEnvFile(values: Readonly<Record<string, string>>): string 
     const value = values[name] ?? "";
     return `${name}=${JSON.stringify(value)}`;
   };
-  const contents = `# Boot settings for factory-orchestrator, written by \`factory-orchestrator init\`.
+  const contents = `# Boot settings for Ganger, written by \`ganger init\`.
 # Only the values needed to boot live here. Tokens (Linear, GitHub) are entered in
 # web onboarding and stored encrypted in the database. Keep this file private.
 # Shell environment variables with the same names override these values.

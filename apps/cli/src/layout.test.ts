@@ -8,13 +8,13 @@ import { appLayout } from "./layout.js";
 const config: BootConfig = {
   host: "127.0.0.1",
   port: 3000,
-  databasePath: "/data/factory.db",
+  databasePath: "/data/ganger.db",
   encryptionKey: new Uint8Array(32),
 };
 
 let dir: string;
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "factory-layout-"));
+  dir = mkdtempSync(join(tmpdir(), "ganger-layout-"));
 });
 afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
