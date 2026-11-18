@@ -2,6 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
+  buttonStyles,
   Card,
   DefinitionItem,
   DefinitionList,
@@ -22,10 +23,11 @@ import {
   fontWeight,
   lineHeight,
   radius,
+  size,
   space,
 } from "@factory/ui/tokens.stylex";
-import { useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { useAgentName } from "../labels";
@@ -40,8 +42,8 @@ export interface RunDetailActions {
   onDeny: (promptId: string, reason: string) => Promise<void>;
   /** 취소를 요청한다(Q77·Q82.8) */
   onCancel: () => Promise<void>;
-  /** 로그 꼬리를 다시 요청한다 */
-  onRefreshLog: () => void;
+  /** 로그 꼬리를 다시 요청한다. 요청을 남기고 다시 읽으면 끝나고, 실패하면 거절한다 */
+  onRefreshLog: () => Promise<void>;
 }
 
 export interface RunDetailScreenProps extends RunDetailActions {
@@ -83,21 +85,32 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const { status, when } = statusLine(run);
   const pr = run.pullRequest;
   const cancelable = canCancel(run) && !run.cancelPending;
+  // 보낸 뒤 누른 요소가 다시 읽은 화면에서 빠지면 포커스를 옮길 곳(티켓 0051)
+  const headRef = useRef<HTMLElement>(null);
+  const cancelStatusRef = useRef<HTMLSpanElement>(null);
 
   return (
     <div {...stylex.props(styles.main)}>
       <nav aria-label={t("crumb.label")} {...stylex.props(styles.crumb)}>
-        <a href={props.runsHref} {...stylex.props(styles.crumbLink)}>
+        <a href={props.runsHref} {...stylex.props(styles.crumbLink, styles.focusRing)}>
           <span aria-hidden="true">‹</span>
           {t("crumb.runs")}
         </a>
       </nav>
 
-      <header {...stylex.props(styles.head)}>
+      <header ref={headRef} tabIndex={-1} {...stylex.props(styles.head, styles.focusTarget)}>
         <p {...stylex.props(styles.stateLine)}>
           <StatusPill status={status}>{statusName(status)}</StatusPill>
           <Text variant="meta">{when}</Text>
-          {run.cancelPending ? <Text variant="meta">{t("cancelPending")}</Text> : null}
+          {/* 취소를 요청하면 트리거가 빠지므로 여기로 포커스를 옮기고 알린다. 비어 있어도 둬야 바뀔 때 읽는다 */}
+          <span
+            ref={cancelStatusRef}
+            role="status"
+            tabIndex={-1}
+            {...stylex.props(styles.meta, styles.focusRing)}
+          >
+            {run.cancelPending ? t("cancelPending") : null}
+          </span>
         </p>
         <div {...stylex.props(styles.titleRow)}>
           {/* 티켓 제목을 저장하면 회색 키 + 제목으로 바꾼다(ADR 0010 9번). 지금은 키만 있다. */}
@@ -111,7 +124,12 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                   {t("openPr", { pr: pr.displayId })}
                 </a>
               )}
-              {cancelable ? <CancelRun onCancel={props.onCancel} /> : null}
+              {cancelable ? (
+                <CancelRun
+                  onCancel={props.onCancel}
+                  focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+                />
+              ) : null}
             </Actions>
           )}
         </div>
@@ -132,6 +150,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
               waitedMs={inputWaitedMs(run)}
               onAnswer={props.onAnswer}
               onDeny={props.onDeny}
+              headRef={headRef}
             />
           ) : null}
 
@@ -187,6 +206,27 @@ function Block({
       </div>
       {children}
     </Card>
+  );
+}
+
+/** 화면에 남아 있는 첫 대상에 포커스를 둔다. 다시 읽은 화면에서 빠진 대상은 건너뛴다 */
+function focusFirst(...targets: ReadonlyArray<RefObject<HTMLElement | null>>): void {
+  for (const target of targets) {
+    const element = target.current;
+    if (element !== null && element.isConnected) {
+      element.focus();
+      return;
+    }
+  }
+}
+
+/** 실패 문구. Home·Tickets·Settings 처럼 alert 로 알리고 문제 색으로 보인다 */
+function ActionFailed() {
+  const t = useTranslations("run");
+  return (
+    <p role="alert" {...stylex.props(styles.error)}>
+      {t("actionFailed")}
+    </p>
   );
 }
 
@@ -266,24 +306,63 @@ function InputBlock({
   waitedMs,
   onAnswer,
   onDeny,
+  headRef,
 }: {
   input: PendingInput;
   waitedMs: number | null;
   onAnswer: RunDetailActions["onAnswer"];
   onDeny: RunDetailActions["onDeny"];
+  headRef: RefObject<HTMLElement | null>;
 }) {
+  // 답·거절을 남긴 뒤에도 카드를 두고 결과를 알린다. 다시 읽어도 같은 카드라 포커스와 상태가 남는다.
   switch (input.kind) {
     case "question":
-      return input.answered ? null : (
-        <QuestionForm question={input} waitedMs={waitedMs} onAnswer={onAnswer} />
+      return (
+        <QuestionForm
+          key={input.questionId}
+          question={input}
+          waitedMs={waitedMs}
+          onAnswer={onAnswer}
+          headRef={headRef}
+        />
       );
     case "permission":
-      return input.denied ? null : (
-        <PermissionWait wait={input} waitedMs={waitedMs} onDeny={onDeny} />
+      return (
+        <PermissionWait
+          key={input.promptId}
+          wait={input}
+          waitedMs={waitedMs}
+          onDeny={onDeny}
+          headRef={headRef}
+        />
       );
     case "unknown":
       return null;
   }
+}
+
+/**
+ * 보내기 상태. 성공하면 결과 문장(role="status")에 포커스를 둔다. 카드가 다시 읽은 화면에서 빠졌으면
+ * 머리(상태·제목)로 옮긴다. 누른 버튼이 사라져 포커스가 body 로 떨어지지 않게 한다.
+ */
+function useSubmit(headRef: RefObject<HTMLElement | null>) {
+  const [submit, setSubmit] = useState<Submit>({ kind: "idle" });
+  const resultRef = useRef<HTMLParagraphElement>(null);
+  const run = (send: () => Promise<void>) => {
+    setSubmit({ kind: "sending" });
+    send().then(
+      () => {
+        setSubmit({ kind: "sent" });
+        // 카드가 남아 있으면 결과 문장이 그려진 뒤(아래 effect) 포커스를 둔다.
+        if (resultRef.current === null || !resultRef.current.isConnected) focusFirst(headRef);
+      },
+      () => setSubmit({ kind: "failed" }),
+    );
+  };
+  useEffect(() => {
+    if (submit.kind === "sent") resultRef.current?.focus();
+  }, [submit.kind]);
+  return { submit, run, resultRef };
 }
 
 type Submit = { kind: "idle" } | { kind: "sending" } | { kind: "sent" } | { kind: "failed" };
@@ -313,14 +392,16 @@ function QuestionForm({
   question,
   waitedMs,
   onAnswer,
+  headRef,
 }: {
   question: Extract<PendingInput, { kind: "question" }>;
   waitedMs: number | null;
   onAnswer: RunDetailActions["onAnswer"];
+  headRef: RefObject<HTMLElement | null>;
 }) {
   const t = useTranslations("run");
   const [answer, setAnswer] = useState("");
-  const [submit, setSubmit] = useState<Submit>({ kind: "idle" });
+  const { submit, run, resultRef } = useSubmit(headRef);
   const [empty, setEmpty] = useState(false);
 
   const send = (body: string) => {
@@ -329,19 +410,22 @@ function QuestionForm({
       return;
     }
     setEmpty(false);
-    setSubmit({ kind: "sending" });
-    onAnswer(question.questionId, body).then(
-      () => setSubmit({ kind: "sent" }),
-      () => setSubmit({ kind: "failed" }),
-    );
+    run(() => onAnswer(question.questionId, body));
   };
 
   return (
     <Card label={t("question.title")}>
       <InputHead kind="question" waitedMs={waitedMs} />
       <pre {...stylex.props(styles.question)}>{question.body}</pre>
-      {submit.kind === "sent" ? (
-        <Text variant="body">{t("question.sent")}</Text>
+      {submit.kind === "sent" || question.answered ? (
+        <p
+          ref={resultRef}
+          role="status"
+          tabIndex={-1}
+          {...stylex.props(styles.result, styles.focusRing)}
+        >
+          {t("question.sent")}
+        </p>
       ) : (
         <form
           {...stylex.props(styles.stack)}
@@ -367,24 +451,23 @@ function QuestionForm({
               </Actions>
             </div>
           )}
-          <div {...stylex.props(styles.answerRow)}>
-            <div {...stylex.props(styles.grow)}>
-              <Field
-                label={t("question.answerLabel")}
-                description={t("question.answerHelp")}
-                {...(empty ? { error: t("question.empty") } : {})}
-              >
+          <Field
+            label={t("question.answerLabel")}
+            description={t("question.answerHelp")}
+            {...(empty ? { error: t("question.empty") } : {})}
+          >
+            {/* 라벨·도움말은 위아래에 두고 입력칸과 버튼만 한 줄에 맞춘다 */}
+            <div {...stylex.props(styles.answerRow)}>
+              <div {...stylex.props(styles.grow)}>
                 <Input name="answer" value={answer} onValueChange={setAnswer} autoComplete="off" />
-              </Field>
-            </div>
-            {/* 화면의 주 행동 하나(ADR 0010 6번). 라벨 줄만큼 내려 입력칸과 줄을 맞춘다 */}
-            <div {...stylex.props(styles.submitOffset)}>
+              </div>
+              {/* 화면의 주 행동 하나(ADR 0010 6번) */}
               <Button type="submit" variant="primary" disabled={submit.kind === "sending"}>
                 {submit.kind === "sending" ? t("question.submitting") : t("question.submit")}
               </Button>
             </div>
-          </div>
-          {submit.kind === "failed" ? <Text variant="body">{t("actionFailed")}</Text> : null}
+          </Field>
+          {submit.kind === "failed" ? <ActionFailed /> : null}
         </form>
       )}
     </Card>
@@ -395,34 +478,39 @@ function PermissionWait({
   wait,
   waitedMs,
   onDeny,
+  headRef,
 }: {
   wait: Extract<PendingInput, { kind: "permission" }>;
   waitedMs: number | null;
   onDeny: RunDetailActions["onDeny"];
+  headRef: RefObject<HTMLElement | null>;
 }) {
   const t = useTranslations("run");
   const [reason, setReason] = useState("");
-  const [submit, setSubmit] = useState<Submit>({ kind: "idle" });
+  const { submit, run, resultRef } = useSubmit(headRef);
   return (
     <Card label={t("permission.title")}>
       <InputHead kind="permission" waitedMs={waitedMs} />
       <div {...stylex.props(styles.stack)}>
         <pre {...stylex.props(styles.question)}>{wait.detail}</pre>
-        <Text variant="body">{t("permission.body")}</Text>
-        {submit.kind === "sent" ? (
-          <Text variant="body">{t("permission.denied")}</Text>
+        {submit.kind === "sent" || wait.denied ? (
+          <p
+            ref={resultRef}
+            role="status"
+            tabIndex={-1}
+            {...stylex.props(styles.result, styles.focusRing)}
+          >
+            {t("permission.denied")}
+          </p>
         ) : (
           <form
             {...stylex.props(styles.stack)}
             onSubmit={(event) => {
               event.preventDefault();
-              setSubmit({ kind: "sending" });
-              onDeny(wait.promptId, reason).then(
-                () => setSubmit({ kind: "sent" }),
-                () => setSubmit({ kind: "failed" }),
-              );
+              run(() => onDeny(wait.promptId, reason));
             }}
           >
+            <Text variant="body">{t("permission.body")}</Text>
             <Field label={t("permission.reasonLabel")} description={t("permission.reasonHelp")}>
               <Input name="reason" value={reason} onValueChange={setReason} autoComplete="off" />
             </Field>
@@ -433,13 +521,20 @@ function PermissionWait({
             </Actions>
           </form>
         )}
-        {submit.kind === "failed" ? <Text variant="body">{t("actionFailed")}</Text> : null}
+        {submit.kind === "failed" ? <ActionFailed /> : null}
       </div>
     </Card>
   );
 }
 
-function CancelRun({ onCancel }: { onCancel: RunDetailActions["onCancel"] }) {
+function CancelRun({
+  onCancel,
+  focusAfter,
+}: {
+  onCancel: RunDetailActions["onCancel"];
+  /** 요청을 남기고 다시 읽은 뒤. 트리거가 빠지므로 상태 줄로 포커스를 옮긴다 */
+  focusAfter: () => void;
+}) {
   const t = useTranslations("run");
   const [failed, setFailed] = useState(false);
   return (
@@ -456,7 +551,7 @@ function CancelRun({ onCancel }: { onCancel: RunDetailActions["onCancel"] }) {
               variant="danger"
               onClick={() => {
                 setFailed(false);
-                onCancel().catch(() => setFailed(true));
+                onCancel().then(focusAfter, () => setFailed(true));
               }}
             >
               {t("cancel.confirm")}
@@ -464,7 +559,7 @@ function CancelRun({ onCancel }: { onCancel: RunDetailActions["onCancel"] }) {
           </>
         }
       />
-      {failed ? <Text variant="meta">{t("actionFailed")}</Text> : null}
+      {failed ? <ActionFailed /> : null}
     </>
   );
 }
@@ -533,9 +628,11 @@ function LogTail({
 }: {
   log: LogTailView;
   now: string;
-  onRefresh: () => void;
+  onRefresh: RunDetailActions["onRefreshLog"];
 }) {
   const t = useTranslations("run.log");
+  const [refresh, setRefresh] = useState<"idle" | "refreshing" | "failed">("idle");
+  const refreshing = refresh === "refreshing";
   const { ago } = useTime();
   const time = (at: string): string => ago(at, Date.parse(now) - Date.parse(at));
   let note: string | undefined;
@@ -567,22 +664,59 @@ function LogTail({
       title={t("title")}
       aside={
         live ? (
-          <Button variant="ghost" onClick={onRefresh}>
-            {t("refresh")}
-          </Button>
+          // 받는 동안 누를 수 없지만 포커스는 남게 disabled 대신 aria-disabled 를 쓴다
+          <button
+            type="button"
+            data-variant="ghost"
+            aria-disabled={refreshing}
+            onClick={() => {
+              if (refreshing) return;
+              setRefresh("refreshing");
+              onRefresh().then(
+                () => setRefresh("idle"),
+                () => setRefresh("failed"),
+              );
+            }}
+            {...stylex.props(...buttonStyles("ghost", refreshing))}
+          >
+            {refreshing ? t("refreshing") : t("refresh")}
+          </button>
         ) : undefined
       }
     >
       {note === undefined ? null : <Text variant="meta">{note}</Text>}
       {body}
+      {refresh === "failed" ? (
+        <p role="alert" {...stylex.props(styles.error)}>
+          {t("refreshFailed")}
+        </p>
+      ) : null}
     </Block>
   );
 }
 
 function LogLines({ lines }: { lines: ReadonlyArray<string> }) {
   const t = useTranslations("run.log");
+  const ref = useRef<HTMLPreElement>(null);
+  const text = lines.join("\n");
+  // 꼬리라 마지막 줄이 중요하다. 열 때와 줄이 바뀔 때 맨 아래로 내린다.
+  useEffect(() => {
+    const element = ref.current;
+    if (element !== null) element.scrollTop = element.scrollHeight;
+  }, [text]);
   if (lines.length === 0) return <Text variant="meta">{t("empty")}</Text>;
-  return <pre {...stylex.props(styles.pre, styles.log)}>{lines.join("\n")}</pre>;
+  return (
+    // 키보드로도 스크롤할 수 있게 포커스를 받는 구역으로 둔다
+    <pre
+      ref={ref}
+      tabIndex={0}
+      role="region"
+      aria-label={t("linesLabel")}
+      {...stylex.props(styles.pre, styles.log, styles.focusRing)}
+    >
+      {text}
+    </pre>
+  );
 }
 
 function Properties({ run }: { run: RunDetail }) {
@@ -745,13 +879,27 @@ const styles = stylex.create({
   crumb: { display: "flex", fontSize: fontSize.ui },
   crumbLink: {
     display: "inline-flex",
-    alignItems: "baseline",
+    alignItems: "center",
     gap: space.s2,
+    // 누르는 영역을 버튼 높이만큼 넓힌다
+    minHeight: size.control,
     color: { default: colors.textTertiary, ":hover": colors.textSecondary },
     textDecoration: "none",
+  },
+  focusRing: {
     outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
     outlineOffset: 2,
   },
+  // 프로그램으로만 포커스를 받는 머리. 테두리를 그리지 않는다.
+  focusTarget: { outline: "none" },
+  meta: { color: colors.textTertiary, fontSize: fontSize.ui, lineHeight: lineHeight.normal },
+  result: {
+    margin: 0,
+    color: colors.textSecondary,
+    fontSize: fontSize.body,
+    lineHeight: lineHeight.relaxed,
+  },
+  error: { margin: 0, color: colors.problem, fontSize: fontSize.ui },
   head: { display: "flex", flexDirection: "column", gap: space.s2 },
   titleRow: {
     display: "flex",
@@ -801,10 +949,8 @@ const styles = stylex.create({
     lineHeight: lineHeight.snug,
     color: colors.textPrimary,
   },
-  answerRow: { display: "flex", alignItems: "flex-start", gap: space.s2 },
+  answerRow: { display: "flex", alignItems: "center", gap: space.s2 },
   grow: { flexGrow: 1, minWidth: 0 },
-  // Field 라벨 줄(글 + px6 틈)과 입력칸·버튼 높이 차이만큼
-  submitOffset: { flexShrink: 0, paddingTop: 28 },
   pre: {
     margin: 0,
     paddingBlock: space.s3,

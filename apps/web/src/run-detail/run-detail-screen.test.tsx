@@ -33,7 +33,7 @@ function render(page: RunDetailPage, timeZone?: string): string {
       onAnswer={resolved}
       onDeny={resolved}
       onCancel={resolved}
-      onRefreshLog={() => {}}
+      onRefreshLog={resolved}
     />,
     runMessages,
     timeZone,
@@ -240,6 +240,8 @@ describe("Run 상세 화면", () => {
     const html = render(page(db, id));
     expect(html).not.toContain('name="answer"');
     expect(text(html)).toContain(runJson.next.answered);
+    // 다시 읽어도 카드를 두고 결과 문장을 role="status" 로 알린다(0051)
+    expect(html).toMatch(new RegExp(`role="status"[^>]*>${runJson.question.sent}<`));
   });
 
   it("CI 상태를 볼 수 없으면 그렇게 보이고 요약 결과는 그대로다(Q79)", () => {
