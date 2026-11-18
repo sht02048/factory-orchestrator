@@ -48,7 +48,11 @@ function TicketsRoute() {
           });
         }}
         onSelect={(id) => {
-          void navigate({ search: (prev) => ({ ...prev, sel: id }), replace: true });
+          void navigate({
+            search: (prev) => ({ ...prev, sel: id }),
+            replace: true,
+            resetScroll: false,
+          });
         }}
         onPickWorkspace={(ws) => {
           void navigate({ search: (prev) => ({ ...prev, ws, sel: undefined }) });
@@ -56,11 +60,14 @@ function TicketsRoute() {
         onOpenRun={(runId) => {
           void navigate({ to: "/runs", search: (prev) => ({ ws: prev.ws, sel: runId }) });
         }}
-        onAssign={async (input) => {
-          const result = await assignTicket({ data: input });
+        onAssign={(input) => assignTicket({ data: input })}
+        onAssigned={(id) => {
           // 새 런을 마지막 런으로 보이게 다시 읽는다
-          if (result.ok) await router.invalidate();
-          return result;
+          void navigate({
+            search: (prev) => ({ ...prev, sel: id }),
+            replace: true,
+            resetScroll: false,
+          }).then(() => router.invalidate());
         }}
       />
     </ScreenMessages>

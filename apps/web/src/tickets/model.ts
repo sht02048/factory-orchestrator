@@ -92,6 +92,11 @@ export interface TrackerLoadError {
     | "failed";
 }
 
+export interface TrackerTruncation {
+  trackerProject: string;
+  limit: number;
+}
+
 export interface TicketsPage {
   workspace: WorkspaceChoice;
   /** 트래커에서 마지막으로 바뀐 것부터 */
@@ -100,6 +105,7 @@ export interface TicketsPage {
   /** 설치의 모든 Mapping 에 쓰인 에이전트(중복 없음). 할당 창에서 기본값을 맨 앞에 둔다 */
   agents: string[];
   errors: TrackerLoadError[];
+  truncated: TrackerTruncation[];
   /** Workspace 에 묶은 트래커 프로젝트가 있는지. 없으면 빈 목록 대신 묶으라고 안내한다 */
   hasTrackerProjects: boolean;
 }
