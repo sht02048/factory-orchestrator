@@ -11,6 +11,9 @@
   "empty": "이 조건에 맞는 런이 없어요.",
   "noRuns": "아직 런이 없어요. 티켓을 할당하면 여기에 보여요.",
   "noRunner": "러너 정하기 전",
+  "noRunnerEnded": "러너 없이 끝남",
+  "metaSeparator": " · ",
+  "prWithState": "{pr} {state}",
   "cancelling": "취소 중",
   "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 런이 보여요.",
   "allWorkspaces": {

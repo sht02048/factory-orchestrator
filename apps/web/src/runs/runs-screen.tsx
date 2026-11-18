@@ -192,12 +192,20 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
   const statusName = useStatusName();
   const status = runStatus(run);
 
-  const meta: string[] = [run.runner?.name ?? t("noRunner")];
+  const meta: string[] = [
+    run.runner?.name ?? (run.state === "ended" ? t("noRunnerEnded") : t("noRunner")),
+  ];
   if (run.state === "ended") {
+    // 끝난 런은 에이전트 대신 어떻게 끝났는지(에이전트 결과·PR)를 보인다
     meta.push(domain(`agentResult.${run.agentResult}`));
     // PR 이 있으면 "#128 열림", 없으면 PR 상태가 있을 때만 그 값
     if (run.pullRequest !== null)
-      meta.push(`${run.pullRequest.displayId} ${domain(`prState.${run.prState}`)}`);
+      meta.push(
+        t("prWithState", {
+          pr: run.pullRequest.displayId,
+          state: domain(`prState.${run.prState}`),
+        }),
+      );
     else if (run.prState !== "none") meta.push(domain(`prState.${run.prState}`));
   } else {
     meta.push(agentName(run.agent));
@@ -210,7 +218,7 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
         <span {...stylex.props(styles.rowText)}>
           {/* 티켓 제목을 저장하면 회색 키 + 제목으로 바꾼다(ADR 0010 9번). 지금은 키만 있다. */}
           <RowTitle>{run.ticketKey}</RowTitle>
-          <Text variant="meta">{meta.join(" · ")}</Text>
+          <Text variant="meta">{meta.join(t("metaSeparator"))}</Text>
         </span>
       </TableCell>
       <TableCell align="end">
