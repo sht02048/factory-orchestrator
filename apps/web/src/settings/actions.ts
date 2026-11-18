@@ -40,7 +40,11 @@ export const RUNNER_KIND: RunnerKind = toRunnerKind("orca");
 
 export const idSchema = z.string().trim().min(1);
 export const MAX_NAME_LENGTH = 200;
-export const nameSchema = z.string().trim().min(1).max(MAX_NAME_LENGTH);
+export const nameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((value) => Array.from(value).length <= MAX_NAME_LENGTH);
 const id = idSchema;
 const name = nameSchema;
 

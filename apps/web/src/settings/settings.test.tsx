@@ -42,6 +42,7 @@ import {
   saveRunnerSetting,
   runnerInput,
   saveTrackerConnectionSetting,
+  trackerConnectionInput,
   mappingInput,
 } from "./actions";
 import { hasPendingRunnerChecks, loadSettingsPage } from "./load";
@@ -346,6 +347,23 @@ describe("Settings 저장하고 다시 열기", () => {
       "Linear",
       "가😀".repeat(100),
     ]);
+
+    const long = saved.find((c) => c.name.startsWith("가"));
+    if (long === undefined) throw new Error("no long connection");
+    const resubmitted = trackerConnectionInput.parse({
+      id: long.id,
+      name: long.name,
+      apiKey: "",
+      webhookSecret: "",
+    });
+    expect(await saveTrackerConnectionSetting(f.context, resubmitted, now)).toEqual({ ok: true });
+    expect(
+      trackerConnectionInput.safeParse({
+        name: `${long.name}가`,
+        apiKey: "",
+        webhookSecret: "",
+      }).success,
+    ).toBe(false);
 
     const id = saved.find((c) => c.name === "Acme")?.id ?? "";
     f.tracker.connection = { ok: true, organizationName: "Acme Renamed" };
