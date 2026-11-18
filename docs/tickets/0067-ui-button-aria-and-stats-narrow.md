@@ -3,7 +3,7 @@ status: todo
 blocked_by: []
 ---
 
-# 0066 공용 Button aria 속성과 Stats 묶음 표 좁은 폭
+# 0067 공용 Button aria 속성과 Stats 묶음 표 좁은 폭
 
 ## 목표
 

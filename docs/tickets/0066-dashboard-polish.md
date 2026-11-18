@@ -3,7 +3,7 @@ status: todo
 blocked_by: []
 ---
 
-# 0065 Dashboard 다듬기
+# 0066 Dashboard 다듬기
 
 ## 목표
 

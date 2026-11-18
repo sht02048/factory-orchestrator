@@ -3,7 +3,7 @@ status: todo
 blocked_by: []
 ---
 
-# 0063 런에 티켓 제목, 러너에 Offline 시각 저장
+# 0064 런에 티켓 제목, 러너에 Offline 시각 저장
 
 ## 목표
 
