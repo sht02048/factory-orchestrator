@@ -25,15 +25,19 @@ import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react
 import { useTranslations } from "use-intl";
 import {
   toAgentId,
+  toLabelId,
   toRunnerProjectId,
   toTrackerConnectionId,
   toTrackerProjectId,
+  toTrackerStateId,
 } from "@factory/core";
 import type {
   AgentId,
+  LabelId,
   RunnerProjectId,
   TrackerConnectionId,
   TrackerProjectId,
+  TrackerStateId,
 } from "@factory/core";
 import type { WorkspaceId } from "@factory/db";
 import { useAgentName, usePrerequisiteName } from "../labels";
@@ -1358,8 +1362,10 @@ function MappingRow({
     send: (choice) => saveMapping(choice.runnerProject, choice.agent),
     onSaved,
   });
-  const progress = useSyncedSave<string | null>({
-    saved: bound.inProgressStateId,
+  const savedState =
+    bound.inProgressStateId === null ? null : toTrackerStateId(bound.inProgressStateId);
+  const progress = useSyncedSave<TrackerStateId | null>({
+    saved: savedState,
     savedKey: bound.inProgressStateId ?? "",
     send: (stateId) =>
       stateId === null
@@ -1424,7 +1430,7 @@ function MappingRow({
               bound.inProgressStateId,
             )}
             value={progress.draft}
-            onValueChange={progress.choose}
+            onValueChange={(value) => progress.choose(toTrackerStateId(value))}
             placeholder={ts("mapping.choose")}
           />
         </td>
@@ -1470,8 +1476,8 @@ function LabelRow({
   const t = useTranslations("onboarding.mapping");
   const ts = useTranslations("settings");
   const reason = useReason();
-  const save = useSyncedSave<string | null>({
-    saved: label.labelId,
+  const save = useSyncedSave<LabelId | null>({
+    saved: label.labelId === null ? null : toLabelId(label.labelId),
     savedKey: label.labelId ?? "",
     send: (labelId) =>
       labelId === null
@@ -1502,7 +1508,7 @@ function LabelRow({
             aria-label={t("labelSelect", { connection: label.connection.name })}
             options={allOptions}
             value={save.draft}
-            onValueChange={save.choose}
+            onValueChange={(value) => save.choose(toLabelId(value))}
             placeholder={ts("label.choose")}
           />
         </span>
