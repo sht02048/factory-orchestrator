@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Card, Field, Input, StatusPill, Text, buttonStyles } from "@factory/ui";
+import { Card, Field, Input, Mascot, StatusPill, Text, buttonStyles } from "@factory/ui";
 import type { ButtonVariant } from "@factory/ui";
 import {
   colors,
@@ -20,7 +20,6 @@ import {
   AlertIcon,
   ChevronLeftIcon,
   LaptopIcon,
-  NoSignalIcon,
   PauseIcon,
   RefreshIcon,
   ServerIcon,
@@ -193,16 +192,8 @@ function BackLink({ onClick, children }: { onClick: () => void; children: ReactN
   );
 }
 
-function Spinner({ size = "large" }: { size?: "large" | "small" }) {
-  return (
-    <span
-      aria-hidden="true"
-      {...stylex.props(
-        styles.spinner,
-        size === "large" ? styles.spinnerLarge : styles.spinnerSmall,
-      )}
-    />
-  );
+function Spinner() {
+  return <span aria-hidden="true" {...stylex.props(styles.spinner)} />;
 }
 
 function StatusIcon({ tone, children }: { tone: "problem" | "neutral"; children: ReactNode }) {
@@ -288,7 +279,7 @@ function LocalState({
       return (
         <Frame width="status" centered>
           <div role="status" {...stylex.props(styles.statusBlock)}>
-            <Spinner />
+            <Mascot mood="signal" />
             <Header title={t("startingTitle")} summary={t("startingSummary")} centered />
           </div>
         </Frame>
@@ -405,7 +396,7 @@ function FindServers({
           </ul>
         ) : (
           <div {...stylex.props(styles.listEmpty)}>
-            {searching ? <Spinner size="small" /> : <Text variant="meta">{t("empty")}</Text>}
+            {searching ? <Spinner /> : <Text variant="meta">{t("empty")}</Text>}
           </div>
         )}
       </Card>
@@ -567,9 +558,7 @@ function Unreachable({ name, url, checking }: { name: string; url: string; check
   const t = useTranslations("screens.unreachable");
   return (
     <Frame width="status" centered>
-      <StatusIcon tone="problem">
-        <NoSignalIcon />
-      </StatusIcon>
+      <Mascot mood="worried" />
       <Header
         title={t("title", { name })}
         summary={checking ? t("checking") : t("summary")}
@@ -688,6 +677,9 @@ const styles = stylex.create({
     display: "inline-block",
     flexShrink: 0,
     boxSizing: "border-box",
+    width: 20,
+    height: 20,
+    borderWidth: 2,
     borderRadius: radius.full,
     borderStyle: "solid",
     borderColor: colors.accentSoft,
@@ -697,8 +689,6 @@ const styles = stylex.create({
     animationTimingFunction: "linear",
     animationIterationCount: "infinite",
   },
-  spinnerLarge: { width: 40, height: 40, borderWidth: 3 },
-  spinnerSmall: { width: 20, height: 20, borderWidth: 2 },
   statusBlock: {
     display: "flex",
     flexDirection: "column",

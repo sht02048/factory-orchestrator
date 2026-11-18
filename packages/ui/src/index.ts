@@ -1,3 +1,14 @@
+export {
+  GangerMark,
+  MASCOT_MOODS,
+  Mascot,
+  type GangerMarkProps,
+  type MarkSize,
+  type MarkTone,
+  type MascotMood,
+  type MascotProps,
+  type MascotSize,
+} from "./components/brand";
 export { Button, buttonStyles, type ButtonProps, type ButtonVariant } from "./components/button";
 export {
   CapacityBar,
@@ -49,6 +60,11 @@ export {
   type MenuProps,
   type MenuRadioProps,
 } from "./components/menu";
+export {
+  MascotMessage,
+  type MascotMessageAlign,
+  type MascotMessageProps,
+} from "./components/mascot-message";
 export { Popover, type PopoverProps } from "./components/popover";
 export { ProblemCallout, type ProblemCalloutProps } from "./components/problem-callout";
 export {

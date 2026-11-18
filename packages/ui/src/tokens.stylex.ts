@@ -46,6 +46,15 @@ export const colors = stylex.defineVars({
   idleSoft: "oklch(0.27 0.01 260)",
 });
 
+export const brand = stylex.defineVars({
+  yellow: "oklch(0.84 0.15 75)",
+  ink: "oklch(0.14 0 0)",
+  paper: "oklch(0.97 0.003 85)",
+  body: "oklch(0.97 0 0)",
+  eye: "oklch(0.12 0 0)",
+  snore: "oklch(0.66 0 0)",
+});
+
 export const space = stylex.defineVars({
   px2: "2px",
   s1: "4px",

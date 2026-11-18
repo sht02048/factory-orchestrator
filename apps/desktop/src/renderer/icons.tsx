@@ -64,17 +64,6 @@ export function AlertIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-export function NoSignalIcon() {
-  return (
-    <Icon size={26} stroke={1.8}>
-      <path d="M2 2l20 20" />
-      <path d="M8.5 16.4a5 5 0 017 0" />
-      <path d="M5 12.9a10 10 0 015.2-2.8M19 12.9a10 10 0 00-2.4-1.7" />
-      <path d="M12 20h.01" />
-    </Icon>
-  );
-}
-
 export function PauseIcon() {
   return (
     <Icon size={26} stroke={1.8}>

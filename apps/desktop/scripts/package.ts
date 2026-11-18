@@ -8,9 +8,10 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { packager } from "@electron/packager";
+import { appIconPaths } from "../src/core/app-icon.ts";
 
 const DESKTOP = resolve(import.meta.dirname, "..");
 const REPO = resolve(DESKTOP, "..", "..");
@@ -84,6 +85,10 @@ writeFileSync(
 );
 cpSync(bundleDir, join(resources, "server"), { recursive: true });
 
+const actool = spawnSync("actool", ["--version"], { encoding: "utf8" });
+const icon = appIconPaths(join(DESKTOP, "icons"), actool.status === 0 ? actool.stdout : null);
+console.log(`app icon: ${icon.map((path) => basename(path)).join(", ")}`);
+
 const arch = values.arch ?? process.arch;
 const [appDir] = await packager({
   dir: stage,
@@ -95,6 +100,7 @@ const [appDir] = await packager({
   appVersion: version,
   appBundleId: "dev.factory-orchestrator.desktop",
   appCategoryType: "public.app-category.developer-tools",
+  icon,
   asar: true,
   extraResource: [join(resources, "server")],
   overwrite: true,

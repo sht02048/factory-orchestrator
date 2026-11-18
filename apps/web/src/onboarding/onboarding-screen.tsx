@@ -6,6 +6,7 @@ import {
   Checkbox,
   Field,
   Input,
+  Mascot,
   PanelBlock,
   Select,
   Text,
@@ -133,6 +134,7 @@ export function OnboardingScreen({
       <StepList page={page} index={index} onStep={onStep} />
       <main {...stylex.props(styles.column)}>
         <div {...stylex.props(styles.heading)}>
+          {index === 0 ? <Mascot mood="default" size="small" /> : null}
           <span {...stylex.props(styles.eyebrow)}>
             {t("eyebrow", {
               step: index + 1,

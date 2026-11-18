@@ -10,7 +10,8 @@
     "start": "electron .",
     "package": "node scripts/package.ts",
     "smoke": "vitest run -c vitest.smoke.config.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "brand-assets": "node scripts/brand-assets.ts"
   },
   "dependencies": {
     "@factory/cli": "workspace:*",

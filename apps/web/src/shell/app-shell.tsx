@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Menu, MenuRadio, MenuRadioOption, MenuSeparator } from "@factory/ui";
+import { GangerMark, Menu, MenuRadio, MenuRadioOption, MenuSeparator } from "@factory/ui";
 import { colors, fontSize, fontWeight, motion, radius, space } from "@factory/ui/tokens.stylex";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -41,6 +41,9 @@ export function AppShell({
   return (
     <div {...stylex.props(styles.app)}>
       <aside {...stylex.props(styles.rail)}>
+        <div data-rail-brand {...stylex.props(styles.brand)}>
+          <GangerMark tone="mono" label={t("brand")} />
+        </div>
         <WorkspaceSwitcher
           shell={shell}
           workspace={workspace}
@@ -178,6 +181,12 @@ const styles = stylex.create({
     paddingInline: space.s2,
     overflow: "auto",
     backgroundColor: colors.bgSidebar,
+  },
+  brand: {
+    display: "flex",
+    justifyContent: "center",
+    paddingTop: space.s1,
+    color: colors.textPrimary,
   },
   workspace: {
     display: "flex",

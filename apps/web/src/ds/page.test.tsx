@@ -39,6 +39,7 @@ describe("/ds 서버 렌더", () => {
       "capacity",
       "problem",
       "statTile",
+      "brand",
     ];
     expect(ids.filter((id) => !html.includes(`id="${id}"`))).toEqual([]);
     expect(ids.filter((id) => !html.includes(`href="#${id}"`))).toEqual([]);

@@ -199,6 +199,11 @@ describe("Runners 목록", () => {
     expect(/<header[^]*?<\/header>/.exec(html)?.[0]).not.toContain("<p");
     expect(html).not.toContain('role="listbox"');
     expect(variantsOf(html)).toEqual(["primary"]);
+    expect(html).toMatch(/<svg[^>]*aria-hidden="true"[^>]*data-mascot="resting"/);
+  });
+
+  it("러너가 있으면 마스코트를 두지 않는다(0077)", () => {
+    expect(render(loadRunnersPage(seedDatabase().db, now))).not.toContain("data-mascot");
   });
 });
 

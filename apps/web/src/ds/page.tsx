@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { PageHeader, Text } from "@factory/ui";
+import { GangerMark, PageHeader, Text } from "@factory/ui";
 import {
   colors,
   fontSize,
@@ -38,9 +38,7 @@ export function DesignSystemPage() {
     <div {...stylex.props(styles.app)}>
       <nav aria-label={tDs("nav.label")} {...stylex.props(styles.sidebar)}>
         <div {...stylex.props(styles.brand)}>
-          <span aria-hidden="true" {...stylex.props(styles.brandMark)}>
-            {tDs("brandMark")}
-          </span>
+          <GangerMark tone="mono" size="small" />
           {tDs("title")}
         </div>
         <NavGroup title={tDs("nav.tokens")}>
@@ -119,16 +117,6 @@ const styles = stylex.create({
     color: colors.textPrimary,
     fontSize: fontSize.body,
     fontWeight: fontWeight.semibold,
-  },
-  brandMark: {
-    display: "grid",
-    placeItems: "center",
-    width: 22,
-    height: 22,
-    borderRadius: radius.pill,
-    backgroundColor: colors.accent,
-    color: colors.textOnAccent,
-    fontSize: fontSize.small,
   },
   navGroup: { display: "flex", flexDirection: "column", gap: space.s1 },
   navLabel: {

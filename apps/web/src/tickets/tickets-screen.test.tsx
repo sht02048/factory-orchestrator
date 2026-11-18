@@ -51,6 +51,14 @@ function panelText(html: string): string {
 }
 
 describe("Tickets 화면", () => {
+  it("티켓이 하나도 없으면 쉬는 반장을 장식으로 두고, 티켓이 있으면 두지 않는다(0077)", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined, now);
+    const empty = render({ ...page, tickets: [], errors: [] });
+    expect(empty).toMatch(/<svg[^>]*aria-hidden="true"[^>]*data-mascot="resting"/);
+    expect(render(page, { filter: "done" })).not.toContain("data-mascot");
+  });
+
   it("행은 키 · 제목 · 마지막 런이고, 트래커 상태는 행에 두지 않는다", async () => {
     const { context } = setupTickets();
     const rows = rowTexts(render(await loadTicketsPage(context, undefined, now)));
