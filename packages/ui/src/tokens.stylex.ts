@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 
 /*
- * 디자인 토큰. 값의 출처는 시안 B(design/prototype/styles.css)다.
+ * 디자인 토큰. 값의 출처는 시안 B(design/prototype/styles.css)와 ADR 0010 의 색·둥글기 규칙이다.
  *
  * - 이 파일은 StyleX 규칙상 defineVars 의 이름 있는 export 만 둔다.
  * - 색은 OKLCH 로만 쓴다. packages/ui 밖에서는 색 값을 직접 쓰지 않고 이 토큰을 쓴다
@@ -20,6 +20,11 @@ export const colors = stylex.defineVars({
   bgHover: "oklch(0.215 0.011 260)",
   bgSelected: "oklch(0.25 0.022 260)",
   bgInset: "oklch(0.145 0.007 260)",
+  // 면: 영역을 선이 아니라 배경색으로 나눈다(ADR 0010 10번). 카드 < 카드 안 행 hover < 보조 버튼.
+  bgCard: "oklch(0.2 0.01 260)",
+  bgCardHover: "oklch(0.23 0.011 260)",
+  bgControl: "oklch(0.26 0.012 260)",
+  bgControlHover: "oklch(0.29 0.013 260)",
   backdrop: "oklch(0.1 0.005 260 / 0.6)",
 
   // 선: 구역 나눔은 subtle, 입력·버튼 테두리는 default, 그 위 hover 는 strong.
@@ -40,16 +45,26 @@ export const colors = stylex.defineVars({
   accentText: "oklch(0.78 0.11 260)",
   accentSoft: "oklch(0.3 0.06 260)",
 
-  // 손댈 일에만 쓰는 상태 색(ADR 0007). Human Check 주황, Failed 빨강.
-  check: "oklch(0.77 0.15 58)",
-  checkSoft: "oklch(0.29 0.05 58)",
-  failed: "oklch(0.7 0.18 25)",
-  failedSoft: "oklch(0.28 0.06 25)",
-  failedBorder: "oklch(0.7 0.18 25 / 0.45)",
-
-  // 러너 Online 점에만 쓴다(ADR 0007 예외). Offline 점은 failed 를 쓴다.
-  online: "oklch(0.72 0.15 150)",
-  onlineRing: "oklch(0.72 0.15 150 / 0.22)",
+  // 상태 색. 색 하나에 뜻 하나다(ADR 0010 5번). 글·점은 기본 값, 알약 바탕은 Soft 를 쓴다.
+  // 보라: 사람이 답·허용(Question, Permission, Waiting for Input).
+  answer: "oklch(0.76 0.13 300)",
+  answerSoft: "oklch(0.3 0.07 300)",
+  // 노랑: 사람이 확인(Human Check).
+  check: "oklch(0.83 0.14 85)",
+  checkSoft: "oklch(0.31 0.06 85)",
+  // 빨강: 문제(Failed, Disconnected, Runner Issue, Offline). 위험 행동 글자와 입력 오류도 이 색이다.
+  problem: "oklch(0.7 0.17 25)",
+  problemSoft: "oklch(0.29 0.07 25)",
+  problemBorder: "oklch(0.7 0.17 25 / 0.45)",
+  // 초록: 진행·정상(Running, Online).
+  progress: "oklch(0.76 0.15 150)",
+  progressSoft: "oklch(0.29 0.06 150)",
+  // 파랑: 병합(Merged). 주 버튼의 accent 보다 옅게 두어 행동과 상태를 가른다.
+  merged: "oklch(0.78 0.1 245)",
+  mergedSoft: "oklch(0.3 0.06 245)",
+  // 회색: 대기·멈춤(Queued, Canceled). 무채색이다.
+  idle: "oklch(0.72 0.01 260)",
+  idleSoft: "oklch(0.27 0.01 260)",
 });
 
 export const space = stylex.defineVars({
@@ -65,9 +80,11 @@ export const space = stylex.defineVars({
   s10: "40px",
 });
 
+// 둥글기(ADR 0010 10번): 카드 12, 버튼·행·입력 8, 알약 6. full 은 점과 아바타에만.
 export const radius = stylex.defineVars({
-  sm: "4px",
-  md: "6px",
+  card: "12px",
+  control: "8px",
+  pill: "6px",
   full: "9999px",
 });
 
@@ -126,6 +143,7 @@ export const size = stylex.defineVars({
   control: "32px",
   input: "36px",
   rowMinHeight: "52px",
-  dot: "7px",
+  dot: "6px",
+  pill: "22px",
   icon: "14px",
 });

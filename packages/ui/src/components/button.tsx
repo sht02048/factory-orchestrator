@@ -4,12 +4,19 @@ import type { ComponentProps, ReactNode } from "react";
 import { cx, type StyleArg } from "../cx";
 import { colors, fontWeight, motion, radius, size, space } from "../tokens.stylex";
 
-export type ButtonVariant = "default" | "primary" | "ghost";
+/**
+ * 버튼 위계(ADR 0010 6번).
+ * - primary: 파랑. 화면 전체에서 주 행동 하나에만.
+ * - secondary: 기본. 카드 행동, 질문 선택지처럼 나머지 행동.
+ * - danger: 빨간 글자 보조 버튼. 취소·거절 같은 위험 행동.
+ * - ghost: 바탕 없는 덜 중요한 행동(닫기, 접기).
+ */
+export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 
 type SdkButtonProps = ComponentProps<typeof SdkButton>;
 
 export interface ButtonProps {
-  /** default: 보조 행동. primary: 화면에서 가장 먼저 할 행동 하나. ghost: 덜 중요한 행동. */
+  /** 기본은 secondary. primary 는 화면에 하나만 둔다(ADR 0010 6번). */
   variant?: ButtonVariant;
   children: ReactNode;
   disabled?: boolean;
@@ -18,7 +25,7 @@ export interface ButtonProps {
   "aria-label"?: string;
 }
 
-export function Button({ variant = "default", children, onClick, ...props }: ButtonProps) {
+export function Button({ variant = "secondary", children, onClick, ...props }: ButtonProps) {
   return (
     <SdkButton
       {...props}
@@ -35,6 +42,7 @@ export function buttonStyles(variant: ButtonVariant, disabled = false): Readonly
   return [
     styles.base,
     variant === "primary" && styles.primary,
+    variant === "danger" && styles.danger,
     variant === "ghost" && styles.ghost,
     disabled && styles.disabled,
   ];
@@ -49,11 +57,9 @@ const styles = stylex.create({
     height: size.control,
     paddingBlock: 0,
     paddingInline: space.s3,
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: { default: colors.borderDefault, ":hover": colors.borderStrong },
-    borderRadius: radius.md,
-    backgroundColor: { default: colors.bgRaised, ":hover": colors.bgRaisedHover },
+    borderWidth: 0,
+    borderRadius: radius.control,
+    backgroundColor: { default: colors.bgControl, ":hover": colors.bgControlHover },
     color: colors.textPrimary,
     font: "inherit",
     fontWeight: fontWeight.medium,
@@ -68,18 +74,16 @@ const styles = stylex.create({
     outlineOffset: 2,
   },
   primary: {
-    borderColor: { default: "transparent", ":hover": "transparent" },
     backgroundColor: { default: colors.accent, ":hover": colors.accentHover },
     color: colors.textOnAccent,
   },
+  danger: { color: colors.problem },
   ghost: {
-    borderColor: { default: "transparent", ":hover": "transparent" },
     backgroundColor: { default: "transparent", ":hover": colors.bgHover },
     color: { default: colors.textSecondary, ":hover": colors.textPrimary },
   },
   disabled: {
-    borderColor: { default: colors.borderSubtle, ":hover": colors.borderSubtle },
-    backgroundColor: { default: "transparent", ":hover": "transparent" },
+    backgroundColor: { default: colors.bgCard, ":hover": colors.bgCard },
     color: { default: colors.textDisabled, ":hover": colors.textDisabled },
     cursor: "not-allowed",
     transform: { default: null, ":active": null },

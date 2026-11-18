@@ -104,7 +104,7 @@ export const fieldStyles = stylex.create({
       ":hover": colors.borderStrong,
       ":focus-visible": colors.accentText,
     },
-    borderRadius: radius.md,
+    borderRadius: radius.control,
     backgroundColor: colors.bgInset,
     color: colors.textPrimary,
     font: "inherit",
@@ -129,7 +129,7 @@ const styles = stylex.create({
     fontSize: fontSize.small,
     textWrap: "pretty",
   },
-  error: { margin: 0, color: colors.failed, fontSize: fontSize.small },
+  error: { margin: 0, color: colors.problem, fontSize: fontSize.small },
   input: {
     "::placeholder": { color: colors.textDisabled },
   },
@@ -137,9 +137,9 @@ const styles = stylex.create({
   readOnly: { color: colors.textSecondary },
   invalid: {
     borderColor: {
-      default: colors.failed,
-      ":hover": colors.failed,
-      ":focus-visible": colors.failed,
+      default: colors.problem,
+      ":hover": colors.problem,
+      ":focus-visible": colors.problem,
     },
   },
   disabled: { color: colors.textDisabled, cursor: "not-allowed" },

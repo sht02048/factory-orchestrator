@@ -25,7 +25,7 @@ import {
 import { colors, fontSize, fontWeight, lineHeight, space } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
-import { useFormatDuration } from "../format/duration";
+import { useTime } from "../format/time";
 import { useAgentName } from "../labels";
 import type { WorkspaceSummary } from "../shell/model";
 import { useDayLabel } from "./dates";
@@ -125,7 +125,7 @@ function StatsView({
   const groupName = useGroupName(dimension);
   const t = useTranslations("stats");
   const dayLabel = useDayLabel();
-  const duration = useFormatDuration();
+  const { duration } = useTime();
   const groups = page.groups[dimension];
   const selected = groups.find((g) => g.key === selectedKey) ?? groups[0];
 
@@ -261,7 +261,7 @@ function PercentText({ part, whole }: { part: number; whole: number }) {
 
 function Figures({ total }: { total: StatsSummary }) {
   const t = useTranslations("stats");
-  const duration = useFormatDuration();
+  const { duration } = useTime();
   const check = total.humanCheck;
   const mergedAfterCheck = percent(check.merged, check.humanCheck);
   return (
@@ -371,7 +371,7 @@ function FailedCombinations({ combinations }: { combinations: ReadonlyArray<Fail
 function GroupPanel({ group, dimension }: { group: StatsGroup; dimension: StatsDimension }) {
   const groupName = useGroupName(dimension);
   const t = useTranslations("stats");
-  const duration = useFormatDuration();
+  const { duration } = useTime();
   const { outcomes, humanCheck, durations } = group;
   // 비율은 취소를 뺀 런으로 나눈다(Q82.9·Q82.18). 취소는 개수만 보인다.
   const share = (count: number) => {
@@ -505,5 +505,5 @@ const styles = stylex.create({
     textAlign: "end",
   },
   checkText: { color: colors.check },
-  failedText: { color: colors.failed },
+  failedText: { color: colors.problem },
 });

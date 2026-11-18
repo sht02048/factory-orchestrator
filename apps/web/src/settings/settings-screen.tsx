@@ -5,7 +5,6 @@ import {
   DetailPanel,
   Dialog,
   DialogClose,
-  Dot,
   Field,
   Input,
   PageHeader,
@@ -15,6 +14,7 @@ import {
   Section,
   Select,
   SplitView,
+  StatusPill,
   Table,
   TableCell,
   TableRow,
@@ -26,6 +26,7 @@ import { colors, space } from "@factory/ui/tokens.stylex";
 import { useEffect, useState, type ReactNode } from "react";
 import { useFormatter, useTranslations } from "use-intl";
 import { prerequisiteHint, useAgentName, usePrerequisiteName } from "../labels";
+import { useStatusName } from "../status";
 import {
   INSTALL_ITEMS,
   MAX_RUN_MINUTES,
@@ -1092,7 +1093,7 @@ export function ConnectionForm({
       <SubmitError state={submit.state} />
       <Actions>
         <Button
-          variant={isNew ? "primary" : "default"}
+          variant={isNew ? "primary" : "secondary"}
           type="submit"
           disabled={submit.sending || !ready}
         >
@@ -1215,7 +1216,7 @@ export function WebhookAddressForm({
       </Field>
       <SubmitError state={submit.state} />
       <Actions>
-        <Button variant="default" type="submit" disabled={submit.sending}>
+        <Button variant="secondary" type="submit" disabled={submit.sending}>
           {submit.sending ? ts("saving") : t("saveWebhook")}
         </Button>
       </Actions>
@@ -1416,7 +1417,7 @@ export function RunnerForm({
       <SubmitError state={submit.state} />
       <Actions>
         <Button
-          variant={isNew ? "primary" : "default"}
+          variant={isNew ? "primary" : "secondary"}
           type="submit"
           disabled={submit.sending || !ready}
         >
@@ -1476,6 +1477,7 @@ function CheckResult({
 }) {
   const t = useTranslations("settings.runners.check");
   const runnerError = useRunnerErrorName();
+  const statusName = useStatusName();
   const format = useFormatter();
   if (check === null) return <Text variant="meta">{t("never")}</Text>;
   switch (check.status) {
@@ -1493,7 +1495,9 @@ function CheckResult({
       return (
         <div {...stylex.props(styles.form)}>
           <span {...stylex.props(styles.inline)}>
-            <Dot tone={check.online ? "online" : "offline"} />
+            <StatusPill status={check.online ? "online" : "offline"}>
+              {statusName(check.online ? "online" : "offline")}
+            </StatusPill>
             {check.online
               ? check.version === null
                 ? t("online")
@@ -1549,7 +1553,6 @@ function Prerequisite({ prerequisite }: { prerequisite: PrerequisiteView }) {
   return (
     <li {...stylex.props(styles.item, styles.prerequisite)}>
       <span {...stylex.props(styles.inline)}>
-        <Dot tone={broken ? "failed" : "neutral"} />
         <span {...stylex.props(styles.primaryText)}>{prerequisiteName(prerequisite)}</span>
         <Text variant="meta">
           {prerequisite.satisfied === null
@@ -1624,7 +1627,7 @@ const styles = stylex.create({
   secondaryText: { color: colors.textSecondary },
   disabledText: { color: colors.textDisabled },
   para: { margin: 0 },
-  error: { margin: 0, color: colors.failed },
+  error: { margin: 0, color: colors.problem },
   fix: { display: "flex", flexDirection: "column", gap: space.s1 },
   bullets: {
     margin: 0,

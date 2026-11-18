@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Listbox, ListboxItem } from "@ui-sdk/react/listbox";
 import { createContext, use, type ReactNode } from "react";
 import { cx } from "../cx";
-import { colors, fontSize, fontWeight, motion, size, space } from "../tokens.stylex";
+import { colors, fontSize, fontWeight, motion, radius, size, space } from "../tokens.stylex";
 
 /*
  * 목록 표: 정렬된 열(ADR 0007). 행을 고르면 오른쪽 상세 패널이 바뀐다.
@@ -145,7 +145,7 @@ export function RowTitle({ children }: { children: ReactNode }) {
   return <span {...stylex.props(styles.rowTitle)}>{children}</span>;
 }
 
-/** 손댈 일 행에만 붙이는 이유 한 줄. 앞에 Dot 을 둘 수 있다. */
+/** 손댈 일 행에만 붙이는 이유 한 줄. */
 export function RowReason({ children }: { children: ReactNode }) {
   return <span {...stylex.props(styles.rowReason)}>{children}</span>;
 }
@@ -169,14 +169,13 @@ const styles = stylex.create({
     color: colors.textTertiary,
     fontSize: fontSize.small,
   },
-  rows: { display: "flex", flexDirection: "column", outline: "none" },
+  rows: { display: "flex", flexDirection: "column", gap: space.px2, outline: "none" },
   row: {
     position: "relative",
     minHeight: size.rowMinHeight,
     paddingBlock: space.s3,
-    borderTopWidth: 1,
-    borderTopStyle: "solid",
-    borderTopColor: colors.borderSubtle,
+    // 행은 선 대신 둥근 면으로 나눈다(ADR 0010 10번).
+    borderRadius: radius.control,
     backgroundColor: { default: "transparent", ":hover": colors.bgHover },
     color: colors.textTertiary,
     cursor: "pointer",
@@ -191,8 +190,6 @@ const styles = stylex.create({
   },
   rowSelected: {
     backgroundColor: { default: colors.bgSelected, ":hover": colors.bgSelected },
-    borderTopColor: "transparent",
-    boxShadow: `inset 2px 0 0 ${colors.accentText}`,
   },
   cell: {
     minWidth: 0,
@@ -224,9 +221,6 @@ const styles = stylex.create({
   empty: {
     paddingBlock: space.s6,
     paddingInline: space.s3,
-    borderTopWidth: 1,
-    borderTopStyle: "solid",
-    borderTopColor: colors.borderSubtle,
     color: colors.textTertiary,
     fontSize: fontSize.body,
   },

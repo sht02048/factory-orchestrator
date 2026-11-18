@@ -15,7 +15,7 @@ import {
   RowTitle,
   Section,
   SplitView,
-  Status,
+  StatusPill,
   Table,
   TableCell,
   TableEmpty,
@@ -25,20 +25,20 @@ import {
   TableRows,
   Text,
 } from "@factory/ui";
-import type { StatusTone } from "@factory/ui";
+import type { PillStatus } from "@factory/ui";
 import { colors, space } from "@factory/ui/tokens.stylex";
-import type { SummaryOutcome } from "@factory/core";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
-import { useFormatDuration } from "../format/duration";
+import { useTime } from "../format/time";
 import { useAgentName } from "../labels";
+import { runStatus, useStatusName } from "../status";
 import type { AttentionItem, BrokenAuthRunner, HomePage, HomeRun, InputWait } from "./model";
 import type { QueuedReason } from "../runs/model";
 import { attentionKey, runKey } from "./model";
 
 // 손댈 일: 티켓(+이유) | 상태 | 에이전트 결과 | PR 상태 | 러너 | 에이전트 또는 Workspace | 경과
-const attentionColumns = "minmax(0, 1fr) 112px 128px 64px 96px 112px 72px";
+const attentionColumns = "minmax(0, 1fr) 144px 128px 64px 96px 112px 72px";
 // 실행 중: 티켓 | 러너 | 에이전트 | 경과
 const runningColumns = "minmax(0, 1fr) 96px 80px 72px";
 // Queued: 티켓(+이유) | 러너 | 에이전트 | 기다린 시간
@@ -210,10 +210,8 @@ function AttentionRunRow({ run, all }: { run: HomeRun; all: boolean }) {
   const agentName = useAgentName();
   const t = useTranslations("home");
   const domain = useTranslations("domain");
-  const duration = useFormatDuration();
-  const status = useRunStatus();
+  const { duration } = useTime();
   const reason = useRowReason();
-  const { tone, label } = status(run);
   return (
     <TableRow value={runKey(run)} label={run.ticketKey}>
       <TableCell>
@@ -221,7 +219,7 @@ function AttentionRunRow({ run, all }: { run: HomeRun; all: boolean }) {
         <RowReason>{reason(run)}</RowReason>
       </TableCell>
       <TableCell>
-        <StatusWithCancel tone={tone} label={label} cancelling={run.cancelling} />
+        <StatusWithCancel status={runStatus(run)} cancelling={run.cancelling} />
       </TableCell>
       <TableCell>
         {run.state === "ended" ? domain(`agentResult.${run.agentResult}`) : t("notApplicable")}
@@ -240,6 +238,7 @@ function AttentionRunRow({ run, all }: { run: HomeRun; all: boolean }) {
 
 function RunnerAuthRow({ runner }: { runner: BrokenAuthRunner }) {
   const t = useTranslations("home");
+  const statusName = useStatusName();
   return (
     <TableRow value={`runner:${runner.id}`} label={runner.name}>
       <TableCell>
@@ -247,7 +246,7 @@ function RunnerAuthRow({ runner }: { runner: BrokenAuthRunner }) {
         <RowReason>{t("row.runnerAuth")}</RowReason>
       </TableCell>
       <TableCell>
-        <Status tone="failed">{t("row.runnerAuthState")}</Status>
+        <StatusPill status="runner-issue">{statusName("runner-issue")}</StatusPill>
       </TableCell>
       <TableCell>{t("notApplicable")}</TableCell>
       <TableCell>{t("notApplicable")}</TableCell>
@@ -269,7 +268,7 @@ function RunningTable({
 }) {
   const agentName = useAgentName();
   const t = useTranslations("home");
-  const duration = useFormatDuration();
+  const { elapsed } = useTime();
   return (
     <Table columns={runningColumns}>
       <TableHead>
@@ -293,7 +292,7 @@ function RunningTable({
               <TableCell>{run.runner?.name ?? t("notApplicable")}</TableCell>
               <TableCell>{agentName(run.agent)}</TableCell>
               <TableCell align="end" numeric>
-                {duration(run.executionMs ?? 0)}
+                {elapsed(run.executionMs ?? 0)}
               </TableCell>
             </TableRow>
           ))}
@@ -314,7 +313,7 @@ function QueuedTable({
 }) {
   const agentName = useAgentName();
   const t = useTranslations("home");
-  const duration = useFormatDuration();
+  const { duration } = useTime();
   const queuedReason = useQueuedReason();
   return (
     <Table columns={queuedColumns}>
@@ -352,19 +351,12 @@ function QueuedTable({
   );
 }
 
-function StatusWithCancel({
-  tone,
-  label,
-  cancelling,
-}: {
-  tone: StatusTone;
-  label: string;
-  cancelling: boolean;
-}) {
+function StatusWithCancel({ status, cancelling }: { status: PillStatus; cancelling: boolean }) {
   const t = useTranslations("home");
+  const statusName = useStatusName();
   return (
     <span {...stylex.props(styles.inline)}>
-      <Status tone={tone}>{label}</Status>
+      <StatusPill status={status}>{statusName(status)}</StatusPill>
       {cancelling ? <Text variant="meta">{t("cancelling")}</Text> : null}
     </span>
   );
@@ -384,10 +376,9 @@ function RunPanel({
   const agentName = useAgentName();
   const t = useTranslations("home.panel");
   const domain = useTranslations("domain");
-  const duration = useFormatDuration();
-  const status = useRunStatus();
+  const { duration, elapsed } = useTime();
+  const statusName = useStatusName();
   const queuedReason = useQueuedReason();
-  const { tone, label } = status(run);
 
   let when: string;
   let reason: string;
@@ -398,11 +389,11 @@ function RunPanel({
       break;
     case "running":
     case "disconnected":
-      when = t("elapsedFor", { duration: duration(run.executionMs ?? 0) });
+      when = elapsed(run.executionMs ?? 0);
       reason = t(`reason.${run.state}`);
       break;
     case "waiting-for-input":
-      when = t("elapsedFor", { duration: duration(run.executionMs ?? 0) });
+      when = elapsed(run.executionMs ?? 0);
       reason = t(`reason.${run.input?.kind ?? "inputUnknown"}`);
       break;
     case "ended":
@@ -419,7 +410,7 @@ function RunPanel({
       <PanelHeader
         status={
           <>
-            <StatusWithCancel tone={tone} label={label} cancelling={run.cancelling} />
+            <StatusWithCancel status={runStatus(run)} cancelling={run.cancelling} />
             <Text variant="meta">{when}</Text>
           </>
         }
@@ -436,7 +427,7 @@ function RunPanel({
           {ended === null ? (
             t("notEnded")
           ) : (
-            <Status tone={summaryTone(ended.summary)}>{domain(`summary.${ended.summary}`)}</Status>
+            <StatusPill status={ended.summary}>{statusName(ended.summary)}</StatusPill>
           )}
         </DefinitionItem>
         <DefinitionItem label={t("agentResult")} empty={ended === null}>
@@ -635,10 +626,11 @@ function PermissionBlock({
 /** GitHub 인증이 깨진 러너와 해결 안내(Q82.14·Q82.15) */
 function RunnerAuthPanel({ runner }: { runner: BrokenAuthRunner }) {
   const t = useTranslations("home.runnerAuth");
+  const statusName = useStatusName();
   return (
     <DetailPanel>
       <PanelHeader
-        status={<Status tone="failed">{t("state")}</Status>}
+        status={<StatusPill status="runner-issue">{statusName("runner-issue")}</StatusPill>}
         title={runner.name}
         subtitle={t("subtitle")}
         reason={t("reason")}
@@ -671,39 +663,10 @@ function href(path: string, search: Record<string, string>): string {
 
 // ---------- 문구 ----------
 
-function summaryTone(summary: SummaryOutcome): StatusTone {
-  switch (summary) {
-    case "human-check":
-      return "check";
-    case "failed":
-      return "failed";
-    case "merged":
-    case "canceled":
-      return "neutral";
-  }
-}
-
-/** 상태 칸: Ended 는 요약 결과, 그 밖은 런 상태. 색은 Human Check·Failed 에만 쓴다(ADR 0007) */
-function useRunStatus(): (run: HomeRun) => { tone: StatusTone; label: string } {
-  const domain = useTranslations("domain");
-  return (run) => {
-    switch (run.state) {
-      case "ended":
-        return { tone: summaryTone(run.summary), label: domain(`summary.${run.summary}`) };
-      case "queued":
-        return { tone: "neutral", label: domain("runState.queued") };
-      case "running":
-      case "waiting-for-input":
-      case "disconnected":
-        return { tone: "running", label: domain(`runState.${run.state}`) };
-    }
-  };
-}
-
 /** 손댈 일 행의 이유 한 줄(ADR 0007) */
 function useRowReason(): (run: HomeRun) => ReactNode {
   const t = useTranslations("home.row");
-  const duration = useFormatDuration();
+  const { duration } = useTime();
   const queuedReason = useQueuedReason();
   return (run) => {
     switch (run.state) {

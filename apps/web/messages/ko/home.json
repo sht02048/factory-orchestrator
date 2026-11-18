@@ -1,14 +1,14 @@
 {
-  "documentTitle": "홈 · Factory Orchestrator",
-  "title": "홈",
-  "subtitle": "{workspace} · 실행 중 {running} · Queued {queued}",
+  "documentTitle": "Home · Factory Orchestrator",
+  "title": "Home",
+  "subtitle": "{workspace} · Running {running} · Queued {queued}",
   "subtitleAll": "모든 Workspace에서 손댈 일만 모았어요.",
   "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 런이 보여요.",
   "notApplicable": "—",
   "cancelling": "취소 중",
   "section": {
     "attention": "손댈 일",
-    "running": "실행 중",
+    "running": "Running",
     "queued": "Queued",
     "queuedNote": "들어온 순서대로 시작해요"
   },
@@ -36,13 +36,11 @@
     "unreachable": "러너에 닿지 않아요",
     "human-check": "PR이 열려 있어요. 사람이 확인해야 해요",
     "failed": "Failed로 끝났어요. 자동으로 다시 시도하지 않아요",
-    "runnerAuth": "GitHub 인증이 깨져 할당에서 뺐어요",
-    "runnerAuthState": "인증 깨짐"
+    "runnerAuth": "GitHub 인증이 깨져 할당에서 뺐어요"
   },
   "panel": {
     "label": "고른 항목 요약",
     "subtitle": "{project} · {workspace}",
-    "elapsedFor": "{duration}째",
     "waitingFor": "{duration}째 기다리는 중",
     "endedAfter": "{duration} 만에 끝났어요",
     "state": "상태",
@@ -72,7 +70,7 @@
     }
   },
   "question": {
-    "title": "질문",
+    "title": "Question",
     "choices": "선택지",
     "answerLabel": "답",
     "answerPlaceholder": "에이전트에게 보낼 답을 써 주세요",
@@ -82,7 +80,7 @@
     "failed": "답을 남기지 못했어요. 다시 해 주세요."
   },
   "permission": {
-    "title": "권한 대기",
+    "title": "Permission",
     "allowOnRunner": "러너 화면에서 허용해 주세요.",
     "reasonLabel": "거절 이유",
     "reasonDescription": "에이전트가 대신 할 일을 적으면 함께 전해요",
@@ -92,7 +90,6 @@
     "failed": "거절을 남기지 못했어요. 다시 해 주세요."
   },
   "runnerAuth": {
-    "state": "인증 깨짐",
     "subtitle": "러너",
     "reason": "이 러너에서 GitHub 인증이 깨져 할당에서 뺐어요. Online/Offline은 그대로이고, 이 러너로 정한 Queued 런은 러너를 비워 기다려요.",
     "fixTitle": "해결 방법",

@@ -10,7 +10,7 @@
   },
   "nav": {
     "label": "화면",
-    "home": "홈",
+    "home": "Home",
     "tickets": "Tickets",
     "runs": "Runs",
     "runners": "Runners",
@@ -20,8 +20,6 @@
   "runners": {
     "title": "Runners",
     "load": "{running}/{capacity}",
-    "online": "Online",
-    "offline": "Offline",
     "empty": "등록한 러너가 없어요"
   }
 }

@@ -28,7 +28,6 @@
   "panel": {
     "label": "고른 런 요약",
     "subtitle": "{project} · {branch}",
-    "elapsedFor": "{duration}째",
     "waitingFor": "{duration}째 기다리는 중",
     "endedAfter": "{duration} 만에 끝났어요",
     "state": "상태",

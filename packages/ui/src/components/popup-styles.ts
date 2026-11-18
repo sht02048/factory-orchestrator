@@ -21,7 +21,7 @@ export const popupStyles = stylex.create({
     padding: space.s1,
     // UI SDK 팝업은 popover 요소라 브라우저 기본 테두리가 붙는다. 테두리는 그림자 토큰이 맡는다.
     borderWidth: 0,
-    borderRadius: radius.md,
+    borderRadius: radius.control,
     backgroundColor: colors.bgRaised,
     boxShadow: shadow.popover,
     color: colors.textSecondary,
@@ -41,7 +41,7 @@ export const popupStyles = stylex.create({
     gap: space.s2,
     height: 30,
     paddingInline: space.s2,
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
     color: colors.textSecondary,
     cursor: "pointer",
     outline: "none",

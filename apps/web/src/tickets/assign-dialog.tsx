@@ -184,5 +184,5 @@ export function AssignForm({
 
 const styles = stylex.create({
   form: { display: "flex", flexDirection: "column", gap: space.s4 },
-  error: { color: colors.failed },
+  error: { color: colors.problem },
 });

@@ -33,6 +33,7 @@ const colorGroups = [
       "backdrop",
     ],
   },
+  { id: "surface", keys: ["bgCard", "bgCardHover", "bgControl", "bgControlHover"] },
   { id: "border", keys: ["borderSubtle", "borderDefault", "borderStrong"] },
   {
     id: "text",
@@ -40,17 +41,30 @@ const colorGroups = [
   },
   { id: "accent", keys: ["accent", "accentHover", "accentText", "accentSoft"] },
   {
-    id: "attention",
-    keys: ["check", "checkSoft", "failed", "failedSoft", "failedBorder"],
+    id: "status",
+    keys: [
+      "answer",
+      "answerSoft",
+      "check",
+      "checkSoft",
+      "problem",
+      "problemSoft",
+      "problemBorder",
+      "progress",
+      "progressSoft",
+      "merged",
+      "mergedSoft",
+      "idle",
+      "idleSoft",
+    ],
   },
-  { id: "runner", keys: ["online", "onlineRing"] },
 ] as const satisfies ReadonlyArray<{
-  id: "background" | "border" | "text" | "accent" | "attention" | "runner";
+  id: "background" | "surface" | "border" | "text" | "accent" | "status";
   keys: ReadonlyArray<ColorKey>;
 }>;
 
 const spaceKeys = ["px2", "s1", "px6", "s2", "s3", "s4", "s5", "s6", "s8", "s10"] as const;
-const radiusKeys = ["sm", "md", "full"] as const;
+const radiusKeys = ["card", "control", "pill", "full"] as const;
 const motionKeys = ["easeOut", "durationFast", "durationToast"] as const;
 const fontSizeKeys = ["page", "panel", "body", "ui", "small", "label", "input"] as const;
 const fontWeightKeys = ["regular", "medium", "semibold"] as const;
@@ -64,6 +78,7 @@ const sizeKeys = [
   "input",
   "rowMinHeight",
   "dot",
+  "pill",
   "icon",
 ] as const;
 
@@ -341,7 +356,7 @@ const styles = stylex.create({
   swatch: {
     width: 40,
     height: 24,
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
     boxShadow: `inset 0 0 0 1px ${colors.borderDefault}`,
   },
   swatchColor: (color: string) => ({ backgroundColor: color }),
@@ -359,7 +374,7 @@ const styles = stylex.create({
   shadowBox: {
     width: 40,
     height: 24,
-    borderRadius: radius.md,
+    borderRadius: radius.control,
     backgroundColor: colors.bgRaised,
     boxShadow: shadow.popover,
   },

@@ -117,7 +117,7 @@ const styles = stylex.create({
   },
   merged: { fill: colors.textDisabled },
   check: { fill: colors.check },
-  failed: { fill: colors.failed },
+  failed: { fill: colors.problem },
   canceled: { fill: colors.borderStrong },
   swatch: { display: "inline-block", width: 8, height: 8, borderRadius: 2 },
 });
@@ -125,6 +125,6 @@ const styles = stylex.create({
 const swatchFill = stylex.create({
   merged: { backgroundColor: colors.textDisabled },
   check: { backgroundColor: colors.check },
-  failed: { backgroundColor: colors.failed },
+  failed: { backgroundColor: colors.problem },
   canceled: { backgroundColor: colors.borderStrong },
 });

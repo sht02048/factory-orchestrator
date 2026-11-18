@@ -2,12 +2,12 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
+  Card,
   DefinitionItem,
   DefinitionList,
   DetailPanel,
   Dialog,
   DialogClose,
-  Dot,
   Field,
   Input,
   Menu,
@@ -18,12 +18,14 @@ import {
   PanelBlock,
   PanelFooter,
   PanelHeader,
+  PILL_STATUSES,
+  Row,
   RowReason,
   RowTitle,
   Section,
   Select,
   SplitView,
-  Status,
+  StatusPill,
   Tab,
   TabPanel,
   Table,
@@ -37,11 +39,13 @@ import {
   Text,
   Tooltip,
   showToast,
-  type StatusTone,
+  statusTone,
+  type PillStatus,
 } from "@factory/ui";
 import { colors, fontWeight, radius, space } from "@factory/ui/tokens.stylex";
 import { useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
+import { useStatusName } from "../status";
 
 type RunId = "r1051" | "r1049" | "r1047" | "r1044";
 
@@ -49,8 +53,7 @@ interface SampleRun {
   id: RunId;
   number: number;
   ticket: string;
-  tone: StatusTone;
-  state: "check" | "failed" | "running" | "merged";
+  status: PillStatus;
   runner: string;
   agent: string;
   elapsed: string;
@@ -64,8 +67,7 @@ const runs: ReadonlyArray<SampleRun> = [
     id: "r1051",
     number: 1051,
     ticket: "ACME-123",
-    tone: "check",
-    state: "check",
+    status: "human-check",
     runner: "runner-a",
     agent: "Claude Code",
     elapsed: "42:10",
@@ -76,8 +78,7 @@ const runs: ReadonlyArray<SampleRun> = [
     id: "r1049",
     number: 1049,
     ticket: "ACME-119",
-    tone: "failed",
-    state: "failed",
+    status: "failed",
     runner: "runner-b",
     agent: "Codex",
     elapsed: "18:02",
@@ -88,8 +89,7 @@ const runs: ReadonlyArray<SampleRun> = [
     id: "r1047",
     number: 1047,
     ticket: "ACME-131",
-    tone: "running",
-    state: "running",
+    status: "running",
     runner: "runner-a",
     agent: "Claude Code",
     elapsed: "07:45",
@@ -100,8 +100,7 @@ const runs: ReadonlyArray<SampleRun> = [
     id: "r1044",
     number: 1044,
     ticket: "ACME-108",
-    tone: "neutral",
-    state: "merged",
+    status: "merged",
     runner: "runner-c",
     agent: "Codex",
     elapsed: "23:51",
@@ -125,7 +124,7 @@ export function ComponentSections() {
   const [workspace, setWorkspace] = useState("commerce");
   const [agent, setAgent] = useState<string | null>(null);
 
-  const stateLabel = (state: SampleRun["state"]) => t(`status.${state}`);
+  const statusName = useStatusName();
   const current = runs.find((r) => r.id === selected) ?? runs[0];
 
   return (
@@ -135,7 +134,8 @@ export function ComponentSections() {
           <Demo>
             <Actions>
               <Button variant="primary">{t("buttons.primary")}</Button>
-              <Button>{t("buttons.default")}</Button>
+              <Button>{t("buttons.secondary")}</Button>
+              <Button variant="danger">{t("buttons.danger")}</Button>
               <Button variant="ghost">{t("buttons.ghost")}</Button>
               <Button disabled>{t("buttons.disabled")}</Button>
             </Actions>
@@ -146,26 +146,49 @@ export function ComponentSections() {
       <div id="status">
         <Section title={t("nav.status")} note={t("status.note")}>
           <Demo>
-            <div {...stylex.props(styles.row)}>
-              <Status tone="check">{t("status.check")}</Status>
-              <Status tone="failed">{t("status.failed")}</Status>
-              <Status tone="running">{t("status.running")}</Status>
-              <Status tone="neutral">{t("status.queued")}</Status>
-              <Status tone="neutral" dot={false}>
-                {t("status.merged")}
-              </Status>
-            </div>
-            <div {...stylex.props(styles.row)}>
-              <span {...stylex.props(styles.inline)}>
-                <Dot tone="online" />
-                <Text variant="ui">{t("status.online")}</Text>
-              </span>
-              <span {...stylex.props(styles.inline)}>
-                <Dot tone="offline" />
-                <Text variant="ui">{t("status.offline")}</Text>
-              </span>
+            <div {...stylex.props(styles.pills)}>
+              {PILL_STATUSES.map((status) => (
+                <span key={status} {...stylex.props(styles.pillSample)}>
+                  <StatusPill status={status}>{statusName(status)}</StatusPill>
+                  <Text variant="meta">{t(`status.tone.${statusTone(status)}`)}</Text>
+                </span>
+              ))}
             </div>
           </Demo>
+        </Section>
+      </div>
+
+      <div id="card">
+        <Section title={t("nav.card")} note={t("card.note")}>
+          <div {...stylex.props(styles.cards)}>
+            <Card label={t("card.label")}>
+              <span {...stylex.props(styles.inline)}>
+                <StatusPill status="question">{statusName("question")}</StatusPill>
+                <Text variant="meta">ACME-1</Text>
+                <Text variant="title">{t("card.ticketTitle")}</Text>
+              </span>
+              <Text variant="body">{t("card.body")}</Text>
+              <Actions>
+                <Button>{t("card.choiceA")}</Button>
+                <Button>{t("card.choiceB")}</Button>
+                <Button variant="danger">{t("card.deny")}</Button>
+              </Actions>
+            </Card>
+            <Card padding="compact">
+              <Row
+                leading={<StatusPill status="running">{statusName("running")}</StatusPill>}
+                trailing="10:02"
+              >
+                <Text variant="ui">{t("card.rowStarted")}</Text>
+              </Row>
+              <Row
+                leading={<StatusPill status="queued">{statusName("queued")}</StatusPill>}
+                trailing="10:01"
+              >
+                <Text variant="ui">{t("card.rowQueued")}</Text>
+              </Row>
+            </Card>
+          </div>
         </Section>
       </div>
 
@@ -240,17 +263,10 @@ export function ComponentSections() {
                         >
                           <TableCell>
                             <RowTitle>{t(`table.rows.${run.id}.title`)}</RowTitle>
-                            {reason === "" ? null : (
-                              <RowReason>
-                                <Dot tone={run.tone} />
-                                {reason}
-                              </RowReason>
-                            )}
+                            {reason === "" ? null : <RowReason>{reason}</RowReason>}
                           </TableCell>
                           <TableCell>
-                            <Status tone={run.tone} dot={false}>
-                              {stateLabel(run.state)}
-                            </Status>
+                            <StatusPill status={run.status}>{statusName(run.status)}</StatusPill>
                           </TableCell>
                           <TableCell>{run.runner}</TableCell>
                           <TableCell>{run.agent}</TableCell>
@@ -265,7 +281,7 @@ export function ComponentSections() {
               }
               panel={
                 current === undefined ? null : (
-                  <RunPanel run={current} stateLabel={stateLabel(current.state)} />
+                  <RunPanel run={current} stateLabel={statusName(current.status)} />
                 )
               }
             />
@@ -446,7 +462,7 @@ function RunPanel({ run, stateLabel }: { run: SampleRun; stateLabel: string }) {
       <PanelHeader
         status={
           <>
-            <Status tone={run.tone}>{stateLabel}</Status>
+            <StatusPill status={run.status}>{stateLabel}</StatusPill>
             <Text variant="meta" numeric>
               #{run.number}
             </Text>
@@ -458,7 +474,7 @@ function RunPanel({ run, stateLabel }: { run: SampleRun; stateLabel: string }) {
       />
       <Actions>
         {run.pr === null ? (
-          <Button variant={run.state === "failed" ? "primary" : "default"}>
+          <Button variant={run.status === "failed" ? "primary" : "secondary"}>
             {t("table.rerun")}
           </Button>
         ) : (
@@ -499,7 +515,14 @@ const styles = stylex.create({
     borderTopStyle: "solid",
     borderTopColor: colors.borderSubtle,
   },
-  row: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s6 },
+  pills: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+    gap: space.s3,
+    width: "100%",
+  },
+  pillSample: { display: "inline-flex", alignItems: "center", gap: space.s2 },
+  cards: { display: "flex", flexDirection: "column", gap: space.s3, maxWidth: 640 },
   inline: { display: "inline-flex", alignItems: "center", gap: space.s2 },
   frame: {
     height: 440,
@@ -507,7 +530,7 @@ const styles = stylex.create({
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: colors.borderSubtle,
-    borderRadius: radius.md,
+    borderRadius: radius.card,
   },
   narrow: { width: 216 },
   menuLabel: { color: colors.textTertiary, fontWeight: fontWeight.regular },

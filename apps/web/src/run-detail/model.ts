@@ -92,6 +92,8 @@ export interface OtherRun {
 
 export interface RunDetail {
   id: string;
+  /** 서버가 이 데이터를 읽은 때. 지난 일의 상대 시간("25분 전")을 이 때로부터 잰다 */
+  now: string;
   ticketKey: string;
   /** 트래커 프로젝트 이름. Workspace 에서 뺀 트래커 프로젝트면 ID */
   trackerProject: string;

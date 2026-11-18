@@ -64,8 +64,8 @@ export interface RunnerView {
   assignmentBlocked: boolean;
   /** 마지막으로 읽은 GitHub 인증 결과. 아직 읽지 못했으면 null */
   githubAuth: GitHubAuthCheck[] | null;
-  /** 마지막 상태 확인부터 지금까지. 확인한 적 없으면 null */
-  checkedAgoMs: number | null;
+  /** 마지막 상태 확인의 때와 그때부터 지금까지. 확인한 적 없으면 null */
+  checked: { at: string; agoMs: number } | null;
   capacity: number;
   /** 시작한 순서. 모든 Workspace 의 런이다 */
   occupying: OccupyingRun[];

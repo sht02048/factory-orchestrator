@@ -11,7 +11,7 @@ import {
   PanelHeader,
   RowTitle,
   SplitView,
-  Status,
+  StatusPill,
   Tab,
   Table,
   TableCell,
@@ -23,19 +23,18 @@ import {
   Tabs,
   Text,
 } from "@factory/ui";
-import type { SummaryOutcome } from "@factory/core";
-import type { StatusTone } from "@factory/ui";
 import { colors, space } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useFormatter, useTranslations } from "use-intl";
 import type { WorkspaceSummary } from "../shell/model";
+import { runStatus, useStatusName } from "../status";
 import type { AssignInput, AssignResult } from "./assign";
 import { AssignDialog } from "./assign-dialog";
-import { TICKET_FILTERS, lastRun, matchesFilter, needsAttention } from "./model";
-import type { TicketFilter, TicketRun, TicketView, TicketsPage } from "./model";
+import { TICKET_FILTERS, lastRun, matchesFilter } from "./model";
+import type { TicketFilter, TicketView, TicketsPage } from "./model";
 
 // 제목 | 티켓 | 트래커 프로젝트 | 트래커 상태 | 마지막 런 (시안 B)
-const columns = "minmax(0, 1fr) 96px 128px 104px 120px";
+const columns = "minmax(0, 1fr) 96px 128px 104px 144px";
 
 export interface TicketsScreenProps {
   page: TicketsPage;
@@ -199,7 +198,7 @@ function TicketsList({
 
 function TicketRow({ ticket }: { ticket: TicketView }) {
   const t = useTranslations("tickets");
-  const status = useRunStatus();
+  const statusName = useStatusName();
   const run = lastRun(ticket);
   return (
     <TableRow value={ticket.id} label={ticket.title}>
@@ -213,9 +212,7 @@ function TicketRow({ ticket }: { ticket: TicketView }) {
         {run === undefined ? (
           <Text variant="meta">{t("unassigned")}</Text>
         ) : (
-          <Status tone={status(run).tone} dot={needsAttention(run)}>
-            {status(run).label}
-          </Status>
+          <StatusPill status={runStatus(run)}>{statusName(runStatus(run))}</StatusPill>
         )}
       </TableCell>
     </TableRow>
@@ -235,7 +232,7 @@ function TicketPanel({
 }) {
   const t = useTranslations("tickets.panel");
   const tList = useTranslations("tickets");
-  const status = useRunStatus();
+  const statusName = useStatusName();
   const format = useFormatter();
   const run = lastRun(ticket);
   const { assignability } = ticket;
@@ -253,12 +250,10 @@ function TicketPanel({
       <PanelHeader
         status={
           run === undefined ? (
-            <Status tone="neutral" dot={false}>
-              {tList("unassigned")}
-            </Status>
+            <Text variant="meta">{tList("unassigned")}</Text>
           ) : (
             <>
-              <Status tone={status(run).tone}>{status(run).label}</Status>
+              <StatusPill status={runStatus(run)}>{statusName(runStatus(run))}</StatusPill>
               <Text variant="meta">{t("lastRun")}</Text>
             </>
           )
@@ -326,9 +321,7 @@ function TicketPanel({
           <ol {...stylex.props(styles.history)}>
             {ticket.runs.map((r) => (
               <li key={r.id} {...stylex.props(styles.historyRow)}>
-                <Status tone={status(r).tone} dot={false}>
-                  {status(r).label}
-                </Status>
+                <StatusPill status={runStatus(r)}>{statusName(runStatus(r))}</StatusPill>
                 <Text variant="meta">
                   {format.dateTime(new Date(r.assignedAt), {
                     month: "numeric",
@@ -353,35 +346,6 @@ function TicketPanel({
   );
 }
 
-function summaryTone(summary: SummaryOutcome): StatusTone {
-  switch (summary) {
-    case "human-check":
-      return "check";
-    case "failed":
-      return "failed";
-    case "merged":
-    case "canceled":
-      return "neutral";
-  }
-}
-
-/** 런 상태 글: Ended 는 요약 결과, 그 밖은 런 상태. 색은 Human Check·Failed 에만 쓴다(ADR 0007) */
-function useRunStatus(): (run: TicketRun) => { tone: StatusTone; label: string } {
-  const domain = useTranslations("domain");
-  return (run) => {
-    switch (run.state) {
-      case "ended":
-        return { tone: summaryTone(run.summary), label: domain(`summary.${run.summary}`) };
-      case "queued":
-        return { tone: "neutral", label: domain("runState.queued") };
-      case "running":
-      case "waiting-for-input":
-      case "disconnected":
-        return { tone: "running", label: domain(`runState.${run.state}`) };
-    }
-  };
-}
-
 const styles = stylex.create({
   notice: {
     maxWidth: 720,
@@ -395,7 +359,7 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: space.s2,
     paddingBlock: space.s3,
-    color: colors.failed,
+    color: colors.problem,
   },
   inline: { display: "inline-flex", alignItems: "baseline", gap: space.s2 },
   labels: { display: "inline-flex", flexWrap: "wrap", gap: space.s2 },

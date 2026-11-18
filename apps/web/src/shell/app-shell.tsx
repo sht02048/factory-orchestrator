@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Dot, Menu, MenuRadio, MenuRadioOption, MenuSeparator } from "@factory/ui";
+import { Menu, MenuRadio, MenuRadioOption, MenuSeparator, StatusPill } from "@factory/ui";
 import {
   colors,
   fontSize,
@@ -13,6 +13,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
+import { useStatusName } from "../status";
 import { ALL_WORKSPACES } from "./model";
 import type { ShellData, WorkspaceChoice } from "./model";
 import { navIcons } from "./nav-icons";
@@ -48,6 +49,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const t = useTranslations("shell");
+  const statusName = useStatusName();
   return (
     <div {...stylex.props(styles.app)}>
       <aside {...stylex.props(styles.sidebar)}>
@@ -99,20 +101,17 @@ export function AppShell({
                     search={(prev) => ({ ws: prev.ws, sel: runner.id })}
                     {...stylex.props(styles.runner)}
                   >
-                    {runner.online ? (
-                      <Dot tone="online" label={t("runners.online")} />
-                    ) : (
-                      <Dot tone="offline" />
-                    )}
                     <span {...stylex.props(styles.runnerName)}>{runner.name}</span>
-                    <span {...stylex.props(styles.runnerLoad)}>
-                      {runner.online
-                        ? t("runners.load", {
-                            running: runner.occupied,
-                            capacity: runner.capacity,
-                          })
-                        : t("runners.offline")}
-                    </span>
+                    {runner.online ? (
+                      <span {...stylex.props(styles.runnerLoad)}>
+                        {t("runners.load", {
+                          running: runner.occupied,
+                          capacity: runner.capacity,
+                        })}
+                      </span>
+                    ) : (
+                      <StatusPill status="offline">{statusName("offline")}</StatusPill>
+                    )}
                   </Link>
                 </li>
               ))}
@@ -183,7 +182,7 @@ const styles = stylex.create({
     gap: space.s2,
     paddingBlock: space.s1,
     paddingInline: space.s2,
-    borderRadius: radius.md,
+    borderRadius: radius.control,
     color: colors.textPrimary,
     fontSize: fontSize.body,
     fontWeight: fontWeight.semibold,
@@ -195,7 +194,7 @@ const styles = stylex.create({
     placeItems: "center",
     width: 22,
     height: 22,
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
     backgroundColor: colors.accent,
     color: colors.textOnAccent,
     fontSize: fontSize.small,
@@ -211,7 +210,7 @@ const styles = stylex.create({
     gap: space.s2,
     height: 30,
     paddingInline: space.s2,
-    borderRadius: radius.md,
+    borderRadius: radius.control,
     backgroundColor: { default: "transparent", ":hover": colors.bgHover },
     color: { default: colors.textSecondary, ":hover": colors.textPrimary },
     fontWeight: fontWeight.medium,
@@ -246,7 +245,7 @@ const styles = stylex.create({
     gap: space.s2,
     height: 28,
     paddingInline: space.s2,
-    borderRadius: radius.md,
+    borderRadius: radius.control,
     backgroundColor: { default: "transparent", ":hover": colors.bgHover },
     color: colors.textSecondary,
     fontSize: fontSize.ui,

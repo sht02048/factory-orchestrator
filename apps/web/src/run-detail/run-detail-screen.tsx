@@ -13,17 +13,17 @@ import {
   PanelBlock,
   Section,
   SplitView,
-  Status,
+  StatusPill,
   Text,
 } from "@factory/ui";
-import type { StatusTone } from "@factory/ui";
+import type { PillStatus } from "@factory/ui";
 import { colors, fonts, fontSize, lineHeight, radius, space } from "@factory/ui/tokens.stylex";
-import type { SummaryOutcome } from "@factory/core";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { useFormatter, useTranslations } from "use-intl";
-import { useFormatDuration } from "../format/duration";
+import { useTranslations } from "use-intl";
+import { useTime } from "../format/time";
 import { useAgentName } from "../labels";
+import { runStatus, useStatusName } from "../status";
 import { canCancel } from "./model";
 import type { LogTailView, PendingInput, RunDetail, RunDetailPage, TimelineEvent } from "./model";
 
@@ -74,8 +74,9 @@ function NotFound({ runsHref }: { runsHref: string }) {
 function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const { run } = props;
   const t = useTranslations("run");
-  const status = useStatusLine();
-  const { tone, label, when } = status(run);
+  const statusLine = useStatusLine();
+  const statusName = useStatusName();
+  const { status, when } = statusLine(run);
   const pr = run.pullRequest;
   const cancelable = canCancel(run) && !run.cancelPending;
 
@@ -91,7 +92,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
 
       <header {...stylex.props(styles.head)}>
         <p {...stylex.props(styles.stateLine)}>
-          <Status tone={tone}>{label}</Status>
+          <StatusPill status={status}>{statusName(status)}</StatusPill>
           <Text variant="meta">{when}</Text>
           {run.cancelPending ? <Text variant="meta">{t("cancelPending")}</Text> : null}
         </p>
@@ -147,7 +148,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
         </Section>
       ) : null}
 
-      <LogTail log={run.log} onRefresh={props.onRefreshLog} />
+      <LogTail log={run.log} now={run.now} onRefresh={props.onRefreshLog} />
     </div>
   );
 }
@@ -155,7 +156,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
 function Reason({ run }: { run: RunDetail }) {
   const t = useTranslations("run.reason");
   const domain = useTranslations("domain");
-  const time = useTime();
+  const { clock } = useTime();
   const { status } = run;
   switch (status.state) {
     case "queued":
@@ -169,7 +170,7 @@ function Reason({ run }: { run: RunDetail }) {
     case "disconnected":
       return status.unreachableSince === null
         ? t("disconnected")
-        : t("disconnectedSince", { time: time(status.unreachableSince) });
+        : t("disconnectedSince", { time: clock(status.unreachableSince) });
     case "ended":
       return t(status.summary);
   }
@@ -210,7 +211,7 @@ function NextAction({ run }: { run: RunDetail }) {
     <div {...stylex.props(styles.stack)}>
       {manual ? (
         <p {...stylex.props(styles.flat)}>
-          <Status tone="failed">{t("manualRemoval")}</Status>
+          <Text variant="body">{t("manualRemoval")}</Text>
         </p>
       ) : null}
       <Text variant="body">{manual ? t("next.manualRemoval") : next}</Text>
@@ -393,7 +394,7 @@ function Timeline({ events }: { events: ReadonlyArray<TimelineEvent> }) {
   const t = useTranslations("run.timeline");
   const domain = useTranslations("domain");
   const laterPr = useTranslations("run.laterPr");
-  const time = useTime();
+  const { clock } = useTime();
   const eventDetail = (event: TimelineEvent): string | null => {
     switch (event.kind) {
       case "question":
@@ -424,7 +425,7 @@ function Timeline({ events }: { events: ReadonlyArray<TimelineEvent> }) {
         return (
           <li key={`${event.kind}-${index}`} {...stylex.props(styles.event)}>
             <time dateTime={event.at} {...stylex.props(styles.eventTime)}>
-              {time(event.at)}
+              {clock(event.at)}
             </time>
             <div {...stylex.props(styles.eventBody)}>
               <span>{t(event.kind)}</span>
@@ -437,9 +438,18 @@ function Timeline({ events }: { events: ReadonlyArray<TimelineEvent> }) {
   );
 }
 
-function LogTail({ log, onRefresh }: { log: LogTailView; onRefresh: () => void }) {
+function LogTail({
+  log,
+  now,
+  onRefresh,
+}: {
+  log: LogTailView;
+  now: string;
+  onRefresh: () => void;
+}) {
   const t = useTranslations("run.log");
-  const time = useTime();
+  const { ago } = useTime();
+  const time = (at: string): string => ago(at, Date.parse(now) - Date.parse(at));
   let note: string | undefined;
   let body: ReactNode;
   switch (log.kind) {
@@ -493,8 +503,9 @@ function Properties({ run, runHref }: { run: RunDetail; runHref: (runId: string)
   const ci = useTranslations("run.ci");
   const laterPr = useTranslations("run.laterPr");
   const other = useTranslations("run.otherRuns");
-  const duration = useFormatDuration();
-  const time = useTime();
+  const { duration, ago } = useTime();
+  const statusName = useStatusName();
+  const time = (at: string): string => ago(at, Date.parse(run.now) - Date.parse(at));
   const ended = run.status.state === "ended" ? run.status : null;
   const pr = run.pullRequest;
 
@@ -510,9 +521,7 @@ function Properties({ run, runHref }: { run: RunDetail; runHref: (runId: string)
             {ended === null ? (
               t("notEnded")
             ) : (
-              <Status tone={summaryTone(ended.summary)}>
-                {domain(`summary.${ended.summary}`)}
-              </Status>
+              <StatusPill status={ended.summary}>{statusName(ended.summary)}</StatusPill>
             )}
           </DefinitionItem>
           <DefinitionItem label={t("agentResult")} empty={ended === null}>
@@ -604,30 +613,16 @@ function Properties({ run, runHref }: { run: RunDetail; runHref: (runId: string)
   );
 }
 
-function summaryTone(summary: SummaryOutcome): StatusTone {
-  switch (summary) {
-    case "human-check":
-      return "check";
-    case "failed":
-      return "failed";
-    case "merged":
-    case "canceled":
-      return "neutral";
-  }
-}
-
-/** 상태 줄: Ended 는 요약 결과, 그 밖은 런 상태. 색은 Human Check·Failed 에만 쓴다(ADR 0007) */
-function useStatusLine(): (run: RunDetail) => { tone: StatusTone; label: string; when: string } {
+/** 상태 줄: Ended 는 요약 결과, 그 밖은 런 상태 */
+function useStatusLine(): (run: RunDetail) => { status: PillStatus; when: string } {
   const t = useTranslations("run.when");
-  const domain = useTranslations("domain");
-  const duration = useFormatDuration();
+  const { duration, elapsed } = useTime();
   return (run) => {
     const { status } = run;
     switch (status.state) {
       case "ended":
         return {
-          tone: summaryTone(status.summary),
-          label: domain(`summary.${status.summary}`),
+          status: runStatus(status),
           when:
             run.startedAt === null
               ? t("endedBeforeStart", { duration: duration(run.waitMs) })
@@ -635,33 +630,15 @@ function useStatusLine(): (run: RunDetail) => { tone: StatusTone; label: string;
         };
       case "queued":
         return {
-          tone: "neutral",
-          label: domain("runState.queued"),
+          status: runStatus(status),
           when: t("waitingFor", { duration: duration(run.waitMs) }),
         };
       case "running":
       case "waiting-for-input":
       case "disconnected":
-        return {
-          tone: "running",
-          label: domain(`runState.${status.state}`),
-          when: t("elapsedFor", { duration: duration(run.executionMs ?? 0) }),
-        };
+        return { status: runStatus(status), when: elapsed(run.executionMs ?? 0) };
     }
   };
-}
-
-/** 시각을 "11. 17. 09:30"처럼 쓴다. 표시 시간대는 i18n 설정을 따른다 */
-function useTime(): (iso: string) => string {
-  const format = useFormatter();
-  return (iso) =>
-    format.dateTime(new Date(iso), {
-      month: "numeric",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    });
 }
 
 const styles = stylex.create({
@@ -713,7 +690,7 @@ const styles = stylex.create({
     margin: 0,
     paddingBlock: space.s3,
     paddingInline: space.s4,
-    borderRadius: radius.md,
+    borderRadius: radius.control,
     backgroundColor: colors.bgInset,
     color: colors.textSecondary,
     fontFamily: fonts.mono,

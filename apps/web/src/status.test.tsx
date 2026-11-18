@@ -1,0 +1,173 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import { PILL_STATUSES, type PillStatus } from "@factory/ui";
+import { describe, expect, it } from "vitest";
+import domain from "../messages/ko/domain.json" with { type: "json" };
+import home from "../messages/ko/home.json" with { type: "json" };
+import runners from "../messages/ko/runners.json" with { type: "json" };
+import runs from "../messages/ko/runs.json" with { type: "json" };
+import settings from "../messages/ko/settings.json" with { type: "json" };
+import shell from "../messages/ko/shell.json" with { type: "json" };
+import stats from "../messages/ko/stats.json" with { type: "json" };
+import tickets from "../messages/ko/tickets.json" with { type: "json" };
+import { HomeScreen } from "./home/home-screen";
+import { loadHomePage } from "./home/load";
+import { homeMessages } from "./home/messages";
+import { loadRunsPage } from "./runs/load";
+import { runsMessages } from "./runs/messages";
+import { RunsScreen } from "./runs/runs-screen";
+import { useStatusName } from "./status";
+import { pillsOf } from "./testing/pills";
+import { renderWithMessages } from "./testing/render";
+import { now, seedDatabase } from "./testing/seed";
+
+/*
+ * 화면 낱말(ADR 0010 1·3번). 상태·종류 이름은 GLOSSARY 영어 용어, 메뉴·화면 이름은 영어 화면 이름이다.
+ * 렌더 결과 전체를 낱말로 거르지 않는다. 에이전트 결과("러너 연결 끊김")처럼 한국어로 두는 설명 값이 있다.
+ */
+
+/** 상태 값 → GLOSSARY 영어 용어 */
+const TERMS: Record<PillStatus, string> = {
+  queued: "Queued",
+  running: "Running",
+  "waiting-for-input": "Waiting for Input",
+  disconnected: "Disconnected",
+  merged: "Merged",
+  "human-check": "Human Check",
+  failed: "Failed",
+  canceled: "Canceled",
+  online: "Online",
+  offline: "Offline",
+  question: "Question",
+  permission: "Permission",
+  "runner-issue": "Runner Issue",
+};
+const TERM_NAMES = new Set(Object.values(TERMS));
+const SCREENS = ["Home", "Tickets", "Runs", "Runners", "Stats", "Settings"];
+
+describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
+  it("런 상태·요약 결과·러너 상태·손댈 일 종류는 GLOSSARY 영어 용어다", () => {
+    expect(domain.runState).toEqual({
+      queued: TERMS.queued,
+      running: TERMS.running,
+      "waiting-for-input": TERMS["waiting-for-input"],
+      disconnected: TERMS.disconnected,
+      ended: "Ended",
+    });
+    expect(domain.summary).toEqual({
+      merged: TERMS.merged,
+      "human-check": TERMS["human-check"],
+      failed: TERMS.failed,
+      canceled: TERMS.canceled,
+    });
+    expect(domain.runnerState).toEqual({ online: TERMS.online, offline: TERMS.offline });
+    expect(domain.attention).toEqual({
+      question: TERMS.question,
+      permission: TERMS.permission,
+      "human-check": TERMS["human-check"],
+      failed: TERMS.failed,
+      disconnected: TERMS.disconnected,
+      "runner-issue": TERMS["runner-issue"],
+    });
+  });
+
+  it("메뉴와 화면 제목은 영어 화면 이름이다", () => {
+    const { label: _label, ...nav } = shell.nav;
+    expect(Object.values(nav)).toEqual(SCREENS);
+    expect([home, tickets, runs, runners, stats, settings].map((m) => m.title)).toEqual(SCREENS);
+  });
+
+  it("화면 메시지의 상태 이름 자리도 영어 용어다", () => {
+    expect(home.section.running).toBe(TERMS.running);
+    expect(home.question.title).toBe(TERMS.question);
+    expect(home.permission.title).toBe(TERMS.permission);
+    expect(tickets.filter.running).toBe(TERMS.running);
+    expect(stats.columns.canceled).toBe(TERMS.canceled);
+    expect(stats.panel.canceled).toBe(TERMS.canceled);
+  });
+
+  it("useStatusName 은 상태 값마다 그 영어 용어를 준다", () => {
+    function Names() {
+      const name = useStatusName();
+      return <>{PILL_STATUSES.map((status) => `${status}=${name(status)};`).join("")}</>;
+    }
+    const html = renderWithMessages(<Names />);
+    for (const status of PILL_STATUSES) expect(html).toContain(`${status}=${TERMS[status]};`);
+  });
+});
+
+describe("화면의 상태 알약", () => {
+  it("Home·Runs 의 알약 글은 영어 용어이고 상태 값과 맞는다", () => {
+    const { db } = seedDatabase();
+    const pills = [
+      ...pillsOf(
+        renderWithMessages(
+          <HomeScreen
+            page={loadHomePage(db, "ws-commerce", now)}
+            selectedKey={undefined}
+            onSelect={() => {}}
+            onAnswer={() => Promise.resolve()}
+            onDeny={() => Promise.resolve()}
+          />,
+          homeMessages,
+        ),
+      ),
+      ...pillsOf(
+        renderWithMessages(
+          <RunsScreen
+            page={loadRunsPage(db, undefined, now)}
+            workspaces={[]}
+            filter="all"
+            selectedId={undefined}
+            onFilterChange={() => {}}
+            onSelect={() => {}}
+            onPickWorkspace={() => {}}
+            runHref={(id) => `/runs/${id}`}
+          />,
+          runsMessages,
+        ),
+      ),
+    ];
+    expect(pills.length).toBeGreaterThan(5);
+    for (const pill of pills) {
+      expect(TERM_NAMES.has(pill.label)).toBe(true);
+      expect(pill.label).toBe(new Map(Object.entries(TERMS)).get(pill.status));
+    }
+  });
+});
+
+describe("상태 표시 컴포넌트는 StatusPill 하나다(ADR 0010 4번)", () => {
+  const root = new URL(".", import.meta.url).pathname;
+  const files = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) return files(path);
+      return /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : [];
+    });
+
+  it("앱 코드는 @factory/ui 에서 다른 상태 표시(Status, Dot, Badge)를 가져오지 않는다", () => {
+    const offenders: string[] = [];
+    for (const file of files(root)) {
+      const source = readFileSync(file, "utf8");
+      for (const m of source.matchAll(
+        /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*"@factory\/ui"/g,
+      )) {
+        const names = (m[1] ?? "").split(",").map((n) => n.replace(/^\s*type\s+/, "").trim());
+        for (const name of names) {
+          if (/^(Status|StatusTone|Dot|DotTone|Badge)$/.test(name))
+            offenders.push(`${relative(root, file)}: ${name}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("앱 코드는 상태 색을 직접 고르지 않는다(statusTone·data-status 는 packages/ui 만)", () => {
+    const offenders = files(root)
+      .filter((file) => /statusTone\(|data-status=/.test(readFileSync(file, "utf8")))
+      .map((file) => relative(root, file))
+      // /ds 는 디자인 시스템 미리보기라 알약의 색 이름을 함께 보인다. testing/ 은 알약을 읽는 시험 도구다.
+      .filter((file) => !file.startsWith("ds/") && !file.startsWith("testing/"));
+    expect(offenders).toEqual([]);
+  });
+});

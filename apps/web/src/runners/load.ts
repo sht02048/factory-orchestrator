@@ -88,7 +88,13 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
                 project: prerequisiteProject(p.id, runner.projects),
                 satisfied: p.satisfied,
               })),
-      checkedAgoMs: runner.checkedAt === null ? null : now.getTime() - runner.checkedAt.getTime(),
+      checked:
+        runner.checkedAt === null
+          ? null
+          : {
+              at: runner.checkedAt.toISOString(),
+              agoMs: now.getTime() - runner.checkedAt.getTime(),
+            },
       capacity: runner.capacity,
       occupying: (occupying.get(runner.id) ?? []).toSorted((a, b) => b.executionMs - a.executionMs),
       queued: queued.get(runner.id) ?? [],
