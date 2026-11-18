@@ -82,7 +82,7 @@ node factory-orchestrator-<version>/cli/bin/cli.js init
 node factory-orchestrator-<version>/cli/bin/cli.js start
 ```
 
-To upgrade, build a new bundle, stop the orchestrator, replace the folder, and start it again. Your settings and data stay in the installation folder described below, not in the bundle.
+To upgrade, build a new bundle, stop the orchestrator, extract the new bundle, and start it from there. The folder name includes the version, so if you run the orchestrator as a service, run `service uninstall` with the old bundle and `service install` with the new one. Your settings and data stay in the installation folder described below, not in the bundle.
 
 You can also run the CLI straight from the repository after `pnpm build`, with `node apps/cli/dist/bin/cli.js <command>` (or `pnpm --filter @factory/cli cli <command>`).
 

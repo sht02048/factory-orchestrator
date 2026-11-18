@@ -52,5 +52,7 @@ factory-orchestrator-<version>/
 ## 남은 위험
 
 - 묶은 서드파티 코드의 라이선스 고지를 따로 모으지 않았다. 배포물을 공개하기 전(0031)에 정한다.
+- web 서버 번들의 TanStack Start 매니페스트(`web/server/assets/_tanstack-start-manifest_v-*.js`)에 빌드한 기계의 라우트 소스 절대 경로(`filePath`)가 남는다. 배포물을 남에게 넘기면 빌드한 사람의 홈 경로가 보인다. 공개 전(0031)에 지우거나 바꾸고, 정적 검사에 절대 경로 검사를 더한다.
+- 정적 검사의 import 찾기는 줄 맨 앞의 import·export만 본다. 지금 번들은 줄이지 않아(minify 없음) 맞지만, 줄이면 한 줄에 붙은 import를 놓친다.
 - 시험은 macOS arm64(로컬)와 ubuntu(CI)에서 돌았다. 배포물에는 네이티브 모듈이 없어 플랫폼에 기대지 않지만, 다른 플랫폼의 Electron으로는 확인하지 않았다.
 - Electron `runAsNode` fuse를 끄면 `ELECTRON_RUN_AS_NODE`로 띄우는 방법이 막힌다(research 0012 「남은 위험」). 0046에서 정한다.
