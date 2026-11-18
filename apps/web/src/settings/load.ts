@@ -50,7 +50,7 @@ function addressesView(settings: AddressesView): AddressesView {
 }
 
 /**
- * 러너 설정에서 Settings 가 고치는 값. runners/load.ts 와 같은 이름이다(sshTarget, orcaPath).
+ * 러너 설정에서 Settings 가 고치는 값(sshTarget, orcaPath). runners/load.ts 는 sshTarget 만 읽는다.
  * 모양이 다르면 빈 값으로 보인다.
  */
 const runnerConfigSchema = z.object({

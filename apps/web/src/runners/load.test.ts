@@ -72,7 +72,6 @@ describe("loadRunnersPage", () => {
       ["runner-a", true, 120 * 60_000],
       ["runner-b", false, 120 * 60_000],
     ]);
-    expect(runner(db, "runner-a").projects).toEqual(["github:acme/web"]);
   });
 
   it("capacity 사용량은 Running·Waiting for Input·Disconnected 런을 센다(Q74)", () => {
@@ -119,18 +118,29 @@ describe("loadRunnersPage", () => {
 
   it("GitHub 인증이 깨진 러너는 할당에서 빠졌다고 담고 프로젝트별 결과를 담는다(Q82.14·Q82.15)", () => {
     const { db } = seedDatabase();
-    expect(runner(db, "runner-a")).toMatchObject({ assignmentBlocked: false, githubAuth: null });
+    expect(runner(db, "runner-a")).toMatchObject({ assignmentBlocked: false, checks: null });
     breakGitHubAuth(db);
     const a = runner(db, "runner-a");
     expect(a.online).toBe(true);
     expect(a.assignmentBlocked).toBe(true);
-    // 할당을 막지 않는 필수 조건(상시 서비스)은 담지 않는다
-    expect(a.githubAuth).toEqual([
+    // 할당을 막지 않는 필수 조건(상시 서비스)도 확인 항목으로 담는다
+    expect(a.checks).toEqual([
+      {
+        id: "service",
+        name: "Orca service",
+        project: null,
+        satisfied: true,
+        blocksAssignment: false,
+        hint: null,
+      },
       {
         id: "github-push:github:acme/web",
         name: "GitHub push access: acme/web",
         project: "github:acme/web",
         satisfied: false,
+        blocksAssignment: true,
+        // GitHub push 의 해결 방법은 화면 메시지로 보여 어댑터 안내를 담지 않는다
+        hint: null,
       },
       {
         id: "github-push:github:acme/docs",
@@ -138,6 +148,8 @@ describe("loadRunnersPage", () => {
         // runner-a 의 러너 쪽 프로젝트에 없다
         project: null,
         satisfied: true,
+        blocksAssignment: true,
+        hint: null,
       },
     ]);
   });
@@ -159,9 +171,9 @@ describe("loadRunnersPage", () => {
     expect(workspaces.get("LAB-1")).toBe("Acme Labs");
   });
 
-  it("러너 설정의 ssh 대상과 orca 경로를 보이고, 없거나 모양이 다르면 비운다", () => {
+  it("러너 설정의 ssh 대상을 보이고, 없거나 모양이 다르면 비운다", () => {
     const { db } = seedDatabase();
-    expect(runner(db, "runner-a")).toMatchObject({ sshTarget: null, orcaPath: null });
+    expect(runner(db, "runner-a")).toMatchObject({ sshTarget: null });
     saveRunner(db, {
       id: toRunnerId("runner-a"),
       kind: toRunnerKind("fake"),
@@ -169,18 +181,15 @@ describe("loadRunnersPage", () => {
       config: { sshTarget: "factory@runner-a.example.com", orcaPath: "/usr/local/bin/orca" },
       capacity: 10,
     });
-    expect(runner(db, "runner-a")).toMatchObject({
-      sshTarget: "factory@runner-a.example.com",
-      orcaPath: "/usr/local/bin/orca",
-    });
+    expect(runner(db, "runner-a")).toMatchObject({ sshTarget: "factory@runner-a.example.com" });
     saveRunner(db, {
       id: toRunnerId("runner-a"),
       kind: toRunnerKind("fake"),
       name: "runner-a",
-      config: { sshTarget: 3, orcaPath: "" },
+      config: { sshTarget: 3 },
       capacity: 10,
     });
-    expect(runner(db, "runner-a")).toMatchObject({ sshTarget: null, orcaPath: null });
+    expect(runner(db, "runner-a")).toMatchObject({ sshTarget: null });
   });
 });
 
