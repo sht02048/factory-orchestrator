@@ -9,6 +9,7 @@ The control tower of a software factory. It assigns tickets from a tracker to ru
 | `apps/web`                 | UI, server functions, and the Linear webhook receiver (TanStack Start)                    | Started |
 | `apps/worker`              | Long-running daemon for the assignment queue, runner commands, and run and PR polling     | Started |
 | `apps/cli`                 | `init`, `start`, and launchd/systemd service registration                                 | Started |
+| `apps/desktop`             | macOS desktop app (Electron): window, tray, and notifications; runs the server bundle     | Started |
 | `packages/core`            | Domain logic and the Tracker, Runner, and CodeHost adapter interfaces                     | Stub    |
 | `packages/db`              | SQLite (WAL) schema, access, and migrations                                               | Started |
 | `packages/ui`              | Design system (StyleX + UI SDK)                                                           | Started |
@@ -40,7 +41,7 @@ pnpm install   # also installs the lefthook pre-commit hook
 | `pnpm format:check` | Checks formatting                                               |
 | `pnpm test`         | Runs Vitest (browser tests need Google Chrome)                  |
 | `pnpm check:colors` | Checks for raw color values outside `packages/ui`               |
-| `pnpm build`        | Builds the web app, the worker, and the CLI                     |
+| `pnpm build`        | Builds the web app, the worker, the CLI, and the desktop app    |
 | `pnpm smoke:web`    | Starts the production web build and checks a page               |
 | `pnpm smoke:cli`    | Runs the built CLI's `init` and `start` and checks a page       |
 | `pnpm bundle`       | Packs the builds into a server bundle in `dist/`                |
@@ -108,6 +109,7 @@ factory-orchestrator start    # applies database migrations, then runs the web s
 ```
 
 - `init` writes `<home>/.env` (readable only by you) with the bind address `127.0.0.1`, port `3000`, the database `<home>/data/factory-orchestrator.db`, and a newly generated encryption key. Change them with `--host`, `--port`, and `--database-path`, or edit the file later. If `.env` already exists, `init` leaves it unchanged, so the encryption key never changes by accident. If you lose or change the key, you have to enter the tokens again.
+- `start` holds a lock file, `<home>/server.lock`, while it runs, so only one `start` (one web server and one worker) runs per installation folder. A second `start` for the same folder exits with an error. A lock left behind by a process that no longer exists is taken over.
 - `start` reads `<home>/.env`. Shell environment variables with the same names (`WEB_HOST`, `WEB_PORT`, `DATABASE_PATH`, `ENCRYPTION_KEY`) override it. It applies pending database migrations, starts the web server and the worker, and prints the web address once it responds. If either process exits, `start` stops the other one and exits with an error, so a service manager can restart both. `SIGINT` or `SIGTERM` stops both.
 - After an upgrade, run `start` again (or restart the service). It applies new migrations before anything else starts.
 
@@ -130,6 +132,43 @@ Requests that change data (including server functions) must also come from a pag
 - Run `init` first. `service install` refuses to register a service that would fail to boot, and refuses to overwrite an existing service file.
 - The service runs the Node and CLI paths you installed it with, and uses your current `PATH`. After you move or upgrade Node, or move the server bundle to another folder, run `service uninstall` and `service install` again.
 - On macOS, logs go to `<home>/logs/factory-orchestrator.log`. On Linux, read them with `journalctl --user -u factory-orchestrator.service`, and run `loginctl enable-linger` once so the service keeps running after you log out.
+
+## Desktop app (macOS)
+
+`apps/desktop` is an Electron app with a window, a menu bar (tray) icon, and notifications. Its window shows the same web app. There is no published build yet: build and package it yourself as described below. It is not signed, so macOS asks you to confirm before it opens the first time (Control-click the app, then **Open**).
+
+### Which setup to choose
+
+- **A machine that is always on** (a desktop or a server): run the orchestrator as a service, as described in [Run as a service](#run-as-a-service). launchd or systemd keeps it running and restarts it after a failure.
+- **Your laptop**: use the desktop app's local mode (**이 기계에서 서버 돌리기**, run the server on this machine). The app starts the server in the background, separate from the app itself. Closing or quitting the app leaves the server running; only **서버도 끄고 종료** (quit and stop the server) in the tray menu stops it. **서버 멈추기** and **서버 켜기** stop and start it without quitting. While the app is open, it restarts the server if it crashes. When the laptop sleeps, the server sleeps too, so runs are only watched while the laptop is awake.
+- **Another machine already runs the orchestrator**: use the desktop app's remote mode (**다른 서버에 붙기**, connect to another server) to open it and get notifications. The tray then only shows whether the server is reachable.
+
+On a machine where the service is already installed or running for the same installation folder, the app does not start a second server: it connects to the service and only shows its status. If the service runs a different version than the app, the app tells you once.
+
+### Build and run it locally
+
+```sh
+pnpm install
+pnpm build
+pnpm bundle                                                            # the server bundle the app ships
+pnpm --filter @factory/desktop exec node node_modules/electron/install.js   # downloads Electron once
+pnpm --filter @factory/desktop run package
+```
+
+This writes `apps/desktop/dist/app/Factory Orchestrator-darwin-<arch>/Factory Orchestrator.app` and a `.zip` of it. The app carries the server bundle unchanged in `Contents/Resources/server/` and runs it with its own Node (Electron's), so the machine does not need Node. For development, `pnpm --filter @factory/desktop start` runs the app from the repository with the bundle in `dist/`.
+
+The app uses the same installation folder as the CLI (`~/.factory-orchestrator`, or `FACTORY_HOME`). It writes the server's output to `<home>/logs/desktop-server.log`.
+
+### First launch
+
+The app asks how you want to use it:
+
+- **이 기계에서 서버 돌리기** (run the server on this machine): the app runs `init` if needed, starts the server, and opens onboarding. It also asks whether to start the server when you log in (on by default).
+- **다른 서버에 붙기** (connect to another server): the app lists the orchestrator servers in your Tailscale tailnet. It reads the device list from the Tailscale app already signed in on this Mac (`tailscale status --json`; no extra sign-in) and asks each online device `http://<device>:3000/api/identity`, then `https://<device>/api/identity`. Pick a server to open it. If Tailscale is not installed or not running, or the server uses another port, enter the port or the server's address (the **Web address** from that server's Settings > Addresses). The app remembers the server and opens it next time; if it cannot reach it, it shows that and opens the server as soon as it answers again.
+
+We recommend serving the app to other devices with Tailscale Serve (HTTPS on the device's MagicDNS name) and setting that address as the **Web address**, as described in [Open it from other devices](#open-it-from-other-devices).
+
+The app shows a notification when an agent asks a question, waits for a permission, a run needs a Human Check, or a runner goes Offline. It polls the server's `GET /api/attention` for these.
 
 ## Work items
 
