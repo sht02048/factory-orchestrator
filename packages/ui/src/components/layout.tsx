@@ -31,6 +31,10 @@ export function SplitView({ list, panel, fill = true, variant = "list" }: SplitV
   );
 }
 
+export function NoticeLayout({ children }: { children: ReactNode }) {
+  return <div {...stylex.props(styles.notice)}>{children}</div>;
+}
+
 export interface PageHeaderProps {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -49,7 +53,7 @@ export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
   );
 }
 
-export type SectionTitleRole = "section" | "heading" | "subheading";
+export type SectionTitleRole = "heading" | "subheading";
 
 export interface SectionProps {
   title: ReactNode;
@@ -67,7 +71,7 @@ export interface SectionLink {
 
 export function Section({
   title,
-  titleRole = "section",
+  titleRole = "subheading",
   count,
   note,
   link,
@@ -76,14 +80,8 @@ export function Section({
   const Heading = titleRole === "subheading" ? "h3" : "h2";
   return (
     <section {...stylex.props(styles.section)}>
-      <div
-        {...stylex.props(styles.sectionHead, titleRole !== "section" && styles.sectionHeadLarge)}
-      >
-        <Heading
-          {...stylex.props(titleRole === "section" ? styles.sectionTitle : textStyles(titleRole))}
-        >
-          {title}
-        </Heading>
+      <div {...stylex.props(styles.sectionHead)}>
+        <Heading {...stylex.props(textStyles(titleRole))}>{title}</Heading>
         {count === undefined ? null : <span {...stylex.props(styles.count)}>{count}</span>}
         {note === undefined ? null : <span {...stylex.props(styles.note)}>{note}</span>}
         {link === undefined ? null : (
@@ -143,6 +141,12 @@ const LIST_STACKED = "@container (max-width: 959px)";
 const EDITOR_STACKED = "@container (max-width: 679px)";
 
 const styles = stylex.create({
+  notice: {
+    maxWidth: size.noticeWidth,
+    paddingTop: space.s8,
+    paddingInline: space.s8,
+    paddingBottom: space.s10,
+  },
   frame: { containerType: "inline-size", minHeight: 0 },
   split: {
     display: "grid",
@@ -212,15 +216,8 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "baseline",
     gap: space.s2,
-    marginBottom: space.s2,
+    marginBottom: space.s3,
   },
-  sectionTitle: {
-    margin: 0,
-    color: colors.textPrimary,
-    fontSize: fontSize.body,
-    fontWeight: fontWeight.semibold,
-  },
-  sectionHeadLarge: { marginBottom: space.s3 },
   count: { color: colors.textTertiary, fontVariantNumeric: "tabular-nums" },
   sectionLink: {
     flexShrink: 0,

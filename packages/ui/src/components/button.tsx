@@ -16,6 +16,11 @@ export interface ButtonProps {
   onClick?: SdkButtonProps["onClick"];
   "aria-label"?: string;
   "aria-expanded"?: boolean;
+  "aria-pressed"?: boolean;
+  "aria-controls"?: string;
+  "aria-describedby"?: string;
+  "aria-busy"?: boolean;
+  "aria-disabled"?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
 
@@ -25,7 +30,7 @@ export function Button({ variant = "secondary", children, onClick, ...props }: B
       {...props}
       data-variant={variant}
       {...(onClick === undefined ? {} : { onClick })}
-      className={(s) => cx(...buttonStyles(variant, s.disabled))}
+      className={(s) => cx(...buttonStyles(variant, s.disabled || props["aria-disabled"] === true))}
     >
       {children}
     </SdkButton>

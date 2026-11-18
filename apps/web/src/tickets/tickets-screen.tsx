@@ -9,6 +9,7 @@ import {
   DetailPanel,
   Input,
   MascotMessage,
+  NoticeLayout,
   PageHeader,
   PanelFooter,
   RowTitle,
@@ -36,13 +37,6 @@ import { AssignDialog } from "./assign-dialog";
 import { TICKET_FILTERS, countByFilter, lastRun, matchesFilter, matchesSearch } from "./model";
 import type { TicketFilter, TicketRun, TicketView, TicketsPage } from "./model";
 import { useRowWindow } from "./row-window";
-
-const LAYOUT = {
-  keyColumn: "112px",
-  trackerProjectColumn: "128px",
-  lastRunColumn: "160px",
-  noticeMaxWidth: "720px",
-} as const;
 
 export interface TicketsScreenProps {
   page: TicketsPage;
@@ -78,10 +72,10 @@ export function TicketsScreen(props: TicketsScreenProps) {
 function Notice({ body }: { body: ReactNode }) {
   const t = useTranslations("tickets");
   return (
-    <div {...stylex.props(styles.notice)}>
+    <NoticeLayout>
       <PageHeader title={t("title")} subtitle={t("intro")} />
       {body}
-    </div>
+    </NoticeLayout>
   );
 }
 
@@ -114,10 +108,10 @@ function AllWorkspaces({
 
 function tableColumns(showTrackerProject: boolean): string {
   return [
-    LAYOUT.keyColumn,
+    size.ticketKeyColumn,
     "minmax(0, 1fr)",
-    ...(showTrackerProject ? [LAYOUT.trackerProjectColumn] : []),
-    LAYOUT.lastRunColumn,
+    ...(showTrackerProject ? [size.projectColumn] : []),
+    size.lastRunColumn,
   ].join(" ");
 }
 
@@ -197,16 +191,16 @@ function TicketsList({
                   count: counts[key],
                 }))}
               />
-              <label {...stylex.props(styles.search)}>
-                <span {...stylex.props(styles.searchLabel)}>{t("search.label")}</span>
+              <div {...stylex.props(styles.search)}>
                 <Input
                   type="search"
+                  aria-label={t("search.label")}
                   value={query}
                   onValueChange={setQuery}
                   placeholder={t("search.placeholder")}
                   autoComplete="off"
                 />
-              </label>
+              </div>
             </div>
           </div>
           <div {...stylex.props(styles.tableFrame)}>
@@ -502,12 +496,6 @@ function RunTiming({ run }: { run: TicketRun }) {
 }
 
 const styles = stylex.create({
-  notice: {
-    maxWidth: LAYOUT.noticeMaxWidth,
-    paddingTop: space.s8,
-    paddingInline: space.s8,
-    paddingBottom: space.s10,
-  },
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
   listFrame: {
     display: "grid",
@@ -528,16 +516,8 @@ const styles = stylex.create({
     flexGrow: 1,
     flexShrink: 1,
     flexBasis: 0,
-    minWidth: size.sidebarWidth,
-    maxWidth: size.editorListWidth,
-  },
-  searchLabel: {
-    position: "absolute",
-    width: space.px2,
-    height: space.px2,
-    overflow: "hidden",
-    clipPath: "inset(50%)",
-    whiteSpace: "nowrap",
+    minWidth: size.searchMinWidth,
+    maxWidth: size.searchMaxWidth,
   },
   tableFrame: { display: "grid", gridTemplateRows: "minmax(0, 1fr)", minHeight: 0 },
   scroll: {

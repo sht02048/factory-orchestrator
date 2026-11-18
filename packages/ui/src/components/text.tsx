@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
+import { focusStyles } from "./focus";
 import { colors, fonts, fontSize, fontWeight, letterSpacing, lineHeight } from "../tokens.stylex";
 
 export const TEXT_VARIANTS = [
@@ -8,7 +9,6 @@ export const TEXT_VARIANTS = [
   "heading",
   "panel",
   "subheading",
-  "section",
   "title",
   "body",
   "ui",
@@ -26,7 +26,6 @@ const defaultElement: Record<TextVariant, TextElement> = {
   heading: "h2",
   panel: "h2",
   subheading: "h3",
-  section: "h2",
   title: "span",
   body: "p",
   ui: "span",
@@ -34,24 +33,50 @@ const defaultElement: Record<TextVariant, TextElement> = {
   label: "span",
 };
 
+export const TEXT_TONES = ["strong", "muted", "disabled", "problem"] as const;
+
+export type TextTone = (typeof TEXT_TONES)[number];
+
 export interface TextProps {
   variant: TextVariant;
   as?: TextElement;
+  tone?: TextTone;
   numeric?: boolean;
   mono?: boolean;
   truncate?: boolean;
+  wrap?: "anywhere" | "pre";
+  id?: string;
+  role?: "status" | "alert";
+  tabIndex?: -1;
+  ref?: Ref<HTMLElement>;
   children: ReactNode;
 }
 
-export function Text({ variant, as, numeric, mono, truncate, children }: TextProps) {
+export function Text({
+  variant,
+  as,
+  tone,
+  numeric,
+  mono,
+  truncate,
+  wrap,
+  ref,
+  children,
+  ...attributes
+}: TextProps) {
   const Element = as ?? defaultElement[variant];
   return (
     <Element
+      {...attributes}
+      ref={ref === undefined ? undefined : (node: HTMLElement | null) => assignRef(ref, node)}
       {...stylex.props(
-        textStyles(variant),
+        textStyles(variant, tone),
         numeric === true && styles.numeric,
         mono === true && styles.mono,
         truncate === true && styles.truncate,
+        wrap === "anywhere" && styles.anywhere,
+        wrap === "pre" && styles.preWrap,
+        attributes.tabIndex === -1 && focusStyles.ring,
       )}
     >
       {children}
@@ -59,9 +84,21 @@ export function Text({ variant, as, numeric, mono, truncate, children }: TextPro
   );
 }
 
-export function textStyles(role: TextVariant) {
-  return [styles.reset, roles[role]] as const;
+function assignRef(ref: Ref<HTMLElement>, node: HTMLElement | null) {
+  if (typeof ref === "function") ref(node);
+  else if (ref !== null) ref.current = node;
 }
+
+export function textStyles(role: TextVariant, tone?: TextTone) {
+  return [styles.reset, roles[role], tone === undefined ? null : tones[tone]] as const;
+}
+
+const tones = stylex.create({
+  strong: { color: colors.textPrimary },
+  muted: { color: colors.textTertiary },
+  disabled: { color: colors.textDisabled },
+  problem: { color: colors.problem },
+});
 
 const roles = stylex.create({
   display: {
@@ -104,12 +141,6 @@ const roles = stylex.create({
     letterSpacing: letterSpacing.panel,
     textWrap: "pretty",
   },
-  section: {
-    color: colors.textPrimary,
-    fontSize: fontSize.body,
-    fontWeight: fontWeight.semibold,
-    lineHeight: lineHeight.normal,
-  },
   title: {
     color: colors.textPrimary,
     fontSize: fontSize.body,
@@ -144,6 +175,8 @@ const styles = stylex.create({
   reset: { margin: 0 },
   numeric: { fontVariantNumeric: "tabular-nums" },
   mono: { fontFamily: fonts.mono, fontSize: "0.92em" },
+  anywhere: { overflowWrap: "anywhere" },
+  preWrap: { whiteSpace: "pre-wrap", overflowWrap: "anywhere" },
   truncate: {
     display: "block",
     overflow: "hidden",

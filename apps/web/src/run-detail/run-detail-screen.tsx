@@ -2,8 +2,8 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
-  buttonStyles,
   Card,
+  CodeBlock,
   DefinitionItem,
   DefinitionList,
   Dialog,
@@ -14,18 +14,13 @@ import {
   Row,
   StatusPill,
   Text,
+  focusStyles,
+  linkStyles,
+  NoticeLayout,
+  textStyles,
 } from "@factory/ui";
 import type { PillStatus } from "@factory/ui";
-import {
-  colors,
-  fonts,
-  fontSize,
-  fontWeight,
-  lineHeight,
-  radius,
-  size,
-  space,
-} from "@factory/ui/tokens.stylex";
+import { breakpoints, size, space } from "@factory/ui/tokens.stylex";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
@@ -57,13 +52,15 @@ export function RunDetailScreen(props: RunDetailScreenProps) {
 function NotFound({ runsHref }: { runsHref: string }) {
   const t = useTranslations("run.notFound");
   return (
-    <div {...stylex.props(styles.notice)}>
+    <NoticeLayout>
       <PageHeader title={t("title")} />
-      <Text variant="body">{t("body")}</Text>
-      <a href={runsHref} {...stylex.props(styles.link)}>
-        {t("back")}
-      </a>
-    </div>
+      <div {...stylex.props(styles.noticeBody)}>
+        <Text variant="body">{t("body")}</Text>
+        <a href={runsHref} {...stylex.props(linkStyles())}>
+          {t("back")}
+        </a>
+      </div>
+    </NoticeLayout>
   );
 }
 
@@ -80,25 +77,20 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
 
   return (
     <div {...stylex.props(styles.main)}>
-      <nav aria-label={t("crumb.label")} {...stylex.props(styles.crumb)}>
-        <a href={props.runsHref} {...stylex.props(styles.crumbLink, styles.focusRing)}>
+      <nav aria-label={t("crumb.label")} {...stylex.props(textStyles("ui"), styles.crumb)}>
+        <a href={props.runsHref} {...stylex.props(linkStyles("quiet"), styles.crumbLink)}>
           <span aria-hidden="true">‹</span>
           {t("crumb.runs")}
         </a>
       </nav>
 
-      <header ref={headRef} tabIndex={-1} {...stylex.props(styles.head, styles.focusTarget)}>
+      <header ref={headRef} tabIndex={-1} {...stylex.props(styles.head, focusStyles.target)}>
         <p {...stylex.props(styles.stateLine)}>
           <StatusPill status={status}>{statusName(status)}</StatusPill>
           <Text variant="meta">{when}</Text>
-          <span
-            ref={cancelStatusRef}
-            role="status"
-            tabIndex={-1}
-            {...stylex.props(styles.meta, styles.focusRing)}
-          >
+          <Text variant="meta" ref={cancelStatusRef} role="status" tabIndex={-1}>
             {run.cancelPending ? t("cancelPending") : null}
-          </span>
+          </Text>
         </p>
         <div {...stylex.props(styles.titleRow)}>
           <Text variant="page" as="h1">
@@ -107,7 +99,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
           {pr === null && !cancelable ? null : (
             <Actions>
               {pr === null ? null : (
-                <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
+                <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
                   {t("openPr", { pr: pr.displayId })}
                 </a>
               )}
@@ -144,7 +136,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
           {run.startError === null ? null : (
             <Block title={t("startError.title")}>
               <Text variant="body">{t("startError.body")}</Text>
-              <pre {...stylex.props(styles.pre)}>{run.startError}</pre>
+              <CodeBlock>{run.startError}</CodeBlock>
             </Block>
           )}
 
@@ -153,7 +145,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
               {run.report === null ? (
                 <Text variant="meta">{t("report.none")}</Text>
               ) : (
-                <pre {...stylex.props(styles.pre)}>{run.report}</pre>
+                <CodeBlock>{run.report}</CodeBlock>
               )}
             </Block>
           ) : null}
@@ -185,7 +177,7 @@ function Block({
   return (
     <Card label={title} padding={compact ? "compact" : "normal"}>
       <div {...stylex.props(styles.blockHead, compact && styles.blockHeadCompact)}>
-        <Text variant="section" as="h2">
+        <Text variant="subheading" as="h2">
           {title}
         </Text>
         {aside === undefined ? null : aside}
@@ -208,9 +200,9 @@ function focusFirst(...targets: ReadonlyArray<RefObject<HTMLElement | null>>): v
 function ActionFailed() {
   const t = useTranslations("run");
   return (
-    <p role="alert" {...stylex.props(styles.error)}>
+    <Text variant="ui" as="p" tone="problem" role="alert">
       {t("actionFailed")}
-    </p>
+    </Text>
   );
 }
 
@@ -275,7 +267,9 @@ function NextAction({ run }: { run: RunDetail }) {
   const manual = status.state === "ended" && status.worktreeNeedsManualRemoval;
   return manual ? (
     <p {...stylex.props(styles.flat)}>
-      <span {...stylex.props(styles.problemNote)}>{t("manualRemoval")}</span>{" "}
+      <Text variant="title" tone="problem">
+        {t("manualRemoval")}
+      </Text>{" "}
       <Text variant="body">{t("next.manualRemoval")}</Text>
     </p>
   ) : (
@@ -391,16 +385,13 @@ function QuestionForm({
   return (
     <Card label={t("question.title")}>
       <InputHead kind="question" waitedMs={waitedMs} />
-      <pre {...stylex.props(styles.question)}>{question.body}</pre>
+      <Text variant="panel" as="p" wrap="pre">
+        {question.body}
+      </Text>
       {submit.kind === "sent" || question.answered ? (
-        <p
-          ref={resultRef}
-          role="status"
-          tabIndex={-1}
-          {...stylex.props(styles.result, styles.focusRing)}
-        >
+        <Text variant="body" as="p" ref={resultRef} role="status" tabIndex={-1}>
           {t("question.sent")}
-        </p>
+        </Text>
       ) : (
         <form
           {...stylex.props(styles.stack)}
@@ -464,16 +455,13 @@ function PermissionWait({
     <Card label={t("permission.title")}>
       <InputHead kind="permission" waitedMs={waitedMs} />
       <div {...stylex.props(styles.stack)}>
-        <pre {...stylex.props(styles.question)}>{wait.detail}</pre>
+        <Text variant="panel" as="p" wrap="pre">
+          {wait.detail}
+        </Text>
         {submit.kind === "sent" || wait.denied ? (
-          <p
-            ref={resultRef}
-            role="status"
-            tabIndex={-1}
-            {...stylex.props(styles.result, styles.focusRing)}
-          >
+          <Text variant="body" as="p" ref={resultRef} role="status" tabIndex={-1}>
             {t("permission.denied")}
-          </p>
+          </Text>
         ) : (
           <form
             {...stylex.props(styles.stack)}
@@ -572,15 +560,19 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
             <li key={`${event.kind}-${index}`}>
               <Row
                 trailing={
-                  <time dateTime={event.at} {...stylex.props(styles.eventTime)}>
+                  <time dateTime={event.at} {...stylex.props(textStyles("meta"))}>
                     {stamp(event.at, now)}
                   </time>
                 }
               >
                 <span {...stylex.props(styles.eventBody)}>
-                  <span {...stylex.props(styles.eventTitle)}>{t(event.kind)}</span>
+                  <Text variant="ui" tone="strong">
+                    {t(event.kind)}
+                  </Text>
                   {detail === null ? null : (
-                    <span {...stylex.props(styles.eventDetail)}>{detail}</span>
+                    <Text variant="meta" wrap="pre">
+                      {detail}
+                    </Text>
                   )}
                 </span>
               </Row>
@@ -634,9 +626,8 @@ function LogTail({
       title={t("title")}
       aside={
         live ? (
-          <button
-            type="button"
-            data-variant="ghost"
+          <Button
+            variant="ghost"
             aria-disabled={refreshing}
             onClick={() => {
               if (refreshing) return;
@@ -646,19 +637,18 @@ function LogTail({
                 () => setRefresh("failed"),
               );
             }}
-            {...stylex.props(...buttonStyles("ghost", refreshing))}
           >
             {refreshing ? t("refreshing") : t("refresh")}
-          </button>
+          </Button>
         ) : undefined
       }
     >
       {note === undefined ? null : <Text variant="meta">{note}</Text>}
       {body}
       {refresh === "failed" ? (
-        <p role="alert" {...stylex.props(styles.error)}>
+        <Text variant="ui" as="p" tone="problem" role="alert">
           {t("refreshFailed")}
-        </p>
+        </Text>
       ) : null}
     </Block>
   );
@@ -674,15 +664,9 @@ function LogLines({ lines }: { lines: ReadonlyArray<string> }) {
   }, [text]);
   if (lines.length === 0) return <Text variant="meta">{t("empty")}</Text>;
   return (
-    <pre
-      ref={ref}
-      tabIndex={0}
-      role="region"
-      aria-label={t("linesLabel")}
-      {...stylex.props(styles.pre, styles.log, styles.focusRing)}
-    >
+    <CodeBlock ref={ref} scroll label={t("linesLabel")}>
       {text}
-    </pre>
+    </CodeBlock>
   );
 }
 
@@ -724,7 +708,7 @@ function Properties({ run }: { run: RunDetail }) {
           {pr === null ? (
             t("none")
           ) : (
-            <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
+            <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
               {pr.displayId}
             </a>
           )}
@@ -757,12 +741,16 @@ function Properties({ run }: { run: RunDetail }) {
         )}
         {run.branch === null ? null : (
           <DefinitionItem label={t("branch")}>
-            <span {...stylex.props(styles.mono)}>{run.branch}</span>
+            <Text variant="ui" tone="strong" mono>
+              {run.branch}
+            </Text>
           </DefinitionItem>
         )}
         {run.worktree === null ? null : (
           <DefinitionItem label={t("worktree")}>
-            <span {...stylex.props(styles.mono)}>{run.worktree}</span>
+            <Text variant="ui" tone="strong" mono>
+              {run.worktree}
+            </Text>
           </DefinitionItem>
         )}
       </DefinitionList>
@@ -783,7 +771,7 @@ function OtherRuns({ run, runHref }: { run: RunDetail; runHref: (runId: string) 
           return (
             <li key={o.id}>
               <Row trailing={<StatusPill status={status}>{statusName(status)}</StatusPill>}>
-                <a href={runHref(o.id)} {...stylex.props(styles.link)}>
+                <a href={runHref(o.id)} {...stylex.props(linkStyles())}>
                   {ago(o.assignedAt, Date.parse(run.now) - Date.parse(o.assignedAt))}
                 </a>
               </Row>
@@ -823,46 +811,23 @@ function useStatusLine(): (run: RunDetail) => { status: PillStatus; when: string
 }
 
 const styles = stylex.create({
-  notice: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s4,
-    maxWidth: 720,
-    paddingTop: space.s8,
-    paddingInline: space.s8,
-    paddingBottom: space.s10,
-  },
+  noticeBody: { display: "flex", flexDirection: "column", gap: space.s4 },
   main: {
     display: "flex",
     flexDirection: "column",
     gap: space.s6,
-    maxWidth: 1280,
+    maxWidth: size.detailPageWidth,
     paddingTop: space.s6,
     paddingInline: space.s8,
     paddingBottom: space.s10,
   },
-  crumb: { display: "flex", fontSize: fontSize.ui },
+  crumb: { display: "flex" },
   crumbLink: {
     display: "inline-flex",
     alignItems: "center",
     gap: space.s2,
     minHeight: size.control,
-    color: { default: colors.textTertiary, ":hover": colors.textSecondary },
-    textDecoration: "none",
   },
-  focusRing: {
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
-  },
-  focusTarget: { outline: "none" },
-  meta: { color: colors.textTertiary, fontSize: fontSize.ui, lineHeight: lineHeight.normal },
-  result: {
-    margin: 0,
-    color: colors.textSecondary,
-    fontSize: fontSize.body,
-    lineHeight: lineHeight.relaxed,
-  },
-  error: { margin: 0, color: colors.problem, fontSize: fontSize.ui },
   head: { display: "flex", flexDirection: "column", gap: space.s2 },
   titleRow: {
     display: "flex",
@@ -875,8 +840,8 @@ const styles = stylex.create({
   columns: {
     display: "grid",
     gridTemplateColumns: {
-      default: "minmax(0, 1fr) 360px",
-      "@media (max-width: 960px)": "minmax(0, 1fr)",
+      default: `minmax(0, 1fr) ${size.detailAsideWidth}`,
+      [breakpoints.detailStacked]: "minmax(0, 1fr)",
     },
     alignItems: "start",
     gap: space.s6,
@@ -891,41 +856,9 @@ const styles = stylex.create({
   blockHeadCompact: { paddingTop: space.s2, paddingInline: space.s3, paddingBottom: space.s1 },
   stack: { display: "flex", flexDirection: "column", gap: space.s3 },
   flat: { margin: 0 },
-  problemNote: { color: colors.problem, fontWeight: fontWeight.semibold },
   inline: { display: "inline-flex", alignItems: "baseline", gap: space.s2 },
-  mono: { fontFamily: fonts.mono, fontSize: fontSize.small },
-  link: {
-    color: colors.accentText,
-    textUnderlineOffset: 3,
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
-  },
-  question: {
-    margin: 0,
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
-    fontFamily: "inherit",
-    fontSize: fontSize.panel,
-    fontWeight: fontWeight.semibold,
-    lineHeight: lineHeight.snug,
-    color: colors.textPrimary,
-  },
   answerRow: { display: "flex", alignItems: "center", gap: space.s2 },
   grow: { flexGrow: 1, minWidth: 0 },
-  pre: {
-    margin: 0,
-    paddingBlock: space.s3,
-    paddingInline: space.s4,
-    borderRadius: radius.control,
-    backgroundColor: colors.bgInset,
-    color: colors.textSecondary,
-    fontFamily: fonts.mono,
-    fontSize: fontSize.small,
-    lineHeight: lineHeight.relaxed,
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
-  },
-  log: { maxHeight: 480, overflowY: "auto" },
   timeline: {
     display: "flex",
     flexDirection: "column",
@@ -934,13 +867,5 @@ const styles = stylex.create({
     padding: 0,
     listStyle: "none",
   },
-  eventTime: { fontSize: fontSize.ui },
   eventBody: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  eventTitle: { color: colors.textPrimary },
-  eventDetail: {
-    color: colors.textTertiary,
-    fontSize: fontSize.ui,
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
-  },
 });

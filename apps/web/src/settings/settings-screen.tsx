@@ -5,6 +5,8 @@ import {
   DetailPanel,
   Dialog,
   DialogClose,
+  DividedItem,
+  DividedList,
   Field,
   Input,
   PageHeader,
@@ -20,9 +22,11 @@ import {
   TableRow,
   TableRows,
   Text,
+  linkStyles,
   showToast,
+  textStyles,
 } from "@factory/ui";
-import { colors, fontSize, space } from "@factory/ui/tokens.stylex";
+import { size, space } from "@factory/ui/tokens.stylex";
 import {
   createContext,
   use,
@@ -212,9 +216,9 @@ export function SettingsScreen({
                       ? t("scopeWorkspace", { name: workspace.general.name })
                       : t("scopeInstall")}
                   </Text>
-                  <span role="status" {...stylex.props(styles.unsaved)}>
+                  <Text variant="label" role="status">
                     {hasUnsaved ? t("unsaved") : null}
-                  </span>
+                  </Text>
                 </span>
               }
               title={t(`items.${current}`)}
@@ -480,9 +484,9 @@ export function SubmitError({ state }: { state: SubmitState }) {
   const reason = useReason();
   if (state.kind !== "failed") return null;
   return (
-    <p role="alert" {...stylex.props(styles.error)}>
+    <Text variant="ui" as="p" tone="problem" role="alert">
       {reason(state.reason)}
-    </p>
+    </Text>
   );
 }
 
@@ -593,9 +597,9 @@ export function ProjectsPanel({
         workspace.trackerProjects.map((group) => (
           <PanelBlock key={group.connection.id} title={group.connection.name}>
             {group.error === null ? null : (
-              <p {...stylex.props(styles.error)}>
+              <Text variant="ui" as="p" tone="problem">
                 {t("projects.listFailed", { reason: reason(group.error) })}
-              </p>
+              </Text>
             )}
             <ProjectRows ws={workspace.general.id} group={group} actions={actions} />
           </PanelBlock>
@@ -619,7 +623,7 @@ function ProjectRows({
     return group.error === null ? <Text variant="meta">{t("empty")}</Text> : null;
   }
   return (
-    <ul {...stylex.props(styles.list)}>
+    <DividedList>
       {group.projects.map((project) => (
         <ProjectRow
           key={project.id}
@@ -628,7 +632,7 @@ function ProjectRows({
           actions={actions}
         />
       ))}
-    </ul>
+    </DividedList>
   );
 }
 
@@ -664,14 +668,12 @@ function ProjectRow({
     if (owner.kind === pending.to) actionRef.current?.querySelector("button")?.focus();
   }, [owner.kind, submit.sending, failed]);
   return (
-    <li {...stylex.props(styles.item)}>
+    <DividedItem>
       <div {...stylex.props(styles.row)}>
         <span {...stylex.props(styles.rowText)}>
-          <span
-            {...stylex.props(owner.kind === "other" ? styles.disabledText : styles.primaryText)}
-          >
+          <Text variant="ui" tone={owner.kind === "other" ? "disabled" : "strong"}>
             {project.name}
-          </span>
+          </Text>
           {owner.kind === "free" ? null : (
             <Text variant="meta">
               {owner.kind === "this"
@@ -729,14 +731,16 @@ function ProjectRow({
         </span>
       </div>
       <SubmitError state={submit.state} />
-    </li>
+    </DividedItem>
   );
 }
 
 function ProjectHeading({ bound }: { bound: BoundProject }) {
   return (
     <span {...stylex.props(styles.rowText)}>
-      <span {...stylex.props(styles.primaryText)}>{bound.project.name}</span>
+      <Text variant="ui" tone="strong">
+        {bound.project.name}
+      </Text>
       <Text variant="meta">{bound.connection.name}</Text>
     </span>
   );
@@ -763,7 +767,7 @@ export function MappingPanel({
       {workspace.bound.length === 0 ? (
         <Text variant="meta">{t("noProjects")}</Text>
       ) : (
-        <ul {...stylex.props(styles.list)}>
+        <DividedList>
           {workspace.bound.map((bound) => (
             <MappingRow
               key={`${bound.connection.id}/${bound.project.id}`}
@@ -774,7 +778,7 @@ export function MappingPanel({
               actions={actions}
             />
           ))}
-        </ul>
+        </DividedList>
       )}
     </>
   );
@@ -809,7 +813,7 @@ function MappingRow({
     bound.mapping?.runnerProject,
   );
   return (
-    <li {...stylex.props(styles.item)}>
+    <DividedItem>
       <form
         {...stylex.props(styles.form)}
         onSubmit={(event) => {
@@ -868,7 +872,7 @@ function MappingRow({
           </Button>
         </Actions>
       </form>
-    </li>
+    </DividedItem>
   );
 }
 
@@ -896,7 +900,7 @@ export function ProgressPanel({
       {workspace.bound.length === 0 ? (
         <Text variant="meta">{t("mapping.noProjects")}</Text>
       ) : (
-        <ul {...stylex.props(styles.list)}>
+        <DividedList>
           {workspace.bound.map((bound) => (
             <ProgressRow
               key={`${bound.connection.id}/${bound.project.id}`}
@@ -905,7 +909,7 @@ export function ProgressPanel({
               actions={actions}
             />
           ))}
-        </ul>
+        </DividedList>
       )}
     </>
   );
@@ -930,7 +934,7 @@ function ProgressRow({
     bound.inProgressStateId,
   );
   return (
-    <li {...stylex.props(styles.item)}>
+    <DividedItem>
       <form
         {...stylex.props(styles.form)}
         onSubmit={(event) => {
@@ -950,9 +954,9 @@ function ProgressRow({
       >
         <ProjectHeading bound={bound} />
         {bound.states.ok ? null : (
-          <p {...stylex.props(styles.error)}>
+          <Text variant="ui" as="p" tone="problem">
             {t("progress.listFailed", { reason: reason(bound.states.error) })}
-          </p>
+          </Text>
         )}
         <Field label={t("progress.state")}>
           <Select
@@ -969,7 +973,7 @@ function ProgressRow({
           </Button>
         </Actions>
       </form>
-    </li>
+    </DividedItem>
   );
 }
 
@@ -987,7 +991,7 @@ export function LabelPanel({
       {workspace.labels.length === 0 ? (
         <Text variant="meta">{t("mapping.noProjects")}</Text>
       ) : (
-        <ul {...stylex.props(styles.list)}>
+        <DividedList>
           {workspace.labels.map((label) => (
             <LabelRow
               key={label.connection.id}
@@ -996,7 +1000,7 @@ export function LabelPanel({
               actions={actions}
             />
           ))}
-        </ul>
+        </DividedList>
       )}
     </>
   );
@@ -1025,7 +1029,7 @@ function LabelRow({
       ? options
       : [...options, { value: current, label: t("label.unknown", { id: current }) }];
   return (
-    <li {...stylex.props(styles.item)}>
+    <DividedItem>
       <form
         {...stylex.props(styles.form)}
         onSubmit={(event) => {
@@ -1037,11 +1041,13 @@ function LabelRow({
           );
         }}
       >
-        <span {...stylex.props(styles.primaryText)}>{label.connection.name}</span>
+        <Text variant="ui" tone="strong">
+          {label.connection.name}
+        </Text>
         {label.labels.ok ? null : (
-          <p {...stylex.props(styles.error)}>
+          <Text variant="ui" as="p" tone="problem">
             {t("label.listFailed", { reason: reason(label.labels.error) })}
-          </p>
+          </Text>
         )}
         <Field label={t("label.label")}>
           <Select
@@ -1058,7 +1064,7 @@ function LabelRow({
           </Button>
         </Actions>
       </form>
-    </li>
+    </DividedItem>
   );
 }
 
@@ -1074,13 +1080,13 @@ function ConnectionsPanel({
     <>
       <Text variant="body">{t("hint")}</Text>
       {connections.length === 0 ? null : (
-        <ul {...stylex.props(styles.list)}>
+        <DividedList>
           {connections.map((connection) => (
-            <li key={connection.id} {...stylex.props(styles.item)}>
+            <DividedItem key={connection.id}>
               <ConnectionForm connection={connection} actions={actions} />
-            </li>
+            </DividedItem>
           ))}
-        </ul>
+        </DividedList>
       )}
       <PanelBlock title={t("addTitle")}>
         <ConnectionForm connection={null} actions={actions} />
@@ -1133,7 +1139,9 @@ export function ConnectionForm({
       {connection === null ? null : (
         <div {...stylex.props(styles.row)}>
           <span {...stylex.props(styles.rowText)}>
-            <span {...stylex.props(styles.primaryText)}>{connection.name}</span>
+            <Text variant="ui" tone="strong">
+              {connection.name}
+            </Text>
             <Text variant="meta">
               {connection.hasWebhookSecret
                 ? t("connections.secretSet")
@@ -1235,7 +1243,7 @@ function AddressesPanel({
   return (
     <>
       <PanelBlock>
-        <ul {...stylex.props(styles.bullets)}>
+        <ul {...stylex.props(textStyles("ui"), styles.bullets)}>
           <li>{t("intro")}</li>
           <li>{t("loopback")}</li>
         </ul>
@@ -1354,7 +1362,7 @@ export function GitHubPanel({ saved, actions }: { saved: boolean; actions: Setti
       </div>
       <SubmitError state={check.state} />
       <PanelBlock>
-        <ul {...stylex.props(styles.bullets)}>
+        <ul {...stylex.props(textStyles("ui"), styles.bullets)}>
           <li>{t("github.required")}</li>
           <li>{t("github.optional")}</li>
         </ul>
@@ -1416,7 +1424,7 @@ function RunnersPanel({
     workspaceId === null
       ? "/runners"
       : `/runners?${new URLSearchParams({ ws: workspaceId }).toString()}`;
-  const linkProps: RunnersLinkProps = { ...stylex.props(styles.link), children: t("toRunners") };
+  const linkProps: RunnersLinkProps = { ...stylex.props(linkStyles()), children: t("toRunners") };
   return (
     <>
       <Text variant="body">
@@ -1424,14 +1432,14 @@ function RunnersPanel({
         {renderLink === undefined ? <a href={runnersHref} {...linkProps} /> : renderLink(linkProps)}
       </Text>
       {runners.length === 0 ? null : (
-        <ul {...stylex.props(styles.list)}>
+        <DividedList>
           {runners.map((runner) => (
-            <li key={runner.id} {...stylex.props(styles.item)}>
+            <DividedItem key={runner.id}>
               <RunnerCheck runner={runner} actions={actions} workerSilent={workerSilent} />
               <RunnerForm runner={runner} actions={actions} />
-            </li>
+            </DividedItem>
           ))}
-        </ul>
+        </DividedList>
       )}
       <PanelBlock title={t("addTitle")}>
         <RunnerForm runner={null} actions={actions} />
@@ -1573,7 +1581,9 @@ export function RunnerCheck({
     <div {...stylex.props(styles.form)}>
       <div {...stylex.props(styles.row)}>
         <span {...stylex.props(styles.rowText)}>
-          <span {...stylex.props(styles.primaryText)}>{runner.name}</span>
+          <Text variant="ui" tone="strong">
+            {runner.name}
+          </Text>
           <Text variant="meta" mono truncate>
             {runner.sshTarget}
           </Text>
@@ -1611,14 +1621,22 @@ function CheckResult({
   switch (check.status) {
     case "pending":
       return (
-        <p role="status" {...stylex.props(styles.secondaryText, styles.para)}>
+        <Text variant="ui" as="p" role="status">
           {workerSilent ? t("workerSilent") : t("pending")}
-        </p>
+        </Text>
       );
     case "failed":
-      return <p {...stylex.props(styles.error)}>{t("failed", { error: check.error })}</p>;
+      return (
+        <Text variant="ui" as="p" tone="problem">
+          {t("failed", { error: check.error })}
+        </Text>
+      );
     case "unreadable":
-      return <p {...stylex.props(styles.error)}>{t("unreadable")}</p>;
+      return (
+        <Text variant="ui" as="p" tone="problem">
+          {t("unreadable")}
+        </Text>
+      );
     case "done":
       return (
         <div {...stylex.props(styles.form)}>
@@ -1635,11 +1653,11 @@ function CheckResult({
                 : t("offlineReason", { reason: runnerError(check.error) })}
           </span>
           {check.prerequisites.length === 0 ? null : (
-            <ul {...stylex.props(styles.list)}>
+            <DividedList>
               {check.prerequisites.map((prerequisite) => (
                 <Prerequisite key={prerequisite.id} prerequisite={prerequisite} />
               ))}
-            </ul>
+            </DividedList>
           )}
           <Text variant="meta">
             <time dateTime={check.completedAt}>
@@ -1675,11 +1693,15 @@ function Prerequisite({ prerequisite }: { prerequisite: PrerequisiteView }) {
   const broken = prerequisite.satisfied === false;
   const hint = prerequisiteHint(prerequisite);
   return (
-    <li {...stylex.props(styles.item, styles.prerequisite)}>
+    <DividedItem tight>
       <span {...stylex.props(styles.inline)}>
-        <span {...stylex.props(styles.primaryText)}>{prerequisiteName(prerequisite)}</span>
+        <Text variant="ui" tone="strong">
+          {prerequisiteName(prerequisite)}
+        </Text>
         {broken ? (
-          <span {...stylex.props(styles.brokenText)}>{t("unsatisfied")}</span>
+          <Text variant="ui" tone="problem">
+            {t("unsatisfied")}
+          </Text>
         ) : (
           <Text variant="meta">
             {prerequisite.satisfied === null ? t("unknown") : t("satisfied")}
@@ -1693,15 +1715,17 @@ function Prerequisite({ prerequisite }: { prerequisite: PrerequisiteView }) {
       ) : null}
       {broken && prerequisite.blocksAssignment ? (
         <div {...stylex.props(styles.fix)}>
-          <p {...stylex.props(styles.error)}>{t("blocked")}</p>
+          <Text variant="ui" as="p" tone="problem">
+            {t("blocked")}
+          </Text>
           <Text variant="label">{t("fixTitle")}</Text>
-          <ul {...stylex.props(styles.bullets)}>
+          <ul {...stylex.props(textStyles("ui"), styles.bullets)}>
             <li>{t("fixToken")}</li>
             <li>{t("fixSsh")}</li>
           </ul>
         </div>
       ) : null}
-    </li>
+    </DividedItem>
   );
 }
 
@@ -1713,47 +1737,22 @@ function parseWholeNumber(text: string): number | null {
 
 const styles = stylex.create({
   titleCell: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  form: { display: "flex", flexDirection: "column", gap: space.s4, maxWidth: 640 },
+  form: { display: "flex", flexDirection: "column", gap: space.s4, maxWidth: size.formWidth },
   fieldRow: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+    gridTemplateColumns: `repeat(auto-fit, minmax(${size.fieldMinWidth}, 1fr))`,
     gap: space.s3,
   },
-  list: {
-    margin: 0,
-    padding: 0,
-    listStyle: "none",
-    display: "flex",
-    flexDirection: "column",
-    maxWidth: 640,
-  },
-  item: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s4,
-    paddingBlock: space.s4,
-    borderTopWidth: { default: 1, ":first-child": 0 },
-    borderTopStyle: "solid",
-    borderTopColor: colors.borderSubtle,
-  },
-  prerequisite: { gap: space.s1, paddingBlock: space.s2 },
   row: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: space.s3,
-    maxWidth: 640,
+    maxWidth: size.formWidth,
   },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   inline: { display: "inline-flex", alignItems: "center", gap: space.px6 },
   action: { flexShrink: 0 },
-  unsaved: { color: colors.textSecondary, fontSize: fontSize.small },
-  primaryText: { color: colors.textPrimary },
-  secondaryText: { color: colors.textSecondary },
-  disabledText: { color: colors.textDisabled },
-  para: { margin: 0 },
-  error: { margin: 0, color: colors.problem },
-  brokenText: { color: colors.problem, fontSize: fontSize.ui },
   fix: { display: "flex", flexDirection: "column", gap: space.s1 },
   bullets: {
     margin: 0,
@@ -1761,11 +1760,5 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     gap: space.s1,
-    color: colors.textSecondary,
-  },
-  link: {
-    color: colors.accentText,
-    textDecoration: "underline",
-    textUnderlineOffset: 3,
   },
 });

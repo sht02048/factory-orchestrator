@@ -33,7 +33,19 @@
     "capacity": "CapacityBar",
     "problem": "ProblemCallout",
     "statTile": "StatTile",
-    "brand": "GangerMark·Mascot"
+    "brand": "GangerMark·Mascot",
+    "shell": "앱 틀",
+    "links": "링크·글 톤",
+    "chips": "칩",
+    "choices": "라디오·여러 줄 입력",
+    "codeBlock": "코드 블록",
+    "dataTable": "데이터 표",
+    "outcomes": "결과 막대·차트",
+    "steps": "단계",
+    "disclosure": "펼치기",
+    "dividedList": "나눈 목록",
+    "popover": "팝오버",
+    "icons": "아이콘"
   },
   "colors": {
     "note": "OKLCH 다크 값이에요. packages/ui 밖에서는 이 토큰만 써요.",
@@ -51,7 +63,6 @@
     "level3": "3단계 · 흐린 보조",
     "samplePage": "Runs",
     "samplePanel": "결제 웹훅 재시도 로직 추가",
-    "sampleSection": "To do",
     "sampleTitle": "주문 목록 필터가 새로고침 뒤 사라짐",
     "sampleBody": "PR이 열려 있지만 병합되지 않았어요. CI는 통과했고 리뷰를 기다려요.",
     "sampleUi": "runner-a에서 Claude Code가 처리했어요",
@@ -304,5 +315,105 @@
       "worried": "걱정"
     },
     "message": "처리할 일이 없어요"
+  },
+  "blocks": {
+    "shell": {
+      "note": "AppFrame은 왼쪽 아이콘 레일과 본문이에요. 레일 링크는 railLinkStyles로, 공지 화면은 NoticeLayout으로 그려요.",
+      "brand": "Ganger",
+      "workspace": "Acme",
+      "navLabel": "미리보기 메뉴",
+      "current": "지금",
+      "issues": "문제",
+      "pageTitle": "Runs",
+      "notice": "Workspace를 고르면 목록을 보여 줘요."
+    },
+    "links": {
+      "note": "글 링크는 TextLink나 linkStyles(톤)로 그려요. 문제 뜻의 글은 Text tone=\"problem\"이에요.",
+      "accent": "PR #418 열기",
+      "quiet": "‹ Runs",
+      "action": "토큰 만들기 페이지",
+      "plain": "runner-a",
+      "problemTone": "저장하지 못했어요. 다시 해 볼 수 있어요."
+    },
+    "chips": {
+      "note": "Chip은 짧은 표시예요. 지울 수 있는 조건은 RemovableChip으로 두고, 지우기 이름을 함께 줘요.",
+      "required": "필수",
+      "optional": "선택",
+      "runner": "러너: runner-a",
+      "days": "기간: 최근 7일",
+      "remove": "{condition} 조건 지우기"
+    },
+    "choices": {
+      "note": "하나만 고르는 질문 선택지는 RadioGroup과 RadioOption, 여러 줄 답은 Textarea예요.",
+      "retry": "다시 시도해요",
+      "skip": "건너뛰어요",
+      "textareaLabel": "직접 쓰기",
+      "textareaPlaceholder": "답을 직접 써요"
+    },
+    "codeBlock": {
+      "note": "명령·출력·로그는 CodeBlock이에요. 복사할 명령은 tone=\"command\", 긴 로그는 scroll과 label을 줘요.",
+      "output": "Error: remote rejected (pre-receive hook declined)",
+      "command": "orca service install --path /opt/orca",
+      "logLabel": "로그 줄",
+      "log": "10:45 clone 시작\n10:46 의존성 설치\n10:48 시험 통과"
+    },
+    "dataTable": {
+      "note": "고를 수 없는 정적 표는 DataTable이에요. 카드 안 넓은 표는 framed, 작은 숫자 표는 density=\"compact\"예요.",
+      "label": "매핑 미리보기",
+      "project": "트래커 프로젝트",
+      "runs": "런",
+      "state": "상태",
+      "web": "Web",
+      "api": "API",
+      "done": "다 채웠어요",
+      "empty": "아직 비어 있어요",
+      "caption": "날마다 끝난 런",
+      "day": "날짜",
+      "today": "오늘"
+    },
+    "outcomes": {
+      "note": "Stats의 결과 막대와 쌓은 막대 차트예요. 결과 색은 상태 뜻 그대로 써요.",
+      "merged": "Merged",
+      "check": "Human Check",
+      "failed": "Failed",
+      "canceled": "Canceled",
+      "barLabel": "Merged 6, Human Check 2, Failed 1, Canceled 1",
+      "chartLabel": "날마다 끝난 런",
+      "yesterday": "어제",
+      "today": "오늘"
+    },
+    "steps": {
+      "note": "온보딩의 단계 목록, 번호 안내, 확인 목록이에요. 끝난 표시는 상태 색이 아니라 강조색이에요.",
+      "navLabel": "설정 단계",
+      "title": "시작하기",
+      "first": "Tracker",
+      "second": "GitHub",
+      "third": "Runner",
+      "done": "완료",
+      "notDone": "아직이에요",
+      "checklist": "러너 확인"
+    },
+    "disclosure": {
+      "note": "읽을거리를 접어 두는 카드예요.",
+      "summary": "웹훅이 왜 필요한가요?",
+      "body": "웹훅이 있으면 트래커에서 바뀐 일을 바로 받아요."
+    },
+    "dividedList": {
+      "note": "선으로 나눈 설정 목록이에요. 작은 항목은 tight예요.",
+      "first": "runner-a",
+      "second": "git",
+      "tight": "설치돼 있어요"
+    },
+    "popover": {
+      "note": "행에서 여는 작은 레이어예요. 레이어 안 주 행동 하나만 노랑이에요.",
+      "trigger": "답하기",
+      "title": "ACME-11",
+      "close": "닫기",
+      "body": "재시도 간격을 바꿀까요?"
+    },
+    "icons": {
+      "note": "버튼과 표시에 쓰는 아이콘이에요. 이름이 필요하면 VisuallyHidden으로 줘요.",
+      "hidden": "확인, 닫기, 펼치기"
+    }
   }
 }

@@ -19,7 +19,7 @@ import {
 } from "@factory/ui";
 import type { PillStatus } from "@factory/ui";
 import type { RunId } from "@factory/core";
-import { space } from "@factory/ui/tokens.stylex";
+import { breakpoints, size, space } from "@factory/ui/tokens.stylex";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
@@ -62,11 +62,6 @@ export interface HomeScreenProps {
 type Permission = Extract<InputWait, { kind: "permission" }>;
 
 export const STOPPED_VISIBLE = 3;
-
-const SIDE_COLUMN_WIDTH = 340;
-const TODO_TEXT_MIN_WIDTH = "16rem";
-const ONE_COLUMN = "@container (max-width: 719px)";
-const NARROW_SCREEN = "@media (max-width: 600px)";
 
 export function HomeScreen({ page, onAnswer, onDeny }: HomeScreenProps) {
   const t = useTranslations("home");
@@ -750,7 +745,7 @@ function PermissionAction({
           );
         }}
       >
-        <Text variant="section" as="p">
+        <Text variant="title" as="p" wrap="anywhere">
           {permission.detail}
         </Text>
         <Field
@@ -789,7 +784,7 @@ const styles = stylex.create({
     height: "100%",
     overflow: "auto",
     paddingTop: space.s8,
-    paddingInline: { default: space.s8, [NARROW_SCREEN]: space.s4 },
+    paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
     paddingBottom: space.s10,
   },
   header: {
@@ -802,8 +797,8 @@ const styles = stylex.create({
   columns: {
     display: "grid",
     gridTemplateColumns: {
-      default: `minmax(0, 1fr) ${SIDE_COLUMN_WIDTH}px`,
-      [ONE_COLUMN]: "minmax(0, 1fr)",
+      default: `minmax(0, 1fr) ${size.dashboardSideWidth}`,
+      [breakpoints.dashboardOneColumn]: "minmax(0, 1fr)",
     },
     alignItems: "start",
     columnGap: space.s8,
@@ -833,14 +828,14 @@ const styles = stylex.create({
     flexGrow: 1,
     flexShrink: 1,
     flexBasis: 0,
-    minWidth: `min(100%, ${TODO_TEXT_MIN_WIDTH})`,
+    minWidth: `min(100%, ${size.todoTextMinWidth})`,
   },
   todoAction: {
     display: "flex",
     flexShrink: 0,
     alignItems: "center",
     maxWidth: "100%",
-    paddingInline: { default: 0, [ONE_COLUMN]: space.s3 },
+    paddingInline: { default: 0, [breakpoints.dashboardOneColumn]: space.s3 },
   },
   todoBody: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   keyLine: {

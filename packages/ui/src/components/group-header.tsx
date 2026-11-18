@@ -25,7 +25,7 @@ export function GroupHeader({
   return (
     <div data-status={status} data-tone={tone} {...stylex.props(styles.header)}>
       <span aria-hidden="true" {...stylex.props(statusDotStyles(status))} />
-      <Heading {...stylex.props(textStyles("section"), styles.title)}>
+      <Heading {...stylex.props(textStyles("subheading"), styles.title)}>
         {title}
         {count === undefined ? null : <span {...stylex.props(styles.count)}> {count}</span>}
       </Heading>

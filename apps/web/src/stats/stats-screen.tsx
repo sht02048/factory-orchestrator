@@ -2,6 +2,9 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
+  FailureBar,
+  NoticeLayout,
+  OutcomeSwatch,
   PageHeader,
   Section,
   SegmentedTabs,
@@ -10,7 +13,7 @@ import {
   Text,
 } from "@factory/ui";
 import type { StatTrend } from "@factory/ui";
-import { space } from "@factory/ui/tokens.stylex";
+import { breakpoints, space } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
@@ -32,8 +35,8 @@ import type {
   StatsPeriodDays,
   StatsSummary,
 } from "./model";
-import { BreakdownTable, FailureBar } from "./outcome-bar";
-import { LegendSwatch, ThroughputChart } from "./throughput-chart";
+import { BreakdownTable } from "./outcome-bar";
+import { ThroughputChart } from "./throughput-chart";
 
 export interface StatsScreenProps {
   page: StatsPage;
@@ -71,10 +74,10 @@ type LoadedStatsPage = Extract<StatsPage, { total: StatsSummary }>;
 function Notice({ body }: { body: ReactNode }) {
   const t = useTranslations("stats");
   return (
-    <div {...stylex.props(styles.notice)}>
+    <NoticeLayout>
       <PageHeader title={t("title")} subtitle={t("summary")} />
       {body}
-    </div>
+    </NoticeLayout>
   );
 }
 
@@ -207,19 +210,19 @@ function Legend() {
   return (
     <span {...stylex.props(styles.legend)}>
       <span {...stylex.props(styles.legendItem)}>
-        <LegendSwatch tone="merged" />
+        <OutcomeSwatch tone="merged" />
         {t("merged")}
       </span>
       <span {...stylex.props(styles.legendItem)}>
-        <LegendSwatch tone="check" />
+        <OutcomeSwatch tone="check" />
         {t("check")}
       </span>
       <span {...stylex.props(styles.legendItem)}>
-        <LegendSwatch tone="failed" />
+        <OutcomeSwatch tone="failed" />
         {t("failed")}
       </span>
       <span {...stylex.props(styles.legendItem)}>
-        <LegendSwatch tone="canceled" />
+        <OutcomeSwatch tone="canceled" />
         {t("canceled")}
       </span>
     </span>
@@ -317,7 +320,7 @@ function FailureReasons({ reasons }: { reasons: ReadonlyArray<FailureReasonCount
               })}
             </Text>
           </span>
-          <FailureBar runs={reason.runs} max={max} />
+          <FailureBar value={reason.runs} max={max} />
           <Text variant="ui" numeric>
             {t("count", { runs: reason.runs })}
           </Text>
@@ -376,15 +379,7 @@ function Breakdown({
   );
 }
 
-const TILES_STACKED = "@container (max-width: 44rem)";
-
 const styles = stylex.create({
-  notice: {
-    maxWidth: "45rem",
-    paddingTop: space.s8,
-    paddingInline: space.s8,
-    paddingBottom: space.s10,
-  },
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
   page: {
     height: "100%",
@@ -407,7 +402,7 @@ const styles = stylex.create({
     display: "grid",
     gridTemplateColumns: {
       default: "repeat(4, minmax(0, 1fr))",
-      [TILES_STACKED]: "repeat(2, minmax(0, 1fr))",
+      [breakpoints.statTilesStacked]: "repeat(2, minmax(0, 1fr))",
     },
     gap: space.s4,
   },

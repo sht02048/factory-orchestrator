@@ -196,11 +196,6 @@ export function TokenSections() {
                   {t("typography.sampleSubheading")}
                 </Text>
               </TypeSample>
-              <TypeSample spec="section">
-                <Text variant="section" as="p">
-                  {t("typography.sampleSection")}
-                </Text>
-              </TypeSample>
               <TypeSample spec="title">
                 <Text variant="title">{t("typography.sampleTitle")}</Text>
               </TypeSample>
