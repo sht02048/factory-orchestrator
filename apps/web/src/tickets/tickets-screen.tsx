@@ -24,6 +24,7 @@ import {
   Text,
 } from "@factory/ui";
 import { colors, fontSize, fontWeight, space } from "@factory/ui/tokens.stylex";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
@@ -33,6 +34,7 @@ import type { AssignInput, AssignResult } from "./assign";
 import { AssignDialog } from "./assign-dialog";
 import { TICKET_FILTERS, lastRun, matchesFilter } from "./model";
 import type { TicketFilter, TicketView, TicketsPage } from "./model";
+import { useRowWindow } from "./row-window";
 
 // 티켓(회색 키 + 제목) | 트래커 프로젝트 | 트래커 상태 | 마지막 런 (ADR 0010 9번)
 const columns = "minmax(0, 1fr) 128px 104px 160px";
@@ -49,6 +51,7 @@ export interface TicketsScreenProps {
   onPickWorkspace: (workspaceId: string) => void;
   onOpenRun: (runId: string) => void;
   onAssign: (input: AssignInput) => Promise<AssignResult>;
+  onAssigned: (ticketId: string) => void;
 }
 
 /** Tickets: 현재 Workspace 의 트래커 티켓 목록 + 오른쪽 상세 패널(ADR 0007, 시안 B) */
@@ -115,11 +118,23 @@ function TicketsList({
   onSelect,
   onOpenRun,
   onAssign,
+  onAssigned,
   workspaceName,
 }: TicketsScreenProps & { workspaceName: string }) {
   const t = useTranslations("tickets");
-  const visible = page.tickets.filter((ticket) => matchesFilter(ticket, filter));
-  const selected = visible.find((ticket) => ticket.id === selectedId) ?? visible[0];
+  const visible = useMemo(
+    () => page.tickets.filter((ticket) => matchesFilter(ticket, filter)),
+    [page.tickets, filter],
+  );
+  const counts = useMemo(() => countByFilter(page.tickets), [page.tickets]);
+  const selected =
+    visible.find((ticket) => ticket.id === selectedId) ??
+    page.tickets.find((ticket) => ticket.id === selectedId) ??
+    visible[0];
+  const selectedIndex = selected === undefined ? -1 : visible.indexOf(selected);
+  const listRef = useRef<HTMLDivElement>(null);
+  const rows = useRowWindow(listRef, visible.length, selectedIndex);
+  const [assignedId, setAssignedId] = useState<string | null>(null);
 
   let empty: string;
   if (page.tickets.length > 0 || page.errors.length > 0) empty = t("empty");
@@ -132,10 +147,19 @@ function TicketsList({
         <>
           <PageHeader title={t("title")} subtitle={t("subtitle", { workspace: workspaceName })} />
           {page.errors.length === 0 ? null : (
-            <div role="alert" {...stylex.props(styles.errors)}>
+            <div {...stylex.props(styles.errors)}>
               {page.errors.map((error) => (
                 <Text key={error.trackerProject} variant="body">
                   {t(`loadError.${error.reason}`, { project: error.trackerProject })}
+                </Text>
+              ))}
+            </div>
+          )}
+          {page.truncated.length === 0 ? null : (
+            <div {...stylex.props(styles.truncated)}>
+              {page.truncated.map((cut) => (
+                <Text key={cut.trackerProject} variant="meta">
+                  {t("truncated", { project: cut.trackerProject, limit: cut.limit })}
                 </Text>
               ))}
             </div>
@@ -146,37 +170,40 @@ function TicketsList({
             label={t("filter.label")}
           >
             {TICKET_FILTERS.map((key) => (
-              <Tab
-                key={key}
-                value={key}
-                count={page.tickets.filter((ticket) => matchesFilter(ticket, key)).length}
-                attention={key === "attention"}
-              >
+              <Tab key={key} value={key} count={counts[key]} attention={key === "attention"}>
                 {t(`filter.${key}`)}
               </Tab>
             ))}
           </Tabs>
-          <Table columns={columns}>
-            <TableHead>
-              <TableHeader>{t("columns.ticket")}</TableHeader>
-              <TableHeader>{t("columns.trackerProject")}</TableHeader>
-              <TableHeader>{t("columns.trackerState")}</TableHeader>
-              <TableHeader>{t("columns.lastRun")}</TableHeader>
-            </TableHead>
-            {visible.length === 0 ? (
-              <TableEmpty>{empty}</TableEmpty>
-            ) : (
-              <TableRows
-                label={t("listLabel")}
-                value={selected?.id ?? null}
-                onValueChange={onSelect}
-              >
-                {visible.map((ticket) => (
-                  <TicketRow key={ticket.id} ticket={ticket} />
-                ))}
-              </TableRows>
-            )}
-          </Table>
+          <div ref={listRef}>
+            <Table columns={columns}>
+              <TableHead>
+                <TableHeader>{t("columns.ticket")}</TableHeader>
+                <TableHeader>{t("columns.trackerProject")}</TableHeader>
+                <TableHeader>{t("columns.trackerState")}</TableHeader>
+                <TableHeader>{t("columns.lastRun")}</TableHeader>
+              </TableHead>
+              {visible.length === 0 ? (
+                <TableEmpty>{empty}</TableEmpty>
+              ) : (
+                <TableRows
+                  label={t("listLabel")}
+                  value={visible[selectedIndex]?.id ?? null}
+                  onValueChange={onSelect}
+                >
+                  {rows.spaceBefore > 0 ? (
+                    <div aria-hidden="true" style={{ height: rows.spaceBefore }} />
+                  ) : null}
+                  {visible.slice(rows.start, rows.end).map((ticket) => (
+                    <TicketRow key={ticket.id} ticket={ticket} />
+                  ))}
+                  {rows.spaceAfter > 0 ? (
+                    <div aria-hidden="true" style={{ height: rows.spaceAfter }} />
+                  ) : null}
+                </TableRows>
+              )}
+            </Table>
+          </div>
         </>
       }
       panel={
@@ -188,12 +215,32 @@ function TicketsList({
               page={page}
               onOpenRun={onOpenRun}
               onAssign={onAssign}
+              onAssigned={() => {
+                setAssignedId(selected.id);
+                onAssigned(selected.id);
+              }}
+              focusOpenRun={assignedId === selected.id}
+              onFocusedOpenRun={() => setAssignedId(null)}
             />
           </section>
         )
       }
     />
   );
+}
+
+function countByFilter(tickets: ReadonlyArray<TicketView>): Record<TicketFilter, number> {
+  const counts: Record<TicketFilter, number> = {
+    all: 0,
+    attention: 0,
+    unassigned: 0,
+    running: 0,
+    merged: 0,
+  };
+  for (const ticket of tickets) {
+    for (const key of TICKET_FILTERS) if (matchesFilter(ticket, key)) counts[key] += 1;
+  }
+  return counts;
 }
 
 function TicketRow({ ticket }: { ticket: TicketView }) {
@@ -226,11 +273,17 @@ function TicketPanel({
   page,
   onOpenRun,
   onAssign,
+  onAssigned,
+  focusOpenRun,
+  onFocusedOpenRun,
 }: {
   ticket: TicketView;
   page: TicketsPage;
   onOpenRun: (runId: string) => void;
   onAssign: TicketsScreenProps["onAssign"];
+  onAssigned: () => void;
+  focusOpenRun: boolean;
+  onFocusedOpenRun: () => void;
 }) {
   const t = useTranslations("tickets.panel");
   const tList = useTranslations("tickets");
@@ -238,6 +291,14 @@ function TicketPanel({
   const { ago } = useTime();
   const run = lastRun(ticket);
   const { assignability } = ticket;
+  const openRunRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!focusOpenRun) return;
+    const button = openRunRef.current?.querySelector("button");
+    if (button === null || button === undefined) return;
+    button.focus();
+    onFocusedOpenRun();
+  }, [focusOpenRun, assignability.kind, onFocusedOpenRun]);
 
   let reason: string;
   if (assignability.kind === "active-run") reason = t("reason.active-run");
@@ -281,10 +342,13 @@ function TicketPanel({
             agents={page.agents}
             triggerLabel={run === undefined ? t("assign") : t("reassign")}
             onAssign={onAssign}
+            onAssigned={onAssigned}
           />
         ) : null}
         {assignability.kind === "active-run" ? (
-          <Button onClick={() => onOpenRun(assignability.runId)}>{t("openRun")}</Button>
+          <span ref={openRunRef} {...stylex.props(styles.contents)}>
+            <Button onClick={() => onOpenRun(assignability.runId)}>{t("openRun")}</Button>
+          </span>
         ) : null}
       </Actions>
       <DefinitionList>
@@ -340,6 +404,8 @@ function TicketPanel({
         <PanelFooter>
           <a href={ticket.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
             {t("openInTracker")}
+            <span aria-hidden="true"> ↗</span>
+            <span {...stylex.props(styles.srOnly)}>{` (${t("newTab")})`}</span>
           </a>
         </PanelFooter>
       )}
@@ -361,6 +427,19 @@ const styles = stylex.create({
     gap: space.s2,
     paddingBlock: space.s3,
     color: colors.problem,
+  },
+  truncated: { display: "flex", flexDirection: "column", gap: space.s1, paddingBlock: space.s3 },
+  contents: { display: "contents" },
+  srOnly: {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    padding: 0,
+    margin: -1,
+    overflow: "hidden",
+    clip: "rect(0 0 0 0)",
+    whiteSpace: "nowrap",
+    borderWidth: 0,
   },
   inline: { display: "inline-flex", alignItems: "baseline", gap: space.s2 },
   ticketCell: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },

@@ -24,6 +24,7 @@ function render(page: TicketsPage, options: { filter?: TicketFilter; selectedId?
       onPickWorkspace={noop}
       onOpenRun={noop}
       onAssign={() => Promise.resolve({ ok: false, reason: "active-run" })}
+      onAssigned={noop}
     />,
     ticketsMessages,
   );
@@ -69,6 +70,48 @@ describe("Tickets 화면", () => {
     const { context } = setupTickets();
     const html = render(await loadTicketsPage(context, undefined, now));
     expect(text(html)).toContain("Broken 티켓을 읽지 못했어요. 트래커가 API 키를 받지 않았어요.");
+    expect(html).not.toContain('role="alert"');
+  });
+
+  it("상한에 닿아 잘린 트래커 프로젝트를 목록 위에 알린다(0054)", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined, now);
+    const html = render({ ...page, truncated: [{ trackerProject: "Web", limit: 1000 }] });
+    expect(text(html)).toContain(
+      "Web 티켓이 많아 1,000개만 보여요. 나머지는 트래커에서 찾아 주세요.",
+    );
+    expect(text(render(page))).not.toContain("개만 보여요");
+  });
+
+  it("행이 많아도 처음에는 일부만 그린다(0054)", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined, now);
+    const base = page.tickets[0];
+    if (base === undefined) throw new Error("no ticket");
+    const tickets = Array.from({ length: 1000 }, (_, i) => ({
+      ...base,
+      id: `t-${i}`,
+      key: `ACME-${1000 + i}`,
+    }));
+    const html = render({ ...page, tickets });
+    expect(html.split('role="option"').length - 1).toBeLessThanOrEqual(30);
+    expect(text(html)).toContain("1000");
+  });
+
+  it("고른 티켓이 필터에서 빠져도 패널은 그 티켓을 보인다(0054)", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined, now);
+    const acme3 = page.tickets.find((t) => t.key === "ACME-3");
+    const html = render(page, { filter: "unassigned", selectedId: acme3?.id ?? "" });
+    expect(panelText(html)).toContain("ACME-3 제목");
+    expect(html).not.toMatch(/role="option"[^>]*aria-selected="true"/);
+  });
+
+  it("트래커 링크는 새 탭에서 열린다고 알린다", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined, now);
+    const panel = panelText(render(page, { selectedId: page.tickets[0]?.id ?? "" }));
+    expect(panel).toContain("트래커에서 열기 ↗ (새 탭에서 열려요)");
   });
 
   it("할당 전 티켓은 할당 버튼과 Mapping 기본값을 보인다", async () => {
