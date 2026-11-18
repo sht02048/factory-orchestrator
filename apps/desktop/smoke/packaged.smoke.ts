@@ -12,9 +12,8 @@ import { freePort, nodeEnv, seedAttention } from "./helpers.js";
 
 const DESKTOP = resolve(import.meta.dirname, "..");
 const APP =
-  process.env["SMOKE_APP"] ??
-  join(DESKTOP, "dist", "app", "Factory Orchestrator-darwin-arm64", "Factory Orchestrator.app");
-const EXECUTABLE = join(APP, "Contents", "MacOS", "Factory Orchestrator");
+  process.env["SMOKE_APP"] ?? join(DESKTOP, "dist", "app", "Ganger-darwin-arm64", "Ganger.app");
+const EXECUTABLE = join(APP, "Contents", "MacOS", "Ganger");
 const CLI = join(APP, "Contents", "Resources", "server", "cli", "bin", "cli.js");
 
 let dir: string;
@@ -35,9 +34,9 @@ async function launch(
     executablePath: EXECUTABLE,
     env: {
       ...env,
-      FACTORY_HOME: home,
-      FACTORY_DESKTOP_USER_DATA: userData,
-      FACTORY_TAILSCALE_CLI: join(dir, "no-tailscale"),
+      GANGER_HOME: home,
+      GANGER_DESKTOP_USER_DATA: userData,
+      GANGER_TAILSCALE_CLI: join(dir, "no-tailscale"),
       ...extraEnv,
     },
   });
@@ -101,7 +100,7 @@ async function notifications(app: ElectronApplication): Promise<string[]> {
 }
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "factory-desktop-app-"));
+  dir = mkdtempSync(join(tmpdir(), "ganger-desktop-app-"));
   shots = process.env["SMOKE_SCREENSHOTS"] ?? join(dir, "screenshots");
   mkdirSync(shots, { recursive: true });
   home = join(dir, "home");
@@ -278,7 +277,7 @@ describe("패키징한 앱, 원격 모드", () => {
       60_000,
       "remote server did not start",
     );
-    const app = await launch(userData(), { FACTORY_TAILSCALE_CLI: tailscale });
+    const app = await launch(userData(), { GANGER_TAILSCALE_CLI: tailscale });
     const page = await app.firstWindow();
     await page.getByRole("button", { name: "서버 찾기" }).click();
     await page.getByText("build-box").waitFor({ timeout: 15_000 });
@@ -308,14 +307,14 @@ describe("패키징한 앱, 원격 모드", () => {
     await waitFor(() => webResponds(`http://127.0.0.1:${notOurs}`), 10_000, "decoy did not start");
     await page.getByRole("textbox").fill(`http://127.0.0.1:${notOurs}`);
     await page.getByRole("button", { name: "연결 확인" }).click();
-    await page.getByText("Factory Orchestrator 서버가 아니에요").waitFor({ timeout: 10_000 });
+    await page.getByText("Ganger 서버가 아니에요").waitFor({ timeout: 10_000 });
     await shot(page, "06-address-not-ours");
     expect(page.url().startsWith("file:")).toBe(true);
     await app.close();
   });
 
   it("다시 열면 저장한 서버가 바로 열리고, 꺼져 있으면 '닿지 않아요'를 보인 뒤 다시 뜨면 연다", async () => {
-    let app = await launch(userData(), { FACTORY_TAILSCALE_CLI: tailscale });
+    let app = await launch(userData(), { GANGER_TAILSCALE_CLI: tailscale });
     let page = await app.firstWindow();
     await page.waitForURL(new RegExp(`^http://localhost:${remotePort}/`), { timeout: 30_000 });
     await app.close();
@@ -329,7 +328,7 @@ describe("패키징한 앱, 원격 모드", () => {
     );
     expect(await webResponds(`http://127.0.0.1:${remotePort}`)).toBe(false);
 
-    app = await launch(userData(), { FACTORY_TAILSCALE_CLI: tailscale });
+    app = await launch(userData(), { GANGER_TAILSCALE_CLI: tailscale });
     page = await app.firstWindow();
     await page.getByText("build-box에 닿지 않아요").waitFor({ timeout: 30_000 });
     await shot(page, "07-unreachable");

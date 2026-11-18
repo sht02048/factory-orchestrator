@@ -98,12 +98,12 @@ async function waitFor(
 }
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "factory-desktop-smoke-"));
+  dir = mkdtempSync(join(tmpdir(), "ganger-desktop-smoke-"));
   home = join(dir, "home");
   const { version } = z
     .object({ version: z.string() })
     .parse(JSON.parse(readFileSync(join(REPO, "package.json"), "utf8")));
-  const source = join(REPO, "dist", `factory-orchestrator-${version}`);
+  const source = join(REPO, "dist", `ganger-${version}`);
   cpSync(source, join(dir, "bundle-a"), { recursive: true });
   cpSync(source, join(dir, "bundle-b"), { recursive: true });
   const bPackage = join(dir, "bundle-b", "package.json");

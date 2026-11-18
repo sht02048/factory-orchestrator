@@ -1,3 +1,4 @@
+import { PRODUCT_DISPLAY_NAME } from "@ganger/cli/home";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -308,7 +309,7 @@ export class Controller {
       minWidth: 720,
       minHeight: 520,
       show: false,
-      title: "Factory Orchestrator",
+      title: PRODUCT_DISPLAY_NAME,
       webPreferences: {
         preload: this.options.preloadFile,
         contextIsolation: true,

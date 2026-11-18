@@ -2,7 +2,7 @@
   "name": "@ganger/desktop",
   "version": "0.0.0",
   "private": true,
-  "description": "Desktop app (window, tray, notifications) for factory-orchestrator",
+  "description": "Desktop app (window, tray, notifications) for Ganger",
   "type": "module",
   "main": "dist/main/main.js",
   "scripts": {

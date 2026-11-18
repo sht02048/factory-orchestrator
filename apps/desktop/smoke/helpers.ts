@@ -52,7 +52,7 @@ export function nodeEnv(): Record<string, string | undefined> {
     "WEB_PORT",
     "DATABASE_PATH",
     "ENCRYPTION_KEY",
-    "FACTORY_HOME",
+    "GANGER_HOME",
     "NODE_OPTIONS",
   ]) {
     delete env[name];
