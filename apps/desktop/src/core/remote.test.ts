@@ -89,6 +89,33 @@ describe("Tailscale 상태 읽기", () => {
     });
   });
 
+  it("TailscaleIPs 모양이 이상해도 기기 목록은 읽고 IPv4 만 뺀다", () => {
+    const status = JSON.stringify({
+      BackendState: "Running",
+      Peer: {
+        "nodekey:a": {
+          HostName: "mini",
+          DNSName: "mini.example.ts.net.",
+          Online: true,
+          TailscaleIPs: "100.64.0.2",
+        },
+        "nodekey:b": {
+          HostName: "box",
+          DNSName: "box.example.ts.net.",
+          Online: true,
+          TailscaleIPs: [7, null, "100.64.0.3"],
+        },
+      },
+    });
+    expect(parseTailnetStatus(status)).toEqual({
+      kind: "running",
+      devices: [
+        { name: "mini", host: "mini.example.ts.net" },
+        { name: "box", host: "box.example.ts.net", ipv4: "100.64.0.3" },
+      ],
+    });
+  });
+
   it("Running 이 아니면 꺼짐, 모양이 다르면 읽지 못함이다", () => {
     expect(parseTailnetStatus(JSON.stringify({ BackendState: "NeedsLogin", Peer: null }))).toEqual({
       kind: "stopped",
