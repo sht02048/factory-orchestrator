@@ -11,7 +11,11 @@ export const TAILSCALE_CLI_CANDIDATES = [
 ] as const;
 
 const PHONE_OS = new Set(["ios", "android"]);
-const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
+const ipv4Schema = z.ipv4().refine((ip) => URL.parse(`http://${ip}`)?.hostname === ip);
+
+function isTailnetIpv4(ip: unknown): ip is string {
+  return ipv4Schema.safeParse(ip).success;
+}
 
 const peerSchema = z.object({
   HostName: z.string().optional(),
@@ -55,9 +59,7 @@ export function parseTailnetStatus(output: string): TailnetStatus {
     const host = (peer.DNSName ?? "").replace(/\.$/, "");
     if (host.length === 0) continue;
     const hostName = peer.HostName?.trim() ?? "";
-    const ipv4 = peer.TailscaleIPs?.find(
-      (ip): ip is string => typeof ip === "string" && IPV4.test(ip),
-    );
+    const ipv4 = peer.TailscaleIPs?.find(isTailnetIpv4);
     devices.push({
       name: hostName.length > 0 ? hostName : (host.split(".")[0] ?? host),
       host,

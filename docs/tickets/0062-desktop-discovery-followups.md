@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 blocked_by: []
 ---
 
@@ -21,9 +21,20 @@ blocked_by: []
 
 ## 범위 밖
 
+- 아이콘 버튼 이름(`Tooltip`으로 감싸기). `packages/ui` `Tooltip`은 자식을 자기 트리거 버튼으로 감싸고 트리거를 바꿀 길이 없다. 0074 뒤에 `Tooltip`에 트리거를 바꿀 길을 더하는 후속 티켓에서 한다(코디네이터 결정 2026-11-18).
 - `packages/ui` `Button`에 크기 옵션 더하기와 데스크톱 앱 화면 렌더 시험. 데스크톱 앱 화면은 지금 `buttonStyles`에 높이만 덮어 큰 버튼을 만든다.
 
 ## 완료 조건
 
 - 위 항목마다 단위 시험이나 브라우저 시험이 있고 통과한다. 상태 색과 문구는 화면 캡처로 확인한다.
 - `pnpm typecheck`, `pnpm lint`, `pnpm run check:colors`, `pnpm format:check`, `pnpm test`가 통과한다.
+
+## 결과
+
+- https 주소로도 찾기: 기기마다 http 이름 주소, 그 포트의 Tailscale IPv4, https(Serve) 주소를 차례로 묻고, 모두 열 수 없을 때만 처음 찾은 서버를 "열 수 없어요"로 보인다. https 주소에 다른 서버가 답하면 쓰지 않는다.
+- IPv4 검증: `z.ipv4()`로 거르고 `URL`에 넣었을 때 호스트 이름이 그대로인 값만 쓴다.
+- 상태 색: 0082가 끝냈다(안내 줄은 `textSecondary`, 다시 확인 점은 `accent`, `status-colors.test.ts`).
+- 로그 파일이 없을 때: 로그 폴더를, 폴더도 없으면 있는 가장 가까운 위 폴더를 연다(`src/core/open-log.ts`).
+- 아이콘 버튼 이름: 범위 밖으로 옮겼다. 버튼을 감싸면 버튼 안에 버튼이 생긴다. 지금은 `aria-label`로 이름을 준다.
+- 화면이 바뀔 때 포커스: 화면마다 다시 그리고(`key`), 새 화면의 제목(`h1`, `tabIndex=-1`)으로 포커스를 옮긴다. 렌더러를 vite 개발 서버와 Chrome으로 띄우고 가짜 `window.desktop`을 넣는 브라우저 시험(`src/renderer/screens.test.ts`)으로 확인한다. 코디네이터가 이 시험 하나만 범위 밖에서 들이기로 정했다.
+- 문구: "tailnet에서", "Tailscale을", "이 기계와"로 맞췄다.

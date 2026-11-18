@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   BrowserWindow,
@@ -18,6 +19,7 @@ import { DEFAULT_SERVER_PORT, discoverServers } from "../core/discovery.js";
 import type { DiscoveryResult, FoundServer } from "../core/discovery.js";
 import { probeIdentity } from "../core/identity.js";
 import type { EnsureResult, LocalServer } from "../core/local-server.js";
+import { openLog } from "../core/open-log.js";
 import { connectAddress, reopenSaved, savedFromFound } from "../core/remote.js";
 import type { SavedServer } from "../core/remote.js";
 import type { SettingsStore } from "../core/settings.js";
@@ -391,9 +393,12 @@ export class Controller {
     handle("open-log", () => this.openLog());
   }
 
-  private async openLog(): Promise<void> {
-    const error = await shell.openPath(this.options.logFile);
-    if (error !== "") shell.showItemInFolder(this.options.logFile);
+  private openLog(): Promise<void> {
+    return openLog(this.options.logFile, {
+      exists: existsSync,
+      openPath: (path) => shell.openPath(path),
+      showItemInFolder: (path) => shell.showItemInFolder(path),
+    });
   }
 
   private async pollAttention(): Promise<void> {
