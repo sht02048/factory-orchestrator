@@ -23,8 +23,18 @@ import {
 import type { ReactNode, Ref, RefObject } from "react";
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
-import { toTrackerConnectionId, toTrackerProjectId } from "@factory/core";
-import type { TrackerConnectionId, TrackerProjectId } from "@factory/core";
+import {
+  toAgentId,
+  toRunnerProjectId,
+  toTrackerConnectionId,
+  toTrackerProjectId,
+} from "@factory/core";
+import type {
+  AgentId,
+  RunnerProjectId,
+  TrackerConnectionId,
+  TrackerProjectId,
+} from "@factory/core";
 import type { WorkspaceId } from "@factory/db";
 import { useAgentName, usePrerequisiteName } from "../labels";
 import {
@@ -63,6 +73,7 @@ import {
   stepPassed,
 } from "./model";
 import type { OnboardingStep } from "./model";
+import { createSerialSaver } from "./serial-save";
 
 export interface WorkspaceSetupInput {
   name: string;
@@ -1174,29 +1185,44 @@ function WorkspaceForm({
   );
 }
 
-function useAutoSave() {
+function useSyncedSave<V>({
+  saved,
+  savedKey,
+  send,
+  onSaved,
+}: {
+  saved: V;
+  savedKey: string;
+  send: (value: V) => Promise<ActionResult>;
+  onSaved: () => void;
+}) {
+  const [draft, setDraft] = useState(saved);
   const [state, setState] = useState<SubmitState>({ kind: "idle" });
-  const latest = useRef(0);
-  const run = (action: () => Promise<ActionResult>, onFailed: () => void) => {
-    const request = (latest.current += 1);
-    setState({ kind: "sending" });
-    const fail = (reason: string) => {
-      if (request !== latest.current) return;
-      setState({ kind: "failed", reason });
-      onFailed();
-    };
-    action().then(
-      (result) => {
-        if (result.ok) {
-          if (request === latest.current) setState({ kind: "idle" });
-        } else {
-          fail(result.reason);
-        }
-      },
-      () => fail("unknown"),
-    );
+  const latest = useRef({ saved, send, onSaved });
+  useEffect(() => {
+    latest.current = { saved, send, onSaved };
+  });
+  const [saver] = useState(() =>
+    createSerialSaver<V>({
+      send: (value) => latest.current.send(value),
+      revert: () => setDraft(latest.current.saved),
+      onState: setState,
+      onSaved: () => latest.current.onSaved(),
+    }),
+  );
+  const sending = state.kind === "sending";
+  useEffect(() => {
+    if (!sending) setDraft(latest.current.saved);
+  }, [savedKey, sending]);
+  return {
+    draft,
+    setDraft,
+    state,
+    choose: (value: V) => {
+      setDraft(value);
+      saver.choose(value);
+    },
   };
-  return { state, run };
 }
 
 function MappingStep({
@@ -1209,12 +1235,14 @@ function MappingStep({
   actions: SettingsActions;
 }) {
   const t = useTranslations("onboarding.mapping");
-  const ts = useTranslations("settings.mapping");
+  const ts = useTranslations("settings");
   const missing = missingMappingParts(workspace);
+  const [saves, setSaves] = useState(0);
+  const announce = useCallback(() => setSaves((count) => count + 1), []);
   return (
     <>
       {page.runnerProjects.length === 0 ? (
-        <Text variant="meta">{ts("noRunnerProjects")}</Text>
+        <Text variant="meta">{ts("mapping.noRunnerProjects")}</Text>
       ) : null}
       <div {...stylex.props(styles.tableBox)}>
         <table aria-label={t("tableLabel")} {...stylex.props(styles.table)}>
@@ -1246,20 +1274,25 @@ function MappingStep({
                 runnerProjects={page.runnerProjects}
                 agents={page.agents}
                 actions={actions}
+                onSaved={announce}
               />
             ))}
           </tbody>
         </table>
       </div>
-      <Text variant="meta">{ts("permissionHint")}</Text>
+      <Text variant="meta">{ts("mapping.permissionHint")}</Text>
       {workspace.labels.map((label) => (
         <LabelRow
           key={label.connection.id}
           ws={workspace.general.id}
           label={label}
           actions={actions}
+          onSaved={announce}
         />
       ))}
+      <p role="status" aria-live="polite" {...stylex.props(styles.srOnly)}>
+        {saves === 0 ? null : <span key={saves}>{ts("saved")}</span>}
+      </p>
       <div role="status" {...stylex.props(styles.stack)}>
         {missing.length === 0 ? (
           <p {...stylex.props(styles.ok)}>{t("ready")}</p>
@@ -1278,52 +1311,71 @@ function MappingStep({
   );
 }
 
+interface MappingChoice {
+  runnerProject: RunnerProjectId | null;
+  agent: AgentId | null;
+}
+
 function MappingRow({
   ws,
   bound,
   runnerProjects,
   agents,
   actions,
+  onSaved,
 }: {
   ws: WorkspaceId;
   bound: BoundProject;
   runnerProjects: Choice[];
   agents: string[];
   actions: SettingsActions;
+  onSaved: () => void;
 }) {
   const t = useTranslations("onboarding.mapping");
   const ts = useTranslations("settings");
   const reason = useReason();
   const agentName = useAgentName();
-  const [runnerProject, setRunnerProject] = useState(bound.mapping?.runnerProject ?? null);
-  const [agent, setAgent] = useState(bound.mapping?.agent ?? null);
-  const [stateId, setStateId] = useState(bound.inProgressStateId);
-  const mapping = useAutoSave();
-  const progress = useAutoSave();
+  const hintId = useId();
   const target = { ws, connectionId: bound.connection.id, projectId: bound.project.id };
-  const saveMapping = (nextProject: string | null, nextAgent: string | null) => {
-    if (nextProject === null || nextAgent === null) return;
-    mapping.run(
-      () =>
-        actions.saveMapping({
+  const savedProject =
+    bound.mapping === null ? null : toRunnerProjectId(bound.mapping.runnerProject);
+  const savedAgent = bound.mapping === null ? null : toAgentId(bound.mapping.agent);
+  const saveMapping = (nextProject: RunnerProjectId | null, nextAgent: AgentId | null) =>
+    nextProject === null || nextAgent === null
+      ? Promise.resolve<ActionResult>({ ok: true })
+      : actions.saveMapping({
           ...target,
           runnerProjectId: nextProject,
           agentId: nextAgent,
           model: bound.mapping?.model ?? "",
-        }),
-      () => {
-        setRunnerProject(bound.mapping?.runnerProject ?? null);
-        setAgent(bound.mapping?.agent ?? null);
-      },
-    );
+        });
+  const mapping = useSyncedSave<MappingChoice>({
+    saved: { runnerProject: savedProject, agent: savedAgent },
+    savedKey: `${savedProject ?? ""}\n${savedAgent ?? ""}`,
+    send: (choice) => saveMapping(choice.runnerProject, choice.agent),
+    onSaved,
+  });
+  const progress = useSyncedSave<string | null>({
+    saved: bound.inProgressStateId,
+    savedKey: bound.inProgressStateId ?? "",
+    send: (stateId) =>
+      stateId === null
+        ? Promise.resolve<ActionResult>({ ok: true })
+        : actions.saveInProgress({ ...target, stateId }),
+    onSaved,
+  });
+  const pick = (next: MappingChoice) => {
+    if (next.runnerProject === null || next.agent === null) mapping.setDraft(next);
+    else mapping.choose(next);
   };
+  const { runnerProject, agent } = mapping.draft;
   const project = bound.project.name;
   const done = mappingRowComplete(bound);
   const missingPair =
     runnerProject !== null && agent === null
-      ? t("needAgent")
+      ? "agent"
       : runnerProject === null && agent !== null
-        ? t("needRunnerProject")
+        ? "runnerProject"
         : null;
   const failed =
     mapping.state.kind === "failed" || progress.state.kind === "failed" || !bound.states.ok;
@@ -1339,27 +1391,23 @@ function MappingRow({
         <td {...stylex.props(styles.td)}>
           <Select
             aria-label={t("cellLabel", { project, column: t("runnerProject") })}
+            {...(missingPair === "runnerProject" ? { "aria-describedby": hintId } : {})}
             options={withCurrent(
               runnerProjects.map((p) => ({ value: p.id, label: p.name })),
               bound.mapping?.runnerProject,
             )}
             value={runnerProject}
-            onValueChange={(value) => {
-              setRunnerProject(value);
-              saveMapping(value, agent);
-            }}
+            onValueChange={(value) => pick({ runnerProject: toRunnerProjectId(value), agent })}
             placeholder={ts("mapping.choose")}
           />
         </td>
         <td {...stylex.props(styles.td)}>
           <Select
             aria-label={t("cellLabel", { project, column: t("agent") })}
+            {...(missingPair === "agent" ? { "aria-describedby": hintId } : {})}
             options={agents.map((a) => ({ value: a, label: agentName(a) }))}
             value={agent}
-            onValueChange={(value) => {
-              setAgent(value);
-              saveMapping(runnerProject, value);
-            }}
+            onValueChange={(value) => pick({ runnerProject, agent: toAgentId(value) })}
             placeholder={ts("mapping.choose")}
           />
         </td>
@@ -1372,14 +1420,8 @@ function MappingRow({
                 : [],
               bound.inProgressStateId,
             )}
-            value={stateId}
-            onValueChange={(value) => {
-              setStateId(value);
-              progress.run(
-                () => actions.saveInProgress({ ...target, stateId: value }),
-                () => setStateId(bound.inProgressStateId),
-              );
-            }}
+            value={progress.draft}
+            onValueChange={progress.choose}
             placeholder={ts("mapping.choose")}
           />
         </td>
@@ -1391,7 +1433,11 @@ function MappingRow({
         <tr>
           <td colSpan={5} {...stylex.props(styles.tdError)}>
             <div {...stylex.props(styles.stackTight)}>
-              {missingPair === null ? null : <Text variant="meta">{missingPair}</Text>}
+              {missingPair === null ? null : (
+                <span id={hintId} {...stylex.props(styles.hint)}>
+                  {missingPair === "agent" ? t("needAgent") : t("needRunnerProject")}
+                </span>
+              )}
               <SubmitError state={mapping.state} />
               <SubmitError state={progress.state} />
               {bound.states.ok ? null : (
@@ -1411,16 +1457,25 @@ function LabelRow({
   ws,
   label,
   actions,
+  onSaved,
 }: {
   ws: WorkspaceId;
   label: ConnectionLabel;
   actions: SettingsActions;
+  onSaved: () => void;
 }) {
   const t = useTranslations("onboarding.mapping");
   const ts = useTranslations("settings");
   const reason = useReason();
-  const [labelId, setLabelId] = useState(label.labelId);
-  const save = useAutoSave();
+  const save = useSyncedSave<string | null>({
+    saved: label.labelId,
+    savedKey: label.labelId ?? "",
+    send: (labelId) =>
+      labelId === null
+        ? Promise.resolve<ActionResult>({ ok: true })
+        : actions.saveLabel({ ws, connectionId: label.connection.id, labelId }),
+    onSaved,
+  });
   const options = label.labels.ok
     ? label.labels.items.map((l) => ({ value: l.id, label: l.name }))
     : [];
@@ -1443,14 +1498,8 @@ function LabelRow({
           <Select
             aria-label={t("labelSelect", { connection: label.connection.name })}
             options={allOptions}
-            value={labelId}
-            onValueChange={(value) => {
-              setLabelId(value);
-              save.run(
-                () => actions.saveLabel({ ws, connectionId: label.connection.id, labelId: value }),
-                () => setLabelId(label.labelId),
-              );
-            }}
+            value={save.draft}
+            onValueChange={save.choose}
             placeholder={ts("label.choose")}
           />
         </span>
@@ -1840,6 +1889,7 @@ const styles = stylex.create({
     borderWidth: 0,
   },
   primaryText: { color: colors.textPrimary },
+  hint: { color: colors.textSecondary, fontSize: fontSize.ui },
   ok: { margin: 0, color: colors.textPrimary },
   error: { margin: 0, color: colors.problem },
 });
