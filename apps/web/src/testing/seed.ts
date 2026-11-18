@@ -201,6 +201,19 @@ function startedOn(worktree: string) {
   };
 }
 
+export function addTitledRun(db: Database, key: string, title: string): RunId {
+  const assigned = assignRun(db, {
+    ticket: { connection, key: toTicketKey(key) },
+    ticketTitle: title,
+    trackerProject: webProject,
+    runnerProject: webRepo,
+    agent,
+    now: minutes(100),
+  });
+  if (!assigned.ok) throw new Error(assigned.reason);
+  return assigned.run.id;
+}
+
 export function breakGitHubAuth(db: Database): void {
   recordRunnerCheck(db, {
     runnerId: toRunnerId("runner-a"),

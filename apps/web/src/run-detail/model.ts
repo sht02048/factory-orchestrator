@@ -56,6 +56,7 @@ export interface RunDetail {
   id: string;
   now: string;
   ticketKey: string;
+  ticketTitle: string | null;
   trackerProject: string;
   workspace: { id: string; name: string };
   branch: string | null;

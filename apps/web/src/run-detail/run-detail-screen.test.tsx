@@ -13,7 +13,7 @@ import runJson from "../../messages/ko/run.json" with { type: "json" };
 import { buttonsOf } from "../testing/buttons";
 import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
-import { endedCases, minutes, now, seedDatabase } from "../testing/seed";
+import { addTitledRun, endedCases, minutes, now, seedDatabase } from "../testing/seed";
 import { loadRunDetail, requestRunLogTail } from "./load";
 import { runMessages } from "./messages";
 import type { RunDetail, RunDetailPage } from "./model";
@@ -87,6 +87,18 @@ describe("Run 상세 화면", () => {
         reason: true,
       });
     }
+  });
+
+  it("제목은 할당 때 저장한 티켓 제목이고, 회색 줄에 키를 함께 보인다(ADR 0010 9번, 0064)", () => {
+    const { db } = seedDatabase();
+    const html = render(page(db, addTitledRun(db, "ACME-30", "결제 실패 재시도")));
+    expect(html).toMatch(/<h1[^>]*>결제 실패 재시도<\/h1>/);
+    expect(text(html)).toContain("ACME-30 · Web");
+  });
+
+  it("제목을 모르는 런은 키를 제목으로 보인다", () => {
+    const { db, ids } = seedDatabase();
+    expect(render(page(db, ids.get("ACME-2")))).toMatch(/<h1[^>]*>ACME-2<\/h1>/);
   });
 
   it("에이전트는 ID 대신 공용 에이전트 이름으로 보인다", () => {

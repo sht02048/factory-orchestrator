@@ -38,6 +38,7 @@ export interface RunnerView {
   id: string;
   name: string;
   online: boolean;
+  offlineMs: number | null;
   assignmentBlocked: boolean;
   checks: RunnerCheckItem[] | null;
   checked: { at: string; agoMs: number } | null;

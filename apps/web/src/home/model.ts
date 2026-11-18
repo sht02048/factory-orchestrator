@@ -20,6 +20,7 @@ export type InputWait =
 interface HomeRunBase {
   id: RunId;
   ticketKey: TicketKey;
+  ticketTitle: string | null;
   trackerProject: string;
   workspace: WorkspaceSummary;
   runner: { name: string; online: boolean } | null;
@@ -56,6 +57,7 @@ export interface DashboardRunner {
   id: string;
   name: string;
   cause: RunnerIssueCause | null;
+  offlineMs: number | null;
   used: number;
   capacity: number;
 }
@@ -82,6 +84,7 @@ export function runnerIssues(runners: RunnersSummary): RunnerIssue[] {
 export interface DoneRun {
   id: RunId;
   ticketKey: TicketKey;
+  ticketTitle: string | null;
   workspace: WorkspaceSummary;
   summary: SummaryOutcome;
   endedAt: string;

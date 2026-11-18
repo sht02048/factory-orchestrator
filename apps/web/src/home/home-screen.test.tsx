@@ -1,11 +1,12 @@
 import { toRunId, toTicketKey } from "@ganger/core";
+import { Text } from "@ganger/ui";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import homeJson from "../../messages/ko/home.json" with { type: "json" };
 import { buttonsOf } from "../testing/buttons";
 import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
-import { now, seedDatabase } from "../testing/seed";
+import { addTitledRun, now, seedDatabase } from "../testing/seed";
 import { HomeScreen, QuestionForm, STOPPED_VISIBLE, runHref } from "./home-screen";
 import { loadHomePage } from "./load";
 import { homeMessages } from "./messages";
@@ -344,6 +345,39 @@ describe("In progress", () => {
     expect(text(row(html, "ACME-14"))).toContain(homeJson.row.queuedAnyOffline);
   });
 
+  it("할당 때 저장한 티켓 제목을 회색 키 옆에 보인다(ADR 0010 9번, 0064)", () => {
+    const { db } = seedDatabase();
+    const id = addTitledRun(db, "ACME-30", "결제 실패 재시도");
+    const html = section(render(loadHomePage(db, "ws-commerce", now, "UTC")), "In progress");
+    const titled = rows(html).find((li) => li.includes(`data-run="${id}"`)) ?? "";
+    expect(text(titled)).toContain("ACME-30 결제 실패 재시도");
+    expect(titled).toContain(
+      renderWithMessages(
+        <Text variant="meta" numeric>
+          ACME-30
+        </Text>,
+      ),
+    );
+    expect(titled).toContain(
+      renderWithMessages(
+        <Text variant="title" truncate>
+          결제 실패 재시도
+        </Text>,
+      ),
+    );
+  });
+
+  it("제목을 모르는 런(0064 전에 할당한 런)은 키만 행 제목으로 보인다", () => {
+    const html = section(render(seededPage()), "In progress");
+    expect(row(html, "ACME-10")).toContain(
+      renderWithMessages(
+        <Text variant="title" numeric>
+          ACME-10
+        </Text>,
+      ),
+    );
+  });
+
   it("Queued 까닭은 러너 이름에 맞는 조사로 쓴다", () => {
     const page = seededPage();
     const queued = page.queued.map((run) =>
@@ -367,6 +401,7 @@ describe("Runners", () => {
     expect(dots(offline)).toEqual(["offline"]);
     expect(offline).toContain('href="/runners?sel=runner-b"');
     expect(offline).toMatch(/role="meter"[^>]*aria-valuetext="0\/1"/);
+    expect(text(offline)).toContain("runner-b Offline · 2시간째");
     const online = row(html, "runner-a");
     expect(dots(online)).toEqual(["online"]);
     expect(online).toMatch(/role="meter"[^>]*aria-valuetext="4\/10"/);

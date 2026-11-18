@@ -132,6 +132,7 @@ export function loadRunsPage(
     const base = {
       id: run.id,
       ticketKey: run.ticket.key,
+      ticketTitle: run.ticketTitle,
       trackerProject: projectName(run),
       branch: run.state === "queued" ? null : run.branch,
       runner: runner === undefined ? null : { name: runner.name, online: runner.online },

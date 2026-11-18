@@ -261,8 +261,15 @@ describe("loadHomePage", () => {
     const page = loadHomePage(db, "ws-commerce", now, "UTC");
     expect(page.attention.every((item) => item.kind === "run")).toBe(true);
     expect(page.runners.list).toEqual([
-      { id: "runner-b", name: "runner-b", cause: "offline", used: 0, capacity: 1 },
-      { id: "runner-a", name: "runner-a", cause: null, used: 4, capacity: 10 },
+      {
+        id: "runner-b",
+        name: "runner-b",
+        cause: "offline",
+        offlineMs: now.getTime() - minutes(0).getTime(),
+        used: 0,
+        capacity: 1,
+      },
+      { id: "runner-a", name: "runner-a", cause: null, offlineMs: null, used: 4, capacity: 10 },
     ]);
     expect(loadShell(db).runnerIssues).toBe(1);
 

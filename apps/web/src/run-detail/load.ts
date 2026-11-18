@@ -58,6 +58,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     id: run.id,
     now: now.toISOString(),
     ticketKey: run.ticket.key,
+    ticketTitle: run.ticketTitle,
     trackerProject:
       getWorkspaceTrackerProject(db, run.ticket.connection, run.trackerProject)?.name ??
       run.trackerProject,

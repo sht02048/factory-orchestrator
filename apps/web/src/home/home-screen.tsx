@@ -252,9 +252,20 @@ function TodoGroupBlock({
 function RunKey({ run, all }: { run: HomeRun | DoneRun; all: boolean }) {
   return (
     <span {...stylex.props(styles.keyLine)}>
-      <Text variant="title" numeric>
-        {run.ticketKey}
-      </Text>
+      {run.ticketTitle === null ? (
+        <Text variant="title" numeric>
+          {run.ticketKey}
+        </Text>
+      ) : (
+        <>
+          <Text variant="meta" numeric>
+            {run.ticketKey}
+          </Text>
+          <Text variant="title" truncate>
+            {run.ticketTitle}
+          </Text>
+        </>
+      )}
       {all ? <Text variant="meta">{run.workspace.name}</Text> : null}
     </span>
   );
@@ -497,6 +508,7 @@ function runnerStatus(runner: DashboardRunner): PillStatus {
 function RunnerRow({ runner }: { runner: DashboardRunner }) {
   const t = useTranslations("home.runners");
   const statusName = useStatusName();
+  const { duration } = useTime();
   const status = runnerStatus(runner);
   return (
     <li data-runner={runner.id}>
@@ -505,9 +517,16 @@ function RunnerRow({ runner }: { runner: DashboardRunner }) {
         leading={<StatusDot status={status}>{statusName(status)}</StatusDot>}
       >
         <span {...stylex.props(styles.runnerLine)}>
-          <Text variant="title" truncate>
-            {runner.name}
-          </Text>
+          <span {...stylex.props(styles.runnerName)}>
+            <Text variant="title" truncate>
+              {runner.name}
+            </Text>
+            {runner.cause === "offline" && runner.offlineMs !== null ? (
+              <Text variant="meta" truncate>
+                {t("offlineFor", { duration: duration(runner.offlineMs) })}
+              </Text>
+            ) : null}
+          </span>
           <CapacityBar
             used={runner.used}
             total={runner.capacity}
@@ -845,6 +864,7 @@ const styles = stylex.create({
     columnGap: space.s2,
     minWidth: 0,
   },
+  runnerName: { display: "flex", flexDirection: "column", minWidth: 0 },
   runnerLine: {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
