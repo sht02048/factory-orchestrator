@@ -1,6 +1,10 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { join, relative } from "node:path";
+import { buildMachinePaths } from "./build-paths.ts";
+import { REPO_ROOT } from "./third-party.ts";
+
+export const NOTICE_FILE = "THIRD_PARTY_LICENSES.txt";
 
 const FAKE_ADAPTER =
   /\b(?:Fake(?:Runner|Tracker|CodeHost)|fake(?:Runner|Tracker|CodeHost)Factory)\b/g;
@@ -24,6 +28,8 @@ const MODULE_REFERENCES = [
 
 const BUILTINS = new Set(builtinModules);
 
+const TEXT_FILE = /\.(?:js|mjs|cjs|json|html|css|map|txt|sql)$/;
+
 export function packageImports(source: string): string[] {
   const found = new Set<string>();
   for (const pattern of MODULE_REFERENCES) {
@@ -45,8 +51,12 @@ export function devOnlyMarkers(source: string): string[] {
   return DEV_ONLY_MARKERS.filter((marker) => source.includes(marker));
 }
 
-export function findBundleProblems(root: string): string[] {
+export function findBundleProblems(
+  root: string,
+  buildRoots: readonly string[] = [REPO_ROOT],
+): string[] {
   const problems: string[] = [];
+  if (!existsSync(join(root, NOTICE_FILE))) problems.push(`${NOTICE_FILE} is missing`);
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
@@ -62,8 +72,13 @@ export function findBundleProblems(root: string): string[] {
       if (/\.(?:ts|tsx|mts|cts)$/.test(entry.name)) {
         problems.push(`${shown}: TypeScript source must not be in the bundle`);
       }
-      if (!/\.(?:js|mjs|cjs)$/.test(entry.name)) continue;
+      if (!TEXT_FILE.test(entry.name)) continue;
       const source = readFileSync(path, "utf8");
+      const paths = buildMachinePaths(source, buildRoots);
+      if (paths.length > 0) {
+        problems.push(`${shown}: contains build machine paths ${paths.join(", ")}`);
+      }
+      if (!/\.(?:js|mjs|cjs)$/.test(entry.name)) continue;
       const imports = packageImports(source);
       if (imports.length > 0) problems.push(`${shown}: imports packages ${imports.join(", ")}`);
       const fakes = fakeAdapterNames(source);
@@ -74,5 +89,32 @@ export function findBundleProblems(root: string): string[] {
     }
   };
   walk(root);
+  return problems;
+}
+
+export const ELECTRON_LICENSES = ["LICENSE.electron.txt", "LICENSES.chromium.html"] as const;
+
+export function findAppProblems(
+  resources: string,
+  buildRoots: readonly string[] = [REPO_ROOT],
+): string[] {
+  const problems: string[] = [];
+  for (const name of [NOTICE_FILE, ...ELECTRON_LICENSES]) {
+    if (!existsSync(join(resources, name))) problems.push(`${name} is missing`);
+  }
+  const asar = join(resources, "app.asar");
+  if (existsSync(asar)) {
+    const paths = buildMachinePaths(readFileSync(asar, "latin1"), buildRoots);
+    if (paths.length > 0)
+      problems.push(`app.asar: contains build machine paths ${paths.join(", ")}`);
+  } else {
+    problems.push("app.asar is missing");
+  }
+  const server = join(resources, "server");
+  if (existsSync(server)) {
+    problems.push(...findBundleProblems(server, buildRoots).map((line) => `server/${line}`));
+  } else {
+    problems.push("server is missing");
+  }
   return problems;
 }

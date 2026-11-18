@@ -1,4 +1,6 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+import { thirdPartyManifest } from "../../scripts/third-party";
 
 export default defineConfig({
   build: {
@@ -9,4 +11,7 @@ export default defineConfig({
     rollupOptions: { output: { entryFileNames: "srvx.js" } },
   },
   ssr: { noExternal: true },
+  plugins: [
+    thirdPartyManifest(fileURLToPath(new URL("dist/third-party", import.meta.url)), "srvx"),
+  ],
 });

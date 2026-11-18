@@ -3,10 +3,16 @@
   "tasks": {
     "typecheck": {
       "dependsOn": ["^typecheck"],
-      "inputs": ["$TURBO_DEFAULT$", "../../tsconfig.base.json"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "../../tsconfig.base.json",
+        "../../scripts/build-paths.ts",
+        "../../scripts/third-party.ts"
+      ]
     },
     "build": {
       "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "../../scripts/build-paths.ts", "../../scripts/third-party.ts"],
       "outputs": ["dist/**"]
     }
   }
