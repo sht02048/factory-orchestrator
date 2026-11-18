@@ -42,6 +42,8 @@ export interface StatsScreenProps {
   onDimensionChange: (dimension: StatsDimension) => void;
   onPeriodChange: (days: StatsPeriodDays) => void;
   onPickWorkspace: (workspaceId: string) => void;
+  runsHref?: (dimension: StatsDimension, key: string, days: StatsPeriodDays) => string;
+  onOpenRuns?: (dimension: StatsDimension, key: string, days: StatsPeriodDays) => void;
 }
 
 export function StatsScreen(props: StatsScreenProps) {
@@ -108,6 +110,8 @@ function StatsView({
   dimension,
   onDimensionChange,
   onPeriodChange,
+  runsHref,
+  onOpenRuns,
   workspaceName,
 }: Omit<StatsScreenProps, "page"> & { page: LoadedStatsPage; workspaceName: string }) {
   const t = useTranslations("stats");
@@ -170,6 +174,12 @@ function StatsView({
               dimension={dimension}
               days={days}
               onDimensionChange={onDimensionChange}
+              {...(runsHref === undefined
+                ? {}
+                : { runsHref: (key: string) => runsHref(dimension, key, days) })}
+              {...(onOpenRuns === undefined
+                ? {}
+                : { onOpenRuns: (key: string) => onOpenRuns(dimension, key, days) })}
             />
           </Section>
         </div>
@@ -322,11 +332,15 @@ function Breakdown({
   dimension,
   days,
   onDimensionChange,
+  runsHref,
+  onOpenRuns,
 }: {
   groups: ReadonlyArray<StatsGroup>;
   dimension: StatsDimension;
   days: number;
   onDimensionChange: (dimension: StatsDimension) => void;
+  runsHref?: (key: string) => string;
+  onOpenRuns?: (key: string) => void;
 }) {
   const t = useTranslations("stats");
   const agentName = useAgentName();
@@ -347,6 +361,12 @@ function Breakdown({
                 caption={t("tableCaption", { dimension: t(`dimension.${dimension}`) })}
                 groups={groups}
                 nameOf={nameOf}
+                {...(runsHref === undefined
+                  ? {}
+                  : { runsHref: (group: StatsGroup) => runsHref(group.key) })}
+                {...(onOpenRuns === undefined
+                  ? {}
+                  : { onOpenRuns: (group: StatsGroup) => onOpenRuns(group.key) })}
               />
             )}
           </div>

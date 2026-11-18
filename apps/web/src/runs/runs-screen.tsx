@@ -36,7 +36,8 @@ import {
   matchesFilter,
   needsAttention,
 } from "./model";
-import type { RunFilter, RunView, RunsPage } from "./model";
+import type { ConditionKey } from "./conditions";
+import type { RunCondition, RunFilter, RunView, RunsPage } from "./model";
 
 const columns = "minmax(0, 1fr) 160px 88px";
 
@@ -50,6 +51,7 @@ export interface RunsScreenProps {
   onOpen: (runId: string) => void;
   onPickWorkspace: (workspaceId: string) => void;
   onShowMoreEnded?: () => void;
+  onClearConditions?: (keys: ReadonlyArray<ConditionKey>) => void;
   runHref: (runId: string) => string;
 }
 
@@ -116,6 +118,7 @@ function RunsList({
   onSelect,
   onOpen,
   onShowMoreEnded,
+  onClearConditions,
   runHref,
 }: RunsScreenProps) {
   const t = useTranslations("runs");
@@ -134,10 +137,22 @@ function RunsList({
   const showMoreButton = useRef<HTMLButtonElement>(null);
   const endedStatus = useRef<HTMLParagraphElement>(null);
   const focusAfterMore = useRef(false);
+  const filterBar = useRef<HTMLDivElement>(null);
+  const focusAfterClear = useRef(false);
+  const filtered = page.conditions.length > 0;
   useEffect(() => {
-    if (!focusAfterMore.current) return;
-    focusAfterMore.current = false;
-    (showMoreButton.current ?? endedStatus.current)?.focus();
+    if (focusAfterMore.current) {
+      focusAfterMore.current = false;
+      (showMoreButton.current ?? endedStatus.current)?.focus();
+    }
+    if (focusAfterClear.current) {
+      focusAfterClear.current = false;
+      const bar = filterBar.current;
+      (
+        bar?.querySelector<HTMLElement>("[data-condition] button") ??
+        bar?.querySelector<HTMLElement>("[role='tab'][aria-selected='true']")
+      )?.focus();
+    }
   }, [page]);
 
   return (
@@ -151,27 +166,44 @@ function RunsList({
               attention,
             })}
           />
-          <Tabs<RunFilter>
-            value={filter}
-            onValueChange={onFilterChange}
-            label={t("filter.label")}
-            variant="chips"
-          >
-            {RUN_FILTERS.map((key) => (
-              <Tab
-                key={key}
-                value={key}
-                count={counts.get(key) ?? 0}
-                attention={key === "attention"}
-              >
-                {label(key)}
-              </Tab>
-            ))}
-          </Tabs>
+          <div ref={filterBar} {...stylex.props(styles.filterBar)}>
+            <Tabs<RunFilter>
+              value={filter}
+              onValueChange={onFilterChange}
+              label={t("filter.label")}
+              variant="chips"
+            >
+              {RUN_FILTERS.map((key) => (
+                <Tab
+                  key={key}
+                  value={key}
+                  count={counts.get(key) ?? 0}
+                  attention={key === "attention"}
+                >
+                  {label(key)}
+                </Tab>
+              ))}
+            </Tabs>
+            {page.conditions.length === 0 ? null : (
+              <ConditionChips
+                conditions={page.conditions}
+                onClear={(keys) => {
+                  focusAfterClear.current = true;
+                  onClearConditions?.(keys);
+                }}
+              />
+            )}
+          </div>
           <Card padding="compact" label={t("listLabel")}>
             <Table columns={columns}>
               {visible.length === 0 ? (
-                <TableEmpty>{page.runs.length === 0 ? t("noRuns") : t("empty")}</TableEmpty>
+                <TableEmpty>
+                  {page.runs.length > 0
+                    ? t("empty")
+                    : filtered
+                      ? t("noRunsWithConditions")
+                      : t("noRuns")}
+                </TableEmpty>
               ) : (
                 <TableRows
                   label={t("listLabel")}
@@ -212,7 +244,11 @@ function RunsList({
           {selected === undefined ? (
             <DetailPanel>
               <Text variant="meta">
-                {page.runs.length === 0 ? t("panel.noRuns") : t("panel.empty")}
+                {page.runs.length > 0
+                  ? t("panel.empty")
+                  : filtered
+                    ? t("panel.noRunsWithConditions")
+                    : t("panel.noRuns")}
               </Text>
             </DetailPanel>
           ) : (
@@ -225,6 +261,48 @@ function RunsList({
         </section>
       }
     />
+  );
+}
+
+function ConditionChips({
+  conditions,
+  onClear,
+}: {
+  conditions: ReadonlyArray<RunCondition>;
+  onClear: (keys: ReadonlyArray<ConditionKey>) => void;
+}) {
+  const t = useTranslations("runs.conditions");
+  const agentName = useAgentName();
+  const text = (condition: RunCondition): string => {
+    switch (condition.key) {
+      case "runner":
+        return condition.name === null ? t("noRunner") : t("runner", { name: condition.name });
+      case "project":
+        return t("project", { name: condition.name });
+      case "agent":
+        return t("agent", { name: agentName(condition.agent) });
+      case "days":
+        return t("days", { days: condition.days });
+    }
+  };
+  return (
+    <div role="group" aria-label={t("label")} {...stylex.props(styles.conditions)}>
+      {conditions.map((condition) => (
+        <span key={condition.key} data-condition={condition.key}>
+          <Button
+            aria-label={t("remove", { condition: text(condition) })}
+            onClick={() => onClear([condition.key])}
+          >
+            {text(condition)}
+          </Button>
+        </span>
+      ))}
+      {conditions.length > 1 ? (
+        <Button variant="ghost" onClick={() => onClear(conditions.map((c) => c.key))}>
+          {t("clearAll")}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -411,6 +489,14 @@ const styles = stylex.create({
     paddingBottom: space.s10,
   },
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
+  filterBar: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: space.s4,
+    rowGap: space.s2,
+  },
+  conditions: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
   inline: { display: "inline-flex", alignItems: "center", gap: space.s2 },
   more: {
     display: "flex",

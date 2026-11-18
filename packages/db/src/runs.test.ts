@@ -4,6 +4,7 @@ import {
   summarizeRunOutcome,
   toDeliveryId,
   toPullRequestId,
+  toAgentId,
   toTicketKey,
   toTrackerConnectionId,
   toTrackerKind,
@@ -14,7 +15,7 @@ import {
   toTrackerProjectId,
   toWorktreeRef,
 } from "@factory/core";
-import type { RunId, RunState, TicketRef } from "@factory/core";
+import type { AgentId, RunId, RunState, RunnerId, TicketRef } from "@factory/core";
 import { describe, expect, it } from "vitest";
 import { inTransaction } from "./database.js";
 import type { Database } from "./database.js";
@@ -572,6 +573,62 @@ describe("listRuns 의 순서와 상한", () => {
       listRuns(db, { endedAxes: [{ ...openAxes, laterPrState: null }] }).map((run) => run.id),
     ).toEqual([open]);
     expect(listRuns(db, { endedAxes: [] })).toEqual([]);
+  });
+
+  it("러너·트래커 프로젝트·에이전트·끝난 시각으로 거를 수 있다", () => {
+    const db = seededDatabase();
+    const unassigned = assignOk(db, "ENG-4");
+    change(db, unassigned, { to: "ended", agentResult: "could-not-start", prState: "none" });
+    const runnerA = addRunner(db, { id: "a", capacity: 5, online: true, projects: [repoA] });
+    const runnerB = addRunner(db, { id: "b", capacity: 5, online: true, projects: [repoA] });
+    const endAt = (
+      key: string,
+      minute: number,
+      extra: { runnerId?: RunnerId; agent?: AgentId },
+    ) => {
+      const result = assignRun(db, {
+        ticket: ticket(key),
+        trackerProject,
+        runnerProject: repoA,
+        agent: extra.agent ?? agent,
+        ...(extra.runnerId === undefined ? {} : { runnerId: extra.runnerId }),
+        now: new Date(Date.UTC(2026, 10, 17, 0, minute)),
+      });
+      if (!result.ok) throw new Error(`assign failed: ${result.reason}`);
+      const at = new Date(Date.UTC(2026, 10, 17, 1, minute));
+      const ended = changeRunState(db, result.run.id, { to: "running", started }, at);
+      if (!ended.ok) throw new Error("start failed");
+      const done = changeRunState(
+        db,
+        result.run.id,
+        { to: "ended", agentResult: "reported-success", prState: "merged" },
+        at,
+      );
+      if (!done.ok) throw new Error("end failed");
+      return result.run.id;
+    };
+    const onA = endAt("ENG-1", 0, { runnerId: runnerA });
+    const onB = endAt("ENG-2", 10, { runnerId: runnerB });
+    const codex = endAt("ENG-3", 20, { runnerId: runnerA, agent: toAgentId("codex") });
+    const ids = (filter: Parameters<typeof listRuns>[1]) =>
+      listRuns(db, filter).map((run) => run.id);
+
+    expect(ids({ runnerId: runnerA })).toEqual([onA, codex]);
+    expect(ids({ runnerId: null })).toEqual([unassigned]);
+    expect(ids({ agent: toAgentId("codex") })).toEqual([codex]);
+    expect(ids({ trackerProject: { connection, project: trackerProject } })).toHaveLength(4);
+    expect(
+      ids({ trackerProject: { connection, project: toTrackerProjectId("tp-other") } }),
+    ).toEqual([]);
+    expect(
+      ids({
+        endedBetween: {
+          from: new Date(Date.UTC(2026, 10, 17, 1, 5)),
+          before: new Date(Date.UTC(2026, 10, 17, 1, 20)),
+        },
+      }),
+    ).toEqual([onB]);
+    expect(ids({ runnerId: runnerA, agent: agent, states: ["ended"] })).toEqual([onA]);
   });
 
   it("listRunsWithRecords 는 런과 기록을 한 번에 돌려준다", () => {

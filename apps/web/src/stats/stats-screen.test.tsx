@@ -8,7 +8,13 @@ import { StatsScreen } from "./stats-screen";
 
 const noop = () => {};
 
-function render(page: StatsPage, options: { dimension?: StatsDimension } = {}) {
+function render(
+  page: StatsPage,
+  options: {
+    dimension?: StatsDimension;
+    runsHref?: (dimension: StatsDimension, key: string, days: StatsPeriodDays) => string;
+  } = {},
+) {
   return renderWithMessages(
     <StatsScreen
       page={page}
@@ -20,6 +26,7 @@ function render(page: StatsPage, options: { dimension?: StatsDimension } = {}) {
       onDimensionChange={noop}
       onPeriodChange={noop}
       onPickWorkspace={noop}
+      {...(options.runsHref === undefined ? {} : { runsHref: options.runsHref })}
     />,
     statsMessages,
   );
@@ -178,6 +185,20 @@ describe("Stats 화면(0072)", () => {
       "Claude Code",
       "Codex",
     ]);
+  });
+
+  it("나눠 보기 행 이름은 그 행의 조건과 Stats 기간으로 Runs 를 여는 링크다(0075)", () => {
+    const runsHref = (dimension: StatsDimension, key: string, days: StatsPeriodDays) =>
+      `/runs?${dimension}=${key}&days=${days}`;
+    const html = render(seeded(7), { runsHref });
+    const body = between(html.slice(html.lastIndexOf("<table")), "<tbody", "</tbody>");
+    expect(body).toContain(
+      '<a href="/runs?runner=runner-a&amp;days=7" aria-label="runner-a의 런 보기"',
+    );
+    const agents = render(seeded(), { runsHref, dimension: "agent" });
+    expect(agents).toContain('aria-label="Claude Code의 런 보기"');
+    expect(agents).toContain('href="/runs?agent=claude&amp;days=14"');
+    expect(render(seeded())).not.toContain("의 런 보기");
   });
 
   it("나눠 보기 표의 열 머리는 이름 · 런 · 결과 · 리드 타임이다", () => {

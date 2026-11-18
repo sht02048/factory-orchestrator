@@ -1,5 +1,6 @@
 import type { AgentResult, PrState, SummaryOutcome } from "@factory/core";
 import type { WorkspaceChoice } from "../shell/model";
+import type { StatsPeriodDays } from "../stats/model";
 
 export type QueuedReason =
   | {
@@ -41,7 +42,14 @@ export interface RunsPage {
   runs: RunView[];
   recentEnded: number;
   moreEnded: boolean;
+  conditions: RunCondition[];
 }
+
+export type RunCondition =
+  | { key: "runner"; name: string | null }
+  | { key: "project"; name: string }
+  | { key: "agent"; agent: string }
+  | { key: "days"; days: StatsPeriodDays };
 
 export const ENDED_RUNS_PAGE_SIZE = 50;
 export const MAX_ENDED_RUNS = 5000;

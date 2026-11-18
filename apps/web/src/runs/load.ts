@@ -1,4 +1,11 @@
-import { AGENT_RESULTS, PR_STATES, runDurations, summarizeRunOutcome } from "@factory/core";
+import {
+  AGENT_RESULTS,
+  PR_STATES,
+  runDurations,
+  summarizeRunOutcome,
+  toTrackerConnectionId,
+  toTrackerProjectId,
+} from "@factory/core";
 import type { QueuedRun, RunId } from "@factory/core";
 import {
   getWorkspaceTrackerProject,
@@ -14,8 +21,11 @@ import {
 import type { Database, EndedAxesFilter, RunRecords, StoredRun } from "@factory/db";
 import { isWebUrl } from "../format/url";
 import { resolveWorkspace } from "../shell/model";
+import { DEFAULT_TIME_ZONE } from "../time-zone";
+import { parseTrackerProjectKey, toRunsFilter } from "./conditions";
+import type { RunConditions } from "./conditions";
 import { ENDED_RUNS_PAGE_SIZE } from "./model";
-import type { QueuedReason, RunView, RunsPage } from "./model";
+import type { QueuedReason, RunCondition, RunView, RunsPage } from "./model";
 import { explainQueue } from "./queue-reasons";
 
 export function loadRunsPage(
@@ -23,12 +33,15 @@ export function loadRunsPage(
   ws: string | undefined,
   now: Date,
   endedLimit: number = ENDED_RUNS_PAGE_SIZE,
+  conditions: RunConditions = {},
+  timeZone: string = DEFAULT_TIME_ZONE,
 ): RunsPage {
   const workspace = resolveWorkspace(
     listWorkspaces(db).map((w) => ({ id: w.id, name: w.name })),
     ws,
   );
-  if (workspace.kind !== "one") return { workspace, runs: [], recentEnded: 0, moreEnded: false };
+  if (workspace.kind !== "one")
+    return { workspace, runs: [], recentEnded: 0, moreEnded: false, conditions: [] };
 
   const runners = new Map(listRunners(db).map((r) => [r.id, r]));
   const cancelling = new Set<RunId>(listPendingCancelRequests(db).map((r) => r.runId));
@@ -70,9 +83,17 @@ export function loadRunsPage(
   };
 
   const workspaceId = toWorkspaceId(workspace.workspace.id);
-  const active = listRunsWithRecords(db, { workspaceId, states: ACTIVE_STATES, order: "newest" });
+  const filter = toRunsFilter(conditions, now, timeZone);
+  const { endedBetween, ...scope } = filter;
+  const inScope = { workspaceId, ...scope };
+  const endedScope = endedBetween === undefined ? inScope : { ...inScope, endedBetween };
+  const filtered = Object.keys(filter).length > 0;
+  const active =
+    endedBetween === undefined
+      ? listRunsWithRecords(db, { ...inScope, states: ACTIVE_STATES, order: "newest" })
+      : [];
   const ended = listRunsWithRecords(db, {
-    workspaceId,
+    ...endedScope,
     states: ["ended"],
     order: "newest",
     limit: endedLimit + 1,
@@ -80,12 +101,18 @@ export function loadRunsPage(
   const moreEnded = ended.length > endedLimit;
   const recentEnded = ended.slice(0, endedLimit);
   const recentEndedIds = new Set(recentEnded.map(({ run }) => run.id));
+  const unresolvedLatest =
+    moreEnded || filtered
+      ? listRunsWithRecords(db, {
+          ...endedScope,
+          latestPerTicket: true,
+          endedAxes: UNRESOLVED_ENDED_AXES,
+        })
+      : null;
+  const unresolvedLatestIds =
+    unresolvedLatest === null ? null : new Set(unresolvedLatest.map(({ run }) => run.id));
   const olderAttention = moreEnded
-    ? listRunsWithRecords(db, {
-        workspaceId,
-        latestPerTicket: true,
-        endedAxes: UNRESOLVED_ENDED_AXES,
-      }).filter(({ run }) => !recentEndedIds.has(run.id))
+    ? (unresolvedLatest ?? []).filter(({ run }) => !recentEndedIds.has(run.id))
     : [];
   const stored = [...active, ...recentEnded, ...olderAttention].toSorted(newestFirst);
   const latestByTicket = new Map<string, RunId>();
@@ -138,7 +165,9 @@ export function loadRunsPage(
       case "ended": {
         const summary = summarizeRunOutcome(run).outcome;
         const latest =
-          latestByTicket.get(`${run.ticket.connection}\u0000${run.ticket.key}`) === run.id;
+          unresolvedLatestIds === null
+            ? latestByTicket.get(`${run.ticket.connection}\u0000${run.ticket.key}`) === run.id
+            : unresolvedLatestIds.has(run.id);
         return {
           ...base,
           state: run.state,
@@ -153,7 +182,44 @@ export function loadRunsPage(
     }
   });
 
-  return { workspace, runs, recentEnded: recentEnded.length, moreEnded };
+  return {
+    workspace,
+    runs,
+    recentEnded: recentEnded.length,
+    moreEnded,
+    conditions: describeConditions(db, conditions, runners),
+  };
+}
+
+function describeConditions(
+  db: Database,
+  conditions: RunConditions,
+  runners: ReadonlyMap<string, { name: string }>,
+): RunCondition[] {
+  const described: RunCondition[] = [];
+  if (conditions.runner !== undefined)
+    described.push({
+      key: "runner",
+      name:
+        conditions.runner === ""
+          ? null
+          : (runners.get(conditions.runner)?.name ?? conditions.runner),
+    });
+  const project =
+    conditions.project === undefined ? null : parseTrackerProjectKey(conditions.project);
+  if (project !== null)
+    described.push({
+      key: "project",
+      name:
+        getWorkspaceTrackerProject(
+          db,
+          toTrackerConnectionId(project.connection),
+          toTrackerProjectId(project.project),
+        )?.name ?? project.project,
+    });
+  if (conditions.agent !== undefined) described.push({ key: "agent", agent: conditions.agent });
+  if (conditions.days !== undefined) described.push({ key: "days", days: conditions.days });
+  return described;
 }
 
 function isUnresolvedEndedRun(run: StoredRun, records: RunRecords): boolean {

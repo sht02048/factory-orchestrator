@@ -1,4 +1,5 @@
-import { createFileRoute, getRouteApi } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
+import { conditionsForStatsGroup } from "../../runs/conditions";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
@@ -30,8 +31,9 @@ export const Route = createFileRoute("/_app/stats")({
 function StatsRoute() {
   const page = Route.useLoaderData();
   const shell = appRoute.useLoaderData();
-  const { by } = Route.useSearch();
+  const { by, ws } = Route.useSearch();
   const navigate = Route.useNavigate();
+  const router = useRouter();
   return (
     <ScreenMessages messages={statsMessages}>
       <StatsScreen
@@ -53,8 +55,20 @@ function StatsRoute() {
             replace: true,
           });
         }}
-        onPickWorkspace={(ws) => {
-          void navigate({ search: (prev) => ({ ...prev, ws }) });
+        onPickWorkspace={(next) => {
+          void navigate({ search: (prev) => ({ ...prev, ws: next }) });
+        }}
+        runsHref={(dimension, key, days) =>
+          router.buildLocation({
+            to: "/runs",
+            search: { ws, ...conditionsForStatsGroup(dimension, key, days) },
+          }).href
+        }
+        onOpenRuns={(dimension, key, days) => {
+          void navigate({
+            to: "/runs",
+            search: { ws, ...conditionsForStatsGroup(dimension, key, days) },
+          });
         }}
       />
     </ScreenMessages>

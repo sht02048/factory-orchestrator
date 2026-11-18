@@ -86,5 +86,6 @@
   },
   "result": "Merged {merged} · Human Check {check} · Failed {failed} · Canceled {canceled}",
   "tableCaption": "{dimension}별 런 결과와 리드 타임",
-  "empty": "최근 {days}일 동안 끝난 런이 없어요. 런이 끝나면 여기에 보여요."
+  "empty": "최근 {days}일 동안 끝난 런이 없어요. 런이 끝나면 여기에 보여요.",
+  "openRuns": "{name}의 런 보기"
 }

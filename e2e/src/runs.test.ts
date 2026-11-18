@@ -214,6 +214,50 @@ describe("Runs 화면(브라우저, 0056)", () => {
   });
 });
 
+describe("Runs 조건(브라우저, 0075)", () => {
+  it("주소의 조건으로 거르고, 끝난 런 상한은 조건 안에서 적용하며, 칩을 지우면 포커스가 남은 칩으로 간다", async (context) => {
+    const page = await newPage(context, { width: 1280, height: 900 });
+    await page.goto(`/runs?ws=${workspaceId}&runner=${onlineRunner}&agent=${agent}&days=14`);
+    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+    await page.waitForLoadState("networkidle");
+
+    const conditions = page.getByRole("group", { name: runsJson.conditions.label });
+    const runnerChip = conditions.getByRole("button", {
+      name: `러너: ${onlineRunner} 조건 지우기`,
+    });
+    await runnerChip.waitFor();
+    expect(await conditions.getByRole("button").allTextContents()).toEqual([
+      `러너: ${onlineRunner}`,
+      "에이전트: Claude Code",
+      "기간: 최근 14일",
+      runsJson.conditions.clearAll,
+    ]);
+    expect(await page.getByRole("option", { name: /^ACME-END-/ }).count()).toBe(endedPageSize);
+    expect(await page.getByRole("option", { name: runningKey }).count()).toBe(0);
+
+    await runnerChip.click();
+    await page.waitForURL((url) => !url.searchParams.has("runner"));
+    await runnerChip.waitFor({ state: "detached" });
+    expect(await page.evaluate(() => document.activeElement?.textContent)).toBe(
+      "에이전트: Claude Code",
+    );
+
+    await conditions.getByRole("button", { name: runsJson.conditions.clearAll }).click();
+    await conditions.waitFor({ state: "detached" });
+    expect(new URL(page.url()).search).toBe(`?ws=${workspaceId}`);
+    await page.getByRole("option", { name: runningKey }).waitFor();
+    expect(await page.evaluate(() => document.activeElement?.getAttribute("role"))).toBe("tab");
+  });
+
+  it("조건에 맞는 런이 없으면 조건 때문이라고 알린다", async (context) => {
+    const page = await newPage(context, { width: 1280, height: 900 });
+    await page.goto(`/runs?ws=${workspaceId}&agent=codex`);
+    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+    await page.getByText(runsJson.noRunsWithConditions).waitFor();
+    expect(await page.getByRole("option").count()).toBe(0);
+  });
+});
+
 async function newPage(
   context: TestContext,
   viewport: { width: number; height: number },

@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { textStyles } from "@factory/ui";
 import { colors, radius, size, space } from "@factory/ui/tokens.stylex";
+import type { MouseEvent } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import type { OutcomeCounts, StatsGroup } from "./model";
@@ -60,10 +61,14 @@ export function BreakdownTable({
   caption,
   groups,
   nameOf,
+  runsHref,
+  onOpenRuns,
 }: {
   caption: string;
   groups: ReadonlyArray<StatsGroup>;
   nameOf: (group: StatsGroup) => string;
+  runsHref?: (group: StatsGroup) => string;
+  onOpenRuns?: (group: StatsGroup) => void;
 }) {
   const t = useTranslations("stats");
   const { duration } = useTime();
@@ -95,9 +100,37 @@ export function BreakdownTable({
       </thead>
       <tbody>
         {groups.map((group) => (
-          <tr key={group.key}>
+          <tr
+            key={group.key}
+            {...(onOpenRuns === undefined
+              ? {}
+              : {
+                  onClick: (event: MouseEvent<HTMLTableRowElement>) => {
+                    if (event.target instanceof Element && event.target.closest("a") !== null)
+                      return;
+                    if ((window.getSelection()?.toString() ?? "") !== "") return;
+                    onOpenRuns(group);
+                  },
+                })}
+            {...stylex.props(onOpenRuns !== undefined && styles.openable)}
+          >
             <th scope="row" {...stylex.props(textStyles("title"), styles.td, styles.name)}>
-              {nameOf(group)}
+              {runsHref === undefined ? (
+                nameOf(group)
+              ) : (
+                <a
+                  href={runsHref(group)}
+                  aria-label={t("openRuns", { name: nameOf(group) })}
+                  onClick={(event) => {
+                    if (onOpenRuns === undefined || !isPlainClick(event)) return;
+                    event.preventDefault();
+                    onOpenRuns(group);
+                  }}
+                  {...stylex.props(styles.runsLink)}
+                >
+                  {nameOf(group)}
+                </a>
+              )}
             </th>
             <td {...stylex.props(textStyles("ui"), styles.td, styles.end, styles.numeric)}>
               {group.runs}
@@ -115,7 +148,19 @@ export function BreakdownTable({
   );
 }
 
+function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
+
 const styles = stylex.create({
+  openable: { cursor: "pointer" },
+  runsLink: {
+    color: "inherit",
+    textDecoration: { default: "none", ":hover": "underline", ":focus-visible": "underline" },
+    textUnderlineOffset: 3,
+    outline: { default: "none", ":focus-visible": "2px solid currentColor" },
+    outlineOffset: 2,
+  },
   track: {
     display: "flex",
     gap: space.px2,

@@ -173,6 +173,28 @@ describe("Runs 화면", () => {
     expect(panelText(render(empty))).toContain(runsJson.panel.noRuns);
   });
 
+  it("걸린 조건을 지울 수 있는 버튼 줄로 보이고, 맞는 런이 없으면 조건 때문이라고 알린다(0075)", () => {
+    const { db } = seedDatabase();
+    const page = loadRunsPage(db, undefined, now, 50, {
+      runner: "runner-a",
+      agent: "codex",
+      days: 7,
+    });
+    const html = render(page);
+    expect(html).toContain(`role="group" aria-label="${runsJson.conditions.label}"`);
+    expect(html).toContain(">러너: runner-a<");
+    expect(html).toContain(`aria-label="러너: runner-a 조건 지우기"`);
+    expect(html).toContain(">기간: 최근 7일<");
+    expect(html).toContain(`>${runsJson.conditions.clearAll}<`);
+    expect(html).toContain(runsJson.noRunsWithConditions);
+    expect(panelText(html)).toContain(runsJson.panel.noRunsWithConditions);
+
+    const one = render(loadRunsPage(db, undefined, now, 50, { runner: "" }));
+    expect(one).toContain(`>${runsJson.conditions.noRunner}<`);
+    expect(one).not.toContain(runsJson.conditions.clearAll);
+    expect(render(loadRunsPage(db, undefined, now))).not.toContain(runsJson.conditions.label);
+  });
+
   it("끝난 런이 더 있으면 몇 개까지 보이는지 알리고 '더 보기'를 둔다", () => {
     const { db } = seedDatabase();
     const page: RunsPage = { ...loadRunsPage(db, undefined, now), moreEnded: true };

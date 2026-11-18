@@ -24,10 +24,25 @@ import type {
   RunnerId,
   RunnerProjectId,
   TicketRef,
+  TrackerConnectionId,
   TrackerProjectId,
   WorktreeRef,
 } from "@factory/core";
-import { and, asc, count, desc, eq, gt, inArray, isNull, ne, notExists, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  ne,
+  notExists,
+  or,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
@@ -197,6 +212,10 @@ export interface ListRunsFilter {
   limit?: number;
   latestPerTicket?: boolean;
   endedAxes?: ReadonlyArray<EndedAxesFilter>;
+  runnerId?: RunnerId | null;
+  trackerProject?: { connection: TrackerConnectionId; project: TrackerProjectId };
+  agent?: AgentId;
+  endedBetween?: { from: Date; before: Date };
 }
 
 export interface EndedAxesFilter {
@@ -229,6 +248,19 @@ function selectRunRows(db: Database, filter: ListRunsFilter): RunRow[] {
     conditions.push(eq(runs.ticketKey, filter.ticket.key));
   }
   if (filter.workspaceId !== undefined) conditions.push(eq(runs.workspaceId, filter.workspaceId));
+  if (filter.runnerId !== undefined)
+    conditions.push(
+      filter.runnerId === null ? isNull(runs.runnerId) : eq(runs.runnerId, filter.runnerId),
+    );
+  if (filter.trackerProject !== undefined) {
+    conditions.push(eq(runs.trackerConnectionId, filter.trackerProject.connection));
+    conditions.push(eq(runs.trackerProjectId, filter.trackerProject.project));
+  }
+  if (filter.agent !== undefined) conditions.push(eq(runs.agentId, filter.agent));
+  if (filter.endedBetween !== undefined) {
+    conditions.push(gte(runs.endedAt, filter.endedBetween.from));
+    conditions.push(lt(runs.endedAt, filter.endedBetween.before));
+  }
   if (filter.latestPerTicket === true) {
     const newer = alias(runs, "newer_run");
     conditions.push(
