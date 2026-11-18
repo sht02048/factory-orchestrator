@@ -103,7 +103,8 @@ const styles = stylex.create({
     },
   },
   disabled: {
-    backgroundColor: { default: colors.bgCard, ":hover": colors.bgCard },
+    backgroundColor: { default: colors.bgControl, ":hover": colors.bgControl },
+    boxShadow: `inset 0 0 0 1px ${colors.borderDefault}`,
     color: { default: colors.textDisabled, ":hover": colors.textDisabled },
     cursor: "not-allowed",
     transform: { default: null, ":active": null },
