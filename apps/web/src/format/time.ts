@@ -8,6 +8,7 @@ import { DAY_MS } from "../time-zone";
  * - 지난 일은 상대 시간: 1분 안이면 "방금", "25분 전", "3시간 전", 하루가 넘으면 날짜("11월 17일").
  * - 타임라인은 시각: "10:45".
  * - 기다린 시간·통계 같은 시간의 양은 "12분", "1시간 5분".
+ * - 통계의 하루는 날짜: "11월 4일", 그래프 눈금은 "11/4".
  *
  * 시각과 날짜는 운영자 시간대(time-zone.ts, 티켓 0044)로 그린다. 시간대는 루트의 IntlProvider 가 주고
  * use-intl 포매터가 쓴다. "지금"은 서버가 데이터를 읽을 때 정해 경과 밀리초로 넘긴다. 화면이 Date.now() 로
@@ -28,6 +29,11 @@ export interface TimeFormat {
   clock: (at: Date | string) => string;
   /** 타임라인 시각에 날짜를 붙여야 하면 붙인다: `now` 와 같은 날이면 "10:45", 다른 날이면 "11월 17일 10:45" */
   stamp: (at: Date | string, now: Date | string) => string;
+  /**
+   * 통계의 하루: "11월 4일"(long)과 그래프 눈금 "11/4"(short). `day` 는 운영자 시간대로 이미 나눈 날짜를
+   * UTC 자정 밀리초로 나타낸 값이다(stats/model.ts DailyThroughput.day). 시간대를 다시 적용하지 않는다.
+   */
+  statsDay: (day: number) => { long: string; short: string };
 }
 
 export function useTime(): TimeFormat {
@@ -78,6 +84,11 @@ export function useTime(): TimeFormat {
             minute: "2-digit",
             hourCycle: "h23",
           }),
+    statsDay: (value) => {
+      const date = new Date(value);
+      const parts = { month: date.getUTCMonth() + 1, day: date.getUTCDate() };
+      return { long: t("time.date", parts), short: t("time.dayShort", parts) };
+    },
   };
 }
 

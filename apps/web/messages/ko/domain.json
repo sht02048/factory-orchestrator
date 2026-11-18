@@ -58,7 +58,9 @@
   "time": {
     "justNow": "방금",
     "ago": "{duration} 전",
-    "elapsed": "{duration}째"
+    "elapsed": "{duration}째",
+    "date": "{month}월 {day}일",
+    "dayShort": "{month}/{day}"
   },
   "agent": {
     "claude": "Claude Code",

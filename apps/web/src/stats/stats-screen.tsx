@@ -28,7 +28,6 @@ import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { useAgentName } from "../labels";
 import type { WorkspaceSummary } from "../shell/model";
-import { useDayLabel } from "./dates";
 import { STATS_DAYS, STATS_DIMENSIONS, percent } from "./model";
 import type {
   FailedCombination,
@@ -81,7 +80,7 @@ function Notice({ body }: { body: ReactNode }) {
   const t = useTranslations("stats");
   return (
     <div {...stylex.props(styles.notice)}>
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} subtitle={t("summary")} />
       {body}
     </div>
   );
@@ -124,8 +123,7 @@ function StatsView({
 }: Omit<StatsScreenProps, "page"> & { page: LoadedStatsPage; workspaceName: string }) {
   const groupName = useGroupName(dimension);
   const t = useTranslations("stats");
-  const dayLabel = useDayLabel();
-  const { duration } = useTime();
+  const { statsDay: dayLabel, duration } = useTime();
   const groups = page.groups[dimension];
   const selected = groups.find((g) => g.key === selectedKey) ?? groups[0];
 

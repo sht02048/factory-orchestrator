@@ -1,6 +1,7 @@
 {
   "documentTitle": "Stats · Factory Orchestrator",
   "title": "Stats",
+  "summary": "끝난 런을 요약 결과로 나눠 봐요.",
   "subtitle": "{workspace} · 최근 {days}일({from}–{to})",
   "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 통계가 보여요.",
   "allWorkspaces": {
@@ -8,8 +9,6 @@
     "pick": "{name} 보기"
   },
   "notApplicable": "—",
-  "date": "{month}월 {day}일",
-  "dayShort": "{month}/{day}",
   "percent": "{percent}%",
   "figures": {
     "label": "기간 요약",
