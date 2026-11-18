@@ -51,6 +51,7 @@ export function AssignDialog({
     onAssign({
       connection: ticket.connection,
       ticketKey: ticket.key,
+      ticketTitle: ticket.title,
       trackerProject: ticket.trackerProject.id,
       runnerId: runner === AUTO_RUNNER ? null : runner,
       agent,

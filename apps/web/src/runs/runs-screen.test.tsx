@@ -6,6 +6,7 @@ import domain from "../../messages/ko/domain.json" with { type: "json" };
 import runsJson from "../../messages/ko/runs.json" with { type: "json" };
 import { renderWithMessages } from "../testing/render";
 import {
+  addTitledRun,
   connection,
   endedCases,
   labs,
@@ -131,6 +132,15 @@ describe("Runs 화면", () => {
     expect(text).toContain(domain.agent.claude);
     expect(text).toContain("29분");
     expect(text).toContain("#2");
+  });
+
+  it("행과 패널이 회색 키 옆에 할당 때 저장한 티켓 제목을 보인다(ADR 0010 9번, 0064)", () => {
+    const { db } = seedDatabase();
+    const id = addTitledRun(db, "ACME-30", "결제 실패 재시도");
+    const html = render(loadRunsPage(db, undefined, now), { selectedId: id });
+    expect(rowTexts(html).get("ACME-30")?.slice(0, 2)).toEqual(["ACME-30", "결제 실패 재시도"]);
+    expect(html).toMatch(/<h2[^>]*>결제 실패 재시도<\/h2>/);
+    expect(panelText(html)).toContain("ACME-30 · Web");
   });
 
   it("패널에 Run 상세로 가는 링크를 둔다", () => {

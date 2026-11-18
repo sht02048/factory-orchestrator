@@ -94,6 +94,7 @@ export const runners = sqliteTable(
     mailboxRef: text("mailbox_ref").$type<MailboxRef>(),
     checkedAt: timeMs("checked_at"),
     checkError: text("check_error"),
+    offlineSince: timeMs("offline_since"),
     createdAt: timeMs("created_at").notNull(),
   },
   (t) => [
@@ -201,6 +202,7 @@ export const runs = sqliteTable(
       .references(() => trackerConnections.id)
       .$type<TrackerConnectionId>(),
     ticketKey: text("ticket_key").notNull().$type<TicketKey>(),
+    ticketTitle: text("ticket_title"),
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspaces.id)

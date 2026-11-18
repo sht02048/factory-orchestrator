@@ -46,6 +46,7 @@ import type { DemoWorld } from "./world.js";
 
 const HOUR = 3_600_000;
 const MINUTE = 60_000;
+const OFFLINE_FOR_MINUTES = 47;
 const DAY = 24 * HOUR;
 export const HISTORY_DAYS = 14;
 
@@ -85,6 +86,16 @@ export async function seedDemo(
     seedHistory(db, now);
     const active = seedActive(db, now);
     for (const { runner, health, projects } of checks) {
+      if (!health.online) {
+        recordRunnerCheck(db, {
+          runnerId: runner.id,
+          online: false,
+          checkedAt: new Date(now.getTime() - OFFLINE_FOR_MINUTES * MINUTE),
+          error: health.error,
+          projects: null,
+          assignmentBlocked: null,
+        });
+      }
       recordRunnerCheck(db, {
         runnerId: runner.id,
         online: health.online,
@@ -172,6 +183,7 @@ interface Ticket {
   connection: (typeof seededConnections)[number];
   project: (typeof seededConnections)[number]["spec"]["projects"][number];
   key: TicketKey;
+  title: string;
 }
 
 function ticket(prefix: string, n: number): Ticket {
@@ -179,8 +191,9 @@ function ticket(prefix: string, n: number): Ticket {
     if (connection.spec.keyPrefix !== prefix) continue;
     let index = n;
     for (const project of connection.spec.projects) {
-      if (index <= project.titles.length) {
-        return { connection, project, key: toTicketKey(`${prefix}-${n}`) };
+      const title = project.titles[index - 1];
+      if (title !== undefined) {
+        return { connection, project, key: toTicketKey(`${prefix}-${n}`), title };
       }
       index -= project.titles.length;
     }
@@ -195,6 +208,7 @@ function assign(
 ): { id: RunId; worktreeName: string } {
   const result = assignRun(db, {
     ticket: { connection: t.connection.id, key: t.key },
+    ticketTitle: t.title,
     trackerProject: trackerProjectId(t.project),
     runnerProject: runnerProjectId(t.project),
     agent: input.agentId ?? agent,

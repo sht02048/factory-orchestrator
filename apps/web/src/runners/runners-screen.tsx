@@ -174,8 +174,12 @@ function RunnerRow({ runner }: { runner: RunnerView }) {
 
 function RowSentence({ runner }: { runner: RunnerView }) {
   const t = useTranslations("runners.row");
+  const { duration } = useTime();
   const free = Math.max(0, runner.capacity - runner.occupying.length);
-  if (!runner.online) return t("offline");
+  if (!runner.online)
+    return runner.offlineMs === null
+      ? t("offline")
+      : t("offlineFor", { duration: duration(runner.offlineMs) });
   if (runner.assignmentBlocked) return t("assignmentBlocked");
   if (free > 0) return t("free", { free });
   return runner.queued.length === 0 ? t("full") : t("fullWaiting", { count: runner.queued.length });

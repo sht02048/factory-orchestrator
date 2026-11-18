@@ -97,6 +97,7 @@ export function loadHomePage(
     const base = {
       id: run.id,
       ticketKey: run.ticket.key,
+      ticketTitle: run.ticketTitle,
       trackerProject: projectName(run),
       workspace: workspaceNames.get(run.workspaceId) ?? {
         id: run.workspaceId,
@@ -159,6 +160,10 @@ export function loadHomePage(
       id: runner.id,
       name: runner.name,
       cause: runnerIssueCause(runner),
+      offlineMs:
+        runner.online || runner.offlineSince === null
+          ? null
+          : Math.max(0, now.getTime() - runner.offlineSince.getTime()),
       used: used.get(runner.id) ?? 0,
       capacity: runner.capacity,
     }))
@@ -176,6 +181,7 @@ export function loadHomePage(
             {
               id: run.id,
               ticketKey: run.ticket.key,
+              ticketTitle: run.ticketTitle,
               workspace: workspaceNames.get(run.workspaceId) ?? {
                 id: run.workspaceId,
                 name: run.workspaceId,

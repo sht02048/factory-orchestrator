@@ -69,6 +69,7 @@ function runner(overrides: Partial<RunnerView> & { id: string }): RunnerView {
   return {
     name: overrides.id,
     online: true,
+    offlineMs: null,
     assignmentBlocked: false,
     checks: null,
     checked: null,
@@ -124,7 +125,14 @@ describe("Runners 목록", () => {
     expect(a).toContain('data-tone="problem"');
     expect(textOf(a)).toContain(`runner-a ${runnersJson.row.assignmentBlocked}`);
     const b = rows.find((r) => r.name === "runner-b")?.html ?? "";
-    expect(textOf(b)).toContain(runnersJson.row.offline);
+    expect(textOf(b)).toContain("오케스트레이터가 이 러너에 2시간째 닿지 않아요.");
+  });
+
+  it("Offline 이 된 시각을 모르는 러너는 경과 없이 닿지 않는다고만 보인다(티켓 0064)", () => {
+    const page: RunnersPage = { runners: [runner({ id: "down", online: false })] };
+    const down = rowsOf(render(page)).find((r) => r.name === "down")?.html ?? "";
+    expect(textOf(down)).toContain(runnersJson.row.offline);
+    expect(textOf(down)).not.toContain("째");
   });
 
   it("꽉 찬 러너는 자리를 기다리는 런 수를, 빈자리가 있으면 빈자리 수를 한 문장으로 보인다", () => {

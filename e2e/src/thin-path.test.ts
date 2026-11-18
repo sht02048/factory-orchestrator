@@ -161,7 +161,8 @@ describe("끝에서 끝까지 얇은 경로", () => {
       expect(records?.pullRequest?.displayId ?? null).toBe(scenario.pr === null ? null : "#pr");
 
       const html = await fetchRuns(assigned.id);
-      const [meta, pill] = rowCells(html, scenario.key) ?? [];
+      const [title, meta, pill] = rowCells(html, scenario.key) ?? [];
+      expect(title).toBe(`Ticket ${scenario.key}`);
       expect(pill).toBe(domain.summary[scenario.summary]);
       expect(meta).toContain(domain.agentResult[scenario.agentResult]);
       expect(meta?.includes(domain.prState[scenario.prState])).toBe(
@@ -301,7 +302,7 @@ function rowCells(html: string, key: string): string[] | undefined {
       .split(/<[^>]+>/)
       .map((s) => s.trim())
       .filter((s) => s !== "" && !s.includes("="));
-    if (cells[0] === key) return cells.slice(1, 3);
+    if (cells[0] === key) return cells.slice(1, 4);
   }
   return undefined;
 }

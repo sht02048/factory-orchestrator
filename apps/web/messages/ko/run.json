@@ -1,6 +1,7 @@
 {
   "documentTitle": "{ticket} 런 · Ganger",
   "documentTitleNotFound": "런 · Ganger",
+  "metaSeparator": " · ",
   "crumb": {
     "label": "위치",
     "runs": "Runs",

@@ -11,6 +11,7 @@ export type QueuedReason =
 interface RunViewBase {
   id: string;
   ticketKey: string;
+  ticketTitle: string | null;
   trackerProject: string;
   branch: string | null;
   runner: { name: string; online: boolean } | null;

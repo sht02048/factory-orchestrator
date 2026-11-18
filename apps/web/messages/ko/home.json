@@ -49,6 +49,7 @@
   },
   "runners": {
     "capacity": "{runner} capacity",
+    "offlineFor": "Offline · {duration}째",
     "problemTitle": "러너 {count}대에 문제가 있어요",
     "offline": "Offline이에요: {names}",
     "auth": "GitHub 인증을 다시 해야 해요: {names}",

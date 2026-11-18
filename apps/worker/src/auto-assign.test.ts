@@ -133,6 +133,19 @@ describe("webhook 이벤트로 자동 할당", () => {
     expect(call !== undefined && "model" in call).toBe(false);
   });
 
+  it("webhook 으로 할당한 런은 제목을 모르고 만들고, 시작할 때 트래커에서 읽은 제목을 저장한다(0064)", async () => {
+    h.setRunnerOnline(runnerA, false);
+    webhook("ENG-1", { labelIds: [autoLabel], previousLabelIds: [] });
+    const worker = h.worker();
+
+    await worker.tick();
+    expect(runsOf("ENG-1")[0]).toMatchObject({ state: "queued", ticketTitle: null });
+
+    h.setRunnerOnline(runnerA, true);
+    await worker.tick();
+    expect(runsOf("ENG-1")[0]).toMatchObject({ state: "running", ticketTitle: "Ticket ENG-1" });
+  });
+
   it("같은 webhook 이벤트가 두 번 와도 런이 하나만 생긴다", async () => {
     const event = webhook("ENG-1", {
       labelIds: [autoLabel],
@@ -250,6 +263,17 @@ describe("폴링 보정", () => {
     const runs = runsOf("ENG-1");
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ state: "running", runnerProject: projectA, agent });
+  });
+
+  it("폴링 보정으로 할당한 런은 트래커에서 읽은 티켓 제목을 할당 때 저장한다(0064)", async () => {
+    h.setRunnerOnline(runnerA, false);
+    putTicket("ENG-1", [autoLabel]);
+
+    await h.worker().tick();
+
+    expect(runsOf("ENG-1")).toEqual([
+      expect.objectContaining({ state: "queued", ticketTitle: "Ticket ENG-1" }),
+    ]);
   });
 
   it("데몬을 띄운 뒤 첫 보정은 그 전에 붙은 라벨을 맞추고, 런이 끝난 티켓은 다시 할당하지 않는다", async () => {

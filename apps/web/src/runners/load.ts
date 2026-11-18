@@ -63,6 +63,10 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
       id: runner.id,
       name: runner.name,
       online: runner.online,
+      offlineMs:
+        runner.online || runner.offlineSince === null
+          ? null
+          : Math.max(0, now.getTime() - runner.offlineSince.getTime()),
       assignmentBlocked: runner.assignmentBlocked,
       checks:
         runner.prerequisites?.map((p) => ({

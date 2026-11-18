@@ -53,7 +53,7 @@ import { runStateChanges, runs } from "./schema.js";
 import type { LATER_PR_STATES } from "./schema.js";
 import { getWorkspaceTrackerProject, listRunnerSnapshots } from "./settings.js";
 
-export type StoredRun = Run & { workspaceId: WorkspaceId };
+export type StoredRun = Run & { workspaceId: WorkspaceId; ticketTitle: string | null };
 
 export interface RunRecords {
   startRequestedAt: Date | null;
@@ -91,6 +91,7 @@ function toStoredRun(row: RunRow): StoredRun {
     id: row.id,
     workspaceId: row.workspaceId,
     ticket: { connection: row.trackerConnectionId, key: row.ticketKey },
+    ticketTitle: row.ticketTitle,
     trackerProject: row.trackerProjectId,
     runnerProject: row.runnerProjectId,
     agent: row.agentId,
@@ -320,6 +321,7 @@ export function listRunPlacements(db: Database): RunPlacement[] {
 
 export interface AssignRunInput {
   ticket: TicketRef;
+  ticketTitle?: string | null;
   trackerProject: TrackerProjectId;
   runnerProject: RunnerProjectId;
   agent: AgentId;
@@ -376,6 +378,7 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
         id,
         trackerConnectionId: input.ticket.connection,
         ticketKey: input.ticket.key,
+        ticketTitle: storedTicketTitle(input.ticketTitle),
         workspaceId: project.workspaceId,
         trackerProjectId: input.trackerProject,
         runnerProjectId: input.runnerProject,
@@ -393,6 +396,22 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
     if (run === null) throw new RunRowError(id, "missing right after insert");
     return { ok: true, run };
   });
+}
+
+export const TICKET_TITLE_MAX_LENGTH = 500;
+
+export function storedTicketTitle(title: string | null | undefined): string | null {
+  const trimmed = title?.trim().slice(0, TICKET_TITLE_MAX_LENGTH) ?? "";
+  return trimmed === "" ? null : trimmed;
+}
+
+export function fillRunTicketTitle(db: Database, id: RunId, title: string): void {
+  const stored = storedTicketTitle(title);
+  if (stored === null) return;
+  db.update(runs)
+    .set({ ticketTitle: stored })
+    .where(and(eq(runs.id, id), isNull(runs.ticketTitle)))
+    .run();
 }
 
 export type RunStateChange =

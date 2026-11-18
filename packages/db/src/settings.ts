@@ -172,6 +172,7 @@ export interface StoredRunner {
   mailbox: MailboxRef | null;
   checkedAt: Date | null;
   checkError: unknown;
+  offlineSince: Date | null;
   projects: RunnerProject[];
 }
 
@@ -226,6 +227,9 @@ export function recordRunnerCheck(
       .set({
         online: input.online,
         checkedAt: input.checkedAt,
+        offlineSince: input.online
+          ? null
+          : sql`coalesce(${runners.offlineSince}, ${input.checkedAt.getTime()})`,
         checkError: input.error === null ? null : toJson(input.error, "runner check error"),
         ...(input.assignmentBlocked === null ? {} : { assignmentBlocked: input.assignmentBlocked }),
         ...(input.prerequisites === undefined || input.prerequisites === null
@@ -273,6 +277,7 @@ export function listRunners(db: Database): StoredRunner[] {
       mailbox: row.mailboxRef,
       checkedAt: row.checkedAt,
       checkError: row.checkError === null ? null : parseJson(row.checkError),
+      offlineSince: row.offlineSince,
       projects: projects
         .filter((p) => p.runnerId === row.id)
         .map((p) => ({ id: p.projectId, displayName: p.displayName, setupState: p.setupState })),

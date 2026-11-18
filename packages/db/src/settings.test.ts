@@ -150,6 +150,45 @@ describe("recordRunnerCheck 필수 조건", () => {
   });
 });
 
+describe("recordRunnerCheck Offline 시각(0064)", () => {
+  const check = (id: ReturnType<typeof addRunner>, online: boolean, at: number) => ({
+    runnerId: id,
+    online,
+    checkedAt: new Date(at),
+    error: null,
+    projects: null,
+    assignmentBlocked: null,
+  });
+
+  it("Online 에서 Offline 이 된 첫 확인 시각을 남기고, Offline 이 이어지는 동안 바꾸지 않는다", () => {
+    const db = seededDatabase();
+    const id = addRunner(db, { id: "runner-1", capacity: 1, online: true, projects: [repoA] });
+    expect(listRunners(db)[0]?.offlineSince).toBeNull();
+
+    recordRunnerCheck(db, check(id, false, 5_000));
+    expect(listRunners(db)[0]?.offlineSince).toEqual(new Date(5_000));
+
+    recordRunnerCheck(db, check(id, false, 65_000));
+    expect(listRunners(db)[0]).toMatchObject({
+      online: false,
+      checkedAt: new Date(65_000),
+      offlineSince: new Date(5_000),
+    });
+  });
+
+  it("다시 Online 이 되면 지우고, 그 뒤 Offline 이 되면 새 시각을 남긴다", () => {
+    const db = seededDatabase();
+    const id = addRunner(db, { id: "runner-1", capacity: 1, online: false, projects: [repoA] });
+    expect(listRunners(db)[0]?.offlineSince).toEqual(new Date(0));
+
+    recordRunnerCheck(db, check(id, true, 10_000));
+    expect(listRunners(db)[0]?.offlineSince).toBeNull();
+
+    recordRunnerCheck(db, check(id, false, 20_000));
+    expect(listRunners(db)[0]?.offlineSince).toEqual(new Date(20_000));
+  });
+});
+
 describe("설치 설정(0048)", () => {
   it("처음 읽을 때 설치 ID를 만들고, 다시 읽어도 같은 ID다", () => {
     const db = seededDatabase();

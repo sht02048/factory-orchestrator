@@ -336,10 +336,19 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
   }
 
   return (
-    <TableRow value={run.id} label={run.ticketKey} onOpen={onOpen}>
+    <TableRow value={run.id} label={ticketName(run)} onOpen={onOpen}>
       <TableCell>
         <span {...stylex.props(styles.rowText)}>
-          <RowTitle>{run.ticketKey}</RowTitle>
+          {run.ticketTitle === null ? (
+            <RowTitle>{run.ticketKey}</RowTitle>
+          ) : (
+            <span {...stylex.props(styles.keyLine)}>
+              <Text variant="meta" numeric>
+                {run.ticketKey}
+              </Text>
+              <RowTitle>{run.ticketTitle}</RowTitle>
+            </span>
+          )}
           <Text variant="meta">{meta.join(t("metaSeparator"))}</Text>
         </span>
       </TableCell>
@@ -394,6 +403,10 @@ function RunPanel({
 
   const ended = run.state === "ended" ? run : null;
   const pr = run.pullRequest;
+  const where =
+    run.branch === null
+      ? run.trackerProject
+      : t("subtitle", { project: run.trackerProject, branch: run.branch });
   return (
     <DetailPanel>
       <PanelHeader
@@ -406,11 +419,9 @@ function RunPanel({
             <Text variant="meta">{when}</Text>
           </>
         }
-        title={run.ticketKey}
+        title={run.ticketTitle ?? run.ticketKey}
         subtitle={
-          run.branch === null
-            ? run.trackerProject
-            : t("subtitle", { project: run.trackerProject, branch: run.branch })
+          run.ticketTitle === null ? where : t("subtitleWithKey", { key: run.ticketKey, where })
         }
         reason={reason}
       />
@@ -504,4 +515,15 @@ const styles = stylex.create({
     marginTop: space.s4,
   },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
+  keyLine: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    columnGap: space.s2,
+    minWidth: 0,
+  },
 });
+
+function ticketName(run: RunView): string {
+  return run.ticketTitle === null ? run.ticketKey : `${run.ticketKey} ${run.ticketTitle}`;
+}

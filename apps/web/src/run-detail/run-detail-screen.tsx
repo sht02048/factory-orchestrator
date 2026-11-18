@@ -94,7 +94,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
         </p>
         <div {...stylex.props(styles.titleRow)}>
           <Text variant="page" as="h1">
-            {run.ticketKey}
+            {run.ticketTitle ?? run.ticketKey}
           </Text>
           {pr === null && !cancelable ? null : (
             <Actions>
@@ -113,7 +113,11 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
           )}
         </div>
         <Text variant="meta">
-          {run.branch === null ? run.trackerProject : `${run.trackerProject} · ${run.branch}`}
+          {[
+            ...(run.ticketTitle === null ? [] : [run.ticketKey]),
+            run.trackerProject,
+            ...(run.branch === null ? [] : [run.branch]),
+          ].join(t("metaSeparator"))}
         </Text>
         <Text variant="body">
           <Reason run={run} />
