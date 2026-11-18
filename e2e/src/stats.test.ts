@@ -35,6 +35,7 @@ import { chromium } from "playwright-core";
 import type { Browser, BrowserContext, Page } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import type { TestContext } from "vitest";
 import stats from "../../apps/web/messages/ko/stats.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 import { startWebServer } from "./web-server.js";
@@ -91,20 +92,60 @@ afterAll(async () => {
   if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
 });
 
+async function openPage(context: TestContext): Promise<Page> {
+  const browserContext: BrowserContext = await browser.newContext({
+    baseURL: baseUrl,
+    locale: "ko-KR",
+    timezoneId: "UTC",
+    viewport: { width: 1280, height: 900 },
+  });
+  const page = await browserContext.newPage();
+  page.setDefaultTimeout(30_000);
+  onTestFailed(async () => {
+    mkdirSync(resultsDir, { recursive: true });
+    const name = context.task.name.replace(/[^\p{L}\p{N}_-]+/gu, "-");
+    await page.screenshot({ path: join(resultsDir, `${name}.png`), fullPage: true });
+  });
+  return page;
+}
+
+describe("Stats 기간(브라우저, 0072)", () => {
+  it("기간을 7일로 바꾸면 숫자·차트가 그 7일로 바뀌고 바로 앞 7일과 비교한다", async (context) => {
+    const page = await openPage(context);
+    await page.goto(`/stats?ws=${workspaceId}`);
+    await hydrated(page);
+
+    const ended = page.getByRole("group", { name: stats.figures.ended });
+    const mergedRate = page.getByRole("group", { name: stats.figures.mergedRate });
+    const table = page.getByRole("table", { name: stats.throughput.tableCaption });
+    expect(await ended.textContent()).toContain("2");
+    expect(await table.getByRole("rowheader").count()).toBe(14);
+    expect(await page.getByRole("heading", { level: 1 }).textContent()).toBe(
+      "끝난 런 2개 중 50%를 에이전트가 병합까지 끝냈어요",
+    );
+
+    const periods = page.getByRole("tablist", { name: stats.period.label });
+    await periods.getByRole("tab", { name: "7일" }).click();
+
+    await page.waitForURL(/days=7/);
+    await page
+      .getByRole("heading", {
+        level: 1,
+        name: "끝난 런 1개 중 100%를 에이전트가 병합까지 끝냈어요",
+      })
+      .waitFor();
+    expect(await ended.textContent()).toBe(`${stats.figures.ended}1`);
+    expect(await mergedRate.textContent()).toContain("앞 7일보다 100%p 올랐어요");
+    expect(await table.getByRole("rowheader").count()).toBe(7);
+    expect(await periods.getByRole("tab", { name: "7일" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+  });
+});
+
 describe("Stats 날짜별 처리량(브라우저, 0053)", () => {
   it("키보드로 '표로 보기'를 누르면 날짜별 값 표가 화면에 보인다", async (context) => {
-    const browserContext: BrowserContext = await browser.newContext({
-      baseURL: baseUrl,
-      locale: "ko-KR",
-      timezoneId: "UTC",
-    });
-    const page = await browserContext.newPage();
-    page.setDefaultTimeout(30_000);
-    onTestFailed(async () => {
-      mkdirSync(resultsDir, { recursive: true });
-      const name = context.task.name.replace(/[^\p{L}\p{N}_-]+/gu, "-");
-      await page.screenshot({ path: join(resultsDir, `${name}.png`), fullPage: true });
-    });
+    const page = await openPage(context);
 
     await page.goto(`/stats?ws=${workspaceId}`);
     await hydrated(page);
@@ -208,6 +249,43 @@ function seed(db: Database): void {
       agentResult: "reported-success",
       prState: "merged",
     }),
+  );
+  seedEarlierFailure(db);
+}
+
+function seedEarlierFailure(db: Database): void {
+  const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+  const assigned = assignRun(db, {
+    ticket: { connection, key: toTicketKey("ACME-2") },
+    trackerProject,
+    runnerProject,
+    agent,
+    runnerId,
+    now: tenDaysAgo,
+  });
+  if (!assigned.ok) throw new Error(`assign ACME-2 failed: ${assigned.reason}`);
+  ok(
+    changeRunState(
+      db,
+      assigned.run.id,
+      {
+        to: "running",
+        started: {
+          worktree: toWorktreeRef("wt-acme-2"),
+          branch: "acme/wt-acme-2",
+          agentRef: toAgentRef("agent-wt-acme-2"),
+        },
+      },
+      new Date(tenDaysAgo.getTime() + 60_000),
+    ),
+  );
+  ok(
+    changeRunState(
+      db,
+      assigned.run.id,
+      { to: "ended", agentResult: "reported-failure", prState: "none" },
+      new Date(tenDaysAgo.getTime() + 20 * 60_000),
+    ),
   );
 }
 

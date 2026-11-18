@@ -3,15 +3,12 @@ import { renderWithMessages } from "../testing/render";
 import { addRunDecisionCases, now, seedStatsDatabase } from "../testing/stats-seed";
 import { loadStatsPage } from "./load";
 import { statsMessages } from "./messages";
-import type { StatsDimension, StatsPage } from "./model";
+import type { StatsDimension, StatsPage, StatsPeriodDays } from "./model";
 import { StatsScreen } from "./stats-screen";
 
 const noop = () => {};
 
-function render(
-  page: StatsPage,
-  options: { dimension?: StatsDimension; selectedKey?: string } = {},
-) {
+function render(page: StatsPage, options: { dimension?: StatsDimension } = {}) {
   return renderWithMessages(
     <StatsScreen
       page={page}
@@ -20,171 +17,227 @@ function render(
         { id: "ws-labs", name: "Acme Labs" },
       ]}
       dimension={options.dimension ?? "runner"}
-      selectedKey={options.selectedKey}
       onDimensionChange={noop}
-      onSelect={noop}
+      onPeriodChange={noop}
       onPickWorkspace={noop}
     />,
     statsMessages,
   );
 }
 
+function seeded(days: StatsPeriodDays = 14): StatsPage {
+  return loadStatsPage(seedStatsDatabase(), undefined, now, "UTC", days);
+}
+
 function text(html: string): string {
-  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&#x27;/g, "'")
+    .replace(/\s+/g, " ");
 }
 
-function rowTexts(html: string): string[][] {
-  const list = html.split("<aside")[0] ?? "";
-  return list
-    .split('role="option"')
+function between(html: string, from: string, to: string): string {
+  const start = html.indexOf(from);
+  return html.slice(start, html.indexOf(to, start));
+}
+
+function tiles(html: string): string[] {
+  return html
+    .split('role="group"')
     .slice(1)
-    .map((chunk) =>
-      chunk
-        .split(/<[^>]+>/)
-        .map((s) => s.trim())
-        .filter((s) => s !== "" && !s.includes("=")),
-    );
+    .map((chunk) => text(`<${chunk.slice(0, chunk.indexOf("</div>"))}`).trim());
 }
 
-function panelText(html: string): string {
-  const aside = html.split("<aside")[1] ?? "";
-  return text(aside.slice(aside.indexOf(">") + 1));
+function breakdownRows(html: string): string[][] {
+  const body = between(html.slice(html.lastIndexOf("<table")), "<tbody", "</tbody>");
+  return body
+    .split(/<tr[\s>]/)
+    .slice(1)
+    .map((row) => {
+      const label = /aria-label="([^"]+)"/.exec(row)?.[1] ?? "";
+      return [
+        ...row
+          .split(/<[^>]+>/)
+          .map((s) => s.trim())
+          .filter((s) => s !== "" && !s.includes("=")),
+        label,
+      ];
+    });
 }
 
-describe("Stats 화면", () => {
-  it("기간 요약에 끝난 런, Merged 비율, 손댈 일, 리드 타임, Human Check 뒤 병합을 보인다", () => {
-    const html = text(render(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC")));
-    expect(html).toContain("Acme Commerce · 최근 14일(11월 4일–11월 17일)");
-    expect(html).toContain("9 끝난 런");
-    expect(html).toContain("22% Merged");
-    expect(html).toContain("7 Human Check 3 · Failed 4");
-    expect(html).toContain("22분 리드 타임 중앙값 · p90 2시간 1분 대기 4분 · 실행 20분");
-    expect(html).toContain("33% Human Check 뒤 병합 Human Check 3개 중 1개");
+describe("Stats 화면(0072)", () => {
+  it("메타 줄에 화면 이름·Workspace·기간을, 제목에 결론 문장을 둔다", () => {
+    const html = render(seeded());
+    expect(text(html)).toContain("Stats · Acme Commerce · 최근 14일(11월 4일–11월 17일)");
+    expect(html).toMatch(/<h1[^>]*>끝난 런 9개 중 22%를 에이전트가 병합까지 끝냈어요<\/h1>/);
   });
 
-  it("Failed 조합을 에이전트 결과 · PR 상태로 보인다", () => {
-    const html = text(render(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC")));
-    expect(html).toContain("완료 보고(실패) · PR 없음 2개");
-    expect(html).toContain("완료 보고(성공) · PR 닫힘 1개");
-    expect(html).toContain("시간 초과 · PR 열림 1개");
+  it("기간 7일 · 14일 · 30일을 한 줄 탭으로 고르고 지금 기간이 골라져 있다", () => {
+    const html = render(seeded(7));
+    const periods = between(html, 'aria-label="기간"', "</div>");
+    expect(text(periods)).toContain("7일 14일 30일");
+    expect(periods).toMatch(/aria-selected="true"[^>]*>7일/);
   });
 
-  it("날짜별 처리량 막대에 마우스로 볼 날마다 요약 결과 수를 단다", () => {
-    const html = render(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
+  it("숫자 넷은 같은 모양 카드로 병합률·사람이 손댄 비율·리드 타임·끝난 런이다", () => {
+    expect(tiles(render(seeded()))).toEqual([
+      "병합률 22% 앞 14일보다 78%p 내렸어요",
+      "사람이 손댄 비율 78% Human Check 3 · Failed 4",
+      "리드 타임 중앙값 22분 느린 10%는 2시간 1분 넘게 걸렸어요",
+      "끝난 런 9",
+    ]);
+  });
+
+  it("병합률은 같은 길이의 바로 앞 기간과 비교하고 좋아지면 better, 나빠지면 worse 다", () => {
+    const fourteen = render(seeded(14));
+    expect(fourteen).toMatch(/data-trend="worse"[^>]*>앞 14일보다 78%p 내렸어요/);
+    const seven = render(seeded(7));
+    expect(seven).toMatch(/data-trend="better"[^>]*>앞 7일보다 29%p 올랐어요/);
+    expect(text(seven)).toContain("끝난 런 7개 중 29%를 에이전트가 병합까지 끝냈어요");
+  });
+
+  it("앞 기간에 비율을 낼 런이 없으면 비교할 런이 없다고 말한다", () => {
+    const html = render(seeded(30));
+    expect(text(html)).toContain("앞 30일에는 비교할 런이 없어요");
+    expect(html).not.toContain('data-trend="better"');
+    expect(html).not.toContain('data-trend="worse"');
+  });
+
+  it("기간을 바꾸면 숫자와 차트 막대 수가 바뀐다", () => {
+    const fourteen = render(seeded(14));
+    const seven = render(seeded(7));
+    expect(tiles(fourteen)[3]).toBe("끝난 런 9");
+    expect(tiles(seven)[3]).toBe("끝난 런 7");
+    expect(fourteen.match(/title="[^"]*: Merged/g)).toHaveLength(14);
+    expect(seven.match(/title="[^"]*: Merged/g)).toHaveLength(7);
+    expect(between(seven, "<tbody", "</tbody>").match(/<th scope="row"/g)).toHaveLength(7);
+  });
+
+  it("차트의 마지막 날 이름은 오늘이고 범례는 제목 옆에 있다", () => {
+    const html = render(seeded());
+    const head = text(between(html, "날짜별로 끝난 런", 'role="img"'));
+    expect(head).toContain("Merged Human Check Failed Canceled");
+    const days = text(between(html, 'role="img"', "표로 보기")).trim();
+    expect(days.endsWith("오늘")).toBe(true);
+  });
+
+  it("날짜별 막대에 마우스로 볼 날마다 요약 결과 수를 단다", () => {
+    const html = render(seeded());
     expect(html).toContain('title="11월 16일: Merged 1 · Human Check 1 · Failed 0 · Canceled 0"');
-    expect(html.match(/title="[^"]*: Merged/g)).toHaveLength(14);
   });
 
-  it("날짜별 값을 차트와 이은 표로 접근성 트리에 둔다", () => {
-    const html = render(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
+  it("날짜별 값을 차트와 이은 표로 접근성 트리에 둔다(0053)", () => {
+    const html = render(seeded());
     const tableId = /<table id="([^"]+)"/.exec(html)?.[1];
     expect(tableId).toBeDefined();
     expect(html).toMatch(new RegExp(`role="img"[^>]*aria-details="${tableId ?? ""}"`));
-    const table = html.slice(html.indexOf("<table"), html.indexOf("</table>"));
-    expect(table).toContain("<caption");
-    expect(text(table)).toContain("날짜별로 끝난 런 수 날짜 Merged Human Check Failed Canceled");
-    expect(table.match(/<th scope="row"/g)).toHaveLength(14);
-    expect(text(table)).toContain("11월 16일 1 1 0 0");
-    expect(table).not.toMatch(/\shidden|display:\s*none|aria-hidden/);
+    const table = html.slice(html.indexOf(`<table id="${tableId ?? ""}"`));
+    const throughput = table.slice(0, table.indexOf("</table>"));
+    expect(throughput).toContain("<caption");
+    expect(text(throughput)).toContain(
+      "날짜별로 끝난 런 수 날짜 Merged Human Check Failed Canceled",
+    );
+    expect(throughput.match(/<th scope="row"/g)).toHaveLength(14);
+    expect(text(throughput)).toContain("11월 16일 1 1 0 0");
+    expect(throughput).not.toMatch(/\shidden|display:\s*none|aria-hidden/);
     expect(html).toContain("표로 보기");
   });
 
-  it("나눠 보기 행에 런, Merged 비율, Human Check, Failed, 취소, 리드 타임을 보인다", () => {
-    const page = loadStatsPage(seedStatsDatabase(), undefined, now, "UTC");
-    expect(rowTexts(render(page))).toEqual([
-      ["runner-a", "5", "40%", "2", "1", "0", "22분"],
-      ["runner-b", "4", "0%", "1", "3", "0", "18분"],
+  it("왜 실패했나요는 실패 이유를 말로 쓰고 PR 상태를 한 줄로, 막대와 개수를 함께 보인다", () => {
+    const html = render(seeded());
+    const failures = between(html, "왜 실패했나요", "나눠 보기");
+    expect(text(failures)).toContain("왜 실패했나요 4");
+    expect(text(failures)).toContain("에이전트가 실패를 보고했어요 PR 없음 2개 2개");
+    expect(text(failures)).toContain("PR이 병합되지 않고 닫혔어요 PR 닫힘 1개 1개");
+    expect(text(failures)).toContain("최대 실행 시간을 넘겼어요 PR 열림 1개 1개");
+    expect(failures.match(/<li/g)).toHaveLength(3);
+    expect(failures).not.toContain("완료 보고");
+  });
+
+  it("실패 이유에 에이전트가 중간에 멈춤과 런을 시작하지 못함이 말로 보인다", () => {
+    const db = seedStatsDatabase();
+    addRunDecisionCases(db);
+    const failures = text(
+      between(render(loadStatsPage(db, undefined, now, "UTC", 14)), "왜 실패했나요", "나눠 보기"),
+    );
+    expect(failures).toContain("에이전트가 중간에 멈췄어요 PR 없음 1개 1개");
+    expect(failures).toContain("런을 시작하지 못했어요 PR 없음 1개 1개");
+    expect(failures).not.toContain("Canceled");
+  });
+
+  it("나눠 보기는 러너 · 트래커 프로젝트 · 에이전트 탭과 이름 · 런 · 결과 · 리드 타임 열이다", () => {
+    const html = render(seeded());
+    expect(text(between(html, 'aria-label="나눠 볼 기준"', "</div>"))).toContain(
+      "러너 트래커 프로젝트 에이전트",
+    );
+    expect(breakdownRows(html)).toEqual([
+      ["runner-a", "5", "22분", "Merged 2 · Human Check 2 · Failed 1 · Canceled 0"],
+      ["runner-b", "4", "18분", "Merged 0 · Human Check 1 · Failed 3 · Canceled 0"],
     ]);
-    expect(rowTexts(render(page, { dimension: "agent" })).map((r) => r[0])).toEqual([
+    expect(breakdownRows(render(seeded(), { dimension: "agent" })).map((r) => r[0])).toEqual([
       "Claude Code",
       "Codex",
     ]);
   });
 
-  it("고른 묶음의 요약을 패널에 보인다. 고르지 않았으면 첫 행이다", () => {
-    const page = loadStatsPage(seedStatsDatabase(), undefined, now, "UTC");
-    const first = panelText(render(page));
-    expect(first).toContain("러너별 · 최근 14일");
-    expect(first).toContain("runner-a");
-    expect(first).toContain(
-      "런 5개 중 2개를 에이전트가 병합까지 끝냈어요. 3개는 사람이 손대야 했어요.",
-    );
-    expect(first).toContain("Human Check 뒤 병합 1/2개 · 50%");
-
-    const second = panelText(render(page, { selectedKey: "runner-b" }));
-    expect(second).toContain("Failed 3개 · 75%");
-    expect(second).toContain("Human Check 뒤 병합 0/1개 · 0%");
-    expect(second).toContain("완료 보고(실패) · PR 없음 2개");
+  it("나눠 보기 표의 열 머리는 이름 · 런 · 결과 · 리드 타임이다", () => {
+    const html = render(seeded());
+    const breakdown = html.slice(html.lastIndexOf("<table"));
+    expect(text(between(breakdown, "<thead", "</thead>")).trim()).toBe("이름 런 결과 리드 타임");
   });
 
-  it("기간에 끝난 런이 없으면 빈 목록 문구를 보이고 패널을 비운다", () => {
-    const page = loadStatsPage(
-      seedStatsDatabase(),
-      undefined,
-      new Date("2027-01-01T00:00:00Z"),
-      "UTC",
+  it("오른쪽 상세 패널이 없고 나눠 보기 행은 고르는 목록이 아니다", () => {
+    const html = render(seeded());
+    expect(html).not.toContain("<aside");
+    expect(html).not.toContain('role="listbox"');
+    expect(html).not.toContain('role="option"');
+  });
+
+  it("기간에 끝난 런이 없으면 제목과 구역이 그렇다고 말한다", () => {
+    const html = render(
+      loadStatsPage(seedStatsDatabase(), undefined, new Date("2027-01-01T00:00:00Z"), "UTC", 14),
     );
-    const html = render(page);
-    expect(text(html)).toContain("최근 14일 동안 끝난 런이 없어요.");
+    expect(html).toMatch(/<h1[^>]*>최근 14일 동안 끝난 런이 없어요<\/h1>/);
     expect(text(html)).toContain("이 기간에 Failed 런이 없어요.");
+    expect(text(html)).toContain("최근 14일 동안 끝난 런이 없어요. 런이 끝나면 여기에 보여요.");
     expect(html).not.toContain('role="img"');
     expect(html).not.toContain("<table");
-    const throughput = text(html).split("날짜별 처리량")[1]?.split("Failed 조합")[0] ?? "";
-    expect(throughput.trim()).toBe("최근 14일 동안 끝난 런이 없어요.");
-    expect(panelText(html).trim()).toBe("");
   });
 
   it("파란 주 버튼이 없다. 보기만 하는 화면이다(ADR 0010 6번)", () => {
-    const html = render(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC"));
-    expect(html).not.toContain('data-variant="primary"');
+    expect(render(seeded())).not.toContain('data-variant="primary"');
   });
 
   it("전체 보기에서는 Workspace 를 고르라고 안내한다", () => {
-    const html = text(render(loadStatsPage(seedStatsDatabase(), "all", now, "UTC")));
+    const html = text(render(loadStatsPage(seedStatsDatabase(), "all", now, "UTC", 14)));
     expect(html).toContain("통계는 Workspace마다 봐요.");
     expect(html).toContain("Acme Labs 보기");
   });
 
-  describe("취소(Q82.9·Q82.18)", () => {
+  describe("Canceled(Q82.9·Q82.18)", () => {
     const page = () => {
       const db = seedStatsDatabase();
       addRunDecisionCases(db);
-      return loadStatsPage(db, undefined, now, "UTC");
+      return loadStatsPage(db, undefined, now, "UTC", 14);
     };
 
-    it("기간 요약은 취소를 따로 보이고 Merged 비율에서 뺀다", () => {
+    it("제목과 숫자는 Canceled 를 비율에서 빼고 끝난 런 카드에 따로 적는다", () => {
       const html = render(page());
-      expect(text(html)).toContain("13 끝난 런 취소 2개는 비율에서 빼요");
-      expect(text(html)).toContain("18% Merged");
+      expect(text(html)).toContain(
+        "Canceled를 뺀 끝난 런 11개 중 18%를 에이전트가 병합까지 끝냈어요",
+      );
+      expect(tiles(html)[3]).toBe("끝난 런 13 Canceled 2개는 비율에서 빼요");
       expect(html).toContain('title="11월 17일: Merged 1 · Human Check 0 · Failed 2 · Canceled 2"');
     });
 
-    it("나눠 보기 행과 패널의 비율은 취소를 뺀 런으로 나눈다", () => {
-      const p = page();
-      const rows = rowTexts(render(p, { dimension: "agent" }));
+    it("나눠 보기 결과 막대는 Canceled 를 따로 센다", () => {
+      const rows = breakdownRows(render(page(), { dimension: "agent" }));
       expect(rows.find((r) => r[0] === "gemini")).toEqual([
         "gemini",
         "2",
-        "0%",
-        "0",
-        "1",
-        "1",
         "11분",
+        "Merged 0 · Human Check 0 · Failed 1 · Canceled 1",
       ]);
-      const panel = panelText(render(p, { dimension: "agent", selectedKey: "gemini" }));
-      expect(panel).toContain(
-        "취소를 뺀 런 1개 중 0개를 에이전트가 병합까지 끝냈어요. 1개는 사람이 손대야 했어요. 취소한 1개는 비율에서 뺐어요.",
-      );
-      expect(panel).toContain("Failed 1개 · 100%");
-      expect(panel).toContain("Canceled 1개 · 비율에서 빼요");
-      expect(panel).toContain("비정상 종료 · PR 없음 1개");
-    });
-
-    it("시작하지 않고 끝난 런의 실행 시간은 0으로 보인다(Q82.20)", () => {
-      const panel = panelText(render(page(), { dimension: "agent", selectedKey: "aider" }));
-      expect(panel).toContain("실행 시간 중앙값 0초");
-      expect(panel).toContain("대기 시간 중앙값 5분");
-      expect(panel).toContain("시작할 수 없음 · PR 없음 1개");
     });
   });
 });
