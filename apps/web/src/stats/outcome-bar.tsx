@@ -108,6 +108,7 @@ export function BreakdownTable({
                   onClick: (event: MouseEvent<HTMLTableRowElement>) => {
                     if (event.target instanceof Element && event.target.closest("a") !== null)
                       return;
+                    if ((window.getSelection()?.toString() ?? "") !== "") return;
                     onOpenRuns(group);
                   },
                 })}

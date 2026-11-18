@@ -58,7 +58,15 @@ function RunsRoute() {
         }}
         onPickWorkspace={(next) => {
           void navigate({
-            search: (prev) => ({ ...prev, ws: next, sel: undefined, ended: undefined }),
+            search: (prev) => ({
+              ...prev,
+              ws: next,
+              sel: undefined,
+              ended: undefined,
+              runner: undefined,
+              project: undefined,
+              agent: undefined,
+            }),
           });
         }}
         {...(nextEnded > MAX_ENDED_RUNS

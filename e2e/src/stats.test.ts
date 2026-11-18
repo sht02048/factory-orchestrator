@@ -206,11 +206,11 @@ describe("Stats 나눠 보기에서 Runs 열기(브라우저, 0075)", () => {
     await page.goto(`/stats?ws=${workspaceId}&by=trackerProject`);
     await hydrated(page);
 
-    const name = stats.openRuns.replace("{name}", "Web");
-    for (let i = 0; i < 80; i += 1) {
-      await page.keyboard.press("Tab");
-      if ((await page.getByRole("link", { name }).and(page.locator(":focus")).count()) === 1) break;
-    }
+    const link = page
+      .getByRole("link", { name: stats.openRuns.replace("{name}", "Web") })
+      .and(page.locator(":focus"));
+    for (let i = 0; i < 80 && (await link.count()) === 0; i += 1) await page.keyboard.press("Tab");
+    expect(await link.count()).toBe(1);
     await page.keyboard.press("Enter");
 
     await page.waitForURL(/\/runs\?/);
