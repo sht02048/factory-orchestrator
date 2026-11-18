@@ -18,7 +18,7 @@ UI 리뷰 판정은 Blocked였다. 단계를 옮기거나 처음 연결·러너�
 ### 반드시(Blocking)
 
 1. **단계 이동.** `onboarding-screen.tsx` 단계 목록은 누른 단계가 지금 단계가 되면 `<button>`이 `<span aria-current="step">`으로 바뀐다. "이전"으로 0번 단계에 가도 버튼이 빠진다. "다음"을 누르면 새 단계가 열렸다는 안내가 없다. 단계가 바뀌면 본문 제목에 `tabIndex={-1}`을 주고 포커스를 옮긴다.
-2. **처음 만들기.** `TrackerStep`은 연결이 0개에서 1개가 되면, `RunnerStep`은 러너가 0대에서 1대가 되면 트리 모양이 바뀌어 폼이 새로 마운트된다. `CreateWorkspaceForm`은 성공하면 `ProjectsPanel`로 통째로 바뀌고 토스트도 없다. 0개일 때도 같은 트리(`<ul><li>`)를 쓰고, 성공 뒤 새 카드 제목이나 다음 할 일로 포커스를 옮긴다. `CreateWorkspaceForm`도 성공을 토스트로 알린다.
+2. **처음 만들기.** `TrackerStep`은 연결이 0개에서 1개가 되면, `RunnerStep`은 러너가 0대에서 1대가 되면 트리 모양이 바뀌어 폼이 새로 마운트된다. `CreateWorkspaceForm`은 성공하면 `ProjectsPanel`로 통째로 바뀌고 토스트도 없다. 0개일 때도 같은 트리(`<ul><li>`)를 쓰고, 성공 뒤 새 카드 제목이나 다음 행동으로 포커스를 옮긴다. `CreateWorkspaceForm`도 성공을 토스트로 알린다.
 
 ### 고칠 것(Should fix)
 
