@@ -75,6 +75,7 @@ export class DemoLife {
   private lastTick: number | null = null;
   private lastNewWork = 0;
   private ticketSeq = 1000;
+  private prSeq = 2000;
 
   constructor(options: LifeOptions) {
     this.db = options.db;
@@ -143,18 +144,20 @@ export class DemoLife {
       return;
     }
     if (plan.outcome === "merged" || plan.outcome === "open") {
-      const number = 2000 + (hash(run.input.worktreeName) % 7000);
+      // PR ID 는 겹치지 않게 새로 만든다. 같은 ID 면 가짜 코드 호스트가 앞 PR 을 바꿔 끼운다.
+      this.prSeq += 1;
+      const number = this.prSeq;
       const key = ticketKeyOf(run.input.worktreeName);
       const pr = pullRequestOf(
         {
-          id: run.input.worktreeName,
+          headCommit: `demo-${hash(run.input.worktreeName).toString(16)}`,
           ticketKey: toTicketKey(key),
           runnerProject: repo,
           startedAt: new Date(this.now().getTime() - 5 * 60_000),
           branch: run.started.branch,
         },
         {
-          id: toPullRequestId(`pr-${number}`),
+          id: toPullRequestId(`pr-${randomUUID()}`),
           displayId: `#${number}`,
           url: `https://code.example.com/${repo}/pull/${number}`,
         },

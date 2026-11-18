@@ -48,8 +48,10 @@ if (!existsSync(keyFile)) {
 const encryptionKeyText = readFileSync(keyFile, "utf8").trim();
 const databasePath = join(dataDir, "factory-orchestrator.db");
 const host = process.env["WEB_HOST"] ?? "127.0.0.1";
-const port = Number(process.env["WEB_PORT"] ?? "3000");
-if (!Number.isInteger(port) || port < 0 || port > 65_535) {
+const portText = process.env["WEB_PORT"] ?? "3000";
+const port = Number(portText);
+// web 의 부팅 설정(packages/db parseBootConfig)과 같이 1~65535 의 십진수만 받는다.
+if (!/^\d+$/.test(portText) || port < 1 || port > 65_535) {
   throw new Error(`WEB_PORT must be a port number: ${process.env["WEB_PORT"]}`);
 }
 
@@ -63,7 +65,13 @@ const server = await createServer({
   root: webRoot,
   configFile: join(webRoot, "vite.config.ts"),
   plugins: [swapWebAdapters(), injectDevTools(), devPageRoutes()],
-  server: { host, port, strictPort: true },
+  server: {
+    host,
+    port,
+    strictPort: true,
+    // 개발 데이터(암호화 키, DB)는 저장소 안에 있어도 개발 서버가 파일로 내주지 않는다.
+    fs: { deny: [".dev/**", "**/encryption-key", "**/*.db", "**/*.db-*"] },
+  },
 });
 
 // 워크스페이스 패키지는 소스(.ts)라 Node 가 바로 읽지 못해 vite 로 싣는다. 실으면 globalThis.__factoryDev 를 둔다.

@@ -26,7 +26,10 @@ export function hydrateWorld(db: Database, world: DemoWorld): void {
     const records = getRunWithRecords(db, run.id)?.records;
     if (records?.pullRequest != null) {
       world.codeHost.putPullRequest(toRepoRef(run.runnerProject), {
-        ...pullRequestOf({ ...run, ticketKey: run.ticket.key }, records.pullRequest),
+        ...pullRequestOf(
+          { ...run, ticketKey: run.ticket.key, headCommit: `demo-${run.id.slice(0, 8)}` },
+          records.pullRequest,
+        ),
         state: prStateOf(run, records.laterPrState?.state ?? null),
       });
     }
@@ -70,7 +73,7 @@ export function hydrateWorld(db: Database, world: DemoWorld): void {
 /** 런과 이은 PR 의 모양. 상태는 부르는 쪽이 정한다 */
 export function pullRequestOf(
   run: {
-    id: string;
+    headCommit: string;
     ticketKey: TicketKey;
     runnerProject: StoredRun["runnerProject"];
     startedAt: Date | null;
@@ -89,7 +92,7 @@ export function pullRequestOf(
     mergedAt: null,
     headBranch: run.branch,
     sourceRepo: toRepoRef(run.runnerProject),
-    headCommit: `demo-${run.id.slice(0, 8)}`,
+    headCommit: run.headCommit,
     baseBranch: "main",
     ci: "success",
   };

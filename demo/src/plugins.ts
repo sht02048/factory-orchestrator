@@ -63,6 +63,13 @@ function handle(req: IncomingMessage, res: ServerResponse, path: string): void {
     res.end(devPage(life?.enabled ?? false));
     return;
   }
+  // 다른 사이트가 브라우저로 보낸 POST 는 받지 않는다. 브라우저는 POST 에 Origin 을 붙인다.
+  const origin = req.headers.origin;
+  if (origin !== undefined && origin !== `http://${req.headers.host ?? ""}`) {
+    res.statusCode = 403;
+    res.end();
+    return;
+  }
   if (req.method !== "POST" || life === undefined) {
     res.statusCode = 404;
     res.end();
