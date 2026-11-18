@@ -51,3 +51,28 @@ export interface RunnerView {
 export interface RunnersPage {
   runners: RunnerView[];
 }
+
+export type RunnerRowStatus = "offline" | "runner-issue" | "online";
+
+export function runnerRowStatus(runner: {
+  online: boolean;
+  assignmentBlocked: boolean;
+}): RunnerRowStatus {
+  if (!runner.online) return "offline";
+  if (runner.assignmentBlocked) return "runner-issue";
+  return "online";
+}
+
+export function problemRunnersFirst<T extends { online: boolean; assignmentBlocked: boolean }>(
+  runners: ReadonlyArray<T>,
+): T[] {
+  const hasProblem = (runner: T) => runnerRowStatus(runner) !== "online";
+  return [...runners.filter(hasProblem), ...runners.filter((runner) => !hasProblem(runner))];
+}
+
+export function failedChecksFirst<T extends { satisfied: boolean | null }>(
+  checks: ReadonlyArray<T>,
+): T[] {
+  const rank = (check: T) => (check.satisfied === false ? 0 : check.satisfied === null ? 1 : 2);
+  return checks.toSorted((a, b) => rank(a) - rank(b));
+}
