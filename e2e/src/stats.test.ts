@@ -36,6 +36,7 @@ import type { Browser, BrowserContext, Page } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 import type { TestContext } from "vitest";
+import runs from "../../apps/web/messages/ko/runs.json" with { type: "json" };
 import stats from "../../apps/web/messages/ko/stats.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 import { startWebServer } from "./web-server.js";
@@ -171,6 +172,52 @@ describe("Stats 날짜별 처리량(브라우저, 0053)", () => {
     await page.getByRole("button", { name: stats.throughput.hideTable }).waitFor();
     expect((await box.boundingBox())?.height ?? 0).toBeGreaterThan(100);
     expect(await todayRow.getByRole("cell").allTextContents()).toEqual(["1", "0", "0", "0"]);
+  });
+});
+
+describe("Stats 나눠 보기에서 Runs 열기(브라우저, 0075)", () => {
+  it("행을 누르면 그 러너와 Stats 기간으로 Runs 를 연다", async (context) => {
+    const page = await openPage(context);
+    await page.goto(`/stats?ws=${workspaceId}&days=7`);
+    await hydrated(page);
+
+    const breakdown = page.getByRole("table", { name: "러너별 런 결과와 리드 타임" });
+    await breakdown
+      .getByRole("row")
+      .filter({ hasText: "runner-a" })
+      .getByRole("cell")
+      .first()
+      .click();
+
+    await page.waitForURL(/\/runs\?/);
+    const search = new URL(page.url()).searchParams;
+    expect(search.get("runner")).toBe("runner-a");
+    expect(search.get("days")).toBe("7");
+    expect(search.get("ws")).toBe(workspaceId);
+    const conditions = page.getByRole("group", { name: runs.conditions.label });
+    await conditions.getByRole("button", { name: "기간: 최근 7일 조건 지우기" }).waitFor();
+    expect(await page.getByRole("option").allTextContents()).toEqual([
+      expect.stringContaining("ACME-1"),
+    ]);
+  });
+
+  it("키보드로 행 링크에 가서 Enter 를 누르면 그 조건으로 Runs 를 연다", async (context) => {
+    const page = await openPage(context);
+    await page.goto(`/stats?ws=${workspaceId}&by=trackerProject`);
+    await hydrated(page);
+
+    const name = stats.openRuns.replace("{name}", "Web");
+    for (let i = 0; i < 80; i += 1) {
+      await page.keyboard.press("Tab");
+      if ((await page.getByRole("link", { name }).and(page.locator(":focus")).count()) === 1) break;
+    }
+    await page.keyboard.press("Enter");
+
+    await page.waitForURL(/\/runs\?/);
+    expect(new URL(page.url()).searchParams.get("days")).toBe("14");
+    const conditions = page.getByRole("group", { name: runs.conditions.label });
+    await conditions.getByRole("button", { name: "프로젝트: Web 조건 지우기" }).waitFor();
+    expect(await page.getByRole("option").count()).toBe(2);
   });
 });
 
