@@ -32,7 +32,8 @@ import settings from "../../apps/web/messages/ko/settings.json" with { type: "js
  *
  * 띄우는 방식은 operator-actions.test.ts(0039)와 같다. web 개발 서버의 server/adapters.ts 를 core 가짜 트래커
  * 등록표(browser/fake-adapters.ts)로 바꿔 끼워, 트래커 연결 확인이 가짜 트래커로 성공한다. 빈 DB 에서 시작하고
- * 시험은 차례로 단계를 하나씩 채운다. GitHub 토큰과 러너 확인 결과처럼 화면 밖에서 오는 값은 DB 에 직접 쓴다.
+ * 시험은 차례로 단계를 하나씩 채우므로 앞 시험의 결과에 기대고, 하나만 골라 돌리면(-t) 실패한다.
+ * GitHub 토큰과 러너 확인 결과처럼 화면 밖에서 오는 값은 DB 에 직접 쓴다.
  * 가상 값만 쓴다(acme, example.com).
  */
 
@@ -158,7 +159,7 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
     await page.getByLabel(settings.runners.orcaPath).fill("/opt/orca/bin/orca");
     await page.getByRole("button", { name: settings.runners.add }).click();
 
-    await expect.poll(focused).toBe(onboarding.runner.checkTitle);
+    await expect.poll(focused).toBe("runner-a 러너");
   });
 
   it("첫 Workspace 를 만들면 토스트로 알리고 포커스가 새 Workspace 제목에 간다", async () => {

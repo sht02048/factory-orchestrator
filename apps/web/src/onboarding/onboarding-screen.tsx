@@ -10,7 +10,15 @@ import {
   buttonStyles,
   showToast,
 } from "@factory/ui";
-import { colors, fontSize, fontWeight, fonts, radius, space } from "@factory/ui/tokens.stylex";
+import {
+  colors,
+  fontSize,
+  fontWeight,
+  fonts,
+  lineHeight,
+  radius,
+  space,
+} from "@factory/ui/tokens.stylex";
 import type { ReactNode, Ref, RefObject } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
@@ -366,7 +374,7 @@ function TrackerStep({
   // 첫 연결을 만들면 다음 할 일인 webhook 만들기 안내로 포커스를 옮긴다
   const added = useFocusWhenAdded(connections.length);
   const newest = connections.at(-1)?.id;
-  // 연결이 없을 때도 같은 목록 모양을 쓴다
+  // 연결이 없을 때도 같은 목록 모양을 쓴다. 만든 뒤에는 항목 key 가 바뀌어 새로 그리므로 포커스는 위에서 옮긴다
   return (
     <>
       <ul {...stylex.props(styles.list)}>
@@ -472,10 +480,10 @@ function RunnerStep({
   workerSilent: boolean;
 }) {
   const t = useTranslations("onboarding.runner");
-  // 첫 러너를 등록하면 다음 할 일인 러너 확인으로 포커스를 옮긴다
+  // 첫 러너를 등록하면 다음 할 일인 러너 확인 카드의 제목으로 포커스를 옮긴다
   const added = useFocusWhenAdded(runners.length);
   const newest = runners.at(-1)?.id;
-  // 러너가 없을 때도 같은 목록 모양을 쓴다
+  // 러너가 없을 때도 같은 목록 모양을 쓴다. 만든 뒤에는 항목 key 가 바뀌어 새로 그리므로 포커스는 위에서 옮긴다
   return (
     <ul {...stylex.props(styles.list)}>
       {runners.length === 0 ? (
@@ -497,7 +505,7 @@ function RunnerStep({
               <PanelBlock
                 title={
                   <FocusTarget ref={runner.id === newest ? added : null}>
-                    {t("checkTitle")}
+                    {t("checkTitle", { name: runner.name })}
                   </FocusTarget>
                 }
               >
@@ -819,7 +827,7 @@ const styles = stylex.create({
     overflowWrap: "anywhere",
   },
   word: { whiteSpace: "pre" },
-  locked: { color: colors.textTertiary, fontSize: fontSize.ui },
+  locked: { color: colors.textTertiary, fontSize: fontSize.ui, lineHeight: lineHeight.normal },
   focusTarget: {
     borderRadius: radius.control,
     outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
