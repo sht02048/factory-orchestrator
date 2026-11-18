@@ -102,10 +102,13 @@ const PROJECT = toTrackerProjectId("00000000-0000-4000-8000-000000000102");
 const KEY = toTicketKey("ENG-123");
 
 describe("checkConnection", () => {
-  it("API 키로 viewer를 읽으면 연결된 것이다. 키는 Bearer 없이 보낸다", async () => {
+  it("API 키로 viewer를 읽으면 연결된 것이고 조직 이름을 돌려준다. 키는 Bearer 없이 보낸다", async () => {
     const { tracker: t, sent } = tracker(fixture("connection-ok"));
 
-    await expect(t.checkConnection()).resolves.toEqual({ ok: true });
+    await expect(t.checkConnection()).resolves.toEqual({
+      ok: true,
+      organizationName: "Example organization",
+    });
     expect(sent[0]?.authorization).toBe("lin_api_test");
     expect(sent[0]?.url).toBe("https://api.linear.app/graphql");
   });

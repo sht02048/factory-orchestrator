@@ -119,10 +119,14 @@ export type TrackerErrorDetail =
   | { kind: "not-found" }
   | { kind: "network"; cause: unknown };
 
+export type TrackerConnectionCheck =
+  | { ok: true; organizationName: string | null }
+  | { ok: false; error: TrackerErrorDetail };
+
 export interface Tracker {
   readonly kind: TrackerKind;
 
-  checkConnection(): Promise<ConnectionCheck<TrackerErrorDetail>>;
+  checkConnection(): Promise<TrackerConnectionCheck>;
 
   verifyWebhook(input: {
     rawBody: Uint8Array;
