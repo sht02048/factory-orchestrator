@@ -1600,6 +1600,7 @@ export function RunnerCheck({
   const t = useTranslations("settings.runners");
   const submit = useSubmit();
   const check = runner.check;
+  const checking = submit.sending || (check?.status === "pending" && !workerSilent);
   return (
     <div {...stylex.props(styles.form)}>
       <div {...stylex.props(styles.row)}>
@@ -1611,12 +1612,12 @@ export function RunnerCheck({
         </span>
         <Button
           variant="secondary"
-          disabled={submit.sending || (check?.status === "pending" && !workerSilent)}
+          disabled={checking}
           onClick={() =>
             submit.run(() => actions.recheckRunner({ id: runner.id }), t("checkRequested"))
           }
         >
-          {submit.sending ? t("checking") : t("recheck")}
+          {checking ? t("checking") : t("recheck")}
         </Button>
       </div>
       <SubmitError state={submit.state} />

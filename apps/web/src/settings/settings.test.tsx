@@ -635,6 +635,8 @@ describe("러너 확인", () => {
     ]);
     const text = panelText(render(await loadSettingsPage(f.context, commerce, now), "runners"));
     expect(text).toContain("worker가 러너를 확인하고 있어요");
+    expect(text).toContain("확인하는 중");
+    expect(text).not.toContain("다시 확인");
   });
 
   it("기다리는 동안 읽는 요청 상태는 결과가 오면 거짓이 되고 트래커를 부르지 않는다", async () => {
