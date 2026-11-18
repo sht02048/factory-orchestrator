@@ -1,6 +1,38 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import { packageVersion, previousStableTag, releasePlan } from "./release-plan.ts";
+
+const root = fileURLToPath(new URL("..", import.meta.url));
+
+function declaredVersion(path: string): string {
+  return packageVersion(readFileSync(join(root, path), "utf8"), path);
+}
+
+describe("저장소의 릴리스 버전", () => {
+  it("루트와 데스크톱 앱 버전이 같아 그 버전의 태그로 릴리스 계획을 세운다", () => {
+    const rootVersion = declaredVersion("package.json");
+    const desktopVersion = declaredVersion(join("apps", "desktop", "package.json"));
+    expect(desktopVersion).toBe(rootVersion);
+    expect(
+      releasePlan({ tag: `v${rootVersion}`, rootVersion, desktopVersion, tags: [] }).version,
+    ).toBe(rootVersion);
+  });
+
+  it("v0.1.0-rc.1 태그는 0.1.0-rc.1 버전과 맞고 prerelease 로 올린다", () => {
+    expect(
+      releasePlan({
+        tag: "v0.1.0-rc.1",
+        rootVersion: "0.1.0-rc.1",
+        desktopVersion: "0.1.0-rc.1",
+        tags: ["v0.1.0-rc.1"],
+      }),
+    ).toEqual({ version: "0.1.0-rc.1", prerelease: true, notesStartTag: null });
+  });
+});
 
 describe("releasePlan", () => {
   const tags = ["v0.1.0-rc.1", "v0.1.0-rc.2", "v0.1.0", "v0.1.1", "v0.2.0-rc.1", "v0.10.0"];
