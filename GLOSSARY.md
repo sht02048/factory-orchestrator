@@ -145,7 +145,7 @@ _Avoid_: Aborted, Stopped, 취소(상태 이름으로. 취소 버튼과 "취소 
 ### To do
 
 **To do**:
-운영자가 손을 대야 끝나는 런의 목록. Dashboard 왼쪽 열의 To do 구역이 이것을 보인다. 종류는 Question, Permission, Human Check, Failed, Disconnected다. 러너 문제(Runner Issue)는 넣지 않는다. 종류 이름은 화면에서도 영어 용어 그대로 쓰고, 왜 손대야 하는지는 설명 문장(한국어)으로 쓴다(ADR 0010). 티켓마다 최신 런만 보인다. Canceled는 올리지 않는다. Failed는 운영자 결정 목록(Q14~Q21)에는 없었지만 지금처럼 To do에 올린다(스펙 7번, Q82.9).
+운영자가 손을 대야 끝나는 런의 목록. Dashboard 왼쪽 열의 To do 구역이 이것을 보인다. 종류는 Question, Permission, Human Check, Failed, Disconnected다. 러너 문제(Runner Issue)는 넣지 않는다. 종류 이름은 화면에서도 영어 용어 그대로 쓰고, 왜 손대야 하는지는 설명 문장(한국어)으로 쓴다(ADR 0010). Dashboard는 To do를 하는 일로 묶어 보인다. 답이 필요해요(Question, Permission), 확인해 주세요(Human Check), 멈췄어요(Failed, Disconnected)다. 묶음 이름은 종류를 모아 부르는 화면 문장이라 종류 이름을 대신하지 않는다(ADR 0010 0068 갱신). 티켓마다 최신 런만 보인다. Canceled는 올리지 않는다. Failed는 운영자 결정 목록(Q14~Q21)에는 없었지만 지금처럼 To do에 올린다(스펙 7번, Q82.9). 문장 안에서 To do를 한국어로 말할 때는 처리할 일로 쓴다(아래 Tickets 필터).
 _Avoid_: 손댈 일(티켓 0059 전의 이름이다), Attention, Inbox, 할 일
 
 **Question**:
@@ -157,8 +157,32 @@ Waiting for Input 런 중 에이전트가 권한 프롬프트에서 허용을 �
 _Avoid_: 권한 대기(종류 이름으로), 권한 요청
 
 **Runner Issue**:
-러너 쪽 문제라 운영자가 러너를 고쳐야 하는 일. GitHub 인증이 깨진 러너(할당에서 빠진다)와 Offline 러너가 여기에 든다(ADR 0010 1번, Offline 러너는 티켓 0049부터). To do에는 올리지 않는다. Dashboard에서는 오른쪽 Runners 카드에 보이고, 레일 Runners 아이콘의 점은 Runner Issue 개수다(티켓 0059). 어떤 문제인지는 설명 문장으로 쓰고 따로 상태 이름을 만들지 않는다. 런의 Disconnected와 다르다(그것은 런 하나의 상태다).
+러너 쪽 문제라 운영자가 러너를 고쳐야 하는 일. GitHub 인증이 깨진 러너(할당에서 빠진다)와 Offline 러너가 여기에 든다(ADR 0010 1번, Offline 러너는 티켓 0049부터). To do에는 올리지 않는다. Dashboard에서는 오른쪽 Runners 구역에 보이고, 레일 Runners 아이콘의 점은 Runner Issue 개수다(티켓 0059). 어떤 문제인지는 설명 문장으로 쓰고 따로 상태 이름을 만들지 않는다. 런의 Disconnected와 다르다(그것은 런 하나의 상태다).
 _Avoid_: 막힘, 인증 깨짐, 러너 오류(모두 종류 이름으로. 설명 문장에서 원인을 말하는 것은 괜찮다)
+
+### Tickets 필터
+
+Tickets 화면의 필터 낱말이다(ADR 0010 0068 갱신). 운영자가 그 티켓으로 무엇을 할지에 답하고, 모두 티켓의 마지막 런으로 정한다. 필터는 서로 겹칠 수 있다. 마지막 런이 Failed인 티켓은 할당할 수 있음과 처리할 일에, Canceled인 티켓은 할당할 수 있음과 끝남에 함께 든다. 마지막 런이 Waiting for Input이나 Disconnected인 티켓은 처리할 일에만 든다.
+
+**모두**:
+필터 없이 이 Workspace의 티켓을 모두 보인다.
+_Avoid_: 전체(필터 이름으로)
+
+**할당할 수 있음**:
+런이 없거나 마지막 런이 Failed·Canceled라 운영자가 맡기거나 다시 맡길 만한 티켓. Tickets 머리의 요약("할당할 수 있는 티켓이 {n}개 있어요")도 이 정의로 센다. 할당 규칙(끝나지 않은 런이 없으면 수동 할당할 수 있다)보다 좁다. Merged나 Human Check로 끝난 티켓도 규칙으로는 할당할 수 있지만 다시 맡길 일이 아니라 넣지 않는다.
+_Avoid_: 할당 전(필터 이름으로. 표의 마지막 런 열에서 런이 없음을 보이는 값으로는 괜찮다), 미할당
+
+**처리할 일**:
+마지막 런이 To do인 티켓. 낱말 정의는 To do를 따른다. Tickets 필터와 Dashboard 제목("처리할 일이 {n}개 있어요")에서 To do를 가리키는 한국어 낱말이다. 구역 이름은 영어 To do로 쓴다(ADR 0010 2번).
+_Avoid_: 손댈 일, 할 일
+
+**진행 중**:
+마지막 런이 Queued나 Running이라 사람 손 없이 진행하는 티켓. Waiting for Input·Disconnected는 끝나지 않은 런이지만 사람이 손대야 해 처리할 일에 든다. 런 상태 Running과 다르다.
+_Avoid_: Running(필터 이름으로. 런 상태와 헷갈린다)
+
+**끝남**:
+사람이 할 일 없이 끝난 티켓. 마지막 런이 Merged나 Canceled이거나, Human Check인데 이후 PR 상태가 기록됐다. 런 상태 Ended와 다르다(Failed와 처리할 Human Check는 Ended지만 끝남이 아니다).
+_Avoid_: Merged(필터 이름으로. 요약 결과 하나만 가리킨다), 완료
 
 ### 설치
 
