@@ -33,10 +33,10 @@
   "find": {
     "title": "서버 찾기",
     "back": "처음으로",
-    "searching": "tailnet 에서 서버를 찾고 있어요.",
+    "searching": "tailnet에서 서버를 찾고 있어요.",
     "found": "{count, plural, other {서버 #개를 찾았어요. 열 서버를 골라 주세요.}}",
-    "missing": "Tailscale 을 찾지 못했어요. 주소로 연결할 수 있어요.",
-    "stopped": "Tailscale 을 켜면 서버를 찾을 수 있어요.",
+    "missing": "Tailscale을 찾지 못했어요. 주소로 연결할 수 있어요.",
+    "stopped": "Tailscale을 켜면 서버를 찾을 수 있어요.",
     "unreadable": "Tailscale 상태를 읽지 못했어요. 주소로 연결할 수 있어요.",
     "noneFound": "서버를 찾지 못했어요. 서버 기기의 Settings > 주소에서 주소를 복사해 넣어 주세요.",
     "listLabel": "tailnet에서 찾은 서버",
@@ -78,7 +78,7 @@
     "address": "서버 주소",
     "live": "계속 다시 확인하고 있어요.",
     "checkDevice": "서버 기기가 켜져 있는지 확인해 주세요.",
-    "checkTailscale": "이 맥과 서버 기기 모두 Tailscale에 연결돼 있는지 확인해 주세요.",
+    "checkTailscale": "이 기계와 서버 기기 모두 Tailscale에 연결돼 있는지 확인해 주세요.",
     "retry": "지금 다시 확인",
     "other": "다른 서버 고르기"
   }
