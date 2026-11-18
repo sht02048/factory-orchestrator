@@ -74,7 +74,7 @@ The pre-commit hook runs lint, format check, typecheck, and the color literal ch
 
 ## Self-hosting
 
-> There is no published release yet: no npm package, no GitHub Release. To run the orchestrator, build a server bundle from a clone of this repository, as described in [Build a server bundle](#build-a-server-bundle). The commands below are written as `ganger <command>`; with a server bundle, that is `node <bundle>/cli/bin/cli.js <command>`.
+> The server bundle is not published: there is no npm package and no server download. The macOS app is published on GitHub Releases (see [Desktop app (macOS)](#desktop-app-macos)). To run the orchestrator as a service, build a server bundle from a clone of this repository, as described in [Build a server bundle](#build-a-server-bundle). The commands below are written as `ganger <command>`; with a server bundle, that is `node <bundle>/cli/bin/cli.js <command>`.
 
 The orchestrator is a self-hosted tool. One operator runs one installation on their own machine. The planned setup:
 
@@ -142,7 +142,15 @@ Requests that change data (including server functions) must also come from a pag
 
 ## Desktop app (macOS)
 
-`apps/desktop` is an Electron app with a window, a menu bar (tray) icon, and notifications. Its window shows the same web app. There is no published build yet: build and package it yourself as described below. It is not signed, so macOS asks you to confirm before it opens the first time (Control-click the app, then **Open**).
+`apps/desktop` is an Electron app with a window, a menu bar (tray) icon, and notifications. Its window shows the same web app.
+
+### Install
+
+1. Download `Ganger-<version>-arm64.dmg` from the Releases page of this repository on GitHub. The app runs on Macs with Apple silicon.
+2. Open the dmg and drag **Ganger** onto **Applications**.
+3. Open Ganger from Applications. Release builds are signed with a Developer ID and notarized by Apple, so macOS opens them without a warning.
+
+The app does not update itself yet. To update, download the new dmg from Releases and replace the app in Applications. The server keeps running while you do, and the new app replaces it with its own version when it opens.
 
 ### Which setup to choose
 
@@ -163,6 +171,23 @@ pnpm --filter @ganger/desktop run package
 ```
 
 This writes `apps/desktop/dist/app/Ganger-darwin-<arch>/Ganger.app` and a `.zip` of it. The app carries the server bundle unchanged in `Contents/Resources/server/` and runs it with its own Node (Electron's), so the machine does not need Node. For development, `pnpm --filter @ganger/desktop start` runs the app from the repository with the bundle in `dist/`.
+
+A build you package yourself is not signed, so macOS asks you to confirm before it opens the first time (Control-click the app, then **Open**).
+
+### Build a release dmg
+
+`pnpm release:mac` builds everything, packages the app, and writes `dist/release/Ganger-<version>-<arch>.dmg`. Without signing settings, it skips signing and notarization and makes an unsigned dmg. To sign and notarize, set:
+
+| Variable              | Value                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------- |
+| `APPLE_API_KEY_PATH`  | Path to an App Store Connect API key (`.p8`)                                                      |
+| `APPLE_API_KEY_ID`    | The key's Key ID                                                                                  |
+| `APPLE_API_ISSUER`    | The key's Issuer ID                                                                               |
+| `MACOS_SIGN_KEYCHAIN` | Optional: the keychain that holds the certificate. Without it, the default keychains are searched |
+
+The script signs with the one valid "Developer ID Application" identity it finds in the keychain, notarizes and staples the app, then signs, notarizes, and staples the dmg. Set all three API key variables or none.
+
+Releases are made by GitHub Actions (`.github/workflows/release.yml`) when a maintainer pushes a `v*` tag. The tag must match the `version` in `package.json` and `apps/desktop/package.json`, and its commit must be on `main`. A tag with a `-` (such as `v0.1.0-rc.1`) makes a prerelease. The workflow runs the CI checks, builds and signs the dmg on a macOS runner with a certificate and API key from the `release` environment, verifies the signature, notarization, and Gatekeeper assessment, and then creates the Release with notes generated from merged pull requests.
 
 The app uses the same installation folder as the CLI (`~/.ganger`, or `GANGER_HOME`). It writes the server's output to `<home>/logs/desktop-server.log`.
 
