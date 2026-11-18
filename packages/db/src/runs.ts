@@ -29,6 +29,7 @@ import type {
 } from "@factory/core";
 import { and, asc, count, desc, eq, gt, inArray, isNull, ne, notExists, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";
@@ -208,6 +209,13 @@ export interface ListRunsFilter {
   order?: "oldest" | "newest";
   limit?: number;
   latestPerTicket?: boolean;
+  endedAxes?: ReadonlyArray<EndedAxesFilter>;
+}
+
+export interface EndedAxesFilter {
+  agentResult: AgentResult;
+  prState: PrState;
+  laterPrState?: null;
 }
 
 /** 런 목록. 할당 순서(대기열 순서)로 돌려준다. */
@@ -226,7 +234,8 @@ export function listRunsWithRecords(
 }
 
 function selectRunRows(db: Database, filter: ListRunsFilter): RunRow[] {
-  if (filter.states?.length === 0 || filter.limit === 0) return [];
+  if (filter.states?.length === 0 || filter.limit === 0 || filter.endedAxes?.length === 0)
+    return [];
   const conditions: SQL[] = [];
   if (filter.states !== undefined) conditions.push(inArray(runs.state, [...filter.states]));
   if (filter.ticket !== undefined) {
@@ -245,6 +254,9 @@ function selectRunRows(db: Database, filter: ListRunsFilter): RunRow[] {
             and(
               eq(newer.trackerConnectionId, runs.trackerConnectionId),
               eq(newer.ticketKey, runs.ticketKey),
+              filter.workspaceId === undefined
+                ? undefined
+                : eq(newer.workspaceId, runs.workspaceId),
               or(
                 gt(newer.assignedAt, runs.assignedAt),
                 and(eq(newer.assignedAt, runs.assignedAt), gt(newer.id, runs.id)),
@@ -252,6 +264,20 @@ function selectRunRows(db: Database, filter: ListRunsFilter): RunRow[] {
             ),
           ),
       ),
+    );
+  }
+  if (filter.endedAxes !== undefined) {
+    conditions.push(
+      or(
+        ...filter.endedAxes.map((axes) =>
+          and(
+            eq(runs.state, "ended"),
+            eq(runs.agentResult, axes.agentResult),
+            eq(runs.prState, axes.prState),
+            axes.laterPrState === null ? isNull(runs.laterPrState) : undefined,
+          ),
+        ),
+      ) ?? sql`0`,
     );
   }
   const order =

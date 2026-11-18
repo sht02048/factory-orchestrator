@@ -1,4 +1,4 @@
-import { runDurations, summarizeRunOutcome } from "@factory/core";
+import { AGENT_RESULTS, PR_STATES, runDurations, summarizeRunOutcome } from "@factory/core";
 import type { QueuedRun, RunId } from "@factory/core";
 import {
   getWorkspaceTrackerProject,
@@ -11,7 +11,7 @@ import {
   listWorkspaces,
   toWorkspaceId,
 } from "@factory/db";
-import type { Database, RunRecords, StoredRun } from "@factory/db";
+import type { Database, EndedAxesFilter, RunRecords, StoredRun } from "@factory/db";
 import { isWebUrl } from "../format/url";
 import { resolveWorkspace } from "../shell/model";
 import { ENDED_RUNS_PAGE_SIZE } from "./model";
@@ -87,9 +87,11 @@ export function loadRunsPage(
   const recentEnded = ended.slice(0, endedLimit);
   const recentEndedIds = new Set(recentEnded.map(({ run }) => run.id));
   const olderAttention = moreEnded
-    ? listRunsWithRecords(db, { workspaceId, states: ["ended"], latestPerTicket: true }).filter(
-        ({ run, records }) => !recentEndedIds.has(run.id) && isUnresolvedEndedRun(run, records),
-      )
+    ? listRunsWithRecords(db, {
+        workspaceId,
+        latestPerTicket: true,
+        endedAxes: UNRESOLVED_ENDED_AXES,
+      }).filter(({ run }) => !recentEndedIds.has(run.id))
     : [];
   const stored = [...active, ...recentEnded, ...olderAttention].toSorted(newestFirst);
   // 티켓마다 마지막 런. 같은 티켓에 새 런이 있으면 지난 결과는 손댈 일이 아니다(Home 과 같다, Q88).
@@ -167,6 +169,20 @@ function isUnresolvedEndedRun(run: StoredRun, records: RunRecords): boolean {
   const summary = summarizeRunOutcome(run).outcome;
   return summary === "failed" || (summary === "human-check" && records.laterPrState === null);
 }
+
+const UNRESOLVED_ENDED_AXES: ReadonlyArray<EndedAxesFilter> = AGENT_RESULTS.flatMap((agentResult) =>
+  PR_STATES.flatMap((prState): EndedAxesFilter[] => {
+    switch (summarizeRunOutcome({ agentResult, prState, runnerUnreached: false }).outcome) {
+      case "failed":
+        return [{ agentResult, prState }];
+      case "human-check":
+        return [{ agentResult, prState, laterPrState: null }];
+      case "merged":
+      case "canceled":
+        return [];
+    }
+  }),
+);
 
 const ACTIVE_STATES = ["queued", "running", "waiting-for-input", "disconnected"] as const;
 

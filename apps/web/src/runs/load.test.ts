@@ -7,7 +7,7 @@ import {
   toTicketKey,
   toTrackerProjectId,
 } from "@factory/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   activeCases,
   connection,
@@ -38,6 +38,24 @@ function addEndedRun(db: Database, key: string, at: Date): void {
     at,
   );
   if (!ended.ok) throw new Error(JSON.stringify(ended.error));
+}
+
+function countRunRowsRead(db: Database, read: () => void): number {
+  const reads: Array<{ mock: { results: Array<{ type: string; value: unknown }> } }> = [];
+  const prepare = db.$client.prepare.bind(db.$client);
+  const spy = vi.spyOn(db.$client, "prepare").mockImplementation((source: string) => {
+    const statement = prepare(source);
+    if (/from "runs"/.test(source)) reads.push(vi.spyOn(statement, "all"));
+    return statement;
+  });
+  try {
+    read();
+  } finally {
+    spy.mockRestore();
+  }
+  return reads
+    .flatMap((all) => all.mock.results)
+    .reduce((rows, result) => rows + (Array.isArray(result.value) ? result.value.length : 0), 0);
 }
 
 function byKey(runs: ReadonlyArray<RunView>): Map<string, RunView> {
@@ -180,6 +198,10 @@ describe("끝난 런 상한", () => {
     expect(ended.filter((run) => !run.attention)).toHaveLength(ENDED_RUNS_PAGE_SIZE);
     expect(ended[0]?.ticketKey).toBe(`BULK-${extra - 1}`);
     expect(page.moreEnded).toBe(true);
+    const rowsRead = () => countRunRowsRead(db, () => loadRunsPage(db, undefined, minutes(400)));
+    const before100More = rowsRead();
+    for (let i = 0; i < 100; i += 1) addEndedRun(db, `MORE-${i}`, minutes(300 + i));
+    expect(rowsRead()).toBe(before100More);
     expect(page.runs.filter((run) => run.state !== "ended")).toHaveLength(
       before.runs.filter((run) => run.state !== "ended").length,
     );

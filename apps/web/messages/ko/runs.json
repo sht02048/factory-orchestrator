@@ -17,7 +17,7 @@
   "prWithState": "{pr} {state}",
   "cancelling": "취소 중",
   "ended": {
-    "partial": "끝난 런은 최근 {count}개까지 보여요.",
+    "partial": "끝난 런은 최근 {count}개까지 보여요. 그보다 오래된 런은 손댈 일만 보여요.",
     "all": "끝난 런 {count}개를 모두 보여요.",
     "showMore": "더 보기"
   },

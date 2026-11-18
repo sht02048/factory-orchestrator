@@ -558,6 +558,27 @@ describe("listRuns 의 순서와 상한", () => {
     );
   });
 
+  it("끝난 런을 두 축과 이후 PR 상태로 거를 수 있다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 5, online: true, projects: [repoA] });
+    const merged = assignAt(db, "ENG-1", 0);
+    moveTo(db, merged, "ended");
+    const open = assignAt(db, "ENG-2", 1);
+    change(db, open, { to: "running", started });
+    change(db, open, { to: "ended", agentResult: "reported-success", prState: "open" });
+    const settled = assignAt(db, "ENG-3", 2);
+    change(db, settled, { to: "running", started });
+    change(db, settled, { to: "ended", agentResult: "reported-success", prState: "open" });
+    updateRunRecords(db, settled, { laterPrState: { state: "merged", at: new Date() } });
+
+    const openAxes = { agentResult: "reported-success", prState: "open" } as const;
+    expect(listRuns(db, { endedAxes: [openAxes] }).map((run) => run.id)).toEqual([open, settled]);
+    expect(
+      listRuns(db, { endedAxes: [{ ...openAxes, laterPrState: null }] }).map((run) => run.id),
+    ).toEqual([open]);
+    expect(listRuns(db, { endedAxes: [] })).toEqual([]);
+  });
+
   it("listRunsWithRecords 는 런과 기록을 한 번에 돌려준다", () => {
     const db = seededDatabase();
     const id = assignAt(db, "ENG-1", 0);
