@@ -45,10 +45,12 @@ interface InputBaseProps {
   required?: boolean;
   type?: "text" | "url" | "password" | "email" | "search";
   autoComplete?: string;
+  inputMode?: "text" | "numeric" | "decimal" | "email" | "url" | "search";
   /** 경로·주소·키처럼 그대로 옮겨 쓸 값. 고정폭 글꼴로 보인다. */
   mono?: boolean;
   /** 폼을 연 뒤 입력칸으로 포커스를 옮길 때 쓴다. */
   ref?: Ref<HTMLInputElement>;
+  [data: `data-${string}`]: string | boolean | undefined;
 }
 
 /**
