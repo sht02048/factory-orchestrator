@@ -8,20 +8,20 @@
 
 ### 화면·문서에 보이는 이름
 
-| 자리                                                                          | 지금                                       | 새 이름                   |
-| ----------------------------------------------------------------------------- | ------------------------------------------ | ------------------------- |
-| 제품 이름(문서·화면에 쓰는 이름)                                              | Factory Orchestrator, factory-orchestrator | Ganger                    |
-| README·GLOSSARY 제목                                                          | `# Factory Orchestrator`                   | `# Ganger`                |
-| 웹 문서 제목(`apps/web/messages/ko/*.json`의 `documentTitle`)                 | `… · Factory Orchestrator`                 | `… · Ganger`              |
-| 웹 레일 브랜드(`shell.json`의 `brand`)                                        | Factory Orchestrator                       | Ganger                    |
-| worker 알림 제목(`apps/worker/src/messages.ts`)                               | Factory Orchestrator 런이 끝났어요.        | Ganger 런이 끝났어요.     |
-| 데스크톱 창 제목, 오류 대화상자 제목, 트레이 툴팁, renderer `<title>`         | Factory Orchestrator                       | Ganger                    |
-| 데스크톱 "우리 서버가 아니에요" 문구(`apps/desktop/messages/ko/screens.json`) | 그 주소는 Factory Orchestrator 서버가 …    | 그 주소는 Ganger 서버가 … |
-| 메뉴 막대의 앱 이름(Electron `app.name`, `productName`에서 온다)              | Factory Orchestrator                       | Ganger                    |
-| `LICENSE` 저작권 줄                                                           | Factory Orchestrator contributors          | Ganger contributors       |
-| `.env` 머리 주석(`apps/cli/src/init.ts`), `.env.example`                      | factory-orchestrator                       | Ganger(명령은 `ganger`)   |
-| CLI 도움말(`apps/cli/src/messages.ts`)                                        | `factory-orchestrator <command>`           | `ganger <command>`        |
-| 정적 시안(`design/prototype/`)의 브랜드 글자                                  | factory-orchestrator, `F`                  | Ganger, `G`               |
+| 자리                                                                                 | 지금                                       | 새 이름                   |
+| ------------------------------------------------------------------------------------ | ------------------------------------------ | ------------------------- |
+| 제품 이름(문서·화면에 쓰는 이름)                                                     | Factory Orchestrator, factory-orchestrator | Ganger                    |
+| README·GLOSSARY 제목                                                                 | `# Factory Orchestrator`                   | `# Ganger`                |
+| 웹 문서 제목(`apps/web/messages/ko/*.json`의 `documentTitle`, `shell.json`은 이름만) | `… · Factory Orchestrator`                 | `… · Ganger`              |
+| 웹 레일 브랜드(`shell.json`의 `brand`)                                               | Factory Orchestrator                       | Ganger                    |
+| worker 알림 제목(`apps/worker/src/messages.ts`)                                      | Factory Orchestrator 런이 끝났어요.        | Ganger 런이 끝났어요.     |
+| 데스크톱 창 제목, 오류 대화상자 제목, 트레이 툴팁, renderer `<title>`                | Factory Orchestrator                       | Ganger                    |
+| 데스크톱 "우리 서버가 아니에요" 문구(`apps/desktop/messages/ko/screens.json`)        | 그 주소는 Factory Orchestrator 서버가 …    | 그 주소는 Ganger 서버가 … |
+| 메뉴 막대의 앱 이름(Electron `app.name`, `productName`에서 온다)                     | Factory Orchestrator                       | Ganger                    |
+| `LICENSE` 저작권 줄                                                                  | Factory Orchestrator contributors          | Ganger contributors       |
+| `.env` 머리 주석(`apps/cli/src/init.ts`), `.env.example`                             | factory-orchestrator                       | Ganger(명령은 `ganger`)   |
+| CLI 도움말(`apps/cli/src/messages.ts`)                                               | `factory-orchestrator <command>`           | `ganger <command>`        |
+| 정적 시안(`design/prototype/`)의 브랜드 글자                                         | factory-orchestrator, `F`                  | Ganger, `G`               |
 
 ### 코드·패키지·배포물 이름
 
@@ -111,19 +111,18 @@
 새 CLI(`ganger`)와 새 데스크톱 앱이 설치 폴더를 고를 때 아래 규칙을 따른다. 데스크톱 앱도 CLI와 같은 `resolveHome`을 쓴다.
 
 - 설치 폴더를 `--home`, `GANGER_HOME`, `FACTORY_HOME`으로 따로 골랐으면 옮기지 않고 그 자리를 그대로 쓴다. 운영자가 정한 이름이다.
-- `~/.factory-orchestrator`가 `~/.ganger`가 아닌 곳을 가리키는 심볼릭 링크면(데이터를 다른 디스크로 옮겨 둔 경우), 옮기지 않고 옛 경로를 설치 폴더로 쓰며 경고한다. `~/.ganger`를 새로 만들지 않는다. 새로 만들면 `init`이 새 암호화 키와 빈 DB를 만들어 데이터가 둘로 갈라진다.
-- `~/.ganger`가 있는데 `~/.factory-orchestrator`도 실제 폴더로 있으면, 아무것도 옮기지 않고 `~/.ganger`를 쓰며 두 폴더가 다 있다고 경고한다.
-- `~/.ganger`가 없고 `~/.factory-orchestrator`가 실제 폴더로 있으면 아래 순서로 한 번 옮긴다.
+- `~/.ganger`가 있는데 `~/.factory-orchestrator`도 실제 폴더(또는 `~/.ganger`가 아닌 곳을 가리키는 링크)로 있으면, 아무것도 옮기지 않고 `~/.ganger`를 쓰며 두 폴더가 다 있다고 경고한다.
+- `~/.ganger`가 없고 `~/.factory-orchestrator`가 실제 폴더이거나 `~/.ganger`가 아닌 곳을 가리키는 심볼릭 링크면(데이터를 다른 디스크로 옮겨 둔 경우), 아래 순서로 한 번 옮긴다. 링크면 2의 `rename`이 링크 자체를 `~/.ganger`로 옮기고 링크가 가리키는 대상은 그대로 둔다. 그래서 따로 빼 둔 경우 없이 같은 순서를 따르고, 0.2.0에서도 `~/.ganger`가 그 대상을 가리킨다.
 
-옮기는 쪽은 처음부터 끝까지 옛 폴더의 `server.lock`을 직접 잡는다. 살아 있는 서버가 lock을 잡고 있으면 아무것도 하지 않고 옛 폴더를 그대로 쓰며, 서버를 멈추거나 `ganger service install`을 돌리라고 알린다(아래 서비스). lock을 잡은 동안에는 다른 `start`가 뜨지 못하므로, 확인과 이름 바꾸기 사이에 launchd가 옛 서비스를 다시 띄워도 그 서버는 lock에서 멈춘다.
+옮기는 쪽은 처음부터 끝까지 옛 폴더의 `server.lock`을 직접 잡는다. 살아 있는 서버가 lock을 잡고 있으면 아무것도 하지 않고 옛 폴더를 그대로 쓰며, 서버를 멈추거나 `ganger service install`을 돌리라고 알린다(아래 서비스). lock을 잡은 동안에는 다른 `start`가 뜨지 못하므로, 확인과 이름 바꾸기 사이에 launchd가 옛 서비스를 다시 띄워도 그 서버는 lock에서 멈춘다. 다만 고칠 수 없는 옛 `start`는 `.env`를 읽은 뒤 lock을 잡고, lock을 얻지 못하면 짧게(지금 코드는 1초 안쪽) 다시 시도한다. 그 사이에 lock이 풀리면 옛 서버가 옮기기 전에 읽은 옛 DB 경로를 열어 빈 DB를 만든다. 그래서 옮기는 쪽은 마무리를 끝낸 뒤에도 lock을 3초 더 잡고 있다가 푼다. 그 사이 옛 서버는 lock을 얻지 못해 끝나고, 다시 뜰 때(launchd `ThrottleInterval` 10초 뒤)는 고친 `.env`를 읽는다.
 
-1. DB를 열어 WAL을 본 파일에 모두 옮기고(`PRAGMA wal_checkpoint(TRUNCATE)`) 닫는다. 결과 행이 `busy=0`이고 옮긴 프레임 수가 WAL의 프레임 수와 같을 때만 다음으로 간다. 아니면(sqlite3 셸이나 백업 도구 같은 다른 연결이 DB를 잡고 있으면) 옮기지 않고 옛 폴더를 그대로 쓰며 경고한다. 닫은 뒤 `-wal`이 없거나 0바이트여야 하고, 그때 남은 `-wal`·`-shm`을 지운다. 그래서 이름을 바꾸는 DB는 본 파일 하나다.
+1. `.env`의 DB가 옮기는 폴더 안에 있고 그 파일이 있을 때만, DB를 열어 WAL을 본 파일에 모두 옮기고(`PRAGMA wal_checkpoint(TRUNCATE)`) 닫는다. 결과 행이 `busy=0`이고 옮긴 프레임 수가 WAL의 프레임 수와 같을 때만 다음으로 간다. 아니면(sqlite3 셸이나 백업 도구 같은 다른 연결이 DB를 잡고 있으면) 옮기지 않고 옛 폴더를 그대로 쓰며 경고한다. 닫은 뒤 `-wal`이 없거나 0바이트여야 하고, 그때 남은 `-wal`·`-shm`을 지운다. 그래서 이름을 바꾸는 DB는 본 파일 하나다.
 2. `~/.factory-orchestrator`를 `~/.ganger`로 이름을 바꾼다(`rename` 한 번). `rename`이 실패하면(`EXDEV`, `EBUSY` 등, 옛 폴더가 마운트 지점인 경우) 옮기지 않고 옛 폴더를 그대로 쓰며 경고한다.
 3. `~/.factory-orchestrator`에 `~/.ganger`를 가리키는 심볼릭 링크를 만든다. 2와 3 사이에 옛 경로가 다시 생겨 링크를 만들지 못하면(옛 데스크톱 앱이 그 사이 `init`을 돌린 경우 등), 옛 경로를 지우지 않고 `~/.ganger`를 쓰며 "옛 경로에 새 폴더가 생겼다"고 경고한다. 옛 경로의 새 폴더는 빈 설치이고, 운영자가 지운다. 옛 서비스·옛 앱·옛 CLI가 옛 경로로 같은 데이터를 계속 본다. 동시에 두 서버가 뜨는 것은 지금처럼 `server.lock`이 막는다. 되돌려 옛 버전을 돌려도 데이터가 둘로 갈라지지 않는다.
 4. 마무리(아래)를 한다.
 5. 무엇을 옮겼는지 한 줄로 알린다(CLI는 stderr, 데스크톱은 `desktop-server.log`).
 
-**마무리.** 셸 환경 변수 `DATABASE_PATH`는 `.env` 값을 덮어쓴다(`readBootEnv`). 셸 값이 옛 폴더 아래 옛 이름을 가리키면 마무리는 DB 이름을 바꾸지 않고, 셸 값을 고치라고 알린 뒤 서버를 띄우지 않는다. 바꾸면 다음 `start`가 없는 파일을 열어 빈 DB를 만든다. 셸 값이 없으면 `.env`의 `DATABASE_PATH`가 옛 폴더 아래(`~/.factory-orchestrator/…`)를 가리키면 새 경로를 정한다. 접두어를 `~/.ganger/`로 바꾸고, 파일 이름이 옛 기본값 `factory-orchestrator.db`면 `ganger.db`로 바꾼다. 다른 이름(예: `data/custom.db`)은 접두어만 바꾼다. 옛 폴더 밖을 가리키면 손대지 않는다. 그다음 두 파일의 상태로 이어서 할 일을 고른다.
+**마무리.** 셸 환경 변수 `DATABASE_PATH`는 `.env` 값을 덮어쓴다(`readBootEnv`). 셸 값이 옛 폴더 아래 옛 이름을 가리키면 마무리는 DB 이름을 바꾸지 않고, 셸 값을 고치라고 알린 뒤 서버를 띄우지 않는다. 바꾸면 다음 `start`가 없는 파일을 열어 빈 DB를 만든다. 같은 이유로 0.1.x 동안 `start`는 마무리를 하든 안 하든, 실제로 쓸 `DATABASE_PATH`(셸 값이 우선)가 옛 폴더 아래 `factory-orchestrator.db`를 가리키는데 그 파일이 없으면 서버를 띄우지 않고 새 경로를 알린다. 셸 값이 없으면 `.env`의 `DATABASE_PATH`가 옛 폴더 아래(`~/.factory-orchestrator/…`)를 가리키면 새 경로를 정한다. 접두어를 `~/.ganger/`로 바꾸고, 파일 이름이 옛 기본값 `factory-orchestrator.db`면 `ganger.db`로 바꾼다. 다른 이름(예: `~/.factory-orchestrator/data/custom.db`)은 접두어만 바꾼다. 옛 폴더 밖을 가리키면 손대지 않는다. 그다음 두 파일의 상태로 이어서 할 일을 고른다.
 
 | 옛 경로의 DB | 새 경로의 DB | 할 일                                                                               |
 | ------------ | ------------ | ----------------------------------------------------------------------------------- |
@@ -140,6 +139,8 @@
 
 0.1.x 동안 새 이름이 없으면 옛 이름(`FACTORY_*`)을 읽고, 옛 이름을 읽을 때마다 새 이름을 쓰라고 경고한다. 둘 다 있으면 새 이름을 쓰고 옛 이름은 무시한다고 경고한다. 이 규칙은 위 표의 다섯 변수(`FACTORY_HOME`, `FACTORY_TAILSCALE_CLI`, `FACTORY_DESKTOP_USER_DATA`, `FACTORY_SERVER_BUNDLE`, `FACTORY_DEV_DIR`)에 같이 적용하고, 한 함수가 맡는다. 두 이름을 받는 동안 시험이 환경 변수를 비울 때(`apps/desktop/smoke/helpers.ts`, `scripts/smoke-cli.ts`)는 옛 이름과 새 이름을 함께 비운다. 개발자 셸의 값이 시험에 새어 들지 않게 하려는 것이다. `GANGER_WORKER_WAKE`는 `start`가 자식에게 넣는 내부 값이라 옛 이름을 받지 않는다.
 
+0.2.0에서는 옛 이름의 값을 읽지 않는다. 다만 옛 이름이 있고 새 이름이 없으면 조용히 넘어가지 않고, 새 이름을 쓰라는 오류로 멈춘다. `FACTORY_HOME`만 둔 설치가 0.2.0에서 그 값을 잃고 기본 폴더 `~/.ganger`에 빈 설치를 만들어 데이터가 갈라지는 일을 막는다. 이 확인은 1.0에서 지운다.
+
 ### `/api/identity`의 product 값
 
 새 서버는 `product: "ganger"`를 돌려준다. 새 데스크톱 앱은 0.1.x 동안 `"factory-orchestrator"`도 우리 서버로 받는다. 원격 서버만이 아니라 로컬 서버를 확인할 때도 같다. 데스크톱은 로컬 서버도 같은 `probeIdentity`로 확인하는데(`apps/desktop/src/core/local-server.ts`), 위 규칙대로 옛 서비스나 옛 앱이 띄운 옛 서버가 로컬에서 돌 수 있기 때문이다. 옛 데스크톱 앱은 새 서버를 "우리 서버가 아니에요"로 본다. 옛 앱은 공개하지 않았으므로 새 앱으로 바꾸면 된다.
@@ -149,7 +150,7 @@
 옛 서비스 파일(`factory-orchestrator.plist`, `factory-orchestrator.service`)에는 옛 배포물의 CLI 경로와 `--home ~/.factory-orchestrator`, 옛 로그 경로가 들어 있다. 이 파일을 자동으로 고쳐 쓰지 않는다.
 
 - 옛 서비스가 돌고 있으면 `server.lock`을 잡고 있어 설치 폴더를 옮기지 않는다. 옛 서비스는 옛 폴더에서 그대로 돈다.
-- `ganger service install`은 이 순서로 한다. 옛 서비스를 멈춘다(`launchctl bootout gui/<uid>/factory-orchestrator`, `systemctl --user disable --now factory-orchestrator.service`). 설치 폴더를 옮긴다. 새 서비스(`ganger`, `--home ~/.ganger`, `<home>/logs/ganger.log`)를 쓰고 켠다. 새 서비스가 켜진 뒤에만 옛 파일을 지우고, systemd면 `systemctl --user daemon-reload`를 한다. 중간에 실패하면 옛 파일이 남아 있으므로 무엇이 실패했는지 알리고, 다시 `ganger service install`을 돌리면 이어서 한다. 옛 서비스는 멈춘 채로 둔다. `ganger service uninstall`도 옛 서비스가 있으면 함께 지운다.
+- `ganger service install`은 이 순서로 한다. 옛 서비스를 멈춘다(`launchctl bootout gui/<uid>/factory-orchestrator`, `systemctl --user disable --now factory-orchestrator.service`). 설치 폴더를 다시 골라(`resolveHome`, 멈추기 전에는 lock 때문에 옛 폴더로 골랐을 수 있다) 옮긴다. 새 서비스(`ganger`, `--home ~/.ganger`, `<home>/logs/ganger.log`)를 쓰고 켠다. 새 서비스가 켜진 뒤에만 옛 파일을 지우고, systemd면 `systemctl --user daemon-reload`를 한다. 중간에 실패하면 옛 파일이 남아 있으므로 무엇이 실패했는지 알리고, 다시 `ganger service install`을 돌리면 이어서 한다. 옛 서비스는 멈춘 채로 둔다. `ganger service uninstall`도 옛 서비스가 있으면 함께 지운다.
 - 이미 옮긴 뒤(심볼릭 링크가 있는 뒤)에 옛 서비스가 다시 돌아도 옛 경로가 링크라 같은 데이터를 쓴다. 다음 `ganger service install`에서 새 경로로 바뀐다.
 - 0.1.x 동안 데스크톱 앱이 서비스가 설치됐는지 볼 때(`serviceInstalledFor`) 옛 plist도 본다. 그 안의 `--home`이 옛 경로든 새 경로든 같은 설치로 본다.
 
@@ -175,6 +176,7 @@
 - **설치 폴더를 옮기는 일은 되돌리기 어렵다.** 옮긴 뒤 옛 버전으로 돌아가도 심볼릭 링크로 같은 데이터를 보지만, DB 파일 이름과 `.env`의 `DATABASE_PATH`는 이미 새 이름이다. 옛 버전은 `.env`의 절대 경로를 읽으므로 그대로 돈다. 0.2.0에서 링크를 지운 뒤에는 옛 버전이 옛 경로에서 빈 폴더를 보고 `init`이 새 암호화 키를 만들 수 있다. 0.2.0 릴리스 노트에 적는다.
 - **옮기는 도중 멈추면** 폴더 이름만 바뀌고 링크나 `.env`가 옛 상태일 수 있다. 서버를 띄우기 전에 lock을 잡고 마무리를 매번 확인해 이어서 하는 규칙으로 막고, 0078에서 단계마다 멈춘 경우와 마무리 표의 네 상태를 시험한다.
 - **옛 코드가 새 DB에서 돌 수 있다.** 새 앱이 지울 수 없는 옛 로그인 항목이나 다시 등록하지 않은 옛 서비스가 옛 서버를 띄우면, 링크를 거쳐 새 버전이 마이그레이션한 DB에서 옛 코드가 돈다. 마이그레이션은 앞으로만 가므로 옛 코드가 새 스키마에서 실패할 수 있다. 옛 앱을 지우고 `ganger service install`을 돌리라고 옮길 때 알리는 것으로 줄인다.
+- **0.2.0에서 `FACTORY_*`를 읽지 않으면** 0.1.x 동안 경고를 무시한 설치가 멈춘다. 위 오류로 데이터가 갈라지지는 않지만, 운영자가 환경 변수를 고쳐야 다시 뜬다. 0.2.0 릴리스 노트에 적는다.
 - **0.2.0에서 링크를 지우면** 다시 등록하지 않은 옛 서비스(plist·unit에 `--home ~/.factory-orchestrator`가 적혀 있다)는 `.env`를 찾지 못해(`MissingEnvFileError`) 뜨지 못한다. 0.2.0 릴리스 노트에 "서비스를 다시 등록해야 한다"를 적는다.
 - **서비스 등록이 중간에 실패하면** 옛 plist가 `~/Library/LaunchAgents`에 남아 다음 로그인 때 launchd가 옛 서버를 다시 띄운다(`RunAtLoad`). 새 버전이 마이그레이션한 DB면 옛 코드가 "이 버전이 모르는 마이그레이션"으로 실패하고 `KeepAlive`가 10초마다 다시 띄운다. 실패 안내에 `ganger service install`을 다시 돌리라고 적는다.
 - **lock을 잡은 채 옮기므로** 옮기는 동안 서버를 띄울 수 없다. 큰 DB면 WAL을 옮기는 데 시간이 걸릴 수 있다.
