@@ -177,6 +177,24 @@ describe("Settings 포커스와 입력(브라우저, 0055)", () => {
       .waitFor();
   });
 
+  it("서버가 다듬어 저장한 값도 저장한 뒤에는 바뀐 값으로 알리지 않는다", async () => {
+    await openSettings(page, "general");
+    await page.getByLabel(settings.general.name).fill("Acme ");
+    await page.getByLabel(settings.general.maxRun).fill("060");
+    await page.getByRole("status").getByText(settings.unsaved).waitFor();
+    await page.getByRole("button", { name: settings.save }).click();
+    await page.getByRole("status").getByText(settings.unsaved).waitFor({ state: "detached" });
+
+    await openSettings(page, "addresses");
+    await page.getByLabel(settings.addresses.webhook).fill("https://hooks.example.com/");
+    await page.getByRole("status").getByText(settings.unsaved).waitFor();
+    await page.getByRole("button", { name: settings.addresses.save, exact: true }).click();
+    await page.getByRole("status").getByText(settings.unsaved).waitFor({ state: "detached" });
+    expect(await page.getByLabel(settings.addresses.webhook).inputValue()).toBe(
+      "https://hooks.example.com/",
+    );
+  });
+
   it("Runners 링크는 밑줄이 있고 라우터로 Workspace 를 이어 옮긴다", async () => {
     await openSettings(page, "runners");
     const link = page.getByRole("link", { name: settings.runners.toRunners, exact: true });

@@ -544,7 +544,7 @@ function GeneralPanel({
   const nameOk = name.trim() !== "";
   const maxRunOk = minutes !== null && minutes >= 1 && minutes <= MAX_RUN_MINUTES;
   const validation = useValidateAfterBlur();
-  useReportUnsaved(name !== general.name || maxRun !== String(general.maxRunMinutes));
+  useReportUnsaved(name.trim() !== general.name || minutes !== general.maxRunMinutes);
   return (
     <form
       {...stylex.props(styles.form)}
@@ -665,13 +665,21 @@ function ProjectRow({
   const submit = useSubmit();
   const owner = project.owner;
   const actionRef = useRef<HTMLSpanElement>(null);
-  const focusActionOnceOwnerIs = useRef<ProjectOwnerKind | null>(null);
+  const focusActionAfterOwnerChange = useRef<{
+    from: ProjectOwnerKind;
+    to: ProjectOwnerKind;
+  } | null>(null);
   const failed = submit.state.kind === "failed";
   useEffect(() => {
-    if (failed) focusActionOnceOwnerIs.current = null;
-    if (owner.kind !== focusActionOnceOwnerIs.current || submit.sending) return;
-    focusActionOnceOwnerIs.current = null;
-    actionRef.current?.querySelector("button")?.focus();
+    const pending = focusActionAfterOwnerChange.current;
+    if (pending === null) return;
+    if (failed) {
+      focusActionAfterOwnerChange.current = null;
+      return;
+    }
+    if (submit.sending || owner.kind === pending.from) return;
+    focusActionAfterOwnerChange.current = null;
+    if (owner.kind === pending.to) actionRef.current?.querySelector("button")?.focus();
   }, [owner.kind, submit.sending, failed]);
   return (
     <li {...stylex.props(styles.item)}>
@@ -710,7 +718,7 @@ function ProjectRow({
                   <DialogClose
                     variant="danger"
                     onClick={() => {
-                      focusActionOnceOwnerIs.current = "free";
+                      focusActionAfterOwnerChange.current = { from: "this", to: "free" };
                       submit.run(
                         () => actions.removeProject(refInput),
                         t("removed", { project: project.name }),
@@ -726,7 +734,7 @@ function ProjectRow({
             <Button
               disabled={owner.kind === "other" || submit.sending}
               onClick={() => {
-                focusActionOnceOwnerIs.current = "this";
+                focusActionAfterOwnerChange.current = { from: "free", to: "this" };
                 submit.run(
                   () => actions.addProject({ ...refInput, name: project.name }),
                   t("added", { project: project.name }),
@@ -812,7 +820,7 @@ function MappingRow({
   useReportUnsaved(
     runnerProject !== (bound.mapping?.runnerProject ?? null) ||
       agent !== (bound.mapping?.agent ?? null) ||
-      model !== (bound.mapping?.model ?? ""),
+      model.trim() !== (bound.mapping?.model ?? ""),
   );
   const projectOptions = withCurrent(
     runnerProjects.map((p) => ({ value: p.id, label: p.name })),
@@ -1118,7 +1126,9 @@ export function ConnectionForm({
   const check = useSubmit();
   const isNew = connection === null;
   const ready = name.trim() !== "" && (!isNew || apiKey.trim() !== "");
-  useReportUnsaved(name !== (connection?.name ?? "") || apiKey !== "" || webhookSecret !== "");
+  useReportUnsaved(
+    name.trim() !== (connection?.name ?? "") || apiKey !== "" || webhookSecret !== "",
+  );
   return (
     <form
       {...stylex.props(styles.form)}
@@ -1242,9 +1252,13 @@ function AddressesPanel({
   const [webAddress, setWebAddress] = useState(addresses.webAddress ?? "");
   const [webhookAddress, setWebhookAddress] = useState(addresses.webhookAddress ?? "");
   const submit = useSubmit();
+  const [submittedAddresses, setSubmittedAddresses] = useState({
+    webAddress: addresses.webAddress ?? "",
+    webhookAddress: addresses.webhookAddress ?? "",
+  });
   useReportUnsaved(
-    webAddress !== (addresses.webAddress ?? "") ||
-      webhookAddress !== (addresses.webhookAddress ?? ""),
+    webAddress !== submittedAddresses.webAddress ||
+      webhookAddress !== submittedAddresses.webhookAddress,
   );
   return (
     <>
@@ -1265,6 +1279,7 @@ function AddressesPanel({
                 webhookAddress: webhookAddress.trim(),
               }),
             ts("saved"),
+            () => setSubmittedAddresses({ webAddress, webhookAddress }),
           );
         }}
       >
@@ -1478,10 +1493,10 @@ export function RunnerForm({
     name.trim() !== "" && sshTarget.trim() !== "" && orcaPath.trim() !== "" && capacityOk;
   const validation = useValidateAfterBlur();
   useReportUnsaved(
-    name !== (runner?.name ?? "") ||
-      sshTarget !== (runner?.sshTarget ?? "") ||
-      orcaPath !== (runner?.orcaPath ?? "") ||
-      capacity !== String(runner?.capacity ?? 1),
+    name.trim() !== (runner?.name ?? "") ||
+      sshTarget.trim() !== (runner?.sshTarget ?? "") ||
+      orcaPath.trim() !== (runner?.orcaPath ?? "") ||
+      capacityValue !== (runner?.capacity ?? 1),
   );
   return (
     <form
