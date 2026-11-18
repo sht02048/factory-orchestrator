@@ -33,6 +33,7 @@ import { chromium } from "playwright-core";
 import type { Browser, BrowserContext, Page, Route } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
+import shell from "../../apps/web/messages/ko/shell.json" with { type: "json" };
 import tickets from "../../apps/web/messages/ko/tickets.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 import { startWebServer } from "./web-server.js";
@@ -193,7 +194,10 @@ describe("Tickets 수동 할당(브라우저, 0054)", () => {
     const dialog = page.getByRole("dialog", { name: fill(tickets.assign.title, { key }) });
     await dialog.getByRole("button", { name: tickets.assign.submit }).click();
 
-    await page.getByText(fill(tickets.assign.done, { key })).waitFor();
+    await page
+      .getByRole("region", { name: shell.toastRegion })
+      .getByText(fill(tickets.assign.done, { key }))
+      .waitFor();
     await dialog.waitFor({ state: "hidden" });
     await expect.poll(focused).toBe(tickets.panel.openRun);
     await panel.getByRole("heading", { name: `${key} Ticket number 1` }).waitFor();
@@ -223,7 +227,10 @@ describe("Tickets 수동 할당(브라우저, 0054)", () => {
     await page.waitForTimeout(300);
     expect(await dialog.isVisible()).toBe(true);
     await held.release();
-    await page.getByText(fill(tickets.assign.done, { key })).waitFor();
+    await page
+      .getByRole("region", { name: shell.toastRegion })
+      .getByText(fill(tickets.assign.done, { key }))
+      .waitFor();
     await dialog.waitFor({ state: "hidden" });
     await expect.poll(focused).toBe(tickets.panel.openRun);
   });

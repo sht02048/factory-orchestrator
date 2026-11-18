@@ -45,4 +45,5 @@ e2e 파일마다 띄우는 vite dev 서버가 의존성 최적화 캐시 `apps/w
 
 - e2e 서버 준비를 `e2e/src/web-server.ts`의 `startWebServer` 하나로 모으고, 시험 파일의 임시 폴더를 `cacheDir`로 준다. e2e 서버는 서로의 캐시도, demo가 쓰는 `apps/web`의 캐시도 건드리지 않는다.
 - `e2e/src/web-server.test.ts`가 플러그인이 다른 서버가 떠도 먼저 뜬 서버의 캐시가 그대로인지, e2e 시험 파일이 vite `createServer`를 직접 부르지 않는지 확인한다.
+- PR CI 재실행에서 다른 흔들림이 하나 더 드러났다. 토스트 문구를 페이지 전체에서 `getByText`로 찾는데, UI SDK가 같은 문구를 스크린 리더용 알림(`role="status"`, `data-ui-sdk-announcer`)에도 넣어, 알림이 문구를 가진 때에 맞물리면 요소 두 개에 걸려 strict mode 위반으로 실패했다. 토스트와 스크린 리더 알림에 같은 문구가 있는 것은 접근성상 맞는 동작이라 화면 버그가 아니고, 캐시 변경과 무관하게 원래 있던 경합이다. 토스트를 기다리는 곳(`tickets` 두 곳, `operator-actions`, `onboarding`)을 토스트 영역(`shell.toastRegion`) 안에서 찾게 좁혔다.
 - 시험 시간 제한과 단언은 바꾸지 않았다.

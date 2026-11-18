@@ -20,6 +20,7 @@ import type { Browser, Page } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import onboarding from "../../apps/web/messages/ko/onboarding.json" with { type: "json" };
+import shell from "../../apps/web/messages/ko/shell.json" with { type: "json" };
 import settings from "../../apps/web/messages/ko/settings.json" with { type: "json" };
 import { startWebServer } from "./web-server.js";
 
@@ -140,7 +141,10 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
     await page.getByRole("button", { name: onboarding.workspace.create }).click();
 
     await expect.poll(focused).toBe("Acme Commerce Workspace");
-    await page.getByText(onboarding.workspace.created).waitFor();
+    await page
+      .getByRole("region", { name: shell.toastRegion })
+      .getByText(onboarding.workspace.created)
+      .waitFor();
   });
 });
 

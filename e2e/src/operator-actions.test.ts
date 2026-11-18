@@ -45,6 +45,7 @@ import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" 
 import home from "../../apps/web/messages/ko/home.json" with { type: "json" };
 import run from "../../apps/web/messages/ko/run.json" with { type: "json" };
 import runs from "../../apps/web/messages/ko/runs.json" with { type: "json" };
+import shell from "../../apps/web/messages/ko/shell.json" with { type: "json" };
 import tickets from "../../apps/web/messages/ko/tickets.json" with { type: "json" };
 import {
   connection,
@@ -171,7 +172,10 @@ describe("운영자 핵심 동작(브라우저)", () => {
     const dialog = page.getByRole("dialog", { name: fill(tickets.assign.title, { key }) });
     await dialog.getByRole("button", { name: tickets.assign.submit }).click();
 
-    await page.getByText(fill(tickets.assign.done, { key })).waitFor();
+    await page
+      .getByRole("region", { name: shell.toastRegion })
+      .getByText(fill(tickets.assign.done, { key }))
+      .waitFor();
     const created = runsOf(key);
     expect(created.map((r) => [r.state, r.runnerProject, r.agent])).toEqual([
       ["queued", runnerProject, agent],
