@@ -20,6 +20,7 @@ import {
   recordRunnerCheck,
   saveAutoAssignLabel,
   saveCodeHostConnection,
+  saveInstallAddresses,
   saveMapping,
   saveRunner,
   saveTrackerConnection,
@@ -39,7 +40,7 @@ import {
   seededRunners,
   trackerProjectId,
 } from "./fixtures.js";
-import { PREFILL } from "./values.js";
+import { DEMO_WEBHOOK_ADDRESS, DEMO_WEB_ADDRESS, PREFILL } from "./values.js";
 import { CODE_HOST_KIND, RUNNER_KIND, TRACKER_KIND } from "./world.js";
 import type { DemoWorld } from "./world.js";
 
@@ -112,6 +113,13 @@ export async function seedDemo(
 }
 
 function seedSettings(db: Database, box: SecretBox, now: Date): void {
+  // 다른 기기에서 열 주소와 webhook 공개 주소(티켓 0048). 온보딩 1단계·Settings 의 주소가 채워져 보인다.
+  // 가상 주소라 Host 검사는 127.0.0.1·localhost·WEB_HOST(바인드 주소)로 연 개발 서버를 그대로 받는다.
+  saveInstallAddresses(
+    db,
+    { webAddress: DEMO_WEB_ADDRESS, webhookAddress: DEMO_WEBHOOK_ADDRESS },
+    now,
+  );
   for (const connection of seededConnections) {
     saveTrackerConnection(
       db,
