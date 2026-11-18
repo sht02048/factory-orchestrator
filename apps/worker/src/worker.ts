@@ -12,6 +12,7 @@ import type {
 } from "@ganger/core";
 import {
   changeRunState,
+  fillRunTicketTitle,
   clearStartRequested,
   getMapping,
   getRun,
@@ -524,6 +525,7 @@ async function promptFor(
     context.logger.warn("run's ticket was not found in the tracker", { runId: run.id });
     return "ticket-gone";
   }
+  tryWrite(context, run.id, () => fillRunTicketTitle(context.db, run.id, ticket.title));
   return {
     text: `${ticket.title}\n\n${ticket.body}`,
     ticket: { key: ticket.key, url: ticket.url },

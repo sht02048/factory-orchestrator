@@ -42,6 +42,8 @@ import {
 import {
   assignRun,
   changeRunState,
+  fillRunTicketTitle,
+  getRun,
   getRunWithRecords,
   listRunStateChanges,
   listRuns,
@@ -256,6 +258,33 @@ describe("assignRun", () => {
     });
     if (!result.ok) throw new Error(result.reason);
     expect(listRunStateChanges(db, result.run.id)).toEqual([{ from: null, to: "queued", at: now }]);
+  });
+});
+
+describe("런의 티켓 제목(0064)", () => {
+  it("할당할 때 받은 티켓 제목을 저장하고 읽는다", () => {
+    const db = seededDatabase();
+    const result = assignRun(db, {
+      ticket: ticket("ENG-1"),
+      ticketTitle: "결제 실패 재시도",
+      trackerProject,
+      runnerProject: repoA,
+      agent,
+    });
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.run.ticketTitle).toBe("결제 실패 재시도");
+    expect(getRun(db, result.run.id)?.ticketTitle).toBe("결제 실패 재시도");
+    expect(listRuns(db)[0]?.ticketTitle).toBe("결제 실패 재시도");
+  });
+
+  it("제목 없이 할당한 런은 나중에 읽은 제목으로 한 번만 채운다", () => {
+    const db = seededDatabase();
+    const id = assignOk(db, "ENG-1");
+    expect(getRun(db, id)?.ticketTitle).toBeNull();
+
+    fillRunTicketTitle(db, id, "처음 읽은 제목");
+    fillRunTicketTitle(db, id, "트래커에서 바뀐 제목");
+    expect(getRun(db, id)?.ticketTitle).toBe("처음 읽은 제목");
   });
 });
 

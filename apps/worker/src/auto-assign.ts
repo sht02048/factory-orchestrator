@@ -96,7 +96,7 @@ function assignForEvent(
     runs: listRuns(context.db, { ticket }).map(toAutoAssignmentRun),
   });
   if (!check.ok) return;
-  assign(context, ticket, event.projectId, target.mapping);
+  assign(context, ticket, event.projectId, target.mapping, null);
 }
 
 async function correctByPolling(context: TickContext): Promise<void> {
@@ -195,7 +195,7 @@ function assignForPolledTicket(
     runs: runs.map(toAutoAssignmentRun),
   });
   if (!check.ok) return;
-  assign(context, ref, ticket.project.id, target.mapping);
+  assign(context, ref, ticket.project.id, target.mapping, ticket.title);
 }
 
 function autoAssignTarget(
@@ -218,9 +218,11 @@ function assign(
   ticket: TicketRef,
   trackerProject: TrackerProjectId,
   mapping: StoredMapping,
+  ticketTitle: string | null,
 ): void {
   const result = assignRun(context.db, {
     ticket,
+    ticketTitle,
     trackerProject,
     runnerProject: mapping.runnerProject,
     agent: mapping.agent,
