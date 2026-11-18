@@ -23,6 +23,7 @@ import {
   SecretBox,
   assignRun,
   changeRunState,
+  listRunQuestions,
   migrate,
   openDatabase,
   recordPermissionWaits,
@@ -42,7 +43,6 @@ import { chromium } from "playwright-core";
 import type { Browser, BrowserContext, Locator, Page } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
-import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" };
 import home from "../../apps/web/messages/ko/home.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 import { startWebServer } from "./web-server.js";
@@ -120,73 +120,175 @@ beforeEach(async (test) => {
   });
 });
 
-describe("Home 접근성(브라우저, 0050)", () => {
-  it("키보드로 '직접 답하기'를 열면 입력칸에, Escape·취소로 닫으면 트리거 버튼에 포커스가 간다", async () => {
-    await openHome(page);
-    const card = questionCard(page, "ACME-1");
-    const trigger = card.getByRole("button", { name: home.question.write });
+const longChoice =
+  "Keep the cache in SQLite so that it survives restarts, and add a nightly job that removes entries older than thirty days from every table";
 
-    await trigger.focus();
-    await page.keyboard.press("Enter");
-    expect(await focusedSoon(card.getByLabel(home.question.answerLabel))).toBe(true);
-    await page.keyboard.press("Escape");
+describe("Dashboard 질문 레이어(브라우저, 0060)", () => {
+  it("답하기를 누르면 첫 선택지에 포커스가 가고, ×·Escape·바깥 누르기로 닫으면 답하기로 돌아온다", async () => {
+    await openHome(page);
+    const trigger = todoRow(page, "ACME-1").getByRole("button", { name: home.row.answer });
+    const layer = page.getByRole("dialog");
+
+    await trigger.click();
+    expect(await focusedSoon(layer.getByRole("radio", { name: "SQLite" }))).toBe(true);
+    await layer.getByRole("button", { name: home.question.close }).click();
+    await layer.waitFor({ state: "hidden" });
     expect(await focusedSoon(trigger)).toBe(true);
 
     await page.keyboard.press("Enter");
-    expect(await focusedSoon(card.getByLabel(home.question.answerLabel))).toBe(true);
-    await card.getByRole("button", { name: home.question.cancel }).focus();
-    await page.keyboard.press("Enter");
+    await layer.waitFor();
+    await page.keyboard.press("Escape");
+    await layer.waitFor({ state: "hidden" });
+    expect(await focusedSoon(trigger)).toBe(true);
+
+    await trigger.click();
+    await layer.waitFor();
+    await page.getByRole("heading", { level: 1, name: home.title }).click();
+    await layer.waitFor({ state: "hidden" });
     expect(await focusedSoon(trigger)).toBe(true);
   });
 
-  it("키보드로 '거절'을 열면 이유 칸에, Escape·취소로 닫으면 거절 버튼에 포커스가 간다", async () => {
+  it("선택지를 골라도 보내지 않고, 보내기를 눌러야 보낸 뒤 레이어를 닫고 결과를 status 로 알린다", async () => {
     await openHome(page);
-    const card = permissionCard(page, "ACME-2");
-    const trigger = card.getByRole("button", { name: home.permission.deny, exact: true });
+    const row = todoRow(page, "ACME-4");
+    await row.getByRole("button", { name: home.row.answer }).click();
+    const layer = page.getByRole("dialog");
+    const send = layer.getByRole("button", { name: home.question.send });
+    expect(await send.isDisabled()).toBe(true);
 
-    await trigger.focus();
-    await page.keyboard.press("Enter");
-    expect(await focusedSoon(card.getByLabel(home.permission.reasonLabel))).toBe(true);
-    await page.keyboard.press("Escape");
-    expect(await focusedSoon(trigger)).toBe(true);
+    const posts: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST") posts.push(request.url());
+    });
+    await layer.getByRole("radio", { name: "No" }).check();
+    await layer.getByRole("radio", { name: "Yes" }).check();
+    await page.waitForTimeout(500);
+    expect(posts).toEqual([]);
+    expect(unansweredQuestions("ACME-4")).toEqual(["q-4"]);
+    expect(await send.isEnabled()).toBe(true);
 
-    await page.keyboard.press("Enter");
-    expect(await focusedSoon(card.getByLabel(home.permission.reasonLabel))).toBe(true);
-    await card.getByRole("button", { name: home.permission.cancel }).focus();
-    await page.keyboard.press("Enter");
-    expect(await focusedSoon(trigger)).toBe(true);
-  });
-
-  it("답을 남기면 결과 문장이 status 로 보이고 포커스를 받는다", async () => {
-    await openHome(page);
-    const card = questionCard(page, "ACME-4");
-    await card.getByRole("button", { name: home.question.write }).click();
-    await card.getByLabel(home.question.answerLabel).fill("Use SQLite.");
-    await page.keyboard.press("Enter");
-    const status = card.getByRole("status");
+    await send.click();
+    const status = row.getByRole("status");
     await status.getByText(home.question.answered).waitFor();
+    await layer.waitFor({ state: "hidden" });
     expect(await focusedSoon(status)).toBe(true);
+    expect(answerOf("ACME-4")).toBe("Yes");
   });
 
-  it("거절을 남기면 결과 문장이 status 로 보이고 포커스를 받는다", async () => {
+  it("직접 쓰기를 고르면 글쓰기 칸이 열리고 ⌘ Enter 로 보낸다", async () => {
     await openHome(page);
-    const card = permissionCard(page, "ACME-5");
-    await card.getByRole("button", { name: home.permission.deny, exact: true }).click();
-    await card.getByRole("button", { name: home.permission.send }).click();
-    const status = card.getByRole("status");
+    const row = todoRow(page, "ACME-6");
+    await row.getByRole("button", { name: home.row.answer }).click();
+    const layer = page.getByRole("dialog");
+    expect(await layer.getByLabel(home.question.otherLabel).count()).toBe(0);
+    await layer.getByRole("radio", { name: home.question.other }).check();
+    const other = layer.getByLabel(home.question.otherLabel);
+    expect(await focusedSoon(other)).toBe(true);
+    await other.fill("Ship it on Friday.");
+    await page.keyboard.press("ControlOrMeta+Enter");
+    await row.getByRole("status").getByText(home.question.answered).waitFor();
+    expect(answerOf("ACME-6")).toBe("Ship it on Friday.");
+  });
+
+  it("긴 선택지 문구는 레이어 안에서 줄을 바꿔 다 보인다", async () => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await openHome(page);
+    await todoRow(page, "ACME-3").getByRole("button", { name: home.row.answer }).click();
+    const layer = page.getByRole("dialog");
+    const text = layer.getByText(longChoice, { exact: true });
+    const box = await text.evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      const lineHeight = Number.parseFloat(getComputedStyle(el).lineHeight);
+      const dialog = el.closest('[role="dialog"]')?.getBoundingClientRect();
+      return {
+        clipped: el.scrollWidth > el.clientWidth,
+        lines: Math.round(rect.height / lineHeight),
+        inside: dialog !== undefined && rect.left >= dialog.left && rect.right <= dialog.right,
+        viewport: rect.right <= window.innerWidth,
+      };
+    });
+    expect(box).toMatchObject({ clipped: false, inside: true, viewport: true });
+    expect(box.lines).toBeGreaterThan(1);
+  });
+
+  it("레이어가 열린 화면에서 파란 주 버튼은 레이어 안의 보내기 하나뿐이다(ADR 0010 6번)", async () => {
+    await openHome(page);
+    await todoRow(page, "ACME-1").getByRole("button", { name: home.row.answer }).click();
+    await page.getByRole("dialog").waitFor();
+    const primary = await page
+      .locator('[data-variant="primary"]')
+      .evaluateAll((els) =>
+        els.filter((el) => el.getClientRects().length > 0).map((el) => el.textContent),
+      );
+    expect(primary).toEqual([home.question.send]);
+  });
+
+  it("거절하기는 이유 칸에 포커스를 주고, Escape 로 닫으면 거절하기로, 보내면 결과 status 로 포커스가 간다", async () => {
+    await openHome(page);
+    const trigger = todoRow(page, "ACME-2").getByRole("button", { name: home.row.deny });
+    await trigger.click();
+    const layer = page.getByRole("dialog");
+    expect(await focusedSoon(layer.getByLabel(home.permission.reasonLabel))).toBe(true);
+    await page.keyboard.press("Escape");
+    await layer.waitFor({ state: "hidden" });
+    expect(await focusedSoon(trigger)).toBe(true);
+
+    const row = todoRow(page, "ACME-5");
+    await row.getByRole("button", { name: home.row.deny }).click();
+    await layer.getByRole("button", { name: home.permission.send }).click();
+    const status = row.getByRole("status");
     await status.getByText(home.permission.denied).waitFor();
     expect(await focusedSoon(status)).toBe(true);
   });
+});
 
-  it("입력칸 글자 크기는 폭이 아니라 포인터로 바뀐다(정밀 14px, 터치 16px)", async () => {
+describe("Dashboard 배치(브라우저, 0060)", () => {
+  it("러너 문제는 To do 에 없고 Runners 카드에 이름 링크로 보인다", async () => {
+    await openHome(page);
+    const todo = page.getByRole("region", { name: home.section.todo });
+    const runners = page.getByRole("region", { name: home.section.runners });
+    expect(await todo.getByText("runner-b").count()).toBe(0);
+    expect(await runners.getByRole("link", { name: "runner-b" }).getAttribute("href")).toBe(
+      "/runners?sel=runner-b",
+    );
+    await runners.getByText(home.runners.offline, { exact: true }).waitFor();
+  });
+
+  it("375px 폭에서 행과 페이지가 넘치지 않는다", async () => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await openHome(page);
+    const overflow = await page.evaluate(() => ({
+      rows: [...document.querySelectorAll("li")]
+        .filter((li) => li.scrollWidth > li.clientWidth + 1)
+        .map((li) => li.textContent),
+      outside: [...document.querySelectorAll("li")]
+        .filter((li) => li.getBoundingClientRect().right > window.innerWidth)
+        .map((li) => li.textContent),
+      page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }));
+    expect(overflow).toEqual({ rows: [], outside: [], page: 0 });
+  });
+
+  it("행 제목은 그 런의 Run 상세로 가는 링크이고 행 전체는 링크가 아니다", async () => {
+    await openHome(page);
+    const todo = page.getByRole("region", { name: home.section.todo });
+    const link = todo.getByRole("link", { name: "ACME-2", exact: true });
+    expect(await link.getAttribute("href")).toBe(`/runs/${runIds.get("ACME-2")}?ws=${workspaceId}`);
+    expect(await todo.locator("li > a").count()).toBe(0);
+  });
+
+  it("글쓰기 칸 글자 크기는 폭이 아니라 포인터로 바뀐다(정밀 14px, 터치 16px)", async () => {
     const fontSizeAt = async (target: Page, width: number) => {
       await target.setViewportSize({ width, height: 900 });
       await openHome(target);
-      const card = questionCard(target, "ACME-3");
-      await card.getByRole("button", { name: home.question.write }).click();
-      return card
-        .getByLabel(home.question.answerLabel)
+      await todoRow(target, "ACME-3").getByRole("button", { name: home.row.answer }).click();
+      const layer = target.getByRole("dialog");
+      await layer.getByRole("radio", { name: home.question.other }).check();
+      const size = await layer
+        .getByLabel(home.question.otherLabel)
         .evaluate((input) => getComputedStyle(input).fontSize);
+      await target.keyboard.press("Escape");
+      return size;
     };
     expect(await page.evaluate(() => matchMedia("(pointer: fine)").matches)).toBe(true);
     expect(await fontSizeAt(page, 1280)).toBe("14px");
@@ -207,9 +309,7 @@ describe("Home 접근성(브라우저, 0050)", () => {
   it("버튼은 보이는 높이 32px 그대로, 터치에서만 누르는 영역을 44×44px 로 넓힌다", async () => {
     const hitArea = async (target: Page) => {
       await openHome(target);
-      const button = questionCard(target, "ACME-3").getByRole("button", {
-        name: home.question.write,
-      });
+      const button = todoRow(target, "ACME-3").getByRole("button", { name: home.row.answer });
       return button.evaluate((el) => {
         const before = getComputedStyle(el, "::before");
         return {
@@ -238,39 +338,24 @@ describe("Home 접근성(브라우저, 0050)", () => {
     }
   });
 
-  it("지금 일어나는 일의 행은 그 런의 Run 상세로 가는 링크다", async () => {
+  it("새로 고치지 않아도 새 To do 가 보인다", async () => {
     await openHome(page);
-    const feed = page.getByRole("complementary", { name: home.activity.title });
-    const links = await feed
-      .getByRole("link")
-      .evaluateAll((els) =>
-        els.map((el) => ({ text: el.textContent ?? "", href: el.getAttribute("href") })),
-      );
-    expect(links.length).toBeGreaterThan(0);
-    for (const link of links) {
-      const key = /ACME-\d+/.exec(link.text)?.[0];
-      expect(key).toBeDefined();
-      expect(link.href).toBe(`/runs/${runIds.get(key ?? "")}?ws=${workspaceId}`);
-    }
-  });
-
-  it("새로 고치지 않아도 새 손댈 일이 보인다", async () => {
-    await openHome(page);
-    const card = questionCard(page, "ACME-9");
-    expect(await card.count()).toBe(0);
+    const row = todoRow(page, "ACME-9");
+    expect(await row.count()).toBe(0);
     const run = startRun(toTicketKey("ACME-9"));
     ok(changeRunState(db, run, { to: "waiting-for-input" }));
     recordRunQuestions(db, run, [
       { id: toQuestionId("q-9"), body: "Ship it?", options: [], askedAt: new Date() },
     ]);
-    await card.getByText("Ship it?").waitFor({ timeout: 25_000 });
+    await row.getByText("Ship it?").waitFor({ timeout: 25_000 });
   });
 
-  it("다시 읽기가 실패해도 지금 화면과 열린 폼, 쓰던 답을 그대로 둔다", async () => {
+  it("다시 읽기가 실패해도 지금 화면과 열린 레이어, 쓰던 답을 그대로 둔다", async () => {
     await openHome(page);
-    const card = questionCard(page, "ACME-3");
-    await card.getByRole("button", { name: home.question.write }).click();
-    const input = card.getByLabel(home.question.answerLabel);
+    await todoRow(page, "ACME-3").getByRole("button", { name: home.row.answer }).click();
+    const layer = page.getByRole("dialog");
+    await layer.getByRole("radio", { name: home.question.other }).check();
+    const input = layer.getByLabel(home.question.otherLabel);
     await input.fill("half-written answer");
 
     let failed = 0;
@@ -285,20 +370,6 @@ describe("Home 접근성(브라우저, 0050)", () => {
     expect(failed).toBeGreaterThan(0);
     expect(await input.inputValue()).toBe("half-written answer");
     expect(await page.getByRole("heading", { level: 1, name: home.title }).count()).toBe(1);
-  });
-
-  it("375px 폭에서 머리 영역이 넘치지 않는다", async () => {
-    await page.setViewportSize({ width: 375, height: 812 });
-    await openHome(page);
-    const header = page.locator("header").filter({ has: page.getByRole("heading", { level: 1 }) });
-    const overflow = await header.evaluate((el) => ({
-      header: el.scrollWidth - el.clientWidth,
-      page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      right: Math.max(...[...el.querySelectorAll("*")].map((c) => c.getBoundingClientRect().right)),
-    }));
-    expect(overflow.header).toBe(0);
-    expect(overflow.page).toBe(0);
-    expect(overflow.right).toBeLessThanOrEqual(375);
   });
 });
 
@@ -339,27 +410,32 @@ function seed(db: Database): void {
     assignmentBlocked: false,
   });
 
-  const questionRun = startRun(toTicketKey("ACME-1"));
-  ok(changeRunState(db, questionRun, { to: "waiting-for-input" }));
-  recordRunQuestions(db, questionRun, [
-    {
-      id: toQuestionId("q-1"),
-      body: "Which database should the cache use?",
-      options: [],
-      askedAt: new Date(),
-    },
-  ]);
-  const fontRun = startRun(toTicketKey("ACME-3"));
-  ok(changeRunState(db, fontRun, { to: "waiting-for-input" }));
-  recordRunQuestions(db, fontRun, [
-    { id: toQuestionId("q-3"), body: "Rename the module?", options: [], askedAt: new Date() },
-  ]);
+  saveRunner(db, {
+    id: toRunnerId("runner-b"),
+    kind: runnerKind,
+    name: "runner-b",
+    config: {},
+    capacity: 1,
+  });
+  recordRunnerCheck(db, {
+    runnerId: toRunnerId("runner-b"),
+    online: false,
+    checkedAt: new Date(),
+    error: null,
+    projects: null,
+    assignmentBlocked: false,
+  });
 
-  const answerRun = startRun(toTicketKey("ACME-4"));
-  ok(changeRunState(db, answerRun, { to: "waiting-for-input" }));
-  recordRunQuestions(db, answerRun, [
-    { id: toQuestionId("q-4"), body: "Add a retry?", options: [], askedAt: new Date() },
-  ]);
+  const question = (key: string, id: string, body: string, options: string[]) => {
+    const run = startRun(toTicketKey(key));
+    ok(changeRunState(db, run, { to: "waiting-for-input" }));
+    recordRunQuestions(db, run, [{ id: toQuestionId(id), body, options, askedAt: new Date() }]);
+  };
+  question("ACME-1", "q-1", "Which database should the cache use?", ["SQLite", "In memory"]);
+  question("ACME-3", "q-3", "Rename the module?", [longChoice, "Keep the name"]);
+  question("ACME-4", "q-4", "Add a retry?", ["Yes", "No"]);
+  question("ACME-6", "q-6", "When should it ship?", []);
+
   const denyRun = startRun(toTicketKey("ACME-5"));
   ok(changeRunState(db, denyRun, { to: "waiting-for-input" }));
   recordPermissionWaits(db, denyRun, [
@@ -401,18 +477,27 @@ function ok(result: { ok: true } | { ok: false; error: unknown }): void {
   if (!result.ok) throw new Error(`state change failed: ${JSON.stringify(result.error)}`);
 }
 
-function attentionCard(target: Page, kind: string, key: string): Locator {
-  return target.getByRole("region", {
-    name: home.card.label.replace("{kind}", kind).replace("{name}", key),
-  });
+function todoRow(target: Page, key: string): Locator {
+  return target
+    .getByRole("region", { name: home.section.todo })
+    .getByRole("listitem")
+    .filter({ has: target.getByRole("link", { name: key, exact: true }) });
 }
 
-function questionCard(target: Page, key: string): Locator {
-  return attentionCard(target, domain.attention.question, key);
+function questionsOf(key: string) {
+  const run = runIds.get(key);
+  if (run === undefined) throw new Error(`no run for ${key}`);
+  return listRunQuestions(db, run);
 }
 
-function permissionCard(target: Page, key: string): Locator {
-  return attentionCard(target, domain.attention.permission, key);
+function unansweredQuestions(key: string): string[] {
+  return questionsOf(key)
+    .filter((q) => q.answer === null)
+    .map((q) => q.id);
+}
+
+function answerOf(key: string): string | undefined {
+  return questionsOf(key).find((q) => q.answer !== null)?.answer?.text;
 }
 
 async function openHome(target: Page): Promise<void> {

@@ -11,7 +11,7 @@ import { navIcons } from "./nav-icons";
 const RAIL_WIDTH = 84;
 
 const menuItems = [
-  { key: "home", to: "/" },
+  { key: "dashboard", to: "/" },
   { key: "tickets", to: "/tickets" },
   { key: "runs", to: "/runs" },
   { key: "runners", to: "/runners" },

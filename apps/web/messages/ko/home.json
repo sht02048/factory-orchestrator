@@ -1,70 +1,74 @@
 {
-  "documentTitle": "Home · Factory Orchestrator",
-  "title": "Home",
-  "subtitle": "{count, plural, =0 {손댈 일이 없어요.} other {손댈 일이 #개 있어요.}}",
-  "subtitleAll": "{count, plural, =0 {모든 Workspace에 손댈 일이 없어요.} other {모든 Workspace에서 손댈 일 #개를 모았어요.}}",
+  "documentTitle": "Dashboard · Factory Orchestrator",
+  "title": "Dashboard",
+  "summary": "처리할 일이 {todo}개, 확인할 러너가 {runners}대 있어요.",
+  "summaryAll": "모든 Workspace에 처리할 일이 {todo}개, 확인할 러너가 {runners}대 있어요.",
   "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 런이 보여요.",
-  "cancelling": "취소 중",
   "section": {
-    "attention": "손댈 일"
+    "todo": "To do",
+    "inProgress": "In progress",
+    "runners": "Runners",
+    "doneToday": "Done today"
   },
   "empty": {
-    "attention": "손댈 일이 없어요. 사람이 할 일이 생기면 여기에 보여요."
+    "todo": "처리할 일이 없어요. 사람이 할 일이 생기면 여기에 보여요.",
+    "inProgress": "진행 중인 런이 없어요.",
+    "doneToday": "오늘 끝난 런이 없어요.",
+    "runners": "아직 러너가 없어요."
   },
-  "counts": {
-    "label": "런 수",
-    "mergedToday": "오늘 {merged}"
+  "inProgress": {
+    "counts": "{running} {runningCount} · {queued} {queuedCount}",
+    "link": "Runs에서 보기"
   },
-  "card": {
-    "label": "{kind} {name}",
-    "inputUnknown": "에이전트가 사람 입력을 기다려요. 무엇을 기다리는지 아직 읽지 못했어요.",
-    "unreachableFor": "{runner}에 {duration}째 닿지 않아요. 다시 닿으면 이어서 확인해요.",
-    "unreachable": "{runner}에 닿지 않아요. 다시 닿으면 이어서 확인해요.",
+  "doneToday": {
+    "count": "{count}개",
+    "link": "모두 보기"
+  },
+  "runners": {
+    "check": "{count}대를 확인해주세요",
+    "link": "모두 보기",
+    "offline": "Offline",
+    "auth": "GitHub 인증을 다시 해주세요",
+    "online": "{count}대"
+  },
+  "row": {
+    "cancelling": "취소 중",
+    "inputUnknown": "무엇을 기다리는지 아직 읽지 못했어요",
+    "permission": "{command}{object, select, eul {을} other {를}} 실행해도 될지 묻고 있어요 · 허용은 러너에서 할 수 있어요",
+    "humanCheck": "PR {pr}{object, select, eul {을} other {를}} 확인해주세요",
+    "humanCheckNoPr": "완료 보고를 확인해주세요",
+    "failed": "Tickets에서 다시 할당할 수 있어요",
+    "unreachableFor": "{runner}에 {duration}째 닿지 않아요",
+    "unreachable": "{runner}에 닿지 않아요",
     "noRunner": "러너",
-    "humanCheck": "PR {pr}이 열려 있어요. 사람이 확인해야 해요.",
-    "humanCheckNoPr": "에이전트가 완료 보고를 보냈어요. 사람이 확인해야 해요.",
-    "failed": "Failed로 끝났어요. 자동으로 다시 시도하지 않아요.",
-    "openPr": "PR 보기",
-    "openRun": "런 보기"
+    "queuedFree": "빈 러너를 기다려요",
+    "queuedOffline": "{runner}{subject, select, i {이} other {가}} Offline이라 기다려요",
+    "queuedAnyOffline": "맞는 러너가 Offline이라 기다려요",
+    "answer": "답하기",
+    "deny": "거절하기",
+    "openPr": "PR 보기"
   },
   "question": {
+    "other": "직접 쓰기",
+    "otherLabel": "직접 쓴 답",
+    "otherPlaceholder": "에이전트에게 보낼 답을 써주세요",
     "choices": "선택지",
-    "write": "직접 답하기",
-    "answerLabel": "답",
-    "answerPlaceholder": "에이전트에게 보낼 답을 써 주세요",
-    "send": "답 보내기",
+    "pick": "답을 하나 골라주세요",
+    "note": "보낸 답은 바로 에이전트에게 전해져요",
+    "shortcut": "⌘ Enter로도 보낼 수 있어요",
+    "send": "보내기",
     "sending": "보내는 중…",
-    "cancel": "취소",
-    "answered": "답을 남겼어요. worker가 에이전트에게 전해요.",
-    "failed": "답을 남기지 못했어요. 다시 해 주세요."
+    "close": "닫기",
+    "answered": "답을 보냈어요. worker가 에이전트에게 전해요.",
+    "failed": "답을 보내지 못했어요. 다시 해주세요."
   },
   "permission": {
-    "detail": "{detail} 허용은 러너 화면에서만 할 수 있어요.",
     "reasonLabel": "거절 이유",
     "reasonDescription": "에이전트가 대신 할 일을 적으면 함께 전해요",
-    "deny": "거절",
     "send": "거절 보내기",
     "denying": "거절하는 중…",
-    "cancel": "취소",
-    "denied": "거절을 남겼어요. worker가 에이전트에게 전해요.",
-    "failed": "거절을 남기지 못했어요. 다시 해 주세요."
-  },
-  "runnerIssue": {
-    "offline": "러너에 닿지 않아 Offline이에요. 다시 닿을 때까지 이 러너로 런을 시작하지 않아요.",
-    "auth": "GitHub 인증이 깨져 이 러너는 새 할당에서 빠졌어요.",
-    "fix": "해결 방법 보기"
-  },
-  "activity": {
-    "title": "지금 일어나는 일",
-    "empty": "지난 하루 동안 일어난 일이 없어요.",
-    "started": "시작했어요",
-    "question": "질문했어요",
-    "permission": "권한 허용을 기다려요",
-    "disconnected": "러너와 연결이 끊겼어요",
-    "ended": "{summary}로 끝났어요",
-    "laterPr": {
-      "merged": "PR을 병합했어요",
-      "closed": "PR을 닫았어요"
-    }
+    "close": "닫기",
+    "denied": "거절을 보냈어요. worker가 에이전트에게 전해요.",
+    "failed": "거절을 보내지 못했어요. 다시 해주세요."
   }
 }

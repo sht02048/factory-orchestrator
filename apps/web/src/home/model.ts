@@ -36,6 +36,7 @@ export type HomeRun =
   | (HomeRunBase & {
       state: "waiting-for-input";
       input: InputWait | null;
+      waitingMs: number | null;
     })
   | (HomeRunBase & {
       state: "disconnected";
@@ -55,23 +56,28 @@ export interface RunnerIssue {
   cause: RunnerIssueCause;
 }
 
-export type AttentionItem =
-  | { kind: "run"; run: HomeRun }
-  | { kind: "runner-issue"; runner: RunnerIssue };
+export interface AttentionItem {
+  kind: "run";
+  run: HomeRun;
+}
 
-export type ActivityEvent =
-  | { kind: "started" | "question" | "permission" | "disconnected" }
-  | { kind: "ended"; summary: SummaryOutcome }
-  | { kind: "later-pr"; state: "merged" | "closed" };
+export interface RunnersSummary {
+  issues: RunnerIssue[];
+  online: number;
+}
 
-export interface Activity {
-  key: string;
-  runId: string;
+export interface DoneRun {
+  id: string;
   ticketKey: string;
   workspace: WorkspaceSummary;
-  event: ActivityEvent;
-  at: string;
-  agoMs: number;
+  summary: SummaryOutcome;
+  endedAt: string;
+  endedAgoMs: number;
+}
+
+export interface DoneToday {
+  recent: DoneRun[];
+  total: number;
 }
 
 export interface HomePage {
@@ -79,13 +85,11 @@ export interface HomePage {
   attention: AttentionItem[];
   running: HomeRun[];
   queued: HomeRun[];
-  mergedToday: number;
-  activity: Activity[];
+  runners: RunnersSummary;
+  doneToday: DoneToday;
 }
 
-export function attentionKey(item: AttentionItem): string {
-  return item.kind === "run" ? `run:${item.run.id}` : `runner:${item.runner.id}`;
-}
+export const DONE_TODAY_LIMIT = 5;
 
 export function needsAttention(run: HomeRun): boolean {
   switch (run.state) {
@@ -100,21 +104,30 @@ export function needsAttention(run: HomeRun): boolean {
   }
 }
 
+const noRunners: RunnersSummary = { issues: [], online: 0 };
+const nothingDone: DoneToday = { recent: [], total: 0 };
+
 export function partitionHome(input: {
   workspace: WorkspaceChoice;
   runs: ReadonlyArray<{ ticket: string; run: HomeRun }>;
-  runnerIssues: ReadonlyArray<RunnerIssue>;
-  mergedToday: number;
-  activity: Activity[];
+  runners: RunnersSummary;
+  doneToday: ReadonlyArray<DoneRun>;
 }): HomePage {
-  const { workspace, activity } = input;
+  const { workspace } = input;
   if (workspace.kind === "none")
-    return { workspace, attention: [], running: [], queued: [], mergedToday: 0, activity: [] };
+    return {
+      workspace,
+      attention: [],
+      running: [],
+      queued: [],
+      runners: noRunners,
+      doneToday: nothingDone,
+    };
 
   const latestByTicket = new Map<string, string>();
   for (const { ticket, run } of input.runs) latestByTicket.set(ticket, run.id);
 
-  const attentionRuns = input.runs
+  const attention = input.runs
     .flatMap(({ ticket, run }, index) =>
       needsAttention(run) && (run.state !== "ended" || latestByTicket.get(ticket) === run.id)
         ? [{ run, index }]
@@ -123,21 +136,28 @@ export function partitionHome(input: {
     .toSorted((a, b) => urgency(a.run) - urgency(b.run) || b.index - a.index)
     .map(({ run }): AttentionItem => ({ kind: "run", run }));
 
-  const attention: AttentionItem[] = [
-    ...input.runnerIssues.map((runner): AttentionItem => ({ kind: "runner-issue", runner })),
-    ...attentionRuns,
-  ];
   if (workspace.kind === "all")
-    return { workspace, attention, running: [], queued: [], mergedToday: 0, activity };
+    return {
+      workspace,
+      attention,
+      running: [],
+      queued: [],
+      runners: input.runners,
+      doneToday: nothingDone,
+    };
 
   const runs = input.runs.map(({ run }) => run);
+  const done = input.doneToday.toSorted((a, b) => Date.parse(b.endedAt) - Date.parse(a.endedAt));
   return {
     workspace,
     attention,
     running: runs.filter((run) => run.state === "running"),
     queued: runs.filter((run) => run.state === "queued"),
-    mergedToday: input.mergedToday,
-    activity,
+    runners: input.runners,
+    doneToday: {
+      recent: done.slice(0, DONE_TODAY_LIMIT),
+      total: done.length,
+    },
   };
 }
 
