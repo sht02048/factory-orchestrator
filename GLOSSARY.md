@@ -145,7 +145,7 @@ _Avoid_: Aborted, Stopped, 취소(상태 이름으로. 취소 버튼과 "취소 
 ### 손댈 일
 
 **손댈 일**:
-운영자가 손을 대야 끝나는 일의 목록. Home의 카드와 Runners 아이콘의 문제 점이 이것을 보인다. 종류는 Question, Permission, Human Check, Failed, Disconnected, Runner Issue다. 종류 이름은 화면에서도 영어 용어 그대로 쓰고, 왜 손대야 하는지는 설명 문장(한국어)으로 쓴다(ADR 0010). 런 쪽 종류는 티켓마다 최신 런만 보인다. Canceled는 올리지 않는다.
+운영자가 손을 대야 끝나는 일의 목록. Home의 카드가 이것을 보이고, Runners 아이콘의 점은 그중 Runner Issue 개수다. 종류는 Question, Permission, Human Check, Failed, Disconnected, Runner Issue다. 종류 이름은 화면에서도 영어 용어 그대로 쓰고, 왜 손대야 하는지는 설명 문장(한국어)으로 쓴다(ADR 0010). 런 쪽 종류는 티켓마다 최신 런만 보인다. Canceled는 올리지 않는다. Failed는 운영자 결정 목록(Q14~Q21)에는 없었지만 지금처럼 손댈 일에 올린다(스펙 7번, Q82.9).
 _Avoid_: Attention, Inbox, 할 일
 
 **Question**:

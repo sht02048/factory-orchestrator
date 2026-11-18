@@ -4,7 +4,7 @@
 
 ## 낱말
 
-1. **상태 이름은 GLOSSARY의 영어 용어 그대로 쓴다.** 런 상태 Queued·Running·Waiting for Input·Disconnected, 요약 결과 Merged·Human Check·Failed·Canceled, 러너 Online·Offline. 손댈 일 종류는 Question·Permission·Human Check·Failed·Disconnected·Runner Issue이고, Runner Issue의 세부 원인(GitHub 인증 깨짐, Offline 등)은 설명 문장으로 쓴다.
+1. **상태 이름은 GLOSSARY의 영어 용어 그대로 쓴다.** 런 상태 Queued·Running·Waiting for Input·Disconnected, 요약 결과 Merged·Human Check·Failed·Canceled, 러너 Online·Offline. 손댈 일 종류는 Question·Permission·Human Check·Failed·Disconnected·Runner Issue이고, Runner Issue의 세부 원인(GitHub 인증 깨짐, Offline 등)은 설명 문장으로 쓴다. 운영자가 정한 종류 목록에는 Failed가 없었지만, Failed 런은 지금도 손댈 일에 오르고(스펙 Q82.9) 색 규칙에도 있어 종류에 넣었다.
 2. **설명 문장·버튼·안내는 한국어 해요체로 쓴다.** "손댈 일", "전체"처럼 상태가 아닌 개념 낱말도 한국어로 둔다. 에이전트 결과와 PR 상태의 값(완료 보고(성공), 병합됨 등)은 상태 이름이 아니라 런이 어떻게 끝났는지 설명하는 값이라 한국어 그대로 둔다.
 3. **메뉴·화면 이름은 Home·Tickets·Runs·Runners·Stats·Settings다.** 온보딩 단계 이름은 Tracker·GitHub·Runner·Workspace·Mapping이다.
 
@@ -39,7 +39,7 @@
 
 이 ADR은 [ADR 0007](0007-ui-list-detail-panel.md)을 **보완하고 일부를 대체한다.**
 
-- **남는 것.** 목록 + 오른쪽 상세 패널은 Runs·Tickets에 남는다. 행을 고르면 패널에 요약이 보이고, 행을 열면(두 번 누르기, Enter) Run 상세로 간다. Settings의 이 Workspace·설치 전체 나누기도 그대로다.
+- **남는 것.** 목록 + 오른쪽 상세 패널은 Runs·Tickets·Stats에 남는다. 행을 고르면 패널에 요약이 보이고, 행을 열면(두 번 누르기, Enter) Run 상세로 간다. Settings의 이 Workspace·설치 전체 나누기도 그대로다.
 - **바뀌는 화면.** Home은 목록 + 패널 대신 손댈 일 카드와 오른쪽 "지금 일어나는 일" 흐름이다. Run 상세는 패널이 아니라 전체 화면으로 열고, 질문 카드를 위에, 그 아래 타임라인과 정보·터미널 끝부분을 둔다. Runners는 러너 카드(capacity 막대, 해결 안내)로 보인다. 온보딩은 가운데 한 열이 아니라 왼쪽 단계 목록·가운데 입력·확인 결과로 나눈다(사이드바 없는 첫 진입 전용 화면, 모든 단계 필수, 확인이 성공해야 다음으로 가는 점은 그대로).
 - **대체하는 규칙.** 0007의 "색은 손댈 일에만 쓴다"(Human Check 주황), "카드와 배지를 쓰지 않는다", "구역은 옅은 선과 여백으로 나눈다"는 이 ADR의 5·10번과 카드 화면이 대신한다. 행 안의 위계(제목이 가장 밝고 굵고 ID·러너·시간은 흐리게, 숫자는 tabular-nums)는 그대로다.
 
