@@ -1,5 +1,5 @@
-import { toAgentId, toRunnerId, toTrackerConnectionId, toTrackerProjectId } from "@factory/core";
-import type { ListRunsFilter } from "@factory/db";
+import { toAgentId, toRunnerId, toTrackerConnectionId, toTrackerProjectId } from "@ganger/core";
+import type { ListRunsFilter } from "@ganger/db";
 import { z } from "zod";
 import { statsPeriod, statsPeriodDaysSchema } from "../stats/model";
 import type { StatsDimension, StatsPeriodDays } from "../stats/model";

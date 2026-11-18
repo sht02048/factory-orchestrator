@@ -1,4 +1,4 @@
-import type { AgentResult, PrState, RunId, SummaryOutcome, TicketKey } from "@factory/core";
+import type { AgentResult, PrState, RunId, SummaryOutcome, TicketKey } from "@ganger/core";
 import type { QueuedReason } from "../runs/model";
 import type { RunnerIssueCause, WorkspaceChoice, WorkspaceSummary } from "../shell/model";
 

@@ -13,7 +13,7 @@ import type {
   TrackerConnectionId,
   TrackerProjectId,
   WorktreeRef,
-} from "@factory/core";
+} from "@ganger/core";
 import type { runStateChanges, runs } from "./schema.js";
 
 type Equals<A, B> =

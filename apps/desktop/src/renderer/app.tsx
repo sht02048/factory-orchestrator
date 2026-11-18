@@ -9,8 +9,8 @@ import {
   Tooltip,
   buttonStyles,
   textStyles,
-} from "@factory/ui";
-import type { ButtonVariant } from "@factory/ui";
+} from "@ganger/ui";
+import type { ButtonVariant } from "@ganger/ui";
 import {
   colors,
   fonts,
@@ -20,7 +20,7 @@ import {
   motion,
   radius,
   space,
-} from "@factory/ui/tokens.stylex";
+} from "@ganger/ui/tokens.stylex";
 import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";

@@ -1,13 +1,13 @@
-import { AdapterError, summarizeRunOutcome } from "@factory/core";
-import type { PullRequestSnapshot, Tracker } from "@factory/core";
+import { AdapterError, summarizeRunOutcome } from "@ganger/core";
+import type { PullRequestSnapshot, Tracker } from "@ganger/core";
 import {
   getRunWithRecords,
   getWorkspaceTrackerProject,
   listRunners,
   listRuns,
   updateRunRecords,
-} from "@factory/db";
-import type { RunRecords, StoredRun, StoredRunner } from "@factory/db";
+} from "@ganger/db";
+import type { RunRecords, StoredRun, StoredRunner } from "@ganger/db";
 import { decideRunPrState, tryWrite } from "./context.js";
 import type { ActiveRun, StartedStoredRun, TickContext } from "./context.js";
 import { messages } from "./messages.js";

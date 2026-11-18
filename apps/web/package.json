@@ -1,5 +1,5 @@
 {
-  "name": "@factory/web",
+  "name": "@ganger/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,11 +10,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@factory/codehost-github": "workspace:*",
-    "@factory/core": "workspace:*",
-    "@factory/db": "workspace:*",
-    "@factory/tracker-linear": "workspace:*",
-    "@factory/ui": "workspace:*",
+    "@ganger/codehost-github": "workspace:*",
+    "@ganger/core": "workspace:*",
+    "@ganger/db": "workspace:*",
+    "@ganger/tracker-linear": "workspace:*",
+    "@ganger/ui": "workspace:*",
     "@stylexjs/stylex": "0.19.2",
     "@tanstack/react-router": "1.170.46",
     "@tanstack/react-start": "1.169.5",

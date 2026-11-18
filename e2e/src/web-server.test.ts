@@ -13,8 +13,8 @@ let dir: string;
 const started: WebServer[] = [];
 
 beforeAll(() => {
-  dir = mkdtempSync(join(tmpdir(), "factory-web-server-"));
-  process.env["DATABASE_PATH"] = join(dir, "factory.db");
+  dir = mkdtempSync(join(tmpdir(), "ganger-web-server-"));
+  process.env["DATABASE_PATH"] = join(dir, "ganger.db");
   process.env["ENCRYPTION_KEY"] = Buffer.from(encryptionKey).toString("base64");
 });
 

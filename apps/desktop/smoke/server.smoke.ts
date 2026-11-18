@@ -3,10 +3,10 @@ import type { ChildProcess } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { homePaths, readBootEnv } from "@factory/cli/home";
-import { isProcessAlive, readLiveServerLock } from "@factory/cli/server-lock";
-import type { RunId } from "@factory/core";
-import { getRunWithRecords, openDatabase, parseBootConfig, updateRunRecords } from "@factory/db";
+import { homePaths, readBootEnv } from "@ganger/cli/home";
+import { isProcessAlive, readLiveServerLock } from "@ganger/cli/server-lock";
+import type { RunId } from "@ganger/core";
+import { getRunWithRecords, openDatabase, parseBootConfig, updateRunRecords } from "@ganger/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { LocalServer, fileRecordStore, sleep } from "../src/core/local-server.js";
@@ -98,12 +98,12 @@ async function waitFor(
 }
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "factory-desktop-smoke-"));
+  dir = mkdtempSync(join(tmpdir(), "ganger-desktop-smoke-"));
   home = join(dir, "home");
   const { version } = z
     .object({ version: z.string() })
     .parse(JSON.parse(readFileSync(join(REPO, "package.json"), "utf8")));
-  const source = join(REPO, "dist", `factory-orchestrator-${version}`);
+  const source = join(REPO, "dist", `ganger-${version}`);
   cpSync(source, join(dir, "bundle-a"), { recursive: true });
   cpSync(source, join(dir, "bundle-b"), { recursive: true });
   const bPackage = join(dir, "bundle-b", "package.json");

@@ -15,9 +15,9 @@ import {
   toTrackerKind,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
-import type { PullRequestSnapshot, Runner, RunnerId, RunnerProjectId } from "@factory/core";
-import { FakeCodeHost, FakeRunner, FakeTracker } from "@factory/core/testing";
+} from "@ganger/core";
+import type { PullRequestSnapshot, Runner, RunnerId, RunnerProjectId } from "@ganger/core";
+import { FakeCodeHost, FakeRunner, FakeTracker } from "@ganger/core/testing";
 import {
   SecretBox,
   assignRun,
@@ -32,8 +32,8 @@ import {
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
   toWorkspaceId,
-} from "@factory/db";
-import type { Database, StoredRun } from "@factory/db";
+} from "@ganger/db";
+import type { Database, StoredRun } from "@ganger/db";
 import { createWorker } from "./worker.js";
 import type { Worker, WorkerLogger } from "./worker.js";
 
@@ -68,8 +68,8 @@ export class Harness {
   wrapRunner: (runner: FakeRunner) => Runner = (runner) => runner;
 
   constructor() {
-    this.dir = mkdtempSync(join(tmpdir(), "factory-worker-"));
-    this.dbPath = join(this.dir, "factory.db");
+    this.dir = mkdtempSync(join(tmpdir(), "ganger-worker-"));
+    this.dbPath = join(this.dir, "ganger.db");
     this.db = openDatabase(this.dbPath);
     migrate(this.db);
     saveTrackerConnection(this.db, this.secretBox, {

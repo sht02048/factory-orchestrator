@@ -1,4 +1,4 @@
-import type { CodeHostFactory } from "@factory/core";
+import type { CodeHostFactory } from "@ganger/core";
 import { z } from "zod";
 import { GITHUB_KIND, GitHubCodeHost } from "./github.js";
 import type { GitHubCodeHostOptions } from "./github.js";

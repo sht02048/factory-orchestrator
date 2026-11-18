@@ -1,5 +1,5 @@
-import { AdapterError } from "@factory/core";
-import type { CodeHostErrorDetail } from "@factory/core";
+import { AdapterError } from "@ganger/core";
+import type { CodeHostErrorDetail } from "@ganger/core";
 import { z } from "zod";
 
 export class GitHubError extends AdapterError<CodeHostErrorDetail> {
@@ -23,7 +23,7 @@ export interface RestResponse {
 
 const API_URL = "https://api.github.com";
 const TIMEOUT_MS = 30_000;
-const USER_AGENT = "factory-orchestrator";
+const USER_AGENT = "ganger";
 
 const graphqlErrors = z.array(
   z.object({

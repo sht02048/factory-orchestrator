@@ -24,8 +24,8 @@ import {
   TableRow,
   TableRows,
   Text,
-} from "@factory/ui";
-import { size, space } from "@factory/ui/tokens.stylex";
+} from "@ganger/ui";
+import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";

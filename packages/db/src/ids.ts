@@ -1,4 +1,4 @@
-import type { Brand } from "@factory/core";
+import type { Brand } from "@ganger/core";
 
 export type WorkspaceId = Brand<string, "WorkspaceId">;
 export type CodeHostConnectionId = Brand<string, "CodeHostConnectionId">;

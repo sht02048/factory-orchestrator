@@ -8,10 +8,10 @@ const FAKE_ADAPTER =
 export const DEV_ONLY_MARKERS = [
   "lin_api_demo",
   "github_pat_demo",
-  "__factoryDev",
-  "__factoryDemoWorld",
-  "factory-dev-adapters",
-  "factory-dev-tools",
+  "__gangerDev",
+  "__gangerDemoWorld",
+  "ganger-dev-adapters",
+  "ganger-dev-tools",
   "가짜 값 채우기",
 ] as const;
 

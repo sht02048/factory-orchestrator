@@ -11,8 +11,8 @@ import {
   StackedBarChart,
   Text,
   visuallyHiddenStyles,
-} from "@factory/ui";
-import { space } from "@factory/ui/tokens.stylex";
+} from "@ganger/ui";
+import { space } from "@ganger/ui/tokens.stylex";
 import { useId, useState } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";

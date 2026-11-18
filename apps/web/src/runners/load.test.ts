@@ -7,9 +7,9 @@ import {
   toTrackerProjectId,
   toAgentRef,
   toWorktreeRef,
-} from "@factory/core";
-import { assignRun, changeRunState, saveRunner, updateRunRecords } from "@factory/db";
-import type { Database } from "@factory/db";
+} from "@ganger/core";
+import { assignRun, changeRunState, saveRunner, updateRunRecords } from "@ganger/db";
+import type { Database } from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import { Route, reloadOnEnter } from "../routes/_app/runners";
 import {

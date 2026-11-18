@@ -1,4 +1,4 @@
-import { checkAutoAssignment, labelJustAttached } from "@factory/core";
+import { checkAutoAssignment, labelJustAttached } from "@ganger/core";
 import type {
   AutoAssignmentRun,
   LabelId,
@@ -6,7 +6,7 @@ import type {
   TrackerConnectionId,
   TrackerProjectId,
   TrackerTicket,
-} from "@factory/core";
+} from "@ganger/core";
 import {
   assignRun,
   getAutoAssignLabel,
@@ -17,8 +17,8 @@ import {
   listUnprocessedTrackerEvents,
   listWorkspaces,
   markTrackerEventProcessed,
-} from "@factory/db";
-import type { StoredMapping, StoredRun, StoredTrackerEvent } from "@factory/db";
+} from "@ganger/db";
+import type { StoredMapping, StoredRun, StoredTrackerEvent } from "@ganger/db";
 import type { TickContext } from "./context.js";
 
 export const POLL_CORRECTION_INTERVAL_MS = 60_000;

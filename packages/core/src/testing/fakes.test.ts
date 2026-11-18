@@ -28,7 +28,7 @@ const handled = (answered: QuestionId[] = [], denied: PermissionRequestId[] = []
   denied: new Set(denied),
 });
 
-async function startOne(runner: FakeRunner, worktreeName = "factory-ENG-1-1") {
+async function startOne(runner: FakeRunner, worktreeName = "ganger-ENG-1-1") {
   const mailbox = await runner.ensureMailbox(null);
   const started = await runner.startRun({
     mailbox,
@@ -89,7 +89,7 @@ describe("FakeRunner", () => {
     runner.setProjects([project]);
     const { started } = await startOne(runner);
 
-    expect(started.branch).toBe("fake/factory-ENG-1-1");
+    expect(started.branch).toBe("fake/ganger-ENG-1-1");
     expect(started.agentRef).toBeTruthy();
   });
 
@@ -101,7 +101,7 @@ describe("FakeRunner", () => {
     const input = {
       mailbox,
       project: app,
-      worktreeName: "factory-ENG-1-1",
+      worktreeName: "ganger-ENG-1-1",
       agent: toAgentId("a"),
       prompt: "p",
     };

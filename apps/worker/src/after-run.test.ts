@@ -1,5 +1,5 @@
-import { DISCONNECT_AFTER_MS, summarizeRunOutcome, toTrackerStateId } from "@factory/core";
-import type { PullRequestSnapshot, RunnerId, WorktreeRef } from "@factory/core";
+import { DISCONNECT_AFTER_MS, summarizeRunOutcome, toTrackerStateId } from "@ganger/core";
+import type { PullRequestSnapshot, RunnerId, WorktreeRef } from "@ganger/core";
 import {
   DEFAULT_MAX_RUN_MS,
   LAST_LOG_LINES,
@@ -14,8 +14,8 @@ import {
   saveWorkspaceTrackerProject,
   toWorkspaceId,
   updateRunRecords,
-} from "@factory/db";
-import type { StoredRun } from "@factory/db";
+} from "@ganger/db";
+import type { StoredRun } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PR_POLL_INTERVAL_MS } from "./after-run.js";
 import { RUNNER_CHECK_INTERVAL_MS } from "./runner-check.js";

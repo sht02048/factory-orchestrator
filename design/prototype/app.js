@@ -317,7 +317,7 @@
       )
       .join("");
     return `
-      <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true">F</span>factory-orchestrator</a>
+      <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true">G</span>Ganger</a>
       <div class="ws">
         <button class="ws-trigger" type="button" aria-haspopup="menu" aria-expanded="false" id="ws-trigger">
           <span class="ws-name">${esc(wsName(ws))}</span>${icon.chevron}

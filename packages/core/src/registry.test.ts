@@ -191,7 +191,7 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
       const started = await runner.startRun({
         mailbox,
         project,
-        worktreeName: `factory-ENG-${index}-1`,
+        worktreeName: `ganger-ENG-${index}-1`,
         agent: toAgentId("agent"),
         prompt: "티켓",
       });

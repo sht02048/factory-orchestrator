@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { labelJustAttached, toLabelId } from "@factory/core";
+import { labelJustAttached, toLabelId } from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { MAX_WEBHOOK_BODY_BYTES, verifyLinearWebhook } from "./webhook.js";

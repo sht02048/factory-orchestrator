@@ -18,8 +18,8 @@ import {
   TableRows,
   Text,
   textStyles,
-} from "@factory/ui";
-import { fonts, size, space } from "@factory/ui/tokens.stylex";
+} from "@ganger/ui";
+import { fonts, size, space } from "@ganger/ui/tokens.stylex";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";

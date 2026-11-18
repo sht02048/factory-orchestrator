@@ -202,7 +202,7 @@ importers:
 
   apps/cli:
     dependencies:
-      '@factory/db':
+      '@ganger/db':
         specifier: workspace:*
         version: link:../../packages/db
       zod:
@@ -215,13 +215,13 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@factory/cli':
+      '@ganger/cli':
         specifier: workspace:*
         version: link:../cli
-      '@factory/db':
+      '@ganger/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@factory/ui':
+      '@ganger/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       '@stylexjs/stylex':
@@ -243,7 +243,7 @@ importers:
       '@electron/packager':
         specifier: 20.3.0
         version: 20.3.0
-      '@factory/core':
+      '@ganger/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@stylexjs/unplugin':
@@ -270,19 +270,19 @@ importers:
 
   apps/web:
     dependencies:
-      '@factory/codehost-github':
+      '@ganger/codehost-github':
         specifier: workspace:*
         version: link:../../packages/codehost-github
-      '@factory/core':
+      '@ganger/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@factory/db':
+      '@ganger/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@factory/tracker-linear':
+      '@ganger/tracker-linear':
         specifier: workspace:*
         version: link:../../packages/tracker-linear
-      '@factory/ui':
+      '@ganger/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       '@stylexjs/stylex':
@@ -328,19 +328,19 @@ importers:
 
   apps/worker:
     dependencies:
-      '@factory/codehost-github':
+      '@ganger/codehost-github':
         specifier: workspace:*
         version: link:../../packages/codehost-github
-      '@factory/core':
+      '@ganger/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@factory/db':
+      '@ganger/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@factory/runner-orca':
+      '@ganger/runner-orca':
         specifier: workspace:*
         version: link:../../packages/runner-orca
-      '@factory/tracker-linear':
+      '@ganger/tracker-linear':
         specifier: workspace:*
         version: link:../../packages/tracker-linear
     devDependencies:
@@ -350,16 +350,16 @@ importers:
 
   demo:
     dependencies:
-      '@factory/core':
+      '@ganger/core':
         specifier: workspace:*
         version: link:../packages/core
-      '@factory/db':
+      '@ganger/db':
         specifier: workspace:*
         version: link:../packages/db
-      '@factory/web':
+      '@ganger/web':
         specifier: workspace:*
         version: link:../apps/web
-      '@factory/worker':
+      '@ganger/worker':
         specifier: workspace:*
         version: link:../apps/worker
       playwright-core:
@@ -371,16 +371,16 @@ importers:
 
   e2e:
     dependencies:
-      '@factory/core':
+      '@ganger/core':
         specifier: workspace:*
         version: link:../packages/core
-      '@factory/db':
+      '@ganger/db':
         specifier: workspace:*
         version: link:../packages/db
-      '@factory/web':
+      '@ganger/web':
         specifier: workspace:*
         version: link:../apps/web
-      '@factory/worker':
+      '@ganger/worker':
         specifier: workspace:*
         version: link:../apps/worker
       playwright-core:
@@ -392,7 +392,7 @@ importers:
 
   packages/codehost-github:
     dependencies:
-      '@factory/core':
+      '@ganger/core':
         specifier: workspace:*
         version: link:../core
       zod:
@@ -403,7 +403,7 @@ importers:
 
   packages/db:
     dependencies:
-      '@factory/core':
+      '@ganger/core':
         specifier: workspace:*
         version: link:../core
       drizzle-orm:
@@ -419,7 +419,7 @@ importers:
 
   packages/runner-orca:
     dependencies:
-      '@factory/core':
+      '@ganger/core':
         specifier: workspace:*
         version: link:../core
       zod:
@@ -428,7 +428,7 @@ importers:
 
   packages/tracker-linear:
     dependencies:
-      '@factory/core':
+      '@ganger/core':
         specifier: workspace:*
         version: link:../core
       zod:

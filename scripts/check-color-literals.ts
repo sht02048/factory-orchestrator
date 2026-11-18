@@ -252,7 +252,7 @@ function main(argv: ReadonlyArray<string>): number {
   }
   if (count > 0) {
     console.error(
-      `\n색 값 ${count}개를 packages/ui 밖에서 직접 썼어요. @factory/ui/tokens.stylex 의 colors 토큰으로 바꿔요(packages/ui/DESIGN.md).`,
+      `\n색 값 ${count}개를 packages/ui 밖에서 직접 썼어요. @ganger/ui/tokens.stylex 의 colors 토큰으로 바꿔요(packages/ui/DESIGN.md).`,
     );
     return 1;
   }

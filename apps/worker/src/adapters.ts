@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { AdapterError } from "@factory/core";
+import { AdapterError } from "@ganger/core";
 import type {
   AdapterRegistry,
   CodeHost,
@@ -12,9 +12,9 @@ import type {
   Tracker,
   TrackerConnectionId,
   TrackerKind,
-} from "@factory/core";
-import { getTrackerConnection, listCodeHostConnections, listTrackerConnections } from "@factory/db";
-import type { CodeHostConnectionId, Database, SecretBox, StoredRunner } from "@factory/db";
+} from "@ganger/core";
+import { getTrackerConnection, listCodeHostConnections, listTrackerConnections } from "@ganger/db";
+import type { CodeHostConnectionId, Database, SecretBox, StoredRunner } from "@ganger/db";
 
 export class WorkerAdapters {
   private readonly registry: AdapterRegistry;

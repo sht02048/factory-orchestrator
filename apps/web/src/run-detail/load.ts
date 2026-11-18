@@ -1,5 +1,5 @@
-import { runDurations, summarizeRunOutcome, toRunId } from "@factory/core";
-import type { CiState, QueuedRun, RunId } from "@factory/core";
+import { runDurations, summarizeRunOutcome, toRunId } from "@ganger/core";
+import type { CiState, QueuedRun, RunId } from "@ganger/core";
 import {
   getLogTailRequest,
   getRun,
@@ -15,7 +15,7 @@ import {
   listRuns,
   listWorkspaces,
   requestLogTail,
-} from "@factory/db";
+} from "@ganger/db";
 import type {
   Database,
   RunRecords,
@@ -23,7 +23,7 @@ import type {
   StoredRun,
   StoredPermissionWait,
   StoredRunQuestion,
-} from "@factory/db";
+} from "@ganger/db";
 import { pendingInput } from "../home/load";
 import type { QueuedReason } from "../runs/model";
 import { explainQueue } from "../runs/queue-reasons";

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { z } from "zod";
 
-export const SERVER_BUNDLE_ENV = "FACTORY_SERVER_BUNDLE";
+export const SERVER_BUNDLE_ENV = "GANGER_SERVER_BUNDLE";
 
 const bundlePackageSchema = z.object({ name: z.string(), version: z.string() });
 

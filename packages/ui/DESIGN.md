@@ -4,8 +4,8 @@
 
 ## 꼭 지킬 것
 
-1. **색 값을 직접 쓰지 않는다.** `packages/ui` 밖에서 hex, `rgb()`, `hsl()`, `oklch()`, `color-mix()`, `"red"` 같은 이름 색을 쓰면 `pnpm check:colors`(pre-commit, CI)가 실패한다. 색은 `@factory/ui/tokens.stylex`의 `colors`로만 쓴다. `transparent`, `currentColor`, `inherit`는 괜찮다.
-2. **UI SDK(`@ui-sdk/react`)는 `packages/ui` 안에서만 import 한다.** 앱은 `@factory/ui`의 컴포넌트를 쓴다. 필요한 동작이 없으면 `packages/ui`에 컴포넌트를 더한다(ADR 0003).
+1. **색 값을 직접 쓰지 않는다.** `packages/ui` 밖에서 hex, `rgb()`, `hsl()`, `oklch()`, `color-mix()`, `"red"` 같은 이름 색을 쓰면 `pnpm check:colors`(pre-commit, CI)가 실패한다. 색은 `@ganger/ui/tokens.stylex`의 `colors`로만 쓴다. `transparent`, `currentColor`, `inherit`는 괜찮다.
+2. **UI SDK(`@ui-sdk/react`)는 `packages/ui` 안에서만 import 한다.** 앱은 `@ganger/ui`의 컴포넌트를 쓴다. 필요한 동작이 없으면 `packages/ui`에 컴포넌트를 더한다(ADR 0003).
 3. **스타일은 StyleX로 쓴다.** `stylex.create` + `stylex.props`. 간격·글자·반경·모션도 토큰을 먼저 쓴다. 토큰에 없는 값(열 폭, 고정 높이)만 숫자로 쓴다.
 4. **화면 문구는 컴포넌트에 쓰지 않는다.** 모든 글은 `apps/web/messages/ko/*.json`에 두고 `useTranslations`로 가져온다. 접근 가능한 이름(`label`, `aria-label`)도 메시지에서 온다. `packages/ui` 컴포넌트는 문구를 props로만 받는다(ADR 0005).
 5. **색 하나에 뜻 하나다(ADR 0010 5번).** 상태 색은 여섯 뜻뿐이다: 보라 `answer`(사람이 답·허용), 청록 `check`(사람이 확인), 빨강 `problem`(문제), 초록 `progress`(진행·정상), 파랑 `merged`(병합), 회색 `idle`(대기·멈춤). 상태 색은 화면이 고르지 않고 `StatusPill`이 상태 값으로 고른다. 그 밖의 강조는 브랜드 노랑 Ganger Yellow(`accent*`) 하나다. 로고 취구·마스코트 모자도 같은 `accent`를 쓴다(티켓 0080).
@@ -19,7 +19,7 @@
 
 ## 토큰
 
-`import { colors, space, … } from "@factory/ui/tokens.stylex"`. 모두 `stylex.defineVars`로 만든 CSS 변수다.
+`import { colors, space, … } from "@ganger/ui/tokens.stylex"`. 모두 `stylex.defineVars`로 만든 CSS 변수다.
 
 ### 색 `colors`
 
@@ -98,7 +98,7 @@
 
 ## 컴포넌트
 
-`import { … } from "@factory/ui"`. 모두 SSR에서 렌더되고, 하이드레이션 뒤 동작이 붙는다.
+`import { … } from "@ganger/ui"`. 모두 SSR에서 렌더되고, 하이드레이션 뒤 동작이 붙는다.
 
 ### 화면 틀
 
@@ -199,13 +199,13 @@
 | `DividedList` + `DividedItem`                                                                                            | 선으로 나눈 설정 목록(Settings). 작은 항목은 `tight`                                                                                                                                         |
 | `CheckIcon`, `CloseIcon`, `ChevronDownIcon`                                                                              | 버튼과 표시 안 아이콘                                                                                                                                                                        |
 
-`Button`은 `aria-pressed`, `aria-controls`, `aria-describedby`, `aria-busy`, `aria-disabled`를 받는다. `aria-disabled`이면 못 쓰는 모양이 되지만 포커스는 남는다(작업 중인 새로 고침). `apps/web/src/ds/page.test.tsx`가 `@factory/ui`가 내보내는 컴포넌트마다 `/ds` 미리보기가 있는지 확인한다(앱 루트에 하나만 두는 `Toaster`만 뺀다).
+`Button`은 `aria-pressed`, `aria-controls`, `aria-describedby`, `aria-busy`, `aria-disabled`를 받는다. `aria-disabled`이면 못 쓰는 모양이 되지만 포커스는 남는다(작업 중인 새로 고침). `apps/web/src/ds/page.test.tsx`가 `@ganger/ui`가 내보내는 컴포넌트마다 `/ds` 미리보기가 있는지 확인한다(앱 루트에 하나만 두는 `Toaster`만 뺀다).
 
 ### 브랜드 그림(티켓 0077)
 
 기호·마스코트·색·워드마크·앱 아이콘을 쓰는 규칙은 브랜드 가이드 [`brand/README.md`](brand/README.md)에 모았다(티켓 0081).
 
-원본 SVG는 `packages/ui/brand/`에 있다. 기호·한 색판·파비콘 전용판·워드마크(Manrope ExtraBold 아웃라인, `OFL-Manrope.txt`)·가로·세로 조합·마스코트 표정 넷·앱 아이콘 원본이다. 파비콘·앱 아이콘·트레이 그림은 `pnpm --filter @factory/desktop brand-assets`로 이 원본에서 다시 만든다. 마스코트 몸·눈 같은 그림 전용 무채색은 `brand.*`에 두고 이 컴포넌트들만 쓴다. 노랑(취구·모자)은 강조색 `colors.accent`를 쓴다(티켓 0080).
+원본 SVG는 `packages/ui/brand/`에 있다. 기호·한 색판·파비콘 전용판·워드마크(Manrope ExtraBold 아웃라인, `OFL-Manrope.txt`)·가로·세로 조합·마스코트 표정 넷·앱 아이콘 원본이다. 파비콘·앱 아이콘·트레이 그림은 `pnpm --filter @ganger/desktop brand-assets`로 이 원본에서 다시 만든다. 마스코트 몸·눈 같은 그림 전용 무채색은 `brand.*`에 두고 이 컴포넌트들만 쓴다. 노랑(취구·모자)은 강조색 `colors.accent`를 쓴다(티켓 0080).
 
 | 컴포넌트        | 받는 값                                                         | 언제 쓰는지                                                                                                                                                                         | 쓰지 않는 곳                                                    |
 | --------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |

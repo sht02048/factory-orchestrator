@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
-import { PageHeader, Text } from "@factory/ui";
-import { space } from "@factory/ui/tokens.stylex";
+import { PageHeader, Text } from "@ganger/ui";
+import { space } from "@ganger/ui/tokens.stylex";
 import { useTranslations } from "use-intl";
 import { ScreenMessages } from "../i18n";
 import { placeholderMessages } from "./messages";

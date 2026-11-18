@@ -1,8 +1,8 @@
-import type { AgentResult, PrState, SummaryOutcome } from "@factory/core";
+import type { AgentResult, PrState, SummaryOutcome } from "@ganger/core";
 
 export const messages = {
   resultComment: {
-    title: "Factory Orchestrator 런이 끝났어요.",
+    title: "Ganger 런이 끝났어요.",
     summary: "요약 결과",
     agentResult: "에이전트 결과",
     prState: "PR 상태",

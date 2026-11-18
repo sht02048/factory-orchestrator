@@ -26,7 +26,7 @@ let devRoot: string;
 let browser: Browser;
 
 beforeAll(async () => {
-  devRoot = mkdtempSync(join(tmpdir(), "factory-dev-"));
+  devRoot = mkdtempSync(join(tmpdir(), "ganger-dev-"));
   browser = await chromium.launch({ channel: "chrome" });
 });
 
@@ -119,7 +119,7 @@ async function startDev(args: string[]): Promise<Dev> {
   const port = await freePort();
   const env: Record<string, string | undefined> = {
     ...process.env,
-    FACTORY_DEV_DIR: devRoot,
+    GANGER_DEV_DIR: devRoot,
     WEB_HOST: "127.0.0.1",
     WEB_PORT: String(port),
   };

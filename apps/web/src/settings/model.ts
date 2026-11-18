@@ -1,4 +1,4 @@
-import type { WorkspaceId } from "@factory/db";
+import type { WorkspaceId } from "@ganger/db";
 
 export const WORKSPACE_ITEMS = ["general", "projects", "mapping", "progress", "label"] as const;
 export const INSTALL_ITEMS = ["connections", "github", "runners", "addresses"] as const;

@@ -1,5 +1,5 @@
-import { PR_STATES, SUMMARY_OUTCOMES, runDurations, summarizeRunOutcome } from "@factory/core";
-import type { AgentResult, PrState, SummaryOutcome } from "@factory/core";
+import { PR_STATES, SUMMARY_OUTCOMES, runDurations, summarizeRunOutcome } from "@ganger/core";
+import type { AgentResult, PrState, SummaryOutcome } from "@ganger/core";
 import { z } from "zod";
 import type { WorkspaceChoice } from "../shell/model";
 import { DAY_MS, calendarDay } from "../time-zone";

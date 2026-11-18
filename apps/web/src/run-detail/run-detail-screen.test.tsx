@@ -1,12 +1,12 @@
-import { toPermissionRequestId, toQuestionId } from "@factory/core";
+import { toPermissionRequestId, toQuestionId } from "@ganger/core";
 import {
   completeLogTailRequest,
   recordPermissionWaits,
   recordRunQuestions,
   recordStartFailure,
   updateRunRecords,
-} from "@factory/db";
-import type { Database } from "@factory/db";
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import runJson from "../../messages/ko/run.json" with { type: "json" };

@@ -1,4 +1,4 @@
-import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@factory/core";
+import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@ganger/core";
 import type {
   MailboxRef,
   PermissionRequestId,
@@ -15,7 +15,7 @@ import type {
   StartedRun,
   StartRunInput,
   WorktreeRef,
-} from "@factory/core";
+} from "@ganger/core";
 import { z } from "zod";
 import { parseOrcaRunnerConfig } from "./config.js";
 import type { OrcaRunnerConfig } from "./config.js";
@@ -54,10 +54,10 @@ import type { RemoteExec, RemoteResult } from "./ssh.js";
 
 export const ORCA_RUNNER_KIND: RunnerKind = toRunnerKind("orca");
 
-export const MAILBOX_TITLE = "factory-orchestrator-mailbox";
+export const MAILBOX_TITLE = "ganger-mailbox";
 const MAILBOX_COMMAND = "cat > /dev/null";
-const RUN_OBJECTIVE = "factory-orchestrator";
-export const PUSH_CHECK_REF = "HEAD:refs/heads/factory-orchestrator/push-check";
+const RUN_OBJECTIVE = "ganger";
+export const PUSH_CHECK_REF = "HEAD:refs/heads/ganger/push-check";
 const WORKTREE_PS_LIMIT = 500;
 const LOG_PAGE_SIZE = 100;
 const WORKER_LIST_MAX_PAGES = 50;

@@ -1,4 +1,4 @@
-import type { BootConfig } from "@factory/db";
+import type { BootConfig } from "@ganger/db";
 
 export function webUrl(config: Pick<BootConfig, "host" | "port">): string {
   let host = config.host;

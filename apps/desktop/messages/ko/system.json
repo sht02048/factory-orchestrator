@@ -1,6 +1,6 @@
 {
   "tray": {
-    "tooltip": "Factory Orchestrator",
+    "tooltip": "Ganger",
     "status": {
       "running": "서버가 돌고 있어요",
       "starting": "서버를 띄우고 있어요",

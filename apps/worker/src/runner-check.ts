@@ -1,13 +1,13 @@
-import { isAssignmentBlocked, summarizeRunOutcome } from "@factory/core";
-import type { Runner, RunnerErrorDetail, RunnerHealth, RunnerProject } from "@factory/core";
+import { isAssignmentBlocked, summarizeRunOutcome } from "@ganger/core";
+import type { Runner, RunnerErrorDetail, RunnerHealth, RunnerProject } from "@ganger/core";
 import {
   getRunWithRecords,
   listRuns,
   recordRunnerCheck,
   listRunners,
   updateRunRecords,
-} from "@factory/db";
-import type { StoredRunner } from "@factory/db";
+} from "@ganger/db";
+import type { StoredRunner } from "@ganger/db";
 import { describe, runnerErrorDetail, tryWrite } from "./context.js";
 import type { TickContext } from "./context.js";
 

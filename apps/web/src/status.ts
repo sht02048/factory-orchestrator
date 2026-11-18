@@ -1,4 +1,4 @@
-import type { PillStatus, SummaryStatus } from "@factory/ui";
+import type { PillStatus, SummaryStatus } from "@ganger/ui";
 import { useTranslations } from "use-intl";
 
 export type RunStatusInput =

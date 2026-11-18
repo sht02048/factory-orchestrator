@@ -2,10 +2,10 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { homePaths, readBootEnv } from "@factory/cli/home";
-import { isProcessAlive, readLiveServerLock } from "@factory/cli/server-lock";
-import { getRunWithRecords, openDatabase, parseBootConfig, updateRunRecords } from "@factory/db";
-import type { RunId } from "@factory/core";
+import { homePaths, readBootEnv } from "@ganger/cli/home";
+import { isProcessAlive, readLiveServerLock } from "@ganger/cli/server-lock";
+import { getRunWithRecords, openDatabase, parseBootConfig, updateRunRecords } from "@ganger/db";
+import type { RunId } from "@ganger/core";
 import { _electron } from "playwright-core";
 import type { ElectronApplication } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -15,10 +15,9 @@ import { freePort, nodeEnv, seedRunningRun } from "./helpers.js";
 
 const DESKTOP = resolve(import.meta.dirname, "..");
 const APP_A =
-  process.env["SMOKE_APP"] ??
-  join(DESKTOP, "dist", "app", "Factory Orchestrator-darwin-arm64", "Factory Orchestrator.app");
+  process.env["SMOKE_APP"] ?? join(DESKTOP, "dist", "app", "Ganger-darwin-arm64", "Ganger.app");
 const APP_B = process.env["SMOKE_APP_B"];
-const executable = (app: string) => join(app, "Contents", "MacOS", "Factory Orchestrator");
+const executable = (app: string) => join(app, "Contents", "MacOS", "Ganger");
 
 let dir: string;
 let home: string;
@@ -32,7 +31,7 @@ function launch(app: string): Promise<ElectronApplication> {
   }
   return _electron.launch({
     executablePath: executable(app),
-    env: { ...env, FACTORY_HOME: home, FACTORY_DESKTOP_USER_DATA: join(dir, "user-data") },
+    env: { ...env, GANGER_HOME: home, GANGER_DESKTOP_USER_DATA: join(dir, "user-data") },
   });
 }
 
@@ -59,9 +58,7 @@ function workers(): number {
   const out = spawnSync("ps", ["-axo", "command="], { encoding: "utf8" }).stdout;
   return out
     .split("\n")
-    .filter(
-      (line) => line.includes("Factory Orchestrator.app") && line.includes("worker/server/main.js"),
-    ).length;
+    .filter((line) => line.includes("Ganger.app") && line.includes("worker/server/main.js")).length;
 }
 
 async function waitFor(
@@ -79,7 +76,7 @@ async function waitFor(
 
 beforeAll(async () => {
   if (APP_B === undefined) throw new Error("SMOKE_APP_B is required (see the header of this file)");
-  dir = mkdtempSync(join(tmpdir(), "factory-desktop-swap-"));
+  dir = mkdtempSync(join(tmpdir(), "ganger-desktop-swap-"));
   home = join(dir, "home");
   port = await freePort();
   const cli = join(APP_A, "Contents", "Resources", "server", "cli", "bin", "cli.js");

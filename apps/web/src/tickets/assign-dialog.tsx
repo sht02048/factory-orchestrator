@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
-import { Button, Dialog, DialogClose, Field, Input, Select, Text, showToast } from "@factory/ui";
-import type { SelectOption } from "@factory/ui";
-import { space } from "@factory/ui/tokens.stylex";
+import { Button, Dialog, DialogClose, Field, Input, Select, Text, showToast } from "@ganger/ui";
+import type { SelectOption } from "@ganger/ui";
+import { space } from "@ganger/ui/tokens.stylex";
 import { useState } from "react";
 import { useTranslations } from "use-intl";
 import { useAgentName } from "../labels";

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const SERVICE_NAME = "factory-orchestrator";
+const SERVICE_NAME = "ganger";
 
 export function launchdPlistPath(userHome: string): string {
   return join(userHome, "Library", "LaunchAgents", `${SERVICE_NAME}.plist`);

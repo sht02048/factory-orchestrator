@@ -1,4 +1,4 @@
-import { toTicketKey, toTrackerProjectId } from "@factory/core";
+import { toTicketKey, toTrackerProjectId } from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import { toWorkspaceId } from "./ids.js";
 import { assignRun, changeRunState, getRun, listRuns } from "./runs.js";

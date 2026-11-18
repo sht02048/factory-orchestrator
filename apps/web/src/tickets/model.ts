@@ -1,4 +1,4 @@
-import type { AgentResult, PrState, SummaryOutcome, TrackerStateCategory } from "@factory/core";
+import type { AgentResult, PrState, SummaryOutcome, TrackerStateCategory } from "@ganger/core";
 import type { WorkspaceChoice } from "../shell/model";
 
 export type TicketRun =

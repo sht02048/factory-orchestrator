@@ -4,9 +4,9 @@ import {
   toTrackerKind,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
-import type { TrackerTicket } from "@factory/core";
-import { toWorkspaceId } from "@factory/db";
+} from "@ganger/core";
+import type { TrackerTicket } from "@ganger/core";
+import { toWorkspaceId } from "@ganger/db";
 
 export const fakeKind = toTrackerKind("fake");
 export const connection = toTrackerConnectionId("conn-acme");

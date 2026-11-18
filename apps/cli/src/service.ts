@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { PRODUCT_NAME, homePaths } from "./home.js";
+import { PRODUCT_DISPLAY_NAME, PRODUCT_NAME, homePaths } from "./home.js";
 
 export type ServiceManager = "launchd" | "systemd";
 
@@ -13,7 +13,7 @@ export interface ServiceContext {
   xdgConfigHome?: string;
   nodePath: string;
   cliEntry: string;
-  factoryHome: string;
+  gangerHome: string;
   path: string;
 }
 
@@ -38,12 +38,12 @@ export function servicePlan(context: ServiceContext): ServicePlan {
     context.cliEntry,
     "start",
     "--home",
-    context.factoryHome,
+    context.gangerHome,
   ];
   switch (context.manager) {
     case "launchd": {
       const path = join(context.userHome, "Library", "LaunchAgents", `${SERVICE_NAME}.plist`);
-      const logDir = homePaths(context.factoryHome).logDir;
+      const logDir = homePaths(context.gangerHome).logDir;
       return {
         manager: "launchd",
         file: {
@@ -70,7 +70,7 @@ export function servicePlan(context: ServiceContext): ServicePlan {
         file: {
           path,
           contents: renderSystemdUnit({
-            description: `${SERVICE_NAME} (web and worker)`,
+            description: `${PRODUCT_DISPLAY_NAME} (web and worker)`,
             execStart: programArguments,
             path: context.path,
           }),

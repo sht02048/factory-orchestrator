@@ -1,5 +1,5 @@
-import { getInstallSettings, parseBootConfig } from "@factory/db";
-import type { InstallAddresses } from "@factory/db";
+import { getInstallSettings, parseBootConfig } from "@ganger/db";
+import type { InstallAddresses } from "@ganger/db";
 import { allowedHosts, checkRequest, rejectionLogLine, rejectionResponse } from "./request-guard";
 import type { AllowedHosts } from "./request-guard";
 import { getDatabase } from "./database";

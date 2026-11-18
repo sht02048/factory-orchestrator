@@ -1,4 +1,4 @@
-import { toTrackerConnectionId } from "@factory/core";
+import { toTrackerConnectionId } from "@ganger/core";
 import { createFileRoute } from "@tanstack/react-router";
 import { getAdapterRegistry, getSecretBox } from "../../../../server/adapters";
 import { getDatabase } from "../../../../server/database";

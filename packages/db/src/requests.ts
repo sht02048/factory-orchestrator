@@ -1,5 +1,5 @@
-import { planCancel } from "@factory/core";
-import type { RunId, RunnerHealth, RunnerId } from "@factory/core";
+import { planCancel } from "@ganger/core";
+import type { RunId, RunnerHealth, RunnerId } from "@ganger/core";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";

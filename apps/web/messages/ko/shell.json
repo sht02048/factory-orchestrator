@@ -1,7 +1,7 @@
 {
-  "documentTitle": "Factory Orchestrator",
+  "documentTitle": "Ganger",
   "toastRegion": "알림",
-  "brand": "Factory Orchestrator",
+  "brand": "Ganger",
   "workspace": {
     "switch": "Workspace 바꾸기, 지금 {workspace}",
     "all": "전체",

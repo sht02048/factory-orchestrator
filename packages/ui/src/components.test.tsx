@@ -380,13 +380,13 @@ const classSet = (classes: string) => new Set(classes.split(" ").filter((c) => c
 
 describe("글자 역할(티켓 0073)", () => {
   const before = [
-    ["page", "x1ghz6dp xxbnsim x1g8le32 x45ymtg x8zzex5 xvr1kxx x1w2vvpw"],
-    ["panel", "x1ghz6dp xxbnsim x18oput8 x45ymtg x14efcu5 xh0io9k x1fzhlzt"],
-    ["title", "x1ghz6dp xxbnsim xgg16it xbu08dq x1ro8lm6"],
-    ["body", "x1ghz6dp x1ry0s1v xgg16it x10ct87k x1fzhlzt"],
-    ["ui", "x1ghz6dp x1ry0s1v x1kcddvv x1ro8lm6"],
-    ["meta", "x1ghz6dp x1o6ikt5 x1kcddvv x1ro8lm6"],
-    ["label", "x1ghz6dp x1o6ikt5 xwu4aly xbu08dq x1ro8lm6"],
+    ["page", "x1ghz6dp xymnt6j x1ytcrri x1n3ag6q x7qxgva x9r7267 x1w2vvpw"],
+    ["panel", "x1ghz6dp xymnt6j x16htn7p x1n3ag6q x1dcssyw x26juqj x1fzhlzt"],
+    ["title", "x1ghz6dp xymnt6j x1ipzcd8 x1xo4w25 x1u72hlg"],
+    ["body", "x1ghz6dp xfl7axt x1ipzcd8 x1nvr2p0 x1fzhlzt"],
+    ["ui", "x1ghz6dp xfl7axt xhfhf9y x1u72hlg"],
+    ["meta", "x1ghz6dp x1p8q0ov xhfhf9y x1u72hlg"],
+    ["label", "x1ghz6dp x1p8q0ov xk1alkk x1xo4w25 x1u72hlg"],
   ] as const satisfies ReadonlyArray<readonly [TextVariant, string]>;
 
   it("기존 변형은 0073 전과 같은 스타일(같은 원자 클래스)을 쓴다", () => {
@@ -416,10 +416,10 @@ describe("글자 역할(티켓 0073)", () => {
 describe("면 역할(티켓 0073)", () => {
   it("Card 기본 면은 0073 전과 같은 스타일을 쓴다", () => {
     expect(classSet(classOf(renderToString(<Card>내용</Card>)))).toEqual(
-      classSet("x78zum5 xdt5ytf x3ugt x1piab5x xxe3m9b xrjbj3k"),
+      classSet("x78zum5 xdt5ytf x17ftvvs x3jr529 xeb2ruz xmd46ts"),
     );
     expect(classSet(classOf(renderToString(<Card padding="compact">내용</Card>)))).toEqual(
-      classSet("x78zum5 xdt5ytf xxe3m9b xrjbj3k xxhr3t x4fnp73"),
+      classSet("x78zum5 xdt5ytf xeb2ruz xmd46ts xxhr3t x5rrxxc"),
     );
   });
 

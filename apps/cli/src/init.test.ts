@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BootConfigError, parseBootConfig } from "@factory/db";
+import { BootConfigError, parseBootConfig } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { homePaths, readBootEnv, resolveHome } from "./home.js";
 import { EnvFileFormatError, init, renderEnvFile } from "./init.js";
@@ -9,7 +9,7 @@ import { EnvFileFormatError, init, renderEnvFile } from "./init.js";
 let dir: string;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "factory-cli-init-"));
+  dir = mkdtempSync(join(tmpdir(), "ganger-cli-init-"));
 });
 
 afterEach(() => {
@@ -98,9 +98,9 @@ describe("readBootEnv", () => {
 });
 
 describe("resolveHome", () => {
-  it("--home, FACTORY_HOME, 홈 아래 기본 폴더 순으로 고른다", () => {
-    expect(resolveHome("/opt/a", { FACTORY_HOME: "/opt/b" }, "/home/acme")).toBe("/opt/a");
-    expect(resolveHome(undefined, { FACTORY_HOME: "/opt/b" }, "/home/acme")).toBe("/opt/b");
-    expect(resolveHome(undefined, {}, "/home/acme")).toBe("/home/acme/.factory-orchestrator");
+  it("--home, GANGER_HOME, 홈 아래 기본 폴더 순으로 고른다", () => {
+    expect(resolveHome("/opt/a", { GANGER_HOME: "/opt/b" }, "/home/acme")).toBe("/opt/a");
+    expect(resolveHome(undefined, { GANGER_HOME: "/opt/b" }, "/home/acme")).toBe("/opt/b");
+    expect(resolveHome(undefined, {}, "/home/acme")).toBe("/home/acme/.ganger");
   });
 });

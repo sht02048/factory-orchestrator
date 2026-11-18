@@ -1,10 +1,10 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { homePaths, readBootEnv } from "@factory/cli/home";
-import { isProcessAlive, isSameProcess, readLiveServerLock } from "@factory/cli/server-lock";
-import { webUrl } from "@factory/cli/web-url";
-import { parseBootConfig } from "@factory/db";
+import { homePaths, readBootEnv } from "@ganger/cli/home";
+import { isProcessAlive, isSameProcess, readLiveServerLock } from "@ganger/cli/server-lock";
+import { webUrl } from "@ganger/cli/web-url";
+import { parseBootConfig } from "@ganger/db";
 import { z } from "zod";
 import type { Identity, Probe } from "./identity.js";
 import { probeIdentity } from "./identity.js";

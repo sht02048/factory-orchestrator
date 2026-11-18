@@ -33,7 +33,7 @@
           {
             "paths": [
               {
-                "name": "@factory/ui/tokens.stylex",
+                "name": "@ganger/ui/tokens.stylex",
                 "importNames": [
                   "colors",
                   "fontSize",
@@ -55,35 +55,35 @@
             "forbid": [
               {
                 "element": "button",
-                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @ganger/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
               },
               {
                 "element": "input",
-                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @ganger/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
               },
               {
                 "element": "select",
-                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @ganger/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
               },
               {
                 "element": "textarea",
-                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @ganger/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
               },
               {
                 "element": "table",
-                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @ganger/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
               },
               {
                 "element": "h1",
-                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @ganger/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
               },
               {
                 "element": "h2",
-                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @ganger/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
               },
               {
                 "element": "h3",
-                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @ganger/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
               }
             ]
           }

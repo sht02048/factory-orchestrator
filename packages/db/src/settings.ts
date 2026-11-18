@@ -14,7 +14,7 @@ import type {
   TrackerKind,
   TrackerProjectId,
   TrackerStateId,
-} from "@factory/core";
+} from "@ganger/core";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";

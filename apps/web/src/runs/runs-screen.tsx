@@ -22,8 +22,8 @@ import {
   linkStyles,
   NoticeLayout,
   RemovableChip,
-} from "@factory/ui";
-import { size, space } from "@factory/ui/tokens.stylex";
+} from "@ganger/ui";
+import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useRef } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useTranslations } from "use-intl";

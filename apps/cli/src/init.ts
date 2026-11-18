@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { isDeepStrictEqual, parseEnv } from "node:util";
-import { BOOT_ENV, ENCRYPTION_KEY_BYTES, parseBootConfig } from "@factory/db";
+import { BOOT_ENV, ENCRYPTION_KEY_BYTES, parseBootConfig } from "@ganger/db";
 import { homePaths } from "./home.js";
 
 export interface InitOptions {
@@ -62,7 +62,7 @@ export function renderEnvFile(values: Readonly<Record<string, string>>): string 
     const value = values[name] ?? "";
     return `${name}=${JSON.stringify(value)}`;
   };
-  const contents = `# Boot settings for factory-orchestrator, written by \`factory-orchestrator init\`.
+  const contents = `# Boot settings for Ganger, written by \`ganger init\`.
 # Only the values needed to boot live here. Tokens (Linear, GitHub) are entered in
 # web onboarding and stored encrypted in the database. Keep this file private.
 # Shell environment variables with the same names override these values.

@@ -1,4 +1,4 @@
-import type { SummaryOutcome } from "@factory/core";
+import type { SummaryOutcome } from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import { TICKET_FILTERS, countByFilter, matchesFilter, matchesSearch } from "./model";
 import type { TicketFilter, TicketRun, TicketView } from "./model";

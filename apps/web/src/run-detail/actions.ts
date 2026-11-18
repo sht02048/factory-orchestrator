@@ -1,6 +1,6 @@
-import { toRunId } from "@factory/core";
-import { requestRunCancel } from "@factory/db";
-import type { Database } from "@factory/db";
+import { toRunId } from "@ganger/core";
+import { requestRunCancel } from "@ganger/db";
+import type { Database } from "@ganger/db";
 
 export type RunActionResult = { ok: true } | { ok: false; reason: string };
 

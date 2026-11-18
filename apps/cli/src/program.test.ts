@@ -28,7 +28,7 @@ function context(overrides: Partial<ProgramContext> = {}): ProgramContext {
     userHome: dir,
     uid: 501,
     nodePath: "/opt/node/bin/node",
-    cliEntry: "/opt/factory-orchestrator/dist/bin/cli.js",
+    cliEntry: "/opt/ganger/dist/bin/cli.js",
     layout: unusedLayout,
     runCommand: (command) => {
       ran.push([...command]);
@@ -42,7 +42,7 @@ function context(overrides: Partial<ProgramContext> = {}): ProgramContext {
 }
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "factory-cli-program-"));
+  dir = mkdtempSync(join(tmpdir(), "ganger-cli-program-"));
   out = [];
   err = [];
   ran = [];
@@ -55,7 +55,7 @@ afterEach(() => {
 describe("runProgram", () => {
   it("init은 기본 home에 .env를 만들고, 다시 돌리면 그대로 둔다고 알린다", async () => {
     expect(await runProgram(["init"], context())).toBe(0);
-    const envFile = homePaths(join(dir, ".factory-orchestrator")).envFile;
+    const envFile = homePaths(join(dir, ".ganger")).envFile;
     expect(existsSync(envFile)).toBe(true);
     expect(out.join("\n")).toContain(`Wrote boot settings to ${envFile}`);
 
@@ -70,7 +70,7 @@ describe("runProgram", () => {
       0,
     );
     const printed = out.join("\n");
-    const plist = join(dir, "Library", "LaunchAgents", "factory-orchestrator.plist");
+    const plist = join(dir, "Library", "LaunchAgents", "ganger.plist");
     expect(printed).toContain(`Would write ${plist}:`);
     expect(printed).toContain("<string>start</string>");
     expect(printed).toContain(`launchctl bootstrap gui/501 ${plist}`);
@@ -83,16 +83,16 @@ describe("runProgram", () => {
     const ctx = context({ platform: "linux", env: { PATH: "/usr/bin" } });
     expect(await runProgram(["service", "uninstall", "--dry-run"], ctx)).toBe(0);
     const printed = out.join("\n");
-    expect(printed).toContain("systemctl --user disable --now factory-orchestrator.service");
+    expect(printed).toContain("systemctl --user disable --now ganger.service");
     expect(printed).toContain(
-      `Would remove ${join(dir, ".config", "systemd", "user", "factory-orchestrator.service")}`,
+      `Would remove ${join(dir, ".config", "systemd", "user", "ganger.service")}`,
     );
     expect(ran).toEqual([]);
   });
 
   it("init 전에는 서비스를 등록하지 않는다", async () => {
     expect(await runProgram(["service", "install"], context())).toBe(1);
-    expect(err.join("\n")).toContain("Run `factory-orchestrator init` before installing");
+    expect(err.join("\n")).toContain("Run `ganger init` before installing");
     expect(existsSync(join(dir, "Library"))).toBe(false);
     expect(ran).toEqual([]);
   });
@@ -100,13 +100,13 @@ describe("runProgram", () => {
   it("init 뒤에 등록하고 해제한다", async () => {
     await runProgram(["init"], context());
     expect(await runProgram(["service", "install"], context())).toBe(0);
-    const plist = join(dir, "Library", "LaunchAgents", "factory-orchestrator.plist");
+    const plist = join(dir, "Library", "LaunchAgents", "ganger.plist");
     expect(existsSync(plist)).toBe(true);
     expect(await runProgram(["service", "uninstall"], context())).toBe(0);
     expect(existsSync(plist)).toBe(false);
     expect(ran).toEqual([
       ["launchctl", "bootstrap", "gui/501", plist],
-      ["launchctl", "bootout", "gui/501/factory-orchestrator"],
+      ["launchctl", "bootout", "gui/501/ganger"],
     ]);
   });
 
@@ -116,16 +116,14 @@ describe("runProgram", () => {
     const failing = context({ runCommand: () => ({ ok: false, output: "Boot-out failed: 5" }) });
     expect(await runProgram(["service", "uninstall"], failing)).toBe(1);
     expect(err.join("\n")).toContain("stopping the service failed");
-    expect(existsSync(join(dir, "Library", "LaunchAgents", "factory-orchestrator.plist"))).toBe(
-      false,
-    );
+    expect(existsSync(join(dir, "Library", "LaunchAgents", "ganger.plist"))).toBe(false);
   });
 
   it("명령에 맞지 않는 옵션은 무시하지 않고 2로 끝낸다", async () => {
     expect(await runProgram(["start", "--port", "4000"], context())).toBe(2);
     expect(err.join("\n")).toContain("--port cannot be used with start");
     expect(await runProgram(["init", "--dry-run"], context())).toBe(2);
-    expect(existsSync(join(dir, ".factory-orchestrator"))).toBe(false);
+    expect(existsSync(join(dir, ".ganger"))).toBe(false);
   });
 
   it("지원하지 않는 OS에서는 서비스를 등록하지 않는다", async () => {
@@ -137,11 +135,11 @@ describe("runProgram", () => {
     expect(await runProgram(["serve"], context())).toBe(2);
     expect(err.join("\n")).toContain("Unknown command: serve");
     expect(await runProgram(["--help"], context())).toBe(0);
-    expect(out.join("\n")).toContain("Usage: factory-orchestrator");
+    expect(out.join("\n")).toContain("Usage: ganger");
   });
 
   it("start는 .env가 없으면 init을 먼저 하라고 알린다", async () => {
     expect(await runProgram(["start", "--home", join(dir, "none")], context())).toBe(1);
-    expect(err.join("\n")).toContain("Run `factory-orchestrator init` first");
+    expect(err.join("\n")).toContain("Run `ganger init` first");
   });
 });

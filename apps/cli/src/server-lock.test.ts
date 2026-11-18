@@ -14,7 +14,7 @@ import {
 let home: string;
 
 beforeEach(() => {
-  home = mkdtempSync(join(tmpdir(), "factory-lock-"));
+  home = mkdtempSync(join(tmpdir(), "ganger-lock-"));
 });
 
 afterEach(() => {

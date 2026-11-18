@@ -1,6 +1,12 @@
-# Factory Orchestrator
+<p align="center">
+  <img src="packages/ui/brand/mascot-default.svg" alt="" width="120">
+  <br>
+  <img src="packages/ui/brand/wordmark.svg" alt="Ganger" height="44">
+</p>
 
-The control tower of a software factory. It assigns tickets from a tracker to runners, and shows the status and statistics of the runs in which the runners' agents work on those tickets. Terms are defined in [`GLOSSARY.md`](./GLOSSARY.md), and key decisions are recorded in [`docs/adr/`](./docs/adr/).
+# Ganger
+
+Ganger is the foreman of your software factory: it hands tracker tickets to coding agents on your own runners and shows the status and statistics of every run. The artwork and the rules for using it are in the [brand guide](packages/ui/brand/README.md). Terms are defined in [`GLOSSARY.md`](./GLOSSARY.md), and key decisions are recorded in [`docs/adr/`](./docs/adr/).
 
 ## Structure
 
@@ -57,18 +63,18 @@ The browser tests in `e2e` drive the Google Chrome installed on the machine thro
 - `pnpm dev --onboarding` starts from step 1 of onboarding with an empty database. **Fill with fake values** (bottom right) fills the form fields with values that pass every check. To see a failed check, put `invalid` in a key or token, or `offline`, `no-orca`, or `push-auth` in the runner's ssh target.
 - `--reset` deletes the data of that mode and starts over. `--static` stops the fake agents from moving on their own.
 - `/__dev` (the **Dev tools** link at the bottom right) labels a ticket for auto-assignment, adds a ticket, makes an agent ask a question, and fixes or breaks a runner's GitHub authentication.
-- Data lives in `.dev/<mode>/` in the repository (ignored by git), or under `FACTORY_DEV_DIR`. It never touches `~/.factory-orchestrator`. The server binds to `127.0.0.1:3000`; set `WEB_HOST` and `WEB_PORT` to change that (for example, `WEB_HOST=0.0.0.0 pnpm dev` to open it from another machine on your network). Anyone who can reach that address can use the dev server and `/__dev`, so bind to an address only trusted machines can reach.
+- Data lives in `.dev/<mode>/` in the repository (ignored by git), or under `GANGER_DEV_DIR`. It never touches `~/.ganger`. The server binds to `127.0.0.1:3000`; set `WEB_HOST` and `WEB_PORT` to change that (for example, `WEB_HOST=0.0.0.0 pnpm dev` to open it from another machine on your network). Anyone who can reach that address can use the dev server and `/__dev`, so bind to an address only trusted machines can reach.
 - The fake adapters and the dev tools are registered only by `pnpm dev`. They are not part of the production build or the server bundle; the bundle check (`scripts/bundle-check.ts`, run by `pnpm bundle` and `pnpm smoke:bundle`) fails if fake adapters or dev-only values end up in the bundle.
 
-`pnpm --filter @factory/web dev` still starts only the web app; open `http://127.0.0.1:3000/ds` to see the design system. Run the production build with `pnpm --filter @factory/web start`. It binds to `127.0.0.1` by default. To change that, set the shell environment variables `WEB_HOST` and `WEB_PORT` (for example, `WEB_PORT=4000 pnpm --filter @factory/web start`).
+`pnpm --filter @ganger/web dev` still starts only the web app; open `http://127.0.0.1:3000/ds` to see the design system. Run the production build with `pnpm --filter @ganger/web start`. It binds to `127.0.0.1` by default. To change that, set the shell environment variables `WEB_HOST` and `WEB_PORT` (for example, `WEB_PORT=4000 pnpm --filter @ganger/web start`).
 
-Build the worker with `pnpm --filter @factory/worker build` and start it with `pnpm --filter @factory/worker start`. It reads `DATABASE_PATH` and `ENCRYPTION_KEY` from the shell environment, applies pending database migrations, and then polls until it receives `SIGINT` or `SIGTERM`. It builds adapters from the runners, tracker connections, and code host connections stored in the database, and rebuilds an adapter when its settings change.
+Build the worker with `pnpm --filter @ganger/worker build` and start it with `pnpm --filter @ganger/worker start`. It reads `DATABASE_PATH` and `ENCRYPTION_KEY` from the shell environment, applies pending database migrations, and then polls until it receives `SIGINT` or `SIGTERM`. It builds adapters from the runners, tracker connections, and code host connections stored in the database, and rebuilds an adapter when its settings change.
 
 The pre-commit hook runs lint, format check, typecheck, and the color literal check. CI (GitHub Actions) runs on pull requests and on pushes to `main`, in this order: typecheck → lint → color literal check → format check → test → build → web production smoke test → CLI smoke test → server bundle → server bundle smoke test.
 
 ## Self-hosting
 
-> There is no published release yet: no npm package, no GitHub Release. To run the orchestrator, build a server bundle from a clone of this repository, as described in [Build a server bundle](#build-a-server-bundle). The commands below are written as `factory-orchestrator <command>`; with a server bundle, that is `node <bundle>/cli/bin/cli.js <command>`.
+> There is no published release yet: no npm package, no GitHub Release. To run the orchestrator, build a server bundle from a clone of this repository, as described in [Build a server bundle](#build-a-server-bundle). The commands below are written as `ganger <command>`; with a server bundle, that is `node <bundle>/cli/bin/cli.js <command>`.
 
 The orchestrator is a self-hosted tool. One operator runs one installation on their own machine. The planned setup:
 
@@ -76,7 +82,7 @@ The orchestrator is a self-hosted tool. One operator runs one installation on th
 - A runner is an Orca environment that the orchestrator can reach over ssh.
 - The orchestrator does not change your projects' agent settings. We recommend adding a rule to each project's agent instructions (for example, `AGENTS.md`) to put the ticket key in the pull request title. Otherwise, if an agent opens the pull request from a branch other than the one the orchestrator created (including by renaming that branch), the orchestrator may not find it and may record the run's pull request as missing or closed.
 - Tracker connections, the GitHub token, runners, workspaces, and mappings are set up in web onboarding on first launch. Tokens are stored encrypted in the database.
-- `.env` holds only the minimum values needed to boot: port, bind address, data path, and encryption key. `factory-orchestrator init` writes it, as described below. The addresses that other devices and your tracker use are set in Settings, as described in [Open it from other devices](#open-it-from-other-devices).
+- `.env` holds only the minimum values needed to boot: port, bind address, data path, and encryption key. `ganger init` writes it, as described below. The addresses that other devices and your tracker use are set in Settings, as described in [Open it from other devices](#open-it-from-other-devices).
 
 ### Build a server bundle
 
@@ -88,28 +94,28 @@ pnpm build
 pnpm bundle
 ```
 
-This writes `dist/factory-orchestrator-<version>/` and the same folder packed as `dist/factory-orchestrator-<version>.tar.gz`. Copy the tarball to the machine that runs the orchestrator, extract it anywhere, and run the CLI from it:
+This writes `dist/ganger-<version>/` and the same folder packed as `dist/ganger-<version>.tar.gz`. Copy the tarball to the machine that runs the orchestrator, extract it anywhere, and run the CLI from it:
 
 ```sh
-tar -xzf factory-orchestrator-<version>.tar.gz
-node factory-orchestrator-<version>/cli/bin/cli.js init
-node factory-orchestrator-<version>/cli/bin/cli.js start
+tar -xzf ganger-<version>.tar.gz
+node ganger-<version>/cli/bin/cli.js init
+node ganger-<version>/cli/bin/cli.js start
 ```
 
 To upgrade, build a new bundle, stop the orchestrator, extract the new bundle, and start it from there. The folder name includes the version, so if you run the orchestrator as a service, run `service uninstall` with the old bundle and `service install` with the new one. Your settings and data stay in the installation folder described below, not in the bundle.
 
-You can also run the CLI straight from the repository after `pnpm build`, with `node apps/cli/dist/bin/cli.js <command>` (or `pnpm --filter @factory/cli cli <command>`).
+You can also run the CLI straight from the repository after `pnpm build`, with `node apps/cli/dist/bin/cli.js <command>` (or `pnpm --filter @ganger/cli cli <command>`).
 
 ### Set up and start
 
-The CLI keeps its files in one installation folder: `~/.factory-orchestrator` by default, or the folder in `--home <dir>` or the `FACTORY_HOME` environment variable.
+The CLI keeps its files in one installation folder: `~/.ganger` by default, or the folder in `--home <dir>` or the `GANGER_HOME` environment variable.
 
 ```sh
-factory-orchestrator init     # writes <home>/.env with a new encryption key
-factory-orchestrator start    # applies database migrations, then runs the web server and the worker
+ganger init     # writes <home>/.env with a new encryption key
+ganger start    # applies database migrations, then runs the web server and the worker
 ```
 
-- `init` writes `<home>/.env` (readable only by you) with the bind address `127.0.0.1`, port `3000`, the database `<home>/data/factory-orchestrator.db`, and a newly generated encryption key. Change them with `--host`, `--port`, and `--database-path`, or edit the file later. If `.env` already exists, `init` leaves it unchanged, so the encryption key never changes by accident. If you lose or change the key, you have to enter the tokens again.
+- `init` writes `<home>/.env` (readable only by you) with the bind address `127.0.0.1`, port `3000`, the database `<home>/data/ganger.db`, and a newly generated encryption key. Change them with `--host`, `--port`, and `--database-path`, or edit the file later. If `.env` already exists, `init` leaves it unchanged, so the encryption key never changes by accident. If you lose or change the key, you have to enter the tokens again.
 - `start` holds a lock file, `<home>/server.lock`, while it runs, so only one `start` (one web server and one worker) runs per installation folder. A second `start` for the same folder exits with an error. A lock left behind by a process that no longer exists is taken over.
 - `start` reads `<home>/.env`. Shell environment variables with the same names (`WEB_HOST`, `WEB_PORT`, `DATABASE_PATH`, `ENCRYPTION_KEY`) override it. It applies pending database migrations, starts the web server and the worker, and prints the web address once it responds. If either process exits, `start` stops the other one and exits with an error, so a service manager can restart both. `SIGINT` or `SIGTERM` stops both.
 - After an upgrade, run `start` again (or restart the service). It applies new migrations before anything else starts.
@@ -127,12 +133,12 @@ Requests that change data (including server functions) must also come from a pag
 
 ### Run as a service
 
-`factory-orchestrator service install` registers `start` as a background service for your user account: a launchd agent on macOS (`~/Library/LaunchAgents/factory-orchestrator.plist`) and a systemd user service on Linux (`~/.config/systemd/user/factory-orchestrator.service`). It starts at login and restarts after a failure. `factory-orchestrator service uninstall` stops it and removes the file.
+`ganger service install` registers `start` as a background service for your user account: a launchd agent on macOS (`~/Library/LaunchAgents/ganger.plist`) and a systemd user service on Linux (`~/.config/systemd/user/ganger.service`). It starts at login and restarts after a failure. `ganger service uninstall` stops it and removes the file.
 
 - Add `--dry-run` to either command to print the file and the commands without changing anything.
 - Run `init` first. `service install` refuses to register a service that would fail to boot, and refuses to overwrite an existing service file.
 - The service runs the Node and CLI paths you installed it with, and uses your current `PATH`. After you move or upgrade Node, or move the server bundle to another folder, run `service uninstall` and `service install` again.
-- On macOS, logs go to `<home>/logs/factory-orchestrator.log`. On Linux, read them with `journalctl --user -u factory-orchestrator.service`, and run `loginctl enable-linger` once so the service keeps running after you log out.
+- On macOS, logs go to `<home>/logs/ganger.log`. On Linux, read them with `journalctl --user -u ganger.service`, and run `loginctl enable-linger` once so the service keeps running after you log out.
 
 ## Desktop app (macOS)
 
@@ -152,13 +158,13 @@ On a machine where the service is already installed or running for the same inst
 pnpm install
 pnpm build
 pnpm bundle                                                            # the server bundle the app ships
-pnpm --filter @factory/desktop exec node node_modules/electron/install.js   # downloads Electron once
-pnpm --filter @factory/desktop run package
+pnpm --filter @ganger/desktop exec node node_modules/electron/install.js   # downloads Electron once
+pnpm --filter @ganger/desktop run package
 ```
 
-This writes `apps/desktop/dist/app/Factory Orchestrator-darwin-<arch>/Factory Orchestrator.app` and a `.zip` of it. The app carries the server bundle unchanged in `Contents/Resources/server/` and runs it with its own Node (Electron's), so the machine does not need Node. For development, `pnpm --filter @factory/desktop start` runs the app from the repository with the bundle in `dist/`.
+This writes `apps/desktop/dist/app/Ganger-darwin-<arch>/Ganger.app` and a `.zip` of it. The app carries the server bundle unchanged in `Contents/Resources/server/` and runs it with its own Node (Electron's), so the machine does not need Node. For development, `pnpm --filter @ganger/desktop start` runs the app from the repository with the bundle in `dist/`.
 
-The app uses the same installation folder as the CLI (`~/.factory-orchestrator`, or `FACTORY_HOME`). It writes the server's output to `<home>/logs/desktop-server.log`.
+The app uses the same installation folder as the CLI (`~/.ganger`, or `GANGER_HOME`). It writes the server's output to `<home>/logs/desktop-server.log`.
 
 ### First launch
 

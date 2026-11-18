@@ -25,8 +25,8 @@ import {
   linkStyles,
   showToast,
   textStyles,
-} from "@factory/ui";
-import { size, space } from "@factory/ui/tokens.stylex";
+} from "@ganger/ui";
+import { size, space } from "@ganger/ui/tokens.stylex";
 import {
   createContext,
   use,

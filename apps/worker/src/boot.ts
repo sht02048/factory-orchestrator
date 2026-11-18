@@ -1,5 +1,5 @@
-import { SecretBox, migrate, openDatabase, parseBootConfig } from "@factory/db";
-import type { AdapterRegistry } from "@factory/core";
+import { SecretBox, migrate, openDatabase, parseBootConfig } from "@ganger/db";
+import type { AdapterRegistry } from "@ganger/core";
 import { createAdapterRegistry } from "./registry.js";
 import { startWorker } from "./worker.js";
 import type { RunningWorker, WorkerLogger } from "./worker.js";

@@ -1,13 +1,13 @@
-import { toMailboxRef, toRepoRef } from "@factory/core";
-import type { PullRequestSnapshot, TicketKey } from "@factory/core";
+import { toMailboxRef, toRepoRef } from "@ganger/core";
+import type { PullRequestSnapshot, TicketKey } from "@ganger/core";
 import {
   getRunWithRecords,
   listRunPermissionWaits,
   listRunQuestions,
   listRunners,
   listRuns,
-} from "@factory/db";
-import type { Database, StoredRun } from "@factory/db";
+} from "@ganger/db";
+import type { Database, StoredRun } from "@ganger/db";
 import { stringAt } from "./world.js";
 import type { DemoWorld } from "./world.js";
 

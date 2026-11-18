@@ -1,5 +1,5 @@
-import { toPermissionRequestId, toQuestionId } from "@factory/core";
-import type { AgentQuestion, CompletionReport, PermissionWait, RunProgress } from "@factory/core";
+import { toPermissionRequestId, toQuestionId } from "@ganger/core";
+import type { AgentQuestion, CompletionReport, PermissionWait, RunProgress } from "@ganger/core";
 import { mailPayloadSchema, taskReportSchema } from "./schemas.js";
 import type { MailPayload, MailRow, WorkerShowResult, WorktreePsResult } from "./schemas.js";
 

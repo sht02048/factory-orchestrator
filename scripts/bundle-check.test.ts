@@ -43,9 +43,9 @@ describe("fakeAdapterNames", () => {
 
 describe("devOnlyMarkers", () => {
   it("finds strings that only the pnpm dev entry point has", () => {
-    expect(devOnlyMarkers('const key = "lin_api_demo_acme"; globalThis.__factoryDev;')).toEqual([
+    expect(devOnlyMarkers('const key = "lin_api_demo_acme"; globalThis.__gangerDev;')).toEqual([
       "lin_api_demo",
-      "__factoryDev",
+      "__gangerDev",
     ]);
     expect(devOnlyMarkers('const key = "lin_api_real";')).toEqual([]);
   });
@@ -54,7 +54,7 @@ describe("devOnlyMarkers", () => {
 describe("findBundleProblems", () => {
   let dir: string;
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "factory-bundle-check-"));
+    dir = mkdtempSync(join(tmpdir(), "ganger-bundle-check-"));
   });
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });

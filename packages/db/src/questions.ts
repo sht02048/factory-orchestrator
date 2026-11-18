@@ -1,4 +1,4 @@
-import type { AgentQuestion, QuestionId, RunId } from "@factory/core";
+import type { AgentQuestion, QuestionId, RunId } from "@ganger/core";
 import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 import type { Database } from "./database.js";
 import { runQuestions } from "./schema.js";

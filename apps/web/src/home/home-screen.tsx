@@ -16,10 +16,10 @@ import {
   StatusPill,
   Text,
   textStyles,
-} from "@factory/ui";
-import type { PillStatus } from "@factory/ui";
-import type { RunId } from "@factory/core";
-import { breakpoints, size, space } from "@factory/ui/tokens.stylex";
+} from "@ganger/ui";
+import type { PillStatus } from "@ganger/ui";
+import type { RunId } from "@ganger/core";
+import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";

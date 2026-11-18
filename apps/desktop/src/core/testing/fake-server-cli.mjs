@@ -98,7 +98,7 @@ const webChild =
         process.execPath,
         [
           "-e",
-          `require("node:http").createServer((q, s) => s.end(JSON.stringify({ product: "factory-orchestrator", version: "0.0.0", instanceId: "fake-instance", webAccess: "allowed" }))).listen(${port}, "127.0.0.1")`,
+          `require("node:http").createServer((q, s) => s.end(JSON.stringify({ product: "ganger", version: "0.0.0", instanceId: "fake-instance", webAccess: "allowed" }))).listen(${port}, "127.0.0.1")`,
           self,
         ],
         { stdio: "ignore" },
@@ -111,7 +111,7 @@ const server = createServer((req, res) => {
     res.setHeader("content-type", "application/json");
     res.end(
       JSON.stringify({
-        product: "factory-orchestrator",
+        product: "ganger",
         version: process.env.FAKE_VERSION ?? "0.0.0",
         instanceId: "fake-instance",
         webAccess: "allowed",

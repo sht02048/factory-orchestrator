@@ -9,8 +9,8 @@ import {
   DataTableRowHeader,
   OutcomeBar,
   linkStyles,
-} from "@factory/ui";
-import type { OutcomeSegment } from "@factory/ui";
+} from "@ganger/ui";
+import type { OutcomeSegment } from "@ganger/ui";
 import type { MouseEvent } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";

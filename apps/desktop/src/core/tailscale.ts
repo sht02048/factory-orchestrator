@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { z } from "zod";
 
-export const TAILSCALE_CLI_ENV = "FACTORY_TAILSCALE_CLI";
+export const TAILSCALE_CLI_ENV = "GANGER_TAILSCALE_CLI";
 
 export const TAILSCALE_CLI_CANDIDATES = [
   "/usr/local/bin/tailscale",

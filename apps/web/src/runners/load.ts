@@ -1,6 +1,6 @@
-import { summarizeRunOutcome } from "@factory/core";
-import { getRunWithRecords, listRunners, listRuns, listWorkspaces } from "@factory/db";
-import type { Database, StoredRun } from "@factory/db";
+import { summarizeRunOutcome } from "@ganger/core";
+import { getRunWithRecords, listRunners, listRuns, listWorkspaces } from "@ganger/db";
+import type { Database, StoredRun } from "@ganger/db";
 import { z } from "zod";
 import { prerequisiteHint, prerequisiteProject } from "../labels";
 import type {

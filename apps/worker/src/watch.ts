@@ -1,4 +1,4 @@
-import { decideConnection, decideTimeout, resolveRunProgress } from "@factory/core";
+import { decideConnection, decideTimeout, resolveRunProgress } from "@ganger/core";
 import type {
   AgentResult,
   CompletionReport,
@@ -8,7 +8,7 @@ import type {
   RunOnRunner,
   RunProgress,
   Runner,
-} from "@factory/core";
+} from "@ganger/core";
 import {
   DEFAULT_MAX_RUN_MS,
   LAST_LOG_LINES,
@@ -30,8 +30,8 @@ import {
   sentDenialIds,
   sentQuestionIds,
   updateRunRecords,
-} from "@factory/db";
-import type { RunRecords, StoredRunner } from "@factory/db";
+} from "@ganger/db";
+import type { RunRecords, StoredRunner } from "@ganger/db";
 import {
   answerKey,
   decideRunPrState,

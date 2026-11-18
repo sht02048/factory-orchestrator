@@ -1,5 +1,5 @@
 {
-  "name": "@factory/db",
+  "name": "@ganger/db",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
-    "@factory/core": "workspace:*",
+    "@ganger/core": "workspace:*",
     "drizzle-orm": "1.0.0-rc.5",
     "zod": "4.6.7"
   },

@@ -13,7 +13,7 @@ import {
   toTicketKey,
   toTrackerStateId,
   toWorktreeRef,
-} from "@factory/core";
+} from "@ganger/core";
 import {
   SecretBox,
   assignRun,
@@ -29,8 +29,8 @@ import {
   saveWorkspace,
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
-} from "@factory/db";
-import type { Database } from "@factory/db";
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
 import { chromium } from "playwright-core";
 import type { Browser, BrowserContext, Page } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";
@@ -68,8 +68,8 @@ const fakeAdapters: Plugin = {
 };
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "factory-stats-"));
-  const dbPath = join(dir, "factory.db");
+  dir = mkdtempSync(join(tmpdir(), "ganger-stats-"));
+  const dbPath = join(dir, "ganger.db");
   db = openDatabase(dbPath);
   migrate(db);
   seed(db);

@@ -1,4 +1,4 @@
-import { toDeliveryId, toLabelId, toTicketKey } from "@factory/core";
+import { toDeliveryId, toLabelId, toTicketKey } from "@ganger/core";
 import {
   DEFAULT_MAX_RUN_MS,
   getRun,
@@ -7,7 +7,7 @@ import {
   listUnprocessedTrackerEvents,
   recordTrackerEvent,
   saveAutoAssignLabel,
-} from "@factory/db";
+} from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Harness, connection, projectA, trackerProject, workspaceId } from "./test-fixtures.js";
 
@@ -17,8 +17,8 @@ const failure = vi.hoisted(() => ({
   markTrackerEventProcessedFailures: 0,
 }));
 
-vi.mock("@factory/db", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@factory/db")>();
+vi.mock("@ganger/db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@ganger/db")>();
   return {
     ...actual,
     changeRunState: (...args: Parameters<typeof actual.changeRunState>) => {

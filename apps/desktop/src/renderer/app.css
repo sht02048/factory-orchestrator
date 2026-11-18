@@ -1,6 +1,6 @@
 /*
  * 앱 화면의 전역 CSS(apps/web/src/styles/app.css 와 같은 리셋). StyleX 가 생성 CSS 를 이 자산에 덧붙인다.
- * 색·간격 값은 여기 쓰지 않고 StyleX 토큰(@factory/ui/tokens.stylex)으로 쓴다.
+ * 색·간격 값은 여기 쓰지 않고 StyleX 토큰(@ganger/ui/tokens.stylex)으로 쓴다.
  *
  * 레이어 순서: reset < ui-sdk < StyleX(priority1..). 레이어 밖 선언은 모든 레이어를 이기므로
  * 이 파일의 규칙은 모두 레이어 안에 둔다. 그래야 컴포넌트의 StyleX 여백이 리셋에 지지 않는다.

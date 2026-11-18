@@ -5,7 +5,7 @@ import type {
   TrackerConnectionId,
   TrackerEvent,
   TrackerProjectId,
-} from "@factory/core";
+} from "@ganger/core";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { Database } from "./database.js";
 import { trackerEvents } from "./schema.js";

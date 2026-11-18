@@ -74,7 +74,7 @@ async function checkHostGuard(base: string): Promise<string | undefined> {
     typeof parsed !== "object" ||
     parsed === null ||
     JSON.stringify(Object.keys(parsed).sort()) !== JSON.stringify(expected) ||
-    !("product" in parsed && parsed.product === "factory-orchestrator") ||
+    !("product" in parsed && parsed.product === "ganger") ||
     !("webAccess" in parsed && parsed.webAccess === "host-not-allowed")
   ) {
     return `GET /api/identity returned ${identity.status} ${identity.body}`;
@@ -83,17 +83,17 @@ async function checkHostGuard(base: string): Promise<string | undefined> {
   return undefined;
 }
 
-const dir = mkdtempSync(join(tmpdir(), "factory-smoke-"));
+const dir = mkdtempSync(join(tmpdir(), "ganger-smoke-"));
 const port = await freePort();
 let output = "";
 let hasExited = false;
-const server = spawn("pnpm", ["--filter", "@factory/web", "start"], {
+const server = spawn("pnpm", ["--filter", "@ganger/web", "start"], {
   detached: true,
   env: {
     ...process.env,
     WEB_HOST: "127.0.0.1",
     WEB_PORT: String(port),
-    DATABASE_PATH: join(dir, "factory.db"),
+    DATABASE_PATH: join(dir, "ganger.db"),
     ENCRYPTION_KEY: randomBytes(32).toString("base64"),
   },
   stdio: ["ignore", "pipe", "pipe"],

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { toCodeHostKind, toTrackerConnectionId, toTrackerKind } from "@factory/core";
+import { toCodeHostKind, toTrackerConnectionId, toTrackerKind } from "@ganger/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "./database.js";
 import { toCodeHostConnectionId } from "./ids.js";

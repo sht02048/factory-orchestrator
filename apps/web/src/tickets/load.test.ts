@@ -1,5 +1,5 @@
-import { toTicketKey, toTrackerStateId } from "@factory/core";
-import type { FakeTracker } from "@factory/core/testing";
+import { toTicketKey, toTrackerStateId } from "@ganger/core";
+import type { FakeTracker } from "@ganger/core/testing";
 import { describe, expect, it } from "vitest";
 import { MAX_PAGES, PAGE_SIZE, loadTicketsPage, ticketId } from "./load";
 import { TICKET_FILTERS, lastRun, matchesFilter } from "./model";

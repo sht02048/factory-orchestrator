@@ -43,8 +43,8 @@ import {
   showToast,
   statusTone,
   type PillStatus,
-} from "@factory/ui";
-import { colors, fontWeight, radius, space } from "@factory/ui/tokens.stylex";
+} from "@ganger/ui";
+import { colors, fontWeight, radius, space } from "@ganger/ui/tokens.stylex";
 import { useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useStatusName } from "../status";

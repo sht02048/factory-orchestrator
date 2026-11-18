@@ -14,8 +14,8 @@ import {
   toRunId,
   toTrackerProjectId,
   toWorktreeRef,
-} from "@factory/core";
-import type { AgentId, RunId, RunState, RunnerId, TicketRef } from "@factory/core";
+} from "@ganger/core";
+import type { AgentId, RunId, RunState, RunnerId, TicketRef } from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import { inTransaction } from "./database.js";
 import type { Database } from "./database.js";
@@ -68,7 +68,7 @@ import {
 
 const ticket = (key: string): TicketRef => ({ connection, key: toTicketKey(key) });
 const worktree = toWorktreeRef("repo::/wt/1");
-const started = { worktree, branch: "acme/factory-ENG-1-1", agentRef: toAgentRef("agent-1") };
+const started = { worktree, branch: "acme/ganger-ENG-1-1", agentRef: toAgentRef("agent-1") };
 
 function assign(
   db: Database,
@@ -127,7 +127,7 @@ describe("assignRun", () => {
       state: "queued",
       runnerId: roomy,
       workspaceId: "ws-1",
-      worktreeName: "factory-ENG-1-1",
+      worktreeName: "ganger-ENG-1-1",
     });
   });
 
@@ -182,7 +182,7 @@ describe("assignRun", () => {
     addRunner(db, { id: "r", capacity: 5, online: true, projects: [repoA] });
     moveTo(db, assignOk(db, "ENG-1"), "ended");
     const result = assign(db, "ENG-1");
-    expect(result.ok && result.run.worktreeName).toBe("factory-ENG-1-2");
+    expect(result.ok && result.run.worktreeName).toBe("ganger-ENG-1-2");
   });
 
   it("다른 트래커 연결이나 다른 티켓의 런은 막지 않는다", () => {
@@ -215,7 +215,7 @@ describe("assignRun", () => {
       runnerProject: repoA,
       agent,
     });
-    expect(result.ok && result.run.worktreeName).toBe("factory-ENG-1-2");
+    expect(result.ok && result.run.worktreeName).toBe("ganger-ENG-1-2");
   });
 
   it("DB도 티켓당 Ended가 아닌 런을 하나로 막는다", () => {

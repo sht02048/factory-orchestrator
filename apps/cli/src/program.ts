@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { parseArgs } from "node:util";
-import { BootConfigError, parseBootConfig } from "@factory/db";
+import { BootConfigError, parseBootConfig } from "@ganger/db";
 import { MissingEnvFileError, homePaths, readBootEnv, resolveHome } from "./home.js";
 import { EnvFileFormatError, init } from "./init.js";
 import type { AppLayout } from "./layout.js";
@@ -170,7 +170,7 @@ function planFor(context: ProgramContext, home: string): ServicePlan | undefined
     ...(xdgConfigHome === undefined || xdgConfigHome === "" ? {} : { xdgConfigHome }),
     nodePath: context.nodePath,
     cliEntry: context.cliEntry,
-    factoryHome: home,
+    gangerHome: home,
     path: context.env["PATH"] ?? "/usr/bin:/bin",
   });
 }

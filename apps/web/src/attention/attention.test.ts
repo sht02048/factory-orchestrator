@@ -1,5 +1,5 @@
-import { toPermissionRequestId, toQuestionId } from "@factory/core";
-import { answerRunQuestion, recordPermissionWaits, recordRunQuestions } from "@factory/db";
+import { toPermissionRequestId, toQuestionId } from "@ganger/core";
+import { answerRunQuestion, recordPermissionWaits, recordRunQuestions } from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import { minutes, now, seedDatabase } from "../testing/seed";
 import { loadAttention } from "./attention";

@@ -1,5 +1,5 @@
-import { toAgentId, toQuestionId, toRunnerProjectId } from "@factory/core";
-import type { MailboxRef, RunOnRunner, RunProgress, StartedRun } from "@factory/core";
+import { toAgentId, toQuestionId, toRunnerProjectId } from "@ganger/core";
+import type { MailboxRef, RunOnRunner, RunProgress, StartedRun } from "@ganger/core";
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
 import { DEFAULT_ORCA_PATH, parseOrcaRunnerConfig } from "./config.js";

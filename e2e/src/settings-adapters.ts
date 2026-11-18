@@ -1,6 +1,6 @@
-import { AdapterRegistry, toTrackerProjectId } from "@factory/core";
-import { FakeTracker } from "@factory/core/testing";
-import { SecretBox, parseBootConfig } from "@factory/db";
+import { AdapterRegistry, toTrackerProjectId } from "@ganger/core";
+import { FakeTracker } from "@ganger/core/testing";
+import { SecretBox, parseBootConfig } from "@ganger/db";
 import { fakeKind, trackerProject } from "./browser/fixtures.js";
 
 let registry: AdapterRegistry | undefined;

@@ -13,7 +13,7 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
   toWorktreeRef,
-} from "@factory/core";
+} from "@ganger/core";
 import type {
   AgentResult,
   Page,
@@ -23,8 +23,8 @@ import type {
   RunnerProjectId,
   TrackerProjectId,
   TrackerTicket,
-} from "@factory/core";
-import { FakeTracker } from "@factory/core/testing";
+} from "@ganger/core";
+import { FakeTracker } from "@ganger/core/testing";
 import {
   SecretBox,
   assignRun,
@@ -39,8 +39,8 @@ import {
   saveWorkspace,
   saveWorkspaceTrackerProject,
   toWorkspaceId,
-} from "@factory/db";
-import type { Database } from "@factory/db";
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
 import type { TicketsContext } from "./load";
 
 export const connection = toTrackerConnectionId("conn-acme");

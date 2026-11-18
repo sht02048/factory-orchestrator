@@ -1,5 +1,5 @@
-import { toRunId } from "@factory/core";
-import { getRun } from "@factory/db";
+import { toRunId } from "@ganger/core";
+import { getRun } from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import { assignInput, submitAssignment } from "./assign";
 import type { AssignInput } from "./assign";

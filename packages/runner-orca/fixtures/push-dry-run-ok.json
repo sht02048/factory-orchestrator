@@ -1,5 +1,5 @@
 {
   "exitCode": 0,
-  "stdout": "To https://github.com/acme/sandbox.git\n*\tHEAD:refs/heads/factory-orchestrator/push-check\t[new branch]\nDone\n",
+  "stdout": "To https://github.com/acme/sandbox.git\n*\tHEAD:refs/heads/ganger/push-check\t[new branch]\nDone\n",
   "stderr": ""
 }

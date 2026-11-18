@@ -1,5 +1,5 @@
-import { toAgentRef, toMailboxRef } from "@factory/core";
-import type { AgentRef, MailboxRef } from "@factory/core";
+import { toAgentRef, toMailboxRef } from "@ganger/core";
+import type { AgentRef, MailboxRef } from "@ganger/core";
 import { z } from "zod";
 
 export interface OrcaMailbox {

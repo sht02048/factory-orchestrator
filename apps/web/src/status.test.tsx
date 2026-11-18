@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { PILL_STATUSES, type PillStatus } from "@factory/ui";
+import { PILL_STATUSES, type PillStatus } from "@ganger/ui";
 import { describe, expect, it } from "vitest";
 import domain from "../messages/ko/domain.json" with { type: "json" };
 import ds from "../messages/ko/ds.json" with { type: "json" };
@@ -147,13 +147,11 @@ describe("상태 표시 컴포넌트는 StatusPill 하나다(ADR 0010 4번)", ()
       return /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : [];
     });
 
-  it("앱 코드는 @factory/ui 에서 다른 상태 표시(Status, Dot, Badge)를 가져오지 않는다", () => {
+  it("앱 코드는 @ganger/ui 에서 다른 상태 표시(Status, Dot, Badge)를 가져오지 않는다", () => {
     const offenders: string[] = [];
     for (const file of files(root)) {
       const source = readFileSync(file, "utf8");
-      for (const m of source.matchAll(
-        /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*"@factory\/ui"/g,
-      )) {
+      for (const m of source.matchAll(/import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*"@ganger\/ui"/g)) {
         const names = (m[1] ?? "").split(",").map((n) => n.replace(/^\s*type\s+/, "").trim());
         for (const name of names) {
           if (/^(Status|StatusTone|Dot|DotTone|Badge)$/.test(name))

@@ -7,15 +7,15 @@ import {
   toTrackerConnectionId,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
+} from "@ganger/core";
 import type {
   RunnerProject,
   TrackerLabel,
   TrackerProject,
   TrackerState,
   TrackerTicket,
-} from "@factory/core";
-import { toWorkspaceId } from "@factory/db";
+} from "@ganger/core";
+import { toWorkspaceId } from "@ganger/db";
 import { FAIL_OFFLINE, FAIL_PUSH_AUTH } from "./values.js";
 
 export interface TrackerCatalog {

@@ -4,8 +4,8 @@ import {
   listRuns,
   listWorkspaces,
   toWorkspaceId,
-} from "@factory/db";
-import type { Database, StoredRun } from "@factory/db";
+} from "@ganger/db";
+import type { Database, StoredRun } from "@ganger/db";
 import { resolveWorkspace } from "../shell/model";
 import { calendarDay } from "../time-zone";
 import {

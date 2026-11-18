@@ -1,5 +1,5 @@
-import { toRepoRef } from "@factory/core";
-import type { RepoRef, RunnerProjectId } from "@factory/core";
+import { toRepoRef } from "@ganger/core";
+import type { RepoRef, RunnerProjectId } from "@ganger/core";
 
 const PROJECT = /^github:([A-Za-z0-9][A-Za-z0-9-]*)\/([A-Za-z0-9._-]+)$/;
 const REPO = /^([a-z0-9][a-z0-9-]*)\/([a-z0-9._-]+)$/;

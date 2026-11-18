@@ -11,9 +11,9 @@ import {
   StatTile,
   TabPanel,
   Text,
-} from "@factory/ui";
-import type { StatTrend } from "@factory/ui";
-import { breakpoints, space } from "@factory/ui/tokens.stylex";
+} from "@ganger/ui";
+import type { StatTrend } from "@ganger/ui";
+import { breakpoints, space } from "@ganger/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";

@@ -1,6 +1,6 @@
-import { toPermissionRequestId, toQuestionId, toRunId } from "@factory/core";
-import { answerRunQuestion, denyPermissionWait } from "@factory/db";
-import type { Database } from "@factory/db";
+import { toPermissionRequestId, toQuestionId, toRunId } from "@ganger/core";
+import { answerRunQuestion, denyPermissionWait } from "@ganger/db";
+import type { Database } from "@ganger/db";
 import { z } from "zod";
 
 export const answerInput = z.object({

@@ -1,4 +1,4 @@
-import { AdapterError, decidePrState } from "@factory/core";
+import { AdapterError, decidePrState } from "@ganger/core";
 import type {
   AgentResult,
   CommentId,
@@ -12,9 +12,9 @@ import type {
   RunnerErrorDetail,
   RunnerId,
   StartedRun,
-} from "@factory/core";
-import { changeRunState, listRunners, setRunnerMailbox } from "@factory/db";
-import type { Database, StoredRun, StoredRunner } from "@factory/db";
+} from "@ganger/core";
+import { changeRunState, listRunners, setRunnerMailbox } from "@ganger/db";
+import type { Database, StoredRun, StoredRunner } from "@ganger/db";
 import type { WorkerAdapters } from "./adapters.js";
 import type { AutoAssignState } from "./auto-assign.js";
 

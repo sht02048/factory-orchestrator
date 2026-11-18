@@ -44,7 +44,7 @@ function defaultTarball(): string {
   const version =
     typeof parsed === "object" && parsed !== null && "version" in parsed ? parsed.version : null;
   if (typeof version !== "string") throw new Error("package.json has no version");
-  return join(REPO, "dist", `factory-orchestrator-${version}.tar.gz`);
+  return join(REPO, "dist", `ganger-${version}.tar.gz`);
 }
 
 function installBundle(installDir: string): string {
@@ -58,8 +58,8 @@ function installBundle(installDir: string): string {
   return join(root, "cli", "bin", "cli.js");
 }
 
-const home = mkdtempSync(join(tmpdir(), "factory-smoke-cli-"));
-const installDir = values.bundle ? mkdtempSync(join(tmpdir(), "factory-smoke-bundle-")) : null;
+const home = mkdtempSync(join(tmpdir(), "ganger-smoke-cli-"));
+const installDir = values.bundle ? mkdtempSync(join(tmpdir(), "ganger-smoke-bundle-")) : null;
 const port = await freePort();
 const env = { ...process.env };
 for (const name of [
@@ -67,7 +67,7 @@ for (const name of [
   "WEB_PORT",
   "DATABASE_PATH",
   "ENCRYPTION_KEY",
-  "FACTORY_HOME",
+  "GANGER_HOME",
   "NODE_PATH",
   "NODE_OPTIONS",
 ]) {
@@ -128,7 +128,7 @@ try {
     throw new Error(`GET ${asset} returned ${assetResponse.status}`);
   console.log(`GET ${asset} -> ${assetResponse.status}`);
 
-  const db = new DatabaseSync(join(home, "data", "factory-orchestrator.db"));
+  const db = new DatabaseSync(join(home, "data", "ganger.db"));
   try {
     db.exec("PRAGMA busy_timeout = 5000");
     const applied = db.prepare("SELECT count(*) AS n FROM schema_migrations").get()?.["n"];

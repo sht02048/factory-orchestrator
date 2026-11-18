@@ -15,7 +15,7 @@ import { appIconPaths } from "../src/core/app-icon.ts";
 
 const DESKTOP = resolve(import.meta.dirname, "..");
 const REPO = resolve(DESKTOP, "..", "..");
-const PRODUCT = "Factory Orchestrator";
+const PRODUCT = "Ganger";
 
 const { values } = parseArgs({
   options: { arch: { type: "string" }, bundle: { type: "string" }, out: { type: "string" } },
@@ -40,7 +40,7 @@ const electronVersion = stringField(
   readJson(join(DESKTOP, "node_modules", "electron", "package.json")),
   "version",
 );
-const bundleDir = resolve(values.bundle ?? join(REPO, "dist", `factory-orchestrator-${version}`));
+const bundleDir = resolve(values.bundle ?? join(REPO, "dist", `ganger-${version}`));
 for (const required of [
   join(DESKTOP, "dist", "main", "main.js"),
   join(DESKTOP, "dist", "preload", "preload.cjs"),
@@ -72,7 +72,7 @@ writeFileSync(
   join(stage, "package.json"),
   `${JSON.stringify(
     {
-      name: "factory-orchestrator-desktop",
+      name: "ganger-desktop",
       productName: PRODUCT,
       version,
       type: "module",
@@ -98,7 +98,7 @@ const [appDir] = await packager({
   arch,
   electronVersion,
   appVersion: version,
-  appBundleId: "dev.factory-orchestrator.desktop",
+  appBundleId: "dev.ganger.desktop",
   appCategoryType: "public.app-category.developer-tools",
   icon,
   asar: true,

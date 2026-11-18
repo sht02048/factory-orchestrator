@@ -1,5 +1,5 @@
 export const messages = {
-  usage: `Usage: factory-orchestrator <command> [options]
+  usage: `Usage: ganger <command> [options]
 
 Commands:
   init                 Write boot settings (.env) with a new encryption key.
@@ -10,10 +10,10 @@ Commands:
 
 Options:
   --home <dir>         Installation folder for .env, data, and logs
-                       (default: $FACTORY_HOME, or ~/.factory-orchestrator)
+                       (default: $GANGER_HOME, or ~/.ganger)
   --host <address>     init: address the web server binds to (default: 127.0.0.1)
   --port <port>        init: port the web server listens on (default: 3000)
-  --database-path <p>  init: SQLite file (default: <home>/data/factory-orchestrator.db)
+  --database-path <p>  init: SQLite file (default: <home>/data/ganger.db)
   --dry-run            service: print what would be written and run, and change nothing
   -h, --help           Show this help`,
 
@@ -23,7 +23,7 @@ Options:
       `  web: ${host}:${port}\n  database: ${databasePath}`,
     exists: (envFile: string) =>
       `Boot settings already exist at ${envFile}. Left them unchanged, including the encryption key.`,
-    next: "Next: run `factory-orchestrator start`, then open the web address to finish onboarding.",
+    next: "Next: run `ganger start`, then open the web address to finish onboarding.",
   },
 
   start: {
@@ -62,13 +62,13 @@ Options:
       `Removed ${path}, but stopping the service failed (see above). Check it with launchctl or systemctl.`,
     commandFailed: (command: string, output: string) =>
       `Warning: ${command} failed:\n${output.trim()}`,
-    needsInit: "Run `factory-orchestrator init` before installing the service.",
+    needsInit: "Run `ganger init` before installing the service.",
   },
 
   errors: {
     unknownCommand: (command: string) => `Unknown command: ${command}`,
     optionNotFor: (options: string, command: string) => `${options} cannot be used with ${command}`,
     missingEnvFile: (envFile: string) =>
-      `Boot settings not found at ${envFile}. Run \`factory-orchestrator init\` first.`,
+      `Boot settings not found at ${envFile}. Run \`ganger init\` first.`,
   },
 } as const;

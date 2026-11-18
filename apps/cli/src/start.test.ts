@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadMigrations, openDatabase } from "@factory/db";
+import { loadMigrations, openDatabase } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MissingEnvFileError } from "./home.js";
 import { init } from "./init.js";
@@ -16,7 +16,7 @@ let dir: string;
 let started: Started | undefined;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "factory-cli-start-"));
+  dir = mkdtempSync(join(tmpdir(), "ganger-cli-start-"));
 });
 
 afterEach(async () => {

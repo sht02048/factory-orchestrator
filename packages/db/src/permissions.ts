@@ -1,4 +1,4 @@
-import type { PermissionRequestId, PermissionWait, RunId } from "@factory/core";
+import type { PermissionRequestId, PermissionWait, RunId } from "@ganger/core";
 import { and, asc, eq, inArray, isNotNull, isNull, not } from "drizzle-orm";
 import type { Database } from "./database.js";
 import { runPermissionWaits } from "./schema.js";

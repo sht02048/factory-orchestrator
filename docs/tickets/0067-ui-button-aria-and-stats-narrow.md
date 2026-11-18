@@ -1,9 +1,11 @@
 ---
-status: todo
+status: done
 blocked_by: []
 ---
 
 # 0067 공용 Button aria 속성과 Stats 묶음 표 좁은 폭
+
+0074(#113)가 공용 `Button`의 aria 속성을 끝냈다(2026-11-18). 그래서 이 티켓을 done으로 닫는다.
 
 Stats 묶음 표 좁은 폭 부분은 [0072](0072-stats-v2.md)(Stats v2)로 옮겼다(티켓 [0068](0068-v2-screens-decision.md), 2026-11-18). 0072가 오른쪽 패널을 없애고 나눠 보기 표를 다시 짠다. 이 티켓에는 공용 `Button` 부분만 남는다. 아래 Stats 묶음 표 문장은 옮기기 전 기록이다.
 

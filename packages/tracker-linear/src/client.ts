@@ -1,5 +1,5 @@
-import { AdapterError } from "@factory/core";
-import type { TrackerErrorDetail } from "@factory/core";
+import { AdapterError } from "@ganger/core";
+import type { TrackerErrorDetail } from "@ganger/core";
 import { z } from "zod";
 
 export const LINEAR_API_URL = "https://api.linear.app/graphql";

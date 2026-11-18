@@ -5,7 +5,7 @@ describe("신원 확인 응답", () => {
   it("제품 이름·버전·설치 ID·화면 열 수 있는지만 담는다", () => {
     const identity = identityOf("3f1c2b9e-0000-4000-8000-000000000000", "host-not-allowed");
     expect(identity).toEqual({
-      product: "factory-orchestrator",
+      product: "ganger",
       version: PRODUCT_VERSION,
       instanceId: "3f1c2b9e-0000-4000-8000-000000000000",
       webAccess: "host-not-allowed",
@@ -23,13 +23,13 @@ describe("신원 확인 응답", () => {
         webAccess: "allowed",
       }).success,
     ).toBe(false);
-    expect(PRODUCT_NAME).toBe("factory-orchestrator");
+    expect(PRODUCT_NAME).toBe("ganger");
   });
 
   it("모르는 webAccess 값은 열 수 없음으로 읽는다(값을 더해도 옛 클라이언트가 깨지지 않는다)", () => {
     expect(
       identitySchema.parse({
-        product: "factory-orchestrator",
+        product: "ganger",
         version: "9.0.0",
         instanceId: "x",
         webAccess: "read-only",

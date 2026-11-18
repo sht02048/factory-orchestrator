@@ -8,8 +8,8 @@ import {
   toTicketKey,
   toTrackerProjectId,
   toWorktreeRef,
-} from "@factory/core";
-import type { RunId } from "@factory/core";
+} from "@ganger/core";
+import type { RunId } from "@ganger/core";
 import {
   answerRunQuestion,
   denyPermissionWait,
@@ -21,8 +21,8 @@ import {
   recordRunnerCheck,
   requestRunCancel,
   updateRunRecords,
-} from "@factory/db";
-import type { Database } from "@factory/db";
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import {
   breakGitHubAuth,

@@ -1,6 +1,6 @@
-import { toAgentId, toRunnerProjectId, toTicketKey, toTrackerProjectId } from "@factory/core";
-import { assignRun, changeRunState, requestRunCancel } from "@factory/db";
-import type { Database } from "@factory/db";
+import { toAgentId, toRunnerProjectId, toTicketKey, toTrackerProjectId } from "@ganger/core";
+import { assignRun, changeRunState, requestRunCancel } from "@ganger/db";
+import type { Database } from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import runsJson from "../../messages/ko/runs.json" with { type: "json" };

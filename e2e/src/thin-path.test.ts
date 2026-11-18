@@ -16,9 +16,9 @@ import {
   toTrackerKind,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
-import type { AgentResult, PrState, RunId, SummaryOutcome, TicketKey } from "@factory/core";
-import { FakeCodeHost, FakeRunner, FakeTracker } from "@factory/core/testing";
+} from "@ganger/core";
+import type { AgentResult, PrState, RunId, SummaryOutcome, TicketKey } from "@ganger/core";
+import { FakeCodeHost, FakeRunner, FakeTracker } from "@ganger/core/testing";
 import {
   SecretBox,
   assignRun,
@@ -38,10 +38,10 @@ import {
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
   toWorkspaceId,
-} from "@factory/db";
-import type { Database, StoredRun } from "@factory/db";
-import { startWorker } from "@factory/worker";
-import type { RunningWorker } from "@factory/worker";
+} from "@ganger/db";
+import type { Database, StoredRun } from "@ganger/db";
+import { startWorker } from "@ganger/worker";
+import type { RunningWorker } from "@ganger/worker";
 import type { ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" };
@@ -103,8 +103,8 @@ const runner = new FakeRunner(toRunnerKind(fakeKind));
 const warnings: unknown[] = [];
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "factory-e2e-"));
-  const dbPath = join(dir, "factory.db");
+  dir = mkdtempSync(join(tmpdir(), "ganger-e2e-"));
+  const dbPath = join(dir, "ganger.db");
   db = openDatabase(dbPath);
   migrate(db);
   seed(db);

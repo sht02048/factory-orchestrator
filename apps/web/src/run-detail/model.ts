@@ -1,4 +1,4 @@
-import type { AgentResult, PrState, RunState, SummaryOutcome } from "@factory/core";
+import type { AgentResult, PrState, RunState, SummaryOutcome } from "@ganger/core";
 import type { InputWait } from "../home/model";
 import type { QueuedReason } from "../runs/model";
 
