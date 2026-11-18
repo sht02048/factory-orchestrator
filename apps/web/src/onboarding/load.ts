@@ -18,9 +18,10 @@ import {
 import type { Database, SecretBox } from "@factory/db";
 import { z } from "zod";
 import { idSchema, nameSchema } from "../settings/actions";
+import { loadSettingsPage, loadTrackerProjectChoices } from "../settings/load";
 import type { SettingsContext } from "../settings/load";
-import type { SaveResult } from "../settings/model";
-import { isSetupComplete } from "./model";
+import type { ConnectionProjects, SaveResult, SettingsPage } from "../settings/model";
+import { ONBOARDING_STEPS, isSetupComplete, resolveStep } from "./model";
 import type { SetupCounts } from "./model";
 
 export function loadSetupCounts(db: Database, secretBox: SecretBox): SetupCounts {
@@ -43,6 +44,23 @@ export function loadSetupCounts(db: Database, secretBox: SecretBox): SetupCounts
 
 export function isOnboardingComplete(db: Database, secretBox: SecretBox): boolean {
   return isSetupComplete(loadSetupCounts(db, secretBox));
+}
+
+export async function loadOnboardingPage(
+  context: SettingsContext,
+  step: number | undefined,
+  now: Date,
+): Promise<{ page: SettingsPage; trackerProjects: ConnectionProjects[] }> {
+  const page = await loadSettingsPage(context, undefined, now);
+  if (page.workspace !== null) return { page, trackerProjects: page.workspace.trackerProjects };
+  const onWorkspaceStep = ONBOARDING_STEPS[resolveStep(page, step)] === "workspace";
+  return {
+    page,
+    trackerProjects:
+      onWorkspaceStep && page.install.connections.length > 0
+        ? await loadTrackerProjectChoices(context, null)
+        : [],
+  };
 }
 
 export const firstWorkspaceInput = z.object({

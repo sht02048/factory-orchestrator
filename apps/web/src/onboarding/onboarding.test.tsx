@@ -24,7 +24,7 @@ import {
   saveWorkspaceTrackerProject,
   toWorkspaceId,
 } from "@factory/db";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   saveGitHubToken,
   saveInProgressState,
@@ -40,7 +40,7 @@ import { settingsMessages } from "../settings/messages";
 import { SettingsScreen } from "../settings/settings-screen";
 import { buttonsOf } from "../testing/buttons";
 import { renderWithMessages } from "../testing/render";
-import { isOnboardingComplete, setUpFirstWorkspace } from "./load";
+import { isOnboardingComplete, loadOnboardingPage, setUpFirstWorkspace } from "./load";
 import { onboardingMessages } from "./messages";
 import {
   HOME_PATH,
@@ -756,6 +756,27 @@ describe("다섯 단계를 마치기", () => {
     expect(shown).toContain("Acme Labs에 있어요");
     expect(html).toMatch(/role="checkbox"[^>]*aria-checked="false"[^>]*aria-disabled="true"/);
     expect(buttonsOf(html).find((b) => b.label === "만들기")?.variant).toBe("primary");
+  });
+
+  it("Workspace 가 없을 때 트래커 프로젝트 목록은 Workspace 단계에서만 트래커에서 읽는다", async () => {
+    const f = fixture();
+    await connectTracker(f);
+    expect(await saveGitHubToken(f.context, { token: "github_pat_example" }, now)).toEqual({
+      ok: true,
+    });
+    const runnerId = registerRunner(f);
+    finishCheck(f, runnerId, health({ service: true, push: true }));
+    const listProjects = vi.spyOn(f.tracker, "listProjects");
+
+    for (const step of [1, 2, 3]) {
+      expect((await loadOnboardingPage(f.context, step, now)).trackerProjects).toEqual([]);
+    }
+    expect(listProjects).not.toHaveBeenCalled();
+
+    const atWorkspace = await loadOnboardingPage(f.context, 4, now);
+    expect(listProjects).toHaveBeenCalledTimes(1);
+    expect(atWorkspace.trackerProjects[0]?.projects.map((p) => p.name)).toEqual(["Web"]);
+    expect((await loadOnboardingPage(f.context, undefined, now)).trackerProjects).toHaveLength(1);
   });
 
   it("Workspace 를 만들면서 고른 트래커 프로젝트를 한 번에 넣고, 하나라도 못 넣으면 아무것도 만들지 않는다", async () => {

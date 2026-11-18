@@ -20,7 +20,9 @@ export const Route = createFileRoute("/onboarding")({
   validateSearch: z.object({ step: z.number().int().optional().catch(undefined) }),
   loaderDeps: ({ search }) => ({ step: search.step }),
   loader: async ({ deps }) => {
-    const loaded = await getOnboardingPage();
+    const loaded = await getOnboardingPage({
+      data: deps.step === undefined ? {} : { step: deps.step },
+    });
     const pinned = stepToPin(loaded.page, deps.step);
     if (pinned !== null) {
       throw redirect({ to: ONBOARDING_PATH, search: { step: pinned }, replace: true });
