@@ -13,6 +13,8 @@
 
 **갱신(2026-11-18, 운영자 결정, 티켓 0029).** 지금 만드는 배포물은 의존성까지 묶은 서버 배포물(폴더와 tarball, Node 미포함)이고 공개하지 않는다. npm 패키지로 낼지와 Changesets는 릴리스 티켓 0031에서 정한다. CLI가 `init`, `start`, 서비스 등록을 맡는 점은 그대로다.
 
+**갱신(2026-11-18, 운영자 결정, 티켓 0076).** 제품 이름은 Ganger다. 위의 임시 이름 `factory-orchestrator`와 그 이름이 들어간 패키지·CLI 명령·설치 폴더·환경 변수·데스크톱 앱 이름을 바꾸는 표와, 이미 설치한 곳을 옮기는 규칙은 [ADR 0011](0011-product-name-ganger.md)에 있다.
+
 ## Considered Options
 
 - **Docker 이미지 우선 배포**: 설치는 쉽지만 macOS에서 ssh·Tailscale 연동이 불편해 미룬다.
