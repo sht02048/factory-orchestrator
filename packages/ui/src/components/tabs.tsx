@@ -80,7 +80,10 @@ export function TabPanel({ value, children }: { value: string; children: ReactNo
 const styles = stylex.create({
   list: {
     display: "flex",
-    gap: space.s6,
+    // 영어 상태 이름(ADR 0010)이 길어 탭이 넘치면 줄바꿈 대신 가로로 스크롤한다.
+    overflowX: "auto",
+    scrollbarWidth: "none",
+    gap: space.s5,
     marginBottom: space.s2,
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
@@ -89,6 +92,8 @@ const styles = stylex.create({
   tab: {
     position: "relative",
     display: "flex",
+    flexShrink: 0,
+    whiteSpace: "nowrap",
     alignItems: "baseline",
     gap: space.px6,
     height: 36,

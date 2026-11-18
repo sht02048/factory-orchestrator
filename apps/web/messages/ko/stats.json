@@ -46,7 +46,7 @@
     "merged": "Merged",
     "check": "Human Check",
     "failed": "Failed",
-    "canceled": "취소",
+    "canceled": "Canceled",
     "leadTime": "리드 타임"
   },
   "listLabel": "{dimension} 통계",
@@ -63,7 +63,7 @@
     "failed": "Failed",
     "countPercent": "{count}개 · {percent}%",
     "count": "{count}개",
-    "canceled": "취소",
+    "canceled": "Canceled",
     "canceledCount": "{count}개 · 비율에서 빼요",
     "leadTime": "리드 타임 중앙값",
     "leadTimeP90": "리드 타임 p90",

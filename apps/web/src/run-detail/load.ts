@@ -59,6 +59,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
 
   const detail: RunDetail = {
     id: run.id,
+    now: now.toISOString(),
     ticketKey: run.ticket.key,
     trackerProject:
       getWorkspaceTrackerProject(db, run.ticket.connection, run.trackerProject)?.name ??

@@ -3,12 +3,12 @@ import {
   DefinitionItem,
   DefinitionList,
   DetailPanel,
-  Dot,
   PageHeader,
   PanelBlock,
   PanelHeader,
   RowTitle,
   SplitView,
+  StatusPill,
   Table,
   TableCell,
   TableEmpty,
@@ -21,8 +21,9 @@ import {
 import { colors, fonts, space } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
-import { useFormatDuration } from "../format/duration";
+import { useTime } from "../format/time";
 import { usePrerequisiteName } from "../labels";
+import { useStatusName } from "../status";
 import type { GitHubAuthCheck, RunWorkspace, RunnerView, RunnersPage } from "./model";
 
 // 러너 | 상태 | 사용 중 | Queued | 남은 워크트리 | 마지막 확인
@@ -88,7 +89,7 @@ export function RunnersScreen({ page, selectedId, onSelect }: RunnersScreenProps
 
 function RunnerRow({ runner }: { runner: RunnerView }) {
   const t = useTranslations("runners");
-  const duration = useFormatDuration();
+  const { ago } = useTime();
   const count = (n: number) => (n === 0 ? t("notApplicable") : t("count", { count: n }));
   return (
     <TableRow value={runner.id} label={runner.name}>
@@ -122,28 +123,22 @@ function RunnerRow({ runner }: { runner: RunnerView }) {
         {count(runner.leftWorktrees.length)}
       </TableCell>
       <TableCell align="end" numeric>
-        {runner.checkedAgoMs === null
-          ? t("neverChecked")
-          : t("checkedAgo", { duration: duration(runner.checkedAgoMs) })}
+        {runner.checked === null ? t("neverChecked") : ago(runner.checked.at, runner.checked.agoMs)}
       </TableCell>
     </TableRow>
   );
 }
 
 function OnlineState({ online }: { online: boolean }) {
-  const t = useTranslations("runners");
-  return (
-    <span {...stylex.props(styles.inline)}>
-      <Dot tone={online ? "online" : "offline"} />
-      {online ? t("online") : t("offline")}
-    </span>
-  );
+  const statusName = useStatusName();
+  const status = online ? "online" : "offline";
+  return <StatusPill status={status}>{statusName(status)}</StatusPill>;
 }
 
 function RunnerPanel({ runner }: { runner: RunnerView }) {
   const t = useTranslations("runners.panel");
   const domain = useTranslations("domain");
-  const duration = useFormatDuration();
+  const { duration, elapsed, ago } = useTime();
   const occupied = runner.occupying.length;
   const free = Math.max(0, runner.capacity - occupied);
 
@@ -160,9 +155,9 @@ function RunnerPanel({ runner }: { runner: RunnerView }) {
           <>
             <OnlineState online={runner.online} />
             <Text variant="meta">
-              {runner.checkedAgoMs === null
+              {runner.checked === null
                 ? t("neverChecked")
-                : t("checkedAgo", { duration: duration(runner.checkedAgoMs) })}
+                : t("checkedAgo", { time: ago(runner.checked.at, runner.checked.agoMs) })}
             </Text>
           </>
         }
@@ -181,7 +176,7 @@ function RunnerPanel({ runner }: { runner: RunnerView }) {
               meta={t("runMeta", {
                 workspace: run.workspace.name,
                 state: domain(`runState.${run.state}`),
-                duration: duration(run.executionMs),
+                elapsed: elapsed(run.executionMs),
               })}
             />
           ))}
@@ -330,7 +325,6 @@ function runHref(workspaceId: string, runId: string): string {
 
 const styles = stylex.create({
   titleCell: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  inline: { display: "inline-flex", alignItems: "center", gap: space.px6 },
   list: { margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column" },
   item: {
     paddingBlock: space.s2,

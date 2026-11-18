@@ -5,10 +5,7 @@
   "noRunners": "등록한 러너가 없어요. Settings에서 러너를 등록하면 여기에 보여요.",
   "listLabel": "러너 목록",
   "notApplicable": "—",
-  "online": "Online",
-  "offline": "Offline",
   "assignmentBlocked": "할당에서 빠짐",
-  "checkedAgo": "{duration} 전",
   "neverChecked": "확인 전",
   "columns": {
     "runner": "러너",
@@ -22,7 +19,7 @@
   "count": "{count}개",
   "panel": {
     "label": "고른 러너 요약",
-    "checkedAgo": "{duration} 전 확인",
+    "checkedAgo": "{time} 확인",
     "neverChecked": "아직 확인하지 않았어요",
     "reason": {
       "offline": "오케스트레이터가 이 러너에 닿지 않아요. 다시 닿을 때까지 이 러너에서 런을 시작하지 않아요.",
@@ -33,7 +30,7 @@
     "capacity": "capacity {occupied}/{capacity}",
     "freeCapacity": "{count}개 비어 있어요",
     "noFreeCapacity": "Offline이라 남은 capacity를 쓸 수 없어요",
-    "runMeta": "{workspace} · {state} · {duration}째",
+    "runMeta": "{workspace} · {state} · {elapsed}",
     "queued": "기다리는 런 {count}",
     "queuedMeta": "{workspace} · {duration}째 기다리는 중",
     "leftWorktrees": "남은 워크트리 {count}",

@@ -94,7 +94,7 @@ export function OnboardingScreen({
         <div {...stylex.props(styles.footer)}>
           {passed ? null : <Text variant="meta">{t("nextLocked")}</Text>}
           <Button
-            variant={passed ? "primary" : "default"}
+            variant={passed ? "primary" : "secondary"}
             disabled={!passed}
             onClick={() => (last ? onFinish() : onStep(index + 1))}
           >
@@ -573,7 +573,7 @@ const styles = stylex.create({
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: colors.borderDefault,
-    borderRadius: radius.md,
+    borderRadius: radius.control,
     backgroundColor: colors.bgInset,
     color: colors.textPrimary,
     fontFamily: fonts.mono,
@@ -581,5 +581,5 @@ const styles = stylex.create({
   },
   word: { whiteSpace: "pre" },
   ok: { margin: 0, color: colors.textPrimary },
-  error: { margin: 0, color: colors.failed },
+  error: { margin: 0, color: colors.problem },
 });

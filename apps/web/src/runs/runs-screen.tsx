@@ -9,7 +9,7 @@ import {
   PanelHeader,
   RowTitle,
   SplitView,
-  Status,
+  StatusPill,
   Tab,
   Table,
   TableCell,
@@ -21,19 +21,18 @@ import {
   Tabs,
   Text,
 } from "@factory/ui";
-import type { SummaryOutcome } from "@factory/core";
-import type { StatusTone } from "@factory/ui";
 import { colors, space } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
-import { useFormatDuration } from "../format/duration";
+import { useTime } from "../format/time";
 import { useAgentName } from "../labels";
+import { runStatus, useStatusName } from "../status";
 import type { WorkspaceSummary } from "../shell/model";
 import { RUN_FILTERS, elapsedMs, filterKeyOf, matchesFilter } from "./model";
 import type { RunFilter, RunView, RunsPage } from "./model";
 
 // 티켓 | 상태 | 에이전트 결과 | PR 상태 | 러너 | 에이전트 | 경과
-const columns = "minmax(0, 1fr) 104px 128px 64px 96px 80px 72px";
+const columns = "minmax(0, 1fr) 144px 128px 64px 96px 80px 72px";
 
 /** 손댈 일(GLOSSARY): 개수를 밝게 보이는 필터 */
 const attentionFilters: ReadonlySet<RunFilter> = new Set([
@@ -190,9 +189,9 @@ function RunRow({ run }: { run: RunView }) {
   const agentName = useAgentName();
   const t = useTranslations("runs");
   const domain = useTranslations("domain");
-  const duration = useFormatDuration();
-  const status = useRunStatus();
-  const { tone, label } = status(run);
+  const { duration, elapsed } = useTime();
+  const statusName = useStatusName();
+  const status = runStatus(run);
   return (
     <TableRow value={run.id} label={run.ticketKey}>
       <TableCell>
@@ -200,9 +199,7 @@ function RunRow({ run }: { run: RunView }) {
       </TableCell>
       <TableCell>
         <span {...stylex.props(styles.inline)}>
-          <Status tone={tone} dot={false}>
-            {label}
-          </Status>
+          <StatusPill status={status}>{statusName(status)}</StatusPill>
           {run.state !== "ended" && run.cancelling ? (
             <Text variant="meta">{t("cancelling")}</Text>
           ) : null}
@@ -217,7 +214,7 @@ function RunRow({ run }: { run: RunView }) {
       <TableCell>{run.runner?.name ?? t("notApplicable")}</TableCell>
       <TableCell>{agentName(run.agent)}</TableCell>
       <TableCell align="end" numeric>
-        {duration(elapsedMs(run))}
+        {run.state === "ended" ? duration(elapsedMs(run)) : elapsed(elapsedMs(run))}
       </TableCell>
     </TableRow>
   );
@@ -227,9 +224,9 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
   const agentName = useAgentName();
   const t = useTranslations("runs.panel");
   const domain = useTranslations("domain");
-  const duration = useFormatDuration();
-  const status = useRunStatus();
-  const { tone, label } = status(run);
+  const { duration, elapsed } = useTime();
+  const statusName = useStatusName();
+  const status = runStatus(run);
 
   let when: string;
   let reason: string;
@@ -244,7 +241,7 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
     case "running":
     case "waiting-for-input":
     case "disconnected":
-      when = t("elapsedFor", { duration: duration(run.executionMs ?? 0) });
+      when = elapsed(run.executionMs ?? 0);
       reason = t(`reason.${run.state}`);
       break;
     case "ended":
@@ -262,7 +259,7 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
       <PanelHeader
         status={
           <>
-            <Status tone={tone}>{label}</Status>
+            <StatusPill status={status}>{statusName(status)}</StatusPill>
             {run.state !== "ended" && run.cancelling ? (
               <Text variant="meta">{t("cancelling")}</Text>
             ) : null}
@@ -293,7 +290,7 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
           {ended === null ? (
             t("notEnded")
           ) : (
-            <Status tone={summaryTone(ended.summary)}>{domain(`summary.${ended.summary}`)}</Status>
+            <StatusPill status={ended.summary}>{statusName(ended.summary)}</StatusPill>
           )}
         </DefinitionItem>
         <DefinitionItem label={t("agentResult")} empty={ended === null}>
@@ -332,54 +329,10 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
   );
 }
 
-function summaryTone(summary: SummaryOutcome): StatusTone {
-  switch (summary) {
-    case "human-check":
-      return "check";
-    case "failed":
-      return "failed";
-    case "merged":
-    case "canceled":
-      return "neutral";
-  }
-}
-
-/** 상태 칸: Ended 는 요약 결과, 그 밖은 런 상태. 색은 Human Check·Failed 에만 쓴다(ADR 0007) */
-function useRunStatus(): (run: RunView) => { tone: StatusTone; label: string } {
-  const domain = useTranslations("domain");
-  return (run) => {
-    switch (run.state) {
-      case "ended":
-        return { tone: summaryTone(run.summary), label: domain(`summary.${run.summary}`) };
-      case "queued":
-        return { tone: "neutral", label: domain("runState.queued") };
-      case "running":
-      case "waiting-for-input":
-      case "disconnected":
-        return { tone: "running", label: domain(`runState.${run.state}`) };
-    }
-  };
-}
-
 function useFilterLabel(): (filter: RunFilter) => string {
   const t = useTranslations("runs.filter");
-  const domain = useTranslations("domain");
-  return (filter) => {
-    switch (filter) {
-      case "all":
-        return t("all");
-      case "queued":
-      case "running":
-      case "waiting-for-input":
-      case "disconnected":
-        return domain(`runState.${filter}`);
-      case "merged":
-      case "human-check":
-      case "failed":
-      case "canceled":
-        return domain(`summary.${filter}`);
-    }
-  };
+  const statusName = useStatusName();
+  return (filter) => (filter === "all" ? t("all") : statusName(filter));
 }
 
 const styles = stylex.create({

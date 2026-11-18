@@ -129,7 +129,7 @@ const styles = stylex.create({
     height: 34,
     paddingInline: space.s2,
     borderWidth: 0,
-    borderRadius: radius.md,
+    borderRadius: radius.control,
     backgroundColor: { default: "transparent", ":hover": colors.bgHover },
     boxShadow: `inset 0 0 0 1px ${colors.borderSubtle}`,
     color: colors.textPrimary,

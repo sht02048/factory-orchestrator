@@ -11,7 +11,7 @@ import {
 } from "../tokens.stylex";
 
 /*
- * 화면 틀(ADR 0007): 목록 | 오른쪽 상세 패널. 구역은 카드 대신 옅은 선과 여백으로 나눈다.
+ * 화면 틀(ADR 0007): 목록 | 오른쪽 상세 패널. 영역은 면(배경색)과 여백으로 나눈다(ADR 0010).
  */
 
 export interface SplitViewProps {
@@ -153,10 +153,8 @@ const styles = stylex.create({
   panel: {
     minWidth: 0,
     overflow: "auto",
+    // 목록과 패널은 선이 아니라 면(배경색)으로 나눈다(ADR 0010 10번).
     backgroundColor: colors.bgPanel,
-    borderInlineStartWidth: 1,
-    borderInlineStartStyle: "solid",
-    borderInlineStartColor: colors.borderSubtle,
   },
   pageHead: {
     display: "flex",

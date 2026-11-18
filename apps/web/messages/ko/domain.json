@@ -1,9 +1,9 @@
 {
   "runState": {
     "queued": "Queued",
-    "running": "실행 중",
-    "waiting-for-input": "입력 기다림",
-    "disconnected": "연결 끊김",
+    "running": "Running",
+    "waiting-for-input": "Waiting for Input",
+    "disconnected": "Disconnected",
     "ended": "Ended"
   },
   "agentResult": {
@@ -27,7 +27,19 @@
     "merged": "Merged",
     "human-check": "Human Check",
     "failed": "Failed",
-    "canceled": "취소"
+    "canceled": "Canceled"
+  },
+  "attention": {
+    "question": "Question",
+    "permission": "Permission",
+    "human-check": "Human Check",
+    "failed": "Failed",
+    "disconnected": "Disconnected",
+    "runner-issue": "Runner Issue"
+  },
+  "runnerState": {
+    "online": "Online",
+    "offline": "Offline"
   },
   "queuedReason": {
     "starting": "곧 시작해요",
@@ -42,6 +54,11 @@
     "minutes": "{minutes}분",
     "hours": "{hours}시간",
     "hoursMinutes": "{hours}시간 {minutes}분"
+  },
+  "time": {
+    "justNow": "방금",
+    "ago": "{duration} 전",
+    "elapsed": "{duration}째"
   },
   "agent": {
     "claude": "Claude Code",

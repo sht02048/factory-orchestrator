@@ -7,7 +7,7 @@
     "all": "전체",
     "attention": "손댈 일",
     "unassigned": "할당 전",
-    "running": "실행 중",
+    "running": "Running",
     "merged": "Merged"
   },
   "columns": {

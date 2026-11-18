@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   Button,
+  Card,
   DefinitionItem,
   DefinitionList,
   Dialog,
@@ -11,9 +12,11 @@ import {
   Input,
   Menu,
   MenuItem,
+  PILL_STATUSES,
+  Row,
   Select,
   SplitView,
-  Status,
+  StatusPill,
   Tab,
   Table,
   TableCell,
@@ -22,31 +25,71 @@ import {
   Tabs,
   Text,
   Tooltip,
+  statusTone,
+  type PillStatus,
+  type StatusTone,
 } from "./index";
 
 const noop = () => {};
 
 describe("서버 렌더", () => {
   it("Button 은 변형마다 다른 클래스를 갖고 disabled 를 넘긴다", () => {
-    const primary = renderToString(<Button variant="primary">시작</Button>);
-    const plain = renderToString(<Button>시작</Button>);
-    const disabled = renderToString(<Button disabled>시작</Button>);
-    expect(primary).toContain('type="button"');
-    expect(primary).not.toEqual(plain);
-    expect(disabled).toContain("disabled");
+    const html = (variant?: "primary" | "secondary" | "danger" | "ghost") =>
+      renderToString(<Button {...(variant === undefined ? {} : { variant })}>시작</Button>);
+    expect(html("primary")).toContain('type="button"');
+    // 기본은 보조 버튼이다.
+    expect(html()).toEqual(html("secondary"));
+    const classes = new Set(["primary", "secondary", "danger", "ghost"] as const);
+    expect(new Set([...classes].map((v) => html(v))).size).toBe(4);
+    expect(renderToString(<Button disabled>시작</Button>)).toContain("disabled");
   });
 
-  it("Status 는 점과 글을 함께 그리고, 점은 스크린 리더에서 숨긴다", () => {
-    const html = renderToString(<Status tone="check">Human Check</Status>);
+  it("StatusPill 은 상태 값마다 ADR 0010 5번의 색을 고른다", () => {
+    const expected: Record<StatusTone, PillStatus[]> = {
+      answer: ["waiting-for-input", "question", "permission"],
+      check: ["human-check"],
+      problem: ["disconnected", "failed", "offline", "runner-issue"],
+      progress: ["running", "online"],
+      merged: ["merged"],
+      idle: ["queued", "canceled"],
+    };
+    const actual: Record<StatusTone, PillStatus[]> = {
+      answer: [],
+      check: [],
+      problem: [],
+      progress: [],
+      merged: [],
+      idle: [],
+    };
+    for (const status of PILL_STATUSES) actual[statusTone(status)].push(status);
+    expect(actual).toEqual(expected);
+  });
+
+  it("StatusPill 은 점과 이름을 함께 그리고, 점은 스크린 리더에서 숨긴다", () => {
+    const html = renderToString(<StatusPill status="human-check">Human Check</StatusPill>);
     expect(html).toContain("Human Check");
+    expect(html).toContain('data-tone="check"');
     expect(html).toContain('aria-hidden="true"');
-    expect(
-      renderToString(
-        <Status tone="failed" dot={false}>
-          Failed
-        </Status>,
-      ),
-    ).not.toContain("aria-hidden");
+    // 색이 다르면 클래스가 다르다.
+    const failed = renderToString(<StatusPill status="failed">Human Check</StatusPill>);
+    expect(failed.replace(/data-[a-z]+="[^"]*"/g, "")).not.toEqual(
+      html.replace(/data-[a-z]+="[^"]*"/g, ""),
+    );
+  });
+
+  it("Card 는 이름이 있으면 구역으로, Row 는 앞·뒤 칸을 그린다", () => {
+    expect(renderToString(<Card>내용</Card>)).toMatch(/^<div/);
+    expect(renderToString(<Card label="손댈 일">내용</Card>)).toMatch(
+      /^<section aria-label="손댈 일"/,
+    );
+    const row = renderToString(
+      <Row leading={<StatusPill status="running">Running</StatusPill>} trailing="10:45">
+        시작했어요
+      </Row>,
+    );
+    expect(row).toContain("Running");
+    expect(row).toContain("시작했어요");
+    expect(row).toContain("10:45");
   });
 
   it("Text 는 변형에 맞는 기본 요소를 쓴다", () => {

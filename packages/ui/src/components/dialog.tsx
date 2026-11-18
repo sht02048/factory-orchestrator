@@ -50,7 +50,7 @@ export interface DialogProps {
 
 export function Dialog({
   trigger,
-  triggerVariant = "default",
+  triggerVariant = "secondary",
   title,
   description,
   children,
@@ -88,7 +88,7 @@ export interface DialogCloseProps {
 }
 
 /** 다이얼로그를 닫는 버튼. onClick 을 먼저 부른 뒤 닫는다. */
-export function DialogClose({ variant = "default", children, onClick }: DialogCloseProps) {
+export function DialogClose({ variant = "secondary", children, onClick }: DialogCloseProps) {
   return (
     <SdkDialogClose
       {...(onClick === undefined ? {} : { onClick })}
@@ -126,7 +126,7 @@ const styles = stylex.create({
     width: "min(440px, calc(100vw - 32px))",
     padding: space.s6,
     borderWidth: 0,
-    borderRadius: radius.md,
+    borderRadius: radius.card,
     backgroundColor: colors.bgRaised,
     boxShadow: shadow.popover,
     color: colors.textPrimary,

@@ -54,7 +54,7 @@ const styles = stylex.create({
     cursor: "help",
     outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
     outlineOffset: 2,
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
   },
   content: {
     zIndex: 100,
@@ -63,7 +63,7 @@ const styles = stylex.create({
     borderWidth: 0,
     paddingBlock: space.s1,
     paddingInline: space.s2,
-    borderRadius: radius.sm,
+    borderRadius: radius.pill,
     backgroundColor: colors.bgRaised,
     boxShadow: shadow.popover,
     color: colors.textPrimary,
