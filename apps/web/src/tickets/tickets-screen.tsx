@@ -70,7 +70,7 @@ export function TicketsScreen(props: TicketsScreenProps) {
         />
       );
     case "one":
-      return <TicketsList {...props} />;
+      return <TicketsList key={page.workspace.workspace.id} {...props} />;
   }
 }
 
@@ -148,12 +148,13 @@ function TicketsList({
   const scrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const rows = useRowWindow(listRef, visible.length, selectedIndex);
-  const moreBelow = useMoreBelow(scrollRef, visible.length);
+  const moreBelow = useMoreBelow(scrollRef, listRef, visible.length);
   const [assignedId, setAssignedId] = useState<string | null>(null);
   const showTrackerProject = page.trackerProjectCount > 1;
 
   let empty: string;
-  if (query.trim() !== "" && page.tickets.length > 0) empty = t("noMatch", { query: query.trim() });
+  const filtered = counts[filter] > 0;
+  if (query.trim() !== "" && filtered) empty = t("noMatch", { query: query.trim() });
   else if (page.tickets.length > 0 || page.errors.length > 0) empty = t("empty");
   else if (page.trackerProjectCount === 0) empty = t("noProjects");
   else empty = t("noTickets");
@@ -275,7 +276,11 @@ function TicketsList({
   );
 }
 
-function useMoreBelow(scrollRef: RefObject<HTMLElement | null>, rowCount: number): boolean {
+function useMoreBelow(
+  scrollRef: RefObject<HTMLElement | null>,
+  contentRef: RefObject<HTMLElement | null>,
+  rowCount: number,
+): boolean {
   const [moreBelow, setMoreBelow] = useState(false);
   useLayoutEffect(() => {
     const scroller = scrollRef.current;
@@ -287,11 +292,12 @@ function useMoreBelow(scrollRef: RefObject<HTMLElement | null>, rowCount: number
     scroller.addEventListener("scroll", update, { passive: true });
     const observer = new ResizeObserver(update);
     observer.observe(scroller);
+    if (contentRef.current !== null) observer.observe(contentRef.current);
     return () => {
       scroller.removeEventListener("scroll", update);
       observer.disconnect();
     };
-  }, [scrollRef, rowCount]);
+  }, [scrollRef, contentRef, rowCount]);
   return moreBelow;
 }
 

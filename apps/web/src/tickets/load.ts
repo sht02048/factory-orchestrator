@@ -2,6 +2,7 @@ import { AdapterError, checkAssignment, summarizeRunOutcome } from "@factory/cor
 import type {
   AdapterRegistry,
   LabelId,
+  RunnerId,
   Tracker,
   TrackerConnectionId,
   TrackerTicket,
@@ -49,7 +50,8 @@ export async function loadTicketsPage(
     listWorkspaces(db).map((w) => ({ id: w.id, name: w.name })),
     ws,
   );
-  const runners = listRunners(db).map((runner) => ({
+  const storedRunners = listRunners(db);
+  const runners = storedRunners.map((runner) => ({
     id: runner.id,
     name: runner.name,
     online: runner.online,
@@ -57,7 +59,7 @@ export async function loadTicketsPage(
     projects: runner.projects.map((p) => p.id),
   }));
   const agents = mappingAgents(db);
-  const runnerNames = new Map(runners.map((runner) => [runner.id, runner.name]));
+  const runnerNames = new Map(storedRunners.map((runner) => [runner.id, runner.name]));
   if (workspace.kind !== "one")
     return {
       workspace,
@@ -213,7 +215,7 @@ function groupRuns(runs: ReadonlyArray<StoredRun>): Map<string, StoredRun[]> {
 function toTicketRun(
   db: Database,
   run: StoredRun,
-  runnerNames: ReadonlyMap<string, string>,
+  runnerNames: ReadonlyMap<RunnerId, string>,
   now: Date,
 ): TicketRun {
   const runnerName = run.runnerId === null ? null : (runnerNames.get(run.runnerId) ?? null);
