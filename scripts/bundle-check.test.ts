@@ -2,7 +2,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { fakeAdapterNames, findBundleProblems, packageImports } from "./bundle-check.ts";
+import {
+  devOnlyMarkers,
+  fakeAdapterNames,
+  findBundleProblems,
+  packageImports,
+} from "./bundle-check.ts";
 
 describe("packageImports", () => {
   it("finds package imports and ignores relative paths and Node built-ins", () => {
@@ -33,6 +38,16 @@ describe("fakeAdapterNames", () => {
       fakeAdapterNames("class FakeRunner {}\nregistry.registerTracker(fakeTrackerFactory);"),
     ).toEqual(["FakeRunner", "fakeTrackerFactory"]);
     expect(fakeAdapterNames("class OrcaRunner {}")).toEqual([]);
+  });
+});
+
+describe("devOnlyMarkers", () => {
+  it("finds strings that only the pnpm dev entry point has", () => {
+    expect(devOnlyMarkers('const key = "lin_api_demo_acme"; globalThis.__factoryDev;')).toEqual([
+      "lin_api_demo",
+      "__factoryDev",
+    ]);
+    expect(devOnlyMarkers('const key = "lin_api_real";')).toEqual([]);
   });
 });
 

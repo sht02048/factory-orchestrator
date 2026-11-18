@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // main.ts 는 Node 가 바로 돌려(타입 지우기) 상대 경로를 .ts 로 import 한다.
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "lib": ["ES2024", "DOM"]
+  },
+  "include": ["src", "vitest.config.ts"]
+}
