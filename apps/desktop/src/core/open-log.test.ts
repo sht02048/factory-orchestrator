@@ -34,8 +34,14 @@ describe("로그 열기", () => {
   });
 
   it("서버가 로그를 쓰기 전에 실패해 파일이 없으면 로그 폴더를 연다", async () => {
-    const { deps, calls } = fakeShell({ files: [] });
+    const { deps, calls } = fakeShell({ files: ["/home/logs"] });
     await openLog("/home/logs/server.log", deps);
     expect(calls).toEqual(["open /home/logs"]);
+  });
+
+  it("로그 폴더도 아직 없으면 있는 가장 가까운 위 폴더를 연다", async () => {
+    const { deps, calls } = fakeShell({ files: ["/home"] });
+    await openLog("/home/logs/server.log", deps);
+    expect(calls).toEqual(["open /home"]);
   });
 });
