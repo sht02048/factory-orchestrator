@@ -23,6 +23,7 @@ import {
 import { describe, expect, it } from "vitest";
 import {
   addTrackerProject,
+  saveAddresses,
   saveGitHubToken,
   saveInProgressState,
   saveLabel,
@@ -106,6 +107,7 @@ const noopActions: OnboardingActions = {
   checkGitHubToken: reject,
   saveRunner: reject,
   recheckRunner: reject,
+  saveAddresses: reject,
   pollRunnerChecks: () => Promise.resolve(false),
   createWorkspace: reject,
 };
@@ -536,6 +538,31 @@ describe("다섯 단계를 마치기", () => {
     expect(shown).toContain("Linear에서 webhook 만들기");
     expect(shown).toContain("Issues");
     expect(render(settings, "tracker")).toContain(connection.webhookPath);
+  });
+
+  it("webhook 공개 주소를 정하면 1단계가 브라우저 주소가 아니라 그 주소로 webhook 주소를 보인다(0048)", async () => {
+    const f = fixture();
+    await connectTracker(f);
+    const before = await page(f);
+    // 정하지 않았으면 그 사실과 정하는 방법, 경로를 보인다
+    const unset = text(render(before, "tracker"));
+    expect(unset).toContain("아직 webhook 공개 주소가 없어요");
+    expect(unset).toContain("Tailscale Funnel");
+
+    expect(
+      saveAddresses(
+        f.context,
+        { webAddress: "", webhookAddress: "https://hooks.example.com/" },
+        now,
+        { host: "127.0.0.1:3000", bindHost: "127.0.0.1" },
+      ),
+    ).toEqual({ ok: true });
+    const settings = await page(f);
+    const connection = settings.install.connections[0];
+    if (connection === undefined) throw new Error("no connection");
+    const html = render(settings, "tracker");
+    expect(html).toContain(`https://hooks.example.com${connection.webhookPath}`);
+    expect(text(html)).not.toContain("아직 webhook 공개 주소가 없어요");
   });
 
   it("단계 없는 주소로 들어와 트래커 연결을 저장하면 1단계에 머물고 webhook 경로가 보인다", async () => {

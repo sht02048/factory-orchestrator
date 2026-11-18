@@ -20,6 +20,7 @@ import {
   requestRunnerCheck,
   saveAutoAssignLabel,
   saveCodeHostConnection,
+  saveInstallAddresses,
   saveMapping,
   saveRunner,
   saveTrackerConnection,
@@ -29,6 +30,7 @@ import {
 } from "@factory/db";
 import type { WorkspaceId } from "@factory/db";
 import { z } from "zod";
+import { allowedHosts, hostnameOfHostHeader } from "../server/request-guard";
 import { remoteErrorOf, remoteErrorOfDetail } from "./load";
 import type { SettingsContext } from "./load";
 import { MAX_MODEL_LENGTH, MAX_RUN_MINUTES } from "./model";
@@ -424,5 +426,67 @@ export function requestRunnerCheckSetting(
   const runner = listRunners(context.db).find((r) => r.id === input.id);
   if (runner === undefined) return { ok: false, reason: "not-found" };
   requestRunnerCheck(context.db, runner.id, now);
+  return { ok: true };
+}
+
+// ---------- 주소(티켓 0048) ----------
+
+export const addressesInput = z.object({
+  webAddress: z.string().trim().max(2000),
+  webhookAddress: z.string().trim().max(2000),
+});
+
+/**
+ * 넣은 주소를 저장할 모양(origin)으로 바꾼다. 비었으면 null(정하지 않음)이다. http·https 이고 경로·쿼리·사용자
+ * 정보가 없어야 한다. 서버는 경로 접두사 아래에서 돌지 않아 경로가 붙은 주소는 맞지 않는다. 틀리면 undefined 다.
+ */
+export function normalizeAddress(value: string): string | null | undefined {
+  if (value === "") return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return undefined;
+  }
+  const plain =
+    (url.protocol === "http:" || url.protocol === "https:") &&
+    url.username === "" &&
+    url.password === "" &&
+    url.pathname === "/" &&
+    url.search === "" &&
+    url.hash === "";
+  return plain ? url.origin : undefined;
+}
+
+export type AddressSaveReason = "invalid-web-address" | "invalid-webhook-address" | "locks-out";
+
+/** 지금 요청이 온 곳. 저장하면 지금 보는 화면이 막히는지 보는 데 쓴다 */
+export interface RequestOrigin {
+  /** 요청의 Host 헤더. 모르면 null */
+  host: string | null;
+  /** 부팅 설정의 바인드 주소(WEB_HOST). 모르면 null */
+  bindHost: string | null;
+}
+
+/**
+ * 다른 기기에서 열 주소와 webhook 공개 주소를 저장한다. 저장하면 지금 보는 화면의 호스트가 허용 목록에서
+ * 빠지는 경우(예: tailnet 이름으로 열어 놓고 다른 이름을 넣음)는 저장하지 않는다. 127.0.0.1 로 연 화면은 늘 열린다.
+ */
+export function saveAddresses(
+  context: SettingsContext,
+  input: z.infer<typeof addressesInput>,
+  now: Date,
+  from: RequestOrigin,
+): SaveResult<AddressSaveReason> {
+  const webAddress = normalizeAddress(input.webAddress);
+  if (webAddress === undefined) return { ok: false, reason: "invalid-web-address" };
+  const webhookAddress = normalizeAddress(input.webhookAddress);
+  if (webhookAddress === undefined) return { ok: false, reason: "invalid-webhook-address" };
+  const current = hostnameOfHostHeader(from.host);
+  if (current !== null) {
+    const next = allowedHosts({ bindHost: from.bindHost, webAddress, webhookAddress });
+    if (!next.web.has(current)) return { ok: false, reason: "locks-out" };
+  }
+  saveInstallAddresses(context.db, { webAddress, webhookAddress }, now);
   return { ok: true };
 }

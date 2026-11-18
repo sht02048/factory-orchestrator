@@ -34,6 +34,7 @@ import {
   removeTrackerProject,
   requestRunnerCheckSetting,
   saveGeneral,
+  saveAddresses,
   saveGitHubToken,
   saveInProgressState,
   saveLabel,
@@ -148,6 +149,7 @@ const noopActions: SettingsActions = {
   checkGitHubToken: () => Promise.resolve({ ok: true }),
   saveRunner: () => Promise.resolve({ ok: true }),
   recheckRunner: () => Promise.resolve({ ok: true }),
+  saveAddresses: () => Promise.resolve({ ok: true }),
   pollRunnerChecks: () => Promise.resolve(false),
 };
 
@@ -381,6 +383,99 @@ describe("Settings 저장하고 다시 열기", () => {
         ok: false,
       });
     }
+  });
+});
+
+describe("주소(0048)", () => {
+  const local = { host: "127.0.0.1:3000", bindHost: "127.0.0.1" };
+
+  it("두 주소를 origin 으로 저장하고 다시 열면 보인다. 비우면 정하지 않음이다", async () => {
+    const f = fixture();
+    expect((await loadSettingsPage(f.context, undefined)).install.addresses).toEqual({
+      webAddress: null,
+      webhookAddress: null,
+    });
+    expect(
+      saveAddresses(
+        f.context,
+        {
+          webAddress: "https://Server.example.ts.net/",
+          webhookAddress: "https://hooks.example.com",
+        },
+        now,
+        local,
+      ),
+    ).toEqual({ ok: true });
+    const page = await loadSettingsPage(f.context, undefined);
+    expect(page.install.addresses).toEqual({
+      webAddress: "https://server.example.ts.net",
+      webhookAddress: "https://hooks.example.com",
+    });
+    const shown = panelText(render(page, "addresses"));
+    expect(shown).toContain("다른 기기에서 열 주소");
+    expect(render(page, "addresses")).toContain('value="https://server.example.ts.net"');
+
+    expect(saveAddresses(f.context, { webAddress: "", webhookAddress: "" }, now, local)).toEqual({
+      ok: true,
+    });
+    expect((await loadSettingsPage(f.context, undefined)).install.addresses).toEqual({
+      webAddress: null,
+      webhookAddress: null,
+    });
+  });
+
+  it("경로·사용자 정보가 붙거나 http·https 가 아닌 주소는 받지 않는다", () => {
+    const f = fixture();
+    for (const webAddress of [
+      "server.example.ts.net",
+      "https://server.example.ts.net/app",
+      "ftp://x.example",
+      "https://a:b@x.example",
+    ]) {
+      expect(saveAddresses(f.context, { webAddress, webhookAddress: "" }, now, local)).toEqual({
+        ok: false,
+        reason: "invalid-web-address",
+      });
+    }
+    expect(
+      saveAddresses(
+        f.context,
+        { webAddress: "", webhookAddress: "https://hooks.example.com/?x=1" },
+        now,
+        local,
+      ),
+    ).toEqual({ ok: false, reason: "invalid-webhook-address" });
+  });
+
+  it("저장하면 지금 보는 화면의 주소가 막히는 값은 저장하지 않는다", async () => {
+    const f = fixture();
+    const remote = { host: "server.example.ts.net", bindHost: "127.0.0.1" };
+    expect(
+      saveAddresses(
+        f.context,
+        { webAddress: "https://other.example.ts.net", webhookAddress: "" },
+        now,
+        remote,
+      ),
+    ).toEqual({ ok: false, reason: "locks-out" });
+    expect((await loadSettingsPage(f.context, undefined)).install.addresses.webAddress).toBeNull();
+    expect(
+      saveAddresses(
+        f.context,
+        { webAddress: "https://server.example.ts.net", webhookAddress: "" },
+        now,
+        remote,
+      ),
+    ).toEqual({ ok: true });
+    // 127.0.0.1 로 연 화면은 어떤 값을 넣어도 막히지 않는다
+    expect(
+      saveAddresses(
+        f.context,
+        { webAddress: "https://other.example.ts.net", webhookAddress: "" },
+        now,
+        local,
+      ),
+    ).toEqual({ ok: true });
   });
 });
 

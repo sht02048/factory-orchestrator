@@ -4,13 +4,13 @@
  *
  * Settings 는 이 Workspace 와 설치 전체로 나눈다(ADR 0006·0007).
  * - 이 Workspace: 이름·최대 실행 시간, 트래커 프로젝트, Mapping, "In Progress" 상태, Auto-assign Label
- * - 설치 전체: 트래커 연결, GitHub 토큰, 러너 등록
+ * - 설치 전체: 트래커 연결, GitHub 토큰, 러너 등록, 주소(다른 기기에서 열 주소, webhook 공개 주소)
  * 비밀값(API 키, signing secret, 토큰)은 화면에 돌려주지 않는다. 저장했는지만 알린다.
  */
 
-/** 왼쪽 목록의 항목. 앞 다섯은 이 Workspace, 뒤 셋은 설치 전체다 */
+/** 왼쪽 목록의 항목. 앞 다섯은 이 Workspace, 뒤 넷은 설치 전체다 */
 export const WORKSPACE_ITEMS = ["general", "projects", "mapping", "progress", "label"] as const;
-export const INSTALL_ITEMS = ["connections", "github", "runners"] as const;
+export const INSTALL_ITEMS = ["connections", "github", "runners", "addresses"] as const;
 export type WorkspaceItem = (typeof WORKSPACE_ITEMS)[number];
 export type InstallItem = (typeof INSTALL_ITEMS)[number];
 export type SettingsItem = WorkspaceItem | InstallItem;
@@ -141,11 +141,20 @@ export interface RunnerSettingsView {
   check: RunnerCheckView | null;
 }
 
+/** 바깥에서 이 서버에 닿는 두 주소(origin, 티켓 0048). 정하지 않았으면 null 이다 */
+export interface AddressesView {
+  /** 다른 기기에서 열 주소(예: Tailscale Serve 주소). 이 호스트로 온 화면 요청을 받는다 */
+  webAddress: string | null;
+  /** webhook 공개 주소(예: Tailscale Funnel, Cloudflare Tunnel). 트래커 webhook 주소의 앞부분이다 */
+  webhookAddress: string | null;
+}
+
 export interface InstallSettings {
   connections: TrackerConnectionView[];
   /** GitHub 토큰을 저장했는지 */
   githubToken: boolean;
   runners: RunnerSettingsView[];
+  addresses: AddressesView;
 }
 
 export interface SettingsPage {

@@ -34,6 +34,7 @@ import {
   WORKSPACE_ITEMS,
 } from "./model";
 import type {
+  AddressesView,
   BoundProject,
   Choice,
   ConnectionLabel,
@@ -92,6 +93,8 @@ export interface SettingsActions {
     capacity: number;
   }) => Promise<ActionResult>;
   recheckRunner: (input: { id: string }) => Promise<ActionResult>;
+  /** 다른 기기에서 열 주소와 webhook 공개 주소(0048). 빈 값은 정하지 않음이다 */
+  saveAddresses: (input: { webAddress: string; webhookAddress: string }) => Promise<ActionResult>;
   /**
    * 러너 확인 결과를 기다리는 동안 부른다. 아직 기다리면 true 다. 결과가 오면 화면 값을 다시 읽는다.
    * 트래커를 부르지 않는 가벼운 읽기여야 한다.
@@ -298,6 +301,7 @@ function WorkspaceSummary({
     case "connections":
     case "github":
     case "runners":
+    case "addresses":
       return null;
   }
 }
@@ -311,6 +315,12 @@ function InstallSummary({ item, page }: { item: SettingsItem; page: SettingsPage
       return page.install.githubToken ? t("githubSet") : t("githubUnset");
     case "runners":
       return t("runners", { count: page.install.runners.length });
+    case "addresses": {
+      const { webAddress, webhookAddress } = page.install.addresses;
+      return t("addresses", {
+        set: [webAddress, webhookAddress].filter((a) => a !== null).length,
+      });
+    }
     case "general":
     case "projects":
     case "mapping":
@@ -346,6 +356,8 @@ function ItemPanel({
           workspaceId={workspace?.general.id ?? null}
         />
       );
+    case "addresses":
+      return <AddressesPanel addresses={page.install.addresses} actions={actions} />;
     case "general":
     case "projects":
     case "mapping":
@@ -406,6 +418,10 @@ function useReason(): (reason: string) => string {
       case "missing-key":
       case "taken":
         return t(`remoteError.${reason}`);
+      case "invalid-web-address":
+      case "invalid-webhook-address":
+      case "locks-out":
+        return t(`addresses.error.${reason}`);
       default:
         return t("failed");
     }
@@ -1081,6 +1097,126 @@ export function ConnectionForm({
           disabled={submit.sending || !ready}
         >
           {submit.sending ? t("saving") : isNew ? t("connections.add") : t("connections.saveEdit")}
+        </Button>
+      </Actions>
+    </form>
+  );
+}
+
+// ---------- 주소(0048) ----------
+
+/**
+ * 다른 기기에서 열 주소와 webhook 공개 주소. 서버는 이 주소의 호스트로 온 요청만 받는다(Host 검사).
+ * 127.0.0.1 로 연 화면은 늘 열려, 잘못 넣어도 이 기계에서 고칠 수 있다.
+ */
+function AddressesPanel({
+  addresses,
+  actions,
+}: {
+  addresses: AddressesView;
+  actions: SettingsActions;
+}) {
+  const t = useTranslations("settings.addresses");
+  const ts = useTranslations("settings");
+  const [webAddress, setWebAddress] = useState(addresses.webAddress ?? "");
+  const [webhookAddress, setWebhookAddress] = useState(addresses.webhookAddress ?? "");
+  const submit = useSubmit();
+  return (
+    <>
+      <PanelBlock>
+        <ul {...stylex.props(styles.bullets)}>
+          <li>{t("intro")}</li>
+          <li>{t("loopback")}</li>
+        </ul>
+      </PanelBlock>
+      <form
+        {...stylex.props(styles.form)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit.run(
+            () =>
+              actions.saveAddresses({
+                webAddress: webAddress.trim(),
+                webhookAddress: webhookAddress.trim(),
+              }),
+            ts("saved"),
+          );
+        }}
+      >
+        <Field label={t("web")} description={t("webDescription")}>
+          <Input
+            name="webAddress"
+            type="url"
+            value={webAddress}
+            onValueChange={setWebAddress}
+            placeholder={t("webPlaceholder")}
+            mono
+          />
+        </Field>
+        <Field label={t("webhook")} description={t("webhookDescription")}>
+          <Input
+            name="webhookAddress"
+            type="url"
+            value={webhookAddress}
+            onValueChange={setWebhookAddress}
+            placeholder={t("webhookPlaceholder")}
+            mono
+          />
+        </Field>
+        <SubmitError state={submit.state} />
+        <Actions>
+          <Button variant="primary" type="submit" disabled={submit.sending}>
+            {submit.sending ? ts("saving") : t("save")}
+          </Button>
+        </Actions>
+      </form>
+    </>
+  );
+}
+
+/**
+ * 온보딩 트래커 단계의 webhook 공개 주소 칸(0048). 다른 기기에서 열 주소는 그대로 두고 webhook 공개 주소만 바꾼다.
+ */
+export function WebhookAddressForm({
+  addresses,
+  actions,
+}: {
+  addresses: AddressesView;
+  actions: SettingsActions;
+}) {
+  const t = useTranslations("settings.addresses");
+  const ts = useTranslations("settings");
+  const [webhookAddress, setWebhookAddress] = useState(addresses.webhookAddress ?? "");
+  const submit = useSubmit();
+  return (
+    <form
+      {...stylex.props(styles.form)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit.run(
+          () =>
+            actions.saveAddresses({
+              webAddress: addresses.webAddress ?? "",
+              webhookAddress: webhookAddress.trim(),
+            }),
+          ts("saved"),
+        );
+      }}
+    >
+      <Field label={t("webhook")} description={t("webhookDescription")}>
+        <Input
+          name="webhookAddress"
+          type="url"
+          value={webhookAddress}
+          onValueChange={setWebhookAddress}
+          placeholder={t("webhookPlaceholder")}
+          mono
+        />
+      </Field>
+      <SubmitError state={submit.state} />
+      <Actions>
+        <Button variant="default" type="submit" disabled={submit.sending}>
+          {submit.sending ? ts("saving") : t("saveWebhook")}
         </Button>
       </Actions>
     </form>

@@ -2,6 +2,7 @@ import { AdapterError, toTrackerConnectionId, toTrackerProjectId } from "@factor
 import type { AdapterRegistry, RunnerId, Tracker, TrackerConnectionId } from "@factory/core";
 import {
   getAutoAssignLabel,
+  getInstallSettings,
   getMapping,
   getRunnerCheckRequest,
   listPendingRunnerCheckRequests,
@@ -18,6 +19,7 @@ import { prerequisiteProject } from "../labels";
 import { resolveWorkspace } from "../shell/model";
 import { KNOWN_AGENTS } from "./model";
 import type {
+  AddressesView,
   BoundProject,
   Choice,
   ConnectionLabel,
@@ -41,6 +43,10 @@ export interface SettingsContext {
 /** 트래커 연결의 webhook 수신 경로(routes/api/webhooks/tracker/$connectionId) */
 export function webhookPath(connectionId: string): string {
   return `/api/webhooks/tracker/${encodeURIComponent(connectionId)}`;
+}
+
+function addressesView(settings: AddressesView): AddressesView {
+  return { webAddress: settings.webAddress, webhookAddress: settings.webhookAddress };
 }
 
 /**
@@ -164,6 +170,7 @@ export async function loadSettingsPage(
         webhookPath: webhookPath(connection.id),
       })),
       githubToken: listCodeHostConnections(db, secretBox).length > 0,
+      addresses: addressesView(getInstallSettings(db)),
       runners: runners.map((runner): RunnerSettingsView => {
         const config = runnerConfigSchema.safeParse(runner.config);
         return {

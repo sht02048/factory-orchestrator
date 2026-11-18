@@ -1,8 +1,11 @@
+import { parseBootConfig } from "@factory/db";
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import {
   addTrackerProject,
   addTrackerProjectInput,
+  addressesInput,
   checkGitHubToken,
   checkTrackerConnection,
   connectionIdInput,
@@ -15,6 +18,7 @@ import {
   requestRunnerCheckSetting,
   runnerIdInput,
   runnerInput,
+  saveAddresses,
   saveGeneral,
   saveGitHubToken,
   saveInProgressState,
@@ -95,3 +99,13 @@ export const saveRunnerSettings = createServerFn({ method: "POST" })
 export const requestRunnerCheckNow = createServerFn({ method: "POST" })
   .validator(runnerIdInput)
   .handler(({ data }) => requestRunnerCheckSetting(context(), data, new Date()));
+
+/** 다른 기기에서 열 주소와 webhook 공개 주소(0048). 저장하면 지금 보는 화면이 막히는지 요청의 Host 로 본다 */
+export const saveAddressesSetting = createServerFn({ method: "POST" })
+  .validator(addressesInput)
+  .handler(({ data }) =>
+    saveAddresses(context(), data, new Date(), {
+      host: getRequestHeader("host") ?? null,
+      bindHost: parseBootConfig(process.env).host,
+    }),
+  );
