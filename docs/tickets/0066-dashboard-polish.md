@@ -3,7 +3,7 @@ status: done
 blocked_by: []
 ---
 
-0069에 합쳤다. 화면 개편 v2 결정(티켓 [0068](0068-v2-screens-decision.md), 2026-11-18)으로 Dashboard를 다시 짜면서 아래 항목을 [0069](0069-dashboard-v2.md)의 「0066에서 가져온 것」으로 옮겼다. 375px Done today 키 말줄임은 0069의 새 오른쪽 열 배치와 375px 스크린숏이 대신한다.
+0069에 합쳤다. 화면 개편 v2 결정(티켓 [0068](0068-v2-screens-decision.md), 2026-11-18)으로 Dashboard를 다시 짜면서 아래 항목을 [0069](0069-dashboard-v2.md)의 「0066에서 가져온 것」으로 옮겼다. 아래 완료 조건의 시험(선택지 Enter, 다시 연 레이어의 오류, 모든 Workspace 보기의 구역 표시)도 0069가 한다. 375px Done today 키 말줄임은 0069의 새 오른쪽 열 배치와 375px 스크린숏이 대신한다.
 
 # 0066 Dashboard 다듬기
 

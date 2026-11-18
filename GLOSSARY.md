@@ -181,7 +181,7 @@ _Avoid_: 손댈 일, 할 일
 _Avoid_: Running(필터 이름으로. 런 상태와 헷갈린다)
 
 **끝남**:
-사람이 할 일 없이 끝난 티켓. 마지막 런이 Merged나 Canceled이거나, Human Check인데 이후 PR 상태가 기록됐다. 런 상태 Ended와 다르다(Failed와 처리할 Human Check는 Ended지만 끝남이 아니다).
+사람이 더 손댈 것 없이 끝난 티켓. 마지막 런이 Merged나 Canceled이거나, Human Check인데 이후 PR 상태가 기록됐다. 런 상태 Ended와 다르다(Failed와 처리할 Human Check는 Ended지만 끝남이 아니다).
 _Avoid_: Merged(필터 이름으로. 요약 결과 하나만 가리킨다), 완료
 
 ### 설치
