@@ -624,7 +624,7 @@ describe("다섯 단계를 마치기", () => {
       states: { ok: true as const, items: [] },
     };
     const workspace = {
-      general: { id: "ws-1", name: "Acme", maxRunMinutes: 120 },
+      general: { id: toWorkspaceId("ws-1"), name: "Acme", maxRunMinutes: 120 },
       trackerProjects: [],
       bound: [bound],
       labels: [

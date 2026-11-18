@@ -23,6 +23,9 @@ import {
 import type { ReactNode, Ref, RefObject } from "react";
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
+import { toTrackerConnectionId, toTrackerProjectId } from "@factory/core";
+import type { TrackerConnectionId, TrackerProjectId } from "@factory/core";
+import type { WorkspaceId } from "@factory/db";
 import { useAgentName, usePrerequisiteName } from "../labels";
 import {
   RunnerCheck,
@@ -63,7 +66,11 @@ import type { OnboardingStep } from "./model";
 
 export interface WorkspaceSetupInput {
   name: string;
-  projects: Array<{ connectionId: string; projectId: string; name: string }>;
+  projects: Array<{
+    connectionId: TrackerConnectionId;
+    projectId: TrackerProjectId;
+    name: string;
+  }>;
 }
 
 export interface OnboardingActions extends SettingsActions {
@@ -1016,7 +1023,8 @@ function WorkspaceStep({
   );
 }
 
-const projectKey = (connectionId: string, projectId: string) => `${connectionId}\n${projectId}`;
+const projectKey = (connectionId: TrackerConnectionId, projectId: TrackerProjectId) =>
+  `${connectionId}\n${projectId}`;
 
 function WorkspaceForm({
   workspace,
@@ -1054,13 +1062,15 @@ function WorkspaceForm({
       onSubmit={(event) => {
         event.preventDefault();
         if (!ready) return;
-        const projects = groups.flatMap((group) =>
-          group.projects.flatMap((project) =>
-            picked.has(projectKey(group.connection.id, project.id))
-              ? [{ connectionId: group.connection.id, projectId: project.id, name: project.name }]
-              : [],
-          ),
-        );
+        const projects = groups.flatMap((group) => {
+          const connectionId = toTrackerConnectionId(group.connection.id);
+          return group.projects.flatMap((project) => {
+            const projectId = toTrackerProjectId(project.id);
+            return picked.has(projectKey(connectionId, projectId))
+              ? [{ connectionId, projectId, name: project.name }]
+              : [];
+          });
+        });
         submit.run(
           () => actions.setUpWorkspace({ name: name.trim(), projects }),
           workspace === null ? t("created") : ts("saved"),
@@ -1100,7 +1110,10 @@ function WorkspaceForm({
                 <Text variant="meta">{ts("projects.empty")}</Text>
               ) : null}
               {group.projects.map((project) => {
-                const key = projectKey(group.connection.id, project.id);
+                const key = projectKey(
+                  toTrackerConnectionId(group.connection.id),
+                  toTrackerProjectId(project.id),
+                );
                 const owner = project.owner;
                 switch (owner.kind) {
                   case "this":
@@ -1271,7 +1284,7 @@ function MappingRow({
   agents,
   actions,
 }: {
-  ws: string;
+  ws: WorkspaceId;
   bound: BoundProject;
   runnerProjects: Choice[];
   agents: string[];
@@ -1398,7 +1411,7 @@ function LabelRow({
   label,
   actions,
 }: {
-  ws: string;
+  ws: WorkspaceId;
   label: ConnectionLabel;
   actions: SettingsActions;
 }) {

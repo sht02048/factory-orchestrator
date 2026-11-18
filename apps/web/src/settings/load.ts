@@ -274,7 +274,7 @@ async function trackerProjectChoices(
   workspaceId: WorkspaceId | null,
   connections: ReadonlyArray<StoredTrackerConnection>,
   workspaces: ReadonlyArray<{ id: WorkspaceId; name: string }>,
-  trackers: ReadonlyMap<string, Tracker | null>,
+  trackers: ReadonlyMap<TrackerConnectionId, Tracker | null>,
 ): Promise<ConnectionProjects[]> {
   const { db } = context;
   const allBound = listWorkspaceTrackerProjects(db);
