@@ -1,9 +1,17 @@
-import type { RunnerSettingsView, SettingsPage, WorkspaceSettings } from "../settings/model";
+import type {
+  BoundProject,
+  RunnerSettingsView,
+  SettingsPage,
+  WorkspaceSettings,
+} from "../settings/model";
 
 export const ONBOARDING_STEPS = ["tracker", "github", "runner", "workspace", "mapping"] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 export const ONBOARDING_PATH = "/onboarding";
+
+export const LINEAR_API_KEY_URL = "https://linear.app/settings/account/security";
+export const GITHUB_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
 export const HOME_PATH = "/";
 
 const OPEN_PATHS = [ONBOARDING_PATH, "/ds", "/api"];
@@ -63,6 +71,10 @@ export function missingMappingParts(workspace: WorkspaceSettings): MappingPart[]
     }
   }
   return best;
+}
+
+export function mappingRowComplete(bound: BoundProject): boolean {
+  return bound.mapping !== null && bound.inProgressStateId !== null;
 }
 
 export function runnerPassed(runner: RunnerSettingsView): boolean {

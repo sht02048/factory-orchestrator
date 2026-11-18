@@ -7,8 +7,7 @@ import { onboardingMessages } from "../onboarding/messages";
 import { HOME_PATH, ONBOARDING_PATH, resolveStep, stepToPin } from "../onboarding/model";
 import { OnboardingScreen } from "../onboarding/onboarding-screen";
 import type { OnboardingActions } from "../onboarding/onboarding-screen";
-import { createWorkspace } from "../server/onboarding-functions";
-import { getSettingsPage } from "../server/settings-functions";
+import { getOnboardingPage, setUpWorkspace } from "../server/onboarding-functions";
 import { useReloadOnSuccess, useSettingsActions } from "../settings/use-settings-actions";
 
 const t = createTranslator({
@@ -21,19 +20,19 @@ export const Route = createFileRoute("/onboarding")({
   validateSearch: z.object({ step: z.number().int().optional().catch(undefined) }),
   loaderDeps: ({ search }) => ({ step: search.step }),
   loader: async ({ deps }) => {
-    const page = await getSettingsPage({ data: {} });
-    const pinned = stepToPin(page, deps.step);
+    const loaded = await getOnboardingPage();
+    const pinned = stepToPin(loaded.page, deps.step);
     if (pinned !== null) {
       throw redirect({ to: ONBOARDING_PATH, search: { step: pinned }, replace: true });
     }
-    return page;
+    return loaded;
   },
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: OnboardingRoute,
 });
 
 function OnboardingRoute() {
-  const page = Route.useLoaderData();
+  const { page, trackerProjects } = Route.useLoaderData();
   const { step } = Route.useSearch();
   const navigate = Route.useNavigate();
   const settingsActions = useSettingsActions();
@@ -41,7 +40,7 @@ function OnboardingRoute() {
   const actions = useMemo(
     (): OnboardingActions => ({
       ...settingsActions,
-      createWorkspace: then((data) => createWorkspace({ data })),
+      setUpWorkspace: then((data) => setUpWorkspace({ data })),
     }),
     [settingsActions, then],
   );
@@ -50,6 +49,7 @@ function OnboardingRoute() {
     <ScreenMessages messages={onboardingMessages}>
       <OnboardingScreen
         page={page}
+        trackerProjects={trackerProjects}
         index={resolveStep(page, step)}
         onStep={(index) => {
           void navigate({ search: { step: index + 1 } });

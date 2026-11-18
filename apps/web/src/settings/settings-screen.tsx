@@ -428,9 +428,12 @@ function ItemPanel({
   }
 }
 
-type SubmitState = { kind: "idle" } | { kind: "sending" } | { kind: "failed"; reason: string };
+export type SubmitState =
+  | { kind: "idle" }
+  | { kind: "sending" }
+  | { kind: "failed"; reason: string };
 
-function useSubmit() {
+export function useSubmit() {
   const [state, setState] = useState<SubmitState>({ kind: "idle" });
   const run = (action: () => Promise<ActionResult>, success: string, onSuccess?: () => void) => {
     if (state.kind === "sending") return;
@@ -451,7 +454,7 @@ function useSubmit() {
   return { state, run, sending: state.kind === "sending" };
 }
 
-function useReason(): (reason: string) => string {
+export function useReason(): (reason: string) => string {
   const t = useTranslations("settings");
   return (reason) => {
     switch (reason) {
@@ -473,7 +476,7 @@ function useReason(): (reason: string) => string {
   };
 }
 
-function SubmitError({ state }: { state: SubmitState }) {
+export function SubmitError({ state }: { state: SubmitState }) {
   const reason = useReason();
   if (state.kind !== "failed") return null;
   return (
@@ -500,7 +503,7 @@ function useValidateAfterBlur() {
   };
 }
 
-const passwordManagerIgnoredSecretProps = {
+export const passwordManagerIgnoredSecretProps = {
   type: "password",
   autoComplete: "off",
   "data-1p-ignore": true,
@@ -869,7 +872,7 @@ function MappingRow({
   );
 }
 
-function withCurrent(
+export function withCurrent(
   options: ReadonlyArray<{ value: string; label: string }>,
   current: string | null | undefined,
 ): Array<{ value: string; label: string }> {
@@ -1555,10 +1558,12 @@ export function RunnerCheck({
   runner,
   actions,
   workerSilent,
+  primary = false,
 }: {
   runner: RunnerSettingsView;
   actions: SettingsActions;
   workerSilent: boolean;
+  primary?: boolean;
 }) {
   const t = useTranslations("settings.runners");
   const submit = useSubmit();
@@ -1574,7 +1579,7 @@ export function RunnerCheck({
           </Text>
         </span>
         <Button
-          variant="secondary"
+          variant={primary ? "primary" : "secondary"}
           disabled={checking}
           onClick={() =>
             submit.run(() => actions.recheckRunner({ id: runner.id }), t("checkRequested"))

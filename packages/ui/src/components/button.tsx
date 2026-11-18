@@ -15,6 +15,7 @@ export interface ButtonProps {
   type?: "button" | "submit" | "reset";
   onClick?: SdkButtonProps["onClick"];
   "aria-label"?: string;
+  "aria-expanded"?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
 
