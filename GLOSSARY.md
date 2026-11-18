@@ -157,7 +157,7 @@ Waiting for Input 런 중 에이전트가 권한 프롬프트에서 허용을 �
 _Avoid_: 권한 대기(종류 이름으로), 권한 요청
 
 **Runner Issue**:
-러너 쪽 문제라 운영자가 러너를 고쳐야 하는 일. GitHub 인증이 깨진 러너(할당에서 빠진다)와 Offline 러너가 여기에 든다(ADR 0010 1번, Offline 러너는 티켓 0049부터). To do에는 올리지 않고 Dashboard의 Runners 카드와 레일 Runners 아이콘의 점(Runner Issue 개수)에만 보인다(티켓 0059). 어떤 문제인지는 설명 문장으로 쓰고 따로 상태 이름을 만들지 않는다. 런의 Disconnected와 다르다(그것은 런 하나의 상태다).
+러너 쪽 문제라 운영자가 러너를 고쳐야 하는 일. GitHub 인증이 깨진 러너(할당에서 빠진다)와 Offline 러너가 여기에 든다(ADR 0010 1번, Offline 러너는 티켓 0049부터). To do에는 올리지 않는다. Dashboard에서는 오른쪽 Runners 카드에 보이고, 레일 Runners 아이콘의 점은 Runner Issue 개수다(티켓 0059). 어떤 문제인지는 설명 문장으로 쓰고 따로 상태 이름을 만들지 않는다. 런의 Disconnected와 다르다(그것은 런 하나의 상태다).
 _Avoid_: 막힘, 인증 깨짐, 러너 오류(모두 종류 이름으로. 설명 문장에서 원인을 말하는 것은 괜찮다)
 
 ### 설치

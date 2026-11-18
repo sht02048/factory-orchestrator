@@ -4,7 +4,7 @@
 
 ## 낱말
 
-1. **상태 이름은 GLOSSARY의 영어 용어 그대로 쓴다.** 런 상태 Queued·Running·Waiting for Input·Disconnected, 요약 결과 Merged·Human Check·Failed·Canceled, 러너 Online·Offline. To do 종류는 Question·Permission·Human Check·Failed·Disconnected다. 운영자가 정한 종류 목록에는 Failed가 없었지만, Failed 런은 지금도 To do에 오르고(스펙 Q82.9) 색 규칙에도 있어 종류에 넣었다. 러너 문제는 Runner Issue로 부르고 세부 원인(GitHub 인증 깨짐, Offline 등)은 설명 문장으로 쓴다. Runner Issue는 To do에 올리지 않고 Dashboard의 Runners 카드와 레일 Runners 아이콘 점에만 보인다(아래 갱신). Runner Issue에 Offline 러너를 넣는 것은 운영자 결정(규칙 1의 "러너 인증 깨짐·Offline 등")이고 0049에서 적용했다.
+1. **상태 이름은 GLOSSARY의 영어 용어 그대로 쓴다.** 런 상태 Queued·Running·Waiting for Input·Disconnected, 요약 결과 Merged·Human Check·Failed·Canceled, 러너 Online·Offline. To do 종류는 Question·Permission·Human Check·Failed·Disconnected다. 운영자가 정한 종류 목록에는 Failed가 없었지만, Failed 런은 지금도 To do에 오르고(스펙 Q82.9) 색 규칙에도 있어 종류에 넣었다. 러너 문제는 Runner Issue로 부르고 세부 원인(GitHub 인증 깨짐, Offline 등)은 설명 문장으로 쓴다. Runner Issue는 To do에 올리지 않고, Dashboard에서는 오른쪽 Runners 카드에 보인다(아래 갱신). Runner Issue에 Offline 러너를 넣는 것은 운영자 결정(규칙 1의 "러너 인증 깨짐·Offline 등")이고 0049에서 적용했다.
 2. **설명 문장·버튼·안내는 한국어 해요체로 쓴다.** "전체"처럼 상태가 아닌 개념 낱말도 한국어로 둔다. 예외로 Dashboard 구역 이름(To do·In progress·Runners·Done today)은 메뉴·화면 이름처럼 영어로 쓴다. 에이전트 결과와 PR 상태의 값(완료 보고(성공), 병합됨 등)은 상태 이름이 아니라 런이 어떻게 끝났는지 설명하는 값이라 한국어 그대로 둔다.
 3. **메뉴·화면 이름은 Dashboard·Tickets·Runs·Runners·Stats·Settings다.** 온보딩 단계 이름은 Tracker·GitHub·Runner·Workspace·Mapping이다.
 
@@ -35,7 +35,7 @@
 - "손댈 일"은 To do로 바꾼다. 러너 문제(Runner Issue)는 To do에서 빼 Dashboard 오른쪽 Runners 카드로 옮긴다(1번).
 - "지금 일어나는 일" 흐름은 다른 구역과 겹쳐 뺀다. 그 자리에 오늘 끝난 런(Done today)을 둔다. 오른쪽 위 개수 타일도 뺀다.
 - 질문은 행 안에 펼치지 않고 "답하기"로 여는 레이어에서 답한다. 선택지는 고르는 라디오 항목이고, "보내기"(레이어 안의 주 버튼)를 눌러야 보낸다(6번). Run 상세의 질문 카드는 0060 범위 밖이라 아직 선택지를 누르면 바로 보내는 보조 버튼이다. 이 규칙으로 바꾸는 일은 따로 티켓으로 한다.
-- 앞선 문서([ADR 0004](0004-agent-merges-its-own-pr.md)·[0009](0009-run-via-orca-orchestration.md), [1단계 스펙](../spec/0001-phase-1.md), `design/prototype/README.md`, 끝난 티켓)의 "손댈 일"·"홈"·"Home"은 그때의 기록이다. 지금 낱말은 To do와 Dashboard다.
+- 앞선 문서([ADR 0004](0004-agent-merges-its-own-pr.md)·[0009](0009-run-via-orca-orchestration.md), [1단계 스펙](../spec/0001-phase-1.md), `design/prototype/README.md`, 끝난 티켓)의 "손댈 일"·"홈"·"Home"은 그때의 기록이다. 지금 낱말은 To do와 Dashboard다. Dashboard 밖 화면의 메시지 파일에 남은 "손댈 일"(Tickets 탭, Canceled 설명, 디자인 시스템 미리보기 등)도 0060 범위 밖이라, To do로 바꾸는 일은 Run 상세 질문 카드와 함께 따로 티켓으로 한다.
 
 ## 이유
 
