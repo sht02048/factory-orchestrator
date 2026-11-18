@@ -15,6 +15,7 @@ import type {
   TrackerProjectId,
   TrackerStateId,
 } from "@factory/core";
+import { randomUUID } from "node:crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "./database.js";
@@ -23,6 +24,7 @@ import type { CodeHostConnectionId, WorkspaceId } from "./ids.js";
 import {
   autoAssignLabels,
   codeHostConnections,
+  installSettings,
   mappings,
   runnerProjects,
   runners,
@@ -557,4 +559,58 @@ export function getAutoAssignLabel(
     )
     .get();
   return row?.labelId ?? null;
+}
+
+// ---------- 설치 설정 ----------
+
+const INSTALL_SETTINGS_ROW = 1;
+
+export interface InstallAddresses {
+  /** 다른 기기에서 열 주소(origin). 정하지 않았으면 null */
+  webAddress: string | null;
+  /** webhook 공개 주소(origin). 정하지 않았으면 null */
+  webhookAddress: string | null;
+}
+
+export interface StoredInstallSettings extends InstallAddresses {
+  /** 설치마다 만든 임의 ID(신원 확인 경로, 티켓 0048) */
+  instanceId: string;
+}
+
+/**
+ * 설치 설정을 읽는다. 행이 없으면 새 설치 ID로 만든다. 거의 모든 요청이 부르므로(Host 검사) 행이 있으면 읽기만 한다.
+ * 두 프로세스가 함께 만들어도 한쪽만 들어가고(`onConflictDoNothing`), 다시 읽어 같은 ID를 본다.
+ */
+export function getInstallSettings(db: Database): StoredInstallSettings {
+  const read = () =>
+    db
+      .select({
+        instanceId: installSettings.instanceId,
+        webAddress: installSettings.webAddress,
+        webhookAddress: installSettings.webhookAddress,
+      })
+      .from(installSettings)
+      .where(eq(installSettings.id, INSTALL_SETTINGS_ROW))
+      .get();
+  const existing = read();
+  if (existing !== undefined) return existing;
+  db.insert(installSettings)
+    .values({ id: INSTALL_SETTINGS_ROW, instanceId: randomUUID(), updatedAt: new Date() })
+    .onConflictDoNothing()
+    .run();
+  const created = read();
+  if (created === undefined) throw new Error("install settings row is missing after insert");
+  return created;
+}
+
+/** 두 주소를 함께 저장한다. 값 검사(origin 모양)는 부르는 쪽이 경계에서 한다 */
+export function saveInstallAddresses(db: Database, input: InstallAddresses, now: Date): void {
+  const { instanceId } = getInstallSettings(db);
+  db.insert(installSettings)
+    .values({ id: INSTALL_SETTINGS_ROW, instanceId, ...input, updatedAt: now })
+    .onConflictDoUpdate({
+      target: installSettings.id,
+      set: { webAddress: input.webAddress, webhookAddress: input.webhookAddress, updatedAt: now },
+    })
+    .run();
 }

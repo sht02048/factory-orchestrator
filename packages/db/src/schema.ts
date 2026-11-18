@@ -86,6 +86,27 @@ export const codeHostConnections = sqliteTable(
   (t) => [check("code_host_connections_config_json", sql`json_valid(${t.config})`)],
 );
 
+// ---------- 설치 설정 ----------
+
+/**
+ * 설치 하나에 한 줄뿐인 설정(티켓 0048). 행이 없으면 처음 읽을 때 만든다.
+ * - instance_id: 설치마다 만든 임의 ID. 신원 확인 경로가 돌려줘, 주소가 여러 개여도 같은 서버로 묶는다
+ * - web_address: 다른 기기에서 열 주소(origin). 그 호스트로 온 화면 요청을 받는다
+ * - webhook_address: webhook 공개 주소(origin). 그 호스트로 온 webhook 요청을 받는다
+ * 주소는 `.env`가 아니라 여기 둔다. 부팅에 필요하지 않고, 화면에서 고치면 다시 띄우지 않아도 된다(ADR 0005).
+ */
+export const installSettings = sqliteTable(
+  "install_settings",
+  {
+    id: integer("id").primaryKey(),
+    instanceId: text("instance_id").notNull(),
+    webAddress: text("web_address"),
+    webhookAddress: text("webhook_address"),
+    updatedAt: timeMs("updated_at").notNull(),
+  },
+  (t) => [check("install_settings_single_row", sql`${t.id} = 1`)],
+);
+
 // ---------- 러너 ----------
 
 /** Runner(ADR 0006). ssh 대상, orca 경로 같은 어댑터 값은 config에 둔다. */
