@@ -2,6 +2,7 @@
   "documentTitle": "처음 설정 · Factory Orchestrator",
   "heading": "시작하기",
   "stepsLabel": "설정 단계",
+  "stepDone": "완료",
   "eyebrow": "{step}/{total} · {name}",
   "back": "이전",
   "next": "다음",
@@ -52,6 +53,7 @@
   },
   "runner": {
     "beforeTitle": "등록하기 전에 러너에서 해 둘 일",
+    "checkTitle": "{name} 러너",
     "beforeService": "Orca 상시 서비스를 설치해요. 러너가 꺼졌다 켜져도 Orca가 다시 떠요.",
     "pathPlaceholder": "orca 절대 경로",
     "beforeAuth": "비대화형 ssh 세션에서도 GitHub에 push할 수 있게 인증해 둬요. 에이전트가 러너에서 push하고 PR을 열어야 PR 상태를 정할 수 있어요.",
@@ -78,6 +80,7 @@
     "namePlaceholder": "예: Acme Commerce",
     "create": "만들기",
     "creating": "만드는 중",
+    "created": "Workspace를 만들었어요",
     "current": "{name} Workspace",
     "pickHint": "트래커 프로젝트를 하나 이상 넣어요.",
     "failed": "만들지 못했어요. 다시 해 주세요."
