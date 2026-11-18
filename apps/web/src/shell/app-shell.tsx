@@ -1,41 +1,35 @@
 import * as stylex from "@stylexjs/stylex";
-import { Menu, MenuRadio, MenuRadioOption, MenuSeparator, StatusPill } from "@factory/ui";
-import {
-  colors,
-  fontSize,
-  fontWeight,
-  letterSpacing,
-  motion,
-  radius,
-  size,
-  space,
-} from "@factory/ui/tokens.stylex";
+import { Menu, MenuRadio, MenuRadioOption, MenuSeparator } from "@factory/ui";
+import { colors, fontSize, fontWeight, motion, radius, space } from "@factory/ui/tokens.stylex";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
-import { useStatusName } from "../status";
 import { ALL_WORKSPACES } from "./model";
 import type { ShellData, WorkspaceChoice } from "./model";
 import { navIcons } from "./nav-icons";
 
 /*
- * 앱 셸(시안 B): 사이드바(Workspace 전환기, 내비, RUNNERS) | 본문.
- * 내비 항목은 모든 화면을 여기 둔다. 화면 티켓은 라우트만 더하고 셸을 고치지 않는다.
+ * 앱 셸(시안 B, ADR 0010 11번): 왼쪽 아이콘 레일 | 본문.
+ * 레일 맨 위에 Workspace 바꾸기, 가운데 메뉴 Home·Tickets·Runs·Runners·Stats, 맨 아래 Settings.
+ * Runners 아이콘에는 Runner Issue 개수 점을 단다. 화면 티켓은 라우트만 더하고 셸을 고치지 않는다.
  */
 
-const navItems = [
+const RAIL_WIDTH = 84;
+
+const menuItems = [
   { key: "home", to: "/" },
   { key: "tickets", to: "/tickets" },
   { key: "runs", to: "/runs" },
   { key: "runners", to: "/runners" },
   { key: "stats", to: "/stats" },
-  { key: "settings", to: "/settings" },
 ] as const;
+
+type NavKey = (typeof menuItems)[number]["key"] | "settings";
 
 export interface AppShellProps {
   shell: ShellData;
   workspace: WorkspaceChoice;
-  /** 지금 주소의 경로. 내비에서 현재 화면을 표시한다 */
+  /** 지금 주소의 경로. 레일에서 현재 화면을 표시한다 */
   pathname: string;
   onWorkspaceChange: (ws: string) => void;
   children: ReactNode;
@@ -49,78 +43,78 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const t = useTranslations("shell");
-  const statusName = useStatusName();
+  const isCurrent = (to: string) =>
+    to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`);
   return (
     <div {...stylex.props(styles.app)}>
-      <aside {...stylex.props(styles.sidebar)}>
-        <Link to="/" {...stylex.props(styles.brand)}>
-          <span aria-hidden="true" {...stylex.props(styles.brandMark)}>
-            {t("brandMark")}
-          </span>
-          {t("brand")}
-        </Link>
+      <aside {...stylex.props(styles.rail)}>
         <WorkspaceSwitcher
           shell={shell}
           workspace={workspace}
           onWorkspaceChange={onWorkspaceChange}
         />
-        <nav aria-label={t("nav.label")}>
+        <nav aria-label={t("nav.label")} {...stylex.props(styles.nav)}>
           <ul {...stylex.props(styles.navList)}>
-            {navItems.map((item) => {
-              const current =
-                item.to === "/"
-                  ? pathname === "/"
-                  : pathname === item.to || pathname.startsWith(`${item.to}/`);
-              return (
-                <li key={item.key}>
-                  <Link
-                    to={item.to}
-                    {...(current ? { "aria-current": "page" } : {})}
-                    {...stylex.props(styles.navLink, current && styles.navLinkCurrent)}
-                  >
-                    {navIcons[item.key]}
-                    {t(`nav.${item.key}`)}
-                  </Link>
-                </li>
-              );
-            })}
+            {menuItems.map((item) => (
+              <li key={item.key}>
+                <RailLink
+                  navKey={item.key}
+                  to={item.to}
+                  current={isCurrent(item.to)}
+                  issues={item.key === "runners" ? shell.runnerIssues : 0}
+                />
+              </li>
+            ))}
+          </ul>
+          <ul {...stylex.props(styles.navList)}>
+            <li>
+              <RailLink
+                navKey="settings"
+                to="/settings"
+                current={isCurrent("/settings")}
+                issues={0}
+              />
+            </li>
           </ul>
         </nav>
-        <section aria-labelledby="sidebar-runners" {...stylex.props(styles.runners)}>
-          <h2 id="sidebar-runners" {...stylex.props(styles.sectionLabel)}>
-            {t("runners.title")}
-          </h2>
-          {shell.runners.length === 0 ? (
-            <p {...stylex.props(styles.runnersEmpty)}>{t("runners.empty")}</p>
-          ) : (
-            <ul {...stylex.props(styles.navList)}>
-              {shell.runners.map((runner) => (
-                <li key={runner.id}>
-                  <Link
-                    to="/runners"
-                    search={(prev) => ({ ws: prev.ws, sel: runner.id })}
-                    {...stylex.props(styles.runner)}
-                  >
-                    <span {...stylex.props(styles.runnerName)}>{runner.name}</span>
-                    {runner.online ? (
-                      <span {...stylex.props(styles.runnerLoad)}>
-                        {t("runners.load", {
-                          running: runner.occupied,
-                          capacity: runner.capacity,
-                        })}
-                      </span>
-                    ) : (
-                      <StatusPill status="offline">{statusName("offline")}</StatusPill>
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
       </aside>
       <main {...stylex.props(styles.main)}>{children}</main>
     </div>
+  );
+}
+
+function RailLink({
+  navKey,
+  to,
+  current,
+  issues,
+}: {
+  navKey: NavKey;
+  to: string;
+  current: boolean;
+  /** 0 보다 크면 아이콘에 문제 개수 점을 단다 */
+  issues: number;
+}) {
+  const t = useTranslations("shell");
+  const name = t(`nav.${navKey}`);
+  return (
+    <Link
+      to={to}
+      {...(current ? { "aria-current": "page" } : {})}
+      // 점의 개수는 화면 읽기에도 이름으로 알린다("Runners, Runner Issue 2개")
+      {...(issues > 0 ? { "aria-label": t("nav.withIssues", { name, count: issues }) } : {})}
+      {...stylex.props(styles.navLink, current && styles.navLinkCurrent)}
+    >
+      <span {...stylex.props(styles.iconBox)}>
+        {navIcons[navKey]}
+        {issues > 0 ? (
+          <span aria-hidden="true" data-issues={issues} {...stylex.props(styles.issueDot)}>
+            {issues}
+          </span>
+        ) : null}
+      </span>
+      <span {...stylex.props(styles.navName)}>{name}</span>
+    </Link>
   );
 }
 
@@ -131,13 +125,27 @@ function WorkspaceSwitcher({
 }: Pick<AppShellProps, "shell" | "workspace" | "onWorkspaceChange">) {
   const t = useTranslations("shell.workspace");
   if (workspace.kind === "none") {
-    return <p {...stylex.props(styles.noWorkspace)}>{t("none")}</p>;
+    return (
+      <div {...stylex.props(styles.workspace)}>
+        <span aria-hidden="true" {...stylex.props(styles.avatar, styles.avatarEmpty)} />
+        <span {...stylex.props(styles.workspaceName)}>{t("none")}</span>
+      </div>
+    );
   }
+  const name = workspace.kind === "all" ? t("all") : workspace.workspace.name;
   const value = workspace.kind === "all" ? ALL_WORKSPACES : workspace.workspace.id;
   return (
     <Menu
-      label={t("label")}
-      trigger={workspace.kind === "all" ? t("all") : workspace.workspace.name}
+      variant="rail"
+      label={t("switch", { workspace: name })}
+      trigger={
+        <>
+          <span aria-hidden="true" {...stylex.props(styles.avatar)}>
+            {initialOf(name)}
+          </span>
+          <span {...stylex.props(styles.workspaceName)}>{name}</span>
+        </>
+      }
     >
       <MenuRadio value={value} onValueChange={onWorkspaceChange}>
         {shell.workspaces.map((w) => (
@@ -152,6 +160,14 @@ function WorkspaceSwitcher({
   );
 }
 
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/** Workspace 이름의 첫 글자. 영문은 대문자로 */
+function initialOf(name: string): string {
+  const [first] = graphemes.segment(name.trim());
+  return first?.segment.toUpperCase() ?? "";
+}
+
 const focusRing = {
   outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
   outlineOffset: -2,
@@ -160,60 +176,72 @@ const focusRing = {
 const styles = stylex.create({
   app: {
     display: "grid",
-    gridTemplateColumns: `${size.sidebarWidth} minmax(0, 1fr)`,
+    gridTemplateColumns: `${RAIL_WIDTH}px minmax(0, 1fr)`,
     height: "100dvh",
   },
-  sidebar: {
+  rail: {
     display: "flex",
     flexDirection: "column",
     gap: space.s4,
     minHeight: 0,
-    paddingBlock: space.s3,
+    paddingBlock: space.s4,
     paddingInline: space.s2,
     overflow: "auto",
     backgroundColor: colors.bgSidebar,
-    borderInlineEndWidth: 1,
-    borderInlineEndStyle: "solid",
-    borderInlineEndColor: colors.borderSubtle,
   },
-  brand: {
+  workspace: {
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
-    gap: space.s2,
-    paddingBlock: space.s1,
-    paddingInline: space.s2,
-    borderRadius: radius.control,
-    color: colors.textPrimary,
-    fontSize: fontSize.body,
-    fontWeight: fontWeight.semibold,
-    textDecoration: "none",
-    ...focusRing,
+    gap: space.s1,
+    paddingBlock: space.s2,
   },
-  brandMark: {
+  avatar: {
     display: "grid",
     placeItems: "center",
-    width: 22,
-    height: 22,
-    borderRadius: radius.pill,
+    width: 36,
+    height: 36,
+    borderRadius: radius.control,
     backgroundColor: colors.accent,
     color: colors.textOnAccent,
+    fontSize: fontSize.body,
+    fontWeight: fontWeight.semibold,
+  },
+  avatarEmpty: { backgroundColor: colors.bgControl },
+  workspaceName: {
+    maxWidth: "100%",
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+    color: colors.textSecondary,
     fontSize: fontSize.small,
+    fontWeight: fontWeight.regular,
   },
-  noWorkspace: {
-    paddingInline: space.s2,
-    color: colors.textTertiary,
+  nav: {
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    flexGrow: 1,
+    gap: space.s4,
   },
-  navList: { display: "flex", flexDirection: "column", gap: space.px2 },
+  navList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    margin: 0,
+    padding: 0,
+    listStyle: "none",
+  },
   navLink: {
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
-    gap: space.s2,
-    height: 30,
-    paddingInline: space.s2,
+    gap: space.s1,
+    paddingBlock: space.s2,
     borderRadius: radius.control,
     backgroundColor: { default: "transparent", ":hover": colors.bgHover },
-    color: { default: colors.textSecondary, ":hover": colors.textPrimary },
-    fontWeight: fontWeight.medium,
+    color: { default: colors.textTertiary, ":hover": colors.textPrimary },
+    fontSize: fontSize.small,
     textDecoration: "none",
     transitionProperty: "background-color, color",
     transitionDuration: motion.durationFast,
@@ -224,44 +252,30 @@ const styles = stylex.create({
     backgroundColor: { default: colors.bgSelected, ":hover": colors.bgSelected },
     color: { default: colors.textPrimary, ":hover": colors.textPrimary },
   },
-  runners: { display: "flex", flexDirection: "column", gap: space.s1 },
-  sectionLabel: {
-    margin: 0,
-    paddingInline: space.s2,
-    color: colors.textTertiary,
+  iconBox: {
+    position: "relative",
+    display: "grid",
+    placeItems: "center",
+    width: 24,
+    height: 24,
+  },
+  issueDot: {
+    position: "absolute",
+    top: -4,
+    insetInlineEnd: -8,
+    display: "grid",
+    placeItems: "center",
+    minWidth: 16,
+    height: 16,
+    paddingInline: space.px2,
+    borderRadius: radius.full,
+    backgroundColor: colors.problem,
+    color: colors.textOnAccent,
     fontSize: fontSize.label,
-    fontWeight: fontWeight.medium,
-    letterSpacing: letterSpacing.label,
-    textTransform: "uppercase",
-  },
-  runnersEmpty: {
-    paddingInline: space.s2,
-    color: colors.textTertiary,
-    fontSize: fontSize.small,
-  },
-  runner: {
-    display: "flex",
-    alignItems: "center",
-    gap: space.s2,
-    height: 28,
-    paddingInline: space.s2,
-    borderRadius: radius.control,
-    backgroundColor: { default: "transparent", ":hover": colors.bgHover },
-    color: colors.textSecondary,
-    fontSize: fontSize.ui,
-    textDecoration: "none",
-    ...focusRing,
-  },
-  runnerName: {
-    minWidth: 0,
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-  },
-  runnerLoad: {
-    marginInlineStart: "auto",
-    color: colors.textTertiary,
+    fontWeight: fontWeight.semibold,
     fontVariantNumeric: "tabular-nums",
+    lineHeight: 1,
   },
+  navName: { maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis" },
   main: { minWidth: 0, minHeight: 0, overflow: "hidden" },
 });

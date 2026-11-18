@@ -1,6 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { createTranslator } from "use-intl";
-import { z } from "zod";
 import { HomeScreen } from "../../home/home-screen";
 import { homeMessages } from "../../home/messages";
 import { ScreenMessages, defaultLocale } from "../../i18n";
@@ -8,9 +7,8 @@ import { answerQuestion, denyPermission, getHomePage } from "../../server/functi
 
 const t = createTranslator({ locale: defaultLocale, messages: homeMessages, namespace: "home" });
 
-/** 홈: 현재 Workspace 의 손댈 일, 실행 중, Queued. 고른 행(sel)은 주소에 남는다 */
+/** Home: 현재 Workspace 의 손댈 일 카드와 지금 일어나는 일 */
 export const Route = createFileRoute("/_app/")({
-  validateSearch: z.object({ sel: z.string().optional() }),
   loaderDeps: ({ search }) => ({ ws: search.ws }),
   loader: ({ deps }) => getHomePage({ data: { ws: deps.ws } }),
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
@@ -19,17 +17,11 @@ export const Route = createFileRoute("/_app/")({
 
 function HomeRoute() {
   const page = Route.useLoaderData();
-  const { sel } = Route.useSearch();
-  const navigate = Route.useNavigate();
   const router = useRouter();
   return (
     <ScreenMessages messages={homeMessages}>
       <HomeScreen
         page={page}
-        selectedKey={sel}
-        onSelect={(key) => {
-          void navigate({ search: (prev) => ({ ...prev, sel: key }), replace: true });
-        }}
         onAnswer={async (input) => {
           await answerQuestion({ data: input });
           // 답했음(answered)을 다시 읽어 답하기 칸을 닫는다

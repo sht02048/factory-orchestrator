@@ -37,7 +37,10 @@ export const getRunnersPage = createServerFn({ method: "GET" }).handler(() =>
 
 export const getHomePage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
-  .handler(({ data }) => loadHomePage(getDatabase(), data.ws, new Date()));
+  .handler(({ data }) =>
+    // "오늘 Merged"는 화면 시각과 같은 시간대로 자른다(0044).
+    loadHomePage(getDatabase(), data.ws, new Date(), parseTimeZone(getCookie(TIME_ZONE_COOKIE))),
+  );
 
 /** 손댈 일의 질문에 답을 남긴다. worker 가 러너에 보낸다(Q61·Q82.3) */
 export const answerQuestion = createServerFn({ method: "POST" })

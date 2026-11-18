@@ -87,7 +87,7 @@ function RootLayout() {
 
 /**
  * 브라우저 시간대가 서버가 그린 시간대와 다르면(첫 방문, 지난 방문 뒤 시간대를 옮김) 쿠키에 남기고,
- * 시간대를 쓰는 데이터(루트의 시간대, Stats 날짜 구간)를 다시 읽는다. 열린 탭에서 OS 시간대를 바꾸면
+ * 시간대를 쓰는 데이터(루트의 시간대, Stats 날짜 구간, Home 의 오늘 Merged)를 다시 읽는다. 열린 탭에서 OS 시간대를 바꾸면
  * 다음에 페이지를 열 때 맞춘다. hydration 이 끝난 뒤에 돌아 서버 렌더링과 어긋나지 않는다.
  * 쿠키에 이미 같은 값이 있으면(쿠키를 막았거나 서버가 다른 이름을 쓰는 경우) 다시 읽지 않는다.
  */
@@ -98,7 +98,10 @@ function TimeZoneSync({ timeZone }: { timeZone: string }) {
     if (local === timeZone || timeZoneFromCookies(document.cookie) === local) return;
     document.cookie = timeZoneCookie(local);
     void router.invalidate({
-      filter: (match) => match.routeId === rootRouteId || match.routeId === "/_app/stats",
+      filter: (match) =>
+        match.routeId === rootRouteId ||
+        match.routeId === "/_app/stats" ||
+        match.routeId === "/_app/",
     });
   }, [router, timeZone]);
   return null;

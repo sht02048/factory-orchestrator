@@ -1,13 +1,13 @@
 import type { ReactNode } from "react";
 
-// 사이드바 내비 아이콘(시안 B). 색은 currentColor 를 따른다.
+// 레일 메뉴 아이콘(시안 B). 색은 currentColor 를 따른다.
 
 function Icon({ children }: { children: ReactNode }) {
   return (
     <svg
       aria-hidden="true"
-      width="16"
-      height="16"
+      width="20"
+      height="20"
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
@@ -53,9 +53,9 @@ export const navIcons = {
   ),
   settings: (
     <Icon>
-      <path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" />
-      <circle cx="10" cy="4.5" r="1.5" />
-      <circle cx="6" cy="11.5" r="1.5" />
+      <circle cx="8" cy="8" r="2" />
+      <path d="M8 1.75v1.5M8 12.75v1.5M14.25 8h-1.5M3.25 8h-1.5M12.42 3.58l-1.06 1.06M4.64 11.36l-1.06 1.06M12.42 12.42l-1.06-1.06M4.64 4.64 3.58 3.58" />
+      <circle cx="8" cy="8" r="4.25" />
     </Icon>
   ),
 } as const;
