@@ -18,3 +18,5 @@ pre-commit:
             run: pnpm run typecheck
           - name: color-literals
             run: pnpm run check:colors
+          - name: style-lengths
+            run: pnpm run check:lengths
