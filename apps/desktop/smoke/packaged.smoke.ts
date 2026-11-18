@@ -296,7 +296,7 @@ describe("패키징한 앱, 원격 모드", () => {
     const app = await launch(other);
     const page = await app.firstWindow();
     await page.getByRole("button", { name: "서버 찾기" }).click();
-    await page.getByText("Tailscale 을 찾지 못했어요").waitFor({ timeout: 15_000 });
+    await page.getByText("Tailscale을 찾지 못했어요").waitFor({ timeout: 15_000 });
     await page.getByRole("button", { name: "주소로 연결하기" }).click();
     const notOurs = await freePort();
     const decoy = spawn(process.execPath, [
