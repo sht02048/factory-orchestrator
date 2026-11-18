@@ -2,6 +2,8 @@ import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
+import { pickConditions, runConditionsSearch } from "../../runs/conditions";
+import type { ConditionKey } from "../../runs/conditions";
 import { runsMessages } from "../../runs/messages";
 import { ENDED_RUNS_PAGE_SIZE, MAX_ENDED_RUNS, RUN_FILTERS } from "../../runs/model";
 import { RunsScreen } from "../../runs/runs-screen";
@@ -15,10 +17,15 @@ export const Route = createFileRoute("/_app/runs")({
     f: z.enum(RUN_FILTERS).optional().catch(undefined),
     sel: z.string().optional(),
     ended: z.number().int().min(1).max(MAX_ENDED_RUNS).optional().catch(undefined),
+    ...runConditionsSearch,
   }),
-  loaderDeps: ({ search }) => ({ ws: search.ws, ended: search.ended }),
+  loaderDeps: ({ search }) => ({
+    ws: search.ws,
+    ended: search.ended,
+    ...pickConditions(search),
+  }),
   loader: ({ deps }) =>
-    getRunsPage({ data: { ws: deps.ws, ended: deps.ended ?? ENDED_RUNS_PAGE_SIZE } }),
+    getRunsPage({ data: { ...deps, ended: deps.ended ?? ENDED_RUNS_PAGE_SIZE } }),
   shouldReload: false,
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: RunsRoute,
@@ -65,6 +72,17 @@ function RunsRoute() {
                 });
               },
             })}
+        onClearConditions={(keys: ReadonlyArray<ConditionKey>) => {
+          void navigate({
+            search: (prev) => ({
+              ...prev,
+              ...Object.fromEntries(keys.map((key) => [key, undefined])),
+              sel: undefined,
+              ended: undefined,
+            }),
+            replace: true,
+          });
+        }}
         runHref={(id) =>
           `/runs/${encodeURIComponent(id)}${ws === undefined ? "" : `?ws=${encodeURIComponent(ws)}`}`
         }

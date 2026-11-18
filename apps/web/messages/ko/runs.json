@@ -8,9 +8,20 @@
     "all": "전체",
     "attention": "손댈 일"
   },
+  "conditions": {
+    "label": "걸린 조건",
+    "runner": "러너: {name}",
+    "noRunner": "러너: 없음",
+    "project": "프로젝트: {name}",
+    "agent": "에이전트: {name}",
+    "days": "기간: 최근 {days}일",
+    "remove": "{condition} 조건 지우기",
+    "clearAll": "조건 모두 지우기"
+  },
   "listLabel": "런 목록",
   "empty": "이 조건에 맞는 런이 없어요.",
   "noRuns": "아직 런이 없어요. 티켓을 할당하면 여기에 보여요.",
+  "noRunsWithConditions": "이 조건에 맞는 런이 없어요. 조건을 지우면 다른 런도 보여요.",
   "noRunner": "러너 정하기 전",
   "noRunnerEnded": "러너 없이 끝남",
   "metaSeparator": " · ",
@@ -55,6 +66,7 @@
       "human-check": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
       "failed": "에이전트 결과와 PR 상태 때문에 Failed예요. 자동으로 다시 시도하지 않아요.",
       "canceled": "운영자가 취소한 런이에요. 손댈 일에 올리지 않아요."
-    }
+    },
+    "noRunsWithConditions": "조건에 맞는 런이 생기면 여기에 요약이 보여요."
   }
 }

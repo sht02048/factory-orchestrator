@@ -18,6 +18,8 @@ import {
   offlineQueuedKey,
   seedDatabase,
 } from "../testing/seed";
+import { loadStatsPage } from "../stats/load";
+import { startOfCalendarDay, trackerProjectKey } from "./conditions";
 import { loadRunsPage } from "./load";
 import { ENDED_RUNS_PAGE_SIZE } from "./model";
 import type { RunView } from "./model";
@@ -238,6 +240,101 @@ describe("Workspace 범위(ADR 0006)", () => {
       runs: [],
       recentEnded: 0,
       moreEnded: false,
+      conditions: [],
     });
+  });
+});
+
+describe("조건으로 거르기(0075)", () => {
+  const keysOf = (runs: ReadonlyArray<RunView>) => runs.map((run) => run.ticketKey).toSorted();
+
+  it("러너 조건이면 그 러너의 런만, 빈 러너면 러너 없는 런만 담는다", () => {
+    const { db } = seedDatabase();
+    const all = loadRunsPage(db, undefined, now).runs;
+    const onA = loadRunsPage(db, undefined, now, ENDED_RUNS_PAGE_SIZE, { runner: "runner-a" });
+    expect(keysOf(onA.runs)).toEqual(keysOf(all.filter((run) => run.runner?.name === "runner-a")));
+    expect(onA.runs.length).toBeGreaterThan(0);
+    expect(onA.conditions).toEqual([{ key: "runner", name: "runner-a" }]);
+
+    const none = loadRunsPage(db, undefined, now, ENDED_RUNS_PAGE_SIZE, { runner: "" });
+    expect(keysOf(none.runs)).toEqual([offlineQueuedKey]);
+    expect(none.conditions).toEqual([{ key: "runner", name: null }]);
+  });
+
+  it("Stats 나눠 보기의 트래커 프로젝트 키로 그 프로젝트의 런만 담는다", () => {
+    const { db } = seedDatabase();
+    const stats = loadStatsPage(db, undefined, now, "UTC", 14);
+    if (!("groups" in stats)) throw new Error("stats");
+    const web = stats.groups.trackerProject.find((group) => group.name === "Web");
+    if (web === undefined) throw new Error("Web group");
+    expect(web.key).toBe(trackerProjectKey(connection, "tp-web"));
+
+    const page = loadRunsPage(db, undefined, now, ENDED_RUNS_PAGE_SIZE, { project: web.key });
+    expect(page.runs).toHaveLength(endedCases.length + activeCases.length + 1);
+    expect(page.conditions).toEqual([{ key: "project", name: "Web" }]);
+    const other = trackerProjectKey(connection, "tp-other");
+    expect(loadRunsPage(db, undefined, now, ENDED_RUNS_PAGE_SIZE, { project: other }).runs).toEqual(
+      [],
+    );
+  });
+
+  it("에이전트 조건이면 그 에이전트의 런만 담는다", () => {
+    const { db } = seedDatabase();
+    expect(
+      loadRunsPage(db, undefined, now, ENDED_RUNS_PAGE_SIZE, { agent: "claude" }).runs,
+    ).toHaveLength(endedCases.length + activeCases.length + 1);
+    const codex = loadRunsPage(db, undefined, now, ENDED_RUNS_PAGE_SIZE, { agent: "codex" });
+    expect(codex.runs).toEqual([]);
+    expect(codex.conditions).toEqual([{ key: "agent", agent: "codex" }]);
+  });
+
+  it("기간 조건이면 Stats 와 같은 날짜 범위에 끝난 런만 담고 진행 중인 런은 뺀다", () => {
+    const { db } = seedDatabase();
+    addEndedRun(db, "OLD-1", new Date(now.getTime() - 8 * 24 * 60 * 60_000));
+    const week = loadRunsPage(db, undefined, now, ENDED_RUNS_PAGE_SIZE, { days: 7 });
+    expect(keysOf(week.runs)).toEqual(endedCases.map((c) => c.key).toSorted());
+    expect(week.conditions).toEqual([{ key: "days", days: 7 }]);
+    const twoWeeks = loadRunsPage(db, undefined, now, ENDED_RUNS_PAGE_SIZE, { days: 14 });
+    expect(keysOf(twoWeeks.runs)).toContain("OLD-1");
+  });
+
+  it("끝난 런 상한은 조건 안에서 적용하고, 조건 밖 런은 담지 않는다", () => {
+    const { db } = seedDatabase();
+    for (let i = 0; i < 5; i += 1) addEndedRun(db, `BULK-${i}`, minutes(200 + i));
+    const page = loadRunsPage(db, undefined, minutes(400), 3, { runner: "runner-a" });
+    const ended = page.runs.filter((run) => run.state === "ended");
+    expect(ended.slice(0, 3).map((run) => run.ticketKey)).toEqual(["BULK-4", "BULK-3", "BULK-2"]);
+    expect(ended.slice(3).every((run) => run.attention)).toBe(true);
+    expect(page.moreEnded).toBe(true);
+    expect(page.runs.every((run) => run.runner?.name === "runner-a")).toBe(true);
+    expect(page.runs.map((run) => run.ticketKey)).not.toContain(offlineQueuedKey);
+  });
+
+  it("조건으로 걸러도 손댈 일은 그 티켓의 마지막 런에만 붙는다", () => {
+    const { db } = seedDatabase();
+    const failedKey = endedCases.find((c) => c.summary === "failed")?.key ?? "";
+    const assigned = assignRun(db, {
+      ticket: { connection, key: toTicketKey(failedKey) },
+      trackerProject: toTrackerProjectId("tp-web"),
+      runnerProject: toRunnerProjectId("github:acme/web"),
+      agent: toAgentId("codex"),
+      now: minutes(300),
+    });
+    if (!assigned.ok) throw new Error(assigned.reason);
+    const claude = loadRunsPage(db, undefined, minutes(400), ENDED_RUNS_PAGE_SIZE, {
+      agent: "claude",
+    });
+    expect(claude.runs.find((run) => run.ticketKey === failedKey)?.attention).toBe(false);
+  });
+});
+
+describe("startOfCalendarDay", () => {
+  it("그 시간대에서 그날이 시작하는 순간을 돌려준다", () => {
+    const day = Date.UTC(2026, 10, 17);
+    expect(startOfCalendarDay(day, "UTC").toISOString()).toBe("2026-11-17T00:00:00.000Z");
+    expect(startOfCalendarDay(day, "Asia/Seoul").toISOString()).toBe("2026-11-16T15:00:00.000Z");
+    expect(startOfCalendarDay(Date.UTC(2026, 2, 8), "America/New_York").toISOString()).toBe(
+      "2026-03-08T05:00:00.000Z",
+    );
   });
 });

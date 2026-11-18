@@ -6,6 +6,7 @@ import { loadHomePage } from "../home/load";
 import { cancelRunRequest } from "../run-detail/actions";
 import { loadRunDetail, requestRunLogTail } from "../run-detail/load";
 import { loadRunnersPage } from "../runners/load";
+import { pickConditions, runConditionsSchema } from "../runs/conditions";
 import { loadRunsPage } from "../runs/load";
 import { MAX_ENDED_RUNS } from "../runs/model";
 import { loadShell } from "../shell/load";
@@ -43,12 +44,21 @@ export const denyPermission = createServerFn({ method: "POST" })
 
 export const getRunsPage = createServerFn({ method: "GET" })
   .validator(
-    z.object({
+    runConditionsSchema.extend({
       ws: z.string().optional(),
       ended: z.number().int().min(1).max(MAX_ENDED_RUNS).optional(),
     }),
   )
-  .handler(({ data }) => loadRunsPage(getDatabase(), data.ws, new Date(), data.ended));
+  .handler(({ data }) =>
+    loadRunsPage(
+      getDatabase(),
+      data.ws,
+      new Date(),
+      data.ended,
+      pickConditions(data),
+      parseTimeZone(getCookie(TIME_ZONE_COOKIE)),
+    ),
+  );
 
 export const getStatsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional(), days: statsPeriodDaysSchema }))
