@@ -17,10 +17,6 @@ export function endsWithFinalConsonant(word: string): boolean {
   return LETTERS_READ_WITH_FINAL_CONSONANT.has(lower.at(-1) ?? "");
 }
 
-export function objectParticle(word: string): "eul" | "reul" {
-  return endsWithFinalConsonant(word) ? "eul" : "reul";
-}
-
 export function subjectParticle(word: string): "i" | "ga" {
   return endsWithFinalConsonant(word) ? "i" : "ga";
 }

@@ -1,18 +1,29 @@
 import * as stylex from "@stylexjs/stylex";
-import { Button, Text } from "@factory/ui";
-import { colors, fontSize, fontWeight, space } from "@factory/ui/tokens.stylex";
+import { Button, Text, textStyles } from "@factory/ui";
+import { colors, space } from "@factory/ui/tokens.stylex";
 import { useId, useState } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { STATS_DAYS } from "./model";
 import type { DailyThroughput } from "./model";
+import { fill, outcomeSegments } from "./outcome-bar";
+import type { OutcomeTone } from "./outcome-bar";
 
-const PLOT_HEIGHT = 136;
+const PLOT_HEIGHT = 160;
 const GRID_LINES = 4;
+const MAX_DAY_LABELS = 8;
 
-type Outcome = "merged" | "check" | "failed" | "canceled";
+export function dayLabelShown(index: number, days: number): boolean {
+  const every = Math.ceil(days / MAX_DAY_LABELS);
+  return (days - 1 - index) % every === 0;
+}
 
-export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughput> }) {
+export function ThroughputChart({
+  daily,
+  days,
+}: {
+  daily: ReadonlyArray<DailyThroughput>;
+  days: number;
+}) {
   const t = useTranslations("stats.throughput");
   const { statsDay: dayLabel } = useTime();
   const tableId = useId();
@@ -22,12 +33,13 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
   );
   const max = Math.max(0, ...totals);
 
-  if (max === 0) return <Text variant="meta">{t("empty", { days: STATS_DAYS })}</Text>;
+  if (max === 0) return <Text variant="meta">{t("empty", { days })}</Text>;
 
   const step = Math.max(1, Math.ceil(max / GRID_LINES / 2) * 2);
   const top = step * GRID_LINES;
   const ticks = Array.from({ length: GRID_LINES + 1 }, (_, i) => i * step);
   const columns = `repeat(${daily.length}, minmax(0, 1fr))`;
+  const lastIndex = daily.length - 1;
 
   return (
     <div>
@@ -42,7 +54,7 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
             <span
               key={tick}
               style={{ bottom: `${(tick / top) * 100}%` }}
-              {...stylex.props(styles.text, styles.tick)}
+              {...stylex.props(textStyles("label"), styles.numeric, styles.tick)}
             >
               {tick}
             </span>
@@ -57,43 +69,39 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
             />
           ))}
           <div style={{ gridTemplateColumns: columns }} {...stylex.props(styles.bars)}>
-            {daily.map((d) => {
-              const segments: ReadonlyArray<{ key: Outcome; value: number }> = [
-                { key: "merged", value: d.outcomes.merged },
-                { key: "check", value: d.outcomes["human-check"] },
-                { key: "failed", value: d.outcomes.failed },
-                { key: "canceled", value: d.outcomes.canceled },
-              ];
-              return (
-                <div
-                  key={d.day}
-                  title={t("day", {
-                    day: dayLabel(d.day).long,
-                    merged: d.outcomes.merged,
-                    check: d.outcomes["human-check"],
-                    failed: d.outcomes.failed,
-                    canceled: d.outcomes.canceled,
-                  })}
-                  {...stylex.props(styles.bar)}
-                >
-                  {segments.map((segment) =>
-                    segment.value === 0 ? null : (
-                      <span
-                        key={segment.key}
-                        style={{ height: `calc(${(segment.value / top) * 100}% - 1px)` }}
-                        {...stylex.props(styles.segment, fill[segment.key])}
-                      />
-                    ),
-                  )}
-                </div>
-              );
-            })}
+            {daily.map((d) => (
+              <div
+                key={d.day}
+                title={t("day", {
+                  day: dayLabel(d.day).long,
+                  merged: d.outcomes.merged,
+                  check: d.outcomes["human-check"],
+                  failed: d.outcomes.failed,
+                  canceled: d.outcomes.canceled,
+                })}
+                {...stylex.props(styles.bar)}
+              >
+                {outcomeSegments(d.outcomes).map((segment) =>
+                  segment.value === 0 ? null : (
+                    <span
+                      key={segment.tone}
+                      style={{ height: `calc(${(segment.value / top) * 100}% - 1px)` }}
+                      {...stylex.props(styles.segment, fill[segment.tone])}
+                    />
+                  ),
+                )}
+              </div>
+            ))}
           </div>
         </div>
         <div style={{ gridTemplateColumns: columns }} {...stylex.props(styles.days)}>
           {daily.map((d, i) => (
-            <span key={d.day} {...stylex.props(styles.text, styles.day)}>
-              {i % 2 === 1 || i === daily.length - 1 ? dayLabel(d.day).short : null}
+            <span key={d.day} {...stylex.props(textStyles("label"), styles.numeric, styles.day)}>
+              {i === lastIndex
+                ? t("today")
+                : dayLabelShown(i, daily.length)
+                  ? dayLabel(d.day).short
+                  : null}
             </span>
           ))}
         </div>
@@ -105,22 +113,24 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
       </div>
       <div {...stylex.props(!showTable && styles.hidden)}>
         <table id={tableId} {...stylex.props(styles.table)}>
-          <caption {...stylex.props(styles.caption)}>{t("tableCaption")}</caption>
+          <caption {...stylex.props(textStyles("label"), styles.caption)}>
+            {t("tableCaption")}
+          </caption>
           <thead>
             <tr>
-              <th scope="col" {...stylex.props(styles.th)}>
+              <th scope="col" {...stylex.props(textStyles("label"), styles.th)}>
                 {t("columns.day")}
               </th>
-              <th scope="col" {...stylex.props(styles.th, styles.end)}>
+              <th scope="col" {...stylex.props(textStyles("label"), styles.th, styles.end)}>
                 {t("columns.merged")}
               </th>
-              <th scope="col" {...stylex.props(styles.th, styles.end)}>
+              <th scope="col" {...stylex.props(textStyles("label"), styles.th, styles.end)}>
                 {t("columns.check")}
               </th>
-              <th scope="col" {...stylex.props(styles.th, styles.end)}>
+              <th scope="col" {...stylex.props(textStyles("label"), styles.th, styles.end)}>
                 {t("columns.failed")}
               </th>
-              <th scope="col" {...stylex.props(styles.th, styles.end)}>
+              <th scope="col" {...stylex.props(textStyles("label"), styles.th, styles.end)}>
                 {t("columns.canceled")}
               </th>
             </tr>
@@ -128,13 +138,21 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
           <tbody>
             {daily.map((d) => (
               <tr key={d.day}>
-                <th scope="row" {...stylex.props(styles.td, styles.rowHead)}>
+                <th scope="row" {...stylex.props(textStyles("ui"), styles.td, styles.rowHead)}>
                   {dayLabel(d.day).long}
                 </th>
-                <td {...stylex.props(styles.td, styles.end)}>{d.outcomes.merged}</td>
-                <td {...stylex.props(styles.td, styles.end)}>{d.outcomes["human-check"]}</td>
-                <td {...stylex.props(styles.td, styles.end)}>{d.outcomes.failed}</td>
-                <td {...stylex.props(styles.td, styles.end)}>{d.outcomes.canceled}</td>
+                <td {...stylex.props(textStyles("ui"), styles.td, styles.end)}>
+                  {d.outcomes.merged}
+                </td>
+                <td {...stylex.props(textStyles("ui"), styles.td, styles.end)}>
+                  {d.outcomes["human-check"]}
+                </td>
+                <td {...stylex.props(textStyles("ui"), styles.td, styles.end)}>
+                  {d.outcomes.failed}
+                </td>
+                <td {...stylex.props(textStyles("ui"), styles.td, styles.end)}>
+                  {d.outcomes.canceled}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -144,11 +162,9 @@ export function ThroughputChart({ daily }: { daily: ReadonlyArray<DailyThroughpu
   );
 }
 
-export function LegendSwatch({ outcome }: { outcome: Outcome }) {
-  return <i aria-hidden {...stylex.props(styles.swatch, fill[outcome])} />;
+export function LegendSwatch({ tone }: { tone: OutcomeTone }) {
+  return <i aria-hidden {...stylex.props(styles.swatch, fill[tone])} />;
 }
-
-const hatch = `repeating-linear-gradient(135deg, transparent 0 2px, ${colors.bgCanvas} 2px 3px)`;
 
 const styles = stylex.create({
   chart: {
@@ -192,17 +208,12 @@ const styles = stylex.create({
   },
   days: { gridColumn: 2, display: "grid" },
   day: { display: "flex", justifyContent: "center", minWidth: 0, whiteSpace: "nowrap" },
-  text: {
-    color: colors.textTertiary,
-    fontSize: fontSize.label,
-    fontVariantNumeric: "tabular-nums",
-  },
+  numeric: { fontVariantNumeric: "tabular-nums" },
   actions: { display: "flex", justifyContent: "flex-end", marginTop: space.s2 },
   table: {
     width: "100%",
     marginTop: space.s2,
     borderCollapse: "collapse",
-    fontSize: fontSize.ui,
     fontVariantNumeric: "tabular-nums",
   },
   hidden: {
@@ -216,18 +227,10 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     borderWidth: 0,
   },
-  caption: {
-    textAlign: "start",
-    paddingBottom: space.s1,
-    color: colors.textTertiary,
-    fontSize: fontSize.small,
-  },
+  caption: { textAlign: "start", paddingBottom: space.s1 },
   th: {
     paddingBlock: space.s1,
     paddingInline: space.s2,
-    color: colors.textTertiary,
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.medium,
     textAlign: "start",
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
@@ -236,19 +239,11 @@ const styles = stylex.create({
   td: {
     paddingBlock: space.s1,
     paddingInline: space.s2,
-    color: colors.textPrimary,
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: colors.borderSubtle,
   },
-  rowHead: { color: colors.textSecondary, fontWeight: fontWeight.regular, textAlign: "start" },
+  rowHead: { textAlign: "start" },
   end: { textAlign: "end" },
-  swatch: { display: "inline-block", width: 8, height: 8, borderRadius: 2 },
-});
-
-const fill = stylex.create({
-  merged: { backgroundColor: colors.merged },
-  check: { backgroundColor: colors.check },
-  failed: { backgroundColor: colors.problem },
-  canceled: { backgroundColor: colors.idle, backgroundImage: hatch },
+  swatch: { display: "inline-block", width: space.s2, height: space.s2, borderRadius: 2 },
 });

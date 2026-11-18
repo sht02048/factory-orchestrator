@@ -134,7 +134,7 @@ describe("운영자 핵심 동작(브라우저)", () => {
     const row = page
       .getByRole("region", { name: home.section.todo })
       .getByRole("listitem")
-      .filter({ has: page.getByRole("link", { name: "ACME-1", exact: true }) });
+      .filter({ has: page.getByText("ACME-1", { exact: true }) });
     await row.getByText(questionBody).waitFor();
     await row.getByRole("button", { name: home.row.answer }).click();
     const layer = page.getByRole("dialog");

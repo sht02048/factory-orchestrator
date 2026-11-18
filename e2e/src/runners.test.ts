@@ -90,51 +90,78 @@ afterAll(async () => {
   if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
 });
 
-describe("Runners 카드(브라우저, 0057)", () => {
-  it("긴 프로젝트 이름의 확인 항목과 긴 러너 이름을 자르지 않고 줄을 바꾼다", async (context) => {
-    const page = await openPage(context.task.name, { width: 420, height: 900 });
+describe("Runners 목록 + 패널(브라우저, 0057·0071)", () => {
+  it("sel 로 러너를 골라 들어오면 그 행을 고르고 포커스하고 패널에 그 러너를 보인다", async (context) => {
+    const page = await openPage(context.task.name, { width: 1280, height: 600 });
+    await page.goto(`/runners?ws=${workspaceId}&sel=${selectedRunner}`);
+    await hydrated(page);
+
+    const list = page.getByRole("listbox", { name: runners.listLabel });
+    const row = list.getByRole("option").filter({ has: page.locator(`#runner-${selectedRunner}`) });
+    await expect.poll(async () => row.evaluate((el) => el === document.activeElement)).toBe(true);
+    expect(await row.getAttribute("aria-selected")).toBe("true");
+    const panel = page.getByRole("region", { name: runners.panel.label });
+    expect(
+      await panel.getByRole("heading", { level: 2, name: "runner-z", exact: true }).isVisible(),
+    ).toBe(true);
+    const box = await row.boundingBox();
+    expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
+    expect((box?.y ?? Number.POSITIVE_INFINITY) + (box?.height ?? 0)).toBeLessThanOrEqual(601);
+  });
+
+  it("행을 누르면 패널과 주소의 sel 이 그 러너로 바뀐다", async (context) => {
+    const page = await openPage(context.task.name, { width: 1280, height: 800 });
     await page.goto(`/runners?ws=${workspaceId}`);
     await hydrated(page);
 
-    const card = page.getByRole("region", {
-      name: runners.card.label.replace("{name}", longRunnerName),
-    });
-    const checkName = card.getByText(`GitHub push 권한: ${longProject}`, { exact: true });
-    const title = card.getByRole("heading", { name: longRunnerName, exact: true });
+    await page
+      .getByRole("option")
+      .filter({ has: page.locator(`#runner-${longRunner}`) })
+      .click();
+    const panel = page.getByRole("region", { name: runners.panel.label });
+    await panel.getByRole("heading", { level: 2, name: longRunnerName, exact: true }).waitFor();
+    await expect.poll(() => new URL(page.url()).searchParams.get("sel")).toBe(longRunner);
+    expect(await panel.getByRole("button", { name: runners.panel.recheck }).count()).toBe(0);
+  });
+
+  it("긴 러너 이름과 긴 확인 항목 이름을 패널 안에서 자르지 않고 줄을 바꾼다", async (context) => {
+    const page = await openPage(context.task.name, { width: 1280, height: 800 });
+    await page.goto(`/runners?ws=${workspaceId}&sel=${longRunner}`);
+    await hydrated(page);
+
+    const panel = page.getByRole("region", { name: runners.panel.label });
+    const checkName = panel.getByText(`GitHub push 권한: ${longProject}`, { exact: true });
+    const title = panel.getByRole("heading", { name: longRunnerName, exact: true });
     await checkName.waitFor();
 
-    const cardBox = await card.boundingBox();
-    expect(cardBox?.width ?? 0).toBeLessThan(longProject.length * 7);
+    const panelBox = await panel.boundingBox();
     for (const [target, text] of [
       [checkName, `GitHub push 권한: ${longProject}`],
       [title, longRunnerName],
     ] as const) {
-      const layout = await textLayout(page, text);
+      const layout = await textLayout(page, "aside", text);
       expect(layout.whiteSpace).not.toBe("nowrap");
       expect(layout.textOverflow).not.toBe("ellipsis");
       expect(layout.overflowing).toBe(false);
       expect(layout.lines).toBeGreaterThan(1);
       const box = await target.boundingBox();
       expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
-        (cardBox?.x ?? 0) + (cardBox?.width ?? 0),
+        (panelBox?.x ?? 0) + (panelBox?.width ?? 0),
       );
     }
   });
 
-  it("sel 로 러너를 골라 들어오면 그 러너 카드로 스크롤하고 포커스를 옮긴다", async (context) => {
-    const page = await openPage(context.task.name, { width: 420, height: 600 });
+  it("문제 러너의 해결 상자에서 다시 확인을 누르면 확인을 요청했다고 알린다", async (context) => {
+    const page = await openPage(context.task.name, { width: 1280, height: 800 });
     await page.goto(`/runners?ws=${workspaceId}&sel=${selectedRunner}`);
     await hydrated(page);
 
-    const cell = page.locator(`li#runner-${selectedRunner}`);
+    const panel = page.getByRole("region", { name: runners.panel.label });
+    const fix = panel.getByRole("region", { name: runners.panel.fix.offline.title });
+    await fix.getByRole("button", { name: runners.panel.recheck }).click();
     await expect
-      .poll(async () => page.locator(":focus").getAttribute("id"))
-      .toBe(`runner-${selectedRunner}`);
-    expect(await cell.getAttribute("aria-current")).toBe("true");
-    expect(await cell.isVisible()).toBe(true);
-    const box = await cell.boundingBox();
-    expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
-    expect(box?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(600);
+      .poll(async () => panel.getByRole("status").textContent())
+      .toBe(runners.panel.recheckStatus.requested);
   });
 });
 
@@ -145,9 +172,9 @@ interface TextLayout {
   lines: number;
 }
 
-async function textLayout(page: Page, text: string): Promise<TextLayout> {
+async function textLayout(page: Page, scope: string, text: string): Promise<TextLayout> {
   const raw: unknown = await page.evaluate(`(() => {
-    const el = [...document.querySelectorAll("h2, span")].find(
+    const el = [...document.querySelectorAll(${JSON.stringify(`${scope} h2, ${scope} span`)})].find(
       (e) => e.textContent === ${JSON.stringify(text)},
     );
     if (el === undefined) return null;

@@ -1,4 +1,4 @@
-import type { AgentResult, PrState, SummaryOutcome } from "@factory/core";
+import type { AgentResult, PrState, RunId, SummaryOutcome, TicketKey } from "@factory/core";
 import type { QueuedReason } from "../runs/model";
 import type { RunnerIssueCause, WorkspaceChoice, WorkspaceSummary } from "../shell/model";
 
@@ -18,8 +18,8 @@ export type InputWait =
     };
 
 interface HomeRunBase {
-  id: string;
-  ticketKey: string;
+  id: RunId;
+  ticketKey: TicketKey;
   trackerProject: string;
   workspace: WorkspaceSummary;
   runner: { name: string; online: boolean } | null;
@@ -48,11 +48,19 @@ export type HomeRun =
       prState: PrState;
       summary: SummaryOutcome;
       prSettledLater: boolean;
+      endedAt: string;
+      endedAgoMs: number;
     });
 
-export interface RunnerIssue {
+export interface DashboardRunner {
   id: string;
   name: string;
+  cause: RunnerIssueCause | null;
+  used: number;
+  capacity: number;
+}
+
+export interface RunnerIssue extends DashboardRunner {
   cause: RunnerIssueCause;
 }
 
@@ -62,13 +70,18 @@ export interface AttentionItem {
 }
 
 export interface RunnersSummary {
-  issues: RunnerIssue[];
-  online: number;
+  list: DashboardRunner[];
+}
+
+export function runnerIssues(runners: RunnersSummary): RunnerIssue[] {
+  return runners.list.flatMap((runner) =>
+    runner.cause === null ? [] : [{ ...runner, cause: runner.cause }],
+  );
 }
 
 export interface DoneRun {
-  id: string;
-  ticketKey: string;
+  id: RunId;
+  ticketKey: TicketKey;
   workspace: WorkspaceSummary;
   summary: SummaryOutcome;
   endedAt: string;
@@ -91,6 +104,37 @@ export interface HomePage {
 
 export const DONE_TODAY_LIMIT = 5;
 
+export const TODO_GROUPS = ["answer", "check", "stopped"] as const;
+
+export type TodoGroupKind = (typeof TODO_GROUPS)[number];
+
+export interface TodoGroup {
+  kind: TodoGroupKind;
+  runs: HomeRun[];
+}
+
+export function todoGroupOf(run: HomeRun): TodoGroupKind | null {
+  switch (run.state) {
+    case "waiting-for-input":
+      return "answer";
+    case "disconnected":
+      return "stopped";
+    case "ended":
+      if (run.summary === "human-check") return "check";
+      return run.summary === "failed" ? "stopped" : null;
+    case "queued":
+    case "running":
+      return null;
+  }
+}
+
+export function todoGroups(attention: ReadonlyArray<AttentionItem>): TodoGroup[] {
+  return TODO_GROUPS.map((kind) => ({
+    kind,
+    runs: attention.flatMap(({ run }) => (todoGroupOf(run) === kind ? [run] : [])),
+  })).filter((group) => group.runs.length > 0);
+}
+
 export function needsAttention(run: HomeRun): boolean {
   switch (run.state) {
     case "waiting-for-input":
@@ -104,7 +148,7 @@ export function needsAttention(run: HomeRun): boolean {
   }
 }
 
-const noRunners: RunnersSummary = { issues: [], online: 0 };
+const noRunners: RunnersSummary = { list: [] };
 const nothingDone: DoneToday = { recent: [], total: 0 };
 
 export function partitionHome(input: {
@@ -135,16 +179,6 @@ export function partitionHome(input: {
     )
     .toSorted((a, b) => urgency(a.run) - urgency(b.run) || b.index - a.index)
     .map(({ run }): AttentionItem => ({ kind: "run", run }));
-
-  if (workspace.kind === "all")
-    return {
-      workspace,
-      attention,
-      running: [],
-      queued: [],
-      runners: input.runners,
-      doneToday: nothingDone,
-    };
 
   const runs = input.runs.map(({ run }) => run);
   const done = input.doneToday.toSorted((a, b) => Date.parse(b.endedAt) - Date.parse(a.endedAt));

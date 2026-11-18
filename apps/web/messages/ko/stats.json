@@ -2,7 +2,17 @@
   "documentTitle": "Stats · Factory Orchestrator",
   "title": "Stats",
   "summary": "끝난 런을 요약 결과로 나눠 봐요.",
-  "subtitle": "{workspace} · 최근 {days}일({from}–{to})",
+  "meta": "Stats · {workspace} · 최근 {days}일({from}–{to})",
+  "headline": {
+    "rated": "끝난 런 {runs}개 중 {percent}%를 에이전트가 병합까지 끝냈어요",
+    "ratedWithCanceled": "Canceled를 뺀 끝난 런 {runs}개 중 {percent}%를 에이전트가 병합까지 끝냈어요",
+    "onlyCanceled": "끝난 런 {runs}개가 모두 Canceled예요",
+    "empty": "최근 {days}일 동안 끝난 런이 없어요"
+  },
+  "period": {
+    "label": "기간",
+    "option": "{days}일"
+  },
   "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 통계가 보여요.",
   "allWorkspaces": {
     "body": "통계는 Workspace마다 봐요. Workspace를 고르면 그 Workspace의 통계가 보여요.",
@@ -12,19 +22,23 @@
   "percent": "{percent}%",
   "figures": {
     "label": "기간 요약",
+    "mergedRate": "병합률",
+    "up": "앞 {days}일보다 {points}%p 올랐어요",
+    "down": "앞 {days}일보다 {points}%p 내렸어요",
+    "same": "앞 {days}일과 같아요",
+    "noPrevious": "앞 {days}일에는 비교할 런이 없어요",
+    "humanTouched": "사람이 손댄 비율",
+    "humanTouchedDetail": "Human Check {check} · Failed {failed}",
+    "leadTime": "리드 타임 중앙값",
+    "leadTimeP90": "느린 10%는 {p90} 넘게 걸렸어요",
     "ended": "끝난 런",
-    "canceled": "취소 {count}개는 비율에서 빼요",
-    "merged": "Merged",
-    "attention": "Human Check <check>{checkCount}</check> · Failed <failed>{failedCount}</failed>",
-    "leadTime": "리드 타임 중앙값 · p90 {p90}",
-    "leadTimeSplit": "대기 {wait} · 실행 {execution}",
-    "mergedAfterCheck": "Human Check 뒤 병합",
-    "mergedAfterCheckOf": "Human Check {total}개 중 {merged}개"
+    "canceled": "Canceled {count}개는 비율에서 빼요"
   },
   "throughput": {
-    "title": "날짜별 처리량",
+    "title": "날짜별로 끝난 런",
     "chartLabel": "날짜별로 끝난 런 수. 요약 결과로 나눠 쌓았어요.",
     "day": "{day}: Merged {merged} · Human Check {check} · Failed {failed} · Canceled {canceled}",
+    "today": "오늘",
     "empty": "최근 {days}일 동안 끝난 런이 없어요.",
     "showTable": "표로 보기",
     "hideTable": "표 접기",
@@ -37,52 +51,40 @@
       "canceled": "Canceled"
     }
   },
-  "failedCombinations": {
-    "title": "Failed 조합",
-    "note": "에이전트 결과 · PR 상태",
-    "combination": "{agentResult} · PR {prState}",
+  "failures": {
+    "title": "왜 실패했나요",
+    "listLabel": "실패 이유",
+    "reasons": {
+      "reported-failure": "에이전트가 실패를 보고했어요",
+      "no-pr": "에이전트가 성공을 보고했지만 PR이 없어요",
+      "pr-closed": "PR이 병합되지 않고 닫혔어요",
+      "ended-without-report": "에이전트가 중간에 멈췄어요",
+      "timed-out": "최대 실행 시간을 넘겼어요",
+      "stopped-waiting-for-input": "입력을 기다리다 멈췄어요",
+      "runner-disconnected": "러너와 연결이 끊겼어요",
+      "worktree-missing": "워크트리를 찾지 못했어요",
+      "could-not-start": "런을 시작하지 못했어요"
+    },
+    "prStates": "PR {states}",
+    "prState": "{state} {count}개",
+    "separator": " · ",
     "count": "{runs}개",
     "empty": "이 기간에 Failed 런이 없어요."
   },
   "dimension": {
-    "label": "나눠 보기",
-    "runner": "러너별",
-    "trackerProject": "트래커 프로젝트별",
-    "agent": "에이전트별"
+    "title": "나눠 보기",
+    "label": "나눠 볼 기준",
+    "runner": "러너",
+    "trackerProject": "트래커 프로젝트",
+    "agent": "에이전트"
   },
   "columns": {
     "name": "이름",
     "runs": "런",
-    "merged": "Merged",
-    "check": "Human Check",
-    "failed": "Failed",
-    "canceled": "Canceled",
+    "result": "결과",
     "leadTime": "리드 타임"
   },
-  "listLabel": "{dimension} 통계",
-  "empty": "최근 {days}일 동안 끝난 런이 없어요. 런이 끝나면 여기에 보여요.",
-  "panel": {
-    "label": "고른 항목 요약",
-    "context": "{dimension} · 최근 {days}일",
-    "why": "런 {runs}개 중 {merged}개를 에이전트가 병합까지 끝냈어요. {attention}개는 사람이 손대야 했어요.",
-    "whyWithCanceled": "취소를 뺀 런 {runs}개 중 {merged}개를 에이전트가 병합까지 끝냈어요. {attention}개는 사람이 손대야 했어요. 취소한 {canceled}개는 비율에서 뺐어요.",
-    "whyOnlyCanceled": "끝난 런 {canceled}개가 모두 취소예요. 취소는 비율에서 빼요.",
-    "runs": "끝난 런",
-    "merged": "Merged",
-    "check": "Human Check",
-    "failed": "Failed",
-    "countPercent": "{count}개 · {percent}%",
-    "count": "{count}개",
-    "canceled": "Canceled",
-    "canceledCount": "{count}개 · 비율에서 빼요",
-    "leadTime": "리드 타임 중앙값",
-    "leadTimeP90": "리드 타임 p90",
-    "wait": "대기 시간 중앙값",
-    "execution": "실행 시간 중앙값",
-    "mergedAfterCheck": "Human Check 뒤 병합",
-    "mergedAfterCheckValue": "{merged}/{total}개 · {percent}%",
-    "noHumanCheck": "Human Check 런이 없어요",
-    "failedCombinations": "Failed 조합",
-    "noFailed": "Failed 런이 없어요"
-  }
+  "result": "Merged {merged} · Human Check {check} · Failed {failed} · Canceled {canceled}",
+  "tableCaption": "{dimension}별 런 결과와 리드 타임",
+  "empty": "최근 {days}일 동안 끝난 런이 없어요. 런이 끝나면 여기에 보여요."
 }
