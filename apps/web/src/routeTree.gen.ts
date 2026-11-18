@@ -18,6 +18,7 @@ import { Route as AppRunsRouteImport } from './routes/_app/runs'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppStatsRouteImport } from './routes/_app/stats'
 import { Route as AppTicketsRouteImport } from './routes/_app/tickets'
+import { Route as ApiIdentityRouteImport } from './routes/api/identity'
 import { Route as AppRunsRunIdRouteImport } from './routes/_app/runs_.$runId'
 import { Route as ApiWebhooksTrackerConnectionIdRouteImport } from './routes/api/webhooks/tracker/$connectionId'
 
@@ -65,6 +66,11 @@ const AppTicketsRoute = AppTicketsRouteImport.update({
   path: '/tickets',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiIdentityRoute = ApiIdentityRouteImport.update({
+  id: '/api/identity',
+  path: '/api/identity',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRunsRunIdRoute = AppRunsRunIdRouteImport.update({
   id: '/runs_/$runId',
   path: '/runs/$runId',
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/stats': typeof AppStatsRoute
   '/tickets': typeof AppTicketsRoute
+  '/api/identity': typeof ApiIdentityRoute
   '/runs/$runId': typeof AppRunsRunIdRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
 }
@@ -97,6 +104,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/stats': typeof AppStatsRoute
   '/tickets': typeof AppTicketsRoute
+  '/api/identity': typeof ApiIdentityRoute
   '/': typeof AppIndexRoute
   '/runs/$runId': typeof AppRunsRunIdRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
@@ -111,6 +119,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/stats': typeof AppStatsRoute
   '/_app/tickets': typeof AppTicketsRoute
+  '/api/identity': typeof ApiIdentityRoute
   '/_app/': typeof AppIndexRoute
   '/_app/runs_/$runId': typeof AppRunsRunIdRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
@@ -126,6 +135,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stats'
     | '/tickets'
+    | '/api/identity'
     | '/runs/$runId'
     | '/api/webhooks/tracker/$connectionId'
   fileRoutesByTo: FileRoutesByTo
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stats'
     | '/tickets'
+    | '/api/identity'
     | '/'
     | '/runs/$runId'
     | '/api/webhooks/tracker/$connectionId'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/stats'
     | '/_app/tickets'
+    | '/api/identity'
     | '/_app/'
     | '/_app/runs_/$runId'
     | '/api/webhooks/tracker/$connectionId'
@@ -159,6 +171,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   DsRoute: typeof DsRoute
   OnboardingRoute: typeof OnboardingRoute
+  ApiIdentityRoute: typeof ApiIdentityRoute
   ApiWebhooksTrackerConnectionIdRoute: typeof ApiWebhooksTrackerConnectionIdRoute
 }
 
@@ -227,6 +240,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTicketsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/identity': {
+      id: '/api/identity'
+      path: '/api/identity'
+      fullPath: '/api/identity'
+      preLoaderRoute: typeof ApiIdentityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/runs_/$runId': {
       id: '/_app/runs_/$runId'
       path: '/runs/$runId'
@@ -270,6 +290,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   DsRoute: DsRoute,
   OnboardingRoute: OnboardingRoute,
+  ApiIdentityRoute: ApiIdentityRoute,
   ApiWebhooksTrackerConnectionIdRoute: ApiWebhooksTrackerConnectionIdRoute,
 }
 export const routeTree = rootRouteImport
