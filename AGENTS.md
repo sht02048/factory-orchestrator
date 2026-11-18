@@ -39,6 +39,8 @@
 - 공용 설정 `tsconfig.base.json`은 `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `verbatimModuleSyntax`, `noPropertyAccessFromIndexSignature`를 켠다. 패키지 설정에서 끄지 않는다.
 - oxlint type-aware 모드가 `no-explicit-any`, `no-unsafe-*`, `no-floating-promises`, `switch-exhaustiveness-check`를 error로 막는다. 경고도 실패다.
 - 외부 입력(webhook, ssh로 받은 출력, API 응답, 환경 변수)은 경계에서 스키마로 파싱해 타입을 얻는다. `as` 단언으로 타입을 붙이지 않는다. 단언은 검증 없이 타입만 바꿔 잘못된 값이 안쪽까지 들어온다. 스키마 검증기는 스파이크에서 zod로 확인했다([`docs/research/0001`](docs/research/0001-web-stack-spike.md)).
+- 코드에 주석을 쓰지 않는다. 기존 코드에도 주석이 없다. 설명이 필요하면 테스트, 함수·변수 이름, 코드 구조로 드러내고 테스트로 검증한다. 주석은 코드와 따로 유지보수해야 하고 최신인지 보장되지 않아, 에이전트가 낡은 주석을 근거 삼아 엉뚱한 작업을 한다. 테스트와 이름은 코드와 함께 검증된다.
+- 예외는 도구가 요구하는 지시문이다(`oxlint-disable`, `@ts-expect-error`, `/// <reference>`, `@vitest-environment`, 번들러 매직 주석, JS 파일의 JSDoc 타입 주석 등).
 
 ## UI
 
