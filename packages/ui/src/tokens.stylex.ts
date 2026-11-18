@@ -38,6 +38,7 @@ export const colors = stylex.defineVars({
   textTertiary: "oklch(0.66 0.012 260)",
   textDisabled: "oklch(0.5 0.01 260)",
   textOnAccent: "oklch(0.99 0 0)",
+  textOnProblem: "oklch(0.185 0.009 260)",
 
   // 포인트 색 하나(파랑). 주 버튼, 선택 표시, 링크, 포커스 링.
   accent: "oklch(0.54 0.16 260)",
