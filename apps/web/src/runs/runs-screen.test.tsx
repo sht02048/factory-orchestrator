@@ -14,6 +14,7 @@ import {
   offlineQueuedKey,
   seedDatabase,
 } from "../testing/seed";
+import { loadHomePage } from "../home/load";
 import { loadRunsPage } from "./load";
 import { runsMessages } from "./messages";
 import type { RunFilter, RunsPage } from "./model";
@@ -171,23 +172,42 @@ describe("Runs 화면", () => {
     expect([...queued.keys()].sort()).toEqual(["ACME-13", offlineQueuedKey].sort());
   });
 
-  it("손댈 일 칩은 Waiting for Input·Disconnected·Human Check·Failed 런만 보이고 머리글에 그 수를 쓴다", () => {
-    const { db } = seedDatabase();
-    const page = loadRunsPage(db, undefined, now);
-    const keys = [...rowTexts(render(page, { filter: "attention" })).keys()].sort();
-    const expected = page.runs
-      .filter((run) =>
-        run.state === "ended"
-          ? run.summary === "human-check" || run.summary === "failed"
-          : run.state === "waiting-for-input" || run.state === "disconnected",
-      )
-      .map((run) => run.ticketKey)
-      .sort();
-    expect(keys).toEqual(expected);
-    expect(expected.length).toBeGreaterThan(0);
+  it("손댈 일 칩과 머리글 수는 Home 의 손댈 일 런과 같다(티켓마다 마지막 런)", () => {
+    const { db, ids } = seedDatabase();
+    const homeRunIds = (): string[] =>
+      loadHomePage(db, "ws-commerce", now)
+        .attention.flatMap((item) => (item.kind === "run" ? [item.run.id] : []))
+        .sort();
+    const attentionIds = (page: RunsPage): string[] => {
+      const keys = new Set(rowTexts(render(page, { filter: "attention" })).keys());
+      return page.runs
+        .filter((run) => keys.has(run.ticketKey) && run.attention)
+        .map((run) => run.id)
+        .sort();
+    };
+
+    let page = loadRunsPage(db, undefined, now);
+    expect(attentionIds(page)).toEqual(homeRunIds());
+    expect(homeRunIds().length).toBeGreaterThan(0);
     expect(render(page)).toContain(
-      `${page.runs.length}개 중 ${expected.length}개가 손댈 일이에요.`,
+      `${page.runs.length}개 중 ${homeRunIds().length}개가 손댈 일이에요.`,
     );
+
+    // 끝난 손댈 일 런의 티켓에 새 런을 할당하면 지난 결과는 손댈 일에서 빠진다.
+    const failedKey = endedCases.find((c) => c.summary === "failed")?.key;
+    if (failedKey === undefined) throw new Error("seed");
+    const result = assignRun(db, {
+      ticket: { connection, key: toTicketKey(failedKey) },
+      trackerProject: toTrackerProjectId("tp-web"),
+      runnerProject: toRunnerProjectId("github:acme/web"),
+      agent: toAgentId("claude"),
+      now: minutes(110),
+    });
+    expect(result.ok).toBe(true);
+    page = loadRunsPage(db, undefined, now);
+    const oldFailed = ids.get(failedKey);
+    expect(page.runs.find((run) => run.id === oldFailed)?.attention).toBe(false);
+    expect(attentionIds(page)).toEqual(homeRunIds());
   });
 
   it('Canceled 필터는 운영자가 취소한 런만 "취소"로 보인다(Q82.18)', () => {
