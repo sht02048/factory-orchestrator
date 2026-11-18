@@ -5,6 +5,8 @@ dist/
 .turbo/
 coverage/
 e2e/test-results/
+# pnpm dev 의 개발 데이터(티켓 0047)
+.dev/
 *.tsbuildinfo
 .DS_Store
 

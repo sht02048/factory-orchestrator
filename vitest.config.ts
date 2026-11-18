@@ -6,6 +6,7 @@ export default defineConfig({
       "packages/*",
       "apps/*",
       "e2e",
+      "demo",
       { test: { name: "scripts", include: ["scripts/**/*.test.ts"] } },
     ],
   },

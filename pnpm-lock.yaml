@@ -290,6 +290,27 @@ importers:
         specifier: 8.3.8
         version: 8.3.8(@types/node@24.19.2)(jiti@2.7.0)
 
+  demo:
+    dependencies:
+      '@factory/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@factory/db':
+        specifier: workspace:*
+        version: link:../packages/db
+      '@factory/web':
+        specifier: workspace:*
+        version: link:../apps/web
+      '@factory/worker':
+        specifier: workspace:*
+        version: link:../apps/worker
+      playwright-core:
+        specifier: 1.65.0
+        version: 1.65.0
+      vite:
+        specifier: 8.3.8
+        version: 8.3.8(@types/node@24.19.2)(jiti@2.7.0)
+
   e2e:
     dependencies:
       '@factory/core':
