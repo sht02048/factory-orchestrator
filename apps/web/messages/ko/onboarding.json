@@ -30,7 +30,7 @@
     "workspace": {
       "name": "Workspace",
       "title": "첫 Workspace를 만들어요",
-      "description": "함께 볼 트래커 프로젝트를 골라 묶어요. 홈·Tickets·Stats는 Workspace 단위로 보여요."
+      "description": "함께 볼 트래커 프로젝트를 골라 묶어요. Dashboard·Tickets·Stats는 Workspace 단위로 보여요."
     },
     "mapping": {
       "name": "Mapping",
