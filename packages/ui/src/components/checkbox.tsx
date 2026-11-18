@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Checkbox as SdkCheckbox, CheckboxIndicator } from "@ui-sdk/react/checkbox";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { cx } from "../cx";
 import { colors, fontSize, motion, radius, size, space } from "../tokens.stylex";
 import { CheckIcon } from "./icons";
@@ -24,31 +24,36 @@ export function Checkbox({
   name,
   value,
 }: CheckboxProps) {
+  const descriptionId = useId();
+  const hasDescription = description !== undefined;
   return (
-    <label {...stylex.props(styles.row, disabled === true && styles.rowDisabled)}>
-      <SdkCheckbox
-        checked={checked}
-        onCheckedChange={(next) => onCheckedChange(next === true)}
-        {...(disabled === undefined ? {} : { disabled })}
-        {...(name === undefined ? {} : { name })}
-        {...(value === undefined ? {} : { value })}
-        className={(s) =>
-          cx(styles.box, s.checked && styles.checked, s.disabled && styles.disabled)
-        }
-      >
-        <CheckboxIndicator className={cx(styles.indicator)}>
-          <CheckIcon />
-        </CheckboxIndicator>
-      </SdkCheckbox>
-      <span {...stylex.props(styles.text)}>
-        <span {...stylex.props(disabled === true ? styles.labelDisabled : styles.label)}>
+    <div {...stylex.props(styles.row, disabled === true && styles.rowDisabled)}>
+      <label {...stylex.props(styles.label, disabled === true && styles.labelCursorDisabled)}>
+        <SdkCheckbox
+          checked={checked}
+          {...(hasDescription ? { "aria-describedby": descriptionId } : {})}
+          onCheckedChange={(next) => onCheckedChange(next === true)}
+          {...(disabled === undefined ? {} : { disabled })}
+          {...(name === undefined ? {} : { name })}
+          {...(value === undefined ? {} : { value })}
+          className={(s) =>
+            cx(styles.box, s.checked && styles.checked, s.disabled && styles.disabled)
+          }
+        >
+          <CheckboxIndicator className={cx(styles.indicator)}>
+            <CheckIcon />
+          </CheckboxIndicator>
+        </SdkCheckbox>
+        <span {...stylex.props(disabled === true ? styles.textDisabled : styles.text)}>
           {label}
         </span>
-        {description === undefined ? null : (
-          <span {...stylex.props(styles.description)}>{description}</span>
-        )}
-      </span>
-    </label>
+      </label>
+      {hasDescription ? (
+        <span id={descriptionId} {...stylex.props(styles.description)}>
+          {description}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -56,21 +61,22 @@ const styles = stylex.create({
   row: {
     position: "relative",
     display: "flex",
-    alignItems: "center",
-    gap: space.s3,
+    flexDirection: "column",
+    justifyContent: "center",
+    gap: space.px2,
     minHeight: size.rowMinHeight,
     paddingInline: space.s3,
     borderRadius: radius.control,
-    cursor: "pointer",
     backgroundColor: {
       default: "transparent",
       ":hover": { default: null, "@media (hover: hover)": colors.bgCardHover },
     },
   },
   rowDisabled: {
-    cursor: "not-allowed",
     backgroundColor: { default: "transparent", ":hover": "transparent" },
   },
+  label: { display: "flex", alignItems: "center", gap: space.s3, cursor: "pointer" },
+  labelCursorDisabled: { cursor: "not-allowed" },
   box: {
     display: "inline-flex",
     alignItems: "center",
@@ -99,8 +105,11 @@ const styles = stylex.create({
     color: colors.textDisabled,
   },
   indicator: { display: "inline-flex" },
-  text: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  label: { color: colors.textPrimary },
-  labelDisabled: { color: colors.textDisabled },
-  description: { color: colors.textTertiary, fontSize: fontSize.small },
+  text: { minWidth: 0, color: colors.textPrimary },
+  textDisabled: { minWidth: 0, color: colors.textDisabled },
+  description: {
+    paddingInlineStart: `calc(18px + ${space.s3})`,
+    color: colors.textTertiary,
+    fontSize: fontSize.small,
+  },
 });

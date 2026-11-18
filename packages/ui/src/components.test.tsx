@@ -316,13 +316,18 @@ describe("서버 렌더", () => {
         />
       </>,
     );
-    const [web, api] = html.split("API");
-    expect(web).toMatch(/<label[^>]*>.*role="checkbox"/s);
-    expect(web).toContain('aria-checked="true"');
-    expect(html).toContain('aria-checked="false"');
-    expect(html).toContain("다른 Workspace에 있어요");
-    expect(api).toBeDefined();
-    expect(html.match(/disabled=""/g)?.length ?? 0).toBeGreaterThan(0);
+    const labels = [...html.matchAll(/<label[^>]*>(.*?)<\/label>/gs)].map((m) => m[1] ?? "");
+    expect(labels).toHaveLength(2);
+    expect(labels[0]).toContain('role="checkbox"');
+    expect(labels[0]).toContain('aria-checked="true"');
+    expect(labels[1]).toContain('aria-checked="false"');
+    expect(labels[1]).toContain('disabled=""');
+    expect(labels[1]).not.toContain("다른 Workspace에 있어요");
+    const describedBy = /aria-describedby="([^"]+)"/.exec(labels[1] ?? "")?.[1];
+    expect(describedBy).toBeDefined();
+    expect(html).toContain(`id="${describedBy}"`);
+    expect(html).toMatch(new RegExp(`id="${describedBy}"[^>]*>다른 Workspace에 있어요<`));
+    expect(labels[0]).not.toContain("aria-describedby");
   });
 
   it("Select 는 aria-label 을 트리거에 붙인다", () => {
