@@ -42,8 +42,10 @@ import {
 import {
   assignRun,
   changeRunState,
+  TICKET_TITLE_MAX_LENGTH,
   fillRunTicketTitle,
   getRun,
+  storedTicketTitle,
   getRunWithRecords,
   listRunStateChanges,
   listRuns,
@@ -282,9 +284,22 @@ describe("런의 티켓 제목(0064)", () => {
     const id = assignOk(db, "ENG-1");
     expect(getRun(db, id)?.ticketTitle).toBeNull();
 
-    fillRunTicketTitle(db, id, "처음 읽은 제목");
+    fillRunTicketTitle(db, id, "   ");
+    expect(getRun(db, id)?.ticketTitle).toBeNull();
+    fillRunTicketTitle(db, id, "  처음 읽은 제목  ");
     fillRunTicketTitle(db, id, "트래커에서 바뀐 제목");
     expect(getRun(db, id)?.ticketTitle).toBe("처음 읽은 제목");
+  });
+});
+
+describe("storedTicketTitle", () => {
+  it("앞뒤 공백을 지우고, 빈 제목은 비우고, 상한까지만 남긴다", () => {
+    expect(storedTicketTitle("  결제  ")).toBe("결제");
+    expect(storedTicketTitle("   ")).toBeNull();
+    expect(storedTicketTitle(undefined)).toBeNull();
+    expect(storedTicketTitle("가".repeat(TICKET_TITLE_MAX_LENGTH + 5))).toHaveLength(
+      TICKET_TITLE_MAX_LENGTH,
+    );
   });
 });
 

@@ -873,7 +873,7 @@ const styles = stylex.create({
     minWidth: 0,
     maxWidth: "100%",
   },
-  keyPart: { flexShrink: 0, whiteSpace: "nowrap" },
+  keyPart: { flexShrink: 0 },
   runnerName: { display: "flex", flexDirection: "column", minWidth: 0 },
   runnerLine: {
     display: "grid",

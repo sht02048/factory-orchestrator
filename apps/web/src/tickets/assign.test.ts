@@ -1,7 +1,8 @@
 import { toRunId } from "@ganger/core";
 import { getRun } from "@ganger/db";
 import { describe, expect, it } from "vitest";
-import { TICKET_TITLE_MAX_LENGTH, assignInput, submitAssignment } from "./assign";
+import { TICKET_TITLE_MAX_LENGTH } from "@ganger/db";
+import { assignInput, submitAssignment } from "./assign";
 import type { AssignInput } from "./assign";
 import { connection, docsProject, now, setupTickets, webProject } from "./test-fixtures";
 
@@ -56,6 +57,13 @@ describe("수동 할당", () => {
     expect(
       assignInput.safeParse({ ...base, ticketTitle: "가".repeat(TICKET_TITLE_MAX_LENGTH) }).success,
     ).toBe(true);
+  });
+
+  it("제목을 보내지 않는 옛 화면의 할당도 받고 제목은 비워 둔다(0064)", () => {
+    const { db } = setupTickets();
+    const { ticketTitle: _omitted, ...withoutTitle } = base;
+    const parsed = assignInput.parse(withoutTitle);
+    expect(assignedRun(db, submitAssignment(db, parsed, now)).ticketTitle).toBeNull();
   });
 
   it("러너와 에이전트를 바꿔 할당한 값이 런에 저장된다", () => {

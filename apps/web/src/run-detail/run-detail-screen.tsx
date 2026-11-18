@@ -117,7 +117,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
             ...(run.ticketTitle === null ? [] : [run.ticketKey]),
             run.trackerProject,
             ...(run.branch === null ? [] : [run.branch]),
-          ].join(" · ")}
+          ].join(t("metaSeparator"))}
         </Text>
         <Text variant="body">
           <Reason run={run} />

@@ -378,7 +378,7 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
         id,
         trackerConnectionId: input.ticket.connection,
         ticketKey: input.ticket.key,
-        ticketTitle: input.ticketTitle ?? null,
+        ticketTitle: storedTicketTitle(input.ticketTitle),
         workspaceId: project.workspaceId,
         trackerProjectId: input.trackerProject,
         runnerProjectId: input.runnerProject,
@@ -398,9 +398,18 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
   });
 }
 
+export const TICKET_TITLE_MAX_LENGTH = 500;
+
+export function storedTicketTitle(title: string | null | undefined): string | null {
+  const trimmed = title?.trim().slice(0, TICKET_TITLE_MAX_LENGTH) ?? "";
+  return trimmed === "" ? null : trimmed;
+}
+
 export function fillRunTicketTitle(db: Database, id: RunId, title: string): void {
+  const stored = storedTicketTitle(title);
+  if (stored === null) return;
   db.update(runs)
-    .set({ ticketTitle: title })
+    .set({ ticketTitle: stored })
     .where(and(eq(runs.id, id), isNull(runs.ticketTitle)))
     .run();
 }
