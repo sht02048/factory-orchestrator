@@ -22,5 +22,86 @@
     "typescript/no-unsafe-type-assertion": "error",
     "typescript/no-unsafe-unary-minus": "error",
     "typescript/switch-exhaustiveness-check": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["apps/web/**/*.{ts,tsx}"],
+      "plugins": ["typescript", "unicorn", "oxc", "import", "vitest", "react"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@factory/ui/tokens.stylex",
+                "importNames": [
+                  "colors",
+                  "fontSize",
+                  "fontWeight",
+                  "lineHeight",
+                  "letterSpacing",
+                  "radius",
+                  "shadow",
+                  "motion"
+                ],
+                "message": "apps/web 은 글자·면·색·움직임 토큰을 직접 가져오지 않아요. Text·textStyles·Card·surfaceStyles 같은 역할과 컴포넌트를 써요(packages/ui/DESIGN.md). 배치용 space·size 만 가져와요."
+              }
+            ]
+          }
+        ],
+        "react/forbid-elements": [
+          "error",
+          {
+            "forbid": [
+              {
+                "element": "button",
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+              },
+              {
+                "element": "input",
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+              },
+              {
+                "element": "select",
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+              },
+              {
+                "element": "textarea",
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+              },
+              {
+                "element": "table",
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+              },
+              {
+                "element": "h1",
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+              },
+              {
+                "element": "h2",
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+              },
+              {
+                "element": "h3",
+                "message": "apps/web 은 이 HTML 요소를 직접 쓰지 않아요. @factory/ui 의 공용 컴포넌트를 쓰고, 없는 속성이 필요하면 packages/ui 를 넓혀요(packages/ui/DESIGN.md)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["apps/web/**/*.test.{ts,tsx}"],
+      "rules": {
+        "react/forbid-elements": "off"
+      },
+      "plugins": ["typescript", "unicorn", "oxc", "import", "vitest", "react"]
+    },
+    {
+      "files": ["apps/web/src/ds/**"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }

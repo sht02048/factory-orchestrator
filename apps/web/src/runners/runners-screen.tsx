@@ -19,7 +19,7 @@ import {
   Text,
   textStyles,
 } from "@factory/ui";
-import { fonts, space } from "@factory/ui/tokens.stylex";
+import { fonts, size, space } from "@factory/ui/tokens.stylex";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
@@ -50,7 +50,7 @@ export interface RunnersScreenProps {
   actions: RunnerActions;
 }
 
-const columns = "112px minmax(0, 1fr) 160px";
+const columns = `${size.runnerStatusColumn} minmax(0, 1fr) ${size.capacityColumn}`;
 
 export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: RunnersScreenProps) {
   const t = useTranslations("runners");

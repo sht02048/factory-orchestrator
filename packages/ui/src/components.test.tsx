@@ -382,7 +382,6 @@ describe("글자 역할(티켓 0073)", () => {
   const before = [
     ["page", "x1ghz6dp xxbnsim x1g8le32 x45ymtg x8zzex5 xvr1kxx x1w2vvpw"],
     ["panel", "x1ghz6dp xxbnsim x18oput8 x45ymtg x14efcu5 xh0io9k x1fzhlzt"],
-    ["section", "x1ghz6dp xxbnsim xgg16it x45ymtg x1ro8lm6"],
     ["title", "x1ghz6dp xxbnsim xgg16it xbu08dq x1ro8lm6"],
     ["body", "x1ghz6dp x1ry0s1v xgg16it x10ct87k x1fzhlzt"],
     ["ui", "x1ghz6dp x1ry0s1v x1kcddvv x1ro8lm6"],
@@ -437,15 +436,14 @@ describe("면 역할(티켓 0073)", () => {
 });
 
 describe("Section 제목 역할(티켓 0073)", () => {
-  it("기본 Section 은 0073 전과 같은 마크업이다", () => {
-    expect(
-      renderToString(
-        <Section title="T" count={2} note="n">
-          c
-        </Section>,
-      ),
-    ).toBe(
-      '<section class="xdj266r x1h2wk5"><div class="x78zum5 x1pha0wt xd7inxn xa7h3ct"><h2 class="x1ghz6dp xxbnsim xgg16it x45ymtg">T</h2><span class="x1o6ikt5 xss6m8b">2</span><span class="xvc5jky x1o6ikt5 xwu4aly">n</span></div>c</section>',
+  it("기본 Section 제목은 subheading 역할의 h3 이다(티켓 0074에서 section 변형을 정리)", () => {
+    const html = renderToString(
+      <Section title="T" count={2} note="n">
+        c
+      </Section>,
+    );
+    expect(html).toContain(
+      `<h3 class="${stylex.props(textStyles("subheading")).className}">T</h3>`,
     );
   });
 

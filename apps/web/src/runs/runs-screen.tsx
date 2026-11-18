@@ -19,8 +19,11 @@ import {
   TableRows,
   Tabs,
   Text,
+  linkStyles,
+  NoticeLayout,
+  RemovableChip,
 } from "@factory/ui";
-import { colors, fontSize, space } from "@factory/ui/tokens.stylex";
+import { size, space } from "@factory/ui/tokens.stylex";
 import { useEffect, useRef } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useTranslations } from "use-intl";
@@ -39,7 +42,7 @@ import {
 import type { ConditionKey } from "./conditions";
 import type { RunCondition, RunFilter, RunView, RunsPage } from "./model";
 
-const columns = "minmax(0, 1fr) 160px 88px";
+const columns = `minmax(0, 1fr) ${size.runStatusColumn} ${size.elapsedColumn}`;
 
 export interface RunsScreenProps {
   page: RunsPage;
@@ -76,10 +79,10 @@ export function RunsScreen(props: RunsScreenProps) {
 function Notice({ body }: { body: ReactNode }) {
   const t = useTranslations("runs");
   return (
-    <div {...stylex.props(styles.notice)}>
+    <NoticeLayout>
       <PageHeader title={t("title")} />
       {body}
-    </div>
+    </NoticeLayout>
   );
 }
 
@@ -219,11 +222,11 @@ function RunsList({
           </Card>
           {page.moreEnded || page.recentEnded > ENDED_RUNS_PAGE_SIZE ? (
             <div {...stylex.props(styles.more)}>
-              <p ref={endedStatus} role="status" tabIndex={-1} {...stylex.props(styles.moreStatus)}>
+              <Text variant="meta" as="p" ref={endedStatus} role="status" tabIndex={-1}>
                 {page.moreEnded
                   ? t("ended.partial", { count: page.recentEnded })
                   : t("ended.all", { count: page.recentEnded })}
-              </p>
+              </Text>
               {page.moreEnded && onShowMoreEnded !== undefined ? (
                 <Button
                   ref={showMoreButton}
@@ -289,12 +292,12 @@ function ConditionChips({
     <div role="group" aria-label={t("label")} {...stylex.props(styles.conditions)}>
       {conditions.map((condition) => (
         <span key={condition.key} data-condition={condition.key}>
-          <Button
-            aria-label={t("remove", { condition: text(condition) })}
-            onClick={() => onClear([condition.key])}
+          <RemovableChip
+            removeLabel={t("remove", { condition: text(condition) })}
+            onRemove={() => onClear([condition.key])}
           >
             {text(condition)}
-          </Button>
+          </RemovableChip>
         </span>
       ))}
       {conditions.length > 1 ? (
@@ -419,12 +422,12 @@ function RunPanel({
             event.preventDefault();
             onOpenDetail();
           }}
-          {...stylex.props(styles.link)}
+          {...stylex.props(linkStyles())}
         >
           {t("openDetail")}
         </a>
         {pr === null ? null : (
-          <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
+          <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
             {t("openPr", { pr: pr.displayId })}
           </a>
         )}
@@ -461,7 +464,7 @@ function RunPanel({
           {pr === null ? (
             t("none")
           ) : (
-            <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
+            <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
               {pr.displayId}
             </a>
           )}
@@ -482,12 +485,6 @@ function useFilterLabel(): (filter: RunFilter) => string {
 }
 
 const styles = stylex.create({
-  notice: {
-    maxWidth: 720,
-    paddingTop: space.s8,
-    paddingInline: space.s8,
-    paddingBottom: space.s10,
-  },
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
   filterBar: {
     display: "flex",
@@ -506,17 +503,5 @@ const styles = stylex.create({
     gap: space.s3,
     marginTop: space.s4,
   },
-  moreStatus: {
-    margin: 0,
-    color: colors.textTertiary,
-    fontSize: fontSize.ui,
-    outline: "none",
-  },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  link: {
-    color: colors.accentText,
-    textUnderlineOffset: 3,
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
-  },
 });

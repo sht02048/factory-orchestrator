@@ -3,24 +3,39 @@ import {
   Actions,
   Button,
   Card,
+  CheckTick,
   Checkbox,
+  Checklist,
+  ChecklistItem,
+  Chip,
+  CodeBlock,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+  DataTableRowHeader,
+  Disclosure,
+  DoneMark,
   Field,
   Input,
   Mascot,
+  NumberedList,
   PanelBlock,
   Select,
+  StepNav,
+  StepNavItem,
   Text,
+  VisuallyHidden,
   buttonStyles,
+  focusStyles,
+  linkStyles,
+  surfaceStyles,
+  textStyles,
+  visuallyHiddenStyles,
 } from "@factory/ui";
-import {
-  colors,
-  fontSize,
-  fontWeight,
-  fonts,
-  lineHeight,
-  radius,
-  space,
-} from "@factory/ui/tokens.stylex";
+import { breakpoints, size, space } from "@factory/ui/tokens.stylex";
 import type { ReactNode, Ref, RefObject } from "react";
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
@@ -135,13 +150,13 @@ export function OnboardingScreen({
       <main {...stylex.props(styles.column)}>
         <div {...stylex.props(styles.heading)}>
           {index === 0 ? <Mascot mood="default" size="small" /> : null}
-          <span {...stylex.props(styles.eyebrow)}>
+          <Text variant="label" numeric>
             {t("eyebrow", {
               step: index + 1,
               total: ONBOARDING_STEPS.length,
               name: t(`steps.${step}.name`),
             })}
-          </span>
+          </Text>
           <Text variant="page">
             <FocusTarget ref={titleRef}>{t(`steps.${step}.title`)}</FocusTarget>
           </Text>
@@ -164,20 +179,18 @@ export function OnboardingScreen({
           ) : null}
           <div {...stylex.props(styles.footerEnd)}>
             {passed ? null : (
-              <span id={lockedId} {...stylex.props(styles.locked)}>
+              <Text variant="meta" id={lockedId}>
                 {t("nextLocked")}
-              </span>
+              </Text>
             )}
-            <button
-              type="button"
-              data-variant={passed ? "primary" : "secondary"}
+            <Button
+              variant={passed ? "primary" : "secondary"}
               disabled={!passed}
-              aria-describedby={passed ? undefined : lockedId}
+              {...(passed ? {} : { "aria-describedby": lockedId })}
               onClick={() => (last ? onFinish() : onStep(index + 1))}
-              {...stylex.props(...buttonStyles(passed ? "primary" : "secondary", !passed))}
             >
               {last ? t("finish") : t("next")}
-            </button>
+            </Button>
           </div>
         </div>
       </main>
@@ -197,65 +210,28 @@ function StepList({
   const t = useTranslations("onboarding");
   const reachable = reachableIndex(page);
   return (
-    <nav aria-label={t("stepsLabel")} {...stylex.props(styles.nav)}>
-      <span {...stylex.props(styles.brand)}>{t("heading")}</span>
-      <ol {...stylex.props(styles.steps)}>
-        {ONBOARDING_STEPS.map((step, i) => {
-          const current = i === index;
-          const done = stepPassed(page, step);
-          const content: ReactNode = (
-            <>
-              <span
-                {...stylex.props(
-                  styles.marker,
-                  done && styles.markerDone,
-                  current && styles.markerCurrent,
-                )}
-              >
-                {done && !current ? (
-                  <>
-                    <CheckMark />
-                    <span {...stylex.props(styles.srOnly)}>{i + 1}</span>
-                  </>
-                ) : (
-                  i + 1
-                )}
-              </span>
-              <span>{t(`steps.${step}.name`)}</span>
-              {done && !current ? (
-                <span {...stylex.props(styles.srOnly)}>{t("stepDone")}</span>
-              ) : null}
-            </>
-          );
-          return (
-            <li key={step}>
-              {i <= reachable && !current ? (
-                <button
-                  type="button"
-                  onClick={() => onStep(i)}
-                  {...stylex.props(styles.step, styles.stepButton, done && styles.stepDone)}
-                >
-                  {content}
-                </button>
-              ) : (
-                <span
-                  aria-current={current ? "step" : undefined}
-                  {...stylex.props(styles.step, current && styles.stepCurrent)}
-                >
-                  {content}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
+    <StepNav label={t("stepsLabel")} title={t("heading")}>
+      {ONBOARDING_STEPS.map((step, i) => {
+        const current = i === index;
+        const done = stepPassed(page, step);
+        return (
+          <StepNavItem
+            key={step}
+            number={i + 1}
+            name={t(`steps.${step}.name`)}
+            state={current ? "current" : done ? "done" : "todo"}
+            doneLabel={t("stepDone")}
+            {...(i <= reachable && !current ? { onSelect: () => onStep(i) } : {})}
+          />
+        );
+      })}
+    </StepNav>
   );
 }
 
 function FocusTarget({ ref, children }: { ref: Ref<HTMLSpanElement>; children: ReactNode }) {
   return (
-    <span ref={ref} tabIndex={-1} {...stylex.props(styles.focusTarget)}>
+    <span ref={ref} tabIndex={-1} {...stylex.props(focusStyles.ring)}>
       {children}
     </span>
   );
@@ -269,24 +245,6 @@ function useFocusWhenAdded(count: number): RefObject<HTMLSpanElement | null> {
     seen.current = count;
   }, [count]);
   return ref;
-}
-
-function CheckMark() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="12"
-      height="12"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m3.5 8.5 3 3 6-7" />
-    </svg>
-  );
 }
 
 function ExternalMark() {
@@ -307,22 +265,6 @@ function ExternalMark() {
   );
 }
 
-function DoneCircle() {
-  return (
-    <span {...stylex.props(styles.marker, styles.markerDone, styles.doneCircle)}>
-      <CheckMark />
-    </span>
-  );
-}
-
-function Tick({ done, label }: { done: boolean; label: string }) {
-  return (
-    <span role="img" aria-label={label} {...stylex.props(done ? styles.tick : styles.tickEmpty)}>
-      {done ? <CheckMark /> : null}
-    </span>
-  );
-}
-
 function ExternalLink({
   href,
   children,
@@ -339,11 +281,11 @@ function ExternalLink({
       target="_blank"
       rel="noreferrer"
       {...(button ? { "data-variant": "secondary" } : {})}
-      {...stylex.props(...(button ? buttonStyles("secondary") : [styles.link]))}
+      {...stylex.props(...(button ? buttonStyles("secondary") : linkStyles("action")))}
     >
       {children}
       <ExternalMark />
-      <span {...stylex.props(styles.srOnly)}>{t("externalLink")}</span>
+      <VisuallyHidden>{t("externalLink")}</VisuallyHidden>
     </a>
   );
 }
@@ -361,9 +303,9 @@ function SummaryRow({
 }) {
   return (
     <div {...stylex.props(styles.summary)}>
-      <DoneCircle />
+      <DoneMark />
       <span {...stylex.props(styles.summaryText)}>
-        <span {...stylex.props(styles.summaryTitle)}>{title}</span>
+        <Text variant="title">{title}</Text>
         <Text variant="meta" mono={mono} truncate>
           {meta}
         </Text>
@@ -558,8 +500,8 @@ function TrackerKeyForm({
           mono
         />
       </Field>
-      <div {...stylex.props(styles.inset)}>
-        <span {...stylex.props(styles.insetTitle)}>{t("guideTitle")}</span>
+      <div {...stylex.props(surfaceStyles("inset"), textStyles("ui"), styles.insetStack)}>
+        <Text variant="title">{t("guideTitle")}</Text>
         <ol {...stylex.props(styles.bullets, styles.decimal)}>
           <li>{t("guideStepOpen")}</li>
           <li>{t("guideStepCreate")}</li>
@@ -586,25 +528,22 @@ function TrackerKeyForm({
 function WebhookExplainer() {
   const t = useTranslations("onboarding.webhook");
   return (
-    <details {...stylex.props(styles.details)}>
-      <summary {...stylex.props(styles.detailsSummary)}>{t("question")}</summary>
-      <div {...stylex.props(styles.detailsBody)}>
-        <p {...stylex.props(styles.para)}>{t("answer")}</p>
-        <div {...stylex.props(styles.compare)}>
-          <div {...stylex.props(styles.inset, styles.compareItem)}>
-            <span {...stylex.props(styles.insetTitle)}>{t("withoutTitle")}</span>
-            <span>{t("withoutBody")}</span>
-          </div>
-          <div {...stylex.props(styles.inset, styles.compareItem)}>
-            <span {...stylex.props(styles.insetTitle)}>{t("withTitle")}</span>
-            <span>{t("withBody")}</span>
-          </div>
+    <Disclosure summary={t("question")}>
+      <p {...stylex.props(styles.para)}>{t("answer")}</p>
+      <div {...stylex.props(styles.compare)}>
+        <div {...stylex.props(surfaceStyles("inset"), textStyles("ui"), styles.insetStack)}>
+          <Text variant="title">{t("withoutTitle")}</Text>
+          <span>{t("withoutBody")}</span>
         </div>
-        <p {...stylex.props(styles.para)}>{t("retry")}</p>
-        <p {...stylex.props(styles.para)}>{t("stopped")}</p>
-        <p {...stylex.props(styles.para)}>{t("address")}</p>
+        <div {...stylex.props(surfaceStyles("inset"), textStyles("ui"), styles.insetStack)}>
+          <Text variant="title">{t("withTitle")}</Text>
+          <span>{t("withBody")}</span>
+        </div>
       </div>
-    </details>
+      <p {...stylex.props(styles.para)}>{t("retry")}</p>
+      <p {...stylex.props(styles.para)}>{t("stopped")}</p>
+      <p {...stylex.props(styles.para)}>{t("address")}</p>
+    </Disclosure>
   );
 }
 
@@ -650,38 +589,33 @@ function GitHubGuide() {
     <div key="permissions" {...stylex.props(styles.stackTight)}>
       <span>{t("guideStepPermissions")}</span>
       <span {...stylex.props(styles.permission)}>
-        <span {...stylex.props(styles.chip, styles.chipStrong)}>{t("required")}</span>
-        <span {...stylex.props(styles.primaryText)}>{t("permissionPullRequests")}</span>
+        <Chip strong>{t("required")}</Chip>
+        <Text variant="ui" tone="strong">
+          {t("permissionPullRequests")}
+        </Text>
         <Text variant="meta">{t("permissionPullRequestsNote")}</Text>
       </span>
       <span {...stylex.props(styles.permission)}>
-        <span {...stylex.props(styles.chip)}>{t("optional")}</span>
-        <span {...stylex.props(styles.primaryText)}>{t("permissionActions")}</span>
+        <Chip>{t("optional")}</Chip>
+        <Text variant="ui" tone="strong">
+          {t("permissionActions")}
+        </Text>
         <Text variant="meta">{t("permissionActionsNote")}</Text>
       </span>
     </div>,
     t("guideStepPaste"),
   ];
   return (
-    <section aria-labelledby={titleId} {...stylex.props(styles.card)}>
+    <section aria-labelledby={titleId} {...stylex.props(surfaceStyles("card"), styles.guide)}>
       <div {...stylex.props(styles.cardHeader)}>
-        <h2 id={titleId} {...stylex.props(styles.cardTitle)}>
+        <Text variant="panel" as="h2" id={titleId}>
           {t("guideTitle")}
-        </h2>
+        </Text>
         <ExternalLink href={GITHUB_TOKEN_URL} button>
           {t("guideLink")}
         </ExternalLink>
       </div>
-      <ol {...stylex.props(styles.numbered)}>
-        {steps.map((content, i) => (
-          <li key={i} {...stylex.props(styles.numberedItem)}>
-            <span aria-hidden="true" {...stylex.props(styles.marker, styles.numberedMarker)}>
-              {i + 1}
-            </span>
-            <span {...stylex.props(styles.numberedBody)}>{content}</span>
-          </li>
-        ))}
-      </ol>
+      <NumberedList items={steps} />
     </section>
   );
 }
@@ -889,22 +823,21 @@ function RunnerChecklist({
   const tc = useTranslations("settings.runners.check");
   const prerequisiteName = usePrerequisiteName();
   return (
-    <ul aria-label={t("checklist")} {...stylex.props(styles.checklist)}>
-      <li {...stylex.props(styles.checkItem)}>
-        <Tick done label={tc("satisfied")} />
+    <Checklist label={t("checklist")}>
+      <ChecklistItem done label={tc("satisfied")}>
         {version === null ? tc("online") : tc("onlineVersion", { version })}
-      </li>
+      </ChecklistItem>
       {prerequisites.map((prerequisite) => (
-        <li key={prerequisite.id} {...stylex.props(styles.checkItem)}>
-          <Tick
-            done={prerequisite.satisfied === true}
-            label={prerequisite.satisfied === true ? tc("satisfied") : tc("unknown")}
-          />
+        <ChecklistItem
+          key={prerequisite.id}
+          done={prerequisite.satisfied === true}
+          label={prerequisite.satisfied === true ? tc("satisfied") : tc("unknown")}
+        >
           {prerequisiteName(prerequisite)}
           {prerequisite.satisfied === true ? null : <Text variant="meta">{tc("unknown")}</Text>}
-        </li>
+        </ChecklistItem>
       ))}
-    </ul>
+    </Checklist>
   );
 }
 
@@ -934,16 +867,18 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
     problems.service || problems.githubAuth || problems.error !== null || problems.pushUnchecked;
   if (!known && !check.online) {
     return (
-      <p role="alert" {...stylex.props(styles.error)}>
+      <Text variant="ui" as="p" tone="problem" role="alert">
         {t("offline")}
-      </p>
+      </Text>
     );
   }
   return (
     <div role="alert" {...stylex.props(styles.stack)}>
       {problems.service ? (
         <div {...stylex.props(styles.stack)}>
-          <p {...stylex.props(styles.error)}>{t("serviceTitle")}</p>
+          <Text variant="ui" as="p" tone="problem">
+            {t("serviceTitle")}
+          </Text>
           <Text variant="body">{t("serviceBody")}</Text>
           <Command value={serviceInstallCommand(runner.orcaPath)} />
           <Text variant="meta">{t("serviceLinux")}</Text>
@@ -951,9 +886,11 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
       ) : null}
       {problems.githubAuth ? (
         <div {...stylex.props(styles.stack)}>
-          <p {...stylex.props(styles.error)}>{t("authTitle")}</p>
+          <Text variant="ui" as="p" tone="problem">
+            {t("authTitle")}
+          </Text>
           <Text variant="body">{t("authBody")}</Text>
-          <ul {...stylex.props(styles.bullets)}>
+          <ul {...stylex.props(textStyles("ui"), styles.bullets)}>
             <li>{t("authCauseToken")}</li>
             <li>{t("authCauseKeychain")}</li>
             <li>{t("authCauseSshKey")}</li>
@@ -962,19 +899,25 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
       ) : null}
       {problems.error === null ? null : (
         <div {...stylex.props(styles.stack)}>
-          <p {...stylex.props(styles.error)}>{t("errorTitle")}</p>
+          <Text variant="ui" as="p" tone="problem">
+            {t("errorTitle")}
+          </Text>
           <Text variant="body">{t("errorBody", { reason: runnerError(problems.error) })}</Text>
         </div>
       )}
       {problems.pushUnchecked && problems.error === null ? (
         <div {...stylex.props(styles.stack)}>
-          <p {...stylex.props(styles.error)}>{t("pushUncheckedTitle")}</p>
+          <Text variant="ui" as="p" tone="problem">
+            {t("pushUncheckedTitle")}
+          </Text>
           <Text variant="body">{t("pushUncheckedBody")}</Text>
         </div>
       ) : null}
       {known ? null : (
         <div {...stylex.props(styles.stack)}>
-          <p {...stylex.props(styles.error)}>{t("otherTitle")}</p>
+          <Text variant="ui" as="p" tone="problem">
+            {t("otherTitle")}
+          </Text>
           <Text variant="body">{t("otherBody")}</Text>
         </div>
       )}
@@ -985,13 +928,13 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
 function Command({ value }: { value: string }) {
   const words = value.split(" ");
   return (
-    <code {...stylex.props(styles.command)}>
+    <CodeBlock tone="command">
       {words.map((word, i) => (
         <span key={i} {...stylex.props(styles.word)}>
           {i === 0 ? word : ` ${word}`}
         </span>
       ))}
-    </code>
+    </CodeBlock>
   );
 }
 
@@ -1112,20 +1055,22 @@ function WorkspaceForm({
         />
       </Field>
       <fieldset aria-labelledby={legendId} {...stylex.props(styles.fieldset)}>
-        <span id={legendId} {...stylex.props(styles.legend)}>
+        <Text variant="ui" id={legendId}>
           {t("projects")}
-        </span>
+        </Text>
         <Text variant="meta">{t("projectsHint")}</Text>
         {groups.length === 0 ? (
           <Text variant="meta">{ts("projects.noConnections")}</Text>
         ) : (
           groups.map((group) => (
-            <div key={group.connection.id} {...stylex.props(styles.group)}>
-              <span {...stylex.props(styles.groupTitle)}>{group.connection.name}</span>
+            <div key={group.connection.id} {...stylex.props(surfaceStyles("inset"), styles.group)}>
+              <span {...stylex.props(textStyles("label"), styles.groupTitle)}>
+                {group.connection.name}
+              </span>
               {group.error === null ? null : (
-                <p {...stylex.props(styles.error)}>
+                <Text variant="ui" as="p" tone="problem">
                   {ts("projects.listFailed", { reason: reason(group.error) })}
-                </p>
+                </Text>
               )}
               {group.projects.length === 0 && group.error === null ? (
                 <Text variant="meta">{ts("projects.empty")}</Text>
@@ -1253,42 +1198,30 @@ function MappingStep({
       {page.runnerProjects.length === 0 ? (
         <Text variant="meta">{ts("mapping.noRunnerProjects")}</Text>
       ) : null}
-      <div {...stylex.props(styles.tableBox)}>
-        <table aria-label={t("tableLabel")} {...stylex.props(styles.table)}>
-          <thead>
-            <tr>
-              <th scope="col" {...stylex.props(styles.th, styles.thFirst)}>
-                {t("trackerProject")}
-              </th>
-              <th scope="col" {...stylex.props(styles.th)}>
-                {t("runnerProject")}
-              </th>
-              <th scope="col" {...stylex.props(styles.th)}>
-                {t("agent")}
-              </th>
-              <th scope="col" {...stylex.props(styles.th)}>
-                {t("inProgress")}
-              </th>
-              <th scope="col" {...stylex.props(styles.th, styles.thLast)}>
-                <span {...stylex.props(styles.srOnly)}>{t("rowState")}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {workspace.bound.map((bound) => (
-              <MappingRow
-                key={`${bound.connection.id}/${bound.project.id}`}
-                ws={workspace.general.id}
-                bound={bound}
-                runnerProjects={page.runnerProjects}
-                agents={page.agents}
-                actions={actions}
-                onSaved={announce}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable label={t("tableLabel")} framed>
+        <DataTableHead>
+          <DataTableHeader>{t("trackerProject")}</DataTableHeader>
+          <DataTableHeader>{t("runnerProject")}</DataTableHeader>
+          <DataTableHeader>{t("agent")}</DataTableHeader>
+          <DataTableHeader>{t("inProgress")}</DataTableHeader>
+          <DataTableHeader shrink>
+            <VisuallyHidden>{t("rowState")}</VisuallyHidden>
+          </DataTableHeader>
+        </DataTableHead>
+        <DataTableBody>
+          {workspace.bound.map((bound) => (
+            <MappingRow
+              key={`${bound.connection.id}/${bound.project.id}`}
+              ws={workspace.general.id}
+              bound={bound}
+              runnerProjects={page.runnerProjects}
+              agents={page.agents}
+              actions={actions}
+              onSaved={announce}
+            />
+          ))}
+        </DataTableBody>
+      </DataTable>
       <Text variant="meta">{ts("mapping.permissionHint")}</Text>
       {workspace.labels.map((label) => (
         <LabelRow
@@ -1299,16 +1232,20 @@ function MappingStep({
           onSaved={announce}
         />
       ))}
-      <p role="status" aria-live="polite" {...stylex.props(styles.srOnly)}>
+      <p role="status" aria-live="polite" {...stylex.props(visuallyHiddenStyles.hidden)}>
         {saves === 0 ? null : <span key={saves}>{ts("saved")}</span>}
       </p>
       <div {...stylex.props(styles.stack)}>
         {missing.length === 0 ? (
-          <p {...stylex.props(styles.ok)}>{t("ready")}</p>
+          <Text variant="ui" as="p" tone="strong">
+            {t("ready")}
+          </Text>
         ) : (
           <>
-            <p {...stylex.props(styles.ok)}>{t("missingTitle")}</p>
-            <ul {...stylex.props(styles.bullets)}>
+            <Text variant="ui" as="p" tone="strong">
+              {t("missingTitle")}
+            </Text>
+            <ul {...stylex.props(textStyles("ui"), styles.bullets)}>
               {missing.map((part) => (
                 <li key={part}>{t(`missing.${part}`)}</li>
               ))}
@@ -1392,14 +1329,16 @@ function MappingRow({
     mapping.state.kind === "failed" || progress.state.kind === "failed" || !bound.states.ok;
   return (
     <Fragment>
-      <tr {...stylex.props(styles.tr)}>
-        <th scope="row" {...stylex.props(styles.rowHeader)}>
+      <DataTableRow>
+        <DataTableRowHeader>
           <span {...stylex.props(styles.rowHeaderText)}>
-            <span {...stylex.props(styles.primaryText)}>{project}</span>
+            <Text variant="ui" tone="strong">
+              {project}
+            </Text>
             <Text variant="meta">{bound.connection.name}</Text>
           </span>
-        </th>
-        <td {...stylex.props(styles.td)}>
+        </DataTableRowHeader>
+        <DataTableCell wide>
           <Select
             aria-label={t("cellLabel", { project, column: t("runnerProject") })}
             {...(missingPair === "runnerProject" ? { "aria-describedby": hintId } : {})}
@@ -1411,8 +1350,8 @@ function MappingRow({
             onValueChange={(value) => pick({ runnerProject: toRunnerProjectId(value), agent })}
             placeholder={ts("mapping.choose")}
           />
-        </td>
-        <td {...stylex.props(styles.td)}>
+        </DataTableCell>
+        <DataTableCell wide>
           <Select
             aria-label={t("cellLabel", { project, column: t("agent") })}
             {...(missingPair === "agent" ? { "aria-describedby": hintId } : {})}
@@ -1421,8 +1360,8 @@ function MappingRow({
             onValueChange={(value) => pick({ runnerProject, agent: toAgentId(value) })}
             placeholder={ts("mapping.choose")}
           />
-        </td>
-        <td {...stylex.props(styles.td)}>
+        </DataTableCell>
+        <DataTableCell wide>
           <Select
             aria-label={t("cellLabel", { project, column: t("inProgress") })}
             options={withCurrent(
@@ -1435,30 +1374,30 @@ function MappingRow({
             onValueChange={(value) => progress.choose(toTrackerStateId(value))}
             placeholder={ts("mapping.choose")}
           />
-        </td>
-        <td {...stylex.props(styles.td, styles.tdLast)}>
-          <Tick done={done} label={done ? t("rowDone") : t("rowEmpty")} />
-        </td>
-      </tr>
+        </DataTableCell>
+        <DataTableCell>
+          <CheckTick done={done} label={done ? t("rowDone") : t("rowEmpty")} />
+        </DataTableCell>
+      </DataTableRow>
       {failed || missingPair !== null ? (
-        <tr>
-          <td colSpan={5} {...stylex.props(styles.tdError)}>
+        <DataTableRow divided={false}>
+          <DataTableCell colSpan={5}>
             <div {...stylex.props(styles.stackTight)}>
               {missingPair === null ? null : (
-                <span id={hintId} {...stylex.props(styles.hint)}>
+                <Text variant="ui" id={hintId}>
                   {missingPair === "agent" ? t("needAgent") : t("needRunnerProject")}
-                </span>
+                </Text>
               )}
               <SubmitError state={mapping.state} />
               <SubmitError state={progress.state} />
               {bound.states.ok ? null : (
-                <p {...stylex.props(styles.error)}>
+                <Text variant="ui" as="p" tone="problem">
                   {ts("progress.listFailed", { reason: reason(bound.states.error) })}
-                </p>
+                </Text>
               )}
             </div>
-          </td>
-        </tr>
+          </DataTableCell>
+        </DataTableRow>
       ) : null}
     </Fragment>
   );
@@ -1500,9 +1439,9 @@ function LabelRow({
     <Card>
       <div {...stylex.props(styles.labelRow)}>
         <span {...stylex.props(styles.labelText)}>
-          <span {...stylex.props(styles.primaryText)}>
+          <Text variant="ui" tone="strong">
             {t("labelTitle")} <Text variant="meta">· {label.connection.name}</Text>
-          </span>
+          </Text>
           <Text variant="meta">{t("labelHint")}</Text>
         </span>
         <span {...stylex.props(styles.labelSelect)}>
@@ -1514,12 +1453,12 @@ function LabelRow({
             placeholder={ts("label.choose")}
           />
         </span>
-        <Tick done={done} label={done ? t("rowDone") : t("rowEmpty")} />
+        <CheckTick done={done} label={done ? t("rowDone") : t("rowEmpty")} />
       </div>
       {label.labels.ok ? null : (
-        <p {...stylex.props(styles.error)}>
+        <Text variant="ui" as="p" tone="problem">
           {ts("label.listFailed", { reason: reason(label.labels.error) })}
-        </p>
+        </Text>
       )}
       <SubmitError state={save.state} />
     </Card>
@@ -1530,8 +1469,8 @@ const styles = stylex.create({
   page: {
     display: "grid",
     gridTemplateColumns: {
-      default: "240px minmax(0, 760px)",
-      "@media (max-width: 900px)": "minmax(0, 1fr)",
+      default: `${size.stepNavWidth} minmax(0, ${size.stepContentWidth})`,
+      [breakpoints.stepsStacked]: "minmax(0, 1fr)",
     },
     justifyContent: "center",
     columnGap: space.s10,
@@ -1541,63 +1480,7 @@ const styles = stylex.create({
     paddingInline: space.s6,
     paddingBottom: space.s10,
     boxSizing: "border-box",
-    backgroundColor: colors.bgCanvas,
   },
-  nav: { display: "flex", flexDirection: "column", gap: space.s6 },
-  brand: {
-    color: colors.textPrimary,
-    fontSize: fontSize.panel,
-    fontWeight: fontWeight.semibold,
-  },
-  steps: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s1,
-    margin: 0,
-    padding: 0,
-    listStyle: "none",
-  },
-  step: {
-    display: "flex",
-    alignItems: "center",
-    gap: space.s3,
-    width: "100%",
-    paddingBlock: space.s2,
-    paddingInline: space.s3,
-    borderRadius: radius.control,
-    color: colors.textTertiary,
-    fontSize: fontSize.body,
-    boxSizing: "border-box",
-  },
-  stepButton: {
-    borderWidth: 0,
-    backgroundColor: {
-      default: "transparent",
-      ":hover": { default: null, "@media (hover: hover)": colors.bgHover },
-    },
-    font: "inherit",
-    textAlign: "start",
-    cursor: "pointer",
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-  },
-  stepDone: { color: colors.textSecondary },
-  stepCurrent: { backgroundColor: colors.bgCard, color: colors.textPrimary },
-  marker: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    width: 22,
-    height: 22,
-    borderRadius: radius.full,
-    backgroundColor: colors.bgControl,
-    color: colors.textTertiary,
-    fontSize: fontSize.label,
-    fontVariantNumeric: "tabular-nums",
-  },
-  markerDone: { backgroundColor: colors.progressSoft, color: colors.progress },
-  markerCurrent: { backgroundColor: colors.accent, color: colors.textOnAccent },
-  doneCircle: { width: 28, height: 28 },
   column: {
     display: "flex",
     flexDirection: "column",
@@ -1605,12 +1488,6 @@ const styles = stylex.create({
     minWidth: 0,
   },
   heading: { display: "flex", flexDirection: "column", gap: space.s2 },
-  eyebrow: {
-    color: colors.textTertiary,
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.medium,
-    fontVariantNumeric: "tabular-nums",
-  },
   body: { display: "flex", flexDirection: "column", gap: space.s4 },
   footer: {
     display: "flex",
@@ -1642,7 +1519,6 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     gap: space.s1,
-    color: colors.textSecondary,
   },
   decimal: { listStyleType: "decimal" },
   summary: { display: "flex", alignItems: "center", gap: space.s3, minWidth: 0 },
@@ -1653,68 +1529,15 @@ const styles = stylex.create({
     flexGrow: 1,
     minWidth: 0,
   },
-  summaryTitle: { color: colors.textPrimary, fontWeight: fontWeight.medium },
   summaryActions: { display: "flex", flexWrap: "wrap", gap: space.s2, flexShrink: 0 },
-  inset: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-    paddingBlock: space.s4,
-    paddingInline: space.s4,
-    borderRadius: radius.control,
-    backgroundColor: colors.bgInset,
-    color: colors.textSecondary,
-  },
-  insetTitle: { color: colors.textPrimary, fontWeight: fontWeight.medium },
-  link: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: space.px6,
-    color: colors.accentText,
-    fontWeight: fontWeight.medium,
-    textDecoration: { default: "none", ":hover": "underline" },
-    textUnderlineOffset: 3,
-    borderRadius: radius.control,
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
-  },
-  details: {
-    paddingBlock: space.s4,
-    paddingInline: space.s5,
-    borderRadius: radius.card,
-    backgroundColor: colors.bgCard,
-    color: colors.textSecondary,
-    lineHeight: lineHeight.relaxed,
-  },
-  detailsSummary: {
-    cursor: "pointer",
-    color: colors.textPrimary,
-    fontWeight: fontWeight.medium,
-    borderRadius: radius.control,
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
-  },
-  detailsBody: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s3,
-    paddingTop: space.s3,
-  },
+  insetStack: { display: "flex", flexDirection: "column", gap: space.s2 },
   compare: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gridTemplateColumns: `repeat(auto-fit, minmax(${size.compareMinWidth}, 1fr))`,
     gap: space.s2,
   },
-  compareItem: { fontSize: fontSize.ui, gap: space.s1 },
   para: { margin: 0 },
-  card: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s4,
-    padding: space.s5,
-    borderRadius: radius.card,
-    backgroundColor: colors.bgCard,
-  },
+  guide: { display: "flex", flexDirection: "column", gap: space.s4 },
   cardHeader: {
     display: "flex",
     flexWrap: "wrap",
@@ -1722,71 +1545,7 @@ const styles = stylex.create({
     justifyContent: "space-between",
     gap: space.s3,
   },
-  cardTitle: {
-    margin: 0,
-    color: colors.textPrimary,
-    fontSize: fontSize.panel,
-    fontWeight: fontWeight.semibold,
-  },
-  numbered: {
-    margin: 0,
-    padding: 0,
-    listStyle: "none",
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s3,
-  },
-  numberedItem: { display: "flex", gap: space.s3, alignItems: "flex-start" },
-  numberedMarker: { backgroundColor: colors.accentSoft, color: colors.accentText },
-  numberedBody: {
-    flexGrow: 1,
-    minWidth: 0,
-    color: colors.textSecondary,
-    lineHeight: lineHeight.relaxed,
-  },
   permission: { display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: space.s2 },
-  chip: {
-    flexShrink: 0,
-    paddingInline: space.px6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.bgControl,
-    color: colors.textSecondary,
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.medium,
-  },
-  chipStrong: { color: colors.textPrimary },
-  checklist: {
-    margin: 0,
-    paddingBlock: 0,
-    paddingInlineStart: space.s10,
-    paddingInlineEnd: 0,
-    listStyle: "none",
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-    color: colors.textPrimary,
-  },
-  checkItem: { display: "flex", alignItems: "center", gap: space.s2, flexWrap: "wrap" },
-  tick: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    width: 18,
-    height: 18,
-    color: colors.progress,
-  },
-  tickEmpty: {
-    display: "inline-block",
-    flexShrink: 0,
-    width: 14,
-    height: 14,
-    boxSizing: "border-box",
-    borderWidth: 2,
-    borderStyle: "solid",
-    borderColor: colors.borderStrong,
-    borderRadius: radius.full,
-  },
   fieldset: {
     display: "flex",
     flexDirection: "column",
@@ -1796,111 +1555,23 @@ const styles = stylex.create({
     borderWidth: 0,
     minWidth: 0,
   },
-  legend: { color: colors.textSecondary, fontWeight: fontWeight.medium },
   group: {
     display: "flex",
     flexDirection: "column",
     paddingBlock: space.s2,
     paddingInline: space.s1,
-    borderRadius: radius.control,
-    backgroundColor: colors.bgInset,
   },
-  groupTitle: {
-    paddingTop: space.s1,
-    paddingInline: space.s3,
-    color: colors.textTertiary,
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.medium,
-  },
-  tableBox: {
-    position: "relative",
-    overflowX: "auto",
-    borderRadius: radius.card,
-    backgroundColor: colors.bgCard,
-  },
-  table: {
-    width: "100%",
-    minWidth: 640,
-    borderCollapse: "collapse",
-    fontSize: fontSize.body,
-  },
-  th: {
-    paddingTop: space.s4,
-    paddingBottom: space.s2,
-    paddingInline: space.s2,
-    color: colors.textTertiary,
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.medium,
-    textAlign: "start",
-    whiteSpace: "nowrap",
-  },
-  thFirst: { paddingInlineStart: space.s5 },
-  thLast: { width: 18, paddingInlineEnd: space.s5 },
-  tr: {
-    borderTopWidth: 1,
-    borderTopStyle: "solid",
-    borderTopColor: colors.borderSubtle,
-  },
-  rowHeader: {
-    paddingBlock: space.s3,
-    paddingInlineStart: space.s5,
-    paddingInlineEnd: space.s2,
-    textAlign: "start",
-    fontWeight: fontWeight.regular,
-    verticalAlign: "middle",
-  },
+  groupTitle: { paddingTop: space.s1, paddingInline: space.s3 },
   rowHeaderText: { display: "flex", flexDirection: "column", gap: space.px2 },
-  td: {
-    paddingBlock: space.s3,
-    paddingInline: space.s2,
-    verticalAlign: "middle",
-    minWidth: 140,
-  },
-  tdLast: { minWidth: 0, paddingInlineEnd: space.s5 },
-  tdError: { paddingBottom: space.s3, paddingInline: space.s5 },
   labelRow: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s3 },
   labelText: {
     display: "flex",
     flexDirection: "column",
     gap: space.px2,
     flexGrow: 1,
-    flexBasis: 280,
+    flexBasis: size.labelTextMinWidth,
     minWidth: 0,
   },
-  labelSelect: { flexGrow: 0, flexShrink: 1, flexBasis: 240, minWidth: 0 },
-  command: {
-    display: "block",
-    paddingBlock: space.s2,
-    paddingInline: space.s3,
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colors.borderDefault,
-    borderRadius: radius.control,
-    backgroundColor: colors.bgInset,
-    color: colors.textPrimary,
-    fontFamily: fonts.mono,
-    overflowWrap: "anywhere",
-  },
+  labelSelect: { flexGrow: 0, flexShrink: 1, flexBasis: size.labelSelectWidth, minWidth: 0 },
   word: { whiteSpace: "pre" },
-  locked: { color: colors.textTertiary, fontSize: fontSize.ui, lineHeight: lineHeight.normal },
-  focusTarget: {
-    borderRadius: radius.control,
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
-  },
-  srOnly: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    padding: 0,
-    margin: -1,
-    overflow: "hidden",
-    clip: "rect(0 0 0 0)",
-    whiteSpace: "nowrap",
-    borderWidth: 0,
-  },
-  primaryText: { color: colors.textPrimary },
-  hint: { color: colors.textSecondary, fontSize: fontSize.ui },
-  ok: { margin: 0, color: colors.textPrimary },
-  error: { margin: 0, color: colors.problem },
 });

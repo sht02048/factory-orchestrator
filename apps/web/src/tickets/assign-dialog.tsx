@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { Button, Dialog, DialogClose, Field, Input, Select, Text, showToast } from "@factory/ui";
 import type { SelectOption } from "@factory/ui";
-import { colors, space } from "@factory/ui/tokens.stylex";
+import { space } from "@factory/ui/tokens.stylex";
 import { useState } from "react";
 import { useTranslations } from "use-intl";
 import { useAgentName } from "../labels";
@@ -103,9 +103,9 @@ export function AssignDialog({
         onAgentChange={setAgent}
       />
       {failure === null ? null : (
-        <div role="alert" {...stylex.props(styles.error)}>
-          <Text variant="ui">{t(`error.${failure}`)}</Text>
-        </div>
+        <Text variant="ui" as="div" tone="problem" role="alert">
+          {t(`error.${failure}`)}
+        </Text>
       )}
     </Dialog>
   );
@@ -177,5 +177,4 @@ export function AssignForm({
 
 const styles = stylex.create({
   form: { display: "flex", flexDirection: "column", gap: space.s4 },
-  error: { color: colors.problem },
 });

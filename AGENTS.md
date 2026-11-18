@@ -27,9 +27,9 @@
 - `main`은 PR 머지로만 바꾼다. 직접 push하지 않는다.
 - 작업은 최신 `main`에서 짧게 사는 기능 브랜치로 한다.
 - PR은 머지 커밋으로 병합한다. squash·rebase 병합은 쓰지 않는다.
-- `main`에 머지하려면 CI `check`가 통과해야 한다. CI는 typecheck → lint → 색 검사(`pnpm run check:colors`) → format check → test(e2e 시험과 브라우저 시험 포함) → build → 웹 프로덕션 실행 시험(`pnpm run smoke:web`) → CLI 실행 시험(`pnpm run smoke:cli`) → 서버 배포물 만들기(`pnpm run bundle`) → 서버 배포물 실행 시험(`pnpm run smoke:bundle`)을 돈다. `.md` 파일만 바꾼 변경은 `check`가 이 단계들을 건너뛰고 통과한다. 문서의 형식 검사는 커밋 훅이 맡는다. `docs/research/fixtures/`의 JSON은 시험 입력이라 건너뛰지 않는다.
+- `main`에 머지하려면 CI `check`가 통과해야 한다. CI는 typecheck → lint(디자인 시스템 규칙 포함: `apps/web`의 글자·면·색·움직임 토큰 import와 `button`·`input`·`select`·`textarea`·`table`·`h1`~`h3` 직접 사용 금지) → 색 검사(`pnpm run check:colors`) → 길이 값 검사(`pnpm run check:lengths`) → format check → test(e2e 시험과 브라우저 시험 포함) → build → 웹 프로덕션 실행 시험(`pnpm run smoke:web`) → CLI 실행 시험(`pnpm run smoke:cli`) → 서버 배포물 만들기(`pnpm run bundle`) → 서버 배포물 실행 시험(`pnpm run smoke:bundle`)을 돈다. `.md` 파일만 바꾼 변경은 `check`가 이 단계들을 건너뛰고 통과한다. 문서의 형식 검사는 커밋 훅이 맡는다. `docs/research/fixtures/`의 JSON은 시험 입력이라 건너뛰지 않는다.
 - PR 본문의 머지 위험이 one-way이고 blast radius가 큼인 PR은 자동으로 병합하지 않고 사람이 직접 병합한다. 그 밖의 PR은 게이트(독립 리뷰와 CI `check`)를 통과한 뒤 병합할 수 있다.
-- 커밋 훅(lefthook pre-commit: lint, format check, typecheck, 색 검사)을 우회하지 않는다. `--no-verify`를 쓰지 않는다.
+- 커밋 훅(lefthook pre-commit: lint, format check, typecheck, 색 검사, 길이 값 검사)을 우회하지 않는다. `--no-verify`를 쓰지 않는다.
 - 새 워크트리에서는 커밋 전에 `pnpm install`을 돌린다. 훅이 `node_modules`의 도구를 쓴다.
 
 ## TypeScript와 워크스페이스
@@ -49,3 +49,4 @@
 - 화면 문구는 컴포넌트에 직접 쓰지 않고 메시지 파일로 분리한다(ADR 0005). 나중에 뽑아내는 일은 화면이 늘수록 비싸진다.
 - 한국어 문구는 해요체 UX 라이팅으로 쓴다.
 - 디자인 시스템(`packages/ui`)이 생기면 토큰과 컴포넌트를 거기서 먼저 찾아 쓴다(ADR 0003).
+- `apps/web` 화면은 [`packages/ui/DESIGN.md`](packages/ui/DESIGN.md)의 역할과 컴포넌트만 쓴다. 글자·면·색·움직임 토큰 import, 직접 쓴 `button`·`input`·`select`·`textarea`·`table`·`h1`~`h3`, px·rem·em 길이는 lint와 `check:lengths`가 막는다. 필요한 속성이나 모양이 없으면 화면에서 우회하지 않고 `packages/ui`를 넓힌다.

@@ -1,24 +1,62 @@
 import * as stylex from "@stylexjs/stylex";
 import { Tooltip as SdkTooltip, TooltipContent, TooltipTrigger } from "@ui-sdk/react/tooltip";
 import type { ReactNode } from "react";
+import { buttonStyles, type ButtonVariant } from "./button";
 import { cx } from "../cx";
-import { colors, fontSize, lineHeight, motion, radius, shadow, space } from "../tokens.stylex";
+import {
+  colors,
+  fontSize,
+  lineHeight,
+  motion,
+  radius,
+  shadow,
+  size,
+  space,
+} from "../tokens.stylex";
+
+export interface TooltipAction {
+  variant?: ButtonVariant;
+  busy?: boolean;
+  onClick: () => void;
+}
 
 export interface TooltipProps {
   content: string;
   children: ReactNode;
   labelsTrigger?: boolean;
   side?: "top" | "bottom" | "left" | "right";
+  action?: TooltipAction;
 }
 
-export function Tooltip({ content, children, labelsTrigger, side = "top" }: TooltipProps) {
+export function Tooltip({ content, children, labelsTrigger, side = "top", action }: TooltipProps) {
   return (
     <SdkTooltip type={labelsTrigger === true ? "label" : "description"}>
-      <TooltipTrigger className={cx(styles.trigger)}>{children}</TooltipTrigger>
+      {action === undefined ? (
+        <TooltipTrigger className={cx(styles.trigger)}>{children}</TooltipTrigger>
+      ) : (
+        <ActionTrigger action={action}>{children}</ActionTrigger>
+      )}
       <TooltipContent side={side} sideOffset={6} className={cx(styles.content)}>
         {content}
       </TooltipContent>
     </SdkTooltip>
+  );
+}
+
+function ActionTrigger({ action, children }: { action: TooltipAction; children: ReactNode }) {
+  const variant = action.variant ?? "secondary";
+  const busy = action.busy === true;
+  return (
+    <TooltipTrigger
+      data-variant={variant}
+      {...(busy ? { "aria-disabled": true } : {})}
+      onClick={() => {
+        if (!busy) action.onClick();
+      }}
+      className={cx(...buttonStyles(variant, busy), styles.iconAction)}
+    >
+      {children}
+    </TooltipTrigger>
   );
 }
 
@@ -45,6 +83,12 @@ const styles = stylex.create({
     outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
     outlineOffset: 2,
     borderRadius: radius.pill,
+  },
+  iconAction: {
+    flexShrink: 0,
+    width: size.iconButton,
+    height: size.iconButton,
+    paddingInline: 0,
   },
   content: {
     zIndex: 100,

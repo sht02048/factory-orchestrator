@@ -1,6 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Toaster } from "@factory/ui";
-import { colors, fonts, fontSize, lineHeight } from "@factory/ui/tokens.stylex";
+import { Toaster, documentStyles } from "@factory/ui";
 import {
   HeadContent,
   Outlet,
@@ -58,7 +57,7 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
         {import.meta.env.DEV ? <link rel="stylesheet" href="/virtual:stylex.css" /> : null}
       </head>
-      <body {...stylex.props(styles.body)}>
+      <body {...stylex.props(documentStyles.body)}>
         {children}
         <Scripts />
       </body>
@@ -97,19 +96,3 @@ function AppToaster() {
   const tShell = useTranslations("shell");
   return <Toaster label={tShell("toastRegion")} />;
 }
-
-const styles = stylex.create({
-  body: {
-    margin: 0,
-    backgroundColor: colors.bgCanvas,
-    color: colors.textPrimary,
-    fontFamily: fonts.sans,
-    fontSize: fontSize.ui,
-    lineHeight: lineHeight.normal,
-    WebkitFontSmoothing: "antialiased",
-    MozOsxFontSmoothing: "grayscale",
-    fontSynthesis: "none",
-    wordBreak: "keep-all",
-    overflowWrap: "break-word",
-  },
-});

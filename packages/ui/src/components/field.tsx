@@ -1,9 +1,19 @@
 import * as stylex from "@stylexjs/stylex";
 import { Field as SdkField, FieldDescription, FieldError, FieldLabel } from "@ui-sdk/react/field";
 import { Input as SdkInput } from "@ui-sdk/react/input";
-import { createContext, use, type ReactNode, type Ref } from "react";
+import { createContext, use, type KeyboardEventHandler, type ReactNode, type Ref } from "react";
 import { cx } from "../cx";
-import { colors, fonts, fontSize, fontWeight, motion, radius, size, space } from "../tokens.stylex";
+import {
+  colors,
+  fonts,
+  fontSize,
+  fontWeight,
+  lineHeight,
+  motion,
+  radius,
+  size,
+  space,
+} from "../tokens.stylex";
 
 export interface FieldProps {
   label: ReactNode;
@@ -37,6 +47,9 @@ interface InputBaseProps {
   autoComplete?: string;
   inputMode?: "text" | "numeric" | "decimal" | "email" | "url" | "search";
   mono?: boolean;
+  id?: string;
+  "aria-label"?: string;
+  "aria-describedby"?: string;
   ref?: Ref<HTMLInputElement>;
   [data: `data-${string}`]: string | boolean | undefined;
 }
@@ -76,6 +89,30 @@ export function Input({ mono, onValueChange, ...props }: InputProps) {
           s.disabled && styles.disabled,
         )
       }
+    />
+  );
+}
+
+export interface TextareaProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  name?: string;
+  rows?: number;
+  placeholder?: string;
+  id?: string;
+  "aria-label"?: string;
+  "aria-describedby"?: string;
+  onKeyDown?: KeyboardEventHandler<HTMLTextAreaElement>;
+  ref?: Ref<HTMLTextAreaElement>;
+}
+
+export function Textarea({ onValueChange, ...props }: TextareaProps) {
+  const invalid = use(InvalidContext);
+  return (
+    <textarea
+      {...props}
+      onChange={(event) => onValueChange(event.currentTarget.value)}
+      {...stylex.props(fieldStyles.control, styles.textarea, invalid && styles.invalid)}
     />
   );
 }
@@ -122,6 +159,14 @@ const styles = stylex.create({
     "::placeholder": { color: colors.textDisabled },
   },
   mono: { fontFamily: fonts.mono },
+  textarea: {
+    display: "block",
+    height: "auto",
+    minHeight: size.textareaMinHeight,
+    paddingBlock: space.s2,
+    lineHeight: lineHeight.normal,
+    resize: "vertical",
+  },
   readOnly: { color: colors.textSecondary },
   invalid: {
     borderColor: {
