@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_call:
 
 # pull request는 새 커밋이 오면 앞 실행을 취소한다. main push는 커밋마다 따로 묶어 연속 병합 때도
 # 앞 커밋의 CI가 취소되거나 대기 중에 밀려나지 않게 한다.
