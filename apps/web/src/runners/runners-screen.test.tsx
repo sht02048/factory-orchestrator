@@ -104,7 +104,6 @@ describe("Runners 화면", () => {
     const html = render(loadRunnersPage(db, now), "runner-b");
     expect(html).toMatch(/<li id="runner-runner-b" aria-current="true" tabindex="-1"/);
     expect(html).not.toMatch(/<li id="runner-runner-a" aria-current/);
-    // 고르지 않은 카드는 포커스를 받지 않는다
     expect(html).not.toMatch(/<li id="runner-runner-a"[^>]*tabindex/);
   });
 
@@ -113,7 +112,6 @@ describe("Runners 화면", () => {
     const text = textOf(html);
     expect(text).toContain(runnersJson.empty.title);
     expect(text).toContain(runnersJson.empty.body);
-    // 안내는 본문 블록에 한 번만 둔다. 부제목에 겹쳐 쓰지 않는다
     expect(/<header[^]*?<\/header>/.exec(html)?.[0]).not.toContain("<p");
     expect(html).not.toContain(`aria-label="${runnersJson.listLabel}"`);
     expect(variantsOf(html)).toEqual(["primary"]);
@@ -134,16 +132,13 @@ describe("Runners 화면", () => {
     const { db, ids } = seedDatabase();
     const a = cardHtml(render(loadRunnersPage(db, now)), "runner-a");
     const id = ids.get("LAB-1") ?? "";
-    // 링크가 상태 알약·티켓 키·Workspace 를 담은 행 전체를 감싼다
     const link = new RegExp(
       `<a href="/runs/${id}\\?ws=ws-labs"[^>]*>(?:(?!</a>)[^])*data-status="[^"]+"(?:(?!</a>)[^])*LAB-1(?:(?!</a>)[^])*</a>`,
     );
     expect(a).toMatch(link);
-    // 행 안에 링크를 겹치지 않는다
     expect(a).not.toMatch(/<a [^>]*>(?:(?!<\/a>)[^])*<a /);
   });
 
-  // 잘리지 않고 줄을 바꾸는지는 실제 글자 폭이 필요해 브라우저 시험(e2e/src/runners.test.ts)에서 본다
   it("긴 프로젝트 이름의 확인 항목을 이름 전체로 그린다", () => {
     const { db } = seedDatabase();
     const project = "github:acme/a-very-long-repository-name-that-does-not-fit-in-a-card";

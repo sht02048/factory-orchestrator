@@ -34,16 +34,6 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest"
 import runners from "../../apps/web/messages/ko/runners.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 
-/*
- * Runners 카드의 브라우저 시험(티켓 0057).
- *
- * - 긴 프로젝트 이름의 확인 항목과 긴 러너 이름이 320px 카드에서 잘리지 않고 줄을 바꾼다.
- * - Home 의 Runner Issue 카드처럼 sel 로 러너를 골라 들어오면 그 카드에 포커스가 간다.
- *
- * 띄우는 방식은 operator-actions.test.ts(티켓 0039)와 같다: apps/web 의 vite 개발 서버 + 설치된 Chrome.
- * 공용 도우미(browser/*)는 읽기만 하고, 이 시험의 seed 와 서버 설정은 이 파일에 둔다. 가상 값만 쓴다.
- */
-
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
 const adaptersModule = join(webRoot, "src/server/adapters.ts");
 const fakeAdaptersModule = fileURLToPath(new URL("./browser/fake-adapters.ts", import.meta.url));
@@ -51,13 +41,10 @@ const resultsDir = fileURLToPath(new URL("../test-results", import.meta.url));
 
 const encryptionKey = new Uint8Array(32).fill(7);
 
-/** 긴 이름의 러너. 카드 제목이 한 줄에 들어가지 않는다 */
 const longRunnerName = "build-runner-with-a-very-long-name-for-the-acme-staging-cluster";
 const longRunner = toRunnerId("runner-long");
-/** 프로젝트 이름이 긴 GitHub push 확인 항목. "GitHub push 권한: {project}"의 끝이 잘리면 안 된다 */
 const longProject = "acme/a-very-long-repository-name-that-does-not-fit-in-one-card-line";
 const longProjectId = toRunnerProjectId(`github:${longProject}`);
-/** sel 로 고르는 러너. 앞에 카드를 여럿 두어 스크롤해야 보이게 한다 */
 const selectedRunner = toRunnerId("runner-z");
 const fillerCount = 8;
 
@@ -67,7 +54,6 @@ let web: ViteDevServer;
 let baseUrl: string;
 let browser: Browser;
 
-/** web 의 server/adapters.ts 를 가짜 트래커 등록표로 바꾼다. 제품 코드는 고치지 않는다 */
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
   enforce: "pre",
@@ -136,9 +122,7 @@ describe("Runners 카드(브라우저, 0057)", () => {
       expect(layout.whiteSpace).not.toBe("nowrap");
       expect(layout.textOverflow).not.toBe("ellipsis");
       expect(layout.overflowing).toBe(false);
-      // 한 줄에 들어가지 않아 줄을 바꿨다
       expect(layout.lines).toBeGreaterThan(1);
-      // 글 전체가 카드 안에 있다
       const box = await target.boundingBox();
       expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
         (cardBox?.x ?? 0) + (cardBox?.width ?? 0),
@@ -152,12 +136,10 @@ describe("Runners 카드(브라우저, 0057)", () => {
     await hydrated(page);
 
     const cell = page.locator(`li#runner-${selectedRunner}`);
-    // 포커스는 hydrate 뒤 effect 에서 옮긴다
     await expect
       .poll(async () => page.locator(":focus").getAttribute("id"))
       .toBe(`runner-${selectedRunner}`);
     expect(await cell.getAttribute("aria-current")).toBe("true");
-    // 스크롤해 화면 안에 들어왔다
     expect(await cell.isVisible()).toBe(true);
     const box = await cell.boundingBox();
     expect(box?.y ?? -1).toBeGreaterThanOrEqual(0);
@@ -168,16 +150,10 @@ describe("Runners 카드(브라우저, 0057)", () => {
 interface TextLayout {
   whiteSpace: string;
   textOverflow: string;
-  /** 글이 칸보다 넓어 넘쳤다(잘렸다) */
   overflowing: boolean;
-  /** 줄 수 */
   lines: number;
 }
 
-/**
- * 글이 text 와 같은 요소의 계산된 줄바꿈·말줄임과 줄 수. e2e 는 DOM 타입을 싣지 않아 식을 문자열로
- * 넘기고, 돌아온 값은 경계에서 모양을 확인한다.
- */
 async function textLayout(page: Page, text: string): Promise<TextLayout> {
   const raw: unknown = await page.evaluate(`(() => {
     const el = [...document.querySelectorAll("h2, span")].find(
@@ -210,7 +186,6 @@ async function textLayout(page: Page, text: string): Promise<TextLayout> {
   };
 }
 
-/** 실패하면 화면을 찍는 새 페이지. 닫지 않는다: afterAll 의 browser.close() 가 함께 닫는다 */
 async function openPage(
   testName: string,
   viewport: { width: number; height: number },
@@ -234,7 +209,6 @@ function seed(db: Database): void {
     config: {},
     secrets: { apiKey: "secret" },
   });
-  // 온보딩(0026)을 마친 설치로 둔다. GitHub 토큰이 없으면 모든 화면이 온보딩으로 간다
   saveCodeHostConnection(db, new SecretBox(encryptionKey), {
     id: toCodeHostConnectionId("github"),
     kind: toCodeHostKind("github"),
@@ -301,7 +275,6 @@ function seed(db: Database): void {
   });
 }
 
-/** 서버 렌더한 화면에 React 가 붙을 때까지 기다린다. 붙기 전에 누르면 키 입력이 사라진다 */
 async function hydrated(page: Page): Promise<void> {
   await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
   await page.waitForLoadState("networkidle");
