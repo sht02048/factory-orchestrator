@@ -1,5 +1,14 @@
 import * as stylex from "@stylexjs/stylex";
-import { Card, Field, Input, Mascot, StatusPill, Text, buttonStyles } from "@factory/ui";
+import {
+  Card,
+  Field,
+  Input,
+  Mascot,
+  StatusPill,
+  Text,
+  buttonStyles,
+  textStyles,
+} from "@factory/ui";
 import type { ButtonVariant } from "@factory/ui";
 import {
   colors,
@@ -44,7 +53,9 @@ export function App() {
   }, []);
   return (
     <IntlProvider locale="ko" messages={messages}>
-      <div {...stylex.props(styles.canvas)}>{view === null ? null : <Screen view={view} />}</div>
+      <div {...stylex.props(styles.canvas)}>
+        {view === null ? null : <Screen key={view.screen} view={view} />}
+      </div>
     </IntlProvider>
   );
 }
@@ -110,9 +121,15 @@ function Header({
   centered?: boolean;
   live?: boolean;
 }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
   return (
     <header {...stylex.props(styles.header, centered && styles.centerText)}>
-      <Text variant="page">{title}</Text>
+      <h1 ref={titleRef} tabIndex={-1} {...stylex.props(...textStyles("page"), styles.title)}>
+        {title}
+      </h1>
       <p role={live ? "status" : undefined} {...stylex.props(styles.summary)}>
         {summary}
       </p>
@@ -622,6 +639,7 @@ const styles = stylex.create({
   },
   statusColumn: { alignItems: "center", gap: space.s5 },
   header: { display: "flex", flexDirection: "column", gap: space.s2 },
+  title: { outline: "none" },
   centerText: { textAlign: "center" },
   summary: {
     margin: 0,
