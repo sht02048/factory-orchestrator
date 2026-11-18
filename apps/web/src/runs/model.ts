@@ -71,7 +71,12 @@ export interface RunsPage {
   workspace: WorkspaceChoice;
   /** 새 것부터 */
   runs: RunView[];
+  recentEnded: number;
+  moreEnded: boolean;
 }
+
+export const ENDED_RUNS_PAGE_SIZE = 50;
+export const MAX_ENDED_RUNS = 5000;
 
 /**
  * 상태 칩 필터(Q66·Q67, ADR 0010): 전체, 손댈 일, Ended 가 아닌 상태 넷과 Ended 의 요약 결과 넷.
