@@ -29,6 +29,12 @@ describe("signingFromEnv", () => {
     ).toMatchObject({ kind: "signed", keychain: null });
   });
 
+  it("키체인만 있고 공증 값이 없으면 서명 없는 dmg 로 넘어가지 않고 멈춘다", () => {
+    expect(() => signingFromEnv({ MACOS_SIGN_KEYCHAIN: "/tmp/release.keychain-db" })).toThrow(
+      "MACOS_SIGN_KEYCHAIN is set without",
+    );
+  });
+
   it("공증 값이 일부만 있으면 서명 없는 dmg 로 넘어가지 않고 멈춘다", () => {
     expect(() => signingFromEnv({ APPLE_API_KEY_PATH: "k", APPLE_API_KEY_ID: "i" })).toThrow(
       "Missing: APPLE_API_ISSUER",

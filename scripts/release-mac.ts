@@ -1,5 +1,5 @@
 import { spawnSync, type SpawnSyncOptions } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { packageVersion } from "./release-plan.ts";
@@ -17,19 +17,25 @@ export type Signing =
   | { kind: "unsigned" }
   | { kind: "signed"; notary: NotaryCredentials; keychain: string | null };
 
+const SECRET_ARGS = new Set<string>();
+
 const NOTARY_ENV = ["APPLE_API_KEY_PATH", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"] as const;
 
 export function signingFromEnv(env: Readonly<Record<string, string | undefined>>): Signing {
   const values = NOTARY_ENV.map((name) => env[name] ?? "");
   const [keyPath = "", keyId = "", issuer = ""] = values;
   const missing = NOTARY_ENV.filter((_, index) => values[index] === "");
-  if (missing.length === NOTARY_ENV.length) return { kind: "unsigned" };
+  const keychain = env["MACOS_SIGN_KEYCHAIN"] ?? "";
+  if (missing.length === NOTARY_ENV.length) {
+    if (keychain !== "")
+      throw new Error(`MACOS_SIGN_KEYCHAIN is set without ${NOTARY_ENV.join(", ")}`);
+    return { kind: "unsigned" };
+  }
   if (missing.length > 0) {
     throw new Error(
       `Set all of ${NOTARY_ENV.join(", ")} to sign, or none. Missing: ${missing.join(", ")}`,
     );
   }
-  const keychain = env["MACOS_SIGN_KEYCHAIN"] ?? "";
   return {
     kind: "signed",
     notary: { keyPath, keyId, issuer },
@@ -62,11 +68,16 @@ export function notaryStatus(output: string): { id: string; status: string } {
   throw new Error(`Unexpected notarytool output: ${output}`);
 }
 
-function run(command: string, args: ReadonlyArray<string>, options: SpawnSyncOptions = {}): string {
-  console.log(`$ ${command} ${args.join(" ")}`);
+function run(
+  command: string,
+  args: ReadonlyArray<string>,
+  options: SpawnSyncOptions = {},
+  allowFailure = false,
+): string {
+  console.log(`$ ${command} ${args.map((arg) => (SECRET_ARGS.has(arg) ? "***" : arg)).join(" ")}`);
   const result = spawnSync(command, args, { stdio: ["ignore", "pipe", "inherit"], ...options });
   const stdout = result.stdout?.toString() ?? "";
-  if (result.status !== 0) {
+  if (result.status !== 0 && !allowFailure) {
     process.stdout.write(stdout);
     throw new Error(`${command} exited with ${result.status ?? result.signal ?? "unknown"}`);
   }
@@ -74,6 +85,7 @@ function run(command: string, args: ReadonlyArray<string>, options: SpawnSyncOpt
 }
 
 function notarize(path: string, notary: NotaryCredentials): void {
+  SECRET_ARGS.add(notary.keyId).add(notary.issuer);
   const credentials = [
     "--key",
     notary.keyPath,
@@ -83,15 +95,12 @@ function notarize(path: string, notary: NotaryCredentials): void {
     notary.issuer,
   ];
   const result = notaryStatus(
-    run("xcrun", [
-      "notarytool",
-      "submit",
-      path,
-      ...credentials,
-      "--wait",
-      "--output-format",
-      "json",
-    ]),
+    run(
+      "xcrun",
+      ["notarytool", "submit", path, ...credentials, "--wait", "--output-format", "json"],
+      {},
+      true,
+    ),
   );
   console.log(`notarization ${result.id}: ${result.status}`);
   if (result.status !== "Accepted") {
@@ -187,6 +196,8 @@ function main(): void {
 
   rmSync(work, { recursive: true, force: true });
   console.log(`dmg: ${dmg}`);
+  const outputFile = process.env["GITHUB_OUTPUT"];
+  if (outputFile !== undefined) appendFileSync(outputFile, `dmg=${dmg}\n`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

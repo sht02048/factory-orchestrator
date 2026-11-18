@@ -16,6 +16,7 @@ import { appIconPaths } from "../src/core/app-icon.ts";
 const DESKTOP = resolve(import.meta.dirname, "..");
 const REPO = resolve(DESKTOP, "..", "..");
 const PRODUCT = "Ganger";
+const MAIN_ENTITLEMENTS = join(DESKTOP, "entitlements.mac.plist");
 
 const { values } = parseArgs({
   options: {
@@ -103,6 +104,8 @@ const osxSign =
     : {
         identity: signIdentity,
         continueOnError: false,
+        optionsForFile: (filePath: string) =>
+          filePath.includes(" Helper") ? {} : { entitlements: MAIN_ENTITLEMENTS },
         ...(values.keychain === undefined ? {} : { keychain: values.keychain }),
       };
 const [appDir] = await packager({

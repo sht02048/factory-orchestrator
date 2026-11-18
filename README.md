@@ -150,7 +150,7 @@ Requests that change data (including server functions) must also come from a pag
 2. Open the dmg and drag **Ganger** onto **Applications**.
 3. Open Ganger from Applications. Release builds are signed with a Developer ID and notarized by Apple, so macOS opens them without a warning.
 
-The app does not update itself yet. To update, download the new dmg from Releases and replace the app in Applications. The server keeps running while you do, and the new app replaces it with its own version when it opens.
+The app does not update itself yet. To update, download the new dmg from Releases and replace the app in Applications. The server keeps running while you do. When the new app opens, it replaces a server it started with its own version; a server you run as a service keeps its version, and the app tells you that the versions differ.
 
 ### Which setup to choose
 
