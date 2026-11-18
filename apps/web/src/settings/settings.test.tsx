@@ -323,8 +323,29 @@ describe("Settings 저장하고 다시 열기", () => {
         now,
       ),
     ).toEqual({ ok: true });
+    f.tracker.connection = { ok: true, organizationName: "   " };
+    expect(
+      await saveTrackerConnectionSetting(
+        f.context,
+        { apiKey: "lin_api_blank", webhookSecret: "" },
+        now,
+      ),
+    ).toEqual({ ok: true });
+    f.tracker.connection = { ok: true, organizationName: `  ${"a".repeat(250)}  ` };
+    expect(
+      await saveTrackerConnectionSetting(
+        f.context,
+        { apiKey: "lin_api_long", webhookSecret: "" },
+        now,
+      ),
+    ).toEqual({ ok: true });
     const saved = listTrackerConnections(f.context.db, f.context.secretBox);
-    expect(saved.map((c) => c.name).toSorted()).toEqual(["Acme", "Linear"]);
+    expect(saved.map((c) => c.name).toSorted()).toEqual([
+      "Acme",
+      "Linear",
+      "Linear",
+      "a".repeat(200),
+    ]);
 
     const id = saved.find((c) => c.name === "Acme")?.id ?? "";
     f.tracker.connection = { ok: true, organizationName: "Acme Renamed" };

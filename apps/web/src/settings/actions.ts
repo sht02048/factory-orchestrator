@@ -39,7 +39,8 @@ import type { ConnectionSaveReason, RemoteError, SaveResult } from "./model";
 export const RUNNER_KIND: RunnerKind = toRunnerKind("orca");
 
 const id = z.string().trim().min(1);
-const name = z.string().trim().min(1).max(200);
+const MAX_NAME_LENGTH = 200;
+const name = z.string().trim().min(1).max(MAX_NAME_LENGTH);
 
 function workspaceOf(context: SettingsContext, ws: string): WorkspaceId | null {
   return listWorkspaces(context.db).find((w) => w.id === ws)?.id ?? null;
@@ -193,6 +194,11 @@ const secret = z.string().trim().max(1000);
 
 const DEFAULT_CONNECTION_NAME = "Linear";
 
+function connectionNameOf(organizationName: string | null): string | null {
+  const trimmed = organizationName?.trim().slice(0, MAX_NAME_LENGTH).trim() ?? "";
+  return trimmed === "" ? null : trimmed;
+}
+
 export const trackerConnectionInput = z.object({
   id: id.optional(),
   name: name.optional(),
@@ -232,7 +238,7 @@ export async function saveTrackerConnectionSetting(
       context.registry.createTracker(kind, { config, secrets }).checkConnection(),
     );
     if (!check.ok) return { ok: false, reason: check.reason };
-    organizationName = check.organizationName;
+    organizationName = connectionNameOf(check.organizationName);
   }
   saveTrackerConnection(
     context.db,
