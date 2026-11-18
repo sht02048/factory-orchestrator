@@ -1,26 +1,44 @@
 import * as stylex from "@stylexjs/stylex";
 import {
   Button,
+  CapacityBar,
   Card,
   Field,
+  GroupHeader,
   Input,
-  PageHeader,
   Popover,
+  ProblemCallout,
+  Row,
+  Section,
+  StatusDot,
   StatusPill,
   Text,
   buttonStyles,
+  textStyles,
 } from "@factory/ui";
 import type { PillStatus } from "@factory/ui";
-import { colors, fontSize, fontWeight, lineHeight, radius, space } from "@factory/ui/tokens.stylex";
-import { useEffect, useId, useRef, useState } from "react";
-import type { FormEvent, KeyboardEvent, ReactNode, RefObject } from "react";
+import type { RunId } from "@factory/core";
+import { space } from "@factory/ui/tokens.stylex";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { runStatus, useStatusName } from "../status";
-import type { AnswerDraft } from "./answer-draft";
-import { answerToSend, emptyDraft, pickChoice, pickOther, writeOther } from "./answer-draft";
-import type { DoneRun, HomePage, HomeRun, InputWait, RunnersSummary } from "./model";
-import { objectParticle, subjectParticle } from "./particle";
+import { useStatusName } from "../status";
+import type {
+  DashboardRunner,
+  DoneRun,
+  HomePage,
+  HomeRun,
+  InputWait,
+  TodoGroup,
+  TodoGroupKind,
+} from "./model";
+import { runnerIssues, todoGroups } from "./model";
+import { subjectParticle } from "./particle";
+import { QuestionForm } from "./question-form";
+import type { Question, SendState } from "./question-form";
+
+export { QuestionForm } from "./question-form";
 
 export interface AnswerInput {
   runId: string;
@@ -40,36 +58,52 @@ export interface HomeScreenProps {
   onDeny: (input: DenyInput) => Promise<void>;
 }
 
-type Question = Extract<InputWait, { kind: "question" }>;
 type Permission = Extract<InputWait, { kind: "permission" }>;
+
+export const STOPPED_VISIBLE = 3;
+
+const SIDE_COLUMN_WIDTH = 340;
+const TODO_TEXT_MIN_WIDTH = "16rem";
+const ONE_COLUMN = "@container (max-width: 719px)";
+const NARROW_SCREEN = "@media (max-width: 600px)";
 
 export function HomeScreen({ page, onAnswer, onDeny }: HomeScreenProps) {
   const t = useTranslations("home");
   if (page.workspace.kind === "none") {
     return (
       <div {...stylex.props(styles.page)}>
-        <PageHeader title={t("title")} />
-        <Text variant="body">{t("noWorkspace")}</Text>
+        <header {...stylex.props(styles.header)}>
+          <Text variant="label" as="p">
+            {t("title")}
+          </Text>
+          <Text variant="display" as="h1">
+            {t("headlineEmpty")}
+          </Text>
+          <Text variant="body">{t("noWorkspace")}</Text>
+        </header>
       </div>
     );
   }
   const all = page.workspace.kind === "all";
-  const counts = { todo: page.attention.length, runners: page.runners.issues.length };
+  const groups = todoGroups(page.attention);
   return (
     <div {...stylex.props(styles.page)}>
-      <PageHeader
-        title={t("title")}
-        subtitle={all ? t("summaryAll", counts) : t("summary", counts)}
-      />
+      <DashboardHeader page={page} groups={groups} all={all} />
       <div {...stylex.props(styles.frame)}>
         <div {...stylex.props(styles.columns)}>
-          <div {...stylex.props(styles.column)}>
-            <TodoSection page={page} all={all} onAnswer={onAnswer} onDeny={onDeny} />
-            {all ? null : <InProgressSection page={page} />}
+          <div {...stylex.props(styles.mainColumn)}>
+            <TodoSection
+              groups={groups}
+              total={page.attention.length}
+              all={all}
+              onAnswer={onAnswer}
+              onDeny={onDeny}
+            />
+            <InProgressSection page={page} all={all} />
           </div>
-          <div {...stylex.props(styles.column)}>
-            <RunnersCard runners={page.runners} />
-            {all ? null : <DoneTodayCard page={page} />}
+          <div {...stylex.props(styles.sideColumn)}>
+            <RunnersSection runners={page.runners.list} />
+            <DoneTodaySection page={page} all={all} />
           </div>
         </div>
       </div>
@@ -77,148 +111,155 @@ export function HomeScreen({ page, onAnswer, onDeny }: HomeScreenProps) {
   );
 }
 
-function TitledSection({
-  title,
-  aside,
-  quiet = false,
-  children,
+function DashboardHeader({
+  page,
+  groups,
+  all,
 }: {
-  title: string;
-  aside?: ReactNode;
-  quiet?: boolean;
-  children: ReactNode;
+  page: HomePage;
+  groups: TodoGroup[];
+  all: boolean;
 }) {
-  const titleId = useId();
+  const t = useTranslations("home");
+  const total = page.attention.length;
+  const inProgress = page.running.length + page.queued.length;
+  const summary =
+    total === 0
+      ? inProgress === 0
+        ? t("summary.idle")
+        : t("summary.inProgress", { count: inProgress })
+      : t("summary.sentence", {
+          list: groups
+            .map((group) => t(`summary.${group.kind}`, { count: group.runs.length }))
+            .join(t("summary.separator")),
+        });
   return (
-    <section aria-labelledby={titleId}>
-      <Card padding="compact">
-        <div {...stylex.props(styles.cardHead)}>
-          <h2 id={titleId} {...stylex.props(styles.sectionTitle, quiet && styles.quietTitle)}>
-            {title}
-          </h2>
-          {aside}
-        </div>
-        {children}
-      </Card>
-    </section>
+    <header {...stylex.props(styles.header)}>
+      <Text variant="label" as="p">
+        {all ? `${t("title")} · ${t("allWorkspaces")}` : t("title")}
+      </Text>
+      <Text variant="display" as="h1">
+        {total === 0 ? t("headlineEmpty") : t("headline", { count: total })}
+      </Text>
+      <Text variant="body">{summary}</Text>
+    </header>
   );
 }
 
 function TodoSection({
-  page,
+  groups,
+  total,
   all,
   onAnswer,
   onDeny,
 }: {
-  page: HomePage;
+  groups: TodoGroup[];
+  total: number;
   all: boolean;
   onAnswer: HomeScreenProps["onAnswer"];
   onDeny: HomeScreenProps["onDeny"];
 }) {
   const t = useTranslations("home");
   return (
-    <TitledSection title={t("section.todo")}>
-      {page.attention.length === 0 ? (
-        <p {...stylex.props(styles.empty)}>{t("empty.todo")}</p>
-      ) : (
-        <ul {...stylex.props(styles.rows)}>
-          {page.attention.map(({ run }) => (
-            <TodoRow key={run.id} run={run} all={all} onAnswer={onAnswer} onDeny={onDeny} />
-          ))}
-        </ul>
-      )}
-    </TitledSection>
+    <Card label={t("section.todo")}>
+      <Section title={t("section.todo")} titleRole="heading" count={total}>
+        {groups.length === 0 ? (
+          <Text variant="meta" as="p">
+            {t("empty.todo")}
+          </Text>
+        ) : (
+          <div {...stylex.props(styles.groups)}>
+            {groups.map((group) => (
+              <TodoGroupBlock
+                key={group.kind}
+                group={group}
+                all={all}
+                onAnswer={onAnswer}
+                onDeny={onDeny}
+              />
+            ))}
+          </div>
+        )}
+      </Section>
+    </Card>
   );
 }
 
-function InProgressSection({ page }: { page: HomePage }) {
-  const t = useTranslations("home");
-  const statusName = useStatusName();
-  const runs = [...page.running, ...page.queued];
-  return (
-    <TitledSection
-      title={t("section.inProgress")}
-      aside={
-        <>
-          <span {...stylex.props(styles.headCounts)}>
-            {t("inProgress.counts", {
-              running: statusName("running"),
-              runningCount: page.running.length,
-              queued: statusName("queued"),
-              queuedCount: page.queued.length,
-            })}
-          </span>
-          <HeadLink href={runsHref(page)}>{t("inProgress.link")}</HeadLink>
-        </>
-      }
-    >
-      {runs.length === 0 ? (
-        <p {...stylex.props(styles.empty)}>{t("empty.inProgress")}</p>
-      ) : (
-        <ul {...stylex.props(styles.rows)}>
-          {runs.map((run) => (
-            <ProgressRow key={run.id} run={run} />
-          ))}
-        </ul>
-      )}
-    </TitledSection>
-  );
-}
+const GROUP_STATUS: Record<TodoGroupKind, PillStatus> = {
+  answer: "question",
+  check: "human-check",
+  stopped: "failed",
+};
 
-function runsHref(page: HomePage): string {
-  return page.workspace.kind === "one"
-    ? href("/runs", { ws: page.workspace.workspace.id })
-    : "/runs";
-}
-
-function HeadLink({ href: to, children }: { href: string; children: ReactNode }) {
-  return (
-    <a href={to} {...stylex.props(styles.headLink)}>
-      {children}
-    </a>
-  );
-}
-
-function RunRow({
-  run,
-  status,
-  all = false,
-  reason,
-  action,
+function TodoGroupBlock({
+  group,
+  all,
+  onAnswer,
+  onDeny,
 }: {
-  run: HomeRun;
-  status: PillStatus;
-  all?: boolean;
-  reason: ReactNode;
-  action?: ReactNode;
+  group: TodoGroup;
+  all: boolean;
+  onAnswer: HomeScreenProps["onAnswer"];
+  onDeny: HomeScreenProps["onDeny"];
 }) {
-  const t = useTranslations("home.row");
-  const statusName = useStatusName();
+  const t = useTranslations("home.group");
+  const [expanded, setExpanded] = useState(false);
+  const firstHiddenRef = useRef<HTMLLIElement>(null);
+  const focusFirstHidden = useRef(false);
+  useEffect(() => {
+    if (!expanded || !focusFirstHidden.current) return;
+    focusFirstHidden.current = false;
+    firstHiddenRef.current?.querySelector("a")?.focus();
+  }, [expanded]);
+  const limited = group.kind === "stopped" && !expanded;
+  const visible = limited ? group.runs.slice(0, STOPPED_VISIBLE) : group.runs;
+  const hidden = group.runs.length - visible.length;
   return (
-    <li data-run={run.id} {...stylex.props(styles.row)}>
-      <span {...stylex.props(styles.lead)}>
-        <StatusPill status={status}>{statusName(status)}</StatusPill>
-        <a href={runHref(run)} {...stylex.props(styles.title)}>
-          {run.ticketKey}
-        </a>
-        {all ? <span {...stylex.props(styles.meta)}>{run.workspace.name}</span> : null}
-        {run.cancelling ? <span {...stylex.props(styles.meta)}>{t("cancelling")}</span> : null}
-      </span>
-      <span {...stylex.props(styles.trail)}>
-        <span {...stylex.props(styles.reason)}>{reason}</span>
-        {action}
-      </span>
-    </li>
+    <div data-group={group.kind} {...stylex.props(styles.group)}>
+      <GroupHeader
+        status={GROUP_STATUS[group.kind]}
+        title={t(`${group.kind}.title`)}
+        count={group.runs.length}
+        description={t(`${group.kind}.description`)}
+      />
+      <ul {...stylex.props(styles.rows)}>
+        {visible.map((run, index) => (
+          <TodoRow
+            key={run.id}
+            run={run}
+            all={all}
+            onAnswer={onAnswer}
+            onDeny={onDeny}
+            itemRef={index === STOPPED_VISIBLE ? firstHiddenRef : undefined}
+          />
+        ))}
+      </ul>
+      {hidden > 0 ? (
+        <div>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              focusFirstHidden.current = true;
+              setExpanded(true);
+            }}
+          >
+            {t("more", { count: hidden })}
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
-function runHref(run: { id: string; workspace: { id: string } }): string {
-  return href(`/runs/${encodeURIComponent(run.id)}`, { ws: run.workspace.id });
-}
-
-function todoStatus(run: HomeRun): PillStatus {
-  if (run.state === "waiting-for-input" && run.input !== null) return run.input.kind;
-  return runStatus(run.state === "ended" ? run : { state: run.state });
+function RunKey({ run, all }: { run: HomeRun | DoneRun; all: boolean }) {
+  return (
+    <span {...stylex.props(styles.keyLine)}>
+      <Text variant="title" numeric>
+        {run.ticketKey}
+      </Text>
+      {all ? <Text variant="meta">{run.workspace.name}</Text> : null}
+    </span>
+  );
 }
 
 function TodoRow({
@@ -226,48 +267,69 @@ function TodoRow({
   all,
   onAnswer,
   onDeny,
+  itemRef,
 }: {
   run: HomeRun;
   all: boolean;
   onAnswer: HomeScreenProps["onAnswer"];
   onDeny: HomeScreenProps["onDeny"];
+  itemRef: RefObject<HTMLLIElement | null> | undefined;
 }) {
   const t = useTranslations("home.row");
-  const { duration } = useTime();
-  const status = todoStatus(run);
-  const row = (reason: ReactNode, action?: ReactNode) => (
-    <RunRow run={run} status={status} all={all} reason={reason} action={action} />
+  const { ago, duration, elapsed } = useTime();
+  const line = (detail: ReactNode, trailing?: string, action?: ReactNode) => (
+    <li data-run={run.id} ref={itemRef} {...stylex.props(styles.todoItem)}>
+      <span {...stylex.props(styles.todoLink)}>
+        <Row href={runHref(run)} {...(trailing === undefined ? {} : { trailing })}>
+          <span {...stylex.props(styles.todoBody)}>
+            <span {...stylex.props(styles.keyLine)}>
+              <RunKey run={run} all={all} />
+              {run.cancelling ? <Text variant="meta">{t("cancelling")}</Text> : null}
+            </span>
+            <Text variant="ui">{detail}</Text>
+          </span>
+        </Row>
+      </span>
+      {action === undefined ? null : <span {...stylex.props(styles.todoAction)}>{action}</span>}
+    </li>
   );
-  const inputReasonAndAction = (waiting: HomeRun, input: InputWait): [ReactNode, ReactNode] => {
-    switch (input.kind) {
-      case "question":
-        return [input.body, <QuestionAction run={waiting} question={input} onAnswer={onAnswer} />];
-      case "permission":
-        return [
-          t("permission", { command: input.detail, object: objectParticle(input.detail) }),
-          <PermissionAction run={waiting} permission={input} onDeny={onDeny} />,
-        ];
-    }
-  };
   switch (run.state) {
-    case "waiting-for-input":
-      return run.input === null
-        ? row(t("inputUnknown"))
-        : row(...inputReasonAndAction(run, run.input));
+    case "waiting-for-input": {
+      const since = run.waitingMs === null ? undefined : elapsed(run.waitingMs);
+      const input = run.input;
+      if (input === null) return line(t("inputUnknown"), since);
+      switch (input.kind) {
+        case "question":
+          return line(
+            input.body,
+            since,
+            <QuestionAction run={run} question={input} onAnswer={onAnswer} />,
+          );
+        case "permission":
+          return line(
+            t("permission", { command: input.detail }),
+            since,
+            <PermissionAction run={run} permission={input} onDeny={onDeny} />,
+          );
+      }
+      return null;
+    }
     case "disconnected": {
       const runner = run.runner?.name ?? t("noRunner");
-      return row(
+      return line(
         run.unreachableMs === null
           ? t("unreachable", { runner })
           : t("unreachableFor", { runner, duration: duration(run.unreachableMs) }),
       );
     }
     case "ended": {
-      if (run.summary !== "human-check") return row(t("failed"));
+      if (run.summary !== "human-check")
+        return line(t("failedAt", { time: ago(run.endedAt, run.endedAgoMs) }));
       const pr = run.pullRequest;
-      if (pr === null) return row(t("humanCheckNoPr"));
-      return row(
-        t("humanCheck", { pr: pr.displayId, object: objectParticle(pr.displayId) }),
+      if (pr === null) return line(t("humanCheckNoPr"));
+      return line(
+        t("pullRequest", { pr: pr.displayId }),
+        undefined,
         <a
           href={pr.url}
           target="_blank"
@@ -285,48 +347,225 @@ function TodoRow({
   }
 }
 
-function ProgressRow({ run }: { run: HomeRun }) {
+function InProgressSection({ page, all }: { page: HomePage; all: boolean }) {
+  const t = useTranslations("home");
+  const runs = [...page.running, ...page.queued];
+  return (
+    <Card surface="plain" label={t("section.inProgress")}>
+      <Section
+        title={t("section.inProgress")}
+        titleRole="heading"
+        count={runs.length}
+        link={{ href: runsHref(page), label: t("inProgress.link") }}
+      >
+        {runs.length === 0 ? (
+          <Text variant="meta" as="p">
+            {t("empty.inProgress")}
+          </Text>
+        ) : (
+          <ul {...stylex.props(styles.rows)}>
+            {runs.map((run) => (
+              <ProgressRow key={run.id} run={run} all={all} />
+            ))}
+          </ul>
+        )}
+      </Section>
+    </Card>
+  );
+}
+
+function ProgressRow({ run, all }: { run: HomeRun; all: boolean }) {
   const t = useTranslations("home.row");
   const tDomain = useTranslations("domain");
+  const statusName = useStatusName();
   const { elapsed } = useTime();
+  const item = (status: PillStatus, detail: string | undefined, since: number | null) => (
+    <li data-run={run.id}>
+      <Row
+        href={runHref(run)}
+        leading={<StatusDot status={status}>{statusName(status)}</StatusDot>}
+        {...(since === null ? {} : { trailing: elapsed(since) })}
+      >
+        <span {...stylex.props(styles.keyLine)}>
+          <RunKey run={run} all={all} />
+          {detail === undefined ? null : (
+            <Text variant="meta" truncate>
+              {detail}
+            </Text>
+          )}
+          {run.cancelling ? <Text variant="meta">{t("cancelling")}</Text> : null}
+        </span>
+      </Row>
+    </li>
+  );
   switch (run.state) {
-    case "running": {
-      const parts = [
-        run.runner?.name,
-        run.executionMs === null ? undefined : elapsed(run.executionMs),
-      ].filter((part) => part !== undefined);
-      return <RunRow run={run} status="running" reason={parts.join(" · ")} />;
-    }
+    case "running":
+      return item("running", run.runner?.name, run.executionMs);
     case "queued": {
       const reason = run.queuedReason;
-      let text: string;
       switch (reason.kind) {
         case "behind":
         case "no-capacity":
-          text = t("queuedFree");
-          break;
+          return item("queued", t("queuedFree"), run.waitMs);
         case "runner-offline":
-          text =
+          return item(
+            "queued",
             run.runner === null
               ? t("queuedAnyOffline")
               : t("queuedOffline", {
                   runner: run.runner.name,
                   subject: subjectParticle(run.runner.name),
-                });
-          break;
+                }),
+            run.waitMs,
+          );
         case "starting":
         case "project-missing":
         case "assignment-blocked":
-          text = tDomain(`queuedReason.${reason.kind}`);
-          break;
+          return item("queued", tDomain(`queuedReason.${reason.kind}`), run.waitMs);
       }
-      return <RunRow run={run} status="queued" reason={text} />;
+      return null;
     }
     case "waiting-for-input":
     case "disconnected":
     case "ended":
       return null;
   }
+}
+
+function RunnersSection({ runners }: { runners: DashboardRunner[] }) {
+  const t = useTranslations("home");
+  const issues = runnerIssues({ list: runners });
+  const names = (cause: "offline" | "auth") =>
+    issues.filter((runner) => runner.cause === cause).map((runner) => runner.name);
+  const offline = names("offline");
+  const auth = names("auth");
+  return (
+    <Card surface="plain" label={t("section.runners")}>
+      <Section title={t("section.runners")} titleRole="subheading" count={runners.length}>
+        {runners.length === 0 ? (
+          <Text variant="meta" as="p">
+            {t("empty.runners")}
+          </Text>
+        ) : (
+          <div {...stylex.props(styles.sideBlock)}>
+            <ul {...stylex.props(styles.rows)}>
+              {runners.map((runner) => (
+                <RunnerRow key={runner.id} runner={runner} />
+              ))}
+            </ul>
+            {issues.length === 0 ? null : (
+              <ProblemCallout
+                title={t("runners.problemTitle", { count: issues.length })}
+                actions={
+                  <a
+                    href="/runners"
+                    data-variant="secondary"
+                    {...stylex.props(...buttonStyles("secondary"))}
+                  >
+                    {t("runners.fix")}
+                  </a>
+                }
+              >
+                {offline.length === 0 ? null : (
+                  <p {...stylex.props(styles.reset)}>
+                    {t("runners.offline", { names: offline.join(", ") })}
+                  </p>
+                )}
+                {auth.length === 0 ? null : (
+                  <p {...stylex.props(styles.reset)}>
+                    {t("runners.auth", { names: auth.join(", ") })}
+                  </p>
+                )}
+              </ProblemCallout>
+            )}
+          </div>
+        )}
+      </Section>
+    </Card>
+  );
+}
+
+function runnerStatus(runner: DashboardRunner): PillStatus {
+  switch (runner.cause) {
+    case null:
+      return "online";
+    case "offline":
+      return "offline";
+    case "auth":
+      return "runner-issue";
+  }
+}
+
+function RunnerRow({ runner }: { runner: DashboardRunner }) {
+  const t = useTranslations("home.runners");
+  const statusName = useStatusName();
+  const status = runnerStatus(runner);
+  return (
+    <li data-runner={runner.id}>
+      <Row
+        href={href("/runners", { sel: runner.id })}
+        leading={<StatusDot status={status}>{statusName(status)}</StatusDot>}
+      >
+        <span {...stylex.props(styles.runnerLine)}>
+          <Text variant="title" truncate>
+            {runner.name}
+          </Text>
+          <CapacityBar
+            used={runner.used}
+            total={runner.capacity}
+            label={t("capacity", { runner: runner.name })}
+            tone={runner.cause === null ? "progress" : "problem"}
+          />
+        </span>
+      </Row>
+    </li>
+  );
+}
+
+function DoneTodaySection({ page, all }: { page: HomePage; all: boolean }) {
+  const t = useTranslations("home");
+  const done = page.doneToday;
+  return (
+    <Card surface="plain" label={t("section.doneToday")}>
+      <Section
+        title={t("section.doneToday")}
+        titleRole="subheading"
+        count={done.total}
+        link={{ href: runsHref(page), label: t("doneToday.link") }}
+      >
+        {done.recent.length === 0 ? (
+          <Text variant="meta" as="p">
+            {t("empty.doneToday")}
+          </Text>
+        ) : (
+          <ul {...stylex.props(styles.rows)}>
+            {done.recent.map((run) => (
+              <DoneRow key={run.id} run={run} all={all} />
+            ))}
+          </ul>
+        )}
+      </Section>
+    </Card>
+  );
+}
+
+function DoneRow({ run, all }: { run: DoneRun; all: boolean }) {
+  const statusName = useStatusName();
+  const { ago } = useTime();
+  return (
+    <li data-run={run.id}>
+      <Row
+        href={runHref(run)}
+        leading={<StatusDot status={run.summary}>{statusName(run.summary)}</StatusDot>}
+        trailing={<time dateTime={run.endedAt}>{ago(run.endedAt, run.endedAgoMs)}</time>}
+      >
+        <span {...stylex.props(styles.keyLine)}>
+          <RunKey run={run} all={all} />
+          <Text variant="meta">{statusName(run.summary)}</Text>
+        </span>
+      </Row>
+    </li>
+  );
 }
 
 function useResultFocus(done: boolean) {
@@ -348,7 +587,7 @@ function useResultFocus(done: boolean) {
   };
 }
 
-function useLayer() {
+function useLayer(onOpen: () => void = () => {}) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const focusTriggerOnClose = useRef(false);
@@ -361,6 +600,7 @@ function useLayer() {
     open,
     triggerRef,
     onOpenChange: (next: boolean) => {
+      if (next) onOpen();
       focusTriggerOnClose.current = !next;
       setOpen(next);
     },
@@ -379,7 +619,12 @@ function ResultText({
   children: string;
 }) {
   return (
-    <span ref={resultRef} role="status" tabIndex={-1} {...stylex.props(styles.result)}>
+    <span
+      ref={resultRef}
+      role="status"
+      tabIndex={-1}
+      {...stylex.props(textStyles("ui"), styles.result)}
+    >
       {children}
     </span>
   );
@@ -390,7 +635,9 @@ function LayerTitle({ run, status, since }: { run: HomeRun; status: PillStatus; 
   return (
     <>
       <StatusPill status={status}>{statusName(status)}</StatusPill>
-      <span {...stylex.props(styles.key)}>{run.ticketKey}</span>
+      <Text variant="meta" numeric>
+        {run.ticketKey}
+      </Text>
       {since === "" ? null : <span>{since}</span>}
     </>
   );
@@ -445,118 +692,6 @@ function QuestionAction({
   );
 }
 
-type SendState = "idle" | "sending" | "failed";
-
-export function QuestionForm({
-  question,
-  onSend,
-}: {
-  question: Question;
-  onSend: (answer: string) => Promise<void>;
-}) {
-  const t = useTranslations("home.question");
-  const [draft, setDraft] = useState<AnswerDraft>(emptyDraft);
-  const [state, setState] = useState<SendState>("idle");
-  const otherRef = useRef<HTMLTextAreaElement>(null);
-  const name = useId();
-  const otherId = useId();
-  const hintId = useId();
-  const answer = answerToSend(question.choices, draft);
-  const sending = state === "sending";
-  const otherPicked = draft.pick?.kind === "other";
-
-  useEffect(() => {
-    if (otherPicked) otherRef.current?.focus();
-  }, [otherPicked]);
-
-  const send = () => {
-    if (answer === null || sending) return;
-    setState("sending");
-    onSend(answer).then(
-      () => setState("idle"),
-      () => setState("failed"),
-    );
-  };
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    send();
-  };
-  const onOtherKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey)) return;
-    event.preventDefault();
-    send();
-  };
-
-  return (
-    <form onSubmit={onSubmit} {...stylex.props(styles.layerForm)}>
-      <fieldset disabled={sending} {...stylex.props(styles.fieldset)}>
-        <legend {...stylex.props(styles.questionText)}>{question.body}</legend>
-        <div {...stylex.props(styles.choices)}>
-          {question.choices.map((choice, index) => (
-            <label key={`${index}:${choice}`} {...stylex.props(styles.choice)}>
-              <input
-                type="radio"
-                name={name}
-                value={String(index)}
-                checked={draft.pick?.kind === "choice" && draft.pick.index === index}
-                onChange={() => setDraft((d) => pickChoice(d, index))}
-                {...stylex.props(styles.radio)}
-              />
-              <span {...stylex.props(styles.choiceText)}>{choice}</span>
-            </label>
-          ))}
-          <label {...stylex.props(styles.choice)}>
-            <input
-              type="radio"
-              name={name}
-              value="other"
-              checked={otherPicked}
-              onChange={() => setDraft(pickOther)}
-              {...stylex.props(styles.radio)}
-            />
-            <span {...stylex.props(styles.choiceText)}>{t("other")}</span>
-          </label>
-        </div>
-        {otherPicked ? (
-          <div {...stylex.props(styles.other)}>
-            <label htmlFor={otherId} {...stylex.props(styles.srOnly)}>
-              {t("otherLabel")}
-            </label>
-            <textarea
-              ref={otherRef}
-              id={otherId}
-              name="answer"
-              rows={3}
-              value={draft.otherText}
-              placeholder={t("otherPlaceholder")}
-              aria-describedby={hintId}
-              onChange={(event) => {
-                const text = event.currentTarget.value;
-                setDraft((d) => writeOther(d, text));
-              }}
-              onKeyDown={onOtherKeyDown}
-              {...stylex.props(styles.textarea)}
-            />
-          </div>
-        ) : null}
-      </fieldset>
-      {state === "failed" ? (
-        <p role="alert" {...stylex.props(styles.error)}>
-          {t("failed")}
-        </p>
-      ) : null}
-      <div {...stylex.props(styles.layerFoot)}>
-        <span id={hintId} {...stylex.props(styles.hint)}>
-          {draft.pick === null ? t("pick") : otherPicked ? t("shortcut") : t("note")}
-        </span>
-        <Button variant="primary" type="submit" disabled={answer === null || sending}>
-          {sending ? t("sending") : t("send")}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 function PermissionAction({
   run,
   permission,
@@ -568,10 +703,10 @@ function PermissionAction({
 }) {
   const t = useTranslations("home");
   const { elapsed } = useTime();
-  const layer = useLayer();
-  const result = useResultFocus(permission.denied);
   const [reason, setReason] = useState("");
   const [state, setState] = useState<SendState>("idle");
+  const layer = useLayer(() => setState("idle"));
+  const result = useResultFocus(permission.denied);
   if (permission.denied)
     return <ResultText resultRef={result.resultRef}>{t("permission.denied")}</ResultText>;
   const sending = state === "sending";
@@ -612,7 +747,9 @@ function PermissionAction({
           );
         }}
       >
-        <p {...stylex.props(styles.questionText)}>{permission.detail}</p>
+        <Text variant="section" as="p">
+          {permission.detail}
+        </Text>
         <Field
           label={t("permission.reasonLabel")}
           description={t("permission.reasonDescription")}
@@ -621,7 +758,6 @@ function PermissionAction({
           <Input name="reason" value={reason} onValueChange={setReason} autoComplete="off" />
         </Field>
         <div {...stylex.props(styles.layerFoot)}>
-          <span />
           <Button variant="danger" type="submit" disabled={sending}>
             {sending ? t("permission.denying") : t("permission.send")}
           </Button>
@@ -631,348 +767,95 @@ function PermissionAction({
   );
 }
 
-function RunnersCard({ runners }: { runners: RunnersSummary }) {
-  const t = useTranslations("home");
-  const statusName = useStatusName();
-  const issues = runners.issues;
-  return (
-    <TitledSection
-      title={t("section.runners")}
-      quiet
-      aside={
-        <>
-          {issues.length === 0 ? null : (
-            <span {...stylex.props(styles.headCounts)}>
-              {t("runners.check", { count: issues.length })}
-            </span>
-          )}
-          <HeadLink href="/runners">{t("runners.link")}</HeadLink>
-        </>
-      }
-    >
-      {issues.length === 0 && runners.online === 0 ? (
-        <p {...stylex.props(styles.empty)}>{t("empty.runners")}</p>
-      ) : (
-        <ul {...stylex.props(styles.rows)}>
-          {issues.map((runner) => (
-            <li key={runner.id} data-runner={runner.id} {...stylex.props(styles.row)}>
-              <span {...stylex.props(styles.lead)}>
-                <StatusPill status="runner-issue">{statusName("runner-issue")}</StatusPill>
-                <a href={href("/runners", { sel: runner.id })} {...stylex.props(styles.title)}>
-                  {runner.name}
-                </a>
-              </span>
-              <span {...stylex.props(styles.trail)}>
-                <span {...stylex.props(styles.reason)}>{t(`runners.${runner.cause}`)}</span>
-              </span>
-            </li>
-          ))}
-          {runners.online === 0 ? null : (
-            <li {...stylex.props(styles.row)}>
-              <span {...stylex.props(styles.lead)}>
-                <StatusPill status="online">{statusName("online")}</StatusPill>
-                <span {...stylex.props(styles.reason)}>
-                  {t("runners.online", { count: runners.online })}
-                </span>
-              </span>
-            </li>
-          )}
-        </ul>
-      )}
-    </TitledSection>
-  );
+function runsHref(page: HomePage): string {
+  return page.workspace.kind === "one"
+    ? href("/runs", { ws: page.workspace.workspace.id })
+    : "/runs";
 }
 
-function DoneTodayCard({ page }: { page: HomePage }) {
-  const t = useTranslations("home");
-  const statusName = useStatusName();
-  const { ago } = useTime();
-  const done = page.doneToday;
-  return (
-    <TitledSection
-      title={t("section.doneToday")}
-      quiet
-      aside={
-        <>
-          <span {...stylex.props(styles.headCounts)}>
-            {t("doneToday.count", { count: done.total })}
-          </span>
-          <HeadLink href={runsHref(page)}>{t("doneToday.link")}</HeadLink>
-        </>
-      }
-    >
-      {done.recent.length === 0 ? (
-        <p {...stylex.props(styles.empty)}>{t("empty.doneToday")}</p>
-      ) : (
-        <ul {...stylex.props(styles.rows)}>
-          {done.recent.map((run) => (
-            <DoneRow
-              key={run.id}
-              run={run}
-              statusLabel={statusName(run.summary)}
-              time={ago(run.endedAt, run.endedAgoMs)}
-            />
-          ))}
-        </ul>
-      )}
-    </TitledSection>
-  );
-}
-
-function DoneRow({ run, statusLabel, time }: { run: DoneRun; statusLabel: string; time: string }) {
-  return (
-    <li data-run={run.id} {...stylex.props(styles.row, styles.rowSingleLine)}>
-      <span {...stylex.props(styles.lead)}>
-        <StatusPill status={run.summary}>{statusLabel}</StatusPill>
-        <a href={runHref(run)} {...stylex.props(styles.title)}>
-          {run.ticketKey}
-        </a>
-      </span>
-      <span {...stylex.props(styles.trailCompact)}>
-        <time dateTime={run.endedAt} {...stylex.props(styles.reason)}>
-          {time}
-        </time>
-      </span>
-    </li>
-  );
+export function runHref(run: { id: RunId; workspace: { id: string } }): string {
+  return href(`/runs/${encodeURIComponent(run.id)}`, { ws: run.workspace.id });
 }
 
 function href(path: string, search: Record<string, string>): string {
   return `${path}?${new URLSearchParams(search).toString()}`;
 }
 
-const STACKED = "@container (max-width: 879px)";
-const SIDE_WIDTH = 360;
-
 const styles = stylex.create({
   page: {
     height: "100%",
     overflow: "auto",
     paddingTop: space.s8,
-    paddingInline: { default: space.s8, "@media (max-width: 600px)": space.s4 },
+    paddingInline: { default: space.s8, [NARROW_SCREEN]: space.s4 },
     paddingBottom: space.s10,
+  },
+  header: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
+    marginBottom: space.s8,
   },
   frame: { containerType: "inline-size" },
   columns: {
     display: "grid",
     gridTemplateColumns: {
-      default: `minmax(0, 1fr) minmax(0, ${SIDE_WIDTH}px)`,
-      [STACKED]: "minmax(0, 1fr)",
+      default: `minmax(0, 1fr) ${SIDE_COLUMN_WIDTH}px`,
+      [ONE_COLUMN]: "minmax(0, 1fr)",
     },
     alignItems: "start",
-    gap: space.s4,
+    columnGap: space.s8,
+    rowGap: space.s10,
   },
-  column: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
-  cardHead: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    columnGap: space.s3,
-    rowGap: space.s1,
-    minWidth: 0,
-    paddingBlock: space.s2,
-    paddingInline: space.s3,
-  },
-  sectionTitle: {
-    margin: 0,
-    color: colors.textPrimary,
-    fontSize: fontSize.body,
-    fontWeight: fontWeight.semibold,
-  },
-  quietTitle: { color: colors.textSecondary, fontSize: fontSize.ui },
-  headCounts: {
-    color: colors.textTertiary,
-    fontSize: fontSize.ui,
-    fontVariantNumeric: "tabular-nums",
-  },
-  headLink: {
-    marginInlineStart: "auto",
-    color: colors.accentText,
-    fontSize: fontSize.ui,
-    textDecoration: { default: "none", ":hover": "underline" },
-    whiteSpace: "nowrap",
-    borderRadius: radius.pill,
-    outline: { default: null, ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
-  },
-  empty: {
-    margin: 0,
-    paddingBlock: space.s2,
-    paddingInline: space.s3,
-    color: colors.textTertiary,
-  },
+  mainColumn: { display: "flex", flexDirection: "column", gap: space.s10, minWidth: 0 },
+  sideColumn: { display: "flex", flexDirection: "column", gap: space.s10, minWidth: 0 },
+  sideBlock: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
+  groups: { display: "flex", flexDirection: "column", gap: space.s6, minWidth: 0 },
+  group: { display: "flex", flexDirection: "column", gap: space.s1, minWidth: 0 },
   rows: {
     display: "flex",
     flexDirection: "column",
+    minWidth: 0,
     margin: 0,
     padding: 0,
     listStyle: "none",
   },
-  row: {
+  todoItem: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
-    columnGap: space.s3,
-    rowGap: space.s1,
+    columnGap: space.s2,
     minWidth: 0,
-    minHeight: 44,
-    paddingBlock: space.s2,
-    paddingInline: space.s3,
-    borderRadius: radius.control,
   },
-  lead: {
-    display: "flex",
-    flexGrow: 0,
-    flexShrink: 1,
-    flexBasis: "auto",
-    alignItems: "center",
-    gap: space.s2,
-    minWidth: 0,
-    maxWidth: "100%",
-  },
-  trail: {
-    display: "flex",
+  todoLink: {
     flexGrow: 1,
     flexShrink: 1,
     flexBasis: 0,
+    minWidth: `min(100%, ${TODO_TEXT_MIN_WIDTH})`,
+  },
+  todoAction: {
+    display: "flex",
+    flexShrink: 0,
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: space.s3,
-    minWidth: "min(100%, 12rem)",
     maxWidth: "100%",
+    paddingInline: { default: 0, [ONE_COLUMN]: space.s3 },
   },
-  trailCompact: {
-    display: "flex",
-    flexShrink: 0,
-    alignItems: "center",
-    marginInlineStart: "auto",
-    whiteSpace: "nowrap",
-  },
-  rowSingleLine: { flexWrap: "nowrap" },
-  title: {
-    minWidth: 0,
-    overflow: "hidden",
-    color: colors.textPrimary,
-    fontWeight: fontWeight.medium,
-    fontVariantNumeric: "tabular-nums",
-    textDecoration: { default: "none", ":hover": "underline" },
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    borderRadius: radius.pill,
-    outline: { default: null, ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
-  },
-  meta: {
-    flexShrink: 0,
-    color: colors.textTertiary,
-    fontSize: fontSize.ui,
-    whiteSpace: "nowrap",
-  },
-  key: {
-    color: colors.textTertiary,
-    fontVariantNumeric: "tabular-nums",
-    whiteSpace: "nowrap",
-  },
-  reason: {
-    minWidth: 0,
-    color: colors.textSecondary,
-    fontSize: fontSize.ui,
-    fontVariantNumeric: "tabular-nums",
-    lineHeight: lineHeight.snug,
-    overflowWrap: "anywhere",
-  },
-  result: {
-    flexShrink: 1,
-    minWidth: 0,
-    color: colors.textSecondary,
-    fontSize: fontSize.ui,
-    outline: "none",
-  },
-  srOnly: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    margin: -1,
-    padding: 0,
-    overflow: "hidden",
-    clip: "rect(0 0 0 0)",
-    whiteSpace: "nowrap",
-    borderWidth: 0,
-  },
-  layerForm: { display: "flex", flexDirection: "column", gap: space.s3, minWidth: 0 },
-  fieldset: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s3,
-    minWidth: 0,
-    margin: 0,
-    padding: 0,
-    borderWidth: 0,
-  },
-  questionText: {
-    margin: 0,
-    padding: 0,
-    color: colors.textPrimary,
-    fontSize: fontSize.body,
-    fontWeight: fontWeight.semibold,
-    lineHeight: lineHeight.normal,
-    overflowWrap: "anywhere",
-  },
-  choices: { display: "flex", flexDirection: "column", gap: space.px2 },
-  choice: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: space.s2,
-    minWidth: 0,
-    paddingBlock: space.s2,
-    paddingInline: space.s2,
-    borderRadius: radius.control,
-    backgroundColor: {
-      default: "transparent",
-      ":hover": { default: null, "@media (hover: hover)": colors.bgHover },
-      ":has(input:checked)": colors.bgSelected,
-    },
-    color: colors.textPrimary,
-    cursor: "pointer",
-  },
-  radio: {
-    flexShrink: 0,
-    width: 16,
-    height: 16,
-    marginBlock: 2,
-    marginInline: 0,
-    accentColor: colors.accent,
-  },
-  choiceText: {
-    minWidth: 0,
-    lineHeight: lineHeight.normal,
-    whiteSpace: "normal",
-    overflowWrap: "anywhere",
-  },
-  other: { display: "flex", flexDirection: "column", minWidth: 0 },
-  textarea: {
-    boxSizing: "border-box",
-    width: "100%",
-    minHeight: 72,
-    paddingBlock: space.s2,
-    paddingInline: space.s3,
-    borderWidth: 0,
-    borderRadius: radius.control,
-    backgroundColor: colors.bgInset,
-    color: colors.textPrimary,
-    font: "inherit",
-    fontSize: { default: fontSize.body, "@media (pointer: coarse)": fontSize.input },
-    lineHeight: lineHeight.normal,
-    resize: "vertical",
-    outline: { default: null, ":focus-visible": `2px solid ${colors.accentText}` },
-  },
-  error: { margin: 0, color: colors.problem, fontSize: fontSize.ui },
-  layerFoot: {
+  todoBody: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
+  keyLine: {
     display: "flex",
     flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: space.s3,
+    alignItems: "baseline",
+    columnGap: space.s2,
+    minWidth: 0,
   },
-  hint: { minWidth: 0, color: colors.textTertiary, fontSize: fontSize.small },
+  runnerLine: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+    alignItems: "center",
+    gap: space.s3,
+    minWidth: 0,
+  },
+  reset: { margin: 0 },
+  result: { flexShrink: 1, minWidth: 0, outline: "none" },
+  layerForm: { display: "flex", flexDirection: "column", gap: space.s3, minWidth: 0 },
+  layerFoot: { display: "flex", justifyContent: "flex-end", gap: space.s3 },
 });

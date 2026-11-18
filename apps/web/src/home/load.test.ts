@@ -37,6 +37,7 @@ import {
 import { loadShell } from "../shell/load";
 import { loadHomePage } from "./load";
 import type { AttentionItem, HomeRun } from "./model";
+import { runnerIssues } from "./model";
 
 const keys = (runs: ReadonlyArray<HomeRun>) => runs.map((run) => run.ticketKey);
 const attentionKeys = (items: ReadonlyArray<AttentionItem>) =>
@@ -255,21 +256,24 @@ describe("loadHomePage", () => {
     expect(page.queued.every((run) => !run.cancelling)).toBe(true);
   });
 
-  it("러너 문제는 To do 에 없고 Runners 카드의 문제 러너로 담고, 나머지는 Online 수로 센다(티켓 0060)", () => {
+  it("러너는 문제 있는 러너부터 쓰는 칸과 capacity 를 담고, 러너 문제는 To do 에 없다(티켓 0060·0069)", () => {
     const { db } = seedDatabase();
     const page = loadHomePage(db, "ws-commerce", now, "UTC");
     expect(page.attention.every((item) => item.kind === "run")).toBe(true);
-    expect(page.runners).toEqual({
-      issues: [{ id: "runner-b", name: "runner-b", cause: "offline" }],
-      online: 1,
-    });
+    expect(page.runners.list).toEqual([
+      { id: "runner-b", name: "runner-b", cause: "offline", used: 0, capacity: 1 },
+      { id: "runner-a", name: "runner-a", cause: null, used: 4, capacity: 10 },
+    ]);
     expect(loadShell(db).runnerIssues).toBe(1);
 
     breakGitHubAuth(db);
     expect(loadShell(db).runnerIssues).toBe(2);
     const broken = loadHomePage(db, "ws-commerce", now, "UTC");
-    expect(broken.runners.issues.map((r) => r.id).toSorted()).toEqual(["runner-a", "runner-b"]);
-    expect(broken.runners.online).toBe(0);
+    expect(
+      runnerIssues(broken.runners)
+        .map((r) => r.id)
+        .toSorted(),
+    ).toEqual(["runner-a", "runner-b"]);
     expect(attentionKeys(broken.attention)).toEqual(attentionKeys(page.attention));
   });
 
@@ -284,25 +288,26 @@ describe("loadHomePage", () => {
       projects: null,
     });
     const page = loadHomePage(db, "ws-commerce", now, "UTC");
-    expect(page.runners.issues).toContainEqual({ id: "runner-a", name: "runner-a", cause: "auth" });
+    expect(runnerIssues(page.runners)).toContainEqual(
+      expect.objectContaining({ id: "runner-a", name: "runner-a", cause: "auth" }),
+    );
     expect(page.queued.find((run) => run.ticketKey === "ACME-13")).toMatchObject({
       queuedReason: { kind: "assignment-blocked" },
     });
-    expect(loadHomePage(db, labs, now, "UTC").runners.issues.map((r) => r.id)).toContain(
-      "runner-a",
-    );
-    expect(loadHomePage(db, "all", now, "UTC").runners.issues.map((r) => r.id)).toContain(
-      "runner-a",
-    );
+    for (const ws of [labs, "all"])
+      expect(runnerIssues(loadHomePage(db, ws, now, "UTC").runners).map((r) => r.id)).toContain(
+        "runner-a",
+      );
   });
 
-  it("전체에서는 모든 Workspace 의 손댈 일만 담는다(ADR 0006)", () => {
+  it("전체에서는 모든 Workspace 의 To do·진행 중·오늘 끝난 런을 Workspace 와 함께 담는다(ADR 0006, 티켓 0069)", () => {
     const { db } = seedDatabase();
     addLabsFailedRun(db);
     const page = loadHomePage(db, "all", now, "UTC");
     expect(page.workspace.kind).toBe("all");
-    expect(page.running).toEqual([]);
-    expect(page.queued).toEqual([]);
+    expect(keys(page.running)).toEqual(expect.arrayContaining(["ACME-10", "LAB-1"]));
+    expect(keys(page.queued)).toContain("ACME-13");
+    expect(page.doneToday.recent.map((run) => run.workspace.id)).toContain("ws-commerce");
     const attention = attentionKeys(page.attention);
     expect(attention).toContain("LAB-2");
     expect(attention).toContain("ACME-11");
@@ -346,7 +351,7 @@ describe("loadHomePage", () => {
     const withCanceled = loadHomePage(db, "ws-commerce", now, "UTC").doneToday;
     expect(withCanceled.total).toBe(8);
     expect(withCanceled.recent.map((run) => run.summary)).toContain("canceled");
-    expect(loadHomePage(db, "all", now, "UTC").doneToday).toEqual({ recent: [], total: 0 });
+    expect(loadHomePage(db, "all", now, "UTC").doneToday.total).toBeGreaterThanOrEqual(8);
   });
 
   it("질문을 기다리는 런은 가장 오래된 대기부터 지난 시간을 담는다", () => {

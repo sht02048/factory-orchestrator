@@ -19,7 +19,7 @@ import { isWebUrl } from "../format/url";
 import { resolveWorkspace, runnerIssueCause } from "../shell/model";
 import { calendarDay } from "../time-zone";
 import type { QueuedReason } from "../runs/model";
-import type { DoneRun, HomePage, HomeRun, InputWait, RunnerIssue } from "./model";
+import type { DashboardRunner, DoneRun, HomePage, HomeRun, InputWait } from "./model";
 import { partitionHome } from "./model";
 
 export function loadHomePage(
@@ -34,7 +34,7 @@ export function loadHomePage(
     return partitionHome({
       workspace,
       runs: [],
-      runners: { issues: [], online: 0 },
+      runners: { list: [] },
       doneToday: [],
     });
 
@@ -45,6 +45,7 @@ export function loadHomePage(
     workspace.kind === "one" ? { workspaceId: toWorkspaceId(workspace.workspace.id) } : {},
   );
 
+  const placements = listRunPlacements(db);
   const queueReasons = explainQueue({
     queued: listRuns(db, { states: ["queued"] }).flatMap((run): QueuedRun[] =>
       run.state === "queued"
@@ -60,7 +61,7 @@ export function loadHomePage(
         : [],
     ),
     runners: listRunnerSnapshots(db),
-    runs: listRunPlacements(db),
+    runs: placements,
   });
   const cancelling = new Set<string>(listPendingCancelRequests(db).map((r) => r.runId));
 
@@ -141,22 +142,34 @@ export function loadHomePage(
           prState: run.prState,
           summary: summarizeRunOutcome(run).outcome,
           prSettledLater: (records?.laterPrState ?? null) !== null,
+          endedAt: run.endedAt.toISOString(),
+          endedAgoMs: Math.max(0, now.getTime() - run.endedAt.getTime()),
         };
     }
   };
 
   const today = calendarDay(now, timeZone);
-  const issues = [...runners.values()].flatMap((runner): RunnerIssue[] => {
-    const cause = runnerIssueCause(runner);
-    return cause === null ? [] : [{ id: runner.id, name: runner.name, cause }];
-  });
+  const used = new Map<string, number>();
+  for (const placement of placements) {
+    if (placement.runnerId === null || placement.state === "queued") continue;
+    used.set(placement.runnerId, (used.get(placement.runnerId) ?? 0) + 1);
+  }
+  const dashboardRunners = [...runners.values()]
+    .map((runner): DashboardRunner => ({
+      id: runner.id,
+      name: runner.name,
+      cause: runnerIssueCause(runner),
+      used: used.get(runner.id) ?? 0,
+      capacity: runner.capacity,
+    }))
+    .toSorted((a, b) => Number(a.cause === null) - Number(b.cause === null));
   return partitionHome({
     workspace,
     runs: runs.map((run) => ({
       ticket: `${run.ticket.connection}\u0000${run.ticket.key}`,
       run: toView(run),
     })),
-    runners: { issues, online: runners.size - issues.length },
+    runners: { list: dashboardRunners },
     doneToday: runs.flatMap((run): DoneRun[] =>
       run.state === "ended" && calendarDay(run.endedAt, timeZone) === today
         ? [
