@@ -183,37 +183,21 @@ describe("서버 찾기", () => {
     });
   });
 
-  it("이름으로 열 수 없는 서버는 같은 포트·scheme 의 Tailscale IPv4 로 다시 묻고, 열리면 그 주소로 보인다", async () => {
-    const asked: string[] = [];
+  it("이름으로 열 수 없는 http 서버는 같은 포트의 Tailscale IPv4 로 다시 묻고, 열리면 그 주소로 보인다", async () => {
     const result = await discoverServers({
       tailnet: () =>
         Promise.resolve({
           kind: "running",
-          devices: [
-            { name: "mini", host: "mini.example.ts.net", ipv4: "100.64.0.2" },
-            { name: "box", host: "box.example.ts.net", ipv4: "100.64.0.3" },
-          ],
+          devices: [{ name: "mini", host: "mini.example.ts.net", ipv4: "100.64.0.2" }],
         }),
-      probe: fakeProbe(
-        {
-          "http://mini.example.ts.net:3000": identity("inst-2", { webAccess: "host-not-allowed" }),
-          "http://100.64.0.2:3000": identity("inst-2"),
-          "https://box.example.ts.net": identity("inst-3", { webAccess: "host-not-allowed" }),
-          "https://100.64.0.3": identity("inst-3"),
-        },
-        asked,
-      ),
+      probe: fakeProbe({
+        "http://mini.example.ts.net:3000": identity("inst-2", { webAccess: "host-not-allowed" }),
+        "http://100.64.0.2:3000": identity("inst-2"),
+      }),
     });
     expect(result).toEqual({
       kind: "found",
       servers: [
-        {
-          instanceId: "inst-3",
-          name: "box",
-          url: "https://100.64.0.3",
-          version: "0.1.0",
-          webAccess: "allowed",
-        },
         {
           instanceId: "inst-2",
           name: "mini",
@@ -223,7 +207,29 @@ describe("서버 찾기", () => {
         },
       ],
     });
-    expect(asked).toContain("https://100.64.0.3");
+  });
+
+  it("https(Serve)에서 열 수 없다고 답하면 IP 로 다시 묻지 않는다", async () => {
+    const asked: string[] = [];
+    const result = await discoverServers({
+      tailnet: () =>
+        Promise.resolve({
+          kind: "running",
+          devices: [{ name: "box", host: "box.example.ts.net", ipv4: "100.64.0.3" }],
+        }),
+      probe: fakeProbe(
+        {
+          "https://box.example.ts.net": identity("inst-3", { webAccess: "host-not-allowed" }),
+          "https://100.64.0.3": identity("inst-3"),
+        },
+        asked,
+      ),
+    });
+    expect(result).toMatchObject({
+      kind: "found",
+      servers: [{ url: "https://box.example.ts.net", webAccess: "host-not-allowed" }],
+    });
+    expect(asked.some((origin) => origin.includes("100.64.0.3"))).toBe(false);
   });
 
   it("IP 로도 열 수 없거나 다른 서버가 답하면 이름 주소로 열 수 없음을 그대로 보인다", async () => {

@@ -38,8 +38,10 @@ export async function probeDevice(
       version: result.identity.version,
       webAccess: result.identity.webAccess,
     };
-    if (found.webAccess === "allowed" || device.ipv4 === undefined) return found;
     const byIp = new URL(origin);
+    if (found.webAccess === "allowed" || device.ipv4 === undefined || byIp.protocol !== "http:") {
+      return found;
+    }
     byIp.hostname = device.ipv4;
     const retry = await options.probe(byIp.origin, options.timeoutMs);
     if (
