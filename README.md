@@ -99,6 +99,10 @@ factory-orchestrator start    # applies database migrations, then runs the web s
 - `start` reads `<home>/.env`. Shell environment variables with the same names (`WEB_HOST`, `WEB_PORT`, `DATABASE_PATH`, `ENCRYPTION_KEY`) override it. It applies pending database migrations, starts the web server and the worker, and prints the web address once it responds. If either process exits, `start` stops the other one and exits with an error, so a service manager can restart both. `SIGINT` or `SIGTERM` stops both.
 - After an upgrade, run `start` again (or restart the service). It applies new migrations before anything else starts.
 
+### Open it from other devices
+
+The web app has no login. Anyone who can reach its address can change settings and send commands to your runners. Keep it on `127.0.0.1` or inside a private network such as a Tailscale tailnet, and never expose the whole app to the public internet; open only the webhook path (`/api/webhooks/...`) publicly. If you share your tailnet with other people, use Tailscale ACLs to limit which users and devices can reach the orchestrator's machine.
+
 ### Run as a service
 
 `factory-orchestrator service install` registers `start` as a background service for your user account: a launchd agent on macOS (`~/Library/LaunchAgents/factory-orchestrator.plist`) and a systemd user service on Linux (`~/.config/systemd/user/factory-orchestrator.service`). It starts at login and restarts after a failure. `factory-orchestrator service uninstall` stops it and removes the file.
