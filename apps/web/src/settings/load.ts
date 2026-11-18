@@ -13,6 +13,7 @@ import {
   listWorkspaceTrackerProjects,
   listWorkspaces,
 } from "@ganger/db";
+import type { PowerSettings } from "@ganger/cli/power-settings";
 import type { Database, SecretBox, StoredTrackerConnection, WorkspaceId } from "@ganger/db";
 import { z } from "zod";
 import { prerequisiteProject } from "../labels";
@@ -24,6 +25,7 @@ import type {
   Choice,
   ConnectionLabel,
   ConnectionProjects,
+  PowerView,
   Remote,
   RemoteError,
   RunnerCheckView,
@@ -33,10 +35,21 @@ import type {
   WorkspaceSettings,
 } from "./model";
 
+export interface PowerSettingsStore {
+  read(): PowerSettings;
+  write(settings: PowerSettings): void;
+}
+
 export interface SettingsContext {
   db: Database;
   secretBox: SecretBox;
   registry: AdapterRegistry;
+  power?: PowerSettingsStore;
+}
+
+function powerView(store: PowerSettingsStore | undefined): PowerView {
+  if (store === undefined) return { available: false, preventSleep: true };
+  return { available: true, preventSleep: store.read().preventSleep };
 }
 
 export function webhookPath(connectionId: string): string {
@@ -157,6 +170,7 @@ export async function loadSettingsPage(
       })),
       githubToken: listCodeHostConnections(db, secretBox).length > 0,
       addresses: addressesView(getInstallSettings(db)),
+      power: powerView(context.power),
       runners: runners.map((runner): RunnerSettingsView => {
         const config = runnerConfigSchema.safeParse(runner.config);
         return {

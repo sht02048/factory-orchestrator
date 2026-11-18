@@ -9,6 +9,7 @@ import {
   requestRunnerCheckNow,
   saveAddressesSetting,
   saveGitHubTokenSetting,
+  savePowerSettings,
   saveRunnerSettings,
   saveTrackerConnection,
   saveWorkspaceGeneral,
@@ -52,6 +53,7 @@ export function useSettingsActions(): SettingsActions {
       saveRunner: then((data) => saveRunnerSettings({ data })),
       recheckRunner: then((data) => requestRunnerCheckNow({ data })),
       saveAddresses: then((data) => saveAddressesSetting({ data })),
+      savePower: then((data) => savePowerSettings({ data })),
       pollRunnerChecks: async () => {
         const pending = await getRunnerChecksPending();
         if (!pending) await router.invalidate();

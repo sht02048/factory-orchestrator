@@ -27,7 +27,11 @@ import {
   schema,
   toWorkspaceId,
 } from "@ganger/db";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { installPowerSettings } from "../server/power-settings";
 import { renderWithMessages } from "../testing/render";
 import {
   addTrackerProject,
@@ -44,6 +48,8 @@ import {
   saveTrackerConnectionSetting,
   trackerConnectionInput,
   mappingInput,
+  powerInput,
+  savePowerSetting,
 } from "./actions";
 import { hasPendingRunnerChecks, loadSettingsPage } from "./load";
 import type { SettingsContext } from "./load";
@@ -146,6 +152,7 @@ const noopActions: SettingsActions = {
   saveRunner: () => Promise.resolve({ ok: true }),
   recheckRunner: () => Promise.resolve({ ok: true }),
   saveAddresses: () => Promise.resolve({ ok: true }),
+  savePower: () => Promise.resolve({ ok: true }),
   pollRunnerChecks: () => Promise.resolve(false),
 };
 
@@ -960,5 +967,63 @@ describe("Settings 화면", () => {
     expect(html).toContain("Workspace를 고르면 그 Workspace의 설정을 바꿀 수 있어요.");
     expect(html).not.toContain('aria-label="Workspace 설정"');
     expect(panelText(html)).toContain("설치 전체");
+  });
+});
+
+describe("잠자기 방지(0084)", () => {
+  function withHome<T>(use: (home: string) => T): T {
+    const home = mkdtempSync(join(tmpdir(), "ganger-web-power-"));
+    try {
+      return use(home);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  }
+
+  it("설치 폴더를 모르면 바꿀 수 없다고 보이고 저장하지 않는다", async () => {
+    const f = fixture();
+    const page = await loadSettingsPage(f.context, undefined, now);
+    expect(page.install.power).toEqual({ available: false, preventSleep: true });
+    const shown = panelText(render(page, "power"));
+    expect(shown).toContain("ganger start로 띄우지 않아 여기서 바꿀 수 없어요");
+    expect(render(page, "power")).toMatch(/<button[^>]*type="submit"[^>]*disabled/);
+    expect(savePowerSetting(f.context, { preventSleep: false })).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+  });
+
+  it("기본은 켜짐이고, 끄면 설치 폴더의 power.json에 저장해 다시 열면 꺼져 있다", async () => {
+    await withHome(async (home) => {
+      const power = installPowerSettings({ GANGER_HOME: home });
+      if (power === undefined) throw new Error("home not accepted");
+      const f = fixture();
+      const context = { ...f.context, power };
+      expect((await loadSettingsPage(context, undefined, now)).install.power).toEqual({
+        available: true,
+        preventSleep: true,
+      });
+      expect(savePowerSetting(context, { preventSleep: false })).toEqual({ ok: true });
+      expect(JSON.parse(readFileSync(join(home, "power.json"), "utf8"))).toEqual({
+        preventSleep: false,
+      });
+      const page = await loadSettingsPage(context, undefined, now);
+      expect(page.install.power).toEqual({ available: true, preventSleep: false });
+      const shown = panelText(render(page, "power"));
+      expect(shown).toContain("서버가 도는 동안 이 맥이 잠들지 않게");
+      expect(shown).toContain("뚜껑을 닫거나");
+      expect(shown).toContain("러너 맥");
+    });
+  });
+
+  it("설치 폴더 값은 절대 경로일 때만 받는다", () => {
+    expect(installPowerSettings({})).toBeUndefined();
+    expect(installPowerSettings({ GANGER_HOME: " " })).toBeUndefined();
+    expect(installPowerSettings({ GANGER_HOME: "relative/home" })).toBeUndefined();
+  });
+
+  it("켜기·끄기 값은 boolean만 받는다", () => {
+    expect(powerInput.safeParse({ preventSleep: true }).success).toBe(true);
+    expect(powerInput.safeParse({ preventSleep: "false" }).success).toBe(false);
   });
 });
