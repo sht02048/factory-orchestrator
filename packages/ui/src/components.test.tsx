@@ -197,6 +197,26 @@ describe("서버 렌더", () => {
     expect(html).toContain(`id="${label}"`);
   });
 
+  it("Input 은 data 속성과 inputMode 를 입력 요소에 넘긴다(티켓 0055)", () => {
+    const html = renderToString(
+      <Field label="API 키">
+        <Input
+          name="apiKey"
+          type="password"
+          autoComplete="off"
+          data-1p-ignore
+          data-lpignore="true"
+          inputMode="numeric"
+        />
+      </Field>,
+    );
+    const input = /<input[^>]*>/.exec(html)?.[0] ?? "";
+    expect(input).toContain('data-1p-ignore="true"');
+    expect(input).toContain('data-lpignore="true"');
+    expect(input).toContain('inputMode="numeric"');
+    expect(input).toContain('autoComplete="off"');
+  });
+
   it("버튼과 버튼 모양 트리거는 data-variant 로 변형을 드러낸다(주 버튼 하나 시험, ADR 0010 6번)", () => {
     const html = renderToString(
       <>

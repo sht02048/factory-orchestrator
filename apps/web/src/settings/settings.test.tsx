@@ -635,6 +635,8 @@ describe("러너 확인", () => {
     ]);
     const text = panelText(render(await loadSettingsPage(f.context, commerce, now), "runners"));
     expect(text).toContain("worker가 러너를 확인하고 있어요");
+    expect(text).toContain("확인하는 중");
+    expect(text).not.toContain("다시 확인");
   });
 
   it("기다리는 동안 읽는 요청 상태는 결과가 오면 거짓이 되고 트래커를 부르지 않는다", async () => {
@@ -852,6 +854,38 @@ describe("Settings 화면", () => {
       const primary = [...render(page, item).matchAll(/data-variant="primary"/g)].length;
       expect({ item, primary: primary <= 1 }).toEqual({ item, primary: true });
     }
+  });
+
+  it("비밀값 칸은 새 비밀번호를 권하지 않고 비밀번호 관리자가 건너뛴다(0055)", async () => {
+    const f = fixture();
+    await addConnection(f);
+    const page = await loadSettingsPage(f.context, commerce, now);
+    const secrets = [
+      ...render(page, "connections").matchAll(/<input[^>]*>/g),
+      ...render(page, "github").matchAll(/<input[^>]*>/g),
+    ]
+      .map((match) => match[0])
+      .filter((input) => input.includes('type="password"'));
+    expect(secrets.length).toBe(5);
+    for (const input of secrets) {
+      expect(input).not.toContain("new-password");
+      expect(input).toContain('autoComplete="off"');
+      expect(input).toContain('data-1p-ignore="true"');
+      expect(input).toContain('data-lpignore="true"');
+    }
+  });
+
+  it("분·Capacity 칸은 숫자 키보드를 쓰고, 처음 열 때는 오류를 보이지 않는다(0055)", async () => {
+    const f = fixture();
+    const page = await loadSettingsPage(f.context, commerce, now);
+    const general = render(page, "general");
+    expect(/<input[^>]*name="maxRunMinutes"[^>]*>/.exec(general)?.[0]).toContain(
+      'inputMode="numeric"',
+    );
+    const runners = render(page, "runners");
+    expect(/<input[^>]*name="capacity"[^>]*>/.exec(runners)?.[0]).toContain('inputMode="numeric"');
+    expect(general).not.toContain('aria-invalid="true"');
+    expect(runners).not.toContain('aria-invalid="true"');
   });
 
   it("이 Workspace 와 설치 전체로 나눈다", async () => {
