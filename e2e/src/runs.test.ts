@@ -163,6 +163,34 @@ describe("Runs 화면(브라우저, 0056)", () => {
     expect(panelBox.width).toBeGreaterThan(500);
   });
 
+  it("editor 변형(Settings)은 800px 에서 두 열이고 700px 에서 편집 영역이 아래로 내려간다", async (context) => {
+    const boxes = async (width: number) => {
+      const page = await newPage(context, { width, height: 900 });
+      await page.goto(`/settings?ws=${workspaceId}`);
+      await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+      await page.waitForLoadState("networkidle");
+      return page.evaluate(() => {
+        const panel = document.querySelector("main aside");
+        const list = panel?.previousElementSibling;
+        if (panel === null || panel === undefined || list === null || list === undefined)
+          throw new Error("split view not found");
+        const box = (element: Element) => {
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return { x, y, width, height };
+        };
+        return { list: box(list), panel: box(panel) };
+      });
+    };
+
+    const wide = await boxes(800);
+    expect(wide.panel.x).toBeGreaterThan(wide.list.x);
+    expect(wide.panel.width).toBeGreaterThan(360);
+
+    const narrow = await boxes(700);
+    expect(narrow.panel.x).toBe(narrow.list.x);
+    expect(narrow.panel.y).toBeGreaterThanOrEqual(narrow.list.y + narrow.list.height);
+  });
+
   it("레일의 Runner Issue 점은 글자와 바탕의 대비가 4.5:1 이상이다", async (context) => {
     const page = await newPage(context, { width: 1280, height: 900 });
     await openRuns(page);
