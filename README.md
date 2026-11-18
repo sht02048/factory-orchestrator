@@ -181,6 +181,17 @@ The app shows a notification when an agent asks a question, waits for a permissi
 
 Work is tracked as local tickets in [`docs/tickets/`](./docs/tickets/) instead of in a tracker.
 
+## Contributing
+
+The repository was renamed from `factory-orchestrator` to `ganger`. GitHub forwards the old address for now, but do not rely on that. In each clone and worktree you already have, point `origin` at the new address (replace `<owner>` with the account that owns the repository):
+
+```sh
+git remote set-url origin https://github.com/<owner>/ganger.git
+git remote -v   # check that fetch and push show the new address
+```
+
+Use `git@github.com:<owner>/ganger.git` instead if you clone over ssh. Worktrees share the remote of their main clone, so running the command once per clone is enough.
+
 ## License
 
 [MIT](./LICENSE)
