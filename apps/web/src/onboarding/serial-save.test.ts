@@ -55,6 +55,7 @@ describe("한 줄의 자동 저장은 한 번에 하나씩 보낸다", () => {
     const h = harness();
     h.choose("A");
     h.choose("B");
+    await flush();
     expect(h.sent).toEqual(["A"]);
 
     h.reply("A", { ok: true });
@@ -74,6 +75,7 @@ describe("한 줄의 자동 저장은 한 번에 하나씩 보낸다", () => {
     h.choose("A");
     h.choose("B");
     h.choose("C");
+    await flush();
     h.reply("A", { ok: true });
     await flush();
     expect(h.sent).toEqual(["A", "C"]);
@@ -87,10 +89,42 @@ describe("한 줄의 자동 저장은 한 번에 하나씩 보낸다", () => {
     const h = harness();
     h.choose("A");
     h.choose("B");
+    await flush();
     h.reply("A", { ok: false, reason: "network" });
     await flush();
     expect(h.sent).toEqual(["A", "B"]);
     expect(h.shown()).toBe("B");
     expect(h.states).not.toContain("failed");
+  });
+
+  it("보내기나 저장 알림이 바로 예외를 던져도 다음 고른 값을 보낸다", async () => {
+    const sent: string[] = [];
+    const states: string[] = [];
+    let shown = "none";
+    const saver = createSerialSaver<string>({
+      send: (value) => {
+        sent.push(value);
+        if (value === "boom") throw new Error("send failed");
+        return Promise.resolve({ ok: true });
+      },
+      revert: () => {
+        shown = "none";
+      },
+      onState: (state) => states.push(state.kind),
+      onSaved: () => {
+        if (sent.length === 2) throw new Error("announce failed");
+      },
+    });
+    saver.choose("boom");
+    await flush();
+    expect(states.at(-1)).toBe("failed");
+    expect(shown).toBe("none");
+
+    saver.choose("A");
+    await flush();
+    saver.choose("B");
+    await flush();
+    expect(sent).toEqual(["boom", "A", "B"]);
+    expect(states.at(-1)).toBe("idle");
   });
 });

@@ -33,13 +33,19 @@ export function createSerialSaver<V>(handlers: SerialSaveHandlers<V>): {
     queued = null;
     running = true;
     handlers.onState({ kind: "sending" });
-    handlers.send(item.value).then(
-      (result) => {
-        if (result.ok) handlers.onSaved();
-        finish(result.ok ? null : result.reason);
-      },
-      () => finish("unknown"),
-    );
+    Promise.resolve()
+      .then(() => handlers.send(item.value))
+      .then(
+        (result) => {
+          try {
+            if (result.ok) handlers.onSaved();
+          } finally {
+            finish(result.ok ? null : result.reason);
+          }
+        },
+        () => finish("unknown"),
+      )
+      .catch(() => {});
   };
 
   return {
