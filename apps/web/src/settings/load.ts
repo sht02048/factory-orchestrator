@@ -129,10 +129,12 @@ const toChoice = (item: { id: string; name: string }): Choice => ({ id: item.id,
 /**
  * Settings 화면이 보일 값. DB 의 설정과, 이 Workspace 의 트래커 프로젝트·상태·라벨처럼 트래커에서 읽어야 하는
  * 목록을 함께 담는다. 트래커에서 읽지 못한 목록은 까닭과 함께 비워 두고 DB 값은 그대로 보인다.
+ * `now` 는 서버가 읽은 때다. 러너 확인 시각의 상대 시간("25분 전")을 여기서 정한다.
  */
 export async function loadSettingsPage(
   context: SettingsContext,
   ws: string | undefined,
+  now: Date,
 ): Promise<SettingsPage> {
   const { db, secretBox } = context;
   const connections = listTrackerConnections(db, secretBox);
@@ -179,7 +181,7 @@ export async function loadSettingsPage(
           sshTarget: config.success ? config.data.sshTarget : "",
           orcaPath: config.success ? config.data.orcaPath : "",
           capacity: runner.capacity,
-          check: runnerCheckView(db, runner.id, runner.projects),
+          check: runnerCheckView(db, runner.id, runner.projects, now),
         };
       }),
     },
@@ -331,6 +333,7 @@ function runnerCheckView(
   db: Database,
   runnerId: RunnerId,
   projects: ReadonlyArray<{ id: string; displayName: string }>,
+  now: Date,
 ): RunnerCheckView | null {
   const request = getRunnerCheckRequest(db, runnerId);
   if (request === null) return null;
@@ -341,15 +344,18 @@ function runnerCheckView(
       return {
         status: "failed",
         completedAt: request.completedAt.toISOString(),
+        completedAgoMs: Math.max(0, now.getTime() - request.completedAt.getTime()),
         error: request.error,
       };
     case "done": {
       const completedAt = request.completedAt.toISOString();
+      const completedAgoMs = Math.max(0, now.getTime() - request.completedAt.getTime());
       const parsed = runnerHealthSchema.safeParse(request.result);
-      if (!parsed.success) return { status: "unreadable", completedAt };
+      if (!parsed.success) return { status: "unreadable", completedAt, completedAgoMs };
       return {
         status: "done",
         completedAt,
+        completedAgoMs,
         online: parsed.data.online,
         version: parsed.data.version,
         prerequisites: parsed.data.prerequisites.map((p) => ({

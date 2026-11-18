@@ -115,13 +115,17 @@ export interface PrerequisiteView {
   blocksAssignment: boolean;
 }
 
-/** 러너 확인 요청과 worker 가 쓴 결과(Q61) */
+/**
+ * 러너 확인 요청과 worker 가 쓴 결과(Q61). `completedAgoMs` 는 결과가 온 때부터 서버가 읽은 때까지(밀리초)로,
+ * 화면이 "25분 전"처럼 상대 시간으로 쓴다(ADR 0010 7번).
+ */
 export type RunnerCheckView =
   | { status: "pending"; requestedAt: string }
-  | { status: "failed"; completedAt: string; error: string }
+  | { status: "failed"; completedAt: string; completedAgoMs: number; error: string }
   | {
       status: "done";
       completedAt: string;
+      completedAgoMs: number;
       online: boolean;
       version: string | null;
       prerequisites: PrerequisiteView[];
@@ -129,7 +133,7 @@ export type RunnerCheckView =
       error: string | null;
     }
   /** 결과를 읽지 못함(저장된 모양이 다름) */
-  | { status: "unreadable"; completedAt: string };
+  | { status: "unreadable"; completedAt: string; completedAgoMs: number };
 
 export interface RunnerSettingsView {
   id: string;
