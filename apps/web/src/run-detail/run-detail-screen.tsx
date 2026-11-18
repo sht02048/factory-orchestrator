@@ -2,22 +2,28 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
+  Card,
   DefinitionItem,
   DefinitionList,
   Dialog,
   DialogClose,
-  DetailPanel,
   Field,
   Input,
   PageHeader,
-  PanelBlock,
-  Section,
-  SplitView,
+  Row,
   StatusPill,
   Text,
 } from "@factory/ui";
 import type { PillStatus } from "@factory/ui";
-import { colors, fonts, fontSize, lineHeight, radius, space } from "@factory/ui/tokens.stylex";
+import {
+  colors,
+  fonts,
+  fontSize,
+  fontWeight,
+  lineHeight,
+  radius,
+  space,
+} from "@factory/ui/tokens.stylex";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
@@ -46,16 +52,14 @@ export interface RunDetailScreenProps extends RunDetailActions {
   runHref: (runId: string) => string;
 }
 
-/** Run 상세: 왼쪽 결과·타임라인·로그, 오른쪽 런 속성과 같은 티켓의 다른 런(ADR 0007, 시안 B) */
+/**
+ * Run 상세: 전체 화면(ADR 0010). 위에 상태·제목·행동, 그 아래 왼쪽은 질문 카드·지나온 일,
+ * 오른쪽은 런 정보·터미널 끝부분·같은 티켓의 다른 런.
+ */
 export function RunDetailScreen(props: RunDetailScreenProps) {
   const { page } = props;
   if (page.kind === "not-found") return <NotFound runsHref={props.runsHref} />;
-  return (
-    <SplitView
-      list={<Main {...props} run={page.run} />}
-      panel={<Properties run={page.run} runHref={props.runHref} />}
-    />
-  );
+  return <Main {...props} run={page.run} />;
 }
 
 function NotFound({ runsHref }: { runsHref: string }) {
@@ -83,11 +87,10 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   return (
     <div {...stylex.props(styles.main)}>
       <nav aria-label={t("crumb.label")} {...stylex.props(styles.crumb)}>
-        <a href={props.runsHref} {...stylex.props(styles.link)}>
+        <a href={props.runsHref} {...stylex.props(styles.crumbLink)}>
+          <span aria-hidden="true">‹</span>
           {t("crumb.runs")}
         </a>
-        <span aria-hidden="true">/</span>
-        <span>{t("crumb.run", { ticket: run.ticketKey })}</span>
       </nav>
 
       <header {...stylex.props(styles.head)}>
@@ -96,61 +99,101 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
           <Text variant="meta">{when}</Text>
           {run.cancelPending ? <Text variant="meta">{t("cancelPending")}</Text> : null}
         </p>
-        <Text variant="page" as="h1">
-          {run.ticketKey}
-        </Text>
+        <div {...stylex.props(styles.titleRow)}>
+          {/* 티켓 제목을 저장하면 회색 키 + 제목으로 바꾼다(ADR 0010 9번). 지금은 키만 있다. */}
+          <Text variant="page" as="h1">
+            {run.ticketKey}
+          </Text>
+          {pr === null && !cancelable ? null : (
+            <Actions>
+              {pr === null ? null : (
+                <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
+                  {t("openPr", { pr: pr.displayId })}
+                </a>
+              )}
+              {cancelable ? <CancelRun onCancel={props.onCancel} /> : null}
+            </Actions>
+          )}
+        </div>
         <Text variant="meta">
           {run.branch === null ? run.trackerProject : `${run.trackerProject} · ${run.branch}`}
         </Text>
         <Text variant="body">
           <Reason run={run} />
         </Text>
-        {pr === null && !cancelable ? null : (
-          <Actions>
-            {pr === null ? null : (
-              <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
-                {t("openPr", { pr: pr.displayId })}
-              </a>
-            )}
-            {cancelable ? <CancelRun onCancel={props.onCancel} /> : null}
-          </Actions>
-        )}
+        <NextAction run={run} />
       </header>
 
-      {run.status.state === "waiting-for-input" ? (
-        <InputBlock input={run.status.input} onAnswer={props.onAnswer} onDeny={props.onDeny} />
-      ) : null}
+      <div {...stylex.props(styles.columns)}>
+        <div {...stylex.props(styles.column)}>
+          {run.status.state === "waiting-for-input" ? (
+            <InputBlock
+              input={run.status.input}
+              waitedMs={inputWaitedMs(run)}
+              onAnswer={props.onAnswer}
+              onDeny={props.onDeny}
+            />
+          ) : null}
 
-      <Section title={t("next.title")}>
-        <NextAction run={run} />
-      </Section>
-
-      <Section title={t("timeline.title")}>
-        <Timeline events={run.timeline} />
-      </Section>
-
-      {run.startError === null ? null : (
-        <Section title={t("startError.title")}>
-          <div {...stylex.props(styles.stack)}>
-            <Text variant="body">{t("startError.body")}</Text>
-            <pre {...stylex.props(styles.pre)}>{run.startError}</pre>
-          </div>
-        </Section>
-      )}
-
-      {run.status.state === "ended" ? (
-        <Section title={t("report.title")}>
-          {run.report === null ? (
-            <Text variant="meta">{t("report.none")}</Text>
-          ) : (
-            <pre {...stylex.props(styles.pre)}>{run.report}</pre>
+          {run.startError === null ? null : (
+            <Block title={t("startError.title")}>
+              <Text variant="body">{t("startError.body")}</Text>
+              <pre {...stylex.props(styles.pre)}>{run.startError}</pre>
+            </Block>
           )}
-        </Section>
-      ) : null}
 
-      <LogTail log={run.log} now={run.now} onRefresh={props.onRefreshLog} />
+          {run.status.state === "ended" ? (
+            <Block title={t("report.title")}>
+              {run.report === null ? (
+                <Text variant="meta">{t("report.none")}</Text>
+              ) : (
+                <pre {...stylex.props(styles.pre)}>{run.report}</pre>
+              )}
+            </Block>
+          ) : null}
+
+          <Timeline events={run.timeline} now={run.now} />
+        </div>
+
+        <div {...stylex.props(styles.column)}>
+          <Properties run={run} />
+          <LogTail log={run.log} now={run.now} onRefresh={props.onRefreshLog} />
+          <OtherRuns run={run} runHref={props.runHref} />
+        </div>
+      </div>
     </div>
   );
+}
+
+/** 이름 붙은 카드 하나. 제목 줄 오른쪽에 흐린 값이나 행동을 둘 수 있다 */
+function Block({
+  title,
+  aside,
+  compact = false,
+  children,
+}: {
+  title: string;
+  aside?: ReactNode;
+  compact?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Card label={title} padding={compact ? "compact" : "normal"}>
+      <div {...stylex.props(styles.blockHead, compact && styles.blockHeadCompact)}>
+        <Text variant="section" as="h2">
+          {title}
+        </Text>
+        {aside === undefined ? null : aside}
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+/** 지금 보이는 질문·권한 요청을 받은 때부터 서버가 읽은 때까지 */
+function inputWaitedMs(run: RunDetail): number | null {
+  if (run.status.state !== "waiting-for-input" || run.status.inputSince === null) return null;
+  return Math.max(0, Date.parse(run.now) - Date.parse(run.status.inputSince));
 }
 
 function Reason({ run }: { run: RunDetail }) {
@@ -207,32 +250,37 @@ function NextAction({ run }: { run: RunDetail }) {
       break;
   }
   const manual = status.state === "ended" && status.worktreeNeedsManualRemoval;
-  return (
-    <div {...stylex.props(styles.stack)}>
-      {manual ? (
-        <p {...stylex.props(styles.flat)}>
-          <Text variant="body">{t("manualRemoval")}</Text>
-        </p>
-      ) : null}
-      <Text variant="body">{manual ? t("next.manualRemoval") : next}</Text>
-    </div>
+  return manual ? (
+    <p {...stylex.props(styles.flat)}>
+      {/* 사람이 해야 할 문제라 빨강(ADR 0010 5번)으로 띄운다 */}
+      <span {...stylex.props(styles.problemNote)}>{t("manualRemoval")}</span>{" "}
+      <Text variant="body">{t("next.manualRemoval")}</Text>
+    </p>
+  ) : (
+    <Text variant="body">{next}</Text>
   );
 }
 
 function InputBlock({
   input,
+  waitedMs,
   onAnswer,
   onDeny,
 }: {
   input: PendingInput;
+  waitedMs: number | null;
   onAnswer: RunDetailActions["onAnswer"];
   onDeny: RunDetailActions["onDeny"];
 }) {
   switch (input.kind) {
     case "question":
-      return input.answered ? null : <QuestionForm question={input} onAnswer={onAnswer} />;
+      return input.answered ? null : (
+        <QuestionForm question={input} waitedMs={waitedMs} onAnswer={onAnswer} />
+      );
     case "permission":
-      return input.denied ? null : <PermissionWait wait={input} onDeny={onDeny} />;
+      return input.denied ? null : (
+        <PermissionWait wait={input} waitedMs={waitedMs} onDeny={onDeny} />
+      );
     case "unknown":
       return null;
   }
@@ -240,11 +288,34 @@ function InputBlock({
 
 type Submit = { kind: "idle" } | { kind: "sending" } | { kind: "sent" } | { kind: "failed" };
 
+/** 질문 카드의 머리: 종류 알약 + 기다린 시간 */
+function InputHead({
+  kind,
+  waitedMs,
+}: {
+  kind: "question" | "permission";
+  waitedMs: number | null;
+}) {
+  const t = useTranslations("run.input");
+  const statusName = useStatusName();
+  const { elapsed } = useTime();
+  return (
+    <p {...stylex.props(styles.stateLine)}>
+      <StatusPill status={kind}>{statusName(kind)}</StatusPill>
+      {waitedMs === null ? null : (
+        <Text variant="meta">{t(kind, { elapsed: elapsed(waitedMs) })}</Text>
+      )}
+    </p>
+  );
+}
+
 function QuestionForm({
   question,
+  waitedMs,
   onAnswer,
 }: {
   question: Extract<PendingInput, { kind: "question" }>;
+  waitedMs: number | null;
   onAnswer: RunDetailActions["onAnswer"];
 }) {
   const t = useTranslations("run");
@@ -266,67 +337,75 @@ function QuestionForm({
   };
 
   return (
-    <Section title={t("question.title")}>
-      <div {...stylex.props(styles.stack)}>
-        <pre {...stylex.props(styles.question)}>{question.body}</pre>
-        {submit.kind === "sent" ? (
-          <Text variant="body">{t("question.sent")}</Text>
-        ) : (
-          <form
-            {...stylex.props(styles.stack)}
-            onSubmit={(event) => {
-              event.preventDefault();
-              send(answer);
-            }}
-          >
-            {question.choices.length === 0 ? null : (
-              <div {...stylex.props(styles.stack)}>
-                <Text variant="label">{t("question.choicesLabel")}</Text>
-                <Actions>
-                  {question.choices.map((choice) => (
-                    <Button
-                      key={choice}
-                      disabled={submit.kind === "sending"}
-                      onClick={() => send(choice)}
-                    >
-                      {choice}
-                    </Button>
-                  ))}
-                </Actions>
-              </div>
-            )}
-            <Field
-              label={t("question.answerLabel")}
-              description={t("question.answerHelp")}
-              {...(empty ? { error: t("question.empty") } : {})}
-            >
-              <Input name="answer" value={answer} onValueChange={setAnswer} autoComplete="off" />
-            </Field>
-            <Actions>
+    <Card label={t("question.title")}>
+      <InputHead kind="question" waitedMs={waitedMs} />
+      <pre {...stylex.props(styles.question)}>{question.body}</pre>
+      {submit.kind === "sent" ? (
+        <Text variant="body">{t("question.sent")}</Text>
+      ) : (
+        <form
+          {...stylex.props(styles.stack)}
+          onSubmit={(event) => {
+            event.preventDefault();
+            send(answer);
+          }}
+        >
+          {question.choices.length === 0 ? null : (
+            // 선택지는 모두 같은 보조 버튼이다. 추천처럼 칠하지 않는다(ADR 0010 6번).
+            <div role="group" aria-label={t("question.choicesLabel")}>
+              <Actions>
+                {question.choices.map((choice) => (
+                  <Button
+                    key={choice}
+                    variant="secondary"
+                    disabled={submit.kind === "sending"}
+                    onClick={() => send(choice)}
+                  >
+                    {choice}
+                  </Button>
+                ))}
+              </Actions>
+            </div>
+          )}
+          <div {...stylex.props(styles.answerRow)}>
+            <div {...stylex.props(styles.grow)}>
+              <Field
+                label={t("question.answerLabel")}
+                description={t("question.answerHelp")}
+                {...(empty ? { error: t("question.empty") } : {})}
+              >
+                <Input name="answer" value={answer} onValueChange={setAnswer} autoComplete="off" />
+              </Field>
+            </div>
+            {/* 화면의 주 행동 하나(ADR 0010 6번). 라벨 줄만큼 내려 입력칸과 줄을 맞춘다 */}
+            <div {...stylex.props(styles.submitOffset)}>
               <Button type="submit" variant="primary" disabled={submit.kind === "sending"}>
                 {submit.kind === "sending" ? t("question.submitting") : t("question.submit")}
               </Button>
-            </Actions>
-            {submit.kind === "failed" ? <Text variant="body">{t("actionFailed")}</Text> : null}
-          </form>
-        )}
-      </div>
-    </Section>
+            </div>
+          </div>
+          {submit.kind === "failed" ? <Text variant="body">{t("actionFailed")}</Text> : null}
+        </form>
+      )}
+    </Card>
   );
 }
 
 function PermissionWait({
   wait,
+  waitedMs,
   onDeny,
 }: {
   wait: Extract<PendingInput, { kind: "permission" }>;
+  waitedMs: number | null;
   onDeny: RunDetailActions["onDeny"];
 }) {
   const t = useTranslations("run");
   const [reason, setReason] = useState("");
   const [submit, setSubmit] = useState<Submit>({ kind: "idle" });
   return (
-    <Section title={t("permission.title")}>
+    <Card label={t("permission.title")}>
+      <InputHead kind="permission" waitedMs={waitedMs} />
       <div {...stylex.props(styles.stack)}>
         <pre {...stylex.props(styles.question)}>{wait.detail}</pre>
         <Text variant="body">{t("permission.body")}</Text>
@@ -348,7 +427,7 @@ function PermissionWait({
               <Input name="reason" value={reason} onValueChange={setReason} autoComplete="off" />
             </Field>
             <Actions>
-              <Button type="submit" disabled={submit.kind === "sending"}>
+              <Button type="submit" variant="danger" disabled={submit.kind === "sending"}>
                 {submit.kind === "sending" ? t("permission.denying") : t("permission.deny")}
               </Button>
             </Actions>
@@ -356,7 +435,7 @@ function PermissionWait({
         )}
         {submit.kind === "failed" ? <Text variant="body">{t("actionFailed")}</Text> : null}
       </div>
-    </Section>
+    </Card>
   );
 }
 
@@ -367,14 +446,14 @@ function CancelRun({ onCancel }: { onCancel: RunDetailActions["onCancel"] }) {
     <>
       <Dialog
         trigger={t("cancel.trigger")}
-        triggerVariant="ghost"
+        triggerVariant="danger"
         title={t("cancel.title")}
         description={t("cancel.body")}
         actions={
           <>
             <DialogClose>{t("cancel.dismiss")}</DialogClose>
             <DialogClose
-              variant="primary"
+              variant="danger"
               onClick={() => {
                 setFailed(false);
                 onCancel().catch(() => setFailed(true));
@@ -390,11 +469,11 @@ function CancelRun({ onCancel }: { onCancel: RunDetailActions["onCancel"] }) {
   );
 }
 
-function Timeline({ events }: { events: ReadonlyArray<TimelineEvent> }) {
+function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: string }) {
   const t = useTranslations("run.timeline");
   const domain = useTranslations("domain");
   const laterPr = useTranslations("run.laterPr");
-  const { clock } = useTime();
+  const { stamp } = useTime();
   const eventDetail = (event: TimelineEvent): string | null => {
     switch (event.kind) {
       case "question":
@@ -419,22 +498,31 @@ function Timeline({ events }: { events: ReadonlyArray<TimelineEvent> }) {
     }
   };
   return (
-    <ol {...stylex.props(styles.timeline)}>
-      {events.map((event, index) => {
-        const detail = eventDetail(event);
-        return (
-          <li key={`${event.kind}-${index}`} {...stylex.props(styles.event)}>
-            <time dateTime={event.at} {...stylex.props(styles.eventTime)}>
-              {clock(event.at)}
-            </time>
-            <div {...stylex.props(styles.eventBody)}>
-              <span>{t(event.kind)}</span>
-              {detail === null ? null : <span {...stylex.props(styles.eventDetail)}>{detail}</span>}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+    <Block title={t("title")} compact>
+      <ol {...stylex.props(styles.timeline)}>
+        {events.map((event, index) => {
+          const detail = eventDetail(event);
+          return (
+            <li key={`${event.kind}-${index}`}>
+              <Row
+                trailing={
+                  <time dateTime={event.at} {...stylex.props(styles.eventTime)}>
+                    {stamp(event.at, now)}
+                  </time>
+                }
+              >
+                <span {...stylex.props(styles.eventBody)}>
+                  <span {...stylex.props(styles.eventTitle)}>{t(event.kind)}</span>
+                  {detail === null ? null : (
+                    <span {...stylex.props(styles.eventDetail)}>{detail}</span>
+                  )}
+                </span>
+              </Row>
+            </li>
+          );
+        })}
+      </ol>
+    </Block>
   );
 }
 
@@ -475,18 +563,19 @@ function LogTail({
   // 기다리는 중에도 다시 요청할 수 있게 둔다. worker 가 늦으면 화면이 다시 읽기를 멈춘다.
   const live = log.kind !== "none" && log.kind !== "stored";
   return (
-    <Section title={t("title")} {...(note === undefined ? {} : { note })}>
-      <div {...stylex.props(styles.stack)}>
-        {body}
-        {live ? (
-          <Actions>
-            <Button variant="ghost" onClick={onRefresh}>
-              {t("refresh")}
-            </Button>
-          </Actions>
-        ) : null}
-      </div>
-    </Section>
+    <Block
+      title={t("title")}
+      aside={
+        live ? (
+          <Button variant="ghost" onClick={onRefresh}>
+            {t("refresh")}
+          </Button>
+        ) : undefined
+      }
+    >
+      {note === undefined ? null : <Text variant="meta">{note}</Text>}
+      {body}
+    </Block>
   );
 }
 
@@ -496,120 +585,113 @@ function LogLines({ lines }: { lines: ReadonlyArray<string> }) {
   return <pre {...stylex.props(styles.pre, styles.log)}>{lines.join("\n")}</pre>;
 }
 
-function Properties({ run, runHref }: { run: RunDetail; runHref: (runId: string) => string }) {
+function Properties({ run }: { run: RunDetail }) {
   const agentName = useAgentName();
   const t = useTranslations("run.props");
   const domain = useTranslations("domain");
   const ci = useTranslations("run.ci");
   const laterPr = useTranslations("run.laterPr");
-  const other = useTranslations("run.otherRuns");
-  const { duration, ago } = useTime();
-  const statusName = useStatusName();
+  const { duration, ago, stamp } = useTime();
   const time = (at: string): string => ago(at, Date.parse(run.now) - Date.parse(at));
   const ended = run.status.state === "ended" ? run.status : null;
   const pr = run.pullRequest;
 
   return (
-    <DetailPanel>
-      <section aria-label={t("label")} {...stylex.props(styles.stack)}>
-        <DefinitionList>
-          <DefinitionItem label={t("ticket")}>{run.ticketKey}</DefinitionItem>
-          <DefinitionItem label={t("state")}>
-            {domain(`runState.${run.status.state}`)}
-          </DefinitionItem>
-          <DefinitionItem label={t("summary")} empty={ended === null}>
-            {ended === null ? (
-              t("notEnded")
-            ) : (
-              <StatusPill status={ended.summary}>{statusName(ended.summary)}</StatusPill>
-            )}
-          </DefinitionItem>
-          <DefinitionItem label={t("agentResult")} empty={ended === null}>
-            {ended === null ? t("notEnded") : domain(`agentResult.${ended.agentResult}`)}
-          </DefinitionItem>
-          <DefinitionItem label={t("prState")} empty={ended === null}>
-            {ended === null ? t("notEnded") : domain(`prState.${ended.prState}`)}
-          </DefinitionItem>
-          {ended?.laterPrState == null ? null : (
-            <DefinitionItem label={t("laterPrState")}>
-              {t("laterPr", {
-                state: laterPr(ended.laterPrState.state),
-                time: time(ended.laterPrState.at),
-              })}
-            </DefinitionItem>
-          )}
-          <DefinitionItem label={t("pr")} empty={pr === null}>
-            {pr === null ? (
-              t("none")
-            ) : (
-              <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
-                {pr.displayId}
-              </a>
-            )}
-          </DefinitionItem>
-          <DefinitionItem label={t("ci")} empty={pr === null}>
-            {pr === null ? t("none") : ci(pr.ci)}
-          </DefinitionItem>
-          <DefinitionItem label={t("runner")} empty={run.runner === null}>
-            {run.runner === null ? (
-              t("noRunner")
-            ) : (
-              <span {...stylex.props(styles.inline)}>
-                {run.runner.name}
-                {run.runner.online ? null : <Text variant="meta">{t("runnerOffline")}</Text>}
-              </span>
-            )}
-          </DefinitionItem>
-          <DefinitionItem label={t("agent")}>{agentName(run.agent)}</DefinitionItem>
-          <DefinitionItem label={t("model")} empty={run.model === null}>
-            {run.model ?? t("defaultModel")}
-          </DefinitionItem>
-          <DefinitionItem label={t("waited")}>{duration(run.waitMs)}</DefinitionItem>
-          <DefinitionItem label={t("executed")} empty={run.executionMs === null}>
-            {run.executionMs === null ? t("notStarted") : duration(run.executionMs)}
-          </DefinitionItem>
-          <DefinitionItem label={t("branch")} empty={run.branch === null}>
-            {run.branch === null ? (
-              t("notStarted")
-            ) : (
-              <span {...stylex.props(styles.mono)}>{run.branch}</span>
-            )}
-          </DefinitionItem>
-          <DefinitionItem label={t("worktree")} empty={run.worktree === null}>
-            {run.worktree === null ? (
-              t("notStarted")
-            ) : (
-              <span {...stylex.props(styles.mono)}>{run.worktree}</span>
-            )}
-          </DefinitionItem>
-          <DefinitionItem label={t("workspace")}>
+    <Card label={t("label")}>
+      <DefinitionList>
+        <DefinitionItem label={t("runner")} empty={run.runner === null}>
+          {run.runner === null ? (
+            t("noRunner")
+          ) : (
             <span {...stylex.props(styles.inline)}>
-              {run.workspace.name}
-              <Text variant="meta">{run.trackerProject}</Text>
+              {run.runner.name}
+              {run.runner.online ? null : <Text variant="meta">{t("runnerOffline")}</Text>}
             </span>
+          )}
+        </DefinitionItem>
+        <DefinitionItem label={t("agent")}>{agentName(run.agent)}</DefinitionItem>
+        <DefinitionItem label={t("model")} empty={run.model === null}>
+          {run.model ?? t("defaultModel")}
+        </DefinitionItem>
+        <DefinitionItem label={t("workspace")}>
+          <span {...stylex.props(styles.inline)}>
+            {run.workspace.name}
+            <Text variant="meta">{run.trackerProject}</Text>
+          </span>
+        </DefinitionItem>
+        <DefinitionItem label={t("pr")} empty={pr === null}>
+          {pr === null ? (
+            t("none")
+          ) : (
+            <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(styles.link)}>
+              {pr.displayId}
+            </a>
+          )}
+        </DefinitionItem>
+        {pr === null ? null : <DefinitionItem label={t("ci")}>{ci(pr.ci)}</DefinitionItem>}
+        {ended === null ? null : (
+          <>
+            <DefinitionItem label={t("agentResult")}>
+              {domain(`agentResult.${ended.agentResult}`)}
+            </DefinitionItem>
+            <DefinitionItem label={t("prState")}>
+              {domain(`prState.${ended.prState}`)}
+            </DefinitionItem>
+            {ended.laterPrState === null ? null : (
+              <DefinitionItem label={t("laterPrState")}>
+                {t("laterPr", {
+                  state: laterPr(ended.laterPrState.state),
+                  time: time(ended.laterPrState.at),
+                })}
+              </DefinitionItem>
+            )}
+          </>
+        )}
+        <DefinitionItem label={t("started")} empty={run.startedAt === null}>
+          {run.startedAt === null ? t("notStarted") : stamp(run.startedAt, run.now)}
+        </DefinitionItem>
+        <DefinitionItem label={t("waited")}>{duration(run.waitMs)}</DefinitionItem>
+        {run.executionMs === null ? null : (
+          <DefinitionItem label={t("executed")}>{duration(run.executionMs)}</DefinitionItem>
+        )}
+        {run.branch === null ? null : (
+          <DefinitionItem label={t("branch")}>
+            <span {...stylex.props(styles.mono)}>{run.branch}</span>
           </DefinitionItem>
-        </DefinitionList>
-      </section>
-      {run.otherRuns.length === 0 ? null : (
-        <PanelBlock title={other("title")}>
-          <ol {...stylex.props(styles.others)}>
-            {run.otherRuns.map((o) => (
-              <li key={o.id}>
+        )}
+        {run.worktree === null ? null : (
+          <DefinitionItem label={t("worktree")}>
+            <span {...stylex.props(styles.mono)}>{run.worktree}</span>
+          </DefinitionItem>
+        )}
+      </DefinitionList>
+    </Card>
+  );
+}
+
+/** 같은 티켓의 다른 런: 할당한 때 + 상태 알약 */
+function OtherRuns({ run, runHref }: { run: RunDetail; runHref: (runId: string) => string }) {
+  const t = useTranslations("run.otherRuns");
+  const { ago } = useTime();
+  const statusName = useStatusName();
+  if (run.otherRuns.length === 0) return null;
+  return (
+    <Block title={t("title")} compact>
+      <ol {...stylex.props(styles.timeline)}>
+        {run.otherRuns.map((o) => {
+          const status = runStatus(o);
+          return (
+            <li key={o.id}>
+              <Row trailing={<StatusPill status={status}>{statusName(status)}</StatusPill>}>
                 <a href={runHref(o.id)} {...stylex.props(styles.link)}>
-                  {other("item", {
-                    time: time(o.assignedAt),
-                    state:
-                      o.summary === null
-                        ? domain(`runState.${o.state}`)
-                        : domain(`summary.${o.summary}`),
-                  })}
+                  {ago(o.assignedAt, Date.parse(run.now) - Date.parse(o.assignedAt))}
                 </a>
-              </li>
-            ))}
-          </ol>
-        </PanelBlock>
-      )}
-    </DetailPanel>
+              </Row>
+            </li>
+          );
+        })}
+      </ol>
+    </Block>
   );
 }
 
@@ -654,21 +736,53 @@ const styles = stylex.create({
   main: {
     display: "flex",
     flexDirection: "column",
-    gap: space.s10,
+    gap: space.s6,
+    maxWidth: 1280,
     paddingTop: space.s6,
     paddingInline: space.s8,
     paddingBottom: space.s10,
   },
-  crumb: {
-    display: "flex",
+  crumb: { display: "flex", fontSize: fontSize.ui },
+  crumbLink: {
+    display: "inline-flex",
+    alignItems: "baseline",
     gap: space.s2,
-    color: colors.textTertiary,
-    fontSize: fontSize.ui,
+    color: { default: colors.textTertiary, ":hover": colors.textSecondary },
+    textDecoration: "none",
+    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
+    outlineOffset: 2,
   },
   head: { display: "flex", flexDirection: "column", gap: space.s2 },
-  stateLine: { display: "flex", alignItems: "baseline", gap: space.s3, margin: 0 },
+  titleRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.s4,
+  },
+  stateLine: { display: "flex", alignItems: "center", gap: space.s3, margin: 0 },
+  // 왼쪽 질문·지나온 일, 오른쪽 정보·터미널 끝부분. 좁으면 한 열로 쌓는다.
+  columns: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "minmax(0, 1fr) 360px",
+      "@media (max-width: 960px)": "minmax(0, 1fr)",
+    },
+    alignItems: "start",
+    gap: space.s6,
+  },
+  column: { display: "flex", flexDirection: "column", gap: space.s6, minWidth: 0 },
+  blockHead: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.s3,
+  },
+  // 행을 담는 카드는 안쪽 여백이 좁아 제목만 행 글과 줄을 맞춘다.
+  blockHeadCompact: { paddingTop: space.s2, paddingInline: space.s3, paddingBottom: space.s1 },
   stack: { display: "flex", flexDirection: "column", gap: space.s3 },
   flat: { margin: 0 },
+  problemNote: { color: colors.problem, fontWeight: fontWeight.semibold },
   inline: { display: "inline-flex", alignItems: "baseline", gap: space.s2 },
   mono: { fontFamily: fonts.mono, fontSize: fontSize.small },
   link: {
@@ -682,10 +796,15 @@ const styles = stylex.create({
     whiteSpace: "pre-wrap",
     overflowWrap: "anywhere",
     fontFamily: "inherit",
-    fontSize: fontSize.body,
-    lineHeight: lineHeight.relaxed,
+    fontSize: fontSize.panel,
+    fontWeight: fontWeight.semibold,
+    lineHeight: lineHeight.snug,
     color: colors.textPrimary,
   },
+  answerRow: { display: "flex", alignItems: "flex-start", gap: space.s2 },
+  grow: { flexGrow: 1, minWidth: 0 },
+  // Field 라벨 줄(글 + px6 틈)과 입력칸·버튼 높이 차이만큼
+  submitOffset: { flexShrink: 0, paddingTop: 28 },
   pre: {
     margin: 0,
     paddingBlock: space.s3,
@@ -703,21 +822,18 @@ const styles = stylex.create({
   timeline: {
     display: "flex",
     flexDirection: "column",
-    gap: space.s3,
+    gap: space.px2,
     margin: 0,
     padding: 0,
     listStyle: "none",
   },
-  event: { display: "grid", gridTemplateColumns: "104px minmax(0, 1fr)", columnGap: space.s4 },
-  eventTime: { color: colors.textTertiary, fontVariantNumeric: "tabular-nums" },
-  eventBody: { display: "flex", flexDirection: "column", gap: space.s1, minWidth: 0 },
-  eventDetail: { color: colors.textSecondary, whiteSpace: "pre-wrap", overflowWrap: "anywhere" },
-  others: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-    margin: 0,
-    padding: 0,
-    listStyle: "none",
+  eventTime: { fontSize: fontSize.ui },
+  eventBody: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
+  eventTitle: { color: colors.textPrimary },
+  eventDetail: {
+    color: colors.textTertiary,
+    fontSize: fontSize.ui,
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
   },
 });

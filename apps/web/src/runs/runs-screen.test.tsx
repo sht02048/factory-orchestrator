@@ -14,6 +14,7 @@ import {
   offlineQueuedKey,
   seedDatabase,
 } from "../testing/seed";
+import { loadHomePage } from "../home/load";
 import { loadRunsPage } from "./load";
 import { runsMessages } from "./messages";
 import type { RunFilter, RunsPage } from "./model";
@@ -36,6 +37,7 @@ function render(
       selectedId={options.selectedId}
       onFilterChange={noop}
       onSelect={noop}
+      onOpen={noop}
       onPickWorkspace={noop}
       runHref={(id) => `/runs/${id}`}
     />,
@@ -78,32 +80,45 @@ function addProjectMissingRun(db: Database, key: string): string {
 }
 
 describe("Runs 화면", () => {
-  it("Ended 런은 상태 칸에 요약 결과, 두 칸에 에이전트 결과와 PR 상태를 나란히 보인다", () => {
+  // 행의 칸: [키, 흐린 줄(러너 · 에이전트 또는 에이전트 결과 · PR), 상태 알약, 시간]
+  it("Ended 런은 알약에 요약 결과, 흐린 줄에 러너와 에이전트 결과를 보인다", () => {
     const { db } = seedDatabase();
     const rows = rowTexts(render(loadRunsPage(db, undefined, now)));
     for (const c of endedCases) {
-      expect({ key: c.key, cells: rows.get(c.key)?.slice(1, 4) }).toEqual({
+      const cells = rows.get(c.key);
+      expect({ key: c.key, pill: cells?.[2] }).toEqual({
         key: c.key,
-        cells: [
-          domain.summary[c.summary],
-          domain.agentResult[c.agentResult],
-          domain.prState[c.prState],
-        ],
+        pill: domain.summary[c.summary],
       });
+      expect(cells?.[1]).toContain(domain.agentResult[c.agentResult]);
     }
   });
 
-  it("Ended 가 아닌 런은 상태 칸에 런 상태를 보이고 두 칸은 비운다", () => {
+  it("Ended 가 아닌 런은 알약에 런 상태, 흐린 줄에 러너와 에이전트를 보인다", () => {
     const { db } = seedDatabase();
     const rows = rowTexts(render(loadRunsPage(db, undefined, now)));
-    expect(rows.get("ACME-10")?.slice(1, 4)).toEqual([
+    expect(rows.get("ACME-10")?.slice(1, 3)).toEqual([
+      `runner-a · ${domain.agent.claude}`,
       domain.runState.running,
-      runsJson.notApplicable,
-      runsJson.notApplicable,
     ]);
-    expect(rows.get("ACME-11")?.[1]).toBe(domain.runState["waiting-for-input"]);
-    expect(rows.get("ACME-12")?.[1]).toBe(domain.runState.disconnected);
-    expect(rows.get("ACME-13")?.[1]).toBe(domain.runState.queued);
+    expect(rows.get("ACME-11")?.[2]).toBe(domain.runState["waiting-for-input"]);
+    expect(rows.get("ACME-12")?.[2]).toBe(domain.runState.disconnected);
+    expect(rows.get("ACME-13")?.[2]).toBe(domain.runState.queued);
+    expect(rows.get(offlineQueuedKey)?.[1]).toContain(runsJson.noRunner);
+  });
+
+  it("시간 칸은 끝난 런이면 상대 시간, 진행 중이면 경과다(ADR 0010 7번)", () => {
+    const { db } = seedDatabase();
+    const page = loadRunsPage(db, undefined, now);
+    const rows = rowTexts(render(page));
+    const times = page.runs.map((run) => ({
+      ended: run.state === "ended",
+      time: rows.get(run.ticketKey)?.[3] ?? "",
+    }));
+    const relative = /^(방금|\d+(분|시간) 전|\d+월 \d+일)$/;
+    expect(times.filter((r) => r.ended).every((r) => relative.test(r.time))).toBe(true);
+    expect(times.filter((r) => !r.ended).every((r) => r.time.endsWith("째"))).toBe(true);
+    expect(times.some((r) => r.ended) && times.some((r) => !r.ended)).toBe(true);
   });
 
   it("패널에 상태, 요약 결과, 두 축, 러너, 에이전트, 경과 시간, PR 을 보인다", () => {
@@ -157,6 +172,44 @@ describe("Runs 화면", () => {
     expect([...queued.keys()].sort()).toEqual(["ACME-13", offlineQueuedKey].sort());
   });
 
+  it("손댈 일 칩과 머리글 수는 Home 의 손댈 일 런과 같다(티켓마다 마지막 런)", () => {
+    const { db, ids } = seedDatabase();
+    const homeRunIds = (): string[] =>
+      loadHomePage(db, "ws-commerce", now, "UTC")
+        .attention.flatMap((item) => (item.kind === "run" ? [item.run.id] : []))
+        .sort();
+    const attentionIds = (page: RunsPage): string[] => {
+      const keys = new Set(rowTexts(render(page, { filter: "attention" })).keys());
+      return page.runs
+        .filter((run) => keys.has(run.ticketKey) && run.attention)
+        .map((run) => run.id)
+        .sort();
+    };
+
+    let page = loadRunsPage(db, undefined, now);
+    expect(attentionIds(page)).toEqual(homeRunIds());
+    expect(homeRunIds().length).toBeGreaterThan(0);
+    expect(render(page)).toContain(
+      `${page.runs.length}개 중 ${homeRunIds().length}개가 손댈 일이에요.`,
+    );
+
+    // 끝난 손댈 일 런의 티켓에 새 런을 할당하면 지난 결과는 손댈 일에서 빠진다.
+    const failedKey = endedCases.find((c) => c.summary === "failed")?.key;
+    if (failedKey === undefined) throw new Error("seed");
+    const result = assignRun(db, {
+      ticket: { connection, key: toTicketKey(failedKey) },
+      trackerProject: toTrackerProjectId("tp-web"),
+      runnerProject: toRunnerProjectId("github:acme/web"),
+      agent: toAgentId("claude"),
+      now: minutes(110),
+    });
+    expect(result.ok).toBe(true);
+    page = loadRunsPage(db, undefined, now);
+    const oldFailed = ids.get(failedKey);
+    expect(page.runs.find((run) => run.id === oldFailed)?.attention).toBe(false);
+    expect(attentionIds(page)).toEqual(homeRunIds());
+  });
+
   it('Canceled 필터는 운영자가 취소한 런만 "취소"로 보인다(Q82.18)', () => {
     const { db, ids } = seedDatabase();
     const id = ids.get("ACME-13");
@@ -171,11 +224,8 @@ describe("Runs 화면", () => {
     const page = loadRunsPage(db, undefined, now);
     const canceled = rowTexts(render(page, { filter: "canceled" }));
     expect([...canceled.keys()]).toEqual(["ACME-13"]);
-    expect(canceled.get("ACME-13")?.slice(1, 4)).toEqual([
-      domain.summary.canceled,
-      domain.agentResult.canceled,
-      domain.prState.none,
-    ]);
+    expect(canceled.get("ACME-13")?.[2]).toBe(domain.summary.canceled);
+    expect(canceled.get("ACME-13")?.[1]).toContain(domain.agentResult.canceled);
     // Failed 에는 들지 않는다
     expect(rowTexts(render(page, { filter: "failed" })).has("ACME-13")).toBe(false);
   });
@@ -200,12 +250,10 @@ describe("Runs 화면", () => {
     expect(requestRunCancel(db, id, minutes(110)).ok).toBe(true);
     const page = loadRunsPage(db, undefined, now);
     const rows = rowTexts(render(page));
-    expect(rows.get("ACME-10")?.slice(1, 3)).toEqual([
-      domain.runState.running,
-      runsJson.cancelling,
-    ]);
+    expect(rows.get("ACME-10")?.[1]).toContain(runsJson.cancelling);
+    expect(rows.get("ACME-10")?.[2]).toBe(domain.runState.running);
     // 런 상태는 그대로다
-    expect(rows.get("ACME-11")).not.toContain(runsJson.cancelling);
+    expect(rows.get("ACME-11")?.[1]).not.toContain(runsJson.cancelling);
     const text = panelText(render(page, { selectedId: id }));
     expect(text).toContain(runsJson.panel.cancelling);
     expect(text).toContain(runsJson.panel.cancellingReason);
@@ -232,7 +280,7 @@ describe("Runs 화면", () => {
     const { db } = seedDatabase();
     const html = render(loadRunsPage(db, undefined, now));
     expect(html).toContain(runsJson.title);
-    expect(html).toContain(runsJson.columns.agentResult);
+    expect(html).toContain(runsJson.filter.attention);
     expect(html).not.toMatch(/\b(runs|domain)\.[a-zA-Z]/);
   });
 });

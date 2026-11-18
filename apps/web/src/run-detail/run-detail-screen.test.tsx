@@ -10,6 +10,8 @@ import type { Database } from "@factory/db";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import runJson from "../../messages/ko/run.json" with { type: "json" };
+import { buttonsOf } from "../testing/buttons";
+import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
 import { endedCases, minutes, now, seedDatabase } from "../testing/seed";
 import { loadRunDetail, requestRunLogTail } from "./load";
@@ -294,6 +296,115 @@ describe("Run 상세 화면", () => {
     expect(body).toContain("PR을 열고 CI 통과를 확인했어요.");
     expect(body).toContain(runJson.otherRuns.title);
     expect(body).toContain(domain.summary.failed);
+  });
+
+  it("파란 주 버튼은 하나 이하이고, 질문 선택지는 모두 보조 버튼, 런 취소는 위험 버튼이다(ADR 0010 6번)", () => {
+    const { db, ids } = seedDatabase();
+    const question = ids.get("ACME-11");
+    if (question === undefined) throw new Error("no ACME-11");
+    recordRunQuestions(db, question, [
+      {
+        id: toQuestionId("q-1"),
+        body: "재시도 간격을 바꿀까요?",
+        options: ["지수 백오프", "30초 고정"],
+        askedAt: minutes(50),
+      },
+    ]);
+    const html = render(page(db, question));
+    const buttons = buttonsOf(html);
+    expect(buttons.filter((b) => b.variant === "primary").map((b) => b.label)).toEqual([
+      runJson.question.submit,
+    ]);
+    for (const choice of ["지수 백오프", "30초 고정"]) {
+      expect(buttons.find((b) => b.label === choice)?.variant).toBe("secondary");
+    }
+    expect(buttons.find((b) => b.label === runJson.cancel.trigger)?.variant).toBe("danger");
+    expect(buttons.some((b) => b.variant === "other")).toBe(false);
+
+    // 다른 상태의 런도 주 버튼이 하나를 넘지 않는다.
+    const extra = addExtraEnded(db);
+    for (const id of [...ids.values(), ...extra.values()]) {
+      const primaries = buttonsOf(render(page(db, id))).filter((b) => b.variant === "primary");
+      expect(primaries.length).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("권한 대기의 거절은 위험 버튼이다", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-11");
+    if (id === undefined) throw new Error("no ACME-11");
+    recordPermissionWaits(db, id, [
+      { id: toPermissionRequestId("perm-1"), detail: "Bash: ls", requestedAt: minutes(50) },
+    ]);
+    const buttons = buttonsOf(render(page(db, id)));
+    expect(buttons.find((b) => b.label === runJson.permission.deny)?.variant).toBe("danger");
+    expect(buttons.filter((b) => b.variant === "primary")).toEqual([]);
+  });
+
+  it("상태 알약 글은 GLOSSARY 영어 용어다(ADR 0010 1번)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-11");
+    if (id === undefined) throw new Error("no ACME-11");
+    recordRunQuestions(db, id, [
+      { id: toQuestionId("q-1"), body: "계속할까요?", options: [], askedAt: minutes(50) },
+    ]);
+    const terms = new Map<string, string>([
+      ["queued", "Queued"],
+      ["running", "Running"],
+      ["waiting-for-input", "Waiting for Input"],
+      ["disconnected", "Disconnected"],
+      ["merged", "Merged"],
+      ["human-check", "Human Check"],
+      ["failed", "Failed"],
+      ["canceled", "Canceled"],
+      ["question", "Question"],
+      ["permission", "Permission"],
+    ]);
+    const extra = addExtraEnded(db);
+    const pills = [...ids.values(), ...extra.values()].flatMap((runId) =>
+      pillsOf(render(page(db, runId))),
+    );
+    expect(pills.length).toBeGreaterThan(ids.size);
+    expect(pills.some((p) => p.status === "question")).toBe(true);
+    for (const pill of pills) expect(pill.label).toBe(terms.get(pill.status));
+  });
+
+  it("질문 카드에 Question 알약과 답을 기다린 시간을 보인다", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-11");
+    if (id === undefined) throw new Error("no ACME-11");
+    recordRunQuestions(db, id, [
+      { id: toQuestionId("q-1"), body: "계속할까요?", options: [], askedAt: minutes(50) },
+    ]);
+    // 질문은 T0 + 50분, 서버가 읽은 때는 T0 + 120분
+    expect(text(render(page(db, id)))).toContain("Question 1시간 10분째 답을 기다려요");
+    // 질문이 둘 기다리면 먼저 받은 질문을 보이고 그 시각부터 잰다
+    recordRunQuestions(db, id, [
+      { id: toQuestionId("q-2"), body: "나중 질문", options: [], askedAt: minutes(100) },
+    ]);
+    const body = text(render(page(db, id)));
+    expect(body).toContain("Question 1시간 10분째 답을 기다려요 계속할까요?");
+    expect(body).not.toContain("20분째 답을 기다려요");
+  });
+
+  it("타임라인은 같은 날이면 시각만, 다른 날이면 날짜를 붙인다", () => {
+    const { db, ids } = seedDatabase();
+    const run = found(db, ids.get("ACME-10"));
+    const body = text(
+      render({
+        kind: "found",
+        run: {
+          ...run,
+          now: "2026-11-18T03:00:00.000Z",
+          timeline: [
+            { kind: "assigned", at: "2026-11-17T23:10:00.000Z" },
+            { kind: "started", at: "2026-11-18T01:45:00.000Z" },
+          ],
+        },
+      }),
+    );
+    expect(body).toContain("11월 17일 23:10");
+    expect(body).toMatch(/ 01:45 /);
   });
 
   it("없는 런이면 찾을 수 없다고 보인다", () => {

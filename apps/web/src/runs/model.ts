@@ -37,6 +37,11 @@ interface RunViewBase {
   executionMs: number | null;
   /** 런과 이어진 PR. worker 가 찾기 전이면 null */
   pullRequest: { displayId: string; url: string } | null;
+  /**
+   * 손댈 일(GLOSSARY)에 드는 런인가. Home 과 같은 규칙이다: Waiting for Input·Disconnected 런, 그리고
+   * 티켓마다 마지막 런만 보아 Failed 와 PR 이 아직 정리되지 않은 Human Check(Q54·Q88·Q89)
+   */
+  attention: boolean;
 }
 
 /**
@@ -52,6 +57,10 @@ export type RunView =
   | (RunViewBase & Cancellable & { state: "running" | "waiting-for-input" | "disconnected" })
   | (RunViewBase & {
       state: "ended";
+      /** 끝난 시각(ISO). 하루가 넘으면 날짜로 쓴다 */
+      endedAt: string;
+      /** 끝난 때부터 서버가 읽은 때까지. 목록의 상대 시간("53분 전")에 쓴다 */
+      endedAgoMs: number;
       agentResult: AgentResult;
       prState: PrState;
       /** core summarizeRunOutcome 으로 계산한 값 */
@@ -64,13 +73,17 @@ export interface RunsPage {
   runs: RunView[];
 }
 
-/** 상태 필터(Q66·Q67): Ended 가 아닌 상태 넷과 Ended 의 요약 결과 넷 */
+/**
+ * 상태 칩 필터(Q66·Q67, ADR 0010): 전체, 손댈 일, Ended 가 아닌 상태 넷과 Ended 의 요약 결과 넷.
+ * 손댈 일은 Home 과 같은 런을 묶은 필터라 런 하나가 손댈 일과 그 상태 칩에 함께 든다.
+ */
 export const RUN_FILTERS = [
   "all",
-  "queued",
+  "attention",
   "running",
   "waiting-for-input",
   "disconnected",
+  "queued",
   "merged",
   "human-check",
   "failed",
@@ -78,18 +91,24 @@ export const RUN_FILTERS = [
 ] as const;
 export type RunFilter = (typeof RUN_FILTERS)[number];
 
-export type RunFilterKey = Exclude<RunFilter, "all">;
+export type RunFilterKey = Exclude<RunFilter, "all" | "attention">;
 
-/** 런이 드는 필터. Ended 는 요약 결과로 나눈다 */
+/** 런이 드는 상태 칩. Ended 는 요약 결과로 나눈다 */
 export function filterKeyOf(run: RunView): RunFilterKey {
   return run.state === "ended" ? run.summary : run.state;
 }
 
-export function matchesFilter(run: RunView, filter: RunFilter): boolean {
-  return filter === "all" || filterKeyOf(run) === filter;
+export function needsAttention(run: RunView): boolean {
+  return run.attention;
 }
 
-/** 목록의 경과 칸: Queued 는 기다린 시간, 그 밖은 실행 시간 */
+export function matchesFilter(run: RunView, filter: RunFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "attention") return needsAttention(run);
+  return filterKeyOf(run) === filter;
+}
+
+/** 진행 중인 런의 경과: Queued 는 기다린 시간, 그 밖은 실행 시간 */
 export function elapsedMs(run: RunView): number {
   return run.executionMs ?? run.waitMs;
 }

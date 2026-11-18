@@ -189,11 +189,13 @@ describe("끝에서 끝까지 얇은 경로", () => {
 
       // Runs 화면이 DB 에서 읽어 두 칸과 요약 결과를 보인다.
       const html = await fetchRuns(assigned.id);
-      expect(rowCells(html, scenario.key)).toEqual([
-        domain.summary[scenario.summary],
-        domain.agentResult[scenario.agentResult],
-        domain.prState[scenario.prState],
-      ]);
+      // 행: 흐린 줄(러너 · 에이전트 결과 · PR 과 PR 상태)과 요약 결과 알약
+      const [meta, pill] = rowCells(html, scenario.key) ?? [];
+      expect(pill).toBe(domain.summary[scenario.summary]);
+      expect(meta).toContain(domain.agentResult[scenario.agentResult]);
+      expect(meta?.includes(domain.prState[scenario.prState])).toBe(
+        scenario.pr !== null || scenario.prState !== "none",
+      );
       const panel = panelText(html);
       expect(panel).toContain(scenario.key);
       expect(panel).toContain(domain.summary[scenario.summary]);
@@ -325,14 +327,14 @@ async function fetchRuns(selected: RunId): Promise<string> {
   return response.text();
 }
 
-/** 목록에서 티켓 키 행의 상태·에이전트 결과·PR 상태 칸. 태그를 지우고 빈 칸과 속성 조각은 버린다. */
+/** 목록에서 티켓 키 행의 흐린 줄·상태 알약 칸. 태그를 지우고 빈 칸과 속성 조각은 버린다. */
 function rowCells(html: string, key: string): string[] | undefined {
   for (const chunk of html.split('role="option"').slice(1)) {
     const cells = chunk
       .split(/<[^>]+>/)
       .map((s) => s.trim())
       .filter((s) => s !== "" && !s.includes("="));
-    if (cells[0] === key) return cells.slice(1, 4);
+    if (cells[0] === key) return cells.slice(1, 3);
   }
   return undefined;
 }

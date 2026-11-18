@@ -45,6 +45,9 @@ function RunsRoute() {
         onSelect={(id) => {
           void navigate({ search: (prev) => ({ ...prev, sel: id }), replace: true });
         }}
+        onOpen={(id) => {
+          void navigate({ to: "/runs/$runId", params: { runId: id }, search: { ws } });
+        }}
         onPickWorkspace={(next) => {
           void navigate({ search: (prev) => ({ ...prev, ws: next, sel: undefined }) });
         }}

@@ -31,6 +31,7 @@ import type {
   CiView,
   LogTailView,
   OtherRun,
+  PendingInput,
   RunDetail,
   RunDetailPage,
   RunDetailStatus,
@@ -118,11 +119,10 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords): RunDetailS
       return { state: "queued", queuedReason: queuedReasonOf(db, run.id) };
     case "running":
       return { state: "running" };
-    case "waiting-for-input":
-      return {
-        state: "waiting-for-input",
-        input: pendingInput(db, run.id) ?? { kind: "unknown" },
-      };
+    case "waiting-for-input": {
+      const input = pendingInput(db, run.id) ?? { kind: "unknown" };
+      return { state: "waiting-for-input", input, inputSince: inputSinceOf(db, run.id, input) };
+    }
     case "disconnected":
       return {
         state: "disconnected",
@@ -143,6 +143,26 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords): RunDetailS
             : { state: records.laterPrState.state, at: records.laterPrState.at.toISOString() },
       };
     }
+  }
+}
+
+/** 화면이 보이는 그 질문·권한 대기를 받은 시각. 여럿이 함께 기다려도 보이는 것의 시각이다 */
+function inputSinceOf(db: Database, runId: RunId, input: PendingInput): string | null {
+  switch (input.kind) {
+    case "question":
+      return (
+        listRunQuestions(db, runId)
+          .find((q) => q.id === input.questionId)
+          ?.askedAt.toISOString() ?? null
+      );
+    case "permission":
+      return (
+        listRunPermissionWaits(db, runId)
+          .find((w) => w.id === input.promptId)
+          ?.requestedAt.toISOString() ?? null
+      );
+    case "unknown":
+      return null;
   }
 }
 
@@ -266,12 +286,17 @@ function otherRunsOf(db: Database, run: StoredRun): OtherRun[] {
   return listRuns(db, { ticket: run.ticket })
     .filter((other) => other.id !== run.id)
     .toReversed()
-    .map((other) => ({
-      id: other.id,
-      assignedAt: other.assignedAt.toISOString(),
-      state: other.state,
-      summary: other.state === "ended" ? summarizeRunOutcome(other).outcome : null,
-    }));
+    .map((other): OtherRun => {
+      const assignedAt = other.assignedAt.toISOString();
+      return other.state === "ended"
+        ? {
+            id: other.id,
+            assignedAt,
+            state: "ended",
+            summary: summarizeRunOutcome(other).outcome,
+          }
+        : { id: other.id, assignedAt, state: other.state };
+    });
 }
 
 /** 코드 호스트가 준 CI 값을 화면 값으로 옮긴다. 모르는 값은 unknown 이다(Q79). */

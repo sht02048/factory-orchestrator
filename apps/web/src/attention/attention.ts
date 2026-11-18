@@ -1,6 +1,7 @@
 import { listRunners } from "@factory/db";
 import type { Database } from "@factory/db";
 import { loadHomePage } from "../home/load";
+import { localTimeZone } from "../time-zone";
 import type { HomePage } from "../home/model";
 import { ALL_WORKSPACES } from "../shell/model";
 
@@ -79,5 +80,6 @@ export function attentionEvents(
 }
 
 export function loadAttention(db: Database, now: Date): AttentionEvent[] {
-  return attentionEvents(loadHomePage(db, ALL_WORKSPACES, now), listRunners(db));
+  // 시간대는 Home 의 "오늘" 묶음에만 쓰여 손댈 일 사건에는 영향이 없다. 서버 시간대를 넘긴다.
+  return attentionEvents(loadHomePage(db, ALL_WORKSPACES, now, localTimeZone()), listRunners(db));
 }
