@@ -2,14 +2,27 @@ import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 import { colors, radius, space } from "../tokens.stylex";
 
+export const SURFACE_ROLES = ["card", "plain", "inset", "problem"] as const;
+
+export type SurfaceRole = (typeof SURFACE_ROLES)[number];
+
+export function surfaceStyles(role: SurfaceRole) {
+  return surfaces[role];
+}
+
 export interface CardProps {
   children: ReactNode;
   padding?: "normal" | "compact";
   label?: string;
+  surface?: SurfaceRole;
 }
 
-export function Card({ children, padding = "normal", label }: CardProps) {
-  const props = stylex.props(styles.card, padding === "compact" && styles.compact);
+export function Card({ children, padding = "normal", label, surface = "card" }: CardProps) {
+  const props = stylex.props(
+    styles.card,
+    surfaces[surface],
+    padding === "compact" && styles.compact,
+  );
   return label === undefined ? (
     <div {...props}>{children}</div>
   ) : (
@@ -50,9 +63,6 @@ const styles = stylex.create({
     display: "flex",
     flexDirection: "column",
     gap: space.s3,
-    padding: space.s5,
-    borderRadius: radius.card,
-    backgroundColor: colors.bgCard,
   },
   compact: { gap: 0, padding: space.s2 },
   row: {
@@ -84,4 +94,11 @@ const styles = stylex.create({
     color: colors.textTertiary,
     fontVariantNumeric: "tabular-nums",
   },
+});
+
+const surfaces = stylex.create({
+  card: { padding: space.s5, borderRadius: radius.card, backgroundColor: colors.bgCard },
+  plain: { padding: 0, borderRadius: 0, backgroundColor: "transparent" },
+  inset: { padding: space.s3, borderRadius: radius.control, backgroundColor: colors.bgInset },
+  problem: { padding: space.s4, borderRadius: radius.card, backgroundColor: colors.problemSoft },
 });

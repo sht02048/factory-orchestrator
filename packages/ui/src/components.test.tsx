@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   Button,
+  CapacityBar,
   Card,
   Checkbox,
   DefinitionItem,
@@ -10,14 +11,21 @@ import {
   Dialog,
   DialogClose,
   Field,
+  GroupHeader,
   Input,
   Menu,
   MenuItem,
   PILL_STATUSES,
   Popover,
+  ProblemCallout,
   Row,
+  SURFACE_ROLES,
+  Section,
+  SegmentedTabs,
   Select,
   SplitView,
+  StatTile,
+  StatusDot,
   StatusPill,
   Tab,
   Table,
@@ -25,12 +33,17 @@ import {
   TableRow,
   TableRows,
   Tabs,
+  TEXT_VARIANTS,
   Text,
   Tooltip,
   statusTone,
+  surfaceStyles,
+  textStyles,
   type PillStatus,
   type StatusTone,
+  type TextVariant,
 } from "./index";
+import * as stylex from "@stylexjs/stylex";
 
 const noop = () => {};
 
@@ -361,5 +374,223 @@ describe("서버 렌더", () => {
     expect(editor).toContain("목록");
     expect(editor).toContain("패널");
     expect(editor).not.toEqual(list);
+  });
+});
+
+const classOf = (html: string) => /class="([^"]*)"/.exec(html)?.[1] ?? "";
+const classSet = (classes: string) => new Set(classes.split(" ").filter((c) => c !== ""));
+
+describe("글자 역할(티켓 0073)", () => {
+  const before = [
+    ["page", "x1ghz6dp xxbnsim x1g8le32 x45ymtg x8zzex5 xvr1kxx x1w2vvpw"],
+    ["panel", "x1ghz6dp xxbnsim x18oput8 x45ymtg x14efcu5 xh0io9k x1fzhlzt"],
+    ["section", "x1ghz6dp xxbnsim xgg16it x45ymtg x1ro8lm6"],
+    ["title", "x1ghz6dp xxbnsim xgg16it xbu08dq x1ro8lm6"],
+    ["body", "x1ghz6dp x1ry0s1v xgg16it x10ct87k x1fzhlzt"],
+    ["ui", "x1ghz6dp x1ry0s1v x1kcddvv x1ro8lm6"],
+    ["meta", "x1ghz6dp x1o6ikt5 x1kcddvv x1ro8lm6"],
+    ["label", "x1ghz6dp x1o6ikt5 xwu4aly xbu08dq x1ro8lm6"],
+  ] as const satisfies ReadonlyArray<readonly [TextVariant, string]>;
+
+  it("기존 변형은 0073 전과 같은 스타일(같은 원자 클래스)을 쓴다", () => {
+    for (const [variant, classes] of before) {
+      const html = renderToString(<Text variant={variant}>글</Text>);
+      expect([variant, classSet(classOf(html))]).toEqual([variant, classSet(classes)]);
+    }
+  });
+
+  it("새 역할 display·heading·subheading 은 기존 변형과 다른 스타일이고 알맞은 제목 요소를 쓴다", () => {
+    const html = (variant: TextVariant) => renderToString(<Text variant={variant}>글</Text>);
+    expect(html("display")).toMatch(/^<h2/);
+    expect(html("heading")).toMatch(/^<h2/);
+    expect(html("subheading")).toMatch(/^<h3/);
+    const all = new Set(TEXT_VARIANTS.map((v) => classOf(html(v))));
+    expect(all.size).toBe(TEXT_VARIANTS.length);
+  });
+
+  it("textStyles 는 Text 와 같은 스타일을 다른 요소에 입힌다", () => {
+    for (const role of TEXT_VARIANTS) {
+      const fromText = classOf(renderToString(<Text variant={role}>글</Text>));
+      expect(stylex.props(textStyles(role)).className).toBe(fromText);
+    }
+  });
+});
+
+describe("면 역할(티켓 0073)", () => {
+  it("Card 기본 면은 0073 전과 같은 스타일을 쓴다", () => {
+    expect(classSet(classOf(renderToString(<Card>내용</Card>)))).toEqual(
+      classSet("x78zum5 xdt5ytf x3ugt x1piab5x xxe3m9b xrjbj3k"),
+    );
+    expect(classSet(classOf(renderToString(<Card padding="compact">내용</Card>)))).toEqual(
+      classSet("x78zum5 xdt5ytf xxe3m9b xrjbj3k xxhr3t x4fnp73"),
+    );
+  });
+
+  it("면 역할 네 가지가 서로 다르고, Card surface 와 surfaceStyles 가 같은 면을 쓴다", () => {
+    const cards = SURFACE_ROLES.map((surface) =>
+      classOf(renderToString(<Card surface={surface}>내용</Card>)),
+    );
+    expect(new Set(cards).size).toBe(SURFACE_ROLES.length);
+    for (const [index, surface] of SURFACE_ROLES.entries()) {
+      const surfaceClasses = classSet(stylex.props(surfaceStyles(surface)).className ?? "");
+      expect([...surfaceClasses].every((c) => classSet(cards[index] ?? "").has(c))).toBe(true);
+    }
+  });
+});
+
+describe("Section 제목 역할(티켓 0073)", () => {
+  it("기본 Section 은 0073 전과 같은 마크업이다", () => {
+    expect(
+      renderToString(
+        <Section title="T" count={2} note="n">
+          c
+        </Section>,
+      ),
+    ).toBe(
+      '<section class="xdj266r x1h2wk5"><div class="x78zum5 x1pha0wt xd7inxn xa7h3ct"><h2 class="x1ghz6dp xxbnsim xgg16it x45ymtg">T</h2><span class="x1o6ikt5 xss6m8b">2</span><span class="xvc5jky x1o6ikt5 xwu4aly">n</span></div>c</section>',
+    );
+  });
+
+  it("heading 은 h2, subheading 은 h3 이고 글자 역할 스타일을 쓴다", () => {
+    const heading = renderToString(
+      <Section title="To do" titleRole="heading" count={3}>
+        c
+      </Section>,
+    );
+    const subheading = renderToString(
+      <Section title="Runners" titleRole="subheading">
+        c
+      </Section>,
+    );
+    expect(heading).toContain(
+      `<h2 class="${stylex.props(textStyles("heading")).className}">To do</h2>`,
+    );
+    expect(subheading).toContain(
+      `<h3 class="${stylex.props(textStyles("subheading")).className}">Runners</h3>`,
+    );
+    expect(heading).toContain(">3<");
+  });
+
+  it("오른쪽 링크는 이름과 주소를 가진 a 다", () => {
+    const html = renderToString(
+      <Section title="Done today" titleRole="heading" link={{ href: "/runs", label: "모두 보기" }}>
+        c
+      </Section>,
+    );
+    expect(html).toMatch(/<a href="\/runs"[^>]*>모두 보기<\/a>/);
+  });
+});
+
+describe("새 컴포넌트(티켓 0073)", () => {
+  const periods = [
+    { value: "7d", label: "7일", count: 12 },
+    { value: "30d", label: "30일", count: 40 },
+    { value: "all", label: "전체" },
+  ] as const;
+
+  it("SegmentedTabs 는 이름 있는 tablist 이고 고른 탭만 탭 순서에 있어 화살표로 옮긴다", () => {
+    const html = renderToString(
+      <SegmentedTabs value="30d" onValueChange={noop} label="기간" items={periods} />,
+    );
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('aria-label="기간"');
+    const tabs = html.match(/<button[^>]*role="tab"[^>]*>.*?<\/button>/g) ?? [];
+    expect(tabs).toHaveLength(3);
+    expect(tabs.map((tab) => /tabindex="(-?\d)"/.exec(tab)?.[1])).toEqual(["-1", "0", "-1"]);
+    expect(tabs.map((tab) => /aria-selected="(\w+)"/.exec(tab)?.[1])).toEqual([
+      "false",
+      "true",
+      "false",
+    ]);
+    expect(tabs[0]).toMatch(/>7일<span[^>]*>12<\/span>/);
+    expect(tabs[2]).not.toContain("<span");
+  });
+
+  it("GroupHeader 는 상태 값으로 점 색을 고르고, 제목에 이름과 개수가 함께 있다", () => {
+    const html = renderToString(
+      <GroupHeader status="question" title="Question" count={2} description="답을 기다려요" />,
+    );
+    expect(html).toContain('data-tone="answer"');
+    expect(html).toMatch(/<span aria-hidden="true"[^>]*><\/span><h3/);
+    expect(html).toMatch(/<h3[^>]*>Question<span[^>]*> <!-- -->2<\/span><\/h3>/);
+    expect(html).toContain("답을 기다려요");
+    expect(
+      renderToString(<GroupHeader status="failed" title="Failed" headingLevel="h2" />),
+    ).toMatch(/data-tone="problem"[^>]*>.*<h2/);
+  });
+
+  it("CapacityBar 는 이름 있는 meter 이고 '쓰는/전체' 를 값 글로 읽는다", () => {
+    const html = renderToString(<CapacityBar used={1} total={2} label="작업 칸" />);
+    expect(html).toContain('role="meter"');
+    expect(html).toContain('aria-label="작업 칸"');
+    expect(html).toContain('aria-valuenow="1"');
+    expect(html).toContain('aria-valuemax="2"');
+    expect(html).toContain('aria-valuetext="1/2"');
+    expect(html).toContain('data-tone="progress"');
+    expect(html).toMatch(/aria-hidden="true"[^>]*>1\/2</);
+    expect(
+      renderToString(<CapacityBar used={2} total={2} label="작업 칸" tone="problem" />),
+    ).toContain('data-tone="problem"');
+    expect(renderToString(<CapacityBar used={0} total={0} label="작업 칸" />)).toContain(
+      'aria-valuetext="0/0"',
+    );
+  });
+
+  it("ProblemCallout 은 제목으로 이름 붙은 구역이고, 단계는 번호 목록, 행동은 마지막이다", () => {
+    const html = renderToString(
+      <ProblemCallout
+        title="GitHub 인증이 깨졌어요"
+        steps={["러너에서 gh auth login 을 실행해요", "다시 확인을 눌러요"]}
+        actions={<Button>다시 확인</Button>}
+      >
+        이 러너는 PR 을 만들 수 없어요.
+      </ProblemCallout>,
+    );
+    const labelledBy = /^<section aria-labelledby="([^"]+)"/.exec(html)?.[1];
+    expect(labelledBy).toBeDefined();
+    expect(html).toMatch(new RegExp(`<h3 id="${labelledBy}"[^>]*>GitHub 인증이 깨졌어요</h3>`));
+    expect(html.match(/<li/g)).toHaveLength(2);
+    expect(html.indexOf("<ol")).toBeLessThan(html.indexOf("다시 확인</button>"));
+    const plain = renderToString(<ProblemCallout title="Offline" />);
+    expect(plain).not.toContain("<ol");
+    expect(plain).not.toContain("<button");
+  });
+
+  it("StatTile 은 뜻으로 이름 붙은 묶음이고, 비교 줄은 좋아짐·나빠짐에 따라 색이 다르다", () => {
+    const tile = (trend?: "better" | "worse") =>
+      renderToString(
+        <StatTile
+          value="12"
+          label="끝난 런"
+          detail="지난주보다 3 늘었어요"
+          {...(trend === undefined ? {} : { trend })}
+        />,
+      );
+    const html = tile("better");
+    const labelledBy = /role="group" aria-labelledby="([^"]+)"/.exec(html)?.[1];
+    expect(labelledBy).toBeDefined();
+    expect(html).toMatch(new RegExp(`id="${labelledBy}"[^>]*>끝난 런<`));
+    const detailClass = (h: string) => /data-trend="\w+" class="([^"]*)"/.exec(h)?.[1];
+    expect(new Set([tile(), tile("better"), tile("worse")].map(detailClass)).size).toBe(3);
+    expect(renderToString(<StatTile value="0" label="끝난 런" />)).not.toContain("data-trend");
+  });
+
+  it("StatusDot 은 상태 값으로 점 색을 고르고, 상태 이름은 화면 읽기용 글로 남긴다", () => {
+    const html = renderToString(<StatusDot status="running">Running</StatusDot>);
+    expect(html).toContain('data-tone="progress"');
+    expect(html).toMatch(
+      /<span aria-hidden="true"[^>]*><\/span><span class="[^"]+">Running<\/span>/,
+    );
+    const tones = PILL_STATUSES.map(
+      (status) =>
+        /data-tone="(\w+)"/.exec(renderToString(<StatusDot status={status}>x</StatusDot>))?.[1],
+    );
+    expect(tones).toEqual(PILL_STATUSES.map((status) => statusTone(status)));
+    const dotClass = (status: PillStatus) =>
+      /aria-hidden="true" class="([^"]*)"/.exec(
+        renderToString(<StatusDot status={status}>x</StatusDot>),
+      )?.[1];
+    expect(dotClass("failed")).not.toEqual(dotClass("running"));
+    expect(dotClass("failed")).toEqual(dotClass("offline"));
   });
 });

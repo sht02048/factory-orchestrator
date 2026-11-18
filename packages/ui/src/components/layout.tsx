@@ -1,11 +1,13 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
+import { textStyles } from "./text";
 import {
   colors,
   fontSize,
   fontWeight,
   letterSpacing,
   lineHeight,
+  radius,
   size,
   space,
 } from "../tokens.stylex";
@@ -47,20 +49,51 @@ export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
   );
 }
 
+export type SectionTitleRole = "section" | "heading" | "subheading";
+
 export interface SectionProps {
   title: ReactNode;
+  titleRole?: SectionTitleRole;
   count?: number;
   note?: ReactNode;
+  link?: SectionLink;
   children: ReactNode;
 }
 
-export function Section({ title, count, note, children }: SectionProps) {
+export interface SectionLink {
+  href: string;
+  label: ReactNode;
+}
+
+export function Section({
+  title,
+  titleRole = "section",
+  count,
+  note,
+  link,
+  children,
+}: SectionProps) {
+  const Heading = titleRole === "subheading" ? "h3" : "h2";
   return (
     <section {...stylex.props(styles.section)}>
-      <div {...stylex.props(styles.sectionHead)}>
-        <h2 {...stylex.props(styles.sectionTitle)}>{title}</h2>
+      <div
+        {...stylex.props(styles.sectionHead, titleRole !== "section" && styles.sectionHeadLarge)}
+      >
+        <Heading
+          {...stylex.props(titleRole === "section" ? styles.sectionTitle : textStyles(titleRole))}
+        >
+          {title}
+        </Heading>
         {count === undefined ? null : <span {...stylex.props(styles.count)}>{count}</span>}
         {note === undefined ? null : <span {...stylex.props(styles.note)}>{note}</span>}
+        {link === undefined ? null : (
+          <a
+            href={link.href}
+            {...stylex.props(styles.sectionLink, note === undefined && styles.pushEnd)}
+          >
+            {link.label}
+          </a>
+        )}
       </div>
       {children}
     </section>
@@ -187,7 +220,19 @@ const styles = stylex.create({
     fontSize: fontSize.body,
     fontWeight: fontWeight.semibold,
   },
+  sectionHeadLarge: { marginBottom: space.s3 },
   count: { color: colors.textTertiary, fontVariantNumeric: "tabular-nums" },
+  sectionLink: {
+    flexShrink: 0,
+    borderRadius: radius.pill,
+    color: { default: colors.accentText, ":hover": colors.textPrimary },
+    fontSize: fontSize.ui,
+    fontWeight: fontWeight.medium,
+    textDecoration: "none",
+    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
+    outlineOffset: 2,
+  },
+  pushEnd: { marginInlineStart: "auto" },
   note: {
     marginInlineStart: "auto",
     color: colors.textTertiary,

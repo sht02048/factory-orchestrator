@@ -9,8 +9,9 @@
 3. **스타일은 StyleX로 쓴다.** `stylex.create` + `stylex.props`. 간격·글자·반경·모션도 토큰을 먼저 쓴다. 토큰에 없는 값(열 폭, 고정 높이)만 숫자로 쓴다.
 4. **화면 문구는 컴포넌트에 쓰지 않는다.** 모든 글은 `apps/web/messages/ko/*.json`에 두고 `useTranslations`로 가져온다. 접근 가능한 이름(`label`, `aria-label`)도 메시지에서 온다. `packages/ui` 컴포넌트는 문구를 props로만 받는다(ADR 0005).
 5. **색 하나에 뜻 하나다(ADR 0010 5번).** 상태 색은 여섯 뜻뿐이다: 보라 `answer`(사람이 답·허용), 노랑 `check`(사람이 확인), 빨강 `problem`(문제), 초록 `progress`(진행·정상), 파랑 `merged`(병합), 회색 `idle`(대기·멈춤). 상태 색은 화면이 고르지 않고 `StatusPill`이 상태 값으로 고른다. 그 밖의 강조는 포인트 파랑(`accent*`) 하나다.
-6. **상태는 `StatusPill` 하나로만 보인다(ADR 0010 4번).** 점 + GLOSSARY 영어 이름. 영역은 선이 아니라 면(`bgCard`, `bgPanel`)으로 나누고, To do·러너처럼 한 덩어리는 `Card`로 묶는다.
+6. **상태는 `StatusPill` 하나로만 보인다(ADR 0010 4번).** 점 + GLOSSARY 영어 이름. 예외는 Dashboard다(ADR 0010 0068 갱신). To do는 묶음 머리(`GroupHeader`)의 색 점과 이름이 행마다의 알약을 대신하고, 면 없는 구역(In progress, Runners, Done today)의 행은 알약 대신 상태 점(`StatusDot`) 하나로 상태를 보인다. 영역은 선이 아니라 면으로 나누고, 면은 아래 면 역할로 고른다.
 7. **변형을 새로 만들지 않는다.** 아래 표에 없는 변형이 필요하면 먼저 이 문서와 컴포넌트에 더하고, `/ds`에 미리보기를 넣는다.
+8. **화면은 역할과 컴포넌트만 쓰고 토큰을 직접 쓰지 않는다.** 글자는 `Text` 변형이나 `textStyles(역할)`, 면은 `Card surface`나 `surfaceStyles(역할)`, 구역 제목은 `Section titleRole`로 고른다. `apps/web`에서 `fontSize`·`fontWeight`·`lineHeight`·`letterSpacing`·`radius`·`colors`를 직접 가져와 글자나 면을 만들지 않는다. 배치에 필요한 `space`·`size`만 직접 쓴다. 지금은 방향이고, 검사로 막는 일은 티켓 0074가 한다.
 
 ## 토큰
 
@@ -41,22 +42,36 @@
 
 값은 모두 OKLCH 다크 값이다. 테스트(`tokens.test.ts`)가 OKLCH인지, 채도 있는 색이 포인트와 상태 색 다섯 뜻에만 있는지, 상태 색끼리 색상이 충분히 먼지, 회색이 무채색인지 검사한다. 상태 색은 `StatusPill`·위험 버튼·입력 오류·차트(Stats의 Human Check·Failed 막대)처럼 그 뜻을 그릴 때만 쓴다.
 
-### 글자
+### 글자 역할
 
-위계는 세 단계다. 행에서는 제목만 밝고 굵게, ID·러너·시간은 흐리게, 숫자는 `numeric`(tabular-nums)으로 둔다.
+위계는 세 단계다. 행에서는 제목만 밝고 굵게, ID·러너·시간은 흐리게, 숫자는 `numeric`(tabular-nums)으로 둔다. 역할마다 크기·굵기·줄 높이·자간이 한 묶음이다. `Text variant`로 쓰고, `Text`를 쓸 수 없는 요소(제목 태그를 직접 고르는 컴포넌트, 버튼 안 글자 등)에는 `stylex.props(textStyles(역할))`로 같은 스타일을 입힌다. 역할 목록은 `TEXT_VARIANTS`다.
 
-| 단계          | `Text` 변형 | 크기 / 굵기 | 쓰는 곳                              |
-| ------------- | ----------- | ----------- | ------------------------------------ |
-| 1 화면을 대표 | `page`      | 22 / 600    | 페이지 제목. 화면에 하나             |
-|               | `panel`     | 17 / 600    | 상세 패널·다이얼로그 제목            |
-| 2 읽는 내용   | `section`   | 14 / 600    | 목록 구역 제목                       |
-|               | `title`     | 14 / 500    | 행 제목(`RowTitle`과 같다)           |
-|               | `body`      | 14 / 400    | 설명 문단, 패널의 이유               |
-| 3 흐린 보조   | `ui`        | 13 / 400    | 일반 UI 글(본문 기본 크기)           |
-|               | `meta`      | 13 / 400    | ID, 러너, 시간처럼 흐린 값           |
-|               | `label`     | 12 / 500    | 열 머리글, 패널 블록 제목, 작은 라벨 |
+| 단계          | 역할(`Text` 변형) | 크기 / 굵기 | 기본 요소 | 쓰는 곳                                                                                                        |
+| ------------- | ----------------- | ----------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| 1 화면을 대표 | `display`         | 26 / 600    | `h2`      | 결론 제목. Dashboard·Stats처럼 결론 문장이 제목인 화면에 하나(ADR 0010 8번, 0068 갱신)                         |
+|               | `page`            | 22 / 600    | `h1`      | 페이지 제목. 화면에 하나                                                                                       |
+|               | `heading`         | 20 / 600    | `h2`      | 주 구역 제목(Dashboard To do·In progress, Stats 구역). `Section titleRole="heading"`                           |
+|               | `panel`           | 17 / 600    | `h2`      | 상세 패널·다이얼로그 제목                                                                                      |
+| 2 읽는 내용   | `subheading`      | 15 / 600    | `h3`      | 보조 구역·카드 제목(Dashboard 오른쪽 열 Runners·Done today). `Section titleRole="subheading"`                  |
+|               | `section`         | 14 / 600    | `h2`      | 목록 구역 제목. 본문과 크기가 같아 구역이 잘 안 보인다. 새 화면은 `heading`·`subheading`을 쓴다(0074에서 정리) |
+|               | `title`           | 14 / 500    | `span`    | 행 제목(`RowTitle`과 같다)                                                                                     |
+|               | `body`            | 14 / 400    | `p`       | 설명 문단, 패널의 이유                                                                                         |
+| 3 흐린 보조   | `ui`              | 13 / 400    | `span`    | 일반 UI 글(본문 기본 크기)                                                                                     |
+|               | `meta`            | 13 / 400    | `span`    | ID, 러너, 시간처럼 흐린 값                                                                                     |
+|               | `label`           | 12 / 500    | `span`    | 열 머리글, 패널 블록 제목, 작은 라벨                                                                           |
 
-토큰: `fontSize`(`page 22`, `panel 17`, `body 14`, `ui 13`, `small 12`, `label 11`, `input 16`), `fontWeight`(`regular`, `medium`, `semibold`), `lineHeight`(`tight`, `snug`, `normal`, `relaxed`), `letterSpacing`(`page`, `panel`, `label`), `fonts`(`sans`, `mono`). 굵기는 이 세 개만 쓴다.
+토큰: `fontSize`(`display 26`, `page 22`, `heading 20`, `panel 17`, `subheading 15`, `body 14`, `ui 13`, `small 12`, `label 11`, `input 16`), `fontWeight`(`regular`, `medium`, `semibold`), `lineHeight`(`tight`, `snug`, `normal`, `relaxed`), `letterSpacing`(`display`, `page`, `panel`, `label`), `fonts`(`sans`, `mono`). 굵기는 이 세 개만 쓴다. 토큰은 역할과 컴포넌트를 만들 때 `packages/ui` 안에서 쓴다.
+
+### 면 역할
+
+면은 역할로 고른다. 둥글기와 안쪽 여백이 역할에 묶여 있다. `Card surface={역할}`(기본 `card`)로 쓰고, `Card`가 맞지 않는 요소에는 `stylex.props(surfaceStyles(역할))`을 입힌다. 역할 목록은 `SURFACE_ROLES`다.
+
+| 역할      | 면                  | 둥글기 / 안쪽 여백 | 쓰는 곳                                                                                     | 쓰지 않는 곳                                 |
+| --------- | ------------------- | ------------------ | ------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `card`    | `bgCard`            | 12 / 20            | 주 구역 카드. 한 덩어리로 보여야 하는 구역(Dashboard To do, Run 상세 정보·타임라인)         | 구역마다 습관처럼 두르지 않는다              |
+| `plain`   | 없음                | 0 / 0              | 면 없는 구역. 제목과 목록만 둔다(Dashboard In progress, Runners, Done today, ADR 0010 10번) | 다른 면과 갈라 보여야 하는 덩어리            |
+| `inset`   | `bgInset`           | 8 / 12             | 카드·패널 안의 안쪽 상자(터미널 끝부분, 명령 예시, 확인 결과 묶음)                          | 화면 바탕 바로 위. 그때는 `card`             |
+| `problem` | `problemSoft`(빨강) | 12 / 16            | 문제 상자. 해결할 일을 알린다. 보통 `ProblemCallout`으로 쓴다                               | 문제가 아닌 강조. 빨강은 문제 뜻 하나다(5번) |
 
 ### 간격 `space`, 반경 `radius`, 그림자 `shadow`, 모션 `motion`, 크기 `size`
 
@@ -81,10 +96,10 @@
 | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SplitView`                                                           | 목록 화면의 기본 틀. 왼쪽 목록, 오른쪽 `panelWidth` 상세 패널(ADR 0007). Tickets, Runs, Stats. Settings는 `variant="editor"`(왼쪽 `editorListWidth` 항목 목록, 오른쪽 넓은 편집 영역). Dashboard는 To do·In progress + 오른쪽 Runners·Done today 두 열이다(ADR 0010) |
 | `PageHeader`                                                          | 목록 위 페이지 제목·부제·오른쪽 행동                                                                                                                                                                                                                                 |
-| `Section`                                                             | 목록 화면의 구역(To do, Running, Queued). 제목 + 개수 + 오른쪽 흐린 메모                                                                                                                                                                                             |
+| `Section`                                                             | 화면의 구역. 제목 + 개수 + 오른쪽 흐린 메모(`note`) 또는 링크(`link`). 제목 무게는 `titleRole`로 고른다: 주 구역은 `heading`, 보조 구역·오른쪽 열은 `subheading`, 기본 `section`은 기존 목록 화면용(0074에서 정리)                                                   |
 | `DetailPanel` > `PanelHeader`, `Actions`, `PanelBlock`, `PanelFooter` | 상세 패널 안. 상태 줄 → 제목 → 흐린 부제 → 이유 → 버튼 → 속성 블록 → 바닥 순서                                                                                                                                                                                       |
 | `Actions`                                                             | 버튼 줄. 주 버튼을 맨 앞에                                                                                                                                                                                                                                           |
-| `Card`                                                                | 면 한 덩어리(둥글기 12). To do 카드, 러너 카드, Run 상세의 정보·타임라인. 이름(`label`)을 주면 `section`. 행을 담으면 `padding="compact"`                                                                                                                            |
+| `Card`                                                                | 면 한 덩어리. 면은 `surface`(위 면 역할, 기본 `card`). Dashboard To do 카드, Run 상세의 정보·타임라인. Runners는 목록 + 상세 패널이라 카드를 쓰지 않는다(ADR 0010 0068 갱신). 이름(`label`)을 주면 `section`. 행을 담으면 `padding="compact"`                        |
 | `Row`                                                                 | 카드 안 한 줄(둥글기 8). 앞(`leading`, 아이콘·알약) · 본문 · 뒤(`trailing`, 시간 같은 흐린 값). `href`를 주면 행 전체가 링크다. 누를 수 없는 행은 `interactive={false}`로 hover 면을 끈다                                                                            |
 
 ### 목록
@@ -101,9 +116,10 @@
 
 ### 상태
 
-| 컴포넌트     | 받는 값                                     | 규칙                                                                                                                                                                                                       |
-| ------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `StatusPill` | `status`: `PillStatus`, children: 상태 이름 | 런 상태·요약 결과·러너 Online/Offline·To do 종류를 모두 이것 하나로 그린다. 색은 `statusTone(status)`가 ADR 0010 5번 표대로 고른다. 이름은 메시지 파일의 GLOSSARY 영어 용어(웹은 `useStatusName`)를 넘긴다 |
+| 컴포넌트     | 받는 값                                     | 규칙                                                                                                                                                                                                                                                             |
+| ------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `StatusPill` | `status`: `PillStatus`, children: 상태 이름 | 런 상태·요약 결과·러너 Online/Offline·To do 종류를 모두 이것 하나로 그린다. 색은 `statusTone(status)`가 ADR 0010 5번 표대로 고른다. 이름은 메시지 파일의 GLOSSARY 영어 용어(웹은 `useStatusName`)를 넘긴다                                                       |
+| `StatusDot`  | `status`: `PillStatus`, children: 상태 이름 | 면 없는 구역(Dashboard In progress, Runners, Done today)의 행에서 알약 대신 쓰는 점 하나(ADR 0010 4번 예외, 0068 갱신). 색은 `statusTone`이 고르고, 이름은 보이지 않는 화면 읽기용 글로 남는다. 그 밖의 행은 `StatusPill`. 묶음 머리 점은 `GroupHeader`가 그린다 |
 
 화면은 색이나 톤을 고르지 않는다. 상태가 아닌 값(에이전트 결과, PR 상태, "할당 전")은 알약이 아니라 글로 둔다.
 
@@ -119,6 +135,18 @@
 | `Tooltip`                                                           | `labelsTrigger`, `side`                                          | 아이콘 버튼의 이름, 잘린 값의 전체만. 누를 것을 넣지 않는다                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `Dialog` + `DialogClose`                                            | `triggerVariant`, `DialogClose variant`                          | 되돌릴 수 없는 행동 확인(지우기, 연결 끊기)과 할당 확인(Mapping 기본값을 보이고 러너·에이전트만 바꿈)만. 그 밖의 편집은 패널이나 Settings 편집 영역에서 한다. 주 버튼(`primary`)을 마지막에                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `Toaster` + `showToast`                                             |                                                                  | 앱 루트에 `Toaster` 하나. 끝난 행동을 짧게 알린다("저장했어요"). 실패처럼 읽고 판단할 내용은 화면 안에 남긴다                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+
+### 화면 개편 v2 블록(티켓 0073)
+
+0069~0072가 쓰는 공용 블록이다. 화면은 이것을 가져다 쓰고, 같은 모양을 화면에서 다시 만들지 않는다.
+
+| 컴포넌트         | 받는 값                                                                         | 언제 쓰는지                                                                                                                                                                                                                     | 쓰지 않는 곳                                                                            |
+| ---------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `SegmentedTabs`  | `value`, `onValueChange`, `label`, `items`(`value`, `label`, `count`), `panels` | 한 줄 묶음 탭으로 목록의 범위를 바꿀 때. Tickets 필터, Stats 기간(7일·14일·30일)·나눠 보기. UI SDK Tabs 위에 만들어 `role="tablist"`이고 좌우 화살표로 옮기면 바로 고른다(고른 탭만 탭 순서에 있다). `label`이 tablist 이름이다 | 항목이 많아 한 줄을 넘칠 때(`Select`), 화면 상단 밑줄 필터(`Tabs`), 행동 실행(`Button`) |
+| `GroupHeader`    | `status`, `title`, `count`, `description`, `headingLevel`(기본 `h3`)            | 목록 묶음 머리. Dashboard To do의 하는 일 묶음(답이 필요해요·확인해 주세요·멈췄어요). 점 색은 `status`(`PillStatus`)로 `statusTone`이 고른다. 묶음 안 행의 알약을 대신하고, 되풀이되는 설명을 `description`에 한 번만 둔다      | 행 하나의 상태(`StatusPill`), 구역 제목(`Section`)                                      |
+| `CapacityBar`    | `used`, `total`, `label`, `tone`(`progress` 기본, `problem`)                    | 러너의 쓰는 칸/전체 칸. Dashboard Runners, Runners 목록·패널. UI SDK Meter 위에 만들어 `role="meter"`이고 `label`이 이름, 값 글은 "1/2"(ADR 0010 7번). 문제 있는 러너는 `tone="problem"`                                        | 진행률(끝이 있는 일의 %), 상태 색을 다른 뜻으로 쓸 때                                   |
+| `ProblemCallout` | `title`, `children`(설명), `steps`(번호 단계), `actions`                        | 운영자가 해결할 문제와 그 순서. Dashboard 러너 문제, Runners 패널의 해결 상자. `problem` 면이고 제목으로 이름 붙은 `section`이다. 행동은 보조 버튼                                                                              | 끝난 행동 알림(`showToast`), 입력 오류(`Field error`), 런 실패 이유 한 줄(행 안 글)     |
+| `StatTile`       | `value`, `label`, `detail`, `trend`(`better`, `worse`)                          | Stats의 숫자 칸. 큰 숫자, 뜻, 앞 기간과 비교한 줄. 비교 줄 색은 숫자가 오르내린 방향이 아니라 좋아졌는지로 고른다(Failed가 늘면 `worse`). `label`로 이름 붙은 `group`이다                                                       | 표의 숫자 열(`TableCell numeric`), 상태 개수 타일(ADR 0010 0059 갱신으로 뺐다)          |
 
 ### 티켓 목록에서 바꾼 것
 

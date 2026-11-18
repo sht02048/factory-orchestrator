@@ -72,8 +72,11 @@ export const fonts = stylex.defineVars({
 });
 
 export const fontSize = stylex.defineVars({
+  display: "26px",
   page: "22px",
+  heading: "20px",
   panel: "17px",
+  subheading: "15px",
   body: "14px",
   ui: "13px",
   small: "12px",
@@ -95,6 +98,7 @@ export const lineHeight = stylex.defineVars({
 });
 
 export const letterSpacing = stylex.defineVars({
+  display: "-0.015em",
   page: "-0.01em",
   panel: "-0.005em",
   label: "0.04em",

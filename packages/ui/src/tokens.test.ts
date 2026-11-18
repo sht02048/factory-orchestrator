@@ -91,3 +91,40 @@ describe("간격 토큰", () => {
     expect(offGrid).toEqual([]);
   });
 });
+
+describe("글자 토큰(티켓 0073)", () => {
+  it("기존 크기는 그대로 두고 display 26, heading 20, subheading 15 를 더한다", () => {
+    expect(Object.fromEntries(block("fontSize"))).toEqual({
+      display: "26px",
+      page: "22px",
+      heading: "20px",
+      panel: "17px",
+      subheading: "15px",
+      body: "14px",
+      ui: "13px",
+      small: "12px",
+      label: "11px",
+      input: "16px",
+    });
+  });
+
+  it("굵기·줄 높이·자간의 기존 값을 바꾸지 않는다", () => {
+    expect(Object.fromEntries(block("fontWeight"))).toEqual({
+      regular: "400",
+      medium: "500",
+      semibold: "600",
+    });
+    expect(Object.fromEntries(block("lineHeight"))).toEqual({
+      tight: "1.2",
+      snug: "1.35",
+      normal: "1.5",
+      relaxed: "1.55",
+    });
+    expect(Object.fromEntries(block("letterSpacing"))).toEqual({
+      display: "-0.015em",
+      page: "-0.01em",
+      panel: "-0.005em",
+      label: "0.04em",
+    });
+  });
+});
