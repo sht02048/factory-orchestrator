@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { MASCOT_BODY, MASCOT_BRIM, WHISTLE_BODY } from "./components/brand";
+import { MASCOT_BODY, MASCOT_BRIM, WHISTLE_BODY, WORRIED_BROWS } from "./components/brand";
 import { GangerMark, MASCOT_MOODS, Mascot, MascotMessage } from "./index";
 
 const brandDir = new URL("../brand/", import.meta.url);
@@ -43,6 +43,22 @@ describe("반장 마스코트", () => {
       expect(html).toContain(`d="${MASCOT_BODY}"`);
       expect(html).toContain(`d="${MASCOT_BRIM}"`);
     }
+  });
+
+  it("걱정 표정의 눈썹은 바깥이 낮고 안쪽이 높아 화난 표정으로 읽히지 않는다", () => {
+    const brows = [...WORRIED_BROWS.matchAll(/M([\d.]+) ([\d.]+)l(-?[\d.]+)(-?[\d.]+)/g)].map(
+      ([, x, y, dx, dy]) => ({
+        outer: { x: Number(x), y: Number(y) },
+        inner: { x: Number(x) + Number(dx), y: Number(y) + Number(dy) },
+      }),
+    );
+    expect(brows).toHaveLength(2);
+    for (const { outer, inner } of brows) {
+      expect(Math.abs(inner.x - 50)).toBeLessThan(Math.abs(outer.x - 50));
+      expect(inner.y).toBeLessThan(outer.y);
+    }
+    expect(renderToString(<Mascot mood="worried" />)).toContain(`d="${WORRIED_BROWS}"`);
+    expect(sourceFile("mascot-worried.svg")).toContain(`d="${WORRIED_BROWS}"`);
   });
 
   it("MascotMessage 는 마스코트를 숨기고 글만 읽힌다", () => {

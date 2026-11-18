@@ -8,6 +8,7 @@ export const WHISTLE_VIEW_BOX = "5 9 90 90";
 
 export const MASCOT_BODY = "M20 58a30 30 0 0 1 60 0v8a14 14 0 0 1-14 14H34a14 14 0 0 1-14-14z";
 export const MASCOT_BRIM = "M16 46h56a10 10 0 0 1 10 10H26a10 10 0 0 1-10-10z";
+export const WORRIED_BROWS = "M33 61l9-3M67 61l-9-3";
 
 export type MarkTone = "brand" | "mono";
 export type MarkSize = "small" | "medium" | "large";
@@ -101,7 +102,7 @@ function MascotFace({ mood }: { mood: MascotMood }) {
         <>
           <circle cx="38" cy="67" r="4.3" {...stylex.props(styles.eye)} />
           <circle cx="62" cy="67" r="4.3" {...stylex.props(styles.eye)} />
-          <path d="M33 58l9 3M67 58l-9 3" strokeWidth="3" {...stylex.props(styles.eyeLine)} />
+          <path d={WORRIED_BROWS} strokeWidth="3" {...stylex.props(styles.eyeLine)} />
         </>
       );
   }
