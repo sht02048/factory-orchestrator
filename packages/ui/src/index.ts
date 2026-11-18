@@ -58,6 +58,7 @@ export {
 } from "./components/segmented-tabs";
 export { Select, type SelectOption, type SelectProps } from "./components/select";
 export { StatTile, type StatTileProps, type StatTrend } from "./components/stat-tile";
+export { StatusDot, statusDotStyles, type StatusDotProps } from "./components/status-dot";
 export {
   PILL_STATUSES,
   StatusPill,

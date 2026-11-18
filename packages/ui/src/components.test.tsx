@@ -25,6 +25,7 @@ import {
   Select,
   SplitView,
   StatTile,
+  StatusDot,
   StatusPill,
   Tab,
   Table,
@@ -572,5 +573,24 @@ describe("새 컴포넌트(티켓 0073)", () => {
     const detailClass = (h: string) => /data-trend="\w+" class="([^"]*)"/.exec(h)?.[1];
     expect(new Set([tile(), tile("better"), tile("worse")].map(detailClass)).size).toBe(3);
     expect(renderToString(<StatTile value="0" label="끝난 런" />)).not.toContain("data-trend");
+  });
+
+  it("StatusDot 은 상태 값으로 점 색을 고르고, 상태 이름은 화면 읽기용 글로 남긴다", () => {
+    const html = renderToString(<StatusDot status="running">Running</StatusDot>);
+    expect(html).toContain('data-tone="progress"');
+    expect(html).toMatch(
+      /<span aria-hidden="true"[^>]*><\/span><span class="[^"]+">Running<\/span>/,
+    );
+    const tones = PILL_STATUSES.map(
+      (status) =>
+        /data-tone="(\w+)"/.exec(renderToString(<StatusDot status={status}>x</StatusDot>))?.[1],
+    );
+    expect(tones).toEqual(PILL_STATUSES.map((status) => statusTone(status)));
+    const dotClass = (status: PillStatus) =>
+      /aria-hidden="true" class="([^"]*)"/.exec(
+        renderToString(<StatusDot status={status}>x</StatusDot>),
+      )?.[1];
+    expect(dotClass("failed")).not.toEqual(dotClass("running"));
+    expect(dotClass("failed")).toEqual(dotClass("offline"));
   });
 });

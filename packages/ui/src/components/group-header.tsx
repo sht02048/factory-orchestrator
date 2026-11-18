@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
-import { colors, fontSize, radius, size, space } from "../tokens.stylex";
+import { colors, fontSize, space } from "../tokens.stylex";
+import { statusDotStyles } from "./status-dot";
 import { statusTone, type PillStatus } from "./status-pill";
 import { textStyles } from "./text";
 
@@ -23,7 +24,7 @@ export function GroupHeader({
   const tone = statusTone(status);
   return (
     <div data-status={status} data-tone={tone} {...stylex.props(styles.header)}>
-      <span aria-hidden="true" {...stylex.props(styles.dot, dotTone[tone])} />
+      <span aria-hidden="true" {...stylex.props(statusDotStyles(status))} />
       <Heading {...stylex.props(textStyles("section"), styles.title)}>
         {title}
         {count === undefined ? null : <span {...stylex.props(styles.count)}> {count}</span>}
@@ -43,12 +44,6 @@ const styles = stylex.create({
     minWidth: 0,
     paddingBlock: space.s1,
   },
-  dot: {
-    flexShrink: 0,
-    width: size.dot,
-    height: size.dot,
-    borderRadius: radius.full,
-  },
   title: { display: "inline-flex", alignItems: "baseline", gap: space.px6, minWidth: 0 },
   count: {
     color: colors.textTertiary,
@@ -63,13 +58,4 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
     textOverflow: "ellipsis",
   },
-});
-
-const dotTone = stylex.create({
-  answer: { backgroundColor: colors.answer },
-  check: { backgroundColor: colors.check },
-  problem: { backgroundColor: colors.problem },
-  progress: { backgroundColor: colors.progress },
-  merged: { backgroundColor: colors.merged },
-  idle: { backgroundColor: colors.idle },
 });

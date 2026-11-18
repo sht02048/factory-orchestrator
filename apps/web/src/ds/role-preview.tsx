@@ -11,6 +11,7 @@ import {
   Section,
   SegmentedTabs,
   StatTile,
+  StatusDot,
   StatusPill,
   Text,
   textStyles,
@@ -22,6 +23,7 @@ import { useStatusName } from "../status";
 
 export const roleSectionIds = [
   "surfaces",
+  "statusDot",
   "sections",
   "segmented",
   "groupHeader",
@@ -55,6 +57,42 @@ export function RoleSections() {
               </Card>
             ))}
           </div>
+        </Section>
+      </div>
+
+      <div id="statusDot">
+        <Section title={t("nav.statusDot")} note={t("statusDot.note")}>
+          <Demo>
+            <div {...stylex.props(styles.stack)}>
+              <Section title="In progress" titleRole="heading" count={2}>
+                <Row
+                  interactive={false}
+                  leading={<StatusDot status="running">{statusName("running")}</StatusDot>}
+                  trailing="25분째"
+                >
+                  <Text variant="title">{t("statusDot.running")}</Text>
+                </Row>
+                <Row
+                  interactive={false}
+                  leading={
+                    <StatusDot status="waiting-for-input">
+                      {statusName("waiting-for-input")}
+                    </StatusDot>
+                  }
+                  trailing="3분째"
+                >
+                  <Text variant="title">{t("statusDot.waiting")}</Text>
+                </Row>
+                <Row
+                  interactive={false}
+                  leading={<StatusDot status="queued">{statusName("queued")}</StatusDot>}
+                  trailing="방금"
+                >
+                  <Text variant="title">{t("statusDot.queued")}</Text>
+                </Row>
+              </Section>
+            </div>
+          </Demo>
         </Section>
       </div>
 
