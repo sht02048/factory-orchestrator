@@ -21,7 +21,13 @@ import type { Database, SecretBox, StoredRun, StoredWorkspaceTrackerProject } fr
 import { z } from "zod";
 import { isWebUrl } from "../format/url";
 import { resolveWorkspace } from "../shell/model";
-import type { TicketRun, TicketView, TicketsPage, TrackerLoadError } from "./model";
+import type {
+  TicketRun,
+  TicketView,
+  TicketsPage,
+  TrackerLoadError,
+  TrackerTruncation,
+} from "./model";
 
 export interface TicketsContext {
   db: Database;
@@ -30,8 +36,8 @@ export interface TicketsContext {
 }
 
 /** 트래커 프로젝트 하나에서 읽는 쪽 크기와 쪽수. 250 은 Linear 상한이다(research 0005 12절) */
-const PAGE_SIZE = 250;
-const MAX_PAGES = 4;
+export const PAGE_SIZE = 250;
+export const MAX_PAGES = 4;
 
 /**
  * Tickets 화면이 보일 값을 읽는다. 티켓은 현재 Workspace 에 묶인 트래커 프로젝트마다 그 트래커 연결의
@@ -61,7 +67,15 @@ export async function loadTicketsPage(
   }));
   const agents = mappingAgents(db);
   if (workspace.kind !== "one")
-    return { workspace, tickets: [], runners, agents, errors: [], hasTrackerProjects: false };
+    return {
+      workspace,
+      tickets: [],
+      runners,
+      agents,
+      errors: [],
+      truncated: [],
+      hasTrackerProjects: false,
+    };
 
   const workspaceId = toWorkspaceId(workspace.workspace.id);
   const projects = listWorkspaceTrackerProjects(db, workspaceId);
@@ -85,6 +99,7 @@ export async function loadTicketsPage(
   };
 
   const errors: TrackerLoadError[] = [];
+  const truncated: TrackerTruncation[] = [];
   const results = await Promise.all(
     projects.map(async (project) => {
       try {
@@ -93,7 +108,8 @@ export async function loadTicketsPage(
           errors.push({ trackerProject: project.name, reason: "unknown-connection" });
           return [];
         }
-        const tickets = await readProjectTickets(tracker, project);
+        const { tickets, more } = await readProjectTickets(tracker, project);
+        if (more) truncated.push({ trackerProject: project.name, limit: tickets.length });
         return tickets.map((ticket) => ({ project, ticket }));
       } catch (error) {
         errors.push({ trackerProject: project.name, reason: loadErrorReason(error) });
@@ -137,18 +153,27 @@ export async function loadTicketsPage(
     });
 
   errors.sort((a, b) => a.trackerProject.localeCompare(b.trackerProject));
-  return { workspace, tickets, runners, agents, errors, hasTrackerProjects: projects.length > 0 };
+  truncated.sort((a, b) => a.trackerProject.localeCompare(b.trackerProject));
+  return {
+    workspace,
+    tickets,
+    runners,
+    agents,
+    errors,
+    truncated,
+    hasTrackerProjects: projects.length > 0,
+  };
 }
 
 /** 트래커 연결과 티켓 키로 만든 티켓 식별값. 다른 연결의 같은 키는 다른 티켓이다 */
 export function ticketId(connection: string, key: string): string {
-  return `${connection}\u0000${key}`;
+  return JSON.stringify([connection, key]);
 }
 
 async function readProjectTickets(
   tracker: Tracker,
   project: StoredWorkspaceTrackerProject,
-): Promise<TrackerTicket[]> {
+): Promise<{ tickets: TrackerTicket[]; more: boolean }> {
   const tickets: TrackerTicket[] = [];
   let after: string | null = null;
   for (let page = 0; page < MAX_PAGES; page += 1) {
@@ -160,7 +185,7 @@ async function readProjectTickets(
     after = result.nextCursor;
     if (after === null) break;
   }
-  return tickets;
+  return { tickets, more: after !== null };
 }
 
 /** 어댑터 오류의 종류. detail 은 어댑터마다 다른 모양이라 kind 만 읽는다 */

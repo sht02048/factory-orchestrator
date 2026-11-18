@@ -1,8 +1,10 @@
+import { toTicketKey, toTrackerStateId } from "@factory/core";
+import type { FakeTracker } from "@factory/core/testing";
 import { describe, expect, it } from "vitest";
-import { loadTicketsPage, ticketId } from "./load";
+import { MAX_PAGES, PAGE_SIZE, loadTicketsPage, ticketId } from "./load";
 import { TICKET_FILTERS, lastRun, matchesFilter } from "./model";
 import type { TicketFilter, TicketView, TicketsPage } from "./model";
-import { connection, labs, now, setupTickets } from "./test-fixtures";
+import { T0, connection, docsProject, labs, now, setupTickets } from "./test-fixtures";
 
 function byKey(page: TicketsPage, key: string): TicketView {
   const found = page.tickets.find((t) => t.key === key);
@@ -12,6 +14,21 @@ function byKey(page: TicketsPage, key: string): TicketView {
 
 function keysIn(page: TicketsPage, filter: TicketFilter): string[] {
   return page.tickets.filter((t) => matchesFilter(t, filter)).map((t) => t.key);
+}
+
+function addDocs(tracker: FakeTracker, total: number): void {
+  for (let i = 2; i <= total; i += 1) {
+    tracker.addTicket({
+      key: toTicketKey(`DOC-${i}`),
+      title: `DOC-${i} 제목`,
+      body: "",
+      url: `https://linear.example.com/acme/issue/DOC-${i}`,
+      labels: [],
+      project: { id: docsProject, name: "Docs" },
+      state: { id: toTrackerStateId("st-todo"), name: "Todo", category: "unstarted" },
+      updatedAt: T0,
+    });
+  }
 }
 
 describe("Tickets 읽기", () => {
@@ -43,6 +60,14 @@ describe("Tickets 읽기", () => {
     expect(lastRun(byKey(page, "ACME-3"))).toMatchObject({ state: "running" });
     expect(lastRun(byKey(page, "ACME-4"))).toMatchObject({ state: "queued" });
     expect(lastRun(byKey(page, "ACME-6"))).toBeUndefined();
+  });
+
+  it("티켓 식별값은 주소(sel)를 거쳐도 그대로다(0054)", () => {
+    const id = ticketId(connection, "ACME-6");
+    const url = new URL("https://factory.example.com/tickets");
+    url.searchParams.set("sel", id);
+    expect(new URL(url.href).searchParams.get("sel")).toBe(id);
+    expect(ticketId("a", "b-c")).not.toBe(ticketId("a-b", "c"));
   });
 
   it("런 이력은 새 것부터 둔다", async () => {
@@ -90,6 +115,26 @@ describe("Tickets 읽기", () => {
     const page = await loadTicketsPage(context, undefined, now);
     expect(page.errors).toEqual([{ trackerProject: "Broken", reason: "unauthorized" }]);
     expect(page.tickets.length).toBe(7);
+  });
+
+  it("상한보다 많은 트래커 프로젝트는 상한까지만 읽고 잘렸다고 남긴다(0054)", async () => {
+    const { context, tracker } = setupTickets();
+    const limit = MAX_PAGES * PAGE_SIZE;
+    addDocs(tracker, limit + 1);
+    const page = await loadTicketsPage(context, undefined, now);
+    expect(page.truncated).toEqual([{ trackerProject: "Docs", limit }]);
+    expect(page.tickets.filter((t) => t.trackerProject.name === "Docs")).toHaveLength(limit);
+    expect(page.tickets.filter((t) => t.trackerProject.name === "Web")).toHaveLength(6);
+  });
+
+  it("상한에 꼭 맞으면 잘렸다고 하지 않는다", async () => {
+    const { context, tracker } = setupTickets();
+    addDocs(tracker, MAX_PAGES * PAGE_SIZE);
+    const page = await loadTicketsPage(context, undefined, now);
+    expect(page.truncated).toEqual([]);
+    expect(page.tickets.filter((t) => t.trackerProject.name === "Docs")).toHaveLength(
+      MAX_PAGES * PAGE_SIZE,
+    );
   });
 
   it("필터: 실행 중에는 Running 만 들고 Queued 는 넣지 않는다", async () => {

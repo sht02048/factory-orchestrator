@@ -39,6 +39,7 @@ function render(
       onSelect={noop}
       onOpen={noop}
       onPickWorkspace={noop}
+      onShowMoreEnded={noop}
       runHref={(id) => `/runs/${id}`}
     />,
     runsMessages,
@@ -143,6 +144,48 @@ describe("Runs 화면", () => {
     const html = render(loadRunsPage(db, undefined, now), { selectedId: id });
     expect(html).toContain(`href="/runs/${id ?? ""}"`);
     expect(panelText(html)).toContain(runsJson.panel.openDetail);
+  });
+
+  it("진행 중인 런의 경과 시간은 패널에 한 번만 보인다", () => {
+    const { db, ids } = seedDatabase();
+    const page = loadRunsPage(db, undefined, now);
+    const running = page.runs.find((run) => run.ticketKey === "ACME-10");
+    const minutesElapsed = Math.floor((running?.executionMs ?? 0) / 60_000);
+    const text = panelText(render(page, { selectedId: ids.get("ACME-10") }));
+    expect(text.match(/째/g)).toHaveLength(1);
+    expect(text).not.toContain(`${String(minutesElapsed)}분 `);
+  });
+
+  it("러너가 Offline 이면 패널에 Offline 알약을 보인다", () => {
+    const { db, ids } = seedDatabase();
+    const page = loadRunsPage(db, undefined, now);
+    const id = ids.get("ACME-10");
+    const offline: RunsPage = {
+      ...page,
+      runs: page.runs.map((run) =>
+        run.id === id ? { ...run, runner: { name: "runner-a", online: false } } : run,
+      ),
+    };
+    const html = render(offline, { selectedId: id }).split("<aside")[1] ?? "";
+    expect(html).toContain(`>${domain.runnerState.offline}<`);
+  });
+
+  it("필터에 맞는 런이 없으면 패널에 빈 상태 한 줄을 둔다", () => {
+    const { db } = seedDatabase();
+    const page = loadRunsPage(db, labs, now);
+    expect(panelText(render(page, { filter: "merged" }))).toContain(runsJson.panel.empty);
+    const empty: RunsPage = { ...page, runs: [] };
+    expect(panelText(render(empty))).toContain(runsJson.panel.noRuns);
+  });
+
+  it("끝난 런이 더 있으면 몇 개까지 보이는지 알리고 '더 보기'를 둔다", () => {
+    const { db } = seedDatabase();
+    const page: RunsPage = { ...loadRunsPage(db, undefined, now), moreEnded: true };
+    const ended = page.runs.filter((run) => run.state === "ended").length;
+    const html = render(page);
+    expect(html).toContain(runsJson.ended.partial.replace("{count}", String(ended)));
+    expect(html).toContain(`>${runsJson.ended.showMore}<`);
+    expect(render({ ...page, moreEnded: false })).not.toContain(runsJson.ended.showMore);
   });
 
   it("Queued 런의 패널에 기다리는 이유를 보인다(Q65·Q68)", () => {

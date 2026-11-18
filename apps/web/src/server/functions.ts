@@ -7,6 +7,7 @@ import { cancelRunRequest } from "../run-detail/actions";
 import { loadRunDetail, requestRunLogTail } from "../run-detail/load";
 import { loadRunnersPage } from "../runners/load";
 import { loadRunsPage } from "../runs/load";
+import { MAX_ENDED_RUNS } from "../runs/model";
 import { loadShell } from "../shell/load";
 import { loadStatsPage } from "../stats/load";
 import { assignInput, submitAssignment } from "../tickets/assign";
@@ -53,8 +54,13 @@ export const denyPermission = createServerFn({ method: "POST" })
   .handler(({ data }) => submitDenial(getDatabase(), data, new Date()));
 
 export const getRunsPage = createServerFn({ method: "GET" })
-  .validator(z.object({ ws: z.string().optional() }))
-  .handler(({ data }) => loadRunsPage(getDatabase(), data.ws, new Date()));
+  .validator(
+    z.object({
+      ws: z.string().optional(),
+      ended: z.number().int().min(1).max(MAX_ENDED_RUNS).optional(),
+    }),
+  )
+  .handler(({ data }) => loadRunsPage(getDatabase(), data.ws, new Date(), data.ended));
 
 export const getStatsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))

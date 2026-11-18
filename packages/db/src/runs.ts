@@ -27,7 +27,9 @@ import type {
   TrackerProjectId,
   WorktreeRef,
 } from "@factory/core";
-import { and, asc, count, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, ne, notExists, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";
@@ -200,12 +202,40 @@ export function getRunWithRecords(
   return row === undefined ? null : { run: toStoredRun(row), records: toRunRecords(row) };
 }
 
+export interface ListRunsFilter {
+  states?: ReadonlyArray<RunState>;
+  ticket?: TicketRef;
+  workspaceId?: WorkspaceId;
+  order?: "oldest" | "newest";
+  limit?: number;
+  latestPerTicket?: boolean;
+  endedAxes?: ReadonlyArray<EndedAxesFilter>;
+}
+
+export interface EndedAxesFilter {
+  agentResult: AgentResult;
+  prState: PrState;
+  laterPrState?: null;
+}
+
 /** 런 목록. 할당 순서(대기열 순서)로 돌려준다. */
-export function listRuns(
+export function listRuns(db: Database, filter: ListRunsFilter = {}): StoredRun[] {
+  return selectRunRows(db, filter).map(toStoredRun);
+}
+
+export function listRunsWithRecords(
   db: Database,
-  filter: { states?: ReadonlyArray<RunState>; ticket?: TicketRef; workspaceId?: WorkspaceId } = {},
-): StoredRun[] {
-  if (filter.states?.length === 0) return [];
+  filter: ListRunsFilter = {},
+): Array<{ run: StoredRun; records: RunRecords }> {
+  return selectRunRows(db, filter).map((row) => ({
+    run: toStoredRun(row),
+    records: toRunRecords(row),
+  }));
+}
+
+function selectRunRows(db: Database, filter: ListRunsFilter): RunRow[] {
+  if (filter.states?.length === 0 || filter.limit === 0 || filter.endedAxes?.length === 0)
+    return [];
   const conditions: SQL[] = [];
   if (filter.states !== undefined) conditions.push(inArray(runs.state, [...filter.states]));
   if (filter.ticket !== undefined) {
@@ -213,13 +243,53 @@ export function listRuns(
     conditions.push(eq(runs.ticketKey, filter.ticket.key));
   }
   if (filter.workspaceId !== undefined) conditions.push(eq(runs.workspaceId, filter.workspaceId));
-  return db
+  if (filter.latestPerTicket === true) {
+    const newer = alias(runs, "newer_run");
+    conditions.push(
+      notExists(
+        db
+          .select({ id: newer.id })
+          .from(newer)
+          .where(
+            and(
+              eq(newer.trackerConnectionId, runs.trackerConnectionId),
+              eq(newer.ticketKey, runs.ticketKey),
+              filter.workspaceId === undefined
+                ? undefined
+                : eq(newer.workspaceId, runs.workspaceId),
+              or(
+                gt(newer.assignedAt, runs.assignedAt),
+                and(eq(newer.assignedAt, runs.assignedAt), gt(newer.id, runs.id)),
+              ),
+            ),
+          ),
+      ),
+    );
+  }
+  if (filter.endedAxes !== undefined) {
+    conditions.push(
+      or(
+        ...filter.endedAxes.map((axes) =>
+          and(
+            eq(runs.state, "ended"),
+            eq(runs.agentResult, axes.agentResult),
+            eq(runs.prState, axes.prState),
+            axes.laterPrState === null ? isNull(runs.laterPrState) : undefined,
+          ),
+        ),
+      ) ?? sql`0`,
+    );
+  }
+  const order =
+    filter.order === "newest"
+      ? [desc(runs.assignedAt), desc(runs.id)]
+      : [asc(runs.assignedAt), asc(runs.id)];
+  const query = db
     .select()
     .from(runs)
     .where(and(...conditions))
-    .orderBy(asc(runs.assignedAt), asc(runs.id))
-    .all()
-    .map(toStoredRun);
+    .orderBy(...order);
+  return filter.limit === undefined ? query.all() : query.limit(filter.limit).all();
 }
 
 /** capacity를 셀 런(Ended 빼고). core remainingCapacity·pickRunner·planQueue에 넘긴다. */

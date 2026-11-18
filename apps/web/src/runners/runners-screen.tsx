@@ -43,7 +43,10 @@ export function RunnersScreen({ page, selectedId, ws }: RunnersScreenProps) {
 
   useEffect(() => {
     if (selectedId === undefined) return;
-    document.getElementById(cardId(selectedId))?.scrollIntoView({ block: "nearest" });
+    const card = document.getElementById(cardId(selectedId));
+    if (card === null) return;
+    card.scrollIntoView({ block: "nearest" });
+    card.focus({ preventScroll: true });
   }, [selectedId]);
 
   return (
@@ -52,7 +55,7 @@ export function RunnersScreen({ page, selectedId, ws }: RunnersScreenProps) {
         title={t("title")}
         subtitle={
           runners.length === 0
-            ? t("noRunners")
+            ? undefined
             : t("subtitle", { total: runners.length, available, issues })
         }
         actions={
@@ -65,13 +68,16 @@ export function RunnersScreen({ page, selectedId, ws }: RunnersScreenProps) {
           </a>
         }
       />
-      {runners.length === 0 ? null : (
+      {runners.length === 0 ? (
+        <EmptyRunners />
+      ) : (
         <ul aria-label={t("listLabel")} {...stylex.props(styles.grid)}>
           {runners.map((runner) => (
             <li
               key={runner.id}
               id={cardId(runner.id)}
               aria-current={runner.id === selectedId ? "true" : undefined}
+              tabIndex={runner.id === selectedId ? -1 : undefined}
               {...stylex.props(styles.cell, runner.id === selectedId && styles.selected)}
             >
               <RunnerCard runner={runner} />
@@ -80,6 +86,16 @@ export function RunnersScreen({ page, selectedId, ws }: RunnersScreenProps) {
         </ul>
       )}
     </div>
+  );
+}
+
+function EmptyRunners() {
+  const t = useTranslations("runners.empty");
+  return (
+    <Card>
+      <Text variant="title">{t("title")}</Text>
+      <Text variant="body">{t("body")}</Text>
+    </Card>
   );
 }
 
@@ -183,7 +199,6 @@ function CapacityBar({ runner }: { runner: RunnerView }) {
   );
 }
 
-/** capacity 를 차지하는 런과 기다리는 런. 티켓 키는 그 런의 Workspace 로 연 Runs 로 이어진다 */
 function RunList({ runner }: { runner: RunnerView }) {
   const t = useTranslations("runners.card");
   const statusName = useStatusName();
@@ -193,44 +208,60 @@ function RunList({ runner }: { runner: RunnerView }) {
     <ol aria-label={t("runs")} {...stylex.props(styles.list)}>
       {runner.occupying.map((run) => (
         <li key={run.id}>
-          <Row
-            leading={<StatusPill status={run.state}>{statusName(run.state)}</StatusPill>}
-            trailing={elapsed(run.executionMs)}
-          >
-            <RunLabel ticketKey={run.ticketKey} runId={run.id} workspace={run.workspace} />
-          </Row>
+          <RunRowLink runId={run.id} workspace={run.workspace}>
+            <Row
+              leading={<StatusPill status={run.state}>{statusName(run.state)}</StatusPill>}
+              trailing={elapsed(run.executionMs)}
+            >
+              <RunLabel ticketKey={run.ticketKey} workspace={run.workspace} />
+            </Row>
+          </RunRowLink>
         </li>
       ))}
       {runner.queued.map((run) => (
         <li key={run.id}>
-          <Row
-            leading={<StatusPill status="queued">{statusName("queued")}</StatusPill>}
-            trailing={t("queuedFor", { duration: duration(run.waitMs) })}
-          >
-            <RunLabel ticketKey={run.ticketKey} runId={run.id} workspace={run.workspace} />
-          </Row>
+          <RunRowLink runId={run.id} workspace={run.workspace}>
+            <Row
+              leading={<StatusPill status="queued">{statusName("queued")}</StatusPill>}
+              trailing={t("queuedFor", { duration: duration(run.waitMs) })}
+            >
+              <RunLabel ticketKey={run.ticketKey} workspace={run.workspace} />
+            </Row>
+          </RunRowLink>
         </li>
       ))}
     </ol>
   );
 }
 
+function RunRowLink({
+  runId,
+  workspace,
+  children,
+}: {
+  runId: string;
+  workspace: RunWorkspace;
+  children: ReactNode;
+}) {
+  return (
+    <a href={runHref(workspace.id, runId)} {...stylex.props(styles.rowLink)}>
+      {children}
+    </a>
+  );
+}
+
 function RunLabel({
   ticketKey,
-  runId,
   workspace,
   meta,
 }: {
   ticketKey: string;
-  runId: string;
   workspace: RunWorkspace;
   meta?: ReactNode;
 }) {
   return (
     <span {...stylex.props(styles.runLabel)}>
-      <a href={runHref(workspace.id, runId)} {...stylex.props(styles.runLink)}>
-        {ticketKey}
-      </a>
+      <span {...stylex.props(styles.ticketKey)}>{ticketKey}</span>
       <Text variant="meta" truncate>
         {meta ?? workspace.name}
       </Text>
@@ -319,17 +350,18 @@ function LeftWorktrees({ runner }: { runner: RunnerView }) {
       <ul {...stylex.props(styles.list)}>
         {runner.leftWorktrees.map((run) => (
           <li key={run.id}>
-            <Row>
-              <RunLabel
-                ticketKey={run.ticketKey}
-                runId={run.id}
-                workspace={run.workspace}
-                meta={t("worktreeMeta", {
-                  workspace: run.workspace.name,
-                  reason: t(`worktree.${run.worktree}`),
-                })}
-              />
-            </Row>
+            <RunRowLink runId={run.id} workspace={run.workspace}>
+              <Row>
+                <RunLabel
+                  ticketKey={run.ticketKey}
+                  workspace={run.workspace}
+                  meta={t("worktreeMeta", {
+                    workspace: run.workspace.name,
+                    reason: t(`worktree.${run.worktree}`),
+                  })}
+                />
+              </Row>
+            </RunRowLink>
           </li>
         ))}
       </ul>
@@ -338,7 +370,7 @@ function LeftWorktrees({ runner }: { runner: RunnerView }) {
 }
 
 function runHref(workspaceId: string, runId: string): string {
-  return `/runs?${new URLSearchParams({ ws: workspaceId, sel: runId }).toString()}`;
+  return `/runs/${encodeURIComponent(runId)}?${new URLSearchParams({ ws: workspaceId }).toString()}`;
 }
 
 function Icon({ children }: { children: ReactNode }) {
@@ -396,7 +428,7 @@ const styles = stylex.create({
     padding: 0,
     listStyle: "none",
   },
-  cell: { minWidth: 0, borderRadius: radius.card },
+  cell: { minWidth: 0, borderRadius: radius.card, outline: "none" },
   selected: { outline: `2px solid ${colors.accentText}`, outlineOffset: 2 },
   head: {
     display: "flex",
@@ -411,9 +443,7 @@ const styles = stylex.create({
     color: colors.textPrimary,
     fontSize: fontSize.panel,
     fontWeight: fontWeight.semibold,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    overflowWrap: "anywhere",
   },
   pills: { display: "flex", flexShrink: 0, gap: space.s1 },
   capacity: { display: "flex", flexDirection: "column", gap: space.s2 },
@@ -447,14 +477,18 @@ const styles = stylex.create({
     minWidth: 0,
   },
   runLabel: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
-  runLink: {
+  rowLink: {
+    display: "block",
+    borderRadius: radius.control,
+    color: "inherit",
+    textDecoration: "none",
+    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
+    outlineOffset: 2,
+  },
+  ticketKey: {
     flexShrink: 0,
     color: colors.textPrimary,
     fontVariantNumeric: "tabular-nums",
-    textDecoration: { default: "none", ":hover": "underline" },
-    textUnderlineOffset: 3,
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
   },
   check: { display: "flex", alignItems: "flex-start", gap: space.s2, minWidth: 0 },
   checkText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
@@ -467,13 +501,7 @@ const styles = stylex.create({
   checkIcon: { display: "inline-flex", flexShrink: 0, color: colors.textTertiary },
   ok: { color: colors.progress },
   broken: { color: colors.problem },
-  checkName: {
-    minWidth: 0,
-    color: colors.textSecondary,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
+  checkName: { minWidth: 0, color: colors.textSecondary, overflowWrap: "anywhere" },
   fix: {
     display: "flex",
     flexDirection: "column",

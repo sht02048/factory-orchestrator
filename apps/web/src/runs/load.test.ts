@@ -1,8 +1,16 @@
-import { updateRunRecords } from "@factory/db";
-import { toPullRequestId } from "@factory/core";
-import { describe, expect, it } from "vitest";
+import { assignRun, changeRunState, updateRunRecords } from "@factory/db";
+import type { Database } from "@factory/db";
+import {
+  toAgentId,
+  toPullRequestId,
+  toRunnerProjectId,
+  toTicketKey,
+  toTrackerProjectId,
+} from "@factory/core";
+import { describe, expect, it, vi } from "vitest";
 import {
   activeCases,
+  connection,
   endedCases,
   labs,
   minutes,
@@ -11,7 +19,44 @@ import {
   seedDatabase,
 } from "../testing/seed";
 import { loadRunsPage } from "./load";
+import { ENDED_RUNS_PAGE_SIZE } from "./model";
 import type { RunView } from "./model";
+
+function addEndedRun(db: Database, key: string, at: Date): void {
+  const assigned = assignRun(db, {
+    ticket: { connection, key: toTicketKey(key) },
+    trackerProject: toTrackerProjectId("tp-web"),
+    runnerProject: toRunnerProjectId("github:acme/web"),
+    agent: toAgentId("claude"),
+    now: at,
+  });
+  if (!assigned.ok) throw new Error(assigned.reason);
+  const ended = changeRunState(
+    db,
+    assigned.run.id,
+    { to: "ended", agentResult: "canceled", prState: "none" },
+    at,
+  );
+  if (!ended.ok) throw new Error(JSON.stringify(ended.error));
+}
+
+function countRunRowsRead(db: Database, read: () => void): number {
+  const reads: Array<{ mock: { results: Array<{ type: string; value: unknown }> } }> = [];
+  const prepare = db.$client.prepare.bind(db.$client);
+  const spy = vi.spyOn(db.$client, "prepare").mockImplementation((source: string) => {
+    const statement = prepare(source);
+    if (/from "runs"/.test(source)) reads.push(vi.spyOn(statement, "all"));
+    return statement;
+  });
+  try {
+    read();
+  } finally {
+    spy.mockRestore();
+  }
+  return reads
+    .flatMap((all) => all.mock.results)
+    .reduce((rows, result) => rows + (Array.isArray(result.value) ? result.value.length : 0), 0);
+}
 
 function byKey(runs: ReadonlyArray<RunView>): Map<string, RunView> {
   return new Map(runs.map((run) => [run.ticketKey, run]));
@@ -104,6 +149,65 @@ describe("loadRunsPage", () => {
   });
 });
 
+describe("끝난 런 상한", () => {
+  it("진행 중인 런은 모두, 끝난 런은 상한만큼 새 것부터 읽고 더 있는지 알린다", () => {
+    const { db } = seedDatabase();
+    const full = loadRunsPage(db, undefined, now);
+    const endedKeys = full.runs.filter((run) => run.state === "ended").map((run) => run.ticketKey);
+    const activeKeys = full.runs.filter((run) => run.state !== "ended").map((run) => run.ticketKey);
+    expect(full.moreEnded).toBe(false);
+
+    const limited = loadRunsPage(db, undefined, now, 3);
+    expect(limited.moreEnded).toBe(true);
+    const olderAttention = full.runs
+      .filter((run) => run.state === "ended" && run.attention)
+      .map((run) => run.ticketKey)
+      .filter((key) => !endedKeys.slice(0, 3).includes(key));
+    expect(limited.runs.filter((run) => run.state === "ended").map((run) => run.ticketKey)).toEqual(
+      [...endedKeys.slice(0, 3), ...olderAttention],
+    );
+    expect(limited.runs.filter((run) => run.state !== "ended").map((run) => run.ticketKey)).toEqual(
+      activeKeys,
+    );
+    expect(loadRunsPage(db, undefined, now, endedKeys.length).moreEnded).toBe(false);
+  });
+
+  it("상한 밖의 끝난 런도 손댈 일이면 담는다(Home 과 같다)", () => {
+    const { db } = seedDatabase();
+    const attentionKeys = (runs: ReadonlyArray<RunView>) =>
+      runs.filter((run) => run.attention).map((run) => run.ticketKey);
+    const before = attentionKeys(loadRunsPage(db, undefined, now).runs);
+    expect(before.length).toBeGreaterThan(0);
+    for (let i = 0; i < ENDED_RUNS_PAGE_SIZE + 5; i += 1)
+      addEndedRun(db, `BULK-${i}`, minutes(200 + i));
+
+    const page = loadRunsPage(db, undefined, minutes(400));
+    expect(attentionKeys(page.runs)).toEqual(before);
+    expect(page.runs.filter((run) => run.state === "ended").length).toBeGreaterThan(
+      ENDED_RUNS_PAGE_SIZE,
+    );
+  });
+
+  it("끝난 런이 많아도 기본 상한만큼만 읽는다", () => {
+    const { db } = seedDatabase();
+    const before = loadRunsPage(db, undefined, now);
+    const extra = ENDED_RUNS_PAGE_SIZE + 5;
+    for (let i = 0; i < extra; i += 1) addEndedRun(db, `BULK-${i}`, minutes(200 + i));
+    const page = loadRunsPage(db, undefined, minutes(400));
+    const ended = page.runs.filter((run) => run.state === "ended");
+    expect(ended.filter((run) => !run.attention)).toHaveLength(ENDED_RUNS_PAGE_SIZE);
+    expect(ended[0]?.ticketKey).toBe(`BULK-${extra - 1}`);
+    expect(page.moreEnded).toBe(true);
+    const rowsRead = () => countRunRowsRead(db, () => loadRunsPage(db, undefined, minutes(400)));
+    const before100More = rowsRead();
+    for (let i = 0; i < 100; i += 1) addEndedRun(db, `MORE-${i}`, minutes(300 + i));
+    expect(rowsRead()).toBe(before100More);
+    expect(page.runs.filter((run) => run.state !== "ended")).toHaveLength(
+      before.runs.filter((run) => run.state !== "ended").length,
+    );
+  });
+});
+
 describe("Workspace 범위(ADR 0006)", () => {
   it("Workspace 를 바꾸면 그 Workspace 의 런만 담는다", () => {
     const { db } = seedDatabase();
@@ -130,6 +234,11 @@ describe("Workspace 범위(ADR 0006)", () => {
 
   it("전체에서는 런을 담지 않는다", () => {
     const { db } = seedDatabase();
-    expect(loadRunsPage(db, "all", now)).toEqual({ workspace: { kind: "all" }, runs: [] });
+    expect(loadRunsPage(db, "all", now)).toEqual({
+      workspace: { kind: "all" },
+      runs: [],
+      recentEnded: 0,
+      moreEnded: false,
+    });
   });
 });

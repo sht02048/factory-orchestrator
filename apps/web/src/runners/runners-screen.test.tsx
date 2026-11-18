@@ -102,13 +102,18 @@ describe("Runners 화면", () => {
   it("주소로 고른 러너 카드를 표시한다", () => {
     const { db } = seedDatabase();
     const html = render(loadRunnersPage(db, now), "runner-b");
-    expect(html).toMatch(/<li id="runner-runner-b" aria-current="true"/);
+    expect(html).toMatch(/<li id="runner-runner-b" aria-current="true" tabindex="-1"/);
     expect(html).not.toMatch(/<li id="runner-runner-a" aria-current/);
+    expect(html).not.toMatch(/<li id="runner-runner-a"[^>]*tabindex/);
   });
 
-  it("러너가 없어도 주 버튼은 하나다", () => {
+  it("러너가 없으면 빈 상태 블록에서 안내하고 주 버튼은 하나다", () => {
     const html = render({ runners: [] });
-    expect(textOf(html)).toContain(runnersJson.noRunners);
+    const text = textOf(html);
+    expect(text).toContain(runnersJson.empty.title);
+    expect(text).toContain(runnersJson.empty.body);
+    expect(/<header[^]*?<\/header>/.exec(html)?.[0]).not.toContain("<p");
+    expect(html).not.toContain(`aria-label="${runnersJson.listLabel}"`);
     expect(variantsOf(html)).toEqual(["primary"]);
   });
 
@@ -123,10 +128,41 @@ describe("Runners 화면", () => {
     expect(textOf(a)).toContain("6자리가 비어 있어요.");
   });
 
-  it("런 줄은 그 런의 Workspace 로 연 Runs 로 이어진다", () => {
+  it("런 행 전체가 그 런의 Workspace 로 연 Run 상세 링크다(0050 5번)", () => {
     const { db, ids } = seedDatabase();
-    const html = render(loadRunnersPage(db, now));
-    expect(html).toContain(`href="/runs?ws=ws-labs&amp;sel=${ids.get("LAB-1") ?? ""}"`);
+    const a = cardHtml(render(loadRunnersPage(db, now)), "runner-a");
+    const id = ids.get("LAB-1") ?? "";
+    const link = new RegExp(
+      `<a href="/runs/${id}\\?ws=ws-labs"[^>]*>(?:(?!</a>)[^])*data-status="[^"]+"(?:(?!</a>)[^])*LAB-1(?:(?!</a>)[^])*</a>`,
+    );
+    expect(a).toMatch(link);
+    expect(a).not.toMatch(/<a [^>]*>(?:(?!<\/a>)[^])*<a /);
+  });
+
+  it("긴 프로젝트 이름의 확인 항목을 이름 전체로 그린다", () => {
+    const { db } = seedDatabase();
+    const project = "github:acme/a-very-long-repository-name-that-does-not-fit-in-a-card";
+    recordRunnerCheck(db, {
+      runnerId: toRunnerId("runner-a"),
+      online: true,
+      checkedAt: now,
+      error: null,
+      projects: null,
+      assignmentBlocked: false,
+      prerequisites: [
+        {
+          id: `github-push:${project}`,
+          name: `GitHub push access: ${project}`,
+          satisfied: false,
+          hint: null,
+          blocksAssignment: false,
+        },
+      ],
+    });
+    const a = cardHtml(render(loadRunnersPage(db, now)), "runner-a");
+    expect(a).toMatch(
+      new RegExp(`aria-label="${card.check.broken}"[^]*?>GitHub push 권한: ${project}</span>`),
+    );
   });
 
   it("남은 워크트리와 그 까닭을 보인다", () => {

@@ -29,6 +29,7 @@
 |        | `borderDefault`, `borderStrong`                                   | 입력·버튼 테두리, 그 hover                                              |
 | 글자   | `textPrimary` > `textSecondary` > `textTertiary` > `textDisabled` | 제목·값 > 본문·설명 > ID·러너·시간·머리글 > 못 쓰는 상태                |
 |        | `textOnAccent`                                                    | `accent` 바탕 위 글자                                                   |
+|        | `textOnProblem`                                                   | `problem` 바탕 위 글자(Runner Issue 개수 점)                            |
 | 포인트 | `accent`, `accentHover`                                           | 주 버튼 바탕                                                            |
 |        | `accentText`, `accentSoft`                                        | 링크·선택 막대·포커스 링, 선택 영역·포커스 링 바깥                      |
 | 상태   | `answer`, `answerSoft`                                            | 보라. Question·Permission·Waiting for Input 알약 글·점, 알약 바탕       |

@@ -43,6 +43,8 @@ import {
   changeRunState,
   getRunWithRecords,
   listRunStateChanges,
+  listRuns,
+  listRunsWithRecords,
   recordStartFailure,
   recordStartRequested,
   setQueuedRunRunner,
@@ -512,6 +514,77 @@ describe("updateRunRecords", () => {
     }
     // Drizzle은 SQLite 오류를 cause에 담아 다시 던진다.
     expect(caught instanceof Error ? String(caught.cause) : "").toMatch(/CHECK/);
+  });
+});
+
+describe("listRuns 의 순서와 상한", () => {
+  function assignAt(db: Database, key: string, minute: number): RunId {
+    const result = assignRun(db, {
+      ticket: ticket(key),
+      trackerProject,
+      runnerProject: repoA,
+      agent,
+      now: new Date(Date.UTC(2026, 10, 17, 0, minute)),
+    });
+    if (!result.ok) throw new Error(`assign failed: ${result.reason}`);
+    return result.run.id;
+  }
+
+  it("기본은 할당 순서이고, 새 것부터 상한만큼만 읽을 수 있다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 5, online: true, projects: [repoA] });
+    const ids = ["ENG-1", "ENG-2", "ENG-3", "ENG-4"].map((key, i) => assignAt(db, key, i));
+    for (const id of ids.slice(0, 3)) moveTo(db, id, "ended");
+
+    expect(listRuns(db).map((run) => run.id)).toEqual(ids);
+    expect(
+      listRuns(db, { states: ["ended"], order: "newest", limit: 2 }).map((run) => run.id),
+    ).toEqual([ids[2], ids[1]]);
+    expect(listRuns(db, { limit: 0 })).toEqual([]);
+  });
+
+  it("티켓마다 마지막 런만 읽을 수 있다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 5, online: true, projects: [repoA] });
+    const first = assignAt(db, "ENG-1", 0);
+    moveTo(db, first, "ended");
+    const second = assignAt(db, "ENG-1", 1);
+    moveTo(db, second, "ended");
+    const other = assignAt(db, "ENG-2", 2);
+
+    expect(listRuns(db, { latestPerTicket: true }).map((run) => run.id)).toEqual([second, other]);
+    expect(listRuns(db, { latestPerTicket: true, states: ["ended"] }).map((run) => run.id)).toEqual(
+      [second],
+    );
+  });
+
+  it("끝난 런을 두 축과 이후 PR 상태로 거를 수 있다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 5, online: true, projects: [repoA] });
+    const merged = assignAt(db, "ENG-1", 0);
+    moveTo(db, merged, "ended");
+    const open = assignAt(db, "ENG-2", 1);
+    change(db, open, { to: "running", started });
+    change(db, open, { to: "ended", agentResult: "reported-success", prState: "open" });
+    const settled = assignAt(db, "ENG-3", 2);
+    change(db, settled, { to: "running", started });
+    change(db, settled, { to: "ended", agentResult: "reported-success", prState: "open" });
+    updateRunRecords(db, settled, { laterPrState: { state: "merged", at: new Date() } });
+
+    const openAxes = { agentResult: "reported-success", prState: "open" } as const;
+    expect(listRuns(db, { endedAxes: [openAxes] }).map((run) => run.id)).toEqual([open, settled]);
+    expect(
+      listRuns(db, { endedAxes: [{ ...openAxes, laterPrState: null }] }).map((run) => run.id),
+    ).toEqual([open]);
+    expect(listRuns(db, { endedAxes: [] })).toEqual([]);
+  });
+
+  it("listRunsWithRecords 는 런과 기록을 한 번에 돌려준다", () => {
+    const db = seededDatabase();
+    const id = assignAt(db, "ENG-1", 0);
+    const at = new Date("2026-11-17T03:00:00Z");
+    updateRunRecords(db, id, { worktreeRemovedAt: at });
+    expect(listRunsWithRecords(db, { workspaceId })).toEqual([getRunWithRecords(db, id)]);
   });
 });
 

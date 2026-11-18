@@ -21,6 +21,7 @@ export interface AssignDialogProps {
   agents: ReadonlyArray<string>;
   triggerLabel: string;
   onAssign: (input: AssignInput) => Promise<AssignResult>;
+  onAssigned: () => void;
 }
 
 /**
@@ -34,6 +35,7 @@ export function AssignDialog({
   agents,
   triggerLabel,
   onAssign,
+  onAssigned,
 }: AssignDialogProps) {
   const t = useTranslations("tickets.assign");
   const [open, setOpen] = useState(false);
@@ -63,6 +65,7 @@ export function AssignDialog({
         if (result.ok) {
           setOpen(false);
           showToast(t("done", { key: ticket.key }));
+          onAssigned();
         } else {
           setFailure(result.reason);
         }
@@ -82,6 +85,7 @@ export function AssignDialog({
       description={t("description")}
       open={open}
       onOpenChange={(next) => {
+        if (!next && pending) return;
         if (next) reset();
         setOpen(next);
       }}

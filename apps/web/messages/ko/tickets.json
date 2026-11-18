@@ -2,7 +2,7 @@
   "documentTitle": "Tickets · Factory Orchestrator",
   "title": "Tickets",
   "summary": "트래커 티켓을 보고 런을 맡겨요.",
-  "subtitle": "{workspace}에 묶은 트래커 프로젝트의 티켓이에요. 자동 할당 라벨이 붙으면 운영자 없이 할당해요.",
+  "subtitle": "{workspace}에 묶은 트래커 프로젝트의 티켓이에요.",
   "filter": {
     "label": "티켓 거르기",
     "all": "전체",
@@ -27,6 +27,7 @@
     "body": "전체에서는 모든 Workspace의 손댈 일만 모아 봐요. 티켓은 Workspace를 골라야 보여요.",
     "pick": "{name} 보기"
   },
+  "truncated": "{project} 티켓이 많아 {limit, number}개만 보여요. 나머지는 트래커에서 찾아 주세요.",
   "loadError": {
     "unauthorized": "{project} 티켓을 읽지 못했어요. 트래커가 API 키를 받지 않았어요. Settings에서 연결을 확인해 주세요.",
     "rate-limited": "{project} 티켓을 읽지 못했어요. 트래커 요청 한도를 넘었어요. 잠시 뒤 다시 열어 주세요.",
@@ -60,7 +61,8 @@
     "none": "없음",
     "noMapping": "Mapping이 없어요",
     "history": "런 {count}개",
-    "openInTracker": "트래커에서 열기"
+    "openInTracker": "트래커에서 열기",
+    "newTab": "새 탭에서 열려요"
   },
   "assign": {
     "title": "{key} 티켓을 할당할까요?",
