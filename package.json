@@ -8,6 +8,7 @@
     "prepare": "lefthook install",
     "build": "turbo run build",
     "bundle": "node scripts/bundle.ts",
+    "release:mac": "node scripts/release-mac.ts",
     "dev": "node demo/src/main.ts",
     "check:colors": "node scripts/check-color-literals.ts",
     "check:lengths": "node scripts/check-style-lengths.ts",

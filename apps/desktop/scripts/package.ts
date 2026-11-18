@@ -18,7 +18,13 @@ const REPO = resolve(DESKTOP, "..", "..");
 const PRODUCT = "Ganger";
 
 const { values } = parseArgs({
-  options: { arch: { type: "string" }, bundle: { type: "string" }, out: { type: "string" } },
+  options: {
+    arch: { type: "string" },
+    bundle: { type: "string" },
+    out: { type: "string" },
+    "sign-identity": { type: "string" },
+    keychain: { type: "string" },
+  },
 });
 
 function readJson(path: string): Record<string, unknown> {
@@ -90,6 +96,15 @@ const icon = appIconPaths(join(DESKTOP, "icons"), actool.status === 0 ? actool.s
 console.log(`app icon: ${icon.map((path) => basename(path)).join(", ")}`);
 
 const arch = values.arch ?? process.arch;
+const signIdentity = values["sign-identity"];
+const osxSign =
+  signIdentity === undefined
+    ? undefined
+    : {
+        identity: signIdentity,
+        continueOnError: false,
+        ...(values.keychain === undefined ? {} : { keychain: values.keychain }),
+      };
 const [appDir] = await packager({
   dir: stage,
   out,
@@ -105,7 +120,7 @@ const [appDir] = await packager({
   extraResource: [join(resources, "server")],
   overwrite: true,
   prune: false,
-  osxSign: undefined,
+  osxSign,
 });
 if (appDir === undefined) throw new Error("packager produced nothing");
 
