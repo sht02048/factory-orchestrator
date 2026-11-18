@@ -13,7 +13,8 @@ import {
 } from "@factory/ui";
 import type { PillStatus } from "@factory/ui";
 import { colors, fontSize, fontWeight, radius, space } from "@factory/ui/tokens.stylex";
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import type { KeyboardEvent, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { runStatus, useStatusName } from "../status";
@@ -269,6 +270,82 @@ function InputCardBody({
   }
 }
 
+/**
+ * 트리거 버튼으로 여는 폼의 포커스(티켓 0050). 열면 입력칸으로, 닫으면 트리거 버튼으로 포커스를 옮긴다.
+ * 트리거 버튼은 폼이 열린 동안 DOM 에서 빠지므로 다시 그려진 뒤(effect)에 옮긴다.
+ */
+function useFormDisclosure() {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const returnFocus = useRef(false);
+  useEffect(() => {
+    if (open) {
+      inputRef.current?.focus();
+    } else if (returnFocus.current) {
+      returnFocus.current = false;
+      triggerRef.current?.focus();
+    }
+  }, [open]);
+  const close = () => {
+    returnFocus.current = true;
+    setOpen(false);
+  };
+  return {
+    open,
+    show: () => setOpen(true),
+    close,
+    triggerRef,
+    inputRef,
+    /** 폼 안에서 Escape 를 누르면 닫는다 */
+    onKeyDown: (event: KeyboardEvent<HTMLFormElement>) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      close();
+    },
+  };
+}
+
+/**
+ * 답·거절을 남긴 뒤 결과 문장으로 포커스를 옮긴다(티켓 0050). 답한 버튼과 폼은 다시 읽은 뒤 DOM 에서
+ * 빠진다. 이 화면에서 보낸 것이 받아졌을 때만 옮긴다(다른 사람이 답했을 때는 포커스를 뺏지 않는다).
+ */
+function useResultFocus(done: boolean) {
+  const resultRef = useRef<HTMLDivElement>(null);
+  const awaiting = useRef(false);
+  useEffect(() => {
+    if (!done || !awaiting.current) return;
+    awaiting.current = false;
+    resultRef.current?.focus();
+  }, [done]);
+  return {
+    resultRef,
+    /** 보내기 직전에 부른다 */
+    sending: () => {
+      awaiting.current = true;
+    },
+    /** 보내기에 실패하면 부른다 */
+    failed: () => {
+      awaiting.current = false;
+    },
+  };
+}
+
+/** 답·거절을 남겼다는 결과 문장. 화면 읽기가 알리고(role="status"), 보낸 뒤 포커스를 받는다 */
+function ResultText({
+  resultRef,
+  children,
+}: {
+  resultRef: RefObject<HTMLDivElement | null>;
+  children: string;
+}) {
+  return (
+    <div ref={resultRef} role="status" tabIndex={-1} {...stylex.props(styles.result)}>
+      <Text variant="meta">{children}</Text>
+    </div>
+  );
+}
+
 /** 질문 본문과 선택지. 선택지와 "직접 답하기"는 모두 같은 보조 버튼이다(ADR 0010 6번, Q82.3) */
 function QuestionBody({
   runId,
@@ -280,15 +357,28 @@ function QuestionBody({
   onAnswer: HomeScreenProps["onAnswer"];
 }) {
   const t = useTranslations("home.question");
-  const [writing, setWriting] = useState(false);
+  const form = useFormDisclosure();
+  const result = useResultFocus(question.answered);
   const [answer, setAnswer] = useState("");
   const [state, setState] = useState<SendState>("idle");
-  const send = (text: string) => {
-    if (text.trim() === "" || state === "sending") return;
+  // 보내는 중인 선택지. 누른 선택지에만 "보내는 중…"을 보인다
+  const [sendingChoice, setSendingChoice] = useState<string | null>(null);
+  const sending = state === "sending";
+  const send = (text: string, choice: string | null) => {
+    if (text.trim() === "" || sending) return;
     setState("sending");
+    setSendingChoice(choice);
+    result.sending();
     onAnswer({ runId, questionId: question.questionId, answer: text }).then(
-      () => setState("idle"),
-      () => setState("failed"),
+      () => {
+        setState("idle");
+        setSendingChoice(null);
+      },
+      () => {
+        result.failed();
+        setState("failed");
+        setSendingChoice(null);
+      },
     );
   };
 
@@ -296,29 +386,35 @@ function QuestionBody({
     <>
       <p {...stylex.props(styles.question)}>{question.body}</p>
       {question.answered ? (
-        <Text variant="meta">{t("answered")}</Text>
+        <ResultText resultRef={result.resultRef}>{t("answered")}</ResultText>
       ) : (
         <>
           <div role="group" aria-label={t("choices")}>
             <Actions>
               {question.choices.map((choice) => (
-                <Button key={choice} disabled={state === "sending"} onClick={() => send(choice)}>
-                  {choice}
+                <Button key={choice} disabled={sending} onClick={() => send(choice, choice)}>
+                  {sendingChoice === choice ? t("sending") : choice}
                 </Button>
               ))}
-              {writing ? null : <Button onClick={() => setWriting(true)}>{t("write")}</Button>}
+              {form.open ? null : (
+                <Button ref={form.triggerRef} disabled={sending} onClick={form.show}>
+                  {t("write")}
+                </Button>
+              )}
             </Actions>
           </div>
-          {writing ? (
+          {form.open ? (
             <form
               {...stylex.props(styles.form)}
+              onKeyDown={form.onKeyDown}
               onSubmit={(event) => {
                 event.preventDefault();
-                send(answer);
+                send(answer, null);
               }}
             >
               <Field label={t("answerLabel")}>
                 <Input
+                  ref={form.inputRef}
                   name="answer"
                   value={answer}
                   onValueChange={setAnswer}
@@ -327,8 +423,11 @@ function QuestionBody({
                 />
               </Field>
               <Actions>
-                <Button type="submit" disabled={state === "sending" || answer.trim() === ""}>
-                  {state === "sending" ? t("sending") : t("send")}
+                <Button type="submit" disabled={sending || answer.trim() === ""}>
+                  {sending && sendingChoice === null ? t("sending") : t("send")}
+                </Button>
+                <Button variant="ghost" disabled={sending} onClick={form.close}>
+                  {t("cancel")}
                 </Button>
               </Actions>
             </form>
@@ -355,38 +454,45 @@ function PermissionBody({
   onDeny: HomeScreenProps["onDeny"];
 }) {
   const t = useTranslations("home.permission");
-  const [open, setOpen] = useState(false);
+  const form = useFormDisclosure();
+  const result = useResultFocus(permission.denied);
   const [reason, setReason] = useState("");
   const [state, setState] = useState<SendState>("idle");
+  const sending = state === "sending";
   return (
     <>
       <Text variant="body">{t("detail", { detail: permission.detail })}</Text>
       {permission.denied ? (
-        <Text variant="meta">{t("denied")}</Text>
+        <ResultText resultRef={result.resultRef}>{t("denied")}</ResultText>
       ) : (
         <>
           <Actions>
             <RunLink run={run} />
-            {open ? null : (
-              <Button variant="danger" onClick={() => setOpen(true)}>
+            {form.open ? null : (
+              <Button ref={form.triggerRef} variant="danger" onClick={form.show}>
                 {t("deny")}
               </Button>
             )}
           </Actions>
-          {open ? (
+          {form.open ? (
             <form
               {...stylex.props(styles.form)}
+              onKeyDown={form.onKeyDown}
               onSubmit={(event) => {
                 event.preventDefault();
-                if (state === "sending") return;
+                if (sending) return;
                 setState("sending");
+                result.sending();
                 onDeny({
                   runId: run.id,
                   promptId: permission.promptId,
                   reason: reason.trim(),
                 }).then(
                   () => setState("idle"),
-                  () => setState("failed"),
+                  () => {
+                    result.failed();
+                    setState("failed");
+                  },
                 );
               }}
             >
@@ -395,11 +501,20 @@ function PermissionBody({
                 description={t("reasonDescription")}
                 error={state === "failed" ? t("failed") : undefined}
               >
-                <Input name="reason" value={reason} onValueChange={setReason} autoComplete="off" />
+                <Input
+                  ref={form.inputRef}
+                  name="reason"
+                  value={reason}
+                  onValueChange={setReason}
+                  autoComplete="off"
+                />
               </Field>
               <Actions>
-                <Button variant="danger" type="submit" disabled={state === "sending"}>
-                  {state === "sending" ? t("denying") : t("send")}
+                <Button variant="danger" type="submit" disabled={sending}>
+                  {sending ? t("denying") : t("send")}
+                </Button>
+                <Button variant="ghost" disabled={sending} onClick={form.close}>
+                  {t("cancel")}
                 </Button>
               </Actions>
             </form>
@@ -439,10 +554,14 @@ function ActivityFeed({ activity, all }: { activity: ReadonlyArray<Activity>; al
   const t = useTranslations("home.activity");
   const { ago } = useTime();
   const text = useActivityText();
+  // 이름은 제목(h2) 한 곳에서만 준다. 카드에 이름을 또 주면 화면 읽기가 제목을 두 번 읽는다
+  const titleId = useId();
   return (
-    <aside {...stylex.props(styles.feed)}>
-      <Card padding="compact" label={t("title")}>
-        <h2 {...stylex.props(styles.feedTitle)}>{t("title")}</h2>
+    <aside aria-labelledby={titleId} {...stylex.props(styles.feed)}>
+      <Card padding="compact">
+        <h2 id={titleId} {...stylex.props(styles.feedTitle)}>
+          {t("title")}
+        </h2>
         {activity.length === 0 ? (
           <p {...stylex.props(styles.feedEmpty)}>{t("empty")}</p>
         ) : (
@@ -450,6 +569,7 @@ function ActivityFeed({ activity, all }: { activity: ReadonlyArray<Activity>; al
             {activity.map((item) => (
               <li key={item.key}>
                 <Row
+                  href={href(`/runs/${encodeURIComponent(item.runId)}`, { ws: item.workspace.id })}
                   leading={
                     <span {...stylex.props(styles.feedIcon)}>{activityIcons[item.event.kind]}</span>
                   }
@@ -496,7 +616,8 @@ const styles = stylex.create({
     height: "100%",
     overflow: "auto",
     paddingTop: space.s8,
-    paddingInline: space.s8,
+    // 좁은 화면에서는 좌우 여백을 줄여 내용 폭을 확보한다(티켓 0050)
+    paddingInline: { default: space.s8, "@media (max-width: 600px)": space.s4 },
     paddingBottom: space.s10,
   },
   columns: {
@@ -529,8 +650,10 @@ const styles = stylex.create({
     fontWeight: fontWeight.semibold,
   },
   form: { display: "flex", flexDirection: "column", gap: space.s3, maxWidth: 560 },
+  // 결과 문장은 보낸 뒤 포커스만 받는다(누를 수 없다). 포커스 링을 그리지 않는다
+  result: { outline: "none" },
   error: { margin: 0, color: colors.problem, fontSize: fontSize.ui },
-  counts: { display: "flex", gap: space.s2, margin: 0 },
+  counts: { display: "flex", flexWrap: "wrap", gap: space.s2, margin: 0 },
   count: {
     display: "flex",
     flexDirection: "column-reverse",

@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { createTranslator } from "use-intl";
 import { HomeScreen } from "../../home/home-screen";
 import { homeMessages } from "../../home/messages";
+import { useRefreshWhileVisible } from "../../home/refresh";
 import { ScreenMessages, defaultLocale } from "../../i18n";
 import { answerQuestion, denyPermission, getHomePage } from "../../server/functions";
 
@@ -18,6 +19,11 @@ export const Route = createFileRoute("/_app/")({
 function HomeRoute() {
   const page = Route.useLoaderData();
   const router = useRouter();
+  // 새 손댈 일·사건·"N분 전"을 새로 고치지 않아도 보인다(티켓 0050). Home 로더만 다시 읽고,
+  // 읽는 동안에는 이전 화면을 그대로 둔다(forcePending 없음).
+  useRefreshWhileVisible(() => {
+    void router.invalidate({ filter: (match) => match.routeId === Route.id });
+  });
   return (
     <ScreenMessages messages={homeMessages}>
       <HomeScreen
