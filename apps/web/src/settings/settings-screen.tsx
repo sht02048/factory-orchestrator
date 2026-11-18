@@ -1278,7 +1278,12 @@ export function GitHubPanel({ saved, actions }: { saved: boolean; actions: Setti
         </Field>
         <SubmitError state={submit.state} />
         <Actions>
-          <Button variant="primary" type="submit" disabled={submit.sending || token.trim() === ""}>
+          {/* 저장한 뒤 바꾸는 것은 주 행동이 아니다. 온보딩에서는 "다음"이 주 버튼이 된다(ADR 0010 6번) */}
+          <Button
+            variant={saved ? "secondary" : "primary"}
+            type="submit"
+            disabled={submit.sending || token.trim() === ""}
+          >
             {submit.sending ? t("saving") : t("github.save")}
           </Button>
         </Actions>

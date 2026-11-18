@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
-import { Actions, Button, Field, Input, PanelBlock, Text } from "@factory/ui";
-import { colors, fonts, radius, space } from "@factory/ui/tokens.stylex";
+import { Actions, Button, Card, Field, Input, PanelBlock, Text } from "@factory/ui";
+import { colors, fontSize, fontWeight, fonts, radius, space } from "@factory/ui/tokens.stylex";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { useTranslations } from "use-intl";
 import {
@@ -28,6 +29,7 @@ import {
   MAPPING_PARTS,
   ONBOARDING_STEPS,
   missingMappingParts,
+  reachableIndex,
   runnerPassed,
   runnerProblems,
   serviceInstallCommand,
@@ -52,8 +54,9 @@ export interface OnboardingScreenProps {
 }
 
 /**
- * 온보딩: 사이드바 없는 전체 화면, 가운데 한 열에 한 단계씩(ADR 0007, 시안 B onboarding.html).
+ * 온보딩: 사이드바 없는 전체 화면(ADR 0007). 왼쪽 단계 목록, 가운데 입력과 확인 결과(ADR 0010, 시안 B).
  * 입력 폼과 연결 확인은 Settings 의 것을 그대로 쓴다. 단계의 확인이 성공해야 다음으로 간다.
+ * 파란 주 버튼은 하나다: 확인이 성공하면 "다음", 그 전에는 단계의 저장 버튼이다(ADR 0010 6번).
  */
 export function OnboardingScreen({
   page,
@@ -74,16 +77,16 @@ export function OnboardingScreen({
 
   return (
     <div {...stylex.props(styles.page)}>
-      <div {...stylex.props(styles.top)}>
-        {index > 0 ? (
-          <Button variant="ghost" onClick={() => onStep(index - 1)}>
-            {t("back")}
-          </Button>
-        ) : null}
-      </div>
+      <StepList page={page} index={index} onStep={onStep} />
       <main {...stylex.props(styles.column)}>
-        <Progress index={index} />
         <div {...stylex.props(styles.heading)}>
+          <span {...stylex.props(styles.eyebrow)}>
+            {t("eyebrow", {
+              step: index + 1,
+              total: ONBOARDING_STEPS.length,
+              name: t(`steps.${step}.name`),
+            })}
+          </span>
           <Text variant="page">{t(`steps.${step}.title`)}</Text>
           <Text variant="body">{t(`steps.${step}.description`)}</Text>
         </div>
@@ -92,43 +95,104 @@ export function OnboardingScreen({
           <StepBody step={step} page={page} actions={actions} workerSilent={workerSilent} />
         </div>
         <div {...stylex.props(styles.footer)}>
-          {passed ? null : <Text variant="meta">{t("nextLocked")}</Text>}
-          <Button
-            variant={passed ? "primary" : "secondary"}
-            disabled={!passed}
-            onClick={() => (last ? onFinish() : onStep(index + 1))}
-          >
-            {last ? t("finish") : t("next")}
-          </Button>
+          {index > 0 ? (
+            <Button variant="secondary" onClick={() => onStep(index - 1)}>
+              {t("back")}
+            </Button>
+          ) : null}
+          <div {...stylex.props(styles.footerEnd)}>
+            {passed ? null : <Text variant="meta">{t("nextLocked")}</Text>}
+            <Button
+              variant={passed ? "primary" : "secondary"}
+              disabled={!passed}
+              onClick={() => (last ? onFinish() : onStep(index + 1))}
+            >
+              {last ? t("finish") : t("next")}
+            </Button>
+          </div>
         </div>
       </main>
     </div>
   );
 }
 
-function Progress({ index }: { index: number }) {
+/**
+ * 왼쪽 단계 목록. 확인이 성공한 단계는 체크, 지금 단계는 번호를 밝게 보인다.
+ * 앞 단계가 모두 성공한 단계까지만 누를 수 있다(resolveStep 과 같은 규칙).
+ */
+function StepList({
+  page,
+  index,
+  onStep,
+}: {
+  page: SettingsPage;
+  index: number;
+  onStep: (index: number) => void;
+}) {
   const t = useTranslations("onboarding");
-  const total = ONBOARDING_STEPS.length;
+  const reachable = reachableIndex(page);
   return (
-    <div
-      role="img"
-      aria-label={t("progress", { step: index + 1, total })}
-      {...stylex.props(styles.progress)}
+    <nav aria-label={t("stepsLabel")} {...stylex.props(styles.nav)}>
+      <span {...stylex.props(styles.brand)}>{t("heading")}</span>
+      <ol {...stylex.props(styles.steps)}>
+        {ONBOARDING_STEPS.map((step, i) => {
+          const current = i === index;
+          const done = stepPassed(page, step);
+          const content: ReactNode = (
+            <>
+              <span
+                {...stylex.props(
+                  styles.marker,
+                  done && styles.markerDone,
+                  current && styles.markerCurrent,
+                )}
+              >
+                {done && !current ? <CheckMark /> : i + 1}
+              </span>
+              <span>{t(`steps.${step}.name`)}</span>
+            </>
+          );
+          return (
+            <li key={step}>
+              {i <= reachable && !current ? (
+                <button
+                  type="button"
+                  onClick={() => onStep(i)}
+                  {...stylex.props(styles.step, styles.stepButton, done && styles.stepDone)}
+                >
+                  {content}
+                </button>
+              ) : (
+                <span
+                  aria-current={current ? "step" : undefined}
+                  {...stylex.props(styles.step, current && styles.stepCurrent)}
+                >
+                  {content}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+function CheckMark() {
+  return (
+    <svg
+      aria-hidden="true"
+      width="12"
+      height="12"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      {ONBOARDING_STEPS.map((step, i) => (
-        <span
-          key={step}
-          {...stylex.props(
-            styles.dot,
-            i < index && styles.dotDone,
-            i === index && styles.dotCurrent,
-          )}
-        />
-      ))}
-      <span aria-hidden="true" {...stylex.props(styles.count)}>
-        {index + 1} / {total}
-      </span>
-    </div>
+      <path d="m3.5 8.5 3 3 6-7" />
+    </svg>
   );
 }
 
@@ -153,7 +217,11 @@ function StepBody({
         />
       );
     case "github":
-      return <GitHubPanel saved={page.install.githubToken} actions={actions} />;
+      return (
+        <Card>
+          <GitHubPanel saved={page.install.githubToken} actions={actions} />
+        </Card>
+      );
     case "runner":
       return (
         <RunnerStep runners={page.install.runners} actions={actions} workerSilent={workerSilent} />
@@ -187,7 +255,7 @@ function MappingStep({
   return (
     <>
       {MAPPING_PARTS.map((part) => (
-        <section key={part} {...stylex.props(styles.section)}>
+        <Card key={part} label={t(`parts.${part}`)}>
           <Text variant="title">{t(`parts.${part}`)}</Text>
           {part === "mapping" ? (
             <MappingPanel workspace={workspace} page={page} actions={actions} />
@@ -196,7 +264,7 @@ function MappingStep({
           ) : (
             <LabelPanel workspace={workspace} actions={actions} />
           )}
-        </section>
+        </Card>
       ))}
       {missing.length === 0 ? (
         <p role="status" {...stylex.props(styles.ok)}>
@@ -227,18 +295,28 @@ function TrackerStep({
   addresses: AddressesView;
   actions: SettingsActions;
 }) {
-  if (connections.length === 0) return <ConnectionForm connection={null} actions={actions} />;
+  if (connections.length === 0) {
+    return (
+      <Card>
+        <ConnectionForm connection={null} actions={actions} />
+      </Card>
+    );
+  }
   return (
     <>
       <ul {...stylex.props(styles.list)}>
         {connections.map((connection) => (
-          <li key={connection.id} {...stylex.props(styles.item)}>
-            <ConnectionForm connection={connection} actions={actions} />
-            <WebhookGuide connection={connection} webhookAddress={addresses.webhookAddress} />
+          <li key={connection.id}>
+            <Card>
+              <ConnectionForm connection={connection} actions={actions} />
+              <WebhookGuide connection={connection} webhookAddress={addresses.webhookAddress} />
+            </Card>
           </li>
         ))}
       </ul>
-      <WebhookAddressForm addresses={addresses} actions={actions} />
+      <Card>
+        <WebhookAddressForm addresses={addresses} actions={actions} />
+      </Card>
     </>
   );
 }
@@ -311,8 +389,12 @@ function RunnerStep({
   if (runners.length === 0) {
     return (
       <>
-        <RunnerBefore />
-        <RunnerForm runner={null} actions={actions} />
+        <Card>
+          <RunnerBefore />
+        </Card>
+        <Card>
+          <RunnerForm runner={null} actions={actions} />
+        </Card>
       </>
     );
   }
@@ -320,9 +402,13 @@ function RunnerStep({
     <ul {...stylex.props(styles.list)}>
       {runners.map((runner) => (
         <li key={runner.id} {...stylex.props(styles.item)}>
-          <RunnerCheck runner={runner} actions={actions} workerSilent={workerSilent} />
-          <RunnerGuide runner={runner} />
-          <RunnerForm runner={runner} actions={actions} />
+          <Card>
+            <RunnerForm runner={runner} actions={actions} />
+          </Card>
+          <Card>
+            <RunnerCheck runner={runner} actions={actions} workerSilent={workerSilent} />
+            <RunnerGuide runner={runner} />
+          </Card>
         </li>
       ))}
     </ul>
@@ -436,15 +522,21 @@ function Command({ value }: { value: string }) {
 function WorkspaceStep({ page, actions }: { page: SettingsPage; actions: OnboardingActions }) {
   const t = useTranslations("onboarding.workspace");
   const workspace = page.workspace;
-  if (workspace === null) return <CreateWorkspaceForm actions={actions} />;
+  if (workspace === null) {
+    return (
+      <Card>
+        <CreateWorkspaceForm actions={actions} />
+      </Card>
+    );
+  }
   return (
-    <>
+    <Card>
       <div {...stylex.props(styles.stack)}>
         <Text variant="title">{t("current", { name: workspace.general.name })}</Text>
         <Text variant="meta">{t("pickHint")}</Text>
       </div>
       <ProjectsPanel workspace={workspace} actions={actions} />
-    </>
+    </Card>
   );
 }
 
@@ -491,73 +583,112 @@ function CreateWorkspaceForm({ actions }: { actions: OnboardingActions }) {
 
 const styles = stylex.create({
   page: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: "240px minmax(0, 760px)",
+      "@media (max-width: 900px)": "minmax(0, 1fr)",
+    },
+    justifyContent: "center",
+    columnGap: space.s10,
+    rowGap: space.s6,
     minHeight: "100dvh",
+    paddingTop: space.s10,
+    paddingInline: space.s6,
+    paddingBottom: space.s10,
+    boxSizing: "border-box",
     backgroundColor: colors.bgCanvas,
   },
-  top: {
+  nav: { display: "flex", flexDirection: "column", gap: space.s6 },
+  brand: {
+    color: colors.textPrimary,
+    fontSize: fontSize.panel,
+    fontWeight: fontWeight.semibold,
+  },
+  steps: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    margin: 0,
+    padding: 0,
+    listStyle: "none",
+  },
+  step: {
     display: "flex",
     alignItems: "center",
-    height: 56,
-    paddingInline: space.s6,
+    gap: space.s3,
+    width: "100%",
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    borderRadius: radius.control,
+    color: colors.textTertiary,
+    fontSize: fontSize.body,
+    boxSizing: "border-box",
   },
+  stepButton: {
+    borderWidth: 0,
+    backgroundColor: { default: "transparent", ":hover": colors.bgHover },
+    font: "inherit",
+    textAlign: "start",
+    cursor: "pointer",
+    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
+  },
+  stepDone: { color: colors.textSecondary },
+  stepCurrent: {
+    backgroundColor: colors.bgCard,
+    color: colors.textPrimary,
+    fontWeight: fontWeight.semibold,
+  },
+  marker: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    width: 22,
+    height: 22,
+    borderRadius: radius.full,
+    backgroundColor: colors.bgControl,
+    color: colors.textTertiary,
+    fontSize: fontSize.label,
+    fontVariantNumeric: "tabular-nums",
+  },
+  markerDone: { backgroundColor: colors.progressSoft, color: colors.progress },
+  markerCurrent: { backgroundColor: colors.accent, color: colors.textOnAccent },
   column: {
     display: "flex",
     flexDirection: "column",
-    gap: space.s8,
-    width: "100%",
-    maxWidth: 560,
-    marginInline: "auto",
-    paddingTop: "8vh",
-    paddingInline: space.s4,
-    paddingBottom: space.s10,
-    boxSizing: "border-box",
-  },
-  progress: { display: "flex", alignItems: "center", gap: space.px6 },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: radius.full,
-    backgroundColor: colors.borderDefault,
-  },
-  dotDone: { backgroundColor: colors.textTertiary },
-  dotCurrent: { width: 18, backgroundColor: colors.textPrimary },
-  count: {
-    marginInlineStart: space.s2,
-    color: colors.textTertiary,
-    fontVariantNumeric: "tabular-nums",
+    gap: space.s6,
+    minWidth: 0,
   },
   heading: { display: "flex", flexDirection: "column", gap: space.s2 },
-  body: { display: "flex", flexDirection: "column", gap: space.s6 },
+  eyebrow: {
+    color: colors.textTertiary,
+    fontSize: fontSize.small,
+    fontWeight: fontWeight.medium,
+    fontVariantNumeric: "tabular-nums",
+  },
+  body: { display: "flex", flexDirection: "column", gap: space.s4 },
   footer: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s3,
+  },
+  footerEnd: {
     display: "flex",
     alignItems: "center",
     justifyContent: "flex-end",
     gap: space.s3,
-    paddingTop: space.s6,
-    borderTopWidth: 1,
-    borderTopStyle: "solid",
-    borderTopColor: colors.borderSubtle,
+    marginInlineStart: "auto",
   },
   stack: { display: "flex", flexDirection: "column", gap: space.s3, margin: 0 },
-  section: {
+  list: {
+    margin: 0,
+    padding: 0,
+    listStyle: "none",
     display: "flex",
     flexDirection: "column",
-    gap: space.s3,
-    paddingTop: { default: space.s6, ":first-child": 0 },
-    borderTopWidth: { default: 1, ":first-child": 0 },
-    borderTopStyle: "solid",
-    borderTopColor: colors.borderSubtle,
+    gap: space.s4,
   },
-  list: { margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column" },
-  item: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s6,
-    paddingBlock: space.s6,
-    borderTopWidth: { default: 1, ":first-child": 0 },
-    borderTopStyle: "solid",
-    borderTopColor: colors.borderSubtle,
-  },
+  item: { display: "flex", flexDirection: "column", gap: space.s4 },
   bullets: {
     margin: 0,
     paddingInlineStart: space.s5,

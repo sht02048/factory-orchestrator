@@ -383,6 +383,80 @@ describe("확인이 실패한 단계", () => {
   });
 });
 
+/** 렌더한 버튼(과 버튼 모양 링크) 중 파란 주 버튼 수 */
+const primaryCount = (html: string) => html.match(/data-variant="primary"/g)?.length ?? 0;
+
+/** 다섯 단계를 모두 그려 단계마다 주 버튼 수를 돌려준다 */
+function primaryByStep(settings: SettingsPage): Array<{ step: OnboardingStep; primary: number }> {
+  return ONBOARDING_STEPS.map((step) => ({ step, primary: primaryCount(render(settings, step)) }));
+}
+
+describe("단계 목록과 주 버튼(ADR 0010)", () => {
+  it("단계 이름 메시지는 Tracker·GitHub·Runner·Workspace·Mapping 이다", () => {
+    const steps = onboardingMessages.onboarding.steps;
+    expect(ONBOARDING_STEPS.map((step) => steps[step].name)).toEqual([
+      "Tracker",
+      "GitHub",
+      "Runner",
+      "Workspace",
+      "Mapping",
+    ]);
+  });
+
+  it("왼쪽 단계 목록에 다섯 단계 이름과 지금 단계를 보인다", async () => {
+    const f = fixture();
+    await connectTracker(f);
+    const html = render(await page(f), "github");
+    const nav = html.slice(html.indexOf("<nav"), html.indexOf("</nav>"));
+    // 확인이 성공한 Tracker 는 번호 대신 체크를 보인다
+    expect(text(nav)).toContain("시작하기 Tracker 2 GitHub 3 Runner 4 Workspace 5 Mapping");
+    expect(nav).toMatch(/aria-current="step"[^>]*>.*?GitHub</);
+    // 확인이 성공한 단계는 눌러 돌아갈 수 있고, 갈 수 없는 뒤 단계는 누를 수 없다
+    expect(nav).toMatch(/<button[^>]*>.*?Tracker<\/span><\/button>/);
+    expect(nav).not.toMatch(/<button[^>]*>.*?Runner<\/span><\/button>/);
+    expect(text(html)).toContain("2/5 · GitHub");
+  });
+
+  it("어느 단계에서도 파란 주 버튼은 하나 이하다", async () => {
+    const f = fixture();
+    const atMostOne = async () => {
+      for (const { step, primary } of primaryByStep(await page(f))) {
+        expect({ step, atMostOne: primary <= 1 }).toEqual({ step, atMostOne: true });
+      }
+    };
+    await atMostOne();
+    await connectTracker(f);
+    await atMostOne();
+    expect(await saveGitHubToken(f.context, { token: "github_pat_example" }, now)).toEqual({
+      ok: true,
+    });
+    await atMostOne();
+    const runnerId = registerRunner(f);
+    // 확인을 기다리는 동안
+    await atMostOne();
+    finishCheck(f, runnerId, health({ service: true, push: true }));
+    await atMostOne();
+    expect(createFirstWorkspace(f.context.db, { name: "Acme Commerce" }, now)).toEqual({
+      ok: true,
+    });
+    await atMostOne();
+  });
+
+  it("확인이 성공한 단계는 다음이 주 버튼이고 저장 버튼은 보조 버튼이다", async () => {
+    const f = fixture();
+    await connectTracker(f);
+    expect(await saveGitHubToken(f.context, { token: "github_pat_example" }, now)).toEqual({
+      ok: true,
+    });
+    const settings = await page(f);
+    for (const step of ["tracker", "github"] as const) {
+      const html = render(settings, step);
+      expect(primaryCount(html)).toBe(1);
+      expect(nextButton(html, "다음")).toContain('data-variant="primary"');
+    }
+  });
+});
+
 describe("다섯 단계를 마치기", () => {
   it("다섯 단계를 마치면 홈으로 가고, 그 뒤에는 온보딩이 뜨지 않는다", async () => {
     const f = fixture();

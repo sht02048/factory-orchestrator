@@ -1,28 +1,35 @@
 {
   "documentTitle": "처음 설정 · Factory Orchestrator",
-  "progress": "{total}단계 중 {step}단계",
+  "heading": "시작하기",
+  "stepsLabel": "설정 단계",
+  "eyebrow": "{step}/{total} · {name}",
   "back": "이전",
   "next": "다음",
   "finish": "설정 마치기",
   "nextLocked": "확인이 끝나야 다음으로 갈 수 있어요.",
   "steps": {
     "tracker": {
+      "name": "Tracker",
       "title": "트래커를 연결해요",
       "description": "티켓을 읽어 올 Linear 조직의 API 키를 넣어요. 넣으면 바로 연결을 확인하고, 확인되면 저장해요. signing secret은 저장한 뒤 webhook을 만들면 받으니 지금은 비워 둬도 돼요."
     },
     "github": {
+      "name": "GitHub",
       "title": "GitHub 토큰을 넣어요",
       "description": "런이 연 PR의 상태를 읽을 때 써요. 넣으면 바로 GitHub에 연결을 확인하고, 확인되면 암호화해서 저장해요."
     },
     "runner": {
+      "name": "Runner",
       "title": "첫 러너를 등록해요",
       "description": "ssh로 닿는 Orca 환경이 러너예요. 등록하면 worker가 ssh로 접속해 러너가 런을 돌릴 준비가 됐는지 확인해요."
     },
     "workspace": {
+      "name": "Workspace",
       "title": "첫 Workspace를 만들어요",
       "description": "함께 볼 트래커 프로젝트를 골라 묶어요. 홈·Tickets·Stats는 Workspace 단위로 보여요."
     },
     "mapping": {
+      "name": "Mapping",
       "title": "티켓을 누가 처리할지 정해요",
       "description": "트래커 프로젝트마다 러너 쪽 프로젝트와 에이전트를 고르고, 런이 시작할 때 티켓을 옮길 \"In Progress\" 상태와 자동 할당에 쓸 Auto-assign Label을 정해요. 셋을 모두 정한 트래커 프로젝트가 하나 이상이면 설정을 마칠 수 있어요."
     }
