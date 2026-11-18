@@ -20,7 +20,7 @@ UI 리뷰 판정은 Approve with changes였다. 4번은 `packages/ui/src/compone
 1. **Runner Issue 점 대비.** `shell/app-shell.tsx`의 점이 `colors.problem` 바탕에 `colors.textOnAccent` 11px 글자라 대비가 약 2.8:1이다. 글자를 어두운 색으로 바꾸거나 바탕을 더 어두운 빨강으로 바꿔 4.5:1을 넘긴다(색은 토큰으로).
 2. **런 목록 상한.** `runs/load.ts`가 `listRuns(db, { workspaceId })`로 Workspace의 모든 런을 읽고(상한 없음, `packages/db/src/runs.ts`), 런마다 `getRunWithRecords`로 다시 읽으며(N+1), 가상화 없이 모두 그린다. 진행 중인 런은 모두 보이고 끝난 런은 최근 N개와 "더 보기"로 자르거나 페이지를 나눈다. 기록은 이미 읽은 행에서 만든다.
 3. **"자세히 보기" 내비게이션.** 패널의 "자세히 보기"가 일반 `<a href>`라 문서 전체를 다시 읽는다. Enter·두 번 누르기는 클라이언트 내비게이션이다. 수정키 없는 클릭은 `onOpen(id)`로 보내거나 라우터 `Link`를 쓴다.
-4. **좁은 창.** `SplitView`가 `minmax(0,1fr) 384px` 하나뿐이라 창이 약 830px보다 좁으면 티켓 열이 0px가 된다. 좁은 폭에서 패널을 아래로 내리거나 숨긴다. `SplitView`를 쓰는 다른 화면(Tickets, Settings)도 함께 확인한다.
+4. **좁은 창.** `SplitView` 기본 변형(`minmax(0,1fr) 384px`)에 좁은 폭 배치가 없어 창이 약 830px보다 좁으면 티켓 열이 0px가 된다. 좁은 폭에서 패널을 아래로 내리거나 숨긴다. 기본 변형을 쓰는 Tickets·Stats와 editor 변형(`320px minmax(0,1fr)`)을 쓰는 Settings도 함께 확인한다.
 
 ### 하면 좋은 것(Nits)
 
