@@ -1,8 +1,8 @@
-import { spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { homePaths, readBootEnv } from "@factory/cli/home";
-import { isProcessAlive, readLiveServerLock } from "@factory/cli/server-lock";
+import { isProcessAlive, isSameProcess, readLiveServerLock } from "@factory/cli/server-lock";
 import { webUrl } from "@factory/cli/web-url";
 import { parseBootConfig } from "@factory/db";
 import { z } from "zod";
@@ -27,6 +27,10 @@ export const spawnRecordSchema = z.object({
   pid: z.number().int().positive(),
   buildId: z.string(),
   home: z.string(),
+  /** 띄운 시각(ISO 8601). pid 가 다른 프로세스에 다시 쓰였는지(재부팅 등) 시작 시각으로 가린다 */
+  spawnedAt: z.string(),
+  /** 띄운 서버 배포물 폴더. 남은 web·worker 를 치울 때 이 폴더에서 뜬 프로세스만 멈춘다 */
+  root: z.string(),
 });
 export type SpawnRecord = z.infer<typeof spawnRecordSchema>;
 
@@ -88,10 +92,11 @@ export interface LocalServerOptions {
   records: RecordStore;
   /** ②의 표준 출력·오류를 덧붙여 쓰는 파일 */
   logFile: string;
+  /** 서버 배포물 폴더. 기록에 남겨 남은 web·worker 를 가린다 */
+  bundleRoot?: string;
   /** 이 home 에 ③이 등록돼 있는가 */
   serviceInstalled?: () => boolean;
   probe?: Probe;
-  isAlive?: (pid: number) => boolean;
   readyTimeoutMs?: number;
   stopTimeoutMs?: number;
   pollMs?: number;
@@ -105,20 +110,18 @@ export class LocalServer {
   readonly home: string;
   private readonly options: LocalServerOptions;
   private readonly probe: Probe;
-  private readonly isAlive: (pid: number) => boolean;
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(options: LocalServerOptions) {
     this.options = options;
     this.home = options.home;
     this.probe = options.probe ?? ((origin, timeoutMs) => probeIdentity(origin, timeoutMs));
-    this.isAlive = options.isAlive ?? isProcessAlive;
   }
 
   /** 지금 이 home 의 서버 상태. 아무것도 바꾸지 않는다 */
   async status(): Promise<LocalStatus> {
     const record = this.ownRecord();
-    const lock = readLiveServerLock(this.home, this.isAlive);
+    const lock = readLiveServerLock(this.home);
     if (lock !== undefined) {
       const owner: Owner = record?.pid === lock.pid ? "app" : "external";
       const probed = await this.probe(lock.url, 1_000);
@@ -129,7 +132,7 @@ export class LocalServer {
     }
     if (record !== undefined) {
       // 띄운 직후 잠금을 쥐기 전이다.
-      if (this.isAlive(record.pid)) {
+      if (recordAlive(record)) {
         return {
           state: "starting",
           owner: "app",
@@ -139,7 +142,7 @@ export class LocalServer {
       }
       // 앱이 띄운 `start` 가 SIGKILL 로 끝나 web·worker 만 남았다. 남은 web 이 포트에서 답해도 다른 서버로 보지 않고
       // 멈춘 것으로 본다. 다시 띄울 때(launch)와 멈출 때 그룹째 치운다.
-      if (groupAlive(record.pid)) return { state: "stopped" };
+      if (leftovers(record).length > 0) return { state: "stopped" };
     }
     // 잠금 없이 같은 포트에서 답하는 서버(잠금 파일을 쓰기 전 버전의 ③ 등)에도 붙는다. 두 벌을 띄우지 않는다.
     const url = this.configuredUrl();
@@ -185,7 +188,7 @@ export class LocalServer {
       const current = await this.status();
       if (current.state === "stopped") {
         const record = this.ownRecord();
-        if (record !== undefined) await stopGroup(record.pid);
+        if (record !== undefined) await stopLeftovers(record);
         this.options.records.write(undefined);
         return { ok: true };
       }
@@ -231,7 +234,7 @@ export class LocalServer {
   private async launch(replaced: boolean): Promise<EnsureResult> {
     // 앞서 띄운 `start` 가 SIGKILL 로 끝났으면 그 web·worker 가 그룹에 남아 있다. 새 ②와 worker 가 두 벌 돌지 않게 먼저 치운다.
     const previous = this.ownRecord();
-    if (previous !== undefined && !this.isAlive(previous.pid)) await stopGroup(previous.pid);
+    if (previous !== undefined && !recordAlive(previous)) await stopLeftovers(previous);
     const init = this.initHome();
     if (!init.ok) return { kind: "failed", reason: init.reason };
     mkdirSync(dirname(this.options.logFile), { recursive: true });
@@ -255,7 +258,14 @@ export class LocalServer {
       closeSync(log);
     }
     if (pid === undefined) return { kind: "failed", reason: "could not spawn the server" };
-    this.options.records.write({ pid, buildId: this.options.bundle.buildId, home: this.home });
+    this.options.records.write({
+      pid,
+      buildId: this.options.bundle.buildId,
+      home: this.home,
+      // 자식은 spawn 이 돌아오기 전에 이미 시작했다. 그 뒤 시각을 적어 시작 시각 비교가 늘 맞게 한다.
+      spawnedAt: new Date().toISOString(),
+      root: this.options.bundleRoot ?? dirname(dirname(dirname(this.options.bundle.cliEntry))),
+    });
     return this.waitReady(pid, replaced);
   }
 
@@ -266,7 +276,7 @@ export class LocalServer {
       if (current.state === "running") return { kind: "running", status: current, replaced };
       if (current.state === "stopped" || current.pid !== pid) {
         // 띄운 `start` 가 끝났다. 같은 home 에 다른 서버가 먼저 잠금을 쥐었으면 그쪽에 붙는다.
-        if (!this.isAlive(pid)) {
+        if (!isProcessAlive(pid)) {
           if (current.state === "starting") return this.waitReady(current.pid, replaced);
           return { kind: "failed", reason: `the server exited; see ${this.options.logFile}` };
         }
@@ -284,13 +294,14 @@ export class LocalServer {
       signal(-pid, "SIGKILL");
       await this.waitGone(pid, 5_000);
     }
-    await stopGroup(pid);
+    const record = this.ownRecord();
+    if (record !== undefined) await stopLeftovers(record);
     this.options.records.write(undefined);
   }
 
   private async waitGone(pid: number, timeoutMs: number): Promise<boolean> {
     const deadline = Date.now() + timeoutMs;
-    while (this.isAlive(pid)) {
+    while (isProcessAlive(pid)) {
       if (Date.now() > deadline) return false;
       await sleep(100);
     }
@@ -306,23 +317,46 @@ function signal(pid: number, name: NodeJS.Signals): void {
   }
 }
 
-/** `start` 가 SIGKILL 로 끝나 남은 web·worker 를 멈춘다. 같은 프로세스 그룹(리더 = `start`)이라 그룹으로 보낸다 */
-async function stopGroup(leader: number): Promise<void> {
-  if (!groupAlive(leader)) return;
-  signal(-leader, "SIGTERM");
-  const deadline = Date.now() + 5_000;
-  while (groupAlive(leader) && Date.now() < deadline) await sleep(100);
-  if (groupAlive(leader)) signal(-leader, "SIGKILL");
+/** 기록한 ②의 `start` 가 아직 그 프로세스로 도는가(같은 pid 를 다시 받은 다른 프로세스가 아닌가) */
+function recordAlive(record: SpawnRecord): boolean {
+  const since = new Date(record.spawnedAt);
+  return Number.isNaN(since.getTime()) ? false : isSameProcess(record.pid, since);
 }
 
-/** 프로세스 그룹에 남은 프로세스가 있는가 */
-function groupAlive(leader: number): boolean {
+/**
+ * `start` 가 SIGKILL 로 끝나 남은 web·worker. 같은 프로세스 그룹(리더 = 기록한 `start` pid)이면서 기록한 서버
+ * 배포물 폴더에서 뜬 프로세스만 고른다. pid 를 다시 받은 관계없는 그룹은 고르지 않는다.
+ */
+function leftovers(record: SpawnRecord): number[] {
+  let out: string;
   try {
-    process.kill(-leader, 0);
-    return true;
-  } catch (error) {
-    return error instanceof Error && "code" in error && error.code === "EPERM";
+    out = execFileSync("ps", ["-axo", "pid=,pgid=,command="], {
+      encoding: "utf8",
+      maxBuffer: 16 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return [];
   }
+  return out.split("\n").flatMap((line) => {
+    const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);
+    if (match === null) return [];
+    const [, pid, pgid, command] = match;
+    if (Number(pgid) !== record.pid || command === undefined || !command.includes(record.root))
+      return [];
+    return [Number(pid)];
+  });
+}
+
+async function stopLeftovers(record: SpawnRecord): Promise<void> {
+  const send = (name: NodeJS.Signals) => {
+    for (const pid of leftovers(record)) signal(pid, name);
+  };
+  if (leftovers(record).length === 0) return;
+  send("SIGTERM");
+  const deadline = Date.now() + 5_000;
+  while (leftovers(record).length > 0 && Date.now() < deadline) await sleep(100);
+  send("SIGKILL");
 }
 
 export function sleep(ms: number): Promise<void> {

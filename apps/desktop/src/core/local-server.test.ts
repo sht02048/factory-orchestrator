@@ -3,7 +3,7 @@ import type { ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { LocalServer, fileRecordStore, sleep } from "./local-server.js";
@@ -209,6 +209,39 @@ describe("LocalServer", () => {
     expect(
       await server({ bundle: { cliEntry: FAKE_CLI, buildId: "build-b" } }).ensureRunning(),
     ).toMatchObject({ kind: "running", replaced: false, status: { pid: after.status.pid } });
+  });
+
+  it("기록한 pid 가 재부팅 뒤 다른 프로세스에 다시 쓰였으면 그 프로세스를 ②로 보지 않고 건드리지 않는다", async () => {
+    const stranger = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      stdio: "ignore",
+    });
+    others.push(stranger);
+    if (stranger.pid === undefined) throw new Error("no pid");
+    const records = fileRecordStore(join(dir, "app", "server-process.json"));
+    records.write({
+      pid: stranger.pid,
+      buildId: "build-a",
+      home,
+      spawnedAt: "2000-01-01T00:00:00.000Z",
+      root: dirname(FAKE_CLI),
+    });
+    // 전원이 꺼져 남은 잠금도 같은 pid 를 가리킨다.
+    mkdirSync(home, { recursive: true });
+    writeFileSync(
+      join(home, "server.lock"),
+      JSON.stringify({
+        pid: stranger.pid,
+        url: `http://127.0.0.1:${port}`,
+        startedAt: "2000-01-01T00:00:00.000Z",
+      }),
+    );
+    const local = server({ records });
+    expect(await local.status()).toEqual({ state: "stopped" });
+    const result = await local.ensureRunning();
+    expect(result).toMatchObject({ kind: "running", status: { owner: "app" } });
+    if (result.kind !== "running") return;
+    expect(result.status.pid).not.toBe(stranger.pid);
+    expect(alive(stranger.pid)).toBe(true);
   });
 
   it("뜨지 못하고 끝나면 실패를 알린다", async () => {

@@ -59,6 +59,7 @@ if (!app.requestSingleInstanceLock()) {
       bundle,
       // ②는 앱 실행 파일을 Node 로 써서 띄운다(Electron runAsNode fuse 를 켜 둔다, 티켓 0046).
       node: { command: process.execPath, env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } },
+      bundleRoot: bundle.root,
       records: fileRecordStore(join(data, "server-process.json")),
       logFile,
       serviceInstalled: () => serviceInstalledFor(home, homedir()),
