@@ -1,0 +1,188 @@
+import { createServer } from "node:net";
+import { homePaths, readBootEnv } from "@factory/cli/home";
+import {
+  toAgentId,
+  toAgentRef,
+  toPermissionRequestId,
+  toQuestionId,
+  toRunnerId,
+  toRunnerKind,
+  toRunnerProjectId,
+  toTicketKey,
+  toTrackerConnectionId,
+  toTrackerKind,
+  toTrackerProjectId,
+  toWorktreeRef,
+} from "@factory/core";
+import type { AgentResult, PrState, RunId } from "@factory/core";
+import {
+  SecretBox,
+  assignRun,
+  changeRunState,
+  openDatabase,
+  parseBootConfig,
+  recordPermissionWaits,
+  recordRunQuestions,
+  recordRunnerCheck,
+  saveMapping,
+  saveRunner,
+  saveTrackerConnection,
+  saveWorkspace,
+  saveWorkspaceTrackerProject,
+  toWorkspaceId,
+} from "@factory/db";
+import type { Database } from "@factory/db";
+
+/*
+ * 로컬 smoke 시험(티켓 0046)이 함께 쓰는 것. 가상 값만 쓴다(acme, .invalid).
+ */
+
+export function freePort(): Promise<number> {
+  return new Promise((resolvePort, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = typeof address === "object" && address !== null ? address.port : 0;
+      server.close(() => resolvePort(port));
+    });
+  });
+}
+
+/** Electron 실행 파일을 Node 로 돌리는 환경. 셸의 부팅 값은 home 의 .env 를 덮으므로 뺀다 */
+export function nodeEnv(): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
+  for (const name of [
+    "WEB_HOST",
+    "WEB_PORT",
+    "DATABASE_PATH",
+    "ENCRYPTION_KEY",
+    "FACTORY_HOME",
+    "NODE_OPTIONS",
+  ]) {
+    delete env[name];
+  }
+  return env;
+}
+
+const connection = toTrackerConnectionId("conn-acme");
+const trackerProject = toTrackerProjectId("tp-web");
+const runnerProject = toRunnerProjectId("github:acme/web");
+const runnerId = toRunnerId("runner-smoke");
+
+function withDatabase<T>(home: string, run: (db: Database, key: Uint8Array) => T): T {
+  const config = parseBootConfig(readBootEnv(homePaths(home).envFile, {}));
+  const db = openDatabase(config.databasePath);
+  try {
+    db.$client.exec("PRAGMA busy_timeout = 5000");
+    return run(db, config.encryptionKey);
+  } finally {
+    db.$client.close();
+  }
+}
+
+/** 트래커 연결·Workspace·매핑·러너(닿지 않는 Orca 러너)를 넣는다. 이미 있으면 그대로 둔다 */
+function ensureBase(db: Database, key: Uint8Array): void {
+  if (db.$client.prepare("SELECT 1 FROM runners WHERE id = ?").get(runnerId) !== undefined) return;
+  const workspaceId = toWorkspaceId("ws-acme");
+  saveTrackerConnection(db, new SecretBox(key), {
+    id: connection,
+    kind: toTrackerKind("fake"),
+    name: "Acme",
+    config: {},
+    secrets: {},
+  });
+  saveWorkspace(db, { id: workspaceId, name: "Acme" });
+  saveWorkspaceTrackerProject(db, {
+    workspaceId,
+    connection,
+    projectId: trackerProject,
+    name: "Web",
+    inProgressStateId: null,
+  });
+  saveMapping(db, { connection, trackerProject, runnerProject, agent: toAgentId("claude") });
+  // `.invalid` 는 이름이 풀리지 않도록 예약된 최상위 도메인이다. worker 의 확인은 Offline 으로 남는다.
+  saveRunner(db, {
+    id: runnerId,
+    kind: toRunnerKind("orca"),
+    name: "smoke-runner",
+    config: { sshTarget: "factory-smoke.invalid", connectTimeoutSeconds: 3 },
+    capacity: 10,
+  });
+  recordRunnerCheck(db, {
+    runnerId,
+    online: true,
+    checkedAt: new Date(),
+    error: null,
+    assignmentBlocked: false,
+    projects: [{ id: runnerProject, displayName: "acme/web", setupState: "ready" }],
+  });
+}
+
+function startRun(db: Database, key: string): RunId {
+  const assigned = assignRun(db, {
+    ticket: { connection, key: toTicketKey(key) },
+    trackerProject,
+    runnerProject,
+    agent: toAgentId("claude"),
+    now: new Date(),
+  });
+  if (!assigned.ok) throw new Error(assigned.reason);
+  const worktree = `wt-${key.toLowerCase()}`;
+  const started = changeRunState(db, assigned.run.id, {
+    to: "running",
+    started: {
+      worktree: toWorktreeRef(worktree),
+      branch: `acme/${worktree}`,
+      agentRef: toAgentRef(`agent-${worktree}`),
+    },
+  });
+  if (!started.ok) throw new Error(JSON.stringify(started));
+  return assigned.run.id;
+}
+
+/** Running 런 하나를 넣는다 */
+export function seedRunningRun(home: string, key = "ACME-1"): RunId {
+  return withDatabase(home, (db, encryptionKey) => {
+    ensureBase(db, encryptionKey);
+    return startRun(db, key);
+  });
+}
+
+/**
+ * 알림 시험용 사건(Q4)을 넣는다. Question·Permission 을 기다리는 런, Human Check·Merged·Failed 로 끝난 런.
+ * 러너 Offline 은 worker 가 닿지 않는 러너를 확인하며 기록한다.
+ */
+export function seedAttention(home: string): void {
+  withDatabase(home, (db, encryptionKey) => {
+    ensureBase(db, encryptionKey);
+    const waiting = (key: string): RunId => {
+      const id = startRun(db, key);
+      const changed = changeRunState(db, id, { to: "waiting-for-input" });
+      if (!changed.ok) throw new Error(JSON.stringify(changed));
+      return id;
+    };
+    recordRunQuestions(db, waiting("ACME-21"), [
+      {
+        id: toQuestionId("q-smoke"),
+        body: "어느 쪽으로 할까요?",
+        options: [],
+        askedAt: new Date(),
+      },
+    ]);
+    recordPermissionWaits(db, waiting("ACME-22"), [
+      {
+        id: toPermissionRequestId("apr-smoke"),
+        detail: "Bash(touch notes.txt)",
+        requestedAt: new Date(),
+      },
+    ]);
+    const ended = (key: string, agentResult: AgentResult, prState: PrState): void => {
+      const changed = changeRunState(db, startRun(db, key), { to: "ended", agentResult, prState });
+      if (!changed.ok) throw new Error(JSON.stringify(changed));
+    };
+    ended("ACME-23", "reported-success", "open");
+    ended("ACME-24", "reported-success", "merged");
+    ended("ACME-25", "timed-out", "none");
+  });
+}
