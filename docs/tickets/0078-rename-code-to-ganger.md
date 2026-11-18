@@ -1,6 +1,6 @@
 ---
 status: todo
-blocked_by: [0076, 0074]
+blocked_by: [0076, 0074, 0077]
 ---
 
 # 0078 코드·패키지·문서 이름을 Ganger로 바꾸기
@@ -17,7 +17,7 @@ blocked_by: [0076, 0074]
 
 - 패키지 이름(`@factory/*` → 0076의 새 범위)과 모든 import, pnpm 워크스페이스·Turborepo 설정, lockfile.
 - CLI 명령, 설치·데이터 폴더, 환경 변수, 데스크톱 앱 번들 ID·이름. 0076의 옮기기 규칙대로 이미 설치한 곳을 옮기는 코드와 시험.
-- 화면 문구·메시지 파일·문서 제목의 제품 이름, README·AGENTS.md·GLOSSARY·DESIGN.md.
+- 화면 문구·메시지 파일·문서 제목의 제품 이름, README·AGENTS.md·GLOSSARY·DESIGN.md. README 머리에는 0077의 원본(반장 + 워드마크)과 한 줄 소개를 넣는다.
 - 지난 티켓·research 기록은 그 시점 기록이라 고치지 않는다.
 - CI, smoke 시험, 서버 배포물(bundle) 스크립트의 이름.
 
