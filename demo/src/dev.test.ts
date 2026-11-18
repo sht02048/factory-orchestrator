@@ -76,8 +76,8 @@ describe("pnpm dev", () => {
       const next = page.getByRole("button", { name: onboarding.next });
 
       await fill.click();
-      await page.getByRole("button", { name: settings.connections.add }).click();
-      await page.getByText(settings.connections.added).waitFor();
+      await page.getByRole("button", { name: onboarding.tracker.check }).click();
+      await page.getByText(onboarding.tracker.checked).waitFor();
       await next.click();
       await fill.click();
       await page.getByRole("button", { name: settings.github.save }).click();
@@ -85,11 +85,11 @@ describe("pnpm dev", () => {
       await next.click();
       await fill.click();
       await page.getByRole("button", { name: settings.runners.add }).click();
-      await page.getByText(onboarding.runner.passed).waitFor();
+      await page.getByText(onboarding.runner.ready.replace("{name}", "runner-a")).waitFor();
       await next.click();
       await fill.click();
+      await page.getByRole("checkbox", { name: "Web" }).click();
       await page.getByRole("button", { name: onboarding.workspace.create }).click();
-      await page.getByRole("button", { name: settings.projects.add }).first().click();
       await enabled(next);
       await next.click();
       const main = page.locator("main");
@@ -97,15 +97,10 @@ describe("pnpm dev", () => {
         await main.getByRole("combobox").nth(index).click();
         await page.getByRole("option", { name: option, exact: true }).click();
       };
-      const save = main.getByRole("button", { name: settings.save });
       await choose(0, "acme/web");
       await choose(1, "Claude Code");
-      await save.nth(0).click();
-      await page.getByText(settings.saved).first().waitFor();
       await choose(2, "In Progress");
-      await save.nth(1).click();
       await choose(3, "factory");
-      await save.nth(2).click();
       const finish = page.getByRole("button", { name: onboarding.finish });
       await enabled(finish);
       await finish.click();

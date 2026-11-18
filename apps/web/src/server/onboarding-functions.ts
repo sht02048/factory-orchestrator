@@ -1,16 +1,27 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import {
-  createFirstWorkspace,
   firstWorkspaceInput,
   isOnboardingComplete,
+  loadOnboardingPage,
+  setUpFirstWorkspace,
 } from "../onboarding/load";
-import { getSecretBox } from "./adapters";
+import type { SettingsContext } from "../settings/load";
+import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
+
+function context(): SettingsContext {
+  return { db: getDatabase(), secretBox: getSecretBox(), registry: getAdapterRegistry() };
+}
 
 export const getOnboardingComplete = createServerFn({ method: "GET" }).handler(() =>
   isOnboardingComplete(getDatabase(), getSecretBox()),
 );
 
-export const createWorkspace = createServerFn({ method: "POST" })
+export const getOnboardingPage = createServerFn({ method: "GET" })
+  .validator(z.object({ step: z.number().int().optional() }))
+  .handler(({ data }) => loadOnboardingPage(context(), data.step, new Date()));
+
+export const setUpWorkspace = createServerFn({ method: "POST" })
   .validator(firstWorkspaceInput)
-  .handler(({ data }) => createFirstWorkspace(getDatabase(), data, new Date()));
+  .handler(({ data }) => setUpFirstWorkspace(context(), data, new Date()));

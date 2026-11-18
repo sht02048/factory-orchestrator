@@ -7,7 +7,7 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
 } from "@factory/core";
-import type { RunnerHealth, RunnerId } from "@factory/core";
+import type { RunnerHealth, RunnerId, TrackerConnectionId } from "@factory/core";
 import { FakeCodeHost, FakeTracker } from "@factory/core/testing";
 import {
   SecretBox,
@@ -19,11 +19,13 @@ import {
   migrate,
   openDatabase,
   recordRunnerCheck,
+  requestRunnerCheck,
+  saveWorkspace,
+  saveWorkspaceTrackerProject,
+  toWorkspaceId,
 } from "@factory/db";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-  addTrackerProject,
-  saveAddresses,
   saveGitHubToken,
   saveInProgressState,
   saveLabel,
@@ -31,13 +33,14 @@ import {
   saveRunnerSetting,
   saveTrackerConnectionSetting,
 } from "../settings/actions";
-import { loadSettingsPage } from "../settings/load";
+import { loadSettingsPage, loadTrackerProjectChoices } from "../settings/load";
 import type { SettingsContext } from "../settings/load";
-import type { SettingsPage } from "../settings/model";
+import type { ConnectionProjects, SettingsPage } from "../settings/model";
 import { settingsMessages } from "../settings/messages";
 import { SettingsScreen } from "../settings/settings-screen";
+import { buttonsOf } from "../testing/buttons";
 import { renderWithMessages } from "../testing/render";
-import { createFirstWorkspace, isOnboardingComplete } from "./load";
+import { isOnboardingComplete, loadOnboardingPage, setUpFirstWorkspace } from "./load";
 import { onboardingMessages } from "./messages";
 import {
   HOME_PATH,
@@ -104,13 +107,18 @@ const noopActions: OnboardingActions = {
   recheckRunner: reject,
   saveAddresses: reject,
   pollRunnerChecks: () => Promise.resolve(false),
-  createWorkspace: reject,
+  setUpWorkspace: reject,
 };
 
-function render(settings: SettingsPage, step: OnboardingStep): string {
+function render(
+  settings: SettingsPage,
+  step: OnboardingStep,
+  trackerProjects: ConnectionProjects[] = [],
+): string {
   return renderWithMessages(
     <OnboardingScreen
       page={settings}
+      trackerProjects={trackerProjects}
       index={ONBOARDING_STEPS.indexOf(step)}
       onStep={() => {}}
       onFinish={() => {}}
@@ -138,13 +146,28 @@ function nextButton(html: string, label: string): string {
 const isDisabled = (button: string) => /\sdisabled(=""|\s|>)/.test(button);
 
 async function connectTracker(f: Fixture): Promise<void> {
+  f.tracker.connection = { ok: true, organizationName: "Acme" };
   expect(
     await saveTrackerConnectionSetting(
       f.context,
-      { name: "Acme", apiKey: "lin_api_example", webhookSecret: "" },
+      { apiKey: "lin_api_example", webhookSecret: "" },
       now,
     ),
   ).toEqual({ ok: true });
+}
+
+function connectionId(f: Fixture): TrackerConnectionId {
+  const found = listTrackerConnections(f.context.db, f.context.secretBox)[0];
+  if (found === undefined) throw new Error("no tracker connection");
+  return found.id;
+}
+
+function setUpWorkspace(f: Fixture, name = "Acme Commerce") {
+  return setUpFirstWorkspace(
+    f.context,
+    { name, projects: [{ connectionId: connectionId(f), projectId: webProject, name: "Web" }] },
+    now,
+  );
 }
 
 function registerRunner(f: Fixture): RunnerId {
@@ -252,7 +275,7 @@ describe("확인이 실패한 단계", () => {
     expect(
       await saveTrackerConnectionSetting(
         f.context,
-        { name: "Acme", apiKey: "lin_api_wrong", webhookSecret: "" },
+        { apiKey: "lin_api_wrong", webhookSecret: "" },
         now,
       ),
     ).toEqual({ ok: false, reason: "unauthorized" });
@@ -359,10 +382,45 @@ describe("확인이 실패한 단계", () => {
     expect(text(html)).toContain("GitHub 인증을 아직 확인하지 못했어요");
   });
 
-  it("러너 확인이 성공하면 다음으로 갈 수 있다", async () => {
+  it("러너가 여럿이어도 주 버튼은 하나다: 마치기 전에는 가장 최근 러너의 다시 확인, 마친 뒤에는 다음", async () => {
+    const f = fixture();
+    await connectTracker(f);
+    expect(await saveGitHubToken(f.context, { token: "github_pat_example" }, now)).toEqual({
+      ok: true,
+    });
+    const first = registerRunner(f);
+    finishCheck(f, first, health({ service: true, push: false }));
+    const second = saveRunnerSetting(
+      f.context,
+      { name: "runner-b", sshTarget: "factory@runner-b.example.com", orcaPath, capacity: 1 },
+      now,
+    );
+    if (!second.ok) throw new Error(second.reason);
+    finishCheck(f, second.runnerId, health({ service: true, push: false }));
+    const primaries = async () =>
+      buttonsOf(render(await page(f), "runner"))
+        .filter((b) => b.variant === "primary")
+        .map((b) => b.label);
+    expect(await primaries()).toEqual(["다시 확인"]);
+
+    requestRunnerCheck(f.context.db, first, now);
+    finishCheck(f, first, health({ service: true, push: true }));
+    expect(await primaries()).toEqual(["다음"]);
+  });
+
+  it("러너 확인이 성공하면 폼을 접어 요약과 확인 목록을 보이고 다음으로 갈 수 있다", async () => {
     const { settings, html } = await runnerStep(health({ service: true, push: true }));
     expect(stepPassed(settings, "runner")).toBe(true);
     expect(isDisabled(nextButton(html, "다음"))).toBe(false);
+    const shown = text(html);
+    expect(shown).toContain("runner-a 러너가 준비됐어요");
+    expect(shown).toContain("factory@runner-a.example.com · capacity 2");
+    expect(shown).toContain("러너에 닿았어요 · orca 1.4.258");
+    expect(html).not.toContain('name="sshTarget"');
+    const labels = buttonsOf(html).map((b) => `${b.variant}:${b.label}`);
+    expect(labels).toContain("secondary:다시 확인");
+    expect(labels).toContain("secondary:수정");
+    expect(html.match(/role="img" aria-label="갖췄어요"/g)).toHaveLength(3);
   });
 });
 
@@ -396,28 +454,28 @@ describe("단계 목록과 주 버튼(ADR 0010)", () => {
     expect(text(html)).toContain("2/5 · GitHub");
   });
 
-  it("어느 단계에서도 파란 주 버튼은 하나 이하다", async () => {
+  it("단계를 마치기 전에는 그 단계의 저장·확인이, 마친 뒤에는 다음이 하나뿐인 주 버튼이다", async () => {
     const f = fixture();
-    const atMostOne = async () => {
-      for (const { step, primary } of primaryByStep(await page(f))) {
-        expect({ step, atMostOne: primary <= 1 }).toEqual({ step, atMostOne: true });
+    const check = async () => {
+      const settings = await page(f);
+      for (const { step, primary } of primaryByStep(settings)) {
+        const expected = step === "mapping" && !stepPassed(settings, step) ? 0 : 1;
+        expect({ step, primary }).toEqual({ step, primary: expected });
       }
     };
-    await atMostOne();
+    await check();
     await connectTracker(f);
-    await atMostOne();
+    await check();
     expect(await saveGitHubToken(f.context, { token: "github_pat_example" }, now)).toEqual({
       ok: true,
     });
-    await atMostOne();
+    await check();
     const runnerId = registerRunner(f);
-    await atMostOne();
+    await check();
     finishCheck(f, runnerId, health({ service: true, push: true }));
-    await atMostOne();
-    expect(createFirstWorkspace(f.context.db, { name: "Acme Commerce" }, now)).toEqual({
-      ok: true,
-    });
-    await atMostOne();
+    await check();
+    expect(setUpWorkspace(f)).toEqual({ ok: true });
+    await check();
   });
 
   it("다음을 막은 동안에는 막은 까닭을 다음 버튼의 설명으로 잇는다(0052)", async () => {
@@ -468,24 +526,18 @@ describe("다섯 단계를 마치기", () => {
     finishCheck(f, runnerId, health({ service: true, push: true }));
     expect(await reached()).toBe(3);
 
-    expect(createFirstWorkspace(f.context.db, { name: "Acme Commerce" }, now)).toEqual({
-      ok: true,
-    });
-    expect(createFirstWorkspace(f.context.db, { name: "Acme Again" }, now)).toEqual({ ok: true });
+    expect(setUpWorkspace(f)).toEqual({ ok: true });
     const workspaces = listWorkspaces(f.context.db);
     expect(workspaces.map((w) => w.name)).toEqual(["Acme Commerce"]);
     const ws = workspaces[0]?.id ?? "";
-    const connectionId = listTrackerConnections(f.context.db, f.context.secretBox)[0]?.id ?? "";
-    expect(await reached()).toBe(3);
-    const project = { ws, connectionId, projectId: webProject };
-    expect(addTrackerProject(f.context, { ...project, name: "Web" })).toEqual({ ok: true });
+    const project = { ws, connectionId: connectionId(f), projectId: webProject };
     expect(await reached()).toBe(4);
 
     const locked = async (missing: string[]) => {
       const html = render(await page(f), "mapping");
       expect(isDisabled(nextButton(html, "설정 마치기"))).toBe(true);
       expect(isOnboardingComplete(f.context.db, f.context.secretBox)).toBe(false);
-      expect(html).toMatch(/<div role="status"[^>]*><p[^>]*>설정을 마치려면 이것을 정해요.</);
+      expect(html).toMatch(/<div class="[^"]*"><p[^>]*>설정을 마치려면 이것을 정해요.</);
       const shown = text(html);
       for (const part of ["mapping", "progress", "label"] as const) {
         const guide = onboardingMessages.onboarding.mapping.missing[part];
@@ -496,24 +548,42 @@ describe("다섯 단계를 마치기", () => {
       }
     };
     await locked(["mapping", "progress", "label"]);
-    const shown = text(render(await page(f), "mapping"));
+    const table = render(await page(f), "mapping");
+    const shown = text(table);
     expect(shown).toContain("러너 쪽 프로젝트");
-    expect(shown).toContain('"In Progress" 상태');
+    expect(shown).toContain("시작하면 옮길 상태");
     expect(shown).toContain("Auto-assign Label");
+    expect(table).toContain('aria-label="Web의 러너 쪽 프로젝트"');
+    expect(table).toContain('aria-label="Web의 에이전트"');
+    expect(table).toContain('aria-label="Web의 시작하면 옮길 상태"');
+    expect(table).toContain('aria-label="Acme의 Auto-assign Label"');
+    expect(table).toMatch(/<th scope="row"[^>]*>.*?Web/);
+    expect(table).not.toContain('name="model"');
+    expect(shown).not.toContain(settingsMessages.settings.mapping.model);
+    expect(
+      buttonsOf(table)
+        .filter((b) => b.variant !== "other")
+        .map((b) => b.label),
+    ).toEqual(["이전", "설정 마치기"]);
 
     expect(
       saveMappingSetting(f.context, { ...project, runnerProjectId: repo, agentId: "claude" }),
     ).toEqual({ ok: true });
     await locked(["progress", "label"]);
+    expect(render(await page(f), "mapping")).toContain('aria-label="아직 비어 있어요"');
     expect(saveInProgressState(f.context, { ...project, stateId: "st-doing" })).toEqual({
       ok: true,
     });
     await locked(["label"]);
-    expect(saveLabel(f.context, { ws, connectionId, labelId: "lb-auto" })).toEqual({ ok: true });
+    expect(render(await page(f), "mapping")).toMatch(/<tr[^>]*>.*?aria-label="다 채웠어요"/s);
+    expect(saveLabel(f.context, { ws, connectionId: connectionId(f), labelId: "lb-auto" })).toEqual(
+      { ok: true },
+    );
 
     const settings = await page(f);
     const ready = render(settings, "mapping");
-    expect(ready).toMatch(/<div role="status"[^>]*><p[^>]*>라벨만 붙이면/);
+    expect(ready).toMatch(/<div class="[^"]*"><p[^>]*>라벨만 붙이면/);
+    expect(ready.match(/role="status"/g)).toHaveLength(1);
     expect(text(ready)).toContain(onboardingMessages.onboarding.mapping.ready);
     expect(ONBOARDING_STEPS.every((step) => stepPassed(settings, step))).toBe(true);
     expect(isDisabled(nextButton(render(settings, "mapping"), "설정 마치기"))).toBe(false);
@@ -556,7 +626,7 @@ describe("다섯 단계를 마치기", () => {
       states: { ok: true as const, items: [] },
     };
     const workspace = {
-      general: { id: "ws-1", name: "Acme", maxRunMinutes: 120 },
+      general: { id: toWorkspaceId("ws-1"), name: "Acme", maxRunMinutes: 120 },
       trackerProjects: [],
       bound: [bound],
       labels: [
@@ -589,43 +659,177 @@ describe("다섯 단계를 마치기", () => {
     expect(text(render(settings, "tracker"))).not.toContain("이전");
   });
 
-  it("트래커 연결을 마치면 webhook 경로와 만드는 방법을 안내한다", async () => {
+  it("1단계는 API 키 하나만 묻고, 키 만드는 법과 webhook 없이 돌아가는 방식을 안내한다", async () => {
+    const f = fixture();
+    const html = render(await page(f), "tracker");
+    const inputs = [...html.matchAll(/<input[^>]*name="([^"]+)"/g)].map((m) => m[1]);
+    expect(inputs).toEqual(["apiKey"]);
+    const shown = text(html);
+    expect(shown).toContain("API 키 만드는 법");
+    expect(html).toContain('href="https://linear.app/settings/account/security"');
+    expect(shown).toContain("webhook은 안 만들어도 되나요?");
+    expect(shown).toContain("1분쯤마다");
+    expect(shown).toContain("10초쯤 안에");
+    expect(shown).toContain("끝난 런이 있던 티켓");
+    expect(shown).toContain("하루 넘게 멈춰");
+    expect(shown).toContain("아직 런이 없던 티켓");
+    expect(shown).toContain("Tickets에서 직접 할당해요");
+    expect(shown).not.toContain("signing secret");
+    expect(shown).not.toContain("Webhook 경로");
+    expect(
+      buttonsOf(html)
+        .filter((b) => b.variant === "primary")
+        .map((b) => b.label),
+    ).toEqual(["연결 확인"]);
+  });
+
+  it("트래커 연결을 마치면 조직 이름과 확인했다는 요약 한 줄만 보이고, 수정으로 폼을 다시 연다", async () => {
     const f = fixture();
     await connectTracker(f);
     const settings = await page(f);
-    const connection = settings.install.connections[0];
-    if (connection === undefined) throw new Error("no connection");
-    const shown = text(render(settings, "tracker"));
-    expect(shown).toContain("Linear에서 webhook 만들기");
-    expect(shown).toContain("Issues");
-    expect(render(settings, "tracker")).toContain(connection.webhookPath);
+    expect(settings.install.connections.map((c) => c.name)).toEqual(["Acme"]);
+    const html = render(settings, "tracker");
+    const shown = text(html);
+    expect(shown).toContain("Acme 연결을 확인했어요");
+    expect(html).not.toContain('name="apiKey"');
+    expect(html).not.toContain(settings.install.connections[0]?.webhookPath ?? "?");
+    const edit = buttonsOf(html).find((b) => b.label === "수정");
+    expect(edit?.variant).toBe("secondary");
+    expect(html).toMatch(/aria-expanded="false"[^>]*>수정</);
+    expect(isDisabled(nextButton(html, "다음"))).toBe(false);
   });
 
-  it("webhook 공개 주소를 정하면 1단계가 브라우저 주소가 아니라 그 주소로 webhook 주소를 보인다(0048)", async () => {
+  it("GitHub 토큰을 넣기 전에는 만드는 법을, 저장한 뒤에는 요약과 토큰 바꾸기를 보인다", async () => {
     const f = fixture();
     await connectTracker(f);
-    const before = await page(f);
-    const unset = text(render(before, "tracker"));
-    expect(unset).toContain("아직 webhook 공개 주소가 없어요");
-    expect(unset).toContain("Tailscale Funnel");
+    const before = render(await page(f), "github");
+    const shown = text(before);
+    expect(shown).toContain("토큰 만드는 법");
+    expect(before).toContain('href="https://github.com/settings/personal-access-tokens/new"');
+    for (const word of [
+      "Fine-grained token",
+      "Resource owner",
+      "Repository access",
+      "Pull requests",
+      "Metadata는 자동으로 들어가요",
+      "Actions",
+      "조직 관리자가 토큰을 승인",
+    ]) {
+      expect({ word, shown: shown.includes(word) }).toEqual({ word, shown: true });
+    }
+    expect(before).toContain('name="token"');
+
+    expect(await saveGitHubToken(f.context, { token: "github_pat_example" }, now)).toEqual({
+      ok: true,
+    });
+    const after = render(await page(f), "github");
+    expect(text(after)).toContain("GitHub 토큰을 저장했어요");
+    expect(after).not.toContain('name="token"');
+    expect(after).not.toContain("토큰 만드는 법");
+    expect(buttonsOf(after).find((b) => b.label === "토큰 바꾸기")?.variant).toBe("secondary");
+  });
+
+  it("Workspace 단계는 이름과 연결별 트래커 프로젝트 체크 목록을 한 폼으로 보이고, 다른 Workspace의 것은 고를 수 없다", async () => {
+    const f = fixture();
+    await connectTracker(f);
+    const listed = await loadTrackerProjectChoices(f.context, null);
+    const projects = listed.map((group) => ({
+      ...group,
+      projects: [
+        ...group.projects,
+        {
+          id: "tp-mobile",
+          name: "Mobile",
+          owner: { kind: "other" as const, workspace: { id: "ws-labs", name: "Acme Labs" } },
+          mappings: 0,
+          queuedRuns: 0,
+        },
+      ],
+    }));
+    expect(listed[0]?.projects.map((p) => [p.name, p.owner.kind])).toEqual([["Web", "free"]]);
+    const html = render(await page(f), "workspace", projects);
+    const shown = text(html);
+    expect(shown).toContain("Workspace 이름");
+    expect(shown).toContain("넣을 트래커 프로젝트");
+    expect(shown).toContain("Acme");
+    expect(html).toMatch(/role="checkbox"[^>]*aria-checked="false"(?![^>]*disabled)/);
+    expect(shown).toContain("Acme Labs에 있어요");
+    expect(html).toMatch(/role="checkbox"[^>]*aria-checked="false"[^>]*aria-disabled="true"/);
+    expect(buttonsOf(html).find((b) => b.label === "만들기")?.variant).toBe("primary");
+  });
+
+  it("Workspace 가 없을 때 트래커 프로젝트 목록은 Workspace 단계에서만 트래커에서 읽는다", async () => {
+    const f = fixture();
+    await connectTracker(f);
+    expect(await saveGitHubToken(f.context, { token: "github_pat_example" }, now)).toEqual({
+      ok: true,
+    });
+    const runnerId = registerRunner(f);
+    finishCheck(f, runnerId, health({ service: true, push: true }));
+    const listProjects = vi.spyOn(f.tracker, "listProjects");
+
+    for (const step of [1, 2, 3]) {
+      expect((await loadOnboardingPage(f.context, step, now)).trackerProjects).toEqual([]);
+    }
+    expect(listProjects).not.toHaveBeenCalled();
+
+    const atWorkspace = await loadOnboardingPage(f.context, 4, now);
+    expect(listProjects).toHaveBeenCalledTimes(1);
+    expect(atWorkspace.trackerProjects[0]?.projects.map((p) => p.name)).toEqual(["Web"]);
+    expect((await loadOnboardingPage(f.context, undefined, now)).trackerProjects).toHaveLength(1);
+  });
+
+  it("Workspace 를 만들면서 고른 트래커 프로젝트를 한 번에 넣고, 하나라도 못 넣으면 아무것도 만들지 않는다", async () => {
+    const f = fixture();
+    await connectTracker(f);
+    const project = { connectionId: connectionId(f), projectId: webProject, name: "Web" };
+    expect(
+      setUpFirstWorkspace(
+        f.context,
+        { name: "Acme", projects: [project, { ...project, connectionId: "missing" }] },
+        now,
+      ),
+    ).toEqual({ ok: false, reason: "not-found" });
+    expect(listWorkspaces(f.context.db)).toEqual([]);
+
+    expect(setUpFirstWorkspace(f.context, { name: "Acme", projects: [project] }, now)).toEqual({
+      ok: true,
+    });
+    const settings = await page(f);
+    expect(settings.workspace?.bound.map((b) => b.project.name)).toEqual(["Web"]);
+    expect(stepPassed(settings, "workspace")).toBe(true);
+    const html = render(settings, "workspace");
+    expect(text(html)).toContain("Acme Workspace");
+    expect(text(html)).toContain("트래커 프로젝트 1개 · Web");
 
     expect(
-      saveAddresses(
-        f.context,
-        { webAddress: "", webhookAddress: "https://hooks.example.com/" },
-        now,
-        { host: "127.0.0.1:3000", bindHost: "127.0.0.1" },
-      ),
+      setUpFirstWorkspace(f.context, { name: "Acme Commerce", projects: [project] }, now),
     ).toEqual({ ok: true });
-    const settings = await page(f);
-    const connection = settings.install.connections[0];
-    if (connection === undefined) throw new Error("no connection");
-    const html = render(settings, "tracker");
-    expect(html).toContain(`https://hooks.example.com${connection.webhookPath}`);
-    expect(text(html)).not.toContain("아직 webhook 공개 주소가 없어요");
+    expect(listWorkspaces(f.context.db).map((w) => w.name)).toEqual(["Acme Commerce"]);
+
+    const taken = toTrackerProjectId("tp-taken");
+    saveWorkspace(f.context.db, { id: toWorkspaceId("ws-labs"), name: "Acme Labs" }, now);
+    saveWorkspaceTrackerProject(f.context.db, {
+      workspaceId: toWorkspaceId("ws-labs"),
+      connection: connectionId(f),
+      projectId: taken,
+      name: "Taken",
+      inProgressStateId: null,
+    });
+    expect(
+      setUpFirstWorkspace(
+        f.context,
+        {
+          name: "Renamed",
+          projects: [{ ...project, projectId: taken, name: "Taken" }],
+        },
+        now,
+      ),
+    ).toEqual({ ok: false, reason: "taken" });
+    expect(listWorkspaces(f.context.db)[0]?.name).toBe("Acme Commerce");
   });
 
-  it("단계 없는 주소로 들어와 트래커 연결을 저장하면 1단계에 머물고 webhook 경로가 보인다", async () => {
+  it("단계 없는 주소로 들어와 트래커 연결을 저장하면 1단계에 머물고 연결 요약이 보인다", async () => {
     const f = fixture();
     const step = stepToPin(await page(f), undefined);
     expect(step).toBe(1);
@@ -636,11 +840,8 @@ describe("다섯 단계를 마치기", () => {
     const index = resolveStep(settings, step ?? undefined);
     expect(index).toBe(0);
     expect(stepToPin(settings, step ?? undefined)).toBeNull();
-    const connection = settings.install.connections[0];
-    if (connection === undefined) throw new Error("no connection");
     const html = render(settings, ONBOARDING_STEPS[index] ?? "github");
-    expect(text(html)).toContain("Linear에서 webhook 만들기");
-    expect(html).toContain(connection.webhookPath);
+    expect(text(html)).toContain("연결을 확인했어요");
     expect(isDisabled(nextButton(html, "다음"))).toBe(false);
   });
 
@@ -650,30 +851,5 @@ describe("다섯 단계를 마치기", () => {
     expect(step).toBe(1);
     await connectTracker(f);
     expect(resolveStep(await page(f), step ?? undefined)).toBe(0);
-  });
-
-  it("signing secret 없이 저장한 연결이면 1단계에 그 사실을 알리고, 다음으로 가는 것은 막지 않는다", async () => {
-    const f = fixture();
-    await connectTracker(f);
-    const withoutSecret = await page(f);
-    expect(withoutSecret.install.connections[0]?.hasWebhookSecret).toBe(false);
-    const html = render(withoutSecret, "tracker");
-    expect(text(html)).toContain("아직 signing secret이 없어요");
-    expect(text(html)).toContain("서명 검증에 실패");
-    expect(isDisabled(nextButton(html, "다음"))).toBe(false);
-
-    const id = withoutSecret.install.connections[0]?.id ?? "";
-    expect(
-      await saveTrackerConnectionSetting(
-        f.context,
-        { id, name: "Acme", apiKey: "", webhookSecret: "lin_wh_example" },
-        now,
-      ),
-    ).toEqual({ ok: true });
-    const withSecret = await page(f);
-    expect(withSecret.install.connections[0]?.hasWebhookSecret).toBe(true);
-    const shown = text(render(withSecret, "tracker"));
-    expect(shown).not.toContain("아직 signing secret이 없어요");
-    expect(shown).toContain("signing secret을 저장했어요");
   });
 });

@@ -171,7 +171,7 @@ _Avoid_: 패키지(npm 패키지와 헷갈린다), 빌드 산출물(앱 하나�
 _Avoid_: 바인드 주소(`WEB_HOST`, 서버가 듣는 인터페이스다), 공개 주소
 
 **webhook 공개 주소**:
-트래커가 webhook을 보내는 공개 인터넷 주소(예: Tailscale Funnel, Cloudflare Tunnel). Settings의 주소와 온보딩 1단계에서 정한다. 이 주소의 호스트로는 webhook 경로만 받고, 온보딩은 이 주소 뒤에 webhook 경로를 붙여 보인다. 화면·README에서는 "webhook address"로 쓴다.
+트래커가 webhook을 보내는 공개 인터넷 주소(예: Tailscale Funnel, Cloudflare Tunnel). Settings의 주소에서 정한다. 이 주소의 호스트로는 webhook 경로만 받는다. 온보딩은 webhook을 묻지 않고, 1단계에서 webhook 없이도 자동 할당이 도는 방식과 켜는 곳만 안내한다. 화면·README에서는 "webhook address"로 쓴다.
 _Avoid_: 공개 주소(어느 주소인지 흐리다), 터널 주소
 
 **신원 확인 경로**:

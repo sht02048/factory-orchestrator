@@ -3,6 +3,7 @@ import {
   Actions,
   Button,
   Card,
+  Checkbox,
   DefinitionItem,
   DefinitionList,
   DetailPanel,
@@ -122,6 +123,8 @@ export function ComponentSections() {
   const [selected, setSelected] = useState<RunId>("r1051");
   const [workspace, setWorkspace] = useState("commerce");
   const [agent, setAgent] = useState<string | null>(null);
+  const [web, setWeb] = useState(true);
+  const [api, setApi] = useState(false);
 
   const statusName = useStatusName();
   const current = runs.find((r) => r.id === selected) ?? runs[0];
@@ -427,6 +430,17 @@ export function ComponentSections() {
                   mono
                 />
               </Field>
+              <div>
+                <Checkbox label={t("form.checkWeb")} checked={web} onCheckedChange={setWeb} />
+                <Checkbox label={t("form.checkApi")} checked={api} onCheckedChange={setApi} />
+                <Checkbox
+                  label={t("form.checkMobile")}
+                  description={t("form.checkMobileHint")}
+                  checked={false}
+                  disabled
+                  onCheckedChange={() => {}}
+                />
+              </div>
             </div>
           </Demo>
         </Section>

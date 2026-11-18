@@ -8,57 +8,89 @@
   "next": "다음",
   "finish": "설정 마치기",
   "nextLocked": "확인이 끝나야 다음으로 갈 수 있어요.",
+  "edit": "수정",
+  "close": "닫기",
+  "externalLink": "새 창에서 열려요",
   "steps": {
     "tracker": {
       "name": "Tracker",
-      "title": "트래커를 연결해요",
-      "description": "티켓을 읽어 올 Linear 조직의 API 키를 넣어요. 넣으면 바로 연결을 확인하고, 확인되면 저장해요. signing secret은 저장한 뒤 webhook을 만들면 받으니 지금은 비워 둬도 돼요."
+      "title": "Linear를 연결해요",
+      "description": "티켓을 읽어 올 Linear 조직의 API 키 하나만 있으면 돼요."
     },
     "github": {
       "name": "GitHub",
       "title": "GitHub 토큰을 넣어요",
-      "description": "런이 연 PR의 상태를 읽을 때 써요. 넣으면 바로 GitHub에 연결을 확인하고, 확인되면 암호화해서 저장해요."
+      "description": "런이 연 PR의 상태를 읽을 때 써요. 읽기 권한만 있으면 돼요."
     },
     "runner": {
       "name": "Runner",
       "title": "첫 러너를 등록해요",
-      "description": "ssh로 닿는 Orca 환경이 러너예요. 등록하면 worker가 ssh로 접속해 러너가 런을 돌릴 준비가 됐는지 확인해요."
+      "description": "ssh로 닿는 Orca 환경이 러너예요. 등록하면 worker가 접속해 런을 돌릴 준비가 됐는지 확인해요."
     },
     "workspace": {
       "name": "Workspace",
       "title": "첫 Workspace를 만들어요",
-      "description": "함께 볼 트래커 프로젝트를 골라 묶어요. 홈·Tickets·Stats는 Workspace 단위로 보여요."
+      "description": "함께 볼 트래커 프로젝트를 골라 묶어요. Dashboard·Tickets·Stats는 Workspace 단위로 보여요."
     },
     "mapping": {
       "name": "Mapping",
       "title": "티켓을 누가 처리할지 정해요",
-      "description": "트래커 프로젝트마다 러너 쪽 프로젝트와 에이전트를 고르고, 런이 시작할 때 티켓을 옮길 \"In Progress\" 상태와 자동 할당에 쓸 Auto-assign Label을 정해요. 셋을 모두 정한 트래커 프로젝트가 하나 이상이면 설정을 마칠 수 있어요."
+      "description": "트래커 프로젝트마다 한 줄씩 채워요. 한 줄을 다 채우고 그 트래커 연결의 Auto-assign Label을 고르면 설정을 마칠 수 있어요."
     }
   },
+  "tracker": {
+    "keyDescription": "연결을 확인하면 암호화해서 저장해요. 연결 이름은 Linear 조직 이름으로 정하고, Settings에서 바꿀 수 있어요.",
+    "keyDescriptionEdit": "새 키로 연결을 확인하면 암호화해서 저장해요. 연결 이름은 그대로예요.",
+    "keyPlaceholder": "lin_api_…",
+    "check": "연결 확인",
+    "checked": "연결을 확인했어요",
+    "guideTitle": "API 키 만드는 법",
+    "guideStepOpen": "Linear에서 Settings › Account › Security & access로 가요.",
+    "guideStepCreate": "Personal API keys에서 새 키를 만들어요.",
+    "guideStepPaste": "만든 키를 복사해 위 칸에 붙여 넣어요.",
+    "guideLink": "Linear에서 키 만들기"
+  },
   "webhook": {
-    "title": "Linear에서 webhook 만들기",
-    "intro": "티켓이 바뀌면 바로 알 수 있게 Linear가 이 오케스트레이터로 이벤트를 보내게 해요.",
-    "stepOpen": "Linear 설정의 API 화면에서 새 webhook을 만들어요.",
-    "stepUrl": "URL에는 아래 webhook 주소를 넣어요. webhook 공개 주소 뒤에 경로를 붙인 거예요.",
-    "stepEvents": "받을 이벤트는 Issues를 골라요.",
-    "stepSecret": "만든 뒤 보이는 signing secret을 위 연결의 Webhook signing secret 칸에 넣고 저장해요.",
-    "url": "Webhook 주소",
-    "urlDescription": "아래에서 정한 webhook 공개 주소로 만들었어요.",
-    "secretSaved": "signing secret을 저장했어요. 다음을 누르면 넘어가요.",
-    "secretMissingTitle": "아직 signing secret이 없어요",
-    "secretMissingBody": "이대로 다음으로 가도 돼요. 다만 Linear가 보낸 webhook이 서명 검증에 실패해, Auto-assign Label을 붙인 티켓을 바로 할당하지 못하고 1분쯤마다 트래커를 다시 읽을 때 할당해요. 이때 런이 한 번도 없던 티켓만 할당하니, 라벨을 다시 붙여 다시 맡기려면 Tickets에서 할당해요.",
-    "path": "Webhook 경로",
-    "addressMissingTitle": "아직 webhook 공개 주소가 없어요",
-    "addressMissingBody": "webhook을 쓰려면 트래커가 공개 인터넷에서 이 서버에 닿아야 해요. 없어도 런이 한 번도 없던 티켓은 Auto-assign Label을 붙이면 1분쯤 안에 할당돼요. 라벨을 다시 붙여 다시 맡기려면 webhook이 있어야 하고, 없으면 Tickets에서 다시 할당해요. Tailscale Funnel, Cloudflare Tunnel, 리버스 프록시 중 하나로 연 주소를 아래 webhook 공개 주소에 넣으면 전체 webhook 주소가 보여요. 나중에 Settings의 주소에서 넣어도 돼요."
+    "question": "webhook은 안 만들어도 되나요?",
+    "answer": "네, 지금은 API 키만 있으면 돼요. Auto-assign Label을 붙인 티켓은 webhook 없이도 할당해요. webhook은 할당을 앞당기고, 한 가지 경우를 더 맡아요.",
+    "withoutTitle": "webhook 없이",
+    "withoutBody": "worker가 1분쯤마다 Linear를 읽어, Auto-assign Label이 붙었고 아직 런이 없던 티켓을 할당해요. 라벨을 붙이고 런이 생기기까지 최대 1분쯤 걸려요.",
+    "withTitle": "webhook을 켜면",
+    "withBody": "라벨을 붙이는 순간 Linear가 바로 알려 줘서 10초쯤 안에 할당해요. 끝난 런이 있던 티켓도 라벨을 뺐다가 다시 붙이면 다시 할당해요.",
+    "retry": "webhook이 없으면 끝난 런이 있던 티켓은 라벨로 다시 할당하지 않아요. 그런 티켓은 Tickets에서 직접 할당해요.",
+    "stopped": "webhook 없이 worker가 하루 넘게 멈춰 있었다면 그동안 라벨을 붙인 티켓은 놓칠 수 있어요. 그런 티켓은 Tickets에서 할당해요.",
+    "address": "켜려면 Linear가 인터넷에서 이 서버에 닿을 webhook 공개 주소가 따로 있어야 해요. 이 서버는 보통 이 기기나 tailnet 안에서만 열려 있어서, Tailscale Funnel이나 Cloudflare Tunnel로 webhook 경로만 밖에 열어야 해요. 그래서 설정을 마친 뒤 Settings의 주소와 트래커 연결에서 켜요."
+  },
+  "github": {
+    "saved": "GitHub 토큰을 저장했어요",
+    "savedMeta": "연결을 확인했어요",
+    "change": "토큰 바꾸기",
+    "guideTitle": "토큰 만드는 법",
+    "guideLink": "GitHub에서 토큰 만들기",
+    "guideStepToken": "Fine-grained token을 새로 만들어요. 위 버튼을 누르면 만드는 화면이 바로 열려요.",
+    "guideStepOwner": "Resource owner는 저장소가 있는 계정이나 조직을 골라요.",
+    "guideStepRepos": "Repository access에서 에이전트가 PR을 여는 저장소를 골라요.",
+    "guideStepPermissions": "Permissions에서 아래 권한을 Read-only로 줘요.",
+    "required": "필수",
+    "optional": "선택",
+    "permissionPullRequests": "Pull requests",
+    "permissionPullRequestsNote": "Metadata는 자동으로 들어가요",
+    "permissionActions": "Actions",
+    "permissionActionsNote": "있으면 Run 상세에 CI 상태가 보여요",
+    "guideStepPaste": "만든 토큰을 복사해 토큰 칸에 넣어요. 조직 저장소면 조직 관리자가 토큰을 승인해야 할 수 있어요.",
+    "tokenDescription": "GitHub에 연결을 확인한 뒤 암호화해서 저장해요.",
+    "tokenPlaceholder": "github_pat_…"
   },
   "runner": {
     "beforeTitle": "등록하기 전에 러너에서 해 둘 일",
     "checkTitle": "{name} 러너",
+    "ready": "{name} 러너가 준비됐어요",
+    "target": "{sshTarget} · capacity {capacity}",
+    "checklist": "확인 결과",
     "beforeService": "Orca 상시 서비스를 설치해요. 러너가 꺼졌다 켜져도 Orca가 다시 떠요.",
     "pathPlaceholder": "orca 절대 경로",
     "beforeAuth": "비대화형 ssh 세션에서도 GitHub에 push할 수 있게 인증해 둬요. 에이전트가 러너에서 push하고 PR을 열어야 PR 상태를 정할 수 있어요.",
     "waiting": "확인 결과를 기다리고 있어요.",
-    "passed": "러너가 준비됐어요. 다음으로 가요.",
     "offline": "러너에 닿지 않았어요. ssh 대상과 orca 실행 파일 경로를 확인하고 저장하면 다시 확인해요.",
     "serviceTitle": "Orca 상시 서비스가 없어요",
     "serviceBody": "러너에서 아래 명령으로 서비스를 설치한 뒤 다시 확인해요. PATH에 orca가 없어도 되게 등록한 경로를 넣었어요.",
@@ -78,25 +110,36 @@
   "workspace": {
     "name": "Workspace 이름",
     "namePlaceholder": "예: Acme Commerce",
+    "projects": "넣을 트래커 프로젝트",
+    "projectsHint": "하나 이상 골라요. 한 트래커 프로젝트는 Workspace 하나에만 넣을 수 있어요.",
+    "inThis": "이 Workspace에 있어요. 빼려면 Settings에서 빼요.",
     "create": "만들기",
     "creating": "만드는 중",
     "created": "Workspace를 만들었어요",
     "current": "{name} Workspace",
-    "pickHint": "트래커 프로젝트를 하나 이상 넣어요.",
-    "failed": "만들지 못했어요. 다시 해 주세요."
+    "summary": "트래커 프로젝트 {count}개 · {names}"
   },
   "mapping": {
-    "parts": {
-      "mapping": "Mapping",
-      "progress": "\"In Progress\" 상태",
-      "label": "Auto-assign Label"
-    },
-    "ready": "라벨만 붙이면 티켓을 할당하고, 런이 시작하면 티켓을 \"In Progress\"로 옮겨요.",
+    "trackerProject": "트래커 프로젝트",
+    "runnerProject": "러너 쪽 프로젝트",
+    "agent": "에이전트",
+    "inProgress": "시작하면 옮길 상태",
+    "rowState": "다 채웠는지",
+    "tableLabel": "트래커 프로젝트별 Mapping",
+    "cellLabel": "{project}의 {column}",
+    "rowDone": "다 채웠어요",
+    "rowEmpty": "아직 비어 있어요",
+    "needAgent": "에이전트도 골라야 저장해요.",
+    "needRunnerProject": "러너 쪽 프로젝트도 골라야 저장해요.",
+    "labelTitle": "Auto-assign Label",
+    "labelHint": "이 라벨이 붙은 티켓은 운영자 없이 할당해요. 라벨이 없는 티켓은 Tickets에서 직접 할당해요.",
+    "labelSelect": "{connection}의 Auto-assign Label",
+    "ready": "라벨만 붙이면 티켓을 할당하고, 런이 시작하면 티켓을 고른 상태로 옮겨요.",
     "missingTitle": "설정을 마치려면 이것을 정해요.",
     "missing": {
-      "mapping": "러너 쪽 프로젝트와 에이전트를 골라 Mapping을 저장해요.",
-      "progress": "Mapping을 정한 트래커 프로젝트의 \"In Progress\" 상태를 골라 저장해요. 고르지 않으면 런이 시작해도 티켓 상태가 바뀌지 않아요.",
-      "label": "그 트래커 연결의 Auto-assign Label을 골라 저장해요. 고르지 않으면 라벨을 붙여도 할당되지 않아요."
+      "mapping": "한 줄에서 러너 쪽 프로젝트와 에이전트를 골라요.",
+      "progress": "그 줄의 시작하면 옮길 상태를 골라요. 고르지 않으면 런이 시작해도 티켓 상태가 바뀌지 않아요.",
+      "label": "그 트래커 연결의 Auto-assign Label을 골라요. 고르지 않으면 라벨을 붙여도 할당되지 않아요."
     }
   }
 }

@@ -1,5 +1,6 @@
 export { Button, buttonStyles, type ButtonProps, type ButtonVariant } from "./components/button";
 export { Card, Row, type CardProps, type RowProps } from "./components/card";
+export { Checkbox, type CheckboxProps } from "./components/checkbox";
 export {
   DefinitionItem,
   DefinitionList,

@@ -1,3 +1,5 @@
+import type { WorkspaceId } from "@factory/db";
+
 export const WORKSPACE_ITEMS = ["general", "projects", "mapping", "progress", "label"] as const;
 export const INSTALL_ITEMS = ["connections", "github", "runners", "addresses"] as const;
 export type WorkspaceItem = (typeof WORKSPACE_ITEMS)[number];
@@ -21,7 +23,7 @@ export interface Choice {
 }
 
 export interface WorkspaceGeneral {
-  id: string;
+  id: WorkspaceId;
   name: string;
   maxRunMinutes: number;
 }

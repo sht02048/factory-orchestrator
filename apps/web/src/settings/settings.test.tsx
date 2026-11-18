@@ -42,6 +42,7 @@ import {
   saveRunnerSetting,
   runnerInput,
   saveTrackerConnectionSetting,
+  trackerConnectionInput,
   mappingInput,
 } from "./actions";
 import { hasPendingRunnerChecks, loadSettingsPage } from "./load";
@@ -303,6 +304,79 @@ describe("Settings 저장하고 다시 열기", () => {
         secrets: { apiKey: "lin_api_example", webhookSecret: "whsec_example" },
       }),
     ]);
+  });
+
+  it("이름 없이 저장하면 연결 이름을 트래커 조직 이름으로, 조직 이름이 없으면 Linear로 정한다", async () => {
+    const f = fixture();
+    f.tracker.connection = { ok: true, organizationName: "Acme" };
+    expect(
+      await saveTrackerConnectionSetting(
+        f.context,
+        { apiKey: "lin_api_example", webhookSecret: "" },
+        now,
+      ),
+    ).toEqual({ ok: true });
+    f.tracker.connection = { ok: true, organizationName: null };
+    expect(
+      await saveTrackerConnectionSetting(
+        f.context,
+        { apiKey: "lin_api_other", webhookSecret: "" },
+        now,
+      ),
+    ).toEqual({ ok: true });
+    f.tracker.connection = { ok: true, organizationName: "   " };
+    expect(
+      await saveTrackerConnectionSetting(
+        f.context,
+        { apiKey: "lin_api_blank", webhookSecret: "" },
+        now,
+      ),
+    ).toEqual({ ok: true });
+    f.tracker.connection = { ok: true, organizationName: `  ${"가😀".repeat(150)}  ` };
+    expect(
+      await saveTrackerConnectionSetting(
+        f.context,
+        { apiKey: "lin_api_long", webhookSecret: "" },
+        now,
+      ),
+    ).toEqual({ ok: true });
+    const saved = listTrackerConnections(f.context.db, f.context.secretBox);
+    expect(saved.map((c) => c.name).toSorted()).toEqual([
+      "Acme",
+      "Linear",
+      "Linear",
+      "가😀".repeat(100),
+    ]);
+
+    const long = saved.find((c) => c.name.startsWith("가"));
+    if (long === undefined) throw new Error("no long connection");
+    const resubmitted = trackerConnectionInput.parse({
+      id: long.id,
+      name: long.name,
+      apiKey: "",
+      webhookSecret: "",
+    });
+    expect(await saveTrackerConnectionSetting(f.context, resubmitted, now)).toEqual({ ok: true });
+    expect(
+      trackerConnectionInput.safeParse({
+        name: `${long.name}가`,
+        apiKey: "",
+        webhookSecret: "",
+      }).success,
+    ).toBe(false);
+
+    const id = saved.find((c) => c.name === "Acme")?.id ?? "";
+    f.tracker.connection = { ok: true, organizationName: "Acme Renamed" };
+    expect(
+      await saveTrackerConnectionSetting(
+        f.context,
+        { id, apiKey: "lin_api_rotated", webhookSecret: "" },
+        now,
+      ),
+    ).toEqual({ ok: true });
+    expect(
+      listTrackerConnections(f.context.db, f.context.secretBox).find((c) => c.id === id)?.name,
+    ).toBe("Acme");
   });
 
   it("연결 확인에 실패하면 트래커 연결과 GitHub 토큰을 저장하지 않는다", async () => {

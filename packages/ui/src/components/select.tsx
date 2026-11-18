@@ -26,6 +26,8 @@ export interface SelectProps {
   placeholder?: string;
   name?: string;
   disabled?: boolean;
+  "aria-label"?: string;
+  "aria-describedby"?: string;
 }
 
 export function Select({
@@ -35,6 +37,8 @@ export function Select({
   placeholder,
   name,
   disabled,
+  "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
 }: SelectProps) {
   return (
     <SdkSelect<string>
@@ -48,6 +52,8 @@ export function Select({
       {...(disabled === undefined ? {} : { disabled })}
     >
       <SelectTrigger
+        {...(ariaLabel === undefined ? {} : { "aria-label": ariaLabel })}
+        {...(ariaDescribedBy === undefined ? {} : { "aria-describedby": ariaDescribedBy })}
         className={(s) =>
           cx(fieldStyles.control, styles.trigger, s.placeholder && styles.placeholder)
         }

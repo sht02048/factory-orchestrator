@@ -20,7 +20,7 @@ import type {
   StartedRun,
   Tracker,
   TrackerComment,
-  TrackerErrorDetail,
+  TrackerConnectionCheck,
   TrackerEvent,
   TrackerLabel,
   TrackerProject,
@@ -79,7 +79,7 @@ export class FakeTracker implements Tracker {
   readonly labels = new Map<TrackerProjectId, TrackerLabel[]>();
   readonly states = new Map<TrackerProjectId, TrackerState[]>();
   readonly stateChanges: Array<{ key: TicketKey; stateId: TrackerStateId }> = [];
-  connection: ConnectionCheck<TrackerErrorDetail> = { ok: true };
+  connection: TrackerConnectionCheck = { ok: true, organizationName: null };
   verifyWebhookWith: (input: { rawBody: Uint8Array; now: Date }) => WebhookResult = () => ({
     ok: false,
     error: "malformed",
@@ -94,7 +94,7 @@ export class FakeTracker implements Tracker {
     this.tickets.set(ticket.key, ticket);
   }
 
-  checkConnection(): Promise<ConnectionCheck<TrackerErrorDetail>> {
+  checkConnection(): Promise<TrackerConnectionCheck> {
     return Promise.resolve(this.connection);
   }
 

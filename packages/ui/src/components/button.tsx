@@ -15,6 +15,7 @@ export interface ButtonProps {
   type?: "button" | "submit" | "reset";
   onClick?: SdkButtonProps["onClick"];
   "aria-label"?: string;
+  "aria-expanded"?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
 
@@ -37,7 +38,7 @@ export function buttonStyles(variant: ButtonVariant, disabled = false): Readonly
     variant === "primary" && styles.primary,
     variant === "danger" && styles.danger,
     variant === "ghost" && styles.ghost,
-    disabled && styles.disabled,
+    disabled && (variant === "ghost" ? styles.ghostDisabled : styles.disabled),
   ];
 }
 
@@ -102,7 +103,14 @@ const styles = stylex.create({
     },
   },
   disabled: {
-    backgroundColor: { default: colors.bgCard, ":hover": colors.bgCard },
+    backgroundColor: { default: colors.bgControl, ":hover": colors.bgControl },
+    boxShadow: `inset 0 0 0 1px ${colors.borderDefault}`,
+    color: { default: colors.textDisabled, ":hover": colors.textDisabled },
+    cursor: "not-allowed",
+    transform: { default: null, ":active": null },
+  },
+  ghostDisabled: {
+    backgroundColor: { default: "transparent", ":hover": "transparent" },
     color: { default: colors.textDisabled, ":hover": colors.textDisabled },
     cursor: "not-allowed",
     transform: { default: null, ":active": null },

@@ -33,7 +33,9 @@ export class DemoWorld {
     if (apiKey.toLowerCase().includes(FAIL_AUTH)) {
       tracker.connection = { ok: false, error: { kind: "unauthorized" } };
     } else {
-      const catalog = trackerCatalog(trackerSpecFor(apiKey), this.now());
+      const spec = trackerSpecFor(apiKey);
+      tracker.connection = { ok: true, organizationName: spec.name };
+      const catalog = trackerCatalog(spec, this.now());
       tracker.projects.push(...catalog.projects);
       for (const project of catalog.projects) {
         tracker.states.set(project.id, catalog.states);

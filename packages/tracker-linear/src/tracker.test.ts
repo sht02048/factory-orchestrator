@@ -102,12 +102,26 @@ const PROJECT = toTrackerProjectId("00000000-0000-4000-8000-000000000102");
 const KEY = toTicketKey("ENG-123");
 
 describe("checkConnection", () => {
-  it("API 키로 viewer를 읽으면 연결된 것이다. 키는 Bearer 없이 보낸다", async () => {
-    const { tracker: t, sent } = tracker(fixture("connection-ok"));
+  it("API 키로 viewer를 읽으면 연결된 것이고 조직 이름을 돌려준다. 키는 Bearer 없이 보낸다", async () => {
+    const { tracker: t, sent } = tracker(fixture("connection-ok"), fixture("organization-ok"));
 
-    await expect(t.checkConnection()).resolves.toEqual({ ok: true });
+    await expect(t.checkConnection()).resolves.toEqual({
+      ok: true,
+      organizationName: "Example organization",
+    });
     expect(sent[0]?.authorization).toBe("lin_api_test");
     expect(sent[0]?.url).toBe("https://api.linear.app/graphql");
+  });
+
+  it("viewer는 읽히는데 조직을 읽지 못하면 연결은 된 것이고 조직 이름은 비운다", async () => {
+    const partial = withBody(fixture("organization-ok"), () => ({
+      data: { viewer: { organization: null } },
+      errors: [{ message: "Forbidden", extensions: { code: "FORBIDDEN" } }],
+    }));
+    for (const second of [partial, new TypeError("fetch failed")]) {
+      const { tracker: t } = tracker(fixture("connection-ok"), second);
+      await expect(t.checkConnection()).resolves.toEqual({ ok: true, organizationName: null });
+    }
   });
 
   it("인증 실패를 unauthorized로 돌려준다", async () => {

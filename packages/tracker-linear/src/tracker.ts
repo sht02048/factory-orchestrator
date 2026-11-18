@@ -8,14 +8,13 @@ import {
 } from "@factory/core";
 import type {
   CommentId,
-  ConnectionCheck,
   LabelId,
   Page,
   Paged,
   TicketKey,
   Tracker,
   TrackerComment,
-  TrackerErrorDetail,
+  TrackerConnectionCheck,
   TrackerFactory,
   TrackerLabel,
   TrackerProject,
@@ -80,6 +79,8 @@ fragment TicketFields on Issue {
 const PAGE_INFO = "pageInfo { hasNextPage endCursor }";
 
 const QUERY_CONNECTION = "query Connection { viewer { id } }";
+
+const QUERY_ORGANIZATION = "query Organization { viewer { organization { name } } }";
 
 const QUERY_TICKET = `query Ticket($id: String!) { issue(id: $id) { ...TicketFields } }
 ${TICKET_FIELDS}`;
@@ -239,17 +240,30 @@ export class LinearTracker implements Tracker {
     this.webhookSecret = input.webhookSecret;
   }
 
-  async checkConnection(): Promise<ConnectionCheck<TrackerErrorDetail>> {
+  async checkConnection(): Promise<TrackerConnectionCheck> {
     try {
       await this.client.request(
         QUERY_CONNECTION,
         {},
         z.object({ viewer: z.object({ id: idSchema }) }),
       );
-      return { ok: true };
+      return { ok: true, organizationName: await this.organizationName() };
     } catch (error) {
       if (error instanceof LinearTrackerError) return { ok: false, error: error.detail };
       throw error;
+    }
+  }
+
+  private async organizationName(): Promise<string | null> {
+    try {
+      const data = await this.client.request(
+        QUERY_ORGANIZATION,
+        {},
+        z.object({ viewer: z.object({ organization: z.object({ name: z.string() }) }) }),
+      );
+      return data.viewer.organization.name;
+    } catch {
+      return null;
     }
   }
 
