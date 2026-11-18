@@ -129,28 +129,34 @@ describe("Settings 포커스와 입력(브라우저, 0055)", () => {
     const name = page.getByLabel(settings.general.name);
     const maxRun = page.getByLabel(settings.general.maxRun);
 
+    const form = page.locator("form").filter({ has: name });
+
     await name.fill("");
-    expect(await page.getByText(settings.general.nameInvalid).count()).toBe(0);
+    expect(await form.getByText(settings.general.nameInvalid).count()).toBe(0);
     await maxRun.focus();
-    await page.getByText(settings.general.nameInvalid).waitFor();
+    await form.getByText(settings.general.nameInvalid).waitFor();
 
     await maxRun.fill("");
-    expect(await page.getByText(settings.general.maxRunInvalid).count()).toBe(0);
+    expect(await form.getByText(settings.general.maxRunInvalid).count()).toBe(0);
     await name.focus();
-    await page.getByText(settings.general.maxRunInvalid).waitFor();
+    await form.getByText(settings.general.maxRunInvalid).waitFor();
 
     await maxRun.fill("60");
-    await page.getByText(settings.general.maxRunInvalid).waitFor({ state: "detached" });
+    await form.getByText(settings.general.maxRunInvalid).waitFor({ state: "detached" });
   });
 
   it("러너 Capacity 도 칸을 벗어난 뒤에 오류를 보이고, 숫자 키보드를 쓴다", async () => {
     await openSettings(page, "runners");
-    const capacity = page.getByLabel(settings.runners.capacity).first();
+    const form = page
+      .locator("form")
+      .filter({ has: page.getByLabel(settings.runners.capacity) })
+      .first();
+    const capacity = form.getByLabel(settings.runners.capacity);
     expect(await capacity.getAttribute("inputmode")).toBe("numeric");
     await capacity.fill("");
-    expect(await page.getByText(settings.runners.capacityInvalid).count()).toBe(0);
-    await page.getByLabel(settings.runners.name).first().focus();
-    await page.getByText(settings.runners.capacityInvalid).first().waitFor();
+    expect(await form.getByText(settings.runners.capacityInvalid).count()).toBe(0);
+    await form.getByLabel(settings.runners.name).focus();
+    await form.getByText(settings.runners.capacityInvalid).waitFor();
   });
 
   it("비밀값 칸은 새 비밀번호를 권하지 않고 비밀번호 관리자가 건너뛴다", async () => {
@@ -170,7 +176,7 @@ describe("Settings 포커스와 입력(브라우저, 0055)", () => {
     await openSettings(page, "general");
     expect(await page.getByText(settings.unsaved).count()).toBe(0);
     await page.getByLabel(settings.general.name).fill("Acme Shop");
-    await page.getByRole("status").getByText(settings.unsaved).waitFor();
+    await unsavedStatus().waitFor();
     await page
       .getByRole("listbox", { name: settings.workspaceListLabel })
       .getByText(settings.unsaved)
@@ -181,15 +187,15 @@ describe("Settings 포커스와 입력(브라우저, 0055)", () => {
     await openSettings(page, "general");
     await page.getByLabel(settings.general.name).fill("Acme ");
     await page.getByLabel(settings.general.maxRun).fill("060");
-    await page.getByRole("status").getByText(settings.unsaved).waitFor();
+    await unsavedStatus().waitFor();
     await page.getByRole("button", { name: settings.save }).click();
-    await page.getByRole("status").getByText(settings.unsaved).waitFor({ state: "detached" });
+    await unsavedStatus().waitFor({ state: "detached" });
 
     await openSettings(page, "addresses");
     await page.getByLabel(settings.addresses.webhook).fill("https://hooks.example.com/");
-    await page.getByRole("status").getByText(settings.unsaved).waitFor();
+    await unsavedStatus().waitFor();
     await page.getByRole("button", { name: settings.addresses.save, exact: true }).click();
-    await page.getByRole("status").getByText(settings.unsaved).waitFor({ state: "detached" });
+    await unsavedStatus().waitFor({ state: "detached" });
     expect(await page.getByLabel(settings.addresses.webhook).inputValue()).toBe(
       "https://hooks.example.com/",
     );
@@ -229,6 +235,13 @@ function projectRow(name: string): Locator {
     .getByRole("listitem")
     .filter({ hasText: name })
     .filter({ has: page.getByRole("button") });
+}
+
+function unsavedStatus(): Locator {
+  return page
+    .getByRole("region", { name: settings.panelLabel })
+    .getByRole("status")
+    .getByText(settings.unsaved);
 }
 
 async function focused(): Promise<string | null> {
