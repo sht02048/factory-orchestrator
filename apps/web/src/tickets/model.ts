@@ -11,11 +11,14 @@ export type TicketRun =
   | {
       id: string;
       assignedAt: string;
+      /** 할당부터 서버가 읽은 때까지(밀리초). 화면이 "25분 전"으로 쓴다(ADR 0010 7번) */
+      assignedAgoMs: number;
       state: "queued" | "running" | "waiting-for-input" | "disconnected";
     }
   | {
       id: string;
       assignedAt: string;
+      assignedAgoMs: number;
       state: "ended";
       agentResult: AgentResult;
       prState: PrState;

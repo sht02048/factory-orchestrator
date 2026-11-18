@@ -23,9 +23,10 @@ import {
   Tabs,
   Text,
 } from "@factory/ui";
-import { colors, space } from "@factory/ui/tokens.stylex";
+import { colors, fontSize, fontWeight, space } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
-import { useFormatter, useTranslations } from "use-intl";
+import { useTranslations } from "use-intl";
+import { useTime } from "../format/time";
 import type { WorkspaceSummary } from "../shell/model";
 import { runStatus, useStatusName } from "../status";
 import type { AssignInput, AssignResult } from "./assign";
@@ -33,8 +34,8 @@ import { AssignDialog } from "./assign-dialog";
 import { TICKET_FILTERS, lastRun, matchesFilter } from "./model";
 import type { TicketFilter, TicketView, TicketsPage } from "./model";
 
-// 제목 | 티켓 | 트래커 프로젝트 | 트래커 상태 | 마지막 런 (시안 B)
-const columns = "minmax(0, 1fr) 96px 128px 104px 144px";
+// 티켓(회색 키 + 제목) | 트래커 프로젝트 | 트래커 상태 | 마지막 런 (ADR 0010 9번)
+const columns = "minmax(0, 1fr) 128px 104px 160px";
 
 export interface TicketsScreenProps {
   page: TicketsPage;
@@ -73,7 +74,7 @@ function Notice({ body }: { body: ReactNode }) {
   const t = useTranslations("tickets");
   return (
     <div {...stylex.props(styles.notice)}>
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} subtitle={t("summary")} />
       {body}
     </div>
   );
@@ -157,7 +158,6 @@ function TicketsList({
           </Tabs>
           <Table columns={columns}>
             <TableHead>
-              <TableHeader>{t("columns.title")}</TableHeader>
               <TableHeader>{t("columns.ticket")}</TableHeader>
               <TableHeader>{t("columns.trackerProject")}</TableHeader>
               <TableHeader>{t("columns.trackerState")}</TableHeader>
@@ -201,11 +201,13 @@ function TicketRow({ ticket }: { ticket: TicketView }) {
   const statusName = useStatusName();
   const run = lastRun(ticket);
   return (
-    <TableRow value={ticket.id} label={ticket.title}>
+    <TableRow value={ticket.id} label={`${ticket.key} ${ticket.title}`}>
       <TableCell>
-        <RowTitle>{ticket.title}</RowTitle>
+        <span {...stylex.props(styles.ticketCell)}>
+          <span {...stylex.props(styles.key)}>{ticket.key}</span>
+          <RowTitle>{ticket.title}</RowTitle>
+        </span>
       </TableCell>
-      <TableCell numeric>{ticket.key}</TableCell>
       <TableCell>{ticket.trackerProject.name}</TableCell>
       <TableCell>{ticket.trackerState.name}</TableCell>
       <TableCell>
@@ -233,7 +235,7 @@ function TicketPanel({
   const t = useTranslations("tickets.panel");
   const tList = useTranslations("tickets");
   const statusName = useStatusName();
-  const format = useFormatter();
+  const { ago } = useTime();
   const run = lastRun(ticket);
   const { assignability } = ticket;
 
@@ -258,9 +260,13 @@ function TicketPanel({
             </>
           )
         }
-        title={ticket.title}
+        title={
+          <span {...stylex.props(styles.ticketCell)}>
+            <span {...stylex.props(styles.key, styles.panelKey)}>{ticket.key}</span>
+            <span>{ticket.title}</span>
+          </span>
+        }
         subtitle={t("subtitle", {
-          key: ticket.key,
           project: ticket.trackerProject.name,
           state: ticket.trackerState.name,
         })}
@@ -323,12 +329,7 @@ function TicketPanel({
               <li key={r.id} {...stylex.props(styles.historyRow)}>
                 <StatusPill status={runStatus(r)}>{statusName(runStatus(r))}</StatusPill>
                 <Text variant="meta">
-                  {format.dateTime(new Date(r.assignedAt), {
-                    month: "numeric",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  <time dateTime={r.assignedAt}>{ago(r.assignedAt, r.assignedAgoMs)}</time>
                 </Text>
               </li>
             ))}
@@ -362,6 +363,17 @@ const styles = stylex.create({
     color: colors.problem,
   },
   inline: { display: "inline-flex", alignItems: "baseline", gap: space.s2 },
+  ticketCell: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
+  // 티켓은 어디서나 회색 키 + 제목(ADR 0010 9번). Home 의 키와 같은 모양
+  key: {
+    flexShrink: 0,
+    color: colors.textTertiary,
+    fontSize: fontSize.ui,
+    fontWeight: fontWeight.regular,
+    fontVariantNumeric: "tabular-nums",
+    whiteSpace: "nowrap",
+  },
+  panelKey: { fontSize: "inherit" },
   labels: { display: "inline-flex", flexWrap: "wrap", gap: space.s2 },
   label: { color: colors.textTertiary },
   autoLabel: { color: colors.accentText },

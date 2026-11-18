@@ -1,6 +1,7 @@
 {
   "documentTitle": "Tickets · Factory Orchestrator",
   "title": "Tickets",
+  "summary": "트래커 티켓을 보고 런을 맡겨요.",
   "subtitle": "{workspace}에 묶은 트래커 프로젝트의 티켓이에요. 자동 할당 라벨이 붙으면 운영자 없이 할당해요.",
   "filter": {
     "label": "티켓 거르기",
@@ -11,7 +12,6 @@
     "merged": "Merged"
   },
   "columns": {
-    "title": "제목",
     "ticket": "티켓",
     "trackerProject": "트래커 프로젝트",
     "trackerState": "트래커 상태",
@@ -38,7 +38,7 @@
   "panel": {
     "label": "고른 티켓 요약",
     "lastRun": "마지막 런",
-    "subtitle": "{key} · {project} · {state}",
+    "subtitle": "{project} · {state}",
     "reason": {
       "unassigned": "아직 런이 없어요. 할당하면 Mapping이 정한 러너 쪽 프로젝트와 에이전트로 처리해요.",
       "active-run": "진행 중이거나 Queued인 런이 있어 새로 할당할 수 없어요. 그 런이 끝나면 할 수 있어요.",
