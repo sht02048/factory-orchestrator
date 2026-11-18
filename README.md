@@ -16,6 +16,7 @@ The control tower of a software factory. It assigns tickets from a tracker to ru
 | `packages/runner-orca`     | Runner adapter that runs `orca` on a remote runner over ssh                               | Planned |
 | `packages/codehost-github` | Code host adapter for GitHub (finding pull requests and reading their state and CI state) | Planned |
 | `e2e`                      | End-to-end tests with fake adapters, including operator actions in a real browser         | Started |
+| `demo`                     | The `pnpm dev` entry point: web and worker with fake adapters and seeded data             | Started |
 
 "Planned" paths do not exist in the repository yet. `packages/ui` holds the design system: tokens, components, and the usage rules in [`packages/ui/DESIGN.md`](./packages/ui/DESIGN.md). `apps/web` only has a design system preview (`/ds`) so far, and the stub packages have no real code yet.
 
@@ -32,6 +33,7 @@ pnpm install   # also installs the lefthook pre-commit hook
 
 | Command             | What it does                                                  |
 | ------------------- | ------------------------------------------------------------- |
+| `pnpm dev`    | Runs the web app (hot reload) and the worker with fake adapters |
 | `pnpm typecheck`    | Type-checks every package with TypeScript 7 (`tsc`)           |
 | `pnpm lint`         | Runs oxlint in type-aware mode                                |
 | `pnpm format`       | Formats with oxfmt                                            |
@@ -46,7 +48,17 @@ pnpm install   # also installs the lefthook pre-commit hook
 
 The browser tests in `e2e` drive the Google Chrome installed on the machine through `playwright-core`; they do not download a browser. GitHub's Ubuntu runners already have Chrome. When a browser test fails, a screenshot of the page is saved to `e2e/test-results/`, and CI uploads it as an artifact.
 
-Start the web app with `pnpm --filter @factory/web dev` and open `http://127.0.0.1:3000/ds` to see the design system. Run the production build with `pnpm --filter @factory/web start`. It binds to `127.0.0.1` by default. To change that, set the shell environment variables `WEB_HOST` and `WEB_PORT` (for example, `WEB_PORT=4000 pnpm --filter @factory/web start`).
+### Development
+
+`pnpm dev` starts the web app in development mode (hot reload) and the worker in one process. The tracker, the runners, and the code host are fake adapters, so it needs no Linear key, ssh access, or GitHub token, and it never reaches those services. By default it opens on the home screen of a finished setup with sample data: two tracker connections and workspaces, three runners (one online, one with broken GitHub authentication, one offline), runs in every state, and two weeks of past runs for Stats. The fake agents keep working over time: they ask questions now and then, open pull requests, and send completion reports. Answer questions, cancel runs, and assign tickets in the app as usual.
+
+- `pnpm dev --onboarding` starts from step 1 of onboarding with an empty database. **Fill with fake values** (bottom right) fills the form fields with values that pass every check. To see a failed check, put `invalid` in a key or token, or `offline`, `no-orca`, or `push-auth` in the runner's ssh target.
+- `--reset` deletes the data of that mode and starts over. `--static` stops the fake agents from moving on their own.
+- `/__dev` (the **Dev tools** link at the bottom right) labels a ticket for auto-assignment, adds a ticket, makes an agent ask a question, and fixes or breaks a runner's GitHub authentication.
+- Data lives in `.dev/<mode>/` in the repository (ignored by git), or under `FACTORY_DEV_DIR`. It never touches `~/.factory-orchestrator`. The server binds to `127.0.0.1:3000`; set `WEB_HOST` and `WEB_PORT` to change that (for example, `WEB_HOST=0.0.0.0 pnpm dev` to open it from another machine on your network).
+- The fake adapters and the dev tools are registered only by `pnpm dev`. They are not part of the production build or the CLI, and CI checks that with `pnpm check:dev-code` after the build.
+
+`pnpm --filter @factory/web dev` still starts only the web app; open `http://127.0.0.1:3000/ds` to see the design system. Run the production build with `pnpm --filter @factory/web start`. It binds to `127.0.0.1` by default. To change that, set the shell environment variables `WEB_HOST` and `WEB_PORT` (for example, `WEB_PORT=4000 pnpm --filter @factory/web start`).
 
 Build the worker with `pnpm --filter @factory/worker build` and start it with `pnpm --filter @factory/worker start`. It reads `DATABASE_PATH` and `ENCRYPTION_KEY` from the shell environment, applies pending database migrations, and then polls until it receives `SIGINT` or `SIGTERM`. It builds adapters from the runners, tracker connections, and code host connections stored in the database, and rebuilds an adapter when its settings change.
 
