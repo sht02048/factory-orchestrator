@@ -1,13 +1,14 @@
 import { toRunId } from "@ganger/core";
 import { getRun } from "@ganger/db";
 import { describe, expect, it } from "vitest";
-import { assignInput, submitAssignment } from "./assign";
+import { TICKET_TITLE_MAX_LENGTH, assignInput, submitAssignment } from "./assign";
 import type { AssignInput } from "./assign";
 import { connection, docsProject, now, setupTickets, webProject } from "./test-fixtures";
 
 const base: AssignInput = {
   connection,
   ticketKey: "ACME-6",
+  ticketTitle: "Checkout retry",
   trackerProject: webProject,
   runnerId: null,
   agent: "claude",
@@ -36,6 +37,25 @@ describe("수동 할당", () => {
       runnerId: "runner-a",
       assignedAt: now,
     });
+  });
+
+  it("Tickets 화면이 트래커에서 읽은 제목을 앞뒤 공백 없이 런에 저장한다(0064)", () => {
+    const { db } = setupTickets();
+    const parsed = assignInput.parse({ ...base, ticketTitle: "  결제 실패 재시도  " });
+    expect(assignedRun(db, submitAssignment(db, parsed, now)).ticketTitle).toBe("결제 실패 재시도");
+  });
+
+  it("빈 제목은 비워 두고, 상한보다 긴 제목은 받지 않는다(0064)", () => {
+    const { db } = setupTickets();
+    const blank = assignInput.parse({ ...base, ticketTitle: "   " });
+    expect(assignedRun(db, submitAssignment(db, blank, now)).ticketTitle).toBeNull();
+    expect(
+      assignInput.safeParse({ ...base, ticketTitle: "가".repeat(TICKET_TITLE_MAX_LENGTH + 1) })
+        .success,
+    ).toBe(false);
+    expect(
+      assignInput.safeParse({ ...base, ticketTitle: "가".repeat(TICKET_TITLE_MAX_LENGTH) }).success,
+    ).toBe(true);
   });
 
   it("러너와 에이전트를 바꿔 할당한 값이 런에 저장된다", () => {

@@ -9,9 +9,12 @@ import { assignRun, getMapping, listRunners, listWorkspaceTrackerProjects } from
 import type { Database } from "@ganger/db";
 import { z } from "zod";
 
+export const TICKET_TITLE_MAX_LENGTH = 500;
+
 export const assignInput = z.object({
   connection: z.string().min(1),
   ticketKey: z.string().min(1),
+  ticketTitle: z.string().trim().max(TICKET_TITLE_MAX_LENGTH),
   trackerProject: z.string().min(1),
   runnerId: z.string().min(1).nullable(),
   agent: z.string().min(1),
@@ -53,6 +56,7 @@ export function submitAssignment(db: Database, input: AssignInput, now: Date): A
 
   const result = assignRun(db, {
     ticket: { connection, key: toTicketKey(input.ticketKey) },
+    ticketTitle: input.ticketTitle === "" ? null : input.ticketTitle,
     trackerProject,
     runnerProject: mapping.runnerProject,
     agent: toAgentId(input.agent),
