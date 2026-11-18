@@ -11,6 +11,8 @@ import {
 import { basename, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { packager } from "@electron/packager";
+import { ELECTRON_LICENSES, findAppProblems, NOTICE_FILE } from "../../../scripts/bundle-check.ts";
+import { readManifests, renderNotices, THIRD_PARTY_DIR } from "../../../scripts/third-party.ts";
 import { appIconPaths } from "../src/core/app-icon.ts";
 
 const DESKTOP = resolve(import.meta.dirname, "..");
@@ -91,6 +93,10 @@ writeFileSync(
   )}\n`,
 );
 cpSync(bundleDir, join(resources, "server"), { recursive: true });
+writeFileSync(
+  join(resources, NOTICE_FILE),
+  renderNotices(PRODUCT, readManifests([join(DESKTOP, "dist", THIRD_PARTY_DIR)])),
+);
 
 const actool = spawnSync("actool", ["--version"], { encoding: "utf8" });
 const icon = appIconPaths(join(DESKTOP, "icons"), actool.status === 0 ? actool.stdout : null);
@@ -122,7 +128,7 @@ const [appDir] = await packager({
   appCategoryType: "public.app-category.developer-tools",
   icon,
   asar: true,
-  extraResource: [join(resources, "server")],
+  extraResource: [join(resources, "server"), join(resources, NOTICE_FILE)],
   overwrite: true,
   prune: false,
   osxSign,
@@ -130,6 +136,15 @@ const [appDir] = await packager({
 if (appDir === undefined) throw new Error("packager produced nothing");
 
 const appPath = join(appDir, `${PRODUCT}.app`);
+const appResources = join(appPath, "Contents", "Resources");
+const [electronLicense, chromiumLicenses] = ELECTRON_LICENSES;
+cpSync(join(appDir, "LICENSE"), join(appResources, electronLicense));
+cpSync(join(appDir, chromiumLicenses), join(appResources, chromiumLicenses));
+const problems = findAppProblems(appResources);
+if (problems.length > 0) {
+  console.error(`app check failed:\n${problems.map((line) => `- ${line}`).join("\n")}`);
+  process.exit(1);
+}
 const zip = join(out, `${PRODUCT}-${version}-darwin-${arch}.zip`);
 const ditto = spawnSync("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", appPath, zip], {
   stdio: "inherit",

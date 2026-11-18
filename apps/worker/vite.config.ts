@@ -1,5 +1,7 @@
+import { fileURLToPath } from "node:url";
 import { bundleMigrations } from "@ganger/db/bundle-migrations";
 import { defineConfig } from "vite";
+import { thirdPartyManifest } from "../../scripts/third-party";
 
 export default defineConfig({
   build: {
@@ -10,5 +12,8 @@ export default defineConfig({
     rollupOptions: { output: { entryFileNames: "server/[name].js" } },
   },
   ssr: { noExternal: true },
-  plugins: [bundleMigrations()],
+  plugins: [
+    bundleMigrations(),
+    thirdPartyManifest(fileURLToPath(new URL("dist/third-party", import.meta.url)), "worker"),
+  ],
 });

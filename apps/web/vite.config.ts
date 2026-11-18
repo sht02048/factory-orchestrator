@@ -4,6 +4,8 @@ import stylex from "@stylexjs/unplugin";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig, type PluginOption } from "vite";
+import { relativeBuildPaths } from "../../scripts/build-paths";
+import { thirdPartyManifest } from "../../scripts/third-party";
 
 const stylexPlugin = stylex.vite as (options?: Parameters<typeof stylex.vite>[0]) => PluginOption;
 
@@ -22,5 +24,7 @@ export default defineConfig(({ command }) => ({
     tanstackStart(),
     viteReact(),
     bundleMigrations(),
+    relativeBuildPaths(repoRoot),
+    thirdPartyManifest(fileURLToPath(new URL("dist/third-party", import.meta.url)), "web"),
   ],
 }));

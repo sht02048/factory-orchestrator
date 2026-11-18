@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import stylex from "@stylexjs/unplugin";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig, type PluginOption } from "vite";
+import { thirdPartyManifest } from "../../scripts/third-party";
 
 const stylexPlugin = stylex.vite as (options?: Parameters<typeof stylex.vite>[0]) => PluginOption;
 
@@ -20,5 +21,6 @@ export default defineConfig({
       },
     }),
     viteReact(),
+    thirdPartyManifest(fileURLToPath(new URL("dist/third-party", import.meta.url)), "renderer"),
   ],
 });

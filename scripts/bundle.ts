@@ -2,7 +2,8 @@ import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { findBundleProblems } from "./bundle-check.ts";
+import { findBundleProblems, NOTICE_FILE } from "./bundle-check.ts";
+import { copyleftKind, readManifests, renderNotices, THIRD_PARTY_DIR } from "./third-party.ts";
 
 const REPO = resolve(import.meta.dirname, "..");
 const NAME = "ganger";
@@ -41,8 +42,18 @@ rmSync(bundleDir, { recursive: true, force: true });
 rmSync(tarball, { force: true });
 mkdirSync(bundleDir, { recursive: true });
 
-for (const part of parts) cpSync(part.from, join(bundleDir, part.dir), { recursive: true });
+for (const part of parts) {
+  cpSync(part.from, join(bundleDir, part.dir), {
+    recursive: true,
+    filter: (source) => source !== join(part.from, THIRD_PARTY_DIR),
+  });
+}
 cpSync(join(REPO, "LICENSE"), join(bundleDir, "LICENSE"));
+const thirdParty = readManifests(parts.map((part) => join(part.from, THIRD_PARTY_DIR)));
+writeFileSync(join(bundleDir, NOTICE_FILE), renderNotices("Ganger", thirdParty));
+for (const pkg of thirdParty.filter((item) => copyleftKind(item.license) !== null)) {
+  console.warn(`copyleft license (${pkg.license}): ${pkg.name}@${pkg.version}`);
+}
 writeFileSync(
   join(bundleDir, "package.json"),
   `${JSON.stringify(
