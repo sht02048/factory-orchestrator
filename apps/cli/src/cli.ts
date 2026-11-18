@@ -1,6 +1,6 @@
 import { realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { workspaceLayout } from "./layout.js";
+import { appLayout } from "./layout.js";
 import { runCommand, runProgram } from "./program.js";
 
 /*
@@ -15,7 +15,7 @@ process.exitCode = await runProgram(process.argv.slice(2), {
   uid: process.getuid?.() ?? 0,
   nodePath: process.execPath,
   cliEntry: entry === undefined ? "" : realpathSync(entry),
-  layout: workspaceLayout(),
+  layout: appLayout(),
   runCommand,
   out: (line) => console.log(line),
   err: (line) => console.error(line),

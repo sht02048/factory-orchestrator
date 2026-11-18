@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
-    "start": "srvx --prod --host \"${WEB_HOST:-127.0.0.1}\" --port \"${WEB_PORT:-3000}\" -s ../client dist/server/server.js",
+    "build": "vite build && vite build -c vite.srvx.config.ts",
+    "start": "node dist/srvx/srvx.js --prod --host \"${WEB_HOST:-127.0.0.1}\" --port \"${WEB_PORT:-3000}\" -s ../client dist/server/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

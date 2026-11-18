@@ -8,5 +8,5 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true
   },
-  "include": ["src", "messages", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "messages", "vite.config.ts", "vite.srvx.config.ts", "vitest.config.ts"]
 }

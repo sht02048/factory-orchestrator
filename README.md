@@ -30,17 +30,19 @@ pnpm install   # also installs the lefthook pre-commit hook
 
 ## Commands
 
-| Command             | What it does                                              |
-| ------------------- | --------------------------------------------------------- |
-| `pnpm typecheck`    | Type-checks every package with TypeScript 7 (`tsc`)       |
-| `pnpm lint`         | Runs oxlint in type-aware mode                            |
-| `pnpm format`       | Formats with oxfmt                                        |
-| `pnpm format:check` | Checks formatting                                         |
-| `pnpm test`         | Runs Vitest (browser tests need Google Chrome)            |
-| `pnpm check:colors` | Checks for raw color values outside `packages/ui`         |
-| `pnpm build`        | Builds the web app, the worker, and the CLI               |
-| `pnpm smoke:web`    | Starts the production web build and checks a page         |
-| `pnpm smoke:cli`    | Runs the built CLI's `init` and `start` and checks a page |
+| Command             | What it does                                                  |
+| ------------------- | ------------------------------------------------------------- |
+| `pnpm typecheck`    | Type-checks every package with TypeScript 7 (`tsc`)           |
+| `pnpm lint`         | Runs oxlint in type-aware mode                                |
+| `pnpm format`       | Formats with oxfmt                                            |
+| `pnpm format:check` | Checks formatting                                             |
+| `pnpm test`         | Runs Vitest (browser tests need Google Chrome)                |
+| `pnpm check:colors` | Checks for raw color values outside `packages/ui`             |
+| `pnpm build`        | Builds the web app, the worker, and the CLI                   |
+| `pnpm smoke:web`    | Starts the production web build and checks a page             |
+| `pnpm smoke:cli`    | Runs the built CLI's `init` and `start` and checks a page     |
+| `pnpm bundle`       | Packs the builds into a server bundle in `dist/`              |
+| `pnpm smoke:bundle` | Extracts the server bundle outside the repository and runs it |
 
 The browser tests in `e2e` drive the Google Chrome installed on the machine through `playwright-core`; they do not download a browser. GitHub's Ubuntu runners already have Chrome. When a browser test fails, a screenshot of the page is saved to `e2e/test-results/`, and CI uploads it as an artifact.
 
@@ -48,11 +50,11 @@ Start the web app with `pnpm --filter @factory/web dev` and open `http://127.0.0
 
 Build the worker with `pnpm --filter @factory/worker build` and start it with `pnpm --filter @factory/worker start`. It reads `DATABASE_PATH` and `ENCRYPTION_KEY` from the shell environment, applies pending database migrations, and then polls until it receives `SIGINT` or `SIGTERM`. It builds adapters from the runners, tracker connections, and code host connections stored in the database, and rebuilds an adapter when its settings change.
 
-The pre-commit hook runs lint, format check, typecheck, and the color literal check. CI (GitHub Actions) runs on pull requests and on pushes to `main`, in this order: typecheck → lint → color literal check → format check → test → build → web production smoke test → CLI smoke test.
+The pre-commit hook runs lint, format check, typecheck, and the color literal check. CI (GitHub Actions) runs on pull requests and on pushes to `main`, in this order: typecheck → lint → color literal check → format check → test → build → web production smoke test → CLI smoke test → server bundle → server bundle smoke test.
 
 ## Self-hosting
 
-> The npm package is not published yet. Until it is, build from a clone of this repository with `pnpm install && pnpm build` and run the CLI with `node apps/cli/dist/bin/cli.js <command>` (or `pnpm --filter @factory/cli cli <command>`). The commands below are written as `factory-orchestrator <command>`.
+> There is no published release yet: no npm package, no GitHub Release. To run the orchestrator, build a server bundle from a clone of this repository, as described in [Build a server bundle](#build-a-server-bundle). The commands below are written as `factory-orchestrator <command>`; with a server bundle, that is `node <bundle>/cli/bin/cli.js <command>`.
 
 The orchestrator is a self-hosted tool. One operator runs one installation on their own machine. The planned setup:
 
@@ -61,6 +63,28 @@ The orchestrator is a self-hosted tool. One operator runs one installation on th
 - The orchestrator does not change your projects' agent settings. We recommend adding a rule to each project's agent instructions (for example, `AGENTS.md`) to put the ticket key in the pull request title. Otherwise, if an agent opens the pull request from a branch other than the one the orchestrator created (including by renaming that branch), the orchestrator may not find it and may record the run's pull request as missing or closed.
 - Tracker connections, the GitHub token, runners, workspaces, and mappings are set up in web onboarding on first launch. Tokens are stored encrypted in the database.
 - `.env` holds only the minimum values needed to boot: port, bind address, data path, and encryption key. `factory-orchestrator init` writes it, as described below.
+
+### Build a server bundle
+
+A server bundle is one folder that holds the web app, the worker, and the CLI with all their runtime dependencies. It does not need the repository, `pnpm`, or `node_modules`. It does not include Node: you need Node 24 on the machine that runs it.
+
+```sh
+pnpm install
+pnpm build
+pnpm bundle
+```
+
+This writes `dist/factory-orchestrator-<version>/` and the same folder packed as `dist/factory-orchestrator-<version>.tar.gz`. Copy the tarball to the machine that runs the orchestrator, extract it anywhere, and run the CLI from it:
+
+```sh
+tar -xzf factory-orchestrator-<version>.tar.gz
+node factory-orchestrator-<version>/cli/bin/cli.js init
+node factory-orchestrator-<version>/cli/bin/cli.js start
+```
+
+To upgrade, build a new bundle, stop the orchestrator, extract the new bundle, and start it from there. The folder name includes the version, so if you run the orchestrator as a service, run `service uninstall` with the old bundle and `service install` with the new one. Your settings and data stay in the installation folder described below, not in the bundle.
+
+You can also run the CLI straight from the repository after `pnpm build`, with `node apps/cli/dist/bin/cli.js <command>` (or `pnpm --filter @factory/cli cli <command>`).
 
 ### Set up and start
 
@@ -81,7 +105,7 @@ factory-orchestrator start    # applies database migrations, then runs the web s
 
 - Add `--dry-run` to either command to print the file and the commands without changing anything.
 - Run `init` first. `service install` refuses to register a service that would fail to boot, and refuses to overwrite an existing service file.
-- The service runs the Node and CLI paths you installed it with, and uses your current `PATH`. After you move or upgrade Node, run `service uninstall` and `service install` again.
+- The service runs the Node and CLI paths you installed it with, and uses your current `PATH`. After you move or upgrade Node, or move the server bundle to another folder, run `service uninstall` and `service install` again.
 - On macOS, logs go to `<home>/logs/factory-orchestrator.log`. On Linux, read them with `journalctl --user -u factory-orchestrator.service`, and run `loginctl enable-linger` once so the service keeps running after you log out.
 
 ## Work items

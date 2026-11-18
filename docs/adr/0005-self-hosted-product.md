@@ -11,6 +11,8 @@
 
 릴리스는 SemVer와 Changesets로 하고 1.0 전까지는 0.x를 쓴다. 업데이트할 때 DB 마이그레이션을 자동으로 실행한다. 이름 `factory-orchestrator`는 임시다.
 
+**갱신(2026-11-18, 운영자 결정, 티켓 0029).** 지금 만드는 배포물은 의존성까지 묶은 서버 배포물(폴더와 tarball, Node 미포함)이고 공개하지 않는다. npm 패키지로 낼지와 Changesets는 릴리스 티켓 0031에서 정한다. CLI가 `init`, `start`, 서비스 등록을 맡는 점은 그대로다.
+
 ## Considered Options
 
 - **Docker 이미지 우선 배포**: 설치는 쉽지만 macOS에서 ssh·Tailscale 연동이 불편해 미룬다.
