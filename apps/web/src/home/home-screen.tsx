@@ -493,7 +493,7 @@ export function QuestionForm({
         <legend {...stylex.props(styles.questionText)}>{question.body}</legend>
         <div {...stylex.props(styles.choices)}>
           {question.choices.map((choice, index) => (
-            <label key={choice} {...stylex.props(styles.choice)}>
+            <label key={`${index}:${choice}`} {...stylex.props(styles.choice)}>
               <input
                 type="radio"
                 name={name}
