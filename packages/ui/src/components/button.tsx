@@ -29,6 +29,8 @@ export function Button({ variant = "secondary", children, onClick, ...props }: B
   return (
     <SdkButton
       {...props}
+      // 화면에 주 버튼이 하나 이하인지 시험이 읽는다(ADR 0010 6번)
+      data-variant={variant}
       {...(onClick === undefined ? {} : { onClick })}
       className={(s) => cx(...buttonStyles(variant, s.disabled))}
     >
@@ -37,7 +39,10 @@ export function Button({ variant = "secondary", children, onClick, ...props }: B
   );
 }
 
-/** 버튼 모양을 다른 UI SDK 트리거(DialogTrigger 등)에 입힐 때 쓴다. */
+/**
+ * 버튼 모양을 다른 UI SDK 트리거(DialogTrigger 등)나 링크에 입힐 때 쓴다.
+ * 링크에 입히면 `data-variant` 도 함께 붙여 주 버튼 시험이 세게 한다.
+ */
 export function buttonStyles(variant: ButtonVariant, disabled = false): ReadonlyArray<StyleArg> {
   return [
     styles.base,
@@ -63,6 +68,8 @@ const styles = stylex.create({
     color: colors.textPrimary,
     font: "inherit",
     fontWeight: fontWeight.medium,
+    // 버튼 모양을 입힌 링크(buttonStyles)에 밑줄이 생기지 않게 한다
+    textDecoration: "none",
     whiteSpace: "nowrap",
     cursor: "pointer",
     userSelect: "none",
