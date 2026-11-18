@@ -21,7 +21,7 @@ import {
 import type { StoredMapping, StoredRun, StoredTrackerEvent } from "@factory/db";
 import type { TickContext } from "./context.js";
 
-export const POLL_CORRECTION_INTERVAL_MS = 5 * 60_000;
+export const POLL_CORRECTION_INTERVAL_MS = 60_000;
 
 export const POLL_CORRECTION_FIRST_LOOKBACK_MS = 24 * 60 * 60_000;
 

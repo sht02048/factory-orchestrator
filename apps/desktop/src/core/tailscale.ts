@@ -11,12 +11,14 @@ export const TAILSCALE_CLI_CANDIDATES = [
 ] as const;
 
 const PHONE_OS = new Set(["ios", "android"]);
+const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
 
 const peerSchema = z.object({
   HostName: z.string().optional(),
   DNSName: z.string().optional(),
   OS: z.string().optional(),
   Online: z.boolean().optional(),
+  TailscaleIPs: z.array(z.unknown()).nullish().catch(undefined),
 });
 
 const statusSchema = z.object({
@@ -27,6 +29,7 @@ const statusSchema = z.object({
 export interface TailnetDevice {
   name: string;
   host: string;
+  ipv4?: string;
 }
 
 export type TailnetStatus =
@@ -52,7 +55,14 @@ export function parseTailnetStatus(output: string): TailnetStatus {
     const host = (peer.DNSName ?? "").replace(/\.$/, "");
     if (host.length === 0) continue;
     const hostName = peer.HostName?.trim() ?? "";
-    devices.push({ name: hostName.length > 0 ? hostName : (host.split(".")[0] ?? host), host });
+    const ipv4 = peer.TailscaleIPs?.find(
+      (ip): ip is string => typeof ip === "string" && IPV4.test(ip),
+    );
+    devices.push({
+      name: hostName.length > 0 ? hostName : (host.split(".")[0] ?? host),
+      host,
+      ...(ipv4 === undefined ? {} : { ipv4 }),
+    });
   }
   return { kind: "running", devices };
 }

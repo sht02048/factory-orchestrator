@@ -1,7 +1,6 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   AdapterRegistry,
   toAgentId,
@@ -43,12 +42,11 @@ import {
 import type { Database, StoredRun } from "@factory/db";
 import { startWorker } from "@factory/worker";
 import type { RunningWorker } from "@factory/worker";
-import { createServer } from "vite";
 import type { ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" };
+import { startWebServer } from "./web-server.js";
 
-const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
 const fakeKind = "fake";
 const connection = toTrackerConnectionId("conn-acme");
 const workspaceId = toWorkspaceId("ws-acme");
@@ -124,18 +122,10 @@ beforeAll(async () => {
 
   process.env["DATABASE_PATH"] = dbPath;
   process.env["ENCRYPTION_KEY"] = Buffer.from(encryptionKey).toString("base64");
-  web = await createServer({
-    root: webRoot,
-    configFile: join(webRoot, "vite.config.ts"),
-    logLevel: "warn",
-    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, watch: null },
-  });
-  await web.listen();
-  const address = web.httpServer?.address();
-  if (address === null || address === undefined || typeof address === "string") {
-    throw new Error("web dev server has no TCP address");
-  }
-  baseUrl = `http://127.0.0.1:${address.port}`;
+  ({ server: web, baseUrl } = await startWebServer({
+    plugins: [],
+    cacheDir: join(dir, "vite-cache"),
+  }));
 }, 120_000);
 
 afterAll(async () => {

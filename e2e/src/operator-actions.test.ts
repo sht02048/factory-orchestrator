@@ -39,13 +39,13 @@ import {
 import type { Database } from "@factory/db";
 import { chromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
-import { createServer } from "vite";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" };
 import home from "../../apps/web/messages/ko/home.json" with { type: "json" };
 import run from "../../apps/web/messages/ko/run.json" with { type: "json" };
 import runs from "../../apps/web/messages/ko/runs.json" with { type: "json" };
+import shell from "../../apps/web/messages/ko/shell.json" with { type: "json" };
 import tickets from "../../apps/web/messages/ko/tickets.json" with { type: "json" };
 import {
   connection,
@@ -54,6 +54,7 @@ import {
   unassignedTicket,
   workspaceId,
 } from "./browser/fixtures.js";
+import { startWebServer } from "./web-server.js";
 
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
 const adaptersModule = join(webRoot, "src/server/adapters.ts");
@@ -98,19 +99,10 @@ beforeAll(async () => {
 
   process.env["DATABASE_PATH"] = dbPath;
   process.env["ENCRYPTION_KEY"] = Buffer.from(encryptionKey).toString("base64");
-  web = await createServer({
-    root: webRoot,
-    configFile: join(webRoot, "vite.config.ts"),
-    logLevel: "warn",
+  ({ server: web, baseUrl } = await startWebServer({
     plugins: [fakeAdapters],
-    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, watch: null },
-  });
-  await web.listen();
-  const address = web.httpServer?.address();
-  if (address === null || address === undefined || typeof address === "string") {
-    throw new Error("web dev server has no TCP address");
-  }
-  baseUrl = `http://127.0.0.1:${address.port}`;
+    cacheDir: join(dir, "vite-cache"),
+  }));
 
   browser = await chromium.launch({ channel: "chrome" });
 }, 120_000);
@@ -180,7 +172,10 @@ describe("운영자 핵심 동작(브라우저)", () => {
     const dialog = page.getByRole("dialog", { name: fill(tickets.assign.title, { key }) });
     await dialog.getByRole("button", { name: tickets.assign.submit }).click();
 
-    await page.getByText(fill(tickets.assign.done, { key })).waitFor();
+    await page
+      .getByRole("region", { name: shell.toastRegion })
+      .getByText(fill(tickets.assign.done, { key }))
+      .waitFor();
     const created = runsOf(key);
     expect(created.map((r) => [r.state, r.runnerProject, r.agent])).toEqual([
       ["queued", runnerProject, agent],

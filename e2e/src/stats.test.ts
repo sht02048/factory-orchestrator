@@ -33,11 +33,11 @@ import {
 import type { Database } from "@factory/db";
 import { chromium } from "playwright-core";
 import type { Browser, BrowserContext, Page } from "playwright-core";
-import { createServer } from "vite";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 import stats from "../../apps/web/messages/ko/stats.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
+import { startWebServer } from "./web-server.js";
 
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
 const adaptersModule = join(webRoot, "src/server/adapters.ts");
@@ -74,19 +74,10 @@ beforeAll(async () => {
 
   process.env["DATABASE_PATH"] = dbPath;
   process.env["ENCRYPTION_KEY"] = Buffer.from(encryptionKey).toString("base64");
-  web = await createServer({
-    root: webRoot,
-    configFile: join(webRoot, "vite.config.ts"),
-    logLevel: "warn",
+  ({ server: web, baseUrl } = await startWebServer({
     plugins: [fakeAdapters],
-    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, watch: null },
-  });
-  await web.listen();
-  const address = web.httpServer?.address();
-  if (address === null || address === undefined || typeof address === "string") {
-    throw new Error("web dev server has no TCP address");
-  }
-  baseUrl = `http://127.0.0.1:${address.port}`;
+    cacheDir: join(dir, "vite-cache"),
+  }));
 
   browser = await chromium.launch({ channel: "chrome" });
 }, 120_000);

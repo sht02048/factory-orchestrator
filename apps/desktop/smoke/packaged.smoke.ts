@@ -286,7 +286,7 @@ describe("패키징한 앱, 원격 모드", () => {
     expect(await page.getByText("phone").count()).toBe(0);
     await shot(page, "04-find-servers");
 
-    await page.getByRole("button", { name: "연결", exact: true }).click();
+    await page.getByRole("button", { name: "열기", exact: true }).click();
     await page.waitForURL(new RegExp(`^http://localhost:${remotePort}/`), { timeout: 30_000 });
     await shot(page, "05-remote-web");
     await app.close();

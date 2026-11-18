@@ -17,11 +17,12 @@ import {
 import type { Database } from "@factory/db";
 import { chromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
-import { createServer } from "vite";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import onboarding from "../../apps/web/messages/ko/onboarding.json" with { type: "json" };
+import shell from "../../apps/web/messages/ko/shell.json" with { type: "json" };
 import settings from "../../apps/web/messages/ko/settings.json" with { type: "json" };
+import { startWebServer } from "./web-server.js";
 
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
 const adaptersModule = join(webRoot, "src/server/adapters.ts");
@@ -56,19 +57,10 @@ beforeAll(async () => {
 
   process.env["DATABASE_PATH"] = dbPath;
   process.env["ENCRYPTION_KEY"] = Buffer.from(encryptionKey).toString("base64");
-  web = await createServer({
-    root: webRoot,
-    configFile: join(webRoot, "vite.config.ts"),
-    logLevel: "warn",
+  ({ server: web, baseUrl } = await startWebServer({
     plugins: [fakeAdapters],
-    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, watch: null },
-  });
-  await web.listen();
-  const address = web.httpServer?.address();
-  if (address === null || address === undefined || typeof address === "string") {
-    throw new Error("web dev server has no TCP address");
-  }
-  baseUrl = `http://127.0.0.1:${address.port}`;
+    cacheDir: join(dir, "vite-cache"),
+  }));
 
   browser = await chromium.launch({ channel: "chrome" });
 }, 120_000);
@@ -149,7 +141,10 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
     await page.getByRole("button", { name: onboarding.workspace.create }).click();
 
     await expect.poll(focused).toBe("Acme Commerce Workspace");
-    await page.getByText(onboarding.workspace.created).waitFor();
+    await page
+      .getByRole("region", { name: shell.toastRegion })
+      .getByText(onboarding.workspace.created)
+      .waitFor();
   });
 });
 
