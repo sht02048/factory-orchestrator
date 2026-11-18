@@ -7,9 +7,11 @@
   "scripts": {
     "prepare": "lefthook install",
     "build": "turbo run build",
+    "bundle": "node scripts/bundle.ts",
     "check:colors": "node scripts/check-color-literals.ts",
     "smoke:web": "node scripts/smoke-web-prod.ts",
     "smoke:cli": "node scripts/smoke-cli.ts",
+    "smoke:bundle": "node scripts/smoke-cli.ts --bundle",
     "typecheck": "tsc --noEmit -p tsconfig.json && turbo run typecheck",
     "lint": "oxlint --type-aware --deny-warnings",
     "format": "oxfmt",

@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BootConfig } from "@factory/db";
 
@@ -20,45 +19,54 @@ export interface AppLayout {
   worker(): ProcessSpec;
 }
 
+/** 서버 배포물 안에서 web·worker 산출물(각 앱의 `dist`)을 두는 폴더. 배포물 루트 기준이다 */
+export const BUNDLE_DIRS = { cli: "cli", web: "web", worker: "worker" } as const;
+
 /**
- * 저장소(pnpm 워크스페이스) 안에서 빌드한 web과 worker를 띄운다. CLI 패키지 옆의 `apps/web`,
- * `apps/worker`의 `dist`를 쓴다. npm 패키지로 묶을 때의 배치는 0029가 정하고 이 함수만 바꾼다.
- *
- * web은 `pnpm --filter @factory/web start`와 같은 srvx 명령을 pnpm 없이 Node로 바로 돌린다.
+ * CLI가 놓인 곳에서 web과 worker 빌드 산출물을 찾는다. 서버 배포물(`pnpm run bundle`, 0029)에서는 CLI 옆의
+ * `web`·`worker` 폴더를, 저장소(pnpm 워크스페이스)에서는 CLI 패키지 옆 `apps/web`·`apps/worker`의 `dist`를
+ * 쓴다. 두 곳 모두 산출물이 의존성까지 묶여 있어 `node_modules` 없이 돈다.
  */
-export function workspaceLayout(from: string = fileURLToPath(import.meta.url)): AppLayout {
-  const appsDir = dirname(packageRoot(from));
-  const webDir = join(appsDir, "web");
-  const workerDir = join(appsDir, "worker");
-  const serverEntry = join(webDir, "dist", "server", "server.js");
-  const clientDir = join(webDir, "dist", "client");
-  const workerEntry = join(workerDir, "dist", "server", "main.js");
+export function appLayout(from: string = fileURLToPath(import.meta.url)): AppLayout {
+  const root = packageRoot(from);
+  const bundled = join(root, BUNDLE_DIRS.web);
+  if (existsSync(bundled)) return distLayout(bundled, join(root, BUNDLE_DIRS.worker));
+  const appsDir = dirname(root);
+  return distLayout(join(appsDir, "web", "dist"), join(appsDir, "worker", "dist"));
+}
+
+/**
+ * web·worker의 `dist` 폴더로 띄울 명령을 만든다. web은 `pnpm --filter @factory/web start`와 같은
+ * srvx 명령을 pnpm 없이 Node로 바로 돌린다. srvx도 `dist/srvx`에 묶여 있다.
+ */
+function distLayout(webDist: string, workerDist: string): AppLayout {
+  const srvx = join(webDist, "srvx", "srvx.js");
+  const serverEntry = join(webDist, "server", "server.js");
+  const clientDir = join(webDist, "client");
+  const workerEntry = join(workerDist, "server", "main.js");
   return {
-    web: (config) => {
-      const srvx = srvxBin(webDir);
-      return {
-        name: "web",
-        command: process.execPath,
-        args: [
-          srvx,
-          "--prod",
-          "--host",
-          config.host,
-          "--port",
-          String(config.port),
-          "--static",
-          clientDir,
-          serverEntry,
-        ],
-        cwd: webDir,
-        requires: [srvx, serverEntry, clientDir],
-      };
-    },
+    web: (config) => ({
+      name: "web",
+      command: process.execPath,
+      args: [
+        srvx,
+        "--prod",
+        "--host",
+        config.host,
+        "--port",
+        String(config.port),
+        "--static",
+        clientDir,
+        serverEntry,
+      ],
+      cwd: webDist,
+      requires: [srvx, serverEntry, clientDir],
+    }),
     worker: () => ({
       name: "worker",
       command: process.execPath,
       args: [workerEntry],
-      cwd: workerDir,
+      cwd: workerDist,
       requires: [workerEntry],
     }),
   };
@@ -73,15 +81,4 @@ function packageRoot(from: string): string {
     dir = parent;
   }
   return dir;
-}
-
-/** web이 쓰는 srvx 버전의 실행 파일. srvx는 `./package.json`을 내보내지 않아 `./cli`에서 찾아간다. */
-function srvxBin(webDir: string): string {
-  try {
-    const cli = createRequire(join(webDir, "package.json")).resolve("srvx/cli");
-    return resolve(dirname(cli), "..", "bin", "srvx.mjs");
-  } catch {
-    // 설치가 안 된 경우. requires 검사가 이 경로가 없다고 알린다.
-    return join(webDir, "node_modules", "srvx", "bin", "srvx.mjs");
-  }
 }

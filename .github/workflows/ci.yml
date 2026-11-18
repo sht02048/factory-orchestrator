@@ -49,3 +49,8 @@ jobs:
         run: pnpm run smoke:web
       - name: CLI smoke test
         run: pnpm run smoke:cli
+      - name: Server bundle
+        run: pnpm run bundle
+      # 배포물을 저장소 밖 임시 폴더에 풀어 init·start·러너 확인을 돌린다(티켓 0029).
+      - name: Server bundle smoke test
+        run: pnpm run smoke:bundle
