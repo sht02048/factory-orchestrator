@@ -78,11 +78,11 @@ describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
   });
 
   it("To do 는 이름 자리에서 To do, 필터와 문장 안에서는 처리할 일이다(ADR 0010 0068 갱신)", () => {
-    expect([ds.typography.sampleSection, ds.tabs.todo]).toEqual([
-      home.section.todo,
-      home.section.todo,
+    expect(ds.typography.sampleSection).toBe(home.section.todo);
+    expect([runs.filter.attention, ds.tabs.todo]).toEqual([
+      tickets.filter.todo,
+      tickets.filter.todo,
     ]);
-    expect(runs.filter.attention).toBe(tickets.filter.todo);
     expect([run.reason.canceled, runs.panel.reason.canceled]).toEqual([
       "운영자가 취소한 런이에요. 처리할 일에 올리지 않아요.",
       "운영자가 취소한 런이에요. 처리할 일에 올리지 않아요.",

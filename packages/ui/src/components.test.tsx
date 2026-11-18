@@ -155,13 +155,13 @@ describe("서버 렌더", () => {
           전체
         </Tab>
         <Tab value="todo" count={3} attention>
-          To do
+          처리할 일
         </Tab>
       </Tabs>,
     );
     expect(html).toContain('role="tablist"');
     expect(html).toContain('aria-label="상태로 거르기"');
-    expect(html).toMatch(/aria-selected="true"[^>]*>To do/);
+    expect(html).toMatch(/aria-selected="true"[^>]*>처리할 일/);
     expect(html).toContain(">42<");
   });
 
@@ -172,7 +172,7 @@ describe("서버 렌더", () => {
           전체
         </Tab>
         <Tab value="todo" count={4} attention>
-          To do
+          처리할 일
         </Tab>
       </Tabs>,
     );

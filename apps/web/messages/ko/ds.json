@@ -117,7 +117,7 @@
     "label": "상태로 거르기",
     "chipsLabel": "상태 칩으로 거르기",
     "all": "전체",
-    "todo": "To do",
+    "todo": "처리할 일",
     "running": "Running",
     "queued": "Queued",
     "panelAll": "모든 런을 최근 순서로 보여 줘요.",
