@@ -509,7 +509,13 @@ const styles = stylex.create({
     justifyContent: "space-between",
     gap: space.s3,
   },
-  search: { flexGrow: 0, flexShrink: 1, flexBasis: size.editorListWidth, minWidth: 0 },
+  search: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: size.sidebarWidth,
+    maxWidth: size.editorListWidth,
+  },
   searchLabel: {
     position: "absolute",
     width: space.px2,
@@ -518,7 +524,7 @@ const styles = stylex.create({
     clipPath: "inset(50%)",
     whiteSpace: "nowrap",
   },
-  tableFrame: { display: "grid", minHeight: 0 },
+  tableFrame: { display: "grid", gridTemplateRows: "minmax(0, 1fr)", minHeight: 0 },
   scroll: {
     flexGrow: 1,
     minHeight: 0,
