@@ -33,7 +33,7 @@ jobs:
           if [ "$EVENT" = "pull_request" ]; then base="$PR_BASE"; fi
           files=""
           if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
-            files=$(git diff --name-only "$base" "$HEAD_SHA")
+            files=$(git diff --name-only --no-renames "$base" "$HEAD_SHA")
           fi
           if [ -n "$files" ] && ! printf '%s\n' "$files" | grep -qvE '\.md$'; then
             echo "code=false" >> "$GITHUB_OUTPUT"
