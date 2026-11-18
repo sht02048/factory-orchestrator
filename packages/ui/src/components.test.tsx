@@ -92,9 +92,7 @@ describe("서버 렌더", () => {
 
   it("Card 는 이름이 있으면 구역으로, Row 는 앞·뒤 칸을 그린다", () => {
     expect(renderToString(<Card>내용</Card>)).toMatch(/^<div/);
-    expect(renderToString(<Card label="손댈 일">내용</Card>)).toMatch(
-      /^<section aria-label="손댈 일"/,
-    );
+    expect(renderToString(<Card label="To do">내용</Card>)).toMatch(/^<section aria-label="To do"/);
     const row = renderToString(
       <Row leading={<StatusPill status="running">Running</StatusPill>} trailing="10:45">
         시작했어요
@@ -157,13 +155,13 @@ describe("서버 렌더", () => {
           전체
         </Tab>
         <Tab value="todo" count={3} attention>
-          손댈 일
+          처리할 일
         </Tab>
       </Tabs>,
     );
     expect(html).toContain('role="tablist"');
     expect(html).toContain('aria-label="상태로 거르기"');
-    expect(html).toMatch(/aria-selected="true"[^>]*>손댈 일/);
+    expect(html).toMatch(/aria-selected="true"[^>]*>처리할 일/);
     expect(html).toContain(">42<");
   });
 
@@ -174,7 +172,7 @@ describe("서버 렌더", () => {
           전체
         </Tab>
         <Tab value="todo" count={4} attention>
-          손댈 일
+          처리할 일
         </Tab>
       </Tabs>,
     );

@@ -1,12 +1,12 @@
 {
   "documentTitle": "Runs · Factory Orchestrator",
   "title": "Runs",
-  "subtitle": "{attention, plural, =0 {런 {total}개, 손댈 일은 없어요.} other {{total}개 중 {attention}개가 손댈 일이에요.}}",
-  "subtitleRecent": "{attention, plural, =0 {최근 런 {total}개, 손댈 일은 없어요.} other {최근 런 {total}개 중 {attention}개가 손댈 일이에요.}}",
+  "subtitle": "{attention, plural, =0 {런 {total}개, 처리할 일은 없어요.} other {{total}개 중 {attention}개가 처리할 일이에요.}}",
+  "subtitleRecent": "{attention, plural, =0 {최근 런 {total}개, 처리할 일은 없어요.} other {최근 런 {total}개 중 {attention}개가 처리할 일이에요.}}",
   "filter": {
     "label": "상태로 거르기",
     "all": "전체",
-    "attention": "손댈 일"
+    "attention": "처리할 일"
   },
   "conditions": {
     "label": "걸린 조건",
@@ -28,13 +28,13 @@
   "prWithState": "{pr} {state}",
   "cancelling": "취소 중",
   "ended": {
-    "partial": "끝난 런은 최근 {count}개까지 보여요. 그보다 오래된 런은 손댈 일만 보여요.",
+    "partial": "끝난 런은 최근 {count}개까지 보여요. 그보다 오래된 런은 처리할 일만 보여요.",
     "all": "끝난 런 {count}개를 모두 보여요.",
     "showMore": "더 보기"
   },
   "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 런이 보여요.",
   "allWorkspaces": {
-    "body": "전체에서는 모든 Workspace의 손댈 일만 모아 봐요. 런은 Workspace를 골라야 보여요.",
+    "body": "전체에서는 모든 Workspace의 처리할 일만 모아 봐요. 런은 Workspace를 골라야 보여요.",
     "pick": "{name} 보기"
   },
   "panel": {
@@ -65,7 +65,7 @@
       "merged": "에이전트가 완료 보고를 보냈고 PR이 병합됐어요.",
       "human-check": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
       "failed": "에이전트 결과와 PR 상태 때문에 Failed예요. 자동으로 다시 시도하지 않아요.",
-      "canceled": "운영자가 취소한 런이에요. 손댈 일에 올리지 않아요."
+      "canceled": "운영자가 취소한 런이에요. 처리할 일에 올리지 않아요."
     },
     "noRunsWithConditions": "조건에 맞는 런이 생기면 여기에 요약이 보여요."
   }

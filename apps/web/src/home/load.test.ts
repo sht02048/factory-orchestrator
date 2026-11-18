@@ -121,7 +121,7 @@ describe("loadHomePage", () => {
     expect(offline).toMatchObject({ queuedReason: { kind: "runner-offline" }, runner: null });
   });
 
-  it("입력 기다림과 연결 끊김 런을 상태 그대로 손댈 일에 담는다", () => {
+  it("입력 기다림과 연결 끊김 런을 상태 그대로 To do에 담는다", () => {
     const { db } = seedDatabase();
     const page = loadHomePage(db, "ws-commerce", now, "UTC");
     const runs = page.attention.flatMap((item) => (item.kind === "run" ? [item.run] : []));
@@ -129,7 +129,7 @@ describe("loadHomePage", () => {
     expect(runs.find((run) => run.ticketKey === "ACME-12")?.state).toBe("disconnected");
   });
 
-  it("손댈 일의 Ended 런은 에이전트 결과와 PR 상태를 따로 담는다", () => {
+  it("To do의 Ended 런은 에이전트 결과와 PR 상태를 따로 담는다", () => {
     const { db } = seedDatabase();
     const page = loadHomePage(db, "ws-commerce", now, "UTC");
     const run = page.attention.find(
@@ -146,7 +146,7 @@ describe("loadHomePage", () => {
     });
   });
 
-  it("같은 티켓에 새 런이 있으면 지난 Ended 런은 손댈 일에서 빠진다", () => {
+  it("같은 티켓에 새 런이 있으면 지난 Ended 런은 To do에서 빠진다", () => {
     const { db } = seedDatabase();
     const again = assignRun(db, {
       ticket: { connection, key: toTicketKey("ACME-3") },
@@ -161,7 +161,7 @@ describe("loadHomePage", () => {
     expect(keys(page.queued)).toContain("ACME-3");
   });
 
-  it("Human Check 런은 사람이 PR 을 병합하거나 닫으면 손댈 일에서 빠진다(Q89)", () => {
+  it("Human Check 런은 사람이 PR 을 병합하거나 닫으면 To do에서 빠진다(Q89)", () => {
     const { db, ids } = seedDatabase();
     const id = ids.get("ACME-2");
     if (id === undefined) throw new Error("ACME-2 missing");
@@ -176,7 +176,7 @@ describe("loadHomePage", () => {
     );
   });
 
-  it("Canceled 런은 PR 이 열려 있어도 손댈 일에 없다(Q82.9)", () => {
+  it("Canceled 런은 PR 이 열려 있어도 To do에 없다(Q82.9)", () => {
     const { db } = seedDatabase();
     addEndedRun(db, { key: "ACME-30", trackerProject: "tp-web", agentResult: "canceled" });
     const page = loadHomePage(db, "ws-commerce", now, "UTC");

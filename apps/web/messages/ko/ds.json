@@ -51,7 +51,7 @@
     "level3": "3단계 · 흐린 보조",
     "samplePage": "Runs",
     "samplePanel": "결제 웹훅 재시도 로직 추가",
-    "sampleSection": "손댈 일",
+    "sampleSection": "To do",
     "sampleTitle": "주문 목록 필터가 새로고침 뒤 사라짐",
     "sampleBody": "PR이 열려 있지만 병합되지 않았어요. CI는 통과했고 리뷰를 기다려요.",
     "sampleUi": "runner-a에서 Claude Code가 처리했어요",
@@ -103,8 +103,8 @@
     }
   },
   "card": {
-    "note": "손댈 일 카드·러너 카드는 Card, 카드 안 한 줄은 Row예요. 카드 행동은 모두 보조 버튼이에요.",
-    "label": "손댈 일 카드 예시",
+    "note": "To do 카드·러너 카드는 Card, 카드 안 한 줄은 Row예요. 카드 행동은 모두 보조 버튼이에요.",
+    "label": "To do 카드 예시",
     "ticketTitle": "결제 실패 재시도",
     "body": "재시도 간격을 지수 백오프로 바꿀까요, 지금처럼 30초 고정으로 둘까요?",
     "choiceA": "지수 백오프",
@@ -117,7 +117,7 @@
     "label": "상태로 거르기",
     "chipsLabel": "상태 칩으로 거르기",
     "all": "전체",
-    "todo": "손댈 일",
+    "todo": "처리할 일",
     "running": "Running",
     "queued": "Queued",
     "panelAll": "모든 런을 최근 순서로 보여 줘요.",
