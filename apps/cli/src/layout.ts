@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { BootConfig } from "@factory/db";
+import type { BootConfig } from "@ganger/db";
 
 export interface ProcessSpec {
   name: "web" | "worker";

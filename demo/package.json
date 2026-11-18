@@ -1,5 +1,5 @@
 {
-  "name": "@factory/demo",
+  "name": "@ganger/demo",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,10 +7,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@factory/core": "workspace:*",
-    "@factory/db": "workspace:*",
-    "@factory/web": "workspace:*",
-    "@factory/worker": "workspace:*",
+    "@ganger/core": "workspace:*",
+    "@ganger/db": "workspace:*",
+    "@ganger/web": "workspace:*",
+    "@ganger/worker": "workspace:*",
     "playwright-core": "1.65.0",
     "vite": "8.3.8"
   }

@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AdapterRegistry } from "@factory/core";
-import { BootConfigError, loadMigrations, openDatabase } from "@factory/db";
+import { AdapterRegistry } from "@ganger/core";
+import { BootConfigError, loadMigrations, openDatabase } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { bootWorker } from "./boot.js";
 import { createAdapterRegistry } from "./registry.js";

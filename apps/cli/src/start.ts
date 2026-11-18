@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { BOOT_ENV, migrate, openDatabase, parseBootConfig } from "@factory/db";
-import type { BootConfig } from "@factory/db";
+import { BOOT_ENV, migrate, openDatabase, parseBootConfig } from "@ganger/db";
+import type { BootConfig } from "@ganger/db";
 import { homePaths, readBootEnv } from "./home.js";
 import type { AppLayout, ProcessSpec } from "./layout.js";
 import { ServerAlreadyRunningError, acquireServerLock } from "./server-lock.js";

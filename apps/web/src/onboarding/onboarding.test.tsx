@@ -6,9 +6,9 @@ import {
   toTrackerKind,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
-import type { RunnerHealth, RunnerId, TrackerConnectionId } from "@factory/core";
-import { FakeCodeHost, FakeTracker } from "@factory/core/testing";
+} from "@ganger/core";
+import type { RunnerHealth, RunnerId, TrackerConnectionId } from "@ganger/core";
+import { FakeCodeHost, FakeTracker } from "@ganger/core/testing";
 import {
   SecretBox,
   completeRunnerCheckRequest,
@@ -23,7 +23,7 @@ import {
   saveWorkspace,
   saveWorkspaceTrackerProject,
   toWorkspaceId,
-} from "@factory/db";
+} from "@ganger/db";
 import { describe, expect, it, vi } from "vitest";
 import {
   saveGitHubToken,

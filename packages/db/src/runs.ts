@@ -6,7 +6,7 @@ import {
   pickRunner,
   toRunId,
   transitionRun,
-} from "@factory/core";
+} from "@ganger/core";
 import type {
   AgentId,
   AgentRef,
@@ -27,7 +27,7 @@ import type {
   TrackerConnectionId,
   TrackerProjectId,
   WorktreeRef,
-} from "@factory/core";
+} from "@ganger/core";
 import {
   and,
   asc,

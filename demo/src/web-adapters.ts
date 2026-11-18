@@ -1,5 +1,5 @@
-import type { AdapterRegistry } from "@factory/core";
-import { SecretBox, parseBootConfig } from "@factory/db";
+import type { AdapterRegistry } from "@ganger/core";
+import { SecretBox, parseBootConfig } from "@ganger/db";
 import { demoWorld } from "./world.js";
 
 let registry: AdapterRegistry | undefined;

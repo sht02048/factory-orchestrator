@@ -1,4 +1,4 @@
-import { getInstallSettings } from "@factory/db";
+import { getInstallSettings } from "@ganger/db";
 import { createFileRoute } from "@tanstack/react-router";
 import { identityOf } from "../../identity/identity";
 import { getDatabase } from "../../server/database";

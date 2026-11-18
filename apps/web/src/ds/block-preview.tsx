@@ -47,8 +47,8 @@ import {
   VisuallyHidden,
   WorkspaceBadge,
   railLinkStyles,
-} from "@factory/ui";
-import { space } from "@factory/ui/tokens.stylex";
+} from "@ganger/ui";
+import { space } from "@ganger/ui/tokens.stylex";
 import { useId, useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 

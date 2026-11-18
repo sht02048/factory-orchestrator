@@ -6,7 +6,7 @@ import {
   toRepoRef,
   toRunnerProjectId,
   toTicketKey,
-} from "@factory/core";
+} from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import { summarizeRuns } from "./ci.js";
 import { GitHubCodeHost, searchQuery } from "./github.js";

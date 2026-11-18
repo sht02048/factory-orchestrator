@@ -9,9 +9,9 @@ import {
   toTicketKey,
   toTrackerConnectionId,
   toTrackerKind,
-} from "@factory/core";
-import type { CodeHost, Runner, Tracker } from "@factory/core";
-import { FakeCodeHost, FakeRunner, FakeTracker } from "@factory/core/testing";
+} from "@ganger/core";
+import type { CodeHost, Runner, Tracker } from "@ganger/core";
+import { FakeCodeHost, FakeRunner, FakeTracker } from "@ganger/core/testing";
 import {
   SecretBox,
   listRunners,
@@ -21,8 +21,8 @@ import {
   saveRunner,
   saveTrackerConnection,
   toCodeHostConnectionId,
-} from "@factory/db";
-import type { Database } from "@factory/db";
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   ConnectionPausedError,

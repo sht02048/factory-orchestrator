@@ -9,9 +9,9 @@ import {
   toTrackerKind,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
-import type { RunnerHealth, RunnerId, TrackerConnectionId } from "@factory/core";
-import { FakeCodeHost, FakeTracker } from "@factory/core/testing";
+} from "@ganger/core";
+import type { RunnerHealth, RunnerId, TrackerConnectionId } from "@ganger/core";
+import { FakeCodeHost, FakeTracker } from "@ganger/core/testing";
 import {
   SecretBox,
   assignRun,
@@ -26,7 +26,7 @@ import {
   saveWorkspace,
   schema,
   toWorkspaceId,
-} from "@factory/db";
+} from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import { renderWithMessages } from "../testing/render";
 import {

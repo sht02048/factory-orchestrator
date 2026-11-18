@@ -1,21 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { toDeliveryId, toPullRequestId, toRepoRef, toTicketKey } from "@factory/core";
+import { toDeliveryId, toPullRequestId, toRepoRef, toTicketKey } from "@ganger/core";
 import type {
   RunnerProjectId,
   TicketKey,
   TrackerConnectionId,
   TrackerTicket,
   WorktreeRef,
-} from "@factory/core";
-import type { FakeRunner, FakeRunnerRun, FakeTracker } from "@factory/core/testing";
+} from "@ganger/core";
+import type { FakeRunner, FakeRunnerRun, FakeTracker } from "@ganger/core/testing";
 import {
   listRunners,
   listRuns,
   listTrackerConnections,
   recordTrackerEvent,
   requestRunnerCheck,
-} from "@factory/db";
-import type { Database, SecretBox } from "@factory/db";
+} from "@ganger/db";
+import type { Database, SecretBox } from "@ganger/db";
 import { autoAssignLabel } from "./fixtures.js";
 import { FAIL_PUSH_AUTH } from "./values.js";
 import { pullRequestOf } from "./hydrate.js";

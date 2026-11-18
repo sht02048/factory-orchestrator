@@ -12,8 +12,8 @@ import {
   toRunnerProjectId,
   toTicketKey,
   toTrackerStateId,
-} from "@factory/core";
-import { FakeTracker } from "@factory/core/testing";
+} from "@ganger/core";
+import { FakeTracker } from "@ganger/core/testing";
 import {
   SecretBox,
   migrate,
@@ -27,8 +27,8 @@ import {
   saveWorkspace,
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
-} from "@factory/db";
-import type { Database } from "@factory/db";
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
 import { chromium } from "playwright-core";
 import type { Browser, BrowserContext, Page, Route } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";

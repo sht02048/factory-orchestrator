@@ -1,5 +1,5 @@
 import { createServer } from "node:net";
-import { homePaths, readBootEnv } from "@factory/cli/home";
+import { homePaths, readBootEnv } from "@ganger/cli/home";
 import {
   toAgentId,
   toAgentRef,
@@ -13,8 +13,8 @@ import {
   toTrackerKind,
   toTrackerProjectId,
   toWorktreeRef,
-} from "@factory/core";
-import type { AgentResult, PrState, RunId } from "@factory/core";
+} from "@ganger/core";
+import type { AgentResult, PrState, RunId } from "@ganger/core";
 import {
   SecretBox,
   assignRun,
@@ -30,8 +30,8 @@ import {
   saveWorkspace,
   saveWorkspaceTrackerProject,
   toWorkspaceId,
-} from "@factory/db";
-import type { Database } from "@factory/db";
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
 
 export function freePort(): Promise<number> {
   return new Promise((resolvePort, reject) => {

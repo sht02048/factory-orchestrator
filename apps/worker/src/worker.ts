@@ -1,4 +1,4 @@
-import { canRunnerTake, decideStartFailure, MAX_START_RETRIES, planQueue } from "@factory/core";
+import { canRunnerTake, decideStartFailure, MAX_START_RETRIES, planQueue } from "@ganger/core";
 import type {
   AdapterRegistry,
   MailboxRef,
@@ -9,7 +9,7 @@ import type {
   RunnerId,
   StartedRun,
   TicketKey,
-} from "@factory/core";
+} from "@ganger/core";
 import {
   changeRunState,
   clearStartRequested,
@@ -28,8 +28,8 @@ import {
   recordStartRequested,
   setQueuedRunRunner,
   setRunnerMailbox,
-} from "@factory/db";
-import type { SecretBox, StoredRun } from "@factory/db";
+} from "@ganger/db";
+import type { SecretBox, StoredRun } from "@ganger/db";
 import { WorkerAdapters } from "./adapters.js";
 import {
   describe,

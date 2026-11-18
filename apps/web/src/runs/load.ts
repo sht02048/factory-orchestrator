@@ -5,8 +5,8 @@ import {
   summarizeRunOutcome,
   toTrackerConnectionId,
   toTrackerProjectId,
-} from "@factory/core";
-import type { QueuedRun, RunId } from "@factory/core";
+} from "@ganger/core";
+import type { QueuedRun, RunId } from "@ganger/core";
 import {
   getWorkspaceTrackerProject,
   listPendingCancelRequests,
@@ -17,8 +17,8 @@ import {
   listRunners,
   listWorkspaces,
   toWorkspaceId,
-} from "@factory/db";
-import type { Database, EndedAxesFilter, RunRecords, StoredRun } from "@factory/db";
+} from "@ganger/db";
+import type { Database, EndedAxesFilter, RunRecords, StoredRun } from "@ganger/db";
 import { isWebUrl } from "../format/url";
 import { resolveWorkspace } from "../shell/model";
 import { DEFAULT_TIME_ZONE } from "../time-zone";

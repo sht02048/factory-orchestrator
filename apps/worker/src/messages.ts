@@ -1,4 +1,4 @@
-import type { AgentResult, PrState, SummaryOutcome } from "@factory/core";
+import type { AgentResult, PrState, SummaryOutcome } from "@ganger/core";
 
 export const messages = {
   resultComment: {

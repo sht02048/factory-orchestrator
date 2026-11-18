@@ -1,5 +1,5 @@
-import { listRunners, listWorkspaces } from "@factory/db";
-import type { Database } from "@factory/db";
+import { listRunners, listWorkspaces } from "@ganger/db";
+import type { Database } from "@ganger/db";
 import type { ShellData } from "./model";
 import { runnerIssueCause } from "./model";
 

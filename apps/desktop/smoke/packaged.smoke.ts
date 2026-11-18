@@ -3,7 +3,7 @@ import type { ChildProcess } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { isProcessAlive, readLiveServerLock } from "@factory/cli/server-lock";
+import { isProcessAlive, readLiveServerLock } from "@ganger/cli/server-lock";
 import { _electron } from "playwright-core";
 import type { ElectronApplication, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

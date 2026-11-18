@@ -5,8 +5,8 @@ import {
   getRunWithRecords,
   listPendingLogTailRequests,
   listPendingRunnerCheckRequests,
-} from "@factory/db";
-import type { RunId, RunnerHealth, RunnerId } from "@factory/core";
+} from "@ganger/db";
+import type { RunId, RunnerHealth, RunnerId } from "@ganger/core";
 import { describe, findRunner, mailboxFor, runnerErrorDetail, tryWrite } from "./context.js";
 import type { TickContext } from "./context.js";
 import { checkRunner } from "./runner-check.js";

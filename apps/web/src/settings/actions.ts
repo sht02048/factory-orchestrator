@@ -8,8 +8,8 @@ import {
   toTrackerConnectionId,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
-import type { RunnerId, RunnerKind } from "@factory/core";
+} from "@ganger/core";
+import type { RunnerId, RunnerKind } from "@ganger/core";
 import {
   getTrackerConnection,
   getWorkspaceTrackerProject,
@@ -27,8 +27,8 @@ import {
   saveWorkspace,
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
-} from "@factory/db";
-import type { WorkspaceId } from "@factory/db";
+} from "@ganger/db";
+import type { WorkspaceId } from "@ganger/db";
 import { z } from "zod";
 import { allowedHosts, hostnameOfHostHeader } from "../server/request-guard";
 import { remoteErrorOf, remoteErrorOfDetail } from "./load";

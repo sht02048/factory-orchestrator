@@ -1,6 +1,6 @@
-import type { AdapterRegistry, TrackerConnectionId, WebhookVerifyError } from "@factory/core";
-import { getTrackerConnection, recordTrackerEvent } from "@factory/db";
-import type { Database, SecretBox } from "@factory/db";
+import type { AdapterRegistry, TrackerConnectionId, WebhookVerifyError } from "@ganger/core";
+import { getTrackerConnection, recordTrackerEvent } from "@ganger/db";
+import type { Database, SecretBox } from "@ganger/db";
 
 export const MAX_WEBHOOK_REQUEST_BYTES = 5 * 1024 * 1024;
 

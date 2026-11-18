@@ -87,7 +87,7 @@ const dir = mkdtempSync(join(tmpdir(), "factory-smoke-"));
 const port = await freePort();
 let output = "";
 let hasExited = false;
-const server = spawn("pnpm", ["--filter", "@factory/web", "start"], {
+const server = spawn("pnpm", ["--filter", "@ganger/web", "start"], {
   detached: true,
   env: {
     ...process.env,

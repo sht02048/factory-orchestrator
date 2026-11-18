@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { isDeepStrictEqual, parseEnv } from "node:util";
-import { BOOT_ENV, ENCRYPTION_KEY_BYTES, parseBootConfig } from "@factory/db";
+import { BOOT_ENV, ENCRYPTION_KEY_BYTES, parseBootConfig } from "@ganger/db";
 import { homePaths } from "./home.js";
 
 export interface InitOptions {

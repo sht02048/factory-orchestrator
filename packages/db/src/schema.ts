@@ -1,4 +1,4 @@
-import { AGENT_RESULTS, NOT_STARTED_AGENT_RESULTS, PR_STATES, RUN_STATES } from "@factory/core";
+import { AGENT_RESULTS, NOT_STARTED_AGENT_RESULTS, PR_STATES, RUN_STATES } from "@ganger/core";
 import type {
   AgentId,
   AgentRef,
@@ -20,7 +20,7 @@ import type {
   TrackerProjectId,
   TrackerStateId,
   WorktreeRef,
-} from "@factory/core";
+} from "@ganger/core";
 import { sql } from "drizzle-orm";
 import {
   check,

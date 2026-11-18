@@ -10,8 +10,8 @@ import {
   toTrackerProjectId,
   toAgentRef,
   toWorktreeRef,
-} from "@factory/core";
-import type { AgentResult, PrState, RunId, RunnerId, RunnerProjectId } from "@factory/core";
+} from "@ganger/core";
+import type { AgentResult, PrState, RunId, RunnerId, RunnerProjectId } from "@ganger/core";
 import {
   SecretBox,
   assignRun,
@@ -26,8 +26,8 @@ import {
   saveWorkspaceTrackerProject,
   toWorkspaceId,
   updateRunRecords,
-} from "@factory/db";
-import type { Database } from "@factory/db";
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
 
 export const connection = toTrackerConnectionId("conn-acme");
 export const commerce = toWorkspaceId("ws-commerce");

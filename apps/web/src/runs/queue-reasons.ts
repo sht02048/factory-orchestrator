@@ -1,4 +1,4 @@
-import { planQueue } from "@factory/core";
+import { planQueue } from "@ganger/core";
 import type {
   QueuedRun,
   RunId,
@@ -6,7 +6,7 @@ import type {
   RunnerId,
   RunnerSnapshot,
   UnplacedReason,
-} from "@factory/core";
+} from "@ganger/core";
 
 export type QueuedReasonCode =
   | { kind: "starting" | "behind" | UnplacedReason }

@@ -36,11 +36,11 @@ function diagnosticsOf(json: unknown): Diagnostic[] {
 
 const fixtures: Record<string, string> = {
   "apps/web/src/bad-tokens.tsx": [
-    'import { colors, fontSize, radius, space } from "@factory/ui/tokens.stylex";',
+    'import { colors, fontSize, radius, space } from "@ganger/ui/tokens.stylex";',
     "export const used = [colors, fontSize, radius, space];",
   ].join("\n"),
   "apps/web/src/bad-namespace.tsx": [
-    'import * as tokens from "@factory/ui/tokens.stylex";',
+    'import * as tokens from "@ganger/ui/tokens.stylex";',
     "export const used = tokens;",
   ].join("\n"),
   "apps/web/src/bad-elements.tsx": [
@@ -58,14 +58,14 @@ const fixtures: Record<string, string> = {
     ");",
   ].join("\n"),
   "apps/web/src/good.tsx": [
-    'import { Button, Text } from "@factory/ui";',
-    'import { size, space } from "@factory/ui/tokens.stylex";',
+    'import { Button, Text } from "@ganger/ui";',
+    'import { size, space } from "@ganger/ui/tokens.stylex";',
     "export const used = [size, space];",
     'export const Good = () => <Text variant="page">제목<Button>누르기</Button></Text>;',
   ].join("\n"),
   "apps/web/src/good.test.tsx": "export const Fixture = () => <button>시험 안 버튼</button>;",
   "apps/web/src/ds/catalog.tsx": [
-    'import { colors } from "@factory/ui/tokens.stylex";',
+    'import { colors } from "@ganger/ui/tokens.stylex";',
     "export const used = colors;",
   ].join("\n"),
   "packages/ui/src/inside.tsx": [

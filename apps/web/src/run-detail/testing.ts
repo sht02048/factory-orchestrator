@@ -5,10 +5,10 @@ import {
   toTicketKey,
   toTrackerProjectId,
   toWorktreeRef,
-} from "@factory/core";
-import type { AgentResult, PrState, RunId, SummaryOutcome } from "@factory/core";
-import { assignRun, changeRunState } from "@factory/db";
-import type { Database, RunStateChange } from "@factory/db";
+} from "@ganger/core";
+import type { AgentResult, PrState, RunId, SummaryOutcome } from "@ganger/core";
+import { assignRun, changeRunState } from "@ganger/db";
+import type { Database, RunStateChange } from "@ganger/db";
 import { connection, minutes } from "../testing/seed";
 
 export function startedOn(key: string): Extract<RunStateChange, { to: "running" }> {

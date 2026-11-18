@@ -1,4 +1,4 @@
-import { mentionsTicketKey, toCodeHostKind, toPullRequestId } from "@factory/core";
+import { mentionsTicketKey, toCodeHostKind, toPullRequestId } from "@ganger/core";
 import type {
   CiState,
   CodeHost,
@@ -10,7 +10,7 @@ import type {
   RepoRef,
   RunnerProjectId,
   TicketKey,
-} from "@factory/core";
+} from "@ganger/core";
 import { z } from "zod";
 import { readCiState } from "./ci.js";
 import { GitHubError, GitHubHttp } from "./http.js";

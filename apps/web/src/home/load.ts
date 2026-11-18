@@ -1,5 +1,5 @@
-import { runDurations, summarizeRunOutcome } from "@factory/core";
-import type { QueuedRun, RunId } from "@factory/core";
+import { runDurations, summarizeRunOutcome } from "@ganger/core";
+import type { QueuedRun, RunId } from "@ganger/core";
 import {
   getRunWithRecords,
   listPendingCancelRequests,
@@ -12,8 +12,8 @@ import {
   listRuns,
   listWorkspaces,
   toWorkspaceId,
-} from "@factory/db";
-import type { Database, StoredRun } from "@factory/db";
+} from "@ganger/db";
+import type { Database, StoredRun } from "@ganger/db";
 import { explainQueue } from "../runs/queue-reasons";
 import { isWebUrl } from "../format/url";
 import { resolveWorkspace, runnerIssueCause } from "../shell/model";

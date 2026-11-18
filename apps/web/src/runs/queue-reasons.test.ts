@@ -1,5 +1,5 @@
-import { toRunId, toRunnerId, toRunnerProjectId } from "@factory/core";
-import type { QueuedRun, RunnerSnapshot } from "@factory/core";
+import { toRunId, toRunnerId, toRunnerProjectId } from "@ganger/core";
+import type { QueuedRun, RunnerSnapshot } from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import { explainQueue } from "./queue-reasons";
 

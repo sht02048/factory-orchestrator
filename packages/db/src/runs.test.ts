@@ -14,8 +14,8 @@ import {
   toRunId,
   toTrackerProjectId,
   toWorktreeRef,
-} from "@factory/core";
-import type { AgentId, RunId, RunState, RunnerId, TicketRef } from "@factory/core";
+} from "@ganger/core";
+import type { AgentId, RunId, RunState, RunnerId, TicketRef } from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import { inTransaction } from "./database.js";
 import type { Database } from "./database.js";

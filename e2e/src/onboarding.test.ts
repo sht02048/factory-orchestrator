@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { toCodeHostKind, toRunnerProjectId } from "@factory/core";
-import type { RunnerHealth } from "@factory/core";
+import { toCodeHostKind, toRunnerProjectId } from "@ganger/core";
+import type { RunnerHealth } from "@ganger/core";
 import {
   SecretBox,
   completeRunnerCheckRequest,
@@ -15,8 +15,8 @@ import {
   recordRunnerCheck,
   saveCodeHostConnection,
   toCodeHostConnectionId,
-} from "@factory/db";
-import type { Database } from "@factory/db";
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
 import { chromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";

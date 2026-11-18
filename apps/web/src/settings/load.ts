@@ -1,5 +1,5 @@
-import { AdapterError, toTrackerConnectionId, toTrackerProjectId } from "@factory/core";
-import type { AdapterRegistry, RunnerId, Tracker, TrackerConnectionId } from "@factory/core";
+import { AdapterError, toTrackerConnectionId, toTrackerProjectId } from "@ganger/core";
+import type { AdapterRegistry, RunnerId, Tracker, TrackerConnectionId } from "@ganger/core";
 import {
   getAutoAssignLabel,
   getInstallSettings,
@@ -12,8 +12,8 @@ import {
   listTrackerConnections,
   listWorkspaceTrackerProjects,
   listWorkspaces,
-} from "@factory/db";
-import type { Database, SecretBox, StoredTrackerConnection, WorkspaceId } from "@factory/db";
+} from "@ganger/db";
+import type { Database, SecretBox, StoredTrackerConnection, WorkspaceId } from "@ganger/db";
 import { z } from "zod";
 import { prerequisiteProject } from "../labels";
 import { resolveWorkspace } from "../shell/model";

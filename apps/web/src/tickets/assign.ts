@@ -4,9 +4,9 @@ import {
   toTicketKey,
   toTrackerConnectionId,
   toTrackerProjectId,
-} from "@factory/core";
-import { assignRun, getMapping, listRunners, listWorkspaceTrackerProjects } from "@factory/db";
-import type { Database } from "@factory/db";
+} from "@ganger/core";
+import { assignRun, getMapping, listRunners, listWorkspaceTrackerProjects } from "@ganger/db";
+import type { Database } from "@ganger/db";
 import { z } from "zod";
 
 export const assignInput = z.object({

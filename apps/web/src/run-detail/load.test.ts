@@ -1,6 +1,6 @@
-import { AGENT_RESULTS, toPermissionRequestId, toPullRequestId, toQuestionId } from "@factory/core";
-import type { RunId } from "@factory/core";
-import type { Database } from "@factory/db";
+import { AGENT_RESULTS, toPermissionRequestId, toPullRequestId, toQuestionId } from "@ganger/core";
+import type { RunId } from "@ganger/core";
+import type { Database } from "@ganger/db";
 import {
   changeRunState,
   completeLogTailRequest,
@@ -13,7 +13,7 @@ import {
   recordRunQuestions,
   recordStartFailure,
   updateRunRecords,
-} from "@factory/db";
+} from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { endedCases, minutes, now, seedDatabase } from "../testing/seed";

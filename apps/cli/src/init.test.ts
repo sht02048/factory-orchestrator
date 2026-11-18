@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BootConfigError, parseBootConfig } from "@factory/db";
+import { BootConfigError, parseBootConfig } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { homePaths, readBootEnv, resolveHome } from "./home.js";
 import { EnvFileFormatError, init, renderEnvFile } from "./init.js";

@@ -1,12 +1,12 @@
-import { assignRun, changeRunState, updateRunRecords } from "@factory/db";
-import type { Database } from "@factory/db";
+import { assignRun, changeRunState, updateRunRecords } from "@ganger/db";
+import type { Database } from "@ganger/db";
 import {
   toAgentId,
   toPullRequestId,
   toRunnerProjectId,
   toTicketKey,
   toTrackerProjectId,
-} from "@factory/core";
+} from "@ganger/core";
 import { describe, expect, it, vi } from "vitest";
 import {
   activeCases,

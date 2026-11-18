@@ -60,9 +60,9 @@ The browser tests in `e2e` drive the Google Chrome installed on the machine thro
 - Data lives in `.dev/<mode>/` in the repository (ignored by git), or under `FACTORY_DEV_DIR`. It never touches `~/.factory-orchestrator`. The server binds to `127.0.0.1:3000`; set `WEB_HOST` and `WEB_PORT` to change that (for example, `WEB_HOST=0.0.0.0 pnpm dev` to open it from another machine on your network). Anyone who can reach that address can use the dev server and `/__dev`, so bind to an address only trusted machines can reach.
 - The fake adapters and the dev tools are registered only by `pnpm dev`. They are not part of the production build or the server bundle; the bundle check (`scripts/bundle-check.ts`, run by `pnpm bundle` and `pnpm smoke:bundle`) fails if fake adapters or dev-only values end up in the bundle.
 
-`pnpm --filter @factory/web dev` still starts only the web app; open `http://127.0.0.1:3000/ds` to see the design system. Run the production build with `pnpm --filter @factory/web start`. It binds to `127.0.0.1` by default. To change that, set the shell environment variables `WEB_HOST` and `WEB_PORT` (for example, `WEB_PORT=4000 pnpm --filter @factory/web start`).
+`pnpm --filter @ganger/web dev` still starts only the web app; open `http://127.0.0.1:3000/ds` to see the design system. Run the production build with `pnpm --filter @ganger/web start`. It binds to `127.0.0.1` by default. To change that, set the shell environment variables `WEB_HOST` and `WEB_PORT` (for example, `WEB_PORT=4000 pnpm --filter @ganger/web start`).
 
-Build the worker with `pnpm --filter @factory/worker build` and start it with `pnpm --filter @factory/worker start`. It reads `DATABASE_PATH` and `ENCRYPTION_KEY` from the shell environment, applies pending database migrations, and then polls until it receives `SIGINT` or `SIGTERM`. It builds adapters from the runners, tracker connections, and code host connections stored in the database, and rebuilds an adapter when its settings change.
+Build the worker with `pnpm --filter @ganger/worker build` and start it with `pnpm --filter @ganger/worker start`. It reads `DATABASE_PATH` and `ENCRYPTION_KEY` from the shell environment, applies pending database migrations, and then polls until it receives `SIGINT` or `SIGTERM`. It builds adapters from the runners, tracker connections, and code host connections stored in the database, and rebuilds an adapter when its settings change.
 
 The pre-commit hook runs lint, format check, typecheck, and the color literal check. CI (GitHub Actions) runs on pull requests and on pushes to `main`, in this order: typecheck → lint → color literal check → format check → test → build → web production smoke test → CLI smoke test → server bundle → server bundle smoke test.
 
@@ -98,7 +98,7 @@ node factory-orchestrator-<version>/cli/bin/cli.js start
 
 To upgrade, build a new bundle, stop the orchestrator, extract the new bundle, and start it from there. The folder name includes the version, so if you run the orchestrator as a service, run `service uninstall` with the old bundle and `service install` with the new one. Your settings and data stay in the installation folder described below, not in the bundle.
 
-You can also run the CLI straight from the repository after `pnpm build`, with `node apps/cli/dist/bin/cli.js <command>` (or `pnpm --filter @factory/cli cli <command>`).
+You can also run the CLI straight from the repository after `pnpm build`, with `node apps/cli/dist/bin/cli.js <command>` (or `pnpm --filter @ganger/cli cli <command>`).
 
 ### Set up and start
 
@@ -152,11 +152,11 @@ On a machine where the service is already installed or running for the same inst
 pnpm install
 pnpm build
 pnpm bundle                                                            # the server bundle the app ships
-pnpm --filter @factory/desktop exec node node_modules/electron/install.js   # downloads Electron once
-pnpm --filter @factory/desktop run package
+pnpm --filter @ganger/desktop exec node node_modules/electron/install.js   # downloads Electron once
+pnpm --filter @ganger/desktop run package
 ```
 
-This writes `apps/desktop/dist/app/Factory Orchestrator-darwin-<arch>/Factory Orchestrator.app` and a `.zip` of it. The app carries the server bundle unchanged in `Contents/Resources/server/` and runs it with its own Node (Electron's), so the machine does not need Node. For development, `pnpm --filter @factory/desktop start` runs the app from the repository with the bundle in `dist/`.
+This writes `apps/desktop/dist/app/Factory Orchestrator-darwin-<arch>/Factory Orchestrator.app` and a `.zip` of it. The app carries the server bundle unchanged in `Contents/Resources/server/` and runs it with its own Node (Electron's), so the machine does not need Node. For development, `pnpm --filter @ganger/desktop start` runs the app from the repository with the bundle in `dist/`.
 
 The app uses the same installation folder as the CLI (`~/.factory-orchestrator`, or `FACTORY_HOME`). It writes the server's output to `<home>/logs/desktop-server.log`.
 

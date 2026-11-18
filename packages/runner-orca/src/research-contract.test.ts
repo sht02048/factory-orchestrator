@@ -5,8 +5,8 @@ import {
   toQuestionId,
   toRunnerProjectId,
   toWorktreeRef,
-} from "@factory/core";
-import type { RunOnRunner } from "@factory/core";
+} from "@ganger/core";
+import type { RunOnRunner } from "@ganger/core";
 import { describe, expect, test } from "vitest";
 import { decodeAgent, decodeMailbox, encodeAgent, encodeMailbox } from "./refs.js";
 import { ScriptedExec, peekOf, research, runnerWith, stdout } from "./test-support.js";

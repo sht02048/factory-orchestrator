@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
-import * as ui from "@factory/ui";
+import * as ui from "@ganger/ui";
 import { describe, expect, it } from "vitest";
 
 import { renderWithMessages } from "../testing/render";

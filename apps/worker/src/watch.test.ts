@@ -1,5 +1,5 @@
-import { AdapterError, DISCONNECT_AFTER_MS, summarizeRunOutcome } from "@factory/core";
-import type { RunnerErrorDetail, RunnerId, WorktreeRef } from "@factory/core";
+import { AdapterError, DISCONNECT_AFTER_MS, summarizeRunOutcome } from "@ganger/core";
+import type { RunnerErrorDetail, RunnerId, WorktreeRef } from "@ganger/core";
 import {
   DEFAULT_MAX_RUN_MS,
   answerRunQuestion,
@@ -14,13 +14,13 @@ import {
   listRunStateChanges,
   requestRunCancel,
   saveWorkspace,
-} from "@factory/db";
-import type { StoredRun } from "@factory/db";
+} from "@ganger/db";
+import type { StoredRun } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Harness, projectA, projectB } from "./test-fixtures.js";
 import { RUNNER_CHECK_INTERVAL_MS } from "./runner-check.js";
 import type { Worker } from "./worker.js";
-import type { FakeRunnerRun } from "@factory/core/testing";
+import type { FakeRunnerRun } from "@ganger/core/testing";
 
 let h: Harness;
 

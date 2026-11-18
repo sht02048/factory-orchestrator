@@ -5,7 +5,7 @@ import {
   toTrackerKind,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
+} from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { LinearApiError, LinearTrackerError } from "./client.js";

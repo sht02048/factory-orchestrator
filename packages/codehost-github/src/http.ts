@@ -1,5 +1,5 @@
-import { AdapterError } from "@factory/core";
-import type { CodeHostErrorDetail } from "@factory/core";
+import { AdapterError } from "@ganger/core";
+import type { CodeHostErrorDetail } from "@ganger/core";
 import { z } from "zod";
 
 export class GitHubError extends AdapterError<CodeHostErrorDetail> {

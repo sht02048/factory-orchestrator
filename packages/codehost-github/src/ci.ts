@@ -1,4 +1,4 @@
-import type { CiState } from "@factory/core";
+import type { CiState } from "@ganger/core";
 import { z } from "zod";
 import type { GitHubHttp } from "./http.js";
 

@@ -4,8 +4,8 @@ import {
   toTicketKey,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
-import type { LabelId, RunnerId, TrackerEvent, TrackerProjectId } from "@factory/core";
+} from "@ganger/core";
+import type { LabelId, RunnerId, TrackerEvent, TrackerProjectId } from "@ganger/core";
 import {
   listRuns,
   listUnprocessedTrackerEvents,
@@ -14,8 +14,8 @@ import {
   saveAutoAssignLabel,
   saveMapping,
   saveWorkspaceTrackerProject,
-} from "@factory/db";
-import type { StoredRun } from "@factory/db";
+} from "@ganger/db";
+import type { StoredRun } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POLL_CORRECTION_FIRST_LOOKBACK_MS, POLL_CORRECTION_INTERVAL_MS } from "./auto-assign.js";
 import {

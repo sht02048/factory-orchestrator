@@ -1,4 +1,4 @@
-import { AdapterError, checkAssignment, summarizeRunOutcome } from "@factory/core";
+import { AdapterError, checkAssignment, summarizeRunOutcome } from "@ganger/core";
 import type {
   AdapterRegistry,
   LabelId,
@@ -6,7 +6,7 @@ import type {
   Tracker,
   TrackerConnectionId,
   TrackerTicket,
-} from "@factory/core";
+} from "@ganger/core";
 import {
   getAutoAssignLabel,
   getMapping,
@@ -17,8 +17,8 @@ import {
   listWorkspaceTrackerProjects,
   listWorkspaces,
   toWorkspaceId,
-} from "@factory/db";
-import type { Database, SecretBox, StoredRun, StoredWorkspaceTrackerProject } from "@factory/db";
+} from "@ganger/db";
+import type { Database, SecretBox, StoredRun, StoredWorkspaceTrackerProject } from "@ganger/db";
 import { z } from "zod";
 import { isWebUrl } from "../format/url";
 import { resolveWorkspace } from "../shell/model";

@@ -1,5 +1,5 @@
-import { toPermissionRequestId, toTicketKey } from "@factory/core";
-import type { RunId } from "@factory/core";
+import { toPermissionRequestId, toTicketKey } from "@ganger/core";
+import type { RunId } from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import type { Database } from "./database.js";
 import {

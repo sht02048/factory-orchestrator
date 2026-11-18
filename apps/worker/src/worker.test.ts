@@ -1,7 +1,7 @@
-import { AdapterError, MAX_START_RETRIES, summarizeRunOutcome } from "@factory/core";
-import type { CompletionReport, PrState, WorktreeRef } from "@factory/core";
-import { getRun, getRunWithRecords } from "@factory/db";
-import type { StoredRun } from "@factory/db";
+import { AdapterError, MAX_START_RETRIES, summarizeRunOutcome } from "@ganger/core";
+import type { CompletionReport, PrState, WorktreeRef } from "@ganger/core";
+import { getRun, getRunWithRecords } from "@ganger/db";
+import type { StoredRun } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Harness, projectA, projectB, projectC } from "./test-fixtures.js";
 import { START_UNREACHABLE_RETRY_MS, startWorker } from "./worker.js";

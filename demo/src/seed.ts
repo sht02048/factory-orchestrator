@@ -9,8 +9,8 @@ import {
   toQuestionId,
   toTicketKey,
   toWorktreeRef,
-} from "@factory/core";
-import type { AgentId, AgentResult, PrState, RunId, RunnerId, TicketKey } from "@factory/core";
+} from "@ganger/core";
+import type { AgentId, AgentResult, PrState, RunId, RunnerId, TicketKey } from "@ganger/core";
 import {
   assignRun,
   changeRunState,
@@ -28,8 +28,8 @@ import {
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
   updateRunRecords,
-} from "@factory/db";
-import type { Database, SecretBox } from "@factory/db";
+} from "@ganger/db";
+import type { Database, SecretBox } from "@ganger/db";
 import {
   RUNNER_PROJECTS,
   agent,

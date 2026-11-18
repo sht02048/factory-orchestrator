@@ -1,4 +1,4 @@
-import type { ButtonVariant } from "@factory/ui";
+import type { ButtonVariant } from "@ganger/ui";
 
 export interface RenderedButton {
   variant: ButtonVariant | "other";

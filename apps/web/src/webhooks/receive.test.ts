@@ -1,15 +1,15 @@
 import { readFileSync } from "node:fs";
-import { AdapterRegistry, toTrackerConnectionId } from "@factory/core";
-import type { TrackerConnectionId } from "@factory/core";
+import { AdapterRegistry, toTrackerConnectionId } from "@ganger/core";
+import type { TrackerConnectionId } from "@ganger/core";
 import {
   SecretBox,
   listUnprocessedTrackerEvents,
   migrate,
   openDatabase,
   saveTrackerConnection,
-} from "@factory/db";
-import type { Database } from "@factory/db";
-import { LINEAR_TRACKER_KIND, linearTrackerFactory } from "@factory/tracker-linear";
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
+import { LINEAR_TRACKER_KIND, linearTrackerFactory } from "@ganger/tracker-linear";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {

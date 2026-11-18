@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { GangerMark, PageHeader, Text } from "@factory/ui";
+import { GangerMark, PageHeader, Text } from "@ganger/ui";
 import {
   colors,
   fontSize,
@@ -9,7 +9,7 @@ import {
   radius,
   size,
   space,
-} from "@factory/ui/tokens.stylex";
+} from "@ganger/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { BlockSections, blockSectionIds } from "./block-preview";

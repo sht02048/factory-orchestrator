@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Toaster, documentStyles } from "@factory/ui";
+import { Toaster, documentStyles } from "@ganger/ui";
 import {
   HeadContent,
   Outlet,

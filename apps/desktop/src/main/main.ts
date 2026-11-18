@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { resolveHome } from "@factory/cli/home";
+import { resolveHome } from "@ganger/cli/home";
 import { app, dialog } from "electron";
 import { z } from "zod";
 import { LocalServer, fileRecordStore } from "../core/local-server.js";

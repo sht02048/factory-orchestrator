@@ -34,8 +34,8 @@ import {
   surfaceStyles,
   textStyles,
   visuallyHiddenStyles,
-} from "@factory/ui";
-import { breakpoints, size, space } from "@factory/ui/tokens.stylex";
+} from "@ganger/ui";
+import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
 import type { ReactNode, Ref, RefObject } from "react";
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
@@ -46,7 +46,7 @@ import {
   toTrackerConnectionId,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
+} from "@ganger/core";
 import type {
   AgentId,
   LabelId,
@@ -54,8 +54,8 @@ import type {
   TrackerConnectionId,
   TrackerProjectId,
   TrackerStateId,
-} from "@factory/core";
-import type { WorkspaceId } from "@factory/db";
+} from "@ganger/core";
+import type { WorkspaceId } from "@ganger/db";
 import { useAgentName, usePrerequisiteName } from "../labels";
 import {
   RunnerCheck,

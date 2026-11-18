@@ -5,7 +5,7 @@ import {
   toTrackerKind,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
+} from "@ganger/core";
 import type {
   CommentId,
   LabelId,
@@ -22,7 +22,7 @@ import type {
   TrackerState,
   TrackerStateId,
   TrackerTicket,
-} from "@factory/core";
+} from "@ganger/core";
 import { z } from "zod";
 import { LinearClient, LinearTrackerError, connectionSchema } from "./client.js";
 import type { Fetch } from "./client.js";

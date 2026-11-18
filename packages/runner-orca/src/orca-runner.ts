@@ -1,4 +1,4 @@
-import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@factory/core";
+import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@ganger/core";
 import type {
   MailboxRef,
   PermissionRequestId,
@@ -15,7 +15,7 @@ import type {
   StartedRun,
   StartRunInput,
   WorktreeRef,
-} from "@factory/core";
+} from "@ganger/core";
 import { z } from "zod";
 import { parseOrcaRunnerConfig } from "./config.js";
 import type { OrcaRunnerConfig } from "./config.js";

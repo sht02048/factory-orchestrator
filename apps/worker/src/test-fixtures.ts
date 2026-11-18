@@ -15,9 +15,9 @@ import {
   toTrackerKind,
   toTrackerProjectId,
   toTrackerStateId,
-} from "@factory/core";
-import type { PullRequestSnapshot, Runner, RunnerId, RunnerProjectId } from "@factory/core";
-import { FakeCodeHost, FakeRunner, FakeTracker } from "@factory/core/testing";
+} from "@ganger/core";
+import type { PullRequestSnapshot, Runner, RunnerId, RunnerProjectId } from "@ganger/core";
+import { FakeCodeHost, FakeRunner, FakeTracker } from "@ganger/core/testing";
 import {
   SecretBox,
   assignRun,
@@ -32,8 +32,8 @@ import {
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
   toWorkspaceId,
-} from "@factory/db";
-import type { Database, StoredRun } from "@factory/db";
+} from "@ganger/db";
+import type { Database, StoredRun } from "@ganger/db";
 import { createWorker } from "./worker.js";
 import type { Worker, WorkerLogger } from "./worker.js";
 

@@ -9,8 +9,8 @@ import {
   toTrackerConnectionId,
   toTrackerKind,
   toTrackerProjectId,
-} from "@factory/core";
-import type { RunnerId, RunnerProjectId } from "@factory/core";
+} from "@ganger/core";
+import type { RunnerId, RunnerProjectId } from "@ganger/core";
 import { openDatabase } from "./database.js";
 import type { Database } from "./database.js";
 import { toWorkspaceId } from "./ids.js";

@@ -4,9 +4,9 @@ import {
   toRepoRef,
   toRunnerKind,
   toTrackerKind,
-} from "@factory/core";
-import type { RepoRef, RunnerProjectId } from "@factory/core";
-import { FakeCodeHost, FakeRunner, FakeTracker } from "@factory/core/testing";
+} from "@ganger/core";
+import type { RepoRef, RunnerProjectId } from "@ganger/core";
+import { FakeCodeHost, FakeRunner, FakeTracker } from "@ganger/core/testing";
 import { RUNNER_PROJECTS, trackerCatalog, trackerSpecFor } from "./fixtures.js";
 import { FAIL_AUTH, FAIL_NO_ORCA, FAIL_OFFLINE, FAIL_PUSH_AUTH } from "./values.js";
 

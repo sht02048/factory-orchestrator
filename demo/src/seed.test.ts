@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { summarizeRunOutcome } from "@factory/core";
+import { summarizeRunOutcome } from "@ganger/core";
 import {
   SecretBox,
   getAutoAssignLabel,
@@ -17,9 +17,9 @@ import {
   listRuns,
   migrate,
   openDatabase,
-} from "@factory/db";
-import type { Database } from "@factory/db";
-import { createWorker } from "@factory/worker";
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
+import { createWorker } from "@ganger/worker";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { hydrateWorld } from "./hydrate.js";
 import { HISTORY_DAYS, seedDemo } from "./seed.js";

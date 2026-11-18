@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
-import { Button, RadioGroup, RadioOption, Text, Textarea, textStyles } from "@factory/ui";
-import { space } from "@factory/ui/tokens.stylex";
+import { Button, RadioGroup, RadioOption, Text, Textarea, textStyles } from "@ganger/ui";
+import { space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useId, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useTranslations } from "use-intl";

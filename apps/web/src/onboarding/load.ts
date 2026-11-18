@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { toTrackerConnectionId, toTrackerProjectId } from "@factory/core";
+import { toTrackerConnectionId, toTrackerProjectId } from "@ganger/core";
 import {
   getAutoAssignLabel,
   getTrackerConnection,
@@ -14,8 +14,8 @@ import {
   saveWorkspace,
   saveWorkspaceTrackerProject,
   toWorkspaceId,
-} from "@factory/db";
-import type { Database, SecretBox } from "@factory/db";
+} from "@ganger/db";
+import type { Database, SecretBox } from "@ganger/db";
 import { z } from "zod";
 import { idSchema, nameSchema } from "../settings/actions";
 import { loadSettingsPage, loadTrackerProjectChoices } from "../settings/load";

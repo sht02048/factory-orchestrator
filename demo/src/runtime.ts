@@ -1,5 +1,5 @@
-import { SecretBox, listTrackerConnections, migrate, openDatabase } from "@factory/db";
-import { startWorker } from "@factory/worker";
+import { SecretBox, listTrackerConnections, migrate, openDatabase } from "@ganger/db";
+import { startWorker } from "@ganger/worker";
 import { hydrateWorld } from "./hydrate.js";
 import { DemoLife } from "./life.js";
 import { seedDemo } from "./seed.js";

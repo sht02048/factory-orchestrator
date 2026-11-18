@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Button, Section, Text } from "@factory/ui";
+import { Button, Section, Text } from "@ganger/ui";
 import {
   colors,
   fonts,
@@ -12,7 +12,7 @@ import {
   shadow,
   size,
   space,
-} from "@factory/ui/tokens.stylex";
+} from "@ganger/ui/tokens.stylex";
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 

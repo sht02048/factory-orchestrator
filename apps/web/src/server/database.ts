@@ -1,5 +1,5 @@
-import { migrate, openDatabase, parseBootConfig } from "@factory/db";
-import type { Database } from "@factory/db";
+import { migrate, openDatabase, parseBootConfig } from "@ganger/db";
+import type { Database } from "@ganger/db";
 
 let database: Database | undefined;
 

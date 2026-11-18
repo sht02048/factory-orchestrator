@@ -19,8 +19,8 @@ import {
   StatusPill,
   Text,
   textStyles,
-} from "@factory/ui";
-import { colors, space } from "@factory/ui/tokens.stylex";
+} from "@ganger/ui";
+import { colors, space } from "@ganger/ui/tokens.stylex";
 import { useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useStatusName } from "../status";

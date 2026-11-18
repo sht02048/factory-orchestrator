@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
-import { BOOT_ENV } from "@factory/db";
+import { BOOT_ENV } from "@ganger/db";
 
 export const PRODUCT_NAME = "factory-orchestrator";
 export const HOME_ENV = "FACTORY_HOME";

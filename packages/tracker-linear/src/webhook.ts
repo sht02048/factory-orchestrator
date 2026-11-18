@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { toDeliveryId, toLabelId, toTicketKey, toTrackerProjectId } from "@factory/core";
-import type { LabelId, TrackerEvent, WebhookVerifyError } from "@factory/core";
+import { toDeliveryId, toLabelId, toTicketKey, toTrackerProjectId } from "@ganger/core";
+import type { LabelId, TrackerEvent, WebhookVerifyError } from "@ganger/core";
 import { z } from "zod";
 
 export const MAX_WEBHOOK_BODY_BYTES = 5 * 1024 * 1024;

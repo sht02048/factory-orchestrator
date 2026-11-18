@@ -8,8 +8,8 @@ import {
   toRunnerProjectId,
   toTicketKey,
   toWorktreeRef,
-} from "@factory/core";
-import type { RunOnRunner } from "@factory/core";
+} from "@ganger/core";
+import type { RunOnRunner } from "@ganger/core";
 import { describe, expect, test } from "vitest";
 import { OrcaRunnerConfigError } from "./config.js";
 import {

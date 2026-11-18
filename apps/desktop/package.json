@@ -1,5 +1,5 @@
 {
-  "name": "@factory/desktop",
+  "name": "@ganger/desktop",
   "version": "0.0.0",
   "private": true,
   "description": "Desktop app (window, tray, notifications) for factory-orchestrator",
@@ -14,9 +14,9 @@
     "brand-assets": "node scripts/brand-assets.ts"
   },
   "dependencies": {
-    "@factory/cli": "workspace:*",
-    "@factory/db": "workspace:*",
-    "@factory/ui": "workspace:*",
+    "@ganger/cli": "workspace:*",
+    "@ganger/db": "workspace:*",
+    "@ganger/ui": "workspace:*",
     "@stylexjs/stylex": "0.19.2",
     "react": "19.3.1",
     "react-dom": "19.3.1",
@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",
-    "@factory/core": "workspace:*",
+    "@ganger/core": "workspace:*",
     "@stylexjs/unplugin": "0.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

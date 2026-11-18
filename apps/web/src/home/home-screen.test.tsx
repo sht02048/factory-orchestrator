@@ -1,4 +1,4 @@
-import { toRunId, toTicketKey } from "@factory/core";
+import { toRunId, toTicketKey } from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import homeJson from "../../messages/ko/home.json" with { type: "json" };

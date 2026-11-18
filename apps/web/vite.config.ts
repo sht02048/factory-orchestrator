@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { bundleMigrations } from "@factory/db/bundle-migrations";
+import { bundleMigrations } from "@ganger/db/bundle-migrations";
 import stylex from "@stylexjs/unplugin";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";

@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { parseArgs } from "node:util";
-import { BootConfigError, parseBootConfig } from "@factory/db";
+import { BootConfigError, parseBootConfig } from "@ganger/db";
 import { MissingEnvFileError, homePaths, readBootEnv, resolveHome } from "./home.js";
 import { EnvFileFormatError, init } from "./init.js";
 import type { AppLayout } from "./layout.js";

@@ -1,4 +1,4 @@
-import { bundleMigrations } from "@factory/db/bundle-migrations";
+import { bundleMigrations } from "@ganger/db/bundle-migrations";
 import { defineConfig } from "vite";
 
 export default defineConfig({

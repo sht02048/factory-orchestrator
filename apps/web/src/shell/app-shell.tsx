@@ -13,7 +13,7 @@ import {
   RailStatic,
   WorkspaceBadge,
   railLinkStyles,
-} from "@factory/ui";
+} from "@ganger/ui";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
