@@ -65,7 +65,9 @@ export function Dialog({
         ? {}
         : { onOpenChange: (next: boolean) => onOpenChange(next) })}
     >
-      <DialogTrigger className={cx(...buttonStyles(triggerVariant))}>{trigger}</DialogTrigger>
+      <DialogTrigger data-variant={triggerVariant} className={cx(...buttonStyles(triggerVariant))}>
+        {trigger}
+      </DialogTrigger>
       <DialogBackdrop className={cx(styles.backdrop)} />
       <DialogContent className={cx(styles.content)}>
         <div {...stylex.props(styles.head)}>
@@ -92,6 +94,7 @@ export function DialogClose({ variant = "secondary", children, onClick }: Dialog
   return (
     <SdkDialogClose
       {...(onClick === undefined ? {} : { onClick })}
+      data-variant={variant}
       className={cx(...buttonStyles(variant))}
     >
       {children}

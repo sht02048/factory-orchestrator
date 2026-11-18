@@ -1,0 +1,44 @@
+{
+  "tray": {
+    "tooltip": "Factory Orchestrator",
+    "status": {
+      "running": "서버가 돌고 있어요",
+      "starting": "서버를 띄우고 있어요",
+      "stopped": "서버가 멈췄어요",
+      "failed": "서버를 띄우지 못했어요",
+      "external": "이 기계의 서비스에 붙었어요",
+      "externalStopped": "이 기계의 서비스가 멈췄어요",
+      "remote": "{name}에 연결했어요",
+      "remoteUnreachable": "{name}에 닿지 않아요",
+      "choosing": "모드를 고르고 있어요"
+    },
+    "versionDiffers": "서버 버전 {server}, 앱 버전 {app}",
+    "open": "창 열기",
+    "startServer": "서버 켜기",
+    "stopServer": "서버 멈추기",
+    "openAtLogin": "로그인할 때 서버 띄우기",
+    "changeMode": "모드 바꾸기",
+    "chooseServer": "다른 서버 고르기",
+    "quit": "종료",
+    "quitWithServer": "서버도 끄고 종료"
+  },
+  "menu": {
+    "server": "서버",
+    "edit": "편집",
+    "view": "보기",
+    "window": "창"
+  },
+  "notifications": {
+    "question": { "title": "Question", "body": "{ticket} 에이전트가 답을 기다려요." },
+    "permission": {
+      "title": "Permission",
+      "body": "{ticket} 에이전트가 허용을 기다려요. 러너 화면에서 허용해 주세요."
+    },
+    "humanCheck": { "title": "Human Check", "body": "{ticket} PR 을 확인해 주세요." },
+    "runnerOffline": { "title": "Runner Issue", "body": "{runner} 러너가 Offline 이에요." },
+    "versionDiffers": {
+      "title": "서버 버전이 앱과 달라요",
+      "body": "이 기계의 서비스는 {server}, 앱은 {app}이에요. 서비스를 다시 설치하면 맞출 수 있어요."
+    }
+  }
+}

@@ -175,7 +175,7 @@ describe("Runs 화면", () => {
   it("손댈 일 칩과 머리글 수는 Home 의 손댈 일 런과 같다(티켓마다 마지막 런)", () => {
     const { db, ids } = seedDatabase();
     const homeRunIds = (): string[] =>
-      loadHomePage(db, "ws-commerce", now)
+      loadHomePage(db, "ws-commerce", now, "UTC")
         .attention.flatMap((item) => (item.kind === "run" ? [item.run.id] : []))
         .sort();
     const attentionIds = (page: RunsPage): string[] => {

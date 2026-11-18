@@ -6,13 +6,19 @@
     "factory-orchestrator": "./dist/bin/cli.js"
   },
   "type": "module",
+  "exports": {
+    "./server-lock": "./src/server-lock.ts",
+    "./home": "./src/home.ts",
+    "./web-url": "./src/web-url.ts"
+  },
   "scripts": {
     "build": "vite build",
     "cli": "node dist/bin/cli.js",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@factory/db": "workspace:*"
+    "@factory/db": "workspace:*",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "vite": "8.3.8"

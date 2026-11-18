@@ -4,6 +4,10 @@ import { BOOT_ENV, migrate, openDatabase, parseBootConfig } from "@factory/db";
 import type { BootConfig } from "@factory/db";
 import { homePaths, readBootEnv } from "./home.js";
 import type { AppLayout, ProcessSpec } from "./layout.js";
+import { ServerAlreadyRunningError, acquireServerLock } from "./server-lock.js";
+import { webUrl } from "./web-url.js";
+
+export { webUrl };
 
 /** web이 응답하기를 기다리는 시간 */
 export const READY_TIMEOUT_MS = 60_000;
@@ -48,7 +52,7 @@ export class StartError extends Error {
 }
 
 /**
- * 부팅 설정을 읽고 DB 마이그레이션을 돌린 뒤(ADR 0005: 업데이트 때 자동으로 돈다) web과 worker를
+ * 부팅 설정을 읽고 home 의 서버 잠금(server-lock.ts)을 쥐고 DB 마이그레이션을 돌린 뒤(ADR 0005: 업데이트 때 자동으로 돈다) web과 worker를
  * 띄운다(ADR 0002). web이 바인딩 주소에서 응답하면 풀린다.
  *
  * 마이그레이션을 여기서 먼저 돌려 실패하면 아무 프로세스도 띄우지 않는다. web과 worker도 띄울 때
@@ -63,14 +67,30 @@ export async function start(options: StartOptions): Promise<Started> {
     throw new StartError(`build output not found (run pnpm build): ${missing.join(", ")}`);
   }
 
-  const db = openDatabase(config.databasePath);
+  const url = webUrl(config);
+  // 같은 home 에 web·worker 가 두 벌 돌지 않게 마이그레이션보다 먼저 잠금을 쥔다(0046). 두 worker 가 같은 DB 를
+  // 폴링하면 할당과 뒤처리가 겹친다. 자식이 모두 끝나면 놓는다.
+  let lock;
+  try {
+    lock = acquireServerLock(options.home, { pid: process.pid, url });
+  } catch (error) {
+    if (error instanceof ServerAlreadyRunningError) throw new StartError(error.message);
+    throw error;
+  }
+
   let migrated: string[];
   try {
-    migrated = migrate(db);
-  } finally {
-    db.$client.close();
+    const db = openDatabase(config.databasePath);
+    try {
+      migrated = migrate(db);
+    } finally {
+      db.$client.close();
+    }
+    options.onMigrated?.(config, migrated);
+  } catch (error) {
+    lock.release();
+    throw error;
   }
-  options.onMigrated?.(config, migrated);
 
   const childEnv: Record<string, string | undefined> = {
     ...options.env,
@@ -84,7 +104,7 @@ export async function start(options: StartOptions): Promise<Started> {
     options.stopTimeoutMs ?? STOP_TIMEOUT_MS,
   );
 
-  const url = webUrl(config);
+  const exited = group.exited.finally(() => lock.release());
   try {
     await waitForWeb(
       url,
@@ -94,18 +114,20 @@ export async function start(options: StartOptions): Promise<Started> {
     );
   } catch (error) {
     await group.stop();
+    await exited;
     throw error;
   }
-  return { config, url, migrated, stop: group.stop, exited: group.exited };
-}
-
-/** 바인딩 주소로 닿는 주소. 모든 인터페이스에 바인딩했으면 같은 머신의 루프백으로 닿는다 */
-export function webUrl(config: Pick<BootConfig, "host" | "port">): string {
-  let host = config.host;
-  if (host === "0.0.0.0") host = "127.0.0.1";
-  else if (host === "::") host = "::1";
-  if (host.includes(":")) host = `[${host}]`;
-  return `http://${host}:${config.port}`;
+  return {
+    config,
+    url,
+    migrated,
+    stop: () =>
+      group
+        .stop()
+        .then(() => exited)
+        .then(() => undefined),
+    exited,
+  };
 }
 
 interface Child {
