@@ -1,24 +1,16 @@
 {
   "documentTitle": "Runs · Factory Orchestrator",
   "title": "Runs",
-  "subtitle": "{workspace}의 런이에요. 새 것부터 보여 줘요.",
+  "subtitle": "{attention, plural, =0 {런 {total}개, 손댈 일은 없어요.} other {{total}개 중 {attention}개가 손댈 일이에요.}}",
   "filter": {
     "label": "상태로 거르기",
-    "all": "전체"
-  },
-  "columns": {
-    "ticket": "티켓",
-    "state": "상태",
-    "agentResult": "에이전트 결과",
-    "prState": "PR 상태",
-    "runner": "러너",
-    "agent": "에이전트",
-    "elapsed": "경과"
+    "all": "전체",
+    "attention": "손댈 일"
   },
   "listLabel": "런 목록",
   "empty": "이 조건에 맞는 런이 없어요.",
   "noRuns": "아직 런이 없어요. 티켓을 할당하면 여기에 보여요.",
-  "notApplicable": "—",
+  "noRunner": "러너 정하기 전",
   "cancelling": "취소 중",
   "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 런이 보여요.",
   "allWorkspaces": {

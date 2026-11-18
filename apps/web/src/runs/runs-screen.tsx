@@ -2,6 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
+  Card,
   DefinitionItem,
   DefinitionList,
   DetailPanel,
@@ -14,8 +15,6 @@ import {
   Table,
   TableCell,
   TableEmpty,
-  TableHead,
-  TableHeader,
   TableRow,
   TableRows,
   Tabs,
@@ -28,19 +27,11 @@ import { useTime } from "../format/time";
 import { useAgentName } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import type { WorkspaceSummary } from "../shell/model";
-import { RUN_FILTERS, elapsedMs, filterKeyOf, matchesFilter } from "./model";
+import { RUN_FILTERS, elapsedMs, filterKeyOf, matchesFilter, needsAttention } from "./model";
 import type { RunFilter, RunView, RunsPage } from "./model";
 
-// 티켓 | 상태 | 에이전트 결과 | PR 상태 | 러너 | 에이전트 | 경과
-const columns = "minmax(0, 1fr) 144px 128px 64px 96px 80px 72px";
-
-/** 손댈 일(GLOSSARY): 개수를 밝게 보이는 필터 */
-const attentionFilters: ReadonlySet<RunFilter> = new Set([
-  "waiting-for-input",
-  "disconnected",
-  "human-check",
-  "failed",
-]);
+// 티켓(키 + 흐린 줄) | 상태 알약 | 시간
+const columns = "minmax(0, 1fr) 160px 88px";
 
 export interface RunsScreenProps {
   page: RunsPage;
@@ -51,6 +42,8 @@ export interface RunsScreenProps {
   selectedId: string | undefined;
   onFilterChange: (filter: RunFilter) => void;
   onSelect: (runId: string) => void;
+  /** 행을 연다(두 번 누르기, Enter): Run 상세로 간다(ADR 0010) */
+  onOpen: (runId: string) => void;
   onPickWorkspace: (workspaceId: string) => void;
   /** 런의 Run 상세 주소 */
   runHref: (runId: string) => string;
@@ -71,7 +64,7 @@ export function RunsScreen(props: RunsScreenProps) {
         />
       );
     case "one":
-      return <RunsList {...props} workspaceName={page.workspace.workspace.name} />;
+      return <RunsList {...props} />;
   }
 }
 
@@ -118,14 +111,18 @@ function RunsList({
   selectedId,
   onFilterChange,
   onSelect,
+  onOpen,
   runHref,
-  workspaceName,
-}: RunsScreenProps & { workspaceName: string }) {
+}: RunsScreenProps) {
   const t = useTranslations("runs");
   const label = useFilterLabel();
   const visible = page.runs.filter((run) => matchesFilter(run, filter));
   const selected = visible.find((run) => run.id === selectedId) ?? visible[0];
-  const counts = new Map<RunFilter, number>([["all", page.runs.length]]);
+  const attention = page.runs.filter(needsAttention).length;
+  const counts = new Map<RunFilter, number>([
+    ["all", page.runs.length],
+    ["attention", attention],
+  ]);
   for (const run of page.runs) {
     const key = filterKeyOf(run);
     counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -135,43 +132,44 @@ function RunsList({
     <SplitView
       list={
         <>
-          <PageHeader title={t("title")} subtitle={t("subtitle", { workspace: workspaceName })} />
-          <Tabs<RunFilter> value={filter} onValueChange={onFilterChange} label={t("filter.label")}>
+          <PageHeader
+            title={t("title")}
+            subtitle={t("subtitle", { total: page.runs.length, attention })}
+          />
+          <Tabs<RunFilter>
+            value={filter}
+            onValueChange={onFilterChange}
+            label={t("filter.label")}
+            variant="chips"
+          >
             {RUN_FILTERS.map((key) => (
               <Tab
                 key={key}
                 value={key}
                 count={counts.get(key) ?? 0}
-                attention={attentionFilters.has(key)}
+                attention={key === "attention"}
               >
                 {label(key)}
               </Tab>
             ))}
           </Tabs>
-          <Table columns={columns}>
-            <TableHead>
-              <TableHeader>{t("columns.ticket")}</TableHeader>
-              <TableHeader>{t("columns.state")}</TableHeader>
-              <TableHeader>{t("columns.agentResult")}</TableHeader>
-              <TableHeader>{t("columns.prState")}</TableHeader>
-              <TableHeader>{t("columns.runner")}</TableHeader>
-              <TableHeader>{t("columns.agent")}</TableHeader>
-              <TableHeader align="end">{t("columns.elapsed")}</TableHeader>
-            </TableHead>
-            {visible.length === 0 ? (
-              <TableEmpty>{page.runs.length === 0 ? t("noRuns") : t("empty")}</TableEmpty>
-            ) : (
-              <TableRows
-                label={t("listLabel")}
-                value={selected?.id ?? null}
-                onValueChange={onSelect}
-              >
-                {visible.map((run) => (
-                  <RunRow key={run.id} run={run} />
-                ))}
-              </TableRows>
-            )}
-          </Table>
+          <Card padding="compact" label={t("listLabel")}>
+            <Table columns={columns}>
+              {visible.length === 0 ? (
+                <TableEmpty>{page.runs.length === 0 ? t("noRuns") : t("empty")}</TableEmpty>
+              ) : (
+                <TableRows
+                  label={t("listLabel")}
+                  value={selected?.id ?? null}
+                  onValueChange={onSelect}
+                >
+                  {visible.map((run) => (
+                    <RunRow key={run.id} run={run} onOpen={() => onOpen(run.id)} />
+                  ))}
+                </TableRows>
+              )}
+            </Table>
+          </Card>
         </>
       }
       panel={
@@ -185,36 +183,41 @@ function RunsList({
   );
 }
 
-function RunRow({ run }: { run: RunView }) {
+/** 둥근 행: 키(제목 자리) + 흐린 줄(러너·에이전트), 상태 알약, 경과 또는 상대 시간 */
+function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
   const agentName = useAgentName();
   const t = useTranslations("runs");
   const domain = useTranslations("domain");
-  const { duration, elapsed } = useTime();
+  const { ago, elapsed } = useTime();
   const statusName = useStatusName();
   const status = runStatus(run);
+
+  const meta: string[] = [run.runner?.name ?? t("noRunner")];
+  if (run.state === "ended") {
+    meta.push(domain(`agentResult.${run.agentResult}`));
+    // PR 이 있으면 "#128 열림", 없으면 PR 상태가 있을 때만 그 값
+    if (run.pullRequest !== null)
+      meta.push(`${run.pullRequest.displayId} ${domain(`prState.${run.prState}`)}`);
+    else if (run.prState !== "none") meta.push(domain(`prState.${run.prState}`));
+  } else {
+    meta.push(agentName(run.agent));
+    if (run.cancelling) meta.push(t("cancelling"));
+  }
+
   return (
-    <TableRow value={run.id} label={run.ticketKey}>
+    <TableRow value={run.id} label={run.ticketKey} onOpen={onOpen}>
       <TableCell>
-        <RowTitle>{run.ticketKey}</RowTitle>
-      </TableCell>
-      <TableCell>
-        <span {...stylex.props(styles.inline)}>
-          <StatusPill status={status}>{statusName(status)}</StatusPill>
-          {run.state !== "ended" && run.cancelling ? (
-            <Text variant="meta">{t("cancelling")}</Text>
-          ) : null}
+        <span {...stylex.props(styles.rowText)}>
+          {/* 티켓 제목을 저장하면 회색 키 + 제목으로 바꾼다(ADR 0010 9번). 지금은 키만 있다. */}
+          <RowTitle>{run.ticketKey}</RowTitle>
+          <Text variant="meta">{meta.join(" · ")}</Text>
         </span>
       </TableCell>
-      <TableCell>
-        {run.state === "ended" ? domain(`agentResult.${run.agentResult}`) : t("notApplicable")}
+      <TableCell align="end">
+        <StatusPill status={status}>{statusName(status)}</StatusPill>
       </TableCell>
-      <TableCell>
-        {run.state === "ended" ? domain(`prState.${run.prState}`) : t("notApplicable")}
-      </TableCell>
-      <TableCell>{run.runner?.name ?? t("notApplicable")}</TableCell>
-      <TableCell>{agentName(run.agent)}</TableCell>
       <TableCell align="end" numeric>
-        {run.state === "ended" ? duration(elapsedMs(run)) : elapsed(elapsedMs(run))}
+        {run.state === "ended" ? ago(run.endedAt, run.endedAgoMs) : elapsed(elapsedMs(run))}
       </TableCell>
     </TableRow>
   );
@@ -332,7 +335,7 @@ function RunPanel({ run, detailHref }: { run: RunView; detailHref: string }) {
 function useFilterLabel(): (filter: RunFilter) => string {
   const t = useTranslations("runs.filter");
   const statusName = useStatusName();
-  return (filter) => (filter === "all" ? t("all") : statusName(filter));
+  return (filter) => (filter === "all" || filter === "attention" ? t(filter) : statusName(filter));
 }
 
 const styles = stylex.create({
@@ -344,6 +347,7 @@ const styles = stylex.create({
   },
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
   inline: { display: "inline-flex", alignItems: "baseline", gap: space.s2 },
+  rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   link: {
     color: colors.accentText,
     textUnderlineOffset: 3,

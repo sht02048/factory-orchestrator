@@ -121,6 +121,7 @@ describe("화면의 상태 알약", () => {
             selectedId={undefined}
             onFilterChange={() => {}}
             onSelect={() => {}}
+            onOpen={() => {}}
             onPickWorkspace={() => {}}
             runHref={(id) => `/runs/${id}`}
           />,

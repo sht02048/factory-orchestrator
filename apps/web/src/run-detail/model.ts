@@ -82,13 +82,14 @@ export type RunDetailStatus =
     };
 
 /** 같은 티켓의 다른 런 한 줄(시안 B) */
-export interface OtherRun {
-  id: string;
-  assignedAt: string;
-  state: RunState;
-  /** Ended 런의 요약 결과 */
-  summary: SummaryOutcome | null;
-}
+export type OtherRun = { id: string; assignedAt: string } & (
+  | { state: Exclude<RunState, "ended"> }
+  | {
+      state: "ended";
+      /** Ended 런의 요약 결과 */
+      summary: SummaryOutcome;
+    }
+);
 
 export interface RunDetail {
   id: string;

@@ -266,12 +266,17 @@ function otherRunsOf(db: Database, run: StoredRun): OtherRun[] {
   return listRuns(db, { ticket: run.ticket })
     .filter((other) => other.id !== run.id)
     .toReversed()
-    .map((other) => ({
-      id: other.id,
-      assignedAt: other.assignedAt.toISOString(),
-      state: other.state,
-      summary: other.state === "ended" ? summarizeRunOutcome(other).outcome : null,
-    }));
+    .map((other): OtherRun => {
+      const assignedAt = other.assignedAt.toISOString();
+      return other.state === "ended"
+        ? {
+            id: other.id,
+            assignedAt,
+            state: "ended",
+            summary: summarizeRunOutcome(other).outcome,
+          }
+        : { id: other.id, assignedAt, state: other.state };
+    });
 }
 
 /** 코드 호스트가 준 CI 값을 화면 값으로 옮긴다. 모르는 값은 unknown 이다(Q79). */

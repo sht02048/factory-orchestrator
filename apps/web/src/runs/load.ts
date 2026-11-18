@@ -112,6 +112,8 @@ export function loadRunsPage(db: Database, ws: string | undefined, now: Date): R
           return {
             ...base,
             state: run.state,
+            endedAt: run.endedAt.toISOString(),
+            endedAgoMs: Math.max(0, now.getTime() - run.endedAt.getTime()),
             agentResult: run.agentResult,
             prState: run.prState,
             summary: summarizeRunOutcome(run).outcome,

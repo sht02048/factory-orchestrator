@@ -32,7 +32,6 @@
     "denied": "권한 요청을 거절했어요. worker가 에이전트에게 거절을 보내요."
   },
   "next": {
-    "title": "다음 행동",
     "queued": "할 일이 없어요. 러너가 비면 worker가 시작해요.",
     "running": "할 일이 없어요. 에이전트가 끝나면 결과를 기록해요.",
     "question": "아래에서 질문에 답해 주세요.",
@@ -59,6 +58,10 @@
     "sent": "답을 남겼어요. worker가 보내요.",
     "empty": "답을 써 주세요."
   },
+  "input": {
+    "question": "{elapsed} 답을 기다려요",
+    "permission": "{elapsed} 허용을 기다려요"
+  },
   "permission": {
     "title": "Permission",
     "body": "러너 화면에서 허용해 주세요. 오케스트레이터에서는 허용할 수 없어요.",
@@ -78,7 +81,7 @@
   },
   "actionFailed": "요청을 남기지 못했어요. 잠시 뒤 다시 해 주세요.",
   "timeline": {
-    "title": "타임라인",
+    "title": "지나온 일",
     "assigned": "할당",
     "started": "시작",
     "waiting-for-input": "Waiting for Input",
@@ -99,20 +102,17 @@
     "none": "에이전트가 보낸 완료 보고가 없어요."
   },
   "log": {
-    "title": "로그 꼬리",
+    "title": "터미널 끝부분",
     "none": "아직 시작하지 않아 로그가 없어요.",
     "pending": "러너에서 로그를 가져오고 있어요.",
     "failed": "로그를 가져오지 못했어요: {error}",
     "empty": "로그가 비어 있어요.",
     "stored": "끝날 때 저장한 마지막 {count}줄",
     "fetched": "{time} 가져온 {count}줄",
-    "refresh": "다시 가져오기"
+    "refresh": "새로 받기"
   },
   "props": {
     "label": "런 정보",
-    "ticket": "티켓",
-    "state": "상태",
-    "summary": "요약 결과",
     "agentResult": "에이전트 결과",
     "prState": "PR 상태",
     "laterPrState": "이후 PR 상태",
@@ -126,13 +126,13 @@
     "branch": "브랜치",
     "worktree": "워크트리",
     "workspace": "Workspace",
-    "notEnded": "런이 끝나면 기록해요",
     "notStarted": "아직 시작하지 않았어요",
     "none": "없음",
     "noRunner": "아직 정하지 않았어요",
     "defaultModel": "러너 기본값을 써요",
     "runnerOffline": "Offline",
-    "laterPr": "{state} · {time}"
+    "laterPr": "{state} · {time}",
+    "started": "시작"
   },
   "ci": {
     "success": "통과",
@@ -147,8 +147,7 @@
     "closed": "닫힘"
   },
   "otherRuns": {
-    "title": "같은 티켓의 다른 런",
-    "item": "{time} · {state}"
+    "title": "같은 티켓의 다른 런"
   },
   "startError": {
     "title": "시작 오류",
