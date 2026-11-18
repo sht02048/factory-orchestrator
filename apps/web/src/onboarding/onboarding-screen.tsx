@@ -1162,12 +1162,24 @@ function WorkspaceForm({
 
 function useAutoSave() {
   const [state, setState] = useState<SubmitState>({ kind: "idle" });
-  const run = (action: () => Promise<ActionResult>) => {
+  const latest = useRef(0);
+  const run = (action: () => Promise<ActionResult>, onFailed: () => void) => {
+    const request = (latest.current += 1);
     setState({ kind: "sending" });
+    const fail = (reason: string) => {
+      if (request !== latest.current) return;
+      setState({ kind: "failed", reason });
+      onFailed();
+    };
     action().then(
-      (result) =>
-        setState(result.ok ? { kind: "idle" } : { kind: "failed", reason: result.reason }),
-      () => setState({ kind: "failed", reason: "unknown" }),
+      (result) => {
+        if (result.ok) {
+          if (request === latest.current) setState({ kind: "idle" });
+        } else {
+          fail(result.reason);
+        }
+      },
+      () => fail("unknown"),
     );
   };
   return { state, run };
@@ -1277,13 +1289,18 @@ function MappingRow({
   const target = { ws, connectionId: bound.connection.id, projectId: bound.project.id };
   const saveMapping = (nextProject: string | null, nextAgent: string | null) => {
     if (nextProject === null || nextAgent === null) return;
-    mapping.run(() =>
-      actions.saveMapping({
-        ...target,
-        runnerProjectId: nextProject,
-        agentId: nextAgent,
-        model: bound.mapping?.model ?? "",
-      }),
+    mapping.run(
+      () =>
+        actions.saveMapping({
+          ...target,
+          runnerProjectId: nextProject,
+          agentId: nextAgent,
+          model: bound.mapping?.model ?? "",
+        }),
+      () => {
+        setRunnerProject(bound.mapping?.runnerProject ?? null);
+        setAgent(bound.mapping?.agent ?? null);
+      },
     );
   };
   const project = bound.project.name;
@@ -1338,7 +1355,10 @@ function MappingRow({
             value={stateId}
             onValueChange={(value) => {
               setStateId(value);
-              progress.run(() => actions.saveInProgress({ ...target, stateId: value }));
+              progress.run(
+                () => actions.saveInProgress({ ...target, stateId: value }),
+                () => setStateId(bound.inProgressStateId),
+              );
             }}
             placeholder={ts("mapping.choose")}
           />
@@ -1405,8 +1425,9 @@ function LabelRow({
             value={labelId}
             onValueChange={(value) => {
               setLabelId(value);
-              save.run(() =>
-                actions.saveLabel({ ws, connectionId: label.connection.id, labelId: value }),
+              save.run(
+                () => actions.saveLabel({ ws, connectionId: label.connection.id, labelId: value }),
+                () => setLabelId(label.labelId),
               );
             }}
             placeholder={ts("label.choose")}
