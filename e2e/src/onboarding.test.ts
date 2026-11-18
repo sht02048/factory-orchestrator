@@ -178,6 +178,28 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
       .poll(() => getMapping(db, connectionId(), trackerProject)?.runnerProject ?? null)
       .toBe("github:acme/web");
   });
+
+  it("수정 폼을 저장해 닫으면 포커스가 body 가 아니라 요약에 남는다", async () => {
+    await open(1);
+    await page.getByRole("button", { name: onboarding.edit, exact: true }).click();
+    await page.getByLabel(settings.connections.apiKey).fill("lin_api_rotated");
+    await page.getByRole("button", { name: onboarding.tracker.check }).click();
+    await page.getByLabel(settings.connections.apiKey).waitFor({ state: "detached" });
+    await expect.poll(focused).toBe(onboarding.edit);
+
+    await open(4);
+    await page.getByRole("button", { name: onboarding.edit, exact: true }).click();
+    await page.getByLabel(onboarding.workspace.name).fill("Acme Commerce HQ");
+    await page.getByRole("button", { name: settings.save, exact: true }).click();
+    await page.getByText("Acme Commerce HQ Workspace").waitFor();
+    await expect.poll(focused).toBe(onboarding.edit);
+
+    await open(3);
+    await page.getByRole("button", { name: onboarding.edit, exact: true }).click();
+    await page.getByLabel(settings.runners.capacity).fill("2");
+    await page.getByRole("button", { name: settings.runners.save }).click();
+    await expect.poll(focused).toBe("runner-a 러너");
+  });
 });
 
 async function open(step: number): Promise<void> {

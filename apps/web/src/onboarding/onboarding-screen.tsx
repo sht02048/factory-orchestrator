@@ -21,7 +21,7 @@ import {
   space,
 } from "@factory/ui/tokens.stylex";
 import type { ReactNode, Ref, RefObject } from "react";
-import { Fragment, useEffect, useId, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
 import { useAgentName, usePrerequisiteName } from "../labels";
 import {
@@ -351,19 +351,38 @@ function SummaryRow({
   );
 }
 
-function ToggleButton({
-  open,
-  onToggle,
-  label,
-}: {
-  open: boolean;
-  onToggle: () => void;
-  label: string;
-}) {
+function useEditToggle() {
+  const [editing, setEditing] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const refocus = useRef(false);
+  const close = useCallback(() => setEditing(false), []);
+  useEffect(() => {
+    if (editing || !refocus.current) return;
+    refocus.current = false;
+    toggleRef.current?.focus();
+  }, [editing]);
+  return {
+    editing,
+    toggleRef,
+    toggle: () => setEditing((open) => !open),
+    close,
+    done: () => {
+      refocus.current = true;
+      setEditing(false);
+    },
+  };
+}
+
+function ToggleButton({ edit, label }: { edit: ReturnType<typeof useEditToggle>; label: string }) {
   const t = useTranslations("onboarding");
   return (
-    <Button variant="secondary" aria-expanded={open} onClick={onToggle}>
-      {open ? t("close") : label}
+    <Button
+      ref={edit.toggleRef}
+      variant="secondary"
+      aria-expanded={edit.editing}
+      onClick={edit.toggle}
+    >
+      {edit.editing ? t("close") : label}
     </Button>
   );
 }
@@ -444,7 +463,7 @@ function TrackerConnectionItem({
   titleRef: Ref<HTMLSpanElement> | undefined;
 }) {
   const t = useTranslations("onboarding");
-  const [editing, setEditing] = useState(false);
+  const edit = useEditToggle();
   return (
     <Card>
       <SummaryRow
@@ -457,14 +476,10 @@ function TrackerConnectionItem({
         }
         meta={t("tracker.checked")}
       >
-        <ToggleButton open={editing} onToggle={() => setEditing(!editing)} label={t("edit")} />
+        <ToggleButton edit={edit} label={t("edit")} />
       </SummaryRow>
-      {editing ? (
-        <TrackerKeyForm
-          connection={connection}
-          actions={actions}
-          onDone={() => setEditing(false)}
-        />
+      {edit.editing ? (
+        <TrackerKeyForm connection={connection} actions={actions} onDone={edit.done} />
       ) : null}
     </Card>
   );
@@ -567,7 +582,7 @@ function WebhookExplainer() {
 
 function GitHubStep({ saved, actions }: { saved: boolean; actions: SettingsActions }) {
   const t = useTranslations("onboarding.github");
-  const [editing, setEditing] = useState(false);
+  const edit = useEditToggle();
   const added = useFocusWhenAdded(saved ? 1 : 0);
   if (!saved) {
     return (
@@ -586,13 +601,13 @@ function GitHubStep({ saved, actions }: { saved: boolean; actions: SettingsActio
           title={<FocusTarget ref={added}>{t("saved")}</FocusTarget>}
           meta={t("savedMeta")}
         >
-          <ToggleButton open={editing} onToggle={() => setEditing(!editing)} label={t("change")} />
+          <ToggleButton edit={edit} label={t("change")} />
         </SummaryRow>
-        {editing ? (
-          <GitHubTokenForm actions={actions} primary={false} onDone={() => setEditing(false)} />
+        {edit.editing ? (
+          <GitHubTokenForm actions={actions} primary={false} onDone={edit.done} />
         ) : null}
       </Card>
-      {editing ? <GitHubGuide /> : null}
+      {edit.editing ? <GitHubGuide /> : null}
     </>
   );
 }
@@ -750,15 +765,21 @@ function RunnerItem({
   const ts = useTranslations("settings.runners");
   const own = useRef<HTMLSpanElement>(null);
   const titleRef = focusRef ?? own;
-  const [editing, setEditing] = useState(false);
+  const edit = useEditToggle();
   const recheck = useSubmit();
   const focusAfterRecheck = useRef(false);
   const passed = runnerPassed(runner);
+  const shownPassed = useRef(passed);
+  const closeEdit = edit.close;
   useEffect(() => {
-    if (passed || !focusAfterRecheck.current) return;
+    if (shownPassed.current === passed) return;
+    shownPassed.current = passed;
+    if (!passed) closeEdit();
+    const active = document.activeElement;
+    const lost = focusAfterRecheck.current || active === null || active === document.body;
     focusAfterRecheck.current = false;
-    titleRef.current?.focus();
-  }, [passed, titleRef]);
+    if (lost) titleRef.current?.focus();
+  }, [passed, titleRef, closeEdit]);
 
   if (passed && runner.check?.status === "done") {
     return (
@@ -780,14 +801,14 @@ function RunnerItem({
           >
             {recheck.sending ? ts("checking") : ts("recheck")}
           </Button>
-          <ToggleButton open={editing} onToggle={() => setEditing(!editing)} label={t("edit")} />
+          <ToggleButton edit={edit} label={t("edit")} />
         </SummaryRow>
         <SubmitError state={recheck.state} />
         <RunnerChecklist
           version={runner.check.version}
           prerequisites={runner.check.prerequisites}
         />
-        {editing ? <RunnerForm runner={runner} actions={actions} /> : null}
+        {edit.editing ? <RunnerForm runner={runner} actions={actions} /> : null}
       </Card>
     );
   }
@@ -950,7 +971,7 @@ function WorkspaceStep({
   const workspace = page.workspace;
   const passed = stepPassed(page, "workspace");
   const added = useFocusWhenAdded(passed ? 1 : 0);
-  const [editing, setEditing] = useState(false);
+  const edit = useEditToggle();
   if (workspace === null || !passed) {
     return (
       <Card>
@@ -971,15 +992,15 @@ function WorkspaceStep({
           names: workspace.bound.map((b) => b.project.name).join(", "),
         })}
       >
-        <ToggleButton open={editing} onToggle={() => setEditing(!editing)} label={t("edit")} />
+        <ToggleButton edit={edit} label={t("edit")} />
       </SummaryRow>
-      {editing ? (
+      {edit.editing ? (
         <WorkspaceForm
           workspace={workspace}
           groups={trackerProjects}
           actions={actions}
           primary={false}
-          onDone={() => setEditing(false)}
+          onDone={edit.done}
         />
       ) : null}
     </Card>
