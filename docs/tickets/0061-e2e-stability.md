@@ -1,5 +1,5 @@
 ---
-status: doing
+status: done
 blocked_by: []
 ---
 
@@ -31,3 +31,18 @@ CI `check`의 e2e 브라우저 시험이 자주 시간 초과로 실패한다. �
 - 로컬에서 전체 e2e를 CI와 비슷한 조건(동시 실행)으로 세 번 돌려 모두 통과한 기록.
 - PR의 CI `check`가 같은 head에서 두 번 통과한다.
 - 전체 e2e 실행 시간이 이전보다 크게 늘지 않았다는 전후 수치.
+
+## 원인
+
+e2e 파일마다 띄우는 vite dev 서버가 의존성 최적화 캐시 `apps/web/node_modules/.vite`를 함께 썼다. 병렬 실행이나 콜드 스타트 자체가 원인이 아니다.
+
+- vite는 캐시 해시에 플러그인 이름을 넣는다. e2e 파일은 플러그인 묶음이 셋이다(`e2e-fake-adapters` 8개, settings의 `e2e-settings-adapters`, thin-path의 플러그인 없음). demo `pnpm dev`도 같은 캐시를 쓰고 플러그인이 또 다르다.
+- 해시가 다른 서버가 뜨면 공유 캐시를 지우고 다시 만든다. 그때 첫 페이지를 읽던 다른 서버는 의존성 요청에 `504 Outdated Optimize Dep`을 받는다. vite는 다시 읽으라는 신호를 HMR로 보내는데 e2e 서버는 `hmr: false`라, 페이지가 하이드레이션하지 못한 채 시간 초과까지 기다린다.
+- 재현: 플러그인 이름만 다른 서버 둘을 같은 캐시로 띄우고 첫 페이지 읽기와 둘째 서버 시작을 겹치면, 8번 중 2번 `react.js` 등에 504를 받고 하이드레이션하지 못했다. 서버마다 캐시를 따로 주면 8번 모두 1초 안에 하이드레이션했다.
+- main에서 전체 시험을 CI처럼 돌린 세 번 중 한 번이 CI와 같은 모양으로 실패했다(`home.test.ts`·`settings.test.ts` 준비의 `__TSR_ROUTER__` 110초 초과, demo `dev.test.ts`의 `hydrated` 시간 초과).
+
+## 고친 것
+
+- e2e 서버 준비를 `e2e/src/web-server.ts`의 `startWebServer` 하나로 모으고, 시험 파일의 임시 폴더를 `cacheDir`로 준다. e2e 서버는 서로의 캐시도, demo가 쓰는 `apps/web`의 캐시도 건드리지 않는다.
+- `e2e/src/web-server.test.ts`가 플러그인이 다른 서버가 떠도 먼저 뜬 서버의 캐시가 그대로인지, e2e 시험 파일이 vite `createServer`를 직접 부르지 않는지 확인한다.
+- 시험 시간 제한과 단언은 바꾸지 않았다.
