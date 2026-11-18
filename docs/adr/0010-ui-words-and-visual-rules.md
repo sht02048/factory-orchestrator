@@ -4,7 +4,7 @@
 
 ## 낱말
 
-1. **상태 이름은 GLOSSARY의 영어 용어 그대로 쓴다.** 런 상태 Queued·Running·Waiting for Input·Disconnected, 요약 결과 Merged·Human Check·Failed·Canceled, 러너 Online·Offline. 손댈 일 종류는 Question·Permission·Human Check·Failed·Disconnected·Runner Issue이고, Runner Issue의 세부 원인(GitHub 인증 깨짐, Offline 등)은 설명 문장으로 쓴다. 운영자가 정한 종류 목록에는 Failed가 없었지만, Failed 런은 지금도 손댈 일에 오르고(스펙 Q82.9) 색 규칙에도 있어 종류에 넣었다.
+1. **상태 이름은 GLOSSARY의 영어 용어 그대로 쓴다.** 런 상태 Queued·Running·Waiting for Input·Disconnected, 요약 결과 Merged·Human Check·Failed·Canceled, 러너 Online·Offline. 손댈 일 종류는 Question·Permission·Human Check·Failed·Disconnected·Runner Issue이고, Runner Issue의 세부 원인(GitHub 인증 깨짐, Offline 등)은 설명 문장으로 쓴다. 운영자가 정한 종류 목록에는 Failed가 없었지만, Failed 런은 지금도 손댈 일에 오르고(스펙 Q82.9) 색 규칙에도 있어 종류에 넣었다. Runner Issue에 Offline 러너를 넣는 것은 운영자 결정(규칙 1의 "러너 인증 깨짐·Offline 등")이다. 지금 손댈 일에는 GitHub 인증이 깨진 러너만 오르므로(스펙 3절 7번·9절) Offline 러너를 올리는 것은 동작 변경이고 0049에서 한다.
 2. **설명 문장·버튼·안내는 한국어 해요체로 쓴다.** "손댈 일", "전체"처럼 상태가 아닌 개념 낱말도 한국어로 둔다. 에이전트 결과와 PR 상태의 값(완료 보고(성공), 병합됨 등)은 상태 이름이 아니라 런이 어떻게 끝났는지 설명하는 값이라 한국어 그대로 둔다.
 3. **메뉴·화면 이름은 Home·Tickets·Runs·Runners·Stats·Settings다.** 온보딩 단계 이름은 Tracker·GitHub·Runner·Workspace·Mapping이다.
 
@@ -39,7 +39,7 @@
 
 이 ADR은 [ADR 0007](0007-ui-list-detail-panel.md)을 **보완하고 일부를 대체한다.**
 
-- **남는 것.** 목록 + 오른쪽 상세 패널은 Runs·Tickets·Stats에 남는다. 행을 고르면 패널에 요약이 보이고, 행을 열면(두 번 누르기, Enter) Run 상세로 간다. Settings의 이 Workspace·설치 전체 나누기도 그대로다.
+- **남는 것.** 목록 + 오른쪽 상세 패널은 Runs·Tickets에 남는다. Stats는 운영자가 따로 정하지 않아 지금 구조(목록 + 패널)를 그대로 둔다. 행을 고르면 패널에 요약이 보이고, 행을 열면(두 번 누르기, Enter) Run 상세로 간다. Settings의 이 Workspace·설치 전체 나누기도 그대로다.
 - **바뀌는 화면.** Home은 목록 + 패널 대신 손댈 일 카드와 오른쪽 "지금 일어나는 일" 흐름이다. Run 상세는 패널이 아니라 전체 화면으로 열고, 질문 카드를 위에, 그 아래 타임라인과 정보·터미널 끝부분을 둔다. Runners는 러너 카드(capacity 막대, 해결 안내)로 보인다. 온보딩은 가운데 한 열이 아니라 왼쪽 단계 목록·가운데 입력·확인 결과로 나눈다(사이드바 없는 첫 진입 전용 화면, 모든 단계 필수, 확인이 성공해야 다음으로 가는 점은 그대로).
 - **대체하는 규칙.** 0007의 "색은 손댈 일에만 쓴다"(Human Check 주황), "카드와 배지를 쓰지 않는다", "구역은 옅은 선과 여백으로 나눈다"는 이 ADR의 5·10번과 카드 화면이 대신한다. 행 안의 위계(제목이 가장 밝고 굵고 ID·러너·시간은 흐리게, 숫자는 tabular-nums)는 그대로다.
 
@@ -50,6 +50,7 @@
 - **"지금 일어나는 일" 흐름은 DB에 이미 있는 사건만으로 시작한다.** 런 상태 바뀜(`run_state_changes`), 질문(`run_questions`), 권한 대기(`run_permission_waits`), 런 끝·PR 같은 기록이다. 시안의 "커밋 n개" 같은 런 중간 진행은 러너에서 받아 오는 데이터가 없어 빼고 시작한다. 넣으려면 러너 어댑터가 무엇을 얼마나 자주 읽을지 따로 정해야 한다.
 - **`packages/ui`의 규칙 문서(`DESIGN.md`)와 토큰 시험이 바뀐다.** 지금 문서는 "카드와 배지를 쓰지 않는다", "색은 손댈 일에만", 반경 `md 6`을 적고, `tokens.test.ts`는 채도 있는 색을 포인트·Human Check·Failed·Online에만 허락한다. 적용 티켓([0049](../tickets/0049-ui-redesign.md))이 토큰·컴포넌트와 함께 고친다. 그 전까지 이 ADR과 `DESIGN.md`가 다르면 이 ADR이 앞선다.
 - **포인트 파랑은 둘에 쓰인다.** Merged 알약과 주 버튼·링크다. 하나는 상태 알약, 하나는 행동이라 모양으로 갈린다. 알약의 파랑이 주 버튼과 헷갈리면 0049에서 알약 쪽 톤을 따로 정한다.
+- **이 ADR이 앞선 문서의 화면 낱말보다 앞선다.** [1단계 스펙](../spec/0001-phase-1.md)(Disconnected를 "연결 끊김", Canceled를 "취소"로 쓴다는 문장)과 `design/prototype/README.md`(Running을 "실행 중"으로 쓴다는 문장), 끝난 티켓들의 같은 문구는 그때의 기록이다. 상태 이름의 화면 낱말은 이 ADR과 GLOSSARY를 따른다.
 - **메시지 파일 낱말을 바꾼다.** "실행 중", "입력 기다림", "연결 끊김", "취소", "인증 깨짐", "권한 대기", "홈" 같은 상태·화면 이름을 영어 용어로 바꾸고, 시간 표기는 함수 하나로 모은다. 적용은 0049에서 한다.
 
 ## Considered Options
