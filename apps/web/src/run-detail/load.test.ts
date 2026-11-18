@@ -337,6 +337,7 @@ describe("질문과 답(Q82.3)", () => {
         choices: ["돌려 주세요", "멈춰 주세요"],
         answered: false,
       },
+      inputSince: minutes(60).toISOString(),
     });
   });
 
@@ -360,6 +361,7 @@ describe("질문과 답(Q82.3)", () => {
     expect(detail(db, id).status).toEqual({
       state: "waiting-for-input",
       input: { kind: "unknown" },
+      inputSince: null,
     });
   });
 
@@ -396,6 +398,7 @@ describe("권한 대기(Q82.4)", () => {
         detail: "Bash: rm -rf node_modules",
         denied: false,
       },
+      inputSince: minutes(60).toISOString(),
     });
   });
 

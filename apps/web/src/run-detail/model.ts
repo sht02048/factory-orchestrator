@@ -63,7 +63,12 @@ export type LogTailView =
 export type RunDetailStatus =
   | { state: "queued"; queuedReason: QueuedReason }
   | { state: "running" }
-  | { state: "waiting-for-input"; input: PendingInput }
+  | {
+      state: "waiting-for-input";
+      input: PendingInput;
+      /** 지금 기다리는 질문을 받거나 권한을 요청한 시각(ISO). 입력을 모르면 null */
+      inputSince: string | null;
+    }
   | {
       state: "disconnected";
       /** ssh 가 연속으로 실패하기 시작한 시각(Q50·Q67). 기록이 없으면 null */

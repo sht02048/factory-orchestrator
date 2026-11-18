@@ -190,13 +190,10 @@ function Block({
   );
 }
 
-/** 지금 기다리는 질문·권한 요청이 들어온 때부터 서버가 읽은 때까지. 타임라인의 마지막 그 일로 잰다 */
+/** 지금 보이는 질문·권한 요청을 받은 때부터 서버가 읽은 때까지 */
 function inputWaitedMs(run: RunDetail): number | null {
-  if (run.status.state !== "waiting-for-input") return null;
-  const kind = run.status.input.kind;
-  if (kind === "unknown") return null;
-  const last = run.timeline.findLast((event) => event.kind === kind);
-  return last === undefined ? null : Math.max(0, Date.parse(run.now) - Date.parse(last.at));
+  if (run.status.state !== "waiting-for-input" || run.status.inputSince === null) return null;
+  return Math.max(0, Date.parse(run.now) - Date.parse(run.status.inputSince));
 }
 
 function Reason({ run }: { run: RunDetail }) {

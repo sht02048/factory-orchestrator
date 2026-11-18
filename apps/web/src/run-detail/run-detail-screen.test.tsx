@@ -378,6 +378,13 @@ describe("Run 상세 화면", () => {
     ]);
     // 질문은 T0 + 50분, 서버가 읽은 때는 T0 + 120분
     expect(text(render(page(db, id)))).toContain("Question 1시간 10분째 답을 기다려요");
+    // 질문이 둘 기다리면 먼저 받은 질문을 보이고 그 시각부터 잰다
+    recordRunQuestions(db, id, [
+      { id: toQuestionId("q-2"), body: "나중 질문", options: [], askedAt: minutes(100) },
+    ]);
+    const body = text(render(page(db, id)));
+    expect(body).toContain("Question 1시간 10분째 답을 기다려요 계속할까요?");
+    expect(body).not.toContain("20분째 답을 기다려요");
   });
 
   it("타임라인은 같은 날이면 시각만, 다른 날이면 날짜를 붙인다", () => {
