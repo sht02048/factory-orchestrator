@@ -17,7 +17,8 @@ export const identitySchema = z.object({
   product: z.literal(PRODUCT_NAME),
   version: z.string(),
   instanceId: z.string(),
-  webAccess: z.enum(WEB_ACCESS),
+  // 서버가 나중에 값을 더해도 옛 클라이언트가 "우리 서버가 아님"으로 보지 않게, 모르는 값은 열 수 없음으로 읽는다
+  webAccess: z.enum(WEB_ACCESS).catch("host-not-allowed"),
 });
 export type Identity = z.infer<typeof identitySchema>;
 

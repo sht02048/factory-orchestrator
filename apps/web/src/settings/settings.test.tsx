@@ -431,6 +431,7 @@ describe("주소(0048)", () => {
       "https://server.example.ts.net/app",
       "ftp://x.example",
       "https://a:b@x.example",
+      "https://my_host.example",
     ]) {
       expect(saveAddresses(f.context, { webAddress, webhookAddress: "" }, now, local)).toEqual({
         ok: false,

@@ -35,7 +35,7 @@
     "githubSet": "저장했어요",
     "githubUnset": "아직 없어요",
     "runners": "{count, plural, =0 {아직 없어요} other {#대}}",
-    "addresses": "{set}/2개 정함"
+    "addresses": "{set, plural, =0 {아직 없어요} other {2개 중 #개 정했어요}}"
   },
   "remoteError": {
     "unauthorized": "키나 토큰이 맞지 않아요. 새로 만들어 넣어 주세요.",

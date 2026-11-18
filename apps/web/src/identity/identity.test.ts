@@ -29,4 +29,15 @@ describe("신원 확인 응답", () => {
     ).toBe(false);
     expect(PRODUCT_NAME).toBe("factory-orchestrator");
   });
+
+  it("모르는 webAccess 값은 열 수 없음으로 읽는다(값을 더해도 옛 클라이언트가 깨지지 않는다)", () => {
+    expect(
+      identitySchema.parse({
+        product: "factory-orchestrator",
+        version: "9.0.0",
+        instanceId: "x",
+        webAccess: "read-only",
+      }).webAccess,
+    ).toBe("host-not-allowed");
+  });
 });

@@ -455,7 +455,9 @@ export function normalizeAddress(value: string): string | null | undefined {
     url.pathname === "/" &&
     url.search === "" &&
     url.hash === "";
-  return plain ? url.origin : undefined;
+  // Host 검사가 읽을 수 있는 호스트 이름이어야 한다. URL 은 밑줄 같은 글자도 받아, 저장해 놓고 그 이름으로는
+  // 열리지 않는 주소가 생긴다. 두 쪽이 같은 규칙(hostnameOfHostHeader)을 쓴다.
+  return plain && hostnameOfHostHeader(url.host) !== null ? url.origin : undefined;
 }
 
 export type AddressSaveReason = "invalid-web-address" | "invalid-webhook-address" | "locks-out";

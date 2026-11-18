@@ -55,7 +55,7 @@ research [0013](../research/0013-remote-client-pairing.md)의 「운영자가 �
 | `webAccess`  | `"allowed"`: 물은 Host로 화면을 열 수 있다. `"host-not-allowed"`: 서버는 맞지만 그 Host는 Host 검사에 막힌다. 앱은 "그 서버의 Settings > 주소에서 다른 기기에서 열 주소를 정하세요"를 안내한다 |
 
 - 호스트명·주소·경로·계정 같은 운영자 값은 담지 않는다(ADR 0005). 그래서 정한 주소를 알려 주지 않는다. Host 검사를 받지 않아 DNS 리바인딩으로도 읽힐 수 있기 때문이다.
-- 필드를 더하는 것은 하위 호환이다. 앱은 모르는 필드를 무시하고, 위 네 필드를 zod로 파싱한다(`apps/web/src/identity/identity.ts`의 `identitySchema`). 이름을 바꾸거나 빼려면 0046과 함께 바꾼다.
+- 필드나 `webAccess` 값을 더하는 것은 하위 호환이다. 앱은 모르는 필드를 무시하고 모르는 `webAccess` 값은 `"host-not-allowed"`로 읽으며, 위 네 필드를 zod로 파싱한다(`apps/web/src/identity/identity.ts`의 `identitySchema`). 이름을 바꾸거나 빼려면 0046과 함께 바꾼다.
 
 ### Host 검사와의 관계 (판단)
 
