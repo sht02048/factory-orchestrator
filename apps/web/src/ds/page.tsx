@@ -15,8 +15,6 @@ import { useTranslations } from "use-intl";
 import { ComponentSections } from "./component-preview";
 import { TokenSections } from "./token-preview";
 
-// /ds: packages/ui 의 모든 토큰과 컴포넌트 미리보기. 시안 B 처럼 사이드바 | 본문 틀을 쓴다.
-
 const tokenLinks = ["colors", "typography", "space", "size", "radius", "shadow", "motion"] as const;
 const componentLinks = [
   "buttons",

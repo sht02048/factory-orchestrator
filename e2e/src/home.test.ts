@@ -1,4 +1,3 @@
-// 브라우저 안에서 도는 evaluate 함수가 DOM 전역(document, getComputedStyle)을 쓴다
 /// <reference lib="dom" />
 
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -48,20 +47,6 @@ import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" 
 import home from "../../apps/web/messages/ko/home.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 
-/*
- * Home 을 키보드·화면 읽기·터치로 써도 깨지지 않는지 실제 브라우저로 보는 시험(티켓 0050).
- *
- * - "직접 답하기"·"거절" 폼을 열면 입력칸에 포커스가 가고, 취소·Escape 로 닫으면 트리거 버튼으로 돌아온다
- * - 답·거절이 성공하면 결과 문장이 role="status" 이고 포커스를 받는다
- * - 입력칸 글자 크기는 화면 폭이 아니라 포인터 종류로 바뀐다
- * - 지금 일어나는 일의 행은 Run 상세 링크다
- * - 새로 고치지 않아도 새 손댈 일이 보인다(문서가 보일 때 15초마다 다시 읽는다)
- * - 375px 폭에서 머리 영역이 넘치지 않는다
- *
- * 띄우는 방식은 operator-actions 시험(티켓 0039)과 같다. 공용 도우미를 고치지 않으려고 필요한 것은 이 파일에 둔다.
- * 시험이 실패하면 그때의 화면을 e2e/test-results 에 남긴다(CI 산출물).
- */
-
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
 const adaptersModule = join(webRoot, "src/server/adapters.ts");
 const fakeAdaptersModule = fileURLToPath(new URL("./browser/fake-adapters.ts", import.meta.url));
@@ -82,7 +67,6 @@ let context: BrowserContext;
 let page: Page;
 const runIds = new Map<string, RunId>();
 
-/** web 의 server/adapters.ts 를 가짜 트래커 등록표로 바꾼다. 제품 코드는 고치지 않는다 */
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
   enforce: "pre",
@@ -118,8 +102,6 @@ beforeAll(async () => {
 
   browser = await chromium.launch({ channel: "chrome" });
 
-  // 개발 서버는 화면 모듈을 처음 요청할 때 변환한다. CI 에서는 다른 브라우저 시험과 함께 돌아 첫 화면이
-  // 시험 하나의 대기 시간(30초)을 넘길 수 있어, 여기서 Home 을 한 번 열어 변환을 끝내 둔다.
   const warm = await browser.newPage({ baseURL: baseUrl, locale: "ko-KR" });
   warm.setDefaultTimeout(110_000);
   await openHome(warm);
@@ -215,12 +197,10 @@ describe("Home 접근성(브라우저, 0050)", () => {
         .getByLabel(home.question.answerLabel)
         .evaluate((input) => getComputedStyle(input).fontSize);
     };
-    // 마우스(정밀 포인터): 좁은 폭에서도 14px
     expect(await page.evaluate(() => matchMedia("(pointer: fine)").matches)).toBe(true);
     expect(await fontSizeAt(page, 1280)).toBe("14px");
     expect(await fontSizeAt(page, 375)).toBe("14px");
 
-    // 터치(거친 포인터): 넓은 폭(iPad 가로)에서도 16px 이라 포커스 때 확대하지 않는다
     const touch = await browser.newContext({ baseURL: baseUrl, locale: "ko-KR", hasTouch: true });
     try {
       const tablet = await touch.newPage();
@@ -287,13 +267,11 @@ describe("Home 접근성(브라우저, 0050)", () => {
     await openHome(page);
     const card = questionCard(page, "ACME-9");
     expect(await card.count()).toBe(0);
-    // 화면을 연 뒤 worker 가 새 질문을 쓴다
     const run = startRun(toTicketKey("ACME-9"));
     ok(changeRunState(db, run, { to: "waiting-for-input" }));
     recordRunQuestions(db, run, [
       { id: toQuestionId("q-9"), body: "Ship it?", options: [], askedAt: new Date() },
     ]);
-    // 15초 주기로 다시 읽는다
     await card.getByText("Ship it?").waitFor({ timeout: 25_000 });
   });
 
@@ -304,7 +282,6 @@ describe("Home 접근성(브라우저, 0050)", () => {
     const input = card.getByLabel(home.question.answerLabel);
     await input.fill("half-written answer");
 
-    // 서버 함수 요청을 모두 실패시키고, 문서가 다시 보인 것처럼 곧바로 다시 읽게 한다
     let failed = 0;
     await page.route("**/_serverFn/**", async (route) => {
       failed += 1;
@@ -371,7 +348,6 @@ function seed(db: Database): void {
     assignmentBlocked: false,
   });
 
-  // 질문을 기다리는 런 둘: 포커스 시험(ACME-1), 글자 크기 시험(ACME-3)
   const questionRun = startRun(toTicketKey("ACME-1"));
   ok(changeRunState(db, questionRun, { to: "waiting-for-input" }));
   recordRunQuestions(db, questionRun, [
@@ -388,7 +364,6 @@ function seed(db: Database): void {
     { id: toQuestionId("q-3"), body: "Rename the module?", options: [], askedAt: new Date() },
   ]);
 
-  // 시험마다 다른 런을 쓴다. 답·거절을 남기는 시험이 포커스 시험의 런을 바꾸지 않게 한다
   const answerRun = startRun(toTicketKey("ACME-4"));
   ok(changeRunState(db, answerRun, { to: "waiting-for-input" }));
   recordRunQuestions(db, answerRun, [
@@ -400,7 +375,6 @@ function seed(db: Database): void {
     { id: toPermissionRequestId("p-5"), detail: "rm -rf build", requestedAt: new Date() },
   ]);
 
-  // 권한 허용을 기다리는 런: 거절 포커스 시험
   const permissionRun = startRun(toTicketKey("ACME-2"));
   ok(changeRunState(db, permissionRun, { to: "waiting-for-input" }));
   recordPermissionWaits(db, permissionRun, [
@@ -408,7 +382,6 @@ function seed(db: Database): void {
   ]);
 }
 
-/** 런을 할당하고 러너에서 시작한 상태로 둔다(worker 가 하는 일을 DB 에 직접 쓴다) */
 function startRun(key: TicketKey): RunId {
   const assigned = assignRun(db, {
     ticket: { connection, key },
@@ -437,7 +410,6 @@ function ok(result: { ok: true } | { ok: false; error: unknown }): void {
   if (!result.ok) throw new Error(`state change failed: ${JSON.stringify(result.error)}`);
 }
 
-/** 손댈 일 카드(section aria-label="{종류} {이름}") */
 function attentionCard(target: Page, kind: string, key: string): Locator {
   return target.getByRole("region", {
     name: home.card.label.replace("{kind}", kind).replace("{name}", key),
@@ -457,7 +429,6 @@ async function openHome(target: Page): Promise<void> {
   await hydrated(target);
 }
 
-/** 이 요소가 5초 안에 포커스를 갖는지. 포커스는 다시 그린 뒤(effect)에 옮겨지므로 잠시 기다린다 */
 async function focusedSoon(locator: Locator): Promise<boolean> {
   return locator.evaluate(
     (el) =>
@@ -473,10 +444,6 @@ async function focusedSoon(locator: Locator): Promise<boolean> {
   );
 }
 
-/**
- * 서버 렌더한 화면에 React 가 붙을 때까지 기다린다. 붙기 전에 누르면 클릭이 사라진다.
- * TanStack Router 는 하이드레이션이 끝나면 window.__TSR_ROUTER__ 를 둔다.
- */
 async function hydrated(target: Page): Promise<void> {
   await target.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
   await target.waitForLoadState("networkidle");

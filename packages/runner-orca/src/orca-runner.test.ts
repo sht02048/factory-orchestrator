@@ -30,7 +30,6 @@ import {
   stdout,
 } from "./test-support.js";
 
-// 이 티켓이 테스트 러너에서 받은 출력(fixtures/)의 값
 const MAILBOX = encodeMailbox({
   terminal: "term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7",
   runId: "run_493ebb2f403d",
@@ -50,7 +49,6 @@ const RUN: RunOnRunner = {
 
 const BROKEN = stdout("Error: something went wrong before JSON\n", 1);
 
-/** 어댑터가 던진 오류의 detail(core RunnerErrorDetail) */
 async function adapterError(promise: Promise<unknown>): Promise<unknown> {
   try {
     await promise;
@@ -64,14 +62,12 @@ async function adapterError(promise: Promise<unknown>): Promise<unknown> {
   throw new Error("expected an AdapterError");
 }
 
-/** 러너 쪽 프로젝트 목록(이 티켓이 받은 출력) */
 function withProjects(exec: ScriptedExec): ScriptedExec {
   return exec
     .orca("project list", stdout(own("project-list.json")))
     .orca("project setups", stdout(own("project-setups.json")));
 }
 
-/** 소비하는 check(`--peek` 없음)를 부르지 않았다 */
 function expectNoConsumingCheck(exec: ScriptedExec): void {
   const consuming = exec
     .commands()
@@ -651,7 +647,6 @@ describe("pollRun", () => {
   });
 
   test("reads the research 0008 lost escalation as ended without report", async () => {
-    // research 0008의 R3. 우편함은 term_…01, Run은 run_000000000001이다.
     const r3: RunOnRunner = {
       mailbox: encodeMailbox({
         terminal: "term_00000000-0000-4000-8000-000000000001",

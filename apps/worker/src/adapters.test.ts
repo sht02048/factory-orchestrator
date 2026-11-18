@@ -38,7 +38,6 @@ const codeHostId = toCodeHostConnectionId("code-1");
 const runnerId = toRunnerId("runner-1");
 const ticket = toTicketKey("ENG-1");
 
-/** factory가 받은 설정을 남기고 매번 새 가짜 어댑터를 만든다. */
 class CountingFactories {
   readonly trackers: Array<{ config: unknown; adapter: FakeTracker }> = [];
   readonly codeHosts: Array<{ config: unknown; adapter: FakeCodeHost }> = [];
@@ -147,7 +146,6 @@ describe("WorkerAdapters: 설정이 바뀌면 어댑터를 다시 만든다", ()
     const first = tracker();
     expect(tracker()).toBe(first);
     expect(factories.trackers).toHaveLength(1);
-    // factory에는 복호화한 비밀값을 넘긴다.
     expect(factories.trackers[0]?.config).toEqual({ config: {}, secrets: { apiKey: "key-1" } });
 
     saveTracker("key-2");
@@ -210,7 +208,6 @@ describe("WorkerAdapters: 오류 종류에 맞춰 연결을 쉰다", () => {
 
     advance(29_000);
     await expect(tracker().getTicket(ticket)).rejects.toBeInstanceOf(ConnectionPausedError);
-    // 쉬는 동안의 실패는 다시 쉬는 시간을 늘리지 않는다.
     advance(1_000);
     await expect(tracker().getTicket(ticket)).resolves.toBeNull();
   });

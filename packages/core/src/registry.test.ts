@@ -60,7 +60,6 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
       .registerTracker(trackersA.factory)
       .registerTracker(trackersB.factory);
 
-    // DB에 저장된 Tracker Connection이라고 본다: 연결 ID, 종류, 그 종류만 아는 설정.
     const connections = [
       { id: toTrackerConnectionId("conn-a"), kind: toTrackerKind("tracker-a") },
       { id: toTrackerConnectionId("conn-b"), kind: toTrackerKind("tracker-b") },
@@ -83,7 +82,6 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
       });
     }
 
-    // conn-a의 ENG-1에만 도는 런이 있다.
     const runs = [
       {
         ticket: { connection: connections[0]!.id, key },
@@ -115,7 +113,6 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
   });
 
   it("러너·코드 호스트 두 종류에서 대기열·다시 연결·PR 상태·요약 계산이 같은 규칙으로 돈다", async () => {
-    // 새 종류는 core를 고치지 않고 factory를 한 줄씩 등록해 더한다.
     const runnersA = fakeRunnerFactory(toRunnerKind("runner-a"));
     const runnersB = fakeRunnerFactory(toRunnerKind("runner-b"));
     const hostsA = fakeCodeHostFactory(toCodeHostKind("host-a"), "a:");
@@ -128,7 +125,6 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
       .registerCodeHost(hostsA.factory)
       .registerCodeHost(hostsB.factory);
 
-    // DB에 저장된 러너 설정이라고 본다: 종류와 그 종류만 아는 설정.
     const registered: Array<{ id: RunnerId; kind: string; project: RunnerProjectId }> = [
       { id: toRunnerId("r-a"), kind: "runner-a", project: toRunnerProjectId("a:acme/app") },
       { id: toRunnerId("r-b"), kind: "runner-b", project: toRunnerProjectId("b:acme/web") },
@@ -145,7 +141,6 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
       { id: registered[1]!.project, displayName: "web", setupState: "ready" },
     ]);
 
-    // 어댑터가 답한 상태로 core 대기열 입력을 만든다.
     const snapshots: RunnerSnapshot[] = [];
     for (const [id, runner] of runners) {
       const health = await runner.checkHealth();
@@ -183,7 +178,6 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
       { runId: "run-b", runnerId: "r-b" },
     ]);
 
-    // 각 러너 종류로 시작하고 끝을 읽어 core가 두 축과 요약 결과를 정한다.
     const codeHosts: CodeHost[] = [
       registry.createCodeHost(toCodeHostKind("host-a"), {}),
       registry.createCodeHost(toCodeHostKind("host-b"), {}),

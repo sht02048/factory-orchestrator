@@ -8,10 +8,6 @@ import {
 } from "./request-guard";
 import type { AllowedHostsInput } from "./request-guard";
 
-/*
- * Host·Origin 검사(0048). 가상 주소만 쓴다(example.com, example.ts.net).
- */
-
 const configured: AllowedHostsInput = {
   bindHost: "127.0.0.1",
   webAddress: "https://server.example.ts.net",
@@ -117,7 +113,6 @@ describe("Host 검사", () => {
     expect(verdictOf(request("/api/identity", { host: "server.example.ts.net" }), unset)).toEqual({
       ok: true,
     });
-    // 상태를 바꾸는 요청은 예외가 아니다
     expect(
       verdictOf(request("/api/identity", { method: "POST", host: "evil.example" }), unset),
     ).toMatchObject({ ok: false, reason: "host-not-allowed" });

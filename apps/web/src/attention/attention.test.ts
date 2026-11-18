@@ -4,10 +4,6 @@ import { describe, expect, it } from "vitest";
 import { minutes, now, seedDatabase } from "../testing/seed";
 import { loadAttention } from "./attention";
 
-/*
- * 알림할 사건(0046, Q4). 질문 대기·권한 대기·Human Check·러너 Offline 만 담고 Merged·Failed 는 담지 않는다.
- * 시드: ACME-2 는 Human Check, ACME-1 은 Merged, ACME-3~7 은 Failed, runner-b 는 Offline, ACME-11 은 입력 기다림.
- */
 describe("알림할 사건", () => {
   it("Human Check 와 러너 Offline 만 담고 Merged·Failed 는 담지 않는다", () => {
     const { db } = seedDatabase();

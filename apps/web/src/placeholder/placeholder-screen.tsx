@@ -7,7 +7,6 @@ import { placeholderMessages } from "./messages";
 
 export type PlaceholderScreenKey = "tickets" | "runners" | "stats" | "settings";
 
-/** 내비에는 있지만 아직 만들지 않은 화면. 각 화면 티켓이 이 라우트를 바꾼다 */
 export function PlaceholderScreen({ screen }: { screen: PlaceholderScreenKey }) {
   return (
     <ScreenMessages messages={placeholderMessages}>

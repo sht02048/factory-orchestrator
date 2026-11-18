@@ -31,10 +31,6 @@ function runner(db: Database, name: string): RunnerView {
 
 const keys = (runs: ReadonlyArray<{ ticketKey: string }>) => runs.map((run) => run.ticketKey);
 
-/**
- * Offline 인 runner-b 에 런 둘을 더한다. 하나는 러너에 닿지 않아 Disconnected 가 된 런,
- * 하나는 Disconnected 인 채 끝나 에이전트 결과가 러너 연결 끊김인 런이다.
- */
 function addRunsOnOfflineRunner(db: Database): void {
   const runnerB = toRunnerId("runner-b");
   for (const [key, end] of [
@@ -80,7 +76,6 @@ describe("loadRunnersPage", () => {
     expect(a.capacity).toBe(10);
     expect(keys(a.occupying).toSorted()).toEqual(["ACME-10", "ACME-11", "ACME-12", "LAB-1"]);
     expect(a.occupying.find((run) => run.ticketKey === "ACME-12")?.state).toBe("disconnected");
-    // Queued 와 Ended 런은 capacity 를 쓰지 않는다
     expect(keys(a.queued)).toEqual(["ACME-13"]);
   });
 
@@ -96,13 +91,10 @@ describe("loadRunnersPage", () => {
   it("남은 워크트리는 PR 이 정해질 때까지 남기거나 사람이 정할 Ended 런이다(Q44·Q51·Q75·Q77)", () => {
     const { db } = seedDatabase();
     addRunsOnOfflineRunner(db);
-    // ACME-2: 완료 보고(실패) · PR 열림 → PR 이 정해질 때까지 남김
-    // ACME-5: 러너 연결 끊김 → 사람이 정함. 그 밖의 Ended 런은 바로 지우거나 지울 것이 없다
     expect(runner(db, "runner-a").leftWorktrees.map((w) => [w.ticketKey, w.worktree])).toEqual([
       ["ACME-2", "keep-until-pr-settles"],
       ["ACME-5", "operator-decides"],
     ]);
-    // 러너 연결 끊김 런은 Offline 러너에도 남는다
     expect(runner(db, "runner-b").leftWorktrees.map((w) => [w.ticketKey, w.worktree])).toEqual([
       ["ACME-21", "operator-decides"],
     ]);
@@ -123,7 +115,6 @@ describe("loadRunnersPage", () => {
     const a = runner(db, "runner-a");
     expect(a.online).toBe(true);
     expect(a.assignmentBlocked).toBe(true);
-    // 할당을 막지 않는 필수 조건(상시 서비스)도 확인 항목으로 담는다
     expect(a.checks).toEqual([
       {
         id: "service",
@@ -139,13 +130,11 @@ describe("loadRunnersPage", () => {
         project: "github:acme/web",
         satisfied: false,
         blocksAssignment: true,
-        // GitHub push 의 해결 방법은 화면 메시지로 보여 어댑터 안내를 담지 않는다
         hint: null,
       },
       {
         id: "github-push:github:acme/docs",
         name: "GitHub push access: acme/docs",
-        // runner-a 의 러너 쪽 프로젝트에 없다
         project: null,
         satisfied: true,
         blocksAssignment: true,
@@ -204,16 +193,13 @@ describe("Workspace 범위(ADR 0006)", () => {
   });
 
   it("라우트 loader 는 ws 에 기대지 않아 Workspace 를 바꿔도 같은 러너 목록을 보인다", () => {
-    // ws 가 loaderDeps 에 없으면 Workspace 를 바꿔도 같은 loader 결과를 쓴다(Runs 는 ws 를 deps 로 둔다).
     expect(Route.options.loaderDeps).toBeUndefined();
-    // 화면에 다시 들어오면 새로 읽고, 머무는 동안(행 고르기, Workspace 바꾸기)은 다시 읽지 않는다
     expect(Route.options.shouldReload).toBe(reloadOnEnter);
     expect(reloadOnEnter({ cause: "enter" })).toBe(true);
     expect(reloadOnEnter({ cause: "stay" })).toBe(false);
   });
 });
 
-/** 시작한 런이 러너에서 받는 값(워크트리, 실제 브랜치, 에이전트 참조) */
 function startedOn(worktree: string) {
   return {
     worktree: toWorktreeRef(worktree),

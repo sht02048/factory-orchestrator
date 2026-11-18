@@ -34,7 +34,6 @@ afterEach(async () => {
 
 const inProgress = toTrackerStateId("in-progress");
 
-/** Workspace에서 "In Progress" 상태를 고른다. */
 function chooseInProgress(): void {
   saveWorkspaceTrackerProject(h.db, {
     workspaceId: toWorkspaceId("ws-1"),
@@ -86,7 +85,6 @@ function report(run: StoredRun, runnerId: RunnerId, outcome = "succeeded"): void
   h.runner(runnerId).report(worktreeOf(run), { outcome, body: "끝" });
 }
 
-/** 런의 PR을 사람이 병합하거나 닫은 것처럼 바꾼다. */
 async function settlePullRequest(run: StoredRun, state: "merged" | "closed"): Promise<void> {
   const found = current(run);
   if (found.state === "queued" || found.branch === null) throw new Error("run has not started");
@@ -105,7 +103,6 @@ describe("트래커 갱신", () => {
   it("런 시작 때 In Progress로 한 번, 끝날 때 결과 댓글을 한 번 달고 다시 띄워도 댓글은 하나다", async () => {
     chooseInProgress();
     const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
-    // 러너가 Offline이라 Queued로 남는 동안은 바꾸지 않는다(Q68).
     h.setRunnerOnline(runnerId, false);
     const run = h.assign("ENG-1", projectA);
     const worker = h.worker();
@@ -135,7 +132,6 @@ describe("트래커 갱신", () => {
     expect(comments[0]?.body).toContain(run.id);
     expect(recordsOf(run).trackerComment).toEqual({ id: comments[0]?.id, at: h.now });
 
-    // 댓글을 단 직후 데몬을 다시 띄운다.
     await worker.close();
     const restarted = h.worker();
     await restarted.tick();
@@ -150,7 +146,6 @@ describe("트래커 갱신", () => {
     await worker.tick();
     const [comment] = h.tracker.comments.get(run.ticket.key) ?? [];
     expect(comment).toBeDefined();
-    // 댓글을 단 기록을 잃은 것처럼 만든다.
     updateRunRecords(h.db, run.id, { trackerComment: null });
     await worker.close();
 
@@ -239,7 +234,6 @@ describe("워크트리 정리", () => {
     expect(recordsOf(run).laterPrState).toBeNull();
 
     await settlePullRequest(run, "merged");
-    // 폴링 간격 안에서는 다시 조회하지 않는다.
     await worker.tick();
     expect(recordsOf(run).laterPrState).toBeNull();
 
@@ -294,7 +288,6 @@ describe("워크트리 정리", () => {
     await worker.tick();
     expect(h.runner(runnerId).removed).toEqual([]);
     expect(recordsOf(run).worktreeRemovedAt).toBeNull();
-    // 결과 댓글은 단다.
     expect(h.tracker.comments.get(run.ticket.key)).toHaveLength(1);
   });
 
@@ -311,7 +304,6 @@ describe("워크트리 정리", () => {
     expect(ended(run).agentResult).toBe("runner-disconnected");
     expect(summarizeRunOutcome(ended(run)).worktree).toBe("operator-decides");
 
-    // 러너가 다시 Online이 된다.
     h.runner(runnerId).online = true;
     h.advance(RUNNER_CHECK_INTERVAL_MS);
     await worker.tick();
@@ -321,7 +313,6 @@ describe("워크트리 정리", () => {
     expect(h.runner(runnerId).removed).toEqual([]);
     expect(recordsOf(run).worktreeRemovedAt).toBeNull();
 
-    // 사람이 러너에서 지운다. 다음 러너 확인 때 기록한다.
     h.runner(runnerId).deleteWorktree(worktree);
     await worker.tick();
     expect(recordsOf(run).worktreeRemovedAt).toBeNull();

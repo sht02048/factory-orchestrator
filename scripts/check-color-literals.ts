@@ -1,16 +1,3 @@
-/*
- * packages/ui 밖에서 색 값을 직접 쓰면 실패하는 검사(티켓 0003, ADR 0003).
- * oxlint 에는 StyleX 규칙이 없어 따로 둔다. 색은 @factory/ui/tokens.stylex 의 토큰으로만 쓴다.
- *
- * 잡는 것: hex(#fff, #1a2b3c), 색 함수(rgb(), hsl(), oklch(), color-mix() …), 이름 색(red, white …).
- * CSS 파일은 선언 값 전체를, 코드 파일은 CSS 값 문맥(color: "red", fill="red", "1px solid #000",
- * linear-gradient(red, blue))을 본다. 색을 받지 않는 속성의 값(plan: "gold")은 놓아준다.
- * 놓아주는 것: transparent, currentColor, inherit 같은 키워드.
- *
- * 실행: node scripts/check-color-literals.ts [파일 …]
- * 파일을 주지 않으면 apps/ 와 packages/(packages/ui 제외) 아래 코드 파일을 모두 본다.
- */
-
 import { readdirSync, readFileSync } from "node:fs";
 import { extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,25 +22,19 @@ const CODE_EXTENSIONS = new Set([
 
 const SKIP_DIRS = new Set(["node_modules", "dist", ".turbo", ".output", "coverage"]);
 
-// 생성 파일과 디자인 시스템 자체는 검사하지 않는다.
 const SKIP_FILES = new Set(["routeTree.gen.ts"]);
 const ALLOWED_ROOT = join("packages", "ui");
 
-// 앞이 . 이면 메서드 호출(d3.color(x))이라 놓아준다.
 const COLOR_FUNCTION =
   /(?<![\w.-])(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark)\(/gi;
 
-// 글자 a–f 가 하나라도 있는 hex.
 const HEX_WITH_LETTER = /#(?=[0-9a-f]*[a-f])(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})(?![\w-])/gi;
-// 숫자만 있는 hex 는 PR 번호(#418)와 구분되지 않아, 코드에서는 CSS 값 문맥에서만 잡는다:
-// 문자열 전체이거나, 테두리·그림자 값 안(solid #000, 1px #000, , #000).
 const HEX = "#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})(?![\\w-])";
 const QUOTED_HEX = new RegExp(`(["'\`])(${HEX})\\1`, "gi");
 const HEX_IN_CSS_VALUE = new RegExp(
   `(?:\\b(?:solid|dashed|dotted|double|inset)|\\d(?:px|em|rem)|,)\\s+(${HEX})`,
   "gi",
 );
-// CSS 파일에서는 모든 hex 를 잡는다.
 const ANY_HEX = new RegExp(HEX, "gi");
 
 const NAMED_COLORS = new Set(
@@ -76,10 +57,6 @@ const NAMED_COLORS = new Set(
     "whitesmoke yellow yellowgreen"
   ).split(" "),
 );
-// 코드: 색을 받는 속성의 값으로 준 이름 색(color: "red", fill="red", fill={a ? "red" : "blue"}),
-// 테두리·그림자 값 안의 이름 색("1px solid red"), gradient 안의 이름 색.
-// 맨 문자열이나 색을 받지 않는 속성의 값(plan: "gold" 등)은 색으로 보지 않는다.
-// 이름은 소문자로, - 를 빼고 비교한다(backgroundColor, background-color).
 const COLOR_PROPERTIES = new Set([
   "fill",
   "stroke",
@@ -105,28 +82,22 @@ const isColorProperty = (name: string): boolean => {
   const key = name.replace(/-/g, "").toLowerCase();
   return COLOR_PROPERTIES.has(key) || /colou?r$/.test(key);
 };
-// 객체 키(color:, "background-color":). 앞이 . 이면 삼항식·타입이 아니라도 키가 아니다.
 const OBJECT_KEY = /(?<![\w$.-])(["']?)([A-Za-z_$][\w$-]*)\1\s*:(?!:)/g;
-// JSX 속성(fill="red", stopColor={...}). const color = "red" 같은 변수 선언은 뺀다.
 const JSX_ATTRIBUTE = /(?<=\s)(?<!\b(?:const|let|var)\s+)([A-Za-z][\w-]*)\s*=\s*(?=["'{])/g;
 const GRADIENT = /(?<![\w-])(?:repeating-)?(?:linear|radial|conic)-gradient\(/gi;
-// gradient 안의 낱말. 앞이 . 이면 속성 접근(colors.red)이다.
 const GRADIENT_WORD = /(?<![\w.$-])[a-z]+(?![\w-])/gi;
 const NAMED_IN_CSS_VALUE =
   /(?<=(?:\b(?:solid|dashed|dotted|double|inset)|\d(?:px|em|rem|%)?)\s+)([a-z]+)\b/gi;
-// CSS: 선언 값(: 와 ; 사이)의 낱말.
 const CSS_DECLARATION = /:([^;{}]*)(?:;|}|$)/g;
 const WORD = /[a-z]+/gi;
 
 export type SourceKind = "code" | "css";
 
 interface StringToken {
-  /** 여는 따옴표 다음 글자의 위치. */
   start: number;
   content: string;
 }
 
-/** start 의 따옴표로 여는 문자열을 읽고, 닫는 따옴표 다음 위치를 돌려준다. */
 function readString(text: string, start: number): { token: StringToken; end: number } {
   const quote = text[start];
   let i = start + 1;
@@ -134,10 +105,6 @@ function readString(text: string, start: number): { token: StringToken; end: num
   return { token: { start: start + 1, content: text.slice(start + 1, i) }, end: i + 1 };
 }
 
-/**
- * start 부터 값 하나(괄호 바깥의 , ; 나 닫는 괄호 전까지)를 훑어 그 안의 문자열 리터럴을 모은다.
- * 삼항식(a ? "red" : "blue")과 ?? || 대체값의 모든 분기를 본다.
- */
 function stringsInValue(text: string, start: number): StringToken[] {
   const tokens: StringToken[] = [];
   let depth = 0;
@@ -160,7 +127,6 @@ function stringsInValue(text: string, start: number): StringToken[] {
   return tokens;
 }
 
-/** start 의 여는 괄호에 맞는 닫는 괄호 위치. */
 function matchingParen(text: string, start: number): number {
   let depth = 0;
   for (let i = start; i < text.length; i += 1) {
@@ -173,7 +139,6 @@ function matchingParen(text: string, start: number): number {
   return text.length;
 }
 
-/** 소스 한 개에서 색 리터럴을 찾는다. */
 export function findColorLiterals(source: string, kind: SourceKind = "code"): ColorLiteral[] {
   const found: ColorLiteral[] = [];
   const text =
@@ -242,7 +207,6 @@ export function findColorLiterals(source: string, kind: SourceKind = "code"): Co
   return found.sort((a, b) => a.line - b.line || a.column - b.column);
 }
 
-/** 이 경로가 검사 대상인지(저장소 루트 기준 상대 경로). */
 export function isChecked(path: string): boolean {
   const normalized = path.split(sep).join("/");
   if (!/^(apps|packages)\//.test(normalized)) return false;

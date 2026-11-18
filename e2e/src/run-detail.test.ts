@@ -45,15 +45,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } f
 import run from "../../apps/web/messages/ko/run.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 
-/*
- * Run 상세에서 답·거절·취소를 키보드로 보낸 뒤 포커스와 결과 안내가 남는지, 실패 문구가 alert 인지,
- * 로그 꼬리가 마지막 줄부터 보이는지 실제 브라우저로 본다(티켓 0051).
- *
- * 띄우는 방식은 operator-actions.test.ts(티켓 0039)와 같다. apps/web 의 vite 설정으로 개발 서버를 띄우고
- * playwright-core 로 설치된 Chrome 을 띄운다. worker 는 띄우지 않는다.
- * 시험이 실패하면 그때의 화면을 e2e/test-results 에 남긴다.
- */
-
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
 const adaptersModule = join(webRoot, "src/server/adapters.ts");
 const fakeAdaptersModule = fileURLToPath(new URL("./browser/fake-adapters.ts", import.meta.url));
@@ -64,7 +55,6 @@ const runnerId = toRunnerId("runner-a");
 const agent = toAgentId("claude");
 const encryptionKey = new Uint8Array(32).fill(7);
 
-/** 로그 꼬리 줄 수. 끝날 때 저장하는 최대 줄 수와 같다 */
 const LOG_LINES = 200;
 
 let dir: string;
@@ -79,7 +69,6 @@ let cancelRun: RunId;
 let cancelFailsRun: RunId;
 let endedRun: RunId;
 
-/** web 의 server/adapters.ts 를 가짜 트래커 등록표로 바꾼다. 제품 코드는 고치지 않는다 */
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
   enforce: "pre",
@@ -169,7 +158,6 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
 
   it("요청을 남기지 못하면 실패 문구가 role=alert 로 보인다", async () => {
     await open(cancelFailsRun);
-    // 화면을 연 뒤 런이 끝나 취소 요청이 거절되게 한다.
     ok(
       changeRunState(db, cancelFailsRun, {
         to: "ended",
@@ -190,7 +178,6 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
     await open(endedRun);
     const log = page.getByRole("region", { name: run.log.linesLabel });
     await log.waitFor();
-    // e2e 는 DOM 타입을 싣지 않아 쓰는 값만 적는다. 넘쳐서 스크롤되고, 맨 아래에 있다
     const atBottom = await log.evaluate(
       (e: { scrollHeight: number; clientHeight: number; scrollTop: number }) =>
         e.scrollHeight > e.clientHeight && e.scrollTop + e.clientHeight >= e.scrollHeight - 1,
@@ -205,9 +192,6 @@ async function open(runId: RunId): Promise<void> {
   await hydrated(page);
 }
 
-/**
- * 포커스를 가진 요소나 그 조상인 role=status 의 글. 포커스가 body 에 있거나 status 밖이면 undefined.
- */
 async function focusedStatusText(): Promise<string | undefined> {
   const focused = page.locator('[role="status"]:focus-within');
   if ((await focused.count()) !== 1) return undefined;
@@ -222,7 +206,6 @@ function seed(db: Database): void {
     config: {},
     secrets: { apiKey: "secret" },
   });
-  // 온보딩(0026)을 마친 설치로 둔다
   saveCodeHostConnection(db, new SecretBox(encryptionKey), {
     id: toCodeHostConnectionId("github"),
     kind: toCodeHostKind("github"),
@@ -289,7 +272,6 @@ function seed(db: Database): void {
   });
 }
 
-/** 런을 할당하고 러너에서 시작한 상태로 둔다(worker 가 하는 일을 DB 에 직접 쓴다) */
 function startRun(key: string): RunId {
   const assigned = assignRun(db, {
     ticket: { connection, key: toTicketKey(key) },
@@ -317,10 +299,6 @@ function ok(result: { ok: true } | { ok: false; error: unknown }): void {
   if (!result.ok) throw new Error(`state change failed: ${JSON.stringify(result.error)}`);
 }
 
-/**
- * 서버 렌더한 화면에 React 가 붙을 때까지 기다린다. 붙기 전에 누르면 클릭이 사라진다.
- * TanStack Router 는 하이드레이션이 끝나면 window.__TSR_ROUTER__ 를 둔다.
- */
 async function hydrated(page: Page): Promise<void> {
   await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
   await page.waitForLoadState("networkidle");

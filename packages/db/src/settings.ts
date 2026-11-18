@@ -34,11 +34,6 @@ import {
 } from "./schema.js";
 import type { SecretBox } from "./secret-box.js";
 
-/**
- * 설정 테이블 접근. 서비스마다 다른 값은 어댑터가 정하는 JSON(`config`)과 봉한 비밀값(`secrets`)에
- * 넣는다. db는 그 안을 해석하지 않고, 어댑터 factory가 경계에서 스키마로 파싱한다(core registry).
- */
-
 function parseJson(text: string): unknown {
   const value: unknown = JSON.parse(text);
   return value;
@@ -46,20 +41,15 @@ function parseJson(text: string): unknown {
 
 function toJson(value: unknown, what: string): string {
   const text = JSON.stringify(value);
-  // JSON.stringify(undefined)는 문자열이 아니다. 쓰기 전에 막는다.
   if (typeof text !== "string") throw new TypeError(`${what} must be JSON`);
   return text;
 }
-
-// ---------- 연결(트래커, 코드 호스트) ----------
 
 export interface StoredConnection<Id, Kind> {
   id: Id;
   kind: Kind;
   name: string;
-  /** 비밀이 아닌 어댑터 설정 */
   config: unknown;
-  /** 복호화한 비밀값(API 키, signing secret, 토큰). 어댑터 설정과 함께 factory에 넘긴다 */
   secrets: unknown;
 }
 
@@ -71,7 +61,6 @@ export interface ConnectionInput<Id, Kind> {
   secrets: unknown;
 }
 
-/** 봉한 값이 묶이는 자리. 한 행의 값을 다른 행에 옮겨 붙이면 열리지 않는다. */
 const sealContext = (
   table: "tracker_connections" | "code_host_connections",
   id: TrackerConnectionId | CodeHostConnectionId,
@@ -171,24 +160,15 @@ export function listCodeHostConnections(db: Database, box: SecretBox): StoredCod
     }));
 }
 
-// ---------- 러너 ----------
-
 export interface StoredRunner {
   id: RunnerId;
   kind: RunnerKind;
   name: string;
-  /** 어댑터 설정(ssh 대상, 실행 파일 경로 등) */
   config: unknown;
   capacity: number;
   online: boolean;
-  /** 할당을 막는 필수 조건이 깨졌는지(1단계는 GitHub 인증, Q82.14) */
   assignmentBlocked: boolean;
-  /**
-   * 마지막으로 읽은 러너 필수 조건(1단계는 Orca 상시 서비스와 프로젝트별 GitHub 인증, Q82.15).
-   * 아직 읽지 못했거나 저장한 값을 읽을 수 없으면 null
-   */
   prerequisites: RunnerPrerequisite[] | null;
-  /** 러너 어댑터가 만든 우편함. 아직 없으면 null(Q82.1) */
   mailbox: MailboxRef | null;
   checkedAt: Date | null;
   checkError: unknown;
@@ -213,7 +193,6 @@ export function saveRunner(
     .run();
 }
 
-/** 저장한 필수 조건(core RunnerPrerequisite) 하나. 읽을 때 모양을 확인한다 */
 const storedPrerequisites = z.array(
   z.object({
     id: z.string(),
@@ -230,13 +209,6 @@ function readPrerequisites(text: string | null): RunnerPrerequisite[] | null {
   return parsed.success ? parsed.data : null;
 }
 
-/**
- * 러너 상태 확인 결과를 쓴다(0016). Online 여부, 확인 시각, 오류, 러너 쪽 프로젝트 목록,
- * 할당을 막는 필수 조건이 깨졌는지(core isAssignmentBlocked, Q82.14)와 필수 조건 하나하나의 결과
- * (프로젝트별 GitHub 인증, Q82.15)를 바꾼다. 러너에 닿지 못해 프로젝트 목록이나 필수 조건을 읽지
- * 못했으면 null로 줘 이전 값을 남긴다. `prerequisites`를 주지 않아도 이전 값을 남긴다.
- * `assignmentBlocked`는 `prerequisites`로 계산한 값(core isAssignmentBlocked)을 준다.
- */
 export function recordRunnerCheck(
   db: Database,
   input: {
@@ -307,9 +279,6 @@ export function listRunners(db: Database): StoredRunner[] {
     }));
 }
 
-/**
- * 러너 어댑터가 만들거나 확인한 우편함을 쓴다(core Runner.ensureMailbox, Q82.1). 바뀌었을 때만 쓰면 된다.
- */
 export function setRunnerMailbox(
   db: Database,
   runnerId: RunnerId,
@@ -318,7 +287,6 @@ export function setRunnerMailbox(
   db.update(runners).set({ mailboxRef: mailbox }).where(eq(runners.id, runnerId)).run();
 }
 
-/** core 할당·대기열 판단에 넘기는 러너 모습 */
 export function listRunnerSnapshots(db: Database): RunnerSnapshot[] {
   return listRunners(db).map((runner) => ({
     id: runner.id,
@@ -328,8 +296,6 @@ export function listRunnerSnapshots(db: Database): RunnerSnapshot[] {
     projects: runner.projects.map((p) => p.id),
   }));
 }
-
-// ---------- Workspace, 트래커 프로젝트, Mapping, Auto-assign Label ----------
 
 export const DEFAULT_MAX_RUN_MS = 2 * 60 * 60 * 1000;
 
@@ -367,10 +333,6 @@ export interface StoredWorkspaceTrackerProject {
   inProgressStateId: TrackerStateId | null;
 }
 
-/**
- * 트래커 프로젝트를 Workspace에 묶는다. 이미 다른 Workspace에 묶인 트래커 프로젝트면 false를
- * 돌려주고 바꾸지 않는다(ADR 0006). 같은 Workspace면 이름과 "In Progress" 상태를 고친다.
- */
 export function saveWorkspaceTrackerProject(
   db: Database,
   input: StoredWorkspaceTrackerProject,
@@ -420,10 +382,6 @@ export function getWorkspaceTrackerProject(
   return row ?? null;
 }
 
-/**
- * Workspace에 묶인 트래커 프로젝트. `workspaceId`를 주면 그 Workspace 것만, 없으면 모든 Workspace 것을
- * 돌려준다. 묶은 순서가 아니라 트래커 연결, 이름 순서다.
- */
 export function listWorkspaceTrackerProjects(
   db: Database,
   workspaceId?: WorkspaceId,
@@ -448,12 +406,6 @@ export function listWorkspaceTrackerProjects(
     .all();
 }
 
-/**
- * 트래커 프로젝트를 Workspace에서 뺀다. 그 Workspace에 묶여 있을 때만 빼고 true를 돌려준다.
- * 그 트래커 프로젝트의 Mapping은 외래 키로 함께 지워진다. 런은 트래커 프로젝트를 외래 키로 묶지 않아
- * 지난 런과 통계는 남는다(schema `runs.trackerProjectId`). 그 Mapping을 쓰던 Queued 런은 대기열 맨 앞에
- * 오면 시작할 수 없음으로 끝난다(Q82.16).
- */
 export function removeWorkspaceTrackerProject(
   db: Database,
   input: { workspaceId: WorkspaceId; connection: TrackerConnectionId; projectId: TrackerProjectId },
@@ -477,11 +429,9 @@ export interface StoredMapping {
   trackerProject: TrackerProjectId;
   runnerProject: RunnerProjectId;
   agent: AgentId;
-  /** 에이전트 모델(0043). null 이면 정하지 않았다(러너 설정, 그다음 러너 도구의 기본값) */
   model: string | null;
 }
 
-/** Mapping 을 저장한다. model 을 주지 않으면 정하지 않은 것(null)으로 저장한다 */
 export function saveMapping(
   db: Database,
   input: Omit<StoredMapping, "model"> & { model?: string | null },
@@ -561,26 +511,17 @@ export function getAutoAssignLabel(
   return row?.labelId ?? null;
 }
 
-// ---------- 설치 설정 ----------
-
 const INSTALL_SETTINGS_ROW = 1;
 
 export interface InstallAddresses {
-  /** 다른 기기에서 열 주소(origin). 정하지 않았으면 null */
   webAddress: string | null;
-  /** webhook 공개 주소(origin). 정하지 않았으면 null */
   webhookAddress: string | null;
 }
 
 export interface StoredInstallSettings extends InstallAddresses {
-  /** 설치마다 만든 임의 ID(신원 확인 경로, 티켓 0048) */
   instanceId: string;
 }
 
-/**
- * 설치 설정을 읽는다. 행이 없으면 새 설치 ID로 만든다. 거의 모든 요청이 부르므로(Host 검사) 행이 있으면 읽기만 한다.
- * 두 프로세스가 함께 만들어도 한쪽만 들어가고(`onConflictDoNothing`), 다시 읽어 같은 ID를 본다.
- */
 export function getInstallSettings(db: Database): StoredInstallSettings {
   const read = () =>
     db
@@ -603,7 +544,6 @@ export function getInstallSettings(db: Database): StoredInstallSettings {
   return created;
 }
 
-/** 두 주소를 함께 저장한다. 값 검사(origin 모양)는 부르는 쪽이 경계에서 한다 */
 export function saveInstallAddresses(db: Database, input: InstallAddresses, now: Date): void {
   const { instanceId } = getInstallSettings(db);
   db.insert(installSettings)

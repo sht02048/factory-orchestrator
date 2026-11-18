@@ -1,8 +1,3 @@
-/*
- * 앱이 직접 그리는 화면(첫 실행 모드 선택, 서버 찾기, 주소 입력, 닿지 않음, 로컬 서버 상태)의 상태와 화면이 부르는
- * 행동. main 이 상태를 정하고 renderer 는 그리기만 한다. preload 가 둘 사이를 잇는다.
- */
-
 export type ConnectError = "invalid" | "unreachable" | "not-ours" | "host-not-allowed";
 
 export interface FoundServerView {
@@ -42,6 +37,5 @@ export interface DesktopApi {
   chooseMode(): Promise<void>;
 }
 
-/** ipc 채널 이름. 행동 이름 앞에 붙인다 */
 export const IPC_PREFIX = "desktop:";
 export const VIEW_CHANNEL = "desktop:view";

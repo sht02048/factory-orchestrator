@@ -1,7 +1,3 @@
-// 시험용 서버 CLI. 서버 배포물의 `cli.js` 자리에 넣어 `init`·`start` 의 바깥 동작만 흉내 낸다(apps/desktop 시험).
-// - init: home 에 부팅 설정 .env 를 쓴다(포트는 FAKE_PORT).
-// - start: home 의 server.lock 을 쥐고(apps/cli server-lock 과 같은 모양), worker 자리 자식을 같은 그룹에 띄우고,
-//   /api/identity 로 답한다. SIGTERM 을 받으면 자식을 멈추고 잠금을 놓고 끝난다. 사건은 home/events.log 에 남긴다.
 import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -33,7 +29,6 @@ const port = Number(/WEB_PORT="(\d+)"/.exec(readFileSync(join(home, ".env"), "ut
 const url = `http://127.0.0.1:${port}`;
 const lockPath = join(home, "server.lock");
 /**
- * 잠금 주인이 살아 있는가. apps/cli server-lock 처럼 잠금을 쓴 뒤에 시작한 프로세스(pid 재사용)는 주인이 아니다.
  * @param {number} pid
  * @param {string} startedAt
  */
@@ -84,7 +79,6 @@ for (let attempt = 0; ; attempt += 1) {
       log("refused");
       process.exit(1);
     }
-    // 막 만든 잠금은 내용을 쓰기 전에 읽힐 수 있다. 읽지 못하면 지우지 않고 다시 본다.
     if (holder === undefined) {
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
       continue;
@@ -94,13 +88,10 @@ for (let attempt = 0; ; attempt += 1) {
 }
 log("start");
 
-// 자식 명령 줄에 이 파일 경로를 남긴다. 실제 web·worker 가 배포물 폴더 경로로 뜨는 것과 같게, 앱이 남은 자식을
-// 고를 때 쓴다.
 const self = import.meta.filename;
 const worker = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)", self], {
   stdio: "ignore",
 });
-// FAKE_WEB_CHILD=1: 실제 start 처럼 web 을 따로 띄운다. start 가 SIGKILL 로 끝나면 이 web 이 남아 포트에서 답한다.
 const webChild =
   process.env.FAKE_WEB_CHILD === "1"
     ? spawn(

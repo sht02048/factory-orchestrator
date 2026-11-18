@@ -12,11 +12,6 @@ import { readServerLock, serverLockPath } from "./server-lock.js";
 import { StartError, start, webUrl } from "./start.js";
 import type { Started } from "./start.js";
 
-/*
- * start의 순서와 감독을 본다. web·worker 자리에는 받은 부팅 값으로 뜨는 작은 Node 스크립트를 넣는다.
- * 실제 빌드 산출물로 띄우는 확인은 빌드 뒤에 도는 `pnpm smoke:cli`가 한다(CI는 test 뒤에 build한다).
- */
-
 let dir: string;
 let started: Started | undefined;
 
@@ -42,7 +37,6 @@ function freePort(): Promise<number> {
   });
 }
 
-/** 바인딩 주소에서 받은 DATABASE_PATH를 돌려주는 web 자리 */
 const FAKE_WEB = `
 import { createServer } from "node:http";
 const server = createServer((_req, res) => res.end(JSON.stringify({ databasePath: process.env.DATABASE_PATH })));
@@ -154,7 +148,6 @@ describe("start", () => {
     const home = join(dir, "home");
     init({ home, port: String(await freePort()) });
     const abort = new AbortController();
-    // web 자리는 바로 응답하므로, 마이그레이션 직후 신호를 보내 첫 응답보다 먼저 닿게 한다.
     const pending = start({
       home,
       env: {},
@@ -180,7 +173,6 @@ describe("start", () => {
     const home = join(dir, "home");
     init({ home, port: String(await freePort()) });
     started = await start({ home, env: {}, layout: fakeLayout(), onOutput: quiet });
-    // 잠금은 pid 로 산 프로세스를 가린다. 다른 프로세스가 쥔 것처럼 살아 있는 다른 pid 를 적는다.
     const lock = readServerLock(home);
     if (lock === undefined) throw new Error("lock missing");
     writeFileSync(serverLockPath(home), JSON.stringify({ ...lock, pid: process.ppid }));

@@ -1,8 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { colors, fontSize, motion, radius, shadow, space } from "../tokens.stylex";
 
-// Menu·Select 처럼 떠 있는 목록이 함께 쓰는 모양.
-
 const popIn = stylex.keyframes({
   from: { opacity: 0, transform: "scale(0.97) translateY(-2px)" },
   to: { opacity: 1, transform: "none" },
@@ -19,7 +17,6 @@ export const popupStyles = stylex.create({
     overflow: "auto",
     margin: 0,
     padding: space.s1,
-    // UI SDK 팝업은 popover 요소라 브라우저 기본 테두리가 붙는다. 테두리는 그림자 토큰이 맡는다.
     borderWidth: 0,
     borderRadius: radius.control,
     backgroundColor: colors.bgRaised,

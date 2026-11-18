@@ -4,18 +4,6 @@ import { createContext, use, type ReactNode } from "react";
 import { cx } from "../cx";
 import { colors, fontSize, fontWeight, motion, radius, space } from "../tokens.stylex";
 
-/*
- * 밑줄 탭. 목록 위 필터(전체·손댈 일·실행 중 …)와 화면 안 보기 전환에 쓴다.
- *
- * <Tabs value={f} onValueChange={setF} label="상태로 거르기">
- *   <Tab value="all" count={42}>전체</Tab>
- *   <Tab value="todo" count={3} attention>손댈 일</Tab>
- * </Tabs>
- * <TabPanel value="all">…</TabPanel>  // Tabs 의 panels 로 넘긴다
- *
- * variant="chips" 는 둥근 칩 줄이다(Runs 의 상태 칩 필터, ADR 0010). 고른 칩만 밝은 면이다.
- */
-
 export type TabsVariant = "underline" | "chips";
 
 const VariantContext = createContext<TabsVariant>("underline");
@@ -23,13 +11,9 @@ const VariantContext = createContext<TabsVariant>("underline");
 export interface TabsProps<T extends string> {
   value: T;
   onValueChange: (value: T) => void;
-  /** 탭 목록의 접근 가능한 이름. */
   label: string;
-  /** Tab 들. */
   children: ReactNode;
-  /** TabPanel 들. 목록 아래에 놓인다. */
   panels?: ReactNode;
-  /** 기본은 밑줄 탭. chips 는 상태 칩 필터. */
   variant?: TabsVariant;
 }
 
@@ -64,9 +48,7 @@ export function Tabs<T extends string>({
 export interface TabProps {
   value: string;
   children: ReactNode;
-  /** 탭 옆 개수. */
   count?: number;
-  /** 손댈 일이 있는 탭. 개수를 밝고 굵게 보인다(색은 쓰지 않는다). */
   attention?: boolean;
 }
 
@@ -110,7 +92,6 @@ export function TabPanel({ value, children }: { value: string; children: ReactNo
 const styles = stylex.create({
   list: {
     display: "flex",
-    // 영어 상태 이름(ADR 0010)이 길어 탭이 넘치면 줄바꿈 대신 가로로 스크롤한다.
     overflowX: "auto",
     scrollbarWidth: "none",
     gap: space.s5,
@@ -163,7 +144,6 @@ const styles = stylex.create({
     lineHeight: "32px",
     transitionProperty: "color, background-color",
   },
-  // 칩의 개수는 칩 글자색을 따라 흐리게 둔다(고른 칩의 밝은 면 위에서도 읽힌다).
   chipCount: { opacity: 0.6 },
   chipAttention: { opacity: 1, fontWeight: fontWeight.semibold },
   chipSelected: {

@@ -13,10 +13,6 @@ const t = createTranslator({
   namespace: "settings",
 });
 
-/**
- * Settings: 이 Workspace(현재 ws) / 설치 전체(ADR 0006·0007). 고른 항목(sel)은 주소에 남는다.
- * 저장하면 화면 값을 다시 읽는다(useSettingsActions).
- */
 export const Route = createFileRoute("/_app/settings")({
   validateSearch: z.object({ sel: z.string().optional() }),
   loaderDeps: ({ search }) => ({ ws: search.ws }),

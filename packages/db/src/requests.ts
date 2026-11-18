@@ -5,12 +5,6 @@ import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";
 import { logTailRequests, runCancelRequests, runnerCheckRequests, runs } from "./schema.js";
 
-// ---------- web이 남기는 요청(Q61) ----------
-
-/**
- * 요청 하나의 모습. web이 남기고 worker가 처리해 결과를 쓴다. 대상마다 하나이고 다음 요청이 덮어쓴다.
- * `pending`은 요청을 받았지만 아직 결과가 없다는 뜻이다.
- */
 export type RequestStatus<T> =
   | { status: "pending"; requestedAt: Date }
   | { status: "done"; requestedAt: Date; completedAt: Date; result: T }
@@ -28,7 +22,6 @@ function toStatus<T>(row: {
   return { status: "done", requestedAt, completedAt, result: row.result };
 }
 
-/** Run 상세가 로그 꼬리를 요청한다(0022). 결과를 지우고 다시 기다린다. */
 export function requestLogTail(db: Database, runId: RunId, now: Date = new Date()): void {
   db.insert(logTailRequests)
     .values({ runId, requestedAt: now })
@@ -39,7 +32,6 @@ export function requestLogTail(db: Database, runId: RunId, now: Date = new Date(
     .run();
 }
 
-/** 처리할 로그 꼬리 요청(0017) */
 export function listPendingLogTailRequests(
   db: Database,
 ): Array<{ runId: RunId; requestedAt: Date }> {
@@ -51,9 +43,6 @@ export function listPendingLogTailRequests(
     .all();
 }
 
-/**
- * 로그 꼬리 요청의 결과를 쓴다. 처리하는 동안 새 요청이 왔으면(`requestedAt`이 다르면) 쓰지 않는다.
- */
 export function completeLogTailRequest(
   db: Database,
   input: { runId: RunId; requestedAt: Date; completedAt: Date } & (
@@ -85,7 +74,6 @@ export function getLogTailRequest(db: Database, runId: RunId): RequestStatus<str
   return row === undefined ? null : toStatus({ ...row, result: row.lines ?? [] });
 }
 
-/** 온보딩·Settings가 러너 확인을 요청한다(0025·0026). */
 export function requestRunnerCheck(db: Database, runnerId: RunnerId, now: Date = new Date()): void {
   db.insert(runnerCheckRequests)
     .values({ runnerId, requestedAt: now })
@@ -136,10 +124,6 @@ export function completeRunnerCheckRequest(
   );
 }
 
-/**
- * 러너 확인 결과. 결과는 JSON으로 저장한 RunnerHealth이고, 날짜는 문자열로 돌아온다.
- * 화면이 쓰는 형태로 파싱하는 일은 읽는 쪽이 맡는다(경계 파싱).
- */
 export function getRunnerCheckRequest(
   db: Database,
   runnerId: RunnerId,
@@ -154,17 +138,10 @@ export function getRunnerCheckRequest(
   return toStatus({ ...row, result });
 }
 
-// ---------- 런 취소 요청(Q77·Q82.8) ----------
-
 export type RequestRunCancelResult =
   | { ok: true; requestedAt: Date }
   | { ok: false; reason: "not-found" | "already-ended" };
 
-/**
- * 운영자가 런 취소를 요청한다(web, 스펙 3절 6번). 끝나지 않은 런(Queued·Running·Waiting for Input·
- * Disconnected)이면 받아들이고, Ended 런이면 거부한다(core planCancel). 이미 처리하지 않은 요청이 있으면
- * 그 요청을 그대로 둔다(처음 요청 시각을 남긴다).
- */
 export function requestRunCancel(
   db: Database,
   runId: RunId,
@@ -185,7 +162,6 @@ export function requestRunCancel(
   });
 }
 
-/** 처리하지 않은 취소 요청. 요청 순서다(worker, 0016). 화면의 "취소 중"도 이것으로 안다(Q82.21). */
 export function listPendingCancelRequests(
   db: Database,
 ): Array<{ runId: RunId; requestedAt: Date }> {
@@ -197,9 +173,6 @@ export function listPendingCancelRequests(
     .all();
 }
 
-/**
- * 런의 취소 요청. 처리했든 안 했든 돌려준다(Run 상세 타임라인, 0022). 요청이 없으면 null이다.
- */
 export function getRunCancelRequest(
   db: Database,
   runId: RunId,
@@ -216,7 +189,6 @@ export function getRunCancelRequest(
   );
 }
 
-/** 런에 처리하지 않은 취소 요청이 있는지(취소 중). */
 export function hasPendingCancelRequest(db: Database, runId: RunId): boolean {
   return (
     db
@@ -227,10 +199,6 @@ export function hasPendingCancelRequest(db: Database, runId: RunId): boolean {
   );
 }
 
-/**
- * 취소 요청을 처리했다고 표시한다. 한 번만 참이다: 이미 표시했거나 요청이 없으면 false라, 둘이 함께
- * 처리하려 해도 한쪽만 처리한다. 런을 끝낸 쓰기와 같은 트랜잭션에서 부른다.
- */
 export function markCancelRequestProcessed(
   db: Database,
   runId: RunId,

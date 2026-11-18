@@ -10,26 +10,11 @@ import type { Identity, Probe } from "./identity.js";
 import { probeIdentity } from "./identity.js";
 import type { ServerBundle } from "./server-bundle.js";
 
-/*
- * 이 기계의 서버(②)를 찾고, 띄우고, 멈춘다(티켓 0046).
- *
- * - ②는 앱의 자식이 아니다. 앱 실행 파일을 Node 로(ELECTRON_RUN_AS_NODE) 써서 서버 배포물의 CLI `start` 를
- *   새 세션(detached, 자기 프로세스 그룹)으로 띄우고 놓는다. 앱이 끝나거나 다시 떠도 ②는 계속 돈다.
- * - 도는 서버는 home 의 잠금 파일(`start` 가 쥔다, apps/cli/src/server-lock.ts)로 찾는다. 같은 home 에는 `start` 가
- *   하나만 뜬다. 잠금을 쥔 프로세스가 이 앱이 띄운 것(기록한 pid)이면 앱이 켜고 끄며, 아니면(③ 헤드리스 서비스,
- *   터미널의 `start`) 붙어서 상태만 본다.
- * - 앱이 띄운 ②의 서버 코드가 앱에 실린 배포물과 다르면(앱 업데이트) 옛 ②를 멈추고 새 ②를 띄운다. 옛 `start` 가
- *   끝나 잠금을 놓은 뒤에 새 `start` 를 띄우므로 worker 가 두 벌 돌지 않는다. 마이그레이션은 새 `start` 가 돌린다.
- */
-
-/** 앱이 띄운 ②의 기록. 앱 데이터 폴더에 둔다 */
 export const spawnRecordSchema = z.object({
   pid: z.number().int().positive(),
   buildId: z.string(),
   home: z.string(),
-  /** 띄운 시각(ISO 8601). pid 가 다른 프로세스에 다시 쓰였는지(재부팅 등) 시작 시각으로 가린다 */
   spawnedAt: z.string(),
-  /** 띄운 서버 배포물 폴더. 남은 web·worker 를 치울 때 이 폴더에서 뜬 프로세스만 멈춘다 */
   root: z.string(),
 });
 export type SpawnRecord = z.infer<typeof spawnRecordSchema>;
@@ -56,7 +41,6 @@ export function fileRecordStore(path: string): RecordStore {
   };
 }
 
-/** app: 이 앱이 띄운 ②. external: ③이나 터미널에서 띄운 서버. 앱은 상태만 본다 */
 export type Owner = "app" | "external";
 
 export type LocalStatus =
@@ -65,7 +49,6 @@ export type LocalStatus =
   | {
       state: "running";
       owner: Owner;
-      /** 잠금 없이 포트로만 찾은 서버면 모른다 */
       pid: number | undefined;
       url: string;
       identity: Identity;
@@ -75,10 +58,8 @@ export type EnsureResult =
   | {
       kind: "running";
       status: Extract<LocalStatus, { state: "running" }>;
-      /** 앱에 실린 서버 코드로 옛 ②를 바꿨다 */
       replaced: boolean;
     }
-  /** 이 home 에 헤드리스 서비스(③)가 등록돼 있지만 아직 돌지 않는다. 서비스 관리자가 띄우므로 ②를 띄우지 않는다 */
   | { kind: "service-not-running" }
   | { kind: "failed"; reason: string };
 
@@ -87,14 +68,10 @@ export type StopResult = { ok: true } | { ok: false; reason: "not-owned" };
 export interface LocalServerOptions {
   home: string;
   bundle: Pick<ServerBundle, "cliEntry" | "buildId">;
-  /** ②를 돌릴 Node. 앱은 자기 실행 파일과 ELECTRON_RUN_AS_NODE=1 을 준다 */
   node: { command: string; env: Readonly<Record<string, string | undefined>> };
   records: RecordStore;
-  /** ②의 표준 출력·오류를 덧붙여 쓰는 파일 */
   logFile: string;
-  /** 서버 배포물 폴더. 기록에 남겨 남은 web·worker 를 가린다 */
   bundleRoot?: string;
-  /** 이 home 에 ③이 등록돼 있는가 */
   serviceInstalled?: () => boolean;
   probe?: Probe;
   readyTimeoutMs?: number;
@@ -103,7 +80,6 @@ export interface LocalServerOptions {
 }
 
 export const READY_TIMEOUT_MS = 60_000;
-/** `start` 는 자식을 15초 안에 멈추고 넘기면 SIGKILL 한다(apps/cli start.ts). 그보다 조금 길게 기다린다 */
 export const STOP_TIMEOUT_MS = 20_000;
 
 export class LocalServer {
@@ -118,12 +94,10 @@ export class LocalServer {
     this.probe = options.probe ?? ((origin, timeoutMs) => probeIdentity(origin, timeoutMs));
   }
 
-  /** 지금 이 home 의 서버 상태. 아무것도 바꾸지 않는다 */
   async status(): Promise<LocalStatus> {
     const record = this.ownRecord();
     const lock = readLiveServerLock(this.home);
     if (lock !== undefined) {
-      // pid 만 같으면 안 된다. 재부팅 뒤 ③이 앱이 기록한 pid 를 다시 받았을 수 있다.
       const owner: Owner =
         record !== undefined && record.pid === lock.pid && recordAlive(record) ? "app" : "external";
       const probed = await this.probe(lock.url, 1_000);
@@ -133,7 +107,6 @@ export class LocalServer {
       return { state: "starting", owner, pid: lock.pid, url: lock.url };
     }
     if (record !== undefined) {
-      // 띄운 직후 잠금을 쥐기 전이다.
       if (recordAlive(record)) {
         return {
           state: "starting",
@@ -142,11 +115,8 @@ export class LocalServer {
           url: this.configuredUrl() ?? "",
         };
       }
-      // 앱이 띄운 `start` 가 SIGKILL 로 끝나 web·worker 만 남았다. 남은 web 이 포트에서 답해도 다른 서버로 보지 않고
-      // 멈춘 것으로 본다. 다시 띄울 때(launch)와 멈출 때 그룹째 치운다.
       if (leftovers(record).length > 0) return { state: "stopped" };
     }
-    // 잠금 없이 같은 포트에서 답하는 서버(잠금 파일을 쓰기 전 버전의 ③ 등)에도 붙는다. 두 벌을 띄우지 않는다.
     const url = this.configuredUrl();
     if (url !== undefined) {
       const probed = await this.probe(url, 1_000);
@@ -163,10 +133,6 @@ export class LocalServer {
     return { state: "stopped" };
   }
 
-  /**
-   * 도는 서버에 붙고, 없으면 ②를 띄운다. 앱이 띄운 ②가 다른 서버 코드면 바꾼다. ③에는 붙기만 한다.
-   * 동시에 불러도(트레이, 감시) 차례로 돈다.
-   */
   ensureRunning(): Promise<EnsureResult> {
     return this.serial(async () => {
       const current = await this.status();
@@ -184,7 +150,6 @@ export class LocalServer {
     });
   }
 
-  /** 앱이 띄운 ②만 멈춘다. ③은 서비스 관리자가 다시 띄우므로 멈추지 않는다 */
   stop(): Promise<StopResult> {
     return this.serial(async () => {
       const current = await this.status();
@@ -201,7 +166,6 @@ export class LocalServer {
     });
   }
 
-  /** `init` 으로 부팅 설정을 만든다. 이미 있으면 그대로 둔다(암호화 키를 바꾸지 않는다) */
   initHome(): { ok: true } | { ok: false; reason: string } {
     if (existsSync(homePaths(this.home).envFile)) return { ok: true };
     const result = spawnSync(
@@ -213,7 +177,6 @@ export class LocalServer {
     return { ok: false, reason: `${result.stdout}${result.stderr}`.trim() || "init failed" };
   }
 
-  /** 부팅 설정의 web 주소. 설정이 없거나 틀리면 undefined */
   configuredUrl(): string | undefined {
     try {
       return webUrl(parseBootConfig(readBootEnv(homePaths(this.home).envFile, {})));
@@ -234,7 +197,6 @@ export class LocalServer {
   }
 
   private async launch(replaced: boolean): Promise<EnsureResult> {
-    // 앞서 띄운 `start` 가 SIGKILL 로 끝났으면 그 web·worker 가 그룹에 남아 있다. 새 ②와 worker 가 두 벌 돌지 않게 먼저 치운다.
     const previous = this.ownRecord();
     if (previous !== undefined && !recordAlive(previous)) await stopLeftovers(previous);
     const init = this.initHome();
@@ -247,7 +209,6 @@ export class LocalServer {
         this.options.node.command,
         [this.options.bundle.cliEntry, "start", "--home", this.home],
         {
-          // 새 세션·프로세스 그룹으로 띄워 앱과 함께 끝나지 않게 한다. web·worker 는 이 그룹에 든다.
           detached: true,
           stdio: ["ignore", log, log],
           env: { ...this.options.node.env },
@@ -264,7 +225,6 @@ export class LocalServer {
       pid,
       buildId: this.options.bundle.buildId,
       home: this.home,
-      // 자식은 spawn 이 돌아오기 전에 이미 시작했다. 그 뒤 시각을 적어 시작 시각 비교가 늘 맞게 한다.
       spawnedAt: new Date().toISOString(),
       root: this.options.bundleRoot ?? dirname(dirname(dirname(this.options.bundle.cliEntry))),
     });
@@ -277,7 +237,6 @@ export class LocalServer {
       const current = await this.status();
       if (current.state === "running") return { kind: "running", status: current, replaced };
       if (current.state === "stopped" || current.pid !== pid) {
-        // 띄운 `start` 가 끝났다. 같은 home 에 다른 서버가 먼저 잠금을 쥐었으면 그쪽에 붙는다.
         if (!isProcessAlive(pid)) {
           if (current.state === "starting") return this.waitReady(current.pid, replaced);
           return { kind: "failed", reason: `the server exited; see ${this.options.logFile}` };
@@ -288,7 +247,6 @@ export class LocalServer {
     return { kind: "failed", reason: "the server did not respond in time" };
   }
 
-  /** SIGTERM 으로 멈추고 끝나기를 기다린다. 넘기면 그룹째 SIGKILL 한다. 남은 web·worker(그룹)도 치운다 */
   private async stopOwned(pid: number | undefined): Promise<void> {
     if (pid === undefined) return;
     signal(pid, "SIGTERM");
@@ -314,21 +272,14 @@ export class LocalServer {
 function signal(pid: number, name: NodeJS.Signals): void {
   try {
     process.kill(pid, name);
-  } catch {
-    // 이미 끝났다.
-  }
+  } catch {}
 }
 
-/** 기록한 ②의 `start` 가 아직 그 프로세스로 도는가(같은 pid 를 다시 받은 다른 프로세스가 아닌가) */
 function recordAlive(record: SpawnRecord): boolean {
   const since = new Date(record.spawnedAt);
   return Number.isNaN(since.getTime()) ? false : isSameProcess(record.pid, since);
 }
 
-/**
- * `start` 가 SIGKILL 로 끝나 남은 web·worker. 같은 프로세스 그룹(리더 = 기록한 `start` pid)이면서 기록한 서버
- * 배포물 폴더에서 뜬 프로세스만 고른다. pid 를 다시 받은 관계없는 그룹은 고르지 않는다.
- */
 function leftovers(record: SpawnRecord): number[] {
   let out: string;
   try {

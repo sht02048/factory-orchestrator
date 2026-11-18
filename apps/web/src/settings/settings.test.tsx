@@ -52,11 +52,6 @@ import type { SettingsItem, SettingsPage } from "./model";
 import { SettingsScreen } from "./settings-screen";
 import type { SettingsActions } from "./settings-screen";
 
-/*
- * Settings(0025). 가상 값만 쓴다(acme, example.com).
- * 트래커·코드 호스트는 가짜 어댑터 하나를 등록표에 넣어 쓴다. 넘겨받은 설정은 기록한다.
- */
-
 const now = new Date("2026-11-17T09:00:00Z");
 const commerce = toWorkspaceId("ws-commerce");
 const labs = toWorkspaceId("ws-labs");
@@ -68,7 +63,6 @@ interface Fixture {
   context: SettingsContext;
   tracker: FakeTracker;
   codeHost: FakeCodeHost;
-  /** 어댑터를 만들 때 받은 설정 */
   trackerConfigs: unknown[];
 }
 
@@ -161,7 +155,6 @@ function render(page: SettingsPage, selected: SettingsItem): string {
   );
 }
 
-/** 편집 영역(aside) 안의 글 */
 function panelText(html: string): string {
   const panel = html.split("<aside")[1] ?? "";
   return panel
@@ -263,7 +256,6 @@ describe("Settings 저장하고 다시 열기", () => {
     ]);
     expect(page.runnerProjects).toEqual([{ id: repo, name: "acme/web" }]);
 
-    // 다시 연 화면이 저장한 값을 채워 보인다
     const general = render(page, "general");
     expect(general).toContain('value="Acme Store"');
     expect(general).toContain('value="90"');
@@ -331,7 +323,6 @@ describe("Settings 저장하고 다시 열기", () => {
     const page = await loadSettingsPage(f.context, commerce, now);
     expect(page.install.connections).toEqual([]);
     expect(page.install.githubToken).toBe(false);
-    // 확인할 때 어댑터는 입력한 키를 받았다
     expect(f.trackerConfigs).toEqual([
       { config: {}, secrets: { apiKey: "wrong", webhookSecret: null } },
     ]);
@@ -357,7 +348,6 @@ describe("Settings 저장하고 다시 열기", () => {
     expect(text).toContain("에이전트 설정에서 미리 허용해 두세요");
     expect(text).toContain("러너 쪽 프로젝트");
     expect(text).not.toContain("러너 이름");
-    // 모델은 선택 칸이고, 비우면 러너 설정이나 러너 Orca 의 기본값을 쓴다고 안내한다(0043)
     expect(text).toContain("모델");
     expect(text).toContain("러너 Orca의 기본값");
   });
@@ -373,7 +363,6 @@ describe("Settings 저장하고 다시 열기", () => {
 
     expect(saveMappingSetting(f.context, { ...mapping, model: "sonnet" })).toEqual({ ok: true });
     expect((await saved())?.mapping?.model).toBe("sonnet");
-    // 지우고 저장하면 정하지 않은 것으로 돌아간다
     expect(saveMappingSetting(f.context, { ...mapping, model: "" })).toEqual({ ok: true });
     expect((await saved())?.mapping?.model).toBeNull();
 
@@ -472,7 +461,6 @@ describe("주소(0048)", () => {
         remote,
       ),
     ).toEqual({ ok: true });
-    // 127.0.0.1 로 연 화면은 어떤 값을 넣어도 막히지 않는다
     expect(
       saveAddresses(
         f.context,
@@ -497,7 +485,6 @@ describe("트래커 프로젝트는 Workspace 하나에만", () => {
       }),
     ).toEqual({ ok: true });
 
-    // 다른 Workspace 에서 넣으려 하면 거절한다
     expect(
       addTrackerProject(f.context, {
         ws: labs,
@@ -507,7 +494,6 @@ describe("트래커 프로젝트는 Workspace 하나에만", () => {
       }),
     ).toEqual({ ok: false, reason: "taken" });
 
-    // 다른 Workspace 의 화면에는 묶인 Workspace 가 보이고 넣기 버튼이 꺼져 있다
     const page = await loadSettingsPage(f.context, labs, now);
     expect(page.workspace?.trackerProjects[0]?.projects).toEqual([
       {
@@ -526,7 +512,6 @@ describe("트래커 프로젝트는 Workspace 하나에만", () => {
     const labRow = html.split("<li").find((chunk) => chunk.includes(">Lab<")) ?? "";
     expect(labRow).not.toMatch(/<button[^>]*disabled/);
 
-    // 다른 Workspace 에서는 뺄 수도 없다
     expect(
       removeTrackerProject(f.context, {
         ws: labs,
@@ -559,7 +544,6 @@ describe("트래커 프로젝트는 Workspace 하나에만", () => {
       mappings: 1,
       queuedRuns: 2,
     });
-    // 빼기는 위험 행동이라 빨간 글자 보조 버튼이다(ADR 0010 6번)
     expect(render(before, "projects")).toMatch(
       /<button[^>]*data-variant="danger"[^>]*>빼기<\/button>/,
     );
@@ -645,7 +629,6 @@ describe("러너 확인", () => {
     expect(hasPendingRunnerChecks(f.context.db)).toBe(true);
     await checked(f, runnerId, { result: health() });
     expect(hasPendingRunnerChecks(f.context.db)).toBe(false);
-    // 연결이 없으니 트래커 어댑터를 만든 적이 없다(가벼운 읽기는 DB 만 본다)
     expect(f.trackerConfigs).toEqual([]);
   });
 
@@ -768,7 +751,6 @@ describe("러너 확인", () => {
       projects: [{ id: repo, displayName: "acme/web", setupState: "ready" }],
       assignmentBlocked: true,
     });
-    // 이름과 안내는 runner-orca 어댑터가 주는 영어 문자열 그대로다
     const page = await checked(f, runnerId, {
       result: health({
         prerequisites: [
@@ -805,9 +787,7 @@ describe("러너 확인", () => {
     });
     const text = panelText(render(page, "runners"));
     expect(text).toContain("Orca 상시 서비스 갖추지 못했어요");
-    // 설치 명령은 언어가 없는 명령이라 그대로 보인다
     expect(text).toContain("/usr/local/bin/orca serve service install");
-    // 러너 쪽 프로젝트 표시 이름을 넣고, 찾지 못하면 프로젝트 ID 를 넣는다
     expect(text).toContain("GitHub push 권한: acme/web 갖추지 못했어요");
     expect(text).toContain("GitHub push 권한: github:acme/gone 갖췄어요");
     expect(text).toContain("Disk space 갖췄어요");

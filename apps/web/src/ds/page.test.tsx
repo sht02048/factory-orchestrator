@@ -7,7 +7,6 @@ import { DesignSystemPage } from "./page";
 const messages = dsMessages;
 
 function renderPage(): string {
-  // 메시지 키가 없거나 인자가 틀리면 테스트를 깨뜨린다.
   return renderWithMessages(<DesignSystemPage />, dsMessages);
 }
 
@@ -42,7 +41,6 @@ describe("/ds 서버 렌더", () => {
     expect(html).toContain(messages.ds.title);
     expect(html).toContain(messages.ds.buttons.primary);
     expect(html).toContain(messages.ds.table.rows.r1051.title);
-    // 메시지 키가 그대로 새어 나오지 않는다.
     expect(html).not.toMatch(/ds\.(nav|buttons|table)\./);
   });
 });

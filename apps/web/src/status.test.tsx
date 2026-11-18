@@ -21,12 +21,6 @@ import { pillsOf } from "./testing/pills";
 import { renderWithMessages } from "./testing/render";
 import { now, seedDatabase } from "./testing/seed";
 
-/*
- * 화면 낱말(ADR 0010 1·3번). 상태·종류 이름은 GLOSSARY 영어 용어, 메뉴·화면 이름은 영어 화면 이름이다.
- * 렌더 결과 전체를 낱말로 거르지 않는다. 에이전트 결과("러너 연결 끊김")처럼 한국어로 두는 설명 값이 있다.
- */
-
-/** 상태 값 → GLOSSARY 영어 용어 */
 const TERMS: Record<PillStatus, string> = {
   queued: "Queued",
   running: "Running",
@@ -162,7 +156,6 @@ describe("상태 표시 컴포넌트는 StatusPill 하나다(ADR 0010 4번)", ()
     const offenders = files(root)
       .filter((file) => /statusTone\(|data-status=/.test(readFileSync(file, "utf8")))
       .map((file) => relative(root, file))
-      // /ds 는 디자인 시스템 미리보기라 알약의 색 이름을 함께 보인다. testing/ 은 알약을 읽는 시험 도구다.
       .filter((file) => !file.startsWith("ds/") && !file.startsWith("testing/"));
     expect(offenders).toEqual([]);
   });

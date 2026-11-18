@@ -71,7 +71,6 @@ describe("loadRunDetail", () => {
       summary: "canceled",
       worktreeNeedsManualRemoval: true,
     });
-    // 러너에 닿아 끝난 취소는 PR 이 열려 있으면 남길 뿐 사람이 지울 일이 없다
     expect(detail(db, extra.get("ACME-21")).status).toMatchObject({
       worktreeNeedsManualRemoval: false,
     });
@@ -80,7 +79,6 @@ describe("loadRunDetail", () => {
   it("시작하지 않고 끝난 런은 브랜치·워크트리가 없고 실행 시간이 0 이다(Q82.10·Q82.20)", () => {
     const { db } = seedDatabase();
     const extra = addExtraEnded(db);
-    // ACME-23: 230분에 할당, 231분에 Queued 에서 취소
     expect(detail(db, extra.get("ACME-23"))).toMatchObject({
       branch: null,
       worktree: null,
@@ -124,7 +122,6 @@ describe("loadRunDetail", () => {
     const { db, ids } = seedDatabase();
     const id = ids.get("ACME-5");
     expect(detail(db, id).status).toMatchObject({ worktreeNeedsManualRemoval: true });
-    // 그 밖의 결과는 사람이 지울 일이 없다
     expect(detail(db, ids.get("ACME-3")).status).toMatchObject({
       worktreeNeedsManualRemoval: false,
     });
@@ -182,12 +179,10 @@ describe("loadRunDetail", () => {
 
   it("대기 시간과 실행 시간을 나눠 담는다(Q59)", () => {
     const { db, ids } = seedDatabase();
-    // ACME-2: 2분에 할당, 3분에 시작, 32분에 끝남
     expect(detail(db, ids.get("ACME-2"))).toMatchObject({
       waitMs: 60_000,
       executionMs: 29 * 60_000,
     });
-    // Queued 는 지금까지 기다렸고 실행 시간이 없다
     expect(detail(db, ids.get("ACME-13"))).toMatchObject({ executionMs: null, worktree: null });
   });
 
@@ -321,7 +316,6 @@ describe("질문과 답(Q82.3)", () => {
     return { db, id };
   }
 
-  /** server function 과 같은 경계 검증을 거쳐 답한다 */
   function answer(db: Database, runId: string, questionId: string, text: string, at: number) {
     submitAnswer(db, answerInput.parse({ runId, questionId, answer: text }), minutes(at));
   }
@@ -347,7 +341,6 @@ describe("질문과 답(Q82.3)", () => {
     expect(listRunQuestions(db, id).map((q) => q.answer)).toEqual([
       { text: "돌려 주세요", answeredAt: minutes(61), sentAt: null },
     ]);
-    // 한 질문에 답은 하나다
     expect(() => answer(db, id, "q-1", "멈춰 주세요", 62)).toThrow(AnswerRejectedError);
     expect(listRunQuestions(db, id)).toHaveLength(1);
 
@@ -429,7 +422,6 @@ describe("취소(Q77·Q82.8·Q82.21)", () => {
       if (id === undefined) throw new Error(`no ${key}`);
       expect(detail(db, id).cancelPending).toBe(false);
       expect(cancelRunRequest(db, id, minutes(100))).toEqual({ ok: true });
-      // 두 번 눌러도 요청은 하나다
       expect(cancelRunRequest(db, id, minutes(101))).toEqual({ ok: true });
       const run = detail(db, id);
       expect(run.cancelPending).toBe(true);
@@ -463,7 +455,6 @@ describe("취소(Q77·Q82.8·Q82.21)", () => {
     const run = detail(db, id);
     expect(run.cancelPending).toBe(false);
     expect(run.status).toMatchObject({ agentResult: "canceled", summary: "canceled" });
-    // 처리한 뒤에도 언제 취소를 요청했는지 타임라인에 남는다
     expect(run.timeline.slice(-2)).toEqual([
       { kind: "cancel-requested", at: minutes(100).toISOString() },
       { kind: "ended", agentResult: "canceled", at: minutes(101).toISOString() },

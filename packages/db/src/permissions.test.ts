@@ -37,7 +37,6 @@ describe("권한 대기와 거절 요청 (Q82.4·Q82.5)", () => {
     const wait = { id: p1, detail: "Bash(touch a.txt)", requestedAt };
 
     expect(recordPermissionWaits(db, id, [wait])).toBe(1);
-    // 러너는 메일을 소비하지 않아 같은 대기가 다시 온다.
     expect(recordPermissionWaits(db, id, [wait])).toBe(0);
     expect(listUnsentDenials(db)).toEqual([]);
 
@@ -76,7 +75,6 @@ describe("권한 대기와 거절 요청 (Q82.4·Q82.5)", () => {
       { id: p2, detail: "b", requestedAt },
     ]);
     const at = new Date("2026-11-17T02:00:00Z");
-    // 러너에서 p1을 허용해 p2만 남았다
     expect(resolvePermissionWaits(db, id, [p2], at)).toBe(1);
     expect(resolvePermissionWaits(db, id, [p2], at)).toBe(0);
     expect(listRunPermissionWaits(db, id).map((w) => [w.id, w.resolvedAt])).toEqual([
@@ -87,7 +85,6 @@ describe("권한 대기와 거절 요청 (Q82.4·Q82.5)", () => {
       ok: false,
       reason: "resolved",
     });
-    // 열린 대기가 없으면 모두 닫는다
     expect(resolvePermissionWaits(db, id, [], at)).toBe(1);
   });
 

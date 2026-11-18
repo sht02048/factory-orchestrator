@@ -1,7 +1,3 @@
-/**
- * CLI가 터미널에 쓰는 문구. 코드에 직접 쓰지 않고 여기에만 둔다(ADR 0005).
- * CLI는 설치·운영 문서와 함께 읽는 사용자 문서 쪽이라 영어로 쓴다(ADR 0005: 사용자 문서는 영어).
- */
 export const messages = {
   usage: `Usage: factory-orchestrator <command> [options]
 

@@ -18,10 +18,6 @@ import { ENDED_RUNS_PAGE_SIZE } from "./model";
 import type { QueuedReason, RunView, RunsPage } from "./model";
 import { explainQueue } from "./queue-reasons";
 
-/**
- * Runs 화면이 보일 값을 DB 에서 읽는다. 현재 Workspace(주소의 ws)의 런만 담고, 새 것부터 둔다.
- * 요약 결과는 저장하지 않으므로 core summarizeRunOutcome 으로 계산한다(Q66·Q76).
- */
 export function loadRunsPage(
   db: Database,
   ws: string | undefined,
@@ -37,7 +33,6 @@ export function loadRunsPage(
   const runners = new Map(listRunners(db).map((r) => [r.id, r]));
   const cancelling = new Set<RunId>(listPendingCancelRequests(db).map((r) => r.runId));
   const queueReasons = explainQueue({
-    // 대기열은 설치 전체에 하나다. 다른 Workspace 의 Queued 런도 순서에 든다(ADR 0006).
     queued: listRuns(db, { states: ["queued"] }).flatMap((run): QueuedRun[] =>
       run.state === "queued"
         ? [
@@ -46,7 +41,6 @@ export function loadRunsPage(
               assignedAt: run.assignedAt,
               project: run.runnerProject,
               runnerId: run.runnerId,
-              // 영영 시작할 수 없는 런은 worker 가 다음 바퀴에 끝낸다. 화면은 순서만 본다.
               unstartable: false,
             },
           ]
@@ -94,7 +88,6 @@ export function loadRunsPage(
       }).filter(({ run }) => !recentEndedIds.has(run.id))
     : [];
   const stored = [...active, ...recentEnded, ...olderAttention].toSorted(newestFirst);
-  // 티켓마다 마지막 런. 같은 티켓에 새 런이 있으면 지난 결과는 손댈 일이 아니다(Home 과 같다, Q88).
   const latestByTicket = new Map<string, RunId>();
   for (const { run } of stored.toReversed())
     latestByTicket.set(`${run.ticket.connection}\u0000${run.ticket.key}`, run.id);
@@ -154,7 +147,6 @@ export function loadRunsPage(
           agentResult: run.agentResult,
           prState: run.prState,
           summary,
-          // Human Check 런은 사람이 PR 을 병합하거나 닫으면 뺀다(Q54·Q89).
           attention: latest && isUnresolvedEndedRun(run, records),
         };
       }

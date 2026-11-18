@@ -54,25 +54,17 @@ import type { RemoteExec, RemoteResult } from "./ssh.js";
 
 export const ORCA_RUNNER_KIND: RunnerKind = toRunnerKind("orca");
 
-/** 우편함 터미널 탭 제목과 그것이 돌리는 명령. 터미널에 무엇이 입력돼도 셸 명령으로 돌지 않게 한다(research 0008 1절). */
 export const MAILBOX_TITLE = "factory-orchestrator-mailbox";
 const MAILBOX_COMMAND = "cat > /dev/null";
 const RUN_OBJECTIVE = "factory-orchestrator";
-/** GitHub 인증 확인에 쓰는 브랜치. `--dry-run`이라 만들지 않는다 */
 export const PUSH_CHECK_REF = "HEAD:refs/heads/factory-orchestrator/push-check";
-/** worktree ps 한 번에 받을 행 수. 잘리면(truncated) worktree show로 다시 확인한다 */
 const WORKTREE_PS_LIMIT = 500;
-/** worker-read 한 쪽의 메시지 수와 끝까지 읽을 때의 쪽 수 상한 */
 const LOG_PAGE_SIZE = 100;
-/** worker-list를 넘길 쪽 수의 안전 상한(에이전트 5천 개) */
 const WORKER_LIST_MAX_PAGES = 50;
-/** 끝까지 읽을 쪽 수의 안전 상한(메시지 2만 개). 닿으면 꼬리가 아니라는 줄을 맨 앞에 둔다 */
 export const LOG_MAX_PAGES = 200;
 export const LOG_CUT_MARKER = `[log tail cut: the transcript is longer than ${LOG_PAGE_SIZE * LOG_MAX_PAGES} messages, so these are not its last lines]`;
-/** 오류에 남길 출력의 최대 길이 */
 const RAW_LIMIT = 4000;
 
-/** 우편함 신원이 없거나 묶인 Run이 다르다는 오류 코드(research 0008 1절, fixtures/check-peek-consumer-fenced.json) */
 const SENDER_ERROR_CODES = new Set([
   "no_active_sender_terminal",
   "terminal_handle_stale",
@@ -84,7 +76,6 @@ type Outcome<T> = { ok: true; result: T } | { ok: false; code: string; message: 
 interface CallOptions {
   stdin?: string;
   timeoutMs?: number;
-  /** `--from`·`--terminal`로 우편함 신원을 쓰는 명령. 신원 오류를 mailbox-missing으로 바꾼다 */
   usesMailbox?: boolean;
 }
 
@@ -95,11 +86,6 @@ interface ProjectRow {
   setup: { repoId: string; path: string; setupState: string } | null;
 }
 
-/**
- * ssh로 러너의 `orca`를 불러 core Runner를 구현한다(ADR 0009, research 0008 「제안: Runner 어댑터 계약」).
- * 모든 orca 명령은 `--json`을 주고 종료 코드가 아니라 봉투의 `ok`·`error.code`로 판단한다. 메일은 소비하지
- * 않고 읽는다(`check --peek`, Q82.5). 5분 연결 끊김 판단은 worker와 core가 한다.
- */
 export class OrcaRunner implements Runner {
   readonly kind = ORCA_RUNNER_KIND;
   private readonly config: OrcaRunnerConfig;
@@ -109,8 +95,6 @@ export class OrcaRunner implements Runner {
     this.config = config;
     this.exec = exec ?? sshExec(config);
   }
-
-  // ---------- 상태 확인과 프로젝트 ----------
 
   async checkHealth(): Promise<RunnerHealth> {
     const checkedAt = new Date();
@@ -151,7 +135,6 @@ export class OrcaRunner implements Runner {
     }));
   }
 
-  /** Orca 상시 서비스(스펙 9절, Q43). 없어도 Online은 바꾸지 않는다 */
   private async servicePrerequisite(): Promise<RunnerPrerequisite> {
     const base = {
       id: "orca-service",
@@ -167,11 +150,6 @@ export class OrcaRunner implements Runner {
     }
   }
 
-  /**
-   * 러너 쪽 프로젝트 저장소에 비대화형 ssh 세션에서 push할 수 있는지(Q82.15). `git push --dry-run`은
-   * 원격의 receive-pack에 인증한 뒤 아무것도 올리지 않는다. 인증을 묻는 프롬프트는 끈다.
-   * 실패해도 Online은 바꾸지 않고, 할당에서 빼는 것은 core와 worker가 한다(Q82.14).
-   */
   private async pushPrerequisite(project: ProjectRow): Promise<RunnerPrerequisite> {
     const base = {
       id: `github-push:${project.id}`,
@@ -179,7 +157,6 @@ export class OrcaRunner implements Runner {
       hint: "Run `gh auth login --insecure-storage` and `gh auth setup-git` on the runner, or add a GitHub SSH key for the runner user.",
       blocksAssignment: true,
     };
-    // 준비되지 않은 프로젝트는 체크아웃이 없거나 망가졌을 수 있다. 인증을 확인한 것이 아니므로 모름으로 둔다.
     if (project.setup === null || project.setup.setupState !== "ready") {
       return { ...base, satisfied: null };
     }
@@ -195,7 +172,6 @@ export class OrcaRunner implements Runner {
         "push",
         "--dry-run",
         "--porcelain",
-        // 프로젝트의 pre-push 훅(테스트·lint)을 돌리지 않는다. 훅 실패를 인증 실패로 읽지 않게 한다.
         "--no-verify",
         project.remoteName,
         PUSH_CHECK_REF,
@@ -204,7 +180,6 @@ export class OrcaRunner implements Runner {
       return { ...base, satisfied: null };
     }
     if (result.timedOut || result.exitCode === 255 || result.exitCode === null) {
-      // ssh가 러너에 닿지 못했다. 확인하지 못한 것이지 깨진 것이 아니다.
       return { ...base, satisfied: null };
     }
     return { ...base, satisfied: result.exitCode === 0 };
@@ -228,15 +203,12 @@ export class OrcaRunner implements Runner {
     });
   }
 
-  // ---------- 우편함 ----------
-
   async ensureMailbox(current: MailboxRef | null): Promise<MailboxRef> {
     const known = current === null ? null : decodeMailbox(current);
     if (current !== null && known !== null) {
       const state = await this.mailboxState(known);
       if (state === "alive") return current;
       if (state === "unbound") {
-        // 터미널은 살아 있는데 Run에 묶이지 않았다. 같은 터미널을 다시 묶는다.
         const runId = await this.bindRun(known.terminal, known.runId);
         return encodeMailbox({ terminal: known.terminal, runId });
       }
@@ -247,7 +219,6 @@ export class OrcaRunner implements Runner {
       const runId = await this.bindRun(handle, known?.runId ?? null);
       return encodeMailbox({ terminal: handle, runId });
     } catch (error) {
-      // 신원 없이 남는 터미널을 두지 않는다. 닫지 못해도 원래 오류를 알린다.
       await this.orcaOutcome(["terminal", "close", "--terminal", handle], z.unknown()).catch(
         () => undefined,
       );
@@ -255,10 +226,6 @@ export class OrcaRunner implements Runner {
     }
   }
 
-  /**
-   * 우편함 터미널이 살아 있고 저장한 Run에 묶여 있는지. 살아 있어도 묶임을 잃으면(`consumer_fenced`,
-   * `no_active_sender_terminal`) 우편함 명령이 실패하므로 `run-current`로 함께 본다.
-   */
   private async mailboxState(mailbox: OrcaMailbox): Promise<"alive" | "unbound" | "dead"> {
     const shown = await this.orcaOutcome(
       ["terminal", "show", "--terminal", mailbox.terminal],
@@ -268,21 +235,18 @@ export class OrcaRunner implements Runner {
       if (shown.code === "terminal_handle_stale") return "dead";
       throw this.errorFor(shown, {});
     }
-    // 닫힌 터미널도 `terminal show`는 ok이고 connected가 false다(fixtures/terminal-show-closed.json).
     if (shown.result.terminal.connected !== true) return "dead";
     const current = await this.orcaOutcome(
       ["orchestration", "run-current", "--from", mailbox.terminal],
       runCurrentResultSchema,
     );
     if (!current.ok) {
-      // 두 호출 사이에 터미널이 사라졌다.
       if (current.code === "terminal_handle_stale") return "dead";
       throw this.errorFor(current, {});
     }
     return current.result.runId === mailbox.runId ? "alive" : "unbound";
   }
 
-  /** 우편함 터미널은 러너 쪽 프로젝트의 등록 저장소에 띄운다. 워크트리 없이 만들 수 없다. */
   private async createMailboxTerminal(): Promise<string> {
     const projects = await this.loadProjects();
     const home =
@@ -312,10 +276,6 @@ export class OrcaRunner implements Runner {
     return created.terminal.handle;
   }
 
-  /**
-   * 새 우편함 터미널을 오케스트레이션 Run에 코디네이터로 묶는다. 러너마다 Run 하나를 오래 쓰므로(Q82.7)
-   * 이전 Run이 있으면 `run-use`로 이어 쓰고, 안 되면 새로 만든다.
-   */
   private async bindRun(handle: string, previousRunId: string | null): Promise<string> {
     if (previousRunId !== null) {
       const used = await this.orcaOutcome(
@@ -332,8 +292,6 @@ export class OrcaRunner implements Runner {
     return created.runId;
   }
 
-  // ---------- 시작 ----------
-
   async startRun(input: StartRunInput): Promise<StartedRun> {
     const mailbox = this.mailboxOf(input.mailbox);
     const projects = await this.loadProjects();
@@ -346,8 +304,6 @@ export class OrcaRunner implements Runner {
       });
     }
 
-    // 사양(티켓)은 ssh stdin으로 `--spec-file -`에 넘긴다. 명령 인자에 넣지 않으므로 인용과 길이 한계를 거치지
-    // 않고, 러너에 지울 파일도 남지 않는다(research 0008 「제안」의 파일 업로드를 이 티켓에서 바꿈).
     const args = [
       "orchestration",
       "worker-start",
@@ -381,9 +337,7 @@ export class OrcaRunner implements Runner {
         usesMailbox: true,
       });
     } catch (error) {
-      // 명령을 보낸 뒤 연결이 끊기면 러너에서 돌았는지 모른다(core start-outcome-unknown).
       const detail = detailOf(error);
-      // 출력이 깨진 것도 명령이 돈 뒤일 수 있어 같이 다룬다.
       if (detail.kind === "unreachable" || detail.kind === "malformed-output") {
         throw new AdapterError<RunnerErrorDetail>(
           {
@@ -396,8 +350,6 @@ export class OrcaRunner implements Runner {
       throw error;
     }
     if (started.state !== "ready") {
-      // 실패로 확인된 값만 런이 남지 않았다고 본다. 모르는 값은 결과 모름으로 보내 findStartedRun을 먼저
-      // 거치게 한다(CODING_STANDARDS 「외부 열거값은 모르는 값이 와도 깨지지 않게 둔다」).
       throw new AdapterError<RunnerErrorDetail>(
         started.state === "failed"
           ? {
@@ -419,7 +371,6 @@ export class OrcaRunner implements Runner {
     try {
       return await this.startedRunAt(selector, agent);
     } catch (error) {
-      // 에이전트는 떴다. 브랜치를 읽지 못했으니 findStartedRun으로 이어 붙이게 한다.
       throw new AdapterError<RunnerErrorDetail>(
         {
           kind: "start-outcome-unknown",
@@ -443,15 +394,11 @@ export class OrcaRunner implements Runner {
       throw this.errorFor(shown, {});
     }
     const worktree = shown.result.worktree;
-    // 우편함의 Run에서 먼저 찾고, 없으면(우편함을 다시 만들며 Run이 바뀐 경우) 모든 Run에서 찾는다. ssh
-    // 호출자에는 묶인 Run이 없어 `--run` 없이 부르면 모든 Run의 에이전트가 온다. 둘 다 끝까지 넘긴다.
     const mailbox = decodeMailbox(input.mailbox);
     const worker =
       (mailbox === null ? undefined : await this.findWorker(worktree.id, mailbox.runId)) ??
       (await this.findWorker(worktree.id, null));
     if (worker === undefined) {
-      // 이름의 워크트리는 있는데 에이전트를 찾지 못했다. 없다고(null) 답하면 같은 이름으로 다시 시작해
-      // 에이전트가 둘 생길 수 있으므로 오류로 알린다. worker는 시작 오류처럼 다시 시도하다 끝낸다(Q86).
       throw new AdapterError<RunnerErrorDetail>({
         kind: "runner-error",
         code: "worktree_without_agent",
@@ -473,7 +420,6 @@ export class OrcaRunner implements Runner {
     };
   }
 
-  /** worker-list를 끝까지 넘기며 그 워크트리의 가장 최근 에이전트를 찾는다(최근 것부터 온다). */
   private async findWorker(
     worktreeId: string,
     runId: string | null,
@@ -512,8 +458,6 @@ export class OrcaRunner implements Runner {
     };
   }
 
-  // ---------- 진행 ----------
-
   async pollRun(run: RunOnRunner): Promise<RunProgress> {
     const agent = this.agentOf(run);
     const mailbox = this.mailboxOf(run.mailbox);
@@ -521,7 +465,6 @@ export class OrcaRunner implements Runner {
       ["orchestration", "worker-show", "--dispatch", agent.dispatchId],
       workerShowResultSchema,
     );
-    // `ready`는 일하는 중이다. 그 밖의 상태(보고로 settled, 사라짐, 모르는 값)에서만 Task 결과를 읽는다.
     const taskResult = worker.state === "ready" ? null : await this.taskResult(agent);
     if (completionReport(taskResult) !== null) {
       return decideProgress({
@@ -550,7 +493,6 @@ export class OrcaRunner implements Runner {
   }
 
   private async taskResult(agent: OrcaAgent): Promise<string | Record<string, unknown> | null> {
-    // `--brief`는 사양을 160자로 줄이고 결과는 그대로 둔다. Run의 Task가 쌓여도 응답이 덜 커진다.
     const { tasks } = await this.orca(
       ["orchestration", "task-list", "--run", agent.runId, "--full", "--brief"],
       taskListResultSchema,
@@ -558,10 +500,6 @@ export class OrcaRunner implements Runner {
     return tasks.find((task) => task.id === agent.taskId)?.result ?? null;
   }
 
-  /**
-   * 메일을 소비하지 않고 읽는다(Q82.5). 소비하는 `check`(`--peek` 없음)는 부르지 않는다. 우편함이 다른
-   * Run에 묶였으면(우편함을 다시 만들며 Run을 이어 쓰지 못한 경우) 그 런의 Run 메일함을 `inbox`로 읽는다.
-   */
   private async readMail(mailbox: OrcaMailbox, agent: OrcaAgent): Promise<ReadonlyArray<MailRow>> {
     if (mailbox.runId === agent.runId) {
       const checked = await this.orca(
@@ -620,7 +558,6 @@ export class OrcaRunner implements Runner {
     const agent = this.agentOf(run);
     const mailbox = this.mailboxOf(run.mailbox);
     await this.orca(
-      // deny에는 `--run`이 없다(orca help). Dispatch로 대상을 정한다.
       [
         "orchestration",
         "deny",
@@ -638,8 +575,6 @@ export class OrcaRunner implements Runner {
     );
   }
 
-  // ---------- 멈추기·닫기·정리 ----------
-
   async stopAgent(run: RunOnRunner): Promise<void> {
     const agent = this.agentOf(run);
     await this.orca(
@@ -656,10 +591,6 @@ export class OrcaRunner implements Runner {
     );
   }
 
-  /**
-   * `worker-read`는 처음부터 쪽으로 읽으므로 끝까지 넘기며 마지막 줄들을 남긴다. 놓은 뒤에도 보관본을
-   * 읽지만 보고 없이 죽은 에이전트는 비어 있을 수 있어 worker가 멈추거나 닫기 전에 부른다(research 0008 6절).
-   */
   async readLogTail(run: RunOnRunner, opts: { lines: number }): Promise<ReadonlyArray<string>> {
     if (opts.lines <= 0) return [];
     const agent = this.agentOf(run);
@@ -681,7 +612,6 @@ export class OrcaRunner implements Runner {
       lines = [...lines, ...workerReadLines(result)].slice(-opts.lines);
       const transcript = result.transcript;
       const next = transcript?.nextCursor ?? null;
-      // 끝에 닿아도 nextCursor가 오므로(fixtures/worker-read-transcript.json) 한 쪽을 다 채우지 못하면 끝이다.
       if (
         transcript === null ||
         transcript === undefined ||
@@ -693,7 +623,6 @@ export class OrcaRunner implements Runner {
       }
       cursor = next;
     }
-    // 상한에 닿았다. 줄 수를 지키며 맨 앞에 잘렸다는 표시를 둔다.
     return [LOG_CUT_MARKER, ...(opts.lines > 1 ? lines.slice(-(opts.lines - 1)) : [])];
   }
 
@@ -708,7 +637,6 @@ export class OrcaRunner implements Runner {
   }
 
   async removeWorktree(worktree: WorktreeRef): Promise<void> {
-    // 에이전트가 남긴 파일이 있어도 지운다(research 0003 9절). 브랜치는 남긴다(`--delete-branch` 없음).
     const removed = await this.orcaOutcome(
       ["worktree", "rm", "--worktree", `id:${worktree}`, "--force"],
       worktreeRmResultSchema,
@@ -716,8 +644,6 @@ export class OrcaRunner implements Runner {
     if (removed.ok || removed.code === "selector_not_found") return;
     throw this.errorFor(removed, {});
   }
-
-  // ---------- ssh와 orca 봉투 ----------
 
   private mailboxOf(ref: MailboxRef): OrcaMailbox {
     const mailbox = decodeMailbox(ref);
@@ -742,7 +668,6 @@ export class OrcaRunner implements Runner {
     return agent;
   }
 
-  /** orca 명령을 돌려 결과를 스키마로 파싱한다. `ok: false`는 오류 종류로 바꿔 던진다. */
   private async orca<T>(
     args: ReadonlyArray<string>,
     schema: z.ZodType<T>,
@@ -753,7 +678,6 @@ export class OrcaRunner implements Runner {
     return outcome.result;
   }
 
-  /** orca 명령을 돌린다. ssh·출력 오류는 던지고, `ok: false`는 코드와 함께 돌려준다. */
   private async orcaOutcome<T>(
     args: ReadonlyArray<string>,
     schema: z.ZodType<T>,
@@ -804,7 +728,6 @@ export class OrcaRunner implements Runner {
     });
   }
 
-  /** 인자 배열을 한 곳(toRemoteCommand)에서 인용해 ssh로 보낸다. */
   private async run(argv: ReadonlyArray<string>, options: CallOptions = {}): Promise<RemoteResult> {
     let command: string;
     try {
@@ -839,15 +762,10 @@ export const orcaRunnerFactory: RunnerFactory = {
   },
 };
 
-/**
- * `worker-start --model` 인자. 런의 모델(Mapping 값)이 러너 설정의 모델보다 앞서고(0043), 둘 다 없으면
- * 넘기지 않아 러너의 Orca 설정을 따른다.
- */
 function modelArgs(model: string | undefined): string[] {
   return model === undefined ? [] : ["--model", model];
 }
 
-/** `refs/heads/<name>`에서 브랜치 이름을 꺼낸다. Orca가 러너의 접두사를 붙여 정한 이름이다(Q82.6). */
 function branchName(ref: string | null | undefined, worktree: string): string {
   if (ref === null || ref === undefined || ref.length === 0) {
     throw new AdapterError<RunnerErrorDetail>({
@@ -866,7 +784,6 @@ function detailOf(error: unknown): RunnerErrorDetail {
   return { kind: "unreachable", detail: String(error) };
 }
 
-/** 이 어댑터가 던진 AdapterError의 detail인지. 다른 어댑터·코드의 오류는 러너에 닿지 못한 것으로 다룬다 */
 function isRunnerErrorDetail(detail: unknown): detail is RunnerErrorDetail {
   if (typeof detail !== "object" || detail === null || !("kind" in detail)) return false;
   switch (detail.kind) {

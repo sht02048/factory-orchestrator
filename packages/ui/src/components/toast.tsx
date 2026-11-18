@@ -3,19 +3,11 @@ import { Toast, ToastRegion, ToastTitle, toast } from "@ui-sdk/react/toast";
 import { cx } from "../cx";
 import { colors, fontSize, motion, radius, shadow, space } from "../tokens.stylex";
 
-/*
- * 끝난 행동을 알리는 짧은 한 줄(저장했어요, 할당했어요). 스스로 사라진다.
- * 실패처럼 사람이 읽고 판단해야 하는 내용은 토스트가 아니라 화면 안에 남긴다.
- *
- * 앱 루트에 <Toaster label="알림" /> 를 한 번 두고, 행동이 끝나면 showToast("저장했어요") 를 부른다.
- */
-
 export function showToast(message: string): void {
   toast(message);
 }
 
 export interface ToasterProps {
-  /** 알림 영역의 접근 가능한 이름. 메시지 파일의 글을 넘긴다. */
   label: string;
 }
 
@@ -61,7 +53,6 @@ const styles = stylex.create({
     boxShadow: shadow.popover,
     color: colors.textPrimary,
     fontSize: fontSize.ui,
-    // 시안 B 처럼 한 번에 하나만 보인다. 뒤로 밀린 토스트는 흐려지며 사라진다.
     opacity: 0,
     animationName: { default: rise, "@media (prefers-reduced-motion: reduce)": "none" },
     animationDuration: motion.durationToast,

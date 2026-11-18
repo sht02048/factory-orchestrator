@@ -33,7 +33,6 @@ describe("수동 할당", () => {
       trackerProject: "tp-web",
       runnerProject: "github:acme/web",
       agent: "claude",
-      // Online 이고 인증이 깨지지 않은 runner-a 를 고른다(Q53·Q82.14)
       runnerId: "runner-a",
       assignedAt: now,
     });
@@ -45,7 +44,6 @@ describe("수동 할당", () => {
       db,
       submitAssignment(db, { ...base, runnerId: "runner-b", agent: "codex" }, now),
     );
-    // Offline 러너도 고를 수 있다. 러너 쪽 프로젝트는 Mapping 값 그대로다
     expect(run).toMatchObject({
       runnerId: "runner-b",
       agent: "codex",
@@ -56,13 +54,11 @@ describe("수동 할당", () => {
   it("Mapping 의 모델을 런에 적고, 에이전트를 바꾸면 모델을 넘기지 않는다(0043)", () => {
     const { db } = setupTickets();
     expect(assignedRun(db, submitAssignment(db, base, now)).model).toBe("sonnet");
-    // Mapping 의 모델은 그 에이전트의 모델 이름이라 다른 에이전트에 넘기지 않는다
     const changed = assignedRun(
       db,
       submitAssignment(db, { ...base, ticketKey: "ACME-7", agent: "codex" }, now),
     );
     expect(changed).toMatchObject({ agent: "codex", model: null });
-    // 입력에 모델을 넣어도 받지 않는다. 수동 할당에서는 러너와 에이전트만 바꾼다(Q53·Q60)
     expect(assignInput.parse({ ...base, model: "opus" })).not.toHaveProperty("model");
   });
 
@@ -81,7 +77,6 @@ describe("수동 할당", () => {
         reason: "active-run",
       });
     }
-    // 같은 티켓을 두 번 할당하면 두 번째가 막힌다
     expect(submitAssignment(db, base, now).ok).toBe(true);
     expect(submitAssignment(db, base, now)).toEqual({ ok: false, reason: "active-run" });
   });

@@ -11,13 +11,6 @@ import { describe, findRunner, mailboxFor, runnerErrorDetail, tryWrite } from ".
 import type { TickContext } from "./context.js";
 import { checkRunner } from "./runner-check.js";
 
-/**
- * web이 DB에 남긴 요청을 처리한다(Q61). web은 ssh를 쓰지 않아 러너에 닿는 일은 worker가 대신한다.
- * 결과 쓰기는 요청 시각이 같고 아직 끝나지 않은 요청에만 되므로 요청 하나는 한 번만 처리한다. 처리하는 동안
- * 새 요청이 와서 덮어썼으면 쓰지 않고 다음 바퀴에 새 요청을 처리한다.
- *
- * 실패는 결과의 `error`에 JSON(`{"kind": ...}`)으로 쓴다. 러너 어댑터 오류는 core RunnerErrorDetail 그대로다.
- */
 export async function processWebRequests(
   context: TickContext,
   kind: "log-tail" | "runner-check",
@@ -26,15 +19,10 @@ export async function processWebRequests(
     if (kind === "log-tail") await processLogTailRequests(context);
     else await processRunnerCheckRequests(context);
   } catch (error) {
-    // 요청 목록을 읽지 못해도 바퀴의 다른 일은 이어 간다.
     context.logger.warn("could not process web requests", { kind, error });
   }
 }
 
-/**
- * 로그 꼬리 요청(Run 상세, Q46). 끝나지 않은 런은 러너에서 마지막 줄들을 읽는다. 끝난 런은 끝날 때 저장한
- * 마지막 로그를 돌려준다. 결과는 화면에 보일 임시 값이라 런 기록에 남기지 않는다.
- */
 async function processLogTailRequests(context: TickContext): Promise<void> {
   for (const request of listPendingLogTailRequests(context.db)) {
     const complete = (result: { lines: ReadonlyArray<string> } | { error: string }): void => {
@@ -76,10 +64,6 @@ async function readLogTail(
   return { lines };
 }
 
-/**
- * 러너 확인 요청(온보딩·Settings). 주기적 러너 확인과 같이 확인 결과를 러너에 쓰고, 요청에는 그때의
- * RunnerHealth를 쓴다.
- */
 async function processRunnerCheckRequests(context: TickContext): Promise<void> {
   for (const request of listPendingRunnerCheckRequests(context.db)) {
     const outcome = await checkRequestedRunner(context, request.runnerId);

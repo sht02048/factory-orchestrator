@@ -31,7 +31,6 @@ describe("quoteArg", () => {
     expect(quoteArg("A=1")).toBe("'A=1'");
   });
 
-  // 원격 셸(zsh, bash, sh)이 인용한 인자를 글자 그대로 받는지 로컬 셸로 확인한다.
   for (const shell of ["/bin/sh", "/bin/bash", "/bin/zsh"].filter((path) => existsSync(path))) {
     test(`${shell} reads the quoted argument back unchanged`, () => {
       for (const value of [tricky, leadingEquals]) {

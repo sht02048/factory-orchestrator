@@ -23,20 +23,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } f
 import onboarding from "../../apps/web/messages/ko/onboarding.json" with { type: "json" };
 import settings from "../../apps/web/messages/ko/settings.json" with { type: "json" };
 
-/*
- * 온보딩의 키보드 포커스를 실제 브라우저로 확인하는 시험(티켓 0052).
- *
- * - 단계를 옮기면(다음·이전·단계 목록) 새 단계 제목에 포커스가 간다
- * - 첫 연결·첫 러너·첫 Workspace 를 만든 뒤 포커스가 body 로 떨어지지 않는다
- * - 완료한 단계는 접근성 이름에 "완료"를 갖는다
- *
- * 띄우는 방식은 operator-actions.test.ts(0039)와 같다. web 개발 서버의 server/adapters.ts 를 core 가짜 트래커
- * 등록표(browser/fake-adapters.ts)로 바꿔 끼워, 트래커 연결 확인이 가짜 트래커로 성공한다. 빈 DB 에서 시작하고
- * 시험은 차례로 단계를 하나씩 채우므로 앞 시험의 결과에 기대고, 하나만 골라 돌리면(-t) 실패한다.
- * GitHub 토큰과 러너 확인 결과처럼 화면 밖에서 오는 값은 DB 에 직접 쓴다.
- * 가상 값만 쓴다(acme, example.com).
- */
-
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
 const adaptersModule = join(webRoot, "src/server/adapters.ts");
 const fakeAdaptersModule = fileURLToPath(new URL("./browser/fake-adapters.ts", import.meta.url));
@@ -52,7 +38,6 @@ let baseUrl: string;
 let browser: Browser;
 let page: Page;
 
-/** web 의 server/adapters.ts 를 가짜 트래커 등록표로 바꾼다. 제품 코드는 고치지 않는다 */
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
   enforce: "pre",
@@ -122,21 +107,17 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
     saveGitHubToken();
     await open(1);
 
-    // 다음
     await page.getByRole("button", { name: onboarding.next, exact: true }).focus();
     await page.keyboard.press("Enter");
     await page.waitForURL(/step=2/);
     await expect.poll(focused).toBe(steps.github.title);
 
-    // 이전: 1단계에는 이전 버튼이 없어 누른 버튼이 빠진다
     await page.getByRole("button", { name: onboarding.back }).focus();
     await page.keyboard.press("Enter");
     await page.waitForURL(/step=1/);
     await expect.poll(focused).toBe(steps.tracker.title);
 
-    // 단계 목록: 누른 단계는 지금 단계가 되어 버튼이 빠진다
     const nav = page.getByRole("navigation", { name: onboarding.stepsLabel });
-    // 완료한 단계는 체크 표시만 보이지만 접근성 이름에 번호와 완료를 갖는다
     const github = nav.getByRole("button", {
       name: `2 GitHub ${onboarding.stepDone}`,
       exact: true,
@@ -146,7 +127,6 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
     await page.waitForURL(/step=2/);
     await expect.poll(focused).toBe(steps.github.title);
 
-    // 2단계에서는 완료한 Tracker 가 버튼이고 이름에 완료를 갖는다
     await nav
       .getByRole("button", { name: `1 Tracker ${onboarding.stepDone}`, exact: true })
       .waitFor();
@@ -173,20 +153,17 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
   });
 });
 
-/** 온보딩의 한 단계(1부터)를 열고 hydration 을 기다린다 */
 async function open(step: number): Promise<void> {
   await page.goto(`/onboarding?step=${step}`);
   await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
   await page.waitForLoadState("networkidle");
 }
 
-/** 포커스를 가진 요소의 글. body 에 떨어지면 :focus 인 요소가 없어 null 이다 */
 async function focused(): Promise<string | null> {
   const active = page.locator(":focus");
   return (await active.count()) === 0 ? null : active.first().textContent();
 }
 
-/** GitHub 단계를 마친 것처럼 토큰을 쓴다. 가짜 어댑터 등록표에는 코드 호스트가 없어 화면으로 확인하지 않는다 */
 function saveGitHubToken(): void {
   saveCodeHostConnection(db, new SecretBox(encryptionKey), {
     id: toCodeHostConnectionId("github"),
@@ -197,7 +174,6 @@ function saveGitHubToken(): void {
   });
 }
 
-/** worker 가 러너 확인을 마친 것처럼 결과를 쓴다(Q61) */
 function finishRunnerCheck(): void {
   const request = listPendingRunnerCheckRequests(db)[0];
   if (request === undefined) throw new Error("no pending runner check");

@@ -4,19 +4,14 @@ import { z } from "zod";
 import { inTransaction } from "./database.js";
 import type { Database } from "./database.js";
 
-/** drizzle-kit이 만든 마이그레이션 하나(`drizzle/<시각>_<이름>/migration.sql`) */
 export interface Migration {
-  /** 폴더 이름. 시각으로 시작해 순서를 정한다 */
   name: string;
-  /** SQL 파일의 해시. 이미 적용한 마이그레이션을 고쳤는지 본다 */
   hash: string;
-  /** `--> statement-breakpoint`로 나눈 문장 */
   sql: ReadonlyArray<string>;
 }
 
 export const MIGRATIONS_FOLDER = fileURLToPath(new URL("../drizzle", import.meta.url));
 
-/** 이 패키지에 든 마이그레이션. 이미 배포한 것은 고치지 않고 `db:generate`로 새로 더한다. */
 export function loadMigrations(folder: string = MIGRATIONS_FOLDER): Migration[] {
   return readMigrationFiles({ migrationsFolder: folder })
     .toSorted((a, b) => a.folderMillis - b.folderMillis || a.name.localeCompare(b.name))
@@ -32,23 +27,6 @@ export class MigrationError extends Error {
 
 const appliedRow = z.object({ name: z.string(), hash: z.string() });
 
-/**
- * 아직 돌지 않은 마이그레이션을 차례로 돌린다(ADR 0005: 업데이트 때 자동으로 돈다).
- *
- * - 여러 번 불러도 안전하다. 적용한 것은 `schema_migrations`에 이름과 해시로 남긴다.
- * - 한 번에 돌리는 마이그레이션 전부가 BEGIN IMMEDIATE 하나 안에서 돈다. 하나라도 실패하면 아무것도
- *   남기지 않고, web과 worker가 함께 띄워도 쓰기 잠금으로 한쪽만 돌린다.
- * - DB에 이 코드가 모르는 마이그레이션이 있으면(다운그레이드) 거부한다. 이미 적용한 마이그레이션의
- *   SQL이 바뀌었어도 거부한다.
- *
- * - 외래 키 검사를 트랜잭션 밖에서 끄고 돌린다. drizzle-kit은 SQLite 테이블을 바꿀 때 새 테이블을 만들고
- *   옛 테이블을 지우는데, 트랜잭션 안의 `PRAGMA foreign_keys=OFF`는 듣지 않아 `DROP TABLE`이
- *   ON DELETE CASCADE로 자식 행을 지운다. 대신 커밋 전에 `foreign_key_check`로 위반이 없는지 본다.
- *
- * Drizzle의 migrate()는 BEGIN(지연 잠금)을 쓰고 다운그레이드를 막지 않아 쓰지 않는다.
- *
- * @returns 이번에 돌린 마이그레이션 이름
- */
 export function migrate(
   db: Database,
   migrations: ReadonlyArray<Migration> = loadMigrations(),
@@ -56,7 +34,6 @@ export function migrate(
 ): string[] {
   const client = db.$client;
   if (client.isTransaction) {
-    // 트랜잭션 안에서는 외래 키 검사를 끌 수 없다.
     throw new MigrationError("migrate() must not run inside a transaction");
   }
   const foreignKeys = client.prepare("PRAGMA foreign_keys").get()?.["foreign_keys"] === 1;

@@ -22,20 +22,8 @@ import { pullRequestOf } from "./hydrate.js";
 import { stringAt } from "./world.js";
 import type { DemoWorld } from "./world.js";
 
-/*
- * 가짜 러너의 에이전트를 시간에 따라 움직인다(티켓 0047). 러너에서 시작한 런은 잠시 일하다가 가끔 질문하고,
- * 답을 받으면 이어서 일한 뒤 PR 을 열고 완료 보고를 보낸다. 열어 둔 PR 은 조금 뒤 병합한다. 일감이 모자라면
- * 가짜 트래커의 티켓에 Auto-assign Label 을 붙여 자동 할당이 새 런을 만들게 한다.
- *
- * 개발 화면(/__dev)의 버튼도 같은 동작을 한 번씩 일으킨다. worker 는 실제 제품 코드 그대로 돌고, 여기서는
- * 러너·트래커·코드 호스트 쪽(가짜 어댑터)만 바꾼다.
- */
-
-/** 런 하나가 일하는 시간(답을 기다린 시간은 빼고) */
 const WORK_MS = { min: 40_000, max: 110_000 };
-/** 열린 PR 을 병합하기까지 */
 const MERGE_AFTER_MS = 90_000;
-/** 일감을 더 만드는 간격과, 그때 진행 중인 런이 이보다 적어야 한다 */
 const NEW_WORK_EVERY_MS = 60_000;
 const BUSY_RUNS = 4;
 
@@ -51,13 +39,11 @@ const QUESTIONS = [
 interface Plan {
   workMs: number;
   ask: boolean;
-  /** merged: 병합한 PR, open: 열린 PR(Human Check), failure: PR 없이 실패 보고, vanish: 보고 없이 사라짐 */
   outcome: "merged" | "open" | "failure" | "vanish";
 }
 
 interface Tracked {
   plan: Plan;
-  /** 일한 시간(밀리초). 답을 기다리는 동안은 늘지 않는다 */
   worked: number;
   asked: boolean;
 }
@@ -76,7 +62,6 @@ export class DemoLife {
   private readonly world: DemoWorld;
   private readonly now: () => Date;
   private readonly tracked = new Map<WorktreeRef, Tracked>();
-  /** 병합할 열린 PR: 저장소, 런 키, 병합할 시각 */
   private readonly toMerge: Array<{ repo: RunnerProjectId; worktree: WorktreeRef; at: number }> =
     [];
   private lastTick: number | null = null;
@@ -91,7 +76,6 @@ export class DemoLife {
     this.now = options.now ?? (() => new Date());
   }
 
-  /** 한 걸음. 앞 걸음 뒤 지난 시간만큼 일을 진행한다 */
   tick(): void {
     const now = this.now().getTime();
     const elapsed = this.lastTick === null ? 0 : now - this.lastTick;
@@ -151,7 +135,6 @@ export class DemoLife {
       return;
     }
     if (plan.outcome === "merged" || plan.outcome === "open") {
-      // PR ID 는 겹치지 않게 새로 만든다. 같은 ID 면 가짜 코드 호스트가 앞 PR 을 바꿔 끼운다.
       this.prSeq += 1;
       const number = this.prSeq;
       const key = ticketKeyOf(run.input.worktreeName);
@@ -169,7 +152,6 @@ export class DemoLife {
           url: `https://code.example.com/${repo}/pull/${number}`,
         },
       );
-      // 런 시작 뒤에 만든 PR 이어야 찾는다. 시작 시각을 모르니 지금으로 둔다
       const created = { ...pr, createdAt: this.now() };
       if (plan.outcome === "merged") {
         this.world.codeHost.putPullRequest(toRepoRef(repo), {
@@ -214,12 +196,6 @@ export class DemoLife {
     }
   }
 
-  // ---------- 개발 화면의 동작 ----------
-
-  /**
-   * Auto-assign Label 이 없는 티켓 하나에 라벨을 붙이고 webhook 이 온 것처럼 이벤트를 쓴다. worker 의 자동 할당이
-   * 다음 바퀴에 런을 만든다. 붙인 티켓 키를 돌려준다. 붙일 티켓이 없으면 새로 만든다.
-   */
   labelTicket(): TicketKey | null {
     const target = this.trackerConnections()[0];
     if (target === undefined) return null;
@@ -259,7 +235,6 @@ export class DemoLife {
     return labeled.key;
   }
 
-  /** 첫 트래커 연결의 첫 프로젝트에 라벨 없는 티켓을 하나 만든다. Tickets 화면에서 수동 할당할 수 있다 */
   addTicket(): TrackerTicket | null {
     const target = this.trackerConnections()[0];
     const project = target?.tracker.projects[0];
@@ -282,7 +257,6 @@ export class DemoLife {
     return ticket;
   }
 
-  /** 일하는 런 하나가 질문한다. 질문한 런의 워크트리 이름을 돌려준다 */
   askQuestion(): string | null {
     for (const runner of this.world.runners.values()) {
       if (!runner.online) continue;
@@ -299,10 +273,6 @@ export class DemoLife {
     return null;
   }
 
-  /**
-   * GitHub 인증이 깨진 러너를 고치거나, 고친 러너를 다시 깨뜨린다. 러너 확인을 요청해 worker 가 곧 다시 본다.
-   * 바꾼 뒤 인증이 멀쩡한지 돌려준다. 그런 러너가 없으면 null 이다.
-   */
   togglePushAuth(): boolean | null {
     for (const stored of listRunners(this.db)) {
       const sshTarget = stringAt(stored.config, "sshTarget");
@@ -337,12 +307,10 @@ function branchOf(world: DemoWorld, worktree: WorktreeRef): string {
   return "";
 }
 
-/** 워크트리 이름(factory-ACME-1-1)에서 티켓 키를 꺼낸다 */
 function ticketKeyOf(worktreeName: string): TicketKey {
   return toTicketKey(worktreeName.replace(/^factory-/, "").replace(/-\d+$/, ""));
 }
 
-/** 워크트리 이름마다 정해진 계획. 다시 띄워도 같은 런은 같게 움직인다 */
 export function planFor(worktreeName: string): Plan {
   const h = hash(worktreeName);
   const roll = h % 100;

@@ -11,17 +11,6 @@ import { describe, expect, test } from "vitest";
 import { decodeAgent, decodeMailbox, encodeAgent, encodeMailbox } from "./refs.js";
 import { ScriptedExec, peekOf, research, runnerWith, stdout } from "./test-support.js";
 
-/**
- * Runner 계약 메서드 전부를 research 0008(Orca 오케스트레이션 런)의 실제 출력으로 시험한다. 0003·0004 출력은
- * 가상 ID가 달라 각자 따로 쓴다. research 픽스처에 없는 명령(project setups, worktree show)의 출력만 0008의
- * 같은 값으로 만든다.
- *
- * readLogTail(`worker-read`)과 worktreeExists의 성공 경로는 research 픽스처가 없어 이 티켓이 러너에서 받은
- * 출력(fixtures/)으로 orca-runner.test.ts에서 시험한다.
- *
- * 0008의 대상: `term_…01`이 우편함, `run_000000000001`이 Run, R1(`ctx_…01`) 질문·완료 보고,
- * R2(`ctx_…02`) 권한 대기·거절·멈추기, R3(`ctx_…03`) 보고 없이 사라짐.
- */
 const REPO = "10000000-0000-4000-8000-000000000004";
 const MAILBOX = encodeMailbox({
   terminal: "term_00000000-0000-4000-8000-000000000001",
@@ -40,7 +29,6 @@ function runOf(n: 1 | 2 | 3): RunOnRunner {
   };
 }
 
-/** 0008 러너의 등록 저장소. project list·setups 픽스처가 0008에는 없어 같은 값으로 만든다 */
 function withSandbox(exec: ScriptedExec): ScriptedExec {
   return exec
     .orca(
@@ -82,7 +70,6 @@ function withSandbox(exec: ScriptedExec): ScriptedExec {
     );
 }
 
-/** `worktree show` 결과. 0008 본문의 R1 워크트리와 브랜치(`acme/fo-orch-r1`)다 */
 const R1_WORKTREE_SHOW = stdout(
   JSON.stringify({
     ok: true,
@@ -95,7 +82,6 @@ const R1_WORKTREE_SHOW = stdout(
   }),
 );
 
-/** 0008 `inbox --full`의 질문 행을 `check --peek --full` 봉투로 */
 function inboxRows(file: string): string[] {
   const parsed: unknown = JSON.parse(research(`0008/${file}`));
   if (typeof parsed !== "object" || parsed === null || !("result" in parsed)) throw new Error();

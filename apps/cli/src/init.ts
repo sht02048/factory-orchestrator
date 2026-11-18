@@ -7,12 +7,9 @@ import { homePaths } from "./home.js";
 
 export interface InitOptions {
   home: string;
-  /** 바인딩 주소. 없으면 127.0.0.1(스펙 7절) */
   host?: string;
   port?: string;
-  /** 없으면 home 안의 `data/factory-orchestrator.db`. 상대 경로는 현재 폴더 기준으로 푼다 */
   databasePath?: string;
-  /** 시험에서 키를 정한다. 없으면 32바이트를 새로 뽑는다 */
   generateKey?: () => string;
 }
 
@@ -29,15 +26,8 @@ export class EnvFileFormatError extends Error {
   }
 }
 
-/**
- * 부팅 설정 `.env`를 만든다(ADR 0005). 암호화 키는 새로 뽑는다.
- *
- * 이미 있으면 덮어쓰지 않고 그대로 둔다. 키를 바꾸면 DB에 저장한 토큰을 다시 입력해야 하기 때문이다.
- * 파일은 배타적으로 만들어(`wx`) 두 번 동시에 돌아도 한쪽만 쓴다.
- */
 export function init(options: InitOptions): InitResult {
   const paths = homePaths(options.home);
-  // 이미 있으면 주어진 값을 검사하지도 않고 그대로 둔다. 동시에 도는 경우는 아래 `wx`가 막는다.
   if (existsSync(paths.envFile)) return { created: false, envFile: paths.envFile };
   const values = {
     [BOOT_ENV.host]: options.host ?? "127.0.0.1",
@@ -47,7 +37,6 @@ export function init(options: InitOptions): InitResult {
       options.generateKey ?? (() => randomBytes(ENCRYPTION_KEY_BYTES).toString("base64"))
     )(),
   };
-  // 쓰기 전에 start와 같은 규칙으로 검사한다. 틀린 값으로 파일을 만들지 않는다.
   const config = parseBootConfig(values);
   const contents = renderEnvFile(values);
 
@@ -68,7 +57,6 @@ export function init(options: InitOptions): InitResult {
   };
 }
 
-/** 사용자가 열어 보는 파일이라 설명은 영어로 쓴다(ADR 0005: 사용자 문서는 영어). */
 export function renderEnvFile(values: Readonly<Record<string, string>>): string {
   const line = (name: string): string => {
     const value = values[name] ?? "";
@@ -91,7 +79,6 @@ ${line(BOOT_ENV.databasePath)}
 # you have to enter the tokens again.
 ${line(BOOT_ENV.encryptionKey)}
 `;
-  // JSON 문자열의 이스케이프를 .env 파서가 모두 풀지는 않는다. 다시 읽어 같은 값이 나오는지 확인한다.
   const parsed = parseEnv(contents);
   for (const [name, value] of Object.entries(values)) {
     if (!isDeepStrictEqual(parsed[name], value)) throw new EnvFileFormatError(name);

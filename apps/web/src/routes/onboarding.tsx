@@ -17,12 +17,6 @@ const t = createTranslator({
   namespace: "onboarding",
 });
 
-/**
- * 온보딩(0026): 첫 진입 전용 전체 화면이라 사이드바가 있는 _app 밖에 둔다(ADR 0007).
- * 화면 값과 저장은 Settings 의 server function 을 그대로 쓴다. 보는 단계(step, 1부터)는 주소에 남는다.
- * 주소에 단계가 없으면 지금 보일 단계를 넣어 다시 보낸다. 그래야 저장 뒤 다시 읽어도 그 단계에 머문다(0041).
- * Workspace 는 첫 Workspace 다(ws 를 주지 않는다).
- */
 export const Route = createFileRoute("/onboarding")({
   validateSearch: z.object({ step: z.number().int().optional().catch(undefined) }),
   loaderDeps: ({ search }) => ({ step: search.step }),

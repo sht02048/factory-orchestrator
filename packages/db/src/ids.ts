@@ -1,8 +1,6 @@
 import type { Brand } from "@factory/core";
 
-/** 오케스트레이터가 만든 Workspace 하나의 ID */
 export type WorkspaceId = Brand<string, "WorkspaceId">;
-/** 오케스트레이터에 등록한 코드 호스트 연결 하나의 ID */
 export type CodeHostConnectionId = Brand<string, "CodeHostConnectionId">;
 
 function isNonEmpty<B extends string>(value: string): value is Brand<string, B> {

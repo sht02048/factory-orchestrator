@@ -155,7 +155,6 @@ describe("planQueue", () => {
   });
 
   it("러너가 Online이 되면 비웠던 런이 원래 자리로 돌아가 뒤 런보다 먼저 시작한다 (Q73)", () => {
-    // head는 r1이 Offline이 되어 러너를 비운 런이고, later는 그 뒤에 들어와 r1을 정한 런이다.
     const head = queued("head", app, null);
     const later = queued("later", app, r1);
 
@@ -213,7 +212,6 @@ describe("planQueue", () => {
     expect(gone.unplaced).toEqual([{ runId: head.id, reason: "project-missing" }]);
     expect(gone.start).toEqual([{ runId: behind.id, runnerId: r2 }]);
 
-    // 다음 판단: head는 러너가 비었고 behind보다 먼저 들어왔다. r2에 프로젝트가 생겼다.
     const later = queued("later", web, r2);
     const back = planQueue({
       queued: [later, { ...head, runnerId: null }],

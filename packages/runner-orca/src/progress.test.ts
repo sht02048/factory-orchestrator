@@ -4,7 +4,6 @@ import type { ProgressInput } from "./progress.js";
 import { checkResultSchema, workerShowResultSchema } from "./schemas.js";
 import { peekOf, research } from "./test-support.js";
 
-// research 0008의 픽스처만 쓴다(R2: 권한 프롬프트, R3: 보고 없이 죽음).
 function worker(file: string): ProgressInput["worker"] {
   const parsed: unknown = JSON.parse(research(`0008/${file}`));
   if (typeof parsed !== "object" || parsed === null || !("result" in parsed)) throw new Error();

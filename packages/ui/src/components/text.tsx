@@ -2,13 +2,6 @@ import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 import { colors, fonts, fontSize, fontWeight, letterSpacing, lineHeight } from "../tokens.stylex";
 
-/**
- * 글자 위계. 시안 B 의 세 단계를 따른다.
- *
- * 1단계(화면을 대표): page(페이지 제목), panel(상세 패널 제목)
- * 2단계(읽는 내용): section(구역 제목), title(행 제목), body(설명 문단)
- * 3단계(흐린 보조): ui(일반 UI 글), meta(ID·러너·시간처럼 흐린 값), label(작은 머리글)
- */
 export type TextVariant = "page" | "panel" | "section" | "title" | "body" | "ui" | "meta" | "label";
 
 type TextElement = "h1" | "h2" | "h3" | "p" | "span" | "div";
@@ -26,13 +19,9 @@ const defaultElement: Record<TextVariant, TextElement> = {
 
 export interface TextProps {
   variant: TextVariant;
-  /** 기본 요소를 바꿀 때만 쓴다(문서 구조상 h2 대신 h3 등). */
   as?: TextElement;
-  /** 숫자를 세로로 맞춘다(tabular-nums). 시간·개수·ID 에 쓴다. */
   numeric?: boolean;
-  /** 고정폭 글꼴. 경로·명령·키처럼 그대로 옮겨 쓸 값에 쓴다. */
   mono?: boolean;
-  /** 한 줄로 자르고 말줄임표를 붙인다. */
   truncate?: boolean;
   children: ReactNode;
 }

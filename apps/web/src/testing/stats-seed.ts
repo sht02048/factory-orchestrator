@@ -27,16 +27,6 @@ import {
 } from "@factory/db";
 import type { Database } from "@factory/db";
 
-/*
- * Stats 테스트 DB. 가상 값만 쓴다(acme). 지표 값은 stats/load.test.ts 가 손으로 계산해 둔다.
- *
- * - Workspace 둘: ws-commerce(트래커 프로젝트 Web, API), ws-labs(트래커 프로젝트 Lab)
- * - 러너 둘: runner-a, runner-b(둘 다 acme/web 이 있다). 에이전트 둘: claude, codex
- * - 기준 시각 now 는 2026-11-17 12:00 UTC 라 기간은 11월 4일~17일(UTC)이다.
- * - ws-commerce 의 기간 안 Ended 런 아홉(statsCases)과, 세지 않는 런 셋(기간 전에 끝남, 실행 중,
- *   다른 Workspace)을 둔다.
- */
-
 const connection = toTrackerConnectionId("conn-acme");
 export const commerce = toWorkspaceId("ws-commerce");
 export const labs = toWorkspaceId("ws-labs");
@@ -58,14 +48,11 @@ export interface StatsCase {
   agentResult: AgentResult;
   prState: PrState;
   laterPrState: "merged" | "closed" | null;
-  /** 할당 시각(UTC ISO) */
   assignedAt: string;
-  /** 할당부터 시작까지, 시작부터 종료까지(분) */
   waitMinutes: number;
   executionMinutes: number;
 }
 
-/** 기간 안에 끝난 ws-commerce 런. 끝난 날은 할당 날과 같고, C-7 만 11월 3일에 할당해 4일에 끝난다 */
 export const statsCases: ReadonlyArray<StatsCase> = [
   {
     key: "C-1",
@@ -177,7 +164,6 @@ export const statsCases: ReadonlyArray<StatsCase> = [
   },
 ];
 
-/** 세지 않는 런: 기간 전(11월 3일)에 끝남 */
 const beforePeriod: StatsCase = {
   key: "OLD-1",
   project: "Web",
@@ -191,7 +177,6 @@ const beforePeriod: StatsCase = {
   executionMinutes: 10,
 };
 
-/** 세지 않는 런: 다른 Workspace */
 const otherWorkspace: StatsCase = {
   key: "LAB-1",
   project: "Lab",
@@ -205,9 +190,6 @@ const otherWorkspace: StatsCase = {
   executionMinutes: 10,
 };
 
-/**
- * Stats 테스트 DB 를 만든다. path 를 주면 그 파일에 쓴다(화면을 눈으로 볼 때).
- */
 export function seedStatsDatabase(options: { path?: string } = {}): Database {
   const at = (iso: string, plusMinutes = 0) =>
     new Date(new Date(iso).getTime() + plusMinutes * 60_000);
@@ -277,7 +259,6 @@ export function seedStatsDatabase(options: { path?: string } = {}): Database {
     }
   }
 
-  // 세지 않는 런: 아직 실행 중
   const active = mustRun(
     assignRun(db, {
       ticket: { connection, key: toTicketKey("C-10") },
@@ -316,7 +297,6 @@ function mustRun<R>(result: { ok: true; run: R } | { ok: false }): R {
   return result.run;
 }
 
-/** 시작한 런이 러너에서 받는 값(워크트리, 실제 브랜치, 에이전트 참조) */
 function startedOn(worktree: string) {
   return {
     worktree: toWorktreeRef(worktree),
@@ -325,14 +305,6 @@ function startedOn(worktree: string) {
   };
 }
 
-/**
- * 런 실행 결정(Q82)으로 생긴 결과를 ws-commerce 에 더한다(티켓 0038). 모두 11월 17일에 끝난다.
- *
- * - 에이전트 aider: 시작하지 않고 끝난 런 둘.
- *   X-1 Queued 에서 취소(할당 10:00, 끝 10:20) → 취소. X-2 시작할 수 없음(할당 10:00, 끝 10:05) → Failed
- * - 에이전트 gemini: runner-a 에서 시작한 런 둘(대기 1분, 실행 10분)
- *   X-3 비정상 종료 · PR 없음 → Failed. X-4 운영자가 취소함 · PR 열림 → 취소
- */
 export function addRunDecisionCases(db: Database): void {
   const at = (hhmm: string) => new Date(`2026-11-17T${hhmm}:00Z`);
   const assign = (key: string, agent: string) =>

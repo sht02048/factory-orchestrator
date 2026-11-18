@@ -11,12 +11,6 @@ import type { Database, StoredRun } from "@factory/db";
 import { stringAt } from "./world.js";
 import type { DemoWorld } from "./world.js";
 
-/*
- * 가짜 러너와 코드 호스트는 메모리에만 있어, 띄울 때마다 DB 의 런에서 다시 만든다(티켓 0047). 그래야
- * 다시 띄운 뒤에도 worker 가 진행 중인 런을 러너에서 찾고(못 찾으면 워크트리 없음으로 끝낸다) 이은 PR 을 읽는다.
- * 트래커에 붙인 라벨과 새로 만든 티켓은 되살리지 않는다(fixtures.ts 의 목록에서 다시 시작한다).
- */
-
 export function hydrateWorld(db: Database, world: DemoWorld): void {
   const sshTargets = new Map(
     listRunners(db).map((runner) => [runner.id, stringAt(runner.config, "sshTarget")]),
@@ -70,7 +64,6 @@ export function hydrateWorld(db: Database, world: DemoWorld): void {
   }
 }
 
-/** 런과 이은 PR 의 모양. 상태는 부르는 쪽이 정한다 */
 export function pullRequestOf(
   run: {
     headCommit: string;

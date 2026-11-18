@@ -4,22 +4,9 @@ import { createContext, use, type ReactNode } from "react";
 import { cx } from "../cx";
 import { colors, fontSize, fontWeight, motion, radius, size, space } from "../tokens.stylex";
 
-/*
- * 목록 표: 정렬된 열(ADR 0007). 행을 고르면 오른쪽 상세 패널이 바뀐다.
- * 행 선택과 위아래 화살표 이동은 UI SDK Listbox 가 맡는다.
- *
- * <Table columns="minmax(0, 1fr) 80px 56px">
- *   <TableHead><TableHeader>…</TableHeader>…</TableHead>
- *   <TableRows label="…" value={sel} onValueChange={setSel}>
- *     <TableRow value="1051"><TableCell>…</TableCell>…</TableRow>
- *   </TableRows>
- * </Table>
- */
-
 const ColumnsContext = createContext<string>("minmax(0, 1fr)");
 
 export interface TableProps {
-  /** CSS grid-template-columns 값. 첫 열(제목)은 minmax(0, 1fr), 나머지는 고정 폭으로 둔다. */
   columns: string;
   children: ReactNode;
 }
@@ -58,7 +45,6 @@ export function TableHeader({
 }
 
 export interface TableRowsProps {
-  /** 목록의 접근 가능한 이름. 메시지 파일의 글을 넘긴다. */
   label: string;
   value: string | null;
   onValueChange: (value: string) => void;
@@ -83,9 +69,7 @@ export function TableRows({ label, value, onValueChange, children }: TableRowsPr
 
 export interface TableRowProps {
   value: string;
-  /** 행의 접근 가능한 이름(보통 제목). 없으면 행의 글 전체를 읽는다. */
   label?: string;
-  /** 두 번 누르거나 Enter 로 상세 화면을 열 때. */
   onOpen?: () => void;
   children: ReactNode;
 }
@@ -121,7 +105,6 @@ export function TableRow({ value, label, onOpen, children }: TableRowProps) {
 
 export interface TableCellProps {
   align?: CellAlign;
-  /** 숫자 열. tabular-nums 로 자릿수를 맞춘다. */
   numeric?: boolean;
   children: ReactNode;
 }
@@ -140,24 +123,20 @@ export function TableCell({ align = "start", numeric, children }: TableCellProps
   );
 }
 
-/** 행 제목. 행에서 가장 밝고 굵은 글이다. */
 export function RowTitle({ children }: { children: ReactNode }) {
   return <span {...stylex.props(styles.rowTitle)}>{children}</span>;
 }
 
-/** 손댈 일 행에만 붙이는 이유 한 줄. */
 export function RowReason({ children }: { children: ReactNode }) {
   return <span {...stylex.props(styles.rowReason)}>{children}</span>;
 }
 
-/** 목록이 비었을 때 한 줄. */
 export function TableEmpty({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.empty)}>{children}</div>;
 }
 
 const styles = stylex.create({
   table: { display: "flex", flexDirection: "column", minWidth: 0 },
-  // 열 폭(gridTemplateColumns)은 Table 의 columns 값으로 행마다 inline style 로 준다.
   grid: {
     display: "grid",
     alignItems: "center",
@@ -174,7 +153,6 @@ const styles = stylex.create({
     position: "relative",
     minHeight: size.rowMinHeight,
     paddingBlock: space.s3,
-    // 행은 선 대신 둥근 면으로 나눈다(ADR 0010 10번).
     borderRadius: radius.control,
     backgroundColor: { default: "transparent", ":hover": colors.bgHover },
     color: colors.textTertiary,

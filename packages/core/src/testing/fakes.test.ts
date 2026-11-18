@@ -16,7 +16,6 @@ import type { PermissionRequestId, QuestionId } from "../ids.js";
 import { resolveRunProgress } from "../timing.js";
 import { FakeCodeHost, FakeRunner, FakeTracker } from "./index.js";
 
-// 가짜 어댑터 셋이 인터페이스를 만족하는지 typecheck로 확인한다.
 const _tracker: Tracker = new FakeTracker();
 const _runner: Runner = new FakeRunner();
 const _codeHost: CodeHost = new FakeCodeHost();

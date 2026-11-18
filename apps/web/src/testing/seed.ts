@@ -29,15 +29,6 @@ import {
 } from "@factory/db";
 import type { Database } from "@factory/db";
 
-/*
- * 테스트 DB. 가상 값만 쓴다(acme, example.com).
- *
- * - Workspace 둘: ws-commerce(트래커 프로젝트 Web), ws-labs(트래커 프로젝트 Lab)
- * - 러너 둘: runner-a(Online, capacity 10, acme/web), runner-b(Offline, capacity 1, acme/lab)
- * - ws-commerce 런: 상태 다섯, Ended 의 에이전트 결과 여섯과 PR 상태 넷을 모두 담는다
- * - ws-labs 런: LAB-1(실행 중) 하나
- */
-
 export const connection = toTrackerConnectionId("conn-acme");
 export const commerce = toWorkspaceId("ws-commerce");
 export const labs = toWorkspaceId("ws-labs");
@@ -57,7 +48,6 @@ export interface EndedCase {
   summary: "merged" | "human-check" | "failed";
 }
 
-/** Ended 런. 에이전트 결과 여섯과 PR 상태 넷이 모두 나온다 */
 export const endedCases: ReadonlyArray<EndedCase> = [
   { key: "ACME-1", agentResult: "reported-success", prState: "merged", summary: "merged" },
   { key: "ACME-2", agentResult: "reported-failure", prState: "open", summary: "human-check" },
@@ -68,7 +58,6 @@ export const endedCases: ReadonlyArray<EndedCase> = [
   { key: "ACME-7", agentResult: "reported-success", prState: "closed", summary: "failed" },
 ];
 
-/** Ended 가 아닌 런과 그 상태 */
 export const activeCases = [
   { key: "ACME-10", state: "running" },
   { key: "ACME-11", state: "waiting-for-input" },
@@ -76,14 +65,10 @@ export const activeCases = [
   { key: "ACME-13", state: "queued" },
 ] as const;
 
-/** 맞는 러너(acme/lab 이 있는 runner-b)가 Offline 이라 러너를 정하지 못한 Queued 런 */
 export const offlineQueuedKey = "ACME-14";
 
 export const now = minutes(120);
 
-/**
- * 테스트 DB 를 만든다. path 를 주면 그 파일에 쓰고(화면을 눈으로 볼 때), origin 을 주면 그 시각부터 런을 둔다.
- */
 export function seedDatabase(options: { path?: string; origin?: Date } = {}): {
   db: Database;
   ids: Map<string, RunId>;
@@ -208,7 +193,6 @@ function expectOk(result: { ok: boolean }): void {
   if (!result.ok) throw new Error(`state change failed: ${JSON.stringify(result)}`);
 }
 
-/** 시작한 런이 러너에서 받는 값(워크트리, 실제 브랜치, 에이전트 참조) */
 function startedOn(worktree: string) {
   return {
     worktree: toWorktreeRef(worktree),
@@ -217,10 +201,6 @@ function startedOn(worktree: string) {
   };
 }
 
-/**
- * runner-a 의 GitHub 인증 확인 결과를 넣는다(Q82.14·Q82.15). acme/web 은 깨졌고 acme/docs 는 통과한다.
- * 할당에서 빠지지만 Online 은 그대로다.
- */
 export function breakGitHubAuth(db: Database): void {
   recordRunnerCheck(db, {
     runnerId: toRunnerId("runner-a"),
@@ -231,7 +211,6 @@ export function breakGitHubAuth(db: Database): void {
     assignmentBlocked: true,
     prerequisites: [
       { id: "service", name: "Orca service", satisfied: true, hint: null, blocksAssignment: false },
-      // 이름과 해결 방법은 runner-orca 어댑터가 주는 모양을 따른다
       {
         id: "github-push:github:acme/web",
         name: "GitHub push access: acme/web",
@@ -250,9 +229,6 @@ export function breakGitHubAuth(db: Database): void {
   });
 }
 
-/**
- * runner-b 에서 시작한 뒤 취소했지만 러너에 닿지 못한 채 끝난 런을 더한다(Q82.21). 워크트리는 사람이 정한다.
- */
 export function addUnreachedCanceledRun(db: Database, key: string): RunId {
   const assigned = assignRun(db, {
     ticket: { connection, key: toTicketKey(key) },

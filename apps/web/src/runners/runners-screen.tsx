@@ -10,29 +10,20 @@ import { runnerIssueCause } from "../shell/model";
 import { useStatusName } from "../status";
 import type { RunWorkspace, RunnerCheckItem, RunnerView, RunnersPage } from "./model";
 
-/** 러너 추가는 Settings 의 러너 등록에서 한다. 보던 Workspace(ws)를 이어 간다 */
 export function addRunnerHref(ws: string | undefined): string {
   const search = new URLSearchParams(ws === undefined ? {} : { ws });
   search.set("sel", "runners");
   return `/settings?${search.toString()}`;
 }
 
-/** capacity 막대를 칸으로 나눠 그리는 가장 큰 capacity. 넘으면 한 줄 막대로 그린다 */
 const MAX_SEGMENTS = 12;
 
 export interface RunnersScreenProps {
   page: RunnersPage;
-  /** 주소로 고른 러너(Home 의 Runner Issue 카드에서 온다). 그 카드로 스크롤하고 테두리로 보인다 */
   selectedId: string | undefined;
-  /** 보던 Workspace. 러너 추가 링크가 이어 간다 */
   ws: string | undefined;
 }
 
-/**
- * Runners: 러너 카드(시안 B, ADR 0010). Online·Offline 알약, capacity 막대, 확인 항목, 문제가 있으면 해결 안내.
- * Workspace 와 상관없는 공용 화면이라 모든 Workspace 의 런을 보인다(ADR 0006).
- * 파란 주 버튼은 "러너 추가" 하나다(ADR 0010 6번).
- */
 export function RunnersScreen({ page, selectedId, ws }: RunnersScreenProps) {
   const t = useTranslations("runners");
   const { runners } = page;
@@ -164,7 +155,6 @@ function Summary({ runner }: { runner: RunnerView }) {
   return runner.queued.length === 0 ? t("full") : t("fullWaiting", { count: runner.queued.length });
 }
 
-/** "Capacity 2/2"와 막대(ADR 0010 7번: 비율은 "2/2"로 쓴다). Offline 이면 막대가 빨갛다 */
 function CapacityBar({ runner }: { runner: RunnerView }) {
   const t = useTranslations("runners.card");
   const occupied = Math.min(runner.occupying.length, runner.capacity);
@@ -269,10 +259,6 @@ function RunLabel({
   );
 }
 
-/**
- * 러너 확인 항목(스펙 9절). Offline 이면 마지막 결과 대신 닿지 않는다는 것 하나를 보인다.
- * GitHub push 는 프로젝트마다다(Q82.15).
- */
 function CheckList({ runner }: { runner: RunnerView }) {
   const t = useTranslations("runners.card");
   const prerequisiteName = usePrerequisiteName();
@@ -315,7 +301,6 @@ function CheckLine({
   children,
 }: {
   state: CheckState;
-  /** 깨진 항목의 해결 안내(Orca 상시 서비스 설치 명령 등) */
   hint?: string | null;
   children: ReactNode;
 }) {
@@ -392,7 +377,6 @@ function Icon({ children }: { children: ReactNode }) {
   );
 }
 
-// 확인 항목 아이콘. 통과는 초록(정상), 깨짐은 빨강(문제)으로 ADR 0010 5번의 뜻을 따른다
 const checkIcons: Record<CheckState, ReactNode> = {
   ok: (
     <Icon>

@@ -18,13 +18,6 @@ import type {
 import { toWorkspaceId } from "@factory/db";
 import { FAIL_OFFLINE, FAIL_PUSH_AUTH } from "./values.js";
 
-/*
- * 개발 진입점(티켓 0047)의 가상 값. 실제 서비스·계정·주소는 쓰지 않는다(ADR 0005). 트래커는 가짜 트래커가
- * 이 목록으로 답하고, 미리 채운 모드의 시드(seed.ts)도 같은 값을 DB 에 쓴다.
- *
- * 가짜 어댑터는 입력값으로 확인 결과를 정한다(world.ts, values.ts).
- */
-
 export interface TrackerCatalog {
   projects: TrackerProject[];
   states: TrackerState[];
@@ -55,13 +48,11 @@ const todo = states[1] ?? states[0];
 interface ProjectSpec {
   id: string;
   name: string;
-  /** 러너 쪽 프로젝트(저장소). Mapping 이 고른다 */
   repo: string;
   titles: string[];
 }
 
 interface TrackerSpec {
-  /** 트래커 연결 이름이자 API 키에 든 낱말 */
   name: string;
   keyPrefix: string;
   projects: ProjectSpec[];
@@ -149,7 +140,6 @@ const GLOBEX: TrackerSpec = {
 
 export const TRACKERS: ReadonlyArray<TrackerSpec> = [ACME, GLOBEX];
 
-/** API 키에 든 낱말로 트래커를 고른다. 모르는 키(온보딩에서 새로 넣은 값)는 Acme 다 */
 export function trackerSpecFor(apiKey: string): TrackerSpec {
   const lower = apiKey.toLowerCase();
   return TRACKERS.find((spec) => lower.includes(spec.name.toLowerCase())) ?? ACME;
@@ -163,7 +153,6 @@ export function runnerProjectId(spec: ProjectSpec) {
   return toRunnerProjectId(spec.repo);
 }
 
-/** 트래커 하나의 목록. 티켓 키는 프로젝트를 이어 1 부터 센다 */
 export function trackerCatalog(spec: TrackerSpec, now: Date): TrackerCatalog {
   const tickets: TrackerTicket[] = [];
   let n = 0;
@@ -195,7 +184,6 @@ export function trackerCatalog(spec: TrackerSpec, now: Date): TrackerCatalog {
   };
 }
 
-/** 가짜 러너가 가진 러너 쪽 프로젝트(모든 저장소) */
 export const RUNNER_PROJECTS: ReadonlyArray<RunnerProject> = TRACKERS.flatMap((spec) =>
   spec.projects.map((project) => ({
     id: runnerProjectId(project),
@@ -203,8 +191,6 @@ export const RUNNER_PROJECTS: ReadonlyArray<RunnerProject> = TRACKERS.flatMap((s
     setupState: "ready",
   })),
 );
-
-// ---------- 미리 채운 모드의 설정 ----------
 
 export const seededConnections = TRACKERS.map((spec) => ({
   spec,
@@ -214,10 +200,6 @@ export const seededConnections = TRACKERS.map((spec) => ({
   webhookSecret: `lin_wh_demo_${spec.name.toLowerCase()}`,
 }));
 
-/**
- * 러너 셋. runner-a 는 Online(진행 중인 런으로 가득 차 Queued 런이 기다린다), runner-b 는 GitHub 인증이 깨짐, runner-c 는 Offline(Disconnected 런이 있다).
- * 상태는 ssh 대상의 낱말로 가짜 러너가 정한다.
- */
 export const seededRunners = [
   { id: toRunnerId("runner-a"), name: "runner-a", sshTarget: "runner-a.example.com", capacity: 3 },
   {

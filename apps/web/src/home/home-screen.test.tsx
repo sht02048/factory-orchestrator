@@ -23,7 +23,6 @@ function seededPage(ws = "ws-commerce"): HomePage {
   return loadHomePage(db, ws, now, "UTC");
 }
 
-/** 손댈 일 카드 하나(section aria-label="{종류} {이름}")의 HTML */
 function card(html: string, label: string): string {
   const start = html.indexOf(`aria-label="${label}"`);
   if (start < 0) return "";
@@ -34,14 +33,12 @@ function text(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 }
 
-/** 지금 일어나는 일(aside)의 HTML */
 function feed(html: string): string {
   const start = html.indexOf("<aside");
   if (start < 0) return "";
   return html.slice(start, html.indexOf("</aside>", start));
 }
 
-/** 버튼과 버튼 모양 링크의 변형 */
 function variants(html: string): string[] {
   return [...html.matchAll(/data-variant="([^"]+)"/g)].map((m) => m[1] ?? "");
 }
@@ -55,7 +52,6 @@ function runOf(page: HomePage, key: string): HomeRun {
   return found.run;
 }
 
-/** 시드의 입력 기다림 런(ACME-11)에 기다리는 입력을 붙인다 */
 function withInput(page: HomePage, input: InputWait): HomePage {
   return {
     ...page,
@@ -94,7 +90,6 @@ describe("Home", () => {
     expect(human).toContain('href="https://example.com/acme/web/pull/2"');
     expect(text(card(html, "Disconnected ACME-12"))).toContain("runner-a에");
     expect(text(card(html, "Failed ACME-3"))).toContain(homeJson.card.failed);
-    // 손댈 일 카드 수 = 손댈 일 수
     const cards = html.match(/<section aria-label="[^"]+"/g) ?? [];
     const attentionCards = cards.filter(
       (c) => !c.includes(homeJson.section.attention) && !c.includes(homeJson.activity.title),
@@ -118,7 +113,6 @@ describe("Home", () => {
   });
 
   it("카드 행동과 질문 선택지는 모두 보조 버튼이고 파란 주 버튼은 하나 이하다(ADR 0010 6번, Q18)", () => {
-    // 질문 카드와 권한 카드를 함께 둔다
     const base = withInput(seededPage(), question);
     const acme11 = runOf(base, "ACME-11");
     const permissionRun: HomeRun = {
@@ -145,7 +139,6 @@ describe("Home", () => {
     expect(q).toMatch(/<button[^>]*data-variant="secondary"[^>]*>30초 고정<\/button>/);
     expect(text(q)).toContain(homeJson.question.write);
 
-    // 거절은 빨간 글자 보조 버튼이다. 허용은 러너 화면에서만 한다(Q82.4)
     const p = card(html, "Permission ACME-22");
     expect(text(p)).toContain("git push --force 허용은 러너 화면에서만 할 수 있어요.");
     expect(p).toMatch(/<button[^>]*data-variant="danger"[^>]*>거절<\/button>/);
@@ -157,7 +150,6 @@ describe("Home", () => {
     const q = card(html, "Question ACME-11");
     expect(text(q)).toContain(homeJson.question.answered);
     expect(variants(q)).toEqual([]);
-    // 결과 문장은 화면 읽기가 알리고 보낸 뒤 포커스를 받는다(티켓 0050)
     expect(q).toMatch(/<div role="status" tabindex="-1"[^>]*>.*답을 남겼어요/);
   });
 
@@ -205,7 +197,6 @@ describe("Home", () => {
   it("지금 일어나는 일은 회색 키, 사건 문장, 상대 시간으로 보인다(ADR 0010 7번)", () => {
     const html = render(seededPage());
     const activity = text(feed(html));
-    // 가장 최근: ACME-7 이 Failed 로 끝남(120분 - 37분 = 83분 전 → 1시간 전)
     expect(activity).toContain("ACME-7 Failed로 끝났어요 1시간 전");
     expect(activity).toContain("ACME-12 러너와 연결이 끊겼어요");
   });

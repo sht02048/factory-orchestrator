@@ -42,7 +42,6 @@ const keys = (runs: ReadonlyArray<HomeRun>) => runs.map((run) => run.ticketKey);
 const attentionKeys = (items: ReadonlyArray<AttentionItem>) =>
   items.map((item) => (item.kind === "run" ? item.run.ticketKey : `runner:${item.runner.id}`));
 
-/** 런을 시작해 끝낸다 */
 function addEndedRun(
   db: Database,
   input: { key: string; trackerProject: string; agentResult: "timed-out" | "canceled" },
@@ -75,7 +74,6 @@ function addEndedRun(
   return id;
 }
 
-/** ws-labs 에 Failed 로 끝난 런 하나를 더한다 */
 function addLabsFailedRun(db: Database): void {
   addEndedRun(db, { key: "LAB-2", trackerProject: "tp-lab", agentResult: "timed-out" });
 }
@@ -90,10 +88,8 @@ describe("loadHomePage", () => {
     const { db } = seedDatabase();
     const page = loadHomePage(db, "ws-commerce", now, "UTC");
 
-    // 시드의 runner-b 는 Offline 이라 Runner Issue 로 맨 앞에 온다
     expect(attentionKeys(page.attention)[0]).toBe("runner:runner-b");
     const attention = attentionKeys(page.attention).filter((key) => !key.startsWith("runner:"));
-    // 입력 기다림·연결 끊김이 먼저, 그다음 Human Check·Failed 인 Ended 런(새 것부터)
     expect(attention.slice(0, 2)).toEqual(["ACME-11", "ACME-12"]);
     expect(attention.slice(2).toSorted()).toEqual(
       endedCases
@@ -102,7 +98,7 @@ describe("loadHomePage", () => {
         .toSorted(),
     );
     expect(attention.slice(2)).toEqual(attention.slice(2).toSorted().toReversed());
-    expect(attention).not.toContain("ACME-1"); // Merged
+    expect(attention).not.toContain("ACME-1");
 
     expect(keys(page.running)).toEqual(["ACME-10"]);
     expect(keys(page.queued)).toEqual(["ACME-13", offlineQueuedKey]);
@@ -110,7 +106,6 @@ describe("loadHomePage", () => {
 
   it("Queued 는 들어온 순서로 보이고, 순서에서 빠진 런에는 이유를 담는다(Q68)", () => {
     const { db } = seedDatabase();
-    // ACME-13 보다 먼저 들어온 런이 없으니 하나를 일찍 할당한 것처럼 더한다
     const early = assignRun(db, {
       ticket: { connection, key: toTicketKey("ACME-20") },
       trackerProject: toTrackerProjectId("tp-web"),
@@ -173,7 +168,6 @@ describe("loadHomePage", () => {
     updateRunRecords(db, id, { laterPrState: { state: "merged", at: minutes(110) } });
     const page = loadHomePage(db, "ws-commerce", now, "UTC");
     expect(attentionKeys(page.attention)).not.toContain("ACME-2");
-    // Failed 런은 이후 PR 상태와 상관없이 남는다
     const failedId = ids.get("ACME-5");
     if (failedId === undefined) throw new Error("ACME-5 missing");
     updateRunRecords(db, failedId, { laterPrState: { state: "closed", at: minutes(110) } });
@@ -269,11 +263,9 @@ describe("loadHomePage", () => {
       kind: "runner-issue",
       runner: { id: "runner-b", name: "runner-b", cause: "offline" },
     });
-    // Online 러너(runner-a)는 오르지 않는다
     expect(attentionKeys(page.attention)).not.toContain("runner:runner-a");
     expect(loadShell(db).runnerIssues).toBe(1);
 
-    // GitHub 인증까지 깨지면 둘 다 센다
     breakGitHubAuth(db);
     expect(loadShell(db).runnerIssues).toBe(2);
     expect(
@@ -301,7 +293,6 @@ describe("loadHomePage", () => {
     expect(page.queued.find((run) => run.ticketKey === "ACME-13")).toMatchObject({
       queuedReason: { kind: "assignment-blocked" },
     });
-    // 러너는 Workspace 밖 자원이라 다른 Workspace 와 전체에서도 보인다
     expect(attentionKeys(loadHomePage(db, labs, now, "UTC").attention)).toContain(
       "runner:runner-a",
     );
@@ -320,7 +311,7 @@ describe("loadHomePage", () => {
     const attention = attentionKeys(page.attention);
     expect(attention).toContain("LAB-2");
     expect(attention).toContain("ACME-11");
-    expect(attention).not.toContain("LAB-1"); // 실행 중
+    expect(attention).not.toContain("LAB-1");
     const lab = page.attention.find(
       (item) => item.kind === "run" && item.run.ticketKey === "LAB-2",
     );
@@ -338,9 +329,7 @@ describe("loadHomePage", () => {
 
   it("오늘 Merged 는 운영자 시간대의 오늘 Merged 로 끝난 런만 센다(0044)", () => {
     const { db } = seedDatabase();
-    // ACME-1 은 2026-11-17 09:31Z 에 Merged 로 끝났고 지금은 11:00Z 다
     expect(loadHomePage(db, "ws-commerce", now, "UTC").mergedToday).toBe(1);
-    // UTC+14 에서는 끝난 때가 11-17 23:31, 지금이 11-18 01:00 이라 오늘이 아니다
     expect(loadHomePage(db, "ws-commerce", now, "Pacific/Kiritimati").mergedToday).toBe(0);
     expect(loadHomePage(db, "all", now, "UTC").mergedToday).toBe(0);
   });
@@ -352,7 +341,6 @@ describe("loadHomePage", () => {
     expect(activity.map((a) => Date.parse(a.at))).toEqual(
       activity.map((a) => Date.parse(a.at)).toSorted((a, b) => b - a),
     );
-    // 가장 최근 사건은 ACME-7 이 Failed 로 끝난 것이다
     expect(activity[0]).toMatchObject({
       ticketKey: "ACME-7",
       event: { kind: "ended", summary: "failed" },

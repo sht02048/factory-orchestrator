@@ -36,13 +36,6 @@ import type { SettingsContext } from "./load";
 import { MAX_MODEL_LENGTH, MAX_RUN_MINUTES } from "./model";
 import type { ConnectionSaveReason, RemoteError, SaveResult } from "./model";
 
-/*
- * Settings 의 저장과 연결 확인. 입력은 server function 경계에서 zod 로 파싱한 값이다.
- * web 은 ssh 를 쓰지 않는다. 러너 확인은 DB 에 요청을 남기고 worker 가 결과를 쓴다(Q61).
- * Linear·GitHub 연결 확인은 어댑터로 바로 한다.
- */
-
-/** 1단계 러너 종류(Orca, ADR 0008). 설정은 { sshTarget, orcaPath } 다(runner-orca, 0013) */
 export const RUNNER_KIND: RunnerKind = toRunnerKind("orca");
 
 const id = z.string().trim().min(1);
@@ -51,8 +44,6 @@ const name = z.string().trim().min(1).max(200);
 function workspaceOf(context: SettingsContext, ws: string): WorkspaceId | null {
   return listWorkspaces(context.db).find((w) => w.id === ws)?.id ?? null;
 }
-
-// ---------- 이 Workspace ----------
 
 export const generalInput = z.object({
   ws: id,
@@ -82,10 +73,6 @@ export const trackerProjectInput = z.object({
 
 export const addTrackerProjectInput = trackerProjectInput.extend({ name });
 
-/**
- * 트래커 프로젝트를 이 Workspace 에 넣는다. 다른 Workspace 에 묶여 있으면 넣지 않는다(ADR 0006).
- * 이미 이 Workspace 에 있으면 "In Progress" 상태를 그대로 둔다.
- */
 export function addTrackerProject(
   context: SettingsContext,
   input: z.infer<typeof addTrackerProjectInput>,
@@ -113,7 +100,6 @@ export function addTrackerProject(
   return saved ? { ok: true } : { ok: false, reason: "taken" };
 }
 
-/** 트래커 프로젝트를 이 Workspace 에서 뺀다. Mapping 도 함께 지워지고 런 기록은 남는다 */
 export function removeTrackerProject(
   context: SettingsContext,
   input: z.infer<typeof trackerProjectInput>,
@@ -128,7 +114,6 @@ export function removeTrackerProject(
   return removed ? { ok: true } : { ok: false, reason: "not-found" };
 }
 
-/** 이 Workspace 에 묶인 트래커 프로젝트. 아니면 null */
 function boundProject(context: SettingsContext, input: z.infer<typeof trackerProjectInput>) {
   const workspaceId = workspaceOf(context, input.ws);
   if (workspaceId === null) return null;
@@ -143,10 +128,6 @@ function boundProject(context: SettingsContext, input: z.infer<typeof trackerPro
 export const mappingInput = trackerProjectInput.extend({
   runnerProjectId: id,
   agentId: id,
-  /**
-   * 에이전트 모델(0043). 비우면 정하지 않은 것이다. `worker-start --model` 값으로 넘기므로 러너 CLI 의
-   * 옵션으로 읽히지 않게 `-`로 시작하지 못하고, 공백·제어 문자를 넣지 못한다.
-   */
   model: z
     .string()
     .trim()
@@ -155,7 +136,6 @@ export const mappingInput = trackerProjectInput.extend({
     .optional(),
 });
 
-/** Mapping 을 저장한다. 러너는 고르지 않는다(Q53). 모델을 비우면 정하지 않은 것(null)으로 저장한다 */
 export function saveMappingSetting(
   context: SettingsContext,
   input: z.infer<typeof mappingInput>,
@@ -174,7 +154,6 @@ export function saveMappingSetting(
 
 export const inProgressInput = trackerProjectInput.extend({ stateId: id });
 
-/** 런이 시작할 때 티켓을 옮길 "In Progress" 상태(Q41) */
 export function saveInProgressState(
   context: SettingsContext,
   input: z.infer<typeof inProgressInput>,
@@ -210,28 +189,19 @@ export function saveLabel(
   return { ok: true };
 }
 
-// ---------- 설치 전체: 트래커 연결 ----------
-
-/** 비밀값 칸. 비우면 저장된 값을 그대로 둔다 */
 const secret = z.string().trim().max(1000);
 
 export const trackerConnectionInput = z.object({
-  /** 없으면 새 연결 */
   id: id.optional(),
   name,
   apiKey: secret,
   webhookSecret: secret,
 });
 
-/** 트래커 연결의 비밀값. 1단계 트래커 어댑터가 받는 모양이다(API 키, webhook signing secret) */
 const trackerSecretsSchema = z
   .object({ apiKey: z.string(), webhookSecret: z.string().nullish() })
   .loose();
 
-/**
- * 트래커 연결을 저장한다. 새 API 키는 트래커에 닿는지 먼저 확인하고, 확인에 실패하면 저장하지 않는다.
- * 비운 비밀값 칸은 저장된 값을 그대로 둔다. 새 연결의 종류는 등록한 트래커 종류 중 첫째다(1단계는 Linear 하나).
- */
 export async function saveTrackerConnectionSetting(
   context: SettingsContext,
   input: z.infer<typeof trackerConnectionInput>,
@@ -277,7 +247,6 @@ export async function saveTrackerConnectionSetting(
 
 export const connectionIdInput = z.object({ id });
 
-/** 저장한 트래커 연결이 지금도 닿는지 어댑터로 확인한다 */
 export async function checkTrackerConnection(
   context: SettingsContext,
   input: z.infer<typeof connectionIdInput>,
@@ -295,14 +264,8 @@ export async function checkTrackerConnection(
   );
 }
 
-// ---------- 설치 전체: GitHub 토큰 ----------
-
 export const githubTokenInput = z.object({ token: z.string().trim().min(1).max(1000) });
 
-/**
- * GitHub 토큰을 확인한 뒤 저장한다. 연결은 설치에 하나다. 이미 있으면 그 연결의 토큰을 바꾼다.
- * 확인은 토큰이 맞고 GitHub 에 닿는지만 본다. CI 를 읽을 권한은 저장소마다 달라 여기서 알 수 없다(Q79).
- */
 export async function saveGitHubToken(
   context: SettingsContext,
   input: z.infer<typeof githubTokenInput>,
@@ -332,7 +295,6 @@ export async function saveGitHubToken(
   return { ok: true };
 }
 
-/** 저장한 GitHub 토큰이 지금도 맞는지 확인한다 */
 export async function checkGitHubToken(
   context: SettingsContext,
 ): Promise<SaveResult<RemoteError | "not-found">> {
@@ -357,16 +319,9 @@ async function checkWith(
   }
 }
 
-// ---------- 설치 전체: 러너 ----------
-
 export const runnerInput = z.object({
-  /** 없으면 새 러너 */
   id: id.optional(),
   name,
-  /**
-   * ssh 에 그대로 넘기는 대상. "-" 로 시작하면 ssh 옵션으로 읽히므로(-oProxyCommand 등) 거절하고,
-   * 공백·제어 문자도 받지 않는다.
-   */
   sshTarget: z
     .string()
     .trim()
@@ -377,10 +332,6 @@ export const runnerInput = z.object({
   capacity: z.number().int().min(1).max(100),
 });
 
-/**
- * 러너를 저장하고 러너 확인을 요청한다. ssh 는 web 이 아니라 worker 가 쓴다(Q61).
- * 저장한 러너의 id 를 돌려준다.
- */
 export function saveRunnerSetting(
   context: SettingsContext,
   input: z.infer<typeof runnerInput>,
@@ -396,7 +347,6 @@ export function saveRunnerSetting(
       id: runnerId,
       kind: existing?.kind ?? RUNNER_KIND,
       name: input.name,
-      // Settings 가 고치지 않는 설정 키는 남긴다
       config: {
         ...looseConfig(existing?.config),
         sshTarget: input.sshTarget,
@@ -417,7 +367,6 @@ function looseConfig(config: unknown): Record<string, unknown> {
 
 export const runnerIdInput = z.object({ id });
 
-/** 러너 확인을 요청한다. 결과는 worker 가 쓰고 화면이 다시 읽는다(Q61) */
 export function requestRunnerCheckSetting(
   context: SettingsContext,
   input: z.infer<typeof runnerIdInput>,
@@ -429,17 +378,11 @@ export function requestRunnerCheckSetting(
   return { ok: true };
 }
 
-// ---------- 주소(티켓 0048) ----------
-
 export const addressesInput = z.object({
   webAddress: z.string().trim().max(2000),
   webhookAddress: z.string().trim().max(2000),
 });
 
-/**
- * 넣은 주소를 저장할 모양(origin)으로 바꾼다. 비었으면 null(정하지 않음)이다. http·https 이고 경로·쿼리·사용자
- * 정보가 없어야 한다. 서버는 경로 접두사 아래에서 돌지 않아 경로가 붙은 주소는 맞지 않는다. 틀리면 undefined 다.
- */
 export function normalizeAddress(value: string): string | null | undefined {
   if (value === "") return null;
   let url: URL;
@@ -455,25 +398,16 @@ export function normalizeAddress(value: string): string | null | undefined {
     url.pathname === "/" &&
     url.search === "" &&
     url.hash === "";
-  // Host 검사가 읽을 수 있는 호스트 이름이어야 한다. URL 은 밑줄 같은 글자도 받아, 저장해 놓고 그 이름으로는
-  // 열리지 않는 주소가 생긴다. 두 쪽이 같은 규칙(hostnameOfHostHeader)을 쓴다.
   return plain && hostnameOfHostHeader(url.host) !== null ? url.origin : undefined;
 }
 
 export type AddressSaveReason = "invalid-web-address" | "invalid-webhook-address" | "locks-out";
 
-/** 지금 요청이 온 곳. 저장하면 지금 보는 화면이 막히는지 보는 데 쓴다 */
 export interface RequestOrigin {
-  /** 요청의 Host 헤더. 모르면 null */
   host: string | null;
-  /** 부팅 설정의 바인드 주소(WEB_HOST). 모르면 null */
   bindHost: string | null;
 }
 
-/**
- * 다른 기기에서 열 주소와 webhook 공개 주소를 저장한다. 저장하면 지금 보는 화면의 호스트가 허용 목록에서
- * 빠지는 경우(예: tailnet 이름으로 열어 놓고 다른 이름을 넣음)는 저장하지 않는다. 127.0.0.1 로 연 화면은 늘 열린다.
- */
 export function saveAddresses(
   context: SettingsContext,
   input: z.infer<typeof addressesInput>,

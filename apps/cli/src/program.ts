@@ -18,7 +18,6 @@ import type { CommandRunner, ServicePlan } from "./service.js";
 import { StartError, start } from "./start.js";
 import type { Started } from "./start.js";
 
-/** CLI가 바깥과 닿는 곳. 시험에서 바꿔 끼운다 */
 export interface ProgramContext {
   env: Readonly<Record<string, string | undefined>>;
   platform: NodeJS.Platform;
@@ -30,11 +29,9 @@ export interface ProgramContext {
   runCommand: CommandRunner;
   out(line: string): void;
   err(line: string): void;
-  /** start가 받은 멈춤 신호를 기다린다 */
   onStopSignal(handler: (signal: NodeJS.Signals) => void): void;
 }
 
-/** @returns 프로세스 종료 코드 */
 export async function runProgram(
   argv: ReadonlyArray<string>,
   context: ProgramContext,
@@ -116,7 +113,6 @@ function runInit(context: ProgramContext, options: Parameters<typeof init>[0]): 
 }
 
 async function runStart(context: ProgramContext, home: string): Promise<number> {
-  // 뜨는 중에 신호를 받아도 자식을 남기지 않게 handler를 먼저 단다. 뜨는 중이면 기다림을 멈추고 정리한다.
   const abort = new AbortController();
   let started: Started | undefined;
   context.onStopSignal((signal) => {
@@ -192,7 +188,6 @@ function runServiceInstall(context: ProgramContext, home: string, dryRun: boolea
     for (const command of plan.install) context.out(`  ${formatCommand(command)}`);
     return 0;
   }
-  // 부팅 설정이 없거나 틀린 채로 등록하면 서비스가 뜨자마자 끝나기를 되풀이한다. 미리 막는다.
   try {
     parseBootConfig(readBootEnv(homePaths(home).envFile, {}));
   } catch (error) {
@@ -257,7 +252,6 @@ function describeError(error: unknown): string {
   return error instanceof Error ? (error.stack ?? error.message) : String(error);
 }
 
-/** 실제 명령 실행. 출력은 실패했을 때만 보여 주려고 모은다 */
 export const runCommand: CommandRunner = (command) => {
   const [file, ...args] = command;
   if (file === undefined) return { ok: false, output: "empty command" };

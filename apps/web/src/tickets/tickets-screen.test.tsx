@@ -32,7 +32,6 @@ function render(page: TicketsPage, options: { filter?: TicketFilter; selectedId?
 
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
-/** 목록의 행(role="option")마다 칸 글 */
 function rowTexts(html: string): Map<string, string> {
   const rows = new Map<string, string>();
   for (const chunk of html.split('role="option"').slice(1)) {
@@ -43,7 +42,6 @@ function rowTexts(html: string): Map<string, string> {
   return rows;
 }
 
-/** 버튼과 버튼 모양 링크의 변형 */
 function variants(html: string): string[] {
   return [...html.matchAll(/data-variant="([^"]+)"/g)].map((m) => m[1] ?? "");
 }
@@ -152,7 +150,6 @@ describe("Tickets 화면", () => {
     const html = render(page, { selectedId: acme1.id });
     const row = rowTexts(html).get("ACME-1") ?? "";
     expect(row).toContain(`> ACME-1 ${acme1.title} Web Todo`);
-    // 패널 제목도 키 + 제목이고, 아래 줄에 키를 다시 쓰지 않는다
     const heading = /<h2[^>]*>([\s\S]*?)<\/h2>/.exec(html.split("<aside")[1] ?? "")?.[1] ?? "";
     expect(text(heading).trim()).toBe(`ACME-1 ${acme1.title}`);
   });
@@ -175,7 +172,6 @@ describe("Tickets 화면", () => {
       const all = variants(render(page, { selectedId: ticket.id }));
       expect(all.filter((v) => v === "primary").length).toBeLessThanOrEqual(1);
     }
-    // 할당할 수 있는 티켓의 할당하기가 그 주 버튼이다
     const ready = page.tickets.find((t) => t.assignability.kind === "ready");
     expect(variants(render(page, { selectedId: ready?.id ?? "" }))).toContain("primary");
   });

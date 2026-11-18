@@ -1,11 +1,3 @@
-/**
- * 테스트용 가짜 어댑터. 메모리 안에서 동작하고, 테스트가 응답을 정할 수 있다.
- * worker 시험(0006·0016)과 끝에서 끝까지 얇은 경로(0008)가 이것으로 돈다.
- *
- * 각 가짜는 종류(kind)를 받아 만들 수 있어, 서로 다른 종류의 트래커·러너·코드 호스트가 함께
- * 등록된 경우도 시험할 수 있다. factory를 AdapterRegistry에 등록하면 만든 어댑터를
- * factory의 `created`에서 꺼내 응답을 정한다.
- */
 import { AdapterError } from "../adapters.js";
 import type {
   AgentQuestion,
@@ -77,8 +69,6 @@ function paginate<T>(all: ReadonlyArray<T>, page: Page | undefined): Paged<T> {
   };
 }
 
-// ---------- Tracker ----------
-
 type WebhookResult = { ok: true; event: TrackerEvent } | { ok: false; error: WebhookVerifyError };
 
 export class FakeTracker implements Tracker {
@@ -88,10 +78,8 @@ export class FakeTracker implements Tracker {
   readonly projects: TrackerProject[] = [];
   readonly labels = new Map<TrackerProjectId, TrackerLabel[]>();
   readonly states = new Map<TrackerProjectId, TrackerState[]>();
-  /** setState 호출 기록 */
   readonly stateChanges: Array<{ key: TicketKey; stateId: TrackerStateId }> = [];
   connection: ConnectionCheck<TrackerErrorDetail> = { ok: true };
-  /** verifyWebhook이 돌려줄 값. 따로 정하지 않으면 malformed다. */
   verifyWebhookWith: (input: { rawBody: Uint8Array; now: Date }) => WebhookResult = () => ({
     ok: false,
     error: "malformed",
@@ -177,42 +165,24 @@ export class FakeTracker implements Tracker {
   }
 }
 
-// ---------- Runner ----------
-
-/** 가짜 러너 안의 런 하나. 테스트가 질문·권한 대기·완료 보고·사라짐을 일으킨다. */
 export interface FakeRunnerRun {
   input: StartRunInput;
   started: StartedRun;
   questions: AgentQuestion[];
-  /** answerQuestion으로 받은 답. 같은 질문에 두 번 오면 둘 다 남는다 */
   answers: Array<{ questionId: QuestionId; answer: string }>;
-  /** 아직 열린 권한 대기 */
   permissionWaits: PermissionWait[];
-  /** denyPermission으로 받은 거절 */
   denials: Array<{ permissionId: PermissionRequestId; reason: string }>;
   report: CompletionReport | null;
-  /** 보고 없이 사라졌으면 그 설명 */
   endedWithoutReport: string | null;
   agentStopped: boolean;
   agentClosed: boolean;
   log: string[];
 }
 
-/**
- * 러너 하나. 따로 정하지 않으면 Online이고 갖춰야 할 것을 모두 갖췄으며,
- * `setProjects`로 넣은 러너 쪽 프로젝트를 가진다고 답한다.
- * Offline이면 러너에 닿는 메서드가 unreachable AdapterError로 실패한다.
- *
- * 실제 러너처럼 질문 메일은 답한 뒤에도 남는다(Q82.5). 답했는지는 부르는 쪽이 DB로 거른다.
- * 같은 워크트리 이름으로 다시 시작하면 runner-error로 거절한다. 이미 시작했는지는 findStartedRun으로 본다.
- */
 export class FakeRunner implements Runner {
   readonly kind: RunnerKind;
-  /** 워크트리 이름으로 찾는 런 */
   readonly runs = new Map<string, FakeRunnerRun>();
-  /** removeWorktree 호출 기록 */
   readonly removed: WorktreeRef[] = [];
-  /** startRun 호출 기록(실패 포함) */
   readonly startCalls: StartRunInput[] = [];
   online = true;
   prerequisites: RunnerPrerequisite[] = [
@@ -232,9 +202,7 @@ export class FakeRunner implements Runner {
     },
   ];
   projects: RunnerProject[] = [];
-  /** 다음 startRun을 이 오류로 실패시킨다. 한 번 쓰면 비운다. */
   failNextStart: RunnerErrorDetail | null = null;
-  /** 다음 startRun은 런을 시작하지만 응답을 잃는다(start-outcome-unknown). 한 번 쓰면 거짓이 된다. */
   loseNextStartResponse = false;
   private readonly mailboxes = new Set<MailboxRef>();
   private seq = 0;
@@ -247,12 +215,10 @@ export class FakeRunner implements Runner {
     this.projects = [...projects];
   }
 
-  /** 우편함 터미널이 사라진 것처럼 만든다. 그 우편함을 쓰는 호출은 mailbox-missing으로 실패한다. */
   dropMailbox(mailbox: MailboxRef): void {
     this.mailboxes.delete(mailbox);
   }
 
-  /** 워크트리로 런을 찾는다. 없으면 던진다. */
   runAt(worktree: WorktreeRef): FakeRunnerRun {
     for (const run of this.runs.values()) {
       if (run.started.worktree === worktree) return run;
@@ -264,7 +230,6 @@ export class FakeRunner implements Runner {
     });
   }
 
-  /** 에이전트가 질문한다(Q82.3). 질문 ID를 돌려준다. */
   ask(
     worktree: WorktreeRef,
     question: { body: string; options?: string[]; at?: Date },
@@ -280,20 +245,17 @@ export class FakeRunner implements Runner {
     return id;
   }
 
-  /** 에이전트가 권한 프롬프트에서 허용을 기다린다(Q82.4). 대기 ID를 돌려준다. */
   requestPermission(worktree: WorktreeRef, detail: string, at?: Date): PermissionRequestId {
     const id = toPermissionRequestId(`fake-permission-${this.next()}`);
     this.runAt(worktree).permissionWaits.push({ id, detail, requestedAt: at ?? new Date() });
     return id;
   }
 
-  /** 사람이 러너 화면에서 권한을 허용한 것처럼 대기를 닫는다. */
   allowPermission(worktree: WorktreeRef, id: PermissionRequestId): void {
     const run = this.runAt(worktree);
     run.permissionWaits = run.permissionWaits.filter((p) => p.id !== id);
   }
 
-  /** 에이전트가 완료 보고를 보낸다(Q82.2). 에이전트는 닫을 때까지 살아 있다. */
   report(
     worktree: WorktreeRef,
     report: { outcome: CompletionReport["outcome"]; body?: string; at?: Date },
@@ -305,12 +267,10 @@ export class FakeRunner implements Runner {
     };
   }
 
-  /** 에이전트가 완료 보고 없이 사라진다(Q82.19). */
   vanish(worktree: WorktreeRef, detail = "agent terminal is gone"): void {
     this.runAt(worktree).endedWithoutReport = detail;
   }
 
-  /** 사람이 러너에서 워크트리를 지운 것처럼 만든다. */
   deleteWorktree(worktree: WorktreeRef): void {
     for (const [name, run] of this.runs) {
       if (run.started.worktree === worktree) this.runs.delete(name);
@@ -372,7 +332,6 @@ export class FakeRunner implements Runner {
       const n = this.next();
       const started: StartedRun = {
         worktree: toWorktreeRef(`fake::/fake/${input.worktreeName}`),
-        // 실제 러너처럼 브랜치는 러너가 접두사를 붙여 정한다(Q82.6).
         branch: `fake/${input.worktreeName}`,
         agentRef: toAgentRef(`fake-agent-${n}`),
       };
@@ -517,12 +476,6 @@ function unreachable(): RunnerErrorDetail {
   return { kind: "unreachable", detail: "fake runner is offline" };
 }
 
-// ---------- CodeHost ----------
-
-/**
- * PR은 저장소별로 넣는다. 브랜치·티켓 키 찾기는 넣은 PR에서 고른다.
- * 러너 쪽 프로젝트 ID "<prefix><저장소>"를 저장소로 읽는다(기본 prefix "fake:").
- */
 export class FakeCodeHost implements CodeHost {
   readonly kind: CodeHostKind;
   connection: ConnectionCheck<CodeHostErrorDetail> = { ok: true };
@@ -535,7 +488,6 @@ export class FakeCodeHost implements CodeHost {
     this.projectPrefix = projectPrefix;
   }
 
-  /** 같은 id의 PR이 있으면 바꾼다. 병합·닫힘 같은 이후 변화도 이것으로 정한다. */
   putPullRequest(repo: RepoRef, pr: PullRequestSnapshot): void {
     const list = (this.prs.get(repo) ?? []).filter((p) => p.id !== pr.id);
     list.push(pr);
@@ -559,7 +511,6 @@ export class FakeCodeHost implements CodeHost {
     return Promise.resolve(this.list(repo).filter((pr) => pr.headBranch === branch));
   }
 
-  /** 실제 어댑터처럼 키를 낱말 경계로 찾고 `createdSince` 이후에 만든 PR만 돌려준다(research 0006 20절). */
   findPullRequestsByTicketKey(
     repo: RepoRef,
     ticketKey: TicketKey,
@@ -587,9 +538,6 @@ export class FakeCodeHost implements CodeHost {
   }
 }
 
-// ---------- Factories ----------
-
-/** 등록할 수 있는 가짜 factory. create로 만든 어댑터를 `created`에 순서대로 모은다. */
 export interface FakeFactory<F, A> {
   readonly factory: F;
   readonly created: A[];

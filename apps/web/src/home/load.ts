@@ -23,14 +23,8 @@ import type { QueuedReason } from "../runs/model";
 import type { Activity, ActivityEvent, HomePage, HomeRun, InputWait, RunnerIssue } from "./model";
 import { partitionHome } from "./model";
 
-/** 흐름에 보이는 사건 수 */
 const ACTIVITY_LIMIT = 8;
 
-/**
- * 홈 화면이 보일 값을 DB 에서 읽는다(현재 Workspace, "전체"면 모든 Workspace).
- * 요약 결과는 저장하지 않으므로 core summarizeRunOutcome 으로 계산한다(Q66·Q76).
- * "오늘"은 운영자 시간대(timeZone, 0044)로 자른다.
- */
 export function loadHomePage(
   db: Database,
   ws: string | undefined,
@@ -50,7 +44,6 @@ export function loadHomePage(
   );
 
   const queueReasons = explainQueue({
-    // 대기열은 설치 전체에 하나다. 다른 Workspace 의 Queued 런도 순서에 든다(ADR 0006).
     queued: listRuns(db, { states: ["queued"] }).flatMap((run): QueuedRun[] =>
       run.state === "queued"
         ? [
@@ -59,7 +52,6 @@ export function loadHomePage(
               assignedAt: run.assignedAt,
               project: run.runnerProject,
               runnerId: run.runnerId,
-              // 영영 시작할 수 없는 런은 worker 가 다음 바퀴에 끝낸다. 화면은 순서만 본다.
               unstartable: false,
             },
           ]
@@ -151,7 +143,6 @@ export function loadHomePage(
       ticket: `${run.ticket.connection}\u0000${run.ticket.key}`,
       run: toView(run),
     })),
-    // 러너는 Workspace 밖 자원이라 어느 Workspace 의 홈에서든 보인다(ADR 0006)
     runnerIssues: [...runners.values()].flatMap((runner): RunnerIssue[] => {
       const cause = runnerIssueCause(runner);
       return cause === null ? [] : [{ id: runner.id, name: runner.name, cause }];
@@ -166,11 +157,6 @@ export function loadHomePage(
   });
 }
 
-/**
- * 지금 일어나는 일(ADR 0010 Consequences). DB 에 있는 기록(상태 바뀜, 질문, 권한 대기, 런 끝, 이후 PR)만으로
- * 만들고 새 것부터 ACTIVITY_LIMIT 개를 둔다. 하루가 넘게 전에 끝난 런은 이후 PR 상태만 본다.
- * 입력 기다림 상태 바뀜은 같은 때의 질문·권한 대기 사건이 대신한다.
- */
 function activityOf(
   db: Database,
   runs: ReadonlyArray<StoredRun>,
@@ -186,7 +172,6 @@ function activityOf(
       workspace: workspaces.get(run.workspaceId) ?? { id: run.workspaceId, name: run.workspaceId },
     };
     const push = (event: ActivityEvent, at: Date, key: string) => {
-      // 하루가 넘은 일과 읽은 때보다 뒤의 일은 뺀다
       if (at.getTime() < since || at.getTime() > now.getTime()) return;
       items.push({
         ...base,
@@ -213,7 +198,6 @@ function activityOf(
     for (const wait of listRunPermissionWaits(db, run.id))
       push({ kind: "permission" }, wait.requestedAt, `permission:${wait.id}`);
   }
-  // 같은 시각이면 넣은 순서의 반대(나중 사건이 위)
   return items
     .map((item, index) => ({ item, index }))
     .toSorted((a, b) => Date.parse(b.item.at) - Date.parse(a.item.at) || b.index - a.index)
@@ -221,11 +205,6 @@ function activityOf(
     .map(({ item }) => item);
 }
 
-/**
- * 입력 기다림 런이 기다리는 입력(Q82.3·Q82.4·Q82.5). 아직 러너에 보내지 않은 질문과, 닫히지 않았고 거절을
- * 보내지 않은 권한 대기 가운데 먼저 받은 것이다. 답이나 거절을 남겼지만 worker 가 아직 보내지 않았으면
- * answered·denied 다. worker 가 아직 아무것도 쓰지 않았으면 null 이다.
- */
 export function pendingInput(db: Database, runId: RunId): InputWait | null {
   const inputs: Array<{ at: Date; input: InputWait }> = [];
   for (const q of listRunQuestions(db, runId)) {

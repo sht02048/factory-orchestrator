@@ -12,12 +12,6 @@ import { LinearApiError, LinearTrackerError } from "./client.js";
 import type { Fetch } from "./client.js";
 import { LinearTracker, linearTrackerFactory } from "./tracker.js";
 
-/**
- * `fixtures/`는 이 티켓이 테스트 Linear 워크스페이스에서 이 패키지의 쿼리로 받은 응답(상태 코드, 헤더 일부,
- * 본문)을 가상 값으로 바꾼 것이다. UUID는 `00000000-0000-4000-8000-` 뒤 번호로, 조직은 `acme`, 팀 키는
- * `ENG`, 티켓 제목·본문·사람 이름은 예시 값으로 바꿨다. rate limit과 5xx는 받지 못해 문서(research 0002
- * B.4)의 모양으로 테스트 안에서 만든다.
- */
 const fixtureSchema = z.object({
   status: z.number(),
   headers: z.record(z.string(), z.string()),
@@ -44,7 +38,6 @@ interface SentRequest {
   variables: Record<string, unknown>;
 }
 
-/** 부른 순서대로 응답을 하나씩 돌려주는 fetch. 보낸 요청을 기록한다. */
 function fakeFetch(...responses: Array<Fixture | Error>): { fetch: Fetch; sent: SentRequest[] } {
   const sent: SentRequest[] = [];
   const queue = [...responses];
@@ -74,7 +67,6 @@ function tracker(...responses: Array<Fixture | Error>) {
   };
 }
 
-/** 픽스처 본문의 일부를 바꾼 사본 */
 function withBody(base: Fixture, edit: (body: unknown) => unknown): Fixture {
   const copy: unknown = structuredClone(base.body);
   return { ...base, body: edit(copy) };
@@ -87,7 +79,6 @@ const connectionBody = z.object({
   ),
 });
 
-/** connection 응답을 마지막 쪽으로 바꾼다 */
 function lastPage(base: Fixture): Fixture {
   return withBody(base, (body) => {
     const parsed = connectionBody.parse(body);
@@ -286,7 +277,6 @@ describe("조회", () => {
       ["In Review", "started"],
       ["Done", "completed"],
       ["Canceled", "canceled"],
-      // core 분류에 없는 Linear 값은 그대로 두고 맨 뒤에 둔다.
       ["Duplicate", "duplicate"],
     ]);
   });

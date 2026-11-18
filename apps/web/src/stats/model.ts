@@ -9,65 +9,44 @@ import type { AgentResult, PrState, SummaryOutcome } from "@factory/core";
 import type { WorkspaceChoice } from "../shell/model";
 import { DAY_MS, calendarDay } from "../time-zone";
 
-/*
- * Stats 화면이 보이는 값과 그 계산. server function 이 돌려주고 화면이 그린다. DB 를 들여오지 않는다.
- * 화면 문구는 담지 않고 열거값과 숫자만 담는다. 문구는 메시지 파일이 정한다.
- *
- * - 요약 결과는 core summarizeRunOutcome 으로만 정한다(Q66·Q76).
- * - 리드 타임·대기 시간·실행 시간은 core runDurations 로 잰다(Q59).
- */
-
-/** 통계를 보는 기간. 운영자 시간대의 오늘을 넣어 이 날 수만큼 거슬러 끝난 런을 센다 */
 export const STATS_DAYS = 14;
 
-/** 나눠 보기(티켓 0002): 러너별, 트래커 프로젝트별, 에이전트별 */
 export const STATS_DIMENSIONS = ["runner", "trackerProject", "agent"] as const;
 export type StatsDimension = (typeof STATS_DIMENSIONS)[number];
 
 export type OutcomeCounts = Record<SummaryOutcome, number>;
 
-/** 런 하나를 통계에 넣을 때 쓰는 값. Ended 런만 넣는다 */
 export interface StatsRun {
   runner: GroupKey;
   trackerProject: GroupKey;
   agent: GroupKey;
   agentResult: AgentResult;
   prState: PrState;
-  /** 운영자가 취소함이 러너에 닿지 못한 채 끝났는지(Q82.21) */
   runnerUnreached: boolean;
-  /** 이후 PR 상태(Q54·Q69). 런이 끝난 뒤 사람이 병합하거나 닫지 않았으면 null */
   laterPrState: "merged" | "closed" | null;
   assignedAt: Date;
-  /** 시작하지 않고 끝난 런(Queued에서 취소, 시작할 수 없음)은 null(Q82.9·Q82.20) */
   startedAt: Date | null;
   endedAt: Date;
 }
 
 export interface GroupKey {
-  /** 묶는 기준. 이름이 같아도 기준이 다르면 다른 묶음이다 */
   key: string;
   name: string;
 }
 
-/** 시간 분포. 값은 밀리초이고, 런이 없으면 StatsSummary.durations 가 null 이다 */
 export interface DurationStats {
-  /** 할당(Queued 포함)부터 종료까지(Q59) */
   leadP50Ms: number;
   leadP90Ms: number;
-  /** 할당부터 시작까지 */
   waitP50Ms: number;
-  /** 시작부터 종료까지 */
   executionP50Ms: number;
 }
 
-/** Failed 런의 에이전트 결과 × PR 상태 조합 하나(Q71) */
 export interface FailedCombination {
   agentResult: AgentResult;
   prState: PrState;
   runs: number;
 }
 
-/** Human Check 런의 이후 PR 상태(Q54·Q69). 아직 열린 PR 은 humanCheck - merged - closed */
 export interface HumanCheckFollowUp {
   humanCheck: number;
   merged: number;
@@ -76,15 +55,10 @@ export interface HumanCheckFollowUp {
 
 export interface StatsSummary {
   runs: number;
-  /**
-   * 성공·실패율의 분모: Canceled 를 뺀 끝난 런. Canceled 는 운영자가 스스로 멈춘 런이라 따로 세고
-   * 비율에 넣지 않는다(GLOSSARY Canceled, Q82.9·Q82.18)
-   */
   rated: number;
   outcomes: OutcomeCounts;
   durations: DurationStats | null;
   humanCheck: HumanCheckFollowUp;
-  /** 런이 많은 조합부터. 같으면 에이전트 결과, PR 상태의 정의 순서 */
   failedCombinations: FailedCombination[];
 }
 
@@ -94,7 +68,6 @@ export interface StatsGroup extends StatsSummary {
 }
 
 export interface DailyThroughput {
-  /** 운영자 시간대의 날짜. 그 날 UTC 0시의 epoch 밀리초로 나타낸다(time-zone.ts calendarDay) */
   day: number;
   outcomes: OutcomeCounts;
 }
@@ -103,15 +76,12 @@ export type StatsPage =
   | { workspace: Exclude<WorkspaceChoice, { kind: "one" }> }
   | {
       workspace: Extract<WorkspaceChoice, { kind: "one" }>;
-      /** 기간: 첫날과 마지막 날(운영자 시간대의 날짜, calendarDay 와 같은 나타냄) */
       period: { firstDay: number; lastDay: number };
       total: StatsSummary;
-      /** 기간의 날마다 하나, 오래된 날부터 */
       daily: DailyThroughput[];
       groups: Record<StatsDimension, StatsGroup[]>;
     };
 
-/** 운영자 시간대의 오늘까지 STATS_DAYS 일. 이 기간에 끝난 런을 센다 */
 export function statsPeriod(now: Date, timeZone: string): { firstDay: number; lastDay: number } {
   const lastDay = calendarDay(now, timeZone);
   return { firstDay: lastDay - (STATS_DAYS - 1) * DAY_MS, lastDay };
@@ -121,10 +91,6 @@ function emptyOutcomes(): OutcomeCounts {
   return { merged: 0, "human-check": 0, failed: 0, canceled: 0 };
 }
 
-/**
- * 정렬한 값의 백분위수(nearest-rank). 값 n 개 중 ceil(p × n) 번째 값이다.
- * 짝수 개의 중앙값은 가운데 둘 중 앞 값이라, 손으로 셀 때도 실제 런 하나의 값이 나온다.
- */
 export function percentile(sorted: ReadonlyArray<number>, p: number): number {
   const index = Math.max(0, Math.ceil(p * sorted.length) - 1);
   const value = sorted[index];
@@ -136,7 +102,6 @@ function sortedNumbers(values: ReadonlyArray<number>): number[] {
   return values.toSorted((a, b) => a - b);
 }
 
-/** 런 묶음 하나의 요약 결과 분포, 시간, Human Check 뒤 병합, Failed 조합 */
 export function summarizeStats(runs: ReadonlyArray<StatsRun>): StatsSummary {
   const outcomes = emptyOutcomes();
   const humanCheck: HumanCheckFollowUp = { humanCheck: 0, merged: 0, closed: 0 };
@@ -199,7 +164,6 @@ export function summarizeStats(runs: ReadonlyArray<StatsRun>): StatsSummary {
   };
 }
 
-/** 기준 하나로 런을 나눠 묶음마다 요약한다. 런이 많은 묶음부터, 같으면 이름 순 */
 export function groupStats(runs: ReadonlyArray<StatsRun>, dimension: StatsDimension): StatsGroup[] {
   const groups = new Map<string, { name: string; runs: StatsRun[] }>();
   for (const run of runs) {
@@ -213,7 +177,6 @@ export function groupStats(runs: ReadonlyArray<StatsRun>, dimension: StatsDimens
     .toSorted((a, b) => b.runs - a.runs || a.name.localeCompare(b.name));
 }
 
-/** 날마다(운영자 시간대) 끝난 런 수(처리량)를 요약 결과로 나눈다. 런이 없는 날도 0 으로 둔다 */
 export function dailyThroughput(
   runs: ReadonlyArray<StatsRun>,
   period: { firstDay: number; lastDay: number },
@@ -231,10 +194,8 @@ export function dailyThroughput(
   return days;
 }
 
-/** 요약 결과 넷을 정해진 순서로 돈다(Merged, Human Check, Failed, Canceled) */
 export const OUTCOME_ORDER: ReadonlyArray<SummaryOutcome> = SUMMARY_OUTCOMES;
 
-/** 비율을 정수 퍼센트로. 분모가 0 이면 null */
 export function percent(part: number, whole: number): number | null {
   return whole === 0 ? null : Math.round((part / whole) * 100);
 }

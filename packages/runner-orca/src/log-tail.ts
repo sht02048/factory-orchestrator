@@ -1,10 +1,5 @@
 import type { WorkerReadResult } from "./schemas.js";
 
-/**
- * `worker-read` 한 쪽을 화면에 보일 줄로 바꾼다. 출력은 둘 중 하나다(fixtures/worker-read-*.json).
- * - `source: "transcript"`: 에이전트 대화 기록. 메시지마다 `[역할]` 머리를 붙이고 본문을 줄로 나눈다.
- * - `source: "terminal"`: 터미널 출력 줄(`terminal.tail`). 그대로 쓴다.
- */
 export function workerReadLines(result: WorkerReadResult): string[] {
   if (result.transcript !== null && result.transcript !== undefined) {
     return result.transcript.messages.flatMap((message) =>

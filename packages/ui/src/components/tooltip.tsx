@@ -4,19 +4,9 @@ import type { ReactNode } from "react";
 import { cx } from "../cx";
 import { colors, fontSize, lineHeight, motion, radius, shadow, space } from "../tokens.stylex";
 
-/*
- * 짧은 힌트. 아이콘만 있는 버튼의 이름이나, 잘린 값의 전체를 보일 때만 쓴다.
- * 링크나 버튼처럼 누를 것은 넣지 않는다(툴팁에는 포커스가 가지 않는다).
- *
- * <Tooltip content="ssh 설정의 Host 이름">runner-a</Tooltip>
- */
-
 export interface TooltipProps {
-  /** 힌트 글. 몇 단어로 쓴다. */
   content: string;
-  /** 트리거 안 내용. 글자 또는 아이콘. */
   children: ReactNode;
-  /** 트리거가 아이콘뿐일 때 true. 힌트가 트리거의 이름이 된다. */
   labelsTrigger?: boolean;
   side?: "top" | "bottom" | "left" | "right";
 }

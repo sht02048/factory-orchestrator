@@ -47,16 +47,10 @@ export const projectC = toRunnerProjectId("fake:acme/c");
 const fakeKind = "fake";
 export const workspaceId = toWorkspaceId("ws-1");
 
-/** 러너 쪽 프로젝트 ID "fake:<저장소>"에서 FakeCodeHost가 읽는 저장소 */
 export function repoOf(project: RunnerProjectId) {
   return toRepoRef(project.slice("fake:".length));
 }
 
-/**
- * 시험 하나의 환경. 임시 디렉터리의 DB 파일, 가짜 트래커·코드 호스트 하나, 러너 ID별 가짜 러너.
- * 가짜 어댑터는 worker 밖에서 응답을 정하려고 registry factory가 같은 인스턴스를 돌려준다.
- * 데몬을 다시 띄워도(새 worker) 러너·트래커·코드 호스트 쪽 상태는 이어진다.
- */
 export class Harness {
   readonly dbPath: string;
   readonly db: Database;
@@ -67,12 +61,10 @@ export class Harness {
   readonly registry: AdapterRegistry;
   readonly warnings: Array<{ message: string; fields: unknown }> = [];
   now = new Date("2026-11-17T00:00:00Z");
-  /** true면 코드 호스트 factory가 던진다(설정 오류 등). */
   codeHostBroken = false;
   private readonly dir: string;
   private readonly workers: Worker[] = [];
   private prSeq = 0;
-  /** 러너 어댑터를 감쌀 때 쓴다. */
   wrapRunner: (runner: FakeRunner) => Runner = (runner) => runner;
 
   constructor() {
@@ -102,7 +94,6 @@ export class Harness {
       name: "Web",
       inProgressStateId: null,
     });
-    // 할당은 런마다 러너 쪽 프로젝트를 받는다. Mapping은 런을 시작할 수 있는지(Q82.16)만 본다.
     saveMapping(this.db, { connection, trackerProject, runnerProject: projectA, agent });
 
     this.registry = new AdapterRegistry()
@@ -120,10 +111,6 @@ export class Harness {
       });
   }
 
-  /**
-   * 러너를 등록하고 가짜 러너와 DB의 러너 확인 결과를 함께 맞춘다. worker의 주기적 러너 확인은 마지막 확인에서
-   * 간격이 지난 뒤에 가짜 러너를 다시 읽는다.
-   */
   addRunner(input: {
     id: string;
     capacity: number;
@@ -176,7 +163,6 @@ export class Harness {
     });
   }
 
-  /** 가짜 러너의 GitHub 인증(할당을 막는 필수 조건)을 정한다. DB에는 다음 러너 확인이 쓴다. */
   setPushAuth(id: RunnerId, ok: boolean): void {
     const fake = this.runner(id);
     fake.prerequisites = fake.prerequisites.map((p) =>
@@ -190,7 +176,6 @@ export class Harness {
     return fake;
   }
 
-  /** 트래커에 티켓을 넣고 db 할당 진입점으로 런을 만든다. 할당 시각은 1초씩 늘려 순서를 정한다. */
   assign(key: string, project: RunnerProjectId): StoredRun {
     const ticketKey = toTicketKey(key);
     this.tracker.addTicket({
@@ -215,7 +200,6 @@ export class Harness {
     return result.run;
   }
 
-  /** 시작한 런의 실제 브랜치로 PR을 넣는다. */
   putPullRequest(run: StoredRun, state: PullRequestSnapshot["state"]): void {
     if (run.state === "queued" || run.branch === null) throw new Error("run has not started");
     this.prSeq += 1;

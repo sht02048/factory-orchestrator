@@ -39,16 +39,6 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest"
 import stats from "../../apps/web/messages/ko/stats.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 
-/*
- * Stats 날짜별 처리량을 키보드로 읽는 브라우저 시험(티켓 0053).
- *
- * 막대 그림은 role="img" 라 날짜별 값은 표로 읽는다. 표는 처음에 화면에서만 숨기고 접근성 트리에 두며,
- * Tab 으로 "표로 보기"에 가 Enter 를 누르면 화면에도 보인다.
- *
- * 띄우는 방식은 operator-actions.test.ts(티켓 0039)와 같다: apps/web 의 vite 개발 서버 + 설치된 Chrome.
- * 공용 도우미(browser/*)는 읽기만 하고, 이 시험의 seed 와 서버 설정은 이 파일에 둔다. 가상 값만 쓴다.
- */
-
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
 const adaptersModule = join(webRoot, "src/server/adapters.ts");
 const fakeAdaptersModule = fileURLToPath(new URL("./browser/fake-adapters.ts", import.meta.url));
@@ -65,7 +55,6 @@ let web: ViteDevServer;
 let baseUrl: string;
 let browser: Browser;
 
-/** web 의 server/adapters.ts 를 가짜 트래커 등록표로 바꾼다. 제품 코드는 고치지 않는다 */
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
   enforce: "pre",
@@ -113,8 +102,6 @@ afterAll(async () => {
 
 describe("Stats 날짜별 처리량(브라우저, 0053)", () => {
   it("키보드로 '표로 보기'를 누르면 날짜별 값 표가 화면에 보인다", async (context) => {
-    // 서버 렌더와 브라우저가 같은 날짜로 그리게 시간대를 UTC 로 둔다.
-    // 닫지 않는다: 실패 화면은 시험 뒤에 찍고, afterAll 의 browser.close() 가 함께 닫는다.
     const browserContext: BrowserContext = await browser.newContext({
       baseURL: baseUrl,
       locale: "ko-KR",
@@ -141,25 +128,20 @@ describe("Stats 날짜별 처리량(브라우저, 0053)", () => {
       .getByRole("row")
       .filter({ has: page.getByRole("rowheader", { name: today, exact: true }) });
 
-    // 처음부터 접근성 트리에 표가 있고, 화면에서는 숨겨 둔다.
     await table.waitFor({ state: "attached" });
     expect(await table.getByRole("rowheader").count()).toBe(14);
-    // 표를 감싼 상자를 1px 로 줄여 화면에서만 숨긴다.
     const box = table.locator("..");
     expect((await box.boundingBox())?.height ?? 0).toBeLessThanOrEqual(1);
 
-    // Tab 으로 "표로 보기"까지 가서 Enter 를 누른다(마우스를 쓰지 않는다).
     await focusByTab(page, stats.throughput.showTable);
     await page.keyboard.press("Enter");
 
     await page.getByRole("button", { name: stats.throughput.hideTable }).waitFor();
     expect((await box.boundingBox())?.height ?? 0).toBeGreaterThan(100);
-    // 날짜, Merged, Human Check, Failed, Canceled
     expect(await todayRow.getByRole("cell").allTextContents()).toEqual(["1", "0", "0", "0"]);
   });
 });
 
-/** 이름이 name 인 버튼에 포커스가 갈 때까지 Tab 을 누른다 */
 async function focusByTab(page: Page, name: string): Promise<void> {
   for (let i = 0; i < 80; i += 1) {
     await page.keyboard.press("Tab");
@@ -177,7 +159,6 @@ function seed(db: Database): void {
     config: {},
     secrets: { apiKey: "secret" },
   });
-  // 온보딩(0026)을 마친 설치로 둔다. GitHub 토큰이 없으면 모든 화면이 온보딩으로 간다
   saveCodeHostConnection(db, new SecretBox(encryptionKey), {
     id: toCodeHostConnectionId("github"),
     kind: toCodeHostKind("github"),
@@ -211,7 +192,6 @@ function seed(db: Database): void {
     assignmentBlocked: false,
   });
 
-  // 오늘 Merged 로 끝난 런 하나
   const key = toTicketKey("ACME-1");
   const assigned = assignRun(db, {
     ticket: { connection, key },
@@ -244,7 +224,6 @@ function ok(result: { ok: true } | { ok: false; error: unknown }): void {
   if (!result.ok) throw new Error(`state change failed: ${JSON.stringify(result.error)}`);
 }
 
-/** 서버 렌더한 화면에 React 가 붙을 때까지 기다린다. 붙기 전에 누르면 키 입력이 사라진다 */
 async function hydrated(page: Page): Promise<void> {
   await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
   await page.waitForLoadState("networkidle");

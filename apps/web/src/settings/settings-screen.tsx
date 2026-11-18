@@ -62,7 +62,6 @@ import type {
   WorkspaceSettings,
 } from "./model";
 
-/** 저장 결과. 실패 까닭은 settings.remoteError 의 키이거나 그 밖의 값이다 */
 export type ActionResult = { ok: true } | { ok: false; reason: string };
 
 interface ProjectRef {
@@ -71,7 +70,6 @@ interface ProjectRef {
   projectId: string;
 }
 
-/** 화면의 저장·확인 행동. 라우트가 server function 으로 잇고, 성공하면 화면 값을 다시 읽는다 */
 export interface SettingsActions {
   saveGeneral: (input: {
     ws: string;
@@ -106,18 +104,12 @@ export interface SettingsActions {
     capacity: number;
   }) => Promise<ActionResult>;
   recheckRunner: (input: { id: string }) => Promise<ActionResult>;
-  /** 다른 기기에서 열 주소와 webhook 공개 주소(0048). 빈 값은 정하지 않음이다 */
   saveAddresses: (input: { webAddress: string; webhookAddress: string }) => Promise<ActionResult>;
-  /**
-   * 러너 확인 결과를 기다리는 동안 부른다. 아직 기다리면 true 다. 결과가 오면 화면 값을 다시 읽는다.
-   * 트래커를 부르지 않는 가벼운 읽기여야 한다.
-   */
   pollRunnerChecks: () => Promise<boolean>;
 }
 
 export interface SettingsScreenProps {
   page: SettingsPage;
-  /** 고른 항목. 없거나 고를 수 없으면 Workspace 가 있으면 일반, 없으면 트래커 연결 */
   selected: string | undefined;
   onSelect: (item: SettingsItem) => void;
   actions: SettingsActions;
@@ -141,7 +133,6 @@ function useReportUnsaved(unsaved: boolean): void {
   useEffect(() => () => report(formId, false), [report, formId]);
 }
 
-/** Settings: 왼쪽 항목 목록 + 오른쪽 편집 영역(ADR 0007, 시안 B). 이 Workspace / 설치 전체로 나눈다(ADR 0006) */
 export function SettingsScreen({
   page,
   selected,
@@ -228,7 +219,6 @@ export function SettingsScreen({
               }
               title={t(`items.${current}`)}
             />
-            {/* Workspace 나 항목을 바꾸면 편집 중인 값을 새로 채운다 */}
             <ReportUnsavedContext value={reportUnsaved}>
               <ItemPanel
                 key={`${workspace?.general.id ?? ""}:${current}`}
@@ -246,11 +236,6 @@ export function SettingsScreen({
   );
 }
 
-/**
- * 러너 확인 결과를 기다리는 동안 요청 상태만 다시 읽는다. `pendingKey` 는 기다리는 요청들(러너와 요청 시각)이라
- * 새 요청이 생기면 처음부터 다시 기다린다. 앞 읽기가 끝난 뒤에만 다음 읽기를 걸어 겹치지 않는다.
- * RUNNER_CHECK_POLL_LIMIT_MS 가 지나도 결과가 없으면 그만 읽고 true(worker 가 응답하지 않음)를 돌려준다.
- */
 export function useRunnerCheckPolling(pendingKey: string, poll: () => Promise<boolean>): boolean {
   const [silent, setSilent] = useState(false);
   useEffect(() => {
@@ -443,11 +428,8 @@ function ItemPanel({
   }
 }
 
-// ---------- 저장 상태 ----------
-
 type SubmitState = { kind: "idle" } | { kind: "sending" } | { kind: "failed"; reason: string };
 
-/** 저장·확인 하나의 상태. 성공하면 토스트로 알리고, 실패는 화면 안에 남긴다(DESIGN.md Toaster) */
 function useSubmit() {
   const [state, setState] = useState<SubmitState>({ kind: "idle" });
   const run = (action: () => Promise<ActionResult>, success: string, onSuccess?: () => void) => {
@@ -469,7 +451,6 @@ function useSubmit() {
   return { state, run, sending: state.kind === "sending" };
 }
 
-/** 실패 까닭을 문구로 바꾼다. 모르는 까닭은 일반 실패 문구다 */
 function useReason(): (reason: string) => string {
   const t = useTranslations("settings");
   return (reason) => {
@@ -525,8 +506,6 @@ const passwordManagerIgnoredSecretProps = {
   "data-1p-ignore": true,
   "data-lpignore": "true",
 } as const;
-
-// ---------- 이 Workspace ----------
 
 function GeneralPanel({
   workspace,
@@ -890,7 +869,6 @@ function MappingRow({
   );
 }
 
-/** 저장된 값이 목록에 없어도(러너에서 사라짐 등) 그 값을 고른 채로 보이게 더한다 */
 function withCurrent(
   options: ReadonlyArray<{ value: string; label: string }>,
   current: string | null | undefined,
@@ -1081,8 +1059,6 @@ function LabelRow({
   );
 }
 
-// ---------- 설치 전체 ----------
-
 function ConnectionsPanel({
   connections,
   actions,
@@ -1110,7 +1086,6 @@ function ConnectionsPanel({
   );
 }
 
-/** 연결 하나를 고치거나(connection) 새로 더한다(null) */
 export function ConnectionForm({
   connection,
   actions,
@@ -1234,12 +1209,6 @@ export function ConnectionForm({
   );
 }
 
-// ---------- 주소(0048) ----------
-
-/**
- * 다른 기기에서 열 주소와 webhook 공개 주소. 서버는 이 주소의 호스트로 온 요청만 받는다(Host 검사).
- * 127.0.0.1 로 연 화면은 늘 열려, 잘못 넣어도 이 기계에서 고칠 수 있다.
- */
 function AddressesPanel({
   addresses,
   actions,
@@ -1314,9 +1283,6 @@ function AddressesPanel({
   );
 }
 
-/**
- * 온보딩 트래커 단계의 webhook 공개 주소 칸(0048). 다른 기기에서 열 주소는 그대로 두고 webhook 공개 주소만 바꾼다.
- */
 export function WebhookAddressForm({
   addresses,
   actions,
@@ -1416,7 +1382,6 @@ export function GitHubPanel({ saved, actions }: { saved: boolean; actions: Setti
         </Field>
         <SubmitError state={submit.state} />
         <Actions>
-          {/* 저장한 뒤 바꾸는 것은 주 행동이 아니다. 온보딩에서는 "다음"이 주 버튼이 된다(ADR 0010 6번) */}
           <Button
             variant={saved ? "secondary" : "primary"}
             type="submit"
@@ -1440,7 +1405,6 @@ function RunnersPanel({
   runners: RunnerSettingsView[];
   actions: SettingsActions;
   workerSilent: boolean;
-  /** Runners 로 가도 사이드바의 Workspace 를 이어 가게 주소에 남긴다 */
   workspaceId: string | null;
   renderLink: ((props: RunnersLinkProps) => ReactNode) | undefined;
 }) {
@@ -1587,7 +1551,6 @@ export function RunnerForm({
   );
 }
 
-/** 러너 확인 요청과 worker 가 쓴 결과. 필수 조건을 하나씩 보인다(스펙 9절) */
 export function RunnerCheck({
   runner,
   actions,
@@ -1683,7 +1646,6 @@ function CheckResult({
   }
 }
 
-/** 러너 오류 종류(core RunnerErrorDetail.kind)를 문구로 바꾼다. 모르는 종류는 그대로 보인다 */
 export function useRunnerErrorName(): (kind: string) => string {
   const t = useTranslations("settings.runners.check.errorKind");
   return (kind) => {
@@ -1712,7 +1674,6 @@ function Prerequisite({ prerequisite }: { prerequisite: PrerequisiteView }) {
       <span {...stylex.props(styles.inline)}>
         <span {...stylex.props(styles.primaryText)}>{prerequisiteName(prerequisite)}</span>
         {broken ? (
-          // 깨진 항목은 문제 색으로 드러낸다(ADR 0010 5번 빨강: 문제)
           <span {...stylex.props(styles.brokenText)}>{t("unsatisfied")}</span>
         ) : (
           <Text variant="meta">
@@ -1739,7 +1700,6 @@ function Prerequisite({ prerequisite }: { prerequisite: PrerequisiteView }) {
   );
 }
 
-/** "12" 같은 자연수 글을 숫자로 바꾼다. 아니면 null */
 function parseWholeNumber(text: string): number | null {
   const trimmed = text.trim();
   if (!/^\d+$/.test(trimmed)) return null;
