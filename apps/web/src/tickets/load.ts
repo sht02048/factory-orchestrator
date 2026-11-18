@@ -22,6 +22,7 @@ import { z } from "zod";
 import { isWebUrl } from "../format/url";
 import { resolveWorkspace } from "../shell/model";
 import type {
+  AssignDefaults,
   TicketRun,
   TicketView,
   TicketsPage,
@@ -56,6 +57,7 @@ export async function loadTicketsPage(
     projects: runner.projects.map((p) => p.id),
   }));
   const agents = mappingAgents(db);
+  const runnerNames = new Map(runners.map((runner) => [runner.id, runner.name]));
   if (workspace.kind !== "one")
     return {
       workspace,
@@ -64,7 +66,7 @@ export async function loadTicketsPage(
       agents,
       errors: [],
       truncated: [],
-      hasTrackerProjects: false,
+      trackerProjectCount: 0,
     };
 
   const workspaceId = toWorkspaceId(workspace.workspace.id);
@@ -137,7 +139,8 @@ export async function loadTicketsPage(
           name: label.name,
           autoAssign: label.id === autoAssign,
         })),
-        runs: runs.toReversed().map((run) => toTicketRun(db, run, now)),
+        runs: runs.toReversed().map((run) => toTicketRun(db, run, runnerNames, now)),
+        mapping: mappingOf(db, project),
         assignability: assignabilityOf(db, project, ticket, runs),
       };
     });
@@ -151,7 +154,7 @@ export async function loadTicketsPage(
     agents,
     errors,
     truncated,
-    hasTrackerProjects: projects.length > 0,
+    trackerProjectCount: projects.length,
   };
 }
 
@@ -207,20 +210,35 @@ function groupRuns(runs: ReadonlyArray<StoredRun>): Map<string, StoredRun[]> {
   return byTicket;
 }
 
-function toTicketRun(db: Database, run: StoredRun, now: Date): TicketRun {
-  const assignedAt = run.assignedAt.toISOString();
-  const assignedAgoMs = Math.max(0, now.getTime() - run.assignedAt.getTime());
-  if (run.state !== "ended") return { id: run.id, assignedAt, assignedAgoMs, state: run.state };
+function toTicketRun(
+  db: Database,
+  run: StoredRun,
+  runnerNames: ReadonlyMap<string, string>,
+  now: Date,
+): TicketRun {
+  const runnerName = run.runnerId === null ? null : (runnerNames.get(run.runnerId) ?? null);
+  if (run.state !== "ended")
+    return {
+      id: run.id,
+      runnerName,
+      state: run.state,
+      elapsedMs: msSince(run.state === "queued" ? run.assignedAt : run.startedAt, now),
+    };
   return {
     id: run.id,
-    assignedAt,
-    assignedAgoMs,
+    runnerName,
     state: run.state,
+    endedAt: run.endedAt.toISOString(),
+    endedAgoMs: msSince(run.endedAt, now),
     agentResult: run.agentResult,
     prState: run.prState,
     summary: summarizeRunOutcome(run).outcome,
     prSettledLater: (getRunWithRecords(db, run.id)?.records.laterPrState ?? null) !== null,
   };
+}
+
+function msSince(at: Date, now: Date): number {
+  return Math.max(0, now.getTime() - at.getTime());
 }
 
 function assignabilityOf(
@@ -237,12 +255,14 @@ function assignabilityOf(
     const active = runs.findLast((run) => run.state !== "ended");
     return { kind: "active-run", runId: active?.id ?? "" };
   }
-  const mapping = getMapping(db, project.connection, project.projectId);
+  const mapping = mappingOf(db, project);
   if (mapping === null) return { kind: "no-mapping" };
-  return {
-    kind: "ready",
-    defaults: { runnerProject: mapping.runnerProject, agent: mapping.agent },
-  };
+  return { kind: "ready", defaults: mapping };
+}
+
+function mappingOf(db: Database, project: StoredWorkspaceTrackerProject): AssignDefaults | null {
+  const mapping = getMapping(db, project.connection, project.projectId);
+  return mapping === null ? null : { runnerProject: mapping.runnerProject, agent: mapping.agent };
 }
 
 function mappingAgents(db: Database): string[] {

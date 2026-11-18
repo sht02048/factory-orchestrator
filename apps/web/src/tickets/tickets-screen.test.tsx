@@ -51,7 +51,7 @@ function panelText(html: string): string {
 }
 
 describe("Tickets 화면", () => {
-  it("티켓마다 트래커 프로젝트·상태와 마지막 런 결과를 보인다", async () => {
+  it("행은 키 · 제목 · 마지막 런이고, 트래커 상태는 행에 두지 않는다", async () => {
     const { context } = setupTickets();
     const rows = rowTexts(render(await loadTicketsPage(context, undefined, now)));
     expect(rows.get("ACME-1")).toContain("Merged");
@@ -60,8 +60,47 @@ describe("Tickets 화면", () => {
     expect(rows.get("ACME-4")).toContain("Queued");
     expect(rows.get("ACME-5")).toContain("Waiting for Input");
     expect(rows.get("ACME-6")).toContain("할당 전");
-    expect(rows.get("ACME-6")).toContain("Web");
-    expect(rows.get("ACME-6")).toContain("Todo");
+    expect(rows.get("ACME-6")).not.toContain("Todo");
+  });
+
+  it("머리는 Tickets 와 할당할 수 있는 티켓 수 요약이다", async () => {
+    const { context } = setupTickets();
+    const html = render(await loadTicketsPage(context, undefined, now));
+    const heading = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1] ?? "";
+    expect(text(heading).trim()).toBe("Tickets");
+    expect(text(html)).toContain("할당할 수 있는 티켓이 2개 있어요.");
+  });
+
+  it("필터는 한 줄 묶음 탭이고 각 개수를 보인다", async () => {
+    const { context } = setupTickets();
+    const html = render(await loadTicketsPage(context, undefined, now));
+    const tabs = [...html.matchAll(/role="tab"[^>]*>([\s\S]*?)<\/button>/g)].map((m) =>
+      text(m[1] ?? "").trim(),
+    );
+    expect(tabs).toEqual(["모두 7", "할당할 수 있음 2", "처리할 일 2", "진행 중 2", "끝남 1"]);
+  });
+
+  it.each<[TicketFilter, string[]]>([
+    ["all", ["ACME-6", "ACME-5", "ACME-4", "ACME-3", "ACME-2", "ACME-1", "DOC-1"]],
+    ["assignable", ["ACME-6", "DOC-1"]],
+    ["todo", ["ACME-5", "ACME-2"]],
+    ["in-progress", ["ACME-4", "ACME-3"]],
+    ["done", ["ACME-1"]],
+  ])("필터 %s 는 그 티켓만 목록에 보인다", async (filter, keys) => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined, now);
+    expect([...rowTexts(render(page, { filter })).keys()]).toEqual(keys);
+  });
+
+  it("트래커 프로젝트 열은 트래커 프로젝트가 둘 이상일 때만 보인다", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined, now);
+    expect(page.trackerProjectCount).toBe(3);
+    expect(rowTexts(render(page)).get("ACME-6")).toContain("Web");
+    expect(text(render(page))).toContain("트래커 프로젝트");
+    const single = render({ ...page, trackerProjectCount: 1 });
+    expect(rowTexts(single).get("ACME-6")).not.toContain("Web");
+    expect(text(single.split("<aside")[0] ?? "")).not.toContain("트래커 프로젝트");
   });
 
   it("읽지 못한 트래커 프로젝트를 알린다", async () => {
@@ -100,7 +139,7 @@ describe("Tickets 화면", () => {
     const { context } = setupTickets();
     const page = await loadTicketsPage(context, undefined, now);
     const acme3 = page.tickets.find((t) => t.key === "ACME-3");
-    const html = render(page, { filter: "unassigned", selectedId: acme3?.id ?? "" });
+    const html = render(page, { filter: "assignable", selectedId: acme3?.id ?? "" });
     expect(panelText(html)).toContain("ACME-3 제목");
     expect(html).not.toMatch(/role="option"[^>]*aria-selected="true"/);
   });
@@ -109,7 +148,10 @@ describe("Tickets 화면", () => {
     const { context } = setupTickets();
     const page = await loadTicketsPage(context, undefined, now);
     const panel = panelText(render(page, { selectedId: page.tickets[0]?.id ?? "" }));
-    expect(panel).toContain("트래커에서 열기 ↗ (새 탭에서 열려요)");
+    expect(panel).toContain("트래커에서 열기 ↗");
+    expect(render(page, { selectedId: page.tickets[0]?.id ?? "" })).toContain(
+      'aria-label="트래커에서 열기 (새 탭에서 열려요)"',
+    );
   });
 
   it("할당 전 티켓은 할당 버튼과 Mapping 기본값을 보인다", async () => {
@@ -127,7 +169,7 @@ describe("Tickets 화면", () => {
     const page = await loadTicketsPage(context, undefined, now);
     const acme3 = page.tickets.find((t) => t.key === "ACME-3");
     const panel = panelText(render(page, { selectedId: acme3?.id ?? "" }));
-    expect(panel).toContain("진행 중이거나 Queued인 런이 있어 새로 할당할 수 없어요");
+    expect(panel).toContain("에이전트가 작업하고 있어요.");
     expect(panel).toContain("런 보기");
     expect(panel).not.toContain("할당하기");
     expect(panel).not.toContain("새 런 시작");
@@ -139,30 +181,24 @@ describe("Tickets 화면", () => {
     const acme1 = page.tickets.find((t) => t.key === "ACME-1");
     const panel = panelText(render(page, { selectedId: acme1?.id ?? "" }));
     expect(panel).toContain("새 런 시작");
-    expect(panel).toContain("런 2개");
+    expect(panel).toContain("런 보기");
+    expect(panel).toContain("런 수 2개");
   });
 
-  it("티켓은 회색 키 + 제목 한 칸으로 보인다(ADR 0010 9번)", async () => {
+  it("패널은 키 · 트래커 프로젝트 · 트래커 상태 메타 줄과 제목, 마지막 런 상자를 보인다", async () => {
     const { context } = setupTickets();
     const page = await loadTicketsPage(context, undefined, now);
-    const acme1 = page.tickets.find((t) => t.key === "ACME-1");
-    if (acme1 === undefined) throw new Error("no ACME-1");
-    const html = render(page, { selectedId: acme1.id });
-    const row = rowTexts(html).get("ACME-1") ?? "";
-    expect(row).toContain(`> ACME-1 ${acme1.title} Web Todo`);
-    const heading = /<h2[^>]*>([\s\S]*?)<\/h2>/.exec(html.split("<aside")[1] ?? "")?.[1] ?? "";
-    expect(text(heading).trim()).toBe(`ACME-1 ${acme1.title}`);
-  });
-
-  it("런 이력의 할당 시각은 서버가 읽은 때부터의 상대 시간이다(ADR 0010 7번)", async () => {
-    const { context } = setupTickets();
-    const page = await loadTicketsPage(context, undefined, now);
-    const acme1 = page.tickets.find((t) => t.key === "ACME-1");
-    if (acme1 === undefined) throw new Error("no ACME-1");
-    for (const run of acme1.runs)
-      expect(run.assignedAgoMs).toBe(now.getTime() - new Date(run.assignedAt).getTime());
-    const panel = panelText(render(page, { selectedId: acme1.id }));
-    expect(panel).toMatch(/\d+시간 전|\d+분 전|방금/);
+    const acme3 = page.tickets.find((t) => t.key === "ACME-3");
+    if (acme3 === undefined) throw new Error("no ACME-3");
+    const html = render(page, { selectedId: acme3.id });
+    const aside = html.split("<aside")[1] ?? "";
+    const heading = /<h2[^>]*>([\s\S]*?)<\/h2>/.exec(aside)?.[1] ?? "";
+    expect(text(heading).trim()).toBe(acme3.title);
+    const panel = panelText(html);
+    expect(panel).toContain("ACME-3 · Web · Todo");
+    expect(aside).toContain('aria-label="마지막 런"');
+    expect(panel).toMatch(/Running runner-a · \d+시간 \d+분째/);
+    expect(panel).toContain("Mapping github:acme/web · claude");
   });
 
   it("파란 주 버튼은 화면에 하나 이하다(ADR 0010 6번)", async () => {

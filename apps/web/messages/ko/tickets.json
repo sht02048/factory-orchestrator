@@ -1,30 +1,35 @@
 {
   "documentTitle": "Tickets · Factory Orchestrator",
   "title": "Tickets",
-  "summary": "트래커 티켓을 보고 런을 맡겨요.",
-  "subtitle": "{workspace}에 묶은 트래커 프로젝트의 티켓이에요.",
+  "intro": "트래커 티켓을 보고 런을 맡겨요.",
+  "summary": "할당할 수 있는 티켓이 {count, number}개 있어요.",
   "filter": {
     "label": "티켓 거르기",
-    "all": "전체",
-    "attention": "손댈 일",
-    "unassigned": "할당 전",
-    "running": "Running",
-    "merged": "Merged"
+    "all": "모두",
+    "assignable": "할당할 수 있음",
+    "todo": "처리할 일",
+    "in-progress": "진행 중",
+    "done": "끝남"
+  },
+  "search": {
+    "label": "키나 제목으로 찾기",
+    "placeholder": "키나 제목으로 찾기"
   },
   "columns": {
-    "ticket": "티켓",
+    "key": "키",
+    "title": "제목",
     "trackerProject": "트래커 프로젝트",
-    "trackerState": "트래커 상태",
     "lastRun": "마지막 런"
   },
   "listLabel": "티켓 목록",
   "empty": "이 조건에 맞는 티켓이 없어요.",
+  "noMatch": "‘{query}’와 맞는 티켓이 없어요.",
   "noTickets": "아직 티켓이 없어요. 트래커 프로젝트에 티켓을 만들면 여기에 보여요.",
   "noProjects": "이 Workspace에 묶은 트래커 프로젝트가 없어요. Settings에서 트래커 프로젝트를 묶으면 티켓이 보여요.",
   "unassigned": "할당 전",
   "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 티켓이 보여요.",
   "allWorkspaces": {
-    "body": "전체에서는 모든 Workspace의 손댈 일만 모아 봐요. 티켓은 Workspace를 골라야 보여요.",
+    "body": "전체에서는 모든 Workspace의 처리할 일만 모아 봐요. 티켓은 Workspace를 골라야 보여요.",
     "pick": "{name} 보기"
   },
   "truncated": "{project} 티켓이 많아 {limit, number}개만 보여요. 나머지는 트래커에서 찾아 주세요.",
@@ -39,28 +44,32 @@
   "panel": {
     "label": "고른 티켓 요약",
     "lastRun": "마지막 런",
-    "subtitle": "{project} · {state}",
-    "reason": {
+    "runner": "{runner} · {time}",
+    "noRunner": "러너 정하기 전 · {time}",
+    "next": {
       "unassigned": "아직 런이 없어요. 할당하면 Mapping이 정한 러너 쪽 프로젝트와 에이전트로 처리해요.",
-      "active-run": "진행 중이거나 Queued인 런이 있어 새로 할당할 수 없어요. 그 런이 끝나면 할 수 있어요.",
       "no-mapping": "이 트래커 프로젝트에 Mapping이 없어 할당할 수 없어요. Settings에서 Mapping을 만들면 할당할 수 있어요.",
+      "queued": "러너에 자리가 나기를 기다려요. 시작하면 진행 중으로 바뀌어요.",
+      "running": "에이전트가 작업하고 있어요. 끝나면 결과가 여기에 보여요.",
+      "waiting-for-input": "에이전트가 운영자를 기다려요. 런 보기에서 답하거나 확인해 주세요.",
+      "disconnected": "러너에 닿지 않아요. 런 보기에서 러너 상태를 확인해 주세요.",
       "merged": "에이전트가 완료 보고를 보냈고 PR이 병합됐어요.",
       "human-check": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
+      "human-check-settled": "에이전트가 완료 보고를 보냈고 이후 PR 상태가 기록됐어요. 더 손댈 일이 없어요.",
       "failed": "마지막 런이 Failed예요. 자동으로 다시 시도하지 않아요. 새 런을 시작할 수 있어요.",
       "canceled": "운영자가 취소한 런이에요. 새 런을 시작할 수 있어요."
     },
     "assign": "할당하기",
     "reassign": "새 런 시작",
     "openRun": "런 보기",
-    "trackerState": "트래커 상태",
-    "trackerStateNote": "트래커 기준",
     "labels": "라벨",
     "autoAssign": "자동 할당",
     "mapping": "Mapping",
     "mappingValue": "{project} · {agent}",
     "none": "없음",
     "noMapping": "Mapping이 없어요",
-    "history": "런 {count}개",
+    "runCount": "런 수",
+    "runCountValue": "{count, number}개",
     "openInTracker": "트래커에서 열기",
     "newTab": "새 탭에서 열려요"
   },

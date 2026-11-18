@@ -135,15 +135,15 @@ describe("Tickets 읽기", () => {
     );
   });
 
-  it("필터: 실행 중에는 Running 만 들고 Queued 는 넣지 않는다", async () => {
+  it("필터: 마지막 런으로 할당할 수 있음·처리할 일·진행 중·끝남을 가른다(GLOSSARY Tickets 필터)", async () => {
     const { context } = setupTickets();
     const page = await loadTicketsPage(context, undefined, now);
     expect(Object.fromEntries(TICKET_FILTERS.map((f) => [f, keysIn(page, f)]))).toEqual({
       all: ["ACME-6", "ACME-5", "ACME-4", "ACME-3", "ACME-2", "ACME-1", "DOC-1"],
-      attention: ["ACME-5", "ACME-2"],
-      unassigned: ["ACME-6", "DOC-1"],
-      running: ["ACME-3"],
-      merged: ["ACME-1"],
+      assignable: ["ACME-6", "DOC-1"],
+      todo: ["ACME-5", "ACME-2"],
+      "in-progress": ["ACME-4", "ACME-3"],
+      done: ["ACME-1"],
     });
   });
 
