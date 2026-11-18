@@ -1,5 +1,5 @@
 {
-  "documentTitle": "Runs · Factory Orchestrator",
+  "documentTitle": "Runs · Ganger",
   "title": "Runs",
   "subtitle": "{attention, plural, =0 {런 {total}개, 처리할 일은 없어요.} other {{total}개 중 {attention}개가 처리할 일이에요.}}",
   "subtitleRecent": "{attention, plural, =0 {최근 런 {total}개, 처리할 일은 없어요.} other {최근 런 {total}개 중 {attention}개가 처리할 일이에요.}}",

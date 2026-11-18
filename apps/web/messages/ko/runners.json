@@ -1,5 +1,5 @@
 {
-  "documentTitle": "Runners · Factory Orchestrator",
+  "documentTitle": "Runners · Ganger",
   "title": "Runners",
   "subtitle": "{issues, plural, =0 {러너 {total}대 모두 문제가 없어요.} other {{total}대 중 #대에 문제가 있어요.}} {available, plural, =0 {지금 새 런을 받을 수 있는 러너가 없어요.} other {#대가 지금 새 런을 받을 수 있어요.}}",
   "add": "러너 추가",

@@ -12,7 +12,7 @@ const ACTIONS: ReadonlyArray<{ path: string; label: string; help: string }> = [
   {
     path: "question",
     label: "에이전트가 질문하기",
-    help: "일하는 런 하나가 질문해요. 홈의 손댈 일에 오르고 답할 수 있어요.",
+    help: "일하는 런 하나가 질문해요. Dashboard의 To do에 올라 답할 수 있어요.",
   },
   {
     path: "push-auth",
@@ -52,7 +52,7 @@ export function devPage(lifeEnabled: boolean): string {
 <body>
 <h1>개발 도구</h1>
 <p>가짜 어댑터로 도는 개발 진입점이에요. 실제 트래커·러너·GitHub 에 닿지 않아요.
-자동 진행: <strong id="life">${lifeEnabled ? "켜짐" : "꺼짐"}</strong> · <a href="/">홈으로</a></p>
+자동 진행: <strong id="life">${lifeEnabled ? "켜짐" : "꺼짐"}</strong> · <a href="/">Dashboard로</a></p>
 <ul>${buttons}</ul>
 <output id="result"></output>
 <script type="module">

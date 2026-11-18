@@ -1,6 +1,6 @@
 {
   "title": "디자인 시스템",
-  "documentTitle": "디자인 시스템 · Factory Orchestrator",
+  "documentTitle": "디자인 시스템 · Ganger",
   "subtitle": "packages/ui 의 토큰과 컴포넌트예요. 규칙은 packages/ui/DESIGN.md 에 있어요.",
   "theme": "다크",
   "nav": {
