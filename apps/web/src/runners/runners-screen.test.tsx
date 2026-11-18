@@ -102,13 +102,20 @@ describe("Runners 화면", () => {
   it("주소로 고른 러너 카드를 표시한다", () => {
     const { db } = seedDatabase();
     const html = render(loadRunnersPage(db, now), "runner-b");
-    expect(html).toMatch(/<li id="runner-runner-b" aria-current="true"/);
+    expect(html).toMatch(/<li id="runner-runner-b" aria-current="true" tabindex="-1"/);
     expect(html).not.toMatch(/<li id="runner-runner-a" aria-current/);
+    // 고르지 않은 카드는 포커스를 받지 않는다
+    expect(html).not.toMatch(/<li id="runner-runner-a"[^>]*tabindex/);
   });
 
-  it("러너가 없어도 주 버튼은 하나다", () => {
+  it("러너가 없으면 빈 상태 블록에서 안내하고 주 버튼은 하나다", () => {
     const html = render({ runners: [] });
-    expect(textOf(html)).toContain(runnersJson.noRunners);
+    const text = textOf(html);
+    expect(text).toContain(runnersJson.empty.title);
+    expect(text).toContain(runnersJson.empty.body);
+    // 안내는 본문 블록에 한 번만 둔다. 부제목에 겹쳐 쓰지 않는다
+    expect(/<header[^]*?<\/header>/.exec(html)?.[0]).not.toContain("<p");
+    expect(html).not.toContain(`aria-label="${runnersJson.listLabel}"`);
     expect(variantsOf(html)).toEqual(["primary"]);
   });
 
@@ -123,10 +130,44 @@ describe("Runners 화면", () => {
     expect(textOf(a)).toContain("6자리가 비어 있어요.");
   });
 
-  it("런 줄은 그 런의 Workspace 로 연 Runs 로 이어진다", () => {
+  it("런 행 전체가 그 런의 Workspace 로 연 Run 상세 링크다(0050 5번)", () => {
     const { db, ids } = seedDatabase();
-    const html = render(loadRunnersPage(db, now));
-    expect(html).toContain(`href="/runs?ws=ws-labs&amp;sel=${ids.get("LAB-1") ?? ""}"`);
+    const a = cardHtml(render(loadRunnersPage(db, now)), "runner-a");
+    const id = ids.get("LAB-1") ?? "";
+    // 링크가 상태 알약·티켓 키·Workspace 를 담은 행 전체를 감싼다
+    const link = new RegExp(
+      `<a href="/runs/${id}\\?ws=ws-labs"[^>]*>(?:(?!</a>)[^])*data-status="[^"]+"(?:(?!</a>)[^])*LAB-1(?:(?!</a>)[^])*</a>`,
+    );
+    expect(a).toMatch(link);
+    // 행 안에 링크를 겹치지 않는다
+    expect(a).not.toMatch(/<a [^>]*>(?:(?!<\/a>)[^])*<a /);
+  });
+
+  // 잘리지 않고 줄을 바꾸는지는 실제 글자 폭이 필요해 브라우저 시험(e2e/src/runners.test.ts)에서 본다
+  it("긴 프로젝트 이름의 확인 항목을 이름 전체로 그린다", () => {
+    const { db } = seedDatabase();
+    const project = "github:acme/a-very-long-repository-name-that-does-not-fit-in-a-card";
+    recordRunnerCheck(db, {
+      runnerId: toRunnerId("runner-a"),
+      online: true,
+      checkedAt: now,
+      error: null,
+      projects: null,
+      assignmentBlocked: false,
+      prerequisites: [
+        {
+          id: `github-push:${project}`,
+          name: `GitHub push access: ${project}`,
+          satisfied: false,
+          hint: null,
+          blocksAssignment: false,
+        },
+      ],
+    });
+    const a = cardHtml(render(loadRunnersPage(db, now)), "runner-a");
+    expect(a).toMatch(
+      new RegExp(`aria-label="${card.check.broken}"[^]*?>GitHub push 권한: ${project}</span>`),
+    );
   });
 
   it("남은 워크트리와 그 까닭을 보인다", () => {

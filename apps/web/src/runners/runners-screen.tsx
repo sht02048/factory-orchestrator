@@ -22,7 +22,7 @@ const MAX_SEGMENTS = 12;
 
 export interface RunnersScreenProps {
   page: RunnersPage;
-  /** 주소로 고른 러너(Home 의 Runner Issue 카드에서 온다). 그 카드로 스크롤하고 테두리로 보인다 */
+  /** 주소로 고른 러너(Home 의 Runner Issue 카드에서 온다). 그 카드로 스크롤·포커스하고 테두리로 보인다 */
   selectedId: string | undefined;
   /** 보던 Workspace. 러너 추가 링크가 이어 간다 */
   ws: string | undefined;
@@ -43,7 +43,11 @@ export function RunnersScreen({ page, selectedId, ws }: RunnersScreenProps) {
 
   useEffect(() => {
     if (selectedId === undefined) return;
-    document.getElementById(cardId(selectedId))?.scrollIntoView({ block: "nearest" });
+    const card = document.getElementById(cardId(selectedId));
+    if (card === null) return;
+    card.scrollIntoView({ block: "nearest" });
+    // 키보드·화면 읽기 사용자도 고른 러너에서 시작하게 포커스를 옮긴다. 스크롤은 위에서 이미 했다
+    card.focus({ preventScroll: true });
   }, [selectedId]);
 
   return (
@@ -52,7 +56,7 @@ export function RunnersScreen({ page, selectedId, ws }: RunnersScreenProps) {
         title={t("title")}
         subtitle={
           runners.length === 0
-            ? t("noRunners")
+            ? undefined
             : t("subtitle", { total: runners.length, available, issues })
         }
         actions={
@@ -65,13 +69,16 @@ export function RunnersScreen({ page, selectedId, ws }: RunnersScreenProps) {
           </a>
         }
       />
-      {runners.length === 0 ? null : (
+      {runners.length === 0 ? (
+        <EmptyRunners />
+      ) : (
         <ul aria-label={t("listLabel")} {...stylex.props(styles.grid)}>
           {runners.map((runner) => (
             <li
               key={runner.id}
               id={cardId(runner.id)}
               aria-current={runner.id === selectedId ? "true" : undefined}
+              tabIndex={runner.id === selectedId ? -1 : undefined}
               {...stylex.props(styles.cell, runner.id === selectedId && styles.selected)}
             >
               <RunnerCard runner={runner} />
@@ -80,6 +87,17 @@ export function RunnersScreen({ page, selectedId, ws }: RunnersScreenProps) {
         </ul>
       )}
     </div>
+  );
+}
+
+/** 러너가 0대일 때. 주 버튼(러너 추가)은 머리에 하나만 둔다(ADR 0010 6번) */
+function EmptyRunners() {
+  const t = useTranslations("runners.empty");
+  return (
+    <Card>
+      <Text variant="title">{t("title")}</Text>
+      <Text variant="body">{t("body")}</Text>
+    </Card>
   );
 }
 
@@ -183,7 +201,10 @@ function CapacityBar({ runner }: { runner: RunnerView }) {
   );
 }
 
-/** capacity 를 차지하는 런과 기다리는 런. 티켓 키는 그 런의 Workspace 로 연 Runs 로 이어진다 */
+/**
+ * capacity 를 차지하는 런과 기다리는 런. 행 전체가 그 런의 Workspace 로 연 Run 상세로 이어진다
+ * (티켓 0050 5번: Row 의 hover 면이 누를 수 있는 곳과 맞게 한다).
+ */
 function RunList({ runner }: { runner: RunnerView }) {
   const t = useTranslations("runners.card");
   const statusName = useStatusName();
@@ -193,44 +214,61 @@ function RunList({ runner }: { runner: RunnerView }) {
     <ol aria-label={t("runs")} {...stylex.props(styles.list)}>
       {runner.occupying.map((run) => (
         <li key={run.id}>
-          <Row
-            leading={<StatusPill status={run.state}>{statusName(run.state)}</StatusPill>}
-            trailing={elapsed(run.executionMs)}
-          >
-            <RunLabel ticketKey={run.ticketKey} runId={run.id} workspace={run.workspace} />
-          </Row>
+          <RunRowLink runId={run.id} workspace={run.workspace}>
+            <Row
+              leading={<StatusPill status={run.state}>{statusName(run.state)}</StatusPill>}
+              trailing={elapsed(run.executionMs)}
+            >
+              <RunLabel ticketKey={run.ticketKey} workspace={run.workspace} />
+            </Row>
+          </RunRowLink>
         </li>
       ))}
       {runner.queued.map((run) => (
         <li key={run.id}>
-          <Row
-            leading={<StatusPill status="queued">{statusName("queued")}</StatusPill>}
-            trailing={t("queuedFor", { duration: duration(run.waitMs) })}
-          >
-            <RunLabel ticketKey={run.ticketKey} runId={run.id} workspace={run.workspace} />
-          </Row>
+          <RunRowLink runId={run.id} workspace={run.workspace}>
+            <Row
+              leading={<StatusPill status="queued">{statusName("queued")}</StatusPill>}
+              trailing={t("queuedFor", { duration: duration(run.waitMs) })}
+            >
+              <RunLabel ticketKey={run.ticketKey} workspace={run.workspace} />
+            </Row>
+          </RunRowLink>
         </li>
       ))}
     </ol>
   );
 }
 
+/** 런 행 하나를 감싸는 Run 상세 링크. 행 안에는 다른 링크·버튼을 두지 않는다 */
+function RunRowLink({
+  runId,
+  workspace,
+  children,
+}: {
+  runId: string;
+  workspace: RunWorkspace;
+  children: ReactNode;
+}) {
+  return (
+    <a href={runHref(workspace.id, runId)} {...stylex.props(styles.rowLink)}>
+      {children}
+    </a>
+  );
+}
+
 function RunLabel({
   ticketKey,
-  runId,
   workspace,
   meta,
 }: {
   ticketKey: string;
-  runId: string;
   workspace: RunWorkspace;
   meta?: ReactNode;
 }) {
   return (
     <span {...stylex.props(styles.runLabel)}>
-      <a href={runHref(workspace.id, runId)} {...stylex.props(styles.runLink)}>
-        {ticketKey}
-      </a>
+      <span {...stylex.props(styles.ticketKey)}>{ticketKey}</span>
       <Text variant="meta" truncate>
         {meta ?? workspace.name}
       </Text>
@@ -319,17 +357,18 @@ function LeftWorktrees({ runner }: { runner: RunnerView }) {
       <ul {...stylex.props(styles.list)}>
         {runner.leftWorktrees.map((run) => (
           <li key={run.id}>
-            <Row>
-              <RunLabel
-                ticketKey={run.ticketKey}
-                runId={run.id}
-                workspace={run.workspace}
-                meta={t("worktreeMeta", {
-                  workspace: run.workspace.name,
-                  reason: t(`worktree.${run.worktree}`),
-                })}
-              />
-            </Row>
+            <RunRowLink runId={run.id} workspace={run.workspace}>
+              <Row>
+                <RunLabel
+                  ticketKey={run.ticketKey}
+                  workspace={run.workspace}
+                  meta={t("worktreeMeta", {
+                    workspace: run.workspace.name,
+                    reason: t(`worktree.${run.worktree}`),
+                  })}
+                />
+              </Row>
+            </RunRowLink>
           </li>
         ))}
       </ul>
@@ -337,8 +376,9 @@ function LeftWorktrees({ runner }: { runner: RunnerView }) {
   );
 }
 
+/** Run 상세(`/runs/:id?ws=`). Home 의 흐름 행과 같은 곳으로 간다 */
 function runHref(workspaceId: string, runId: string): string {
-  return `/runs?${new URLSearchParams({ ws: workspaceId, sel: runId }).toString()}`;
+  return `/runs/${encodeURIComponent(runId)}?${new URLSearchParams({ ws: workspaceId }).toString()}`;
 }
 
 function Icon({ children }: { children: ReactNode }) {
@@ -396,7 +436,8 @@ const styles = stylex.create({
     padding: 0,
     listStyle: "none",
   },
-  cell: { minWidth: 0, borderRadius: radius.card },
+  // 고른 카드는 포커스를 받아도 아래 selected 테두리 하나로 보인다
+  cell: { minWidth: 0, borderRadius: radius.card, outline: "none" },
   selected: { outline: `2px solid ${colors.accentText}`, outlineOffset: 2 },
   head: {
     display: "flex",
@@ -411,9 +452,8 @@ const styles = stylex.create({
     color: colors.textPrimary,
     fontSize: fontSize.panel,
     fontWeight: fontWeight.semibold,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    // 이름이 길면 자르지 않고 줄을 바꿔 끝까지 보인다
+    overflowWrap: "anywhere",
   },
   pills: { display: "flex", flexShrink: 0, gap: space.s1 },
   capacity: { display: "flex", flexDirection: "column", gap: space.s2 },
@@ -447,14 +487,18 @@ const styles = stylex.create({
     minWidth: 0,
   },
   runLabel: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
-  runLink: {
+  rowLink: {
+    display: "block",
+    borderRadius: radius.control,
+    color: "inherit",
+    textDecoration: "none",
+    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
+    outlineOffset: 2,
+  },
+  ticketKey: {
     flexShrink: 0,
     color: colors.textPrimary,
     fontVariantNumeric: "tabular-nums",
-    textDecoration: { default: "none", ":hover": "underline" },
-    textUnderlineOffset: 3,
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
   },
   check: { display: "flex", alignItems: "flex-start", gap: space.s2, minWidth: 0 },
   checkText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
@@ -467,13 +511,8 @@ const styles = stylex.create({
   checkIcon: { display: "inline-flex", flexShrink: 0, color: colors.textTertiary },
   ok: { color: colors.progress },
   broken: { color: colors.problem },
-  checkName: {
-    minWidth: 0,
-    color: colors.textSecondary,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
+  // "GitHub push 권한: {project}"는 끝의 프로젝트가 항목마다 달라 자르지 않고 줄을 바꾼다
+  checkName: { minWidth: 0, color: colors.textSecondary, overflowWrap: "anywhere" },
   fix: {
     display: "flex",
     flexDirection: "column",
