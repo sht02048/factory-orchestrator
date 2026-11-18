@@ -31,11 +31,12 @@ import {
 import type { Database } from "@factory/db";
 import { chromium } from "playwright-core";
 import type { Browser, BrowserContext, Page, Route } from "playwright-core";
-import { createServer } from "vite";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
+import shell from "../../apps/web/messages/ko/shell.json" with { type: "json" };
 import tickets from "../../apps/web/messages/ko/tickets.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
+import { startWebServer } from "./web-server.js";
 
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
 const adaptersModule = join(webRoot, "src/server/adapters.ts");
@@ -103,19 +104,10 @@ beforeAll(async () => {
 
   process.env["DATABASE_PATH"] = dbPath;
   process.env["ENCRYPTION_KEY"] = Buffer.from(encryptionKey).toString("base64");
-  web = await createServer({
-    root: webRoot,
-    configFile: join(webRoot, "vite.config.ts"),
-    logLevel: "warn",
+  ({ server: web, baseUrl } = await startWebServer({
     plugins: [fakeAdapters],
-    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, watch: null },
-  });
-  await web.listen();
-  const address = web.httpServer?.address();
-  if (address === null || address === undefined || typeof address === "string") {
-    throw new Error("web dev server has no TCP address");
-  }
-  baseUrl = `http://127.0.0.1:${address.port}`;
+    cacheDir: join(dir, "vite-cache"),
+  }));
 
   browser = await chromium.launch({ channel: "chrome" });
 }, 120_000);
@@ -202,7 +194,10 @@ describe("Tickets 수동 할당(브라우저, 0054)", () => {
     const dialog = page.getByRole("dialog", { name: fill(tickets.assign.title, { key }) });
     await dialog.getByRole("button", { name: tickets.assign.submit }).click();
 
-    await page.getByText(fill(tickets.assign.done, { key })).waitFor();
+    await page
+      .getByRole("region", { name: shell.toastRegion })
+      .getByText(fill(tickets.assign.done, { key }))
+      .waitFor();
     await dialog.waitFor({ state: "hidden" });
     await expect.poll(focused).toBe(tickets.panel.openRun);
     await panel.getByRole("heading", { name: `${key} Ticket number 1` }).waitFor();
@@ -232,7 +227,10 @@ describe("Tickets 수동 할당(브라우저, 0054)", () => {
     await page.waitForTimeout(300);
     expect(await dialog.isVisible()).toBe(true);
     await held.release();
-    await page.getByText(fill(tickets.assign.done, { key })).waitFor();
+    await page
+      .getByRole("region", { name: shell.toastRegion })
+      .getByText(fill(tickets.assign.done, { key }))
+      .waitFor();
     await dialog.waitFor({ state: "hidden" });
     await expect.poll(focused).toBe(tickets.panel.openRun);
   });
