@@ -89,7 +89,7 @@ export interface SettingsActions {
   }) => Promise<ActionResult>;
   saveConnection: (input: {
     id?: string;
-    name: string;
+    name?: string;
     apiKey: string;
     webhookSecret: string;
   }) => Promise<ActionResult>;

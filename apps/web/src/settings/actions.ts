@@ -9,7 +9,7 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
 } from "@factory/core";
-import type { ConnectionCheck, RunnerId, RunnerKind } from "@factory/core";
+import type { RunnerId, RunnerKind } from "@factory/core";
 import {
   getTrackerConnection,
   getWorkspaceTrackerProject,
@@ -191,9 +191,11 @@ export function saveLabel(
 
 const secret = z.string().trim().max(1000);
 
+const DEFAULT_CONNECTION_NAME = "Linear";
+
 export const trackerConnectionInput = z.object({
   id: id.optional(),
-  name,
+  name: name.optional(),
   apiKey: secret,
   webhookSecret: secret,
 });
@@ -224,11 +226,13 @@ export async function saveTrackerConnectionSetting(
   const secrets = { ...previous, apiKey, webhookSecret };
   const config = existing?.config ?? {};
 
+  let organizationName: string | null = null;
   if (input.apiKey !== "") {
-    const check = await checkWith(() =>
+    const check = await checkWith<{ ok: true; organizationName: string | null }>(() =>
       context.registry.createTracker(kind, { config, secrets }).checkConnection(),
     );
     if (!check.ok) return { ok: false, reason: check.reason };
+    organizationName = check.organizationName;
   }
   saveTrackerConnection(
     context.db,
@@ -236,7 +240,7 @@ export async function saveTrackerConnectionSetting(
     {
       id: existing?.id ?? toTrackerConnectionId(randomUUID()),
       kind,
-      name: input.name,
+      name: input.name ?? existing?.name ?? organizationName ?? DEFAULT_CONNECTION_NAME,
       config,
       secrets,
     },
@@ -307,12 +311,12 @@ export async function checkGitHubToken(
   );
 }
 
-async function checkWith(
-  run: () => Promise<ConnectionCheck<{ kind: string }>>,
-): Promise<SaveResult<RemoteError>> {
+async function checkWith<C extends { ok: true }>(
+  run: () => Promise<C | { ok: false; error: unknown }>,
+): Promise<C | { ok: false; reason: RemoteError }> {
   try {
     const result = await run();
-    if (result.ok) return { ok: true };
+    if (result.ok) return result;
     return { ok: false, reason: remoteErrorOfDetail(result.error) };
   } catch (error) {
     return { ok: false, reason: remoteErrorOf(error) };
