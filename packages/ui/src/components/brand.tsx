@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { brand } from "../tokens.stylex";
+import { brand, colors } from "../tokens.stylex";
 
 export const WHISTLE_BODY =
   "M40 34h36a8 8 0 0 1 8 8v4a8 8 0 0 1-8 8H63.66A24 24 0 1 1 40 34zM40 49.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 1 0 0-17z";
@@ -117,11 +117,11 @@ const line = {
 const styles = stylex.create({
   svg: { display: "block", flexShrink: 0 },
   current: { fill: "currentColor" },
-  yellow: { fill: brand.yellow },
+  yellow: { fill: colors.accent },
   body: { fill: brand.body },
   eye: { fill: brand.eye },
   eyeLine: { ...line, stroke: brand.eye },
-  sound: { ...line, stroke: brand.yellow },
+  sound: { ...line, stroke: colors.accent },
   snore: { ...line, stroke: brand.snore },
 });
 

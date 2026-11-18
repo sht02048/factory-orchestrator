@@ -162,11 +162,12 @@ describe("브랜드(티켓 0077)", () => {
     }
   }, 120_000);
 
-  it("레일 맨 위에 제품 기호가 있고 그 아래 Workspace 바꾸기가 온다", async () => {
+  it("레일 맨 위에 취구가 노란 제품 기호가 있고 그 아래 Workspace 바꾸기가 온다", async () => {
     await page.goto("/");
     const rail = page.locator("aside").first();
     const mark = rail.getByRole("img", { name: shell.brand });
     await expect.poll(() => mark.count()).toBe(1);
+    expect(await mark.getAttribute("data-mark-tone")).toBe("brand");
     const switcher = rail.getByRole("button", { name: /Workspace 바꾸기/ });
     const markBox = await mark.boundingBox();
     const switcherBox = await switcher.boundingBox();

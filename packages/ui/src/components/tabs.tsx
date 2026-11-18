@@ -124,7 +124,7 @@ const styles = stylex.create({
   },
   selected: {
     color: { default: colors.textPrimary, ":hover": colors.textPrimary },
-    boxShadow: "inset 0 -2px 0 currentColor",
+    boxShadow: `inset 0 -2px 0 ${colors.accent}`,
   },
   chipList: {
     display: "flex",
