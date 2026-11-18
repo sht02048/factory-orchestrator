@@ -2,9 +2,12 @@
   "documentTitle": "Runners · Factory Orchestrator",
   "title": "Runners",
   "subtitle": "{total}대 중 {available}대가 새 런을 받을 수 있어요.{issues, plural, =0 {} other { #대는 문제가 있어요.}}",
-  "noRunners": "등록한 러너가 없어요. 러너를 추가하면 여기에 보여요.",
   "add": "러너 추가",
   "listLabel": "러너 목록",
+  "empty": {
+    "title": "등록한 러너가 없어요",
+    "body": "러너를 추가하면 여기에서 capacity와 맡은 런, 확인 항목을 볼 수 있어요."
+  },
   "card": {
     "label": "{name} 러너",
     "summary": {
