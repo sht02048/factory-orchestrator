@@ -78,7 +78,9 @@ fragment TicketFields on Issue {
 
 const PAGE_INFO = "pageInfo { hasNextPage endCursor }";
 
-const QUERY_CONNECTION = "query Connection { viewer { id organization { name } } }";
+const QUERY_CONNECTION = "query Connection { viewer { id } }";
+
+const QUERY_ORGANIZATION = "query Organization { viewer { organization { name } } }";
 
 const QUERY_TICKET = `query Ticket($id: String!) { issue(id: $id) { ...TicketFields } }
 ${TICKET_FIELDS}`;
@@ -240,20 +242,28 @@ export class LinearTracker implements Tracker {
 
   async checkConnection(): Promise<TrackerConnectionCheck> {
     try {
-      const data = await this.client.request(
+      await this.client.request(
         QUERY_CONNECTION,
         {},
-        z.object({
-          viewer: z.object({
-            id: idSchema,
-            organization: z.object({ name: z.string() }).nullish(),
-          }),
-        }),
+        z.object({ viewer: z.object({ id: idSchema }) }),
       );
-      return { ok: true, organizationName: data.viewer.organization?.name ?? null };
+      return { ok: true, organizationName: await this.organizationName() };
     } catch (error) {
       if (error instanceof LinearTrackerError) return { ok: false, error: error.detail };
       throw error;
+    }
+  }
+
+  private async organizationName(): Promise<string | null> {
+    try {
+      const data = await this.client.request(
+        QUERY_ORGANIZATION,
+        {},
+        z.object({ viewer: z.object({ organization: z.object({ name: z.string() }) }) }),
+      );
+      return data.viewer.organization.name;
+    } catch {
+      return null;
     }
   }
 
