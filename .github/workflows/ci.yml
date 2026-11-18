@@ -45,9 +45,6 @@ jobs:
           if-no-files-found: ignore
       - name: Build
         run: pnpm run build
-      # 개발 진입점(pnpm dev)의 가짜 어댑터·가짜 값이 배포물에 들어가지 않았는지 본다.
-      - name: Dev-only code check
-        run: pnpm run check:dev-code
       - name: Web production smoke test
         run: pnpm run smoke:web
       - name: CLI smoke test

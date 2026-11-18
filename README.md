@@ -31,20 +31,20 @@ pnpm install   # also installs the lefthook pre-commit hook
 
 ## Commands
 
-| Command             | What it does                                                  |
-| ------------------- | ------------------------------------------------------------- |
-| `pnpm dev`    | Runs the web app (hot reload) and the worker with fake adapters |
-| `pnpm typecheck`    | Type-checks every package with TypeScript 7 (`tsc`)           |
-| `pnpm lint`         | Runs oxlint in type-aware mode                                |
-| `pnpm format`       | Formats with oxfmt                                            |
-| `pnpm format:check` | Checks formatting                                             |
-| `pnpm test`         | Runs Vitest (browser tests need Google Chrome)                |
-| `pnpm check:colors` | Checks for raw color values outside `packages/ui`             |
-| `pnpm build`        | Builds the web app, the worker, and the CLI                   |
-| `pnpm smoke:web`    | Starts the production web build and checks a page             |
-| `pnpm smoke:cli`    | Runs the built CLI's `init` and `start` and checks a page     |
-| `pnpm bundle`       | Packs the builds into a server bundle in `dist/`              |
-| `pnpm smoke:bundle` | Extracts the server bundle outside the repository and runs it |
+| Command             | What it does                                                    |
+| ------------------- | --------------------------------------------------------------- |
+| `pnpm dev`          | Runs the web app (hot reload) and the worker with fake adapters |
+| `pnpm typecheck`    | Type-checks every package with TypeScript 7 (`tsc`)             |
+| `pnpm lint`         | Runs oxlint in type-aware mode                                  |
+| `pnpm format`       | Formats with oxfmt                                              |
+| `pnpm format:check` | Checks formatting                                               |
+| `pnpm test`         | Runs Vitest (browser tests need Google Chrome)                  |
+| `pnpm check:colors` | Checks for raw color values outside `packages/ui`               |
+| `pnpm build`        | Builds the web app, the worker, and the CLI                     |
+| `pnpm smoke:web`    | Starts the production web build and checks a page               |
+| `pnpm smoke:cli`    | Runs the built CLI's `init` and `start` and checks a page       |
+| `pnpm bundle`       | Packs the builds into a server bundle in `dist/`                |
+| `pnpm smoke:bundle` | Extracts the server bundle outside the repository and runs it   |
 
 The browser tests in `e2e` drive the Google Chrome installed on the machine through `playwright-core`; they do not download a browser. GitHub's Ubuntu runners already have Chrome. When a browser test fails, a screenshot of the page is saved to `e2e/test-results/`, and CI uploads it as an artifact.
 
@@ -56,7 +56,7 @@ The browser tests in `e2e` drive the Google Chrome installed on the machine thro
 - `--reset` deletes the data of that mode and starts over. `--static` stops the fake agents from moving on their own.
 - `/__dev` (the **Dev tools** link at the bottom right) labels a ticket for auto-assignment, adds a ticket, makes an agent ask a question, and fixes or breaks a runner's GitHub authentication.
 - Data lives in `.dev/<mode>/` in the repository (ignored by git), or under `FACTORY_DEV_DIR`. It never touches `~/.factory-orchestrator`. The server binds to `127.0.0.1:3000`; set `WEB_HOST` and `WEB_PORT` to change that (for example, `WEB_HOST=0.0.0.0 pnpm dev` to open it from another machine on your network). Anyone who can reach that address can use the dev server and `/__dev`, so bind to an address only trusted machines can reach.
-- The fake adapters and the dev tools are registered only by `pnpm dev`. They are not part of the production build or the CLI, and CI checks that with `pnpm check:dev-code` after the build.
+- The fake adapters and the dev tools are registered only by `pnpm dev`. They are not part of the production build or the server bundle; the bundle check (`scripts/bundle-check.ts`, run by `pnpm bundle` and `pnpm smoke:bundle`) fails if fake adapters or dev-only values end up in the bundle.
 
 `pnpm --filter @factory/web dev` still starts only the web app; open `http://127.0.0.1:3000/ds` to see the design system. Run the production build with `pnpm --filter @factory/web start`. It binds to `127.0.0.1` by default. To change that, set the shell environment variables `WEB_HOST` and `WEB_PORT` (for example, `WEB_PORT=4000 pnpm --filter @factory/web start`).
 

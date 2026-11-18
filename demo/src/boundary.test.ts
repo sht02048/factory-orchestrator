@@ -2,12 +2,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { findDevMarkers } from "../../scripts/check-dev-code.ts";
+import { devOnlyMarkers } from "../../scripts/bundle-check.ts";
 import { PREFILL } from "./values.js";
 
 /*
- * 가짜 어댑터가 제품 코드에 들어가지 않는다는 경계 시험(티켓 0047). 빌드 산출물은 CI 의 빌드 뒤 단계
- * (scripts/check-dev-code.ts)가 보고, 여기서는 빌드 없이 소스의 import 경계를 본다.
+ * 가짜 어댑터가 제품 코드에 들어가지 않는다는 경계 시험(티켓 0047). 서버 배포물은 배포물 정적 검사
+ * (scripts/bundle-check.ts, CI 의 bundle·smoke:bundle)가 보고, 여기서는 빌드 없이 소스의 import 경계를 본다.
  *
  * - 제품 앱(apps/web·worker·cli)과 어댑터 패키지의 시험 아닌 소스가 demo/ 나 @factory/core/testing 을 import 하지 않는다.
  * - 제품 앱의 package.json 이 @factory/demo 에 기대지 않는다.
@@ -58,8 +58,8 @@ describe("개발 경로와 제품 코드의 경계", () => {
     }
   });
 
-  it("빌드 검사의 표시 문자열은 가짜 값을 잡는다", () => {
-    expect(findDevMarkers(`const key = "${PREFILL["apiKey"]}";`)).toEqual(["lin_api_demo"]);
-    expect(findDevMarkers("export const realAdapter = 1;")).toEqual([]);
+  it("배포물 검사의 개발 전용 문자열은 가짜 값을 잡는다", () => {
+    expect(devOnlyMarkers(`const key = "${PREFILL["apiKey"]}";`)).toEqual(["lin_api_demo"]);
+    expect(devOnlyMarkers("export const realAdapter = 1;")).toEqual([]);
   });
 });

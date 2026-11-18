@@ -37,6 +37,6 @@ blocked_by: []
 
 - 시드가 런의 모든 상태와 요약 결과 넷, 지난 2주 런, 러너 셋의 상태를 만든다는 시험이 통과한다(`demo/src/seed.test.ts`).
 - 시드를 쓴 DB에서 가짜 세계를 되살린 뒤 worker 한 바퀴가 진행 중인 런을 바꾸지 않는다는 시험이 통과한다.
-- 제품 소스가 가짜 어댑터·개발 진입점을 import 하지 않는다는 시험(`demo/src/boundary.test.ts`)과, 빌드 산출물에 개발 경로 문자열이 없다는 CI 단계(`pnpm run check:dev-code`)가 통과한다.
+- 제품 소스가 가짜 어댑터·개발 진입점을 import 하지 않는다는 시험(`demo/src/boundary.test.ts`)과, 서버 배포물에 가짜 어댑터·개발 전용 문자열이 없다는 배포물 정적 검사(`scripts/bundle-check.ts`, 0029의 `bundle`·`smoke:bundle`)가 통과한다.
 - 실제 명령을 띄워 미리 채운 모드의 홈·Runs·Runners·Stats·Tickets가 온보딩으로 보내지 않고 200을 주고, SIGTERM에 포트를 닫는다는 시험이 통과한다(`demo/src/dev.test.ts`).
 - 온보딩 모드에서 브라우저로 가짜 값을 채워 5단계를 마치면 홈이 열린다는 시험이 통과한다.
