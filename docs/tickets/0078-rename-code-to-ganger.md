@@ -23,7 +23,7 @@ blocked_by: [0076, 0074]
 
 ## 완료 조건
 
-- `git grep -iE "factory[- ]orchestrator|@factory/|FACTORY_"` 결과가 지난 기록(docs/tickets·docs/research)과 옮기기 코드·시험 말고는 없다.
+- `git grep -iE "factory[- ]orchestrator|@factory/|FACTORY_"` 결과가 옛 이름이 남아도 되는 곳 말고는 없다. 남아도 되는 곳: 지난 기록(`docs/tickets`, `docs/research`), 결정 기록(`docs/adr`, 특히 0076의 옮기기 규칙), 이미 설치한 곳을 옮기는 코드와 그 시험.
 - 옛 설치 폴더·환경 변수를 가진 설치가 새 이름으로 옮겨진다는 시험.
 - 전체 CI와 데스크톱 패키징이 통과한다.
 - 머지 위험은 one-way(설치 폴더·환경 변수 이름 변경)라 사람이 직접 병합한다(AGENTS.md).

@@ -13,7 +13,7 @@ blocked_by: []
 
 운영자 결정(2026-11-18): 0.1.0 공개(0031) 전에 브랜딩을 Ganger로 바꾼다. 공개 뒤에 바꾸면 설치 폴더·패키지·저장소 링크를 두 번 옮겨야 한다. 범위는 제품 이름, 코드·패키지 이름, 앱 아이콘·로고, GitHub 저장소 이름 전부다.
 
-2026-11-18 기준 옛 이름이 들어간 곳(저장소 추적 파일 241개): `@factory/*` 패키지 이름(core 212, db 166, ui 62, cli 14, worker 11, web 9 등), `factory-orchestrator` 113곳, 설치 폴더 `~/.factory-orchestrator` 17곳, 환경 변수 `FACTORY_HOME`·`FACTORY_TAILSCALE_CLI`·`FACTORY_WORKER_WAKE` 등.
+2026-11-18 기준 옛 이름이 들어간 곳(저장소 추적 파일 약 240개): `@factory/*` 패키지 이름(core·db·ui가 가장 많다), `factory-orchestrator` 약 50개 파일, 설치 폴더 `~/.factory-orchestrator` 약 17곳, 환경 변수 `FACTORY_HOME`·`FACTORY_TAILSCALE_CLI`·`FACTORY_WORKER_WAKE`·`FACTORY_DEV_DIR`·`FACTORY_DESKTOP_USER_DATA`·`FACTORY_SERVER_BUNDLE`. 0078을 시작할 때 다시 센다.
 
 ## 범위
 
