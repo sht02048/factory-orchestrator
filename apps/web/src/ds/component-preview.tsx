@@ -228,6 +228,25 @@ export function ComponentSections() {
               {t("tabs.queued")}
             </Tab>
           </Tabs>
+          <Tabs<FilterKey>
+            value={filter}
+            onValueChange={setFilter}
+            label={t("tabs.chipsLabel")}
+            variant="chips"
+          >
+            <Tab value="all" count={42}>
+              {t("tabs.all")}
+            </Tab>
+            <Tab value="todo" count={2} attention>
+              {t("tabs.todo")}
+            </Tab>
+            <Tab value="running" count={1}>
+              {t("tabs.running")}
+            </Tab>
+            <Tab value="queued" count={0}>
+              {t("tabs.queued")}
+            </Tab>
+          </Tabs>
         </Section>
       </div>
 

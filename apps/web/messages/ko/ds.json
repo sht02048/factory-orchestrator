@@ -104,6 +104,7 @@
   },
   "tabs": {
     "label": "상태로 거르기",
+    "chipsLabel": "상태 칩으로 거르기",
     "all": "전체",
     "todo": "손댈 일",
     "running": "Running",

@@ -144,6 +144,34 @@ describe("서버 렌더", () => {
     expect(html).toContain(">42<");
   });
 
+  it("Tabs chips 는 같은 탭 목록을 칩 모양으로 그린다", () => {
+    const html = renderToString(
+      <Tabs value="all" onValueChange={noop} label="상태로 거르기" variant="chips">
+        <Tab value="all" count={52}>
+          전체
+        </Tab>
+        <Tab value="todo" count={4} attention>
+          손댈 일
+        </Tab>
+      </Tabs>,
+    );
+    const underline = renderToString(
+      <Tabs value="all" onValueChange={noop} label="상태로 거르기">
+        <Tab value="all" count={52}>
+          전체
+        </Tab>
+      </Tabs>,
+    );
+    expect(html).toContain('role="tablist"');
+    expect(html).toMatch(/aria-selected="true"[^>]*>전체/);
+    expect(html).toContain(">4<");
+    const listClass = (h: string) =>
+      /role="tablist"[^>]*class="([^"]+)"|class="([^"]+)"[^>]*role="tablist"/.exec(h);
+    const chips = listClass(html);
+    const under = listClass(underline);
+    expect(chips?.[1] ?? chips?.[2]).not.toBe(under?.[1] ?? under?.[2]);
+  });
+
   it("Field 의 오류는 입력을 invalid 로 만들고 라벨을 잇는다", () => {
     const html = renderToString(
       <Field label="Orca 경로" error="찾지 못했어요">
