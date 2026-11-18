@@ -46,10 +46,10 @@
     "urlDescription": "아래에서 정한 webhook 공개 주소로 만들었어요.",
     "secretSaved": "signing secret을 저장했어요. 다음을 누르면 넘어가요.",
     "secretMissingTitle": "아직 signing secret이 없어요",
-    "secretMissingBody": "이대로 다음으로 가도 돼요. 다만 Linear가 보낸 webhook이 서명 검증에 실패해, Auto-assign Label을 붙인 티켓을 바로 할당하지 못하고 주기적으로 트래커를 다시 읽을 때 할당해요.",
+    "secretMissingBody": "이대로 다음으로 가도 돼요. 다만 Linear가 보낸 webhook이 서명 검증에 실패해, Auto-assign Label을 붙인 티켓을 바로 할당하지 못하고 1분쯤마다 트래커를 다시 읽을 때 할당해요. 이때 런이 한 번도 없던 티켓만 할당하니, 라벨을 다시 붙여 다시 맡기려면 Tickets에서 할당해요.",
     "path": "Webhook 경로",
     "addressMissingTitle": "아직 webhook 공개 주소가 없어요",
-    "addressMissingBody": "webhook을 쓰려면 트래커가 공개 인터넷에서 이 서버에 닿아야 해요. 없어도 Auto-assign Label을 붙인 티켓은 1분쯤 안에 할당돼요. Tailscale Funnel, Cloudflare Tunnel, 리버스 프록시 중 하나로 연 주소를 아래 webhook 공개 주소에 넣으면 전체 webhook 주소가 보여요. 나중에 Settings의 주소에서 넣어도 돼요."
+    "addressMissingBody": "webhook을 쓰려면 트래커가 공개 인터넷에서 이 서버에 닿아야 해요. 없어도 런이 한 번도 없던 티켓은 Auto-assign Label을 붙이면 1분쯤 안에 할당돼요. 라벨을 다시 붙여 다시 맡기려면 webhook이 있어야 하고, 없으면 Tickets에서 다시 할당해요. Tailscale Funnel, Cloudflare Tunnel, 리버스 프록시 중 하나로 연 주소를 아래 webhook 공개 주소에 넣으면 전체 webhook 주소가 보여요. 나중에 Settings의 주소에서 넣어도 돼요."
   },
   "runner": {
     "beforeTitle": "등록하기 전에 러너에서 해 둘 일",
