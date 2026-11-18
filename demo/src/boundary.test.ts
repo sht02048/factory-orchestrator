@@ -15,7 +15,7 @@ const PRODUCT_DIRS = [
   "packages/tracker-linear/src",
   "packages/db/src",
 ];
-const FORBIDDEN = [/@factory\/core\/testing/, /@factory\/demo/, /\bdemo\/src\b/];
+const FORBIDDEN = [/@ganger\/core\/testing/, /@ganger\/demo/, /\bdemo\/src\b/];
 
 function* sources(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

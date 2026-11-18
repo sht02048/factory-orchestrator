@@ -151,9 +151,7 @@ describe("상태 표시 컴포넌트는 StatusPill 하나다(ADR 0010 4번)", ()
     const offenders: string[] = [];
     for (const file of files(root)) {
       const source = readFileSync(file, "utf8");
-      for (const m of source.matchAll(
-        /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*"@factory\/ui"/g,
-      )) {
+      for (const m of source.matchAll(/import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*"@ganger\/ui"/g)) {
         const names = (m[1] ?? "").split(",").map((n) => n.replace(/^\s*type\s+/, "").trim());
         for (const name of names) {
           if (/^(Status|StatusTone|Dot|DotTone|Badge)$/.test(name))
