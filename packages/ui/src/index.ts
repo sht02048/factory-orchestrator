@@ -1,5 +1,19 @@
 export { Button, buttonStyles, type ButtonProps, type ButtonVariant } from "./components/button";
-export { Card, Row, type CardProps, type RowProps } from "./components/card";
+export {
+  CapacityBar,
+  capacityText,
+  type CapacityBarProps,
+  type CapacityTone,
+} from "./components/capacity-bar";
+export {
+  Card,
+  Row,
+  SURFACE_ROLES,
+  surfaceStyles,
+  type CardProps,
+  type RowProps,
+  type SurfaceRole,
+} from "./components/card";
 export { Checkbox, type CheckboxProps } from "./components/checkbox";
 export {
   DefinitionItem,
@@ -8,6 +22,7 @@ export {
 } from "./components/definition-list";
 export { Dialog, DialogClose, type DialogCloseProps, type DialogProps } from "./components/dialog";
 export { Field, Input, type FieldProps, type InputProps } from "./components/field";
+export { GroupHeader, type GroupHeaderProps } from "./components/group-header";
 export {
   Actions,
   DetailPanel,
@@ -19,7 +34,9 @@ export {
   SplitView,
   type PageHeaderProps,
   type PanelHeaderProps,
+  type SectionLink,
   type SectionProps,
+  type SectionTitleRole,
   type SplitViewProps,
 } from "./components/layout";
 export {
@@ -33,7 +50,14 @@ export {
   type MenuRadioProps,
 } from "./components/menu";
 export { Popover, type PopoverProps } from "./components/popover";
+export { ProblemCallout, type ProblemCalloutProps } from "./components/problem-callout";
+export {
+  SegmentedTabs,
+  type SegmentedTabsItem,
+  type SegmentedTabsProps,
+} from "./components/segmented-tabs";
 export { Select, type SelectOption, type SelectProps } from "./components/select";
+export { StatTile, type StatTileProps, type StatTrend } from "./components/stat-tile";
 export {
   PILL_STATUSES,
   StatusPill,
@@ -63,6 +87,12 @@ export {
   type TableRowsProps,
 } from "./components/table";
 export { Tab, TabPanel, Tabs, type TabProps, type TabsProps } from "./components/tabs";
-export { Text, type TextProps, type TextVariant } from "./components/text";
+export {
+  TEXT_VARIANTS,
+  Text,
+  textStyles,
+  type TextProps,
+  type TextVariant,
+} from "./components/text";
 export { Toaster, showToast, type ToasterProps } from "./components/toast";
 export { Tooltip, type TooltipProps } from "./components/tooltip";
