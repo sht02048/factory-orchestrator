@@ -26,6 +26,8 @@ export interface TimeFormat {
   ago: (at: Date | string, agoMs: number) => string;
   /** 타임라인 시각: "10:45" */
   clock: (at: Date | string) => string;
+  /** 타임라인 시각에 날짜를 붙여야 하면 붙인다: `now` 와 같은 날이면 "10:45", 다른 날이면 "11월 17일 10:45" */
+  stamp: (at: Date | string, now: Date | string) => string;
 }
 
 export function useTime(): TimeFormat {
@@ -44,6 +46,12 @@ export function useTime(): TimeFormat {
       : t("duration.hoursMinutes", { hours, minutes });
   };
 
+  const clock = (at: Date | string): string =>
+    format.dateTime(toDate(at), { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  // 같은 날인지는 운영자 시간대의 날짜로 가린다.
+  const day = (at: Date | string): string =>
+    format.dateTime(toDate(at), { year: "numeric", month: "numeric", day: "numeric" });
+
   return {
     duration,
     elapsed: (ms) => t("time.elapsed", { duration: duration(ms) }),
@@ -59,8 +67,17 @@ export function useTime(): TimeFormat {
         });
       return format.dateTime(toDate(at), { month: "long", day: "numeric" });
     },
-    clock: (at) =>
-      format.dateTime(toDate(at), { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }),
+    clock,
+    stamp: (at, now) =>
+      day(at) === day(now)
+        ? clock(at)
+        : format.dateTime(toDate(at), {
+            month: "long",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hourCycle: "h23",
+          }),
   };
 }
 

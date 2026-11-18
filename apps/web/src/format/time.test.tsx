@@ -42,6 +42,16 @@ describe("시간 표기(ADR 0010 7번)", () => {
     expect(draw((time) => time.clock(at), "America/New_York")).toBe("20:45");
   });
 
+  it("타임라인 시각은 지금과 다른 날이면 운영자 시간대의 날짜를 붙인다", () => {
+    const now = "2026-11-18T03:00:00.000Z";
+    // 같은 날(UTC)
+    expect(draw((time) => time.stamp("2026-11-18T01:45:00.000Z", now))).toBe("01:45");
+    // 어제(UTC)
+    expect(draw((time) => time.stamp("2026-11-17T23:10:00.000Z", now))).toBe("11월 17일 23:10");
+    // 서울에서는 둘 다 11월 18일이라 시각만
+    expect(draw((time) => time.stamp("2026-11-17T23:10:00.000Z", now), "Asia/Seoul")).toBe("08:10");
+  });
+
   it("시간의 양은 단위를 붙여 쓴다", () => {
     expect(draw((time) => time.duration(40 * 1000))).toBe("40초");
     expect(draw((time) => time.duration(12 * MINUTE))).toBe("12분");
