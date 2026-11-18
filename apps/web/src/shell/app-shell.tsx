@@ -42,7 +42,7 @@ export function AppShell({
     <div {...stylex.props(styles.app)}>
       <aside {...stylex.props(styles.rail)}>
         <div data-rail-brand {...stylex.props(styles.brand)}>
-          <GangerMark tone="mono" label={t("brand")} />
+          <GangerMark tone="brand" label={t("brand")} />
         </div>
         <WorkspaceSwitcher
           shell={shell}
@@ -249,7 +249,7 @@ const styles = stylex.create({
   },
   navLinkCurrent: {
     backgroundColor: { default: colors.bgSelected, ":hover": colors.bgSelected },
-    color: { default: colors.textPrimary, ":hover": colors.textPrimary },
+    color: { default: colors.accentText, ":hover": colors.accentText },
   },
   iconBox: {
     position: "relative",

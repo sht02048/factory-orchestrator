@@ -225,7 +225,7 @@ describe("Stats 화면(0072)", () => {
     expect(html).not.toContain("<table");
   });
 
-  it("파란 주 버튼이 없다. 보기만 하는 화면이다(ADR 0010 6번)", () => {
+  it("노란 주 버튼이 없다. 보기만 하는 화면이다(ADR 0010 6번)", () => {
     expect(render(seeded())).not.toContain('data-variant="primary"');
   });
 

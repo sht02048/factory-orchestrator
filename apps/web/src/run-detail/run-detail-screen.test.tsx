@@ -295,7 +295,7 @@ describe("Run 상세 화면", () => {
     expect(body).toContain(domain.summary.failed);
   });
 
-  it("파란 주 버튼은 하나 이하이고, 질문 선택지는 모두 보조 버튼, 런 취소는 위험 버튼이다(ADR 0010 6번)", () => {
+  it("노란 주 버튼은 하나 이하이고, 질문 선택지는 모두 보조 버튼, 런 취소는 위험 버튼이다(ADR 0010 6번)", () => {
     const { db, ids } = seedDatabase();
     const question = ids.get("ACME-11");
     if (question === undefined) throw new Error("no ACME-11");

@@ -209,7 +209,7 @@ describe("Tickets 화면", () => {
     expect(panel).toContain("Mapping github:acme/web · claude");
   });
 
-  it("파란 주 버튼은 화면에 하나 이하다(ADR 0010 6번)", async () => {
+  it("노란 주 버튼은 화면에 하나 이하다(ADR 0010 6번)", async () => {
     const { context } = setupTickets();
     const page = await loadTicketsPage(context, undefined, now);
     for (const ticket of page.tickets) {

@@ -175,7 +175,7 @@ describe("Runners 목록", () => {
     );
   });
 
-  it("파란 주 버튼은 러너 추가 하나이고 Settings 의 러너 등록으로 간다(ADR 0010 6번)", () => {
+  it("노란 주 버튼은 러너 추가 하나이고 Settings 의 러너 등록으로 간다(ADR 0010 6번)", () => {
     const { db } = seedDatabase();
     breakGitHubAuth(db);
     const html = render(loadRunnersPage(db, now));
