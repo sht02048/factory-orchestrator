@@ -1,5 +1,4 @@
 import {
-  getRunWithRecords,
   getWorkspaceTrackerProject,
   listRunners,
   listRuns,
@@ -9,14 +8,22 @@ import {
 import type { Database, StoredRun } from "@factory/db";
 import { resolveWorkspace } from "../shell/model";
 import { calendarDay } from "../time-zone";
-import { dailyThroughput, groupStats, statsPeriod, summarizeStats } from "./model";
-import type { StatsPage, StatsRun } from "./model";
+import {
+  dailyThroughput,
+  groupStats,
+  inPeriod,
+  previousPeriod,
+  statsPeriod,
+  summarizeStats,
+} from "./model";
+import type { StatsPage, StatsPeriodDays, StatsRun } from "./model";
 
 export function loadStatsPage(
   db: Database,
   ws: string | undefined,
   now: Date,
   timeZone: string,
+  days: StatsPeriodDays,
 ): StatsPage {
   const workspace = resolveWorkspace(
     listWorkspaces(db).map((w) => ({ id: w.id, name: w.name })),
@@ -24,7 +31,8 @@ export function loadStatsPage(
   );
   if (workspace.kind !== "one") return { workspace };
 
-  const period = statsPeriod(now, timeZone);
+  const period = statsPeriod(now, timeZone, days);
+  const previous = previousPeriod(period);
   const runnerNames = new Map(listRunners(db).map((r) => [r.id, r.name]));
   const projectNames = new Map<string, string>();
   const projectName = (run: StoredRun): string => {
@@ -39,45 +47,45 @@ export function loadStatsPage(
     return name;
   };
 
-  const runs = listRuns(db, {
+  const current: StatsRun[] = [];
+  const before: StatsRun[] = [];
+  for (const run of listRuns(db, {
     workspaceId: toWorkspaceId(workspace.workspace.id),
     states: ["ended"],
-  }).flatMap((run): StatsRun[] => {
-    if (run.state !== "ended") return [];
+  })) {
+    if (run.state !== "ended") continue;
     const day = calendarDay(run.endedAt, timeZone);
-    if (day < period.firstDay || day > period.lastDay) return [];
-    const later = getRunWithRecords(db, run.id)?.records.laterPrState ?? null;
-    return [
-      {
-        runner:
-          run.runnerId === null
-            ? { key: "", name: "—" }
-            : { key: run.runnerId, name: runnerNames.get(run.runnerId) ?? run.runnerId },
-        trackerProject: {
-          key: trackerProjectKey(run),
-          name: projectName(run),
-        },
-        agent: { key: run.agent, name: run.agent },
-        agentResult: run.agentResult,
-        prState: run.prState,
-        runnerUnreached: run.runnerUnreached,
-        laterPrState: later?.state ?? null,
-        assignedAt: run.assignedAt,
-        startedAt: run.startedAt,
-        endedAt: run.endedAt,
+    const bucket = inPeriod(day, period) ? current : inPeriod(day, previous) ? before : null;
+    if (bucket === null) continue;
+    bucket.push({
+      runner:
+        run.runnerId === null
+          ? { key: "", name: "—" }
+          : { key: run.runnerId, name: runnerNames.get(run.runnerId) ?? run.runnerId },
+      trackerProject: {
+        key: trackerProjectKey(run),
+        name: projectName(run),
       },
-    ];
-  });
+      agent: { key: run.agent, name: run.agent },
+      agentResult: run.agentResult,
+      prState: run.prState,
+      runnerUnreached: run.runnerUnreached,
+      assignedAt: run.assignedAt,
+      startedAt: run.startedAt,
+      endedAt: run.endedAt,
+    });
+  }
 
   return {
     workspace,
     period,
-    total: summarizeStats(runs),
-    daily: dailyThroughput(runs, period, timeZone),
+    total: summarizeStats(current),
+    previous: summarizeStats(before),
+    daily: dailyThroughput(current, period, timeZone),
     groups: {
-      runner: groupStats(runs, "runner"),
-      trackerProject: groupStats(runs, "trackerProject"),
-      agent: groupStats(runs, "agent"),
+      runner: groupStats(current, "runner"),
+      trackerProject: groupStats(current, "trackerProject"),
+      agent: groupStats(current, "agent"),
     },
   };
 }

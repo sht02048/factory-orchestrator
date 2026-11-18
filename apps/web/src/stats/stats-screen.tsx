@@ -2,51 +2,45 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
-  DefinitionItem,
-  DefinitionList,
-  DetailPanel,
   PageHeader,
-  PanelBlock,
-  PanelHeader,
-  RowTitle,
   Section,
-  SplitView,
-  Tab,
-  Table,
-  TableCell,
-  TableEmpty,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableRows,
-  Tabs,
+  SegmentedTabs,
+  StatTile,
+  TabPanel,
   Text,
 } from "@factory/ui";
-import { colors, fontSize, fontWeight, lineHeight, space } from "@factory/ui/tokens.stylex";
+import type { StatTrend } from "@factory/ui";
+import { space } from "@factory/ui/tokens.stylex";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { useAgentName } from "../labels";
 import type { WorkspaceSummary } from "../shell/model";
-import { STATS_DAYS, STATS_DIMENSIONS, percent } from "./model";
+import {
+  PR_STATE_ORDER,
+  STATS_DIMENSIONS,
+  STATS_PERIOD_DAYS,
+  humanTouchedRate,
+  mergedRate,
+  mergedRateChange,
+} from "./model";
 import type {
-  FailedCombination,
+  FailureReasonCount,
   StatsDimension,
   StatsGroup,
   StatsPage,
+  StatsPeriodDays,
   StatsSummary,
 } from "./model";
+import { BreakdownTable, FailureBar } from "./outcome-bar";
 import { LegendSwatch, ThroughputChart } from "./throughput-chart";
-
-const columns = "minmax(0, 1fr) 56px 72px 104px 64px 56px 88px";
 
 export interface StatsScreenProps {
   page: StatsPage;
   workspaces: ReadonlyArray<WorkspaceSummary>;
   dimension: StatsDimension;
-  selectedKey: string | undefined;
   onDimensionChange: (dimension: StatsDimension) => void;
-  onSelect: (key: string) => void;
+  onPeriodChange: (days: StatsPeriodDays) => void;
   onPickWorkspace: (workspaceId: string) => void;
 }
 
@@ -112,374 +106,297 @@ function AllWorkspaces({
 function StatsView({
   page,
   dimension,
-  selectedKey,
   onDimensionChange,
-  onSelect,
+  onPeriodChange,
   workspaceName,
 }: Omit<StatsScreenProps, "page"> & { page: LoadedStatsPage; workspaceName: string }) {
-  const groupName = useGroupName(dimension);
   const t = useTranslations("stats");
-  const { statsDay: dayLabel, duration } = useTime();
-  const groups = page.groups[dimension];
-  const selected = groups.find((g) => g.key === selectedKey) ?? groups[0];
+  const { statsDay: dayLabel } = useTime();
+  const days = page.period.days;
 
   return (
-    <SplitView
-      list={
-        <>
-          <PageHeader
-            title={t("title")}
-            subtitle={t("subtitle", {
-              workspace: workspaceName,
-              days: STATS_DAYS,
-              from: dayLabel(page.period.firstDay).long,
-              to: dayLabel(page.period.lastDay).long,
-            })}
+    <div {...stylex.props(styles.page)}>
+      <div {...stylex.props(styles.frame)}>
+        <header {...stylex.props(styles.header)}>
+          <div {...stylex.props(styles.headline)}>
+            <Text variant="meta">
+              {t("meta", {
+                workspace: workspaceName,
+                days,
+                from: dayLabel(page.period.firstDay).long,
+                to: dayLabel(page.period.lastDay).long,
+              })}
+            </Text>
+            <Text variant="display" as="h1">
+              <Headline total={page.total} days={days} />
+            </Text>
+          </div>
+          <SegmentedTabs<`${StatsPeriodDays}`>
+            value={`${days}`}
+            onValueChange={(next) => {
+              const picked = STATS_PERIOD_DAYS.find((d) => `${d}` === next);
+              if (picked !== undefined) onPeriodChange(picked);
+            }}
+            label={t("period.label")}
+            items={STATS_PERIOD_DAYS.map((d) => ({
+              value: `${d}` as const,
+              label: t("period.option", { days: d }),
+            }))}
           />
-          <Figures total={page.total} />
+        </header>
+        <Figures total={page.total} previous={page.previous} days={days} />
+        <div {...stylex.props(styles.sections)}>
           <Section
             title={t("throughput.title")}
-            note={
-              page.total.runs === 0 ? undefined : (
-                <span {...stylex.props(styles.legend)}>
-                  <span {...stylex.props(styles.legendItem)}>
-                    <LegendSwatch outcome="merged" />
-                    {t("columns.merged")}
-                  </span>
-                  <span {...stylex.props(styles.legendItem)}>
-                    <LegendSwatch outcome="check" />
-                    {t("columns.check")}
-                  </span>
-                  <span {...stylex.props(styles.legendItem)}>
-                    <LegendSwatch outcome="failed" />
-                    {t("columns.failed")}
-                  </span>
-                  <span {...stylex.props(styles.legendItem)}>
-                    <LegendSwatch outcome="canceled" />
-                    {t("columns.canceled")}
-                  </span>
-                </span>
-              )
-            }
+            titleRole="heading"
+            note={page.total.runs === 0 ? undefined : <Legend />}
           >
-            <ThroughputChart daily={page.daily} />
+            <ThroughputChart daily={page.daily} days={days} />
           </Section>
           <Section
-            title={t("failedCombinations.title")}
+            title={t("failures.title")}
+            titleRole="heading"
             count={page.total.outcomes.failed}
-            note={t("failedCombinations.note")}
           >
-            {page.total.failedCombinations.length === 0 ? (
-              <Text variant="meta">{t("failedCombinations.empty")}</Text>
+            {page.total.failureReasons.length === 0 ? (
+              <Text variant="meta">{t("failures.empty")}</Text>
             ) : (
-              <FailedCombinations combinations={page.total.failedCombinations} />
+              <FailureReasons reasons={page.total.failureReasons} />
             )}
           </Section>
-          <div {...stylex.props(styles.breakdown)}>
-            <Tabs<StatsDimension>
-              value={dimension}
-              onValueChange={onDimensionChange}
-              label={t("dimension.label")}
-            >
-              {STATS_DIMENSIONS.map((key) => (
-                <Tab key={key} value={key}>
-                  {t(`dimension.${key}`)}
-                </Tab>
-              ))}
-            </Tabs>
-            <Table columns={columns}>
-              <TableHead>
-                <TableHeader>{t("columns.name")}</TableHeader>
-                <TableHeader align="end">{t("columns.runs")}</TableHeader>
-                <TableHeader align="end">{t("columns.merged")}</TableHeader>
-                <TableHeader align="end">{t("columns.check")}</TableHeader>
-                <TableHeader align="end">{t("columns.failed")}</TableHeader>
-                <TableHeader align="end">{t("columns.canceled")}</TableHeader>
-                <TableHeader align="end">{t("columns.leadTime")}</TableHeader>
-              </TableHead>
-              {groups.length === 0 ? (
-                <TableEmpty>{t("empty", { days: STATS_DAYS })}</TableEmpty>
-              ) : (
-                <TableRows
-                  label={t("listLabel", { dimension: t(`dimension.${dimension}`) })}
-                  value={selected?.key ?? null}
-                  onValueChange={onSelect}
-                >
-                  {groups.map((group) => (
-                    <TableRow key={group.key} value={group.key} label={groupName(group)}>
-                      <TableCell>
-                        <RowTitle>{groupName(group)}</RowTitle>
-                      </TableCell>
-                      <TableCell align="end" numeric>
-                        {group.runs}
-                      </TableCell>
-                      <TableCell align="end" numeric>
-                        <PercentText part={group.outcomes.merged} whole={group.rated} />
-                      </TableCell>
-                      <TableCell align="end" numeric>
-                        {group.outcomes["human-check"]}
-                      </TableCell>
-                      <TableCell align="end" numeric>
-                        {group.outcomes.failed}
-                      </TableCell>
-                      <TableCell align="end" numeric>
-                        {group.outcomes.canceled}
-                      </TableCell>
-                      <TableCell align="end" numeric>
-                        {group.durations === null
-                          ? t("notApplicable")
-                          : duration(group.durations.leadP50Ms)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableRows>
-              )}
-            </Table>
-          </div>
-        </>
-      }
-      panel={
-        selected === undefined ? null : (
-          <section aria-label={t("panel.label")}>
-            <GroupPanel group={selected} dimension={dimension} />
-          </section>
-        )
-      }
-    />
+          <Section title={t("dimension.title")} titleRole="heading">
+            <Breakdown
+              groups={page.groups[dimension]}
+              dimension={dimension}
+              days={days}
+              onDimensionChange={onDimensionChange}
+            />
+          </Section>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function PercentText({ part, whole }: { part: number; whole: number }) {
-  const t = useTranslations("stats");
-  const value = percent(part, whole);
-  return <>{value === null ? t("notApplicable") : t("percent", { percent: value })}</>;
+function Headline({ total, days }: { total: StatsSummary; days: number }) {
+  const t = useTranslations("stats.headline");
+  const rate = mergedRate(total);
+  if (total.runs === 0) return <>{t("empty", { days })}</>;
+  if (rate === null) return <>{t("onlyCanceled", { runs: total.runs })}</>;
+  return (
+    <>
+      {total.outcomes.canceled === 0
+        ? t("rated", { runs: total.rated, percent: rate })
+        : t("ratedWithCanceled", { runs: total.rated, percent: rate })}
+    </>
+  );
 }
 
-function Figures({ total }: { total: StatsSummary }) {
+function Legend() {
+  const t = useTranslations("stats.throughput.columns");
+  return (
+    <span {...stylex.props(styles.legend)}>
+      <span {...stylex.props(styles.legendItem)}>
+        <LegendSwatch tone="merged" />
+        {t("merged")}
+      </span>
+      <span {...stylex.props(styles.legendItem)}>
+        <LegendSwatch tone="check" />
+        {t("check")}
+      </span>
+      <span {...stylex.props(styles.legendItem)}>
+        <LegendSwatch tone="failed" />
+        {t("failed")}
+      </span>
+      <span {...stylex.props(styles.legendItem)}>
+        <LegendSwatch tone="canceled" />
+        {t("canceled")}
+      </span>
+    </span>
+  );
+}
+
+function usePercentText(): (value: number | null) => string {
+  const t = useTranslations("stats");
+  return (value) => (value === null ? t("notApplicable") : t("percent", { percent: value }));
+}
+
+function Figures({
+  total,
+  previous,
+  days,
+}: {
+  total: StatsSummary;
+  previous: StatsSummary;
+  days: number;
+}) {
   const t = useTranslations("stats");
   const { duration } = useTime();
-  const check = total.humanCheck;
-  const mergedAfterCheck = percent(check.merged, check.humanCheck);
+  const percentText = usePercentText();
+  const change = mergedRateChange(total, previous);
+  const rate = mergedRate(total);
+  const trend: StatTrend | undefined =
+    change === null || change === 0 ? undefined : change > 0 ? "better" : "worse";
+
   return (
     <section aria-label={t("figures.label")} {...stylex.props(styles.figures)}>
-      <Figure
-        value={total.runs}
-        label={
-          total.outcomes.canceled === 0 ? (
-            t("figures.ended")
-          ) : (
-            <>
-              {t("figures.ended")}
-              <br />
-              {t("figures.canceled", { count: total.outcomes.canceled })}
-            </>
-          )
-        }
-      />
-      <Figure
-        value={<PercentText part={total.outcomes.merged} whole={total.rated} />}
-        label={t("figures.merged")}
-      />
-      <Figure
-        value={total.outcomes["human-check"] + total.outcomes.failed}
-        label={
-          <>
-            {t.rich("figures.attention", {
-              check: (chunks) => <span {...stylex.props(styles.checkText)}>{chunks}</span>,
-              failed: (chunks) => <span {...stylex.props(styles.failedText)}>{chunks}</span>,
-              checkCount: total.outcomes["human-check"],
-              failedCount: total.outcomes.failed,
+      <StatTile
+        label={t("figures.mergedRate")}
+        value={percentText(rate)}
+        {...(rate === null
+          ? {}
+          : {
+              detail:
+                change === null
+                  ? t("figures.noPrevious", { days })
+                  : change === 0
+                    ? t("figures.same", { days })
+                    : t(change > 0 ? "figures.up" : "figures.down", {
+                        days,
+                        points: Math.abs(change),
+                      }),
             })}
-          </>
-        }
+        {...(trend === undefined ? {} : { trend })}
       />
-      <Figure
-        value={total.durations === null ? t("notApplicable") : duration(total.durations.leadP50Ms)}
-        label={
-          total.durations === null ? (
-            t("figures.leadTime", { p90: t("notApplicable") })
-          ) : (
-            <>
-              {t("figures.leadTime", { p90: duration(total.durations.leadP90Ms) })}
-              <br />
-              {t("figures.leadTimeSplit", {
-                wait: duration(total.durations.waitP50Ms),
-                execution: duration(total.durations.executionP50Ms),
-              })}
-            </>
-          )
-        }
+      <StatTile
+        label={t("figures.humanTouched")}
+        value={percentText(humanTouchedRate(total))}
+        detail={t("figures.humanTouchedDetail", {
+          check: total.outcomes["human-check"],
+          failed: total.outcomes.failed,
+        })}
       />
-      <Figure
-        value={
-          mergedAfterCheck === null
-            ? t("notApplicable")
-            : t("percent", { percent: mergedAfterCheck })
-        }
-        label={
-          <>
-            {t("figures.mergedAfterCheck")}
-            <br />
-            {t("figures.mergedAfterCheckOf", { total: check.humanCheck, merged: check.merged })}
-          </>
-        }
+      <StatTile
+        label={t("figures.leadTime")}
+        value={total.leadTime === null ? t("notApplicable") : duration(total.leadTime.p50Ms)}
+        {...(total.leadTime === null
+          ? {}
+          : { detail: t("figures.leadTimeP90", { p90: duration(total.leadTime.p90Ms) }) })}
+      />
+      <StatTile
+        label={t("figures.ended")}
+        value={total.runs}
+        {...(total.outcomes.canceled === 0
+          ? {}
+          : { detail: t("figures.canceled", { count: total.outcomes.canceled }) })}
       />
     </section>
   );
 }
 
-function Figure({ value, label }: { value: ReactNode; label: ReactNode }) {
-  return (
-    <div>
-      <span {...stylex.props(styles.figureValue)}>{value}</span>
-      <span {...stylex.props(styles.figureLabel)}>{label}</span>
-    </div>
-  );
-}
-
-function useGroupName(dimension: StatsDimension): (group: StatsGroup) => string {
-  const agentName = useAgentName();
-  return (group) => (dimension === "agent" ? agentName(group.key) : group.name);
-}
-
-function FailedCombinations({ combinations }: { combinations: ReadonlyArray<FailedCombination> }) {
-  const t = useTranslations("stats.failedCombinations");
+function FailureReasons({ reasons }: { reasons: ReadonlyArray<FailureReasonCount> }) {
+  const t = useTranslations("stats.failures");
   const domain = useTranslations("domain");
+  const max = Math.max(0, ...reasons.map((r) => r.runs));
   return (
-    <dl {...stylex.props(styles.combinations)}>
-      {combinations.map((c) => (
-        <div key={`${c.agentResult}-${c.prState}`} {...stylex.props(styles.combination)}>
-          <dt {...stylex.props(styles.combinationName)}>
-            {t("combination", {
-              agentResult: domain(`agentResult.${c.agentResult}`),
-              prState: domain(`prState.${c.prState}`),
-            })}
-          </dt>
-          <dd {...stylex.props(styles.combinationCount)}>{t("count", { runs: c.runs })}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function GroupPanel({ group, dimension }: { group: StatsGroup; dimension: StatsDimension }) {
-  const groupName = useGroupName(dimension);
-  const t = useTranslations("stats");
-  const { duration } = useTime();
-  const { outcomes, humanCheck, durations } = group;
-  const share = (count: number) => {
-    const value = percent(count, group.rated);
-    return value === null
-      ? t("panel.count", { count })
-      : t("panel.countPercent", { count, percent: value });
-  };
-  const mergedAfterCheck = percent(humanCheck.merged, humanCheck.humanCheck);
-
-  return (
-    <DetailPanel>
-      <PanelHeader
-        status={
-          <Text variant="meta">
-            {t("panel.context", { dimension: t(`dimension.${dimension}`), days: STATS_DAYS })}
-          </Text>
-        }
-        title={groupName(group)}
-        reason={
-          group.rated === 0
-            ? t("panel.whyOnlyCanceled", { canceled: outcomes.canceled })
-            : outcomes.canceled === 0
-              ? t("panel.why", {
-                  runs: group.rated,
-                  merged: outcomes.merged,
-                  attention: outcomes["human-check"] + outcomes.failed,
-                })
-              : t("panel.whyWithCanceled", {
-                  runs: group.rated,
-                  merged: outcomes.merged,
-                  attention: outcomes["human-check"] + outcomes.failed,
-                  canceled: outcomes.canceled,
-                })
-        }
-      />
-      <DefinitionList>
-        <DefinitionItem label={t("panel.runs")}>{group.runs}</DefinitionItem>
-        <DefinitionItem label={t("panel.merged")}>{share(outcomes.merged)}</DefinitionItem>
-        <DefinitionItem label={t("panel.check")}>
-          <span {...stylex.props(outcomes["human-check"] > 0 && styles.checkText)}>
-            {share(outcomes["human-check"])}
-          </span>
-        </DefinitionItem>
-        <DefinitionItem label={t("panel.failed")}>
-          <span {...stylex.props(outcomes.failed > 0 && styles.failedText)}>
-            {share(outcomes.failed)}
-          </span>
-        </DefinitionItem>
-        <DefinitionItem label={t("panel.canceled")}>
-          {t("panel.canceledCount", { count: outcomes.canceled })}
-        </DefinitionItem>
-        <DefinitionItem label={t("panel.leadTime")}>
-          {durations === null ? t("notApplicable") : duration(durations.leadP50Ms)}
-        </DefinitionItem>
-        <DefinitionItem label={t("panel.leadTimeP90")}>
-          {durations === null ? t("notApplicable") : duration(durations.leadP90Ms)}
-        </DefinitionItem>
-        <DefinitionItem label={t("panel.wait")}>
-          {durations === null ? t("notApplicable") : duration(durations.waitP50Ms)}
-        </DefinitionItem>
-        <DefinitionItem label={t("panel.execution")}>
-          {durations === null ? t("notApplicable") : duration(durations.executionP50Ms)}
-        </DefinitionItem>
-        <DefinitionItem label={t("panel.mergedAfterCheck")} empty={mergedAfterCheck === null}>
-          {mergedAfterCheck === null
-            ? t("panel.noHumanCheck")
-            : t("panel.mergedAfterCheckValue", {
-                merged: humanCheck.merged,
-                total: humanCheck.humanCheck,
-                percent: mergedAfterCheck,
+    <ul aria-label={t("listLabel")} {...stylex.props(styles.reasons)}>
+      {reasons.map((reason) => (
+        <li key={reason.reason} {...stylex.props(styles.reason)}>
+          <span {...stylex.props(styles.reasonText)}>
+            <Text variant="title">{t(`reasons.${reason.reason}`)}</Text>
+            <Text variant="meta">
+              {t("prStates", {
+                states: PR_STATE_ORDER.filter((state) => reason.prStates[state] > 0)
+                  .map((state) =>
+                    t("prState", {
+                      state: domain(`prState.${state}`),
+                      count: reason.prStates[state],
+                    }),
+                  )
+                  .join(t("separator")),
               })}
-        </DefinitionItem>
-      </DefinitionList>
-      <PanelBlock title={t("panel.failedCombinations")}>
-        {group.failedCombinations.length === 0 ? (
-          <Text variant="meta">{t("panel.noFailed")}</Text>
-        ) : (
-          <FailedCombinations combinations={group.failedCombinations} />
-        )}
-      </PanelBlock>
-    </DetailPanel>
+            </Text>
+          </span>
+          <FailureBar runs={reason.runs} max={max} />
+          <Text variant="ui" numeric>
+            {t("count", { runs: reason.runs })}
+          </Text>
+        </li>
+      ))}
+    </ul>
   );
 }
+
+function Breakdown({
+  groups,
+  dimension,
+  days,
+  onDimensionChange,
+}: {
+  groups: ReadonlyArray<StatsGroup>;
+  dimension: StatsDimension;
+  days: number;
+  onDimensionChange: (dimension: StatsDimension) => void;
+}) {
+  const t = useTranslations("stats");
+  const agentName = useAgentName();
+  const nameOf = (group: StatsGroup) => (dimension === "agent" ? agentName(group.key) : group.name);
+  return (
+    <SegmentedTabs<StatsDimension>
+      value={dimension}
+      onValueChange={onDimensionChange}
+      label={t("dimension.label")}
+      items={STATS_DIMENSIONS.map((key) => ({ value: key, label: t(`dimension.${key}`) }))}
+      panels={
+        <TabPanel value={dimension}>
+          <div {...stylex.props(styles.breakdown)}>
+            {groups.length === 0 ? (
+              <Text variant="meta">{t("empty", { days })}</Text>
+            ) : (
+              <BreakdownTable
+                caption={t("tableCaption", { dimension: t(`dimension.${dimension}`) })}
+                groups={groups}
+                nameOf={nameOf}
+              />
+            )}
+          </div>
+        </TabPanel>
+      }
+    />
+  );
+}
+
+const TILES_STACKED = "@container (max-width: 44rem)";
 
 const styles = stylex.create({
   notice: {
-    maxWidth: 720,
+    maxWidth: "45rem",
     paddingTop: space.s8,
     paddingInline: space.s8,
     paddingBottom: space.s10,
   },
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
+  page: {
+    height: "100%",
+    overflow: "auto",
+    paddingTop: space.s8,
+    paddingInline: space.s8,
+    paddingBottom: space.s10,
+  },
+  frame: { containerType: "inline-size" },
+  header: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: space.s4,
+    marginBottom: space.s6,
+  },
+  headline: { display: "flex", flexDirection: "column", gap: space.s1, minWidth: 0 },
   figures: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-    gap: space.s6,
-    marginBottom: space.s10,
+    gridTemplateColumns: {
+      default: "repeat(4, minmax(0, 1fr))",
+      [TILES_STACKED]: "repeat(2, minmax(0, 1fr))",
+    },
+    gap: space.s4,
   },
-  figureValue: {
-    display: "block",
-    color: colors.textPrimary,
-    fontSize: fontSize.page,
-    fontWeight: fontWeight.semibold,
-    fontVariantNumeric: "tabular-nums",
-    lineHeight: lineHeight.tight,
+  sections: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s10,
+    marginTop: space.s10,
   },
-  figureLabel: {
-    display: "block",
-    marginTop: space.s1,
-    color: colors.textTertiary,
-    fontSize: fontSize.ui,
-    lineHeight: lineHeight.snug,
-  },
-  breakdown: { marginTop: space.s10 },
   legend: {
     display: "inline-flex",
     flexWrap: "wrap",
@@ -487,21 +404,22 @@ const styles = stylex.create({
     rowGap: space.s1,
   },
   legendItem: { display: "inline-flex", alignItems: "center", gap: space.px6 },
-  combinations: {
+  reasons: {
     display: "grid",
-    gridTemplateColumns: "max-content max-content",
-    rowGap: space.s2,
+    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr) auto",
+    alignItems: "center",
     columnGap: space.s6,
+    rowGap: space.s4,
     margin: 0,
+    padding: 0,
+    listStyle: "none",
   },
-  combination: { display: "contents" },
-  combinationName: { color: colors.textSecondary },
-  combinationCount: {
-    margin: 0,
-    color: colors.textPrimary,
-    fontVariantNumeric: "tabular-nums",
-    textAlign: "end",
+  reason: {
+    display: "grid",
+    gridColumn: "1 / -1",
+    gridTemplateColumns: "subgrid",
+    alignItems: "center",
   },
-  checkText: { color: colors.check },
-  failedText: { color: colors.problem },
+  reasonText: { display: "flex", flexDirection: "column", minWidth: 0 },
+  breakdown: { marginTop: space.s4 },
 });

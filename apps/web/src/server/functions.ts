@@ -10,6 +10,7 @@ import { loadRunsPage } from "../runs/load";
 import { MAX_ENDED_RUNS } from "../runs/model";
 import { loadShell } from "../shell/load";
 import { loadStatsPage } from "../stats/load";
+import { statsPeriodDaysSchema } from "../stats/model";
 import { assignInput, submitAssignment } from "../tickets/assign";
 import { loadTicketsPage } from "../tickets/load";
 import { TIME_ZONE_COOKIE, parseTimeZone } from "../time-zone";
@@ -50,9 +51,15 @@ export const getRunsPage = createServerFn({ method: "GET" })
   .handler(({ data }) => loadRunsPage(getDatabase(), data.ws, new Date(), data.ended));
 
 export const getStatsPage = createServerFn({ method: "GET" })
-  .validator(z.object({ ws: z.string().optional() }))
+  .validator(z.object({ ws: z.string().optional(), days: statsPeriodDaysSchema }))
   .handler(({ data }) =>
-    loadStatsPage(getDatabase(), data.ws, new Date(), parseTimeZone(getCookie(TIME_ZONE_COOKIE))),
+    loadStatsPage(
+      getDatabase(),
+      data.ws,
+      new Date(),
+      parseTimeZone(getCookie(TIME_ZONE_COOKIE)),
+      data.days,
+    ),
   );
 
 export const getRunDetail = createServerFn({ method: "GET" })

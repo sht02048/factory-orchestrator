@@ -73,8 +73,7 @@ describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
 
   it("화면 메시지의 상태 이름 자리도 영어 용어다", () => {
     expect(tickets.filter.running).toBe(TERMS.running);
-    expect(stats.columns.canceled).toBe(TERMS.canceled);
-    expect(stats.panel.canceled).toBe(TERMS.canceled);
+    expect(stats.throughput.columns.canceled).toBe(TERMS.canceled);
   });
 
   it("useStatusName 은 상태 값마다 그 영어 용어를 준다", () => {
