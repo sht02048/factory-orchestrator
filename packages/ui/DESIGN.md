@@ -170,6 +170,8 @@
 
 ### 브랜드 그림(티켓 0077)
 
+기호·마스코트·색·워드마크·앱 아이콘을 쓰는 규칙은 브랜드 가이드 [`brand/README.md`](brand/README.md)에 모았다(티켓 0081).
+
 원본 SVG는 `packages/ui/brand/`에 있다. 기호·한 색판·파비콘 전용판·워드마크(Manrope ExtraBold 아웃라인, `OFL-Manrope.txt`)·가로·세로 조합·마스코트 표정 넷·앱 아이콘 원본이다. 파비콘·앱 아이콘·트레이 그림은 `pnpm --filter @factory/desktop brand-assets`로 이 원본에서 다시 만든다. 마스코트 몸·눈 같은 그림 전용 무채색은 `brand.*`에 두고 이 컴포넌트들만 쓴다. 노랑(취구·모자)은 강조색 `colors.accent`를 쓴다(티켓 0080).
 
 | 컴포넌트        | 받는 값                                                         | 언제 쓰는지                                                                                                                                                                         | 쓰지 않는 곳                                                    |
