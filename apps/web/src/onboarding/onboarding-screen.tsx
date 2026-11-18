@@ -539,7 +539,10 @@ function TrackerKeyForm({
         );
       }}
     >
-      <Field label={ts("connections.apiKey")} description={t("keyDescription")}>
+      <Field
+        label={ts("connections.apiKey")}
+        description={isNew ? t("keyDescription") : t("keyDescriptionEdit")}
+      >
         <Input
           name="apiKey"
           {...passwordManagerIgnoredSecretProps}
