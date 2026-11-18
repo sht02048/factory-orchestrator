@@ -8,7 +8,7 @@
 - **Settings는 이 Workspace와 설치 전체로 나눈다.** 이름·트래커 프로젝트·Mapping·Auto-assign Label은 현재 Workspace, 트래커 연결·GitHub 토큰·러너 등록은 설치 전체다(ADR 0006).
 - **온보딩은 첫 진입 전용 전체 화면이다.** 사이드바 없이 가운데 한 열에 한 단계씩 두고, 모든 단계가 필수이며 확인이 성공해야 다음으로 간다.
 
-**갱신(2026-11-18, 운영자 결정, [ADR 0010](0010-ui-words-and-visual-rules.md)).** 목록 + 상세 패널은 Runs·Tickets에 남고, Stats도 지금 구조를 그대로 둔다. Home(손댈 일 카드 + 지금 일어나는 일), Run 상세(전체 화면), Runners(러너 카드), 온보딩(왼쪽 단계·가운데 입력)은 0010을 따르고, 위의 "색은 손댈 일에만", "카드와 배지를 쓰지 않는다", 옅은 선으로 구역 나누기는 0010의 색·둥글기·면 규칙이 대신한다.
+**갱신(2026-11-18, 운영자 결정, [ADR 0010](0010-ui-words-and-visual-rules.md)).** 목록 + 상세 패널은 Runs·Tickets에 남고, Stats도 지금 구조를 그대로 둔다. Dashboard(To do·In progress·Runners·Done today, 처음 이름은 Home), Run 상세(전체 화면), Runners(러너 카드), 온보딩(왼쪽 단계·가운데 입력)은 0010을 따르고, 위의 "색은 손댈 일에만", "카드와 배지를 쓰지 않는다", 옅은 선으로 구역 나누기는 0010의 색·둥글기·면 규칙이 대신한다.
 
 ## Considered Options
 
