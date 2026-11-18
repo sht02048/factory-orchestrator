@@ -408,12 +408,12 @@ describe("단계 목록과 주 버튼(ADR 0010)", () => {
     await connectTracker(f);
     const html = render(await page(f), "github");
     const nav = html.slice(html.indexOf("<nav"), html.indexOf("</nav>"));
-    // 확인이 성공한 Tracker 는 번호 대신 체크를 보인다
-    expect(text(nav)).toContain("시작하기 Tracker 2 GitHub 3 Runner 4 Workspace 5 Mapping");
+    // 확인이 성공한 Tracker 는 번호 대신 체크를 보이고, 화면 읽기에는 완료를 글로 알린다(0052)
+    expect(text(nav)).toContain("시작하기 1 Tracker 완료 2 GitHub 3 Runner 4 Workspace 5 Mapping");
     expect(nav).toMatch(/aria-current="step"[^>]*>.*?GitHub</);
     // 확인이 성공한 단계는 눌러 돌아갈 수 있고, 갈 수 없는 뒤 단계는 누를 수 없다
-    expect(nav).toMatch(/<button[^>]*>.*?Tracker<\/span><\/button>/);
-    expect(nav).not.toMatch(/<button[^>]*>.*?Runner<\/span><\/button>/);
+    const buttons = (nav.match(/<button.*?<\/button>/g) ?? []).map(text);
+    expect(buttons).toEqual([" 1 Tracker 완료 "]);
     expect(text(html)).toContain("2/5 · GitHub");
   });
 
@@ -440,6 +440,22 @@ describe("단계 목록과 주 버튼(ADR 0010)", () => {
       ok: true,
     });
     await atMostOne();
+  });
+
+  it("다음을 막은 동안에는 막은 까닭을 다음 버튼의 설명으로 잇는다(0052)", async () => {
+    const f = fixture();
+    const html = render(await page(f), "tracker");
+    const next = nextButton(html, "다음");
+    expect(isDisabled(next)).toBe(true);
+    const describedBy = next.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(describedBy).toBeDefined();
+    expect(html).toContain(`id="${describedBy}"`);
+    expect(html).toMatch(
+      new RegExp(`id="${describedBy}"[^>]*>확인이 끝나야 다음으로 갈 수 있어요.<`),
+    );
+
+    await connectTracker(f);
+    expect(nextButton(render(await page(f), "tracker"), "다음")).not.toContain("aria-describedby");
   });
 
   it("확인이 성공한 단계는 다음이 주 버튼이고 저장 버튼은 보조 버튼이다", async () => {
@@ -494,6 +510,8 @@ describe("다섯 단계를 마치기", () => {
       const html = render(await page(f), "mapping");
       expect(isDisabled(nextButton(html, "설정 마치기"))).toBe(true);
       expect(isOnboardingComplete(f.context.db, f.context.secretBox)).toBe(false);
+      // 안내는 같은 status 요소 안에서만 바뀐다(0052)
+      expect(html).toMatch(/<div role="status"[^>]*><p[^>]*>설정을 마치려면 이것을 정해요.</);
       const shown = text(html);
       for (const part of ["mapping", "progress", "label"] as const) {
         const guide = onboardingMessages.onboarding.mapping.missing[part];
@@ -522,9 +540,9 @@ describe("다섯 단계를 마치기", () => {
     expect(saveLabel(f.context, { ws, connectionId, labelId: "lb-auto" })).toEqual({ ok: true });
 
     const settings = await page(f);
-    expect(text(render(settings, "mapping"))).toContain(
-      onboardingMessages.onboarding.mapping.ready,
-    );
+    const ready = render(settings, "mapping");
+    expect(ready).toMatch(/<div role="status"[^>]*><p[^>]*>라벨만 붙이면/);
+    expect(text(ready)).toContain(onboardingMessages.onboarding.mapping.ready);
     expect(ONBOARDING_STEPS.every((step) => stepPassed(settings, step))).toBe(true);
     expect(isDisabled(nextButton(render(settings, "mapping"), "설정 마치기"))).toBe(false);
     expect(HOME_PATH).toBe("/");
