@@ -1296,7 +1296,7 @@ function MappingStep({
       <p role="status" aria-live="polite" {...stylex.props(styles.srOnly)}>
         {saves === 0 ? null : <span key={saves}>{ts("saved")}</span>}
       </p>
-      <div role="status" {...stylex.props(styles.stack)}>
+      <div {...stylex.props(styles.stack)}>
         {missing.length === 0 ? (
           <p {...stylex.props(styles.ok)}>{t("ready")}</p>
         ) : (

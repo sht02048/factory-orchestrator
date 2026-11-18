@@ -537,7 +537,7 @@ describe("다섯 단계를 마치기", () => {
       const html = render(await page(f), "mapping");
       expect(isDisabled(nextButton(html, "설정 마치기"))).toBe(true);
       expect(isOnboardingComplete(f.context.db, f.context.secretBox)).toBe(false);
-      expect(html).toMatch(/<div role="status"[^>]*><p[^>]*>설정을 마치려면 이것을 정해요.</);
+      expect(html).toMatch(/<div class="[^"]*"><p[^>]*>설정을 마치려면 이것을 정해요.</);
       const shown = text(html);
       for (const part of ["mapping", "progress", "label"] as const) {
         const guide = onboardingMessages.onboarding.mapping.missing[part];
@@ -582,7 +582,8 @@ describe("다섯 단계를 마치기", () => {
 
     const settings = await page(f);
     const ready = render(settings, "mapping");
-    expect(ready).toMatch(/<div role="status"[^>]*><p[^>]*>라벨만 붙이면/);
+    expect(ready).toMatch(/<div class="[^"]*"><p[^>]*>라벨만 붙이면/);
+    expect(ready.match(/role="status"/g)).toHaveLength(1);
     expect(text(ready)).toContain(onboardingMessages.onboarding.mapping.ready);
     expect(ONBOARDING_STEPS.every((step) => stepPassed(settings, step))).toBe(true);
     expect(isDisabled(nextButton(render(settings, "mapping"), "설정 마치기"))).toBe(false);
