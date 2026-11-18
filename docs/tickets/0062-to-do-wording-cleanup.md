@@ -14,7 +14,7 @@ blocked_by: []
 0060은 Dashboard 화면만 바꿨다. 다른 화면의 메시지와 시험, AGENTS.md에 옛 낱말이 남아 있다(2026-11-18 기준).
 
 - 메시지: `apps/web/messages/ko/` 의 `run.json`, `runs.json`, `tickets.json`, `ds.json`
-- 시험: `apps/web/src/status.test.tsx`, `home/load.test.ts`, `runs/runs-screen.test.tsx`, `runs/load.test.ts`, `stats/stats-screen.test.tsx`
+- 시험: `apps/web/src/status.test.tsx`, `home/load.test.ts`, `runs/runs-screen.test.tsx`, `runs/load.test.ts`, `stats/stats-screen.test.tsx`, `packages/ui/src/components.test.tsx`
 - AGENTS.md "UI" 절의 "Home·Run 상세·Runners·온보딩"
 
 ## 범위

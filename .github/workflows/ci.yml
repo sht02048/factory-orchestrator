@@ -35,9 +35,9 @@ jobs:
           if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
             files=$(git diff --name-only "$base" "$HEAD_SHA")
           fi
-          if [ -n "$files" ] && ! printf '%s\n' "$files" | grep -qvE '^docs/|\.md$'; then
+          if [ -n "$files" ] && ! printf '%s\n' "$files" | grep -qvE '\.md$'; then
             echo "code=false" >> "$GITHUB_OUTPUT"
-            echo "Only docs changed; skipping checks."
+            echo "Only Markdown changed; skipping checks."
           else
             echo "code=true" >> "$GITHUB_OUTPUT"
           fi
