@@ -60,7 +60,7 @@ afterAll(async () => {
 });
 
 describe("/ds SegmentedTabs 키보드(브라우저, 0073)", () => {
-  it("화살표 키로 탭을 옮기면 포커스와 선택이 함께 옮고, 끝에서 처음으로 돈다", async (context) => {
+  it("화살표 키로 탭을 옮기면 포커스와 선택이 함께 옮고, 양 끝에서 반대 끝으로 돈다", async (context) => {
     const page = await openPage(context.task.name);
     await page.goto("/ds");
     await hydrated(page);
@@ -80,6 +80,11 @@ describe("/ds SegmentedTabs 키보드(브라우저, 0073)", () => {
     await page.keyboard.press("ArrowLeft");
     await expect.poll(selected).toMatch(new RegExp(`^${ds.segmented.days30}`));
     await expect.poll(focused).toMatch(new RegExp(`^${ds.segmented.days30}`));
+
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(selected).toMatch(new RegExp(`^${ds.segmented.days7}`));
+    await page.keyboard.press("ArrowLeft");
+    await expect.poll(selected).toMatch(new RegExp(`^${ds.segmented.days30}`));
 
     await expect
       .poll(() =>

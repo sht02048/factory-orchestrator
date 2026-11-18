@@ -234,14 +234,20 @@
     "note": "면 없는 구역의 행에서 알약 대신 쓰는 상태 점이에요. 상태 이름은 화면 읽기 프로그램이 읽어요.",
     "running": "결제 웹훅 재시도 로직 추가",
     "waiting": "주문 목록 필터 유지",
-    "queued": "헬스 체크 엔드포인트 추가"
+    "queued": "헬스 체크 엔드포인트 추가",
+    "sectionTitle": "In progress",
+    "runningTime": "25분째",
+    "waitingTime": "3분째",
+    "queuedTime": "방금"
   },
   "sections": {
     "note": "제목 역할로 구역의 무게를 골라요. 오른쪽에 링크를 둘 수 있어요.",
     "link": "모두 보기",
     "headingBody": "heading · 주 구역 제목(20/600)",
     "subheadingBody": "subheading · 보조 구역·카드 제목(15/600)",
-    "display": "끝난 런 40개 중 70%를 병합까지 끝냈어요"
+    "display": "끝난 런 40개 중 70%를 병합까지 끝냈어요",
+    "headingTitle": "To do",
+    "subheadingTitle": "Runners"
   },
   "segmented": {
     "note": "한 줄 묶음 탭이에요. 화살표 키로 옮기고, 옮기면 바로 골라요.",
@@ -284,6 +290,7 @@
     "failed": "Failed",
     "failedDetail": "앞 7일보다 2개 늘었어요",
     "wait": "사람을 기다린 시간",
-    "waitDetail": "앞 7일과 같아요"
+    "waitDetail": "앞 7일과 같아요",
+    "waitValue": "12분"
   }
 }

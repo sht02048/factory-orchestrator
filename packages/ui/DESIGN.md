@@ -46,19 +46,19 @@
 
 위계는 세 단계다. 행에서는 제목만 밝고 굵게, ID·러너·시간은 흐리게, 숫자는 `numeric`(tabular-nums)으로 둔다. 역할마다 크기·굵기·줄 높이·자간이 한 묶음이다. `Text variant`로 쓰고, `Text`를 쓸 수 없는 요소(제목 태그를 직접 고르는 컴포넌트, 버튼 안 글자 등)에는 `stylex.props(textStyles(역할))`로 같은 스타일을 입힌다. 역할 목록은 `TEXT_VARIANTS`다.
 
-| 단계          | 역할(`Text` 변형) | 크기 / 굵기 | 기본 요소                            | 쓰는 곳                                                                                                        |
-| ------------- | ----------------- | ----------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| 1 화면을 대표 | `display`         | 26 / 600    | `h2`                                 | 결론 제목. Dashboard·Stats처럼 결론 문장이 제목인 화면에 하나(ADR 0010 8번, 0068 갱신)                         |
-|               | `page`            | 22 / 600    | `h1`                                 | 페이지 제목. 화면에 하나                                                                                       |
-|               | `heading`         | 20 / 600    | `h2`                                 | 주 구역 제목(Dashboard To do·In progress, Stats 구역). `Section titleRole="heading"`                           |
-|               | `panel`           | 17 / 600    | `h2`                                 | 상세 패널·다이얼로그 제목                                                                                      |
-| 2 읽는 내용   | `subheading`      | 15 / 600    | `h3`                                 | 보조 구역·카드 제목(Dashboard 오른쪽 열 Runners·Done today). `Section titleRole="subheading"`                  |
-|               | `section`         | 14 / 600    | `h2`                                 | 목록 구역 제목. 본문과 크기가 같아 구역이 잘 안 보인다. 새 화면은 `heading`·`subheading`을 쓴다(0074에서 정리) |
-|               | `title`           | 14 / 500    | 행 제목(`RowTitle`과 같다)           |
-|               | `body`            | 14 / 400    | 설명 문단, 패널의 이유               |
-| 3 흐린 보조   | `ui`              | 13 / 400    | 일반 UI 글(본문 기본 크기)           |
-|               | `meta`            | 13 / 400    | ID, 러너, 시간처럼 흐린 값           |
-|               | `label`           | 12 / 500    | 열 머리글, 패널 블록 제목, 작은 라벨 |
+| 단계          | 역할(`Text` 변형) | 크기 / 굵기 | 기본 요소 | 쓰는 곳                                                                                                        |
+| ------------- | ----------------- | ----------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| 1 화면을 대표 | `display`         | 26 / 600    | `h2`      | 결론 제목. Dashboard·Stats처럼 결론 문장이 제목인 화면에 하나(ADR 0010 8번, 0068 갱신)                         |
+|               | `page`            | 22 / 600    | `h1`      | 페이지 제목. 화면에 하나                                                                                       |
+|               | `heading`         | 20 / 600    | `h2`      | 주 구역 제목(Dashboard To do·In progress, Stats 구역). `Section titleRole="heading"`                           |
+|               | `panel`           | 17 / 600    | `h2`      | 상세 패널·다이얼로그 제목                                                                                      |
+| 2 읽는 내용   | `subheading`      | 15 / 600    | `h3`      | 보조 구역·카드 제목(Dashboard 오른쪽 열 Runners·Done today). `Section titleRole="subheading"`                  |
+|               | `section`         | 14 / 600    | `h2`      | 목록 구역 제목. 본문과 크기가 같아 구역이 잘 안 보인다. 새 화면은 `heading`·`subheading`을 쓴다(0074에서 정리) |
+|               | `title`           | 14 / 500    | `span`    | 행 제목(`RowTitle`과 같다)                                                                                     |
+|               | `body`            | 14 / 400    | `p`       | 설명 문단, 패널의 이유                                                                                         |
+| 3 흐린 보조   | `ui`              | 13 / 400    | `span`    | 일반 UI 글(본문 기본 크기)                                                                                     |
+|               | `meta`            | 13 / 400    | `span`    | ID, 러너, 시간처럼 흐린 값                                                                                     |
+|               | `label`           | 12 / 500    | `span`    | 열 머리글, 패널 블록 제목, 작은 라벨                                                                           |
 
 토큰: `fontSize`(`display 26`, `page 22`, `heading 20`, `panel 17`, `subheading 15`, `body 14`, `ui 13`, `small 12`, `label 11`, `input 16`), `fontWeight`(`regular`, `medium`, `semibold`), `lineHeight`(`tight`, `snug`, `normal`, `relaxed`), `letterSpacing`(`display`, `page`, `panel`, `label`), `fonts`(`sans`, `mono`). 굵기는 이 세 개만 쓴다. 토큰은 역할과 컴포넌트를 만들 때 `packages/ui` 안에서 쓴다.
 

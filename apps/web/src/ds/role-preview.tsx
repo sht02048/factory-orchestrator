@@ -64,11 +64,11 @@ export function RoleSections() {
         <Section title={t("nav.statusDot")} note={t("statusDot.note")}>
           <Demo>
             <div {...stylex.props(styles.stack)}>
-              <Section title="In progress" titleRole="heading" count={2}>
+              <Section title={t("statusDot.sectionTitle")} titleRole="heading" count={2}>
                 <Row
                   interactive={false}
                   leading={<StatusDot status="running">{statusName("running")}</StatusDot>}
-                  trailing="25분째"
+                  trailing={t("statusDot.runningTime")}
                 >
                   <Text variant="title">{t("statusDot.running")}</Text>
                 </Row>
@@ -79,14 +79,14 @@ export function RoleSections() {
                       {statusName("waiting-for-input")}
                     </StatusDot>
                   }
-                  trailing="3분째"
+                  trailing={t("statusDot.waitingTime")}
                 >
                   <Text variant="title">{t("statusDot.waiting")}</Text>
                 </Row>
                 <Row
                   interactive={false}
                   leading={<StatusDot status="queued">{statusName("queued")}</StatusDot>}
-                  trailing="방금"
+                  trailing={t("statusDot.queuedTime")}
                 >
                   <Text variant="title">{t("statusDot.queued")}</Text>
                 </Row>
@@ -101,14 +101,14 @@ export function RoleSections() {
           <Demo>
             <div {...stylex.props(styles.stack)}>
               <Section
-                title="To do"
+                title={t("sections.headingTitle")}
                 titleRole="heading"
                 count={3}
                 link={{ href: "#sections", label: t("sections.link") }}
               >
                 <Text variant="meta">{t("sections.headingBody")}</Text>
               </Section>
-              <Section title="Runners" titleRole="subheading" count={2}>
+              <Section title={t("sections.subheadingTitle")} titleRole="subheading" count={2}>
                 <Text variant="meta">{t("sections.subheadingBody")}</Text>
               </Section>
               <p {...stylex.props(textStyles("display"))}>{t("sections.display")}</p>
@@ -255,7 +255,11 @@ export function RoleSections() {
               detail={t("statTile.failedDetail")}
               trend="worse"
             />
-            <StatTile value="12분" label={t("statTile.wait")} detail={t("statTile.waitDetail")} />
+            <StatTile
+              value={t("statTile.waitValue")}
+              label={t("statTile.wait")}
+              detail={t("statTile.waitDetail")}
+            />
           </div>
         </Section>
       </div>
