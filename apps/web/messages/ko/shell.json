@@ -10,7 +10,7 @@
   "nav": {
     "label": "화면",
     "withIssues": "{name}, Runner Issue {count}개",
-    "home": "Home",
+    "dashboard": "Dashboard",
     "tickets": "Tickets",
     "runs": "Runs",
     "runners": "Runners",

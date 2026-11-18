@@ -19,9 +19,12 @@ function Icon({ children }: { children: ReactNode }) {
 }
 
 export const navIcons = {
-  home: (
+  dashboard: (
     <Icon>
-      <path d="M2.5 7 8 2.5 13.5 7v6a.5.5 0 0 1-.5.5h-3v-4H6v4H3a.5.5 0 0 1-.5-.5Z" />
+      <rect x="2.25" y="2.25" width="4.75" height="4.75" rx="1" />
+      <rect x="9" y="2.25" width="4.75" height="4.75" rx="1" />
+      <rect x="2.25" y="9" width="4.75" height="4.75" rx="1" />
+      <rect x="9" y="9" width="4.75" height="4.75" rx="1" />
     </Icon>
   ),
   tickets: (

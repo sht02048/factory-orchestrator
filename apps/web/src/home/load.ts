@@ -5,7 +5,6 @@ import {
   listPendingCancelRequests,
   listRunPermissionWaits,
   listRunQuestions,
-  listRunStateChanges,
   getWorkspaceTrackerProject,
   listRunPlacements,
   listRunnerSnapshots,
@@ -18,12 +17,10 @@ import type { Database, StoredRun } from "@factory/db";
 import { explainQueue } from "../runs/queue-reasons";
 import { isWebUrl } from "../format/url";
 import { resolveWorkspace, runnerIssueCause } from "../shell/model";
-import { DAY_MS, calendarDay } from "../time-zone";
+import { calendarDay } from "../time-zone";
 import type { QueuedReason } from "../runs/model";
-import type { Activity, ActivityEvent, HomePage, HomeRun, InputWait, RunnerIssue } from "./model";
+import type { DoneRun, HomePage, HomeRun, InputWait, RunnerIssue } from "./model";
 import { partitionHome } from "./model";
-
-const ACTIVITY_LIMIT = 8;
 
 export function loadHomePage(
   db: Database,
@@ -34,7 +31,12 @@ export function loadHomePage(
   const workspaces = listWorkspaces(db).map((w) => ({ id: w.id, name: w.name }));
   const workspace = resolveWorkspace(workspaces, ws);
   if (workspace.kind === "none")
-    return partitionHome({ workspace, runs: [], runnerIssues: [], mergedToday: 0, activity: [] });
+    return partitionHome({
+      workspace,
+      runs: [],
+      runners: { issues: [], online: 0 },
+      doneToday: [],
+    });
 
   const workspaceNames = new Map(workspaces.map((w) => [w.id, w]));
   const runners = new Map(listRunners(db).map((r) => [r.id, r]));
@@ -114,8 +116,15 @@ export function loadHomePage(
         return { ...base, state: run.state, queuedReason: queuedReason(run.id) };
       case "running":
         return { ...base, state: run.state };
-      case "waiting-for-input":
-        return { ...base, state: run.state, input: pendingInput(db, run.id) };
+      case "waiting-for-input": {
+        const pending = oldestPendingInput(db, run.id);
+        return {
+          ...base,
+          state: run.state,
+          input: pending?.input ?? null,
+          waitingMs: pending === null ? null : Math.max(0, now.getTime() - pending.at.getTime()),
+        };
+      }
       case "disconnected": {
         const since = records?.unreachableSince ?? null;
         return {
@@ -137,75 +146,42 @@ export function loadHomePage(
   };
 
   const today = calendarDay(now, timeZone);
+  const issues = [...runners.values()].flatMap((runner): RunnerIssue[] => {
+    const cause = runnerIssueCause(runner);
+    return cause === null ? [] : [{ id: runner.id, name: runner.name, cause }];
+  });
   return partitionHome({
     workspace,
     runs: runs.map((run) => ({
       ticket: `${run.ticket.connection}\u0000${run.ticket.key}`,
       run: toView(run),
     })),
-    runnerIssues: [...runners.values()].flatMap((runner): RunnerIssue[] => {
-      const cause = runnerIssueCause(runner);
-      return cause === null ? [] : [{ id: runner.id, name: runner.name, cause }];
-    }),
-    mergedToday: runs.filter(
-      (run) =>
-        run.state === "ended" &&
-        calendarDay(run.endedAt, timeZone) === today &&
-        summarizeRunOutcome(run).outcome === "merged",
-    ).length,
-    activity: activityOf(db, runs, workspaceNames, now),
+    runners: { issues, online: runners.size - issues.length },
+    doneToday: runs.flatMap((run): DoneRun[] =>
+      run.state === "ended" && calendarDay(run.endedAt, timeZone) === today
+        ? [
+            {
+              id: run.id,
+              ticketKey: run.ticket.key,
+              workspace: workspaceNames.get(run.workspaceId) ?? {
+                id: run.workspaceId,
+                name: run.workspaceId,
+              },
+              summary: summarizeRunOutcome(run).outcome,
+              endedAt: run.endedAt.toISOString(),
+              endedAgoMs: Math.max(0, now.getTime() - run.endedAt.getTime()),
+            },
+          ]
+        : [],
+    ),
   });
 }
 
-function activityOf(
-  db: Database,
-  runs: ReadonlyArray<StoredRun>,
-  workspaces: ReadonlyMap<string, { id: string; name: string }>,
-  now: Date,
-): Activity[] {
-  const since = now.getTime() - DAY_MS;
-  const items: Activity[] = [];
-  for (const run of runs) {
-    const base = {
-      runId: run.id,
-      ticketKey: run.ticket.key,
-      workspace: workspaces.get(run.workspaceId) ?? { id: run.workspaceId, name: run.workspaceId },
-    };
-    const push = (event: ActivityEvent, at: Date, key: string) => {
-      if (at.getTime() < since || at.getTime() > now.getTime()) return;
-      items.push({
-        ...base,
-        key: `${run.id}:${key}`,
-        event,
-        at: at.toISOString(),
-        agoMs: Math.max(0, now.getTime() - at.getTime()),
-      });
-    };
-    const laterPr = getRunWithRecords(db, run.id)?.records.laterPrState ?? null;
-    if (laterPr !== null) push({ kind: "later-pr", state: laterPr.state }, laterPr.at, "later-pr");
-    if (run.state === "ended" && run.endedAt.getTime() < since) continue;
-
-    for (const [index, change] of listRunStateChanges(db, run.id).entries()) {
-      const key = `change:${index}`;
-      if (change.from === "queued" && change.to === "running")
-        push({ kind: "started" }, change.at, key);
-      else if (change.to === "disconnected") push({ kind: "disconnected" }, change.at, key);
-      else if (change.to === "ended" && run.state === "ended")
-        push({ kind: "ended", summary: summarizeRunOutcome(run).outcome }, change.at, key);
-    }
-    for (const question of listRunQuestions(db, run.id))
-      push({ kind: "question" }, question.askedAt, `question:${question.id}`);
-    for (const wait of listRunPermissionWaits(db, run.id))
-      push({ kind: "permission" }, wait.requestedAt, `permission:${wait.id}`);
-  }
-  return items
-    .map((item, index) => ({ item, index }))
-    .toSorted((a, b) => Date.parse(b.item.at) - Date.parse(a.item.at) || b.index - a.index)
-    .slice(0, ACTIVITY_LIMIT)
-    .map(({ item }) => item);
+export function pendingInput(db: Database, runId: RunId): InputWait | null {
+  return oldestPendingInput(db, runId)?.input ?? null;
 }
 
-export function pendingInput(db: Database, runId: RunId): InputWait | null {
+function oldestPendingInput(db: Database, runId: RunId): { at: Date; input: InputWait } | null {
   const inputs: Array<{ at: Date; input: InputWait }> = [];
   for (const q of listRunQuestions(db, runId)) {
     if (q.answer !== null && q.answer.sentAt !== null) continue;
@@ -232,5 +208,5 @@ export function pendingInput(db: Database, runId: RunId): InputWait | null {
       },
     });
   }
-  return inputs.toSorted((a, b) => a.at.getTime() - b.at.getTime())[0]?.input ?? null;
+  return inputs.toSorted((a, b) => a.at.getTime() - b.at.getTime())[0] ?? null;
 }

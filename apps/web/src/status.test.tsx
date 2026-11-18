@@ -37,7 +37,7 @@ const TERMS: Record<PillStatus, string> = {
   "runner-issue": "Runner Issue",
 };
 const TERM_NAMES = new Set(Object.values(TERMS));
-const SCREENS = ["Home", "Tickets", "Runs", "Runners", "Stats", "Settings"];
+const SCREENS = ["Dashboard", "Tickets", "Runs", "Runners", "Stats", "Settings"];
 
 describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
   it("런 상태·요약 결과·러너 상태·손댈 일 종류는 GLOSSARY 영어 용어다", () => {
@@ -88,7 +88,7 @@ describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
 });
 
 describe("화면의 상태 알약", () => {
-  it("Home·Runs 의 알약 글은 영어 용어이고 상태 값과 맞는다", () => {
+  it("Dashboard·Runs 의 알약 글은 영어 용어이고 상태 값과 맞는다", () => {
     const { db } = seedDatabase();
     const pills = [
       ...pillsOf(
