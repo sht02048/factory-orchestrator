@@ -23,6 +23,7 @@ import {
   Text,
   TextLink,
   Textarea,
+  Tooltip,
   textStyles,
 } from "./index";
 import * as stylex from "@stylexjs/stylex";
@@ -177,5 +178,23 @@ describe("DataTable·차트·단계(티켓 0074)", () => {
   it("AppFrame 은 레일과 본문을 나눈다", () => {
     const html = renderToString(<AppFrame rail="레일">본문</AppFrame>);
     expect(html).toMatch(/<aside[^>]*>레일<\/aside><main[^>]*>본문<\/main>/);
+  });
+});
+
+describe("Tooltip action 트리거(0062 후속)", () => {
+  it("action 을 주면 트리거 자신이 버튼 모양이라 버튼 안에 버튼이 생기지 않는다", () => {
+    const html = renderToString(
+      <Tooltip
+        content="다시 찾기"
+        labelsTrigger
+        action={{ variant: "ghost", busy: true, onClick: noop }}
+      >
+        <svg aria-hidden="true" />
+      </Tooltip>,
+    );
+    expect(html.match(/<button/g)).toHaveLength(1);
+    expect(html).toContain('data-variant="ghost"');
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).toMatch(/<button[^>]*aria-label(ledby)?="[^"]+"/);
   });
 });

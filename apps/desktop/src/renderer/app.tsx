@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Card, Field, Input, Mascot, StatusPill, Text, buttonStyles } from "@factory/ui";
+import { Card, Field, Input, Mascot, StatusPill, Text, Tooltip, buttonStyles } from "@factory/ui";
 import type { ButtonVariant } from "@factory/ui";
 import {
   colors,
@@ -371,18 +371,17 @@ function FindServers({
           <Text variant="label" as="h2">
             {t("listLabel")}
           </Text>
-          <button
-            type="button"
-            aria-label={t("refresh")}
-            aria-disabled={searching || undefined}
-            data-variant="ghost"
-            onClick={() => {
-              if (!searching) void api().findServers(port);
+          <Tooltip
+            content={t("refresh")}
+            labelsTrigger
+            action={{
+              variant: "ghost",
+              busy: searching,
+              onClick: () => void api().findServers(port),
             }}
-            {...stylex.props(...buttonStyles("ghost", searching), styles.iconButton)}
           >
             <RefreshIcon />
-          </button>
+          </Tooltip>
         </div>
         {servers.length > 0 ? (
           <ul {...stylex.props(styles.list)}>
@@ -672,7 +671,6 @@ const styles = stylex.create({
     },
     fontSize: fontSize.body,
   },
-  iconButton: { flexShrink: 0, width: 40, height: 40, paddingInline: 0 },
   spinner: {
     display: "inline-block",
     flexShrink: 0,

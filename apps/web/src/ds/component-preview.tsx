@@ -2,6 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
   Button,
+  CloseIcon,
   Card,
   Checkbox,
   DefinitionItem,
@@ -452,6 +453,13 @@ export function ComponentSections() {
             <Text variant="ui">
               <Tooltip content={t("tooltip.content")}>{t("tooltip.trigger")}</Tooltip>
             </Text>
+            <Tooltip
+              content={t("tooltip.iconAction")}
+              labelsTrigger
+              action={{ variant: "ghost", onClick: () => showToast(t("tooltip.iconAction")) }}
+            >
+              <CloseIcon />
+            </Tooltip>
           </Demo>
         </Section>
       </div>

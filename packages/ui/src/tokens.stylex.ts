@@ -124,6 +124,7 @@ export const motion = stylex.defineVars({
 export const size = stylex.defineVars({
   sidebarWidth: "216px",
   railWidth: "84px",
+  iconButton: "40px",
   railAvatar: "36px",
   railIcon: "24px",
   issueBadge: "16px",
