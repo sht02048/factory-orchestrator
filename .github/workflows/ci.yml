@@ -19,38 +19,73 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Detect docs-only change
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          base="$PUSH_BEFORE"
+          if [ "$EVENT" = "pull_request" ]; then base="$PR_BASE"; fi
+          files=""
+          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+            files=$(git diff --name-only "$base" "$HEAD_SHA")
+          fi
+          if [ -n "$files" ] && ! printf '%s\n' "$files" | grep -qvE '^docs/|\.md$'; then
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "Only docs changed; skipping checks."
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: pnpm/action-setup@v6
+        if: steps.scope.outputs.code == 'true'
       - uses: actions/setup-node@v7
+        if: steps.scope.outputs.code == 'true'
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        if: steps.scope.outputs.code == 'true'
       - name: Typecheck
+        if: steps.scope.outputs.code == 'true'
         run: pnpm run typecheck
       - name: Lint
+        if: steps.scope.outputs.code == 'true'
         run: pnpm run lint
       - name: Color literals
+        if: steps.scope.outputs.code == 'true'
         run: pnpm run check:colors
       - name: Format check
+        if: steps.scope.outputs.code == 'true'
         run: pnpm run format:check
       - name: Test
+        if: steps.scope.outputs.code == 'true'
         run: pnpm run test
       # 브라우저 시험(e2e)이 실패하면 그때의 화면을 남긴다.
       - name: Upload browser test screenshots
-        if: failure()
+        if: failure() && steps.scope.outputs.code == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: browser-test-screenshots
           path: e2e/test-results/
           if-no-files-found: ignore
       - name: Build
+        if: steps.scope.outputs.code == 'true'
         run: pnpm run build
       - name: Web production smoke test
+        if: steps.scope.outputs.code == 'true'
         run: pnpm run smoke:web
       - name: CLI smoke test
+        if: steps.scope.outputs.code == 'true'
         run: pnpm run smoke:cli
       - name: Server bundle
+        if: steps.scope.outputs.code == 'true'
         run: pnpm run bundle
       # 배포물을 저장소 밖 임시 폴더에 풀어 init·start·러너 확인을 돌린다(티켓 0029).
       - name: Server bundle smoke test
+        if: steps.scope.outputs.code == 'true'
         run: pnpm run smoke:bundle
