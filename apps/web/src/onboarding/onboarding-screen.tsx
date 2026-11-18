@@ -581,6 +581,7 @@ function WebhookExplainer() {
           </div>
         </div>
         <p {...stylex.props(styles.para)}>{t("retry")}</p>
+        <p {...stylex.props(styles.para)}>{t("stopped")}</p>
         <p {...stylex.props(styles.para)}>{t("address")}</p>
       </div>
     </details>

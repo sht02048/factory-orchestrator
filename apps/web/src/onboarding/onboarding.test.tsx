@@ -667,6 +667,9 @@ describe("다섯 단계를 마치기", () => {
     expect(html).toContain('href="https://linear.app/settings/account/security"');
     expect(shown).toContain("webhook은 안 만들어도 되나요?");
     expect(shown).toContain("1분쯤마다");
+    expect(shown).toContain("10초쯤 안에");
+    expect(shown).toContain("끝난 런이 있던 티켓");
+    expect(shown).toContain("하루 넘게 멈춰");
     expect(shown).toContain("아직 런이 없던 티켓");
     expect(shown).toContain("Tickets에서 직접 할당해요");
     expect(shown).not.toContain("signing secret");
