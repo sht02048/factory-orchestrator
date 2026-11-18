@@ -174,6 +174,8 @@ describe("Runs 화면", () => {
     const { db } = seedDatabase();
     const page = loadRunsPage(db, labs, now);
     expect(panelText(render(page, { filter: "merged" }))).toContain(runsJson.panel.empty);
+    const empty: RunsPage = { ...page, runs: [] };
+    expect(panelText(render(empty))).toContain(runsJson.panel.noRuns);
   });
 
   it("끝난 런이 더 있으면 몇 개까지 보이는지 알리고 '더 보기'를 둔다", () => {

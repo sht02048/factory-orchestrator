@@ -543,6 +543,21 @@ describe("listRuns 의 순서와 상한", () => {
     expect(listRuns(db, { limit: 0 })).toEqual([]);
   });
 
+  it("티켓마다 마지막 런만 읽을 수 있다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 5, online: true, projects: [repoA] });
+    const first = assignAt(db, "ENG-1", 0);
+    moveTo(db, first, "ended");
+    const second = assignAt(db, "ENG-1", 1);
+    moveTo(db, second, "ended");
+    const other = assignAt(db, "ENG-2", 2);
+
+    expect(listRuns(db, { latestPerTicket: true }).map((run) => run.id)).toEqual([second, other]);
+    expect(listRuns(db, { latestPerTicket: true, states: ["ended"] }).map((run) => run.id)).toEqual(
+      [second],
+    );
+  });
+
   it("listRunsWithRecords 는 런과 기록을 한 번에 돌려준다", () => {
     const db = seededDatabase();
     const id = assignAt(db, "ENG-1", 0);

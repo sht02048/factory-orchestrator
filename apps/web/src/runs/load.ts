@@ -32,7 +32,7 @@ export function loadRunsPage(
     listWorkspaces(db).map((w) => ({ id: w.id, name: w.name })),
     ws,
   );
-  if (workspace.kind !== "one") return { workspace, runs: [], moreEnded: false };
+  if (workspace.kind !== "one") return { workspace, runs: [], recentEnded: 0, moreEnded: false };
 
   const runners = new Map(listRunners(db).map((r) => [r.id, r]));
   const cancelling = new Set<RunId>(listPendingCancelRequests(db).map((r) => r.runId));
@@ -84,7 +84,14 @@ export function loadRunsPage(
     limit: endedLimit + 1,
   });
   const moreEnded = ended.length > endedLimit;
-  const stored = [...active, ...ended.slice(0, endedLimit)].toSorted(newestFirst);
+  const recentEnded = ended.slice(0, endedLimit);
+  const recentEndedIds = new Set(recentEnded.map(({ run }) => run.id));
+  const olderAttention = moreEnded
+    ? listRunsWithRecords(db, { workspaceId, states: ["ended"], latestPerTicket: true }).filter(
+        ({ run, records }) => !recentEndedIds.has(run.id) && isUnresolvedEndedRun(run, records),
+      )
+    : [];
+  const stored = [...active, ...recentEnded, ...olderAttention].toSorted(newestFirst);
   // 티켓마다 마지막 런. 같은 티켓에 새 런이 있으면 지난 결과는 손댈 일이 아니다(Home 과 같다, Q88).
   const latestByTicket = new Map<string, RunId>();
   for (const { run } of stored.toReversed())
@@ -146,15 +153,19 @@ export function loadRunsPage(
           prState: run.prState,
           summary,
           // Human Check 런은 사람이 PR 을 병합하거나 닫으면 뺀다(Q54·Q89).
-          attention:
-            latest &&
-            (summary === "failed" || (summary === "human-check" && records.laterPrState === null)),
+          attention: latest && isUnresolvedEndedRun(run, records),
         };
       }
     }
   });
 
-  return { workspace, runs, moreEnded };
+  return { workspace, runs, recentEnded: recentEnded.length, moreEnded };
+}
+
+function isUnresolvedEndedRun(run: StoredRun, records: RunRecords): boolean {
+  if (run.state !== "ended") return false;
+  const summary = summarizeRunOutcome(run).outcome;
+  return summary === "failed" || (summary === "human-check" && records.laterPrState === null);
 }
 
 const ACTIVE_STATES = ["queued", "running", "waiting-for-input", "disconnected"] as const;

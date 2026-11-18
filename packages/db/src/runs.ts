@@ -27,7 +27,8 @@ import type {
   TrackerProjectId,
   WorktreeRef,
 } from "@factory/core";
-import { and, asc, count, desc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, ne, notExists, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import type { SQL } from "drizzle-orm";
 import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";
@@ -206,6 +207,7 @@ export interface ListRunsFilter {
   workspaceId?: WorkspaceId;
   order?: "oldest" | "newest";
   limit?: number;
+  latestPerTicket?: boolean;
 }
 
 /** 런 목록. 할당 순서(대기열 순서)로 돌려준다. */
@@ -232,6 +234,26 @@ function selectRunRows(db: Database, filter: ListRunsFilter): RunRow[] {
     conditions.push(eq(runs.ticketKey, filter.ticket.key));
   }
   if (filter.workspaceId !== undefined) conditions.push(eq(runs.workspaceId, filter.workspaceId));
+  if (filter.latestPerTicket === true) {
+    const newer = alias(runs, "newer_run");
+    conditions.push(
+      notExists(
+        db
+          .select({ id: newer.id })
+          .from(newer)
+          .where(
+            and(
+              eq(newer.trackerConnectionId, runs.trackerConnectionId),
+              eq(newer.ticketKey, runs.ticketKey),
+              or(
+                gt(newer.assignedAt, runs.assignedAt),
+                and(eq(newer.assignedAt, runs.assignedAt), gt(newer.id, runs.id)),
+              ),
+            ),
+          ),
+      ),
+    );
+  }
   const order =
     filter.order === "newest"
       ? [desc(runs.assignedAt), desc(runs.id)]

@@ -71,6 +71,7 @@ export interface RunsPage {
   workspace: WorkspaceChoice;
   /** 새 것부터 */
   runs: RunView[];
+  recentEnded: number;
   moreEnded: boolean;
 }
 

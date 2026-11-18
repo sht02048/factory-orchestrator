@@ -141,13 +141,33 @@ describe("끝난 런 상한", () => {
 
     const limited = loadRunsPage(db, undefined, now, 3);
     expect(limited.moreEnded).toBe(true);
+    const olderAttention = full.runs
+      .filter((run) => run.state === "ended" && run.attention)
+      .map((run) => run.ticketKey)
+      .filter((key) => !endedKeys.slice(0, 3).includes(key));
     expect(limited.runs.filter((run) => run.state === "ended").map((run) => run.ticketKey)).toEqual(
-      endedKeys.slice(0, 3),
+      [...endedKeys.slice(0, 3), ...olderAttention],
     );
     expect(limited.runs.filter((run) => run.state !== "ended").map((run) => run.ticketKey)).toEqual(
       activeKeys,
     );
     expect(loadRunsPage(db, undefined, now, endedKeys.length).moreEnded).toBe(false);
+  });
+
+  it("상한 밖의 끝난 런도 손댈 일이면 담는다(Home 과 같다)", () => {
+    const { db } = seedDatabase();
+    const attentionKeys = (runs: ReadonlyArray<RunView>) =>
+      runs.filter((run) => run.attention).map((run) => run.ticketKey);
+    const before = attentionKeys(loadRunsPage(db, undefined, now).runs);
+    expect(before.length).toBeGreaterThan(0);
+    for (let i = 0; i < ENDED_RUNS_PAGE_SIZE + 5; i += 1)
+      addEndedRun(db, `BULK-${i}`, minutes(200 + i));
+
+    const page = loadRunsPage(db, undefined, minutes(400));
+    expect(attentionKeys(page.runs)).toEqual(before);
+    expect(page.runs.filter((run) => run.state === "ended").length).toBeGreaterThan(
+      ENDED_RUNS_PAGE_SIZE,
+    );
   });
 
   it("끝난 런이 많아도 기본 상한만큼만 읽는다", () => {
@@ -157,7 +177,7 @@ describe("끝난 런 상한", () => {
     for (let i = 0; i < extra; i += 1) addEndedRun(db, `BULK-${i}`, minutes(200 + i));
     const page = loadRunsPage(db, undefined, minutes(400));
     const ended = page.runs.filter((run) => run.state === "ended");
-    expect(ended).toHaveLength(ENDED_RUNS_PAGE_SIZE);
+    expect(ended.filter((run) => !run.attention)).toHaveLength(ENDED_RUNS_PAGE_SIZE);
     expect(ended[0]?.ticketKey).toBe(`BULK-${extra - 1}`);
     expect(page.moreEnded).toBe(true);
     expect(page.runs.filter((run) => run.state !== "ended")).toHaveLength(
@@ -195,6 +215,7 @@ describe("Workspace 범위(ADR 0006)", () => {
     expect(loadRunsPage(db, "all", now)).toEqual({
       workspace: { kind: "all" },
       runs: [],
+      recentEnded: 0,
       moreEnded: false,
     });
   });

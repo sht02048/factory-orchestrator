@@ -137,7 +137,6 @@ function RunsList({
     const key = filterKeyOf(run);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  const endedShown = page.runs.filter((run) => run.state === "ended").length;
   const showMoreButton = useRef<HTMLButtonElement>(null);
   const endedStatus = useRef<HTMLParagraphElement>(null);
   const focusAfterMore = useRef(false);
@@ -192,12 +191,12 @@ function RunsList({
               )}
             </Table>
           </Card>
-          {page.moreEnded || endedShown > ENDED_RUNS_PAGE_SIZE ? (
+          {page.moreEnded || page.recentEnded > ENDED_RUNS_PAGE_SIZE ? (
             <div {...stylex.props(styles.more)}>
               <p ref={endedStatus} role="status" tabIndex={-1} {...stylex.props(styles.moreStatus)}>
                 {page.moreEnded
-                  ? t("ended.partial", { count: endedShown })
-                  : t("ended.all", { count: endedShown })}
+                  ? t("ended.partial", { count: page.recentEnded })
+                  : t("ended.all", { count: page.recentEnded })}
               </p>
               {page.moreEnded && onShowMoreEnded !== undefined ? (
                 <Button
@@ -218,7 +217,9 @@ function RunsList({
         <section aria-label={t("panel.label")}>
           {selected === undefined ? (
             <DetailPanel>
-              <Text variant="meta">{t("panel.empty")}</Text>
+              <Text variant="meta">
+                {page.runs.length === 0 ? t("panel.noRuns") : t("panel.empty")}
+              </Text>
             </DetailPanel>
           ) : (
             <RunPanel

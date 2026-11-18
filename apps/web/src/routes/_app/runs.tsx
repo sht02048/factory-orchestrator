@@ -31,6 +31,7 @@ function RunsRoute() {
   const shell = appRoute.useLoaderData();
   const { f, sel, ws, ended } = Route.useSearch();
   const navigate = Route.useNavigate();
+  const nextEnded = (ended ?? ENDED_RUNS_PAGE_SIZE) + ENDED_RUNS_PAGE_SIZE;
   return (
     <ScreenMessages messages={runsMessages}>
       <RunsScreen
@@ -55,16 +56,17 @@ function RunsRoute() {
             search: (prev) => ({ ...prev, ws: next, sel: undefined, ended: undefined }),
           });
         }}
-        onShowMoreEnded={() => {
-          void navigate({
-            search: (prev) => ({
-              ...prev,
-              ended: (ended ?? ENDED_RUNS_PAGE_SIZE) + ENDED_RUNS_PAGE_SIZE,
-            }),
-            replace: true,
-            resetScroll: false,
-          });
-        }}
+        {...(nextEnded > MAX_ENDED_RUNS
+          ? {}
+          : {
+              onShowMoreEnded: () => {
+                void navigate({
+                  search: (prev) => ({ ...prev, ended: nextEnded }),
+                  replace: true,
+                  resetScroll: false,
+                });
+              },
+            })}
         runHref={(id) =>
           `/runs/${encodeURIComponent(id)}${ws === undefined ? "" : `?ws=${encodeURIComponent(ws)}`}`
         }
