@@ -211,7 +211,7 @@ describe("Dashboard 질문 레이어(브라우저, 0060)", () => {
     expect(box.lines).toBeGreaterThan(1);
   });
 
-  it("레이어가 열린 화면에서 파란 주 버튼은 레이어 안의 보내기 하나뿐이다(ADR 0010 6번)", async () => {
+  it("레이어가 열린 화면에서 노란 주 버튼은 레이어 안의 보내기 하나뿐이다(ADR 0010 6번)", async () => {
     await openHome(page);
     await todoRow(page, "ACME-1").getByRole("button", { name: home.row.answer }).click();
     await page.getByRole("dialog").waitFor();

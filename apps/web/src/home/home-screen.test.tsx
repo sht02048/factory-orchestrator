@@ -256,7 +256,7 @@ describe("To do 묶음", () => {
     expect(buttonsOf(p)).toEqual([{ variant: "danger", label: homeJson.row.deny }]);
   });
 
-  it("화면의 버튼은 보조·위험·덜 중요한 버튼뿐이고, 파란 주 버튼은 레이어 안의 보내기 하나다(ADR 0010 6번)", () => {
+  it("화면의 버튼은 보조·위험·덜 중요한 버튼뿐이고, 노란 주 버튼은 레이어 안의 보내기 하나다(ADR 0010 6번)", () => {
     const html = render(withPermission(withInput(seededPage(), question)));
     const variants = [...html.matchAll(/data-variant="([^"]+)"/g)].map((m) => m[1]);
     expect(variants).not.toContain("primary");

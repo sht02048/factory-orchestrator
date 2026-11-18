@@ -896,7 +896,7 @@ describe("러너 확인", () => {
 });
 
 describe("Settings 화면", () => {
-  it("어느 항목을 열어도 파란 주 버튼은 하나 이하다(ADR 0010 6번)", async () => {
+  it("어느 항목을 열어도 노란 주 버튼은 하나 이하다(ADR 0010 6번)", async () => {
     const f = fixture();
     const connection = await addConnection(f);
     const project = { ws: commerce, connectionId: connection, projectId: webProject };
