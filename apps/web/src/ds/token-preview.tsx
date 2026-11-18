@@ -66,10 +66,21 @@ const colorGroups = [
 const spaceKeys = ["px2", "s1", "px6", "s2", "s3", "s4", "s5", "s6", "s8", "s10"] as const;
 const radiusKeys = ["card", "control", "pill", "full"] as const;
 const motionKeys = ["easeOut", "durationFast", "durationToast"] as const;
-const fontSizeKeys = ["page", "panel", "body", "ui", "small", "label", "input"] as const;
+const fontSizeKeys = [
+  "display",
+  "page",
+  "heading",
+  "panel",
+  "subheading",
+  "body",
+  "ui",
+  "small",
+  "label",
+  "input",
+] as const;
 const fontWeightKeys = ["regular", "medium", "semibold"] as const;
 const lineHeightKeys = ["tight", "snug", "normal", "relaxed"] as const;
-const letterSpacingKeys = ["page", "panel", "label"] as const;
+const letterSpacingKeys = ["display", "page", "panel", "label"] as const;
 const fontKeys = ["sans", "mono"] as const;
 const sizeKeys = [
   "sidebarWidth",
@@ -158,9 +169,19 @@ export function TokenSections() {
         <Section title={t("nav.typography")} note={t("typography.note")}>
           <div {...stylex.props(styles.typeLevels)}>
             <TypeLevel title={t("typography.level1")}>
+              <TypeSample spec="display">
+                <Text variant="display" as="p">
+                  {t("typography.sampleDisplay")}
+                </Text>
+              </TypeSample>
               <TypeSample spec="page">
                 <Text variant="page" as="p">
                   {t("typography.samplePage")}
+                </Text>
+              </TypeSample>
+              <TypeSample spec="heading">
+                <Text variant="heading" as="p">
+                  {t("typography.sampleHeading")}
                 </Text>
               </TypeSample>
               <TypeSample spec="panel">
@@ -170,6 +191,11 @@ export function TokenSections() {
               </TypeSample>
             </TypeLevel>
             <TypeLevel title={t("typography.level2")}>
+              <TypeSample spec="subheading">
+                <Text variant="subheading" as="p">
+                  {t("typography.sampleSubheading")}
+                </Text>
+              </TypeSample>
               <TypeSample spec="section">
                 <Text variant="section" as="p">
                   {t("typography.sampleSection")}

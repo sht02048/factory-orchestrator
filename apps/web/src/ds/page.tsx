@@ -13,6 +13,7 @@ import {
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { ComponentSections } from "./component-preview";
+import { RoleSections, roleSectionIds } from "./role-preview";
 import { TokenSections } from "./token-preview";
 
 const tokenLinks = ["colors", "typography", "space", "size", "radius", "shadow", "motion"] as const;
@@ -28,6 +29,7 @@ const componentLinks = [
   "tooltip",
   "dialog",
   "toast",
+  ...roleSectionIds,
 ] as const;
 
 export function DesignSystemPage() {
@@ -62,6 +64,7 @@ export function DesignSystemPage() {
           <div {...stylex.props(styles.sections)}>
             <TokenSections />
             <ComponentSections />
+            <RoleSections />
           </div>
         </div>
       </main>
