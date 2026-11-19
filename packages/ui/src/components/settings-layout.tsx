@@ -441,7 +441,7 @@ function RowText({
   );
 }
 
-const NAV_TOP_HEIGHT = `calc(${size.iconButton} + 2 * ${space.s3} + ${space.s4})`;
+const NAV_TOP_HEIGHT = `calc(${size.settingsChipHeight} + 2 * ${space.s3} + ${space.s4})`;
 
 const styles = stylex.create({
   frame: { containerType: "inline-size", minWidth: 0 },
@@ -496,12 +496,12 @@ const styles = stylex.create({
     display: "flex",
     alignItems: "center",
     gap: space.s2,
-    minHeight: { default: size.control, [breakpoints.settingsNavTop]: size.iconButton },
+    minHeight: { default: size.control, [breakpoints.settingsNavTop]: size.settingsChipHeight },
     paddingInline: space.s3,
     borderRadius: radius.control,
     backgroundColor: {
       default: "transparent",
-      [breakpoints.settingsNavTop]: colors.bgCard,
+      [breakpoints.settingsNavTop]: colors.navChip,
       ":hover": colors.bgHover,
     },
     color: colors.textSecondary,

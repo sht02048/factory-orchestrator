@@ -1,18 +1,10 @@
 import { useBlocker } from "@tanstack/react-router";
 
 export interface UnsavedGuard {
-  isDirty: () => boolean;
-  onBlocked: () => void;
+  hold: () => boolean;
 }
 
-export function NavigationGuard({ isDirty, onBlocked }: UnsavedGuard) {
-  useBlocker({
-    shouldBlockFn: () => {
-      if (!isDirty()) return false;
-      onBlocked();
-      return true;
-    },
-    enableBeforeUnload: isDirty,
-  });
+export function NavigationGuard({ hold }: UnsavedGuard) {
+  useBlocker({ shouldBlockFn: hold, enableBeforeUnload: false });
   return null;
 }

@@ -59,7 +59,7 @@ const styles = stylex.create({
     padding: 0,
     borderWidth: 0,
     borderRadius: radius.full,
-    backgroundColor: colors.borderStrong,
+    backgroundColor: colors.switchTrack,
     cursor: "pointer",
     transitionProperty: "background-color",
     transitionDuration: motion.durationFast,
@@ -74,8 +74,8 @@ const styles = stylex.create({
     },
   },
   on: { backgroundColor: colors.accent },
-  offRing: { boxShadow: `inset 0 0 0 1px ${colors.textTertiary}` },
-  disabled: { backgroundColor: colors.bgControl, cursor: "not-allowed" },
+  offRing: { boxShadow: `inset 0 0 0 1px ${colors.switchTrackRing}` },
+  disabled: { backgroundColor: colors.switchTrackDisabled, cursor: "not-allowed" },
   thumb: {
     position: "absolute",
     insetBlockStart: THUMB_INSET,
@@ -83,7 +83,7 @@ const styles = stylex.create({
     width: size.switchThumb,
     height: size.switchThumb,
     borderRadius: radius.full,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.switchThumb,
     transitionProperty: "transform",
     transitionDuration: {
       default: motion.durationFast,
@@ -95,6 +95,6 @@ const styles = stylex.create({
     backgroundColor: colors.textOnAccent,
     transform: `translateX(calc(${size.switchWidth} - ${size.switchThumb} - 2 * ${THUMB_INSET}))`,
   },
-  thumbDisabled: { backgroundColor: colors.textDisabled },
-  thumbOnDisabled: { backgroundColor: colors.textDisabled },
+  thumbDisabled: { backgroundColor: colors.switchThumbDisabled },
+  thumbOnDisabled: { backgroundColor: colors.switchThumbDisabled },
 });

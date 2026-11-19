@@ -36,6 +36,7 @@ import type {
 import { useAgentName } from "../labels";
 import { GITHUB_TOKEN_URL, LINEAR_API_KEY_URL } from "../onboarding/model";
 import {
+  SecretField,
   useCredentialReason,
   CredentialFormFrame,
   ExternalLink,
@@ -53,7 +54,6 @@ import {
 } from "./row-state";
 import {
   SubmitError,
-  passwordManagerIgnoredSecretProps,
   useReason,
   useReportUnsaved,
   useSubmit,
@@ -947,40 +947,25 @@ function ConnectionEditor({
           autoComplete="off"
         />
       </Field>
-      <Field
+      <SecretField
+        name="apiKey"
         label={t("connections.apiKey")}
-        info={
-          <InfoTip
-            label={t("infoLabel", { label: t("connections.apiKey") })}
-            content={t("connections.keepSecret")}
-          />
-        }
-      >
-        <Input
-          name="apiKey"
-          {...passwordManagerIgnoredSecretProps}
-          value={apiKey}
-          onValueChange={setApiKey}
-          mono
-        />
-      </Field>
-      <Field
+        hint={t("connections.keepSecret")}
+        hints="info"
+        error={undefined}
+        placeholder={t("credentials.keyPlaceholder")}
+        value={apiKey}
+        onValueChange={setApiKey}
+      />
+      <SecretField
+        name="webhookSecret"
         label={t("connections.webhookSecret")}
-        info={
-          <InfoTip
-            label={t("infoLabel", { label: t("connections.webhookSecret") })}
-            content={`${t("connections.webhookSecretInfo")} ${t("connections.keepSecret")}`}
-          />
-        }
-      >
-        <Input
-          name="webhookSecret"
-          {...passwordManagerIgnoredSecretProps}
-          value={webhookSecret}
-          onValueChange={setWebhookSecret}
-          mono
-        />
-      </Field>
+        hint={`${t("connections.webhookSecretInfo")} ${t("connections.keepSecret")}`}
+        hints="info"
+        error={undefined}
+        value={webhookSecret}
+        onValueChange={setWebhookSecret}
+      />
       <Field
         label={t("connections.webhookPath")}
         info={

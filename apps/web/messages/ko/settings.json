@@ -451,5 +451,5 @@
   },
   "changeLabel": "{label} {action}",
   "revertedRetry": "저장하지 못해 되돌렸어요. 연결을 확인하고 다시 바꿔 주세요.",
-  "unsavedBlocked": "저장하지 않은 변경이 있어요. 저장하거나 닫은 뒤 다시 해 주세요."
+  "unsavedBlocked": "저장하지 않은 변경이 있어요. 저장하거나 닫아 주세요. 버리고 옮기려면 한 번 더 누르면 돼요."
 }

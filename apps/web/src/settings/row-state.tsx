@@ -90,6 +90,34 @@ export function showBlockedEditor(selector: string): void {
   });
 }
 
+export function useUnsavedHold(blockedSelector: string) {
+  const dirty = useRef(new Set<string>());
+  const warned = useRef(false);
+  const [blocked, setBlocked] = useState(false);
+  const report = useCallback((formId: string, unsaved: boolean) => {
+    if (unsaved) dirty.current.add(formId);
+    else dirty.current.delete(formId);
+    if (dirty.current.size === 0) {
+      warned.current = false;
+      setBlocked(false);
+    }
+  }, []);
+  const guard = useMemo(
+    (): UnsavedGuard => ({
+      hold: () => {
+        if (dirty.current.size === 0) return false;
+        if (warned.current) return false;
+        warned.current = true;
+        setBlocked(true);
+        showBlockedEditor(blockedSelector);
+        return true;
+      },
+    }),
+    [blockedSelector],
+  );
+  return { blocked, report, guard };
+}
+
 export function EditorProvider({
   children,
   renderGuard,
@@ -100,42 +128,20 @@ export function EditorProvider({
   blockedSelector?: string;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
-  const [blocked, setBlocked] = useState(false);
-  const dirty = useRef(new Set<string>());
-  const report = useCallback((formId: string, unsaved: boolean) => {
-    if (unsaved) dirty.current.add(formId);
-    else dirty.current.delete(formId);
-    if (dirty.current.size === 0) setBlocked(false);
-  }, []);
+  const { blocked, report, guard } = useUnsavedHold(blockedSelector);
   const open = useCallback(
     (id: string) => {
-      if (openId !== null && openId !== id && dirty.current.size > 0) {
-        setBlocked(true);
-        showBlockedEditor(blockedSelector);
-        return;
-      }
-      setBlocked(false);
+      if (openId !== null && openId !== id && guard.hold()) return;
       setOpenId(id);
     },
-    [openId, blockedSelector],
+    [openId, guard],
   );
   const closeAll = useCallback(() => {
-    setBlocked(false);
     setOpenId(null);
   }, []);
   const value = useMemo(
     () => ({ openId, blocked, open, closeAll }),
     [openId, blocked, open, closeAll],
-  );
-  const guard = useMemo(
-    (): UnsavedGuard => ({
-      isDirty: () => dirty.current.size > 0,
-      onBlocked: () => {
-        setBlocked(true);
-        showBlockedEditor(blockedSelector);
-      },
-    }),
-    [blockedSelector],
   );
   return (
     <ReportUnsavedContext value={report}>

@@ -322,6 +322,10 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     await page.getByRole("main").getByRole("link", { name: settings.project.breadcrumb }).click();
     await page.getByRole("alert").getByText(settings.unsavedBlocked).waitFor();
     expect(new URL(page.url()).pathname).toContain("/settings/projects/");
+    await page.getByRole("main").getByRole("link", { name: settings.project.breadcrumb }).click();
+    await page.waitForURL((url) => url.pathname === "/settings");
+    await section(settings.sections.projects).getByRole("link", { name: /^API/ }).click();
+    await page.waitForURL(/\/settings\/projects\/conn-acme\/tp-api/);
     await page.getByRole("button", { name: settings.projects.remove }).click();
     await page.getByRole("dialog").getByRole("button", { name: settings.projects.remove }).click();
     await page.waitForURL((url) => url.pathname === "/settings");
@@ -544,7 +548,7 @@ describe("Runners 의 러너 고치기(브라우저, 0119)", () => {
 });
 
 describe("Runners 고치는 중 다른 러너 고르기(브라우저, 0119 리뷰 후속)", () => {
-  it("고친 값을 저장하지 않았으면 다른 러너로 옮기지 않고 알린다", async () => {
+  it("고친 값을 저장하지 않았으면 다른 러너로 옮기지 않고 알리고, 한 번 더 고르면 버리고 옮긴다", async () => {
     saveRunner(db, {
       id: toRunnerId("runner-b"),
       kind: toRunnerKind("fake"),
@@ -563,10 +567,6 @@ describe("Runners 고치는 중 다른 러너 고르기(브라우저, 0119 리�
     await page.getByRole("option", { name: /runner-b/ }).click();
     await page.getByRole("alert").getByText(runners.panel.unsavedBlocked).waitFor();
     expect(await capacity.inputValue()).toBe("5");
-    await page.getByRole("link", { name: runners.add, exact: true }).click();
-    await page.getByRole("alert").getByText(runners.panel.unsavedBlocked).waitFor();
-    expect(new URL(page.url()).searchParams.get("sel")).toBe("runner-a");
-    await page.getByRole("button", { name: settings.close }).click();
     await page.getByRole("option", { name: /runner-b/ }).click();
     await page.waitForURL(/sel=runner-b/);
   });

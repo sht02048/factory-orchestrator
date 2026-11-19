@@ -128,6 +128,40 @@ function hintProps(
     : { description: hint };
 }
 
+export function SecretField({
+  name,
+  label,
+  hint,
+  hints,
+  error,
+  placeholder,
+  value,
+  onValueChange,
+}: {
+  name: string;
+  label: string;
+  hint: string;
+  hints: HintPlacement;
+  error: string | undefined;
+  placeholder?: string;
+  value: string;
+  onValueChange: (value: string) => void;
+}) {
+  const t = useTranslations("settings");
+  return (
+    <Field label={label} error={error} {...hintProps(hint, hints, t("infoLabel", { label }))}>
+      <Input
+        name={name}
+        {...passwordManagerIgnoredSecretProps}
+        value={value}
+        onValueChange={onValueChange}
+        {...(placeholder === undefined ? {} : { placeholder })}
+        mono
+      />
+    </Field>
+  );
+}
+
 export function TrackerKeyForm({
   connection,
   actions,
@@ -182,27 +216,19 @@ export function TrackerKeyForm({
         </Button>
       }
     >
-      <Field
+      <SecretField
+        name="apiKey"
         label={t("connections.apiKey")}
+        hint={isNew ? t("credentials.keyDescription") : t("credentials.keyDescriptionEdit")}
+        hints={hints}
         error={missing ? t("credentials.keyRequired") : undefined}
-        {...hintProps(
-          isNew ? t("credentials.keyDescription") : t("credentials.keyDescriptionEdit"),
-          hints,
-          t("infoLabel", { label: t("connections.apiKey") }),
-        )}
-      >
-        <Input
-          name="apiKey"
-          {...passwordManagerIgnoredSecretProps}
-          value={apiKey}
-          onValueChange={(value) => {
-            setApiKey(value);
-            if (missing) setMissing(value.trim() === "");
-          }}
-          placeholder={t("credentials.keyPlaceholder")}
-          mono
-        />
-      </Field>
+        placeholder={t("credentials.keyPlaceholder")}
+        value={apiKey}
+        onValueChange={(value) => {
+          setApiKey(value);
+          if (missing) setMissing(value.trim() === "");
+        }}
+      />
       {guide}
       <SubmitError state={submit.state} describe={describe} />
     </CredentialFormFrame>
@@ -253,27 +279,19 @@ export function GitHubTokenForm({
         </Button>
       }
     >
-      <Field
+      <SecretField
+        name="token"
         label={t("github.token")}
+        hint={t("credentials.tokenDescription")}
+        hints={hints}
         error={missing ? t("credentials.tokenRequired") : undefined}
-        {...hintProps(
-          t("credentials.tokenDescription"),
-          hints,
-          t("infoLabel", { label: t("github.token") }),
-        )}
-      >
-        <Input
-          name="token"
-          {...passwordManagerIgnoredSecretProps}
-          value={token}
-          onValueChange={(value) => {
-            setToken(value);
-            if (missing) setMissing(value.trim() === "");
-          }}
-          placeholder={t("credentials.tokenPlaceholder")}
-          mono
-        />
-      </Field>
+        placeholder={t("credentials.tokenPlaceholder")}
+        value={token}
+        onValueChange={(value) => {
+          setToken(value);
+          if (missing) setMissing(value.trim() === "");
+        }}
+      />
       <SubmitError state={submit.state} describe={describe} />
     </CredentialFormFrame>
   );

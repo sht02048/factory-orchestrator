@@ -28,14 +28,14 @@ import {
 } from "@ganger/ui";
 import { USAGE_HIGH_PERCENT } from "@ganger/core";
 import { breakpoints, fonts, size, space } from "@ganger/ui/tokens.stylex";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useLocale, useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { usePrerequisiteName, useUsageNames } from "../labels";
 import { PushProblems, useCheckingText, usePushSummaryText } from "../push-check";
 import type { UnsavedGuard } from "../settings/navigation-guard";
-import { showBlockedEditor } from "../settings/row-state";
+import { useUnsavedHold } from "../settings/row-state";
 import { ReportUnsavedContext, useRunnerCheckPolling } from "../settings/settings-screen";
 import type { ActionResult } from "../settings/settings-screen";
 import { useStatusName } from "../status";
@@ -99,37 +99,17 @@ export function RunnersScreen({
     (r) => runnerRowStatus(r) === "online" && r.occupying.length < r.capacity,
   ).length;
   const adding = selectedId === ADD_RUNNER_SELECTION && setup !== undefined;
-  const unsaved = useRef(new Set<string>());
-  const [blocked, setBlocked] = useState(false);
-  const reportUnsaved = useCallback((formId: string, dirty: boolean) => {
-    if (dirty) unsaved.current.add(formId);
-    else unsaved.current.delete(formId);
-    if (unsaved.current.size === 0) setBlocked(false);
-  }, []);
-  const guard = useMemo(
-    (): UnsavedGuard => ({
-      isDirty: () => unsaved.current.size > 0,
-      onBlocked: () => {
-        setBlocked(true);
-        showBlockedEditor("[data-runner-editing]");
-      },
-    }),
-    [],
-  );
+  const { blocked, report: reportUnsaved, guard } = useUnsavedHold("[data-runner-editing]");
   const guardLinks = (event: MouseEvent<HTMLDivElement>) => {
-    if (!guard.isDirty() || !(event.target instanceof Element)) return;
+    if (!(event.target instanceof Element)) return;
     const link = event.target.closest("a[href]");
     if (link === null || link.getAttribute("href")?.startsWith("#") === true) return;
+    if (!guard.hold()) return;
     event.preventDefault();
     event.stopPropagation();
-    guard.onBlocked();
   };
   const selectUnlessUnsaved = (id: string) => {
-    if (guard.isDirty()) {
-      guard.onBlocked();
-      return;
-    }
-    setBlocked(false);
+    if (guard.hold()) return;
     onSelect(id);
   };
   const selected = adding ? undefined : (runners.find((r) => r.id === selectedId) ?? runners[0]);
