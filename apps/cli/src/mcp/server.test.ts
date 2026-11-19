@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SecretBox } from "@ganger/db";
+import { SecretBox, saveWorkspace, toWorkspaceId } from "@ganger/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -262,5 +262,14 @@ describe("ganger mcp 서버", () => {
     expect(byName.json).toMatchObject({ workspace: { id: "ws-labs" }, todo: [] });
     const unknown = await call("get_stats", { workspace: "nope" });
     expect(unknown.isError).toBe(true);
+  });
+
+  it("이름이 같은 Workspace가 여럿이면 id로 고르라고 알린다", async () => {
+    saveWorkspace(seeded.db, { id: toWorkspaceId("ws-twin"), name: "Acme Commerce" }, at(2));
+    const byName = await call("get_dashboard", { workspace: "Acme Commerce" });
+    expect(byName.isError).toBe(true);
+    expect(byName.text).toContain("Pass its id");
+    const byId = await call("get_dashboard", { workspace: "ws-twin" });
+    expect(byId.json).toMatchObject({ workspace: { id: "ws-twin" } });
   });
 });

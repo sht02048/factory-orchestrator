@@ -16,7 +16,13 @@ export function openMcpDatabase(
 ): Database {
   if (!existsSync(databasePath)) throw new McpStartError(messages.mcp.noDatabase(databasePath));
   const db = openDatabase(databasePath);
-  const check = checkSchema(db, migrations);
+  let check;
+  try {
+    check = checkSchema(db, migrations);
+  } catch (error) {
+    db.$client.close();
+    throw error;
+  }
   if (check.kind === "current") return db;
   db.$client.close();
   switch (check.kind) {

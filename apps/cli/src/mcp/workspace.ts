@@ -17,9 +17,18 @@ export function workspaceRefs(db: Database): WorkspaceRef[] {
 export function pickWorkspace(db: Database, given: string | undefined): WorkspacePick {
   const workspaces = workspaceRefs(db);
   if (given !== undefined) {
-    const found =
-      workspaces.find((w) => w.id === given) ?? workspaces.find((w) => w.name === given);
-    if (found !== undefined) return { ok: true, workspace: found };
+    const byId = workspaces.find((w) => w.id === given);
+    if (byId !== undefined) return { ok: true, workspace: byId };
+    const byName = workspaces.filter((w) => w.name === given);
+    const [named, ...sameName] = byName;
+    if (named !== undefined && sameName.length === 0) return { ok: true, workspace: named };
+    if (named !== undefined) {
+      return {
+        ok: false,
+        error: `More than one workspace is named "${given}". Pass its id instead.`,
+        workspaces,
+      };
+    }
     return { ok: false, error: `No workspace has the id or name "${given}".`, workspaces };
   }
   const [only, ...others] = workspaces;

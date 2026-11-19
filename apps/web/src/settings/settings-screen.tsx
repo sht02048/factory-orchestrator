@@ -47,6 +47,7 @@ import { prerequisiteHint } from "@ganger/app/prerequisites";
 import { hermesConfig, jsonConfig } from "@ganger/app/settings/mcp-launch";
 import type { McpLaunch } from "@ganger/app/settings/mcp-launch";
 import { useAgentName, usePrerequisiteName } from "../labels";
+import { browserClipboard, copyText } from "./clipboard";
 import { useStatusName } from "../status";
 import {
   INSTALL_ITEMS,
@@ -1349,9 +1350,8 @@ function McpSnippet({
 }) {
   const t = useTranslations("settings.mcp");
   const copy = () => {
-    navigator.clipboard.writeText(text).then(
-      () => showToast(t("copied", { name })),
-      () => showToast(t("copyFailed")),
+    void copyText(text, browserClipboard()).then((copied) =>
+      showToast(copied ? t("copied", { name }) : t("copyFailed")),
     );
   };
   return (

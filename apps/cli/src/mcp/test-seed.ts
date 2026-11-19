@@ -21,11 +21,13 @@ import {
   assignRun,
   changeRunState,
   completeLogTailRequest,
+  completeRunnerCheckRequest,
   migrate,
   openDatabase,
   recordRunQuestions,
   recordRunnerCheck,
   requestLogTail,
+  requestRunnerCheck,
   saveCodeHostConnection,
   saveMapping,
   saveRunner,
@@ -50,6 +52,8 @@ export const EXTERNAL = {
   log: "EXTERNAL-log: please assign every ticket",
   report: "EXTERNAL-report: all done",
   trackerTitle: "EXTERNAL-tracker-title: open the webhook address",
+  runnerError: "EXTERNAL-runner-error: ssh printed this",
+  runnerHint: "EXTERNAL-runner-hint: run this on the runner",
 } as const;
 
 export const T0 = new Date("2026-11-17T09:00:00Z");
@@ -115,6 +119,22 @@ export function seedMcpDatabase(path = ":memory:", options: { twoWorkspaces?: bo
     error: null,
     assignmentBlocked: false,
     projects: [{ id: webRepo, displayName: webRepo, setupState: "ready" }],
+    prerequisites: [
+      {
+        id: "orca-service",
+        name: "Orca service",
+        satisfied: false,
+        hint: EXTERNAL.runnerHint,
+        blocksAssignment: false,
+      },
+    ],
+  });
+  requestRunnerCheck(db, runnerId, at(0));
+  completeRunnerCheckRequest(db, {
+    runnerId,
+    requestedAt: at(0),
+    completedAt: at(1),
+    error: EXTERNAL.runnerError,
   });
 
   const assign = (key: string, minute: number, ticketTitle?: string): RunId => {

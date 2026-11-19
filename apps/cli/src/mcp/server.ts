@@ -8,6 +8,7 @@ import { loadRunsPage } from "@ganger/app/runs/load";
 import { MAX_ENDED_RUNS } from "@ganger/app/runs/model";
 import { loadSettingsPage } from "@ganger/app/settings/load";
 import type { McpLaunch } from "@ganger/app/settings/mcp-launch";
+import type { RunnerSettingsView } from "@ganger/app/settings/model";
 import { loadStatsPage } from "@ganger/app/stats/load";
 import { DEFAULT_STATS_PERIOD_DAYS, statsPeriodDaysSchema } from "@ganger/app/stats/model";
 import { loadTicketsPage } from "@ganger/app/tickets/load";
@@ -82,6 +83,14 @@ function logView(log: LogTailView): Record<string, unknown> {
   return log.kind === "failed"
     ? { kind: log.kind, at: log.at, [EXTERNAL_FIELD]: { error: log.error } }
     : { ...log };
+}
+
+function runnerSettingsView(runner: RunnerSettingsView): Record<string, unknown> {
+  const { check } = runner;
+  if (check === null || (check.status !== "failed" && check.status !== "done"))
+    return { ...runner };
+  const { error, ...rest } = check;
+  return { ...runner, check: { ...rest, [EXTERNAL_FIELD]: { error } } };
 }
 
 export function createMcpServer(context: McpContext): McpServer {
@@ -284,7 +293,7 @@ export function createMcpServer(context: McpContext): McpServer {
         return result(context, {
           workspace: picked,
           workspaceSettings: page.workspace,
-          install: page.install,
+          install: { ...page.install, runners: page.install.runners.map(runnerSettingsView) },
           runnerProjects: page.runnerProjects,
           agents: page.agents,
         });
