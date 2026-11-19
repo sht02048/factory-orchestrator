@@ -183,6 +183,10 @@ _Avoid_: 막힘, 인증 깨짐, 러너 오류(모두 종류 이름으로. 설명
 운영자에게 알릴 만한 일이 생긴 기록. 서버가 사건마다 단조 증가 번호, 종류, 대상(런 또는 러너), 생긴 시각, 해결 여부와 해결 시각을 저장한다(티켓 0103). 종류는 To do 다섯 가지(Question, Permission, Human Check, Failed, Disconnected)와 Runner Issue(Offline, GitHub 인증 깨짐, 공급자 사용량 한도)다. To do·Runner Issue와 짝을 이루지만 상태가 아니다. 원인이 사라지면(답했거나, PR을 확인했거나, 러너가 돌아왔으면) 해결된다. 같은 원인은 해결 전이면 사건 하나이고, 해결된 뒤 10분 안에 같은 원인이 다시 생기면 새 사건 대신 그 사건을 다시 연다(Offline 깜빡임이 다시 울리지 않게). 해결된 사건은 7일 뒤 지운다. Merged·Canceled와 Queued·Running으로 옮김은 사건이 아니다. 데스크톱 앱에 뜨는 러너 등록 요청(0099)도 알림 사건이 아니다. 데스크톱 앱이 SSE로 받아 OS 알림으로 보이고, 나중에 외부 알림 연동과 모바일 푸시도 같은 사건을 쓴다.
 _Avoid_: Attention, 알림(OS에 뜨는 알림 자체를 말할 때만 쓴다), 이벤트(단독으로. 런 상태 기록과 헷갈린다)
 
+**변경 기록**:
+무엇이 바뀌었는지 남긴 줄. DB 표 `change_events`에 번호, 대상 종류(run, runner, assignment, workspace, settings, tracker), 대상 id, Workspace, 시각을 담는다. 바꾸는 코드가 같은 트랜잭션에서 쓰고, web이 SSE(`/api/change-events/stream`)로 보내 열린 화면이 그 대상의 데이터만 다시 읽게 한다. 내용은 담지 않는다. 하루 지나면 지운다(ADR 0019). 운영자에게 알릴 일만 담는 알림 사건과 다르다.
+_Avoid_: 이벤트(단독으로), 알림 사건, 변경 로그
+
 ### Tickets 필터
 
 Tickets 화면의 필터 낱말이다(ADR 0010 0068 갱신). 운영자가 그 티켓으로 무엇을 할지에 답하고, 다섯 필터 다 티켓의 마지막 런으로 정한다. 필터는 서로 겹칠 수 있다. 마지막 런이 Failed인 티켓은 할당할 수 있음과 처리할 일에, Canceled인 티켓은 할당할 수 있음과 끝남에 함께 든다. 마지막 런이 Waiting for Input이나 Disconnected인 티켓은 처리할 일에만 든다.
