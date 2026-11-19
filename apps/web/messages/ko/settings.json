@@ -27,7 +27,8 @@
     "runners": "러너 등록",
     "addresses": "주소",
     "power": "잠자기",
-    "mcp": "MCP"
+    "mcp": "MCP",
+    "updates": "업데이트"
   },
   "summary": {
     "general": "최대 실행 시간 {minutes}분",
@@ -44,7 +45,10 @@
     "powerOff": "꺼져 있어요",
     "powerUnavailable": "여기서 바꿀 수 없어요",
     "mcpRead": "읽기만 열려 있어요",
-    "mcpWrite": "쓰기도 열려 있어요"
+    "mcpWrite": "쓰기도 열려 있어요",
+    "updatesVersion": "지금 {version}",
+    "updatesOff": "지금 {version} · 새 버전을 확인하지 않아요",
+    "updatesReady": "새 버전 {version}{object} 받았어요"
   },
   "remoteError": {
     "unauthorized": "키나 토큰이 맞지 않아요. 새로 만들어 넣어 주세요.",
@@ -300,5 +304,50 @@
     "copy": "{name} 설정 복사",
     "copied": "{name} 설정을 복사했어요",
     "copyFailed": "복사하지 못했어요. 설정 글을 직접 골라 복사해 주세요."
-  }
+  },
+  "updates": {
+    "version": "지금 버전",
+    "lastChecked": "마지막 확인",
+    "same": "{version} · 앱과 서버가 같아요",
+    "differs": "앱 {app} · 서버 {server}",
+    "appOnly": "앱 {app}",
+    "never": "아직 확인하지 않았어요",
+    "checkNow": "지금 확인",
+    "checking": "확인하는 중",
+    "checkingStatus": "새 버전이 있는지 확인하고 있어요",
+    "latestStatus": "{when} · 새 버전이 없어요",
+    "failedStatus": "새 버전을 확인하지 못했어요. 인터넷 연결을 살핀 뒤 지금 확인을 다시 눌러 주세요",
+    "downloadingStatus": "새 버전 {version}{object} 받고 있어요",
+    "readyStatus": "새 버전 {version}{object} 받았어요. 다시 시작하면 바뀌어요",
+    "manualStatus": "{when} · 새 버전 {version}{subject} 있어요",
+    "unavailable": "이 빌드에는 업데이트 주소가 없어 확인하지 않아요",
+    "restart": "다시 시작",
+    "notes": "바뀐 내용",
+    "openRelease": "Release 열기",
+    "auto": "새 버전이 나오면 받아 두고 물어보기",
+    "autoDescription": "이 Mac의 앱 설정이에요. 확인할 때 이 기기의 IP와 지금 버전이 GitHub Releases에 전해져요. 끄면 확인하지 않고, 새 버전은 Release에서 직접 받아요.",
+    "manual": {
+      "outside-applications": {
+        "title": "Applications 폴더 밖에서 실행 중이에요",
+        "body": "새 버전 {version}{subject} 있어요. Finder에서 Ganger를 Applications 폴더로 옮긴 뒤 다시 열면 자동으로 업데이트할 수 있어요."
+      },
+      "no-permission": {
+        "title": "앱을 바꿀 권한이 없어요",
+        "body": "새 버전 {version}{subject} 있어요. Release에서 받아 직접 설치해 주세요."
+      }
+    },
+    "serverDiffers": {
+      "remote": {
+        "title": "앱과 서버 버전이 달라요",
+        "body": "앱은 {app}, 서버는 {server} 버전이에요. 서버 기계에서 서버를 업데이트해 주세요."
+      },
+      "external": {
+        "title": "앱과 서버 버전이 달라요",
+        "body": "앱은 {app}, 서버는 {server} 버전이에요. 이 서버는 앱이 띄우지 않아(헤드리스 서비스나 터미널) 앱이 바꾸지 않아요. 서버를 띄운 방법으로 업데이트해 주세요."
+      }
+    },
+    "browserManual": "이 서버는 자동으로 업데이트하지 않아요. 새 버전은 GitHub Releases에서 받아 직접 바꿔요.",
+    "browserDesktop": "데스크톱 앱으로 열면 새 버전이 있는지 확인하고, 앱이 띄운 서버는 앱과 함께 바꿔요."
+  },
+  "scopeUpdates": "앱과 서버"
 }

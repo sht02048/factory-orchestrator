@@ -209,6 +209,37 @@ describe("LocalServer", () => {
     ).toMatchObject({ kind: "running", replaced: false, status: { pid: after.status.pid } });
   });
 
+  it("앱 업데이트로 바꿀 때 옛 ②가 아직 도는 동안 바꾸기 시작을 알리고, 그 뒤 옛 ②를 멈추고 새 ②를 띄운다", async () => {
+    const before = await server({
+      bundle: { cliEntry: FAKE_CLI, buildId: "0.1.0+aaaa" },
+    }).ensureRunning();
+    if (before.kind !== "running" || before.status.pid === undefined) {
+      throw new Error(JSON.stringify(before));
+    }
+    const oldPid = before.status.pid;
+    const order: string[] = [];
+    const after = await server({
+      bundle: { cliEntry: FAKE_CLI, buildId: "0.2.0+bbbb" },
+    }).ensureRunning({
+      onReplacing: (replacement) => {
+        order.push(`replacing ${replacement.from} -> ${replacement.to}`);
+        order.push(`old alive ${alive(oldPid)}`);
+        order.push(`new started ${events("start").length > 1}`);
+      },
+    });
+    expect(order).toEqual(["replacing 0.1.0 -> 0.2.0", "old alive true", "new started false"]);
+    expect(after).toMatchObject({ kind: "running", replaced: true });
+    expect(alive(oldPid)).toBe(false);
+    expect(workerPids().filter(alive)).toHaveLength(1);
+  });
+
+  it("같은 배포물이면 바꾸기를 알리지 않는다", async () => {
+    await server().ensureRunning();
+    const replacing: unknown[] = [];
+    await server().ensureRunning({ onReplacing: (replacement) => replacing.push(replacement) });
+    expect(replacing).toEqual([]);
+  });
+
   it("기록한 pid 가 재부팅 뒤 다른 프로세스에 다시 쓰였으면 그 프로세스를 ②로 보지 않고 건드리지 않는다", async () => {
     const stranger = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
       stdio: "ignore",

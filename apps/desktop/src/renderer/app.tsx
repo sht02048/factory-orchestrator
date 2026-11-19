@@ -94,6 +94,8 @@ export function Screen({ view }: { view: ViewState }) {
     case "local-failed":
     case "local-service":
       return <LocalState view={view} />;
+    case "local-updating":
+      return <LocalUpdating from={view.from} to={view.to} />;
     case "find-servers":
       return <FindServers port={view.port} searching={view.searching} result={view.result} />;
     case "enter-address":
@@ -369,6 +371,23 @@ function LocalState({
         </Frame>
       );
   }
+}
+
+function LocalUpdating({ from, to }: { from: string | null; to: string | null }) {
+  const t = useTranslations("screens.updating");
+  return (
+    <Frame width="status" centered>
+      <div role="status" {...stylex.props(styles.statusBlock)}>
+        <Mascot mood="signal" />
+        <Header
+          title={t("title")}
+          summary={from !== null && to !== null ? t("summaryVersions", { from, to }) : t("summary")}
+          centered
+        />
+        <Text variant="meta">{t("runs")}</Text>
+      </div>
+    </Frame>
+  );
 }
 
 function FindServers({

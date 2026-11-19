@@ -14,6 +14,8 @@ import type { ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
 import { appMessages, defaultLocale, t } from "../i18n";
 import { NotFoundScreen } from "../not-found/not-found-screen";
+import { useDesktopUpdates } from "../shell/desktop-updates";
+import { UpdateToast } from "../shell/update-toast";
 import { ONBOARDING_PATH, isOpenPath, onboardingRedirect } from "../onboarding/model";
 import { getTimeZone, getTitleBarHidden } from "../server/functions";
 import { getOnboardingComplete } from "../server/onboarding-functions";
@@ -99,5 +101,22 @@ function TimeZoneSync({ timeZone }: { timeZone: string }) {
 
 function AppToaster() {
   const tShell = useTranslations("shell");
-  return <Toaster label={tShell("toastRegion")} />;
+  const updates = useDesktopUpdates();
+  const view = updates.kind === "desktop" ? updates.view : null;
+  if (updates.kind !== "desktop" || view === null || view.toast === null) {
+    return <Toaster label={tShell("toastRegion")} />;
+  }
+  return (
+    <Toaster
+      label={tShell("toastRegion")}
+      pinned={
+        <UpdateToast
+          toast={view.toast}
+          serverKind={view.server.kind}
+          serverVersion={view.server.version}
+          act={updates.act}
+        />
+      }
+    />
+  );
 }

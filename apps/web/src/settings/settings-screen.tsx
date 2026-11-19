@@ -51,6 +51,7 @@ import { hermesConfig, jsonConfig } from "@ganger/app/settings/mcp-launch";
 import { useAgentName, usePrerequisiteName } from "../labels";
 import { PushProblems } from "../push-check";
 import { browserClipboard, copyText } from "./clipboard";
+import { UpdatesPanel, UpdatesScope, UpdatesSummary } from "./updates-panel";
 import { DEFAULT_ORCA_PATH } from "@ganger/runner-orca/config";
 import { shellQuote } from "../onboarding/model";
 import { useStatusName } from "../status";
@@ -230,9 +231,13 @@ export function SettingsScreen({
                 status={
                   <span {...stylex.props(styles.inline)}>
                     <Text variant="meta">
-                      {workspace !== null && isWorkspaceItem(current)
-                        ? t("scopeWorkspace", { name: workspace.general.name })
-                        : t("scopeInstall")}
+                      {workspace !== null && isWorkspaceItem(current) ? (
+                        t("scopeWorkspace", { name: workspace.general.name })
+                      ) : current === "updates" ? (
+                        <UpdatesScope />
+                      ) : (
+                        t("scopeInstall")
+                      )}
                     </Text>
                     <Text variant="label" role="status">
                       {hasUnsaved ? t("unsaved") : null}
@@ -373,6 +378,7 @@ function WorkspaceSummary({
     case "addresses":
     case "power":
     case "mcp":
+    case "updates":
       return null;
   }
 }
@@ -399,6 +405,8 @@ function InstallSummary({ item, page }: { item: SettingsItem; page: SettingsPage
     }
     case "mcp":
       return page.install.mcp.writeAllowed ? t("mcpWrite") : t("mcpRead");
+    case "updates":
+      return <UpdatesSummary />;
     case "general":
     case "projects":
     case "mapping":
@@ -443,6 +451,8 @@ function ItemPanel({
       return <PowerPanel power={page.install.power} actions={actions} />;
     case "mcp":
       return <McpPanel mcp={page.install.mcp} actions={actions} />;
+    case "updates":
+      return <UpdatesPanel />;
     case "general":
     case "projects":
     case "mapping":

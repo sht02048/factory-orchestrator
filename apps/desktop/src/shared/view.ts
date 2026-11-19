@@ -26,6 +26,7 @@ export type FindResult =
 export type ViewState =
   | { screen: "choose-mode" }
   | { screen: "local-starting" }
+  | { screen: "local-updating"; from: string | null; to: string | null }
   | { screen: "local-stopped" }
   | { screen: "local-failed"; logFile: string }
   | { screen: "local-service" }
@@ -65,3 +66,6 @@ export const VIEW_CHANNEL = "desktop:view";
 export const NAVIGATE_CHANNEL = "desktop:navigate";
 export const NOTIFICATION_SETTINGS_CHANNEL = "desktop:notification-settings";
 export const NOTIFICATION_SETTINGS_WINDOW = "notifications";
+export const UPDATE_CHANNEL = "desktop:update";
+export const UPDATE_GET = "desktop:update-get";
+export const UPDATE_ACT = "desktop:update-act";

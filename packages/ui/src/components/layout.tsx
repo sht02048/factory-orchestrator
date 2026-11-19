@@ -178,7 +178,7 @@ const styles = stylex.create({
     maxWidth: size.noticeWidth,
     paddingTop: space.s8,
     paddingInline: space.s8,
-    paddingBottom: space.s10,
+    paddingBottom: `max(${space.s10}, var(--pinned-toast-space, 0px) + ${space.s10})`,
   },
   frame: { containerType: "inline-size", minHeight: 0 },
   split: {
@@ -210,13 +210,14 @@ const styles = stylex.create({
     overflow: "auto",
     paddingTop: space.s8,
     paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
-    paddingBottom: space.s10,
+    paddingBottom: `max(${space.s10}, var(--pinned-toast-space, 0px) + ${space.s10})`,
   },
   panelEditor: { backgroundColor: colors.bgCanvas },
   panel: {
     minWidth: 0,
     overflow: "auto",
     backgroundColor: colors.bgPanel,
+    scrollPaddingBlockEnd: "var(--pinned-toast-space, 0px)",
   },
   screen: {
     display: "grid",

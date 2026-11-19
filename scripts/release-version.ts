@@ -99,12 +99,12 @@ export function bumpVersions(root: string, next: string): string {
 }
 
 function main(argv: ReadonlyArray<string>): number {
-  const [command, next] = argv;
-  if (command !== "bump" || next === undefined) {
-    console.error("usage: node scripts/release-version.ts bump <version>");
+  const [command, next, directory, ...rest] = argv;
+  if (command !== "bump" || next === undefined || rest.length > 0) {
+    console.error("usage: node scripts/release-version.ts bump <version> [directory]");
     return 2;
   }
-  const root = fileURLToPath(new URL("..", import.meta.url));
+  const root = directory ?? fileURLToPath(new URL("..", import.meta.url));
   try {
     const previous = bumpVersions(root, next);
     console.log(`${previous} -> ${next}`);
