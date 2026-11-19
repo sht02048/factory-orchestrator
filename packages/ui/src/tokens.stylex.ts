@@ -20,6 +20,13 @@ export const colors = stylex.defineVars({
   borderStrong: "oklch(0.375 0 0)",
   borderSelected: "oklch(0.55 0 0)",
 
+  switchTrack: "oklch(0.375 0 0)",
+  switchTrackRing: "oklch(0.68 0 0)",
+  switchTrackDisabled: "oklch(0.235 0 0)",
+  switchThumb: "oklch(0.97 0 0)",
+  switchThumbDisabled: "oklch(0.5 0 0)",
+  navChip: "oklch(0.175 0 0)",
+
   meterFill: "oklch(0.62 0 0)",
   meterTrack: "oklch(0.27 0 0)",
 
@@ -183,6 +190,16 @@ export const size = stylex.defineVars({
   labelSelectWidth: "240px",
   mappingTableMinWidth: "640px",
   mappingCellMinWidth: "140px",
+  settingsBodyWidth: "720px",
+  settingsNavWidth: "168px",
+  settingsControlWidth: "240px",
+  settingsNumberWidth: "80px",
+  switchWidth: "44px",
+  switchHeight: "26px",
+  switchThumb: "20px",
+  infoTip: "24px",
+  infoTipWidth: "320px",
+  settingsChipHeight: "40px",
   repoSelectWidth: "240px",
   saveStatusColumn: "88px",
 });
@@ -213,4 +230,6 @@ export const breakpoints = stylex.defineConsts({
   tableFoldThirdRange: "@container (440px <= width < 560px)",
   tableStackedBelowThird: "@container (width < 440px)",
   rowSlotsFit: "@container (max-width: 399px)",
+  settingsNavTop: "@container (width < 760px)",
+  settingsRowStacked: "@container (width < 480px)",
 });

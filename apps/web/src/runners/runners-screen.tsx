@@ -4,6 +4,7 @@ import {
   buttonStyles,
   CapacityCells,
   DetailPanel,
+  focusStyles,
   MascotMessage,
   PageHeader,
   PanelRows,
@@ -28,12 +29,14 @@ import {
 import { USAGE_HIGH_PERCENT } from "@ganger/core";
 import { breakpoints, fonts, size, space } from "@ganger/ui/tokens.stylex";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useLocale, useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { usePrerequisiteName, useUsageNames } from "../labels";
 import { PushProblems, useCheckingText, usePushSummaryText } from "../push-check";
-import { useRunnerCheckPolling } from "../settings/settings-screen";
+import type { UnsavedGuard } from "../settings/navigation-guard";
+import { useUnsavedHold } from "../settings/row-state";
+import { ReportUnsavedContext, useRunnerCheckPolling } from "../settings/settings-screen";
 import type { ActionResult } from "../settings/settings-screen";
 import { useStatusName } from "../status";
 import { failedChecksFirst, problemRunnersFirst, runnerRowStatus } from "@ganger/app/runners/model";
@@ -61,6 +64,13 @@ export interface RunnerActions {
   pollChecks: () => Promise<boolean>;
 }
 
+export interface RunnerEditControls {
+  onDone: () => void;
+  onClose: () => void;
+}
+
+export type RenderRunnerEdit = (runner: RunnerView, controls: RunnerEditControls) => ReactNode;
+
 export interface RunnersScreenProps {
   page: RunnersPage;
   selectedId: string | undefined;
@@ -68,6 +78,8 @@ export interface RunnersScreenProps {
   onSelect: (id: string) => void;
   actions: RunnerActions;
   setup?: ReactNode;
+  renderEdit?: RenderRunnerEdit;
+  renderGuard?: (guard: UnsavedGuard) => ReactNode;
 }
 
 export function RunnersScreen({
@@ -77,6 +89,8 @@ export function RunnersScreen({
   onSelect,
   actions,
   setup,
+  renderEdit,
+  renderGuard,
 }: RunnersScreenProps) {
   const t = useTranslations("runners");
   const runners = problemRunnersFirst(page.runners);
@@ -85,6 +99,19 @@ export function RunnersScreen({
     (r) => runnerRowStatus(r) === "online" && r.occupying.length < r.capacity,
   ).length;
   const adding = selectedId === ADD_RUNNER_SELECTION && setup !== undefined;
+  const { blocked, report: reportUnsaved, guard } = useUnsavedHold("[data-runner-editing]");
+  const guardLinks = (event: MouseEvent<HTMLDivElement>) => {
+    if (!(event.target instanceof Element)) return;
+    const link = event.target.closest("a[href]");
+    if (link === null || link.getAttribute("href")?.startsWith("#") === true) return;
+    if (!guard.hold()) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const selectUnlessUnsaved = (id: string) => {
+    if (guard.hold()) return;
+    onSelect(id);
+  };
   const selected = adding ? undefined : (runners.find((r) => r.id === selectedId) ?? runners[0]);
 
   useEffect(() => {
@@ -96,75 +123,86 @@ export function RunnersScreen({
   }, [selectedId]);
 
   return (
-    <ScreenLayout
-      header={
-        <PageHeader
-          title={t("title")}
-          subtitle={
-            runners.length === 0
-              ? undefined
-              : t("subtitle", { total: runners.length, available, issues })
+    <div {...stylex.props(styles.guardFrame)} onClickCapture={guardLinks}>
+      {renderGuard?.(guard)}
+      <ScreenLayout
+        header={
+          <PageHeader
+            title={t("title")}
+            subtitle={
+              runners.length === 0
+                ? undefined
+                : t("subtitle", { total: runners.length, available, issues })
+            }
+            actions={
+              <a
+                href={addRunnerHref(ws)}
+                data-variant="primary"
+                {...stylex.props(...buttonStyles("primary"))}
+              >
+                {t("add")}
+              </a>
+            }
+          />
+        }
+      >
+        <SplitView
+          fill={false}
+          list={
+            <div {...stylex.props(styles.listColumn)}>
+              {runners.length === 0 ? (
+                <EmptyRunners />
+              ) : (
+                <Table columns="minmax(0, 1fr)">
+                  <ResponsiveColumnsHead
+                    lead={t("columns.runner")}
+                    columns={[
+                      { width: size.capacityCellsColumn, content: t("columns.capacity") },
+                      { width: size.usageColumn, content: t("columns.usage") },
+                    ]}
+                  />
+                  <TableRows
+                    label={t("listLabel")}
+                    value={selected?.id ?? null}
+                    onValueChange={selectUnlessUnsaved}
+                  >
+                    {runners.map((runner) => (
+                      <RunnerRow key={runner.id} runner={runner} />
+                    ))}
+                  </TableRows>
+                </Table>
+              )}
+            </div>
           }
-          actions={
-            <a
-              href={addRunnerHref(ws)}
-              data-variant="primary"
-              {...stylex.props(...buttonStyles("primary"))}
-            >
-              {t("add")}
-            </a>
+          panel={
+            <section aria-label={adding ? t("add") : t("panel.label")}>
+              {adding ? (
+                <DetailPanel>
+                  <div {...stylex.props(styles.setup)}>
+                    <Text variant="heading">{t("add")}</Text>
+                    {setup}
+                  </div>
+                </DetailPanel>
+              ) : selected === undefined ? (
+                <DetailPanel>
+                  {runners.length === 0 ? null : <Text variant="meta">{t("panel.empty")}</Text>}
+                </DetailPanel>
+              ) : (
+                <ReportUnsavedContext value={reportUnsaved}>
+                  <RunnerPanel
+                    key={selected.id}
+                    runner={selected}
+                    actions={actions}
+                    renderEdit={renderEdit}
+                    blocked={blocked}
+                  />
+                </ReportUnsavedContext>
+              )}
+            </section>
           }
         />
-      }
-    >
-      <SplitView
-        fill={false}
-        list={
-          <div {...stylex.props(styles.listColumn)}>
-            {runners.length === 0 ? (
-              <EmptyRunners />
-            ) : (
-              <Table columns="minmax(0, 1fr)">
-                <ResponsiveColumnsHead
-                  lead={t("columns.runner")}
-                  columns={[
-                    { width: size.capacityCellsColumn, content: t("columns.capacity") },
-                    { width: size.usageColumn, content: t("columns.usage") },
-                  ]}
-                />
-                <TableRows
-                  label={t("listLabel")}
-                  value={selected?.id ?? null}
-                  onValueChange={onSelect}
-                >
-                  {runners.map((runner) => (
-                    <RunnerRow key={runner.id} runner={runner} />
-                  ))}
-                </TableRows>
-              </Table>
-            )}
-          </div>
-        }
-        panel={
-          <section aria-label={adding ? t("add") : t("panel.label")}>
-            {adding ? (
-              <DetailPanel>
-                <div {...stylex.props(styles.setup)}>
-                  <Text variant="heading">{t("add")}</Text>
-                  {setup}
-                </div>
-              </DetailPanel>
-            ) : selected === undefined ? (
-              <DetailPanel>
-                {runners.length === 0 ? null : <Text variant="meta">{t("panel.empty")}</Text>}
-              </DetailPanel>
-            ) : (
-              <RunnerPanel key={selected.id} runner={selected} actions={actions} />
-            )}
-          </section>
-        }
-      />
-    </ScreenLayout>
+      </ScreenLayout>
+    </div>
   );
 }
 
@@ -252,12 +290,23 @@ function RowSentence({ runner }: { runner: RunnerView }) {
   return pushBlocked === 0 ? capacity : t("withPushBlocked", { capacity, count: pushBlocked });
 }
 
-function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerActions }) {
+function RunnerPanel({
+  runner,
+  actions,
+  renderEdit,
+  blocked,
+}: {
+  runner: RunnerView;
+  actions: RunnerActions;
+  renderEdit: RenderRunnerEdit | undefined;
+  blocked: boolean;
+}) {
   const t = useTranslations("runners.panel");
   const statusName = useStatusName();
   const { ago } = useTime();
   const status = runnerRowStatus(runner);
   const recheck = useRecheck(runner.id, actions);
+  const edit = useRunnerEdit();
   return (
     <DetailPanel>
       <div {...stylex.props(styles.panelHead)}>
@@ -269,14 +318,39 @@ function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerA
               : t("checkedAgo", { time: ago(runner.checked.at, runner.checked.agoMs) })}
           </Text>
         </div>
-        <div {...stylex.props(styles.wrap)}>
-          <Text variant="heading">{runner.name}</Text>
-          {runner.sshTarget === null ? null : (
-            <Text variant="meta" as="p" mono>
-              {runner.sshTarget}
-            </Text>
+        <div {...stylex.props(styles.nameLine)}>
+          <div {...stylex.props(styles.wrap)}>
+            <Text variant="heading">{runner.name}</Text>
+            {runner.sshTarget === null ? null : (
+              <Text variant="meta" as="p" mono>
+                {runner.sshTarget}
+              </Text>
+            )}
+          </div>
+          {renderEdit === undefined || edit.open ? null : (
+            <Button
+              ref={edit.triggerRef}
+              aria-label={t("editLabel", { name: runner.name })}
+              aria-expanded={false}
+              onClick={edit.show}
+            >
+              {t("edit")}
+            </Button>
           )}
         </div>
+        {renderEdit !== undefined && edit.open ? (
+          <div
+            ref={edit.formRef}
+            data-runner-editing=""
+            tabIndex={-1}
+            {...stylex.props(styles.editForm, focusStyles.target)}
+          >
+            <Text variant="meta" as="p" tone="problem" role="alert">
+              {blocked ? t("unsavedBlocked") : null}
+            </Text>
+            {renderEdit(runner, { onDone: edit.close, onClose: edit.close })}
+          </div>
+        ) : null}
         <p
           ref={recheck.statusRef}
           role="status"
@@ -299,6 +373,36 @@ function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerA
       <LeftWorktrees runner={runner} />
     </DetailPanel>
   );
+}
+
+function useRunnerEdit() {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (open) {
+      const form = formRef.current;
+      const field = window.matchMedia("(pointer: fine)").matches
+        ? form?.querySelector<HTMLElement>("input")
+        : null;
+      (field ?? form)?.focus();
+      return;
+    }
+    if (!refocus.current) return;
+    refocus.current = false;
+    triggerRef.current?.focus();
+  }, [open]);
+  return {
+    open,
+    triggerRef,
+    formRef,
+    show: () => setOpen(true),
+    close: () => {
+      refocus.current = true;
+      setOpen(false);
+    },
+  };
 }
 
 type RecheckPhase = "idle" | "sending" | "requested" | "done" | "failed";
@@ -795,6 +899,14 @@ const styles = stylex.create({
   panelHead: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   statusLine: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
   wrap: { minWidth: 0, overflowWrap: "anywhere" },
+  guardFrame: { display: "contents" },
+  nameLine: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: space.s3,
+  },
+  editForm: { paddingTop: space.s2 },
   list: {
     display: "flex",
     flexDirection: "column",

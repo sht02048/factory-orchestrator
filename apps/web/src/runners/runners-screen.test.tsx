@@ -85,6 +85,7 @@ function runner(overrides: Partial<RunnerView> & { id: string }): RunnerView {
     queued: [],
     leftWorktrees: [],
     sshTarget: null,
+    orcaPath: null,
     usage: null,
     ...overrides,
   };

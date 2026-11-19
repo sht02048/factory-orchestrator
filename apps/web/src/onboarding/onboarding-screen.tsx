@@ -20,12 +20,9 @@ import {
   StepNav,
   StepNavItem,
   Text,
-  VisuallyHidden,
   WindowDragFrame,
   useTitleBarHidden,
-  buttonStyles,
   focusStyles,
-  linkStyles,
   surfaceStyles,
   textStyles,
 } from "@ganger/ui";
@@ -44,7 +41,6 @@ import {
   RunnerCheck,
   RunnerForm,
   SubmitError,
-  passwordManagerIgnoredSecretProps,
   useReason,
   useRunnerCheckPolling,
   useRunnerErrorName,
@@ -52,6 +48,7 @@ import {
   withCurrent,
 } from "../settings/settings-screen";
 import type { ActionResult, SettingsActions } from "../settings/settings-screen";
+import { ExternalLink, GitHubTokenForm, TrackerKeyForm } from "../settings/credential-forms";
 import type {
   BoundProject,
   ConnectionProjects,
@@ -244,49 +241,6 @@ function useFocusWhenAdded(count: number): RefObject<HTMLSpanElement | null> {
   return ref;
 }
 
-function ExternalMark() {
-  return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M7 17 17 7M8 7h9v9" />
-    </svg>
-  );
-}
-
-function ExternalLink({
-  href,
-  children,
-  button = false,
-}: {
-  href: string;
-  children: ReactNode;
-  button?: boolean;
-}) {
-  const t = useTranslations("onboarding");
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      {...(button ? { "data-variant": "secondary" } : {})}
-      {...stylex.props(...(button ? buttonStyles("secondary") : linkStyles("action")))}
-    >
-      {children}
-      <ExternalMark />
-      <VisuallyHidden>{t("externalLink")}</VisuallyHidden>
-    </a>
-  );
-}
-
 function SummaryRow({
   title,
   meta,
@@ -403,7 +357,7 @@ function TrackerStep({
         {connections.length === 0 ? (
           <li key="new">
             <Card>
-              <TrackerKeyForm connection={null} actions={actions} />
+              <TrackerKeyForm connection={null} actions={actions} guide={<TrackerKeyGuide />} />
             </Card>
           </li>
         ) : (
@@ -449,83 +403,31 @@ function TrackerConnectionItem({
         <ToggleButton edit={edit} label={t("edit")} />
       </SummaryRow>
       {edit.editing ? (
-        <TrackerKeyForm connection={connection} actions={actions} onDone={edit.done} />
+        <TrackerKeyForm
+          connection={connection}
+          actions={actions}
+          onDone={edit.done}
+          guide={<TrackerKeyGuide />}
+        />
       ) : null}
     </Card>
   );
 }
 
-function TrackerKeyForm({
-  connection,
-  actions,
-  onDone,
-}: {
-  connection: TrackerConnectionView | null;
-  actions: SettingsActions;
-  onDone?: () => void;
-}) {
+function TrackerKeyGuide() {
   const t = useTranslations("onboarding.tracker");
-  const ts = useTranslations("settings");
-  const [apiKey, setApiKey] = useState("");
-  const submit = useSubmit();
-  const isNew = connection === null;
-  const ready = apiKey.trim() !== "";
   return (
-    <form
-      {...stylex.props(styles.form)}
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!ready) return;
-        submit.run(
-          () =>
-            actions.saveConnection({
-              ...(connection === null ? {} : { id: connection.id }),
-              apiKey: apiKey.trim(),
-              webhookSecret: "",
-            }),
-          isNew ? ts("connections.added") : ts("saved"),
-          () => {
-            setApiKey("");
-            onDone?.();
-          },
-        );
-      }}
-    >
-      <Field
-        label={ts("connections.apiKey")}
-        description={isNew ? t("keyDescription") : t("keyDescriptionEdit")}
-      >
-        <Input
-          name="apiKey"
-          {...passwordManagerIgnoredSecretProps}
-          value={apiKey}
-          onValueChange={setApiKey}
-          placeholder={t("keyPlaceholder")}
-          mono
-        />
-      </Field>
-      <div {...stylex.props(surfaceStyles("inset"), textStyles("ui"), styles.insetStack)}>
-        <Text variant="title">{t("guideTitle")}</Text>
-        <ol {...stylex.props(styles.bullets, styles.decimal)}>
-          <li>{t("guideStepOpen")}</li>
-          <li>{t("guideStepCreate")}</li>
-          <li>{t("guideStepPaste")}</li>
-        </ol>
-        <span>
-          <ExternalLink href={LINEAR_API_KEY_URL}>{t("guideLink")}</ExternalLink>
-        </span>
-      </div>
-      <SubmitError state={submit.state} />
-      <Actions>
-        <Button
-          variant={isNew ? "primary" : "secondary"}
-          type="submit"
-          disabled={submit.sending || !ready}
-        >
-          {submit.sending ? ts("connections.checking") : t("check")}
-        </Button>
-      </Actions>
-    </form>
+    <div {...stylex.props(surfaceStyles("inset"), textStyles("ui"), styles.insetStack)}>
+      <Text variant="title">{t("guideTitle")}</Text>
+      <ol {...stylex.props(styles.bullets, styles.decimal)}>
+        <li>{t("guideStepOpen")}</li>
+        <li>{t("guideStepCreate")}</li>
+        <li>{t("guideStepPaste")}</li>
+      </ol>
+      <span>
+        <ExternalLink href={LINEAR_API_KEY_URL}>{t("guideLink")}</ExternalLink>
+      </span>
+    </div>
   );
 }
 
@@ -621,60 +523,6 @@ function GitHubGuide() {
       </div>
       <NumberedList items={steps} />
     </section>
-  );
-}
-
-function GitHubTokenForm({
-  actions,
-  primary,
-  onDone,
-}: {
-  actions: SettingsActions;
-  primary: boolean;
-  onDone?: () => void;
-}) {
-  const t = useTranslations("onboarding.github");
-  const ts = useTranslations("settings");
-  const [token, setToken] = useState("");
-  const submit = useSubmit();
-  const ready = token.trim() !== "";
-  return (
-    <form
-      {...stylex.props(styles.form)}
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!ready) return;
-        submit.run(
-          () => actions.saveGitHubToken({ token: token.trim() }),
-          ts("saved"),
-          () => {
-            setToken("");
-            onDone?.();
-          },
-        );
-      }}
-    >
-      <Field label={ts("github.token")} description={t("tokenDescription")}>
-        <Input
-          name="token"
-          {...passwordManagerIgnoredSecretProps}
-          value={token}
-          onValueChange={setToken}
-          placeholder={t("tokenPlaceholder")}
-          mono
-        />
-      </Field>
-      <SubmitError state={submit.state} />
-      <Actions>
-        <Button
-          variant={primary ? "primary" : "secondary"}
-          type="submit"
-          disabled={submit.sending || !ready}
-        >
-          {submit.sending ? ts("saving") : ts("github.save")}
-        </Button>
-      </Actions>
-    </form>
   );
 }
 
