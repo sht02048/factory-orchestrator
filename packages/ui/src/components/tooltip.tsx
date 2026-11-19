@@ -1,6 +1,11 @@
 import * as stylex from "@stylexjs/stylex";
-import { Tooltip as SdkTooltip, TooltipContent, TooltipTrigger } from "@ui-sdk/react/tooltip";
-import type { ReactNode } from "react";
+import {
+  Tooltip as SdkTooltip,
+  TooltipContent,
+  TooltipShortcut,
+  TooltipTrigger,
+} from "@ui-sdk/react/tooltip";
+import type { ReactElement, ReactNode } from "react";
 import { buttonStyles, type ButtonVariant } from "./button";
 import { cx } from "../cx";
 import {
@@ -26,18 +31,34 @@ export interface TooltipProps {
   labelsTrigger?: boolean;
   side?: "top" | "bottom" | "left" | "right";
   action?: TooltipAction;
+  shortcut?: string;
+  render?: ReactElement<Record<string, unknown>>;
 }
 
-export function Tooltip({ content, children, labelsTrigger, side = "top", action }: TooltipProps) {
+export function Tooltip({
+  content,
+  children,
+  labelsTrigger,
+  side = "top",
+  action,
+  shortcut,
+  render,
+}: TooltipProps) {
   return (
-    <SdkTooltip type={labelsTrigger === true ? "label" : "description"}>
-      {action === undefined ? (
-        <TooltipTrigger className={cx(styles.trigger)}>{children}</TooltipTrigger>
-      ) : (
+    <SdkTooltip
+      type={labelsTrigger === true ? "label" : "description"}
+      {...(shortcut === undefined ? {} : { shortcut })}
+    >
+      {action !== undefined ? (
         <ActionTrigger action={action}>{children}</ActionTrigger>
+      ) : render !== undefined ? (
+        <TooltipTrigger render={render}>{children}</TooltipTrigger>
+      ) : (
+        <TooltipTrigger className={cx(styles.trigger)}>{children}</TooltipTrigger>
       )}
       <TooltipContent side={side} sideOffset={6} className={cx(styles.content)}>
         {content}
+        {shortcut === undefined ? null : <TooltipShortcut className={cx(styles.shortcut)} />}
       </TooltipContent>
     </SdkTooltip>
   );
@@ -110,5 +131,10 @@ const styles = stylex.create({
     },
     animationDuration: motion.durationFast,
     animationTimingFunction: motion.easeOut,
+  },
+  shortcut: {
+    marginInlineStart: space.s2,
+    color: colors.textSecondary,
+    fontVariantNumeric: "tabular-nums",
   },
 });

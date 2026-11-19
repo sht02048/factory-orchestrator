@@ -11,6 +11,7 @@ import {
   RailNav,
   RailNavList,
   RailStatic,
+  Tooltip,
   WorkspaceBadge,
   railLinkStyles,
 } from "@ganger/ui";
@@ -19,17 +20,13 @@ import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { ALL_WORKSPACES } from "@ganger/app/shell/model";
 import type { ShellData, WorkspaceChoice } from "@ganger/app/shell/model";
+import { navShortcuts } from "@ganger/app/shell/nav-shortcuts";
+import type { NavShortcut } from "@ganger/app/shell/nav-shortcuts";
 import { navIcons } from "./nav-icons";
+import { NavHotkeys } from "./nav-hotkeys";
 
-const menuItems = [
-  { key: "dashboard", to: "/" },
-  { key: "tickets", to: "/tickets" },
-  { key: "runs", to: "/runs" },
-  { key: "runners", to: "/runners" },
-  { key: "stats", to: "/stats" },
-] as const;
-
-type NavKey = (typeof menuItems)[number]["key"] | "settings";
+const mainItems = navShortcuts.filter((item) => item.screen !== "settings");
+const bottomItems = navShortcuts.filter((item) => item.screen === "settings");
 
 export interface AppShellProps {
   shell: ShellData;
@@ -53,6 +50,7 @@ export function AppShell({
     <AppFrame
       rail={
         <>
+          <NavHotkeys />
           <RailBrand>
             <GangerMark tone="brand" label={t("brand")} />
           </RailBrand>
@@ -62,28 +60,19 @@ export function AppShell({
             onWorkspaceChange={onWorkspaceChange}
           />
           <RailNav label={t("nav.label")}>
-            <RailNavList>
-              {menuItems.map((item) => (
-                <li key={item.key}>
-                  <RailLink
-                    navKey={item.key}
-                    to={item.to}
-                    current={isCurrent(item.to)}
-                    issues={item.key === "runners" ? shell.runnerIssues : 0}
-                  />
-                </li>
-              ))}
-            </RailNavList>
-            <RailNavList>
-              <li>
-                <RailLink
-                  navKey="settings"
-                  to="/settings"
-                  current={isCurrent("/settings")}
-                  issues={0}
-                />
-              </li>
-            </RailNavList>
+            {[mainItems, bottomItems].map((items) => (
+              <RailNavList key={items[0]?.screen}>
+                {items.map((item) => (
+                  <li key={item.screen}>
+                    <RailLink
+                      item={item}
+                      current={isCurrent(item.path)}
+                      issues={item.screen === "runners" ? shell.runnerIssues : 0}
+                    />
+                  </li>
+                ))}
+              </RailNavList>
+            ))}
           </RailNav>
         </>
       }
@@ -94,27 +83,32 @@ export function AppShell({
 }
 
 function RailLink({
-  navKey,
-  to,
+  item,
   current,
   issues,
 }: {
-  navKey: NavKey;
-  to: string;
+  item: NavShortcut;
   current: boolean;
   issues: number;
 }) {
   const t = useTranslations("shell");
-  const name = t(`nav.${navKey}`);
+  const name = t(`nav.${item.screen}`);
   return (
-    <Link
-      to={to}
-      {...(current ? { "aria-current": "page" } : {})}
-      {...(issues > 0 ? { "aria-label": t("nav.withIssues", { name, count: issues }) } : {})}
-      {...stylex.props(railLinkStyles(current))}
+    <Tooltip
+      content={issues > 0 ? t("nav.withIssues", { name, count: issues }) : name}
+      labelsTrigger
+      side="right"
+      shortcut={item.hotkey}
+      render={
+        <Link
+          to={item.path}
+          {...(current ? { "aria-current": "page" } : {})}
+          {...stylex.props(railLinkStyles(current))}
+        />
+      }
     >
-      <RailLinkContent icon={navIcons[navKey]} name={name} issues={issues} />
-    </Link>
+      <RailLinkContent icon={navIcons[item.screen]} name={name} issues={issues} />
+    </Tooltip>
   );
 }
 

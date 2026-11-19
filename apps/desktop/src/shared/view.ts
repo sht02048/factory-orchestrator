@@ -40,3 +40,4 @@ export interface DesktopApi {
 
 export const IPC_PREFIX = "desktop:";
 export const VIEW_CHANNEL = "desktop:view";
+export const NAVIGATE_CHANNEL = "desktop:navigate";

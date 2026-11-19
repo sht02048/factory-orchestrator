@@ -446,6 +446,21 @@ describe("서버 렌더", () => {
     expect(html).not.toContain("지울까요?");
   });
 
+  it("Tooltip 의 render 는 링크를 트리거로 쓰고, shortcut 은 aria-keyshortcuts 와 키 표시를 더한다(0102)", () => {
+    const html = renderToString(
+      <Tooltip content="Runs" labelsTrigger shortcut="Mod+3" render={<a href="/runs" />}>
+        Runs
+      </Tooltip>,
+    );
+    expect(html).toMatch(/<a [^>]*href="\/runs"[^>]*aria-keyshortcuts="Control\+3"/);
+    expect(html).not.toContain("<button");
+    expect(html).toContain("Ctrl+3");
+
+    const plain = renderToString(<Tooltip content="힌트">capacity</Tooltip>);
+    expect(plain).toContain("<button");
+    expect(plain).not.toContain("aria-keyshortcuts");
+  });
+
   it("Popover 는 닫힌 채 버튼 모양 트리거만 보이고, 열면 제목과 닫기 버튼을 그린다", () => {
     const closed = renderToString(
       <Popover trigger="답하기" title="질문" closeLabel="닫기" open={false} onOpenChange={noop}>
