@@ -17,6 +17,8 @@
 
 **갱신(2026-11-19, 운영자 결정, 티켓 0031).** 위의 "배포는 npm 패키지 하나와 CLI다"를 바꾼다. 배포는 macOS 앱(dmg)을 GitHub Release로 올리는 것이다. npm 패키지는 내지 않고 Changesets도 쓰지 않는다. dmg는 Developer ID로 서명하고 공증하며, `v*` 태그를 push할 때 GitHub Actions의 `release` 워크플로가 만든다. 버전은 루트와 `apps/desktop`의 `package.json`을 PR로 올린 뒤 태그를 단다. CLI가 `init`, `start`, launchd·systemd 서비스 등록을 맡는 점은 그대로다. Linux·macOS 서버 배포물(티켓 0029)은 0.1.0에 올리지 않을 뿐이고, Linux 서버 지원을 접는 것이 아니다.
 
+**갱신(2026-11-19, 운영자 결정, 티켓 0114).** 버전은 `develop`에서 딴 `release/v<version>` PR이나 버전을 올린 `hotfix/*` PR이 `main`에 머지될 때 올라가고, 그 머지가 자동으로 태그를 단다. 기능 작업은 `develop`에 모은다. 흐름은 [ADR 0017](0017-develop-branch-flow.md)에 있다.
+
 ## Considered Options
 
 - **Docker 이미지 우선 배포**: 설치는 쉽지만 macOS에서 ssh·Tailscale 연동이 불편해 미룬다.
