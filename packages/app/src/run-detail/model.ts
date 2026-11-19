@@ -1,4 +1,5 @@
 import type { AgentResult, PrState, RunState, SummaryOutcome } from "@ganger/core";
+import type { McpActionOutcome } from "@ganger/db";
 import type { InputWait } from "../home/model.js";
 import type { QueuedReason } from "../runs/model.js";
 
@@ -12,6 +13,7 @@ export type TimelineEvent = { at: string } & (
   | { kind: "cancel-requested" }
   | { kind: "ended"; agentResult: AgentResult }
   | { kind: "later-pr"; state: "merged" | "closed" }
+  | { kind: "mcp"; client: string; tool: string; outcome: McpActionOutcome }
 );
 
 export type PendingInput = InputWait | { kind: "unknown" };

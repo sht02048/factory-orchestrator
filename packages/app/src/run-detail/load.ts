@@ -6,6 +6,7 @@ import {
   getRunWithRecords,
   getWorkspaceTrackerProject,
   getRunCancelRequest,
+  listRunMcpActions,
   listRunPlacements,
   listRunPermissionWaits,
   listRunQuestions,
@@ -20,11 +21,13 @@ import type {
   Database,
   RunRecords,
   RunStateChangeRecord,
+  StoredMcpAction,
   StoredRun,
   StoredPermissionWait,
   StoredRunQuestion,
 } from "@ganger/db";
 import { pendingInput } from "../home/load.js";
+import { mcpActionView } from "../mcp/actions.js";
 import type { QueuedReason } from "../runs/model.js";
 import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
 import type {
@@ -90,6 +93,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
       questions,
       permissionWaits,
       cancelRequest?.requestedAt ?? null,
+      listRunMcpActions(db, run.id),
     ),
     log: logOf(db, run, records),
     otherRuns: otherRunsOf(db, run),
@@ -189,8 +193,19 @@ function timelineOf(
   questions: ReadonlyArray<StoredRunQuestion>,
   permissionWaits: ReadonlyArray<StoredPermissionWait>,
   cancelRequestedAt: Date | null,
+  mcpActions: ReadonlyArray<StoredMcpAction>,
 ): TimelineEvent[] {
   const events: TimelineEvent[] = [];
+  for (const action of mcpActions) {
+    const view = mcpActionView(action);
+    events.push({
+      kind: "mcp",
+      client: view.client,
+      tool: view.tool,
+      outcome: view.outcome,
+      at: view.at,
+    });
+  }
   for (const change of changes) {
     const event = changeEvent(run, change);
     if (event !== null) events.push(event);
