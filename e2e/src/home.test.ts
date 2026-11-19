@@ -375,6 +375,31 @@ describe("Dashboard 칸반 배치(브라우저, 0100)", () => {
     }
   });
 
+  it("행동이 있는 카드의 바닥 줄은 좁은 칸에서도 낱말을 끊지 않고 행동 버튼과 겹치지 않는다", async () => {
+    for (const width of [960, 1100, 1440, 1728, 400]) {
+      await page.setViewportSize({ width, height: 900 });
+      await openHome(page);
+      const foot = await cardButton(page, "ACME-3").evaluate((button) => {
+        const footId = button.getAttribute("aria-describedby")?.split(" ").at(-1) ?? "";
+        const footEl = document.getElementById(footId);
+        const meta = footEl?.firstElementChild;
+        const action = button.nextElementSibling;
+        if (footEl === null || !(meta instanceof HTMLElement) || action === null) return null;
+        const metaRect = meta.getBoundingClientRect();
+        const actionRect = action.getBoundingClientRect();
+        const lineHeight = Number.parseFloat(getComputedStyle(meta).lineHeight);
+        return {
+          metaLines: Math.round(metaRect.height / lineHeight),
+          overlaps:
+            actionRect.top < metaRect.bottom &&
+            actionRect.left < metaRect.right &&
+            actionRect.right > metaRect.left,
+        };
+      });
+      expect({ width, foot }).toEqual({ width, foot: { metaLines: 1, overlaps: false } });
+    }
+  });
+
   it("러너 문제는 Runners 열의 러너 행과 빨간 상자로 보인다(0069)", async () => {
     await openHome(page);
     const runners = page.getByRole("region", { name: home.section.runners });

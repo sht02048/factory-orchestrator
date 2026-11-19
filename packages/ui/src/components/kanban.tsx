@@ -3,7 +3,7 @@ import { useId } from "react";
 import type { ReactNode, Ref } from "react";
 import { focusStyles } from "./focus";
 import { textStyles } from "./text";
-import { colors, fontSize, radius, size, space } from "../tokens.stylex";
+import { breakpoints, colors, fontSize, radius, size, space } from "../tokens.stylex";
 
 export interface KanbanColumnProps {
   title: string;
@@ -83,6 +83,7 @@ export function KanbanCard({
           styles.open,
           focusStyles.ring,
           styles.openRadius,
+          action !== undefined && styles.openWithAction,
           selected && styles.selected,
         )}
       >
@@ -156,7 +157,7 @@ const styles = stylex.create({
     paddingInline: space.s1,
     paddingTop: space.s2,
   },
-  card: { position: "relative", minWidth: 0 },
+  card: { position: "relative", minWidth: 0, containerType: "inline-size" },
   open: {
     display: "flex",
     flexDirection: "column",
@@ -177,6 +178,12 @@ const styles = stylex.create({
     cursor: "pointer",
   },
   openRadius: { borderRadius: radius.control },
+  openWithAction: {
+    paddingBottom: {
+      default: space.s3,
+      [breakpoints.kanbanCardActionBelow]: `calc(${space.s3} + ${size.control} + ${space.s2})`,
+    },
+  },
   selected: { boxShadow: `inset 0 0 0 1px ${colors.borderSelected}` },
   tag: { display: "flex", paddingBottom: space.s1 },
   title: { display: "block", minWidth: 0, overflowWrap: "anywhere" },
@@ -197,15 +204,15 @@ const styles = stylex.create({
     paddingTop: space.s1,
   },
   footWithAction: {
-    alignItems: "center",
-    minHeight: size.control,
-    paddingInlineEnd: size.rowActionColumn,
+    alignItems: { default: "center", [breakpoints.kanbanCardActionBelow]: "baseline" },
+    minHeight: { default: size.control, [breakpoints.kanbanCardActionBelow]: 0 },
+    paddingInlineEnd: { default: size.rowActionColumn, [breakpoints.kanbanCardActionBelow]: 0 },
   },
   meta: {
     flexGrow: 1,
     flexShrink: 1,
     minWidth: 0,
-    overflowWrap: "anywhere",
+    overflowWrap: "break-word",
   },
   time: { flexShrink: 0, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" },
   action: {

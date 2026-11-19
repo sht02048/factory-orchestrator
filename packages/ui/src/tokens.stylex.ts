@@ -189,6 +189,7 @@ export const breakpoints = stylex.defineConsts({
   dashboardOneColumn: "@container (max-width: 719px)",
   kanbanRunnersBelow: "@container (760px <= width < 1280px)",
   kanbanStacked: "@container (width < 760px)",
+  kanbanCardActionBelow: "@container (width < 360px)",
   statTilesTwoColumns: "@container (480px < width <= 880px)",
   statTilesStacked: "@container (max-width: 480px)",
   statsChartsStacked: "@container (max-width: 880px)",
