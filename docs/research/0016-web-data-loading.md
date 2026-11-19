@@ -116,7 +116,7 @@
 - Runners는 미리 읽은 뒤 들어가면 또 읽을 수 있다(1절, **[추정]**).
 - 할당 뒤 트래커 티켓 목록 전체를 다시 읽는다(`tickets.tsx:66`). 바뀐 것은 런 표시뿐이다.
 - Mapping 자동 저장마다 Settings 전체와 트래커 세 읽기가 다시 돈다.
-- Run 상세를 열면 `getRunDetail` → `requestRunLog` → `router.invalidate()` → `getRunDetail`로 한 번 더 읽는다(`runs_.$runId.tsx:50-54`).
+- Run 상세를 열면 실행 중인 런일 때(`requested`가 참일 때) `getRunDetail` → `requestRunLog` → `router.invalidate()` → `getRunDetail`로 한 번 더 읽는다(`runs_.$runId.tsx:50-54`).
 - Tickets와 Settings가 같은 트래커 라벨을 따로 읽는다.
 
 ## 10. 지켜야 할 계약

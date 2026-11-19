@@ -22,7 +22,7 @@ Runs 목록과 Run 상세를 Query로 옮기고 변경 기록으로 갱신한다
 4. **열 때 로그 요청.** `requestRunLog` 뒤에 `["runs", "detail", runId]`만 무효화한다(지금은 화면 전체).
 5. **처리 중 폴링.** 로그 받는 중(2초, 최대 15번)과 멈추기·재개 처리 중(2초)을 그 query의 `refetchInterval`로 옮긴다.
 6. **구독 연결.** 0124의 구독 모듈이 `run`·`assignment` 바뀜에 이 key들을 무효화하는지 화면에서 확인한다.
-7. 두 route에서 `router.invalidate()`를 지운다.
+7. 두 route에서 `router.invalidate()`를 지운다. 아직 옮기지 않은 화면도 바꾸는 쓰기는 옮기는 동안 그 route id만 고른 `router.invalidate({ filter })`를 함께 부른다(스펙 6절 3번).
 
 ## 완료 조건
 

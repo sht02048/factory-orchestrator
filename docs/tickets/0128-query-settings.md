@@ -20,10 +20,10 @@ Settings를 Query로 옮긴다. 저장 뒤에 Settings 전체와 트래커 세 �
 
 ## 할 일
 
-1. **query 나누기.** DB 설정은 `["settings", ...]`(staleTime 30초), 트래커 프로젝트·상태는 `["tracker", "projects" | "states", ...]`(staleTime 5분, C3). 라벨은 0127이 만든 `["tracker", "labels", connectionId, projectId]`를 그대로 쓴다. 서버 함수도 그에 맞춰 나눈다. 온보딩은 `loadSettingsPage`를 그대로 부르므로(`apps/web/src/onboarding/load.ts:54`) 그 모양을 지키거나 온보딩 쪽을 함께 고친다.
+1. **query 나누기.** DB 설정은 `["settings", ...]`(staleTime 30초), 트래커 프로젝트·상태는 `["tracker", "projects" | "states", ...]`(staleTime 5분, C3). 라벨은 0127이 만든 `["tracker", "labels", connectionId, projectId]`를 그대로 쓴다. 서버 함수도 그에 맞춰 나눈다. `["tracker", ...]` key는 트래커 응답 원본만 담고, 트래커 프로젝트 고르기에 덧붙이는 DB 값(다른 Workspace의 주인, Mapping, Queued 런 수, `packages/app/src/settings/load.ts:348-395`)은 `["settings", ...]` 쪽에서 계산한다(스펙 4.3). 온보딩은 `loadSettingsPage`를 그대로 부르므로(`apps/web/src/onboarding/load.ts:54`) 그 모양을 지키거나 온보딩 쪽을 함께 고친다.
 2. **저장 뒤(C7).** Settings 세 route가 0127의 훅에 넘기는 `router.invalidate()`를 바꾼 key 무효화나, 서버가 새 값을 돌려주면 `setQueryData`로 바꾼다. 직렬 저장·초안 맞추기의 동작(마지막 값만 모아 차례로, 실패하면 되돌림, 저장된 값으로 다시 맞춤)은 그대로다.
 3. **쓰기 오류(C5).** 쓰기 서버 함수는 지금처럼 `{ ok: false, reason }`을 돌려주고, mutation이 이유가 담긴 오류로 바꾼다. 화면 문구는 그대로다.
-4. **트래커.** "Linear에서 다시 읽기"는 `["tracker"]`만 무효화한다. 라벨 만들기는 Auto-assign Label을 DB에도 저장하므로(`packages/app/src/settings/actions.ts`의 `saveAutoAssignLabel`) `["tracker"]`와 `["settings"]`를 무효화한다. 트래커 연결과 트래커 프로젝트 더하기·지우기도 `["tracker"]`를 함께 무효화한다. 다른 탭·기기에도 닿도록 0124의 `tracker` 변경 기록을 쓴다.
+4. **트래커.** "Linear에서 다시 읽기"는 `["tracker"]`만 무효화한다. 라벨 만들기는 Auto-assign Label을 DB에도 저장하므로(`packages/app/src/settings/actions.ts`의 `createAutoAssignLabel`이 `saveAutoAssignLabel`을 부른다) `["tracker"]`와 `["settings"]`를 무효화한다. 트래커 연결과 트래커 프로젝트 더하기·지우기도 `["tracker"]`를 함께 무효화한다. 다른 탭·기기에도 닿도록 0124의 `tracker` 변경 기록을 쓴다.
 5. **변경 기록.** Settings 쓰기가 0124에서 `workspace`·`settings`·`tracker` 줄을 스펙 5.2대로 남기는지 0119 뒤 쓰는 곳 모두에 대해 확인한다. 빠진 곳은 이 티켓에서 더한다.
 6. 셸과 함께 바뀌는 저장(Workspace 이름, 더하기·지우기)은 `["shell"]`도 무효화한다.
 7. 세 route에 `preloadStaleTime` 0을 주고 `router.invalidate()`를 지운다. 트래커 프로젝트 상세에서 프로젝트를 지운 뒤의 필터 무효화(`/_app/settings`)도 key 무효화로 바꾼다.

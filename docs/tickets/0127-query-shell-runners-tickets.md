@@ -22,7 +22,7 @@ blocked_by: [0124]
 
 1. **셸.** `["shell"]`(`getShell`). `_app` 로더가 이 query를 데운다. 구독 모듈이 `runner`·`workspace` 바뀜에 무효화한다(스펙 5.4). 셸 query는 이 티켓이 만들고 0128이 Settings 저장 뒤 무효화에 쓴다.
 2. **Runners.** `["runners", "list"]`(`getRunnersPage`). `reloadOnEnter`를 지운다. 러너 다시 점검 요청은 mutation으로 바꾸고(0124의 오류 타입), 점검 3초 폴링(최대 2분)은 `refetchInterval`로 옮긴다. 점검이 끝나면 `["runners", "list"]`와 `["shell"]`만 무효화한다.
-3. **함께 쓰는 훅 나누기.** `settings/use-settings-actions.ts`의 `useSettingsActions`·`useReloadOnSuccess`와 `settings/settings-screen.tsx`의 `useRunnerCheckPolling`은 Settings 세 route, Runners, 온보딩이 함께 쓴다(research 0016 3·4절). 저장·점검이 끝난 뒤 할 일을 부르는 쪽이 넘기게 바꾼다. Runners는 위 key 무효화를 넘기고, Settings와 온보딩은 지금처럼 `router.invalidate()`를 넘긴다(Settings는 0128이 바꾸고, 온보딩은 라우터 로더로 남는다, C1). Runners 화면에서 러너를 더하거나 저장하는 동작(`saveRunner` 등)도 이 티켓이 맡는다. Runners와 온보딩이 함께 쓰는 `runner-setup/use-runner-setup-actions.ts`(This Mac 설정, 러너 등록 끝)도 같은 방식으로 나눈다. Runners는 `["runners", "list"]`와 `["shell"]` 무효화를 넘기고 온보딩은 `router.invalidate()`를 넘긴다.
+3. **함께 쓰는 훅 나누기.** `settings/use-settings-actions.ts`의 `useSettingsActions`·`useReloadOnSuccess`는 Settings 세 route, Runners, 온보딩이, `settings/settings-screen.tsx`의 `useRunnerCheckPolling`은 Runners와 온보딩이 함께 쓴다(research 0016 3·4절). 저장·점검이 끝난 뒤 할 일을 부르는 쪽이 넘기게 바꾼다. Runners는 위 key 무효화를 넘기고, Settings와 온보딩은 지금처럼 `router.invalidate()`를 넘긴다(Settings는 0128이 바꾸고, 온보딩은 라우터 로더로 남는다, C1). Runners 화면에서 러너를 더하거나 저장하는 동작(`saveRunner` 등)도 이 티켓이 맡는다. Runners와 온보딩이 함께 쓰는 `runner-setup/use-runner-setup-actions.ts`(This Mac 설정, 러너 등록 끝)도 같은 방식으로 나눈다. Runners는 `["runners", "list"]`와 `["shell"]` 무효화를 넘기고 온보딩은 `router.invalidate()`를 넘긴다.
 4. **Tickets 나누기.** 서버 함수를 둘로 나눈다.
    - DB 부분(런 표시, 할당할 수 있음 등): `["tickets", "runs", ws]`, staleTime 30초.
    - 트래커 티켓 목록: `["tracker", "tickets", ws]`, staleTime 5분(C3).
@@ -31,7 +31,7 @@ blocked_by: [0124]
    - 화면은 두 결과를 합쳐 그린다. 트래커가 느리면 지금처럼 `Remote<T>`로 그 부분만 기다리거나 실패를 보인다.
 5. **할당.** 성공하면 `["tickets", "runs"]`와 런 쪽 key만 무효화한다. 트래커 query는 건드리지 않는다.
 6. **트래커 무효화(C3).** `tracker` 바뀜(webhook, "Linear에서 다시 읽기", 라벨 만들기)에 `["tracker"]`를 무효화한다.
-7. 세 route에 `preloadStaleTime` 0을 주고 `router.invalidate()`를 지운다. `_app`의 `shouldReload: false`는 셸 query로 옮긴 뒤 의미가 없으면 지운다.
+7. 세 route에 `preloadStaleTime` 0을 주고 `router.invalidate()`를 지운다. 아직 옮기지 않은 화면도 바꾸는 쓰기는 옮기는 동안 그 route id만 고른 `router.invalidate({ filter })`를 함께 부른다(스펙 6절 3번). `_app`의 `shouldReload: false`는 셸 query로 옮긴 뒤 의미가 없으면 지운다.
 
 ## 완료 조건
 

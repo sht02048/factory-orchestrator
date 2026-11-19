@@ -5,7 +5,7 @@
 ## 결정
 
 - **`_app` 데이터 화면과 셸의 클라이언트 캐시는 TanStack Query 하나다.** Dashboard, Tickets, Runs, Run 상세, Runners, Stats, Settings와 셸(레일 배지, Workspace 목록)이 대상이다. 신선도는 Query의 `staleTime`이 정한다.
-- **라우터 로더는 Query를 부른다.** 로더와 컴포넌트가 같은 `queryOptions`를 쓰고, 로더는 캐시를 데우기만 한다. 서버 렌더와 hydration은 `@tanstack/react-router-ssr-query`가 맡고, `QueryClient`는 요청마다 `getRouter()` 안에서 만든다. 다 옮긴 뒤 라우터 `defaultPreloadStaleTime`은 0이다(공식 권장).
+- **라우터 로더는 Query를 부른다.** 로더와 컴포넌트가 같은 `queryOptions`를 쓰고, 로더는 캐시가 있으면 기다리지 않고 넘어간다. 다시 들어온 화면은 캐시로 바로 그리고 뒤에서 새로 읽는다(0117 계약, 스펙 0003 4.2). 서버 렌더와 hydration은 `@tanstack/react-router-ssr-query`가 맡고, `QueryClient`는 요청마다 `getRouter()` 안에서 만든다. 다 옮긴 뒤 라우터 `defaultPreloadStaleTime`은 0이다(공식 권장).
 - **루트와 온보딩·러너 설정 흐름은 라우터 로더로 남는다.** 루트는 시간대·제목 표시줄 쿠키와 온보딩 완료 확인을 읽는다. 앱 전체의 context라 주인이 라우터다. 온보딩과 러너 설정은 한 번 지나가는 흐름이라 캐시로 얻는 것이 없다.
 - **바뀐 것은 DB의 변경 기록 표 `change_events`에 남긴다.** 무엇을 바꾸는 코드가 같은 트랜잭션에서 대상 종류·id·Workspace·시각을 한 줄 쓴다. web·worker·`ganger mcp` 중 누가 썼든 같은 표에 남는다.
 - **web은 새 SSE 통로 `/api/change-events/stream`으로 그 줄을 보낸다.** 서버가 1초마다 표를 읽어 새 줄을 보내고, 브라우저는 대상에 맞는 query key만 무효화한다. 보이는 화면의 query만 다시 읽는다. 다시 연결하면 `Last-Event-ID`로 놓친 줄부터 받고, 그 번호로 이어 받을 수 없으면(이미 지워졌거나, DB를 되돌려 지금 번호보다 크면) 모든 query를 무효화한다. SSE가 끊긴 동안은 30초 폴링으로 버틴다.
