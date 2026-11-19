@@ -43,6 +43,7 @@ import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" };
 import home from "../../apps/web/messages/ko/home.json" with { type: "json" };
+import question from "../../apps/web/messages/ko/question.json" with { type: "json" };
 import run from "../../apps/web/messages/ko/run.json" with { type: "json" };
 import runs from "../../apps/web/messages/ko/runs.json" with { type: "json" };
 import shell from "../../apps/web/messages/ko/shell.json" with { type: "json" };
@@ -138,9 +139,8 @@ describe("운영자 핵심 동작(브라우저)", () => {
     await row.getByText(questionBody).waitFor();
     await row.getByRole("button", { name: home.card.answer }).click();
     const layer = page.getByRole("dialog");
-    await layer.getByRole("radio", { name: home.question.other }).check();
-    await layer.getByLabel(home.question.otherLabel).fill(answerText);
-    await layer.getByRole("button", { name: home.question.send }).click();
+    await layer.getByLabel(question.answerLabel).fill(answerText);
+    await layer.getByRole("button", { name: question.send }).click();
     await layer.getByRole("status").getByText(home.question.answered).waitFor();
 
     const answered = listRunQuestions(db, questionRun).filter((q) => q.answer !== null);

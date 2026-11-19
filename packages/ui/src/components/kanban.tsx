@@ -186,7 +186,14 @@ const styles = stylex.create({
   },
   selected: { boxShadow: `inset 0 0 0 1px ${colors.borderSelected}` },
   tag: { display: "flex", paddingBottom: space.s1 },
-  title: { display: "block", minWidth: 0, overflowWrap: "anywhere" },
+  title: {
+    display: "-webkit-box",
+    minWidth: 0,
+    overflow: "hidden",
+    overflowWrap: "anywhere",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: 2,
+  },
   detail: {
     display: "-webkit-box",
     minWidth: 0,

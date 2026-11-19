@@ -152,6 +152,12 @@ export { Popover, type PopoverProps } from "./components/popover";
 export { ProblemCallout, type ProblemCalloutProps } from "./components/problem-callout";
 export { RadioGroup, RadioOption, type RadioOptionProps } from "./components/radio";
 export {
+  QuestionForm,
+  type QuestionChoiceItem,
+  type QuestionFormLabels,
+  type QuestionFormProps,
+} from "./components/question-form";
+export {
   SegmentedTabs,
   type SegmentedTabsItem,
   type SegmentedTabsProps,

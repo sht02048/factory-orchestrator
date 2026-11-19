@@ -1,4 +1,5 @@
 import home from "../../messages/ko/home.json" with { type: "json" };
+import { questionMessages } from "../question/messages";
 
 declare module "../i18n" {
   interface AppMessages {
@@ -6,4 +7,4 @@ declare module "../i18n" {
   }
 }
 
-export const homeMessages = { home };
+export const homeMessages = { home, ...questionMessages };

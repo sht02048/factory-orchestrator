@@ -72,7 +72,6 @@
     "openPr": "PR 보기"
   },
   "sheet": {
-    "title": "{key} {title}",
     "close": "닫기",
     "runDetail": "Run 상세 보기",
     "since": {
@@ -98,17 +97,8 @@
     "agent": "에이전트"
   },
   "question": {
-    "other": "직접 쓰기",
-    "otherLabel": "직접 쓴 답",
-    "otherPlaceholder": "에이전트에게 보낼 답을 써주세요",
-    "choices": "선택지",
-    "pick": "답을 하나 골라주세요",
-    "note": "보낸 답은 바로 에이전트에게 전해져요",
-    "shortcut": "⌘ Enter로 보낼 수 있어요",
-    "send": "보내기",
-    "sending": "보내는 중…",
-    "answered": "답을 보냈어요. worker가 에이전트에게 전해요.",
-    "failed": "답을 보내지 못했어요. 다시 해주세요."
+    "title": "에이전트 질문",
+    "answered": "답을 보냈어요. worker가 에이전트에게 전해요."
   },
   "permission": {
     "reasonLabel": "거절 이유",
