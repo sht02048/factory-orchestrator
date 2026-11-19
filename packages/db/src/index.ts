@@ -2,6 +2,7 @@ export * from "./config.js";
 export * from "./database.js";
 export * from "./events.js";
 export * from "./ids.js";
+export * from "./mcp-actions.js";
 export * from "./migrate.js";
 export * from "./permissions.js";
 export * from "./questions.js";
