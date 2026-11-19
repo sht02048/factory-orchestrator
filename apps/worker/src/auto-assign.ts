@@ -16,6 +16,7 @@ import {
   listRuns,
   listUnprocessedTrackerEvents,
   listWorkspaces,
+  markTrackerChanged,
   markTrackerEventProcessed,
 } from "@ganger/db";
 import type { StoredMapping, StoredRun, StoredTrackerEvent } from "@ganger/db";
@@ -119,6 +120,7 @@ async function correctByPolling(context: TickContext): Promise<void> {
       logger.warn("could not list labeled tickets", { connection, labelId, error });
       continue;
     }
+    if (tickets.length > 0) markTrackerChanged(context.db, connection);
     let complete = true;
     for (const ticket of tickets) {
       try {

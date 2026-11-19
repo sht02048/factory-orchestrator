@@ -56,6 +56,7 @@ export interface TicketsScreenProps {
   onOpenRun: (runId: string) => void;
   onAssign: (input: AssignInput) => Promise<AssignResult>;
   onAssigned: (ticketId: string) => void;
+  onReread: () => Promise<void>;
 }
 
 export function TicketsScreen(props: TicketsScreenProps) {
@@ -112,6 +113,25 @@ function AllWorkspaces({
   );
 }
 
+function RereadButton({ onReread }: { onReread: () => Promise<void> }) {
+  const t = useTranslations("tickets.reread");
+  const [reading, setReading] = useState(false);
+  return (
+    <Button
+      variant="ghost"
+      aria-disabled={reading}
+      aria-busy={reading}
+      onClick={() => {
+        if (reading) return;
+        setReading(true);
+        void onReread().finally(() => setReading(false));
+      }}
+    >
+      {reading ? t("reading") : t("action")}
+    </Button>
+  );
+}
+
 function tableColumns(showTrackerProject: boolean): string {
   return [
     size.ticketKeyColumn,
@@ -130,6 +150,7 @@ function TicketsList({
   onOpenRun,
   onAssign,
   onAssigned,
+  onReread,
 }: TicketsScreenProps) {
   const t = useTranslations("tickets");
   const [query, setQuery] = useState("");
@@ -163,7 +184,13 @@ function TicketsList({
   return (
     <ScreenLayout
       header={
-        <PageHeader title={t("title")} subtitle={t("summary", { count: counts.assignable })} />
+        <PageHeader
+          title={t("title")}
+          subtitle={t("summary", { count: counts.assignable })}
+          {...(page.trackerProjectCount === 0
+            ? {}
+            : { actions: <RereadButton onReread={onReread} /> })}
+        />
       }
     >
       <SplitView

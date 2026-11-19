@@ -15,6 +15,7 @@ import {
   saveAutoAssignLabel,
   saveMapping,
   saveWorkspaceTrackerProject,
+  trackerReadGeneration,
 } from "@ganger/db";
 import type { StoredRun } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -312,6 +313,17 @@ describe("폴링 보정", () => {
     const runs = runsOf("ENG-1");
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ state: "running", runnerProject: projectA, agent });
+  });
+
+  it("폴링 보정이 바뀐 티켓을 읽으면 웹이 담아 둔 트래커 읽기를 지우게 표시하고, 바뀐 티켓이 없으면 두지 않는다(0122)", async () => {
+    const worker = h.worker();
+    await worker.tick();
+    expect(trackerReadGeneration(h.db, connection)).toBe(0);
+
+    putTicket("ENG-1", [autoLabel]);
+    h.advance(POLL_CORRECTION_INTERVAL_MS);
+    await worker.tick();
+    expect(trackerReadGeneration(h.db, connection)).toBeGreaterThan(0);
   });
 
   it("폴링 보정으로 할당한 런은 트래커에서 읽은 티켓 제목을 할당 때 저장한다(0064)", async () => {

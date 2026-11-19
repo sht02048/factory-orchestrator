@@ -2,6 +2,10 @@
   "documentTitle": "Tickets · Ganger",
   "title": "Tickets",
   "intro": "트래커 티켓을 보고 런을 맡겨요.",
+  "reread": {
+    "action": "트래커에서 다시 읽기",
+    "reading": "다시 읽는 중…"
+  },
   "summary": "할당할 수 있는 티켓이 {count, number}개 있어요.",
   "filter": {
     "label": "티켓 거르기",

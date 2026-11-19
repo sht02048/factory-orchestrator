@@ -2,7 +2,7 @@ import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router"
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { assignTicket, getTicketsPage } from "../../server/functions";
+import { assignTicket, getTicketsPage, rereadTrackers } from "../../server/functions";
 import { ticketsMessages } from "../../tickets/messages";
 import { TICKET_FILTERS } from "@ganger/app/tickets/model";
 import { TicketsScreen } from "../../tickets/tickets-screen";
@@ -64,6 +64,10 @@ function TicketsRoute() {
             replace: true,
             resetScroll: false,
           }).then(() => router.invalidate());
+        }}
+        onReread={async () => {
+          await rereadTrackers();
+          await router.invalidate();
         }}
       />
     </ScreenMessages>

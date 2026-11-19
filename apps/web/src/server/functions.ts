@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
+import { markAllTrackersChanged } from "@ganger/db";
 import { z } from "zod";
 import { answerInput, denyInput, submitAnswer, submitDenial } from "@ganger/app/home/actions";
 import { loadHomePage } from "@ganger/app/home/load";
@@ -19,6 +20,7 @@ import { loadTicketsPage } from "@ganger/app/tickets/load";
 import { TIME_ZONE_COOKIE, parseTimeZone } from "@ganger/app/time-zone";
 import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
+import { getTrackerReads } from "./tracker-reads";
 
 export const getTimeZone = createServerFn({ method: "GET" }).handler(() =>
   parseTimeZone(getCookie(TIME_ZONE_COOKIE)),
@@ -98,11 +100,20 @@ export const getTicketsPage = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
   .handler(({ data }) =>
     loadTicketsPage(
-      { db: getDatabase(), secretBox: getSecretBox(), registry: getAdapterRegistry() },
+      {
+        db: getDatabase(),
+        secretBox: getSecretBox(),
+        registry: getAdapterRegistry(),
+        trackerReads: getTrackerReads(),
+      },
       data.ws,
       new Date(),
     ),
   );
+
+export const rereadTrackers = createServerFn({ method: "POST" }).handler(() => {
+  markAllTrackersChanged(getDatabase());
+});
 
 export const assignTicket = createServerFn({ method: "POST" })
   .validator(assignInput)

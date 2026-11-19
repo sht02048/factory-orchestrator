@@ -42,6 +42,7 @@ import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
 import { serverMcpLaunch } from "./mcp-launch";
 import { installPowerSettings } from "./power-settings";
+import { getTrackerReads } from "./tracker-reads";
 
 function context(): SettingsContext {
   const power = installPowerSettings(process.env);
@@ -50,6 +51,7 @@ function context(): SettingsContext {
     secretBox: getSecretBox(),
     registry: getAdapterRegistry(),
     mcpLaunch: serverMcpLaunch(process.env, process.execPath),
+    trackerReads: getTrackerReads(),
     ...(power === undefined ? {} : { power }),
   };
 }

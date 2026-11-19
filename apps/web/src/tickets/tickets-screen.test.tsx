@@ -25,6 +25,7 @@ function render(page: TicketsPage, options: { filter?: TicketFilter; selectedId?
       onOpenRun={noop}
       onAssign={() => Promise.resolve({ ok: false, reason: "active-run" })}
       onAssigned={noop}
+      onReread={() => Promise.resolve()}
     />,
     ticketsMessages,
   );
@@ -77,6 +78,19 @@ describe("Tickets 화면", () => {
     const heading = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1] ?? "";
     expect(text(heading).trim()).toBe("Tickets");
     expect(text(html)).toContain("할당할 수 있는 티켓이 2개 있어요.");
+  });
+
+  it("트래커 프로젝트가 있으면 머리 오른쪽에 트래커에서 다시 읽기를 두고, 없으면 두지 않는다(0122)", async () => {
+    const { context } = setupTickets();
+    const html = render(await loadTicketsPage(context, undefined, now));
+    expect(html).toMatch(/<button[^>]*>트래커에서 다시 읽기<\/button>/);
+
+    const empty = render({
+      ...(await loadTicketsPage(context, undefined, now)),
+      tickets: [],
+      trackerProjectCount: 0,
+    });
+    expect(empty).not.toContain("트래커에서 다시 읽기");
   });
 
   it("필터는 한 줄 묶음 탭이고 각 개수를 보인다", async () => {
