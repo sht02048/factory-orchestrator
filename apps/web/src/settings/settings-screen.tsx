@@ -306,6 +306,12 @@ export function RunnerForm({
     (direct || orcaPath.trim() !== "") &&
     capacityOk;
   const validation = useValidateAfterBlur();
+  useReportUnsaved(
+    name.trim() !== (runner?.name ?? "") ||
+      sshTarget.trim() !== (runner?.sshTarget ?? "") ||
+      orcaPath.trim() !== (runner?.orcaPath ?? blankOrcaPath) ||
+      capacityValue !== (runner?.capacity ?? 1),
+  );
   const changeSshTarget = (value: string) => {
     setSshTarget(value);
     if (direct && isNew && !nameEdited) setName(nameFromSshTarget(value));
@@ -435,7 +441,12 @@ export function RunnerForm({
         </>
       )}
       <SubmitError state={submit.state} />
-      <Actions>
+      <div {...stylex.props(styles.formActions, onClose !== undefined && styles.formActionsEnd)}>
+        {onClose === undefined ? null : (
+          <Button variant="ghost" onClick={onClose}>
+            {t("close")}
+          </Button>
+        )}
         <Button variant={primary ? "primary" : "secondary"} type="submit" disabled={submit.sending}>
           {submit.sending
             ? t("saving")
@@ -445,12 +456,7 @@ export function RunnerForm({
                 : t("runners.add")
               : t("runners.save")}
         </Button>
-        {onClose === undefined ? null : (
-          <Button variant="ghost" onClick={onClose}>
-            {t("close")}
-          </Button>
-        )}
-      </Actions>
+      </div>
     </form>
   );
 }
@@ -659,6 +665,8 @@ function parseWholeNumber(text: string): number | null {
 }
 
 const styles = stylex.create({
+  formActions: { display: "flex", flexWrap: "wrap", gap: space.s2 },
+  formActionsEnd: { justifyContent: "flex-end" },
   titleCell: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   form: { display: "flex", flexDirection: "column", gap: space.s4, maxWidth: size.formWidth },
   fieldRow: {

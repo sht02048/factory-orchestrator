@@ -34,7 +34,7 @@ import { useLocale, useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { usePrerequisiteName, useUsageNames } from "../labels";
 import { PushProblems, useCheckingText, usePushSummaryText } from "../push-check";
-import { useRunnerCheckPolling } from "../settings/settings-screen";
+import { ReportUnsavedContext, useRunnerCheckPolling } from "../settings/settings-screen";
 import type { ActionResult } from "../settings/settings-screen";
 import { useStatusName } from "../status";
 import { failedChecksFirst, problemRunnersFirst, runnerRowStatus } from "@ganger/app/runners/model";
@@ -95,6 +95,24 @@ export function RunnersScreen({
     (r) => runnerRowStatus(r) === "online" && r.occupying.length < r.capacity,
   ).length;
   const adding = selectedId === ADD_RUNNER_SELECTION && setup !== undefined;
+  const unsaved = useRef(new Set<string>());
+  const [blocked, setBlocked] = useState(false);
+  const reportUnsaved = useCallback((formId: string, dirty: boolean) => {
+    if (dirty) unsaved.current.add(formId);
+    else unsaved.current.delete(formId);
+    if (unsaved.current.size === 0) setBlocked(false);
+  }, []);
+  const selectUnlessUnsaved = (id: string) => {
+    if (unsaved.current.size > 0) {
+      setBlocked(true);
+      const editing = document.querySelector<HTMLElement>("[data-runner-editing]");
+      editing?.scrollIntoView({ block: "nearest" });
+      editing?.querySelector<HTMLElement>("input")?.focus({ preventScroll: true });
+      return;
+    }
+    setBlocked(false);
+    onSelect(id);
+  };
   const selected = adding ? undefined : (runners.find((r) => r.id === selectedId) ?? runners[0]);
 
   useEffect(() => {
@@ -145,7 +163,7 @@ export function RunnersScreen({
                 <TableRows
                   label={t("listLabel")}
                   value={selected?.id ?? null}
-                  onValueChange={onSelect}
+                  onValueChange={selectUnlessUnsaved}
                 >
                   {runners.map((runner) => (
                     <RunnerRow key={runner.id} runner={runner} />
@@ -169,12 +187,15 @@ export function RunnersScreen({
                 {runners.length === 0 ? null : <Text variant="meta">{t("panel.empty")}</Text>}
               </DetailPanel>
             ) : (
-              <RunnerPanel
-                key={selected.id}
-                runner={selected}
-                actions={actions}
-                renderEdit={renderEdit}
-              />
+              <ReportUnsavedContext value={reportUnsaved}>
+                <RunnerPanel
+                  key={selected.id}
+                  runner={selected}
+                  actions={actions}
+                  renderEdit={renderEdit}
+                  blocked={blocked}
+                />
+              </ReportUnsavedContext>
             )}
           </section>
         }
@@ -271,10 +292,12 @@ function RunnerPanel({
   runner,
   actions,
   renderEdit,
+  blocked,
 }: {
   runner: RunnerView;
   actions: RunnerActions;
   renderEdit: RenderRunnerEdit | undefined;
+  blocked: boolean;
 }) {
   const t = useTranslations("runners.panel");
   const statusName = useStatusName();
@@ -316,9 +339,13 @@ function RunnerPanel({
         {renderEdit !== undefined && edit.open ? (
           <div
             ref={edit.formRef}
+            data-runner-editing=""
             tabIndex={-1}
             {...stylex.props(styles.editForm, focusStyles.target)}
           >
+            <Text variant="meta" as="p" tone="problem" role="alert">
+              {blocked ? t("unsavedBlocked") : null}
+            </Text>
             {renderEdit(runner, { onDone: edit.close, onClose: edit.close })}
           </div>
         ) : null}

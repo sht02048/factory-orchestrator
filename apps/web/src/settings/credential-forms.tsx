@@ -161,7 +161,6 @@ export function TrackerKeyForm({
       footer={footer}
       onSubmit={() => {
         setMissing(!ready);
-        setMissing(!ready);
         if (!ready) return;
         submit.run(
           () =>
@@ -237,6 +236,7 @@ export function GitHubTokenForm({
       onClose={onClose}
       footer={footer}
       onSubmit={() => {
+        setMissing(!ready);
         if (!ready) return;
         submit.run(
           () => actions.saveGitHubToken({ token: token.trim() }),

@@ -177,14 +177,17 @@ function LabelRow({
     <SettingsRow
       label={t("project.label")}
       detail={t("project.labelScope", { connection: label.connection.name })}
-      message={
-        <AutoAssignLabelPicker
-          ws={ws}
-          label={label}
-          actions={actions}
-          selectLabel={t("label.selectFor", { connection: label.connection.name })}
-          showReload={false}
-        />
+      wideControl
+      control={
+        <span {...stylex.props(styles.select)}>
+          <AutoAssignLabelPicker
+            ws={ws}
+            label={label}
+            actions={actions}
+            selectLabel={t("label.selectFor", { connection: label.connection.name })}
+            showReload={false}
+          />
+        </span>
       }
     />
   );

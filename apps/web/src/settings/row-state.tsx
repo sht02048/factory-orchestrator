@@ -94,6 +94,11 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       if (openId !== null && openId !== id && dirty.current.size > 0) {
         setBlocked(true);
+        const editing = document.querySelector<HTMLElement>("[data-editing]");
+        editing?.scrollIntoView({ block: "nearest" });
+        editing?.querySelector<HTMLElement>("input:not([readonly]), button")?.focus({
+          preventScroll: true,
+        });
         return;
       }
       setBlocked(false);

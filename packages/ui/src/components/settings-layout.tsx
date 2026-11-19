@@ -262,6 +262,7 @@ export function SettingsRow({
     return (
       <div
         ref={ref}
+        data-editing=""
         {...(id === undefined ? {} : { id })}
         {...stylex.props(styles.row, styles.rowOpen)}
       >
@@ -272,6 +273,7 @@ export function SettingsRow({
   return (
     <div
       ref={ref}
+      {...(open ? { "data-editing": "" } : {})}
       {...(id === undefined ? {} : { id })}
       {...stylex.props(styles.row, open && styles.rowOpen)}
     >

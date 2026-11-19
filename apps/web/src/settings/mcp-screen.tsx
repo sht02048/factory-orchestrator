@@ -168,7 +168,7 @@ function Recent({ recent, now }: { recent: ReadonlyArray<McpActionView>; now: st
   if (recent.length === 0) {
     return (
       <SettingsGroup>
-        <SettingsRow label={t("recentEmpty")} disabled />
+        <SettingsRow label={t("recentEmpty")} />
       </SettingsGroup>
     );
   }

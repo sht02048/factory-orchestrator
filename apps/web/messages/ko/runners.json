@@ -100,6 +100,7 @@
       "privacy": "계정 정보는 저장하지 않아요."
     },
     "edit": "고치기",
-    "editLabel": "{name} 러너 고치기"
+    "editLabel": "{name} 러너 고치기",
+    "unsavedBlocked": "고친 값을 저장하지 않았어요. 저장하거나 닫은 뒤 다른 러너를 골라 주세요."
   }
 }

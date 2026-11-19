@@ -473,7 +473,6 @@ export function MappingEditor({
                     </Menu>
                   </span>
                 )}
-                {draft.repos.length > 1 ? <Text variant="meta">{t("routeHint")}</Text> : null}
               </div>
             </>
           ),

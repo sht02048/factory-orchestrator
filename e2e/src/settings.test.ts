@@ -384,6 +384,47 @@ describe("Settings 폼과 도움말(브라우저, 0119 리뷰 후속)", () => {
     await connections.getByText(settings.credentials.keyRequired).waitFor({ state: "detached" });
   });
 
+  it("GitHub 토큰을 비운 채 저장하면 칸 아래에 토큰을 넣으라고 알린다", async () => {
+    await openSettings(page);
+    const connections = section(settings.sections.connections);
+    await connections
+      .getByRole("button", { name: `${settings.github.label} ${settings.change}` })
+      .click();
+    await connections.getByRole("button", { name: settings.github.save }).click();
+    await connections.getByText(settings.credentials.tokenRequired).waitFor();
+    const token = page.getByRole("textbox", { name: settings.github.token, exact: true });
+    expect(await token.getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("다른 줄이 막히면 고친 값이 남은 줄을 화면에 보이고 그 칸으로 포커스를 옮긴다", async () => {
+    await page.setViewportSize({ width: 1280, height: 700 });
+    await openSettings(page);
+    const advanced = section(settings.sections.advanced);
+    await advanced.getByRole("button", { name: /^Webhook 공개 주소 (정하기|바꾸기)$/ }).click();
+    const webhook = page.getByRole("textbox", { name: settings.addresses.webhook, exact: true });
+    await webhook.fill("https://draft.example.com");
+    await page
+      .getByRole("navigation", { name: settings.nav.label })
+      .getByRole("link", { name: settings.sections.workspace })
+      .click();
+    await section(settings.sections.workspace)
+      .getByRole("button", { name: settings.change })
+      .click();
+    await page.getByRole("alert").getByText(settings.unsavedBlocked).waitFor();
+    await expect.poll(() => webhook.evaluate((el) => el === document.activeElement)).toBe(true);
+    expect(await webhook.isVisible()).toBe(true);
+    await page.keyboard.press("Escape");
+  });
+
+  it("넣을 트래커 프로젝트 목록은 Escape 로 닫고 + 넣기로 포커스가 돌아온다", async () => {
+    await openSettings(page);
+    const projects = section(settings.sections.projects);
+    await projects.getByRole("button", { name: settings.projects.openLabel }).click();
+    await expect.poll(focused).toBe(settings.projects.add);
+    await page.keyboard.press("Escape");
+    await expect.poll(focused).toBe(settings.projects.open);
+  });
+
   it("맞지 않는 분 값은 넣은 값을 그대로 두고 오류를 그 칸에 잇는다", async () => {
     await openSettings(page);
     const minutes = page.getByRole("textbox", { name: settings.workspace.maxRunLabel });
@@ -446,6 +487,32 @@ describe("Runners 의 러너 고치기(브라우저, 0119)", () => {
     await page.getByRole("button", { name: settings.runners.save }).click();
     await capacity.waitFor({ state: "detached" });
     await page.getByText(settings.runners.savedAndChecking).waitFor();
+  });
+});
+
+describe("Runners 고치는 중 다른 러너 고르기(브라우저, 0119 리뷰 후속)", () => {
+  it("고친 값을 저장하지 않았으면 다른 러너로 옮기지 않고 알린다", async () => {
+    saveRunner(db, {
+      id: toRunnerId("runner-b"),
+      kind: toRunnerKind("fake"),
+      name: "runner-b",
+      config: {},
+      capacity: 2,
+    });
+    await page.goto(`/runners?ws=${workspaceId}&sel=runner-a`);
+    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+    await page.waitForLoadState("networkidle");
+    await page
+      .getByRole("button", { name: runners.panel.editLabel.replace("{name}", "runner-a") })
+      .click();
+    const capacity = page.getByRole("textbox", { name: settings.runners.capacity, exact: true });
+    await capacity.fill("5");
+    await page.getByRole("option", { name: /runner-b/ }).click();
+    await page.getByRole("alert").getByText(runners.panel.unsavedBlocked).waitFor();
+    expect(await capacity.inputValue()).toBe("5");
+    await page.getByRole("button", { name: settings.close }).click();
+    await page.getByRole("option", { name: /runner-b/ }).click();
+    await page.waitForURL(/sel=runner-b/);
   });
 });
 

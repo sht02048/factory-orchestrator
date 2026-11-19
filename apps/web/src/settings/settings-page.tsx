@@ -20,7 +20,7 @@ import {
   type SettingsLinkRowRenderProps,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { MAX_RUN_MINUTES } from "@ganger/app/settings/model";
 import type {
@@ -533,7 +533,6 @@ function ProjectsSection({
         {workspace.bound.length === 0 && !edit.open ? (
           <SettingsRow
             label={hasConnections ? t("projects.none") : t("projects.needConnection")}
-            disabled
             control={
               hasConnections ? undefined : (
                 <a href="#connections" {...stylex.props(linkStyles("action"))}>
@@ -558,7 +557,7 @@ function ProjectsSection({
               </Button>
             }
             expanded={
-              <FocusFirst>
+              <FocusFirst onEscape={edit.close}>
                 <ProjectCandidates
                   workspace={workspace}
                   actions={actions}
@@ -774,7 +773,7 @@ function ConnectionsSection({
     >
       <SettingsGroup>
         {connections.length === 0 && !add.open ? (
-          <SettingsRow label={t("connections.none")} disabled />
+          <SettingsRow label={t("connections.none")} />
         ) : null}
         {connections.map((connection) => (
           <ConnectionRow key={connection.id} connection={connection} actions={actions} />
@@ -818,10 +817,23 @@ function ConnectionsSection({
   );
 }
 
-function FocusFirst({ children }: { children: ReactNode }) {
+function FocusFirst({ children, onEscape }: { children: ReactNode; onEscape?: () => void }) {
   const ref = useFocusFirstField();
   return (
-    <div ref={ref} tabIndex={-1} {...stylex.props(focusStyles.target)}>
+    <div
+      ref={ref}
+      tabIndex={-1}
+      {...(onEscape === undefined
+        ? {}
+        : {
+            onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => {
+              if (event.key !== "Escape") return;
+              event.preventDefault();
+              onEscape();
+            },
+          })}
+      {...stylex.props(focusStyles.target)}
+    >
       {children}
     </div>
   );
