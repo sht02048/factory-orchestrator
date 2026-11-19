@@ -160,7 +160,8 @@
     "rejected": "Linear가 라벨 만들기를 거절했어요. 워크스페이스 라벨을 만들 권한이 있는지 확인해 주세요.",
     "selectFor": "{connection}의 Auto-assign Label",
     "createFailedStatus": "만들지 못했어요",
-    "createFailed": "{name} 라벨을 만들지 못했어요. {reason}"
+    "createFailed": "{name} 라벨을 만들지 못했어요. {reason}",
+    "createFailedRetry": "{name} 라벨을 만들지 못했어요. 연결을 확인하고 다시 골라 주세요."
   },
   "connections": {
     "hint": "모든 Workspace가 함께 써요. Workspace는 어느 연결의 트래커 프로젝트든 고를 수 있어요.",

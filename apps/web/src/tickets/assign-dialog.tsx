@@ -233,7 +233,12 @@ export function AssignForm({
               >
                 <span {...stylex.props(styles.repo)}>
                   <span {...stylex.props(styles.repoName)}>
-                    <Text variant="ui" tone="strong" mono wrap="anywhere">
+                    <Text
+                      variant="ui"
+                      tone={reach.pushBlockedEverywhere ? "disabled" : "strong"}
+                      mono
+                      wrap="anywhere"
+                    >
                       {choice.name}
                     </Text>
                     {choice.isDefault ? <Chip strong>{t("repoDefault")}</Chip> : null}

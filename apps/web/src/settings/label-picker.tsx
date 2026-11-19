@@ -129,7 +129,12 @@ export function AutoAssignLabelPicker({
     creating.kind === "failed"
       ? creating.reason === "rejected"
         ? t("rejected")
-        : t("createFailed", { name: AUTO_ASSIGN_LABEL_NAME, reason: labelReason(creating.reason) })
+        : creating.reason === "unknown" || creating.reason === "failed"
+          ? t("createFailedRetry", { name: AUTO_ASSIGN_LABEL_NAME })
+          : t("createFailed", {
+              name: AUTO_ASSIGN_LABEL_NAME,
+              reason: labelReason(creating.reason),
+            })
       : save.state.kind === "failed"
         ? labelReason(save.state.reason)
         : null;

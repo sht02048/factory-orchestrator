@@ -1426,15 +1426,5 @@ const styles = stylex.create({
   groupTitle: { paddingTop: space.s1, paddingInline: space.s3 },
   rowHeaderText: { display: "flex", flexDirection: "column", gap: space.px2 },
   mappingHeading: { display: "inline-flex", alignItems: "flex-start", gap: space.s2 },
-  labelRow: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s3 },
-  labelText: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.px2,
-    flexGrow: 1,
-    flexBasis: size.labelTextMinWidth,
-    minWidth: 0,
-  },
-  labelSelect: { flexGrow: 0, flexShrink: 1, flexBasis: size.labelSelectWidth, minWidth: 0 },
   word: { whiteSpace: "pre" },
 });
