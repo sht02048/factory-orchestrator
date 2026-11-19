@@ -1,13 +1,13 @@
 import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
+  BulletList,
   Button,
   Checkbox,
   DefinitionItem,
   DefinitionList,
   PanelBlock,
   ProblemCallout,
-  Text,
   TextLink,
 } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
@@ -63,14 +63,7 @@ export function BrowserUpdates() {
         </DefinitionList>
       </PanelBlock>
       <PanelBlock>
-        <ul {...stylex.props(styles.bullets)}>
-          <li>
-            <Text variant="ui">{t("browserManual")}</Text>
-          </li>
-          <li>
-            <Text variant="ui">{t("browserDesktop")}</Text>
-          </li>
-        </ul>
+        <BulletList items={[t("browserManual"), t("browserDesktop")]} />
       </PanelBlock>
     </>
   );
@@ -218,13 +211,6 @@ function Situation({ view, act }: { view: UpdateView; act: (action: UpdateAction
 }
 
 const styles = stylex.create({
-  bullets: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-    margin: 0,
-    paddingInlineStart: space.s5,
-  },
   checkLine: {
     display: "flex",
     flexWrap: "wrap",

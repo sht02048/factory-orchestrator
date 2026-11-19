@@ -129,7 +129,7 @@ export class Updater {
       return;
     }
     this.latest = { version: release.version, notesUrl: release.notesUrl };
-    if (ready !== null && ready.version === release.version) {
+    if (ready !== null) {
       this.set(ready);
       return;
     }

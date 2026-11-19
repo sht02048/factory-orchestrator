@@ -108,6 +108,28 @@ describe("Updater", () => {
     expect(view().check.kind).toBe("ready");
   });
 
+  it("받아 둔 새 버전이 있는 동안 더 새 버전이 나와도 다시 받지 않고 다시 시작이 받아 둔 버전을 설치한다", async () => {
+    const newer = [
+      {
+        ...RELEASES[0],
+        tag_name: "v0.2.1",
+        html_url: "https://github.com/acme/ganger/releases/tag/v0.2.1",
+      },
+    ];
+    let list: unknown = RELEASES;
+    const { updater, calls, view } = setup({ releases: async () => list });
+    await updater.checkNow();
+    updater.downloaded();
+    list = newer;
+    await updater.checkNow();
+    expect(calls.download).toHaveLength(1);
+    expect(view().check).toEqual({ kind: "ready", version: "0.2.0", notesUrl: NOTES });
+    expect(view().latest?.version).toBe("0.2.1");
+    expect(view().toast?.kind).toBe("ready");
+    expect(updater.restart()).toBe(true);
+    expect(calls.install).toBe(1);
+  });
+
   it("받아 둔 채 앱을 다시 열었는데 아직 옛 버전이면 다시 받아 토스트를 다시 보인다", async () => {
     const first = setup();
     await first.updater.checkNow();
