@@ -236,6 +236,17 @@ describe("ganger mcp 서버", () => {
     });
   });
 
+  it("런 목록의 days는 지난 N일 안에 끝난 런만 주고, runner는 이름으로도 고른다", async () => {
+    const runs = z.object({ runs: z.array(z.object({ id: z.string(), state: z.string() })) });
+    const recent = runs.parse((await call("list_runs", { days: 7 })).json).runs;
+    expect(recent).toEqual([{ id: seeded.ended, state: "ended" }]);
+    const byName = runs.parse((await call("list_runs", { runner: "runner-a" })).json).runs;
+    expect(byName.map((r) => r.id).toSorted()).toEqual([seeded.ended, seeded.waiting].toSorted());
+    const unknown = await call("list_runs", { runner: "nope" });
+    expect(unknown.isError).toBe(true);
+    expect(unknown.json).toMatchObject({ runners: [{ id: runnerId, name: "runner-a" }] });
+  });
+
   it("런 목록·통계·설정을 준다", async () => {
     const runs = await call("list_runs");
     const listed = z
