@@ -113,7 +113,7 @@ export function AppFlow({
                       {t("pressTitle")}
                     </Text>
                     <Text variant="meta">{t("pressBody")}</Text>
-                    {state.kind === "issued" && !stopped ? (
+                    {state.kind === "issued" && !stopped && !preparing ? (
                       <Text variant="meta" numeric>
                         {t("expiresIn", { time: remainingLabel(left) })}
                       </Text>

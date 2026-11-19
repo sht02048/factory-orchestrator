@@ -652,11 +652,13 @@ function RunnerEnrollment({ server, enrollment }: { server: string; enrollment: 
       return (
         <Frame width="status" centered>
           <Header title={t("askTitle")} summary={t("askSummary", { server })} centered />
-          <section aria-label={t("youTitle")} {...stylex.props(styles.infoBox, styles.youBox)}>
-            <Text variant="ui" tone="strong">
-              {t("youTitle")}
-            </Text>
-            <Text variant="meta">{t("youBody")}</Text>
+          <section aria-label={t("youTitle")} {...stylex.props(styles.infoBox)}>
+            <span {...stylex.props(styles.youText)}>
+              <Text variant="ui" tone="strong">
+                {t("youTitle")}
+              </Text>
+              <Text variant="meta">{t("youBody")}</Text>
+            </span>
           </section>
           <EnrollmentSteps enrollment={enrollment} />
           <CenteredActions>
@@ -668,6 +670,7 @@ function RunnerEnrollment({ server, enrollment }: { server: string; enrollment: 
               {enrollment.accepting ? t("registering") : t("register")}
             </ActionButton>
             <ActionButton
+              variant="danger"
               disabled={enrollment.accepting}
               onClick={() => void api().cancelEnrollment()}
             >
@@ -682,14 +685,13 @@ function RunnerEnrollment({ server, enrollment }: { server: string; enrollment: 
         <Frame width="status" centered>
           <Header title={t("runningTitle")} summary={t("runningSummary", { server })} centered />
           {enrollment.progress.waitingForRemoteLogin ? (
-            <section
-              aria-label={t("remoteLoginWaitTitle")}
-              {...stylex.props(styles.infoBox, styles.youBox)}
-            >
-              <Text variant="ui" tone="strong" role="status">
-                {t("remoteLoginWaitTitle")}
-              </Text>
-              <Text variant="meta">{t("remoteLoginWaitBody")}</Text>
+            <section aria-label={t("remoteLoginWaitTitle")} {...stylex.props(styles.infoBox)}>
+              <span {...stylex.props(styles.youText)}>
+                <Text variant="ui" tone="strong">
+                  {t("remoteLoginWaitTitle")}
+                </Text>
+                <Text variant="meta">{t("remoteLoginWaitBody")}</Text>
+              </span>
               <div {...stylex.props(styles.actions)}>
                 <ActionButton size="medium" onClick={() => void api().openSharing()}>
                   {t("openSharing")}
@@ -700,6 +702,7 @@ function RunnerEnrollment({ server, enrollment }: { server: string; enrollment: 
           <EnrollmentSteps enrollment={enrollment} />
           <CenteredActions>
             <ActionButton
+              variant="danger"
               disabled={enrollment.canceling}
               onClick={() => void api().cancelEnrollment()}
             >
@@ -772,11 +775,17 @@ function EnrollmentSteps({ enrollment }: { enrollment: EnrollmentPhase }) {
   const t = useTranslations("screens.enrollment");
   const rows = enrollmentRows(enrollment);
   const current = rows.find((row) => row.state === "running");
+  const waitingForRemoteLogin =
+    enrollment.phase === "running" && enrollment.progress.waitingForRemoteLogin;
   return (
-    <div {...stylex.props(styles.stepsBox)}>
+    <div {...stylex.props(styles.infoBox)}>
       <VisuallyHidden>
         <span role="status">
-          {current === undefined ? "" : t("nowRunning", { step: t(`step.${current.step}`) })}
+          {waitingForRemoteLogin
+            ? t("remoteLoginWaitTitle")
+            : current === undefined
+              ? ""
+              : t("nowRunning", { step: t(`step.${current.step}`) })}
         </span>
       </VisuallyHidden>
       <Checklist label={t("stepsLabel")}>
@@ -792,9 +801,14 @@ function EnrollmentSteps({ enrollment }: { enrollment: EnrollmentPhase }) {
                 {t(`step.${step}`)}
               </Text>
               {state === "running" || state === "failed" || state === "skipped" ? (
-                <Text variant="meta" {...(state === "failed" ? { tone: "problem" as const } : {})}>
-                  {t(`state.${state}`)}
-                </Text>
+                <span aria-hidden="true">
+                  <Text
+                    variant="meta"
+                    {...(state === "failed" ? { tone: "problem" as const } : {})}
+                  >
+                    {t(`state.${state}`)}
+                  </Text>
+                </span>
               ) : null}
             </span>
           </ChecklistItem>
@@ -1075,16 +1089,6 @@ const styles = stylex.create({
     listStyleType: "disc",
   },
   checkItem: { paddingInlineStart: space.px2 },
-  youBox: { gap: space.s1 },
-  stepsBox: {
-    boxSizing: "border-box",
-    width: "100%",
-    paddingBlock: space.s4,
-    paddingInline: space.s5,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderStyle: "solid",
-    borderColor: colors.borderSubtle,
-  },
+  youText: { display: "flex", flexDirection: "column", gap: space.s1 },
   stepText: { display: "inline-flex", flexWrap: "wrap", alignItems: "baseline", gap: space.s2 },
 });
