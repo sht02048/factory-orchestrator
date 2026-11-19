@@ -291,7 +291,10 @@
     "note": "공급자 사용량 창의 쓴 비율이에요. 90% 이상이면 빨간 막대예요.",
     "label": "사용량",
     "session": "Claude 5시간",
-    "weekly": "Claude 주간"
+    "weekly": "Claude 주간",
+    "panelTitle": "공급자 사용량",
+    "panelMeta": "3분 전 읽었어요",
+    "panelBody": "UsageMeter는 이름과 %를 한 줄에 두고 막대를 아래에 둬요. PanelSection은 블록 제목 줄 끝에 숫자·시각을 둬요."
   },
   "capacityCells": {
     "title": "Runners",
