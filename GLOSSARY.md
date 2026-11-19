@@ -209,5 +209,5 @@ _Avoid_: health 경로(살아 있는지만 묻는 것처럼 들린다)
 _Avoid_: User, Admin
 
 **MCP 클라이언트**:
-Operator와 같은 기계에서 MCP로 Ganger를 읽고 다루는 에이전트(예: Hermes). Operator가 허용한 범위에서만 쓰기를 하고, 한 일은 Operator가 한 일과 구분해 남는다. 비밀 값 저장과 러너가 실행할 명령 바꾸기는 하지 못한다.
+Ganger가 도는 기계에서 MCP로 Ganger를 읽고 다루는 에이전트(예: Hermes). Operator를 대신해 일하지만 Operator가 아니고, 한 일은 Operator가 한 일과 구분된다. 할 수 있는 범위는 [ADR 0013](docs/adr/0013-mcp-client-scope.md).
 _Avoid_: 봇, 자동화(무엇이 했는지 흐리다), 사용자(다중 사용자로 읽힌다)
