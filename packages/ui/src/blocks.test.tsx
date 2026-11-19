@@ -68,6 +68,13 @@ describe("Button aria 속성(티켓 0067·0074)", () => {
       new RegExp(`<span class="([^"]*)">${label}</span>`).exec(html)?.[1];
     expect(hiddenClass(idle, "다시 읽는 중…")).toBe(hiddenClass(busy, "다시 읽기"));
     expect(hiddenClass(idle, "다시 읽기")).toBe(hiddenClass(busy, "다시 읽는 중…"));
+
+    const callerDisabled = renderToString(
+      <Button aria-disabled busy={{ active: false, label: "다시 읽는 중…" }}>
+        다시 읽기
+      </Button>,
+    );
+    expect(callerDisabled).toContain('aria-disabled="true"');
   });
 
   it("aria-pressed·aria-describedby 를 넘긴다", () => {

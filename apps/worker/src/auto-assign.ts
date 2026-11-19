@@ -124,8 +124,12 @@ async function correctByPolling(context: TickContext): Promise<void> {
     const changedUpTo = autoAssign.changedUpTo.get(key) ?? Number.NEGATIVE_INFINITY;
     const latest = Math.max(changedUpTo, ...tickets.map((ticket) => ticket.updatedAt.getTime()));
     if (latest > changedUpTo) {
-      markTrackerChanged(context.db, connection);
-      autoAssign.changedUpTo.set(key, latest);
+      try {
+        markTrackerChanged(context.db, connection);
+        autoAssign.changedUpTo.set(key, latest);
+      } catch (error) {
+        logger.warn("could not mark tracker reads changed", { connection, error });
+      }
     }
     let complete = true;
     for (const ticket of tickets) {

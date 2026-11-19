@@ -123,7 +123,7 @@ describe("원격에서 화면 옮기기(브라우저, 0122)", () => {
     const seen = await watchPendingBar(page);
     const started = Date.now();
     await page.getByRole("button", { name: tickets.reread.action }).click();
-    await page.getByRole("status").getByText(tickets.reread.done).waitFor();
+    await page.getByText(tickets.reread.done).first().waitFor();
     expect(Date.now() - started).toBeGreaterThanOrEqual(TRACKER_DELAY_MS);
     expect(await seen()).toBe(false);
   });

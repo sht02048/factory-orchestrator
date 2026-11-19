@@ -25,6 +25,7 @@ import {
   TableRow,
   TableRows,
   Text,
+  showToast,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -113,9 +114,7 @@ function AllWorkspaces({
   );
 }
 
-type RereadResult = "idle" | "reading" | "checking" | "done" | "failed";
-
-export const REREAD_NOTICE_MS = 5_000;
+type RereadResult = "idle" | "reading" | "checking" | "failed";
 
 function RereadButton({
   onReread,
@@ -127,11 +126,14 @@ function RereadButton({
   const t = useTranslations("tickets.reread");
   const [result, setResult] = useState<RereadResult>("idle");
   useEffect(() => {
-    if (result === "checking") setResult(failedProjects > 0 ? "failed" : "done");
-    if (result !== "done") return;
-    const timer = setTimeout(() => setResult("idle"), REREAD_NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [result, failedProjects]);
+    if (result !== "checking") return;
+    if (failedProjects > 0) {
+      setResult("failed");
+      return;
+    }
+    setResult("idle");
+    showToast(t("done"));
+  }, [result, failedProjects, t]);
   return (
     <div {...stylex.props(styles.reread)}>
       <Button
@@ -146,8 +148,8 @@ function RereadButton({
       >
         {t("action")}
       </Button>
-      <Text variant="meta" role="status" {...(result === "failed" ? { tone: "problem" } : {})}>
-        {result === "done" ? t("done") : result === "failed" ? t("failed") : ""}
+      <Text variant="meta" tone="problem" role="status">
+        {result === "failed" ? t("failed") : ""}
       </Text>
     </div>
   );

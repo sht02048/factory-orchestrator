@@ -26,10 +26,13 @@ export interface ButtonProps {
 }
 
 export function Button({ variant = "secondary", children, onClick, busy, ...props }: ButtonProps) {
+  const busyNow = busy?.active === true;
+  const disabled = props["aria-disabled"] === true || busyNow;
   const busyProps =
-    busy === undefined ? {} : { "aria-busy": busy.active, "aria-disabled": busy.active };
-  const disabled = props["aria-disabled"] === true || busy?.active === true;
-  const handleClick = busy?.active === true ? undefined : onClick;
+    busy === undefined
+      ? {}
+      : { "aria-busy": busyNow || props["aria-busy"] === true, "aria-disabled": disabled };
+  const handleClick = busyNow ? undefined : onClick;
   return (
     <SdkButton
       {...props}
