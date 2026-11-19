@@ -130,8 +130,8 @@
     "copied": "명령을 복사했어요",
     "copyFailed": "복사하지 못했어요. 명령을 직접 골라 복사해 주세요.",
     "viewScript": "스크립트 내용 보기",
-    "reviewFirst": "내려받아 확인한 뒤 실행",
-    "oneLine": "한 줄로 실행",
+    "reviewFirst": "확인 뒤 실행",
+    "oneLine": "바로 실행",
     "expiresIn": "{time} 뒤 만료 · 한 번만 쓸 수 있어요",
     "starting": "명령을 만들고 있어요",
     "whatTitle": "이 명령이 하는 일",
@@ -195,7 +195,8 @@
         "invalid-web-address": "https://server.example.ts.net 처럼 경로 없이 넣어 주세요.",
         "invalid-webhook-address": "저장된 webhook 공개 주소가 올바르지 않아요. Settings › 주소에서 고쳐 주세요.",
         "locks-out": "저장하면 지금 보는 이 화면의 주소가 막혀요. 지금 주소를 넣거나, 이 기계의 http://127.0.0.1 에서 정해 주세요.",
-        "request-failed": "서버에 닿지 못했어요. 다시 해 주세요."
+        "request-failed": "서버에 닿지 못했어요. 다시 해 주세요.",
+        "empty": "다른 맥이 이 서버에 닿을 주소를 넣어 주세요. 예: https://server.example.ts.net"
       }
     },
     "expiredHere": "새 명령을 받으면 여기에 보여요."

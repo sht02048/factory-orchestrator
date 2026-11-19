@@ -214,6 +214,13 @@ export function CommandFlow({
               expired={expired}
               left={left}
             />
+            <WaitingRow
+              state={state}
+              expired={expired}
+              renewed={renewed}
+              primary={primary}
+              onNewCommand={() => void start()}
+            />
             <Disclosure summary={t("whatTitle")}>
               <ul {...stylex.props(styles.bullets)}>
                 {WHAT_ITEMS.map((item) => (
@@ -224,13 +231,6 @@ export function CommandFlow({
               </ul>
               <Text variant="meta">{t("whatNote")}</Text>
             </Disclosure>
-            <WaitingRow
-              state={state}
-              expired={expired}
-              renewed={renewed}
-              primary={primary}
-              onNewCommand={() => void start()}
-            />
             <PanelBlock title={t("helpTitle")}>
               <ul {...stylex.props(styles.bullets)}>
                 {HELP_ITEMS.map((item) => (
@@ -421,23 +421,32 @@ function WebAddressForm({
   const [value, setValue] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const fail = (message: string) => {
+    setError(message);
+    inputRef.current?.focus();
+  };
   return (
     <form
       {...stylex.props(styles.group)}
       onSubmit={(event) => {
         event.preventDefault();
-        if (sending || value.trim() === "") return;
+        if (sending) return;
+        if (value.trim() === "") {
+          fail(t("error.empty"));
+          return;
+        }
         setSending(true);
         setError(null);
         actions.saveWebAddress(value.trim()).then(
           (result) => {
             setSending(false);
             if (result.ok) onSaved();
-            else setError(t(`error.${result.reason}`));
+            else fail(t(`error.${result.reason}`));
           },
           () => {
             setSending(false);
-            setError(t("error.request-failed"));
+            fail(t("error.request-failed"));
           },
         );
       }}
@@ -445,6 +454,7 @@ function WebAddressForm({
       <Text variant="body">{t("body")}</Text>
       <Field label={t("label")} description={t("description")} error={error ?? undefined}>
         <Input
+          ref={inputRef}
           name="webAddress"
           type="url"
           value={value}
@@ -455,7 +465,7 @@ function WebAddressForm({
         />
       </Field>
       <Actions>
-        <Button type="submit" disabled={sending || value.trim() === ""}>
+        <Button type="submit" disabled={sending}>
           {sending ? t("saving") : t("save")}
         </Button>
       </Actions>
@@ -546,5 +556,6 @@ const styles = stylex.create({
     gap: space.s1,
     margin: 0,
     paddingInlineStart: space.s5,
+    listStyleType: "disc",
   },
 });

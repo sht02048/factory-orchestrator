@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -262,9 +262,23 @@ function runCommandOn(
     / \| sh$/u,
     ` | sed -e "s#^DEFAULT_ORCA=.*#DEFAULT_ORCA='${mac.orca}'#" -e "s#^HOST_KEY_FILE=.*#HOST_KEY_FILE='${hostKeyFile}'#" | sh`,
   );
-  return spawnSync("/bin/sh", ["-c", patched], {
-    encoding: "utf8",
-    env: { HOME: mac.home, PATH: `${mac.bin}:/usr/bin:/bin` },
+  return new Promise<{ status: number; stdout: string; stderr: string }>((resolve) => {
+    execFile(
+      "/bin/sh",
+      ["-c", patched],
+      {
+        encoding: "utf8",
+        timeout: 30_000,
+        env: { HOME: mac.home, PATH: `${mac.bin}:/usr/bin:/bin` },
+      },
+      (error, stdout, stderr) => {
+        resolve({
+          status: error === null ? 0 : typeof error.code === "number" ? error.code : 1,
+          stdout,
+          stderr,
+        });
+      },
+    );
   });
 }
 
@@ -300,7 +314,7 @@ describe("다른 맥 · 명령으로 등록(브라우저, 0097)", () => {
     const root = mkdtempSync(join(tmpdir(), "ganger-other-mac-"));
     try {
       const mac = otherMac(root);
-      const ran = runCommandOn(mac, root, line);
+      const ran = await runCommandOn(mac, root, line);
       expect([ran.status, ran.stderr]).toEqual([0, ""]);
       expect(ran.stdout).toContain("registered other-mac as a runner");
       expect(readFileSync(join(mac.home, ".ssh", "authorized_keys"), "utf8")).toContain(
@@ -321,7 +335,7 @@ describe("다른 맥 · 명령으로 등록(브라우저, 0097)", () => {
         "AAAAC3NzaC1lZDI1NTE5AAAAIE2eOtherMacHostKey",
       );
 
-      const again = runCommandOn(mac, root, line);
+      const again = await runCommandOn(mac, root, line);
       expect(again.status).not.toBe(0);
       expect(again.stderr).toContain("expired or was already used");
     } finally {
@@ -353,7 +367,7 @@ describe("다른 맥 · 명령으로 등록(브라우저, 0097)", () => {
     await page.getByRole("status").filter({ hasText: command.newCommandReady }).waitFor();
     await expect.poll(focused).toBe(command.newCommand);
     const replaced = await fetch(`${baseUrl}/api/runner-enrollment/script?t=${token}`);
-    expect(replaced.status).toBe(410);
+    expect(await replaced.text()).toMatch(/expired or was already used.*exit 1/u);
   });
 
   it("그 맥이 알린 실패를 이유와 함께 보인다", async () => {

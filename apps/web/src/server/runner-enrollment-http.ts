@@ -58,7 +58,7 @@ export async function serveSetupScript(request: Request): Promise<Response> {
   if (script === null) {
     return new Response(
       "echo 'Ganger: this command expired or was already used. Get a new command on the Ganger screen.' >&2; exit 1\n",
-      { status: 410, headers: TEXT },
+      { status: 200, headers: TEXT },
     );
   }
   return new Response(script, { status: 200, headers: TEXT });
