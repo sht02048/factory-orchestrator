@@ -4,7 +4,13 @@ import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
 import { runnersMessages } from "../../runners/messages";
+import { RunnerSetup } from "../../runner-setup/runner-setup";
+import { runnerSetupMessages } from "../../runner-setup/messages";
+import { useRunnerSetupActions } from "../../runner-setup/use-runner-setup-actions";
 import { RunnersScreen } from "../../runners/runners-screen";
+import { settingsMessages } from "../../settings/messages";
+import { RunnerForm } from "../../settings/settings-screen";
+import { useSettingsActions } from "../../settings/use-settings-actions";
 import type { RunnerActions } from "../../runners/runners-screen";
 import { getRunnersPage } from "../../server/functions";
 import { getRunnerChecksPending, requestRunnerCheckNow } from "../../server/settings-functions";
@@ -47,16 +53,27 @@ function RunnersRoute() {
     }),
     [router],
   );
+  const settingsActions = useSettingsActions();
+  const setupActions = useRunnerSetupActions();
+  const select = (id: string) => {
+    void navigate({ search: (prev) => ({ ...prev, sel: id }), replace: true });
+  };
   return (
-    <ScreenMessages messages={runnersMessages}>
+    <ScreenMessages messages={{ ...runnersMessages, ...settingsMessages, ...runnerSetupMessages }}>
       <RunnersScreen
         page={page}
         selectedId={sel}
         ws={ws}
-        onSelect={(id) => {
-          void navigate({ search: (prev) => ({ ...prev, sel: id }), replace: true });
-        }}
+        onSelect={select}
         actions={actions}
+        setup={
+          <RunnerSetup
+            actions={setupActions}
+            manualForm={<RunnerForm runner={null} actions={settingsActions} primary={false} />}
+            onRegistered={select}
+            primary={false}
+          />
+        }
       />
     </ScreenMessages>
   );

@@ -17,6 +17,7 @@ import system from "../../messages/ko/system.json" with { type: "json" };
 import { AttentionDiff, attentionPath, fetchAttention } from "../core/attention.js";
 import type { AttentionEvent } from "../core/attention.js";
 import { DEFAULT_SERVER_PORT, discoverServers } from "../core/discovery.js";
+import { opensOutsideApp } from "../core/external-url.js";
 import type { DiscoveryResult, FoundServer } from "../core/discovery.js";
 import { probeIdentity } from "../core/identity.js";
 import type { EnsureResult, LocalServer } from "../core/local-server.js";
@@ -324,7 +325,7 @@ export class Controller {
       window.hide();
     });
     window.webContents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:/.test(url)) void shell.openExternal(url);
+      if (opensOutsideApp(url)) void shell.openExternal(url);
       return { action: "deny" };
     });
     window.webContents.on("will-navigate", (event, url) => {
@@ -332,7 +333,7 @@ export class Controller {
       if (this.serverUrl !== undefined && new URL(url).origin === new URL(this.serverUrl).origin)
         return;
       event.preventDefault();
-      if (/^https?:/.test(url)) void shell.openExternal(url);
+      if (opensOutsideApp(url)) void shell.openExternal(url);
     });
     window.webContents.on("did-fail-load", (_event, code, _description, url, isMainFrame) => {
       if (!isMainFrame || code === -3 || this.isAppScreen(url)) return;

@@ -24,8 +24,8 @@
     },
     "runner": {
       "name": "Runner",
-      "title": "첫 러너를 등록해요",
-      "description": "ssh로 닿는 Orca 환경이 러너예요. 등록하면 worker가 접속해 런을 돌릴 준비가 됐는지 확인해요."
+      "title": "에이전트를 돌릴 맥을 정해요",
+      "description": "러너는 Orca가 에이전트를 실제로 돌리는 맥이에요. Ganger는 ssh로 그 맥에 붙어 런을 시작하고 지켜봐요."
     },
     "workspace": {
       "name": "Workspace",
@@ -105,7 +105,15 @@
     "errorTitle": "러너 확인 중 오류가 났어요",
     "errorBody": "러너에는 닿았지만 확인을 끝내지 못했어요({reason}). 러너의 Orca 상태를 확인하고 다시 확인해요.",
     "pushUncheckedTitle": "GitHub 인증을 아직 확인하지 못했어요",
-    "pushUncheckedBody": "준비된 러너 쪽 프로젝트가 없어 git push --dry-run을 해 보지 못했어요. 러너의 Orca에 프로젝트 저장소를 추가하고 준비한 뒤 다시 확인해요."
+    "pushUncheckedBody": "준비된 러너 쪽 프로젝트가 없어 git push --dry-run을 해 보지 못했어요. 러너의 Orca에 프로젝트 저장소를 추가하고 준비한 뒤 다시 확인해요.",
+    "checking": "확인하고 있어요",
+    "checkingItems": {
+      "ssh": "ssh로 닿는지",
+      "service": "Orca 상시 서비스",
+      "push": "저장소 push"
+    },
+    "running": "진행 중",
+    "managed": "Ganger 키로 붙어요 · 호스트 키 고정됨"
   },
   "workspace": {
     "name": "Workspace 이름",

@@ -8,6 +8,8 @@ import { HOME_PATH, ONBOARDING_PATH, resolveStep, stepToPin } from "../onboardin
 import { OnboardingScreen } from "../onboarding/onboarding-screen";
 import type { OnboardingActions } from "../onboarding/onboarding-screen";
 import { getOnboardingPage, setUpWorkspace } from "../server/onboarding-functions";
+import { runnerSetupMessages } from "../runner-setup/messages";
+import { useRunnerSetupActions } from "../runner-setup/use-runner-setup-actions";
 import { useReloadOnSuccess, useSettingsActions } from "../settings/use-settings-actions";
 
 const t = createTranslator({
@@ -39,16 +41,18 @@ function OnboardingRoute() {
   const navigate = Route.useNavigate();
   const settingsActions = useSettingsActions();
   const then = useReloadOnSuccess();
+  const setupActions = useRunnerSetupActions();
   const actions = useMemo(
     (): OnboardingActions => ({
       ...settingsActions,
+      ...setupActions,
       setUpWorkspace: then((data) => setUpWorkspace({ data })),
     }),
-    [settingsActions, then],
+    [settingsActions, setupActions, then],
   );
 
   return (
-    <ScreenMessages messages={onboardingMessages}>
+    <ScreenMessages messages={{ ...onboardingMessages, ...runnerSetupMessages }}>
       <OnboardingScreen
         page={page}
         trackerProjects={trackerProjects}

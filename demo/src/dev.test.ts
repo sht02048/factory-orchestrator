@@ -9,6 +9,7 @@ import { chromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 import onboarding from "../../apps/web/messages/ko/onboarding.json" with { type: "json" };
+import runnerSetup from "../../apps/web/messages/ko/runnerSetup.json" with { type: "json" };
 import settings from "../../apps/web/messages/ko/settings.json" with { type: "json" };
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -84,6 +85,7 @@ describe("pnpm dev", () => {
       await page.getByRole("button", { name: settings.github.save }).click();
       await enabled(next);
       await next.click();
+      await page.getByText(runnerSetup.choose.manual).click();
       await fill.click();
       await page.getByRole("button", { name: settings.runners.add }).click();
       await main.getByText(onboarding.runner.ready.replace("{name}", "runner-a")).waitFor();

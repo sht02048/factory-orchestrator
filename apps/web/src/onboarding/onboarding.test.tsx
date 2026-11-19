@@ -42,6 +42,7 @@ import { buttonsOf } from "../testing/buttons";
 import { renderWithMessages } from "../testing/render";
 import { isOnboardingComplete, loadOnboardingPage, setUpFirstWorkspace } from "./load";
 import { onboardingMessages } from "./messages";
+import { runnerSetupMessages } from "../runner-setup/messages";
 import {
   HOME_PATH,
   ONBOARDING_PATH,
@@ -109,6 +110,8 @@ const noopActions: OnboardingActions = {
   savePower: reject,
   saveMcpWrite: reject,
   pollRunnerChecks: () => Promise.resolve(false),
+  thisMacStatus: () => new Promise(() => undefined),
+  runThisMacStep: reject,
   setUpWorkspace: reject,
 };
 
@@ -126,7 +129,7 @@ function render(
       onFinish={() => {}}
       actions={noopActions}
     />,
-    onboardingMessages,
+    { ...onboardingMessages, ...runnerSetupMessages },
   );
 }
 
@@ -327,11 +330,11 @@ describe("확인이 실패한 단계", () => {
     const shown = text(html);
     expect(shown).toContain("Orca 상시 서비스가 없어요");
     expect(serviceInstallCommand(orcaPath)).toBe(
-      "/opt/orca/bin/orca serve service install --bind 127.0.0.1 --refuse-public --command /opt/orca/bin/orca",
+      "/opt/orca/bin/orca serve service install --bind 127.0.0.1 --command /opt/orca/bin/orca",
     );
     expect(shown).toContain(serviceInstallCommand(orcaPath));
     expect(serviceInstallCommand("/opt/my tools/orca")).toBe(
-      "'/opt/my tools/orca' serve service install --bind 127.0.0.1 --refuse-public --command '/opt/my tools/orca'",
+      "'/opt/my tools/orca' serve service install --bind 127.0.0.1 --command '/opt/my tools/orca'",
     );
     expect(shown).not.toContain("ssh 대상과 orca 실행 파일 경로를 확인하고");
     expect(shown).not.toContain("--supervise");

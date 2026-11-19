@@ -1,3 +1,4 @@
+import { serviceInstallArgs } from "@ganger/runner-orca/service-install";
 import type {
   BoundProject,
   RunnerSettingsView,
@@ -152,13 +153,11 @@ export function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
-const SERVICE_INSTALL = "serve service install --bind 127.0.0.1 --refuse-public --command";
-
 export function serviceInstallCommand(orcaPath: string): string {
-  const path = shellQuote(orcaPath);
-  return `${path} ${SERVICE_INSTALL} ${path}`;
+  return serviceInstallArgs(orcaPath).map(shellQuote).join(" ");
 }
 
 export function serviceInstallTemplate(placeholder: string): string {
-  return `orca ${SERVICE_INSTALL} <${placeholder}>`;
+  const [, ...args] = serviceInstallArgs(`<${placeholder}>`);
+  return ["orca", ...args].join(" ");
 }

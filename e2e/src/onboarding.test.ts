@@ -24,6 +24,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } f
 import onboarding from "../../apps/web/messages/ko/onboarding.json" with { type: "json" };
 import shell from "../../apps/web/messages/ko/shell.json" with { type: "json" };
 import settings from "../../apps/web/messages/ko/settings.json" with { type: "json" };
+import runnerSetup from "../../apps/web/messages/ko/runnerSetup.json" with { type: "json" };
 import { trackerProject } from "./browser/fixtures.js";
 import { startWebServer } from "./web-server.js";
 
@@ -131,8 +132,9 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
 
   it("첫 러너를 등록하면 포커스가 body 가 아니라 러너 확인 제목에 간다", async () => {
     await open(3);
+    await page.getByText(runnerSetup.choose.manual).click();
     await page.getByLabel(settings.runners.name).fill("runner-a");
-    await page.getByLabel(settings.runners.sshTarget).fill("factory@runner-a.example.com");
+    await page.getByLabel(settings.runners.sshTarget).fill("ganger@runner-a.example.com");
     await page.getByLabel(settings.runners.orcaPath).fill("/opt/orca/bin/orca");
     await page.getByRole("button", { name: settings.runners.add }).click();
 

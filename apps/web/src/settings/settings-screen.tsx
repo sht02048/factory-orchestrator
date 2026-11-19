@@ -1673,9 +1673,11 @@ function RunnersPanel({
 export function RunnerForm({
   runner,
   actions,
+  primary = runner === null,
 }: {
   runner: RunnerSettingsView | null;
   actions: SettingsActions;
+  primary?: boolean;
 }) {
   const t = useTranslations("settings");
   const [name, setName] = useState(runner?.name ?? "");
@@ -1773,7 +1775,7 @@ export function RunnerForm({
       <SubmitError state={submit.state} />
       <Actions>
         <Button
-          variant={isNew ? "primary" : "secondary"}
+          variant={primary ? "primary" : "secondary"}
           type="submit"
           disabled={submit.sending || !ready}
         >

@@ -64,7 +64,7 @@ export class DemoWorld {
         id: "orca-service",
         name: "Orca background service",
         satisfied: !target.includes(FAIL_NO_ORCA),
-        hint: "orca serve service install --bind 127.0.0.1 --refuse-public --command orca",
+        hint: "orca serve service install --bind 127.0.0.1 --command orca",
         blocksAssignment: false,
       },
       ...RUNNER_PROJECTS.map((project) => ({
