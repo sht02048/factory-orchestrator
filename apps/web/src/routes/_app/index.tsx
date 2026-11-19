@@ -76,8 +76,8 @@ function HomeRoute() {
         }}
         onControl={async (input) => {
           const result = await controlRun({ data: input });
-          if (!result.ok) throw new Error(result.reason);
           await router.invalidate();
+          return result.ok ? "requested" : "state-changed";
         }}
         openRunId={run === undefined ? undefined : toRunId(run)}
         onOpenRunShown={clearOpenRun}

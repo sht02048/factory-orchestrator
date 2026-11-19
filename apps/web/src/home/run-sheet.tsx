@@ -21,6 +21,8 @@ import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import type { HomeRun, InputWait } from "@ganger/app/home/model";
 import { todoTagOf } from "@ganger/app/home/model";
+import { availableRunControl } from "@ganger/app/run-control-view";
+import type { RunControl } from "@ganger/core";
 import { QuestionForm } from "./question-form";
 import type { SendState } from "./question-form";
 import type { SheetMode } from "./run-card";
@@ -43,6 +45,7 @@ export function RunSheet({
   all,
   onAnswer,
   onDeny,
+  onControl,
 }: {
   target: SheetTarget | null;
   open: boolean;
@@ -51,6 +54,7 @@ export function RunSheet({
   all: boolean;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
+  onControl: SheetControl;
 }) {
   const t = useTranslations("home.sheet");
   if (target === null) return null;
@@ -74,7 +78,13 @@ export function RunSheet({
       finalFocus={finalFocus}
     >
       <div key={run.id} {...stylex.props(styles.body)}>
-        <SheetBody run={run} tagged={tag !== null} onAnswer={onAnswer} onDeny={onDeny} />
+        <SheetBody
+          run={run}
+          tagged={tag !== null}
+          onAnswer={onAnswer}
+          onDeny={onDeny}
+          onControl={onControl}
+        />
         <RunFacts run={run} all={all} />
         <div>
           <TextLink href={runHref(run)}>{t("runDetail")}</TextLink>
@@ -121,11 +131,13 @@ function SheetBody({
   tagged,
   onAnswer,
   onDeny,
+  onControl,
 }: {
   run: HomeRun;
   tagged: boolean;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
+  onControl: SheetControl;
 }) {
   const t = useTranslations("home.sheet");
   const text = useRunText();
@@ -133,9 +145,12 @@ function SheetBody({
     case "queued":
       return <Text variant="body">{text.queued(run)}</Text>;
     case "running":
-      return <Text variant="body">{t("running")}</Text>;
     case "paused":
-      return <Text variant="body">{t("paused")}</Text>;
+      return (
+        <ControlBlock run={run} onControl={onControl}>
+          {t(run.state)}
+        </ControlBlock>
+      );
     case "disconnected":
       return (
         <Block>
@@ -161,6 +176,60 @@ function SheetBody({
       if (tagged && run.summary === "failed") return <FailedBlock run={run} />;
       return <EndedBlock run={run} />;
   }
+}
+
+type SheetControl = (run: HomeRun, control: RunControl, focusAfter?: () => void) => Promise<void>;
+
+function ControlBlock({
+  run,
+  onControl,
+  children,
+}: {
+  run: HomeRun;
+  onControl: SheetControl;
+  children: ReactNode;
+}) {
+  const t = useTranslations("home");
+  const domain = useTranslations("domain");
+  const statusRef = useRef<HTMLParagraphElement>(null);
+  const [sending, setSending] = useState(false);
+  const control = run.control;
+  const available = availableRunControl(run.state, run.cancelling, control);
+  const pending =
+    control?.status === "pending"
+      ? t(control.control === "pause" ? "card.pausing" : "card.resuming")
+      : null;
+  return (
+    <Block>
+      <Text variant="body">{children}</Text>
+      {control?.status === "failed" ? (
+        <Text variant="ui" as="p" tone="problem">
+          {t(control.control === "pause" ? "card.pauseFailed" : "card.resumeFailed", {
+            reason: domain(`runControlFailure.${control.reason}`),
+          })}
+        </Text>
+      ) : null}
+      <Text variant="meta" as="p" ref={statusRef} role="status" tabIndex={-1}>
+        {pending}
+      </Text>
+      {available === null ? null : (
+        <div>
+          <Button
+            variant={available === "resume" ? "primary" : "secondary"}
+            disabled={sending}
+            onClick={() => {
+              setSending(true);
+              void onControl(run, available, () => statusRef.current?.focus()).finally(() =>
+                setSending(false),
+              );
+            }}
+          >
+            {t(available === "resume" ? "card.resume" : "card.pause")}
+          </Button>
+        </div>
+      )}
+    </Block>
+  );
 }
 
 function Block({ children }: { children: ReactNode }) {

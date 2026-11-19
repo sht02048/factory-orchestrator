@@ -20,7 +20,7 @@ import {
   toWorkspaceId,
 } from "@ganger/db";
 import type { Database, StoredRun, StoredRunner } from "@ganger/db";
-import { runControlOf } from "../run-control.js";
+import { runControlOf, withoutPauses } from "../run-control.js";
 import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
 import { isWebUrl } from "../format/url.js";
 import { resolveWorkspace, runnerIssueCause } from "../shell/model.js";
@@ -118,7 +118,7 @@ export function loadHomePage(
       runner: runner === undefined ? null : { name: runner.name, online: runner.online },
       agent: run.agent,
       waitMs: durations.waitMs ?? 0,
-      executionMs: durations.executionMs,
+      executionMs: withoutPauses(durations.executionMs, records, now),
       pullRequest:
         pr === null || pr === undefined || !isWebUrl(pr.url)
           ? null

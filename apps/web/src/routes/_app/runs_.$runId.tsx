@@ -89,8 +89,9 @@ function RunDetailRoute() {
           await reload();
         }}
         onControl={async (control) => {
-          expectOk(await controlRun({ data: { runId, control } }));
+          const result = await controlRun({ data: { runId, control } });
           await reload();
+          return result.ok ? "requested" : "state-changed";
         }}
         onRefreshLog={async () => {
           setPolls(0);

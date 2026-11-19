@@ -26,6 +26,7 @@ import { parseTrackerProjectKey, toRunsFilter } from "./conditions.js";
 import type { RunConditions } from "./conditions.js";
 import { ENDED_RUNS_PAGE_SIZE } from "./model.js";
 import type { QueuedReason, RunCondition, RunView, RunsPage } from "./model.js";
+import { withoutPauses } from "../run-control.js";
 import { describeQueuedReason, explainQueue } from "./queue-reasons.js";
 
 export function loadRunsPage(
@@ -140,7 +141,7 @@ export function loadRunsPage(
       runner: runner === undefined ? null : { name: runner.name, online: runner.online },
       agent: run.agent,
       waitMs: durations.waitMs ?? 0,
-      executionMs: durations.executionMs,
+      executionMs: withoutPauses(durations.executionMs, records, now),
       pullRequest:
         pr === null || pr === undefined || !isWebUrl(pr.url)
           ? null
@@ -156,8 +157,16 @@ export function loadRunsPage(
           cancelling: cancelling.has(run.id),
         };
       case "running":
-      case "paused":
         return { ...base, state: run.state, cancelling: cancelling.has(run.id) };
+      case "paused": {
+        const since = records.pausedSince;
+        return {
+          ...base,
+          state: run.state,
+          cancelling: cancelling.has(run.id),
+          pausedMs: since === null ? null : Math.max(0, now.getTime() - since.getTime()),
+        };
+      }
       case "waiting-for-input":
       case "disconnected":
         return {

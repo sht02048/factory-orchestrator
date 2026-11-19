@@ -30,7 +30,7 @@ import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import { canCancel } from "@ganger/app/run-detail/model";
 import { availableRunControl } from "@ganger/app/run-control-view";
-import type { RunControlView } from "@ganger/app/run-control-view";
+import type { RunControlOutcome, RunControlView } from "@ganger/app/run-control-view";
 import type { RunControl } from "@ganger/core";
 import type {
   LogTailView,
@@ -44,7 +44,7 @@ export interface RunDetailActions {
   onAnswer: (questionId: string, body: string) => Promise<void>;
   onDeny: (promptId: string, reason: string) => Promise<void>;
   onCancel: () => Promise<void>;
-  onControl: (control: RunControl) => Promise<void>;
+  onControl: (control: RunControl) => Promise<RunControlOutcome>;
   onRefreshLog: () => Promise<void>;
 }
 
@@ -565,7 +565,8 @@ function ControlRun({
   focusAfter: () => void;
 }) {
   const t = useTranslations("run.control");
-  const [state, setState] = useState<"idle" | "sending" | "failed">("idle");
+  const domain = useTranslations("domain");
+  const [state, setState] = useState<"idle" | "sending" | "changed" | "failed">("idle");
   return (
     <>
       <Button
@@ -574,8 +575,8 @@ function ControlRun({
         onClick={() => {
           setState("sending");
           onControl(control).then(
-            () => {
-              setState("idle");
+            (outcome) => {
+              setState(outcome === "requested" ? "idle" : "changed");
               focusAfter();
             },
             () => setState("failed"),
@@ -585,6 +586,11 @@ function ControlRun({
         {t(control)}
       </Button>
       {state === "failed" ? <ActionFailed /> : null}
+      {state === "changed" ? (
+        <Text variant="ui" as="p" tone="problem" role="alert">
+          {domain("runControlFailure.state-changed")}
+        </Text>
+      ) : null}
     </>
   );
 }
@@ -593,7 +599,7 @@ function ControlFailed({ control }: { control: Extract<RunControlView, { status:
   const t = useTranslations("run.control");
   const domain = useTranslations("domain");
   return (
-    <Text variant="ui" as="p" tone="problem" role="alert">
+    <Text variant="ui" as="p" tone="problem">
       {t(control.control === "pause" ? "pauseFailed" : "resumeFailed", {
         reason: domain(`runControlFailure.${control.reason}`),
       })}

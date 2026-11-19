@@ -26,6 +26,17 @@ export function runControlOf(
   }
 }
 
+export function withoutPauses(
+  executionMs: number | null,
+  records: { pausedMs: number; pausedSince: Date | null } | undefined,
+  now: Date,
+): number | null {
+  if (executionMs === null || records === undefined) return executionMs;
+  const current =
+    records.pausedSince === null ? 0 : Math.max(0, now.getTime() - records.pausedSince.getTime());
+  return Math.max(0, executionMs - records.pausedMs - current);
+}
+
 export type RunControlActionResult =
   | { ok: true }
   | {

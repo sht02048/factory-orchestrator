@@ -27,7 +27,7 @@ import type {
   StoredRunQuestion,
 } from "@ganger/db";
 import { pendingInput } from "../home/load.js";
-import { runControlOf } from "../run-control.js";
+import { runControlOf, withoutPauses } from "../run-control.js";
 import { mcpActionView } from "../mcp/actions.js";
 import type { QueuedReason } from "../runs/model.js";
 import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
@@ -76,7 +76,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     startedAt: startedAt?.toISOString() ?? null,
     endedAt: endedAt?.toISOString() ?? null,
     waitMs: durations.waitMs ?? 0,
-    executionMs: durations.executionMs,
+    executionMs: withoutPauses(durations.executionMs, records, now),
     status: statusOf(db, run, records, now),
     pullRequest:
       pr === null || !isWebUrl(pr.url)

@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import { Button, KanbanCard, Menu, MenuItem, MoreIcon, StatusPill, buttonStyles } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
 import type { RunControl } from "@ganger/core";
-import { useId } from "react";
+import { useId, useState } from "react";
 import type { ReactNode, Ref } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
@@ -37,12 +37,20 @@ export function RunCard({
   selected: boolean;
   openRef: Ref<HTMLButtonElement>;
   onOpen: (mode: SheetMode) => void;
-  onControl: (control: RunControl) => void;
+  onControl: (control: RunControl) => Promise<void>;
 }) {
   const todoTag = tagged ? todoTagOf(run) : null;
   const tag: PillStatus | null = todoTag ?? (run.state === "paused" ? "paused" : null);
   const titleId = useId();
-  const parts = useCardParts(run, todoTag !== null, all, titleId, onOpen, onControl);
+  const [sending, setSending] = useState(false);
+  const control = (kind: RunControl): void => {
+    setSending(true);
+    void onControl(kind).finally(() => setSending(false));
+  };
+  const parts = useCardParts(run, todoTag !== null, all, titleId, onOpen, {
+    onControl: control,
+    sending,
+  });
   const statusName = useRunText().statusName;
   return (
     <li data-run={run.id} data-tag={tag ?? undefined}>
@@ -65,7 +73,7 @@ function useCardParts(
   all: boolean,
   titleId: string,
   onOpen: (mode: SheetMode) => void,
-  onControl: (control: RunControl) => void,
+  { onControl, sending }: { onControl: (control: RunControl) => void; sending: boolean },
 ): CardParts {
   const t = useTranslations("home.card");
   const tDomain = useTranslations("domain");
@@ -124,6 +132,7 @@ function useCardParts(
                 <Button
                   variant="secondary"
                   aria-describedby={titleId}
+                  disabled={sending}
                   onClick={() => onControl("resume")}
                 >
                   {t("resume")}

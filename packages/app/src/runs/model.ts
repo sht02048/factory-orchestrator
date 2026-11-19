@@ -29,8 +29,8 @@ interface Cancellable {
 
 export type RunView =
   | (RunViewBase & Cancellable & { state: "queued"; queuedReason: QueuedReason })
-  | (RunViewBase &
-      Cancellable & { state: "running" | "waiting-for-input" | "paused" | "disconnected" })
+  | (RunViewBase & Cancellable & { state: "running" | "waiting-for-input" | "disconnected" })
+  | (RunViewBase & Cancellable & { state: "paused"; pausedMs: number | null })
   | (RunViewBase & {
       state: "ended";
       endedAt: string;
@@ -114,5 +114,6 @@ function matchesGroup(run: RunView, group: RunGroupFilter): boolean {
 }
 
 export function elapsedMs(run: RunView): number {
+  if (run.state === "paused" && run.pausedMs !== null) return run.pausedMs;
   return run.executionMs ?? run.waitMs;
 }

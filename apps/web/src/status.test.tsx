@@ -112,7 +112,7 @@ describe("화면의 상태 알약", () => {
             page={loadHomePage(db, "ws-commerce", now, "UTC")}
             onAnswer={() => Promise.resolve()}
             onDeny={() => Promise.resolve()}
-            onControl={() => Promise.resolve()}
+            onControl={() => Promise.resolve("requested" as const)}
           />,
           homeMessages,
         ),

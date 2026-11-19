@@ -80,6 +80,7 @@
       "failed": "에이전트 결과와 PR 상태 때문에 Failed예요. 자동으로 다시 시도하지 않아요.",
       "canceled": "운영자가 취소한 런이에요. 처리할 일에 올리지 않아요."
     },
-    "noRunsWithConditions": "조건에 맞는 런이 생기면 여기에 요약이 보여요."
+    "noRunsWithConditions": "조건에 맞는 런이 생기면 여기에 요약이 보여요.",
+    "pausedFor": "{duration}째 멈춰 있어요"
   }
 }

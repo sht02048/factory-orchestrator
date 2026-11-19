@@ -26,6 +26,7 @@ import { useTime } from "../format/time";
 import { useUsageNames } from "../labels";
 import { useStatusName } from "../status";
 import type { DashboardRunner, HomePage, HomeRun } from "@ganger/app/home/model";
+import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import {
   dashboardBoard,
   freeCapacity,
@@ -70,7 +71,7 @@ export interface HomeScreenProps {
   onViewChange?: (view: DashboardView) => void;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
-  onControl: (input: ControlInput) => Promise<void>;
+  onControl: (input: ControlInput) => Promise<RunControlOutcome>;
   openRunId?: RunId | undefined;
   onOpenRunShown?: () => void;
 }
@@ -86,7 +87,7 @@ interface CardHost {
   cardRef: (id: RunId) => (element: HTMLButtonElement | null) => void;
   focusCard: (id: RunId) => void;
   onOpen: (run: HomeRun, tagged: boolean, mode: SheetMode) => void;
-  onControl: (run: HomeRun, control: RunControl) => void;
+  onControl: (run: HomeRun, control: RunControl, focusAfter?: () => void) => Promise<void>;
 }
 
 export function HomeScreen({
@@ -150,12 +151,17 @@ export function HomeScreen({
       setTarget({ run, tagged, mode });
       setOpen(true);
     },
-    onControl: (run, control) => {
+    onControl: (run, control, focusAfter) => {
       const key = run.ticketKey;
-      onControl({ runId: run.id, control }).then(
-        () => {
-          cards.current.get(run.id)?.focus();
-          showToast(t(`control.${control}Requested`, { key }));
+      return onControl({ runId: run.id, control }).then(
+        (outcome) => {
+          if (focusAfter === undefined) cards.current.get(run.id)?.focus();
+          else focusAfter();
+          showToast(
+            outcome === "requested"
+              ? t(`control.${control}Requested`, { key })
+              : t("control.stateChanged", { key }),
+          );
         },
         () => showToast(t(`control.${control}Rejected`, { key })),
       );
@@ -249,6 +255,7 @@ export function HomeScreen({
         all={all}
         onAnswer={onAnswer}
         onDeny={onDeny}
+        onControl={host.onControl}
       />
     </div>
   );

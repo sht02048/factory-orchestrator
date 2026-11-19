@@ -4,6 +4,8 @@ export type RunControlView =
   | { control: RunControl; status: "pending" }
   | { control: RunControl; status: "failed"; reason: RunControlFailure | "unknown" };
 
+export type RunControlOutcome = "requested" | "state-changed";
+
 export function availableRunControl(
   state: RunState,
   cancelling: boolean,
