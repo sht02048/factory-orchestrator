@@ -81,6 +81,14 @@ export function runnerIssues(runners: RunnersSummary): RunnerIssue[] {
   );
 }
 
+export function freeCapacity(runners: RunnersSummary): number {
+  return runners.list.reduce(
+    (sum, runner) =>
+      runner.cause === null ? sum + Math.max(0, runner.capacity - runner.used) : sum,
+    0,
+  );
+}
+
 export interface DoneRun {
   id: RunId;
   ticketKey: TicketKey;
