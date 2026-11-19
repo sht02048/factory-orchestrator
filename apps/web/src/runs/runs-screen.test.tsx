@@ -47,16 +47,67 @@ function render(
   );
 }
 
-function rowTexts(html: string): Map<string, string[]> {
-  const rows = new Map<string, string[]>();
-  for (const chunk of html.split('role="option"').slice(1)) {
-    const row = chunk.split('role="option"')[0] ?? "";
-    const cells = row
+interface RowCells {
+  key: string;
+  title: string;
+  runner: string;
+  result: string;
+  pill: string;
+  time: string;
+}
+
+function spanEnd(html: string, start: number): number {
+  let depth = 0;
+  let at = start;
+  do {
+    const open = html.indexOf("<span", at + 1);
+    const close = html.indexOf("</span>", at + 1);
+    if (open !== -1 && open < close) {
+      depth += 1;
+      at = open;
+    } else {
+      depth -= 1;
+      at = close;
+    }
+  } while (depth >= 0);
+  return at + "</span>".length;
+}
+
+function withoutFoldedOnly(html: string): string {
+  let out = html;
+  for (let start = out.indexOf("<span data-folded-only="); start !== -1;) {
+    out = out.slice(0, start) + out.slice(spanEnd(out, start));
+    start = out.indexOf("<span data-folded-only=");
+  }
+  return out;
+}
+
+function foldedLine(html: string, key: string): string {
+  const row = html.split('role="option"').find((chunk) => chunk.includes(`>${key}<`)) ?? "";
+  const start = row.indexOf('<span data-folded-only="first"');
+  if (start === -1) return "";
+  return row.slice(start, spanEnd(row, start)).replace(/<[^>]+>/g, "");
+}
+
+function rowTexts(html: string): Map<string, RowCells> {
+  const rows = new Map<string, RowCells>();
+  for (const chunk of withoutFoldedOnly(html).split('role="option"').slice(1)) {
+    const cells = chunk
       .split(/<[^>]+>/)
       .map((s) => s.trim())
       .filter((s) => s !== "" && !s.includes("="));
-    const key = cells[0];
-    if (key !== undefined) rows.set(key, cells);
+    const [key, ...rest] = cells;
+    if (key === undefined) continue;
+    const untitled = /data-hide-when="stacked"[^>]*><\/span>/.test(chunk);
+    const [title, runner, result, pill, time] = untitled ? [key, ...rest] : rest;
+    rows.set(key, {
+      key,
+      title: title ?? "",
+      runner: runner ?? "",
+      result: result ?? "",
+      pill: pill ?? "",
+      time: time ?? "",
+    });
   }
   return rows;
 }
@@ -84,25 +135,66 @@ describe("Runs 화면", () => {
     const rows = rowTexts(render(loadRunsPage(db, undefined, now)));
     for (const c of endedCases) {
       const cells = rows.get(c.key);
-      expect({ key: c.key, pill: cells?.[2] }).toEqual({
+      expect({ key: c.key, pill: cells?.pill }).toEqual({
         key: c.key,
         pill: domain.summary[c.summary],
       });
-      expect(cells?.[1]).toContain(domain.agentResult[c.agentResult]);
+      expect(cells?.result).toContain(domain.agentResult[c.agentResult]);
     }
   });
 
   it("Ended 가 아닌 런은 알약에 런 상태, 흐린 줄에 러너와 에이전트를 보인다", () => {
     const { db } = seedDatabase();
     const rows = rowTexts(render(loadRunsPage(db, undefined, now)));
-    expect(rows.get("ACME-10")?.slice(1, 3)).toEqual([
-      `runner-a · ${domain.agent.claude}`,
+    const running = rows.get("ACME-10");
+    expect([running?.runner, running?.result, running?.pill]).toEqual([
+      "runner-a",
+      domain.agent.claude,
       domain.runState.running,
     ]);
-    expect(rows.get("ACME-11")?.[2]).toBe(domain.runState["waiting-for-input"]);
-    expect(rows.get("ACME-12")?.[2]).toBe(domain.runState.disconnected);
-    expect(rows.get("ACME-13")?.[2]).toBe(domain.runState.queued);
-    expect(rows.get(offlineQueuedKey)?.[1]).toContain(runsJson.noRunner);
+    expect(rows.get("ACME-11")?.pill).toBe(domain.runState["waiting-for-input"]);
+    expect(rows.get("ACME-12")?.pill).toBe(domain.runState.disconnected);
+    expect(rows.get("ACME-13")?.pill).toBe(domain.runState.queued);
+    expect(rows.get(offlineQueuedKey)?.runner).toBe(runsJson.noRunner);
+  });
+
+  it("행은 키·제목·러너·결과·상태·시간 열이고 열 머리를 둔다(0101)", () => {
+    const { db } = seedDatabase();
+    const id = addTitledRun(db, "ACME-30", "결제 실패 재시도");
+    const html = render(loadRunsPage(db, undefined, now), { selectedId: id });
+    const head = html
+      .split('aria-hidden="true"')
+      .find((chunk) => chunk.includes(runsJson.columns.key));
+    const headers = (head ?? "")
+      .split("</div>")[0]
+      ?.split(/<[^>]+>/)
+      .map((s) => s.trim())
+      .filter((s) => s !== "" && !s.includes("="));
+    expect(headers).toEqual([
+      runsJson.columns.key,
+      runsJson.columns.title,
+      runsJson.columns.runner,
+      runsJson.columns.result,
+      runsJson.columns.status,
+      runsJson.columns.time,
+    ]);
+    const row = rowTexts(html).get("ACME-30");
+    expect(row?.title).toBe("결제 실패 재시도");
+    expect(row?.runner).not.toBe("");
+    expect(html).toContain('title="결제 실패 재시도"');
+  });
+
+  it("좁아져 접히면 러너와 결과가 제목 아래 둘째 줄로 돌아간다(0101)", () => {
+    const { db } = seedDatabase();
+    const html = render(loadRunsPage(db, undefined, now));
+    const rows = rowTexts(html);
+    const running = rows.get("ACME-10");
+    expect(foldedLine(html, "ACME-10")).toBe(
+      `${running?.runner ?? ""}${runsJson.metaSeparator}${running?.result ?? ""}`,
+    );
+    const ended = endedCases[0];
+    if (ended === undefined) throw new Error("no ended case");
+    expect(foldedLine(html, ended.key)).toContain(domain.agentResult[ended.agentResult]);
   });
 
   it("시간 칸은 끝난 런이면 상대 시간, 진행 중이면 경과다(ADR 0010 7번)", () => {
@@ -111,7 +203,7 @@ describe("Runs 화면", () => {
     const rows = rowTexts(render(page));
     const times = page.runs.map((run) => ({
       ended: run.state === "ended",
-      time: rows.get(run.ticketKey)?.[3] ?? "",
+      time: rows.get(run.ticketKey)?.time ?? "",
     }));
     const relative = /^(방금|\d+(분|시간) 전|\d+월 \d+일)$/;
     expect(times.filter((r) => r.ended).every((r) => relative.test(r.time))).toBe(true);
@@ -138,7 +230,8 @@ describe("Runs 화면", () => {
     const { db } = seedDatabase();
     const id = addTitledRun(db, "ACME-30", "결제 실패 재시도");
     const html = render(loadRunsPage(db, undefined, now), { selectedId: id });
-    expect(rowTexts(html).get("ACME-30")?.slice(0, 2)).toEqual(["ACME-30", "결제 실패 재시도"]);
+    const titled = rowTexts(html).get("ACME-30");
+    expect([titled?.key, titled?.title]).toEqual(["ACME-30", "결제 실패 재시도"]);
     expect(html).toMatch(/<h2[^>]*>결제 실패 재시도<\/h2>/);
     expect(panelText(html)).toContain("ACME-30 · Web");
   });
@@ -370,8 +463,8 @@ describe("Runs 화면", () => {
     const page = loadRunsPage(db, undefined, now);
     const canceled = rowTexts(render(page, { filter: "canceled" }));
     expect([...canceled.keys()]).toEqual(["ACME-13"]);
-    expect(canceled.get("ACME-13")?.[2]).toBe(domain.summary.canceled);
-    expect(canceled.get("ACME-13")?.[1]).toContain(domain.agentResult.canceled);
+    expect(canceled.get("ACME-13")?.pill).toBe(domain.summary.canceled);
+    expect(canceled.get("ACME-13")?.result).toContain(domain.agentResult.canceled);
     expect(rowTexts(render(page, { filter: "failed" })).has("ACME-13")).toBe(false);
   });
 
@@ -395,9 +488,9 @@ describe("Runs 화면", () => {
     expect(requestRunCancel(db, id, minutes(110)).ok).toBe(true);
     const page = loadRunsPage(db, undefined, now);
     const rows = rowTexts(render(page));
-    expect(rows.get("ACME-10")?.[1]).toContain(runsJson.cancelling);
-    expect(rows.get("ACME-10")?.[2]).toBe(domain.runState.running);
-    expect(rows.get("ACME-11")?.[1]).not.toContain(runsJson.cancelling);
+    expect(rows.get("ACME-10")?.result).toContain(runsJson.cancelling);
+    expect(rows.get("ACME-10")?.pill).toBe(domain.runState.running);
+    expect(rows.get("ACME-11")?.result).not.toContain(runsJson.cancelling);
     const text = panelText(render(page, { selectedId: id }));
     expect(text).toContain(runsJson.panel.cancelling);
     expect(text).toContain(runsJson.panel.cancellingReason);

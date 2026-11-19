@@ -154,6 +154,48 @@ describe("Runs 화면(브라우저, 0056)", () => {
     expect(panelBox.width).toBeGreaterThan(500);
   });
 
+  it("넓은 창에서는 열로 나눈 한 줄 행이 패널 바로 앞까지 채우고, 좁아지면 결과 → 러너 순으로 접는다(0101)", async (context) => {
+    const layoutAt = async (width: number) => {
+      const page = await newPage(context, { width, height: 900 });
+      await openRuns(page);
+      const row = page.getByRole("option", { name: runningKey });
+      await row.waitFor();
+      return page.evaluate((key) => {
+        const option = [...document.querySelectorAll('[role="option"]')].find((e) =>
+          e.textContent?.includes(key),
+        );
+        const list = document.querySelector('[role="listbox"]');
+        const panel = document.querySelector("main aside");
+        if (option === undefined || list === null || panel === null)
+          throw new Error("runs layout not found");
+        const shown = (selector: string) =>
+          [...option.querySelectorAll(selector)].some((e) => e.getBoundingClientRect().width > 0);
+        const listBox = list.getBoundingClientRect();
+        const panelBox = panel.getBoundingClientRect();
+        return {
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          gap: Math.round(panelBox.left - listBox.right),
+          result: shown('[data-hide-when="first"]'),
+          runner: shown('[data-hide-when="second"]'),
+          secondLine: shown('[data-folded-only="first"]'),
+          rowHeight: Math.round(option.getBoundingClientRect().height),
+        };
+      }, runningKey);
+    };
+
+    const wide = await layoutAt(1728);
+    expect(wide).toMatchObject({ overflow: 0, result: true, runner: true, secondLine: false });
+    expect(wide.gap).toBeLessThanOrEqual(64);
+
+    const middle = await layoutAt(1280);
+    expect(middle).toMatchObject({ overflow: 0, result: false, runner: false, secondLine: true });
+
+    for (const width of [900, 400]) {
+      const narrow = await layoutAt(width);
+      expect(narrow).toMatchObject({ overflow: 0, result: false, runner: false, secondLine: true });
+    }
+  });
+
   it("editor 변형(Settings)은 800px 에서 두 열이고 700px 에서 편집 영역이 아래로 내려간다", async (context) => {
     const boxes = async (width: number) => {
       const page = await newPage(context, { width, height: 900 });

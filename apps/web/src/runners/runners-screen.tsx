@@ -745,10 +745,7 @@ function runHref(workspaceId: string, runId: string): string {
 }
 
 const styles = stylex.create({
-  listColumn: {
-    maxWidth: size.runnerListMaxWidth,
-    minWidth: 0,
-  },
+  listColumn: { minWidth: 0 },
   rowHead: {
     display: "flex",
     flexWrap: "wrap",
