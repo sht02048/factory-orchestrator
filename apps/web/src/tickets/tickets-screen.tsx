@@ -25,6 +25,7 @@ import {
   TableRow,
   TableRows,
   Text,
+  VisuallyHidden,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -113,22 +114,32 @@ function AllWorkspaces({
   );
 }
 
+type RereadResult = "idle" | "reading" | "done" | "failed";
+
 function RereadButton({ onReread }: { onReread: () => Promise<void> }) {
   const t = useTranslations("tickets.reread");
-  const [reading, setReading] = useState(false);
+  const [result, setResult] = useState<RereadResult>("idle");
+  const reading = result === "reading";
   return (
-    <Button
-      variant="ghost"
-      aria-disabled={reading}
-      aria-busy={reading}
-      onClick={() => {
-        if (reading) return;
-        setReading(true);
-        void onReread().finally(() => setReading(false));
-      }}
-    >
-      {reading ? t("reading") : t("action")}
-    </Button>
+    <>
+      <Button
+        aria-disabled={reading}
+        aria-busy={reading}
+        onClick={() => {
+          if (reading) return;
+          setResult("reading");
+          onReread().then(
+            () => setResult("done"),
+            () => setResult("failed"),
+          );
+        }}
+      >
+        {reading ? t("reading") : t("action")}
+      </Button>
+      <VisuallyHidden>
+        <span role="status">{result === "done" || result === "failed" ? t(result) : ""}</span>
+      </VisuallyHidden>
+    </>
   );
 }
 

@@ -83,7 +83,10 @@ describe("Tickets 화면", () => {
   it("트래커 프로젝트가 있으면 머리 오른쪽에 트래커에서 다시 읽기를 두고, 없으면 두지 않는다(0122)", async () => {
     const { context } = setupTickets();
     const html = render(await loadTicketsPage(context, undefined, now));
-    expect(html).toMatch(/<button[^>]*>트래커에서 다시 읽기<\/button>/);
+    expect(html).toMatch(
+      /<button[^>]*data-variant="secondary"[^>]*>트래커에서 다시 읽기<\/button>/,
+    );
+    expect(html).toMatch(/<span role="status"><\/span>/);
 
     const empty = render({
       ...(await loadTicketsPage(context, undefined, now)),
