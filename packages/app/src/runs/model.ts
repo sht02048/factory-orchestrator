@@ -29,7 +29,8 @@ interface Cancellable {
 
 export type RunView =
   | (RunViewBase & Cancellable & { state: "queued"; queuedReason: QueuedReason })
-  | (RunViewBase & Cancellable & { state: "running" | "waiting-for-input" | "disconnected" })
+  | (RunViewBase & Cancellable & { state: "running" | "waiting-for-input" })
+  | (RunViewBase & Cancellable & { state: "disconnected"; paused: boolean })
   | (RunViewBase & Cancellable & { state: "paused"; pausedMs: number | null })
   | (RunViewBase & {
       state: "ended";

@@ -236,6 +236,7 @@ export interface ResumeAgentInput {
   model?: string;
   message: string;
   restartPrompt: string;
+  startIfGone?: boolean;
 }
 
 export interface ResumedAgent {

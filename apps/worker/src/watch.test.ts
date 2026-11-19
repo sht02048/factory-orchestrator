@@ -874,6 +874,36 @@ describe("멈추기·재개(0118)", () => {
     expect(stateOf(run)).toBe("paused");
   });
 
+  it("새 세션 시작 결과를 모르면 요청을 끝내지 않고, 다음 바퀴에 뜬 세션을 이어 받는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    await pause(run, worker);
+    h.runner(runnerId).vanish(worktreeOf(run));
+    h.runner(runnerId).loseNextResumeResponse = true;
+    expect(requestRunControl(h.db, run.id, "resume", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+    expect(getRunControlRequest(h.db, run.id)).toMatchObject({ status: "pending" });
+
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(getRunControlRequest(h.db, run.id)).toMatchObject({ status: "done" });
+    expect(agentOf(run, runnerId).resumes).toHaveLength(2);
+  });
+
+  it("결과를 모르는 재개 뒤 취소하면 뜬 세션을 이어 받아 멈추고 끝낸다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    await pause(run, worker);
+    h.runner(runnerId).vanish(worktreeOf(run));
+    h.runner(runnerId).loseNextResumeResponse = true;
+    expect(requestRunControl(h.db, run.id, "resume", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    requestRunCancel(h.db, run.id, h.now);
+    await worker.tick();
+    expect(ended(run).agentResult).toBe("canceled");
+    expect(agentOf(run, runnerId).agentStopped).toBe(true);
+    expect(agentOf(run, runnerId).resumes.at(-1)?.startIfGone).toBe(false);
+  });
+
   it("러너에 닿지 않으면 멈추기가 실패하고 그 이유를 남기며 Running 그대로 둔다", async () => {
     const { run, runnerId, worker } = await startOne();
     cutSsh(runnerId);

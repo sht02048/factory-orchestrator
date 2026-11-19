@@ -106,6 +106,7 @@ export function createWorker(options: WorkerOptions): Worker {
     unmarkedAnswers: new Set(),
     unmarkedDenials: new Set(),
     pendingEndings: new Map(),
+    resumesWithUnknownOutcome: new Set(),
     prPolledAt: new Map(),
     unrecordedComments: new Map(),
     ticketsGone: new Set(),

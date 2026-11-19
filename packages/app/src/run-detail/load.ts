@@ -130,6 +130,7 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date):
       return {
         state: "disconnected",
         unreachableSince: records.unreachableSince?.toISOString() ?? null,
+        paused: records.pausedSince !== null,
       };
     case "ended": {
       const outcome = summarizeRunOutcome(run);

@@ -1214,4 +1214,14 @@ describe("pauseAgent and resumeAgent", () => {
     expect(decodeAgent(resumed.agentRef)?.dispatchId).toBe("ctx_new");
     expect(retry.commands().some((command) => command.includes("worker-start"))).toBe(false);
   });
+
+  test("with startIfGone false a resume only adopts and never starts a new agent", async () => {
+    const exec = new ScriptedExec()
+      .orca("orchestration worker-show", shown({ liveness: "exited", terminal: null }))
+      .orca("orchestration worker-list", onlyOldWorker);
+    expect(
+      await adapterError(runnerWith(exec).resumeAgent(RUN, { ...resumeInput, startIfGone: false })),
+    ).toMatchObject({ kind: "runner-error", code: "agent_not_running" });
+    expect(exec.commands().some((command) => command.includes("worker-start"))).toBe(false);
+  });
 });

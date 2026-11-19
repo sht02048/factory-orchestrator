@@ -22,6 +22,7 @@ export async function processRunControlRequests(context: TickContext): Promise<v
   }
   for (const request of pending) {
     let failure: RunControlFailure | null;
+    let detail: RunnerErrorDetail | null = null;
     try {
       failure = await applyRunControl(context, request);
     } catch (error) {
@@ -30,8 +31,11 @@ export async function processRunControlRequests(context: TickContext): Promise<v
         control: request.control,
         error,
       });
-      failure = failureOf(runnerErrorDetail(error));
+      detail = runnerErrorDetail(error);
+      failure = failureOf(detail);
     }
+    if (keepTrying(context, request, detail)) continue;
+    context.resumesWithUnknownOutcome.delete(request.runId);
     tryWrite(context, request.runId, () =>
       completeRunControlRequest(context.db, {
         runId: request.runId,
@@ -43,6 +47,22 @@ export async function processRunControlRequests(context: TickContext): Promise<v
   }
 }
 
+function keepTrying(
+  context: TickContext,
+  request: PendingRunControlRequest,
+  detail: RunnerErrorDetail | null,
+): boolean {
+  if (request.control !== "resume" || detail === null) return false;
+  if (detail.kind === "start-outcome-unknown") {
+    context.resumesWithUnknownOutcome.add(request.runId);
+    return true;
+  }
+  return (
+    context.resumesWithUnknownOutcome.has(request.runId) &&
+    failureOf(detail) === "runner-unreachable"
+  );
+}
+
 async function applyRunControl(
   context: TickContext,
   request: PendingRunControlRequest,
@@ -51,7 +71,9 @@ async function applyRunControl(
   const run = getRunWithRecords(db, request.runId)?.run;
   if (run === undefined || run.state === "queued" || run.state === "ended") return "state-changed";
   if (!planRunControl(run.state, request.control).ok) return "state-changed";
-  if (hasPendingCancelRequest(db, run.id)) return "state-changed";
+  const cancelling = hasPendingCancelRequest(db, run.id);
+  const unknownResume = context.resumesWithUnknownOutcome.has(run.id);
+  if (cancelling && !unknownResume) return "state-changed";
   const stored = findRunner(db, run.runnerId);
   if (stored === undefined) return "runner-error";
   const runner = context.adapters.runner(stored);
@@ -68,6 +90,7 @@ async function applyRunControl(
     ...(run.model === null ? {} : { model: run.model }),
     message: messages.resume.message,
     restartPrompt: await restartPromptFor(context, run),
+    startIfGone: !cancelling,
   });
   return recorded(context, run, () =>
     changeRunState(db, run.id, { to: "running", resumedAgentRef: resumed.agentRef }, context.now()),

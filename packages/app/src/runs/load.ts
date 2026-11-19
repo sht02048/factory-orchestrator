@@ -168,12 +168,19 @@ export function loadRunsPage(
         };
       }
       case "waiting-for-input":
+        return {
+          ...base,
+          state: run.state,
+          cancelling: cancelling.has(run.id),
+          attention: true,
+        };
       case "disconnected":
         return {
           ...base,
           state: run.state,
           cancelling: cancelling.has(run.id),
           attention: true,
+          paused: records.pausedSince !== null,
         };
       case "ended": {
         const summary = summarizeRunOutcome(run).outcome;

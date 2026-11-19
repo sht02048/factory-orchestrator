@@ -210,6 +210,7 @@ export class FakeRunner implements Runner {
   providerUsage: ProviderUsageReading = { kind: "read", providers: [] };
   failNextStart: RunnerErrorDetail | null = null;
   failNextControl: RunnerErrorDetail | null = null;
+  loseNextResumeResponse = false;
   loseNextStartResponse = false;
   private readonly mailboxes = new Set<MailboxRef>();
   private seq = 0;
@@ -447,10 +448,25 @@ export class FakeRunner implements Runner {
       if (found.endedWithoutReport === null) {
         return { agentRef: found.started.agentRef, restarted: false };
       }
+      if (input.startIfGone === false) {
+        found.paused = true;
+        throw new AdapterError<RunnerErrorDetail>({
+          kind: "runner-error",
+          code: "agent_not_running",
+          message: "no agent session is running in the worktree",
+        });
+      }
       const agentRef = toAgentRef(`fake-agent-${this.next()}`);
       found.started = { ...found.started, agentRef };
       found.endedWithoutReport = null;
       found.agentStopped = false;
+      if (this.loseNextResumeResponse) {
+        this.loseNextResumeResponse = false;
+        throw new AdapterError<RunnerErrorDetail>({
+          kind: "start-outcome-unknown",
+          detail: "fake runner lost the resume response",
+        });
+      }
       return { agentRef, restarted: true };
     });
   }

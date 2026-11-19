@@ -638,6 +638,13 @@ export class OrcaRunner implements Runner {
     const mailbox = this.mailboxOf(run.mailbox);
     const adopted = await this.liveWorkerAt(run.worktree, mailbox.runId, agent.dispatchId);
     if (adopted !== null) return { agentRef: adopted, restarted: true };
+    if (input.startIfGone === false) {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "agent_not_running",
+        message: "no agent session is running in the worktree",
+      });
+    }
     let started: z.infer<typeof workerStartResultSchema>;
     try {
       started = await this.orca(

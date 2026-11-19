@@ -45,6 +45,7 @@ export type RunDetailStatus =
   | {
       state: "disconnected";
       unreachableSince: string | null;
+      paused: boolean;
     }
   | {
       state: "ended";

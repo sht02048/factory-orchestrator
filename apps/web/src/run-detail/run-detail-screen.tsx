@@ -273,6 +273,11 @@ function Reason({ run }: { run: RunDetail }) {
     case "waiting-for-input":
       return t(inputKey(status.input));
     case "disconnected":
+      if (status.paused) {
+        return status.unreachableSince === null
+          ? t("disconnectedPaused")
+          : t("disconnectedPausedSince", { time: clock(status.unreachableSince) });
+      }
       return status.unreachableSince === null
         ? t("disconnected")
         : t("disconnectedSince", { time: clock(status.unreachableSince) });

@@ -246,6 +246,13 @@ describe("Run 상세 화면", () => {
     );
     expect(text(html)).toContain(runJson.timeline.paused);
     expect(detail.executionMs).toBe(before - 30 * 60_000);
+
+    expect(changeRunState(db, id, { to: "disconnected" }, minutes(110))).toMatchObject({
+      ok: true,
+    });
+    const offline = text(render(page(db, id)));
+    expect(offline).toContain(runJson.reason.disconnectedPaused);
+    expect(offline).not.toContain(runJson.reason.disconnected);
   });
 
   it("질문으로 기다리는 런은 질문 내용, 선택지, 답하기 칸을 보인다", () => {
