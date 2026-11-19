@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Button,
   buttonStyles,
-  CapacityBar,
+  CapacityCells,
   Card,
   Field,
   GroupHeader,
@@ -34,7 +34,7 @@ import type {
   TodoGroup,
   TodoGroupKind,
 } from "./model";
-import { runnerIssues, todoGroups } from "./model";
+import { freeCapacity, runnerIssues, todoGroups } from "./model";
 import { subjectParticle } from "./particle";
 import { QuestionForm } from "./question-form";
 import type { Question, SendState } from "./question-form";
@@ -445,14 +445,26 @@ function ProgressRow({ run, all }: { run: HomeRun; all: boolean }) {
 
 function RunnersSection({ runners }: { runners: DashboardRunner[] }) {
   const t = useTranslations("home");
+  const { duration } = useTime();
   const issues = runnerIssues({ list: runners });
-  const names = (cause: "offline" | "auth") =>
-    issues.filter((runner) => runner.cause === cause).map((runner) => runner.name);
-  const offline = names("offline");
-  const auth = names("auth");
+  const offline = issues
+    .filter((runner) => runner.cause === "offline")
+    .map((runner) =>
+      runner.offlineMs === null
+        ? runner.name
+        : t("runners.offlineName", { name: runner.name, duration: duration(runner.offlineMs) }),
+    );
+  const auth = issues.filter((runner) => runner.cause === "auth").map((runner) => runner.name);
   return (
     <Card surface="plain" label={t("section.runners")}>
-      <Section title={t("section.runners")} titleRole="subheading" count={runners.length}>
+      <Section
+        title={t("section.runners")}
+        titleRole="subheading"
+        count={runners.length}
+        {...(runners.length === 0
+          ? {}
+          : { note: t("runners.free", { count: freeCapacity({ list: runners }) }) })}
+      >
         {runners.length === 0 ? (
           <Text variant="meta" as="p">
             {t("empty.runners")}
@@ -510,32 +522,24 @@ function runnerStatus(runner: DashboardRunner): PillStatus {
 function RunnerRow({ runner }: { runner: DashboardRunner }) {
   const t = useTranslations("home.runners");
   const statusName = useStatusName();
-  const { duration } = useTime();
   const status = runnerStatus(runner);
   return (
     <li data-runner={runner.id}>
       <Row
         href={href("/runners", { sel: runner.id })}
         leading={<StatusDot status={status}>{statusName(status)}</StatusDot>}
-      >
-        <span {...stylex.props(styles.runnerLine)}>
-          <span {...stylex.props(styles.runnerName)}>
-            <Text variant="title" truncate>
-              {runner.name}
-            </Text>
-            {runner.cause === "offline" && runner.offlineMs !== null ? (
-              <Text variant="meta" truncate>
-                {t("offlineFor", { duration: duration(runner.offlineMs) })}
-              </Text>
-            ) : null}
-          </span>
-          <CapacityBar
+        trailing={
+          <CapacityCells
             used={runner.used}
             total={runner.capacity}
-            label={t("capacity", { runner: runner.name })}
+            label={t("capacity", { used: runner.used, total: runner.capacity })}
             tone={runner.cause === null ? "progress" : "problem"}
           />
-        </span>
+        }
+      >
+        <Text variant="title" truncate>
+          {runner.name}
+        </Text>
       </Row>
     </li>
   );
@@ -874,14 +878,6 @@ const styles = stylex.create({
     maxWidth: "100%",
   },
   keyPart: { flexShrink: 0 },
-  runnerName: { display: "flex", flexDirection: "column", minWidth: 0 },
-  runnerLine: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-    alignItems: "center",
-    gap: space.s3,
-    minWidth: 0,
-  },
   reset: { margin: 0 },
   result: { flexShrink: 1, minWidth: 0, outline: "none" },
   layerForm: { display: "flex", flexDirection: "column", gap: space.s3, minWidth: 0 },

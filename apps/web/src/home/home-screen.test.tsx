@@ -395,24 +395,98 @@ describe("In progress", () => {
 });
 
 describe("Runners", () => {
-  it("러너마다 상태 점·이름·capacity 막대를 보이고 문제가 있으면 빨간 상자 하나를 둔다", () => {
+  it("러너마다 상태 점·이름·칸·숫자를 한 줄로 보이고 문제가 있으면 빨간 상자 하나를 둔다", () => {
     const html = section(render(seededPage()), "Runners");
     const offline = row(html, "runner-b");
     expect(dots(offline)).toEqual(["offline"]);
     expect(offline).toContain('href="/runners?sel=runner-b"');
-    expect(offline).toMatch(/role="meter"[^>]*aria-valuetext="0\/1"/);
-    expect(text(offline)).toContain("runner-b Offline · 2시간째");
+    expect(offline).toMatch(/role="img" aria-label="1자리 중 0자리 사용" data-tone="problem"/);
+    expect(text(offline)).toBe("Offline runner-b 0/1");
     const online = row(html, "runner-a");
     expect(dots(online)).toEqual(["online"]);
-    expect(online).toMatch(/role="meter"[^>]*aria-valuetext="4\/10"/);
+    expect(online).toMatch(/role="img" aria-label="10자리 중 4자리 사용" data-tone="progress"/);
     expect(html.indexOf("runner-b")).toBeLessThan(html.indexOf("runner-a"));
 
     expect([...html.matchAll(/<section aria-labelledby/g)]).toHaveLength(1);
     expect(html).toMatch(/<h3[^>]*>러너 1대에 문제가 있어요<\/h3>/);
-    expect(text(html)).toContain("Offline이에요: runner-b");
+    expect(text(html)).toContain("Offline이에요: runner-b(2시간째)");
     expect(html).toMatch(
       /<a href="\/runners" data-variant="secondary"[^>]*>Runners에서 고치기<\/a>/,
     );
+  });
+
+  it("칸 하나가 자리 하나이고, 쓰는 자리는 Online이면 초록·문제 러너면 빨강, 빈자리는 테두리만이다", () => {
+    const page = seededPage();
+    const html = section(
+      render({
+        ...page,
+        runners: {
+          list: [
+            { id: "r-half", name: "mac-half", cause: null, offlineMs: null, used: 2, capacity: 3 },
+            { id: "r-full", name: "mac-full", cause: null, offlineMs: null, used: 3, capacity: 3 },
+            {
+              id: "r-auth",
+              name: "mac-auth",
+              cause: "auth",
+              offlineMs: null,
+              used: 1,
+              capacity: 2,
+            },
+          ],
+        },
+      }),
+      "Runners",
+    );
+    const cells = (name: string) =>
+      [...row(html, name).matchAll(/data-cell="(used|free)"/g)].map((m) => m[1]);
+    expect(cells("mac-half")).toEqual(["used", "used", "free"]);
+    expect(cells("mac-full")).toEqual(["used", "used", "used"]);
+    expect(cells("mac-auth")).toEqual(["used", "free"]);
+    expect(row(html, "mac-half")).toContain('data-tone="progress"');
+    expect(row(html, "mac-auth")).toContain('data-tone="problem"');
+    expect(text(row(html, "mac-half"))).toBe("Online mac-half 2/3");
+  });
+
+  it("구역 머리에 Online이고 문제 없는 러너의 빈자리 합을 새 런 받을 자리로 보인다", () => {
+    const page = seededPage();
+    const html = section(
+      render({
+        ...page,
+        runners: {
+          list: [
+            { id: "r-half", name: "mac-half", cause: null, offlineMs: null, used: 2, capacity: 3 },
+            { id: "r-free", name: "mac-free", cause: null, offlineMs: null, used: 0, capacity: 2 },
+            { id: "r-over", name: "mac-over", cause: null, offlineMs: null, used: 3, capacity: 2 },
+            {
+              id: "r-off",
+              name: "mac-off",
+              cause: "offline",
+              offlineMs: 60_000,
+              used: 0,
+              capacity: 4,
+            },
+            {
+              id: "r-auth",
+              name: "mac-auth",
+              cause: "auth",
+              offlineMs: null,
+              used: 0,
+              capacity: 4,
+            },
+          ],
+        },
+      }),
+      "Runners",
+    );
+    expect(text(html)).toContain("Runners 5 새 런 받을 자리 3");
+    expect(text(section(render(seededPage()), "Runners"))).toContain("새 런 받을 자리 6");
+  });
+
+  it("러너가 없으면 새 런 받을 자리 줄을 두지 않는다", () => {
+    const page = seededPage();
+    const html = section(render({ ...page, runners: { list: [] } }), "Runners");
+    expect(text(html)).not.toContain("새 런 받을 자리");
+    expect(text(html)).toContain("아직 러너가 없어요.");
   });
 
   it("GitHub 인증이 깨진 러너는 Runner Issue 점과 인증 까닭으로 보인다", () => {

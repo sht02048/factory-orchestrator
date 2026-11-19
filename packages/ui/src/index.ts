@@ -30,6 +30,12 @@ export {
   type CapacityTone,
 } from "./components/capacity-bar";
 export {
+  CAPACITY_CELLS_MAX,
+  CapacityCells,
+  showsCapacityCells,
+  type CapacityCellsProps,
+} from "./components/capacity-cells";
+export {
   Card,
   Row,
   SURFACE_ROLES,
