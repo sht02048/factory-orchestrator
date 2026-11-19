@@ -18,7 +18,7 @@ DB에서 바뀐 것을 열린 웹 화면이 몇 초 안에 알게 한다. 바꾸
 ## 할 일
 
 1. **표.** `packages/db`에 `change_events`(`seq` 단조 증가, `kind`, `target_id`, `workspace_id`, `at`)와 마이그레이션을 더한다. `kind`는 `run`, `runner`, `assignment`, `workspace`, `settings`, `tracker`다(C12). `at`에 지우기용 색인을 둔다.
-2. **쓰는 곳(같은 트랜잭션).** `packages/db`의 쓰기 함수 안에서 줄을 써서 web·worker·MCP 어느 프로세스가 불러도 빠지지 않게 한다. 스펙 5.2의 표를 따른다.
+2. **쓰는 곳(같은 트랜잭션, 바뀐 것이 있을 때만).** worker가 주기마다 부르는 쓰기 함수(`recordRunQuestions`, `recordPermissionWaits`, `recordRunnerCheck`, `recordProviderUsage`)는 바뀐 행이 없거나 화면에 보이는 값이 그대로면 줄을 쓰지 않는다(스펙 5.2). `packages/db`의 쓰기 함수 안에서 줄을 써서 web·worker·MCP 어느 프로세스가 불러도 빠지지 않게 한다. 스펙 5.2의 표를 따른다.
    - run: 상태 바뀜과 Paused, PR·CI 바뀜, Question·Permission 생김과 답·거절, 취소·멈추기·재개·로그 요청과 처리 결과, 티켓 제목 채움. 0120이 더한 쓰는 곳도 찾는다.
    - runner: 점검 결과와 Online/Offline, 공급자 사용량, 러너 저장·capacity, Mailbox Terminal(`setRunnerMailbox`).
    - assignment: 새 런(자동, 수동, MCP).
@@ -28,7 +28,7 @@ DB에서 바뀐 것을 열린 웹 화면이 몇 초 안에 알게 한다. 바꾸
    - "Linear에서 다시 읽기"는 지금 클라이언트의 `router.invalidate()`뿐이다. `tracker` 줄을 쓰는 서버 동작을 더한다(0122가 서버 캐시를 비우는 동작을 먼저 만들었으면 거기에 붙인다). 이 줄과 라벨 만들기의 `tracker` 줄은 트래커 API 호출 뒤에 쓰며, DB 트랜잭션에 묶이지 않는다.
    - web의 변경 기록 읽기가 `tracker` 줄을 보면 브라우저에 보내기 전에 0122의 그 연결 서버 캐시를 비운다(스펙 5.2). 0122가 아직 없으면 0122가 이 연결을 만든다.
    - worker가 트래커를 바꾸는 일(`apps/worker/src/after-run.ts`의 `markInProgress`, 댓글)도 `tracker` 줄을 쓴다.
-   - 표에 없는 쓰기 함수(`setQueuedRunRunner`, `recordStartRequested`, `recordStartFailure`, `recordRunQuestions`, `recordPermissionWaits`, `saveCodeHostConnection`, `recordMcpAction`)도 하나씩 본다. 잠자기 설정은 DB 밖이라 저장 뒤 `settings` 줄을 따로 쓴다.
+   - 표에 없는 쓰기 함수(`setQueuedRunRunner`, `recordStartRequested`, `recordStartFailure`, `recordRunQuestions`, `recordPermissionWaits`, `saveCodeHostConnection`, `recordMcpAction`, 점검 요청 `requestRunnerCheckSetting`, Run 상세가 보이는 트래커 프로젝트 이름을 바꾸는 Settings 쓰기)도 하나씩 본다. 잠자기 설정은 DB 밖이라 저장 뒤 `settings` 줄을 따로 쓴다.
    - MCP 프로세스(`ganger mcp`)의 쓰기도 같은 함수를 지나 줄을 남기는지 시험으로 확인한다.
 3. **통로 `/api/change-events/stream`.** `apps/web/src/routes/api/`에 둔다. web 프로세스 하나가 1초마다 마지막 번호 뒤의 줄을 읽어 열린 연결 모두에 보낸다. 메시지는 `change`(`id`=`seq`, `{ kind, targetId, workspaceId }`), `ready`, `reset`, 15초 하트비트, `retry`. `Last-Event-ID`(또는 `?after=`)로 이어 받고, 이어 받을 수 없으면 `reset`을 보낸다(C11, 스펙 5.3). 받은 번호가 지운 번호의 상한(표에 줄이 있으면 남은 가장 작은 번호 − 1, 비었으면 `sqlite_sequence`)보다 작을 때와, 지금 가장 큰 번호보다 클 때(DB 파일을 되돌림)다. 표가 비어 있어도 판단할 수 있어야 한다. 요청 검사(Host·Origin)는 다른 웹 경로와 같다.
 4. **지우기.** 하루 지난 줄을 지운다(C9). 열린 연결 수와 상관없이 정한 주기로 돈다. 주기를 정해 적는다.
@@ -42,6 +42,8 @@ DB에서 바뀐 것을 열린 웹 화면이 몇 초 안에 알게 한다. 바꾸
 ## 완료 조건
 
 - [ ] 시험: 2번의 쓰기 함수마다 같은 트랜잭션에서 `change_events` 줄이 생기고, 트랜잭션이 롤백되면 줄도 없다.
+- [ ] 시험: 바뀌는 것이 없는 호출(같은 Question을 다시 기록, 같은 점검 결과)은 줄을 남기지 않는다.
+- [ ] 시험: 표가 비어 있을 때 첫 연결의 번호(`max(가장 큰 seq, sqlite_sequence)`)로는 `reset`이 나지 않는다.
 - [ ] 시험: MCP 쓰기 도구로 바꾼 것도 줄을 남긴다.
 - [ ] 시험: 통로가 `Last-Event-ID` 뒤의 줄부터 보낸다. 지운 번호(표가 빈 경우 포함)와 지금보다 큰 번호면 `reset`을 보낸다. 하루 지난 줄을 지운다.
 - [ ] 시험: 오류 변환 함수가 `{ ok: false, reason }`과 throw한 오류를 같은 타입으로 바꾸고 이유를 지킨다.
