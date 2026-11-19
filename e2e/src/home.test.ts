@@ -195,19 +195,22 @@ describe("Dashboard 상세 패널(브라우저, 0100)", () => {
     expect(await focusedSoon(cardButton(page, "ACME-1"))).toBe(true);
   });
 
-  it("선택지를 골라도 보내지 않고, 보내기를 눌러야 보낸 뒤 결과를 status 로 알린다", async () => {
+  it("고르기 전 보내기는 고르라고 알리고, 골라도 보내지 않으며, 보내기를 눌러야 보낸 뒤 결과를 status 로 알린다", async () => {
     await openHome(page);
     await card(page, "ACME-4").getByRole("button", { name: home.card.answer }).click();
     const panel = page.getByRole("dialog");
     const send = panel.getByRole("button", { name: questionJson.send });
-    expect(await send.isDisabled()).toBe(true);
-
     const posts: string[] = [];
     page.on("request", (request) => {
       if (request.method() === "POST") posts.push(request.url());
     });
+
+    await send.click();
+    await panel.getByRole("alert").getByText(questionJson.pick).waitFor();
+    expect(await focusedSoon(panel.getByRole("radio", { name: "Yes" }))).toBe(true);
     await panel.getByRole("radio", { name: "No" }).check();
     await panel.getByRole("radio", { name: "Yes" }).check();
+    expect(await panel.getByText(questionJson.pick).count()).toBe(0);
     await page.waitForTimeout(500);
     expect(posts).toEqual([]);
     expect(unansweredQuestions("ACME-4")).toEqual(["q-4"]);
@@ -242,6 +245,9 @@ describe("Dashboard 상세 패널(브라우저, 0100)", () => {
     const input = panel.getByLabel(questionJson.answerLabel);
     expect(await focusedSoon(input)).toBe(true);
     expect(await panel.getByRole("radio").count()).toBe(0);
+    await page.keyboard.press("ControlOrMeta+Enter");
+    await panel.getByRole("alert").getByText(questionJson.empty).waitFor();
+    expect(unansweredQuestions("ACME-6")).toEqual(["q-6"]);
     await input.fill("Ship it on Friday.");
     await page.keyboard.press("ControlOrMeta+Enter");
     await panel.getByRole("status").getByText(home.question.answered).waitFor();

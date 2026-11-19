@@ -422,7 +422,7 @@ describe("모든 Workspace 보기(0066)", () => {
 });
 
 describe("질문 레이어", () => {
-  it("질문, 선택지 라디오, 마지막 직접 쓰기를 보이고 고르기 전에는 보내기가 꺼져 있다", () => {
+  it("질문, 선택지 라디오, 마지막 직접 쓰기를 보이고 고르기 전에는 고르라고 안내한다", () => {
     const html = renderForm(question);
     expect(html).toMatch(/<p[^>]*>재시도 간격을 바꿀까요\?<\/p>/);
     const labelledBy = /role="radiogroup" aria-labelledby="([^"]+)"/.exec(html)?.[1];
@@ -430,9 +430,7 @@ describe("질문 레이어", () => {
     const radios = [...html.matchAll(/<input type="radio"[^>]*>\s*<span[^>]*>([^<]+)<\/span>/g)];
     expect(radios.map((m) => m[1])).toEqual([...question.choices, questionJson.other]);
     expect(html).not.toContain("checked");
-    expect(html).toMatch(
-      /<button[^>]*data-variant="primary"[^>]*disabled=""[^>]*>보내기<\/button>/,
-    );
+    expect(html).toMatch(/<button[^>]*data-variant="primary"[^>]*>보내기<\/button>/);
     expect(text(html)).toContain(questionJson.pick);
     expect(html).not.toContain("<textarea");
   });

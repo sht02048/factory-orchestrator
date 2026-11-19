@@ -250,6 +250,7 @@ export function BlockSections() {
                   otherPlaceholder: t("question.otherPlaceholder"),
                   answerLabel: t("question.answerLabel"),
                   pick: t("question.pick"),
+                  empty: t("question.empty"),
                   note: t("question.sendNote"),
                   shortcut: t("question.shortcut"),
                   send: t("question.send"),

@@ -9,6 +9,7 @@ const labels: QuestionFormLabels = {
   otherPlaceholder: "Type an answer",
   answerLabel: "Answer",
   pick: "Pick one",
+  empty: "Write an answer",
   note: "Sends right away",
   shortcut: "Cmd Enter sends",
   send: "Send",
@@ -43,7 +44,8 @@ describe("QuestionForm(티켓 0116)", () => {
     );
     expect(html).toContain(">Write my own<");
     expect(html.indexOf("I suggest B.")).toBeGreaterThan(html.indexOf("Write my own"));
-    expect(html).toMatch(/<button[^>]*data-variant="primary"[^>]*disabled=""[^>]*>Send<\/button>/);
+    expect(html).toMatch(/<button[^>]*data-variant="primary"[^>]*>Send<\/button>/);
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Send/);
     expect(html).toContain(">Pick one<");
   });
 
@@ -55,6 +57,11 @@ describe("QuestionForm(티켓 0116)", () => {
     expect(html).toContain("<textarea");
     expect(html).toContain(">Answer<");
     expect(html).toContain(">Cmd Enter sends<");
+    const describedBy =
+      /<textarea[^>]*aria-describedby="([^"]+)"/.exec(html)?.[1]?.split(" ") ?? [];
+    const leadId = /<div id="([^"]+)"[^>]*><p/.exec(html)?.[1];
+    expect(describedBy[0]).toBe(leadId);
+    expect(describedBy).toHaveLength(3);
   });
 
   it("ask 의 선택지는 글자 없이 그대로 보인다", () => {

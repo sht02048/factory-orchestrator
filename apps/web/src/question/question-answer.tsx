@@ -24,6 +24,7 @@ export function QuestionAnswer({
         otherPlaceholder: t("otherPlaceholder"),
         answerLabel: t("answerLabel"),
         pick: t("pick"),
+        empty: t("empty"),
         note: t("note"),
         shortcut: t("shortcut"),
         send: t("send"),

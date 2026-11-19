@@ -403,6 +403,7 @@
       "otherPlaceholder": "에이전트에게 보낼 답을 써 주세요",
       "answerLabel": "답",
       "pick": "답을 하나 골라 주세요",
+      "empty": "답을 써 주세요",
       "sendNote": "보낸 답은 바로 에이전트에게 전해져요",
       "shortcut": "⌘ Enter로 보낼 수 있어요",
       "send": "보내기",
