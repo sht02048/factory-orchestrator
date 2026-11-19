@@ -257,6 +257,9 @@ describe("Mapping 여러 저장소와 즉시 저장(브라우저, 0115)", () => 
         .getByRole("button", { name: fill(settings.mapping.removeLabel, { repo: "acme/api" }) })
         .count(),
     ).toBe(0);
+    expect(
+      await page.evaluate(() => document.activeElement?.closest('[role="group"]') !== null),
+    ).toBe(true);
     await page.unroute("**/_serverFn/**", fail);
     expect(savedRepos().map((r) => r.project)).toEqual(["fake:acme/web"]);
   });

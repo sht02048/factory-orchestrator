@@ -6,11 +6,10 @@ import { useId, useState } from "react";
 import { useTranslations } from "use-intl";
 import { AUTO_ASSIGN_LABEL_NAME, findLabelNamed } from "@ganger/core";
 import type { Choice, ConnectionLabel } from "@ganger/app/settings/model";
-import { ReloadFromTracker, SaveStatusText, useLabelCreatedToast } from "./mapping-editor";
+import { ReloadFromTracker, useLabelCreatedToast } from "./mapping-editor";
 import { useReason } from "./settings-screen";
 import type { ActionResult, SettingsActions } from "./settings-screen";
 import { useSyncedSave } from "./synced-save";
-import type { SaveStatus } from "./synced-save";
 
 export const CREATE_LABEL = "\u0000create";
 
@@ -62,6 +61,7 @@ export function AutoAssignLabelPicker({
   showReload?: boolean;
 }) {
   const t = useTranslations("settings.label");
+  const ts = useTranslations("settings.mapping.status");
   const labelReason = useLabelReason();
   const toast = useLabelCreatedToast();
   const goneId = useId();
@@ -117,18 +117,23 @@ export function AutoAssignLabelPicker({
     );
   };
 
-  const status: SaveStatus | "creating" =
+  const statusText =
     creating.kind === "sending"
-      ? "creating"
+      ? t("creating")
       : creating.kind === "failed"
-        ? "reverted"
-        : save.status;
-  const failure =
+        ? t("createFailedStatus")
+        : save.status === "idle"
+          ? null
+          : ts(save.status);
+  const failureText =
     creating.kind === "failed"
-      ? creating.reason
+      ? creating.reason === "rejected"
+        ? t("rejected")
+        : t("createFailed", { name: AUTO_ASSIGN_LABEL_NAME, reason: labelReason(creating.reason) })
       : save.state.kind === "failed"
-        ? save.state.reason
+        ? labelReason(save.state.reason)
         : null;
+  const problem = creating.kind === "failed" || save.status === "reverted";
 
   return (
     <div {...stylex.props(styles.picker)}>
@@ -147,13 +152,9 @@ export function AutoAssignLabelPicker({
             placeholder={t("choose")}
           />
         </span>
-        {status === "creating" ? (
-          <Text variant="meta" role="status">
-            {t("creating")}
-          </Text>
-        ) : (
-          <SaveStatusText status={status} />
-        )}
+        <Text variant="meta" role="status" {...(problem ? { tone: "problem" } : {})}>
+          {statusText}
+        </Text>
         {showReload ? <ReloadFromTracker onReload={actions.reloadFromTracker} /> : null}
       </div>
       {label.labels.ok ? null : (
@@ -166,9 +167,9 @@ export function AutoAssignLabelPicker({
           {t("gone", { name: AUTO_ASSIGN_LABEL_NAME })}
         </Text>
       ) : null}
-      {failure === null ? null : (
+      {failureText === null ? null : (
         <Text variant="ui" as="p" tone="problem" role="alert">
-          {labelReason(failure)}
+          {failureText}
         </Text>
       )}
     </div>

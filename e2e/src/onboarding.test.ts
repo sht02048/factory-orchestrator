@@ -166,7 +166,7 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
       await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
     ).toBeLessThanOrEqual(0);
 
-    await card.getByRole("button", { name: "Web에 저장소 더하기" }).click();
+    await card.getByRole("button", { name: "Web의 기본 저장소 고르기" }).click();
     await page.getByRole("menuitem", { name: "acme/web", exact: true }).click();
     await card.getByText(settings.mapping.needAgent).waitFor();
     await card.getByRole("combobox", { name: settings.mapping.agent }).click();

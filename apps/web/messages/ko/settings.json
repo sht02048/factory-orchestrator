@@ -98,15 +98,15 @@
     "repos": "저장소",
     "default": "기본",
     "defaultRoute": "맞는 라벨이 없는 티켓은 모두 여기로 가요",
-    "repoLabel": "{repo}로 보낼 라벨",
+    "repoLabel": "{repo} 라벨",
     "noLabel": "라벨 없음",
     "noLabelRoute": "라벨이 없어 할당 창에서 고를 때만 가요",
     "labelUsed": "{label} · {repo}에 붙어 있어요",
     "labelMissing": "Linear에 없는 라벨",
-    "labelGone": "Linear에 없어요. 라벨을 다시 고르기 전에는 이 저장소로 라벨로 보내지 않아요.",
+    "labelGone": "Linear에 없어요. 다른 라벨을 고르기 전까지 라벨로는 이 저장소에 보내지 않아요.",
     "labelsFailed": "Linear에서 라벨을 읽지 못했어요. {reason}",
     "makeDefault": "기본으로 바꾸기",
-    "makeDefaultLabel": "{repo}를 기본으로 바꾸기",
+    "makeDefaultLabel": "{repo} 기본으로 바꾸기",
     "remove": "빼기",
     "removeLabel": "{repo} 빼기",
     "add": "저장소 더하기",
@@ -134,7 +134,8 @@
     "reloading": "읽는 중…",
     "reloaded": "Linear에서 다시 읽었어요",
     "reloadFailed": "다시 읽지 못했어요. 잠시 뒤 다시 해 주세요.",
-    "revertedRetry": "저장하지 못해 원래대로 되돌렸어요. 연결을 확인하고 다시 골라 주세요."
+    "revertedRetry": "저장하지 못해 원래대로 되돌렸어요. 연결을 확인하고 다시 골라 주세요.",
+    "addFirstLabel": "{project}의 기본 저장소 고르기"
   },
   "progress": {
     "hint": "런이 실제로 시작될 때 티켓을 이 상태로 바꿔요. 상태는 트래커 프로젝트마다 달라요.",
@@ -155,7 +156,9 @@
     "picked": "{name} 라벨을 골랐어요",
     "gone": "Linear에 없어요. 이 라벨로는 더 할당하지 않아요. 다른 라벨을 고르거나 {name} 라벨을 만들어 주세요.",
     "rejected": "Linear가 라벨 만들기를 거절했어요. 워크스페이스 라벨을 만들 권한이 있는지 확인해 주세요.",
-    "selectFor": "{connection}의 Auto-assign Label"
+    "selectFor": "{connection}의 Auto-assign Label",
+    "createFailedStatus": "만들지 못했어요",
+    "createFailed": "{name} 라벨을 만들지 못했어요. {reason}"
   },
   "connections": {
     "hint": "모든 Workspace가 함께 써요. Workspace는 어느 연결의 트래커 프로젝트든 고를 수 있어요.",

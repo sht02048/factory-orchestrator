@@ -1211,11 +1211,17 @@ function MappingStep({
       {workspace.labels.map((label) => (
         <Card key={label.connection.id}>
           <div {...stylex.props(styles.stackTight)}>
-            <span {...stylex.props(styles.rowHeaderText)}>
-              <Text variant="ui" tone="strong">
-                {t("labelTitle")} <Text variant="meta">· {label.connection.name}</Text>
-              </Text>
-              <Text variant="meta">{t("labelHint")}</Text>
+            <span {...stylex.props(styles.mappingHeading)}>
+              <CheckTick
+                done={label.labelId !== null}
+                label={label.labelId !== null ? t("rowDone") : t("rowEmpty")}
+              />
+              <span {...stylex.props(styles.rowHeaderText)}>
+                <Text variant="ui" tone="strong">
+                  {t("labelTitle")} <Text variant="meta">· {label.connection.name}</Text>
+                </Text>
+                <Text variant="meta">{t("labelHint")}</Text>
+              </span>
             </span>
             <AutoAssignLabelPicker
               ws={workspace.general.id}

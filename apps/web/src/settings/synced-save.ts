@@ -44,10 +44,11 @@ export function useSyncedSave<V>({
       },
     }),
   );
-  const sending = state.kind === "sending";
+  const sending = useRef(false);
+  sending.current = state.kind === "sending";
   useEffect(() => {
-    if (!sending) setDraft(latest.current.saved);
-  }, [savedKey, sending]);
+    if (!sending.current) setDraft(latest.current.saved);
+  }, [savedKey]);
   return {
     draft,
     setDraft,

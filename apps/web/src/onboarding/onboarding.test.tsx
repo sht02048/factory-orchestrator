@@ -599,7 +599,7 @@ describe("다섯 단계를 마치기", () => {
     expect(shown).toContain("시작하면 옮길 상태");
     expect(shown).toContain("Auto-assign Label");
     expect(table).toContain('aria-label="Web Mapping"');
-    expect(table).toContain('aria-label="Web에 저장소 더하기"');
+    expect(table).toContain('aria-label="Web의 기본 저장소 고르기"');
     expect(table).toContain('aria-label="Acme의 Auto-assign Label"');
     expect(table).not.toContain('name="model"');
     expect(shown).not.toContain(settingsMessages.settings.mapping.model);

@@ -95,6 +95,7 @@ export function MappingEditor({
   const [model, setModel] = useState(draft.model);
   useEffect(() => setModel(draft.model), [draft.model]);
 
+  const editorRef = useRef<HTMLDivElement>(null);
   const addRef = useRef<HTMLSpanElement>(null);
   const actionRefs = useRef(new Map<string, HTMLSpanElement>());
   const [focusAfter, setFocusAfter] = useState<FocusAfterChange>(null);
@@ -117,6 +118,16 @@ export function MappingEditor({
   const nameOf = (id: string) => runnerProjects.find((p) => p.id === id)?.name ?? id;
   const addable = runnerProjects.filter((p) => !draft.repos.some((repo) => repo.id === p.id));
   const failure = save.state.kind === "failed" ? save.state.reason : null;
+  useEffect(() => {
+    if (failure === null) return;
+    const editor = editorRef.current;
+    if (editor === null || editor.contains(document.activeElement)) return;
+    const control =
+      actionRefs.current.get(statusTarget)?.querySelector("button") ??
+      addRef.current?.querySelector("button") ??
+      editor.querySelector("button");
+    control?.focus();
+  }, [failure, statusTarget]);
   useReportUnsaved(
     (!isCompleteDraft(draft) && mappingDraftKey(draft) !== mappingDraftKey(saved)) ||
       model.trim() !== draft.model,
@@ -142,7 +153,7 @@ export function MappingEditor({
   };
 
   return (
-    <div role="group" aria-labelledby={headingId} {...stylex.props(styles.editor)}>
+    <div ref={editorRef} role="group" aria-labelledby={headingId} {...stylex.props(styles.editor)}>
       <div {...stylex.props(styles.header)}>
         <span id={headingId}>{heading}</span>
         <SaveStatusText status={statusTarget === MAPPING_TARGET ? save.status : "idle"} />
@@ -184,7 +195,11 @@ export function MappingEditor({
         {addable.length === 0 ? null : (
           <span ref={addRef} {...stylex.props(styles.add)}>
             <Menu
-              label={t("addLabel", { project: bound.project.name })}
+              label={
+                draft.repos.length === 0
+                  ? t("addFirstLabel", { project: bound.project.name })
+                  : t("addLabel", { project: bound.project.name })
+              }
               {...(draft.repos.length === 0 && missing !== null ? { describedBy: missingId } : {})}
               trigger={draft.repos.length === 0 ? t("addFirst") : t("add")}
             >
@@ -436,7 +451,7 @@ const styles = stylex.create({
   add: { display: "block", maxWidth: size.repoSelectWidth },
   fields: {
     display: "grid",
-    gridTemplateColumns: `repeat(auto-fit, minmax(${size.fieldMinWidth}, 1fr))`,
+    gridTemplateColumns: `repeat(auto-fit, minmax(min(${size.fieldMinWidth}, 100%), 1fr))`,
     gap: space.s3,
   },
   reload: { display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },

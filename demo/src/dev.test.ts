@@ -99,10 +99,11 @@ describe("pnpm dev", () => {
         await main.getByRole("combobox").nth(index).click();
         await page.getByRole("option", { name: option, exact: true }).click();
       };
-      await choose(0, "acme/web");
-      await choose(1, "Claude Code");
-      await choose(2, "In Progress");
-      await choose(3, "factory");
+      await main.getByRole("button", { name: "Web의 기본 저장소 고르기" }).click();
+      await page.getByRole("menuitem", { name: "acme/web", exact: true }).click();
+      await choose(0, "Claude Code");
+      await choose(1, "In Progress");
+      await choose(2, "factory");
       const finish = page.getByRole("button", { name: onboarding.finish });
       await enabled(finish);
       await finish.click();

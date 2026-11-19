@@ -106,6 +106,7 @@ export async function loadTicketsPage(
 
   const errors: TrackerLoadError[] = [];
   const truncated: TrackerTruncation[] = [];
+  const labelNames = new Map<string, string>();
   const results = await Promise.all(
     projects.map(async (project) => {
       try {
@@ -114,8 +115,12 @@ export async function loadTicketsPage(
           errors.push({ trackerProject: project.name, reason: "unknown-connection" });
           return [];
         }
-        const { tickets, more } = await readProjectTickets(tracker, project);
+        const [{ tickets, more }, labels] = await Promise.all([
+          readProjectTickets(tracker, project),
+          tracker.listLabels(project.projectId).catch(() => []),
+        ]);
         if (more) truncated.push({ trackerProject: project.name, limit: tickets.length });
+        for (const label of labels) labelNames.set(label.id, label.name);
         return tickets.map((ticket) => ({ project, ticket }));
       } catch (error) {
         errors.push({ trackerProject: project.name, reason: loadErrorReason(error) });
@@ -134,7 +139,6 @@ export async function loadTicketsPage(
     return label;
   };
 
-  const labelNames = new Map<string, string>();
   for (const { ticket } of results.flat()) {
     for (const label of ticket.labels) labelNames.set(label.id, label.name);
   }
