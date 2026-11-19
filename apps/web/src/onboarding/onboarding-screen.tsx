@@ -21,6 +21,8 @@ import {
   StepNavItem,
   Text,
   VisuallyHidden,
+  WindowDragFrame,
+  useTitleBarHidden,
   buttonStyles,
   focusStyles,
   linkStyles,
@@ -129,59 +131,62 @@ export function OnboardingScreen({
     titleRef.current?.focus();
   }, [index]);
   const lockedId = useId();
+  const titleBarHidden = useTitleBarHidden();
 
   return (
-    <div {...stylex.props(styles.page)}>
-      <StepList page={page} index={index} onStep={onStep} />
-      <main {...stylex.props(styles.column)}>
-        <div {...stylex.props(styles.heading)}>
-          {index === 0 ? <Mascot mood="default" size="small" /> : null}
-          <Text variant="label" numeric>
-            {t("eyebrow", {
-              step: index + 1,
-              total: ONBOARDING_STEPS.length,
-              name: t(`steps.${step}.name`),
-            })}
-          </Text>
-          <Text variant="page">
-            <FocusTarget ref={titleRef}>{t(`steps.${step}.title`)}</FocusTarget>
-          </Text>
-          <Text variant="body">{t(`steps.${step}.description`)}</Text>
-        </div>
-        <div key={step} {...stylex.props(styles.body)}>
-          <StepBody
-            step={step}
-            page={page}
-            trackerProjects={trackerProjects}
-            actions={actions}
-            workerSilent={workerSilent}
-            direct={direct}
-          />
-        </div>
-        <div {...stylex.props(styles.footer)}>
-          {index > 0 ? (
-            <Button variant="secondary" onClick={() => onStep(index - 1)}>
-              {t("back")}
-            </Button>
-          ) : null}
-          <div {...stylex.props(styles.footerEnd)}>
-            {passed ? null : (
-              <Text variant="meta" id={lockedId}>
-                {t("nextLocked")}
-              </Text>
-            )}
-            <Button
-              variant={passed ? "primary" : "secondary"}
-              disabled={!passed}
-              {...(passed ? {} : { "aria-describedby": lockedId })}
-              onClick={() => (last ? onFinish() : onStep(index + 1))}
-            >
-              {last ? t("finish") : t("next")}
-            </Button>
+    <WindowDragFrame>
+      <div {...stylex.props(styles.page, titleBarHidden && styles.pageBelowTitleBar)}>
+        <StepList page={page} index={index} onStep={onStep} />
+        <main {...stylex.props(styles.column)}>
+          <div {...stylex.props(styles.heading)}>
+            {index === 0 ? <Mascot mood="default" size="small" /> : null}
+            <Text variant="label" numeric>
+              {t("eyebrow", {
+                step: index + 1,
+                total: ONBOARDING_STEPS.length,
+                name: t(`steps.${step}.name`),
+              })}
+            </Text>
+            <Text variant="page">
+              <FocusTarget ref={titleRef}>{t(`steps.${step}.title`)}</FocusTarget>
+            </Text>
+            <Text variant="body">{t(`steps.${step}.description`)}</Text>
           </div>
-        </div>
-      </main>
-    </div>
+          <div key={step} {...stylex.props(styles.body)}>
+            <StepBody
+              step={step}
+              page={page}
+              trackerProjects={trackerProjects}
+              actions={actions}
+              workerSilent={workerSilent}
+              direct={direct}
+            />
+          </div>
+          <div {...stylex.props(styles.footer)}>
+            {index > 0 ? (
+              <Button variant="secondary" onClick={() => onStep(index - 1)}>
+                {t("back")}
+              </Button>
+            ) : null}
+            <div {...stylex.props(styles.footerEnd)}>
+              {passed ? null : (
+                <Text variant="meta" id={lockedId}>
+                  {t("nextLocked")}
+                </Text>
+              )}
+              <Button
+                variant={passed ? "primary" : "secondary"}
+                disabled={!passed}
+                {...(passed ? {} : { "aria-describedby": lockedId })}
+                onClick={() => (last ? onFinish() : onStep(index + 1))}
+              >
+                {last ? t("finish") : t("next")}
+              </Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    </WindowDragFrame>
   );
 }
 
@@ -1324,6 +1329,7 @@ const styles = stylex.create({
     paddingBottom: space.s10,
     boxSizing: "border-box",
   },
+  pageBelowTitleBar: { minHeight: `calc(100dvh - ${size.titleBar})`, paddingTop: space.s4 },
   column: {
     display: "flex",
     flexDirection: "column",

@@ -8,6 +8,7 @@ import {
 } from "@ui-sdk/react/dialog";
 import type { ReactNode } from "react";
 import { cx } from "../cx";
+import { windowRegion } from "../window-frame";
 import { buttonStyles } from "./button";
 import { textStyles } from "./text";
 import { colors, fontSize, lineHeight, motion, shadow, size, space } from "../tokens.stylex";
@@ -37,8 +38,9 @@ export function Sheet({
 }: SheetProps) {
   return (
     <SdkDialog open={open} onOpenChange={(next: boolean) => onOpenChange(next)}>
-      <DialogBackdrop className={cx(styles.backdrop)} />
+      <DialogBackdrop {...windowRegion("no-drag")} className={cx(styles.backdrop)} />
       <DialogContent
+        {...windowRegion("no-drag")}
         {...(initialFocus === undefined ? {} : { initialFocus })}
         {...(finalFocus === undefined ? {} : { finalFocus })}
         className={cx(styles.content)}
