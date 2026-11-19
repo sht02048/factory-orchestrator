@@ -36,7 +36,7 @@ blocked_by: [0124]
 ## 완료 조건
 
 - [ ] 시험: 서버 렌더한 화면에서 hydration이 끝날 때까지 이 화면의 서버 함수를 다시 부르지 않는다.
-- [ ] 시험: mutation 하나 뒤 다시 읽는 서버 함수가 그 mutation이 바꾼 query뿐이다. 루트(`getTimeZone`, `getTitleBarHidden`)와 셸(`getShell`)은 다시 읽지 않는다.
+- [ ] 시험: mutation 하나 뒤 다시 읽는 서버 함수가 그 mutation이 바꾼 query뿐이다. 루트(`getTimeZone`, `getTitleBarHidden`)와 셸(`getShell`)은 다시 읽지 않는다(스펙 7절 2번의 예외 제외).
 - [ ] 시험: 할당 뒤 트래커 티켓 목록을 다시 읽지 않는다(트래커 가짜 어댑터 호출 수).
 - [ ] 시험: 러너가 Offline이 되면 셸 배지와 Runners가 3초 안에 바뀐다.
 - [ ] 시험: Workspace를 더하면 셸의 Workspace 목록이 바뀐다.

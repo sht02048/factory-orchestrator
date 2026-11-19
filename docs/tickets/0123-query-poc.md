@@ -28,7 +28,7 @@ blocked_by: [0119, 0120]
    - #7529: 프로덕션 빌드에서 `curl`로 문서를 받을 때 응답이 바로 끝난다(60초 "Serialization timeout"이 없다).
    - #8795: Safari(WebKit)에서 화면을 열고 이동해도 멈추지 않는다. 데스크톱 앱(Electron)에서도 한 번 본다.
    - #6347: 깨끗한 `pnpm install` 뒤 dev·build·`pnpm run bundle`이 통합의 peer를 찾는다.
-9. 서버 함수에 `AbortSignal`을 넘기는 방법과 실패한 query가 서버 렌더 HTML에 오류 메시지를 싣는지 확인해 적는다(research 0015 5절).
+9. 서버 함수에 `AbortSignal`을 넘기는 방법과 실패한 query가 서버 렌더 HTML에 오류 메시지를 싣는지 확인해 적는다(research 0015 5절). query 읽기가 throw할 때 지금 설정에서 어디에 보이는지(루트 `RootError`가 화면 전체를 대신하는지)도 적는다(스펙 0003 열린 질문 4).
 
 ## 완료 조건
 

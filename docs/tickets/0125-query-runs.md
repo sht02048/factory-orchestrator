@@ -27,7 +27,7 @@ Runs 목록과 Run 상세를 Query로 옮기고 변경 기록으로 갱신한다
 ## 완료 조건
 
 - [ ] 시험: 서버 렌더한 화면에서 hydration이 끝날 때까지 이 화면의 서버 함수를 다시 부르지 않는다.
-- [ ] 시험: mutation 하나 뒤 다시 읽는 서버 함수가 그 mutation이 바꾼 query뿐이다. 루트(`getTimeZone`, `getTitleBarHidden`)와 셸(`getShell`)은 다시 읽지 않는다.
+- [ ] 시험: mutation 하나 뒤 다시 읽는 서버 함수가 그 mutation이 바꾼 query뿐이다. 루트(`getTimeZone`, `getTitleBarHidden`)와 셸(`getShell`)은 다시 읽지 않는다(스펙 7절 2번의 예외 제외).
 - [ ] 시험: worker와 같은 함수로 런 상태를 바꾸면 열린 Runs와 Run 상세가 3초 안에 바뀐다.
 - [ ] 시험: SSE가 끊기면 열린 Run 상세가 30초마다 다시 읽는다(가짜 시계).
 - [ ] 시험: 시간대 쿠키가 바뀌면 Runs가 새 시간대로 다시 읽는다.

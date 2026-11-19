@@ -20,7 +20,7 @@ Settings를 Query로 옮긴다. 저장 뒤에 Settings 전체와 트래커 세 �
 
 ## 할 일
 
-1. **query 나누기.** DB 설정은 `["settings", ...]`(staleTime 30초), 트래커 프로젝트·상태는 `["tracker", "projects" | "states", ...]`(staleTime 5분, C3). 라벨은 0127이 만든 `["tracker", "labels", connectionId, projectId]`를 그대로 쓴다. 서버 함수도 그에 맞춰 나눈다.
+1. **query 나누기.** DB 설정은 `["settings", ...]`(staleTime 30초), 트래커 프로젝트·상태는 `["tracker", "projects" | "states", ...]`(staleTime 5분, C3). 라벨은 0127이 만든 `["tracker", "labels", connectionId, projectId]`를 그대로 쓴다. 서버 함수도 그에 맞춰 나눈다. 온보딩은 `loadSettingsPage`를 그대로 부르므로(`apps/web/src/onboarding/load.ts:54`) 그 모양을 지키거나 온보딩 쪽을 함께 고친다.
 2. **저장 뒤(C7).** Settings 세 route가 0127의 훅에 넘기는 `router.invalidate()`를 바꾼 key 무효화나, 서버가 새 값을 돌려주면 `setQueryData`로 바꾼다. 직렬 저장·초안 맞추기의 동작(마지막 값만 모아 차례로, 실패하면 되돌림, 저장된 값으로 다시 맞춤)은 그대로다.
 3. **쓰기 오류(C5).** 쓰기 서버 함수는 지금처럼 `{ ok: false, reason }`을 돌려주고, mutation이 이유가 담긴 오류로 바꾼다. 화면 문구는 그대로다.
 4. **트래커.** "Linear에서 다시 읽기"는 `["tracker"]`만 무효화한다. 라벨 만들기는 Auto-assign Label을 DB에도 저장하므로(`packages/app/src/settings/actions.ts`의 `saveAutoAssignLabel`) `["tracker"]`와 `["settings"]`를 무효화한다. 트래커 연결과 트래커 프로젝트 더하기·지우기도 `["tracker"]`를 함께 무효화한다. 다른 탭·기기에도 닿도록 0124의 `tracker` 변경 기록을 쓴다.
@@ -31,7 +31,7 @@ Settings를 Query로 옮긴다. 저장 뒤에 Settings 전체와 트래커 세 �
 ## 완료 조건
 
 - [ ] 시험: 서버 렌더한 화면에서 hydration이 끝날 때까지 이 화면의 서버 함수를 다시 부르지 않는다.
-- [ ] 시험: mutation 하나 뒤 다시 읽는 서버 함수가 그 mutation이 바꾼 query뿐이다. 루트(`getTimeZone`, `getTitleBarHidden`)와 셸(`getShell`)은 다시 읽지 않는다.
+- [ ] 시험: mutation 하나 뒤 다시 읽는 서버 함수가 그 mutation이 바꾼 query뿐이다. 루트(`getTimeZone`, `getTitleBarHidden`)와 셸(`getShell`)은 다시 읽지 않는다(스펙 7절 2번의 예외 제외).
 - [ ] 시험: Mapping을 저장해도 트래커 프로젝트·상태·라벨을 다시 읽지 않는다(트래커 가짜 어댑터 호출 수).
 - [ ] 시험: 온보딩은 저장 뒤 지금처럼 다시 읽는다.
 - [ ] 0115의 직렬 저장·초안 맞추기 시험(`serial-save.test.ts`, `mapping-draft.test.ts`)이 그대로 통과한다.
