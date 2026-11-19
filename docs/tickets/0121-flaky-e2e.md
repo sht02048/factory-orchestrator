@@ -1,5 +1,5 @@
 ---
-status: doing
+status: done
 blocked_by: []
 ---
 
@@ -48,4 +48,4 @@ CI 와 로컬 부하에서 가끔 실패하는 e2e 두 개의 원인을 찾아 �
 
 - [x] 고치기 전 시험으로 같은 맥에서 실패를 재현한다(8개 동시 실행 16회): nav-shortcuts 8/16, 토스트 4/16 실패.
 - [x] 고친 시험이 8개 동시 실행 16회에서 0 실패다: nav-shortcuts 0/16, 토스트 0/16.
-- [ ] 고친 시험이 전체 시험(`pnpm run test`) 3회에서 0 실패다.
+- [x] 고친 시험이 전체 시험(`pnpm run test`) 3회에서 0 실패다. 3회 중 1회는 이 티켓과 상관없는 `apps/desktop/src/core/local-server.test.ts` 'ServerWatch > 짧은 시간에 거듭 끝나면 …'이 5초 제한을 넘겨 실패했다. 실제 프로세스를 띄우고 죽이는 시험이라 부하에 흔들린다. 별도 티켓 후보로 남긴다.
