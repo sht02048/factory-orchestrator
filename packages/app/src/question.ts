@@ -22,9 +22,11 @@ interface ListParse {
 }
 
 const LINE_MARKER = /^\s*(?:\(([A-Za-z]|\d{1,2})\)|([A-Za-z]|\d{1,2})[.)])\s+(.*)$/;
-const INLINE_MARKER = /(?:^|\s)(?:\(([A-Za-z]|\d{1,2})\)|([A-Za-z]|\d{1,2})\))\s+/g;
+const INLINE_MARKER = /(?<=^|\s)(?:\(([A-Za-z]|\d{1,2})\)|([A-Za-z]|\d{1,2})\))(?=\s)/g;
 const SENTENCE_END = /(?<=[.!?。？！])\s+/;
 const ASKS = /[?？]/;
+const ENDS_ASKING = /[?？]\s*$/;
+const ENDS_INTRODUCING = /[:：]\s*$/;
 
 export function readQuestion(body: string, options: ReadonlyArray<string>): ReadQuestion {
   if (options.length > 0) {
@@ -96,18 +98,18 @@ function listOnLines(body: string): ListParse | null {
     if (items.length < 2) continue;
     const lead = lines.slice(0, start).join("\n");
     const after = lines.slice(end).join("\n");
-    if (!ASKS.test(lead)) return null;
+    if (!asksRightBefore(lead)) continue;
     return { lead, items, after };
   }
   return null;
 }
 
 function listInline(body: string): ListParse | null {
-  const markers = [...body.matchAll(INLINE_MARKER)].map((match) => ({
-    label: match[1] ?? match[2] ?? "",
-    start: match.index + (match[0].length - match[0].trimStart().length),
-    end: match.index + match[0].length,
-  }));
+  const markers = [...body.matchAll(INLINE_MARKER)].map((match) => {
+    const after = match.index + match[0].length;
+    const space = /^\s*/.exec(body.slice(after))?.[0].length ?? 0;
+    return { label: match[1] ?? match[2] ?? "", start: match.index, end: after + space };
+  });
   for (let first = 0; first < markers.length; first += 1) {
     const head = markers[first];
     if (head === undefined || !startsSequence(head.label)) continue;
@@ -129,7 +131,7 @@ function listInline(body: string): ListParse | null {
     );
     lastItem.text = lastText;
     const lead = body.slice(0, head.start);
-    if (!ASKS.test(lead)) continue;
+    if (!asksRightBefore(lead)) continue;
     return {
       lead,
       items: items.map((item) => ({ label: item.label, text: item.text.trim() })),
@@ -137,6 +139,10 @@ function listInline(body: string): ListParse | null {
     };
   }
   return null;
+}
+
+function asksRightBefore(lead: string): boolean {
+  return ENDS_ASKING.test(lead) || (ENDS_INTRODUCING.test(lead) && ASKS.test(lead));
 }
 
 function splitTail(text: string, labels: ReadonlyArray<string>): [string, string] {

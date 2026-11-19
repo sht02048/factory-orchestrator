@@ -95,6 +95,27 @@ describe("readQuestion without options", () => {
     expect(questionSummary(body, [])).toBe(body);
   });
 
+  test("keeps the text whole when numbered words come later in a sentence after the question", () => {
+    const body = "Is this OK? I checked step 1) the db and 2) the cache already.";
+    expect(readQuestion(body, [])).toEqual({ lead: [body], choices: [], after: [] });
+  });
+
+  test("splits choices introduced with a colon after the question", () => {
+    const read = readQuestion("Which cache should I use? Options: (A) SQLite (B) memory", []);
+    expect(read.choices.map((choice) => choice.answer)).toEqual(["(A) SQLite", "(B) memory"]);
+  });
+
+  test("finds a choice marker right after another marker", () => {
+    const read = readQuestion("Which? (A) foo, see (a) (B) bar", []);
+    expect(read.choices.map((choice) => choice.marker)).toEqual(["A", "B"]);
+  });
+
+  test("skips a done list and splits the choice list after the question", () => {
+    const read = readQuestion("Plan:\n1. a\n2. b\n\nWhich?\nA. x\nB. y", []);
+    expect(read.lead).toEqual(["Plan:\n1. a\n2. b", "Which?"]);
+    expect(read.choices.map((choice) => choice.answer)).toEqual(["(A) x", "(B) y"]);
+  });
+
   test("keeps the text whole when the markers are not in order", () => {
     const body = "Which plan? (B) later (A) now";
     expect(readQuestion(body, [])).toEqual({ lead: [body], choices: [], after: [] });
