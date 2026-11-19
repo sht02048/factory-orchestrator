@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { AgentActivity, UnreportedStop } from "./adapters.js";
-import { TURN_ENDED_PAUSE_AFTER_MS, decideRunnerStop } from "./runner-stop.js";
+import {
+  STOP_NOTICE_SLACK_MS,
+  TURN_ENDED_PAUSE_AFTER_MS,
+  decideRunnerStop,
+} from "./runner-stop.js";
 
 const start = new Date("2026-01-01T00:00:00Z");
 const at = (ms: number) => new Date(start.getTime() + ms);
@@ -77,6 +81,17 @@ describe("decideRunnerStop(0120): Running 런", () => {
         },
       ),
     ).toBeNull();
+  });
+
+  it("초 단위로 적힌 러너 알림은 Running이 된 직후 몇 초 앞선 시각이어도 새 신호로 본다", () => {
+    const runningSince = at(10 * MINUTE + 500);
+    const notice = (ms: number) =>
+      running(
+        { kind: "turn-ended", since: at(MINUTE) },
+        { runningSince, unreportedStop: { at: at(ms), lastOutput: [] } },
+      );
+    expect(notice(10 * MINUTE)).toMatchObject({ to: "paused", source: "unreported" });
+    expect(notice(10 * MINUTE + 500 - STOP_NOTICE_SLACK_MS)).toBeNull();
   });
 
   it("에이전트 상태를 모르면 Running 그대로 둔다", () => {

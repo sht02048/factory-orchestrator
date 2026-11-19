@@ -2,6 +2,7 @@ import type { AgentActivity, UnreportedStop } from "./adapters.js";
 import type { PauseSource } from "./run.js";
 
 export const TURN_ENDED_PAUSE_AFTER_MS = 10 * 60 * 1000;
+export const STOP_NOTICE_SLACK_MS = 5 * 1000;
 
 export type RunnerStopDecision =
   | {
@@ -31,7 +32,7 @@ export function decideRunnerStop(input: {
     return { to: "paused", source: "runner", lastOutput: null };
   }
   const stop = input.unreportedStop;
-  if (stop !== null && isAfter(stop.at, input.runningSince)) {
+  if (stop !== null && isAfter(stop.at, slackBefore(input.runningSince))) {
     return { to: "paused", source: "unreported", lastOutput: stop.lastOutput };
   }
   if (
@@ -42,6 +43,10 @@ export function decideRunnerStop(input: {
     return { to: "paused", source: "unreported", lastOutput: null };
   }
   return null;
+}
+
+function slackBefore(mark: Date | null): Date | null {
+  return mark === null ? null : new Date(mark.getTime() - STOP_NOTICE_SLACK_MS);
 }
 
 function isAfter(at: Date, mark: Date | null): boolean {

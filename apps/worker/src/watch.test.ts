@@ -1102,6 +1102,26 @@ describe("러너에서 멈춘·막힌 에이전트(0120)", () => {
     expect(stateOf(run)).toBe("running");
   });
 
+  it("답을 보낸 직후 Orca가 끝난 에이전트에게 전하지 못했다고 알리면, 초 단위 시각이 앞서도 '보고 없이 멈춤'이 된다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.advance(MINUTE);
+    const question = h.runner(runnerId).ask(worktreeOf(run), { body: "어떻게 할까요?", at: h.now });
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+
+    h.advance(MINUTE + 700);
+    answerRunQuestion(h.db, { runId: run.id, questionId: question, answer: "A" }, h.now);
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+
+    h.runner(runnerId).stopWithoutReport(worktreeOf(run), {
+      at: new Date(h.now.getTime() - 700),
+    });
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+    expect(recordsOf(run).pauseSource).toBe("unreported");
+  });
+
   it("에이전트 상태를 모르면 Running 그대로 둔다", async () => {
     const { run, worker } = await startOne();
     h.advance(30 * MINUTE);
