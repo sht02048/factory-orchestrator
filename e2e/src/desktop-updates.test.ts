@@ -137,6 +137,13 @@ describe("데스크톱 업데이트 토스트(브라우저, 0083)", () => {
     await page.waitForTimeout(8_000);
     expect(await toast.isVisible()).toBe(true);
     await shotAtWidths(page, "toast-ready");
+
+    await page.setViewportSize({ width: 400, height: 800 });
+    const settingsLink = page.getByRole("link", { name: shell.nav.settings, exact: true });
+    const narrow = await toast.boundingBox();
+    const link = await settingsLink.boundingBox();
+    if (narrow === null || link === null) throw new Error("no box");
+    expect(narrow.x).toBeGreaterThanOrEqual(link.x + link.width);
   });
 
   it("다른 토스트가 와도 밀려나지 않고 그 위에 다른 토스트가 쌓인다", async (context) => {

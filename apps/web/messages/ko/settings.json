@@ -316,7 +316,7 @@
     "checking": "확인하는 중",
     "checkingStatus": "새 버전이 있는지 확인하고 있어요",
     "latestStatus": "{when} · 새 버전이 없어요",
-    "failedStatus": "{when} · 확인하지 못했어요. 인터넷 연결을 확인하고 다시 확인해 주세요",
+    "failedStatus": "새 버전을 확인하지 못했어요. 인터넷 연결을 살핀 뒤 지금 확인을 다시 눌러 주세요",
     "downloadingStatus": "새 버전 {version}{object} 받고 있어요",
     "readyStatus": "새 버전 {version}{object} 받았어요. 다시 시작하면 바뀌어요",
     "manualStatus": "{when} · 새 버전 {version}{subject} 있어요",
@@ -348,5 +348,6 @@
     },
     "browserManual": "이 서버는 자동으로 업데이트하지 않아요. 새 버전은 GitHub Releases에서 받아 직접 바꿔요.",
     "browserDesktop": "데스크톱 앱으로 열면 새 버전이 있는지 확인하고, 앱이 띄운 서버는 앱과 함께 바꿔요."
-  }
+  },
+  "scopeUpdates": "앱과 서버"
 }

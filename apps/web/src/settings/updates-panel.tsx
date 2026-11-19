@@ -142,7 +142,7 @@ function CheckLine({ view }: { view: UpdateView }) {
     case "checking":
       return t("checkingStatus");
     case "failed":
-      return t("failedStatus", { when });
+      return t("failedStatus");
     case "idle":
       return when;
     case "latest":

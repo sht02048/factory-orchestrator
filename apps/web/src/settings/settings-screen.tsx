@@ -229,7 +229,9 @@ export function SettingsScreen({
                   <Text variant="meta">
                     {workspace !== null && isWorkspaceItem(current)
                       ? t("scopeWorkspace", { name: workspace.general.name })
-                      : t("scopeInstall")}
+                      : current === "updates"
+                        ? t("scopeUpdates")
+                        : t("scopeInstall")}
                   </Text>
                   <Text variant="label" role="status">
                     {hasUnsaved ? t("unsaved") : null}

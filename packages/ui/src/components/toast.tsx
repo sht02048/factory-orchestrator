@@ -119,7 +119,7 @@ const styles = stylex.create({
     bottom: space.s6,
     zIndex: 300,
     width: 320,
-    maxWidth: `calc(100vw - 2 * ${space.s6})`,
+    maxWidth: `calc(100vw - ${size.railWidth} - 2 * ${space.s6})`,
   },
   pinned: {
     display: "flex",
@@ -128,6 +128,9 @@ const styles = stylex.create({
     paddingBlock: space.s4,
     paddingInline: space.s4,
     borderRadius: radius.card,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "transparent",
     backgroundColor: colors.bgRaised,
     boxShadow: shadow.popover,
     color: colors.textPrimary,

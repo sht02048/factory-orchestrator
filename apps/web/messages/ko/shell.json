@@ -31,7 +31,7 @@
       "bodyWithServer": "서버도 같은 버전으로 바꿨어요. 돌던 런은 다시 지켜보고 있어요.",
       "bodyAppOnly": "앱을 새 버전으로 바꿨어요.",
       "bodyServerDiffers": "서버는 아직 {server} 버전이에요. 서버를 띄운 기계에서 따로 바꿔요.",
-      "notes": "바뀐 내용 보기",
+      "notes": "바뀐 내용",
       "close": "닫기"
     }
   }

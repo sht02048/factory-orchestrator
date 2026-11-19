@@ -121,4 +121,10 @@ describe("Settings 업데이트 구역(0083)", () => {
     expect(html).toContain('role="status"');
     expect(text(html)).toContain(settings.updates.checkingStatus);
   });
+
+  it("확인이 실패하면 다시 확인하는 법을 말하고, 확인한 적 없다는 말과 섞지 않는다", () => {
+    const shown = text(render(view({ check: { kind: "failed" } })));
+    expect(shown).toContain(settings.updates.failedStatus);
+    expect(shown).not.toContain(settings.updates.never);
+  });
 });
