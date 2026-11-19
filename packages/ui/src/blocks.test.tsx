@@ -233,6 +233,26 @@ describe("DataTable·차트·단계(티켓 0074)", () => {
     const html = renderToString(<AppFrame rail="레일">본문</AppFrame>);
     expect(html).toMatch(/<aside[^>]*><div[^>]*>레일<\/div><\/aside><main[^>]*>본문<\/main>/);
   });
+
+  it("AppFrame pending 은 진행 중일 때만 진행 줄·aria-busy·상태 문장을 두고, 상태 칸은 늘 그려 둔다(0122)", () => {
+    const idle = renderToString(
+      <AppFrame rail="레일" pending={{ active: false, label: "화면을 여는 중이에요" }}>
+        본문
+      </AppFrame>,
+    );
+    expect(idle).toMatch(/<span role="status"[^>]*><\/span>/);
+    expect(idle).not.toContain("data-pending-bar");
+    expect(idle).not.toContain("aria-busy");
+
+    const busy = renderToString(
+      <AppFrame rail="레일" pending={{ active: true, label: "화면을 여는 중이에요" }}>
+        본문
+      </AppFrame>,
+    );
+    expect(busy).toMatch(/<main aria-busy="true"/);
+    expect(busy).toMatch(/role="status"[^>]*>화면을 여는 중이에요</);
+    expect(busy).toContain("data-pending-bar");
+  });
 });
 
 describe("Tooltip action 트리거(0062 후속)", () => {

@@ -14,15 +14,22 @@ import {
 } from "../tokens.stylex";
 import { windowRegion } from "../window-frame";
 import { focusStyles } from "./focus";
+import { visuallyHiddenStyles } from "./visually-hidden";
 import { useTitleBarHidden } from "./window-chrome";
+
+export interface AppFramePending {
+  active: boolean;
+  label: string;
+}
 
 export interface AppFrameProps {
   rail: ReactNode;
   fill?: boolean;
+  pending?: AppFramePending;
   children: ReactNode;
 }
 
-export function AppFrame({ rail, fill = true, children }: AppFrameProps) {
+export function AppFrame({ rail, fill = true, pending, children }: AppFrameProps) {
   const titleBarHidden = useTitleBarHidden();
   return (
     <div {...stylex.props(styles.app, fill ? styles.fill : styles.contained)}>
@@ -39,8 +46,29 @@ export function AppFrame({ rail, fill = true, children }: AppFrameProps) {
           {rail}
         </div>
       </aside>
-      <main {...stylex.props(styles.main)}>{children}</main>
+      <main
+        {...(pending?.active === true ? { "aria-busy": true } : {})}
+        {...stylex.props(styles.main, pending !== undefined && styles.mainWithPending)}
+      >
+        {pending === undefined ? null : <PendingBar pending={pending} />}
+        {children}
+      </main>
     </div>
+  );
+}
+
+function PendingBar({ pending }: { pending: AppFramePending }) {
+  return (
+    <>
+      <span role="status" {...stylex.props(visuallyHiddenStyles.hidden)}>
+        {pending.active ? pending.label : ""}
+      </span>
+      {pending.active ? (
+        <span aria-hidden="true" data-pending-bar {...stylex.props(styles.pendingTrack)}>
+          <span {...stylex.props(styles.pendingBar)} />
+        </span>
+      ) : null}
+    </>
   );
 }
 
@@ -107,6 +135,11 @@ export function WorkspaceBadge({ name, initial }: { name: ReactNode; initial: st
 export function RailStatic({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.workspace)}>{children}</div>;
 }
+
+const sweep = stylex.keyframes({
+  from: { transform: "translateX(-100%)" },
+  to: { transform: "translateX(250%)" },
+});
 
 const styles = stylex.create({
   app: {
@@ -228,6 +261,27 @@ const styles = stylex.create({
     lineHeight: 1,
   },
   main: { minWidth: 0, minHeight: 0, overflow: "hidden" },
+  mainWithPending: { position: "relative" },
+  pendingTrack: {
+    position: "absolute",
+    insetInline: 0,
+    top: 0,
+    zIndex: 1,
+    height: 2,
+    overflow: "hidden",
+    pointerEvents: "none",
+  },
+  pendingBar: {
+    display: "block",
+    width: { default: "40%", "@media (prefers-reduced-motion: reduce)": "100%" },
+    height: "100%",
+    backgroundColor: colors.accent,
+    opacity: { default: 1, "@media (prefers-reduced-motion: reduce)": 0.6 },
+    animationName: { default: "none", "@media (prefers-reduced-motion: no-preference)": sweep },
+    animationDuration: motion.durationSweep,
+    animationTimingFunction: "ease-in-out",
+    animationIterationCount: "infinite",
+  },
 });
 
 export const documentStyles = stylex.create({

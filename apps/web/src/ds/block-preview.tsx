@@ -116,11 +116,13 @@ function ShellPreview({ titleBarHidden }: { titleBarHidden: boolean }) {
     <figure {...stylex.props(styles.shell)}>
       <figcaption>
         <Text variant="label">{titleBarHidden ? t("shell.desktop") : t("shell.web")}</Text>
+        {titleBarHidden ? null : <Text variant="meta">{t("shell.pending")}</Text>}
       </figcaption>
       <WindowChrome titleBarHidden={titleBarHidden}>
         <div inert={titleBarHidden} {...stylex.props(styles.frame)}>
           <AppFrame
             fill={false}
+            pending={{ active: !titleBarHidden, label: t("shell.pendingLabel") }}
             rail={
               <>
                 <RailStatic>
