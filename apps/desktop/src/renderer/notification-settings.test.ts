@@ -41,7 +41,9 @@ function installFakeNotifications(first: NotificationSettingsView) {
     onNotificationSettings: () => () => undefined,
     setNotificationSettings: (settings) => {
       calls.push({ set: settings });
-      return Promise.resolve();
+      return Reflect.get(window, "failSave") === true
+        ? Promise.reject(new Error("save failed"))
+        : Promise.resolve();
     },
     openSystemNotificationSettings: () => {
       calls.push("open-system");
@@ -158,6 +160,15 @@ describe("알림 설정 창(브라우저, 0103)", () => {
           (el) => el.hasAttribute("disabled") || el.getAttribute("aria-disabled") === "true",
         ),
     ).toBe(true);
+  });
+
+  it("저장에 실패하면 바꾸기 전 값으로 되돌린다", async () => {
+    await openSettings(allOn);
+    await page.evaluate(() => Reflect.set(window, "failSave", true));
+    const question = page.getByRole("checkbox", { name: t.groups.question.label });
+    await question.click();
+    await expect.poll(calls).toHaveLength(1);
+    await expect.poll(() => question.getAttribute("aria-checked")).toBe("true");
   });
 
   it("좁은 창에서도 가로로 넘치지 않는다", async () => {

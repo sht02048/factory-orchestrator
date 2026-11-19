@@ -47,10 +47,9 @@ export function NotificationSettings({
   }, []);
   const save = (next: NotificationSettingsView) => {
     onChange(next);
-    void window.desktopNotifications?.setNotificationSettings({
-      enabled: next.enabled,
-      groups: next.groups,
-    });
+    window.desktopNotifications
+      ?.setNotificationSettings({ enabled: next.enabled, groups: next.groups })
+      .catch(() => onChange(view));
   };
   const setGroup = (group: NotificationGroup, checked: boolean) =>
     save({ ...view, groups: { ...view.groups, [group]: checked } });

@@ -135,6 +135,18 @@ describe("알림에서 Dashboard 열기(브라우저, 0103)", () => {
     expect(await focusedSoon(cardButton(page, "ACME-34"))).toBe(true);
   });
 
+  it("접힌 칸의 카드도 펼쳐 그린 뒤 패널을 열고, 닫으면 그 카드로 포커스가 돌아온다", async () => {
+    for (const key of ["ACME-30", "ACME-31", "ACME-32", "ACME-33", "ACME-34"]) {
+      await page.goto(`/?ws=${workspaceId}&run=${runIds.get(key)}`);
+      await hydrated(page);
+      const panel = page.getByRole("dialog");
+      await panel.getByRole("heading", { name: new RegExp(key) }).waitFor();
+      await page.keyboard.press("Escape");
+      await panel.waitFor({ state: "hidden" });
+      expect(await focusedSoon(cardButton(page, key))).toBe(true);
+    }
+  });
+
   it("Question 런은 답하기 상태로 열어 첫 선택지에 포커스를 준다", async () => {
     await page.goto(`/?ws=${workspaceId}&run=${runIds.get("ACME-1")}`);
     await hydrated(page);

@@ -671,7 +671,7 @@ export class Controller {
       { id: "open", label: t("tray.open"), click: () => this.showWindow() },
       {
         id: "tray-notification-settings",
-        label: t("tray.notificationSettings"),
+        label: t("menu.notificationSettings"),
         click: () => this.showNotificationSettings(),
       },
     );

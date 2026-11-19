@@ -75,6 +75,7 @@ export const SETTLED_VISIBLE = 3;
 interface CardHost {
   all: boolean;
   selectedId: RunId | null;
+  revealedId: RunId | null;
   cardRef: (id: RunId) => (element: HTMLButtonElement | null) => void;
   focusCard: (id: RunId) => void;
   onOpen: (run: HomeRun, tagged: boolean, mode: SheetMode) => void;
@@ -93,6 +94,7 @@ export function HomeScreen({
   const cards = useRef(new Map<RunId, HTMLButtonElement>());
   const [target, setTarget] = useState<SheetTarget | null>(null);
   const [open, setOpen] = useState(false);
+  const [revealedId, setRevealedId] = useState<RunId | null>(null);
   const shownRunId = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (openRunId === undefined || shownRunId.current === openRunId) return;
@@ -102,6 +104,7 @@ export function HomeScreen({
     onOpenRunShown();
     if (run === undefined) return;
     const tagged = page.attention.some((item) => item.run.id === run.id);
+    setRevealedId(run.id);
     setTarget({ run, tagged, mode: opensAnswer(run) ? "answer" : "summary" });
     setOpen(true);
   }, [openRunId, page, onOpenRunShown]);
@@ -128,6 +131,7 @@ export function HomeScreen({
   const host: CardHost = {
     all,
     selectedId: open && target !== null ? target.run.id : null,
+    revealedId,
     cardRef: (id) => (element) => {
       if (element === null) cards.current.delete(id);
       else cards.current.set(id, element);
@@ -318,7 +322,8 @@ function CardList({
         {empty}
       </Text>
     );
-  const visible = expanded ? runs : runs.slice(0, limit);
+  const revealed = runs.slice(limit).some((run) => run.id === host.revealedId);
+  const visible = expanded || revealed ? runs : runs.slice(0, limit);
   const hidden = runs.length - visible.length;
   return (
     <>
@@ -354,7 +359,9 @@ function CardList({
 
 function SettledCards({ runs, page, host }: { runs: HomeRun[]; page: HomePage; host: CardHost }) {
   const t = useTranslations("home.board");
-  const visible = runs.slice(0, SETTLED_VISIBLE);
+  const first = runs.slice(0, SETTLED_VISIBLE);
+  const revealed = runs.slice(SETTLED_VISIBLE).find((run) => run.id === host.revealedId);
+  const visible = revealed === undefined ? first : [...first, revealed];
   return (
     <div data-settled="" {...stylex.props(styles.settled)}>
       <KanbanSubheading>{t("settled")}</KanbanSubheading>
