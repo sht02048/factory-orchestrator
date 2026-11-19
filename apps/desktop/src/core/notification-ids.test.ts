@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notificationId, staleNotificationIds } from "./notification-ids.js";
+import { notificationId, openEventIdOf, staleNotificationIds } from "./notification-ids.js";
 
 const url = "http://127.0.0.1:3000";
 const other = "https://ganger.example.com";
@@ -21,6 +21,12 @@ describe("앱을 다시 켰을 때 지울 알림", () => {
       notificationId(url, "bundle-1"),
       notificationId(url, "missed-1"),
     ]);
+  });
+
+  it("이 서버 사건 알림 ID 에서 사건 번호를 읽는다", () => {
+    expect(openEventIdOf(url, notificationId(url, "event-12"))).toBe(12);
+    expect(openEventIdOf(url, notificationId(url, "bundle-1"))).toBeNull();
+    expect(openEventIdOf(url, notificationId(other, "event-12"))).toBeNull();
   });
 
   it("서버마다 다른 알림 ID 를 쓴다", () => {

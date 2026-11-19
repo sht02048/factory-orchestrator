@@ -29,7 +29,7 @@ export function NotificationSettingsWindow() {
     const api = window.desktopNotifications;
     if (api === undefined) return;
     const off = api.onNotificationSettings(setView);
-    void api.getNotificationSettings().then(setView);
+    void api.getNotificationSettings().then(setView, () => undefined);
     return off;
   }, []);
   return (

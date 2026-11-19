@@ -57,6 +57,10 @@ export type LegacyAlert =
     }
   | { kind: "runner-offline"; key: string; runnerId: string; runnerName: string };
 
+function legacyKey(kind: string, cause: string): string {
+  return `${kind}:${cause.split(":").at(-1) ?? cause}`;
+}
+
 export function legacyAlerts(db: Database): LegacyAlert[] {
   return listOpenNotificationEvents(db).flatMap((event): LegacyAlert[] => {
     switch (event.kind) {
@@ -67,7 +71,7 @@ export function legacyAlerts(db: Database): LegacyAlert[] {
           ? [
               {
                 kind: LEGACY_KINDS[event.kind],
-                key: event.cause,
+                key: legacyKey(event.kind, event.cause),
                 runId: event.target.runId,
                 ticketKey: event.target.ticketKey,
               },

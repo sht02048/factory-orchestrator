@@ -91,6 +91,17 @@ describe("알림 사건", () => {
     expect(openKinds(db)).toContainEqual(["permission", "ACME-11"]);
   });
 
+  it("옛 경로의 Question key 는 예전처럼 질문 ID 로 만든다", () => {
+    const { db, ids } = seedDatabase();
+    recordRunQuestions(db, runOf(ids, "ACME-11"), [
+      { id: toQuestionId("q-7"), body: "계속할까요?", options: [], askedAt: minutes(100) },
+    ]);
+    syncNotifications(db, now);
+    expect(legacyAlerts(db)).toContainEqual(
+      expect.objectContaining({ kind: "question", key: "question:q-7" }),
+    );
+  });
+
   it("옛 데스크톱 앱 경로에는 예전 네 종류만 예전 모양으로 준다", () => {
     const { db } = seedDatabase();
     syncNotifications(db, now);

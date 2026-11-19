@@ -16,7 +16,12 @@ import type { IpcMainEvent, IpcMainInvokeEvent, MenuItemConstructorOptions } fro
 import { createTranslator } from "use-intl";
 import system from "../../messages/ko/system.json" with { type: "json" };
 import { NotificationFeed } from "../core/notification-feed.js";
-import { notificationId, serverKey, staleNotificationIds } from "../core/notification-ids.js";
+import {
+  notificationId,
+  openEventIdOf,
+  serverKey,
+  staleNotificationIds,
+} from "../core/notification-ids.js";
 import type { FeedBatch } from "../core/notification-feed.js";
 import { DEFAULT_NOTIFICATION_PREFS, notificationPrefsSchema } from "../core/notification-prefs.js";
 import type { NotificationPrefs } from "../core/notification-prefs.js";
@@ -547,6 +552,19 @@ export class Controller {
       new Set(this.delivered.keys()),
     );
     if (stale.length > 0) Notification.remove(stale);
+    const staleSet = new Set(stale);
+    for (const notification of history) {
+      const eventId = openEventIdOf(url, notification.id);
+      if (eventId === null || staleSet.has(notification.id)) continue;
+      if (this.delivered.has(notification.id)) continue;
+      notification.on("click", () => {
+        const path = this.feed?.url === url ? this.feed.notifier.openPath(eventId) : undefined;
+        this.delivered.delete(notification.id);
+        this.showWindow();
+        if (path !== undefined) this.openServer(url, path);
+      });
+      this.delivered.set(notification.id, notification);
+    }
   }
 
   private setNotificationPermission(permission: NotificationPermission): void {

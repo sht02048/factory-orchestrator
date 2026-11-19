@@ -8,6 +8,13 @@ export function notificationId(url: string, id: string): string {
   return `ganger:${serverKey(url)}:${id}`;
 }
 
+export function openEventIdOf(url: string, id: string): number | null {
+  const prefix = notificationId(url, "event-");
+  if (!id.startsWith(prefix)) return null;
+  const value = Number(id.slice(prefix.length));
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
 export function staleNotificationIds(
   url: string,
   delivered: ReadonlyArray<string>,

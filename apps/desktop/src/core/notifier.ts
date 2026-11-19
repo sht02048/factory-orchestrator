@@ -113,6 +113,11 @@ export class Notifier {
     return effects;
   }
 
+  openPath(id: number): string | undefined {
+    const record = this.open.get(id);
+    return record === undefined ? undefined : pathOf(record);
+  }
+
   refresh(): NotifierEffect[] {
     const effects: NotifierEffect[] = [];
     this.updateBadge(effects);
@@ -228,10 +233,10 @@ export class Notifier {
   }
 
   private resolve(id: number, effects: NotifierEffect[]): void {
-    this.open.delete(id);
+    const wasOpen = this.open.delete(id);
     this.reminders.delete(id);
     const removed: string[] = [];
-    if (this.shown.delete(id)) removed.push(eventNotificationId(id));
+    if (this.shown.delete(id) || wasOpen) removed.push(eventNotificationId(id));
     const groupId = this.groupOfEvent.get(id);
     if (groupId !== undefined) {
       this.groupOfEvent.delete(id);

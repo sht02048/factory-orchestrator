@@ -161,10 +161,19 @@ describe("알림 고르기", () => {
           [10, 11, 12].map((id) => event(id, "question", { resolved: true })),
         ),
       ),
-    ).toEqual([]);
-    expect(removed(live(notifier, [event(13, "question", { resolved: true })]))).toEqual([
+    ).not.toContain("bundle-1");
+    expect(removed(live(notifier, [event(13, "question", { resolved: true })]))).toContain(
       "bundle-1",
+    );
+  });
+
+  it("앱을 다시 켜기 전에 띄운 알림도 그 사건이 해결되면 지운다", () => {
+    const { notifier } = setup(5);
+    notifier.receive({ events: [event(3)], open: [3], initial: true }, "catch-up", T);
+    expect(removed(live(notifier, [event(3, "question", { resolved: true })], T + 1))).toEqual([
+      "event-3",
     ]);
+    expect(notifier.openPath(3)).toBeUndefined();
   });
 
   it("다시 붙었을 때 열린 목록에 없는 사건의 알림을 지운다", () => {
