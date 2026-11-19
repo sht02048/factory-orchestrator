@@ -17,6 +17,7 @@ import {
   RowTitle,
   Section,
   Select,
+  ScreenLayout,
   SplitView,
   StatusPill,
   Table,
@@ -185,72 +186,76 @@ export function SettingsScreen({
     hasUnsaved && item === current ? t("unsaved") : summary;
 
   return (
-    <SplitView
-      variant="editor"
-      list={
-        <>
-          <PageHeader title={t("title")} subtitle={t("subtitle")} />
-          <Section
-            title={t("workspaceGroup")}
-            {...(workspace === null ? {} : { note: workspace.general.name })}
-          >
-            {workspace === null ? (
-              <Text variant="meta">{t("noWorkspace")}</Text>
-            ) : (
+    <ScreenLayout header={<PageHeader title={t("title")} subtitle={t("subtitle")} />}>
+      <SplitView
+        fill={false}
+        variant="editor"
+        list={
+          <>
+            <Section
+              title={t("workspaceGroup")}
+              {...(workspace === null ? {} : { note: workspace.general.name })}
+            >
+              {workspace === null ? (
+                <Text variant="meta">{t("noWorkspace")}</Text>
+              ) : (
+                <ItemList
+                  label={t("workspaceListLabel")}
+                  items={WORKSPACE_ITEMS}
+                  selected={current}
+                  onSelect={onSelect}
+                  summary={(item) =>
+                    summaryOrUnsaved(item, <WorkspaceSummary item={item} workspace={workspace} />)
+                  }
+                />
+              )}
+            </Section>
+            <Section title={t("installGroup")} note={t("installNote")}>
               <ItemList
-                label={t("workspaceListLabel")}
-                items={WORKSPACE_ITEMS}
+                label={t("installListLabel")}
+                items={INSTALL_ITEMS}
                 selected={current}
                 onSelect={onSelect}
                 summary={(item) =>
-                  summaryOrUnsaved(item, <WorkspaceSummary item={item} workspace={workspace} />)
+                  summaryOrUnsaved(item, <InstallSummary item={item} page={page} />)
                 }
               />
-            )}
-          </Section>
-          <Section title={t("installGroup")} note={t("installNote")}>
-            <ItemList
-              label={t("installListLabel")}
-              items={INSTALL_ITEMS}
-              selected={current}
-              onSelect={onSelect}
-              summary={(item) => summaryOrUnsaved(item, <InstallSummary item={item} page={page} />)}
-            />
-          </Section>
-        </>
-      }
-      panel={
-        <section aria-label={t("panelLabel")}>
-          <DetailPanel>
-            <PanelHeader
-              status={
-                <span {...stylex.props(styles.inline)}>
-                  <Text variant="meta">
-                    {workspace !== null && isWorkspaceItem(current)
-                      ? t("scopeWorkspace", { name: workspace.general.name })
-                      : t("scopeInstall")}
-                  </Text>
-                  <Text variant="label" role="status">
-                    {hasUnsaved ? t("unsaved") : null}
-                  </Text>
-                </span>
-              }
-              title={t(`items.${current}`)}
-            />
-            <ReportUnsavedContext value={reportUnsaved}>
-              <ItemPanel
-                key={`${workspace?.general.id ?? ""}:${current}`}
-                item={current}
-                page={page}
-                actions={actions}
-                workerSilent={workerSilent}
-                renderRunnersLink={renderRunnersLink}
+            </Section>
+          </>
+        }
+        panel={
+          <section aria-label={t("panelLabel")}>
+            <DetailPanel>
+              <PanelHeader
+                status={
+                  <span {...stylex.props(styles.inline)}>
+                    <Text variant="meta">
+                      {workspace !== null && isWorkspaceItem(current)
+                        ? t("scopeWorkspace", { name: workspace.general.name })
+                        : t("scopeInstall")}
+                    </Text>
+                    <Text variant="label" role="status">
+                      {hasUnsaved ? t("unsaved") : null}
+                    </Text>
+                  </span>
+                }
+                title={t(`items.${current}`)}
               />
-            </ReportUnsavedContext>
-          </DetailPanel>
-        </section>
-      }
-    />
+              <ReportUnsavedContext value={reportUnsaved}>
+                <ItemPanel
+                  key={`${workspace?.general.id ?? ""}:${current}`}
+                  item={current}
+                  page={page}
+                  actions={actions}
+                  workerSilent={workerSilent}
+                  renderRunnersLink={renderRunnersLink}
+                />
+              </ReportUnsavedContext>
+            </DetailPanel>
+          </section>
+        }
+      />
+    </ScreenLayout>
   );
 }
 

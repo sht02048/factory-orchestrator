@@ -10,6 +10,8 @@ import {
   Text,
   Tooltip,
   VisuallyHidden,
+  WindowChrome,
+  WindowDragStrip,
   buttonStyles,
   textStyles,
 } from "@ganger/ui";
@@ -22,6 +24,7 @@ import {
   lineHeight,
   motion,
   radius,
+  size,
   space,
 } from "@ganger/ui/tokens.stylex";
 import { useEffect, useId, useRef, useState } from "react";
@@ -59,9 +62,12 @@ export function App() {
   }, []);
   return (
     <IntlProvider locale="ko" messages={messages}>
-      <div {...stylex.props(styles.canvas)}>
-        {view === null ? null : <Screen key={screenKey(view)} view={view} />}
-      </div>
+      <WindowChrome titleBarHidden>
+        <div {...stylex.props(styles.canvas)}>
+          <WindowDragStrip />
+          {view === null ? null : <Screen key={screenKey(view)} view={view} />}
+        </div>
+      </WindowChrome>
     </IntlProvider>
   );
 }
@@ -852,7 +858,8 @@ const styles = stylex.create({
     justifyContent: "center",
     alignItems: "flex-start",
     minHeight: "100vh",
-    paddingBlock: space.s10,
+    paddingTop: size.titleBar,
+    paddingBottom: space.s10,
     paddingInline: space.s6,
   },
   frameCentered: { alignItems: "center" },

@@ -7,6 +7,7 @@ import {
   NoticeLayout,
   OutcomeSwatch,
   PageHeader,
+  ScreenLayout,
   Section,
   SegmentedTabs,
   StatTile,
@@ -78,10 +79,9 @@ type LoadedStatsPage = Extract<StatsPage, { total: StatsSummary }>;
 function Notice({ body }: { body: ReactNode }) {
   const t = useTranslations("stats");
   return (
-    <NoticeLayout>
-      <PageHeader title={t("title")} subtitle={t("summary")} />
-      {body}
-    </NoticeLayout>
+    <ScreenLayout header={<PageHeader title={t("title")} subtitle={t("summary")} />}>
+      <NoticeLayout>{body}</NoticeLayout>
+    </ScreenLayout>
   );
 }
 
@@ -128,94 +128,100 @@ function StatsView({
   const days = page.period.days;
 
   return (
-    <div {...stylex.props(styles.page)}>
-      <div {...stylex.props(styles.frame)}>
-        <header {...stylex.props(styles.header)}>
-          <div {...stylex.props(styles.headline)}>
-            <Text variant="meta">
+    <ScreenLayout
+      header={
+        <PageHeader
+          title={t("title")}
+          subtitle={<Headline total={page.total} days={days} />}
+          actions={
+            <SegmentedTabs<`${StatsPeriodDays}`>
+              value={`${days}`}
+              onValueChange={(next) => {
+                const picked = STATS_PERIOD_DAYS.find((d) => `${d}` === next);
+                if (picked !== undefined) onPeriodChange(picked);
+              }}
+              label={t("period.label")}
+              items={STATS_PERIOD_DAYS.map((d) => ({
+                value: `${d}` as const,
+                label: t("period.option", { days: d }),
+              }))}
+            />
+          }
+        />
+      }
+    >
+      <div {...stylex.props(styles.page)}>
+        <div {...stylex.props(styles.frame)}>
+          <div {...stylex.props(styles.period)}>
+            <Text variant="meta" as="p">
               {t("meta", {
                 workspace: workspaceName,
                 from: dayLabel(page.period.firstDay).long,
                 to: dayLabel(page.period.lastDay).long,
               })}
             </Text>
-            <Text variant="display" as="h1">
-              <Headline total={page.total} days={days} />
-            </Text>
           </div>
-          <SegmentedTabs<`${StatsPeriodDays}`>
-            value={`${days}`}
-            onValueChange={(next) => {
-              const picked = STATS_PERIOD_DAYS.find((d) => `${d}` === next);
-              if (picked !== undefined) onPeriodChange(picked);
-            }}
-            label={t("period.label")}
-            items={STATS_PERIOD_DAYS.map((d) => ({
-              value: `${d}` as const,
-              label: t("period.option", { days: d }),
-            }))}
-          />
-        </header>
-        <Figures total={page.total} previous={page.previous} days={days} />
-        <div {...stylex.props(styles.charts)}>
-          <Card label={t("throughput.title")}>
-            <div {...stylex.props(styles.chartFrame)}>
+          <Figures total={page.total} previous={page.previous} days={days} />
+          <div {...stylex.props(styles.charts)}>
+            <Card label={t("throughput.title")}>
+              <div {...stylex.props(styles.chartFrame)}>
+                <Section
+                  title={t("throughput.title")}
+                  titleRole="heading"
+                  note={page.total.runs === 0 ? undefined : <Legend placement="head" />}
+                >
+                  {page.total.runs === 0 ? null : <Legend placement="body" />}
+                  <ThroughputChart daily={page.daily} days={days} />
+                </Section>
+              </div>
+            </Card>
+            <Card label={t("failures.title")}>
               <Section
-                title={t("throughput.title")}
+                title={t("failures.title")}
                 titleRole="heading"
-                note={page.total.runs === 0 ? undefined : <Legend placement="head" />}
+                count={page.total.outcomes.failed}
               >
-                {page.total.runs === 0 ? null : <Legend placement="body" />}
-                <ThroughputChart daily={page.daily} days={days} />
+                {page.total.failureReasons.length === 0 ? (
+                  <Text variant="meta">{t("failures.empty")}</Text>
+                ) : (
+                  <FailureReasons reasons={page.total.failureReasons} />
+                )}
+                {page.total.outcomes.failed === 0 || failedRunsHref === undefined ? null : (
+                  <div {...stylex.props(styles.failedRuns)}>
+                    <TextLink
+                      href={failedRunsHref(days)}
+                      onClick={(event) => {
+                        if (onOpenFailedRuns === undefined || !isPlainClick(event)) return;
+                        event.preventDefault();
+                        onOpenFailedRuns(days);
+                      }}
+                    >
+                      {t("failures.openRuns")}
+                    </TextLink>
+                  </div>
+                )}
               </Section>
-            </div>
-          </Card>
-          <Card label={t("failures.title")}>
-            <Section
-              title={t("failures.title")}
-              titleRole="heading"
-              count={page.total.outcomes.failed}
-            >
-              {page.total.failureReasons.length === 0 ? (
-                <Text variant="meta">{t("failures.empty")}</Text>
-              ) : (
-                <FailureReasons reasons={page.total.failureReasons} />
-              )}
-              {page.total.outcomes.failed === 0 || failedRunsHref === undefined ? null : (
-                <div {...stylex.props(styles.failedRuns)}>
-                  <TextLink
-                    href={failedRunsHref(days)}
-                    onClick={(event) => {
-                      if (onOpenFailedRuns === undefined || !isPlainClick(event)) return;
-                      event.preventDefault();
-                      onOpenFailedRuns(days);
-                    }}
-                  >
-                    {t("failures.openRuns")}
-                  </TextLink>
-                </div>
-              )}
+            </Card>
+          </div>
+          <div {...stylex.props(styles.breakdownSection)}>
+            <Section title={t("dimension.title")} titleRole="heading">
+              <Breakdown
+                groups={page.groups[dimension]}
+                dimension={dimension}
+                days={days}
+                onDimensionChange={onDimensionChange}
+                {...(runsHref === undefined
+                  ? {}
+                  : { runsHref: (key: string) => runsHref(dimension, key, days) })}
+                {...(onOpenRuns === undefined
+                  ? {}
+                  : { onOpenRuns: (key: string) => onOpenRuns(dimension, key, days) })}
+              />
             </Section>
-          </Card>
-        </div>
-        <div {...stylex.props(styles.breakdownSection)}>
-          <Section title={t("dimension.title")} titleRole="heading">
-            <Breakdown
-              groups={page.groups[dimension]}
-              dimension={dimension}
-              days={days}
-              onDimensionChange={onDimensionChange}
-              {...(runsHref === undefined
-                ? {}
-                : { runsHref: (key: string) => runsHref(dimension, key, days) })}
-              {...(onOpenRuns === undefined
-                ? {}
-                : { onOpenRuns: (key: string) => onOpenRuns(dimension, key, days) })}
-            />
-          </Section>
+          </div>
         </div>
       </div>
-    </div>
+    </ScreenLayout>
   );
 }
 
@@ -434,15 +440,7 @@ const styles = stylex.create({
     paddingBottom: space.s10,
   },
   frame: { containerType: "inline-size", maxWidth: size.statsPageWidth },
-  header: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: space.s4,
-    marginBottom: space.s6,
-  },
-  headline: { display: "flex", flexDirection: "column", gap: space.s1, minWidth: 0 },
+  period: { marginBottom: space.s4 },
   figures: {
     display: "grid",
     gridTemplateColumns: {

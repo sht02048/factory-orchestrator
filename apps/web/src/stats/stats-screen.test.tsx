@@ -75,10 +75,14 @@ function breakdownRows(html: string): string[][] {
 }
 
 describe("Stats 화면(0072)", () => {
-  it("메타 줄에 화면 이름·Workspace·기간을, 제목에 결론 문장을 둔다", () => {
+  it("한 줄 머리에 화면 이름 제목과 결론 요약을 두고, 그 아래에 Workspace·기간을 둔다(0113)", () => {
     const html = render(seeded());
-    expect(text(html)).toContain("Stats · Acme Commerce · 11월 4일–11월 17일");
-    expect(html).toMatch(/<h1[^>]*>끝난 런 9개 중 22%를 에이전트가 병합까지 끝냈어요<\/h1>/);
+    const header = between(html, "<header", "</header>");
+    expect(header).toMatch(/<h1[^>]*>Stats<\/h1>/);
+    expect(text(header)).toContain("끝난 런 9개 중 22%를 에이전트가 병합까지 끝냈어요.");
+    expect(header).toContain('aria-label="기간"');
+    expect(text(html)).toContain("Acme Commerce · 11월 4일–11월 17일");
+    expect(text(html)).not.toContain("Stats · Acme Commerce");
   });
 
   it("기간 7일 · 14일 · 30일을 한 줄 탭으로 고르고 지금 기간이 골라져 있다", () => {
@@ -251,7 +255,9 @@ describe("Stats 화면(0072)", () => {
     const html = render(
       loadStatsPage(seedStatsDatabase(), undefined, new Date("2027-01-01T00:00:00Z"), "UTC", 14),
     );
-    expect(html).toMatch(/<h1[^>]*>최근 14일 동안 끝난 런이 없어요<\/h1>/);
+    expect(text(between(html, "<header", "</header>"))).toContain(
+      "최근 14일 동안 끝난 런이 없어요.",
+    );
     expect(text(html)).toContain("이 기간에 Failed 런이 없어요.");
     expect(text(html)).toContain("최근 14일 동안 끝난 런이 없어요. 런이 끝나면 여기에 보여요.");
     expect(html).not.toContain('role="img"');
@@ -277,7 +283,9 @@ describe("Stats 화면(0072)", () => {
 
     it("제목은 Canceled 를 뺀 수로 말하고 뺐다는 설명은 끝난 런 카드가 맡는다", () => {
       const html = render(page());
-      expect(html).toMatch(/<h1[^>]*>끝난 런 11개 중 18%를 에이전트가 병합까지 끝냈어요<\/h1>/);
+      expect(text(between(html, "<header", "</header>"))).toContain(
+        "끝난 런 11개 중 18%를 에이전트가 병합까지 끝냈어요.",
+      );
       expect(html).not.toContain("Canceled를 뺀");
       expect(tiles(html)[3]).toBe("끝난 런 13 Canceled 2개를 빼고 11개로 비율을 내요");
       expect(html).toContain('title="11월 17일: Merged 1 · Human Check 0 · Failed 2 · Canceled 2"');

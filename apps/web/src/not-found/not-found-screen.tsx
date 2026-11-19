@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { MascotMessage, Text, buttonStyles } from "@ganger/ui";
+import { MascotMessage, Text, WindowDragStrip, buttonStyles } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
 import { Link } from "@tanstack/react-router";
 import { useTranslations } from "use-intl";
@@ -18,6 +18,7 @@ function NotFound() {
   const t = useTranslations("notFound");
   return (
     <main {...stylex.props(styles.page)}>
+      <WindowDragStrip />
       <MascotMessage mood="worried" size="large">
         <Text variant="page">{t("title")}</Text>
         <Text variant="body">{t("body")}</Text>

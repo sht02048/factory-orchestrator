@@ -7,6 +7,8 @@ import {
   ProblemCallout,
   Section,
   Text,
+  WindowChrome,
+  WindowDragStrip,
   textStyles,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
@@ -34,9 +36,12 @@ export function NotificationSettingsWindow() {
   }, []);
   return (
     <IntlProvider locale="ko" messages={{ screens }}>
-      <div {...stylex.props(documentStyles.body, styles.canvas)}>
-        {view === null ? null : <NotificationSettings view={view} onChange={setView} />}
-      </div>
+      <WindowChrome titleBarHidden>
+        <div {...stylex.props(documentStyles.body, styles.canvas)}>
+          <WindowDragStrip />
+          {view === null ? null : <NotificationSettings view={view} onChange={setView} />}
+        </div>
+      </WindowChrome>
     </IntlProvider>
   );
 }
@@ -125,7 +130,8 @@ const styles = stylex.create({
     display: "flex",
     justifyContent: "center",
     minHeight: "100vh",
-    paddingBlock: space.s8,
+    paddingTop: size.titleBar,
+    paddingBottom: space.s8,
     paddingInline: space.s6,
   },
   column: {

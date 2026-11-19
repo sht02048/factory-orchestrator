@@ -89,16 +89,30 @@ export {
   PanelBlock,
   PanelFooter,
   PanelHeader,
+  ScreenLayout,
   Section,
   SplitView,
   type PageHeaderProps,
   type PanelHeaderProps,
+  type ScreenLayoutProps,
   type SectionLink,
   type SectionProps,
   type SectionTitleRole,
   type SplitViewProps,
 } from "./components/layout";
 export { CheckIcon, ChevronDownIcon, CloseIcon } from "./components/icons";
+export {
+  WindowChrome,
+  WindowDragStrip,
+  useTitleBarHidden,
+  type WindowChromeProps,
+} from "./components/window-chrome";
+export {
+  WINDOW_REGION_ATTRIBUTE,
+  windowFrame,
+  windowRegion,
+  type WindowRegion,
+} from "./window-frame";
 export {
   KanbanCard,
   KanbanCards,

@@ -28,6 +28,7 @@ import {
   StepNavItem,
   Text,
   VisuallyHidden,
+  WindowDragStrip,
   buttonStyles,
   focusStyles,
   linkStyles,
@@ -154,6 +155,7 @@ export function OnboardingScreen({
 
   return (
     <div {...stylex.props(styles.page)}>
+      <WindowDragStrip />
       <StepList page={page} index={index} onStep={onStep} />
       <main {...stylex.props(styles.column)}>
         <div {...stylex.props(styles.heading)}>

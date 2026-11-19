@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Toaster, documentStyles } from "@ganger/ui";
+import { Toaster, WindowChrome, documentStyles } from "@ganger/ui";
 import {
   HeadContent,
   Outlet,
@@ -15,7 +15,7 @@ import { IntlProvider, useTranslations } from "use-intl";
 import { appMessages, defaultLocale, t } from "../i18n";
 import { NotFoundScreen } from "../not-found/not-found-screen";
 import { ONBOARDING_PATH, isOpenPath, onboardingRedirect } from "../onboarding/model";
-import { getTimeZone } from "../server/functions";
+import { getTimeZone, getTitleBarHidden } from "../server/functions";
 import { getOnboardingComplete } from "../server/onboarding-functions";
 import { localTimeZone, timeZoneCookie, timeZoneFromCookies } from "@ganger/app/time-zone";
 import appCss from "../styles/app.css?url";
@@ -30,7 +30,10 @@ export const Route = createRootRoute({
     if (onboardingRedirect(location.pathname, complete) !== null)
       throw redirect({ to: ONBOARDING_PATH });
   },
-  loader: () => getTimeZone(),
+  loader: async () => {
+    const [timeZone, titleBarHidden] = await Promise.all([getTimeZone(), getTitleBarHidden()]);
+    return { timeZone, titleBarHidden };
+  },
   shouldReload: false,
   head: () => ({
     meta: [
@@ -66,12 +69,14 @@ function RootDocument({ children }: { children: ReactNode }) {
 }
 
 function RootLayout() {
-  const timeZone = Route.useLoaderData();
+  const { timeZone, titleBarHidden } = Route.useLoaderData();
   return (
     <IntlProvider locale={defaultLocale} messages={appMessages} timeZone={timeZone}>
-      <TimeZoneSync timeZone={timeZone} />
-      <Outlet />
-      <AppToaster />
+      <WindowChrome titleBarHidden={titleBarHidden}>
+        <TimeZoneSync timeZone={timeZone} />
+        <Outlet />
+        <AppToaster />
+      </WindowChrome>
     </IntlProvider>
   );
 }

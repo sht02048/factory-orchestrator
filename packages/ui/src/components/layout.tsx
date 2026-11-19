@@ -1,6 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 import { textStyles } from "./text";
+import { useTitleBarHidden } from "./window-chrome";
+import { windowRegion } from "../window-frame";
 import {
   colors,
   fontSize,
@@ -11,6 +13,8 @@ import {
   size,
   space,
 } from "../tokens.stylex";
+
+const NARROW_SCREEN = "@media (max-width: 600px)";
 
 export interface SplitViewProps {
   list: ReactNode;
@@ -35,20 +39,46 @@ export function NoticeLayout({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.notice)}>{children}</div>;
 }
 
+export interface ScreenLayoutProps {
+  header: ReactNode;
+  fill?: boolean;
+  children: ReactNode;
+}
+
+export function ScreenLayout({ header, fill = true, children }: ScreenLayoutProps) {
+  return (
+    <div {...stylex.props(styles.screen, fill ? styles.fill : styles.contained)}>
+      {header}
+      <div {...stylex.props(styles.screenBody)}>{children}</div>
+    </div>
+  );
+}
+
 export interface PageHeaderProps {
   title: ReactNode;
   subtitle?: ReactNode;
+  lead?: ReactNode;
   actions?: ReactNode;
 }
 
-export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, lead, actions }: PageHeaderProps) {
+  const titleBarHidden = useTitleBarHidden();
   return (
-    <header {...stylex.props(styles.pageHead)}>
-      <div>
+    <header {...(titleBarHidden ? windowRegion("drag") : {})} {...stylex.props(styles.pageHead)}>
+      {lead === undefined ? null : (
+        <div {...windowRegion("no-drag")} {...stylex.props(styles.pageLead)}>
+          {lead}
+        </div>
+      )}
+      <div {...stylex.props(styles.pageHeading)}>
         <h1 {...stylex.props(styles.pageTitle)}>{title}</h1>
         {subtitle === undefined ? null : <p {...stylex.props(styles.pageSub)}>{subtitle}</p>}
       </div>
-      {actions}
+      {actions === undefined ? null : (
+        <div {...windowRegion("no-drag")} {...stylex.props(styles.pageActions)}>
+          {actions}
+        </div>
+      )}
     </header>
   );
 }
@@ -188,15 +218,39 @@ const styles = stylex.create({
     overflow: "auto",
     backgroundColor: colors.bgPanel,
   },
+  screen: {
+    display: "grid",
+    gridTemplateRows: "auto minmax(0, 1fr)",
+    minWidth: 0,
+  },
+  screenBody: { minWidth: 0, minHeight: 0, overflow: "auto" },
   pageHead: {
     display: "flex",
     flexWrap: "wrap",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: space.s4,
-    marginBottom: space.s6,
+    alignItems: "center",
+    columnGap: space.s4,
+    rowGap: space.s2,
+    minHeight: size.titleBar,
+    paddingBlock: space.s2,
+    paddingInline: { default: space.s8, [NARROW_SCREEN]: space.s4 },
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.borderSubtle,
+  },
+  pageLead: { display: "flex", alignItems: "center", flexShrink: 0 },
+  pageHeading: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    columnGap: space.s3,
+    rowGap: space.px2,
+    flexGrow: 1,
+    flexBasis: size.pageHeadingMinWidth,
+    minWidth: 0,
   },
   pageTitle: {
+    flexShrink: 0,
+    maxWidth: "100%",
     margin: 0,
     color: colors.textPrimary,
     fontSize: fontSize.page,
@@ -206,10 +260,18 @@ const styles = stylex.create({
     textWrap: "balance",
   },
   pageSub: {
+    minWidth: 0,
     margin: 0,
-    marginTop: space.s1,
     color: colors.textTertiary,
     fontSize: fontSize.ui,
+    textWrap: "pretty",
+  },
+  pageActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: space.s2,
+    marginInlineStart: "auto",
   },
   section: {
     marginTop: { default: 0, ":not(:first-child)": space.s10 },

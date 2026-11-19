@@ -13,6 +13,7 @@ import {
   ProblemCallout,
   Row,
   RowTitle,
+  ScreenLayout,
   SplitView,
   StatusPill,
   Table,
@@ -95,69 +96,75 @@ export function RunnersScreen({
   }, [selectedId]);
 
   return (
-    <SplitView
-      list={
-        <div {...stylex.props(styles.listColumn)}>
-          <PageHeader
-            title={t("title")}
-            subtitle={
-              runners.length === 0
-                ? undefined
-                : t("subtitle", { total: runners.length, available, issues })
-            }
-            actions={
-              <a
-                href={addRunnerHref(ws)}
-                data-variant="primary"
-                {...stylex.props(...buttonStyles("primary"))}
-              >
-                {t("add")}
-              </a>
-            }
-          />
-          {runners.length === 0 ? (
-            <EmptyRunners />
-          ) : (
-            <Table columns="minmax(0, 1fr)">
-              <ResponsiveColumnsHead
-                lead={t("columns.runner")}
-                columns={[
-                  { width: size.capacityCellsColumn, content: t("columns.capacity") },
-                  { width: size.usageColumn, content: t("columns.usage") },
-                ]}
-              />
-              <TableRows
-                label={t("listLabel")}
-                value={selected?.id ?? null}
-                onValueChange={onSelect}
-              >
-                {runners.map((runner) => (
-                  <RunnerRow key={runner.id} runner={runner} />
-                ))}
-              </TableRows>
-            </Table>
-          )}
-        </div>
+    <ScreenLayout
+      header={
+        <PageHeader
+          title={t("title")}
+          subtitle={
+            runners.length === 0
+              ? undefined
+              : t("subtitle", { total: runners.length, available, issues })
+          }
+          actions={
+            <a
+              href={addRunnerHref(ws)}
+              data-variant="primary"
+              {...stylex.props(...buttonStyles("primary"))}
+            >
+              {t("add")}
+            </a>
+          }
+        />
       }
-      panel={
-        <section aria-label={adding ? t("add") : t("panel.label")}>
-          {adding ? (
-            <DetailPanel>
-              <div {...stylex.props(styles.setup)}>
-                <Text variant="heading">{t("add")}</Text>
-                {setup}
-              </div>
-            </DetailPanel>
-          ) : selected === undefined ? (
-            <DetailPanel>
-              {runners.length === 0 ? null : <Text variant="meta">{t("panel.empty")}</Text>}
-            </DetailPanel>
-          ) : (
-            <RunnerPanel key={selected.id} runner={selected} actions={actions} />
-          )}
-        </section>
-      }
-    />
+    >
+      <SplitView
+        fill={false}
+        list={
+          <div {...stylex.props(styles.listColumn)}>
+            {runners.length === 0 ? (
+              <EmptyRunners />
+            ) : (
+              <Table columns="minmax(0, 1fr)">
+                <ResponsiveColumnsHead
+                  lead={t("columns.runner")}
+                  columns={[
+                    { width: size.capacityCellsColumn, content: t("columns.capacity") },
+                    { width: size.usageColumn, content: t("columns.usage") },
+                  ]}
+                />
+                <TableRows
+                  label={t("listLabel")}
+                  value={selected?.id ?? null}
+                  onValueChange={onSelect}
+                >
+                  {runners.map((runner) => (
+                    <RunnerRow key={runner.id} runner={runner} />
+                  ))}
+                </TableRows>
+              </Table>
+            )}
+          </div>
+        }
+        panel={
+          <section aria-label={adding ? t("add") : t("panel.label")}>
+            {adding ? (
+              <DetailPanel>
+                <div {...stylex.props(styles.setup)}>
+                  <Text variant="heading">{t("add")}</Text>
+                  {setup}
+                </div>
+              </DetailPanel>
+            ) : selected === undefined ? (
+              <DetailPanel>
+                {runners.length === 0 ? null : <Text variant="meta">{t("panel.empty")}</Text>}
+              </DetailPanel>
+            ) : (
+              <RunnerPanel key={selected.id} runner={selected} actions={actions} />
+            )}
+          </section>
+        }
+      />
+    </ScreenLayout>
   );
 }
 
