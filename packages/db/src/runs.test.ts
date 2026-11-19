@@ -659,6 +659,11 @@ describe("Paused(0118)", () => {
     changeRunState(db, id, { to: "disconnected" }, at(8));
     changeRunState(db, id, { to: "running" }, at(12));
     expect(runningSince(db, id)).toEqual(at(5));
+
+    changeRunState(db, id, { to: "waiting-for-input" }, at(14));
+    changeRunState(db, id, { to: "disconnected" }, at(20));
+    changeRunState(db, id, { to: "running" }, at(25));
+    expect(runningSince(db, id)).toEqual(at(25));
   });
 
   it("DB가 Paused 런에만 멈춘 시각을 허용한다", () => {

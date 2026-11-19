@@ -1081,6 +1081,27 @@ describe("러너에서 멈춘·막힌 에이전트(0120)", () => {
     expect(recordsOf(run).pauseSource).toBe("runner");
   });
 
+  it("끊긴 동안 질문에 답한 런은 다시 닿은 뒤 답하기 전의 멈춤 알림으로 멈추지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.advance(MINUTE);
+    const question = h.runner(runnerId).ask(worktreeOf(run), { body: "어떻게 할까요?", at: h.now });
+    h.runner(runnerId).stopWithoutReport(worktreeOf(run), { at: h.now });
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+
+    await disconnect(run, runnerId, worker);
+    answerRunQuestion(
+      h.db,
+      { runId: run.id, questionId: question, answer: "A 로 해 주세요" },
+      h.now,
+    );
+    h.advance(MINUTE);
+    cutSsh(runnerId, false);
+    await worker.tick();
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+  });
+
   it("에이전트 상태를 모르면 Running 그대로 둔다", async () => {
     const { run, worker } = await startOne();
     h.advance(30 * MINUTE);
