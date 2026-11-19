@@ -207,6 +207,7 @@ describe("Dashboard 상세 패널(브라우저, 0100)", () => {
 
     await send.click();
     await panel.getByRole("alert").getByText(questionJson.pick).waitFor();
+    expect(await panel.getByText(questionJson.pick).count()).toBe(1);
     expect(await focusedSoon(panel.getByRole("radio", { name: "Yes" }))).toBe(true);
     await panel.getByRole("radio", { name: "No" }).check();
     await panel.getByRole("radio", { name: "Yes" }).check();
@@ -234,6 +235,10 @@ describe("Dashboard 상세 패널(브라우저, 0100)", () => {
     expect(await other.isChecked()).toBe(true);
     expect(await focusedSoon(other)).toBe(true);
     await page.keyboard.press("Enter");
+    expect(await focusedSoon(panel.getByLabel(questionJson.otherLabel))).toBe(true);
+    await page.keyboard.press("Shift+Tab");
+    await panel.getByRole("button", { name: questionJson.send }).click();
+    await panel.getByRole("alert").getByText(questionJson.empty).waitFor();
     expect(await focusedSoon(panel.getByLabel(questionJson.otherLabel))).toBe(true);
     await page.keyboard.press("Escape");
   });

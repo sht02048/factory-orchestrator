@@ -93,7 +93,10 @@ export function QuestionForm({ lead, choices, after = [], labels, onSend }: Ques
     if (sending) return;
     if (answer === null) {
       setMissing(true);
-      formRef.current?.querySelector<HTMLElement>("textarea, input[type=radio]")?.focus();
+      (
+        otherRef.current ??
+        formRef.current?.querySelector<HTMLElement>("textarea, input[type=radio]")
+      )?.focus();
       return;
     }
     setState("sending");
@@ -213,7 +216,7 @@ export function QuestionForm({ lead, choices, after = [], labels, onSend }: Ques
       </p>
       <div {...stylex.props(styles.foot)}>
         <span id={hintId} {...stylex.props(textStyles("label"))}>
-          {hint}
+          {problem === null ? hint : null}
         </span>
         <Button variant="primary" type="submit" disabled={sending}>
           {sending ? labels.sending : labels.send}
