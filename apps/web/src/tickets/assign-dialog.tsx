@@ -102,6 +102,13 @@ export function AssignDialog({
       description={t("description")}
       open={open}
       scrollBody
+      status={
+        failure === null ? undefined : (
+          <Text variant="ui" as="div" tone="problem" role="alert">
+            {t(`error.${failure}`)}
+          </Text>
+        )
+      }
       onOpenChange={(next) => {
         if (!next && pending) return;
         if (next) reset();
@@ -131,11 +138,6 @@ export function AssignDialog({
         onRunnerChange={setRunner}
         onAgentChange={setAgent}
       />
-      {failure === null ? null : (
-        <Text variant="ui" as="div" tone="problem" role="alert">
-          {t(`error.${failure}`)}
-        </Text>
-      )}
     </Dialog>
   );
 }

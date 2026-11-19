@@ -240,6 +240,10 @@ describe("Mapping 여러 저장소와 즉시 저장(브라우저, 0115)", () => 
       .poll(() => savedRepos().find((r) => r.isDefault)?.project ?? null)
       .toBe("fake:acme/api");
     expect(savedRepos().find((r) => r.project === "fake:acme/api")?.labelId ?? null).toBeNull();
+    await page
+      .getByRole("status")
+      .getByText(fill(settings.mapping.labelDropped, { repo: "acme/api", label: "api" }))
+      .waitFor();
     await expect.poll(focused).toBe(settings.mapping.makeDefault);
   });
 

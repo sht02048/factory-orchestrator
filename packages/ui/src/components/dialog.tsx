@@ -33,6 +33,7 @@ export interface DialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   scrollBody?: boolean;
+  status?: ReactNode;
 }
 
 export function Dialog({
@@ -45,6 +46,7 @@ export function Dialog({
   open,
   onOpenChange,
   scrollBody = false,
+  status,
 }: DialogProps) {
   return (
     <SdkDialog
@@ -67,7 +69,17 @@ export function Dialog({
             <DialogDescription className={cx(styles.description)}>{description}</DialogDescription>
           )}
         </div>
-        {scrollBody ? <div {...stylex.props(styles.body)}>{children}</div> : children}
+        {scrollBody ? (
+          <div
+            onFocus={(event) => event.target.scrollIntoView({ block: "nearest" })}
+            {...stylex.props(styles.body)}
+          >
+            {children}
+          </div>
+        ) : (
+          children
+        )}
+        {status === undefined ? null : <div {...stylex.props(styles.status)}>{status}</div>}
         <div {...stylex.props(styles.actions)}>{actions}</div>
       </DialogContent>
     </SdkDialog>
@@ -148,6 +160,7 @@ const styles = stylex.create({
     overscrollBehavior: "contain",
   },
   head: { display: "flex", flexDirection: "column", gap: space.s2, flexShrink: 0 },
+  status: { flexShrink: 0 },
   title: {
     margin: 0,
     fontSize: fontSize.panel,

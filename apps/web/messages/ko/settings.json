@@ -139,7 +139,9 @@
     "addFirstLabel": "{project}의 기본 저장소 고르기",
     "labelUnread": "읽지 못한 라벨",
     "labelAutoAssign": "Auto-assign Label",
-    "labelIsAutoAssign": "이 라벨은 Auto-assign Label이에요. 자동 할당하는 티켓마다 붙어 있어 저장소를 가르는 라벨로 쓸 수 없어요. 다른 라벨로 바꿔 주세요."
+    "labelIsAutoAssign": "이 라벨은 Auto-assign Label이에요. 자동 할당하는 티켓마다 붙어 있어 저장소를 가르는 라벨로 쓸 수 없어요. 다른 라벨로 바꿔 주세요.",
+    "labelDropped": "기본 저장소를 바꾸며 {repo}에 붙어 있던 {label} 라벨을 뗐어요. 이 라벨로는 더 저장소를 가르지 않아요.",
+    "makeDefaultDropsLabel": "기본으로 바꾸면 붙어 있는 {label} 라벨을 떼요."
   },
   "progress": {
     "hint": "런이 실제로 시작될 때 티켓을 이 상태로 바꿔요. 상태는 트래커 프로젝트마다 달라요.",

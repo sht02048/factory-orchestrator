@@ -1,5 +1,16 @@
 import * as stylex from "@stylexjs/stylex";
-import { Button, Chip, Field, Input, Menu, MenuItem, Select, Text, showToast } from "@ganger/ui";
+import {
+  Button,
+  Chip,
+  Field,
+  Input,
+  Menu,
+  MenuItem,
+  Select,
+  Text,
+  VisuallyHidden,
+  showToast,
+} from "@ganger/ui";
 import type { SelectOption } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
@@ -95,6 +106,7 @@ export function MappingEditor({
   const missingId = useId();
   const saved = mappingDraftOf(bound);
   const [target, setTarget] = useState(MAPPING_TARGET);
+  const [labelDropped, setLabelDropped] = useState<{ repo: string; label: string } | null>(null);
   const save = useSyncedSave<MappingDraft>({
     saved,
     savedKey: mappingDraftKey(saved),
@@ -121,8 +133,11 @@ export function MappingEditor({
     }
   }, [focusAfter, draft]);
 
+  const labelName = (id: string) =>
+    (bound.labels.ok ? bound.labels.items.find((l) => l.id === id)?.name : undefined) ?? id;
   const change = (next: MappingDraft, changed: string) => {
     setTarget(changed);
+    setLabelDropped(null);
     if (isCompleteDraft(next)) save.choose(next);
     else save.setDraft(next);
   };
@@ -170,6 +185,9 @@ export function MappingEditor({
         <SaveStatusText status={statusTarget === MAPPING_TARGET ? save.status : "idle"} />
       </div>
       {statusTarget === MAPPING_TARGET ? failureLine : null}
+      <Text variant="meta" role="status">
+        {labelDropped === null || failure !== null ? null : t("labelDropped", labelDropped)}
+      </Text>
       <div {...stylex.props(styles.repos)}>
         <Text variant="label">{t("repos")}</Text>
         {bound.labels.ok ? null : (
@@ -185,6 +203,7 @@ export function MappingEditor({
             draft={draft}
             bound={bound}
             autoAssignLabelId={autoAssignLabelId}
+            labelName={labelName}
             nameOf={nameOf}
             status={statusTarget === repo.id ? save.status : "idle"}
             failureLine={statusTarget === repo.id ? failureLine : null}
@@ -197,6 +216,9 @@ export function MappingEditor({
               const previous = draft.repos.find((r) => r.isDefault)?.id ?? null;
               if (previous !== null) setFocusAfter({ kind: "make-default", repo: previous });
               change(withDefaultRepo(draft, repo.id), repo.id);
+              if (repo.labelId !== null) {
+                setLabelDropped({ repo: nameOf(repo.id), label: labelName(repo.labelId) });
+              }
             }}
             onRemove={() => {
               setFocusAfter({ kind: "add" });
@@ -296,6 +318,7 @@ function RepoRow({
   draft,
   bound,
   autoAssignLabelId,
+  labelName,
   nameOf,
   status,
   failureLine,
@@ -309,6 +332,7 @@ function RepoRow({
   draft: MappingDraft;
   bound: BoundProject;
   autoAssignLabelId: string | null;
+  labelName: (id: string) => string;
   nameOf: (id: string) => string;
   status: SaveStatus;
   failureLine: ReactNode;
@@ -320,6 +344,7 @@ function RepoRow({
   const t = useTranslations("settings.mapping");
   const goneId = useId();
   const routeHintId = useId();
+  const dropsLabelId = useId();
   const labels = (bound.labels.ok ? bound.labels.items : []).filter(
     (label) => label.id !== autoAssignLabelId,
   );
@@ -384,9 +409,18 @@ function RepoRow({
         <span ref={actionRef} {...stylex.props(styles.repoActions)}>
           {repo.isDefault ? null : (
             <>
-              <Button aria-label={t("makeDefaultLabel", { repo: name })} onClick={onMakeDefault}>
+              <Button
+                aria-label={t("makeDefaultLabel", { repo: name })}
+                {...(repo.labelId === null ? {} : { "aria-describedby": dropsLabelId })}
+                onClick={onMakeDefault}
+              >
                 {t("makeDefault")}
               </Button>
+              {repo.labelId === null ? null : (
+                <VisuallyHidden id={dropsLabelId}>
+                  {t("makeDefaultDropsLabel", { label: labelName(repo.labelId) })}
+                </VisuallyHidden>
+              )}
               <Button
                 variant="danger"
                 aria-label={t("removeLabel", { repo: name })}

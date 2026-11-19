@@ -293,6 +293,13 @@ describe("Tickets 수동 할당(브라우저, 0054)", () => {
     const title = await dialog.getByRole("heading").first().boundingBox();
     expect(box !== null && box.y >= 0 && box.y + box.height <= 568).toBe(true);
     expect(title !== null && title.y >= 0).toBe(true);
+    await submit.focus();
+    await page.keyboard.press("Tab");
+    const wrapped = await page.evaluate(() => {
+      const rect = document.activeElement?.getBoundingClientRect();
+      return rect === undefined ? null : { top: rect.top, bottom: rect.bottom };
+    });
+    expect(wrapped !== null && wrapped.top >= 0 && wrapped.bottom <= 568).toBe(true);
 
     await submit.click();
     await dialog.waitFor({ state: "hidden" });
