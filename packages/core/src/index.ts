@@ -10,6 +10,7 @@ export * from "./summary.js";
 export * from "./timing.js";
 export * from "./transition.js";
 export * from "./usage-limit.js";
+export * from "./worker-wake.js";
 
 export function isDefined<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;

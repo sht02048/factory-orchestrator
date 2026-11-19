@@ -45,6 +45,7 @@ import { processAfterRuns } from "./after-run.js";
 import { assignAutomatically, createAutoAssignState } from "./auto-assign.js";
 import { processWebRequests } from "./requests.js";
 import { checkRunners } from "./runner-check.js";
+import { startTickLoop } from "./tick-loop.js";
 import { watchActiveRuns } from "./watch.js";
 
 export type { WorkerLogger } from "./context.js";
@@ -63,6 +64,7 @@ export interface Worker {
 }
 
 export interface RunningWorker {
+  wake(): void;
   stop(): Promise<void>;
 }
 
@@ -72,25 +74,16 @@ const consoleLogger: WorkerLogger = {
 
 export function startWorker(options: WorkerOptions & { pollIntervalMs: number }): RunningWorker {
   const worker = createWorker(options);
-  const logger = options.logger ?? consoleLogger;
-  let stopped = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  const loop = async (): Promise<void> => {
-    timer = null;
-    try {
-      await worker.tick();
-    } catch (error) {
-      logger.warn("tick failed", { error });
-    }
-    if (!stopped) timer = setTimeout(() => void loop(), options.pollIntervalMs);
-  };
-  void loop();
+  const loop = startTickLoop({
+    tick: () => worker.tick(),
+    pollIntervalMs: options.pollIntervalMs,
+    logger: options.logger ?? consoleLogger,
+  });
 
   return {
+    wake: () => loop.wake(),
     stop: async () => {
-      stopped = true;
-      if (timer !== null) clearTimeout(timer);
+      loop.stop();
       await worker.close();
     },
   };
