@@ -153,7 +153,7 @@ export interface RunnersLinkProps {
 
 const ReportUnsavedContext = createContext<(formId: string, unsaved: boolean) => void>(() => {});
 
-function useReportUnsaved(unsaved: boolean): void {
+export function useReportUnsaved(unsaved: boolean): void {
   const report = use(ReportUnsavedContext);
   const formId = useId();
   useEffect(() => {

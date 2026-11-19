@@ -607,12 +607,7 @@ describe("다섯 단계를 마치기", () => {
       buttonsOf(table)
         .filter((b) => b.variant !== "other")
         .map((b) => b.label),
-    ).toEqual([
-      settingsMessages.settings.mapping.reload,
-      settingsMessages.settings.mapping.reload,
-      "이전",
-      "설정 마치기",
-    ]);
+    ).toEqual([settingsMessages.settings.mapping.reload, "이전", "설정 마치기"]);
 
     expect(
       saveMappingSetting(f.context, { ...project, runnerProjectId: repo, agentId: "claude" }),

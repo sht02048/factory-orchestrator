@@ -117,7 +117,7 @@
     "needRepo": "기본 저장소를 고르면 저장해요.",
     "modelSave": "모델은 칸을 벗어나거나 Enter를 누르면 저장해요.",
     "status": {
-      "saving": "저장 중",
+      "saving": "저장하는 중…",
       "saved": "저장했어요",
       "reverted": "되돌렸어요"
     },
@@ -146,11 +146,11 @@
     "hint": "이 라벨이 붙은 티켓은 운영자 없이 바로 할당해요. 라벨이 없는 티켓은 Tickets에서 직접 할당해요. 라벨은 트래커 연결마다 따로 정해요.",
     "label": "라벨",
     "choose": "라벨을 골라 주세요",
-    "listFailed": "트래커에서 라벨을 읽지 못했어요. {reason}",
-    "unknown": "트래커에 없는 라벨({id})",
+    "listFailed": "Linear에서 라벨을 읽지 못했어요. {reason}",
+    "unknown": "Linear에 없는 라벨({id})",
     "create": "{name} 라벨 만들기",
     "pickExisting": "{name} 고르기",
-    "creating": "만드는 중",
+    "creating": "만드는 중…",
     "created": "Linear에 {name} 라벨을 만들고 골랐어요",
     "picked": "{name} 라벨을 골랐어요",
     "gone": "Linear에 없어요. 이 라벨로는 더 할당하지 않아요. 다른 라벨을 고르거나 {name} 라벨을 만들어 주세요.",

@@ -16,6 +16,8 @@ import {
   GroupHeader,
   Input,
   Menu,
+  RadioGroup,
+  RadioOption,
   MenuItem,
   PILL_STATUSES,
   KanbanCard,
@@ -458,6 +460,25 @@ describe("서버 렌더", () => {
     expect(rail).toContain("Acme");
     expect(rail).not.toContain("<svg");
     expect(field).toContain("<svg");
+  });
+
+  it("Menu 트리거와 RadioGroup 은 설명 글을 aria-describedby 로 잇는다(0115)", () => {
+    const html = renderToString(
+      <>
+        <Menu label="Web에 저장소 더하기" describedBy="hint-a" trigger="저장소 더하기">
+          <MenuItem value="a">A</MenuItem>
+        </Menu>
+        <RadioGroup labelledBy="title-b" describedBy="hint-b">
+          <RadioOption name="r" value="a" checked onCheck={noop}>
+            A
+          </RadioOption>
+        </RadioGroup>
+      </>,
+    );
+    expect(html).toMatch(
+      /aria-label="Web에 저장소 더하기"[^>]*aria-describedby="hint-a"|aria-describedby="hint-a"[^>]*aria-label="Web에 저장소 더하기"/,
+    );
+    expect(html).toContain('role="radiogroup" aria-labelledby="title-b" aria-describedby="hint-b"');
   });
 
   it("팝업(Menu·Select·Dialog·Tooltip)은 닫힌 채 트리거만 보인다", () => {

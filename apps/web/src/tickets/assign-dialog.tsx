@@ -195,6 +195,7 @@ export function AssignForm({
   const { duration } = useTime();
   const repoLabelId = useId();
   const repoName = useId();
+  const repoHintId = useId();
   const runnerOptions = runnerOptionsFor(runners, repo, agent, {
     auto: t("runnerAuto"),
     offline: (name) => t("runnerOffline", { name }),
@@ -218,7 +219,7 @@ export function AssignForm({
         <Text variant="label" id={repoLabelId}>
           {t("project")}
         </Text>
-        <RadioGroup labelledBy={repoLabelId}>
+        <RadioGroup labelledBy={repoLabelId} describedBy={repoHintId}>
           {defaults.repos.map((choice) => {
             const reach = repoReach(runners, choice.id);
             return (
@@ -235,7 +236,7 @@ export function AssignForm({
                     <Text variant="ui" tone="strong" mono wrap="anywhere">
                       {choice.id}
                     </Text>
-                    {choice.isDefault ? <Chip tone="accent">{t("repoDefault")}</Chip> : null}
+                    {choice.isDefault ? <Chip strong>{t("repoDefault")}</Chip> : null}
                     {choice.label === null ? null : (
                       <Text variant="meta">{t("repoLabel", { label: choice.label })}</Text>
                     )}
@@ -250,7 +251,9 @@ export function AssignForm({
             );
           })}
         </RadioGroup>
-        <Text variant="meta">{t("projectHint")}</Text>
+        <Text variant="meta" id={repoHintId}>
+          {t("projectHint")}
+        </Text>
       </div>
       <Field label={t("runner")} description={t("runnerHint")}>
         <Select

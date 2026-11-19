@@ -1217,6 +1217,7 @@ function MappingStep({
               label={label}
               actions={actions}
               selectLabel={t("labelSelect", { connection: label.connection.name })}
+              showReload={false}
             />
           </div>
         </Card>

@@ -52,12 +52,14 @@ export function AutoAssignLabelPicker({
   actions,
   onSaved,
   selectLabel,
+  showReload = true,
 }: {
   ws: string;
   label: ConnectionLabel;
   actions: Pick<SettingsActions, "saveLabel" | "createLabel" | "reloadFromTracker">;
   onSaved?: () => void;
   selectLabel: string;
+  showReload?: boolean;
 }) {
   const t = useTranslations("settings.label");
   const labelReason = useLabelReason();
@@ -152,7 +154,7 @@ export function AutoAssignLabelPicker({
         ) : (
           <SaveStatusText status={status} />
         )}
-        <ReloadFromTracker onReload={actions.reloadFromTracker} />
+        {showReload ? <ReloadFromTracker onReload={actions.reloadFromTracker} /> : null}
       </div>
       {label.labels.ok ? null : (
         <Text variant="ui" as="p" tone="problem">

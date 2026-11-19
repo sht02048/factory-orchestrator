@@ -17,7 +17,7 @@ import {
   withRepoRemoved,
 } from "./mapping-draft";
 import type { MappingDraft, RepoDraft } from "./mapping-draft";
-import { useReason } from "./settings-screen";
+import { useReason, useReportUnsaved } from "./settings-screen";
 import type { ActionResult, SettingsActions } from "./settings-screen";
 import { useSyncedSave } from "./synced-save";
 import type { SaveStatus } from "./synced-save";
@@ -81,6 +81,7 @@ export function MappingEditor({
   const mappingReason = useMappingReason();
   const agentName = useAgentName();
   const headingId = useId();
+  const missingId = useId();
   const saved = mappingDraftOf(bound);
   const [target, setTarget] = useState(MAPPING_TARGET);
   const save = useSyncedSave<MappingDraft>({
@@ -116,6 +117,10 @@ export function MappingEditor({
   const nameOf = (id: string) => runnerProjects.find((p) => p.id === id)?.name ?? id;
   const addable = runnerProjects.filter((p) => !draft.repos.some((repo) => repo.id === p.id));
   const failure = save.state.kind === "failed" ? save.state.reason : null;
+  useReportUnsaved(
+    (!isCompleteDraft(draft) && mappingDraftKey(draft) !== mappingDraftKey(saved)) ||
+      model.trim() !== draft.model,
+  );
   const missing =
     draft.repos.length === 0 && draft.agent !== null
       ? t("needRepo")
@@ -180,6 +185,7 @@ export function MappingEditor({
           <span ref={addRef} {...stylex.props(styles.add)}>
             <Menu
               label={t("addLabel", { project: bound.project.name })}
+              {...(draft.repos.length === 0 && missing !== null ? { describedBy: missingId } : {})}
               trigger={draft.repos.length === 0 ? t("addFirst") : t("add")}
             >
               {addable.map((p) => (
@@ -199,6 +205,7 @@ export function MappingEditor({
       <div {...stylex.props(styles.fields)}>
         <Field label={t("agent")}>
           <Select
+            {...(draft.agent === null && missing !== null ? { "aria-describedby": missingId } : {})}
             options={agents.map((a) => ({ value: a, label: agentName(a) }))}
             value={draft.agent}
             onValueChange={(value) => change({ ...draft, agent: value }, MAPPING_TARGET)}
@@ -213,7 +220,7 @@ export function MappingEditor({
             }}
             onBlur={saveModel}
           >
-            <Field label={t("model")} description={t("modelDescription")}>
+            <Field label={t("model")} description={`${t("modelDescription")} ${t("modelSave")}`}>
               <Input
                 name="model"
                 value={model}
@@ -226,7 +233,11 @@ export function MappingEditor({
           </form>
         ) : null}
       </div>
-      {missing === null ? null : <Text variant="ui">{missing}</Text>}
+      {missing === null ? null : (
+        <Text variant="ui" id={missingId}>
+          {missing}
+        </Text>
+      )}
       {children}
     </div>
   );
@@ -305,7 +316,7 @@ function RepoRow({
           <Text variant="ui" tone="strong" mono wrap="anywhere">
             {name}
           </Text>
-          {repo.isDefault ? <Chip tone="accent">{t("default")}</Chip> : null}
+          {repo.isDefault ? <Chip strong>{t("default")}</Chip> : null}
         </span>
         <span {...stylex.props(styles.repoLabel)}>
           {repo.isDefault ? (
@@ -397,7 +408,7 @@ const styles = stylex.create({
     justifyContent: "space-between",
     gap: space.s2,
   },
-  repos: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
+  repos: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
   repoBlock: { display: "flex", flexDirection: "column", gap: space.s1, minWidth: 0 },
   repoRow: {
     display: "flex",
