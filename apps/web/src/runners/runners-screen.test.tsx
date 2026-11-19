@@ -83,7 +83,7 @@ function runner(overrides: Partial<RunnerView> & { id: string }): RunnerView {
   };
 }
 
-const callout = /<section aria-labelledby=/;
+const callout = /<section aria-labelledby="[^"]*"[^>]*><div[^>]*><span aria-hidden="true"/;
 
 describe("Runners 목록", () => {
   it("문제 있는 러너(Offline·Runner Issue)를 Online 러너보다 위에 두고 그 안의 순서는 지킨다", () => {
@@ -117,14 +117,15 @@ describe("Runners 목록", () => {
     ]);
   });
 
-  it('행에 이름·주소와 capacity 막대 "n/m", 그 아래 무엇이 문제인지 한 문장을 보인다', () => {
+  it('행에 알약·이름·주소, 그 아래 무엇이 문제인지 한 문장, 자리 칸과 "n/m"을 보인다(0092)', () => {
     const { db } = seedDatabase();
     breakGitHubAuth(db);
     const rows = rowsOf(render(loadRunnersPage(db, now)));
     const a = rows.find((r) => r.name === "runner-a")?.html ?? "";
-    expect(a).toMatch(/role="meter"[^>]*aria-valuetext="4\/10"/);
-    expect(a).toContain('data-tone="problem"');
-    expect(textOf(a)).toContain(`runner-a ${runnersJson.row.assignmentBlocked}`);
+    expect(a).not.toMatch(/role="meter"[^>]*aria-valuetext="4\/10"/);
+    expect(a).toMatch(/role="img" aria-label="10자리 중 4자리 사용" data-tone="problem"/);
+    expect(textOf(a)).toContain("4/10");
+    expect(textOf(a)).toContain(`Runner Issue runner-a ${runnersJson.row.assignmentBlocked}`);
     const b = rows.find((r) => r.name === "runner-b")?.html ?? "";
     expect(textOf(b)).toContain("오케스트레이터가 이 러너에 2시간째 닿지 않아요.");
   });
@@ -282,7 +283,10 @@ describe("Runners 고른 러너 패널", () => {
   it("지금 하는 런 블록은 n/capacity 와 쓰는 런·기다리는 런을 Run 상세 링크로 보인다", () => {
     const { db, ids } = seedDatabase();
     const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
-    expect(textOf(a)).toContain("지금 하는 런 · 4/10");
+    expect(textOf(a)).toContain(`${panel.slots} 4/10`);
+    expect(a).toMatch(
+      /<h3[^>]*>자리<\/h3><span[^>]*><span role="img" aria-label="10자리 중 4자리 사용"/,
+    );
     const statuses = pillsOf(a).map((p) => p.status);
     expect(statuses).toContain("running");
     expect(statuses).toContain("disconnected");
@@ -301,7 +305,7 @@ describe("Runners 고른 러너 패널", () => {
     const { db } = seedDatabase();
     breakGitHubAuth(db);
     const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
-    expect(textOf(a)).toContain("확인 항목 · 2/3 통과");
+    expect(textOf(a)).toContain(`${panel.checksTitle} 2/3 통과`);
     const states = [...a.matchAll(/data-check="([^"]+)"/g)].map((m) => m[1]);
     expect(states).toEqual(["broken", "ok", "ok"]);
     expect(a).toMatch(
@@ -316,8 +320,8 @@ describe("Runners 고른 러너 패널", () => {
     ]);
     expect(lines).toEqual([
       ["broken", `${panel.check.broken} GitHub push 권한: github:acme/web`],
-      ["ok", "Orca service"],
-      ["ok", "GitHub push 권한: github:acme/docs"],
+      ["ok", `${panel.check.ok} Orca service`],
+      ["ok", `${panel.check.ok} GitHub push 권한: github:acme/docs`],
     ]);
     expect(a).not.toContain('data-status="online" data-tone');
   });
@@ -342,7 +346,7 @@ describe("Runners 고른 러너 패널", () => {
         ],
       }),
     );
-    expect(textOf(html)).toContain("확인 항목 · 0/1 통과");
+    expect(textOf(html)).toContain(`${panel.checksTitle} 0/1 통과`);
     expect(html).toMatch(new RegExp(`data-check="unknown"[^]*?${panel.check.unknown}`));
   });
 
@@ -366,7 +370,7 @@ describe("Runners 고른 러너 패널", () => {
       ],
     });
     const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
-    expect(textOf(a)).toContain("확인 항목 · 0/1 통과");
+    expect(textOf(a)).toContain(`${panel.checksTitle} 0/1 통과`);
     expect(textOf(a)).toContain("Orca 상시 서비스 orca serve service install");
     expect(a).not.toMatch(callout);
   });
@@ -477,16 +481,17 @@ describe("공급자 사용량(0086)", () => {
     ]);
   });
 
-  it("패널에 쓰는 공급자의 있는 창만, 로그인 안 한 공급자는 한 줄, 그 밖은 접어 두고 읽은 시각과 안내를 보인다", () => {
+  it("패널에 쓰는 공급자의 있는 창만, 로그인 안 한 공급자와 쓰지 않는 공급자는 한 줄로 접고 읽은 시각과 안내를 보인다", () => {
     const html = panelHtml(render(seededWithUsage(), "runner-a"));
     const text = textOf(html);
     expect(text).toContain(panel.usage.title);
     expect(text).toContain("3분 전 읽었어요");
-    expect(text).toMatch(/5시간 \S+에 초기화돼요/);
+    expect(text).toMatch(/5시간 100% \S+에 초기화돼요 · 한도에 닿았어요/);
+    expect(text).toContain("주간 72% Fable 주간 9%");
     expect(text).toContain("Fable 주간");
     expect(text).not.toContain("월간");
-    expect(text).toContain("로그인하지 않았어요: Kimi, Cursor");
-    expect(html).toMatch(/<details[^>]*><summary[^>]*>쓰지 않는 공급자 1개<\/summary>/);
+    expect(text).toContain("Kimi, Cursor · 로그인하지 않았어요 · 쓰지 않는 공급자 1개");
+    expect(html).not.toContain("<details");
     expect(text).toContain("newbie");
     expect(text).toContain(panel.usage.error);
     expect(text).toContain(panel.usage.privacy);
@@ -498,5 +503,120 @@ describe("공급자 사용량(0086)", () => {
     const fresh = render({ runners: [runner({ id: "new" })] }, "new");
     expect(textOf(panelHtml(fresh))).toContain(panel.usage.notRead);
     expect(textOf(rowsOf(fresh)[0]?.html ?? "")).toContain(usage.notRead);
+  });
+});
+
+describe("Runners 다시 그리기(0092)", () => {
+  const usage = runnersJson.usage;
+  const readAt = new Date(now.getTime() - 3 * 60_000);
+
+  function withUsage(
+    windows: { kind: "session" | "weekly"; usedPercent: number; resetsAt: Date | null }[],
+  ) {
+    const { db } = seedDatabase();
+    recordProviderUsage(db, {
+      runnerId: toRunnerId("runner-a"),
+      readAt,
+      reading: { kind: "read", providers: [{ provider: "claude", status: "ok", windows }] },
+    });
+    return loadRunnersPage(db, now);
+  }
+
+  it("목록 위에 러너 / 자리 / 사용량(가장 높은 값) 열 머리를 둔다", () => {
+    const html = render(withUsage([]));
+    const head = html.slice(0, html.indexOf('role="listbox"'));
+    expect(textOf(head)).toContain(
+      `${runnersJson.columns.runner} ${runnersJson.columns.slots} ${runnersJson.columns.usage}`,
+    );
+    expect(head).toMatch(/aria-hidden="true"/);
+  });
+
+  it("행의 사용량은 이름과 %를 한 줄에, 막대를 그 아래에 둔다", () => {
+    const page = withUsage([{ kind: "session", usedPercent: 93, resetsAt: null }]);
+    const a = rowsOf(render(page)).find((r) => r.name === "runner-a")?.html ?? "";
+    expect(a).toMatch(
+      /role="meter"[^>]*aria-valuetext="93%"[^>]*><span aria-hidden="true"[^>]*><span[^>]*>Claude 5시간<\/span><span[^>]*>93%<\/span><\/span><div/,
+    );
+    expect(a).toContain('data-tone="problem"');
+  });
+
+  it("사용량을 읽지 못한 러너의 사용량 칸은 한 줄 글이다", () => {
+    const { db } = seedDatabase();
+    recordProviderUsage(db, {
+      runnerId: toRunnerId("runner-a"),
+      readAt,
+      reading: { kind: "unreadable" },
+    });
+    const a =
+      rowsOf(render(loadRunnersPage(db, now))).find((r) => r.name === "runner-a")?.html ?? "";
+    expect(textOf(a)).toContain(usage.unreadable);
+    expect(a).not.toContain('role="meter"');
+  });
+
+  it("문제 러너의 이유 한 줄은 problem 색, Online 러너는 아니다", () => {
+    const page: RunnersPage = {
+      runners: [runner({ id: "down", online: false }), runner({ id: "ok" })],
+    };
+    const html = render(page);
+    const [down, ok] = rowsOf(html);
+    const reasonClass = (row: string, text: string) =>
+      new RegExp(`class="([^"]*)"[^>]*>${text}<`).exec(row)?.[1] ?? "";
+    const problemClass = reasonClass(down?.html ?? "", runnersJson.row.offline);
+    const okClass = reasonClass(ok?.html ?? "", runnersJson.row.free.replace("{free}", "2"));
+    expect(problemClass).not.toBe("");
+    expect(okClass).not.toBe("");
+    expect(problemClass).not.toBe(okClass);
+  });
+
+  it("패널은 머리 → 문제 상자 → 자리 → 공급자 사용량 → 확인 항목 순서다", () => {
+    const { db } = seedDatabase();
+    breakGitHubAuth(db);
+    const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
+    const at = (needle: string) => a.indexOf(needle);
+    const order = [
+      at("<h2"),
+      at(panel.fix.assignmentBlocked.title),
+      at(`>${panel.slots}</h3>`),
+      at(`>${panel.usage.title}</h3>`),
+      at(`>${panel.checksTitle}</h3>`),
+    ];
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((x, y) => x - y));
+  });
+
+  it("공급자 사용량 머리 오른쪽에 읽은 시각, 확인 항목 머리 오른쪽에 통과 수를 둔다", () => {
+    const { db } = seedDatabase();
+    breakGitHubAuth(db);
+    recordProviderUsage(db, {
+      runnerId: toRunnerId("runner-a"),
+      readAt,
+      reading: { kind: "read", providers: [] },
+    });
+    const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
+    expect(a).toMatch(new RegExp(`>${panel.usage.title}</h3><span[^>]*>3분 전 읽었어요</span>`));
+    expect(a).toMatch(new RegExp(`>${panel.checksTitle}</h3><span[^>]*>2/3 통과</span>`));
+  });
+
+  it("확인 항목은 통과한 것도 상태 낱말 칸을 채워 항목 이름이 한 줄로 맞는다", () => {
+    const { db } = seedDatabase();
+    breakGitHubAuth(db);
+    const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
+    const words = [...a.matchAll(/data-check="[^"]+"[^>]*><span[^>]*>([^<]+)<\/span>/g)].map(
+      (m) => m[1],
+    );
+    expect(words).toEqual([panel.check.broken, panel.check.ok, panel.check.ok]);
+  });
+
+  it("초기화 시각이 지난 100% 창은 한도라고 하지 않는다", () => {
+    const past = new Date(now.getTime() - 60_000);
+    const a = panelHtml(
+      render(withUsage([{ kind: "session", usedPercent: 100, resetsAt: past }]), "runner-a"),
+    );
+    expect(textOf(a)).not.toContain(panel.usage.atLimit);
+    const future = new Date(now.getTime() + 60_000);
+    const b = panelHtml(
+      render(withUsage([{ kind: "session", usedPercent: 100, resetsAt: future }]), "runner-a"),
+    );
+    expect(textOf(b)).toContain(panel.usage.atLimit);
   });
 });

@@ -191,4 +191,6 @@ export {
 export { Toaster, showToast, type ToasterProps } from "./components/toast";
 export { Tooltip, type TooltipAction, type TooltipProps } from "./components/tooltip";
 export { UsageBar, usageText, type UsageBarProps, type UsageTone } from "./components/usage-bar";
+export { UsageMeter, type UsageMeterProps } from "./components/usage-meter";
+export { PanelSection, type PanelSectionProps } from "./components/panel-section";
 export { VisuallyHidden, visuallyHiddenStyles } from "./components/visually-hidden";

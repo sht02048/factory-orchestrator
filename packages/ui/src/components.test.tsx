@@ -39,6 +39,8 @@ import {
   Text,
   Tooltip,
   UsageBar,
+  UsageMeter,
+  PanelSection,
   statusTone,
   surfaceStyles,
   textStyles,
@@ -548,6 +550,40 @@ describe("새 컴포넌트(티켓 0073)", () => {
     expect(over).toContain('data-tone="problem"');
     expect(over).toContain('aria-valuenow="100"');
     expect(over).toContain('aria-valuetext="130%"');
+  });
+
+  it("UsageMeter 는 이름과 %를 한 줄에, 막대를 그 아래에 두고 meter 하나로 읽는다", () => {
+    const html = renderToString(
+      <UsageMeter
+        name="Claude 5시간"
+        percent={93.2}
+        label="runner-a Claude 5시간"
+        tone="problem"
+      />,
+    );
+    expect(html).toContain('role="meter"');
+    expect(html).toContain('aria-label="runner-a Claude 5시간"');
+    expect(html).toContain('aria-valuetext="93%"');
+    expect(html).toContain('data-tone="problem"');
+    expect(html).toMatch(
+      /<span aria-hidden="true"[^>]*><span[^>]*>Claude 5시간<\/span><span[^>]*>93%<\/span><\/span><div/,
+    );
+    const over = renderToString(<UsageMeter name="주간" percent={130} label="주간" />);
+    expect(over).toContain('aria-valuenow="100"');
+    expect(over).toContain('data-tone="neutral"');
+  });
+
+  it("PanelSection 은 제목 h3 로 이름 붙은 section 이고 meta 를 제목 줄 끝에 둔다", () => {
+    const html = renderToString(
+      <PanelSection title="자리" meta="1/2">
+        <p>본문</p>
+      </PanelSection>,
+    );
+    const id = /<section aria-labelledby="([^"]+)"/.exec(html)?.[1] ?? "";
+    expect(id).not.toBe("");
+    expect(html).toContain(`<h3 id="${id}"`);
+    expect(html).toMatch(/>자리<\/h3><span[^>]*>1\/2<\/span><\/div><p>본문<\/p>/);
+    expect(renderToString(<PanelSection title="t">x</PanelSection>)).not.toMatch(/<\/h3><span/);
   });
 
   it("CapacityCells 는 자리 하나를 칸 하나로 그리고 칸 묶음을 이름 하나로 읽는다", () => {

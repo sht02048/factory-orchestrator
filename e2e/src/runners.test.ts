@@ -15,6 +15,7 @@ import {
   SecretBox,
   migrate,
   openDatabase,
+  recordProviderUsage,
   recordRunnerCheck,
   saveAutoAssignLabel,
   saveCodeHostConnection,
@@ -165,6 +166,60 @@ describe("Runners 목록 + 패널(브라우저, 0057·0071)", () => {
   });
 });
 
+describe("Runners 다시 그리기(브라우저, 0092)", () => {
+  it("1280px에서 행의 세 칸이 열 머리와 같은 x에서 시작하고 목록은 900px를 넘지 않는다", async (context) => {
+    const page = await openPage(context.task.name, { width: 1280, height: 800 });
+    await page.goto(`/runners?ws=${workspaceId}&sel=${longRunner}`);
+    await hydrated(page);
+
+    const header = page
+      .getByRole("main")
+      .locator("span")
+      .filter({ hasText: new RegExp(`^${runners.columns.slots}$`) })
+      .first();
+    const usageHeader = page.getByText(runners.columns.usage, { exact: true });
+    const row = page.getByRole("option").filter({ has: page.locator(`#runner-${longRunner}`) });
+    const slots = row.getByRole("img", { name: "2자리 중 0자리 사용" });
+    const meter = row.getByRole("meter");
+    const [headerBox, usageHeaderBox, slotsBox, meterBox, listBox] = await Promise.all([
+      header.boundingBox(),
+      usageHeader.boundingBox(),
+      slots.boundingBox(),
+      meter.boundingBox(),
+      page.getByRole("listbox", { name: runners.listLabel }).boundingBox(),
+    ]);
+    expect(Math.round(slotsBox?.x ?? -1)).toBe(Math.round(headerBox?.x ?? -2));
+    expect(Math.round(meterBox?.x ?? -1)).toBe(Math.round(usageHeaderBox?.x ?? -2));
+    expect(listBox?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(900);
+  });
+
+  it("패널의 사용량 막대와 확인 항목 이름이 같은 x에서 시작한다", async (context) => {
+    const page = await openPage(context.task.name, { width: 1280, height: 1000 });
+    await page.goto(`/runners?ws=${workspaceId}&sel=${longRunner}`);
+    await hydrated(page);
+
+    const panel = page.getByRole("region", { name: runners.panel.label });
+    const bar = panel.getByRole("meter").first();
+    const check = panel.getByText(`GitHub push 권한: ${longProject}`, { exact: true });
+    await check.waitFor();
+    const [barBox, checkBox] = await Promise.all([bar.boundingBox(), check.boundingBox()]);
+    expect(Math.round(barBox?.x ?? -1)).toBe(Math.round(checkBox?.x ?? -2));
+    expect(await panel.getByText(runners.panel.usage.atLimit, { exact: false }).count()).toBe(1);
+  });
+
+  it("400px에서 페이지가 가로로 넘치지 않는다", async (context) => {
+    const page = await openPage(context.task.name, { width: 400, height: 800 });
+    await page.goto(`/runners?ws=${workspaceId}&sel=${longRunner}`);
+    await hydrated(page);
+
+    const overflow: unknown = await page.evaluate(
+      "document.documentElement.scrollWidth - document.documentElement.clientWidth",
+    );
+    expect(overflow).toBe(0);
+    expect(await page.getByText(runners.columns.usage, { exact: true }).isVisible()).toBe(false);
+  });
+});
+
 interface TextLayout {
   whiteSpace: string;
   textOverflow: string;
@@ -273,6 +328,24 @@ function seed(db: Database): void {
         blocksAssignment: false,
       },
     ],
+  });
+
+  recordProviderUsage(db, {
+    runnerId: longRunner,
+    readAt: new Date(),
+    reading: {
+      kind: "read",
+      providers: [
+        {
+          provider: "claude",
+          status: "ok",
+          windows: [
+            { kind: "session", usedPercent: 100, resetsAt: new Date(Date.now() + 60 * 60_000) },
+            { kind: "weekly", usedPercent: 42, resetsAt: null },
+          ],
+        },
+      ],
+    },
   });
 
   for (let i = 0; i < fillerCount; i += 1) {

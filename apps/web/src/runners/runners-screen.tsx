@@ -2,12 +2,11 @@ import * as stylex from "@stylexjs/stylex";
 import {
   Button,
   buttonStyles,
-  CapacityBar,
+  CapacityCells,
   DetailPanel,
-  Disclosure,
   MascotMessage,
   PageHeader,
-  PanelBlock,
+  PanelSection,
   ProblemCallout,
   Row,
   RowTitle,
@@ -15,14 +14,17 @@ import {
   StatusPill,
   Table,
   TableCell,
+  TableHead,
+  TableHeader,
   TableRow,
   TableRows,
   Text,
   textStyles,
   UsageBar,
+  UsageMeter,
 } from "@ganger/ui";
 import { USAGE_HIGH_PERCENT } from "@ganger/core";
-import { fonts, size, space } from "@ganger/ui/tokens.stylex";
+import { breakpoints, fonts, size, space } from "@ganger/ui/tokens.stylex";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
@@ -60,8 +62,6 @@ export interface RunnersScreenProps {
   actions: RunnerActions;
 }
 
-const columns = `${size.runnerStatusColumn} minmax(0, 1fr) ${size.usageColumn} ${size.capacityColumn}`;
-
 export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: RunnersScreenProps) {
   const t = useTranslations("runners");
   const runners = problemRunnersFirst(page.runners);
@@ -82,7 +82,7 @@ export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: Runne
   return (
     <SplitView
       list={
-        <>
+        <div {...stylex.props(styles.listColumn)}>
           <PageHeader
             title={t("title")}
             subtitle={
@@ -103,7 +103,18 @@ export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: Runne
           {runners.length === 0 ? (
             <EmptyRunners />
           ) : (
-            <Table columns={columns}>
+            <Table columns="minmax(0, 1fr)">
+              <div {...stylex.props(styles.head)}>
+                <TableHead>
+                  <TableHeader>
+                    <span {...stylex.props(styles.rowGrid)}>
+                      <span>{t("columns.runner")}</span>
+                      <span>{t("columns.slots")}</span>
+                      <span>{t("columns.usage")}</span>
+                    </span>
+                  </TableHeader>
+                </TableHead>
+              </div>
               <TableRows
                 label={t("listLabel")}
                 value={selected?.id ?? null}
@@ -115,7 +126,7 @@ export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: Runne
               </TableRows>
             </Table>
           )}
-        </>
+        </div>
       }
       panel={
         <section aria-label={t("panel.label")}>
@@ -147,43 +158,52 @@ export function rowMarkerId(runnerId: string): string {
 }
 
 function RunnerRow({ runner }: { runner: RunnerView }) {
-  const t = useTranslations("runners");
   const statusName = useStatusName();
   const status = runnerRowStatus(runner);
   return (
     <TableRow value={runner.id} label={runner.name}>
       <TableCell>
-        <StatusPill status={status}>{statusName(status)}</StatusPill>
-      </TableCell>
-      <TableCell>
-        <span id={rowMarkerId(runner.id)} {...stylex.props(styles.rowText)}>
-          <span {...stylex.props(styles.rowHead)}>
-            <span {...stylex.props(styles.rowName)}>
-              <RowTitle>{runner.name}</RowTitle>
+        <span id={rowMarkerId(runner.id)} {...stylex.props(styles.rowGrid)}>
+          <span {...stylex.props(styles.rowText)}>
+            <span {...stylex.props(styles.rowHead)}>
+              <StatusPill status={status}>{statusName(status)}</StatusPill>
+              <span {...stylex.props(styles.rowName)}>
+                <RowTitle>{runner.name}</RowTitle>
+              </span>
+              {runner.sshTarget === null ? null : (
+                <span {...stylex.props(styles.rowHost)}>
+                  <Text variant="meta" mono truncate>
+                    {runner.sshTarget}
+                  </Text>
+                </span>
+              )}
             </span>
-            {runner.sshTarget === null ? null : (
-              <Text variant="meta" mono truncate>
-                {runner.sshTarget}
-              </Text>
-            )}
+            <Text variant="ui" {...(status === "online" ? {} : { tone: "problem" })} truncate>
+              <RowSentence runner={runner} />
+            </Text>
           </span>
-          <Text variant="meta" truncate>
-            <RowSentence runner={runner} />
-          </Text>
+          <span {...stylex.props(styles.slotsCell)}>
+            <RunnerSlots runner={runner} />
+          </span>
+          <span {...stylex.props(styles.usageCell)}>
+            <HighestUsage runner={runner} />
+          </span>
         </span>
       </TableCell>
-      <TableCell>
-        <HighestUsage runner={runner} />
-      </TableCell>
-      <TableCell>
-        <CapacityBar
-          used={runner.occupying.length}
-          total={runner.capacity}
-          label={t("capacityLabel", { name: runner.name })}
-          tone={status === "online" ? "progress" : "problem"}
-        />
-      </TableCell>
     </TableRow>
+  );
+}
+
+function RunnerSlots({ runner }: { runner: RunnerView }) {
+  const t = useTranslations("runners");
+  const used = runner.occupying.length;
+  return (
+    <CapacityCells
+      used={used}
+      total={runner.capacity}
+      label={t("slotsLabel", { used, total: runner.capacity })}
+      tone={runnerRowStatus(runner) === "online" ? "progress" : "problem"}
+    />
   );
 }
 
@@ -241,7 +261,7 @@ function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerA
           onRecheck={recheck.request}
         />
       )}
-      <RunList runner={runner} />
+      <SlotRuns runner={runner} />
       <ProviderUsage runner={runner} />
       <CheckList runner={runner} />
       <LeftWorktrees runner={runner} />
@@ -341,17 +361,17 @@ function FixCallout({
   );
 }
 
-function RunList({ runner }: { runner: RunnerView }) {
+function SlotRuns({ runner }: { runner: RunnerView }) {
   const t = useTranslations("runners.panel");
   const statusName = useStatusName();
   const { elapsed, duration } = useTime();
   const empty = runner.occupying.length === 0 && runner.queued.length === 0;
   return (
-    <PanelBlock title={t("runs", { occupied: runner.occupying.length, capacity: runner.capacity })}>
+    <PanelSection title={t("slots")} meta={<RunnerSlots runner={runner} />}>
       {empty ? (
-        <Text variant="meta">{t("noRuns")}</Text>
+        <Text variant="ui">{t("noRuns")}</Text>
       ) : (
-        <ol {...stylex.props(styles.list)}>
+        <ol {...stylex.props(styles.list, styles.rowList)}>
           {runner.occupying.map((run) => (
             <li key={run.id}>
               <Row
@@ -376,7 +396,7 @@ function RunList({ runner }: { runner: RunnerView }) {
           ))}
         </ol>
       )}
-    </PanelBlock>
+    </PanelSection>
   );
 }
 
@@ -398,24 +418,27 @@ function CheckList({ runner }: { runner: RunnerView }) {
   const prerequisiteName = usePrerequisiteName();
   if (!runner.online) {
     return (
-      <PanelBlock title={t("checksTitle")}>
+      <PanelSection title={t("checksTitle")}>
         <ul {...stylex.props(styles.list)}>
           <CheckLine state="broken">{t("unreachable")}</CheckLine>
         </ul>
-      </PanelBlock>
+      </PanelSection>
     );
   }
   const checks = runner.checks;
   if (checks === null || checks.length === 0) {
     return (
-      <PanelBlock title={t("checksTitle")}>
-        <Text variant="meta">{t("noChecks")}</Text>
-      </PanelBlock>
+      <PanelSection title={t("checksTitle")}>
+        <Text variant="ui">{t("noChecks")}</Text>
+      </PanelSection>
     );
   }
   const passed = checks.filter((check) => check.satisfied === true).length;
   return (
-    <PanelBlock title={t("checks", { passed, total: checks.length })}>
+    <PanelSection
+      title={t("checksTitle")}
+      meta={t("checksPassed", { passed, total: checks.length })}
+    >
       <ul {...stylex.props(styles.list)}>
         {failedChecksFirst(checks).map((check) => (
           <CheckLine
@@ -427,7 +450,7 @@ function CheckList({ runner }: { runner: RunnerView }) {
           </CheckLine>
         ))}
       </ul>
-    </PanelBlock>
+    </PanelSection>
   );
 }
 
@@ -449,10 +472,12 @@ function CheckLine({
 }) {
   const t = useTranslations("runners.panel.check");
   return (
-    <li data-check={state} {...stylex.props(styles.check)}>
-      {state === "ok" ? null : <Text variant="meta">{t(state)}</Text>}
+    <li data-check={state} {...stylex.props(styles.labelGrid)}>
+      <Text variant="ui" tone={state === "broken" ? "problem" : "muted"}>
+        {t(state)}
+      </Text>
       <span {...stylex.props(styles.checkText, styles.wrap)}>
-        <Text variant="body" as="span">
+        <Text variant="ui" tone="strong" as="span">
           {children}
         </Text>
         {hint === null ? null : (
@@ -469,8 +494,11 @@ function LeftWorktrees({ runner }: { runner: RunnerView }) {
   const t = useTranslations("runners.panel");
   if (runner.leftWorktrees.length === 0) return null;
   return (
-    <PanelBlock title={t("leftWorktrees", { count: runner.leftWorktrees.length })}>
-      <ul {...stylex.props(styles.list)}>
+    <PanelSection
+      title={t("leftWorktrees")}
+      meta={t("leftWorktreesCount", { count: runner.leftWorktrees.length })}
+    >
+      <ul {...stylex.props(styles.list, styles.rowList)}>
         {runner.leftWorktrees.map((run) => (
           <li key={run.id}>
             <Row href={runHref(run.workspace.id, run.id)}>
@@ -485,7 +513,7 @@ function LeftWorktrees({ runner }: { runner: RunnerView }) {
           </li>
         ))}
       </ul>
-    </PanelBlock>
+    </PanelSection>
   );
 }
 
@@ -503,16 +531,12 @@ function HighestUsage({ runner }: { runner: RunnerView }) {
   const provider = names.provider(usage.highest.provider);
   const window = names.window(usage.highest.window.kind);
   return (
-    <span {...stylex.props(styles.usageCell)}>
-      <Text variant="meta" truncate>
-        {t("name", { provider, window })}
-      </Text>
-      <UsageBar
-        percent={usage.highest.window.usedPercent}
-        label={t("barLabel", { runner: runner.name, provider, window })}
-        tone={usageTone(usage.highest.window)}
-      />
-    </span>
+    <UsageMeter
+      name={t("name", { provider, window })}
+      percent={usage.highest.window.usedPercent}
+      label={t("barLabel", { runner: runner.name, provider, window })}
+      tone={usageTone(usage.highest.window)}
+    />
   );
 }
 
@@ -521,23 +545,19 @@ function ProviderUsage({ runner }: { runner: RunnerView }) {
   const { ago } = useTime();
   const usage = runner.usage;
   return (
-    <PanelBlock title={t("title")}>
-      <div {...stylex.props(styles.usage)}>
-        {usage === null ? (
-          <Text variant="meta">{t("notRead")}</Text>
-        ) : (
-          <>
-            <Text variant="meta">{t("readAgo", { time: ago(usage.readAt, usage.agoMs) })}</Text>
-            {usage.kind === "unreadable" ? (
-              <Text variant="body">{t("unreadable")}</Text>
-            ) : (
-              <ProviderUsageList runner={runner} usage={usage} />
-            )}
-          </>
-        )}
-        <Text variant="meta">{t("privacy")}</Text>
-      </div>
-    </PanelBlock>
+    <PanelSection
+      title={t("title")}
+      meta={usage === null ? undefined : t("readAgo", { time: ago(usage.readAt, usage.agoMs) })}
+    >
+      {usage === null ? (
+        <Text variant="ui">{t("notRead")}</Text>
+      ) : usage.kind === "unreadable" ? (
+        <Text variant="ui">{t("unreadable")}</Text>
+      ) : (
+        <ProviderUsageList runner={runner} usage={usage} />
+      )}
+      <Text variant="meta">{t("privacy")}</Text>
+    </PanelSection>
   );
 }
 
@@ -553,6 +573,18 @@ function ProviderUsageList({
   const using = usage.providers.filter((p) => p.status === "ok" || p.status === "error");
   const signedOut = usage.providers.filter((p) => p.status === "signed-out");
   const unavailable = usage.providers.filter((p) => p.status === "unavailable");
+  const signedOutText =
+    signedOut.length === 0
+      ? null
+      : t("signedOut", {
+          providers: signedOut.map((p) => names.provider(p.provider)).join(", "),
+        });
+  const unavailableText =
+    unavailable.length === 0 ? null : t("unavailable", { count: unavailable.length });
+  const others =
+    signedOutText !== null && unavailableText !== null
+      ? t("others", { signedOut: signedOutText, unavailable: unavailableText })
+      : (signedOutText ?? unavailableText);
   return (
     <>
       {using.map((provider) => (
@@ -563,26 +595,7 @@ function ProviderUsageList({
           now={usage.now}
         />
       ))}
-      {signedOut.length === 0 ? null : (
-        <Text variant="meta">
-          {t("signedOut", {
-            providers: signedOut.map((p) => names.provider(p.provider)).join(", "),
-          })}
-        </Text>
-      )}
-      {unavailable.length === 0 ? null : (
-        <Disclosure summary={t("unavailable", { count: unavailable.length })}>
-          <ul {...stylex.props(styles.list)}>
-            {unavailable.map((p) => (
-              <li key={p.provider}>
-                <Text variant="body" as="span">
-                  {names.provider(p.provider)}
-                </Text>
-              </li>
-            ))}
-          </ul>
-        </Disclosure>
-      )}
+      {others === null ? null : <Text variant="ui">{others}</Text>}
     </>
   );
 }
@@ -605,25 +618,21 @@ function ProviderWindows({
     <section aria-label={name} {...stylex.props(styles.provider)}>
       <Text variant="title">{name}</Text>
       {provider.status === "error" ? (
-        <Text variant="meta">{t("error")}</Text>
+        <Text variant="ui">{t("error")}</Text>
       ) : provider.windows.length === 0 ? (
-        <Text variant="meta">{t("noWindows")}</Text>
+        <Text variant="ui">{t("noWindows")}</Text>
       ) : (
-        <ul {...stylex.props(styles.list)}>
+        <ul {...stylex.props(styles.list, styles.windows)}>
           {provider.windows.map((window) => {
             const windowName = names.window(window.kind);
+            const atLimit = isAtLimit(window, now);
             return (
-              <li key={window.kind} {...stylex.props(styles.window)}>
-                <span {...stylex.props(styles.windowHead)}>
-                  <Text variant="body" as="span">
-                    {windowName}
-                  </Text>
-                  {window.resetsAt === null ? null : (
-                    <Text variant="meta">
-                      {t("resetsAt", { time: stamp(window.resetsAt, now) })}
-                    </Text>
-                  )}
-                </span>
+              <li
+                key={window.kind}
+                data-window={window.kind}
+                {...stylex.props(styles.labelGrid, styles.windowGrid)}
+              >
+                <Text variant="ui">{windowName}</Text>
                 <UsageBar
                   percent={window.usedPercent}
                   label={tUsage("barLabel", {
@@ -633,6 +642,20 @@ function ProviderWindows({
                   })}
                   tone={usageTone(window)}
                 />
+                {window.resetsAt === null && !atLimit ? null : (
+                  <span {...stylex.props(styles.labelGridRest)}>
+                    <Text variant="meta">
+                      {[
+                        window.resetsAt === null
+                          ? null
+                          : t("resetsAt", { time: stamp(window.resetsAt, now) }),
+                        atLimit ? t("atLimit") : null,
+                      ]
+                        .filter((part) => part !== null)
+                        .join(" · ")}
+                    </Text>
+                  </span>
+                )}
               </li>
             );
           })}
@@ -642,39 +665,76 @@ function ProviderWindows({
   );
 }
 
+function isAtLimit(window: UsageWindowView, now: string): boolean {
+  if (window.usedPercent < 100) return false;
+  return window.resetsAt === null || Date.parse(window.resetsAt) > Date.parse(now);
+}
+
 function runHref(workspaceId: string, runId: string): string {
   return `/runs/${encodeURIComponent(runId)}?${new URLSearchParams({ ws: workspaceId }).toString()}`;
 }
 
 const styles = stylex.create({
-  rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  rowHead: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
+  listColumn: {
+    containerType: "inline-size",
+    maxWidth: size.runnerListMaxWidth,
+    minWidth: 0,
+  },
+  rowGrid: {
+    display: "grid",
+    gridTemplateColumns: {
+      default: `minmax(0, 1fr) ${size.slotsColumn} ${size.usageColumn}`,
+      [breakpoints.runnerRowStacked]: "auto minmax(0, 1fr)",
+    },
+    alignItems: "center",
+    columnGap: space.s5,
+    rowGap: space.s2,
+    minWidth: 0,
+  },
+  head: {
+    display: { default: "block", [breakpoints.runnerRowStacked]: "none" },
+  },
+  rowText: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.px2,
+    minWidth: 0,
+    gridColumn: { default: "auto", [breakpoints.runnerRowStacked]: "1 / -1" },
+  },
+  rowHead: { display: "flex", alignItems: "center", gap: space.s2, minWidth: 0 },
   rowName: { display: "flex", flexShrink: 0, maxWidth: "100%" },
+  rowHost: { minWidth: 0 },
+  slotsCell: { display: "flex", minWidth: 0 },
+  usageCell: { minWidth: 0 },
   panelHead: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   statusLine: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
   wrap: { minWidth: 0, overflowWrap: "anywhere" },
   list: {
     display: "flex",
     flexDirection: "column",
-    gap: space.px2,
+    gap: space.s2,
     margin: 0,
     padding: 0,
     listStyle: "none",
     minWidth: 0,
   },
+  rowList: {
+    gap: space.px2,
+    marginInline: `calc(${space.s3} * -1)`,
+  },
+  windows: { gap: space.s3 },
+  labelGrid: {
+    display: "grid",
+    gridTemplateColumns: `${size.panelLabelColumn} minmax(0, 1fr)`,
+    alignItems: "baseline",
+    columnGap: space.s3,
+    rowGap: space.s1,
+    minWidth: 0,
+  },
+  windowGrid: { alignItems: "center" },
+  labelGridRest: { gridColumn: "2 / -1", minWidth: 0 },
   runLabel: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
-  check: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
   checkText: { display: "flex", flexDirection: "column", gap: space.px2 },
   code: { fontFamily: fonts.mono },
-  usageCell: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  usage: { display: "flex", flexDirection: "column", gap: space.s3, minWidth: 0 },
   provider: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
-  window: { display: "flex", flexDirection: "column", gap: space.s1, minWidth: 0 },
-  windowHead: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: space.s2,
-  },
 });
