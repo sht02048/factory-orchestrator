@@ -180,10 +180,10 @@ export function CommandFlow({
   }, [registered, onRegistered]);
 
   return (
-    <Card label={t("title")}>
+    <Card label={t("title")} surface="plain">
       <div {...stylex.props(styles.stack)}>
         <div {...stylex.props(styles.group)}>
-          <Text variant="title" as="h2">
+          <Text variant="title" as="h3">
             <span ref={titleRef} tabIndex={-1} {...stylex.props(focusStyles.ring)}>
               {t("title")}
             </span>
@@ -292,11 +292,12 @@ function Steps({
               </Text>
             ) : stopped ? (
               <Text variant="meta">{t("expiredHere")}</Text>
-            ) : null}
+            ) : (
+              <CommandBox issued={issued} left={left} />
+            )}
           </span>,
         ]}
       />
-      {issued === null || stopped ? null : <CommandBox issued={issued} left={left} />}
     </section>
   );
 }
