@@ -96,7 +96,7 @@ function listOnLines(body: string): ListParse | null {
     if (items.length < 2) continue;
     const lead = lines.slice(0, start).join("\n");
     const after = lines.slice(end).join("\n");
-    if (!ASKS.test(lead) && !ASKS.test(after)) return null;
+    if (!ASKS.test(lead)) return null;
     return { lead, items, after };
   }
   return null;
@@ -129,7 +129,7 @@ function listInline(body: string): ListParse | null {
     );
     lastItem.text = lastText;
     const lead = body.slice(0, head.start);
-    if (!ASKS.test(lead) && !ASKS.test(tail)) continue;
+    if (!ASKS.test(lead)) continue;
     return {
       lead,
       items: items.map((item) => ({ label: item.label, text: item.text.trim() })),

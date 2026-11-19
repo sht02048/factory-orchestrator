@@ -89,6 +89,12 @@ describe("readQuestion without options", () => {
     expect(readQuestion(body, [])).toEqual({ lead: [body], choices: [], after: [] });
   });
 
+  test("keeps the text whole when the question comes only after the list", () => {
+    const body = "다음을 했어요.\n1. 빌드\n2. 테스트\n이대로 머지할까요?";
+    expect(readQuestion(body, [])).toEqual({ lead: [body], choices: [], after: [] });
+    expect(questionSummary(body, [])).toBe(body);
+  });
+
   test("keeps the text whole when the markers are not in order", () => {
     const body = "Which plan? (B) later (A) now";
     expect(readQuestion(body, [])).toEqual({ lead: [body], choices: [], after: [] });
