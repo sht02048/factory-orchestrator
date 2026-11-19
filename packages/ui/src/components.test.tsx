@@ -461,6 +461,14 @@ describe("서버 렌더", () => {
     expect(html).not.toContain("<button");
     expect(html).toContain("Ctrl+3");
 
+    const disabled = renderToString(
+      <Tooltip content="Runs" labelsTrigger disabled render={<a href="/runs" />}>
+        Runs
+      </Tooltip>,
+    );
+    expect(disabled).toMatch(/<a [^>]*href="\/runs"/);
+    expect(disabled).not.toContain("aria-keyshortcuts");
+
     const plain = renderToString(<Tooltip content="힌트">capacity</Tooltip>);
     expect(plain).toContain("<button");
     expect(plain).not.toContain("aria-keyshortcuts");

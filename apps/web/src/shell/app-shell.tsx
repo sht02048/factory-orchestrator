@@ -16,12 +16,13 @@ import {
   railLinkStyles,
 } from "@ganger/ui";
 import { Link } from "@tanstack/react-router";
+import { useRef } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { ALL_WORKSPACES } from "@ganger/app/shell/model";
 import type { ShellData, WorkspaceChoice } from "@ganger/app/shell/model";
 import { navShortcuts } from "@ganger/app/shell/nav-shortcuts";
-import type { NavShortcut } from "@ganger/app/shell/nav-shortcuts";
+import type { NavScreen, NavShortcut } from "@ganger/app/shell/nav-shortcuts";
 import { navIcons } from "./nav-icons";
 import { useDesktopNavigation } from "./desktop-navigation";
 
@@ -44,7 +45,8 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const t = useTranslations("shell");
-  const { inDesktopApp } = useDesktopNavigation();
+  const railLinks = useRef(new Map<NavScreen, HTMLAnchorElement>());
+  const { inDesktopApp } = useDesktopNavigation((screen) => railLinks.current.get(screen)?.focus());
   const isCurrent = (to: string) =>
     to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`);
   return (
@@ -69,6 +71,10 @@ export function AppShell({
                       current={isCurrent(item.path)}
                       issues={item.screen === "runners" ? shell.runnerIssues : 0}
                       showShortcut={inDesktopApp}
+                      linkRef={(element) => {
+                        if (element === null) railLinks.current.delete(item.screen);
+                        else railLinks.current.set(item.screen, element);
+                      }}
                     />
                   </li>
                 ))}
@@ -88,30 +94,33 @@ function RailLink({
   current,
   issues,
   showShortcut,
+  linkRef,
 }: {
   item: NavShortcut;
   current: boolean;
   issues: number;
   showShortcut: boolean;
+  linkRef: (element: HTMLAnchorElement | null) => void;
 }) {
   const t = useTranslations("shell");
   const name = t(`nav.${item.screen}`);
-  const content = <RailLinkContent icon={navIcons[item.screen]} name={name} issues={issues} />;
-  const linkProps = {
-    to: item.path,
-    ...(current ? { "aria-current": "page" as const } : {}),
-    ...stylex.props(railLinkStyles(current)),
-  };
-  if (!showShortcut && issues === 0) return <Link {...linkProps}>{content}</Link>;
   return (
     <Tooltip
       content={issues > 0 ? t("nav.withIssues", { name, count: issues }) : name}
       labelsTrigger
       side="right"
+      disabled={!showShortcut && issues === 0}
       {...(showShortcut ? { shortcut: item.shortcut } : {})}
-      render={<Link {...linkProps} />}
+      render={
+        <Link
+          ref={linkRef}
+          to={item.path}
+          {...(current ? { "aria-current": "page" } : {})}
+          {...stylex.props(railLinkStyles(current))}
+        />
+      }
     >
-      {content}
+      <RailLinkContent icon={navIcons[item.screen]} name={name} issues={issues} />
     </Tooltip>
   );
 }

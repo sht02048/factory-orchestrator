@@ -135,7 +135,7 @@ describe("화면 이동 단축키(브라우저, 0102)", () => {
     }
   });
 
-  it("데스크톱 메뉴가 보낸 화면으로 입력칸에 포커스가 있어도 문서를 다시 읽지 않고 옮기고 Workspace 를 지킨다", async (context) => {
+  it("데스크톱 메뉴가 보낸 화면으로 입력칸에 포커스가 있어도 문서를 다시 읽지 않고 옮기고, 그 화면의 레일 링크에 포커스를 두고 Workspace 를 지킨다", async (context) => {
     const page = await newPage(context, { width: 1280, height: 800 });
     await withDesktopBridge(page);
     await open(page, "/tickets");
@@ -151,6 +151,9 @@ describe("화면 이동 단축키(브라우저, 0102)", () => {
       await page.waitForURL((url) => url.pathname === item.path);
       const link = page.getByRole("link", { name: shell.nav[item.screen], exact: true });
       expect(await link.getAttribute("aria-current")).toBe("page");
+      await expect
+        .poll(() => link.evaluate((element) => element === document.activeElement))
+        .toBe(true);
       expect(new URL(page.url()).searchParams.get("ws")).toBe(workspaceId);
     }
     await menuSends("onboarding");

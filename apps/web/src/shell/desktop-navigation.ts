@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { z } from "zod";
 import {
   DESKTOP_NAVIGATION_GLOBAL,
@@ -38,15 +38,18 @@ export function desktopNavigation(scope: object = globalThis): DesktopNavigation
   };
 }
 
-export function useDesktopNavigation(): { inDesktopApp: boolean } {
+export function useDesktopNavigation(onNavigated: (screen: NavScreen) => void): {
+  inDesktopApp: boolean;
+} {
   const navigate = useNavigate();
   const [inDesktopApp, setInDesktopApp] = useState(false);
+  const navigated = useEffectEvent(onNavigated);
   useEffect(() => {
     const bridge = desktopNavigation();
     if (bridge === null) return;
     setInDesktopApp(true);
     return bridge.onNavigate((screen) => {
-      void navigate({ to: navShortcutOf(screen).path });
+      void navigate({ to: navShortcutOf(screen).path }).then(() => navigated(screen));
     });
   }, [navigate]);
   return { inDesktopApp };

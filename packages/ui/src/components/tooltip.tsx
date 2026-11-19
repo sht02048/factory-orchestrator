@@ -33,6 +33,7 @@ export interface TooltipProps {
   action?: TooltipAction;
   shortcut?: string;
   render?: ReactElement<Record<string, unknown>>;
+  disabled?: boolean;
 }
 
 export function Tooltip({
@@ -43,11 +44,13 @@ export function Tooltip({
   action,
   shortcut,
   render,
+  disabled,
 }: TooltipProps) {
   return (
     <SdkTooltip
       type={labelsTrigger === true ? "label" : "description"}
       {...(shortcut === undefined ? {} : { shortcut })}
+      {...(disabled === undefined ? {} : { disabled })}
     >
       {action !== undefined ? (
         <ActionTrigger action={action}>{children}</ActionTrigger>
