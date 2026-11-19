@@ -85,7 +85,7 @@ Don't edit the derived files by hand. Change the source in this folder and run t
 
 ## dmg install window
 
-- **Source**: [`dmg/background.svg`](dmg/background.svg), 540 × 380, the size of the window the dmg opens. Ink background, a Paper whistle at the top, a Ganger Yellow arrow between the app (left) and Applications (right), and one Paper line, "Drag Ganger to Applications". It sits in its own folder because it is a rendered picture with live text, not a logo source. The icon positions live in `scripts/dmg-settings.py`; move the arrow when you move them.
+- **Source**: [`dmg/background.svg`](dmg/background.svg), 540 × 380, the content area of the window the dmg opens. Paper background, the full-color whistle (Ink body, yellow mouthpiece) at the top, a dark yellow arrow (`oklch(0.62 0.15 70)`, `#be7200`, 3.4:1 on Paper) between the app (left) and Applications (right), and one Ink line, "Drag Ganger to Applications". The background is light because Finder draws the icon names dark on a light picture; Ganger Yellow itself is too light on Paper for the arrow. It sits in its own folder because it is a rendered picture with live text, not a logo source. The icon positions live in `scripts/dmg-settings.py`; move the arrow when you move them.
 - **Outputs**: `node scripts/dmg-background.ts` renders `dmg/background.png` and `dmg/background@2x.png` with Google Chrome. `pnpm release:mac` puts them, with `apps/desktop/icons/icon.icns` as the volume icon, into the dmg.
 
 ## Source files

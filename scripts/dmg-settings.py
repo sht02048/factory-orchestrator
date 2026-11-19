@@ -13,7 +13,7 @@ icon = defines["icon"]
 background = defines["background"]
 
 default_view = "icon-view"
-window_rect = ((200, 120), (540, 380))
+window_rect = ((200, 120), (540, 412))
 show_status_bar = False
 show_tab_view = False
 show_toolbar = False
