@@ -33,6 +33,8 @@ import {
   Tab,
   Table,
   TableCell,
+  TableHead,
+  TableHeader,
   TableRow,
   TableRows,
   Tabs,
@@ -164,6 +166,26 @@ describe("서버 렌더", () => {
       </Table>,
     );
     expect(html).toMatch(/style="--[^:]+:minmax\(0, 1fr\) 152px 88px;--[^:]+:minmax\(0, 1fr\)"/);
+  });
+
+  it("Table 은 narrowColumns 를 준 표에서만 좁을 때 머리글을 숨긴다(티켓 0091)", () => {
+    const headClass = (narrow: string | undefined) =>
+      /<div aria-hidden="true" class="([^"]*)"/.exec(
+        renderToString(
+          <Table
+            columns="minmax(0, 1fr) 80px"
+            {...(narrow === undefined ? {} : { narrowColumns: narrow })}
+          >
+            <TableHead>
+              <TableHeader>제목</TableHeader>
+            </TableHead>
+          </Table>,
+        ),
+      )?.[1] ?? "";
+    expect(headClass(undefined)).not.toBe("");
+    expect(headClass("minmax(0, 1fr)").split(" ").length).toBeGreaterThan(
+      headClass(undefined).split(" ").length,
+    );
   });
 
   it("Tabs 는 고른 탭을 aria-selected 로 표시하고 개수를 붙인다", () => {

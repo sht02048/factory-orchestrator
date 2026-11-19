@@ -19,7 +19,10 @@ const gridColumns = stylex.create({
   }),
 });
 
-const ColumnsContext = createContext(gridColumns.of("minmax(0, 1fr)", "minmax(0, 1fr)"));
+const ColumnsContext = createContext({
+  columns: gridColumns.of("minmax(0, 1fr)", "minmax(0, 1fr)"),
+  stacks: false,
+});
 
 export interface TableProps {
   columns: string;
@@ -29,16 +32,24 @@ export interface TableProps {
 
 export function Table({ columns, narrowColumns, children }: TableProps) {
   return (
-    <ColumnsContext value={gridColumns.of(columns, narrowColumns ?? columns)}>
+    <ColumnsContext
+      value={{
+        columns: gridColumns.of(columns, narrowColumns ?? columns),
+        stacks: narrowColumns !== undefined,
+      }}
+    >
       <div {...stylex.props(styles.table)}>{children}</div>
     </ColumnsContext>
   );
 }
 
 export function TableHead({ children }: { children: ReactNode }) {
-  const columns = use(ColumnsContext);
+  const { columns, stacks } = use(ColumnsContext);
   return (
-    <div aria-hidden="true" {...stylex.props(styles.grid, columns, styles.head)}>
+    <div
+      aria-hidden="true"
+      {...stylex.props(styles.grid, columns, styles.head, stacks && styles.headStacked)}
+    >
       {children}
     </div>
   );
@@ -87,7 +98,7 @@ export interface TableRowProps {
 }
 
 export function TableRow({ value, label, onOpen, children }: TableRowProps) {
-  const columns = use(ColumnsContext);
+  const { columns } = use(ColumnsContext);
   return (
     <ListboxItem<string>
       value={value}
@@ -162,8 +173,8 @@ const styles = stylex.create({
     rowGap: { default: 0, [breakpoints.tableStacked]: space.s1 },
     paddingInline: space.s3,
   },
+  headStacked: { display: { default: "grid", [breakpoints.tableStacked]: "none" } },
   head: {
-    display: { default: "grid", [breakpoints.tableStacked]: "none" },
     height: 30,
     color: colors.textTertiary,
     fontSize: fontSize.small,
