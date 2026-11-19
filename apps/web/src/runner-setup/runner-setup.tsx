@@ -197,7 +197,7 @@ export function RunnerSetup({
 
   return (
     <div {...stylex.props(styles.stack)}>
-      <ServerFacts status={status} onRetry={reloadStatus} />
+      {flow === "commandMac" ? null : <ServerFacts status={status} onRetry={reloadStatus} />}
       {flow === "commandMac" ? (
         <CommandFlow
           actions={actions}

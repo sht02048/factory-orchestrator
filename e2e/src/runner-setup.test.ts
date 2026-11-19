@@ -343,7 +343,7 @@ describe("다른 맥 · 명령으로 등록(브라우저, 0097)", () => {
     }
   });
 
-  it("10분이 지난 명령은 거절하고, 새 명령 받기는 앞 명령을 버리고 포커스를 그대로 둔다", async () => {
+  it("10분이 지난 명령은 거절하고, 새 명령 받기는 앞 명령을 버리고 포커스를 흐름 제목으로 옮긴다", async () => {
     resetFakeThisMac();
     const world = resetFakeEnrollment();
     const first = await openCommandFlow("/runners?sel=new");
@@ -365,7 +365,8 @@ describe("다른 맥 · 명령으로 등록(브라우저, 0097)", () => {
     await code.waitFor();
     expect(await code.textContent()).not.toBe(first);
     await page.getByRole("status").filter({ hasText: command.newCommandReady }).waitFor();
-    await expect.poll(focused).toBe(command.newCommand);
+    await expect.poll(focused).toBe(command.title);
+    expect(await page.getByRole("button", { name: command.newCommand }).count()).toBe(0);
     const replaced = await fetch(`${baseUrl}/api/runner-enrollment/script?t=${token}`);
     expect(await replaced.text()).toMatch(/expired or was already used.*exit 1/u);
   });
@@ -386,6 +387,9 @@ describe("다른 맥 · 명령으로 등록(브라우저, 0097)", () => {
     });
     expect(reported.status).toBe(200);
     await page.getByRole("status").filter({ hasText: command.problem["orca-not-found"] }).waitFor();
+    expect(await page.getByRole("region", { name: command.commandLabel }).count()).toBe(0);
+    await page.getByText(command.expiredHere).waitFor();
+    expect(await page.getByRole("region", { name: runnerSetup.server.title }).count()).toBe(0);
   });
 
   it("400px 에서도 명령 화면이 가로로 넘치지 않는다", async () => {

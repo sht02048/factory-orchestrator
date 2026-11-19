@@ -135,7 +135,7 @@ describe("명령으로 등록(0097)", () => {
     expect(remainingLabel(-5)).toBe("0:00");
   });
 
-  it("명령을 받기 전에는 두 단계와 만드는 중 상태, 하는 일과 안 될 때 안내를 보인다", () => {
+  it("명령을 받기 전에는 두 단계와 만드는 중 상태, 하는 일과 안 될 때 안내를 보이고, 새 명령 받기는 멈췄을 때만 둔다", () => {
     const html = renderWithMessages(
       <CommandFlow
         actions={pending}
@@ -154,7 +154,7 @@ describe("명령으로 등록(0097)", () => {
     expect(shown).toContain("이 명령이 하는 일");
     expect(shown).toContain("관리자 암호를 묻지 않고, 비밀 값을 서버로 보내지 않아요.");
     expect(shown).toContain("명령이 안 되면");
-    expect(text(html)).toContain("새 명령 받기");
+    expect(text(html)).not.toContain("새 명령 받기");
   });
 });
 

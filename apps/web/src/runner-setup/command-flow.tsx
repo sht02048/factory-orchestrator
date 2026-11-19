@@ -3,8 +3,6 @@ import {
   Actions,
   Button,
   Card,
-  Checklist,
-  ChecklistItem,
   CodeBlock,
   DefinitionItem,
   DefinitionList,
@@ -16,6 +14,7 @@ import {
   SegmentedTabs,
   Text,
   TextLink,
+  VisuallyHidden,
   focusStyles,
   showToast,
 } from "@ganger/ui";
@@ -169,6 +168,7 @@ export function CommandFlow({
       (state.view.state === "waiting" && left <= 0));
   const registered =
     state.kind === "issued" && state.view.state === "registered" ? state.view.runner : null;
+  const failed = state.kind === "issued" && state.view.state === "failed";
   const reported = useRef<string | null>(null);
   const openRunnerRef = useRef<HTMLButtonElement>(null);
 
@@ -183,12 +183,19 @@ export function CommandFlow({
     <Card label={t("title")}>
       <div {...stylex.props(styles.stack)}>
         <div {...stylex.props(styles.group)}>
-          <Text variant="title">
+          <Text variant="title" as="h2">
             <span ref={titleRef} tabIndex={-1} {...stylex.props(focusStyles.ring)}>
               {t("title")}
             </span>
           </Text>
           {registered === null ? <Text variant="body">{t("body")}</Text> : null}
+          <VisuallyHidden>
+            <span role="alert">
+              {state.kind === "unavailable" && state.reason !== "no-web-address"
+                ? t(`unavailable.${state.reason}`)
+                : ""}
+            </span>
+          </VisuallyHidden>
         </div>
         {registered !== null ? (
           <Registered
@@ -211,7 +218,7 @@ export function CommandFlow({
           <>
             <Steps
               issued={state.kind === "issued" ? state.issued : null}
-              expired={expired}
+              stopped={expired || failed}
               left={left}
             />
             <WaitingRow
@@ -219,7 +226,10 @@ export function CommandFlow({
               expired={expired}
               renewed={renewed}
               primary={primary}
-              onNewCommand={() => void start()}
+              onNewCommand={() => {
+                titleRef.current?.focus();
+                void start();
+              }}
             />
             <Disclosure summary={t("whatTitle")}>
               <ul {...stylex.props(styles.bullets)}>
@@ -254,16 +264,16 @@ export function CommandFlow({
 
 function Steps({
   issued,
-  expired,
+  stopped,
   left,
 }: {
   issued: Issued | null;
-  expired: boolean;
+  stopped: boolean;
   left: number;
 }) {
   const t = useTranslations("runnerSetup.command");
   return (
-    <section aria-label={t("stepsLabel")}>
+    <section aria-label={t("stepsLabel")} {...stylex.props(styles.stack)}>
       <NumberedList
         items={[
           <span key="remote" {...stylex.props(styles.stepBody)}>
@@ -280,14 +290,13 @@ function Steps({
               <Text variant="meta" role="status">
                 {t("starting")}
               </Text>
-            ) : expired ? (
+            ) : stopped ? (
               <Text variant="meta">{t("expiredHere")}</Text>
-            ) : (
-              <CommandBox issued={issued} left={left} />
-            )}
+            ) : null}
           </span>,
         ]}
       />
+      {issued === null || stopped ? null : <CommandBox issued={issued} left={left} />}
     </section>
   );
 }
@@ -356,20 +365,15 @@ function WaitingRow({
   return (
     <div {...stylex.props(styles.waitingRow)}>
       <span {...stylex.props(styles.waitingText)}>
-        {waiting ? (
-          <Checklist label={t("waiting")}>
-            <ChecklistItem done={false} running label={t("waiting")}>
-              <Text variant="ui">{t("waiting")}</Text>
-            </ChecklistItem>
-          </Checklist>
-        ) : null}
         <Text variant="ui" as="p" role="status" {...(failed === null ? {} : { tone: "problem" })}>
           {failed !== null
             ? t("failed", { problem: tp(failed.problem) })
             : expired
               ? t("expired")
-              : renewed > 0 && waiting
-                ? t("newCommandReady")
+              : waiting
+                ? renewed > 0
+                  ? t("newCommandReady")
+                  : t("waiting")
                 : ""}
         </Text>
         {failed?.detail == null ? null : (
@@ -378,9 +382,11 @@ function WaitingRow({
           </Text>
         )}
       </span>
-      <Button variant={stopped && primary ? "primary" : "secondary"} onClick={onNewCommand}>
-        {t("newCommand")}
-      </Button>
+      {stopped ? (
+        <Button variant={primary ? "primary" : "secondary"} onClick={onNewCommand}>
+          {t("newCommand")}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -400,7 +406,7 @@ function UnavailableNotice({
   }
   return (
     <div {...stylex.props(styles.group)}>
-      <Text variant="ui" as="p" tone="problem" role="alert">
+      <Text variant="ui" as="p" tone="problem">
         {t(`unavailable.${reason}`)}
       </Text>
       <Actions>
