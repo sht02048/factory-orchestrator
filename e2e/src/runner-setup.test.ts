@@ -135,10 +135,7 @@ describe("이 맥을 러너로(브라우저, 0095)", () => {
     await expect.poll(focused, { timeout: 15_000 }).toBe("studio-mac 러너");
     expect(mac.ran).toEqual(["key", "hostKey", "service", "github", "register"]);
     await flow.getByText(thisMac.problem["gh-logged-out"]).waitFor();
-    await page
-      .getByRole("status")
-      .filter({ hasText: "studio-mac을(를) 러너로 등록했어요" })
-      .waitFor();
+    await page.getByRole("status").filter({ hasText: "studio-mac 러너를 등록했어요" }).waitFor();
 
     const after = await flow.evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
     expect(after).toBe(flowTop);

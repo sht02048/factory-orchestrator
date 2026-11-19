@@ -137,7 +137,7 @@ export function RunnersScreen({
         </div>
       }
       panel={
-        <section aria-label={t("panel.label")}>
+        <section aria-label={adding ? t("add") : t("panel.label")}>
           {adding ? (
             <DetailPanel>
               <div {...stylex.props(styles.setup)}>

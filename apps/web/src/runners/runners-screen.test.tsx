@@ -209,6 +209,7 @@ describe("Runners 목록", () => {
     const panel = html.slice(html.indexOf("<aside"));
     expect(panel).toContain("러너 추가");
     expect(panel).toContain("<p>setup-flow</p>");
+    expect(html).toContain('<section aria-label="러너 추가">');
     expect(rowsOf(html).filter((row) => row.selected)).toEqual([]);
   });
 

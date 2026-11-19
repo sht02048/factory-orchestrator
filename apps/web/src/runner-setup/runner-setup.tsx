@@ -182,9 +182,12 @@ function ServerFacts({ status }: { status: StatusState }) {
               {status.status.orcaPath === null ? (
                 t("orcaMissing")
               ) : (
-                <Text variant="meta" mono>
-                  {t("orcaFound", { path: status.status.orcaPath })}
-                </Text>
+                <span {...stylex.props(styles.rowText)}>
+                  {t("orcaFound")}
+                  <Text variant="meta" mono>
+                    {status.status.orcaPath}
+                  </Text>
+                </span>
               )}
             </DefinitionItem>
             <DefinitionItem label={t("remoteLogin")} empty={!status.status.remoteLogin}>
