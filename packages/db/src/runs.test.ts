@@ -33,6 +33,10 @@ import {
   sentQuestionIds,
 } from "./questions.js";
 import {
+  completeRunControlRequest,
+  getRunControlRequest,
+  listPendingRunControlRequests,
+  requestRunControl,
   getRunCancelRequest,
   hasPendingCancelRequest,
   listPendingCancelRequests,
@@ -47,6 +51,7 @@ import {
   getRun,
   storedTicketTitle,
   getRunWithRecords,
+  lastStateBeforeDisconnect,
   listRunStateChanges,
   listRuns,
   listRunsWithRecords,
@@ -542,6 +547,111 @@ describe("changeRunState", () => {
     expect(getRunWithRecords(db, id)?.run).toMatchObject({ runnerId: runner, assignedAt: before });
     moveTo(db, id, "running");
     expect(setQueuedRunRunner(db, id, null)).toBe(false);
+  });
+});
+
+describe("Paused(0118)", () => {
+  const at = (minute: number) => new Date(Date.UTC(2026, 10, 19, 0, minute));
+
+  function runningRun(db: Database): RunId {
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    changeRunState(db, id, { to: "running", started }, at(0));
+    return id;
+  }
+
+  it("Running → Paused → Running 동안 멈춘 시간을 쌓고, 멈춘 동안에만 멈춘 시각을 둔다", () => {
+    const db = seededDatabase();
+    const id = runningRun(db);
+    changeRunState(db, id, { to: "paused" }, at(10));
+    expect(getRunWithRecords(db, id)?.records).toMatchObject({ pausedSince: at(10), pausedMs: 0 });
+    changeRunState(db, id, { to: "running" }, at(25));
+    expect(getRunWithRecords(db, id)?.records).toMatchObject({
+      pausedSince: null,
+      pausedMs: 15 * 60_000,
+    });
+    changeRunState(db, id, { to: "paused" }, at(30));
+    changeRunState(db, id, { to: "running" }, at(35));
+    expect(getRunWithRecords(db, id)?.records.pausedMs).toBe(20 * 60_000);
+  });
+
+  it("다시 시작한 에이전트로 재개하면 에이전트 참조를 바꾼다", () => {
+    const db = seededDatabase();
+    const id = runningRun(db);
+    changeRunState(db, id, { to: "paused" }, at(1));
+    const resumed = changeRunState(
+      db,
+      id,
+      { to: "running", resumedAgentRef: toAgentRef("agent-2") },
+      at(2),
+    );
+    expect(resumed.ok && resumed.run.state === "running" ? resumed.run.agentRef : null).toBe(
+      toAgentRef("agent-2"),
+    );
+  });
+
+  it("Paused 런을 취소해 끝내면 멈춘 시간을 닫는다", () => {
+    const db = seededDatabase();
+    const id = runningRun(db);
+    changeRunState(db, id, { to: "paused" }, at(1));
+    change(db, id, { to: "ended", agentResult: "canceled", prState: "none" });
+    expect(getRunWithRecords(db, id)?.records.pausedSince).toBeNull();
+    expect(getRun(db, id)?.state).toBe("ended");
+  });
+
+  it("Paused 중 러너에 닿지 않아 Disconnected가 되면, 이전 상태가 Paused였음을 이력에서 읽는다", () => {
+    const db = seededDatabase();
+    const id = runningRun(db);
+    changeRunState(db, id, { to: "paused" }, at(1));
+    changeRunState(db, id, { to: "disconnected" }, at(7));
+    expect(getRunWithRecords(db, id)?.records).toMatchObject({
+      pausedSince: null,
+      pausedMs: 6 * 60_000,
+    });
+    expect(lastStateBeforeDisconnect(db, id)).toBe("paused");
+    changeRunState(db, id, { to: "paused" }, at(9));
+    expect(getRunWithRecords(db, id)?.records.pausedSince).toEqual(at(9));
+  });
+
+  it("DB가 Paused 런에만 멈춘 시각을 허용한다", () => {
+    const db = seededDatabase();
+    const id = runningRun(db);
+    expect(() =>
+      db.$client.prepare("UPDATE runs SET paused_since = 1 WHERE id = ?").run(id),
+    ).toThrow(/CHECK/);
+  });
+
+  it("멈추기는 Running 런만, 재개는 Paused 런만, 취소 중이 아닐 때 받는다", () => {
+    const db = seededDatabase();
+    const id = runningRun(db);
+    expect(requestRunControl(db, id, "resume", at(1))).toEqual({ ok: false, reason: "not-paused" });
+    expect(requestRunControl(db, id, "pause", at(1))).toEqual({ ok: true, requestedAt: at(1) });
+    expect(listPendingRunControlRequests(db)).toEqual([
+      { runId: id, control: "pause", requestedAt: at(1) },
+    ]);
+    expect(getRunControlRequest(db, id)).toEqual({
+      status: "pending",
+      requestedAt: at(1),
+      control: "pause",
+    });
+    completeRunControlRequest(db, {
+      runId: id,
+      requestedAt: at(1),
+      completedAt: at(2),
+      error: "agent is gone",
+    });
+    expect(getRunControlRequest(db, id)).toMatchObject({
+      status: "failed",
+      error: "agent is gone",
+    });
+    expect(listPendingRunControlRequests(db)).toEqual([]);
+
+    requestRunCancel(db, id, at(3));
+    expect(requestRunControl(db, id, "pause", at(4))).toEqual({ ok: false, reason: "cancelling" });
+    expect(requestRunControl(db, toRunId("missing"), "pause", at(4))).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
   });
 });
 

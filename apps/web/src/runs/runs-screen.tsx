@@ -459,6 +459,7 @@ function RunPanel({
       break;
     case "running":
     case "waiting-for-input":
+    case "paused":
     case "disconnected":
       when = elapsed(run.executionMs ?? 0);
       reason = t(`reason.${run.state}`);

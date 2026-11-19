@@ -6,13 +6,16 @@ import {
   changeRunState,
   denyPermissionWait,
   getRun,
+  getRunControlRequest,
   getRunWithRecords,
   hasPendingCancelRequest,
   listRunPermissionWaits,
   listRunQuestions,
   listRunners,
   listRunStateChanges,
+  listRuns,
   requestRunCancel,
+  requestRunControl,
   saveWorkspace,
 } from "@ganger/db";
 import type { StoredRun } from "@ganger/db";
@@ -765,3 +768,122 @@ describe("대기열 맨 앞이 막히지 않음 (0037 남은 위험)", () => {
 function runnerError(code: string): RunnerErrorDetail {
   return { kind: "runner-error", code, message: code };
 }
+
+describe("멈추기·재개(0118)", () => {
+  async function pause(run: StoredRun, worker: Worker): Promise<void> {
+    expect(requestRunControl(h.db, run.id, "pause", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+  }
+
+  it("멈추기는 에이전트만 멈추고 워크트리·capacity를 그대로 두며, 재개하면 같은 대화로 이어 Running이 된다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    await pause(run, worker);
+    const agent = agentOf(run, runnerId);
+    expect(agent.paused).toBe(true);
+    expect(agent.agentStopped).toBe(false);
+    expect(h.runner(runnerId).removed).toEqual([]);
+    expect(getRunControlRequest(h.db, run.id)).toMatchObject({ status: "done" });
+
+    h.assign("ENG-2", projectA);
+    await worker.tick();
+    expect(listRuns(h.db, { states: ["queued"] })).toHaveLength(1);
+
+    expect(requestRunControl(h.db, run.id, "resume", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agent.paused).toBe(false);
+    expect(agent.resumes.map((resume) => resume.agent)).toEqual([current(run).agent]);
+    expect(agent.resumes[0]?.message).not.toBe("");
+  });
+
+  it("Paused 동안 최대 실행 시간 시계도 멈추고, 재개하면 남은 시간부터 센다", async () => {
+    const { run, worker } = await startOne();
+    h.advance(DEFAULT_MAX_RUN_MS - 10 * MINUTE);
+    await pause(run, worker);
+
+    h.advance(3 * DEFAULT_MAX_RUN_MS);
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+
+    expect(requestRunControl(h.db, run.id, "resume", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    h.advance(10 * MINUTE - 1);
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    h.advance(1);
+    await worker.tick();
+    expect(ended(run).agentResult).toBe("timed-out");
+  });
+
+  it("멈춘 에이전트가 사라져도 Paused로 두고, 재개하면 같은 워크트리에서 새 에이전트를 띄운다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    await pause(run, worker);
+    const before = current(run);
+    h.runner(runnerId).vanish(worktreeOf(run), "runner rebooted");
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+
+    expect(requestRunControl(h.db, run.id, "resume", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    const after = current(run);
+    expect(after.state).toBe("running");
+    expect(after.state === "running" && before.state === "paused" ? after.agentRef : null).not.toBe(
+      before.state === "paused" ? before.agentRef : null,
+    );
+    expect(after.state === "running" ? after.worktree : null).toBe(worktreeOf(run));
+    expect(agentOf(run, runnerId).resumes[0]?.restartPrompt).toContain("ENG-1");
+  });
+
+  it("Paused 중에 취소하면 에이전트를 멈추고 운영자가 취소함으로 끝낸다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    await pause(run, worker);
+    requestRunCancel(h.db, run.id, h.now);
+    expect(requestRunControl(h.db, run.id, "resume", h.now)).toEqual({
+      ok: false,
+      reason: "cancelling",
+    });
+    await worker.tick();
+    expect(ended(run).agentResult).toBe("canceled");
+    expect(agentOf(run, runnerId).agentStopped).toBe(true);
+  });
+
+  it("Paused 중 러너에 5분 동안 닿지 않으면 Disconnected가 되고, 다시 닿으면 Paused로 돌아간다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    await pause(run, worker);
+    await disconnect(run, runnerId, worker);
+
+    cutSsh(runnerId, false);
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+    expect(agentOf(run, runnerId).paused).toBe(true);
+  });
+
+  it("러너에 닿지 않으면 멈추기가 실패하고 그 이유를 남기며 Running 그대로 둔다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    cutSsh(runnerId);
+    expect(requestRunControl(h.db, run.id, "pause", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(getRunControlRequest(h.db, run.id)).toMatchObject({
+      status: "failed",
+      error: "runner-unreachable",
+    });
+  });
+
+  it("에이전트가 없어 멈추지 못하면 agent-not-running 으로 실패한다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.runner(runnerId).failNextControl = {
+      kind: "runner-error",
+      code: "agent_not_running",
+      message: "gone",
+    };
+    expect(requestRunControl(h.db, run.id, "pause", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    expect(getRunControlRequest(h.db, run.id)).toMatchObject({
+      status: "failed",
+      error: "agent-not-running",
+    });
+  });
+});

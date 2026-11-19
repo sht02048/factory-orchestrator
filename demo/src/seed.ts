@@ -58,6 +58,7 @@ export interface SeededRuns {
   running: RunId[];
   question: RunId;
   permission: RunId;
+  paused: RunId;
   disconnected: RunId;
 }
 
@@ -390,6 +391,9 @@ function seedActive(db: Database, now: Date): SeededRuns {
     },
   ]);
 
+  const paused = startedRun(db, ticket("ACME", 24), runnerB.id, ago(70), ago(68));
+  ok(changeRunState(db, paused, { to: "paused" }, ago(18)));
+
   const disconnected = startedRun(db, ticket("ACME", 23), runnerC.id, ago(45), ago(44));
   updateRunRecords(db, disconnected, { unreachableSince: ago(20) });
   ok(changeRunState(db, disconnected, { to: "disconnected" }, ago(15)));
@@ -412,7 +416,7 @@ function seedActive(db: Database, now: Date): SeededRuns {
     prNumber += 1;
     end(db, runId, { ending, at: ago(120 - n * 15), prNumber, repo: t.project.repo });
   }
-  return { queued, running, question, permission, disconnected };
+  return { queued, running, question, permission, paused, disconnected };
 }
 
 function startedRun(

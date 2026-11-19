@@ -5,7 +5,7 @@ export type TicketRun =
   | {
       id: string;
       runnerName: string | null;
-      state: "queued" | "running" | "waiting-for-input" | "disconnected";
+      state: "queued" | "running" | "waiting-for-input" | "paused" | "disconnected";
       elapsedMs: number;
     }
   | {
@@ -100,6 +100,7 @@ export function isTodo(run: TicketRun): boolean {
       return run.summary === "failed" || (run.summary === "human-check" && !run.prSettledLater);
     case "queued":
     case "running":
+    case "paused":
       return false;
   }
 }
@@ -130,7 +131,7 @@ export function matchesFilter(ticket: TicketView, filter: TicketFilter): boolean
     case "todo":
       return run !== undefined && isTodo(run);
     case "in-progress":
-      return run?.state === "queued" || run?.state === "running";
+      return run?.state === "queued" || run?.state === "running" || run?.state === "paused";
     case "done":
       return run !== undefined && isDone(run);
   }

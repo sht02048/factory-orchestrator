@@ -14,10 +14,11 @@ import {
   StatusDot,
   Text,
   TextLink,
+  showToast,
 } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
 import { USAGE_HIGH_PERCENT } from "@ganger/core";
-import type { RunId } from "@ganger/core";
+import type { RunControl, RunId } from "@ganger/core";
 import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
@@ -54,6 +55,11 @@ export interface DenyInput {
   reason: string;
 }
 
+export interface ControlInput {
+  runId: string;
+  control: RunControl;
+}
+
 export const DASHBOARD_VIEWS = ["all", "todo"] as const;
 
 export type DashboardView = (typeof DASHBOARD_VIEWS)[number];
@@ -64,6 +70,7 @@ export interface HomeScreenProps {
   onViewChange?: (view: DashboardView) => void;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
+  onControl: (input: ControlInput) => Promise<void>;
   openRunId?: RunId | undefined;
   onOpenRunShown?: () => void;
 }
@@ -79,6 +86,7 @@ interface CardHost {
   cardRef: (id: RunId) => (element: HTMLButtonElement | null) => void;
   focusCard: (id: RunId) => void;
   onOpen: (run: HomeRun, tagged: boolean, mode: SheetMode) => void;
+  onControl: (run: HomeRun, control: RunControl) => void;
 }
 
 export function HomeScreen({
@@ -87,6 +95,7 @@ export function HomeScreen({
   onViewChange = () => {},
   onAnswer,
   onDeny,
+  onControl,
   openRunId,
   onOpenRunShown = () => {},
 }: HomeScreenProps) {
@@ -140,6 +149,16 @@ export function HomeScreen({
     onOpen: (run, tagged, mode) => {
       setTarget({ run, tagged, mode });
       setOpen(true);
+    },
+    onControl: (run, control) => {
+      const key = run.ticketKey;
+      onControl({ runId: run.id, control }).then(
+        () => {
+          cards.current.get(run.id)?.focus();
+          showToast(t(`control.${control}Requested`, { key }));
+        },
+        () => showToast(t(`control.${control}Rejected`, { key })),
+      );
     },
   };
   const runningTodo = new Set(board.running.todo.map((run) => run.id));
@@ -337,6 +356,7 @@ function CardList({
             selected={host.selectedId === run.id}
             openRef={host.cardRef(run.id)}
             onOpen={(mode) => host.onOpen(run, tagged(run), mode)}
+            onControl={(control) => host.onControl(run, control)}
           />
         ))}
       </KanbanCards>
@@ -375,6 +395,7 @@ function SettledCards({ runs, page, host }: { runs: HomeRun[]; page: HomePage; h
             selected={host.selectedId === run.id}
             openRef={host.cardRef(run.id)}
             onOpen={(mode) => host.onOpen(run, false, mode)}
+            onControl={(control) => host.onControl(run, control)}
           />
         ))}
       </KanbanCards>

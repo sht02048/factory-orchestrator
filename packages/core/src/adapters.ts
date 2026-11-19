@@ -231,6 +231,18 @@ export interface RunOnRunner {
   agentRef: AgentRef;
 }
 
+export interface ResumeAgentInput {
+  agent: AgentId;
+  model?: string;
+  message: string;
+  restartPrompt: string;
+}
+
+export interface ResumedAgent {
+  agentRef: AgentRef;
+  restarted: boolean;
+}
+
 export interface AgentQuestion {
   id: QuestionId;
   body: string;
@@ -281,6 +293,9 @@ export interface Runner {
     run: RunOnRunner,
     input: { permissionId: PermissionRequestId; reason: string },
   ): Promise<void>;
+
+  pauseAgent(run: RunOnRunner): Promise<void>;
+  resumeAgent(run: RunOnRunner, input: ResumeAgentInput): Promise<ResumedAgent>;
 
   stopAgent(run: RunOnRunner): Promise<void>;
   closeAgent(run: RunOnRunner): Promise<void>;

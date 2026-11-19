@@ -35,6 +35,7 @@ function render(page: RunDetailPage, timeZone?: string): string {
       onAnswer={resolved}
       onDeny={resolved}
       onCancel={resolved}
+      onControl={resolved}
       onRefreshLog={resolved}
     />,
     runMessages,

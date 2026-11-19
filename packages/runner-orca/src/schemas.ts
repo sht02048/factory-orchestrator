@@ -86,8 +86,13 @@ export const workerShowResultSchema = z.object({
   state: text,
   stage: optionalText,
   liveness: optionalText,
+  terminal: optionalText,
   workspace: optionalText,
   lastError: optionalText,
+});
+
+export const terminalSendResultSchema = z.object({
+  send: z.object({ accepted: z.boolean() }),
 });
 
 export const taskListResultSchema = z.object({

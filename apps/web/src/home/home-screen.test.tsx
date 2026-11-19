@@ -23,14 +23,14 @@ const reject = () => Promise.reject(new Error("unused"));
 
 function render(page: HomePage) {
   return renderWithMessages(
-    <HomeScreen page={page} onAnswer={reject} onDeny={reject} />,
+    <HomeScreen page={page} onAnswer={reject} onDeny={reject} onControl={reject} />,
     homeMessages,
   );
 }
 
 function renderView(page: HomePage, view: DashboardView) {
   return renderWithMessages(
-    <HomeScreen page={page} view={view} onAnswer={reject} onDeny={reject} />,
+    <HomeScreen page={page} view={view} onAnswer={reject} onDeny={reject} onControl={reject} />,
     homeMessages,
   );
 }

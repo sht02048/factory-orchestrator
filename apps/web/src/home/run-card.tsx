@@ -1,11 +1,15 @@
 import * as stylex from "@stylexjs/stylex";
-import { Button, KanbanCard, StatusPill, buttonStyles } from "@ganger/ui";
+import { Button, KanbanCard, Menu, MenuItem, MoreIcon, StatusPill, buttonStyles } from "@ganger/ui";
+import type { PillStatus } from "@ganger/ui";
+import type { RunControl } from "@ganger/core";
 import { useId } from "react";
 import type { ReactNode, Ref } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import type { HomeRun } from "@ganger/app/home/model";
 import { todoTagOf } from "@ganger/app/home/model";
+import { availableRunControl } from "@ganger/app/run-control-view";
+import type { RunControlView } from "@ganger/app/run-control-view";
 import { RunKey, useRunText } from "./run-text";
 
 export type SheetMode = "summary" | "answer";
@@ -15,6 +19,7 @@ interface CardParts {
   meta?: ReactNode;
   time?: ReactNode;
   action?: ReactNode;
+  menu?: ReactNode;
 }
 
 export function RunCard({
@@ -24,6 +29,7 @@ export function RunCard({
   selected,
   openRef,
   onOpen,
+  onControl,
 }: {
   run: HomeRun;
   tagged: boolean;
@@ -31,10 +37,12 @@ export function RunCard({
   selected: boolean;
   openRef: Ref<HTMLButtonElement>;
   onOpen: (mode: SheetMode) => void;
+  onControl: (control: RunControl) => void;
 }) {
-  const tag = tagged ? todoTagOf(run) : null;
+  const todoTag = tagged ? todoTagOf(run) : null;
+  const tag: PillStatus | null = todoTag ?? (run.state === "paused" ? "paused" : null);
   const titleId = useId();
-  const parts = useCardParts(run, tag !== null, all, titleId, onOpen);
+  const parts = useCardParts(run, todoTag !== null, all, titleId, onOpen, onControl);
   const statusName = useRunText().statusName;
   return (
     <li data-run={run.id} data-tag={tag ?? undefined}>
@@ -57,20 +65,72 @@ function useCardParts(
   all: boolean,
   titleId: string,
   onOpen: (mode: SheetMode) => void,
+  onControl: (control: RunControl) => void,
 ): CardParts {
   const t = useTranslations("home.card");
+  const tDomain = useTranslations("domain");
   const text = useRunText();
   const { ago, elapsed } = useTime();
-  const withFlags = (line: string) => (run.cancelling ? `${line} · ${t("cancelling")}` : line);
+  const controlFlag = controlPendingKey(run.control);
+  const withFlags = (line: string) =>
+    [line, run.cancelling ? t("cancelling") : null, controlFlag === null ? null : t(controlFlag)]
+      .filter((part) => part !== null)
+      .join(" · ");
   const runner = withFlags(text.runnerLine(run, all));
+  const available = availableRunControl(run.state, run.cancelling, run.control);
+  const failed =
+    run.control?.status === "failed"
+      ? {
+          detail: t(run.control.control === "pause" ? "pauseFailed" : "resumeFailed", {
+            reason: tDomain(`runControlFailure.${run.control.reason}`),
+          }),
+        }
+      : {};
   const workspace = all ? ` · ${run.workspace.name}` : "";
   switch (run.state) {
     case "queued":
       return { detail: text.queued(run), meta: runner, time: elapsed(run.waitMs) };
     case "running":
       return {
+        ...failed,
         meta: runner,
         ...(run.executionMs === null ? {} : { time: elapsed(run.executionMs) }),
+        ...(available === "pause"
+          ? {
+              menu: (
+                <Menu
+                  variant="icon"
+                  label={t("menu", { key: run.ticketKey })}
+                  trigger={<MoreIcon />}
+                >
+                  <MenuItem value="pause" onSelect={() => onControl("pause")}>
+                    {t("pause")}
+                  </MenuItem>
+                </Menu>
+              ),
+            }
+          : {}),
+      };
+    case "paused":
+      return {
+        ...failed,
+        meta: runner,
+        ...(run.pausedMs === null
+          ? {}
+          : { time: t("pausedFor", { elapsed: elapsed(run.pausedMs) }) }),
+        ...(available === "resume"
+          ? {
+              action: (
+                <Button
+                  variant="secondary"
+                  aria-describedby={titleId}
+                  onClick={() => onControl("resume")}
+                >
+                  {t("resume")}
+                </Button>
+              ),
+            }
+          : {}),
       };
     case "waiting-for-input": {
       const time = run.waitingMs === null ? {} : { time: elapsed(run.waitingMs) };
@@ -140,4 +200,9 @@ function useCardParts(
       };
     }
   }
+}
+
+function controlPendingKey(control: RunControlView | null): "pausing" | "resuming" | null {
+  if (control?.status !== "pending") return null;
+  return control.control === "pause" ? "pausing" : "resuming";
 }

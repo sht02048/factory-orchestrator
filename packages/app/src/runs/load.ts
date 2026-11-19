@@ -156,6 +156,7 @@ export function loadRunsPage(
           cancelling: cancelling.has(run.id),
         };
       case "running":
+      case "paused":
         return { ...base, state: run.state, cancelling: cancelling.has(run.id) };
       case "waiting-for-input":
       case "disconnected":
@@ -245,7 +246,7 @@ const UNRESOLVED_ENDED_AXES: ReadonlyArray<EndedAxesFilter> = AGENT_RESULTS.flat
   }),
 );
 
-const ACTIVE_STATES = ["queued", "running", "waiting-for-input", "disconnected"] as const;
+const ACTIVE_STATES = ["queued", "running", "waiting-for-input", "paused", "disconnected"] as const;
 
 function newestFirst(
   a: { run: StoredRun; records: RunRecords },

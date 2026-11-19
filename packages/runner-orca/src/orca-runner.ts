@@ -4,6 +4,8 @@ import type {
   PermissionRequestId,
   ProviderUsageReading,
   QuestionId,
+  ResumeAgentInput,
+  ResumedAgent,
   Runner,
   RunnerErrorDetail,
   RunnerFactory,
@@ -50,6 +52,7 @@ import {
   statusResultSchema,
   taskListResultSchema,
   terminalCreateResultSchema,
+  terminalSendResultSchema,
   terminalShowResultSchema,
   workerListResultSchema,
   workerReadResultSchema,
@@ -78,6 +81,7 @@ const WORKER_LIST_MAX_PAGES = 50;
 export const LOG_MAX_PAGES = 200;
 export const LOG_CUT_MARKER = `[log tail cut: the transcript is longer than ${LOG_PAGE_SIZE * LOG_MAX_PAGES} messages, so these are not its last lines]`;
 const RAW_LIMIT = 4000;
+export const INTERRUPT_KEY = "\u001b";
 
 const SENDER_ERROR_CODES = new Set([
   "no_active_sender_terminal",
@@ -609,6 +613,97 @@ export class OrcaRunner implements Runner {
       denyResultSchema,
       { usesMailbox: true },
     );
+  }
+
+  async pauseAgent(run: RunOnRunner): Promise<void> {
+    const terminal = await this.liveAgentTerminal(this.agentOf(run));
+    if (terminal === null) {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "agent_not_running",
+        message: "the agent has no live terminal to pause",
+      });
+    }
+    await this.sendToTerminal(terminal, ["--text", INTERRUPT_KEY]);
+  }
+
+  async resumeAgent(run: RunOnRunner, input: ResumeAgentInput): Promise<ResumedAgent> {
+    const agent = this.agentOf(run);
+    const terminal = await this.liveAgentTerminal(agent);
+    if (terminal !== null) {
+      await this.sendToTerminal(terminal, ["--text", input.message, "--enter"]);
+      return { agentRef: run.agentRef, restarted: false };
+    }
+    const mailbox = this.mailboxOf(run.mailbox);
+    const started = await this.orca(
+      [
+        "orchestration",
+        "worker-start",
+        "--from",
+        mailbox.terminal,
+        "--run",
+        mailbox.runId,
+        "--spec-file",
+        "-",
+        "--task-title",
+        `resume ${agent.taskId}`,
+        "--worktree",
+        `id:${run.worktree}`,
+        "--agent",
+        input.agent,
+        ...modelArgs(input.model ?? this.config.model),
+      ],
+      workerStartResultSchema,
+      { stdin: input.restartPrompt, timeoutMs: this.config.startTimeoutMs, usesMailbox: true },
+    );
+    if (started.state !== "ready") {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "worker_start_failed",
+        message: `worker-start ended in state ${started.state}`,
+      });
+    }
+    return {
+      agentRef: encodeAgent({
+        dispatchId: started.dispatchId,
+        taskId: started.taskId,
+        runId: started.runId,
+      }),
+      restarted: true,
+    };
+  }
+
+  private async liveAgentTerminal(agent: OrcaAgent): Promise<string | null> {
+    const worker = await this.orca(
+      ["orchestration", "worker-show", "--dispatch", agent.dispatchId],
+      workerShowResultSchema,
+    );
+    const terminal = worker.terminal ?? null;
+    if (terminal === null || worker.liveness === "exited") return null;
+    if (worker.liveness === "live") return terminal;
+    const shown = await this.orcaOutcome(
+      ["terminal", "show", "--terminal", terminal],
+      terminalShowResultSchema,
+    );
+    if (!shown.ok) {
+      if (shown.code === "terminal_handle_stale") return null;
+      throw this.errorFor(shown, {});
+    }
+    return shown.result.terminal.connected === true ? terminal : null;
+  }
+
+  private async sendToTerminal(terminal: string, input: ReadonlyArray<string>): Promise<void> {
+    const sent = await this.orca(
+      ["terminal", "send", "--terminal", terminal, ...input],
+      terminalSendResultSchema,
+    );
+    if (!sent.send.accepted) {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "input_not_accepted",
+        message: "the agent terminal did not accept the input",
+      });
+    }
   }
 
   async stopAgent(run: RunOnRunner): Promise<void> {

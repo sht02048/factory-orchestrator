@@ -38,6 +38,7 @@ function runCause(run: HomeRun): NotificationCause | null {
       return null;
     case "queued":
     case "running":
+    case "paused":
       return null;
   }
 }

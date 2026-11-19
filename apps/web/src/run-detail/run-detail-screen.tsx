@@ -29,6 +29,9 @@ import { useTime } from "../format/time";
 import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import { canCancel } from "@ganger/app/run-detail/model";
+import { availableRunControl } from "@ganger/app/run-control-view";
+import type { RunControlView } from "@ganger/app/run-control-view";
+import type { RunControl } from "@ganger/core";
 import type {
   LogTailView,
   PendingInput,
@@ -41,6 +44,7 @@ export interface RunDetailActions {
   onAnswer: (questionId: string, body: string) => Promise<void>;
   onDeny: (promptId: string, reason: string) => Promise<void>;
   onCancel: () => Promise<void>;
+  onControl: (control: RunControl) => Promise<void>;
   onRefreshLog: () => Promise<void>;
 }
 
@@ -79,8 +83,15 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const { status, when } = statusLine(run);
   const pr = run.pullRequest;
   const cancelable = canCancel(run) && !run.cancelPending;
+  const control = availableRunControl(run.status.state, run.cancelPending, run.control);
   const headRef = useRef<HTMLElement>(null);
   const cancelStatusRef = useRef<HTMLSpanElement>(null);
+  const pending = [
+    run.cancelPending ? t("cancelPending") : null,
+    run.control?.status === "pending"
+      ? t(run.control.control === "pause" ? "control.pausePending" : "control.resumePending")
+      : null,
+  ].filter((part) => part !== null);
 
   return (
     <div {...stylex.props(styles.main)}>
@@ -96,19 +107,27 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
           <StatusPill status={status}>{statusName(status)}</StatusPill>
           <Text variant="meta">{when}</Text>
           <Text variant="meta" ref={cancelStatusRef} role="status" tabIndex={-1}>
-            {run.cancelPending ? t("cancelPending") : null}
+            {pending.length === 0 ? null : pending.join(t("metaSeparator"))}
           </Text>
         </p>
         <div {...stylex.props(styles.titleRow)}>
           <Text variant="page" as="h1">
             {run.ticketTitle ?? run.ticketKey}
           </Text>
-          {pr === null && !cancelable ? null : (
+          {pr === null && !cancelable && control === null ? null : (
             <Actions>
               {pr === null ? null : (
                 <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
                   {t("openPr", { pr: pr.displayId })}
                 </a>
+              )}
+              {control === null ? null : (
+                <ControlRun
+                  key={control}
+                  control={control}
+                  onControl={props.onControl}
+                  focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+                />
               )}
               {cancelable ? (
                 <CancelRun
@@ -119,6 +138,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
             </Actions>
           )}
         </div>
+        {run.control?.status === "failed" ? <ControlFailed control={run.control} /> : null}
         <Text variant="meta">
           {[
             ...(run.ticketTitle === null ? [] : [run.ticketKey]),
@@ -232,6 +252,8 @@ function Reason({ run }: { run: RunDetail }) {
       return queuedReasonText(status.queuedReason);
     case "running":
       return t("running");
+    case "paused":
+      return t("paused");
     case "waiting-for-input":
       return t(inputKey(status.input));
     case "disconnected":
@@ -263,6 +285,7 @@ function NextAction({ run }: { run: RunDetail }) {
   switch (status.state) {
     case "queued":
     case "running":
+    case "paused":
     case "disconnected":
       next = t(`next.${status.state}`);
       break;
@@ -532,6 +555,52 @@ function CancelRun({
   );
 }
 
+function ControlRun({
+  control,
+  onControl,
+  focusAfter,
+}: {
+  control: RunControl;
+  onControl: RunDetailActions["onControl"];
+  focusAfter: () => void;
+}) {
+  const t = useTranslations("run.control");
+  const [state, setState] = useState<"idle" | "sending" | "failed">("idle");
+  return (
+    <>
+      <Button
+        variant={control === "resume" ? "primary" : "secondary"}
+        disabled={state === "sending"}
+        onClick={() => {
+          setState("sending");
+          onControl(control).then(
+            () => {
+              setState("idle");
+              focusAfter();
+            },
+            () => setState("failed"),
+          );
+        }}
+      >
+        {t(control)}
+      </Button>
+      {state === "failed" ? <ActionFailed /> : null}
+    </>
+  );
+}
+
+function ControlFailed({ control }: { control: Extract<RunControlView, { status: "failed" }> }) {
+  const t = useTranslations("run.control");
+  const domain = useTranslations("domain");
+  return (
+    <Text variant="ui" as="p" tone="problem" role="alert">
+      {t(control.control === "pause" ? "pauseFailed" : "resumeFailed", {
+        reason: domain(`runControlFailure.${control.reason}`),
+      })}
+    </Text>
+  );
+}
+
 function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: string }) {
   const t = useTranslations("run.timeline");
   const domain = useTranslations("domain");
@@ -564,6 +633,8 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
       case "started":
       case "waiting-for-input":
       case "resumed":
+      case "paused":
+      case "unpaused":
       case "unreachable":
       case "disconnected":
       case "reconnected":
@@ -826,6 +897,18 @@ function useStatusLine(): (run: RunDetail) => { status: PillStatus; when: string
       case "waiting-for-input":
       case "disconnected":
         return { status: runStatus(status), when: elapsed(run.executionMs ?? 0) };
+      case "paused":
+        return {
+          status: runStatus(status),
+          when:
+            status.pausedSince === null
+              ? ""
+              : t("pausedFor", {
+                  duration: duration(
+                    Math.max(0, Date.parse(run.now) - Date.parse(status.pausedSince)),
+                  ),
+                }),
+        };
     }
   };
 }

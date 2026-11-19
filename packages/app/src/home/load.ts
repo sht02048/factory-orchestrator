@@ -20,6 +20,7 @@ import {
   toWorkspaceId,
 } from "@ganger/db";
 import type { Database, StoredRun, StoredRunner } from "@ganger/db";
+import { runControlOf } from "../run-control.js";
 import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
 import { isWebUrl } from "../format/url.js";
 import { resolveWorkspace, runnerIssueCause } from "../shell/model.js";
@@ -123,12 +124,21 @@ export function loadHomePage(
           ? null
           : { displayId: pr.displayId, url: pr.url },
       cancelling: cancelling.has(run.id),
+      control: run.state === "running" || run.state === "paused" ? runControlOf(db, run) : null,
     };
     switch (run.state) {
       case "queued":
         return { ...base, state: run.state, queuedReason: queuedReason(run.id) };
       case "running":
         return { ...base, state: run.state };
+      case "paused": {
+        const since = records?.pausedSince ?? null;
+        return {
+          ...base,
+          state: run.state,
+          pausedMs: since === null ? null : Math.max(0, now.getTime() - since.getTime()),
+        };
+      }
       case "waiting-for-input": {
         const pending = oldestPendingInput(db, run.id);
         return {

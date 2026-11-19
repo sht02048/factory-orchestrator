@@ -72,6 +72,8 @@ export interface RunRecords {
   trackerStateSetAt: Date | null;
   trackerComment: { id: CommentId; at: Date } | null;
   unreachableSince: Date | null;
+  pausedSince: Date | null;
+  pausedMs: number;
   lastLog: string[] | null;
 }
 
@@ -184,6 +186,8 @@ function toRunRecords(row: RunRow): RunRecords {
         ? null
         : { id: row.trackerCommentId, at: row.trackerCommentedAt },
     unreachableSince: row.unreachableSince,
+    pausedSince: row.pausedSince,
+    pausedMs: row.pausedMs,
     lastLog: row.lastLog,
   };
 }
@@ -416,8 +420,12 @@ export function fillRunTicketTitle(db: Database, id: RunId, title: string): void
 }
 
 export type RunStateChange =
-  | { to: "running"; started?: { worktree: WorktreeRef; branch: string; agentRef: AgentRef } }
-  | { to: "waiting-for-input" | "disconnected" }
+  | {
+      to: "running";
+      started?: { worktree: WorktreeRef; branch: string; agentRef: AgentRef };
+      resumedAgentRef?: AgentRef;
+    }
+  | { to: "waiting-for-input" | "paused" | "disconnected" }
   | {
       to: "ended";
       agentResult: AgentResult;
@@ -451,6 +459,7 @@ export function changeRunState(
     if (!transition.ok) return { ok: false, error: transition.error };
 
     const where = and(eq(runs.id, runId), eq(runs.state, current.state));
+    const pauseClock = pauseClockAfter(db, runId, change.to, now);
     if (change.to === "ended") {
       const notStarted = current.state === "queued";
       const runnerUnreached = change.runnerUnreached ?? false;
@@ -467,6 +476,7 @@ export function changeRunState(
           prState: change.prState,
           runnerUnreached,
           reportBody: change.reportBody ?? null,
+          ...pauseClock,
         })
         .where(where)
         .run();
@@ -481,7 +491,12 @@ export function changeRunState(
         .where(where)
         .run();
     } else {
-      db.update(runs).set({ state: change.to }).where(where).run();
+      const agentRef =
+        change.to === "running" && current.state === "paused" ? change.resumedAgentRef : undefined;
+      db.update(runs)
+        .set({ state: change.to, ...pauseClock, ...(agentRef === undefined ? {} : { agentRef }) })
+        .where(where)
+        .run();
     }
     recordStateChange(db, runId, current.state, change.to, now);
 
@@ -489,6 +504,36 @@ export function changeRunState(
     if (run === null) throw new RunRowError(runId, "missing right after update");
     return { ok: true, run };
   });
+}
+
+function pauseClockAfter(
+  db: Database,
+  runId: RunId,
+  to: RunState,
+  now: Date,
+): { pausedSince: Date | null; pausedMs?: number } {
+  const row = db
+    .select({ pausedSince: runs.pausedSince, pausedMs: runs.pausedMs })
+    .from(runs)
+    .where(eq(runs.id, runId))
+    .get();
+  const since = row?.pausedSince ?? null;
+  const counted =
+    since === null
+      ? {}
+      : { pausedMs: (row?.pausedMs ?? 0) + Math.max(0, now.getTime() - since.getTime()) };
+  return { pausedSince: to === "paused" ? now : null, ...counted };
+}
+
+export function lastStateBeforeDisconnect(db: Database, runId: RunId): RunState | null {
+  const change = db
+    .select({ from: runStateChanges.fromState })
+    .from(runStateChanges)
+    .where(and(eq(runStateChanges.runId, runId), eq(runStateChanges.toState, "disconnected")))
+    .orderBy(desc(runStateChanges.id))
+    .limit(1)
+    .get();
+  return change?.from ?? null;
 }
 
 export function recordStartRequested(db: Database, runId: RunId, now: Date = new Date()): boolean {

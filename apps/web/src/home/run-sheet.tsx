@@ -96,6 +96,8 @@ function SheetStatus({ run, status }: { run: HomeRun; status: PillStatus }) {
         return run.executionMs === null
           ? null
           : t("since.running", { elapsed: elapsed(run.executionMs) });
+      case "paused":
+        return run.pausedMs === null ? null : t("since.paused", { elapsed: elapsed(run.pausedMs) });
       case "waiting-for-input":
         return run.waitingMs === null
           ? null
@@ -132,6 +134,8 @@ function SheetBody({
       return <Text variant="body">{text.queued(run)}</Text>;
     case "running":
       return <Text variant="body">{t("running")}</Text>;
+    case "paused":
+      return <Text variant="body">{t("paused")}</Text>;
     case "disconnected":
       return (
         <Block>

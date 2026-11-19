@@ -42,6 +42,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
         break;
       case "running":
       case "waiting-for-input":
+      case "paused":
       case "disconnected":
         push(occupying, run.runnerId, {
           ...base,

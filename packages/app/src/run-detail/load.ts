@@ -27,6 +27,7 @@ import type {
   StoredRunQuestion,
 } from "@ganger/db";
 import { pendingInput } from "../home/load.js";
+import { runControlOf } from "../run-control.js";
 import { mcpActionView } from "../mcp/actions.js";
 import type { QueuedReason } from "../runs/model.js";
 import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
@@ -86,6 +87,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
       run.state === "ended" && run.agentResult === "could-not-start" ? records.startError : null,
     cancelPending:
       run.state !== "ended" && cancelRequest !== null && cancelRequest.processedAt === null,
+    control: run.state === "running" || run.state === "paused" ? runControlOf(db, run) : null,
     timeline: timelineOf(
       run,
       records,
@@ -114,6 +116,8 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date):
       return { state: "queued", queuedReason: queuedReasonOf(db, run.id, now) };
     case "running":
       return { state: "running" };
+    case "paused":
+      return { state: "paused", pausedSince: records.pausedSince?.toISOString() ?? null };
     case "waiting-for-input": {
       const input = pendingInput(db, run.id) ?? { kind: "unknown" };
       return { state: "waiting-for-input", input, inputSince: inputSinceOf(db, run.id, input) };
@@ -256,7 +260,10 @@ function changeEvent(run: StoredRun, change: RunStateChangeRecord): TimelineEven
     case "running":
       if (change.from === "disconnected") return { kind: "reconnected", at };
       if (change.from === "waiting-for-input") return { kind: "resumed", at };
+      if (change.from === "paused") return { kind: "unpaused", at };
       return { kind: "started", at };
+    case "paused":
+      return change.from === "disconnected" ? { kind: "reconnected", at } : { kind: "paused", at };
     case "waiting-for-input":
       return change.from === "disconnected"
         ? { kind: "reconnected", at }

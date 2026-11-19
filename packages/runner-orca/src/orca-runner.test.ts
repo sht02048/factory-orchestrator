@@ -1016,3 +1016,145 @@ describe("worktreeExists and removeWorktree", () => {
     });
   });
 });
+
+describe("pauseAgent and resumeAgent", () => {
+  const ORCA = "/Applications/Orca.app/Contents/Resources/bin/orca";
+  const AGENT_TERMINAL = "term_9c1d6b7e-2f0a-4c55-9a3e-0d5f1e2b7a10";
+  const shown = (fields: Record<string, string | null>) =>
+    stdout(
+      JSON.stringify({
+        ok: true,
+        result: {
+          dispatchId: "ctx_a6e6a23a7132",
+          taskId: "task_43a3a070dc4c",
+          runId: "run_493ebb2f403d",
+          state: "ready",
+          ...fields,
+        },
+      }),
+    );
+  const sent = stdout(JSON.stringify({ ok: true, result: { send: { accepted: true } } }));
+  const resumeInput = {
+    agent: toAgentId("claude"),
+    message: "Continue where you stopped.",
+    restartPrompt: "ACME-1 Fix checkout\n\nPick up where the previous agent stopped.",
+  };
+
+  test("pauses by sending Escape to the live agent terminal, without stopping the worker", async () => {
+    const exec = new ScriptedExec()
+      .orca("orchestration worker-show", shown({ liveness: "live", terminal: AGENT_TERMINAL }))
+      .orca("terminal send", sent);
+    await runnerWith(exec).pauseAgent(RUN);
+    expect(exec.commands()).toEqual([
+      `${ORCA} orchestration worker-show --dispatch ctx_a6e6a23a7132 --json`,
+      `${ORCA} terminal send --terminal ${AGENT_TERMINAL} --text '\u001b' --json`,
+    ]);
+    expect(exec.commands().some((command) => command.includes("worker-stop"))).toBe(false);
+  });
+
+  test("pausing an agent that already exited is a runner error and sends nothing", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration worker-show",
+      shown({ liveness: "exited", terminal: AGENT_TERMINAL }),
+    );
+    expect(await adapterError(runnerWith(exec).pauseAgent(RUN))).toMatchObject({
+      kind: "runner-error",
+      code: "agent_not_running",
+    });
+    expect(exec.commands()).toHaveLength(1);
+  });
+
+  test("an unverifiable agent is paused only when its terminal is still connected", async () => {
+    const exec = new ScriptedExec()
+      .orca(
+        "orchestration worker-show",
+        shown({ liveness: "unverifiable", terminal: AGENT_TERMINAL }),
+      )
+      .orca(
+        "terminal show",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: { terminal: { handle: AGENT_TERMINAL, connected: true } },
+          }),
+        ),
+      )
+      .orca("terminal send", sent);
+    await runnerWith(exec).pauseAgent(RUN);
+    expect(exec.commands()[2]).toContain("terminal send");
+  });
+
+  test("a terminal that refuses input is a runner error", async () => {
+    const exec = new ScriptedExec()
+      .orca("orchestration worker-show", shown({ liveness: "live", terminal: AGENT_TERMINAL }))
+      .orca(
+        "terminal send",
+        stdout(JSON.stringify({ ok: true, result: { send: { accepted: false } } })),
+      );
+    expect(await adapterError(runnerWith(exec).pauseAgent(RUN))).toMatchObject({
+      kind: "runner-error",
+      code: "input_not_accepted",
+    });
+  });
+
+  test("resumes the same conversation by typing the message into the agent terminal", async () => {
+    const exec = new ScriptedExec()
+      .orca("orchestration worker-show", shown({ liveness: "live", terminal: AGENT_TERMINAL }))
+      .orca("terminal send", sent);
+    const resumed = await runnerWith(exec).resumeAgent(RUN, resumeInput);
+    expect(resumed).toEqual({ agentRef: RUN.agentRef, restarted: false });
+    expect(exec.commands()).toEqual([
+      `${ORCA} orchestration worker-show --dispatch ctx_a6e6a23a7132 --json`,
+      `${ORCA} terminal send --terminal ${AGENT_TERMINAL} --text 'Continue where you stopped.' --enter --json`,
+    ]);
+  });
+
+  test("starts a new agent in the same worktree when the conversation is gone", async () => {
+    const exec = new ScriptedExec()
+      .orca("orchestration worker-show", shown({ liveness: "exited", terminal: null }))
+      .orca(
+        "orchestration worker-start",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: {
+              dispatchId: "ctx_new",
+              taskId: "task_new",
+              runId: "run_493ebb2f403d",
+              state: "ready",
+            },
+          }),
+        ),
+      );
+    const resumed = await runnerWith(exec).resumeAgent(RUN, resumeInput);
+    expect(resumed.restarted).toBe(true);
+    expect(decodeAgent(resumed.agentRef)).toEqual({
+      dispatchId: "ctx_new",
+      taskId: "task_new",
+      runId: "run_493ebb2f403d",
+    });
+    expect(exec.commands()[1]).toBe(
+      `${ORCA} orchestration worker-start --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --run run_493ebb2f403d --spec-file - --task-title 'resume task_43a3a070dc4c' --worktree 'id:${WORKTREE}' --agent claude --json`,
+    );
+    expect(exec.calls[1]?.stdin).toBe(resumeInput.restartPrompt);
+    expect(exec.commands().some((command) => command.includes("--name"))).toBe(false);
+  });
+
+  test("a restart that does not become ready is a runner error", async () => {
+    const exec = new ScriptedExec()
+      .orca("orchestration worker-show", shown({ liveness: "exited", terminal: null }))
+      .orca(
+        "orchestration worker-start",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: { dispatchId: "ctx_new", taskId: "task_new", runId: "run_1", state: "failed" },
+          }),
+        ),
+      );
+    expect(await adapterError(runnerWith(exec).resumeAgent(RUN, resumeInput))).toMatchObject({
+      kind: "runner-error",
+      code: "worker_start_failed",
+    });
+  });
+});

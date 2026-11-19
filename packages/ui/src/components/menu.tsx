@@ -11,28 +11,34 @@ import {
 } from "@ui-sdk/react/menu";
 import type { ReactNode } from "react";
 import { cx } from "../cx";
-import { colors, fontWeight, motion, radius, space } from "../tokens.stylex";
+import { colors, fontWeight, motion, radius, size, space } from "../tokens.stylex";
 import { CheckIcon, ChevronDownIcon } from "./icons";
 import { popupStyles } from "./popup-styles";
 
 export interface MenuProps {
   trigger: ReactNode;
   label?: string;
-  variant?: "default" | "rail";
+  variant?: "default" | "rail" | "icon";
   children: ReactNode;
 }
 
 export function Menu({ trigger, label, variant = "default", children }: MenuProps) {
   const rail = variant === "rail";
+  const icon = variant === "icon";
   return (
     <SdkMenu>
       <MenuTrigger
         {...(label === undefined ? {} : { "aria-label": label })}
         className={(s) =>
-          cx(styles.trigger, rail && styles.railTrigger, s.open && styles.triggerOpen)
+          cx(
+            styles.trigger,
+            rail && styles.railTrigger,
+            icon && styles.iconTrigger,
+            s.open && styles.triggerOpen,
+          )
         }
       >
-        {rail ? (
+        {rail || icon ? (
           trigger
         ) : (
           <>
@@ -45,7 +51,7 @@ export function Menu({ trigger, label, variant = "default", children }: MenuProp
       </MenuTrigger>
       <MenuContent
         side={rail ? "right" : "bottom"}
-        align="start"
+        align={icon ? "end" : "start"}
         sideOffset={rail ? 8 : 4}
         className={cx(popupStyles.content)}
       >
@@ -158,6 +164,18 @@ const styles = stylex.create({
     paddingInline: space.s1,
     boxShadow: "none",
     textAlign: "center",
+  },
+  iconTrigger: {
+    justifyContent: "center",
+    width: size.control,
+    height: size.control,
+    padding: 0,
+    boxShadow: "none",
+    color: {
+      default: colors.textSecondary,
+      ":hover": { default: null, "@media (hover: hover)": colors.textPrimary },
+    },
+    transitionProperty: "background-color, color",
   },
   triggerOpen: { backgroundColor: colors.bgHover },
   triggerText: {

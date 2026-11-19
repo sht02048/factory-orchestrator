@@ -29,7 +29,8 @@ interface Cancellable {
 
 export type RunView =
   | (RunViewBase & Cancellable & { state: "queued"; queuedReason: QueuedReason })
-  | (RunViewBase & Cancellable & { state: "running" | "waiting-for-input" | "disconnected" })
+  | (RunViewBase &
+      Cancellable & { state: "running" | "waiting-for-input" | "paused" | "disconnected" })
   | (RunViewBase & {
       state: "ended";
       endedAt: string;
@@ -61,6 +62,7 @@ export type RunGroupFilter = (typeof RUN_GROUP_FILTERS)[number];
 
 export const RUN_STATUS_FILTERS = [
   "running",
+  "paused",
   "waiting-for-input",
   "disconnected",
   "queued",
@@ -87,7 +89,7 @@ export function needsAttention(run: RunView): boolean {
 }
 
 export function isInProgress(run: RunView): boolean {
-  return run.state === "queued" || run.state === "running";
+  return run.state === "queued" || run.state === "running" || run.state === "paused";
 }
 
 export function isDone(run: RunView): boolean {

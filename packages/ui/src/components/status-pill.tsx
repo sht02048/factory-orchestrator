@@ -2,7 +2,7 @@ import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 import { colors, fontSize, fontWeight, radius, size, space } from "../tokens.stylex";
 
-export type RunStateStatus = "queued" | "running" | "waiting-for-input" | "disconnected";
+export type RunStateStatus = "queued" | "running" | "waiting-for-input" | "paused" | "disconnected";
 export type SummaryStatus = "merged" | "human-check" | "failed" | "canceled";
 export type RunnerStatus = "online" | "offline";
 export type AttentionStatus =
@@ -21,6 +21,7 @@ export const PILL_STATUSES = [
   "queued",
   "running",
   "waiting-for-input",
+  "paused",
   "disconnected",
   "merged",
   "human-check",
@@ -52,6 +53,7 @@ export function statusTone(status: PillStatus): StatusTone {
     case "merged":
       return "merged";
     case "queued":
+    case "paused":
     case "canceled":
       return "idle";
   }

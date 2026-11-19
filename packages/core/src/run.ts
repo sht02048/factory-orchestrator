@@ -14,6 +14,7 @@ export const RUN_STATES = [
   "queued",
   "running",
   "waiting-for-input",
+  "paused",
   "disconnected",
   "ended",
 ] as const;
@@ -23,12 +24,14 @@ export const ACTIVE_RUN_STATES: ReadonlySet<RunState> = new Set([
   "queued",
   "running",
   "waiting-for-input",
+  "paused",
   "disconnected",
 ]);
 
 export const CAPACITY_OCCUPYING_STATES: ReadonlySet<RunState> = new Set([
   "running",
   "waiting-for-input",
+  "paused",
   "disconnected",
 ]);
 
@@ -122,6 +125,6 @@ export type Run =
   | (RunBase & { state: "queued"; runnerId: RunnerId | null })
   | (RunBase &
       StartedRunFields & {
-        state: "running" | "waiting-for-input" | "disconnected";
+        state: "running" | "waiting-for-input" | "paused" | "disconnected";
       })
   | EndedRun;
