@@ -176,7 +176,6 @@
     "sshTarget": "ssh 대상",
     "orcaPath": "orca 경로",
     "capacity": "자리",
-    "capacityValue": "1",
     "github": {
       "gh-missing": "그 맥에 gh가 없어서 GitHub 인증 정리를 건너뛰었어요. 저장소에 push하려면 gh를 설치하고 로그인해요.",
       "gh-logged-out": "그 맥의 gh에 로그인돼 있지 않아서 GitHub 인증 정리를 건너뛰었어요.",

@@ -12,11 +12,29 @@ const BODY_LIMIT_BYTES = 16 * 1024;
 const NO_STORE = { "cache-control": "no-store" };
 const TEXT = { "content-type": "text/plain; charset=utf-8", ...NO_STORE };
 
+async function readLimited(request: Request): Promise<string | null> {
+  if (request.body === null) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > BODY_LIMIT_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 async function readFields(request: Request): Promise<Record<string, unknown> | null> {
   const length = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(length) || length > BODY_LIMIT_BYTES) return null;
-  const text = await request.text();
-  if (text.length > BODY_LIMIT_BYTES) return null;
+  const text = await readLimited(request);
+  if (text === null) return null;
   const type = request.headers.get("content-type") ?? "";
   if (type.includes("application/json")) {
     try {

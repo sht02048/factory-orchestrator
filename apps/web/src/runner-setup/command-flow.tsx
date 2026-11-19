@@ -512,7 +512,7 @@ function Registered({
             {runner.orcaPath}
           </Text>
         </DefinitionItem>
-        <DefinitionItem label={t("capacity")}>{t("capacityValue")}</DefinitionItem>
+        <DefinitionItem label={t("capacity")}>{runner.capacity}</DefinitionItem>
       </DefinitionList>
       {runner.github === "done" ? null : <Text variant="meta">{t(`github.${runner.github}`)}</Text>}
       <Actions>

@@ -2,7 +2,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AdapterRegistry } from "@ganger/core";
-import { SecretBox, listRunners, migrate, openDatabase } from "@ganger/db";
+import { SecretBox, listRunners, migrate, openDatabase, saveRunner } from "@ganger/db";
+import { toRunnerId, toRunnerKind } from "@ganger/core";
 import { OrcaRunner, parseOrcaRunnerConfig, sshArgs } from "@ganger/runner-orca";
 import type { RemoteExec, RemoteResult } from "@ganger/runner-orca";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
@@ -174,6 +175,7 @@ describe("receiving a runner enrollment", () => {
         name: "Studio Mac",
         sshTarget: "dev@studio-mac.example.ts.net",
         orcaPath: ORCA,
+        capacity: 1,
         github: "done",
       },
     });
@@ -214,6 +216,30 @@ describe("receiving a runner enrollment", () => {
     expect(readFileSync(paths.knownHostsFile, "utf8")).toBe(
       "studio-mac.example.ts.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOtherMacHostKey\n",
     );
+    expect(listRunners(ctx.db)).toHaveLength(1);
+  });
+
+  test("re-enrolling a Mac keeps the runner's saved name and capacity and reports them", () => {
+    const ctx = context();
+    receiveEnrollment(ctx, ready(ctx.enrollments.issue().token), new Date());
+    const [first] = listRunners(ctx.db);
+    saveRunner(ctx.db, {
+      id: first?.id ?? toRunnerId("x"),
+      kind: toRunnerKind("orca"),
+      name: "Desk",
+      config: first?.config ?? {},
+      capacity: 3,
+    });
+    const again = ctx.enrollments.issue();
+    expect(receiveEnrollment(ctx, ready(again.token), new Date())).toEqual({
+      status: 200,
+      kind: "registered",
+      name: "Desk",
+    });
+    expect(ctx.enrollments.view(again.id)).toMatchObject({
+      state: "registered",
+      runner: { name: "Desk", capacity: 3 },
+    });
     expect(listRunners(ctx.db)).toHaveLength(1);
   });
 
@@ -270,6 +296,14 @@ describe("starting an enrollment", () => {
     expect(
       await startEnrollment({ enrollments: ctx.enrollments, ssh: null, webAddress: WEB_ADDRESS }),
     ).toEqual({ ok: false, reason: "no-home" });
+    expect(
+      await startEnrollment({
+        enrollments: ctx.enrollments,
+        ssh: ctx.ssh,
+        webAddress: "not a url",
+      }),
+    ).toEqual({ ok: false, reason: "no-web-address" });
+    expect(ctx.enrollments.claim("token-1")).toEqual({ ok: false, refusal: "unknown" });
   });
 
   test("gives a one-line command for the other Mac and serves the script only for a live token", async () => {

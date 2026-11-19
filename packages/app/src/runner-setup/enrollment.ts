@@ -1,11 +1,12 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { isAbsolute } from "node:path";
 import type { RunnerId } from "@ganger/core";
+import { listRunners } from "@ganger/db";
 import { z } from "zod";
 import type { SettingsContext } from "../settings/load.js";
 import { parsePublicKey } from "./ganger-ssh.js";
 import type { GangerSsh } from "./ganger-ssh.js";
-import { saveGangerRunner } from "./register.js";
+import { THIS_MAC_CAPACITY, saveGangerRunner } from "./register.js";
 import {
   renderSetupScript,
   reviewFirstCommand,
@@ -42,6 +43,7 @@ export interface EnrolledRunner {
   name: string;
   sshTarget: string;
   orcaPath: string;
+  capacity: number;
   github: GitHubSetupResult;
 }
 
@@ -267,17 +269,20 @@ export function receiveEnrollment(
       { name: ready.name, sshTarget, orcaPath: ready.orcaPath, access },
       now,
     );
+    const stored = listRunners(context.db).find((runner) => runner.id === runnerId);
+    const name = stored?.name ?? ready.name;
     context.enrollments.finish(id, {
       state: "registered",
       runner: {
         id: runnerId,
-        name: ready.name,
+        name,
         sshTarget,
         orcaPath: ready.orcaPath,
+        capacity: stored?.capacity ?? THIS_MAC_CAPACITY,
         github: ready.github,
       },
     });
-    return { status: 200, kind: "registered", name: ready.name };
+    return { status: 200, kind: "registered", name };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     context.enrollments.finish(id, {
@@ -328,7 +333,9 @@ export interface StartEnrollmentInput {
 
 export async function startEnrollment(input: StartEnrollmentInput): Promise<StartEnrollmentResult> {
   if (input.replacing !== undefined) input.enrollments.revoke(input.replacing);
-  if (input.webAddress === null) return { ok: false, reason: "no-web-address" };
+  if (input.webAddress === null || !URL.canParse(input.webAddress)) {
+    return { ok: false, reason: "no-web-address" };
+  }
   if (input.ssh === null) return { ok: false, reason: "no-home" };
   const key = await input.ssh.publicKey();
   if (!key.ok) return { ok: false, reason: "keygen-failed" };
