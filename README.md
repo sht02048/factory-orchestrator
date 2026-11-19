@@ -17,6 +17,7 @@ Ganger is the foreman of your software factory: it hands tracker tickets to codi
 | `apps/cli`                 | `init`, `start`, and launchd/systemd service registration                                 | Started |
 | `apps/desktop`             | macOS desktop app (Electron): window, tray, and notifications; runs the server bundle     | Started |
 | `packages/core`            | Domain logic and the Tracker, Runner, and CodeHost adapter interfaces                     | Stub    |
+| `packages/app`             | What each screen reads and writes, shared by the web server functions and `ganger mcp`    | Started |
 | `packages/db`              | SQLite (WAL) schema, access, and migrations                                               | Started |
 | `packages/ui`              | Design system (StyleX + UI SDK)                                                           | Started |
 | `packages/tracker-linear`  | Tracker adapter for Linear (GraphQL API and webhooks)                                     | Planned |
@@ -141,6 +142,28 @@ Requests that change data (including server functions) must also come from a pag
 - Run `init` first. `service install` refuses to register a service that would fail to boot, and refuses to overwrite an existing service file.
 - The service runs the Node and CLI paths you installed it with, and uses your current `PATH`. After you move or upgrade Node, or move the server bundle to another folder, run `service uninstall` and `service install` again.
 - On macOS, logs go to `<home>/logs/ganger.log`. On Linux, read them with `journalctl --user -u ganger.service`, and run `loginctl enable-linger` once so the service keeps running after you log out.
+
+### Connect an MCP client
+
+`ganger mcp` runs an [MCP](https://modelcontextprotocol.io) server over stdin and stdout, so an agent on the same machine (for example, Hermes) can read Ganger's current state. The MCP client starts the command itself; it opens no network port. It reads the database of the installation folder (`--home` or `GANGER_HOME`) directly, so it works even while the server is stopped, and every result says whether the server is running.
+
+- The tools only read: the Dashboard summary, tickets, runs and run detail (with the last stored lines of the log), runners, stats, and settings. They are marked read-only. Tools that take a workspace accept its id or name, and you can leave it out when there is only one.
+- Results are JSON. Text that someone other than the operator wrote (ticket titles and bodies, agent questions and reports, logs) is in `external` fields, and the server instructions tell the client to treat it as data, not instructions. No result includes a secret value; settings show only whether a key or token is set.
+- `ganger mcp` never applies database migrations. If the database is older than the CLI, it stops and asks you to start the server first; if it is newer, it asks you to update Ganger.
+- Settings > MCP shows the client configuration with the absolute paths of this installation's CLI, in the Hermes `~/.hermes/config.yaml` format and the `mcpServers` JSON format, with a copy button. With the desktop app, `ganger` is not on your `PATH`, so copy it from there.
+
+For a server bundle, the configuration looks like this (Hermes, `~/.hermes/config.yaml`):
+
+```yaml
+mcp_servers:
+  ganger:
+    command: "/usr/local/bin/node"
+    args:
+      - "/opt/ganger-0.1.0/cli/bin/cli.js"
+      - "mcp"
+      - "--home"
+      - "/Users/you/.ganger"
+```
 
 ## Desktop app (macOS)
 

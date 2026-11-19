@@ -3,6 +3,7 @@ import {
   Actions,
   Button,
   Checkbox,
+  CodeBlock,
   DetailPanel,
   Dialog,
   DialogClose,
@@ -43,6 +44,8 @@ import {
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { prerequisiteHint } from "@ganger/app/prerequisites";
+import { hermesConfig, jsonConfig } from "@ganger/app/settings/mcp-launch";
+import type { McpLaunch } from "@ganger/app/settings/mcp-launch";
 import { useAgentName, usePrerequisiteName } from "../labels";
 import { useStatusName } from "../status";
 import {
@@ -357,6 +360,7 @@ function WorkspaceSummary({
     case "runners":
     case "addresses":
     case "power":
+    case "mcp":
       return null;
   }
 }
@@ -381,6 +385,8 @@ function InstallSummary({ item, page }: { item: SettingsItem; page: SettingsPage
       if (!available) return t("powerUnavailable");
       return preventSleep ? t("powerOn") : t("powerOff");
     }
+    case "mcp":
+      return t("mcp");
     case "general":
     case "projects":
     case "mapping":
@@ -423,6 +429,8 @@ function ItemPanel({
       return <AddressesPanel addresses={page.install.addresses} actions={actions} />;
     case "power":
       return <PowerPanel power={page.install.power} actions={actions} />;
+    case "mcp":
+      return <McpPanel launch={page.install.mcp} />;
     case "general":
     case "projects":
     case "mapping":
@@ -1308,6 +1316,63 @@ function AddressesPanel({
   );
 }
 
+function McpPanel({ launch }: { launch: McpLaunch }) {
+  const t = useTranslations("settings.mcp");
+  return (
+    <>
+      <PanelBlock>
+        <ul {...stylex.props(textStyles("ui"), styles.bullets)}>
+          <li>{t("intro")}</li>
+          <li>{t("readOnly")}</li>
+          <li>{t("external")}</li>
+          {launch.located ? null : <li>{t("notLocated")}</li>}
+        </ul>
+      </PanelBlock>
+      <McpSnippet
+        name={t("hermes")}
+        description={t("hermesDescription")}
+        text={hermesConfig(launch)}
+      />
+      <McpSnippet name={t("json")} description={t("jsonDescription")} text={jsonConfig(launch)} />
+    </>
+  );
+}
+
+function McpSnippet({
+  name,
+  description,
+  text,
+}: {
+  name: string;
+  description: string;
+  text: string;
+}) {
+  const t = useTranslations("settings.mcp");
+  const copy = () => {
+    navigator.clipboard.writeText(text).then(
+      () => showToast(t("copied", { name })),
+      () => showToast(t("copyFailed")),
+    );
+  };
+  return (
+    <PanelBlock title={name}>
+      <div {...stylex.props(styles.snippet)}>
+        <Text variant="ui" as="p" tone="muted">
+          {description}
+        </Text>
+        <CodeBlock tone="command" label={name}>
+          {text}
+        </CodeBlock>
+        <Actions>
+          <Button variant="secondary" onClick={copy}>
+            {t("copy", { name })}
+          </Button>
+        </Actions>
+      </div>
+    </PanelBlock>
+  );
+}
+
 function PowerPanel({ power, actions }: { power: PowerView; actions: SettingsActions }) {
   const t = useTranslations("settings.power");
   const ts = useTranslations("settings");
@@ -1814,6 +1879,7 @@ const styles = stylex.create({
   inline: { display: "inline-flex", alignItems: "center", gap: space.px6 },
   action: { flexShrink: 0 },
   fix: { display: "flex", flexDirection: "column", gap: space.s1 },
+  snippet: { display: "flex", flexDirection: "column", gap: space.s3 },
   bullets: {
     margin: 0,
     paddingInlineStart: space.s5,

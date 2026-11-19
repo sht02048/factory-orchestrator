@@ -31,6 +31,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { serverMcpLaunch } from "../server/mcp-launch";
 import { installPowerSettings } from "../server/power-settings";
 import { renderWithMessages } from "../testing/render";
 import {
@@ -1025,5 +1026,46 @@ describe("잠자기 방지(0084)", () => {
   it("켜기·끄기 값은 boolean만 받는다", () => {
     expect(powerInput.safeParse({ preventSleep: true }).success).toBe(true);
     expect(powerInput.safeParse({ preventSleep: "false" }).success).toBe(false);
+  });
+});
+
+describe("MCP 구역(0088)", () => {
+  const appEnv = {
+    GANGER_CLI_ENTRY: "/Applications/Ganger.app/Contents/Resources/server/cli/bin/cli.js",
+    GANGER_HOME: "/Users/operator/.ganger",
+    ELECTRON_RUN_AS_NODE: "1",
+  };
+  const appNode = "/Applications/Ganger.app/Contents/MacOS/Ganger";
+
+  it("앱 안 CLI의 절대 경로가 든 Hermes·JSON 설정 조각과 복사 버튼을 보인다", async () => {
+    const f = fixture();
+    const context = { ...f.context, mcpLaunch: serverMcpLaunch(appEnv, appNode) };
+    const page = await loadSettingsPage(context, commerce, now);
+    const html = render(page, "mcp");
+    const shown = panelText(html);
+    expect(shown).toContain("mcp_servers:");
+    expect(shown).toContain(`command: "${appNode}"`);
+    expect(shown).toContain(`- "${appEnv.GANGER_CLI_ENTRY}"`);
+    expect(shown).toContain('ELECTRON_RUN_AS_NODE: "1"');
+    expect(shown).toContain('"mcpServers"');
+    expect(shown).toContain("~/.hermes/config.yaml");
+    expect(shown).toContain("external 칸");
+    expect(shown).not.toContain("CLI 위치를 몰라요");
+    expect(html).toContain("Hermes 설정 복사");
+    expect(html).toContain("다른 클라이언트(JSON) 설정 복사");
+  });
+
+  it("CLI 위치를 모르면 PATH의 ganger를 쓰라고 알린다", async () => {
+    const f = fixture();
+    const context = { ...f.context, mcpLaunch: serverMcpLaunch({}, "/usr/bin/node") };
+    const shown = panelText(render(await loadSettingsPage(context, commerce, now), "mcp"));
+    expect(shown).toContain("CLI 위치를 몰라요");
+    expect(shown).toContain('command: "ganger"');
+  });
+
+  it("CLI·설치 폴더 경로는 절대 경로일 때만 받는다", () => {
+    expect(
+      serverMcpLaunch({ GANGER_CLI_ENTRY: "cli.js", GANGER_HOME: "home" }, "/usr/bin/node"),
+    ).toEqual({ located: false, command: "ganger", args: ["mcp"], env: {} });
   });
 });

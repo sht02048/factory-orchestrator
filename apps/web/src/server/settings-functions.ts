@@ -35,6 +35,7 @@ import { hasPendingRunnerChecks, loadSettingsPage } from "@ganger/app/settings/l
 import type { SettingsContext } from "@ganger/app/settings/load";
 import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
+import { serverMcpLaunch } from "./mcp-launch";
 import { installPowerSettings } from "./power-settings";
 
 function context(): SettingsContext {
@@ -43,6 +44,7 @@ function context(): SettingsContext {
     db: getDatabase(),
     secretBox: getSecretBox(),
     registry: getAdapterRegistry(),
+    mcpLaunch: serverMcpLaunch(process.env, process.execPath),
     ...(power === undefined ? {} : { power }),
   };
 }

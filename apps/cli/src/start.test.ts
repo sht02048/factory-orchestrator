@@ -341,6 +341,37 @@ describe("start의 잠자기 방지", () => {
     });
     expect(await (await fetch(started.url)).json()).toEqual({ home });
   });
+
+  it("web에 CLI 위치를 넘겨 Settings가 MCP 설정 조각에 절대 경로를 쓰게 한다", async () => {
+    const home = join(dir, "home");
+    init({ home, port: String(await freePort()) });
+    const layout = fakeLayout();
+    const entryEchoWeb = join(dir, "entry-echo-web.mjs");
+    writeFileSync(
+      entryEchoWeb,
+      FAKE_WEB.replace(
+        "databasePath: process.env.DATABASE_PATH",
+        "cliEntry: process.env.GANGER_CLI_ENTRY",
+      ),
+    );
+    started = await start({
+      home,
+      env: {},
+      layout: {
+        web: (config) => ({
+          ...layout.web(config),
+          args: [entryEchoWeb],
+          requires: [entryEchoWeb],
+        }),
+        worker: () => layout.worker(),
+      },
+      onOutput: quiet,
+      cliEntry: "/opt/ganger/cli/bin/cli.js",
+    });
+    expect(await (await fetch(started.url)).json()).toEqual({
+      cliEntry: "/opt/ganger/cli/bin/cli.js",
+    });
+  });
 });
 
 describe("webUrl", () => {

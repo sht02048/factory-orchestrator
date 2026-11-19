@@ -14,6 +14,8 @@ import {
   listWorkspaces,
 } from "@ganger/db";
 import type { PowerSettingsStore } from "../power-settings.js";
+import { mcpLaunch } from "./mcp-launch.js";
+import type { McpLaunch } from "./mcp-launch.js";
 import type { Database, SecretBox, StoredTrackerConnection, WorkspaceId } from "@ganger/db";
 import { z } from "zod";
 import { prerequisiteProject } from "../prerequisites.js";
@@ -42,6 +44,7 @@ export interface SettingsContext {
   secretBox: SecretBox;
   registry: AdapterRegistry;
   power?: PowerSettingsStore;
+  mcpLaunch?: McpLaunch;
 }
 
 function powerView(store: PowerSettingsStore | undefined): PowerView {
@@ -168,6 +171,9 @@ export async function loadSettingsPage(
       githubToken: listCodeHostConnections(db, secretBox).length > 0,
       addresses: addressesView(getInstallSettings(db)),
       power: powerView(context.power),
+      mcp:
+        context.mcpLaunch ??
+        mcpLaunch({ nodePath: "node", cliEntry: undefined, home: undefined, electron: false }),
       runners: runners.map((runner): RunnerSettingsView => {
         const config = runnerConfigSchema.safeParse(runner.config);
         return {

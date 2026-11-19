@@ -1,7 +1,15 @@
 import type { WorkspaceId } from "@ganger/db";
+import type { McpLaunch } from "./mcp-launch.js";
 
 export const WORKSPACE_ITEMS = ["general", "projects", "mapping", "progress", "label"] as const;
-export const INSTALL_ITEMS = ["connections", "github", "runners", "addresses", "power"] as const;
+export const INSTALL_ITEMS = [
+  "connections",
+  "github",
+  "runners",
+  "addresses",
+  "power",
+  "mcp",
+] as const;
 export type WorkspaceItem = (typeof WORKSPACE_ITEMS)[number];
 export type InstallItem = (typeof INSTALL_ITEMS)[number];
 export type SettingsItem = WorkspaceItem | InstallItem;
@@ -123,6 +131,7 @@ export interface InstallSettings {
   runners: RunnerSettingsView[];
   addresses: AddressesView;
   power: PowerView;
+  mcp: McpLaunch;
 }
 
 export interface SettingsPage {

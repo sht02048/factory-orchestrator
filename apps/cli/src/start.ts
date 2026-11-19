@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { CLI_ENTRY_ENV } from "@ganger/app/settings/mcp-launch";
 import { BOOT_ENV, migrate, openDatabase, parseBootConfig } from "@ganger/db";
 import type { BootConfig } from "@ganger/db";
 import { HOME_ENV, homePaths, readBootEnv } from "./home.js";
@@ -25,6 +26,7 @@ export interface StartOptions {
   readyTimeoutMs?: number;
   stopTimeoutMs?: number;
   keepAwake?: Omit<KeepAwakeOptions, "serverPid" | "readSettings">;
+  cliEntry?: string;
 }
 
 export interface Started {
@@ -77,6 +79,7 @@ export async function start(options: StartOptions): Promise<Started> {
   const childEnv: Record<string, string | undefined> = {
     ...options.env,
     [HOME_ENV]: options.home,
+    ...(options.cliEntry === undefined ? {} : { [CLI_ENTRY_ENV]: options.cliEntry }),
     [BOOT_ENV.host]: config.host,
     [BOOT_ENV.port]: String(config.port),
     [BOOT_ENV.databasePath]: config.databasePath,
