@@ -154,7 +154,7 @@ const styles = stylex.create({
     paddingBlock: space.s3,
     borderBlockWidth: 1,
     borderBlockStyle: "solid",
-    borderBlockColor: colors.borderSubtle,
+    borderBlockColor: colors.borderDefault,
     borderInlineWidth: 0,
     overflowY: "auto",
     overscrollBehavior: "contain",

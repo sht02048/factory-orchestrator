@@ -36,6 +36,7 @@ import type { SaveStatus } from "./synced-save";
 const NO_LABEL = "\u0000none";
 const RELOADED_NOTICE_MS = 5000;
 const MAPPING_TARGET = "\u0000mapping";
+const AGENT_TARGET = "\u0000agent";
 
 export function autoAssignLabelOf(
   workspace: WorkspaceSettings,
@@ -114,13 +115,17 @@ export function MappingEditor({
     onSaved: () => onSaved?.(),
   });
   const draft = save.draft;
-  const statusTarget = draft.repos.some((repo) => repo.id === target) ? target : MAPPING_TARGET;
+  const statusTarget =
+    target === AGENT_TARGET || draft.repos.some((repo) => repo.id === target)
+      ? target
+      : MAPPING_TARGET;
   const [model, setModel] = useState(draft.model);
   useEffect(() => setModel(draft.model), [draft.model]);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const addRef = useRef<HTMLSpanElement>(null);
   const actionRefs = useRef(new Map<string, HTMLSpanElement>());
+  const rowRefs = useRef(new Map<string, HTMLDivElement>());
   const [focusAfter, setFocusAfter] = useState<FocusAfterChange>(null);
   useEffect(() => {
     if (focusAfter === null) return;
@@ -147,7 +152,9 @@ export function MappingEditor({
   useEffect(() => {
     if (failure === null) return;
     const editor = editorRef.current;
-    if (editor === null || editor.contains(document.activeElement)) return;
+    if (editor === null) return;
+    const row = rowRefs.current.get(statusTarget);
+    if (row?.contains(document.activeElement) ?? editor.contains(document.activeElement)) return;
     const control =
       actionRefs.current.get(statusTarget)?.querySelector("button") ??
       addRef.current?.querySelector("button") ??
@@ -175,7 +182,7 @@ export function MappingEditor({
   const saveModel = () => {
     const trimmed = model.trim();
     if (trimmed === draft.model) return;
-    change({ ...draft, model: trimmed }, MAPPING_TARGET);
+    change({ ...draft, model: trimmed }, AGENT_TARGET);
   };
 
   return (
@@ -207,6 +214,10 @@ export function MappingEditor({
             nameOf={nameOf}
             status={statusTarget === repo.id ? save.status : "idle"}
             failureLine={statusTarget === repo.id ? failureLine : null}
+            rowRef={(node) => {
+              if (node === null) rowRefs.current.delete(repo.id);
+              else rowRefs.current.set(repo.id, node);
+            }}
             actionRef={(node) => {
               if (node === null) actionRefs.current.delete(repo.id);
               else actionRefs.current.set(repo.id, node);
@@ -222,7 +233,7 @@ export function MappingEditor({
             }}
             onRemove={() => {
               setFocusAfter({ kind: "add" });
-              change(withRepoRemoved(draft, repo.id), MAPPING_TARGET);
+              change(withRepoRemoved(draft, repo.id), repo.id);
             }}
           />
         ))}
@@ -257,7 +268,7 @@ export function MappingEditor({
             {...(draft.agent === null && missing !== null ? { "aria-describedby": missingId } : {})}
             options={agents.map((a) => ({ value: a, label: agentName(a) }))}
             value={draft.agent}
-            onValueChange={(value) => change({ ...draft, agent: value }, MAPPING_TARGET)}
+            onValueChange={(value) => change({ ...draft, agent: value }, AGENT_TARGET)}
             placeholder={t("choose")}
           />
         </Field>
@@ -282,6 +293,8 @@ export function MappingEditor({
           </form>
         ) : null}
       </div>
+      <SaveStatusText status={statusTarget === AGENT_TARGET ? save.status : "idle"} />
+      {statusTarget === AGENT_TARGET ? failureLine : null}
       {missing === null ? null : (
         <Text variant="ui" id={missingId}>
           {missing}
@@ -322,6 +335,7 @@ function RepoRow({
   nameOf,
   status,
   failureLine,
+  rowRef,
   actionRef,
   onLabel,
   onMakeDefault,
@@ -336,6 +350,7 @@ function RepoRow({
   nameOf: (id: string) => string;
   status: SaveStatus;
   failureLine: ReactNode;
+  rowRef: (node: HTMLDivElement | null) => void;
   actionRef: (node: HTMLSpanElement | null) => void;
   onLabel: (labelId: string | null) => void;
   onMakeDefault: () => void;
@@ -375,7 +390,7 @@ function RepoRow({
     .filter((id) => id !== null)
     .join(" ");
   return (
-    <div {...stylex.props(styles.repoBlock)}>
+    <div ref={rowRef} {...stylex.props(styles.repoBlock)}>
       <div {...stylex.props(styles.repoRow)}>
         <span {...stylex.props(styles.repoName)}>
           <Text variant="ui" tone="strong" mono wrap="anywhere">
