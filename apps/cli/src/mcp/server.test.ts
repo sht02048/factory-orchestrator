@@ -174,7 +174,17 @@ describe("ganger mcp 서버", () => {
       ],
       running: [],
       queued: [],
-      runners: [{ id: runnerId, name: "runner-a", cause: null, used: 1, capacity: 2 }],
+      runners: [
+        {
+          id: runnerId,
+          name: "runner-a",
+          cause: null,
+          used: 1,
+          capacity: 2,
+          usage: { provider: "claude", window: "session", usedPercent: 40 },
+          limits: [],
+        },
+      ],
       doneToday: { total: 1, recent: [{ id: seeded.ended, summary: "failed" }] },
     });
   });
@@ -206,7 +216,14 @@ describe("ganger mcp 서버", () => {
   it("러너는 id나 이름으로 찾는다", async () => {
     const byName = await call("get_runner", { runner: "runner-a" });
     const byId = await call("get_runner", { runner: runnerId });
-    expect(byName.json).toMatchObject({ runner: { id: runnerId, capacity: 2, online: true } });
+    expect(byName.json).toMatchObject({
+      runner: {
+        id: runnerId,
+        capacity: 2,
+        online: true,
+        usage: { providers: [{ provider: "claude", status: "ok" }] },
+      },
+    });
     expect(byId.text).toBe(byName.text);
   });
 

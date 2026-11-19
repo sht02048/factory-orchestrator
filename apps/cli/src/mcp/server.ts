@@ -114,7 +114,7 @@ export function createMcpServer(context: McpContext): McpServer {
     {
       title: "Dashboard summary",
       description:
-        'The Dashboard of a workspace: runs that need the operator ("todo", grouped as answer, check, and stopped), running and queued runs, runners with used and total capacity, and runs that ended today.',
+        'The Dashboard of a workspace: runs that need the operator ("todo", grouped as answer, check, and stopped), running and queued runs, runners with used and total capacity and their highest provider usage and reached limits, and runs that ended today.',
       inputSchema: { workspace: workspaceArg },
       annotations: READ_ONLY,
     },
@@ -170,7 +170,7 @@ export function createMcpServer(context: McpContext): McpServer {
         "Runs of the workspace: every run that has not ended, then the most recently ended runs.",
       inputSchema: {
         workspace: workspaceArg,
-        runner: z.string().max(200).optional().describe("Only runs on this runner id."),
+        runner: z.string().min(1).max(200).optional().describe("Only runs on this runner id."),
         agent: z.string().min(1).max(200).optional().describe("Only runs of this agent."),
         days: statsPeriodDaysSchema.optional().describe("Only runs assigned in the last N days."),
         ended: z
@@ -222,7 +222,7 @@ export function createMcpServer(context: McpContext): McpServer {
     {
       title: "List runners",
       description:
-        "Every runner: online state, last check, capacity, the runs it is working on or has queued, and worktrees left behind.",
+        "Every runner: online state, last check, capacity, provider usage, the runs it is working on or has queued, and worktrees left behind.",
       annotations: READ_ONLY,
     },
     () => result(context, { runners: loadRunnersPage(context.db, context.now()).runners }),

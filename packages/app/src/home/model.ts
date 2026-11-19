@@ -1,3 +1,4 @@
+import type { UsageWindowKind } from "@ganger/core";
 import type { AgentResult, PrState, RunId, SummaryOutcome, TicketKey } from "@ganger/core";
 import type { QueuedReason } from "../runs/model.js";
 import type { RunnerIssueCause, WorkspaceChoice, WorkspaceSummary } from "../shell/model.js";
@@ -53,6 +54,18 @@ export type HomeRun =
       endedAgoMs: number;
     });
 
+export interface DashboardUsageLine {
+  provider: string;
+  window: UsageWindowKind;
+  usedPercent: number;
+}
+
+export interface DashboardUsageLimit {
+  provider: string;
+  window: UsageWindowKind;
+  resetsInMs: number | null;
+}
+
 export interface DashboardRunner {
   id: string;
   name: string;
@@ -60,6 +73,21 @@ export interface DashboardRunner {
   offlineMs: number | null;
   used: number;
   capacity: number;
+  usage: DashboardUsageLine | null;
+  limits: DashboardUsageLimit[];
+}
+
+export function limitedRunners(runners: RunnersSummary): DashboardRunner[] {
+  return runners.list.filter((runner) => runner.limits.length > 0);
+}
+
+export function readyAgainInMs(runner: DashboardRunner): number | null {
+  let latest = 0;
+  for (const limit of runner.limits) {
+    if (limit.resetsInMs === null) return null;
+    latest = Math.max(latest, limit.resetsInMs);
+  }
+  return latest;
 }
 
 export interface RunnerIssue extends DashboardRunner {

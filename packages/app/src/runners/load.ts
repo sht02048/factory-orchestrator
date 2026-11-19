@@ -1,14 +1,17 @@
-import { summarizeRunOutcome } from "@ganger/core";
+import { currentWindows, highestUsage, summarizeRunOutcome } from "@ganger/core";
+import type { UsageWindow } from "@ganger/core";
 import { getRunWithRecords, listRunners, listRuns, listWorkspaces } from "@ganger/db";
-import type { Database, StoredRun } from "@ganger/db";
+import type { Database, StoredProviderUsage, StoredRun } from "@ganger/db";
 import { z } from "zod";
 import { prerequisiteHint, prerequisiteProject } from "../prerequisites.js";
 import type {
   LeftWorktree,
   OccupyingRun,
   RunWorkspace,
+  RunnerUsageView,
   RunnerView,
   RunnersPage,
+  UsageWindowView,
   QueuedRunView,
 } from "./model.js";
 
@@ -89,7 +92,39 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
       queued: queued.get(runner.id) ?? [],
       leftWorktrees: leftWorktrees.get(runner.id) ?? [],
       sshTarget: config.sshTarget ?? null,
+      usage: usageView(runner.providerUsage, now),
     };
   });
   return { runners };
+}
+
+function windowView(window: UsageWindow): UsageWindowView {
+  return {
+    kind: window.kind,
+    usedPercent: window.usedPercent,
+    resetsAt: window.resetsAt === null ? null : window.resetsAt.toISOString(),
+  };
+}
+
+export function usageView(stored: StoredProviderUsage | null, now: Date): RunnerUsageView | null {
+  if (stored === null) return null;
+  const base = {
+    readAt: stored.readAt.toISOString(),
+    agoMs: Math.max(0, now.getTime() - stored.readAt.getTime()),
+    now: now.toISOString(),
+  };
+  if (stored.reading.kind === "unreadable") return { ...base, kind: "unreadable" };
+  const providers = currentWindows(stored.reading.providers, now);
+  const highest = highestUsage(providers);
+  return {
+    ...base,
+    kind: "read",
+    providers: providers.map((usage) => ({
+      provider: usage.provider,
+      status: usage.status,
+      windows: usage.windows.map(windowView),
+    })),
+    highest:
+      highest === null ? null : { provider: highest.provider, window: windowView(highest.window) },
+  };
 }

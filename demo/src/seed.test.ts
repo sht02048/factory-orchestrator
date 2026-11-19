@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { summarizeRunOutcome } from "@ganger/core";
+import { highestUsage, summarizeRunOutcome } from "@ganger/core";
 import {
   SecretBox,
   getAutoAssignLabel,
@@ -94,6 +94,30 @@ describe("seedDemo", () => {
       ["runner-b", true, true],
       ["runner-c", false, false],
     ]);
+  });
+
+  it("러너마다 공급자 사용량: 정상, 90% 이상과 100%, 로그인 안 함·쓰지 않음", async () => {
+    await seedDemo(db, box, new DemoWorld(() => now), now);
+    const highest = listRunners(db).map((r) => {
+      const reading = r.providerUsage?.reading;
+      if (reading?.kind !== "read") return [r.name, null, []];
+      const top = highestUsage(reading.providers);
+      return [
+        r.name,
+        top === null ? null : top.window.usedPercent,
+        [...new Set(reading.providers.map((p) => p.status))],
+      ];
+    });
+    expect(highest).toEqual([
+      ["runner-a", 72, ["ok", "signed-out", "unavailable"]],
+      ["runner-b", 100, ["ok", "signed-out", "unavailable"]],
+      ["runner-c", 54, ["ok"]],
+    ]);
+    const weekly = listRunners(db)[1]?.providerUsage?.reading;
+    expect(
+      weekly?.kind === "read" &&
+        weekly.providers[0]?.windows.some((w) => w.kind === "weekly" && w.usedPercent >= 90),
+    ).toBe(true);
   });
 
   it("가짜 세계를 DB 에서 되살리면 worker 한 바퀴 뒤에도 진행 중인 런이 그대로다", async () => {

@@ -1,3 +1,5 @@
+import type { ProviderUsageStatus, UsageWindowKind } from "@ganger/core";
+
 export interface RunWorkspace {
   id: string;
   name: string;
@@ -34,6 +36,27 @@ export interface RunnerCheckItem {
   hint: string | null;
 }
 
+export interface UsageWindowView {
+  kind: UsageWindowKind;
+  usedPercent: number;
+  resetsAt: string | null;
+}
+
+export interface ProviderUsageView {
+  provider: string;
+  status: ProviderUsageStatus;
+  windows: UsageWindowView[];
+}
+
+export type RunnerUsageView = { readAt: string; agoMs: number; now: string } & (
+  | {
+      kind: "read";
+      providers: ProviderUsageView[];
+      highest: { provider: string; window: UsageWindowView } | null;
+    }
+  | { kind: "unreadable" }
+);
+
 export interface RunnerView {
   id: string;
   name: string;
@@ -47,6 +70,7 @@ export interface RunnerView {
   queued: QueuedRunView[];
   leftWorktrees: LeftWorktree[];
   sshTarget: string | null;
+  usage: RunnerUsageView | null;
 }
 
 export interface RunnersPage {

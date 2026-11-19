@@ -3,7 +3,7 @@ import domain from "../../messages/ko/domain.json" with { type: "json" };
 import runnersJson from "../../messages/ko/runners.json" with { type: "json" };
 import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
-import { recordRunnerCheck } from "@ganger/db";
+import { recordProviderUsage, recordRunnerCheck } from "@ganger/db";
 import { toRunnerId } from "@ganger/core";
 import { addUnreachedCanceledRun, breakGitHubAuth, now, seedDatabase } from "../testing/seed";
 import { loadRunnersPage } from "@ganger/app/runners/load";
@@ -78,6 +78,7 @@ function runner(overrides: Partial<RunnerView> & { id: string }): RunnerView {
     queued: [],
     leftWorktrees: [],
     sshTarget: null,
+    usage: null,
     ...overrides,
   };
 }
@@ -406,5 +407,96 @@ describe("Runners 고른 러너 패널", () => {
         { id: "c", satisfied: false },
       ]).map((c) => c.id),
     ).toEqual(["c", "b", "a"]);
+  });
+});
+
+describe("공급자 사용량(0086)", () => {
+  const usage = runnersJson.usage;
+  const readAt = new Date(now.getTime() - 3 * 60_000);
+  const resetsAt = new Date(now.getTime() + 72 * 60_000);
+
+  function seededWithUsage() {
+    const { db } = seedDatabase();
+    recordProviderUsage(db, {
+      runnerId: toRunnerId("runner-a"),
+      readAt,
+      reading: {
+        kind: "read",
+        providers: [
+          {
+            provider: "claude",
+            status: "ok",
+            windows: [
+              { kind: "session", usedPercent: 100, resetsAt },
+              { kind: "weekly", usedPercent: 72, resetsAt: null },
+              { kind: "fableWeekly", usedPercent: 9, resetsAt: null },
+            ],
+          },
+          {
+            provider: "codex",
+            status: "ok",
+            windows: [{ kind: "weekly", usedPercent: 40, resetsAt: null }],
+          },
+          { provider: "kimi", status: "signed-out", windows: [] },
+          { provider: "cursor", status: "signed-out", windows: [] },
+          { provider: "gemini", status: "unavailable", windows: [] },
+          { provider: "newbie", status: "error", windows: [] },
+        ],
+      },
+    });
+    recordProviderUsage(db, {
+      runnerId: toRunnerId("runner-b"),
+      readAt,
+      reading: { kind: "unreadable" },
+    });
+    return loadRunnersPage(db, now);
+  }
+
+  it("목록 행에 가장 높은 사용량의 공급자·창 이름과 막대·%를 보인다", () => {
+    const rows = rowsOf(render(seededWithUsage()));
+    const a = rows.find((r) => r.name === "runner-a")?.html ?? "";
+    expect(textOf(a)).toContain("Claude 5시간");
+    expect(a).toContain('aria-valuetext="100%"');
+    expect(a).toContain('aria-label="runner-a Claude 5시간 사용량"');
+    expect(a).toMatch(/data-tone="problem"[^>]*role="meter"[^>]*aria-valuetext="100%"/);
+    const b = rows.find((r) => r.name === "runner-b")?.html ?? "";
+    expect(textOf(b)).toContain(usage.unreadable);
+    expect(b).not.toMatch(/aria-valuetext="\d+%"/);
+  });
+
+  it("90% 미만이면 중립, 90% 이상이면 problem 막대다", () => {
+    const html = panelHtml(render(seededWithUsage(), "runner-a"));
+    const tones = [
+      ...html.matchAll(/data-tone="([a-z]+)"[^>]*role="meter"[^>]*aria-valuetext="(\d+)%"/g),
+    ].map((m) => [m[2], m[1]]);
+    expect(tones).toEqual([
+      ["100", "problem"],
+      ["72", "neutral"],
+      ["9", "neutral"],
+      ["40", "neutral"],
+    ]);
+  });
+
+  it("패널에 쓰는 공급자의 있는 창만, 로그인 안 한 공급자는 한 줄, 그 밖은 접어 두고 읽은 시각과 안내를 보인다", () => {
+    const html = panelHtml(render(seededWithUsage(), "runner-a"));
+    const text = textOf(html);
+    expect(text).toContain(panel.usage.title);
+    expect(text).toContain("3분 전 읽었어요");
+    expect(text).toMatch(/5시간 \S+에 초기화돼요/);
+    expect(text).toContain("Fable 주간");
+    expect(text).not.toContain("월간");
+    expect(text).toContain("로그인하지 않았어요: Kimi, Cursor");
+    expect(html).toMatch(/<details[^>]*><summary[^>]*>쓰지 않는 공급자 1개<\/summary>/);
+    expect(text).toContain("newbie");
+    expect(text).toContain(panel.usage.error);
+    expect(text).toContain(panel.usage.privacy);
+  });
+
+  it("읽지 못했거나 아직 읽지 않았으면 그렇게 말한다", () => {
+    const page = seededWithUsage();
+    expect(textOf(panelHtml(render(page, "runner-b")))).toContain(panel.usage.unreadable);
+    const fresh = render({ runners: [runner({ id: "new" })] }, "new");
+    expect(textOf(panelHtml(fresh))).toContain(panel.usage.notRead);
+    expect(textOf(rowsOf(fresh)[0]?.html ?? "")).toContain(usage.notRead);
   });
 });

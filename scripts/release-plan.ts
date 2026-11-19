@@ -89,7 +89,7 @@ function isOnMain(root: string, commit: string): boolean {
 
 function main(): number {
   const root = fileURLToPath(new URL("..", import.meta.url));
-  const tag = process.env["GITHUB_REF_NAME"] ?? "";
+  const tag = process.env["RELEASE_TAG"] || process.env["GITHUB_REF_NAME"] || "";
   const commit = git(root, ["rev-parse", "HEAD^{commit}"]).trim();
   if (!isOnMain(root, commit)) {
     console.error(`${tag} points at ${commit}, which is not on origin/main.`);

@@ -59,7 +59,7 @@ The browser tests in `e2e` drive the Google Chrome installed on the machine thro
 
 ### Development
 
-`pnpm dev` starts the web app in development mode (hot reload) and the worker in one process. The tracker, the runners, and the code host are fake adapters, so it needs no Linear key, ssh access, or GitHub token, and it never reaches those services. By default it opens on the Dashboard of a finished setup with sample data: two tracker connections and workspaces, three runners (one online, one with broken GitHub authentication, one offline), runs in every state, and two weeks of past runs for Stats. The fake agents keep working over time: they ask questions now and then, open pull requests, and send completion reports. Answer questions, cancel runs, and assign tickets in the app as usual.
+`pnpm dev` starts the web app in development mode (hot reload) and the worker in one process. The tracker, the runners, and the code host are fake adapters, so it needs no Linear key, ssh access, or GitHub token, and it never reaches those services. By default it opens on the Dashboard of a finished setup with sample data: two tracker connections and workspaces, three runners (one online, one with broken GitHub authentication, one offline) with sample provider usage, runs in every state, and two weeks of past runs for Stats. The fake agents keep working over time: they ask questions now and then, open pull requests, and send completion reports. Answer questions, cancel runs, and assign tickets in the app as usual.
 
 - `pnpm dev --onboarding` starts from step 1 of onboarding with an empty database. **Fill with fake values** (bottom right) fills the form fields with values that pass every check. To see a failed check, put `invalid` in a key or token, or `offline`, `no-orca`, or `push-auth` in the runner's ssh target.
 - `--reset` deletes the data of that mode and starts over. `--static` stops the fake agents from moving on their own.
@@ -147,7 +147,7 @@ Requests that change data (including server functions) must also come from a pag
 
 `ganger mcp` runs an [MCP](https://modelcontextprotocol.io) server over stdin and stdout, so an agent on the same machine (for example, Hermes) can read Ganger's current state. The MCP client starts the command itself; it opens no network port. It reads the database of the installation folder (`--home` or `GANGER_HOME`) directly, so it works even while the server is stopped, and every result says whether the server is running.
 
-- The tools only read: the Dashboard summary, tickets, runs and run detail (with the last stored lines of the log), runners, stats, and settings. They are marked read-only. Tools that take a workspace accept its id or name, and you can leave it out when there is only one.
+- The tools only read: the Dashboard summary (including runners' provider usage), tickets, runs and run detail (with the last stored lines of the log), runners and their provider usage, stats, and settings. They are marked read-only. Tools that take a workspace accept its id or name, and you can leave it out when there is only one.
 - Results are JSON. Text that someone other than the operator wrote (ticket titles and bodies, agent questions and reports, logs) is in `external` fields, and the server instructions tell the client to treat it as data, not instructions. No result includes a secret value; settings show only whether a key or token is set.
 - `ganger mcp` never applies database migrations. If the database is older than the CLI, it stops and asks you to start the server first; if it is newer, it asks you to update Ganger.
 - Settings > MCP shows the client configuration with the absolute paths of this installation's CLI, in the Hermes `~/.hermes/config.yaml` format and the `mcpServers` JSON format, with a copy button. With the desktop app, `ganger` is not on your `PATH`, so copy it from there.
@@ -212,7 +212,65 @@ A build you package yourself is not signed, so macOS asks you to confirm before 
 
 The script signs with the one valid "Developer ID Application" identity it finds in the keychain, notarizes and staples the app, then signs, notarizes, and staples the dmg. Set all three API key variables or none.
 
-Releases are made by GitHub Actions (`.github/workflows/release.yml`) when a maintainer pushes a `v*` tag. The tag must match the `version` in `package.json` and `apps/desktop/package.json`, and its commit must be on `main`. A tag with a `-` (such as `v0.1.0-rc.1`) makes a prerelease. The workflow runs the CI checks, builds and signs the dmg on a macOS runner with a certificate and API key from the `release` environment, verifies the signature, notarization, and Gatekeeper assessment, and then creates the Release with notes generated from merged pull requests.
+### Make a release
+
+Releases are made by GitHub Actions. There is no changelog file; Release notes are generated from merged pull requests.
+
+1. In the Actions tab, run **Prepare release** on `main` with the new version, without the `v` (such as `0.1.0` or `0.1.0-rc.2`). It opens a pull request from `release/v<version>` that changes the `version` in `package.json` and `apps/desktop/package.json`. The version must be higher than the current one.
+2. Merge that pull request after its checks pass. On the push to `main`, **Tag release** (`.github/workflows/tag-release.yml`) sees that both versions changed to the same higher version and creates the `v<version>` tag on the merge commit.
+3. The tag push starts **Release** (`.github/workflows/release.yml`). It checks that the tag matches both versions and that its commit is on `main`, runs the CI checks, builds and signs the dmg on a macOS runner with a certificate and API key from the `release` environment, verifies the signature, notarization, and Gatekeeper assessment, and then creates the Release.
+
+A tag with a `-` (such as `v0.1.0-rc.1`) makes a prerelease, and a stable Release collects notes from the previous stable tag. Tag release does nothing when the versions did not change or the tag already points at the merge commit. It fails when only one of the two versions changed, when the version is lower, when the version is not like `1.2.3` or `1.2.3-rc.1`, or when the tag already points at another commit. Release stops before building when a Release for the tag already exists.
+
+An administrator can still push a `v*` tag by hand to release a commit on `main`. `release.yml` can also be called from another workflow with a `tag` input, but its signing job only gets the `release` environment when the calling run is on a `v*` tag.
+
+### Automatic releases
+
+Tags and pull requests made with the default `GITHUB_TOKEN` do not start other workflows, so Prepare release and Tag release use a GitHub App token instead. The app's key lives in a `release-bot` environment that only `main` can use; the signing secrets stay in the `release` environment, which only `v*` tags can use. Set this up once, before you merge a version change. Replace `OWNER/REPO` with your repository.
+
+1. Create a GitHub App (Settings > Developer settings > GitHub Apps > New GitHub App) under the account that owns the repository:
+   - Homepage URL: the repository URL.
+   - Webhook: clear **Active**.
+   - Repository permissions: **Contents** read and write, **Pull requests** read and write. Leave everything else at no access.
+   - Where can this GitHub App be installed: **Only on this account**.
+2. On the app's page, note the **App ID** and generate a private key (a `.pem` file).
+3. Install the app (Install App) on this repository only.
+4. Create the `release-bot` environment and allow only the `main` branch to use it:
+
+   ```sh
+   gh api --method PUT repos/OWNER/REPO/environments/release-bot \
+     -F 'deployment_branch_policy[protected_branches]=false' \
+     -F 'deployment_branch_policy[custom_branch_policies]=true'
+   gh api --method POST repos/OWNER/REPO/environments/release-bot/deployment-branch-policies \
+     -f name=main -f type=branch
+   ```
+
+5. Store the app ID and key in that environment, then delete the local `.pem` file:
+
+   ```sh
+   gh secret set RELEASE_APP_ID --env release-bot --repo OWNER/REPO --body <app-id>
+   gh secret set RELEASE_APP_PRIVATE_KEY --env release-bot --repo OWNER/REPO < <key>.pem
+   ```
+
+6. If a ruleset limits who can create `v*` tags, add the app to its bypass list. `PUT` replaces the whole list, so this keeps the actors that are already there and adds the app:
+
+   ```sh
+   ruleset_id="$(gh api repos/OWNER/REPO/rulesets --jq '.[] | select(.name == "Release tags") | .id')"
+   gh api "repos/OWNER/REPO/rulesets/$ruleset_id" \
+     | jq --argjson app <app-id> '{bypass_actors: (.bypass_actors + [{actor_id: $app, actor_type: "Integration", bypass_mode: "always"}])}' \
+     | gh api --method PUT "repos/OWNER/REPO/rulesets/$ruleset_id" --input -
+   ```
+
+7. Optional, recommended when pull requests can be merged without a person: require a reviewer on the `release` environment. With the app, anyone who can merge to `main` can make a tag and so start signing; a required reviewer keeps one human approval before the signing job reads the certificate. Replace `<user-id>` with your GitHub user ID (`gh api user --jq .id`):
+
+   ```sh
+   gh api --method PUT repos/OWNER/REPO/environments/release \
+     -F 'reviewers[][type]=User' -F 'reviewers[][id]=<user-id>' \
+     -F 'deployment_branch_policy[protected_branches]=false' \
+     -F 'deployment_branch_policy[custom_branch_policies]=true'
+   ```
+
+Without these settings, Prepare release and Tag release stop with an error that points here. If a job runs before the `release-bot` environment exists, GitHub creates the environment without the branch rule, so do step 4 first. After you finish, re-run a failed Tag release run to create the tag.
 
 The app uses the same installation folder as the CLI (`~/.ganger`, or `GANGER_HOME`). It writes the server's output to `<home>/logs/desktop-server.log`.
 

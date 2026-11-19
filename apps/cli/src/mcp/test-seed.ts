@@ -24,6 +24,7 @@ import {
   completeRunnerCheckRequest,
   migrate,
   openDatabase,
+  recordProviderUsage,
   recordRunQuestions,
   recordRunnerCheck,
   requestLogTail,
@@ -128,6 +129,20 @@ export function seedMcpDatabase(path = ":memory:", options: { twoWorkspaces?: bo
         blocksAssignment: false,
       },
     ],
+  });
+  recordProviderUsage(db, {
+    runnerId,
+    readAt: at(50),
+    reading: {
+      kind: "read",
+      providers: [
+        {
+          provider: "claude",
+          status: "ok",
+          windows: [{ kind: "session", usedPercent: 40, resetsAt: at(120) }],
+        },
+      ],
+    },
   });
   requestRunnerCheck(db, runnerId, at(0));
   completeRunnerCheckRequest(db, {

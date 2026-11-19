@@ -16,6 +16,7 @@ import {
   changeRunState,
   inTransaction,
   recordPermissionWaits,
+  recordProviderUsage,
   recordRunQuestions,
   recordRunnerCheck,
   saveAutoAssignLabel,
@@ -35,6 +36,7 @@ import {
   agent,
   autoAssignLabel,
   inProgressState,
+  providerUsageFor,
   runnerProjectId,
   seededConnections,
   seededRunners,
@@ -47,6 +49,7 @@ import type { DemoWorld } from "./world.js";
 const HOUR = 3_600_000;
 const MINUTE = 60_000;
 const OFFLINE_FOR_MINUTES = 47;
+const USAGE_READ_MINUTES_AGO = 2;
 const DAY = 24 * HOUR;
 export const HISTORY_DAYS = 14;
 
@@ -104,6 +107,14 @@ export async function seedDemo(
         projects: projects === null ? null : [...projects],
         assignmentBlocked: isAssignmentBlocked(health),
         prerequisites: health.prerequisites,
+      });
+      const readAt = new Date(
+        now.getTime() - (health.online ? USAGE_READ_MINUTES_AGO : OFFLINE_FOR_MINUTES) * MINUTE,
+      );
+      recordProviderUsage(db, {
+        runnerId: runner.id,
+        readAt,
+        reading: providerUsageFor(runner.sshTarget, readAt),
       });
     }
     return active;
