@@ -21,6 +21,7 @@ import {
   orcaRunnerFactory,
 } from "./orca-runner.js";
 import { briefFor } from "./agent-brief.js";
+import { escalationQuestionId } from "./progress.js";
 import { decodeAgent, decodeMailbox, encodeAgent, encodeMailbox } from "./refs.js";
 import {
   ScriptedExec,
@@ -648,10 +649,36 @@ describe("pollRun", () => {
       .orca("worktree ps", stdout(own("worktree-ps-agent-wait-working.json")));
   }
 
+  test("with several agents in the worktree, the run's own row is found by its terminal(0120)", async () => {
+    const exec = new ScriptedExec()
+      .orca(
+        "orchestration worker-show",
+        stdout(research("0120/worker-show-unverifiable-retained.json")),
+      )
+      .orca("orchestration check", stdout(own("check-peek-empty.json")))
+      .orca("worktree ps", stdout(research("0120/worktree-ps-two-agents.json")))
+      .orca("terminal show", stdout(research("0120/terminal-show.json")));
+    const progress = await runnerWith(exec).pollRun({
+      ...RUN,
+      worktree: toWorktreeRef(
+        "20000000-0000-4000-8000-000000000001::<path>/workspaces/acme/ganger-ACME-7-1",
+      ),
+    });
+    expect(progress).toMatchObject({
+      kind: "active",
+      activity: { kind: "interrupted", since: new Date(1795084992430) },
+    });
+    expect(exec.commands()).toContain(
+      "/Applications/Orca.app/Contents/Resources/bin/orca terminal show --terminal term_30000000-0000-4000-8000-000000000001 --json",
+    );
+  });
+
   test("a working agent without mail is active", async () => {
     const exec = polling(own("worker-show-working.json"), own("check-peek-empty.json"));
     expect(await runnerWith(exec).pollRun(RUN)).toEqual({
       kind: "active",
+      activity: { kind: "working", since: new Date("2026-11-17T16:08:15.671Z") },
+      unreportedStop: null,
       questions: [],
       permissionWaits: [],
     });
@@ -669,6 +696,8 @@ describe("pollRun", () => {
     const exec = polling(own("worker-show-working.json"), own("check-peek-full-question.json"));
     expect(await runnerWith(exec).pollRun(RUN)).toEqual({
       kind: "active",
+      activity: { kind: "working", since: new Date("2026-11-17T16:08:15.671Z") },
+      unreportedStop: null,
       questions: [
         {
           id: toQuestionId("msg_49acb8390fb2"),
@@ -787,6 +816,20 @@ describe("answerQuestion and denyPermission", () => {
     });
     expect(exec.commands()).toEqual([
       `/Applications/Orca.app/Contents/Resources/bin/orca orchestration reply --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --id msg_49acb8390fb2 --body 'A\nsecond line: it'\\''s "quoted" $HOME \`echo x\`' --json`,
+    ]);
+  });
+
+  test("an answer to a blocked escalation goes to its dispatch, not as a reply(0120)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(research("0120/send-to-dispatch.json")),
+    );
+    await runnerWith(exec).answerQuestion(RUN, {
+      questionId: escalationQuestionId("msg_000000000122"),
+      answer: "시안은 docs/login.png 에 있어요",
+    });
+    expect(exec.commands()).toEqual([
+      `/Applications/Orca.app/Contents/Resources/bin/orca orchestration send --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --to dispatch:ctx_a6e6a23a7132 --subject 'Answer from the operator' --body '시안은 docs/login.png 에 있어요' --json`,
     ]);
   });
 

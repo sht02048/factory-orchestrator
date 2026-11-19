@@ -264,11 +264,22 @@ export interface CompletionReport {
   reportedAt: Date | null;
 }
 
+export type AgentActivity =
+  | { kind: "working" | "interrupted" | "turn-ended"; since: Date }
+  | { kind: "unknown" };
+
+export interface UnreportedStop {
+  at: Date;
+  lastOutput: ReadonlyArray<string>;
+}
+
 export type RunProgress =
   | {
       kind: "active";
       questions: ReadonlyArray<AgentQuestion>;
       permissionWaits: ReadonlyArray<PermissionWait>;
+      activity?: AgentActivity;
+      unreportedStop?: UnreportedStop | null;
     }
   | { kind: "reported"; report: CompletionReport }
   | { kind: "ended-without-report"; detail: string }

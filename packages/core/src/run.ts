@@ -35,7 +35,7 @@ export const CAPACITY_OCCUPYING_STATES: ReadonlySet<RunState> = new Set([
   "disconnected",
 ]);
 
-export const PAUSE_SOURCES = ["operator"] as const;
+export const PAUSE_SOURCES = ["operator", "runner", "unreported"] as const;
 export type PauseSource = (typeof PAUSE_SOURCES)[number];
 
 export const AGENT_RESULTS = [

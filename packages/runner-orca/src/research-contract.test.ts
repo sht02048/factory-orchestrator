@@ -181,6 +181,8 @@ describe("research 0008 contract", () => {
     const progress = await runner.pollRun(runOf(1));
     expect(progress).toEqual({
       kind: "active",
+      activity: { kind: "unknown" },
+      unreportedStop: null,
       questions: [
         {
           id: toQuestionId("msg_000000000001"),
@@ -235,6 +237,8 @@ describe("research 0008 contract", () => {
     const runner = runnerWith(exec);
     expect(await runner.pollRun(runOf(2))).toEqual({
       kind: "active",
+      activity: { kind: "unknown" },
+      unreportedStop: null,
       questions: [],
       permissionWaits: [
         {

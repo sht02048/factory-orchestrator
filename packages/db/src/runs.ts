@@ -562,6 +562,28 @@ export function lastStateBeforeDisconnect(db: Database, runId: RunId): RunState 
   return change?.from ?? null;
 }
 
+export function runningSince(db: Database, runId: RunId): Date | null {
+  const changes = db
+    .select({
+      from: runStateChanges.fromState,
+      to: runStateChanges.toState,
+      at: runStateChanges.changedAt,
+    })
+    .from(runStateChanges)
+    .where(eq(runStateChanges.runId, runId))
+    .orderBy(desc(runStateChanges.id))
+    .all();
+  for (const [index, change] of changes.entries()) {
+    if (change.to !== "running") continue;
+    if (change.from !== "disconnected") return change.at;
+    const intoDisconnect = changes
+      .slice(index + 1)
+      .find((earlier) => earlier.to === "disconnected");
+    if (intoDisconnect?.from !== "running") return change.at;
+  }
+  return null;
+}
+
 export function recordStartRequested(db: Database, runId: RunId, now: Date = new Date()): boolean {
   return (
     db

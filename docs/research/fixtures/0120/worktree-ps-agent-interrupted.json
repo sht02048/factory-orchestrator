@@ -1,0 +1,89 @@
+{
+  "ok": true,
+  "result": {
+    "worktrees": [
+      {
+        "workspaceKind": "git",
+        "worktreeId": "20000000-0000-4000-8000-000000000001::<path>/workspaces/acme/ganger-ACME-7-1",
+        "repoId": "20000000-0000-4000-8000-000000000001",
+        "hostId": "local",
+        "terminalPlatform": "darwin",
+        "repo": "acme-app",
+        "path": "<path>/workspaces/acme/ganger-ACME-7-1",
+        "branch": "refs/heads/ganger/ganger-ACME-7-1",
+        "isArchived": false,
+        "isMainWorktree": false,
+        "hasHostSidebarActivity": true,
+        "defaultBranch": false,
+        "worktreeInstanceId": "20000000-0000-4000-8000-000000000010",
+        "parentWorktreeId": null,
+        "childWorktreeIds": [],
+        "workspaceLineage": null,
+        "displayName": "ganger-ACME-7-1",
+        "workspaceStatus": "in-progress",
+        "sortOrder": 1795084909452,
+        "lastActivityAt": 1795084909452,
+        "createdAt": 1795084909452,
+        "creatorProvenance": {
+          "kind": "host"
+        },
+        "linkedIssue": null,
+        "linkedPR": null,
+        "linkedLinearIssue": null,
+        "linkedGitLabMR": null,
+        "linkedGitLabIssue": null,
+        "linkedItems": [],
+        "comment": "",
+        "isPinned": false,
+        "isActive": false,
+        "unread": false,
+        "liveTerminalCount": 2,
+        "hasAttachedPty": true,
+        "unverifiableTerminalCount": 0,
+        "lastOutputAt": 1795095001528,
+        "preview": "❯ ",
+        "status": "active",
+        "agents": [
+          {
+            "paneKey": "30000000-0000-4000-8000-000000000001:31000000-0000-4000-8000-000000000001",
+            "parentPaneKey": "30000000-0000-4000-8000-000000000009:31000000-0000-4000-8000-000000000009",
+            "state": "done",
+            "agentType": "claude",
+            "prompt": "You are working inside Orca, a multi-agent IDE. Your task ID is: task_000000000120 === TASK === ACME-7 로그인 버튼 고치기",
+            "taskTitle": "ganger-ACME-7-1",
+            "displayName": "ganger-ACME-7-1",
+            "conversationName": "ACME-7 로그인 버튼 고치기",
+            "lastAssistantMessage": null,
+            "toolName": null,
+            "toolInput": null,
+            "interrupted": true,
+            "mainAgent": {
+              "state": "done",
+              "outcome": "cancellation",
+              "stateStartedAt": 1795084992430
+            },
+            "stateStartedAt": 1795084992430,
+            "updatedAt": 1795084992430,
+            "hasLivePty": true,
+            "programStatus": {
+              "state": "idle",
+              "observedAt": 1795084992429
+            },
+            "agentWait": null
+          }
+        ],
+        "sidebarStatus": "active",
+        "terminalVerdict": "live"
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": [],
+      "omittedHostSelectors": []
+    },
+    "totalCount": 1,
+    "truncated": false
+  }
+}
