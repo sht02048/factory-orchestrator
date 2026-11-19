@@ -1,6 +1,7 @@
-import { toPermissionRequestId, toQuestionId } from "@ganger/core";
+import { toPermissionRequestId, toQuestionId, toRunnerId } from "@ganger/core";
 import {
   completeLogTailRequest,
+  recordProviderUsage,
   recordPermissionWaits,
   recordRunQuestions,
   recordStartFailure,
@@ -347,6 +348,33 @@ describe("Run 상세 화면", () => {
     const buttons = buttonsOf(render(page(db, id)));
     expect(buttons.find((b) => b.label === runJson.permission.deny)?.variant).toBe("danger");
     expect(buttons.filter((b) => b.variant === "primary")).toEqual([]);
+  });
+
+  it("맞는 러너가 모두 런의 공급자 한도에 닿으면 대기 사유에 공급자와 풀리는 시간을 보인다", () => {
+    const { db } = seedDatabase();
+    recordProviderUsage(db, {
+      runnerId: toRunnerId("runner-a"),
+      readAt: minutes(110),
+      reading: {
+        kind: "read",
+        providers: [
+          {
+            provider: "claude",
+            status: "ok",
+            windows: [{ kind: "session", usedPercent: 100, resetsAt: minutes(188) }],
+          },
+        ],
+      },
+    });
+    const id = assign(db, "ACME-90", 115);
+
+    expect(found(db, id).status).toEqual({
+      state: "queued",
+      queuedReason: { kind: "usage-limit", provider: "claude", resetsInMs: 68 * 60_000 },
+    });
+    expect(text(render(page(db, id)))).toContain(
+      "모든 러너가 Claude 한도에 닿아 1시간 8분 뒤 풀려요",
+    );
   });
 
   it("상태 알약 글은 GLOSSARY 영어 용어다(ADR 0010 1번)", () => {

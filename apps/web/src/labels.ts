@@ -1,6 +1,8 @@
 import type { UsageWindowKind } from "@ganger/core";
 import { useTranslations } from "use-intl";
 import domain from "../messages/ko/domain.json" with { type: "json" };
+import { useTime } from "./format/time";
+import type { QueuedReason } from "./runs/model";
 
 export function useAgentName(): (agent: string) => string {
   const t = useTranslations("domain.agent");
@@ -77,5 +79,28 @@ export function useUsageNames(): {
   return {
     provider: (id) => (isKnownProvider(id) ? t(`provider.${id}`) : id),
     window: (kind) => t(`window.${kind}`),
+  };
+}
+
+export function useQueuedReasonText(): (reason: QueuedReason) => string {
+  const t = useTranslations("domain.queuedReason");
+  const names = useUsageNames();
+  const { duration } = useTime();
+  return (reason) => {
+    switch (reason.kind) {
+      case "no-capacity":
+        return t("no-capacity", { runner: reason.runner });
+      case "usage-limit":
+        return t("usage-limit", {
+          provider: names.provider(reason.provider),
+          duration: duration(reason.resetsInMs),
+        });
+      case "starting":
+      case "behind":
+      case "runner-offline":
+      case "project-missing":
+      case "assignment-blocked":
+        return t(reason.kind);
+    }
   };
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { RunnerSnapshot } from "./assignment.js";
 import { pickRunner } from "./assignment.js";
-import { toRunId, toRunnerId, toRunnerProjectId } from "./ids.js";
+import { toAgentId, toRunId, toRunnerId, toRunnerProjectId } from "./ids.js";
 import type { RunId, RunnerId } from "./ids.js";
 import { planQueue } from "./queue.js";
 import type { QueuedRun } from "./queue.js";
@@ -10,11 +10,19 @@ import type { RunState } from "./run.js";
 
 const app = toRunnerProjectId("github:acme/app");
 const web = toRunnerProjectId("github:acme/web");
+const claude = toAgentId("claude");
 const r1 = toRunnerId("r1");
 const r2 = toRunnerId("r2");
 
 function runner(overrides: Partial<RunnerSnapshot> & Pick<RunnerSnapshot, "id">): RunnerSnapshot {
-  return { online: true, assignmentBlocked: false, capacity: 1, projects: [app], ...overrides };
+  return {
+    online: true,
+    assignmentBlocked: false,
+    capacity: 1,
+    projects: [app],
+    usageLimits: [],
+    ...overrides,
+  };
 }
 
 let minute = 0;
@@ -28,6 +36,7 @@ function queued(
   return {
     id: toRunId(id),
     project,
+    agent: claude,
     runnerId,
     assignedAt: new Date(Date.UTC(2026, 0, 1, 0, minute)),
     unstartable,
@@ -88,7 +97,7 @@ describe("planQueue", () => {
 
   it("맞는 러너가 모두 Offline이면 러너 없는 Queued가 되고, 러너가 Online이 되면 그 러너로 정한다 (Q65·Q68)", () => {
     const offline = [runner({ id: r1, online: false })];
-    expect(pickRunner({ project: app, runners: offline, runs: [] })).toBeNull();
+    expect(pickRunner({ project: app, agent: claude, runners: offline, runs: [] })).toBeNull();
 
     const run = queued("a", app, null);
     const stillOffline = planQueue({ queued: [run], runners: offline, runs: [] });
@@ -265,6 +274,56 @@ describe("planQueue", () => {
     expect(reasonWith([runner({ id: r1, projects: [web] })])).toEqual([
       { runId: a.id, reason: "project-missing" },
     ]);
+  });
+
+  it("맞는 러너가 모두 런의 공급자 한도에 닿았으면 가장 빨리 풀리는 한도를 이유로 남긴다", () => {
+    const a = queued("a", app, null);
+    const soon = { provider: "claude", until: new Date(Date.UTC(2026, 10, 19, 10, 8)) };
+    const late = { provider: "claude", until: new Date(Date.UTC(2026, 10, 19, 12)) };
+
+    const plan = planQueue({
+      queued: [a],
+      runners: [
+        runner({ id: r1, usageLimits: [late] }),
+        runner({ id: r2, usageLimits: [soon] }),
+        runner({ id: toRunnerId("r3"), assignmentBlocked: true }),
+      ],
+      runs: [],
+    });
+
+    expect(plan.unplaced).toEqual([{ runId: a.id, reason: "usage-limit", limit: soon }]);
+    expect(plan.start).toEqual([]);
+  });
+
+  it("한도에 닿지 않은 러너가 있으면 그 러너로 정하고, 다른 공급자의 한도는 보지 않는다", () => {
+    const a = queued("a", app, null);
+    const codexLimit = { provider: "codex", until: new Date(Date.UTC(2026, 10, 19, 10)) };
+    const claudeLimit = { provider: "claude", until: new Date(Date.UTC(2026, 10, 19, 10)) };
+
+    const plan = planQueue({
+      queued: [a],
+      runners: [
+        runner({ id: r1, capacity: 3, usageLimits: [claudeLimit] }),
+        runner({ id: r2, usageLimits: [codexLimit] }),
+      ],
+      runs: [],
+    });
+
+    expect(plan.assigned).toEqual([{ runId: a.id, runnerId: r2 }]);
+  });
+
+  it("이미 러너를 정한 런은 그 러너가 한도에 닿아도 바꾸지 않는다(수동 할당을 막지 않는다)", () => {
+    const a = queued("a", app, r1);
+    const limit = { provider: "claude", until: new Date(Date.UTC(2026, 10, 19, 10)) };
+
+    const plan = planQueue({
+      queued: [a],
+      runners: [runner({ id: r1, usageLimits: [limit] }), runner({ id: r2 })],
+      runs: [],
+    });
+
+    expect(plan.cleared).toEqual([]);
+    expect(plan.start).toEqual([{ runId: a.id, runnerId: r1 }]);
   });
 
   it("맨 앞 런이 영영 시작할 수 없으면 시작할 수 없음으로 끝내 뒤 런이 막히지 않는다 (Q82.16)", () => {

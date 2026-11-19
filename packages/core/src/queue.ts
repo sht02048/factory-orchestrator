@@ -1,11 +1,14 @@
 import { canRunnerTake, pickRunner, remainingCapacity } from "./assignment.js";
 import type { RunnerSnapshot, RunPlacement } from "./assignment.js";
-import type { RunId, RunnerId, RunnerProjectId } from "./ids.js";
+import type { AgentId, RunId, RunnerId, RunnerProjectId } from "./ids.js";
+import { usageLimitOf } from "./usage-limit.js";
+import type { UsageLimit } from "./usage-limit.js";
 
 export interface QueuedRun {
   id: RunId;
   assignedAt: Date;
   project: RunnerProjectId;
+  agent: AgentId;
   runnerId: RunnerId | null;
   unstartable: boolean;
 }
@@ -17,10 +20,12 @@ export interface RunnerChoice {
 
 export type UnplacedReason = "runner-offline" | "assignment-blocked" | "project-missing";
 
+export type Unplaced = { reason: UnplacedReason } | { reason: "usage-limit"; limit: UsageLimit };
+
 export interface QueuePlan {
   cleared: Array<{ runId: RunId; reason: UnplacedReason }>;
   assigned: RunnerChoice[];
-  unplaced: Array<{ runId: RunId; reason: UnplacedReason }>;
+  unplaced: Array<{ runId: RunId } & Unplaced>;
   couldNotStart: RunId[];
   start: RunnerChoice[];
 }
@@ -54,9 +59,14 @@ export function planQueue(input: {
     }
 
     if (runnerId === null) {
-      runnerId = pickRunner({ project: run.project, runners: input.runners, runs: placements });
+      runnerId = pickRunner({
+        project: run.project,
+        agent: run.agent,
+        runners: input.runners,
+        runs: placements,
+      });
       if (runnerId === null) {
-        plan.unplaced.push({ runId: run.id, reason: unplacedReason(input.runners, run.project) });
+        plan.unplaced.push({ runId: run.id, ...unplacedReason(input.runners, run) });
         continue;
       }
       plan.assigned.push({ runId: run.id, runnerId });
@@ -84,11 +94,22 @@ function whyCannotTake(runner: RunnerSnapshot, project: RunnerProjectId): Unplac
 
 function unplacedReason(
   runners: ReadonlyArray<RunnerSnapshot>,
-  project: RunnerProjectId,
-): UnplacedReason {
-  const withProject = runners.filter((runner) => runner.projects.includes(project));
-  if (withProject.length === 0) return "project-missing";
-  return withProject.some((runner) => runner.online) ? "assignment-blocked" : "runner-offline";
+  run: Pick<QueuedRun, "project" | "agent">,
+): Unplaced {
+  const withProject = runners.filter((runner) => runner.projects.includes(run.project));
+  if (withProject.length === 0) return { reason: "project-missing" };
+  const online = withProject.filter((runner) => runner.online);
+  if (online.length === 0) return { reason: "runner-offline" };
+  const limits = online
+    .filter((runner) => !runner.assignmentBlocked)
+    .flatMap((runner) => {
+      const limit = usageLimitOf(runner.usageLimits, run.agent);
+      return limit === null ? [] : [limit];
+    });
+  const earliest = limits.toSorted((a, b) => a.until.getTime() - b.until.getTime())[0];
+  return earliest === undefined
+    ? { reason: "assignment-blocked" }
+    : { reason: "usage-limit", limit: earliest };
 }
 
 function fifoOrder(queued: ReadonlyArray<QueuedRun>): QueuedRun[] {

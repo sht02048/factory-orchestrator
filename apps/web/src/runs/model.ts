@@ -6,7 +6,8 @@ export type QueuedReason =
   | {
       kind: "starting" | "behind" | "runner-offline" | "project-missing" | "assignment-blocked";
     }
-  | { kind: "no-capacity"; runner: string };
+  | { kind: "no-capacity"; runner: string }
+  | { kind: "usage-limit"; provider: string; resetsInMs: number };
 
 interface RunViewBase {
   id: string;

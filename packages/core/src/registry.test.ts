@@ -151,6 +151,7 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
         assignmentBlocked: isAssignmentBlocked(health),
         capacity: 1,
         projects: projects.map((p) => p.id),
+        usageLimits: [],
       });
     }
     const plan = planQueue({
@@ -159,6 +160,7 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
           id: toRunId("run-a"),
           assignedAt: new Date(1),
           project: registered[0]!.project,
+          agent: toAgentId("agent"),
           runnerId: null,
           unstartable: false,
         },
@@ -166,6 +168,7 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
           id: toRunId("run-b"),
           assignedAt: new Date(2),
           project: registered[1]!.project,
+          agent: toAgentId("agent"),
           runnerId: null,
           unstartable: false,
         },

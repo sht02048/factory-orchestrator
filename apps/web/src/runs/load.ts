@@ -26,7 +26,7 @@ import { parseTrackerProjectKey, toRunsFilter } from "./conditions";
 import type { RunConditions } from "./conditions";
 import { ENDED_RUNS_PAGE_SIZE } from "./model";
 import type { QueuedReason, RunCondition, RunView, RunsPage } from "./model";
-import { explainQueue } from "./queue-reasons";
+import { describeQueuedReason, explainQueue } from "./queue-reasons";
 
 export function loadRunsPage(
   db: Database,
@@ -53,13 +53,14 @@ export function loadRunsPage(
               id: run.id,
               assignedAt: run.assignedAt,
               project: run.runnerProject,
+              agent: run.agent,
               runnerId: run.runnerId,
               unstartable: false,
             },
           ]
         : [],
     ),
-    runners: listRunnerSnapshots(db),
+    runners: listRunnerSnapshots(db, now),
     runs: listRunPlacements(db),
   });
 
@@ -76,11 +77,12 @@ export function loadRunsPage(
     return name;
   };
 
-  const queuedReason = (id: RunId): QueuedReason => {
-    const code = queueReasons.get(id) ?? { kind: "behind" };
-    if (code.kind !== "no-capacity") return code;
-    return { kind: "no-capacity", runner: runners.get(code.runnerId)?.name ?? code.runnerId };
-  };
+  const queuedReason = (id: RunId): QueuedReason =>
+    describeQueuedReason(
+      queueReasons.get(id) ?? { kind: "behind" },
+      (runnerId) => runners.get(runnerId)?.name ?? runnerId,
+      now,
+    );
 
   const workspaceId = toWorkspaceId(workspace.workspace.id);
   const filter = toRunsFilter(conditions, now, timeZone);

@@ -28,7 +28,7 @@ import { useEffect, useRef } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { useAgentName } from "../labels";
+import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import type { WorkspaceSummary } from "../shell/model";
 import {
@@ -375,6 +375,7 @@ function RunPanel({
   const t = useTranslations("runs.panel");
   const domain = useTranslations("domain");
   const { duration, elapsed } = useTime();
+  const queuedReasonText = useQueuedReasonText();
   const statusName = useStatusName();
   const status = runStatus(run);
 
@@ -383,10 +384,7 @@ function RunPanel({
   switch (run.state) {
     case "queued":
       when = t("waitingFor", { duration: duration(run.waitMs) });
-      reason =
-        run.queuedReason.kind === "no-capacity"
-          ? domain("queuedReason.no-capacity", { runner: run.queuedReason.runner })
-          : domain(`queuedReason.${run.queuedReason.kind}`);
+      reason = queuedReasonText(run.queuedReason);
       break;
     case "running":
     case "waiting-for-input":

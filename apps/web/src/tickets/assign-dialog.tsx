@@ -4,10 +4,12 @@ import type { SelectOption } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
 import { useState } from "react";
 import { useTranslations } from "use-intl";
-import { useAgentName } from "../labels";
+import { providerOfAgent } from "@ganger/core";
+import { useTime } from "../format/time";
+import { useAgentName, useUsageNames } from "../labels";
 import type { AssignInput, AssignResult } from "./assign";
 import { agentsFor, runnersFor } from "./model";
-import type { AssignDefaults, RunnerChoice, TicketView } from "./model";
+import type { AssignDefaults, RunnerChoice, RunnerUsageLimit, TicketView } from "./model";
 
 export const AUTO_RUNNER = "\u0000auto";
 
@@ -122,16 +124,27 @@ export interface AssignFormProps {
   onAgentChange: (agent: string) => void;
 }
 
+export interface RunnerOptionLabels {
+  auto: string;
+  offline: (name: string) => string;
+  blocked: (name: string) => string;
+  limited: (name: string, limit: RunnerUsageLimit) => string;
+}
+
 export function runnerOptionsFor(
   runners: ReadonlyArray<RunnerChoice>,
   runnerProject: string,
-  label: { auto: string; offline: (name: string) => string; blocked: (name: string) => string },
+  agent: string,
+  label: RunnerOptionLabels,
 ): SelectOption[] {
+  const provider = providerOfAgent(agent);
   return [
     { value: AUTO_RUNNER, label: label.auto },
     ...runnersFor(runners, runnerProject).map((r): SelectOption => {
       if (r.assignmentBlocked) return { value: r.id, label: label.blocked(r.name), disabled: true };
-      return { value: r.id, label: r.online ? r.name : label.offline(r.name) };
+      if (!r.online) return { value: r.id, label: label.offline(r.name) };
+      const limit = r.usageLimits.find((l) => l.provider === provider);
+      return { value: r.id, label: limit === undefined ? r.name : label.limited(r.name, limit) };
     }),
   ];
 }
@@ -146,10 +159,18 @@ export function AssignForm({
   onAgentChange,
 }: AssignFormProps) {
   const t = useTranslations("tickets.assign");
-  const runnerOptions = runnerOptionsFor(runners, defaults.runnerProject, {
+  const usageNames = useUsageNames();
+  const { duration } = useTime();
+  const runnerOptions = runnerOptionsFor(runners, defaults.runnerProject, agent, {
     auto: t("runnerAuto"),
     offline: (name) => t("runnerOffline", { name }),
     blocked: (name) => t("runnerBlocked", { name }),
+    limited: (name, limit) =>
+      t("runnerLimited", {
+        name,
+        provider: usageNames.provider(limit.provider),
+        duration: duration(limit.resetsInMs),
+      }),
   });
   const agentName = useAgentName();
   const agentOptions: SelectOption[] = agentsFor(agents, defaults.agent).map((a) => ({
