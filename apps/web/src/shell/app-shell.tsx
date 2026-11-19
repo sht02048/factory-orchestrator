@@ -17,8 +17,8 @@ import {
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
-import { ALL_WORKSPACES } from "./model";
-import type { ShellData, WorkspaceChoice } from "./model";
+import { ALL_WORKSPACES } from "@ganger/app/shell/model";
+import type { ShellData, WorkspaceChoice } from "@ganger/app/shell/model";
 import { navIcons } from "./nav-icons";
 
 const menuItems = [

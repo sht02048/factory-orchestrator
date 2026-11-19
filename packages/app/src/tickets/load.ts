@@ -20,8 +20,8 @@ import {
 } from "@ganger/db";
 import type { Database, SecretBox, StoredRun, StoredWorkspaceTrackerProject } from "@ganger/db";
 import { z } from "zod";
-import { isWebUrl } from "../format/url";
-import { resolveWorkspace } from "../shell/model";
+import { isWebUrl } from "../format/url.js";
+import { resolveWorkspace } from "../shell/model.js";
 import type {
   AssignDefaults,
   TicketRun,
@@ -29,7 +29,7 @@ import type {
   TicketsPage,
   TrackerLoadError,
   TrackerTruncation,
-} from "./model";
+} from "./model.js";
 
 export interface TicketsContext {
   db: Database;

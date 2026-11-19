@@ -1,9 +1,9 @@
 import { listRunners } from "@ganger/db";
 import type { Database } from "@ganger/db";
-import { loadHomePage } from "../home/load";
-import { localTimeZone } from "../time-zone";
-import type { HomePage } from "../home/model";
-import { ALL_WORKSPACES } from "../shell/model";
+import { loadHomePage } from "@ganger/app/home/load";
+import { localTimeZone } from "@ganger/app/time-zone";
+import type { HomePage } from "@ganger/app/home/model";
+import { ALL_WORKSPACES } from "@ganger/app/shell/model";
 
 export type AttentionEvent =
   | { kind: "question"; key: string; runId: string; ticketKey: string }

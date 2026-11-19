@@ -20,7 +20,7 @@ import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { useAgentName } from "../labels";
-import type { WorkspaceSummary } from "../shell/model";
+import type { WorkspaceSummary } from "@ganger/app/shell/model";
 import {
   PR_STATE_ORDER,
   STATS_DIMENSIONS,
@@ -28,7 +28,7 @@ import {
   humanTouchedRate,
   mergedRate,
   mergedRateChange,
-} from "./model";
+} from "@ganger/app/stats/model";
 import type {
   FailureReasonCount,
   StatsDimension,
@@ -36,7 +36,7 @@ import type {
   StatsPage,
   StatsPeriodDays,
   StatsSummary,
-} from "./model";
+} from "@ganger/app/stats/model";
 import { BreakdownTable, isPlainClick } from "./breakdown-table";
 import { ThroughputChart } from "./throughput-chart";
 

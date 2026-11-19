@@ -6,7 +6,7 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { useTranslations } from "use-intl";
 import type { AnswerDraft } from "./answer-draft";
 import { answerToSend, emptyDraft, pickChoice, pickOther, writeOther } from "./answer-draft";
-import type { InputWait } from "./model";
+import type { InputWait } from "@ganger/app/home/model";
 
 export type Question = Extract<InputWait, { kind: "question" }>;
 

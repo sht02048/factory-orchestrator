@@ -13,8 +13,8 @@ import { size } from "@ganger/ui/tokens.stylex";
 import type { MouseEvent } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { mergedRate } from "./model";
-import type { StatsGroup } from "./model";
+import { mergedRate } from "@ganger/app/stats/model";
+import type { StatsGroup } from "@ganger/app/stats/model";
 
 const BREAKDOWN_COLUMN_WIDTHS = [
   null,

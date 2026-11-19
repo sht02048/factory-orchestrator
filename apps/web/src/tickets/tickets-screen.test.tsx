@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { renderWithMessages } from "../testing/render";
 import { AUTO_RUNNER, AssignForm, runnerOptionsFor } from "./assign-dialog";
-import { loadTicketsPage } from "./load";
+import { loadTicketsPage } from "@ganger/app/tickets/load";
 import { ticketsMessages } from "./messages";
-import type { RunnerChoice, TicketFilter, TicketsPage } from "./model";
+import type { RunnerChoice, TicketFilter, TicketsPage } from "@ganger/app/tickets/model";
 import { now, setupTickets } from "./test-fixtures";
 import { TicketsScreen } from "./tickets-screen";
 

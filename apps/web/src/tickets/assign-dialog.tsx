@@ -7,9 +7,14 @@ import { useTranslations } from "use-intl";
 import { providerOfAgent } from "@ganger/core";
 import { useTime } from "../format/time";
 import { useAgentName, useUsageNames } from "../labels";
-import type { AssignInput, AssignResult } from "./assign";
-import { agentsFor, runnersFor } from "./model";
-import type { AssignDefaults, RunnerChoice, RunnerUsageLimit, TicketView } from "./model";
+import type { AssignInput, AssignResult } from "@ganger/app/tickets/assign";
+import { agentsFor, runnersFor } from "@ganger/app/tickets/model";
+import type {
+  AssignDefaults,
+  RunnerChoice,
+  RunnerUsageLimit,
+  TicketView,
+} from "@ganger/app/tickets/model";
 
 export const AUTO_RUNNER = "\u0000auto";
 

@@ -1,6 +1,6 @@
 import type { AgentResult, PrState, RunState, SummaryOutcome } from "@ganger/core";
-import type { InputWait } from "../home/model";
-import type { QueuedReason } from "../runs/model";
+import type { InputWait } from "../home/model.js";
+import type { QueuedReason } from "../runs/model.js";
 
 export type CiView = "success" | "failure" | "pending" | "none" | "unavailable" | "unknown";
 

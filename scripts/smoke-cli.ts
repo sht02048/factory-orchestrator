@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { parseArgs } from "node:util";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { findBundleProblems } from "./bundle-check.ts";
 
 const REPO = join(import.meta.dirname, "..");
@@ -56,6 +58,47 @@ function installBundle(installDir: string): string {
   if (problems.length > 0) throw new Error(`server bundle check failed:\n${problems.join("\n")}`);
   console.log(`extracted ${tarball} to ${root}; bundle check passed`);
   return join(root, "cli", "bin", "cli.js");
+}
+
+async function checkMcp(input: {
+  cli: string;
+  cwd: string;
+  home: string;
+  env: Record<string, string | undefined>;
+}): Promise<void> {
+  const env = Object.fromEntries(
+    Object.entries(input.env).flatMap(([name, value]) =>
+      value === undefined ? [] : [[name, value]],
+    ),
+  );
+  const client = new Client({ name: "ganger-smoke", version: "0.0.0" });
+  await client.connect(
+    new StdioClientTransport({
+      command: nodePath,
+      args: [input.cli, "mcp", "--home", input.home],
+      cwd: input.cwd,
+      env,
+    }),
+  );
+  try {
+    const { tools } = await client.listTools();
+    if (!tools.some((tool) => tool.name === "get_dashboard")) {
+      throw new Error(
+        `ganger mcp listed no get_dashboard tool: ${tools.map((t) => t.name).join(", ")}`,
+      );
+    }
+    const dashboard = await client.callTool({ name: "get_dashboard", arguments: {} });
+    const text = JSON.stringify(dashboard.content);
+    if (dashboard.isError === true || !text.includes("Smoke workspace")) {
+      throw new Error(`ganger mcp get_dashboard returned ${text}`);
+    }
+    if (!text.includes('\\"running\\": true')) {
+      throw new Error(`ganger mcp did not report the running server: ${text}`);
+    }
+    console.log(`ganger mcp: ${tools.length} tools; get_dashboard returned the smoke workspace`);
+  } finally {
+    await client.close();
+  }
 }
 
 const home = mkdtempSync(join(tmpdir(), "ganger-smoke-cli-"));
@@ -161,9 +204,17 @@ try {
       throw new Error(`runner check recorded online=${String(row?.["online"])}`);
     if (typeof row?.["checkError"] !== "string") throw new Error("runner check recorded no error");
     console.log(`runner check recorded: offline, error ${row["checkError"]}`);
+
+    db.prepare("INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?)").run(
+      "smoke-workspace",
+      "Smoke workspace",
+      Date.now(),
+    );
   } finally {
     db.close();
   }
+
+  await checkMcp({ cli, cwd, home, env });
 
   started.kill("SIGTERM");
   await waitFor(() => exitCode !== undefined, STOP_TIMEOUT_MS, "start did not stop after SIGTERM");

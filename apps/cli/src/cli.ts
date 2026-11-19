@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { caffeinate } from "./keep-awake.js";
 import { appLayout } from "./layout.js";
 import { runCommand, runProgram } from "./program.js";
+import { PRODUCT_VERSION } from "./version.js";
 
 const entry = process.argv[1];
 process.exitCode = await runProgram(process.argv.slice(2), {
@@ -15,6 +16,9 @@ process.exitCode = await runProgram(process.argv.slice(2), {
   layout: appLayout(),
   runCommand,
   holdSleepAssertion: caffeinate,
+  version: PRODUCT_VERSION,
+  stdin: process.stdin,
+  stdout: process.stdout,
   out: (line) => console.log(line),
   err: (line) => console.error(line),
   onStopSignal: (handler) => {

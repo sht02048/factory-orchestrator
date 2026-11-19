@@ -2,10 +2,10 @@ import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { pickConditions, runConditionsSearch } from "../../runs/conditions";
-import type { ConditionKey } from "../../runs/conditions";
+import { pickConditions, runConditionsSearch } from "@ganger/app/runs/conditions";
+import type { ConditionKey } from "@ganger/app/runs/conditions";
 import { runsMessages } from "../../runs/messages";
-import { ENDED_RUNS_PAGE_SIZE, MAX_ENDED_RUNS, RUN_FILTERS } from "../../runs/model";
+import { ENDED_RUNS_PAGE_SIZE, MAX_ENDED_RUNS, RUN_FILTERS } from "@ganger/app/runs/model";
 import { RunsScreen } from "../../runs/runs-screen";
 import { getRunsPage } from "../../server/functions";
 

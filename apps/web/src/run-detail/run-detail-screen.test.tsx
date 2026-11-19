@@ -15,13 +15,13 @@ import { buttonsOf } from "../testing/buttons";
 import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
 import { addTitledRun, endedCases, minutes, now, seedDatabase } from "../testing/seed";
-import { loadRunDetail, requestRunLogTail } from "./load";
+import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
 import { runMessages } from "./messages";
-import type { RunDetail, RunDetailPage } from "./model";
+import type { RunDetail, RunDetailPage } from "@ganger/app/run-detail/model";
 import { RunDetailScreen } from "./run-detail-screen";
 import { addExtraEnded, assign, extraEndedCases, walk } from "./testing";
-import { answerInput, submitAnswer } from "../home/actions";
-import { cancelRunRequest } from "./actions";
+import { answerInput, submitAnswer } from "@ganger/app/home/actions";
+import { cancelRunRequest } from "@ganger/app/run-detail/actions";
 
 const resolved = () => Promise.resolve();
 

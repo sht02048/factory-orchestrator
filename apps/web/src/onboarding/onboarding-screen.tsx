@@ -78,7 +78,7 @@ import type {
   SettingsPage,
   TrackerConnectionView,
   WorkspaceSettings,
-} from "../settings/model";
+} from "@ganger/app/settings/model";
 import {
   GITHUB_TOKEN_URL,
   LINEAR_API_KEY_URL,

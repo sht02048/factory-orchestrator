@@ -17,7 +17,7 @@ import { NotFoundScreen } from "../not-found/not-found-screen";
 import { ONBOARDING_PATH, isOpenPath, onboardingRedirect } from "../onboarding/model";
 import { getTimeZone } from "../server/functions";
 import { getOnboardingComplete } from "../server/onboarding-functions";
-import { localTimeZone, timeZoneCookie, timeZoneFromCookies } from "../time-zone";
+import { localTimeZone, timeZoneCookie, timeZoneFromCookies } from "@ganger/app/time-zone";
 import appCss from "../styles/app.css?url";
 
 let completeInBrowser = false;

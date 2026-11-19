@@ -30,11 +30,11 @@ import {
 } from "@ganger/db";
 import type { WorkspaceId } from "@ganger/db";
 import { z } from "zod";
-import { allowedHosts, hostnameOfHostHeader } from "../server/request-guard";
-import { remoteErrorOf, remoteErrorOfDetail } from "./load";
-import type { SettingsContext } from "./load";
-import { MAX_MODEL_LENGTH, MAX_RUN_MINUTES } from "./model";
-import type { ConnectionSaveReason, RemoteError, SaveResult } from "./model";
+import { allowedHosts, hostnameOfHostHeader } from "../request-guard.js";
+import { remoteErrorOf, remoteErrorOfDetail } from "./load.js";
+import type { SettingsContext } from "./load.js";
+import { MAX_MODEL_LENGTH, MAX_RUN_MINUTES } from "./model.js";
+import type { ConnectionSaveReason, RemoteError, SaveResult } from "./model.js";
 
 export const RUNNER_KIND: RunnerKind = toRunnerKind("orca");
 

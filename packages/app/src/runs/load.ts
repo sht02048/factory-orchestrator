@@ -19,14 +19,14 @@ import {
   toWorkspaceId,
 } from "@ganger/db";
 import type { Database, EndedAxesFilter, RunRecords, StoredRun } from "@ganger/db";
-import { isWebUrl } from "../format/url";
-import { resolveWorkspace } from "../shell/model";
-import { DEFAULT_TIME_ZONE } from "../time-zone";
-import { parseTrackerProjectKey, toRunsFilter } from "./conditions";
-import type { RunConditions } from "./conditions";
-import { ENDED_RUNS_PAGE_SIZE } from "./model";
-import type { QueuedReason, RunCondition, RunView, RunsPage } from "./model";
-import { describeQueuedReason, explainQueue } from "./queue-reasons";
+import { isWebUrl } from "../format/url.js";
+import { resolveWorkspace } from "../shell/model.js";
+import { DEFAULT_TIME_ZONE } from "../time-zone.js";
+import { parseTrackerProjectKey, toRunsFilter } from "./conditions.js";
+import type { RunConditions } from "./conditions.js";
+import { ENDED_RUNS_PAGE_SIZE } from "./model.js";
+import type { QueuedReason, RunCondition, RunView, RunsPage } from "./model.js";
+import { describeQueuedReason, explainQueue } from "./queue-reasons.js";
 
 export function loadRunsPage(
   db: Database,

@@ -35,6 +35,15 @@ describe("packageImports", () => {
       'if (x) throw new Error(`requires (import { serve } from "srvx/node")`);\nconst s = "require";';
     expect(packageImports(source)).toEqual([]);
   });
+
+  it("ignores require calls written as generated code in a template literal", () => {
+    const source = [
+      'const code = (0, codegen_1._)`require("ajv/dist/runtime/validation_error").default`;',
+      'const formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${name}`;',
+      'const real = require("left-pad");',
+    ].join("\n");
+    expect(packageImports(source)).toEqual(["left-pad"]);
+  });
 });
 
 describe("fakeAdapterNames", () => {

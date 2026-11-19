@@ -6,10 +6,10 @@ import { renderWithMessages } from "../testing/render";
 import { recordProviderUsage, recordRunnerCheck } from "@ganger/db";
 import { toRunnerId } from "@ganger/core";
 import { addUnreachedCanceledRun, breakGitHubAuth, now, seedDatabase } from "../testing/seed";
-import { loadRunnersPage } from "./load";
+import { loadRunnersPage } from "@ganger/app/runners/load";
 import { runnersMessages } from "./messages";
-import { failedChecksFirst, problemRunnersFirst } from "./model";
-import type { RunnerView, RunnersPage } from "./model";
+import { failedChecksFirst, problemRunnersFirst } from "@ganger/app/runners/model";
+import type { RunnerView, RunnersPage } from "@ganger/app/runners/model";
 import { addRunnerHref, RunnersScreen } from "./runners-screen";
 import type { RunnerActions } from "./runners-screen";
 

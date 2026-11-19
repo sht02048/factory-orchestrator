@@ -27,8 +27,14 @@ import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
-import { canCancel } from "./model";
-import type { LogTailView, PendingInput, RunDetail, RunDetailPage, TimelineEvent } from "./model";
+import { canCancel } from "@ganger/app/run-detail/model";
+import type {
+  LogTailView,
+  PendingInput,
+  RunDetail,
+  RunDetailPage,
+  TimelineEvent,
+} from "@ganger/app/run-detail/model";
 
 export interface RunDetailActions {
   onAnswer: (questionId: string, body: string) => Promise<void>;
