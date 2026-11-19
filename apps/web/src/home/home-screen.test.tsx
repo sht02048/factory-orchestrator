@@ -422,8 +422,26 @@ describe("Runners", () => {
         ...page,
         runners: {
           list: [
-            { id: "r-half", name: "mac-half", cause: null, offlineMs: null, used: 2, capacity: 3 },
-            { id: "r-full", name: "mac-full", cause: null, offlineMs: null, used: 3, capacity: 3 },
+            {
+              id: "r-half",
+              name: "mac-half",
+              cause: null,
+              offlineMs: null,
+              used: 2,
+              capacity: 3,
+              usage: null,
+              limits: [],
+            },
+            {
+              id: "r-full",
+              name: "mac-full",
+              cause: null,
+              offlineMs: null,
+              used: 3,
+              capacity: 3,
+              usage: null,
+              limits: [],
+            },
             {
               id: "r-auth",
               name: "mac-auth",
@@ -431,6 +449,8 @@ describe("Runners", () => {
               offlineMs: null,
               used: 1,
               capacity: 2,
+              usage: null,
+              limits: [],
             },
           ],
         },
@@ -454,9 +474,36 @@ describe("Runners", () => {
         ...page,
         runners: {
           list: [
-            { id: "r-half", name: "mac-half", cause: null, offlineMs: null, used: 2, capacity: 3 },
-            { id: "r-free", name: "mac-free", cause: null, offlineMs: null, used: 0, capacity: 2 },
-            { id: "r-over", name: "mac-over", cause: null, offlineMs: null, used: 3, capacity: 2 },
+            {
+              id: "r-half",
+              name: "mac-half",
+              cause: null,
+              offlineMs: null,
+              used: 2,
+              capacity: 3,
+              usage: null,
+              limits: [],
+            },
+            {
+              id: "r-free",
+              name: "mac-free",
+              cause: null,
+              offlineMs: null,
+              used: 0,
+              capacity: 2,
+              usage: null,
+              limits: [],
+            },
+            {
+              id: "r-over",
+              name: "mac-over",
+              cause: null,
+              offlineMs: null,
+              used: 3,
+              capacity: 2,
+              usage: null,
+              limits: [],
+            },
             {
               id: "r-off",
               name: "mac-off",
@@ -464,6 +511,8 @@ describe("Runners", () => {
               offlineMs: 60_000,
               used: 0,
               capacity: 4,
+              usage: null,
+              limits: [],
             },
             {
               id: "r-auth",
@@ -472,6 +521,8 @@ describe("Runners", () => {
               offlineMs: null,
               used: 0,
               capacity: 4,
+              usage: null,
+              limits: [],
             },
           ],
         },
@@ -566,5 +617,85 @@ describe("문구", () => {
   it("문구는 메시지 파일에서 온다", () => {
     const html = render(withPermission(withInput(seededPage(), question))) + renderForm(question);
     expect(html).not.toMatch(/\b(home|domain)\.[a-zA-Z]/);
+  });
+});
+
+describe("Runners 공급자 사용량(0086)", () => {
+  const base = { cause: null, offlineMs: null, used: 1, capacity: 2, limits: [] };
+
+  it("러너 행 아래에 가장 높은 사용량을 숫자로, 90% 이상이면 빨강 글자로 보인다", () => {
+    const html = section(
+      render({
+        ...seededPage(),
+        runners: {
+          list: [
+            {
+              ...base,
+              id: "r-a",
+              name: "mac-a",
+              usage: { provider: "claude", window: "weekly", usedPercent: 72.4 },
+            },
+            {
+              ...base,
+              id: "r-b",
+              name: "mac-b",
+              usage: { provider: "codex", window: "session", usedPercent: 93 },
+            },
+            { ...base, id: "r-c", name: "mac-c", usage: null },
+          ],
+        },
+      }),
+      "Runners",
+    );
+    expect(text(row(html, "mac-a"))).toBe("Online mac-a Claude 주간 72% 1/2");
+    expect(text(row(html, "mac-b"))).toContain("Codex 5시간 93%");
+    expect(row(html, "mac-a")).toContain(
+      renderWithMessages(
+        <Text variant="meta" numeric>
+          Claude 주간 72%
+        </Text>,
+      ),
+    );
+    expect(row(html, "mac-b")).toContain(
+      renderWithMessages(
+        <Text variant="meta" numeric tone="problem">
+          Codex 5시간 93%
+        </Text>,
+      ),
+    );
+    expect(text(row(html, "mac-c"))).toBe("Online mac-c 1/2");
+  });
+
+  it("100%에 닿은 러너는 문제 상자에 한 줄, 머리 문장에 언제 다시 받는지 보인다", () => {
+    const page: HomePage = {
+      ...seededPage(),
+      runners: {
+        list: [
+          {
+            ...base,
+            id: "r-c",
+            name: "runner-c",
+            usage: { provider: "claude", window: "session", usedPercent: 100 },
+            limits: [{ provider: "claude", window: "session", resetsInMs: 72 * 60_000 }],
+          },
+          { ...base, id: "r-a", name: "runner-a", usage: null },
+        ],
+      },
+    };
+    const html = render(page);
+    const runners = section(html, "Runners");
+    expect(text(runners)).toContain("러너 1대에 문제가 있어요");
+    expect(text(runners)).toContain(
+      "Claude 5시간 한도에 닿았어요: runner-c · 1시간 12분 뒤 풀려요",
+    );
+    expect(text(html)).toContain("한도에 닿은 러너 1대는 1시간 12분 뒤부터 다시 런을 받아요.");
+  });
+
+  it("한도에 닿은 러너가 없으면 문제 상자와 머리 문장에 한도 이야기가 없다", () => {
+    const html = render({
+      ...seededPage(),
+      runners: { list: [{ ...base, id: "r-a", name: "runner-a", usage: null }] },
+    });
+    expect(text(html)).not.toContain("한도");
   });
 });

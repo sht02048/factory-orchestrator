@@ -11,7 +11,9 @@
     "check": "확인할 PR {count}개",
     "stopped": "멈춘 런 {count}개",
     "inProgress": "진행 중인 런이 {count}개 있어요.",
-    "idle": "진행 중인 런도 없어요."
+    "idle": "진행 중인 런도 없어요.",
+    "limit": "한도에 닿은 러너 {count}대는 {duration} 뒤부터 다시 런을 받아요.",
+    "limitUnknown": "한도에 닿은 러너가 {count}대 있어요."
   },
   "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 런이 보여요.",
   "section": {
@@ -54,7 +56,10 @@
     "problemTitle": "러너 {count}대에 문제가 있어요",
     "offline": "Offline이에요: {names}",
     "auth": "GitHub 인증을 다시 해야 해요: {names}",
-    "fix": "Runners에서 고치기"
+    "fix": "Runners에서 고치기",
+    "usage": "{provider} {window} {percent}%",
+    "limit": "{provider} {window} 한도에 닿았어요: {name} · {duration} 뒤 풀려요",
+    "limitUnknown": "{provider} {window} 한도에 닿았어요: {name}"
   },
   "row": {
     "cancelling": "취소 중",

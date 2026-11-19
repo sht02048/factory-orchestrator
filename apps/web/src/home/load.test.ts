@@ -18,6 +18,7 @@ import {
   recordPermissionWaits,
   recordRunQuestions,
   resolvePermissionWaits,
+  recordProviderUsage,
   recordRunnerCheck,
   requestRunCancel,
   updateRunRecords,
@@ -268,8 +269,19 @@ describe("loadHomePage", () => {
         offlineMs: now.getTime() - minutes(0).getTime(),
         used: 0,
         capacity: 1,
+        usage: null,
+        limits: [],
       },
-      { id: "runner-a", name: "runner-a", cause: null, offlineMs: null, used: 4, capacity: 10 },
+      {
+        id: "runner-a",
+        name: "runner-a",
+        cause: null,
+        offlineMs: null,
+        used: 4,
+        capacity: 10,
+        usage: null,
+        limits: [],
+      },
     ]);
     expect(loadShell(db).runnerIssues).toBe(1);
 
@@ -377,5 +389,53 @@ describe("loadHomePage", () => {
       (item) => item.run.ticketKey === "ACME-11",
     )?.run;
     expect(run).toMatchObject({ state: "waiting-for-input", waitingMs: 25 * 60_000 });
+  });
+});
+
+describe("loadHomePage 공급자 사용량(0086)", () => {
+  const claude = (
+    windows: Array<{ kind: "session" | "weekly"; usedPercent: number; resetsAt: Date | null }>,
+  ) => ({
+    kind: "read" as const,
+    providers: [{ provider: "claude", status: "ok" as const, windows }],
+  });
+
+  it("러너마다 지금 창 중 가장 높은 사용량과, Online 러너의 100% 창과 풀릴 때까지 남은 시간을 담는다", () => {
+    const { db } = seedDatabase();
+    recordProviderUsage(db, {
+      runnerId: toRunnerId("runner-a"),
+      readAt: now,
+      reading: claude([
+        { kind: "session", usedPercent: 100, resetsAt: new Date(now.getTime() + 72 * 60_000) },
+        { kind: "weekly", usedPercent: 120, resetsAt: new Date(now.getTime() - 1) },
+      ]),
+    });
+    recordProviderUsage(db, {
+      runnerId: toRunnerId("runner-b"),
+      readAt: now,
+      reading: claude([{ kind: "session", usedPercent: 100, resetsAt: null }]),
+    });
+    const list = loadHomePage(db, "ws-commerce", now, "UTC").runners.list;
+    expect(list.find((r) => r.id === "runner-a")).toMatchObject({
+      usage: { provider: "claude", window: "session", usedPercent: 100 },
+      limits: [{ provider: "claude", window: "session", resetsInMs: 72 * 60_000 }],
+    });
+    expect(list.find((r) => r.id === "runner-b")).toMatchObject({
+      cause: "offline",
+      usage: { provider: "claude", window: "session", usedPercent: 100 },
+      limits: [],
+    });
+  });
+
+  it("읽지 못했거나 읽지 않은 러너는 사용량이 없다", () => {
+    const { db } = seedDatabase();
+    recordProviderUsage(db, {
+      runnerId: toRunnerId("runner-a"),
+      readAt: now,
+      reading: { kind: "unreadable" },
+    });
+    for (const runner of loadHomePage(db, "ws-commerce", now, "UTC").runners.list) {
+      expect(runner).toMatchObject({ usage: null, limits: [] });
+    }
   });
 });
