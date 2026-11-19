@@ -147,7 +147,7 @@ const styles = stylex.create({
     maxWidth: size.noticeWidth,
     paddingTop: space.s8,
     paddingInline: space.s8,
-    paddingBottom: space.s10,
+    paddingBottom: `max(${space.s10}, var(--pinned-toast-space, 0px) + ${space.s10})`,
   },
   frame: { containerType: "inline-size", minHeight: 0 },
   split: {
@@ -179,7 +179,7 @@ const styles = stylex.create({
     overflow: "auto",
     paddingTop: space.s8,
     paddingInline: space.s8,
-    paddingBottom: space.s10,
+    paddingBottom: `max(${space.s10}, var(--pinned-toast-space, 0px) + ${space.s10})`,
   },
   listEditor: { paddingInline: space.s6 },
   panelEditor: { backgroundColor: colors.bgCanvas },
@@ -187,6 +187,7 @@ const styles = stylex.create({
     minWidth: 0,
     overflow: "auto",
     backgroundColor: colors.bgPanel,
+    scrollPaddingBlockEnd: "var(--pinned-toast-space, 0px)",
   },
   pageHead: {
     display: "flex",

@@ -33,6 +33,11 @@ export function UpdatesPanel() {
   }
 }
 
+export function UpdatesScope() {
+  const t = useTranslations("settings");
+  return useDesktopUpdates().kind === "desktop" ? t("scopeUpdates") : t("scopeInstall");
+}
+
 export function UpdatesSummary() {
   const t = useTranslations("settings.summary");
   const updates = useDesktopUpdates();
@@ -90,8 +95,9 @@ export function DesktopUpdates({
           <DefinitionItem label={t("lastChecked")}>
             <span {...stylex.props(styles.checkLine)}>
               <span role="status">
-                <CheckLine view={view} />
+                {view.check.kind === "ready" ? null : <CheckLine view={view} />}
               </span>
+              {view.check.kind === "ready" ? <CheckLine view={view} /> : null}
               {view.check.kind === "unavailable" ? null : (
                 <Button
                   aria-disabled={checking}

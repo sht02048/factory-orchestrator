@@ -50,7 +50,7 @@ import { hermesConfig, jsonConfig } from "@ganger/app/settings/mcp-launch";
 import { useAgentName, usePrerequisiteName } from "../labels";
 import { PushProblems } from "../push-check";
 import { browserClipboard, copyText } from "./clipboard";
-import { UpdatesPanel, UpdatesSummary } from "./updates-panel";
+import { UpdatesPanel, UpdatesScope, UpdatesSummary } from "./updates-panel";
 import { DEFAULT_ORCA_PATH } from "@ganger/runner-orca/config";
 import { shellQuote } from "../onboarding/model";
 import { useStatusName } from "../status";
@@ -227,11 +227,13 @@ export function SettingsScreen({
               status={
                 <span {...stylex.props(styles.inline)}>
                   <Text variant="meta">
-                    {workspace !== null && isWorkspaceItem(current)
-                      ? t("scopeWorkspace", { name: workspace.general.name })
-                      : current === "updates"
-                        ? t("scopeUpdates")
-                        : t("scopeInstall")}
+                    {workspace !== null && isWorkspaceItem(current) ? (
+                      t("scopeWorkspace", { name: workspace.general.name })
+                    ) : current === "updates" ? (
+                      <UpdatesScope />
+                    ) : (
+                      t("scopeInstall")
+                    )}
                   </Text>
                   <Text variant="label" role="status">
                     {hasUnsaved ? t("unsaved") : null}

@@ -206,11 +206,11 @@ export {
 } from "./components/text";
 export { RowActionSlot, TimeSlot, type TimeSlotProps } from "./components/time-slot";
 export {
+  PINNED_TOAST_SPACE,
   PinnedToast,
   Toaster,
   showToast,
   type PinnedToastProps,
-  type PinnedToastTone,
   type ToasterProps,
 } from "./components/toast";
 export { Tooltip, type TooltipAction, type TooltipProps } from "./components/tooltip";

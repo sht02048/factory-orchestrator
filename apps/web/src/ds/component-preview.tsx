@@ -543,7 +543,6 @@ export function ComponentSections() {
           <Text variant="meta">{t("toast.pinnedNote")}</Text>
           <Demo>
             <PinnedToast
-              tone="accent"
               title={t("toast.pinnedTitle")}
               announcement={t("toast.pinnedTitle")}
               actions={

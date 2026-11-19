@@ -19,7 +19,6 @@ export function UpdateToast({ toast, serverKind, serverVersion, act }: UpdateToa
     const title = t("ready.title", { version: toast.version, object: particles.object });
     return (
       <PinnedToast
-        tone="accent"
         title={title}
         announcement={title}
         actions={
@@ -42,7 +41,6 @@ export function UpdateToast({ toast, serverKind, serverVersion, act }: UpdateToa
   const serverMatches = serverVersion === toast.version;
   return (
     <PinnedToast
-      tone="progress"
       title={title}
       announcement={title}
       actions={

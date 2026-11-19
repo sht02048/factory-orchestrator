@@ -127,4 +127,9 @@ describe("Settings 업데이트 구역(0083)", () => {
     expect(shown).toContain(settings.updates.failedStatus);
     expect(shown).not.toContain(settings.updates.never);
   });
+
+  it("받은 새 버전은 토스트가 알리므로 패널의 status 로 다시 알리지 않는다", () => {
+    const html = render(view({ check: { kind: "ready", version: "0.3.0", notesUrl: NOTES } }));
+    expect(html).toMatch(/<span role="status"><\/span>/);
+  });
 });

@@ -172,6 +172,35 @@ describe("데스크톱 업데이트 토스트(브라우저, 0083)", () => {
     expect(Math.abs((settled?.y ?? 0) - before.y)).toBeLessThan(1);
   });
 
+  it("키보드로 나중에를 눌러 닫으면 토스트에 들어오기 전 자리로 포커스를 돌려준다", async (context) => {
+    const page = await newPage(context, { width: 1280, height: 800 });
+    await withUpdates(page, READY);
+    await open(page, "/");
+    const toast = pinnedToast(page);
+    const dashboard = page.getByRole("link", { name: shell.nav.dashboard, exact: true });
+    await dashboard.focus();
+    await toast.getByRole("button", { name: shell.update.ready.later }).focus();
+    await page.keyboard.press("Enter");
+    await toast.waitFor({ state: "detached" });
+    await expect
+      .poll(() => dashboard.evaluate((element) => element === document.activeElement))
+      .toBe(true);
+  });
+
+  it("떠 있는 동안 높이를 알려 목록이 그만큼 아래 여백을 둔다", async (context) => {
+    const page = await newPage(context, { width: 1280, height: 800 });
+    await withUpdates(page, READY);
+    await open(page, "/settings");
+    await pinnedToast(page).waitFor();
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          document.documentElement.style.getPropertyValue("--pinned-toast-space"),
+        ),
+      )
+      .toMatch(/^\d+(\.\d+)?px$/);
+  });
+
   it("나중에를 누르면 닫히고, 다시 시작을 누르면 앱에 다시 시작을 보낸다", async (context) => {
     const page = await newPage(context, { width: 1280, height: 800 });
     await withUpdates(page, READY);

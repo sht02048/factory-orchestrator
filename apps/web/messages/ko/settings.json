@@ -47,7 +47,7 @@
     "mcpRead": "읽기만 열려 있어요",
     "mcpWrite": "쓰기도 열려 있어요",
     "updatesVersion": "지금 {version}",
-    "updatesOff": "지금 {version} · 자동 업데이트 꺼짐",
+    "updatesOff": "지금 {version} · 새 버전을 확인하지 않아요",
     "updatesReady": "새 버전 {version}{object} 받았어요"
   },
   "remoteError": {

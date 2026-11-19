@@ -74,7 +74,6 @@ describe("PinnedToast(티켓 0083)", () => {
   it("제목으로 이름 붙은 구역이고, 본문과 행동을 그리며, 화면 읽기 알림 칸은 마운트 뒤에 채운다", () => {
     const html = renderToString(
       <PinnedToast
-        tone="accent"
         title="새 버전 0.2.0을 받았어요"
         announcement="새 버전 0.2.0을 받았어요"
         actions={<Button>나중에</Button>}
@@ -93,9 +92,7 @@ describe("PinnedToast(티켓 0083)", () => {
     const html = renderToString(
       <Toaster
         label="알림"
-        pinned={
-          <PinnedToast tone="progress" title="바꿨어요" announcement="바꿨어요" actions={null} />
-        }
+        pinned={<PinnedToast title="바꿨어요" announcement="바꿨어요" actions={null} />}
       />,
     );
     expect(html).toContain("바꿨어요");
