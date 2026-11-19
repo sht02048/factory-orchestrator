@@ -716,10 +716,6 @@ const styles = stylex.create({
     listStyle: "none",
     minWidth: 0,
   },
-  rowList: {
-    gap: space.px2,
-    marginInline: `calc(${space.s3} * -1)`,
-  },
   windows: { gap: space.s3 },
   labelGrid: {
     display: "grid",
