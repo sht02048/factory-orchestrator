@@ -3,6 +3,7 @@ import {
   Actions,
   Button,
   CapacityBar,
+  CapacityCells,
   Card,
   GangerMark,
   GroupHeader,
@@ -32,6 +33,7 @@ export const roleSectionIds = [
   "segmented",
   "groupHeader",
   "capacity",
+  "capacityCells",
   "problem",
   "statTile",
   "brand",
@@ -39,6 +41,14 @@ export const roleSectionIds = [
 
 type Period = "7d" | "14d" | "30d";
 type Split = "runner" | "agent" | "project";
+
+const capacityCellsSamples = [
+  { name: "runner-a", status: "online", used: 2, total: 3 },
+  { name: "runner-b", status: "online", used: 3, total: 3 },
+  { name: "runner-c", status: "runner-issue", used: 1, total: 2 },
+  { name: "runner-d", status: "offline", used: 0, total: 2 },
+  { name: "runner-e", status: "online", used: 5, total: 12 },
+] as const;
 
 function Demo({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.demo)}>{children}</div>;
@@ -217,6 +227,40 @@ export function RoleSections() {
                   <Text variant="title">runner-c</Text>
                 </Row>
               </Card>
+            </div>
+          </Demo>
+        </Section>
+      </div>
+
+      <div id="capacityCells">
+        <Section title={t("nav.capacityCells")} note={t("capacityCells.note")}>
+          <Demo>
+            <div {...stylex.props(styles.stack)}>
+              <Section
+                title={t("capacityCells.title")}
+                count={capacityCellsSamples.length}
+                note={t("capacityCells.free", { count: 8 })}
+              >
+                {capacityCellsSamples.map((sample) => (
+                  <Row
+                    key={sample.name}
+                    interactive={false}
+                    leading={
+                      <StatusDot status={sample.status}>{statusName(sample.status)}</StatusDot>
+                    }
+                    trailing={
+                      <CapacityCells
+                        used={sample.used}
+                        total={sample.total}
+                        label={t("capacityCells.label", { used: sample.used, total: sample.total })}
+                        tone={sample.status === "online" ? "progress" : "problem"}
+                      />
+                    }
+                  >
+                    <Text variant="title">{sample.name}</Text>
+                  </Row>
+                ))}
+              </Section>
             </div>
           </Demo>
         </Section>
