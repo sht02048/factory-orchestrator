@@ -72,17 +72,17 @@
 
 ## 4. 폴링
 
-| 곳                                                                                                                                                            | 주기                                                                     | 결과가 가는 곳                                            |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------- |
-| Dashboard `home/refresh.ts:3, 11-38`, `_app/index.tsx:44-50`                                                                                                  | 15초, 탭이 보일 때만                                                     | 라우터 캐시 밖 로컬 state(`index.tsx:35-36`). 셸은 그대로 |
-| Dashboard 멈추기·재개 처리 중 `_app/index.tsx:14, 51-56`                                                                                                      | 2초                                                                      | 위와 같은 로컬 state                                      |
-| Run 상세 로그 `runs_.$runId.tsx:23-24, 56-64`                                                                                                                 | 2초 × 최대 15번                                                          | `router.invalidate()`                                     |
-| Run 상세 멈추기·재개 처리 중 `runs_.$runId.tsx:66-70`                                                                                                         | 2초                                                                      | `router.invalidate()`                                     |
-| 러너 점검 `settings/settings-screen.tsx:114-146`(Settings, Runners `runners/runners-screen.tsx:432`, 온보딩 `onboarding/onboarding-screen.tsx:126`이 함께 씀) | 점검 요청 뒤 3초, 최대 2분(`packages/app/src/settings/model.ts:159-160`) | 끝나면 `router.invalidate()`                              |
-| This Mac 상태 `runner-setup/runner-setup.tsx:56`                                                                                                              | 2.5초                                                                    | 컴포넌트 state                                            |
-| 러너 등록 `runner-setup/enrollment.tsx:37`                                                                                                                    | 2초                                                                      | 끝나면 `router.invalidate()`                              |
+| 곳                                                                                                                                              | 주기                                                                     | 결과가 가는 곳                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------- |
+| Dashboard `home/refresh.ts:3, 11-38`, `_app/index.tsx:44-50`                                                                                    | 15초, 탭이 보일 때만                                                     | 라우터 캐시 밖 로컬 state(`index.tsx:35-36`). 셸은 그대로 |
+| Dashboard 멈추기·재개 처리 중 `_app/index.tsx:14, 51-56`                                                                                        | 2초                                                                      | 위와 같은 로컬 state                                      |
+| Run 상세 로그 `runs_.$runId.tsx:23-24, 56-64`                                                                                                   | 2초 × 최대 15번                                                          | `router.invalidate()`                                     |
+| Run 상세 멈추기·재개 처리 중 `runs_.$runId.tsx:66-70`                                                                                           | 2초                                                                      | `router.invalidate()`                                     |
+| 러너 점검 `settings/settings-screen.tsx:114-146`(Runners `runners/runners-screen.tsx:432`와 온보딩 `onboarding/onboarding-screen.tsx:126`이 씀) | 점검 요청 뒤 3초, 최대 2분(`packages/app/src/settings/model.ts:159-160`) | 끝나면 `router.invalidate()`                              |
+| This Mac 상태 `runner-setup/runner-setup.tsx:56`                                                                                                | 2.5초                                                                    | 컴포넌트 state                                            |
+| 러너 등록 `runner-setup/enrollment.tsx:37`                                                                                                      | 2초                                                                      | 끝나면 `router.invalidate()`                              |
 
-그 밖에는(Tickets, Runs, Stats, 셸, 점검 요청이 없을 때의 Runners·Settings) 머무는 동안 다시 읽지 않는다 **[코드]**.
+그 밖에는(Tickets, Runs, Stats, Settings, 셸, 점검 요청이 없을 때의 Runners) 머무는 동안 다시 읽지 않는다 **[코드]**.
 
 ## 5. Settings 저장(0115)
 

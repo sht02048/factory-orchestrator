@@ -26,7 +26,7 @@ Settings를 Query로 옮긴다. 저장 뒤에 Settings 전체와 트래커 세 �
 4. **트래커.** "Linear에서 다시 읽기"는 `["tracker"]`만 무효화한다. 라벨 만들기는 Auto-assign Label을 DB에도 저장하므로(`packages/app/src/settings/actions.ts`의 `saveAutoAssignLabel`) `["tracker"]`와 `["settings"]`를 무효화한다. 트래커 연결과 트래커 프로젝트 더하기·지우기도 `["tracker"]`를 함께 무효화한다. 다른 탭·기기에도 닿도록 0124의 `tracker` 변경 기록을 쓴다.
 5. **변경 기록.** Settings 쓰기가 0124에서 `workspace`·`settings`·`tracker` 줄을 스펙 5.2대로 남기는지 0119 뒤 쓰는 곳 모두에 대해 확인한다. 빠진 곳은 이 티켓에서 더한다.
 6. 셸과 함께 바뀌는 저장(Workspace 이름, 더하기·지우기)은 `["shell"]`도 무효화한다.
-7. 세 route에 `preloadStaleTime` 0을 주고 `router.invalidate()`를 지운다. 트래커 프로젝트 상세에서 프로젝트를 지운 뒤의 필터 무효화(`/_app/settings`)도 key 무효화로 바꾼다. Settings 화면 안의 러너 점검 폴링은 0127의 방식을 따른다.
+7. 세 route에 `preloadStaleTime` 0을 주고 `router.invalidate()`를 지운다. 트래커 프로젝트 상세에서 프로젝트를 지운 뒤의 필터 무효화(`/_app/settings`)도 key 무효화로 바꾼다.
 
 ## 완료 조건
 
