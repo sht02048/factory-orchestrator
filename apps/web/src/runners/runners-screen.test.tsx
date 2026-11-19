@@ -345,7 +345,7 @@ describe("Runners 고른 러너 패널", () => {
     );
     expect(text).toContain(`acme/api ${pushCheck.failure.auth}`);
     expect(text).toContain(`acme/lab 확인하지 못했어요 · ${pushCheck.failure.timeout}`);
-    expect(a.match(/<code[^>]*>gh auth setup-git<\/code>/g)).toHaveLength(1);
+    expect(a.match(/>gh auth setup-git</g)).toHaveLength(1);
     expect(text).toContain(pushCheck.scope);
     expect(a).not.toMatch(callout);
 

@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Text } from "@ganger/ui";
-import { fonts, space } from "@ganger/ui/tokens.stylex";
+import { space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
@@ -21,9 +21,9 @@ export function PushProblems({ summary }: { summary: PushSummary }) {
   const problems = [...summary.failed, ...summary.unknown];
   if (problems.length === 0) return null;
   const code = (chunks: ReactNode) => (
-    <code {...stylex.props(styles.code)}>
-      {typeof chunks === "string" ? wordsKeptWhole(chunks) : chunks}
-    </code>
+    <Text variant="meta" as="span" mono>
+      {chunks}
+    </Text>
   );
   return (
     <div {...stylex.props(styles.stack)}>
@@ -49,14 +49,6 @@ export function PushProblems({ summary }: { summary: PushSummary }) {
   );
 }
 
-function wordsKeptWhole(command: string): ReactNode {
-  return command.split(" ").map((word, index) => (
-    <span key={index} {...stylex.props(styles.word)}>
-      {index === 0 ? word : ` ${word}`}
-    </span>
-  ));
-}
-
 function ProblemLine({ problem, broken }: { problem: PushProblem; broken: boolean }) {
   const t = useTranslations("domain.pushCheck");
   const kind = problem.failure === null ? null : t(`failure.${problem.failure.kind}`);
@@ -73,10 +65,10 @@ function ProblemLine({ problem, broken }: { problem: PushProblem; broken: boolea
   else detail = t.rich("failedReason", { kind, reason, code: reasonCode });
   return (
     <li data-push={broken ? "broken" : "unknown"} {...stylex.props(styles.line)}>
-      <Text variant="ui" tone={broken ? "problem" : "strong"} as="span">
+      <Text variant="ui" tone={broken ? "problem" : "strong"} as="span" wrap="anywhere">
         {problem.project}
       </Text>
-      <Text variant="meta" as="span">
+      <Text variant="meta" as="span" wrap="anywhere">
         {detail}
       </Text>
     </li>
@@ -119,8 +111,5 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: space.px2,
     minWidth: 0,
-    overflowWrap: "anywhere",
   },
-  code: { fontFamily: fonts.mono },
-  word: { whiteSpace: "pre" },
 });
