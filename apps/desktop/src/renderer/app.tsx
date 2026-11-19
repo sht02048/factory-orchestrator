@@ -1,6 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import {
   Card,
+  Checklist,
+  ChecklistItem,
   Field,
   Input,
   Mascot,
@@ -25,6 +27,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
 import screens from "../../messages/ko/screens.json" with { type: "json" };
+import { ENROLL_STEPS } from "../shared/enrollment";
+import type { EnrollStep, EnrollmentPhase, SetupProgress } from "../shared/enrollment";
 import type { DesktopApi, FindResult, FoundServerView, ViewState } from "../shared/view";
 import {
   AlertIcon,
@@ -55,10 +59,16 @@ export function App() {
   return (
     <IntlProvider locale="ko" messages={messages}>
       <div {...stylex.props(styles.canvas)}>
-        {view === null ? null : <Screen key={view.screen} view={view} />}
+        {view === null ? null : <Screen key={screenKey(view)} view={view} />}
       </div>
     </IntlProvider>
   );
+}
+
+export function screenKey(view: ViewState): string {
+  return view.screen === "runner-enrollment"
+    ? `${view.screen}:${view.enrollment.phase}`
+    : view.screen;
 }
 
 function api(): DesktopApi {
@@ -82,6 +92,8 @@ export function Screen({ view }: { view: ViewState }) {
       return <EnterAddress checking={view.checking} error={view.error} />;
     case "unreachable":
       return <Unreachable name={view.name} url={view.url} checking={view.checking} />;
+    case "runner-enrollment":
+      return <RunnerEnrollment server={view.server} enrollment={view.enrollment} />;
   }
 }
 
@@ -602,6 +614,192 @@ function Unreachable({ name, url, checking }: { name: string; url: string; check
   );
 }
 
+type RowState = "waiting" | "running" | "done" | "failed";
+
+export function enrollmentRows(
+  enrollment: EnrollmentPhase,
+): ReadonlyArray<{ step: EnrollStep; state: RowState }> {
+  const progress: SetupProgress | null =
+    enrollment.phase === "running" ||
+    enrollment.phase === "registered" ||
+    enrollment.phase === "failed"
+      ? enrollment.progress
+      : null;
+  const done = progress?.done ?? [];
+  const next = ENROLL_STEPS.find((step) => !done.includes(step));
+  return ENROLL_STEPS.map((step) => ({
+    step,
+    state: done.includes(step)
+      ? "done"
+      : step !== next
+        ? "waiting"
+        : enrollment.phase === "running"
+          ? "running"
+          : enrollment.phase === "failed"
+            ? "failed"
+            : "waiting",
+  }));
+}
+
+function RunnerEnrollment({ server, enrollment }: { server: string; enrollment: EnrollmentPhase }) {
+  const t = useTranslations("screens.enrollment");
+  switch (enrollment.phase) {
+    case "ask":
+      return (
+        <Frame width="status" centered>
+          <Header title={t("askTitle")} summary={t("askSummary", { server })} centered />
+          <section aria-label={t("serverLabel")} {...stylex.props(styles.infoBox)}>
+            <span {...stylex.props(styles.live)}>
+              <ServerIcon size={16} />
+              {t("serverLabel")}
+            </span>
+            <span {...stylex.props(styles.url)}>{server}</span>
+          </section>
+          <section aria-label={t("youTitle")} {...stylex.props(styles.infoBox, styles.youBox)}>
+            <Text variant="ui" tone="strong">
+              {t("youTitle")}
+            </Text>
+            <Text variant="meta">{t("youBody")}</Text>
+          </section>
+          <EnrollmentSteps enrollment={enrollment} />
+          <CenteredActions>
+            <ActionButton
+              variant="primary"
+              disabled={enrollment.accepting}
+              onClick={() => void api().acceptEnrollment()}
+            >
+              {enrollment.accepting ? t("registering") : t("register")}
+            </ActionButton>
+            <ActionButton
+              disabled={enrollment.accepting}
+              onClick={() => void api().cancelEnrollment()}
+            >
+              {t("cancel")}
+            </ActionButton>
+          </CenteredActions>
+          <Text variant="meta">{t("note")}</Text>
+        </Frame>
+      );
+    case "running":
+      return (
+        <Frame width="status" centered>
+          <Header title={t("runningTitle")} summary={t("runningSummary", { server })} centered />
+          {enrollment.progress.waitingForRemoteLogin ? (
+            <section
+              aria-label={t("remoteLoginWaitTitle")}
+              {...stylex.props(styles.infoBox, styles.youBox)}
+            >
+              <Text variant="ui" tone="strong" role="status">
+                {t("remoteLoginWaitTitle")}
+              </Text>
+              <Text variant="meta">{t("remoteLoginWaitBody")}</Text>
+              <div {...stylex.props(styles.actions)}>
+                <ActionButton size="medium" onClick={() => void api().openSharing()}>
+                  {t("openSharing")}
+                </ActionButton>
+              </div>
+            </section>
+          ) : null}
+          <EnrollmentSteps enrollment={enrollment} />
+          <CenteredActions>
+            <ActionButton
+              disabled={enrollment.canceling}
+              onClick={() => void api().cancelEnrollment()}
+            >
+              {enrollment.canceling ? t("canceling") : t("cancel")}
+            </ActionButton>
+          </CenteredActions>
+        </Frame>
+      );
+    case "registered":
+      return (
+        <Frame width="status" centered>
+          <Mascot mood="default" />
+          <Header
+            title={t("registeredTitle")}
+            summary={t("registeredSummary", { server })}
+            centered
+            live
+          />
+          <EnrollmentSteps enrollment={enrollment} />
+          {enrollment.progress.github === null || enrollment.progress.github === "done" ? null : (
+            <Text variant="meta">{t(`github.${enrollment.progress.github}`)}</Text>
+          )}
+          <CenteredActions>
+            <ActionButton variant="primary" onClick={() => void api().closeEnrollment()}>
+              {t("backToServer")}
+            </ActionButton>
+          </CenteredActions>
+        </Frame>
+      );
+    case "failed": {
+      const problem = enrollment.progress.problem ?? "script-failed";
+      return (
+        <Frame width="status" centered>
+          <StatusIcon tone="problem">
+            <AlertIcon size={26} />
+          </StatusIcon>
+          <Header
+            title={problem === "canceled" ? t("canceledTitle") : t("failedTitle")}
+            summary={`${t(`problem.${problem}`)} ${t("failedNext")}`}
+            centered
+            live
+          />
+          <EnrollmentSteps enrollment={enrollment} />
+          <CenteredActions>
+            <ActionButton variant="primary" onClick={() => void api().closeEnrollment()}>
+              {t("backToServer")}
+            </ActionButton>
+          </CenteredActions>
+        </Frame>
+      );
+    }
+    case "gone":
+      return (
+        <Frame width="status" centered>
+          <StatusIcon tone="neutral">
+            <PauseIcon />
+          </StatusIcon>
+          <Header title={t("goneTitle")} summary={t(`gone.${enrollment.reason}`)} centered live />
+          <CenteredActions>
+            <ActionButton variant="primary" onClick={() => void api().closeEnrollment()}>
+              {t("backToServer")}
+            </ActionButton>
+          </CenteredActions>
+        </Frame>
+      );
+  }
+}
+
+function EnrollmentSteps({ enrollment }: { enrollment: EnrollmentPhase }) {
+  const t = useTranslations("screens.enrollment");
+  return (
+    <div {...stylex.props(styles.stepsBox)}>
+      <Checklist label={t("stepsLabel")}>
+        {enrollmentRows(enrollment).map(({ step, state }) => (
+          <ChecklistItem
+            key={step}
+            done={state === "done"}
+            running={state === "running"}
+            label={t(`state.${state}`)}
+          >
+            <span {...stylex.props(styles.stepText)}>
+              <Text variant="ui" {...(state === "waiting" ? { tone: "muted" as const } : {})}>
+                {t(`step.${step}`)}
+              </Text>
+              {state === "running" || state === "failed" ? (
+                <Text variant="meta" {...(state === "failed" ? { tone: "problem" as const } : {})}>
+                  {t(`state.${state}`)}
+                </Text>
+              ) : null}
+            </span>
+          </ChecklistItem>
+        ))}
+      </Checklist>
+    </div>
+  );
+}
+
 const spin = stylex.keyframes({ to: { transform: "rotate(360deg)" } });
 const pulse = stylex.keyframes({ "0%, 100%": { opacity: 1 }, "50%": { opacity: 0.35 } });
 
@@ -873,4 +1071,16 @@ const styles = stylex.create({
     listStyleType: "disc",
   },
   checkItem: { paddingInlineStart: space.px2 },
+  youBox: { gap: space.s1 },
+  stepsBox: {
+    boxSizing: "border-box",
+    width: "100%",
+    paddingBlock: space.s4,
+    paddingInline: space.s5,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: colors.borderSubtle,
+  },
+  stepText: { display: "inline-flex", flexWrap: "wrap", alignItems: "baseline", gap: space.s2 },
 });

@@ -6,6 +6,7 @@ import {
   getThisMacStatus,
   runThisMacStep,
   saveEnrollmentWebAddress,
+  startAppRunnerEnrollment,
   startRunnerEnrollment,
 } from "../server/runner-setup-functions";
 import type { RunnerSetupActions } from "./runner-setup";
@@ -22,6 +23,8 @@ export function useRunnerSetupActions(): RunnerSetupActions {
       },
       startEnrollment: (replacing) =>
         startRunnerEnrollment({ data: replacing === undefined ? {} : { replacing } }),
+      startAppEnrollment: (replacing) =>
+        startAppRunnerEnrollment({ data: replacing === undefined ? {} : { replacing } }),
       enrollment: async (id) => {
         const view = await getRunnerEnrollment({ data: { id } });
         if (view.state === "registered") await router.invalidate();

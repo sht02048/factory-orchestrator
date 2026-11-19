@@ -23,6 +23,16 @@ import { connection, fakeKind } from "./browser/fixtures.js";
 import { resetFakeThisMac } from "./browser/fake-this-mac.js";
 import { resetFakeEnrollment } from "./browser/fake-enrollment.js";
 import { startWebServer } from "./web-server.js";
+import { probeIdentity } from "../../apps/desktop/src/core/identity.js";
+import { RunnerEnrollmentFlow } from "../../apps/desktop/src/core/runner-enrollment.js";
+import type { RunnerEnrollmentDeps } from "../../apps/desktop/src/core/runner-enrollment.js";
+import {
+  acceptOffer,
+  fetchOffer,
+  isServerMac,
+  runSetupScript,
+} from "../../apps/desktop/src/core/runner-offer.js";
+import type { SavedServer } from "../../apps/desktop/src/core/remote.js";
 
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
 const adaptersModule = join(webRoot, "src/server/adapters.ts");
@@ -32,6 +42,7 @@ const resultsDir = fileURLToPath(new URL("../test-results", import.meta.url));
 const encryptionKey = new Uint8Array(32).fill(7);
 const thisMac = runnerSetup.thisMac;
 const command = runnerSetup.command;
+const app = runnerSetup.app;
 const HOST_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE2eOtherMacHostKey root@other-mac";
 
 let dir: string;
@@ -162,7 +173,7 @@ describe("이 맥을 러너로(브라우저, 0095)", () => {
     await page.getByText(runnerSetup.choose.question).waitFor();
     expect(
       await page.getByRole("radio", { name: /다른 맥 · 그 맥에 Ganger 앱이 있어요/ }).isDisabled(),
-    ).toBe(true);
+    ).toBe(false);
     expect(await page.getByRole("radio", { name: /다른 맥 · 터미널 명령으로/ }).isDisabled()).toBe(
       false,
     );
@@ -414,5 +425,230 @@ describe("다른 맥 · 명령으로 등록(브라우저, 0097)", () => {
       timeout: 30_000,
     });
     expect(listRunners(db).some((r) => r.name === "nowhere")).toBe(false);
+  });
+});
+
+async function openAppFlow(path: string): Promise<void> {
+  await page.goto(path);
+  await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+  await page.getByText(runnerSetup.choose.question).waitFor();
+  await page.getByRole("radio", { name: /다른 맥 · 그 맥에 Ganger 앱이 있어요/ }).check();
+  const chips = page.getByRole("list", { name: runnerSetup.choose.stepsLabel });
+  await chips.getByText("직접 해요: 앱에서 등록 누르기").waitFor({ state: "attached" });
+  await page.getByRole("button", { name: runnerSetup.choose.continue }).click();
+  await expect.poll(focused).toBe(app.title);
+  const address = page.getByRole("textbox", { name: command.address.label });
+  const waiting = page.getByRole("status").filter({ hasText: app.waiting });
+  await Promise.race([address.waitFor(), waiting.waitFor()]);
+  if (await address.isVisible()) {
+    await address.fill(baseUrl);
+    await page.getByRole("button", { name: app.addressSave }).click();
+  }
+  await waiting.waitFor();
+}
+
+function otherMacApp(
+  mac: { home: string; bin: string; orca: string },
+  root: string,
+  overrides: Partial<RunnerEnrollmentDeps> = {},
+) {
+  const hostKeyFile = join(root, "host_key.pub");
+  writeFileSync(hostKeyFile, `${HOST_KEY}\n`);
+  return new RunnerEnrollmentFlow({
+    fetchOffer: (origin) => fetchOffer(origin),
+    acceptOffer: (origin, id) => acceptOffer(origin, id),
+    runScript: (script, onProgress) =>
+      runSetupScript(script, onProgress, {
+        shell: {
+          command: "/bin/sh",
+          args: [
+            "-c",
+            `sed -e "s#^DEFAULT_ORCA=.*#DEFAULT_ORCA='${mac.orca}'#" -e "s#^HOST_KEY_FILE=.*#HOST_KEY_FILE='${hostKeyFile}'#" | sh -s`,
+          ],
+        },
+        env: { HOME: mac.home, PATH: `${mac.bin}:/usr/bin:/bin` },
+      }),
+    isServerMac: async () => false,
+    onChange: () => undefined,
+    ...overrides,
+  });
+}
+
+async function connectedServer(): Promise<SavedServer> {
+  const probed = await probeIdentity(baseUrl, 3_000);
+  if (probed.kind !== "ours") throw new Error("the e2e server did not answer as Ganger");
+  return { instanceId: probed.identity.instanceId, name: "mac-mini", url: baseUrl };
+}
+
+describe("다른 맥 · Ganger 앱으로 등록(브라우저, 0099)", () => {
+  it("다른 맥의 앱에 요청이 뜨고, 앱이 등록하면 Ganger 관리 러너로 저장하고 서버 화면이 등록을 알린다", async () => {
+    resetFakeThisMac();
+    const world = resetFakeEnrollment();
+    await openAppFlow("/onboarding?step=3");
+    await page.getByText(/\d+:\d\d 뒤 만료 · 맥 한 대만 등록할 수 있어요/u).waitFor();
+
+    const root = mkdtempSync(join(tmpdir(), "ganger-app-mac-"));
+    try {
+      const mac = otherMac(root);
+      const server = await connectedServer();
+      const first = otherMacApp(mac, root);
+      const second = otherMacApp(mac, root);
+      await first.tick(server);
+      await second.tick(server);
+      expect(first.state).toMatchObject({ server: "mac-mini", step: { phase: "ask" } });
+      expect(second.state).toMatchObject({ step: { phase: "ask" } });
+
+      await first.accept();
+      expect(first.state?.step).toMatchObject({
+        phase: "registered",
+        progress: { done: ["remoteLogin", "key", "service", "github", "register"] },
+      });
+      await second.tick(server);
+      expect(second.state?.step).toEqual({ phase: "gone", reason: "ended" });
+
+      expect(readFileSync(join(mac.home, ".ssh", "authorized_keys"), "utf8")).toContain(
+        "AAAAC3NzaC1lZDI1NTE5AAAAIGangerKeyForE2e ganger",
+      );
+      await page
+        .getByRole("status")
+        .filter({ hasText: "other-mac 러너를 등록했어요" })
+        .waitFor({ timeout: 10_000 });
+      const runner = listRunners(db).find((r) => r.name === "other-mac");
+      expect(runner?.config).toMatchObject({ access: { kind: "ganger" } });
+      expect(JSON.stringify(runner?.config)).toMatch(/"sshTarget":"[\w.-]+@100\.64\.0\.9"/u);
+      expect(world.ssh.pinned.get("100.64.0.9")?.body).toBe(
+        "AAAAC3NzaC1lZDI1NTE5AAAAIE2eOtherMacHostKey",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("두 앱이 동시에 등록을 누르면 한쪽만 받고, 다른 쪽은 다른 맥이 먼저 눌렀다고 보인다", async () => {
+    resetFakeThisMac();
+    resetFakeEnrollment();
+    await openAppFlow("/runners?sel=new");
+    const server = await connectedServer();
+    const scripts: string[] = [];
+    const quiet = {
+      runScript: (script: string) => {
+        scripts.push(script);
+        return { cancel: () => undefined, finished: new Promise<never>(() => undefined) };
+      },
+    };
+    const root = mkdtempSync(join(tmpdir(), "ganger-app-mac-"));
+    try {
+      const mac = otherMac(root);
+      const apps = [otherMacApp(mac, root, quiet), otherMacApp(mac, root, quiet)];
+      for (const one of apps) await one.tick(server);
+      void Promise.all(apps.map((one) => one.accept()));
+      await expect
+        .poll(() =>
+          apps.map((one) => one.state?.step.phase ?? "").sort((a, b) => a.localeCompare(b)),
+        )
+        .toEqual(["gone", "running"]);
+      expect(apps.find((one) => one.state?.step.phase === "gone")?.state?.step).toEqual({
+        phase: "gone",
+        reason: "taken",
+      });
+      expect(scripts).toHaveLength(1);
+      expect(scripts[0]).toMatch(/^GANGER_TOKEN='[\w-]+'$/mu);
+      await page.getByRole("status").filter({ hasText: app.preparing }).waitFor();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("그 맥의 실패를 서버 화면에 보이고, 10분이 지난 요청은 앱에 뜨지 않는다", async () => {
+    resetFakeThisMac();
+    const world = resetFakeEnrollment();
+    await openAppFlow("/runners?sel=new");
+    const server = await connectedServer();
+    const root = mkdtempSync(join(tmpdir(), "ganger-app-mac-"));
+    const runnersBefore = listRunners(db).length;
+    try {
+      const mac = otherMac(root);
+      writeFileSync(join(mac.home, ".ssh"), "not a folder");
+      const failing = otherMacApp(mac, root);
+      await failing.tick(server);
+      await failing.accept();
+      expect(failing.state?.step).toMatchObject({
+        phase: "failed",
+        progress: { problem: "authorized-keys-failed" },
+      });
+      await page
+        .getByRole("status")
+        .filter({ hasText: command.problem["authorized-keys-failed"] })
+        .waitFor({ timeout: 10_000 });
+      expect(listRunners(db)).toHaveLength(runnersBefore);
+
+      await page.getByRole("button", { name: app.askAgain }).click();
+      await expect.poll(focused).toBe(app.title);
+      await page.getByRole("status").filter({ hasText: app.askedAgain }).waitFor();
+      world.clockOffsetMs = 10 * 60_000;
+      await page.getByRole("status").filter({ hasText: app.expired }).waitFor();
+      const late = otherMacApp(mac, root);
+      await late.tick(server);
+      expect(late.state).toBeNull();
+      expect(await fetchOffer(baseUrl)).toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("서버를 돌리는 맥의 앱에는 요청이 뜨지 않는다", async () => {
+    resetFakeThisMac();
+    resetFakeEnrollment();
+    await openAppFlow("/runners?sel=new");
+    const server = await connectedServer();
+    expect(await fetchOffer(baseUrl)).not.toBeNull();
+    const own = new RunnerEnrollmentFlow({
+      fetchOffer: (origin) => fetchOffer(origin),
+      acceptOffer: (origin, id) => acceptOffer(origin, id),
+      runScript: () => {
+        throw new Error("must not run");
+      },
+      isServerMac: (saved) =>
+        isServerMac(saved, (origin, timeoutMs) => probeIdentity(origin, timeoutMs), [
+          Number(new URL(baseUrl).port),
+        ]),
+      onChange: () => undefined,
+    });
+    await own.tick(server);
+    expect(own.state).toBeNull();
+  });
+
+  it("토큰 없이 받는 끝점은 아무것도 하지 않고, 받기 전 요청에는 토큰이 없다", async () => {
+    resetFakeThisMac();
+    resetFakeEnrollment();
+    await openAppFlow("/runners?sel=new");
+    const runnersBefore = listRunners(db).length;
+    const offered = await fetch(`${baseUrl}/api/runner-enrollment/offer`);
+    expect(await offered.text()).toMatch(/^\{"offer":\{"id":"[0-9a-f-]+","expiresInMs":\d+\}\}$/u);
+    const offer = await fetchOffer(baseUrl);
+    const blank = await fetch(`${baseUrl}/api/runner-enrollment`, {
+      method: "POST",
+      body: new URLSearchParams({ outcome: "ready" }),
+    });
+    expect(blank.status).toBe(403);
+    const crossSite = await fetch(`${baseUrl}/api/runner-enrollment/offer/accept`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "https://evil.example.com" },
+      body: JSON.stringify({ id: offer?.id }),
+    });
+    expect(crossSite.status).toBe(403);
+    expect((await fetchOffer(baseUrl))?.id).toBe(offer?.id);
+    expect(listRunners(db)).toHaveLength(runnersBefore);
+  });
+
+  it("400px 에서도 Ganger 앱 화면이 가로로 넘치지 않는다", async () => {
+    resetFakeThisMac();
+    resetFakeEnrollment();
+    await page.setViewportSize({ width: 400, height: 844 });
+    await openAppFlow("/onboarding?step=3");
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 });

@@ -4,8 +4,10 @@ import type { RunnerId } from "@ganger/core";
 import { listRunners } from "@ganger/db";
 import { z } from "zod";
 import type { SettingsContext } from "../settings/load.js";
+import { GITHUB_SETUP_RESULTS, REPORTED_PROBLEMS } from "./enrollment-protocol.js";
+import type { EnrollmentProblem, GitHubSetupResult } from "./enrollment-protocol.js";
 import { parsePublicKey } from "./ganger-ssh.js";
-import type { GangerSsh } from "./ganger-ssh.js";
+import type { GangerSsh, PublicKey } from "./ganger-ssh.js";
 import { THIS_MAC_CAPACITY, saveGangerRunner } from "./register.js";
 import {
   renderSetupScript,
@@ -19,24 +21,8 @@ const FORGET_AFTER_MS = 60 * 60_000;
 const TOKEN_BYTES = 24;
 const DETAIL_LIMIT = 300;
 
-export const ENROLLMENT_PROBLEMS = [
-  "remote-login-off",
-  "orca-not-found",
-  "tailscale-missing",
-  "host-key-missing",
-  "authorized-keys-failed",
-  "service-failed",
-  "invalid-report",
-  "register-failed",
-] as const;
-export type EnrollmentProblem = (typeof ENROLLMENT_PROBLEMS)[number];
-
-const REPORTED_PROBLEMS = ENROLLMENT_PROBLEMS.filter(
-  (problem) => problem !== "invalid-report" && problem !== "register-failed",
-);
-
-export const GITHUB_SETUP_RESULTS = ["done", "gh-missing", "gh-logged-out", "gh-failed"] as const;
-export type GitHubSetupResult = (typeof GITHUB_SETUP_RESULTS)[number];
+export { ENROLLMENT_PROBLEMS, GITHUB_SETUP_RESULTS } from "./enrollment-protocol.js";
+export type { EnrollmentProblem, GitHubSetupResult } from "./enrollment-protocol.js";
 
 export interface EnrolledRunner {
   id: RunnerId;
@@ -49,6 +35,7 @@ export interface EnrolledRunner {
 
 export type EnrollmentView =
   | { state: "waiting"; expiresInMs: number }
+  | { state: "preparing"; expiresInMs: number }
   | { state: "expired" }
   | { state: "registered"; runner: EnrolledRunner }
   | { state: "failed"; problem: EnrollmentProblem; detail: string | null }
@@ -60,7 +47,13 @@ export interface IssuedEnrollment {
   expiresInMs: number;
 }
 
+export interface EnrollmentOffer {
+  id: string;
+  expiresInMs: number;
+}
+
 export type ClaimRefusal = "unknown" | "expired" | "used";
+export type OfferRefusal = "unknown" | "expired" | "taken";
 
 type Outcome =
   | { state: "waiting" }
@@ -68,11 +61,14 @@ type Outcome =
   | { state: "registered"; runner: EnrolledRunner }
   | { state: "failed"; problem: EnrollmentProblem; detail: string | null };
 
+type OfferState = "none" | "open" | "taken";
+
 interface Entry {
   id: string;
-  tokenHash: string;
+  tokenHash: string | null;
   issuedAt: number;
   expiresAt: number;
+  offer: OfferState;
   outcome: Outcome;
 }
 
@@ -100,27 +96,68 @@ export class RunnerEnrollments {
   }
 
   issue(replacing?: string): IssuedEnrollment {
-    const now = this.now();
-    this.forgetOld(now);
-    if (replacing !== undefined) this.revoke(replacing);
-    const token = this.newToken();
-    const entry: Entry = {
-      id: randomUUID(),
-      tokenHash: hashToken(token),
-      issuedAt: now,
-      expiresAt: now + this.ttlMs,
-      outcome: { state: "waiting" },
-    };
-    this.byHash.set(entry.tokenHash, entry);
-    this.byId.set(entry.id, entry);
+    const entry = this.add(replacing, "none");
+    const token = this.giveToken(entry);
     return { id: entry.id, token, expiresInMs: this.ttlMs };
+  }
+
+  offer(replacing?: string): EnrollmentOffer {
+    const entry = this.add(replacing, "open");
+    return { id: entry.id, expiresInMs: this.ttlMs };
+  }
+
+  openOffer(): EnrollmentOffer | null {
+    const now = this.now();
+    let newest: Entry | null = null;
+    for (const entry of this.byId.values()) {
+      if (entry.offer !== "open" || entry.outcome.state !== "waiting") continue;
+      if (now >= entry.expiresAt) continue;
+      if (newest === null || entry.issuedAt >= newest.issuedAt) newest = entry;
+    }
+    return newest === null ? null : { id: newest.id, expiresInMs: newest.expiresAt - now };
+  }
+
+  acceptOffer(id: string): { ok: true; token: string } | { ok: false; refusal: OfferRefusal } {
+    const entry = this.byId.get(id);
+    if (entry === undefined || entry.offer === "none") return { ok: false, refusal: "unknown" };
+    if (entry.offer === "taken" || entry.outcome.state !== "waiting") {
+      return { ok: false, refusal: "taken" };
+    }
+    const now = this.now();
+    if (now >= entry.expiresAt) return { ok: false, refusal: "expired" };
+    entry.offer = "taken";
+    entry.expiresAt = now + this.ttlMs;
+    return { ok: true, token: this.giveToken(entry) };
   }
 
   revoke(id: string): void {
     const entry = this.byId.get(id);
     if (entry === undefined) return;
     this.byId.delete(id);
-    this.byHash.delete(entry.tokenHash);
+    if (entry.tokenHash !== null) this.byHash.delete(entry.tokenHash);
+  }
+
+  private add(replacing: string | undefined, offer: OfferState): Entry {
+    const now = this.now();
+    this.forgetOld(now);
+    if (replacing !== undefined) this.revoke(replacing);
+    const entry: Entry = {
+      id: randomUUID(),
+      tokenHash: null,
+      issuedAt: now,
+      expiresAt: now + this.ttlMs,
+      offer,
+      outcome: { state: "waiting" },
+    };
+    this.byId.set(entry.id, entry);
+    return entry;
+  }
+
+  private giveToken(entry: Entry): string {
+    const token = this.newToken();
+    entry.tokenHash = hashToken(token);
+    this.byHash.set(entry.tokenHash, entry);
+    return token;
   }
 
   usable(token: string): boolean {
@@ -151,7 +188,10 @@ export class RunnerEnrollments {
       case "claimed": {
         const left = entry.expiresAt - this.now();
         if (outcome.state === "waiting" && left <= 0) return { state: "expired" };
-        return { state: "waiting", expiresInMs: Math.max(0, left) };
+        const expiresInMs = Math.max(0, left);
+        return entry.offer === "taken"
+          ? { state: "preparing", expiresInMs }
+          : { state: "waiting", expiresInMs };
       }
       case "registered":
         return { state: "registered", runner: outcome.runner };
@@ -331,16 +371,31 @@ export interface StartEnrollmentInput {
   replacing?: string | undefined;
 }
 
-export async function startEnrollment(input: StartEnrollmentInput): Promise<StartEnrollmentResult> {
-  if (input.replacing !== undefined) input.enrollments.revoke(input.replacing);
-  if (input.webAddress === null || !URL.canParse(input.webAddress)) {
+type EnrollmentUnavailable = Extract<StartEnrollmentResult, { ok: false }>["reason"];
+
+type Prepared =
+  | { ok: true; webAddress: string; publicKey: PublicKey }
+  | { ok: false; reason: EnrollmentUnavailable };
+
+async function prepareEnrollment(
+  ssh: GangerSsh | null,
+  webAddress: string | null,
+): Promise<Prepared> {
+  if (webAddress === null || !URL.canParse(webAddress)) {
     return { ok: false, reason: "no-web-address" };
   }
-  if (input.ssh === null) return { ok: false, reason: "no-home" };
-  const key = await input.ssh.publicKey();
+  if (ssh === null) return { ok: false, reason: "no-home" };
+  const key = await ssh.publicKey();
   if (!key.ok) return { ok: false, reason: "keygen-failed" };
+  return { ok: true, webAddress, publicKey: key.publicKey };
+}
+
+export async function startEnrollment(input: StartEnrollmentInput): Promise<StartEnrollmentResult> {
+  if (input.replacing !== undefined) input.enrollments.revoke(input.replacing);
+  const prepared = await prepareEnrollment(input.ssh, input.webAddress);
+  if (!prepared.ok) return prepared;
   const issued = input.enrollments.issue();
-  const scriptUrl = setupScriptUrl(input.webAddress, issued.token);
+  const scriptUrl = setupScriptUrl(prepared.webAddress, issued.token);
   const { pathname, search } = new URL(scriptUrl);
   return {
     ok: true,
@@ -350,6 +405,47 @@ export async function startEnrollment(input: StartEnrollmentInput): Promise<Star
     reviewCommand: reviewFirstCommand(scriptUrl),
     scriptPath: `${pathname}${search}`,
   };
+}
+
+export type StartAppEnrollmentResult =
+  | { ok: true; id: string; expiresInMs: number }
+  | { ok: false; reason: EnrollmentUnavailable };
+
+export async function startAppEnrollment(
+  input: StartEnrollmentInput,
+): Promise<StartAppEnrollmentResult> {
+  if (input.replacing !== undefined) input.enrollments.revoke(input.replacing);
+  const prepared = await prepareEnrollment(input.ssh, input.webAddress);
+  if (!prepared.ok) return prepared;
+  const offer = input.enrollments.offer();
+  return { ok: true, id: offer.id, expiresInMs: offer.expiresInMs };
+}
+
+export interface AcceptOfferRequest {
+  enrollments: RunnerEnrollments;
+  ssh: GangerSsh | null;
+  webAddress: string | null;
+  id: string;
+}
+
+export type AcceptOfferReply =
+  | { status: 200; body: { ok: true; script: string } }
+  | { status: 410; body: { ok: false; reason: OfferRefusal } }
+  | { status: 503; body: { ok: false; reason: EnrollmentUnavailable } };
+
+export async function acceptEnrollmentOffer(
+  request: AcceptOfferRequest,
+): Promise<AcceptOfferReply> {
+  const prepared = await prepareEnrollment(request.ssh, request.webAddress);
+  if (!prepared.ok) return { status: 503, body: { ok: false, reason: prepared.reason } };
+  const accepted = request.enrollments.acceptOffer(request.id);
+  if (!accepted.ok) return { status: 410, body: { ok: false, reason: accepted.refusal } };
+  const script = renderSetupScript({
+    serverUrl: prepared.webAddress,
+    token: accepted.token,
+    publicKey: prepared.publicKey,
+  });
+  return { status: 200, body: { ok: true, script } };
 }
 
 export interface SetupScriptRequest {

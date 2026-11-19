@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { renderWithMessages } from "../testing/render";
 import { runnerSetupMessages } from "./messages";
-import { CommandFlow, remainingLabel } from "./command-flow";
+import { AppFlow } from "./app-flow";
+import { CommandFlow } from "./command-flow";
+import { remainingLabel } from "./enrollment";
 import { RunnerSetup, canOpenSharingSettings } from "./runner-setup";
 import type { RunnerSetupActions } from "./runner-setup";
 
@@ -9,6 +11,7 @@ const pending: RunnerSetupActions = {
   thisMacStatus: () => new Promise(() => undefined),
   runThisMacStep: () => Promise.reject(new Error("unused")),
   startEnrollment: () => new Promise(() => undefined),
+  startAppEnrollment: () => new Promise(() => undefined),
   saveWebAddress: () => new Promise(() => undefined),
   enrollment: () => new Promise(() => undefined),
   cancelEnrollment: () => Promise.resolve(),
@@ -63,14 +66,17 @@ describe("러너 고르기 화면(0095)", () => {
     expect(text(html)).toContain("약 1분");
   });
 
-  it("Ganger 앱 선택지만 흐리고 곧 지원 꼬리표를 달며, 터미널 명령 선택지는 고를 수 있다(0097)", () => {
+  it("세 선택지를 모두 고를 수 있고 곧 지원 꼬리표가 없다(0099)", () => {
     const html = render();
-    expect(html.match(/<input[^>]*value="appMac"[^>]*>/)?.[0]).toContain('disabled=""');
-    expect(html.match(/<input[^>]*value="commandMac"[^>]*>/)?.[0]).not.toContain("disabled");
+    for (const option of ["thisMac", "appMac", "commandMac"]) {
+      expect(html.match(new RegExp(`<input[^>]*value="${option}"[^>]*>`))?.[0]).not.toContain(
+        "disabled",
+      );
+    }
     const shown = text(html);
-    expect(shown.match(/곧 지원/g)).toHaveLength(1);
-    expect(shown).toContain("다른 맥 · 그 맥에 Ganger 앱이 있어요 곧 지원");
-    expect(shown).not.toContain("다른 맥 · 터미널 명령으로 곧 지원");
+    expect(shown).not.toContain("곧 지원");
+    expect(shown).toContain("다른 맥 · 그 맥에 Ganger 앱이 있어요");
+    expect(shown).toContain("그 맥의 Ganger 앱에서 버튼 하나로 등록해요.");
     expect(shown).not.toContain("지금은 아래");
     expect(shown).not.toContain("직접 입력하기'로");
   });
@@ -155,6 +161,25 @@ describe("명령으로 등록(0097)", () => {
     expect(shown).toContain("관리자 암호를 묻지 않고, 비밀 값을 서버로 보내지 않아요.");
     expect(shown).toContain("명령이 안 되면");
     expect(text(html)).not.toContain("새 명령 받기");
+  });
+});
+
+describe("Ganger 앱으로 등록(0099)", () => {
+  it("요청을 만드는 동안 그 맥에서 할 두 단계, 앱이 하는 일과 뜨지 않을 때 안내를 보이고, 다시 요청하기는 멈췄을 때만 둔다", () => {
+    const html = renderWithMessages(
+      <AppFlow actions={pending} titleRef={{ current: null }} onBack={() => undefined} primary />,
+      runnerSetupMessages,
+    );
+    const shown = text(html);
+    expect(html).toContain('aria-label="다른 맥의 Ganger 앱으로 등록해요"');
+    expect(shown).toContain("러너로 쓸 맥에서 원격 로그인을 켜요");
+    expect(shown).toContain("그 맥의 Ganger 앱에서 등록을 눌러요");
+    expect(shown).toContain("“이 맥을 러너로 등록할까요?”가 떠요");
+    expect(shown).toContain("요청을 만들고 있어요");
+    expect(shown).toContain("그 맥의 앱이 하는 일");
+    expect(shown).toContain("앱에 요청이 뜨지 않으면");
+    expect(shown).not.toContain("명령 복사");
+    expect(shown).not.toContain("다시 요청하기");
   });
 });
 

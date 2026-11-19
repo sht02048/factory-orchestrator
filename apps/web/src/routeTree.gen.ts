@@ -23,6 +23,8 @@ import { Route as ApiIdentityRouteImport } from './routes/api/identity'
 import { Route as AppRunsRunIdRouteImport } from './routes/_app/runs_.$runId'
 import { Route as ApiRunnerEnrollmentIndexRouteImport } from './routes/api/runner-enrollment/index'
 import { Route as ApiRunnerEnrollmentScriptRouteImport } from './routes/api/runner-enrollment/script'
+import { Route as ApiRunnerEnrollmentOfferIndexRouteImport } from './routes/api/runner-enrollment/offer/index'
+import { Route as ApiRunnerEnrollmentOfferAcceptRouteImport } from './routes/api/runner-enrollment/offer/accept'
 import { Route as ApiWebhooksTrackerConnectionIdRouteImport } from './routes/api/webhooks/tracker/$connectionId'
 
 const AppRoute = AppRouteImport.update({
@@ -96,6 +98,18 @@ const ApiRunnerEnrollmentScriptRoute =
     path: '/api/runner-enrollment/script',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiRunnerEnrollmentOfferIndexRoute =
+  ApiRunnerEnrollmentOfferIndexRouteImport.update({
+    id: '/api/runner-enrollment/offer/',
+    path: '/api/runner-enrollment/offer/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiRunnerEnrollmentOfferAcceptRoute =
+  ApiRunnerEnrollmentOfferAcceptRouteImport.update({
+    id: '/api/runner-enrollment/offer/accept',
+    path: '/api/runner-enrollment/offer/accept',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiWebhooksTrackerConnectionIdRoute =
   ApiWebhooksTrackerConnectionIdRouteImport.update({
     id: '/api/webhooks/tracker/$connectionId',
@@ -117,7 +131,9 @@ export interface FileRoutesByFullPath {
   '/runs/$runId': typeof AppRunsRunIdRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
   '/api/runner-enrollment/': typeof ApiRunnerEnrollmentIndexRoute
+  '/api/runner-enrollment/offer/accept': typeof ApiRunnerEnrollmentOfferAcceptRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
+  '/api/runner-enrollment/offer/': typeof ApiRunnerEnrollmentOfferIndexRoute
 }
 export interface FileRoutesByTo {
   '/ds': typeof DsRoute
@@ -133,7 +149,9 @@ export interface FileRoutesByTo {
   '/runs/$runId': typeof AppRunsRunIdRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
   '/api/runner-enrollment': typeof ApiRunnerEnrollmentIndexRoute
+  '/api/runner-enrollment/offer/accept': typeof ApiRunnerEnrollmentOfferAcceptRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
+  '/api/runner-enrollment/offer': typeof ApiRunnerEnrollmentOfferIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -151,7 +169,9 @@ export interface FileRoutesById {
   '/_app/runs_/$runId': typeof AppRunsRunIdRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
   '/api/runner-enrollment/': typeof ApiRunnerEnrollmentIndexRoute
+  '/api/runner-enrollment/offer/accept': typeof ApiRunnerEnrollmentOfferAcceptRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
+  '/api/runner-enrollment/offer/': typeof ApiRunnerEnrollmentOfferIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -169,7 +189,9 @@ export interface FileRouteTypes {
     | '/runs/$runId'
     | '/api/runner-enrollment/script'
     | '/api/runner-enrollment/'
+    | '/api/runner-enrollment/offer/accept'
     | '/api/webhooks/tracker/$connectionId'
+    | '/api/runner-enrollment/offer/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/ds'
@@ -185,7 +207,9 @@ export interface FileRouteTypes {
     | '/runs/$runId'
     | '/api/runner-enrollment/script'
     | '/api/runner-enrollment'
+    | '/api/runner-enrollment/offer/accept'
     | '/api/webhooks/tracker/$connectionId'
+    | '/api/runner-enrollment/offer'
   id:
     | '__root__'
     | '/_app'
@@ -202,7 +226,9 @@ export interface FileRouteTypes {
     | '/_app/runs_/$runId'
     | '/api/runner-enrollment/script'
     | '/api/runner-enrollment/'
+    | '/api/runner-enrollment/offer/accept'
     | '/api/webhooks/tracker/$connectionId'
+    | '/api/runner-enrollment/offer/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -213,7 +239,9 @@ export interface RootRouteChildren {
   ApiIdentityRoute: typeof ApiIdentityRoute
   ApiRunnerEnrollmentScriptRoute: typeof ApiRunnerEnrollmentScriptRoute
   ApiRunnerEnrollmentIndexRoute: typeof ApiRunnerEnrollmentIndexRoute
+  ApiRunnerEnrollmentOfferAcceptRoute: typeof ApiRunnerEnrollmentOfferAcceptRoute
   ApiWebhooksTrackerConnectionIdRoute: typeof ApiWebhooksTrackerConnectionIdRoute
+  ApiRunnerEnrollmentOfferIndexRoute: typeof ApiRunnerEnrollmentOfferIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -316,6 +344,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiRunnerEnrollmentScriptRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/runner-enrollment/offer/': {
+      id: '/api/runner-enrollment/offer/'
+      path: '/api/runner-enrollment/offer'
+      fullPath: '/api/runner-enrollment/offer/'
+      preLoaderRoute: typeof ApiRunnerEnrollmentOfferIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/runner-enrollment/offer/accept': {
+      id: '/api/runner-enrollment/offer/accept'
+      path: '/api/runner-enrollment/offer/accept'
+      fullPath: '/api/runner-enrollment/offer/accept'
+      preLoaderRoute: typeof ApiRunnerEnrollmentOfferAcceptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/webhooks/tracker/$connectionId': {
       id: '/api/webhooks/tracker/$connectionId'
       path: '/api/webhooks/tracker/$connectionId'
@@ -356,7 +398,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiIdentityRoute: ApiIdentityRoute,
   ApiRunnerEnrollmentScriptRoute: ApiRunnerEnrollmentScriptRoute,
   ApiRunnerEnrollmentIndexRoute: ApiRunnerEnrollmentIndexRoute,
+  ApiRunnerEnrollmentOfferAcceptRoute: ApiRunnerEnrollmentOfferAcceptRoute,
   ApiWebhooksTrackerConnectionIdRoute: ApiWebhooksTrackerConnectionIdRoute,
+  ApiRunnerEnrollmentOfferIndexRoute: ApiRunnerEnrollmentOfferIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

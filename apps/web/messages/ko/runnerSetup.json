@@ -28,13 +28,13 @@
     "appMacBody": "그 맥의 Ganger 앱에서 버튼 하나로 등록해요.",
     "commandMac": "다른 맥 · 터미널 명령으로",
     "commandMacBody": "등록 명령 한 줄을 그 맥 터미널에 붙여 넣어요.",
-    "soon": "곧 지원해요",
     "stepsLabel": "할 일 순서",
     "about": "약 1분",
     "continue": "이 방법으로 계속",
     "directHint": "ssh 설정을 이미 해 뒀나요?",
     "directLink": "주소 직접 입력하기",
-    "aboutCommand": "약 2분"
+    "aboutCommand": "약 2분",
+    "aboutApp": "약 2분"
   },
   "chips": {
     "remoteLogin": "원격 로그인 켜기",
@@ -49,7 +49,8 @@
     "findOrca": "Orca 찾기",
     "githubCheck": "GitHub 확인",
     "pasteCommand": "명령 붙여 넣기",
-    "keyServiceGithub": "키·서비스·GitHub"
+    "keyServiceGithub": "키·서비스·GitHub",
+    "pressInApp": "앱에서 등록 누르기"
   },
   "direct": {
     "back": "맥 고르기로",
@@ -169,7 +170,8 @@
       "authorized-keys-failed": "그 맥의 ~/.ssh/authorized_keys에 Ganger 키를 넣지 못했어요.",
       "service-failed": "그 맥에 Orca 상시 서비스를 설치하지 못했어요.",
       "invalid-report": "그 맥이 보낸 정보를 읽지 못했어요.",
-      "register-failed": "러너를 저장하지 못했어요."
+      "register-failed": "러너를 저장하지 못했어요.",
+      "canceled": "그 맥에서 등록을 멈췄어요."
     },
     "registered": "{name} 러너를 등록했어요. 아래에서 확인 결과를 봐요.",
     "registeredHere": "{name} 러너를 등록했어요. 러너 보기에서 확인 결과를 봐요.",
@@ -199,5 +201,28 @@
       }
     },
     "expiredHere": "새 명령을 받으면 여기에 보여요."
+  },
+  "app": {
+    "title": "다른 맥의 Ganger 앱으로 등록해요",
+    "body": "러너로 쓸 맥에서 두 가지만 직접 해요. 나머지는 그 맥의 Ganger 앱이 해요.",
+    "stepsLabel": "그 맥에서 할 일",
+    "pressTitle": "그 맥의 Ganger 앱에서 등록을 눌러요",
+    "pressBody": "그 맥의 Ganger 앱이 이 서버에 붙어 있으면 “이 맥을 러너로 등록할까요?”가 떠요.",
+    "expiresIn": "{time} 뒤 만료 · 맥 한 대만 등록할 수 있어요",
+    "starting": "요청을 만들고 있어요",
+    "waiting": "러너를 기다리고 있어요",
+    "askedAgain": "다시 요청했어요. 그 맥의 앱에 다시 떠요.",
+    "preparing": "그 맥의 앱이 준비하고 있어요. 끝나면 여기에 보여요.",
+    "expired": "요청이 만료됐어요. 다시 요청하면 그 맥의 앱에 다시 떠요.",
+    "failed": "{problem} 다시 요청해 주세요.",
+    "askAgain": "다시 요청하기",
+    "addressSave": "저장하고 요청 보내기",
+    "whatTitle": "그 맥의 앱이 하는 일",
+    "helpTitle": "앱에 요청이 뜨지 않으면",
+    "help": {
+      "connected": "그 맥의 Ganger 앱이 ‘다른 서버에 붙기’로 이 서버에 붙어 있는지 봐요",
+      "version": "그 맥의 Ganger 앱을 최신 버전으로 올려요",
+      "command": "앱 없이 하려면 다른 방법 고르기 › 다른 맥 · 터미널 명령으로"
+    }
   }
 }

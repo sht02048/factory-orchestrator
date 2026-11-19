@@ -1,3 +1,5 @@
+import type { EnrollmentPhase } from "./enrollment.js";
+
 export type ConnectError = "invalid" | "unreachable" | "not-ours" | "host-not-allowed";
 
 export interface FoundServerView {
@@ -21,7 +23,8 @@ export type ViewState =
   | { screen: "local-service" }
   | { screen: "find-servers"; port: number; searching: boolean; result: FindResult | null }
   | { screen: "enter-address"; checking: boolean; error: ConnectError | null }
-  | { screen: "unreachable"; name: string; url: string; checking: boolean };
+  | { screen: "unreachable"; name: string; url: string; checking: boolean }
+  | { screen: "runner-enrollment"; server: string; enrollment: EnrollmentPhase };
 
 export interface DesktopApi {
   getView(): Promise<ViewState>;
@@ -36,6 +39,10 @@ export interface DesktopApi {
   retry(): Promise<void>;
   chooseMode(): Promise<void>;
   openLog(): Promise<void>;
+  acceptEnrollment(): Promise<void>;
+  cancelEnrollment(): Promise<void>;
+  closeEnrollment(): Promise<void>;
+  openSharing(): Promise<void>;
 }
 
 export const IPC_PREFIX = "desktop:";
