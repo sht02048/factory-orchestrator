@@ -7,6 +7,11 @@ on:
         description: "New version without the v, such as 0.1.0 or 0.1.0-rc.2"
         required: true
         type: string
+      source:
+        description: "develop to cut release/v<version>, or a hotfix/* branch to add the version change to"
+        required: true
+        default: develop
+        type: string
 
 concurrency:
   group: prepare-release
@@ -20,11 +25,23 @@ jobs:
     runs-on: ubuntu-latest
     environment: release-bot
     steps:
-      - name: Check that this runs on main
-        if: github.ref != 'refs/heads/main'
+      - name: Check that this runs on develop
+        if: github.ref != 'refs/heads/develop'
         run: |
-          echo "::error::Run Prepare release on main, not $GITHUB_REF."
+          echo "::error::Run Prepare release on develop, not $GITHUB_REF. Pick a hotfix/* branch with the source input instead."
           exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: tools
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: tools/.nvmrc
+      - name: Check the source branch
+        id: source
+        env:
+          SOURCE: ${{ inputs.source }}
+        run: node tools/scripts/branch-flow.ts release-source "$SOURCE"
       - name: Check the release app settings
         env:
           APP_ID: ${{ secrets.RELEASE_APP_ID }}
@@ -43,40 +60,59 @@ jobs:
           permission-pull-requests: write
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: main
+          ref: ${{ steps.source.outputs.branch }}
+          path: source
           token: ${{ steps.app.outputs.token }}
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        with:
-          node-version-file: .nvmrc
-      - name: Bump the versions on a release branch
+      - name: Bump the versions
         id: bump
+        working-directory: source
         env:
           VERSION: ${{ inputs.version }}
+          KIND: ${{ steps.source.outputs.kind }}
+          SOURCE: ${{ steps.source.outputs.branch }}
           APP_SLUG: ${{ steps.app.outputs.app-slug }}
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
-          branch="release/v${VERSION:?}"
-          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
-            echo "::error::Branch $branch already exists. Merge or close its pull request and delete the branch first."
-            exit 1
+          if [ "$KIND" = "develop" ]; then
+            branch="release/v${VERSION:?}"
+            if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+              echo "::error::Branch $branch already exists. Merge or close its pull request and delete the branch first."
+              exit 1
+            fi
+          else
+            branch="${SOURCE:?}"
           fi
-          node scripts/release-version.ts bump "$VERSION"
+          node ../tools/scripts/release-version.ts bump "${VERSION:?}" "$PWD"
           user_id="$(gh api "users/${APP_SLUG:?}[bot]" --jq .id)"
           git config user.name "${APP_SLUG}[bot]"
           git config user.email "${user_id:?}+${APP_SLUG}[bot]@users.noreply.github.com"
-          git switch -c "$branch"
+          if [ "$KIND" = "develop" ]; then
+            git switch -c "$branch"
+          fi
           git add package.json apps/desktop/package.json
           git commit -m "🔖 release: 버전을 ${VERSION} 로 올리기"
-          git push origin "$branch"
+          git push origin "HEAD:refs/heads/$branch"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
       - name: Open the pull request
         env:
           VERSION: ${{ inputs.version }}
+          KIND: ${{ steps.source.outputs.kind }}
           BRANCH: ${{ steps.bump.outputs.branch }}
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
-          body="$(printf '%s\n\n%s\n' \
-            "Bump the version in package.json and apps/desktop/package.json to ${VERSION:?}." \
-            "Merging this pull request makes the Tag release workflow create v${VERSION}, which starts the Release workflow.")"
-          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "${BRANCH:?}" \
-            --title "🔖 release: 버전을 ${VERSION} 로 올리기" --body "$body"
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "${BRANCH:?}" --state open --json url --jq '.[0].url // ""')"
+          if [ -n "$existing" ]; then
+            echo "Added the version change to $BRANCH. Its pull request is $existing."
+            exit 0
+          fi
+          if [ "$KIND" = "develop" ]; then
+            title="🔖 release: 버전을 ${VERSION:?} 로 올리기"
+            first="Release develop as ${VERSION}: bump the version in package.json and apps/desktop/package.json."
+          else
+            title="🚑 hotfix: ${BRANCH} 를 ${VERSION:?} 로 내기"
+            first="Release the hotfix on ${BRANCH} as ${VERSION}: bump the version in package.json and apps/desktop/package.json."
+          fi
+          body="$(printf '%s\n\n%s\n' "$first" \
+            "Merging this pull request makes the Tag release workflow create v${VERSION}, which starts the Release workflow. Sync develop then merges main back into develop.")"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+            --title "$title" --body "$body"

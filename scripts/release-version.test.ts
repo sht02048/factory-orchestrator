@@ -1,6 +1,8 @@
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -128,5 +130,16 @@ describe("bumpVersions", () => {
     const root = repo("0.2.0", "0.2.0");
     expect(() => bumpVersions(root, "0.1.0")).toThrow("is not higher");
     expect(readFileSync(join(root, "package.json"), "utf8")).toContain('"version": "0.2.0"');
+  });
+
+  it("CLI 는 다른 폴더를 받으면 그 폴더의 버전을 올린다", () => {
+    const root = repo("0.1.0", "0.1.0");
+    const script = fileURLToPath(new URL("release-version.ts", import.meta.url));
+    expect(
+      execFileSync(process.execPath, [script, "bump", "0.1.1", root], { encoding: "utf8" }),
+    ).toBe("0.1.0 -> 0.1.1\n");
+    expect(readFileSync(join(root, "apps", "desktop", "package.json"), "utf8")).toContain(
+      '"version": "0.1.1"',
+    );
   });
 });

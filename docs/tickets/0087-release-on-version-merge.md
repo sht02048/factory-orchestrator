@@ -5,6 +5,8 @@ blocked_by: []
 
 # 0087 버전이 바뀐 PR이 머지되면 자동으로 릴리스
 
+> **흐름 바꿈(2026-11-19, 티켓 [0114](0114-develop-branch-flow.md)).** 기능 작업은 `develop`에 모으고, Prepare release는 `develop`에서 돌아 `release/v<version>`을 `develop`에서 딴다. hotfix는 `source` 입력으로 `hotfix/*` 브랜치에 버전 커밋을 더한다. Tag release와 `release.yml`은 그대로다. `release-bot` environment는 `develop`에서도 쓰고, 앱에는 Workflows 권한이 더해진다. 아래는 0087 때의 기록이다. 지금 흐름은 [ADR 0017](../adr/0017-develop-branch-flow.md)을 본다.
+
 ## 목표
 
 버전을 올린 PR이 `main`에 머지되면 사람이 태그를 push하지 않아도 그 버전의 Release가 나온다.
