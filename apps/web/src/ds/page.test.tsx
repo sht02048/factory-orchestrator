@@ -39,6 +39,7 @@ describe("/ds 서버 렌더", () => {
       "segmented",
       "groupHeader",
       "capacity",
+      "usage",
       "capacityCells",
       "problem",
       "statTile",

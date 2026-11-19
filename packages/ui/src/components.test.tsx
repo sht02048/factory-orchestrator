@@ -38,6 +38,7 @@ import {
   TEXT_VARIANTS,
   Text,
   Tooltip,
+  UsageBar,
   statusTone,
   surfaceStyles,
   textStyles,
@@ -532,6 +533,21 @@ describe("새 컴포넌트(티켓 0073)", () => {
     expect(renderToString(<CapacityBar used={0} total={0} label="작업 칸" />)).toContain(
       'aria-valuetext="0/0"',
     );
+  });
+
+  it("UsageBar 는 이름 있는 meter 이고 '%' 를 값 글로 읽는다", () => {
+    const html = renderToString(<UsageBar percent={72.4} label="Claude 주간" />);
+    expect(html).toContain('role="meter"');
+    expect(html).toContain('aria-label="Claude 주간"');
+    expect(html).toContain('aria-valuenow="72.4"');
+    expect(html).toContain('aria-valuemax="100"');
+    expect(html).toContain('aria-valuetext="72%"');
+    expect(html).toContain('data-tone="neutral"');
+    expect(html).toMatch(/aria-hidden="true"[^>]*>72%</);
+    const over = renderToString(<UsageBar percent={130} label="한도" tone="problem" />);
+    expect(over).toContain('data-tone="problem"');
+    expect(over).toContain('aria-valuenow="100"');
+    expect(over).toContain('aria-valuetext="130%"');
   });
 
   it("CapacityCells 는 자리 하나를 칸 하나로 그리고 칸 묶음을 이름 하나로 읽는다", () => {

@@ -1,0 +1,86 @@
+{
+  "id": "local-account-list",
+  "ok": true,
+  "result": {
+    "claude": {
+      "activeAccount": {
+        "email": "operator@example.com",
+        "organizationName": "Acme Inc",
+        "homePath": "<path>/.claude"
+      }
+    },
+    "codex": { "activeAccount": null },
+    "rateLimits": {
+      "claude": {
+        "provider": "claude",
+        "extraUsage": null,
+        "updatedAt": 1795047117328,
+        "error": null,
+        "status": "ok",
+        "usageMetadata": {},
+        "session": {
+          "usedPercent": 100,
+          "windowMinutes": 300,
+          "resetsAt": 1795051437328,
+          "resetDescription": "4:00 PM"
+        },
+        "weekly": {
+          "usedPercent": 72,
+          "windowMinutes": 10080,
+          "resetsAt": 1795291200240,
+          "resetDescription": "Sun 5:00 AM"
+        },
+        "fableWeekly": {
+          "usedPercent": 9,
+          "windowMinutes": 10080,
+          "resetsAt": 1795291200241,
+          "resetDescription": "Sun 5:00 AM"
+        },
+        "monthly": null
+      },
+      "codex": {
+        "provider": "codex",
+        "updatedAt": 1795047117035,
+        "error": "Codex not signed in",
+        "status": "unavailable",
+        "session": null,
+        "weekly": null,
+        "fableWeekly": null,
+        "monthly": null
+      },
+      "gemini": {
+        "provider": "gemini",
+        "updatedAt": 1795047117035,
+        "error": "Gemini CLI OAuth is disabled in settings",
+        "status": "unavailable",
+        "session": null,
+        "weekly": null,
+        "fableWeekly": null,
+        "monthly": null
+      },
+      "cursor": {
+        "provider": "cursor",
+        "updatedAt": 1795047117080,
+        "error": "No Cursor sign-in on this computer",
+        "status": "unavailable",
+        "usageMetadata": { "failureKind": "missing-credentials" },
+        "session": null,
+        "weekly": null,
+        "fableWeekly": null,
+        "monthly": null
+      },
+      "minimaxCookieConfigured": false,
+      "cursorAuthConfigured": false,
+      "claudeTarget": { "runtime": "host", "wslDistro": null },
+      "inactiveClaudeAccounts": [
+        {
+          "email": "other@example.com",
+          "organizationName": "Other Org",
+          "rateLimits": { "weekly": { "usedPercent": 12 } }
+        }
+      ],
+      "antigravityAccounts": []
+    }
+  },
+  "_meta": { "runtimeId": "d8374bf0-adca-4823-960e-46489e547cad" }
+}

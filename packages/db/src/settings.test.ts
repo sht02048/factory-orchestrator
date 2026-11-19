@@ -7,6 +7,7 @@ import {
   getMapping,
   listRunners,
   listWorkspaceTrackerProjects,
+  recordProviderUsage,
   recordRunnerCheck,
   removeWorkspaceTrackerProject,
   saveInstallAddresses,
@@ -186,6 +187,64 @@ describe("recordRunnerCheck Offline 시각(0064)", () => {
 
     recordRunnerCheck(db, check(id, false, 20_000));
     expect(listRunners(db)[0]?.offlineSince).toEqual(new Date(20_000));
+  });
+});
+
+describe("recordProviderUsage(0086)", () => {
+  it("읽기 전에는 사용량이 없다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "runner-1", capacity: 1, online: true, projects: [repoA] });
+    expect(listRunners(db)[0]?.providerUsage).toBeNull();
+  });
+
+  it("공급자별 상태와 창 사용량, 읽은 시각을 저장하고 읽는다", () => {
+    const db = seededDatabase();
+    const id = addRunner(db, { id: "runner-1", capacity: 1, online: true, projects: [repoA] });
+    const reading = {
+      kind: "read" as const,
+      providers: [
+        {
+          provider: "claude",
+          status: "ok" as const,
+          windows: [
+            { kind: "session" as const, usedPercent: 100, resetsAt: new Date(9_000) },
+            { kind: "weekly" as const, usedPercent: 72, resetsAt: null },
+          ],
+        },
+        { provider: "codex", status: "signed-out" as const, windows: [] },
+      ],
+    };
+    recordProviderUsage(db, { runnerId: id, readAt: new Date(5_000), reading });
+    expect(listRunners(db)[0]?.providerUsage).toEqual({ readAt: new Date(5_000), reading });
+  });
+
+  it("읽지 못한 결과도 시각과 함께 남기고, 러너 상태는 바꾸지 않는다", () => {
+    const db = seededDatabase();
+    const id = addRunner(db, { id: "runner-1", capacity: 1, online: true, projects: [repoA] });
+    const before = listRunners(db)[0];
+    recordProviderUsage(db, {
+      runnerId: id,
+      readAt: new Date(7_000),
+      reading: { kind: "unreadable" },
+    });
+    const after = listRunners(db)[0];
+    expect(after?.providerUsage).toEqual({
+      readAt: new Date(7_000),
+      reading: { kind: "unreadable" },
+    });
+    expect({ ...after, providerUsage: null }).toEqual({ ...before, providerUsage: null });
+  });
+
+  it("저장된 값이 깨졌으면 읽지 못한 것으로 본다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "runner-1", capacity: 1, online: true, projects: [repoA] });
+    db.$client
+      .prepare("UPDATE runners SET provider_usage = ?, provider_usage_read_at = 3000")
+      .run(JSON.stringify({ kind: "read", providers: [{ provider: 1 }] }));
+    expect(listRunners(db)[0]?.providerUsage).toEqual({
+      readAt: new Date(3_000),
+      reading: { kind: "unreadable" },
+    });
   });
 });
 

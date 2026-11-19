@@ -5,6 +5,7 @@ import {
   listRuns,
   recordRunnerCheck,
   listRunners,
+  recordProviderUsage,
   updateRunRecords,
 } from "@ganger/db";
 import type { StoredRunner } from "@ganger/db";
@@ -12,6 +13,7 @@ import { describe, runnerErrorDetail, tryWrite } from "./context.js";
 import type { TickContext } from "./context.js";
 
 export const RUNNER_CHECK_INTERVAL_MS = 60_000;
+export const PROVIDER_USAGE_INTERVAL_MS = 5 * 60_000;
 
 export async function checkRunners(context: TickContext): Promise<void> {
   const now = context.now().getTime();
@@ -66,6 +68,7 @@ export async function checkRunner(
     prerequisites: health.online ? health.prerequisites : null,
   });
   if (health.online) {
+    await readProviderUsage(context, stored, runner);
     try {
       await confirmRemovedWorktrees(context, stored, runner);
     } catch (error) {
@@ -73,6 +76,27 @@ export async function checkRunner(
     }
   }
   return { ok: true, health };
+}
+
+async function readProviderUsage(
+  context: TickContext,
+  stored: StoredRunner,
+  runner: Runner,
+): Promise<void> {
+  if (runner.readProviderUsage === undefined) return;
+  const readAt = stored.providerUsage?.readAt;
+  if (
+    readAt !== undefined &&
+    context.now().getTime() - readAt.getTime() < PROVIDER_USAGE_INTERVAL_MS
+  ) {
+    return;
+  }
+  try {
+    const reading = await runner.readProviderUsage();
+    recordProviderUsage(context.db, { runnerId: stored.id, readAt: context.now(), reading });
+  } catch {
+    context.logger.warn("could not read runner provider usage", { runnerId: stored.id });
+  }
 }
 
 async function confirmRemovedWorktrees(

@@ -2,6 +2,7 @@ export * from "./adapters.js";
 export * from "./assignment.js";
 export * from "./ids.js";
 export * from "./pr-state.js";
+export * from "./provider-usage.js";
 export * from "./queue.js";
 export * from "./registry.js";
 export * from "./run.js";

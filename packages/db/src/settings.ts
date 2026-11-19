@@ -3,6 +3,7 @@ import type {
   CodeHostKind,
   LabelId,
   MailboxRef,
+  ProviderUsageReading,
   RunnerErrorDetail,
   RunnerId,
   RunnerKind,
@@ -15,6 +16,7 @@ import type {
   TrackerProjectId,
   TrackerStateId,
 } from "@ganger/core";
+import { USAGE_WINDOW_KINDS } from "@ganger/core";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -173,7 +175,13 @@ export interface StoredRunner {
   checkedAt: Date | null;
   checkError: unknown;
   offlineSince: Date | null;
+  providerUsage: StoredProviderUsage | null;
   projects: RunnerProject[];
+}
+
+export interface StoredProviderUsage {
+  readAt: Date;
+  reading: ProviderUsageReading;
 }
 
 export function saveRunner(
@@ -254,6 +262,83 @@ export function recordRunnerCheck(
   });
 }
 
+const storedProviderUsage = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("read"),
+    providers: z.array(
+      z.object({
+        provider: z.string(),
+        status: z.enum(["ok", "signed-out", "unavailable", "error"]),
+        windows: z.array(
+          z.object({
+            kind: z.enum(USAGE_WINDOW_KINDS),
+            usedPercent: z.number(),
+            resetsAt: z.number().nullable(),
+          }),
+        ),
+      }),
+    ),
+  }),
+  z.object({ kind: z.literal("unreadable") }),
+]);
+
+function providerUsageJson(reading: ProviderUsageReading): string {
+  const stored: z.infer<typeof storedProviderUsage> =
+    reading.kind === "unreadable"
+      ? reading
+      : {
+          kind: "read",
+          providers: reading.providers.map((usage) => ({
+            provider: usage.provider,
+            status: usage.status,
+            windows: usage.windows.map((window) => ({
+              kind: window.kind,
+              usedPercent: window.usedPercent,
+              resetsAt: window.resetsAt === null ? null : window.resetsAt.getTime(),
+            })),
+          })),
+        };
+  return toJson(stored, "provider usage");
+}
+
+function readProviderUsage(text: string | null, readAt: Date | null): StoredProviderUsage | null {
+  if (readAt === null) return null;
+  if (text === null) return { readAt, reading: { kind: "unreadable" } };
+  let json: unknown;
+  try {
+    json = parseJson(text);
+  } catch {
+    return { readAt, reading: { kind: "unreadable" } };
+  }
+  const parsed = storedProviderUsage.safeParse(json);
+  if (!parsed.success || parsed.data.kind === "unreadable") {
+    return { readAt, reading: { kind: "unreadable" } };
+  }
+  return {
+    readAt,
+    reading: {
+      kind: "read",
+      providers: parsed.data.providers.map((usage) => ({
+        ...usage,
+        windows: usage.windows.map((window) => ({
+          ...window,
+          resetsAt: window.resetsAt === null ? null : new Date(window.resetsAt),
+        })),
+      })),
+    },
+  };
+}
+
+export function recordProviderUsage(
+  db: Database,
+  input: { runnerId: RunnerId; readAt: Date; reading: ProviderUsageReading },
+): void {
+  db.update(runners)
+    .set({ providerUsage: providerUsageJson(input.reading), providerUsageReadAt: input.readAt })
+    .where(eq(runners.id, input.runnerId))
+    .run();
+}
+
 export function listRunners(db: Database): StoredRunner[] {
   const projects = db
     .select()
@@ -278,6 +363,7 @@ export function listRunners(db: Database): StoredRunner[] {
       checkedAt: row.checkedAt,
       checkError: row.checkError === null ? null : parseJson(row.checkError),
       offlineSince: row.offlineSince,
+      providerUsage: readProviderUsage(row.providerUsage, row.providerUsageReadAt),
       projects: projects
         .filter((p) => p.runnerId === row.id)
         .map((p) => ({ id: p.projectId, displayName: p.displayName, setupState: p.setupState })),

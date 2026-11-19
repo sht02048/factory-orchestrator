@@ -1,4 +1,6 @@
+import type { UsageWindowKind } from "@ganger/core";
 import { useTranslations } from "use-intl";
+import domain from "../messages/ko/domain.json" with { type: "json" };
 
 export function useAgentName(): (agent: string) => string {
   const t = useTranslations("domain.agent");
@@ -59,4 +61,21 @@ export function usePrerequisiteName(): (prerequisite: PrerequisiteLabelInput) =>
 
 export function prerequisiteHint(prerequisite: { id: string; hint: string | null }): string | null {
   return prerequisiteKind(prerequisite.id).kind === "github-push" ? null : prerequisite.hint;
+}
+
+type KnownProvider = keyof typeof domain.usage.provider;
+
+function isKnownProvider(provider: string): provider is KnownProvider {
+  return Object.hasOwn(domain.usage.provider, provider);
+}
+
+export function useUsageNames(): {
+  provider: (id: string) => string;
+  window: (kind: UsageWindowKind) => string;
+} {
+  const t = useTranslations("domain.usage");
+  return {
+    provider: (id) => (isKnownProvider(id) ? t(`provider.${id}`) : id),
+    window: (kind) => t(`window.${kind}`),
+  };
 }

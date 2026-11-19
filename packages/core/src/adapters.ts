@@ -18,6 +18,7 @@ import type {
   TrackerStateId,
   WorktreeRef,
 } from "./ids.js";
+import type { ProviderUsageReading } from "./provider-usage.js";
 
 export class AdapterError<D extends { kind: string }> extends Error {
   readonly detail: D;
@@ -241,6 +242,7 @@ export interface Runner {
 
   checkHealth(): Promise<RunnerHealth>;
   listProjects(): Promise<ReadonlyArray<RunnerProject>>;
+  readProviderUsage?(): Promise<ProviderUsageReading>;
 
   ensureMailbox(current: MailboxRef | null): Promise<MailboxRef>;
 

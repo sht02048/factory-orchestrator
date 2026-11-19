@@ -1,4 +1,5 @@
 import { AdapterError } from "../adapters.js";
+import type { ProviderUsageReading } from "../provider-usage.js";
 import type {
   AgentQuestion,
   CodeHost,
@@ -202,6 +203,7 @@ export class FakeRunner implements Runner {
     },
   ];
   projects: RunnerProject[] = [];
+  providerUsage: ProviderUsageReading = { kind: "read", providers: [] };
   failNextStart: RunnerErrorDetail | null = null;
   loseNextStartResponse = false;
   private readonly mailboxes = new Set<MailboxRef>();
@@ -295,6 +297,10 @@ export class FakeRunner implements Runner {
 
   listProjects(): Promise<ReadonlyArray<RunnerProject>> {
     return this.reach(() => this.projects);
+  }
+
+  readProviderUsage(): Promise<ProviderUsageReading> {
+    return this.reach(() => this.providerUsage);
   }
 
   ensureMailbox(current: MailboxRef | null): Promise<MailboxRef> {

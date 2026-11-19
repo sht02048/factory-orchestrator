@@ -18,12 +18,14 @@ import {
   textStyles,
 } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
+import { USAGE_HIGH_PERCENT } from "@ganger/core";
 import type { RunId } from "@ganger/core";
 import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
+import { useUsageNames } from "../labels";
 import { useStatusName } from "../status";
 import type {
   DashboardRunner,
@@ -34,7 +36,7 @@ import type {
   TodoGroup,
   TodoGroupKind,
 } from "./model";
-import { freeCapacity, runnerIssues, todoGroups } from "./model";
+import { freeCapacity, limitedRunners, readyAgainInMs, runnerIssues, todoGroups } from "./model";
 import { subjectParticle } from "./particle";
 import { QuestionForm } from "./question-form";
 import type { Question, SendState } from "./question-form";
@@ -117,9 +119,24 @@ function DashboardHeader({
   all: boolean;
 }) {
   const t = useTranslations("home");
+  const { duration } = useTime();
   const total = page.attention.length;
   const inProgress = page.running.length + page.queued.length;
-  const summary =
+  const limited = limitedRunners(page.runners);
+  const readyTimes = limited.flatMap((runner) => {
+    const ms = readyAgainInMs(runner);
+    return ms === null ? [] : [ms];
+  });
+  const limitSentence =
+    limited.length === 0
+      ? null
+      : readyTimes.length === 0
+        ? t("summary.limitUnknown", { count: limited.length })
+        : t("summary.limit", {
+            count: limited.length,
+            duration: duration(Math.min(...readyTimes)),
+          });
+  const work =
     total === 0
       ? inProgress === 0
         ? t("summary.idle")
@@ -137,7 +154,9 @@ function DashboardHeader({
       <Text variant="display" as="h1">
         {total === 0 ? t("headlineEmpty") : t("headline", { count: total })}
       </Text>
-      <Text variant="body">{summary}</Text>
+      <Text variant="body">
+        {limitSentence === null ? work : t("summary.withLimit", { work, limit: limitSentence })}
+      </Text>
     </header>
   );
 }
@@ -455,6 +474,25 @@ function RunnersSection({ runners }: { runners: DashboardRunner[] }) {
         : t("runners.offlineName", { name: runner.name, duration: duration(runner.offlineMs) }),
     );
   const auth = issues.filter((runner) => runner.cause === "auth").map((runner) => runner.name);
+  const names = useUsageNames();
+  const limited = limitedRunners({ list: runners });
+  const limitLines = limited.flatMap((runner) =>
+    runner.limits.map((limit) => {
+      const values = {
+        provider: names.provider(limit.provider),
+        window: names.window(limit.window),
+        name: runner.name,
+      };
+      return {
+        key: `${runner.id}:${limit.provider}:${limit.window}`,
+        text:
+          limit.resetsInMs === null
+            ? t("runners.limitUnknown", values)
+            : t("runners.limit", { ...values, duration: duration(limit.resetsInMs) }),
+      };
+    }),
+  );
+  const problemCount = new Set([...issues, ...limited].map((runner) => runner.id)).size;
   return (
     <Card surface="plain" label={t("section.runners")}>
       <Section
@@ -476,9 +514,9 @@ function RunnersSection({ runners }: { runners: DashboardRunner[] }) {
                 <RunnerRow key={runner.id} runner={runner} />
               ))}
             </ul>
-            {issues.length === 0 ? null : (
+            {problemCount === 0 ? null : (
               <ProblemCallout
-                title={t("runners.problemTitle", { count: issues.length })}
+                title={t("runners.problemTitle", { count: problemCount })}
                 actions={
                   <a
                     href="/runners"
@@ -499,6 +537,11 @@ function RunnersSection({ runners }: { runners: DashboardRunner[] }) {
                     {t("runners.auth", { names: auth.join(", ") })}
                   </p>
                 )}
+                {limitLines.map((line) => (
+                  <p key={line.key} {...stylex.props(styles.reset)}>
+                    {line.text}
+                  </p>
+                ))}
               </ProblemCallout>
             )}
           </div>
@@ -537,11 +580,34 @@ function RunnerRow({ runner }: { runner: DashboardRunner }) {
           />
         }
       >
-        <Text variant="title" truncate>
-          {runner.name}
-        </Text>
+        <span {...stylex.props(styles.runnerText)}>
+          <Text variant="title" truncate>
+            {runner.name}
+          </Text>
+          <RunnerUsage runner={runner} />
+        </span>
       </Row>
     </li>
+  );
+}
+
+function RunnerUsage({ runner }: { runner: DashboardRunner }) {
+  const t = useTranslations("home.runners");
+  const names = useUsageNames();
+  if (runner.usage === null) return null;
+  const { provider, window, usedPercent } = runner.usage;
+  return (
+    <Text
+      variant="meta"
+      numeric
+      {...(usedPercent >= USAGE_HIGH_PERCENT ? { tone: "problem" } : {})}
+    >
+      {t("usage", {
+        provider: names.provider(provider),
+        window: names.window(window),
+        percent: Math.round(usedPercent),
+      })}
+    </Text>
   );
 }
 
@@ -832,6 +898,7 @@ const styles = stylex.create({
   mainColumn: { display: "flex", flexDirection: "column", gap: space.s10, minWidth: 0 },
   sideColumn: { display: "flex", flexDirection: "column", gap: space.s10, minWidth: 0 },
   sideBlock: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
+  runnerText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   groups: { display: "flex", flexDirection: "column", gap: space.s6, minWidth: 0 },
   group: { display: "flex", flexDirection: "column", gap: space.s1, minWidth: 0 },
   rows: {

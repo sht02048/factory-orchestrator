@@ -163,6 +163,46 @@ describe("migrate", () => {
     ).toEqual([{ id: "r", online: 0, checked_at: 5, offline_since: null }]);
   });
 
+  it("0086 마이그레이션이 기존 러너를 남긴 채 공급자 사용량 칸을 비워 더한다", () => {
+    const db = openDatabase(":memory:");
+    const all = loadMigrations();
+    const added = all.findIndex((m) => m.name.endsWith("_runner_provider_usage"));
+    expect(added).toBeGreaterThan(0);
+    migrate(db, all.slice(0, added));
+    db.$client.exec(`
+      INSERT INTO tracker_connections (id, kind, name, secrets, created_at) VALUES ('c', 'fake', 'c', '{}', 0);
+      INSERT INTO workspaces (id, name, created_at) VALUES ('w', 'w', 0);
+      INSERT INTO runners (id, kind, name, capacity, online, prerequisites, checked_at, offline_since, created_at)
+        VALUES ('r', 'fake', 'r', 2, 1, '[]', 5, NULL, 0);
+      INSERT INTO runner_projects (runner_id, project_id, display_name, setup_state)
+        VALUES ('r', 'rp', 'rp', 'ready');
+      INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
+        runner_project_id, agent_id, worktree_name, state, runner_id, assigned_at)
+        VALUES ('queued', 'c', 'ENG-1', 'w', 'tp', 'rp', 'a', 'ganger-ENG-1-1', 'queued', 'r', 1);
+    `);
+
+    expect(migrate(db)).toEqual(all.slice(added).map((m) => m.name));
+    expect(
+      db.$client
+        .prepare(
+          "SELECT id, capacity, online, prerequisites, checked_at, provider_usage, provider_usage_read_at FROM runners",
+        )
+        .all(),
+    ).toEqual([
+      {
+        id: "r",
+        capacity: 2,
+        online: 1,
+        prerequisites: "[]",
+        checked_at: 5,
+        provider_usage: null,
+        provider_usage_read_at: null,
+      },
+    ]);
+    expect(db.$client.prepare("SELECT count(*) AS n FROM runner_projects").get()?.["n"]).toBe(1);
+    expect(db.$client.prepare("SELECT runner_id FROM runs").all()).toEqual([{ runner_id: "r" }]);
+  });
+
   it("0037 마이그레이션이 옛 런을 결정적 워크트리 이름·실제 브랜치·완료 보고 결과로 옮긴다", () => {
     const db = openDatabase(":memory:");
     const all = loadMigrations();

@@ -2,6 +2,7 @@ import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@g
 import type {
   MailboxRef,
   PermissionRequestId,
+  ProviderUsageReading,
   QuestionId,
   Runner,
   RunnerErrorDetail,
@@ -21,6 +22,7 @@ import { parseOrcaRunnerConfig } from "./config.js";
 import type { OrcaRunnerConfig } from "./config.js";
 import { workerReadLines } from "./log-tail.js";
 import { completionReport, decideProgress } from "./progress.js";
+import { parseProviderUsage } from "./provider-usage.js";
 import { decodeAgent, decodeMailbox, encodeAgent, encodeMailbox } from "./refs.js";
 import type { OrcaAgent, OrcaMailbox } from "./refs.js";
 import {
@@ -133,6 +135,17 @@ export class OrcaRunner implements Runner {
       displayName: project.displayName,
       setupState: project.setup?.setupState ?? "not-set-up",
     }));
+  }
+
+  async readProviderUsage(): Promise<ProviderUsageReading> {
+    let result: RemoteResult;
+    try {
+      result = await this.run([this.config.orcaPath, "account", "list", "--json"]);
+    } catch {
+      return { kind: "unreadable" };
+    }
+    if (result.timedOut) return { kind: "unreadable" };
+    return parseProviderUsage(result.stdout);
   }
 
   private async servicePrerequisite(): Promise<RunnerPrerequisite> {

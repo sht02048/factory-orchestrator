@@ -1,4 +1,10 @@
-import { runDurations, summarizeRunOutcome } from "@ganger/core";
+import {
+  currentWindows,
+  highestUsage,
+  reachedUsageLimits,
+  runDurations,
+  summarizeRunOutcome,
+} from "@ganger/core";
 import type { QueuedRun, RunId } from "@ganger/core";
 import {
   getRunWithRecords,
@@ -13,7 +19,7 @@ import {
   listWorkspaces,
   toWorkspaceId,
 } from "@ganger/db";
-import type { Database, StoredRun } from "@ganger/db";
+import type { Database, StoredRun, StoredRunner } from "@ganger/db";
 import { explainQueue } from "../runs/queue-reasons";
 import { isWebUrl } from "../format/url";
 import { resolveWorkspace, runnerIssueCause } from "../shell/model";
@@ -166,6 +172,7 @@ export function loadHomePage(
           : Math.max(0, now.getTime() - runner.offlineSince.getTime()),
       used: used.get(runner.id) ?? 0,
       capacity: runner.capacity,
+      ...dashboardUsage(runner, now),
     }))
     .toSorted((a, b) => Number(a.cause === null) - Number(b.cause === null));
   return partitionHome({
@@ -228,4 +235,34 @@ function oldestPendingInput(db: Database, runId: RunId): { at: Date; input: Inpu
     });
   }
   return inputs.toSorted((a, b) => a.at.getTime() - b.at.getTime())[0] ?? null;
+}
+
+function dashboardUsage(
+  runner: StoredRunner,
+  now: Date,
+): Pick<DashboardRunner, "usage" | "limits"> {
+  const reading = runner.providerUsage?.reading;
+  if (reading?.kind !== "read") return { usage: null, limits: [] };
+  const providers = currentWindows(reading.providers, now);
+  const highest = highestUsage(providers);
+  return {
+    usage:
+      highest === null
+        ? null
+        : {
+            provider: highest.provider,
+            window: highest.window.kind,
+            usedPercent: highest.window.usedPercent,
+          },
+    limits: runner.online
+      ? reachedUsageLimits(providers).map(({ provider, window }) => ({
+          provider,
+          window: window.kind,
+          resetsInMs:
+            window.resetsAt === null
+              ? null
+              : Math.max(0, window.resetsAt.getTime() - now.getTime()),
+        }))
+      : [],
+  };
 }
