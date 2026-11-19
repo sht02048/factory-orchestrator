@@ -74,8 +74,10 @@ import { navigationMenu } from "./navigation-menu.js";
 import { mainWindowOptions, settingsWindowOptions, titleBarCookie } from "./window-options.js";
 
 async function loadServerScreen(window: BrowserWindow, url: string): Promise<void> {
-  await window.webContents.session.cookies.set(titleBarCookie(url)).catch(() => undefined);
-  await window.loadURL(url);
+  await Promise.resolve()
+    .then(() => window.webContents.session.cookies.set(titleBarCookie(url)))
+    .catch(() => undefined);
+  await window.loadURL(url).catch(() => undefined);
 }
 
 const t = createTranslator({ locale: "ko", messages: { system }, namespace: "system" });

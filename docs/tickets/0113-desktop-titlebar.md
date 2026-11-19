@@ -28,6 +28,8 @@ blocked_by: []
 
 그래서 제목 표시줄을 숨긴 창만 서버 화면을 열기 전에 그 서버 주소에 쿠키(`ganger-title-bar=hidden`)를 심고, 서버가 첫 화면부터 쿠키를 읽어 그린다(시간대 쿠키와 같은 방식). 0102의 다리 판단은 단축키 표시에 그대로 쓴다.
 
+새 데스크톱 앱이 이 기능이 없는 예전 서버(버전이 다른 원격 서버)를 열면 쿠키를 읽지 않아 끌기 영역이 없다. 그래서 preload가 서버 화면에 끌기 영역(`data-app-region="drag"`)이 없으면 레일 위 신호등 자리(84×56)에 끌기 손잡이를 둔다. 예전 서버의 그 자리에는 장식인 제품 기호만 있다.
+
 ## 범위
 
 - `packages/ui`: `PageHeader`를 한 줄 머리로 바꾸고 선택 속성 `lead`(제목 앞 링크)를 더한다. 머리 줄을 본문 위에 두는 `ScreenLayout`, 창 문맥 `WindowChrome`·`useTitleBarHidden`, 레일 없는 화면을 감싸 맨 위 끌기 줄 아래에서만 내용을 스크롤하는 `WindowDragFrame`, 창 틀 값(`@ganger/ui/window-frame`)을 더한다. `AppFrame`은 제목 표시줄을 숨긴 창에서 레일 위 56px을 비운다. `Sheet`·`Dialog`는 끌기에서 뺀다. 토큰 `size.titleBar`, `size.pageHeadingMinWidth`.

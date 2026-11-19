@@ -6,6 +6,7 @@ import {
   navPathKeepingWorkspace,
 } from "@ganger/app/shell/nav-shortcuts";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
+import { addDragHandleIfMissing } from "./drag-handle.js";
 import { notificationSettingsViewSchema } from "../core/notification-prefs.js";
 import { DESKTOP_UPDATES_GLOBAL } from "@ganger/app/updates/view";
 import type { DesktopApi, NotificationSettingsApi, ViewState } from "../shared/view.js";
@@ -73,6 +74,9 @@ if (window.location.protocol === "file:") {
 }
 
 if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+  window.addEventListener("DOMContentLoaded", () =>
+    addDragHandleIfMissing<HTMLDivElement>(document),
+  );
   const listeners = new Set<(screen: NavScreen) => void>();
   ipcRenderer.on(NAVIGATE_CHANNEL, (_event: IpcRendererEvent, screen: unknown) => {
     if (!isNavScreen(screen)) return;
