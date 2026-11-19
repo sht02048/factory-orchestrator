@@ -42,9 +42,10 @@ const styles = stylex.create({
   },
   action: {
     display: "inline-flex",
-    flexShrink: 0,
+    flexShrink: 1,
     justifyContent: "flex-end",
     alignItems: "center",
-    inlineSize: { default: size.rowActionColumn, [breakpoints.rowSlotsFit]: "auto" },
+    minInlineSize: { default: size.rowActionColumn, [breakpoints.rowSlotsFit]: 0 },
+    maxInlineSize: "100%",
   },
 });
