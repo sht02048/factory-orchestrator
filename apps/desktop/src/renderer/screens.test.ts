@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -134,6 +134,28 @@ describe("데스크톱 화면 전환 포커스(브라우저, 0062)", () => {
     await refresh.click();
     await expect.poll(() => refresh.getAttribute("aria-disabled")).toBe("true");
     expect(await refresh.evaluate((button) => button === document.activeElement)).toBe(true);
+  });
+});
+
+describe("서버 바꾸기 화면(브라우저, 0083)", () => {
+  it("앱 업데이트 뒤 ②를 바꾸는 동안 반장과 버전, 런이 이어진다는 안내를 status 로 보인다", async () => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await openScreen({ screen: "local-updating", from: "0.1.0", to: "0.2.0" });
+    await expect.poll(focusedHeading).toBe(screens.updating.title);
+    const status = page.getByRole("status");
+    expect(await status.innerText()).toContain("0.1.0 → 0.2.0");
+    expect(await status.innerText()).toContain(screens.updating.runs);
+    expect(await page.locator('[data-mascot="signal"]').count()).toBe(1);
+    const shots = process.env["UPDATE_SCREENSHOTS"];
+    if (shots !== undefined) {
+      mkdirSync(shots, { recursive: true });
+      await page.screenshot({ path: join(shots, "updating-1280.png") });
+    }
+  });
+
+  it("버전을 모르면 버전 없이 안내한다", async () => {
+    await openScreen({ screen: "local-updating", from: null, to: null });
+    expect(await page.getByRole("status").innerText()).toContain(screens.updating.summary);
   });
 });
 

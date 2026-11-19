@@ -164,6 +164,27 @@ describe("패키징한 앱, 로컬 모드", () => {
     expect(await webResponds(url())).toBe(true);
   });
 
+  it("서버 화면에 업데이트 다리가 열려 앱·서버 버전과 확인 상태를 받는다(0083)", async () => {
+    const app = await launch(userData());
+    const page = await app.firstWindow();
+    await page.waitForURL(new RegExp(`^${url()}`), { timeout: 30_000 });
+    const view = await page.evaluate(async () => {
+      const bridge: unknown = Reflect.get(globalThis, "gangerDesktopUpdates");
+      if (typeof bridge !== "object" || bridge === null) return null;
+      const getUpdate: unknown = Reflect.get(bridge, "getUpdate");
+      if (typeof getUpdate !== "function") return null;
+      const value: unknown = await Reflect.apply(getUpdate, bridge, []);
+      return value;
+    });
+    expect(view).toMatchObject({
+      server: { kind: "app" },
+      check: { kind: "unavailable" },
+      autoUpdate: true,
+      toast: null,
+    });
+    await app.close();
+  });
+
   it("트레이에서 ②를 멈추면 web 이 응답을 멈추고, 다시 켜면 다시 응답한다", async () => {
     const app = await launch(userData());
     const page = await app.firstWindow();

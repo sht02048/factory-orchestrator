@@ -205,7 +205,14 @@ export {
   type TextVariant,
 } from "./components/text";
 export { RowActionSlot, TimeSlot, type TimeSlotProps } from "./components/time-slot";
-export { Toaster, showToast, type ToasterProps } from "./components/toast";
+export {
+  PinnedToast,
+  Toaster,
+  showToast,
+  type PinnedToastProps,
+  type PinnedToastTone,
+  type ToasterProps,
+} from "./components/toast";
 export { Tooltip, type TooltipAction, type TooltipProps } from "./components/tooltip";
 export { UsageBar, usageText, type UsageBarProps, type UsageTone } from "./components/usage-bar";
 export { UsageMeter, type UsageMeterProps } from "./components/usage-meter";

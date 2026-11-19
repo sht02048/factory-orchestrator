@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { z } from "zod";
 import { notificationPrefsSchema } from "./notification-prefs.js";
+import { updateSettingsSchema } from "./updater.js";
 
 export const appSettingsSchema = z.object({
   mode: z.enum(["local", "remote"]).optional(),
@@ -13,6 +14,7 @@ export const appSettingsSchema = z.object({
     .record(z.string(), z.number().int().nonnegative())
     .optional()
     .catch(undefined),
+  updates: updateSettingsSchema.optional().catch(undefined),
 });
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 

@@ -21,6 +21,7 @@ import {
   PanelFooter,
   PanelHeader,
   PILL_STATUSES,
+  PinnedToast,
   Row,
   RowActionSlot,
   RowReason,
@@ -538,6 +539,22 @@ export function ComponentSections() {
         <Section title={t("nav.toast")} note={t("toast.note")}>
           <Demo>
             <Button onClick={() => showToast(t("toast.message"))}>{t("toast.trigger")}</Button>
+          </Demo>
+          <Text variant="meta">{t("toast.pinnedNote")}</Text>
+          <Demo>
+            <PinnedToast
+              tone="accent"
+              title={t("toast.pinnedTitle")}
+              announcement={t("toast.pinnedTitle")}
+              actions={
+                <>
+                  <Button variant="primary">{t("toast.pinnedPrimary")}</Button>
+                  <Button>{t("toast.pinnedSecondary")}</Button>
+                </>
+              }
+            >
+              {t("toast.pinnedBody")}
+            </PinnedToast>
           </Demo>
         </Section>
       </div>

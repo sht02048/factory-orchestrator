@@ -8,7 +8,13 @@ import { LocalServer, fileRecordStore } from "../core/local-server.js";
 import { SERVER_BUNDLE_ENV, loadServerBundle } from "../core/server-bundle.js";
 import { serviceInstalledFor } from "../core/service.js";
 import { fileSettingsStore } from "../core/settings.js";
+import type { SettingsStore } from "../core/settings.js";
+import { releasesApiUrl } from "@ganger/app/updates/releases";
+import { UPDATE_CONFIG_FILE, fetchReleases, updateRepository } from "../core/update-config.js";
+import { Updater } from "../core/updater.js";
+import type { UpdateStore } from "../core/updater.js";
 import { Controller, appPaths } from "./controller.js";
+import { installBlock, squirrelInstaller } from "./update-installer.js";
 
 const USER_DATA_ENV = "GANGER_DESKTOP_USER_DATA";
 
@@ -50,8 +56,28 @@ if (!app.requestSingleInstanceLock()) {
       logFile,
       serviceInstalled: () => serviceInstalledFor(home, homedir()),
     });
+    const settings = fileSettingsStore(join(data, "settings.json"));
+    const updater = new Updater({
+      currentVersion: app.getVersion(),
+      arch: process.arch,
+      repository: updateRepository(
+        app.isPackaged ? join(process.resourcesPath, UPDATE_CONFIG_FILE) : null,
+        process.env,
+      ),
+      fetchReleases: (repository) => fetchReleases(releasesApiUrl(repository)),
+      installer: squirrelInstaller({
+        downloaded: () => updater.downloaded(),
+        failed: () => updater.failed(),
+        beforeInstall: () => controller?.prepareForInstall(),
+      }),
+      blocked: installBlock,
+      store: updateStore(settings),
+      now: () => new Date(),
+      onChange: () => controller?.sendUpdate(),
+    });
     controller = new Controller({
-      settings: fileSettingsStore(join(data, "settings.json")),
+      settings,
+      updater,
       local,
       serverVersion: bundle.version,
       logFile,
@@ -78,4 +104,11 @@ function serverBundleRoot(): string {
       )
     : undefined;
   return any === undefined ? named : join(repo, "dist", any);
+}
+
+function updateStore(settings: SettingsStore): UpdateStore {
+  return {
+    read: () => settings.read().updates ?? {},
+    write: (updates) => settings.write({ ...settings.read(), updates }),
+  };
 }

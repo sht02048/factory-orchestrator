@@ -7,11 +7,15 @@ import {
 } from "@ganger/app/shell/nav-shortcuts";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 import { notificationSettingsViewSchema } from "../core/notification-prefs.js";
+import { DESKTOP_UPDATES_GLOBAL } from "@ganger/app/updates/view";
 import type { DesktopApi, NotificationSettingsApi, ViewState } from "../shared/view.js";
 import {
   IPC_PREFIX,
   NAVIGATE_CHANNEL,
   NOTIFICATION_SETTINGS_CHANNEL,
+  UPDATE_ACT,
+  UPDATE_CHANNEL,
+  UPDATE_GET,
   VIEW_CHANNEL,
 } from "../shared/view.js";
 
@@ -77,6 +81,18 @@ if (window.location.protocol === "http:" || window.location.protocol === "https:
       return;
     }
     for (const listener of listeners) listener(screen);
+  });
+  contextBridge.exposeInMainWorld(DESKTOP_UPDATES_GLOBAL, {
+    getUpdate: (): Promise<unknown> => ipcRenderer.invoke(UPDATE_GET),
+    onUpdate: (listener: (view: unknown) => void) => {
+      const handler = (_event: IpcRendererEvent, view: unknown) => listener(view);
+      ipcRenderer.on(UPDATE_CHANNEL, handler);
+      return () => {
+        ipcRenderer.off(UPDATE_CHANNEL, handler);
+      };
+    },
+    act: (action: string): Promise<void> =>
+      ipcRenderer.invoke(UPDATE_ACT, action).then(() => undefined),
   });
   contextBridge.exposeInMainWorld(DESKTOP_NAVIGATION_GLOBAL, {
     onNavigate: (listener: (screen: NavScreen) => void) => {

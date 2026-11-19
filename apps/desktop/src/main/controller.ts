@@ -32,7 +32,7 @@ import { DEFAULT_SERVER_PORT, discoverServers } from "../core/discovery.js";
 import { opensOutsideApp } from "../core/external-url.js";
 import type { DiscoveryResult, FoundServer } from "../core/discovery.js";
 import { probeIdentity } from "../core/identity.js";
-import type { EnsureResult, LocalServer } from "../core/local-server.js";
+import type { EnsureHooks, EnsureResult, LocalServer } from "../core/local-server.js";
 import { openLog } from "../core/open-log.js";
 import { connectAddress, reopenSaved, savedFromFound } from "../core/remote.js";
 import type { SavedServer } from "../core/remote.js";
@@ -48,6 +48,10 @@ import {
 } from "../core/runner-offer.js";
 import { SHARING_SETTINGS_URL } from "@ganger/app/runner-setup/model";
 import { ServerWatch } from "../core/watch.js";
+import { FIRST_CHECK_DELAY_MS } from "../core/updater.js";
+import type { ServerVersion, Updater } from "../core/updater.js";
+import { isUpdateAction } from "@ganger/app/updates/view";
+import type { UpdateAction, UpdateView } from "@ganger/app/updates/view";
 import type { WatchState } from "../core/watch.js";
 import type {
   FindResult,
@@ -60,6 +64,9 @@ import {
   NAVIGATE_CHANNEL,
   NOTIFICATION_SETTINGS_CHANNEL,
   NOTIFICATION_SETTINGS_WINDOW,
+  UPDATE_ACT,
+  UPDATE_CHANNEL,
+  UPDATE_GET,
   VIEW_CHANNEL,
 } from "../shared/view.js";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
@@ -69,6 +76,7 @@ const t = createTranslator({ locale: "ko", messages: { system }, namespace: "sys
 
 const REMINDER_TICK_MS = 30_000;
 const REMOTE_RETRY_MS = 5_000;
+const UPDATE_TICK_MS = 10 * 60_000;
 const SYSTEM_NOTIFICATION_SETTINGS =
   "x-apple.systempreferences:com.apple.Notifications-Settings.extension";
 
@@ -81,6 +89,7 @@ export interface ControllerOptions {
   preloadFile: string;
   trayIcon: string;
   openedAtLogin: boolean;
+  updater: Updater;
 }
 
 type Mode = "choosing" | "local" | "remote";
@@ -105,6 +114,8 @@ export class Controller {
   private found: FoundServer[] = [];
   private remote: { server: SavedServer; reachable: boolean } | undefined;
   private notifiedVersion = false;
+  private serverVersion: string | null = null;
+  private updateTimer: NodeJS.Timeout | undefined;
   quitting = false;
 
   constructor(options: ControllerOptions) {
@@ -132,6 +143,10 @@ export class Controller {
       this.feed?.feed.reconnect();
     });
     this.offerTimer = setInterval(() => void this.pollOffer(), OFFER_POLL_MS);
+    this.updateTimer = setTimeout(() => {
+      void this.options.updater.tick();
+      this.updateTimer = setInterval(() => void this.options.updater.tick(), UPDATE_TICK_MS);
+    }, FIRST_CHECK_DELAY_MS);
     const settings = this.options.settings.read();
     if (!this.options.openedAtLogin || settings.mode === undefined) this.showWindow();
     switch (settings.mode) {
@@ -164,13 +179,64 @@ export class Controller {
 
   quit(): void {
     this.quitting = true;
+    this.stopBackground();
+    app.quit();
+  }
+
+  prepareForInstall(): void {
+    this.quitting = true;
+    this.stopBackground();
+  }
+
+  private stopBackground(): void {
     this.watch.stop();
     if (this.reminderTimer !== undefined) clearInterval(this.reminderTimer);
     this.feed?.feed.stop();
     if (this.offerTimer !== undefined) clearInterval(this.offerTimer);
+    if (this.updateTimer !== undefined) clearInterval(this.updateTimer);
     this.enrollment.stop();
     this.stopRemoteRetry();
-    app.quit();
+  }
+
+  sendUpdate(): void {
+    const window = this.window;
+    if (window === undefined || window.isDestroyed() || this.serverUrl === undefined) return;
+    window.webContents.send(UPDATE_CHANNEL, this.updateView());
+  }
+
+  private updateView(): UpdateView {
+    return this.options.updater.view(this.serverVersionView());
+  }
+
+  private serverVersionView(): ServerVersion {
+    if (this.mode === "remote") return { kind: "remote", version: this.serverVersion };
+    const state = this.watch.state;
+    const external = "owner" in state && state.owner === "external";
+    return { kind: external ? "external" : "app", version: this.serverVersion };
+  }
+
+  private runUpdateAction(action: UpdateAction): void {
+    const updater = this.options.updater;
+    switch (action) {
+      case "restart":
+        updater.restart();
+        break;
+      case "later":
+        updater.later();
+        break;
+      case "dismiss-updated":
+        updater.dismissUpdated();
+        break;
+      case "check-now":
+        void updater.checkNow();
+        break;
+      case "auto-on":
+        updater.setAutoUpdate(true);
+        break;
+      case "auto-off":
+        updater.setAutoUpdate(false);
+        break;
+    }
   }
 
   private async startLocal(): Promise<void> {
@@ -179,10 +245,16 @@ export class Controller {
     this.watch.setWanted(true);
     this.setView({ screen: "local-starting" });
     this.refreshMenus();
-    const result = await this.options.local.ensureRunning();
+    const result = await this.options.local.ensureRunning(this.swapHooks());
     this.watch.adopt(result);
     this.watch.start();
     this.afterEnsure(result);
+  }
+
+  private swapHooks(): EnsureHooks {
+    return {
+      onReplacing: ({ from, to }) => this.setView({ screen: "local-updating", from, to }),
+    };
   }
 
   private afterEnsure(result: EnsureResult): void {
@@ -203,7 +275,7 @@ export class Controller {
   private async restartLocal(): Promise<void> {
     this.watch.setWanted(true);
     this.setView({ screen: "local-starting" });
-    const result = await this.options.local.ensureRunning();
+    const result = await this.options.local.ensureRunning(this.swapHooks());
     this.watch.adopt(result);
     this.afterEnsure(result);
   }
@@ -212,13 +284,16 @@ export class Controller {
     if (this.mode !== "local") return;
     switch (state.kind) {
       case "running":
+        this.serverVersion = state.status.identity.version;
         if (this.serverUrl !== state.status.url) this.openServer(state.status.url);
+        else this.sendUpdate();
         break;
       case "starting":
         break;
       case "stopped":
         if (state.owner === "external") this.setView({ screen: "local-service" });
-        else if (this.view.screen !== "local-starting") this.setView({ screen: "local-stopped" });
+        else if (this.view.screen !== "local-starting" && this.view.screen !== "local-updating")
+          this.setView({ screen: "local-stopped" });
         break;
       case "failed":
         this.setView({ screen: "local-failed", logFile: this.options.logFile });
@@ -284,7 +359,16 @@ export class Controller {
     this.mode = "remote";
     this.remote = { server, reachable: true };
     this.watch.stop();
+    this.serverVersion = null;
     this.openServer(server.url);
+    void this.readRemoteVersion(server);
+  }
+
+  private async readRemoteVersion(server: SavedServer): Promise<void> {
+    const probed = await probeIdentity(server.url, 3_000);
+    if (probed.kind !== "ours" || this.remote?.server.instanceId !== server.instanceId) return;
+    this.serverVersion = probed.identity.version;
+    this.sendUpdate();
   }
 
   private async openRemote(saved: SavedServer): Promise<void> {
@@ -467,6 +551,22 @@ export class Controller {
     handle("enrollment-cancel", () => this.enrollment.cancel());
     handle("enrollment-close", () => this.enrollment.close());
     handle("open-sharing", () => shell.openExternal(SHARING_SETTINGS_URL));
+    ipcMain.handle(UPDATE_GET, (event) => (this.fromServerPage(event) ? this.updateView() : null));
+    ipcMain.handle(UPDATE_ACT, (event, action: unknown) => {
+      if (this.fromServerPage(event) && isUpdateAction(action)) this.runUpdateAction(action);
+    });
+  }
+
+  private fromServerPage(event: IpcMainInvokeEvent): boolean {
+    const window = this.window;
+    const serverUrl = this.serverUrl;
+    if (window === undefined || window.isDestroyed() || serverUrl === undefined) return false;
+    if (event.sender !== window.webContents || event.senderFrame === null) return false;
+    try {
+      return new URL(event.senderFrame.url).origin === new URL(serverUrl).origin;
+    } catch {
+      return false;
+    }
   }
 
   private pollOffer(): Promise<void> {

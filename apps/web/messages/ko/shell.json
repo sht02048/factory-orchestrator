@@ -16,5 +16,23 @@
     "runners": "Runners",
     "stats": "Stats",
     "settings": "Settings"
+  },
+  "update": {
+    "ready": {
+      "title": "새 버전 {version}{object} 받았어요",
+      "bodyWithServer": "다시 시작하면 앱과 서버가 함께 바뀌어 화면이 몇 초 끊겨요. 돌던 런은 러너에서 이어져요.",
+      "bodyAppOnly": "다시 시작하면 앱이 바뀌어요. 서버는 서버를 띄운 기계에서 따로 바꿔요.",
+      "restart": "다시 시작",
+      "later": "나중에",
+      "notes": "바뀐 내용"
+    },
+    "updated": {
+      "title": "{version}{direction} 바꿨어요",
+      "bodyWithServer": "서버도 같은 버전으로 바꿨어요. 돌던 런은 다시 지켜보고 있어요.",
+      "bodyAppOnly": "앱을 새 버전으로 바꿨어요.",
+      "bodyServerDiffers": "서버는 아직 {server} 버전이에요. 서버를 띄운 기계에서 따로 바꿔요.",
+      "notes": "바뀐 내용 보기",
+      "close": "닫기"
+    }
   }
 }
