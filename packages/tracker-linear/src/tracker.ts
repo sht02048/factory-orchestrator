@@ -24,7 +24,7 @@ import type {
   TrackerTicket,
 } from "@ganger/core";
 import { z } from "zod";
-import { LinearClient, LinearTrackerError, connectionSchema } from "./client.js";
+import { LinearApiError, LinearClient, LinearTrackerError, connectionSchema } from "./client.js";
 import type { Fetch } from "./client.js";
 import { verifyLinearWebhook } from "./webhook.js";
 import type { WebhookResult } from "./webhook.js";
@@ -377,7 +377,9 @@ export class LinearTracker implements Tracker {
       }),
     );
     const label = data.issueLabelCreate.issueLabel;
-    if (!data.issueLabelCreate.success || label === null) throw notFound();
+    if (!data.issueLabelCreate.success || label === null) {
+      throw new LinearApiError("Linear가 라벨을 만들지 않았다", { code: null, status: 200 });
+    }
     return toLabel(label);
   }
 

@@ -1,4 +1,11 @@
-import { toAgentId, toLabelId, toRunId, toRunnerId, toRunnerProjectId } from "@ganger/core";
+import {
+  toAgentId,
+  toLabelId,
+  toRunId,
+  toRunnerId,
+  toRunnerProjectId,
+  toTicketKey,
+} from "@ganger/core";
 import { getRun, recordRunnerCheck, replaceMapping } from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import { TICKET_TITLE_MAX_LENGTH } from "@ganger/db";
@@ -176,6 +183,19 @@ describe("여러 저장소 수동 할당(0115)", () => {
       ],
     });
     expect(defaults("ACME-1")?.runnerProject).toBe(webRepo);
+    expect(defaults("ACME-2")?.runnerProject).toBe(webRepo);
+  });
+
+  it("지난 런이 Failed·취소가 아니면 지난 저장소가 아니라 라벨 규칙으로 고른다", async () => {
+    const { context, tracker } = withApiRepo();
+    const ticket = await tracker.getTicket(toTicketKey("ACME-1"));
+    if (ticket === null) throw new Error("no ACME-1");
+    tracker.addTicket({ ...ticket, labels: [{ id: bug, name: "bug" }] });
+    const page = await loadTicketsPage(context, undefined, now);
+    const found = page.tickets.find((t) => t.key === "ACME-1");
+    expect(
+      found?.assignability.kind === "ready" ? found.assignability.defaults.runnerProject : null,
+    ).toBe(apiRepo);
   });
 
   it("고른 저장소로 런을 만든다", () => {

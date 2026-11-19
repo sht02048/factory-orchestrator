@@ -8,6 +8,7 @@ import {
 } from "@ganger/core";
 import type {
   AdapterRegistry,
+  SummaryOutcome,
   LabelId,
   RunnerId,
   Tracker,
@@ -287,6 +288,17 @@ function assignabilityOf(
   return { kind: "ready", defaults };
 }
 
+function retriesLastRepo(outcome: SummaryOutcome): boolean {
+  switch (outcome) {
+    case "failed":
+    case "canceled":
+      return true;
+    case "merged":
+    case "human-check":
+      return false;
+  }
+}
+
 interface RepoNames {
   labelNames: ReadonlyMap<string, string>;
   repoNames: ReadonlyMap<string, string>;
@@ -306,7 +318,13 @@ function assignDefaultsOf(
       mapping.repos,
       ticket.labels.map((label) => label.id),
     ) ?? mapping.defaultRepo;
-  const lastRepo = runs.at(-1)?.runnerProject;
+  const last = runs.at(-1);
+  const lastRepo =
+    last !== undefined &&
+    last.state === "ended" &&
+    retriesLastRepo(summarizeRunOutcome(last).outcome)
+      ? last.runnerProject
+      : undefined;
   const previous = mapping.repos.some((repo) => repo.project === lastRepo) ? lastRepo : undefined;
   return {
     runnerProject: previous ?? routed,
