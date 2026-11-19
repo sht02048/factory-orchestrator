@@ -108,15 +108,17 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
         <p {...stylex.props(styles.stateLine)}>
           <StatusPill status={status}>{statusName(status)}</StatusPill>
           <Text variant="meta">{when}</Text>
-          <Text
-            variant="meta"
-            ref={cancelStatusRef}
-            role="status"
-            tabIndex={-1}
-            {...(failure === null ? {} : { tone: "problem" as const })}
-          >
-            {[...pending, ...(failure === null ? [] : [failure])].join(t("metaSeparator"))}
-          </Text>
+          <span {...stylex.props(failure !== null && styles.statusOwnLine)}>
+            <Text
+              variant="meta"
+              ref={cancelStatusRef}
+              role="status"
+              tabIndex={-1}
+              {...(failure === null ? {} : { tone: "problem" as const })}
+            >
+              {[...pending, ...(failure === null ? [] : [failure])].join(t("metaSeparator"))}
+            </Text>
+          </span>
         </p>
         <div {...stylex.props(styles.titleRow)}>
           <Text variant="page" as="h1">
@@ -947,7 +949,15 @@ const styles = stylex.create({
     justifyContent: "space-between",
     gap: space.s4,
   },
-  stateLine: { display: "flex", alignItems: "center", gap: space.s3, margin: 0 },
+  stateLine: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: space.s3,
+    rowGap: space.s1,
+    margin: 0,
+  },
+  statusOwnLine: { flexBasis: "100%" },
   columns: {
     display: "grid",
     gridTemplateColumns: {

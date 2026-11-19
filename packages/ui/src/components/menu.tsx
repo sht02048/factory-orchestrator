@@ -35,6 +35,7 @@ export function Menu({ trigger, label, variant = "default", children }: MenuProp
             rail && styles.railTrigger,
             icon && styles.iconTrigger,
             s.open && styles.triggerOpen,
+            icon && s.open && styles.iconTriggerOpen,
           )
         }
       >
@@ -166,6 +167,10 @@ const styles = stylex.create({
     textAlign: "center",
   },
   iconTrigger: {
+    backgroundColor: {
+      default: "transparent",
+      ":hover": { default: null, "@media (hover: hover)": colors.bgRaisedHover },
+    },
     justifyContent: "center",
     width: size.control,
     height: size.control,
@@ -178,6 +183,7 @@ const styles = stylex.create({
     transitionProperty: "background-color, color",
   },
   triggerOpen: { backgroundColor: colors.bgHover },
+  iconTriggerOpen: { backgroundColor: colors.bgRaisedHover },
   triggerText: {
     display: "flex",
     gap: space.px6,
