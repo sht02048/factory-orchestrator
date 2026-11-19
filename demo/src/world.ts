@@ -7,7 +7,7 @@ import {
 } from "@ganger/core";
 import type { RepoRef, RunnerProjectId } from "@ganger/core";
 import { FakeCodeHost, FakeRunner, FakeTracker } from "@ganger/core/testing";
-import { RUNNER_PROJECTS, trackerCatalog, trackerSpecFor } from "./fixtures.js";
+import { RUNNER_PROJECTS, providerUsageFor, trackerCatalog, trackerSpecFor } from "./fixtures.js";
 import { FAIL_AUTH, FAIL_NO_ORCA, FAIL_OFFLINE, FAIL_PUSH_AUTH } from "./values.js";
 
 export const TRACKER_KIND = toTrackerKind("linear");
@@ -54,6 +54,7 @@ export class DemoWorld {
     const target = sshTarget.toLowerCase();
     runner.setProjects(RUNNER_PROJECTS);
     runner.online = !target.includes(FAIL_OFFLINE);
+    runner.providerUsage = providerUsageFor(sshTarget, this.now());
     runner.prerequisites = [
       {
         id: "orca-service",

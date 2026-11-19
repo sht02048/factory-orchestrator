@@ -9,6 +9,8 @@ import {
   toTrackerStateId,
 } from "@ganger/core";
 import type {
+  ProviderUsage,
+  ProviderUsageReading,
   RunnerProject,
   TrackerLabel,
   TrackerProject,
@@ -215,3 +217,71 @@ export const seededRunners = [
     capacity: 2,
   },
 ] as const;
+
+const USAGE_MINUTE = 60_000;
+
+export function providerUsageFor(sshTarget: string, now: Date): ProviderUsageReading {
+  const inMinutes = (minutes: number) => new Date(now.getTime() + minutes * USAGE_MINUTE);
+  const target = sshTarget.toLowerCase();
+  const unused: ProviderUsage[] = [
+    { provider: "gemini", status: "unavailable", windows: [] },
+    { provider: "antigravity", status: "unavailable", windows: [] },
+  ];
+  if (target.includes(FAIL_PUSH_AUTH)) {
+    return {
+      kind: "read",
+      providers: [
+        {
+          provider: "claude",
+          status: "ok",
+          windows: [
+            { kind: "session", usedPercent: 100, resetsAt: inMinutes(72) },
+            { kind: "weekly", usedPercent: 93, resetsAt: inMinutes(3 * 24 * 60) },
+          ],
+        },
+        { provider: "codex", status: "signed-out", windows: [] },
+        ...unused,
+      ],
+    };
+  }
+  if (target.includes(FAIL_OFFLINE)) {
+    return {
+      kind: "read",
+      providers: [
+        {
+          provider: "claude",
+          status: "ok",
+          windows: [
+            { kind: "session", usedPercent: 54, resetsAt: inMinutes(110) },
+            { kind: "weekly", usedPercent: 41, resetsAt: inMinutes(4 * 24 * 60) },
+          ],
+        },
+      ],
+    };
+  }
+  return {
+    kind: "read",
+    providers: [
+      {
+        provider: "claude",
+        status: "ok",
+        windows: [
+          { kind: "session", usedPercent: 38, resetsAt: inMinutes(160) },
+          { kind: "weekly", usedPercent: 72, resetsAt: inMinutes(2 * 24 * 60 + 300) },
+          { kind: "fableWeekly", usedPercent: 31, resetsAt: inMinutes(2 * 24 * 60 + 300) },
+        ],
+      },
+      {
+        provider: "codex",
+        status: "ok",
+        windows: [
+          { kind: "session", usedPercent: 6, resetsAt: inMinutes(200) },
+          { kind: "weekly", usedPercent: 18, resetsAt: inMinutes(5 * 24 * 60) },
+        ],
+      },
+      { provider: "kimi", status: "signed-out", windows: [] },
+      { provider: "cursor", status: "signed-out", windows: [] },
+      ...unused,
+    ],
+  };
+}
