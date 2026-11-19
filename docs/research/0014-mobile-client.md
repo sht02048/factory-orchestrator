@@ -1,6 +1,6 @@
 # 모바일 클라이언트 탐색 (기술 제약·사용자 흐름)
 
-조사일 2026-11-19. 운영자가 모바일 앱을 계획하려 한다. 운영자 결정(같은 날): Ganger 웹 화면을 그대로 가져가지 않고, 모바일 UI는 모바일에 맞게 따로 설계한다. 낱말은 GLOSSARY를 그대로 쓴다. 이 문서는 기술 선택지와 제약, 모바일에서 할 일과 흐름을 사실로 정리한다. 제품 코드는 바꾸지 않았다. 결정은 운영자 몫이라 ADR은 쓰지 않고 권장안과 남은 결정만 적는다. 서버 발견·페어링은 research [0013](0013-remote-client-pairing.md)을 잇는다.
+조사일 2026-11-19. 운영자가 모바일 앱을 계획하려 한다. 운영자 결정(같은 날): Ganger 웹 화면을 그대로 가져가지 않고, 모바일 UI는 모바일에 맞게 따로 설계한다. 낱말은 GLOSSARY를 그대로 쓴다. 이 문서는 기술 선택지와 제약, 모바일에서 할 일과 흐름을 사실로 정리한다. 제품 코드는 바꾸지 않았다. 결정은 운영자 몫이라 ADR은 쓰지 않고 권장안과 남은 결정만 적는다. 서버 발견·페어링은 research [0013](0013-remote-client-pairing.md)을 잇는다. 1·4·6절의 서버 현황(공개 경로, `/api/attention` 폴링, GLOSSARY의 Runner Issue)은 티켓 0103 머지 전 기준이다. 아래 「남은 결정」은 운영자가 2026-11-19에 정했거나 미뤘고, 그 결과는 스펙 [0002](../spec/0002-mobile.md)와 ADR [0015](../adr/0015-device-token-pairing.md)·[0016](../adr/0016-mobile-push-via-expo.md)에 있다.
 
 출처 표시는 research 0004·0009·0012·0013을 따른다.
 
@@ -48,14 +48,14 @@
 
 APNs 키(.p8)는 앱 게시자의 Apple 팀에 묶인다. 셀프호스팅 서버마다 키를 줄 수 없으니 선택지는 넷이다.
 
-1. **프로젝트가 운영하는 중앙 릴레이.** Home Assistant가 이 방식이다(공식 릴레이, 하루 150건 제한, 옵트아웃과 Android 로컬 푸시) **[문서]**([HA 알림](https://developers.home-assistant.io/docs/api/native-app-integration/notifications)). 운영 부담이 있고, ADR 0005(셀프호스팅·회사 인프라 의존 없음)와 부딪히는지 따져야 한다. 릴레이를 둔다면 페이로드에 티켓 제목을 넣지 않고 "확인할 일 있음" 신호만 보내, 앱이 tailnet으로 내용을 가져온다.
+1. **프로젝트가 운영하는 중앙 릴레이.** Home Assistant가 이 방식이다(공식 릴레이, 기기 하나당 하루 500건 제한, 옵트아웃과 Android 로컬 푸시) **[문서]**([HA 알림](https://contributors.home-assistant.io/companion/mobile-app-api/notifications/)). 운영 부담이 있고, ADR 0005(필수 의존성은 Orca, GitHub, Linear뿐)와 부딪히는지 따져야 한다. 릴레이를 둔다면 페이로드에 티켓 제목을 넣지 않고 "확인할 일 있음" 신호만 보내, 앱이 tailnet으로 내용을 가져온다.
 2. **각자 빌드·서명.** 사용자 부담이 너무 크다.
 3. **ntfy·Pushover 연동.** 서버가 `/api/attention`과 같은 사건을 ntfy 토픽으로 보내는 설정이다. 앱 없이 바로 쓸 수 있고 가장 싸다 **[추정]**.
 4. **PWA 웹 푸시.** 브라우저 공급자의 푸시 서비스만 거친다. (a)를 고를 때만 의미가 있다.
 
 ## 5. 배포
 
-- Apple Developer 계정(연 99달러)이 필요하다. 셀프호스팅 클라이언트는 심사(가이드라인 2.1)에서 데모 서버나 데모 모드를 요구받는 일이 흔하다 **[추정]**. `demo/`의 가짜 어댑터를 앱 안 데모 모드나 공개 데모 서버로 다시 쓸 수 있다.
+- Apple Developer 계정(연 99달러)이 필요하다. 셀프호스팅 클라이언트는 심사(가이드라인 2.1)에서 데모 서버나 데모 모드를 요구받는 일이 흔하다 **[추정]**. 제품 앱은 `demo/`를 import 하지 않으므로(티켓 0047), 앱 안 데모 모드의 데이터는 따로 둬야 한다(스펙 0002 열린 질문 16). 공개 데모 서버는 `demo/`를 쓸 수 있다.
 - TestFlight 외부 테스트도 베타 심사를 거친다 **[추정]**.
 - CI 서명은 `.github/workflows/release.yml`이 쓰는 App Store Connect API 키를 다시 쓸 수 있다. iOS 배포 인증서와 프로비저닝 프로파일은 따로 더한다(fastlane match나 EAS credentials) **[코드][추정]**.
 
@@ -63,15 +63,15 @@ APNs 키(.p8)는 앱 게시자의 Apple 팀에 묶인다. 셀프호스팅 서버
 
 ### 할 일 (빈도·긴급도 순)
 
-| #   | 할 일                                             | 쓰기      | 지금 서버 함수                            |
-| --- | ------------------------------------------------- | --------- | ----------------------------------------- |
-| 1   | Question 알림을 받고 답하기                       | 예        | `answerQuestion`                          |
-| 2   | Permission 거절(허용은 러너 화면에서만, ADR 0009) | 예        | `denyPermission`                          |
-| 3   | Human Check PR 확인(GitHub Mobile로 넘김)         | 아니요    | `getHomePage`의 PR 링크                   |
-| 4   | Failed·Disconnected 보고 다시 맡기기              | 예        | `assignTicket`, `getRunDetail`            |
-| 5   | Runner Issue 확인                                 | 다시 확인 | `getRunnersPage`, `requestRunnerCheckNow` |
-| 6   | 오늘 진행 훑기                                    | 아니요    | `getHomePage`, `getStatsPage`             |
-| 7   | 티켓 할당, 런 취소                                | 예        | `assignTicket`, `cancelRun`               |
+| #   | 할 일                                                                        | 쓰기      | 지금 서버 함수                            |
+| --- | ---------------------------------------------------------------------------- | --------- | ----------------------------------------- |
+| 1   | Question 알림을 받고 답하기                                                  | 예        | `answerQuestion`                          |
+| 2   | Permission 거절(허용은 러너 화면에서만, ADR 0009)                            | 예        | `denyPermission`                          |
+| 3   | Human Check PR 확인(GitHub Mobile로 넘김)                                    | 아니요    | `getHomePage`의 PR 링크                   |
+| 4   | Failed 보고 다시 맡기기(Disconnected는 끝나지 않은 런이라 다시 맡길 수 없다) | 예        | `assignTicket`, `getRunDetail`            |
+| 5   | Runner Issue 확인                                                            | 다시 확인 | `getRunnersPage`, `requestRunnerCheckNow` |
+| 6   | 오늘 진행 훑기                                                               | 아니요    | `getHomePage`, `getStatsPage`             |
+| 7   | 티켓 할당, 런 취소                                                           | 예        | `assignTicket`, `cancelRun`               |
 
 넣지 않는 것: 온보딩, 러너 추가·ssh 대상 바꾸기, 비밀 값 저장(트래커 키, GitHub 토큰), MCP 쓰기 허용, Mapping 편집, Stats 세부 표. ssh와 비밀 값은 ADR 0013이 MCP에서 막은 이유와 같다.
 
