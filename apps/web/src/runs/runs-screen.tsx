@@ -22,7 +22,6 @@ import {
   TableRows,
   Tabs,
   Text,
-  TimeSlot,
   linkStyles,
   NoticeLayout,
   RemovableChip,
@@ -406,10 +405,8 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
       <TableCell>
         <StatusPill status={status}>{statusName(status)}</StatusPill>
       </TableCell>
-      <TableCell align="end">
-        <TimeSlot>
-          {run.state === "ended" ? ago(run.endedAt, run.endedAgoMs) : elapsed(elapsedMs(run))}
-        </TimeSlot>
+      <TableCell align="end" numeric>
+        {run.state === "ended" ? ago(run.endedAt, run.endedAgoMs) : elapsed(elapsedMs(run))}
       </TableCell>
     </TableRow>
   );

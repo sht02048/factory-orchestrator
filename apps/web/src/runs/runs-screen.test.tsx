@@ -62,6 +62,7 @@ function spanEnd(html: string, start: number): number {
   do {
     const open = html.indexOf("<span", at + 1);
     const close = html.indexOf("</span>", at + 1);
+    if (close === -1) throw new Error("unclosed span");
     if (open !== -1 && open < close) {
       depth += 1;
       at = open;

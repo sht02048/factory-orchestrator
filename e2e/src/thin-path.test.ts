@@ -305,6 +305,7 @@ function withoutFoldedOnly(html: string): string {
     do {
       const open = out.indexOf("<span", at + 1);
       const close = out.indexOf("</span>", at + 1);
+      if (close === -1) throw new Error("unclosed span");
       if (open !== -1 && open < close) {
         depth += 1;
         at = open;

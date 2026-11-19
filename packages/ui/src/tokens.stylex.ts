@@ -196,7 +196,7 @@ export const breakpoints = stylex.defineConsts({
   responsiveColumnsStacked: "@container (width < 600px)",
   responsiveColumnsSplit: "@container (400px <= width < 600px)",
   responsiveColumnsSingle: "@container (width < 400px)",
-  tableStacked: "@container (max-width: 559px)",
+  tableStacked: "@container (width < 560px)",
   tableFoldFirstRange: "@container (820px <= width < 1000px)",
   tableFoldSecondRange: "@container (560px <= width < 820px)",
   tableFoldedFirst: "@container (width < 1000px)",
