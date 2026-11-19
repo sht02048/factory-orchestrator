@@ -117,6 +117,21 @@ function RunnersRoute() {
             primary={false}
           />
         }
+        renderEdit={(runner, controls) => (
+          <RunnerForm
+            runner={{
+              id: runner.id,
+              name: runner.name,
+              sshTarget: runner.sshTarget ?? "",
+              orcaPath: runner.orcaPath ?? "",
+              capacity: runner.capacity,
+            }}
+            actions={settingsActions}
+            primary={false}
+            onDone={controls.onDone}
+            onClose={controls.onClose}
+          />
+        )}
       />
     </ScreenMessages>
   );

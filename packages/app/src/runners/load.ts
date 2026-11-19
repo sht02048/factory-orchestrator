@@ -17,6 +17,7 @@ import type {
 
 const runnerConfigSchema = z.object({
   sshTarget: z.string().min(1).optional().catch(undefined),
+  orcaPath: z.string().min(1).optional().catch(undefined),
 });
 
 export function loadRunnersPage(db: Database, now: Date): RunnersPage {
@@ -98,6 +99,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
       queued: queued.get(runner.id) ?? [],
       leftWorktrees: leftWorktrees.get(runner.id) ?? [],
       sshTarget: config.sshTarget ?? null,
+      orcaPath: config.orcaPath ?? null,
       usage: usageView(runner.providerUsage, now),
     };
   });

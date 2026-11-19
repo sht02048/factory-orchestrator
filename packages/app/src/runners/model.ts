@@ -73,6 +73,7 @@ export interface RunnerView {
   queued: QueuedRunView[];
   leftWorktrees: LeftWorktree[];
   sshTarget: string | null;
+  orcaPath: string | null;
   usage: RunnerUsageView | null;
 }
 

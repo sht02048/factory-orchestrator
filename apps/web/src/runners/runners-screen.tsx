@@ -61,6 +61,13 @@ export interface RunnerActions {
   pollChecks: () => Promise<boolean>;
 }
 
+export interface RunnerEditControls {
+  onDone: () => void;
+  onClose: () => void;
+}
+
+export type RenderRunnerEdit = (runner: RunnerView, controls: RunnerEditControls) => ReactNode;
+
 export interface RunnersScreenProps {
   page: RunnersPage;
   selectedId: string | undefined;
@@ -68,6 +75,7 @@ export interface RunnersScreenProps {
   onSelect: (id: string) => void;
   actions: RunnerActions;
   setup?: ReactNode;
+  renderEdit?: RenderRunnerEdit;
 }
 
 export function RunnersScreen({
@@ -77,6 +85,7 @@ export function RunnersScreen({
   onSelect,
   actions,
   setup,
+  renderEdit,
 }: RunnersScreenProps) {
   const t = useTranslations("runners");
   const runners = problemRunnersFirst(page.runners);
@@ -159,7 +168,12 @@ export function RunnersScreen({
                 {runners.length === 0 ? null : <Text variant="meta">{t("panel.empty")}</Text>}
               </DetailPanel>
             ) : (
-              <RunnerPanel key={selected.id} runner={selected} actions={actions} />
+              <RunnerPanel
+                key={selected.id}
+                runner={selected}
+                actions={actions}
+                renderEdit={renderEdit}
+              />
             )}
           </section>
         }
@@ -252,12 +266,21 @@ function RowSentence({ runner }: { runner: RunnerView }) {
   return pushBlocked === 0 ? capacity : t("withPushBlocked", { capacity, count: pushBlocked });
 }
 
-function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerActions }) {
+function RunnerPanel({
+  runner,
+  actions,
+  renderEdit,
+}: {
+  runner: RunnerView;
+  actions: RunnerActions;
+  renderEdit: RenderRunnerEdit | undefined;
+}) {
   const t = useTranslations("runners.panel");
   const statusName = useStatusName();
   const { ago } = useTime();
   const status = runnerRowStatus(runner);
   const recheck = useRecheck(runner.id, actions);
+  const edit = useRunnerEdit();
   return (
     <DetailPanel>
       <div {...stylex.props(styles.panelHead)}>
@@ -269,14 +292,31 @@ function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerA
               : t("checkedAgo", { time: ago(runner.checked.at, runner.checked.agoMs) })}
           </Text>
         </div>
-        <div {...stylex.props(styles.wrap)}>
-          <Text variant="heading">{runner.name}</Text>
-          {runner.sshTarget === null ? null : (
-            <Text variant="meta" as="p" mono>
-              {runner.sshTarget}
-            </Text>
+        <div {...stylex.props(styles.nameLine)}>
+          <div {...stylex.props(styles.wrap)}>
+            <Text variant="heading">{runner.name}</Text>
+            {runner.sshTarget === null ? null : (
+              <Text variant="meta" as="p" mono>
+                {runner.sshTarget}
+              </Text>
+            )}
+          </div>
+          {renderEdit === undefined || edit.open ? null : (
+            <Button
+              ref={edit.triggerRef}
+              aria-label={t("editLabel", { name: runner.name })}
+              aria-expanded={false}
+              onClick={edit.show}
+            >
+              {t("edit")}
+            </Button>
           )}
         </div>
+        {renderEdit !== undefined && edit.open ? (
+          <div ref={edit.formRef} {...stylex.props(styles.editForm)}>
+            {renderEdit(runner, { onDone: edit.close, onClose: edit.close })}
+          </div>
+        ) : null}
         <p
           ref={recheck.statusRef}
           role="status"
@@ -299,6 +339,32 @@ function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerA
       <LeftWorktrees runner={runner} />
     </DetailPanel>
   );
+}
+
+function useRunnerEdit() {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (open) {
+      formRef.current?.querySelector<HTMLElement>("input")?.focus();
+      return;
+    }
+    if (!refocus.current) return;
+    refocus.current = false;
+    triggerRef.current?.focus();
+  }, [open]);
+  return {
+    open,
+    triggerRef,
+    formRef,
+    show: () => setOpen(true),
+    close: () => {
+      refocus.current = true;
+      setOpen(false);
+    },
+  };
 }
 
 type RecheckPhase = "idle" | "sending" | "requested" | "done" | "failed";
@@ -795,6 +861,13 @@ const styles = stylex.create({
   panelHead: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   statusLine: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
   wrap: { minWidth: 0, overflowWrap: "anywhere" },
+  nameLine: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: space.s3,
+  },
+  editForm: { paddingTop: space.s2 },
   list: {
     display: "flex",
     flexDirection: "column",

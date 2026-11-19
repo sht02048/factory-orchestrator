@@ -98,6 +98,8 @@
       "unavailable": "쓰지 않아요: {unavailable}",
       "others": "로그인하지 않았어요: {signedOut}. 쓰지 않아요: {unavailable}",
       "privacy": "계정 정보는 저장하지 않아요."
-    }
+    },
+    "edit": "고치기",
+    "editLabel": "{name} 러너 고치기"
   }
 }
