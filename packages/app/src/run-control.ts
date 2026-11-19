@@ -4,9 +4,12 @@ import { getRunControlRequest, requestRunControl } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import type { RunControlView } from "./run-control-view.js";
 
+export const RUN_CONTROL_FAILURE_SHOWN_MS = 10 * 60_000;
+
 export function runControlOf(
   db: Database,
   run: { id: string; state: RunState },
+  now: Date,
 ): RunControlView | null {
   const request = getRunControlRequest(db, toRunId(run.id));
   if (request === null) return null;
@@ -14,7 +17,8 @@ export function runControlOf(
     case "pending":
       return { control: request.control, status: "pending" };
     case "failed":
-      return planRunControl(run.state, request.control).ok
+      return planRunControl(run.state, request.control).ok &&
+        now.getTime() - request.completedAt.getTime() < RUN_CONTROL_FAILURE_SHOWN_MS
         ? {
             control: request.control,
             status: "failed",

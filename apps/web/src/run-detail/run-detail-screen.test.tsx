@@ -212,7 +212,7 @@ describe("Run 상세 화면", () => {
     completeRunControlRequest(db, {
       runId: running,
       requestedAt: minutes(100),
-      completedAt: minutes(101),
+      completedAt: minutes(115),
       error: "runner-unreachable",
     });
     const failed = render(page(db, running));
@@ -223,6 +223,9 @@ describe("Run 상세 화면", () => {
     expect(text(failed)).toContain(reason);
     expect(failed).not.toMatch(/role="alert"[^>]*>[^<]*멈추지 못했어요/);
     expect(labels(failed)).toContain(runJson.control.pause);
+
+    const later = loadRunDetail(db, running, minutes(126));
+    expect(later.kind === "found" ? later.run.control : "missing").toBeNull();
   });
 
   it("Paused 런은 Paused 알약, 멈춘 시간, 재개하기를 보이고 실행 시간에서 멈춘 시간을 뺀다(0118)", () => {

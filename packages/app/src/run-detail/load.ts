@@ -87,7 +87,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
       run.state === "ended" && run.agentResult === "could-not-start" ? records.startError : null,
     cancelPending:
       run.state !== "ended" && cancelRequest !== null && cancelRequest.processedAt === null,
-    control: run.state === "running" || run.state === "paused" ? runControlOf(db, run) : null,
+    control: run.state === "running" || run.state === "paused" ? runControlOf(db, run, now) : null,
     timeline: timelineOf(
       run,
       records,

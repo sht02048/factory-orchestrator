@@ -93,6 +93,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
       ? t(run.control.control === "pause" ? "control.pausePending" : "control.resumePending")
       : null,
   ].filter((part) => part !== null);
+  const failure = useControlFailure(run.control);
 
   return (
     <div {...stylex.props(styles.main)}>
@@ -107,8 +108,14 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
         <p {...stylex.props(styles.stateLine)}>
           <StatusPill status={status}>{statusName(status)}</StatusPill>
           <Text variant="meta">{when}</Text>
-          <Text variant="meta" ref={cancelStatusRef} role="status" tabIndex={-1}>
-            {pending.length === 0 ? null : pending.join(t("metaSeparator"))}
+          <Text
+            variant="meta"
+            ref={cancelStatusRef}
+            role="status"
+            tabIndex={-1}
+            {...(failure === null ? {} : { tone: "problem" as const })}
+          >
+            {[...pending, ...(failure === null ? [] : [failure])].join(t("metaSeparator"))}
           </Text>
         </p>
         <div {...stylex.props(styles.titleRow)}>
@@ -139,7 +146,6 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
             </Actions>
           )}
         </div>
-        <ControlFailed control={run.control} />
         <Text variant="meta">
           {[
             ...(run.ticketTitle === null ? [] : [run.ticketKey]),
@@ -594,18 +600,13 @@ function ControlRun({
   );
 }
 
-function ControlFailed({ control }: { control: RunControlView | null }) {
+function useControlFailure(control: RunControlView | null): string | null {
   const t = useTranslations("run.control");
   const domain = useTranslations("domain");
-  return (
-    <Text variant="ui" as="p" tone="problem" role="status">
-      {control?.status === "failed"
-        ? t(control.control === "pause" ? "pauseFailed" : "resumeFailed", {
-            reason: domain(`runControlFailure.${control.reason}`),
-          })
-        : null}
-    </Text>
-  );
+  if (control?.status !== "failed") return null;
+  return t(control.control === "pause" ? "pauseFailed" : "resumeFailed", {
+    reason: domain(`runControlFailure.${control.reason}`),
+  });
 }
 
 function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: string }) {

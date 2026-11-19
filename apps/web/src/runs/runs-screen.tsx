@@ -405,7 +405,11 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
         <StatusPill status={status}>{statusName(status)}</StatusPill>
       </TableCell>
       <TableCell align="end" numeric>
-        {run.state === "ended" ? ago(run.endedAt, run.endedAgoMs) : elapsed(elapsedMs(run))}
+        {run.state === "ended"
+          ? ago(run.endedAt, run.endedAgoMs)
+          : run.state === "paused"
+            ? t("pausedFor", { elapsed: elapsed(elapsedMs(run)) })
+            : elapsed(elapsedMs(run))}
       </TableCell>
     </TableRow>
   );

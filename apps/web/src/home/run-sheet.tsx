@@ -199,35 +199,43 @@ function ControlBlock({
     control?.status === "pending"
       ? t(control.control === "pause" ? "card.pausing" : "card.resuming")
       : null;
+  const failure =
+    control?.status === "failed"
+      ? t(control.control === "pause" ? "card.pauseFailed" : "card.resumeFailed", {
+          reason: domain(`runControlFailure.${control.reason}`),
+        })
+      : null;
   return (
     <Block>
       <Text variant="body">{children}</Text>
-      <Text variant="ui" as="p" tone="problem" role="status">
-        {control?.status === "failed"
-          ? t(control.control === "pause" ? "card.pauseFailed" : "card.resumeFailed", {
-              reason: domain(`runControlFailure.${control.reason}`),
-            })
-          : null}
-      </Text>
-      <Text variant="meta" as="p" ref={statusRef} role="status" tabIndex={-1}>
-        {pending}
-      </Text>
-      {available === null ? null : (
-        <div>
-          <Button
-            variant={available === "resume" ? "primary" : "secondary"}
-            disabled={sending}
-            onClick={() => {
-              setSending(true);
-              void onControl(run, available, () => statusRef.current?.focus()).finally(() =>
-                setSending(false),
-              );
-            }}
-          >
-            {t(available === "resume" ? "card.resume" : "card.pause")}
-          </Button>
-        </div>
-      )}
+      <div {...stylex.props(styles.controlGroup)}>
+        <Text
+          variant="ui"
+          as="p"
+          ref={statusRef}
+          role="status"
+          tabIndex={-1}
+          {...(failure === null ? { tone: "muted" as const } : { tone: "problem" as const })}
+        >
+          {failure ?? pending}
+        </Text>
+        {available === null ? null : (
+          <div {...stylex.props((failure ?? pending) !== null && styles.controlBelowStatus)}>
+            <Button
+              variant={available === "resume" ? "primary" : "secondary"}
+              disabled={sending}
+              onClick={() => {
+                setSending(true);
+                void onControl(run, available, () => statusRef.current?.focus()).finally(() =>
+                  setSending(false),
+                );
+              }}
+            >
+              {t(available === "resume" ? "card.resume" : "card.pause")}
+            </Button>
+          </div>
+        )}
+      </div>
     </Block>
   );
 }
@@ -415,6 +423,8 @@ function DenyBlock({
 const styles = stylex.create({
   body: { display: "flex", flexDirection: "column", gap: space.s6, minWidth: 0 },
   block: { display: "flex", flexDirection: "column", gap: space.s3, minWidth: 0 },
+  controlGroup: { display: "flex", flexDirection: "column", alignItems: "flex-start", minWidth: 0 },
+  controlBelowStatus: { paddingTop: space.s2 },
   foot: { display: "flex", justifyContent: "flex-end", gap: space.s3 },
   result: { outline: "none" },
 });

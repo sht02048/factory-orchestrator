@@ -78,7 +78,8 @@
     "resumeFailed": "재개하지 못했어요. {reason}",
     "menu": "{key} 런 메뉴",
     "pause": "멈추기",
-    "resume": "재개하기"
+    "resume": "재개하기",
+    "pausedFor": "{elapsed} 멈춤"
   },
   "sheet": {
     "title": "{key} {title}",

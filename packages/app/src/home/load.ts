@@ -124,7 +124,8 @@ export function loadHomePage(
           ? null
           : { displayId: pr.displayId, url: pr.url },
       cancelling: cancelling.has(run.id),
-      control: run.state === "running" || run.state === "paused" ? runControlOf(db, run) : null,
+      control:
+        run.state === "running" || run.state === "paused" ? runControlOf(db, run, now) : null,
     };
     switch (run.state) {
       case "queued":

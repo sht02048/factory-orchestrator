@@ -125,7 +125,9 @@ function useCardParts(
       return {
         ...failed,
         meta: runner,
-        ...(run.pausedMs === null ? {} : { time: elapsed(run.pausedMs) }),
+        ...(run.pausedMs === null
+          ? {}
+          : { time: t("pausedFor", { elapsed: elapsed(run.pausedMs) }) }),
         ...(available === "resume"
           ? {
               action: (
