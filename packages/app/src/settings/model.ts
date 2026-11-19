@@ -112,9 +112,12 @@ export interface RunnerSettingsView {
   name: string;
   sshTarget: string;
   orcaPath: string;
+  access: RunnerAccess;
   capacity: number;
   check: RunnerCheckView | null;
 }
+
+export type RunnerAccess = "ganger" | "manual";
 
 export interface AddressesView {
   webAddress: string | null;

@@ -297,6 +297,9 @@ importers:
       '@ganger/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@ganger/runner-orca':
+        specifier: workspace:*
+        version: link:../../packages/runner-orca
       '@ganger/tracker-linear':
         specifier: workspace:*
         version: link:../../packages/tracker-linear
@@ -368,6 +371,9 @@ importers:
 
   demo:
     dependencies:
+      '@ganger/app':
+        specifier: workspace:*
+        version: link:../packages/app
       '@ganger/core':
         specifier: workspace:*
         version: link:../packages/core
@@ -389,6 +395,9 @@ importers:
 
   e2e:
     dependencies:
+      '@ganger/app':
+        specifier: workspace:*
+        version: link:../packages/app
       '@ganger/core':
         specifier: workspace:*
         version: link:../packages/core
@@ -419,6 +428,9 @@ importers:
       '@ganger/db':
         specifier: workspace:*
         version: link:../db
+      '@ganger/runner-orca':
+        specifier: workspace:*
+        version: link:../runner-orca
       '@ganger/tracker-linear':
         specifier: workspace:*
         version: link:../tracker-linear

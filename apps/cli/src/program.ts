@@ -148,6 +148,7 @@ async function runStart(context: ProgramContext, home: string): Promise<number> 
         hold: context.holdSleepAssertion,
         warn: (line) => context.err(line),
       },
+      warn: (line) => context.err(line),
       onMigrated: (config, migrated) => {
         context.out(messages.start.config(homePaths(home).envFile, config.databasePath));
         context.out(messages.start.migrated(migrated));

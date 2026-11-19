@@ -50,6 +50,7 @@ import {
   worktreeShowResultSchema,
 } from "./schemas.js";
 import type { MailRow } from "./schemas.js";
+import { serviceInstallArgs } from "./service-install.js";
 import { RemoteCommandTooLongError, toRemoteCommand } from "./shell.js";
 import { sshExec } from "./ssh.js";
 import type { RemoteExec, RemoteResult } from "./ssh.js";
@@ -152,7 +153,7 @@ export class OrcaRunner implements Runner {
     const base = {
       id: "orca-service",
       name: "Orca background service",
-      hint: `${this.config.orcaPath} serve service install --bind 127.0.0.1 --refuse-public --command ${this.config.orcaPath}`,
+      hint: toRemoteCommand(serviceInstallArgs(this.config.orcaPath)),
       blocksAssignment: false,
     };
     try {
