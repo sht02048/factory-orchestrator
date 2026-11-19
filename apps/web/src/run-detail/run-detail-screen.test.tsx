@@ -229,6 +229,42 @@ describe("Run 상세 화면", () => {
     expect(later.kind === "found" ? later.run.control : "missing").toBeNull();
   });
 
+  it("러너에서 멈춘 런과 보고 없이 멈춘 런은 이유를 다르게 보이고, 보고 없이 멈추면 마지막 출력을 접지 않고 보인다(0120)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    expect(changeRunState(db, id, { to: "paused", source: "runner" }, minutes(90))).toMatchObject({
+      ok: true,
+    });
+    const onRunner = text(render(page(db, id)));
+    expect(onRunner).toContain(
+      runJson.reason.paused.replace("{source}", domain.pauseSource.runner),
+    );
+    expect(onRunner).not.toContain(runJson.lastOutput.title);
+
+    expect(changeRunState(db, id, { to: "running" }, minutes(95))).toMatchObject({ ok: true });
+    expect(
+      changeRunState(db, id, { to: "paused", source: "unreported" }, minutes(100)),
+    ).toMatchObject({ ok: true });
+    updateRunRecords(db, id, { lastLog: ["로그인 버튼을 고쳤어요", "❯"] });
+    const detail = found(db, id);
+    expect(detail.status).toMatchObject({
+      state: "paused",
+      pauseSource: "unreported",
+      lastOutput: ["로그인 버튼을 고쳤어요", "❯"],
+    });
+    const html = render(page(db, id));
+    expect(text(html)).toContain(
+      runJson.reason.paused.replace("{source}", domain.pauseSource.unreported),
+    );
+    expect(text(html)).toContain(runJson.lastOutput.title);
+    expect(text(html)).toContain("로그인 버튼을 고쳤어요");
+    expect(html).not.toContain("<details");
+
+    updateRunRecords(db, id, { lastLog: null });
+    expect(text(render(page(db, id)))).toContain(runJson.lastOutput.none);
+  });
+
   it("Paused 런은 Paused 알약, 멈춘 시간, 재개하기를 보이고 실행 시간에서 멈춘 시간을 뺀다(0118)", () => {
     const { db, ids } = seedDatabase();
     const id = ids.get("ACME-10");

@@ -1,6 +1,7 @@
 import { AdapterError } from "../adapters.js";
 import type { ProviderUsageReading } from "../provider-usage.js";
 import type {
+  AgentActivity,
   AgentQuestion,
   CodeHost,
   CodeHostErrorDetail,
@@ -28,6 +29,7 @@ import type {
   TrackerLabel,
   TrackerProject,
   TrackerState,
+  UnreportedStop,
   TrackerTicket,
   WebhookVerifyError,
 } from "../adapters.js";
@@ -196,6 +198,8 @@ export interface FakeRunnerRun {
   paused: boolean;
   resumes: ResumeAgentInput[];
   log: string[];
+  activity: AgentActivity;
+  unreportedStop: UnreportedStop | null;
 }
 
 export class FakeRunner implements Runner {
@@ -293,6 +297,26 @@ export class FakeRunner implements Runner {
     this.runAt(worktree).endedWithoutReport = detail;
   }
 
+  interruptOnRunner(worktree: WorktreeRef, at: Date = new Date()): void {
+    this.runAt(worktree).activity = { kind: "interrupted", since: at };
+  }
+
+  stopWithoutReport(
+    worktree: WorktreeRef,
+    stop: { lastOutput?: string[]; at?: Date; notified?: boolean } = {},
+  ): void {
+    const run = this.runAt(worktree);
+    const at = stop.at ?? new Date();
+    run.activity = { kind: "turn-ended", since: at };
+    run.unreportedStop = stop.notified === false ? null : { at, lastOutput: stop.lastOutput ?? [] };
+  }
+
+  continueOnRunner(worktree: WorktreeRef, at: Date = new Date()): void {
+    const run = this.runAt(worktree);
+    run.activity = { kind: "working", since: at };
+    run.unreportedStop = null;
+  }
+
   deleteWorktree(worktree: WorktreeRef): void {
     for (const [name, run] of this.runs) {
       if (run.started.worktree === worktree) this.runs.delete(name);
@@ -375,6 +399,8 @@ export class FakeRunner implements Runner {
         paused: false,
         resumes: [],
         log: [],
+        activity: { kind: "unknown" },
+        unreportedStop: null,
       });
       if (this.loseNextStartResponse) {
         this.loseNextStartResponse = false;
@@ -403,6 +429,8 @@ export class FakeRunner implements Runner {
         kind: "active",
         questions: [...found.questions],
         permissionWaits: [...found.permissionWaits],
+        activity: found.activity,
+        unreportedStop: found.unreportedStop,
       };
     });
   }
@@ -459,6 +487,8 @@ export class FakeRunner implements Runner {
       const found = this.runAt(run.worktree);
       found.resumes.push({ ...input });
       found.paused = false;
+      found.activity = { kind: "unknown" };
+      found.unreportedStop = null;
       if (found.endedWithoutReport === null) {
         return { agentRef: found.started.agentRef, restarted: false };
       }

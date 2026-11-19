@@ -116,12 +116,15 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date):
       return { state: "queued", queuedReason: queuedReasonOf(db, run.id, now) };
     case "running":
       return { state: "running" };
-    case "paused":
+    case "paused": {
+      const pauseSource = records.pauseSource ?? "operator";
       return {
         state: "paused",
         pausedSince: records.pausedSince?.toISOString() ?? null,
-        pauseSource: records.pauseSource ?? "operator",
+        pauseSource,
+        lastOutput: pauseSource === "unreported" ? (records.lastLog ?? []) : null,
       };
+    }
     case "waiting-for-input": {
       const input = pendingInput(db, run.id) ?? { kind: "unknown" };
       return { state: "waiting-for-input", input, inputSince: inputSinceOf(db, run.id, input) };

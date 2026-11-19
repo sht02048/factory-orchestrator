@@ -58,6 +58,7 @@ import {
   listRunsWithRecords,
   recordStartFailure,
   recordStartRequested,
+  runningSince,
   setQueuedRunRunner,
   updateRunRecords,
 } from "./runs.js";
@@ -632,6 +633,37 @@ describe("Paused(0118)", () => {
     expect(() =>
       db.$client.prepare("UPDATE runs SET pause_source = NULL WHERE id = ?").run(id),
     ).toThrow(/CHECK/);
+  });
+
+  it("러너에서 멈춤·보고 없이 멈춤을 멈춘 이유로 저장하고, 모르는 이유는 막는다(0120)", () => {
+    const db = seededDatabase();
+    const id = runningRun(db);
+    changeRunState(db, id, { to: "paused", source: "runner" }, at(1));
+    expect(getRunWithRecords(db, id)?.records.pauseSource).toBe("runner");
+    changeRunState(db, id, { to: "disconnected" }, at(7));
+    changeRunState(db, id, { to: "paused" }, at(9));
+    expect(getRunWithRecords(db, id)?.records.pauseSource).toBe("runner");
+    changeRunState(db, id, { to: "running" }, at(10));
+    changeRunState(db, id, { to: "paused", source: "unreported" }, at(11));
+    expect(getRunWithRecords(db, id)?.records.pauseSource).toBe("unreported");
+    expect(() =>
+      db.$client.prepare("UPDATE runs SET pause_source = 'agent' WHERE id = ?").run(id),
+    ).toThrow(/CHECK/);
+  });
+
+  it("Running이 된 시각은 재개·답변으로 돌아온 때이고, 연결이 돌아온 때는 앞 시각을 잇는다(0120)", () => {
+    const db = seededDatabase();
+    const id = runningRun(db);
+    changeRunState(db, id, { to: "paused" }, at(1));
+    changeRunState(db, id, { to: "running" }, at(5));
+    changeRunState(db, id, { to: "disconnected" }, at(8));
+    changeRunState(db, id, { to: "running" }, at(12));
+    expect(runningSince(db, id)).toEqual(at(5));
+
+    changeRunState(db, id, { to: "waiting-for-input" }, at(14));
+    changeRunState(db, id, { to: "disconnected" }, at(20));
+    changeRunState(db, id, { to: "running" }, at(25));
+    expect(runningSince(db, id)).toEqual(at(25));
   });
 
   it("DB가 Paused 런에만 멈춘 시각을 허용한다", () => {

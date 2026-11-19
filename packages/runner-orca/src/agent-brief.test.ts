@@ -18,4 +18,9 @@ describe("briefFor", () => {
   test("tells the agent to put the recommended choice first with a marker", () => {
     expect(brief).toContain("첫 선택지로 두고 끝에 ` (추천)`을 붙인다");
   });
+
+  test("tells the agent to ask with options instead of escalating when blocked", () => {
+    expect(brief).toContain("`escalation`을 보내지 않고 `ask`로 묻는다");
+    expect(brief).toContain("다음 행동을 `--options`로 단다");
+  });
 });
