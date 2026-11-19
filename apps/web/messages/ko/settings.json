@@ -135,7 +135,7 @@
     "reloading": "읽는 중…",
     "reloaded": "Linear에서 다시 읽었어요",
     "reloadFailed": "다시 읽지 못했어요. 잠시 뒤 다시 해 주세요.",
-    "revertedRetry": "저장하지 못해 원래대로 되돌렸어요. 연결을 확인하고 다시 골라 주세요.",
+    "revertedRetry": "저장하지 못해 원래대로 되돌렸어요. 연결을 확인하고 다시 해 주세요.",
     "addFirstLabel": "{project}의 기본 저장소 고르기",
     "labelUnread": "읽지 못한 라벨",
     "labelAutoAssign": "Auto-assign Label",
@@ -164,7 +164,7 @@
     "selectFor": "{connection}의 Auto-assign Label",
     "createFailedStatus": "만들지 못했어요",
     "createFailed": "{name} 라벨을 만들지 못했어요. {reason}",
-    "createFailedRetry": "{name} 라벨을 만들지 못했어요. 연결을 확인하고 다시 골라 주세요.",
+    "createFailedRetry": "{name} 라벨을 만들지 못했어요. 연결을 확인하고 다시 해 주세요.",
     "repoLabelUsed": "{name} · {repo} 저장소를 가르는 라벨이라 고를 수 없어요",
     "repoLabelRejected": "그 라벨은 Mapping에서 저장소를 가르는 데 쓰고 있어요. 다른 라벨을 고르거나 Mapping에서 라벨을 떼어 주세요."
   },
