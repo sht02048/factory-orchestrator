@@ -1,10 +1,10 @@
 export const navShortcuts = [
-  { screen: "dashboard", path: "/", hotkey: "Mod+1" },
-  { screen: "tickets", path: "/tickets", hotkey: "Mod+2" },
-  { screen: "runs", path: "/runs", hotkey: "Mod+3" },
-  { screen: "runners", path: "/runners", hotkey: "Mod+4" },
-  { screen: "stats", path: "/stats", hotkey: "Mod+5" },
-  { screen: "settings", path: "/settings", hotkey: "Mod+," },
+  { screen: "dashboard", path: "/", shortcut: "Mod+1" },
+  { screen: "tickets", path: "/tickets", shortcut: "Mod+2" },
+  { screen: "runs", path: "/runs", shortcut: "Mod+3" },
+  { screen: "runners", path: "/runners", shortcut: "Mod+4" },
+  { screen: "stats", path: "/stats", shortcut: "Mod+5" },
+  { screen: "settings", path: "/settings", shortcut: "Mod+," },
 ] as const;
 
 export type NavShortcut = (typeof navShortcuts)[number];

@@ -98,7 +98,7 @@ describe("화면 이동 단축키(브라우저, 0102)", () => {
     await open(page, "/runs");
     await markDocument(page);
 
-    for (const item of navShortcuts) await page.keyboard.press(playwrightKey(item.hotkey));
+    for (const item of navShortcuts) await page.keyboard.press(playwrightKey(item.shortcut));
     await expect.poll(() => new URL(page.url()).pathname, { timeout: 1_000 }).toBe("/runs");
     expect(await documentMarked(page)).toBe(true);
 
@@ -121,7 +121,7 @@ describe("화면 이동 단축키(브라우저, 0102)", () => {
       const link = page.getByRole("link", { name: shell.nav[item.screen], exact: true });
       await expect
         .poll(() => link.getAttribute("aria-keyshortcuts"))
-        .toBe(item.hotkey.replace("Mod", isMac ? "Meta" : "Control"));
+        .toBe(item.shortcut.replace("Mod", isMac ? "Meta" : "Control"));
     }
 
     await page.getByRole("link", { name: shell.nav.runs, exact: true }).hover();
@@ -177,8 +177,8 @@ async function withDesktopBridge(page: Page): Promise<void> {
   }, DESKTOP_NAVIGATION_GLOBAL);
 }
 
-function playwrightKey(hotkey: string): string {
-  return hotkey.replace(/^Mod\+/, "ControlOrMeta+");
+function playwrightKey(shortcut: string): string {
+  return shortcut.replace(/^Mod\+/, "ControlOrMeta+");
 }
 
 async function markDocument(page: Page): Promise<void> {

@@ -101,7 +101,7 @@ function RailLink({
       content={issues > 0 ? t("nav.withIssues", { name, count: issues }) : name}
       labelsTrigger
       side="right"
-      {...(showShortcut ? { shortcut: item.hotkey } : {})}
+      {...(showShortcut ? { shortcut: item.shortcut } : {})}
       render={
         <Link
           to={item.path}

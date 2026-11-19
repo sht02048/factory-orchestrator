@@ -504,12 +504,11 @@ export function ComponentSections() {
               <CloseIcon />
             </Tooltip>
             <Tooltip
-              content={t("tooltip.shortcutContent")}
+              content={t("tooltip.linkContent")}
               labelsTrigger
-              shortcut="Mod+3"
               render={<a href="#tooltip" {...stylex.props(linkStyles())} />}
             >
-              {t("tooltip.shortcutContent")}
+              {t("tooltip.linkContent")}
             </Tooltip>
           </Demo>
         </Section>

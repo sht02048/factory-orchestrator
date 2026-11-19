@@ -2,8 +2,8 @@ import { navShortcuts } from "@ganger/app/shell/nav-shortcuts";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 import type { MenuItemConstructorOptions } from "electron";
 
-export function electronAccelerator(hotkey: string): string {
-  return hotkey.replace(/^Mod\+/, "CommandOrControl+");
+export function electronAccelerator(shortcut: string): string {
+  return shortcut.replace(/^Mod\+/, "CommandOrControl+");
 }
 
 export function navigationMenu(options: {
@@ -18,7 +18,7 @@ export function navigationMenu(options: {
     submenu: navShortcuts.map((item) => ({
       id: `navigate-${item.screen}`,
       label: options.screenLabel(item.screen),
-      accelerator: electronAccelerator(item.hotkey),
+      accelerator: electronAccelerator(item.shortcut),
       enabled: options.enabled,
       click: () => options.onNavigate(item.screen),
     })),
