@@ -56,7 +56,7 @@
 
 시안 MB1(2026-11-19 운영자 승인)을 옮긴다. 세로 한 손 쓰기를 기준으로 한다.
 
-- **Dashboard(M18).** 웹 Dashboard와 같은 줄기로, 칸반 세 칸을 위쪽 세그먼트 Queued · Running · Done으로 바꿔 한 번에 한 칸을 보인다. 처음 열면 처리할 일이 있는 칸부터 보인다. 처리할 일은 웹과 같이 카드 위 꼬리표(Question, Permission, Human Check, Failed, Disconnected)로 보이고, 꼬리표 카드가 칸 맨 위에 온다. 카드에서 바로 할 수 있는 행동 하나(Question 답하기, Permission 거절, Human Check PR 보기)를 둔다. Failed 카드의 다시 맡기기는 열린 질문 9가 정해진 뒤 더한다. 제목과 요약 문장은 웹 Dashboard와 같다("처리할 일이 4개 있어요", "답할 질문 2개, 확인할 PR 1개, 멈춘 런 1개예요."). "처리할 일만" 스위치를 둔다. 맨 위에는 Workspace 고르기, Runners 버튼, 설정이 있다. 아래 탭 막대는 두지 않는다.
+- **Dashboard(M18).** 웹 Dashboard와 같은 줄기로, 칸반 세 칸을 위쪽 세그먼트 Queued · Running · Done으로 바꿔 한 번에 한 칸을 보인다. 처음 열면 처리할 일이 있는 칸부터 보인다. 처리할 일은 웹과 같이 카드 위 꼬리표(Question, Permission, Human Check, Failed, Disconnected, 그리고 무엇을 기다리는지 아직 읽지 못한 런의 Waiting for Input)로 보이고, 꼬리표 카드가 칸 맨 위에 온다. 카드에서 바로 할 수 있는 행동 하나(Question 답하기, Permission 거절, Human Check PR 보기)를 둔다. Failed 카드의 다시 맡기기는 열린 질문 9가 정해진 뒤 더한다. 제목과 요약 문장은 웹 Dashboard와 같다("처리할 일이 4개 있어요", "답할 질문 2개, 확인할 PR 1개, 멈춘 런 1개예요."). "처리할 일만" 스위치를 둔다. 맨 위에는 Workspace 고르기, Runners 버튼, 설정이 있다. 아래 탭 막대는 두지 않는다.
 - **세그먼트의 처리할 일 표시(M19).** 칸 이름에는 전체 수를 붙이지 않고, 처리할 일이 있는 칸에만 노란 배지로 그 수를 붙인다. 고른 칸의 런 수는 세그먼트 아래 줄에 처리할 일과 나머지로 나눠 쓴다(예: Running 칸 "처리할 일 2 · Running 1").
 - **칸 이름(M21).** 세 번째 칸은 Done이다. ADR 0010과 GLOSSARY는 이 칸을 Done today로 적는다. 웹 이름도 바꿀지, Done이 며칠의 끝난 런을 보일지, GLOSSARY와 ADR 0010을 어떻게 갱신할지는 열린 질문 4다. 같은 칸이 두 이름으로 남지 않게 한다.
 - **Runners 버튼(M18).** 평소에는 회색 버튼이고, Runner Issue가 있으면 문제 러너 수를 빨간 배지로 붙인다. 세는 법은 웹 레일 Runners 점과 같다(사용량 한도 러너는 세지 않는다, GLOSSARY). 버튼 전체를 빨갛게 하지 않는다.
@@ -136,7 +136,7 @@ M9로 정한 순서다. 1번은 이 문서와 함께 들어가고, 2번부터는
 | M2   | 서버 인증은 기기 토큰과 QR 연결이다(ADR 0015)                                  |
 | M3   | 범위는 보기, 답하기, 거절, 다시 맡기기, 할당, 취소. 할당·취소는 확인한다       |
 | M4   | Expo(React Native). Android는 나중                                             |
-| M5   | 공급자 사용량 한도는 Runner Issue의 한 종류다(티켓 0103이 GLOSSARY에 반영한다) |
+| M5   | 공급자 사용량 한도는 Runner Issue의 한 종류다(티켓 0103이 GLOSSARY에 반영했다) |
 | M6   | `packages/api`와 `/api/v1`. 알림 사건 SSE도 v1 아래에서 데스크톱과 함께 쓴다   |
 | M7   | 같은 Apple 개발자 팀, 앱 안 데모 모드                                          |
 | M8   | 할당·취소는 확인 시트만. Face ID와 스와이프는 나중                             |

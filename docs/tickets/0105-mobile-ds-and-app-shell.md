@@ -11,7 +11,7 @@ Expo(React Native) 앱을 저장소에 더하고, 모바일 디자인 시스템�
 
 ## 범위
 
-- 모바일 앱 패키지를 pnpm 워크스페이스에 더하고, typecheck·lint·test가 CI `check`에서 돈다. iOS 빌드는 이 티켓에서 CI에 넣지 않는다.
+- 모바일 앱 패키지를 pnpm 워크스페이스에 더하고, typecheck·lint·test가 CI `check`에서 돈다. iOS 빌드는 이 티켓에서 CI에 넣지 않는다. 색 검사(`check:colors`)는 `packages/ui` 밖의 색 리터럴을 막으므로, 모바일 토큰 위치를 허용 목록에 더한다(React Native는 oklch를 못 써 sRGB 값이 필요하다). turbo `build`가 모바일 패키지를 어떻게 다룰지도 정한다.
 - 모바일 디자인 시스템: 토큰(Ink, Paper, Ganger Yellow, 상태 색, 둥글기 카드 10·버튼 8·세그먼트 안 6·시트 16·알약 6)과 컴포넌트(카드, 세그먼트, 처리할 일 배지, 상태 알약, 시트, 스위치, 버튼). 사용 규칙 문서를 함께 둔다.
 - 데모 모드 화면: Dashboard(세그먼트 Queued · Running · Done, 처리할 일 꼬리표, 처리할 일만 스위치, Runners 버튼과 문제 배지), Runners(보기만), 설정, 빈 상태(마스코트). 문구는 메시지 파일로 둔다(ADR 0005).
 - 데모 데이터는 `demo/`를 import 하지 않는다(티켓 0047).
