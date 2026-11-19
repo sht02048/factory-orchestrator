@@ -49,6 +49,7 @@ async function connect(options: { twoWorkspaces?: boolean } = {}): Promise<void>
     timeZone: "UTC",
     now: () => at(60),
     serverStatus: () => status,
+    schemaProblem: () => null,
   };
   const server = createMcpServer(context);
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();

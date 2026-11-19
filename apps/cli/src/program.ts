@@ -4,14 +4,14 @@ import { parseArgs } from "node:util";
 import { createAdapterRegistry } from "@ganger/app/adapters";
 import { ELECTRON_RUN_AS_NODE_ENV, mcpLaunch } from "@ganger/app/settings/mcp-launch";
 import { localTimeZone } from "@ganger/app/time-zone";
-import { BootConfigError, SecretBox, parseBootConfig } from "@ganger/db";
+import { BootConfigError, SecretBox, loadMigrations, parseBootConfig } from "@ganger/db";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { MissingEnvFileError, homePaths, readBootEnv, resolveHome } from "./home.js";
 import { EnvFileFormatError, init } from "./init.js";
 import type { HoldSleepAssertion } from "./keep-awake.js";
 import type { AppLayout } from "./layout.js";
-import { McpStartError, openMcpDatabase } from "./mcp/open.js";
-import { createMcpServer } from "./mcp/server.js";
+import { McpStartError, openMcpDatabase, schemaProblem } from "./mcp/open.js";
+import { WRITE_SWITCH_POLL_MS, createMcpServer } from "./mcp/server.js";
 import { messages } from "./messages.js";
 import { readLiveServerLock } from "./server-lock.js";
 import {
@@ -178,8 +178,9 @@ async function runStart(context: ProgramContext, home: string): Promise<number> 
 
 async function runMcp(context: ProgramContext, home: string): Promise<number> {
   const config = parseBootConfig(readBootEnv(homePaths(home).envFile, context.env));
-  const db = openMcpDatabase(config.databasePath);
-  const server = createMcpServer({
+  const migrations = loadMigrations();
+  const db = openMcpDatabase(config.databasePath, migrations);
+  const mcp = createMcpServer({
     db,
     secretBox: new SecretBox(config.encryptionKey),
     registry: createAdapterRegistry(),
@@ -197,17 +198,21 @@ async function runMcp(context: ProgramContext, home: string): Promise<number> {
       const lock = readLiveServerLock(home);
       return { running: lock !== undefined, url: lock?.url ?? null };
     },
+    schemaProblem: () => schemaProblem(db, migrations),
   });
+  const { server } = mcp;
   const closed = new Promise<void>((resolve) => {
     server.server.onclose = resolve;
   });
   const close = () => void server.close();
   context.stdin.once("end", close);
   context.onStopSignal(close);
+  const watchWriteSwitch = setInterval(mcp.syncWriteTools, WRITE_SWITCH_POLL_MS);
   try {
-    await server.connect(new StdioServerTransport(context.stdin, context.stdout));
+    await mcp.connect(new StdioServerTransport(context.stdin, context.stdout));
     await closed;
   } finally {
+    clearInterval(watchWriteSwitch);
     context.stdin.off("end", close);
     db.$client.close();
   }

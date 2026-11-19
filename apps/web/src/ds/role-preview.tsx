@@ -10,6 +10,10 @@ import {
   Mascot,
   MASCOT_MOODS,
   MascotMessage,
+  PanelRows,
+  PanelSection,
+  ResponsiveColumns,
+  ResponsiveColumnsHead,
   ProblemCallout,
   Row,
   Section,
@@ -21,6 +25,7 @@ import {
   Text,
   textStyles,
   UsageBar,
+  UsageMeter,
 } from "@ganger/ui";
 import { colors, space } from "@ganger/ui/tokens.stylex";
 import { useState, type ReactNode } from "react";
@@ -260,6 +265,39 @@ export function RoleSections() {
                   <Text variant="title">{t("usage.weekly")}</Text>
                 </Row>
               </Card>
+              <span {...stylex.props(styles.usageMeter)}>
+                <UsageMeter
+                  name={t("usage.session")}
+                  percent={100}
+                  label={t("usage.label")}
+                  tone="problem"
+                />
+              </span>
+              <PanelSection title={t("usage.panelTitle")} meta={t("usage.panelMeta")}>
+                <Text variant="ui">{t("usage.panelBody")}</Text>
+                <PanelRows>
+                  <li>
+                    <Row interactive={false}>
+                      <Text variant="ui">{t("usage.panelRow")}</Text>
+                    </Row>
+                  </li>
+                </PanelRows>
+              </PanelSection>
+              <ResponsiveColumnsHead
+                lead={t("usage.columnsLead")}
+                columns={[{ width: "200px", content: t("usage.columnsUsage") }]}
+              />
+              <ResponsiveColumns
+                lead={<Text variant="title">{t("usage.columnsLead")}</Text>}
+                columns={[
+                  {
+                    width: "200px",
+                    content: (
+                      <UsageMeter name={t("usage.weekly")} percent={72} label={t("usage.label")} />
+                    ),
+                  },
+                ]}
+              />
             </div>
           </Demo>
         </Section>
@@ -403,6 +441,7 @@ const styles = stylex.create({
     gap: space.s3,
   },
   capacity: { display: "block", width: 160 },
+  usageMeter: { display: "block", width: 200 },
   brandRow: { display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: space.s6 },
   figure: {
     display: "flex",
