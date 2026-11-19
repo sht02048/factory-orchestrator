@@ -73,16 +73,21 @@ export function SectionNav({ label, items, problemLabel }: SectionNavProps) {
     };
     update();
     const target: HTMLElement | Window = scroller ?? window;
+    const settle = () => {
+      pinned.current = false;
+    };
     target.addEventListener("scroll", onScroll, { passive: true });
+    target.addEventListener("scrollend", settle, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
-    for (const event of ["wheel", "touchmove", "keydown"] as const) {
+    for (const event of ["wheel", "touchmove", "keydown", "pointerdown"] as const) {
       window.addEventListener(event, unpin, { passive: true });
     }
     return () => {
       if (frame !== 0) cancelAnimationFrame(frame);
       target.removeEventListener("scroll", onScroll);
+      target.removeEventListener("scrollend", settle);
       window.removeEventListener("resize", onScroll);
-      for (const event of ["wheel", "touchmove", "keydown"] as const) {
+      for (const event of ["wheel", "touchmove", "keydown", "pointerdown"] as const) {
         window.removeEventListener(event, unpin);
       }
     };

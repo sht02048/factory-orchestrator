@@ -127,6 +127,16 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
 
     await page.mouse.wheel(0, -5000);
     await expect.poll(() => current(nav)).toBe(settings.sections.workspace);
+
+    await nav.getByRole("link", { name: settings.sections.server }).click();
+    await page.waitForTimeout(800);
+    await page.evaluate(() => {
+      let node = document.querySelector("section#workspace")?.parentElement ?? null;
+      while (node !== null && getComputedStyle(node).overflowY !== "auto")
+        node = node.parentElement;
+      node?.scrollTo({ top: 0 });
+    });
+    await expect.poll(() => current(nav)).toBe(settings.sections.workspace);
   });
 
   it("처음에 넘치지 않던 화면이 나중에 넘쳐도 목차가 스크롤을 따라간다", async () => {
