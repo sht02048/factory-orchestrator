@@ -1,7 +1,9 @@
 import { spawnSync, type SpawnSyncOptions } from "node:child_process";
-import { appendFileSync, mkdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkDmg } from "./check-dmg.ts";
+import { BACKGROUND_PNG } from "./dmg-background.ts";
 import { packageVersion } from "./release-plan.ts";
 
 const PRODUCT = "Ganger";
@@ -89,6 +91,47 @@ function run(
   return stdout;
 }
 
+export interface DmgbuildInput {
+  root: string;
+  app: string;
+  dmg: string;
+}
+
+export function dmgbuildArgs({ root, app, dmg }: DmgbuildInput): string[] {
+  return [
+    "-s",
+    join(root, "scripts", "dmg-settings.py"),
+    "-D",
+    `app=${app}`,
+    "-D",
+    `background=${BACKGROUND_PNG}`,
+    "-D",
+    `icon=${join(root, "apps", "desktop", "icons", "icon.icns")}`,
+    PRODUCT,
+    dmg,
+  ];
+}
+
+function installDmgbuild(root: string, work: string): string {
+  const venv = join(work, "dmgbuild");
+  const uv = spawnSync("uv", ["--version"], { stdio: "ignore" });
+  if (uv.error !== undefined || uv.status !== 0) {
+    throw new Error("uv is required to install dmgbuild: https://docs.astral.sh/uv/");
+  }
+  run("uv", ["venv", "--quiet", "--python", "3.12", venv]);
+  run("uv", [
+    "pip",
+    "install",
+    "--quiet",
+    "--python",
+    join(venv, "bin", "python"),
+    "--require-hashes",
+    "-r",
+    join(root, "scripts", "dmgbuild-requirements.txt"),
+  ]);
+  return join(venv, "bin", "dmgbuild");
+}
+
 function notarize(path: string, notary: NotaryCredentials): void {
   SECRET_ARGS.add(notary.keyId).add(notary.issuer);
   const credentials = [
@@ -123,6 +166,7 @@ function main(): void {
   const work = join(out, "work");
   rmSync(out, { recursive: true, force: true });
   mkdirSync(work, { recursive: true });
+  const dmgbuild = installDmgbuild(root, work);
 
   const identity =
     signing.kind === "signed"
@@ -168,24 +212,9 @@ function main(): void {
     run("xcrun", ["stapler", "staple", app]);
   }
 
-  const volume = join(work, "volume");
-  mkdirSync(volume);
-  run("ditto", [app, join(volume, `${PRODUCT}.app`)]);
-  symlinkSync("/Applications", join(volume, "Applications"));
   const dmg = join(out, `${PRODUCT}-${version}-${arch}.dmg`);
-  run("hdiutil", [
-    "create",
-    "-volname",
-    PRODUCT,
-    "-srcfolder",
-    volume,
-    "-fs",
-    "HFS+",
-    "-format",
-    "UDZO",
-    "-ov",
-    dmg,
-  ]);
+  run(dmgbuild, dmgbuildArgs({ root, app, dmg }), { stdio: "inherit" });
+  checkDmg(dmg);
 
   if (signing.kind === "signed" && identity !== null) {
     run("codesign", [
