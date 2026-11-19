@@ -125,6 +125,8 @@
     "unknown": "잠시 뒤 다시 해 주세요."
   },
   "pauseSource": {
-    "operator": "멈췄어요"
+    "operator": "멈췄어요",
+    "runner": "러너에서 멈췄어요",
+    "unreported": "보고 없이 멈췄어요"
   }
 }

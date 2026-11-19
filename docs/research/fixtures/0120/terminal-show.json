@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_30000000-0000-4000-8000-000000000001",
+      "ptyId": "20000000-0000-4000-8000-000000000001::<path>/workspaces/acme/ganger-ACME-7-1@@00000001",
+      "incarnationId": "40000000-0000-4000-8000-000000000001",
+      "orphaned": false,
+      "worktreeId": "20000000-0000-4000-8000-000000000001::<path>/workspaces/acme/ganger-ACME-7-1",
+      "worktreePath": "<path>/workspaces/acme/ganger-ACME-7-1",
+      "branch": "refs/heads/ganger/ganger-ACME-7-1",
+      "tabId": "30000000-0000-4000-8000-000000000001",
+      "leafId": "31000000-0000-4000-8000-000000000001",
+      "title": "ganger-ACME-7-1",
+      "connected": true,
+      "writable": true,
+      "lastOutputAt": 1795084992430,
+      "preview": "❯ ",
+      "executionHostId": "local",
+      "agentIdentity": "claude",
+      "paneRuntimeId": 1,
+      "rendererGraphEpoch": 0,
+      "agentWait": null
+    }
+  }
+}

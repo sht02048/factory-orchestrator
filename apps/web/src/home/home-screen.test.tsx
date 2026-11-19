@@ -798,6 +798,21 @@ describe("Dashboard 멈추기·재개(0118)", () => {
     expect(text(paused)).toContain(domain.pauseSource.operator);
   });
 
+  it("러너에서 멈춘 런도 Running 칸의 Paused 카드로 두고 누가 멈췄는지만 다르게 보인다(0120)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    expect(changeRunState(db, id, { to: "paused", source: "runner" }, minutes(100))).toMatchObject({
+      ok: true,
+    });
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    expect(page.attention.some((item) => item.run.ticketKey === "ACME-10")).toBe(false);
+    const paused = row(section(render(page), homeJson.column.running), "ACME-10");
+    expect(pillsOf(paused)).toEqual([{ status: "paused", label: domain.runState.paused }]);
+    expect(buttonsOf(paused).map((button) => button.label)).toContain(homeJson.card.resume);
+    expect(text(paused)).toContain(domain.pauseSource.runner);
+  });
+
   it("요청 중이면 카드 아래 줄에 멈추는 중을 보이고 행동을 숨기며, 실패하면 이유를 보인다", () => {
     const { db, ids } = seedDatabase();
     const id = ids.get("ACME-10");

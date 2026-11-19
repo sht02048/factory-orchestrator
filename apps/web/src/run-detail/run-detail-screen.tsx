@@ -179,6 +179,19 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
               />
             ) : null}
 
+            {run.status.state === "paused" && run.status.lastOutput !== null ? (
+              <Block title={t("lastOutput.title")}>
+                <Text variant="body">{t("lastOutput.body")}</Text>
+                {run.status.lastOutput.length === 0 ? (
+                  <Text variant="meta">{t("lastOutput.none")}</Text>
+                ) : (
+                  <CodeBlock scroll label={t("lastOutput.linesLabel")}>
+                    {run.status.lastOutput.join("\n")}
+                  </CodeBlock>
+                )}
+              </Block>
+            ) : null}
+
             {run.startError === null ? null : (
               <Block title={t("startError.title")}>
                 <Text variant="body">{t("startError.body")}</Text>

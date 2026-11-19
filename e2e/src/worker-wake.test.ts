@@ -204,6 +204,41 @@ describe("멈추기·재개(0118, 가짜 어댑터)", () => {
   });
 });
 
+describe("러너에서 멈춘 에이전트(0120, 가짜 어댑터)", () => {
+  it("러너에서 에이전트 세션이 중단되면 카드가 '러너에서 멈췄어요' Paused가 되고, 재개 버튼으로 Running이 된다", async () => {
+    await vi.waitFor(() => expect(runOfTicket()?.state).toBe("running"), { timeout: 30_000 });
+    const run = runOfTicket();
+    if (run === undefined || run.state === "queued" || run.state === "ended") {
+      throw new Error("run has not started");
+    }
+    const key = unassignedTicket.key;
+    fakeRunner.interruptOnRunner(run.worktree);
+    loop.wake();
+    await vi.waitFor(() => expect(runOfTicket()?.state).toBe("paused"), { timeout: 10_000 });
+
+    const page = await browser.newPage({ baseURL: baseUrl, locale: "ko-KR" });
+    page.setDefaultTimeout(30_000);
+    try {
+      await page.goto(`/?ws=${workspaceId}`);
+      await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+      await page.waitForLoadState("networkidle");
+      const card = page
+        .getByRole("region", { name: home.column.running })
+        .getByRole("listitem")
+        .filter({ has: page.getByText(key, { exact: true }) });
+      await card.getByText(domain.runState.paused, { exact: true }).waitFor();
+      await card.getByText(domain.pauseSource.runner, { exact: true }).waitFor();
+
+      await card.getByRole("button", { name: home.card.resume }).click();
+      await vi.waitFor(() => expect(runOfTicket()?.state).toBe("running"), { timeout: 10_000 });
+      await card.getByRole("button", { name: fill(home.card.menu, { key }) }).waitFor();
+    } finally {
+      await page.close();
+    }
+    expect(fakeRunner.runAt(run.worktree).resumes).toHaveLength(2);
+  });
+});
+
 async function assignFromTickets(page: Page): Promise<void> {
   const key = unassignedTicket.key;
   await page.goto(`/tickets?ws=${workspaceId}`);
