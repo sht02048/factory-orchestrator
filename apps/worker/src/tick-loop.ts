@@ -41,7 +41,7 @@ export function startTickLoop(options: TickLoopOptions): TickLoop {
   const schedule = (): void => {
     if (endSleep === null) return;
     if (timer !== null) clearTimeout(timer);
-    timer = setTimeout(wakeUp, Math.max(0, nextTickAt() - Date.now()));
+    timer = setTimeout(wakeUp, Math.max(0, nextTickAt() - performance.now()));
   };
 
   const sleep = (): Promise<void> =>
@@ -58,7 +58,7 @@ export function startTickLoop(options: TickLoopOptions): TickLoop {
       } catch (error) {
         options.logger.warn("tick failed", { error });
       }
-      tickEndedAt = Date.now();
+      tickEndedAt = performance.now();
       if (!stopped) await sleep();
     }
   };
@@ -67,7 +67,7 @@ export function startTickLoop(options: TickLoopOptions): TickLoop {
     wake: () => {
       if (stopped || woken) return;
       woken = true;
-      firstWakeAt = Date.now();
+      firstWakeAt = performance.now();
       schedule();
     },
     stop: () => {

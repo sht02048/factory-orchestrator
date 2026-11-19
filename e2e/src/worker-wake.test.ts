@@ -64,7 +64,7 @@ let db: Database;
 let worker: Worker;
 let loop: TickLoop;
 let ticks = 0;
-let wakes = 0;
+const ticksAtWake: number[] = [];
 let web: ViteDevServer;
 let baseUrl: string;
 let browser: Browser;
@@ -109,7 +109,7 @@ beforeAll(async () => {
     logger: { warn: () => undefined },
   });
   globalThis.__gangerE2eWakeWorker = () => {
-    wakes += 1;
+    ticksAtWake.push(ticks);
     loop.wake();
   };
 
@@ -150,8 +150,7 @@ describe("web 이 DB 에 쓴 직후 worker 깨우기", () => {
     }
     const assignedAt = Date.now();
 
-    expect(ticks).toBe(1);
-    expect(wakes).toBeGreaterThan(0);
+    expect(ticksAtWake[0]).toBe(1);
     await vi.waitFor(() => expect(runOfTicket()?.state).toBe("running"), {
       timeout: START_WITHIN_MS,
       interval: 50,

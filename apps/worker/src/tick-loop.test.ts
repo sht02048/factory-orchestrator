@@ -122,6 +122,18 @@ describe("바퀴 사이의 기다림", () => {
     expect(recorded.warnings).toEqual(["tick failed"]);
   });
 
+  it("바퀴 사이에 시스템 시계가 뒤로 가도 wake 는 250ms 뒤, 폴링은 폴링 간격 뒤에 돈다", async () => {
+    const recorded = startRecording();
+    await advance(2_000);
+    vi.setSystemTime(Date.now() - 3_600_000);
+
+    running().wake();
+    await advance(WAKE_BATCH_MS);
+    expect(recorded.starts).toHaveLength(2);
+    await advance(POLL_INTERVAL_MS);
+    expect(recorded.starts).toHaveLength(3);
+  });
+
   it("기다리는 중에 stop 하면 시계를 움직이지 않아도 바로 멈추고 더는 돌지 않는다", async () => {
     const recorded = startRecording();
     await advance(1_000);
