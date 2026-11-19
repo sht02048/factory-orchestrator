@@ -229,7 +229,7 @@ Releases are made by GitHub Actions. There is no changelog file; Release notes a
 
 Feature work goes to `develop`, the default branch. `main` only changes when you release or ship a hotfix, and `develop` always contains every commit on `main`:
 
-- Pull requests to `main` come only from `release/*` and `hotfix/*` branches of this repository, and the branch must contain the latest `main`. The CI job `main-pr` checks this so a release cut from an old `develop` cannot undo a hotfix. If `main` moves while such a pull request is open, merge `main` into its branch and let `main-pr` run again. The job passes without checking anything while the repository has no `develop` branch.
+- Pull requests to `main` come only from `release/*` and `hotfix/*` branches of this repository, and the branch must contain the latest `main`. The `main-pr` job (`.github/workflows/main-pr.yml`) checks this so a release cut from an old `develop` cannot undo a hotfix. It runs again when a pull request is retargeted to `main`. With "require branches to be up to date" on `main`, GitHub also asks you to merge `main` into the branch when `main` moves while the pull request is open. The job passes without checking anything while the repository has no `develop` branch.
 - After every push to `main`, **Sync develop** (`.github/workflows/sync-develop.yml`) merges `main` into `develop` with a merge commit. If they conflict, it pushes nothing to `develop` and opens a pull request from `sync/main-to-develop` to `develop` instead; resolve it there and merge it with a merge commit. Sync develop does nothing while there is no `develop` branch.
 
 To release what is on `develop`:
@@ -292,13 +292,13 @@ Tags, pushes, and pull requests made with the default `GITHUB_TOKEN` do not star
      -F 'deployment_branch_policy[custom_branch_policies]=true'
    ```
 
-8. Create `develop` from `main`, make it the default branch, and protect it like `main`: changes only through pull requests, the `check` status check required, no force pushes or deletion, and the app on the bypass list so Sync develop can push its merge commit. Then add `main-pr` to the required status checks of `main`:
+8. Create `develop` from `main`, make it the default branch, and protect it like `main`: changes only through pull requests, the `check` status check required, no force pushes or deletion, and the app on the bypass list so Sync develop can push its merge commit. Then add `main-pr` to the required status checks of `main` and require branches to be up to date before merging. Set `APP_ID` to the app ID first:
 
    ```sh
    gh api --method POST repos/OWNER/REPO/git/refs \
      -f ref=refs/heads/develop -f sha="$(gh api repos/OWNER/REPO/git/ref/heads/main --jq .object.sha)"
    gh api --method PATCH repos/OWNER/REPO -f default_branch=develop
-   jq -n --argjson app <app-id> '{
+   jq -n --argjson app "$APP_ID" '{
      name: "develop", target: "branch", enforcement: "active",
      conditions: {ref_name: {include: ["refs/heads/develop"], exclude: []}},
      bypass_actors: [{actor_id: $app, actor_type: "Integration", bypass_mode: "always"}],
@@ -309,6 +309,8 @@ Tags, pushes, and pull requests made with the default `GITHUB_TOKEN` do not star
      ]}' | gh api --method POST repos/OWNER/REPO/rulesets --input -
    gh api --method POST repos/OWNER/REPO/branches/main/protection/required_status_checks/contexts \
      --input - <<< '{"contexts": ["main-pr"]}'
+   gh api --method PATCH repos/OWNER/REPO/branches/main/protection/required_status_checks \
+     -F strict=true
    ```
 
 Without these settings, Prepare release, Tag release, and Sync develop stop with an error that points here. If a job runs before the `release-bot` environment exists, GitHub creates the environment without the branch rule, so do step 4 first. After you finish, re-run a failed Tag release run to create the tag.

@@ -22,11 +22,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh api "repos/$GITHUB_REPOSITORY/branches/develop" > /dev/null 2>&1; then
+          if gh api "repos/$GITHUB_REPOSITORY/branches/develop" > /dev/null 2> "$RUNNER_TEMP/develop-error"; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
+          elif grep -q "(HTTP 404)" "$RUNNER_TEMP/develop-error"; then
             echo "No develop branch yet; nothing to sync."
             echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            cat "$RUNNER_TEMP/develop-error"
+            echo "::error::Could not check whether develop exists."
+            exit 1
           fi
 
   merge:
@@ -73,6 +77,11 @@ jobs:
               echo "develop already contains main ($MAIN_SHA)."
               ;;
             409)
+              if ! printf '%s\n' "$response" | grep -q '"message": *"Merge conflict"'; then
+                printf '%s\n' "$response"
+                echo "::error::Merging main into develop was refused (HTTP 409) for a reason other than a conflict."
+                exit 1
+              fi
               echo "conflict=true" >> "$GITHUB_ENV"
               echo "::warning::main ($MAIN_SHA) conflicts with develop. Opening a pull request from sync/main-to-develop to resolve it."
               ;;
@@ -90,19 +99,21 @@ jobs:
           MAIN_SHA: ${{ github.sha }}
         run: |
           branch="sync/main-to-develop"
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" > /dev/null 2>&1; then
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --base develop --head "$branch" --state open --json url --jq '.[0].url // ""')"
+          if [ -n "$existing" ]; then
             if ! gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/$branch" \
               -f sha="${MAIN_SHA:?}" -F force=false > /dev/null; then
               echo "::warning::$branch has commits that main does not have, so it was left as it is. Merge main into it by hand."
             fi
+            echo "The conflict pull request is $existing."
+            exit 0
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" > /dev/null 2>&1; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/heads/$branch" \
+              -f sha="${MAIN_SHA:?}" -F force=true > /dev/null
           else
             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
               -f ref="refs/heads/$branch" -f sha="${MAIN_SHA:?}" > /dev/null
-          fi
-          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --base develop --head "$branch" --state open --json url --jq '.[0].url // ""')"
-          if [ -n "$existing" ]; then
-            echo "The conflict pull request is $existing."
-            exit 0
           fi
           body="$(printf '%s\n\n%s\n' \
             "main changed in a way that conflicts with develop, so Sync develop could not merge it. develop must always contain every commit on main." \

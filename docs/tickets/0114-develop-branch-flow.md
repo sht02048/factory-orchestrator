@@ -25,7 +25,7 @@ blocked_by: []
 - Prepare release: `develop`에서 돈다. 입력 `source`(기본 `develop`). `develop`이면 `release/v<version>`을 따 버전을 올리고 `main`으로 PR을 연다. `hotfix/*`면 그 브랜치에 버전 커밋을 더하고 `main`으로 가는 PR을 쓰거나 연다. hotfix 브랜치의 코드는 실행하지 않는다.
 - Tag release: 그대로 둔다. 버전이 안 바뀐 hotfix 머지는 태그를 만들지 않는다.
 - Sync develop(새 워크플로): `main` push마다 앱 토큰으로 GitHub merges API를 불러 `main`을 `develop`에 머지 커밋으로 합친다. 충돌이면 `sync/main-to-develop` 브랜치와 `develop`으로 가는 PR을 연다. `develop`이 없으면 건너뛴다.
-- CI: `develop` push에서도 `check`를 돌리고, `main`으로 가는 PR에 잡 `main-pr`을 더한다.
+- CI: `develop` push에서도 `check`를 돌린다. `main`으로 가는 PR은 새 워크플로 `main-pr.yml`의 잡 `main-pr`이 본다. 베이스를 `main`으로 바꾸는 `edited`에도 돈다.
 - 문서: AGENTS.md 작업 흐름, README 릴리스 절, 0087 메모, ADR 0005 갱신 단락, 새 ADR 0017.
 
 ## 운영자 설정(이 PR 머지 뒤, 코디네이터가 gh API로 한다)
@@ -36,7 +36,7 @@ README "Automatic releases" 절의 8단계와 앱 권한·environment 단계에 
 2. 앱 권한에 Workflows read and write를 더하고 설치에서 승인한다(Sync develop이 워크플로 파일이 바뀐 `main`을 합칠 때 필요).
 3. `release-bot` environment의 배포 브랜치에 `develop`을 더한다(Prepare release가 `develop`에서 돈다).
 4. `develop` 보호 ruleset: PR 필수, required check `check`, force push·삭제 금지, bypass에 앱.
-5. `main`의 required check에 `main-pr`을 더한다.
+5. `main`의 required check에 `main-pr`을 더하고 branches up to date를 켠다.
 
 ## 완료 조건
 
