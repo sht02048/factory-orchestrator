@@ -177,10 +177,13 @@ const styles = stylex.create({
   tag: { display: "flex", paddingBottom: space.s1 },
   title: { display: "block", minWidth: 0, overflowWrap: "anywhere" },
   detail: {
-    display: "block",
+    display: "-webkit-box",
     minWidth: 0,
+    overflow: "hidden",
     color: colors.textSecondary,
     overflowWrap: "anywhere",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: 2,
   },
   foot: {
     display: "flex",

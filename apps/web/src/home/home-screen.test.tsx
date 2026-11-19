@@ -273,7 +273,7 @@ describe("Dashboard 칸반(티켓 0100)", () => {
     );
     const settled = done.slice(done.indexOf(homeJson.board.settled));
     expect(rows(settled)).toHaveLength(SETTLED_VISIBLE);
-    expect(settled).toMatch(/<a href="\/runs\?ws=ws-commerce"[^>]*>Runs에서 2개 더 보기<\/a>/);
+    expect(settled).toMatch(/<a href="\/runs\?ws=ws-commerce"[^>]*>Runs에서 모두 보기<\/a>/);
   });
 
   it("Queued·Running 칸은 6장이 넘으면 앞 6장과 N개 더 보기를 보인다", () => {

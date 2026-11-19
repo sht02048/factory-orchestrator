@@ -131,6 +131,7 @@ export function HomeScreen({
     },
   };
   const runningTodo = new Set(board.running.todo.map((run) => run.id));
+  const todoIds = new Set(page.attention.map(({ run }) => run.id));
   return (
     <div {...stylex.props(styles.page)}>
       <div {...stylex.props(styles.top)}>
@@ -206,7 +207,11 @@ export function HomeScreen({
         </div>
       </div>
       <RunSheet
-        target={fresh === undefined || target === null ? target : { ...target, run: fresh }}
+        target={
+          fresh === undefined || target === null
+            ? target
+            : { ...target, run: fresh, tagged: todoIds.has(fresh.id) }
+        }
         open={open}
         onOpenChange={setOpen}
         finalFocus={() => (target === null ? null : (cards.current.get(target.run.id) ?? null))}
@@ -346,9 +351,7 @@ function SettledCards({ runs, page, host }: { runs: HomeRun[]; page: HomePage; h
       </KanbanCards>
       {runs.length > visible.length ? (
         <div {...stylex.props(styles.allRuns)}>
-          <TextLink href={runsHref(page)}>
-            {t("allRuns", { count: runs.length - visible.length })}
-          </TextLink>
+          <TextLink href={runsHref(page)}>{t("allRuns")}</TextLink>
         </div>
       ) : null}
     </div>

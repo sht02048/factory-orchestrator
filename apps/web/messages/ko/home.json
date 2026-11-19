@@ -36,7 +36,7 @@
   "board": {
     "more": "{count}개 더 보기",
     "settled": "처리할 일 없이 끝났어요",
-    "allRuns": "Runs에서 {count}개 더 보기"
+    "allRuns": "Runs에서 모두 보기"
   },
   "section": {
     "runners": "Runners"

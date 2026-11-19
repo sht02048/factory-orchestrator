@@ -27,7 +27,7 @@ Dashboard 본문을 런 상태 기준 칸반 세 칸(Queued, Running, Done today
 7. **반응형.** 본문 폭이 넓으면(창 약 1440px 이상) 3칸 + Runners 열, 그보다 좁으면 Runners를 칸반 아래로 내린다. 더 좁으면(창 약 900px 이하) 칸을 세로로 쌓는다. 가로 스크롤이 없고 320px에서도 잘리지 않는다. 본문 최대 폭 고정(1200px)을 없애 넓은 창에서 오른쪽이 비지 않는다.
 8. **빈 칸.** 칸마다 한 줄("Queued 런이 없어요"). 카드 끌기는 없고 끌 수 있어 보이는 모양(손잡이, grab 커서)도 쓰지 않는다.
 9. **데이터.** `HomePage`에 오늘 끝난 런 전체(`endedToday`, `HomeRun`)와 런마다 티켓 ID(`ticketId`, Tickets 선택 값)를 더한다. MCP가 쓰는 `doneToday`·`todoGroups`는 그대로 둔다.
-10. **디자인 시스템.** `packages/ui`에 칸(`KanbanColumn`), 카드(`KanbanCard`), 오른쪽 패널(`Sheet`)을 더하고 DESIGN.md·`/ds`·시험을 함께 고친다. 기존 컴포넌트는 바꾸지 않는다.
+10. **디자인 시스템.** `packages/ui`에 칸(`KanbanColumn`), 카드(`KanbanCard`), 오른쪽 패널(`Sheet`)을 더하고 DESIGN.md·`/ds`·시험을 함께 고친다. 기존 컴포넌트는 선택 속성만 더하고(Runners 열 제목을 `h2`로 두는 `Section headingLevel`) 기존 사용처는 바꾸지 않는다.
 11. **문서.** ADR 0010의 Dashboard 구조(왼쪽 To do 묶음 → 칸반 세 칸 + 꼬리표)와 GLOSSARY의 To do·Question·Runner Issue의 Dashboard 문장을 새 구조에 맞춘다. To do 낱말 자체(종류 다섯, 처리할 일)는 그대로다.
 
 ## 범위 밖
