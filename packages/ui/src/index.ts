@@ -107,6 +107,7 @@ export {
   CloseIcon,
   ExternalIcon,
   InfoIcon,
+  MoreIcon,
 } from "./components/icons";
 export {
   WindowChrome,

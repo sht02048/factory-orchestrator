@@ -1,12 +1,14 @@
-import type { AgentResult, PrState, RunState, SummaryOutcome } from "@ganger/core";
+import type { AgentResult, PauseSource, PrState, RunState, SummaryOutcome } from "@ganger/core";
 import type { McpActionOutcome } from "@ganger/db";
 import type { InputWait } from "../home/model.js";
+import type { RunControlView } from "../run-control-view.js";
 import type { QueuedReason } from "../runs/model.js";
 
 export type CiView = "success" | "failure" | "pending" | "none" | "unavailable" | "unknown";
 
 export type TimelineEvent = { at: string } & (
   | { kind: "assigned" | "started" | "waiting-for-input" | "resumed" }
+  | { kind: "paused" | "unpaused" }
   | { kind: "unreachable" | "disconnected" | "reconnected" }
   | { kind: "question" | "answer" | "permission"; body: string }
   | { kind: "denied"; body: string }
@@ -34,6 +36,7 @@ export type LogTailView =
 export type RunDetailStatus =
   | { state: "queued"; queuedReason: QueuedReason }
   | { state: "running" }
+  | { state: "paused"; pausedSince: string | null; pauseSource: PauseSource }
   | {
       state: "waiting-for-input";
       input: PendingInput;
@@ -42,6 +45,7 @@ export type RunDetailStatus =
   | {
       state: "disconnected";
       unreachableSince: string | null;
+      paused: boolean;
     }
   | {
       state: "ended";
@@ -82,6 +86,7 @@ export interface RunDetail {
   report: string | null;
   startError: string | null;
   cancelPending: boolean;
+  control: RunControlView | null;
   timeline: TimelineEvent[];
   log: LogTailView;
   otherRuns: OtherRun[];

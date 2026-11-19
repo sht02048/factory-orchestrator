@@ -1,4 +1,10 @@
-import { AGENT_RESULTS, NOT_STARTED_AGENT_RESULTS, PR_STATES, RUN_STATES } from "@ganger/core";
+import {
+  AGENT_RESULTS,
+  NOT_STARTED_AGENT_RESULTS,
+  PAUSE_SOURCES,
+  PR_STATES,
+  RUN_STATES,
+} from "@ganger/core";
 import { MCP_ACTION_OUTCOMES } from "./mcp-actions-model.js";
 import { NOTIFICATION_EVENT_KINDS } from "./notification-events-model.js";
 import type {
@@ -12,6 +18,7 @@ import type {
   PullRequestId,
   PermissionRequestId,
   QuestionId,
+  RunControl,
   RunId,
   RunnerId,
   RunnerKind,
@@ -272,6 +279,9 @@ export const runs = sqliteTable(
     trackerCommentId: text("tracker_comment_id").$type<CommentId>(),
     trackerCommentedAt: timeMs("tracker_commented_at"),
     unreachableSince: timeMs("unreachable_since"),
+    pausedSince: timeMs("paused_since"),
+    pausedMs: integer("paused_ms").notNull().default(0),
+    pauseSource: text("pause_source", { enum: PAUSE_SOURCES }),
     lastLog: text("last_log", { mode: "json" }).$type<string[]>(),
   },
   (t) => [
@@ -284,8 +294,15 @@ export const runs = sqliteTable(
     check("runs_queued_not_started", sql`${t.state} <> 'queued' OR ${t.startedAt} IS NULL`),
     check(
       "runs_active_started",
-      sql`${t.state} NOT IN ('running', 'waiting-for-input', 'disconnected') OR ${t.startedAt} IS NOT NULL`,
+      sql`${t.state} NOT IN ('running', 'waiting-for-input', 'paused', 'disconnected') OR ${t.startedAt} IS NOT NULL`,
     ),
+    check(
+      "runs_paused_since_while_paused",
+      sql`(${t.state} <> 'paused' OR ${t.pausedSince} IS NOT NULL) AND (${t.pausedSince} IS NULL OR ${t.state} IN ('paused', 'disconnected'))`,
+    ),
+    check("runs_paused_ms", sql`${t.pausedMs} >= 0`),
+    check("runs_pause_source", sql`${t.pauseSource} IN ${inList(PAUSE_SOURCES)}`),
+    check("runs_paused_has_source", sql`${t.state} <> 'paused' OR ${t.pauseSource} IS NOT NULL`),
     check(
       "runs_started_has_runner_worktree",
       sql`${t.startedAt} IS NULL OR (${t.runnerId} IS NOT NULL AND ${t.worktreeRef} IS NOT NULL AND ${t.branch} IS NOT NULL AND ${t.agentRef} IS NOT NULL)`,
@@ -449,6 +466,23 @@ export const runPermissionWaits = sqliteTable(
       .on(t.deniedAt)
       .where(sql`${t.deniedAt} IS NOT NULL AND ${t.denySentAt} IS NULL`),
   ],
+);
+
+export const RUN_CONTROLS = ["pause", "resume"] as const satisfies ReadonlyArray<RunControl>;
+
+export const runControlRequests = sqliteTable(
+  "run_control_requests",
+  {
+    runId: text("run_id")
+      .primaryKey()
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    control: text("control", { enum: RUN_CONTROLS }).notNull(),
+    requestedAt: timeMs("requested_at").notNull(),
+    completedAt: timeMs("completed_at"),
+    error: text("error"),
+  },
+  (t) => [check("run_control_requests_control", sql`${t.control} IN ${inList(RUN_CONTROLS)}`)],
 );
 
 export const runCancelRequests = sqliteTable("run_cancel_requests", {

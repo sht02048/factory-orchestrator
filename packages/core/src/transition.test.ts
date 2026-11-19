@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { RUN_STATES } from "./run.js";
 import type { RunState } from "./run.js";
-import { canTransitionRun, planCancel, transitionRun } from "./transition.js";
+import { canTransitionRun, planCancel, planRunControl, transitionRun } from "./transition.js";
 
 const ALLOWED: ReadonlyArray<readonly [RunState, RunState]> = [
   ["queued", "running"],
@@ -16,6 +16,11 @@ const ALLOWED: ReadonlyArray<readonly [RunState, RunState]> = [
   ["waiting-for-input", "ended"],
   ["disconnected", "ended"],
   ["queued", "ended"],
+  ["running", "paused"],
+  ["paused", "running"],
+  ["paused", "disconnected"],
+  ["paused", "ended"],
+  ["disconnected", "paused"],
 ];
 
 const isAllowed = (from: RunState, to: RunState): boolean =>
@@ -58,6 +63,7 @@ describe("planCancel", () => {
     ["queued", "end-now"],
     ["running", "stop-agent-then-end"],
     ["waiting-for-input", "stop-agent-then-end"],
+    ["paused", "stop-agent-then-end"],
     ["disconnected", "wait-for-reconnect"],
   ] as const)("%s 런의 취소는 받아들인다: %s (Q82.8·Q82.10·Q82.11)", (state, action) => {
     expect(planCancel(state)).toEqual({ ok: true, action });
@@ -65,5 +71,28 @@ describe("planCancel", () => {
 
   it("Ended 런의 취소는 거부한다 (Q82.8)", () => {
     expect(planCancel("ended")).toEqual({ ok: false, reason: "already-ended" });
+  });
+});
+
+describe("planRunControl(0118)", () => {
+  it("Running 런만 멈추고, Paused 런만 재개한다", () => {
+    expect(planRunControl("running", "pause")).toEqual({ ok: true });
+    expect(planRunControl("paused", "resume")).toEqual({ ok: true });
+    for (const state of ["queued", "waiting-for-input", "paused", "disconnected"] as const) {
+      expect(planRunControl(state, "pause")).toEqual({ ok: false, reason: "not-running" });
+    }
+    for (const state of ["queued", "running", "waiting-for-input", "disconnected"] as const) {
+      expect(planRunControl(state, "resume")).toEqual({ ok: false, reason: "not-paused" });
+    }
+  });
+
+  it("Ended 런은 멈추거나 재개하지 않는다", () => {
+    expect(planRunControl("ended", "pause")).toEqual({ ok: false, reason: "already-ended" });
+    expect(planRunControl("ended", "resume")).toEqual({ ok: false, reason: "already-ended" });
+  });
+
+  it("다시 연결했을 때 운영자가 멈춰 둔 런이면 Disconnected에서 Paused로 돌아간다", () => {
+    expect(canTransitionRun("disconnected", "paused")).toBe(true);
+    expect(canTransitionRun("waiting-for-input", "paused")).toBe(false);
   });
 });

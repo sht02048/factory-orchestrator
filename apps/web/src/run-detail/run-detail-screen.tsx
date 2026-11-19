@@ -19,6 +19,7 @@ import {
   focusStyles,
   linkStyles,
   NoticeLayout,
+  showToast,
   textStyles,
 } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
@@ -31,6 +32,9 @@ import { QuestionAnswer } from "../question/question-answer";
 import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import { canCancel } from "@ganger/app/run-detail/model";
+import { availableRunControl } from "@ganger/app/run-control-view";
+import type { RunControlOutcome, RunControlView } from "@ganger/app/run-control-view";
+import type { RunControl } from "@ganger/core";
 import type {
   LogTailView,
   PendingInput,
@@ -43,6 +47,7 @@ export interface RunDetailActions {
   onAnswer: (questionId: string, body: string) => Promise<void>;
   onDeny: (promptId: string, reason: string) => Promise<void>;
   onCancel: () => Promise<void>;
+  onControl: (control: RunControl) => Promise<RunControlOutcome>;
   onRefreshLog: () => Promise<void>;
 }
 
@@ -82,8 +87,16 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const { status, when } = statusLine(run);
   const pr = run.pullRequest;
   const cancelable = canCancel(run) && !run.cancelPending;
+  const control = availableRunControl(run.status.state, run.cancelPending, run.control);
   const headRef = useRef<HTMLDivElement>(null);
   const cancelStatusRef = useRef<HTMLSpanElement>(null);
+  const pending = [
+    run.cancelPending ? t("cancelPending") : null,
+    run.control?.status === "pending"
+      ? t(run.control.control === "pause" ? "control.pausePending" : "control.resumePending")
+      : null,
+  ].filter((part) => part !== null);
+  const failure = useControlFailure(run.cancelPending ? null : run.control);
 
   return (
     <ScreenLayout
@@ -112,16 +125,32 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
             <p {...stylex.props(styles.stateLine)}>
               <StatusPill status={status}>{statusName(status)}</StatusPill>
               <Text variant="meta">{when}</Text>
-              <Text variant="meta" ref={cancelStatusRef} role="status" tabIndex={-1}>
-                {run.cancelPending ? t("cancelPending") : null}
-              </Text>
+              <span {...stylex.props(failure !== null && styles.statusOwnLine)}>
+                <Text
+                  variant="meta"
+                  ref={cancelStatusRef}
+                  role="status"
+                  tabIndex={-1}
+                  {...(failure === null ? {} : { tone: "problem" as const })}
+                >
+                  {[...pending, ...(failure === null ? [] : [failure])].join(t("metaSeparator"))}
+                </Text>
+              </span>
             </p>
-            {pr === null && !cancelable ? null : (
+            {pr === null && !cancelable && control === null ? null : (
               <Actions>
                 {pr === null ? null : (
                   <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
                     {t("openPr", { pr: pr.displayId })}
                   </a>
+                )}
+                {control === null ? null : (
+                  <ControlRun
+                    key={control}
+                    control={control}
+                    onControl={props.onControl}
+                    focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+                  />
                 )}
                 {cancelable ? (
                   <CancelRun
@@ -231,6 +260,7 @@ function inputWaitedMs(run: RunDetail): number | null {
 
 function Reason({ run }: { run: RunDetail }) {
   const t = useTranslations("run.reason");
+  const domain = useTranslations("domain");
   const queuedReasonText = useQueuedReasonText();
   const { clock } = useTime();
   const { status } = run;
@@ -239,9 +269,16 @@ function Reason({ run }: { run: RunDetail }) {
       return queuedReasonText(status.queuedReason);
     case "running":
       return t("running");
+    case "paused":
+      return t("paused", { source: domain(`pauseSource.${status.pauseSource}`) });
     case "waiting-for-input":
       return t(inputKey(status.input));
     case "disconnected":
+      if (status.paused) {
+        return status.unreachableSince === null
+          ? t("disconnectedPaused")
+          : t("disconnectedPausedSince", { time: clock(status.unreachableSince) });
+      }
       return status.unreachableSince === null
         ? t("disconnected")
         : t("disconnectedSince", { time: clock(status.unreachableSince) });
@@ -270,6 +307,7 @@ function NextAction({ run }: { run: RunDetail }) {
   switch (status.state) {
     case "queued":
     case "running":
+    case "paused":
     case "disconnected":
       next = t(`next.${status.state}`);
       break;
@@ -497,6 +535,55 @@ function CancelRun({
   );
 }
 
+function ControlRun({
+  control,
+  onControl,
+  focusAfter,
+}: {
+  control: RunControl;
+  onControl: RunDetailActions["onControl"];
+  focusAfter: () => void;
+}) {
+  const t = useTranslations("run.control");
+  const domain = useTranslations("domain");
+  const [state, setState] = useState<"idle" | "sending" | "failed">("idle");
+  return (
+    <>
+      <Button
+        variant={control === "resume" ? "primary" : "secondary"}
+        aria-disabled={state === "sending"}
+        aria-busy={state === "sending"}
+        onClick={() => {
+          if (state === "sending") return;
+          setState("sending");
+          onControl(control).then(
+            (outcome) => {
+              setState("idle");
+              if (outcome === "state-changed") {
+                showToast(domain("runControlFailure.state-changed"));
+              }
+              focusAfter();
+            },
+            () => setState("failed"),
+          );
+        }}
+      >
+        {t(control)}
+      </Button>
+      {state === "failed" ? <ActionFailed /> : null}
+    </>
+  );
+}
+
+function useControlFailure(control: RunControlView | null): string | null {
+  const t = useTranslations("run.control");
+  const domain = useTranslations("domain");
+  if (control?.status !== "failed") return null;
+  return t(control.control === "pause" ? "pauseFailed" : "resumeFailed", {
+    reason: domain(`runControlFailure.${control.reason}`),
+  });
+}
+
 function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: string }) {
   const t = useTranslations("run.timeline");
   const domain = useTranslations("domain");
@@ -529,6 +616,8 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
       case "started":
       case "waiting-for-input":
       case "resumed":
+      case "paused":
+      case "unpaused":
       case "unreachable":
       case "disconnected":
       case "reconnected":
@@ -791,6 +880,18 @@ function useStatusLine(): (run: RunDetail) => { status: PillStatus; when: string
       case "waiting-for-input":
       case "disconnected":
         return { status: runStatus(status), when: elapsed(run.executionMs ?? 0) };
+      case "paused":
+        return {
+          status: runStatus(status),
+          when:
+            status.pausedSince === null
+              ? ""
+              : t("pausedFor", {
+                  duration: duration(
+                    Math.max(0, Date.parse(run.now) - Date.parse(status.pausedSince)),
+                  ),
+                }),
+        };
     }
   };
 }
@@ -821,7 +922,15 @@ const styles = stylex.create({
     justifyContent: "space-between",
     gap: space.s3,
   },
-  stateLine: { display: "flex", alignItems: "center", gap: space.s3, margin: 0 },
+  stateLine: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: space.s3,
+    rowGap: space.s1,
+    margin: 0,
+  },
+  statusOwnLine: { flexBasis: "100%" },
   columns: {
     display: "grid",
     gridTemplateColumns: {

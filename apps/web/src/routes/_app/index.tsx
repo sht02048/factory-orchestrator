@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createTranslator } from "use-intl";
 import { toRunId } from "@ganger/core";
 import { z } from "zod";
@@ -8,7 +8,10 @@ import { homeMessages } from "../../home/messages";
 import type { HomePage } from "@ganger/app/home/model";
 import { useRefreshWhileVisible } from "../../home/refresh";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { answerQuestion, denyPermission, getHomePage } from "../../server/functions";
+import { hasPendingControl } from "@ganger/app/home/model";
+import { answerQuestion, controlRun, denyPermission, getHomePage } from "../../server/functions";
+
+const CONTROL_POLL_MS = 2_000;
 
 const t = createTranslator({ locale: defaultLocale, messages: homeMessages, namespace: "home" });
 
@@ -38,12 +41,19 @@ function HomeRoute() {
       resetScroll: false,
     });
   }, [navigate]);
-  useRefreshWhileVisible(() => {
+  const refresh = useCallback(() => {
     void getHomePage({ data: { ws } }).then(
       (next) => setPolled({ base: loaded, page: next }),
       () => {},
     );
-  });
+  }, [ws, loaded]);
+  useRefreshWhileVisible(refresh);
+  const controlPending = hasPendingControl(page);
+  useEffect(() => {
+    if (!controlPending) return undefined;
+    const timer = setTimeout(refresh, CONTROL_POLL_MS);
+    return () => clearTimeout(timer);
+  }, [controlPending, page, refresh]);
   return (
     <ScreenMessages messages={homeMessages}>
       <HomeScreen
@@ -63,6 +73,11 @@ function HomeRoute() {
         onDeny={async (input) => {
           await denyPermission({ data: input });
           await router.invalidate();
+        }}
+        onControl={async (input) => {
+          const result = await controlRun({ data: input });
+          await router.invalidate();
+          return result.ok ? "requested" : "state-changed";
         }}
         openRunId={run === undefined ? undefined : toRunId(run)}
         onOpenRunShown={clearOpenRun}

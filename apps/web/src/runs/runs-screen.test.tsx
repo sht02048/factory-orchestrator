@@ -378,6 +378,7 @@ describe("Runs 화면", () => {
     const statuses = tabs(tablist(all, runsJson.filter.statusLabel));
     expect(statuses.map((tab) => tab.text.replace(/ \d+$/, ""))).toEqual([
       "Running",
+      "Paused",
       "Waiting for Input",
       "Disconnected",
       "Queued",

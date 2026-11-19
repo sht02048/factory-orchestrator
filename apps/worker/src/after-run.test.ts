@@ -10,6 +10,7 @@ import {
   listRunners,
   requestLogTail,
   requestRunCancel,
+  requestRunControl,
   requestRunnerCheck,
   saveWorkspaceTrackerProject,
   toWorkspaceId,
@@ -165,6 +166,17 @@ describe("트래커 갱신", () => {
     const { run, worker } = await startOne();
     expect(recordsOf(run).trackerStateSetAt).toBeNull();
     await worker.tick();
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(recordsOf(run).trackerStateSetAt).toEqual(h.now);
+  });
+
+  it("멈춘 런도 In Progress 표시를 마저 한다(0118)", async () => {
+    chooseInProgress();
+    const spy = vi.spyOn(h.tracker, "setState").mockRejectedValueOnce(new Error("network"));
+    const { run, worker } = await startOne();
+    expect(requestRunControl(h.db, run.id, "pause", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    expect(current(run).state).toBe("paused");
     expect(spy).toHaveBeenCalledTimes(2);
     expect(recordsOf(run).trackerStateSetAt).toEqual(h.now);
   });

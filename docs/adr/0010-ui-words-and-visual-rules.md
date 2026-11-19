@@ -4,7 +4,7 @@
 
 ## 낱말
 
-1. **상태 이름은 GLOSSARY의 영어 용어 그대로 쓴다.** 런 상태 Queued·Running·Waiting for Input·Disconnected, 요약 결과 Merged·Human Check·Failed·Canceled, 러너 Online·Offline. To do 종류는 Question·Permission·Human Check·Failed·Disconnected다. 운영자가 정한 종류 목록에는 Failed가 없었지만, Failed 런은 지금도 To do에 오르고(스펙 Q82.9) 색 규칙에도 있어 종류에 넣었다. 러너 문제는 Runner Issue로 부르고 세부 원인(GitHub 인증 깨짐, Offline 등)은 설명 문장으로 쓴다. Runner Issue는 To do에 올리지 않고, Dashboard에서는 오른쪽 Runners 열에 보인다(아래 갱신). Runner Issue에 Offline 러너를 넣는 것은 운영자 결정(규칙 1의 "러너 인증 깨짐·Offline 등")이고 0049에서 적용했다.
+1. **상태 이름은 GLOSSARY의 영어 용어 그대로 쓴다.** 런 상태 Queued·Running·Waiting for Input·Paused·Disconnected, 요약 결과 Merged·Human Check·Failed·Canceled, 러너 Online·Offline. To do 종류는 Question·Permission·Human Check·Failed·Disconnected다. 운영자가 정한 종류 목록에는 Failed가 없었지만, Failed 런은 지금도 To do에 오르고(스펙 Q82.9) 색 규칙에도 있어 종류에 넣었다. 러너 문제는 Runner Issue로 부르고 세부 원인(GitHub 인증 깨짐, Offline 등)은 설명 문장으로 쓴다. Runner Issue는 To do에 올리지 않고, Dashboard에서는 오른쪽 Runners 열에 보인다(아래 갱신). Runner Issue에 Offline 러너를 넣는 것은 운영자 결정(규칙 1의 "러너 인증 깨짐·Offline 등")이고 0049에서 적용했다.
 2. **설명 문장·버튼·안내는 한국어 해요체로 쓴다.** "모두"처럼 상태가 아닌 개념 낱말도 한국어로 둔다. 예외로 Dashboard 칸·열 이름(Queued·Running·Done today·Runners)은 메뉴·화면 이름처럼 영어로 쓴다(아래 0100 갱신). 에이전트 결과와 PR 상태의 값(완료 보고(성공), 병합됨 등)은 상태 이름이 아니라 런이 어떻게 끝났는지 설명하는 값이라 한국어 그대로 둔다.
 3. **메뉴·화면 이름은 Dashboard·Tickets·Runs·Runners·Stats·Settings다.** 온보딩 단계 이름은 Tracker·GitHub·Runner·Workspace·Mapping이다.
 
@@ -20,7 +20,7 @@
    | 빨강 | 문제           | Failed, Disconnected, Runner Issue, Offline |
    | 초록 | 진행·정상      | Running, Online                             |
    | 파랑 | 병합           | Merged                                      |
-   | 회색 | 대기·멈춤      | Queued, Canceled                            |
+   | 회색 | 대기·멈춤      | Queued, Paused, Canceled                    |
 
    강조색(티켓 [0080](../tickets/0080-apply-brand-to-app-ui.md)): 상태가 아닌 강조는 Ganger Yellow `oklch(0.84 0.15 75)` 하나다(`accent*`). 주 버튼, 링크, 고른 탭·레일 항목 표시, 포커스 링, 로고 취구와 마스코트 모자에 쓴다. 노랑 바탕 위 글자는 Ink다. 바탕·면은 Ink `oklch(0.14 0 0)`에서 밝기만 바꾼 무채색, 글자는 Paper `oklch(0.97 0.003 85)`에서 밝기만 내린 따뜻한 무채색이다. 상태 색은 강조색과 색상(hue)이 40° 넘게 떨어진다. 앞서 0077은 노랑을 Human Check 색과 겹치지 않게 그림 안에만 두었으나, 0080에서 Human Check가 노랑을 내놓고 청록이 되어 이 예외를 강조색 규칙으로 바꿨다. 마스코트는 화면이 장난스러워지지 않게 상태를 나타내는 자리 곁에 두지 않는다.
 
@@ -56,7 +56,7 @@
 
 **갱신(2026-11-19, 운영자 결정, 티켓 [0100](../tickets/0100-dashboard-kanban.md)).** 운영자가 Dashboard 본문이 1200px로 고정돼 왼쪽에 붙고 넓은 창에서 오른쪽이 비는 점, To do 묶음·In progress·Runners·Done today 네 구역이 두 열에 흩어져 런이 어디쯤 있는지 한눈에 보이지 않는 점을 짚고 시안 KA·KB를 골랐다. 위 1·2·4·6·10번과 "ADR 0007과의 관계"에 반영했다. 0068 갱신의 Dashboard 항목(To do를 하는 일로 묶은 카드, 면 없는 In progress·Done today 구역)은 이것으로 바뀐다.
 
-- **칸반 세 칸 + Runners 열.** 본문은 런 상태 기준 칸 Queued(Queued 런), Running(Running·Waiting for Input·Disconnected 런), Done today(오늘 끝난 런)와 오른쪽 Runners 열이다. 본문 최대 폭 고정을 없앤다. 창이 넓으면(약 1440px 이상) 칸 셋 오른쪽에 Runners 열, 좁으면 Runners를 칸반 아래로 내리고, 더 좁으면(약 900px 이하) 칸을 세로로 쌓는다.
+- **칸반 세 칸 + Runners 열.** 본문은 런 상태 기준 칸 Queued(Queued 런), Running(Running·Waiting for Input·Paused·Disconnected 런, Paused는 0118부터), Done today(오늘 끝난 런)와 오른쪽 Runners 열이다. 본문 최대 폭 고정을 없앤다. 창이 넓으면(약 1440px 이상) 칸 셋 오른쪽에 Runners 열, 좁으면 Runners를 칸반 아래로 내리고, 더 좁으면(약 900px 이하) 칸을 세로로 쌓는다.
 - **To do는 칸이 아니라 꼬리표.** To do 종류(Question·Permission·Human Check·Failed·Disconnected)는 카드 위 꼬리표 알약(`StatusPill`, 점 + 종류 이름)으로 보이고, 꼬리표 카드가 칸 맨 위에 온다. 무엇을 기다리는지 아직 읽지 못한 Waiting for Input 런은 꼬리표 Waiting for Input이다. To do에 오른 끝난 런은 어제 끝났어도 Done today 칸에 꼬리표로 남고, 그 밖의 끝난 런은 소제목 "처리할 일 없이 끝났어요" 아래에 모은다.
 - **보기.** 머리 오른쪽의 "모두 / 처리할 일만 {n}"으로 꼬리표 카드만 남길 수 있고, 주소(`?view=todo`)에 남는다.
 - **상세는 오른쪽 패널.** 카드를 누르면 오른쪽에 덮여 열리는 패널(`Sheet`)이 상세를 보인다. Question은 답하기, Permission은 러너에서 허용하라는 안내와 거절, Human Check는 PR 링크, Failed는 에이전트 결과·PR 상태 두 축과 Tickets에서 다시 맡기기를 패널에서 한다. 앞선 답하기·거절하기 팝오버는 이 패널로 바뀐다. 카드를 끌어 옮기지 않는다.
@@ -76,6 +76,13 @@
 - **바꾸기.** 고르면 끝나는 값(스위치·선택·숫자)은 바로 저장하고 그 줄에 "저장하는 중 / 저장했어요 / 되돌렸어요"와 실패 이유를 보인다. 글로 넣는 값(이름·키·토큰·주소)은 "바꾸기"를 누르면 그 줄이 펼쳐지고, 펼친 편집 영역의 저장이 화면의 주 행동 하나다(6번, 한 번에 하나만 펼친다). 비밀 값 입력칸은 펼치기 전에는 띄우지 않는다.
 - **보조 설명.** 늘 보이는 안내 문단·접기 상자 대신 라벨 옆 ⓘ 도움말에 둔다. 따라 하는 단계 안내(토큰·API 키 만드는 법)는 "…에서 만들기 ↗" 바깥 링크 하나와 필요한 권한 도움말로 줄인다.
 - **하위 화면.** 트래커 프로젝트 상세와 MCP는 주소가 있는 하위 화면이고, 머리는 "Settings ›" 링크와 이름이다.
+
+**갱신(2026-11-19, 운영자 결정, 티켓 [0118](../tickets/0118-run-pause-resume.md)).** 운영자가 런을 끝내지 않고 잠시 멈췄다가 같은 자리에서 이어 가는 길을 원했다. 새 런 상태 Paused를 더하고 위 1·4·5번에 반영했다.
+
+- **Paused는 회색이다.** 운영자가 스스로 멈춰 둔 런이라 사람이 답할 일(보라)도 문제(빨강)도 아니고, 진행 중(초록)도 아니다. 기존 의미 토큰 중 "대기·멈춤"인 회색 `idle`이 뜻 그대로 맞아 새 색을 만들지 않았다. 같은 회색인 Queued·Canceled와는 이름과 놓인 칸(Queued 칸, Done today 칸)으로 갈린다.
+- **Dashboard Running 칸에 그대로 두고 꼬리표를 단다.** Paused 런은 capacity를 계속 차지하고 끝나지 않았으므로 Running 칸에 남는다. To do가 아니지만 카드에 꼬리표 Paused를 달아(4번의 예외) 일하는 카드와 갈리게 하고, 카드에 "재개" 버튼을 둔다. Running 런 카드는 오른쪽 위 메뉴(`…`)에 "멈추기"를 둔다. To do·알림·배지에는 넣지 않는다.
+- **"멈춰 둔 런".** 문장에서는 Paused 런을 "멈춰 둔 런"으로 쓴다. Dashboard 요약 문장의 "멈춘 런"은 Failed·Disconnected를 모아 부르는 말이라 섞지 않는다.
+- **Runs·Tickets 필터.** Paused는 처리할 일이 아니라 진행 중에 든다. Runs 아래 줄 상태 칩에 Paused를 더한다.
 
 ## 이유
 

@@ -7,6 +7,7 @@ import {
   MAX_START_RETRIES,
   decideConnection,
   decideStartFailure,
+  countedRunMs,
   decideTimeout,
   resolveRunProgress,
   runDurations,
@@ -18,10 +19,32 @@ const HOUR = 60 * 60 * 1000;
 const MINUTE = 60 * 1000;
 const SECOND = 1000;
 
+describe("countedRunMs(0118)", () => {
+  it("시작부터 지금까지에서 지난 멈춤과 지금 멈춤을 뺀다", () => {
+    expect(
+      countedRunMs({ startedAt: start, now: at(HOUR), pausedMs: 10 * MINUTE, pausedSince: null }),
+    ).toBe(50 * MINUTE);
+    expect(
+      countedRunMs({
+        startedAt: start,
+        now: at(HOUR),
+        pausedMs: 10 * MINUTE,
+        pausedSince: at(40 * MINUTE),
+      }),
+    ).toBe(30 * MINUTE);
+  });
+});
+
 describe("decideTimeout", () => {
   const maxRunMs = 2 * HOUR;
 
-  const base = { startedAt: start, maxRunMs, cancelRequested: false };
+  const base = {
+    startedAt: start,
+    maxRunMs,
+    pausedMs: 0,
+    pausedSince: null,
+    cancelRequested: false,
+  };
 
   it.each([
     ["running", { agentResult: "timed-out", stopAgent: true, runnerUnreached: false }],
@@ -57,8 +80,29 @@ describe("decideTimeout", () => {
     expect(decideTimeout({ ...base, state: "running", now: at(maxRunMs - 1) })).toBeNull();
   });
 
-  it.each(["queued", "ended"] as const)("%s 런은 시간 초과를 보지 않는다", (state) => {
+  it.each(["queued", "paused", "ended"] as const)("%s 런은 시간 초과를 보지 않는다", (state) => {
     expect(decideTimeout({ ...base, state, now: at(10 * maxRunMs) })).toBeNull();
+  });
+
+  it("멈춘 런이 Disconnected가 돼도 멈춤 시계가 이어져 시간 초과로 끝나지 않는다(0118)", () => {
+    expect(
+      decideTimeout({
+        ...base,
+        state: "disconnected",
+        pausedSince: at(maxRunMs - MINUTE),
+        now: at(10 * maxRunMs),
+      }),
+    ).toBeNull();
+  });
+
+  it("멈춘 시간은 최대 실행 시간에 세지 않는다(0118)", () => {
+    const pausedMs = 30 * MINUTE;
+    expect(
+      decideTimeout({ ...base, pausedMs, state: "running", now: at(maxRunMs + pausedMs - 1) }),
+    ).toBeNull();
+    expect(
+      decideTimeout({ ...base, pausedMs, state: "running", now: at(maxRunMs + pausedMs) }),
+    ).toMatchObject({ agentResult: "timed-out" });
   });
 });
 
@@ -73,8 +117,8 @@ describe("decideConnection", () => {
     ).toBe("keep-watching");
   });
 
-  it.each(["running", "waiting-for-input"] as const)(
-    "%s 런은 ssh가 5분 동안 계속 실패하면 Disconnected가 된다 (Q67)",
+  it.each(["running", "waiting-for-input", "paused"] as const)(
+    "%s 런은 ssh가 5분 동안 계속 실패하면 Disconnected가 된다 (Q67·0118)",
     (state) => {
       expect(
         decideConnection({ state, unreachableSince: start, now: at(DISCONNECT_AFTER_MS) }),

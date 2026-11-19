@@ -43,6 +43,7 @@ import {
 import type { QueuedStoredRun, TickContext, WorkerLogger } from "./context.js";
 import { processAfterRuns } from "./after-run.js";
 import { assignAutomatically, createAutoAssignState } from "./auto-assign.js";
+import { processRunControlRequests } from "./control.js";
 import { processWebRequests } from "./requests.js";
 import { checkRunners } from "./runner-check.js";
 import { startTickLoop } from "./tick-loop.js";
@@ -134,6 +135,7 @@ async function tick(context: TickContext): Promise<void> {
   context.mailboxes.clear();
   await processWebRequests(context, "runner-check");
   await checkRunners(context);
+  await processRunControlRequests(context);
   await watchActiveRuns(context);
   await cancelQueuedRuns(context);
   await assignAutomatically(context);

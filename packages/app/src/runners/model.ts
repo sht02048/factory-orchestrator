@@ -10,7 +10,7 @@ export interface OccupyingRun {
   id: string;
   ticketKey: string;
   workspace: RunWorkspace;
-  state: "running" | "waiting-for-input" | "disconnected";
+  state: "running" | "waiting-for-input" | "paused" | "disconnected";
   executionMs: number;
 }
 

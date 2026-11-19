@@ -15,7 +15,8 @@
   "when": {
     "waitingFor": "{duration}째 기다리는 중",
     "endedAfter": "{duration} 만에 끝났어요",
-    "endedBeforeStart": "시작하지 않고 {duration} 기다린 뒤 끝났어요"
+    "endedBeforeStart": "시작하지 않고 {duration} 기다린 뒤 끝났어요",
+    "pausedFor": "{duration}째 멈춰 있어요"
   },
   "cancelPending": "취소 중",
   "reason": {
@@ -30,7 +31,10 @@
     "failed": "에이전트 결과와 PR 상태 때문에 Failed예요. 자동으로 다시 시도하지 않아요.",
     "canceled": "운영자가 취소한 런이에요. 처리할 일에 올리지 않아요.",
     "answered": "질문에 답했어요. worker가 에이전트에게 답을 보내면 다시 실행해요.",
-    "denied": "권한 요청을 거절했어요. worker가 에이전트에게 거절을 보내요."
+    "denied": "권한 요청을 거절했어요. worker가 에이전트에게 거절을 보내요.",
+    "paused": "{source}. 워크트리와 러너 자리는 그대로이고, 최대 실행 시간도 멈춰 있어요.",
+    "disconnectedPaused": "멈춰 둔 런인데 러너에 5분 넘게 닿지 않았어요. 다시 닿으면 멈춘 채로 돌아와요. 최대 실행 시간은 멈춰 있어요.",
+    "disconnectedPausedSince": "멈춰 둔 런인데 {time}부터 러너에 닿지 않아요. 다시 닿으면 멈춘 채로 돌아와요. 최대 실행 시간은 멈춰 있어요."
   },
   "next": {
     "queued": "할 일이 없어요. 러너가 비면 worker가 시작해요.",
@@ -45,7 +49,8 @@
     "manualRemoval": "러너가 돌아오면 러너에서 워크트리를 직접 지워 주세요.",
     "canceled": "할 일이 없어요. 필요하면 티켓을 다시 할당해 주세요.",
     "answered": "할 일이 없어요. worker가 답을 보내요.",
-    "denied": "할 일이 없어요. worker가 거절을 보내요."
+    "denied": "할 일이 없어요. worker가 거절을 보내요.",
+    "paused": "이어서 하려면 재개하기를 눌러 주세요. 같은 러너와 워크트리에서 이어서 해요."
   },
   "manualRemoval": "사람이 지워야 함",
   "openPr": "PR {pr} 열기",
@@ -122,7 +127,9 @@
       "network": "연결하지 못했어요. 네트워크를 확인해 주세요",
       "invalid": "설정이 맞지 않아요. Settings에서 확인해 주세요",
       "unavailable": "MCP 서버가 설치 폴더를 몰라요. Settings에서 바꿔 주세요"
-    }
+    },
+    "paused": "멈춤",
+    "unpaused": "재개"
   },
   "report": {
     "title": "완료 보고",
@@ -182,5 +189,13 @@
   "startError": {
     "title": "시작 오류",
     "body": "러너가 시작 명령에 낸 마지막 오류예요. 같은 이름으로 다시 시도해도 실패해 시작할 수 없음으로 끝냈어요."
+  },
+  "control": {
+    "pause": "멈추기",
+    "resume": "재개하기",
+    "pausePending": "멈추는 중",
+    "resumePending": "재개하는 중",
+    "pauseFailed": "멈추지 못했어요. {reason}",
+    "resumeFailed": "재개하지 못했어요. {reason}"
   }
 }

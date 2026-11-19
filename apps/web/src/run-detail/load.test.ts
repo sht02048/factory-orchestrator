@@ -139,6 +139,7 @@ describe("loadRunDetail", () => {
     expect(run.status).toEqual({
       state: "disconnected",
       unreachableSince: minutes(40).toISOString(),
+      paused: false,
     });
     expect(run.timeline.map((e) => e.kind)).toEqual([
       "assigned",

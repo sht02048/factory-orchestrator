@@ -360,6 +360,7 @@ type NextStep =
   | "queued"
   | "running"
   | "waiting-for-input"
+  | "paused"
   | "disconnected"
   | "merged"
   | "human-check"

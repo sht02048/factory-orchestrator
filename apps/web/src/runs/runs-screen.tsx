@@ -411,7 +411,11 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
         <StatusPill status={status}>{statusName(status)}</StatusPill>
       </TableCell>
       <TableCell align="end" numeric>
-        {run.state === "ended" ? ago(run.endedAt, run.endedAgoMs) : elapsed(elapsedMs(run))}
+        {run.state === "ended"
+          ? ago(run.endedAt, run.endedAgoMs)
+          : run.state === "paused"
+            ? t("pausedFor", { elapsed: elapsed(elapsedMs(run)) })
+            : elapsed(elapsedMs(run))}
       </TableCell>
     </TableRow>
   );
@@ -465,9 +469,16 @@ function RunPanel({
       break;
     case "running":
     case "waiting-for-input":
-    case "disconnected":
       when = elapsed(run.executionMs ?? 0);
       reason = t(`reason.${run.state}`);
+      break;
+    case "disconnected":
+      when = elapsed(run.executionMs ?? 0);
+      reason = t(run.paused ? "reason.disconnectedPaused" : "reason.disconnected");
+      break;
+    case "paused":
+      when = run.pausedMs === null ? "" : t("pausedFor", { duration: duration(run.pausedMs) });
+      reason = t("reason.paused");
       break;
     case "ended":
       when = t("endedAfter", { duration: duration(run.executionMs ?? 0) });

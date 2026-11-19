@@ -16,6 +16,7 @@ import {
   getRunWithRecords,
   hasPendingCancelRequest,
   inTransaction,
+  lastStateBeforeDisconnect,
   listRunners,
   listRuns,
   listUnsentAnswers,
@@ -47,7 +48,9 @@ export async function watchActiveRuns(context: TickContext): Promise<void> {
   const { db, logger } = context;
   const runnersById = new Map(listRunners(db).map((runner) => [runner.id, runner]));
   const maxRunMs = new Map(listWorkspaces(db).map((ws) => [ws.id, ws.maxRunMs]));
-  for (const run of listRuns(db, { states: ["running", "waiting-for-input", "disconnected"] })) {
+  for (const run of listRuns(db, {
+    states: ["running", "waiting-for-input", "paused", "disconnected"],
+  })) {
     if (run.state === "queued" || run.state === "ended") continue;
     try {
       await watchRun(context, run, runnersById.get(run.runnerId), {
@@ -61,17 +64,24 @@ export async function watchActiveRuns(context: TickContext): Promise<void> {
 
 interface WatchSettings {
   maxRunMs: number;
+  pausedMs: number;
+  pausedSince: Date | null;
 }
 
 async function watchRun(
   context: TickContext,
   run: ActiveRun,
   storedRunner: StoredRunner | undefined,
-  settings: WatchSettings,
+  limits: { maxRunMs: number },
 ): Promise<void> {
   const { db, logger, adapters } = context;
   const records = getRunWithRecords(db, run.id)?.records;
   if (records === undefined) return;
+  const settings: WatchSettings = {
+    maxRunMs: limits.maxRunMs,
+    pausedMs: records.pausedMs,
+    pausedSince: records.pausedSince,
+  };
   const cancelRequested = hasPendingCancelRequest(db, run.id);
   if (storedRunner === undefined) {
     logger.warn("run's runner is not registered", { runId: run.id, runnerId: run.runnerId });
@@ -128,10 +138,14 @@ async function watchRun(
     );
   }
 
-  const resolution = resolveRunProgress(progress, {
-    answered: answeredQuestions(context, run),
-    denied: deniedPermissions(context, run),
-  });
+  const resolution = keepPausedRunPaused(
+    context,
+    run,
+    resolveRunProgress(progress, {
+      answered: answeredQuestions(context, run),
+      denied: deniedPermissions(context, run),
+    }),
+  );
   const pending = context.pendingEndings.get(run.id);
   const ending =
     pending === undefined
@@ -140,6 +154,8 @@ async function watchRun(
           resolution,
           cancelRequested,
           maxRunMs: settings.maxRunMs,
+          pausedMs: settings.pausedMs,
+          pausedSince: settings.pausedSince,
         })
       : { agentResult: pending.agentResult, report: pending.report, agent: "none" as const };
   if (ending === null) {
@@ -185,6 +201,8 @@ async function endWithoutProgress(
     startedAt: run.startedAt,
     now: context.now(),
     maxRunMs: input.maxRunMs,
+    pausedMs: input.pausedMs,
+    pausedSince: input.pausedSince,
     cancelRequested: input.cancelRequested,
   });
   const ending =
@@ -223,6 +241,8 @@ async function endIfTimedOut(
     startedAt: run.startedAt,
     now: context.now(),
     maxRunMs: input.maxRunMs,
+    pausedMs: input.pausedMs,
+    pausedSince: input.pausedSince,
     cancelRequested: input.cancelRequested,
   });
   if (timeout === null) return;
@@ -250,6 +270,25 @@ async function readLastLog(
   }
 }
 
+type WatchResolution =
+  | ReturnType<typeof resolveRunProgress>
+  | { kind: "continue"; state: "paused" };
+
+function keepPausedRunPaused(
+  context: TickContext,
+  run: ActiveRun,
+  resolution: ReturnType<typeof resolveRunProgress>,
+): WatchResolution {
+  const paused =
+    run.state === "paused" ||
+    (run.state === "disconnected" && lastStateBeforeDisconnect(context.db, run.id) === "paused");
+  if (!paused) return resolution;
+  if (resolution.kind === "continue" || resolution.agentResult === "ended-without-report") {
+    return { kind: "continue", state: "paused" };
+  }
+  return resolution;
+}
+
 interface Ending extends Omit<PendingEnding, "lastLog"> {
   agent: "stop" | "close" | "none";
 }
@@ -259,9 +298,11 @@ function decideEnding(
   run: ActiveRun,
   input: {
     progress: RunProgress;
-    resolution: ReturnType<typeof resolveRunProgress>;
+    resolution: WatchResolution;
     cancelRequested: boolean;
     maxRunMs: number;
+    pausedMs: number;
+    pausedSince: Date | null;
   },
 ): Ending | null {
   const { progress, resolution } = input;
@@ -284,6 +325,8 @@ function decideEnding(
     startedAt: run.startedAt,
     now: context.now(),
     maxRunMs: input.maxRunMs,
+    pausedMs: input.pausedMs,
+    pausedSince: input.pausedSince,
     cancelRequested: false,
   });
   if (timeout === null) return null;
