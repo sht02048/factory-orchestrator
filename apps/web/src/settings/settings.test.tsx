@@ -50,12 +50,12 @@ import {
   mappingInput,
   powerInput,
   savePowerSetting,
-} from "./actions";
-import { hasPendingRunnerChecks, loadSettingsPage } from "./load";
-import type { SettingsContext } from "./load";
+} from "@ganger/app/settings/actions";
+import { hasPendingRunnerChecks, loadSettingsPage } from "@ganger/app/settings/load";
+import type { SettingsContext } from "@ganger/app/settings/load";
 import { settingsMessages } from "./messages";
-import { INSTALL_ITEMS, WORKSPACE_ITEMS } from "./model";
-import type { SettingsItem, SettingsPage } from "./model";
+import { INSTALL_ITEMS, WORKSPACE_ITEMS } from "@ganger/app/settings/model";
+import type { SettingsItem, SettingsPage } from "@ganger/app/settings/model";
 import { SettingsScreen } from "./settings-screen";
 import type { SettingsActions } from "./settings-screen";
 

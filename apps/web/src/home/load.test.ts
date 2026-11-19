@@ -34,10 +34,10 @@ import {
   offlineQueuedKey,
   seedDatabase,
 } from "../testing/seed";
-import { loadShell } from "../shell/load";
-import { loadHomePage } from "./load";
-import type { AttentionItem, HomeRun } from "./model";
-import { runnerIssues } from "./model";
+import { loadShell } from "@ganger/app/shell/load";
+import { loadHomePage } from "@ganger/app/home/load";
+import type { AttentionItem, HomeRun } from "@ganger/app/home/model";
+import { runnerIssues } from "@ganger/app/home/model";
 
 const keys = (runs: ReadonlyArray<HomeRun>) => runs.map((run) => run.ticketKey);
 const attentionKeys = (items: ReadonlyArray<AttentionItem>) =>

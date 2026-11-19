@@ -1,7 +1,12 @@
 import type { SummaryOutcome } from "@ganger/core";
 import { describe, expect, it } from "vitest";
-import { TICKET_FILTERS, countByFilter, matchesFilter, matchesSearch } from "./model";
-import type { TicketFilter, TicketRun, TicketView } from "./model";
+import {
+  TICKET_FILTERS,
+  countByFilter,
+  matchesFilter,
+  matchesSearch,
+} from "@ganger/app/tickets/model";
+import type { TicketFilter, TicketRun, TicketView } from "@ganger/app/tickets/model";
 
 function ticket(key: string, title: string, runs: TicketRun[]): TicketView {
   return {

@@ -1,6 +1,6 @@
 import type { AgentResult, PrState, SummaryOutcome } from "@ganger/core";
-import type { WorkspaceChoice } from "../shell/model";
-import type { StatsPeriodDays } from "../stats/model";
+import type { WorkspaceChoice } from "../shell/model.js";
+import type { StatsPeriodDays } from "../stats/model.js";
 
 export type QueuedReason =
   | {

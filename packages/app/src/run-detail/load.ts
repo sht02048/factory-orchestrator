@@ -24,9 +24,9 @@ import type {
   StoredPermissionWait,
   StoredRunQuestion,
 } from "@ganger/db";
-import { pendingInput } from "../home/load";
-import type { QueuedReason } from "../runs/model";
-import { explainQueue } from "../runs/queue-reasons";
+import { pendingInput } from "../home/load.js";
+import type { QueuedReason } from "../runs/model.js";
+import { explainQueue } from "../runs/queue-reasons.js";
 import type {
   CiView,
   LogTailView,
@@ -36,7 +36,7 @@ import type {
   RunDetailPage,
   RunDetailStatus,
   TimelineEvent,
-} from "./model";
+} from "./model.js";
 
 export function loadRunDetail(db: Database, runId: string, now: Date): RunDetailPage {
   const found = getRunWithRecords(db, toRunId(runId));

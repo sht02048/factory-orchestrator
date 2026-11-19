@@ -6,7 +6,7 @@ import { HOME_ENV, homePaths, readBootEnv } from "./home.js";
 import { keepAwake } from "./keep-awake.js";
 import type { KeepAwakeOptions } from "./keep-awake.js";
 import type { AppLayout, ProcessSpec } from "./layout.js";
-import { readPowerSettings } from "./power-settings.js";
+import { readPowerSettings } from "@ganger/app/power-settings";
 import { ServerAlreadyRunningError, acquireServerLock } from "./server-lock.js";
 import { webUrl } from "./web-url.js";
 

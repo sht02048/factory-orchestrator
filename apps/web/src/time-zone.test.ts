@@ -5,7 +5,7 @@ import {
   parseTimeZone,
   timeZoneCookie,
   timeZoneFromCookies,
-} from "./time-zone";
+} from "@ganger/app/time-zone";
 
 const iso = (day: number) => new Date(day).toISOString().slice(0, 10);
 

@@ -13,12 +13,12 @@ import {
   listWorkspaceTrackerProjects,
   listWorkspaces,
 } from "@ganger/db";
-import type { PowerSettings } from "@ganger/cli/power-settings";
+import type { PowerSettingsStore } from "../power-settings.js";
 import type { Database, SecretBox, StoredTrackerConnection, WorkspaceId } from "@ganger/db";
 import { z } from "zod";
-import { prerequisiteProject } from "../labels";
-import { resolveWorkspace } from "../shell/model";
-import { KNOWN_AGENTS } from "./model";
+import { prerequisiteProject } from "../prerequisites.js";
+import { resolveWorkspace } from "../shell/model.js";
+import { KNOWN_AGENTS } from "./model.js";
 import type {
   AddressesView,
   BoundProject,
@@ -33,12 +33,9 @@ import type {
   SettingsPage,
   TrackerProjectChoice,
   WorkspaceSettings,
-} from "./model";
+} from "./model.js";
 
-export interface PowerSettingsStore {
-  read(): PowerSettings;
-  write(settings: PowerSettings): void;
-}
+export type { PowerSettingsStore };
 
 export interface SettingsContext {
   db: Database;

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { IntlProvider, createTranslator, useMessages, useTimeZone } from "use-intl";
 import domain from "../messages/ko/domain.json" with { type: "json" };
 import shell from "../messages/ko/shell.json" with { type: "json" };
-import { DEFAULT_TIME_ZONE } from "./time-zone";
+import { DEFAULT_TIME_ZONE } from "@ganger/app/time-zone";
 
 export interface AppMessages {
   shell: typeof shell;

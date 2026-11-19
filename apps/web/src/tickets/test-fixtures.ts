@@ -41,7 +41,7 @@ import {
   toWorkspaceId,
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
-import type { TicketsContext } from "./load";
+import type { TicketsContext } from "@ganger/app/tickets/load";
 
 export const connection = toTrackerConnectionId("conn-acme");
 export const commerce = toWorkspaceId("ws-commerce");

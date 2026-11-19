@@ -14,13 +14,13 @@ import {
   toWorkspaceId,
 } from "@ganger/db";
 import type { Database, StoredRun } from "@ganger/db";
-import { explainQueue } from "../runs/queue-reasons";
-import { isWebUrl } from "../format/url";
-import { resolveWorkspace, runnerIssueCause } from "../shell/model";
-import { calendarDay } from "../time-zone";
-import type { QueuedReason } from "../runs/model";
-import type { DashboardRunner, DoneRun, HomePage, HomeRun, InputWait } from "./model";
-import { partitionHome } from "./model";
+import { explainQueue } from "../runs/queue-reasons.js";
+import { isWebUrl } from "../format/url.js";
+import { resolveWorkspace, runnerIssueCause } from "../shell/model.js";
+import { calendarDay } from "../time-zone.js";
+import type { QueuedReason } from "../runs/model.js";
+import type { DashboardRunner, DoneRun, HomePage, HomeRun, InputWait } from "./model.js";
+import { partitionHome } from "./model.js";
 
 export function loadHomePage(
   db: Database,

@@ -202,6 +202,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@ganger/app':
+        specifier: workspace:*
+        version: link:../../packages/app
       '@ganger/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -270,6 +273,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ganger/app':
+        specifier: workspace:*
+        version: link:../../packages/app
       '@ganger/cli':
         specifier: workspace:*
         version: link:../cli
@@ -392,6 +398,24 @@ importers:
       vite:
         specifier: 8.3.8
         version: 8.3.8(@types/node@24.19.2)(jiti@2.7.0)
+
+  packages/app:
+    dependencies:
+      '@ganger/codehost-github':
+        specifier: workspace:*
+        version: link:../codehost-github
+      '@ganger/core':
+        specifier: workspace:*
+        version: link:../core
+      '@ganger/db':
+        specifier: workspace:*
+        version: link:../db
+      '@ganger/tracker-linear':
+        specifier: workspace:*
+        version: link:../tracker-linear
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   packages/codehost-github:
     dependencies:

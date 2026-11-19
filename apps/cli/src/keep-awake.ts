@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { PowerSettingsRead } from "./power-settings.js";
+import type { PowerSettingsRead } from "@ganger/app/power-settings";
 
 export const KEEP_AWAKE_POLL_MS = 5_000;
 export const CAFFEINATE_PATH = "/usr/bin/caffeinate";

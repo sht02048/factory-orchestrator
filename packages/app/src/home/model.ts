@@ -1,6 +1,6 @@
 import type { AgentResult, PrState, RunId, SummaryOutcome, TicketKey } from "@ganger/core";
-import type { QueuedReason } from "../runs/model";
-import type { RunnerIssueCause, WorkspaceChoice, WorkspaceSummary } from "../shell/model";
+import type { QueuedReason } from "../runs/model.js";
+import type { RunnerIssueCause, WorkspaceChoice, WorkspaceSummary } from "../shell/model.js";
 
 export type InputWait =
   | {

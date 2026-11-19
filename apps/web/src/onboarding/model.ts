@@ -3,7 +3,7 @@ import type {
   RunnerSettingsView,
   SettingsPage,
   WorkspaceSettings,
-} from "../settings/model";
+} from "@ganger/app/settings/model";
 
 export const ONBOARDING_STEPS = ["tracker", "github", "runner", "workspace", "mapping"] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];

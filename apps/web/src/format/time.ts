@@ -1,5 +1,5 @@
 import { useFormatter, useTranslations } from "use-intl";
-import { DAY_MS } from "../time-zone";
+import { DAY_MS } from "@ganger/app/time-zone";
 
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;

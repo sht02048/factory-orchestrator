@@ -30,9 +30,9 @@ import {
   saveTrackerConnectionSetting,
   trackerConnectionInput,
   trackerProjectInput,
-} from "../settings/actions";
-import { hasPendingRunnerChecks, loadSettingsPage } from "../settings/load";
-import type { SettingsContext } from "../settings/load";
+} from "@ganger/app/settings/actions";
+import { hasPendingRunnerChecks, loadSettingsPage } from "@ganger/app/settings/load";
+import type { SettingsContext } from "@ganger/app/settings/load";
 import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
 import { installPowerSettings } from "./power-settings";

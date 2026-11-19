@@ -5,9 +5,9 @@ import { space } from "@ganger/ui/tokens.stylex";
 import { useState } from "react";
 import { useTranslations } from "use-intl";
 import { useAgentName } from "../labels";
-import type { AssignInput, AssignResult } from "./assign";
-import { agentsFor, runnersFor } from "./model";
-import type { AssignDefaults, RunnerChoice, TicketView } from "./model";
+import type { AssignInput, AssignResult } from "@ganger/app/tickets/assign";
+import { agentsFor, runnersFor } from "@ganger/app/tickets/model";
+import type { AssignDefaults, RunnerChoice, TicketView } from "@ganger/app/tickets/model";
 
 export const AUTO_RUNNER = "\u0000auto";
 

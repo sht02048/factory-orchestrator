@@ -1,7 +1,7 @@
 import { toRunId, toRunnerId, toRunnerProjectId } from "@ganger/core";
 import type { QueuedRun, RunnerSnapshot } from "@ganger/core";
 import { describe, expect, it } from "vitest";
-import { explainQueue } from "./queue-reasons";
+import { explainQueue } from "@ganger/app/runs/queue-reasons";
 
 const repo = toRunnerProjectId("github:acme/web");
 const other = toRunnerProjectId("github:acme/other");

@@ -15,10 +15,10 @@ import {
   offlineQueuedKey,
   seedDatabase,
 } from "../testing/seed";
-import { loadHomePage } from "../home/load";
-import { loadRunsPage } from "./load";
+import { loadHomePage } from "@ganger/app/home/load";
+import { loadRunsPage } from "@ganger/app/runs/load";
 import { runsMessages } from "./messages";
-import type { RunFilter, RunsPage } from "./model";
+import type { RunFilter, RunsPage } from "@ganger/app/runs/model";
 import { RunsScreen } from "./runs-screen";
 
 const noop = () => {};

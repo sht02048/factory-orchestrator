@@ -17,10 +17,10 @@ import {
 } from "@ganger/db";
 import type { Database, SecretBox } from "@ganger/db";
 import { z } from "zod";
-import { idSchema, nameSchema } from "../settings/actions";
-import { loadSettingsPage, loadTrackerProjectChoices } from "../settings/load";
-import type { SettingsContext } from "../settings/load";
-import type { ConnectionProjects, SaveResult, SettingsPage } from "../settings/model";
+import { idSchema, nameSchema } from "@ganger/app/settings/actions";
+import { loadSettingsPage, loadTrackerProjectChoices } from "@ganger/app/settings/load";
+import type { SettingsContext } from "@ganger/app/settings/load";
+import type { ConnectionProjects, SaveResult, SettingsPage } from "@ganger/app/settings/model";
 import { ONBOARDING_STEPS, isSetupComplete, resolveStep } from "./model";
 import type { SetupCounts } from "./model";
 

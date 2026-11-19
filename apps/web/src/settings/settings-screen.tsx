@@ -42,7 +42,8 @@ import {
 } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { prerequisiteHint, useAgentName, usePrerequisiteName } from "../labels";
+import { prerequisiteHint } from "@ganger/app/prerequisites";
+import { useAgentName, usePrerequisiteName } from "../labels";
 import { useStatusName } from "../status";
 import {
   INSTALL_ITEMS,
@@ -50,7 +51,7 @@ import {
   RUNNER_CHECK_POLL_LIMIT_MS,
   RUNNER_CHECK_POLL_MS,
   WORKSPACE_ITEMS,
-} from "./model";
+} from "@ganger/app/settings/model";
 import type {
   AddressesView,
   BoundProject,
@@ -66,7 +67,7 @@ import type {
   TrackerConnectionView,
   TrackerProjectChoice,
   WorkspaceSettings,
-} from "./model";
+} from "@ganger/app/settings/model";
 
 export type ActionResult = { ok: true } | { ok: false; reason: string };
 

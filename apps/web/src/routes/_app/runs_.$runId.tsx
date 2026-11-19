@@ -4,7 +4,7 @@ import { createTranslator } from "use-intl";
 import { ScreenMessages, defaultLocale } from "../../i18n";
 import { runMessages } from "../../run-detail/messages";
 import { RunDetailScreen } from "../../run-detail/run-detail-screen";
-import type { RunActionResult } from "../../run-detail/actions";
+import type { RunActionResult } from "@ganger/app/run-detail/actions";
 import {
   answerQuestion,
   cancelRun,

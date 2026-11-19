@@ -14,7 +14,7 @@ import {
   denyInput,
   submitAnswer,
   submitDenial,
-} from "./actions";
+} from "@ganger/app/home/actions";
 
 function seedQuestion() {
   const { db, ids } = seedDatabase();

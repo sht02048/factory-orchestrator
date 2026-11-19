@@ -30,12 +30,18 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import type { WorkspaceSummary } from "../shell/model";
+import type { WorkspaceSummary } from "@ganger/app/shell/model";
 import { runStatus, useStatusName } from "../status";
-import type { AssignInput, AssignResult } from "./assign";
+import type { AssignInput, AssignResult } from "@ganger/app/tickets/assign";
 import { AssignDialog } from "./assign-dialog";
-import { TICKET_FILTERS, countByFilter, lastRun, matchesFilter, matchesSearch } from "./model";
-import type { TicketFilter, TicketRun, TicketView, TicketsPage } from "./model";
+import {
+  TICKET_FILTERS,
+  countByFilter,
+  lastRun,
+  matchesFilter,
+  matchesSearch,
+} from "@ganger/app/tickets/model";
+import type { TicketFilter, TicketRun, TicketView, TicketsPage } from "@ganger/app/tickets/model";
 import { useRowWindow } from "./row-window";
 
 export interface TicketsScreenProps {

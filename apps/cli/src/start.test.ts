@@ -9,7 +9,7 @@ import { MissingEnvFileError } from "./home.js";
 import { init } from "./init.js";
 import type { HoldSleepAssertion } from "./keep-awake.js";
 import type { AppLayout, ProcessSpec } from "./layout.js";
-import { writePowerSettings } from "./power-settings.js";
+import { writePowerSettings } from "@ganger/app/power-settings";
 import { readServerLock, serverLockPath } from "./server-lock.js";
 import { StartError, start, webUrl } from "./start.js";
 import type { Started } from "./start.js";

@@ -9,8 +9,7 @@
   "exports": {
     "./server-lock": "./src/server-lock.ts",
     "./home": "./src/home.ts",
-    "./web-url": "./src/web-url.ts",
-    "./power-settings": "./src/power-settings.ts"
+    "./web-url": "./src/web-url.ts"
   },
   "scripts": {
     "build": "vite build",
@@ -18,6 +17,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@ganger/app": "workspace:*",
     "@ganger/db": "workspace:*",
     "zod": "4.6.7"
   },
