@@ -434,7 +434,7 @@ function CheckList({ runner, recheck }: { runner: RunnerView; recheck: Recheck }
       <Button variant="secondary" disabled={recheck.checking} onClick={recheck.request}>
         {recheck.checking ? t("checking") : t("recheck")}
       </Button>
-      <Text variant="meta" as="span">
+      <Text variant="meta" as="span" numeric>
         {checkingText}
       </Text>
     </div>

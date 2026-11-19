@@ -392,6 +392,25 @@ describe("확인이 실패한 단계", () => {
     expect(stepPassed(settings, "runner")).toBe(true);
     expect(isDisabled(nextButton(html, "다음"))).toBe(false);
     expect(text(html)).toContain("push를 확인할 저장소가 없어요");
+    expect(html).not.toContain('aria-label="일부만 통과"');
+  });
+
+  it("push를 확인하지 못한 저장소만 있으면 실패라고 하지 않고 확인하지 못했다고 알린다 (0096)", async () => {
+    const result = health({ service: true, push: true });
+    const { settings, html } = await runnerStep({
+      ...result,
+      prerequisites: result.prerequisites.map((p) =>
+        p.id === "orca-service"
+          ? p
+          : { ...p, satisfied: null, failure: { kind: "timeout" as const, reason: null } },
+      ),
+    });
+    expect(stepPassed(settings, "runner")).toBe(true);
+    const shown = text(html);
+    expect(shown).toContain("push를 확인하지 못한 저장소가 있어요");
+    expect(shown).toContain("acme/web 확인하지 못했어요 · 시간 초과");
+    expect(shown).not.toContain("push가 안 되는 저장소가 있어요");
+    expect(html).not.toContain('aria-label="일부만 통과"');
   });
 
   it("러너가 여럿이어도 주 버튼은 하나다: 마치기 전에는 가장 최근 러너의 다시 확인, 마친 뒤에는 다음", async () => {

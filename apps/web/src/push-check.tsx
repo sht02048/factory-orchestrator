@@ -20,7 +20,11 @@ export function PushProblems({ summary }: { summary: PushSummary }) {
   const t = useTranslations("domain.pushCheck");
   const problems = [...summary.failed, ...summary.unknown];
   if (problems.length === 0) return null;
-  const code = (chunks: ReactNode) => <code {...stylex.props(styles.code)}>{chunks}</code>;
+  const code = (chunks: ReactNode) => (
+    <code {...stylex.props(styles.code)}>
+      {typeof chunks === "string" ? wordsKeptWhole(chunks) : chunks}
+    </code>
+  );
   return (
     <div {...stylex.props(styles.stack)}>
       <ul aria-label={t("problemsLabel")} {...stylex.props(styles.list)}>
@@ -45,20 +49,34 @@ export function PushProblems({ summary }: { summary: PushSummary }) {
   );
 }
 
+function wordsKeptWhole(command: string): ReactNode {
+  return command.split(" ").map((word, index) => (
+    <span key={index} {...stylex.props(styles.word)}>
+      {index === 0 ? word : ` ${word}`}
+    </span>
+  ));
+}
+
 function ProblemLine({ problem, broken }: { problem: PushProblem; broken: boolean }) {
   const t = useTranslations("domain.pushCheck");
   const kind = problem.failure === null ? null : t(`failure.${problem.failure.kind}`);
   const reason = problem.failure?.reason ?? null;
-  let detail: string;
+  const reasonCode = (chunks: ReactNode) => (
+    <Text variant="meta" as="span" mono>
+      {chunks}
+    </Text>
+  );
+  let detail: ReactNode;
   if (!broken) detail = kind === null ? t("unknown") : t("unknownReason", { kind });
   else if (kind === null) detail = t("failure.other");
-  else detail = reason === null ? kind : t("failedReason", { kind, reason });
+  else if (reason === null) detail = kind;
+  else detail = t.rich("failedReason", { kind, reason, code: reasonCode });
   return (
     <li data-push={broken ? "broken" : "unknown"} {...stylex.props(styles.line)}>
       <Text variant="ui" tone={broken ? "problem" : "strong"} as="span">
         {problem.project}
       </Text>
-      <Text variant="meta" as="span" mono={reason !== null && broken}>
+      <Text variant="meta" as="span">
         {detail}
       </Text>
     </li>
@@ -99,4 +117,5 @@ const styles = stylex.create({
     overflowWrap: "anywhere",
   },
   code: { fontFamily: fonts.mono },
+  word: { whiteSpace: "pre" },
 });

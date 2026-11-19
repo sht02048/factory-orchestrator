@@ -101,9 +101,11 @@
     "errorBody": "러너에는 닿았지만 확인을 끝내지 못했어요({reason}). 러너의 Orca 상태를 확인하고 다시 확인해요.",
     "pushWarning": "일부만 통과",
     "pushWarningTitle": "push가 안 되는 저장소가 있어요",
-    "pushWarningBody": "러너는 준비됐으니 다음으로 갈 수 있어요. 아래 저장소의 티켓만 이 러너에 맡기지 않아요.",
+    "pushWarningBody": "러너는 준비됐으니 다음으로 갈 수 있어요.",
     "pushNoneTitle": "push를 확인할 저장소가 없어요",
-    "pushNoneBody": "러너의 Orca에 준비된 저장소가 없어 git push --dry-run을 해 보지 못했어요. 다음으로 갈 수 있고, 저장소를 추가하면 다음 확인 때 확인해요."
+    "pushNoneBody": "러너의 Orca에 준비된 저장소가 없어 git push --dry-run을 해 보지 못했어요. 다음으로 갈 수 있고, 저장소를 추가하면 다음 확인 때 확인해요.",
+    "pushUnknownTitle": "push를 확인하지 못한 저장소가 있어요",
+    "pushUnknownBody": "러너는 준비됐으니 다음으로 갈 수 있어요. 다음 확인 때 다시 확인해요."
   },
   "workspace": {
     "name": "Workspace 이름",

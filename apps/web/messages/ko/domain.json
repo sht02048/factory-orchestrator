@@ -103,7 +103,7 @@
       "other": "기타"
     },
     "problemsLabel": "push 확인에 실패한 저장소",
-    "failedReason": "{kind} · {reason}",
+    "failedReason": "{kind} · <code>{reason}</code>",
     "unknown": "확인하지 못했어요",
     "unknownReason": "확인하지 못했어요 · {kind}",
     "scope": "push가 안 되는 저장소의 티켓만 이 러너에 맡기지 않아요. 다른 저장소의 티켓은 그대로 맡겨요.",

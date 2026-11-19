@@ -826,6 +826,10 @@ function RunnerChecklist({
   const pushText = usePushSummaryText();
   const push = summarizePushChecks(prerequisites);
   const pushPassed = push.total > 0 && push.passed === push.total;
+  const pushStateLabel = (summary: PushSummary): string => {
+    if (summary.total > 0 && summary.passed === summary.total) return tc("satisfied");
+    return summary.failed.length > 0 ? t("pushWarning") : tc("unknown");
+  };
   return (
     <div {...stylex.props(styles.stack)}>
       <Checklist label={t("checklist")}>
@@ -842,7 +846,7 @@ function RunnerChecklist({
             {prerequisite.satisfied === true ? null : <Text variant="meta">{tc("unknown")}</Text>}
           </ChecklistItem>
         ))}
-        <ChecklistItem done={pushPassed} label={pushPassed ? tc("satisfied") : t("pushWarning")}>
+        <ChecklistItem done={pushPassed} label={pushStateLabel(push)}>
           {tPush("name")} · {pushText(push)}
         </ChecklistItem>
       </Checklist>
@@ -854,12 +858,14 @@ function RunnerChecklist({
 function RunnerPushWarning({ push }: { push: PushSummary | null }) {
   const t = useTranslations("onboarding.runner");
   if (push === null || !pushNeedsWarning(push)) return null;
+  const kind =
+    push.total === 0 ? "pushNone" : push.failed.length > 0 ? "pushWarning" : "pushUnknown";
   return (
-    <div role="status" {...stylex.props(styles.stack)}>
+    <div {...stylex.props(styles.stack)}>
       <Text variant="ui" as="p" tone="strong">
-        {push.total === 0 ? t("pushNoneTitle") : t("pushWarningTitle")}
+        {t(`${kind}Title`)}
       </Text>
-      <Text variant="body">{push.total === 0 ? t("pushNoneBody") : t("pushWarningBody")}</Text>
+      <Text variant="body">{t(`${kind}Body`)}</Text>
       <PushProblems summary={push} />
     </div>
   );
@@ -886,7 +892,11 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
     check?.status === "pending" ? (check.requestedAgoMs ?? 0) : null,
   );
   if (check === null || check.status === "pending") {
-    return check === null ? null : <Text variant="meta">{checkingText ?? t("waiting")}</Text>;
+    return check === null ? null : (
+      <Text variant="meta" numeric>
+        {checkingText ?? t("waiting")}
+      </Text>
+    );
   }
   if (check.status !== "done") return null;
   const problems = runnerProblems(runner);
