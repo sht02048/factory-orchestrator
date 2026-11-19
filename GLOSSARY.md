@@ -33,7 +33,7 @@ _Avoid_: Team, Org, Space, Organization
 _Avoid_: Worker, Agent, Host, Machine
 
 **Capacity**:
-한 러너가 동시에 돌릴 수 있는 런의 최대 수.
+한 러너가 동시에 돌릴 수 있는 런의 최대 수. 화면 문구에서는 capacity 한 단위를 "자리"라고 쓴다(런 하나가 자리 하나를 차지한다).
 _Avoid_: Slot, Concurrency
 
 **Online / Offline**:

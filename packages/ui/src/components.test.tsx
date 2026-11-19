@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   Button,
+  CAPACITY_CELLS_MAX,
   CapacityBar,
+  CapacityCells,
   Card,
   Checkbox,
   DefinitionItem,
@@ -546,6 +548,54 @@ describe("새 컴포넌트(티켓 0073)", () => {
     expect(over).toContain('data-tone="problem"');
     expect(over).toContain('aria-valuenow="100"');
     expect(over).toContain('aria-valuetext="130%"');
+  });
+
+  it("CapacityCells 는 자리 하나를 칸 하나로 그리고 칸 묶음을 이름 하나로 읽는다", () => {
+    const html = renderToString(<CapacityCells used={2} total={3} label="3자리 중 2자리 사용" />);
+    expect(html).toMatch(/^<span role="img" aria-label="3자리 중 2자리 사용" data-tone="progress"/);
+    expect([...html.matchAll(/data-cell="(used|free)"/g)].map((m) => m[1])).toEqual([
+      "used",
+      "used",
+      "free",
+    ]);
+    expect(html).toMatch(/<span aria-hidden="true"[^>]*><span data-cell="used"/);
+    expect(html).toMatch(/aria-hidden="true"[^>]*>2\/3</);
+    expect(renderToString(<CapacityCells used={1} total={2} label="x" tone="problem" />)).toContain(
+      'data-tone="problem"',
+    );
+  });
+
+  it("CapacityCells 는 쓰는 칸과 빈칸의 모양을 다르게 하고, 쓰는 칸 색은 tone 을 따른다", () => {
+    const cellClass = (html: string, kind: "used" | "free") =>
+      new RegExp(`data-cell="${kind}" class="([^"]+)"`).exec(html)?.[1] ?? "";
+    const progress = renderToString(<CapacityCells used={1} total={2} label="x" />);
+    const problem = renderToString(<CapacityCells used={1} total={2} label="x" tone="problem" />);
+    expect(cellClass(progress, "used")).not.toBe(cellClass(progress, "free"));
+    expect(cellClass(progress, "used")).not.toBe(cellClass(problem, "used"));
+    expect(cellClass(progress, "free")).toBe(cellClass(problem, "free"));
+  });
+
+  it("CapacityCells 는 자리가 기준보다 많으면 칸 없이 숫자만 보인다", () => {
+    expect(CAPACITY_CELLS_MAX).toBe(8);
+    const atMax = renderToString(<CapacityCells used={8} total={8} label="x" />);
+    expect(atMax).toContain('data-cells="shown"');
+    expect([...atMax.matchAll(/data-cell=/g)]).toHaveLength(8);
+    const over = renderToString(<CapacityCells used={3} total={9} label="x" />);
+    expect(over).toContain('data-cells="number-only"');
+    expect(over).not.toContain("data-cell=");
+    expect(over).toMatch(/aria-hidden="true"[^>]*>3\/9</);
+    const none = renderToString(<CapacityCells used={0} total={0} label="x" />);
+    expect(none).toContain('data-cells="number-only"');
+    expect(none).toMatch(/>0\/0</);
+  });
+
+  it("CapacityCells 는 쓰는 자리가 capacity 보다 많아도 칸은 capacity 만큼 채우고 숫자는 그대로 보인다", () => {
+    const html = renderToString(<CapacityCells used={3} total={2} label="x" />);
+    expect([...html.matchAll(/data-cell="(used|free)"/g)].map((m) => m[1])).toEqual([
+      "used",
+      "used",
+    ]);
+    expect(html).toMatch(/>3\/2</);
   });
 
   it("ProblemCallout 은 제목으로 이름 붙은 구역이고, 단계는 번호 목록, 행동은 마지막이다", () => {

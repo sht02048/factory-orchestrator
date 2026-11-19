@@ -304,7 +304,12 @@ describe("Dashboard 배치(브라우저, 0060)", () => {
     expect(await todo.getByText("runner-b").count()).toBe(0);
     const offline = runners.locator('a[href="/runners?sel=runner-b"]');
     await offline.getByText("runner-b", { exact: true }).waitFor();
-    expect(await offline.getByRole("meter").getAttribute("aria-valuetext")).toBe("0/1");
+    const capacity = home.runners.capacity.replace("{total}", "1").replace("{used}", "0");
+    await offline.getByRole("img", { name: capacity, exact: true }).waitFor();
+    expect(await offline.locator("[data-cell]").count()).toBe(1);
+    await runners
+      .getByText(new RegExp(`^${home.runners.free.replace("{count}", "\\d+")}$`))
+      .waitFor();
     const problem = runners.getByRole("region", {
       name: home.runners.problemTitle.replace("{count}", "1"),
     });
