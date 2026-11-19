@@ -184,7 +184,7 @@ function LabelRow({
             ws={ws}
             label={label}
             actions={actions}
-            selectLabel={t("label.selectFor", { connection: label.connection.name })}
+            selectLabel={t("project.label")}
             showReload={false}
           />
         </span>

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslations } from "use-intl";
+import type { UnsavedGuard } from "./navigation-guard";
 import { ReportUnsavedContext, useReason, type ActionResult } from "./settings-screen";
 
 export type AutoSaveStatus = "idle" | "saving" | "saved" | "reverted";
@@ -81,7 +82,21 @@ const EditorContext = createContext<EditorSlot>({
   closeAll: () => {},
 });
 
-export function EditorProvider({ children }: { children: ReactNode }) {
+export function showBlockedEditor(selector: string): void {
+  const editing = document.querySelector<HTMLElement>(selector);
+  editing?.scrollIntoView({ block: "nearest" });
+  editing?.querySelector<HTMLElement>("input:not([readonly]), button")?.focus({
+    preventScroll: true,
+  });
+}
+
+export function EditorProvider({
+  children,
+  renderGuard,
+}: {
+  children: ReactNode;
+  renderGuard?: (guard: UnsavedGuard) => ReactNode;
+}) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
   const dirty = useRef(new Set<string>());
@@ -94,11 +109,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       if (openId !== null && openId !== id && dirty.current.size > 0) {
         setBlocked(true);
-        const editing = document.querySelector<HTMLElement>("[data-editing]");
-        editing?.scrollIntoView({ block: "nearest" });
-        editing?.querySelector<HTMLElement>("input:not([readonly]), button")?.focus({
-          preventScroll: true,
-        });
+        showBlockedEditor("[data-editing]");
         return;
       }
       setBlocked(false);
@@ -114,9 +125,22 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     () => ({ openId, blocked, open, closeAll }),
     [openId, blocked, open, closeAll],
   );
+  const guard = useMemo(
+    (): UnsavedGuard => ({
+      isDirty: () => dirty.current.size > 0,
+      onBlocked: () => {
+        setBlocked(true);
+        showBlockedEditor("[data-editing]");
+      },
+    }),
+    [],
+  );
   return (
     <ReportUnsavedContext value={report}>
-      <EditorContext value={value}>{children}</EditorContext>
+      <EditorContext value={value}>
+        {renderGuard?.(guard)}
+        {children}
+      </EditorContext>
     </ReportUnsavedContext>
   );
 }

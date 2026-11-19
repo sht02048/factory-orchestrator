@@ -28,12 +28,14 @@ import {
 } from "@ganger/ui";
 import { USAGE_HIGH_PERCENT } from "@ganger/core";
 import { breakpoints, fonts, size, space } from "@ganger/ui/tokens.stylex";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useLocale, useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { usePrerequisiteName, useUsageNames } from "../labels";
 import { PushProblems, useCheckingText, usePushSummaryText } from "../push-check";
+import type { UnsavedGuard } from "../settings/navigation-guard";
+import { showBlockedEditor } from "../settings/row-state";
 import { ReportUnsavedContext, useRunnerCheckPolling } from "../settings/settings-screen";
 import type { ActionResult } from "../settings/settings-screen";
 import { useStatusName } from "../status";
@@ -77,6 +79,7 @@ export interface RunnersScreenProps {
   actions: RunnerActions;
   setup?: ReactNode;
   renderEdit?: RenderRunnerEdit;
+  renderGuard?: (guard: UnsavedGuard) => ReactNode;
 }
 
 export function RunnersScreen({
@@ -87,6 +90,7 @@ export function RunnersScreen({
   actions,
   setup,
   renderEdit,
+  renderGuard,
 }: RunnersScreenProps) {
   const t = useTranslations("runners");
   const runners = problemRunnersFirst(page.runners);
@@ -102,12 +106,19 @@ export function RunnersScreen({
     else unsaved.current.delete(formId);
     if (unsaved.current.size === 0) setBlocked(false);
   }, []);
+  const guard = useMemo(
+    (): UnsavedGuard => ({
+      isDirty: () => unsaved.current.size > 0,
+      onBlocked: () => {
+        setBlocked(true);
+        showBlockedEditor("[data-runner-editing]");
+      },
+    }),
+    [],
+  );
   const selectUnlessUnsaved = (id: string) => {
-    if (unsaved.current.size > 0) {
-      setBlocked(true);
-      const editing = document.querySelector<HTMLElement>("[data-runner-editing]");
-      editing?.scrollIntoView({ block: "nearest" });
-      editing?.querySelector<HTMLElement>("input")?.focus({ preventScroll: true });
+    if (guard.isDirty()) {
+      guard.onBlocked();
       return;
     }
     setBlocked(false);
@@ -124,83 +135,91 @@ export function RunnersScreen({
   }, [selectedId]);
 
   return (
-    <ScreenLayout
-      header={
-        <PageHeader
-          title={t("title")}
-          subtitle={
-            runners.length === 0
-              ? undefined
-              : t("subtitle", { total: runners.length, available, issues })
+    <>
+      {renderGuard?.(guard)}
+      <ScreenLayout
+        header={
+          <PageHeader
+            title={t("title")}
+            subtitle={
+              runners.length === 0
+                ? undefined
+                : t("subtitle", { total: runners.length, available, issues })
+            }
+            actions={
+              <a
+                href={addRunnerHref(ws)}
+                onClick={(event) => {
+                  if (!guard.isDirty()) return;
+                  event.preventDefault();
+                  guard.onBlocked();
+                }}
+                data-variant="primary"
+                {...stylex.props(...buttonStyles("primary"))}
+              >
+                {t("add")}
+              </a>
+            }
+          />
+        }
+      >
+        <SplitView
+          fill={false}
+          list={
+            <div {...stylex.props(styles.listColumn)}>
+              {runners.length === 0 ? (
+                <EmptyRunners />
+              ) : (
+                <Table columns="minmax(0, 1fr)">
+                  <ResponsiveColumnsHead
+                    lead={t("columns.runner")}
+                    columns={[
+                      { width: size.capacityCellsColumn, content: t("columns.capacity") },
+                      { width: size.usageColumn, content: t("columns.usage") },
+                    ]}
+                  />
+                  <TableRows
+                    label={t("listLabel")}
+                    value={selected?.id ?? null}
+                    onValueChange={selectUnlessUnsaved}
+                  >
+                    {runners.map((runner) => (
+                      <RunnerRow key={runner.id} runner={runner} />
+                    ))}
+                  </TableRows>
+                </Table>
+              )}
+            </div>
           }
-          actions={
-            <a
-              href={addRunnerHref(ws)}
-              data-variant="primary"
-              {...stylex.props(...buttonStyles("primary"))}
-            >
-              {t("add")}
-            </a>
+          panel={
+            <section aria-label={adding ? t("add") : t("panel.label")}>
+              {adding ? (
+                <DetailPanel>
+                  <div {...stylex.props(styles.setup)}>
+                    <Text variant="heading">{t("add")}</Text>
+                    {setup}
+                  </div>
+                </DetailPanel>
+              ) : selected === undefined ? (
+                <DetailPanel>
+                  {runners.length === 0 ? null : <Text variant="meta">{t("panel.empty")}</Text>}
+                </DetailPanel>
+              ) : (
+                <ReportUnsavedContext value={reportUnsaved}>
+                  <RunnerPanel
+                    key={selected.id}
+                    runner={selected}
+                    actions={actions}
+                    renderEdit={renderEdit}
+                    blocked={blocked}
+                  />
+                </ReportUnsavedContext>
+              )}
+            </section>
           }
         />
-      }
-    >
-      <SplitView
-        fill={false}
-        list={
-          <div {...stylex.props(styles.listColumn)}>
-            {runners.length === 0 ? (
-              <EmptyRunners />
-            ) : (
-              <Table columns="minmax(0, 1fr)">
-                <ResponsiveColumnsHead
-                  lead={t("columns.runner")}
-                  columns={[
-                    { width: size.capacityCellsColumn, content: t("columns.capacity") },
-                    { width: size.usageColumn, content: t("columns.usage") },
-                  ]}
-                />
-                <TableRows
-                  label={t("listLabel")}
-                  value={selected?.id ?? null}
-                  onValueChange={selectUnlessUnsaved}
-                >
-                  {runners.map((runner) => (
-                    <RunnerRow key={runner.id} runner={runner} />
-                  ))}
-                </TableRows>
-              </Table>
-            )}
-          </div>
-        }
-        panel={
-          <section aria-label={adding ? t("add") : t("panel.label")}>
-            {adding ? (
-              <DetailPanel>
-                <div {...stylex.props(styles.setup)}>
-                  <Text variant="heading">{t("add")}</Text>
-                  {setup}
-                </div>
-              </DetailPanel>
-            ) : selected === undefined ? (
-              <DetailPanel>
-                {runners.length === 0 ? null : <Text variant="meta">{t("panel.empty")}</Text>}
-              </DetailPanel>
-            ) : (
-              <ReportUnsavedContext value={reportUnsaved}>
-                <RunnerPanel
-                  key={selected.id}
-                  runner={selected}
-                  actions={actions}
-                  renderEdit={renderEdit}
-                  blocked={blocked}
-                />
-              </ReportUnsavedContext>
-            )}
-          </section>
-        }
-      />
-    </ScreenLayout>
+      </ScreenLayout>
+    </>
   );
 }
 

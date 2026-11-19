@@ -59,6 +59,7 @@ import {
   useSubmit,
   type SettingsActions,
 } from "./settings-screen";
+import type { UnsavedGuard } from "./navigation-guard";
 import { UpdatesRows } from "./updates-panel";
 
 export const SETTINGS_SECTIONS = [
@@ -115,6 +116,7 @@ export interface SettingsScreenProps {
   ws: string | undefined;
   actions: SettingsActions;
   renderLink?: RenderSettingsLink;
+  renderGuard?: (guard: UnsavedGuard) => ReactNode;
 }
 
 export function SettingsScreen({
@@ -124,6 +126,7 @@ export function SettingsScreen({
   ws,
   actions,
   renderLink = plainSettingsLink(ws),
+  renderGuard,
 }: SettingsScreenProps) {
   const t = useTranslations("settings");
   const workspace = page.workspace;
@@ -137,7 +140,7 @@ export function SettingsScreen({
   }));
   return (
     <ScreenLayout header={<PageHeader title={t("title")} />}>
-      <EditorProvider>
+      <EditorProvider {...(renderGuard === undefined ? {} : { renderGuard })}>
         <SettingsLayout
           nav={
             <SectionNav label={t("nav.label")} items={navItems} problemLabel={t("nav.problem")} />
@@ -404,7 +407,6 @@ function MaxRunRow({
   actions: SettingsActions;
 }) {
   const t = useTranslations("settings");
-  const ts = useTranslations("settings");
   const { general } = workspace;
   const autoSave = useAutoSave(general.maxRunMinutes, (minutes: number) =>
     actions.saveGeneral({ ws: general.id, name: general.name, maxRunMinutes: minutes }),
@@ -432,7 +434,7 @@ function MaxRunRow({
       label={t("workspace.maxRun")}
       info={
         <InfoTip
-          label={ts("infoLabel", { label: t("workspace.maxRun") })}
+          label={t("infoLabel", { label: t("workspace.maxRun") })}
           content={t("workspace.maxRunInfo")}
         />
       }
@@ -551,11 +553,6 @@ function ProjectsSection({
                 content={t("projects.info")}
               />
             }
-            control={
-              <Button variant="ghost" onClick={edit.close}>
-                {t("close")}
-              </Button>
-            }
             expanded={
               <FocusFirst onEscape={edit.close}>
                 <ProjectCandidates
@@ -566,6 +563,11 @@ function ProjectsSection({
                     setFocusKey(projectRowId(connectionId, projectId));
                   }}
                 />
+                <span {...stylex.props(styles.candidateClose)}>
+                  <Button variant="ghost" onClick={edit.close}>
+                    {t("close")}
+                  </Button>
+                </span>
               </FocusFirst>
             }
           />
@@ -1157,6 +1159,7 @@ const styles = stylex.create({
   number: { display: "flex", alignItems: "center", gap: space.s2 },
   numberInput: { display: "flex", width: size.settingsNumberWidth },
   candidates: { display: "flex", flexDirection: "column", gap: space.s2 },
+  candidateClose: { display: "flex", justifyContent: "flex-end", paddingTop: space.s2 },
   candidateList: {
     display: "flex",
     flexDirection: "column",

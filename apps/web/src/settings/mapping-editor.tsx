@@ -406,7 +406,6 @@ export function MappingEditor({
                 {labelDropped === null || failure !== null ? null : t("labelDropped", labelDropped)}
               </Text>
               <div {...stylex.props(styles.repos)}>
-                {renderSections === undefined ? <Text variant="label">{t("repos")}</Text> : null}
                 {bound.labels.ok ? null : (
                   <Text variant="ui" as="p" tone="problem">
                     {t("labelsFailed", { reason: mappingReason(bound.labels.error) })}

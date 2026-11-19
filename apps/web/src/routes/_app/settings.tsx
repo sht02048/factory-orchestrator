@@ -5,6 +5,7 @@ import { ScreenMessages, defaultLocale } from "../../i18n";
 import { getSettingsPage } from "../../server/settings-functions";
 import { settingsMessages } from "../../settings/messages";
 import { SettingsScreen } from "../../settings/settings-page";
+import { NavigationGuard } from "../../settings/navigation-guard";
 import { routerSettingsLink } from "../../settings/settings-link";
 import { useSettingsActions } from "../../settings/use-settings-actions";
 
@@ -35,6 +36,7 @@ function SettingsRoute() {
         ws={ws}
         actions={actions}
         renderLink={routerSettingsLink}
+        renderGuard={(guard) => <NavigationGuard {...guard} />}
       />
     </ScreenMessages>
   );

@@ -416,6 +416,21 @@ describe("Settings 폼과 도움말(브라우저, 0119 리뷰 후속)", () => {
     await page.keyboard.press("Escape");
   });
 
+  it("고친 값이 남아 있으면 다른 화면으로 옮기지 않고 그 줄을 보인다", async () => {
+    await openSettings(page);
+    const workspace = section(settings.sections.workspace);
+    await workspace.getByRole("button", { name: settings.change }).click();
+    const name = workspace.getByRole("textbox", { name: settings.workspace.name, exact: true });
+    await name.fill("Acme Leaving");
+    await section(settings.sections.advanced).getByRole("link", { name: /^MCP/ }).click();
+    await page.getByRole("alert").getByText(settings.unsavedBlocked).waitFor();
+    expect(new URL(page.url()).pathname).toBe("/settings");
+    expect(await name.inputValue()).toBe("Acme Leaving");
+    await workspace.getByRole("button", { name: settings.close }).click();
+    await section(settings.sections.advanced).getByRole("link", { name: /^MCP/ }).click();
+    await page.waitForURL(/\/settings\/mcp/);
+  });
+
   it("넣을 트래커 프로젝트 목록은 Escape 로 닫고 + 넣기로 포커스가 돌아온다", async () => {
     await openSettings(page);
     const projects = section(settings.sections.projects);
@@ -510,6 +525,9 @@ describe("Runners 고치는 중 다른 러너 고르기(브라우저, 0119 리�
     await page.getByRole("option", { name: /runner-b/ }).click();
     await page.getByRole("alert").getByText(runners.panel.unsavedBlocked).waitFor();
     expect(await capacity.inputValue()).toBe("5");
+    await page.getByRole("link", { name: runners.add, exact: true }).click();
+    await page.getByRole("alert").getByText(runners.panel.unsavedBlocked).waitFor();
+    expect(new URL(page.url()).searchParams.get("sel")).toBe("runner-a");
     await page.getByRole("button", { name: settings.close }).click();
     await page.getByRole("option", { name: /runner-b/ }).click();
     await page.waitForURL(/sel=runner-b/);
@@ -615,7 +633,7 @@ describe("프로젝트 상세의 Auto-assign Label 만들기(브라우저, 0115�
     await openSettings(page, projectPath);
     await page.getByText(fill(settings.label.gone, { name: "ganger" })).waitFor();
 
-    const select = fill(settings.label.selectFor, { connection: "Acme" });
+    const select = settings.project.label;
     await pick(page, select, fill(settings.label.create, { name: "ganger" }));
     await expect
       .poll(() => getAutoAssignLabel(db, workspaceId, connection))
