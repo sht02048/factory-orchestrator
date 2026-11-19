@@ -22,6 +22,7 @@ import {
   DividedList,
   DoneMark,
   FailureBar,
+  GangerMark,
   KanbanCard,
   KanbanCards,
   KanbanColumn,
@@ -42,6 +43,7 @@ import {
   RailNavList,
   RailStatic,
   RemovableChip,
+  ScreenLayout,
   Section,
   StackedBarChart,
   StepMarker,
@@ -51,6 +53,7 @@ import {
   TextLink,
   Textarea,
   VisuallyHidden,
+  WindowChrome,
   WorkspaceBadge,
   railLinkStyles,
   ScrollRegion,
@@ -89,6 +92,67 @@ function Demo({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.demo)}>{children}</div>;
 }
 
+function ShellPreview({ titleBarHidden }: { titleBarHidden: boolean }) {
+  const t = useTranslations("ds.blocks");
+  return (
+    <figure {...stylex.props(styles.shell)}>
+      <figcaption>
+        <Text variant="label">{titleBarHidden ? t("shell.desktop") : t("shell.web")}</Text>
+      </figcaption>
+      <WindowChrome titleBarHidden={titleBarHidden}>
+        <div inert={titleBarHidden} {...stylex.props(styles.frame)}>
+          <AppFrame
+            fill={false}
+            rail={
+              <>
+                <RailStatic>
+                  <WorkspaceBadge name={t("shell.workspace")} initial="A" />
+                </RailStatic>
+                <RailNav label={t("shell.navLabel")}>
+                  <RailNavList>
+                    <li>
+                      <a href="#shell" aria-current="page" {...stylex.props(railLinkStyles(true))}>
+                        <RailLinkContent
+                          icon={<CheckIcon />}
+                          name={t("shell.current")}
+                          issues={0}
+                        />
+                      </a>
+                    </li>
+                    <li>
+                      <a href="#shell" {...stylex.props(railLinkStyles(false))}>
+                        <RailLinkContent icon={<CloseIcon />} name={t("shell.issues")} issues={2} />
+                      </a>
+                    </li>
+                  </RailNavList>
+                </RailNav>
+                <RailBrand>
+                  <GangerMark tone="brand" label={t("shell.brand")} />
+                </RailBrand>
+              </>
+            }
+          >
+            <ScreenLayout
+              fill={false}
+              header={
+                <PageHeader
+                  title={t("shell.pageTitle")}
+                  subtitle={t("shell.summary")}
+                  actions={<Button variant="primary">{t("shell.action")}</Button>}
+                />
+              }
+            >
+              <NoticeLayout>
+                <Text variant="body">{t("shell.notice")}</Text>
+              </NoticeLayout>
+            </ScreenLayout>
+          </AppFrame>
+        </div>
+      </WindowChrome>
+    </figure>
+  );
+}
+
 export function BlockSections() {
   const t = useTranslations("ds.blocks");
   const tNav = useTranslations("ds.nav");
@@ -104,51 +168,9 @@ export function BlockSections() {
     <>
       <div id="shell">
         <Section title={tNav("shell")} note={t("shell.note")}>
-          <div {...stylex.props(styles.frame)}>
-            <AppFrame
-              fill={false}
-              rail={
-                <>
-                  <RailBrand>
-                    <Text variant="label">{t("shell.brand")}</Text>
-                  </RailBrand>
-                  <RailStatic>
-                    <WorkspaceBadge name={t("shell.workspace")} initial="A" />
-                  </RailStatic>
-                  <RailNav label={t("shell.navLabel")}>
-                    <RailNavList>
-                      <li>
-                        <a
-                          href="#shell"
-                          aria-current="page"
-                          {...stylex.props(railLinkStyles(true))}
-                        >
-                          <RailLinkContent
-                            icon={<CheckIcon />}
-                            name={t("shell.current")}
-                            issues={0}
-                          />
-                        </a>
-                      </li>
-                      <li>
-                        <a href="#shell" {...stylex.props(railLinkStyles(false))}>
-                          <RailLinkContent
-                            icon={<CloseIcon />}
-                            name={t("shell.issues")}
-                            issues={2}
-                          />
-                        </a>
-                      </li>
-                    </RailNavList>
-                  </RailNav>
-                </>
-              }
-            >
-              <NoticeLayout>
-                <PageHeader title={t("shell.pageTitle")} />
-                <Text variant="body">{t("shell.notice")}</Text>
-              </NoticeLayout>
-            </AppFrame>
+          <div {...stylex.props(styles.shells)}>
+            <ShellPreview titleBarHidden={false} />
+            <ShellPreview titleBarHidden />
           </div>
         </Section>
       </div>
@@ -525,6 +547,8 @@ const styles = stylex.create({
     maxWidth: 640,
   },
   columns: { display: "flex", flexWrap: "wrap", gap: space.s10 },
+  shells: { display: "flex", flexDirection: "column", gap: space.s6 },
+  shell: { display: "flex", flexDirection: "column", gap: space.s2, margin: 0 },
   frame: { height: 320, overflow: "hidden" },
   kanban: { width: "100%", maxWidth: 360, paddingBlock: space.s5 },
 });

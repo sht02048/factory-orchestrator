@@ -10,6 +10,7 @@ import { pickConditions, runConditionsSchema } from "@ganger/app/runs/conditions
 import { loadRunsPage } from "@ganger/app/runs/load";
 import { MAX_ENDED_RUNS } from "@ganger/app/runs/model";
 import { loadShell } from "@ganger/app/shell/load";
+import { TITLE_BAR_COOKIE, isTitleBarHidden } from "@ganger/app/shell/window-chrome";
 import { loadStatsPage } from "@ganger/app/stats/load";
 import { statsPeriodDaysSchema } from "@ganger/app/stats/model";
 import { assignInput, submitAssignment } from "@ganger/app/tickets/assign";
@@ -20,6 +21,10 @@ import { getDatabase } from "./database";
 
 export const getTimeZone = createServerFn({ method: "GET" }).handler(() =>
   parseTimeZone(getCookie(TIME_ZONE_COOKIE)),
+);
+
+export const getTitleBarHidden = createServerFn({ method: "GET" }).handler(() =>
+  isTitleBarHidden(getCookie(TITLE_BAR_COOKIE)),
 );
 
 export const getShell = createServerFn({ method: "GET" }).handler(() => loadShell(getDatabase()));
