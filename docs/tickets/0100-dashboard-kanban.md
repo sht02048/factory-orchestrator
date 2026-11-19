@@ -1,5 +1,5 @@
 ---
-status: doing
+status: done
 blocked_by: []
 ---
 
@@ -37,9 +37,9 @@ Dashboard 본문을 런 상태 기준 칸반 세 칸(Queued, Running, Done today
 
 ## 완료 조건
 
-- [ ] 서버 렌더 시험: 칸 셋과 Runners 열, 칸마다 카드와 꼬리표(Question·Permission·Disconnected는 Running, Human Check·Failed는 Done today 위), 꼬리표 카드가 칸 맨 위, 처리할 일 없이 끝난 카드가 소제목 아래, 빈 칸 한 줄, 처리할 일만 보기에서 꼬리표 카드만 남음, 긴 칸의 "N개 더 보기".
-- [ ] 로더 시험: `endedToday`가 오늘 끝난 런을 최근 순으로 담고 시간대를 따르며, `ticketId`가 Tickets의 티켓 ID와 같다.
-- [ ] 브라우저 시험: 카드를 누르면 패널이 열리고 닫기·Esc·바깥 누르기로 닫으면 포커스가 카드로 돌아온다. "답하기"는 패널을 Question 상태로 열고 첫 선택지에 포커스가 간다. 고르기만 하면 보내지 않고 보내기·⌘ Enter로 보낸 뒤 결과를 status로 알린다. 거절도 패널에서 한다. 처리할 일만 보기가 새로 고침 뒤에도 남는다. 1728·1280·900·400·320px에서 가로 스크롤이 없고, 넓은 창에서는 Runners 열이 칸반 오른쪽, 좁은 창에서는 아래에 있다.
-- [ ] `/ds`에 새 컴포넌트 미리보기, `components.test.tsx`에 서버 렌더 시험.
-- [ ] ADR 0010·GLOSSARY·DESIGN.md 갱신.
-- [ ] PR 본문 스크린숏: 1728px 기본·처리할 일만·Question 패널 열림, 1280px, 900px, 400px.
+- [x] 서버 렌더 시험: 칸 셋과 Runners 열, 칸마다 카드와 꼬리표(Question·Permission·Disconnected는 Running, Human Check·Failed는 Done today 위), 꼬리표 카드가 칸 맨 위, 처리할 일 없이 끝난 카드가 소제목 아래, 빈 칸 한 줄, 처리할 일만 보기에서 꼬리표 카드만 남음, 긴 칸의 "N개 더 보기".
+- [x] 로더 시험: `endedToday`가 오늘 끝난 런을 최근 순으로 담고 시간대를 따르며, `ticketId`가 Tickets의 티켓 ID와 같다.
+- [x] 브라우저 시험: 카드를 누르면 패널이 열리고 닫기·Esc·바깥 누르기로 닫으면 포커스가 카드로 돌아온다. "답하기"는 패널을 Question 상태로 열고 첫 선택지에 포커스가 간다. 고르기만 하면 보내지 않고 보내기·⌘ Enter로 보낸 뒤 결과를 status로 알린다. 거절도 패널에서 한다. 처리할 일만 보기가 새로 고침 뒤에도 남는다. 1728·1280·900·400·320px에서 가로 스크롤이 없고, 넓은 창에서는 Runners 열이 칸반 오른쪽, 좁은 창에서는 아래에 있다.
+- [x] `/ds`에 새 컴포넌트 미리보기, `components.test.tsx`에 서버 렌더 시험.
+- [x] ADR 0010·GLOSSARY·DESIGN.md 갱신.
+- [x] PR 본문 스크린숏: 1728px 기본·처리할 일만·Question 패널 열림, 1280px, 900px, 400px.
