@@ -15,6 +15,9 @@ import {
   Table,
   TableCell,
   TableEmpty,
+  TableFoldedOnly,
+  TableHead,
+  TableHeader,
   TableRow,
   TableRows,
   Tabs,
@@ -51,7 +54,30 @@ import type {
   RunsPage,
 } from "@ganger/app/runs/model";
 
-const columns = `minmax(0, 1fr) ${size.runStatusColumn} ${size.timeColumn}`;
+const titleColumn = `minmax(0, ${size.runTitleMaxColumn})`;
+const flexibleTitleColumn = "minmax(0, 1fr)";
+const resultColumn = `minmax(${size.runResultColumn}, 1fr)`;
+const columns = [
+  size.ticketKeyColumn,
+  titleColumn,
+  size.runRunnerColumn,
+  resultColumn,
+  size.runStatusColumn,
+  size.timeColumn,
+].join(" ");
+const foldedColumns = {
+  first: [
+    size.ticketKeyColumn,
+    flexibleTitleColumn,
+    size.runRunnerColumn,
+    size.runStatusColumn,
+    size.timeColumn,
+  ].join(" "),
+  second: [size.ticketKeyColumn, flexibleTitleColumn, size.runStatusColumn, size.timeColumn].join(
+    " ",
+  ),
+  third: [flexibleTitleColumn, size.runStatusColumn, size.timeColumn].join(" "),
+};
 const narrowColumns = "minmax(0, 1fr)";
 
 export interface RunsScreenProps {
@@ -207,7 +233,15 @@ function RunsList({
             )}
           </div>
           <Card padding="compact" label={t("listLabel")}>
-            <Table columns={columns} narrowColumns={narrowColumns}>
+            <Table columns={columns} foldedColumns={foldedColumns} narrowColumns={narrowColumns}>
+              <TableHead>
+                <TableHeader hideWhen="stacked">{t("columns.key")}</TableHeader>
+                <TableHeader>{t("columns.title")}</TableHeader>
+                <TableHeader hideWhen="second">{t("columns.runner")}</TableHeader>
+                <TableHeader hideWhen="first">{t("columns.result")}</TableHeader>
+                <TableHeader>{t("columns.status")}</TableHeader>
+                <TableHeader align="end">{t("columns.time")}</TableHeader>
+              </TableHead>
               {visible.length === 0 ? (
                 <TableEmpty>
                   {page.runs.length > 0
@@ -319,47 +353,53 @@ function ConditionChips({
 }
 
 function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
-  const agentName = useAgentName();
   const t = useTranslations("runs");
-  const domain = useTranslations("domain");
   const { ago, elapsed } = useTime();
   const statusName = useStatusName();
   const status = runStatus(run);
-
-  const meta: string[] = [
-    run.runner?.name ?? (run.state === "ended" ? t("noRunnerEnded") : t("noRunner")),
-  ];
-  if (run.state === "ended") {
-    meta.push(domain(`agentResult.${run.agentResult}`));
-    if (run.pullRequest !== null)
-      meta.push(
-        t("prWithState", {
-          pr: run.pullRequest.displayId,
-          state: domain(`prState.${run.prState}`),
-        }),
-      );
-    else if (run.prState !== "none") meta.push(domain(`prState.${run.prState}`));
-  } else {
-    meta.push(agentName(run.agent));
-    if (run.cancelling) meta.push(t("cancelling"));
-  }
+  const runner = run.runner?.name ?? (run.state === "ended" ? t("noRunnerEnded") : t("noRunner"));
+  const result = useRunResultText(run);
 
   return (
     <TableRow value={run.id} label={ticketName(run)} onOpen={onOpen}>
+      <TableCell hideWhen="stacked">
+        {run.ticketTitle === null ? null : (
+          <Text variant="meta" numeric>
+            {run.ticketKey}
+          </Text>
+        )}
+      </TableCell>
       <TableCell>
         <span {...stylex.props(styles.rowText)}>
           {run.ticketTitle === null ? (
             <RowTitle>{run.ticketKey}</RowTitle>
           ) : (
-            <span {...stylex.props(styles.keyLine)}>
-              <Text variant="meta" numeric>
-                {run.ticketKey}
-              </Text>
-              <RowTitle>{run.ticketTitle}</RowTitle>
-            </span>
+            <RowTitle fullText={run.ticketTitle}>{run.ticketTitle}</RowTitle>
           )}
-          <Text variant="meta">{meta.join(t("metaSeparator"))}</Text>
+          <TableFoldedOnly when="first" block>
+            <Text variant="meta">
+              {run.ticketTitle === null ? null : (
+                <TableFoldedOnly when="stacked">
+                  <Text variant="meta" numeric>
+                    {run.ticketKey}
+                  </Text>
+                  {t("metaSeparator")}
+                </TableFoldedOnly>
+              )}
+              <TableFoldedOnly when="second">
+                {runner}
+                {t("metaSeparator")}
+              </TableFoldedOnly>
+              {result}
+            </Text>
+          </TableFoldedOnly>
         </span>
+      </TableCell>
+      <TableCell hideWhen="second">
+        <Text variant="meta">{runner}</Text>
+      </TableCell>
+      <TableCell hideWhen="first">
+        <Text variant="meta">{result}</Text>
       </TableCell>
       <TableCell>
         <StatusPill status={status}>{statusName(status)}</StatusPill>
@@ -369,6 +409,28 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
       </TableCell>
     </TableRow>
   );
+}
+
+function useRunResultText(run: RunView): string {
+  const t = useTranslations("runs");
+  const domain = useTranslations("domain");
+  const agentName = useAgentName();
+  const parts: string[] = [];
+  if (run.state === "ended") {
+    parts.push(domain(`agentResult.${run.agentResult}`));
+    if (run.pullRequest !== null)
+      parts.push(
+        t("prWithState", {
+          pr: run.pullRequest.displayId,
+          state: domain(`prState.${run.prState}`),
+        }),
+      );
+    else if (run.prState !== "none") parts.push(domain(`prState.${run.prState}`));
+  } else {
+    parts.push(agentName(run.agent));
+    if (run.cancelling) parts.push(t("cancelling"));
+  }
+  return parts.join(t("metaSeparator"));
 }
 
 function RunPanel({
@@ -498,7 +560,7 @@ function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
 
 const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
-  listColumn: { maxWidth: size.runsListWidth },
+  listColumn: { minWidth: 0 },
   filterBar: {
     display: "flex",
     flexDirection: "column",
@@ -517,13 +579,6 @@ const styles = stylex.create({
     marginTop: space.s4,
   },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  keyLine: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    columnGap: space.s2,
-    minWidth: 0,
-  },
 });
 
 function ticketName(run: RunView): string {

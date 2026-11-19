@@ -34,6 +34,7 @@ import {
   Table,
   TableCell,
   TableEmpty,
+  TableFoldedOnly,
   TableHead,
   TableHeader,
   TableRow,
@@ -113,6 +114,10 @@ const runs: ReadonlyArray<SampleRun> = [
 ];
 
 const runColumns = "minmax(0, 1fr) 96px 80px 96px 56px";
+const runFoldedColumns = {
+  first: "minmax(0, 1fr) 96px 80px 56px",
+  second: "minmax(0, 1fr) 96px 56px",
+};
 
 type FilterKey = "all" | "todo" | "running" | "queued";
 
@@ -285,12 +290,12 @@ export function ComponentSections() {
             <SplitView
               fill={false}
               list={
-                <Table columns={runColumns}>
+                <Table columns={runColumns} foldedColumns={runFoldedColumns}>
                   <TableHead>
                     <TableHeader>{t("table.colTicket")}</TableHeader>
                     <TableHeader>{t("table.colState")}</TableHeader>
-                    <TableHeader>{t("table.colRunner")}</TableHeader>
-                    <TableHeader>{t("table.colAgent")}</TableHeader>
+                    <TableHeader hideWhen="second">{t("table.colRunner")}</TableHeader>
+                    <TableHeader hideWhen="first">{t("table.colAgent")}</TableHeader>
                     <TableHeader align="end">{t("table.colElapsed")}</TableHeader>
                   </TableHead>
                   <TableRows
@@ -310,14 +315,25 @@ export function ComponentSections() {
                           label={t(`table.rows.${run.id}.title`)}
                         >
                           <TableCell>
-                            <RowTitle>{t(`table.rows.${run.id}.title`)}</RowTitle>
+                            <RowTitle fullText={t(`table.rows.${run.id}.title`)}>
+                              {t(`table.rows.${run.id}.title`)}
+                            </RowTitle>
                             {reason === "" ? null : <RowReason>{reason}</RowReason>}
+                            <TableFoldedOnly when="first" block>
+                              <Text variant="meta">
+                                <TableFoldedOnly when="second">
+                                  {run.runner}
+                                  {t("table.foldSeparator")}
+                                </TableFoldedOnly>
+                                {run.agent}
+                              </Text>
+                            </TableFoldedOnly>
                           </TableCell>
                           <TableCell>
                             <StatusPill status={run.status}>{statusName(run.status)}</StatusPill>
                           </TableCell>
-                          <TableCell>{run.runner}</TableCell>
-                          <TableCell>{run.agent}</TableCell>
+                          <TableCell hideWhen="second">{run.runner}</TableCell>
+                          <TableCell hideWhen="first">{run.agent}</TableCell>
                           <TableCell align="end" numeric>
                             {run.elapsed}
                           </TableCell>

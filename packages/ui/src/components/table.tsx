@@ -14,28 +14,91 @@ import {
 } from "../tokens.stylex";
 
 const gridColumns = stylex.create({
-  of: (wide: string, narrow: string) => ({
-    gridTemplateColumns: { default: wide, [breakpoints.tableStacked]: narrow },
+  of: (wide: string, first: string, second: string, narrow: string) => ({
+    gridTemplateColumns: {
+      default: wide,
+      [breakpoints.tableFoldFirstRange]: first,
+      [breakpoints.tableFoldSecondRange]: second,
+      [breakpoints.tableStacked]: narrow,
+    },
+  }),
+  withThird: (wide: string, first: string, second: string, third: string, narrow: string) => ({
+    gridTemplateColumns: {
+      default: wide,
+      [breakpoints.tableFoldFirstRange]: first,
+      [breakpoints.tableFoldSecondRange]: second,
+      [breakpoints.tableFoldThirdRange]: third,
+      [breakpoints.tableStackedBelowThird]: narrow,
+    },
   }),
 });
 
-const ColumnsContext = createContext({
-  columns: gridColumns.of("minmax(0, 1fr)", "minmax(0, 1fr)"),
-  stacks: false,
+const single = "minmax(0, 1fr)";
+
+type HeadHiding = "none" | "stacked" | "belowThird";
+
+const ColumnsContext = createContext<{ columns: stylex.StyleXStyles; headHiding: HeadHiding }>({
+  columns: gridColumns.of(single, single, single, single),
+  headHiding: "none",
 });
+
+export type TableFold = "first" | "second" | "stacked";
+
+export interface TableFoldedColumns {
+  first: string;
+  second?: string;
+  third?: string;
+}
 
 export interface TableProps {
   columns: string;
   narrowColumns?: string;
+  foldedColumns?: TableFoldedColumns;
   children: ReactNode;
 }
 
-export function Table({ columns, narrowColumns, children }: TableProps) {
+export function tableColumnTemplates({
+  columns,
+  narrowColumns,
+  foldedColumns,
+}: Omit<TableProps, "children">): {
+  wide: string;
+  first: string;
+  second: string;
+  third: string | null;
+  narrow: string;
+} {
+  const first = foldedColumns?.first ?? columns;
+  const second = foldedColumns?.second ?? first;
+  const third = foldedColumns?.third ?? null;
+  return { wide: columns, first, second, third, narrow: narrowColumns ?? third ?? second };
+}
+
+export function Table({ columns, narrowColumns, foldedColumns, children }: TableProps) {
+  const templates = tableColumnTemplates({
+    columns,
+    ...(narrowColumns === undefined ? {} : { narrowColumns }),
+    ...(foldedColumns === undefined ? {} : { foldedColumns }),
+  });
   return (
     <ColumnsContext
       value={{
-        columns: gridColumns.of(columns, narrowColumns ?? columns),
-        stacks: narrowColumns !== undefined,
+        columns:
+          templates.third === null
+            ? gridColumns.of(templates.wide, templates.first, templates.second, templates.narrow)
+            : gridColumns.withThird(
+                templates.wide,
+                templates.first,
+                templates.second,
+                templates.third,
+                templates.narrow,
+              ),
+        headHiding:
+          narrowColumns === undefined
+            ? "none"
+            : templates.third === null
+              ? "stacked"
+              : "belowThird",
       }}
     >
       <div {...stylex.props(styles.table)}>{children}</div>
@@ -44,11 +107,17 @@ export function Table({ columns, narrowColumns, children }: TableProps) {
 }
 
 export function TableHead({ children }: { children: ReactNode }) {
-  const { columns, stacks } = use(ColumnsContext);
+  const { columns, headHiding } = use(ColumnsContext);
   return (
     <div
       aria-hidden="true"
-      {...stylex.props(styles.grid, columns, styles.head, stacks && styles.headStacked)}
+      {...stylex.props(
+        styles.grid,
+        columns,
+        styles.head,
+        headHiding === "stacked" && styles.headStacked,
+        headHiding === "belowThird" && styles.headStackedBelowThird,
+      )}
     >
       {children}
     </div>
@@ -59,12 +128,24 @@ export type CellAlign = "start" | "end";
 
 export function TableHeader({
   align = "start",
+  hideWhen,
   children,
 }: {
   align?: CellAlign;
+  hideWhen?: TableFold;
   children: ReactNode;
 }) {
-  return <span {...stylex.props(styles.cell, align === "end" && styles.end)}>{children}</span>;
+  return (
+    <span
+      {...stylex.props(
+        styles.cell,
+        align === "end" && styles.end,
+        hideWhen !== undefined && hiddenWhen[hideWhen],
+      )}
+    >
+      {children}
+    </span>
+  );
 }
 
 export interface TableRowsProps {
@@ -135,16 +216,19 @@ function columnsStyle(columns: stylex.StyleXStyles) {
 export interface TableCellProps {
   align?: CellAlign;
   numeric?: boolean;
+  hideWhen?: TableFold;
   children: ReactNode;
 }
 
-export function TableCell({ align = "start", numeric, children }: TableCellProps) {
+export function TableCell({ align = "start", numeric, hideWhen, children }: TableCellProps) {
   return (
     <span
+      {...(hideWhen === undefined ? {} : { "data-hide-when": hideWhen })}
       {...stylex.props(
         styles.cell,
         align === "end" && styles.end,
         numeric === true && styles.numeric,
+        hideWhen !== undefined && hiddenWhen[hideWhen],
       )}
     >
       {children}
@@ -152,8 +236,32 @@ export function TableCell({ align = "start", numeric, children }: TableCellProps
   );
 }
 
-export function RowTitle({ children }: { children: ReactNode }) {
-  return <span {...stylex.props(styles.rowTitle)}>{children}</span>;
+export interface TableFoldedOnlyProps {
+  when: TableFold;
+  block?: boolean;
+  children: ReactNode;
+}
+
+export function TableFoldedOnly({ when, block, children }: TableFoldedOnlyProps) {
+  return (
+    <span
+      data-folded-only={when}
+      {...stylex.props(block === true ? shownWhenBlock[when] : shownWhenInline[when])}
+    >
+      {children}
+    </span>
+  );
+}
+
+export function RowTitle({ fullText, children }: { fullText?: string; children: ReactNode }) {
+  return (
+    <span
+      {...(fullText === undefined ? {} : { title: fullText })}
+      {...stylex.props(styles.rowTitle)}
+    >
+      {children}
+    </span>
+  );
 }
 
 export function RowReason({ children }: { children: ReactNode }) {
@@ -174,6 +282,9 @@ const styles = stylex.create({
     paddingInline: space.s3,
   },
   headStacked: { display: { default: "grid", [breakpoints.tableStacked]: "none" } },
+  headStackedBelowThird: {
+    display: { default: "grid", [breakpoints.tableStackedBelowThird]: "none" },
+  },
   head: {
     height: 30,
     color: colors.textTertiary,
@@ -233,5 +344,41 @@ const styles = stylex.create({
     paddingInline: space.s3,
     color: colors.textTertiary,
     fontSize: fontSize.body,
+  },
+});
+
+const hiddenWhen = stylex.create({
+  first: { display: { default: null, [breakpoints.tableFoldedFirst]: "none" } },
+  second: { display: { default: null, [breakpoints.tableFoldedSecond]: "none" } },
+  stacked: { display: { default: null, [breakpoints.tableStacked]: "none" } },
+});
+
+const shownWhenInline = stylex.create({
+  first: { display: { default: "none", [breakpoints.tableFoldedFirst]: "inline" } },
+  second: { display: { default: "none", [breakpoints.tableFoldedSecond]: "inline" } },
+  stacked: { display: { default: "none", [breakpoints.tableStacked]: "inline" } },
+});
+
+const shownWhenBlock = stylex.create({
+  first: {
+    display: { default: "none", [breakpoints.tableFoldedFirst]: "block" },
+    minWidth: 0,
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+  },
+  second: {
+    display: { default: "none", [breakpoints.tableFoldedSecond]: "block" },
+    minWidth: 0,
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+  },
+  stacked: {
+    display: { default: "none", [breakpoints.tableStacked]: "block" },
+    minWidth: 0,
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
   },
 });

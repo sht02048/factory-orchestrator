@@ -146,7 +146,8 @@
     "panelQueued": "capacity를 기다리는 런이 없어요."
   },
   "table": {
-    "note": "행을 누르거나 위아래 화살표로 고르면 오른쪽 패널이 바뀌어요.",
+    "note": "행을 누르거나 위아래 화살표로 고르면 오른쪽 패널이 바뀌어요. 표가 좁아지면 에이전트, 러너 순으로 열을 접어 제목 아래 줄로 옮겨요.",
+    "foldSeparator": " · ",
     "listLabel": "런 목록",
     "editorNote": "Settings는 variant=\"editor\"로 왼쪽 항목 목록을 좁게, 오른쪽 편집 영역을 넓게 둬요.",
     "editorListLabel": "설정 항목",
