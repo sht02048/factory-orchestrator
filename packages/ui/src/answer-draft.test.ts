@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { answerToSend, emptyDraft, pickChoice, pickOther, writeOther } from "./answer-draft";
+import {
+  answerToSend,
+  emptyDraft,
+  pickChoice,
+  pickOther,
+  writeOther,
+} from "./components/answer-draft";
 
 const choices = ["지수 백오프", "30초 고정"];
 

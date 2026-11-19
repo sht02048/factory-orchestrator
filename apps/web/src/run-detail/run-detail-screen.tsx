@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
+import { QuestionAnswer } from "../question/question-answer";
 import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import { canCancel } from "@ganger/app/run-detail/model";
@@ -328,15 +329,17 @@ function InputBlock({
 function useSubmit(headRef: RefObject<HTMLElement | null>) {
   const [submit, setSubmit] = useState<Submit>({ kind: "idle" });
   const resultRef = useRef<HTMLParagraphElement>(null);
-  const run = (send: () => Promise<void>) => {
+  const run = (send: () => Promise<void>): Promise<void> => {
     setSubmit({ kind: "sending" });
-    send().then(
+    const sent = send();
+    sent.then(
       () => {
         setSubmit({ kind: "sent" });
         if (resultRef.current === null || !resultRef.current.isConnected) focusFirst(headRef);
       },
       () => setSubmit({ kind: "failed" }),
     );
+    return sent;
   };
   useEffect(() => {
     if (submit.kind === "sent") resultRef.current?.focus();
@@ -378,69 +381,25 @@ function QuestionForm({
   headRef: RefObject<HTMLElement | null>;
 }) {
   const t = useTranslations("run");
-  const [answer, setAnswer] = useState("");
   const { submit, run, resultRef } = useSubmit(headRef);
-  const [empty, setEmpty] = useState(false);
-
-  const send = (body: string) => {
-    if (body.trim() === "") {
-      setEmpty(true);
-      return;
-    }
-    setEmpty(false);
-    run(() => onAnswer(question.questionId, body));
-  };
-
   return (
     <Card label={t("question.title")}>
       <InputHead kind="question" waitedMs={waitedMs} />
-      <Text variant="panel" as="p" wrap="pre">
-        {question.body}
-      </Text>
       {submit.kind === "sent" || question.answered ? (
-        <Text variant="body" as="p" ref={resultRef} role="status" tabIndex={-1}>
-          {t("question.sent")}
-        </Text>
+        <>
+          <Text variant="body" as="p" wrap="pre">
+            {question.body}
+          </Text>
+          <Text variant="body" as="p" ref={resultRef} role="status" tabIndex={-1}>
+            {t("question.sent")}
+          </Text>
+        </>
       ) : (
-        <form
-          {...stylex.props(styles.stack)}
-          onSubmit={(event) => {
-            event.preventDefault();
-            send(answer);
-          }}
-        >
-          {question.choices.length === 0 ? null : (
-            <div role="group" aria-label={t("question.choicesLabel")}>
-              <Actions>
-                {question.choices.map((choice) => (
-                  <Button
-                    key={choice}
-                    variant="secondary"
-                    disabled={submit.kind === "sending"}
-                    onClick={() => send(choice)}
-                  >
-                    {choice}
-                  </Button>
-                ))}
-              </Actions>
-            </div>
-          )}
-          <Field
-            label={t("question.answerLabel")}
-            description={t("question.answerHelp")}
-            {...(empty ? { error: t("question.empty") } : {})}
-          >
-            <div {...stylex.props(styles.answerRow)}>
-              <div {...stylex.props(styles.grow)}>
-                <Input name="answer" value={answer} onValueChange={setAnswer} autoComplete="off" />
-              </div>
-              <Button type="submit" variant="primary" disabled={submit.kind === "sending"}>
-                {submit.kind === "sending" ? t("question.submitting") : t("question.submit")}
-              </Button>
-            </div>
-          </Field>
-          {submit.kind === "failed" ? <ActionFailed /> : null}
-        </form>
+        <QuestionAnswer
+          body={question.body}
+          options={question.choices}
+          onSend={(answer) => run(() => onAnswer(question.questionId, answer))}
+        />
       )}
     </Card>
   );
@@ -476,7 +435,7 @@ function PermissionWait({
             {...stylex.props(styles.stack)}
             onSubmit={(event) => {
               event.preventDefault();
-              run(() => onDeny(wait.promptId, reason));
+              void run(() => onDeny(wait.promptId, reason));
             }}
           >
             <Text variant="body">{t("permission.body")}</Text>

@@ -40,6 +40,7 @@
     "links": "링크·글 톤",
     "chips": "칩",
     "choices": "라디오·여러 줄 입력",
+    "question": "에이전트 질문",
     "codeBlock": "코드 블록",
     "dataTable": "데이터 표",
     "outcomes": "결과 막대·차트",
@@ -390,6 +391,23 @@
       "skip": "건너뛰어요",
       "textareaLabel": "직접 쓰기",
       "textareaPlaceholder": "답을 직접 써요"
+    },
+    "question": {
+      "note": "에이전트 질문에 답하는 폼이에요. 질문 문단, 고르는 라디오, 직접 쓰기, 보내기를 한 번에 둬요. 선택지가 없으면 라디오 없이 답 칸만 보여요.",
+      "lead": "시계 티켓이 아직 main에 없어요. 어떻게 할까요?",
+      "wait": "시계 티켓이 머지될 때까지 기다린다",
+      "start": "지금 main에서 먼저 시작하고 나중에 맞춘다",
+      "after": "기본 제안은 B예요.",
+      "other": "직접 쓰기",
+      "otherLabel": "직접 쓴 답",
+      "otherPlaceholder": "에이전트에게 보낼 답을 써 주세요",
+      "answerLabel": "답",
+      "pick": "답을 하나 골라 주세요",
+      "sendNote": "보낸 답은 바로 에이전트에게 전해져요",
+      "shortcut": "⌘ Enter로 보낼 수 있어요",
+      "send": "보내기",
+      "sending": "보내는 중…",
+      "failed": "답을 보내지 못했어요. 다시 보내 주세요."
     },
     "codeBlock": {
       "note": "명령·출력·로그는 CodeBlock이에요. 복사할 명령은 tone=\"command\", 긴 로그는 scroll과 label을 줘요.",

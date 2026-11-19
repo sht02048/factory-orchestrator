@@ -44,6 +44,7 @@ import type { Browser, BrowserContext, Locator, Page } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import home from "../../apps/web/messages/ko/home.json" with { type: "json" };
+import questionJson from "../../apps/web/messages/ko/question.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 import { startWebServer } from "./web-server.js";
 
@@ -198,7 +199,7 @@ describe("Dashboard 상세 패널(브라우저, 0100)", () => {
     await openHome(page);
     await card(page, "ACME-4").getByRole("button", { name: home.card.answer }).click();
     const panel = page.getByRole("dialog");
-    const send = panel.getByRole("button", { name: home.question.send });
+    const send = panel.getByRole("button", { name: questionJson.send });
     expect(await send.isDisabled()).toBe(true);
 
     const posts: string[] = [];
@@ -219,14 +220,14 @@ describe("Dashboard 상세 패널(브라우저, 0100)", () => {
     await card(page, "ACME-4").getByText(home.card.answered).waitFor();
   });
 
-  it("직접 쓰기를 고르면 글쓰기 칸이 열리고 ⌘ Enter 로 보낸다", async () => {
+  it("나눌 선택지가 없는 질문은 라디오 없이 답 칸에 바로 쓰고 ⌘ Enter 로 보낸다(0116)", async () => {
     await openHome(page);
     await card(page, "ACME-6").getByRole("button", { name: home.card.answer }).click();
     const panel = page.getByRole("dialog");
-    await panel.getByRole("radio", { name: home.question.other }).check();
-    const other = panel.getByLabel(home.question.otherLabel);
-    expect(await focusedSoon(other)).toBe(true);
-    await other.fill("Ship it on Friday.");
+    const input = panel.getByLabel(questionJson.answerLabel);
+    expect(await focusedSoon(input)).toBe(true);
+    expect(await panel.getByRole("radio").count()).toBe(0);
+    await input.fill("Ship it on Friday.");
     await page.keyboard.press("ControlOrMeta+Enter");
     await panel.getByRole("status").getByText(home.question.answered).waitFor();
     expect(answerOf("ACME-6")).toBe("Ship it on Friday.");
@@ -258,7 +259,7 @@ describe("Dashboard 상세 패널(브라우저, 0100)", () => {
       .evaluateAll((els) =>
         els.filter((el) => el.getClientRects().length > 0).map((el) => el.textContent),
       );
-    expect(primary).toEqual([home.question.send]);
+    expect(primary).toEqual([questionJson.send]);
   });
 
   it("긴 선택지 문구는 패널 안에서 줄을 바꿔 다 보인다", async () => {
@@ -291,13 +292,13 @@ describe("Dashboard 상세 패널(브라우저, 0100)", () => {
     const answer = card(page, "ACME-1").getByRole("button", { name: home.card.answer });
     await answer.click();
     await panel.getByRole("radio", { name: "SQLite" }).check();
-    await panel.getByRole("button", { name: home.question.send }).click();
-    await panel.getByRole("alert").getByText(home.question.failed).waitFor();
+    await panel.getByRole("button", { name: questionJson.send }).click();
+    await panel.getByRole("alert").getByText(questionJson.failed).waitFor();
     await page.keyboard.press("Escape");
     await panel.waitFor({ state: "hidden" });
     await answer.click();
     await panel.getByRole("radio", { name: "SQLite" }).waitFor();
-    expect(await panel.getByText(home.question.failed).count()).toBe(0);
+    expect(await panel.getByText(questionJson.failed).count()).toBe(0);
     await page.keyboard.press("Escape");
     await panel.waitFor({ state: "hidden" });
     await page.unroute("**/_serverFn/**");
@@ -476,9 +477,9 @@ describe("Dashboard 칸반 배치(브라우저, 0100)", () => {
       await openHome(target);
       await card(target, "ACME-3").getByRole("button", { name: home.card.answer }).click();
       const panel = target.getByRole("dialog");
-      await panel.getByRole("radio", { name: home.question.other }).check();
+      await panel.getByRole("radio", { name: questionJson.other }).check();
       const size = await panel
-        .getByLabel(home.question.otherLabel)
+        .getByLabel(questionJson.otherLabel)
         .evaluate((input) => getComputedStyle(input).fontSize);
       await target.keyboard.press("Escape");
       return size;
@@ -542,8 +543,8 @@ describe("Dashboard 칸반 배치(브라우저, 0100)", () => {
     await openHome(page);
     await card(page, "ACME-3").getByRole("button", { name: home.card.answer }).click();
     const panel = page.getByRole("dialog");
-    await panel.getByRole("radio", { name: home.question.other }).check();
-    const input = panel.getByLabel(home.question.otherLabel);
+    await panel.getByRole("radio", { name: questionJson.other }).check();
+    const input = panel.getByLabel(questionJson.otherLabel);
     await input.fill("half-written answer");
 
     let failed = 0;

@@ -3,7 +3,6 @@ import { defaultStringifySearch } from "@tanstack/react-router";
 import { Text } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
 import type { RunId } from "@ganger/core";
-import { space } from "@ganger/ui/tokens.stylex";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { useAgentName, useQueuedReasonText } from "../labels";
@@ -17,7 +16,12 @@ export function RunKey({ run }: { run: HomeRun }) {
       <Text variant="meta" numeric>
         {run.ticketKey}
       </Text>
-      {run.ticketTitle === null ? null : <Text variant="title">{run.ticketTitle}</Text>}
+      {run.ticketTitle === null ? null : (
+        <>
+          {" "}
+          <Text variant="title">{run.ticketTitle}</Text>
+        </>
+      )}
     </span>
   );
 }
@@ -93,11 +97,5 @@ export function href(path: string, search: Record<string, string>): string {
 }
 
 const styles = stylex.create({
-  keyLine: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    columnGap: space.s2,
-    minWidth: 0,
-  },
+  keyLine: { overflowWrap: "anywhere" },
 });

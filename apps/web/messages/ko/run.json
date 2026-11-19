@@ -51,13 +51,7 @@
   "openPr": "PR {pr} 열기",
   "question": {
     "title": "에이전트 질문",
-    "answerLabel": "답",
-    "answerHelp": "답하면 worker가 러너의 에이전트에게 보내요.",
-    "choicesLabel": "선택지",
-    "submit": "답 보내기",
-    "submitting": "보내는 중",
-    "sent": "답을 남겼어요. worker가 보내요.",
-    "empty": "답을 써 주세요."
+    "sent": "답을 남겼어요. worker가 보내요."
   },
   "input": {
     "question": "{elapsed} 답을 기다려요",

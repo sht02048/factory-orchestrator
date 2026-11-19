@@ -3,17 +3,13 @@ import { Text } from "@ganger/ui";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import homeJson from "../../messages/ko/home.json" with { type: "json" };
+import questionJson from "../../messages/ko/question.json" with { type: "json" };
+import { QuestionAnswer } from "../question/question-answer";
 import { buttonsOf } from "../testing/buttons";
 import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
 import { addTitledRun, now, seedDatabase } from "../testing/seed";
-import {
-  COLUMN_VISIBLE,
-  DONE_TODO_VISIBLE,
-  HomeScreen,
-  QuestionForm,
-  SETTLED_VISIBLE,
-} from "./home-screen";
+import { COLUMN_VISIBLE, DONE_TODO_VISIBLE, HomeScreen, SETTLED_VISIBLE } from "./home-screen";
 import type { DashboardView } from "./home-screen";
 import { loadHomePage } from "@ganger/app/home/load";
 import { homeMessages } from "./messages";
@@ -36,7 +32,10 @@ function renderView(page: HomePage, view: DashboardView) {
 }
 
 function renderForm(question: Extract<InputWait, { kind: "question" }>) {
-  return renderWithMessages(<QuestionForm question={question} onSend={reject} />, homeMessages);
+  return renderWithMessages(
+    <QuestionAnswer body={question.body} options={question.choices} onSend={reject} />,
+    homeMessages,
+  );
 }
 
 function seededPage(ws = "ws-commerce"): HomePage {
@@ -341,7 +340,7 @@ describe("Dashboard 칸반(티켓 0100)", () => {
     expect(variants).not.toContain("primary");
     const layer = buttonsOf(renderForm(question));
     expect(layer.filter((b) => b.variant === "primary")).toEqual([
-      { variant: "primary", label: homeJson.question.send },
+      { variant: "primary", label: questionJson.send },
     ]);
   });
 
@@ -425,14 +424,16 @@ describe("모든 Workspace 보기(0066)", () => {
 describe("질문 레이어", () => {
   it("질문, 선택지 라디오, 마지막 직접 쓰기를 보이고 고르기 전에는 보내기가 꺼져 있다", () => {
     const html = renderForm(question);
-    expect(html).toMatch(/<legend[^>]*>재시도 간격을 바꿀까요\?<\/legend>/);
+    expect(html).toMatch(/<p[^>]*>재시도 간격을 바꿀까요\?<\/p>/);
+    const labelledBy = /role="radiogroup" aria-labelledby="([^"]+)"/.exec(html)?.[1];
+    expect(html).toContain(`<div id="${labelledBy}"`);
     const radios = [...html.matchAll(/<input type="radio"[^>]*>\s*<span[^>]*>([^<]+)<\/span>/g)];
-    expect(radios.map((m) => m[1])).toEqual([...question.choices, homeJson.question.other]);
+    expect(radios.map((m) => m[1])).toEqual([...question.choices, questionJson.other]);
     expect(html).not.toContain("checked");
     expect(html).toMatch(
       /<button[^>]*data-variant="primary"[^>]*disabled=""[^>]*>보내기<\/button>/,
     );
-    expect(text(html)).toContain(homeJson.question.pick);
+    expect(text(html)).toContain(questionJson.pick);
     expect(html).not.toContain("<textarea");
   });
 
@@ -441,6 +442,49 @@ describe("질문 레이어", () => {
     const html = renderForm({ ...question, choices: [long, "30초 고정"] });
     expect(html).toContain(`>${long}</span>`);
     expect(html).not.toContain("…");
+  });
+});
+
+describe("질문 레이어: 선택지 없이 온 질문(0116)", () => {
+  const inline = {
+    ...question,
+    body: "02 작업 전제인 01이 main에 없어요. 어떻게 할까요? (A) 01 이 머지될 때까지 기다린다 (B) 02 를 먼저 한다(충돌 가능). 기본 제안은 B 예요.",
+    choices: [],
+  };
+
+  it("글 안의 (A) (B)를 글자와 함께 선택지로 나누고 추천 문장은 선택지 아래에 둔다", () => {
+    const html = renderForm(inline);
+    const radios = [
+      ...html.matchAll(/<input type="radio"[^>]*>\s*<span[^>]*>([\s\S]*?)<\/span><\/label>/g),
+    ];
+    expect(radios.map((m) => text(m[1] ?? ""))).toEqual([
+      "A 01 이 머지될 때까지 기다린다",
+      "B 02 를 먼저 한다(충돌 가능).",
+      questionJson.other,
+    ]);
+    expect(html).toMatch(/<p[^>]*>02 작업 전제인 01이 main에 없어요. 어떻게 할까요\?<\/p>/);
+    expect(html.indexOf("기본 제안은 B 예요.")).toBeGreaterThan(html.indexOf(questionJson.other));
+    expect(html).not.toContain("(A)");
+  });
+
+  it("나눌 수 없으면 문단을 그대로 두고 라디오 없이 바로 쓰는 답 칸을 보인다", () => {
+    const html = renderForm({
+      ...question,
+      body: "첫 줄\n둘째 줄\n\n테스트를 건너뛸까요?",
+      choices: [],
+    });
+    expect(html).not.toContain('type="radio"');
+    expect(html).toMatch(/<p[^>]*>첫 줄\n둘째 줄<\/p>/);
+    expect(html).toMatch(/<p[^>]*>테스트를 건너뛸까요\?<\/p>/);
+    expect(html).toContain("<textarea");
+    expect(text(html)).toContain(questionJson.answerLabel);
+    expect(text(html)).toContain(questionJson.shortcut);
+  });
+
+  it("카드는 선택지를 뺀 질문만 두 줄 요약으로 보인다", () => {
+    const card = row(section(render(withInput(seededPage(), inline)), "Running"), "ACME-11");
+    expect(text(card)).toContain("어떻게 할까요?");
+    expect(text(card)).not.toContain("머지될 때까지");
   });
 });
 
@@ -639,7 +683,7 @@ describe("문구", () => {
 
   it("문구는 메시지 파일에서 온다", () => {
     const html = render(withPermission(withInput(seededPage(), question))) + renderForm(question);
-    expect(html).not.toMatch(/\b(home|domain)\.[a-zA-Z]/);
+    expect(html).not.toMatch(/\b(home|domain|question)\.[a-zA-Z]/);
   });
 });
 
