@@ -7,6 +7,7 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -27,6 +28,22 @@ let bin: string;
 let log: string;
 let orca: string;
 let hostKeyFile: string;
+let system: string;
+
+const SYSTEM_TOOLS = [
+  "cat",
+  "chmod",
+  "grep",
+  "head",
+  "hostname",
+  "id",
+  "ls",
+  "mkdir",
+  "mktemp",
+  "rm",
+  "tail",
+  "tr",
+];
 
 function stub(name: string, body: string): void {
   const file = join(bin, name);
@@ -41,7 +58,15 @@ beforeEach(() => {
   log = join(root, "log");
   orca = join(root, "Orca.app", "orca");
   hostKeyFile = join(root, "ssh_host_ed25519_key.pub");
-  for (const dir of [home, bin, log, join(root, "Orca.app")]) mkdirSync(dir, { recursive: true });
+  system = join(root, "system");
+  for (const dir of [home, bin, log, system, join(root, "Orca.app")]) {
+    mkdirSync(dir, { recursive: true });
+  }
+  for (const tool of SYSTEM_TOOLS) {
+    const found = spawnSync("/bin/sh", ["-c", `command -v ${tool}`], { encoding: "utf8" });
+    const path = found.stdout.trim();
+    if (found.status === 0 && path.startsWith("/")) symlinkSync(path, join(system, tool));
+  }
   writeFileSync(hostKeyFile, `${HOST_KEY}\n`);
   writeFileSync(orca, `#!/bin/sh\nprintf '%s\\n' "$*" >>"${log}/orca"\n`);
   chmodSync(orca, 0o755);
@@ -94,7 +119,7 @@ function run(overrides: Partial<SetupScriptInput> = {}) {
   const result = spawnSync("/bin/sh", ["-s"], {
     input: script,
     encoding: "utf8",
-    env: { HOME: home, PATH: `${bin}:/usr/bin:/bin` },
+    env: { HOME: home, PATH: `${bin}:${system}` },
   });
   return { ...result, output: `${result.stdout}${result.stderr}` };
 }
