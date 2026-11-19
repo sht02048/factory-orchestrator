@@ -21,7 +21,6 @@ export const Route = createFileRoute("/_app/tickets")({
   }),
   loaderDeps: ({ search }) => ({ ws: search.ws }),
   loader: ({ deps }) => getTicketsPage({ data: { ws: deps.ws } }),
-  shouldReload: false,
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: TicketsRoute,
 });

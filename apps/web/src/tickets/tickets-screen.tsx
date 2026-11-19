@@ -11,6 +11,7 @@ import {
   MascotMessage,
   NoticeLayout,
   PageHeader,
+  ScreenLayout,
   PanelFooter,
   RowTitle,
   SegmentedTabs,
@@ -78,10 +79,9 @@ export function TicketsScreen(props: TicketsScreenProps) {
 function Notice({ body }: { body: ReactNode }) {
   const t = useTranslations("tickets");
   return (
-    <NoticeLayout>
-      <PageHeader title={t("title")} subtitle={t("intro")} />
-      {body}
-    </NoticeLayout>
+    <ScreenLayout header={<PageHeader title={t("title")} subtitle={t("intro")} />}>
+      <NoticeLayout>{body}</NoticeLayout>
+    </ScreenLayout>
   );
 }
 
@@ -161,127 +161,133 @@ function TicketsList({
   else empty = t("noTickets");
 
   return (
-    <SplitView
-      list={
-        <div {...stylex.props(styles.listFrame)}>
-          <div {...stylex.props(styles.listTop)}>
-            <PageHeader title={t("title")} subtitle={t("summary", { count: counts.assignable })} />
-            {page.errors.length === 0 ? null : (
-              <Card surface="problem">
+    <ScreenLayout
+      header={
+        <PageHeader title={t("title")} subtitle={t("summary", { count: counts.assignable })} />
+      }
+    >
+      <SplitView
+        fill={false}
+        list={
+          <div {...stylex.props(styles.listFrame)}>
+            <div {...stylex.props(styles.listTop)}>
+              {page.errors.length === 0 ? null : (
+                <Card surface="problem">
+                  <div {...stylex.props(styles.lines)}>
+                    {page.errors.map((error) => (
+                      <Text key={error.trackerProject} variant="body">
+                        {t(`loadError.${error.reason}`, { project: error.trackerProject })}
+                      </Text>
+                    ))}
+                  </div>
+                </Card>
+              )}
+              {page.truncated.length === 0 ? null : (
                 <div {...stylex.props(styles.lines)}>
-                  {page.errors.map((error) => (
-                    <Text key={error.trackerProject} variant="body">
-                      {t(`loadError.${error.reason}`, { project: error.trackerProject })}
+                  {page.truncated.map((cut) => (
+                    <Text key={cut.trackerProject} variant="meta">
+                      {t("truncated", { project: cut.trackerProject, limit: cut.limit })}
                     </Text>
                   ))}
                 </div>
-              </Card>
-            )}
-            {page.truncated.length === 0 ? null : (
-              <div {...stylex.props(styles.lines)}>
-                {page.truncated.map((cut) => (
-                  <Text key={cut.trackerProject} variant="meta">
-                    {t("truncated", { project: cut.trackerProject, limit: cut.limit })}
-                  </Text>
-                ))}
-              </div>
-            )}
-            <div {...stylex.props(styles.toolbar)}>
-              <SegmentedTabs<TicketFilter>
-                value={filter}
-                onValueChange={onFilterChange}
-                label={t("filter.label")}
-                items={TICKET_FILTERS.map((key) => ({
-                  value: key,
-                  label: t(`filter.${key}`),
-                  count: counts[key],
-                }))}
-              />
-              <div {...stylex.props(styles.search)}>
-                <Input
-                  type="search"
-                  aria-label={t("search.label")}
-                  value={query}
-                  onValueChange={setQuery}
-                  placeholder={t("search.placeholder")}
-                  autoComplete="off"
+              )}
+              <div {...stylex.props(styles.toolbar)}>
+                <SegmentedTabs<TicketFilter>
+                  value={filter}
+                  onValueChange={onFilterChange}
+                  label={t("filter.label")}
+                  items={TICKET_FILTERS.map((key) => ({
+                    value: key,
+                    label: t(`filter.${key}`),
+                    count: counts[key],
+                  }))}
                 />
-              </div>
-            </div>
-          </div>
-          <div {...stylex.props(styles.tableFrame)}>
-            <Table columns={tableColumns(showTrackerProject)} narrowColumns="minmax(0, 1fr)">
-              <TableHead>
-                <TableHeader>{t("columns.key")}</TableHeader>
-                <TableHeader>{t("columns.title")}</TableHeader>
-                {showTrackerProject ? (
-                  <TableHeader>{t("columns.trackerProject")}</TableHeader>
-                ) : null}
-                <TableHeader>{t("columns.lastRun")}</TableHeader>
-              </TableHead>
-              <div
-                ref={scrollRef}
-                data-more-below={moreBelow}
-                {...stylex.props(styles.scroll, moreBelow && styles.fadeBottom)}
-              >
-                <div ref={listRef}>
-                  {visible.length === 0 ? (
-                    <TableEmpty>
-                      {page.tickets.length === 0 && page.errors.length === 0 ? (
-                        <MascotMessage mood="resting" size="small">
-                          {empty}
-                        </MascotMessage>
-                      ) : (
-                        empty
-                      )}
-                    </TableEmpty>
-                  ) : (
-                    <TableRows
-                      label={t("listLabel")}
-                      value={visible[selectedIndex]?.id ?? null}
-                      onValueChange={onSelect}
-                    >
-                      {rows.spaceBefore > 0 ? (
-                        <div aria-hidden="true" style={{ height: rows.spaceBefore }} />
-                      ) : null}
-                      {visible.slice(rows.start, rows.end).map((ticket) => (
-                        <TicketRow
-                          key={ticket.id}
-                          ticket={ticket}
-                          showTrackerProject={showTrackerProject}
-                        />
-                      ))}
-                      {rows.spaceAfter > 0 ? (
-                        <div aria-hidden="true" style={{ height: rows.spaceAfter }} />
-                      ) : null}
-                    </TableRows>
-                  )}
+                <div {...stylex.props(styles.search)}>
+                  <Input
+                    type="search"
+                    aria-label={t("search.label")}
+                    value={query}
+                    onValueChange={setQuery}
+                    placeholder={t("search.placeholder")}
+                    autoComplete="off"
+                  />
                 </div>
               </div>
-            </Table>
+            </div>
+            <div {...stylex.props(styles.tableFrame)}>
+              <Table columns={tableColumns(showTrackerProject)} narrowColumns="minmax(0, 1fr)">
+                <TableHead>
+                  <TableHeader>{t("columns.key")}</TableHeader>
+                  <TableHeader>{t("columns.title")}</TableHeader>
+                  {showTrackerProject ? (
+                    <TableHeader>{t("columns.trackerProject")}</TableHeader>
+                  ) : null}
+                  <TableHeader>{t("columns.lastRun")}</TableHeader>
+                </TableHead>
+                <div
+                  ref={scrollRef}
+                  data-more-below={moreBelow}
+                  {...stylex.props(styles.scroll, moreBelow && styles.fadeBottom)}
+                >
+                  <div ref={listRef}>
+                    {visible.length === 0 ? (
+                      <TableEmpty>
+                        {page.tickets.length === 0 && page.errors.length === 0 ? (
+                          <MascotMessage mood="resting" size="small">
+                            {empty}
+                          </MascotMessage>
+                        ) : (
+                          empty
+                        )}
+                      </TableEmpty>
+                    ) : (
+                      <TableRows
+                        label={t("listLabel")}
+                        value={visible[selectedIndex]?.id ?? null}
+                        onValueChange={onSelect}
+                      >
+                        {rows.spaceBefore > 0 ? (
+                          <div aria-hidden="true" style={{ height: rows.spaceBefore }} />
+                        ) : null}
+                        {visible.slice(rows.start, rows.end).map((ticket) => (
+                          <TicketRow
+                            key={ticket.id}
+                            ticket={ticket}
+                            showTrackerProject={showTrackerProject}
+                          />
+                        ))}
+                        {rows.spaceAfter > 0 ? (
+                          <div aria-hidden="true" style={{ height: rows.spaceAfter }} />
+                        ) : null}
+                      </TableRows>
+                    )}
+                  </div>
+                </div>
+              </Table>
+            </div>
           </div>
-        </div>
-      }
-      panel={
-        selected === undefined ? null : (
-          <section aria-label={t("panel.label")}>
-            <TicketPanel
-              key={selected.id}
-              ticket={selected}
-              page={page}
-              onOpenRun={onOpenRun}
-              onAssign={onAssign}
-              onAssigned={() => {
-                setAssignedId(selected.id);
-                onAssigned(selected.id);
-              }}
-              focusOpenRun={assignedId === selected.id}
-              onFocusedOpenRun={() => setAssignedId(null)}
-            />
-          </section>
-        )
-      }
-    />
+        }
+        panel={
+          selected === undefined ? null : (
+            <section aria-label={t("panel.label")}>
+              <TicketPanel
+                key={selected.id}
+                ticket={selected}
+                page={page}
+                onOpenRun={onOpenRun}
+                onAssign={onAssign}
+                onAssigned={() => {
+                  setAssignedId(selected.id);
+                  onAssigned(selected.id);
+                }}
+                focusOpenRun={assignedId === selected.id}
+                onFocusedOpenRun={() => setAssignedId(null)}
+              />
+            </section>
+          )
+        }
+      />
+    </ScreenLayout>
   );
 }
 

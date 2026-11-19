@@ -162,18 +162,21 @@ describe("브랜드(티켓 0077)", () => {
     }
   }, 120_000);
 
-  it("레일 맨 위에 취구가 노란 제품 기호가 있고 그 아래 Workspace 바꾸기가 온다", async () => {
+  it("레일 맨 위에 Workspace 바꾸기가 오고, 취구가 노란 제품 기호는 Settings 아래 레일 맨 아래에 온다(0113)", async () => {
     await page.goto("/");
     const rail = page.locator("aside").first();
     const mark = rail.getByRole("img", { name: shell.brand });
     await expect.poll(() => mark.count()).toBe(1);
     expect(await mark.getAttribute("data-mark-tone")).toBe("brand");
     const switcher = rail.getByRole("button", { name: /Workspace 바꾸기/ });
+    const settings = rail.getByRole("link", { name: shell.nav.settings, exact: true });
     const markBox = await mark.boundingBox();
     const switcherBox = await switcher.boundingBox();
-    expect(markBox).not.toBeNull();
-    expect(switcherBox).not.toBeNull();
-    expect((markBox?.y ?? 0) + (markBox?.height ?? 0)).toBeLessThanOrEqual(switcherBox?.y ?? 0);
+    const settingsBox = await settings.boundingBox();
+    expect(switcherBox?.y ?? Number.NaN).toBeLessThanOrEqual(16);
+    expect(markBox?.y ?? 0).toBeGreaterThanOrEqual(
+      (settingsBox?.y ?? Number.NaN) + (settingsBox?.height ?? 0),
+    );
   }, 120_000);
 
   it("없는 주소는 걱정하는 반장과 안내를 보이고, 반장은 화면 읽기에서 숨는다", async () => {

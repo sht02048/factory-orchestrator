@@ -231,7 +231,7 @@ describe("DataTable·차트·단계(티켓 0074)", () => {
 
   it("AppFrame 은 레일과 본문을 나눈다", () => {
     const html = renderToString(<AppFrame rail="레일">본문</AppFrame>);
-    expect(html).toMatch(/<aside[^>]*>레일<\/aside><main[^>]*>본문<\/main>/);
+    expect(html).toMatch(/<aside[^>]*><div[^>]*>레일<\/div><\/aside><main[^>]*>본문<\/main>/);
   });
 });
 

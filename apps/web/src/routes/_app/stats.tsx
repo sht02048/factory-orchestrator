@@ -23,7 +23,6 @@ export const Route = createFileRoute("/_app/stats")({
   loaderDeps: ({ search }) => ({ ws: search.ws, days: search.days }),
   loader: ({ deps }) =>
     getStatsPage({ data: { ws: deps.ws, days: deps.days ?? DEFAULT_STATS_PERIOD_DAYS } }),
-  shouldReload: false,
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: StatsRoute,
 });

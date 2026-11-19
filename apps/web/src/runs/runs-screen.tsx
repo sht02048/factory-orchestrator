@@ -9,6 +9,7 @@ import {
   PageHeader,
   PanelHeader,
   RowTitle,
+  ScreenLayout,
   SplitView,
   StatusPill,
   Tab,
@@ -115,10 +116,9 @@ export function RunsScreen(props: RunsScreenProps) {
 function Notice({ body }: { body: ReactNode }) {
   const t = useTranslations("runs");
   return (
-    <NoticeLayout>
-      <PageHeader title={t("title")} />
-      {body}
-    </NoticeLayout>
+    <ScreenLayout header={<PageHeader title={t("title")} />}>
+      <NoticeLayout>{body}</NoticeLayout>
+    </ScreenLayout>
   );
 }
 
@@ -188,125 +188,131 @@ function RunsList({
   }, [page]);
 
   return (
-    <SplitView
-      list={
-        <div {...stylex.props(styles.listColumn)}>
-          <PageHeader
-            title={t("title")}
-            subtitle={t(page.moreEnded ? "subtitleRecent" : "subtitle", {
-              total: page.runs.length,
-              attention,
-            })}
-          />
-          <div ref={filterBar} {...stylex.props(styles.filterBar)}>
-            <SegmentedTabs<RunGroupFilter>
-              value={isGroupFilter(filter) ? filter : null}
-              onValueChange={onFilterChange}
-              label={t("filter.groupLabel")}
-              items={RUN_GROUP_FILTERS.map((key) => ({
-                value: key,
-                label: t(`filter.${key}`),
-                count: countOf(key),
-                attention: key === "attention",
-              }))}
-            />
-            <Tabs<RunFilterKey>
-              value={isGroupFilter(filter) ? null : filter}
-              onValueChange={onFilterChange}
-              label={t("filter.statusLabel")}
-              variant="chips"
-            >
-              {RUN_STATUS_FILTERS.map((key) => (
-                <Tab key={key} value={key} count={countOf(key)}>
-                  {statusName(key)}
-                </Tab>
-              ))}
-            </Tabs>
-            {page.conditions.length === 0 ? null : (
-              <ConditionChips
-                conditions={page.conditions}
-                onClear={(keys) => {
-                  focusAfterClear.current = true;
-                  onClearConditions?.(keys);
-                }}
+    <ScreenLayout
+      header={
+        <PageHeader
+          title={t("title")}
+          subtitle={t(page.moreEnded ? "subtitleRecent" : "subtitle", {
+            total: page.runs.length,
+            attention,
+          })}
+        />
+      }
+    >
+      <SplitView
+        fill={false}
+        list={
+          <div {...stylex.props(styles.listColumn)}>
+            <div ref={filterBar} {...stylex.props(styles.filterBar)}>
+              <SegmentedTabs<RunGroupFilter>
+                value={isGroupFilter(filter) ? filter : null}
+                onValueChange={onFilterChange}
+                label={t("filter.groupLabel")}
+                items={RUN_GROUP_FILTERS.map((key) => ({
+                  value: key,
+                  label: t(`filter.${key}`),
+                  count: countOf(key),
+                  attention: key === "attention",
+                }))}
+              />
+              <Tabs<RunFilterKey>
+                value={isGroupFilter(filter) ? null : filter}
+                onValueChange={onFilterChange}
+                label={t("filter.statusLabel")}
+                variant="chips"
+              >
+                {RUN_STATUS_FILTERS.map((key) => (
+                  <Tab key={key} value={key} count={countOf(key)}>
+                    {statusName(key)}
+                  </Tab>
+                ))}
+              </Tabs>
+              {page.conditions.length === 0 ? null : (
+                <ConditionChips
+                  conditions={page.conditions}
+                  onClear={(keys) => {
+                    focusAfterClear.current = true;
+                    onClearConditions?.(keys);
+                  }}
+                />
+              )}
+            </div>
+            <Card padding="compact" label={t("listLabel")}>
+              <Table columns={columns} foldedColumns={foldedColumns} narrowColumns={narrowColumns}>
+                <TableHead>
+                  <TableHeader hideWhen="stacked">{t("columns.key")}</TableHeader>
+                  <TableHeader>{t("columns.title")}</TableHeader>
+                  <TableHeader hideWhen="second">{t("columns.runner")}</TableHeader>
+                  <TableHeader hideWhen="first">{t("columns.result")}</TableHeader>
+                  <TableHeader>{t("columns.status")}</TableHeader>
+                  <TableHeader align="end">{t("columns.time")}</TableHeader>
+                </TableHead>
+                {visible.length === 0 ? (
+                  <TableEmpty>
+                    {page.runs.length > 0
+                      ? t("empty")
+                      : filtered
+                        ? t("noRunsWithConditions")
+                        : t("noRuns")}
+                  </TableEmpty>
+                ) : (
+                  <TableRows
+                    label={t("listLabel")}
+                    value={selected?.id ?? null}
+                    onValueChange={onSelect}
+                  >
+                    {visible.map((run) => (
+                      <RunRow key={run.id} run={run} onOpen={() => onOpen(run.id)} />
+                    ))}
+                  </TableRows>
+                )}
+              </Table>
+            </Card>
+            {page.moreEnded || page.recentEnded > ENDED_RUNS_PAGE_SIZE ? (
+              <div {...stylex.props(styles.more)}>
+                <Text variant="meta" as="p" ref={endedStatus} role="status" tabIndex={-1}>
+                  {page.moreEnded
+                    ? t("ended.partial", { count: page.recentEnded })
+                    : t("ended.all", { count: page.recentEnded })}
+                </Text>
+                {page.moreEnded && onShowMoreEnded !== undefined ? (
+                  <Button
+                    ref={showMoreButton}
+                    onClick={() => {
+                      focusAfterMore.current = true;
+                      onShowMoreEnded();
+                    }}
+                  >
+                    {t("ended.showMore")}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        }
+        panel={
+          <section aria-label={t("panel.label")}>
+            {selected === undefined ? (
+              <DetailPanel>
+                <Text variant="meta">
+                  {page.runs.length > 0
+                    ? t("panel.empty")
+                    : filtered
+                      ? t("panel.noRunsWithConditions")
+                      : t("panel.noRuns")}
+                </Text>
+              </DetailPanel>
+            ) : (
+              <RunPanel
+                run={selected}
+                detailHref={runHref(selected.id)}
+                onOpenDetail={() => onOpen(selected.id)}
               />
             )}
-          </div>
-          <Card padding="compact" label={t("listLabel")}>
-            <Table columns={columns} foldedColumns={foldedColumns} narrowColumns={narrowColumns}>
-              <TableHead>
-                <TableHeader hideWhen="stacked">{t("columns.key")}</TableHeader>
-                <TableHeader>{t("columns.title")}</TableHeader>
-                <TableHeader hideWhen="second">{t("columns.runner")}</TableHeader>
-                <TableHeader hideWhen="first">{t("columns.result")}</TableHeader>
-                <TableHeader>{t("columns.status")}</TableHeader>
-                <TableHeader align="end">{t("columns.time")}</TableHeader>
-              </TableHead>
-              {visible.length === 0 ? (
-                <TableEmpty>
-                  {page.runs.length > 0
-                    ? t("empty")
-                    : filtered
-                      ? t("noRunsWithConditions")
-                      : t("noRuns")}
-                </TableEmpty>
-              ) : (
-                <TableRows
-                  label={t("listLabel")}
-                  value={selected?.id ?? null}
-                  onValueChange={onSelect}
-                >
-                  {visible.map((run) => (
-                    <RunRow key={run.id} run={run} onOpen={() => onOpen(run.id)} />
-                  ))}
-                </TableRows>
-              )}
-            </Table>
-          </Card>
-          {page.moreEnded || page.recentEnded > ENDED_RUNS_PAGE_SIZE ? (
-            <div {...stylex.props(styles.more)}>
-              <Text variant="meta" as="p" ref={endedStatus} role="status" tabIndex={-1}>
-                {page.moreEnded
-                  ? t("ended.partial", { count: page.recentEnded })
-                  : t("ended.all", { count: page.recentEnded })}
-              </Text>
-              {page.moreEnded && onShowMoreEnded !== undefined ? (
-                <Button
-                  ref={showMoreButton}
-                  onClick={() => {
-                    focusAfterMore.current = true;
-                    onShowMoreEnded();
-                  }}
-                >
-                  {t("ended.showMore")}
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      }
-      panel={
-        <section aria-label={t("panel.label")}>
-          {selected === undefined ? (
-            <DetailPanel>
-              <Text variant="meta">
-                {page.runs.length > 0
-                  ? t("panel.empty")
-                  : filtered
-                    ? t("panel.noRunsWithConditions")
-                    : t("panel.noRuns")}
-              </Text>
-            </DetailPanel>
-          ) : (
-            <RunPanel
-              run={selected}
-              detailHref={runHref(selected.id)}
-              onOpenDetail={() => onOpen(selected.id)}
-            />
-          )}
-        </section>
-      }
-    />
+          </section>
+        }
+      />
+    </ScreenLayout>
   );
 }
 

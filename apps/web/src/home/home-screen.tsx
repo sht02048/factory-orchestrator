@@ -7,8 +7,10 @@ import {
   KanbanCards,
   KanbanColumn,
   KanbanSubheading,
+  PageHeader,
   ProblemCallout,
   Row,
+  ScreenLayout,
   Section,
   SegmentedTabs,
   StatusDot,
@@ -121,17 +123,9 @@ export function HomeScreen({
   }, [openRunId, page, onOpenRunShown]);
   if (page.workspace.kind === "none") {
     return (
-      <div {...stylex.props(styles.page)}>
-        <header {...stylex.props(styles.header)}>
-          <Text variant="label" as="p">
-            {t("title")}
-          </Text>
-          <Text variant="display" as="h1">
-            {t("headlineEmpty")}
-          </Text>
-          <Text variant="body">{t("noWorkspace")}</Text>
-        </header>
-      </div>
+      <ScreenLayout header={<PageHeader title={t("title")} subtitle={t("noWorkspace")} />}>
+        {null}
+      </ScreenLayout>
     );
   }
   const all = page.workspace.kind === "all";
@@ -175,94 +169,104 @@ export function HomeScreen({
   const runningTodo = new Set(board.running.todo.map((run) => run.id));
   const todoIds = new Set(page.attention.map(({ run }) => run.id));
   return (
-    <div {...stylex.props(styles.page)}>
-      <div {...stylex.props(styles.top)}>
-        <DashboardHeader page={page} all={all} />
-        <SegmentedTabs<DashboardView>
-          value={view}
-          onValueChange={onViewChange}
-          label={t("view.label")}
-          items={[
-            { value: "all", label: t("view.all") },
-            {
-              value: "todo",
-              label: t("view.todo"),
-              count: page.attention.length,
-              attention: true,
-            },
-          ]}
+    <ScreenLayout
+      header={
+        <PageHeader
+          title={all ? `${t("title")} · ${t("allWorkspaces")}` : t("title")}
+          subtitle={<DashboardSummary page={page} />}
+          actions={
+            <SegmentedTabs<DashboardView>
+              value={view}
+              onValueChange={onViewChange}
+              label={t("view.label")}
+              items={[
+                { value: "all", label: t("view.all") },
+                {
+                  value: "todo",
+                  label: t("view.todo"),
+                  count: page.attention.length,
+                  attention: true,
+                },
+              ]}
+            />
+          }
         />
-      </div>
-      <div {...stylex.props(styles.frame)}>
-        <div {...stylex.props(styles.board)}>
-          <KanbanColumn title={t("column.queued")} count={todoOnly ? 0 : board.queued.length}>
-            <CardList
-              runs={todoOnly ? [] : board.queued}
-              tagged={() => false}
-              limit={COLUMN_VISIBLE}
-              empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.queued")}
-              host={host}
-            />
-          </KanbanColumn>
-          <KanbanColumn
-            title={t("column.running")}
-            count={
-              todoOnly
-                ? board.running.todo.length
-                : board.running.todo.length + board.running.rest.length
-            }
-          >
-            <CardList
-              runs={todoOnly ? board.running.todo : [...board.running.todo, ...board.running.rest]}
-              tagged={(run) => runningTodo.has(run.id)}
-              limit={COLUMN_VISIBLE}
-              empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.running")}
-              host={host}
-            />
-          </KanbanColumn>
-          <KanbanColumn
-            title={t("column.done")}
-            count={
-              todoOnly ? board.done.todo.length : board.done.todo.length + board.done.rest.length
-            }
-          >
-            <CardList
-              runs={board.done.todo}
-              tagged={() => true}
-              limit={DONE_TODO_VISIBLE}
-              empty={
+      }
+    >
+      <div {...stylex.props(styles.page)}>
+        <div {...stylex.props(styles.frame)}>
+          <div {...stylex.props(styles.board)}>
+            <KanbanColumn title={t("column.queued")} count={todoOnly ? 0 : board.queued.length}>
+              <CardList
+                runs={todoOnly ? [] : board.queued}
+                tagged={() => false}
+                limit={COLUMN_VISIBLE}
+                empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.queued")}
+                host={host}
+              />
+            </KanbanColumn>
+            <KanbanColumn
+              title={t("column.running")}
+              count={
                 todoOnly
-                  ? t("columnEmpty.todo")
-                  : board.done.rest.length === 0
-                    ? t("columnEmpty.done")
-                    : null
+                  ? board.running.todo.length
+                  : board.running.todo.length + board.running.rest.length
               }
-              host={host}
-            />
-            {todoOnly || board.done.rest.length === 0 ? null : (
-              <SettledCards runs={board.done.rest} page={page} host={host} />
-            )}
-          </KanbanColumn>
-          <div {...stylex.props(styles.runners)}>
-            <RunnersSection runners={page.runners.list} />
+            >
+              <CardList
+                runs={
+                  todoOnly ? board.running.todo : [...board.running.todo, ...board.running.rest]
+                }
+                tagged={(run) => runningTodo.has(run.id)}
+                limit={COLUMN_VISIBLE}
+                empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.running")}
+                host={host}
+              />
+            </KanbanColumn>
+            <KanbanColumn
+              title={t("column.done")}
+              count={
+                todoOnly ? board.done.todo.length : board.done.todo.length + board.done.rest.length
+              }
+            >
+              <CardList
+                runs={board.done.todo}
+                tagged={() => true}
+                limit={DONE_TODO_VISIBLE}
+                empty={
+                  todoOnly
+                    ? t("columnEmpty.todo")
+                    : board.done.rest.length === 0
+                      ? t("columnEmpty.done")
+                      : null
+                }
+                host={host}
+              />
+              {todoOnly || board.done.rest.length === 0 ? null : (
+                <SettledCards runs={board.done.rest} page={page} host={host} />
+              )}
+            </KanbanColumn>
+            <div {...stylex.props(styles.runners)}>
+              <RunnersSection runners={page.runners.list} />
+            </div>
           </div>
         </div>
+        <RunSheet
+          target={
+            fresh === undefined || target === null
+              ? target
+              : { ...target, run: fresh, tagged: todoIds.has(fresh.id) }
+          }
+          open={open}
+          onOpenChange={setOpen}
+          finalFocus={() => (target === null ? null : (cards.current.get(target.run.id) ?? null))}
+          all={all}
+          onAnswer={onAnswer}
+          onDeny={onDeny}
+          onControl={host.onControl}
+        />
       </div>
-      <RunSheet
-        target={
-          fresh === undefined || target === null
-            ? target
-            : { ...target, run: fresh, tagged: todoIds.has(fresh.id) }
-        }
-        open={open}
-        onOpenChange={setOpen}
-        finalFocus={() => (target === null ? null : (cards.current.get(target.run.id) ?? null))}
-        all={all}
-        onAnswer={onAnswer}
-        onDeny={onDeny}
-        onControl={host.onControl}
-      />
-    </div>
+    </ScreenLayout>
   );
 }
 
@@ -280,7 +284,7 @@ function opensAnswer(run: HomeRun): boolean {
   return run.state === "waiting-for-input" && run.input?.kind === "question" && !run.input.answered;
 }
 
-function DashboardHeader({ page, all }: { page: HomePage; all: boolean }) {
+function DashboardSummary({ page }: { page: HomePage }) {
   const t = useTranslations("home");
   const { duration } = useTime();
   const groups = todoGroups(page.attention);
@@ -310,19 +314,7 @@ function DashboardHeader({ page, all }: { page: HomePage; all: boolean }) {
             .map((group) => t(`summary.${group.kind}`, { count: group.runs.length }))
             .join(t("summary.separator")),
         });
-  return (
-    <header {...stylex.props(styles.header)}>
-      <Text variant="label" as="p">
-        {all ? `${t("title")} · ${t("allWorkspaces")}` : t("title")}
-      </Text>
-      <Text variant="display" as="h1">
-        {total === 0 ? t("headlineEmpty") : t("headline", { count: total })}
-      </Text>
-      <Text variant="body">
-        {limitSentence === null ? work : t("summary.withLimit", { work, limit: limitSentence })}
-      </Text>
-    </header>
-  );
+  return limitSentence === null ? work : t("summary.withLimit", { work, limit: limitSentence });
 }
 
 function CardList({
@@ -583,21 +575,6 @@ const styles = stylex.create({
     paddingTop: space.s8,
     paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
     paddingBottom: space.s10,
-  },
-  top: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    columnGap: space.s6,
-    rowGap: space.s4,
-    marginBottom: space.s8,
-  },
-  header: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-    minWidth: 0,
   },
   frame: { containerType: "inline-size" },
   board: {

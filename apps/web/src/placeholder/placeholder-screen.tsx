@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { PageHeader, Text } from "@ganger/ui";
+import { PageHeader, ScreenLayout, Text } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
 import { useTranslations } from "use-intl";
 import { ScreenMessages } from "../i18n";
@@ -19,10 +19,11 @@ function Placeholder({ screen }: { screen: PlaceholderScreenKey }) {
   const tNav = useTranslations("shell.nav");
   const t = useTranslations("placeholder");
   return (
-    <div {...stylex.props(styles.page)}>
-      <PageHeader title={tNav(screen)} />
-      <Text variant="body">{t("body")}</Text>
-    </div>
+    <ScreenLayout header={<PageHeader title={tNav(screen)} />}>
+      <div {...stylex.props(styles.page)}>
+        <Text variant="body">{t("body")}</Text>
+      </div>
+    </ScreenLayout>
   );
 }
 
