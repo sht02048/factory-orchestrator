@@ -84,6 +84,10 @@
     "versionDiffers": {
       "title": "서버 버전이 앱과 달라요",
       "body": "이 기계의 서비스는 {server}, 앱은 {app}이에요. 서비스를 다시 설치하면 맞출 수 있어요."
+    },
+    "runnerEnrollment": {
+      "title": "이 맥을 러너로 등록할까요?",
+      "body": "{server}의 Ganger가 이 맥에서 에이전트를 돌리려고 해요. 눌러서 확인해요."
     }
   },
   "settingsWindow": {

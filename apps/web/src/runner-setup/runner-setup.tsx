@@ -26,18 +26,18 @@ import { SHARING_SETTINGS_URL } from "@ganger/app/runner-setup/model";
 import type { StepProblem, ThisMacStatus, ThisMacStep } from "@ganger/app/runner-setup/model";
 import type { RegisterResult } from "@ganger/app/runner-setup/register";
 import type { RunnerId } from "@ganger/core";
+import { AppFlow } from "./app-flow";
+import type { AppFlowActions } from "./app-flow";
 import { CommandFlow } from "./command-flow";
 import type { CommandFlowActions } from "./command-flow";
 
-export interface RunnerSetupActions extends CommandFlowActions {
+export interface RunnerSetupActions extends CommandFlowActions, AppFlowActions {
   thisMacStatus: () => Promise<ThisMacStatus>;
   runThisMacStep: (step: ThisMacStep) => Promise<RegisterResult>;
 }
 
 export const SETUP_CHOICES = ["thisMac", "appMac", "commandMac"] as const;
 export type SetupChoice = (typeof SETUP_CHOICES)[number];
-type OpenChoice = Exclude<SetupChoice, "appMac">;
-const OPEN_CHOICES: ReadonlySet<SetupChoice> = new Set<SetupChoice>(["thisMac", "commandMac"]);
 
 export interface DirectEntry {
   open: boolean;
@@ -62,6 +62,13 @@ const THIS_MAC_CHIPS = [
   { key: "check", you: false },
 ] as const;
 
+const APP_CHIPS = [
+  { key: "remoteLogin", you: true },
+  { key: "pressInApp", you: true },
+  { key: "keyServiceGithub", you: false },
+  { key: "check", you: false },
+] as const;
+
 const COMMAND_CHIPS = [
   { key: "remoteLogin", you: true },
   { key: "pasteCommand", you: true },
@@ -76,8 +83,21 @@ const DIRECT_CHIPS = [
   { key: "githubCheck", you: false },
 ] as const;
 
+const CHOICE_CHIPS = {
+  thisMac: THIS_MAC_CHIPS,
+  appMac: APP_CHIPS,
+  commandMac: COMMAND_CHIPS,
+} as const;
+
+const CHOICE_ABOUT = {
+  thisMac: "choose.about",
+  appMac: "choose.aboutApp",
+  commandMac: "choose.aboutCommand",
+} as const;
+
 type ChipStep =
   | (typeof THIS_MAC_CHIPS)[number]
+  | (typeof APP_CHIPS)[number]
   | (typeof COMMAND_CHIPS)[number]
   | (typeof DIRECT_CHIPS)[number];
 
@@ -167,8 +187,9 @@ export function RunnerSetup({
   onRegistered?: (runnerId: RunnerId) => void;
   primary: boolean;
 }) {
-  const [choice, setChoice] = useState<OpenChoice>("thisMac");
-  const [flow, setFlow] = useState<OpenChoice | null>(null);
+  const [choice, setChoice] = useState<SetupChoice>("thisMac");
+  const [flow, setFlow] = useState<SetupChoice | null>(null);
+  const otherMac = flow === "commandMac" || flow === "appMac";
   const flowOpen = flow !== null;
   const [status, reloadStatus] = useThisMacStatus(
     actions.thisMacStatus,
@@ -197,8 +218,17 @@ export function RunnerSetup({
 
   return (
     <div {...stylex.props(styles.stack)}>
-      {flow === "commandMac" ? null : <ServerFacts status={status} onRetry={reloadStatus} />}
-      {flow === "commandMac" ? (
+      {otherMac ? null : <ServerFacts status={status} onRetry={reloadStatus} />}
+      {flow === "appMac" ? (
+        <AppFlow
+          actions={actions}
+          titleRef={flowTitle}
+          onBack={() => setFlow(null)}
+          primary={primary}
+          {...(onOpenRunner === undefined ? {} : { onOpenRunner })}
+          {...(onRegistered === undefined ? {} : { onRegistered })}
+        />
+      ) : flow === "commandMac" ? (
         <CommandFlow
           actions={actions}
           titleRef={flowTitle}
@@ -221,7 +251,7 @@ export function RunnerSetup({
       ) : (
         <Chooser
           name={status.kind === "ready" ? status.status.name : null}
-          ready={status.kind === "ready" || choice === "commandMac"}
+          ready={status.kind === "ready" || choice !== "thisMac"}
           choice={choice}
           onChoose={setChoice}
           continueRef={continueRef}
@@ -338,8 +368,8 @@ function Chooser({
 }: {
   name: string | null;
   ready: boolean;
-  choice: OpenChoice;
-  onChoose: (choice: OpenChoice) => void;
+  choice: SetupChoice;
+  onChoose: (choice: SetupChoice) => void;
   continueRef: RefObject<HTMLButtonElement | null>;
   primary: boolean;
   onContinue: () => void;
@@ -361,7 +391,6 @@ function Chooser({
       </div>
       <RadioGroup labelledBy={questionId}>
         {SETUP_CHOICES.map((option) => {
-          const open = OPEN_CHOICES.has(option);
           const chosen = option === choice;
           return (
             <RadioOption
@@ -369,34 +398,21 @@ function Chooser({
               name="runner-setup"
               value={option}
               checked={chosen}
-              disabled={!open}
-              onCheck={() => {
-                if (option !== "appMac") onChoose(option);
-              }}
+              onCheck={() => onChoose(option)}
             >
               <span {...stylex.props(styles.optionBody)}>
-                <span {...stylex.props(styles.inline)}>
-                  <Text variant="ui" tone={open ? "strong" : "disabled"}>
-                    {option === "thisMac"
-                      ? name === null
-                        ? t("choose.thisMacFallback")
-                        : t("choose.thisMac", { name })
-                      : t(`choose.${option}`)}
-                  </Text>
-                  {open ? null : <Chip>{t("choose.soon")}</Chip>}
-                </span>
-                <Text variant="meta" {...(open ? {} : { tone: "disabled" as const })}>
-                  {t(`choose.${option}Body`)}
+                <Text variant="ui" tone="strong">
+                  {option === "thisMac"
+                    ? name === null
+                      ? t("choose.thisMacFallback")
+                      : t("choose.thisMac", { name })
+                    : t(`choose.${option}`)}
                 </Text>
+                <Text variant="meta">{t(`choose.${option}Body`)}</Text>
                 {chosen ? (
                   <span {...stylex.props(styles.chipRow)}>
-                    <StepChips
-                      steps={option === "commandMac" ? COMMAND_CHIPS : THIS_MAC_CHIPS}
-                      label={t("choose.stepsLabel")}
-                    />
-                    <Text variant="meta">
-                      {option === "commandMac" ? t("choose.aboutCommand") : t("choose.about")}
-                    </Text>
+                    <StepChips steps={CHOICE_CHIPS[option]} label={t("choose.stepsLabel")} />
+                    <Text variant="meta">{t(CHOICE_ABOUT[option])}</Text>
                   </span>
                 ) : null}
               </span>

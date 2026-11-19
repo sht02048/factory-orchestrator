@@ -42,6 +42,10 @@ if (window.location.protocol === "file:") {
     retry: () => invoke("retry"),
     chooseMode: () => invoke("choose-mode"),
     openLog: () => invoke("open-log"),
+    acceptEnrollment: () => invoke("enrollment-accept"),
+    cancelEnrollment: () => invoke("enrollment-cancel"),
+    closeEnrollment: () => invoke("enrollment-close"),
+    openSharing: () => invoke("open-sharing"),
   };
   contextBridge.exposeInMainWorld("desktop", api);
 

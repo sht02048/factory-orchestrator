@@ -11,9 +11,11 @@ import type { CommandRunner } from "./commands.js";
 import {
   ENROLLMENT_TTL_MS,
   RunnerEnrollments,
+  acceptEnrollmentOffer,
   hashToken,
   receiveEnrollment,
   setupScriptFor,
+  startAppEnrollment,
   startEnrollment,
 } from "./enrollment.js";
 import type { EnrollmentContext } from "./enrollment.js";
@@ -337,6 +339,175 @@ describe("starting an enrollment", () => {
     expect(replaced).toMatchObject({ ok: true });
     expect(await setupScriptFor({ ...request, token: "token-1" })).toBeNull();
     expect(ctx.enrollments.claim("token-1")).toEqual({ ok: false, refusal: "unknown" });
+  });
+});
+
+describe("registering another Mac from its Ganger app", () => {
+  async function offered(ctx: EnrollmentContext) {
+    const started = await startAppEnrollment({
+      enrollments: ctx.enrollments,
+      ssh: ctx.ssh,
+      webAddress: WEB_ADDRESS,
+    });
+    if (!started.ok) throw new Error(started.reason);
+    return started;
+  }
+
+  const accept = (ctx: EnrollmentContext, id: string) =>
+    acceptEnrollmentOffer({
+      enrollments: ctx.enrollments,
+      ssh: ctx.ssh,
+      webAddress: WEB_ADDRESS,
+      id,
+    });
+
+  test("offers the request to apps without a token and gives the token only on accept", async () => {
+    const ctx = context();
+    const started = await offered(ctx);
+    expect(started).toEqual({ ok: true, id: started.id, expiresInMs: ENROLLMENT_TTL_MS });
+    expect(ctx.enrollments.openOffer()).toEqual({
+      id: started.id,
+      expiresInMs: ENROLLMENT_TTL_MS,
+    });
+    expect(JSON.stringify(ctx.enrollments.openOffer())).not.toContain("token-");
+    expect(ctx.enrollments.claim("token-1")).toEqual({ ok: false, refusal: "unknown" });
+
+    const reply = await accept(ctx, started.id);
+    expect(reply.status).toBe(200);
+    expect(reply.body.ok && reply.body.script).toContain("GANGER_TOKEN='token-1'");
+    expect(reply.body.ok && reply.body.script).toContain(
+      `ENROLL_URL='${WEB_ADDRESS}/api/runner-enrollment'`,
+    );
+    expect(JSON.stringify(ctx.enrollments)).not.toContain("token-1");
+    expect(ctx.enrollments.openOffer()).toBeNull();
+    expect(ctx.enrollments.view(started.id)).toEqual({
+      state: "preparing",
+      expiresInMs: ENROLLMENT_TTL_MS,
+    });
+    expect(await accept(ctx, started.id)).toEqual({
+      status: 410,
+      body: { ok: false, reason: "taken" },
+    });
+  });
+
+  test("lets only one of two apps that accept at once take the request", async () => {
+    const ctx = context();
+    const { id } = await offered(ctx);
+    const replies = await Promise.all([accept(ctx, id), accept(ctx, id)]);
+    expect(replies.map((reply) => reply.status).sort((a, b) => a - b)).toEqual([200, 410]);
+    expect(replies.find((reply) => reply.status === 410)?.body).toEqual({
+      ok: false,
+      reason: "taken",
+    });
+  });
+
+  test("the app's report saves the Mac as a Ganger-managed runner", async () => {
+    const ctx = context();
+    const { id } = await offered(ctx);
+    expect((await accept(ctx, id)).status).toBe(200);
+    expect(receiveEnrollment(ctx, ready("token-1"), new Date())).toEqual({
+      status: 200,
+      kind: "registered",
+      name: "Studio Mac",
+    });
+    const [stored] = listRunners(ctx.db);
+    const paths = gangerSshPaths(gangerHome);
+    expect(stored?.config).toEqual({
+      sshTarget: "dev@studio-mac.example.ts.net",
+      orcaPath: ORCA,
+      access: {
+        kind: "ganger",
+        identityFile: paths.identityFile,
+        knownHostsFile: paths.knownHostsFile,
+      },
+    });
+    expect(ctx.enrollments.view(id)).toMatchObject({
+      state: "registered",
+      runner: { id: stored?.id, name: "Studio Mac", sshTarget: "dev@studio-mac.example.ts.net" },
+    });
+    expect(receiveEnrollment(ctx, ready("token-1"), new Date())).toEqual({
+      status: 410,
+      kind: "used",
+    });
+  });
+
+  test("shows a failure or a cancel from the app on the server screen", async () => {
+    const ctx = context();
+    const { id } = await offered(ctx);
+    await accept(ctx, id);
+    expect(
+      receiveEnrollment(
+        ctx,
+        { token: "token-1", outcome: "failed", problem: "canceled" },
+        new Date(),
+      ),
+    ).toEqual({ status: 200, kind: "failure-recorded" });
+    expect(ctx.enrollments.view(id)).toEqual({
+      state: "failed",
+      problem: "canceled",
+      detail: null,
+    });
+    expect(listRunners(ctx.db)).toEqual([]);
+  });
+
+  test("an offer nobody takes expires after 10 minutes", async () => {
+    const ctx = context();
+    const { id } = await offered(ctx);
+    clock += ENROLLMENT_TTL_MS;
+    expect(ctx.enrollments.openOffer()).toBeNull();
+    expect(ctx.enrollments.view(id)).toEqual({ state: "expired" });
+    expect(await accept(ctx, id)).toEqual({ status: 410, body: { ok: false, reason: "expired" } });
+  });
+
+  test("the token an app takes lives 10 minutes from when it was taken", async () => {
+    const ctx = context();
+    const { id } = await offered(ctx);
+    clock += ENROLLMENT_TTL_MS - 1;
+    await accept(ctx, id);
+    clock += ENROLLMENT_TTL_MS - 1;
+    expect(ctx.enrollments.usable("token-1")).toBe(true);
+    clock += 1;
+    expect(receiveEnrollment(ctx, ready("token-1"), new Date())).toEqual({
+      status: 410,
+      kind: "expired",
+    });
+    expect(ctx.enrollments.view(id)).toEqual({ state: "expired" });
+  });
+
+  test("leaving the flow on the server screen withdraws the offer", async () => {
+    const ctx = context();
+    const { id } = await offered(ctx);
+    ctx.enrollments.revoke(id);
+    expect(ctx.enrollments.openOffer()).toBeNull();
+    expect(await accept(ctx, id)).toEqual({ status: 410, body: { ok: false, reason: "unknown" } });
+  });
+
+  test("a terminal command is never offered to apps", async () => {
+    const ctx = context();
+    const issued = ctx.enrollments.issue();
+    expect(ctx.enrollments.openOffer()).toBeNull();
+    expect(await accept(ctx, issued.id)).toEqual({
+      status: 410,
+      body: { ok: false, reason: "unknown" },
+    });
+  });
+
+  test("needs the address other devices use, like the command", async () => {
+    const ctx = context();
+    expect(
+      await startAppEnrollment({ enrollments: ctx.enrollments, ssh: ctx.ssh, webAddress: null }),
+    ).toEqual({ ok: false, reason: "no-web-address" });
+    expect(ctx.enrollments.openOffer()).toBeNull();
+    const { id } = await offered(ctx);
+    expect(
+      await acceptEnrollmentOffer({
+        enrollments: ctx.enrollments,
+        ssh: ctx.ssh,
+        webAddress: null,
+        id,
+      }),
+    ).toEqual({ status: 503, body: { ok: false, reason: "no-web-address" } });
+    expect(ctx.enrollments.openOffer()).toMatchObject({ id });
   });
 });
 

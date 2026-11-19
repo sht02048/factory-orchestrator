@@ -49,6 +49,10 @@ function installFakeDesktop({ first, next }: { first: ViewState; next: Transitio
     retry: move("retry"),
     chooseMode: move("chooseMode"),
     openLog: move("openLog"),
+    acceptEnrollment: move("acceptEnrollment"),
+    cancelEnrollment: move("cancelEnrollment"),
+    closeEnrollment: move("closeEnrollment"),
+    openSharing: move("openSharing"),
   };
   window.desktop = api;
 }
@@ -130,5 +134,145 @@ describe("데스크톱 화면 전환 포커스(브라우저, 0062)", () => {
     await refresh.click();
     await expect.poll(() => refresh.getAttribute("aria-disabled")).toBe("true");
     expect(await refresh.evaluate((button) => button === document.activeElement)).toBe(true);
+  });
+});
+
+const START = { done: [], waitingForRemoteLogin: false, github: null, problem: null } as const;
+
+describe("이 맥을 러너로 등록하기(브라우저, 0099)", () => {
+  it("요청은 붙은 서버 이름, 직접 할 일, 할 일 단계와 등록·취소를 보이고, 등록을 누르면 진행 화면 제목으로 포커스가 간다", async () => {
+    await openScreen(
+      {
+        screen: "runner-enrollment",
+        server: "mac-mini",
+        enrollment: { phase: "ask", accepting: false },
+      },
+      {
+        acceptEnrollment: {
+          screen: "runner-enrollment",
+          server: "mac-mini",
+          enrollment: {
+            phase: "running",
+            progress: { ...START, done: ["remoteLogin"] },
+            canceling: false,
+          },
+        },
+      },
+    );
+    await expect.poll(focusedHeading).toBe(screens.enrollment.askTitle);
+    await page.getByText("mac-mini의 Ganger가 이 맥에서 에이전트를 돌려요.").waitFor();
+    await page.getByText(screens.enrollment.youBody).waitFor();
+    const steps = page.getByRole("list", { name: screens.enrollment.stepsLabel });
+    expect(await steps.getByRole("listitem").count()).toBe(5);
+    await page.getByRole("button", { name: screens.enrollment.cancel }).waitFor();
+
+    await page.getByRole("button", { name: screens.enrollment.register }).click();
+    await expect.poll(focusedHeading).toBe(screens.enrollment.runningTitle);
+    await steps.getByText(screens.enrollment.state.running).waitFor();
+    await page
+      .getByRole("status")
+      .filter({ hasText: "Ganger 키 등록 진행 중" })
+      .waitFor({ state: "attached" });
+  });
+
+  it("원격 로그인을 기다리는 동안 켜는 곳을 알리고 공유 설정을 열 수 있다", async () => {
+    await openScreen({
+      screen: "runner-enrollment",
+      server: "mac-mini",
+      enrollment: {
+        phase: "running",
+        progress: { ...START, waitingForRemoteLogin: true },
+        canceling: false,
+      },
+    });
+    await page
+      .getByRole("status")
+      .filter({ hasText: screens.enrollment.remoteLoginWaitTitle })
+      .waitFor();
+    await page.getByRole("button", { name: screens.enrollment.openSharing }).waitFor();
+    const steps = page.getByRole("list", { name: screens.enrollment.stepsLabel });
+    expect(await steps.getByText(screens.enrollment.state.running).count()).toBe(1);
+  });
+
+  it("실패는 이유와 멈춘 단계를 보이고, 만료는 서버 화면으로 돌아가는 길을 둔다", async () => {
+    await openScreen(
+      {
+        screen: "runner-enrollment",
+        server: "mac-mini",
+        enrollment: {
+          phase: "failed",
+          progress: { ...START, done: ["remoteLogin", "key"], problem: "service-failed" },
+        },
+      },
+      {
+        closeEnrollment: {
+          screen: "runner-enrollment",
+          server: "mac-mini",
+          enrollment: { phase: "gone", reason: "expired" },
+        },
+      },
+    );
+    await expect.poll(focusedHeading).toBe(screens.enrollment.failedTitle);
+    await page.getByText(screens.enrollment.problem["service-failed"], { exact: false }).waitFor();
+    const steps = page.getByRole("list", { name: screens.enrollment.stepsLabel });
+    await steps.getByText(screens.enrollment.state.failed).waitFor();
+    await page.getByRole("button", { name: screens.enrollment.backToServer }).click();
+    await expect.poll(focusedHeading).toBe(screens.enrollment.goneTitle);
+    await page.getByText(screens.enrollment.gone.expired).waitFor();
+  });
+});
+
+describe("등록 끝 화면(브라우저, 0099)", () => {
+  it("GitHub 정리를 건너뛰었으면 그 줄에 건너뛰었다고 쓰고, 서버 화면으로 돌아가는 버튼을 둔다", async () => {
+    await openScreen({
+      screen: "runner-enrollment",
+      server: "mac-mini",
+      enrollment: {
+        phase: "registered",
+        progress: {
+          ...START,
+          done: ["remoteLogin", "key", "service", "github", "register"],
+          github: "gh-logged-out",
+        },
+      },
+    });
+    await expect.poll(focusedHeading).toBe(screens.enrollment.registeredTitle);
+    const steps = page.getByRole("list", { name: screens.enrollment.stepsLabel });
+    expect(await steps.getByText(screens.enrollment.state.skipped).count()).toBe(1);
+    await page.getByText(screens.enrollment.github["gh-logged-out"]).waitFor();
+    await page.getByRole("button", { name: screens.enrollment.backToServer }).waitFor();
+  });
+});
+
+describe("서버에 알리는 중에는 취소를 막기(브라우저, 0099)", () => {
+  it("GitHub 단계가 끝나면 취소 버튼을 못 쓰게 한다", async () => {
+    await openScreen({
+      screen: "runner-enrollment",
+      server: "mac-mini",
+      enrollment: {
+        phase: "running",
+        progress: { ...START, done: ["remoteLogin", "key", "service", "github"] },
+        canceling: false,
+      },
+    });
+    const cancel = page.getByRole("button", { name: screens.enrollment.cancel });
+    expect(await cancel.getAttribute("aria-disabled")).toBe("true");
+  });
+});
+
+describe("이 맥에서 취소한 등록(브라우저, 0099)", () => {
+  it("취소는 문제로 칠하지 않고 어느 단계도 실패로 표시하지 않는다", async () => {
+    await openScreen({
+      screen: "runner-enrollment",
+      server: "mac-mini",
+      enrollment: {
+        phase: "failed",
+        progress: { ...START, done: ["remoteLogin"], problem: "canceled" },
+      },
+    });
+    await expect.poll(focusedHeading).toBe(screens.enrollment.canceledTitle);
+    const steps = page.getByRole("list", { name: screens.enrollment.stepsLabel });
+    expect(await steps.getByText(screens.enrollment.state.failed).count()).toBe(0);
+    expect(await steps.getByRole("img", { name: screens.enrollment.state.failed }).count()).toBe(0);
   });
 });

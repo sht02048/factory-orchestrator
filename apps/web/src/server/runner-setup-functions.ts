@@ -6,8 +6,12 @@ import type { RegisterResult } from "@ganger/app/runner-setup/register";
 import { getInstallSettings, parseBootConfig } from "@ganger/db";
 import { getRequestHeader } from "@tanstack/react-start/server";
 import { addressesInput, saveAddresses } from "@ganger/app/settings/actions";
-import { startEnrollment } from "@ganger/app/runner-setup/enrollment";
-import type { EnrollmentView, StartEnrollmentResult } from "@ganger/app/runner-setup/enrollment";
+import { startAppEnrollment, startEnrollment } from "@ganger/app/runner-setup/enrollment";
+import type {
+  EnrollmentView,
+  StartAppEnrollmentResult,
+  StartEnrollmentResult,
+} from "@ganger/app/runner-setup/enrollment";
 import {
   getAdapterRegistry,
   getGangerSsh,
@@ -49,6 +53,17 @@ export const startRunnerEnrollment = createServerFn({ method: "POST" })
   .validator(z.object({ replacing: z.uuid().optional() }))
   .handler(({ data }): Promise<StartEnrollmentResult> =>
     startEnrollment({
+      enrollments: getRunnerEnrollments(),
+      ssh: getGangerSsh(),
+      webAddress: getInstallSettings(getDatabase()).webAddress,
+      replacing: data.replacing,
+    }),
+  );
+
+export const startAppRunnerEnrollment = createServerFn({ method: "POST" })
+  .validator(z.object({ replacing: z.uuid().optional() }))
+  .handler(({ data }): Promise<StartAppEnrollmentResult> =>
+    startAppEnrollment({
       enrollments: getRunnerEnrollments(),
       ssh: getGangerSsh(),
       webAddress: getInstallSettings(getDatabase()).webAddress,

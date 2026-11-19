@@ -1,5 +1,7 @@
 import { getInstallSettings } from "@ganger/db";
+import { z } from "zod";
 import {
+  acceptEnrollmentOffer,
   enrollmentReplyText,
   receiveEnrollment,
   setupScriptFor,
@@ -80,4 +82,24 @@ export async function serveSetupScript(request: Request): Promise<Response> {
     );
   }
   return new Response(script, { status: 200, headers: TEXT });
+}
+
+export function serveEnrollmentOffer(): Response {
+  return Response.json({ offer: getRunnerEnrollments().openOffer() }, { headers: NO_STORE });
+}
+
+const offerId = z.object({ id: z.uuid() });
+
+export async function acceptRunnerEnrollmentOffer(request: Request): Promise<Response> {
+  const parsed = offerId.safeParse(await readFields(request));
+  if (!parsed.success) {
+    return Response.json({ ok: false, reason: "unknown" }, { status: 410, headers: NO_STORE });
+  }
+  const reply = await acceptEnrollmentOffer({
+    enrollments: getRunnerEnrollments(),
+    ssh: getGangerSsh(),
+    webAddress: getInstallSettings(getDatabase()).webAddress,
+    id: parsed.data.id,
+  });
+  return Response.json(reply.body, { status: reply.status, headers: NO_STORE });
 }
