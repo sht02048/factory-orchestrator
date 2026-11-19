@@ -2,6 +2,14 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
+  InfoTip,
+  SectionNav,
+  SettingsGroup,
+  SettingsLayout,
+  SettingsLinkRow,
+  SettingsRow,
+  SettingsSection,
+  Switch,
   Button,
   CAPACITY_CELLS_MAX,
   CapacityBar,
@@ -992,5 +1000,101 @@ describe("새 컴포넌트(티켓 0073)", () => {
       )?.[1];
     expect(dotClass("failed")).not.toEqual(dotClass("running"));
     expect(dotClass("failed")).toEqual(dotClass("offline"));
+  });
+});
+
+describe("설정 한 페이지 부품(티켓 0119)", () => {
+  it("Switch 는 role=switch 이고 켜짐·못 씀을 aria 로 알린다", () => {
+    const on = renderToString(<Switch aria-label="잠자기" checked onCheckedChange={noop} />);
+    expect(on).toMatch(/role="switch"/);
+    expect(on).toContain('aria-checked="true"');
+    expect(on).toContain('aria-label="잠자기"');
+    const off = renderToString(
+      <Switch aria-label="잠자기" checked={false} onCheckedChange={noop} disabled />,
+    );
+    expect(off).toContain('aria-checked="false"');
+    expect(off).toMatch(/role="switch"[^>]*disabled|disabled[^>]*role="switch"/);
+  });
+
+  it("InfoTip 은 이름 있는 단추이고 설명을 aria-describedby 로 잇는 툴팁에 담는다", () => {
+    const html = renderToString(<InfoTip label="최대 실행 시간 도움말" content="멈추고 끝내요." />);
+    expect(html).toContain('aria-label="최대 실행 시간 도움말"');
+    expect(html).toMatch(/<button[^>]*aria-describedby="([^"]+)"/);
+    const id = /aria-describedby="([^"]+)"/.exec(html)?.[1] ?? "";
+    expect(html).toMatch(new RegExp(`role="tooltip"[^>]*id="${id}"[^>]*>멈추고 끝내요.`));
+  });
+
+  it("SettingsRow 는 라벨·값·동작을 한 줄에 두고 상태 칸을 늘 그려 둔다", () => {
+    const html = renderToString(
+      <SettingsGroup label="예시">
+        <SettingsRow
+          label="이름"
+          labelId="name-label"
+          value="Acme"
+          detail="두 번째 줄"
+          detailTone="problem"
+          control={<Button>바꾸기</Button>}
+        />
+        <SettingsRow label="빈 줄" />
+      </SettingsGroup>,
+    );
+    expect(html).toContain('role="group" aria-label="예시"');
+    expect(html).toContain('id="name-label"');
+    expect(html.match(/role="status"/g)).toHaveLength(2);
+    expect(html).toContain(">바꾸기</button>");
+    expect(html.match(/>Acme</g)).toHaveLength(2);
+  });
+
+  it("SettingsRow 는 펼치면 편집 영역을 그리고, formOnly 이면 줄 대신 편집 영역만 그린다", () => {
+    const open = renderToString(
+      <SettingsRow label="토큰" detail="저장했어요" expanded={<form />} />,
+    );
+    expect(open).toContain("토큰");
+    expect(open).toContain("<form>");
+    const only = renderToString(
+      <SettingsRow label="이름" control={<Button>바꾸기</Button>} formOnly expanded={<form />} />,
+    );
+    expect(only).not.toContain("바꾸기");
+    expect(only).toContain("<form>");
+  });
+
+  it("SettingsLinkRow 는 넘긴 링크 요소로 줄 전체를 감싸고 화살표를 붙인다", () => {
+    const html = renderToString(
+      <SettingsLinkRow
+        id="runners-row"
+        label="러너"
+        detail="3대"
+        render={(props) => <a href="/runners" {...props} />}
+      />,
+    );
+    expect(html).toMatch(/<div id="runners-row"[^>]*><a href="\/runners"[^>]*>/);
+    expect(html).toContain('<path d="M6 4l4 4-4 4"');
+  });
+
+  it("SectionNav 는 이름 있는 nav 안에 구역 링크를 두고 첫 구역을 지금 위치로, 문제 구역에 점과 읽을 글을 붙인다", () => {
+    const html = renderToString(
+      <SettingsLayout
+        nav={
+          <SectionNav
+            label="목차"
+            problemLabel="확인할 것이 있어요"
+            items={[
+              { id: "a", label: "가" },
+              { id: "b", label: "나", problem: true },
+            ]}
+          />
+        }
+      >
+        <SettingsSection id="a" title="가">
+          본문
+        </SettingsSection>
+      </SettingsLayout>,
+    );
+    expect(html).toContain('<nav aria-label="목차"');
+    expect(html).toMatch(/href="#a" aria-current="location"/);
+    expect(html).not.toMatch(/href="#b" aria-current/);
+    expect(html.match(/확인할 것이 있어요/g)).toHaveLength(1);
+    expect(html).toContain('<section id="a" aria-labelledby="a-heading"');
+    expect(html).toMatch(/<h2 id="a-heading" tabindex="-1" data-section-heading=""/);
   });
 });

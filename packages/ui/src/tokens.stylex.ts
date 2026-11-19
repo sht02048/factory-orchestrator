@@ -183,6 +183,15 @@ export const size = stylex.defineVars({
   labelSelectWidth: "240px",
   mappingTableMinWidth: "640px",
   mappingCellMinWidth: "140px",
+  settingsBodyWidth: "720px",
+  settingsNavWidth: "168px",
+  settingsControlWidth: "240px",
+  settingsNumberWidth: "80px",
+  switchWidth: "44px",
+  switchHeight: "26px",
+  switchThumb: "20px",
+  infoTip: "24px",
+  infoTipWidth: "320px",
 });
 
 export const breakpoints = stylex.defineConsts({
@@ -211,4 +220,6 @@ export const breakpoints = stylex.defineConsts({
   tableFoldThirdRange: "@container (440px <= width < 560px)",
   tableStackedBelowThird: "@container (width < 440px)",
   rowSlotsFit: "@container (max-width: 399px)",
+  settingsNavTop: "@container (width < 760px)",
+  settingsRowStacked: "@container (width < 480px)",
 });

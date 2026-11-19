@@ -100,7 +100,14 @@ export {
   type SectionTitleRole,
   type SplitViewProps,
 } from "./components/layout";
-export { CheckIcon, ChevronDownIcon, CloseIcon } from "./components/icons";
+export {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  ExternalIcon,
+  InfoIcon,
+} from "./components/icons";
 export {
   WindowChrome,
   WindowDragFrame,
@@ -227,7 +234,30 @@ export {
   type PinnedToastProps,
   type ToasterProps,
 } from "./components/toast";
-export { Tooltip, type TooltipAction, type TooltipProps } from "./components/tooltip";
+export {
+  InfoTip,
+  Tooltip,
+  type InfoTipProps,
+  type TooltipAction,
+  type TooltipProps,
+} from "./components/tooltip";
+export { Switch, type SwitchProps } from "./components/switch";
+export {
+  SectionNav,
+  SettingsGroup,
+  SettingsLayout,
+  SettingsLinkRow,
+  SettingsRow,
+  SettingsSection,
+  type SectionNavItem,
+  type SectionNavProps,
+  type SettingsDetailTone,
+  type SettingsLayoutProps,
+  type SettingsLinkRowProps,
+  type SettingsLinkRowRenderProps,
+  type SettingsRowProps,
+  type SettingsSectionProps,
+} from "./components/settings-layout";
 export { UsageBar, usageText, type UsageBarProps, type UsageTone } from "./components/usage-bar";
 export { UsageMeter, type UsageMeterProps } from "./components/usage-meter";
 export { PanelRows, PanelSection, type PanelSectionProps } from "./components/panel-section";

@@ -47,6 +47,7 @@ interface InputBaseProps {
   autoComplete?: string;
   inputMode?: "text" | "numeric" | "decimal" | "email" | "url" | "search";
   mono?: boolean;
+  invalid?: boolean;
   id?: string;
   "aria-label"?: string;
   "aria-describedby"?: string;
@@ -71,11 +72,12 @@ export type InputProps = InputBaseProps &
     | { value: string; readOnly: true; onValueChange?: never; defaultValue?: never }
   );
 
-export function Input({ mono, onValueChange, ...props }: InputProps) {
-  const invalid = use(InvalidContext);
+export function Input({ mono, invalid: invalidProp, onValueChange, ...props }: InputProps) {
+  const invalid = use(InvalidContext) || invalidProp === true;
   return (
     <SdkInput
       {...props}
+      {...(invalidProp === true ? { "aria-invalid": true } : {})}
       {...(onValueChange === undefined
         ? {}
         : { onChange: (event) => onValueChange(event.currentTarget.value) })}

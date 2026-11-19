@@ -8,6 +8,7 @@ import {
 import type { ReactElement, ReactNode } from "react";
 import { buttonStyles, type ButtonVariant } from "./button";
 import { cx } from "../cx";
+import { InfoIcon } from "./icons";
 import {
   colors,
   fontSize,
@@ -62,6 +63,25 @@ export function Tooltip({
       <TooltipContent side={side} sideOffset={6} className={cx(styles.content)}>
         {content}
         {shortcut === undefined ? null : <TooltipShortcut className={cx(styles.shortcut)} />}
+      </TooltipContent>
+    </SdkTooltip>
+  );
+}
+
+export interface InfoTipProps {
+  label: string;
+  content: string;
+  side?: "top" | "bottom" | "left" | "right";
+}
+
+export function InfoTip({ label, content, side = "top" }: InfoTipProps) {
+  return (
+    <SdkTooltip type="description">
+      <TooltipTrigger aria-label={label} className={cx(styles.info)}>
+        <InfoIcon />
+      </TooltipTrigger>
+      <TooltipContent side={side} sideOffset={6} className={cx(styles.content, styles.infoContent)}>
+        {content}
       </TooltipContent>
     </SdkTooltip>
   );
@@ -134,6 +154,37 @@ const styles = stylex.create({
     },
     animationDuration: motion.durationFast,
     animationTimingFunction: motion.easeOut,
+  },
+  info: {
+    position: "relative",
+    display: "inline-flex",
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    width: size.infoTip,
+    height: size.infoTip,
+    padding: 0,
+    borderWidth: 0,
+    borderRadius: radius.full,
+    backgroundColor: "transparent",
+    color: { default: colors.textTertiary, ":hover": colors.textPrimary },
+    cursor: "help",
+    verticalAlign: "middle",
+    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
+    outlineOffset: 0,
+    "::before": {
+      content: "''",
+      position: "absolute",
+      insetBlock: `calc(-1 * ${space.s2})`,
+      insetInline: `calc(-1 * ${space.s2})`,
+    },
+  },
+  infoContent: {
+    maxWidth: size.infoTipWidth,
+    paddingBlock: space.s2,
+    paddingInline: space.s3,
+    lineHeight: lineHeight.normal,
+    textWrap: "pretty",
   },
   shortcut: {
     marginInlineStart: space.s2,
