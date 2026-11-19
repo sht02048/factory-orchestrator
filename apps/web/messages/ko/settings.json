@@ -148,7 +148,7 @@
     "namePlaceholder": "예: runner-a",
     "sshTarget": "ssh 대상",
     "sshTargetDescription": "비대화형 ssh로 닿는 대상이에요. ssh 설정의 Host 이름이나 user@host를 넣어요.",
-    "sshTargetPlaceholder": "factory@runner.example.com",
+    "sshTargetPlaceholder": "ganger@runner.example.com",
     "orcaPath": "orca 실행 파일 경로",
     "orcaPathDescription": "러너에서 which orca로 나온 경로를 넣어요.",
     "capacity": "Capacity",

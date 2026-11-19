@@ -2,8 +2,15 @@ import * as stylex from "@stylexjs/stylex";
 import type { KeyboardEventHandler, ReactNode } from "react";
 import { colors, lineHeight, radius, space } from "../tokens.stylex";
 
-export function RadioGroup({ children }: { children: ReactNode }) {
-  return <div {...stylex.props(styles.group)}>{children}</div>;
+export function RadioGroup({ labelledBy, children }: { labelledBy?: string; children: ReactNode }) {
+  return (
+    <div
+      {...(labelledBy === undefined ? {} : { role: "radiogroup", "aria-labelledby": labelledBy })}
+      {...stylex.props(styles.group)}
+    >
+      {children}
+    </div>
+  );
 }
 
 export interface RadioOptionProps {

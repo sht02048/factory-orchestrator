@@ -15,5 +15,8 @@ describe("opensOutsideApp", () => {
     expect(opensOutsideApp("file:///etc/passwd")).toBe(false);
     expect(opensOutsideApp("x-apple.systempreferences:com.apple.preference.security")).toBe(false);
     expect(opensOutsideApp("javascript:alert(1)")).toBe(false);
+    expect(opensOutsideApp("x-apple.systempreferences:com.apple.preferences.sharingXYZ")).toBe(
+      false,
+    );
   });
 });

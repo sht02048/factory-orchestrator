@@ -237,7 +237,7 @@ export function localThisMac(options: LocalThisMacOptions): ThisMac {
         orcaPath,
         remoteLogin,
         tailscale: tailscaleState,
-        gangerKey: paths !== null,
+        gangerHomeKnown: paths !== null,
       };
     },
     async runStep(step) {

@@ -19,7 +19,7 @@ export class FakeThisMac implements ThisMac {
       orcaPath: FAKE_ORCA_PATH,
       remoteLogin: this.remoteLogin,
       tailscale: "connected",
-      gangerKey: true,
+      gangerHomeKnown: true,
     };
   }
 

@@ -219,7 +219,7 @@ describe("this mac as a runner", () => {
   test("fails every step with no-home when the Ganger home is unknown", async () => {
     const thisMac = mac(fakeRunner(() => undefined).run, { gangerHome: undefined });
     expect(await thisMac.runStep("key")).toMatchObject({ problem: "no-home" });
-    expect((await thisMac.status()).gangerKey).toBe(false);
+    expect((await thisMac.status()).gangerHomeKnown).toBe(false);
   });
 
   test("reads the mac status", async () => {
@@ -229,7 +229,7 @@ describe("this mac as a runner", () => {
       orcaPath: ORCA,
       remoteLogin: false,
       tailscale: "missing",
-      gangerKey: true,
+      gangerHomeKnown: true,
     });
   });
 

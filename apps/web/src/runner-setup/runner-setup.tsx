@@ -244,35 +244,33 @@ function Chooser({
           <Chip>{t("ganger")}</Chip>
         </span>
       </div>
-      <div role="radiogroup" aria-labelledby={questionId}>
-        <RadioGroup>
-          {SETUP_CHOICES.map((option) => (
-            <RadioOption
-              key={option}
-              name="runner-setup"
-              value={option}
-              checked={choice === option}
-              onCheck={() => onChoice(option)}
-            >
-              <span {...stylex.props(styles.optionBody)}>
-                <Text variant="ui" tone="strong">
-                  {option === "thisMac"
-                    ? name === null
-                      ? t("thisMacFallback")
-                      : t("thisMac", { name })
-                    : t(option)}
-                </Text>
-                <Text variant="meta">{t(`${option}Body`)}</Text>
-                {option !== "thisMac" ? (
-                  <Text variant="meta">{t("soon")}</Text>
-                ) : choice === option ? (
-                  <ThisMacChips />
-                ) : null}
-              </span>
-            </RadioOption>
-          ))}
-        </RadioGroup>
-      </div>
+      <RadioGroup labelledBy={questionId}>
+        {SETUP_CHOICES.map((option) => (
+          <RadioOption
+            key={option}
+            name="runner-setup"
+            value={option}
+            checked={choice === option}
+            onCheck={() => onChoice(option)}
+          >
+            <span {...stylex.props(styles.optionBody)}>
+              <Text variant="ui" tone="strong">
+                {option === "thisMac"
+                  ? name === null
+                    ? t("thisMacFallback")
+                    : t("thisMac", { name })
+                  : t(option)}
+              </Text>
+              <Text variant="meta">{t(`${option}Body`)}</Text>
+              {option !== "thisMac" ? (
+                <Text variant="meta">{t("soon")}</Text>
+              ) : choice === option ? (
+                <ThisMacChips />
+              ) : null}
+            </span>
+          </RadioOption>
+        ))}
+      </RadioGroup>
       {choice === "thisMac" ? (
         <Actions>
           <Button
@@ -350,6 +348,10 @@ function ThisMacFlow({
   const [started, setStarted] = useState(false);
   const [registeredId, setRegisteredId] = useState<RunnerId | null>(null);
   const registered = registeredId !== null;
+  const openRunnerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (registeredId !== null) openRunnerRef.current?.focus();
+  }, [registeredId]);
   const running = useRef(false);
   const ready = status.remoteLogin && status.orcaPath !== null;
 
@@ -437,7 +439,13 @@ function ThisMacFlow({
         <StepRows rows={rows} />
         {failedAt === -1 ? null : (
           <Actions>
-            <Button variant="primary" onClick={() => void runFrom(failedAt)}>
+            <Button
+              variant="primary"
+              onClick={() => {
+                titleRef.current?.focus();
+                void runFrom(failedAt);
+              }}
+            >
               {t("retry")}
             </Button>
           </Actions>
@@ -464,7 +472,11 @@ function ThisMacFlow({
         </Text>
         <Actions>
           {registeredId !== null && onOpenRunner !== undefined ? (
-            <Button variant="primary" onClick={() => onOpenRunner(registeredId)}>
+            <Button
+              ref={openRunnerRef}
+              variant="primary"
+              onClick={() => onOpenRunner(registeredId)}
+            >
               {t("openRunner", { name: status.name })}
             </Button>
           ) : null}

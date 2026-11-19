@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
-import { colors, fontSize, lineHeight, radius, size, space } from "../tokens.stylex";
+import { colors, fontSize, lineHeight, motion, radius, size, space } from "../tokens.stylex";
 import { focusStyles } from "./focus";
 import { CheckIcon } from "./icons";
 import { textStyles } from "./text";
@@ -261,7 +261,7 @@ const styles = stylex.create({
     borderColor: colors.accent,
     borderTopColor: "transparent",
     animationName: { default: "none", "@media (prefers-reduced-motion: no-preference)": spin },
-    animationDuration: "900ms",
+    animationDuration: motion.durationSpin,
     animationTimingFunction: "linear",
     animationIterationCount: "infinite",
   },

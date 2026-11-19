@@ -35,7 +35,7 @@ export interface ThisMacStatus {
   orcaPath: string | null;
   remoteLogin: boolean;
   tailscale: TailscaleState;
-  gangerKey: boolean;
+  gangerHomeKnown: boolean;
 }
 
 export interface GangerRunnerConfig {

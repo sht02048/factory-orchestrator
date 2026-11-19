@@ -31,7 +31,7 @@ export class DemoThisMac implements ThisMac {
       orcaPath: DEMO_ORCA_PATH,
       remoteLogin: this.remoteLogin,
       tailscale: "connected",
-      gangerKey: true,
+      gangerHomeKnown: true,
     };
   }
 

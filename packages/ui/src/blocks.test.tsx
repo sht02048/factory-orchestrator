@@ -5,6 +5,7 @@ import {
   AppFrame,
   Button,
   CheckTick,
+  RadioGroup,
   Chip,
   CodeBlock,
   ScrollRegion,
@@ -108,6 +109,13 @@ describe("칩·링크·코드(티켓 0074)", () => {
     expect(html).toMatch(/^<button[^>]*aria-label="러너 조건 지우기"[^>]*data-variant="secondary"/);
     expect(html).toContain(">러너: a<svg");
     expect(renderToString(<Chip strong>필수</Chip>)).toMatch(/^<span class="[^"]+">필수<\/span>$/);
+  });
+
+  it("RadioGroup 에 labelledBy 를 주면 그 제목을 이름으로 가진 radiogroup 이고, 주지 않으면 그대로다", () => {
+    expect(renderToString(<RadioGroup labelledBy="q-title">a</RadioGroup>)).toMatch(
+      /^<div role="radiogroup" aria-labelledby="q-title" class="[^"]+">a<\/div>$/,
+    );
+    expect(renderToString(<RadioGroup>a</RadioGroup>)).toMatch(/^<div class="[^"]+">a<\/div>$/);
   });
 
   it("Chip tone=accent 는 기본 칩과 다른 강조 면을 입고, 기본 칩은 그대로다", () => {
