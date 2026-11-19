@@ -262,6 +262,7 @@ describe("Settings 저장하고 다시 열기", () => {
         name: "runner-a",
         sshTarget: "factory@runner-a.example.com",
         orcaPath: "/usr/local/bin/orca",
+        access: "manual",
         capacity: 3,
         check: { status: "pending", requestedAt: now.toISOString() },
       },
