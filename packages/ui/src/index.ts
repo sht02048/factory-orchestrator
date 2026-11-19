@@ -184,4 +184,5 @@ export {
 } from "./components/text";
 export { Toaster, showToast, type ToasterProps } from "./components/toast";
 export { Tooltip, type TooltipAction, type TooltipProps } from "./components/tooltip";
+export { UsageBar, usageText, type UsageBarProps, type UsageTone } from "./components/usage-bar";
 export { VisuallyHidden, visuallyHiddenStyles } from "./components/visually-hidden";

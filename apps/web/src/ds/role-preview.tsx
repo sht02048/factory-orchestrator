@@ -6,19 +6,20 @@ import {
   Card,
   GangerMark,
   GroupHeader,
-  MASCOT_MOODS,
   Mascot,
+  MASCOT_MOODS,
   MascotMessage,
   ProblemCallout,
   Row,
-  SURFACE_ROLES,
   Section,
   SegmentedTabs,
   StatTile,
   StatusDot,
   StatusPill,
+  SURFACE_ROLES,
   Text,
   textStyles,
+  UsageBar,
 } from "@ganger/ui";
 import { colors, space } from "@ganger/ui/tokens.stylex";
 import { useState, type ReactNode } from "react";
@@ -32,6 +33,7 @@ export const roleSectionIds = [
   "segmented",
   "groupHeader",
   "capacity",
+  "usage",
   "problem",
   "statTile",
   "brand",
@@ -215,6 +217,37 @@ export function RoleSections() {
                   }
                 >
                   <Text variant="title">runner-c</Text>
+                </Row>
+              </Card>
+            </div>
+          </Demo>
+        </Section>
+      </div>
+
+      <div id="usage">
+        <Section title={t("nav.usage")} note={t("usage.note")}>
+          <Demo>
+            <div {...stylex.props(styles.stack)}>
+              <Card padding="compact">
+                <Row
+                  interactive={false}
+                  trailing={
+                    <span {...stylex.props(styles.capacity)}>
+                      <UsageBar percent={42} label={t("usage.label")} />
+                    </span>
+                  }
+                >
+                  <Text variant="title">{t("usage.session")}</Text>
+                </Row>
+                <Row
+                  interactive={false}
+                  trailing={
+                    <span {...stylex.props(styles.capacity)}>
+                      <UsageBar percent={93} label={t("usage.label")} tone="problem" />
+                    </span>
+                  }
+                >
+                  <Text variant="title">{t("usage.weekly")}</Text>
                 </Row>
               </Card>
             </div>
