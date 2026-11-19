@@ -145,6 +145,16 @@ describe("색 토큰", () => {
     expect(selected.l).toBeGreaterThan(parts(value("bgCardHover")).l);
   });
 
+  it("고른 행 테두리는 행이 놓이는 바탕·고른 행 바탕과 3:1 을 넘는다(WCAG 1.4.11, 티켓 0091)", () => {
+    const ratios = Object.fromEntries(
+      ["bgCanvas", "bgCard", "bgPanel", "bgHover", "bgSelected"].map((bg) => [
+        bg,
+        Math.round(contrast(value("borderSelected"), value(bg)) * 100) / 100,
+      ]),
+    );
+    expect(Object.values(ratios).every((ratio) => ratio >= 3)).toBe(true);
+  });
+
   it("글자는 Paper 의 따뜻한 무채색에서 밝기만 내린 단계다", () => {
     const steps = ["textPrimary", "textSecondary", "textTertiary", "textDisabled"].map((key) =>
       parts(value(key)),

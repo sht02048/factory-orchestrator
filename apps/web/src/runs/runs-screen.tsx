@@ -181,6 +181,7 @@ function RunsList({
                 value: key,
                 label: t(`filter.${key}`),
                 count: countOf(key),
+                attention: key === "attention",
               }))}
             />
             <Tabs<RunFilterKey>

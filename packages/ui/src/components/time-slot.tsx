@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 import { textStyles } from "./text";
-import { size } from "../tokens.stylex";
+import { breakpoints, size } from "../tokens.stylex";
 
 export interface TimeSlotProps {
   children: ReactNode;
@@ -33,7 +33,7 @@ const styles = stylex.create({
   time: {
     display: "inline-block",
     flexShrink: 0,
-    inlineSize: size.timeColumn,
+    inlineSize: { default: size.timeColumn, [breakpoints.rowSlotsFit]: "auto" },
     overflow: "hidden",
     fontVariantNumeric: "tabular-nums",
     textAlign: "end",
@@ -45,6 +45,6 @@ const styles = stylex.create({
     flexShrink: 0,
     justifyContent: "flex-end",
     alignItems: "center",
-    inlineSize: size.rowActionColumn,
+    inlineSize: { default: size.rowActionColumn, [breakpoints.rowSlotsFit]: "auto" },
   },
 });

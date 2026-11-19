@@ -18,6 +18,7 @@ export const colors = stylex.defineVars({
   borderSubtle: "oklch(0.21 0 0)",
   borderDefault: "oklch(0.285 0 0)",
   borderStrong: "oklch(0.375 0 0)",
+  borderSelected: "oklch(0.55 0 0)",
 
   meterFill: "oklch(0.62 0 0)",
   meterTrack: "oklch(0.27 0 0)",
@@ -179,4 +180,5 @@ export const breakpoints = stylex.defineConsts({
   dashboardOneColumn: "@container (max-width: 719px)",
   statTilesStacked: "@container (max-width: 704px)",
   tableStacked: "@container (max-width: 559px)",
+  rowSlotsFit: "@container (max-width: 559px)",
 });
