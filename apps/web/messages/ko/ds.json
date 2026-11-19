@@ -47,6 +47,8 @@
     "disclosure": "펼치기",
     "dividedList": "나눈 목록",
     "popover": "팝오버",
+    "kanban": "KanbanColumn·KanbanCard",
+    "sheet": "Sheet",
     "icons": "아이콘"
   },
   "colors": {
@@ -439,6 +441,23 @@
       "title": "ACME-11",
       "close": "닫기",
       "body": "재시도 간격을 바꿀까요?"
+    },
+    "kanban": {
+      "note": "Dashboard 칸반의 칸과 카드예요. 카드를 누르면 오른쪽 패널이 열려요. 끌어 옮기지 않아요.",
+      "column": "Running",
+      "tag": "Question",
+      "title": "ACME-11 재시도 간격 바꾸기",
+      "detail": "재시도 간격을 바꿀까요?",
+      "meta": "runner-a · Claude Code",
+      "time": "12분째",
+      "action": "답하기",
+      "plainTitle": "ACME-10 결제 실패 재시도",
+      "subheading": "처리할 일 없이 끝났어요"
+    },
+    "sheet": {
+      "note": "카드를 누르면 오른쪽에 덮여 열리는 패널이에요. 닫기·Esc·바깥 누르기로 닫고 포커스는 연 자리로 돌아가요.",
+      "open": "패널 열기",
+      "close": "닫기"
     },
     "icons": {
       "note": "버튼과 표시에 쓰는 아이콘이에요. 이름이 필요하면 VisuallyHidden으로 줘요.",

@@ -61,6 +61,7 @@ export interface SectionProps {
   count?: number;
   note?: ReactNode;
   link?: SectionLink;
+  headingLevel?: "h2" | "h3";
   children: ReactNode;
 }
 
@@ -75,9 +76,10 @@ export function Section({
   count,
   note,
   link,
+  headingLevel,
   children,
 }: SectionProps) {
-  const Heading = titleRole === "subheading" ? "h3" : "h2";
+  const Heading = headingLevel ?? (titleRole === "subheading" ? "h3" : "h2");
   return (
     <section {...stylex.props(styles.section)}>
       <div {...stylex.props(styles.sectionHead)}>

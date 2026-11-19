@@ -99,6 +99,14 @@ export {
   type SplitViewProps,
 } from "./components/layout";
 export { CheckIcon, ChevronDownIcon, CloseIcon } from "./components/icons";
+export {
+  KanbanCard,
+  KanbanCards,
+  KanbanColumn,
+  KanbanSubheading,
+  type KanbanCardProps,
+  type KanbanColumnProps,
+} from "./components/kanban";
 export { TextLink, linkStyles, type LinkTone, type TextLinkProps } from "./components/link";
 export {
   Menu,
@@ -135,6 +143,7 @@ export {
   type SegmentedTabsProps,
 } from "./components/segmented-tabs";
 export { Select, type SelectOption, type SelectProps } from "./components/select";
+export { Sheet, type SheetProps } from "./components/sheet";
 export { StatTile, type StatTileProps, type StatTrend } from "./components/stat-tile";
 export { StatusDot, statusDotStyles, type StatusDotProps } from "./components/status-dot";
 export {

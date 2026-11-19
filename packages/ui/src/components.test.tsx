@@ -18,8 +18,13 @@ import {
   Menu,
   MenuItem,
   PILL_STATUSES,
+  KanbanCard,
+  KanbanCards,
+  KanbanColumn,
+  KanbanSubheading,
   Popover,
   ProblemCallout,
+  Sheet,
   Row,
   RowActionSlot,
   SURFACE_ROLES,
@@ -406,6 +411,58 @@ describe("서버 렌더", () => {
       </Popover>,
     );
     expect(danger).toContain('data-variant="danger"');
+  });
+
+  it("KanbanColumn 은 제목으로 이름 붙은 구역이고 h2 제목과 개수를 그린다(티켓 0100)", () => {
+    const html = renderToString(
+      <KanbanColumn title="Running" count={3}>
+        <KanbanCards>
+          <li>카드</li>
+        </KanbanCards>
+        <KanbanSubheading>처리할 일 없이 끝났어요</KanbanSubheading>
+      </KanbanColumn>,
+    );
+    expect(html).toMatch(/^<section aria-label="Running"/);
+    expect(html).toMatch(/<h2[^>]*>Running<\/h2><span[^>]*>3<\/span>/);
+    expect(html).toMatch(/<ul[^>]*><li>카드<\/li><\/ul>/);
+    expect(html).toMatch(/<p[^>]*>처리할 일 없이 끝났어요<\/p>/);
+  });
+
+  it("KanbanCard 는 패널을 여는 버튼 하나이고, 행동은 그 버튼 밖에 둔다(티켓 0100)", () => {
+    const html = renderToString(
+      <KanbanCard
+        tag={<StatusPill status="question">Question</StatusPill>}
+        title="ACME-1"
+        detail="질문"
+        meta="runner-a"
+        time="12분째"
+        action={<Button>답하기</Button>}
+        selected
+        onOpen={noop}
+      />,
+    );
+    expect(html).toMatch(/<button type="button" aria-haspopup="dialog" aria-expanded="true"/);
+    const open = html.slice(html.indexOf("<button"), html.indexOf("</button>") + 9);
+    expect(open).toContain("Question");
+    expect(open).toContain("ACME-1");
+    expect(open).toContain("12분째");
+    expect(open).not.toContain("답하기");
+    expect(html.indexOf("답하기")).toBeGreaterThan(html.indexOf("</button>"));
+    expect(html).not.toMatch(/draggable|grab/);
+
+    const plain = renderToString(<KanbanCard title="ACME-2" onOpen={noop} />);
+    expect(plain).toContain('aria-expanded="false"');
+    expect(plain).not.toContain("data-status=");
+  });
+
+  it("Sheet 는 닫혀 있으면 아무것도 그리지 않는다(티켓 0100)", () => {
+    const html = renderToString(
+      <Sheet open={false} onOpenChange={noop} title="ACME-1" closeLabel="닫기">
+        <p>내용</p>
+      </Sheet>,
+    );
+    expect(html).not.toContain("내용");
+    expect(html).not.toContain("닫기");
   });
 
   it("Checkbox 는 라벨 안에 체크 상태와 설명을 갖고, 고를 수 없으면 disabled 를 넘긴다", () => {
