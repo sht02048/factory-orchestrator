@@ -67,9 +67,10 @@ async function applyRunControl(
   const { db } = context;
   const run = getRunWithRecords(db, request.runId)?.run;
   if (run === undefined || run.state === "queued" || run.state === "ended") return "state-changed";
-  if (!planRunControl(run.state, request.control).ok) return "state-changed";
+  const unknownResume =
+    request.outcomeUnknown && (run.state === "paused" || run.state === "disconnected");
+  if (!unknownResume && !planRunControl(run.state, request.control).ok) return "state-changed";
   const cancelling = hasPendingCancelRequest(db, run.id);
-  const unknownResume = request.outcomeUnknown;
   if (cancelling && !unknownResume) return "state-changed";
   const stored = findRunner(db, run.runnerId);
   if (stored === undefined) return "runner-error";

@@ -499,7 +499,9 @@ export function changeRunState(
         .run();
     } else {
       const agentRef =
-        change.to === "running" && current.state === "paused" ? change.resumedAgentRef : undefined;
+        change.to === "running" && (current.state === "paused" || current.state === "disconnected")
+          ? change.resumedAgentRef
+          : undefined;
       db.update(runs)
         .set({ state: change.to, ...pauseClock, ...(agentRef === undefined ? {} : { agentRef }) })
         .where(where)

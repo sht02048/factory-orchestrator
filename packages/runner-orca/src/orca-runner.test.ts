@@ -1247,10 +1247,54 @@ describe("pauseAgent and resumeAgent", () => {
       )
       .orca(
         "orchestration worker-show --dispatch ctx_starting",
-        shown({ liveness: "unverifiable", terminal: null }),
+        shown({ liveness: "unverifiable", terminal: null, state: "starting" }),
       );
     const resumed = await runnerWith(exec).resumeAgent(RUN, resumeInput);
     expect(decodeAgent(resumed.agentRef)?.dispatchId).toBe("ctx_starting");
     expect(exec.commands().some((command) => command.includes("worker-start"))).toBe(false);
+  });
+
+  test("an old ready session with no live terminal is not adopted", async () => {
+    const exec = new ScriptedExec()
+      .orca(
+        "orchestration worker-show --dispatch ctx_a6e6a23a7132",
+        shown({ liveness: "exited", terminal: null }),
+      )
+      .orca(
+        "orchestration worker-list",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: {
+              workers: [{ dispatchId: "ctx_old", taskId: "task_old", workspace: WORKTREE }],
+              nextCursor: null,
+            },
+          }),
+        ),
+      )
+      .orca(
+        "orchestration worker-show --dispatch ctx_old",
+        shown({ liveness: "unverifiable", terminal: null }),
+      )
+      .orca(
+        "orchestration worker-start",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: { dispatchId: "ctx_new", taskId: "task_new", runId: "run_1", state: "ready" },
+          }),
+        ),
+      );
+    const resumed = await runnerWith(exec).resumeAgent(RUN, resumeInput);
+    expect(decodeAgent(resumed.agentRef)?.dispatchId).toBe("ctx_new");
+  });
+
+  test("a lost reply while typing the resume message is an unknown outcome", async () => {
+    const exec = new ScriptedExec()
+      .orca("orchestration worker-show", shown({ liveness: "live", terminal: AGENT_TERMINAL }))
+      .orca("terminal send", stdout("ssh: connection reset", 255));
+    expect(await adapterError(runnerWith(exec).resumeAgent(RUN, resumeInput))).toMatchObject({
+      kind: "start-outcome-unknown",
+    });
   });
 });

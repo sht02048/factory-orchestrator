@@ -904,6 +904,22 @@ describe("멈추기·재개(0118)", () => {
     expect(agentOf(run, runnerId).resumes.at(-1)?.startIfGone).toBe(false);
   });
 
+  it("결과를 모르는 재개는 러너가 끊겨 Disconnected를 거쳐도 남아, 다시 닿으면 뜬 세션을 이어 받는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    await pause(run, worker);
+    h.runner(runnerId).vanish(worktreeOf(run));
+    h.runner(runnerId).loseNextResumeResponse = true;
+    expect(requestRunControl(h.db, run.id, "resume", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    await disconnect(run, runnerId, worker);
+    expect(getRunControlRequest(h.db, run.id)).toMatchObject({ status: "pending" });
+
+    cutSsh(runnerId, false);
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(getRunControlRequest(h.db, run.id)).toMatchObject({ status: "done" });
+  });
+
   it("러너에 닿지 않으면 멈추기가 실패하고 그 이유를 남기며 Running 그대로 둔다", async () => {
     const { run, runnerId, worker } = await startOne();
     cutSsh(runnerId);
