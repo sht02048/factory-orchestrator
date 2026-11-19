@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isNavScreen, navScreens, navShortcutOf, navShortcuts } from "./nav-shortcuts.js";
+import {
+  isNavScreen,
+  navPathKeepingWorkspace,
+  navScreens,
+  navShortcutOf,
+  navShortcuts,
+} from "./nav-shortcuts.js";
 
 describe("화면 이동 단축키 목록(0102)", () => {
   it("레일 순서대로 Mod+1~5, Settings는 Mod+,", () => {
@@ -26,5 +32,11 @@ describe("화면 이동 단축키 목록(0102)", () => {
     expect(isNavScreen("onboarding")).toBe(false);
     expect(isNavScreen(3)).toBe(false);
     expect(isNavScreen(undefined)).toBe(false);
+  });
+
+  it("다리 없이 주소를 바꿀 때는 그 화면 경로에 지금 Workspace(ws)만 남긴다", () => {
+    expect(navPathKeepingWorkspace("runs", "?ws=acme&run=7")).toBe("/runs?ws=acme");
+    expect(navPathKeepingWorkspace("dashboard", "?ws=a%26b")).toBe("/?ws=a%26b");
+    expect(navPathKeepingWorkspace("settings", "")).toBe("/settings");
   });
 });

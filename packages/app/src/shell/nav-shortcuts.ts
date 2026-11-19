@@ -22,4 +22,10 @@ export function isNavScreen(value: unknown): value is NavScreen {
   return typeof value === "string" && navScreens.some((screen) => screen === value);
 }
 
+export function navPathKeepingWorkspace(screen: NavScreen, currentSearch: string): string {
+  const workspace = new URLSearchParams(currentSearch).get("ws");
+  const path = navShortcutOf(screen).path;
+  return workspace === null ? path : `${path}?${new URLSearchParams({ ws: workspace }).toString()}`;
+}
+
 export const DESKTOP_NAVIGATION_GLOBAL = "gangerDesktopNavigation";

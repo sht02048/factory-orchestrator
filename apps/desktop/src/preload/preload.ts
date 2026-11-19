@@ -3,7 +3,7 @@ import type { IpcRendererEvent } from "electron";
 import {
   DESKTOP_NAVIGATION_GLOBAL,
   isNavScreen,
-  navShortcutOf,
+  navPathKeepingWorkspace,
 } from "@ganger/app/shell/nav-shortcuts";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 import type { DesktopApi, ViewState } from "../shared/view.js";
@@ -45,7 +45,7 @@ if (window.location.protocol === "http:" || window.location.protocol === "https:
   ipcRenderer.on(NAVIGATE_CHANNEL, (_event: IpcRendererEvent, screen: unknown) => {
     if (!isNavScreen(screen)) return;
     if (listeners.size === 0) {
-      window.location.assign(navShortcutOf(screen).path);
+      window.location.assign(navPathKeepingWorkspace(screen, window.location.search));
       return;
     }
     for (const listener of listeners) listener(screen);
