@@ -1,5 +1,6 @@
 import {
   AdapterRegistry,
+  isAssignmentBlocked,
   toCodeHostKind,
   toRunnerProjectId,
   toLabelId,
@@ -202,11 +203,20 @@ const health = (
       blocksAssignment: false,
     },
     {
-      id: "push:acme/web",
-      name: "acme/web GitHub 인증",
+      id: `github-push:${repo}`,
+      name: "GitHub push access: acme/web",
       satisfied: prerequisites.push,
       hint: null,
-      blocksAssignment: true,
+      blocksAssignment: false,
+      project: repo,
+      ...(prerequisites.push
+        ? {}
+        : {
+            failure: {
+              kind: "auth" as const,
+              reason: "Permission to acme/web.git denied to someone.",
+            },
+          }),
     },
   ],
 });
@@ -242,7 +252,8 @@ function finishCheck(f: Fixture, runnerId: RunnerId, result: RunnerHealth): void
     checkedAt: now,
     error: null,
     projects: result.online ? [{ id: repo, displayName: "acme/web", setupState: "ready" }] : null,
-    assignmentBlocked: result.online ? !result.prerequisites.every((p) => p.satisfied) : null,
+    assignmentBlocked: result.online ? isAssignmentBlocked(result) : null,
+    prerequisites: result.online ? result.prerequisites : null,
   });
 }
 
@@ -319,7 +330,7 @@ describe("확인이 실패한 단계", () => {
     const { settings, html } = await runnerStep(null);
     expect(stepPassed(settings, "runner")).toBe(false);
     expect(isDisabled(nextButton(html, "다음"))).toBe(true);
-    expect(text(html)).toContain("확인 결과를 기다리고 있어요");
+    expect(text(html)).toContain("확인하는 중이에요 · 0초째");
   });
 
   it("Orca 상시 서비스가 없으면 설치 명령을 안내하고 다음으로 갈 수 없다", async () => {
@@ -341,18 +352,21 @@ describe("확인이 실패한 단계", () => {
     expect(shown).not.toContain("러너의 GitHub 인증이 안 돼요");
   });
 
-  it("러너의 GitHub 인증이 안 되면 원인과 해결 방법을 보이고 다음으로 갈 수 없다", async () => {
+  it("저장소 push가 안 돼도 러너 전체 조건이 통과하면 다음으로 가고, 실패한 저장소와 이유·해결 방법을 경고로 보인다 (0096)", async () => {
     const { settings, html } = await runnerStep(health({ service: true, push: false }));
-    expect(stepPassed(settings, "runner")).toBe(false);
-    expect(isDisabled(nextButton(html, "다음"))).toBe(true);
+    expect(stepPassed(settings, "runner")).toBe(true);
+    expect(isDisabled(nextButton(html, "다음"))).toBe(false);
     const shown = text(html);
-    expect(shown).toContain("러너의 GitHub 인증이 안 돼요");
-    expect(shown).toContain("git push --dry-run");
-    expect(shown).toContain("macOS 키체인이 잠겨");
-    expect(shown).toContain("GitHub용 ssh 키");
+    expect(shown).toContain("runner-a 러너가 준비됐어요");
+    expect(shown).toContain("GitHub push · 1개 중 0개 통과");
+    expect(shown).toContain("push가 안 되는 저장소가 있어요");
+    expect(shown).toContain("acme/web 인증 실패 · Permission to acme/web.git denied to someone.");
     expect(shown).toContain("gh auth login --insecure-storage");
     expect(shown).toContain("gh auth setup-git");
+    expect(shown).toContain("push가 안 되는 저장소의 티켓만 이 러너에 맡기지 않아요.");
     expect(shown).not.toContain("Orca 상시 서비스가 없어요");
+    expect(html).toContain('aria-label="갖추지 못했어요"');
+    expect(html).not.toContain('aria-label="일부만 통과"');
   });
 
   it("러너에 닿지 않으면 다음으로 갈 수 없다", async () => {
@@ -374,17 +388,34 @@ describe("확인이 실패한 단계", () => {
     expect(text(html)).toContain("러너 확인 중 오류가 났어요");
   });
 
-  it("GitHub 인증을 확인한 프로젝트가 없으면 다음으로 갈 수 없다", async () => {
+  it("push를 확인할 저장소가 없어도 다음으로 가고 그렇다고 알린다 (0096)", async () => {
+    const result = health({ service: true, push: true });
+    const { settings, html } = await runnerStep({
+      ...result,
+      prerequisites: result.prerequisites.filter((p) => p.id === "orca-service"),
+    });
+    expect(stepPassed(settings, "runner")).toBe(true);
+    expect(isDisabled(nextButton(html, "다음"))).toBe(false);
+    expect(text(html)).toContain("push를 확인할 저장소가 없어요");
+    expect(html).not.toContain('aria-label="일부만 통과"');
+  });
+
+  it("push를 확인하지 못한 저장소만 있으면 실패라고 하지 않고 확인하지 못했다고 알린다 (0096)", async () => {
     const result = health({ service: true, push: true });
     const { settings, html } = await runnerStep({
       ...result,
       prerequisites: result.prerequisites.map((p) =>
-        p.blocksAssignment ? { ...p, satisfied: null } : p,
+        p.id === "orca-service"
+          ? p
+          : { ...p, satisfied: null, failure: { kind: "timeout" as const, reason: null } },
       ),
     });
-    expect(stepPassed(settings, "runner")).toBe(false);
-    expect(isDisabled(nextButton(html, "다음"))).toBe(true);
-    expect(text(html)).toContain("GitHub 인증을 아직 확인하지 못했어요");
+    expect(stepPassed(settings, "runner")).toBe(true);
+    const shown = text(html);
+    expect(shown).toContain("push를 확인하지 못한 저장소가 있어요");
+    expect(shown).toContain("acme/web 확인하지 못했어요 · 시간 초과");
+    expect(shown).not.toContain("push가 안 되는 저장소가 있어요");
+    expect(html).not.toContain('aria-label="일부만 통과"');
   });
 
   it("러너가 여럿이어도 주 버튼은 하나다: 마치기 전에는 가장 최근 러너의 다시 확인, 마친 뒤에는 다음", async () => {
@@ -394,14 +425,14 @@ describe("확인이 실패한 단계", () => {
       ok: true,
     });
     const first = registerRunner(f);
-    finishCheck(f, first, health({ service: true, push: false }));
+    finishCheck(f, first, health({ service: false, push: true }));
     const second = saveRunnerSetting(
       f.context,
       { name: "runner-b", sshTarget: "factory@runner-b.example.com", orcaPath, capacity: 1 },
       now,
     );
     if (!second.ok) throw new Error(second.reason);
-    finishCheck(f, second.runnerId, health({ service: true, push: false }));
+    finishCheck(f, second.runnerId, health({ service: false, push: true }));
     const primaries = async () =>
       buttonsOf(render(await page(f), "runner"))
         .filter((b) => b.variant === "primary")

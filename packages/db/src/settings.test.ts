@@ -5,6 +5,7 @@ import { assignRun, changeRunState, getRun, listRuns } from "./runs.js";
 import {
   getInstallSettings,
   getMapping,
+  listRunnerSnapshots,
   listRunners,
   listWorkspaceTrackerProjects,
   recordProviderUsage,
@@ -148,6 +149,36 @@ describe("recordRunnerCheck 필수 조건", () => {
     });
     recordRunnerCheck(db, { ...check, online: false, assignmentBlocked: null });
     expect(listRunners(db)[0]).toMatchObject({ online: false, prerequisites });
+  });
+
+  it("프로젝트에 걸린 push 실패를 이유와 함께 저장하고, 그 프로젝트만 막힌 프로젝트로 읽는다 (0096)", () => {
+    const db = seededDatabase();
+    const id = addRunner(db, { id: "runner-1", capacity: 1, online: true, projects: [repoA] });
+    const pushFailed = {
+      id: `github-push:${repoA}`,
+      name: "push",
+      satisfied: false,
+      hint: null,
+      blocksAssignment: false,
+      project: repoA,
+      failure: { kind: "auth" as const, reason: "Permission to acme/web.git denied to someone." },
+    };
+    const check = { runnerId: id, checkedAt: new Date(1), error: null, projects: null };
+    recordRunnerCheck(db, {
+      ...check,
+      online: true,
+      assignmentBlocked: false,
+      prerequisites: [prerequisites[0], pushFailed].flatMap((p) => (p === undefined ? [] : [p])),
+    });
+
+    expect(listRunners(db)[0]?.prerequisites?.[1]).toEqual(pushFailed);
+    expect(listRunnerSnapshots(db)[0]).toMatchObject({
+      assignmentBlocked: false,
+      blockedProjects: [repoA],
+    });
+
+    recordRunnerCheck(db, { ...check, online: false, assignmentBlocked: null });
+    expect(listRunnerSnapshots(db)[0]?.blockedProjects).toEqual([]);
   });
 });
 

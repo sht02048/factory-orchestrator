@@ -159,12 +159,23 @@ export type RunnerErrorDetail =
   | { kind: "start-outcome-unknown"; detail: string }
   | { kind: "malformed-output"; raw: string };
 
+export const PREREQUISITE_FAILURE_KINDS = ["auth", "network", "timeout", "other"] as const;
+
+export type PrerequisiteFailureKind = (typeof PREREQUISITE_FAILURE_KINDS)[number];
+
+export interface PrerequisiteFailure {
+  kind: PrerequisiteFailureKind;
+  reason: string | null;
+}
+
 export interface RunnerPrerequisite {
   id: string;
   name: string;
   satisfied: boolean | null;
   hint: string | null;
   blocksAssignment: boolean;
+  project?: RunnerProjectId;
+  failure?: PrerequisiteFailure;
 }
 
 export interface RunnerHealth {
@@ -176,7 +187,19 @@ export interface RunnerHealth {
 }
 
 export function isAssignmentBlocked(health: Pick<RunnerHealth, "prerequisites">): boolean {
-  return health.prerequisites.some((p) => p.blocksAssignment && p.satisfied === false);
+  return health.prerequisites.some(
+    (p) => p.project === undefined && p.blocksAssignment && p.satisfied === false,
+  );
+}
+
+export function blockedProjectsOf(
+  prerequisites: ReadonlyArray<Pick<RunnerPrerequisite, "project" | "satisfied">>,
+): RunnerProjectId[] {
+  const blocked = new Set<RunnerProjectId>();
+  for (const p of prerequisites) {
+    if (p.project !== undefined && p.satisfied === false) blocked.add(p.project);
+  }
+  return [...blocked];
 }
 
 export interface RunnerProject {

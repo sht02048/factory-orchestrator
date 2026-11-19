@@ -264,7 +264,7 @@ describe("Settings 저장하고 다시 열기", () => {
         orcaPath: "/usr/local/bin/orca",
         access: "manual",
         capacity: 3,
-        check: { status: "pending", requestedAt: now.toISOString() },
+        check: { status: "pending", requestedAt: now.toISOString(), requestedAgoMs: 0 },
       },
     ]);
     expect(page.runnerProjects).toEqual([{ id: repo, name: "acme/web" }]);
@@ -881,6 +881,40 @@ describe("러너 확인", () => {
     expect(text).not.toContain("GitHub push access");
     expect(text).not.toContain("Run `gh auth login");
     expect(text).toContain("gh auth login --insecure-storage");
+  });
+
+  it("프로젝트에만 걸린 push 실패도 실패 이유와 해결 안내를 보인다 (0096)", async () => {
+    const f = fixture();
+    const runnerId = addRunner(f);
+    recordRunnerCheck(f.context.db, {
+      runnerId,
+      online: true,
+      checkedAt: now,
+      error: null,
+      projects: [{ id: repo, displayName: "acme/web", setupState: "ready" }],
+      assignmentBlocked: false,
+    });
+    const page = await checked(f, runnerId, {
+      result: health({
+        prerequisites: [
+          {
+            id: `github-push:${repo}`,
+            name: "GitHub push access: acme/web",
+            satisfied: false,
+            hint: "Run `gh auth login --insecure-storage` and `gh auth setup-git` on the runner.",
+            blocksAssignment: false,
+            project: repo,
+            failure: { kind: "auth", reason: "Permission to acme/web.git denied to someone." },
+          },
+        ],
+      }),
+    });
+    const text = panelText(render(page, "runners"));
+    expect(text).toContain("GitHub push 권한: acme/web 갖추지 못했어요");
+    expect(text).toContain("acme/web 인증 실패 · Permission to acme/web.git denied to someone.");
+    expect(text).toContain("gh auth setup-git");
+    expect(text).toContain("push가 안 되는 저장소의 티켓만 이 러너에 맡기지 않아요.");
+    expect(text).not.toContain("이 조건이 깨져 이 러너를 할당에서 뺐어요");
   });
 
   it("러너에 닿지 않은 결과와 확인 오류를 실패로 보인다", async () => {

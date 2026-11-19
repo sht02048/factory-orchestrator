@@ -8,7 +8,14 @@ import {
 import type { RepoRef, RunnerProjectId } from "@ganger/core";
 import { FakeCodeHost, FakeRunner, FakeTracker } from "@ganger/core/testing";
 import { RUNNER_PROJECTS, providerUsageFor, trackerCatalog, trackerSpecFor } from "./fixtures.js";
-import { FAIL_AUTH, FAIL_NO_ORCA, FAIL_OFFLINE, FAIL_PUSH_AUTH } from "./values.js";
+import {
+  FAIL_AUTH,
+  FAIL_NO_ORCA,
+  FAIL_OFFLINE,
+  FAIL_PUSH_AUTH,
+  SLOW_CHECK,
+  SLOW_CHECK_MS,
+} from "./values.js";
 
 export const TRACKER_KIND = toTrackerKind("linear");
 export const RUNNER_KIND = toRunnerKind("orca");
@@ -67,14 +74,33 @@ export class DemoWorld {
         hint: "orca serve service install --bind 127.0.0.1 --command orca",
         blocksAssignment: false,
       },
-      ...RUNNER_PROJECTS.map((project) => ({
-        id: `github-push:${project.id}`,
-        name: `GitHub push access: ${project.displayName}`,
-        satisfied: !target.includes(FAIL_PUSH_AUTH),
-        hint: "Run `gh auth login --insecure-storage` and `gh auth setup-git` on the runner.",
-        blocksAssignment: true,
-      })),
+      ...RUNNER_PROJECTS.map((project, index) => {
+        const denied = target.includes(FAIL_PUSH_AUTH) && index === RUNNER_PROJECTS.length - 1;
+        return {
+          id: `github-push:${project.id}`,
+          name: `GitHub push access: ${project.displayName}`,
+          satisfied: !denied,
+          hint: "Run `gh auth login --insecure-storage` and `gh auth setup-git` on the runner.",
+          blocksAssignment: false,
+          project: project.id,
+          ...(denied
+            ? {
+                failure: {
+                  kind: "auth" as const,
+                  reason: `Permission to ${project.displayName}.git denied to demo-bot.`,
+                },
+              }
+            : {}),
+        };
+      }),
     ];
+    if (target.includes(SLOW_CHECK)) {
+      const checkHealth = runner.checkHealth.bind(runner);
+      runner.checkHealth = async () => {
+        await new Promise((resolve) => setTimeout(resolve, SLOW_CHECK_MS));
+        return checkHealth();
+      };
+    }
     this.runners.set(sshTarget, runner);
     return runner;
   }

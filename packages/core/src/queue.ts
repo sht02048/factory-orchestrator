@@ -1,4 +1,4 @@
-import { canRunnerTake, pickRunner, remainingCapacity } from "./assignment.js";
+import { canRunnerTake, isProjectBlocked, pickRunner, remainingCapacity } from "./assignment.js";
 import type { RunnerSnapshot, RunPlacement } from "./assignment.js";
 import type { AgentId, RunId, RunnerId, RunnerProjectId } from "./ids.js";
 import { usageLimitOf } from "./usage-limit.js";
@@ -101,7 +101,7 @@ function unplacedReason(
   const online = withProject.filter((runner) => runner.online);
   if (online.length === 0) return { reason: "runner-offline" };
   const limits = online
-    .filter((runner) => !runner.assignmentBlocked)
+    .filter((runner) => !runner.assignmentBlocked && !isProjectBlocked(runner, run.project))
     .flatMap((runner) => {
       const limit = usageLimitOf(runner.usageLimits, run.agent);
       return limit === null ? [] : [limit];

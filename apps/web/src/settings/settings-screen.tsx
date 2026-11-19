@@ -43,11 +43,12 @@ import {
 } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { prerequisiteHint } from "@ganger/app/prerequisites";
+import { isPushCheck, prerequisiteHint, summarizePushChecks } from "@ganger/app/prerequisites";
 import { isMcpRejectReason, isMcpWriteTool } from "@ganger/app/mcp/actions";
 import type { McpActionView } from "@ganger/app/mcp/actions";
 import { hermesConfig, jsonConfig } from "@ganger/app/settings/mcp-launch";
 import { useAgentName, usePrerequisiteName } from "../labels";
+import { PushProblems } from "../push-check";
 import { browserClipboard, copyText } from "./clipboard";
 import { useStatusName } from "../status";
 import {
@@ -1916,6 +1917,10 @@ function Prerequisite({ prerequisite }: { prerequisite: PrerequisiteView }) {
   const prerequisiteName = usePrerequisiteName();
   const broken = prerequisite.satisfied === false;
   const hint = prerequisiteHint(prerequisite);
+  const push =
+    isPushCheck(prerequisite) && prerequisite.satisfied !== true
+      ? summarizePushChecks([prerequisite])
+      : null;
   return (
     <DividedItem tight>
       <span {...stylex.props(styles.inline)}>
@@ -1937,6 +1942,7 @@ function Prerequisite({ prerequisite }: { prerequisite: PrerequisiteView }) {
           {hint}
         </Text>
       ) : null}
+      {push === null ? null : <PushProblems summary={push} />}
       {broken && prerequisite.blocksAssignment ? (
         <div {...stylex.props(styles.fix)}>
           <Text variant="ui" as="p" tone="problem">

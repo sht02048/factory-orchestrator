@@ -57,6 +57,9 @@ import type {
 } from "@ganger/core";
 import type { WorkspaceId } from "@ganger/db";
 import { useAgentName, usePrerequisiteName } from "../labels";
+import { PushProblems, useCheckingText, usePushSummaryText } from "../push-check";
+import { runnerWideChecks, summarizePushChecks } from "@ganger/app/prerequisites";
+import type { PushSummary } from "@ganger/app/prerequisites";
 import {
   RunnerCheck,
   RunnerForm,
@@ -74,6 +77,7 @@ import type {
   Choice,
   ConnectionLabel,
   ConnectionProjects,
+  PrerequisiteView,
   RunnerSettingsView,
   SettingsPage,
   TrackerConnectionView,
@@ -85,6 +89,7 @@ import {
   ONBOARDING_STEPS,
   mappingRowComplete,
   missingMappingParts,
+  pushNeedsWarning,
   reachableIndex,
   runnerPassed,
   runnerProblems,
@@ -835,32 +840,58 @@ function RunnerChecklist({
   prerequisites,
 }: {
   version: string | null;
-  prerequisites: Array<{
-    id: string;
-    name: string;
-    satisfied: boolean | null;
-    project: string | null;
-  }>;
+  prerequisites: PrerequisiteView[];
 }) {
   const t = useTranslations("onboarding.runner");
   const tc = useTranslations("settings.runners.check");
+  const tPush = useTranslations("domain.pushCheck");
   const prerequisiteName = usePrerequisiteName();
+  const pushText = usePushSummaryText();
+  const push = summarizePushChecks(prerequisites);
+  const pushPassed = push.total > 0 && push.passed === push.total;
+  const pushStateLabel = (summary: PushSummary): string => {
+    if (summary.total > 0 && summary.passed === summary.total) return tc("satisfied");
+    if (summary.failed.length === 0) return tc("unknown");
+    return summary.passed === 0 ? tc("unsatisfied") : t("pushWarning");
+  };
   return (
-    <Checklist label={t("checklist")}>
-      <ChecklistItem done label={tc("satisfied")}>
-        {version === null ? tc("online") : tc("onlineVersion", { version })}
-      </ChecklistItem>
-      {prerequisites.map((prerequisite) => (
-        <ChecklistItem
-          key={prerequisite.id}
-          done={prerequisite.satisfied === true}
-          label={prerequisite.satisfied === true ? tc("satisfied") : tc("unknown")}
-        >
-          {prerequisiteName(prerequisite)}
-          {prerequisite.satisfied === true ? null : <Text variant="meta">{tc("unknown")}</Text>}
+    <div {...stylex.props(styles.stack)}>
+      <Checklist label={t("checklist")}>
+        <ChecklistItem done label={tc("satisfied")}>
+          {version === null ? tc("online") : tc("onlineVersion", { version })}
         </ChecklistItem>
-      ))}
-    </Checklist>
+        {runnerWideChecks(prerequisites).map((prerequisite) => (
+          <ChecklistItem
+            key={prerequisite.id}
+            done={prerequisite.satisfied === true}
+            label={prerequisite.satisfied === true ? tc("satisfied") : tc("unknown")}
+          >
+            {prerequisiteName(prerequisite)}
+            {prerequisite.satisfied === true ? null : <Text variant="meta">{tc("unknown")}</Text>}
+          </ChecklistItem>
+        ))}
+        <ChecklistItem done={pushPassed} label={pushStateLabel(push)}>
+          {tPush("name")} · {pushText(push)}
+        </ChecklistItem>
+      </Checklist>
+      <RunnerPushWarning push={push} />
+    </div>
+  );
+}
+
+function RunnerPushWarning({ push }: { push: PushSummary | null }) {
+  const t = useTranslations("onboarding.runner");
+  if (push === null || !pushNeedsWarning(push)) return null;
+  const kind =
+    push.total === 0 ? "pushNone" : push.failed.length > 0 ? "pushWarning" : "pushUnknown";
+  return (
+    <div {...stylex.props(styles.stack)}>
+      <Text variant="ui" as="p" tone="strong">
+        {t(`${kind}Title`)}
+      </Text>
+      <Text variant="body">{t(`${kind}Body`)}</Text>
+      <PushProblems summary={push} />
+    </div>
   );
 }
 
@@ -881,13 +912,19 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
   const t = useTranslations("onboarding.runner");
   const runnerError = useRunnerErrorName();
   const check = runner.check;
+  const checkingText = useCheckingText(
+    check?.status === "pending" ? (check.requestedAgoMs ?? 0) : null,
+  );
   if (check === null || check.status === "pending") {
-    return check === null ? null : <Text variant="meta">{t("waiting")}</Text>;
+    return check === null ? null : (
+      <Text variant="meta" numeric>
+        {checkingText ?? t("waiting")}
+      </Text>
+    );
   }
   if (check.status !== "done") return null;
   const problems = runnerProblems(runner);
-  const known =
-    problems.service || problems.githubAuth || problems.error !== null || problems.pushUnchecked;
+  const known = problems.service || problems.error !== null;
   if (!known && !check.online) {
     return (
       <Text variant="ui" as="p" tone="problem" role="alert">
@@ -907,19 +944,6 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
           <Text variant="meta">{t("serviceLinux")}</Text>
         </div>
       ) : null}
-      {problems.githubAuth ? (
-        <div {...stylex.props(styles.stack)}>
-          <Text variant="ui" as="p" tone="problem">
-            {t("authTitle")}
-          </Text>
-          <Text variant="body">{t("authBody")}</Text>
-          <ul {...stylex.props(textStyles("ui"), styles.bullets)}>
-            <li>{t("authCauseToken")}</li>
-            <li>{t("authCauseKeychain")}</li>
-            <li>{t("authCauseSshKey")}</li>
-          </ul>
-        </div>
-      ) : null}
       {problems.error === null ? null : (
         <div {...stylex.props(styles.stack)}>
           <Text variant="ui" as="p" tone="problem">
@@ -928,14 +952,7 @@ function RunnerGuide({ runner }: { runner: RunnerSettingsView }) {
           <Text variant="body">{t("errorBody", { reason: runnerError(problems.error) })}</Text>
         </div>
       )}
-      {problems.pushUnchecked && problems.error === null ? (
-        <div {...stylex.props(styles.stack)}>
-          <Text variant="ui" as="p" tone="problem">
-            {t("pushUncheckedTitle")}
-          </Text>
-          <Text variant="body">{t("pushUncheckedBody")}</Text>
-        </div>
-      ) : null}
+      {problems.error === null ? <RunnerPushWarning push={problems.push} /> : null}
       {known ? null : (
         <div {...stylex.props(styles.stack)}>
           <Text variant="ui" as="p" tone="problem">

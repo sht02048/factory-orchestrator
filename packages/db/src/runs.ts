@@ -364,7 +364,7 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
     } else {
       const chosen = listRunnerSnapshots(db, now).find((runner) => runner.id === input.runnerId);
       if (chosen === undefined) return { ok: false, reason: "unknown-runner" };
-      if (!checkManualRunnerChoice(chosen).ok) {
+      if (!checkManualRunnerChoice(chosen, input.runnerProject).ok) {
         return { ok: false, reason: "runner-assignment-blocked" };
       }
       runnerId = input.runnerId;

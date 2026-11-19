@@ -16,6 +16,7 @@ import {
   addUnreachedCanceledRun,
   breakGitHubAuth,
   connection,
+  failSomePushes,
   minutes,
   now,
   seedDatabase,
@@ -123,6 +124,7 @@ describe("loadRunnersPage", () => {
         satisfied: true,
         blocksAssignment: false,
         hint: null,
+        failure: null,
       },
       {
         id: "github-push:github:acme/web",
@@ -131,6 +133,7 @@ describe("loadRunnersPage", () => {
         satisfied: false,
         blocksAssignment: true,
         hint: null,
+        failure: null,
       },
       {
         id: "github-push:github:acme/docs",
@@ -139,8 +142,25 @@ describe("loadRunnersPage", () => {
         satisfied: true,
         blocksAssignment: true,
         hint: null,
+        failure: null,
       },
     ]);
+  });
+
+  it("push 실패는 러너가 아니라 그 저장소만 막고, 막힌 저장소 이름과 실패 이유를 담는다 (0096)", () => {
+    const { db } = seedDatabase();
+    failSomePushes(db, [
+      { name: "web", satisfied: false, failure: { kind: "auth", reason: "denied" } },
+      { name: "lab", satisfied: null, failure: { kind: "timeout", reason: null } },
+    ]);
+    const a = runner(db, "runner-a");
+    expect(a.assignmentBlocked).toBe(false);
+    expect(a.pushBlockedProjects).toEqual(["acme/web"]);
+    expect(a.checks?.find((c) => c.id === "github-push:github:acme/web")).toMatchObject({
+      project: "acme/web",
+      satisfied: false,
+      failure: { kind: "auth", reason: "denied" },
+    });
   });
 
   it("지운 시각이 있는 워크트리는 세지 않는다(Q75)", () => {

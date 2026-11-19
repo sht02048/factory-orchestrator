@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AdapterError, isAssignmentBlocked } from "../adapters.js";
+import { AdapterError, blockedProjectsOf, isAssignmentBlocked } from "../adapters.js";
 import type { CodeHost, PullRequestSnapshot, Runner, Tracker } from "../adapters.js";
 import {
   toAgentId,
@@ -60,6 +60,23 @@ describe("FakeRunner", () => {
     const health = await runner.checkHealth();
     expect(health.online).toBe(true);
     expect(isAssignmentBlocked(health)).toBe(true);
+  });
+
+  it("프로젝트에 걸린 항목이 깨지면 러너가 아니라 그 프로젝트만 막는다 (0096)", () => {
+    const prerequisites = [
+      {
+        id: "github-push:app",
+        name: "push",
+        satisfied: false,
+        hint: null,
+        blocksAssignment: true,
+        project: project.id,
+      },
+    ];
+
+    expect(isAssignmentBlocked({ prerequisites })).toBe(false);
+    expect(blockedProjectsOf(prerequisites)).toEqual([project.id]);
+    expect(blockedProjectsOf([{ ...prerequisites[0], satisfied: null }])).toEqual([]);
   });
 
   it("우편함은 살아 있으면 그대로 돌려주고, 사라지면 다시 만든다 (Q82.1)", async () => {
