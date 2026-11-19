@@ -157,30 +157,25 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
       .waitFor();
   });
 
-  it("좁은 화면에서 Mapping 표는 상자 안에서 가로로 넘기고, 고르면 바로 저장한다", async () => {
+  it("좁은 화면에서도 Mapping 이 가로로 넘치지 않고, 기본 저장소와 에이전트를 고르면 바로 저장한다", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await open(5);
-    const table = page.getByRole("table", { name: onboarding.mapping.tableLabel });
-    await table.waitFor();
-    const overflow = await table.evaluate((element) => {
-      const box = element.parentElement;
-      return {
-        page: document.documentElement.scrollWidth - window.innerWidth,
-        box: box === null ? 0 : box.scrollWidth - box.clientWidth,
-      };
-    });
-    expect(overflow.page).toBeLessThanOrEqual(0);
-    expect(overflow.box).toBeGreaterThan(0);
+    const card = page.getByRole("region", { name: "Web Mapping" });
+    await card.waitFor();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+    ).toBeLessThanOrEqual(0);
 
-    await page.getByRole("combobox", { name: "Web의 러너 쪽 프로젝트" }).click();
-    await page.getByRole("option", { name: "acme/web", exact: true }).click();
-    await page.getByText(onboarding.mapping.needAgent).waitFor();
-    await page.getByRole("combobox", { name: "Web의 에이전트" }).click();
+    await card.getByRole("button", { name: "Web에 저장소 더하기" }).click();
+    await page.getByRole("menuitem", { name: "acme/web", exact: true }).click();
+    await card.getByText(settings.mapping.needAgent).waitFor();
+    await card.getByRole("combobox", { name: settings.mapping.agent }).click();
     await page.getByRole("option", { name: "Claude Code", exact: true }).click();
     await expect
-      .poll(() => getMapping(db, connectionId(), trackerProject)?.runnerProject ?? null)
+      .poll(() => getMapping(db, connectionId(), trackerProject)?.defaultRepo ?? null)
       .toBe("github:acme/web");
-    await page.getByText(onboarding.mapping.needAgent).waitFor({ state: "detached" });
+    await card.getByText(settings.mapping.needAgent).waitFor({ state: "detached" });
+    await card.getByRole("status").getByText(settings.mapping.status.saved).waitFor();
   });
 
   it("수정 폼을 저장해 닫으면 포커스가 body 가 아니라 요약에 남는다", async () => {

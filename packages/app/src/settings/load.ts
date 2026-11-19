@@ -1,5 +1,11 @@
 import { AdapterError, toTrackerConnectionId, toTrackerProjectId } from "@ganger/core";
-import type { AdapterRegistry, RunnerId, Tracker, TrackerConnectionId } from "@ganger/core";
+import type {
+  AdapterRegistry,
+  RunnerId,
+  Tracker,
+  TrackerConnectionId,
+  TrackerProjectId,
+} from "@ganger/core";
 import {
   getAutoAssignLabel,
   getInstallSettings,
@@ -220,6 +226,25 @@ async function loadWorkspaceSettings(
     trackers,
   );
 
+  const labelsByProject = new Map<string, Promise<Remote<Choice>>>();
+  const projectLabels = (connection: TrackerConnectionId, projectId: TrackerProjectId) => {
+    const key = `${connection}\n${projectId}`;
+    let read = labelsByProject.get(key);
+    if (read === undefined) {
+      const tracker = trackers.get(connection) ?? null;
+      read =
+        tracker === null
+          ? Promise.resolve<Remote<Choice>>({ ok: false, error: "invalid" })
+          : remote(async () =>
+              (await tracker.listLabels(projectId))
+                .map(toChoice)
+                .toSorted((a, b) => a.name.localeCompare(b.name)),
+            );
+      labelsByProject.set(key, read);
+    }
+    return read;
+  };
+
   const bound = await Promise.all(
     mine.map(async (project): Promise<BoundProject> => {
       const tracker = trackers.get(project.connection) ?? null;
@@ -231,15 +256,20 @@ async function loadWorkspaceSettings(
           mapping === null
             ? null
             : {
-                runnerProject: mapping.runnerProject,
                 agent: mapping.agent,
                 model: mapping.model,
+                repos: mapping.repos.map((repo) => ({
+                  id: repo.project,
+                  isDefault: repo.isDefault,
+                  labelId: repo.labelId,
+                })),
               },
         inProgressStateId: project.inProgressStateId,
         states:
           tracker === null
             ? { ok: false, error: "invalid" }
             : await remote(async () => (await tracker.listStates(project.projectId)).map(toChoice)),
+        labels: await projectLabels(project.connection, project.projectId),
       };
     }),
   );
@@ -247,17 +277,21 @@ async function loadWorkspaceSettings(
   const labelConnections = [...new Set(mine.map((p) => p.connection))];
   const labels = await Promise.all(
     labelConnections.map(async (connectionId): Promise<ConnectionLabel> => {
-      const tracker = trackers.get(connectionId) ?? null;
       const projects = mine.filter((p) => p.connection === connectionId);
+      const lists = await Promise.all(
+        projects.map((p) => projectLabels(p.connection, p.projectId)),
+      );
+      const failed = lists.find((list) => !list.ok);
+      const unique = new Map<string, Choice>();
+      for (const list of lists)
+        if (list.ok) for (const label of list.items) unique.set(label.id, label);
       const read: Remote<Choice> =
-        tracker === null
-          ? { ok: false, error: "invalid" }
-          : await remote(async () => {
-              const lists = await Promise.all(projects.map((p) => tracker.listLabels(p.projectId)));
-              const unique = new Map<string, Choice>();
-              for (const label of lists.flat()) unique.set(label.id, toChoice(label));
-              return [...unique.values()].toSorted((a, b) => a.name.localeCompare(b.name));
-            });
+        failed !== undefined && !failed.ok
+          ? { ok: false, error: failed.error }
+          : {
+              ok: true,
+              items: [...unique.values()].toSorted((a, b) => a.name.localeCompare(b.name)),
+            };
       return {
         connection: connectionChoice(connectionId),
         labelId: getAutoAssignLabel(db, workspace.id, toTrackerConnectionId(connectionId)),

@@ -366,6 +366,30 @@ describe("갱신", () => {
     });
   });
 
+  const labelColor = "given-color";
+
+  it("createLabel이 팀 없이 워크스페이스 라벨을 받은 색 그대로 만들고 새 라벨을 돌려준다(0115)", async () => {
+    const { tracker: t, sent } = tracker(fixture("create-label"));
+
+    const label = await t.createLabel({ name: "ganger", color: labelColor });
+
+    expect(sent[0]?.query).toContain("issueLabelCreate");
+    expect(sent[0]?.query).not.toContain("teamId");
+    expect(sent[0]?.variables).toEqual({ name: "ganger", color: labelColor });
+    expect(label).toEqual({
+      id: toLabelId("00000000-0000-4000-8000-000000000200"),
+      name: "ganger",
+    });
+  });
+
+  it("createLabel이 Linear가 거절한 라벨 만들기를 LinearApiError로 던진다(0115)", async () => {
+    const { tracker: t } = tracker(fixture("error-create-label-forbidden"));
+
+    const error = await rejection(t.createLabel({ name: "ganger", color: labelColor }));
+
+    expect(error).toBeInstanceOf(LinearApiError);
+  });
+
   it("addComment가 없는 티켓에 not-found를 던진다", async () => {
     const { tracker: t } = tracker(fixture("error-add-comment-ticket-not-found"));
 

@@ -22,6 +22,7 @@ import {
   saveAutoAssignLabel,
   saveCodeHostConnection,
   saveInstallAddresses,
+  replaceMapping,
   saveMapping,
   saveRunner,
   saveTrackerConnection,
@@ -34,6 +35,7 @@ import type { Database, SecretBox } from "@ganger/db";
 import {
   RUNNER_PROJECTS,
   agent,
+  apiRepoLabel,
   autoAssignLabel,
   inProgressState,
   providerUsageFor,
@@ -155,6 +157,19 @@ function seedSettings(db: Database, box: SecretBox, now: Date): void {
         runnerProject: runnerProjectId(project),
         agent,
         model: project.repo.endsWith("api") ? "sonnet" : "opus",
+      });
+    }
+    const [first, second] = connection.spec.projects;
+    if (first !== undefined && second !== undefined) {
+      replaceMapping(db, {
+        connection: connection.id,
+        trackerProject: trackerProjectId(first),
+        agent,
+        model: "opus",
+        repos: [
+          { project: runnerProjectId(first), isDefault: true, labelId: null },
+          { project: runnerProjectId(second), isDefault: false, labelId: apiRepoLabel },
+        ],
       });
     }
     saveAutoAssignLabel(db, {

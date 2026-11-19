@@ -16,12 +16,13 @@ import {
 import { FakeTracker } from "@ganger/core/testing";
 import {
   SecretBox,
+  listRuns,
   migrate,
   openDatabase,
   recordRunnerCheck,
+  replaceMapping,
   saveAutoAssignLabel,
   saveCodeHostConnection,
-  saveMapping,
   saveRunner,
   saveTrackerConnection,
   saveWorkspace,
@@ -44,6 +45,9 @@ const resultsDir = fileURLToPath(new URL("../test-results", import.meta.url));
 
 const runnerId = toRunnerId("runner-a");
 const runnerProject = toRunnerProjectId("fake:acme/web");
+const apiRepo = toRunnerProjectId("fake:acme/api");
+const apiLabel = toLabelId("label-api");
+const labeledTicket = 3;
 const agent = toAgentId("claude");
 const encryptionKey = new Uint8Array(32).fill(7);
 const trackerReadLimit = 1000;
@@ -88,7 +92,7 @@ beforeAll(async () => {
       title: `Ticket number ${i}`,
       body: "",
       url: `https://tracker.example.com/ACME-${i}`,
-      labels: [],
+      labels: i === labeledTicket ? [{ id: apiLabel, name: "api" }] : [],
       project: { id: trackerProject, name: "Web" },
       state: { id: toTrackerStateId("todo"), name: "Todo", category: "unstarted" },
       updatedAt: new Date(Date.UTC(2026, 10, 17) - i * 60_000),
@@ -267,6 +271,31 @@ describe("Tickets 수동 할당(브라우저, 0054)", () => {
     expect(new URL(page.url()).searchParams.get("sel")).not.toBeNull();
   });
 
+  it("저장소 라벨이 붙은 티켓은 그 저장소를 골라 둔 채 창이 열리고, 할당하면 그 저장소로 런이 생긴다(0115)", async () => {
+    await page.goto(`/tickets?ws=${workspaceId}`);
+    await hydrated(page);
+    const key = `ACME-${labeledTicket}`;
+    await page
+      .getByRole("listbox", { name: tickets.listLabel })
+      .getByRole("option", { name: `${key} Ticket number ${labeledTicket}` })
+      .click();
+    const panel = page.getByRole("region", { name: tickets.panel.label });
+    await panel.getByRole("button", { name: tickets.panel.assign }).click();
+    const dialog = page.getByRole("dialog", { name: fill(tickets.assign.title, { key }) });
+    const repos = dialog.getByRole("radiogroup", { name: tickets.assign.project });
+    expect(await repos.getByRole("radio").count()).toBe(2);
+    expect(await repos.getByRole("radio", { name: /fake:acme\/api/ }).isChecked()).toBe(true);
+    expect(await repos.getByRole("radio", { name: /fake:acme\/web/ }).isChecked()).toBe(false);
+
+    await dialog.getByRole("button", { name: tickets.assign.submit }).click();
+    await dialog.waitFor({ state: "hidden" });
+    await expect
+      .poll(() =>
+        listRuns(db, { ticket: { connection, key: toTicketKey(key) } }).map((r) => r.runnerProject),
+      )
+      .toEqual([apiRepo]);
+  });
+
   it("보내는 중에는 Esc 나 취소로 창이 닫히지 않는다", async () => {
     await page.goto(`/tickets?ws=${workspaceId}`);
     await hydrated(page);
@@ -363,7 +392,15 @@ function seed(db: Database): void {
     name: "Web",
     inProgressStateId: toTrackerStateId("in-progress"),
   });
-  saveMapping(db, { connection, trackerProject, runnerProject, agent });
+  replaceMapping(db, {
+    connection,
+    trackerProject,
+    agent,
+    repos: [
+      { project: runnerProject, isDefault: true, labelId: null },
+      { project: apiRepo, isDefault: false, labelId: apiLabel },
+    ],
+  });
   saveAutoAssignLabel(db, { workspaceId, connection, labelId: toLabelId("factory") });
   saveRunner(db, {
     id: runnerId,
@@ -377,7 +414,10 @@ function seed(db: Database): void {
     online: true,
     checkedAt: new Date(),
     error: null,
-    projects: [{ id: runnerProject, displayName: "acme/web", setupState: "ready" as const }],
+    projects: [
+      { id: runnerProject, displayName: "acme/web", setupState: "ready" as const },
+      { id: apiRepo, displayName: "acme/api", setupState: "ready" as const },
+    ],
     assignmentBlocked: false,
   });
 }

@@ -43,7 +43,10 @@ const labels: TrackerLabel[] = [
   { id: autoAssignLabel, name: "factory" },
   { id: toLabelId("label-bug"), name: "bug" },
   { id: toLabelId("label-feature"), name: "feature" },
+  { id: toLabelId("label-api"), name: "api" },
 ];
+
+export const apiRepoLabel = toLabelId("label-api");
 
 const todo = states[1] ?? states[0];
 

@@ -228,6 +228,7 @@ describe("수동 할당 폼", () => {
     online: true,
     assignmentBlocked: false,
     projects: ["p"],
+    blockedProjects: [],
     usageLimits: [],
     ...overrides,
   });
@@ -236,34 +237,53 @@ describe("수동 할당 폼", () => {
     choice("runner-b", { online: false }),
     choice("runner-c", { assignmentBlocked: true }),
     choice("runner-d", { projects: ["q"] }),
+    choice("runner-e", { projects: ["p", "q"], blockedProjects: ["p"] }),
   ];
   const labels = {
     auto: "auto",
     offline: (n: string) => `${n} offline`,
     blocked: (n: string) => `${n} blocked`,
+    repoBlocked: (n: string) => `${n} repo blocked`,
     limited: (n: string, limit: { provider: string; resetsInMs: number }) =>
       `${n} ${limit.provider} ${limit.resetsInMs}`,
   };
 
-  it("Mapping 기본값으로 채우고 러너 쪽 프로젝트는 읽기 전용이다", () => {
+  it("저장소를 라디오로 고르고 저장소마다 러너 수를, push가 막힌 저장소는 꺼서 보인다(0115)", () => {
     const html = renderWithMessages(
       <AssignForm
-        defaults={{ runnerProject: "github:acme/web", agent: "claude" }}
-        runners={runners}
+        defaults={{
+          runnerProject: "q",
+          agent: "claude",
+          repos: [
+            { id: "p", isDefault: true, label: null },
+            { id: "q", isDefault: false, label: "api" },
+            { id: "r", isDefault: false, label: "infra" },
+          ],
+        }}
+        runners={[...runners, choice("runner-f", { projects: ["r"], blockedProjects: ["r"] })]}
         agents={["codex", "claude"]}
+        repo="q"
         runner={AUTO_RUNNER}
         agent="claude"
+        onRepoChange={noop}
         onRunnerChange={noop}
         onAgentChange={noop}
       />,
       ticketsMessages,
     );
-    expect(html).toMatch(/<input[^>]*name="runnerProject"[^>]*>/);
-    const input = /<input[^>]*name="runnerProject"[^>]*>/.exec(html)?.[0] ?? "";
-    expect(input).toContain('value="github:acme/web"');
-    expect(input).toContain("readOnly");
-    expect(text(html)).toContain("할당 때 자동으로 고르기");
-    expect(text(html)).toContain("Claude Code");
+    const radios = [...html.matchAll(/<input[^>]*type="radio"[^>]*>/g)].map((m) => m[0]);
+    expect(radios).toHaveLength(3);
+    expect(radios[1]).toContain('value="q"');
+    expect(radios[1]).toContain("checked");
+    expect(radios[2]).toContain("disabled");
+    const all = text(html);
+    expect(all).toContain("기본");
+    expect(all).toContain("러너 4대에 있어요");
+    expect(all).toContain("러너 2대에 있어요");
+    expect(all).toContain("라벨 api");
+    expect(all).toContain("push가 막혀 맡길 수 있는 러너가 없어요");
+    expect(all).toContain("할당 때 자동으로 고르기");
+    expect(all).toContain("Claude Code");
   });
 
   it("러너 목록: 자동 고르기가 맨 앞, 그 프로젝트가 있는 러너만, 인증이 깨진 러너는 비활성+이유", () => {
@@ -272,7 +292,12 @@ describe("수동 할당 폼", () => {
       { value: "runner-a", label: "runner-a" },
       { value: "runner-b", label: "runner-b offline" },
       { value: "runner-c", label: "runner-c blocked", disabled: true },
+      { value: "runner-e", label: "runner-e repo blocked", disabled: true },
     ]);
+    expect(runnerOptionsFor(runners, "q", "claude", labels)).toContainEqual({
+      value: "runner-e",
+      label: "runner-e",
+    });
   });
 
   it("고른 에이전트의 공급자 한도에 닿은 러너는 막지 않고 경고만 붙인다", () => {
@@ -293,13 +318,19 @@ describe("수동 할당 폼", () => {
   it("한도 경고 문구에 공급자 이름과 풀리는 시간을 보인다", () => {
     const html = renderWithMessages(
       <AssignForm
-        defaults={{ runnerProject: "p", agent: "claude" }}
+        defaults={{
+          runnerProject: "p",
+          agent: "claude",
+          repos: [{ id: "p", isDefault: true, label: null }],
+        }}
         runners={[
           choice("runner-a", { usageLimits: [{ provider: "claude", resetsInMs: 68 * 60_000 }] }),
         ]}
         agents={["claude"]}
+        repo="p"
         runner="runner-a"
         agent="claude"
+        onRepoChange={noop}
         onRunnerChange={noop}
         onAgentChange={noop}
       />,

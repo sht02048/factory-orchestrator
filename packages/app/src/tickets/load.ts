@@ -1,4 +1,11 @@
-import { AdapterError, checkAssignment, summarizeRunOutcome, usageLimitsAt } from "@ganger/core";
+import {
+  AdapterError,
+  blockedProjectsOf,
+  checkAssignment,
+  routeToRepo,
+  summarizeRunOutcome,
+  usageLimitsAt,
+} from "@ganger/core";
 import type {
   AdapterRegistry,
   LabelId,
@@ -57,6 +64,7 @@ export async function loadTicketsPage(
     online: runner.online,
     assignmentBlocked: runner.assignmentBlocked,
     projects: runner.projects.map((p) => p.id),
+    blockedProjects: runner.online ? blockedProjectsOf(runner.prerequisites ?? []) : [],
     usageLimits: usageLimitsAt(runner.providerUsage, now).map((limit) => ({
       provider: limit.provider,
       resetsInMs: limit.until.getTime() - now.getTime(),
@@ -126,6 +134,11 @@ export async function loadTicketsPage(
     return label;
   };
 
+  const labelNames = new Map<string, string>();
+  for (const { ticket } of results.flat()) {
+    for (const label of ticket.labels) labelNames.set(label.id, label.name);
+  }
+
   const tickets = results
     .flat()
     .toSorted((a, b) => b.ticket.updatedAt.getTime() - a.ticket.updatedAt.getTime())
@@ -146,8 +159,8 @@ export async function loadTicketsPage(
           autoAssign: label.id === autoAssign,
         })),
         runs: runs.toReversed().map((run) => toTicketRun(db, run, runnerNames, now)),
-        mapping: mappingOf(db, project),
-        assignability: assignabilityOf(db, project, ticket, runs),
+        mapping: assignDefaultsOf(db, project, ticket, runs, labelNames),
+        assignability: assignabilityOf(db, project, ticket, runs, labelNames),
       };
     });
 
@@ -252,6 +265,7 @@ function assignabilityOf(
   project: StoredWorkspaceTrackerProject,
   ticket: TrackerTicket,
   runs: ReadonlyArray<StoredRun>,
+  labelNames: ReadonlyMap<string, string>,
 ): TicketView["assignability"] {
   const check = checkAssignment({
     ticket: { connection: project.connection, key: ticket.key },
@@ -261,14 +275,36 @@ function assignabilityOf(
     const active = runs.findLast((run) => run.state !== "ended");
     return { kind: "active-run", runId: active?.id ?? "" };
   }
-  const mapping = mappingOf(db, project);
-  if (mapping === null) return { kind: "no-mapping" };
-  return { kind: "ready", defaults: mapping };
+  const defaults = assignDefaultsOf(db, project, ticket, runs, labelNames);
+  if (defaults === null) return { kind: "no-mapping" };
+  return { kind: "ready", defaults };
 }
 
-function mappingOf(db: Database, project: StoredWorkspaceTrackerProject): AssignDefaults | null {
+function assignDefaultsOf(
+  db: Database,
+  project: StoredWorkspaceTrackerProject,
+  ticket: TrackerTicket,
+  runs: ReadonlyArray<StoredRun>,
+  labelNames: ReadonlyMap<string, string>,
+): AssignDefaults | null {
   const mapping = getMapping(db, project.connection, project.projectId);
-  return mapping === null ? null : { runnerProject: mapping.runnerProject, agent: mapping.agent };
+  if (mapping === null) return null;
+  const routed =
+    routeToRepo(
+      mapping.repos,
+      ticket.labels.map((label) => label.id),
+    ) ?? mapping.defaultRepo;
+  const lastRepo = runs.at(-1)?.runnerProject;
+  const previous = mapping.repos.some((repo) => repo.project === lastRepo) ? lastRepo : undefined;
+  return {
+    runnerProject: previous ?? routed,
+    agent: mapping.agent,
+    repos: mapping.repos.map((repo) => ({
+      id: repo.project,
+      isDefault: repo.isDefault,
+      label: repo.labelId === null ? null : (labelNames.get(repo.labelId) ?? null),
+    })),
+  };
 }
 
 function mappingAgents(db: Database): string[] {

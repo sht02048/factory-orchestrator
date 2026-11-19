@@ -2,6 +2,7 @@ import type {
   AgentId,
   CodeHostKind,
   LabelId,
+  MappingReposProblem,
   MailboxRef,
   ProviderUsageReading,
   RunnerErrorDetail,
@@ -20,6 +21,7 @@ import {
   PREREQUISITE_FAILURE_KINDS,
   USAGE_WINDOW_KINDS,
   blockedProjectsOf,
+  checkMappingRepos,
   toRunnerProjectId,
   usageLimitsAt,
 } from "@ganger/core";
@@ -33,6 +35,7 @@ import {
   autoAssignLabels,
   codeHostConnections,
   installSettings,
+  mappingRepos,
   mappings,
   runnerProjects,
   runners,
@@ -546,32 +549,101 @@ export function removeWorkspaceTrackerProject(
   );
 }
 
+export interface StoredMappingRepo {
+  project: RunnerProjectId;
+  isDefault: boolean;
+  labelId: LabelId | null;
+}
+
 export interface StoredMapping {
   connection: TrackerConnectionId;
   trackerProject: TrackerProjectId;
-  runnerProject: RunnerProjectId;
   agent: AgentId;
   model: string | null;
+  repos: StoredMappingRepo[];
+  defaultRepo: RunnerProjectId;
+}
+
+export type MappingSaveResult = { ok: true } | { ok: false; reason: MappingReposProblem };
+
+export function replaceMapping(
+  db: Database,
+  input: {
+    connection: TrackerConnectionId;
+    trackerProject: TrackerProjectId;
+    agent: AgentId;
+    model?: string | null;
+    repos: ReadonlyArray<StoredMappingRepo>;
+  },
+): MappingSaveResult {
+  const check = checkMappingRepos(
+    input.repos.map((repo) => ({
+      project: repo.project,
+      isDefault: repo.isDefault,
+      labelId: repo.labelId,
+    })),
+  );
+  if (!check.ok) return check;
+  const model = input.model ?? null;
+  inTransaction(db, () => {
+    db.insert(mappings)
+      .values({
+        trackerConnectionId: input.connection,
+        trackerProjectId: input.trackerProject,
+        agentId: input.agent,
+        model,
+      })
+      .onConflictDoUpdate({
+        target: [mappings.trackerConnectionId, mappings.trackerProjectId],
+        set: { agentId: input.agent, model },
+      })
+      .run();
+    db.delete(mappingRepos)
+      .where(
+        and(
+          eq(mappingRepos.trackerConnectionId, input.connection),
+          eq(mappingRepos.trackerProjectId, input.trackerProject),
+        ),
+      )
+      .run();
+    db.insert(mappingRepos)
+      .values(
+        input.repos.map((repo, position) => ({
+          trackerConnectionId: input.connection,
+          trackerProjectId: input.trackerProject,
+          runnerProjectId: repo.project,
+          isDefault: repo.isDefault,
+          labelId: repo.labelId,
+          position,
+        })),
+      )
+      .run();
+  });
+  return { ok: true };
 }
 
 export function saveMapping(
   db: Database,
-  input: Omit<StoredMapping, "model"> & { model?: string | null },
+  input: {
+    connection: TrackerConnectionId;
+    trackerProject: TrackerProjectId;
+    runnerProject: RunnerProjectId;
+    agent: AgentId;
+    model?: string | null;
+  },
 ): void {
-  const model = input.model ?? null;
-  db.insert(mappings)
-    .values({
-      trackerConnectionId: input.connection,
-      trackerProjectId: input.trackerProject,
-      runnerProjectId: input.runnerProject,
-      agentId: input.agent,
-      model,
-    })
-    .onConflictDoUpdate({
-      target: [mappings.trackerConnectionId, mappings.trackerProjectId],
-      set: { runnerProjectId: input.runnerProject, agentId: input.agent, model },
-    })
-    .run();
+  const current = getMapping(db, input.connection, input.trackerProject)?.repos ?? [];
+  const others = current
+    .filter((repo) => repo.project !== input.runnerProject)
+    .map((repo) => ({ ...repo, isDefault: false }));
+  const saved = replaceMapping(db, {
+    connection: input.connection,
+    trackerProject: input.trackerProject,
+    agent: input.agent,
+    model: input.model ?? null,
+    repos: [{ project: input.runnerProject, isDefault: true, labelId: null }, ...others],
+  });
+  if (!saved.ok) throw new Error(`mapping could not be saved: ${saved.reason}`);
 }
 
 export function getMapping(
@@ -583,7 +655,6 @@ export function getMapping(
     .select({
       connection: mappings.trackerConnectionId,
       trackerProject: mappings.trackerProjectId,
-      runnerProject: mappings.runnerProjectId,
       agent: mappings.agentId,
       model: mappings.model,
     })
@@ -595,7 +666,25 @@ export function getMapping(
       ),
     )
     .get();
-  return row ?? null;
+  if (row === undefined) return null;
+  const repos = db
+    .select({
+      project: mappingRepos.runnerProjectId,
+      isDefault: mappingRepos.isDefault,
+      labelId: mappingRepos.labelId,
+    })
+    .from(mappingRepos)
+    .where(
+      and(
+        eq(mappingRepos.trackerConnectionId, connection),
+        eq(mappingRepos.trackerProjectId, trackerProject),
+      ),
+    )
+    .orderBy(asc(mappingRepos.position), asc(mappingRepos.runnerProjectId))
+    .all();
+  const defaultRepo = repos.find((repo) => repo.isDefault)?.project;
+  if (defaultRepo === undefined) return null;
+  return { ...row, repos, defaultRepo };
 }
 
 export function saveAutoAssignLabel(

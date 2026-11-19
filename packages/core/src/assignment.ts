@@ -127,3 +127,61 @@ export function checkManualRunnerChoice(
     ? { ok: false, reason: "assignment-blocked" }
     : { ok: true };
 }
+
+export interface MappingRepo {
+  project: RunnerProjectId;
+  isDefault: boolean;
+  labelId: LabelId | null;
+}
+
+export function defaultRepoOf(repos: ReadonlyArray<MappingRepo>): RunnerProjectId | null {
+  return repos.find((repo) => repo.isDefault)?.project ?? null;
+}
+
+export function routeToRepo(
+  repos: ReadonlyArray<MappingRepo>,
+  ticketLabelIds: ReadonlyArray<LabelId>,
+): RunnerProjectId | null {
+  const matching = repos.filter(
+    (repo) => !repo.isDefault && repo.labelId !== null && ticketLabelIds.includes(repo.labelId),
+  );
+  const [only, ...others] = matching;
+  if (only !== undefined && others.length === 0) return only.project;
+  return defaultRepoOf(repos);
+}
+
+export type MappingReposProblem =
+  | "no-repos"
+  | "no-default"
+  | "many-defaults"
+  | "default-has-label"
+  | "duplicate-repo"
+  | "label-in-use";
+
+export function checkMappingRepos(
+  repos: ReadonlyArray<MappingRepo>,
+): { ok: true } | { ok: false; reason: MappingReposProblem } {
+  if (repos.length === 0) return { ok: false, reason: "no-repos" };
+  const defaults = repos.filter((repo) => repo.isDefault).length;
+  if (defaults === 0) return { ok: false, reason: "no-default" };
+  if (defaults > 1) return { ok: false, reason: "many-defaults" };
+  if (repos.some((repo) => repo.isDefault && repo.labelId !== null)) {
+    return { ok: false, reason: "default-has-label" };
+  }
+  if (new Set(repos.map((repo) => repo.project)).size !== repos.length) {
+    return { ok: false, reason: "duplicate-repo" };
+  }
+  const labels = repos.flatMap((repo) => (repo.labelId === null ? [] : [repo.labelId]));
+  if (new Set(labels).size !== labels.length) return { ok: false, reason: "label-in-use" };
+  return { ok: true };
+}
+
+export const AUTO_ASSIGN_LABEL_NAME = "ganger";
+
+export function findLabelNamed<L extends { name: string }>(
+  labels: ReadonlyArray<L>,
+  name: string,
+): L | null {
+  const wanted = name.trim().toLocaleLowerCase();
+  return labels.find((label) => label.name.trim().toLocaleLowerCase() === wanted) ?? null;
+}

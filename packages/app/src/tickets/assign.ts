@@ -1,6 +1,7 @@
 import {
   toAgentId,
   toRunnerId,
+  toRunnerProjectId,
   toTicketKey,
   toTrackerConnectionId,
   toTrackerProjectId,
@@ -20,6 +21,7 @@ export const assignInput = z.object({
   ticketKey: z.string().min(1),
   ticketTitle: z.string().trim().max(TICKET_TITLE_MAX_LENGTH).default(""),
   trackerProject: z.string().min(1),
+  runnerProject: z.string().min(1),
   runnerId: z.string().min(1).nullable(),
   agent: z.string().min(1),
 });
@@ -33,6 +35,7 @@ export type AssignResult =
       reason:
         | "active-run"
         | "no-mapping"
+        | "unknown-repo"
         | "unknown-agent"
         | "unknown-runner"
         | "runner-assignment-blocked";
@@ -51,9 +54,14 @@ export function submitAssignment(db: Database, input: AssignInput, now: Date): A
     );
   if (!knownAgent) return { ok: false, reason: "unknown-agent" };
 
+  const runnerProject = toRunnerProjectId(input.runnerProject);
+  if (!mapping.repos.some((repo) => repo.project === runnerProject)) {
+    return { ok: false, reason: "unknown-repo" };
+  }
+
   if (input.runnerId !== null) {
     const runner = listRunners(db).find((r) => r.id === input.runnerId);
-    if (runner === undefined || !runner.projects.some((p) => p.id === mapping.runnerProject)) {
+    if (runner === undefined || !runner.projects.some((p) => p.id === runnerProject)) {
       return { ok: false, reason: "unknown-runner" };
     }
   }
@@ -62,7 +70,7 @@ export function submitAssignment(db: Database, input: AssignInput, now: Date): A
     ticket: { connection, key: toTicketKey(input.ticketKey) },
     ticketTitle: input.ticketTitle,
     trackerProject,
-    runnerProject: mapping.runnerProject,
+    runnerProject,
     agent: toAgentId(input.agent),
     model: input.agent === mapping.agent ? mapping.model : null,
     ...(input.runnerId === null ? {} : { runnerId: toRunnerId(input.runnerId) }),
