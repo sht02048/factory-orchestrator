@@ -22,6 +22,7 @@ import {
   PanelHeader,
   PILL_STATUSES,
   Row,
+  RowActionSlot,
   RowReason,
   RowTitle,
   Section,
@@ -39,6 +40,7 @@ import {
   TableRows,
   Tabs,
   Text,
+  TimeSlot,
   Tooltip,
   showToast,
   statusTone,
@@ -190,6 +192,30 @@ export function ComponentSections() {
               >
                 <Text variant="ui">{t("card.rowQueued")}</Text>
               </Row>
+            </Card>
+            <Text variant="meta" as="p">
+              {t("card.timeNote")}
+            </Text>
+            <Card padding="compact" label={t("card.timeLabel")}>
+              {(
+                [
+                  [t("card.timeSeconds"), t("card.answer")],
+                  [t("card.timeMinutes"), t("card.deny")],
+                  [t("card.timeHours"), t("card.answer")],
+                  [t("card.timeDate"), null],
+                ] as const
+              ).map(([time, action]) => (
+                <span key={time} {...stylex.props(styles.timeRow)}>
+                  <span {...stylex.props(styles.timeRowBody)}>
+                    <Row trailing={<TimeSlot>{time}</TimeSlot>}>
+                      <Text variant="ui">{t("card.ticketTitle")}</Text>
+                    </Row>
+                  </span>
+                  <RowActionSlot>
+                    {action === null ? null : <Button>{action}</Button>}
+                  </RowActionSlot>
+                </span>
+              ))}
             </Card>
           </div>
         </Section>
@@ -564,6 +590,8 @@ const styles = stylex.create({
   pillSample: { display: "inline-flex", alignItems: "center", gap: space.s2 },
   cards: { display: "flex", flexDirection: "column", gap: space.s3, maxWidth: 640 },
   inline: { display: "inline-flex", alignItems: "center", gap: space.s2 },
+  timeRow: { display: "flex", alignItems: "center", gap: space.s2 },
+  timeRowBody: { flexGrow: 1, minWidth: 0 },
   frame: {
     height: 440,
     overflow: "hidden",

@@ -11,10 +11,12 @@ import {
   Popover,
   ProblemCallout,
   Row,
+  RowActionSlot,
   Section,
   StatusDot,
   StatusPill,
   Text,
+  TimeSlot,
   textStyles,
 } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
@@ -92,22 +94,24 @@ export function HomeScreen({ page, onAnswer, onDeny }: HomeScreenProps) {
   const groups = todoGroups(page.attention);
   return (
     <div {...stylex.props(styles.page)}>
-      <DashboardHeader page={page} groups={groups} all={all} />
-      <div {...stylex.props(styles.frame)}>
-        <div {...stylex.props(styles.columns)}>
-          <div {...stylex.props(styles.mainColumn)}>
-            <TodoSection
-              groups={groups}
-              total={page.attention.length}
-              all={all}
-              onAnswer={onAnswer}
-              onDeny={onDeny}
-            />
-            <InProgressSection page={page} all={all} />
-          </div>
-          <div {...stylex.props(styles.sideColumn)}>
-            <RunnersSection runners={page.runners.list} />
-            <DoneTodaySection page={page} all={all} />
+      <div {...stylex.props(styles.content)}>
+        <DashboardHeader page={page} groups={groups} all={all} />
+        <div {...stylex.props(styles.frame)}>
+          <div {...stylex.props(styles.columns)}>
+            <div {...stylex.props(styles.mainColumn)}>
+              <TodoSection
+                groups={groups}
+                total={page.attention.length}
+                all={all}
+                onAnswer={onAnswer}
+                onDeny={onDeny}
+              />
+              <InProgressSection page={page} all={all} />
+            </div>
+            <div {...stylex.props(styles.sideColumn)}>
+              <RunnersSection runners={page.runners.list} />
+              <DoneTodaySection page={page} all={all} />
+            </div>
           </div>
         </div>
       </div>
@@ -313,10 +317,10 @@ function TodoRow({
 }) {
   const t = useTranslations("home.row");
   const { ago, duration, elapsed } = useTime();
-  const line = (detail: ReactNode, trailing?: string, action?: ReactNode) => (
+  const line = (detail: ReactNode, since?: string, action?: ReactNode) => (
     <li data-run={run.id} ref={itemRef} {...stylex.props(styles.todoItem)}>
       <span {...stylex.props(styles.todoLink)}>
-        <Row href={runHref(run)} {...(trailing === undefined ? {} : { trailing })}>
+        <Row href={runHref(run)} trailing={<TimeSlot>{since}</TimeSlot>}>
           <span {...stylex.props(styles.todoBody)}>
             <span {...stylex.props(styles.keyLine)}>
               <RunKey run={run} all={all} />
@@ -326,7 +330,9 @@ function TodoRow({
           </span>
         </Row>
       </span>
-      {action === undefined ? null : <span {...stylex.props(styles.todoAction)}>{action}</span>}
+      <span {...stylex.props(styles.todoAction)}>
+        <RowActionSlot>{action}</RowActionSlot>
+      </span>
     </li>
   );
   switch (run.state) {
@@ -421,7 +427,7 @@ function ProgressRow({ run, all }: { run: HomeRun; all: boolean }) {
       <Row
         href={runHref(run)}
         leading={<StatusDot status={status}>{statusName(status)}</StatusDot>}
-        {...(since === null ? {} : { trailing: elapsed(since) })}
+        trailing={<TimeSlot>{since === null ? null : elapsed(since)}</TimeSlot>}
       >
         <span {...stylex.props(styles.keyLine)}>
           <RunKey run={run} all={all} />
@@ -655,7 +661,7 @@ function DoneRow({ run, all }: { run: DoneRun; all: boolean }) {
       <Row
         href={runHref(run)}
         leading={<StatusDot status={run.summary}>{statusName(run.summary)}</StatusDot>}
-        trailing={<time dateTime={run.endedAt}>{ago(run.endedAt, run.endedAgoMs)}</time>}
+        trailing={<TimeSlot dateTime={run.endedAt}>{ago(run.endedAt, run.endedAgoMs)}</TimeSlot>}
       >
         <span {...stylex.props(styles.keyLine)}>
           <RunKey run={run} all={all} />
@@ -887,6 +893,7 @@ const styles = stylex.create({
     paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
     paddingBottom: space.s10,
   },
+  content: { maxWidth: size.dashboardWidth },
   header: {
     display: "flex",
     flexDirection: "column",
@@ -934,6 +941,7 @@ const styles = stylex.create({
   todoAction: {
     display: "flex",
     flexShrink: 0,
+    marginInlineStart: "auto",
     alignItems: "center",
     maxWidth: "100%",
     paddingInline: { default: 0, [breakpoints.dashboardOneColumn]: space.s3 },

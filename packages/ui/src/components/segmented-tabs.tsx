@@ -8,10 +8,11 @@ export interface SegmentedTabsItem<T extends string> {
   value: T;
   label: ReactNode;
   count?: number;
+  attention?: boolean;
 }
 
 export interface SegmentedTabsProps<T extends string> {
-  value: T;
+  value: T | null;
   onValueChange: (value: T) => void;
   label: string;
   items: ReadonlyArray<SegmentedTabsItem<T>>;
@@ -41,7 +42,14 @@ export function SegmentedTabs<T extends string>({
           >
             {item.label}
             {item.count === undefined ? null : (
-              <span {...stylex.props(styles.count)}>{item.count}</span>
+              <span
+                {...stylex.props(
+                  styles.count,
+                  item.attention === true && item.count > 0 && styles.attention,
+                )}
+              >
+                {item.count}
+              </span>
             )}
           </TabsTab>
         ))}
@@ -54,9 +62,8 @@ export function SegmentedTabs<T extends string>({
 const styles = stylex.create({
   list: {
     display: "inline-flex",
+    flexWrap: "wrap",
     maxWidth: "100%",
-    overflowX: "auto",
-    scrollbarWidth: "none",
     gap: space.px2,
     padding: space.px2,
     borderRadius: radius.control,
@@ -92,4 +99,5 @@ const styles = stylex.create({
     color: colors.textTertiary,
     fontVariantNumeric: "tabular-nums",
   },
+  attention: { color: colors.textPrimary, fontWeight: fontWeight.semibold },
 });

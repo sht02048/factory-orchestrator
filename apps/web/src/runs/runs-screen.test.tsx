@@ -242,6 +242,83 @@ describe("Runs 화면", () => {
     expect([...queued.keys()].sort()).toEqual(["ACME-13", offlineQueuedKey].sort());
   });
 
+  it("필터는 두 줄이다: 위는 모두·처리할 일·진행 중·끝남 묶음, 아래는 상태별 칩(티켓 0091)", () => {
+    const { db } = seedDatabase();
+    const page = loadRunsPage(db, undefined, now);
+    const tablist = (html: string, label: string): string => {
+      const start = html.indexOf(`aria-label="${label}"`);
+      expect(html.slice(start, html.indexOf(">", start))).toContain('role="tablist"');
+      return html.slice(start, html.indexOf("</div>", start));
+    };
+    const tabs = (list: string) =>
+      [
+        ...list.matchAll(
+          /<button[^>]*role="tab"[^>]*aria-selected="(true|false)"[^>]*>(.*?)<\/button>/g,
+        ),
+      ].map((m) => ({
+        selected: m[1] === "true",
+        text: (m[2] ?? "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim(),
+      }));
+
+    const all = render(page);
+    const groups = tabs(tablist(all, runsJson.filter.groupLabel));
+    const count = (filter: RunFilter) => rowTexts(render(page, { filter })).size;
+    expect(groups.map((tab) => tab.text)).toEqual([
+      `${runsJson.filter.all} ${page.runs.length}`,
+      `${runsJson.filter.attention} ${count("attention")}`,
+      `${runsJson.filter["in-progress"]} ${count("in-progress")}`,
+      `${runsJson.filter.done} ${count("done")}`,
+    ]);
+    expect(groups.map((tab) => tab.selected)).toEqual([true, false, false, false]);
+    expect(count("attention") + count("in-progress") + count("done")).toBe(page.runs.length);
+
+    const statuses = tabs(tablist(all, runsJson.filter.statusLabel));
+    expect(statuses.map((tab) => tab.text.replace(/ \d+$/, ""))).toEqual([
+      "Running",
+      "Waiting for Input",
+      "Disconnected",
+      "Queued",
+      "Merged",
+      "Human Check",
+      "Failed",
+      "Canceled",
+    ]);
+    expect(statuses.some((tab) => tab.selected)).toBe(false);
+
+    const queued = render(page, { filter: "queued" });
+    expect(tabs(tablist(queued, runsJson.filter.groupLabel)).some((tab) => tab.selected)).toBe(
+      false,
+    );
+    expect(
+      tabs(tablist(queued, runsJson.filter.statusLabel))
+        .filter((tab) => tab.selected)
+        .map((tab) => tab.text),
+    ).toEqual([`Queued ${count("queued")}`]);
+  });
+
+  it("진행 중은 Queued·Running 런, 끝남은 처리할 일이 아닌 끝난 런이다(티켓 0091)", () => {
+    const { db } = seedDatabase();
+    const page = loadRunsPage(db, undefined, now);
+    const keysOf = (filter: RunFilter) => [...rowTexts(render(page, { filter })).keys()].sort();
+    expect(keysOf("in-progress")).toEqual(
+      page.runs
+        .filter((run) => run.state === "queued" || run.state === "running")
+        .map((run) => run.ticketKey)
+        .sort(),
+    );
+    expect(keysOf("done")).toEqual(
+      page.runs
+        .filter((run) => run.state === "ended" && !run.attention)
+        .map((run) => run.ticketKey)
+        .sort(),
+    );
+    expect(keysOf("in-progress").length).toBeGreaterThan(0);
+    expect(keysOf("done").length).toBeGreaterThan(0);
+  });
+
   it("처리할 일 칩과 머리글 수는 Dashboard 의 To do 런과 같다(티켓마다 마지막 런)", () => {
     const { db, ids } = seedDatabase();
     const homeRunIds = (): string[] =>

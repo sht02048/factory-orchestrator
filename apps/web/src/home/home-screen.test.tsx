@@ -202,9 +202,25 @@ describe("To do 묶음", () => {
     expect(human).toContain(`href="${runHref(runOf(page, "ACME-2"))}"`);
     expect(text(human)).toContain("PR #2");
     expect(human).toMatch(
-      /<\/a><\/span><span[^>]*><a href="https:\/\/example.com\/acme\/web\/pull\/2"[^>]*>PR 보기<\/a>/,
+      /<\/a><\/span><span[^>]*><span data-slot="action"[^>]*><a href="https:\/\/example.com\/acme\/web\/pull\/2"[^>]*>PR 보기<\/a>/,
     );
     expect(todo).not.toContain('href="/runners');
+  });
+
+  it("시간은 링크 안 같은 폭 시간 칸에, 버튼은 같은 폭 버튼 칸에 두고 버튼 없는 행도 빈 칸을 남긴다(티켓 0091)", () => {
+    const page = withPermission(withInput(seededPage(), question));
+    const todo = section(render(page), "To do");
+    const slots = (html: string, slot: string) =>
+      html.match(new RegExp(`data-slot="${slot}"`, "g"))?.length ?? 0;
+    const shown = rows(todo).length;
+    expect(shown).toBeGreaterThan(3);
+    expect(slots(todo, "time")).toBe(shown);
+    expect(slots(todo, "action")).toBe(shown);
+    const asking = row(todo, "ACME-11");
+    expect(asking).toMatch(/<span data-slot="time"[^>]*>\d+분째<\/span><\/span><\/a>/);
+    expect(asking).toMatch(/<span data-slot="action"[^>]*><button/);
+    const failed = row(group(todo, "stopped"), "ACME-7");
+    expect(failed).toMatch(/<span data-slot="action"[^>]*><\/span>/);
   });
 
   it("멈췄어요는 Disconnected 를 러너와 함께, Failed 를 끝난 시간과 함께 보이고 처음 3개만 그린 뒤 더 보기를 둔다", () => {

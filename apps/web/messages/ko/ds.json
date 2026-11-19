@@ -124,7 +124,14 @@
     "choiceB": "30초 고정",
     "deny": "거절",
     "rowStarted": "runner-a에서 시작했어요",
-    "rowQueued": "라벨 factory로 자동 할당했어요"
+    "rowQueued": "라벨 factory로 자동 할당했어요",
+    "timeNote": "시간은 TimeSlot, 버튼은 RowActionSlot에 둬요. 글 길이가 달라도, 버튼이 없어도 시간과 버튼이 같은 자리에 서요.",
+    "timeLabel": "시간 칸 예시",
+    "answer": "답하기",
+    "timeSeconds": "42초째",
+    "timeMinutes": "12분째",
+    "timeHours": "1시간 3분째",
+    "timeDate": "11월 17일"
   },
   "tabs": {
     "label": "상태로 거르기",

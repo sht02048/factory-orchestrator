@@ -21,6 +21,7 @@ import {
   Popover,
   ProblemCallout,
   Row,
+  RowActionSlot,
   SURFACE_ROLES,
   Section,
   SegmentedTabs,
@@ -32,11 +33,14 @@ import {
   Tab,
   Table,
   TableCell,
+  TableHead,
+  TableHeader,
   TableRow,
   TableRows,
   Tabs,
   TEXT_VARIANTS,
   Text,
+  TimeSlot,
   Tooltip,
   UsageBar,
   UsageMeter,
@@ -154,7 +158,40 @@ describe("서버 렌더", () => {
     expect(html).toContain('aria-label="런 목록"');
     expect(html.match(/role="option"/g)).toHaveLength(2);
     expect(html).toMatch(/aria-selected="true"[^>]*>.*둘째|둘째.*aria-selected="true"/s);
-    expect(html).toContain("grid-template-columns:minmax(0, 1fr) 80px");
+    expect(html).toMatch(/style="--[^:]+:minmax\(0, 1fr\) 80px;--[^:]+:minmax\(0, 1fr\) 80px"/);
+  });
+
+  it("Table 은 좁은 폭 열 값을 따로 받는다(티켓 0091)", () => {
+    const html = renderToString(
+      <Table columns="minmax(0, 1fr) 152px 88px" narrowColumns="minmax(0, 1fr)">
+        <TableRows label="런 목록" value="a" onValueChange={noop}>
+          <TableRow value="a" label="첫째">
+            <TableCell>첫째</TableCell>
+          </TableRow>
+        </TableRows>
+      </Table>,
+    );
+    expect(html).toMatch(/style="--[^:]+:minmax\(0, 1fr\) 152px 88px;--[^:]+:minmax\(0, 1fr\)"/);
+  });
+
+  it("Table 은 narrowColumns 를 준 표에서만 좁을 때 머리글을 숨긴다(티켓 0091)", () => {
+    const headClass = (narrow: string | undefined) =>
+      /<div aria-hidden="true" class="([^"]*)"/.exec(
+        renderToString(
+          <Table
+            columns="minmax(0, 1fr) 80px"
+            {...(narrow === undefined ? {} : { narrowColumns: narrow })}
+          >
+            <TableHead>
+              <TableHeader>제목</TableHeader>
+            </TableHead>
+          </Table>,
+        ),
+      )?.[1] ?? "";
+    expect(headClass(undefined)).not.toBe("");
+    expect(headClass("minmax(0, 1fr)").split(" ").length).toBeGreaterThan(
+      headClass(undefined).split(" ").length,
+    );
   });
 
   it("Tabs 는 고른 탭을 aria-selected 로 표시하고 개수를 붙인다", () => {
@@ -200,6 +237,54 @@ describe("서버 렌더", () => {
     const chips = listClass(html);
     const under = listClass(underline);
     expect(chips?.[1] ?? chips?.[2]).not.toBe(under?.[1] ?? under?.[2]);
+  });
+
+  it("Tabs 는 값이 null 이면 아무 탭도 고르지 않는다(티켓 0091)", () => {
+    for (const html of [
+      renderToString(
+        <Tabs<string> value={null} onValueChange={noop} label="상태로 거르기" variant="chips">
+          <Tab value="queued" count={1}>
+            Queued
+          </Tab>
+        </Tabs>,
+      ),
+      renderToString(
+        <SegmentedTabs<string>
+          value={null}
+          onValueChange={noop}
+          label="묶음으로 거르기"
+          items={[{ value: "all", label: "모두", count: 3 }]}
+        />,
+      ),
+    ]) {
+      expect(html).toContain('role="tab"');
+      expect(html).not.toContain('aria-selected="true"');
+    }
+  });
+
+  it("TimeSlot 은 시간 글을 같은 폭 칸에 두고, dateTime 을 주면 time 요소다(티켓 0091)", () => {
+    const classOf = (html: string) => /class="([^"]*)"/.exec(html)?.[1] ?? "";
+    const short = renderToString(<TimeSlot>42초째</TimeSlot>);
+    const long = renderToString(<TimeSlot>1시간 3분째</TimeSlot>);
+    expect(short).toMatch(/^<span data-slot="time"/);
+    expect(classOf(short)).toBe(classOf(long));
+    const time = renderToString(<TimeSlot dateTime="2026-11-17T09:00:00.000Z">11월 17일</TimeSlot>);
+    expect(time).toMatch(/^<time dateTime="2026-11-17T09:00:00.000Z" data-slot="time"/);
+    expect(classOf(time)).toBe(classOf(short));
+    expect(renderToString(<TimeSlot>123시간 45분째</TimeSlot>)).toContain(">123시간 45분째<");
+  });
+
+  it("RowActionSlot 은 버튼이 없어도 같은 폭 칸을 남긴다(티켓 0091)", () => {
+    const classOf = (html: string) => /class="([^"]*)"/.exec(html)?.[1] ?? "";
+    const empty = renderToString(<RowActionSlot />);
+    const filled = renderToString(
+      <RowActionSlot>
+        <Button>답하기</Button>
+      </RowActionSlot>,
+    );
+    expect(empty).toMatch(/^<span data-slot="action"/);
+    expect(filled).toContain("답하기");
+    expect(classOf(empty)).toBe(classOf(filled));
   });
 
   it("Field 의 오류는 입력을 invalid 로 만들고 라벨을 잇는다", () => {
