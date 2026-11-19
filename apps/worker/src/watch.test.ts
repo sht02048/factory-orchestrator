@@ -860,6 +860,20 @@ describe("멈추기·재개(0118)", () => {
     expect(agentOf(run, runnerId).paused).toBe(true);
   });
 
+  it("멈춘 런의 러너가 최대 실행 시간보다 오래 꺼져 있어도 런을 끝내지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.advance(DEFAULT_MAX_RUN_MS - MINUTE);
+    await pause(run, worker);
+    await disconnect(run, runnerId, worker);
+    h.advance(3 * DEFAULT_MAX_RUN_MS);
+    await worker.tick();
+    expect(stateOf(run)).toBe("disconnected");
+
+    cutSsh(runnerId, false);
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+  });
+
   it("러너에 닿지 않으면 멈추기가 실패하고 그 이유를 남기며 Running 그대로 둔다", async () => {
     const { run, runnerId, worker } = await startOne();
     cutSsh(runnerId);

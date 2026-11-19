@@ -65,7 +65,7 @@ CREATE TABLE `__new_runs` (
 	CONSTRAINT "runs_runner_unreached" CHECK("runner_unreached" IN (0, 1)),
 	CONSTRAINT "runs_queued_not_started" CHECK("state" <> 'queued' OR "started_at" IS NULL),
 	CONSTRAINT "runs_active_started" CHECK("state" NOT IN ('running', 'waiting-for-input', 'paused', 'disconnected') OR "started_at" IS NOT NULL),
-	CONSTRAINT "runs_paused_since_iff_paused" CHECK(("state" = 'paused') = ("paused_since" IS NOT NULL)),
+	CONSTRAINT "runs_paused_since_while_paused" CHECK(("state" <> 'paused' OR "paused_since" IS NOT NULL) AND ("paused_since" IS NULL OR "state" IN ('paused', 'disconnected'))),
 	CONSTRAINT "runs_paused_ms" CHECK("paused_ms" >= 0),
 	CONSTRAINT "runs_pause_source" CHECK("pause_source" IN ('operator')),
 	CONSTRAINT "runs_paused_has_source" CHECK("state" <> 'paused' OR "pause_source" IS NOT NULL),

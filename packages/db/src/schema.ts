@@ -271,8 +271,8 @@ export const runs = sqliteTable(
       sql`${t.state} NOT IN ('running', 'waiting-for-input', 'paused', 'disconnected') OR ${t.startedAt} IS NOT NULL`,
     ),
     check(
-      "runs_paused_since_iff_paused",
-      sql`(${t.state} = 'paused') = (${t.pausedSince} IS NOT NULL)`,
+      "runs_paused_since_while_paused",
+      sql`(${t.state} <> 'paused' OR ${t.pausedSince} IS NOT NULL) AND (${t.pausedSince} IS NULL OR ${t.state} IN ('paused', 'disconnected'))`,
     ),
     check("runs_paused_ms", sql`${t.pausedMs} >= 0`),
     check("runs_pause_source", sql`${t.pauseSource} IN ${inList(PAUSE_SOURCES)}`),

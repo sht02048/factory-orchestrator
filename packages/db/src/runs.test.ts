@@ -599,18 +599,20 @@ describe("Paused(0118)", () => {
     expect(getRun(db, id)?.state).toBe("ended");
   });
 
-  it("Paused 중 러너에 닿지 않아 Disconnected가 되면, 이전 상태가 Paused였음을 이력에서 읽는다", () => {
+  it("Paused 중 러너에 닿지 않아 Disconnected가 돼도 멈춤 시계는 이어지고, 이전 상태가 Paused였음을 이력에서 읽는다", () => {
     const db = seededDatabase();
     const id = runningRun(db);
     changeRunState(db, id, { to: "paused" }, at(1));
     changeRunState(db, id, { to: "disconnected" }, at(7));
-    expect(getRunWithRecords(db, id)?.records).toMatchObject({
-      pausedSince: null,
-      pausedMs: 6 * 60_000,
-    });
+    expect(getRunWithRecords(db, id)?.records).toMatchObject({ pausedSince: at(1), pausedMs: 0 });
     expect(lastStateBeforeDisconnect(db, id)).toBe("paused");
     changeRunState(db, id, { to: "paused" }, at(9));
-    expect(getRunWithRecords(db, id)?.records.pausedSince).toEqual(at(9));
+    expect(getRunWithRecords(db, id)?.records.pausedSince).toEqual(at(1));
+    changeRunState(db, id, { to: "running" }, at(11));
+    expect(getRunWithRecords(db, id)?.records).toMatchObject({
+      pausedSince: null,
+      pausedMs: 10 * 60_000,
+    });
   });
 
   it("멈춘 이유를 Paused 동안 두고, Disconnected를 거쳐도 지키며, 재개하면 비운다(0120 대비)", () => {

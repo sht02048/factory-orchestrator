@@ -1109,9 +1109,22 @@ describe("pauseAgent and resumeAgent", () => {
     ]);
   });
 
+  const onlyOldWorker = stdout(
+    JSON.stringify({
+      ok: true,
+      result: {
+        workers: [
+          { dispatchId: "ctx_a6e6a23a7132", taskId: "task_43a3a070dc4c", workspace: WORKTREE },
+        ],
+        nextCursor: null,
+      },
+    }),
+  );
+
   test("starts a new agent in the same worktree when the conversation is gone", async () => {
     const exec = new ScriptedExec()
       .orca("orchestration worker-show", shown({ liveness: "exited", terminal: null }))
+      .orca("orchestration worker-list", onlyOldWorker)
       .orca(
         "orchestration worker-start",
         stdout(
@@ -1133,16 +1146,17 @@ describe("pauseAgent and resumeAgent", () => {
       taskId: "task_new",
       runId: "run_493ebb2f403d",
     });
-    expect(exec.commands()[1]).toBe(
+    expect(exec.commands()[2]).toBe(
       `${ORCA} orchestration worker-start --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --run run_493ebb2f403d --spec-file - --task-title 'resume task_43a3a070dc4c' --worktree 'id:${WORKTREE}' --agent claude --json`,
     );
-    expect(exec.calls[1]?.stdin).toBe(resumeInput.restartPrompt);
+    expect(exec.calls[2]?.stdin).toBe(resumeInput.restartPrompt);
     expect(exec.commands().some((command) => command.includes("--name"))).toBe(false);
   });
 
-  test("a restart that does not become ready is a runner error", async () => {
+  test("a restart that ends failed is a runner error", async () => {
     const exec = new ScriptedExec()
       .orca("orchestration worker-show", shown({ liveness: "exited", terminal: null }))
+      .orca("orchestration worker-list", onlyOldWorker)
       .orca(
         "orchestration worker-start",
         stdout(
@@ -1156,5 +1170,48 @@ describe("pauseAgent and resumeAgent", () => {
       kind: "runner-error",
       code: "worker_start_failed",
     });
+  });
+
+  test("a restart whose outcome is unknown is reported as such, and a retry adopts the started agent", async () => {
+    const lost = new ScriptedExec()
+      .orca("orchestration worker-show", shown({ liveness: "exited", terminal: null }))
+      .orca("orchestration worker-list", onlyOldWorker)
+      .orca("orchestration worker-start", stdout("ssh: connection reset", 255));
+    expect(await adapterError(runnerWith(lost).resumeAgent(RUN, resumeInput))).toMatchObject({
+      kind: "start-outcome-unknown",
+    });
+
+    const retry = new ScriptedExec()
+      .orca(
+        "orchestration worker-show --dispatch ctx_a6e6a23a7132",
+        shown({ liveness: "exited", terminal: null }),
+      )
+      .orca(
+        "orchestration worker-list",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: {
+              workers: [
+                {
+                  dispatchId: "ctx_a6e6a23a7132",
+                  taskId: "task_43a3a070dc4c",
+                  workspace: WORKTREE,
+                },
+                { dispatchId: "ctx_new", taskId: "task_new", workspace: WORKTREE },
+              ],
+              nextCursor: null,
+            },
+          }),
+        ),
+      )
+      .orca(
+        "orchestration worker-show --dispatch ctx_new",
+        shown({ liveness: "live", terminal: AGENT_TERMINAL }),
+      );
+    const resumed = await runnerWith(retry).resumeAgent(RUN, resumeInput);
+    expect(resumed.restarted).toBe(true);
+    expect(decodeAgent(resumed.agentRef)?.dispatchId).toBe("ctx_new");
+    expect(retry.commands().some((command) => command.includes("worker-start"))).toBe(false);
   });
 });

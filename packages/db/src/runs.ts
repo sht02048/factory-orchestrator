@@ -525,11 +525,13 @@ function pauseClockAfter(
     .where(eq(runs.id, runId))
     .get();
   const since = row?.pausedSince ?? null;
+  if (to === "paused") return { pausedSince: since ?? now };
+  if (to === "disconnected") return { pausedSince: since };
   const counted =
     since === null
       ? {}
       : { pausedMs: (row?.pausedMs ?? 0) + Math.max(0, now.getTime() - since.getTime()) };
-  return { pausedSince: to === "paused" ? now : null, ...counted };
+  return { pausedSince: null, ...counted };
 }
 
 function pauseSourceAfter(

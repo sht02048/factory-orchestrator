@@ -20,7 +20,7 @@ type StartedEndedRun = Extract<EndedRun, { startedAt: Date }>;
 export async function processAfterRuns(context: TickContext): Promise<void> {
   const runnersById = new Map(listRunners(context.db).map((runner) => [runner.id, runner]));
   const runs = listRuns(context.db, {
-    states: ["running", "waiting-for-input", "disconnected", "ended"],
+    states: ["running", "waiting-for-input", "paused", "disconnected", "ended"],
   });
   for (const run of runs) {
     try {

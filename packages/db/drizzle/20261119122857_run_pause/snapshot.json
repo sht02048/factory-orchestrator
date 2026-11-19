@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "daa5f0e7-6722-443d-a6e9-6771b7f53ddd",
+  "id": "c66bca75-d0f5-4b00-a767-58e383fb776f",
   "prevIds": ["b41d72f4-b382-4401-a87a-c8cb0ba2d802"],
   "ddl": [
     {
@@ -2499,8 +2499,8 @@
     },
     {
       "table": "runs",
-      "name": "runs_paused_since_iff_paused",
-      "value": "(\"state\" = 'paused') = (\"paused_since\" IS NOT NULL)",
+      "name": "runs_paused_since_while_paused",
+      "value": "(\"state\" <> 'paused' OR \"paused_since\" IS NOT NULL) AND (\"paused_since\" IS NULL OR \"state\" IN ('paused', 'disconnected'))",
       "entityType": "checks"
     },
     {

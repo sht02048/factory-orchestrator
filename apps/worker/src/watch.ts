@@ -65,6 +65,7 @@ export async function watchActiveRuns(context: TickContext): Promise<void> {
 interface WatchSettings {
   maxRunMs: number;
   pausedMs: number;
+  pausedSince: Date | null;
 }
 
 async function watchRun(
@@ -76,7 +77,11 @@ async function watchRun(
   const { db, logger, adapters } = context;
   const records = getRunWithRecords(db, run.id)?.records;
   if (records === undefined) return;
-  const settings: WatchSettings = { maxRunMs: limits.maxRunMs, pausedMs: records.pausedMs };
+  const settings: WatchSettings = {
+    maxRunMs: limits.maxRunMs,
+    pausedMs: records.pausedMs,
+    pausedSince: records.pausedSince,
+  };
   const cancelRequested = hasPendingCancelRequest(db, run.id);
   if (storedRunner === undefined) {
     logger.warn("run's runner is not registered", { runId: run.id, runnerId: run.runnerId });
@@ -150,6 +155,7 @@ async function watchRun(
           cancelRequested,
           maxRunMs: settings.maxRunMs,
           pausedMs: settings.pausedMs,
+          pausedSince: settings.pausedSince,
         })
       : { agentResult: pending.agentResult, report: pending.report, agent: "none" as const };
   if (ending === null) {
@@ -196,6 +202,7 @@ async function endWithoutProgress(
     now: context.now(),
     maxRunMs: input.maxRunMs,
     pausedMs: input.pausedMs,
+    pausedSince: input.pausedSince,
     cancelRequested: input.cancelRequested,
   });
   const ending =
@@ -235,6 +242,7 @@ async function endIfTimedOut(
     now: context.now(),
     maxRunMs: input.maxRunMs,
     pausedMs: input.pausedMs,
+    pausedSince: input.pausedSince,
     cancelRequested: input.cancelRequested,
   });
   if (timeout === null) return;
@@ -294,6 +302,7 @@ function decideEnding(
     cancelRequested: boolean;
     maxRunMs: number;
     pausedMs: number;
+    pausedSince: Date | null;
   },
 ): Ending | null {
   const { progress, resolution } = input;
@@ -317,6 +326,7 @@ function decideEnding(
     now: context.now(),
     maxRunMs: input.maxRunMs,
     pausedMs: input.pausedMs,
+    pausedSince: input.pausedSince,
     cancelRequested: false,
   });
   if (timeout === null) return null;

@@ -30,9 +30,10 @@ export function decideTimeout(input: {
   now: Date;
   maxRunMs: number;
   pausedMs: number;
+  pausedSince: Date | null;
   cancelRequested: boolean;
 }): TimeoutDecision | null {
-  const counted = countedRunMs({ ...input, pausedSince: null });
+  const counted = countedRunMs(input);
   if (counted < input.maxRunMs) return null;
   switch (input.state) {
     case "running":

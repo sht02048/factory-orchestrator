@@ -1,5 +1,5 @@
 import { isRunControlFailure, planRunControl, toRunId } from "@ganger/core";
-import type { RunControl, RunState } from "@ganger/core";
+import type { RunControl, RunId, RunState } from "@ganger/core";
 import { getRunControlRequest, requestRunControl } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import type { RunControlView } from "./run-control-view.js";
@@ -8,10 +8,10 @@ export const RUN_CONTROL_FAILURE_SHOWN_MS = 10 * 60_000;
 
 export function runControlOf(
   db: Database,
-  run: { id: string; state: RunState },
+  run: { id: RunId; state: RunState },
   now: Date,
 ): RunControlView | null {
-  const request = getRunControlRequest(db, toRunId(run.id));
+  const request = getRunControlRequest(db, run.id);
   if (request === null) return null;
   switch (request.status) {
     case "pending":

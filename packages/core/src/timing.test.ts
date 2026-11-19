@@ -38,7 +38,13 @@ describe("countedRunMs(0118)", () => {
 describe("decideTimeout", () => {
   const maxRunMs = 2 * HOUR;
 
-  const base = { startedAt: start, maxRunMs, pausedMs: 0, cancelRequested: false };
+  const base = {
+    startedAt: start,
+    maxRunMs,
+    pausedMs: 0,
+    pausedSince: null,
+    cancelRequested: false,
+  };
 
   it.each([
     ["running", { agentResult: "timed-out", stopAgent: true, runnerUnreached: false }],
@@ -76,6 +82,17 @@ describe("decideTimeout", () => {
 
   it.each(["queued", "paused", "ended"] as const)("%s 런은 시간 초과를 보지 않는다", (state) => {
     expect(decideTimeout({ ...base, state, now: at(10 * maxRunMs) })).toBeNull();
+  });
+
+  it("멈춘 런이 Disconnected가 돼도 멈춤 시계가 이어져 시간 초과로 끝나지 않는다(0118)", () => {
+    expect(
+      decideTimeout({
+        ...base,
+        state: "disconnected",
+        pausedSince: at(maxRunMs - MINUTE),
+        now: at(10 * maxRunMs),
+      }),
+    ).toBeNull();
   });
 
   it("멈춘 시간은 최대 실행 시간에 세지 않는다(0118)", () => {

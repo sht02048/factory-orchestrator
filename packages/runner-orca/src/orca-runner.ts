@@ -1,5 +1,6 @@
 import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@ganger/core";
 import type {
+  AgentRef,
   MailboxRef,
   PermissionRequestId,
   ProviderUsageReading,
@@ -635,33 +636,57 @@ export class OrcaRunner implements Runner {
       return { agentRef: run.agentRef, restarted: false };
     }
     const mailbox = this.mailboxOf(run.mailbox);
-    const started = await this.orca(
-      [
-        "orchestration",
-        "worker-start",
-        "--from",
-        mailbox.terminal,
-        "--run",
-        mailbox.runId,
-        "--spec-file",
-        "-",
-        "--task-title",
-        `resume ${agent.taskId}`,
-        "--worktree",
-        `id:${run.worktree}`,
-        "--agent",
-        input.agent,
-        ...modelArgs(input.model ?? this.config.model),
-      ],
-      workerStartResultSchema,
-      { stdin: input.restartPrompt, timeoutMs: this.config.startTimeoutMs, usesMailbox: true },
-    );
+    const adopted = await this.liveWorkerAt(run.worktree, mailbox.runId, agent.dispatchId);
+    if (adopted !== null) return { agentRef: adopted, restarted: true };
+    let started: z.infer<typeof workerStartResultSchema>;
+    try {
+      started = await this.orca(
+        [
+          "orchestration",
+          "worker-start",
+          "--from",
+          mailbox.terminal,
+          "--run",
+          mailbox.runId,
+          "--spec-file",
+          "-",
+          "--task-title",
+          `resume ${agent.taskId}`,
+          "--worktree",
+          `id:${run.worktree}`,
+          "--agent",
+          input.agent,
+          ...modelArgs(input.model ?? this.config.model),
+        ],
+        workerStartResultSchema,
+        { stdin: input.restartPrompt, timeoutMs: this.config.startTimeoutMs, usesMailbox: true },
+      );
+    } catch (error) {
+      const detail = detailOf(error);
+      if (detail.kind === "unreachable" || detail.kind === "malformed-output") {
+        throw new AdapterError<RunnerErrorDetail>(
+          {
+            kind: "start-outcome-unknown",
+            detail: detail.kind === "unreachable" ? detail.detail : detail.raw,
+          },
+          { cause: error },
+        );
+      }
+      throw error;
+    }
     if (started.state !== "ready") {
-      throw new AdapterError<RunnerErrorDetail>({
-        kind: "runner-error",
-        code: "worker_start_failed",
-        message: `worker-start ended in state ${started.state}`,
-      });
+      throw new AdapterError<RunnerErrorDetail>(
+        started.state === "failed"
+          ? {
+              kind: "runner-error",
+              code: "worker_start_failed",
+              message: "worker-start ended in state failed",
+            }
+          : {
+              kind: "start-outcome-unknown",
+              detail: `worker-start ended in state ${started.state}`,
+            },
+      );
     }
     return {
       agentRef: encodeAgent({
@@ -671,6 +696,37 @@ export class OrcaRunner implements Runner {
       }),
       restarted: true,
     };
+  }
+
+  private async liveWorkerAt(
+    worktree: WorktreeRef,
+    runId: string,
+    exceptDispatch: string,
+  ): Promise<AgentRef | null> {
+    let cursor: string | null = null;
+    for (let page = 0; page < WORKER_LIST_MAX_PAGES; page += 1) {
+      const result: z.infer<typeof workerListResultSchema> = await this.orca(
+        [
+          "orchestration",
+          "worker-list",
+          "--run",
+          runId,
+          "--limit",
+          "100",
+          ...(cursor === null ? [] : ["--cursor", cursor]),
+        ],
+        workerListResultSchema,
+      );
+      for (const worker of result.workers) {
+        if (worker.workspace !== worktree || worker.dispatchId === exceptDispatch) continue;
+        const candidate = { dispatchId: worker.dispatchId, taskId: worker.taskId, runId };
+        if ((await this.liveAgentTerminal(candidate)) !== null) return encodeAgent(candidate);
+      }
+      const next = result.nextCursor ?? null;
+      if (next === null || next === cursor || result.workers.length === 0) return null;
+      cursor = next;
+    }
+    return null;
   }
 
   private async liveAgentTerminal(agent: OrcaAgent): Promise<string | null> {
