@@ -13,6 +13,8 @@
   "usage": {
     "name": "{provider} {window}",
     "barLabel": "{runner} {provider} {window} 사용량",
+    "highestBarLabel": "{runner} 가장 높은 사용량: {provider} {window}",
+    "highest": "가장 높은 사용량",
     "notRead": "사용량을 아직 읽지 않았어요",
     "unreadable": "사용량을 읽지 못했어요",
     "noWindows": "읽은 사용량이 없어요"
@@ -72,7 +74,7 @@
     "check": {
       "ok": "통과",
       "broken": "깨졌어요",
-      "unknown": "확인하지 못했어요"
+      "unknown": "모르겠어요"
     },
     "leftWorktrees": "남은 워크트리",
     "leftWorktreesCount": "{count}개",
@@ -91,9 +93,9 @@
       "resetsAtLimit": "{time}에 초기화돼요 · 한도에 닿았어요",
       "noWindows": "사용량 창이 없어요.",
       "error": "사용량을 읽지 못했어요.",
-      "signedOut": "{providers} · 로그인하지 않았어요",
-      "unavailable": "쓰지 않는 공급자 {count}개",
-      "others": "{signedOut} · 그 밖에 {unavailable}",
+      "signedOut": "로그인하지 않았어요: {signedOut}",
+      "unavailable": "쓰지 않아요: {unavailable}",
+      "others": "로그인하지 않았어요: {signedOut}. 쓰지 않아요: {unavailable}",
       "privacy": "계정 정보는 저장하지 않아요."
     }
   }

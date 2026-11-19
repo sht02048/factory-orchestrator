@@ -27,7 +27,7 @@ import { USAGE_HIGH_PERCENT } from "@ganger/core";
 import { breakpoints, fonts, size, space } from "@ganger/ui/tokens.stylex";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { useTranslations } from "use-intl";
+import { useLocale, useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { usePrerequisiteName, useUsageNames } from "../labels";
 import { useRunnerCheckPolling } from "../settings/settings-screen";
@@ -531,12 +531,17 @@ function HighestUsage({ runner }: { runner: RunnerView }) {
   const provider = names.provider(usage.highest.provider);
   const window = names.window(usage.highest.window.kind);
   return (
-    <UsageMeter
-      name={t("name", { provider, window })}
-      percent={usage.highest.window.usedPercent}
-      label={t("barLabel", { runner: runner.name, provider, window })}
-      tone={usageTone(usage.highest.window)}
-    />
+    <span {...stylex.props(styles.highestUsage)}>
+      <span {...stylex.props(styles.highestQualifier)}>
+        <Text variant="meta">{t("highest")}</Text>
+      </span>
+      <UsageMeter
+        name={t("name", { provider, window })}
+        percent={usage.highest.window.usedPercent}
+        label={t("highestBarLabel", { runner: runner.name, provider, window })}
+        tone={usageTone(usage.highest.window)}
+      />
+    </span>
   );
 }
 
@@ -573,18 +578,13 @@ function ProviderUsageList({
   const using = usage.providers.filter((p) => p.status === "ok" || p.status === "error");
   const signedOut = usage.providers.filter((p) => p.status === "signed-out");
   const unavailable = usage.providers.filter((p) => p.status === "unavailable");
-  const signedOutText =
-    signedOut.length === 0
-      ? null
-      : t("signedOut", {
-          providers: signedOut.map((p) => names.provider(p.provider)).join(", "),
-        });
-  const unavailableText =
-    unavailable.length === 0 ? null : t("unavailable", { count: unavailable.length });
-  const others =
-    signedOutText !== null && unavailableText !== null
-      ? t("others", { signedOut: signedOutText, unavailable: unavailableText })
-      : (signedOutText ?? unavailableText);
+  const providerList = new Intl.ListFormat(useLocale(), { type: "conjunction", style: "short" });
+  const listOf = (providers: ProviderUsageView[]) =>
+    providerList.format(providers.map((p) => names.provider(p.provider)));
+  const others = otherProvidersText(t, {
+    signedOut: signedOut.length === 0 ? null : listOf(signedOut),
+    unavailable: unavailable.length === 0 ? null : listOf(unavailable),
+  });
   return (
     <>
       {using.map((provider) => (
@@ -662,6 +662,16 @@ function ProviderWindows({
   );
 }
 
+function otherProvidersText(
+  t: ReturnType<typeof useTranslations<"runners.panel.usage">>,
+  { signedOut, unavailable }: { signedOut: string | null; unavailable: string | null },
+): string | null {
+  if (signedOut !== null && unavailable !== null) return t("others", { signedOut, unavailable });
+  if (signedOut !== null) return t("signedOut", { signedOut });
+  if (unavailable !== null) return t("unavailable", { unavailable });
+  return null;
+}
+
 function isAtLimit(window: UsageWindowView, now: string): boolean {
   if (window.usedPercent < 100) return false;
   return window.resetsAt === null || Date.parse(window.resetsAt) > Date.parse(now);
@@ -711,6 +721,10 @@ const styles = stylex.create({
   rowHost: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 },
   slotsCell: { display: "flex", minWidth: 0 },
   usageCell: { minWidth: 0 },
+  highestUsage: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
+  highestQualifier: {
+    display: { default: "none", [breakpoints.runnerRowStacked]: "block" },
+  },
   panelHead: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   statusLine: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
   wrap: { minWidth: 0, overflowWrap: "anywhere" },

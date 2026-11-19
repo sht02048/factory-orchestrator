@@ -461,7 +461,8 @@ describe("공급자 사용량(0086)", () => {
     const a = rows.find((r) => r.name === "runner-a")?.html ?? "";
     expect(textOf(a)).toContain("Claude 5시간");
     expect(a).toContain('aria-valuetext="100%"');
-    expect(a).toContain('aria-label="runner-a Claude 5시간 사용량"');
+    expect(a).toContain('aria-label="runner-a 가장 높은 사용량: Claude 5시간"');
+    expect(textOf(a)).toContain(`${usage.highest} Claude 5시간 100%`);
     expect(a).toMatch(/data-tone="problem"[^>]*role="meter"[^>]*aria-valuetext="100%"/);
     const b = rows.find((r) => r.name === "runner-b")?.html ?? "";
     expect(textOf(b)).toContain(usage.unreadable);
@@ -490,7 +491,7 @@ describe("공급자 사용량(0086)", () => {
     expect(text).toContain("주간 72% Fable 주간 9%");
     expect(text).toContain("Fable 주간");
     expect(text).not.toContain("월간");
-    expect(text).toContain("Kimi, Cursor · 로그인하지 않았어요 · 그 밖에 쓰지 않는 공급자 1개");
+    expect(text).toContain("로그인하지 않았어요: Kimi 및 Cursor. 쓰지 않아요: Gemini");
     expect(html).not.toContain("<details");
     expect(text).toContain("newbie");
     expect(text).toContain(panel.usage.error);
@@ -605,6 +606,27 @@ describe("Runners 다시 그리기(0092)", () => {
       (m) => m[1],
     );
     expect(words).toEqual([panel.check.broken, panel.check.ok, panel.check.ok]);
+  });
+
+  it("로그인하지 않은 공급자만, 쓰지 않는 공급자만 있으면 그 문장 하나로 이름을 보인다", () => {
+    const only = (status: "signed-out" | "unavailable") => {
+      const { db } = seedDatabase();
+      recordProviderUsage(db, {
+        runnerId: toRunnerId("runner-a"),
+        readAt,
+        reading: {
+          kind: "read",
+          providers: [
+            { provider: "codex", status, windows: [] },
+            { provider: "gemini", status, windows: [] },
+          ],
+        },
+      });
+      return textOf(panelHtml(render(loadRunnersPage(db, now), "runner-a")));
+    };
+    expect(only("signed-out")).toContain("로그인하지 않았어요: Codex 및 Gemini 계정");
+    expect(only("unavailable")).toContain("쓰지 않아요: Codex 및 Gemini 계정");
+    expect(only("unavailable")).not.toContain("로그인하지 않았어요");
   });
 
   it("초기화 시각이 지난 100% 창은 한도라고 하지 않는다", () => {
