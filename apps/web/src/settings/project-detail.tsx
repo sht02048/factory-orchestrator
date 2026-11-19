@@ -17,7 +17,7 @@ import {
   linkStyles,
 } from "@ganger/ui";
 import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import type {
   BoundProject,
@@ -25,7 +25,14 @@ import type {
   SettingsPage,
   WorkspaceSettings,
 } from "@ganger/app/settings/model";
-import { AutoSaveStatusText, RevertedMessage, useAutoSave } from "./row-state";
+import type { UnsavedGuard } from "./navigation-guard";
+import {
+  AutoSaveStatusText,
+  EditorBlockedNotice,
+  EditorProvider,
+  RevertedMessage,
+  useAutoSave,
+} from "./row-state";
 import { AutoAssignLabelPicker } from "./label-picker";
 import { MappingEditor, ReloadFromTracker, autoAssignLabelOf } from "./mapping-editor";
 import {
@@ -45,6 +52,7 @@ export interface ProjectDetailScreenProps {
   actions: SettingsActions;
   onRemoved: () => void;
   renderLink?: RenderSettingsLink;
+  renderGuard?: (guard: UnsavedGuard) => ReactNode;
 }
 
 export function findBoundProject(
@@ -67,6 +75,7 @@ export function ProjectDetailScreen({
   actions,
   onRemoved,
   renderLink = plainSettingsLink(ws),
+  renderGuard,
 }: ProjectDetailScreenProps) {
   const t = useTranslations("settings.project");
   const ts = useTranslations("settings");
@@ -110,53 +119,61 @@ export function ProjectDetailScreen({
         />
       }
     >
-      <SettingsLayout>
-        <MappingEditor
-          ws={workspace.general.id}
-          bound={bound}
-          runnerProjects={page.runnerProjects}
-          agents={page.agents}
-          actions={actions}
-          autoAssignLabelId={autoAssignLabelOf(workspace, bound.connection.id)}
-          heading={<VisuallyHidden>{bound.project.name}</VisuallyHidden>}
-          renderSections={({ repos, agent }) => (
-            <>
-              <SettingsSection
-                id="repo"
-                title={t("repo")}
-                info={
-                  <InfoTip
-                    label={ts("infoLabel", { label: t("repo") })}
-                    content={`${tm("routeHint")} ${t("repoInfo")}`}
-                  />
-                }
-              >
-                <SettingsGroup padded>{repos}</SettingsGroup>
-              </SettingsSection>
-              <SettingsSection id="agent" title={tm("agent")}>
-                {agent}
-              </SettingsSection>
-            </>
-          )}
-        />
-        <SettingsSection id="assign" title={t("assign")}>
-          <SettingsGroup>
-            {label === null ? null : (
-              <LabelRow ws={workspace.general.id} label={label} actions={actions} />
-            )}
-            <StateRow ws={workspace.general.id} bound={bound} actions={actions} />
-          </SettingsGroup>
-        </SettingsSection>
-        <SettingsGroup>
-          <RemoveRow
+      <EditorProvider
+        blockedSelector="#repo"
+        {...(renderGuard === undefined ? {} : { renderGuard })}
+      >
+        <SettingsLayout>
+          <MappingEditor
             ws={workspace.general.id}
             bound={bound}
-            workspace={workspace}
+            runnerProjects={page.runnerProjects}
+            agents={page.agents}
             actions={actions}
-            onRemoved={onRemoved}
+            autoAssignLabelId={autoAssignLabelOf(workspace, bound.connection.id)}
+            heading={<VisuallyHidden>{bound.project.name}</VisuallyHidden>}
+            renderSections={({ repos, agent }) => (
+              <>
+                <SettingsSection
+                  id="repo"
+                  title={t("repo")}
+                  info={
+                    <InfoTip
+                      label={ts("infoLabel", { label: t("repo") })}
+                      content={`${tm("routeHint")} ${t("repoInfo")}`}
+                    />
+                  }
+                >
+                  <SettingsGroup padded>
+                    <EditorBlockedNotice />
+                    {repos}
+                  </SettingsGroup>
+                </SettingsSection>
+                <SettingsSection id="agent" title={tm("agent")}>
+                  {agent}
+                </SettingsSection>
+              </>
+            )}
           />
-        </SettingsGroup>
-      </SettingsLayout>
+          <SettingsSection id="assign" title={t("assign")}>
+            <SettingsGroup>
+              {label === null ? null : (
+                <LabelRow ws={workspace.general.id} label={label} actions={actions} />
+              )}
+              <StateRow ws={workspace.general.id} bound={bound} actions={actions} />
+            </SettingsGroup>
+          </SettingsSection>
+          <SettingsGroup>
+            <RemoveRow
+              ws={workspace.general.id}
+              bound={bound}
+              workspace={workspace}
+              actions={actions}
+              onRemoved={onRemoved}
+            />
+          </SettingsGroup>
+        </SettingsLayout>
+      </EditorProvider>
     </ScreenLayout>
   );
 }

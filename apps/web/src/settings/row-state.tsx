@@ -93,9 +93,11 @@ export function showBlockedEditor(selector: string): void {
 export function EditorProvider({
   children,
   renderGuard,
+  blockedSelector = "[data-editing]",
 }: {
   children: ReactNode;
   renderGuard?: (guard: UnsavedGuard) => ReactNode;
+  blockedSelector?: string;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
@@ -109,13 +111,13 @@ export function EditorProvider({
     (id: string) => {
       if (openId !== null && openId !== id && dirty.current.size > 0) {
         setBlocked(true);
-        showBlockedEditor("[data-editing]");
+        showBlockedEditor(blockedSelector);
         return;
       }
       setBlocked(false);
       setOpenId(id);
     },
-    [openId],
+    [openId, blockedSelector],
   );
   const closeAll = useCallback(() => {
     setBlocked(false);
@@ -130,10 +132,10 @@ export function EditorProvider({
       isDirty: () => dirty.current.size > 0,
       onBlocked: () => {
         setBlocked(true);
-        showBlockedEditor("[data-editing]");
+        showBlockedEditor(blockedSelector);
       },
     }),
-    [],
+    [blockedSelector],
   );
   return (
     <ReportUnsavedContext value={report}>

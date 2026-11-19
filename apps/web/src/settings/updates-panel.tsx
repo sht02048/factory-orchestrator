@@ -172,9 +172,7 @@ function Situation({ view, act }: { view: UpdateView; act: (action: UpdateAction
   if (check.kind === "ready") {
     return (
       <Actions>
-        <Button variant="primary" onClick={() => act("restart")}>
-          {t("restart")}
-        </Button>
+        <Button onClick={() => act("restart")}>{t("restart")}</Button>
         <TextLink href={check.notesUrl} external>
           {t("notes")}
         </TextLink>

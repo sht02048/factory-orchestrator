@@ -6,6 +6,7 @@ import { getSettingsPage, removeWorkspaceTrackerProject } from "../../server/set
 import { settingsMessages } from "../../settings/messages";
 import { ProjectDetailScreen, findBoundProject } from "../../settings/project-detail";
 import type { SettingsActions } from "../../settings/settings-screen";
+import { NavigationGuard } from "../../settings/navigation-guard";
 import { routerSettingsLink } from "../../settings/settings-link";
 import { useSettingsActions } from "../../settings/use-settings-actions";
 
@@ -60,10 +61,11 @@ function ProjectDetailRoute() {
         ws={ws}
         actions={actions}
         renderLink={routerSettingsLink}
+        renderGuard={(guard) => <NavigationGuard {...guard} />}
         onRemoved={() => {
           void router
             .invalidate({ filter: (match) => match.routeId === "/_app/settings" })
-            .then(() => navigate({ to: "/settings" }));
+            .then(() => navigate({ to: "/settings", ignoreBlocker: true }));
         }}
       />
     </ScreenMessages>

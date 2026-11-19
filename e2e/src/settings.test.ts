@@ -298,6 +298,25 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
       .toBe(0);
   });
 
+  it("프로젝트 상세에서 저장하지 못한 저장소 초안이 있으면 Settings 로 옮기지 않고 알린다", async () => {
+    await openSettings(page);
+    const projects = section(settings.sections.projects);
+    await projects.getByRole("button", { name: settings.projects.openLabel }).click();
+    await projects.getByRole("button", { name: settings.projects.add }).click();
+    await projects.getByRole("link", { name: /^API/ }).click();
+    await page.waitForURL(/\/settings\/projects\/conn-acme\/tp-api/);
+    await page
+      .getByRole("button", { name: fill(settings.mapping.addFirstLabel, { project: "API" }) })
+      .click();
+    await page.getByRole("menuitem", { name: "acme/api", exact: true }).click();
+    await page.getByRole("main").getByRole("link", { name: settings.project.breadcrumb }).click();
+    await page.getByRole("alert").getByText(settings.unsavedBlocked).waitFor();
+    expect(new URL(page.url()).pathname).toContain("/settings/projects/");
+    await page.getByRole("button", { name: settings.projects.remove }).click();
+    await page.getByRole("dialog").getByRole("button", { name: settings.projects.remove }).click();
+    await page.waitForURL((url) => url.pathname === "/settings");
+  });
+
   it("프로젝트 상세의 선택은 고르는 즉시 저장한다", async () => {
     await openSettings(page);
     await section(settings.sections.projects).getByRole("link", { name: /^Web/ }).click();
