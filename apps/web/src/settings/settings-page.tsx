@@ -125,7 +125,9 @@ export function SettingsScreen({
   const t = useTranslations("settings");
   const workspace = page.workspace;
   const problems = sectionProblems(page, runnerIssues);
-  const navItems: SectionNavItem[] = SETTINGS_SECTIONS.map((id) => ({
+  const navItems: SectionNavItem[] = SETTINGS_SECTIONS.filter(
+    (id) => workspace !== null || id !== "projects",
+  ).map((id) => ({
     id,
     label: t(`sections.${id}`),
     problem: problems.has(id),
@@ -145,12 +147,14 @@ export function SettingsScreen({
               <WorkspaceRows workspace={workspace} actions={actions} />
             )}
           </SettingsSection>
-          <ProjectsSection
-            page={page}
-            workspace={workspace}
-            actions={actions}
-            renderLink={renderLink}
-          />
+          {workspace === null ? null : (
+            <ProjectsSection
+              page={page}
+              workspace={workspace}
+              actions={actions}
+              renderLink={renderLink}
+            />
+          )}
           <ConnectionsSection
             page={page}
             runnerIssues={runnerIssues}
@@ -472,7 +476,7 @@ function ProjectsSection({
   renderLink,
 }: {
   page: SettingsPage;
-  workspace: WorkspaceSettings | null;
+  workspace: WorkspaceSettings;
   actions: SettingsActions;
   renderLink: RenderSettingsLink;
 }) {
@@ -486,15 +490,6 @@ function ProjectsSection({
     link.focus();
     setFocusKey(null);
   }, [focusKey, workspace]);
-  if (workspace === null) {
-    return (
-      <SettingsSection id="projects" title={t("sections.projects")}>
-        <SettingsGroup>
-          <SettingsRow label={t("projects.none")} disabled />
-        </SettingsGroup>
-      </SettingsSection>
-    );
-  }
   const hasConnections = workspace.trackerProjects.length > 0;
   return (
     <SettingsSection

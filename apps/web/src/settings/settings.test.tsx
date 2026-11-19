@@ -1226,6 +1226,8 @@ describe("Settings 화면", () => {
     expect(textOf(workspace)).toContain("아직 Workspace가 없어요");
     expect(workspace).toMatch(/href="\/onboarding\?step=4"[^>]*>Workspace 만들기</);
     expect(none).not.toContain('name="maxRunMinutes"');
+    expect(none).not.toContain('<section id="projects"');
+    expect(none).not.toContain('href="#projects"');
     expect(textOf(sectionOf(render(page), "workspace"))).toContain("전체 보기에서는");
     expect(sectionOf(render(page), "workspace")).not.toContain("Workspace 만들기");
   });
