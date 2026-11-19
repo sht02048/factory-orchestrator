@@ -317,7 +317,9 @@ function Figures({
         value={total.runs}
         {...(total.outcomes.canceled === 0
           ? {}
-          : { detail: t("figures.canceled", { count: total.outcomes.canceled }) })}
+          : {
+              detail: t("figures.canceled", { count: total.outcomes.canceled, rated: total.rated }),
+            })}
       />
     </section>
   );

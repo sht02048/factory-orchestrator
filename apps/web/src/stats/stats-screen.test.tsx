@@ -279,7 +279,7 @@ describe("Stats 화면(0072)", () => {
       const html = render(page());
       expect(html).toMatch(/<h1[^>]*>끝난 런 11개 중 18%를 에이전트가 병합까지 끝냈어요<\/h1>/);
       expect(html).not.toContain("Canceled를 뺀");
-      expect(tiles(html)[3]).toBe("끝난 런 13 Canceled 2개는 비율에서 빼요");
+      expect(tiles(html)[3]).toBe("끝난 런 13 Canceled 2개를 빼고 11개로 비율을 내요");
       expect(html).toContain('title="11월 17일: Merged 1 · Human Check 0 · Failed 2 · Canceled 2"');
     });
 

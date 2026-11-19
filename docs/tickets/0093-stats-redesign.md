@@ -1,5 +1,5 @@
 ---
-status: doing
+status: done
 blocked_by: []
 ---
 
@@ -16,7 +16,7 @@ Stats를 한눈에 읽히게 다시 짠다. 운영자 평은 "Stats도 완전 �
 ## 범위
 
 - **본문 폭.** 본문은 최대 1100px(`size.statsPageWidth`)이고 왼쪽에 붙는다.
-- **머리.** 작은 줄 "Stats · Workspace · 기간 날짜", 큰 문장 "끝난 런 N개 중 X%를 에이전트가 병합까지 끝냈어요", 오른쪽 기간 7·14·30일. N은 Canceled를 뺀 수이고, Canceled를 뺐다는 설명은 끝난 런 카드("Canceled 4개는 비율에서 빼요")가 맡는다.
+- **머리.** 작은 줄 "Stats · Workspace · 기간 날짜", 큰 문장 "끝난 런 N개 중 X%를 에이전트가 병합까지 끝냈어요", 오른쪽 기간 7·14·30일. N은 Canceled를 뺀 수이고, Canceled를 뺐다는 설명은 끝난 런 카드가 맡고, 머리 문장의 수와 카드의 수를 잇는다("Canceled 4개를 빼고 32개로 비율을 내요").
 - **숫자 카드 넷.** 넓으면 가로 넷, 중간 폭(본문 880px 이하, `breakpoints.statTilesTwoColumns`)은 2×2, 본문 480px 이하(`breakpoints.statTilesStacked`, 704에서 고침)에서만 한 줄에 하나.
 - **차트와 실패 이유를 나란히.** 날짜별 끝난 런과 "왜 실패했나요"를 각각 카드 면에 1.4:1로 둔다. 본문 880px 이하(`breakpoints.statsChartsStacked`)에서는 위아래로 쌓는다.
   - 차트 높이를 160px에서 128px로 줄였다. 범례는 카드 머리 오른쪽, "표로 보기"는 그대로다.

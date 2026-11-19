@@ -163,7 +163,7 @@ describe("Stats 날짜별 처리량(브라우저, 0053)", () => {
 
     await table.waitFor({ state: "attached" });
     expect(await table.getByRole("rowheader").count()).toBe(14);
-    const box = table.locator("..");
+    const box = table.locator("xpath=ancestor::div[3]");
     expect((await box.boundingBox())?.height ?? 0).toBeLessThanOrEqual(1);
 
     await focusByTab(page, stats.throughput.showTable);
@@ -227,11 +227,15 @@ describe("Stats 배치(브라우저, 0093)", () => {
     await page.goto(`/stats?ws=${workspaceId}`);
     await hydrated(page);
     const tiles = await page
-      .getByRole("region", { name: stats.figures.label })
+      .getByRole("region", { name: stats.figures.label, exact: true })
       .getByRole("group")
       .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top));
-    const chart = await page.getByRole("region", { name: stats.throughput.title }).boundingBox();
-    const failures = await page.getByRole("region", { name: stats.failures.title }).boundingBox();
+    const chart = await page
+      .getByRole("region", { name: stats.throughput.title, exact: true })
+      .boundingBox();
+    const failures = await page
+      .getByRole("region", { name: stats.failures.title, exact: true })
+      .boundingBox();
     const frame = await page.getByRole("heading", { level: 1 }).evaluate((h1) => {
       const header = h1.closest("header");
       return header?.parentElement?.getBoundingClientRect().width ?? 0;
@@ -264,28 +268,69 @@ describe("Stats 배치(브라우저, 0093)", () => {
     expect((await layout(context, 400)).tileRows).toBe(4);
   });
 
-  it("나눠 보기 표가 본문보다 넓어지면 표만 옆으로 밀리고 그렇다고 알려 준다", async (context) => {
-    for (const [width, scrolls] of [
-      [1280, false],
-      [400, true],
-    ] as const) {
-      const page = await openPage(context, width);
-      await page.goto(`/stats?ws=${workspaceId}`);
-      await hydrated(page);
-      const region = page.getByRole("region", { name: "러너별 끝난 런, 병합률, 리드 타임" });
-      const [scrollWidth, clientWidth] = await region.evaluate((el) => [
-        el.scrollWidth,
-        el.clientWidth,
-      ]);
-      expect(scrollWidth > clientWidth).toBe(scrolls);
-      expect(await page.getByText(stats.scrollHint).isVisible()).toBe(scrolls);
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        ),
-      ).toBe(0);
-      await page.context().close();
-    }
+  async function breakdownScroll(context: TestContext, width: number) {
+    const page = await openPage(context, width);
+    await page.goto(`/stats?ws=${workspaceId}`);
+    await hydrated(page);
+    const region = page.getByRole("region", {
+      name: "러너별 끝난 런, 병합률, 리드 타임",
+      exact: true,
+    });
+    const result = {
+      hint: await page.getByText(stats.scrollHint).isVisible(),
+      pageOverflow: await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+      region,
+      page,
+    };
+    return result;
+  }
+
+  it("나눠 보기 표가 본문에 들어가면 스크롤 영역도 안내도 없다", async (context) => {
+    const wide = await breakdownScroll(context, 1280);
+    await expect.poll(() => wide.region.count()).toBe(0);
+    expect([wide.hint, wide.pageOverflow]).toEqual([false, 0]);
+    await wide.page.context().close();
+  });
+
+  it("나눠 보기 표가 본문보다 넓으면 표만 옆으로 넘어가고 키보드로 닿는 영역과 안내가 생긴다", async (context) => {
+    const narrow = await breakdownScroll(context, 400);
+    await expect.poll(() => narrow.region.count()).toBe(1);
+    expect([narrow.hint, narrow.pageOverflow]).toEqual([true, 0]);
+    expect(await narrow.region.getAttribute("tabindex")).toBe("0");
+    const [scrollWidth, clientWidth] = await narrow.region.evaluate((el) => [
+      el.scrollWidth,
+      el.clientWidth,
+    ]);
+    expect(scrollWidth).toBeGreaterThan(clientWidth);
+    await narrow.page.context().close();
+  });
+});
+
+describe("Stats 날짜별 표(브라우저, 0093)", () => {
+  it("좁은 폭에서 '표로 보기'로 펼친 표는 표만 옆으로 넘어가고 페이지는 넘치지 않는다", async (context) => {
+    const page = await openPage(context, 400);
+    await page.goto(`/stats?ws=${workspaceId}`);
+    await hydrated(page);
+    await page.getByRole("button", { name: stats.throughput.showTable }).click();
+    await page.getByRole("region", { name: stats.throughput.tableCaption, exact: true }).waitFor();
+    const scroller = await page.evaluate(() => {
+      const h1 = document.querySelector("h1");
+      let el: Element | null = h1;
+      while (
+        el !== null &&
+        !(el.scrollHeight > el.clientHeight && getComputedStyle(el).overflow === "auto")
+      )
+        el = el.parentElement;
+      return el === null ? 0 : el.scrollWidth - el.clientWidth;
+    });
+    expect(scroller).toBe(0);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ),
+    ).toBe(0);
   });
 });
 

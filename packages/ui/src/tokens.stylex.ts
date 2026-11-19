@@ -179,11 +179,11 @@ export const breakpoints = stylex.defineConsts({
   stepsStacked: "@media (max-width: 900px)",
   detailStacked: "@media (max-width: 960px)",
   dashboardOneColumn: "@container (max-width: 719px)",
-  statTilesTwoColumns: "@container (min-width: 481px) and (max-width: 880px)",
+  statTilesTwoColumns: "@container (480px < width <= 880px)",
   statTilesStacked: "@container (max-width: 480px)",
   statsChartsStacked: "@container (max-width: 880px)",
   chartLabelsSparse: "@container (max-width: 400px)",
   failureBarsBelow: "@container (max-width: 400px)",
-  statsLegendBelow: "@container (max-width: 480px)",
+  statsLegendBelow: "@container (max-width: 520px)",
   statsBreakdownScrolls: "@container (max-width: 359px)",
 });

@@ -17,6 +17,7 @@ import { space } from "@ganger/ui/tokens.stylex";
 import { useId, useState } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
+import { HorizontalScroll } from "./horizontal-scroll";
 import type { DailyThroughput, OutcomeCounts } from "@ganger/app/stats/model";
 
 const GRID_LINES = 4;
@@ -101,26 +102,28 @@ export function ThroughputChart({
         </Button>
       </div>
       <div {...stylex.props(styles.table, !showTable && visuallyHiddenStyles.hidden)}>
-        <DataTable id={tableId} caption={t("tableCaption")} density="compact">
-          <DataTableHead>
-            <DataTableHeader>{t("columns.day")}</DataTableHeader>
-            <DataTableHeader align="end">{t("columns.merged")}</DataTableHeader>
-            <DataTableHeader align="end">{t("columns.check")}</DataTableHeader>
-            <DataTableHeader align="end">{t("columns.failed")}</DataTableHeader>
-            <DataTableHeader align="end">{t("columns.canceled")}</DataTableHeader>
-          </DataTableHead>
-          <DataTableBody>
-            {daily.map((d) => (
-              <DataTableRow key={d.day}>
-                <DataTableRowHeader>{dayLabel(d.day).long}</DataTableRowHeader>
-                <DataTableCell align="end">{d.outcomes.merged}</DataTableCell>
-                <DataTableCell align="end">{d.outcomes["human-check"]}</DataTableCell>
-                <DataTableCell align="end">{d.outcomes.failed}</DataTableCell>
-                <DataTableCell align="end">{d.outcomes.canceled}</DataTableCell>
-              </DataTableRow>
-            ))}
-          </DataTableBody>
-        </DataTable>
+        <HorizontalScroll label={t("tableCaption")} shown={showTable}>
+          <DataTable id={tableId} caption={t("tableCaption")} density="compact">
+            <DataTableHead>
+              <DataTableHeader>{t("columns.day")}</DataTableHeader>
+              <DataTableHeader align="end">{t("columns.merged")}</DataTableHeader>
+              <DataTableHeader align="end">{t("columns.check")}</DataTableHeader>
+              <DataTableHeader align="end">{t("columns.failed")}</DataTableHeader>
+              <DataTableHeader align="end">{t("columns.canceled")}</DataTableHeader>
+            </DataTableHead>
+            <DataTableBody>
+              {daily.map((d) => (
+                <DataTableRow key={d.day}>
+                  <DataTableRowHeader>{dayLabel(d.day).long}</DataTableRowHeader>
+                  <DataTableCell align="end">{d.outcomes.merged}</DataTableCell>
+                  <DataTableCell align="end">{d.outcomes["human-check"]}</DataTableCell>
+                  <DataTableCell align="end">{d.outcomes.failed}</DataTableCell>
+                  <DataTableCell align="end">{d.outcomes.canceled}</DataTableCell>
+                </DataTableRow>
+              ))}
+            </DataTableBody>
+          </DataTable>
+        </HorizontalScroll>
       </div>
     </div>
   );
