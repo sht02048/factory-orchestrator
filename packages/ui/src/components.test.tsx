@@ -188,17 +188,25 @@ describe("서버 렌더", () => {
         foldedColumns: { first: "a b", second: "a" },
         narrowColumns: "z",
       }),
-    ).toEqual({ wide: "a b c", first: "a b", second: "a", narrow: "z" });
+    ).toEqual({ wide: "a b c", first: "a b", second: "a", third: null, narrow: "z" });
+    expect(
+      tableColumnTemplates({
+        columns: "a b c",
+        foldedColumns: { first: "a b", second: "a", third: "y" },
+      }),
+    ).toEqual({ wide: "a b c", first: "a b", second: "a", third: "y", narrow: "y" });
     expect(tableColumnTemplates({ columns: "a b c", foldedColumns: { first: "a b" } })).toEqual({
       wide: "a b c",
       first: "a b",
       second: "a b",
+      third: null,
       narrow: "a b",
     });
     expect(tableColumnTemplates({ columns: "a b" })).toEqual({
       wide: "a b",
       first: "a b",
       second: "a b",
+      third: null,
       narrow: "a b",
     });
   });

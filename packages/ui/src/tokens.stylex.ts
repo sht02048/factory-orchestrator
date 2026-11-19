@@ -201,5 +201,7 @@ export const breakpoints = stylex.defineConsts({
   tableFoldSecondRange: "@container (560px <= width < 820px)",
   tableFoldedFirst: "@container (width < 1000px)",
   tableFoldedSecond: "@container (width < 820px)",
+  tableFoldThirdRange: "@container (440px <= width < 560px)",
+  tableStackedBelowThird: "@container (width < 440px)",
   rowSlotsFit: "@container (max-width: 399px)",
 });

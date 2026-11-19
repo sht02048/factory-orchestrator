@@ -77,6 +77,7 @@ const foldedColumns = {
   second: [size.ticketKeyColumn, flexibleTitleColumn, size.runStatusColumn, size.timeColumn].join(
     " ",
   ),
+  third: [flexibleTitleColumn, size.runStatusColumn, size.timeColumn].join(" "),
 };
 const narrowColumns = "minmax(0, 1fr)";
 

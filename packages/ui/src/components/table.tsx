@@ -22,13 +22,24 @@ const gridColumns = stylex.create({
       [breakpoints.tableStacked]: narrow,
     },
   }),
+  withThird: (wide: string, first: string, second: string, third: string, narrow: string) => ({
+    gridTemplateColumns: {
+      default: wide,
+      [breakpoints.tableFoldFirstRange]: first,
+      [breakpoints.tableFoldSecondRange]: second,
+      [breakpoints.tableFoldThirdRange]: third,
+      [breakpoints.tableStackedBelowThird]: narrow,
+    },
+  }),
 });
 
 const single = "minmax(0, 1fr)";
 
-const ColumnsContext = createContext({
+type HeadHiding = "none" | "stacked" | "belowThird";
+
+const ColumnsContext = createContext<{ columns: stylex.StyleXStyles; headHiding: HeadHiding }>({
   columns: gridColumns.of(single, single, single, single),
-  stacks: false,
+  headHiding: "none",
 });
 
 export type TableFold = "first" | "second" | "stacked";
@@ -36,6 +47,7 @@ export type TableFold = "first" | "second" | "stacked";
 export interface TableFoldedColumns {
   first: string;
   second?: string;
+  third?: string;
 }
 
 export interface TableProps {
@@ -49,10 +61,17 @@ export function tableColumnTemplates({
   columns,
   narrowColumns,
   foldedColumns,
-}: Omit<TableProps, "children">): { wide: string; first: string; second: string; narrow: string } {
+}: Omit<TableProps, "children">): {
+  wide: string;
+  first: string;
+  second: string;
+  third: string | null;
+  narrow: string;
+} {
   const first = foldedColumns?.first ?? columns;
   const second = foldedColumns?.second ?? first;
-  return { wide: columns, first, second, narrow: narrowColumns ?? second };
+  const third = foldedColumns?.third ?? null;
+  return { wide: columns, first, second, third, narrow: narrowColumns ?? third ?? second };
 }
 
 export function Table({ columns, narrowColumns, foldedColumns, children }: TableProps) {
@@ -64,13 +83,22 @@ export function Table({ columns, narrowColumns, foldedColumns, children }: Table
   return (
     <ColumnsContext
       value={{
-        columns: gridColumns.of(
-          templates.wide,
-          templates.first,
-          templates.second,
-          templates.narrow,
-        ),
-        stacks: narrowColumns !== undefined,
+        columns:
+          templates.third === null
+            ? gridColumns.of(templates.wide, templates.first, templates.second, templates.narrow)
+            : gridColumns.withThird(
+                templates.wide,
+                templates.first,
+                templates.second,
+                templates.third,
+                templates.narrow,
+              ),
+        headHiding:
+          narrowColumns === undefined
+            ? "none"
+            : templates.third === null
+              ? "stacked"
+              : "belowThird",
       }}
     >
       <div {...stylex.props(styles.table)}>{children}</div>
@@ -79,11 +107,17 @@ export function Table({ columns, narrowColumns, foldedColumns, children }: Table
 }
 
 export function TableHead({ children }: { children: ReactNode }) {
-  const { columns, stacks } = use(ColumnsContext);
+  const { columns, headHiding } = use(ColumnsContext);
   return (
     <div
       aria-hidden="true"
-      {...stylex.props(styles.grid, columns, styles.head, stacks && styles.headStacked)}
+      {...stylex.props(
+        styles.grid,
+        columns,
+        styles.head,
+        headHiding === "stacked" && styles.headStacked,
+        headHiding === "belowThird" && styles.headStackedBelowThird,
+      )}
     >
       {children}
     </div>
@@ -248,6 +282,9 @@ const styles = stylex.create({
     paddingInline: space.s3,
   },
   headStacked: { display: { default: "grid", [breakpoints.tableStacked]: "none" } },
+  headStackedBelowThird: {
+    display: { default: "grid", [breakpoints.tableStackedBelowThird]: "none" },
+  },
   head: {
     height: 30,
     color: colors.textTertiary,

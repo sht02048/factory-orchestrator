@@ -190,7 +190,11 @@ describe("Runs 화면(브라우저, 0056)", () => {
     const middle = await layoutAt(1280);
     expect(middle).toMatchObject({ overflow: 0, result: false, runner: false, secondLine: true });
 
-    for (const width of [900, 400]) {
+    const laptop = await layoutAt(1100);
+    expect(laptop).toMatchObject({ overflow: 0, secondLine: true });
+    expect(laptop.rowHeight).toBeLessThan(middle.rowHeight + 8);
+
+    for (const width of [900, 400, 320]) {
       const narrow = await layoutAt(width);
       expect(narrow).toMatchObject({ overflow: 0, result: false, runner: false, secondLine: true });
     }
