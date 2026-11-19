@@ -41,6 +41,7 @@ describe("창 제목 표시줄(0113)", () => {
     expect(x + TRAFFIC_LIGHTS.width).toBeLessThanOrEqual(windowFrame.railWidth);
     expect(x).toBe(windowFrame.railWidth - TRAFFIC_LIGHTS.width - x);
     expect(y + TRAFFIC_LIGHTS.height / 2).toBe(windowFrame.titleBarHeight / 2);
+    expect({ x, y }).toEqual({ x: 15, y: 20 });
   });
 
   it("서버 화면에는 제목 표시줄을 숨겼다는 쿠키를 그 서버 주소에 심는다", () => {

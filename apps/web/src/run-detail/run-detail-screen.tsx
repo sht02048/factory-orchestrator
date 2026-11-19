@@ -102,42 +102,35 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
             run.trackerProject,
             ...(run.branch === null ? [] : [run.branch]),
           ].join(t("metaSeparator"))}
-          {...(pr === null && !cancelable
-            ? {}
-            : {
-                actions: (
-                  <>
-                    {pr === null ? null : (
-                      <a
-                        href={pr.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        {...stylex.props(linkStyles())}
-                      >
-                        {t("openPr", { pr: pr.displayId })}
-                      </a>
-                    )}
-                    {cancelable ? (
-                      <CancelRun
-                        onCancel={props.onCancel}
-                        focusAfter={() => focusFirst(cancelStatusRef, headRef)}
-                      />
-                    ) : null}
-                  </>
-                ),
-              })}
         />
       }
     >
       <div {...stylex.props(styles.main)}>
         <div ref={headRef} tabIndex={-1} {...stylex.props(styles.head, focusStyles.target)}>
-          <p {...stylex.props(styles.stateLine)}>
-            <StatusPill status={status}>{statusName(status)}</StatusPill>
-            <Text variant="meta">{when}</Text>
-            <Text variant="meta" ref={cancelStatusRef} role="status" tabIndex={-1}>
-              {run.cancelPending ? t("cancelPending") : null}
-            </Text>
-          </p>
+          <div {...stylex.props(styles.stateRow)}>
+            <p {...stylex.props(styles.stateLine)}>
+              <StatusPill status={status}>{statusName(status)}</StatusPill>
+              <Text variant="meta">{when}</Text>
+              <Text variant="meta" ref={cancelStatusRef} role="status" tabIndex={-1}>
+                {run.cancelPending ? t("cancelPending") : null}
+              </Text>
+            </p>
+            {pr === null && !cancelable ? null : (
+              <Actions>
+                {pr === null ? null : (
+                  <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
+                    {t("openPr", { pr: pr.displayId })}
+                  </a>
+                )}
+                {cancelable ? (
+                  <CancelRun
+                    onCancel={props.onCancel}
+                    focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+                  />
+                ) : null}
+              </Actions>
+            )}
+          </div>
           <Text variant="body">
             <Reason run={run} />
           </Text>
@@ -862,6 +855,13 @@ const styles = stylex.create({
     minHeight: size.control,
   },
   head: { display: "flex", flexDirection: "column", gap: space.s2 },
+  stateRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.s3,
+  },
   stateLine: { display: "flex", alignItems: "center", gap: space.s3, margin: 0 },
   columns: {
     display: "grid",

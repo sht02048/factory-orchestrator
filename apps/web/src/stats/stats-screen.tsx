@@ -130,24 +130,7 @@ function StatsView({
   return (
     <ScreenLayout
       header={
-        <PageHeader
-          title={t("title")}
-          subtitle={<Headline total={page.total} days={days} />}
-          actions={
-            <SegmentedTabs<`${StatsPeriodDays}`>
-              value={`${days}`}
-              onValueChange={(next) => {
-                const picked = STATS_PERIOD_DAYS.find((d) => `${d}` === next);
-                if (picked !== undefined) onPeriodChange(picked);
-              }}
-              label={t("period.label")}
-              items={STATS_PERIOD_DAYS.map((d) => ({
-                value: `${d}` as const,
-                label: t("period.option", { days: d }),
-              }))}
-            />
-          }
-        />
+        <PageHeader title={t("title")} subtitle={<Headline total={page.total} days={days} />} />
       }
     >
       <div {...stylex.props(styles.page)}>
@@ -160,6 +143,18 @@ function StatsView({
                 to: dayLabel(page.period.lastDay).long,
               })}
             </Text>
+            <SegmentedTabs<`${StatsPeriodDays}`>
+              value={`${days}`}
+              onValueChange={(next) => {
+                const picked = STATS_PERIOD_DAYS.find((d) => `${d}` === next);
+                if (picked !== undefined) onPeriodChange(picked);
+              }}
+              label={t("period.label")}
+              items={STATS_PERIOD_DAYS.map((d) => ({
+                value: `${d}` as const,
+                label: t("period.option", { days: d }),
+              }))}
+            />
           </div>
           <Figures total={page.total} previous={page.previous} days={days} />
           <div {...stylex.props(styles.charts)}>
@@ -440,7 +435,14 @@ const styles = stylex.create({
     paddingBottom: space.s10,
   },
   frame: { containerType: "inline-size", maxWidth: size.statsPageWidth },
-  period: { marginBottom: space.s4 },
+  period: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.s3,
+    marginBottom: space.s4,
+  },
   figures: {
     display: "grid",
     gridTemplateColumns: {

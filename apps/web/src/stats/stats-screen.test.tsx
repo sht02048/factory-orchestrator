@@ -80,7 +80,6 @@ describe("Stats 화면(0072)", () => {
     const header = between(html, "<header", "</header>");
     expect(header).toMatch(/<h1[^>]*>Stats<\/h1>/);
     expect(text(header)).toContain("끝난 런 9개 중 22%를 에이전트가 병합까지 끝냈어요.");
-    expect(header).toContain('aria-label="기간"');
     expect(text(html)).toContain("Acme Commerce · 11월 4일–11월 17일");
     expect(text(html)).not.toContain("Stats · Acme Commerce");
   });

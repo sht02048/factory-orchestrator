@@ -121,8 +121,9 @@ describe("Stats 기간(브라우저, 0072)", () => {
     const table = page.getByRole("table", { name: stats.throughput.tableCaption });
     expect(await ended.textContent()).toContain("2");
     expect(await table.getByRole("rowheader").count()).toBe(14);
-    expect(await page.getByRole("heading", { level: 1 }).textContent()).toBe(
-      "끝난 런 2개 중 50%를 에이전트가 병합까지 끝냈어요",
+    expect(await page.getByRole("heading", { level: 1 }).textContent()).toBe(stats.title);
+    expect(await page.locator("main header").textContent()).toContain(
+      "끝난 런 2개 중 50%를 에이전트가 병합까지 끝냈어요.",
     );
 
     const periods = page.getByRole("tablist", { name: stats.period.label });
@@ -130,10 +131,8 @@ describe("Stats 기간(브라우저, 0072)", () => {
 
     await page.waitForURL(/days=7/);
     await page
-      .getByRole("heading", {
-        level: 1,
-        name: "끝난 런 1개 중 100%를 에이전트가 병합까지 끝냈어요",
-      })
+      .locator("main header")
+      .getByText("끝난 런 1개 중 100%를 에이전트가 병합까지 끝냈어요.", { exact: true })
       .waitFor();
     expect(await ended.textContent()).toBe(`${stats.figures.ended}1`);
     expect(await mergedRate.textContent()).toContain("앞 7일보다 100%p 올랐어요");
@@ -236,10 +235,11 @@ describe("Stats 배치(브라우저, 0093)", () => {
     const failures = await page
       .getByRole("region", { name: stats.failures.title, exact: true })
       .boundingBox();
-    const frame = await page.getByRole("heading", { level: 1 }).evaluate((h1) => {
-      const header = h1.closest("header");
-      return header?.parentElement?.getBoundingClientRect().width ?? 0;
-    });
+    const frame = await page
+      .getByRole("tablist", { name: stats.period.label })
+      .evaluate(
+        (periods) => periods.parentElement?.parentElement?.getBoundingClientRect().width ?? 0,
+      );
     await page.context().close();
     return {
       tileRows: new Set(tiles.map((top) => Math.round(top))).size,
@@ -316,8 +316,7 @@ describe("Stats 날짜별 표(브라우저, 0093)", () => {
     await page.getByRole("button", { name: stats.throughput.showTable }).click();
     await page.getByRole("region", { name: stats.throughput.tableCaption, exact: true }).waitFor();
     const scroller = await page.evaluate(() => {
-      const h1 = document.querySelector("h1");
-      let el: Element | null = h1;
+      let el: Element | null = document.querySelector('[role="tablist"]');
       while (
         el !== null &&
         !(el.scrollHeight > el.clientHeight && getComputedStyle(el).overflow === "auto")

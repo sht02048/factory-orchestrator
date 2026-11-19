@@ -28,7 +28,7 @@ export function SplitView({ list, panel, fill = true, variant = "list" }: SplitV
   return (
     <div {...stylex.props(styles.frame, fill ? styles.fill : styles.contained)}>
       <div {...stylex.props(styles.split, editor && styles.splitEditor)}>
-        <div {...stylex.props(styles.list, editor && styles.listEditor)}>{list}</div>
+        <div {...stylex.props(styles.list)}>{list}</div>
         <aside {...stylex.props(styles.panel, editor && styles.panelEditor)}>{panel}</aside>
       </div>
     </div>
@@ -211,7 +211,6 @@ const styles = stylex.create({
     paddingInline: space.s8,
     paddingBottom: space.s10,
   },
-  listEditor: { paddingInline: space.s6 },
   panelEditor: { backgroundColor: colors.bgCanvas },
   panel: {
     minWidth: 0,

@@ -2,7 +2,7 @@ import type { BrowserWindowConstructorOptions, CookiesSetDetails, WebPreferences
 import { HIDDEN_TITLE_BAR, TITLE_BAR_COOKIE } from "@ganger/app/shell/window-chrome";
 import { windowFrame } from "@ganger/ui/window-frame";
 
-export const TRAFFIC_LIGHTS = { width: 52, height: 12 } as const;
+export const TRAFFIC_LIGHTS = { width: 54, height: 16 } as const;
 
 export function trafficLightPosition(): { x: number; y: number } {
   return {
