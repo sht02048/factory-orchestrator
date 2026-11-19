@@ -487,6 +487,8 @@
       "time": "12분째",
       "action": "답하기",
       "plainTitle": "ACME-10 결제 실패 재시도",
+      "menuLabel": "ACME-10 런 메뉴",
+      "pause": "멈추기",
       "subheading": "처리할 일 없이 끝났어요"
     },
     "sheet": {

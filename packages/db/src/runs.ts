@@ -15,6 +15,7 @@ import type {
   CommentId,
   InvalidRunTransition,
   NotStartedAgentResult,
+  PauseSource,
   PrState,
   PullRequestId,
   Run,
@@ -72,6 +73,9 @@ export interface RunRecords {
   trackerStateSetAt: Date | null;
   trackerComment: { id: CommentId; at: Date } | null;
   unreachableSince: Date | null;
+  pausedSince: Date | null;
+  pausedMs: number;
+  pauseSource: PauseSource | null;
   lastLog: string[] | null;
 }
 
@@ -184,6 +188,9 @@ function toRunRecords(row: RunRow): RunRecords {
         ? null
         : { id: row.trackerCommentId, at: row.trackerCommentedAt },
     unreachableSince: row.unreachableSince,
+    pausedSince: row.pausedSince,
+    pausedMs: row.pausedMs,
+    pauseSource: row.pauseSource,
     lastLog: row.lastLog,
   };
 }
@@ -416,7 +423,12 @@ export function fillRunTicketTitle(db: Database, id: RunId, title: string): void
 }
 
 export type RunStateChange =
-  | { to: "running"; started?: { worktree: WorktreeRef; branch: string; agentRef: AgentRef } }
+  | {
+      to: "running";
+      started?: { worktree: WorktreeRef; branch: string; agentRef: AgentRef };
+      resumedAgentRef?: AgentRef;
+    }
+  | { to: "paused"; source?: PauseSource }
   | { to: "waiting-for-input" | "disconnected" }
   | {
       to: "ended";
@@ -451,6 +463,10 @@ export function changeRunState(
     if (!transition.ok) return { ok: false, error: transition.error };
 
     const where = and(eq(runs.id, runId), eq(runs.state, current.state));
+    const pauseClock = {
+      ...pauseClockAfter(db, runId, change.to, now),
+      ...pauseSourceAfter(db, runId, change),
+    };
     if (change.to === "ended") {
       const notStarted = current.state === "queued";
       const runnerUnreached = change.runnerUnreached ?? false;
@@ -467,6 +483,7 @@ export function changeRunState(
           prState: change.prState,
           runnerUnreached,
           reportBody: change.reportBody ?? null,
+          ...pauseClock,
         })
         .where(where)
         .run();
@@ -481,7 +498,14 @@ export function changeRunState(
         .where(where)
         .run();
     } else {
-      db.update(runs).set({ state: change.to }).where(where).run();
+      const agentRef =
+        change.to === "running" && (current.state === "paused" || current.state === "disconnected")
+          ? change.resumedAgentRef
+          : undefined;
+      db.update(runs)
+        .set({ state: change.to, ...pauseClock, ...(agentRef === undefined ? {} : { agentRef }) })
+        .where(where)
+        .run();
     }
     recordStateChange(db, runId, current.state, change.to, now);
 
@@ -489,6 +513,53 @@ export function changeRunState(
     if (run === null) throw new RunRowError(runId, "missing right after update");
     return { ok: true, run };
   });
+}
+
+function pauseClockAfter(
+  db: Database,
+  runId: RunId,
+  to: RunState,
+  now: Date,
+): { pausedSince: Date | null; pausedMs?: number } {
+  const row = db
+    .select({ pausedSince: runs.pausedSince, pausedMs: runs.pausedMs })
+    .from(runs)
+    .where(eq(runs.id, runId))
+    .get();
+  const since = row?.pausedSince ?? null;
+  if (to === "paused") return { pausedSince: since ?? now };
+  if (to === "disconnected") return { pausedSince: since };
+  const counted =
+    since === null
+      ? {}
+      : { pausedMs: (row?.pausedMs ?? 0) + Math.max(0, now.getTime() - since.getTime()) };
+  return { pausedSince: null, ...counted };
+}
+
+function pauseSourceAfter(
+  db: Database,
+  runId: RunId,
+  change: RunStateChange,
+): { pauseSource: PauseSource | null } | Record<string, never> {
+  if (change.to === "disconnected") return {};
+  if (change.to !== "paused") return { pauseSource: null };
+  const kept = db
+    .select({ pauseSource: runs.pauseSource })
+    .from(runs)
+    .where(eq(runs.id, runId))
+    .get()?.pauseSource;
+  return { pauseSource: change.source ?? kept ?? "operator" };
+}
+
+export function lastStateBeforeDisconnect(db: Database, runId: RunId): RunState | null {
+  const change = db
+    .select({ from: runStateChanges.fromState })
+    .from(runStateChanges)
+    .where(and(eq(runStateChanges.runId, runId), eq(runStateChanges.toState, "disconnected")))
+    .orderBy(desc(runStateChanges.id))
+    .limit(1)
+    .get();
+  return change?.from ?? null;
 }
 
 export function recordStartRequested(db: Database, runId: RunId, now: Date = new Date()): boolean {

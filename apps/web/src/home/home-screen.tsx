@@ -16,10 +16,11 @@ import {
   StatusDot,
   Text,
   TextLink,
+  showToast,
 } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
 import { USAGE_HIGH_PERCENT } from "@ganger/core";
-import type { RunId } from "@ganger/core";
+import type { RunControl, RunId } from "@ganger/core";
 import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
@@ -27,6 +28,7 @@ import { useTime } from "../format/time";
 import { useUsageNames } from "../labels";
 import { useStatusName } from "../status";
 import type { DashboardRunner, HomePage, HomeRun } from "@ganger/app/home/model";
+import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import {
   dashboardBoard,
   freeCapacity,
@@ -55,6 +57,11 @@ export interface DenyInput {
   reason: string;
 }
 
+export interface ControlInput {
+  runId: string;
+  control: RunControl;
+}
+
 export const DASHBOARD_VIEWS = ["all", "todo"] as const;
 
 export type DashboardView = (typeof DASHBOARD_VIEWS)[number];
@@ -65,6 +72,7 @@ export interface HomeScreenProps {
   onViewChange?: (view: DashboardView) => void;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
+  onControl: (input: ControlInput) => Promise<RunControlOutcome>;
   openRunId?: RunId | undefined;
   onOpenRunShown?: () => void;
 }
@@ -80,6 +88,7 @@ interface CardHost {
   cardRef: (id: RunId) => (element: HTMLButtonElement | null) => void;
   focusCard: (id: RunId) => void;
   onOpen: (run: HomeRun, tagged: boolean, mode: SheetMode) => void;
+  onControl: (run: HomeRun, control: RunControl, focusAfter?: () => void) => Promise<boolean>;
 }
 
 export function HomeScreen({
@@ -88,6 +97,7 @@ export function HomeScreen({
   onViewChange = () => {},
   onAnswer,
   onDeny,
+  onControl,
   openRunId,
   onOpenRunShown = () => {},
 }: HomeScreenProps) {
@@ -97,6 +107,7 @@ export function HomeScreen({
   const [open, setOpen] = useState(false);
   const [revealedId, setRevealedId] = useState<RunId | null>(null);
   const shownRunId = useRef<RunId | undefined>(undefined);
+  useControlFailureToasts(page);
   useEffect(() => {
     if (openRunId === undefined || shownRunId.current === openRunId) return;
     if (page.workspace.kind === "none") return;
@@ -133,6 +144,25 @@ export function HomeScreen({
     onOpen: (run, tagged, mode) => {
       setTarget({ run, tagged, mode });
       setOpen(true);
+    },
+    onControl: (run, control, focusAfter) => {
+      const key = run.ticketKey;
+      return onControl({ runId: run.id, control }).then(
+        (outcome) => {
+          if (focusAfter === undefined) cards.current.get(run.id)?.focus();
+          else focusAfter();
+          showToast(
+            outcome === "requested"
+              ? t(`control.${control}Requested`, { key })
+              : t("control.stateChanged", { key }),
+          );
+          return true;
+        },
+        () => {
+          showToast(t(`control.${control}Rejected`, { key }));
+          return false;
+        },
+      );
     },
   };
   const runningTodo = new Set(board.running.todo.map((run) => run.id));
@@ -232,6 +262,7 @@ export function HomeScreen({
           all={all}
           onAnswer={onAnswer}
           onDeny={onDeny}
+          onControl={host.onControl}
         />
       </div>
     </ScreenLayout>
@@ -328,6 +359,7 @@ function CardList({
             selected={host.selectedId === run.id}
             openRef={host.cardRef(run.id)}
             onOpen={(mode) => host.onOpen(run, tagged(run), mode)}
+            onControl={(control) => host.onControl(run, control)}
           />
         ))}
       </KanbanCards>
@@ -366,6 +398,7 @@ function SettledCards({ runs, page, host }: { runs: HomeRun[]; page: HomePage; h
             selected={host.selectedId === run.id}
             openRef={host.cardRef(run.id)}
             onOpen={(mode) => host.onOpen(run, false, mode)}
+            onControl={(control) => host.onControl(run, control)}
           />
         ))}
       </KanbanCards>
@@ -582,3 +615,25 @@ const styles = stylex.create({
   },
   reset: { margin: 0 },
 });
+
+function useControlFailureToasts(page: HomePage): void {
+  const t = useTranslations("home");
+  const domain = useTranslations("domain");
+  const pending = useRef(new Set<RunId>());
+  useEffect(() => {
+    const nowPending = new Set<RunId>();
+    for (const run of page.running) {
+      const control = run.control;
+      if (control?.status === "pending") nowPending.add(run.id);
+      if (control?.status === "failed" && pending.current.has(run.id)) {
+        showToast(
+          t(control.control === "pause" ? "control.pauseFailed" : "control.resumeFailed", {
+            key: run.ticketKey,
+            reason: domain(`runControlFailure.${control.reason}`),
+          }),
+        );
+      }
+    }
+    pending.current = nowPending;
+  }, [page, t, domain]);
+}

@@ -2,7 +2,7 @@ import type { PillStatus, SummaryStatus } from "@ganger/ui";
 import { useTranslations } from "use-intl";
 
 export type RunStatusInput =
-  | { state: "queued" | "running" | "waiting-for-input" | "disconnected" }
+  | { state: "queued" | "running" | "waiting-for-input" | "paused" | "disconnected" }
   | { state: "ended"; summary: SummaryStatus };
 
 export function runStatus(run: RunStatusInput): PillStatus {
@@ -16,6 +16,7 @@ export function useStatusName(): (status: PillStatus) => string {
       case "queued":
       case "running":
       case "waiting-for-input":
+      case "paused":
       case "disconnected":
         return t(`runState.${status}`);
       case "merged":

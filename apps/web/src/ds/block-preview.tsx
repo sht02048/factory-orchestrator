@@ -25,6 +25,9 @@ import {
   GangerMark,
   KanbanCard,
   KanbanCards,
+  Menu,
+  MenuItem,
+  MoreIcon,
   KanbanColumn,
   KanbanSubheading,
   NoticeLayout,
@@ -519,6 +522,11 @@ export function BlockSections() {
                     title={t("kanban.plainTitle")}
                     meta={t("kanban.meta")}
                     time={t("kanban.time")}
+                    menu={
+                      <Menu variant="icon" label={t("kanban.menuLabel")} trigger={<MoreIcon />}>
+                        <MenuItem value="pause">{t("kanban.pause")}</MenuItem>
+                      </Menu>
+                    }
                     onOpen={() => setSheetOpen(true)}
                   />
                 </li>

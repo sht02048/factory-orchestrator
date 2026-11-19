@@ -1,5 +1,13 @@
 import type { UsageWindowKind } from "@ganger/core";
-import type { AgentResult, PrState, RunId, SummaryOutcome, TicketKey } from "@ganger/core";
+import type {
+  AgentResult,
+  PauseSource,
+  PrState,
+  RunId,
+  SummaryOutcome,
+  TicketKey,
+} from "@ganger/core";
+import type { RunControlView } from "../run-control-view.js";
 import type { QueuedReason } from "../runs/model.js";
 import type { RunnerIssueCause, WorkspaceChoice, WorkspaceSummary } from "../shell/model.js";
 
@@ -31,11 +39,13 @@ interface HomeRunBase {
   executionMs: number | null;
   pullRequest: { displayId: string; url: string } | null;
   cancelling: boolean;
+  control: RunControlView | null;
 }
 
 export type HomeRun =
   | (HomeRunBase & { state: "queued"; queuedReason: QueuedReason })
   | (HomeRunBase & { state: "running" })
+  | (HomeRunBase & { state: "paused"; pausedMs: number | null; pauseSource: PauseSource })
   | (HomeRunBase & {
       state: "waiting-for-input";
       input: InputWait | null;
@@ -165,6 +175,7 @@ export function todoGroupOf(run: HomeRun): TodoGroupKind | null {
       return run.summary === "failed" ? "stopped" : null;
     case "queued":
     case "running":
+    case "paused":
       return null;
   }
 }
@@ -185,6 +196,7 @@ export function needsAttention(run: HomeRun): boolean {
       return (run.summary === "human-check" && !run.prSettledLater) || run.summary === "failed";
     case "queued":
     case "running":
+    case "paused":
       return false;
   }
 }
@@ -228,7 +240,7 @@ export function partitionHome(input: {
   return {
     workspace,
     attention,
-    running: runs.filter((run) => run.state === "running"),
+    running: runs.filter((run) => run.state === "running" || run.state === "paused"),
     queued: runs.filter((run) => run.state === "queued"),
     runners: input.runners,
     doneToday: {
@@ -266,6 +278,7 @@ export function todoTagOf(run: HomeRun): TodoTag | null {
       return run.summary === "human-check" || run.summary === "failed" ? run.summary : null;
     case "queued":
     case "running":
+    case "paused":
       return null;
   }
 }
@@ -303,6 +316,11 @@ function urgency(run: HomeRun): number {
     case "ended":
     case "queued":
     case "running":
+    case "paused":
       return 2;
   }
+}
+
+export function hasPendingControl(page: Pick<HomePage, "running">): boolean {
+  return page.running.some((run) => run.control?.status === "pending");
 }

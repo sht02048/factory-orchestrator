@@ -1,9 +1,15 @@
-import { planCancel } from "@ganger/core";
-import type { RunId, RunnerHealth, RunnerId } from "@ganger/core";
+import { planCancel, planRunControl } from "@ganger/core";
+import type { RunControl, RunId, RunnerHealth, RunnerId } from "@ganger/core";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";
-import { logTailRequests, runCancelRequests, runnerCheckRequests, runs } from "./schema.js";
+import {
+  logTailRequests,
+  runCancelRequests,
+  runControlRequests,
+  runnerCheckRequests,
+  runs,
+} from "./schema.js";
 
 export type RequestStatus<T> =
   | { status: "pending"; requestedAt: Date }
@@ -211,4 +217,113 @@ export function markCancelRequestProcessed(
       .where(and(eq(runCancelRequests.runId, runId), isNull(runCancelRequests.processedAt)))
       .run().changes > 0
   );
+}
+
+export type RequestRunControlResult =
+  | { ok: true; requestedAt: Date }
+  | {
+      ok: false;
+      reason: "not-found" | "already-ended" | "not-running" | "not-paused" | "cancelling";
+    };
+
+export function requestRunControl(
+  db: Database,
+  runId: RunId,
+  control: RunControl,
+  now: Date = new Date(),
+): RequestRunControlResult {
+  return inTransaction(db, (): RequestRunControlResult => {
+    const run = db.select({ state: runs.state }).from(runs).where(eq(runs.id, runId)).get();
+    if (run === undefined) return { ok: false, reason: "not-found" };
+    const plan = planRunControl(run.state, control);
+    if (!plan.ok) return { ok: false, reason: plan.reason };
+    if (hasPendingCancelRequest(db, runId)) return { ok: false, reason: "cancelling" };
+    const pending = db
+      .select({ requestedAt: runControlRequests.requestedAt })
+      .from(runControlRequests)
+      .where(and(eq(runControlRequests.runId, runId), isNull(runControlRequests.completedAt)))
+      .get();
+    if (pending !== undefined) return { ok: true, requestedAt: pending.requestedAt };
+    db.insert(runControlRequests)
+      .values({ runId, control, requestedAt: now })
+      .onConflictDoUpdate({
+        target: runControlRequests.runId,
+        set: { control, requestedAt: now, completedAt: null, error: null },
+      })
+      .run();
+    return { ok: true, requestedAt: now };
+  });
+}
+
+export const RUN_CONTROL_OUTCOME_UNKNOWN = "outcome-unknown";
+
+export interface PendingRunControlRequest {
+  runId: RunId;
+  control: RunControl;
+  requestedAt: Date;
+  outcomeUnknown: boolean;
+}
+
+export function listPendingRunControlRequests(db: Database): PendingRunControlRequest[] {
+  return db
+    .select({
+      runId: runControlRequests.runId,
+      control: runControlRequests.control,
+      requestedAt: runControlRequests.requestedAt,
+      error: runControlRequests.error,
+    })
+    .from(runControlRequests)
+    .where(isNull(runControlRequests.completedAt))
+    .orderBy(asc(runControlRequests.requestedAt), asc(runControlRequests.runId))
+    .all()
+    .map(({ error, ...request }) => ({
+      ...request,
+      outcomeUnknown: error === RUN_CONTROL_OUTCOME_UNKNOWN,
+    }));
+}
+
+export function markRunControlOutcomeUnknown(
+  db: Database,
+  input: { runId: RunId; requestedAt: Date },
+): boolean {
+  return (
+    db
+      .update(runControlRequests)
+      .set({ error: RUN_CONTROL_OUTCOME_UNKNOWN })
+      .where(
+        and(
+          eq(runControlRequests.runId, input.runId),
+          eq(runControlRequests.requestedAt, input.requestedAt),
+          isNull(runControlRequests.completedAt),
+        ),
+      )
+      .run().changes > 0
+  );
+}
+
+export function completeRunControlRequest(
+  db: Database,
+  input: { runId: RunId; requestedAt: Date; completedAt: Date; error: string | null },
+): boolean {
+  return (
+    db
+      .update(runControlRequests)
+      .set({ completedAt: input.completedAt, error: input.error })
+      .where(
+        and(
+          eq(runControlRequests.runId, input.runId),
+          eq(runControlRequests.requestedAt, input.requestedAt),
+          isNull(runControlRequests.completedAt),
+        ),
+      )
+      .run().changes > 0
+  );
+}
+
+export function getRunControlRequest(
+  db: Database,
+  runId: RunId,
+): (RequestStatus<null> & { control: RunControl }) | null {
+  const row = db.select().from(runControlRequests).where(eq(runControlRequests.runId, runId)).get();
+  return row === undefined ? null : { ...toStatus({ ...row, result: null }), control: row.control };
 }

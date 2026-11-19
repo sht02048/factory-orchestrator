@@ -100,7 +100,7 @@ export {
   type SectionTitleRole,
   type SplitViewProps,
 } from "./components/layout";
-export { CheckIcon, ChevronDownIcon, CloseIcon } from "./components/icons";
+export { CheckIcon, ChevronDownIcon, CloseIcon, MoreIcon } from "./components/icons";
 export {
   WindowChrome,
   WindowDragFrame,

@@ -1,5 +1,8 @@
 import { toPermissionRequestId, toQuestionId, toRunId, toRunnerId } from "@ganger/core";
 import {
+  changeRunState,
+  completeRunControlRequest,
+  requestRunControl,
   recordMcpAction,
   completeLogTailRequest,
   recordProviderUsage,
@@ -27,6 +30,8 @@ import { cancelRunRequest } from "@ganger/app/run-detail/actions";
 
 const resolved = () => Promise.resolve();
 
+const labels = (html: string): string[] => buttonsOf(html).map((button) => button.label);
+
 function render(page: RunDetailPage, timeZone?: string): string {
   return renderWithMessages(
     <RunDetailScreen
@@ -36,6 +41,7 @@ function render(page: RunDetailPage, timeZone?: string): string {
       onAnswer={resolved}
       onDeny={resolved}
       onCancel={resolved}
+      onControl={() => Promise.resolve("requested" as const)}
       onRefreshLog={resolved}
     />,
     runMessages,
@@ -191,6 +197,63 @@ describe("Run 상세 화면", () => {
     const pending = render(page(db, running));
     expect(pending).toContain(runJson.cancelPending);
     expect(pending).not.toContain(runJson.cancel.trigger);
+  });
+
+  it("Running 런은 멈추기, 요청 중이면 멈추는 중, 실패하면 이유를 알림 역할 없이 보인다(0118)", () => {
+    const { db, ids } = seedDatabase();
+    const running = ids.get("ACME-10");
+    if (running === undefined) throw new Error("no ACME-10");
+    expect(labels(render(page(db, running)))).toContain(runJson.control.pause);
+
+    expect(requestRunControl(db, running, "pause", minutes(100))).toMatchObject({ ok: true });
+    const pending = render(page(db, running));
+    expect(text(pending)).toContain(runJson.control.pausePending);
+    expect(labels(pending)).not.toContain(runJson.control.pause);
+
+    completeRunControlRequest(db, {
+      runId: running,
+      requestedAt: minutes(100),
+      completedAt: minutes(115),
+      error: "runner-unreachable",
+    });
+    const failed = render(page(db, running));
+    const reason = runJson.control.pauseFailed.replace(
+      "{reason}",
+      domain.runControlFailure["runner-unreachable"],
+    );
+    expect(text(failed)).toContain(reason);
+    expect(failed).not.toMatch(/role="alert"[^>]*>[^<]*멈추지 못했어요/);
+    expect(labels(failed)).toContain(runJson.control.pause);
+
+    const later = loadRunDetail(db, running, minutes(126));
+    expect(later.kind === "found" ? later.run.control : "missing").toBeNull();
+  });
+
+  it("Paused 런은 Paused 알약, 멈춘 시간, 재개하기를 보이고 실행 시간에서 멈춘 시간을 뺀다(0118)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    const before = found(db, id).executionMs ?? 0;
+    expect(changeRunState(db, id, { to: "paused" }, minutes(90))).toMatchObject({ ok: true });
+    const detail = found(db, id);
+    expect(detail.status.state).toBe("paused");
+    const html = render(page(db, id));
+    expect(pillsOf(html)).toContainEqual({ status: "paused", label: domain.runState.paused });
+    expect(buttonsOf(html)).toContainEqual({ variant: "primary", label: runJson.control.resume });
+    expect(labels(html)).not.toContain(runJson.control.pause);
+    expect(text(html)).toContain(runJson.next.paused);
+    expect(text(html)).toContain(
+      runJson.reason.paused.replace("{source}", domain.pauseSource.operator),
+    );
+    expect(text(html)).toContain(runJson.timeline.paused);
+    expect(detail.executionMs).toBe(before - 30 * 60_000);
+
+    expect(changeRunState(db, id, { to: "disconnected" }, minutes(110))).toMatchObject({
+      ok: true,
+    });
+    const offline = text(render(page(db, id)));
+    expect(offline).toContain(runJson.reason.disconnectedPaused);
+    expect(offline).not.toContain(runJson.reason.disconnected);
   });
 
   it("질문으로 기다리는 런은 질문 내용, 선택지, 답하기 칸을 보인다", () => {

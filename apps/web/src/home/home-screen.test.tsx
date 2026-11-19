@@ -8,7 +8,8 @@ import { QuestionAnswer } from "../question/question-answer";
 import { buttonsOf } from "../testing/buttons";
 import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
-import { addTitledRun, now, seedDatabase } from "../testing/seed";
+import { addTitledRun, minutes, now, seedDatabase } from "../testing/seed";
+import { changeRunState, completeRunControlRequest, requestRunControl } from "@ganger/db";
 import { COLUMN_VISIBLE, DONE_TODO_VISIBLE, HomeScreen, SETTLED_VISIBLE } from "./home-screen";
 import type { DashboardView } from "./home-screen";
 import { loadHomePage } from "@ganger/app/home/load";
@@ -19,14 +20,14 @@ const reject = () => Promise.reject(new Error("unused"));
 
 function render(page: HomePage) {
   return renderWithMessages(
-    <HomeScreen page={page} onAnswer={reject} onDeny={reject} />,
+    <HomeScreen page={page} onAnswer={reject} onDeny={reject} onControl={reject} />,
     homeMessages,
   );
 }
 
 function renderView(page: HomePage, view: DashboardView) {
   return renderWithMessages(
-    <HomeScreen page={page} view={view} onAnswer={reject} onDeny={reject} />,
+    <HomeScreen page={page} view={view} onAnswer={reject} onDeny={reject} onControl={reject} />,
     homeMessages,
   );
 }
@@ -770,5 +771,57 @@ describe("Runners 공급자 사용량(0086)", () => {
       runners: { list: [{ ...base, id: "r-a", name: "runner-a", usage: null }] },
     });
     expect(text(html)).not.toContain("한도");
+  });
+});
+
+describe("Dashboard 멈추기·재개(0118)", () => {
+  function pausedPage() {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    expect(changeRunState(db, id, { to: "paused" }, minutes(100))).toMatchObject({ ok: true });
+    return { db, id };
+  }
+
+  it("Running 카드는 오른쪽 위 메뉴로 멈추고, Paused 카드는 Running 칸에 꼬리표와 재개하기를 단다", () => {
+    const running = row(section(render(seededPage()), homeJson.column.running), "ACME-10");
+    expect(running).toContain(`aria-label="${homeJson.card.menu.replace("{key}", "ACME-10")}"`);
+
+    const { db } = pausedPage();
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    expect(page.attention.some((item) => item.run.ticketKey === "ACME-10")).toBe(false);
+    const paused = row(section(render(page), homeJson.column.running), "ACME-10");
+    expect(pillsOf(paused)).toEqual([{ status: "paused", label: domain.runState.paused }]);
+    expect(buttonsOf(paused).map((button) => button.label)).toContain(homeJson.card.resume);
+    expect(paused).not.toContain(homeJson.card.menu.replace("{key}", "ACME-10"));
+    expect(text(paused)).toContain("20분째");
+    expect(text(paused)).toContain(domain.pauseSource.operator);
+  });
+
+  it("요청 중이면 카드 아래 줄에 멈추는 중을 보이고 행동을 숨기며, 실패하면 이유를 보인다", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    requestRunControl(db, id, "pause", minutes(110));
+    const pending = row(
+      section(render(loadHomePage(db, "ws-commerce", now, "UTC")), homeJson.column.running),
+      "ACME-10",
+    );
+    expect(text(pending)).toContain(homeJson.card.pausing);
+    expect(pending).not.toContain('aria-haspopup="menu"');
+
+    completeRunControlRequest(db, {
+      runId: id,
+      requestedAt: minutes(110),
+      completedAt: minutes(111),
+      error: "agent-not-running",
+    });
+    const failed = row(
+      section(render(loadHomePage(db, "ws-commerce", now, "UTC")), homeJson.column.running),
+      "ACME-10",
+    );
+    expect(text(failed)).toContain(
+      homeJson.card.pauseFailed.replace("{reason}", domain.runControlFailure["agent-not-running"]),
+    );
   });
 });

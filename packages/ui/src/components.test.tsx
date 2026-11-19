@@ -19,6 +19,7 @@ import {
   RadioGroup,
   RadioOption,
   MenuItem,
+  MoreIcon,
   PILL_STATUSES,
   KanbanCard,
   KanbanCards,
@@ -120,7 +121,7 @@ describe("서버 렌더", () => {
       problem: ["disconnected", "failed", "offline", "runner-issue"],
       progress: ["running", "online"],
       merged: ["merged"],
-      idle: ["queued", "canceled"],
+      idle: ["queued", "paused", "canceled"],
     };
     const actual: Record<StatusTone, PillStatus[]> = {
       answer: [],
@@ -599,6 +600,37 @@ describe("서버 렌더", () => {
     expect(plain).toContain('aria-labelledby="card-2"');
     expect(plain).not.toContain("aria-describedby");
     expect(plain).not.toContain("data-status=");
+  });
+
+  it("KanbanCard 의 menu 는 카드 버튼 밖에 두고, 아이콘 메뉴 단추는 label 을 이름으로 가진다(티켓 0118)", () => {
+    const html = renderToString(
+      <KanbanCard
+        title="ACME-1"
+        meta="runner-a"
+        time="24분째"
+        menu={
+          <Menu variant="icon" label="ACME-1 런 메뉴" trigger={<MoreIcon />}>
+            <MenuItem value="pause">멈추기</MenuItem>
+          </Menu>
+        }
+        onOpen={noop}
+      />,
+    );
+    const openEnd = html.indexOf("</button>") + "</button>".length;
+    const open = html.slice(html.indexOf("<button"), openEnd);
+    expect(open).not.toContain("ACME-1 런 메뉴");
+    const trigger = /<button[^>]*aria-label="ACME-1 런 메뉴"[^>]*>/.exec(html.slice(openEnd));
+    expect(trigger).not.toBeNull();
+    expect(trigger?.[0]).toContain('aria-haspopup="menu"');
+    expect(html.slice(openEnd)).not.toContain('d="M4 6l4 4 4-4"');
+
+    const plain = renderToString(<KanbanCard title="ACME-1" detail="설명" onOpen={noop} />);
+    const problem = renderToString(
+      <KanbanCard title="ACME-1" detail="멈추지 못했어요" detailTone="problem" onOpen={noop} />,
+    );
+    const classOf = (rendered: string, word: string) =>
+      new RegExp(`class="([^"]*)"[^>]*>${word}<`).exec(rendered)?.[1];
+    expect(classOf(problem, "멈추지 못했어요")).not.toBe(classOf(plain, "설명"));
   });
 
   it("Sheet 는 닫혀 있으면 아무것도 그리지 않는다(티켓 0100)", () => {

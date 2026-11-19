@@ -59,6 +59,8 @@ export function hydrateWorld(db: Database, world: DemoWorld): void {
       endedWithoutReport: null,
       agentStopped: false,
       agentClosed: false,
+      paused: run.state === "paused",
+      resumes: [],
       log: ["$ claude", "Reading the ticket…", "Running the tests…"],
     });
   }

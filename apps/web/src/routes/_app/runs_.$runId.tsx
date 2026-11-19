@@ -8,6 +8,7 @@ import type { RunActionResult } from "@ganger/app/run-detail/actions";
 import {
   answerQuestion,
   cancelRun,
+  controlRun,
   denyPermission,
   getRunDetail,
   requestRunLog,
@@ -44,6 +45,7 @@ function RunDetailRoute() {
   const router = useRouter();
   const reload = () => router.invalidate();
   const pendingLog = page.kind === "found" && page.run.log.kind === "pending";
+  const pendingControl = page.kind === "found" && page.run.control?.status === "pending";
 
   useEffect(() => {
     requestRunLog({ data: { runId } })
@@ -60,6 +62,12 @@ function RunDetailRoute() {
     }, LOG_POLL_MS);
     return () => clearTimeout(timer);
   }, [pendingLog, polls, router]);
+
+  useEffect(() => {
+    if (!pendingControl) return undefined;
+    const timer = setTimeout(() => void router.invalidate(), LOG_POLL_MS);
+    return () => clearTimeout(timer);
+  }, [pendingControl, page, router]);
 
   const search = ws === undefined ? "" : `?ws=${encodeURIComponent(ws)}`;
   return (
@@ -79,6 +87,11 @@ function RunDetailRoute() {
         onCancel={async () => {
           expectOk(await cancelRun({ data: { runId } }));
           await reload();
+        }}
+        onControl={async (control) => {
+          const result = await controlRun({ data: { runId, control } });
+          await reload();
+          return result.ok ? "requested" : "state-changed";
         }}
         onRefreshLog={async () => {
           setPolls(0);
