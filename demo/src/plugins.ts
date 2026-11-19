@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { devPage } from "./dev-page.ts";
+import { DEMO_OTHER_MAC } from "./other-mac.ts";
 import { demoThisMac } from "./this-mac.ts";
 
 const webAdapters = fileURLToPath(
@@ -67,6 +68,19 @@ function handle(req: IncomingMessage, res: ServerResponse, path: string): void {
     res.end(JSON.stringify({ remoteLogin: demoThisMac().toggleRemoteLogin() }));
     return;
   }
+  if (req.method === "POST" && path === "/__dev/expire-enrollment") {
+    globalThis.__gangerDemoEnrollment?.enrollments.expireNow();
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ expired: true }));
+    return;
+  }
+  if (req.method === "POST" && path === "/__dev/enroll-mac") {
+    void enrollDemoMac(`http://${req.headers.host ?? "localhost"}`).then((status) => {
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ status }));
+    });
+    return;
+  }
   if (req.method !== "POST" || life === undefined) {
     res.statusCode = 404;
     res.end();
@@ -97,4 +111,15 @@ function handle(req: IncomingMessage, res: ServerResponse, path: string): void {
   }
   res.setHeader("content-type", "application/json");
   res.end(JSON.stringify(result));
+}
+
+async function enrollDemoMac(origin: string): Promise<number> {
+  const token = globalThis.__gangerDemoEnrollment?.enrollments.lastToken ?? null;
+  if (token === null) return 404;
+  const response = await fetch(`${origin}/api/runner-enrollment`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ token, outcome: "ready", github: "done", ...DEMO_OTHER_MAC }),
+  });
+  return response.status;
 }

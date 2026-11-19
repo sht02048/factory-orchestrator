@@ -6,7 +6,7 @@ import { parseOrcaRunnerConfig } from "@ganger/runner-orca";
 import { z } from "zod";
 import { RUNNER_KIND } from "../settings/actions.js";
 import type { SettingsContext } from "../settings/load.js";
-import type { StepResult, ThisMac } from "./model.js";
+import type { GangerRunnerConfig, StepResult, ThisMac } from "./model.js";
 
 export const THIS_MAC_CAPACITY = 1;
 
@@ -18,6 +18,36 @@ export interface RegisterResult {
   runnerId: RunnerId | null;
 }
 
+export function saveGangerRunner(
+  context: SettingsContext,
+  config: GangerRunnerConfig,
+  now: Date,
+): RunnerId {
+  parseOrcaRunnerConfig(config);
+  const existing = listRunners(context.db).find(
+    (runner) => sshTargetOf.parse(runner.config).sshTarget === config.sshTarget,
+  );
+  const runnerId = existing?.id ?? toRunnerId(randomUUID());
+  saveRunner(
+    context.db,
+    {
+      id: runnerId,
+      kind: existing?.kind ?? RUNNER_KIND,
+      name: existing?.name ?? config.name,
+      config: {
+        ...looseConfig.parse(existing?.config),
+        sshTarget: config.sshTarget,
+        orcaPath: config.orcaPath,
+        access: config.access,
+      },
+      capacity: existing?.capacity ?? THIS_MAC_CAPACITY,
+    },
+    now,
+  );
+  requestRunnerCheck(context.db, runnerId, now);
+  return runnerId;
+}
+
 export async function registerThisMac(
   context: SettingsContext,
   mac: ThisMac,
@@ -27,28 +57,7 @@ export async function registerThisMac(
   if (!prepared.ok) return { result: prepared.result, runnerId: null };
   const { config } = prepared;
   try {
-    parseOrcaRunnerConfig(config);
-    const existing = listRunners(context.db).find(
-      (runner) => sshTargetOf.parse(runner.config).sshTarget === config.sshTarget,
-    );
-    const runnerId = existing?.id ?? toRunnerId(randomUUID());
-    saveRunner(
-      context.db,
-      {
-        id: runnerId,
-        kind: existing?.kind ?? RUNNER_KIND,
-        name: existing?.name ?? config.name,
-        config: {
-          ...looseConfig.parse(existing?.config),
-          sshTarget: config.sshTarget,
-          orcaPath: config.orcaPath,
-          access: config.access,
-        },
-        capacity: existing?.capacity ?? THIS_MAC_CAPACITY,
-      },
-      now,
-    );
-    requestRunnerCheck(context.db, runnerId, now);
+    const runnerId = saveGangerRunner(context, config, now);
     return { result: { step: "register", outcome: "done", detail: config.sshTarget }, runnerId };
   } catch (error) {
     return {

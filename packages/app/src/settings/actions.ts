@@ -352,7 +352,7 @@ export const runnerInput = z.object({
     .min(1)
     .max(500)
     .regex(/^[^-\s\p{Cc}][^\s\p{Cc}]*$/u),
-  orcaPath: z.string().trim().min(1).max(1000),
+  orcaPath: z.string().trim().max(1000),
   capacity,
 });
 

@@ -113,6 +113,22 @@ export function NumberedList({ items }: { items: ReadonlyArray<ReactNode> }) {
   );
 }
 
+export function BulletList({
+  items,
+  tone = "secondary",
+}: {
+  items: ReadonlyArray<ReactNode>;
+  tone?: "secondary" | "tertiary";
+}) {
+  return (
+    <ul {...stylex.props(styles.bullets, tone === "tertiary" && styles.bulletsTertiary)}>
+      {items.map((content, i) => (
+        <li key={i}>{content}</li>
+      ))}
+    </ul>
+  );
+}
+
 export function CheckTick({
   done,
   running,
@@ -225,6 +241,19 @@ const styles = stylex.create({
     color: colors.textSecondary,
     lineHeight: lineHeight.relaxed,
   },
+  bullets: {
+    margin: 0,
+    paddingBlock: 0,
+    paddingInlineEnd: 0,
+    paddingInlineStart: space.s5,
+    listStyleType: "disc",
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    color: colors.textSecondary,
+    lineHeight: lineHeight.relaxed,
+  },
+  bulletsTertiary: { color: colors.textTertiary },
   checklist: {
     margin: 0,
     paddingBlock: 0,
