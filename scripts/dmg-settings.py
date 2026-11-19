@@ -7,7 +7,6 @@ format = "UDZO"
 filesystem = "HFS+"
 files = [application]
 symlinks = {"Applications": "/Applications"}
-hide_extensions = [app_name]
 
 icon = defines["icon"]
 background = defines["background"]
