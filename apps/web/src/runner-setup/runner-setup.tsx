@@ -25,6 +25,7 @@ import { useTranslations } from "use-intl";
 import { SHARING_SETTINGS_URL } from "@ganger/app/runner-setup/model";
 import type { StepProblem, ThisMacStatus, ThisMacStep } from "@ganger/app/runner-setup/model";
 import type { RegisterResult } from "@ganger/app/runner-setup/register";
+import type { RunnerId } from "@ganger/core";
 
 export interface RunnerSetupActions {
   thisMacStatus: () => Promise<ThisMacStatus>;
@@ -103,12 +104,12 @@ function useThisMacStatus(
 export function RunnerSetup({
   actions,
   manualForm,
-  onRegistered,
+  onOpenRunner,
   primary,
 }: {
   actions: RunnerSetupActions;
   manualForm: ReactNode;
-  onRegistered: (runnerId: string) => void;
+  onOpenRunner?: (runnerId: RunnerId) => void;
   primary: boolean;
 }) {
   const t = useTranslations("runnerSetup");
@@ -142,13 +143,14 @@ export function RunnerSetup({
           titleRef={flowTitle}
           onBack={() => setFlowOpen(false)}
           onLookAgain={reloadStatus}
-          onRegistered={onRegistered}
+          {...(onOpenRunner === undefined ? {} : { onOpenRunner })}
         />
       ) : (
         <Chooser
           choice={choice}
           onChoice={setChoice}
           name={status.kind === "ready" ? status.status.name : null}
+          ready={status.kind === "ready"}
           continueRef={continueRef}
           primary={primary}
           onContinue={() => setFlowOpen(true)}
@@ -216,6 +218,7 @@ function Chooser({
   choice,
   onChoice,
   name,
+  ready,
   continueRef,
   primary,
   onContinue,
@@ -223,6 +226,7 @@ function Chooser({
   choice: SetupChoice;
   onChoice: (choice: SetupChoice) => void;
   name: string | null;
+  ready: boolean;
   continueRef: RefObject<HTMLButtonElement | null>;
   primary: boolean;
   onContinue: () => void;
@@ -274,6 +278,7 @@ function Chooser({
           <Button
             ref={continueRef}
             variant={primary ? "primary" : "secondary"}
+            disabled={!ready}
             onClick={onContinue}
           >
             {t("continue")}
@@ -331,19 +336,20 @@ function ThisMacFlow({
   titleRef,
   onBack,
   onLookAgain,
-  onRegistered,
+  onOpenRunner,
 }: {
   status: ThisMacStatus;
   actions: RunnerSetupActions;
   titleRef: RefObject<HTMLSpanElement | null>;
   onBack: () => void;
   onLookAgain: () => void;
-  onRegistered: (runnerId: string) => void;
+  onOpenRunner?: (runnerId: RunnerId) => void;
 }) {
   const t = useTranslations("runnerSetup.thisMac");
   const [rows, setRows] = useState(initialRows);
   const [started, setStarted] = useState(false);
-  const [registered, setRegistered] = useState(false);
+  const [registeredId, setRegisteredId] = useState<RunnerId | null>(null);
+  const registered = registeredId !== null;
   const running = useRef(false);
   const ready = status.remoteLogin && status.orcaPath !== null;
 
@@ -375,15 +381,14 @@ function ThisMacFlow({
           }));
           if (result.outcome === "failed") return;
           if (step === "register" && outcome.runnerId !== null) {
-            setRegistered(true);
-            onRegistered(outcome.runnerId);
+            setRegisteredId(outcome.runnerId);
           }
         }
       } finally {
         running.current = false;
       }
     },
-    [actions, onRegistered],
+    [actions],
   );
 
   useEffect(() => {
@@ -450,12 +455,19 @@ function ThisMacFlow({
         </PanelBlock>
         <Text variant="ui" as="p" role="status">
           {registered
-            ? t("registered", { name: status.name })
+            ? onOpenRunner === undefined
+              ? t("registered", { name: status.name })
+              : t("registeredHere", { name: status.name })
             : failedAt === -1
               ? ""
               : t("stopped", { step: t(`step.${FLOW_STEPS[failedAt] ?? "key"}`) })}
         </Text>
         <Actions>
+          {registeredId !== null && onOpenRunner !== undefined ? (
+            <Button variant="primary" onClick={() => onOpenRunner(registeredId)}>
+              {t("openRunner", { name: status.name })}
+            </Button>
+          ) : null}
           <Button onClick={onBack} disabled={started && !registered && failedAt === -1}>
             {t("back")}
           </Button>

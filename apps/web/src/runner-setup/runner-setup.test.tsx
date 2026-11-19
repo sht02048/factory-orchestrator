@@ -14,7 +14,6 @@ function render(primary = true): string {
     <RunnerSetup
       actions={pending}
       manualForm={<form aria-label="manual-form" />}
-      onRegistered={() => undefined}
       primary={primary}
     />,
     runnerSetupMessages,

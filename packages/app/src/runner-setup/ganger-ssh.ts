@@ -1,4 +1,11 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import type { CommandRunner } from "./commands.js";
@@ -79,13 +86,16 @@ function keyLines(file: string): string[] {
   return existsSync(file) ? readFileSync(file, "utf8").split("\n") : [];
 }
 
-function appendLine(file: string, lines: string[], line: string, mode: number): void {
-  const kept = lines.filter((l, i) => !(l === "" && i === lines.length - 1));
-  writeFileSync(file, `${[...kept, line].join("\n")}\n`, { mode });
+function appendLine(file: string, line: string, mode: number): void {
+  const current = existsSync(file) ? readFileSync(file, "utf8") : "";
+  const separator = current === "" || current.endsWith("\n") ? "" : "\n";
+  appendFileSync(file, `${separator}${line}\n`, { mode });
   chmodSync(file, mode);
 }
 
-export function authorizeKey(userHome: string, key: PublicKey): void {
+export const LOCAL_ONLY_KEY_OPTIONS = 'from="127.0.0.1,::1"';
+
+export function authorizeKey(userHome: string, key: PublicKey, options: string): void {
   const sshDir = join(userHome, ".ssh");
   mkdirSync(sshDir, { recursive: true, mode: 0o700 });
   chmodSync(sshDir, 0o700);
@@ -96,7 +106,7 @@ export function authorizeKey(userHome: string, key: PublicKey): void {
     chmodSync(file, 0o600);
     return;
   }
-  appendLine(file, lines, `${key.type} ${key.body} ganger`, 0o600);
+  appendLine(file, `${options} ${key.type} ${key.body} ganger`, 0o600);
 }
 
 export function pinHostKey(knownHostsFile: string, host: string, key: PublicKey): void {
@@ -107,5 +117,5 @@ export function pinHostKey(knownHostsFile: string, host: string, key: PublicKey)
     return hosts?.split(",").includes(host) === true && type === key.type && body === key.body;
   });
   if (present) return;
-  appendLine(knownHostsFile, lines, `${host} ${key.type} ${key.body}`, 0o600);
+  appendLine(knownHostsFile, `${host} ${key.type} ${key.body}`, 0o600);
 }

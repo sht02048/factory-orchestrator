@@ -35,12 +35,27 @@ describe("sshArgs", () => {
       "-o",
       "IdentitiesOnly=yes",
       "-o",
-      `UserKnownHostsFile=${gangerAccess.knownHostsFile}`,
+      `UserKnownHostsFile="${gangerAccess.knownHostsFile}"`,
       "-o",
       "StrictHostKeyChecking=yes",
     ]);
     expect(args.at(-1)).toBe("ganger@localhost");
     expect(args.at(-2)).toBe("--");
+  });
+
+  test("keeps a home path with spaces and % as one known_hosts file", () => {
+    const args = sshArgs(
+      parseOrcaRunnerConfig({
+        sshTarget: "ganger@localhost",
+        access: {
+          ...gangerAccess,
+          identityFile: "/Users/a b/100%/ssh/id_ed25519",
+          knownHostsFile: "/Users/a b/100%/ssh/known_hosts",
+        },
+      }),
+    );
+    expect(args[1]).toBe("/Users/a b/100%%/ssh/id_ed25519");
+    expect(args[5]).toBe('UserKnownHostsFile="/Users/a b/100%%/ssh/known_hosts"');
   });
 
   test("rejects Ganger access with relative key paths", () => {

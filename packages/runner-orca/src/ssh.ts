@@ -21,6 +21,10 @@ export interface SshIdentity {
   knownHostsFile: string;
 }
 
+function sshPathValue(path: string): string {
+  return `"${path.replaceAll("%", "%%")}"`;
+}
+
 export function sshArgs(input: {
   sshTarget: string;
   connectTimeoutSeconds: number;
@@ -31,11 +35,11 @@ export function sshArgs(input: {
       ? []
       : [
           "-i",
-          input.access.identityFile,
+          input.access.identityFile.replaceAll("%", "%%"),
           "-o",
           "IdentitiesOnly=yes",
           "-o",
-          `UserKnownHostsFile=${input.access.knownHostsFile}`,
+          `UserKnownHostsFile=${sshPathValue(input.access.knownHostsFile)}`,
           "-o",
           "StrictHostKeyChecking=yes",
         ];

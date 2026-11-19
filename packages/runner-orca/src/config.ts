@@ -6,7 +6,8 @@ const absolutePath = z
   .string()
   .trim()
   .min(1)
-  .refine((value) => value.startsWith("/"), { error: "must be an absolute path" });
+  .refine((value) => value.startsWith("/"), { error: "must be an absolute path" })
+  .refine((value) => !/["\n\r]/u.test(value), { error: "must not contain quotes or newlines" });
 
 export const gangerSshAccessSchema = z.object({
   kind: z.literal("ganger"),

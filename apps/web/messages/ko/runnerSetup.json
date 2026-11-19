@@ -99,6 +99,8 @@
     "sshTarget": "ssh 대상",
     "registered": "{name} 러너를 등록했어요. 아래에서 확인 결과를 봐요.",
     "readyLabel": "준비 조건",
-    "stopped": "{step}에서 멈췄어요. 이유를 보고 다시 시도해요."
+    "stopped": "{step}에서 멈췄어요. 이유를 보고 다시 시도해요.",
+    "registeredHere": "{name} 러너를 등록했어요. 러너 보기에서 확인 결과를 봐요.",
+    "openRunner": "{name} 러너 보기"
   }
 }

@@ -70,7 +70,7 @@ function RunnersRoute() {
           <RunnerSetup
             actions={setupActions}
             manualForm={<RunnerForm runner={null} actions={settingsActions} primary={false} />}
-            onRegistered={select}
+            onOpenRunner={select}
             primary={false}
           />
         }

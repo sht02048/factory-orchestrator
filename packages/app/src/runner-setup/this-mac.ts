@@ -7,6 +7,7 @@ import { z } from "zod";
 import { failureDetail, runCommand } from "./commands.js";
 import type { CommandRunner } from "./commands.js";
 import {
+  LOCAL_ONLY_KEY_OPTIONS,
   authorizeKey,
   ensureGangerSshKey,
   gangerSshPaths,
@@ -155,7 +156,7 @@ export function localThisMac(options: LocalThisMacOptions): ThisMac {
     const key = await ensureGangerSshKey(paths, run);
     if (!key.ok) return fail("key", "keygen-failed", key.detail);
     try {
-      authorizeKey(userHome, key.publicKey);
+      authorizeKey(userHome, key.publicKey, LOCAL_ONLY_KEY_OPTIONS);
     } catch (error) {
       return fail("key", "authorized-keys-failed", String(error));
     }

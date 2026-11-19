@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { toRunnerId } from "@ganger/core";
+import type { RunnerId } from "@ganger/core";
 import { listRunners, requestRunnerCheck, saveRunner } from "@ganger/db";
 import { z } from "zod";
 import { RUNNER_KIND } from "../settings/actions.js";
@@ -13,7 +14,7 @@ const looseConfig = z.record(z.string(), z.unknown()).catch({});
 
 export interface RegisterResult {
   result: StepResult;
-  runnerId: string | null;
+  runnerId: RunnerId | null;
 }
 
 export async function registerThisMac(

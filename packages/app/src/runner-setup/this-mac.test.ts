@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import type { CommandResult, CommandRunner } from "./commands.js";
 import { runCommand } from "./commands.js";
 import { gangerSshPaths } from "./ganger-ssh.js";
+import { saveRunnerSetting } from "../settings/actions.js";
 import { registerThisMac } from "./register.js";
 import { localThisMac } from "./this-mac.js";
 import type { LocalThisMacOptions } from "./this-mac.js";
@@ -95,7 +96,9 @@ describe("this mac as a runner", () => {
     expect(await thisMac.runStep("key")).toMatchObject({ outcome: "done" });
     const authorized = join(userHome, ".ssh", "authorized_keys");
     const lines = readFileSync(authorized, "utf8").trim().split("\n");
-    expect(lines).toEqual(["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGangerKeyForTests ganger"]);
+    expect(lines).toEqual([
+      'from="127.0.0.1,::1" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGangerKeyForTests ganger',
+    ]);
     expect(mode(join(userHome, ".ssh"))).toBe(0o700);
     expect(mode(authorized)).toBe(0o600);
     expect(mode(gangerSshPaths(gangerHome).identityFile)).toBe(0o600);
@@ -110,7 +113,7 @@ describe("this mac as a runner", () => {
     await mac(run).runStep("key");
     const authorized = join(userHome, ".ssh", "authorized_keys");
     expect(readFileSync(authorized, "utf8")).toBe(
-      "ssh-rsa AAAAB3Other me@laptop\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGangerKeyForTests ganger\n",
+      'ssh-rsa AAAAB3Other me@laptop\nfrom="127.0.0.1,::1" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGangerKeyForTests ganger\n',
     );
     expect(mode(join(userHome, ".ssh"))).toBe(0o700);
     expect(mode(authorized)).toBe(0o600);
@@ -277,6 +280,22 @@ describe("registerThisMac", () => {
         knownHostsFile: join(gangerHome, "ssh", "known_hosts"),
       },
     });
+  });
+
+  test("editing a Ganger runner keeps Ganger access only while the ssh target stays the same", async () => {
+    const ctx = context();
+    const registered = await registerThisMac(ctx, mac(fakeRunner(() => undefined).run), new Date());
+    const id = registered.runnerId ?? "";
+    const edit = (sshTarget: string) =>
+      saveRunnerSetting(
+        ctx,
+        { id, name: "studio", sshTarget, orcaPath: ORCA, capacity: 2 },
+        new Date(),
+      );
+    edit("ganger@localhost");
+    expect(listRunners(ctx.db)[0]?.config).toMatchObject({ access: { kind: "ganger" } });
+    edit("ganger@runner.example.com");
+    expect(listRunners(ctx.db)[0]?.config).not.toHaveProperty("access");
   });
 
   test("updates the runner already pointing at this mac instead of adding another", async () => {

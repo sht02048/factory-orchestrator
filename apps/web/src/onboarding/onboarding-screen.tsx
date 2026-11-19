@@ -700,7 +700,6 @@ function RunnerStep({
               <RunnerForm runner={null} actions={actions} primary={false} />
             </>
           }
-          onRegistered={() => undefined}
           primary={runners.length === 0}
         />
       ) : null}
