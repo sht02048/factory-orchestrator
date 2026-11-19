@@ -189,6 +189,7 @@ export {
   type TextTone,
   type TextVariant,
 } from "./components/text";
+export { RowActionSlot, TimeSlot, type TimeSlotProps } from "./components/time-slot";
 export { Toaster, showToast, type ToasterProps } from "./components/toast";
 export { Tooltip, type TooltipAction, type TooltipProps } from "./components/tooltip";
 export { UsageBar, usageText, type UsageBarProps, type UsageTone } from "./components/usage-bar";

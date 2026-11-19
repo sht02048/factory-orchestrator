@@ -34,7 +34,7 @@ const colorGroups = [
     ],
   },
   { id: "surface", keys: ["bgCard", "bgCardHover", "bgControl", "bgControlHover"] },
-  { id: "border", keys: ["borderSubtle", "borderDefault", "borderStrong"] },
+  { id: "border", keys: ["borderSubtle", "borderDefault", "borderStrong", "borderSelected"] },
   {
     id: "text",
     keys: ["textPrimary", "textSecondary", "textTertiary", "textDisabled", "textOnAccent"],

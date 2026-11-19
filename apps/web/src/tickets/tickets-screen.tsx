@@ -210,7 +210,7 @@ function TicketsList({
             </div>
           </div>
           <div {...stylex.props(styles.tableFrame)}>
-            <Table columns={tableColumns(showTrackerProject)}>
+            <Table columns={tableColumns(showTrackerProject)} narrowColumns="minmax(0, 1fr)">
               <TableHead>
                 <TableHeader>{t("columns.key")}</TableHeader>
                 <TableHeader>{t("columns.title")}</TableHeader>

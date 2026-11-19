@@ -4,9 +4,12 @@
   "subtitle": "{attention, plural, =0 {런 {total}개, 처리할 일은 없어요.} other {{total}개 중 {attention}개가 처리할 일이에요.}}",
   "subtitleRecent": "{attention, plural, =0 {최근 런 {total}개, 처리할 일은 없어요.} other {최근 런 {total}개 중 {attention}개가 처리할 일이에요.}}",
   "filter": {
-    "label": "상태로 거르기",
-    "all": "전체",
-    "attention": "처리할 일"
+    "groupLabel": "묶음으로 거르기",
+    "statusLabel": "상태로 거르기",
+    "all": "모두",
+    "attention": "처리할 일",
+    "in-progress": "진행 중",
+    "done": "끝남"
   },
   "conditions": {
     "label": "걸린 조건",
@@ -39,7 +42,7 @@
   },
   "panel": {
     "label": "고른 런 요약",
-    "empty": "보여 줄 런이 없어요. 다른 상태를 골라 보세요.",
+    "empty": "보여 줄 런이 없어요. 다른 필터를 골라 보세요.",
     "noRuns": "런이 생기면 여기에 요약이 보여요.",
     "subtitle": "{project} · {branch}",
     "subtitleWithKey": "{key} · {where}",
