@@ -18,6 +18,7 @@ import type {
   WorktreeRef,
 } from "@ganger/core";
 import { z } from "zod";
+import { briefFor } from "./agent-brief.js";
 import { parseOrcaRunnerConfig } from "./config.js";
 import type { OrcaRunnerConfig } from "./config.js";
 import { workerReadLines } from "./log-tail.js";
@@ -368,7 +369,7 @@ export class OrcaRunner implements Runner {
     let started: z.infer<typeof workerStartResultSchema>;
     try {
       started = await this.orca(args, workerStartResultSchema, {
-        stdin: input.prompt,
+        stdin: briefFor(input.prompt),
         timeoutMs: this.config.startTimeoutMs,
         usesMailbox: true,
       });

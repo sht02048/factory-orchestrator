@@ -46,6 +46,7 @@ import {
   OutcomeSwatch,
   PageHeader,
   Popover,
+  QuestionForm,
   RadioGroup,
   RadioOption,
   RailBrand,
@@ -80,6 +81,7 @@ export const blockSectionIds = [
   "links",
   "chips",
   "choices",
+  "question",
   "codeBlock",
   "dataTable",
   "outcomes",
@@ -260,6 +262,37 @@ export function BlockSections() {
                 value={note}
                 onValueChange={setNote}
                 placeholder={t("choices.textareaPlaceholder")}
+              />
+            </div>
+          </Demo>
+        </Section>
+      </div>
+
+      <div id="question">
+        <Section title={tNav("question")} note={t("question.note")}>
+          <Demo>
+            <div {...stylex.props(styles.narrow)}>
+              <QuestionForm
+                lead={[t("question.lead")]}
+                choices={[
+                  { marker: "A", text: t("question.wait"), answer: `(A) ${t("question.wait")}` },
+                  { marker: "B", text: t("question.start"), answer: `(B) ${t("question.start")}` },
+                ]}
+                after={[t("question.after")]}
+                labels={{
+                  other: t("question.other"),
+                  otherLabel: t("question.otherLabel"),
+                  otherPlaceholder: t("question.otherPlaceholder"),
+                  answerLabel: t("question.answerLabel"),
+                  pick: t("question.pick"),
+                  empty: t("question.empty"),
+                  note: t("question.sendNote"),
+                  shortcut: t("question.shortcut"),
+                  send: t("question.send"),
+                  sending: t("question.sending"),
+                  failed: t("question.failed"),
+                }}
+                onSend={() => Promise.resolve()}
               />
             </div>
           </Demo>

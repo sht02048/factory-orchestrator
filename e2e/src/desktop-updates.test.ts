@@ -153,22 +153,22 @@ describe("데스크톱 업데이트 토스트(브라우저, 0083)", () => {
     await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
     const toast = pinnedToast(page);
     await toast.waitFor();
-    const before = await toast.boundingBox();
+    const before = await settledBox(toast);
 
     await page.getByRole("button", { name: ds.toast.trigger }).click();
     const other = page.locator('[data-slot="toast-region"] li').filter({
       hasText: ds.toast.message,
     });
     await other.waitFor();
-    const otherBox = await other.boundingBox();
-    const after = await toast.boundingBox();
+    const otherBox = await settledBox(other);
+    const after = await settledBox(toast);
     if (before === null || otherBox === null || after === null) throw new Error("toast has no box");
     expect(Math.abs(after.y - before.y)).toBeLessThan(1);
     expect(otherBox.y + otherBox.height).toBeLessThanOrEqual(after.y + 1);
 
     await other.waitFor({ state: "detached", timeout: 15_000 });
     expect(await toast.isVisible()).toBe(true);
-    const settled = await toast.boundingBox();
+    const settled = await settledBox(toast);
     expect(Math.abs((settled?.y ?? 0) - before.y)).toBeLessThan(1);
   });
 
@@ -295,6 +295,15 @@ describe("Settings 업데이트 줄(브라우저, 0083·0119)", () => {
     expect(await server.getByRole("button", { name: settings.updates.checkNow }).count()).toBe(0);
   });
 });
+
+async function settledBox(locator: Locator): Promise<Awaited<ReturnType<Locator["boundingBox"]>>> {
+  await locator.evaluate((element) =>
+    Promise.allSettled(
+      element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    ),
+  );
+  return locator.boundingBox();
+}
 
 function pinnedToast(page: Page): Locator {
   return page.locator('[data-slot="pinned-toast"] > section');
