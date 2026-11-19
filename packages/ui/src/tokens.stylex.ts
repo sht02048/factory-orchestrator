@@ -183,7 +183,7 @@ export const breakpoints = stylex.defineConsts({
   statTilesStacked: "@container (max-width: 480px)",
   statsChartsStacked: "@container (max-width: 880px)",
   chartLabelsSparse: "@container (max-width: 400px)",
-  failureBarsBelow: "@container (max-width: 400px)",
+  failureBarsBelow: "@container (max-width: 320px)",
   statsLegendBelow: "@container (max-width: 520px)",
   statsBreakdownScrolls: "@container (max-width: 359px)",
 });

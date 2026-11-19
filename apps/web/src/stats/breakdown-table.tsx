@@ -7,6 +7,7 @@ import {
   DataTableHeader,
   DataTableRow,
   DataTableRowHeader,
+  Text,
   linkStyles,
 } from "@ganger/ui";
 import { size } from "@ganger/ui/tokens.stylex";
@@ -67,7 +68,9 @@ export function BreakdownTable({
               >
                 <DataTableRowHeader strong>
                   {runsHref === undefined ? (
-                    <span {...stylex.props(styles.name)}>{nameOf(group)}</span>
+                    <Text variant="title" wrap="anywhere">
+                      {nameOf(group)}
+                    </Text>
                   ) : (
                     <a
                       href={runsHref(group)}
@@ -77,9 +80,11 @@ export function BreakdownTable({
                         event.preventDefault();
                         onOpenRuns(group);
                       }}
-                      {...stylex.props(linkStyles("plain"), styles.name)}
+                      {...stylex.props(linkStyles("plain"))}
                     >
-                      {nameOf(group)}
+                      <Text variant="title" wrap="anywhere">
+                        {nameOf(group)}
+                      </Text>
                     </a>
                   )}
                 </DataTableRowHeader>
@@ -100,10 +105,6 @@ export function BreakdownTable({
     </HorizontalScroll>
   );
 }
-
-const styles = stylex.create({
-  name: { overflowWrap: "anywhere" },
-});
 
 export function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
