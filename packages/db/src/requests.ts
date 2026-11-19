@@ -238,6 +238,12 @@ export function requestRunControl(
     const plan = planRunControl(run.state, control);
     if (!plan.ok) return { ok: false, reason: plan.reason };
     if (hasPendingCancelRequest(db, runId)) return { ok: false, reason: "cancelling" };
+    const pending = db
+      .select({ requestedAt: runControlRequests.requestedAt })
+      .from(runControlRequests)
+      .where(and(eq(runControlRequests.runId, runId), isNull(runControlRequests.completedAt)))
+      .get();
+    if (pending !== undefined) return { ok: true, requestedAt: pending.requestedAt };
     db.insert(runControlRequests)
       .values({ runId, control, requestedAt: now })
       .onConflictDoUpdate({

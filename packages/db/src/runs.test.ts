@@ -669,6 +669,7 @@ describe("Paused(0118)", () => {
 
     expect(requestRunControl(db, id, "pause", at(2))).toMatchObject({ ok: true });
     markRunControlOutcomeUnknown(db, { runId: id, requestedAt: at(2) });
+    expect(requestRunControl(db, id, "pause", at(5))).toEqual({ ok: true, requestedAt: at(2) });
     expect(listPendingRunControlRequests(db)).toEqual([
       { runId: id, control: "pause", requestedAt: at(2), outcomeUnknown: true },
     ]);

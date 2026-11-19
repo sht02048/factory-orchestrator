@@ -617,7 +617,7 @@ export class OrcaRunner implements Runner {
   }
 
   async pauseAgent(run: RunOnRunner): Promise<void> {
-    const terminal = await this.liveAgentTerminal(this.agentOf(run));
+    const terminal = await this.liveAgentTerminal(this.agentOf(run), run.worktree);
     if (terminal === null) {
       throw new AdapterError<RunnerErrorDetail>({
         kind: "runner-error",
@@ -630,7 +630,7 @@ export class OrcaRunner implements Runner {
 
   async resumeAgent(run: RunOnRunner, input: ResumeAgentInput): Promise<ResumedAgent> {
     const agent = this.agentOf(run);
-    const terminal = await this.liveAgentTerminal(agent);
+    const terminal = await this.liveAgentTerminal(agent, run.worktree);
     if (terminal !== null) {
       try {
         await this.sendToTerminal(terminal, ["--text", input.message, "--enter"]);
@@ -756,7 +756,7 @@ export class OrcaRunner implements Runner {
           ["orchestration", "worker-show", "--dispatch", worker.dispatchId],
           workerShowResultSchema,
         );
-        if (!(await this.provenUnsettled(shown))) continue;
+        if (!(await this.provenUnsettled(shown, worktree))) continue;
         return encodeAgent({
           dispatchId: worker.dispatchId,
           taskId: worker.taskId,
@@ -770,13 +770,16 @@ export class OrcaRunner implements Runner {
     return null;
   }
 
-  private async provenUnsettled(worker: z.infer<typeof workerShowResultSchema>): Promise<boolean> {
+  private async provenUnsettled(
+    worker: z.infer<typeof workerShowResultSchema>,
+    worktree: WorktreeRef,
+  ): Promise<boolean> {
     if (worker.liveness === "exited" || worker.state === "failed") return false;
     if (worker.liveness === "live" || worker.state !== "ready") return true;
-    return (await this.liveAgentTerminal(worker)) !== null;
+    return (await this.liveAgentTerminal(worker, worktree)) !== null;
   }
 
-  private async liveAgentTerminal(agent: OrcaAgent): Promise<string | null> {
+  private async liveAgentTerminal(agent: OrcaAgent, worktree: WorktreeRef): Promise<string | null> {
     const worker = await this.orca(
       ["orchestration", "worker-show", "--dispatch", agent.dispatchId],
       workerShowResultSchema,
@@ -784,6 +787,8 @@ export class OrcaRunner implements Runner {
     const terminal = worker.terminal ?? null;
     if (terminal === null || worker.liveness === "exited") return null;
     if (worker.liveness === "live") return terminal;
+    const row = await this.worktreeRow(worktree);
+    if (row !== null && row !== "unknown" && (row.agents ?? []).length === 0) return null;
     const shown = await this.orcaOutcome(
       ["terminal", "show", "--terminal", terminal],
       terminalShowResultSchema,

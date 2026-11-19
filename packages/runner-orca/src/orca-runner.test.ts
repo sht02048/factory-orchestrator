@@ -1064,12 +1064,44 @@ describe("pauseAgent and resumeAgent", () => {
     expect(exec.commands()).toHaveLength(1);
   });
 
+  const psRow = (agents: number) =>
+    stdout(
+      JSON.stringify({
+        ok: true,
+        result: {
+          worktrees: [
+            {
+              worktreeId: WORKTREE,
+              liveTerminalCount: 1,
+              agents: Array.from({ length: agents }, () => ({ state: "idle" })),
+            },
+          ],
+          truncated: false,
+        },
+      }),
+    );
+
+  test("an agent that exited and left only its shell is not paused or resumed in that shell", async () => {
+    const exec = new ScriptedExec()
+      .orca(
+        "orchestration worker-show",
+        shown({ liveness: "unverifiable", terminal: AGENT_TERMINAL }),
+      )
+      .orca("worktree ps", psRow(0));
+    expect(await adapterError(runnerWith(exec).pauseAgent(RUN))).toMatchObject({
+      kind: "runner-error",
+      code: "agent_not_running",
+    });
+    expect(exec.commands().some((command) => command.includes("terminal send"))).toBe(false);
+  });
+
   test("an unverifiable agent is paused only when its terminal is still connected", async () => {
     const exec = new ScriptedExec()
       .orca(
         "orchestration worker-show",
         shown({ liveness: "unverifiable", terminal: AGENT_TERMINAL }),
       )
+      .orca("worktree ps", psRow(1))
       .orca(
         "terminal show",
         stdout(
@@ -1081,7 +1113,7 @@ describe("pauseAgent and resumeAgent", () => {
       )
       .orca("terminal send", sent);
     await runnerWith(exec).pauseAgent(RUN);
-    expect(exec.commands()[2]).toContain("terminal send");
+    expect(exec.commands()[3]).toContain("terminal send");
   });
 
   test("a terminal that refuses input is a runner error", async () => {
