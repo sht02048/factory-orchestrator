@@ -155,7 +155,7 @@ export const size = stylex.defineVars({
   elapsedColumn: "88px",
   runnerStatusColumn: "112px",
   capacityColumn: "160px",
-  usageColumn: "200px",
+  usageColumn: "160px",
   fieldMinWidth: "200px",
   compareMinWidth: "220px",
   dashboardSideWidth: "340px",

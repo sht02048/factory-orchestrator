@@ -159,7 +159,9 @@ function RunnerRow({ runner }: { runner: RunnerView }) {
       <TableCell>
         <span id={rowMarkerId(runner.id)} {...stylex.props(styles.rowText)}>
           <span {...stylex.props(styles.rowHead)}>
-            <RowTitle>{runner.name}</RowTitle>
+            <span {...stylex.props(styles.rowName)}>
+              <RowTitle>{runner.name}</RowTitle>
+            </span>
             {runner.sshTarget === null ? null : (
               <Text variant="meta" mono truncate>
                 {runner.sshTarget}
@@ -661,6 +663,7 @@ function runHref(workspaceId: string, runId: string): string {
 const styles = stylex.create({
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   rowHead: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
+  rowName: { display: "flex", flexShrink: 0, maxWidth: "100%" },
   panelHead: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   statusLine: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
   wrap: { minWidth: 0, overflowWrap: "anywhere" },
