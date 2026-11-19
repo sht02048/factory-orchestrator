@@ -4,15 +4,18 @@ import {
   getAutoAssignLabel,
   getInstallSettings,
   getMapping,
+  getMcpWriteAllowed,
   getRunnerCheckRequest,
   listPendingRunnerCheckRequests,
   listCodeHostConnections,
+  listRecentMcpActions,
   listRunners,
   listRuns,
   listTrackerConnections,
   listWorkspaceTrackerProjects,
   listWorkspaces,
 } from "@ganger/db";
+import { RECENT_MCP_ACTIONS, mcpActionView } from "../mcp/actions.js";
 import type { PowerSettingsStore } from "../power-settings.js";
 import { mcpLaunch } from "./mcp-launch.js";
 import type { McpLaunch } from "./mcp-launch.js";
@@ -171,9 +174,14 @@ export async function loadSettingsPage(
       githubToken: listCodeHostConnections(db, secretBox).length > 0,
       addresses: addressesView(getInstallSettings(db)),
       power: powerView(context.power),
-      mcp:
-        context.mcpLaunch ??
-        mcpLaunch({ nodePath: "node", cliEntry: undefined, home: undefined, electron: false }),
+      mcp: {
+        launch:
+          context.mcpLaunch ??
+          mcpLaunch({ nodePath: "node", cliEntry: undefined, home: undefined, electron: false }),
+        writeAllowed: getMcpWriteAllowed(db),
+        recent: listRecentMcpActions(db, RECENT_MCP_ACTIONS).map(mcpActionView),
+        now: now.toISOString(),
+      },
       runners: runners.map((runner): RunnerSettingsView => {
         const config = runnerConfigSchema.safeParse(runner.config);
         return {

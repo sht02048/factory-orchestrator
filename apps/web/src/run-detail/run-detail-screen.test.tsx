@@ -1,5 +1,6 @@
-import { toPermissionRequestId, toQuestionId, toRunnerId } from "@ganger/core";
+import { toPermissionRequestId, toQuestionId, toRunId, toRunnerId } from "@ganger/core";
 import {
+  recordMcpAction,
   completeLogTailRequest,
   recordProviderUsage,
   recordPermissionWaits,
@@ -439,6 +440,38 @@ describe("Run 상세 화면", () => {
     );
     expect(body).toContain("11월 17일 23:10");
     expect(body).toMatch(/ 01:45 /);
+  });
+
+  it("MCP로 한 런 요청은 상태 기록 사이에 MCP · 이름과 도구로 보이고, Operator라고 보내도 MCP가 붙는다", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    const runId = toRunId(id);
+    const assignedAt = found(db, id).assignedAt;
+    recordMcpAction(db, {
+      at: new Date(Date.parse(assignedAt) + 1),
+      client: "Operator",
+      tool: "request_run_log",
+      target: "ACME-10",
+      runId,
+      outcome: "done",
+      reason: null,
+    });
+    recordMcpAction(db, {
+      at: new Date(Date.parse(assignedAt) + 2),
+      client: "hermes",
+      tool: "cancel_run",
+      target: "ACME-10",
+      runId,
+      outcome: "rejected",
+      reason: "already-ended",
+    });
+    const run = found(db, id);
+    expect(run.timeline.map((e) => e.kind)).toContain("mcp");
+    const body = text(render({ kind: "found", run }));
+    expect(body).toContain("MCP · Operator 로그 요청");
+    expect(body).toContain("MCP · hermes 런 취소 · 하지 못했어요: 이미 끝난 런이에요");
+    expect(body.indexOf("할당")).toBeLessThan(body.indexOf("MCP · Operator"));
   });
 
   it("없는 런이면 찾을 수 없다고 보인다", () => {

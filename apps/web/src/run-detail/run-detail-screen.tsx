@@ -1,4 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
+import { isMcpRejectReason, isMcpRunTool } from "@ganger/app/mcp/actions";
 import {
   Actions,
   Button,
@@ -536,8 +537,19 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
   const domain = useTranslations("domain");
   const laterPr = useTranslations("run.laterPr");
   const { stamp } = useTime();
+  const toolName = (tool: string): string => (isMcpRunTool(tool) ? t(`mcpTool.${tool}`) : tool);
+  const eventTitle = (event: TimelineEvent): string =>
+    event.kind === "mcp" ? t("mcp", { client: event.client }) : t(event.kind);
   const eventDetail = (event: TimelineEvent): string | null => {
     switch (event.kind) {
+      case "mcp":
+        if (event.outcome === "done") return toolName(event.tool);
+        return isMcpRejectReason(event.reason)
+          ? t("mcpRejected", {
+              tool: toolName(event.tool),
+              reason: t(`mcpReason.${event.reason}`),
+            })
+          : t("mcpRejectedUnknown", { tool: toolName(event.tool) });
       case "question":
       case "answer":
       case "permission":
@@ -575,7 +587,7 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
               >
                 <span {...stylex.props(styles.eventBody)}>
                   <Text variant="ui" tone="strong">
-                    {t(event.kind)}
+                    {eventTitle(event)}
                   </Text>
                   {detail === null ? null : (
                     <Text variant="meta" wrap="pre">

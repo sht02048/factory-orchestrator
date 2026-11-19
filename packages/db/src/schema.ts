@@ -1,4 +1,5 @@
 import { AGENT_RESULTS, NOT_STARTED_AGENT_RESULTS, PR_STATES, RUN_STATES } from "@ganger/core";
+import { MCP_ACTION_OUTCOMES } from "./mcp-actions-model.js";
 import type {
   AgentId,
   AgentRef,
@@ -75,6 +76,7 @@ export const installSettings = sqliteTable(
     instanceId: text("instance_id").notNull(),
     webAddress: text("web_address"),
     webhookAddress: text("webhook_address"),
+    mcpWriteAllowed: integer("mcp_write_allowed", { mode: "boolean" }).notNull().default(false),
     updatedAt: timeMs("updated_at").notNull(),
   },
   (t) => [check("install_settings_single_row", sql`${t.id} = 1`)],
@@ -430,3 +432,24 @@ export const runCancelRequests = sqliteTable("run_cancel_requests", {
   requestedAt: timeMs("requested_at").notNull(),
   processedAt: timeMs("processed_at"),
 });
+
+export const mcpActions = sqliteTable(
+  "mcp_actions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    at: timeMs("at").notNull(),
+    client: text("client").notNull(),
+    tool: text("tool").notNull(),
+    target: text("target"),
+    runId: text("run_id")
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    outcome: text("outcome").notNull().$type<(typeof MCP_ACTION_OUTCOMES)[number]>(),
+    reason: text("reason"),
+  },
+  (t) => [
+    check("mcp_actions_outcome", sql`${t.outcome} IN ${inList(MCP_ACTION_OUTCOMES)}`),
+    index("mcp_actions_run").on(t.runId, t.at),
+    index("mcp_actions_at").on(t.at),
+  ],
+);

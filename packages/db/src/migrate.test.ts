@@ -30,6 +30,7 @@ describe("migrate", () => {
         "code_host_connections",
         "log_tail_requests",
         "mappings",
+        "mcp_actions",
         "run_cancel_requests",
         "run_permission_waits",
         "run_questions",
@@ -201,6 +202,53 @@ describe("migrate", () => {
     ]);
     expect(db.$client.prepare("SELECT count(*) AS n FROM runner_projects").get()?.["n"]).toBe(1);
     expect(db.$client.prepare("SELECT runner_id FROM runs").all()).toEqual([{ runner_id: "r" }]);
+  });
+
+  it("0089 마이그레이션이 기존 설치 설정·런을 남긴 채 MCP 쓰기 허용을 끈 채로 더하고 작업 기록 테이블을 만든다", () => {
+    const db = openDatabase(":memory:");
+    const all = loadMigrations();
+    const added = all.findIndex((m) => m.name.endsWith("_mcp_actions"));
+    expect(added).toBeGreaterThan(0);
+    migrate(db, all.slice(0, added));
+    db.$client.exec(`
+      INSERT INTO install_settings (id, instance_id, web_address, webhook_address, updated_at)
+        VALUES (1, 'instance', 'https://ganger.example.com', NULL, 5);
+      INSERT INTO tracker_connections (id, kind, name, secrets, created_at) VALUES ('c', 'fake', 'c', '{}', 0);
+      INSERT INTO workspaces (id, name, created_at) VALUES ('w', 'w', 0);
+      INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
+        runner_project_id, agent_id, worktree_name, state, assigned_at)
+        VALUES ('queued', 'c', 'ENG-1', 'w', 'tp', 'rp', 'a', 'ganger-ENG-1-1', 'queued', 1);
+    `);
+
+    expect(migrate(db)).toEqual(all.slice(added).map((m) => m.name));
+    expect(
+      db.$client
+        .prepare(
+          "SELECT instance_id, web_address, webhook_address, mcp_write_allowed, updated_at FROM install_settings",
+        )
+        .all(),
+    ).toEqual([
+      {
+        instance_id: "instance",
+        web_address: "https://ganger.example.com",
+        webhook_address: null,
+        mcp_write_allowed: 0,
+        updated_at: 5,
+      },
+    ]);
+    expect(db.$client.prepare("SELECT id FROM runs").all()).toEqual([{ id: "queued" }]);
+    db.$client
+      .prepare(
+        "INSERT INTO mcp_actions (at, client, tool, run_id, outcome) VALUES (6, 'hermes', 'cancel_run', 'queued', 'done')",
+      )
+      .run();
+    expect(() =>
+      db.$client
+        .prepare(
+          "INSERT INTO mcp_actions (at, client, tool, outcome) VALUES (7, 'x', 'y', 'maybe')",
+        )
+        .run(),
+    ).toThrow("CHECK constraint failed");
   });
 
   it("0037 마이그레이션이 옛 런을 결정적 워크트리 이름·실제 브랜치·완료 보고 결과로 옮긴다", () => {

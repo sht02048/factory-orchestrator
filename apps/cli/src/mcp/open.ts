@@ -10,27 +10,34 @@ export class McpStartError extends Error {
   }
 }
 
+export function schemaProblem(db: Database, migrations?: ReadonlyArray<Migration>): string | null {
+  const check = checkSchema(db, migrations);
+  switch (check.kind) {
+    case "current":
+      return null;
+    case "behind":
+      return messages.mcp.databaseBehind(check.missing);
+    case "ahead":
+      return messages.mcp.databaseAhead(check.unknown);
+    case "edited":
+      return messages.mcp.databaseEdited(check.changed);
+  }
+}
+
 export function openMcpDatabase(
   databasePath: string,
   migrations?: ReadonlyArray<Migration>,
 ): Database {
   if (!existsSync(databasePath)) throw new McpStartError(messages.mcp.noDatabase(databasePath));
   const db = openDatabase(databasePath);
-  let check;
+  let problem;
   try {
-    check = checkSchema(db, migrations);
+    problem = schemaProblem(db, migrations);
   } catch (error) {
     db.$client.close();
     throw error;
   }
-  if (check.kind === "current") return db;
+  if (problem === null) return db;
   db.$client.close();
-  switch (check.kind) {
-    case "behind":
-      throw new McpStartError(messages.mcp.databaseBehind(check.missing));
-    case "ahead":
-      throw new McpStartError(messages.mcp.databaseAhead(check.unknown));
-    case "edited":
-      throw new McpStartError(messages.mcp.databaseEdited(check.changed));
-  }
+  throw new McpStartError(problem);
 }
