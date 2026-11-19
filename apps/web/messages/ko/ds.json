@@ -369,7 +369,10 @@
       "optional": "선택",
       "runner": "러너: runner-a",
       "days": "기간: 최근 7일",
-      "remove": "{condition} 조건 지우기"
+      "remove": "{condition} 조건 지우기",
+      "you": "직접 해요",
+      "youLabel": "직접 해요: 원격 로그인 켜기",
+      "remoteLogin": "원격 로그인 켜기"
     },
     "choices": {
       "note": "하나만 고르는 질문 선택지는 RadioGroup과 RadioOption, 여러 줄 답은 Textarea예요.",
@@ -420,6 +423,7 @@
       "third": "Runner",
       "done": "완료",
       "notDone": "아직이에요",
+      "running": "진행 중",
       "checklist": "러너 확인"
     },
     "disclosure": {

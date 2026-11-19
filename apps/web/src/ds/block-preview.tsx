@@ -170,6 +170,11 @@ export function BlockSections() {
             <span {...stylex.props(styles.row)}>
               <Chip strong>{t("chips.required")}</Chip>
               <Chip>{t("chips.optional")}</Chip>
+              <Chip tone="accent">{t("chips.you")}</Chip>
+              <Chip tone="accent">
+                <VisuallyHidden>{t("chips.youLabel")}</VisuallyHidden>
+                <span aria-hidden>{t("chips.remoteLogin")}</span>
+              </Chip>
             </span>
             <span {...stylex.props(styles.row)}>
               {chips.map((chip) => (
@@ -364,8 +369,12 @@ export function BlockSections() {
                   <ChecklistItem done label={t("steps.done")}>
                     {t("steps.first")}
                   </ChecklistItem>
-                  <ChecklistItem done={false} label={t("steps.notDone")}>
+                  <ChecklistItem done={false} running label={t("steps.running")}>
                     {t("steps.second")}
+                    <Text variant="meta">{t("steps.running")}</Text>
+                  </ChecklistItem>
+                  <ChecklistItem done={false} label={t("steps.notDone")}>
+                    {t("steps.third")}
                   </ChecklistItem>
                 </Checklist>
               </div>

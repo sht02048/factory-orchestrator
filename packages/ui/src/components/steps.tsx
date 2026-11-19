@@ -113,9 +113,22 @@ export function NumberedList({ items }: { items: ReadonlyArray<ReactNode> }) {
   );
 }
 
-export function CheckTick({ done, label }: { done: boolean; label: string }) {
+export function CheckTick({
+  done,
+  running,
+  label,
+}: {
+  done: boolean;
+  running?: boolean;
+  label: string;
+}) {
+  const busy = !done && running === true;
   return (
-    <span role="img" aria-label={label} {...stylex.props(done ? styles.tick : styles.tickEmpty)}>
+    <span
+      role="img"
+      aria-label={label}
+      {...stylex.props(done ? styles.tick : styles.tickEmpty, busy && styles.tickRunning)}
+    >
       {done ? <CheckIcon /> : null}
     </span>
   );
@@ -131,20 +144,24 @@ export function Checklist({ label, children }: { label: string; children: ReactN
 
 export function ChecklistItem({
   done,
+  running,
   label,
   children,
 }: {
   done: boolean;
+  running?: boolean;
   label: string;
   children: ReactNode;
 }) {
   return (
     <li {...stylex.props(styles.checkItem)}>
-      <CheckTick done={done} label={label} />
+      <CheckTick done={done} {...(running === undefined ? {} : { running })} label={label} />
       {children}
     </li>
   );
 }
+
+const spin = stylex.keyframes({ to: { transform: "rotate(360deg)" } });
 
 const styles = stylex.create({
   nav: { display: "flex", flexDirection: "column", gap: space.s6 },
@@ -239,6 +256,14 @@ const styles = stylex.create({
     borderStyle: "solid",
     borderColor: colors.borderStrong,
     borderRadius: radius.full,
+  },
+  tickRunning: {
+    borderColor: colors.accent,
+    borderTopColor: "transparent",
+    animationName: { default: "none", "@media (prefers-reduced-motion: no-preference)": spin },
+    animationDuration: "900ms",
+    animationTimingFunction: "linear",
+    animationIterationCount: "infinite",
   },
 });
 
