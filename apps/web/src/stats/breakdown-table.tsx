@@ -9,12 +9,12 @@ import {
   DataTableRowHeader,
   Text,
   linkStyles,
+  ScrollRegion,
 } from "@ganger/ui";
 import { size } from "@ganger/ui/tokens.stylex";
 import type { MouseEvent } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { HorizontalScroll } from "./horizontal-scroll";
 import { mergedRate } from "@ganger/app/stats/model";
 import type { StatsGroup } from "@ganger/app/stats/model";
 
@@ -41,7 +41,7 @@ export function BreakdownTable({
   const t = useTranslations("stats");
   const { duration } = useTime();
   return (
-    <HorizontalScroll label={caption} minWidth={size.statsBreakdownMinWidth}>
+    <ScrollRegion label={caption} minWidth={size.statsBreakdownMinWidth}>
       <DataTable caption={caption} captionHidden fixed columnWidths={BREAKDOWN_COLUMN_WIDTHS}>
         <DataTableHead>
           <DataTableHeader>{t("columns.name")}</DataTableHeader>
@@ -102,7 +102,7 @@ export function BreakdownTable({
           })}
         </DataTableBody>
       </DataTable>
-    </HorizontalScroll>
+    </ScrollRegion>
   );
 }
 

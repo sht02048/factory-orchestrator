@@ -11,13 +11,13 @@ import {
   StackedBarChart,
   Text,
   visuallyHiddenStyles,
+  ScrollRegion,
 } from "@ganger/ui";
 import type { OutcomeSegment } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
 import { useId, useState } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { HorizontalScroll } from "./horizontal-scroll";
 import type { DailyThroughput, OutcomeCounts } from "@ganger/app/stats/model";
 
 const GRID_LINES = 4;
@@ -102,7 +102,7 @@ export function ThroughputChart({
         </Button>
       </div>
       <div {...stylex.props(styles.table, !showTable && visuallyHiddenStyles.hidden)}>
-        <HorizontalScroll label={t("tableCaption")} shown={showTable}>
+        <ScrollRegion label={t("tableCaption")} active={showTable}>
           <DataTable id={tableId} caption={t("tableCaption")} density="compact">
             <DataTableHead>
               <DataTableHeader>{t("columns.day")}</DataTableHeader>
@@ -123,7 +123,7 @@ export function ThroughputChart({
               ))}
             </DataTableBody>
           </DataTable>
-        </HorizontalScroll>
+        </ScrollRegion>
       </div>
     </div>
   );

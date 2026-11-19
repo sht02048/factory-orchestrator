@@ -47,6 +47,7 @@ import {
   VisuallyHidden,
   WorkspaceBadge,
   railLinkStyles,
+  ScrollRegion,
 } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
 import { useId, useState, type ReactNode } from "react";
@@ -273,6 +274,24 @@ export function BlockSections() {
                   </DataTableRow>
                 </DataTableBody>
               </DataTable>
+              <ScrollRegion label={t("dataTable.scrollLabel")} minWidth="560px">
+                <DataTable caption={t("dataTable.scrollLabel")} captionHidden fixed>
+                  <DataTableHead>
+                    <DataTableHeader>{t("dataTable.project")}</DataTableHeader>
+                    <DataTableHeader align="end">{t("dataTable.runs")}</DataTableHeader>
+                    <DataTableHeader align="end">{t("dataTable.state")}</DataTableHeader>
+                  </DataTableHead>
+                  <DataTableBody>
+                    <DataTableRow>
+                      <DataTableRowHeader strong>{t("dataTable.web")}</DataTableRowHeader>
+                      <DataTableCell align="end" numeric>
+                        12
+                      </DataTableCell>
+                      <DataTableCell align="end">{t("dataTable.done")}</DataTableCell>
+                    </DataTableRow>
+                  </DataTableBody>
+                </DataTable>
+              </ScrollRegion>
             </div>
           </Demo>
         </Section>

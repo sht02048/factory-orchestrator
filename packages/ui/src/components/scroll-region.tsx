@@ -1,26 +1,23 @@
 import * as stylex from "@stylexjs/stylex";
-import { focusStyles } from "@ganger/ui";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
+import { focusStyles } from "./focus";
 
-export function HorizontalScroll({
-  label,
-  minWidth,
-  shown = true,
-  children,
-}: {
+export interface ScrollRegionProps {
   label: string;
-  shown?: boolean;
   minWidth?: string;
+  active?: boolean;
   children: ReactNode;
-}) {
+}
+
+export function ScrollRegion({ label, minWidth, active = true, children }: ScrollRegionProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const overflowing = useOverflowing(ref) && shown;
+  const overflowing = useOverflowing(ref) && active;
   return (
     <div
       ref={ref}
       {...(overflowing ? { role: "region", "aria-label": label, tabIndex: 0 } : {})}
-      {...stylex.props(shown && styles.scroller, focusStyles.ringInset)}
+      {...stylex.props(active && styles.scroller, focusStyles.ringInset)}
     >
       <div {...(minWidth === undefined ? {} : { style: { minWidth } })}>{children}</div>
     </div>

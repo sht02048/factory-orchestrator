@@ -373,7 +373,7 @@
       "log": "10:45 clone 시작\n10:46 의존성 설치\n10:48 시험 통과"
     },
     "dataTable": {
-      "note": "고를 수 없는 정적 표는 DataTable이에요. 카드 안 넓은 표는 framed, 작은 숫자 표는 density=\"compact\"예요.",
+      "note": "고를 수 없는 정적 표는 DataTable이에요. 카드 안 넓은 표는 framed, 작은 숫자 표는 density=\"compact\"예요. 좁은 폭에서 표만 옆으로 넘기려면 ScrollRegion에 담아요. 넘칠 때만 이름 있는 영역이 돼요.",
       "label": "매핑 미리보기",
       "project": "트래커 프로젝트",
       "runs": "런",
@@ -384,7 +384,8 @@
       "empty": "아직 비어 있어요",
       "caption": "날마다 끝난 런",
       "day": "날짜",
-      "today": "오늘"
+      "today": "오늘",
+      "scrollLabel": "옆으로 넘기는 표"
     },
     "outcomes": {
       "note": "Stats의 결과 막대와 쌓은 막대 차트예요. 결과 색은 상태 뜻 그대로 써요.",

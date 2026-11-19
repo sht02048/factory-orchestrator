@@ -6,6 +6,7 @@ import {
   Button,
   Chip,
   CodeBlock,
+  ScrollRegion,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -126,6 +127,30 @@ describe("칩·링크·코드(티켓 0074)", () => {
     );
     expect(html).toMatch(/^<pre tabindex="0" role="region" aria-label="로그"/);
     expect(renderToString(<CodeBlock>a</CodeBlock>)).toMatch(/^<pre class="[^"]+">a<\/pre>$/);
+  });
+});
+
+describe("ScrollRegion(티켓 0093)", () => {
+  it("넘치는지 재기 전에는 영역도 Tab 정지점도 아니고 안쪽에 가장 좁은 폭을 둔다", () => {
+    const html = renderToString(
+      <ScrollRegion label="표" minWidth="360px">
+        a
+      </ScrollRegion>,
+    );
+    expect(html).not.toContain('role="region"');
+    expect(html).not.toContain("tabindex");
+    expect(html).toContain('<div style="min-width:360px">a</div>');
+  });
+
+  it("active 가 아니면 스크롤 상자를 만들지 않아 숨긴 내용이 포커스를 받지 않는다", () => {
+    const on = renderToString(<ScrollRegion label="표">a</ScrollRegion>);
+    const off = renderToString(
+      <ScrollRegion label="표" active={false}>
+        a
+      </ScrollRegion>,
+    );
+    const classOf = (html: string) => /class="([^"]*)"/.exec(html)?.[1] ?? "";
+    expect(classOf(on).split(" ").length).toBeGreaterThan(classOf(off).split(" ").length);
   });
 });
 
