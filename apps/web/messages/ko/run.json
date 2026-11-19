@@ -123,11 +123,11 @@
       "already-ended": "이미 끝난 런이에요",
       "not-running": "로그를 받을 수 있는 런이 아니에요",
       "taken": "다른 Workspace가 이미 쓰고 있어요",
-      "unauthorized": "키나 토큰이 맞지 않아요",
-      "rate-limited": "요청이 많아 잠시 막혔어요",
-      "network": "연결하지 못했어요",
-      "invalid": "설정이 맞지 않아요",
-      "unavailable": "MCP 서버가 설치 폴더를 몰라요"
+      "unauthorized": "키나 토큰이 맞지 않아요. Settings에서 새로 넣어 주세요",
+      "rate-limited": "요청이 많아 잠시 막혔어요. 조금 뒤에 다시 시도해 주세요",
+      "network": "연결하지 못했어요. 네트워크를 확인해 주세요",
+      "invalid": "설정이 맞지 않아요. Settings에서 확인해 주세요",
+      "unavailable": "MCP 서버가 설치 폴더를 몰라요. Settings에서 바꿔 주세요"
     }
   },
   "report": {
