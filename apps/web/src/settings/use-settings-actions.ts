@@ -1,5 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { rereadTrackers } from "../server/functions";
 import {
   addWorkspaceTrackerProject,
   checkGitHubTokenNow,
@@ -53,7 +54,10 @@ export function useSettingsActions(): SettingsActions {
         if (result.ok) await router.invalidate();
         return result;
       },
-      reloadFromTracker: () => router.invalidate(),
+      reloadFromTracker: async () => {
+        await rereadTrackers();
+        await router.invalidate();
+      },
       saveConnection: then((data) => saveTrackerConnection({ data })),
       checkConnection: (data) => checkTrackerConnectionNow({ data }),
       saveGitHubToken: then((data) => saveGitHubTokenSetting({ data })),

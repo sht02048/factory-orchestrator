@@ -24,7 +24,7 @@ blocked_by: [0119]
 
 - `packages/app/src/tracker-reads.ts`(새), `packages/app/src/tickets/*`, `packages/app/src/settings/load.ts`·`actions.ts`
 - `packages/db`(표 `tracker_read_generations`, 마이그레이션)
-- `apps/web/src/server/*`, `apps/web/src/webhooks/receive.ts`, `apps/web/src/routes/__root.tsx`, `apps/web/src/routes/_app/tickets.tsx`, `apps/web/src/tickets/tickets-screen.tsx`, `apps/web/messages/ko/tickets.json`
+- `apps/web/src/server/*`, `apps/web/src/settings/use-settings-actions.ts`(Linear에서 다시 읽기), `apps/web/src/webhooks/receive.ts`, `apps/web/src/routes/__root.tsx`, `apps/web/src/routes/_app/tickets.tsx`, `apps/web/src/tickets/tickets-screen.tsx`, `apps/web/messages/ko/tickets.json`
 - 셸: `apps/web/src/shell/*`, `apps/web/messages/ko/shell.json`
 - `apps/worker/src/auto-assign.ts`, `after-run.ts`
 - `packages/ui`(`AppFrame` `pending`), `DESIGN.md`, `/ds`
@@ -62,7 +62,7 @@ blocked_by: [0119]
 
 ## 바꾼 것
 
-- **트래커 읽기 담아 두기(ADR 0019).** 웹 서버가 연결별로 트래커 읽기를 담아 둔다. 30초 안이면 그대로, 30초~5분이면 지난 값을 바로 주고 뒤에서 새로 읽고, 5분이 지나면 기다린다. 실패는 담아 두지 않는다. 연결별 세대 수(`tracker_read_generations`)가 오르면 담아 둔 값을 쓰지 않는다. 세대를 올리는 곳: 트래커 webhook 기록, worker 폴링 보정이 바뀐 티켓을 읽음, worker 가 런 시작 때 티켓 상태를 바꿈, 할당, 바로 할당 라벨 만들기, Mapping 저장, 트래커 연결 저장·확인, Tickets 머리의 "트래커에서 다시 읽기".
+- **트래커 읽기 담아 두기(ADR 0019).** 웹 서버가 연결별로 트래커 읽기를 담아 둔다. 30초 안이면 그대로, 30초~5분이면 지난 값을 바로 주고 뒤에서 새로 읽고, 5분이 지나면 기다린다. 실패는 담아 두지 않는다. 연결별 세대 수(`tracker_read_generations`)가 오르면 담아 둔 값을 쓰지 않는다. 세대를 올리는 곳: 트래커 webhook 기록, worker 폴링 보정이 바뀐 티켓을 읽음, worker 가 런 시작 때 티켓 상태를 바꿈, 할당, 바로 할당 라벨 만들기, Mapping 저장, 트래커 연결 저장·확인, Tickets 머리의 "트래커에서 다시 읽기", Settings 프로젝트 상세·라벨 고르기의 "Linear에서 다시 읽기"(0119 버튼, 지금까지는 화면만 다시 읽어 담아 둔 값을 받았을 것이라 세대를 올리게 했다).
 - **오래된 티켓 상태를 보일 수 있는 최대 시간: 5분.** webhook 이 있으면 webhook 이 도착할 때까지.
 - **루트 왕복.** 서버 렌더 때 루트 `beforeLoad`가 안 온보딩 완료 값을 루트 로더 데이터로 넘기고, 브라우저가 하이드레이션 뒤 그 값을 기억한다. 첫 클라이언트 이동부터 `getOnboardingComplete`를 부르지 않아 화면 이동 한 번에 서버 함수가 하나다. 셸·루트 로더는 0117 대로 다시 읽지 않는다.
 - **진행 표시.** 라우터가 150ms 넘게 다음 화면을 읽으면 본문 맨 위에 2px 노란 진행 줄이 지나가고 본문에 `aria-busy`, 화면 읽기용 상태 문장 "화면을 여는 중이에요"를 둔다. 한 번 켜면 300ms 는 두어 깜박이지 않는다. `prefers-reduced-motion`이면 멈춘 줄이다. 라우터 `pendingComponent`는 쓰지 않았다. 쓰면 늦은 이동 동안 이전 화면이 지워지고 빈 틀이 보여, 이전 화면을 둔 채 진행 줄만 보이는 편이 덜 깜박인다. 레일은 누르는 즉시 새 화면 링크에 `aria-current`가 옮겨 가므로(0113) 어느 링크를 눌렀는지는 레일이 이미 보인다.

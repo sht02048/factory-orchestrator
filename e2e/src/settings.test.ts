@@ -28,6 +28,7 @@ import {
   saveWorkspace,
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
+  trackerReadGeneration,
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { chromium } from "playwright-core";
@@ -658,8 +659,10 @@ describe("프로젝트 상세의 저장소 여러 개와 즉시 저장(브라우
       ],
     });
     expect(await page.getByText("acme/infra", { exact: true }).count()).toBe(0);
+    const generation = trackerReadGeneration(db, connection);
     await page.getByRole("button", { name: settings.mapping.reload }).first().click();
     await page.getByRole("status").getByText(settings.mapping.reloaded).first().waitFor();
+    expect(trackerReadGeneration(db, connection)).toBeGreaterThan(generation);
     await page.getByText("acme/infra", { exact: true }).waitFor();
     await page.getByText("acme/web", { exact: true }).waitFor();
   });

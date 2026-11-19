@@ -65,7 +65,13 @@ const colorGroups = [
 
 const spaceKeys = ["px2", "s1", "px6", "s2", "s3", "s4", "s5", "s6", "s8", "s10"] as const;
 const radiusKeys = ["card", "control", "pill", "full"] as const;
-const motionKeys = ["easeOut", "durationFast", "durationToast", "durationSweep"] as const;
+const motionKeys = [
+  "easeOut",
+  "durationFast",
+  "durationToast",
+  "durationSpin",
+  "durationSweep",
+] as const;
 const fontSizeKeys = [
   "display",
   "page",
