@@ -21,8 +21,8 @@ import {
   getRunWithRecords,
   hasPendingCancelRequest,
   inTransaction,
-  lastChangedTo,
   lastStateBeforeDisconnect,
+  runningSince,
   listRunners,
   listRuns,
   listUnsentAnswers,
@@ -222,7 +222,7 @@ async function followRunnerStop(
     state,
     activity: progress.activity ?? { kind: "unknown" },
     unreportedStop: progress.unreportedStop ?? null,
-    runningSince: lastChangedTo(db, run.id, "running"),
+    runningSince: runningSince(db, run.id),
     pausedSince: records.pausedSince,
     now: context.now(),
   });

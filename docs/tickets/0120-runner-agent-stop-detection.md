@@ -54,7 +54,7 @@ blocked_by: [0118]
 - **보고 없이 멈춤 알아보기**: escalation 가운데 `stopReason`이 `finished`·`errored`인 것. `stopReason`이 없으면 id가 `msg_stop_`로 시작하는 것을 같은 알림으로 본다(보고처럼 짧은 보기나 이유 칸이 없는 Orca 판). id 접두사는 Orca 내부 규칙이라 바뀔 수 있다는 위험이 있다. 그래서 에이전트 행으로도 함께 판단한다. 알림이 없어도 에이전트 행이 질문·완료 보고 없이 done인 채 10분(`TURN_ENDED_PAUSE_AFTER_MS`) 이어지면 보고 없이 멈춤으로 본다. 그 경우 마지막 출력은 러너 로그 끝(`worker-read`)에서 읽는다.
 - **러너에서 멈춤**: 에이전트 행이 working이 아니고 `interrupted: true`이거나 `mainAgent.outcome: "cancellation"`.
 - **막힘 escalation → 질문**: escalation 가운데 `stopReason`·`reason`·`approval`이 없고 id가 `msg_stop_`·`msg_followup_`가 아닌 것. 본문(없으면 제목)을 질문으로, 질문 id는 `escalation:<메일 id>`다. 답은 `reply`가 아니라 `send --to dispatch:<런의 dispatch>`로 보낸다.
-- **지난 신호 거르기**: Running 런은 마지막으로 Running이 된 시각(상태 이력의 `lastChangedTo`)보다 뒤에 생긴 신호만 본다. 재개하거나 질문에 답한 뒤에도 받은편지함에 남은 옛 알림과 옛 에이전트 행으로 다시 멈추지 않게 하려는 것이다. Paused 런은 멈춘 시각(`paused_since`)보다 뒤에 working이 된 행만 다시 시작한 것으로 본다. Ganger가 Escape를 보낸 직후 아직 working으로 남은 행으로 되돌아가지 않게 한다.
+- **지난 신호 거르기**: Running 런은 마지막으로 Running이 된 시각(상태 이력의 `runningSince`)보다 뒤에 생긴 신호만 본다. Disconnected에서 다시 닿아 Running이 된 이력은 기준으로 삼지 않고 그 앞 시각을 잇는다. 끊긴 동안 러너에서 멈춘 것을 놓치지 않으려는 것이다. 재개하거나 질문에 답한 뒤에도 받은편지함에 남은 옛 알림과 옛 에이전트 행으로 다시 멈추지 않게 하려는 것이다. Paused 런은 멈춘 시각(`paused_since`)보다 뒤에 working이 된 행만 다시 시작한 것으로 본다. Ganger가 Escape를 보낸 직후 아직 working으로 남은 행으로 되돌아가지 않게 한다.
 - **차례**: 완료 보고 > 보고 없이 사라짐(lost·exited, 지금처럼 끝냄) > 워크트리 없음 > 열린 질문·권한(Waiting for Input) > 러너에서 멈춤 > 보고 없이 멈춤. 에이전트가 막혔다고 escalation을 보내면 Orca가 곧이어 "보고 없이 멈춤" 알림도 올리는데, 열린 질문이 먼저라 Waiting for Input이 된다. 답을 보내면 Running이 되고 그보다 앞선 알림은 거른다.
 - **모르면 Running**: 에이전트 행이 없거나 여럿인데 고를 수 없거나, 모르는 상태 값이거나, 시각이 없으면 지금처럼 Running으로 둔다.
 - **Ganger가 멈춘 것과 가르기**: 판정은 Running 런에만 멈춤을 더한다. 운영자가 멈춘 런(`pause_source = operator`)은 이미 Paused라 러너 신호로 이유를 바꾸지 않는다. 멈춘 이유는 `runs.pause_source`(`operator`·`runner`·`unreported`)에 저장하고 Dashboard·Run 상세·MCP(`get_run`이 Run 상세 모델을 그대로 준다)가 같은 값을 쓴다. 알림 사건은 0118대로 Paused에 만들지 않는다.
@@ -79,7 +79,7 @@ blocked_by: [0118]
 ## 설계
 
 - **core**: `PAUSE_SOURCES`에 `runner`·`unreported`. `RunProgress`의 active에 선택 칸 `activity`(`working`·`interrupted`·`turn-ended`·`unknown`과 그 시각)와 `unreportedStop`(시각, 마지막 출력). 판정 함수 `decideRunnerStop`(`runner-stop.ts`). 가짜 어댑터에 `interruptOnRunner`·`stopWithoutReport`·`continueOnRunner`.
-- **db**: `pause_source` CHECK를 넓히는 마이그레이션 `20261119135223_run_pause_sources`(SQLite라 `runs`를 다시 만든다). 상태 이력에서 마지막으로 어떤 상태가 된 시각을 읽는 `lastChangedTo`.
+- **db**: `pause_source` CHECK를 넓히는 마이그레이션 `20261119135223_run_pause_sources`(SQLite라 `runs`를 다시 만든다). 상태 이력에서 재개·답변·시작으로 Running이 된 마지막 시각을 읽는 `runningSince`.
 - **runner-orca**: 위 스키마를 zod로 더 읽고(`worktree ps` 에이전트 행, `terminal show`의 `tabId`·`leafId`, payload `reason`, `send` 결과), `decideProgress`가 `activity`·`unreportedStop`·막힘 질문을 만든다. 막힘 질문의 답은 dispatch로 보낸다. 에이전트 지시서에 "막히면 escalation 대신 `ask --options`로 묻고, 질문이나 완료 보고 없이 차례를 끝내면 멈춘 것으로 본다"를 더했다.
 - **worker**: `watchRun`이 끝내지 않는 런에 `decideRunnerStop`을 적용한다. Paused로 바꿀 때 이유를 남기고, 보고 없이 멈춤이면 마지막 출력을 `last_log`에 쓴다(알림에 없으면 러너 로그 끝).
 - **app·web**: Run 상세 `status`의 paused에 `lastOutput`(보고 없이 멈춤일 때만). Run 상세에 "멈추기 전 마지막 출력" 블록을 접지 않고 둔다. 카드·Run 상세 이유 한 줄과 Dashboard 오른쪽 패널 설명이 이유별로 다르다. 메시지는 `domain.json`·`home.json`·`run.json`.
@@ -100,7 +100,7 @@ blocked_by: [0118]
 - 판정 시험: 중단됨 → Paused, 보고 없이 멈춤(알림·10분 규칙) → Paused, 막힘 escalation → 질문, 다시 working → Running, 모르는 형식 → Running, 지난 신호 거르기.
 - runner-orca 시험: 실제 출력 견본으로 에이전트 행·escalation 읽기, 행이 여럿일 때 `terminal show`로 고르기, 막힘 답을 dispatch로 보내기.
 - worker 시험: 러너에서 멈춘 런의 재개, 시간 시계 멈춤, 마지막 출력 저장, 질문이 먼저.
-- DB 시험: 새 이유 저장과 CHECK, `lastChangedTo`.
+- DB 시험: 새 이유 저장과 CHECK, `runningSince`.
 - e2e: 가짜 어댑터로 러너에서 중단 → Paused 카드("러너에서 멈췄어요") → 재개.
 - 스크린숏: Running 칸의 "러너에서 멈췄어요" Paused 카드, Run 상세의 "보고 없이 멈췄어요"와 마지막 출력, 400px.
 

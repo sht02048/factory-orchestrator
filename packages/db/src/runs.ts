@@ -562,11 +562,17 @@ export function lastStateBeforeDisconnect(db: Database, runId: RunId): RunState 
   return change?.from ?? null;
 }
 
-export function lastChangedTo(db: Database, runId: RunId, state: RunState): Date | null {
+export function runningSince(db: Database, runId: RunId): Date | null {
   const change = db
     .select({ at: runStateChanges.changedAt })
     .from(runStateChanges)
-    .where(and(eq(runStateChanges.runId, runId), eq(runStateChanges.toState, state)))
+    .where(
+      and(
+        eq(runStateChanges.runId, runId),
+        eq(runStateChanges.toState, "running"),
+        ne(runStateChanges.fromState, "disconnected"),
+      ),
+    )
     .orderBy(desc(runStateChanges.id))
     .limit(1)
     .get();

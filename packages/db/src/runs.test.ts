@@ -52,13 +52,13 @@ import {
   getRun,
   storedTicketTitle,
   getRunWithRecords,
-  lastChangedTo,
   lastStateBeforeDisconnect,
   listRunStateChanges,
   listRuns,
   listRunsWithRecords,
   recordStartFailure,
   recordStartRequested,
+  runningSince,
   setQueuedRunRunner,
   updateRunRecords,
 } from "./runs.js";
@@ -651,15 +651,14 @@ describe("Paused(0118)", () => {
     ).toThrow(/CHECK/);
   });
 
-  it("마지막으로 어떤 상태가 된 시각을 상태 이력에서 읽는다(0120)", () => {
+  it("Running이 된 시각은 재개·답변으로 돌아온 때이고, 연결이 돌아온 때는 앞 시각을 잇는다(0120)", () => {
     const db = seededDatabase();
     const id = runningRun(db);
-    expect(lastChangedTo(db, id, "paused")).toBeNull();
     changeRunState(db, id, { to: "paused" }, at(1));
     changeRunState(db, id, { to: "running" }, at(5));
-    changeRunState(db, id, { to: "paused" }, at(8));
-    expect(lastChangedTo(db, id, "running")).toEqual(at(5));
-    expect(lastChangedTo(db, id, "paused")).toEqual(at(8));
+    changeRunState(db, id, { to: "disconnected" }, at(8));
+    changeRunState(db, id, { to: "running" }, at(12));
+    expect(runningSince(db, id)).toEqual(at(5));
   });
 
   it("DB가 Paused 런에만 멈춘 시각을 허용한다", () => {

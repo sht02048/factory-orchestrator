@@ -1068,6 +1068,19 @@ describe("러너에서 멈춘·막힌 에이전트(0120)", () => {
     expect(stateOf(run)).toBe("waiting-for-input");
   });
 
+  it("러너가 끊긴 동안 중단된 에이전트도 다시 닿은 뒤 '러너에서 멈춤'으로 알아챈다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.advance(MINUTE);
+    await disconnect(run, runnerId, worker);
+    h.runner(runnerId).interruptOnRunner(worktreeOf(run), h.now);
+    h.advance(MINUTE);
+    cutSsh(runnerId, false);
+    await worker.tick();
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+    expect(recordsOf(run).pauseSource).toBe("runner");
+  });
+
   it("에이전트 상태를 모르면 Running 그대로 둔다", async () => {
     const { run, worker } = await startOne();
     h.advance(30 * MINUTE);
