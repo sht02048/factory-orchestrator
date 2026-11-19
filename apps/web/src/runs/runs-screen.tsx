@@ -374,19 +374,18 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
           {run.ticketTitle === null ? (
             <RowTitle>{run.ticketKey}</RowTitle>
           ) : (
-            <span {...stylex.props(styles.keyLine)}>
-              <TableFoldedOnly when="stacked">
-                <Text variant="meta" numeric>
-                  {run.ticketKey}
-                </Text>
-              </TableFoldedOnly>
-              <span {...stylex.props(styles.title)}>
-                <RowTitle fullText={run.ticketTitle}>{run.ticketTitle}</RowTitle>
-              </span>
-            </span>
+            <RowTitle fullText={run.ticketTitle}>{run.ticketTitle}</RowTitle>
           )}
           <TableFoldedOnly when="first" block>
             <Text variant="meta">
+              {run.ticketTitle === null ? null : (
+                <TableFoldedOnly when="stacked">
+                  <Text variant="meta" numeric>
+                    {run.ticketKey}
+                  </Text>
+                  {t("metaSeparator")}
+                </TableFoldedOnly>
+              )}
               <TableFoldedOnly when="second">
                 {runner}
                 {t("metaSeparator")}
@@ -397,7 +396,7 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
         </span>
       </TableCell>
       <TableCell hideWhen="second">
-        <Text variant="ui">{runner}</Text>
+        <Text variant="meta">{runner}</Text>
       </TableCell>
       <TableCell hideWhen="first">
         <Text variant="meta">{result}</Text>
@@ -580,13 +579,6 @@ const styles = stylex.create({
     marginTop: space.s4,
   },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  keyLine: {
-    display: "flex",
-    alignItems: "baseline",
-    columnGap: space.s2,
-    minWidth: 0,
-  },
-  title: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 },
 });
 
 function ticketName(run: RunView): string {

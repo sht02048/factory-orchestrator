@@ -187,11 +187,17 @@ describe("Runs 화면", () => {
 
   it("좁아져 접히면 러너와 결과가 제목 아래 둘째 줄로 돌아간다(0101)", () => {
     const { db } = seedDatabase();
+    addTitledRun(db, "ACME-30", "결제 실패 재시도");
     const html = render(loadRunsPage(db, undefined, now));
     const rows = rowTexts(html);
     const running = rows.get("ACME-10");
     expect(foldedLine(html, "ACME-10")).toBe(
-      `${running?.runner ?? ""}${runsJson.metaSeparator}${running?.result ?? ""}`,
+      [running?.runner, running?.result].join(runsJson.metaSeparator),
+    );
+    const titled = rows.get("ACME-30");
+    expect(titled?.title).toBe("결제 실패 재시도");
+    expect(foldedLine(html, "ACME-30")).toBe(
+      [titled?.key, titled?.runner, titled?.result].join(runsJson.metaSeparator),
     );
     const ended = endedCases[0];
     if (ended === undefined) throw new Error("no ended case");

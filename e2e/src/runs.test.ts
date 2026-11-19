@@ -51,6 +51,7 @@ const runnerProject = toRunnerProjectId("fake:acme/web");
 const agent = toAgentId("claude");
 const encryptionKey = new Uint8Array(32).fill(7);
 const runningKey = "ACME-RUN";
+const runningTitle = "Retry failed payment webhooks";
 const endedRunCount = 55;
 const endedPageSize = 50;
 
@@ -112,7 +113,7 @@ describe("Runs 화면(브라우저, 0056)", () => {
 
     await page.getByRole("link", { name: runsJson.panel.openDetail }).click();
     await page.waitForURL(/\/runs\/[^/?]+/);
-    await page.getByRole("heading", { name: runningKey }).first().waitFor();
+    await page.getByRole("heading", { name: runningTitle }).first().waitFor();
 
     expect(await page.evaluate(() => "runsDocumentMarker" in globalThis)).toBe(true);
   });
@@ -172,6 +173,10 @@ describe("Runs 화면(브라우저, 0056)", () => {
           [...option.querySelectorAll(selector)].some((e) => e.getBoundingClientRect().width > 0);
         const listBox = list.getBoundingClientRect();
         const panelBox = panel.getBoundingClientRect();
+        const title = option.querySelector("[title]");
+        const titleCell = title?.closest('[role="option"] > *');
+        if (title === null || title === undefined || titleCell === null || titleCell === undefined)
+          throw new Error("runs title not found");
         return {
           overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
           gap: Math.round(panelBox.left - listBox.right),
@@ -179,6 +184,9 @@ describe("Runs 화면(브라우저, 0056)", () => {
           runner: shown('[data-hide-when="second"]'),
           secondLine: shown('[data-folded-only="first"]'),
           rowHeight: Math.round(option.getBoundingClientRect().height),
+          titleShortBy: Math.round(
+            titleCell.getBoundingClientRect().width - title.getBoundingClientRect().width,
+          ),
         };
       }, runningKey);
     };
@@ -191,12 +199,18 @@ describe("Runs 화면(브라우저, 0056)", () => {
     expect(middle).toMatchObject({ overflow: 0, result: false, runner: false, secondLine: true });
 
     const laptop = await layoutAt(1100);
-    expect(laptop).toMatchObject({ overflow: 0, secondLine: true });
+    expect(laptop).toMatchObject({ overflow: 0, secondLine: true, titleShortBy: 0 });
     expect(laptop.rowHeight).toBeLessThan(middle.rowHeight + 8);
 
     for (const width of [900, 400, 320]) {
       const narrow = await layoutAt(width);
-      expect(narrow).toMatchObject({ overflow: 0, result: false, runner: false, secondLine: true });
+      expect(narrow).toMatchObject({
+        overflow: 0,
+        result: false,
+        runner: false,
+        secondLine: true,
+        titleShortBy: 0,
+      });
     }
   });
 
@@ -376,7 +390,7 @@ function seed(db: Database): void {
     const id = assign(db, `ACME-END-${i}`, at);
     ok(changeRunState(db, id, { to: "ended", agentResult: "canceled", prState: "none" }, at));
   }
-  const running = assign(db, runningKey, new Date());
+  const running = assign(db, runningKey, new Date(), runningTitle);
   ok(
     changeRunState(db, running, {
       to: "running",
@@ -389,9 +403,10 @@ function seed(db: Database): void {
   );
 }
 
-function assign(db: Database, key: string, now: Date) {
+function assign(db: Database, key: string, now: Date, ticketTitle?: string) {
   const assigned = assignRun(db, {
     ticket: { connection, key: toTicketKey(key) },
+    ...(ticketTitle === undefined ? {} : { ticketTitle }),
     trackerProject,
     runnerProject,
     agent,
