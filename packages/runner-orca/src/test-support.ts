@@ -81,9 +81,19 @@ export class ScriptedExec implements RemoteExec {
   }
 }
 
-export function runnerWith(exec: ScriptedExec, config: { model?: string } = {}): OrcaRunner {
+export function runnerWith(
+  exec: ScriptedExec,
+  config: { model?: string } = {},
+  sleeps: number[] = [],
+): OrcaRunner {
   return new OrcaRunner(
     parseOrcaRunnerConfig({ sshTarget: "runner.example.com", ...config }),
     exec,
+    {
+      sleep: (ms) => {
+        sleeps.push(ms);
+        return Promise.resolve();
+      },
+    },
   );
 }

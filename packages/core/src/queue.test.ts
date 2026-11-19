@@ -260,6 +260,36 @@ describe("planQueue", () => {
     expect(plan.start).toEqual([{ runId: head.id, runnerId: r2 }]);
   });
 
+  it("정한 러너에서 런의 프로젝트 push가 깨지면 러너를 비우고 다른 맞는 러너로 다시 정한다 (0096)", () => {
+    const head = queued("head", app, r1);
+    const other = queued("other", web, r1);
+
+    const plan = planQueue({
+      queued: [head, other],
+      runners: [
+        runner({ id: r1, capacity: 2, projects: [app, web], blockedProjects: [app] }),
+        runner({ id: r2 }),
+      ],
+      runs: [],
+    });
+
+    expect(plan.cleared).toEqual([{ runId: head.id, reason: "assignment-blocked" }]);
+    expect(plan.assigned).toEqual([{ runId: head.id, runnerId: r2 }]);
+    expect(plan.start).toEqual([
+      { runId: head.id, runnerId: r2 },
+      { runId: other.id, runnerId: r1 },
+    ]);
+  });
+
+  it("맞는 러너가 모두 그 프로젝트의 push가 깨졌으면 이유는 할당 막힘이다 (0096)", () => {
+    const a = queued("a", app, null);
+
+    expect(
+      planQueue({ queued: [a], runners: [runner({ id: r1, blockedProjects: [app] })], runs: [] })
+        .unplaced,
+    ).toEqual([{ runId: a.id, reason: "assignment-blocked" }]);
+  });
+
   it("순서에서 빠진 이유를 맞는 러너의 상태로 가른다 (Q68·Q82.13·Q87)", () => {
     const a = queued("a", app, null);
     const reasonWith = (runners: RunnerSnapshot[]) =>

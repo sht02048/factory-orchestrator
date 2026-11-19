@@ -1,5 +1,6 @@
 import {
   AdapterError,
+  blockedProjectsOf,
   isAssignmentBlocked,
   toAgentId,
   toMailboxRef,
@@ -90,13 +91,28 @@ describe("orcaRunnerFactory", () => {
 });
 
 describe("checkHealth", () => {
-  test("is online with the service and GitHub push access on every project", async () => {
-    const exec = withProjects(
+  const ORIGIN_ONLY = stdout("remote.origin.url https://github.com/acme/sandbox.git\n");
+  const FORK = stdout(
+    [
+      "remote.origin.url https://github.com/someone/sandbox.git",
+      "remote.origin.fetch +refs/heads/*:refs/remotes/origin/*",
+      "remote.upstream.url https://github.com/acme/sandbox.git",
+      "",
+    ].join("\n"),
+  );
+
+  function onlineWith(...push: Parameters<ScriptedExec["on"]>[1][]): ScriptedExec {
+    return withProjects(
       new ScriptedExec()
         .orca("status", stdout(own("status-ready.json")))
         .orca("serve service status", stdout(own("serve-service-status-live.json")))
-        .on("env ", processResult(own("push-dry-run-ok.json"))),
+        .on("git -C ", ORIGIN_ONLY)
+        .on("env ", ...push),
     );
+  }
+
+  test("is online with the service and GitHub push access on every project", async () => {
+    const exec = onlineWith(processResult(own("push-dry-run-ok.json")));
     const health = await runnerWith(exec).checkHealth();
     expect(health).toMatchObject({ online: true, version: "1.4.258", error: null });
     expect(health.prerequisites).toEqual([
@@ -104,40 +120,88 @@ describe("checkHealth", () => {
       expect.objectContaining({
         id: "github-push:github:acme/sandbox",
         satisfied: true,
-        blocksAssignment: true,
+        blocksAssignment: false,
+        project: "github:acme/sandbox",
       }),
     ]);
+    expect(health.prerequisites[1]).not.toHaveProperty("failure");
     expect(isAssignmentBlocked(health)).toBe(false);
-    const push = exec.commands().find((c) => c.startsWith("env "));
-    expect(push).toBe(
+    expect(exec.commands().filter((c) => c.startsWith("git ") || c.startsWith("env "))).toEqual([
+      "git -C '<path>/sandbox' config --get-regexp '^remote\\.'",
       "env 'GIT_TERMINAL_PROMPT=0' 'GIT_SSH_COMMAND=ssh -o BatchMode=yes' git -C '<path>/sandbox' push --dry-run --porcelain --no-verify origin HEAD:refs/heads/ganger/push-check",
-    );
+    ]);
   });
 
-  test("a failed git push --dry-run breaks GitHub access but keeps the runner online", async () => {
-    const exec = withProjects(
-      new ScriptedExec()
-        .orca("status", stdout(own("status-ready.json")))
-        .orca("serve service status", stdout(own("serve-service-status-live.json")))
-        .on("env ", processResult(own("push-dry-run-no-credentials.json"))),
-    );
-    const health = await runnerWith(exec).checkHealth();
+  test("a failed push blocks only its project, with the reason and an auth kind", async () => {
+    const failed = processResult(own("push-dry-run-no-credentials.json"));
+    const sleeps: number[] = [];
+    const exec = onlineWith(failed, failed);
+    const health = await runnerWith(exec, {}, sleeps).checkHealth();
     expect(health.online).toBe(true);
     expect(health.error).toBeNull();
-    expect(health.prerequisites[1]).toMatchObject({ satisfied: false, blocksAssignment: true });
-    expect(isAssignmentBlocked(health)).toBe(true);
+    expect(health.prerequisites[1]).toMatchObject({
+      satisfied: false,
+      blocksAssignment: false,
+      project: "github:acme/sandbox",
+      failure: {
+        kind: "auth",
+        reason:
+          "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+      },
+    });
+    expect(isAssignmentBlocked(health)).toBe(false);
+    expect(blockedProjectsOf(health.prerequisites)).toEqual(["github:acme/sandbox"]);
+    expect(sleeps).toEqual([1000]);
+    expect(exec.commands().filter((c) => c.startsWith("env "))).toHaveLength(2);
+  });
+
+  test("a push that fails once and passes on the retry is satisfied", async () => {
+    const exec = onlineWith(
+      processResult(own("push-dry-run-no-credentials.json")),
+      processResult(own("push-dry-run-ok.json")),
+    );
+    const health = await runnerWith(exec).checkHealth();
+    expect(health.prerequisites[1]).toMatchObject({ satisfied: true });
+    expect(health.prerequisites[1]).not.toHaveProperty("failure");
+  });
+
+  test("a fork checks the push remote git would use, not the project's upstream remote", async () => {
+    const upstream = own("project-list.json").replace(
+      '"remoteName": "origin"',
+      '"remoteName": "upstream"',
+    );
+    expect(upstream).toContain('"remoteName": "upstream"');
+    const exec = new ScriptedExec()
+      .orca("status", stdout(own("status-ready.json")))
+      .orca("serve service status", stdout(own("serve-service-status-live.json")))
+      .orca("project list", stdout(upstream))
+      .orca("project setups", stdout(own("project-setups.json")))
+      .on("git -C ", FORK)
+      .on("env ", processResult(own("push-dry-run-ok.json")));
+    await runnerWith(exec).checkHealth();
+    const push = exec.commands().find((c) => c.startsWith("env "));
+    expect(push).toContain(" origin HEAD:refs/heads/ganger/push-check");
   });
 
   test("an ssh failure during the push check is unknown, not broken", async () => {
-    const exec = withProjects(
-      new ScriptedExec()
-        .orca("status", stdout(own("status-ready.json")))
-        .orca("serve service status", stdout(own("serve-service-status-live.json")))
-        .on("env ", processResult(own("ssh-unreachable.json"))),
-    );
+    const unreachable = processResult(own("ssh-unreachable.json"));
+    const exec = onlineWith(unreachable, unreachable);
     const health = await runnerWith(exec).checkHealth();
-    expect(health.prerequisites[1]).toMatchObject({ satisfied: null });
-    expect(isAssignmentBlocked(health)).toBe(false);
+    expect(health.prerequisites[1]).toMatchObject({
+      satisfied: null,
+      failure: { kind: "network" },
+    });
+    expect(blockedProjectsOf(health.prerequisites)).toEqual([]);
+  });
+
+  test("a push that times out twice is unknown with a timeout kind", async () => {
+    const timedOut = { exitCode: null, stdout: "", stderr: "", timedOut: true };
+    const exec = onlineWith(timedOut, timedOut);
+    const health = await runnerWith(exec).checkHealth();
+    expect(health.prerequisites[1]).toMatchObject({
+      satisfied: null,
+      failure: { kind: "timeout", reason: null },
+    });
   });
 
   test("is offline when the runtime is off and reports a missing service", async () => {

@@ -122,7 +122,10 @@ describe("Runners 목록 + 패널(브라우저, 0057·0071)", () => {
     const panel = page.getByRole("region", { name: runners.panel.label });
     await panel.getByRole("heading", { level: 2, name: longRunnerName, exact: true }).waitFor();
     await expect.poll(() => new URL(page.url()).searchParams.get("sel")).toBe(longRunner);
-    expect(await panel.getByRole("button", { name: runners.panel.recheck }).count()).toBe(0);
+    expect(await panel.getByRole("button", { name: runners.panel.recheck }).count()).toBe(1);
+    expect(await panel.getByRole("region", { name: runners.panel.fix.offline.title }).count()).toBe(
+      0,
+    );
   });
 
   it("긴 러너 이름과 긴 확인 항목 이름을 패널 안에서 자르지 않고 줄을 바꾼다", async (context) => {
@@ -131,13 +134,13 @@ describe("Runners 목록 + 패널(브라우저, 0057·0071)", () => {
     await hydrated(page);
 
     const panel = page.getByRole("region", { name: runners.panel.label });
-    const checkName = panel.getByText(`GitHub push 권한: ${longProject}`, { exact: true });
+    const checkName = panel.getByText(longProject, { exact: true });
     const title = panel.getByRole("heading", { name: longRunnerName, exact: true });
     await checkName.waitFor();
 
     const panelBox = await panel.boundingBox();
     for (const [target, text] of [
-      [checkName, `GitHub push 권한: ${longProject}`],
+      [checkName, longProject],
       [title, longRunnerName],
     ] as const) {
       const layout = await textLayout(page, "aside", text);
@@ -163,6 +166,22 @@ describe("Runners 목록 + 패널(브라우저, 0057·0071)", () => {
     await expect
       .poll(async () => panel.getByRole("status").textContent())
       .toBe(runners.panel.recheckStatus.requested);
+  });
+
+  it("확인 항목의 다시 확인을 누르면 결과가 올 때까지 확인 중과 경과 시간을 보인다 (0096)", async (context) => {
+    const page = await openPage(context.task.name, { width: 1280, height: 800 });
+    await page.goto(`/runners?ws=${workspaceId}&sel=${longRunner}`);
+    await hydrated(page);
+
+    const panel = page.getByRole("region", { name: runners.panel.label });
+    await panel.getByRole("button", { name: runners.panel.recheck }).click();
+    const checking = panel.getByText(/^확인하는 중이에요 · \d+초째$/);
+    await checking.waitFor();
+    const first = await checking.textContent();
+    await expect.poll(async () => checking.textContent(), { timeout: 5_000 }).not.toBe(first);
+    expect(await panel.getByRole("button", { name: runners.panel.checking }).isDisabled()).toBe(
+      true,
+    );
   });
 });
 
@@ -200,7 +219,7 @@ describe("Runners 다시 그리기(브라우저, 0092)", () => {
 
     const panel = page.getByRole("region", { name: runners.panel.label });
     const bar = panel.getByRole("meter").first();
-    const check = panel.getByText(`GitHub push 권한: ${longProject}`, { exact: true });
+    const check = panel.getByText("GitHub push · 1개 중 0개 통과", { exact: true });
     await check.waitFor();
     const [barBox, checkBox] = await Promise.all([bar.boundingBox(), check.boundingBox()]);
     expect(Math.round(barBox?.x ?? -1)).toBe(Math.round(checkBox?.x ?? -2));
@@ -326,6 +345,8 @@ function seed(db: Database): void {
         satisfied: false,
         hint: null,
         blocksAssignment: false,
+        project: longProjectId,
+        failure: { kind: "auth", reason: `Permission to ${longProject}.git denied to someone.` },
       },
     ],
   });

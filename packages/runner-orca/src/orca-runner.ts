@@ -23,6 +23,18 @@ import type { OrcaRunnerConfig } from "./config.js";
 import { workerReadLines } from "./log-tail.js";
 import { completionReport, decideProgress } from "./progress.js";
 import { parseProviderUsage } from "./provider-usage.js";
+import {
+  PUSH_CHECK_CONCURRENCY,
+  PUSH_CHECK_TIMEOUT_MS,
+  PUSH_RETRY_DELAY_MS,
+  choosePushRemote,
+  classifyPush,
+  mapWithConcurrency,
+  pushArgv,
+  remoteConfigArgv,
+  unknownPush,
+} from "./push-check.js";
+import type { PushCheckOutcome } from "./push-check.js";
 import { decodeAgent, decodeMailbox, encodeAgent, encodeMailbox } from "./refs.js";
 import type { OrcaAgent, OrcaMailbox } from "./refs.js";
 import {
@@ -59,7 +71,6 @@ export const ORCA_RUNNER_KIND: RunnerKind = toRunnerKind("orca");
 export const MAILBOX_TITLE = "ganger-mailbox";
 const MAILBOX_COMMAND = "cat > /dev/null";
 const RUN_OBJECTIVE = "ganger";
-export const PUSH_CHECK_REF = "HEAD:refs/heads/ganger/push-check";
 const WORKTREE_PS_LIMIT = 500;
 const LOG_PAGE_SIZE = 100;
 const WORKER_LIST_MAX_PAGES = 50;
@@ -88,14 +99,25 @@ interface ProjectRow {
   setup: { repoId: string; path: string; setupState: string } | null;
 }
 
+export interface OrcaRunnerOptions {
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const realSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
 export class OrcaRunner implements Runner {
   readonly kind = ORCA_RUNNER_KIND;
   private readonly config: OrcaRunnerConfig;
   private readonly exec: RemoteExec;
+  private readonly sleep: (ms: number) => Promise<void>;
 
-  constructor(config: OrcaRunnerConfig, exec?: RemoteExec) {
+  constructor(config: OrcaRunnerConfig, exec?: RemoteExec, options: OrcaRunnerOptions = {}) {
     this.config = config;
     this.exec = exec ?? sshExec(config);
+    this.sleep = options.sleep ?? realSleep;
   }
 
   async checkHealth(): Promise<RunnerHealth> {
@@ -121,7 +143,10 @@ export class OrcaRunner implements Runner {
     }
     try {
       const projects = await this.loadProjects();
-      for (const project of projects) prerequisites.push(await this.pushPrerequisite(project));
+      const pushes = await mapWithConcurrency(projects, PUSH_CHECK_CONCURRENCY, (project) =>
+        this.pushPrerequisite(project),
+      );
+      prerequisites.push(...pushes);
     } catch (error) {
       return { online, version, prerequisites, checkedAt, error: detailOf(error) };
     }
@@ -168,34 +193,31 @@ export class OrcaRunner implements Runner {
       id: `github-push:${project.id}`,
       name: `GitHub push access: ${project.displayName}`,
       hint: "Run `gh auth login --insecure-storage` and `gh auth setup-git` on the runner, or add a GitHub SSH key for the runner user.",
-      blocksAssignment: true,
+      blocksAssignment: false,
+      project: toRunnerProjectId(project.id),
     };
     if (project.setup === null || project.setup.setupState !== "ready") {
       return { ...base, satisfied: null };
     }
-    let result: RemoteResult;
+    const path = project.setup.path;
+    let outcome = await this.tryPush(path, project.remoteName);
+    if (!outcome.satisfied) {
+      await this.sleep(PUSH_RETRY_DELAY_MS);
+      outcome = await this.tryPush(path, project.remoteName);
+    }
+    return { ...base, ...outcome };
+  }
+
+  private async tryPush(path: string, projectRemote: string): Promise<PushCheckOutcome> {
+    const options = { timeoutMs: Math.min(PUSH_CHECK_TIMEOUT_MS, this.config.commandTimeoutMs) };
     try {
-      result = await this.run([
-        "env",
-        "GIT_TERMINAL_PROMPT=0",
-        "GIT_SSH_COMMAND=ssh -o BatchMode=yes",
-        "git",
-        "-C",
-        project.setup.path,
-        "push",
-        "--dry-run",
-        "--porcelain",
-        "--no-verify",
-        project.remoteName,
-        PUSH_CHECK_REF,
-      ]);
-    } catch {
-      return { ...base, satisfied: null };
+      const config = await this.run(remoteConfigArgv(path), options);
+      const remote =
+        config.exitCode === 0 ? choosePushRemote(config.stdout, projectRemote) : projectRemote;
+      return classifyPush(await this.run(pushArgv(path, remote), options), [path]);
+    } catch (error) {
+      return unknownPush(error, [path]);
     }
-    if (result.timedOut || result.exitCode === 255 || result.exitCode === null) {
-      return { ...base, satisfied: null };
-    }
-    return { ...base, satisfied: result.exitCode === 0 };
   }
 
   private async loadProjects(): Promise<ProjectRow[]> {

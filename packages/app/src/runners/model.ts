@@ -1,4 +1,5 @@
 import type { ProviderUsageStatus, UsageWindowKind } from "@ganger/core";
+import type { CheckFailure } from "../prerequisites.js";
 
 export interface RunWorkspace {
   id: string;
@@ -34,6 +35,7 @@ export interface RunnerCheckItem {
   satisfied: boolean | null;
   blocksAssignment: boolean;
   hint: string | null;
+  failure: CheckFailure | null;
 }
 
 export interface UsageWindowView {
@@ -63,6 +65,7 @@ export interface RunnerView {
   online: boolean;
   offlineMs: number | null;
   assignmentBlocked: boolean;
+  pushBlockedProjects: string[];
   checks: RunnerCheckItem[] | null;
   checked: { at: string; agoMs: number } | null;
   capacity: number;

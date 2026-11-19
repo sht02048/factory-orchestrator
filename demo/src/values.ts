@@ -2,6 +2,8 @@ export const FAIL_AUTH = "invalid";
 export const FAIL_OFFLINE = "offline";
 export const FAIL_NO_ORCA = "no-orca";
 export const FAIL_PUSH_AUTH = "push-auth";
+export const SLOW_CHECK = "slow";
+export const SLOW_CHECK_MS = 20_000;
 
 export const DEMO_WEB_ADDRESS = "https://orchestrator.example.ts.net";
 export const DEMO_WEBHOOK_ADDRESS = "https://hooks.example.com";

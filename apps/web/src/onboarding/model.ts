@@ -4,6 +4,8 @@ import type {
   SettingsPage,
   WorkspaceSettings,
 } from "@ganger/app/settings/model";
+import { runnerWideChecks, summarizePushChecks } from "@ganger/app/prerequisites";
+import type { PushSummary } from "@ganger/app/prerequisites";
 
 export const ONBOARDING_STEPS = ["tracker", "github", "runner", "workspace", "mapping"] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
@@ -84,8 +86,7 @@ export function runnerPassed(runner: RunnerSettingsView): boolean {
     check.status === "done" &&
     check.online &&
     check.error === null &&
-    check.prerequisites.every((p) => p.satisfied !== false) &&
-    check.prerequisites.some((p) => p.blocksAssignment && p.satisfied === true)
+    runnerWideChecks(check.prerequisites).every((p) => p.satisfied !== false)
   );
 }
 
@@ -124,27 +125,24 @@ export function stepToPin(page: SettingsPage, requested: number | undefined): nu
 
 export interface RunnerProblems {
   error: string | null;
-  pushUnchecked: boolean;
   service: boolean;
-  githubAuth: boolean;
+  push: PushSummary | null;
 }
 
 export function runnerProblems(runner: RunnerSettingsView): RunnerProblems {
   const check = runner.check;
   if (check === null || check.status !== "done") {
-    return { error: null, pushUnchecked: false, service: false, githubAuth: false };
+    return { error: null, service: false, push: null };
   }
-  const broken = check.prerequisites.filter((p) => p.satisfied === false);
-  const githubAuth = broken.some((p) => p.blocksAssignment);
   return {
     error: check.online ? check.error : null,
-    pushUnchecked:
-      check.online &&
-      !githubAuth &&
-      !check.prerequisites.some((p) => p.blocksAssignment && p.satisfied === true),
-    service: broken.some((p) => !p.blocksAssignment),
-    githubAuth,
+    service: runnerWideChecks(check.prerequisites).some((p) => p.satisfied === false),
+    push: check.online ? summarizePushChecks(check.prerequisites) : null,
   };
+}
+
+export function pushNeedsWarning(push: PushSummary | null): boolean {
+  return push !== null && (push.total === 0 || push.passed < push.total);
 }
 
 export function shellQuote(value: string): string {

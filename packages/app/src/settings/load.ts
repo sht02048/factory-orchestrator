@@ -14,6 +14,7 @@ import {
   listTrackerConnections,
   listWorkspaceTrackerProjects,
   listWorkspaces,
+  runnerPrerequisiteSchema,
 } from "@ganger/db";
 import { RECENT_MCP_ACTIONS, mcpActionView } from "../mcp/actions.js";
 import type { PowerSettingsStore } from "../power-settings.js";
@@ -80,15 +81,7 @@ function hasWebhookSecret(secrets: unknown): boolean {
 const runnerHealthSchema = z.object({
   online: z.boolean(),
   version: z.string().nullable(),
-  prerequisites: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      satisfied: z.boolean().nullable(),
-      hint: z.string().nullable(),
-      blocksAssignment: z.boolean(),
-    }),
-  ),
+  prerequisites: z.array(runnerPrerequisiteSchema),
   error: z.object({ kind: z.string() }).loose().nullable(),
 });
 
@@ -375,7 +368,11 @@ function runnerCheckView(
   if (request === null) return null;
   switch (request.status) {
     case "pending":
-      return { status: "pending", requestedAt: request.requestedAt.toISOString() };
+      return {
+        status: "pending",
+        requestedAt: request.requestedAt.toISOString(),
+        requestedAgoMs: Math.max(0, now.getTime() - request.requestedAt.getTime()),
+      };
     case "failed":
       return {
         status: "failed",
@@ -395,8 +392,13 @@ function runnerCheckView(
         online: parsed.data.online,
         version: parsed.data.version,
         prerequisites: parsed.data.prerequisites.map((p) => ({
-          ...p,
+          id: p.id,
+          name: p.name,
+          satisfied: p.satisfied,
+          hint: p.hint,
+          blocksAssignment: p.blocksAssignment,
           project: prerequisiteProject(p.id, projects),
+          failure: p.failure ?? null,
         })),
         error: parsed.data.error?.kind ?? null,
       };

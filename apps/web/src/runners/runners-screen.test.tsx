@@ -5,7 +5,13 @@ import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
 import { recordProviderUsage, recordRunnerCheck } from "@ganger/db";
 import { toRunnerId } from "@ganger/core";
-import { addUnreachedCanceledRun, breakGitHubAuth, now, seedDatabase } from "../testing/seed";
+import {
+  addUnreachedCanceledRun,
+  breakGitHubAuth,
+  failSomePushes,
+  now,
+  seedDatabase,
+} from "../testing/seed";
 import { loadRunnersPage } from "@ganger/app/runners/load";
 import { runnersMessages } from "./messages";
 import { failedChecksFirst, problemRunnersFirst } from "@ganger/app/runners/model";
@@ -71,6 +77,7 @@ function runner(overrides: Partial<RunnerView> & { id: string }): RunnerView {
     online: true,
     offlineMs: null,
     assignmentBlocked: false,
+    pushBlockedProjects: [],
     checks: null,
     checked: null,
     capacity: 2,
@@ -248,17 +255,16 @@ describe("Runners 고른 러너 패널", () => {
 
     const online = panelHtml(render(page, "runner-a"));
     expect(online).not.toMatch(callout);
-    expect(textOf(online)).not.toContain(panel.recheck);
+    expect(online.match(new RegExp(`>${panel.recheck}</button>`, "g"))).toHaveLength(1);
   });
 
-  it("GitHub 인증이 깨진 러너의 해결 상자는 gh 명령을 모노 글로 단계에 담는다", () => {
+  it("러너 전체 항목이 깨져 할당에서 빠진 러너의 해결 상자는 확인 항목을 보라고 안내한다", () => {
     const { db } = seedDatabase();
     breakGitHubAuth(db);
     const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
     expect(a).toMatch(callout);
     expect(textOf(a)).toContain(panel.fix.assignmentBlocked.title);
-    expect(a).toMatch(/<code[^>]*>gh auth login --insecure-storage<\/code>/);
-    expect(a).toMatch(/<code[^>]*>gh auth setup-git<\/code>/);
+    expect(textOf(a)).toContain(panel.fix.assignmentBlocked.steps["1"]);
   });
 
   it("상태 알약·확인 시각, 제목 이름과 주소를 패널 머리에 둔다", () => {
@@ -307,23 +313,55 @@ describe("Runners 고른 러너 패널", () => {
     const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
     expect(textOf(a)).toContain(`${panel.checksTitle} 2/3 통과`);
     const states = [...a.matchAll(/data-check="([^"]+)"/g)].map((m) => m[1]);
-    expect(states).toEqual(["broken", "ok", "ok"]);
-    expect(a).toMatch(
-      new RegExp(
-        `data-check="broken"[^]*?${panel.check.broken}[^]*?GitHub push 권한: github:acme/web<`,
-      ),
+    expect(states).toEqual(["broken", "ok"]);
+    expect(textOf(a)).toMatch(
+      new RegExp(`${panel.check.broken} GitHub push · 2개 중 1개 통과 github:acme/web 기타`),
     );
+    expect(textOf(a)).toContain(`${panel.check.ok} Orca service`);
     expect(textOf(a)).not.toContain("GitHub push access");
-    const lines = [...a.matchAll(/<li data-check="([^"]+)"[^]*?<\/li>/g)].map((m) => [
-      m[1],
-      textOf(m[0]).trim(),
-    ]);
-    expect(lines).toEqual([
-      ["broken", `${panel.check.broken} GitHub push 권한: github:acme/web`],
-      ["ok", `${panel.check.ok} Orca service`],
-      ["ok", `${panel.check.ok} GitHub push 권한: github:acme/docs`],
-    ]);
     expect(a).not.toContain('data-status="online" data-tone');
+  });
+
+  it("GitHub push는 한 줄로 묶고 실패한 저장소와 이유, 같은 해결 안내는 한 번만 보인다 (0096)", () => {
+    const { db } = seedDatabase();
+    failSomePushes(db, [
+      {
+        name: "web",
+        satisfied: false,
+        failure: { kind: "auth", reason: "Permission to acme/web.git denied to someone." },
+      },
+      { name: "api", satisfied: false, failure: { kind: "auth", reason: null } },
+      { name: "lab", satisfied: null, failure: { kind: "timeout", reason: null } },
+    ]);
+    const html = render(loadRunnersPage(db, now), "runner-a");
+    const a = panelHtml(html);
+    const pushCheck = domain.pushCheck;
+    const text = textOf(a);
+    expect(text).toContain(`${panel.checksTitle} 2/5 통과`);
+    expect(text).toContain(`${panel.check.broken} GitHub push · 4개 중 1개 통과`);
+    expect(text).toContain(
+      `acme/web ${pushCheck.failure.auth} · Permission to acme/web.git denied to someone.`,
+    );
+    expect(text).toContain(`acme/api ${pushCheck.failure.auth}`);
+    expect(text).toContain(`acme/lab 확인하지 못했어요 · ${pushCheck.failure.timeout}`);
+    expect(a.match(/<code[^>]*>gh auth setup-git<\/code>/g)).toHaveLength(1);
+    expect(text).toContain(pushCheck.scope);
+    expect(a).not.toMatch(callout);
+
+    const row = rowsOf(html).find((r) => r.name === "runner-a");
+    expect(pillsOf(row?.html ?? "")).toEqual([
+      { status: "online", label: domain.runnerState.online },
+    ]);
+    expect(textOf(row?.html ?? "")).toContain("push가 안 되는 저장소 2개의 티켓은 맡기지 않아요.");
+  });
+
+  it("모든 저장소가 push를 통과하면 한 줄로 모두 통과라고 보인다 (0096)", () => {
+    const { db } = seedDatabase();
+    failSomePushes(db, []);
+    const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
+    expect(textOf(a)).toContain(`${panel.check.ok} GitHub push · 저장소 4개 모두 통과`);
+    expect([...a.matchAll(/data-check="([^"]+)"/g)].map((m) => m[1])).toEqual(["ok", "ok"]);
+    expect(a).not.toContain("data-push=");
   });
 
   it("확인하지 못한 항목은 그렇다고 글로 보인다", () => {
@@ -340,6 +378,7 @@ describe("Runners 고른 러너 패널", () => {
                 satisfied: null,
                 blocksAssignment: false,
                 hint: null,
+                failure: null,
               },
             ],
           }),
@@ -605,7 +644,7 @@ describe("Runners 다시 그리기(0092)", () => {
     const words = [...a.matchAll(/data-check="[^"]+"[^>]*><span[^>]*>([^<]+)<\/span>/g)].map(
       (m) => m[1],
     );
-    expect(words).toEqual([panel.check.broken, panel.check.ok, panel.check.ok]);
+    expect(words).toEqual([panel.check.broken, panel.check.ok]);
   });
 
   it("로그인하지 않은 공급자만, 쓰지 않는 공급자만 있으면 그 문장 하나로 이름을 보인다", () => {

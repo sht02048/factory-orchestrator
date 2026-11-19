@@ -430,4 +430,18 @@ describe("web 요청 처리", () => {
     const result = getRunnerCheckRequest(h.db, runnerId);
     expect(result?.status === "done" && result.result).toMatchObject({ online: false });
   });
+
+  it("주기 확인이 돌 때가 된 러너에 확인 요청이 오면 그 tick에서 한 번만 확인한다 (0096)", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const worker = h.worker();
+    await worker.tick();
+    const check = vi.spyOn(h.runner(runnerId), "checkHealth");
+    h.advance(RUNNER_CHECK_INTERVAL_MS);
+    requestRunnerCheck(h.db, runnerId, h.now);
+
+    await worker.tick();
+
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(getRunnerCheckRequest(h.db, runnerId)).toMatchObject({ status: "done" });
+  });
 });

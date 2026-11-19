@@ -263,7 +263,7 @@ describe("Settings 저장하고 다시 열기", () => {
         sshTarget: "factory@runner-a.example.com",
         orcaPath: "/usr/local/bin/orca",
         capacity: 3,
-        check: { status: "pending", requestedAt: now.toISOString() },
+        check: { status: "pending", requestedAt: now.toISOString(), requestedAgoMs: 0 },
       },
     ]);
     expect(page.runnerProjects).toEqual([{ id: repo, name: "acme/web" }]);

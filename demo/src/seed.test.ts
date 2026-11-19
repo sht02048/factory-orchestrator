@@ -13,6 +13,7 @@ import {
   listWorkspaces,
   listRunPermissionWaits,
   listRunQuestions,
+  listRunnerSnapshots,
   listRunners,
   listRuns,
   migrate,
@@ -21,6 +22,7 @@ import {
 import type { Database } from "@ganger/db";
 import { createWorker } from "@ganger/worker";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { RUNNER_PROJECTS } from "./fixtures.js";
 import { hydrateWorld } from "./hydrate.js";
 import { HISTORY_DAYS, seedDemo } from "./seed.js";
 import { DemoWorld } from "./world.js";
@@ -86,14 +88,16 @@ describe("seedDemo", () => {
     expect(ended.every((run) => run.assignedAt.getTime() <= now.getTime())).toBe(true);
   });
 
-  it("러너 셋: Online, GitHub 인증 깨짐, Offline", async () => {
+  it("러너 셋: Online, 저장소 하나의 push 실패, Offline", async () => {
     await seedDemo(db, box, new DemoWorld(() => now), now);
     const runners = listRunners(db).map((r) => [r.name, r.online, r.assignmentBlocked]);
     expect(runners).toEqual([
       ["runner-a", true, false],
-      ["runner-b", true, true],
+      ["runner-b", true, false],
       ["runner-c", false, false],
     ]);
+    const blocked = listRunnerSnapshots(db, now).map((r) => r.blockedProjects);
+    expect(blocked).toEqual([[], [RUNNER_PROJECTS.at(-1)?.id], []]);
   });
 
   it("러너마다 공급자 사용량: 정상, 90% 이상과 100%, 로그인 안 함·쓰지 않음", async () => {

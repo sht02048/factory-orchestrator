@@ -1,5 +1,6 @@
 import type { WorkspaceId } from "@ganger/db";
 import type { McpActionView } from "../mcp/actions.js";
+import type { CheckFailure } from "../prerequisites.js";
 import type { McpLaunch } from "./mcp-launch.js";
 
 export const WORKSPACE_ITEMS = ["general", "projects", "mapping", "progress", "label"] as const;
@@ -91,10 +92,11 @@ export interface PrerequisiteView {
   hint: string | null;
   project: string | null;
   blocksAssignment: boolean;
+  failure: CheckFailure | null;
 }
 
 export type RunnerCheckView =
-  | { status: "pending"; requestedAt: string }
+  | { status: "pending"; requestedAt: string; requestedAgoMs?: number }
   | { status: "failed"; completedAt: string; completedAgoMs: number; error: string }
   | {
       status: "done";

@@ -90,5 +90,29 @@
       "fableWeekly": "Fable 주간",
       "monthly": "월간"
     }
+  },
+  "pushCheck": {
+    "name": "GitHub push",
+    "summary": "{total}개 중 {passed}개 통과",
+    "allPassed": "저장소 {total}개 모두 통과",
+    "none": "확인할 저장소가 없어요",
+    "failure": {
+      "auth": "인증 실패",
+      "network": "네트워크",
+      "timeout": "시간 초과",
+      "other": "기타"
+    },
+    "problemsLabel": "push 확인에 실패한 저장소",
+    "failedReason": "{kind} · {reason}",
+    "unknown": "확인하지 못했어요",
+    "unknownReason": "확인하지 못했어요 · {kind}",
+    "scope": "push가 안 되는 저장소의 티켓만 이 러너에 맡기지 않아요. 다른 저장소의 티켓은 그대로 맡겨요.",
+    "fix": {
+      "auth": "인증 실패: 러너에서 <code>gh auth login --insecure-storage</code>와 <code>gh auth setup-git</code>을 실행하거나 GitHub용 ssh 키를 둬요. 포크라면 origin이 쓰기 권한이 있는 포크를 가리키는지 확인해요.",
+      "network": "네트워크: 러너에서 GitHub에 닿는지(DNS, 프록시, 방화벽) 확인해요.",
+      "timeout": "시간 초과: GitHub 응답이 늦었어요. 잠시 뒤 다시 확인해요.",
+      "other": "기타: 이유를 보고 러너의 저장소 클론과 remote 설정을 확인해요."
+    },
+    "checking": "확인하는 중이에요 · {duration}째"
   }
 }
