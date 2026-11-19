@@ -99,6 +99,7 @@ function activityOf(agent: WorktreeAgent | null): AgentActivity {
 
 function isOrcaStopNotice(mail: MailRow, payload: MailPayload | null): boolean {
   if (mail.type !== "escalation") return false;
+  if (mail.id.startsWith(ORCA_FOLLOWUP_MAIL_PREFIX)) return true;
   const reason = payload?.stopReason ?? null;
   if (reason !== null) return UNREPORTED_STOP_REASONS.has(reason);
   return mail.id.startsWith(ORCA_STOP_MAIL_PREFIX);

@@ -46,7 +46,7 @@ blocked_by: [0118]
   - Orca가 올리는 멈춤 알림은 id가 `msg_stop_`로 시작하고 `priority: "high"`, payload에 `stopReason`이 있다. `finished`("Worker stopped without reporting"), `errored`("Worker stopped on an error without reporting"), `needs-input`("Worker is waiting on a prompt"), `lost`·`exited`. 본문에 `Last output:` 다음 줄부터 마지막 출력이 있고, 끝에 `Full output: …` 줄이 붙기도 한다.
   - 보고에서 "payload에 stopReason 없음"이라 본 것은 `inbox`의 짧은 보기 때문이다. 짧은 보기는 payload에서 id만 남긴다(help: "keep only payload ids"). Ganger는 `--full`로 읽어 `stopReason`이 온다.
   - 에이전트가 직접 보낸 escalation은 id가 `msg_<hex>`이고 `priority: "normal"`, payload에 `taskId`·`dispatchId`만 있다.
-  - Orca가 끝난 worker에게 메일을 전하지 못한 알림은 id가 `msg_followup_`로 시작하고 payload에 `reason`이 있다. 질문도 멈춤도 아니다.
+  - Orca가 끝난 worker에게 메일을 전하지 못한 알림은 id가 `msg_followup_`로 시작하고 payload에 `reason`이 있다. 질문이 아니고, 에이전트가 답을 받지 못해 일하지 않는 것이라 보고 없이 멈춤으로 본다(막힘 질문에 답했는데 끝난 에이전트를 깨우지 못하면 Running으로 남지 않게 한다).
 - **dispatch로 답 보내기**: `orchestration send --from <mailbox> --to dispatch:<id> --subject … --body …`의 결과는 `{ messageId }`다(`send-to-dispatch.json`). 시험 워커가 일하는 중에 보내니 차례가 끝난 뒤 받아 그 지시대로 완료 보고를 보냈다.
 
 ## 판정
@@ -63,6 +63,8 @@ blocked_by: [0118]
 
 - **시계 차이**: 에이전트 행의 시각과 escalation의 `created_at`은 러너 시계, 마지막으로 Running이 된 시각·`paused_since`는 서버 시계다. 두 기기 시계가 크게 어긋나면 지난 신호를 새 신호로 보거나 그 반대가 될 수 있다. 보통 NTP로 초 단위라 실제 간격(분 단위)보다 작다.
 - **id 접두사**: `stopReason`이 없을 때만 `msg_stop_` 접두사에 기댄다. Orca가 접두사를 바꾸면 그 경우는 10분 규칙으로만 알아본다.
+- **운영자가 멈춘 런도 다시 working이면 Running**: 운영자가 멈춘 뒤 러너에서 사람이 일을 시키거나 dispatch에 쌓인 메일이 에이전트를 깨우면 에이전트가 실제로 일하므로 Running으로 돌린다. 일하는 런을 Paused로 두고 시계를 멈추는 것보다 실제 상태를 보이는 쪽을 골랐다.
+- **올린 직후의 옛 escalation**: 이 버전을 올리면 진행 중인 런의 받은편지함에 남은, 아직 답하지 않은 막힘 escalation이 질문으로 올라온다. 보고된 런처럼 막혀 기다리는 런은 바로 질문이 되어야 해서 시각으로 거르지 않았다.
 - **10분 규칙의 오판**: 에이전트가 뒤에서 일을 기다리느라 차례를 끝낸 채 10분 넘게 있으면 보고 없이 멈춤으로 보일 수 있다. 셸이 뒤에서 돌면 행이 working이라 해당하지 않는다. 다시 working이 되면 Running으로 돌아가고, 그동안 최대 실행 시간 시계만 멈춘다.
 
 ## 0118이 남긴 확인(실제 러너, Claude Code)

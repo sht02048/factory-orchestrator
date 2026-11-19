@@ -259,12 +259,16 @@ describe("decideProgress: 러너에서 멈춘·막힌 에이전트(0120)", () =>
     });
   });
 
-  test("Orca가 메일을 전하지 못했다는 알림은 질문도 멈춤도 아니다", () => {
+  test("끝난 에이전트에게 메일을 전하지 못했다는 Orca 알림은 질문이 아니라 보고 없이 멈춘 것이다", () => {
     const progress = decideProgress({
       ...runnerStopRun,
       mails: mails0120("escalation-followup-full.json"),
     });
-    expect(progress).toMatchObject({ kind: "active", questions: [], unreportedStop: null });
+    expect(progress).toMatchObject({
+      kind: "active",
+      questions: [],
+      unreportedStop: { at: new Date("2026-11-18T13:25:10Z"), lastOutput: [] },
+    });
   });
 
   test("본 차례는 끝났어도 뒤에서 셸이 도는 에이전트는 working이다", () => {
