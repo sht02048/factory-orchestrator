@@ -33,7 +33,6 @@ export interface TickContext {
   unmarkedAnswers: Set<string>;
   unmarkedDenials: Set<string>;
   pendingEndings: Map<RunId, PendingEnding>;
-  resumesWithUnknownOutcome: Set<RunId>;
   prPolledAt: Map<RunId, number>;
   unrecordedComments: Map<RunId, { id: CommentId; at: Date }>;
   ticketsGone: Set<RunId>;

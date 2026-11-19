@@ -36,6 +36,7 @@ import {
   completeRunControlRequest,
   getRunControlRequest,
   listPendingRunControlRequests,
+  markRunControlOutcomeUnknown,
   requestRunControl,
   getRunCancelRequest,
   hasPendingCancelRequest,
@@ -647,7 +648,7 @@ describe("Paused(0118)", () => {
     expect(requestRunControl(db, id, "resume", at(1))).toEqual({ ok: false, reason: "not-paused" });
     expect(requestRunControl(db, id, "pause", at(1))).toEqual({ ok: true, requestedAt: at(1) });
     expect(listPendingRunControlRequests(db)).toEqual([
-      { runId: id, control: "pause", requestedAt: at(1) },
+      { runId: id, control: "pause", requestedAt: at(1), outcomeUnknown: false },
     ]);
     expect(getRunControlRequest(db, id)).toEqual({
       status: "pending",
@@ -665,6 +666,13 @@ describe("Paused(0118)", () => {
       error: "agent is gone",
     });
     expect(listPendingRunControlRequests(db)).toEqual([]);
+
+    expect(requestRunControl(db, id, "pause", at(2))).toMatchObject({ ok: true });
+    markRunControlOutcomeUnknown(db, { runId: id, requestedAt: at(2) });
+    expect(listPendingRunControlRequests(db)).toEqual([
+      { runId: id, control: "pause", requestedAt: at(2), outcomeUnknown: true },
+    ]);
+    expect(getRunControlRequest(db, id)).toMatchObject({ status: "pending" });
 
     requestRunCancel(db, id, at(3));
     expect(requestRunControl(db, id, "pause", at(4))).toEqual({ ok: false, reason: "cancelling" });

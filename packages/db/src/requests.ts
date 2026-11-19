@@ -249,10 +249,13 @@ export function requestRunControl(
   });
 }
 
+export const RUN_CONTROL_OUTCOME_UNKNOWN = "outcome-unknown";
+
 export interface PendingRunControlRequest {
   runId: RunId;
   control: RunControl;
   requestedAt: Date;
+  outcomeUnknown: boolean;
 }
 
 export function listPendingRunControlRequests(db: Database): PendingRunControlRequest[] {
@@ -261,11 +264,35 @@ export function listPendingRunControlRequests(db: Database): PendingRunControlRe
       runId: runControlRequests.runId,
       control: runControlRequests.control,
       requestedAt: runControlRequests.requestedAt,
+      error: runControlRequests.error,
     })
     .from(runControlRequests)
     .where(isNull(runControlRequests.completedAt))
     .orderBy(asc(runControlRequests.requestedAt), asc(runControlRequests.runId))
-    .all();
+    .all()
+    .map(({ error, ...request }) => ({
+      ...request,
+      outcomeUnknown: error === RUN_CONTROL_OUTCOME_UNKNOWN,
+    }));
+}
+
+export function markRunControlOutcomeUnknown(
+  db: Database,
+  input: { runId: RunId; requestedAt: Date },
+): boolean {
+  return (
+    db
+      .update(runControlRequests)
+      .set({ error: RUN_CONTROL_OUTCOME_UNKNOWN })
+      .where(
+        and(
+          eq(runControlRequests.runId, input.runId),
+          eq(runControlRequests.requestedAt, input.requestedAt),
+          isNull(runControlRequests.completedAt),
+        ),
+      )
+      .run().changes > 0
+  );
 }
 
 export function completeRunControlRequest(

@@ -303,7 +303,7 @@ function end(
   });
 }
 
-const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 21, 22, 23], GLX: [2] };
+const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 21, 22, 23, 24], GLX: [2] };
 const HISTORY_TICKETS = [
   range(1, 35).filter((n) => !ACTIVE_TICKETS.ACME.includes(n)),
   range(1, 10).filter((n) => !ACTIVE_TICKETS.GLX.includes(n)),

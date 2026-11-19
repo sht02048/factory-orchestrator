@@ -6,6 +6,7 @@ import {
   getRunWithRecords,
   hasPendingCancelRequest,
   listPendingRunControlRequests,
+  markRunControlOutcomeUnknown,
 } from "@ganger/db";
 import type { PendingRunControlRequest } from "@ganger/db";
 import { findRunner, mailboxFor, runnerErrorDetail, tryWrite } from "./context.js";
@@ -35,7 +36,6 @@ export async function processRunControlRequests(context: TickContext): Promise<v
       failure = failureOf(detail);
     }
     if (keepTrying(context, request, detail)) continue;
-    context.resumesWithUnknownOutcome.delete(request.runId);
     tryWrite(context, request.runId, () =>
       completeRunControlRequest(context.db, {
         runId: request.runId,
@@ -54,13 +54,10 @@ function keepTrying(
 ): boolean {
   if (request.control !== "resume" || detail === null) return false;
   if (detail.kind === "start-outcome-unknown") {
-    context.resumesWithUnknownOutcome.add(request.runId);
+    tryWrite(context, request.runId, () => markRunControlOutcomeUnknown(context.db, request));
     return true;
   }
-  return (
-    context.resumesWithUnknownOutcome.has(request.runId) &&
-    failureOf(detail) === "runner-unreachable"
-  );
+  return request.outcomeUnknown && failureOf(detail) === "runner-unreachable";
 }
 
 async function applyRunControl(
@@ -72,7 +69,7 @@ async function applyRunControl(
   if (run === undefined || run.state === "queued" || run.state === "ended") return "state-changed";
   if (!planRunControl(run.state, request.control).ok) return "state-changed";
   const cancelling = hasPendingCancelRequest(db, run.id);
-  const unknownResume = context.resumesWithUnknownOutcome.has(run.id);
+  const unknownResume = request.outcomeUnknown;
   if (cancelling && !unknownResume) return "state-changed";
   const stored = findRunner(db, run.runnerId);
   if (stored === undefined) return "runner-error";

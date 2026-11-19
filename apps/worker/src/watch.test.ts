@@ -890,7 +890,7 @@ describe("멈추기·재개(0118)", () => {
     expect(agentOf(run, runnerId).resumes).toHaveLength(2);
   });
 
-  it("결과를 모르는 재개 뒤 취소하면 뜬 세션을 이어 받아 멈추고 끝낸다", async () => {
+  it("결과를 모르는 재개 뒤 worker가 다시 떠도, 취소하면 뜬 세션을 이어 받아 멈추고 끝낸다", async () => {
     const { run, runnerId, worker } = await startOne();
     await pause(run, worker);
     h.runner(runnerId).vanish(worktreeOf(run));
@@ -898,7 +898,7 @@ describe("멈추기·재개(0118)", () => {
     expect(requestRunControl(h.db, run.id, "resume", h.now)).toMatchObject({ ok: true });
     await worker.tick();
     requestRunCancel(h.db, run.id, h.now);
-    await worker.tick();
+    await h.worker().tick();
     expect(ended(run).agentResult).toBe("canceled");
     expect(agentOf(run, runnerId).agentStopped).toBe(true);
     expect(agentOf(run, runnerId).resumes.at(-1)?.startIfGone).toBe(false);

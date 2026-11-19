@@ -710,14 +710,25 @@ export class OrcaRunner implements Runner {
     runId: string,
     exceptDispatch: string,
   ): Promise<AgentRef | null> {
+    for (const run of [runId, null]) {
+      const found = await this.unsettledWorkerAt(worktree, run, exceptDispatch);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+
+  private async unsettledWorkerAt(
+    worktree: WorktreeRef,
+    runId: string | null,
+    exceptDispatch: string,
+  ): Promise<AgentRef | null> {
     let cursor: string | null = null;
     for (let page = 0; page < WORKER_LIST_MAX_PAGES; page += 1) {
       const result: z.infer<typeof workerListResultSchema> = await this.orca(
         [
           "orchestration",
           "worker-list",
-          "--run",
-          runId,
+          ...(runId === null ? [] : ["--run", runId]),
           "--limit",
           "100",
           ...(cursor === null ? [] : ["--cursor", cursor]),
@@ -726,8 +737,16 @@ export class OrcaRunner implements Runner {
       );
       for (const worker of result.workers) {
         if (worker.workspace !== worktree || worker.dispatchId === exceptDispatch) continue;
-        const candidate = { dispatchId: worker.dispatchId, taskId: worker.taskId, runId };
-        if ((await this.liveAgentTerminal(candidate)) !== null) return encodeAgent(candidate);
+        const shown = await this.orca(
+          ["orchestration", "worker-show", "--dispatch", worker.dispatchId],
+          workerShowResultSchema,
+        );
+        if (shown.liveness === "exited" || shown.state === "failed") continue;
+        return encodeAgent({
+          dispatchId: worker.dispatchId,
+          taskId: worker.taskId,
+          runId: shown.runId,
+        });
       }
       const next = result.nextCursor ?? null;
       if (next === null || next === cursor || result.workers.length === 0) return null;

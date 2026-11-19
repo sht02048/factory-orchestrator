@@ -1146,10 +1146,12 @@ describe("pauseAgent and resumeAgent", () => {
       taskId: "task_new",
       runId: "run_493ebb2f403d",
     });
-    expect(exec.commands()[2]).toBe(
+    expect(exec.commands()[1]).toContain("worker-list --run run_493ebb2f403d");
+    expect(exec.commands()[2]).toBe(`${ORCA} orchestration worker-list --limit 100 --json`);
+    expect(exec.commands()[3]).toBe(
       `${ORCA} orchestration worker-start --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --run run_493ebb2f403d --spec-file - --task-title 'resume task_43a3a070dc4c' --worktree 'id:${WORKTREE}' --agent claude --json`,
     );
-    expect(exec.calls[2]?.stdin).toBe(resumeInput.restartPrompt);
+    expect(exec.calls[3]?.stdin).toBe(resumeInput.restartPrompt);
     expect(exec.commands().some((command) => command.includes("--name"))).toBe(false);
   });
 
@@ -1222,6 +1224,33 @@ describe("pauseAgent and resumeAgent", () => {
     expect(
       await adapterError(runnerWith(exec).resumeAgent(RUN, { ...resumeInput, startIfGone: false })),
     ).toMatchObject({ kind: "runner-error", code: "agent_not_running" });
+    expect(exec.commands().some((command) => command.includes("worker-start"))).toBe(false);
+  });
+
+  test("a retry adopts a worker that is still starting in the same worktree", async () => {
+    const exec = new ScriptedExec()
+      .orca(
+        "orchestration worker-show --dispatch ctx_a6e6a23a7132",
+        shown({ liveness: "exited", terminal: null }),
+      )
+      .orca(
+        "orchestration worker-list",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: {
+              workers: [{ dispatchId: "ctx_starting", taskId: "task_s", workspace: WORKTREE }],
+              nextCursor: null,
+            },
+          }),
+        ),
+      )
+      .orca(
+        "orchestration worker-show --dispatch ctx_starting",
+        shown({ liveness: "unverifiable", terminal: null }),
+      );
+    const resumed = await runnerWith(exec).resumeAgent(RUN, resumeInput);
+    expect(decodeAgent(resumed.agentRef)?.dispatchId).toBe("ctx_starting");
     expect(exec.commands().some((command) => command.includes("worker-start"))).toBe(false);
   });
 });
