@@ -296,7 +296,28 @@ describe("Dashboard 상세 패널(브라우저, 0100)", () => {
     const url = new URL(retry ?? "", baseUrl);
     expect(url.pathname).toBe("/tickets");
     expect(url.searchParams.get("ws")).toBe(workspaceId);
-    expect(url.searchParams.get("sel")).toBe(JSON.stringify([connection, "ACME-34"]));
+    expect(url.searchParams.get("sel")).toBe(
+      JSON.stringify(JSON.stringify([connection, "ACME-34"])),
+    );
+
+    await panel.getByRole("link", { name: home.sheet.retry }).click();
+    await page.waitForURL(/\/tickets/);
+    await hydrated(page);
+    const search = await page.evaluate(() => {
+      const router: unknown = Reflect.get(globalThis, "__TSR_ROUTER__");
+      const state: unknown =
+        router === undefined ? undefined : Reflect.get(Object(router), "state");
+      const location: unknown =
+        state === undefined ? undefined : Reflect.get(Object(state), "location");
+      return location === undefined
+        ? undefined
+        : JSON.stringify(Reflect.get(Object(location), "search"));
+    });
+    expect(JSON.parse(search ?? "{}")).toMatchObject({
+      ws: workspaceId,
+      sel: JSON.stringify([connection, "ACME-34"]),
+    });
+    await page.getByRole("heading", { level: 1, name: "Tickets" }).waitFor();
   });
 });
 

@@ -19,7 +19,7 @@ Dashboard 본문을 런 상태 기준 칸반 세 칸(Queued, Running, Done today
    - Queued: Queued 런.
    - Running: Running·Waiting for Input·Disconnected 런. Waiting for Input은 꼬리표 Question 또는 Permission(무엇을 기다리는지 아직 모르면 Waiting for Input), Disconnected는 꼬리표 Disconnected.
    - Done today: 꼬리표 Human Check·Failed 카드(To do에 오른 끝난 런)와 오늘 끝난 나머지 런. 나머지 런(Merged·Canceled, 이후 PR 상태가 기록된 Human Check, 새 런에 밀린 Failed)은 소제목 "처리할 일 없이 끝났어요" 아래에 모은다. To do에 오른 끝난 런은 어제 끝났어도 이 칸에 꼬리표로 남는다(처리할 일이 화면에서 사라지지 않게).
-2. **꼬리표.** 손댈 일(Question·Permission·Human Check·Failed·Disconnected)은 카드 위 꼬리표(`StatusPill`, 점 + 이름)로 보인다. 꼬리표 카드가 칸 맨 위에 온다. Question 카드에는 질문 한 줄과 "답하기", Human Check 카드에는 "PR 보기"가 있다.
+2. **꼬리표.** 손댈 일(Question·Permission·Human Check·Failed·Disconnected)은 카드 위 꼬리표(`StatusPill`, 점 + 이름)로 보인다. 꼬리표 카드가 칸 맨 위에 온다. Question 카드에는 질문(두 줄까지, 전체는 패널)과 "답하기", Human Check 카드에는 "PR 보기"가 있다.
 3. **머리.** 제목 "처리할 일이 {n}개 있어요" + 요약 문장은 그대로 두고, 오른쪽에 "모두 / 처리할 일만 {n}" 분할 버튼을 둔다. 처리할 일만이면 꼬리표 카드만 남긴다. 주소(`?view=todo`)에 남겨 새로 고침에도 그대로다.
 4. **Runners 열.** 지금 Runners 구역(목록, 문제 카드, Runners에서 고치기)을 그대로 오른쪽 열(`dashboardSideWidth`)에 둔다.
 5. **상세 패널.** 카드를 누르면 오른쪽에 덮여 열리는 패널(`Sheet`)이 열린다. Question이면 라디오 선택지·직접 쓰기·⌘ Enter 보내기를 패널 안에서, Permission이면 러너에서 허용하라는 안내와 거절, Human Check면 PR 링크, Failed면 이유(에이전트 결과·PR 상태 두 축)와 Tickets에서 다시 맡기기(Tickets의 새 런 시작을 그대로 쓴다), 그 밖엔 런 요약을 보인다. 모든 패널 끝에 "Run 상세 보기"가 있다. 닫기 버튼·Esc·바깥 누르기로 닫고 포커스는 누른 카드로 돌아간다. 카드의 "답하기"는 패널을 Question 상태로 연다. 지금의 답하기·거절하기 레이어는 이 패널로 바꾼다.

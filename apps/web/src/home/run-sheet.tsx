@@ -64,7 +64,11 @@ export function RunSheet({
       open={open}
       onOpenChange={onOpenChange}
       status={<SheetStatus run={run} status={status} />}
-      title={run.ticketTitle === null ? run.ticketKey : `${run.ticketKey} ${run.ticketTitle}`}
+      title={
+        run.ticketTitle === null
+          ? run.ticketKey
+          : t("title", { key: run.ticketKey, title: run.ticketTitle })
+      }
       closeLabel={t("close")}
       {...(initialFocus === undefined ? {} : { initialFocus })}
       finalFocus={finalFocus}

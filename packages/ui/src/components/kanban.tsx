@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { useId } from "react";
 import type { ReactNode, Ref } from "react";
+import { focusStyles } from "./focus";
 import { textStyles } from "./text";
 import { colors, fontSize, radius, size, space } from "../tokens.stylex";
 
@@ -78,7 +79,12 @@ export function KanbanCard({
         aria-labelledby={nameId}
         {...(described.length === 0 ? {} : { "aria-describedby": described.join(" ") })}
         onClick={onOpen}
-        {...stylex.props(styles.open, selected && styles.selected)}
+        {...stylex.props(
+          styles.open,
+          focusStyles.ring,
+          styles.openRadius,
+          selected && styles.selected,
+        )}
       >
         {tag === undefined ? null : (
           <span id={tagId} {...stylex.props(styles.tag)}>
@@ -161,7 +167,6 @@ const styles = stylex.create({
     margin: 0,
     padding: space.s3,
     borderWidth: 0,
-    borderRadius: radius.control,
     backgroundColor: {
       default: colors.bgRaised,
       ":hover": { default: null, "@media (hover: hover)": colors.bgRaisedHover },
@@ -170,9 +175,8 @@ const styles = stylex.create({
     font: "inherit",
     textAlign: "start",
     cursor: "pointer",
-    outline: { default: "none", ":focus-visible": `2px solid ${colors.accentText}` },
-    outlineOffset: 2,
   },
+  openRadius: { borderRadius: radius.control },
   selected: { boxShadow: `inset 0 0 0 1px ${colors.borderSelected}` },
   tag: { display: "flex", paddingBottom: space.s1 },
   title: { display: "block", minWidth: 0, overflowWrap: "anywhere" },

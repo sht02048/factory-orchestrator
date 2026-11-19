@@ -74,6 +74,7 @@
     "openPr": "PR 보기"
   },
   "sheet": {
+    "title": "{key} {title}",
     "close": "닫기",
     "runDetail": "Run 상세 보기",
     "since": {

@@ -1,4 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
+import { defaultStringifySearch } from "@tanstack/react-router";
 import { Text } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
 import type { RunId } from "@ganger/core";
@@ -88,7 +89,7 @@ export function ticketHref(run: HomeRun): string {
 }
 
 export function href(path: string, search: Record<string, string>): string {
-  return `${path}?${new URLSearchParams(search).toString()}`;
+  return `${path}${defaultStringifySearch(search)}`;
 }
 
 const styles = stylex.create({

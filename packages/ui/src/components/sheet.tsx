@@ -9,16 +9,8 @@ import {
 import type { ReactNode } from "react";
 import { cx } from "../cx";
 import { buttonStyles } from "./button";
-import {
-  colors,
-  fontSize,
-  fontWeight,
-  lineHeight,
-  motion,
-  shadow,
-  size,
-  space,
-} from "../tokens.stylex";
+import { textStyles } from "./text";
+import { colors, fontSize, lineHeight, motion, shadow, size, space } from "../tokens.stylex";
 
 export interface SheetProps {
   open: boolean;
@@ -58,7 +50,7 @@ export function Sheet({
           </DialogClose>
         </div>
         <div {...stylex.props(styles.titleBlock)}>
-          <DialogTitle className={cx(styles.title)}>{title}</DialogTitle>
+          <DialogTitle className={cx(textStyles("panel"), styles.title)}>{title}</DialogTitle>
           {subtitle === undefined ? null : <p {...stylex.props(styles.subtitle)}>{subtitle}</p>}
         </div>
         {children}
@@ -123,13 +115,7 @@ const styles = stylex.create({
     fontVariantNumeric: "tabular-nums",
   },
   titleBlock: { display: "flex", flexDirection: "column", gap: space.s1, minWidth: 0 },
-  title: {
-    margin: 0,
-    fontSize: fontSize.panel,
-    fontWeight: fontWeight.semibold,
-    lineHeight: lineHeight.snug,
-    overflowWrap: "anywhere",
-  },
+  title: { margin: 0, overflowWrap: "anywhere" },
   subtitle: {
     margin: 0,
     color: colors.textTertiary,
