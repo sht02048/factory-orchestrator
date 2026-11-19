@@ -10,6 +10,7 @@ import type { Browser, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 import type { TestContext } from "vitest";
 import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" };
+import tickets from "../../apps/web/messages/ko/tickets.json" with { type: "json" };
 import { TRACKER_DELAY_MS } from "./browser/slow-tracker-adapters.js";
 import { navigationWorkspace, startNavigationWorld, watchedTicket } from "./navigation-world.js";
 import type { NavigationWorld } from "./navigation-world.js";
@@ -112,6 +113,18 @@ describe("원격에서 화면 옮기기(브라우저, 0122)", () => {
 
     const seen = await watchPendingBar(page);
     await navigateByRail(page, "dashboard", "first");
+    expect(await seen()).toBe(false);
+  });
+
+  it("화면 이동이 아닌 다시 읽기(트래커에서 다시 읽기)에는 진행 줄을 켜지 않는다", async (context) => {
+    const page = await newPage(context);
+    await open(page, "/tickets", "tickets");
+
+    const seen = await watchPendingBar(page);
+    const started = Date.now();
+    await page.getByRole("button", { name: tickets.reread.action }).click();
+    await page.getByRole("status").getByText(tickets.reread.done).waitFor();
+    expect(Date.now() - started).toBeGreaterThanOrEqual(TRACKER_DELAY_MS);
     expect(await seen()).toBe(false);
   });
 

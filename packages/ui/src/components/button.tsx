@@ -22,17 +22,32 @@ export interface ButtonProps {
   "aria-busy"?: boolean;
   "aria-disabled"?: boolean;
   ref?: Ref<HTMLButtonElement>;
+  busy?: { active: boolean; label: ReactNode };
 }
 
-export function Button({ variant = "secondary", children, onClick, ...props }: ButtonProps) {
+export function Button({ variant = "secondary", children, onClick, busy, ...props }: ButtonProps) {
+  const busyProps =
+    busy === undefined ? {} : { "aria-busy": busy.active, "aria-disabled": busy.active };
+  const disabled = props["aria-disabled"] === true || busy?.active === true;
+  const handleClick = busy?.active === true ? undefined : onClick;
   return (
     <SdkButton
       {...props}
+      {...busyProps}
       data-variant={variant}
-      {...(onClick === undefined ? {} : { onClick })}
-      className={(s) => cx(...buttonStyles(variant, s.disabled || props["aria-disabled"] === true))}
+      {...(handleClick === undefined ? {} : { onClick: handleClick })}
+      className={(s) => cx(...buttonStyles(variant, s.disabled || disabled))}
     >
-      {children}
+      {busy === undefined ? (
+        children
+      ) : (
+        <span {...stylex.props(styles.labels)}>
+          <span {...stylex.props(styles.label, busy.active && styles.labelHidden)}>{children}</span>
+          <span {...stylex.props(styles.label, !busy.active && styles.labelHidden)}>
+            {busy.label}
+          </span>
+        </span>
+      )}
     </SdkButton>
   );
 }
@@ -48,6 +63,9 @@ export function buttonStyles(variant: ButtonVariant, disabled = false): Readonly
 }
 
 const styles = stylex.create({
+  labels: { display: "grid" },
+  label: { gridArea: "1 / 1" },
+  labelHidden: { visibility: "hidden" },
   base: {
     position: "relative",
     display: "inline-flex",

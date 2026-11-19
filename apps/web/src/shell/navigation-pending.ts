@@ -67,7 +67,10 @@ export class DelayedPending {
 }
 
 export function useNavigationPending(): boolean {
-  const loading = useRouterState({ select: (state) => state.status === "pending" });
+  const loading = useRouterState({
+    select: (state) =>
+      state.status === "pending" && state.location.href !== state.resolvedLocation?.href,
+  });
   const [shown, setShown] = useState(false);
   const pending = useRef<DelayedPending | null>(null);
   useEffect(() => {

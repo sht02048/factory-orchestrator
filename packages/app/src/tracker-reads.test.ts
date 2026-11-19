@@ -152,4 +152,23 @@ describe("트래커 읽기 담아 두기(0122)", () => {
     fail = false;
     await expect(cached.listStates(project)).resolves.toEqual([]);
   });
+
+  it("새로 담을 때 세대가 지났거나 최대 시간을 넘긴 항목은 지워, 쪽 커서가 바뀌어도 쌓이지 않는다", async () => {
+    const { db, tracker } = setup();
+    let clock = 0;
+    const reads = new TrackerReads({ now: () => clock });
+    const cached = reads.wrap(db, connection, tracker);
+    await cached.listProjectTickets(project, { first: 1, after: "cursor-a" });
+    await cached.listProjectTickets(project, { first: 1, after: "cursor-b" });
+    expect(reads.entryCount()).toBe(2);
+
+    clock += TRACKER_READ_MAX_AGE_MS;
+    await cached.listProjectTickets(project, { first: 1, after: "cursor-c" });
+    expect(reads.entryCount()).toBe(1);
+
+    markTrackerChanged(db, connection);
+    await cached.listStates(project);
+    await cached.listProjectTickets(project, { first: 1, after: "cursor-d" });
+    expect(reads.entryCount()).toBe(2);
+  });
 });

@@ -67,7 +67,7 @@ function TicketsRoute() {
         }}
         onReread={async () => {
           await rereadTrackers();
-          await router.invalidate();
+          await router.invalidate({ sync: true });
         }}
       />
     </ScreenMessages>

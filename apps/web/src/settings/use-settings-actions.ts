@@ -56,7 +56,7 @@ export function useSettingsActions(): SettingsActions {
       },
       reloadFromTracker: async () => {
         await rereadTrackers();
-        await router.invalidate();
+        await router.invalidate({ sync: true });
       },
       saveConnection: then((data) => saveTrackerConnection({ data })),
       checkConnection: (data) => checkTrackerConnectionNow({ data }),

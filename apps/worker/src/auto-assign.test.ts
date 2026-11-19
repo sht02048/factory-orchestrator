@@ -323,7 +323,12 @@ describe("폴링 보정", () => {
     putTicket("ENG-1", [autoLabel]);
     h.advance(POLL_CORRECTION_INTERVAL_MS);
     await worker.tick();
-    expect(trackerReadGeneration(h.db, connection)).toBeGreaterThan(0);
+    const marked = trackerReadGeneration(h.db, connection);
+    expect(marked).toBeGreaterThan(0);
+
+    h.advance(POLL_CORRECTION_INTERVAL_MS);
+    await worker.tick();
+    expect(trackerReadGeneration(h.db, connection)).toBe(marked);
   });
 
   it("폴링 보정으로 할당한 런은 트래커에서 읽은 티켓 제목을 할당 때 저장한다(0064)", async () => {

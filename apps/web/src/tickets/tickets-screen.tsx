@@ -25,7 +25,6 @@ import {
   TableRow,
   TableRows,
   Text,
-  showToast,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -114,40 +113,41 @@ function AllWorkspaces({
   );
 }
 
-type RereadResult = "idle" | "reading" | "failed";
+type RereadResult = "idle" | "reading" | "checking" | "done" | "failed";
 
-function RereadButton({ onReread }: { onReread: () => Promise<void> }) {
+export const REREAD_NOTICE_MS = 5_000;
+
+function RereadButton({
+  onReread,
+  failedProjects,
+}: {
+  onReread: () => Promise<void>;
+  failedProjects: number;
+}) {
   const t = useTranslations("tickets.reread");
   const [result, setResult] = useState<RereadResult>("idle");
-  const reading = result === "reading";
+  useEffect(() => {
+    if (result === "checking") setResult(failedProjects > 0 ? "failed" : "done");
+    if (result !== "done") return;
+    const timer = setTimeout(() => setResult("idle"), REREAD_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [result, failedProjects]);
   return (
     <div {...stylex.props(styles.reread)}>
       <Button
-        aria-disabled={reading}
-        aria-busy={reading}
+        busy={{ active: result === "reading", label: t("reading") }}
         onClick={() => {
-          if (reading) return;
           setResult("reading");
           onReread().then(
-            () => {
-              setResult("idle");
-              showToast(t("done"));
-            },
+            () => setResult("checking"),
             () => setResult("failed"),
           );
         }}
       >
-        <span {...stylex.props(styles.stackedLabels)}>
-          <span {...stylex.props(styles.stackedLabel, reading && styles.hiddenLabel)}>
-            {t("action")}
-          </span>
-          <span {...stylex.props(styles.stackedLabel, !reading && styles.hiddenLabel)}>
-            {t("reading")}
-          </span>
-        </span>
+        {t("action")}
       </Button>
-      <Text variant="meta" tone="problem" role="status">
-        {result === "failed" ? t("failed") : ""}
+      <Text variant="meta" role="status" {...(result === "failed" ? { tone: "problem" } : {})}>
+        {result === "done" ? t("done") : result === "failed" ? t("failed") : ""}
       </Text>
     </div>
   );
@@ -210,7 +210,9 @@ function TicketsList({
           subtitle={t("summary", { count: counts.assignable })}
           {...(page.trackerProjectCount === 0
             ? {}
-            : { actions: <RereadButton onReread={onReread} /> })}
+            : {
+                actions: <RereadButton onReread={onReread} failedProjects={page.errors.length} />,
+              })}
         />
       }
     >
@@ -559,9 +561,6 @@ function RunTiming({ run }: { run: TicketRun }) {
 const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
   reread: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: space.s1 },
-  stackedLabels: { display: "grid" },
-  stackedLabel: { gridArea: "1 / 1" },
-  hiddenLabel: { visibility: "hidden" },
   listFrame: {
     display: "grid",
     gridTemplateRows: "auto minmax(0, 1fr)",

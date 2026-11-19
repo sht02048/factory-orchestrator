@@ -60,6 +60,7 @@ class StaleWhileRevalidate<T> {
     const startedAt = this.#timing.now();
     const promise = fetch()
       .then((value) => {
+        this.#forgetOutdated(generation);
         const current = this.#entries.get(key);
         if (current === undefined || current.generation <= generation)
           this.#entries.set(key, { value, fetchedAt: startedAt, generation });
@@ -70,6 +71,18 @@ class StaleWhileRevalidate<T> {
       });
     this.#running.set(key, { promise, generation });
     return promise;
+  }
+
+  get size(): number {
+    return this.#entries.size;
+  }
+
+  #forgetOutdated(generation: number): void {
+    const now = this.#timing.now();
+    for (const [key, entry] of this.#entries) {
+      if (entry.generation < generation || now - entry.fetchedAt >= this.#timing.maxAgeMs)
+        this.#entries.delete(key);
+    }
   }
 }
 
@@ -118,6 +131,13 @@ export class TrackerReads {
       setState: (key, stateId) => tracker.setState(key, stateId),
       addComment: (key, body) => tracker.addComment(key, body),
     };
+  }
+
+  entryCount(): number {
+    let count = 0;
+    for (const reads of this.#connections.values())
+      count += reads.tickets.size + reads.projects.size + reads.labels.size + reads.states.size;
+    return count;
   }
 
   #readsOf(connection: TrackerConnectionId): ConnectionReads {

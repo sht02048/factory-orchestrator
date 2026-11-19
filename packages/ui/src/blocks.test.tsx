@@ -53,6 +53,23 @@ describe("Text tone·속성(티켓 0074)", () => {
 });
 
 describe("Button aria 속성(티켓 0067·0074)", () => {
+  it("busy 는 두 라벨을 겹쳐 폭을 그대로 두고, 진행 중이면 aria-busy·aria-disabled 와 진행 라벨만 이름으로 남긴다(0122)", () => {
+    const idle = renderToString(
+      <Button busy={{ active: false, label: "다시 읽는 중…" }}>다시 읽기</Button>,
+    );
+    const busy = renderToString(
+      <Button busy={{ active: true, label: "다시 읽는 중…" }}>다시 읽기</Button>,
+    );
+    expect(idle).toContain('aria-busy="false"');
+    expect(idle).toMatch(/<span[^>]*>다시 읽기<\/span><span[^>]*>다시 읽는 중…<\/span>/);
+    expect(busy).toContain('aria-busy="true"');
+    expect(busy).toContain('aria-disabled="true"');
+    const hiddenClass = (html: string, label: string) =>
+      new RegExp(`<span class="([^"]*)">${label}</span>`).exec(html)?.[1];
+    expect(hiddenClass(idle, "다시 읽는 중…")).toBe(hiddenClass(busy, "다시 읽기"));
+    expect(hiddenClass(idle, "다시 읽기")).toBe(hiddenClass(busy, "다시 읽는 중…"));
+  });
+
   it("aria-pressed·aria-describedby 를 넘긴다", () => {
     const html = renderToString(
       <Button aria-pressed aria-describedby="hint">

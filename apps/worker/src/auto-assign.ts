@@ -31,10 +31,11 @@ const POLL_CORRECTION_OVERLAP_MS = 60_000;
 export interface AutoAssignState {
   nextPollAt: number;
   polledAt: Map<string, number>;
+  changedUpTo: Map<string, number>;
 }
 
 export function createAutoAssignState(): AutoAssignState {
-  return { nextPollAt: 0, polledAt: new Map() };
+  return { nextPollAt: 0, polledAt: new Map(), changedUpTo: new Map() };
 }
 
 export async function assignAutomatically(context: TickContext): Promise<void> {
@@ -120,7 +121,12 @@ async function correctByPolling(context: TickContext): Promise<void> {
       logger.warn("could not list labeled tickets", { connection, labelId, error });
       continue;
     }
-    if (tickets.length > 0) markTrackerChanged(context.db, connection);
+    const changedUpTo = autoAssign.changedUpTo.get(key) ?? Number.NEGATIVE_INFINITY;
+    const latest = Math.max(changedUpTo, ...tickets.map((ticket) => ticket.updatedAt.getTime()));
+    if (latest > changedUpTo) {
+      markTrackerChanged(context.db, connection);
+      autoAssign.changedUpTo.set(key, latest);
+    }
     let complete = true;
     for (const ticket of tickets) {
       try {
