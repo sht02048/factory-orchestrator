@@ -7,6 +7,7 @@ import { loadRunDetail } from "@ganger/app/run-detail/load";
 import { loadSettingsPage } from "@ganger/app/settings/load";
 import {
   SecretBox,
+  getMapping,
   getRunCancelRequest,
   listRecentMcpActions,
   listRunMcpActions,
@@ -17,7 +18,7 @@ import {
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
-import { toRunId } from "@ganger/core";
+import { toRunId, toTrackerConnectionId, toTrackerProjectId } from "@ganger/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createMcpServer } from "./server.js";
@@ -208,6 +209,36 @@ describe("MCP 쓰기 도구", () => {
     expect(saved.isError).toBe(false);
     const after = listRunners(seeded.db).find((r) => r.id === runnerId);
     expect(after).toEqual({ ...before, capacity: 5 });
+  });
+
+  it("화면이 거절하는 값(옵션처럼 보이는 model 등)은 MCP로도 저장하지 않고 거절로 남긴다", async () => {
+    await connect();
+    for (const model of ["-x", "a b", "bad\u0007"]) {
+      const saved = await call("set_mapping", {
+        connection: "Acme",
+        project: "Web",
+        runnerProject: "github:acme/web",
+        agent: "claude",
+        model,
+      });
+      expect(saved.isError).toBe(true);
+    }
+    const blank = await call("set_in_progress_state", {
+      connection: "Acme",
+      project: "Web",
+      state: "   ",
+    });
+    expect(blank.isError).toBe(true);
+    expect(
+      getMapping(seeded.db, toTrackerConnectionId("conn-acme"), toTrackerProjectId("tp-web"))
+        ?.model,
+    ).toBeNull();
+    expect(listRecentMcpActions(seeded.db, 10).map((a) => [a.tool, a.outcome, a.reason])).toEqual([
+      ["set_in_progress_state", "rejected", "invalid"],
+      ["set_mapping", "rejected", "invalid"],
+      ["set_mapping", "rejected", "invalid"],
+      ["set_mapping", "rejected", "invalid"],
+    ]);
   });
 
   it("되돌릴 수 없는 도구에만 파괴적 표시를 단다", async () => {

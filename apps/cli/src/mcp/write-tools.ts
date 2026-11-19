@@ -1,6 +1,8 @@
 import {
   AnswerRejectedError,
   DenyRejectedError,
+  answerInput,
+  denyInput,
   submitAnswer,
   submitDenial,
 } from "@ganger/app/home/actions";
@@ -13,6 +15,12 @@ import { requestRunLogTail } from "@ganger/app/run-detail/load";
 import {
   RUNNER_CAPACITY_MAX,
   addTrackerProject,
+  addTrackerProjectInput,
+  generalInput,
+  inProgressInput,
+  labelInput,
+  mappingInput,
+  runnerCapacityInput,
   checkGitHubToken,
   checkTrackerConnection,
   removeTrackerProject,
@@ -140,7 +148,17 @@ export function registerWriteTools(
       sync();
       return fail(WRITES_OFF_ERROR);
     }
-    const outcome = await act();
+    let outcome: Outcome;
+    try {
+      outcome = await act();
+    } catch (error) {
+      outcome = rejected({
+        target: null,
+        runId: null,
+        reason: "error",
+        error: `Ganger could not do this: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
     recordMcpAction(context.db, {
       at: context.now(),
       client: mcpClientName(server.server.getClientVersion()?.name),
@@ -175,6 +193,23 @@ export function registerWriteTools(
       }),
     );
   }
+
+  const screenChecked = <S extends z.ZodType>(
+    schema: S,
+    value: z.input<S>,
+    where: { target: string | null; runId: RunId | null },
+  ): { ok: true; data: z.output<S> } | { ok: false; outcome: Outcome } => {
+    const parsed = schema.safeParse(value);
+    if (parsed.success) return { ok: true, data: parsed.data };
+    return {
+      ok: false,
+      outcome: rejected({
+        ...where,
+        reason: "invalid",
+        error: `The app would refuse these values: ${parsed.error.message}`,
+      }),
+    };
+  };
 
   const findRun = (runId: string) => getRun(context.db, toRunId(runId));
   const noRun = (runId: string) =>
@@ -369,7 +404,9 @@ export function registerWriteTools(
         });
       }
       try {
-        submitAnswer(context.db, { runId: run.id, questionId: id, answer }, context.now());
+        const input = screenChecked(answerInput, { runId: run.id, questionId: id, answer }, base);
+        if (!input.ok) return input.outcome;
+        submitAnswer(context.db, input.data, context.now());
       } catch (error) {
         if (!(error instanceof AnswerRejectedError)) throw error;
         return rejected({
@@ -409,11 +446,13 @@ export function registerWriteTools(
         });
       }
       try {
-        submitDenial(
-          context.db,
+        const input = screenChecked(
+          denyInput,
           { runId: run.id, promptId: id, reason: reason ?? "" },
-          context.now(),
+          base,
         );
+        if (!input.ok) return input.outcome;
+        submitDenial(context.db, input.data, context.now());
       } catch (error) {
         if (!(error instanceof DenyRejectedError)) throw error;
         return rejected({
@@ -499,11 +538,17 @@ export function registerWriteTools(
             error: "The workspace is gone.",
           });
         }
-        const saved = saveGeneral(settings(), {
-          ws: picked.id,
-          name: name ?? current.name,
-          maxRunMinutes: maxRunMinutes ?? Math.round(current.maxRunMs / 60_000),
-        });
+        const input = screenChecked(
+          generalInput,
+          {
+            ws: picked.id,
+            name: name ?? current.name,
+            maxRunMinutes: maxRunMinutes ?? Math.round(current.maxRunMs / 60_000),
+          },
+          { target: picked.name, runId: null },
+        );
+        if (!input.ok) return input.outcome;
+        const saved = saveGeneral(settings(), input.data);
         if (!saved.ok) {
           return rejected({
             target: picked.name,
@@ -543,12 +588,13 @@ export function registerWriteTools(
             extra: { projects: projects.map((p) => ({ id: p.id, name: p.name })) },
           });
         }
-        const added = addTrackerProject(settings(), {
-          ws: picked.id,
-          connectionId: found.id,
-          projectId: match.id,
-          name: match.name,
-        });
+        const input = screenChecked(
+          addTrackerProjectInput,
+          { ws: picked.id, connectionId: found.id, projectId: match.id, name: match.name },
+          { target: match.name, runId: null },
+        );
+        if (!input.ok) return input.outcome;
+        const added = addTrackerProject(settings(), input.data);
         if (!added.ok) {
           return rejected({
             target: match.name,
@@ -610,12 +656,18 @@ export function registerWriteTools(
       inWorkspace(workspace, (picked) => {
         const bound = boundProject(picked, connection, project);
         if (!bound.ok) return bound.outcome;
-        const saved = saveMappingSetting(settings(), {
-          ...bound.ref,
-          runnerProjectId: runnerProject,
-          agentId: agent,
-          ...(model === undefined ? {} : { model }),
-        });
+        const input = screenChecked(
+          mappingInput,
+          {
+            ...bound.ref,
+            runnerProjectId: runnerProject,
+            agentId: agent,
+            ...(model === undefined ? {} : { model }),
+          },
+          { target: bound.name, runId: null },
+        );
+        if (!input.ok) return input.outcome;
+        const saved = saveMappingSetting(settings(), input.data);
         if (!saved.ok) {
           return rejected({
             target: bound.name,
@@ -646,7 +698,13 @@ export function registerWriteTools(
       inWorkspace(workspace, (picked) => {
         const bound = boundProject(picked, connection, project);
         if (!bound.ok) return bound.outcome;
-        const saved = saveInProgressState(settings(), { ...bound.ref, stateId: state });
+        const input = screenChecked(
+          inProgressInput,
+          { ...bound.ref, stateId: state },
+          { target: bound.name, runId: null },
+        );
+        if (!input.ok) return input.outcome;
+        const saved = saveInProgressState(settings(), input.data);
         if (!saved.ok) {
           return rejected({
             target: bound.name,
@@ -676,11 +734,13 @@ export function registerWriteTools(
       inWorkspace(workspace, (picked) => {
         const { found, connections } = findConnection(connection);
         if (found === undefined) return noConnection(connection, connections);
-        const saved = saveLabel(settings(), {
-          ws: picked.id,
-          connectionId: found.id,
-          labelId: label,
-        });
+        const input = screenChecked(
+          labelInput,
+          { ws: picked.id, connectionId: found.id, labelId: label },
+          { target: found.name, runId: null },
+        );
+        if (!input.ok) return input.outcome;
+        const saved = saveLabel(settings(), input.data);
         if (!saved.ok) {
           return rejected({
             target: found.name,
@@ -756,7 +816,13 @@ export function registerWriteTools(
     ({ runner, capacity }) => {
       const { found, runners } = findRunner(runner);
       if (found === undefined) return noRunner(runner, runners);
-      const saved = saveRunnerCapacitySetting(settings(), { id: found.id, capacity });
+      const input = screenChecked(
+        runnerCapacityInput,
+        { id: found.id, capacity },
+        { target: found.name, runId: null },
+      );
+      if (!input.ok) return input.outcome;
+      const saved = saveRunnerCapacitySetting(settings(), input.data);
       if (!saved.ok) {
         return rejected({
           target: found.name,
