@@ -238,6 +238,15 @@ Tags and pull requests made with the default `GITHUB_TOKEN` do not start other w
      | gh api --method PUT "repos/OWNER/REPO/rulesets/$ruleset_id" --input -
    ```
 
+7. Optional, recommended when pull requests can be merged without a person: require a reviewer on the `release` environment. With the app, anyone who can merge to `main` can make a tag and so start signing; a required reviewer keeps one human approval before the signing job reads the certificate. Replace `<user-id>` with your GitHub user ID (`gh api user --jq .id`):
+
+   ```sh
+   gh api --method PUT repos/OWNER/REPO/environments/release \
+     -F 'reviewers[][type]=User' -F 'reviewers[][id]=<user-id>' \
+     -F 'deployment_branch_policy[protected_branches]=false' \
+     -F 'deployment_branch_policy[custom_branch_policies]=true'
+   ```
+
 Without these settings, Prepare release and Tag release stop with an error that points here. If a job runs before the `release-bot` environment exists, GitHub creates the environment without the branch rule, so do step 4 first. After you finish, re-run a failed Tag release run to create the tag.
 
 The app uses the same installation folder as the CLI (`~/.ganger`, or `GANGER_HOME`). It writes the server's output to `<home>/logs/desktop-server.log`.

@@ -33,8 +33,10 @@ export function tagDecision(before: PackageVersions | null, after: PackageVersio
   if (!isReleaseVersion(after.root)) {
     throw new Error(`${after.root} is not a release version like 1.2.3 or 1.2.3-rc.1`);
   }
-  if (isReleaseVersion(before.root) && compareVersions(after.root, before.root) <= 0) {
-    throw new Error(`${after.root} is not higher than the previous version ${before.root}`);
+  for (const previous of new Set([before.root, before.desktop])) {
+    if (isReleaseVersion(previous) && compareVersions(after.root, previous) <= 0) {
+      throw new Error(`${after.root} is not higher than the previous version ${previous}`);
+    }
   }
   return { kind: "tag", tag: `v${after.root}`, version: after.root };
 }
@@ -98,7 +100,12 @@ function main(): number {
       commitExists(root, before) ? versionsAt(root, before) : null,
       versionsAt(root, commit),
     );
-    if (decision.kind === "none") {
+    if (decision.kind === "none" && decision.reason.startsWith("the previous commit")) {
+      console.log(
+        `::warning::No release tag: ${decision.reason}. If this push changed the version, create the tag by hand.`,
+      );
+      outputs = ["tag=", `commit=${commit}`];
+    } else if (decision.kind === "none") {
       console.log(`No release tag: ${decision.reason}.`);
       outputs = ["tag=", `commit=${commit}`];
     } else if (

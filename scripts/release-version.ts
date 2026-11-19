@@ -7,7 +7,7 @@ import { packageVersion as readPackageVersion } from "./release-plan.ts";
 export { readPackageVersion };
 
 const VERSION =
-  /^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)(?:-(?<pre>[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+  /^(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)\.(?<patch>0|[1-9]\d*)(?:-(?<pre>(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?$/;
 const TOP_LEVEL_VERSION = /^( {2}"version": ")([^"]*)(",?)$/m;
 
 export const VERSIONED_PACKAGES = [

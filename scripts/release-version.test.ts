@@ -40,7 +40,15 @@ describe("isReleaseVersion", () => {
   it("1.2.3 과 1.2.3-rc.1 꼴만 받는다", () => {
     expect(isReleaseVersion("1.2.3")).toBe(true);
     expect(isReleaseVersion("0.1.0-rc.1")).toBe(true);
-    for (const version of ["v1.2.3", "1.2", "01.2.3", "1.2.3-", "1.2.3-rc..1", "1.2.3+build"]) {
+    for (const version of [
+      "v1.2.3",
+      "1.2",
+      "01.2.3",
+      "1.2.3-",
+      "1.2.3-rc..1",
+      "1.2.3+build",
+      "1.2.3-rc.01",
+    ]) {
       expect(isReleaseVersion(version)).toBe(false);
     }
   });

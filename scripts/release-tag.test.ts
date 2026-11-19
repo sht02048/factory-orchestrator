@@ -39,6 +39,13 @@ describe("tagDecision", () => {
     expect(() => tagDecision(same("0.1.0"), same("0.1.0-rc.3"))).toThrow("is not higher");
   });
 
+  it("앞 커밋의 두 버전이 달랐으면 둘 다보다 높아야 한다", () => {
+    expect(() => tagDecision({ root: "0.2.0", desktop: "0.3.0" }, same("0.2.1"))).toThrow(
+      "is not higher than the previous version 0.3.0",
+    );
+    expect(tagDecision({ root: "0.2.0", desktop: "0.1.0" }, same("0.2.1")).kind).toBe("tag");
+  });
+
   it("형식이 틀린 버전은 실패한다", () => {
     expect(() => tagDecision(same("0.1.0"), same("0.2"))).toThrow("is not a release version");
   });

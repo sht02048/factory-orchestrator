@@ -20,8 +20,9 @@ blocked_by: []
 ## 설계 결정
 
 - **GitHub App 토큰을 쓴다(운영자 결정 2026-11-19, B안).** 기본 `GITHUB_TOKEN`으로 만든 PR·태그는 다른 워크플로를 시작하지 않는다. 그 PR에서는 필수 검사 `check`가 돌지 않아 머지할 수 없고, 그 태그는 `release.yml`을 시작하지 않는다. 앱 토큰으로 만든 PR과 태그는 보통 사람이 만든 것처럼 CI와 tag push 워크플로를 시작한다.
-- **`release` environment는 `v*` 태그만 그대로 둔다.** 처음 결정은 태그를 만든 실행에서 `release.yml`을 workflow_call로 부르는 것이었다. 그러나 workflow_call로 부른 워크플로는 부른 쪽 ref(`refs/heads/main`)로 돌아, `v*` 태그만 받는 `release` environment에 들어가지 못한다. environment에 `main`을 더하면 `main`의 아무 워크플로(에이전트가 자동 병합한 코드 포함)나 서명 secret을 읽게 된다. 그래서 자동 경로는 앱이 만든 태그의 tag push로 하고, `release.yml`은 workflow_call(입력 `tag`)도 받게만 둔다. workflow_call로 부를 때도 부른 쪽이 `v*` 태그에서 돌아야 서명 단계가 environment에 들어간다.
+- **`release` environment는 `v*` 태그만 그대로 둔다.** 처음 결정은 태그를 만든 실행에서 `release.yml`을 workflow_call로 부르는 것이었다. 그러나 workflow_call로 부른 워크플로는 부른 쪽 ref(`refs/heads/main`)로 돌아, `v*` 태그만 받는 `release` environment에 들어가지 못한다. environment에 `main`을 더하면 `main`의 아무 잡이나 `environment: release`만 적어 서명 secret을 바로 읽게 된다. 그래서 자동 경로는 앱이 만든 태그의 tag push로 하고, `release.yml`은 workflow_call(입력 `tag`)도 받게만 둔다. workflow_call로 부를 때도 부른 쪽이 `v*` 태그에서 돌아야 서명 단계가 environment에 들어간다.
 - **앱 secret은 새 environment `release-bot`에 둔다.** 배포 규칙을 `main` 브랜치로 묶는다. 서명 secret 다섯 개는 `release` environment 밖으로 나가지 않는다.
+- **신뢰 경계: `main`에 머지할 수 있으면 서명할 수 있다.** `release-bot`은 `main`의 아무 잡이나 쓸 수 있고, 앱은 `v*` 태그를 만들 수 있으며, 그 tag push는 태그 커밋의 `release.yml`을 `release` environment에서 돌린다. 그래서 자동 병합된 PR 하나(버전 올림과 함께 워크플로를 바꾼 것)로도 사람 손 없이 서명 secret에 닿을 수 있다. 전에는 관리자가 태그를 만드는 것이 사람 확인 지점이었다. 이 PR은 그 확인 지점을 없앤다. 막으려면 운영자가 `release` environment에 required reviewers를 걸어 서명 잡 앞에서 한 번 승인하게 한다(README 7단계, 선택). 걸지 않으면 이 위험을 받아들이는 것이다. 어느 쪽인지는 운영자가 정한다.
 - **앱 권한은 최소로.** Repository permissions: Contents read and write, Pull requests read and write(Metadata read는 자동). 워크플로에서 토큰을 만들 때도 그 둘만 달라고 한다. Webhook은 끈다.
 - **`v*` 태그 ruleset("Release tags")의 bypass에 앱을 더한다.** 관리자만 우회하던 것에 이 앱 하나만 더한다. GitHub Actions 앱(`GITHUB_TOKEN`)은 더하지 않는다.
 
@@ -45,6 +46,7 @@ README "Automatic releases" 절의 단계를 따른다. 요약:
 3. environment `release-bot`을 만들고 배포 규칙을 `main` 브랜치로 묶는다.
 4. 그 environment에 secret `RELEASE_APP_ID`(앱 ID), `RELEASE_APP_PRIVATE_KEY`(개인 키 PEM)를 넣는다.
 5. ruleset "Release tags"의 bypass에 앱을 더한다(`actor_type: Integration`, `actor_id`: 앱 ID).
+6. (선택) `release` environment에 required reviewers를 걸어 서명 잡 앞에서 사람이 한 번 승인하게 한다. 걸지 않으면 「신뢰 경계」의 위험을 받아들이는 것이다.
 
 `release-bot` environment가 없을 때 그 잡이 돌면 GitHub이 배포 규칙 없는 environment를 저절로 만든다. 버전 PR을 머지하기 전에 3번을 먼저 한다.
 

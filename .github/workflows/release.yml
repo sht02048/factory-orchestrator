@@ -29,7 +29,16 @@ jobs:
         id: tag
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
-        run: echo "tag=${TAG:?}" >> "$GITHUB_OUTPUT"
+        run: |
+          if ! [[ "${TAG:?}" =~ ^v[0-9A-Za-z.-]+$ ]]; then
+            echo "::error::$TAG is not a release tag."
+            exit 1
+          fi
+          if [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
+            echo "::error::Release $TAG must run on the tag itself, not on $GITHUB_REF, so the CI checks and signing use the tagged commit."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
       - name: Stop if the Release already exists
         env:
           GH_TOKEN: ${{ github.token }}
