@@ -56,7 +56,11 @@ import {
   updateRunRecords,
 } from "./runs.js";
 import { SecretBox } from "./secret-box.js";
-import { saveTrackerConnection, saveWorkspaceTrackerProject } from "./settings.js";
+import {
+  recordProviderUsage,
+  saveTrackerConnection,
+  saveWorkspaceTrackerProject,
+} from "./settings.js";
 import type { RunStateChange } from "./runs.js";
 import {
   KEY,
@@ -77,7 +81,7 @@ const started = { worktree, branch: "acme/ganger-ENG-1-1", agentRef: toAgentRef(
 function assign(
   db: Database,
   key: string,
-  extra: { runnerId?: ReturnType<typeof addRunner> } = {},
+  extra: { runnerId?: ReturnType<typeof addRunner>; now?: Date } = {},
 ) {
   return assignRun(db, {
     ticket: ticket(key),
@@ -164,6 +168,37 @@ describe("assignRun", () => {
     expect(assign(db, "ENG-2", { runnerId: broken })).toEqual({
       ok: false,
       reason: "runner-assignment-blocked",
+    });
+  });
+
+  it("런의 에이전트 공급자 한도에 닿은 러너는 자동으로 고르지 않고, 운영자는 고를 수 있다", () => {
+    const db = seededDatabase();
+    const now = new Date(Date.UTC(2026, 10, 19, 9));
+    const resetsAt = new Date(now.getTime() + 3_600_000);
+    const limited = addRunner(db, { id: "limited", capacity: 9, online: true, projects: [repoA] });
+    recordProviderUsage(db, {
+      runnerId: limited,
+      readAt: now,
+      reading: {
+        kind: "read",
+        providers: [
+          {
+            provider: "claude",
+            status: "ok",
+            windows: [{ kind: "weekly", usedPercent: 100, resetsAt }],
+          },
+        ],
+      },
+    });
+
+    expect(assign(db, "ENG-1", { now })).toMatchObject({ ok: true, run: { runnerId: null } });
+    expect(assign(db, "ENG-2", { runnerId: limited, now })).toMatchObject({
+      ok: true,
+      run: { runnerId: limited },
+    });
+    expect(assign(db, "ENG-3", { now: resetsAt })).toMatchObject({
+      ok: true,
+      run: { runnerId: limited },
     });
   });
 

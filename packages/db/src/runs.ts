@@ -357,11 +357,12 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
     if (input.runnerId === undefined) {
       runnerId = pickRunner({
         project: input.runnerProject,
-        runners: listRunnerSnapshots(db),
+        agent: input.agent,
+        runners: listRunnerSnapshots(db, now),
         runs: listRunPlacements(db),
       });
     } else {
-      const chosen = listRunnerSnapshots(db).find((runner) => runner.id === input.runnerId);
+      const chosen = listRunnerSnapshots(db, now).find((runner) => runner.id === input.runnerId);
       if (chosen === undefined) return { ok: false, reason: "unknown-runner" };
       if (!checkManualRunnerChoice(chosen).ok) {
         return { ok: false, reason: "runner-assignment-blocked" };

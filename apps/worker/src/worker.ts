@@ -210,7 +210,7 @@ async function processQueue(context: TickContext): Promise<void> {
   const plan = inTransaction(db, () => {
     const queued = listRuns(db, { states: ["queued"] });
     if (queued.length === 0) return null;
-    const runners = listRunnerSnapshots(db).map((runner) =>
+    const runners = listRunnerSnapshots(db, now()).map((runner) =>
       (context.unreachableUntil.get(runner.id) ?? 0) > now().getTime()
         ? { ...runner, online: false }
         : runner,
@@ -302,6 +302,7 @@ function toQueuedRun(context: TickContext, run: StoredRun): QueuedRun[] {
       id: run.id,
       assignedAt: run.assignedAt,
       project: run.runnerProject,
+      agent: run.agent,
       runnerId: run.runnerId,
       unstartable: mapping === null,
     },

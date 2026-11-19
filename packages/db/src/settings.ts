@@ -16,7 +16,7 @@ import type {
   TrackerProjectId,
   TrackerStateId,
 } from "@ganger/core";
-import { USAGE_WINDOW_KINDS } from "@ganger/core";
+import { USAGE_WINDOW_KINDS, usageLimitsAt } from "@ganger/core";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -378,13 +378,14 @@ export function setRunnerMailbox(
   db.update(runners).set({ mailboxRef: mailbox }).where(eq(runners.id, runnerId)).run();
 }
 
-export function listRunnerSnapshots(db: Database): RunnerSnapshot[] {
+export function listRunnerSnapshots(db: Database, now: Date = new Date()): RunnerSnapshot[] {
   return listRunners(db).map((runner) => ({
     id: runner.id,
     online: runner.online,
     assignmentBlocked: runner.assignmentBlocked,
     capacity: runner.capacity,
     projects: runner.projects.map((p) => p.id),
+    usageLimits: usageLimitsAt(runner.providerUsage, now),
   }));
 }
 

@@ -25,7 +25,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { useAgentName } from "../labels";
+import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import { canCancel } from "./model";
 import type { LogTailView, PendingInput, RunDetail, RunDetailPage, TimelineEvent } from "./model";
@@ -217,14 +217,12 @@ function inputWaitedMs(run: RunDetail): number | null {
 
 function Reason({ run }: { run: RunDetail }) {
   const t = useTranslations("run.reason");
-  const domain = useTranslations("domain");
+  const queuedReasonText = useQueuedReasonText();
   const { clock } = useTime();
   const { status } = run;
   switch (status.state) {
     case "queued":
-      return status.queuedReason.kind === "no-capacity"
-        ? domain("queuedReason.no-capacity", { runner: status.queuedReason.runner })
-        : domain(`queuedReason.${status.queuedReason.kind}`);
+      return queuedReasonText(status.queuedReason);
     case "running":
       return t("running");
     case "waiting-for-input":

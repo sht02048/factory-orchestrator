@@ -26,7 +26,7 @@ import type {
 } from "@ganger/db";
 import { pendingInput } from "../home/load";
 import type { QueuedReason } from "../runs/model";
-import { explainQueue } from "../runs/queue-reasons";
+import { describeQueuedReason, explainQueue } from "../runs/queue-reasons";
 import type {
   CiView,
   LogTailView,
@@ -73,7 +73,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     endedAt: endedAt?.toISOString() ?? null,
     waitMs: durations.waitMs ?? 0,
     executionMs: durations.executionMs,
-    status: statusOf(db, run, records),
+    status: statusOf(db, run, records, now),
     pullRequest:
       pr === null || !isWebUrl(pr.url)
         ? null
@@ -104,10 +104,10 @@ export function requestRunLogTail(db: Database, runId: string, now: Date): boole
   return true;
 }
 
-function statusOf(db: Database, run: StoredRun, records: RunRecords): RunDetailStatus {
+function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date): RunDetailStatus {
   switch (run.state) {
     case "queued":
-      return { state: "queued", queuedReason: queuedReasonOf(db, run.id) };
+      return { state: "queued", queuedReason: queuedReasonOf(db, run.id, now) };
     case "running":
       return { state: "running" };
     case "waiting-for-input": {
@@ -156,7 +156,7 @@ function inputSinceOf(db: Database, runId: RunId, input: PendingInput): string |
   }
 }
 
-function queuedReasonOf(db: Database, runId: RunId): QueuedReason {
+function queuedReasonOf(db: Database, runId: RunId, now: Date): QueuedReason {
   const reasons = explainQueue({
     queued: listRuns(db, { states: ["queued"] }).flatMap((run): QueuedRun[] =>
       run.state === "queued"
@@ -165,19 +165,21 @@ function queuedReasonOf(db: Database, runId: RunId): QueuedReason {
               id: run.id,
               assignedAt: run.assignedAt,
               project: run.runnerProject,
+              agent: run.agent,
               runnerId: run.runnerId,
               unstartable: false,
             },
           ]
         : [],
     ),
-    runners: listRunnerSnapshots(db),
+    runners: listRunnerSnapshots(db, now),
     runs: listRunPlacements(db),
   });
-  const code = reasons.get(runId) ?? { kind: "behind" };
-  if (code.kind !== "no-capacity") return code;
-  const runner = listRunners(db).find((r) => r.id === code.runnerId);
-  return { kind: "no-capacity", runner: runner?.name ?? code.runnerId };
+  return describeQueuedReason(
+    reasons.get(runId) ?? { kind: "behind" },
+    (runnerId) => listRunners(db).find((r) => r.id === runnerId)?.name ?? runnerId,
+    now,
+  );
 }
 
 function timelineOf(

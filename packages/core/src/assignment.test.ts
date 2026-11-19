@@ -9,6 +9,7 @@ import {
 } from "./assignment.js";
 import type { RunnerSnapshot } from "./assignment.js";
 import {
+  toAgentId,
   toLabelId,
   toRunnerId,
   toRunnerProjectId,
@@ -20,6 +21,7 @@ import type { AgentResult, RunState } from "./run.js";
 
 const app = toRunnerProjectId("github:acme/app");
 const web = toRunnerProjectId("github:acme/web");
+const claude = toAgentId("claude");
 const r1 = toRunnerId("r1");
 const r2 = toRunnerId("r2");
 const r3 = toRunnerId("r3");
@@ -41,7 +43,14 @@ const endedWith = (agentResult: AgentResult, assigned: number, ended: number) =>
 });
 
 function runner(overrides: Partial<RunnerSnapshot> & Pick<RunnerSnapshot, "id">): RunnerSnapshot {
-  return { online: true, assignmentBlocked: false, capacity: 2, projects: [app], ...overrides };
+  return {
+    online: true,
+    assignmentBlocked: false,
+    capacity: 2,
+    projects: [app],
+    usageLimits: [],
+    ...overrides,
+  };
 }
 
 describe("checkAutoAssignment", () => {
@@ -188,8 +197,8 @@ describe("pickRunner", () => {
     ];
     const runs = [{ runnerId: r2, state: "running" as const }];
 
-    expect(pickRunner({ project: app, runners, runs })).toBe(r1);
-    expect(pickRunner({ project: app, runners, runs: [] })).toBe(r2);
+    expect(pickRunner({ project: app, agent: claude, runners, runs })).toBe(r1);
+    expect(pickRunner({ project: app, agent: claude, runners, runs: [] })).toBe(r2);
   });
 
   it("Offline 러너는 남은 capacity가 많아도 고르지 않는다", () => {
@@ -198,15 +207,20 @@ describe("pickRunner", () => {
       runner({ id: r2, capacity: 1 }),
     ];
 
-    expect(pickRunner({ project: app, runners, runs: [] })).toBe(r2);
+    expect(pickRunner({ project: app, agent: claude, runners, runs: [] })).toBe(r2);
   });
 
   it("남은 capacity가 없어도 맞는 Online 러너가 있으면 고른다(대기열에서 기다린다)", () => {
     const runners = [runner({ id: r1, capacity: 1 })];
 
-    expect(pickRunner({ project: app, runners, runs: [{ runnerId: r1, state: "running" }] })).toBe(
-      r1,
-    );
+    expect(
+      pickRunner({
+        project: app,
+        agent: claude,
+        runners,
+        runs: [{ runnerId: r1, state: "running" }],
+      }),
+    ).toBe(r1);
   });
 
   it("GitHub 인증이 깨진 러너는 남은 capacity가 많아도 고르지 않는다 (Q82.14)", () => {
@@ -215,19 +229,34 @@ describe("pickRunner", () => {
       runner({ id: r2, capacity: 1 }),
     ];
 
-    expect(pickRunner({ project: app, runners, runs: [] })).toBe(r2);
+    expect(pickRunner({ project: app, agent: claude, runners, runs: [] })).toBe(r2);
   });
 
   it("맞는 러너가 모두 인증이 깨졌으면 러너를 정하지 않는다 (Q87)", () => {
     const runners = [runner({ id: r1, assignmentBlocked: true })];
 
-    expect(pickRunner({ project: app, runners, runs: [] })).toBeNull();
+    expect(pickRunner({ project: app, agent: claude, runners, runs: [] })).toBeNull();
+  });
+
+  it("런의 에이전트가 쓰는 공급자 한도에 닿은 러너는 남은 capacity가 많아도 고르지 않는다", () => {
+    const limited = [{ provider: "claude", until: new Date(Date.UTC(2026, 10, 19, 10)) }];
+    const runners = [runner({ id: r1, capacity: 9, usageLimits: limited }), runner({ id: r2 })];
+
+    expect(pickRunner({ project: app, agent: claude, runners, runs: [] })).toBe(r2);
+    expect(pickRunner({ project: app, agent: toAgentId("codex"), runners, runs: [] })).toBe(r1);
+  });
+
+  it("맞는 러너가 모두 한도에 닿았으면 러너를 정하지 않는다", () => {
+    const limited = [{ provider: "claude", until: new Date(Date.UTC(2026, 10, 19, 10)) }];
+    const runners = [runner({ id: r1, usageLimits: limited })];
+
+    expect(pickRunner({ project: app, agent: claude, runners, runs: [] })).toBeNull();
   });
 
   it("맞는 러너가 모두 Offline이면 러너를 정하지 않는다 (Q65)", () => {
     const runners = [runner({ id: r1, online: false }), runner({ id: r2, projects: [web] })];
 
-    expect(pickRunner({ project: app, runners, runs: [] })).toBeNull();
+    expect(pickRunner({ project: app, agent: claude, runners, runs: [] })).toBeNull();
   });
 });
 

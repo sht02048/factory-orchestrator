@@ -9,6 +9,7 @@ export * from "./run.js";
 export * from "./summary.js";
 export * from "./timing.js";
 export * from "./transition.js";
+export * from "./usage-limit.js";
 
 export function isDefined<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;

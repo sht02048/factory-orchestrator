@@ -47,7 +47,8 @@
     "no-capacity": "{runner}에 남은 capacity가 없어 기다리는 중",
     "runner-offline": "맞는 러너가 Offline이라 기다리는 중",
     "project-missing": "러너에서 프로젝트가 빠져 다시 고르는 중",
-    "assignment-blocked": "러너의 GitHub 인증이 깨져 기다리는 중"
+    "assignment-blocked": "러너의 GitHub 인증이 깨져 기다리는 중",
+    "usage-limit": "모든 러너가 {provider} 한도에 닿아 {duration} 뒤 풀려요"
   },
   "duration": {
     "seconds": "{seconds}초",
