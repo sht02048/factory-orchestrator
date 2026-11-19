@@ -4,6 +4,7 @@ import {
   buttonStyles,
   CapacityBar,
   DetailPanel,
+  Disclosure,
   MascotMessage,
   PageHeader,
   PanelBlock,
@@ -18,7 +19,9 @@ import {
   TableRows,
   Text,
   textStyles,
+  UsageBar,
 } from "@ganger/ui";
+import { USAGE_HIGH_PERCENT } from "@ganger/core";
 import { fonts, size, space } from "@ganger/ui/tokens.stylex";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -28,8 +31,16 @@ import { usePrerequisiteName } from "../labels";
 import { useRunnerCheckPolling } from "../settings/settings-screen";
 import type { ActionResult } from "../settings/settings-screen";
 import { useStatusName } from "../status";
+import { runnersMessages } from "./messages";
 import { failedChecksFirst, problemRunnersFirst, runnerRowStatus } from "./model";
-import type { RunnerCheckItem, RunnerView, RunnersPage } from "./model";
+import type {
+  ProviderUsageView,
+  RunnerCheckItem,
+  RunnerUsageView,
+  RunnerView,
+  RunnersPage,
+  UsageWindowView,
+} from "./model";
 
 export function addRunnerHref(ws: string | undefined): string {
   const search = new URLSearchParams(ws === undefined ? {} : { ws });
@@ -50,7 +61,7 @@ export interface RunnersScreenProps {
   actions: RunnerActions;
 }
 
-const columns = `${size.runnerStatusColumn} minmax(0, 1fr) ${size.capacityColumn}`;
+const columns = `${size.runnerStatusColumn} minmax(0, 1fr) ${size.usageColumn} ${size.capacityColumn}`;
 
 export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: RunnersScreenProps) {
   const t = useTranslations("runners");
@@ -161,6 +172,9 @@ function RunnerRow({ runner }: { runner: RunnerView }) {
         </span>
       </TableCell>
       <TableCell>
+        <HighestUsage runner={runner} />
+      </TableCell>
+      <TableCell>
         <CapacityBar
           used={runner.occupying.length}
           total={runner.capacity}
@@ -227,6 +241,7 @@ function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerA
         />
       )}
       <RunList runner={runner} />
+      <ProviderUsage runner={runner} />
       <CheckList runner={runner} />
       <LeftWorktrees runner={runner} />
     </DetailPanel>
@@ -473,6 +488,172 @@ function LeftWorktrees({ runner }: { runner: RunnerView }) {
   );
 }
 
+type KnownProvider = keyof typeof runnersMessages.runners.usage.provider;
+
+function isKnownProvider(provider: string): provider is KnownProvider {
+  return Object.hasOwn(runnersMessages.runners.usage.provider, provider);
+}
+
+function useUsageNames() {
+  const t = useTranslations("runners.usage");
+  const provider = (id: string) => (isKnownProvider(id) ? t(`provider.${id}`) : id);
+  const window = (kind: UsageWindowView["kind"]) => t(`window.${kind}`);
+  return { provider, window };
+}
+
+function usageTone(window: UsageWindowView): "neutral" | "problem" {
+  return window.usedPercent >= USAGE_HIGH_PERCENT ? "problem" : "neutral";
+}
+
+function HighestUsage({ runner }: { runner: RunnerView }) {
+  const t = useTranslations("runners.usage");
+  const names = useUsageNames();
+  const usage = runner.usage;
+  if (usage === null) return <Text variant="meta">{t("notRead")}</Text>;
+  if (usage.kind === "unreadable") return <Text variant="meta">{t("unreadable")}</Text>;
+  if (usage.highest === null) return <Text variant="meta">{t("noWindows")}</Text>;
+  const provider = names.provider(usage.highest.provider);
+  const window = names.window(usage.highest.window.kind);
+  return (
+    <span {...stylex.props(styles.usageCell)}>
+      <Text variant="meta" truncate>
+        {t("name", { provider, window })}
+      </Text>
+      <UsageBar
+        percent={usage.highest.window.usedPercent}
+        label={t("barLabel", { runner: runner.name, provider, window })}
+        tone={usageTone(usage.highest.window)}
+      />
+    </span>
+  );
+}
+
+function ProviderUsage({ runner }: { runner: RunnerView }) {
+  const t = useTranslations("runners.panel.usage");
+  const { ago } = useTime();
+  const usage = runner.usage;
+  return (
+    <PanelBlock title={t("title")}>
+      <div {...stylex.props(styles.usage)}>
+        {usage === null ? (
+          <Text variant="meta">{t("notRead")}</Text>
+        ) : (
+          <>
+            <Text variant="meta">{t("readAgo", { time: ago(usage.readAt, usage.agoMs) })}</Text>
+            {usage.kind === "unreadable" ? (
+              <Text variant="body">{t("unreadable")}</Text>
+            ) : (
+              <ProviderUsageList runner={runner} usage={usage} />
+            )}
+          </>
+        )}
+        <Text variant="meta">{t("privacy")}</Text>
+      </div>
+    </PanelBlock>
+  );
+}
+
+function ProviderUsageList({
+  runner,
+  usage,
+}: {
+  runner: RunnerView;
+  usage: Extract<RunnerUsageView, { kind: "read" }>;
+}) {
+  const t = useTranslations("runners.panel.usage");
+  const names = useUsageNames();
+  const using = usage.providers.filter((p) => p.status === "ok" || p.status === "error");
+  const signedOut = usage.providers.filter((p) => p.status === "signed-out");
+  const unavailable = usage.providers.filter((p) => p.status === "unavailable");
+  return (
+    <>
+      {using.map((provider) => (
+        <ProviderWindows
+          key={provider.provider}
+          runner={runner}
+          provider={provider}
+          now={usage.now}
+        />
+      ))}
+      {signedOut.length === 0 ? null : (
+        <Text variant="meta">
+          {t("signedOut", {
+            providers: signedOut.map((p) => names.provider(p.provider)).join(", "),
+          })}
+        </Text>
+      )}
+      {unavailable.length === 0 ? null : (
+        <Disclosure summary={t("unavailable", { count: unavailable.length })}>
+          <ul {...stylex.props(styles.list)}>
+            {unavailable.map((p) => (
+              <li key={p.provider}>
+                <Text variant="body" as="span">
+                  {names.provider(p.provider)}
+                </Text>
+              </li>
+            ))}
+          </ul>
+        </Disclosure>
+      )}
+    </>
+  );
+}
+
+function ProviderWindows({
+  runner,
+  provider,
+  now,
+}: {
+  runner: RunnerView;
+  provider: ProviderUsageView;
+  now: string;
+}) {
+  const t = useTranslations("runners.panel.usage");
+  const tUsage = useTranslations("runners.usage");
+  const names = useUsageNames();
+  const { stamp } = useTime();
+  const name = names.provider(provider.provider);
+  return (
+    <section aria-label={name} {...stylex.props(styles.provider)}>
+      <Text variant="title">{name}</Text>
+      {provider.status === "error" ? (
+        <Text variant="meta">{t("error")}</Text>
+      ) : provider.windows.length === 0 ? (
+        <Text variant="meta">{t("noWindows")}</Text>
+      ) : (
+        <ul {...stylex.props(styles.list)}>
+          {provider.windows.map((window) => {
+            const windowName = names.window(window.kind);
+            return (
+              <li key={window.kind} {...stylex.props(styles.window)}>
+                <span {...stylex.props(styles.windowHead)}>
+                  <Text variant="body" as="span">
+                    {windowName}
+                  </Text>
+                  {window.resetsAt === null ? null : (
+                    <Text variant="meta">
+                      {t("resetsAt", { time: stamp(window.resetsAt, now) })}
+                    </Text>
+                  )}
+                </span>
+                <UsageBar
+                  percent={window.usedPercent}
+                  label={tUsage("barLabel", {
+                    runner: runner.name,
+                    provider: name,
+                    window: windowName,
+                  })}
+                  tone={usageTone(window)}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function runHref(workspaceId: string, runId: string): string {
   return `/runs/${encodeURIComponent(runId)}?${new URLSearchParams({ ws: workspaceId }).toString()}`;
 }
@@ -496,4 +677,15 @@ const styles = stylex.create({
   check: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
   checkText: { display: "flex", flexDirection: "column", gap: space.px2 },
   code: { fontFamily: fonts.mono },
+  usageCell: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
+  usage: { display: "flex", flexDirection: "column", gap: space.s3, minWidth: 0 },
+  provider: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
+  window: { display: "flex", flexDirection: "column", gap: space.s1, minWidth: 0 },
+  windowHead: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: space.s2,
+  },
 });
