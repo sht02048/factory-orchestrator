@@ -27,5 +27,5 @@ blocked_by: [0104, 0105]
 
 ## 완료 조건
 
-- 시뮬레이터나 기기에서 `pnpm dev` 서버에 QR로 연결해 Dashboard·Runners·설정을 보는 과정을 PR에 남긴다(스크린숏).
+- 실기기에서 HTTPS의 다른 기기에서 열 주소(예: Tailscale Serve)를 둔 `pnpm dev` 서버에 QR로 연결해 Dashboard·Runners·설정을 보는 과정을 PR에 남긴다(스크린숏). 시뮬레이터에는 카메라가 없으므로 QR 내용을 붙여 넣는 개발용 길을 둘 수 있다.
 - 연결 끊기와 지운 기기의 거절을 앱이 처리하는 시험이 있다.
