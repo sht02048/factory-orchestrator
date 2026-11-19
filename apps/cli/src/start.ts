@@ -8,7 +8,10 @@ import { keepAwake } from "./keep-awake.js";
 import type { KeepAwakeOptions } from "./keep-awake.js";
 import type { AppLayout, ProcessSpec } from "./layout.js";
 import { readPowerSettings } from "@ganger/app/power-settings";
+import { runCommand } from "@ganger/app/runner-setup/commands";
+import { ensureGangerSshKey, gangerSshPaths } from "@ganger/app/runner-setup/ganger-ssh";
 import { ServerAlreadyRunningError, acquireServerLock } from "./server-lock.js";
+import { messages } from "./messages.js";
 import { webUrl } from "./web-url.js";
 
 export { webUrl };
@@ -27,6 +30,7 @@ export interface StartOptions {
   stopTimeoutMs?: number;
   keepAwake?: Omit<KeepAwakeOptions, "serverPid" | "readSettings">;
   cliEntry?: string;
+  warn?: (line: string) => void;
 }
 
 export interface Started {
@@ -75,6 +79,9 @@ export async function start(options: StartOptions): Promise<Started> {
     lock.release();
     throw error;
   }
+
+  const sshKey = await ensureGangerSshKey(gangerSshPaths(options.home), runCommand);
+  if (!sshKey.ok) options.warn?.(messages.start.sshKeyFailed(sshKey.detail));
 
   const childEnv: Record<string, string | undefined> = {
     ...options.env,

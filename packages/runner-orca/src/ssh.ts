@@ -16,15 +16,51 @@ export interface RemoteExec {
   run(command: string, options: RemoteRunOptions): Promise<RemoteResult>;
 }
 
-export function sshExec(input: { sshTarget: string; connectTimeoutSeconds: number }): RemoteExec {
-  const baseArgs = [
+export interface SshIdentity {
+  identityFile: string;
+  knownHostsFile: string;
+}
+
+function sshPathValue(path: string): string {
+  return `"${path.replaceAll("%", "%%")}"`;
+}
+
+export function sshArgs(input: {
+  sshTarget: string;
+  connectTimeoutSeconds: number;
+  access?: SshIdentity | undefined;
+}): string[] {
+  const identity =
+    input.access === undefined
+      ? []
+      : [
+          "-i",
+          input.access.identityFile.replaceAll("%", "%%"),
+          "-o",
+          "IdentitiesOnly=yes",
+          "-o",
+          `UserKnownHostsFile=${sshPathValue(input.access.knownHostsFile)}`,
+          "-o",
+          "StrictHostKeyChecking=yes",
+        ];
+  return [
+    ...identity,
     "-o",
     "BatchMode=yes",
     "-o",
     `ConnectTimeout=${input.connectTimeoutSeconds}`,
     "-T",
+    "--",
     input.sshTarget,
   ];
+}
+
+export function sshExec(input: {
+  sshTarget: string;
+  connectTimeoutSeconds: number;
+  access?: SshIdentity | undefined;
+}): RemoteExec {
+  const baseArgs = sshArgs(input);
   return {
     run(command, options) {
       return new Promise<RemoteResult>((resolve, reject) => {

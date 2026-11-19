@@ -67,6 +67,10 @@ function addressesView(settings: AddressesView): AddressesView {
 const runnerConfigSchema = z.object({
   sshTarget: z.string().catch(""),
   orcaPath: z.string().catch(""),
+  access: z
+    .object({ kind: z.literal("ganger") })
+    .optional()
+    .catch(undefined),
 });
 
 const connectionSecretsSchema = z.object({
@@ -182,6 +186,7 @@ export async function loadSettingsPage(
           name: runner.name,
           sshTarget: config.success ? config.data.sshTarget : "",
           orcaPath: config.success ? config.data.orcaPath : "",
+          access: config.success && config.data.access !== undefined ? "ganger" : "manual",
           capacity: runner.capacity,
           check: runnerCheckView(db, runner.id, runner.projects, now),
         };

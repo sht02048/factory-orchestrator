@@ -50,6 +50,8 @@ import { hermesConfig, jsonConfig } from "@ganger/app/settings/mcp-launch";
 import { useAgentName, usePrerequisiteName } from "../labels";
 import { PushProblems } from "../push-check";
 import { browserClipboard, copyText } from "./clipboard";
+import { DEFAULT_ORCA_PATH } from "@ganger/runner-orca/config";
+import { shellQuote } from "../onboarding/model";
 import { useStatusName } from "../status";
 import {
   INSTALL_ITEMS,
@@ -1671,17 +1673,37 @@ function RunnersPanel({
   );
 }
 
+export function nameFromSshTarget(sshTarget: string): string {
+  const host = sshTarget.trim().split("@").at(-1) ?? "";
+  if (host.startsWith("["))
+    return host.slice(1, host.indexOf("]") === -1 ? undefined : host.indexOf("]"));
+  if ((host.match(/:/gu)?.length ?? 0) > 1) return host;
+  const withoutPort = host.split(":")[0] ?? "";
+  if (/^\d+(\.\d+){3}$/u.test(withoutPort)) return withoutPort;
+  return withoutPort.split(".")[0] ?? "";
+}
+
+export function sshCheckCommand(sshTarget: string): string {
+  return ["ssh", "-o", "BatchMode=yes", "--", sshTarget, "true"].map(shellQuote).join(" ");
+}
+
 export function RunnerForm({
   runner,
   actions,
+  primary = runner === null,
+  direct = false,
 }: {
   runner: RunnerSettingsView | null;
   actions: SettingsActions;
+  primary?: boolean;
+  direct?: boolean;
 }) {
   const t = useTranslations("settings");
+  const blankOrcaPath = direct ? DEFAULT_ORCA_PATH : "";
   const [name, setName] = useState(runner?.name ?? "");
+  const [nameEdited, setNameEdited] = useState(false);
   const [sshTarget, setSshTarget] = useState(runner?.sshTarget ?? "");
-  const [orcaPath, setOrcaPath] = useState(runner?.orcaPath ?? "");
+  const [orcaPath, setOrcaPath] = useState(runner?.orcaPath ?? blankOrcaPath);
   const [capacity, setCapacity] = useState(String(runner?.capacity ?? 1));
   const submit = useSubmit();
   const isNew = runner === null;
@@ -1693,8 +1715,72 @@ export function RunnerForm({
   useReportUnsaved(
     name.trim() !== (runner?.name ?? "") ||
       sshTarget.trim() !== (runner?.sshTarget ?? "") ||
-      orcaPath.trim() !== (runner?.orcaPath ?? "") ||
+      orcaPath.trim() !== (runner?.orcaPath ?? blankOrcaPath) ||
       capacityValue !== (runner?.capacity ?? 1),
+  );
+  const changeSshTarget = (value: string) => {
+    setSshTarget(value);
+    if (direct && isNew && !nameEdited) setName(nameFromSshTarget(value));
+  };
+  const changeName = (value: string) => {
+    setName(value);
+    setNameEdited(true);
+  };
+  const nameField = (
+    <Field label={t("runners.name")}>
+      <Input
+        name="name"
+        value={name}
+        onValueChange={changeName}
+        placeholder={t("runners.namePlaceholder")}
+        autoComplete="off"
+      />
+    </Field>
+  );
+  const capacityField = (
+    <Field
+      label={direct ? t("runners.direct.capacity") : t("runners.capacity")}
+      {...(direct ? { description: t("runners.direct.capacityDescription") } : {})}
+      error={
+        capacityOk || !validation.isTouched("capacity") ? undefined : t("runners.capacityInvalid")
+      }
+    >
+      <Input
+        name="capacity"
+        value={capacity}
+        onValueChange={setCapacity}
+        autoComplete="off"
+        inputMode="numeric"
+        mono
+      />
+    </Field>
+  );
+  const sshTargetField = (
+    <Field
+      label={t("runners.sshTarget")}
+      description={
+        direct ? t("runners.direct.sshTargetDescription") : t("runners.sshTargetDescription")
+      }
+    >
+      <Input
+        name="sshTarget"
+        value={sshTarget}
+        onValueChange={changeSshTarget}
+        placeholder={t("runners.sshTargetPlaceholder")}
+        autoComplete="off"
+        mono
+      />
+    </Field>
+  );
+  const orcaPathField = (
+    <Field
+      label={t("runners.orcaPath")}
+      description={
+        direct ? t("runners.direct.orcaPathDescription") : t("runners.orcaPathDescription")
+      }
+    >
+      <Input name="orcaPath" value={orcaPath} onValueChange={setOrcaPath} autoComplete="off" mono />
+    </Field>
   );
   return (
     <form
@@ -1717,71 +1803,76 @@ export function RunnerForm({
           () => {
             if (!isNew) return;
             setName("");
+            setNameEdited(false);
             setSshTarget("");
-            setOrcaPath("");
+            setOrcaPath(blankOrcaPath);
             setCapacity("1");
           },
         );
       }}
     >
-      <div {...stylex.props(styles.fieldRow)}>
-        <Field label={t("runners.name")}>
-          <Input
-            name="name"
-            value={name}
-            onValueChange={setName}
-            placeholder={t("runners.namePlaceholder")}
-            autoComplete="off"
-          />
-        </Field>
-        <Field
-          label={t("runners.capacity")}
-          error={
-            capacityOk || !validation.isTouched("capacity")
-              ? undefined
-              : t("runners.capacityInvalid")
-          }
-        >
-          <Input
-            name="capacity"
-            value={capacity}
-            onValueChange={setCapacity}
-            autoComplete="off"
-            inputMode="numeric"
-            mono
-          />
-        </Field>
-      </div>
-      <Field label={t("runners.sshTarget")} description={t("runners.sshTargetDescription")}>
-        <Input
-          name="sshTarget"
-          value={sshTarget}
-          onValueChange={setSshTarget}
-          placeholder={t("runners.sshTargetPlaceholder")}
-          autoComplete="off"
-          mono
-        />
-      </Field>
-      <Field label={t("runners.orcaPath")} description={t("runners.orcaPathDescription")}>
-        <Input
-          name="orcaPath"
-          value={orcaPath}
-          onValueChange={setOrcaPath}
-          autoComplete="off"
-          mono
-        />
-      </Field>
+      {direct ? (
+        <>
+          {sshTargetField}
+          <div {...stylex.props(styles.fieldRow)}>
+            {nameField}
+            {capacityField}
+          </div>
+          {orcaPathField}
+          <SshCheckCommand sshTarget={sshTarget.trim()} />
+        </>
+      ) : (
+        <>
+          <div {...stylex.props(styles.fieldRow)}>
+            {nameField}
+            {capacityField}
+          </div>
+          {sshTargetField}
+          {orcaPathField}
+        </>
+      )}
       <SubmitError state={submit.state} />
       <Actions>
         <Button
-          variant={isNew ? "primary" : "secondary"}
+          variant={primary ? "primary" : "secondary"}
           type="submit"
           disabled={submit.sending || !ready}
         >
-          {submit.sending ? t("saving") : isNew ? t("runners.add") : t("runners.save")}
+          {submit.sending
+            ? t("saving")
+            : isNew
+              ? direct
+                ? t("runners.direct.submit")
+                : t("runners.add")
+              : t("runners.save")}
         </Button>
       </Actions>
     </form>
+  );
+}
+
+function SshCheckCommand({ sshTarget }: { sshTarget: string }) {
+  const t = useTranslations("settings.runners.direct");
+  const empty = sshTarget === "";
+  const command = sshCheckCommand(empty ? t("targetPlaceholder") : sshTarget);
+  const copy = () => {
+    void copyText(command, browserClipboard()).then((copied) =>
+      showToast(copied ? t("copied") : t("copyFailed")),
+    );
+  };
+  return (
+    <PanelBlock title={t("tryFirst")}>
+      <div {...stylex.props(styles.snippet)}>
+        <CodeBlock tone="command" label={t("tryFirst")}>
+          {command}
+        </CodeBlock>
+        <Actions>
+          <Button variant="ghost" disabled={empty} onClick={copy}>
+            {t("copy")}
+          </Button>
+        </Actions>
+      </div>
+    </PanelBlock>
   );
 }
 

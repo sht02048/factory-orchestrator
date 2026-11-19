@@ -123,6 +123,7 @@ export const motion = stylex.defineVars({
   easeOut: "cubic-bezier(0.23, 1, 0.32, 1)",
   durationFast: "150ms",
   durationToast: "180ms",
+  durationSpin: "900ms",
 });
 
 export const size = stylex.defineVars({

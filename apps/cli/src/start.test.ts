@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -94,6 +94,26 @@ describe("start", () => {
     await started.stop();
     expect(await started.exited).toEqual({});
   });
+
+  it.runIf(existsSync("/usr/bin/ssh-keygen"))(
+    "처음 켜질 때 홈의 ssh 폴더에 Ganger 전용 ed25519 키를 만든다",
+    async () => {
+      const home = join(dir, "home");
+      init({ home, port: String(await freePort()) });
+      const warnings: string[] = [];
+      started = await start({
+        home,
+        env: {},
+        layout: fakeLayout(),
+        onOutput: quiet,
+        warn: (line) => warnings.push(line),
+      });
+      const key = join(home, "ssh", "id_ed25519");
+      expect(statSync(key).mode & 0o777).toBe(0o600);
+      expect(readFileSync(`${key}.pub`, "utf8")).toMatch(/^ssh-ed25519 /);
+      expect(warnings).toEqual([]);
+    },
+  );
 
   it("다시 띄우면 돌릴 마이그레이션이 없다", async () => {
     const home = join(dir, "home");

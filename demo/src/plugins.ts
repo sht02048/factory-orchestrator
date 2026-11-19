@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { devPage } from "./dev-page.ts";
+import { demoThisMac } from "./this-mac.ts";
 
 const webAdapters = fileURLToPath(
   new URL("../../apps/web/src/server/adapters.ts", import.meta.url),
@@ -59,6 +60,11 @@ function handle(req: IncomingMessage, res: ServerResponse, path: string): void {
   if (origin !== undefined && origin !== `http://${req.headers.host ?? ""}`) {
     res.statusCode = 403;
     res.end();
+    return;
+  }
+  if (req.method === "POST" && path === "/__dev/remote-login") {
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ remoteLogin: demoThisMac().toggleRemoteLogin() }));
     return;
   }
   if (req.method !== "POST" || life === undefined) {

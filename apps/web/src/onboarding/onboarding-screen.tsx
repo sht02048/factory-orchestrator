@@ -94,11 +94,12 @@ import {
   runnerPassed,
   runnerProblems,
   serviceInstallCommand,
-  serviceInstallTemplate,
   stepPassed,
 } from "./model";
 import type { OnboardingStep } from "./model";
 import { createSerialSaver } from "./serial-save";
+import { RunnerSetup } from "../runner-setup/runner-setup";
+import type { DirectEntry, RunnerSetupActions } from "../runner-setup/runner-setup";
 
 export interface WorkspaceSetupInput {
   name: string;
@@ -109,7 +110,7 @@ export interface WorkspaceSetupInput {
   }>;
 }
 
-export interface OnboardingActions extends SettingsActions {
+export interface OnboardingActions extends SettingsActions, RunnerSetupActions {
   setUpWorkspace: (input: WorkspaceSetupInput) => Promise<ActionResult>;
 }
 
@@ -120,6 +121,7 @@ export interface OnboardingScreenProps {
   onStep: (index: number) => void;
   onFinish: () => void;
   actions: OnboardingActions;
+  direct: DirectEntry;
 }
 
 export function OnboardingScreen({
@@ -129,6 +131,7 @@ export function OnboardingScreen({
   onStep,
   onFinish,
   actions,
+  direct,
 }: OnboardingScreenProps) {
   const t = useTranslations("onboarding");
   const step: OnboardingStep = ONBOARDING_STEPS[index] ?? "tracker";
@@ -174,6 +177,7 @@ export function OnboardingScreen({
             trackerProjects={trackerProjects}
             actions={actions}
             workerSilent={workerSilent}
+            direct={direct}
           />
         </div>
         <div {...stylex.props(styles.footer)}>
@@ -364,12 +368,14 @@ function StepBody({
   trackerProjects,
   actions,
   workerSilent,
+  direct,
 }: {
   step: OnboardingStep;
   page: SettingsPage;
   trackerProjects: ConnectionProjects[];
   actions: OnboardingActions;
   workerSilent: boolean;
+  direct: DirectEntry;
 }) {
   switch (step) {
     case "tracker":
@@ -378,7 +384,12 @@ function StepBody({
       return <GitHubStep saved={page.install.githubToken} actions={actions} />;
     case "runner":
       return (
-        <RunnerStep runners={page.install.runners} actions={actions} workerSilent={workerSilent} />
+        <RunnerStep
+          runners={page.install.runners}
+          actions={actions}
+          workerSilent={workerSilent}
+          direct={direct}
+        />
       );
     case "workspace":
       return <WorkspaceStep page={page} trackerProjects={trackerProjects} actions={actions} />;
@@ -683,39 +694,55 @@ function RunnerStep({
   runners,
   actions,
   workerSilent,
+  direct,
 }: {
   runners: RunnerSettingsView[];
-  actions: SettingsActions;
+  actions: OnboardingActions;
   workerSilent: boolean;
+  direct: DirectEntry;
 }) {
   const added = useFocusWhenAdded(runners.length);
+  const [registeredId, setRegisteredId] = useState<string | null>(null);
+  const focusId = registeredId ?? runners.at(-1)?.id;
   const newest = runners.at(-1)?.id;
+  const focusedFor = useRef<string | null>(null);
+  const registeredShown = registeredId !== null && runners.some((r) => r.id === registeredId);
+  useEffect(() => {
+    if (!registeredShown || focusedFor.current === registeredId) return;
+    focusedFor.current = registeredId;
+    added.current?.focus();
+  }, [registeredShown, registeredId, added]);
   const stepPassedHere = runners.some(runnerPassed);
+  const [showSetup] = useState(() => !stepPassedHere);
   return (
-    <ul {...stylex.props(styles.list)}>
-      {runners.length === 0 ? (
-        <li key="new" {...stylex.props(styles.item)}>
-          <Card>
-            <RunnerBefore />
-          </Card>
-          <Card>
-            <RunnerForm runner={null} actions={actions} />
-          </Card>
-        </li>
-      ) : (
-        runners.map((runner) => (
-          <li key={runner.id} {...stylex.props(styles.item)}>
-            <RunnerItem
-              runner={runner}
-              actions={actions}
-              workerSilent={workerSilent}
-              focusRef={runner.id === newest ? added : undefined}
-              primary={!stepPassedHere && runner.id === newest}
-            />
-          </li>
-        ))
+    <div {...stylex.props(styles.stack)}>
+      {showSetup ? (
+        <RunnerSetup
+          actions={actions}
+          manualForm={
+            <RunnerForm runner={null} actions={actions} primary={runners.length === 0} direct />
+          }
+          direct={direct}
+          primary={runners.length === 0}
+          onRegistered={setRegisteredId}
+        />
+      ) : null}
+      {runners.length === 0 ? null : (
+        <ul {...stylex.props(styles.list)}>
+          {runners.map((runner) => (
+            <li key={runner.id} {...stylex.props(styles.item)}>
+              <RunnerItem
+                runner={runner}
+                actions={actions}
+                workerSilent={workerSilent}
+                focusRef={runner.id === focusId ? added : undefined}
+                primary={!stepPassedHere && runner.id === newest}
+              />
+            </li>
+          ))}
+        </ul>
       )}
-    </ul>
+    </div>
   );
 }
 
@@ -775,6 +802,7 @@ function RunnerItem({
           <ToggleButton edit={edit} label={t("edit")} />
         </SummaryRow>
         <SubmitError state={recheck.state} />
+        {runner.access === "ganger" ? <Text variant="meta">{t("runner.managed")}</Text> : null}
         <RunnerChecklist
           version={runner.check.version}
           prerequisites={runner.check.prerequisites}
@@ -785,30 +813,44 @@ function RunnerItem({
   }
 
   return (
-    <>
-      <Card>
-        <RunnerForm runner={runner} actions={actions} />
-      </Card>
-      <Card>
-        <PanelBlock
-          title={
-            <FocusTarget ref={titleRef}>
-              {t("runner.checkTitle", { name: runner.name })}
-            </FocusTarget>
-          }
-        >
-          <div {...stylex.props(styles.stack)}>
-            <RunnerCheck
-              runner={runner}
-              actions={actions}
-              workerSilent={workerSilent}
-              primary={primary}
-            />
-            <RunnerGuide runner={runner} />
-          </div>
-        </PanelBlock>
-      </Card>
-    </>
+    <Card label={t("runner.checkTitle", { name: runner.name })}>
+      <PanelBlock
+        title={
+          <FocusTarget ref={titleRef}>{t("runner.checkTitle", { name: runner.name })}</FocusTarget>
+        }
+      >
+        <div {...stylex.props(styles.stack)}>
+          <RunnerCheck
+            runner={runner}
+            actions={actions}
+            workerSilent={workerSilent}
+            primary={primary}
+          />
+          {runner.check?.status === "pending" && !workerSilent ? <PendingChecklist /> : null}
+          <RunnerGuide runner={runner} />
+          <span {...stylex.props(styles.inlineEnd)}>
+            <ToggleButton edit={edit} label={t("edit")} />
+          </span>
+          {edit.editing ? <RunnerForm runner={runner} actions={actions} /> : null}
+        </div>
+      </PanelBlock>
+    </Card>
+  );
+}
+
+const PENDING_CHECKS = ["ssh", "service", "push"] as const;
+
+function PendingChecklist() {
+  const t = useTranslations("onboarding.runner");
+  return (
+    <Checklist label={t("checking")}>
+      {PENDING_CHECKS.map((item) => (
+        <ChecklistItem key={item} done={false} running label={t("running")}>
+          {t(`checkingItems.${item}`)}
+          <Text variant="meta">{t("running")}</Text>
+        </ChecklistItem>
+      ))}
+    </Checklist>
   );
 }
 
@@ -869,19 +911,6 @@ function RunnerPushWarning({ push }: { push: PushSummary | null }) {
       <Text variant="body">{t(`${kind}Body`)}</Text>
       <PushProblems summary={push} />
     </div>
-  );
-}
-
-function RunnerBefore() {
-  const t = useTranslations("onboarding.runner");
-  return (
-    <PanelBlock title={t("beforeTitle")}>
-      <div {...stylex.props(styles.stack)}>
-        <Text variant="body">{t("beforeService")}</Text>
-        <Command value={serviceInstallTemplate(t("pathPlaceholder"))} />
-        <Text variant="body">{t("beforeAuth")}</Text>
-      </div>
-    </PanelBlock>
   );
 }
 
@@ -1530,6 +1559,7 @@ const styles = stylex.create({
     gap: space.s4,
   },
   item: { display: "flex", flexDirection: "column", gap: space.s4 },
+  inlineEnd: { display: "flex", justifyContent: "flex-end" },
   bullets: {
     margin: 0,
     paddingInlineStart: space.s5,

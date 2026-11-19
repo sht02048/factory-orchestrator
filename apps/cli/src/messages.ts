@@ -50,6 +50,8 @@ Options:
     stopping: (signal: string) => `${signal} received, stopping the web server and the worker.`,
     stopped: "Stopped.",
     childFailed: (reason: string) => `Stopping because ${reason}.`,
+    sshKeyFailed: (reason: string) =>
+      `Could not create the Ganger ssh key, so "This Mac as a runner" will not work: ${reason}`,
   },
 
   service: {

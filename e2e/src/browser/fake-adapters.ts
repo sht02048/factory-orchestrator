@@ -1,7 +1,9 @@
 import { AdapterRegistry } from "@ganger/core";
 import { FakeTracker } from "@ganger/core/testing";
 import { SecretBox, parseBootConfig } from "@ganger/db";
+import type { ThisMac } from "@ganger/app/runner-setup/model";
 import { fakeKind, trackerProject, trackerTickets } from "./fixtures.js";
+import { fakeThisMac } from "./fake-this-mac.js";
 
 let registry: AdapterRegistry | undefined;
 let secretBox: SecretBox | undefined;
@@ -23,4 +25,8 @@ export function getAdapterRegistry(): AdapterRegistry {
 export function getSecretBox(): SecretBox {
   secretBox ??= new SecretBox(parseBootConfig(process.env).encryptionKey);
   return secretBox;
+}
+
+export function getThisMac(): ThisMac {
+  return fakeThisMac();
 }

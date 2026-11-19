@@ -192,19 +192,39 @@ describe("Runners 목록", () => {
     );
   });
 
-  it("노란 주 버튼은 러너 추가 하나이고 Settings 의 러너 등록으로 간다(ADR 0010 6번)", () => {
+  it("노란 주 버튼은 러너 추가 하나이고 같은 화면의 러너 등록 패널을 연다(ADR 0010 6번, 0095)", () => {
     const { db } = seedDatabase();
     breakGitHubAuth(db);
     const html = render(loadRunnersPage(db, now));
     expect(variantsOf(html).filter((v) => v === "primary")).toHaveLength(1);
-    expect(html).toContain(`<a href="/settings?sel=runners" data-variant="primary"`);
+    expect(html).toContain(`<a href="/runners?sel=new" data-variant="primary"`);
+  });
+
+  it("러너 추가를 고르면 패널에 온보딩과 같은 등록 흐름을 그리고 목록은 아무 행도 고르지 않는다(0095)", () => {
+    const { db } = seedDatabase();
+    const html = renderWithMessages(
+      <RunnersScreen
+        page={loadRunnersPage(db, now)}
+        selectedId="new"
+        ws={undefined}
+        onSelect={() => undefined}
+        actions={noActions}
+        setup={<p>setup-flow</p>}
+      />,
+      runnersMessages,
+    );
+    const panel = html.slice(html.indexOf("<aside"));
+    expect(panel).toContain("러너 추가");
+    expect(panel).toContain("<p>setup-flow</p>");
+    expect(html).toContain('<section aria-label="러너 추가">');
+    expect(rowsOf(html).filter((row) => row.selected)).toEqual([]);
   });
 
   it("러너 추가 링크는 보던 Workspace(ws)를 이어 간다", () => {
-    expect(addRunnerHref("ws-labs")).toBe("/settings?ws=ws-labs&sel=runners");
+    expect(addRunnerHref("ws-labs")).toBe("/runners?ws=ws-labs&sel=new");
     const { db } = seedDatabase();
     expect(render(loadRunnersPage(db, now), undefined, "ws-labs")).toContain(
-      'href="/settings?ws=ws-labs&amp;sel=runners"',
+      'href="/runners?ws=ws-labs&amp;sel=new"',
     );
   });
 
