@@ -118,6 +118,7 @@ jobs:
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
         run: APPLE_API_KEY_PATH="$API_KEY_PATH" MACOS_SIGN_KEYCHAIN="$KEYCHAIN" pnpm release:mac
       - name: Verify the dmg and the app inside it
         env:
@@ -138,10 +139,28 @@ jobs:
         env:
           DMG: ${{ steps.release.outputs.dmg }}
         run: node scripts/check-dmg.ts "${DMG:?}"
+      - name: Verify the update zip and feed
+        env:
+          UPDATE_ZIP: ${{ steps.release.outputs.update-zip }}
+          UPDATE_FEED: ${{ steps.release.outputs.update-feed }}
+        run: |
+          unpacked="$RUNNER_TEMP/ganger-update"
+          mkdir -p "$unpacked"
+          ditto -x -k "${UPDATE_ZIP:?}" "$unpacked"
+          codesign --verify --deep --strict --verbose=2 "$unpacked/Ganger.app"
+          xcrun stapler validate "$unpacked/Ganger.app"
+          spctl --assess --type execute --verbose=2 "$unpacked/Ganger.app"
+          test -f "$unpacked/Ganger.app/Contents/Resources/app-update.json"
+          node -e 'const feed = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); if (!feed.releases[0].updateTo.url.endsWith(require("path").basename(process.argv[2]))) process.exit(1)' "${UPDATE_FEED:?}" "$UPDATE_ZIP"
+          rm -rf "${unpacked:?}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: macos-dmg
-          path: ${{ steps.release.outputs.dmg }}
+          path: |
+            ${{ steps.release.outputs.dmg }}
+            ${{ steps.release.outputs.update-zip }}
+            ${{ steps.release.outputs.update-feed }}
+            ${{ steps.release.outputs.notes }}
           if-no-files-found: error
           retention-days: 7
       - name: Remove the temporary keychain and API key
@@ -173,4 +192,7 @@ jobs:
           elif [ -n "$NOTES_START_TAG" ]; then
             args+=(--notes-start-tag "$NOTES_START_TAG")
           fi
-          gh release create "$TAG" "${args[@]}" release/*.dmg
+          if [ -s release/release-notes.md ]; then
+            args+=(--notes-file release/release-notes.md)
+          fi
+          gh release create "$TAG" "${args[@]}" release/*.dmg release/*.zip release/*.json

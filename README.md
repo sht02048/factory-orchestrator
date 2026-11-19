@@ -180,7 +180,13 @@ mcp_servers:
 2. Open the dmg and drag **Ganger** onto **Applications**.
 3. Open Ganger from Applications. Release builds are signed with a Developer ID and notarized by Apple, so macOS opens them without a warning.
 
-The app does not update itself yet. To update, download the new dmg from Releases and replace the app in Applications. The server keeps running while you do. When the new app opens, it replaces a server it started with its own version; a server you run as a service keeps its version, and the app tells you that the versions differ.
+### Updates
+
+The app checks the Releases of the repository it was built from every six hours, downloads a newer version in the background, and then asks in the lower-right corner of the window. Choose **다시 시작** (restart) to update now, or **나중에** (later) to update the next time you quit the app. When the new app opens, it replaces a server it started with its own version: the old server stops, the new one starts, and running runs continue on their runners. A server you run as a service, or a server on another machine, keeps its version, and the app tells you that the versions differ.
+
+Settings > **업데이트** (updates) shows the app and server versions, the last check, and **지금 확인** (check now). Each check sends your IP address and the app version to GitHub. Turn off automatic updates there to stop checking; then download new versions from Releases yourself. Automatic updates need a signed app in the Applications folder that you can write to; otherwise the app tells you a new version is available and links to the Release.
+
+Builds before automatic updates (0.1.0 and earlier) cannot update themselves. Download the new dmg from Releases once and replace the app in Applications; the Release notes say so. A server bundle you run with the CLI does not update itself either: build the new version from a clone as described in [Build a server bundle](#build-a-server-bundle).
 
 ### Which setup to choose
 
@@ -206,7 +212,7 @@ A build you package yourself is not signed, so macOS asks you to confirm before 
 
 ### Build a release dmg
 
-`pnpm release:mac` builds everything, packages the app, and writes `dist/release/Ganger-<version>-<arch>.dmg`. Without signing settings, it skips signing and notarization and makes an unsigned dmg. To sign and notarize, set:
+`pnpm release:mac` builds everything, packages the app, and writes `dist/release/Ganger-<version>-<arch>.dmg`. When `GITHUB_REPOSITORY` (set by GitHub Actions) or `GANGER_RELEASE_REPOSITORY` names the repository as `owner/name`, it also writes the update files the app downloads, `Ganger-<version>-darwin-<arch>.zip` and `ganger-update-darwin-<arch>.json`, and stores the repository in the app so the app knows where to check. `RELEASE_TAG` sets the tag the update files point to; it defaults to `v<version>`. Without signing settings, it skips signing and notarization and makes an unsigned dmg. To sign and notarize, set:
 
 | Variable              | Value                                                                                             |
 | --------------------- | ------------------------------------------------------------------------------------------------- |
@@ -223,7 +229,7 @@ Releases are made by GitHub Actions. There is no changelog file; Release notes a
 
 1. In the Actions tab, run **Prepare release** on `main` with the new version, without the `v` (such as `0.1.0` or `0.1.0-rc.2`). It opens a pull request from `release/v<version>` that changes the `version` in `package.json` and `apps/desktop/package.json`. The version must be higher than the current one.
 2. Merge that pull request after its checks pass. On the push to `main`, **Tag release** (`.github/workflows/tag-release.yml`) sees that both versions changed to the same higher version and creates the `v<version>` tag on the merge commit.
-3. The tag push starts **Release** (`.github/workflows/release.yml`). It checks that the tag matches both versions and that its commit is on `main`, runs the CI checks, builds and signs the dmg on a macOS runner with a certificate and API key from the `release` environment, verifies the signature, notarization, and Gatekeeper assessment, and then creates the Release.
+3. The tag push starts **Release** (`.github/workflows/release.yml`). It checks that the tag matches both versions and that its commit is on `main`, runs the CI checks, builds and signs the dmg on a macOS runner with a certificate and API key from the `release` environment, verifies the signature, notarization, and Gatekeeper assessment of the dmg and the update zip, and then creates the Release with the dmg and the update files.
 
 A tag with a `-` (such as `v0.1.0-rc.1`) makes a prerelease, and a stable Release collects notes from the previous stable tag. Tag release does nothing when the versions did not change or the tag already points at the merge commit. It fails when only one of the two versions changed, when the version is lower, when the version is not like `1.2.3` or `1.2.3-rc.1`, or when the tag already points at another commit. Release stops before building when a Release for the tag already exists.
 

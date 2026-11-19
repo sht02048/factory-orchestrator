@@ -11,6 +11,7 @@ export const INSTALL_ITEMS = [
   "addresses",
   "power",
   "mcp",
+  "updates",
 ] as const;
 export type WorkspaceItem = (typeof WORKSPACE_ITEMS)[number];
 export type InstallItem = (typeof INSTALL_ITEMS)[number];

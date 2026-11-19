@@ -63,6 +63,21 @@ export type EnsureResult =
   | { kind: "service-not-running" }
   | { kind: "failed"; reason: string };
 
+export interface Replacement {
+  from: string | null;
+  to: string | null;
+}
+
+export interface EnsureHooks {
+  onReplacing?: (replacement: Replacement) => void;
+}
+
+export function versionOfBuild(buildId: string | undefined): string | null {
+  if (buildId === undefined) return null;
+  const version = buildId.split("+")[0] ?? "";
+  return version.length > 0 ? version : null;
+}
+
 export type StopResult = { ok: true } | { ok: false; reason: "not-owned" };
 
 export interface LocalServerOptions {
@@ -133,11 +148,16 @@ export class LocalServer {
     return { state: "stopped" };
   }
 
-  ensureRunning(): Promise<EnsureResult> {
+  ensureRunning(hooks: EnsureHooks = {}): Promise<EnsureResult> {
     return this.serial(async () => {
       const current = await this.status();
       if (current.state !== "stopped") {
-        if (current.owner === "app" && this.ownRecord()?.buildId !== this.options.bundle.buildId) {
+        const record = this.ownRecord();
+        if (current.owner === "app" && record?.buildId !== this.options.bundle.buildId) {
+          hooks.onReplacing?.({
+            from: versionOfBuild(record?.buildId),
+            to: versionOfBuild(this.options.bundle.buildId),
+          });
           await this.stopOwned(current.pid);
           return this.launch(true);
         }

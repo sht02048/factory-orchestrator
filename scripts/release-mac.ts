@@ -1,10 +1,11 @@
 import { spawnSync, type SpawnSyncOptions } from "node:child_process";
-import { appendFileSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkDmg } from "./check-dmg.ts";
 import { BACKGROUND_PNG } from "./dmg-background.ts";
 import { packageVersion } from "./release-plan.ts";
+import { manualUpdateNotice, releaseRepository, updateArtifacts } from "./release-update.ts";
 
 const PRODUCT = "Ganger";
 const DEVELOPER_ID = "Developer ID Application";
@@ -161,6 +162,8 @@ function main(): void {
   const root = fileURLToPath(new URL("..", import.meta.url));
   const signing = signingFromEnv(process.env);
   const version = packageVersion(readFileSync(join(root, "package.json"), "utf8"), "package.json");
+  const repository = releaseRepository(process.env);
+  const tag = process.env["RELEASE_TAG"] ?? `v${version}`;
   const arch = process.arch;
   const out = join(root, "dist", "release");
   const work = join(out, "work");
@@ -196,6 +199,7 @@ function main(): void {
       "--out",
       join(work, "app"),
       ...(identity === null ? [] : ["--sign-identity", identity]),
+      ...(repository === null ? [] : ["--update-repository", repository]),
       ...(signing.kind === "signed" && signing.keychain !== null
         ? ["--keychain", signing.keychain]
         : []),
@@ -211,6 +215,20 @@ function main(): void {
     rmSync(appZip);
     run("xcrun", ["stapler", "staple", app]);
   }
+
+  const update =
+    repository === null
+      ? null
+      : updateArtifacts({ repository, tag, version, arch, publishedAt: new Date().toISOString() });
+  if (update !== null) {
+    run("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", app, join(out, update.zipName)]);
+    writeFileSync(join(out, update.feedName), update.feed);
+  }
+  console.log(
+    update === null
+      ? "update files: skipped (no GITHUB_REPOSITORY or GANGER_RELEASE_REPOSITORY)"
+      : `update files: ${update.zipName}, ${update.feedName}`,
+  );
 
   const dmg = join(out, `${PRODUCT}-${version}-${arch}.dmg`);
   run(dmgbuild, dmgbuildArgs({ root, app, dmg }), { stdio: "inherit" });
@@ -229,9 +247,20 @@ function main(): void {
   }
 
   rmSync(work, { recursive: true, force: true });
+  const notes = join(out, "release-notes.md");
+  const notice = manualUpdateNotice(version);
+  writeFileSync(notes, notice === null ? "" : `${notice}\n`);
   console.log(`dmg: ${dmg}`);
   const outputFile = process.env["GITHUB_OUTPUT"];
-  if (outputFile !== undefined) appendFileSync(outputFile, `dmg=${dmg}\n`);
+  if (outputFile !== undefined) {
+    appendFileSync(outputFile, `dmg=${dmg}\nnotes=${notes}\n`);
+    if (update !== null) {
+      appendFileSync(
+        outputFile,
+        `update-zip=${join(out, update.zipName)}\nupdate-feed=${join(out, update.feedName)}\n`,
+      );
+    }
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

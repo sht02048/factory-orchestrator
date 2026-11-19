@@ -14,6 +14,7 @@ import { packager } from "@electron/packager";
 import { ELECTRON_LICENSES, findAppProblems, NOTICE_FILE } from "../../../scripts/bundle-check.ts";
 import { readManifests, renderNotices, THIRD_PARTY_DIR } from "../../../scripts/third-party.ts";
 import { appIconPaths } from "../src/core/app-icon.ts";
+import { UPDATE_CONFIG_FILE, updateConfigJson } from "../src/core/update-config.ts";
 
 const DESKTOP = resolve(import.meta.dirname, "..");
 const REPO = resolve(DESKTOP, "..", "..");
@@ -27,6 +28,7 @@ const { values } = parseArgs({
     out: { type: "string" },
     "sign-identity": { type: "string" },
     keychain: { type: "string" },
+    "update-repository": { type: "string" },
   },
 });
 
@@ -93,6 +95,11 @@ writeFileSync(
   )}\n`,
 );
 cpSync(bundleDir, join(resources, "server"), { recursive: true });
+const updateRepository = values["update-repository"];
+if (updateRepository !== undefined) {
+  writeFileSync(join(resources, UPDATE_CONFIG_FILE), updateConfigJson(updateRepository));
+}
+console.log(`update feed: ${updateRepository ?? "none (this app will not check for updates)"}`);
 writeFileSync(
   join(resources, NOTICE_FILE),
   renderNotices(PRODUCT, readManifests([join(DESKTOP, "dist", THIRD_PARTY_DIR)])),
@@ -135,7 +142,11 @@ const [appDir] = await packager({
   appCategoryType: "public.app-category.developer-tools",
   icon,
   asar: true,
-  extraResource: [join(resources, "server"), join(resources, NOTICE_FILE)],
+  extraResource: [
+    join(resources, "server"),
+    join(resources, NOTICE_FILE),
+    ...(updateRepository === undefined ? [] : [join(resources, UPDATE_CONFIG_FILE)]),
+  ],
   overwrite: true,
   prune: false,
   afterCopyExtraResources: [copyElectronLicenses],

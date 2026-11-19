@@ -54,6 +54,8 @@ import {
   UsageMeter,
   PanelRows,
   PanelSection,
+  PinnedToast,
+  Toaster,
   ResponsiveColumns,
   ResponsiveColumnsHead,
   responsiveColumnTemplates,
@@ -67,6 +69,36 @@ import {
 import * as stylex from "@stylexjs/stylex";
 
 const noop = () => {};
+
+describe("PinnedToast(티켓 0083)", () => {
+  it("제목으로 이름 붙은 구역이고, 본문과 행동을 그리며, 화면 읽기 알림 칸은 마운트 뒤에 채운다", () => {
+    const html = renderToString(
+      <PinnedToast
+        title="새 버전 0.2.0을 받았어요"
+        announcement="새 버전 0.2.0을 받았어요"
+        actions={<Button>나중에</Button>}
+      >
+        서버도 함께 바뀌어요.
+      </PinnedToast>,
+    );
+    expect(html).toMatch(/<section aria-labelledby="([^"]+)"[^>]*>[\s\S]*<p id="\1"/);
+    expect(html).toContain("서버도 함께 바뀌어요.");
+    expect(html).toContain("나중에");
+    expect(html).toMatch(/<p role="status"[^>]*><\/p>/);
+    expect(html).not.toContain('role="alert"');
+  });
+
+  it("Toaster 는 고정 토스트를 받으면 함께 그리고, 없으면 그리지 않는다", () => {
+    const html = renderToString(
+      <Toaster
+        label="알림"
+        pinned={<PinnedToast title="바꿨어요" announcement="바꿨어요" actions={null} />}
+      />,
+    );
+    expect(html).toContain("바꿨어요");
+    expect(renderToString(<Toaster label="알림" />)).not.toContain("aria-labelledby");
+  });
+});
 
 describe("서버 렌더", () => {
   it("Button 은 변형마다 다른 클래스를 갖고 disabled 를 넘긴다", () => {
