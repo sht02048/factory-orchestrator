@@ -117,6 +117,14 @@ describe("saving a directly entered runner with an empty orca path", () => {
     expect(listRunners(ctx.db)).toEqual([]);
   });
 
+  test("never looks up orca over the user's ssh when editing an existing runner", async () => {
+    const ctx = context();
+    const saved = await saveRunnerFindingOrca(ctx, { ...input, id: "existing" }, new Date(), () => {
+      throw new Error("ssh should not run");
+    });
+    expect(saved).toEqual({ ok: false, reason: "orca-not-found" });
+  });
+
   test("does not touch ssh when the orca path is given", async () => {
     const ctx = context();
     const saved = await saveRunnerFindingOrca(

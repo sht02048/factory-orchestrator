@@ -57,6 +57,7 @@ export async function saveRunnerFindingOrca(
     sshExec({ sshTarget, connectTimeoutSeconds: CONNECT_TIMEOUT_SECONDS }),
 ): Promise<SaveRunnerResult> {
   if (input.orcaPath !== "") return saveRunnerSetting(context, input, now);
+  if (input.id !== undefined) return { ok: false, reason: "orca-not-found" };
   const found = await findOrcaOverSsh(execFor(input.sshTarget));
   if (!found.ok) return found;
   return saveRunnerSetting(context, { ...input, orcaPath: found.orcaPath }, now);

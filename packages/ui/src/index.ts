@@ -171,6 +171,7 @@ export {
   type TableRowsProps,
 } from "./components/table";
 export {
+  BulletList,
   CheckTick,
   Checklist,
   ChecklistItem,

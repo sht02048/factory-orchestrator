@@ -23,6 +23,7 @@ import {
   FailureBar,
   NoticeLayout,
   NumberedList,
+  BulletList,
   OUTCOME_TONES,
   OutcomeBar,
   OutcomeSwatch,
@@ -365,6 +366,7 @@ export function BlockSections() {
                   <DoneMark />
                 </span>
                 <NumberedList items={[t("steps.first"), t("steps.second"), t("steps.third")]} />
+                <BulletList items={[t("steps.first"), t("steps.second"), t("steps.third")]} />
                 <Checklist label={t("steps.checklist")}>
                   <ChecklistItem done label={t("steps.done")}>
                     {t("steps.first")}

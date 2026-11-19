@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
+  BulletList,
   Button,
   Card,
   CodeBlock,
@@ -232,23 +233,11 @@ export function CommandFlow({
               }}
             />
             <Disclosure summary={t("whatTitle")}>
-              <ul {...stylex.props(styles.bullets)}>
-                {WHAT_ITEMS.map((item) => (
-                  <li key={item}>
-                    <Text variant="ui">{t(`what.${item}`)}</Text>
-                  </li>
-                ))}
-              </ul>
+              <BulletList items={WHAT_ITEMS.map((item) => t(`what.${item}`))} />
               <Text variant="meta">{t("whatNote")}</Text>
             </Disclosure>
             <PanelBlock title={t("helpTitle")}>
-              <ul {...stylex.props(styles.bullets)}>
-                {HELP_ITEMS.map((item) => (
-                  <li key={item}>
-                    <Text variant="meta">{t(`help.${item}`)}</Text>
-                  </li>
-                ))}
-              </ul>
+              <BulletList tone="tertiary" items={HELP_ITEMS.map((item) => t(`help.${item}`))} />
             </PanelBlock>
           </>
         )}
@@ -556,13 +545,5 @@ const styles = stylex.create({
     gap: space.s1,
     minWidth: 0,
     flexGrow: 1,
-  },
-  bullets: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s1,
-    margin: 0,
-    paddingInlineStart: space.s5,
-    listStyleType: "disc",
   },
 });
