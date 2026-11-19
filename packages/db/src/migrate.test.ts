@@ -29,6 +29,7 @@ describe("migrate", () => {
         "auto_assign_labels",
         "code_host_connections",
         "log_tail_requests",
+        "mapping_repos",
         "mappings",
         "mcp_actions",
         "run_cancel_requests",
@@ -249,6 +250,50 @@ describe("migrate", () => {
         )
         .run(),
     ).toThrow("CHECK constraint failed");
+  });
+
+  it("0115 마이그레이션이 기존 Mapping 한 줄을 그 저장소를 기본으로 하는 목록으로 옮긴다", () => {
+    const db = openDatabase(":memory:");
+    const all = loadMigrations();
+    const added = all.findIndex((m) => m.name.endsWith("_mapping_repos"));
+    expect(added).toBeGreaterThan(0);
+    migrate(db, all.slice(0, added));
+    db.$client.exec(`
+      INSERT INTO tracker_connections (id, kind, name, secrets, created_at) VALUES ('c', 'fake', 'c', '{}', 0);
+      INSERT INTO workspaces (id, name, created_at) VALUES ('w', 'w', 0);
+      INSERT INTO workspace_tracker_projects (tracker_connection_id, tracker_project_id, workspace_id, name)
+        VALUES ('c', 'tp1', 'w', 'Web'), ('c', 'tp2', 'w', 'Api'), ('c', 'tp3', 'w', 'Docs');
+      INSERT INTO mappings (tracker_connection_id, tracker_project_id, runner_project_id, agent_id, model)
+        VALUES ('c', 'tp1', 'rp-web', 'claude', 'opus'), ('c', 'tp2', 'rp-api', 'codex', NULL);
+      INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
+        runner_project_id, agent_id, worktree_name, state, assigned_at)
+        VALUES ('queued', 'c', 'ENG-1', 'w', 'tp1', 'rp-web', 'claude', 'ganger-ENG-1-1', 'queued', 1);
+    `);
+
+    expect(migrate(db)).toEqual(all.slice(added).map((m) => m.name));
+    expect(
+      db.$client
+        .prepare(
+          "SELECT tracker_project_id, agent_id, model FROM mappings ORDER BY tracker_project_id",
+        )
+        .all(),
+    ).toEqual([
+      { tracker_project_id: "tp1", agent_id: "claude", model: "opus" },
+      { tracker_project_id: "tp2", agent_id: "codex", model: null },
+    ]);
+    expect(
+      db.$client
+        .prepare(
+          "SELECT tracker_project_id, runner_project_id, is_default, label_id FROM mapping_repos ORDER BY tracker_project_id",
+        )
+        .all(),
+    ).toEqual([
+      { tracker_project_id: "tp1", runner_project_id: "rp-web", is_default: 1, label_id: null },
+      { tracker_project_id: "tp2", runner_project_id: "rp-api", is_default: 1, label_id: null },
+    ]);
+    expect(db.$client.prepare("SELECT id, runner_project_id FROM runs").all()).toEqual([
+      { id: "queued", runner_project_id: "rp-web" },
+    ]);
   });
 
   it("0037 마이그레이션이 옛 런을 결정적 워크트리 이름·실제 브랜치·완료 보고 결과로 옮긴다", () => {

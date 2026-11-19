@@ -144,6 +144,7 @@ export interface Tracker {
   listComments(key: TicketKey, page?: Page): Promise<Paged<TrackerComment>>;
   listProjects(): Promise<ReadonlyArray<TrackerProject>>;
   listLabels(projectId: TrackerProjectId): Promise<ReadonlyArray<TrackerLabel>>;
+  createLabel(input: { name: string; color: string }): Promise<TrackerLabel>;
   listStates(projectId: TrackerProjectId): Promise<ReadonlyArray<TrackerState>>;
 
   setState(key: TicketKey, stateId: TrackerStateId): Promise<void>;

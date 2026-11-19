@@ -183,6 +183,8 @@ export const size = stylex.defineVars({
   labelSelectWidth: "240px",
   mappingTableMinWidth: "640px",
   mappingCellMinWidth: "140px",
+  repoSelectWidth: "240px",
+  saveStatusColumn: "88px",
 });
 
 export const breakpoints = stylex.defineConsts({

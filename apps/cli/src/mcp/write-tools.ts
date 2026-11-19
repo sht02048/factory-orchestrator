@@ -340,7 +340,8 @@ export function registerWriteTools(
           runnerId = picked.id;
         }
         const chosenAgent = agent ?? found.mapping?.agent;
-        if (chosenAgent === undefined) {
+        const chosenRepo = found.mapping?.runnerProject;
+        if (chosenAgent === undefined || chosenRepo === undefined) {
           return rejected({
             target: ticket,
             runId: null,
@@ -355,6 +356,7 @@ export function registerWriteTools(
             ticketKey: found.key,
             ticketTitle: found.title,
             trackerProject: found.trackerProject.id,
+            runnerProject: chosenRepo,
             runnerId,
             agent: chosenAgent,
           },
@@ -364,7 +366,7 @@ export function registerWriteTools(
           return rejected({
             target: ticket,
             runId: null,
-            reason: assigned.reason,
+            reason: assigned.reason === "unknown-repo" ? "no-mapping" : assigned.reason,
             error: `Could not assign "${ticket}": ${assigned.reason}.`,
           });
         }
@@ -641,7 +643,7 @@ export function registerWriteTools(
     {
       title: "Set a mapping",
       description:
-        "Chooses which runner project and agent (and optionally model) a tracker project's tickets go to, the same as Mapping in Settings. get_settings lists runner projects and agents.",
+        "Chooses the default runner project and the agent (and optionally model) for a tracker project's tickets, like Mapping in Settings. Other runner projects of the mapping and their labels stay as they are. get_settings lists runner projects and agents.",
       annotations: WRITE,
     },
     {
