@@ -296,13 +296,35 @@ async function fetchRuns(selected: RunId): Promise<string> {
   return response.text();
 }
 
+function withoutFoldedOnly(html: string): string {
+  const marker = "<span data-folded-only=";
+  let out = html;
+  for (let start = out.indexOf(marker); start !== -1; start = out.indexOf(marker)) {
+    let depth = 0;
+    let at = start;
+    do {
+      const open = out.indexOf("<span", at + 1);
+      const close = out.indexOf("</span>", at + 1);
+      if (open !== -1 && open < close) {
+        depth += 1;
+        at = open;
+      } else {
+        depth -= 1;
+        at = close;
+      }
+    } while (depth >= 0);
+    out = out.slice(0, start) + out.slice(at + "</span>".length);
+  }
+  return out;
+}
+
 function rowCells(html: string, key: string): string[] | undefined {
-  for (const chunk of html.split('role="option"').slice(1)) {
+  for (const chunk of withoutFoldedOnly(html).split('role="option"').slice(1)) {
     const cells = chunk
       .split(/<[^>]+>/)
       .map((s) => s.trim())
       .filter((s) => s !== "" && !s.includes("="));
-    if (cells[0] === key) return cells.slice(1, 4);
+    if (cells[0] === key) return [cells[1] ?? "", cells[3] ?? "", cells[4] ?? ""];
   }
   return undefined;
 }

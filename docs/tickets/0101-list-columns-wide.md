@@ -1,5 +1,5 @@
 ---
-status: doing
+status: done
 blocked_by: []
 ---
 
@@ -16,10 +16,10 @@ blocked_by: []
 ## 범위
 
 - **Runs(`apps/web/src/runs/runs-screen.tsx`).** 목록 폭 제한을 없앤다. 행을 열로 나눈다: 키 · 제목(남는 폭, 말줄임, 마우스를 올리면 전체 제목) · 러너 · 결과(끝난 런은 에이전트 결과와 PR 상태, 진행 중인 런은 에이전트) · 상태 알약 · 시간. 열 머리 줄을 둔다. 한 행은 한 줄이다.
-- **열 접기.** 표 폭이 줄면 결과 → 러너 순으로 열을 빼고, 뺀 값은 제목 아래 둘째 줄로 돌아간다. 더 좁으면 키도 제목 줄 안으로 들어가고 한 열로 쌓는다. 컨테이너 쿼리로 정하고 가로 스크롤은 없다.
+- **열 접기.** 표 폭이 줄면 결과 → 러너 순으로 열을 빼고, 뺀 값은 제목 아래 둘째 줄로 돌아간다. 표 폭이 560px 밑이면 키도 제목 줄 안으로 들어가 제목·상태·시간 세 열이 되고(1100px 창), 440px 밑이면 한 열로 쌓는다. 컨테이너 쿼리로 정하고 가로 스크롤은 없다.
 - **제목 열 최대 폭.** 제목 열은 최대 `size.runTitleMaxColumn`(640px)까지만 넓어지고 남는 폭은 결과 열이 받는다.
 - **Runners(`apps/web/src/runners/runners-screen.tsx`).** 목록 폭 제한을 없앤다. 자리·사용량 열 사이 남는 폭은 이름·설명 열이 받는다. 목록 배치만 고친다.
-- **`packages/ui`.** `Table`에 열 접기(선택 속성 `foldedColumns`), `TableCell`·`TableHeader`에 접히면 숨기기(`hideWhen`), 접혔을 때만 보이는 `TableFoldedOnly`, `RowTitle`에 전체 제목(`fullText`)을 더한다. 쓰지 않게 된 `size.runsListWidth`, `size.runnerListMaxWidth`를 지운다. DESIGN.md와 /ds를 함께 고친다.
+- **`packages/ui`.** `Table`에 열 접기(선택 속성 `foldedColumns`의 `first`·`second`·`third`), `TableCell`·`TableHeader`에 접히면 숨기기(`hideWhen`), 접혔을 때만 보이는 `TableFoldedOnly`, `RowTitle`에 전체 제목(`fullText`)을 더한다. 쓰지 않게 된 `size.runsListWidth`, `size.runnerListMaxWidth`를 지운다. DESIGN.md와 /ds를 함께 고친다.
 
 ## 완료 조건
 
