@@ -147,7 +147,7 @@ graph LR
 
 web 안의 트래커 쓰기(라벨 만들기, 트래커 연결·프로젝트 저장, Linear에서 다시 읽기)는 같은 요청에서 0122의 서버 캐시를 직접 비운 뒤 결과를 돌려준다. 그래야 mutation이 곧바로 다시 읽을 때 새 값을 받는다. 아래 1초 읽기는 다른 프로세스가 쓴 줄을 위한 것이다. 0122의 트래커 서버 캐시는 web 프로세스 메모리에 있어 worker나 `ganger mcp`가 직접 비울 수 없다. 그래서 web의 변경 기록 읽기가 `tracker` 줄을 보면, 브라우저에 보내기 전에 그 트래커 연결의 서버 캐시를 비운다. 어느 프로세스가 줄을 썼든 통한다. 그러지 않으면 브라우저가 다시 읽어도 서버 캐시가 낡은 값을 돌려준다. 0124와 0122 가운데 늦게 머지하는 쪽이 이 연결을 만든다. worker가 트래커를 바꾸는 일(In Progress로 옮기기 `apps/worker/src/after-run.ts`의 `markInProgress`, 댓글)도 `run`과 함께 `tracker` 줄을 쓴다. webhook이 없는 설치에서도 Tickets의 티켓 상태가 5분 동안 낡지 않게 하려는 것이다.
 
-한 쓰기가 둘 이상에 해당하면 줄을 둘 이상 쓴다(라벨 만들기는 `tracker`와 `settings`, 트래커 프로젝트 더하기·지우기는 `settings`와 `tracker`). "Linear에서 다시 읽기"와 라벨 만들기는 트래커 API 호출이라 DB 트랜잭션이 없다. 지금 "Linear에서 다시 읽기"는 클라이언트의 `router.invalidate()`뿐이라(research 0016 3절), 0124가 `tracker` 줄을 쓰는 서버 동작을 더한다(0122가 서버 캐시를 비우는 동작을 먼저 만들었으면 거기에 붙인다). 위 함수 이름은 `develop`(`95dd2ef`) 기준 예다. 0120이 바꾼 쓰는 곳도 0124가 함께 찾는다. 빠진 쓰는 곳은 그 바뀜이 30초 폴링이나 탭 복귀 때까지 화면에 닿지 않는 것으로 드러나므로, 0124는 쓰기 함수마다 줄이 생기는지 시험한다.
+한 쓰기가 둘 이상에 해당하면 줄을 둘 이상 쓴다(라벨 만들기는 `tracker`와 `settings`, 트래커 프로젝트 더하기·지우기는 `settings`와 `tracker`). "Linear에서 다시 읽기"와 라벨 만들기는 트래커 API 호출이라 DB 트랜잭션이 없다. 지금 "Linear에서 다시 읽기"는 클라이언트의 `router.invalidate()`뿐이라(research 0016 3절), 0124가 `tracker` 줄을 쓰는 서버 동작을 더한다(0122가 서버 캐시를 비우는 동작을 먼저 만들었으면 거기에 붙인다). 위 함수 이름은 `develop`(`95dd2ef`) 기준 예다. 빠진 쓰는 곳은 그 바뀜이 30초 폴링이나 탭 복귀 때까지 화면에 닿지 않는 것으로 드러나므로, 0124는 쓰기 함수마다 줄이 생기는지 시험한다.
 
 ### 5.3 SSE 통로 `/api/change-events/stream`(C10, C11)
 
@@ -180,7 +180,7 @@ web 안의 트래커 쓰기(라벨 만들기, 트래커 연결·프로젝트 저
 
 - `run`이 `["runs", "detail"]` 접두사 전체를 무효화하는 것은 Run 상세가 같은 티켓의 다른 런과 그 상태(`run-detail/load.ts:301-315`), 모든 Queued 런으로 계산한 Queued 사유(`:175-198`)를 보여서다. 실제로 다시 읽는 것은 열린 상세뿐이다. 로그 요청과 그 결과는 예외로 그 런의 상세만 무효화할지 0124가 정한다(8절).
 - C12의 화면 매핑에 더해, `run`은 Runners(러너마다 도는 런을 보인다)와 Stats(끝난 런 집계)도 무효화한다. 두 로더가 런을 읽기 때문이다(research 0016 2절). 셸(`["shell"]`)은 Workspace 목록과 Runner Issue 배지만 담아 `workspace`와 `runner`에만 무효화한다. `workspace`·`settings`가 Dashboard와 Tickets 런 표시를 무효화하는 것은 대기 사유와 할당할 수 있음이 Mapping·러너 설정에 달려서다. `runner`가 Tickets 런 표시와 Settings를 무효화하는 것은 Tickets가 러너의 Online·할당 막힘·사용량 한도로 할당할 수 있음을 정하고(`packages/app/src/tickets/load.ts:61-83`), Settings가 러너 목록과 점검을 읽어서다. `workspace`가 Runners를 무효화하는 것은 Runners가 Workspace 이름을 보여서다. `runner`·`workspace`가 Runs 목록·Run 상세·Stats를 무효화하는 것은 Queued 사유가 러너 상태(Online, capacity, 프로젝트)로 정해지고(`packages/app/src/runs/load.ts:47, 81-86`, `run-detail/load.ts:175-198`), Run 상세와 Stats가 러너·Workspace 이름을 보여서다(`run-detail/load.ts:52`, `stats/load.ts:29, 36`). `settings`가 Runs와 Stats를 무효화하는 것은 두 화면이 트래커 프로젝트 이름을 보여서다(`run-detail/load.ts:67`, `stats/load.ts`). `run`·`assignment`가 Settings를 무효화하는 것은 Settings가 트래커 프로젝트마다 Queued 런 수를 보여서다(`settings/load.ts:352`).
-- `workspaceId`가 있으면 그 Workspace의 key만 무효화해도 되지만, 모든 Workspace를 함께 보이는 key(`ws` 없음)가 있어 첫 구현은 접두사 전체를 무효화한다. 이것도 C4의 "해당 key"에 든다. 그 Workspace의 바뀜은 `ws` 없는 key의 결과도 바꾸고, 관찰자가 없는 key는 stale 표시만 되어 실제로 다시 읽는 것은 보이는 화면뿐이다.
+- `workspaceId`가 있으면 그 Workspace의 key만 무효화해도 되지만, 모든 Workspace를 함께 보이는 key(`ws=all`)가 있고 `ws` 없음과 `ws=<첫 Workspace id>`가 같은 데이터를 두 key에 담아(`packages/app/src/shell/model.ts:29-35`) 첫 구현은 접두사 전체를 무효화한다. 이것도 C4의 "해당 key"에 든다. 그 Workspace의 바뀜은 `ws=all` key의 결과도 바꾸고, 관찰자가 없는 key는 stale 표시만 되어 실제로 다시 읽는 것은 보이는 화면뿐이다.
 
 ### 5.5 끊겼을 때(C4, C11)
 
