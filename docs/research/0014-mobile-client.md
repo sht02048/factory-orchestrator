@@ -63,15 +63,15 @@ APNs 키(.p8)는 앱 게시자의 Apple 팀에 묶인다. 셀프호스팅 서버
 
 ### 할 일 (빈도·긴급도 순)
 
-| #   | 할 일                                             | 쓰기      | 지금 서버 함수                            |
-| --- | ------------------------------------------------- | --------- | ----------------------------------------- |
-| 1   | Question 알림을 받고 답하기                       | 예        | `answerQuestion`                          |
-| 2   | Permission 거절(허용은 러너 화면에서만, ADR 0009) | 예        | `denyPermission`                          |
-| 3   | Human Check PR 확인(GitHub Mobile로 넘김)         | 아니요    | `getHomePage`의 PR 링크                   |
-| 4   | Failed·Disconnected 보고 다시 맡기기              | 예        | `assignTicket`, `getRunDetail`            |
-| 5   | Runner Issue 확인                                 | 다시 확인 | `getRunnersPage`, `requestRunnerCheckNow` |
-| 6   | 오늘 진행 훑기                                    | 아니요    | `getHomePage`, `getStatsPage`             |
-| 7   | 티켓 할당, 런 취소                                | 예        | `assignTicket`, `cancelRun`               |
+| #   | 할 일                                                                        | 쓰기      | 지금 서버 함수                            |
+| --- | ---------------------------------------------------------------------------- | --------- | ----------------------------------------- |
+| 1   | Question 알림을 받고 답하기                                                  | 예        | `answerQuestion`                          |
+| 2   | Permission 거절(허용은 러너 화면에서만, ADR 0009)                            | 예        | `denyPermission`                          |
+| 3   | Human Check PR 확인(GitHub Mobile로 넘김)                                    | 아니요    | `getHomePage`의 PR 링크                   |
+| 4   | Failed 보고 다시 맡기기(Disconnected는 끝나지 않은 런이라 다시 맡길 수 없다) | 예        | `assignTicket`, `getRunDetail`            |
+| 5   | Runner Issue 확인                                                            | 다시 확인 | `getRunnersPage`, `requestRunnerCheckNow` |
+| 6   | 오늘 진행 훑기                                                               | 아니요    | `getHomePage`, `getStatsPage`             |
+| 7   | 티켓 할당, 런 취소                                                           | 예        | `assignTicket`, `cancelRun`               |
 
 넣지 않는 것: 온보딩, 러너 추가·ssh 대상 바꾸기, 비밀 값 저장(트래커 키, GitHub 토큰), MCP 쓰기 허용, Mapping 편집, Stats 세부 표. ssh와 비밀 값은 ADR 0013이 MCP에서 막은 이유와 같다.
 

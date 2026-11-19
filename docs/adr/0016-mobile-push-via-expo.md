@@ -1,6 +1,6 @@
 # 모바일 푸시는 Expo Push로 알림 사건 번호만 보낸다
 
-앱이 꺼져 있을 때 iPhone에 알림을 띄우는 길은 Apple 푸시 서버(APNs)뿐이다. APNs는 앱을 낸 쪽 Apple 팀의 키로만 보낼 수 있다. Ganger는 운영자마다 자기 기기에 설치하는 공개 저장소 제품이라(ADR [0005](0005-self-hosted-product.md)), 설치마다 그 키를 나눠 줄 수 없다. 나눠 주면 누구나 Ganger 앱 이름으로 아무 기기에나 알림을 보낼 수 있다. 그래서 키를 가진 중계가 필요하다(research [0014](../research/0014-mobile-client.md) 4절, 2026-11-19 운영자 결정 M10~M16).
+앱이 꺼져 있을 때 iPhone에 알림을 띄우는 길은 Apple 푸시 서버(APNs)뿐이다. APNs는 앱을 낸 쪽 Apple 팀의 키로만 보낼 수 있다. Ganger는 운영자마다 자기 기기에 설치하는 공개 저장소 제품이라(ADR [0005](0005-self-hosted-product.md)), 설치마다 그 키를 나눠 줄 수 없다. 나눠 주면 기기의 APNs 토큰을 아는 누구나 Ganger 앱 이름으로 그 기기에 알림을 보낼 수 있다. 그래서 키를 가진 중계가 필요하다(research [0014](../research/0014-mobile-client.md) 4절, 2026-11-19 운영자 결정 M10~M16).
 
 ## 결정
 
@@ -10,7 +10,7 @@
 - **Enhanced Push Security는 끈다(M12).** 켜면 보낼 때마다 프로젝트의 Expo 접근 토큰이 필요한데, 그 토큰을 설치마다 나눠 줄 수 없다(APNs 키와 같은 문제).
 - **종류와 세기는 데스크톱과 같다(M14).** Question, Permission, Failed, Disconnected, Runner Issue는 보통 알림, Human Check는 소리 없이 알린다. Merged·Canceled와 Queued·Running으로 옮김은 알리지 않는다. 시간 민감(Time Sensitive) 알림은 쓰지 않는다.
 - **Mac 앞에 있으면 미룬다(M15).** 최근 2분 안에 Mac에서 Ganger 앱을 썼으면 모바일 푸시를 5분 미루고, 그 사이 사건이 해결되면 보내지 않는다.
-- **알림에서는 앱을 연다(M16).** 알림을 누르면 그 화면으로 간다. 알림 버튼은 "답하기" 하나이고 앱의 답하기 시트를 연다. 알림 안에서 선택지를 보지 않고 답을 보내지 않는다(ADR [0010](0010-ui-words-and-visual-rules.md) 6번).
+- **알림에서는 앱을 연다(M16).** 알림을 누르면 그 화면으로 간다. Question 알림에만 "답하기" 버튼 하나를 두고 앱의 답하기 시트를 연다. 다른 종류의 알림에는 버튼을 두지 않는다. 알림 안에서 선택지를 보지 않고 답을 보내지 않는다(ADR [0010](0010-ui-words-and-visual-rules.md) 6번).
 
 ## 고려한 대안
 
