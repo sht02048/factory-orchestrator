@@ -141,7 +141,7 @@ export function seedRunningRun(home: string, key = "ACME-1"): RunId {
   });
 }
 
-export function seedAttention(home: string): void {
+export function seedNotificationCauses(home: string): void {
   withDatabase(home, (db, encryptionKey) => {
     ensureBase(db, encryptionKey);
     const waiting = (key: string): RunId => {

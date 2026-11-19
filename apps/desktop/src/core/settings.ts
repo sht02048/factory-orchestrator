@@ -1,12 +1,18 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { z } from "zod";
+import { notificationPrefsSchema } from "./notification-prefs.js";
 
 export const appSettingsSchema = z.object({
   mode: z.enum(["local", "remote"]).optional(),
   remote: z.object({ instanceId: z.string(), name: z.string(), url: z.string() }).optional(),
   openAtLogin: z.boolean().optional(),
   discoveryPort: z.number().int().min(1).max(65_535).optional(),
+  notifications: notificationPrefsSchema.optional().catch(undefined),
+  notificationsSeen: z
+    .record(z.string(), z.number().int().nonnegative())
+    .optional()
+    .catch(undefined),
 });
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 

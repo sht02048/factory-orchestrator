@@ -64,6 +64,8 @@ export interface HomeScreenProps {
   onViewChange?: (view: DashboardView) => void;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
+  openRunId?: RunId | undefined;
+  onOpenRunShown?: () => void;
 }
 
 export const COLUMN_VISIBLE = 6;
@@ -73,6 +75,7 @@ export const SETTLED_VISIBLE = 3;
 interface CardHost {
   all: boolean;
   selectedId: RunId | null;
+  revealedId: RunId | null;
   cardRef: (id: RunId) => (element: HTMLButtonElement | null) => void;
   focusCard: (id: RunId) => void;
   onOpen: (run: HomeRun, tagged: boolean, mode: SheetMode) => void;
@@ -84,11 +87,27 @@ export function HomeScreen({
   onViewChange = () => {},
   onAnswer,
   onDeny,
+  openRunId,
+  onOpenRunShown = () => {},
 }: HomeScreenProps) {
   const t = useTranslations("home");
   const cards = useRef(new Map<RunId, HTMLButtonElement>());
   const [target, setTarget] = useState<SheetTarget | null>(null);
   const [open, setOpen] = useState(false);
+  const [revealedId, setRevealedId] = useState<RunId | null>(null);
+  const shownRunId = useRef<RunId | undefined>(undefined);
+  useEffect(() => {
+    if (openRunId === undefined || shownRunId.current === openRunId) return;
+    if (page.workspace.kind === "none") return;
+    shownRunId.current = openRunId;
+    const run = boardRuns(dashboardBoard(page)).find((candidate) => candidate.id === openRunId);
+    onOpenRunShown();
+    if (run === undefined) return;
+    const tagged = page.attention.some((item) => item.run.id === run.id);
+    setRevealedId(run.id);
+    setTarget({ run, tagged, mode: opensAnswer(run) ? "answer" : "summary" });
+    setOpen(true);
+  }, [openRunId, page, onOpenRunShown]);
   if (page.workspace.kind === "none") {
     return (
       <div {...stylex.props(styles.page)}>
@@ -108,18 +127,11 @@ export function HomeScreen({
   const board = dashboardBoard(page);
   const todoOnly = view === "todo";
   const fresh =
-    target === null
-      ? undefined
-      : [
-          ...board.queued,
-          ...board.running.todo,
-          ...board.running.rest,
-          ...board.done.todo,
-          ...board.done.rest,
-        ].find((run) => run.id === target.run.id);
+    target === null ? undefined : boardRuns(board).find((run) => run.id === target.run.id);
   const host: CardHost = {
     all,
     selectedId: open && target !== null ? target.run.id : null,
+    revealedId,
     cardRef: (id) => (element) => {
       if (element === null) cards.current.delete(id);
       else cards.current.set(id, element);
@@ -223,6 +235,20 @@ export function HomeScreen({
   );
 }
 
+function boardRuns(board: ReturnType<typeof dashboardBoard>): HomeRun[] {
+  return [
+    ...board.queued,
+    ...board.running.todo,
+    ...board.running.rest,
+    ...board.done.todo,
+    ...board.done.rest,
+  ];
+}
+
+function opensAnswer(run: HomeRun): boolean {
+  return run.state === "waiting-for-input" && run.input?.kind === "question" && !run.input.answered;
+}
+
 function DashboardHeader({ page, all }: { page: HomePage; all: boolean }) {
   const t = useTranslations("home");
   const { duration } = useTime();
@@ -296,7 +322,8 @@ function CardList({
         {empty}
       </Text>
     );
-  const visible = expanded ? runs : runs.slice(0, limit);
+  const revealed = runs.slice(limit).some((run) => run.id === host.revealedId);
+  const visible = expanded || revealed ? runs : runs.slice(0, limit);
   const hidden = runs.length - visible.length;
   return (
     <>
@@ -332,7 +359,9 @@ function CardList({
 
 function SettledCards({ runs, page, host }: { runs: HomeRun[]; page: HomePage; host: CardHost }) {
   const t = useTranslations("home.board");
-  const visible = runs.slice(0, SETTLED_VISIBLE);
+  const first = runs.slice(0, SETTLED_VISIBLE);
+  const revealed = runs.slice(SETTLED_VISIBLE).find((run) => run.id === host.revealedId);
+  const visible = revealed === undefined ? first : [...first, revealed];
   return (
     <div data-settled="" {...stylex.props(styles.settled)}>
       <KanbanSubheading>{t("settled")}</KanbanSubheading>

@@ -9,13 +9,25 @@ import {
   app,
   ipcMain,
   nativeImage,
+  powerMonitor,
   shell,
 } from "electron";
 import type { IpcMainEvent, IpcMainInvokeEvent, MenuItemConstructorOptions } from "electron";
 import { createTranslator } from "use-intl";
 import system from "../../messages/ko/system.json" with { type: "json" };
-import { AttentionDiff, attentionPath, fetchAttention } from "../core/attention.js";
-import type { AttentionEvent } from "../core/attention.js";
+import { NotificationFeed } from "../core/notification-feed.js";
+import {
+  notificationId,
+  openEventIdOf,
+  serverKey,
+  staleNotificationIds,
+} from "../core/notification-ids.js";
+import type { FeedBatch } from "../core/notification-feed.js";
+import { DEFAULT_NOTIFICATION_PREFS, notificationPrefsSchema } from "../core/notification-prefs.js";
+import type { NotificationPrefs } from "../core/notification-prefs.js";
+import { notificationText } from "../core/notification-text.js";
+import { Notifier } from "../core/notifier.js";
+import type { NotifierEffect } from "../core/notifier.js";
 import { DEFAULT_SERVER_PORT, discoverServers } from "../core/discovery.js";
 import { opensOutsideApp } from "../core/external-url.js";
 import type { DiscoveryResult, FoundServer } from "../core/discovery.js";
@@ -37,15 +49,28 @@ import {
 import { SHARING_SETTINGS_URL } from "@ganger/app/runner-setup/model";
 import { ServerWatch } from "../core/watch.js";
 import type { WatchState } from "../core/watch.js";
-import type { FindResult, ViewState } from "../shared/view.js";
-import { IPC_PREFIX, NAVIGATE_CHANNEL, VIEW_CHANNEL } from "../shared/view.js";
+import type {
+  FindResult,
+  NotificationPermission,
+  NotificationSettingsView,
+  ViewState,
+} from "../shared/view.js";
+import {
+  IPC_PREFIX,
+  NAVIGATE_CHANNEL,
+  NOTIFICATION_SETTINGS_CHANNEL,
+  NOTIFICATION_SETTINGS_WINDOW,
+  VIEW_CHANNEL,
+} from "../shared/view.js";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 import { navigationMenu } from "./navigation-menu.js";
 
 const t = createTranslator({ locale: "ko", messages: { system }, namespace: "system" });
 
-const ATTENTION_INTERVAL_MS = 15_000;
+const REMINDER_TICK_MS = 30_000;
 const REMOTE_RETRY_MS = 5_000;
+const SYSTEM_NOTIFICATION_SETTINGS =
+  "x-apple.systempreferences:com.apple.Notifications-Settings.extension";
 
 export interface ControllerOptions {
   settings: SettingsStore;
@@ -68,9 +93,12 @@ export class Controller {
   private mode: Mode = "choosing";
   private serverUrl: string | undefined;
   private readonly watch: ServerWatch;
-  private readonly diff = new AttentionDiff();
-  private diffUrl: string | undefined;
-  private attentionTimer: NodeJS.Timeout | undefined;
+  private feed: { url: string; feed: NotificationFeed; notifier: Notifier } | undefined;
+  private catchUp = true;
+  private readonly delivered = new Map<string, Notification>();
+  private reminderTimer: NodeJS.Timeout | undefined;
+  private notificationPermission: NotificationPermission = "unknown";
+  private settingsWindow: BrowserWindow | undefined;
   private remoteTimer: NodeJS.Timeout | undefined;
   private offerTimer: NodeJS.Timeout | undefined;
   private readonly enrollment: RunnerEnrollmentFlow;
@@ -98,7 +126,11 @@ export class Controller {
     this.registerIpc();
     this.tray = new Tray(nativeImage.createFromPath(this.options.trayIcon));
     this.tray.setToolTip(t("tray.tooltip"));
-    this.attentionTimer = setInterval(() => void this.pollAttention(), ATTENTION_INTERVAL_MS);
+    this.reminderTimer = setInterval(() => this.tickReminders(), REMINDER_TICK_MS);
+    powerMonitor.on("resume", () => {
+      this.catchUp = true;
+      this.feed?.feed.reconnect();
+    });
     this.offerTimer = setInterval(() => void this.pollOffer(), OFFER_POLL_MS);
     const settings = this.options.settings.read();
     if (!this.options.openedAtLogin || settings.mode === undefined) this.showWindow();
@@ -133,7 +165,8 @@ export class Controller {
   quit(): void {
     this.quitting = true;
     this.watch.stop();
-    if (this.attentionTimer !== undefined) clearInterval(this.attentionTimer);
+    if (this.reminderTimer !== undefined) clearInterval(this.reminderTimer);
+    this.feed?.feed.stop();
     if (this.offerTimer !== undefined) clearInterval(this.offerTimer);
     this.enrollment.stop();
     this.stopRemoteRetry();
@@ -285,6 +318,7 @@ export class Controller {
   }
 
   private chooseMode(): void {
+    this.stopFeed();
     this.mode = "choosing";
     this.stopRemoteRetry();
     this.watch.stop();
@@ -318,13 +352,9 @@ export class Controller {
   }
 
   private openServer(url: string, path = "/"): void {
-    if (this.diffUrl !== url) {
-      this.diff.reset();
-      this.diffUrl = url;
-    }
+    if (this.feed?.url !== url) this.startFeed(url);
     this.serverUrl = url;
     this.refreshMenus();
-    void this.pollAttention();
     const window = this.window;
     if (window === undefined || window.isDestroyed()) return;
     void window.loadURL(new URL(path, url).toString());
@@ -421,6 +451,16 @@ export class Controller {
     });
     handle("choose-mode", () => this.chooseMode());
     handle("open-log", () => this.openLog());
+    ipcMain.handle(`${IPC_PREFIX}get-notification-settings`, (event) =>
+      fromAppScreen(event) ? this.notificationSettingsView() : undefined,
+    );
+    handle("set-notification-settings", (value) => {
+      const parsed = notificationPrefsSchema.safeParse(value);
+      if (parsed.success) this.saveNotificationPrefs(parsed.data);
+    });
+    handle("open-system-notification-settings", () =>
+      process.platform === "darwin" ? shell.openExternal(SYSTEM_NOTIFICATION_SETTINGS) : undefined,
+    );
     handle("enrollment-accept", () => {
       void this.enrollment.accept();
     });
@@ -472,26 +512,183 @@ export class Controller {
     });
   }
 
-  private async pollAttention(): Promise<void> {
-    const url = this.serverUrl;
-    if (url === undefined) return;
-    const events = await fetchAttention(url);
-    if (events === undefined || url !== this.serverUrl) return;
-    for (const event of this.diff.next(events)) this.notify(event, url);
+  private notificationPrefs(): NotificationPrefs {
+    return this.options.settings.read().notifications ?? DEFAULT_NOTIFICATION_PREFS;
   }
 
-  private notify(event: AttentionEvent, url: string): void {
+  private startFeed(url: string): void {
+    this.stopFeed();
+    const notifier = new Notifier({
+      prefs: () => this.notificationPrefs(),
+      lastSeen: this.options.settings.read().notificationsSeen?.[url] ?? null,
+    });
+    const feed = new NotificationFeed({
+      origin: url,
+      onBatch: (batch) => this.receiveNotifications(url, batch),
+    });
+    this.feed = { url, feed, notifier };
+    feed.start();
+  }
+
+  private stopFeed(): void {
+    const current = this.feed;
+    if (current === undefined) return;
+    this.feed = undefined;
+    current.feed.stop();
+    this.applyNotifications(current.url, current.notifier.clear());
+  }
+
+  private receiveNotifications(url: string, batch: FeedBatch): void {
+    const current = this.feed;
+    if (current?.url !== url) return;
+    const mode = batch.initial && this.catchUp ? "catch-up" : "live";
+    if (batch.initial) this.catchUp = false;
+    this.applyNotifications(url, current.notifier.receive(batch, mode, Date.now()));
+    if (batch.initial && batch.open !== null) void this.removeStaleNotifications(url, batch.open);
+  }
+
+  private tickReminders(): void {
+    const current = this.feed;
+    if (current === undefined) return;
+    this.applyNotifications(current.url, current.notifier.tick(Date.now()));
+  }
+
+  private applyNotifications(url: string, effects: ReadonlyArray<NotifierEffect>): void {
+    for (const effect of effects) {
+      switch (effect.type) {
+        case "show":
+          this.showNotification(url, effect);
+          break;
+        case "remove":
+          this.removeNotifications(effect.ids.map((id) => notificationId(url, id)));
+          break;
+        case "badge":
+          app.setBadgeCount(effect.count);
+          break;
+        case "seen": {
+          const settings = this.options.settings.read();
+          this.options.settings.write({
+            ...settings,
+            notificationsSeen: { ...settings.notificationsSeen, [url]: effect.lastId },
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  private showNotification(url: string, effect: Extract<NotifierEffect, { type: "show" }>): void {
     if (!Notification.isSupported()) return;
-    const { title, body } = notificationText(event);
-    const notification = new Notification({ title, body });
+    const id = notificationId(url, effect.id);
+    const { title, body } = notificationText(effect.content);
+    this.delivered.get(id)?.close();
+    const notification = new Notification({
+      id,
+      groupId: serverKey(url),
+      title,
+      body,
+      silent: effect.silent,
+    });
     notification.on("click", () => {
+      this.delivered.delete(id);
       this.showWindow();
       if (this.view.screen === "runner-enrollment") return;
-      if (this.serverUrl === url || (this.serverUrl === undefined && this.diffUrl === url)) {
-        this.openServer(url, attentionPath(event));
-      }
+      if (this.serverUrl === url || this.feed?.url === url) this.openServer(url, effect.path);
     });
+    notification.on("show", () => this.setNotificationPermission("allowed"));
+    notification.on("failed", () => this.setNotificationPermission("denied"));
+    this.delivered.set(id, notification);
     notification.show();
+  }
+
+  private removeNotifications(ids: ReadonlyArray<string>): void {
+    for (const id of ids) {
+      this.delivered.get(id)?.close();
+      this.delivered.delete(id);
+    }
+    if (process.platform === "darwin" && ids.length > 0) Notification.remove([...ids]);
+  }
+
+  private async removeStaleNotifications(url: string, open: ReadonlyArray<number>): Promise<void> {
+    if (process.platform !== "darwin") return;
+    const history = await Notification.getHistory().catch(() => []);
+    const stale = staleNotificationIds(
+      url,
+      history.map((notification) => notification.id),
+      open,
+      new Set(this.delivered.keys()),
+    );
+    if (stale.length > 0) Notification.remove(stale);
+    const staleSet = new Set(stale);
+    for (const notification of history) {
+      const eventId = openEventIdOf(url, notification.id);
+      if (eventId === null || staleSet.has(notification.id)) continue;
+      if (this.delivered.has(notification.id)) continue;
+      notification.on("click", () => {
+        const path = this.feed?.url === url ? this.feed.notifier.openPath(eventId) : undefined;
+        this.delivered.delete(notification.id);
+        this.showWindow();
+        if (this.view.screen === "runner-enrollment") return;
+        if (path !== undefined) this.openServer(url, path);
+      });
+      this.delivered.set(notification.id, notification);
+    }
+  }
+
+  private setNotificationPermission(permission: NotificationPermission): void {
+    if (this.notificationPermission === permission) return;
+    this.notificationPermission = permission;
+    this.sendNotificationSettings();
+  }
+
+  private notificationSettingsView(): NotificationSettingsView {
+    return { ...this.notificationPrefs(), permission: this.notificationPermission };
+  }
+
+  private sendNotificationSettings(): void {
+    const window = this.settingsWindow;
+    if (window === undefined || window.isDestroyed()) return;
+    window.webContents.send(NOTIFICATION_SETTINGS_CHANNEL, this.notificationSettingsView());
+  }
+
+  private saveNotificationPrefs(prefs: NotificationPrefs): void {
+    this.options.settings.write({ ...this.options.settings.read(), notifications: prefs });
+    const current = this.feed;
+    if (current !== undefined) this.applyNotifications(current.url, current.notifier.refresh());
+    this.sendNotificationSettings();
+  }
+
+  showNotificationSettings(): void {
+    const existing = this.settingsWindow;
+    if (existing !== undefined && !existing.isDestroyed()) {
+      existing.show();
+      existing.focus();
+      return;
+    }
+    const window = new BrowserWindow({
+      width: 560,
+      height: 680,
+      minWidth: 400,
+      minHeight: 480,
+      show: false,
+      title: t("settingsWindow.title"),
+      webPreferences: {
+        preload: this.options.preloadFile,
+        contextIsolation: true,
+        sandbox: true,
+        nodeIntegration: false,
+      },
+    });
+    window.once("ready-to-show", () => window.show());
+    window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    window.webContents.on("will-navigate", (event) => event.preventDefault());
+    window.on("closed", () => {
+      if (this.settingsWindow === window) this.settingsWindow = undefined;
+    });
+    this.settingsWindow = window;
+    void window.loadFile(this.options.rendererFile, {
+      query: { window: NOTIFICATION_SETTINGS_WINDOW },
+    });
   }
 
   private notifyVersion(server: string): void {
@@ -512,6 +709,11 @@ export class Controller {
           label: app.name,
           submenu: [
             { role: "about" },
+            {
+              id: "notification-settings",
+              label: t("menu.notificationSettings"),
+              click: () => this.showNotificationSettings(),
+            },
             { type: "separator" },
             { role: "hide" },
             { role: "hideOthers" },
@@ -554,6 +756,11 @@ export class Controller {
     items.push(
       { type: "separator" },
       { id: "open", label: t("tray.open"), click: () => this.showWindow() },
+      {
+        id: "tray-notification-settings",
+        label: t("menu.notificationSettings"),
+        click: () => this.showNotificationSettings(),
+      },
     );
 
     const state = this.watch.state;
@@ -648,31 +855,6 @@ export class Controller {
     const server = state.status.identity.version;
     if (server === this.options.serverVersion) return undefined;
     return t("tray.versionDiffers", { server, app: this.options.serverVersion });
-  }
-}
-
-export function notificationText(event: AttentionEvent): { title: string; body: string } {
-  switch (event.kind) {
-    case "question":
-      return {
-        title: t("notifications.question.title"),
-        body: t("notifications.question.body", { ticket: event.ticketKey }),
-      };
-    case "permission":
-      return {
-        title: t("notifications.permission.title"),
-        body: t("notifications.permission.body", { ticket: event.ticketKey }),
-      };
-    case "human-check":
-      return {
-        title: t("notifications.humanCheck.title"),
-        body: t("notifications.humanCheck.body", { ticket: event.ticketKey }),
-      };
-    case "runner-offline":
-      return {
-        title: t("notifications.runnerOffline.title"),
-        body: t("notifications.runnerOffline.body", { runner: event.runnerName }),
-      };
   }
 }
 

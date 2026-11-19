@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { AttentionDiff, attentionPath, attentionResponseSchema } from "./attention.js";
 import { deviceOrigins, discoverServers } from "./discovery.js";
 import type { Identity, Probe, ProbeResult } from "./identity.js";
 import { identitySchema, probeIdentity } from "./identity.js";
@@ -551,53 +550,5 @@ describe("저장한 서버 다시 열기", () => {
     ).toEqual({
       kind: "unreachable",
     });
-  });
-});
-
-describe("알림 사건", () => {
-  const question = {
-    kind: "question",
-    key: "question:q-1",
-    runId: "run-1",
-    ticketKey: "ACME-1",
-  } as const;
-  const offline = {
-    kind: "runner-offline",
-    key: "runner-offline:r-1",
-    runnerId: "r-1",
-    runnerName: "mac-mini",
-  } as const;
-  const check = {
-    kind: "human-check",
-    key: "human-check:run-2",
-    runId: "run-2",
-    ticketKey: "ACME-2",
-  } as const;
-
-  it("처음 받은 응답은 기준으로만 삼고, 그 뒤 새로 생긴 사건만 알린다", () => {
-    const diff = new AttentionDiff();
-    expect(diff.next([question])).toEqual([]);
-    expect(diff.next([question, check])).toEqual([check]);
-    expect(diff.next([question, check])).toEqual([]);
-    expect(diff.next([question, check, offline])).toEqual([offline]);
-    expect(diff.next([question, check])).toEqual([]);
-    expect(diff.next([question, check, offline])).toEqual([offline]);
-  });
-
-  it("네 종류만 읽고 Merged·Failed 같은 다른 종류는 버린다", () => {
-    const parsed = attentionResponseSchema.parse({
-      events: [
-        question,
-        { kind: "merged", key: "merged:run-3", runId: "run-3", ticketKey: "ACME-3" },
-        { kind: "failed" },
-        offline,
-      ],
-    });
-    expect(parsed.events).toEqual([question, offline]);
-  });
-
-  it("누르면 런 화면이나 Runners 를 연다", () => {
-    expect(attentionPath(question)).toBe("/runs/run-1");
-    expect(attentionPath(offline)).toBe("/runners");
   });
 });

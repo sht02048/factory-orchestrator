@@ -1,0 +1,78 @@
+import { z } from "zod";
+import type { NotificationRecord } from "@ganger/app/notifications/feed";
+
+export const NOTIFICATION_GROUPS = [
+  "question",
+  "permission",
+  "humanCheck",
+  "failedDisconnected",
+  "runnerIssue",
+] as const;
+export type NotificationGroup = (typeof NOTIFICATION_GROUPS)[number];
+
+export const notificationPrefsSchema = z.object({
+  enabled: z.boolean(),
+  groups: z.object({
+    question: z.boolean(),
+    permission: z.boolean(),
+    humanCheck: z.boolean(),
+    failedDisconnected: z.boolean(),
+    runnerIssue: z.boolean(),
+  }),
+});
+export type NotificationPrefs = z.infer<typeof notificationPrefsSchema>;
+
+export const NOTIFICATION_PERMISSIONS = ["allowed", "denied", "unknown"] as const;
+export type NotificationPermission = (typeof NOTIFICATION_PERMISSIONS)[number];
+
+export const notificationSettingsViewSchema = notificationPrefsSchema.extend({
+  permission: z.enum(NOTIFICATION_PERMISSIONS),
+});
+export type NotificationSettingsView = z.infer<typeof notificationSettingsViewSchema>;
+
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
+  enabled: true,
+  groups: {
+    question: true,
+    permission: true,
+    humanCheck: true,
+    failedDisconnected: true,
+    runnerIssue: true,
+  },
+};
+
+export type NotificationKind = NotificationRecord["kind"];
+
+export function groupOf(kind: NotificationKind): NotificationGroup {
+  switch (kind) {
+    case "question":
+      return "question";
+    case "permission":
+      return "permission";
+    case "human-check":
+      return "humanCheck";
+    case "failed":
+    case "disconnected":
+      return "failedDisconnected";
+    case "runner-offline":
+    case "runner-auth":
+    case "runner-usage-limit":
+      return "runnerIssue";
+  }
+}
+
+export function isTodoKind(kind: NotificationKind): boolean {
+  return groupOf(kind) !== "runnerIssue";
+}
+
+export function isSilentKind(kind: NotificationKind): boolean {
+  return kind === "human-check";
+}
+
+export function remindsKind(kind: NotificationKind): boolean {
+  return kind === "question" || kind === "permission";
+}
+
+export function allows(prefs: NotificationPrefs, kind: NotificationKind): boolean {
+  return prefs.enabled && prefs.groups[groupOf(kind)];
+}

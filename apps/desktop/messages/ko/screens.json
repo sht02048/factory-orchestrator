@@ -82,6 +82,44 @@
     "retry": "지금 다시 확인",
     "other": "다른 서버 고르기"
   },
+  "notificationSettings": {
+    "title": "알림",
+    "summary": "이 Mac에서 받을 알림을 골라요. 방해 금지는 macOS 집중 모드를 따라요.",
+    "permissionOff": {
+      "title": "macOS에서 Ganger 알림이 꺼져 있어요",
+      "body": "시스템 설정의 알림에서 Ganger를 켜야 이 Mac에서 알림을 받아요.",
+      "action": "시스템 설정 열기"
+    },
+    "enabled": {
+      "label": "이 Mac에서 알림 받기",
+      "description": "끄면 알림과 Dock 배지를 모두 멈춰요."
+    },
+    "groupsLabel": "알릴 일",
+    "groupsOff": "알림 받기를 켜면 고를 수 있어요.",
+    "groups": {
+      "question": {
+        "label": "Question",
+        "description": "에이전트가 답을 기다릴 때. 10분 지나도 그대로면 한 번 더 알려요."
+      },
+      "permission": {
+        "label": "Permission",
+        "description": "에이전트가 허용을 기다릴 때. 10분 지나도 그대로면 한 번 더 알려요."
+      },
+      "humanCheck": {
+        "label": "Human Check",
+        "description": "확인할 PR이 생겼을 때. 소리 없이 알려요."
+      },
+      "failedDisconnected": {
+        "label": "Failed · Disconnected",
+        "description": "런이 실패했거나 러너에 5분 넘게 닿지 않을 때."
+      },
+      "runnerIssue": {
+        "label": "Runner Issue",
+        "description": "러너가 Offline이거나, GitHub 인증이 깨졌거나, 사용량 한도에 닿았을 때."
+      }
+    },
+    "note": "다른 곳에서 처리하면 이 Mac의 알림도 지워요."
+  },
   "enrollment": {
     "askTitle": "이 맥을 러너로 등록할까요?",
     "askSummary": "{server}의 Ganger가 이 맥에서 에이전트를 돌려요.",

@@ -27,7 +27,8 @@
     "edit": "편집",
     "view": "보기",
     "window": "창",
-    "navigate": "이동"
+    "navigate": "이동",
+    "notificationSettings": "알림 설정…"
   },
   "navigate": {
     "dashboard": "Dashboard",
@@ -40,19 +41,45 @@
   "notifications": {
     "question": {
       "title": "Question",
-      "body": "{ticket} 에이전트가 답을 기다려요."
+      "body": "{ticket} 에이전트가 답을 기다려요.",
+      "reminder": "{ticket} 에이전트가 10분째 답을 기다려요."
     },
     "permission": {
       "title": "Permission",
-      "body": "{ticket} 에이전트가 허용을 기다려요. 러너 화면에서 허용해 주세요."
+      "body": "{ticket} 에이전트가 허용을 기다려요. 러너 화면에서 허용해 주세요.",
+      "reminder": "{ticket} 에이전트가 10분째 허용을 기다려요. 러너 화면에서 허용해 주세요."
     },
     "humanCheck": {
       "title": "Human Check",
-      "body": "{ticket} PR 을 확인해 주세요."
+      "body": "{ticket} PR을 확인해 주세요."
+    },
+    "failed": {
+      "title": "Failed",
+      "body": "{ticket} 런이 실패했어요. 다시 맡길지 확인해 주세요."
+    },
+    "disconnected": {
+      "title": "Disconnected",
+      "body": "{ticket} 런의 러너에 5분 넘게 닿지 않아요."
     },
     "runnerOffline": {
       "title": "Runner Issue",
-      "body": "{runner} 러너가 Offline 이에요."
+      "body": "{runner} 러너가 Offline이에요."
+    },
+    "runnerAuth": {
+      "title": "Runner Issue",
+      "body": "{runner} 러너의 GitHub 인증이 깨져 할당에서 빠졌어요."
+    },
+    "runnerUsageLimit": {
+      "title": "Runner Issue",
+      "body": "{runner} 러너가 {provider} 사용량 한도에 닿았어요."
+    },
+    "bundle": {
+      "title": "To do",
+      "body": "처리할 일 {count}개가 생겼어요."
+    },
+    "missed": {
+      "title": "To do",
+      "body": "꺼져 있던 동안 처리할 일 {count}개가 생겼어요."
     },
     "versionDiffers": {
       "title": "서버 버전이 앱과 달라요",
@@ -62,5 +89,12 @@
       "title": "이 맥을 러너로 등록할까요?",
       "body": "{server}의 Ganger가 이 맥에서 에이전트를 돌리려고 해요. 눌러서 확인해요."
     }
+  },
+  "settingsWindow": {
+    "title": "알림 설정"
+  },
+  "providers": {
+    "claude": "Claude",
+    "codex": "Codex"
   }
 }
