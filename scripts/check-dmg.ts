@@ -9,27 +9,52 @@ import {
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const APP_NAME = "Ganger.app";
+
+export interface ExtendedAttribute {
+  path: string;
+  name: string;
+}
 
 export interface MountedVolume {
   names: ReadonlyArray<string>;
   applicationsLink: string | null;
   dsStore: Buffer | null;
+  appAttributes: ReadonlyArray<ExtendedAttribute>;
 }
 
 const BACKGROUND_NAMES = [".background.tiff", ".background.png"];
 const DS_STORE_RECORDS = ["Iloc", "bwsp", "icvp"];
+const CODESIGN_REJECTED_ATTRIBUTES = new Set(["com.apple.FinderInfo", "com.apple.ResourceFork"]);
 
 function utf16be(text: string): Buffer {
   return Buffer.from(text, "utf16le").swap16();
 }
 
+export function parseRecursiveXattr(output: string, root: string): ExtendedAttribute[] {
+  const attributes: ExtendedAttribute[] = [];
+  for (const line of output.split("\n")) {
+    const separator = line.lastIndexOf(": ");
+    if (separator === -1) continue;
+    const path = line.slice(0, separator);
+    const name = line.slice(separator + 2);
+    if (path !== root && !path.startsWith(`${root}/`)) continue;
+    attributes.push({ path: join(APP_NAME, relative(root, path)), name });
+  }
+  return attributes;
+}
+
 export function dmgProblems(volume: MountedVolume): string[] {
   const problems: string[] = [];
   if (!volume.names.includes(APP_NAME)) problems.push(`${APP_NAME} is missing`);
+  for (const { path, name } of volume.appAttributes) {
+    if (CODESIGN_REJECTED_ATTRIBUTES.has(name)) {
+      problems.push(`${path} has the ${name} xattr, which codesign --strict rejects`);
+    }
+  }
   if (volume.applicationsLink !== "/Applications") {
     problems.push("Applications is not a link to /Applications");
   }
@@ -57,13 +82,43 @@ export function dmgProblems(volume: MountedVolume): string[] {
 export function readVolume(mount: string): MountedVolume {
   const link = join(mount, "Applications");
   const dsStore = join(mount, ".DS_Store");
+  const app = join(mount, APP_NAME);
   return {
     names: readdirSync(mount),
     applicationsLink: lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink()
       ? readlinkSync(link)
       : null,
     dsStore: existsSync(dsStore) ? readFileSync(dsStore) : null,
+    appAttributes: existsSync(app) ? parseRecursiveXattr(xattrRecursive(app), app) : [],
   };
+}
+
+function xattrRecursive(path: string): string {
+  const result = spawnSync("xattr", ["-r", path], { stdio: ["ignore", "pipe", "inherit"] });
+  if (result.status !== 0) throw new Error(`xattr -r exited with ${result.status ?? "unknown"}`);
+  return result.stdout.toString();
+}
+
+function codesign(args: ReadonlyArray<string>): string | null {
+  const result = spawnSync("codesign", args, { stdio: ["ignore", "ignore", "pipe"] });
+  return result.status === 0 ? null : result.stderr.toString().trim();
+}
+
+export function adHocSignedCopyProblem(app: string): string | null {
+  const work = mkdtempSync(join(tmpdir(), "ganger-dmg-codesign-"));
+  try {
+    const copy = join(work, APP_NAME);
+    const ditto = spawnSync("ditto", [app, copy], { stdio: ["ignore", "ignore", "inherit"] });
+    if (ditto.status !== 0) return `ditto exited with ${ditto.status ?? "unknown"}`;
+    const failure =
+      codesign(["--sign", "-", "--force", "--deep", copy]) ??
+      codesign(["--verify", "--deep", "--strict", copy]);
+    return failure === null
+      ? null
+      : `${APP_NAME} fails codesign --verify --deep --strict after ad-hoc signing:\n  ${failure}`;
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
 }
 
 function hdiutil(args: ReadonlyArray<string>): Error | null {
@@ -89,15 +144,20 @@ export function checkDmg(dmg: string): void {
   let detachError: Error | null = null;
   try {
     problems = dmgProblems(readVolume(mount));
+    const app = join(mount, APP_NAME);
+    if (existsSync(app)) {
+      const signProblem = adHocSignedCopyProblem(app);
+      if (signProblem !== null) problems.push(signProblem);
+    }
   } finally {
     detachError = hdiutil(["detach", mount]);
     if (detachError === null) rmSync(mount, { recursive: true, force: true });
   }
   if (detachError !== null) throw detachError;
   if (problems.length > 0) {
-    throw new Error(`${dmg} has no install window:\n- ${problems.join("\n- ")}`);
+    throw new Error(`${dmg} failed the dmg check:\n- ${problems.join("\n- ")}`);
   }
-  console.log(`dmg install window: ok (${dmg})`);
+  console.log(`dmg install window and app attributes: ok (${dmg})`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

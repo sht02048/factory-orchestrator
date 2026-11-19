@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dmgProblems, type MountedVolume } from "./check-dmg.ts";
+import { dmgProblems, parseRecursiveXattr, type MountedVolume } from "./check-dmg.ts";
 
 function utf16be(text: string): Buffer {
   return Buffer.from(text, "utf16le").swap16();
@@ -20,6 +20,7 @@ const complete: MountedVolume = {
   names: [".DS_Store", ".VolumeIcon.icns", ".background.tiff", "Applications", "Ganger.app"],
   applicationsLink: "/Applications",
   dsStore,
+  appAttributes: [],
 };
 
 describe("dmgProblems", () => {
@@ -33,6 +34,7 @@ describe("dmgProblems", () => {
         names: ["Applications", "Ganger.app"],
         applicationsLink: "/Applications",
         dsStore: null,
+        appAttributes: [],
       }),
     ).toEqual(["background image is missing", "volume icon is missing", ".DS_Store is missing"]);
   });
@@ -60,6 +62,22 @@ describe("dmgProblems", () => {
     ]);
   });
 
+  it("앱 번들 어디든 codesign --strict 가 거부하는 FinderInfo·ResourceFork xattr 이 있으면 알린다", () => {
+    expect(
+      dmgProblems({
+        ...complete,
+        appAttributes: [
+          { path: "Ganger.app", name: "com.apple.FinderInfo" },
+          { path: "Ganger.app", name: "com.apple.provenance" },
+          { path: "Ganger.app/Contents/Resources/icon.icns", name: "com.apple.ResourceFork" },
+        ],
+      }),
+    ).toEqual([
+      "Ganger.app has the com.apple.FinderInfo xattr, which codesign --strict rejects",
+      "Ganger.app/Contents/Resources/icon.icns has the com.apple.ResourceFork xattr, which codesign --strict rejects",
+    ]);
+  });
+
   it("PNG 배경도 배경으로 인정한다", () => {
     expect(
       dmgProblems({
@@ -69,5 +87,25 @@ describe("dmgProblems", () => {
         ),
       }),
     ).toEqual([]);
+  });
+});
+
+describe("parseRecursiveXattr", () => {
+  it("xattr -r 출력을 앱 번들 안 상대 경로와 xattr 이름으로 나눈다", () => {
+    const root = "/Volumes/Ganger: rc/Ganger.app";
+    expect(
+      parseRecursiveXattr(
+        [
+          `${root}: com.apple.FinderInfo`,
+          `${root}/Contents/MacOS/Ganger: com.apple.provenance`,
+          "/Volumes/Ganger: rc/Applications: com.apple.FinderInfo",
+          "",
+        ].join("\n"),
+        root,
+      ),
+    ).toEqual([
+      { path: "Ganger.app", name: "com.apple.FinderInfo" },
+      { path: "Ganger.app/Contents/MacOS/Ganger", name: "com.apple.provenance" },
+    ]);
   });
 });
