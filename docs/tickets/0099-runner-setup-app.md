@@ -37,3 +37,17 @@ blocked_by: [0095, 0097]
 ## 완료 조건
 
 - 다른 맥의 앱이 서버에 등록을 요청하고, 서버가 그 맥을 Ganger 관리 러너로 저장하는지 시험한다.
+
+## 정한 것(구현 때)
+
+- **등록 요청(offer).** `RunnerEnrollments.offer()`가 토큰 없는 요청을 만든다. `openOffer()`는 가장 새로 만든, 아직 아무 앱도 받지 않은 살아 있는 요청의 `{ id, expiresInMs }`만 준다. `acceptOffer(id)`는 그 순간 토큰(24바이트 base64url)을 만들어 해시만 두고 요청을 "받음"으로 바꾼다. 같은 요청을 두 번 받으면 `taken`, 10분이 지나면 `expired`, 거둔 요청이나 명령 흐름의 id는 `unknown`으로 거절한다. 받은 토큰은 받은 때부터 10분 산다(그 맥이 원격 로그인을 켜느라 기다릴 수 있어서). 서버 화면은 받은 뒤 "그 맥의 앱이 준비하고 있어요"(`EnrollmentView`의 `preparing`)를 보인다.
+- **끝점.** `GET /api/runner-enrollment/offer`(`{ offer: { id, expiresInMs } | null }`), `POST /api/runner-enrollment/offer/accept`(JSON `{ id }` → `{ ok: true, script }` 또는 410 `{ ok: false, reason }`, 서버 주소·홈·키가 없으면 503). 둘 다 서버 화면과 같은 request guard를 지난다. 결과 보고는 0097의 `POST /api/runner-enrollment`를 그대로 쓴다. 문제 이름 `canceled`를 더했다.
+- **설치 스크립트.** 0097 스크립트에 `GANGER_PROGRESS=1`일 때만 나오는 `ganger-step:<remote-login-wait|remote-login|key|service|github|report>`, `ganger-github:<결과>`, `ganger-fail:<문제|refused|unreachable|canceled>` 줄을 더했다. INT·TERM을 받으면 그 토큰으로 `canceled`를 보고하고 멈춘다(터미널 명령에서 Ctrl-C도 서버 화면에 보인다). 서버에 결과를 보내기 직전에는 이 처리를 끈다. 공용 상수는 의존성 없는 `packages/app/src/runner-setup/enrollment-protocol.ts`에 두어 데스크톱이 DB 코드를 끌어오지 않는다.
+- **데스크톱 앱.** `RunnerEnrollmentFlow`(`apps/desktop/src/core/runner-enrollment.ts`)가 원격 모드에서 3초마다 요청을 묻고, 요청이 오면 창을 앞으로 가져와 앱 화면 "이 맥을 러너로 등록할까요?"로 바꾼다(창이 가려져 있으면 macOS 알림도). 등록을 누르면 받은 스크립트를 `/bin/sh -s`의 stdin으로 돌리고(stderr는 버리고 stdout에서 기계용 줄만 읽는다) 원격 로그인 → 키 등록 → Orca 서비스 → GitHub → 서버에 등록을 보인다. 취소는 프로세스 그룹에 TERM을 보낸다. 받기 전 취소와 닫은 요청은 그 앱에서만 다시 띄우지 않는다. 앱을 끄면 돌던 스크립트를 멈춘다. GUI 앱의 짧은 PATH를 보태려고 `/opt/homebrew/bin`, `/usr/local/bin`을 더한다.
+- **서버 맥 자신.** 로컬 모드는 묻지 않는다. 원격 주소가 loopback이거나, 이 맥 127.0.0.1(찾기 포트와 저장한 주소의 포트)에서 도는 서버의 instanceId가 원격 서버와 같으면 묻지 않는다. 판정은 서버마다 한 번 해 둔다.
+- **고르기 화면.** "다른 맥 · 그 맥에 Ganger 앱이 있어요"를 열고 칩(직접 해요: 원격 로그인 켜기 → 직접 해요: 앱에서 등록 누르기 → 키·서비스·GitHub → 확인)과 "약 2분"을 둔다. 서버 화면 흐름은 0097의 기다림·등록·주소 입력 조각을 `apps/web/src/runner-setup/enrollment.tsx`로 옮겨 명령 흐름과 같이 쓴다.
+
+## 다음 티켓에 넘김
+
+- **0103(데스크톱 알림 SSE).** 앱의 등록 요청 알아채기는 지금 `GET /api/runner-enrollment/offer` 3초 폴링이다. 0103이 SSE 연결을 깔면 "러너 등록 요청"을 SSE 이벤트 한 종류로 옮기고, 이 폴링은 0103의 폴링 fallback과 함께 SSE가 안 될 때만 쓴다. offer 응답에는 토큰이 없으니 SSE 이벤트에도 토큰을 싣지 않는다.
+- 토큰과 요청은 메모리에만 있어 서버를 다시 켜면 사라진다(0097과 같다).

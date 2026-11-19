@@ -39,6 +39,10 @@ blocked_by: []
 14. **이름.** 새 개념 "알림 사건"(Notification event)을 GLOSSARY에 더한다: 운영자에게 알릴 만한 일이 생긴 기록. To do·Runner Issue와 짝을 이루지만 상태가 아니다. 코드의 `attention`을 이 이름으로 바꾼다. `/api/attention`은 새 경로로 옮기고, 옛 데스크톱 버전을 위해 옛 경로를 언제까지 둘지 이 티켓에 적는다.
 15. **GLOSSARY Runner Issue.** 공급자 사용량 한도를 Runner Issue의 한 종류로 넣는다. 상태 이름은 새로 만들지 않는다.
 
+## 연결 메모
+
+- 0099가 데스크톱 앱의 러너 등록 요청을 `GET /api/runner-enrollment/offer` 3초 폴링으로 알아챈다. 이 티켓이 SSE를 깔면 그 요청을 SSE 이벤트 한 종류로 옮기고, 그 폴링은 SSE가 안 될 때의 fallback으로 둔다. 등록 요청 이벤트에는 토큰을 싣지 않는다(토큰은 앱에서 사람이 누를 때 accept로만 받는다).
+
 ## 범위 밖
 
 - 외부 알림 연동(ntfy, Slack 등). 같은 사건 저장소를 쓰는 후속으로 둔다.
