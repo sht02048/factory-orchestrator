@@ -79,7 +79,8 @@
     "menu": "{key} 런 메뉴",
     "pause": "멈추기",
     "resume": "재개하기",
-    "pausedFor": "{elapsed} 멈춤"
+    "pausedFor": "{elapsed} 멈춤",
+    "requestFailed": "요청을 남기지 못했어요. 잠시 뒤 다시 해 주세요."
   },
   "sheet": {
     "title": "{key} {title}",

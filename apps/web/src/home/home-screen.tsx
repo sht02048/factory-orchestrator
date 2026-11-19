@@ -87,7 +87,7 @@ interface CardHost {
   cardRef: (id: RunId) => (element: HTMLButtonElement | null) => void;
   focusCard: (id: RunId) => void;
   onOpen: (run: HomeRun, tagged: boolean, mode: SheetMode) => void;
-  onControl: (run: HomeRun, control: RunControl, focusAfter?: () => void) => Promise<void>;
+  onControl: (run: HomeRun, control: RunControl, focusAfter?: () => void) => Promise<boolean>;
 }
 
 export function HomeScreen({
@@ -163,8 +163,12 @@ export function HomeScreen({
               ? t(`control.${control}Requested`, { key })
               : t("control.stateChanged", { key }),
           );
+          return true;
         },
-        () => showToast(t(`control.${control}Rejected`, { key })),
+        () => {
+          showToast(t(`control.${control}Rejected`, { key }));
+          return false;
+        },
       );
     },
   };

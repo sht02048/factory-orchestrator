@@ -38,19 +38,25 @@ export function RunCard({
   selected: boolean;
   openRef: Ref<HTMLButtonElement>;
   onOpen: (mode: SheetMode) => void;
-  onControl: (control: RunControl) => Promise<void>;
+  onControl: (control: RunControl) => Promise<boolean>;
 }) {
   const todoTag = tagged ? todoTagOf(run) : null;
   const tag: PillStatus | null = todoTag ?? (run.state === "paused" ? "paused" : null);
   const titleId = useId();
   const [sending, setSending] = useState(false);
+  const [rejected, setRejected] = useState(false);
   const control = (kind: RunControl): void => {
+    if (sending) return;
     setSending(true);
-    void onControl(kind).finally(() => setSending(false));
+    setRejected(false);
+    void onControl(kind)
+      .then((reached) => setRejected(!reached))
+      .finally(() => setSending(false));
   };
   const parts = useCardParts(run, todoTag !== null, all, titleId, onOpen, {
     onControl: control,
     sending,
+    rejected,
   });
   const statusName = useRunText().statusName;
   return (
@@ -74,7 +80,11 @@ function useCardParts(
   all: boolean,
   titleId: string,
   onOpen: (mode: SheetMode) => void,
-  { onControl, sending }: { onControl: (control: RunControl) => void; sending: boolean },
+  {
+    onControl,
+    sending,
+    rejected,
+  }: { onControl: (control: RunControl) => void; sending: boolean; rejected: boolean },
 ): CardParts {
   const t = useTranslations("home.card");
   const tDomain = useTranslations("domain");
@@ -87,8 +97,9 @@ function useCardParts(
       .join(" · ");
   const runner = withFlags(text.runnerLine(run, all));
   const available = availableRunControl(run.state, run.cancelling, run.control);
-  const failed =
-    run.control?.status === "failed"
+  const failed = rejected
+    ? { detail: t("requestFailed"), detailTone: "problem" as const }
+    : run.control?.status === "failed"
       ? {
           detail: t(run.control.control === "pause" ? "pauseFailed" : "resumeFailed", {
             reason: tDomain(`runControlFailure.${run.control.reason}`),
@@ -134,7 +145,8 @@ function useCardParts(
                 <Button
                   variant="secondary"
                   aria-describedby={titleId}
-                  disabled={sending}
+                  aria-disabled={sending}
+                  aria-busy={sending}
                   onClick={() => onControl("resume")}
                 >
                   {t("resume")}

@@ -93,7 +93,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
       ? t(run.control.control === "pause" ? "control.pausePending" : "control.resumePending")
       : null,
   ].filter((part) => part !== null);
-  const failure = useControlFailure(run.control);
+  const failure = useControlFailure(run.cancelPending ? null : run.control);
 
   return (
     <div {...stylex.props(styles.main)}>
@@ -580,8 +580,10 @@ function ControlRun({
     <>
       <Button
         variant={control === "resume" ? "primary" : "secondary"}
-        disabled={state === "sending"}
+        aria-disabled={state === "sending"}
+        aria-busy={state === "sending"}
         onClick={() => {
+          if (state === "sending") return;
           setState("sending");
           onControl(control).then(
             (outcome) => {

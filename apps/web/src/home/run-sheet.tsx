@@ -178,7 +178,11 @@ function SheetBody({
   }
 }
 
-type SheetControl = (run: HomeRun, control: RunControl, focusAfter?: () => void) => Promise<void>;
+type SheetControl = (
+  run: HomeRun,
+  control: RunControl,
+  focusAfter?: () => void,
+) => Promise<boolean>;
 
 function ControlBlock({
   run,
@@ -193,14 +197,16 @@ function ControlBlock({
   const domain = useTranslations("domain");
   const statusRef = useRef<HTMLParagraphElement>(null);
   const [sending, setSending] = useState(false);
+  const [rejected, setRejected] = useState(false);
   const control = run.control;
   const available = availableRunControl(run.state, run.cancelling, control);
   const pending =
     control?.status === "pending"
       ? t(control.control === "pause" ? "card.pausing" : "card.resuming")
       : null;
-  const failure =
-    control?.status === "failed"
+  const failure = rejected
+    ? t("card.requestFailed")
+    : control?.status === "failed"
       ? t(control.control === "pause" ? "card.pauseFailed" : "card.resumeFailed", {
           reason: domain(`runControlFailure.${control.reason}`),
         })
@@ -223,12 +229,15 @@ function ControlBlock({
           <div {...stylex.props((failure ?? pending) !== null && styles.controlBelowStatus)}>
             <Button
               variant={available === "resume" ? "primary" : "secondary"}
-              disabled={sending}
+              aria-disabled={sending}
+              aria-busy={sending}
               onClick={() => {
+                if (sending) return;
                 setSending(true);
-                void onControl(run, available, () => statusRef.current?.focus()).finally(() =>
-                  setSending(false),
-                );
+                setRejected(false);
+                void onControl(run, available, () => statusRef.current?.focus())
+                  .then((reached) => setRejected(!reached))
+                  .finally(() => setSending(false));
               }}
             >
               {t(available === "resume" ? "card.resume" : "card.pause")}
