@@ -262,10 +262,38 @@ describe("pickRunner", () => {
 
 describe("checkManualRunnerChoice", () => {
   it("수동 할당에서 인증이 깨진 러너는 고를 수 없고, Offline 러너는 고를 수 있다 (Q87)", () => {
-    expect(checkManualRunnerChoice(runner({ id: r1, assignmentBlocked: true }))).toEqual({
+    expect(checkManualRunnerChoice(runner({ id: r1, assignmentBlocked: true }), app)).toEqual({
       ok: false,
       reason: "assignment-blocked",
     });
-    expect(checkManualRunnerChoice(runner({ id: r2, online: false }))).toEqual({ ok: true });
+    expect(checkManualRunnerChoice(runner({ id: r2, online: false }), app)).toEqual({ ok: true });
+  });
+
+  it("push가 깨진 프로젝트의 런만 그 러너에 수동으로 맡길 수 없다 (0096)", () => {
+    const pushBroken = runner({ id: r1, projects: [app, web], blockedProjects: [app] });
+
+    expect(checkManualRunnerChoice(pushBroken, app)).toEqual({
+      ok: false,
+      reason: "assignment-blocked",
+    });
+    expect(checkManualRunnerChoice(pushBroken, web)).toEqual({ ok: true });
+  });
+});
+
+describe("push가 깨진 프로젝트 (0096)", () => {
+  it("그 프로젝트의 티켓만 그 러너에 맡기지 않고 다른 프로젝트 티켓은 맡긴다", () => {
+    const runners = [
+      runner({ id: r1, capacity: 9, projects: [app, web], blockedProjects: [app] }),
+      runner({ id: r2, capacity: 1 }),
+    ];
+
+    expect(pickRunner({ project: app, agent: claude, runners, runs: [] })).toBe(r2);
+    expect(pickRunner({ project: web, agent: claude, runners, runs: [] })).toBe(r1);
+  });
+
+  it("맞는 러너가 모두 그 프로젝트의 push가 깨졌으면 러너를 정하지 않는다", () => {
+    const runners = [runner({ id: r1, blockedProjects: [app] })];
+
+    expect(pickRunner({ project: app, agent: claude, runners, runs: [] })).toBeNull();
   });
 });

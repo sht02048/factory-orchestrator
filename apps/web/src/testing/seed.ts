@@ -242,6 +242,51 @@ export function breakGitHubAuth(db: Database): void {
   });
 }
 
+export function failSomePushes(db: Database, failed: ReadonlyArray<PushFailureSeed>): void {
+  const projects = ["web", "docs", "api", "lab"].map((name) =>
+    toRunnerProjectId(`github:acme/${name}`),
+  );
+  recordRunnerCheck(db, {
+    runnerId: toRunnerId("runner-a"),
+    online: true,
+    checkedAt: T0,
+    error: null,
+    projects: projects.map((id) => ({
+      id,
+      displayName: id.slice("github:".length),
+      setupState: "ready",
+    })),
+    assignmentBlocked: false,
+    prerequisites: [
+      {
+        id: "orca-service",
+        name: "Orca service",
+        satisfied: true,
+        hint: null,
+        blocksAssignment: false,
+      },
+      ...projects.map((project) => {
+        const seed = failed.find((f) => `github:acme/${f.name}` === project);
+        return {
+          id: `github-push:${project}`,
+          name: `GitHub push access: ${project}`,
+          satisfied: seed === undefined ? true : seed.satisfied,
+          hint: null,
+          blocksAssignment: false,
+          project,
+          ...(seed === undefined ? {} : { failure: seed.failure }),
+        };
+      }),
+    ],
+  });
+}
+
+export interface PushFailureSeed {
+  name: "web" | "docs" | "api" | "lab";
+  satisfied: false | null;
+  failure: { kind: "auth" | "network" | "timeout" | "other"; reason: string | null };
+}
+
 export function addUnreachedCanceledRun(db: Database, key: string): RunId {
   const assigned = assignRun(db, {
     ticket: { connection, key: toTicketKey(key) },

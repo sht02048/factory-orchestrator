@@ -1,4 +1,4 @@
-import { currentWindows, highestUsage, summarizeRunOutcome } from "@ganger/core";
+import { blockedProjectsOf, currentWindows, highestUsage, summarizeRunOutcome } from "@ganger/core";
 import type { UsageWindow } from "@ganger/core";
 import { getRunWithRecords, listRunners, listRuns, listWorkspaces } from "@ganger/db";
 import type { Database, StoredProviderUsage, StoredRun } from "@ganger/db";
@@ -71,6 +71,11 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
           ? null
           : Math.max(0, now.getTime() - runner.offlineSince.getTime()),
       assignmentBlocked: runner.assignmentBlocked,
+      pushBlockedProjects: runner.online
+        ? blockedProjectsOf(runner.prerequisites ?? []).map(
+            (id) => runner.projects.find((p) => p.id === id)?.displayName ?? id,
+          )
+        : [],
       checks:
         runner.prerequisites?.map((p) => ({
           id: p.id,
@@ -79,6 +84,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
           satisfied: p.satisfied,
           blocksAssignment: p.blocksAssignment,
           hint: prerequisiteHint(p),
+          failure: p.failure ?? null,
         })) ?? null,
       checked:
         runner.checkedAt === null

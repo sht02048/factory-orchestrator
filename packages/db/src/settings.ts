@@ -16,7 +16,13 @@ import type {
   TrackerProjectId,
   TrackerStateId,
 } from "@ganger/core";
-import { USAGE_WINDOW_KINDS, usageLimitsAt } from "@ganger/core";
+import {
+  PREREQUISITE_FAILURE_KINDS,
+  USAGE_WINDOW_KINDS,
+  blockedProjectsOf,
+  toRunnerProjectId,
+  usageLimitsAt,
+} from "@ganger/core";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -212,15 +218,28 @@ export function saveRunner(
     .run();
 }
 
-const storedPrerequisites = z.array(
-  z.object({
+export const runnerPrerequisiteSchema = z
+  .object({
     id: z.string(),
     name: z.string(),
     satisfied: z.boolean().nullable(),
     hint: z.string().nullable(),
     blocksAssignment: z.boolean(),
-  }),
-);
+    project: z.string().optional(),
+    failure: z
+      .object({
+        kind: z.enum(PREREQUISITE_FAILURE_KINDS).catch("other"),
+        reason: z.string().nullable(),
+      })
+      .optional(),
+  })
+  .transform(({ project, failure, ...rest }): RunnerPrerequisite => ({
+    ...rest,
+    ...(project === undefined ? {} : { project: toRunnerProjectId(project) }),
+    ...(failure === undefined ? {} : { failure }),
+  }));
+
+const storedPrerequisites = z.array(runnerPrerequisiteSchema);
 
 function readPrerequisites(text: string | null): RunnerPrerequisite[] | null {
   if (text === null) return null;
@@ -395,6 +414,7 @@ export function listRunnerSnapshots(db: Database, now: Date = new Date()): Runne
     assignmentBlocked: runner.assignmentBlocked,
     capacity: runner.capacity,
     projects: runner.projects.map((p) => p.id),
+    blockedProjects: runner.online ? blockedProjectsOf(runner.prerequisites ?? []) : [],
     usageLimits: usageLimitsAt(runner.providerUsage, now),
   }));
 }

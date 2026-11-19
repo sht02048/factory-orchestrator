@@ -31,10 +31,13 @@ import type { ReactNode } from "react";
 import { useLocale, useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { usePrerequisiteName, useUsageNames } from "../labels";
+import { PushProblems, useCheckingText, usePushSummaryText } from "../push-check";
 import { useRunnerCheckPolling } from "../settings/settings-screen";
 import type { ActionResult } from "../settings/settings-screen";
 import { useStatusName } from "../status";
 import { failedChecksFirst, problemRunnersFirst, runnerRowStatus } from "@ganger/app/runners/model";
+import { runnerWideChecks, summarizePushChecks } from "@ganger/app/prerequisites";
+import type { PushSummary } from "@ganger/app/prerequisites";
 import type {
   ProviderUsageView,
   RunnerCheckItem,
@@ -214,8 +217,14 @@ function RowSentence({ runner }: { runner: RunnerView }) {
       ? t("offline")
       : t("offlineFor", { duration: duration(runner.offlineMs) });
   if (runner.assignmentBlocked) return t("assignmentBlocked");
-  if (free > 0) return t("free", { free });
-  return runner.queued.length === 0 ? t("full") : t("fullWaiting", { count: runner.queued.length });
+  const capacity =
+    free > 0
+      ? t("free", { free })
+      : runner.queued.length === 0
+        ? t("full")
+        : t("fullWaiting", { count: runner.queued.length });
+  const pushBlocked = runner.pushBlockedProjects.length;
+  return pushBlocked === 0 ? capacity : t("withPushBlocked", { capacity, count: pushBlocked });
 }
 
 function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerActions }) {
@@ -261,7 +270,7 @@ function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerA
       )}
       <CapacityRuns runner={runner} />
       <ProviderUsage runner={runner} />
-      <CheckList runner={runner} />
+      <CheckList runner={runner} recheck={recheck} showRecheck={status === "online"} />
       <LeftWorktrees runner={runner} />
     </DetailPanel>
   );
@@ -269,6 +278,8 @@ function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerA
 
 type RecheckPhase = "idle" | "sending" | "requested" | "done" | "failed";
 type RecheckMessage = "requested" | "done" | "failed" | "silent";
+
+type Recheck = ReturnType<typeof useRecheck>;
 
 function useRecheck(runnerId: string, { recheck, pollChecks }: RunnerActions) {
   const [phase, setPhase] = useState<RecheckPhase>("idle");
@@ -310,10 +321,11 @@ function useRecheck(runnerId: string, { recheck, pollChecks }: RunnerActions) {
     );
   };
 
+  const checking = phase === "sending" || (phase === "requested" && !silent);
   return {
     statusRef,
     request,
-    checking: phase === "sending" || (phase === "requested" && !silent),
+    checking,
     message: recheckMessage(phase, silent),
   };
 }
@@ -411,9 +423,30 @@ function RunLabel({ ticketKey, meta }: { ticketKey: string; meta: string }) {
   );
 }
 
-function CheckList({ runner }: { runner: RunnerView }) {
+function CheckList({
+  runner,
+  recheck,
+  showRecheck,
+}: {
+  runner: RunnerView;
+  recheck: Recheck;
+  showRecheck: boolean;
+}) {
   const t = useTranslations("runners.panel");
   const prerequisiteName = usePrerequisiteName();
+  const pushText = usePushSummaryText();
+  const tPush = useTranslations("domain.pushCheck");
+  const checkingText = useCheckingText(recheck.checking ? 0 : null, "elapsed");
+  const footer = !showRecheck ? null : (
+    <div {...stylex.props(styles.checkFooter)}>
+      <Button variant="secondary" disabled={recheck.checking} onClick={recheck.request}>
+        {recheck.checking ? t("checking") : t("recheck")}
+      </Button>
+      <Text variant="meta" as="span" numeric>
+        {checkingText}
+      </Text>
+    </div>
+  );
   if (!runner.online) {
     return (
       <PanelSection title={t("checksTitle")}>
@@ -428,33 +461,62 @@ function CheckList({ runner }: { runner: RunnerView }) {
     return (
       <PanelSection title={t("checksTitle")}>
         <Text variant="ui">{t("noChecks")}</Text>
+        {footer}
       </PanelSection>
     );
   }
-  const passed = checks.filter((check) => check.satisfied === true).length;
+  const push = summarizePushChecks(checks);
+  const lines: Array<{ satisfied: boolean | null; line: ReactNode }> = runnerWideChecks(checks).map(
+    (check) => ({
+      satisfied: check.satisfied,
+      line: (
+        <CheckLine
+          key={check.id}
+          state={checkState(check)}
+          hint={check.satisfied === false ? check.hint : null}
+        >
+          {prerequisiteName(check)}
+        </CheckLine>
+      ),
+    }),
+  );
+  if (push.total > 0) {
+    const satisfied = pushSatisfied(push);
+    lines.push({
+      satisfied,
+      line: (
+        <CheckLine
+          key="github-push"
+          state={checkState({ satisfied })}
+          detail={<PushProblems summary={push} />}
+        >
+          {tPush("name")} · {pushText(push)}
+        </CheckLine>
+      ),
+    });
+  }
   return (
     <PanelSection
       title={t("checksTitle")}
-      meta={t("checksPassed", { passed, total: checks.length })}
+      meta={t("checksPassed", {
+        passed: lines.filter((line) => line.satisfied === true).length,
+        total: lines.length,
+      })}
     >
-      <ul {...stylex.props(styles.list)}>
-        {failedChecksFirst(checks).map((check) => (
-          <CheckLine
-            key={check.id}
-            state={checkState(check)}
-            hint={check.satisfied === false ? check.hint : null}
-          >
-            {prerequisiteName(check)}
-          </CheckLine>
-        ))}
-      </ul>
+      <ul {...stylex.props(styles.list)}>{failedChecksFirst(lines).map((item) => item.line)}</ul>
+      {footer}
     </PanelSection>
   );
 }
 
+function pushSatisfied(push: PushSummary): boolean | null {
+  if (push.failed.length > 0) return false;
+  return push.unknown.length > 0 ? null : true;
+}
+
 type CheckState = "ok" | "broken" | "unknown";
 
-function checkState(check: RunnerCheckItem): CheckState {
+function checkState(check: Pick<RunnerCheckItem, "satisfied">): CheckState {
   if (check.satisfied === null) return "unknown";
   return check.satisfied ? "ok" : "broken";
 }
@@ -462,10 +524,12 @@ function checkState(check: RunnerCheckItem): CheckState {
 function CheckLine({
   state,
   hint = null,
+  detail = null,
   children,
 }: {
   state: CheckState;
   hint?: string | null;
+  detail?: ReactNode;
   children: ReactNode;
 }) {
   const t = useTranslations("runners.panel.check");
@@ -483,6 +547,7 @@ function CheckLine({
             {hint}
           </Text>
         )}
+        {detail}
       </span>
     </li>
   );
@@ -729,6 +794,13 @@ const styles = stylex.create({
   labelGridRest: { gridColumn: "2 / -1", minWidth: 0 },
   runLabel: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
   checkText: { display: "flex", flexDirection: "column", gap: space.px2 },
+  checkFooter: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: space.s3,
+    rowGap: space.s2,
+  },
   code: { fontFamily: fonts.mono },
   provider: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
 });

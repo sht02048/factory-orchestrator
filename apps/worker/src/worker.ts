@@ -139,8 +139,8 @@ export function createWorker(options: WorkerOptions): Worker {
 
 async function tick(context: TickContext): Promise<void> {
   context.mailboxes.clear();
-  await checkRunners(context);
   await processWebRequests(context, "runner-check");
+  await checkRunners(context);
   await watchActiveRuns(context);
   await cancelQueuedRuns(context);
   await assignAutomatically(context);

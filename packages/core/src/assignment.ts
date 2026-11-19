@@ -10,6 +10,7 @@ export interface RunnerSnapshot {
   assignmentBlocked: boolean;
   capacity: number;
   projects: ReadonlyArray<RunnerProjectId>;
+  blockedProjects?: ReadonlyArray<RunnerProjectId>;
   usageLimits: ReadonlyArray<UsageLimit>;
 }
 
@@ -84,8 +85,20 @@ export function remainingCapacity(
   return Math.max(0, runner.capacity - occupied);
 }
 
+export function isProjectBlocked(
+  runner: Pick<RunnerSnapshot, "blockedProjects">,
+  project: RunnerProjectId,
+): boolean {
+  return runner.blockedProjects?.includes(project) ?? false;
+}
+
 export function canRunnerTake(runner: RunnerSnapshot, project: RunnerProjectId): boolean {
-  return runner.online && !runner.assignmentBlocked && runner.projects.includes(project);
+  return (
+    runner.online &&
+    !runner.assignmentBlocked &&
+    runner.projects.includes(project) &&
+    !isProjectBlocked(runner, project)
+  );
 }
 
 export function pickRunner(input: {
@@ -108,6 +121,9 @@ export function pickRunner(input: {
 
 export function checkManualRunnerChoice(
   runner: RunnerSnapshot,
+  project: RunnerProjectId,
 ): { ok: true } | { ok: false; reason: "assignment-blocked" } {
-  return runner.assignmentBlocked ? { ok: false, reason: "assignment-blocked" } : { ok: true };
+  return runner.assignmentBlocked || isProjectBlocked(runner, project)
+    ? { ok: false, reason: "assignment-blocked" }
+    : { ok: true };
 }
