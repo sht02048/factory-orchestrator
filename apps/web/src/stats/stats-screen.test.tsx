@@ -13,6 +13,7 @@ function render(
   options: {
     dimension?: StatsDimension;
     runsHref?: (dimension: StatsDimension, key: string, days: StatsPeriodDays) => string;
+    failedRunsHref?: (days: StatsPeriodDays) => string;
   } = {},
 ) {
   return renderWithMessages(
@@ -27,6 +28,7 @@ function render(
       onPeriodChange={noop}
       onPickWorkspace={noop}
       {...(options.runsHref === undefined ? {} : { runsHref: options.runsHref })}
+      {...(options.failedRunsHref === undefined ? {} : { failedRunsHref: options.failedRunsHref })}
     />,
     statsMessages,
   );
@@ -75,7 +77,7 @@ function breakdownRows(html: string): string[][] {
 describe("Stats 화면(0072)", () => {
   it("메타 줄에 화면 이름·Workspace·기간을, 제목에 결론 문장을 둔다", () => {
     const html = render(seeded());
-    expect(text(html)).toContain("Stats · Acme Commerce · 최근 14일(11월 4일–11월 17일)");
+    expect(text(html)).toContain("Stats · Acme Commerce · 11월 4일–11월 17일");
     expect(html).toMatch(/<h1[^>]*>끝난 런 9개 중 22%를 에이전트가 병합까지 끝냈어요<\/h1>/);
   });
 
@@ -122,7 +124,7 @@ describe("Stats 화면(0072)", () => {
 
   it("차트의 마지막 날 이름은 오늘이고 범례는 제목 옆에 있다", () => {
     const html = render(seeded());
-    const head = text(between(html, "날짜별로 끝난 런", 'role="img"'));
+    const head = text(between(html, "날짜별로 끝난 런</h2>", 'role="img"'));
     expect(head).toContain("Merged Human Check Failed Canceled");
     const days = text(between(html, 'role="img"', "표로 보기")).trim();
     expect(days.endsWith("오늘")).toBe(true);
@@ -152,7 +154,7 @@ describe("Stats 화면(0072)", () => {
 
   it("왜 실패했나요는 실패 이유를 말로 쓰고 PR 상태를 한 줄로, 막대와 개수를 함께 보인다", () => {
     const html = render(seeded());
-    const failures = between(html, "왜 실패했나요", "나눠 보기");
+    const failures = between(html, "왜 실패했나요</h2>", "나눠 보기");
     expect(text(failures)).toContain("왜 실패했나요 4");
     expect(text(failures)).toContain("에이전트가 실패를 보고했어요 PR 없음 2개 2개");
     expect(text(failures)).toContain("PR이 병합되지 않고 닫혔어요 PR 닫힘 1개 1개");
@@ -165,21 +167,25 @@ describe("Stats 화면(0072)", () => {
     const db = seedStatsDatabase();
     addRunDecisionCases(db);
     const failures = text(
-      between(render(loadStatsPage(db, undefined, now, "UTC", 14)), "왜 실패했나요", "나눠 보기"),
+      between(
+        render(loadStatsPage(db, undefined, now, "UTC", 14)),
+        "왜 실패했나요</h2>",
+        "나눠 보기",
+      ),
     );
     expect(failures).toContain("에이전트가 중간에 멈췄어요 PR 없음 1개 1개");
     expect(failures).toContain("런을 시작하지 못했어요 PR 없음 1개 1개");
     expect(failures).not.toContain("Canceled");
   });
 
-  it("나눠 보기는 러너 · 트래커 프로젝트 · 에이전트 탭과 이름 · 런 · 결과 · 리드 타임 열이다", () => {
+  it("나눠 보기는 러너 · 트래커 프로젝트 · 에이전트 탭과 이름 · 끝난 런 · 병합률 · 리드 타임 숫자 열이다", () => {
     const html = render(seeded());
     expect(text(between(html, 'aria-label="나눠 볼 기준"', "</div>"))).toContain(
       "러너 트래커 프로젝트 에이전트",
     );
     expect(breakdownRows(html)).toEqual([
-      ["runner-a", "5", "22분", "Merged 2 · Human Check 2 · Failed 1 · Canceled 0"],
-      ["runner-b", "4", "18분", "Merged 0 · Human Check 1 · Failed 3 · Canceled 0"],
+      ["runner-a", "5", "40%", "22분", ""],
+      ["runner-b", "4", "0%", "18분", ""],
     ]);
     expect(breakdownRows(render(seeded(), { dimension: "agent" })).map((r) => r[0])).toEqual([
       "Claude Code",
@@ -201,10 +207,37 @@ describe("Stats 화면(0072)", () => {
     expect(render(seeded())).not.toContain("의 런 보기");
   });
 
-  it("나눠 보기 표의 열 머리는 이름 · 런 · 결과 · 리드 타임이다", () => {
+  it("나눠 보기 표의 열 머리는 이름 · 끝난 런 · 병합률 · 리드 타임이다", () => {
     const html = render(seeded());
     const breakdown = html.slice(html.lastIndexOf("<table"));
-    expect(text(between(breakdown, "<thead", "</thead>")).trim()).toBe("이름 런 결과 리드 타임");
+    expect(text(between(breakdown, "<thead", "</thead>")).trim()).toBe(
+      "이름 끝난 런 병합률 리드 타임",
+    );
+  });
+
+  it("나눠 보기 표 아래에 이름을 누르면 Runs 가 열린다고 알려 준다. 링크가 없으면 알리지 않는다", () => {
+    const runsHref = () => "/runs";
+    expect(text(render(seeded(), { runsHref }))).toContain(
+      "이름을 누르면 그 조건과 기간으로 Runs가 열려요.",
+    );
+    expect(text(render(seeded()))).not.toContain("이름을 누르면");
+  });
+
+  it("왜 실패했나요 아래 'Failed 런 보기'는 Stats 기간의 Failed 런을 여는 링크다", () => {
+    const failedRunsHref = (days: StatsPeriodDays) => `/runs?f=failed&days=${days}`;
+    const html = render(seeded(7), { failedRunsHref });
+    const failures = between(html, "왜 실패했나요</h2>", "나눠 보기");
+    expect(failures).toMatch(/<a href="\/runs\?f=failed&amp;days=7"[^>]*>Failed 런 보기<\/a>/);
+    expect(render(seeded())).not.toContain("Failed 런 보기");
+  });
+
+  it("기간에 Failed 런이 없으면 'Failed 런 보기'를 두지 않는다", () => {
+    const failedRunsHref = () => "/runs?f=failed";
+    const html = render(
+      loadStatsPage(seedStatsDatabase(), undefined, new Date("2027-01-01T00:00:00Z"), "UTC", 14),
+      { failedRunsHref },
+    );
+    expect(html).not.toContain("Failed 런 보기");
   });
 
   it("오른쪽 상세 패널이 없고 나눠 보기 행은 고르는 목록이 아니다", () => {
@@ -242,23 +275,17 @@ describe("Stats 화면(0072)", () => {
       return loadStatsPage(db, undefined, now, "UTC", 14);
     };
 
-    it("제목과 숫자는 Canceled 를 비율에서 빼고 끝난 런 카드에 따로 적는다", () => {
+    it("제목은 Canceled 를 뺀 수로 말하고 뺐다는 설명은 끝난 런 카드가 맡는다", () => {
       const html = render(page());
-      expect(text(html)).toContain(
-        "Canceled를 뺀 끝난 런 11개 중 18%를 에이전트가 병합까지 끝냈어요",
-      );
-      expect(tiles(html)[3]).toBe("끝난 런 13 Canceled 2개는 비율에서 빼요");
+      expect(html).toMatch(/<h1[^>]*>끝난 런 11개 중 18%를 에이전트가 병합까지 끝냈어요<\/h1>/);
+      expect(html).not.toContain("Canceled를 뺀");
+      expect(tiles(html)[3]).toBe("끝난 런 13 Canceled 2개를 빼고 11개로 비율을 내요");
       expect(html).toContain('title="11월 17일: Merged 1 · Human Check 0 · Failed 2 · Canceled 2"');
     });
 
-    it("나눠 보기 결과 막대는 Canceled 를 따로 센다", () => {
+    it("나눠 보기 끝난 런은 Canceled 를 세고 병합률은 Canceled 를 빼고 낸다", () => {
       const rows = breakdownRows(render(page(), { dimension: "agent" }));
-      expect(rows.find((r) => r[0] === "gemini")).toEqual([
-        "gemini",
-        "2",
-        "11분",
-        "Merged 0 · Human Check 0 · Failed 1 · Canceled 1",
-      ]);
+      expect(rows.find((r) => r[0] === "gemini")).toEqual(["gemini", "2", "0%", "11분", ""]);
     });
   });
 });

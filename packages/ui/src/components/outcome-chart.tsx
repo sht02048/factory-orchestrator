@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
-import { colors, radius, space } from "../tokens.stylex";
+import { breakpoints, colors, radius, space } from "../tokens.stylex";
 import { textStyles } from "./text";
 
 export const OUTCOME_TONES = ["merged", "check", "failed", "canceled"] as const;
@@ -62,6 +62,7 @@ export interface StackedBarChartProps {
   top: number;
   bars: ReadonlyArray<StackedBar>;
   barLabels: ReadonlyArray<ReactNode>;
+  minorBarLabels?: ReadonlyArray<boolean>;
 }
 
 export function StackedBarChart({
@@ -71,6 +72,7 @@ export function StackedBarChart({
   top,
   bars,
   barLabels,
+  minorBarLabels = [],
 }: StackedBarChartProps) {
   const columns = `repeat(${bars.length}, minmax(0, 1fr))`;
   return (
@@ -112,7 +114,15 @@ export function StackedBarChart({
       </div>
       <div style={{ gridTemplateColumns: columns }} {...stylex.props(styles.days)}>
         {barLabels.map((barLabel, i) => (
-          <span key={i} {...stylex.props(textStyles("label"), styles.numeric, styles.day)}>
+          <span
+            key={i}
+            {...stylex.props(
+              textStyles("label"),
+              styles.numeric,
+              styles.day,
+              minorBarLabels[i] === true && styles.minorDay,
+            )}
+          >
             {barLabel}
           </span>
         ))}
@@ -121,7 +131,7 @@ export function StackedBarChart({
   );
 }
 
-const PLOT_HEIGHT = 160;
+const PLOT_HEIGHT = 128;
 
 const styles = stylex.create({
   track: {
@@ -143,6 +153,7 @@ const styles = stylex.create({
     columnGap: space.px6,
     rowGap: space.px6,
     paddingTop: space.s2,
+    containerType: "inline-size",
   },
   axis: { position: "relative", minWidth: space.s4 },
   tick: {
@@ -177,6 +188,7 @@ const styles = stylex.create({
   },
   days: { gridColumn: 2, display: "grid" },
   day: { display: "flex", justifyContent: "center", minWidth: 0, whiteSpace: "nowrap" },
+  minorDay: { visibility: { default: "visible", [breakpoints.chartLabelsSparse]: "hidden" } },
   numeric: { fontVariantNumeric: "tabular-nums" },
 });
 

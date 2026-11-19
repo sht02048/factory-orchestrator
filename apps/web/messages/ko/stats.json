@@ -2,10 +2,9 @@
   "documentTitle": "Stats · Ganger",
   "title": "Stats",
   "summary": "끝난 런을 요약 결과로 나눠 봐요.",
-  "meta": "Stats · {workspace} · 최근 {days}일({from}–{to})",
+  "meta": "Stats · {workspace} · {from}–{to}",
   "headline": {
     "rated": "끝난 런 {runs}개 중 {percent}%를 에이전트가 병합까지 끝냈어요",
-    "ratedWithCanceled": "Canceled를 뺀 끝난 런 {runs}개 중 {percent}%를 에이전트가 병합까지 끝냈어요",
     "onlyCanceled": "끝난 런 {runs}개가 모두 Canceled예요",
     "empty": "최근 {days}일 동안 끝난 런이 없어요"
   },
@@ -32,7 +31,7 @@
     "leadTime": "리드 타임 중앙값",
     "leadTimeP90": "느린 10%는 {p90} 넘게 걸렸어요",
     "ended": "끝난 런",
-    "canceled": "Canceled {count}개는 비율에서 빼요"
+    "canceled": "Canceled {count}개를 빼고 {rated}개로 비율을 내요"
   },
   "throughput": {
     "title": "날짜별로 끝난 런",
@@ -69,7 +68,8 @@
     "prState": "{state} {count}개",
     "separator": " · ",
     "count": "{runs}개",
-    "empty": "이 기간에 Failed 런이 없어요."
+    "empty": "이 기간에 Failed 런이 없어요.",
+    "openRuns": "Failed 런 보기"
   },
   "dimension": {
     "title": "나눠 보기",
@@ -80,12 +80,13 @@
   },
   "columns": {
     "name": "이름",
-    "runs": "런",
-    "result": "결과",
+    "runs": "끝난 런",
+    "mergedRate": "병합률",
     "leadTime": "리드 타임"
   },
-  "result": "Merged {merged} · Human Check {check} · Failed {failed} · Canceled {canceled}",
-  "tableCaption": "{dimension}별 런 결과와 리드 타임",
+  "tableCaption": "{dimension}별 끝난 런, 병합률, 리드 타임",
   "empty": "최근 {days}일 동안 끝난 런이 없어요. 런이 끝나면 여기에 보여요.",
-  "openRuns": "{name}의 런 보기"
+  "openRuns": "{name}의 런 보기",
+  "openRunsHint": "이름을 누르면 그 조건과 기간으로 Runs가 열려요.",
+  "scrollHint": "표를 옆으로 넘기면 나머지 열이 보여요."
 }
