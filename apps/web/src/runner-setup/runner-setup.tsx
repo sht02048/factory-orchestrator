@@ -20,7 +20,7 @@ import {
 } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
 import type { ReactNode, RefObject } from "react";
-import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
 import { SHARING_SETTINGS_URL } from "@ganger/app/runner-setup/model";
 import type { StepProblem, ThisMacStatus, ThisMacStep } from "@ganger/app/runner-setup/model";
@@ -134,7 +134,7 @@ export function RunnerSetup({
 
   return (
     <div {...stylex.props(styles.stack)}>
-      <ServerFacts status={status} />
+      <ServerFacts status={status} onRetry={reloadStatus} />
       {flowOpen && status.kind === "ready" ? (
         <ThisMacFlow
           status={status.status}
@@ -162,7 +162,7 @@ export function RunnerSetup({
   );
 }
 
-function ServerFacts({ status }: { status: StatusState }) {
+function ServerFacts({ status, onRetry }: { status: StatusState; onRetry: () => void }) {
   const t = useTranslations("runnerSetup.server");
   return (
     <Card label={t("title")}>
@@ -172,9 +172,14 @@ function ServerFacts({ status }: { status: StatusState }) {
             {t("loading")}
           </Text>
         ) : status.kind === "failed" ? (
-          <Text variant="ui" as="p" tone="problem" role="alert">
-            {t("failed")}
-          </Text>
+          <div {...stylex.props(styles.stack)}>
+            <Text variant="ui" as="p" tone="problem" role="alert">
+              {t("failed")}
+            </Text>
+            <Actions>
+              <Button onClick={onRetry}>{t("retry")}</Button>
+            </Actions>
+          </div>
         ) : (
           <DefinitionList>
             <DefinitionItem label={t("name")}>{status.status.name}</DefinitionItem>
@@ -254,11 +259,11 @@ function Chooser({
                     : t(option)}
                 </Text>
                 <Text variant="meta">{t(`${option}Body`)}</Text>
-                {choice !== option ? null : option === "thisMac" ? (
-                  <ThisMacChips />
-                ) : (
+                {option !== "thisMac" ? (
                   <Text variant="meta">{t("soon")}</Text>
-                )}
+                ) : choice === option ? (
+                  <ThisMacChips />
+                ) : null}
               </span>
             </RadioOption>
           ))}
@@ -287,21 +292,21 @@ function ThisMacChips() {
         {CHIP_STEPS.map((step, i) => {
           const name = t(`chips.${step.key}`);
           return (
-            <Fragment key={step.key}>
+            <li key={step.key} {...stylex.props(styles.chipItem)}>
               {i === 0 ? null : (
                 <span aria-hidden {...stylex.props(styles.arrow)}>
                   <Text variant="meta">→</Text>
                 </span>
               )}
-              <li {...stylex.props(styles.chipItem)}>
-                <Chip {...(step.you ? { tone: "accent" as const } : {})}>
-                  <VisuallyHidden>
-                    {step.you ? t("chips.you", { step: name }) : t("chips.ganger", { step: name })}
-                  </VisuallyHidden>
+              {step.you ? (
+                <Chip tone="accent">{t("chips.you", { step: name })}</Chip>
+              ) : (
+                <Chip>
+                  <VisuallyHidden>{t("chips.ganger", { step: name })}</VisuallyHidden>
                   <span aria-hidden>{name}</span>
                 </Chip>
-              </li>
-            </Fragment>
+              )}
+            </li>
           );
         })}
       </ol>
@@ -395,7 +400,7 @@ function ThisMacFlow({
             {t("title")}
           </span>
         </Text>
-        <Checklist label={t("stepsLabel")}>
+        <Checklist label={t("readyLabel")}>
           <ChecklistItem
             done={status.orcaPath !== null}
             label={status.orcaPath === null ? t("state.failed") : t("state.done")}
@@ -444,7 +449,11 @@ function ThisMacFlow({
           </DefinitionList>
         </PanelBlock>
         <Text variant="ui" as="p" role="status">
-          {registered ? t("registered", { name: status.name }) : ""}
+          {registered
+            ? t("registered", { name: status.name })
+            : failedAt === -1
+              ? ""
+              : t("stopped", { step: t(`step.${FLOW_STEPS[failedAt] ?? "key"}`) })}
         </Text>
         <Actions>
           <Button onClick={onBack} disabled={started && !registered && failedAt === -1}>
@@ -572,7 +581,7 @@ const styles = stylex.create({
     padding: 0,
     listStyle: "none",
   },
-  chipItem: { display: "inline-flex" },
+  chipItem: { display: "inline-flex", alignItems: "center", gap: space.s1 },
   arrow: { display: "inline-flex" },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
 });

@@ -141,7 +141,7 @@ export function RunnersScreen({
           {adding ? (
             <DetailPanel>
               <div {...stylex.props(styles.setup)}>
-                <Text variant="title">{t("add")}</Text>
+                <Text variant="heading">{t("add")}</Text>
                 {setup}
               </div>
             </DetailPanel>

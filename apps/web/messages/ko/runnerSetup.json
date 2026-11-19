@@ -13,7 +13,8 @@
     "tailscaleDisconnected": "연결되지 않았어요",
     "tailscaleMissing": "설치되지 않았어요",
     "loading": "이 맥을 살펴보고 있어요",
-    "failed": "이 맥의 상태를 읽지 못했어요. 잠시 뒤 다시 열어 봐요."
+    "failed": "이 맥의 상태를 읽지 못했어요.",
+    "retry": "다시 살펴보기"
   },
   "choose": {
     "question": "에이전트를 어느 맥에서 돌릴까요?",
@@ -96,6 +97,8 @@
     "capacity": "자리",
     "capacityValue": "1 · 한 번에 돌릴 런 수예요. 나중에 바꿀 수 있어요.",
     "sshTarget": "ssh 대상",
-    "registered": "{name} 러너를 등록했어요. 아래에서 확인 결과를 봐요."
+    "registered": "{name} 러너를 등록했어요. 아래에서 확인 결과를 봐요.",
+    "readyLabel": "준비 조건",
+    "stopped": "{step}에서 멈췄어요. 이유를 보고 다시 시도해요."
   }
 }

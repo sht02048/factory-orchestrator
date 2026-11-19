@@ -50,12 +50,20 @@ describe("러너 고르기 화면(0095)", () => {
       expect(text(chips)).toContain(`Ganger가 해요: ${step}`);
     }
     expect(text(html)).toContain("약 1분");
-    expect(text(html)).not.toContain("곧 지원해요");
+    expect(text(html).match(/곧 지원해요/g)).toHaveLength(2);
   });
 
-  it("칩의 보이는 이름은 화면 읽기에서 빼고 화면 읽기용 이름만 읽힌다", () => {
+  it("직접 할 단계는 색이 아니라 보이는 글로도 직접 한다고 알린다", () => {
     const html = render();
-    expect(html).toMatch(/<span aria-hidden="true">원격 로그인 켜기<\/span>/);
+    expect(html).toMatch(/<span class="[^"]+">직접 해요: 원격 로그인 켜기<\/span>/);
+    expect(html).toMatch(/<span aria-hidden="true">키 등록<\/span>/);
+  });
+
+  it("단계 칩 목록의 자식은 모두 목록 항목이다", () => {
+    const html = render();
+    const list = html.slice(html.indexOf('aria-label="할 일 순서"'));
+    const body = list.slice(list.indexOf(">") + 1, list.indexOf("</ol>"));
+    expect(body.replace(/<li[^>]*>.*?<\/li>/g, "")).toBe("");
   });
 
   it("직접 입력하기는 접혀 있고 그 안에 지금 폼이 있다", () => {
