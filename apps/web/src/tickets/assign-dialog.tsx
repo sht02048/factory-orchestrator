@@ -124,7 +124,8 @@ export function AssignDialog({
         agent={agent}
         onRepoChange={(next) => {
           setRepo(next);
-          if (!runnersFor(runners, next).some((r) => r.id === runner)) setRunner(AUTO_RUNNER);
+          const kept = runnersFor(runners, next).find((r) => r.id === runner);
+          if (kept === undefined || kept.blockedProjects.includes(next)) setRunner(AUTO_RUNNER);
         }}
         onRunnerChange={setRunner}
         onAgentChange={setAgent}

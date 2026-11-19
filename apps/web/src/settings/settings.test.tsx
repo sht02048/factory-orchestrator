@@ -256,6 +256,7 @@ describe("Settings 저장하고 다시 열기", () => {
         connection: { id: connection, name: "Acme" },
         labelId: "lb-auto",
         labels: { ok: true, items: [{ id: "lb-auto", name: "factory" }] },
+        repoLabels: [],
       },
     ]);
     expect(page.install.connections).toEqual([
@@ -520,6 +521,9 @@ describe("Mapping 여러 저장소와 Auto-assign Label 만들기(0115)", () => 
         }),
       ),
     ).toEqual({ ok: false, reason: "auto-assign-label" });
+    expect(
+      saveLabel(f.context, { ws: commerce, connectionId: project.connectionId, labelId: "lb-api" }),
+    ).toEqual({ ok: false, reason: "repo-label" });
     const page = await loadSettingsPage(f.context, commerce, now);
     expect(page.workspace?.bound[0]?.mapping?.repos).toEqual([
       { id: "github:acme/web", isDefault: true, labelId: null },

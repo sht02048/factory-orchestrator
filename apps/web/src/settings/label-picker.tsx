@@ -16,7 +16,12 @@ export const CREATE_LABEL = "\u0000create";
 export function useLabelReason(): (reason: string) => string {
   const t = useTranslations("settings.label");
   const reason = useReason();
-  return (value) => (value === "rejected" ? t("rejected") : reason(value));
+  return (value) =>
+    value === "rejected"
+      ? t("rejected")
+      : value === "repo-label"
+        ? t("repoLabelRejected")
+        : reason(value);
 }
 
 export function labelOptions(
@@ -26,6 +31,7 @@ export function labelOptions(
     create: (name: string) => string;
     pickExisting: (name: string) => string;
     missing: (id: string) => string;
+    repoLabel: (name: string, repo: string) => string;
   },
   current: string | null,
 ): SelectOption[] {
@@ -37,7 +43,12 @@ export function labelOptions(
     label:
       existing === null ? text.create(AUTO_ASSIGN_LABEL_NAME) : text.pickExisting(existing.name),
   };
-  const options = items.map((item) => ({ value: item.id, label: item.name }));
+  const options = items.map((item): SelectOption => {
+    const use = label.repoLabels.find((repo) => repo.labelId === item.id);
+    return use === undefined
+      ? { value: item.id, label: item.name }
+      : { value: item.id, label: text.repoLabel(item.name, use.repo), disabled: true };
+  });
   const missing =
     current !== null && !items.some((item) => item.id === current)
       ? [{ value: current, label: text.missing(current) }]
@@ -88,6 +99,7 @@ export function AutoAssignLabelPicker({
       create: (name) => t("create", { name }),
       pickExisting: (name) => t("pickExisting", { name }),
       missing: (id) => t("unknown", { id }),
+      repoLabel: (name, repo) => t("repoLabelUsed", { name, repo }),
     },
     save.draft,
   );

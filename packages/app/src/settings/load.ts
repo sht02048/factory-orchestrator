@@ -296,6 +296,13 @@ async function loadWorkspaceSettings(
         connection: connectionChoice(connectionId),
         labelId: getAutoAssignLabel(db, workspace.id, toTrackerConnectionId(connectionId)),
         labels: read,
+        repoLabels: projects.flatMap((project) =>
+          (getMapping(db, project.connection, project.projectId)?.repos ?? []).flatMap((repo) =>
+            repo.labelId === null
+              ? []
+              : [{ labelId: repo.labelId, repo: repo.project, project: project.name }],
+          ),
+        ),
       };
     }),
   );

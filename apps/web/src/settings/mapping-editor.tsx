@@ -323,7 +323,8 @@ function RepoRow({
   const labels = (bound.labels.ok ? bound.labels.items : []).filter(
     (label) => label.id !== autoAssignLabelId,
   );
-  const known = repo.labelId === null || labels.some((l) => l.id === repo.labelId);
+  const isAutoAssign = repo.labelId !== null && repo.labelId === autoAssignLabelId;
+  const known = repo.labelId === null || isAutoAssign || labels.some((l) => l.id === repo.labelId);
   const gone = !known && bound.labels.ok;
   const options: SelectOption[] = [
     { value: NO_LABEL, label: t("noLabel") },
@@ -337,12 +338,15 @@ function RepoRow({
             disabled: true,
           };
     }),
+    ...(repo.labelId !== null && isAutoAssign
+      ? [{ value: repo.labelId, label: t("labelAutoAssign") }]
+      : []),
     ...(repo.labelId !== null && !known
       ? [{ value: repo.labelId, label: bound.labels.ok ? t("labelMissing") : t("labelUnread") }]
       : []),
   ];
   const routeHint = !repo.isDefault && repo.labelId === null;
-  const describedBy = [gone ? goneId : null, routeHint ? routeHintId : null]
+  const describedBy = [gone || isAutoAssign ? goneId : null, routeHint ? routeHintId : null]
     .filter((id) => id !== null)
     .join(" ");
   return (
@@ -394,9 +398,9 @@ function RepoRow({
           )}
         </span>
       </div>
-      {gone ? (
+      {gone || isAutoAssign ? (
         <Text variant="ui" as="p" tone="problem" id={goneId}>
-          {t("labelGone")}
+          {isAutoAssign ? t("labelIsAutoAssign") : t("labelGone")}
         </Text>
       ) : null}
       {failureLine}

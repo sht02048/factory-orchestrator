@@ -673,7 +673,12 @@ describe("다섯 단계를 마치기", () => {
       trackerProjects: [],
       bound: [bound],
       labels: [
-        { connection: choice, labelId: "lb-auto", labels: { ok: true as const, items: [] } },
+        {
+          connection: choice,
+          labelId: "lb-auto",
+          labels: { ok: true as const, items: [] },
+          repoLabels: [],
+        },
       ],
     };
     expect(missingMappingParts(workspace)).toEqual(["mapping"]);

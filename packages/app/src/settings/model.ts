@@ -79,10 +79,17 @@ export interface BoundProject {
   labels: Remote<Choice>;
 }
 
+export interface RepoLabelUse {
+  labelId: string;
+  repo: string;
+  project: string;
+}
+
 export interface ConnectionLabel {
   connection: Choice;
   labelId: string | null;
   labels: Remote<Choice>;
+  repoLabels: RepoLabelUse[];
 }
 
 export interface WorkspaceSettings {
@@ -191,6 +198,6 @@ export type MappingSaveReason =
 
 export type LabelCreateResult =
   | { ok: true; labelId: string; name: string; created: boolean }
-  | { ok: false; reason: RemoteError | "not-found" | "rejected" };
+  | { ok: false; reason: RemoteError | "not-found" | "rejected" | "repo-label" };
 
 export type ConnectionSaveReason = RemoteError | "missing-key" | "not-found";

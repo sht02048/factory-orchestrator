@@ -137,7 +137,9 @@
     "reloadFailed": "다시 읽지 못했어요. 잠시 뒤 다시 해 주세요.",
     "revertedRetry": "저장하지 못해 원래대로 되돌렸어요. 연결을 확인하고 다시 골라 주세요.",
     "addFirstLabel": "{project}의 기본 저장소 고르기",
-    "labelUnread": "읽지 못한 라벨"
+    "labelUnread": "읽지 못한 라벨",
+    "labelAutoAssign": "Auto-assign Label",
+    "labelIsAutoAssign": "이 라벨은 Auto-assign Label이에요. 자동 할당하는 티켓마다 붙어 있어 저장소를 가르는 라벨로 쓸 수 없어요. 다른 라벨로 바꿔 주세요."
   },
   "progress": {
     "hint": "런이 실제로 시작될 때 티켓을 이 상태로 바꿔요. 상태는 트래커 프로젝트마다 달라요.",
@@ -147,7 +149,6 @@
   },
   "label": {
     "hint": "이 라벨이 붙은 티켓은 운영자 없이 바로 할당해요. 라벨이 없는 티켓은 Tickets에서 직접 할당해요. 라벨은 트래커 연결마다 따로 정해요.",
-    "label": "라벨",
     "choose": "라벨을 골라 주세요",
     "listFailed": "Linear에서 라벨을 읽지 못했어요. {reason}",
     "unknown": "Linear에 없는 라벨({id})",
@@ -161,7 +162,9 @@
     "selectFor": "{connection}의 Auto-assign Label",
     "createFailedStatus": "만들지 못했어요",
     "createFailed": "{name} 라벨을 만들지 못했어요. {reason}",
-    "createFailedRetry": "{name} 라벨을 만들지 못했어요. 연결을 확인하고 다시 골라 주세요."
+    "createFailedRetry": "{name} 라벨을 만들지 못했어요. 연결을 확인하고 다시 골라 주세요.",
+    "repoLabelUsed": "{name} · {repo} 저장소를 가르는 라벨이라 고를 수 없어요",
+    "repoLabelRejected": "그 라벨은 Mapping에서 저장소를 가르는 데 쓰고 있어요. 다른 라벨을 고르거나 Mapping에서 라벨을 떼어 주세요."
   },
   "connections": {
     "hint": "모든 Workspace가 함께 써요. Workspace는 어느 연결의 트래커 프로젝트든 고를 수 있어요.",

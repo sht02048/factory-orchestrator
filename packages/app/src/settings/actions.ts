@@ -12,9 +12,10 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
 } from "@ganger/core";
-import type { RunnerId, RunnerKind } from "@ganger/core";
+import type { RunnerId, RunnerKind, TrackerConnectionId } from "@ganger/core";
 import {
   getAutoAssignLabel,
+  getMapping,
   getTrackerConnection,
   getWorkspaceTrackerProject,
   listCodeHostConnections,
@@ -246,6 +247,9 @@ export async function createAutoAssignLabel(
       findLabelNamed(lists.flat(), AUTO_ASSIGN_LABEL_NAME) ??
       (await tracker.createLabel({ name: AUTO_ASSIGN_LABEL_NAME, color }));
     const created = !lists.flat().some((existing) => existing.id === label.id);
+    if (repoLabelIds(context, workspaceId, connection).has(label.id)) {
+      return { ok: false, reason: "repo-label" };
+    }
     saveAutoAssignLabel(context.db, { workspaceId, connection, labelId: label.id });
     return { ok: true, labelId: label.id, name: label.name, created };
   } catch (error) {
@@ -253,10 +257,25 @@ export async function createAutoAssignLabel(
   }
 }
 
+export function repoLabelIds(
+  context: SettingsContext,
+  workspaceId: WorkspaceId,
+  connection: TrackerConnectionId,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const project of listWorkspaceTrackerProjects(context.db, workspaceId)) {
+    if (project.connection !== connection) continue;
+    for (const repo of getMapping(context.db, connection, project.projectId)?.repos ?? []) {
+      if (repo.labelId !== null) ids.add(repo.labelId);
+    }
+  }
+  return ids;
+}
+
 export function saveLabel(
   context: SettingsContext,
   input: z.infer<typeof labelInput>,
-): SaveResult<"not-found"> {
+): SaveResult<"not-found" | "repo-label"> {
   const workspaceId = workspaceOf(context, input.ws);
   const connection = toTrackerConnectionId(input.connectionId);
   if (
@@ -264,6 +283,9 @@ export function saveLabel(
     getTrackerConnection(context.db, context.secretBox, connection) === null
   ) {
     return { ok: false, reason: "not-found" };
+  }
+  if (repoLabelIds(context, workspaceId, connection).has(input.labelId)) {
+    return { ok: false, reason: "repo-label" };
   }
   saveAutoAssignLabel(context.db, {
     workspaceId,
