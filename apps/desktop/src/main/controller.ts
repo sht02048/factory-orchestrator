@@ -71,6 +71,14 @@ import {
 } from "../shared/view.js";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 import { navigationMenu } from "./navigation-menu.js";
+import { mainWindowOptions, settingsWindowOptions, titleBarCookie } from "./window-options.js";
+
+async function loadServerScreen(window: BrowserWindow, url: string): Promise<void> {
+  await Promise.resolve()
+    .then(() => window.webContents.session.cookies.set(titleBarCookie(url)))
+    .catch(() => undefined);
+  await window.loadURL(url).catch(() => undefined);
+}
 
 const t = createTranslator({ locale: "ko", messages: { system }, namespace: "system" });
 
@@ -441,25 +449,14 @@ export class Controller {
     this.refreshMenus();
     const window = this.window;
     if (window === undefined || window.isDestroyed()) return;
-    void window.loadURL(new URL(path, url).toString());
+    void loadServerScreen(window, new URL(path, url).toString());
   }
 
   private ensureWindow(): BrowserWindow {
     if (this.window !== undefined && !this.window.isDestroyed()) return this.window;
-    const window = new BrowserWindow({
-      width: 1280,
-      height: 840,
-      minWidth: 720,
-      minHeight: 520,
-      show: false,
-      title: PRODUCT_DISPLAY_NAME,
-      webPreferences: {
-        preload: this.options.preloadFile,
-        contextIsolation: true,
-        sandbox: true,
-        nodeIntegration: false,
-      },
-    });
+    const window = new BrowserWindow(
+      mainWindowOptions(PRODUCT_DISPLAY_NAME, this.options.preloadFile),
+    );
     window.once("ready-to-show", () => window.show());
     window.on("close", (event) => {
       if (this.quitting) return;
@@ -484,7 +481,7 @@ export class Controller {
       else if (this.mode === "local") void this.watch.tick();
     });
     this.window = window;
-    if (this.serverUrl !== undefined) void window.loadURL(this.serverUrl);
+    if (this.serverUrl !== undefined) void loadServerScreen(window, this.serverUrl);
     else void window.loadFile(this.options.rendererFile);
     return window;
   }
@@ -765,20 +762,9 @@ export class Controller {
       existing.focus();
       return;
     }
-    const window = new BrowserWindow({
-      width: 560,
-      height: 680,
-      minWidth: 400,
-      minHeight: 480,
-      show: false,
-      title: t("settingsWindow.title"),
-      webPreferences: {
-        preload: this.options.preloadFile,
-        contextIsolation: true,
-        sandbox: true,
-        nodeIntegration: false,
-      },
-    });
+    const window = new BrowserWindow(
+      settingsWindowOptions(t("settingsWindow.title"), this.options.preloadFile),
+    );
     window.once("ready-to-show", () => window.show());
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     window.webContents.on("will-navigate", (event) => event.preventDefault());

@@ -10,6 +10,7 @@ import {
 } from "@ui-sdk/react/dialog";
 import type { ReactNode } from "react";
 import { cx } from "../cx";
+import { windowRegion } from "../window-frame";
 import { buttonStyles, type ButtonVariant } from "./button";
 import {
   colors,
@@ -53,8 +54,8 @@ export function Dialog({
       <DialogTrigger data-variant={triggerVariant} className={cx(...buttonStyles(triggerVariant))}>
         {trigger}
       </DialogTrigger>
-      <DialogBackdrop className={cx(styles.backdrop)} />
-      <DialogContent className={cx(styles.content)}>
+      <DialogBackdrop {...windowRegion("no-drag")} className={cx(styles.backdrop)} />
+      <DialogContent {...windowRegion("no-drag")} className={cx(styles.content)}>
         <div {...stylex.props(styles.head)}>
           <DialogTitle className={cx(styles.title)}>{title}</DialogTitle>
           {description === undefined ? null : (

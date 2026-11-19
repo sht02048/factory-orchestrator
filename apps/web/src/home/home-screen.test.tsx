@@ -128,13 +128,20 @@ const question: Extract<InputWait, { kind: "question" }> = {
   answered: false,
 };
 
-describe("Dashboard 제목(ADR 0010 8번, 0068 갱신)", () => {
-  it("메타 줄 Dashboard, 결론 제목, 묶음별 요약 문장을 보인다", () => {
-    const page = seededPage();
-    const html = render(page);
-    expect(html).toMatch(/<p[^>]*>Dashboard<\/p>/);
-    expect(html).toMatch(/<h1[^>]*>처리할 일이 8개 있어요<\/h1>/);
-    expect(text(html)).toContain("답할 질문 1개, 확인할 PR 1개, 멈춘 런 6개예요.");
+describe("Dashboard 한 줄 머리(ADR 0010 8번, 0113 갱신)", () => {
+  const header = (html: string) => html.slice(html.indexOf("<header"), html.indexOf("</header>"));
+
+  it("제목은 화면 이름 Dashboard 이고, 그 옆 요약 한 줄이 처리할 일을 묶음별로 말한다", () => {
+    const html = render(seededPage());
+    expect(header(html)).toMatch(/<h1[^>]*>Dashboard<\/h1>/);
+    expect(text(header(html))).toContain(
+      "처리할 일은 답할 질문 1개, 확인할 PR 1개, 멈춘 런 6개예요.",
+    );
+    expect(html.match(/<h1/g)).toHaveLength(1);
+  });
+
+  it("보기(모두 / 처리할 일만)는 머리 줄 오른쪽 행동이다", () => {
+    expect(header(render(seededPage()))).toContain(`aria-label="${homeJson.view.label}"`);
   });
 
   it("요약 문장에서 0인 묶음은 뺀다", () => {
@@ -143,25 +150,24 @@ describe("Dashboard 제목(ADR 0010 8번, 0068 갱신)", () => {
       ...page,
       attention: page.attention.filter((item) => item.run.ticketKey === "ACME-2"),
     });
-    expect(html).toMatch(/<h1[^>]*>처리할 일이 1개 있어요<\/h1>/);
-    expect(text(html)).toContain("확인할 PR 1개예요.");
-    expect(text(html)).not.toContain("답할 질문");
-    expect(text(html)).not.toContain("멈춘 런");
+    expect(text(header(html))).toContain("처리할 일은 확인할 PR 1개예요.");
+    expect(text(header(html))).not.toContain("답할 질문");
+    expect(text(header(html))).not.toContain("멈춘 런");
   });
 
   it("To do 가 0이면 처리할 일이 없다고 하고 In progress 수를 요약한다", () => {
     const page = seededPage();
     const empty = { ...page, attention: [] };
-    const html = render(empty);
-    expect(html).toMatch(/<h1[^>]*>처리할 일이 없어요<\/h1>/);
-    expect(text(html)).toContain(
-      `진행 중인 런이 ${page.running.length + page.queued.length}개 있어요.`,
+    expect(text(header(render(empty)))).toContain(
+      `처리할 일은 없고, 진행 중인 런이 ${page.running.length + page.queued.length}개 있어요.`,
     );
-    expect(text(render({ ...empty, running: [], queued: [] }))).toContain(homeJson.summary.idle);
+    expect(text(header(render({ ...empty, running: [], queued: [] })))).toContain(
+      homeJson.summary.idle,
+    );
   });
 
-  it("모든 Workspace 보기는 메타 줄에 모든 Workspace 를 붙인다", () => {
-    expect(render(seededPage("all"))).toMatch(/<p[^>]*>Dashboard · 모든 Workspace<\/p>/);
+  it("모든 Workspace 보기는 제목에 모든 Workspace 를 붙인다", () => {
+    expect(render(seededPage("all"))).toMatch(/<h1[^>]*>Dashboard · 모든 Workspace<\/h1>/);
   });
 });
 

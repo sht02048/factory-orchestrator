@@ -53,9 +53,6 @@ export function AppShell({
     <AppFrame
       rail={
         <>
-          <RailBrand>
-            <GangerMark tone="brand" label={t("brand")} />
-          </RailBrand>
           <WorkspaceSwitcher
             shell={shell}
             workspace={workspace}
@@ -81,6 +78,9 @@ export function AppShell({
               </RailNavList>
             ))}
           </RailNav>
+          <RailBrand>
+            <GangerMark tone="brand" label={t("brand")} />
+          </RailBrand>
         </>
       }
     >

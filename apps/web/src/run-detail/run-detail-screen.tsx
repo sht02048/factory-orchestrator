@@ -12,6 +12,7 @@ import {
   Field,
   Input,
   PageHeader,
+  ScreenLayout,
   Row,
   StatusPill,
   Text,
@@ -60,15 +61,16 @@ export function RunDetailScreen(props: RunDetailScreenProps) {
 function NotFound({ runsHref }: { runsHref: string }) {
   const t = useTranslations("run.notFound");
   return (
-    <NoticeLayout>
-      <PageHeader title={t("title")} />
-      <div {...stylex.props(styles.noticeBody)}>
-        <Text variant="body">{t("body")}</Text>
-        <a href={runsHref} {...stylex.props(linkStyles())}>
-          {t("back")}
-        </a>
-      </div>
-    </NoticeLayout>
+    <ScreenLayout header={<PageHeader title={t("title")} />}>
+      <NoticeLayout>
+        <div {...stylex.props(styles.noticeBody)}>
+          <Text variant="body">{t("body")}</Text>
+          <a href={runsHref} {...stylex.props(linkStyles())}>
+            {t("back")}
+          </a>
+        </div>
+      </NoticeLayout>
+    </ScreenLayout>
   );
 }
 
@@ -80,98 +82,102 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const { status, when } = statusLine(run);
   const pr = run.pullRequest;
   const cancelable = canCancel(run) && !run.cancelPending;
-  const headRef = useRef<HTMLElement>(null);
+  const headRef = useRef<HTMLDivElement>(null);
   const cancelStatusRef = useRef<HTMLSpanElement>(null);
 
   return (
-    <div {...stylex.props(styles.main)}>
-      <nav aria-label={t("crumb.label")} {...stylex.props(textStyles("ui"), styles.crumb)}>
-        <a href={props.runsHref} {...stylex.props(linkStyles("quiet"), styles.crumbLink)}>
-          <span aria-hidden="true">‹</span>
-          {t("crumb.runs")}
-        </a>
-      </nav>
-
-      <header ref={headRef} tabIndex={-1} {...stylex.props(styles.head, focusStyles.target)}>
-        <p {...stylex.props(styles.stateLine)}>
-          <StatusPill status={status}>{statusName(status)}</StatusPill>
-          <Text variant="meta">{when}</Text>
-          <Text variant="meta" ref={cancelStatusRef} role="status" tabIndex={-1}>
-            {run.cancelPending ? t("cancelPending") : null}
-          </Text>
-        </p>
-        <div {...stylex.props(styles.titleRow)}>
-          <Text variant="page" as="h1">
-            {run.ticketTitle ?? run.ticketKey}
-          </Text>
-          {pr === null && !cancelable ? null : (
-            <Actions>
-              {pr === null ? null : (
-                <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
-                  {t("openPr", { pr: pr.displayId })}
-                </a>
-              )}
-              {cancelable ? (
-                <CancelRun
-                  onCancel={props.onCancel}
-                  focusAfter={() => focusFirst(cancelStatusRef, headRef)}
-                />
-              ) : null}
-            </Actions>
-          )}
-        </div>
-        <Text variant="meta">
-          {[
+    <ScreenLayout
+      header={
+        <PageHeader
+          lead={
+            <nav aria-label={t("crumb.label")} {...stylex.props(textStyles("ui"), styles.crumb)}>
+              <a href={props.runsHref} {...stylex.props(linkStyles("quiet"), styles.crumbLink)}>
+                <span aria-hidden="true">‹</span>
+                {t("crumb.runs")}
+              </a>
+            </nav>
+          }
+          title={run.ticketTitle ?? run.ticketKey}
+          subtitle={[
             ...(run.ticketTitle === null ? [] : [run.ticketKey]),
             run.trackerProject,
             ...(run.branch === null ? [] : [run.branch]),
           ].join(t("metaSeparator"))}
-        </Text>
-        <Text variant="body">
-          <Reason run={run} />
-        </Text>
-        <NextAction run={run} />
-      </header>
-
-      <div {...stylex.props(styles.columns)}>
-        <div {...stylex.props(styles.column)}>
-          {run.status.state === "waiting-for-input" ? (
-            <InputBlock
-              input={run.status.input}
-              waitedMs={inputWaitedMs(run)}
-              onAnswer={props.onAnswer}
-              onDeny={props.onDeny}
-              headRef={headRef}
-            />
-          ) : null}
-
-          {run.startError === null ? null : (
-            <Block title={t("startError.title")}>
-              <Text variant="body">{t("startError.body")}</Text>
-              <CodeBlock>{run.startError}</CodeBlock>
-            </Block>
-          )}
-
-          {run.status.state === "ended" ? (
-            <Block title={t("report.title")}>
-              {run.report === null ? (
-                <Text variant="meta">{t("report.none")}</Text>
-              ) : (
-                <CodeBlock>{run.report}</CodeBlock>
-              )}
-            </Block>
-          ) : null}
-
-          <Timeline events={run.timeline} now={run.now} />
+        />
+      }
+    >
+      <div {...stylex.props(styles.main)}>
+        <div ref={headRef} tabIndex={-1} {...stylex.props(styles.head, focusStyles.target)}>
+          <div {...stylex.props(styles.stateRow)}>
+            <p {...stylex.props(styles.stateLine)}>
+              <StatusPill status={status}>{statusName(status)}</StatusPill>
+              <Text variant="meta">{when}</Text>
+              <Text variant="meta" ref={cancelStatusRef} role="status" tabIndex={-1}>
+                {run.cancelPending ? t("cancelPending") : null}
+              </Text>
+            </p>
+            {pr === null && !cancelable ? null : (
+              <Actions>
+                {pr === null ? null : (
+                  <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
+                    {t("openPr", { pr: pr.displayId })}
+                  </a>
+                )}
+                {cancelable ? (
+                  <CancelRun
+                    onCancel={props.onCancel}
+                    focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+                  />
+                ) : null}
+              </Actions>
+            )}
+          </div>
+          <Text variant="body">
+            <Reason run={run} />
+          </Text>
+          <NextAction run={run} />
         </div>
 
-        <div {...stylex.props(styles.column)}>
-          <Properties run={run} />
-          <LogTail log={run.log} now={run.now} onRefresh={props.onRefreshLog} />
-          <OtherRuns run={run} runHref={props.runHref} />
+        <div {...stylex.props(styles.columns)}>
+          <div {...stylex.props(styles.column)}>
+            {run.status.state === "waiting-for-input" ? (
+              <InputBlock
+                input={run.status.input}
+                waitedMs={inputWaitedMs(run)}
+                onAnswer={props.onAnswer}
+                onDeny={props.onDeny}
+                headRef={headRef}
+              />
+            ) : null}
+
+            {run.startError === null ? null : (
+              <Block title={t("startError.title")}>
+                <Text variant="body">{t("startError.body")}</Text>
+                <CodeBlock>{run.startError}</CodeBlock>
+              </Block>
+            )}
+
+            {run.status.state === "ended" ? (
+              <Block title={t("report.title")}>
+                {run.report === null ? (
+                  <Text variant="meta">{t("report.none")}</Text>
+                ) : (
+                  <CodeBlock>{run.report}</CodeBlock>
+                )}
+              </Block>
+            ) : null}
+
+            <Timeline events={run.timeline} now={run.now} />
+          </div>
+
+          <div {...stylex.props(styles.column)}>
+            <Properties run={run} />
+            <LogTail log={run.log} now={run.now} onRefresh={props.onRefreshLog} />
+            <OtherRuns run={run} runHref={props.runHref} />
+          </div>
         </div>
       </div>
-    </div>
+    </ScreenLayout>
   );
 }
 
@@ -797,7 +803,7 @@ const styles = stylex.create({
     gap: space.s6,
     maxWidth: size.detailPageWidth,
     paddingTop: space.s6,
-    paddingInline: space.s8,
+    paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
     paddingBottom: space.s10,
   },
   crumb: { display: "flex" },
@@ -808,12 +814,12 @@ const styles = stylex.create({
     minHeight: size.control,
   },
   head: { display: "flex", flexDirection: "column", gap: space.s2 },
-  titleRow: {
+  stateRow: {
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: space.s4,
+    gap: space.s3,
   },
   stateLine: { display: "flex", alignItems: "center", gap: space.s3, margin: 0 },
   columns: {
