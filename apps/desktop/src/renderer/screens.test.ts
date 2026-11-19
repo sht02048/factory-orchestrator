@@ -161,10 +161,6 @@ describe("이 맥을 러너로 등록하기(브라우저, 0099)", () => {
     );
     await expect.poll(focusedHeading).toBe(screens.enrollment.askTitle);
     await page.getByText("mac-mini의 Ganger가 이 맥에서 에이전트를 돌려요.").waitFor();
-    await page
-      .getByRole("region", { name: screens.enrollment.serverLabel })
-      .getByText("mac-mini")
-      .waitFor();
     await page.getByText(screens.enrollment.youBody).waitFor();
     const steps = page.getByRole("list", { name: screens.enrollment.stepsLabel });
     expect(await steps.getByRole("listitem").count()).toBe(5);
@@ -173,6 +169,10 @@ describe("이 맥을 러너로 등록하기(브라우저, 0099)", () => {
     await page.getByRole("button", { name: screens.enrollment.register }).click();
     await expect.poll(focusedHeading).toBe(screens.enrollment.runningTitle);
     await steps.getByText(screens.enrollment.state.running).waitFor();
+    await page
+      .getByRole("status")
+      .filter({ hasText: "Ganger 키 등록 진행 중" })
+      .waitFor({ state: "attached" });
   });
 
   it("원격 로그인을 기다리는 동안 켜는 곳을 알리고 공유 설정을 열 수 있다", async () => {
@@ -219,5 +219,27 @@ describe("이 맥을 러너로 등록하기(브라우저, 0099)", () => {
     await page.getByRole("button", { name: screens.enrollment.backToServer }).click();
     await expect.poll(focusedHeading).toBe(screens.enrollment.goneTitle);
     await page.getByText(screens.enrollment.gone.expired).waitFor();
+  });
+});
+
+describe("등록 끝 화면(브라우저, 0099)", () => {
+  it("GitHub 정리를 건너뛰었으면 그 줄에 건너뛰었다고 쓰고, 서버 화면으로 돌아가는 버튼을 둔다", async () => {
+    await openScreen({
+      screen: "runner-enrollment",
+      server: "mac-mini",
+      enrollment: {
+        phase: "registered",
+        progress: {
+          ...START,
+          done: ["remoteLogin", "key", "service", "github", "register"],
+          github: "gh-logged-out",
+        },
+      },
+    });
+    await expect.poll(focusedHeading).toBe(screens.enrollment.registeredTitle);
+    const steps = page.getByRole("list", { name: screens.enrollment.stepsLabel });
+    expect(await steps.getByText(screens.enrollment.state.skipped).count()).toBe(1);
+    await page.getByText(screens.enrollment.github["gh-logged-out"]).waitFor();
+    await page.getByRole("button", { name: screens.enrollment.backToServer }).waitFor();
   });
 });

@@ -439,7 +439,8 @@ export class Controller {
     if (state === null) {
       if (this.view.screen !== "runner-enrollment") return;
       if (this.mode === "remote" && this.remote !== undefined) {
-        if (this.remote.reachable) this.openServer(this.remote.server.url);
+        const path = previous?.step.phase === "registered" ? "/runners" : "/";
+        if (this.remote.reachable) this.openServer(this.remote.server.url, path);
         else void this.openRemote(this.remote.server);
       } else {
         this.chooseMode();

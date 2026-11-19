@@ -9,6 +9,7 @@ import {
   StatusPill,
   Text,
   Tooltip,
+  VisuallyHidden,
   buttonStyles,
   textStyles,
 } from "@ganger/ui";
@@ -614,7 +615,7 @@ function Unreachable({ name, url, checking }: { name: string; url: string; check
   );
 }
 
-type RowState = "waiting" | "running" | "done" | "failed";
+type RowState = "waiting" | "running" | "done" | "skipped" | "failed";
 
 export function enrollmentRows(
   enrollment: EnrollmentPhase,
@@ -627,10 +628,13 @@ export function enrollmentRows(
       : null;
   const done = progress?.done ?? [];
   const next = ENROLL_STEPS.find((step) => !done.includes(step));
+  const githubSkipped = progress?.github != null && progress.github !== "done";
   return ENROLL_STEPS.map((step) => ({
     step,
     state: done.includes(step)
-      ? "done"
+      ? step === "github" && githubSkipped
+        ? "skipped"
+        : "done"
       : step !== next
         ? "waiting"
         : enrollment.phase === "running"
@@ -648,13 +652,6 @@ function RunnerEnrollment({ server, enrollment }: { server: string; enrollment: 
       return (
         <Frame width="status" centered>
           <Header title={t("askTitle")} summary={t("askSummary", { server })} centered />
-          <section aria-label={t("serverLabel")} {...stylex.props(styles.infoBox)}>
-            <span {...stylex.props(styles.live)}>
-              <ServerIcon size={16} />
-              {t("serverLabel")}
-            </span>
-            <span {...stylex.props(styles.url)}>{server}</span>
-          </section>
           <section aria-label={t("youTitle")} {...stylex.props(styles.infoBox, styles.youBox)}>
             <Text variant="ui" tone="strong">
               {t("youTitle")}
@@ -773,13 +770,20 @@ function RunnerEnrollment({ server, enrollment }: { server: string; enrollment: 
 
 function EnrollmentSteps({ enrollment }: { enrollment: EnrollmentPhase }) {
   const t = useTranslations("screens.enrollment");
+  const rows = enrollmentRows(enrollment);
+  const current = rows.find((row) => row.state === "running");
   return (
     <div {...stylex.props(styles.stepsBox)}>
+      <VisuallyHidden>
+        <span role="status">
+          {current === undefined ? "" : t("nowRunning", { step: t(`step.${current.step}`) })}
+        </span>
+      </VisuallyHidden>
       <Checklist label={t("stepsLabel")}>
-        {enrollmentRows(enrollment).map(({ step, state }) => (
+        {rows.map(({ step, state }) => (
           <ChecklistItem
             key={step}
-            done={state === "done"}
+            done={state === "done" || state === "skipped"}
             running={state === "running"}
             label={t(`state.${state}`)}
           >
@@ -787,7 +791,7 @@ function EnrollmentSteps({ enrollment }: { enrollment: EnrollmentPhase }) {
               <Text variant="ui" {...(state === "waiting" ? { tone: "muted" as const } : {})}>
                 {t(`step.${step}`)}
               </Text>
-              {state === "running" || state === "failed" ? (
+              {state === "running" || state === "failed" || state === "skipped" ? (
                 <Text variant="meta" {...(state === "failed" ? { tone: "problem" as const } : {})}>
                   {t(`state.${state}`)}
                 </Text>
