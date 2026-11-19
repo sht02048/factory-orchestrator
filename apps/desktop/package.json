@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",
+    "@ganger/app": "workspace:*",
     "@ganger/core": "workspace:*",
     "@stylexjs/unplugin": "0.19.2",
     "@types/react": "19.3.0",
