@@ -54,7 +54,11 @@ export class DemoWorld {
     const target = sshTarget.toLowerCase();
     runner.setProjects(RUNNER_PROJECTS);
     runner.online = !target.includes(FAIL_OFFLINE);
-    runner.providerUsage = providerUsageFor(sshTarget, this.now());
+    const readProviderUsage = runner.readProviderUsage.bind(runner);
+    runner.readProviderUsage = () => {
+      runner.providerUsage = providerUsageFor(sshTarget, this.now());
+      return readProviderUsage();
+    };
     runner.prerequisites = [
       {
         id: "orca-service",

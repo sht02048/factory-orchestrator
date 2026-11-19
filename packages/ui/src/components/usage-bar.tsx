@@ -67,7 +67,7 @@ const styles = stylex.create({
 });
 
 const indicatorTone = stylex.create({
-  neutral: { backgroundColor: colors.idle },
+  neutral: { backgroundColor: colors.meterFill },
   problem: { backgroundColor: colors.problem },
 });
 

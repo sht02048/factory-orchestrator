@@ -19,6 +19,8 @@ export const colors = stylex.defineVars({
   borderDefault: "oklch(0.285 0 0)",
   borderStrong: "oklch(0.375 0 0)",
 
+  meterFill: "oklch(0.62 0 0)",
+
   textPrimary: "oklch(0.97 0.003 85)",
   textSecondary: "oklch(0.8 0.004 85)",
   textTertiary: "oklch(0.68 0.004 85)",

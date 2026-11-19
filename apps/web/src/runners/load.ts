@@ -114,7 +114,12 @@ export function usageView(stored: StoredProviderUsage | null, now: Date): Runner
     now: now.toISOString(),
   };
   if (stored.reading.kind === "unreadable") return { ...base, kind: "unreadable" };
-  const providers = stored.reading.providers;
+  const providers = stored.reading.providers.map((usage) => ({
+    ...usage,
+    windows: usage.windows.filter(
+      (window) => window.resetsAt === null || window.resetsAt.getTime() > now.getTime(),
+    ),
+  }));
   const highest = highestUsage(providers);
   return {
     ...base,
