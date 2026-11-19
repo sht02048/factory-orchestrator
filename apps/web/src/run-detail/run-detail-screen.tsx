@@ -185,7 +185,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                 {run.status.lastOutput.length === 0 ? (
                   <Text variant="meta">{t("lastOutput.none")}</Text>
                 ) : (
-                  <CodeBlock scroll label={t("lastOutput.title")}>
+                  <CodeBlock scroll label={t("lastOutput.linesLabel")}>
                     {run.status.lastOutput.join("\n")}
                   </CodeBlock>
                 )}
