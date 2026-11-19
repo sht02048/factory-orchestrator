@@ -41,8 +41,11 @@ export interface ServerStatus {
   url: string | null;
 }
 
+export const WRITE_SWITCH_POLL_MS = 1000;
+
 export interface GangerMcp {
   server: McpServer;
+  readonly syncWriteTools: () => void;
   connect(transport: Transport): Promise<void>;
 }
 
@@ -340,6 +343,7 @@ export function createMcpServer(context: McpContext): GangerMcp {
   sync();
   return {
     server,
+    syncWriteTools: sync,
     connect: (transport) => server.connect(new CheckFirstTransport(transport, sync)),
   };
 }

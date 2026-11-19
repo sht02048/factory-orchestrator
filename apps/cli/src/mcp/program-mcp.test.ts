@@ -15,6 +15,7 @@ import {
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { ReadBuffer, serializeMessage } from "@modelcontextprotocol/sdk/shared/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -199,19 +200,25 @@ describe("ganger mcp", () => {
     expect(out).toEqual([]);
   });
 
-  it("실제 SDK 클라이언트로 stdio에 붙으면 스위치가 꺼져 있을 땐 쓰기 도구가 없고, 켜면 질문에 답하고 기록을 남긴다", async () => {
+  it("실제 SDK 클라이언트로 stdio에 붙으면 스위치가 꺼져 있을 땐 쓰기 도구가 없고, 켜면 묻지 않아도 목록이 바뀌었다고 알리고, 질문에 답하고 기록을 남긴다", async () => {
     writeEnv();
     const { db, waiting } = seedMcpDatabase(databasePath);
     const stdin = new PassThrough();
     const stdout = new PassThrough();
     const running = runMcp(stdin, stdout);
     const client = new Client({ name: "Operator", version: "0" });
+    let notifyListChanged: () => void = () => undefined;
+    const listChanged = new Promise<void>((resolve) => {
+      notifyListChanged = resolve;
+    });
+    client.setNotificationHandler(ToolListChangedNotificationSchema, () => notifyListChanged());
     await client.connect(new PipeClientTransport(stdin, stdout));
 
     const before = (await client.listTools()).tools.map((t) => t.name);
     for (const tool of MCP_WRITE_TOOLS) expect(before).not.toContain(tool);
 
     saveMcpWriteAllowed(db, true, new Date());
+    await listChanged;
     const after = (await client.listTools()).tools.map((t) => t.name);
     expect(after).toEqual(expect.arrayContaining([...MCP_WRITE_TOOLS]));
 

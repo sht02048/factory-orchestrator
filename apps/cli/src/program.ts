@@ -11,7 +11,7 @@ import { EnvFileFormatError, init } from "./init.js";
 import type { HoldSleepAssertion } from "./keep-awake.js";
 import type { AppLayout } from "./layout.js";
 import { McpStartError, openMcpDatabase, schemaProblem } from "./mcp/open.js";
-import { createMcpServer } from "./mcp/server.js";
+import { WRITE_SWITCH_POLL_MS, createMcpServer } from "./mcp/server.js";
 import { messages } from "./messages.js";
 import { readLiveServerLock } from "./server-lock.js";
 import {
@@ -207,10 +207,12 @@ async function runMcp(context: ProgramContext, home: string): Promise<number> {
   const close = () => void server.close();
   context.stdin.once("end", close);
   context.onStopSignal(close);
+  const watchWriteSwitch = setInterval(mcp.syncWriteTools, WRITE_SWITCH_POLL_MS);
   try {
     await mcp.connect(new StdioServerTransport(context.stdin, context.stdout));
     await closed;
   } finally {
+    clearInterval(watchWriteSwitch);
     context.stdin.off("end", close);
     db.$client.close();
   }
