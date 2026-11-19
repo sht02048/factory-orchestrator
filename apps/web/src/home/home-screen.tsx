@@ -941,6 +941,7 @@ const styles = stylex.create({
   todoAction: {
     display: "flex",
     flexShrink: 0,
+    marginInlineStart: "auto",
     alignItems: "center",
     maxWidth: "100%",
     paddingInline: { default: 0, [breakpoints.dashboardOneColumn]: space.s3 },

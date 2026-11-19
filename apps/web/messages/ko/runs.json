@@ -42,7 +42,7 @@
   },
   "panel": {
     "label": "고른 런 요약",
-    "empty": "보여 줄 런이 없어요. 다른 상태를 골라 보세요.",
+    "empty": "보여 줄 런이 없어요. 다른 필터를 골라 보세요.",
     "noRuns": "런이 생기면 여기에 요약이 보여요.",
     "subtitle": "{project} · {branch}",
     "subtitleWithKey": "{key} · {where}",

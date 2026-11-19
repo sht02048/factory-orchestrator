@@ -136,8 +136,14 @@ const styles = stylex.create({
     height: 28,
     paddingInline: space.s2,
     borderRadius: radius.control,
-    backgroundColor: { default: colors.bgHover, ":hover": colors.bgControlHover },
-    color: { default: colors.textSecondary, ":hover": colors.textPrimary },
+    backgroundColor: {
+      default: colors.bgControl,
+      ":hover": { default: null, "@media (hover: hover)": colors.bgControlHover },
+    },
+    color: {
+      default: colors.textSecondary,
+      ":hover": { default: null, "@media (hover: hover)": colors.textPrimary },
+    },
     fontSize: fontSize.small,
     fontWeight: fontWeight.medium,
     lineHeight: "28px",

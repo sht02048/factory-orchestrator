@@ -52,6 +52,7 @@ import type {
 } from "@ganger/app/runs/model";
 
 const columns = `minmax(0, 1fr) ${size.runStatusColumn} ${size.timeColumn}`;
+const narrowColumns = "minmax(0, 1fr)";
 
 export interface RunsScreenProps {
   page: RunsPage;
@@ -205,7 +206,7 @@ function RunsList({
             )}
           </div>
           <Card padding="compact" label={t("listLabel")}>
-            <Table columns={columns}>
+            <Table columns={columns} narrowColumns={narrowColumns}>
               {visible.length === 0 ? (
                 <TableEmpty>
                   {page.runs.length > 0

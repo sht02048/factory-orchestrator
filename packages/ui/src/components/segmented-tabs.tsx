@@ -54,9 +54,8 @@ export function SegmentedTabs<T extends string>({
 const styles = stylex.create({
   list: {
     display: "inline-flex",
+    flexWrap: "wrap",
     maxWidth: "100%",
-    overflowX: "auto",
-    scrollbarWidth: "none",
     gap: space.px2,
     padding: space.px2,
     borderRadius: radius.control,

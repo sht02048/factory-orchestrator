@@ -178,4 +178,5 @@ export const breakpoints = stylex.defineConsts({
   detailStacked: "@media (max-width: 960px)",
   dashboardOneColumn: "@container (max-width: 719px)",
   statTilesStacked: "@container (max-width: 704px)",
+  tableStacked: "@container (max-width: 559px)",
 });

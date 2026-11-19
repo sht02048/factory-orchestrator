@@ -150,7 +150,20 @@ describe("서버 렌더", () => {
     expect(html).toContain('aria-label="런 목록"');
     expect(html.match(/role="option"/g)).toHaveLength(2);
     expect(html).toMatch(/aria-selected="true"[^>]*>.*둘째|둘째.*aria-selected="true"/s);
-    expect(html).toContain("grid-template-columns:minmax(0, 1fr) 80px");
+    expect(html).toMatch(/style="--[^:]+:minmax\(0, 1fr\) 80px;--[^:]+:minmax\(0, 1fr\) 80px"/);
+  });
+
+  it("Table 은 좁은 폭 열 값을 따로 받는다(티켓 0091)", () => {
+    const html = renderToString(
+      <Table columns="minmax(0, 1fr) 152px 88px" narrowColumns="minmax(0, 1fr)">
+        <TableRows label="런 목록" value="a" onValueChange={noop}>
+          <TableRow value="a" label="첫째">
+            <TableCell>첫째</TableCell>
+          </TableRow>
+        </TableRows>
+      </Table>,
+    );
+    expect(html).toMatch(/style="--[^:]+:minmax\(0, 1fr\) 152px 88px;--[^:]+:minmax\(0, 1fr\)"/);
   });
 
   it("Tabs 는 고른 탭을 aria-selected 로 표시하고 개수를 붙인다", () => {

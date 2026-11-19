@@ -2,18 +2,34 @@ import * as stylex from "@stylexjs/stylex";
 import { Listbox, ListboxItem } from "@ui-sdk/react/listbox";
 import { createContext, use, type ReactNode } from "react";
 import { cx } from "../cx";
-import { colors, fontSize, fontWeight, motion, radius, size, space } from "../tokens.stylex";
+import {
+  breakpoints,
+  colors,
+  fontSize,
+  fontWeight,
+  motion,
+  radius,
+  size,
+  space,
+} from "../tokens.stylex";
 
-const ColumnsContext = createContext<string>("minmax(0, 1fr)");
+const gridColumns = stylex.create({
+  of: (wide: string, narrow: string) => ({
+    gridTemplateColumns: { default: wide, [breakpoints.tableStacked]: narrow },
+  }),
+});
+
+const ColumnsContext = createContext(gridColumns.of("minmax(0, 1fr)", "minmax(0, 1fr)"));
 
 export interface TableProps {
   columns: string;
+  narrowColumns?: string;
   children: ReactNode;
 }
 
-export function Table({ columns, children }: TableProps) {
+export function Table({ columns, narrowColumns, children }: TableProps) {
   return (
-    <ColumnsContext value={columns}>
+    <ColumnsContext value={gridColumns.of(columns, narrowColumns ?? columns)}>
       <div {...stylex.props(styles.table)}>{children}</div>
     </ColumnsContext>
   );
@@ -22,11 +38,7 @@ export function Table({ columns, children }: TableProps) {
 export function TableHead({ children }: { children: ReactNode }) {
   const columns = use(ColumnsContext);
   return (
-    <div
-      aria-hidden="true"
-      style={{ gridTemplateColumns: columns }}
-      className={cx(styles.grid, styles.head)}
-    >
+    <div aria-hidden="true" {...stylex.props(styles.grid, columns, styles.head)}>
       {children}
     </div>
   );
@@ -88,10 +100,11 @@ export function TableRow({ value, label, onOpen, children }: TableRowProps) {
               if (event.key === "Enter") onOpen();
             },
           })}
-      style={{ gridTemplateColumns: columns }}
+      {...columnsStyle(columns)}
       className={(s) =>
         cx(
           styles.grid,
+          columns,
           styles.row,
           s.highlighted && styles.rowHighlighted,
           s.selected && styles.rowSelected,
@@ -101,6 +114,11 @@ export function TableRow({ value, label, onOpen, children }: TableRowProps) {
       {children}
     </ListboxItem>
   );
+}
+
+function columnsStyle(columns: stylex.StyleXStyles) {
+  const style = stylex.props(columns).style;
+  return style === undefined ? {} : { style };
 }
 
 export interface TableCellProps {
@@ -136,14 +154,16 @@ export function TableEmpty({ children }: { children: ReactNode }) {
 }
 
 const styles = stylex.create({
-  table: { display: "flex", flexDirection: "column", minWidth: 0 },
+  table: { display: "flex", flexDirection: "column", minWidth: 0, containerType: "inline-size" },
   grid: {
     display: "grid",
     alignItems: "center",
     columnGap: space.s3,
+    rowGap: { default: 0, [breakpoints.tableStacked]: space.s1 },
     paddingInline: space.s3,
   },
   head: {
+    display: { default: "grid", [breakpoints.tableStacked]: "none" },
     height: 30,
     color: colors.textTertiary,
     fontSize: fontSize.small,
