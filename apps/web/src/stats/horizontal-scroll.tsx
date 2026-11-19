@@ -20,7 +20,7 @@ export function HorizontalScroll({
     <div
       ref={ref}
       {...(overflowing ? { role: "region", "aria-label": label, tabIndex: 0 } : {})}
-      {...stylex.props(styles.scroller, focusStyles.ringInset)}
+      {...stylex.props(shown && styles.scroller, focusStyles.ringInset)}
     >
       <div {...(minWidth === undefined ? {} : { style: { minWidth } })}>{children}</div>
     </div>

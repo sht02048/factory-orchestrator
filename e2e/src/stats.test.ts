@@ -334,6 +334,19 @@ describe("Stats 날짜별 표(브라우저, 0093)", () => {
   });
 });
 
+describe("Stats 접힌 날짜별 표(브라우저, 0093)", () => {
+  it("표를 접어 두면 '표로 보기' 다음 Tab 이 바로 'Failed 런 보기'로 간다", async (context) => {
+    const page = await openPage(context);
+    await page.goto(`/stats?ws=${workspaceId}`);
+    await hydrated(page);
+    await focusByTab(page, stats.throughput.showTable);
+    await page.keyboard.press("Tab");
+    expect(await page.evaluate(() => document.activeElement?.textContent?.trim())).toBe(
+      stats.failures.openRuns,
+    );
+  });
+});
+
 describe("Stats 'Failed 런 보기'(브라우저, 0093)", () => {
   it("누르면 Failed 와 Stats 기간 조건으로 Runs 를 연다", async (context) => {
     const page = await openPage(context);
