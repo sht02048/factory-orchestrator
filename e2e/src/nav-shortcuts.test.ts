@@ -93,95 +93,89 @@ afterAll(async () => {
 });
 
 describe("화면 이동 단축키(브라우저, 0102)", () => {
-  it("Mod+1~5, Mod+, 를 누르면 문서를 다시 읽지 않고 레일 순서대로 화면을 옮기고 Workspace 를 지킨다", async (context) => {
+  it("웹 브라우저에서는 Mod+1~5, Mod+, 를 등록하지 않아 화면을 옮기지 않고 툴팁에 키가 없다", async (context) => {
     const page = await newPage(context, { width: 1280, height: 800 });
     await open(page, "/runs");
     await markDocument(page);
 
-    for (const item of navShortcuts) {
-      await page.keyboard.press(playwrightKey(item.hotkey));
-      await page.waitForURL((url) => url.pathname === item.path);
-      const link = page.getByRole("link", { name: shell.nav[item.screen], exact: true });
-      expect(await link.getAttribute("aria-current")).toBe("page");
-      expect(new URL(page.url()).searchParams.get("ws")).toBe(workspaceId);
-    }
+    for (const item of navShortcuts) await page.keyboard.press(playwrightKey(item.hotkey));
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 1_000 }).toBe("/runs");
     expect(await documentMarked(page)).toBe(true);
+
+    for (const item of navShortcuts) {
+      const link = page.getByRole("link", { name: shell.nav[item.screen], exact: true });
+      expect(await link.getAttribute("aria-keyshortcuts")).toBeNull();
+    }
+    await page.getByRole("link", { name: shell.nav.runs, exact: true }).hover();
+    const tooltip = page.getByRole("tooltip").filter({ hasText: shell.nav.runs });
+    await tooltip.waitFor();
+    expect((await tooltip.innerText()).trim()).toBe(shell.nav.runs);
   });
 
-  it("입력칸에 글을 쓰다가 눌러도 레일을 누른 것처럼 바로 옮긴다", async (context) => {
+  it("데스크톱 앱 안에서는 툴팁에 이름과 키를 함께 보이고 aria-keyshortcuts 로 알린다", async (context) => {
     const page = await newPage(context, { width: 1280, height: 800 });
-    await open(page, "/tickets");
-    const search = page.getByRole("searchbox", { name: tickets.search.label });
-    await search.fill("ACME");
-    await search.focus();
-
-    await page.keyboard.press("ControlOrMeta+3");
-    await page.waitForURL((url) => url.pathname === "/runs");
-    expect(new URL(page.url()).searchParams.get("ws")).toBe(workspaceId);
-
-    await open(page, "/tickets");
-    await page.getByRole("searchbox", { name: tickets.search.label }).focus();
-    await page.keyboard.press("ControlOrMeta+,");
-    await page.waitForURL((url) => url.pathname === "/settings");
-    expect(new URL(page.url()).pathname).toBe("/settings");
-  });
-
-  it("레일 링크는 키를 aria-keyshortcuts 로 알리고, 툴팁에 이름과 키를 함께 보인다", async (context) => {
-    const page = await newPage(context, { width: 1280, height: 800 });
+    await withDesktopBridge(page);
     await open(page, "/");
     const isMac = await page.evaluate(() => /Mac/.test(navigator.platform));
     for (const item of navShortcuts) {
       const link = page.getByRole("link", { name: shell.nav[item.screen], exact: true });
-      expect(await link.getAttribute("aria-keyshortcuts")).toBe(
-        item.hotkey.replace("Mod", isMac ? "Meta" : "Control"),
-      );
+      await expect
+        .poll(() => link.getAttribute("aria-keyshortcuts"))
+        .toBe(item.hotkey.replace("Mod", isMac ? "Meta" : "Control"));
     }
 
     await page.getByRole("link", { name: shell.nav.runs, exact: true }).hover();
     const tooltip = page.getByRole("tooltip").filter({ hasText: shell.nav.runs });
     await tooltip.waitFor();
-    expect((await tooltip.innerText()).replace(/[⁦⁩\s]/g, "")).toBe(
+    expect((await tooltip.innerText()).replace(/[\u2066\u2069\s]/g, "")).toBe(
       `${shell.nav.runs}${isMac ? "⌘3" : "Ctrl+3"}`,
     );
     if (screenshotDir !== undefined) {
       mkdirSync(screenshotDir, { recursive: true });
-      await page.screenshot({ path: join(screenshotDir, "rail-tooltip-1280.png") });
+      await page.screenshot({ path: join(screenshotDir, "rail-tooltip-desktop-1280.png") });
     }
   });
 
-  it("데스크톱 앱 안에서는 키를 앱 메뉴에 맡기고, 메뉴가 보낸 화면으로 옮긴다", async (context) => {
+  it("데스크톱 메뉴가 보낸 화면으로 입력칸에 포커스가 있어도 문서를 다시 읽지 않고 옮기고 Workspace 를 지킨다", async (context) => {
     const page = await newPage(context, { width: 1280, height: 800 });
-    await page.addInitScript((name) => {
-      const listeners: Array<(screen: unknown) => void> = [];
-      Object.assign(globalThis, {
-        [name]: {
-          onNavigate: (listener: (screen: unknown) => void) => {
-            listeners.push(listener);
-            return () => listeners.splice(listeners.indexOf(listener), 1);
-          },
-        },
-      });
-      addEventListener("menu-sends", (event) => {
-        if (event instanceof CustomEvent) for (const listener of listeners) listener(event.detail);
-      });
-    }, DESKTOP_NAVIGATION_GLOBAL);
-    await open(page, "/runs");
+    await withDesktopBridge(page);
+    await open(page, "/tickets");
     await markDocument(page);
-
-    await page.keyboard.press("ControlOrMeta+2");
-    await expect.poll(() => new URL(page.url()).pathname, { timeout: 1_000 }).toBe("/runs");
+    const search = page.getByRole("searchbox", { name: tickets.search.label });
+    await search.fill("ACME");
+    await search.focus();
 
     const menuSends = (screen: string) =>
       page.evaluate((detail) => dispatchEvent(new CustomEvent("menu-sends", { detail })), screen);
-    await menuSends("stats");
-    await page.waitForURL((url) => url.pathname === "/stats");
+    for (const item of navShortcuts) {
+      await menuSends(item.screen);
+      await page.waitForURL((url) => url.pathname === item.path);
+      const link = page.getByRole("link", { name: shell.nav[item.screen], exact: true });
+      expect(await link.getAttribute("aria-current")).toBe("page");
+      expect(new URL(page.url()).searchParams.get("ws")).toBe(workspaceId);
+    }
     await menuSends("onboarding");
-    await menuSends("runs");
-    await page.waitForURL((url) => url.pathname === "/runs");
-    expect(new URL(page.url()).searchParams.get("ws")).toBe(workspaceId);
+    await expect.poll(() => new URL(page.url()).pathname, { timeout: 1_000 }).toBe("/settings");
     expect(await documentMarked(page)).toBe(true);
   });
 });
+
+async function withDesktopBridge(page: Page): Promise<void> {
+  await page.addInitScript((name) => {
+    const listeners: Array<(screen: unknown) => void> = [];
+    Object.assign(globalThis, {
+      [name]: {
+        onNavigate: (listener: (screen: unknown) => void) => {
+          listeners.push(listener);
+          return () => listeners.splice(listeners.indexOf(listener), 1);
+        },
+      },
+    });
+    addEventListener("menu-sends", (event) => {
+      if (event instanceof CustomEvent) for (const listener of listeners) listener(event.detail);
+    });
+  }, DESKTOP_NAVIGATION_GLOBAL);
+}
 
 function playwrightKey(hotkey: string): string {
   return hotkey.replace(/^Mod\+/, "ControlOrMeta+");

@@ -1,5 +1,11 @@
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { z } from "zod";
-import { DESKTOP_NAVIGATION_GLOBAL, isNavScreen } from "@ganger/app/shell/nav-shortcuts";
+import {
+  DESKTOP_NAVIGATION_GLOBAL,
+  isNavScreen,
+  navShortcutOf,
+} from "@ganger/app/shell/nav-shortcuts";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 
 export interface DesktopNavigation {
@@ -30,4 +36,18 @@ export function desktopNavigation(scope: object = globalThis): DesktopNavigation
       };
     },
   };
+}
+
+export function useDesktopNavigation(): { inDesktopApp: boolean } {
+  const navigate = useNavigate();
+  const [inDesktopApp, setInDesktopApp] = useState(false);
+  useEffect(() => {
+    const bridge = desktopNavigation();
+    if (bridge === null) return;
+    setInDesktopApp(true);
+    return bridge.onNavigate((screen) => {
+      void navigate({ to: navShortcutOf(screen).path });
+    });
+  }, [navigate]);
+  return { inDesktopApp };
 }

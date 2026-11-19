@@ -9,7 +9,6 @@ import {
   rootRouteId,
   useRouter,
 } from "@tanstack/react-router";
-import { HotkeysProvider } from "@tanstack/react-hotkeys";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
@@ -70,11 +69,9 @@ function RootLayout() {
   const timeZone = Route.useLoaderData();
   return (
     <IntlProvider locale={defaultLocale} messages={appMessages} timeZone={timeZone}>
-      <HotkeysProvider defaultOptions={{ hotkey: { requireReset: true } }}>
-        <TimeZoneSync timeZone={timeZone} />
-        <Outlet />
-        <AppToaster />
-      </HotkeysProvider>
+      <TimeZoneSync timeZone={timeZone} />
+      <Outlet />
+      <AppToaster />
     </IntlProvider>
   );
 }

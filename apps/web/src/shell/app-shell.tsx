@@ -23,7 +23,7 @@ import type { ShellData, WorkspaceChoice } from "@ganger/app/shell/model";
 import { navShortcuts } from "@ganger/app/shell/nav-shortcuts";
 import type { NavShortcut } from "@ganger/app/shell/nav-shortcuts";
 import { navIcons } from "./nav-icons";
-import { NavHotkeys } from "./nav-hotkeys";
+import { useDesktopNavigation } from "./desktop-navigation";
 
 const mainItems = navShortcuts.filter((item) => item.screen !== "settings");
 const bottomItems = navShortcuts.filter((item) => item.screen === "settings");
@@ -44,13 +44,13 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const t = useTranslations("shell");
+  const { inDesktopApp } = useDesktopNavigation();
   const isCurrent = (to: string) =>
     to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`);
   return (
     <AppFrame
       rail={
         <>
-          <NavHotkeys />
           <RailBrand>
             <GangerMark tone="brand" label={t("brand")} />
           </RailBrand>
@@ -68,6 +68,7 @@ export function AppShell({
                       item={item}
                       current={isCurrent(item.path)}
                       issues={item.screen === "runners" ? shell.runnerIssues : 0}
+                      showShortcut={inDesktopApp}
                     />
                   </li>
                 ))}
@@ -86,10 +87,12 @@ function RailLink({
   item,
   current,
   issues,
+  showShortcut,
 }: {
   item: NavShortcut;
   current: boolean;
   issues: number;
+  showShortcut: boolean;
 }) {
   const t = useTranslations("shell");
   const name = t(`nav.${item.screen}`);
@@ -98,7 +101,7 @@ function RailLink({
       content={issues > 0 ? t("nav.withIssues", { name, count: issues }) : name}
       labelsTrigger
       side="right"
-      shortcut={item.hotkey}
+      {...(showShortcut ? { shortcut: item.hotkey } : {})}
       render={
         <Link
           to={item.path}
