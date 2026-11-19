@@ -1,5 +1,5 @@
 ---
-status: todo
+status: doing
 blocked_by: []
 ---
 
@@ -44,6 +44,20 @@ blocked_by: []
 - 외부 알림 연동(ntfy, Slack 등). 같은 사건 저장소를 쓰는 후속으로 둔다.
 - 알림 안 버튼(답하기, 거절하기).
 - 모바일 푸시([research 0014](../research/0014-mobile-client.md)).
+
+## 결정과 구현
+
+- **0046 Q4를 Failed 쪽만 바꾼 이유.** 0046은 사람이 손댈 일이 적던 때라 Merged·Failed를 둘 다 알리지 않았다. Failed는 자동으로 다시 시도하지 않아(GLOSSARY Failed) 운영자가 다시 맡기기 전까지 티켓이 멈춰 있고, Dashboard에서도 꼬리표가 붙는 처리할 일이다. 알리지 않으면 앱을 켜 두고도 멈춘 티켓을 놓친다. Merged는 사람이 할 일이 없어 그대로 알리지 않고, 켜는 선택지도 두지 않는다. `apps/web/src/notifications/notifications.test.ts`(옛 `attention.test.ts`)가 새 결정을 시험한다.
+- **사건 저장소(`packages/db`).** `notification_events`(번호 `id`, 바뀐 순서 `seq`, 종류, 원인 키 `cause`, 대상 런·Workspace·티켓 키 또는 러너, 보일 이름 `subject`, 사용량 한도의 공급자 `detail`, 생긴 시각, 해결 시각)와 `notification_sequence`(한 줄짜리 `seq` 카운터) 두 표를 더했다. 해결되지 않은 사건은 원인 키가 겹치지 않는다(부분 고유 색인). `seq`는 만들 때와 해결·다시 열 때마다 하나씩 늘고, 해결된 사건을 지워도 줄지 않아 `Last-Event-ID`가 거꾸로 가지 않는다. 런·러너를 지우면 그 사건도 지운다.
+- **원인 계산(`packages/app/src/notifications/causes.ts`).** To do는 Dashboard와 같은 `loadHomePage`의 To do 목록(티켓마다 최신 런)에서, Runner Issue는 러너 점검 값에서 계산한다. 사용량 한도는 할당과 같은 `usageLimitsAt`(30분 넘은 값은 보지 않음)을 쓰고 공급자마다 사건 하나다.
+- **동기화.** web 서버가 원인을 계산해 저장소와 맞춘다. SSE 연결이 있으면 2초마다, 폴링·옛 경로 요청 때마다 하되 1초 안에 다시 하지 않는다. 앱이 하나도 붙어 있지 않을 때 생겼다 사라진 일은 사건으로 남지 않는다(놓친 일 요약은 아직 해결 안 된 것만 세므로 결과는 같다).
+- **SSE(`GET /api/notification-events/stream`).** 붙으면 `Last-Event-ID`(또는 `?after=`) 뒤에 바뀐 사건을, 없으면 열린 사건 모두를 보내고 `ready`(지금 번호와 열린 사건 번호 목록)를 보낸다. 그 뒤 바뀐 사건을 바로 보내고 15초마다 하트비트 주석을 보낸다. 응답은 `cache-control: no-transform`, `x-accel-buffering: no`라 프록시가 모아 두지 않는다. 다른 경로처럼 요청 가드(Host 검사)를 지난다.
+- **폴링(`GET /api/notification-events?after=`).** 같은 저장소를 같은 모양(`events`, `cursor`, `open`)으로 준다. 앱은 SSE가 두 번 연달아 `ready` 전에 끊기거나 event-stream이 아니면 5초 폴링으로 돌아가고, 1분마다 SSE를 다시 시도한다.
+- **옛 경로 `GET /api/attention`.** 0.1 데스크톱 앱이 쓰므로 같은 사건 저장소에서 예전 네 종류(question, permission, human-check, runner-offline)만 예전 모양으로 준다. 0.2 첫 릴리스에서 지운다.
+- **데스크톱 앱.** `src/core/notification-feed.ts`(SSE·폴링), `src/core/notifier.ts`(묶기, 다시 알리기, 놓친 일, 지우기, 배지, 설정 반영)는 Electron 없이 시험한다. 서버마다 마지막으로 본 사건 번호를 앱 설정에 두고, 앱을 켜거나 Mac이 깨어난 뒤 첫 묶음에서 그 번호 뒤에 생겨 아직 열린 처리할 일만 요약한다. 처음 붙는 서버는 기준만 잡는다. 해결된 뒤 다시 열린 사건은 이미 본 번호라 다시 울리지 않는다. 알림 ID는 서버 주소 해시와 사건 번호로 만들어, 앱을 다시 켰을 때 알림 센터에 남은 해결된 알림도 지운다(`Notification.getHistory`). 놓친 일 요약에는 Runner Issue를 넣지 않는다(처리할 일이 아니다).
+- **권한 확인.** Electron에는 macOS 알림 권한을 묻는 API가 없어, 알림을 띄우다 `failed`가 나면 꺼짐으로, `show`가 나면 켜짐으로 본다. 아직 알림을 띄운 적이 없으면 안내를 보이지 않는다.
+- **누르면.** 런 사건은 `/?ws=<Workspace>&run=<런>`으로 Dashboard를 열고, Dashboard가 그 카드 상세 패널을 연 뒤 주소에서 `run`을 지운다. Question 런은 답하기 상태로 연다. Runner Issue는 `/runners?sel=<러너>`, 묶음·놓친 일은 `/?ws=all&view=todo`를 연다.
+- **이름.** 코드의 `attention`(알림 쪽)은 `notifications`로 바꿨다. Dashboard 데이터의 `HomePage.attention`(To do 목록)은 이 티켓 범위 밖이라 그대로 두었다.
 
 ## 완료 조건
 

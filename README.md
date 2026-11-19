@@ -287,7 +287,7 @@ The app asks how you want to use it:
 
 We recommend serving the app to other devices with Tailscale Serve (HTTPS on the device's MagicDNS name) and setting that address as the **Web address**, as described in [Open it from other devices](#open-it-from-other-devices).
 
-The app shows a notification when an agent asks a question, waits for a permission, a run needs a Human Check, or a runner goes Offline. It polls the server's `GET /api/attention` for these.
+The app shows a notification when an agent asks a question or waits for a permission, a run needs a Human Check, Failed, or is Disconnected, and when a runner has a Runner Issue (Offline, broken GitHub authentication, or a provider usage limit). The server records these as notification events, and the app keeps a Server-Sent Events connection to `GET /api/notification-events/stream` (it falls back to polling `GET /api/notification-events` every 5 seconds when the stream is not available). When an event is resolved elsewhere (the web screen or another Mac), the app removes its notification. The Dock badge shows the number of To do items. Choose which notifications this Mac shows in **알림 설정** (Notification settings) from the app menu or the tray. Do Not Disturb follows macOS Focus. The old `GET /api/attention` path stays for older desktop apps until the first 0.2 release.
 
 ## Work items
 
