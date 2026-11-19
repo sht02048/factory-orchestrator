@@ -1,5 +1,5 @@
 ---
-status: doing
+status: done
 blocked_by: []
 ---
 
@@ -31,16 +31,19 @@ blocked_by: []
   - 상세 패널의 "공급자 사용량" 구역: 쓰는 공급자마다 있는 창(5시간·주간·Fable 주간·월간)만 막대·%·초기화 시각, 로그인 안 한 공급자는 "로그인하지 않았어요: Kimi, Cursor" 한 줄, 그 밖의 unavailable 공급자는 "쓰지 않는 공급자 N개"로 접어 둔다. "N분 전 읽었어요"와 계정 정보를 저장하지 않는다는 안내를 둔다.
   - 막대 색: 90% 미만 중립 회색, 90% 이상 problem 빨강. 노랑은 쓰지 않는다(ADR 0010 5번).
   - 막대는 `packages/ui`에 새로 더한 `UsageBar`(값 글 "72%")를 쓰고, 열 너비는 새 `size.usageColumn`이다(코디네이터 결정 2026-11-19: `CapacityBar`는 값 글이 "n/m"이라 % 를 보일 수 없고, 같은 값이어도 다른 뜻의 토큰을 빌리지 않는다). `/ds` 미리보기에 `UsageBar`를 더했다.
-- **Dashboard.** 0085(Dashboard Runners 칸 다시 그리기)가 머지된 뒤에, 러너 행 아래 사용량 숫자 줄("Claude 주간 72%", 90% 이상 빨강 글자), 100%에 닿은 러너는 기존 문제 상자에 "Claude 5시간 한도에 닿았어요: runner-c · 1시간 12분 뒤 풀려요" 한 줄, 머리 문장에 한도로 멈춘 러너가 있으면 언제 다시 받는지. 0085가 머지되기 전에는 Dashboard 파일을 고치지 않는다. core의 `reachedUsageLimits`가 100%에 닿은 창을 고른다.
+- **Dashboard.** 0085(Dashboard Runners 칸)가 머지된 뒤에 더했다. 러너 행의 이름 아래에 가장 높은 사용량 숫자 줄("Claude 주간 72%", 90% 이상이면 `Text tone="problem"` 빨강 글자). 100%에 닿은 Online 러너는 기존 문제 상자에 "Claude 5시간 한도에 닿았어요: runner-b · 1시간 12분 뒤 풀려요" 한 줄씩 더하고, 상자 제목의 러너 수는 문제 러너와 한도 러너를 합친 수다. 머리 문장(요약)에 "한도에 닿은 러너 N대는 {가장 빠른 시간} 뒤부터 다시 런을 받아요."를 붙인다. 한 러너가 다시 받는 시각은 그 러너의 한도 창 중 가장 늦게 풀리는 시각이다. Offline 러너의 값은 낡아 한도 줄을 만들지 않는다.
+- **낡은 값.** 초기화 시각이 지난 창은 값이 더는 맞지 않아 목록·패널·Dashboard에서 뺀다(core `currentWindows`).
+- **색(독립 리뷰 반영).** 90% 미만 막대 채움은 상태 색 `idle`(Queued·Canceled)을 빌리지 않고, 상태가 아닌 무채색 토큰 `meterFill`을 새로 두었다. 트랙은 `CapacityBar`와 같은 `idleSoft`다.
+- 공급자·창 이름은 Runners와 Dashboard가 함께 쓰므로 `domain.json`의 `usage`에 두고 `labels.ts`의 `useUsageNames`로 읽는다.
 - **데모 시드(`pnpm dev`).** runner-a는 정상(Claude 주간 72%, Codex, 로그인 안 한 Kimi·Cursor, 쓰지 않는 Gemini·Antigravity), runner-b는 Claude 5시간 100%·주간 93%, runner-c(Offline)는 47분 전에 읽은 값이다.
-- 화면 문구는 `apps/web/messages/ko/runners.json`(Runners)과 `ds.json`(미리보기)에 둔다. 용어 "공급자 사용량"을 GLOSSARY에 더했다.
+- 화면 문구는 `apps/web/messages/ko/runners.json`(Runners), `home.json`(Dashboard), `domain.json`(공급자·창 이름), `ds.json`(미리보기)에 둔다. 용어 "공급자 사용량"을 GLOSSARY에 더했다.
 
 ## 완료 조건
 
 - rateLimits 파싱 시험: 정상, 모르는 공급자·필드, 깨진 창·공급자, 깨진 JSON·오류 봉투, 계정 정보가 결과에 남지 않음(`packages/runner-orca/src/provider-usage.test.ts`).
 - 점검이 사용량을 저장하고, 몇 분에 한 번만 읽고, 실패해도 러너 상태를 바꾸지 않고, Offline 러너는 묻지 않는다는 시험(`apps/worker/src/runner-check.test.ts`).
 - 저장·읽기 시험과 마이그레이션 시험(기존 DB 올리기)(`packages/db/src/settings.test.ts`, `migrate.test.ts`).
-- Runners 목록·패널 시험(`apps/web/src/runners/runners-screen.test.tsx`), `UsageBar` 시험, 데모 시드 시험.
+- Runners 목록·패널 시험(`apps/web/src/runners/runners-screen.test.tsx`), Dashboard 시험(`apps/web/src/home/home-screen.test.tsx`, `load.test.ts`), `UsageBar` 시험, 데모 시드 시험.
 - Runners 목록·패널, Dashboard 1280px 스크린숏.
 
 ## 후속
