@@ -96,7 +96,16 @@
     "cancel-requested": "취소 요청",
     "ended": "종료",
     "later-pr": "이후 PR 상태",
-    "denied": "거절"
+    "denied": "거절",
+    "mcp": "MCP · {client}",
+    "mcpRejected": "{tool} · 하지 못했어요",
+    "mcpTool": {
+      "assign_ticket": "티켓 할당",
+      "answer_question": "답하기",
+      "deny_permission": "Permission 거절",
+      "cancel_run": "런 취소",
+      "request_run_log": "로그 요청"
+    }
   },
   "report": {
     "title": "완료 보고",

@@ -21,6 +21,7 @@ import {
   listTrackerConnections,
   migrate,
   openDatabase,
+  recordMcpAction,
   recordRunnerCheck,
   saveRunner,
   saveWorkspace,
@@ -50,6 +51,7 @@ import {
   trackerConnectionInput,
   mappingInput,
   powerInput,
+  saveMcpWriteSetting,
   savePowerSetting,
 } from "@ganger/app/settings/actions";
 import { hasPendingRunnerChecks, loadSettingsPage } from "@ganger/app/settings/load";
@@ -154,6 +156,7 @@ const noopActions: SettingsActions = {
   recheckRunner: () => Promise.resolve({ ok: true }),
   saveAddresses: () => Promise.resolve({ ok: true }),
   savePower: () => Promise.resolve({ ok: true }),
+  saveMcpWrite: () => Promise.resolve({ ok: true }),
   pollRunnerChecks: () => Promise.resolve(false),
 };
 
@@ -1067,5 +1070,57 @@ describe("MCP 구역(0088)", () => {
     expect(
       serverMcpLaunch({ GANGER_CLI_ENTRY: "cli.js", GANGER_HOME: "home" }, "/usr/bin/node"),
     ).toEqual({ located: false, command: "ganger", args: ["mcp"], env: {} });
+  });
+});
+
+describe("MCP 쓰기 허용과 최근 작업(0089)", () => {
+  it("스위치는 처음엔 꺼져 있고, 저장하면 켜진 채로 다시 보인다", async () => {
+    const f = fixture();
+    const off = await loadSettingsPage(f.context, commerce, now);
+    expect(off.install.mcp.writeAllowed).toBe(false);
+    expect(render(off, "mcp")).toContain("읽기만 열려 있어요");
+    expect(panelText(render(off, "mcp"))).toContain("MCP 쓰기 허용");
+    expect(panelText(render(off, "mcp"))).toContain("이 화면에서만 바꿀 수 있어요");
+
+    expect(saveMcpWriteSetting(f.context, { allowed: true }, now)).toEqual({ ok: true });
+    const on = await loadSettingsPage(f.context, commerce, now);
+    expect(on.install.mcp.writeAllowed).toBe(true);
+    expect(render(on, "mcp")).toContain("쓰기도 열려 있어요");
+    expect(render(on, "mcp")).toMatch(
+      /name="mcpWriteAllowed"[^>]*checked|checked[^>]*name="mcpWriteAllowed"/,
+    );
+  });
+
+  it("런과 상관없는 MCP 쓰기는 최근 작업에 MCP · 이름, 도구, 대상, 결과로 보이고 Operator라고 보내도 MCP가 붙는다", async () => {
+    const f = fixture();
+    expect(panelText(render(await loadSettingsPage(f.context, commerce, now), "mcp"))).toContain(
+      "아직 MCP로 한 쓰기가 없어요",
+    );
+    recordMcpAction(f.context.db, {
+      at: new Date(now.getTime() - 60_000),
+      client: "Operator",
+      tool: "set_runner_capacity",
+      target: "runner-a",
+      runId: null,
+      outcome: "done",
+      reason: null,
+    });
+    recordMcpAction(f.context.db, {
+      at: now,
+      client: "hermes\u0007\u202e",
+      tool: "request_runner_check",
+      target: "runner-b",
+      runId: null,
+      outcome: "rejected",
+      reason: "not-found",
+    });
+
+    const shown = panelText(render(await loadSettingsPage(f.context, commerce, now), "mcp"));
+    expect(shown).toContain("MCP · Operator");
+    expect(shown).toContain("러너 Capacity 바꾸기 · runner-a");
+    expect(shown).toContain("MCP · hermes");
+    expect(shown).not.toContain("\u202e");
+    expect(shown).toContain("러너 다시 확인 · runner-b · 하지 못했어요");
+    expect(shown.indexOf("MCP · hermes")).toBeLessThan(shown.indexOf("MCP · Operator"));
   });
 });

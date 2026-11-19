@@ -107,6 +107,7 @@ const noopActions: OnboardingActions = {
   recheckRunner: reject,
   saveAddresses: reject,
   savePower: reject,
+  saveMcpWrite: reject,
   pollRunnerChecks: () => Promise.resolve(false),
   setUpWorkspace: reject,
 };

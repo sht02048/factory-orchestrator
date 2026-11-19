@@ -14,6 +14,7 @@ import {
   inProgressInput,
   labelInput,
   mappingInput,
+  mcpWriteInput,
   powerInput,
   removeTrackerProject,
   requestRunnerCheckSetting,
@@ -25,6 +26,7 @@ import {
   saveInProgressState,
   saveLabel,
   saveMappingSetting,
+  saveMcpWriteSetting,
   savePowerSetting,
   saveRunnerSetting,
   saveTrackerConnectionSetting,
@@ -117,3 +119,7 @@ export const saveAddressesSetting = createServerFn({ method: "POST" })
 export const savePowerSettings = createServerFn({ method: "POST" })
   .validator(powerInput)
   .handler(({ data }) => savePowerSetting(context(), data));
+
+export const saveMcpWriteSettings = createServerFn({ method: "POST" })
+  .validator(mcpWriteInput)
+  .handler(({ data }) => saveMcpWriteSetting(context(), data, new Date()));
