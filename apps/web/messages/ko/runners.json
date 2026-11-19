@@ -30,7 +30,7 @@
     "full": "꽉 찼어요.",
     "fullWaiting": "꽉 찼어요. 런 {count}개가 자리를 기다려요.",
     "free": "{free}자리가 비어 있어요.",
-    "withPushBlocked": "{capacity} push가 안 되는 저장소 {count}개의 티켓은 맡기지 않아요."
+    "withPushBlocked": "저장소 {count}개는 push가 안 돼 맡기지 않아요. {capacity}"
   },
   "panel": {
     "label": "고른 러너",

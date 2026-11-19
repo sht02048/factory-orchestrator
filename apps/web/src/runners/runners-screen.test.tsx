@@ -265,6 +265,7 @@ describe("Runners 고른 러너 패널", () => {
     expect(a).toMatch(callout);
     expect(textOf(a)).toContain(panel.fix.assignmentBlocked.title);
     expect(textOf(a)).toContain(panel.fix.assignmentBlocked.steps["1"]);
+    expect(a.match(new RegExp(`>${panel.recheck}</button>`, "g"))).toHaveLength(1);
   });
 
   it("상태 알약·확인 시각, 제목 이름과 주소를 패널 머리에 둔다", () => {
@@ -311,7 +312,7 @@ describe("Runners 고른 러너 패널", () => {
     const { db } = seedDatabase();
     breakGitHubAuth(db);
     const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
-    expect(textOf(a)).toContain(`${panel.checksTitle} 2/3 통과`);
+    expect(textOf(a)).toContain(`${panel.checksTitle} 1/2 통과`);
     const states = [...a.matchAll(/data-check="([^"]+)"/g)].map((m) => m[1]);
     expect(states).toEqual(["broken", "ok"]);
     expect(textOf(a)).toMatch(
@@ -337,7 +338,7 @@ describe("Runners 고른 러너 패널", () => {
     const a = panelHtml(html);
     const pushCheck = domain.pushCheck;
     const text = textOf(a);
-    expect(text).toContain(`${panel.checksTitle} 2/5 통과`);
+    expect(text).toContain(`${panel.checksTitle} 1/2 통과`);
     expect(text).toContain(`${panel.check.broken} GitHub push · 4개 중 1개 통과`);
     expect(text).toContain(
       `acme/web ${pushCheck.failure.auth} · Permission to acme/web.git denied to someone.`,
@@ -352,7 +353,9 @@ describe("Runners 고른 러너 패널", () => {
     expect(pillsOf(row?.html ?? "")).toEqual([
       { status: "online", label: domain.runnerState.online },
     ]);
-    expect(textOf(row?.html ?? "")).toContain("push가 안 되는 저장소 2개의 티켓은 맡기지 않아요.");
+    expect(textOf(row?.html ?? "")).toContain(
+      "저장소 2개는 push가 안 돼 맡기지 않아요. 6자리가 비어 있어요.",
+    );
   });
 
   it("모든 저장소가 push를 통과하면 한 줄로 모두 통과라고 보인다 (0096)", () => {
@@ -634,7 +637,7 @@ describe("Runners 다시 그리기(0092)", () => {
     });
     const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
     expect(a).toMatch(new RegExp(`>${panel.usage.title}</h3><span[^>]*>3분 전 읽었어요</span>`));
-    expect(a).toMatch(new RegExp(`>${panel.checksTitle}</h3><span[^>]*>2/3 통과</span>`));
+    expect(a).toMatch(new RegExp(`>${panel.checksTitle}</h3><span[^>]*>1/2 통과</span>`));
   });
 
   it("확인 항목은 통과한 것도 상태 낱말 칸을 채워 항목 이름이 한 줄로 맞는다", () => {

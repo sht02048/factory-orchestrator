@@ -828,7 +828,8 @@ function RunnerChecklist({
   const pushPassed = push.total > 0 && push.passed === push.total;
   const pushStateLabel = (summary: PushSummary): string => {
     if (summary.total > 0 && summary.passed === summary.total) return tc("satisfied");
-    return summary.failed.length > 0 ? t("pushWarning") : tc("unknown");
+    if (summary.failed.length === 0) return tc("unknown");
+    return summary.passed === 0 ? tc("unsatisfied") : t("pushWarning");
   };
   return (
     <div {...stylex.props(styles.stack)}>

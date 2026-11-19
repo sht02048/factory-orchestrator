@@ -270,7 +270,7 @@ function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerA
       )}
       <CapacityRuns runner={runner} />
       <ProviderUsage runner={runner} />
-      <CheckList runner={runner} recheck={recheck} />
+      <CheckList runner={runner} recheck={recheck} showRecheck={status === "online"} />
       <LeftWorktrees runner={runner} />
     </DetailPanel>
   );
@@ -423,13 +423,21 @@ function RunLabel({ ticketKey, meta }: { ticketKey: string; meta: string }) {
   );
 }
 
-function CheckList({ runner, recheck }: { runner: RunnerView; recheck: Recheck }) {
+function CheckList({
+  runner,
+  recheck,
+  showRecheck,
+}: {
+  runner: RunnerView;
+  recheck: Recheck;
+  showRecheck: boolean;
+}) {
   const t = useTranslations("runners.panel");
   const prerequisiteName = usePrerequisiteName();
   const pushText = usePushSummaryText();
   const tPush = useTranslations("domain.pushCheck");
-  const checkingText = useCheckingText(recheck.checking ? 0 : null);
-  const footer = (
+  const checkingText = useCheckingText(recheck.checking ? 0 : null, "elapsed");
+  const footer = !showRecheck ? null : (
     <div {...stylex.props(styles.checkFooter)}>
       <Button variant="secondary" disabled={recheck.checking} onClick={recheck.request}>
         {recheck.checking ? t("checking") : t("recheck")}
@@ -457,7 +465,6 @@ function CheckList({ runner, recheck }: { runner: RunnerView; recheck: Recheck }
       </PanelSection>
     );
   }
-  const passed = checks.filter((check) => check.satisfied === true).length;
   const push = summarizePushChecks(checks);
   const lines: Array<{ satisfied: boolean | null; line: ReactNode }> = runnerWideChecks(checks).map(
     (check) => ({
@@ -491,7 +498,10 @@ function CheckList({ runner, recheck }: { runner: RunnerView; recheck: Recheck }
   return (
     <PanelSection
       title={t("checksTitle")}
-      meta={t("checksPassed", { passed, total: checks.length })}
+      meta={t("checksPassed", {
+        passed: lines.filter((line) => line.satisfied === true).length,
+        total: lines.length,
+      })}
     >
       <ul {...stylex.props(styles.list)}>{failedChecksFirst(lines).map((item) => item.line)}</ul>
       {footer}

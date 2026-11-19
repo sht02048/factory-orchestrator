@@ -362,6 +362,8 @@ describe("확인이 실패한 단계", () => {
     expect(shown).toContain("gh auth setup-git");
     expect(shown).toContain("push가 안 되는 저장소의 티켓만 이 러너에 맡기지 않아요.");
     expect(shown).not.toContain("Orca 상시 서비스가 없어요");
+    expect(html).toContain('aria-label="갖추지 못했어요"');
+    expect(html).not.toContain('aria-label="일부만 통과"');
   });
 
   it("러너에 닿지 않으면 다음으로 갈 수 없다", async () => {

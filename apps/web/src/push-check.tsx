@@ -83,7 +83,10 @@ function ProblemLine({ problem, broken }: { problem: PushProblem; broken: boolea
   );
 }
 
-export function useCheckingText(agoMs: number | null): string | null {
+export function useCheckingText(
+  agoMs: number | null,
+  form: "sentence" | "elapsed" = "sentence",
+): string | null {
   const t = useTranslations("domain.pushCheck");
   const { duration } = useTime();
   const [sinceRender, setSinceRender] = useState(0);
@@ -95,7 +98,9 @@ export function useCheckingText(agoMs: number | null): string | null {
     return () => clearInterval(timer);
   }, [agoMs]);
   if (agoMs === null) return null;
-  return t("checking", { duration: duration(agoMs + sinceRender) });
+  return t(form === "sentence" ? "checking" : "elapsed", {
+    duration: duration(agoMs + sinceRender),
+  });
 }
 
 const styles = stylex.create({

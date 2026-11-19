@@ -113,6 +113,7 @@
       "timeout": "시간 초과: GitHub 응답이 늦었어요. 잠시 뒤 다시 확인해요.",
       "other": "기타: 이유를 보고 러너의 저장소 클론과 remote 설정을 확인해요."
     },
-    "checking": "확인하는 중이에요 · {duration}째"
+    "checking": "확인하는 중이에요 · {duration}째",
+    "elapsed": "{duration}째"
   }
 }
