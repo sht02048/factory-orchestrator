@@ -59,9 +59,26 @@ export function QuestionForm({ lead, choices, after = [], labels, onSend }: Ques
   const sending = state === "sending";
   const otherPicked = draft.pick?.kind === "other";
 
+  const writeAfterPick = useRef(false);
+
   useEffect(() => {
-    if (otherPicked) otherRef.current?.focus();
+    if (!otherPicked) {
+      writeAfterPick.current = false;
+      return;
+    }
+    if (!writeAfterPick.current) return;
+    writeAfterPick.current = false;
+    otherRef.current?.focus();
   }, [otherPicked]);
+
+  const pickOtherToWrite = () => {
+    if (otherPicked) {
+      otherRef.current?.focus();
+      return;
+    }
+    writeAfterPick.current = true;
+    setDraft(pickOther);
+  };
 
   const send = () => {
     if (answer === null || sending) return;
@@ -117,23 +134,30 @@ export function QuestionForm({ lead, choices, after = [], labels, onSend }: Ques
                   onCheck={() => setDraft((d) => pickChoice(d, index))}
                   onKeyDown={pickOnEnter(() => setDraft((d) => pickChoice(d, index)))}
                 >
-                  {choice.marker === null ? null : (
-                    <>
+                  {choice.marker === null ? (
+                    choice.text
+                  ) : (
+                    <span {...stylex.props(styles.marked)}>
                       <span {...stylex.props(styles.marker)}>{choice.marker}</span>{" "}
-                    </>
+                      <span>{choice.text}</span>
+                    </span>
                   )}
-                  {choice.text}
                 </RadioOption>
               ))}
-              <RadioOption
-                name={name}
-                value="other"
-                checked={otherPicked}
-                onCheck={() => setDraft(pickOther)}
-                onKeyDown={pickOnEnter(() => setDraft(pickOther))}
+              <span
+                onPointerDown={() => (writeAfterPick.current = true)}
+                {...stylex.props(styles.contents)}
               >
-                {labels.other}
-              </RadioOption>
+                <RadioOption
+                  name={name}
+                  value="other"
+                  checked={otherPicked}
+                  onCheck={() => setDraft(pickOther)}
+                  onKeyDown={pickOnEnter(pickOtherToWrite)}
+                >
+                  {labels.other}
+                </RadioOption>
+              </span>
             </RadioGroup>
             {otherPicked ? (
               <Textarea
@@ -191,9 +215,13 @@ const styles = stylex.create({
     padding: 0,
     borderWidth: 0,
   },
+  contents: { display: "contents" },
+  marked: {
+    display: "grid",
+    gridTemplateColumns: "auto minmax(0, 1fr)",
+    columnGap: space.s2,
+  },
   marker: {
-    display: "inline-block",
-    marginInlineEnd: space.s1,
     color: colors.textSecondary,
     fontWeight: fontWeight.semibold,
     fontVariantNumeric: "tabular-nums",

@@ -69,7 +69,7 @@ export function RunSheet({
       open={open}
       onOpenChange={onOpenChange}
       status={<SheetStatus run={run} status={status} />}
-      title={<RunKey run={run} />}
+      title={<RunKey run={run} size="panel" />}
       closeLabel={t("close")}
       {...(initialFocus === undefined ? {} : { initialFocus })}
       finalFocus={finalFocus}

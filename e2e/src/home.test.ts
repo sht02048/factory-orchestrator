@@ -220,6 +220,21 @@ describe("Dashboard 상세 패널(브라우저, 0100)", () => {
     await card(page, "ACME-4").getByText(home.card.answered).waitFor();
   });
 
+  it("화살표로 직접 쓰기에 닿으면 포커스는 라디오에 남고, Enter 로 고르면 글쓰기 칸으로 간다(0116)", async () => {
+    await openHome(page);
+    await card(page, "ACME-3").getByRole("button", { name: home.card.answer }).click();
+    const panel = page.getByRole("dialog");
+    const other = panel.getByRole("radio", { name: questionJson.other });
+    expect(await focusedSoon(panel.getByRole("radio").first())).toBe(true);
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    expect(await other.isChecked()).toBe(true);
+    expect(await focusedSoon(other)).toBe(true);
+    await page.keyboard.press("Enter");
+    expect(await focusedSoon(panel.getByLabel(questionJson.otherLabel))).toBe(true);
+    await page.keyboard.press("Escape");
+  });
+
   it("나눌 선택지가 없는 질문은 라디오 없이 답 칸에 바로 쓰고 ⌘ Enter 로 보낸다(0116)", async () => {
     await openHome(page);
     await card(page, "ACME-6").getByRole("button", { name: home.card.answer }).click();

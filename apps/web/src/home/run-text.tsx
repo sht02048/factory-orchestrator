@@ -10,7 +10,7 @@ import { useStatusName } from "../status";
 import type { HomeRun, TodoTag } from "@ganger/app/home/model";
 import { subjectParticle } from "./particle";
 
-export function RunKey({ run }: { run: HomeRun }) {
+export function RunKey({ run, size = "card" }: { run: HomeRun; size?: "card" | "panel" }) {
   return (
     <span {...stylex.props(styles.keyLine)}>
       <Text variant="meta" numeric>
@@ -19,7 +19,9 @@ export function RunKey({ run }: { run: HomeRun }) {
       {run.ticketTitle === null ? null : (
         <>
           {" "}
-          <Text variant="title">{run.ticketTitle}</Text>
+          <Text variant={size === "panel" ? "panel" : "title"} as="span">
+            {run.ticketTitle}
+          </Text>
         </>
       )}
     </span>

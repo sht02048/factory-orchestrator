@@ -38,7 +38,9 @@ describe("QuestionForm(티켓 0116)", () => {
         `<div id="${leadId}"[^>]*><p[^>]*>First line\nsecond line</p><p[^>]*>Which one\\?</p></div>`,
       ),
     );
-    expect(html).toMatch(/<span class="[^"]+">A<\/span> <!-- -->Left/);
+    expect(html).toMatch(
+      /<span class="[^"]+"><span class="[^"]+">A<\/span> <span>Left<\/span><\/span>/,
+    );
     expect(html).toContain(">Write my own<");
     expect(html.indexOf("I suggest B.")).toBeGreaterThan(html.indexOf("Write my own"));
     expect(html).toMatch(/<button[^>]*data-variant="primary"[^>]*disabled=""[^>]*>Send<\/button>/);
