@@ -18,7 +18,7 @@ Runs 목록과 Run 상세를 Query로 옮기고 변경 기록으로 갱신한다
 
 1. **query.** `["runs", "list", { ws, ended, ...conditions }, timeZone]`(`getRunsPage`), `["runs", "detail", runId]`(`getRunDetail`). 로더와 컴포넌트가 같은 `queryOptions`를 쓴다. 두 route에 `preloadStaleTime` 0(0123이 확인한 이름)을 준다.
 2. **시간대를 key에.** 시간대는 루트 로더가 읽은 쿠키 값이다. 쿠키가 바뀌면 key가 바뀌어 Runs가 새로 읽는다. `TimeZoneSync`의 필터에서 빠진 Runs 문제가 이것으로 없어지는 것을 시험한다.
-3. **mutation(C5).** 답하기, 거절, 취소, 멈추기와 재개, 로그 다시 받기. 서버 함수는 바꾸지 않는다. `mutationFn`이 0124의 변환 함수로 `{ ok: false, reason }`과 `answerQuestion`·`denyPermission`이 throw한 오류를 이유가 담긴 오류 타입으로 바꾼다. `expectOk`를 지운다. 멈추기·재개(`controlRun`)의 `ok: false`는 지금처럼 오류가 아니라 "상태가 바뀜" 결과로 화면에 돌려준다(스펙 4.4). 성공하면 `["runs", "detail", runId]`와 `["runs", "list"]`만 무효화한다. 멈추기·재개가 "상태가 바뀜"을 돌려줘도 지금처럼 그 런의 key를 무효화한다. 로그 다시 받기(`requestRunLog`, boolean을 돌려준다)는 `["runs", "detail", runId]`만 무효화한다.
+3. **mutation(C5).** 답하기, 거절, 취소, 멈추기와 재개, 로그 다시 받기. 서버 함수는 바꾸지 않는다. `mutationFn`이 0124의 변환 함수로 `{ ok: false, reason }`과 `answerQuestion`·`denyPermission`이 throw한 오류를 이유가 담긴 오류 타입으로 바꾼다. `expectOk`를 지운다. 멈추기·재개(`controlRun`)의 `ok: false`는 지금처럼 오류가 아니라 "상태가 바뀜" 결과로 화면에 돌려준다(스펙 4.4, C5의 해석이라 시작할 때 운영자에게 확인한다). 성공하면 `["runs", "detail", runId]`와 `["runs", "list"]`만 무효화한다. 멈추기·재개가 "상태가 바뀜"을 돌려줘도 지금처럼 그 런의 key를 무효화한다. 로그 다시 받기(`requestRunLog`, boolean을 돌려준다)는 `["runs", "detail", runId]`만 무효화한다.
 4. **열 때 로그 요청.** `requestRunLog` 뒤에 `["runs", "detail", runId]`만 무효화한다(지금은 화면 전체).
 5. **처리 중 폴링.** 로그 받는 중(2초, 최대 15번)과 멈추기·재개 처리 중(2초)을 그 query의 `refetchInterval`로 옮긴다.
 6. **구독 연결.** 0124의 구독 모듈이 `run`·`assignment` 바뀜에 이 key들을 무효화하는지 화면에서 확인한다.
