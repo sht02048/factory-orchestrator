@@ -6,6 +6,7 @@ import {
   DividedItem,
   DividedList,
   Field,
+  InfoTip,
   Input,
   PanelBlock,
   StatusPill,
@@ -14,7 +15,15 @@ import {
   textStyles,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
-import { createContext, use, useEffect, useId, useState, type FocusEvent } from "react";
+import {
+  createContext,
+  use,
+  useEffect,
+  useId,
+  useState,
+  type FocusEvent,
+  type ReactNode,
+} from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { isPushCheck, prerequisiteHint, summarizePushChecks } from "@ganger/app/prerequisites";
@@ -266,6 +275,7 @@ export function RunnerForm({
   direct = false,
   onDone,
   onClose,
+  hints = "description",
 }: {
   runner: EditableRunner | null;
   actions: SettingsActions;
@@ -273,8 +283,13 @@ export function RunnerForm({
   direct?: boolean;
   onDone?: () => void;
   onClose?: () => void;
+  hints?: "description" | "info";
 }) {
   const t = useTranslations("settings");
+  const hint = (label: string, text: string): { description?: string; info?: ReactNode } =>
+    hints === "info"
+      ? { info: <InfoTip label={t("infoLabel", { label })} content={text} /> }
+      : { description: text };
   const blankOrcaPath = direct ? DEFAULT_ORCA_PATH : "";
   const [name, setName] = useState(runner?.name ?? "");
   const [nameEdited, setNameEdited] = useState(false);
@@ -315,7 +330,9 @@ export function RunnerForm({
   const capacityField = (
     <Field
       label={direct ? t("runners.direct.capacity") : t("runners.capacity")}
-      {...(direct ? { description: t("runners.direct.capacityDescription") } : {})}
+      {...(direct
+        ? hint(t("runners.direct.capacity"), t("runners.direct.capacityDescription"))
+        : {})}
       error={
         capacityOk || !validation.isTouched("capacity") ? undefined : t("runners.capacityInvalid")
       }
@@ -334,9 +351,10 @@ export function RunnerForm({
     <Field
       label={t("runners.sshTarget")}
       error={required("sshTarget", sshTarget)}
-      description={
-        direct ? t("runners.direct.sshTargetDescription") : t("runners.sshTargetDescription")
-      }
+      {...hint(
+        t("runners.sshTarget"),
+        direct ? t("runners.direct.sshTargetDescription") : t("runners.sshTargetDescription"),
+      )}
     >
       <Input
         name="sshTarget"
@@ -352,9 +370,10 @@ export function RunnerForm({
     <Field
       label={t("runners.orcaPath")}
       error={direct ? undefined : required("orcaPath", orcaPath)}
-      description={
-        direct ? t("runners.direct.orcaPathDescription") : t("runners.orcaPathDescription")
-      }
+      {...hint(
+        t("runners.orcaPath"),
+        direct ? t("runners.direct.orcaPathDescription") : t("runners.orcaPathDescription"),
+      )}
     >
       <Input name="orcaPath" value={orcaPath} onValueChange={setOrcaPath} autoComplete="off" mono />
     </Field>

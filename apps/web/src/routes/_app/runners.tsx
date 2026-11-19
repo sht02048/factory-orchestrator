@@ -130,6 +130,7 @@ function RunnersRoute() {
             primary={false}
             onDone={controls.onDone}
             onClose={controls.onClose}
+            hints="info"
           />
         )}
       />

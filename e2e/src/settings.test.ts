@@ -426,19 +426,23 @@ describe("Runners 의 러너 고치기(브라우저, 0119)", () => {
     await page
       .getByRole("button", { name: runners.panel.editLabel.replace("{name}", "runner-a") })
       .click();
-    const capacity = page.getByLabel(settings.runners.capacity);
+    const capacity = page.getByRole("textbox", { name: settings.runners.capacity, exact: true });
     expect(await capacity.getAttribute("inputmode")).toBe("numeric");
     await capacity.fill("");
-    await page.getByLabel(settings.runners.name).focus();
+    await page.getByRole("textbox", { name: settings.runners.name, exact: true }).focus();
     await page.getByText(settings.runners.capacityInvalid).waitFor();
     await page.keyboard.press("Escape");
     await capacity.waitFor({ state: "detached" });
     await expect.poll(focused).toBe(runners.panel.edit);
 
     await page.getByRole("button", { name: runners.panel.edit }).click();
-    await page.getByLabel(settings.runners.capacity).fill("4");
-    await page.getByLabel(settings.runners.sshTarget).fill("ganger@runner-a.example.com");
-    await page.getByLabel(settings.runners.orcaPath).fill("/opt/orca/bin/orca");
+    await page.getByRole("textbox", { name: settings.runners.capacity, exact: true }).fill("4");
+    await page
+      .getByRole("textbox", { name: settings.runners.sshTarget, exact: true })
+      .fill("ganger@runner-a.example.com");
+    await page
+      .getByRole("textbox", { name: settings.runners.orcaPath, exact: true })
+      .fill("/opt/orca/bin/orca");
     await page.getByRole("button", { name: settings.runners.save }).click();
     await capacity.waitFor({ state: "detached" });
     await page.getByText(settings.runners.savedAndChecking).waitFor();

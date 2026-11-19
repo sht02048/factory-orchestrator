@@ -127,7 +127,7 @@ function ClientConfig({ mcp }: { mcp: McpView }) {
         {client === "hermes" ? t("hermesWhere") : t("jsonWhere")}
       </Text>
       {mcp.launch.located ? null : (
-        <Text variant="meta" as="p">
+        <Text variant="meta" as="p" tone="problem">
           {t("notLocated")}
         </Text>
       )}
