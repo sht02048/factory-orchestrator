@@ -25,7 +25,7 @@ blocked_by: []
 
 - **키 정의 한 곳.** `packages/app/src/shell/nav-shortcuts.ts`의 타입 있는 목록(화면, 경로, `Mod+1` 같은 키)을 레일 순서, 레일 툴팁, 데스크톱 메뉴, preload가 함께 쓴다. 데스크톱은 `Mod+`를 Electron의 `CommandOrControl+`로 바꿔 쓴다.
 - **데스크톱 앱.** 앱 메뉴 "보기" 다음에 "이동" 메뉴를 두고 여섯 키를 accelerator로 붙인다(문구는 `apps/desktop/messages/ko/system.json`). 누르면 main이 `desktop:navigate` IPC로 화면 이름을 보내고, preload가 서버 화면에 연 `gangerDesktopNavigation.onNavigate`로 웹 라우터에 넘긴다. 웹은 레일을 누른 것처럼 문서를 다시 읽지 않고 옮기고 Workspace(`ws`)를 지킨다. 받는 쪽이 없으면(이 기능이 없는 서버) preload가 그 경로로 주소를 바꾼다. 서버 화면이 열리지 않았으면 메뉴 항목을 끈다. 입력칸·답하기 패널 안에서 눌러도 쓰다 만 답을 묻지 않고 바로 옮긴다.
-- **보여 주기.** 레일 링크에 마우스를 올리거나 포커스하면 툴팁에 이름을 보인다. 데스크톱 앱 안에서는 "Runs ⌘3"(맥) 또는 "Runs Ctrl+3"처럼 키를 함께 보이고 링크에 `aria-keyshortcuts`를 단다. 웹 브라우저에서는 키를 보이지 않는다. `packages/ui` `Tooltip`에 선택 속성 `shortcut`(UI SDK `TooltipShortcut`)과 `render`(링크 같은 요소를 트리거로)를 더한다.
+- **보여 주기.** 데스크톱 앱 안에서는 레일 링크에 마우스를 올리거나 포커스하면 툴팁에 "Runs ⌘3"(맥) 또는 "Runs Ctrl+3"처럼 이름과 키를 보이고 링크에 `aria-keyshortcuts`를 단다. 웹 브라우저에서는 키를 보이지 않고, 보이는 이름을 되풀이하기만 하는 툴팁도 달지 않는다(Runner Issue가 있는 Runners만 이름과 Issue 수를 툴팁으로 보인다). `packages/ui` `Tooltip`에 선택 속성 `shortcut`(UI SDK `TooltipShortcut`)과 `render`(링크 같은 요소를 트리거로)를 더한다.
 - **문서.** GLOSSARY "단축키", DESIGN.md 툴팁·레일, /ds 툴팁 예시.
 
 ## 역할 나누기
@@ -37,7 +37,7 @@ ADR 0003은 키보드·포커스를 UI SDK에 맡긴다. 포커스·팝업 안 �
 - 시험(`packages/app`): 키 정의 목록 — 레일 순서, 키·경로가 겹치지 않음, 밖에서 받은 화면 이름 검사.
 - 시험(`packages/ui`): `Tooltip`의 `render`가 링크를 트리거로 쓰고 `shortcut`이 `aria-keyshortcuts`와 키 표시를 더한다.
 - 시험(데스크톱): "이동" 메뉴 템플릿 — 여섯 항목의 문구·accelerator·켜짐, 누르면 그 화면, 서버 화면이 없으면 꺼짐.
-- 웹 브라우저 시험: 브라우저에서는 Mod+1..5, Mod+,가 화면을 옮기지 않고 툴팁에 키가 없다. 데스크톱 다리가 있으면 툴팁에 이름과 키, `aria-keyshortcuts`가 있고, 메뉴가 보낸 화면으로 문서를 다시 읽지 않고 옮기며 `ws`를 지킨다(입력칸에 포커스가 있어도).
+- 웹 브라우저 시험: 브라우저에서는 Mod+1..5, Mod+,가 화면을 옮기지 않고 키 표시·`aria-keyshortcuts`와 이름만 되풀이하는 툴팁이 없다. 데스크톱 다리가 있으면 툴팁에 이름과 키, `aria-keyshortcuts`가 있고, 메뉴가 보낸 화면으로 문서를 다시 읽지 않고 옮기며 `ws`를 지킨다(입력칸에 포커스가 있어도).
 - 스크린숏: 데스크톱 앱 레일 툴팁(키 표시) 1280px. 데스크톱 "이동" 메뉴는 가능하면.
 - 마무리 리뷰: `better-interface` 리뷰 → HIGH·MEDIUM 고침 → `interface-review`로 새 서브에이전트 리뷰 → 표를 PR 본문에.
 

@@ -93,7 +93,7 @@ afterAll(async () => {
 });
 
 describe("화면 이동 단축키(브라우저, 0102)", () => {
-  it("웹 브라우저에서는 Mod+1~5, Mod+, 를 등록하지 않아 화면을 옮기지 않고 툴팁에 키가 없다", async (context) => {
+  it("웹 브라우저에서는 Mod+1~5, Mod+, 를 등록하지 않아 화면을 옮기지 않고, 보이는 이름을 되풀이하는 툴팁도 없다", async (context) => {
     const page = await newPage(context, { width: 1280, height: 800 });
     await open(page, "/runs");
     await markDocument(page);
@@ -107,9 +107,8 @@ describe("화면 이동 단축키(브라우저, 0102)", () => {
       expect(await link.getAttribute("aria-keyshortcuts")).toBeNull();
     }
     await page.getByRole("link", { name: shell.nav.runs, exact: true }).hover();
-    const tooltip = page.getByRole("tooltip").filter({ hasText: shell.nav.runs });
-    await tooltip.waitFor();
-    expect((await tooltip.innerText()).trim()).toBe(shell.nav.runs);
+    await page.waitForTimeout(1_000);
+    expect(await page.getByRole("tooltip").filter({ visible: true }).count()).toBe(0);
   });
 
   it("데스크톱 앱 안에서는 툴팁에 이름과 키를 함께 보이고 aria-keyshortcuts 로 알린다", async (context) => {

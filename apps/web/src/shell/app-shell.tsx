@@ -96,21 +96,22 @@ function RailLink({
 }) {
   const t = useTranslations("shell");
   const name = t(`nav.${item.screen}`);
+  const content = <RailLinkContent icon={navIcons[item.screen]} name={name} issues={issues} />;
+  const linkProps = {
+    to: item.path,
+    ...(current ? { "aria-current": "page" as const } : {}),
+    ...stylex.props(railLinkStyles(current)),
+  };
+  if (!showShortcut && issues === 0) return <Link {...linkProps}>{content}</Link>;
   return (
     <Tooltip
       content={issues > 0 ? t("nav.withIssues", { name, count: issues }) : name}
       labelsTrigger
       side="right"
       {...(showShortcut ? { shortcut: item.shortcut } : {})}
-      render={
-        <Link
-          to={item.path}
-          {...(current ? { "aria-current": "page" } : {})}
-          {...stylex.props(railLinkStyles(current))}
-        />
-      }
+      render={<Link {...linkProps} />}
     >
-      <RailLinkContent icon={navIcons[item.screen]} name={name} issues={issues} />
+      {content}
     </Tooltip>
   );
 }

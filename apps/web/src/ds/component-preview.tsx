@@ -508,7 +508,7 @@ export function ComponentSections() {
               labelsTrigger
               render={<a href="#tooltip" {...stylex.props(linkStyles())} />}
             >
-              {t("tooltip.linkContent")}
+              {t("tooltip.linkLabel")}
             </Tooltip>
           </Demo>
         </Section>
