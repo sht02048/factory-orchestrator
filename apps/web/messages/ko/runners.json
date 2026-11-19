@@ -6,24 +6,6 @@
   "listLabel": "러너 목록",
   "capacityLabel": "{name} capacity",
   "usage": {
-    "provider": {
-      "claude": "Claude",
-      "codex": "Codex",
-      "gemini": "Gemini",
-      "cursor": "Cursor",
-      "grok": "Grok",
-      "kimi": "Kimi",
-      "minimax": "MiniMax",
-      "opencodeGo": "OpenCode Go",
-      "antigravity": "Antigravity",
-      "zcode": "ZCode"
-    },
-    "window": {
-      "session": "5시간",
-      "weekly": "주간",
-      "fableWeekly": "Fable 주간",
-      "monthly": "월간"
-    },
     "name": "{provider} {window}",
     "barLabel": "{runner} {provider} {window} 사용량",
     "notRead": "사용량을 아직 읽지 않았어요",

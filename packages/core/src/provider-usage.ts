@@ -45,3 +45,15 @@ export function highestUsage(providers: ReadonlyArray<ProviderUsage>): ProviderW
 export function reachedUsageLimits(providers: ReadonlyArray<ProviderUsage>): ProviderWindowUsage[] {
   return windowsOf(providers).filter((entry) => entry.window.usedPercent >= USAGE_LIMIT_PERCENT);
 }
+
+export function currentWindows(
+  providers: ReadonlyArray<ProviderUsage>,
+  now: Date,
+): ProviderUsage[] {
+  return providers.map((usage) => ({
+    ...usage,
+    windows: usage.windows.filter(
+      (window) => window.resetsAt === null || window.resetsAt.getTime() > now.getTime(),
+    ),
+  }));
+}

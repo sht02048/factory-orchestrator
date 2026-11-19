@@ -69,5 +69,25 @@
   "runnerPrerequisite": {
     "orca-service": "Orca 상시 서비스",
     "github-push": "GitHub push 권한: {project}"
+  },
+  "usage": {
+    "provider": {
+      "claude": "Claude",
+      "codex": "Codex",
+      "gemini": "Gemini",
+      "cursor": "Cursor",
+      "grok": "Grok",
+      "kimi": "Kimi",
+      "minimax": "MiniMax",
+      "opencodeGo": "OpenCode Go",
+      "antigravity": "Antigravity",
+      "zcode": "ZCode"
+    },
+    "window": {
+      "session": "5시간",
+      "weekly": "주간",
+      "fableWeekly": "Fable 주간",
+      "monthly": "월간"
+    }
   }
 }

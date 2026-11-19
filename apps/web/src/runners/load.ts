@@ -1,4 +1,4 @@
-import { highestUsage, summarizeRunOutcome } from "@ganger/core";
+import { currentWindows, highestUsage, summarizeRunOutcome } from "@ganger/core";
 import type { UsageWindow } from "@ganger/core";
 import { getRunWithRecords, listRunners, listRuns, listWorkspaces } from "@ganger/db";
 import type { Database, StoredProviderUsage, StoredRun } from "@ganger/db";
@@ -114,12 +114,7 @@ export function usageView(stored: StoredProviderUsage | null, now: Date): Runner
     now: now.toISOString(),
   };
   if (stored.reading.kind === "unreadable") return { ...base, kind: "unreadable" };
-  const providers = stored.reading.providers.map((usage) => ({
-    ...usage,
-    windows: usage.windows.filter(
-      (window) => window.resetsAt === null || window.resetsAt.getTime() > now.getTime(),
-    ),
-  }));
+  const providers = currentWindows(stored.reading.providers, now);
   const highest = highestUsage(providers);
   return {
     ...base,

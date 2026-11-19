@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { highestUsage, reachedUsageLimits } from "./provider-usage.js";
+import { currentWindows, highestUsage, reachedUsageLimits } from "./provider-usage.js";
 import type { ProviderUsage } from "./provider-usage.js";
 
 const providers: ProviderUsage[] = [
@@ -45,5 +45,13 @@ describe("reachedUsageLimits", () => {
         window: { kind: "session", usedPercent: 100, resetsAt: new Date(1_000) },
       },
     ]);
+  });
+});
+
+describe("currentWindows", () => {
+  it("초기화 시각이 지난 창은 값이 낡아 뺀다", () => {
+    const windows = currentWindows(providers, new Date(1_000));
+    expect(windows[0]?.windows).toEqual([{ kind: "weekly", usedPercent: 72, resetsAt: null }]);
+    expect(currentWindows(providers, new Date(999))[0]?.windows).toHaveLength(2);
   });
 });

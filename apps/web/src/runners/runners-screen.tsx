@@ -27,11 +27,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { usePrerequisiteName } from "../labels";
+import { usePrerequisiteName, useUsageNames } from "../labels";
 import { useRunnerCheckPolling } from "../settings/settings-screen";
 import type { ActionResult } from "../settings/settings-screen";
 import { useStatusName } from "../status";
-import { runnersMessages } from "./messages";
 import { failedChecksFirst, problemRunnersFirst, runnerRowStatus } from "./model";
 import type {
   ProviderUsageView,
@@ -488,19 +487,6 @@ function LeftWorktrees({ runner }: { runner: RunnerView }) {
       </ul>
     </PanelBlock>
   );
-}
-
-type KnownProvider = keyof typeof runnersMessages.runners.usage.provider;
-
-function isKnownProvider(provider: string): provider is KnownProvider {
-  return Object.hasOwn(runnersMessages.runners.usage.provider, provider);
-}
-
-function useUsageNames() {
-  const t = useTranslations("runners.usage");
-  const provider = (id: string) => (isKnownProvider(id) ? t(`provider.${id}`) : id);
-  const window = (kind: UsageWindowView["kind"]) => t(`window.${kind}`);
-  return { provider, window };
 }
 
 function usageTone(window: UsageWindowView): "neutral" | "problem" {
