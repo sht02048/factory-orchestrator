@@ -388,7 +388,7 @@
       "scrollLabel": "옆으로 넘기는 표"
     },
     "outcomes": {
-      "note": "Stats의 결과 막대와 쌓은 막대 차트예요. 결과 색은 상태 뜻 그대로 써요.",
+      "note": "Stats의 범례·실패 이유 막대·날짜별 쌓은 막대 차트예요. 결과 막대(OutcomeBar)는 지금 화면에서 쓰지 않아요. 결과 색은 상태 뜻 그대로 써요.",
       "merged": "Merged",
       "check": "Human Check",
       "failed": "Failed",

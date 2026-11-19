@@ -135,7 +135,6 @@ function StatsView({
             <Text variant="meta">
               {t("meta", {
                 workspace: workspaceName,
-                days,
                 from: dayLabel(page.period.firstDay).long,
                 to: dayLabel(page.period.lastDay).long,
               })}
@@ -160,14 +159,16 @@ function StatsView({
         <Figures total={page.total} previous={page.previous} days={days} />
         <div {...stylex.props(styles.charts)}>
           <Card label={t("throughput.title")}>
-            <Section
-              title={t("throughput.title")}
-              titleRole="heading"
-              note={page.total.runs === 0 ? undefined : <Legend placement="head" />}
-            >
-              {page.total.runs === 0 ? null : <Legend placement="body" />}
-              <ThroughputChart daily={page.daily} days={days} />
-            </Section>
+            <div {...stylex.props(styles.chartFrame)}>
+              <Section
+                title={t("throughput.title")}
+                titleRole="heading"
+                note={page.total.runs === 0 ? undefined : <Legend placement="head" />}
+              >
+                {page.total.runs === 0 ? null : <Legend placement="body" />}
+                <ThroughputChart daily={page.daily} days={days} />
+              </Section>
+            </div>
           </Card>
           <Card label={t("failures.title")}>
             <Section
@@ -237,19 +238,19 @@ function Legend({ placement }: { placement: "head" | "body" }) {
     >
       <span {...stylex.props(styles.legendItem)}>
         <OutcomeSwatch tone="merged" />
-        {t("merged")}
+        <Text variant="meta">{t("merged")}</Text>
       </span>
       <span {...stylex.props(styles.legendItem)}>
         <OutcomeSwatch tone="check" />
-        {t("check")}
+        <Text variant="meta">{t("check")}</Text>
       </span>
       <span {...stylex.props(styles.legendItem)}>
         <OutcomeSwatch tone="failed" />
-        {t("failed")}
+        <Text variant="meta">{t("failed")}</Text>
       </span>
       <span {...stylex.props(styles.legendItem)}>
         <OutcomeSwatch tone="canceled" />
-        {t("canceled")}
+        <Text variant="meta">{t("canceled")}</Text>
       </span>
     </span>
   );
@@ -475,6 +476,7 @@ const styles = stylex.create({
   },
   legendItem: { display: "inline-flex", alignItems: "center", gap: space.px6 },
   scrollHint: { display: { default: "none", [breakpoints.statsBreakdownScrolls]: "block" } },
+  chartFrame: { containerType: "inline-size" },
   reasonsFrame: { containerType: "inline-size" },
   reasons: {
     display: "grid",
