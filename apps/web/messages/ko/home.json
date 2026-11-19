@@ -135,8 +135,8 @@
   "control": {
     "pauseRequested": "{key} 런을 멈추고 있어요.",
     "resumeRequested": "{key} 런을 재개하고 있어요.",
-    "pauseRejected": "{key} 런을 멈추지 못했어요. 잠시 뒤 다시 해 주세요.",
-    "resumeRejected": "{key} 런을 재개하지 못했어요. 잠시 뒤 다시 해 주세요.",
+    "pauseRejected": "{key} 런 멈추기 요청을 남기지 못했어요. 잠시 뒤 다시 해 주세요.",
+    "resumeRejected": "{key} 런 재개 요청을 남기지 못했어요. 잠시 뒤 다시 해 주세요.",
     "stateChanged": "{key} 런의 상태가 그사이 바뀌었어요. 지금 상태를 확인해 주세요.",
     "pauseFailed": "{key} 런을 멈추지 못했어요. {reason}",
     "resumeFailed": "{key} 런을 재개하지 못했어요. {reason}"
