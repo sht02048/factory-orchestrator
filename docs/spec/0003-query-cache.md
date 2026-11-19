@@ -103,7 +103,7 @@ graph LR
 ### 4.4 읽기와 쓰기의 오류(C5)
 
 - **읽기는 실패하면 throw한다.** 그래서 Query의 error 상태와 retry 1을 탄다. 다만 트래커 실패를 화면에 보이는 `Remote<T>` 데이터는 지금처럼 성공한 결과로 돌려준다. 트래커에 닿지 않아도 화면은 그려지고 그 묶음만 실패로 보인다.
-- **쓰기 서버 함수는 지금처럼 `{ ok: false, reason }`을 돌려준다.** 클라이언트 mutation의 `mutationFn`이 `ok: false`를 이유가 담긴 오류 타입으로 바꿔 throw한다. 화면은 그 오류의 이유로 문구를 고른다. 서버 함수는 바꾸지 않는다. 지금 throw하는 `answerQuestion`·`denyPermission`은 그대로 두고, 클라이언트가 그 오류도 같은 오류 타입으로 감싼다. Run 상세의 `expectOk`는 이 변환으로 바뀐다. 오류 타입과 변환 함수는 0124가 만들고, 함께 도는 0125~0127이 그것을 쓴다.
+- **쓰기 서버 함수는 지금처럼 `{ ok: false, reason }`을 돌려준다.** 클라이언트 mutation의 `mutationFn`이 `ok: false`를 이유가 담긴 오류 타입으로 바꿔 throw한다. 화면은 그 오류의 이유로 문구를 고른다. 예외로 `controlRun`의 `ok: false`는 지금처럼 오류가 아니라 "상태가 바뀜"(`"state-changed"`) 결과로 화면에 돌려준다. 서버 함수는 바꾸지 않는다. 지금 throw하는 `answerQuestion`·`denyPermission`은 그대로 두고, 클라이언트가 그 오류도 같은 오류 타입으로 감싼다. Run 상세의 `expectOk`는 이 변환으로 바뀐다. 오류 타입과 변환 함수는 0124가 만들고, 함께 도는 0125~0127이 그것을 쓴다.
 - mutation은 성공하면 그 mutation이 바꾼 key만 무효화하거나, 서버가 돌려준 새 값으로 `setQueryData`한다. 무효화 promise를 돌려줘 다시 읽기가 끝날 때까지 pending으로 둔다.
 - 오류 메시지가 서버 렌더 HTML에 실리지 않는지 0123이 확인한다(통합의 `shouldDehydrateQuery` 기본값, research 0015 5절).
 
@@ -111,7 +111,7 @@ graph LR
 
 - **Runs·Run 상세(0125).** 로그 다시 받기·답하기·거절·취소·멈추기와 재개를 mutation으로. Run 상세를 열 때의 로그 요청 뒤에는 `["runs", "detail", runId]`만 무효화한다. 로그·멈추기 처리 중 2초 폴링은 그 query의 `refetchInterval`로 옮긴다(로그는 지금처럼 최대 15번).
 - **Dashboard·Stats(0126).** `home/refresh.ts`의 15초 폴링을 지우고 Query와 변경 기록으로 바꾼다. 멈추기·재개 처리 중 2초 다시 읽기는 `refetchInterval`로 옮긴다.
-- **셸·Runners·Tickets(0127).** 셸 query는 runner·workspace 변경 기록으로 무효화한다. Runners의 `reloadOnEnter`(들어올 때마다 또 읽기)를 지운다. Tickets는 DB 부분과 트래커 부분을 다른 query로 나눈다. 할당은 `["tickets", "runs", ws]`(와 런 쪽 key)만 무효화하고 트래커 query는 건드리지 않는다. 러너 점검 3초 폴링은 `refetchInterval`로 옮긴다. `useSettingsActions`·`useReloadOnSuccess`는 Settings, Runners, 온보딩이, `useRunnerCheckPolling`과 `useRunnerSetupActions`는 Runners와 온보딩이 함께 쓰므로, 0127이 저장 뒤 동작을 부르는 쪽이 넘기게 나눈다. Runners는 key 무효화를 넘기고, Settings와 온보딩은 아직 `router.invalidate()`를 넘긴다.
+- **셸·Runners·Tickets(0127).** 셸 query는 runner·workspace 변경 기록으로 무효화한다. Runners의 `reloadOnEnter`(들어올 때마다 또 읽기)를 지운다. Tickets는 DB 부분과 트래커 부분을 다른 query로 나눈다. 할당은 `["tickets", "runs", ws]`(와 런 쪽 key)만 무효화하고 트래커 query는 건드리지 않는다. 러너 점검 3초 폴링은 지금처럼 가벼운 `getRunnerChecksPending`을 읽는 작은 query(`["runners", "checks-pending"]`)의 `refetchInterval`로 옮기고, 점검이 끝나면 `["runners", "list"]`와 `["shell"]`을 무효화한다. Runners 전체를 3초마다 읽지 않는다. `useSettingsActions`·`useReloadOnSuccess`는 Settings, Runners, 온보딩이, `useRunnerCheckPolling`과 `useRunnerSetupActions`는 Runners와 온보딩이 함께 쓰므로, 0127이 저장 뒤 동작을 부르는 쪽이 넘기게 나눈다. Runners는 key 무효화를 넘기고, Settings와 온보딩은 아직 `router.invalidate()`를 넘긴다.
 - **Settings(0128, C7).** 0115의 직렬 저장(`serial-save.ts`)과 초안 맞추기(`synced-save.ts`) 동작은 그대로다. 저장 뒤의 `router.invalidate()`(Settings 전체와 트래커 세 읽기)만 바꾼 key 무효화나 `setQueryData`로 바꾼다. Linear 프로젝트·상태·라벨은 따로 query(5분)다. 0119가 나눈 Settings 세 route(`/settings`, `/settings/mcp`, 트래커 프로젝트 상세)가 대상이다. 온보딩(C1)은 라우터 로더로 남아 저장 뒤에도 `router.invalidate()`를 쓴다.
 
 ## 5. 변경 기록 설계
@@ -128,7 +128,7 @@ graph LR
 
 - 내용(상태 값, 제목)은 싣지 않는다. 브라우저는 무엇이 바뀌었는지만 알고, 내용은 query로 다시 읽는다. 그래서 SSE로 비밀값이나 티켓 내용이 나가지 않는다.
 - 하루 지난 줄은 지운다(C9). 지우는 일은 web 프로세스가 열린 연결 수와 상관없이 정한 주기로 하고, 주기는 0124가 정한다.
-- 새 표를 더하는 마이그레이션은 one-way다. 0124는 되돌리는 방법을 티켓에 적는다(머지 전 DB 파일을 복사해 두고 이전 버전 앱과 그 파일로 돌아간다. 표만 남는 것은 이전 버전에 해가 없는지 확인한다).
+- 새 표를 더하는 마이그레이션은 one-way다. 0124는 되돌리는 방법을 티켓에 적는다(머지 전 DB 파일을 복사해 두고 이전 버전 앱과 그 파일로 돌아간다. 이전 버전 앱은 앞선 스키마를 거부하므로 백업한 파일로만 돌아갈 수 있다).
 
 ### 5.2 기록하는 곳(C9, C12)
 
@@ -139,7 +139,7 @@ graph LR
 | `run`        | 상태 바뀜과 Paused(`changeRunState`), PR·CI 바뀜(`updateRunRecords`), Question·Permission 생김과 답·거절, 취소·멈추기·재개·로그 요청과 그 처리 결과, 티켓 제목 채움 |
 | `runner`     | 점검 결과와 Online/Offline(`recordRunnerCheck`), 공급자 사용량(`recordProviderUsage`), 러너 저장·capacity, Mailbox Terminal(`setRunnerMailbox`)                     |
 | `assignment` | 새 런(`assignRun`, 자동·수동·MCP)                                                                                                                                   |
-| `workspace`  | Workspace 목록이 바뀜(더하기, 지우기, 이름)                                                                                                                         |
+| `workspace`  | Workspace 목록이 바뀜(더하기, 이름, 지우기가 생기면 지우기)                                                                                                         |
 | `settings`   | 그 밖의 설정 저장(Mapping, Auto-assign Label, In Progress 상태, 트래커 연결, 설치 전체 설정, MCP 쓰기 허용)                                                         |
 | `tracker`    | 트래커 webhook을 받음(`recordTrackerEvent`), "Linear에서 다시 읽기", Ganger 안에서 트래커를 바꿈(라벨 만들기), 트래커 연결이나 Workspace의 트래커 프로젝트가 바뀜   |
 
@@ -156,7 +156,7 @@ graph LR
 - 메시지
   - `change`: `id`는 `seq`, 데이터는 `{ kind, targetId, workspaceId }`.
   - `ready`: 연결 직후, 이어 받을 줄을 다 보낸 뒤. 데이터는 지금 번호.
-- 첫 연결에는 `Last-Event-ID`가 없다. 서버 렌더와 첫 연결 사이의 바뀜을 놓치지 않도록, 서버 렌더가 어떤 데이터보다 먼저 가장 큰 번호를 읽어 넘기고(요청을 시작할 때나 루트 `beforeLoad`. 라우터는 로더를 동시에 돌려 루트 로더가 먼저라는 보장이 없으므로 로더에서 읽지 않는다. 루트 `beforeLoad`는 온보딩 완료를 안 뒤나 열린 경로에서 일찍 돌아가므로, 그 앞에서 서버에서만 읽고 클라이언트 이동 때는 읽지 않는다), 구독 모듈이 그 번호로 `?after=`를 주어 처음 연결한다. 셸처럼 다시 읽히는 query에서 번호를 읽지 않고, 구독 모듈은 첫 연결 때 받은 번호만 쓴다. 0124가 맡는다.
+- 첫 연결에는 `Last-Event-ID`가 없다. 서버 렌더와 첫 연결 사이의 바뀜을 놓치지 않도록, 서버 렌더가 어떤 데이터보다 먼저 가장 큰 번호를 읽어 넘기고(요청을 시작할 때나 루트 `beforeLoad`. 라우터는 로더를 동시에 돌려 루트 로더가 먼저라는 보장이 없으므로 로더에서 읽지 않는다. 루트 `beforeLoad`는 온보딩 완료를 안 뒤나 열린 경로에서 일찍 돌아가므로, 그 앞에서 서버에서만 읽고 클라이언트 이동 때는 읽지 않는다), 구독 모듈이 그 번호로 `?after=`를 주어 처음 연결한다. 셸처럼 다시 읽히는 query에서 번호를 읽지 않고, 구독 모듈은 첫 연결 때 받은 번호만 쓴다. 번호는 루트 route context로 브라우저에 넘기고(dehydrate) 구독 모듈이 한 번 읽는다. 정확한 길은 0124가 정한다. 0124가 맡는다.
   - `reset`: 받은 번호(`Last-Event-ID` 또는 `?after=`)로 이어 받을 수 없을 때. 브라우저는 모든 query를 무효화한다(C11). 두 경우다.
     - 받은 번호가 지운 줄의 가장 큰 번호보다 작다. 지운 번호의 상한은 표에 줄이 있으면 남은 가장 작은 번호 − 1, 표가 비었으면 SQLite가 마지막으로 준 번호(`sqlite_sequence`)다. 정리 때 지운 상한을 따로 남겨도 된다.
     - 받은 번호가 지금 가장 큰 번호보다 크다. DB 파일을 이전 것으로 되돌렸을 때 생긴다.
@@ -171,18 +171,18 @@ graph LR
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `run`        | `["runs", "detail", targetId]`, `["runs", "list"]`, `["dashboard"]`, `["tickets", "runs"]`(C12), `["runners", "list"]`, `["stats"]`, `["settings"]` |
 | `assignment` | `run`과 같다(새 런 id). 다만 `["runs", "detail"]`은 접두사 전체(같은 티켓의 옛 런 상세가 새 런을 보인다)                                            |
-| `runner`     | `["shell"]`, `["runners", "list"]`, `["dashboard"]`(C12), `["tickets", "runs"]`, `["settings"]`                                                     |
-| `workspace`  | `["shell"]`, `["settings"]`, `["dashboard"]`, `["tickets", "runs"]`, `["runners", "list"]`                                                          |
+| `runner`     | `["shell"]`, `["runners", "list"]`, `["dashboard"]`(C12), `["tickets", "runs"]`, `["settings"]`, `["runs"]`, `["stats"]`                            |
+| `workspace`  | `["shell"]`, `["settings"]`, `["dashboard"]`, `["tickets", "runs"]`, `["runners", "list"]`, `["runs"]`, `["stats"]`                                 |
 | `settings`   | `["settings"]`, `["dashboard"]`, `["tickets", "runs"]`                                                                                              |
 | `tracker`    | `["tracker"]`(Tickets와 Settings의 Linear query, C12)                                                                                               |
 | `reset`      | 모든 query                                                                                                                                          |
 
-- C12의 화면 매핑에 더해, `run`은 Runners(러너마다 도는 런을 보인다)와 Stats(끝난 런 집계)도 무효화한다. 두 로더가 런을 읽기 때문이다(research 0016 2절). 셸(`["shell"]`)은 Workspace 목록과 Runner Issue 배지만 담아 `workspace`와 `runner`에만 무효화한다. `workspace`·`settings`가 Dashboard와 Tickets 런 표시를 무효화하는 것은 대기 사유와 할당할 수 있음이 Mapping·러너 설정에 달려서다. `runner`가 Tickets 런 표시와 Settings를 무효화하는 것은 Tickets가 러너의 Online·할당 막힘·사용량 한도로 할당할 수 있음을 정하고(`packages/app/src/tickets/load.ts:61-83`), Settings가 러너 목록과 점검을 읽어서다. `workspace`가 Runners를 무효화하는 것은 Runners가 Workspace 이름을 보여서다. `run`·`assignment`가 Settings를 무효화하는 것은 Settings가 트래커 프로젝트마다 Queued 런 수를 보여서다(`settings/load.ts:352`).
+- C12의 화면 매핑에 더해, `run`은 Runners(러너마다 도는 런을 보인다)와 Stats(끝난 런 집계)도 무효화한다. 두 로더가 런을 읽기 때문이다(research 0016 2절). 셸(`["shell"]`)은 Workspace 목록과 Runner Issue 배지만 담아 `workspace`와 `runner`에만 무효화한다. `workspace`·`settings`가 Dashboard와 Tickets 런 표시를 무효화하는 것은 대기 사유와 할당할 수 있음이 Mapping·러너 설정에 달려서다. `runner`가 Tickets 런 표시와 Settings를 무효화하는 것은 Tickets가 러너의 Online·할당 막힘·사용량 한도로 할당할 수 있음을 정하고(`packages/app/src/tickets/load.ts:61-83`), Settings가 러너 목록과 점검을 읽어서다. `workspace`가 Runners를 무효화하는 것은 Runners가 Workspace 이름을 보여서다. `runner`·`workspace`가 Runs 목록·Run 상세·Stats를 무효화하는 것은 Queued 사유가 러너 상태(Online, capacity, 프로젝트)로 정해지고(`packages/app/src/runs/load.ts:47, 81-86`, `run-detail/load.ts:172-195`), Run 상세와 Stats가 러너·Workspace 이름을 보여서다(`run-detail/load.ts:52`, `stats/load.ts:29, 36`). `run`·`assignment`가 Settings를 무효화하는 것은 Settings가 트래커 프로젝트마다 Queued 런 수를 보여서다(`settings/load.ts:352`).
 - `workspaceId`가 있으면 그 Workspace의 key만 무효화해도 되지만, 모든 Workspace를 함께 보이는 key(`ws` 없음)가 있어 첫 구현은 접두사 전체를 무효화한다. 이것도 C4의 "해당 key"에 든다. 그 Workspace의 바뀜은 `ws` 없는 key의 결과도 바꾸고, 관찰자가 없는 key는 stale 표시만 되어 실제로 다시 읽는 것은 보이는 화면뿐이다.
 
 ### 5.5 끊겼을 때(C4, C11)
 
-- SSE가 끊기고 다시 붙지 않는 동안 웹은 30초마다 보이는 query를 다시 읽는다. 다시 붙으면 멈춘다.
+- SSE가 끊기고 다시 붙지 않는 동안 웹은 30초마다 보이는 query를 다시 읽는다. 다시 붙으면 멈춘다. `EventSource`는 조용히 다시 붙으므로 "끊김"은 0124가 기준을 정한다(예: `onerror` 뒤 `readyState`가 OPEN이 아님, 하트비트가 N초 넘게 없음).
 - 탭이 다시 보이거나 네트워크가 돌아오면 Query 기본값(C6)대로 stale query를 다시 읽는다. 노트북이 잠들었다 깨어난 경우를 이것과 `Last-Event-ID` 이어 받기가 함께 메운다.
 
 ## 6. 이행 순서
@@ -198,7 +198,7 @@ graph LR
 모든 Query 티켓이 자기 화면에 대해 아래 다섯을 지키고, 0129가 전체로 다시 확인한다.
 
 1. **hydration은 더 읽지 않는다.** 서버 렌더한 화면을 연 뒤 hydration이 끝날 때까지 서버 함수 호출이 0번이다(research 0015 7절의 공식 예제 검사와 같다).
-2. **mutation은 자기 query만 다시 읽는다.** 쓰기 하나 뒤 mutation이 다시 읽게 하는 서버 함수가 그 mutation이 바꾼 query뿐이다. 루트(`getTimeZone`, `getTitleBarHidden`)와 셸(`getShell`)은 다시 읽지 않는다(셸 내용, 곧 Workspace 목록이나 Runner Issue 배지를 바꾸는 쓰기는 예외. 러너 점검 끝, 러너 저장, Workspace 더하기·지우기·이름). 이 시험은 변경 기록 통로를 끈 채 돈다. 같은 탭의 쓰기가 남긴 줄이 1초 뒤 돌아와 그 query를 한 번 더 읽는 것은 8절의 위험으로 따로 본다.
+2. **mutation은 자기 query만 다시 읽는다.** 쓰기 하나 뒤 mutation이 다시 읽게 하는 서버 함수가 그 mutation이 바꾼 query뿐이다. 루트(`getTimeZone`, `getTitleBarHidden`)와 셸(`getShell`)은 다시 읽지 않는다(셸 내용, 곧 Workspace 목록이나 Runner Issue 배지를 바꾸는 쓰기는 예외. 러너 점검 끝, 러너 저장, Workspace 더하기·이름). 이 시험은 변경 기록 통로를 끈 채 돈다. 같은 탭의 쓰기가 남긴 줄이 1초 뒤 돌아와 그 query를 한 번 더 읽는 것은 8절의 위험으로 따로 본다.
 3. **worker 쪽 런 상태 바뀜이 3초 안에 보인다.** 화면을 연 채 DB에서 런 상태를 바꾸고(worker와 같은 함수), 3초 안에 화면이 바뀐다.
 4. **SSE가 끊기면 30초 폴링.** 통로를 막으면 보이는 query가 30초마다 다시 읽힌다(가짜 시계).
 5. **0117 브라우저 시험이 통과한다.** `e2e/src/navigation.test.ts` 세 시험이 같은 뜻으로 통과한다. 0127이 `getTicketsPage`를 나누면 시험이 기다리는 서버 함수 이름만 트래커를 읽는 새 함수로 바꾼다. 그 밖의 기대는 바꾸지 않는다.
@@ -214,6 +214,7 @@ graph LR
   - **#8234**: 실패한 배경 reload가 성공한 match를 error로 바꾼다. Router 쪽이라 루트 로더에 남는다.
 - **쓰는 곳 빠뜨림.** `change_events`를 쓰지 않는 쓰기는 화면에 늦게 닿는다(최대 30초 폴링, 탭 복귀). 5.2의 시험으로 막는다.
 - **탭 여러 개의 연결 수.** HTTP/1.1에서 브라우저는 한 주소에 연결을 6개까지 연다. 탭마다 SSE 하나를 열어 두면 탭이 많을 때 다른 요청이 막힐 수 있다. 0124가 탭 여러 개로 확인한다(열린 질문 1).
+- **런 시작마다 트래커를 다시 읽음.** worker가 In Progress로 옮길 때 `tracker` 줄을 쓰므로(5.2), 런이 시작될 때마다 서버 트래커 캐시가 비고 열린 Tickets 탭이 트래커를 다시 읽는다. 옳은 동작이지만 비용이 있다. 0127의 "할당 뒤 트래커를 다시 읽지 않는다" 시험은 변경 기록 통로를 끈 채 돈다. 0124가 로그 요청과 함께 잰다.
 - **로그 요청이 무효화를 넓게 퍼뜨림.** Run 상세를 열면 실행 중인 런마다 로그 요청을 쓰고(`packages/app/src/run-detail/load.ts:106-111`) worker가 결과를 쓴다. 이것이 `run` 줄이면 모든 탭의 Dashboard·Runs·Tickets·Runners·Stats가 무효화된다. 0124는 로그 요청과 그 결과를 `["runs", "detail", id]`만 무효화하도록 줄에서 가르거나(필드나 종류), 비용을 재서 그대로 둘지 정한다.
 - **같은 탭의 쓰기가 돌아옴.** 쓰기 하나가 남긴 줄이 1초 뒤 SSE로 같은 탭에 돌아와, mutation이 이미 다시 읽은 query를 한 번 더 읽는다. 보이는 query만 읽고 트래커 query는 `tracker` 줄에만 무효화되어 크지 않다. 줄이면 0124가 "방금 다시 읽은 key는 건너뛰기" 같은 방법을 재 보고 정한다.
 - **쓰기 비용.** 쓰기마다 줄 하나가 는다. 하루 지난 줄을 지워 표는 작게 유지된다.
