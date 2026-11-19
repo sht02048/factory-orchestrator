@@ -418,7 +418,7 @@ function seedActive(db: Database, now: Date): SeededRuns {
   ok(changeRunState(db, pausedUnreported, { to: "paused", source: "unreported" }, ago(4)));
   updateRunRecords(db, pausedUnreported, {
     lastLog: [
-      "Added the index on runs.created_at and a migration for it.",
+      "Added page and per_page to GET /projects with a default of 50.",
       "Tests pass locally: 42 passed.",
       "",
       "I have not opened a PR yet.",
