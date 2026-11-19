@@ -1,71 +1,58 @@
 import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
-  BulletList,
   Button,
-  Checkbox,
-  DefinitionItem,
-  DefinitionList,
-  PanelBlock,
+  InfoTip,
   ProblemCallout,
+  SettingsRow,
+  Switch,
   TextLink,
 } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
 import { serverVersionDiffers } from "@ganger/app/updates/view";
 import type { UpdateAction, UpdateView } from "@ganger/app/updates/view";
+import { useId } from "react";
 import { useTranslations } from "use-intl";
 import { particlesOf } from "../format/particles";
 import { useTime } from "../format/time";
 import { PRODUCT_VERSION } from "../identity/identity";
 import { useDesktopUpdates } from "../shell/desktop-updates";
 
-export function UpdatesPanel() {
+export function UpdatesRows() {
   const updates = useDesktopUpdates();
   switch (updates.kind) {
     case "unknown":
-      return null;
+      return <VersionRow />;
     case "browser":
       return <BrowserUpdates />;
     case "desktop":
-      return updates.view === null ? null : (
+      return updates.view === null ? (
+        <VersionRow />
+      ) : (
         <DesktopUpdates view={updates.view} act={updates.act} />
       );
   }
 }
 
-export function UpdatesScope() {
-  const t = useTranslations("settings");
-  return useDesktopUpdates().kind === "desktop" ? t("scopeUpdates") : t("scopeInstall");
-}
-
-export function UpdatesSummary() {
-  const t = useTranslations("settings.summary");
-  const updates = useDesktopUpdates();
-  if (updates.kind !== "desktop" || updates.view === null) {
-    return t("updatesVersion", { version: PRODUCT_VERSION });
-  }
-  const { check, appVersion } = updates.view;
-  if (check.kind === "ready") {
-    return t("updatesReady", { version: check.version, object: particlesOf(check.version).object });
-  }
-  return updates.view.autoUpdate
-    ? t("updatesVersion", { version: appVersion })
-    : t("updatesOff", { version: appVersion });
+function VersionRow() {
+  const t = useTranslations("settings.updates");
+  return <SettingsRow label={t("label")} detail={PRODUCT_VERSION} />;
 }
 
 export function BrowserUpdates() {
   const t = useTranslations("settings.updates");
+  const ts = useTranslations("settings");
   return (
-    <>
-      <PanelBlock>
-        <DefinitionList>
-          <DefinitionItem label={t("version")}>{PRODUCT_VERSION}</DefinitionItem>
-        </DefinitionList>
-      </PanelBlock>
-      <PanelBlock>
-        <BulletList items={[t("browserManual"), t("browserDesktop")]} />
-      </PanelBlock>
-    </>
+    <SettingsRow
+      label={t("label")}
+      info={
+        <InfoTip
+          label={ts("infoLabel", { label: t("label") })}
+          content={`${t("browserManual")} ${t("browserDesktop")}`}
+        />
+      }
+      detail={t("browserDetail", { version: PRODUCT_VERSION })}
+    />
   );
 }
 
@@ -77,46 +64,57 @@ export function DesktopUpdates({
   act: (action: UpdateAction) => void;
 }) {
   const t = useTranslations("settings.updates");
+  const ts = useTranslations("settings");
+  const autoId = useId();
   const checking = view.check.kind === "checking" || view.check.kind === "downloading";
+  const ready = view.check.kind === "ready";
   return (
     <>
-      <PanelBlock>
-        <DefinitionList>
-          <DefinitionItem label={t("version")}>
-            <VersionLine view={view} />
-          </DefinitionItem>
-          <DefinitionItem label={t("lastChecked")}>
-            <span {...stylex.props(styles.checkLine)}>
-              <span role="status">
-                {view.check.kind === "ready" ? null : <CheckLine view={view} />}
-              </span>
-              {view.check.kind === "ready" ? <CheckLine view={view} /> : null}
-              {view.check.kind === "unavailable" ? null : (
-                <Button
-                  aria-disabled={checking}
-                  aria-busy={checking}
-                  onClick={() => {
-                    if (!checking) act("check-now");
-                  }}
-                >
-                  {view.check.kind === "checking" ? t("checking") : t("checkNow")}
-                </Button>
-              )}
+      <SettingsRow
+        label={t("label")}
+        detail={
+          <span {...stylex.props(styles.detail)}>
+            <span>
+              <VersionLine view={view} />
             </span>
-          </DefinitionItem>
-        </DefinitionList>
-      </PanelBlock>
-      <Situation view={view} act={act} />
-      <PanelBlock>
-        <Checkbox
-          name="autoUpdate"
-          label={t("auto")}
-          description={t("autoDescription")}
-          checked={view.autoUpdate}
-          disabled={view.check.kind === "unavailable"}
-          onCheckedChange={(checked) => act(checked ? "auto-on" : "auto-off")}
-        />
-      </PanelBlock>
+            <span role="status">{ready ? null : <CheckLine view={view} />}</span>
+            {ready ? (
+              <span>
+                <CheckLine view={view} />
+              </span>
+            ) : null}
+          </span>
+        }
+        control={
+          view.check.kind === "unavailable" ? undefined : (
+            <Button
+              aria-disabled={checking}
+              aria-busy={checking}
+              onClick={() => {
+                if (!checking) act("check-now");
+              }}
+            >
+              {view.check.kind === "checking" ? t("checking") : t("checkNow")}
+            </Button>
+          )
+        }
+        message={<Situation view={view} act={act} />}
+      />
+      <SettingsRow
+        label={t("auto")}
+        labelId={autoId}
+        info={
+          <InfoTip label={ts("infoLabel", { label: t("auto") })} content={t("autoDescription")} />
+        }
+        control={
+          <Switch
+            aria-labelledby={autoId}
+            checked={view.autoUpdate}
+            disabled={view.check.kind === "unavailable"}
+            onCheckedChange={(checked) => act(checked ? "auto-on" : "auto-off")}
+          />
+        }
+      />
     </>
   );
 }
@@ -170,16 +168,14 @@ function Situation({ view, act }: { view: UpdateView; act: (action: UpdateAction
   const check = view.check;
   if (check.kind === "ready") {
     return (
-      <PanelBlock>
-        <Actions>
-          <Button variant="primary" onClick={() => act("restart")}>
-            {t("restart")}
-          </Button>
-          <TextLink href={check.notesUrl} external>
-            {t("notes")}
-          </TextLink>
-        </Actions>
-      </PanelBlock>
+      <Actions>
+        <Button variant="primary" onClick={() => act("restart")}>
+          {t("restart")}
+        </Button>
+        <TextLink href={check.notesUrl} external>
+          {t("notes")}
+        </TextLink>
+      </Actions>
     );
   }
   if (check.kind === "manual") {
@@ -211,11 +207,10 @@ function Situation({ view, act }: { view: UpdateView; act: (action: UpdateAction
 }
 
 const styles = stylex.create({
-  checkLine: {
+  detail: {
     display: "flex",
     flexWrap: "wrap",
-    alignItems: "center",
-    columnGap: space.s3,
-    rowGap: space.s2,
+    columnGap: space.s2,
+    rowGap: space.px2,
   },
 });

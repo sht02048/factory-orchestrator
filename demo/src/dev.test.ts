@@ -78,7 +78,7 @@ describe("pnpm dev", () => {
       const next = page.getByRole("button", { name: onboarding.next });
 
       await fill.click();
-      await page.getByRole("button", { name: onboarding.tracker.check }).click();
+      await page.getByRole("button", { name: settings.credentials.keyCheck }).click();
       await main.getByText(onboarding.tracker.checked).waitFor();
       await next.click();
       await fill.click();

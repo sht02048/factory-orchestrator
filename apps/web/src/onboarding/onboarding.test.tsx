@@ -38,7 +38,7 @@ import { loadSettingsPage, loadTrackerProjectChoices } from "@ganger/app/setting
 import type { SettingsContext } from "@ganger/app/settings/load";
 import type { ConnectionProjects, SettingsPage } from "@ganger/app/settings/model";
 import { settingsMessages } from "../settings/messages";
-import { SettingsScreen } from "../settings/settings-screen";
+import { SettingsScreen } from "../settings/settings-page";
 import { buttonsOf } from "../testing/buttons";
 import { renderWithMessages } from "../testing/render";
 import { isOnboardingComplete, loadOnboardingPage, setUpFirstWorkspace } from "./load";
@@ -633,13 +633,15 @@ describe("다섯 단계를 마치기", () => {
     const settingsHtml = renderWithMessages(
       <SettingsScreen
         page={settings}
-        selected="progress"
-        onSelect={() => {}}
+        runnerIssues={0}
+        workspaceView="one"
+        ws={ws}
         actions={noopActions}
       />,
       settingsMessages,
     );
-    expect(text(settingsHtml).match(/1\/1개 정함/g)).toHaveLength(3);
+    expect(text(settingsHtml)).toContain("factory 라벨이면 바로 할당");
+    expect(text(settingsHtml)).not.toContain(settingsMessages.settings.projects.noRepo);
 
     const complete = isOnboardingComplete(f.context.db, f.context.secretBox);
     expect(complete).toBe(true);

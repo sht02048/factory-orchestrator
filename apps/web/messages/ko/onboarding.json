@@ -10,7 +10,6 @@
   "nextLocked": "확인이 끝나야 다음으로 갈 수 있어요.",
   "edit": "수정",
   "close": "닫기",
-  "externalLink": "새 창에서 열려요",
   "steps": {
     "tracker": {
       "name": "Tracker",
@@ -39,10 +38,6 @@
     }
   },
   "tracker": {
-    "keyDescription": "연결을 확인하면 암호화해서 저장해요. 연결 이름은 Linear 조직 이름으로 정하고, Settings에서 바꿀 수 있어요.",
-    "keyDescriptionEdit": "새 키로 연결을 확인하면 암호화해서 저장해요. 연결 이름은 그대로예요.",
-    "keyPlaceholder": "lin_api_…",
-    "check": "연결 확인",
     "checked": "연결을 확인했어요",
     "guideTitle": "API 키 만드는 법",
     "guideStepOpen": "Linear에서 Settings › Account › Security & access로 가요.",
@@ -77,9 +72,7 @@
     "permissionPullRequestsNote": "Metadata는 자동으로 들어가요",
     "permissionActions": "Actions",
     "permissionActionsNote": "있으면 Run 상세에 CI 상태가 보여요",
-    "guideStepPaste": "만든 토큰을 복사해 토큰 칸에 넣어요. 조직 저장소면 조직 관리자가 토큰을 승인해야 할 수 있어요.",
-    "tokenDescription": "GitHub에 연결을 확인한 뒤 암호화해서 저장해요.",
-    "tokenPlaceholder": "github_pat_…"
+    "guideStepPaste": "만든 토큰을 복사해 토큰 칸에 넣어요. 조직 저장소면 조직 관리자가 토큰을 승인해야 할 수 있어요."
   },
   "runner": {
     "checkTitle": "{name} 러너",

@@ -93,7 +93,7 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
   it("첫 트래커 연결을 만들면 포커스가 body 가 아니라 연결 요약의 이름에 간다", async () => {
     await open(1);
     await page.getByLabel(settings.connections.apiKey).fill("lin_api_example");
-    await page.getByRole("button", { name: onboarding.tracker.check }).click();
+    await page.getByRole("button", { name: settings.credentials.keyCheck }).click();
 
     await expect.poll(focused).toBe("Linear");
     await page.getByText(onboarding.tracker.checked).waitFor();
@@ -187,7 +187,7 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
     await open(1);
     await page.getByRole("button", { name: onboarding.edit, exact: true }).click();
     await page.getByLabel(settings.connections.apiKey).fill("lin_api_rotated");
-    await page.getByRole("button", { name: onboarding.tracker.check }).click();
+    await page.getByRole("button", { name: settings.credentials.keyCheck }).click();
     await page.getByLabel(settings.connections.apiKey).waitFor({ state: "detached" });
     await expect.poll(focused).toBe(onboarding.edit);
 

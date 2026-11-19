@@ -21,6 +21,7 @@ import { Route as AppTicketsRouteImport } from './routes/_app/tickets'
 import { Route as ApiAttentionRouteImport } from './routes/api/attention'
 import { Route as ApiIdentityRouteImport } from './routes/api/identity'
 import { Route as AppRunsRunIdRouteImport } from './routes/_app/runs_.$runId'
+import { Route as AppSettingsMcpRouteImport } from './routes/_app/settings_.mcp'
 import { Route as ApiNotificationEventsIndexRouteImport } from './routes/api/notification-events/index'
 import { Route as ApiNotificationEventsStreamRouteImport } from './routes/api/notification-events/stream'
 import { Route as ApiRunnerEnrollmentIndexRouteImport } from './routes/api/runner-enrollment/index'
@@ -28,6 +29,7 @@ import { Route as ApiRunnerEnrollmentScriptRouteImport } from './routes/api/runn
 import { Route as ApiRunnerEnrollmentOfferIndexRouteImport } from './routes/api/runner-enrollment/offer/index'
 import { Route as ApiRunnerEnrollmentOfferAcceptRouteImport } from './routes/api/runner-enrollment/offer/accept'
 import { Route as ApiWebhooksTrackerConnectionIdRouteImport } from './routes/api/webhooks/tracker/$connectionId'
+import { Route as AppSettingsProjectsConnectionIdProjectIdRouteImport } from './routes/_app/settings_.projects.$connectionId.$projectId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -88,6 +90,11 @@ const AppRunsRunIdRoute = AppRunsRunIdRouteImport.update({
   path: '/runs/$runId',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsMcpRoute = AppSettingsMcpRouteImport.update({
+  id: '/settings_/mcp',
+  path: '/settings/mcp',
+  getParentRoute: () => AppRoute,
+} as any)
 const ApiNotificationEventsIndexRoute =
   ApiNotificationEventsIndexRouteImport.update({
     id: '/api/notification-events/',
@@ -130,6 +137,12 @@ const ApiWebhooksTrackerConnectionIdRoute =
     path: '/api/webhooks/tracker/$connectionId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AppSettingsProjectsConnectionIdProjectIdRoute =
+  AppSettingsProjectsConnectionIdProjectIdRouteImport.update({
+    id: '/settings_/projects/$connectionId/$projectId',
+    path: '/settings/projects/$connectionId/$projectId',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -143,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/api/attention': typeof ApiAttentionRoute
   '/api/identity': typeof ApiIdentityRoute
   '/runs/$runId': typeof AppRunsRunIdRoute
+  '/settings/mcp': typeof AppSettingsMcpRoute
   '/api/notification-events/stream': typeof ApiNotificationEventsStreamRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
   '/api/notification-events/': typeof ApiNotificationEventsIndexRoute
@@ -150,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/api/runner-enrollment/offer/accept': typeof ApiRunnerEnrollmentOfferAcceptRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
   '/api/runner-enrollment/offer/': typeof ApiRunnerEnrollmentOfferIndexRoute
+  '/settings/projects/$connectionId/$projectId': typeof AppSettingsProjectsConnectionIdProjectIdRoute
 }
 export interface FileRoutesByTo {
   '/ds': typeof DsRoute
@@ -163,6 +178,7 @@ export interface FileRoutesByTo {
   '/api/identity': typeof ApiIdentityRoute
   '/': typeof AppIndexRoute
   '/runs/$runId': typeof AppRunsRunIdRoute
+  '/settings/mcp': typeof AppSettingsMcpRoute
   '/api/notification-events/stream': typeof ApiNotificationEventsStreamRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
   '/api/notification-events': typeof ApiNotificationEventsIndexRoute
@@ -170,6 +186,7 @@ export interface FileRoutesByTo {
   '/api/runner-enrollment/offer/accept': typeof ApiRunnerEnrollmentOfferAcceptRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
   '/api/runner-enrollment/offer': typeof ApiRunnerEnrollmentOfferIndexRoute
+  '/settings/projects/$connectionId/$projectId': typeof AppSettingsProjectsConnectionIdProjectIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -185,6 +202,7 @@ export interface FileRoutesById {
   '/api/identity': typeof ApiIdentityRoute
   '/_app/': typeof AppIndexRoute
   '/_app/runs_/$runId': typeof AppRunsRunIdRoute
+  '/_app/settings_/mcp': typeof AppSettingsMcpRoute
   '/api/notification-events/stream': typeof ApiNotificationEventsStreamRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
   '/api/notification-events/': typeof ApiNotificationEventsIndexRoute
@@ -192,6 +210,7 @@ export interface FileRoutesById {
   '/api/runner-enrollment/offer/accept': typeof ApiRunnerEnrollmentOfferAcceptRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
   '/api/runner-enrollment/offer/': typeof ApiRunnerEnrollmentOfferIndexRoute
+  '/_app/settings_/projects/$connectionId/$projectId': typeof AppSettingsProjectsConnectionIdProjectIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -207,6 +226,7 @@ export interface FileRouteTypes {
     | '/api/attention'
     | '/api/identity'
     | '/runs/$runId'
+    | '/settings/mcp'
     | '/api/notification-events/stream'
     | '/api/runner-enrollment/script'
     | '/api/notification-events/'
@@ -214,6 +234,7 @@ export interface FileRouteTypes {
     | '/api/runner-enrollment/offer/accept'
     | '/api/webhooks/tracker/$connectionId'
     | '/api/runner-enrollment/offer/'
+    | '/settings/projects/$connectionId/$projectId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/ds'
@@ -227,6 +248,7 @@ export interface FileRouteTypes {
     | '/api/identity'
     | '/'
     | '/runs/$runId'
+    | '/settings/mcp'
     | '/api/notification-events/stream'
     | '/api/runner-enrollment/script'
     | '/api/notification-events'
@@ -234,6 +256,7 @@ export interface FileRouteTypes {
     | '/api/runner-enrollment/offer/accept'
     | '/api/webhooks/tracker/$connectionId'
     | '/api/runner-enrollment/offer'
+    | '/settings/projects/$connectionId/$projectId'
   id:
     | '__root__'
     | '/_app'
@@ -248,6 +271,7 @@ export interface FileRouteTypes {
     | '/api/identity'
     | '/_app/'
     | '/_app/runs_/$runId'
+    | '/_app/settings_/mcp'
     | '/api/notification-events/stream'
     | '/api/runner-enrollment/script'
     | '/api/notification-events/'
@@ -255,6 +279,7 @@ export interface FileRouteTypes {
     | '/api/runner-enrollment/offer/accept'
     | '/api/webhooks/tracker/$connectionId'
     | '/api/runner-enrollment/offer/'
+    | '/_app/settings_/projects/$connectionId/$projectId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -358,6 +383,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRunsRunIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/settings_/mcp': {
+      id: '/_app/settings_/mcp'
+      path: '/settings/mcp'
+      fullPath: '/settings/mcp'
+      preLoaderRoute: typeof AppSettingsMcpRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/api/notification-events/': {
       id: '/api/notification-events/'
       path: '/api/notification-events'
@@ -407,6 +439,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWebhooksTrackerConnectionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/settings_/projects/$connectionId/$projectId': {
+      id: '/_app/settings_/projects/$connectionId/$projectId'
+      path: '/settings/projects/$connectionId/$projectId'
+      fullPath: '/settings/projects/$connectionId/$projectId'
+      preLoaderRoute: typeof AppSettingsProjectsConnectionIdProjectIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -418,6 +457,8 @@ interface AppRouteChildren {
   AppTicketsRoute: typeof AppTicketsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppRunsRunIdRoute: typeof AppRunsRunIdRoute
+  AppSettingsMcpRoute: typeof AppSettingsMcpRoute
+  AppSettingsProjectsConnectionIdProjectIdRoute: typeof AppSettingsProjectsConnectionIdProjectIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -428,6 +469,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppTicketsRoute: AppTicketsRoute,
   AppIndexRoute: AppIndexRoute,
   AppRunsRunIdRoute: AppRunsRunIdRoute,
+  AppSettingsMcpRoute: AppSettingsMcpRoute,
+  AppSettingsProjectsConnectionIdProjectIdRoute:
+    AppSettingsProjectsConnectionIdProjectIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

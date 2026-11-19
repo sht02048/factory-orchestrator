@@ -57,9 +57,12 @@ import {
 import { hasPendingRunnerChecks, loadSettingsPage } from "@ganger/app/settings/load";
 import type { SettingsContext } from "@ganger/app/settings/load";
 import { settingsMessages } from "./messages";
-import { INSTALL_ITEMS, WORKSPACE_ITEMS } from "@ganger/app/settings/model";
-import type { SettingsItem, SettingsPage } from "@ganger/app/settings/model";
-import { RunnerForm, SettingsScreen, nameFromSshTarget, sshCheckCommand } from "./settings-screen";
+import type { SettingsPage } from "@ganger/app/settings/model";
+import { jsonConfig } from "@ganger/app/settings/mcp-launch";
+import { McpScreen } from "./mcp-screen";
+import { ProjectDetailScreen, findBoundProject } from "./project-detail";
+import { ProjectCandidates, SettingsScreen, sectionProblems } from "./settings-page";
+import { RunnerCheck, RunnerForm, nameFromSshTarget, sshCheckCommand } from "./settings-screen";
 import type { SettingsActions } from "./settings-screen";
 
 const now = new Date("2026-11-17T09:00:00Z");
@@ -160,19 +163,61 @@ const noopActions: SettingsActions = {
   pollRunnerChecks: () => Promise.resolve(false),
 };
 
-function render(page: SettingsPage, selected: SettingsItem): string {
+function render(page: SettingsPage, runnerIssues = 0): string {
   return renderWithMessages(
-    <SettingsScreen page={page} selected={selected} onSelect={() => {}} actions={noopActions} />,
+    <SettingsScreen
+      page={page}
+      runnerIssues={runnerIssues}
+      workspaceView={page.workspace === null ? "all" : "one"}
+      ws={page.workspace?.general.id}
+      actions={noopActions}
+    />,
     settingsMessages,
   );
 }
 
-function panelText(html: string): string {
-  const panel = html.split("<aside")[1] ?? "";
-  return panel
+function renderProject(page: SettingsPage, connectionId: string, projectId: string): string {
+  return renderWithMessages(
+    <ProjectDetailScreen
+      page={page}
+      connectionId={connectionId}
+      projectId={projectId}
+      ws={page.workspace?.general.id}
+      actions={noopActions}
+      onRemoved={() => {}}
+    />,
+    settingsMessages,
+  );
+}
+
+function renderMcp(page: SettingsPage): string {
+  return renderWithMessages(
+    <McpScreen mcp={page.install.mcp} ws={undefined} actions={noopActions} />,
+    settingsMessages,
+  );
+}
+
+function renderRunnerCheck(page: SettingsPage): string {
+  const runner = page.install.runners[0];
+  if (runner === undefined) throw new Error("no runner");
+  return renderWithMessages(
+    <RunnerCheck runner={runner} actions={noopActions} workerSilent={false} />,
+    settingsMessages,
+  );
+}
+
+function textOf(html: string): string {
+  return html
     .replace(/<[^>]+>/g, " ")
     .replaceAll("&quot;", '"')
     .replace(/\s+/g, " ");
+}
+
+function sectionOf(html: string, id: string): string {
+  const start = html.indexOf(`<section id="${id}"`);
+  if (start === -1) throw new Error(`no section ${id}`);
+  const end = html.indexOf("</section>", start);
+  return html.slice(start, end);
 }
 
 describe("Settings 저장하고 다시 열기", () => {
@@ -269,17 +314,27 @@ describe("Settings 저장하고 다시 열기", () => {
     ]);
     expect(page.runnerProjects).toEqual([{ id: repo, name: "acme/web" }]);
 
-    const general = render(page, "general");
-    expect(general).toContain('value="Acme Store"');
-    expect(general).toContain('value="90"');
-    expect(panelText(render(page, "mapping"))).toContain("acme/web");
-    expect(panelText(render(page, "mapping"))).toContain("Codex");
-    expect(panelText(render(page, "progress"))).toContain("In Progress");
-    expect(panelText(render(page, "label"))).toContain("factory");
-    const runners = render(page, "runners");
-    expect(runners).toContain('value="factory@runner-a.example.com"');
-    expect(runners).toContain('value="/usr/local/bin/orca"');
-    expect(runners).toContain('value="3"');
+    const main = render(page);
+    expect(textOf(sectionOf(main, "workspace"))).toContain("Acme Store");
+    expect(main).toMatch(/name="maxRunMinutes"[^>]*value="90"/);
+    const projects = textOf(sectionOf(main, "projects"));
+    expect(projects).toContain("Web");
+    expect(projects).toContain("acme/web · Codex");
+    expect(projects).toContain("factory 라벨이면 바로 할당");
+    const detail = renderProject(page, connection, webProject);
+    expect(detail).toContain("acme/web");
+    expect(textOf(detail)).toContain("In Progress");
+    expect(textOf(detail)).toContain("factory");
+    expect(detail).toContain('value="gpt-example"');
+    const runner = page.install.runners[0];
+    if (runner === undefined) throw new Error("no runner");
+    const runnerForm = renderWithMessages(
+      <RunnerForm runner={runner} actions={noopActions} />,
+      settingsMessages,
+    );
+    expect(runnerForm).toContain('value="factory@runner-a.example.com"');
+    expect(runnerForm).toContain('value="/usr/local/bin/orca"');
+    expect(runnerForm).toContain('value="3"');
   });
 
   it("토큰은 암호화해 저장하고 화면 값에 담지 않는다", async () => {
@@ -414,11 +469,14 @@ describe("Settings 저장하고 다시 열기", () => {
     ]);
   });
 
-  it("GitHub 토큰 안내에 필수 권한과 선택 권한을 보인다", async () => {
+  it("GitHub 토큰이 없으면 연결 구역에 문제로 보이고 넣기 버튼을 둔다", async () => {
     const f = fixture();
-    const text = panelText(render(await loadSettingsPage(f.context, commerce, now), "github"));
-    expect(text).toContain("필수 권한: Metadata 읽기, Pull requests 읽기");
-    expect(text).toContain("선택 권한: Actions 읽기");
+    const page = await loadSettingsPage(f.context, commerce, now);
+    const connections = sectionOf(render(page), "connections");
+    expect(textOf(connections)).toContain("아직 없어요. PR 상태를 읽으려면 넣어 주세요");
+    expect(connections).toMatch(/<button[^>]*>넣기<\/button>/);
+    expect(sectionProblems(page, 0).has("connections")).toBe(true);
+    expect(connections).not.toContain('type="password"');
   });
 
   it("Mapping 에서 권한을 미리 허용하라고 안내하고 러너는 고르지 않는다", async () => {
@@ -430,8 +488,10 @@ describe("Settings 저장하고 다시 열기", () => {
       projectId: webProject,
       name: "Web",
     });
-    const text = panelText(render(await loadSettingsPage(f.context, commerce, now), "mapping"));
-    expect(text).toContain("에이전트 설정에서 미리 허용해 두세요");
+    const page = await loadSettingsPage(f.context, commerce, now);
+    const html = renderProject(page, connection, webProject);
+    const text = textOf(html);
+    expect(html).toContain('aria-label="저장소"');
     expect(text).toContain("러너 쪽 프로젝트");
     expect(text).not.toContain("러너 이름");
     expect(text).toContain("모델");
@@ -488,9 +548,10 @@ describe("주소(0048)", () => {
       webAddress: "https://server.example.ts.net",
       webhookAddress: "https://hooks.example.com",
     });
-    const shown = panelText(render(page, "addresses"));
-    expect(shown).toContain("다른 기기에서 열 주소");
-    expect(render(page, "addresses")).toContain('value="https://server.example.ts.net"');
+    const server = textOf(sectionOf(render(page), "server"));
+    expect(server).toContain("다른 기기에서 열 주소");
+    expect(server).toContain("https://server.example.ts.net");
+    expect(textOf(sectionOf(render(page), "advanced"))).toContain("https://hooks.example.com");
 
     expect(saveAddresses(f.context, { webAddress: "", webhookAddress: "" }, now, local)).toEqual({
       ok: true,
@@ -591,7 +652,12 @@ describe("트래커 프로젝트는 Workspace 하나에만", () => {
       },
       { id: labProject, name: "Lab", owner: { kind: "free" }, mappings: 0, queuedRuns: 0 },
     ]);
-    const html = render(page, "projects");
+    const workspace = page.workspace;
+    if (workspace === null) throw new Error("no workspace");
+    const html = renderWithMessages(
+      <ProjectCandidates workspace={workspace} actions={noopActions} onAdded={() => {}} />,
+      settingsMessages,
+    );
     const webRow = html.split("<li").find((chunk) => chunk.includes(">Web<")) ?? "";
     expect(webRow).toContain("Acme Commerce에 있어요");
     expect(webRow).toMatch(/<button[^>]*disabled/);
@@ -630,9 +696,9 @@ describe("트래커 프로젝트는 Workspace 하나에만", () => {
       mappings: 1,
       queuedRuns: 2,
     });
-    expect(render(before, "projects")).toMatch(
-      /<button[^>]*data-variant="danger"[^>]*>빼기<\/button>/,
-    );
+    const detail = renderProject(before, connection, webProject);
+    expect(detail).toMatch(/<button[^>]*data-variant="danger"[^>]*>빼기<\/button>/);
+    expect(textOf(detail)).toContain("이 Workspace에서 빼기");
 
     expect(removeTrackerProject(f.context, project)).toEqual({ ok: true });
     const after = await loadSettingsPage(f.context, commerce, now);
@@ -703,7 +769,7 @@ describe("러너 확인", () => {
     expect(listPendingRunnerCheckRequests(f.context.db)).toEqual([
       { runnerId, requestedAt: later },
     ]);
-    const text = panelText(render(await loadSettingsPage(f.context, commerce, now), "runners"));
+    const text = textOf(renderRunnerCheck(await loadSettingsPage(f.context, commerce, now)));
     expect(text).toContain("worker가 러너를 확인하고 있어요");
     expect(text).toContain("확인하는 중");
     expect(text).not.toContain("다시 확인");
@@ -772,7 +838,7 @@ describe("러너 확인", () => {
       online: true,
       version: "1.4.258",
     });
-    const text = panelText(render(page, "runners"));
+    const text = textOf(renderRunnerCheck(page));
     expect(text).toContain("러너에 닿았어요 · orca 1.4.258");
     expect(text).toContain("Orca 상시 서비스 갖췄어요");
     expect(text).toContain("acme/web GitHub 인증 갖췄어요");
@@ -790,7 +856,7 @@ describe("러너 확인", () => {
     );
     const check = later.install.runners[0]?.check;
     expect(check).toMatchObject({ status: "done", completedAgoMs: 25 * 60_000 - 5000 });
-    expect(panelText(render(later, "runners"))).toContain("24분 전 확인");
+    expect(textOf(renderRunnerCheck(later))).toContain("24분 전 확인");
   });
 
   it("GitHub 인증이 깨진 결과는 실패와 해결 방법을 보인다", async () => {
@@ -816,7 +882,7 @@ describe("러너 확인", () => {
         ],
       }),
     });
-    const text = panelText(render(page, "runners"));
+    const text = textOf(renderRunnerCheck(page));
     expect(text).toContain("Orca 상시 서비스 갖추지 못했어요");
     expect(text).toContain("orca serve service install");
     expect(text).toContain("acme/web GitHub 인증 갖추지 못했어요");
@@ -871,7 +937,7 @@ describe("러너 확인", () => {
         ],
       }),
     });
-    const text = panelText(render(page, "runners"));
+    const text = textOf(renderRunnerCheck(page));
     expect(text).toContain("Orca 상시 서비스 갖추지 못했어요");
     expect(text).toContain("/usr/local/bin/orca serve service install");
     expect(text).toContain("GitHub push 권한: acme/web 갖추지 못했어요");
@@ -909,7 +975,7 @@ describe("러너 확인", () => {
         ],
       }),
     });
-    const text = panelText(render(page, "runners"));
+    const text = textOf(renderRunnerCheck(page));
     expect(text).toContain("GitHub push 권한: acme/web 갖추지 못했어요");
     expect(text).toContain("acme/web 인증 실패 · Permission to acme/web.git denied to someone.");
     expect(text).toContain("gh auth setup-git");
@@ -927,9 +993,7 @@ describe("러너 확인", () => {
         error: { kind: "unreachable", detail: "ssh: connect timed out" },
       }),
     });
-    expect(panelText(render(offline, "runners"))).toContain(
-      "러너에 닿지 않았어요 (ssh로 닿지 않음)",
-    );
+    expect(textOf(renderRunnerCheck(offline))).toContain("러너에 닿지 않았어요 (ssh로 닿지 않음)");
 
     requestRunnerCheckSetting(f.context, { id: runnerId }, new Date(now.getTime() + 10_000));
     const failed = await checked(f, runnerId, { error: "ssh failed" });
@@ -937,75 +1001,159 @@ describe("러너 확인", () => {
       status: "failed",
       error: "ssh failed",
     });
-    expect(panelText(render(failed, "runners"))).toContain("러너를 확인하지 못했어요. ssh failed");
+    expect(textOf(renderRunnerCheck(failed))).toContain("러너를 확인하지 못했어요. ssh failed");
   });
 });
 
 describe("Settings 화면", () => {
-  it("어느 항목을 열어도 노란 주 버튼은 하나 이하다(ADR 0010 6번)", async () => {
+  it("한 페이지에 Workspace · 프로젝트 · 연결 · 이 서버 · 고급 구역과 그 목차를 둔다", async () => {
     const f = fixture();
-    const connection = await addConnection(f);
-    const project = { ws: commerce, connectionId: connection, projectId: webProject };
-    addTrackerProject(f.context, { ...project, name: "Web" });
-    saveMappingSetting(f.context, { ...project, runnerProjectId: repo, agentId: "claude" });
-    addRunner(f);
-    const page = await loadSettingsPage(f.context, commerce, now);
-    for (const item of [...WORKSPACE_ITEMS, ...INSTALL_ITEMS]) {
-      const primary = [...render(page, item).matchAll(/data-variant="primary"/g)].length;
-      expect({ item, primary: primary <= 1 }).toEqual({ item, primary: true });
+    const html = render(await loadSettingsPage(f.context, commerce, now));
+    const nav = /<nav aria-label="Settings 목차"[^>]*>.*?<\/nav>/s.exec(html)?.[0] ?? "";
+    expect([...nav.matchAll(/href="#([a-z]+)"/g)].map((m) => m[1])).toEqual([
+      "workspace",
+      "projects",
+      "connections",
+      "server",
+      "advanced",
+    ]);
+    for (const id of ["workspace", "projects", "connections", "server", "advanced"]) {
+      expect(html).toContain(`<section id="${id}" aria-labelledby="${id}-heading"`);
     }
+    expect(textOf(html)).not.toContain("설치 전체");
+    expect(textOf(html)).not.toContain("Acme Commerce Workspace");
+    expect(html).not.toContain("<aside");
   });
 
-  it("비밀값 칸은 새 비밀번호를 권하지 않고 비밀번호 관리자가 건너뛴다(0055)", async () => {
+  it("문제가 있는 구역만 목차에 점을 붙인다", async () => {
+    const f = fixture();
+    const connection = await addConnection(f);
+    await saveGitHubToken(f.context, { token: "github_pat_example" }, now);
+    addRunner(f);
+    const project = { ws: commerce, connectionId: connection, projectId: webProject };
+    addTrackerProject(f.context, { ...project, name: "Web" });
+    const unmapped = await loadSettingsPage(f.context, commerce, now);
+    expect([...sectionProblems(unmapped, 0)]).toEqual(["projects"]);
+    const html = render(unmapped);
+    const nav = /<nav aria-label="Settings 목차"[^>]*>.*?<\/nav>/s.exec(html)?.[0] ?? "";
+    expect(nav.match(/확인할 것이 있어요/g)).toHaveLength(1);
+    expect(textOf(sectionOf(html, "projects"))).toContain("저장소를 아직 정하지 않았어요");
+    expect(textOf(sectionOf(html, "projects"))).toContain("정하기");
+
+    saveMappingSetting(f.context, { ...project, runnerProjectId: repo, agentId: "claude" });
+    const mapped = await loadSettingsPage(f.context, commerce, now);
+    expect([...sectionProblems(mapped, 0)]).toEqual([]);
+    expect([...sectionProblems(mapped, 1)]).toEqual(["connections"]);
+    expect(textOf(sectionOf(render(mapped, 1), "connections"))).toContain(
+      "1대 중 1대를 확인해 주세요",
+    );
+  });
+
+  it("프로젝트 줄은 그 프로젝트 상세 주소로 가는 링크다", async () => {
+    const f = fixture();
+    const connection = await addConnection(f);
+    addTrackerProject(f.context, {
+      ws: commerce,
+      connectionId: connection,
+      projectId: webProject,
+      name: "Web",
+    });
+    const html = sectionOf(render(await loadSettingsPage(f.context, commerce, now)), "projects");
+    expect(html).toContain(`href="/settings/projects/${connection}/${webProject}?ws=${commerce}"`);
+  });
+
+  it("처음 열 때는 비밀값 입력칸을 띄우지 않고 노란 주 버튼도 없다(ADR 0010 6번)", async () => {
     const f = fixture();
     await addConnection(f);
     const page = await loadSettingsPage(f.context, commerce, now);
-    const secrets = [
-      ...render(page, "connections").matchAll(/<input[^>]*>/g),
-      ...render(page, "github").matchAll(/<input[^>]*>/g),
-    ]
-      .map((match) => match[0])
-      .filter((input) => input.includes('type="password"'));
-    expect(secrets.length).toBe(5);
-    for (const input of secrets) {
-      expect(input).not.toContain("new-password");
-      expect(input).toContain('autoComplete="off"');
-      expect(input).toContain('data-1p-ignore="true"');
-      expect(input).toContain('data-lpignore="true"');
-    }
+    const html = render(page);
+    expect(html).not.toContain('type="password"');
+    expect(html).not.toContain('data-variant="primary"');
+    expect(textOf(sectionOf(html, "connections"))).toContain("관리");
   });
 
-  it("분·Capacity 칸은 숫자 키보드를 쓰고, 처음 열 때는 오류를 보이지 않는다(0055)", async () => {
+  it("최대 실행 시간 칸은 숫자 키보드를 쓰고, 처음 열 때는 오류를 보이지 않는다(0055)", async () => {
     const f = fixture();
-    const page = await loadSettingsPage(f.context, commerce, now);
-    const general = render(page, "general");
-    expect(/<input[^>]*name="maxRunMinutes"[^>]*>/.exec(general)?.[0]).toContain(
+    const html = render(await loadSettingsPage(f.context, commerce, now));
+    expect(/<input[^>]*name="maxRunMinutes"[^>]*>/.exec(html)?.[0]).toContain(
       'inputMode="numeric"',
     );
-    const runners = render(page, "runners");
-    expect(/<input[^>]*name="capacity"[^>]*>/.exec(runners)?.[0]).toContain('inputMode="numeric"');
-    expect(general).not.toContain('aria-invalid="true"');
-    expect(runners).not.toContain('aria-invalid="true"');
+    expect(html).toContain('aria-label="최대 실행 시간(분)"');
+    expect(html).not.toContain('aria-invalid="true"');
   });
 
-  it("이 Workspace 와 설치 전체로 나눈다", async () => {
+  it("보조 설명은 늘 보이는 문단이 아니라 라벨 옆 도움말 단추로 둔다", async () => {
     const f = fixture();
-    const html = render(await loadSettingsPage(f.context, commerce, now), "general");
-    expect(html).toContain("이 Workspace");
-    expect(html).toContain("설치 전체");
-    expect(html).toContain("Acme Commerce Workspace");
-    expect(html).toContain('aria-label="Workspace 설정"');
-    expect(html).toContain('aria-label="설치 설정"');
+    const html = render(await loadSettingsPage(f.context, commerce, now));
+    expect(html).toContain('aria-label="최대 실행 시간 도움말"');
+    expect(html).toContain('aria-label="다른 기기에서 열 주소 도움말"');
+    const visible = textOf(
+      html.replace(/<div[^>]*role="tooltip"[^>]*hidden=""[^>]*>.*?<\/div>/gs, ""),
+    );
+    expect(visible).not.toContain("이 Workspace와 설치 전체의 설정을 바꿔요.");
+    expect(visible).not.toContain("런이 이 시간을 넘기면");
+    expect(html).toMatch(/role="tooltip"[^>]*hidden=""[^>]*>런이 이 시간을 넘기면/);
   });
 
-  it("전체 보기에서는 설치 전체만 고칠 수 있다", async () => {
+  it("Workspace 가 없으면 Workspace 와 프로젝트 대신 Workspace 를 만들라는 한 줄과 링크를 둔다", async () => {
     const f = fixture();
     const page = await loadSettingsPage(f.context, "all", now);
     expect(page.workspace).toBeNull();
-    const html = render(page, "general");
-    expect(html).toContain("Workspace를 고르면 그 Workspace의 설정을 바꿀 수 있어요.");
-    expect(html).not.toContain('aria-label="Workspace 설정"');
-    expect(panelText(html)).toContain("설치 전체");
+    const none = renderWithMessages(
+      <SettingsScreen
+        page={page}
+        runnerIssues={0}
+        workspaceView="none"
+        ws={undefined}
+        actions={noopActions}
+      />,
+      settingsMessages,
+    );
+    const workspace = sectionOf(none, "workspace");
+    expect(textOf(workspace)).toContain("아직 Workspace가 없어요");
+    expect(workspace).toMatch(/href="\/onboarding\?step=4"[^>]*>Workspace 만들기</);
+    expect(none).not.toContain('name="maxRunMinutes"');
+    expect(textOf(sectionOf(render(page), "workspace"))).toContain("전체 보기에서는");
+    expect(sectionOf(render(page), "workspace")).not.toContain("Workspace 만들기");
+  });
+
+  it("Runners 로 가는 러너 줄과 MCP 하위 화면으로 가는 줄을 둔다", async () => {
+    const f = fixture();
+    addRunner(f);
+    const html = render(await loadSettingsPage(f.context, commerce, now));
+    expect(sectionOf(html, "connections")).toContain(`href="/runners?ws=${commerce}"`);
+    expect(textOf(sectionOf(html, "connections"))).toContain("Runners에서 더하고 고쳐요");
+    expect(html).not.toContain('name="sshTarget"');
+    expect(sectionOf(html, "advanced")).toContain(`href="/settings/mcp?ws=${commerce}"`);
+  });
+
+  it("없는 프로젝트 상세는 Settings 로 돌아가는 링크를 보인다", async () => {
+    const f = fixture();
+    const page = await loadSettingsPage(f.context, commerce, now);
+    expect(findBoundProject(page.workspace, "nope", "nope")).toBeNull();
+    const html = renderProject(page, "nope", "nope");
+    expect(textOf(html)).toContain("이 Workspace에 없는 트래커 프로젝트예요.");
+    expect(html).toMatch(/href="\/settings\?ws=ws-commerce"[^>]*>Settings로 돌아가기/);
+  });
+
+  it("프로젝트 상세는 머리에 Settings › 이름을 두고 바로 할당 라벨이 연결 단위라고 적는다", async () => {
+    const f = fixture();
+    const connection = await addConnection(f);
+    addTrackerProject(f.context, {
+      ws: commerce,
+      connectionId: connection,
+      projectId: webProject,
+      name: "Web",
+    });
+    const html = renderProject(
+      await loadSettingsPage(f.context, commerce, now),
+      connection,
+      webProject,
+    );
+    expect(html).toMatch(/<h1[^>]*>Web<\/h1>/);
+    expect(html).toMatch(/href="\/settings\?ws=ws-commerce"[^>]*>Settings/);
+    expect(textOf(html)).toContain("Acme 연결의 모든 프로젝트에 같이 써요");
+    expect(textOf(html)).toContain("런이 시작되면 바꿀 상태");
   });
 });
 
@@ -1023,9 +1171,11 @@ describe("잠자기 방지(0084)", () => {
     const f = fixture();
     const page = await loadSettingsPage(f.context, undefined, now);
     expect(page.install.power).toEqual({ available: false, preventSleep: true });
-    const shown = panelText(render(page, "power"));
-    expect(shown).toContain("ganger start로 띄우지 않아 여기서 바꿀 수 없어요");
-    expect(render(page, "power")).toMatch(/<button[^>]*type="submit"[^>]*disabled/);
+    const server = sectionOf(render(page), "server");
+    expect(textOf(server)).toContain("ganger start로 띄우지 않아 여기서 바꿀 수 없어요");
+    const toggle = /<button[^>]*role="switch"[^>]*>/.exec(server)?.[0] ?? "";
+    expect(toggle).toContain("disabled");
+    expect(toggle).toContain('aria-checked="false"');
     expect(savePowerSetting(f.context, { preventSleep: false })).toEqual({
       ok: false,
       reason: "unavailable",
@@ -1048,10 +1198,12 @@ describe("잠자기 방지(0084)", () => {
       });
       const page = await loadSettingsPage(context, undefined, now);
       expect(page.install.power).toEqual({ available: true, preventSleep: false });
-      const shown = panelText(render(page, "power"));
-      expect(shown).toContain("서버가 도는 동안 이 맥이 잠들지 않게");
-      expect(shown).toContain("뚜껑을 닫거나");
-      expect(shown).toContain("러너 맥");
+      const server = sectionOf(render(page), "server");
+      expect(textOf(server)).toContain("서버가 도는 동안 이 맥이 잠들지 않게");
+      expect(textOf(server)).toContain("뚜껑을 닫거나");
+      const toggle = /<button[^>]*role="switch"[^>]*>/.exec(server)?.[0] ?? "";
+      expect(toggle).not.toContain("disabled");
+      expect(toggle).toContain('aria-checked="false"');
     });
   });
 
@@ -1079,24 +1231,23 @@ describe("MCP 구역(0088)", () => {
     const f = fixture();
     const context = { ...f.context, mcpLaunch: serverMcpLaunch(appEnv, appNode) };
     const page = await loadSettingsPage(context, commerce, now);
-    const html = render(page, "mcp");
-    const shown = panelText(html);
+    const html = renderMcp(page);
+    const shown = textOf(html);
     expect(shown).toContain("mcp_servers:");
     expect(shown).toContain(`command: "${appNode}"`);
     expect(shown).toContain(`- "${appEnv.GANGER_CLI_ENTRY}"`);
     expect(shown).toContain('ELECTRON_RUN_AS_NODE: "1"');
-    expect(shown).toContain('"mcpServers"');
+    expect(jsonConfig(page.install.mcp.launch)).toContain('"mcpServers"');
     expect(shown).toContain("~/.hermes/config.yaml");
-    expect(shown).toContain("external 칸");
     expect(shown).not.toContain("CLI 위치를 몰라요");
-    expect(html).toContain("Hermes 설정 복사");
-    expect(html).toContain("다른 클라이언트(JSON) 설정 복사");
+    expect(html).toMatch(/aria-label="클라이언트"[^>]*role="tablist"/);
+    expect(html).toMatch(/<button[^>]*>복사<\/button>/);
   });
 
   it("CLI 위치를 모르면 PATH의 ganger를 쓰라고 알린다", async () => {
     const f = fixture();
     const context = { ...f.context, mcpLaunch: serverMcpLaunch({}, "/usr/bin/node") };
-    const shown = panelText(render(await loadSettingsPage(context, commerce, now), "mcp"));
+    const shown = textOf(renderMcp(await loadSettingsPage(context, commerce, now)));
     expect(shown).toContain("CLI 위치를 몰라요");
     expect(shown).toContain('command: "ganger"');
   });
@@ -1113,22 +1264,27 @@ describe("MCP 쓰기 허용과 최근 작업(0089)", () => {
     const f = fixture();
     const off = await loadSettingsPage(f.context, commerce, now);
     expect(off.install.mcp.writeAllowed).toBe(false);
-    expect(render(off, "mcp")).toContain("읽기만 열려 있어요");
-    expect(panelText(render(off, "mcp"))).toContain("MCP 쓰기 허용");
-    expect(panelText(render(off, "mcp"))).toContain("이 화면에서만 바꿀 수 있어요");
+    expect(textOf(sectionOf(render(off), "advanced"))).toContain("읽기만 열려 있어요");
+    const offMcp = renderMcp(off);
+    expect(textOf(offMcp)).toContain("MCP 클라이언트도 할당·답하기·취소를 하게");
+    expect(textOf(offMcp)).toContain("이 화면에서만 바꿔요");
+    expect(offMcp).toContain('aria-label="켜기 전에 알아 둘 것"');
+    expect(offMcp).toMatch(
+      /role="switch"[^>]*aria-checked="false"|aria-checked="false"[^>]*role="switch"/,
+    );
 
     expect(saveMcpWriteSetting(f.context, { allowed: true }, now)).toEqual({ ok: true });
     const on = await loadSettingsPage(f.context, commerce, now);
     expect(on.install.mcp.writeAllowed).toBe(true);
-    expect(render(on, "mcp")).toContain("쓰기도 열려 있어요");
-    expect(render(on, "mcp")).toMatch(
-      /name="mcpWriteAllowed"[^>]*checked|checked[^>]*name="mcpWriteAllowed"/,
+    expect(textOf(sectionOf(render(on), "advanced"))).toContain("쓰기도 열려 있어요");
+    expect(renderMcp(on)).toMatch(
+      /role="switch"[^>]*aria-checked="true"|aria-checked="true"[^>]*role="switch"/,
     );
   });
 
   it("런과 상관없는 MCP 쓰기는 최근 작업에 MCP · 이름, 도구, 대상, 결과로 보이고 Operator라고 보내도 MCP가 붙는다", async () => {
     const f = fixture();
-    expect(panelText(render(await loadSettingsPage(f.context, commerce, now), "mcp"))).toContain(
+    expect(textOf(renderMcp(await loadSettingsPage(f.context, commerce, now)))).toContain(
       "아직 MCP 클라이언트가 한 작업이 없어요",
     );
     recordMcpAction(f.context.db, {
@@ -1150,12 +1306,13 @@ describe("MCP 쓰기 허용과 최근 작업(0089)", () => {
       reason: "not-found",
     });
 
-    const shown = panelText(render(await loadSettingsPage(f.context, commerce, now), "mcp"));
-    expect(shown).toContain("MCP · Operator");
-    expect(shown).toContain("러너 Capacity 바꾸기 · runner-a");
+    const shown = textOf(renderMcp(await loadSettingsPage(f.context, commerce, now)));
+    expect(shown).toContain("러너 Capacity 바꾸기 · runner-a MCP · Operator");
     expect(shown).toContain("MCP · hermes");
     expect(shown).not.toContain("\u202e");
-    expect(shown).toContain("러너 다시 확인 · runner-b 하지 못했어요: 대상을 찾지 못했어요");
+    expect(shown).toContain(
+      "러너 다시 확인 · runner-b MCP · hermes · 하지 못했어요: 대상을 찾지 못했어요",
+    );
     expect(shown.indexOf("MCP · hermes")).toBeLessThan(shown.indexOf("MCP · Operator"));
   });
 });
