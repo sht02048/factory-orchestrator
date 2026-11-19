@@ -250,7 +250,30 @@ describe("this mac as a runner", () => {
   });
 });
 
+async function preparedMac() {
+  const thisMac = mac(fakeRunner(() => undefined).run);
+  await thisMac.runStep("key");
+  await thisMac.runStep("hostKey");
+  return thisMac;
+}
+
 describe("registerThisMac", () => {
+  test("refuses to register before the key and host key steps ran", async () => {
+    const db = openDatabase(":memory:");
+    migrate(db);
+    const ctx = {
+      db,
+      secretBox: new SecretBox(new Uint8Array(32)),
+      registry: new AdapterRegistry(),
+    };
+    const registered = await registerThisMac(ctx, mac(fakeRunner(() => undefined).run), new Date());
+    expect(registered).toEqual({
+      result: { step: "register", outcome: "failed", problem: "setup-incomplete", detail: null },
+      runnerId: null,
+    });
+    expect(listRunners(db)).toEqual([]);
+  });
+
   function context() {
     const db = openDatabase(":memory:");
     migrate(db);
@@ -263,7 +286,7 @@ describe("registerThisMac", () => {
 
   test("registers account@localhost with one slot and Ganger ssh access", async () => {
     const ctx = context();
-    const registered = await registerThisMac(ctx, mac(fakeRunner(() => undefined).run), new Date());
+    const registered = await registerThisMac(ctx, await preparedMac(), new Date());
     expect(registered.result).toEqual({
       step: "register",
       outcome: "done",
@@ -284,7 +307,7 @@ describe("registerThisMac", () => {
 
   test("editing a Ganger runner keeps Ganger access only while the ssh target stays the same", async () => {
     const ctx = context();
-    const registered = await registerThisMac(ctx, mac(fakeRunner(() => undefined).run), new Date());
+    const registered = await registerThisMac(ctx, await preparedMac(), new Date());
     const id = registered.runnerId ?? "";
     const edit = (sshTarget: string) =>
       saveRunnerSetting(
@@ -307,7 +330,7 @@ describe("registerThisMac", () => {
       config: { sshTarget: "ganger@localhost", orcaPath: "/usr/local/bin/orca", model: "x" },
       capacity: 3,
     });
-    const registered = await registerThisMac(ctx, mac(fakeRunner(() => undefined).run), new Date());
+    const registered = await registerThisMac(ctx, await preparedMac(), new Date());
     expect(registered.runnerId).toBe("old");
     const runners = listRunners(ctx.db);
     expect(runners).toHaveLength(1);

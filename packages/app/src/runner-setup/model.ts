@@ -15,6 +15,7 @@ export const STEP_PROBLEMS = [
   "gh-logged-out",
   "gh-failed",
   "register-failed",
+  "setup-incomplete",
 ] as const;
 export type StepProblem = (typeof STEP_PROBLEMS)[number];
 

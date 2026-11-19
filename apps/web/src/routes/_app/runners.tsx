@@ -60,18 +60,17 @@ function RunnersRoute() {
     void navigate({ search: (prev) => ({ ...prev, sel: id }), replace: true });
   };
   const knownBeforeAdd = useRef<ReadonlySet<string> | null>(null);
-  const runnerIds = page.runners.map((runner) => runner.id).join(",");
   const addActions = useMemo(
     (): SettingsActions => ({
       ...settingsActions,
       saveRunner: async (input) => {
-        knownBeforeAdd.current = new Set(runnerIds.split(","));
+        knownBeforeAdd.current = new Set(page.runners.map((runner) => runner.id));
         const result = await settingsActions.saveRunner(input);
         if (!result.ok) knownBeforeAdd.current = null;
         return result;
       },
     }),
-    [settingsActions, runnerIds],
+    [settingsActions, page.runners],
   );
   useEffect(() => {
     const known = knownBeforeAdd.current;

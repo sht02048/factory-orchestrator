@@ -691,7 +691,16 @@ function RunnerStep({
   workerSilent: boolean;
 }) {
   const added = useFocusWhenAdded(runners.length);
+  const [registeredId, setRegisteredId] = useState<string | null>(null);
+  const focusId = registeredId ?? runners.at(-1)?.id;
   const newest = runners.at(-1)?.id;
+  const focusedFor = useRef<string | null>(null);
+  const registeredShown = registeredId !== null && runners.some((r) => r.id === registeredId);
+  useEffect(() => {
+    if (!registeredShown || focusedFor.current === registeredId) return;
+    focusedFor.current = registeredId;
+    added.current?.focus();
+  }, [registeredShown, registeredId, added]);
   const stepPassedHere = runners.some(runnerPassed);
   const [showSetup] = useState(() => !stepPassedHere);
   return (
@@ -706,6 +715,7 @@ function RunnerStep({
             </>
           }
           primary={runners.length === 0}
+          onRegistered={setRegisteredId}
         />
       ) : null}
       {runners.length === 0 ? null : (
@@ -716,7 +726,7 @@ function RunnerStep({
                 runner={runner}
                 actions={actions}
                 workerSilent={workerSilent}
-                focusRef={runner.id === newest ? added : undefined}
+                focusRef={runner.id === focusId ? added : undefined}
                 primary={!stepPassedHere && runner.id === newest}
               />
             </li>

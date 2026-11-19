@@ -105,11 +105,13 @@ export function RunnerSetup({
   actions,
   manualForm,
   onOpenRunner,
+  onRegistered,
   primary,
 }: {
   actions: RunnerSetupActions;
   manualForm: ReactNode;
   onOpenRunner?: (runnerId: RunnerId) => void;
+  onRegistered?: (runnerId: RunnerId) => void;
   primary: boolean;
 }) {
   const t = useTranslations("runnerSetup");
@@ -143,7 +145,9 @@ export function RunnerSetup({
           titleRef={flowTitle}
           onBack={() => setFlowOpen(false)}
           onLookAgain={reloadStatus}
+          primary={primary}
           {...(onOpenRunner === undefined ? {} : { onOpenRunner })}
+          {...(onRegistered === undefined ? {} : { onRegistered })}
         />
       ) : (
         <Chooser
@@ -334,14 +338,18 @@ function ThisMacFlow({
   titleRef,
   onBack,
   onLookAgain,
+  primary,
   onOpenRunner,
+  onRegistered,
 }: {
   status: ThisMacStatus;
   actions: RunnerSetupActions;
   titleRef: RefObject<HTMLSpanElement | null>;
   onBack: () => void;
   onLookAgain: () => void;
+  primary: boolean;
   onOpenRunner?: (runnerId: RunnerId) => void;
+  onRegistered?: (runnerId: RunnerId) => void;
 }) {
   const t = useTranslations("runnerSetup.thisMac");
   const [rows, setRows] = useState(initialRows);
@@ -384,13 +392,14 @@ function ThisMacFlow({
           if (result.outcome === "failed") return;
           if (step === "register" && outcome.runnerId !== null) {
             setRegisteredId(outcome.runnerId);
+            onRegistered?.(outcome.runnerId);
           }
         }
       } finally {
         running.current = false;
       }
     },
-    [actions],
+    [actions, onRegistered],
   );
 
   useEffect(() => {
@@ -434,13 +443,13 @@ function ThisMacFlow({
             </Actions>
           </div>
         ) : status.remoteLogin ? null : (
-          <RemoteLoginGuide account={status.account} />
+          <RemoteLoginGuide account={status.account} primary={primary} />
         )}
         <StepRows rows={rows} />
         {failedAt === -1 ? null : (
           <Actions>
             <Button
-              variant="primary"
+              variant={primary ? "primary" : "secondary"}
               onClick={() => {
                 titleRef.current?.focus();
                 void runFrom(failedAt);
@@ -474,7 +483,7 @@ function ThisMacFlow({
           {registeredId !== null && onOpenRunner !== undefined ? (
             <Button
               ref={openRunnerRef}
-              variant="primary"
+              variant={primary ? "primary" : "secondary"}
               onClick={() => onOpenRunner(registeredId)}
             >
               {t("openRunner", { name: status.name })}
@@ -489,7 +498,7 @@ function ThisMacFlow({
   );
 }
 
-function RemoteLoginGuide({ account }: { account: string }) {
+function RemoteLoginGuide({ account, primary }: { account: string; primary: boolean }) {
   const t = useTranslations("runnerSetup.thisMac");
   const canOpen = useCanOpenSharing();
   return (
@@ -508,8 +517,8 @@ function RemoteLoginGuide({ account }: { account: string }) {
             href={SHARING_SETTINGS_URL}
             target="_blank"
             rel="noreferrer"
-            data-variant="primary"
-            {...stylex.props(...buttonStyles("primary"))}
+            data-variant={primary ? "primary" : "secondary"}
+            {...stylex.props(...buttonStyles(primary ? "primary" : "secondary"))}
           >
             {t("openSharing")}
           </a>

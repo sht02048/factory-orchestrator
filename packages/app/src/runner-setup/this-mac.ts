@@ -1,4 +1,4 @@
-import { accessSync, constants, readFileSync } from "node:fs";
+import { accessSync, constants, existsSync, readFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { hostname, userInfo, homedir } from "node:os";
 import { isAbsolute } from "node:path";
@@ -88,6 +88,18 @@ function executable(path: string): boolean {
 function loginShell(env: string | undefined): string {
   const parsed = absolutePathSchema.safeParse(env);
   return parsed.success && executable(parsed.data) ? parsed.data : "/bin/sh";
+}
+
+function preparedForLocalhost(paths: GangerSshPaths): boolean {
+  try {
+    const knownHosts = readFileSync(paths.knownHostsFile, "utf8");
+    return (
+      existsSync(paths.identityFile) &&
+      knownHosts.split("\n").some((line) => line.startsWith(`${LOCAL_HOST} `))
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function localThisMac(options: LocalThisMacOptions): ThisMac {
@@ -258,6 +270,9 @@ export function localThisMac(options: LocalThisMacOptions): ThisMac {
       if (paths === null) return { ok: false, result: fail("register", "no-home", null) };
       const user = account();
       if (user === null) return { ok: false, result: fail("register", "register-failed", null) };
+      if (!preparedForLocalhost(paths)) {
+        return { ok: false, result: fail("register", "setup-incomplete", null) };
+      }
       const orcaPath = await findOrca();
       if (orcaPath === null) return { ok: false, result: fail("register", "orca-not-found", null) };
       const config: GangerRunnerConfig = {

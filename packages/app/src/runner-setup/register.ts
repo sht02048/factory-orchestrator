@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { toRunnerId } from "@ganger/core";
 import type { RunnerId } from "@ganger/core";
 import { listRunners, requestRunnerCheck, saveRunner } from "@ganger/db";
+import { parseOrcaRunnerConfig } from "@ganger/runner-orca";
 import { z } from "zod";
 import { RUNNER_KIND } from "../settings/actions.js";
 import type { SettingsContext } from "../settings/load.js";
@@ -26,6 +27,7 @@ export async function registerThisMac(
   if (!prepared.ok) return { result: prepared.result, runnerId: null };
   const { config } = prepared;
   try {
+    parseOrcaRunnerConfig(config);
     const existing = listRunners(context.db).find(
       (runner) => sshTargetOf.parse(runner.config).sshTarget === config.sshTarget,
     );
