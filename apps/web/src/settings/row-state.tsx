@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslations } from "use-intl";
-import { useReason, type ActionResult } from "./settings-screen";
+import { ReportUnsavedContext, useReason, type ActionResult } from "./settings-screen";
 
 export type AutoSaveStatus = "idle" | "saving" | "saved" | "reverted";
 
@@ -69,15 +69,61 @@ export function RevertedMessage({ error }: { error: string | null }) {
 
 interface EditorSlot {
   openId: string | null;
-  setOpenId: (id: string | null) => void;
+  blocked: boolean;
+  open: (id: string) => void;
+  closeAll: () => void;
 }
 
-const EditorContext = createContext<EditorSlot>({ openId: null, setOpenId: () => {} });
+const EditorContext = createContext<EditorSlot>({
+  openId: null,
+  blocked: false,
+  open: () => {},
+  closeAll: () => {},
+});
 
 export function EditorProvider({ children }: { children: ReactNode }) {
   const [openId, setOpenId] = useState<string | null>(null);
-  const value = useMemo(() => ({ openId, setOpenId }), [openId]);
-  return <EditorContext value={value}>{children}</EditorContext>;
+  const [blocked, setBlocked] = useState(false);
+  const dirty = useRef(new Set<string>());
+  const report = useCallback((formId: string, unsaved: boolean) => {
+    if (unsaved) dirty.current.add(formId);
+    else dirty.current.delete(formId);
+    if (dirty.current.size === 0) setBlocked(false);
+  }, []);
+  const open = useCallback(
+    (id: string) => {
+      if (openId !== null && openId !== id && dirty.current.size > 0) {
+        setBlocked(true);
+        return;
+      }
+      setBlocked(false);
+      setOpenId(id);
+    },
+    [openId],
+  );
+  const closeAll = useCallback(() => {
+    setBlocked(false);
+    setOpenId(null);
+  }, []);
+  const value = useMemo(
+    () => ({ openId, blocked, open, closeAll }),
+    [openId, blocked, open, closeAll],
+  );
+  return (
+    <ReportUnsavedContext value={report}>
+      <EditorContext value={value}>{children}</EditorContext>
+    </ReportUnsavedContext>
+  );
+}
+
+export function EditorBlockedNotice() {
+  const t = useTranslations("settings");
+  const { blocked } = use(EditorContext);
+  return (
+    <Text variant="meta" as="p" tone="problem" role="alert">
+      {blocked ? t("unsavedBlocked") : null}
+    </Text>
+  );
 }
 
 export interface InlineEdit {
@@ -88,7 +134,7 @@ export interface InlineEdit {
 }
 
 export function useInlineEdit(id: string): InlineEdit {
-  const { openId, setOpenId } = use(EditorContext);
+  const { openId, open: openEditor, closeAll } = use(EditorContext);
   const open = openId === id;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const refocus = useRef(false);
@@ -97,20 +143,28 @@ export function useInlineEdit(id: string): InlineEdit {
     refocus.current = false;
     triggerRef.current?.focus();
   }, [open]);
-  const show = useCallback(() => setOpenId(id), [id, setOpenId]);
+  const show = useCallback(() => openEditor(id), [id, openEditor]);
   const close = useCallback(() => {
     refocus.current = true;
-    setOpenId(null);
-  }, [setOpenId]);
+    closeAll();
+  }, [closeAll]);
   return { open, triggerRef, show, close };
+}
+
+export function focusEditor(container: HTMLElement | null): void {
+  if (container === null) return;
+  const typing = window.matchMedia("(pointer: fine)").matches;
+  const field =
+    (typing
+      ? container.querySelector<HTMLElement>("input:not([readonly]):not([disabled])")
+      : null) ?? container.querySelector<HTMLElement>("button:not([disabled])");
+  (field ?? container).focus({ preventScroll: field === null });
 }
 
 export function useFocusFirstField(): React.RefObject<HTMLDivElement | null> {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    ref.current
-      ?.querySelector<HTMLElement>("input:not([readonly]):not([disabled]), button:not([disabled])")
-      ?.focus();
+    focusEditor(ref.current);
   }, []);
   return ref;
 }

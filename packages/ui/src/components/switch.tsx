@@ -11,17 +11,26 @@ export interface SwitchProps {
   "aria-describedby"?: string;
   disabled?: boolean;
   name?: string;
+  id?: string;
 }
 
-export function Switch({ checked, onCheckedChange, disabled, name, ...aria }: SwitchProps) {
+export function Switch({ checked, onCheckedChange, disabled, name, id, ...aria }: SwitchProps) {
   return (
     <SdkSwitch
       {...aria}
+      {...(id === undefined ? {} : { id })}
       checked={checked}
       onCheckedChange={(next) => onCheckedChange(next === true)}
       {...(disabled === undefined ? {} : { disabled })}
       {...(name === undefined ? {} : { name })}
-      className={(s) => cx(styles.track, s.checked && styles.on, s.disabled && styles.disabled)}
+      className={(s) =>
+        cx(
+          styles.track,
+          !s.checked && !s.disabled && styles.offRing,
+          s.checked && styles.on,
+          s.disabled && styles.disabled,
+        )
+      }
     >
       <SwitchThumb
         className={(s) =>
@@ -65,6 +74,7 @@ const styles = stylex.create({
     },
   },
   on: { backgroundColor: colors.accent },
+  offRing: { boxShadow: `inset 0 0 0 1px ${colors.textTertiary}` },
   disabled: { backgroundColor: colors.bgControl, cursor: "not-allowed" },
   thumb: {
     position: "absolute",

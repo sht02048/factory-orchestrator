@@ -17,6 +17,7 @@ import {
 
 export interface FieldProps {
   label: ReactNode;
+  info?: ReactNode;
   description?: ReactNode;
   error?: ReactNode;
   children: ReactNode;
@@ -24,11 +25,18 @@ export interface FieldProps {
 
 const InvalidContext = createContext(false);
 
-export function Field({ label, description, error, children }: FieldProps) {
+export function Field({ label, info, description, error, children }: FieldProps) {
   const invalid = error !== undefined && error !== null && error !== false && error !== "";
   return (
     <SdkField invalid={invalid} className={cx(styles.field)}>
-      <FieldLabel className={cx(styles.label)}>{label}</FieldLabel>
+      {info === undefined || info === null ? (
+        <FieldLabel className={cx(styles.label)}>{label}</FieldLabel>
+      ) : (
+        <span {...stylex.props(styles.labelLine)}>
+          <FieldLabel className={cx(styles.label)}>{label}</FieldLabel>
+          {info}
+        </span>
+      )}
       <InvalidContext value={invalid}>{children}</InvalidContext>
       {description === undefined ? null : (
         <FieldDescription className={cx(styles.description)}>{description}</FieldDescription>
@@ -48,6 +56,7 @@ interface InputBaseProps {
   inputMode?: "text" | "numeric" | "decimal" | "email" | "url" | "search";
   mono?: boolean;
   invalid?: boolean;
+  spellCheck?: boolean;
   id?: string;
   "aria-label"?: string;
   "aria-describedby"?: string;
@@ -72,11 +81,19 @@ export type InputProps = InputBaseProps &
     | { value: string; readOnly: true; onValueChange?: never; defaultValue?: never }
   );
 
-export function Input({ mono, invalid: invalidProp, onValueChange, ...props }: InputProps) {
+export function Input({
+  mono,
+  invalid: invalidProp,
+  spellCheck,
+  onValueChange,
+  ...props
+}: InputProps) {
   const invalid = use(InvalidContext) || invalidProp === true;
+  const checkSpelling = spellCheck ?? (mono === true ? false : undefined);
   return (
     <SdkInput
       {...props}
+      {...(checkSpelling === undefined ? {} : { spellCheck: checkSpelling })}
       {...(invalidProp === true ? { "aria-invalid": true } : {})}
       {...(onValueChange === undefined
         ? {}
@@ -150,6 +167,7 @@ export const fieldStyles = stylex.create({
 const styles = stylex.create({
   field: { display: "flex", flexDirection: "column", gap: space.px6 },
   label: { color: colors.textSecondary, fontWeight: fontWeight.medium },
+  labelLine: { display: "flex", alignItems: "center", gap: space.s1 },
   description: {
     margin: 0,
     color: colors.textTertiary,

@@ -14,12 +14,13 @@ import {
   SettingsSection,
   Switch,
   Text,
+  focusStyles,
   linkStyles,
   type SectionNavItem,
   type SettingsLinkRowRenderProps,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { MAX_RUN_MINUTES } from "@ganger/app/settings/model";
 import type {
@@ -35,6 +36,7 @@ import type {
 import { useAgentName } from "../labels";
 import { GITHUB_TOKEN_URL, LINEAR_API_KEY_URL } from "../onboarding/model";
 import {
+  useCredentialReason,
   CredentialFormFrame,
   ExternalLink,
   GitHubTokenForm,
@@ -53,6 +55,7 @@ import {
   SubmitError,
   passwordManagerIgnoredSecretProps,
   useReason,
+  useReportUnsaved,
   useSubmit,
   type SettingsActions,
 } from "./settings-screen";
@@ -341,17 +344,22 @@ function TextEditor({
   const t = useTranslations("settings");
   const [value, setValue] = useState(initial);
   const [invalid, setInvalid] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useReportUnsaved(value !== initial);
   const submit = useSubmit();
   const focusRef = useFocusFirstField();
   return (
-    <div ref={focusRef}>
+    <div ref={focusRef} tabIndex={-1} {...stylex.props(focusStyles.target)}>
       <CredentialFormFrame
         onClose={onClose}
         footer={null}
         onSubmit={() => {
           const problem = validate(value);
           setInvalid(problem);
-          if (problem !== null) return;
+          if (problem !== null) {
+            inputRef.current?.focus();
+            return;
+          }
           submit.run(() => save(value), saved, onClose);
         }}
         submit={
@@ -362,6 +370,7 @@ function TextEditor({
       >
         <Field label={label} error={invalid ?? undefined}>
           <Input
+            ref={inputRef}
             name="value"
             type={type}
             value={value}
@@ -403,16 +412,17 @@ function MaxRunRow({
   const [draft, setDraft] = useState(String(autoSave.value));
   const [editing, setEditing] = useState(false);
   const [invalid, setInvalid] = useState(false);
+  const maxRunErrorId = useId();
   useEffect(() => {
     if (!editing) setDraft(String(autoSave.value));
   }, [autoSave.value, editing]);
   const commit = () => {
-    setEditing(false);
     const minutes = parseMinutes(draft);
     if (minutes === null) {
       setInvalid(true);
       return;
     }
+    setEditing(false);
     setInvalid(false);
     if (minutes !== autoSave.value) autoSave.change(minutes);
     else setDraft(String(minutes));
@@ -442,10 +452,12 @@ function MaxRunRow({
             <Input
               name="maxRunMinutes"
               aria-label={t("workspace.maxRunLabel")}
+              {...(invalid ? { "aria-describedby": maxRunErrorId } : {})}
               value={draft}
               onValueChange={(value) => {
                 setEditing(true);
                 setDraft(value);
+                if (invalid) setInvalid(parseMinutes(value) === null);
               }}
               inputMode="numeric"
               autoComplete="off"
@@ -458,7 +470,7 @@ function MaxRunRow({
       }
       message={
         invalid ? (
-          <Text variant="meta" as="p" tone="problem" role="alert">
+          <Text variant="meta" as="p" tone="problem" role="alert" id={maxRunErrorId}>
             {t("workspace.maxRunInvalid")}
           </Text>
         ) : (
@@ -546,14 +558,16 @@ function ProjectsSection({
               </Button>
             }
             expanded={
-              <ProjectCandidates
-                workspace={workspace}
-                actions={actions}
-                onAdded={(connectionId, projectId) => {
-                  edit.close();
-                  setFocusKey(projectRowId(connectionId, projectId));
-                }}
-              />
+              <FocusFirst>
+                <ProjectCandidates
+                  workspace={workspace}
+                  actions={actions}
+                  onAdded={(connectionId, projectId) => {
+                    edit.close();
+                    setFocusKey(projectRowId(connectionId, projectId));
+                  }}
+                />
+              </FocusFirst>
             }
           />
         ) : null}
@@ -773,6 +787,7 @@ function ConnectionsSection({
                 <TrackerKeyForm
                   connection={null}
                   actions={actions}
+                  hints="info"
                   primary
                   onClose={add.close}
                   onDone={add.close}
@@ -805,7 +820,11 @@ function ConnectionsSection({
 
 function FocusFirst({ children }: { children: ReactNode }) {
   const ref = useFocusFirstField();
-  return <div ref={ref}>{children}</div>;
+  return (
+    <div ref={ref} tabIndex={-1} {...stylex.props(focusStyles.target)}>
+      {children}
+    </div>
+  );
 }
 
 function ConnectionRow({
@@ -851,16 +870,20 @@ function ConnectionEditor({
   onClose: () => void;
 }) {
   const t = useTranslations("settings");
+  const describeTracker = useCredentialReason("tracker");
   const [name, setName] = useState(connection.name);
   const [apiKey, setApiKey] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
+  useReportUnsaved(name.trim() !== connection.name || apiKey !== "" || webhookSecret !== "");
   const submit = useSubmit();
   const check = useSubmit();
   const ready = name.trim() !== "";
+  const [nameMissing, setNameMissing] = useState(false);
   return (
     <CredentialFormFrame
       onClose={onClose}
       onSubmit={() => {
+        setNameMissing(!ready);
         if (!ready) return;
         submit.run(
           () =>
@@ -889,22 +912,36 @@ function ConnectionEditor({
         </Button>
       }
       submit={
-        <Button variant="primary" type="submit" disabled={submit.sending || !ready}>
+        <Button variant="primary" type="submit" disabled={submit.sending}>
           {submit.sending ? t("saving") : t("save")}
         </Button>
       }
     >
-      <SubmitError state={check.state} />
-      <Field label={t("connections.name")}>
+      <SubmitError state={check.state} describe={describeTracker} />
+      <Field
+        label={t("connections.name")}
+        error={nameMissing ? t("connections.nameRequired") : undefined}
+      >
         <Input
           name="name"
           value={name}
-          onValueChange={setName}
+          onValueChange={(value) => {
+            setName(value);
+            if (nameMissing) setNameMissing(value.trim() === "");
+          }}
           placeholder={t("connections.namePlaceholder")}
           autoComplete="off"
         />
       </Field>
-      <Field label={t("connections.apiKey")} description={t("connections.keepSecret")}>
+      <Field
+        label={t("connections.apiKey")}
+        info={
+          <InfoTip
+            label={t("infoLabel", { label: t("connections.apiKey") })}
+            content={t("connections.keepSecret")}
+          />
+        }
+      >
         <Input
           name="apiKey"
           {...passwordManagerIgnoredSecretProps}
@@ -915,7 +952,12 @@ function ConnectionEditor({
       </Field>
       <Field
         label={t("connections.webhookSecret")}
-        description={t("connections.webhookSecretInfo")}
+        info={
+          <InfoTip
+            label={t("infoLabel", { label: t("connections.webhookSecret") })}
+            content={`${t("connections.webhookSecretInfo")} ${t("connections.keepSecret")}`}
+          />
+        }
       >
         <Input
           name="webhookSecret"
@@ -925,10 +967,18 @@ function ConnectionEditor({
           mono
         />
       </Field>
-      <Field label={t("connections.webhookPath")} description={t("connections.webhookPathInfo")}>
+      <Field
+        label={t("connections.webhookPath")}
+        info={
+          <InfoTip
+            label={t("infoLabel", { label: t("connections.webhookPath") })}
+            content={t("connections.webhookPathInfo")}
+          />
+        }
+      >
         <Input value={connection.webhookPath} readOnly mono />
       </Field>
-      <SubmitError state={submit.state} />
+      <SubmitError state={submit.state} describe={describeTracker} />
     </CredentialFormFrame>
   );
 }
@@ -937,6 +987,7 @@ function GitHubRow({ saved, actions }: { saved: boolean; actions: SettingsAction
   const t = useTranslations("settings");
   const edit = useInlineEdit("github");
   const labelId = useId();
+  const describeGitHub = useCredentialReason("github");
   const check = useSubmit();
   return (
     <SettingsRow
@@ -953,12 +1004,15 @@ function GitHubRow({ saved, actions }: { saved: boolean; actions: SettingsAction
           />
         )
       }
-      message={edit.open ? undefined : <SubmitError state={check.state} />}
+      message={
+        edit.open ? undefined : <SubmitError state={check.state} describe={describeGitHub} />
+      }
       expanded={
         edit.open ? (
           <FocusFirst>
             <GitHubTokenForm
               actions={actions}
+              hints="info"
               primary
               onClose={edit.close}
               onDone={edit.close}
@@ -980,7 +1034,7 @@ function GitHubRow({ saved, actions }: { saved: boolean; actions: SettingsAction
                 </>
               }
             />
-            <SubmitError state={check.state} />
+            <SubmitError state={check.state} describe={describeGitHub} />
           </FocusFirst>
         ) : null
       }
@@ -1058,6 +1112,7 @@ function AddressRow({
 function PowerRow({ power, actions }: { power: PowerView; actions: SettingsActions }) {
   const t = useTranslations("settings");
   const labelId = useId();
+  const switchId = useId();
   const autoSave = useAutoSave(power.preventSleep, (preventSleep: boolean) =>
     actions.savePower({ preventSleep }),
   );
@@ -1065,6 +1120,7 @@ function PowerRow({ power, actions }: { power: PowerView; actions: SettingsActio
     <SettingsRow
       label={t("power.toggle")}
       labelId={labelId}
+      labelFor={switchId}
       disabled={!power.available}
       info={
         <InfoTip label={t("infoLabel", { label: t("power.toggle") })} content={t("power.info")} />
@@ -1073,6 +1129,7 @@ function PowerRow({ power, actions }: { power: PowerView; actions: SettingsActio
       status={<AutoSaveStatusText status={autoSave.status} />}
       control={
         <Switch
+          id={switchId}
           aria-labelledby={labelId}
           checked={power.available && autoSave.value}
           disabled={!power.available}

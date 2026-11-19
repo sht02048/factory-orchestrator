@@ -66,6 +66,7 @@ export function DesktopUpdates({
   const t = useTranslations("settings.updates");
   const ts = useTranslations("settings");
   const autoId = useId();
+  const autoSwitchId = useId();
   const checking = view.check.kind === "checking" || view.check.kind === "downloading";
   const ready = view.check.kind === "ready";
   return (
@@ -103,11 +104,13 @@ export function DesktopUpdates({
       <SettingsRow
         label={t("auto")}
         labelId={autoId}
+        labelFor={autoSwitchId}
         info={
           <InfoTip label={ts("infoLabel", { label: t("auto") })} content={t("autoDescription")} />
         }
         control={
           <Switch
+            id={autoSwitchId}
             aria-labelledby={autoId}
             checked={view.autoUpdate}
             disabled={view.check.kind === "unavailable"}

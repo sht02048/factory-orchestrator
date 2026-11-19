@@ -3,6 +3,7 @@ import {
   Button,
   ExternalIcon,
   Field,
+  InfoTip,
   Input,
   VisuallyHidden,
   buttonStyles,
@@ -12,9 +13,11 @@ import { space } from "@ganger/ui/tokens.stylex";
 import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import type { TrackerConnectionView } from "@ganger/app/settings/model";
+import { EditorBlockedNotice } from "./row-state";
 import {
   SubmitError,
   passwordManagerIgnoredSecretProps,
+  useReportUnsaved,
   useSubmit,
   type SettingsActions,
 } from "./settings-screen";
@@ -77,6 +80,7 @@ export function CredentialFormFrame({
       }}
     >
       {children}
+      {onClose === undefined ? null : <EditorBlockedNotice />}
       <div {...stylex.props(styles.actions)}>
         {hasFooter ? <span {...stylex.props(styles.footer)}>{footer}</span> : null}
         <span
@@ -94,6 +98,36 @@ export function CredentialFormFrame({
   );
 }
 
+export type CredentialKind = "tracker" | "github";
+
+export type HintPlacement = "description" | "info";
+
+const CREDENTIAL_ERRORS = [
+  "unauthorized",
+  "rate-limited",
+  "network",
+  "not-found",
+  "invalid",
+] as const;
+
+export function useCredentialReason(kind: CredentialKind): (reason: string) => string | null {
+  const t = useTranslations("settings.credentials.error");
+  return (reason) => {
+    const known = CREDENTIAL_ERRORS.find((r) => r === reason);
+    return known === undefined ? null : t(`${kind}.${known}`);
+  };
+}
+
+function hintProps(
+  hint: string,
+  placement: HintPlacement,
+  infoLabel: string,
+): { description?: string; info?: ReactNode } {
+  return placement === "info"
+    ? { info: <InfoTip label={infoLabel} content={hint} /> }
+    : { description: hint };
+}
+
 export function TrackerKeyForm({
   connection,
   actions,
@@ -102,6 +136,7 @@ export function TrackerKeyForm({
   onClose,
   guide,
   footer,
+  hints = "description",
 }: {
   connection: TrackerConnectionView | null;
   actions: SettingsActions;
@@ -110,17 +145,23 @@ export function TrackerKeyForm({
   onClose?: () => void;
   guide?: ReactNode;
   footer?: ReactNode;
+  hints?: HintPlacement;
 }) {
   const t = useTranslations("settings");
+  const describe = useCredentialReason("tracker");
   const [apiKey, setApiKey] = useState("");
+  useReportUnsaved(apiKey !== "");
   const submit = useSubmit();
   const isNew = connection === null;
   const ready = apiKey.trim() !== "";
+  const [missing, setMissing] = useState(false);
   return (
     <CredentialFormFrame
       onClose={onClose}
       footer={footer}
       onSubmit={() => {
+        setMissing(!ready);
+        setMissing(!ready);
         if (!ready) return;
         submit.run(
           () =>
@@ -137,30 +178,34 @@ export function TrackerKeyForm({
         );
       }}
       submit={
-        <Button
-          variant={primary ? "primary" : "secondary"}
-          type="submit"
-          disabled={submit.sending || !ready}
-        >
+        <Button variant={primary ? "primary" : "secondary"} type="submit" disabled={submit.sending}>
           {submit.sending ? t("connections.checking") : t("credentials.keyCheck")}
         </Button>
       }
     >
       <Field
         label={t("connections.apiKey")}
-        description={isNew ? t("credentials.keyDescription") : t("credentials.keyDescriptionEdit")}
+        error={missing ? t("credentials.keyRequired") : undefined}
+        {...hintProps(
+          isNew ? t("credentials.keyDescription") : t("credentials.keyDescriptionEdit"),
+          hints,
+          t("infoLabel", { label: t("connections.apiKey") }),
+        )}
       >
         <Input
           name="apiKey"
           {...passwordManagerIgnoredSecretProps}
           value={apiKey}
-          onValueChange={setApiKey}
+          onValueChange={(value) => {
+            setApiKey(value);
+            if (missing) setMissing(value.trim() === "");
+          }}
           placeholder={t("credentials.keyPlaceholder")}
           mono
         />
       </Field>
       {guide}
-      <SubmitError state={submit.state} />
+      <SubmitError state={submit.state} describe={describe} />
     </CredentialFormFrame>
   );
 }
@@ -171,17 +216,22 @@ export function GitHubTokenForm({
   onDone,
   onClose,
   footer,
+  hints = "description",
 }: {
   actions: SettingsActions;
   primary: boolean;
   onDone?: () => void;
   onClose?: () => void;
   footer?: ReactNode;
+  hints?: HintPlacement;
 }) {
   const t = useTranslations("settings");
+  const describe = useCredentialReason("github");
   const [token, setToken] = useState("");
+  useReportUnsaved(token !== "");
   const submit = useSubmit();
   const ready = token.trim() !== "";
+  const [missing, setMissing] = useState(false);
   return (
     <CredentialFormFrame
       onClose={onClose}
@@ -198,26 +248,33 @@ export function GitHubTokenForm({
         );
       }}
       submit={
-        <Button
-          variant={primary ? "primary" : "secondary"}
-          type="submit"
-          disabled={submit.sending || !ready}
-        >
+        <Button variant={primary ? "primary" : "secondary"} type="submit" disabled={submit.sending}>
           {submit.sending ? t("saving") : t("github.save")}
         </Button>
       }
     >
-      <Field label={t("github.token")} description={t("credentials.tokenDescription")}>
+      <Field
+        label={t("github.token")}
+        error={missing ? t("credentials.tokenRequired") : undefined}
+        {...hintProps(
+          t("credentials.tokenDescription"),
+          hints,
+          t("infoLabel", { label: t("github.token") }),
+        )}
+      >
         <Input
           name="token"
           {...passwordManagerIgnoredSecretProps}
           value={token}
-          onValueChange={setToken}
+          onValueChange={(value) => {
+            setToken(value);
+            if (missing) setMissing(value.trim() === "");
+          }}
           placeholder={t("credentials.tokenPlaceholder")}
           mono
         />
       </Field>
-      <SubmitError state={submit.state} />
+      <SubmitError state={submit.state} describe={describe} />
     </CredentialFormFrame>
   );
 }

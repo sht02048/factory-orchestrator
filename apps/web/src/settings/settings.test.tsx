@@ -503,7 +503,8 @@ describe("Settings 저장하고 다시 열기", () => {
     const page = await loadSettingsPage(f.context, commerce, now);
     const html = renderProject(page, connection, webProject);
     const text = textOf(html);
-    expect(html).toContain('aria-label="저장소"');
+    expect(html).toContain('aria-label="저장소 도움말"');
+    expect(html).toContain('<section id="agent"');
     expect(text).toContain("에이전트");
     expect(text).not.toContain("러너 이름");
     expect(text).toContain("모델");
@@ -810,7 +811,7 @@ describe("트래커 프로젝트는 Workspace 하나에만", () => {
       queuedRuns: 2,
     });
     const detail = renderProject(before, connection, webProject);
-    expect(detail).toMatch(/<button[^>]*data-variant="danger"[^>]*>빼기<\/button>/);
+    expect(detail).toMatch(/<button[^>]*data-variant="danger"[^>]*>.*?Web 빼기.*?<\/button>/);
     expect(textOf(detail)).toContain("이 Workspace에서 빼기");
 
     expect(removeTrackerProject(f.context, project)).toEqual({ ok: true });

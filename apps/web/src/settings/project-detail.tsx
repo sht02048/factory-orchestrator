@@ -16,7 +16,7 @@ import {
   VisuallyHidden,
   linkStyles,
 } from "@ganger/ui";
-import { size, space } from "@ganger/ui/tokens.stylex";
+import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
 import { useId } from "react";
 import { useTranslations } from "use-intl";
 import type {
@@ -69,6 +69,8 @@ export function ProjectDetailScreen({
   renderLink = plainSettingsLink(ws),
 }: ProjectDetailScreenProps) {
   const t = useTranslations("settings.project");
+  const ts = useTranslations("settings");
+  const tm = useTranslations("settings.mapping");
   const workspace = page.workspace;
   const bound = findBoundProject(workspace, connectionId, projectId);
   const back = renderLink(
@@ -109,25 +111,36 @@ export function ProjectDetailScreen({
       }
     >
       <SettingsLayout>
-        <SettingsSection
-          id="repo"
-          title={t("repo")}
-          info={<InfoTip label={t("repo")} content={t("repoInfo")} />}
-        >
-          <SettingsGroup>
-            <div {...stylex.props(styles.mapping)}>
-              <MappingEditor
-                ws={workspace.general.id}
-                bound={bound}
-                runnerProjects={page.runnerProjects}
-                agents={page.agents}
-                actions={actions}
-                autoAssignLabelId={autoAssignLabelOf(workspace, bound.connection.id)}
-                heading={<VisuallyHidden>{bound.project.name}</VisuallyHidden>}
-              />
-            </div>
-          </SettingsGroup>
-        </SettingsSection>
+        <MappingEditor
+          ws={workspace.general.id}
+          bound={bound}
+          runnerProjects={page.runnerProjects}
+          agents={page.agents}
+          actions={actions}
+          autoAssignLabelId={autoAssignLabelOf(workspace, bound.connection.id)}
+          heading={<VisuallyHidden>{bound.project.name}</VisuallyHidden>}
+          renderSections={({ repos, agent }) => (
+            <>
+              <SettingsSection
+                id="repo"
+                title={t("repo")}
+                info={
+                  <InfoTip
+                    label={ts("infoLabel", { label: t("repo") })}
+                    content={`${tm("routeHint")} ${t("repoInfo")}`}
+                  />
+                }
+              >
+                <SettingsGroup>
+                  <div {...stylex.props(styles.mapping)}>{repos}</div>
+                </SettingsGroup>
+              </SettingsSection>
+              <SettingsSection id="agent" title={tm("agent")}>
+                {agent}
+              </SettingsSection>
+            </>
+          )}
+        />
         <SettingsSection id="assign" title={t("assign")}>
           <SettingsGroup>
             {label === null ? null : (
@@ -212,6 +225,7 @@ function StateRow({
         />
       }
       status={<AutoSaveStatusText status={autoSave.status} />}
+      wideControl
       control={
         <span {...stylex.props(styles.select)}>
           <Select
@@ -265,7 +279,14 @@ function RemoveRow({
       message={<SubmitError state={submit.state} />}
       control={
         <Dialog
-          trigger={t("projects.remove")}
+          trigger={
+            <>
+              <VisuallyHidden>
+                {t("project.removeTrigger", { project: bound.project.name })}
+              </VisuallyHidden>
+              <span aria-hidden="true">{t("projects.remove")}</span>
+            </>
+          }
           triggerVariant="danger"
           title={t("projects.removeTitle", { project: bound.project.name })}
           description={
@@ -303,7 +324,17 @@ function RemoveRow({
 }
 
 const styles = stylex.create({
-  mapping: { paddingBlock: space.s4, paddingInline: space.s5 },
+  mapping: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s3,
+    paddingBlock: space.s4,
+    paddingInline: { default: space.s5, [breakpoints.settingsRowStacked]: space.s4 },
+  },
   crumb: { display: "inline-flex", alignItems: "center", gap: space.s1 },
-  select: { display: "flex", width: size.settingsControlWidth, minWidth: 0 },
+  select: {
+    display: "flex",
+    width: { default: size.settingsControlWidth, [breakpoints.settingsRowStacked]: "100%" },
+    minWidth: 0,
+  },
 });

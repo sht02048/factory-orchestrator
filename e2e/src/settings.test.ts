@@ -284,9 +284,9 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     await page.getByRole("dialog").getByRole("button", { name: settings.projects.remove }).click();
     await page.waitForURL((url) => url.pathname === "/settings");
     await section(settings.sections.projects).getByRole("link", { name: /^Web/ }).waitFor();
-    expect(
-      await section(settings.sections.projects).getByRole("link", { name: /^API/ }).count(),
-    ).toBe(0);
+    await expect
+      .poll(() => section(settings.sections.projects).getByRole("link", { name: /^API/ }).count())
+      .toBe(0);
   });
 
   it("프로젝트 상세의 선택은 고르는 즉시 저장한다", async () => {
@@ -338,6 +338,85 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
       .click();
     await page.waitForURL(/\/runners\?.*ws=ws-acme/);
     expect(await page.evaluate(() => "settingsPageMarker" in globalThis)).toBe(true);
+  });
+});
+
+describe("Settings 폼과 도움말(브라우저, 0119 리뷰 후속)", () => {
+  it("도움말 단추는 눌러도 열리고 다시 누르면 닫힌다", async () => {
+    await openSettings(page);
+    const tip = page.getByRole("button", { name: "최대 실행 시간 도움말" });
+    await tip.click();
+    await page.getByRole("tooltip").getByText("Failed 로 끝내요", { exact: false }).waitFor();
+    await tip.click();
+    await expect.poll(() => page.getByRole("tooltip").filter({ visible: true }).count()).toBe(0);
+  });
+
+  it("고친 값이 남은 줄이 펼쳐져 있으면 다른 줄을 펼치지 않고 알린다", async () => {
+    await openSettings(page);
+    const workspace = section(settings.sections.workspace);
+    await workspace.getByRole("button", { name: settings.change }).click();
+    const name = workspace.getByRole("textbox", { name: settings.workspace.name, exact: true });
+    await name.fill("Acme Draft");
+    await section(settings.sections.connections)
+      .getByRole("button", { name: `${settings.github.label} ${settings.change}` })
+      .click();
+    await page.getByRole("alert").getByText(settings.unsavedBlocked).waitFor();
+    expect(await name.inputValue()).toBe("Acme Draft");
+    expect(await page.getByRole("textbox", { name: settings.github.token }).count()).toBe(0);
+    await workspace.getByRole("button", { name: settings.close }).click();
+    await section(settings.sections.connections)
+      .getByRole("button", { name: `${settings.github.label} ${settings.change}` })
+      .click();
+    await page.getByRole("textbox", { name: settings.github.token }).waitFor();
+  });
+
+  it("비밀값을 비운 채 저장하면 버튼을 막지 않고 칸 아래에 무엇을 넣을지 알린다", async () => {
+    await openSettings(page);
+    const connections = section(settings.sections.connections);
+    await connections.getByRole("button", { name: settings.connections.addLabel }).click();
+    const submit = connections.getByRole("button", { name: settings.credentials.keyCheck });
+    expect(await submit.isDisabled()).toBe(false);
+    await submit.click();
+    await connections.getByText(settings.credentials.keyRequired).waitFor();
+    await page
+      .getByRole("textbox", { name: settings.connections.apiKey, exact: true })
+      .fill("lin_api");
+    await connections.getByText(settings.credentials.keyRequired).waitFor({ state: "detached" });
+  });
+
+  it("맞지 않는 분 값은 넣은 값을 그대로 두고 오류를 그 칸에 잇는다", async () => {
+    await openSettings(page);
+    const minutes = page.getByRole("textbox", { name: settings.workspace.maxRunLabel });
+    await minutes.fill("0");
+    await minutes.press("Enter");
+    await page.getByText(settings.workspace.maxRunInvalid).waitFor();
+    expect(await minutes.inputValue()).toBe("0");
+    const described = await minutes.getAttribute("aria-describedby");
+    expect(await page.locator(`[id="${described}"]`).textContent()).toBe(
+      settings.workspace.maxRunInvalid,
+    );
+    await minutes.fill("12");
+    await page.getByText(settings.workspace.maxRunInvalid).waitFor({ state: "detached" });
+    await page.reload();
+  });
+
+  it("+ 넣기를 누르면 넣을 프로젝트 목록의 첫 버튼으로 포커스가 간다", async () => {
+    await openSettings(page);
+    await section(settings.sections.projects)
+      .getByRole("button", { name: settings.projects.openLabel })
+      .click();
+    await expect.poll(focused).toBe(settings.projects.add);
+  });
+
+  it("스위치 줄의 이름을 눌러도 스위치가 바뀐다", async () => {
+    await openSettings(page, "/settings/mcp");
+    const write = page.getByRole("switch", { name: settings.mcp.writeToggle });
+    const before = await write.getAttribute("aria-checked");
+    await page.locator("label", { hasText: settings.mcp.writeToggle }).click();
+    await expect.poll(() => write.getAttribute("aria-checked")).not.toBe(before);
+    await page.getByText(settings.status.saved, { exact: true }).waitFor();
+    await write.click();
+    await expect.poll(() => write.getAttribute("aria-checked")).toBe(before);
   });
 });
 

@@ -89,7 +89,9 @@ export interface SettingsActions {
   pollRunnerChecks: () => Promise<boolean>;
 }
 
-const ReportUnsavedContext = createContext<(formId: string, unsaved: boolean) => void>(() => {});
+export const ReportUnsavedContext = createContext<(formId: string, unsaved: boolean) => void>(
+  () => {},
+);
 
 export function useReportUnsaved(unsaved: boolean): void {
   const report = use(ReportUnsavedContext);
@@ -171,6 +173,7 @@ export function useReason(): (reason: string) => string {
       case "invalid":
       case "missing-key":
       case "taken":
+      case "unknown":
         return t(`remoteError.${reason}`);
       case "invalid-web-address":
       case "invalid-webhook-address":
@@ -187,12 +190,18 @@ export function useReason(): (reason: string) => string {
   };
 }
 
-export function SubmitError({ state }: { state: SubmitState }) {
+export function SubmitError({
+  state,
+  describe,
+}: {
+  state: SubmitState;
+  describe?: (reason: string) => string | null;
+}) {
   const reason = useReason();
   if (state.kind !== "failed") return null;
   return (
     <Text variant="ui" as="p" tone="problem" role="alert">
-      {reason(state.reason)}
+      {describe?.(state.reason) ?? reason(state.reason)}
     </Text>
   );
 }
@@ -290,8 +299,10 @@ export function RunnerForm({
     setName(value);
     setNameEdited(true);
   };
+  const required = (inputName: string, value: string) =>
+    value.trim() === "" && validation.isTouched(inputName) ? t("runners.required") : undefined;
   const nameField = (
-    <Field label={t("runners.name")}>
+    <Field label={t("runners.name")} error={required("name", name)}>
       <Input
         name="name"
         value={name}
@@ -322,6 +333,7 @@ export function RunnerForm({
   const sshTargetField = (
     <Field
       label={t("runners.sshTarget")}
+      error={required("sshTarget", sshTarget)}
       description={
         direct ? t("runners.direct.sshTargetDescription") : t("runners.sshTargetDescription")
       }
@@ -339,6 +351,7 @@ export function RunnerForm({
   const orcaPathField = (
     <Field
       label={t("runners.orcaPath")}
+      error={direct ? undefined : required("orcaPath", orcaPath)}
       description={
         direct ? t("runners.direct.orcaPathDescription") : t("runners.orcaPathDescription")
       }
@@ -358,7 +371,7 @@ export function RunnerForm({
       }}
       onSubmit={(event) => {
         event.preventDefault();
-        validation.touch("capacity");
+        validation.touch("name", "sshTarget", "orcaPath", "capacity");
         if (!ready || capacityValue === null) return;
         submit.run(
           () =>
@@ -404,11 +417,7 @@ export function RunnerForm({
       )}
       <SubmitError state={submit.state} />
       <Actions>
-        <Button
-          variant={primary ? "primary" : "secondary"}
-          type="submit"
-          disabled={submit.sending || !ready}
-        >
+        <Button variant={primary ? "primary" : "secondary"} type="submit" disabled={submit.sending}>
           {submit.sending
             ? t("saving")
             : isNew

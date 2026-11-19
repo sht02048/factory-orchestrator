@@ -76,7 +76,7 @@ export interface InfoTipProps {
 
 export function InfoTip({ label, content, side = "top" }: InfoTipProps) {
   return (
-    <SdkTooltip type="description">
+    <SdkTooltip type="description" toggleable>
       <TooltipTrigger aria-label={label} className={cx(styles.info)}>
         <InfoIcon />
       </TooltipTrigger>

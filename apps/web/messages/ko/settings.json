@@ -20,7 +20,7 @@
   "infoLabel": "{label} 도움말",
   "externalLink": "새 창에서 열려요",
   "status": {
-    "saving": "저장하는 중",
+    "saving": "저장하는 중…",
     "saved": "저장했어요",
     "reverted": "되돌렸어요"
   },
@@ -32,7 +32,8 @@
     "network": "연결하지 못했어요. 네트워크를 확인하고 다시 해 주세요.",
     "invalid": "설정을 읽지 못했어요. 값을 다시 넣어 주세요.",
     "missing-key": "API 키를 넣어 주세요.",
-    "taken": "다른 Workspace에 이미 있어 넣지 못했어요."
+    "taken": "다른 Workspace에 이미 있어 넣지 못했어요.",
+    "unknown": "Ganger 서버에 닿지 못했어요. 이 화면을 연 서버가 켜져 있는지, 네트워크가 연결됐는지 확인하고 다시 해 주세요."
   },
   "failed": "저장하지 못했어요. 다시 해 주세요.",
   "workspace": {
@@ -94,7 +95,8 @@
     "remove": "이 Workspace에서 빼기",
     "removeDetail": "Mapping도 함께 지워요. 지난 런과 통계는 남아요.",
     "notFound": "이 Workspace에 없는 트래커 프로젝트예요.",
-    "back": "Settings로 돌아가기"
+    "back": "Settings로 돌아가기",
+    "removeTrigger": "{project} 빼기"
   },
   "mapping": {
     "hint": "트래커 프로젝트의 티켓을 어느 저장소(러너 쪽 프로젝트)에서 어떤 에이전트가 처리할지 정해요. 저장소에 라벨을 붙이면 그 라벨이 붙은 티켓은 그 저장소로 가요.",
@@ -162,9 +164,9 @@
     "webhookOff": "webhook 없이 주기적으로 읽어요",
     "webhookPathInfo": "Webhook 공개 주소 뒤에 이 경로를 붙여 트래커의 webhook 주소로 넣어요.",
     "none": "아직 연결한 트래커가 없어요.",
-    "add": "+ 트래커 연결",
+    "add": "+ 더하기",
     "addLabel": "트래커 연결 더하기",
-    "check": "연결 확인",
+    "check": "저장한 키로 다시 확인",
     "checking": "확인하는 중",
     "checkOk": "{name}에 연결했어요",
     "webhookPath": "Webhook 경로",
@@ -174,16 +176,17 @@
     "keepSecret": "바꿀 때만 넣어요. 비우면 저장한 값을 그대로 써요.",
     "webhookSecret": "Webhook signing secret",
     "webhookSecretInfo": "트래커에서 webhook을 만들 때 받은 signing secret이에요. 넣으면 webhook으로 바로 받아요.",
-    "added": "연결을 추가했어요"
+    "added": "트래커 연결을 더했어요",
+    "nameRequired": "연결 이름을 넣어 주세요."
   },
   "github": {
     "label": "GitHub 토큰",
-    "set": "저장했어요",
+    "set": "넣어 뒀어요",
     "unset": "아직 없어요. PR 상태를 읽으려면 넣어 주세요",
     "enter": "넣기",
     "token": "토큰",
     "save": "확인하고 저장",
-    "check": "지금 확인",
+    "check": "저장한 토큰 다시 확인",
     "checking": "확인하는 중",
     "checkOk": "GitHub에 연결했어요",
     "permissionsLabel": "필요한 권한",
@@ -197,7 +200,25 @@
     "keyCheck": "연결 확인",
     "keyGuideLink": "Linear에서 키 만들기",
     "tokenDescription": "GitHub에 연결을 확인한 뒤 암호화해서 저장해요.",
-    "tokenPlaceholder": "github_pat_…"
+    "tokenPlaceholder": "github_pat_…",
+    "error": {
+      "tracker": {
+        "unauthorized": "Linear가 이 키를 받지 않았어요. 키를 끝까지 복사했는지 확인하거나 Linear에서 새 키를 만들어 붙여 넣어 주세요.",
+        "rate-limited": "Linear가 요청이 많다며 잠시 막았어요. 1분쯤 뒤에 다시 확인해 주세요.",
+        "network": "Linear에 연결하지 못했어요. 이 서버의 인터넷 연결을 확인하고 다시 해 주세요.",
+        "not-found": "이 키로 Linear 조직을 찾지 못했어요. 쓰려는 조직의 계정에서 키를 만들었는지 확인해 주세요.",
+        "invalid": "Linear 응답을 읽지 못했어요. 잠시 뒤 다시 해 주세요."
+      },
+      "github": {
+        "unauthorized": "GitHub가 이 토큰을 받지 않았어요. 만료됐거나 잘못 붙여 넣었을 수 있어요. GitHub에서 새 토큰을 만들어 넣어 주세요.",
+        "rate-limited": "GitHub가 요청이 많다며 잠시 막았어요. 몇 분 뒤에 다시 확인해 주세요.",
+        "network": "GitHub에 연결하지 못했어요. 이 서버의 인터넷 연결을 확인하고 다시 해 주세요.",
+        "not-found": "이 토큰으로 GitHub 계정을 읽지 못했어요. 토큰에 Pull requests 읽기 권한을 주고 저장소를 골랐는지 확인해 주세요.",
+        "invalid": "GitHub 응답을 읽지 못했어요. 잠시 뒤 다시 해 주세요."
+      }
+    },
+    "keyRequired": "API 키를 붙여 넣어 주세요.",
+    "tokenRequired": "토큰을 붙여 넣어 주세요."
   },
   "runnersRow": {
     "label": "러너",
@@ -429,5 +450,6 @@
     "repoLabelRejected": "그 라벨은 Mapping에서 저장소를 가르는 데 쓰고 있어요. 다른 라벨을 고르거나 Mapping에서 라벨을 떼어 주세요."
   },
   "changeLabel": "{label} {action}",
-  "revertedRetry": "저장하지 못해 되돌렸어요. 연결을 확인하고 다시 바꿔 주세요."
+  "revertedRetry": "저장하지 못해 되돌렸어요. 연결을 확인하고 다시 바꿔 주세요.",
+  "unsavedBlocked": "저장하지 않은 변경이 있어요. 저장하거나 닫은 뒤 다른 줄을 바꿔 주세요."
 }

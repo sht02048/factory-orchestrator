@@ -4,6 +4,7 @@ import {
   buttonStyles,
   CapacityCells,
   DetailPanel,
+  focusStyles,
   MascotMessage,
   PageHeader,
   PanelRows,
@@ -313,7 +314,11 @@ function RunnerPanel({
           )}
         </div>
         {renderEdit !== undefined && edit.open ? (
-          <div ref={edit.formRef} {...stylex.props(styles.editForm)}>
+          <div
+            ref={edit.formRef}
+            tabIndex={-1}
+            {...stylex.props(styles.editForm, focusStyles.target)}
+          >
             {renderEdit(runner, { onDone: edit.close, onClose: edit.close })}
           </div>
         ) : null}
@@ -348,7 +353,11 @@ function useRunnerEdit() {
   const refocus = useRef(false);
   useEffect(() => {
     if (open) {
-      formRef.current?.querySelector<HTMLElement>("input")?.focus();
+      const form = formRef.current;
+      const field = window.matchMedia("(pointer: fine)").matches
+        ? form?.querySelector<HTMLElement>("input")
+        : null;
+      (field ?? form)?.focus();
       return;
     }
     if (!refocus.current) return;

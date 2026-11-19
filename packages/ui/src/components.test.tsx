@@ -1025,6 +1025,35 @@ describe("새 컴포넌트(티켓 0073)", () => {
 });
 
 describe("설정 한 페이지 부품(티켓 0119)", () => {
+  it("SettingsRow labelFor 는 라벨을 그 스위치에 잇고, 누르면 바뀌는 label 로 그린다", () => {
+    const html = renderToString(
+      <SettingsRow
+        label="잠자기"
+        labelFor="sleep"
+        control={<Switch id="sleep" checked onCheckedChange={noop} />}
+      />,
+    );
+    expect(html).toMatch(/<label for="sleep"[^>]*>잠자기<\/label>/);
+    expect(html).toMatch(/id="sleep"[^>]*role="switch"|role="switch"[^>]*id="sleep"/);
+  });
+
+  it("Field info 는 라벨 옆에 도움말을 두고, mono Input 은 맞춤법 검사를 끈다", () => {
+    const html = renderToString(
+      <Field label="토큰" info={<InfoTip label="토큰 도움말" content="암호화해 저장해요." />}>
+        <Input value="" onValueChange={noop} mono />
+      </Field>,
+    );
+    expect(html).toContain('aria-label="토큰 도움말"');
+    expect(html).toMatch(/spellcheck="false"/i);
+    expect(renderToString(<Input value="" onValueChange={noop} />)).not.toMatch(/spellcheck/i);
+  });
+
+  it("Input invalid 는 aria-invalid 를 단다", () => {
+    expect(
+      renderToString(<Input aria-label="분" value="0" onValueChange={noop} invalid />),
+    ).toContain('aria-invalid="true"');
+  });
+
   it("Switch 는 role=switch 이고 켜짐·못 씀을 aria 로 알린다", () => {
     const on = renderToString(<Switch aria-label="잠자기" checked onCheckedChange={noop} />);
     expect(on).toMatch(/role="switch"/);

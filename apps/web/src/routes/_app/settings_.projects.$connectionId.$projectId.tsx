@@ -61,7 +61,9 @@ function ProjectDetailRoute() {
         actions={actions}
         renderLink={routerSettingsLink}
         onRemoved={() => {
-          void navigate({ to: "/settings" }).then(() => router.invalidate());
+          void router
+            .invalidate({ filter: (match) => match.routeId === "/_app/settings" })
+            .then(() => navigate({ to: "/settings" }));
         }}
       />
     </ScreenMessages>

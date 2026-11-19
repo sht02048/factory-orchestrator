@@ -221,6 +221,7 @@ export type SettingsDetailTone = "default" | "problem";
 export interface SettingsRowProps {
   label: ReactNode;
   labelId?: string;
+  labelFor?: string;
   info?: ReactNode;
   detail?: ReactNode;
   detailTone?: SettingsDetailTone;
@@ -231,6 +232,7 @@ export interface SettingsRowProps {
   message?: ReactNode;
   expanded?: ReactNode;
   formOnly?: boolean;
+  wideControl?: boolean;
   disabled?: boolean;
   id?: string;
   ref?: Ref<HTMLDivElement>;
@@ -239,6 +241,7 @@ export interface SettingsRowProps {
 export function SettingsRow({
   label,
   labelId,
+  labelFor,
   info,
   detail,
   detailTone = "default",
@@ -249,6 +252,7 @@ export function SettingsRow({
   message,
   expanded,
   formOnly = false,
+  wideControl = false,
   disabled = false,
   id,
   ref,
@@ -271,10 +275,11 @@ export function SettingsRow({
       {...(id === undefined ? {} : { id })}
       {...stylex.props(styles.row, open && styles.rowOpen)}
     >
-      <div {...stylex.props(styles.rowMain)}>
+      <div {...stylex.props(styles.rowMain, wideControl && styles.rowMainWide)}>
         <RowText
           label={label}
           labelId={labelId}
+          labelFor={labelFor}
           info={info}
           detail={detail}
           detailTone={detailTone}
@@ -282,7 +287,7 @@ export function SettingsRow({
           disabled={disabled}
           value={value}
         />
-        <span {...stylex.props(styles.rowEnd)}>
+        <span {...stylex.props(styles.rowEnd, wideControl && styles.rowEndWide)}>
           {value === undefined ? null : (
             <span {...stylex.props(textStyles("ui"), styles.value)}>{value}</span>
           )}
@@ -332,6 +337,7 @@ export function SettingsLinkRow({
             <RowText
               label={label}
               labelId={undefined}
+              labelFor={undefined}
               info={undefined}
               detail={detail}
               detailTone={detailTone}
@@ -359,6 +365,7 @@ export function SettingsLinkRow({
 function RowText({
   label,
   labelId,
+  labelFor,
   info,
   detail,
   detailTone,
@@ -368,6 +375,7 @@ function RowText({
 }: {
   label: ReactNode;
   labelId: string | undefined;
+  labelFor: string | undefined;
   info: ReactNode;
   detail: ReactNode;
   detailTone: SettingsDetailTone;
@@ -378,13 +386,28 @@ function RowText({
   return (
     <span {...stylex.props(styles.rowText)}>
       <span {...stylex.props(styles.labelLine)}>
-        <span
-          {...(labelId === undefined ? {} : { id: labelId })}
-          {...stylex.props(textStyles("title", disabled ? "disabled" : "strong"))}
-        >
-          {label}
-        </span>
-        {info}
+        {labelFor === undefined ? (
+          <span
+            {...(labelId === undefined ? {} : { id: labelId })}
+            {...stylex.props(textStyles("title", disabled ? "disabled" : "strong"))}
+          >
+            {label}
+          </span>
+        ) : (
+          <label
+            htmlFor={labelFor}
+            {...(labelId === undefined ? {} : { id: labelId })}
+            {...stylex.props(
+              textStyles("title", disabled ? "disabled" : "strong"),
+              !disabled && styles.labelClickable,
+            )}
+          >
+            {label}
+          </label>
+        )}
+        {info === undefined || info === null ? null : (
+          <span {...stylex.props(styles.infoSlot)}>{info}</span>
+        )}
       </span>
       {detail === undefined || detail === null ? null : (
         <span
@@ -403,8 +426,6 @@ function RowText({
     </span>
   );
 }
-
-const ROW_TEXT_MIN = "12rem";
 
 const NAV_TOP_HEIGHT = `calc(${size.iconButton} + 2 * ${space.s3} + ${space.s4})`;
 
@@ -520,12 +541,16 @@ const styles = stylex.create({
   rowOpen: { backgroundColor: colors.bgCardHover },
   rowMain: {
     display: "flex",
-    flexWrap: { default: "nowrap", [breakpoints.settingsRowStacked]: "wrap" },
     alignItems: "center",
     gap: { default: space.s4, [breakpoints.settingsRowStacked]: space.s3 },
     minHeight: size.rowMinHeight,
     paddingBlock: space.s3,
     paddingInline: { default: space.s5, [breakpoints.settingsRowStacked]: space.s4 },
+  },
+  rowMainWide: { flexWrap: { default: "nowrap", [breakpoints.settingsRowStacked]: "wrap" } },
+  rowEndWide: {
+    flexBasis: { default: "auto", [breakpoints.settingsRowStacked]: "100%" },
+    maxWidth: { default: "60%", [breakpoints.settingsRowStacked]: "100%" },
   },
   linkRow: {
     color: "inherit",
@@ -540,10 +565,16 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: space.px2,
     flexGrow: 1,
-    flexBasis: { default: "auto", [breakpoints.settingsRowStacked]: ROW_TEXT_MIN },
     minWidth: 0,
   },
-  labelLine: { display: "flex", alignItems: "center", gap: space.s1, minWidth: 0 },
+  labelClickable: { cursor: "pointer" },
+  labelLine: { display: "block", minWidth: 0 },
+  infoSlot: {
+    display: "inline-flex",
+    verticalAlign: "middle",
+    marginInlineStart: space.s1,
+    marginBlock: `calc(-1 * ${space.s1})`,
+  },
   detail: { overflowWrap: "anywhere" },
   mono: { fontFamily: fonts.mono },
   rowEnd: {
@@ -551,7 +582,7 @@ const styles = stylex.create({
     alignItems: "center",
     gap: space.s3,
     flexShrink: 0,
-    maxWidth: { default: "60%", [breakpoints.settingsRowStacked]: "100%" },
+    maxWidth: "60%",
     marginInlineStart: "auto",
   },
   valueBelow: { display: { default: "none", [breakpoints.settingsRowStacked]: "block" } },

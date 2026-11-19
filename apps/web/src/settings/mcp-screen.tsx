@@ -62,8 +62,16 @@ export function McpScreen({
   return (
     <ScreenLayout header={<PageHeader lead={back} title={t("mcp.title")} />}>
       <SettingsLayout>
-        <Text variant="body">{t("mcp.intro")}</Text>
-        <SettingsSection id="client" title={t("mcp.clientTitle")}>
+        <SettingsSection
+          id="client"
+          title={t("mcp.clientTitle")}
+          info={
+            <InfoTip
+              label={t("infoLabel", { label: t("mcp.clientTitle") })}
+              content={t("mcp.intro")}
+            />
+          }
+        >
           <ClientConfig mcp={mcp} />
         </SettingsSection>
         <SettingsSection id="write" title={t("mcp.writeTitle")}>
@@ -74,7 +82,12 @@ export function McpScreen({
         <SettingsSection
           id="recent"
           title={t("mcp.recentTitle")}
-          info={<Text variant="meta">{t("mcp.recentNote")}</Text>}
+          info={
+            <InfoTip
+              label={t("infoLabel", { label: t("mcp.recentTitle") })}
+              content={t("mcp.recentNote")}
+            />
+          }
         >
           <Recent recent={mcp.recent} now={mcp.now} />
         </SettingsSection>
@@ -125,16 +138,19 @@ function ClientConfig({ mcp }: { mcp: McpView }) {
 function WriteRow({ allowed, actions }: { allowed: boolean; actions: SettingsActions }) {
   const t = useTranslations("settings.mcp");
   const labelId = useId();
+  const switchId = useId();
   const autoSave = useAutoSave(allowed, (next: boolean) => actions.saveMcpWrite({ allowed: next }));
   return (
     <SettingsRow
       label={t("writeToggle")}
       labelId={labelId}
+      labelFor={switchId}
       info={<InfoTip label={t("writeRiskLabel")} content={t("writeRisk")} />}
       detail={t("writeDetail")}
       status={<AutoSaveStatusText status={autoSave.status} />}
       control={
         <Switch
+          id={switchId}
           aria-labelledby={labelId}
           checked={autoSave.value}
           onCheckedChange={autoSave.change}
