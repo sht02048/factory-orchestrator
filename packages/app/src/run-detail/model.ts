@@ -1,4 +1,4 @@
-import type { AgentResult, PrState, RunState, SummaryOutcome } from "@ganger/core";
+import type { AgentResult, PauseSource, PrState, RunState, SummaryOutcome } from "@ganger/core";
 import type { McpActionOutcome } from "@ganger/db";
 import type { InputWait } from "../home/model.js";
 import type { RunControlView } from "../run-control-view.js";
@@ -36,7 +36,7 @@ export type LogTailView =
 export type RunDetailStatus =
   | { state: "queued"; queuedReason: QueuedReason }
   | { state: "running" }
-  | { state: "paused"; pausedSince: string | null }
+  | { state: "paused"; pausedSince: string | null; pauseSource: PauseSource }
   | {
       state: "waiting-for-input";
       input: PendingInput;

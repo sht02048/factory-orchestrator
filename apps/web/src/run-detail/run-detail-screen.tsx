@@ -259,6 +259,7 @@ function inputWaitedMs(run: RunDetail): number | null {
 
 function Reason({ run }: { run: RunDetail }) {
   const t = useTranslations("run.reason");
+  const domain = useTranslations("domain");
   const queuedReasonText = useQueuedReasonText();
   const { clock } = useTime();
   const { status } = run;
@@ -268,7 +269,7 @@ function Reason({ run }: { run: RunDetail }) {
     case "running":
       return t("running");
     case "paused":
-      return t("paused");
+      return t("paused", { source: domain(`pauseSource.${status.pauseSource}`) });
     case "waiting-for-input":
       return t(inputKey(status.input));
     case "disconnected":

@@ -241,6 +241,9 @@ describe("Run 상세 화면", () => {
     expect(buttonsOf(html)).toContainEqual({ variant: "primary", label: runJson.control.resume });
     expect(labels(html)).not.toContain(runJson.control.pause);
     expect(text(html)).toContain(runJson.next.paused);
+    expect(text(html)).toContain(
+      runJson.reason.paused.replace("{source}", domain.pauseSource.operator),
+    );
     expect(text(html)).toContain(runJson.timeline.paused);
     expect(detail.executionMs).toBe(before - 30 * 60_000);
   });

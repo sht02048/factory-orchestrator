@@ -15,6 +15,7 @@ import type {
   CommentId,
   InvalidRunTransition,
   NotStartedAgentResult,
+  PauseSource,
   PrState,
   PullRequestId,
   Run,
@@ -74,6 +75,7 @@ export interface RunRecords {
   unreachableSince: Date | null;
   pausedSince: Date | null;
   pausedMs: number;
+  pauseSource: PauseSource | null;
   lastLog: string[] | null;
 }
 
@@ -188,6 +190,7 @@ function toRunRecords(row: RunRow): RunRecords {
     unreachableSince: row.unreachableSince,
     pausedSince: row.pausedSince,
     pausedMs: row.pausedMs,
+    pauseSource: row.pauseSource,
     lastLog: row.lastLog,
   };
 }
@@ -425,7 +428,8 @@ export type RunStateChange =
       started?: { worktree: WorktreeRef; branch: string; agentRef: AgentRef };
       resumedAgentRef?: AgentRef;
     }
-  | { to: "waiting-for-input" | "paused" | "disconnected" }
+  | { to: "paused"; source?: PauseSource }
+  | { to: "waiting-for-input" | "disconnected" }
   | {
       to: "ended";
       agentResult: AgentResult;
@@ -459,7 +463,10 @@ export function changeRunState(
     if (!transition.ok) return { ok: false, error: transition.error };
 
     const where = and(eq(runs.id, runId), eq(runs.state, current.state));
-    const pauseClock = pauseClockAfter(db, runId, change.to, now);
+    const pauseClock = {
+      ...pauseClockAfter(db, runId, change.to, now),
+      ...pauseSourceAfter(db, runId, change),
+    };
     if (change.to === "ended") {
       const notStarted = current.state === "queued";
       const runnerUnreached = change.runnerUnreached ?? false;
@@ -523,6 +530,21 @@ function pauseClockAfter(
       ? {}
       : { pausedMs: (row?.pausedMs ?? 0) + Math.max(0, now.getTime() - since.getTime()) };
   return { pausedSince: to === "paused" ? now : null, ...counted };
+}
+
+function pauseSourceAfter(
+  db: Database,
+  runId: RunId,
+  change: RunStateChange,
+): { pauseSource: PauseSource | null } | Record<string, never> {
+  if (change.to === "disconnected") return {};
+  if (change.to !== "paused") return { pauseSource: null };
+  const kept = db
+    .select({ pauseSource: runs.pauseSource })
+    .from(runs)
+    .where(eq(runs.id, runId))
+    .get()?.pauseSource;
+  return { pauseSource: change.source ?? kept ?? "operator" };
 }
 
 export function lastStateBeforeDisconnect(db: Database, runId: RunId): RunState | null {

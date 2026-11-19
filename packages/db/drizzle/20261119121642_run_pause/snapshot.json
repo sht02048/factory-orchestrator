@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "e60a0e10-a72c-4232-a95e-0413380ac119",
+  "id": "daa5f0e7-6722-443d-a6e9-6771b7f53ddd",
   "prevIds": ["b41d72f4-b382-4401-a87a-c8cb0ba2d802"],
   "ddl": [
     {
@@ -1480,6 +1480,16 @@
     },
     {
       "table": "runs",
+      "name": "pause_source",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
       "name": "last_log",
       "type": "text",
       "notNull": false,
@@ -2497,6 +2507,18 @@
       "table": "runs",
       "name": "runs_paused_ms",
       "value": "\"paused_ms\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_pause_source",
+      "value": "\"pause_source\" IN ('operator')",
+      "entityType": "checks"
+    },
+    {
+      "table": "runs",
+      "name": "runs_paused_has_source",
+      "value": "\"state\" <> 'paused' OR \"pause_source\" IS NOT NULL",
       "entityType": "checks"
     },
     {

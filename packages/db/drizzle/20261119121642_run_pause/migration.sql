@@ -10,6 +10,7 @@ CREATE TABLE `run_control_requests` (
 --> statement-breakpoint
 ALTER TABLE `runs` ADD `paused_since` integer;--> statement-breakpoint
 ALTER TABLE `runs` ADD `paused_ms` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE `runs` ADD `pause_source` text;--> statement-breakpoint
 PRAGMA foreign_keys=OFF;--> statement-breakpoint
 CREATE TABLE `__new_runs` (
 	`id` text PRIMARY KEY,
@@ -51,6 +52,7 @@ CREATE TABLE `__new_runs` (
 	`unreachable_since` integer,
 	`paused_since` integer,
 	`paused_ms` integer DEFAULT 0 NOT NULL,
+	`pause_source` text,
 	`last_log` text,
 	CONSTRAINT `fk_runs_tracker_connection_id_tracker_connections_id_fk` FOREIGN KEY (`tracker_connection_id`) REFERENCES `tracker_connections`(`id`),
 	CONSTRAINT `fk_runs_workspace_id_workspaces_id_fk` FOREIGN KEY (`workspace_id`) REFERENCES `workspaces`(`id`),
@@ -65,6 +67,8 @@ CREATE TABLE `__new_runs` (
 	CONSTRAINT "runs_active_started" CHECK("state" NOT IN ('running', 'waiting-for-input', 'paused', 'disconnected') OR "started_at" IS NOT NULL),
 	CONSTRAINT "runs_paused_since_iff_paused" CHECK(("state" = 'paused') = ("paused_since" IS NOT NULL)),
 	CONSTRAINT "runs_paused_ms" CHECK("paused_ms" >= 0),
+	CONSTRAINT "runs_pause_source" CHECK("pause_source" IN ('operator')),
+	CONSTRAINT "runs_paused_has_source" CHECK("state" <> 'paused' OR "pause_source" IS NOT NULL),
 	CONSTRAINT "runs_started_has_runner_worktree" CHECK("started_at" IS NULL OR ("runner_id" IS NOT NULL AND "worktree_ref" IS NOT NULL AND "branch" IS NOT NULL AND "agent_ref" IS NOT NULL)),
 	CONSTRAINT "runs_not_started_ended" CHECK("state" <> 'ended' OR "started_at" IS NOT NULL OR ("agent_result" IN ('canceled', 'could-not-start') AND "pr_state" = 'none' AND "worktree_ref" IS NULL)),
 	CONSTRAINT "runs_could_not_start_not_started" CHECK("agent_result" IS NULL OR "agent_result" <> 'could-not-start' OR "started_at" IS NULL),

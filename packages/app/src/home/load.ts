@@ -135,6 +135,7 @@ export function loadHomePage(
         return {
           ...base,
           state: run.state,
+          pauseSource: records.pauseSource ?? "operator",
           pausedMs: since === null ? null : Math.max(0, now.getTime() - since.getTime()),
         };
       }

@@ -1,4 +1,10 @@
-import { AGENT_RESULTS, NOT_STARTED_AGENT_RESULTS, PR_STATES, RUN_STATES } from "@ganger/core";
+import {
+  AGENT_RESULTS,
+  NOT_STARTED_AGENT_RESULTS,
+  PAUSE_SOURCES,
+  PR_STATES,
+  RUN_STATES,
+} from "@ganger/core";
 import { MCP_ACTION_OUTCOMES } from "./mcp-actions-model.js";
 import { NOTIFICATION_EVENT_KINDS } from "./notification-events-model.js";
 import type {
@@ -249,6 +255,7 @@ export const runs = sqliteTable(
     unreachableSince: timeMs("unreachable_since"),
     pausedSince: timeMs("paused_since"),
     pausedMs: integer("paused_ms").notNull().default(0),
+    pauseSource: text("pause_source", { enum: PAUSE_SOURCES }),
     lastLog: text("last_log", { mode: "json" }).$type<string[]>(),
   },
   (t) => [
@@ -268,6 +275,8 @@ export const runs = sqliteTable(
       sql`(${t.state} = 'paused') = (${t.pausedSince} IS NOT NULL)`,
     ),
     check("runs_paused_ms", sql`${t.pausedMs} >= 0`),
+    check("runs_pause_source", sql`${t.pauseSource} IN ${inList(PAUSE_SOURCES)}`),
+    check("runs_paused_has_source", sql`${t.state} <> 'paused' OR ${t.pauseSource} IS NOT NULL`),
     check(
       "runs_started_has_runner_worktree",
       sql`${t.startedAt} IS NULL OR (${t.runnerId} IS NOT NULL AND ${t.worktreeRef} IS NOT NULL AND ${t.branch} IS NOT NULL AND ${t.agentRef} IS NOT NULL)`,

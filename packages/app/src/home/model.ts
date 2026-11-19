@@ -1,5 +1,12 @@
 import type { UsageWindowKind } from "@ganger/core";
-import type { AgentResult, PrState, RunId, SummaryOutcome, TicketKey } from "@ganger/core";
+import type {
+  AgentResult,
+  PauseSource,
+  PrState,
+  RunId,
+  SummaryOutcome,
+  TicketKey,
+} from "@ganger/core";
 import type { RunControlView } from "../run-control-view.js";
 import type { QueuedReason } from "../runs/model.js";
 import type { RunnerIssueCause, WorkspaceChoice, WorkspaceSummary } from "../shell/model.js";
@@ -38,7 +45,7 @@ interface HomeRunBase {
 export type HomeRun =
   | (HomeRunBase & { state: "queued"; queuedReason: QueuedReason })
   | (HomeRunBase & { state: "running" })
-  | (HomeRunBase & { state: "paused"; pausedMs: number | null })
+  | (HomeRunBase & { state: "paused"; pausedMs: number | null; pauseSource: PauseSource })
   | (HomeRunBase & {
       state: "waiting-for-input";
       input: InputWait | null;

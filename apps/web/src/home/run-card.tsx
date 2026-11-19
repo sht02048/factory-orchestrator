@@ -134,6 +134,7 @@ function useCardParts(
       };
     case "paused":
       return {
+        detail: tDomain(`pauseSource.${run.pauseSource}`),
         ...failed,
         meta: runner,
         ...(run.pausedMs === null

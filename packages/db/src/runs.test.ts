@@ -613,6 +613,24 @@ describe("Paused(0118)", () => {
     expect(getRunWithRecords(db, id)?.records.pausedSince).toEqual(at(9));
   });
 
+  it("멈춘 이유를 Paused 동안 두고, Disconnected를 거쳐도 지키며, 재개하면 비운다(0120 대비)", () => {
+    const db = seededDatabase();
+    const id = runningRun(db);
+    changeRunState(db, id, { to: "paused", source: "operator" }, at(1));
+    expect(getRunWithRecords(db, id)?.records.pauseSource).toBe("operator");
+    changeRunState(db, id, { to: "disconnected" }, at(7));
+    expect(getRunWithRecords(db, id)?.records.pauseSource).toBe("operator");
+    changeRunState(db, id, { to: "paused" }, at(9));
+    expect(getRunWithRecords(db, id)?.records.pauseSource).toBe("operator");
+    changeRunState(db, id, { to: "running" }, at(10));
+    expect(getRunWithRecords(db, id)?.records.pauseSource).toBeNull();
+    changeRunState(db, id, { to: "paused" }, at(11));
+    expect(getRunWithRecords(db, id)?.records.pauseSource).toBe("operator");
+    expect(() =>
+      db.$client.prepare("UPDATE runs SET pause_source = NULL WHERE id = ?").run(id),
+    ).toThrow(/CHECK/);
+  });
+
   it("DB가 Paused 런에만 멈춘 시각을 허용한다", () => {
     const db = seededDatabase();
     const id = runningRun(db);

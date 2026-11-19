@@ -753,6 +753,7 @@ describe("Dashboard 멈추기·재개(0118)", () => {
     expect(buttonsOf(paused).map((button) => button.label)).toContain(homeJson.card.resume);
     expect(paused).not.toContain(homeJson.card.menu.replace("{key}", "ACME-10"));
     expect(text(paused)).toContain("20분째");
+    expect(text(paused)).toContain(domain.pauseSource.operator);
   });
 
   it("요청 중이면 카드 아래 줄에 멈추는 중을 보이고 행동을 숨기며, 실패하면 이유를 보인다", () => {

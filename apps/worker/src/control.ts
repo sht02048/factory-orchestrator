@@ -60,7 +60,7 @@ async function applyRunControl(
   if (request.control === "pause") {
     await runner.pauseAgent(onRunner);
     return recorded(context, run, () =>
-      changeRunState(db, run.id, { to: "paused" }, context.now()),
+      changeRunState(db, run.id, { to: "paused", source: "operator" }, context.now()),
     );
   }
   const resumed = await runner.resumeAgent(onRunner, {

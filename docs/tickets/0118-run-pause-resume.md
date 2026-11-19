@@ -31,9 +31,9 @@ blocked_by: []
 
 - **core**: `RUN_STATES`에 `paused`. 전이 `running → paused`, `paused → running | disconnected | ended`, `disconnected → paused`(멈춘 런이 다시 닿았을 때). `planRunControl(state, "pause" | "resume")`: 멈추기는 Running만, 재개는 Paused만. 취소는 Paused도 "에이전트를 멈추고 끝내기". `decideTimeout`은 `pausedMs`를 빼고 세고 Paused면 보지 않는다(`countedRunMs`). `decideConnection`은 Paused도 5분 규칙을 따른다.
 - **Runner 어댑터**: `pauseAgent(run)`, `resumeAgent(run, { agent, model?, message, restartPrompt })` → `{ agentRef, restarted }`. runner-orca는 위 명령, 가짜 어댑터(`FakeRunner`)는 `paused`·`resumes` 기록과 `failNextControl`.
-- **DB**: `runs.paused_since`(Paused 동안만, CHECK로 강제), `runs.paused_ms`(지난 멈춤 합). 상태를 바꿀 때 `changeRunState`가 멈춘 시간을 쌓는다. 새 표 `run_control_requests`(런마다 한 줄: 멈추기/재개, 요청 시각, 끝난 시각, 실패 이유). 웹이 요청을 남기고(취소 요청 중이면 거절) worker가 처리한다. 취소 요청과 같은 모양이다.
+- **DB**: `runs.paused_since`(Paused 동안만, CHECK로 강제), `runs.paused_ms`(지난 멈춤 합), `runs.pause_source`(멈춘 이유. 0118은 `operator` 하나이고, Paused인 동안 반드시 있고 Disconnected를 거쳐도 지키며 재개하면 비운다. 러너에서 멈춤·보고 없이 멈춤 같은 다른 값을 판정하는 일은 티켓 0120이 한다). 상태를 바꿀 때 `changeRunState`가 멈춘 시간을 쌓는다. 새 표 `run_control_requests`(런마다 한 줄: 멈추기/재개, 요청 시각, 끝난 시각, 실패 이유). 웹이 요청을 남기고(취소 요청 중이면 거절) worker가 처리한다. 취소 요청과 같은 모양이다.
 - **worker**: 틱마다 `processRunControlRequests`가 감시보다 먼저 요청을 처리한다. 실패 이유는 `runner-unreachable`·`agent-not-running`·`runner-error`·`state-changed` 넷으로 남기고 화면이 한국어로 보인다. 감시(`watchActiveRuns`)는 Paused 런도 본다. 보고 없이 사라짐은 Paused로 두고(재개가 새 에이전트를 띄운다), 완료 보고·워크트리 없음·취소는 지금 규칙대로 끝낸다. 시간 초과는 보지 않는다. ssh가 5분 닿지 않으면 Disconnected가 되고, 다시 닿으면 이력에서 Disconnected 직전 상태가 Paused인지 보고 Paused로 돌아간다.
-- **웹**: 서버 함수 `controlRun({ runId, control })`. Dashboard Running 칸의 Running 카드 오른쪽 위 메뉴(`Menu variant="icon"`, `KanbanCard menu`)에 "멈추기", Paused 카드에 꼬리표 `Paused`, "{n}분째 멈춤", "재개하기" 버튼. 오른쪽 패널에도 같은 행동을 둔다. 요청 중이면 카드 아래 줄에 "멈추는 중"/"재개하는 중", 실패하면 카드 설명에 문제 색으로 "멈추지 못했어요. {이유}"(`detailTone="problem"`). 실패는 10분 동안만 보인다(그 뒤에는 지금 상태와 맞지 않을 수 있다). 요청이 처리될 때까지 2초마다 다시 읽는다. 요청을 남긴 뒤 메뉴·버튼이 사라지므로 포커스를 카드 버튼(패널에서는 상태 줄)으로 옮기고 결과는 토스트로 알린다. 늦게 온 실패는 Dashboard 토스트와 패널·Run 상세의 미리 둔 `role="status"` 줄로 알린다. 그사이 상태가 바뀌어 거절되면 토스트로 알리고 다시 읽는다. Run 상세 머리에 "멈추기"(보조)/"재개하기"(주) 버튼, 상태 줄 `role="status"`에 요청 중·실패 문구. 지나온 일에 "멈춤"·"재개". 실행 시간(Dashboard·Runs·Run 상세)은 멈춘 시간을 뺀다. 문장에서는 Paused 런을 "멈춰 둔 런"으로 써 Dashboard 요약의 "멈춘 런"(Failed·Disconnected)과 가른다.
+- **웹**: 서버 함수 `controlRun({ runId, control })`. Dashboard Running 칸의 Running 카드 오른쪽 위 메뉴(`Menu variant="icon"`, `KanbanCard menu`)에 "멈추기", Paused 카드에 꼬리표 `Paused`, "{n}분째 멈춤", "재개하기" 버튼. 오른쪽 패널에도 같은 행동을 둔다. 요청 중이면 카드 아래 줄에 "멈추는 중"/"재개하는 중", 실패하면 카드 설명에 문제 색으로 "멈추지 못했어요. {이유}"(`detailTone="problem"`). 실패는 10분 동안만 보인다(그 뒤에는 지금 상태와 맞지 않을 수 있다). 요청이 처리될 때까지 2초마다 다시 읽는다. 요청을 남긴 뒤 메뉴·버튼이 사라지므로 포커스를 카드 버튼(패널에서는 상태 줄)으로 옮기고 결과는 토스트로 알린다. 늦게 온 실패는 Dashboard 토스트와 패널·Run 상세의 미리 둔 `role="status"` 줄로 알린다. 그사이 상태가 바뀌어 거절되면 토스트로 알리고 다시 읽는다. Run 상세 머리에 "멈추기"(보조)/"재개하기"(주) 버튼, 상태 줄 `role="status"`에 요청 중·실패 문구. 지나온 일에 "멈춤"·"재개". 카드 설명과 Run 상세 이유 첫머리에 멈춘 이유 한 줄(`operator`는 "멈췄어요")을 둔다. 실행 시간(Dashboard·Runs·Run 상세)은 멈춘 시간을 뺀다. 문장에서는 Paused 런을 "멈춰 둔 런"으로 써 Dashboard 요약의 "멈춘 런"(Failed·Disconnected)과 가른다.
 - **브라우저 번들**: 화면이 쓰는 `RunControlView`·`availableRunControl`은 `@ganger/app/run-control-view`에 두고, DB를 읽는 `runControlOf`·`requestControl`은 `@ganger/app/run-control`에 둔다. 섞으면 `@ganger/db`(node 모듈)가 브라우저로 딸려 가 화면이 깨진다.
 - **Runs**: 아래 줄 상태 칩에 Paused, 위 줄 묶음은 진행 중에 든다. 오른쪽 패널 설명 문장.
 - **통계**: Stats는 끝난 런만 세므로 Paused 런은 들지 않는다. 리드 타임은 할당부터 끝날 때까지의 벽시계 시간이라 멈춘 시간도 든다(바꾸지 않는다).
@@ -59,9 +59,9 @@ blocked_by: []
 
 ## DB 마이그레이션과 되돌리기
 
-`packages/db/drizzle/20261119105908_run_pause`가 `run_control_requests`를 만들고 `runs`에 `paused_since`·`paused_ms`를 더하며, 상태 CHECK에 `paused`를 넣으려고 `runs`를 다시 만든다(SQLite는 CHECK를 바꿀 수 없다).
+`packages/db/drizzle/20261119121642_run_pause`가 `run_control_requests`를 만들고 `runs`에 `paused_since`·`paused_ms`·`pause_source`를 더하며, 상태 CHECK에 `paused`를 넣으려고 `runs`를 다시 만든다(SQLite는 CHECK를 바꿀 수 없다).
 
 앞 버전은 모르는 마이그레이션이 적힌 DB로 시작하지 않는다(`migrate.ts`: "database has migrations this version does not know"). 그래서 되돌리는 길은 둘이다.
 
 1. 올리기 전에 떠 둔 DB 백업으로 되살린다. 그 사이의 런 기록은 잃는다.
-2. 기록을 지키려면 먼저 Paused 런을 모두 재개하거나 취소하고, 서버를 멈춘 뒤 SQLite에서 `runs`를 앞 CHECK(`paused` 없음)로 다시 만들고 `run_control_requests` 표와 `schema_migrations`의 `20261119105908_run_pause` 줄을 지운다. `paused_since`·`paused_ms` 열은 앞 코드가 읽지 않아 다시 만들 때 빼면 된다.
+2. 기록을 지키려면 먼저 Paused 런을 모두 재개하거나 취소하고, 서버를 멈춘 뒤 SQLite에서 `runs`를 앞 CHECK(`paused` 없음)로 다시 만들고 `run_control_requests` 표와 `schema_migrations`의 `20261119121642_run_pause` 줄을 지운다. `paused_since`·`paused_ms`·`pause_source` 열은 앞 코드가 읽지 않아 다시 만들 때 빼면 된다.

@@ -117,7 +117,11 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date):
     case "running":
       return { state: "running" };
     case "paused":
-      return { state: "paused", pausedSince: records.pausedSince?.toISOString() ?? null };
+      return {
+        state: "paused",
+        pausedSince: records.pausedSince?.toISOString() ?? null,
+        pauseSource: records.pauseSource ?? "operator",
+      };
     case "waiting-for-input": {
       const input = pendingInput(db, run.id) ?? { kind: "unknown" };
       return { state: "waiting-for-input", input, inputSince: inputSinceOf(db, run.id, input) };
