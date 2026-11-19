@@ -124,26 +124,19 @@
     "summary": "트래커 프로젝트 {count}개 · {names}"
   },
   "mapping": {
-    "trackerProject": "트래커 프로젝트",
-    "runnerProject": "러너 쪽 프로젝트",
-    "agent": "에이전트",
     "inProgress": "시작하면 옮길 상태",
-    "rowState": "다 채웠는지",
-    "tableLabel": "트래커 프로젝트별 Mapping",
-    "cellLabel": "{project}의 {column}",
     "rowDone": "다 채웠어요",
     "rowEmpty": "아직 비어 있어요",
-    "needAgent": "에이전트도 골라야 저장해요.",
-    "needRunnerProject": "러너 쪽 프로젝트도 골라야 저장해요.",
     "labelTitle": "Auto-assign Label",
     "labelHint": "이 라벨이 붙은 티켓은 운영자 없이 할당해요. 라벨이 없는 티켓은 Tickets에서 직접 할당해요.",
     "labelSelect": "{connection}의 Auto-assign Label",
     "ready": "라벨만 붙이면 티켓을 할당하고, 런이 시작하면 티켓을 고른 상태로 옮겨요.",
     "missingTitle": "설정을 마치려면 이것을 정해요.",
     "missing": {
-      "mapping": "한 줄에서 러너 쪽 프로젝트와 에이전트를 골라요.",
-      "progress": "그 줄의 시작하면 옮길 상태를 골라요. 고르지 않으면 런이 시작해도 티켓 상태가 바뀌지 않아요.",
+      "mapping": "한 트래커 프로젝트에서 기본 저장소와 에이전트를 골라요.",
+      "progress": "각 트래커 프로젝트에서 시작하면 옮길 상태를 골라요. 고르지 않으면 런이 시작해도 티켓 상태가 바뀌지 않아요.",
       "label": "그 트래커 연결의 Auto-assign Label을 골라요. 고르지 않으면 라벨을 붙여도 할당되지 않아요."
-    }
+    },
+    "cardLabel": "{project} Mapping"
   }
 }

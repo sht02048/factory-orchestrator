@@ -205,7 +205,14 @@ const styles = stylex.create({
   besideMenu: { paddingInlineEnd: `calc(${size.control} - ${space.s2})` },
   selected: { boxShadow: `inset 0 0 0 1px ${colors.borderSelected}` },
   tag: { display: "flex", paddingBottom: space.s1 },
-  title: { display: "block", minWidth: 0, overflowWrap: "anywhere" },
+  title: {
+    display: "-webkit-box",
+    minWidth: 0,
+    overflow: "hidden",
+    overflowWrap: "anywhere",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: 2,
+  },
   detailProblem: { color: colors.problem },
   detail: {
     display: "-webkit-box",

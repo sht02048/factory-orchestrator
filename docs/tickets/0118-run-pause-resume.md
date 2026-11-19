@@ -59,9 +59,9 @@ blocked_by: []
 
 ## DB 마이그레이션과 되돌리기
 
-`packages/db/drizzle/20261119122857_run_pause`가 `run_control_requests`를 만들고 `runs`에 `paused_since`·`paused_ms`·`pause_source`를 더하며, 상태 CHECK에 `paused`를 넣으려고 `runs`를 다시 만든다(SQLite는 CHECK를 바꿀 수 없다).
+`packages/db/drizzle/20261119132338_run_pause`가 `run_control_requests`를 만들고 `runs`에 `paused_since`·`paused_ms`·`pause_source`를 더하며, 상태 CHECK에 `paused`를 넣으려고 `runs`를 다시 만든다(SQLite는 CHECK를 바꿀 수 없다).
 
 앞 버전은 모르는 마이그레이션이 적힌 DB로 시작하지 않는다(`migrate.ts`: "database has migrations this version does not know"). 그래서 되돌리는 길은 둘이다.
 
 1. 올리기 전에 떠 둔 DB 백업으로 되살린다. 그 사이의 런 기록은 잃는다.
-2. 기록을 지키려면 먼저 Paused 런을 모두 재개하거나 취소하고, 서버를 멈춘 뒤 SQLite에서 `runs`를 앞 CHECK(`paused` 없음)로 다시 만들고 `run_control_requests` 표와 `schema_migrations`의 `20261119122857_run_pause` 줄을 지운다. `paused_since`·`paused_ms`·`pause_source` 열은 앞 코드가 읽지 않아 다시 만들 때 빼면 된다.
+2. 기록을 지키려면 먼저 Paused 런을 모두 재개하거나 취소하고, 서버를 멈춘 뒤 SQLite에서 `runs`를 앞 CHECK(`paused` 없음)로 다시 만들고 `run_control_requests` 표와 `schema_migrations`의 `20261119132338_run_pause` 줄을 지운다. `paused_since`·`paused_ms`·`pause_source` 열은 앞 코드가 읽지 않아 다시 만들 때 빼면 된다.

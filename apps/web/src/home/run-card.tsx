@@ -10,6 +10,7 @@ import type { HomeRun } from "@ganger/app/home/model";
 import { todoTagOf } from "@ganger/app/home/model";
 import { availableRunControl } from "@ganger/app/run-control-view";
 import type { RunControlView } from "@ganger/app/run-control-view";
+import { questionSummary } from "@ganger/app/question";
 import { RunKey, useRunText } from "./run-text";
 
 export type SheetMode = "summary" | "answer";
@@ -163,9 +164,9 @@ function useCardParts(
       switch (input.kind) {
         case "question":
           return input.answered
-            ? { detail: input.body, meta: t("answered"), ...time }
+            ? { detail: questionSummary(input.body, input.choices), meta: t("answered"), ...time }
             : {
-                detail: input.body,
+                detail: questionSummary(input.body, input.choices),
                 meta: runner,
                 ...time,
                 action: (

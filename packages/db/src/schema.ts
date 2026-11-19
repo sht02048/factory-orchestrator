@@ -173,7 +173,6 @@ export const mappings = sqliteTable(
   {
     trackerConnectionId: text("tracker_connection_id").notNull().$type<TrackerConnectionId>(),
     trackerProjectId: text("tracker_project_id").notNull().$type<TrackerProjectId>(),
-    runnerProjectId: text("runner_project_id").notNull().$type<RunnerProjectId>(),
     agentId: text("agent_id").notNull().$type<AgentId>(),
     model: text("model"),
   },
@@ -186,6 +185,33 @@ export const mappings = sqliteTable(
         workspaceTrackerProjects.trackerProjectId,
       ],
     }).onDelete("cascade"),
+  ],
+);
+
+export const mappingRepos = sqliteTable(
+  "mapping_repos",
+  {
+    trackerConnectionId: text("tracker_connection_id").notNull().$type<TrackerConnectionId>(),
+    trackerProjectId: text("tracker_project_id").notNull().$type<TrackerProjectId>(),
+    runnerProjectId: text("runner_project_id").notNull().$type<RunnerProjectId>(),
+    isDefault: integer("is_default", { mode: "boolean" }).notNull(),
+    labelId: text("label_id").$type<LabelId>(),
+    position: integer("position").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.trackerConnectionId, t.trackerProjectId, t.runnerProjectId] }),
+    foreignKey({
+      columns: [t.trackerConnectionId, t.trackerProjectId],
+      foreignColumns: [mappings.trackerConnectionId, mappings.trackerProjectId],
+    }).onDelete("cascade"),
+    uniqueIndex("mapping_repos_one_default")
+      .on(t.trackerConnectionId, t.trackerProjectId)
+      .where(sql`${t.isDefault} = 1`),
+    uniqueIndex("mapping_repos_label_once")
+      .on(t.trackerConnectionId, t.trackerProjectId, t.labelId)
+      .where(sql`${t.labelId} IS NOT NULL`),
+    check("mapping_repos_is_default", sql`${t.isDefault} IN (0, 1)`),
+    check("mapping_repos_default_no_label", sql`${t.isDefault} = 0 OR ${t.labelId} IS NULL`),
   ],
 );
 

@@ -35,6 +35,7 @@ import type { TestContext } from "vitest";
 import shell from "../../apps/web/messages/ko/shell.json" with { type: "json" };
 import tickets from "../../apps/web/messages/ko/tickets.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
+import { waitForRouterIdle } from "./navigation-timing.js";
 import { startWebServer } from "./web-server.js";
 
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
@@ -148,7 +149,7 @@ describe("화면 이동 단축키(브라우저, 0102)", () => {
       page.evaluate((detail) => dispatchEvent(new CustomEvent("menu-sends", { detail })), screen);
     for (const item of navShortcuts) {
       await menuSends(item.screen);
-      await page.waitForURL((url) => url.pathname === item.path);
+      await waitForRouterIdle(page, item.path);
       const link = page.getByRole("link", { name: shell.nav[item.screen], exact: true });
       expect(await link.getAttribute("aria-current")).toBe("page");
       await expect

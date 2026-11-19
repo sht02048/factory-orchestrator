@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./tokens.stylex": "./src/tokens.stylex.ts",
-    "./window-frame": "./src/window-frame.ts"
+    "./window-frame": "./src/window-frame.ts",
+    "./brand-color": "./src/brand-color.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json"

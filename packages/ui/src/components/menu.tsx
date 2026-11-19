@@ -18,17 +18,19 @@ import { popupStyles } from "./popup-styles";
 export interface MenuProps {
   trigger: ReactNode;
   label?: string;
+  describedBy?: string;
   variant?: "default" | "rail" | "icon";
   children: ReactNode;
 }
 
-export function Menu({ trigger, label, variant = "default", children }: MenuProps) {
+export function Menu({ trigger, label, describedBy, variant = "default", children }: MenuProps) {
   const rail = variant === "rail";
   const icon = variant === "icon";
   return (
     <SdkMenu>
       <MenuTrigger
         {...(label === undefined ? {} : { "aria-label": label })}
+        {...(describedBy === undefined ? {} : { "aria-describedby": describedBy })}
         className={(s) =>
           cx(
             styles.trigger,

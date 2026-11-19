@@ -20,6 +20,7 @@ import {
   ORCA_RUNNER_KIND,
   orcaRunnerFactory,
 } from "./orca-runner.js";
+import { briefFor } from "./agent-brief.js";
 import { decodeAgent, decodeMailbox, encodeAgent, encodeMailbox } from "./refs.js";
 import {
   ScriptedExec,
@@ -408,7 +409,7 @@ describe("startRun", () => {
       runId: "run_493ebb2f403d",
     });
     const start = exec.calls.find((c) => c.command.includes("worker-start"));
-    expect(start?.stdin).toBe(input.prompt);
+    expect(start?.stdin).toBe(briefFor(input.prompt));
     expect(start?.command).toBe(
       "/Applications/Orca.app/Contents/Resources/bin/orca orchestration worker-start --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --run run_493ebb2f403d --spec-file - --task-title fo-t0013-probe1 --worktree new-top-level --repo id:527aed9b-0eef-4404-9d8d-9a89d7fb1dc9 --name fo-t0013-probe1 --agent claude --comment 'ENG-1 https://linear.app/acme/issue/ENG-1' --json",
     );

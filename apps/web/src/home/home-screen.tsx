@@ -43,7 +43,6 @@ import { RunSheet } from "./run-sheet";
 import type { SheetTarget } from "./run-sheet";
 import { href } from "./run-text";
 
-export { QuestionForm } from "./question-form";
 export { runHref } from "./run-text";
 
 export interface AnswerInput {

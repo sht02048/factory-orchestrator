@@ -48,6 +48,7 @@ describe("/ds 서버 렌더", () => {
       "links",
       "chips",
       "choices",
+      "question",
       "codeBlock",
       "dataTable",
       "outcomes",

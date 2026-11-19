@@ -20,6 +20,7 @@ import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
 import { addTitledRun, endedCases, minutes, now, seedDatabase } from "../testing/seed";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
+import questionJson from "../../messages/ko/question.json" with { type: "json" };
 import { runMessages } from "./messages";
 import type { RunDetail, RunDetailPage } from "@ganger/app/run-detail/model";
 import { RunDetailScreen } from "./run-detail-screen";
@@ -271,8 +272,8 @@ describe("Run 상세 화면", () => {
     const body = text(html);
     expect(body).toContain("마이그레이션을 지금 돌릴까요?");
     expect(body).toContain("돌려 주세요");
-    expect(body).toContain(runJson.question.submit);
-    expect(html).toContain('name="answer"');
+    expect(body).toContain(questionJson.send);
+    expect(html).toMatch(/<input type="radio"[^>]*value="0"/);
     expect(body).toContain(runJson.next.question);
     expect(body).not.toContain(runJson.permission.deny);
   });
@@ -295,7 +296,7 @@ describe("Run 상세 화면", () => {
     expect(body).toContain(runJson.permission.deny);
     expect(body).not.toContain("허용하기");
     expect(html).not.toMatch(/<button[^>]*>[^<]*허용/);
-    expect(body).not.toContain(runJson.question.submit);
+    expect(body).not.toContain(questionJson.send);
   });
 
   it("답이나 거절을 남긴 뒤에는 입력 칸을 닫고 worker 가 보낸다고 보인다", () => {
@@ -372,7 +373,7 @@ describe("Run 상세 화면", () => {
     expect(body).toContain(domain.summary.failed);
   });
 
-  it("노란 주 버튼은 하나 이하이고, 질문 선택지는 모두 보조 버튼, 런 취소는 위험 버튼이다(ADR 0010 6번)", () => {
+  it("노란 주 버튼은 하나 이하이고, 질문 선택지는 버튼이 아닌 라디오, 런 취소는 위험 버튼이다(ADR 0010 6번)", () => {
     const { db, ids } = seedDatabase();
     const question = ids.get("ACME-11");
     if (question === undefined) throw new Error("no ACME-11");
@@ -387,10 +388,11 @@ describe("Run 상세 화면", () => {
     const html = render(page(db, question));
     const buttons = buttonsOf(html);
     expect(buttons.filter((b) => b.variant === "primary").map((b) => b.label)).toEqual([
-      runJson.question.submit,
+      questionJson.send,
     ]);
     for (const choice of ["지수 백오프", "30초 고정"]) {
-      expect(buttons.find((b) => b.label === choice)?.variant).toBe("secondary");
+      expect(buttons.some((b) => b.label === choice)).toBe(false);
+      expect(html).toMatch(new RegExp(`<input type="radio"[^>]*>\\s*<span[^>]*>${choice}</span>`));
     }
     expect(buttons.find((b) => b.label === runJson.cancel.trigger)?.variant).toBe("danger");
     expect(buttons.some((b) => b.variant === "other")).toBe(false);

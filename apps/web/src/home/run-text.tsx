@@ -3,7 +3,6 @@ import { defaultStringifySearch } from "@tanstack/react-router";
 import { Text } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
 import type { RunId } from "@ganger/core";
-import { space } from "@ganger/ui/tokens.stylex";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { useAgentName, useQueuedReasonText } from "../labels";
@@ -11,13 +10,20 @@ import { useStatusName } from "../status";
 import type { HomeRun, TodoTag } from "@ganger/app/home/model";
 import { subjectParticle } from "./particle";
 
-export function RunKey({ run }: { run: HomeRun }) {
+export function RunKey({ run, size = "card" }: { run: HomeRun; size?: "card" | "panel" }) {
   return (
     <span {...stylex.props(styles.keyLine)}>
       <Text variant="meta" numeric>
         {run.ticketKey}
       </Text>
-      {run.ticketTitle === null ? null : <Text variant="title">{run.ticketTitle}</Text>}
+      {run.ticketTitle === null ? null : (
+        <>
+          {" "}
+          <Text variant={size === "panel" ? "panel" : "title"} as="span">
+            {run.ticketTitle}
+          </Text>
+        </>
+      )}
     </span>
   );
 }
@@ -93,11 +99,5 @@ export function href(path: string, search: Record<string, string>): string {
 }
 
 const styles = stylex.create({
-  keyLine: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    columnGap: space.s2,
-    minWidth: 0,
-  },
+  keyLine: { overflowWrap: "anywhere" },
 });

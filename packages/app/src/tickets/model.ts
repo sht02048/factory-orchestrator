@@ -20,9 +20,17 @@ export type TicketRun =
       prSettledLater: boolean;
     };
 
+export interface AssignRepo {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  label: string | null;
+}
+
 export interface AssignDefaults {
   runnerProject: string;
   agent: string;
+  repos: ReadonlyArray<AssignRepo>;
 }
 
 export type Assignability =
@@ -50,6 +58,7 @@ export interface RunnerChoice {
   online: boolean;
   assignmentBlocked: boolean;
   projects: ReadonlyArray<string>;
+  blockedProjects: ReadonlyArray<string>;
   usageLimits: ReadonlyArray<RunnerUsageLimit>;
 }
 
@@ -165,6 +174,35 @@ export function runnersFor(
   runnerProject: string,
 ): RunnerChoice[] {
   return runners.filter((runner) => runner.projects.includes(runnerProject));
+}
+
+export interface RepoReach {
+  runners: number;
+  pushBlockedEverywhere: boolean;
+}
+
+export function repoReach(runners: ReadonlyArray<RunnerChoice>, runnerProject: string): RepoReach {
+  const having = runnersFor(runners, runnerProject);
+  return {
+    runners: having.length,
+    pushBlockedEverywhere:
+      having.length > 0 && having.every((runner) => runner.blockedProjects.includes(runnerProject)),
+  };
+}
+
+export function firstAssignableRepo(
+  defaults: AssignDefaults,
+  runners: ReadonlyArray<RunnerChoice>,
+): string {
+  const ordered = [
+    defaults.runnerProject,
+    ...defaults.repos.filter((repo) => repo.isDefault).map((repo) => repo.id),
+    ...defaults.repos.map((repo) => repo.id),
+  ];
+  return (
+    ordered.find((repo) => !repoReach(runners, repo).pushBlockedEverywhere) ??
+    defaults.runnerProject
+  );
 }
 
 export function agentsFor(agents: ReadonlyArray<string>, defaultAgent: string): string[] {

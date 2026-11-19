@@ -1,0 +1,22 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "x-complexity": "2"
+  },
+  "body": {
+    "errors": [
+      {
+        "message": "Argument Validation Error",
+        "path": ["issueLabelCreate"],
+        "extensions": {
+          "code": "INVALID_INPUT",
+          "type": "invalid input",
+          "userError": true,
+          "userPresentableMessage": "Only admins can create workspace labels."
+        }
+      }
+    ],
+    "data": null
+  }
+}

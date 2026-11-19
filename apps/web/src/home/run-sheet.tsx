@@ -6,6 +6,7 @@ import {
   DefinitionList,
   Field,
   Input,
+  PanelSection,
   Sheet,
   StatusPill,
   Text,
@@ -23,13 +24,14 @@ import type { HomeRun, InputWait } from "@ganger/app/home/model";
 import { todoTagOf } from "@ganger/app/home/model";
 import { availableRunControl } from "@ganger/app/run-control-view";
 import type { RunControl } from "@ganger/core";
-import { QuestionForm } from "./question-form";
-import type { SendState } from "./question-form";
+import { QuestionAnswer } from "../question/question-answer";
 import type { SheetMode } from "./run-card";
-import { cardStatus, runHref, ticketHref, useRunText } from "./run-text";
+import { RunKey, cardStatus, runHref, ticketHref, useRunText } from "./run-text";
 import type { AnswerInput, DenyInput } from "./home-screen";
 
 type Permission = Extract<InputWait, { kind: "permission" }>;
+
+type SendState = "idle" | "sending" | "failed";
 
 export interface SheetTarget {
   run: HomeRun;
@@ -62,17 +64,16 @@ export function RunSheet({
   const tag = tagged ? todoTagOf(run) : null;
   const status = cardStatus(run, tag);
   const firstRadio = run.state === "waiting-for-input" && run.input?.kind === "question";
-  const initialFocus = target.mode === "answer" && firstRadio ? 'input[type="radio"]' : undefined;
+  const initialFocus =
+    target.mode === "answer" && firstRadio
+      ? '[data-question] input[type="radio"], [data-question] textarea'
+      : undefined;
   return (
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
       status={<SheetStatus run={run} status={status} />}
-      title={
-        run.ticketTitle === null
-          ? run.ticketKey
-          : t("title", { key: run.ticketKey, title: run.ticketTitle })
-      }
+      title={<RunKey run={run} size="panel" />}
       closeLabel={t("close")}
       {...(initialFocus === undefined ? {} : { initialFocus })}
       finalFocus={finalFocus}
@@ -366,16 +367,21 @@ function AnswerBlock({
 }) {
   const t = useTranslations("home.question");
   const result = useResultFocus();
-  if (result.sent || question.answered)
-    return <ResultText resultRef={result.resultRef}>{t("answered")}</ResultText>;
   return (
-    <QuestionForm
-      question={question}
-      onSend={async (answer) => {
-        await onAnswer({ runId: run.id, questionId: question.questionId, answer });
-        result.markSent();
-      }}
-    />
+    <PanelSection title={t("title")}>
+      {result.sent || question.answered ? (
+        <ResultText resultRef={result.resultRef}>{t("answered")}</ResultText>
+      ) : (
+        <QuestionAnswer
+          body={question.body}
+          options={question.choices}
+          onSend={async (answer) => {
+            await onAnswer({ runId: run.id, questionId: question.questionId, answer });
+            result.markSent();
+          }}
+        />
+      )}
+    </PanelSection>
   );
 }
 

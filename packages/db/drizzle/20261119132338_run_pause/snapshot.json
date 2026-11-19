@@ -1,8 +1,8 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "c66bca75-d0f5-4b00-a767-58e383fb776f",
-  "prevIds": ["b41d72f4-b382-4401-a87a-c8cb0ba2d802"],
+  "id": "e1429521-6e20-48fb-b76b-b45ac828328b",
+  "prevIds": ["88a342a7-fe88-4802-aa44-1e74136b169c"],
   "ddl": [
     {
       "name": "auto_assign_labels",
@@ -18,6 +18,10 @@
     },
     {
       "name": "log_tail_requests",
+      "entityType": "tables"
+    },
+    {
+      "name": "mapping_repos",
       "entityType": "tables"
     },
     {
@@ -289,6 +293,66 @@
       "entityType": "columns"
     },
     {
+      "table": "mapping_repos",
+      "name": "tracker_connection_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "mapping_repos",
+      "name": "tracker_project_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "mapping_repos",
+      "name": "runner_project_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "mapping_repos",
+      "name": "is_default",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "mapping_repos",
+      "name": "label_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "mapping_repos",
+      "name": "position",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "mappings",
       "name": "tracker_connection_id",
       "type": "text",
@@ -301,16 +365,6 @@
     {
       "table": "mappings",
       "name": "tracker_project_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "mappings",
-      "name": "runner_project_id",
       "type": "text",
       "notNull": true,
       "autoincrement": false,
@@ -1739,6 +1793,46 @@
       "entityType": "columns"
     },
     {
+      "table": "mapping_repos",
+      "name": "mapping_repos_one_default",
+      "columns": [
+        {
+          "value": "tracker_connection_id",
+          "isExpression": false
+        },
+        {
+          "value": "tracker_project_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"mapping_repos\".\"is_default\" = 1",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "mapping_repos",
+      "name": "mapping_repos_label_once",
+      "columns": [
+        {
+          "value": "tracker_connection_id",
+          "isExpression": false
+        },
+        {
+          "value": "tracker_project_id",
+          "isExpression": false
+        },
+        {
+          "value": "label_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"mapping_repos\".\"label_id\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "mcp_actions",
       "name": "mcp_actions_run",
       "columns": [
@@ -1996,6 +2090,17 @@
       "entityType": "fks"
     },
     {
+      "table": "mapping_repos",
+      "name": "fk_mapping_repos_tracker_connection_id_tracker_project_id_mappings_tracker_connection_id_tracker_project_id_fk",
+      "columns": ["tracker_connection_id", "tracker_project_id"],
+      "tableTo": "mappings",
+      "columnsTo": ["tracker_connection_id", "tracker_project_id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "mappings",
       "name": "fk_mappings_tracker_connection_id_tracker_project_id_workspace_tracker_projects_tracker_connection_id_tracker_project_id_fk",
       "columns": ["tracker_connection_id", "tracker_project_id"],
@@ -2190,6 +2295,13 @@
       "entityType": "pks"
     },
     {
+      "table": "mapping_repos",
+      "name": "mapping_repos_pk",
+      "columns": ["tracker_connection_id", "tracker_project_id", "runner_project_id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "mappings",
       "name": "mappings_pk",
       "columns": ["tracker_connection_id", "tracker_project_id"],
@@ -2345,6 +2457,18 @@
       "table": "log_tail_requests",
       "name": "log_tail_requests_lines_json",
       "value": "\"lines\" IS NULL OR json_valid(\"lines\")",
+      "entityType": "checks"
+    },
+    {
+      "table": "mapping_repos",
+      "name": "mapping_repos_is_default",
+      "value": "\"is_default\" IN (0, 1)",
+      "entityType": "checks"
+    },
+    {
+      "table": "mapping_repos",
+      "name": "mapping_repos_default_no_label",
+      "value": "\"is_default\" = 0 OR \"label_id\" IS NULL",
       "entityType": "checks"
     },
     {

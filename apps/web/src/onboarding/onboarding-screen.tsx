@@ -9,13 +9,6 @@ import {
   ChecklistItem,
   Chip,
   CodeBlock,
-  DataTable,
-  DataTableBody,
-  DataTableCell,
-  DataTableHead,
-  DataTableHeader,
-  DataTableRow,
-  DataTableRowHeader,
   Disclosure,
   DoneMark,
   Field,
@@ -35,30 +28,15 @@ import {
   linkStyles,
   surfaceStyles,
   textStyles,
-  visuallyHiddenStyles,
 } from "@ganger/ui";
 import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
 import type { ReactNode, Ref, RefObject } from "react";
-import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
-import {
-  toAgentId,
-  toLabelId,
-  toRunnerProjectId,
-  toTrackerConnectionId,
-  toTrackerProjectId,
-  toTrackerStateId,
-} from "@ganger/core";
-import type {
-  AgentId,
-  LabelId,
-  RunnerProjectId,
-  TrackerConnectionId,
-  TrackerProjectId,
-  TrackerStateId,
-} from "@ganger/core";
+import { toTrackerConnectionId, toTrackerProjectId, toTrackerStateId } from "@ganger/core";
+import type { TrackerConnectionId, TrackerProjectId, TrackerStateId } from "@ganger/core";
 import type { WorkspaceId } from "@ganger/db";
-import { useAgentName, usePrerequisiteName } from "../labels";
+import { usePrerequisiteName } from "../labels";
 import { PushProblems, useCheckingText, usePushSummaryText } from "../push-check";
 import { runnerWideChecks, summarizePushChecks } from "@ganger/app/prerequisites";
 import type { PushSummary } from "@ganger/app/prerequisites";
@@ -73,11 +51,9 @@ import {
   useSubmit,
   withCurrent,
 } from "../settings/settings-screen";
-import type { ActionResult, SettingsActions, SubmitState } from "../settings/settings-screen";
+import type { ActionResult, SettingsActions } from "../settings/settings-screen";
 import type {
   BoundProject,
-  Choice,
-  ConnectionLabel,
   ConnectionProjects,
   PrerequisiteView,
   RunnerSettingsView,
@@ -99,7 +75,14 @@ import {
   stepPassed,
 } from "./model";
 import type { OnboardingStep } from "./model";
-import { createSerialSaver } from "./serial-save";
+import { AutoAssignLabelPicker } from "../settings/label-picker";
+import {
+  MappingEditor,
+  ReloadFromTracker,
+  autoAssignLabelOf,
+  SaveStatusText,
+} from "../settings/mapping-editor";
+import { useSyncedSave } from "../settings/synced-save";
 import { RunnerSetup } from "../runner-setup/runner-setup";
 import type { DirectEntry, RunnerSetupActions } from "../runner-setup/runner-setup";
 
@@ -1190,46 +1173,6 @@ function WorkspaceForm({
   );
 }
 
-function useSyncedSave<V>({
-  saved,
-  savedKey,
-  send,
-  onSaved,
-}: {
-  saved: V;
-  savedKey: string;
-  send: (value: V) => Promise<ActionResult>;
-  onSaved: () => void;
-}) {
-  const [draft, setDraft] = useState(saved);
-  const [state, setState] = useState<SubmitState>({ kind: "idle" });
-  const latest = useRef({ saved, send, onSaved });
-  useEffect(() => {
-    latest.current = { saved, send, onSaved };
-  });
-  const [saver] = useState(() =>
-    createSerialSaver<V>({
-      send: (value) => latest.current.send(value),
-      revert: () => setDraft(latest.current.saved),
-      onState: setState,
-      onSaved: () => latest.current.onSaved(),
-    }),
-  );
-  const sending = state.kind === "sending";
-  useEffect(() => {
-    if (!sending) setDraft(latest.current.saved);
-  }, [savedKey, sending]);
-  return {
-    draft,
-    setDraft,
-    state,
-    choose: (value: V) => {
-      setDraft(value);
-      saver.choose(value);
-    },
-  };
-}
-
 function MappingStep({
   workspace,
   page,
@@ -1242,50 +1185,60 @@ function MappingStep({
   const t = useTranslations("onboarding.mapping");
   const ts = useTranslations("settings");
   const missing = missingMappingParts(workspace);
-  const [saves, setSaves] = useState(0);
-  const announce = useCallback(() => setSaves((count) => count + 1), []);
   return (
     <>
+      <div {...stylex.props(styles.stackTight)}>
+        <Text variant="ui">{ts("mapping.hint")}</Text>
+        <ReloadFromTracker onReload={actions.reloadFromTracker} />
+      </div>
       {page.runnerProjects.length === 0 ? (
         <Text variant="meta">{ts("mapping.noRunnerProjects")}</Text>
       ) : null}
-      <DataTable label={t("tableLabel")} framed>
-        <DataTableHead>
-          <DataTableHeader>{t("trackerProject")}</DataTableHeader>
-          <DataTableHeader>{t("runnerProject")}</DataTableHeader>
-          <DataTableHeader>{t("agent")}</DataTableHeader>
-          <DataTableHeader>{t("inProgress")}</DataTableHeader>
-          <DataTableHeader shrink>
-            <VisuallyHidden>{t("rowState")}</VisuallyHidden>
-          </DataTableHeader>
-        </DataTableHead>
-        <DataTableBody>
-          {workspace.bound.map((bound) => (
-            <MappingRow
-              key={`${bound.connection.id}/${bound.project.id}`}
-              ws={workspace.general.id}
-              bound={bound}
-              runnerProjects={page.runnerProjects}
-              agents={page.agents}
-              actions={actions}
-              onSaved={announce}
-            />
-          ))}
-        </DataTableBody>
-      </DataTable>
+      {workspace.bound.map((bound) => (
+        <Card
+          key={`${bound.connection.id}/${bound.project.id}`}
+          label={t("cardLabel", { project: bound.project.name })}
+        >
+          <MappingEditor
+            ws={workspace.general.id}
+            bound={bound}
+            runnerProjects={page.runnerProjects}
+            agents={page.agents}
+            actions={actions}
+            showModel={false}
+            autoAssignLabelId={autoAssignLabelOf(workspace, bound.connection.id)}
+            heading={<MappingHeading bound={bound} />}
+          >
+            <ProgressChoice ws={workspace.general.id} bound={bound} actions={actions} />
+          </MappingEditor>
+        </Card>
+      ))}
       <Text variant="meta">{ts("mapping.permissionHint")}</Text>
       {workspace.labels.map((label) => (
-        <LabelRow
-          key={label.connection.id}
-          ws={workspace.general.id}
-          label={label}
-          actions={actions}
-          onSaved={announce}
-        />
+        <Card key={label.connection.id}>
+          <div {...stylex.props(styles.stackTight)}>
+            <span {...stylex.props(styles.mappingHeading)}>
+              <CheckTick
+                done={label.labelId !== null}
+                label={label.labelId !== null ? t("rowDone") : t("rowEmpty")}
+              />
+              <span {...stylex.props(styles.rowHeaderText)}>
+                <Text variant="ui" tone="strong">
+                  {t("labelTitle")} <Text variant="meta">· {label.connection.name}</Text>
+                </Text>
+                <Text variant="meta">{t("labelHint")}</Text>
+              </span>
+            </span>
+            <AutoAssignLabelPicker
+              ws={workspace.general.id}
+              label={label}
+              actions={actions}
+              selectLabel={t("labelSelect", { connection: label.connection.name })}
+              showReload={false}
+            />
+          </div>
+        </Card>
       ))}
-      <p role="status" aria-live="polite" {...stylex.props(visuallyHiddenStyles.hidden)}>
-        {saves === 0 ? null : <span key={saves}>{ts("saved")}</span>}
-      </p>
       <div {...stylex.props(styles.stack)}>
         {missing.length === 0 ? (
           <Text variant="ui" as="p" tone="strong">
@@ -1308,50 +1261,35 @@ function MappingStep({
   );
 }
 
-interface MappingChoice {
-  runnerProject: RunnerProjectId | null;
-  agent: AgentId | null;
+function MappingHeading({ bound }: { bound: BoundProject }) {
+  const t = useTranslations("onboarding.mapping");
+  const done = mappingRowComplete(bound);
+  return (
+    <span {...stylex.props(styles.mappingHeading)}>
+      <CheckTick done={done} label={done ? t("rowDone") : t("rowEmpty")} />
+      <span {...stylex.props(styles.rowHeaderText)}>
+        <Text variant="ui" tone="strong">
+          {bound.project.name}
+        </Text>
+        <Text variant="meta">{bound.connection.name}</Text>
+      </span>
+    </span>
+  );
 }
 
-function MappingRow({
+function ProgressChoice({
   ws,
   bound,
-  runnerProjects,
-  agents,
   actions,
-  onSaved,
 }: {
   ws: WorkspaceId;
   bound: BoundProject;
-  runnerProjects: Choice[];
-  agents: string[];
   actions: SettingsActions;
-  onSaved: () => void;
 }) {
   const t = useTranslations("onboarding.mapping");
   const ts = useTranslations("settings");
   const reason = useReason();
-  const agentName = useAgentName();
-  const hintId = useId();
   const target = { ws, connectionId: bound.connection.id, projectId: bound.project.id };
-  const savedProject =
-    bound.mapping === null ? null : toRunnerProjectId(bound.mapping.runnerProject);
-  const savedAgent = bound.mapping === null ? null : toAgentId(bound.mapping.agent);
-  const saveMapping = (nextProject: RunnerProjectId | null, nextAgent: AgentId | null) =>
-    nextProject === null || nextAgent === null
-      ? Promise.resolve<ActionResult>({ ok: true })
-      : actions.saveMapping({
-          ...target,
-          runnerProjectId: nextProject,
-          agentId: nextAgent,
-          model: bound.mapping?.model ?? "",
-        });
-  const mapping = useSyncedSave<MappingChoice>({
-    saved: { runnerProject: savedProject, agent: savedAgent },
-    savedKey: `${savedProject ?? ""}\n${savedAgent ?? ""}`,
-    send: (choice) => saveMapping(choice.runnerProject, choice.agent),
-    onSaved,
-  });
   const savedState =
     bound.inProgressStateId === null ? null : toTrackerStateId(bound.inProgressStateId);
   const progress = useSyncedSave<TrackerStateId | null>({
@@ -1361,158 +1299,29 @@ function MappingRow({
       stateId === null
         ? Promise.resolve<ActionResult>({ ok: true })
         : actions.saveInProgress({ ...target, stateId }),
-    onSaved,
+    onSaved: () => {},
   });
-  const pick = (next: MappingChoice) => {
-    if (next.runnerProject === null || next.agent === null) mapping.setDraft(next);
-    else mapping.choose(next);
-  };
-  const { runnerProject, agent } = mapping.draft;
-  const project = bound.project.name;
-  const done = mappingRowComplete(bound);
-  const missingPair =
-    runnerProject !== null && agent === null
-      ? "agent"
-      : runnerProject === null && agent !== null
-        ? "runnerProject"
-        : null;
-  const failed =
-    mapping.state.kind === "failed" || progress.state.kind === "failed" || !bound.states.ok;
   return (
-    <Fragment>
-      <DataTableRow>
-        <DataTableRowHeader>
-          <span {...stylex.props(styles.rowHeaderText)}>
-            <Text variant="ui" tone="strong">
-              {project}
-            </Text>
-            <Text variant="meta">{bound.connection.name}</Text>
-          </span>
-        </DataTableRowHeader>
-        <DataTableCell wide>
-          <Select
-            aria-label={t("cellLabel", { project, column: t("runnerProject") })}
-            {...(missingPair === "runnerProject" ? { "aria-describedby": hintId } : {})}
-            options={withCurrent(
-              runnerProjects.map((p) => ({ value: p.id, label: p.name })),
-              bound.mapping?.runnerProject,
-            )}
-            value={runnerProject}
-            onValueChange={(value) => pick({ runnerProject: toRunnerProjectId(value), agent })}
-            placeholder={ts("mapping.choose")}
-          />
-        </DataTableCell>
-        <DataTableCell wide>
-          <Select
-            aria-label={t("cellLabel", { project, column: t("agent") })}
-            {...(missingPair === "agent" ? { "aria-describedby": hintId } : {})}
-            options={agents.map((a) => ({ value: a, label: agentName(a) }))}
-            value={agent}
-            onValueChange={(value) => pick({ runnerProject, agent: toAgentId(value) })}
-            placeholder={ts("mapping.choose")}
-          />
-        </DataTableCell>
-        <DataTableCell wide>
-          <Select
-            aria-label={t("cellLabel", { project, column: t("inProgress") })}
-            options={withCurrent(
-              bound.states.ok
-                ? bound.states.items.map((s) => ({ value: s.id, label: s.name }))
-                : [],
-              bound.inProgressStateId,
-            )}
-            value={progress.draft}
-            onValueChange={(value) => progress.choose(toTrackerStateId(value))}
-            placeholder={ts("mapping.choose")}
-          />
-        </DataTableCell>
-        <DataTableCell>
-          <CheckTick done={done} label={done ? t("rowDone") : t("rowEmpty")} />
-        </DataTableCell>
-      </DataTableRow>
-      {failed || missingPair !== null ? (
-        <DataTableRow divided={false}>
-          <DataTableCell colSpan={5}>
-            <div {...stylex.props(styles.stackTight)}>
-              {missingPair === null ? null : (
-                <Text variant="ui" id={hintId}>
-                  {missingPair === "agent" ? t("needAgent") : t("needRunnerProject")}
-                </Text>
-              )}
-              <SubmitError state={mapping.state} />
-              <SubmitError state={progress.state} />
-              {bound.states.ok ? null : (
-                <Text variant="ui" as="p" tone="problem">
-                  {ts("progress.listFailed", { reason: reason(bound.states.error) })}
-                </Text>
-              )}
-            </div>
-          </DataTableCell>
-        </DataTableRow>
-      ) : null}
-    </Fragment>
-  );
-}
-
-function LabelRow({
-  ws,
-  label,
-  actions,
-  onSaved,
-}: {
-  ws: WorkspaceId;
-  label: ConnectionLabel;
-  actions: SettingsActions;
-  onSaved: () => void;
-}) {
-  const t = useTranslations("onboarding.mapping");
-  const ts = useTranslations("settings");
-  const reason = useReason();
-  const save = useSyncedSave<LabelId | null>({
-    saved: label.labelId === null ? null : toLabelId(label.labelId),
-    savedKey: label.labelId ?? "",
-    send: (labelId) =>
-      labelId === null
-        ? Promise.resolve<ActionResult>({ ok: true })
-        : actions.saveLabel({ ws, connectionId: label.connection.id, labelId }),
-    onSaved,
-  });
-  const options = label.labels.ok
-    ? label.labels.items.map((l) => ({ value: l.id, label: l.name }))
-    : [];
-  const current = label.labelId;
-  const allOptions =
-    current === null || options.some((o) => o.value === current)
-      ? options
-      : [...options, { value: current, label: ts("label.unknown", { id: current }) }];
-  const done = label.labelId !== null;
-  return (
-    <Card>
-      <div {...stylex.props(styles.labelRow)}>
-        <span {...stylex.props(styles.labelText)}>
-          <Text variant="ui" tone="strong">
-            {t("labelTitle")} <Text variant="meta">· {label.connection.name}</Text>
-          </Text>
-          <Text variant="meta">{t("labelHint")}</Text>
-        </span>
-        <span {...stylex.props(styles.labelSelect)}>
-          <Select
-            aria-label={t("labelSelect", { connection: label.connection.name })}
-            options={allOptions}
-            value={save.draft}
-            onValueChange={(value) => save.choose(toLabelId(value))}
-            placeholder={ts("label.choose")}
-          />
-        </span>
-        <CheckTick done={done} label={done ? t("rowDone") : t("rowEmpty")} />
-      </div>
-      {label.labels.ok ? null : (
+    <div {...stylex.props(styles.stackTight)}>
+      <Field label={t("inProgress")}>
+        <Select
+          options={withCurrent(
+            bound.states.ok ? bound.states.items.map((s) => ({ value: s.id, label: s.name })) : [],
+            bound.inProgressStateId,
+          )}
+          value={progress.draft}
+          onValueChange={(value) => progress.choose(toTrackerStateId(value))}
+          placeholder={ts("mapping.choose")}
+        />
+      </Field>
+      <SaveStatusText status={progress.status} />
+      <SubmitError state={progress.state} />
+      {bound.states.ok ? null : (
         <Text variant="ui" as="p" tone="problem">
-          {ts("label.listFailed", { reason: reason(label.labels.error) })}
+          {ts("progress.listFailed", { reason: reason(bound.states.error) })}
         </Text>
       )}
-      <SubmitError state={save.state} />
-    </Card>
+    </div>
   );
 }
 
@@ -1616,15 +1425,6 @@ const styles = stylex.create({
   },
   groupTitle: { paddingTop: space.s1, paddingInline: space.s3 },
   rowHeaderText: { display: "flex", flexDirection: "column", gap: space.px2 },
-  labelRow: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s3 },
-  labelText: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.px2,
-    flexGrow: 1,
-    flexBasis: size.labelTextMinWidth,
-    minWidth: 0,
-  },
-  labelSelect: { flexGrow: 0, flexShrink: 1, flexBasis: size.labelSelectWidth, minWidth: 0 },
+  mappingHeading: { display: "inline-flex", alignItems: "flex-start", gap: space.s2 },
   word: { whiteSpace: "pre" },
 });

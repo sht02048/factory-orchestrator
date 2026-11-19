@@ -35,6 +35,7 @@ import {
   toAgentRef,
   toCodeHostKind,
   toCommentId,
+  toLabelId,
   toMailboxRef,
   toPermissionRequestId,
   toQuestionId,
@@ -80,6 +81,7 @@ export class FakeTracker implements Tracker {
   readonly comments = new Map<TicketKey, TrackerComment[]>();
   readonly projects: TrackerProject[] = [];
   readonly labels = new Map<TrackerProjectId, TrackerLabel[]>();
+  readonly createdLabels: Array<{ label: TrackerLabel; color: string }> = [];
   readonly states = new Map<TrackerProjectId, TrackerState[]>();
   readonly stateChanges: Array<{ key: TicketKey; stateId: TrackerStateId }> = [];
   connection: TrackerConnectionCheck = { ok: true, organizationName: null };
@@ -145,6 +147,18 @@ export class FakeTracker implements Tracker {
 
   listStates(projectId: TrackerProjectId): Promise<ReadonlyArray<TrackerState>> {
     return Promise.resolve(this.states.get(projectId) ?? []);
+  }
+
+  createLabel(input: { name: string; color: string }): Promise<TrackerLabel> {
+    const label: TrackerLabel = {
+      id: toLabelId(`label-created-${this.createdLabels.length + 1}`),
+      name: input.name,
+    };
+    this.createdLabels.push({ label, color: input.color });
+    for (const project of new Set([...this.labels.keys(), ...this.projects.map((p) => p.id)])) {
+      this.labels.set(project, [...(this.labels.get(project) ?? []), label]);
+    }
+    return Promise.resolve(label);
   }
 
   setState(key: TicketKey, stateId: TrackerStateId): Promise<void> {

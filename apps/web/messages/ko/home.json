@@ -81,7 +81,6 @@
     "requestFailed": "요청을 남기지 못했어요. 잠시 뒤 다시 해 주세요."
   },
   "sheet": {
-    "title": "{key} {title}",
     "close": "닫기",
     "runDetail": "Run 상세 보기",
     "since": {
@@ -109,17 +108,8 @@
     "paused": "운영자가 멈춰 둔 런이에요. 워크트리와 러너 자리는 그대로 두고, 최대 실행 시간도 멈춰 있어요. 재개하면 같은 자리에서 이어서 해요."
   },
   "question": {
-    "other": "직접 쓰기",
-    "otherLabel": "직접 쓴 답",
-    "otherPlaceholder": "에이전트에게 보낼 답을 써주세요",
-    "choices": "선택지",
-    "pick": "답을 하나 골라주세요",
-    "note": "보낸 답은 바로 에이전트에게 전해져요",
-    "shortcut": "⌘ Enter로 보낼 수 있어요",
-    "send": "보내기",
-    "sending": "보내는 중…",
-    "answered": "답을 보냈어요. worker가 에이전트에게 전해요.",
-    "failed": "답을 보내지 못했어요. 다시 해주세요."
+    "title": "에이전트 질문",
+    "answered": "답을 보냈어요. worker가 에이전트에게 전해요."
   },
   "permission": {
     "reasonLabel": "거절 이유",

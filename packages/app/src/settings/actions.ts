@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import {
+  AUTO_ASSIGN_LABEL_NAME,
+  AdapterError,
+  findLabelNamed,
   toAgentId,
   toLabelId,
   toRunnerId,
@@ -9,11 +12,14 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
 } from "@ganger/core";
-import type { RunnerId, RunnerKind } from "@ganger/core";
+import type { RunnerId, RunnerKind, TrackerConnectionId } from "@ganger/core";
 import {
+  getAutoAssignLabel,
+  getMapping,
   getTrackerConnection,
   getWorkspaceTrackerProject,
   listCodeHostConnections,
+  listWorkspaceTrackerProjects,
   listRunners,
   listWorkspaces,
   removeWorkspaceTrackerProject,
@@ -21,6 +27,7 @@ import {
   saveAutoAssignLabel,
   saveCodeHostConnection,
   saveInstallAddresses,
+  replaceMapping,
   saveMapping,
   saveMcpWriteAllowed,
   saveRunner,
@@ -33,10 +40,16 @@ import {
 import type { WorkspaceId } from "@ganger/db";
 import { z } from "zod";
 import { allowedHosts, hostnameOfHostHeader } from "../request-guard.js";
-import { remoteErrorOf, remoteErrorOfDetail } from "./load.js";
+import { remoteErrorOf, remoteErrorOfDetail, trackerOf } from "./load.js";
 import type { SettingsContext } from "./load.js";
 import { MAX_MODEL_LENGTH, MAX_RUN_MINUTES } from "./model.js";
-import type { ConnectionSaveReason, RemoteError, SaveResult } from "./model.js";
+import type {
+  ConnectionSaveReason,
+  LabelCreateResult,
+  MappingSaveReason,
+  RemoteError,
+  SaveResult,
+} from "./model.js";
 
 export const RUNNER_KIND: RunnerKind = toRunnerKind("orca");
 
@@ -161,6 +174,40 @@ export function saveMappingSetting(
   return { ok: true };
 }
 
+export const MAX_MAPPING_REPOS = 50;
+
+export const mappingStateInput = trackerProjectInput.extend({
+  agentId: id,
+  model: mappingInput.shape.model,
+  repos: z
+    .array(z.object({ runnerProjectId: id, isDefault: z.boolean(), labelId: id.nullable() }))
+    .min(1)
+    .max(MAX_MAPPING_REPOS),
+});
+
+export function saveMappingState(
+  context: SettingsContext,
+  input: z.infer<typeof mappingStateInput>,
+): SaveResult<MappingSaveReason> {
+  const project = boundProject(context, input);
+  if (project === null) return { ok: false, reason: "not-found" };
+  const autoAssignLabel = getAutoAssignLabel(context.db, project.workspaceId, project.connection);
+  if (autoAssignLabel !== null && input.repos.some((repo) => repo.labelId === autoAssignLabel)) {
+    return { ok: false, reason: "auto-assign-label" };
+  }
+  return replaceMapping(context.db, {
+    connection: project.connection,
+    trackerProject: project.projectId,
+    agent: toAgentId(input.agentId),
+    model: input.model === undefined || input.model === "" ? null : input.model,
+    repos: input.repos.map((repo) => ({
+      project: toRunnerProjectId(repo.runnerProjectId),
+      isDefault: repo.isDefault,
+      labelId: repo.labelId === null ? null : toLabelId(repo.labelId),
+    })),
+  });
+}
+
 export const inProgressInput = trackerProjectInput.extend({ stateId: id });
 
 export function saveInProgressState(
@@ -178,10 +225,57 @@ export function saveInProgressState(
 
 export const labelInput = z.object({ ws: id, connectionId: id, labelId: id });
 
+export const createLabelInput = z.object({ ws: id, connectionId: id });
+
+export async function createAutoAssignLabel(
+  context: SettingsContext,
+  input: z.infer<typeof createLabelInput>,
+  color: string,
+): Promise<LabelCreateResult> {
+  const workspaceId = workspaceOf(context, input.ws);
+  const connection = toTrackerConnectionId(input.connectionId);
+  const stored =
+    workspaceId === null ? null : getTrackerConnection(context.db, context.secretBox, connection);
+  const tracker = stored === null ? null : trackerOf(context, stored);
+  if (workspaceId === null || tracker === null) return { ok: false, reason: "not-found" };
+  const projects = listWorkspaceTrackerProjects(context.db, workspaceId).filter(
+    (project) => project.connection === connection,
+  );
+  try {
+    const lists = await Promise.all(projects.map((p) => tracker.listLabels(p.projectId)));
+    const label =
+      findLabelNamed(lists.flat(), AUTO_ASSIGN_LABEL_NAME) ??
+      (await tracker.createLabel({ name: AUTO_ASSIGN_LABEL_NAME, color }));
+    const created = !lists.flat().some((existing) => existing.id === label.id);
+    if (repoLabelIds(context, workspaceId, connection).has(label.id)) {
+      return { ok: false, reason: "repo-label" };
+    }
+    saveAutoAssignLabel(context.db, { workspaceId, connection, labelId: label.id });
+    return { ok: true, labelId: label.id, name: label.name, created };
+  } catch (error) {
+    return { ok: false, reason: error instanceof AdapterError ? remoteErrorOf(error) : "rejected" };
+  }
+}
+
+export function repoLabelIds(
+  context: SettingsContext,
+  workspaceId: WorkspaceId,
+  connection: TrackerConnectionId,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const project of listWorkspaceTrackerProjects(context.db, workspaceId)) {
+    if (project.connection !== connection) continue;
+    for (const repo of getMapping(context.db, connection, project.projectId)?.repos ?? []) {
+      if (repo.labelId !== null) ids.add(repo.labelId);
+    }
+  }
+  return ids;
+}
+
 export function saveLabel(
   context: SettingsContext,
   input: z.infer<typeof labelInput>,
-): SaveResult<"not-found"> {
+): SaveResult<"not-found" | "repo-label"> {
   const workspaceId = workspaceOf(context, input.ws);
   const connection = toTrackerConnectionId(input.connectionId);
   if (
@@ -189,6 +283,9 @@ export function saveLabel(
     getTrackerConnection(context.db, context.secretBox, connection) === null
   ) {
     return { ok: false, reason: "not-found" };
+  }
+  if (repoLabelIds(context, workspaceId, connection).has(input.labelId)) {
+    return { ok: false, reason: "repo-label" };
   }
   saveAutoAssignLabel(context.db, {
     workspaceId,
