@@ -129,6 +129,15 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     await expect.poll(() => current(nav)).toBe(settings.sections.workspace);
   });
 
+  it("처음에 넘치지 않던 화면이 나중에 넘쳐도 목차가 스크롤을 따라간다", async () => {
+    await page.setViewportSize({ width: 1280, height: 2400 });
+    await openSettings(page);
+    const nav = page.getByRole("navigation", { name: settings.nav.label });
+    await page.setViewportSize({ width: 1280, height: 600 });
+    await page.locator("section#advanced").scrollIntoViewIfNeeded();
+    await expect.poll(() => current(nav)).toBe(settings.sections.advanced);
+  });
+
   it("이름은 줄 안에서 펼쳐 바꾸고, 비우면 오류를 보이며, 닫으면 바꾸기로 포커스가 돌아온다", async () => {
     await openSettings(page);
     const workspace = section(settings.sections.workspace);

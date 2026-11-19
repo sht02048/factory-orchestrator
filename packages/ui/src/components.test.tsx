@@ -1080,6 +1080,13 @@ describe("설정 한 페이지 부품(티켓 0119)", () => {
     expect(renderToString(<Input value="" onValueChange={noop} />)).not.toMatch(/spellcheck/i);
   });
 
+  it("SettingsGroup padded 는 내용을 줄과 같은 안쪽 여백 상자로 감싼다", () => {
+    const plain = renderToString(<SettingsGroup>내용</SettingsGroup>);
+    const padded = renderToString(<SettingsGroup padded>내용</SettingsGroup>);
+    expect(plain).not.toMatch(/<div[^>]*><div[^>]*>내용/);
+    expect(padded).toMatch(/<div[^>]*><div[^>]*>내용<\/div><\/div>/);
+  });
+
   it("Input invalid 는 aria-invalid 를 단다", () => {
     expect(
       renderToString(<Input aria-label="분" value="0" onValueChange={noop} invalid />),

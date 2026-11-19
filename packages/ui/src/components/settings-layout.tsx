@@ -149,8 +149,7 @@ function scrollParent(element: HTMLElement): HTMLElement | null {
   let node = element.parentElement;
   while (node !== null) {
     const { overflowY } = getComputedStyle(node);
-    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight)
-      return node;
+    if (overflowY === "auto" || overflowY === "scroll") return node;
     node = node.parentElement;
   }
   return null;
@@ -205,13 +204,21 @@ export function SettingsSection({ id, title, info, actions, children }: Settings
   );
 }
 
-export function SettingsGroup({ children, label }: { children: ReactNode; label?: string }) {
+export function SettingsGroup({
+  children,
+  label,
+  padded = false,
+}: {
+  children: ReactNode;
+  label?: string;
+  padded?: boolean;
+}) {
   return (
     <div
       {...(label === undefined ? {} : { role: "group", "aria-label": label })}
       {...stylex.props(styles.group)}
     >
-      {children}
+      {padded ? <div {...stylex.props(styles.groupBody)}>{children}</div> : children}
     </div>
   );
 }
@@ -539,6 +546,10 @@ const styles = stylex.create({
     borderTopWidth: { default: 0, ":not(:first-child)": 1 },
     borderTopStyle: "solid",
     borderTopColor: colors.borderSubtle,
+  },
+  groupBody: {
+    paddingBlock: space.s4,
+    paddingInline: { default: space.s5, [breakpoints.settingsRowStacked]: space.s4 },
   },
   rowOpen: {
     backgroundColor: colors.bgCardHover,

@@ -131,9 +131,7 @@ export function ProjectDetailScreen({
                   />
                 }
               >
-                <SettingsGroup>
-                  <div {...stylex.props(styles.mapping)}>{repos}</div>
-                </SettingsGroup>
+                <SettingsGroup padded>{repos}</SettingsGroup>
               </SettingsSection>
               <SettingsSection id="agent" title={tm("agent")}>
                 {agent}
@@ -327,10 +325,6 @@ function RemoveRow({
 }
 
 const styles = stylex.create({
-  mapping: {
-    paddingBlock: space.s4,
-    paddingInline: { default: space.s5, [breakpoints.settingsRowStacked]: space.s4 },
-  },
   crumb: { display: "inline-flex", alignItems: "center", gap: space.s1 },
   select: {
     display: "flex",
