@@ -19,14 +19,16 @@ blocked_by: [0124]
 ## 할 일
 
 1. **셸.** `["shell"]`(`getShell`). `_app` 로더가 이 query를 데운다. 구독 모듈이 `runner`·`workspace`·`settings` 바뀜에 무효화한다. 셸 query는 이 티켓이 만들고 0128이 Settings 저장 뒤 무효화에 쓴다.
-2. **Runners.** `["runners", "list"]`(`getRunnersPage`). `reloadOnEnter`를 지운다. 러너 다시 점검 요청은 mutation으로 바꾸고, 점검 3초 폴링(`useRunnerCheckPolling`, 최대 2분)은 `refetchInterval`로 옮긴다. 점검이 끝나면 `["runners", "list"]`와 `["shell"]`만 무효화한다.
-3. **Tickets 나누기.** 서버 함수를 둘로 나눈다.
+2. **Runners.** `["runners", "list"]`(`getRunnersPage`). `reloadOnEnter`를 지운다. 러너 다시 점검 요청은 mutation으로 바꾸고(0124의 오류 타입), 점검 3초 폴링(최대 2분)은 `refetchInterval`로 옮긴다. 점검이 끝나면 `["runners", "list"]`와 `["shell"]`만 무효화한다.
+3. **함께 쓰는 훅 나누기.** `settings/use-settings-actions.ts`의 `useSettingsActions`·`useReloadOnSuccess`와 `settings/settings-screen.tsx`의 `useRunnerCheckPolling`은 Settings 세 route, Runners, 온보딩이 함께 쓴다(research 0016 3·4절). 저장·점검이 끝난 뒤 할 일을 부르는 쪽이 넘기게 바꾼다. Runners는 위 key 무효화를 넘기고, Settings와 온보딩은 지금처럼 `router.invalidate()`를 넘긴다(Settings는 0128이 바꾸고, 온보딩은 라우터 로더로 남는다, C1). Runners 화면에서 러너를 더하거나 저장하는 동작(`saveRunner` 등)도 이 티켓이 맡는다.
+4. **Tickets 나누기.** 서버 함수를 둘로 나눈다.
    - DB 부분(런 표시, 할당할 수 있음 등): `["tickets", "runs", ws]`, staleTime 30초.
-   - 트래커 티켓 목록과 라벨: `["tracker", "tickets", ws]`, staleTime 5분(C3). 라벨 key는 0128의 Settings 라벨 query와 같은 key를 쓰도록 맞춘다.
+   - 트래커 티켓 목록: `["tracker", "tickets", ws]`, staleTime 5분(C3).
+   - 트래커 라벨: `["tracker", "labels", connectionId, projectId]`, staleTime 5분. 이 티켓이 만들고 0128의 Settings가 그대로 쓴다.
    - 화면은 두 결과를 합쳐 그린다. 트래커가 느리면 지금처럼 `Remote<T>`로 그 부분만 기다리거나 실패를 보인다.
-4. **할당.** 성공하면 `["tickets", "runs"]`와 런 쪽 key만 무효화한다. 트래커 query는 건드리지 않는다.
-5. **트래커 무효화(C3).** `tracker` 바뀜(webhook, "Linear에서 다시 읽기", 라벨 만들기)에 `["tracker"]`를 무효화한다.
-6. 세 route에 `preloadStaleTime` 0을 주고 `router.invalidate()`를 지운다. `_app`의 `shouldReload: false`는 셸 query로 옮긴 뒤 의미가 없으면 지운다.
+5. **할당.** 성공하면 `["tickets", "runs"]`와 런 쪽 key만 무효화한다. 트래커 query는 건드리지 않는다.
+6. **트래커 무효화(C3).** `tracker` 바뀜(webhook, "Linear에서 다시 읽기", 라벨 만들기)에 `["tracker"]`를 무효화한다.
+7. 세 route에 `preloadStaleTime` 0을 주고 `router.invalidate()`를 지운다. `_app`의 `shouldReload: false`는 셸 query로 옮긴 뒤 의미가 없으면 지운다.
 
 ## 완료 조건
 
@@ -37,6 +39,7 @@ blocked_by: [0124]
 - [ ] 시험: Workspace를 더하면 셸의 Workspace 목록이 바뀐다.
 - [ ] 시험: 트래커 webhook을 받으면 Tickets의 트래커 query가 다시 읽힌다.
 - [ ] 시험: 미리 읽은 뒤 Runners에 들어가면 서버 함수를 더 부르지 않는다.
+- [ ] 시험: 훅을 나눈 뒤에도 온보딩과 Settings는 저장·점검 뒤 지금처럼 다시 읽는다.
 - [ ] 시험: SSE가 끊기면 열린 Runners가 30초마다 다시 읽는다(가짜 시계).
 - [ ] 로더 SQL 수 시험(`apps/web/src/server/loader-queries.test.ts`)에 Tickets DB 부분을 더했다.
 - [ ] 0117 브라우저 시험이 그대로 통과한다(포인터를 올린 뒤 Tickets를 누르면 느린 트래커를 기다리지 않는다).

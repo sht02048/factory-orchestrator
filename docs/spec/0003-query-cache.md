@@ -34,7 +34,8 @@
 
 ## 3. 선행과 순서
 
-- 0118(런 멈추기·재개)과 0115(Mapping 저장소 여럿)는 `develop`에 머지됐다. 0119(Settings 개편)와 0120(러너 쪽 멈춤 감지)이 머지된 뒤 Query 작업을 시작한다(C8). 0119가 Settings 로더와 화면을, 0120이 런 상태를 쓰는 worker 코드를 바꾸기 때문이다.
+- 0118(런 멈추기·재개), 0115(Mapping 저장소 여럿), 0119(Settings 개편)는 `develop`에 머지됐다. 0120(러너 쪽 멈춤 감지)이 머지된 뒤 Query 작업을 시작한다(C8). 0120이 런 상태를 쓰는 worker 코드를 바꾸기 때문이다.
+- 0129는 0122의 원격 지연 측정 스크립트로 다시 재므로 0122 뒤에 한다.
 - 순서(C14): 0123 → 0124 → (0125, 0126, 0127 함께) → 0128(0127 뒤) → 0129.
 
 ```mermaid
@@ -48,6 +49,7 @@ graph LR
   T0124 --> T0127[0127 셸·Runners·Tickets]
   T0127 --> T0128[0128 Settings]
   T0125 & T0126 & T0127 & T0128 --> T0129[0129 정리]
+  T0122 --> T0129
 ```
 
 ## 4. 클라이언트 캐시 설계
@@ -72,33 +74,34 @@ graph LR
 | 라우터 `defaultPreloadStaleTime`             | 0(모든 `_app` 화면을 옮긴 뒤, 0129) |
 
 - 0117 계약을 지킨다(C6). 레일 링크에 포인터를 올리면 그 화면의 query를 미리 읽는다. 다시 들어간 화면은 캐시로 바로 그리고 낡았으면 뒤에서 새로 읽는다. 그래서 로더는 캐시가 있으면 신선도와 상관없이 바로 넘어가는 변형(`queryClient.query({ ...options, staleTime: "static" })` 또는 그와 같은 API)을 쓰고, 새로 읽기는 컴포넌트의 `useSuspenseQuery`가 맡는다. 어느 API를 쓸지는 0123이 설치한 버전에서 정한다(research 0015 1.4의 문서 사이 불일치).
-- 옮기는 동안 라우터 전역 `defaultPreloadStaleTime`은 지금 값(5초)으로 두고, 옮긴 화면의 route에만 0을 준다. route 옵션 이름은 0123이 확인한다(research 0015 9절). 모두 옮기면 0129가 전역을 0으로 바꾸고 route별 값을 지운다.
+- 옮기는 동안 라우터 전역 `defaultPreloadStaleTime`은 지금 값(5초)으로 두고, 옮긴 화면의 route에만 0을 준다. route 옵션 이름은 0123이 확인한다(research 0015 9절). 모두 옮기면 0129가 전역을 0으로 바꾸고 route별 값을 지운다. 이 단계 나눔은 C6(전역 0)을 이행 순서(C14)에 맞춰 적용하는 구현 선택이고 새 결정이 아니다. 전역 0이 라우터 로더로 남는 온보딩·러너 설정 route(C1)의 미리 읽기에 주는 영향은 0129가 확인한다.
 
 ### 4.3 query key
 
 엔터티 접두사 계층으로 둔다. 시간대가 결과를 바꾸는 query는 시간대를 key에 넣는다. 시간대 값은 루트 로더가 읽은 쿠키 값이다. 그래서 시간대 쿠키가 바뀌면 key가 바뀌어 새로 읽고, 지금 `TimeZoneSync`의 필터에서 Runs가 빠진 문제(research 0016 8절 4번)가 없어진다.
 
-| 화면·부분                            | key(모양)                                                  | 서버 함수                 | staleTime |
-| ------------------------------------ | ---------------------------------------------------------- | ------------------------- | --------- |
-| 셸 배지·Workspace 목록               | `["shell"]`                                                | `getShell`                | 30초      |
-| Dashboard                            | `["dashboard", ws, timeZone]`                              | `getHomePage`             | 30초      |
-| Runs 목록                            | `["runs", "list", { ws, ended, ...conditions }, timeZone]` | `getRunsPage`             | 30초      |
-| Run 상세                             | `["runs", "detail", runId]`                                | `getRunDetail`            | 30초      |
-| Runners                              | `["runners", "list"]`                                      | `getRunnersPage`          | 30초      |
-| Stats                                | `["stats", ws, days, timeZone]`                            | `getStatsPage`            | 30초      |
-| Tickets의 DB 부분(런 표시 등)        | `["tickets", "runs", ws]`                                  | 새로 나눈 서버 함수(0127) | 30초      |
-| Tickets의 트래커 티켓·라벨           | `["tracker", "tickets", ws]`                               | 새로 나눈 서버 함수(0127) | 5분       |
-| Settings의 DB 설정                   | `["settings", ...]`(0119 뒤 모양에 맞춰 0128이 정함)       | 나눈 서버 함수(0128)      | 30초      |
-| Settings의 트래커 프로젝트·상태·라벨 | `["tracker", "projects" \| "states" \| "labels", ...]`     | 나눈 서버 함수(0128)      | 5분       |
+| 화면·부분                          | key(모양)                                                  | 서버 함수                 | staleTime |
+| ---------------------------------- | ---------------------------------------------------------- | ------------------------- | --------- |
+| 셸 배지·Workspace 목록             | `["shell"]`                                                | `getShell`                | 30초      |
+| Dashboard                          | `["dashboard", ws, timeZone]`                              | `getHomePage`             | 30초      |
+| Runs 목록                          | `["runs", "list", { ws, ended, ...conditions }, timeZone]` | `getRunsPage`             | 30초      |
+| Run 상세                           | `["runs", "detail", runId]`                                | `getRunDetail`            | 30초      |
+| Runners                            | `["runners", "list"]`                                      | `getRunnersPage`          | 30초      |
+| Stats                              | `["stats", ws, days, timeZone]`                            | `getStatsPage`            | 30초      |
+| Tickets의 DB 부분(런 표시 등)      | `["tickets", "runs", ws]`                                  | 새로 나눈 서버 함수(0127) | 30초      |
+| Tickets의 트래커 티켓 목록         | `["tracker", "tickets", ws]`                               | 새로 나눈 서버 함수(0127) | 5분       |
+| 트래커 라벨(Tickets·Settings 함께) | `["tracker", "labels", connectionId, projectId]`           | 새로 나눈 서버 함수(0127) | 5분       |
+| Settings의 DB 설정                 | `["settings", ...]`(0119의 세 route에 맞춰 0128이 정함)    | 나눈 서버 함수(0128)      | 30초      |
+| Settings의 트래커 프로젝트·상태    | `["tracker", "projects" \| "states", ...]`                 | 나눈 서버 함수(0128)      | 5분       |
 
 - `ws`가 없으면(기본 Workspace) key에도 빈 값으로 넣는다. 같은 화면을 `ws` 있이 열 때와 다른 key가 되게 한다.
-- 트래커 라벨처럼 Tickets와 Settings가 같은 것을 읽으면 같은 key를 쓴다. 지금 따로 읽는 중복(research 0016 9절)이 없어진다.
+- 트래커 라벨처럼 Tickets와 Settings가 같은 것을 읽으면 같은 key를 쓴다. 두 로더 모두 트래커 프로젝트마다 라벨을 읽으므로 key도 프로젝트 단위다. 0127이 만들고 0128이 다시 쓴다. 지금 따로 읽는 중복(research 0016 9절)이 없어진다.
 - 비밀값은 key에 넣지 않는다.
 
 ### 4.4 읽기와 쓰기의 오류(C5)
 
 - **읽기는 실패하면 throw한다.** 그래서 Query의 error 상태와 retry 1을 탄다. 다만 트래커 실패를 화면에 보이는 `Remote<T>` 데이터는 지금처럼 성공한 결과로 돌려준다. 트래커에 닿지 않아도 화면은 그려지고 그 묶음만 실패로 보인다.
-- **쓰기 서버 함수는 지금처럼 `{ ok: false, reason }`을 돌려준다.** 클라이언트 mutation의 `mutationFn`이 `ok: false`를 이유가 담긴 오류 타입으로 바꿔 throw한다. 화면은 그 오류의 이유로 문구를 고른다. 지금 throw하는 `answerQuestion`·`denyPermission`도 같은 오류 타입으로 맞춘다. Run 상세의 `expectOk`는 이 변환으로 바뀐다.
+- **쓰기 서버 함수는 지금처럼 `{ ok: false, reason }`을 돌려준다.** 클라이언트 mutation의 `mutationFn`이 `ok: false`를 이유가 담긴 오류 타입으로 바꿔 throw한다. 화면은 그 오류의 이유로 문구를 고른다. 서버 함수는 바꾸지 않는다. 지금 throw하는 `answerQuestion`·`denyPermission`은 그대로 두고, 클라이언트가 그 오류도 같은 오류 타입으로 감싼다. Run 상세의 `expectOk`는 이 변환으로 바뀐다. 오류 타입과 변환 함수는 0124가 만들고, 함께 도는 0125~0127이 그것을 쓴다.
 - mutation은 성공하면 그 mutation이 바꾼 key만 무효화하거나, 서버가 돌려준 새 값으로 `setQueryData`한다. 무효화 promise를 돌려줘 다시 읽기가 끝날 때까지 pending으로 둔다.
 - 오류 메시지가 서버 렌더 HTML에 실리지 않는지 0123이 확인한다(통합의 `shouldDehydrateQuery` 기본값, research 0015 5절).
 
@@ -106,8 +109,8 @@ graph LR
 
 - **Runs·Run 상세(0125).** 로그 다시 받기·답하기·거절·취소·멈추기와 재개를 mutation으로. Run 상세를 열 때의 로그 요청 뒤에는 `["runs", "detail", runId]`만 무효화한다. 로그·멈추기 처리 중 2초 폴링은 그 query의 `refetchInterval`로 옮긴다(로그는 지금처럼 최대 15번).
 - **Dashboard·Stats(0126).** `home/refresh.ts`의 15초 폴링을 지우고 Query와 변경 기록으로 바꾼다. 멈추기·재개 처리 중 2초 다시 읽기는 `refetchInterval`로 옮긴다.
-- **셸·Runners·Tickets(0127).** 셸 query는 runner·workspace 변경 기록으로 무효화한다. Runners의 `reloadOnEnter`(들어올 때마다 또 읽기)를 지운다. Tickets는 DB 부분과 트래커 부분을 다른 query로 나눈다. 할당은 `["tickets", "runs", ws]`(와 런 쪽 key)만 무효화하고 트래커 query는 건드리지 않는다. 러너 점검 3초 폴링은 `refetchInterval`로 옮긴다.
-- **Settings(0128, C7).** 0115의 직렬 저장(`serial-save.ts`)과 초안 맞추기(`synced-save.ts`) 동작은 그대로다. 저장 뒤의 `router.invalidate()`(Settings 전체와 트래커 세 읽기)만 바꾼 key 무효화나 `setQueryData`로 바꾼다. Linear 프로젝트·상태·라벨은 따로 query(5분)다.
+- **셸·Runners·Tickets(0127).** 셸 query는 runner·workspace 변경 기록으로 무효화한다. Runners의 `reloadOnEnter`(들어올 때마다 또 읽기)를 지운다. Tickets는 DB 부분과 트래커 부분을 다른 query로 나눈다. 할당은 `["tickets", "runs", ws]`(와 런 쪽 key)만 무효화하고 트래커 query는 건드리지 않는다. 러너 점검 3초 폴링은 `refetchInterval`로 옮긴다. `useSettingsActions`·`useReloadOnSuccess`와 `useRunnerCheckPolling`은 Settings, Runners, 온보딩이 함께 쓰므로, 0127이 저장 뒤 동작을 부르는 쪽이 넘기게 나눈다. Runners는 key 무효화를 넘기고, Settings와 온보딩은 아직 `router.invalidate()`를 넘긴다.
+- **Settings(0128, C7).** 0115의 직렬 저장(`serial-save.ts`)과 초안 맞추기(`synced-save.ts`) 동작은 그대로다. 저장 뒤의 `router.invalidate()`(Settings 전체와 트래커 세 읽기)만 바꾼 key 무효화나 `setQueryData`로 바꾼다. Linear 프로젝트·상태·라벨은 따로 query(5분)다. 0119가 나눈 Settings 세 route(`/settings`, `/settings/mcp`, 트래커 프로젝트 상세)가 대상이다. 온보딩(C1)은 라우터 로더로 남아 저장 뒤에도 `router.invalidate()`를 쓴다.
 
 ## 5. 변경 기록 설계
 
@@ -146,7 +149,9 @@ graph LR
 - 메시지
   - `change`: `id`는 `seq`, 데이터는 `{ kind, targetId, workspaceId }`.
   - `ready`: 연결 직후, 이어 받을 줄을 다 보낸 뒤. 데이터는 지금 번호.
-  - `reset`: 받은 `Last-Event-ID`(또는 `?after=`)가 남은 가장 작은 번호보다 오래되어 사이의 줄을 이미 지웠을 때. 브라우저는 모든 query를 무효화한다(C11).
+  - `reset`: 받은 번호(`Last-Event-ID` 또는 `?after=`)로 이어 받을 수 없을 때. 브라우저는 모든 query를 무효화한다(C11). 두 경우다.
+    - 받은 번호가 지운 줄의 가장 큰 번호보다 작다. 표가 비어 있어도 판단할 수 있게, 서버는 남은 줄이 아니라 지운 번호의 상한(정리 때 남기는 표시나 SQLite의 `sqlite_sequence`)과 비교한다.
+    - 받은 번호가 지금 가장 큰 번호보다 크다. DB 파일을 이전 것으로 되돌렸을 때 생긴다.
 - 다시 연결은 브라우저 `EventSource`의 `Last-Event-ID`로 이어 받는다(C11).
 - 요청 검사(Host·Origin, 0048)는 다른 웹 경로와 같다.
 
@@ -189,7 +194,7 @@ graph LR
 4. **SSE가 끊기면 30초 폴링.** 통로를 막으면 보이는 query가 30초마다 다시 읽힌다(가짜 시계).
 5. **0117 브라우저 시험이 통과한다.** `e2e/src/navigation.test.ts` 세 시험을 고치지 않고 통과한다.
 
-이 밖에 0124는 쓰기 함수마다 `change_events` 줄이 같은 트랜잭션에 생기는지(롤백하면 줄도 없는지), `Last-Event-ID` 이어 받기, 오래된 번호의 `reset`, 하루 지난 줄 지우기를 시험한다.
+이 밖에 0124는 쓰기 함수마다 `change_events` 줄이 같은 트랜잭션에 생기는지(롤백하면 줄도 없는지), `Last-Event-ID` 이어 받기, `reset`의 두 경우(표가 빈 경우와 지금보다 큰 번호 포함), 하루 지난 줄 지우기를 시험한다.
 
 ## 8. 위험
 

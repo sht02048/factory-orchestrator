@@ -19,7 +19,7 @@ Dashboard와 Stats를 Query로 옮기고, Dashboard의 15초 폴링을 변경 �
 1. **query.** `["dashboard", ws, timeZone]`(`getHomePage`), `["stats", ws, days, timeZone]`(`getStatsPage`). 로더와 컴포넌트가 같은 `queryOptions`를 쓴다. 두 route에 `preloadStaleTime` 0을 준다.
 2. **15초 폴링 지우기.** `home/refresh.ts`와 `_app/index.tsx`의 로컬 state(`polled`)를 지우고 Query와 변경 기록(0124)으로 갱신한다.
 3. **멈추기·재개 처리 중.** 2초 다시 읽기를 `refetchInterval`로 옮긴다.
-4. **mutation(C5).** Dashboard의 답하기, 거절, 멈추기와 재개. 0125와 같은 오류 타입을 쓴다(먼저 끝난 티켓이 만든 것을 따른다). 성공하면 `["dashboard"]`와 그 런의 `["runs", ...]` key만 무효화한다.
+4. **mutation(C5).** Dashboard의 답하기, 거절, 멈추기와 재개. 0124가 만든 오류 타입과 변환 함수를 쓴다. 서버 함수는 바꾸지 않는다. 성공하면 `["dashboard"]`와 그 런의 `["runs", ...]` key만 무효화한다.
 5. **시간대.** key에 넣어, `TimeZoneSync`의 `/_app/stats`·`/_app/` 필터 없이도 새로 읽게 한다. 루트 필터 정리는 0129가 한다.
 6. 두 route에서 `router.invalidate()`를 지운다.
 
