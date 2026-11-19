@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { Button, KanbanCard, StatusPill, buttonStyles } from "@ganger/ui";
+import { useId } from "react";
 import type { ReactNode, Ref } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
@@ -32,13 +33,15 @@ export function RunCard({
   onOpen: (mode: SheetMode) => void;
 }) {
   const tag = tagged ? todoTagOf(run) : null;
-  const parts = useCardParts(run, tag !== null, all, onOpen);
+  const titleId = useId();
+  const parts = useCardParts(run, tag !== null, all, titleId, onOpen);
   const statusName = useRunText().statusName;
   return (
     <li data-run={run.id} data-tag={tag ?? undefined}>
       <KanbanCard
         {...(tag === null ? {} : { tag: <StatusPill status={tag}>{statusName(tag)}</StatusPill> })}
         title={<RunKey run={run} />}
+        titleId={titleId}
         {...parts}
         selected={selected}
         openRef={openRef}
@@ -52,6 +55,7 @@ function useCardParts(
   run: HomeRun,
   tagged: boolean,
   all: boolean,
+  titleId: string,
   onOpen: (mode: SheetMode) => void,
 ): CardParts {
   const t = useTranslations("home.card");
@@ -81,7 +85,11 @@ function useCardParts(
                 meta: runner,
                 ...time,
                 action: (
-                  <Button variant="secondary" onClick={() => onOpen("answer")}>
+                  <Button
+                    variant="secondary"
+                    aria-describedby={titleId}
+                    onClick={() => onOpen("answer")}
+                  >
                     {t("answer")}
                   </Button>
                 ),
@@ -114,6 +122,7 @@ function useCardParts(
                     target="_blank"
                     rel="noreferrer"
                     data-variant="secondary"
+                    aria-describedby={titleId}
                     {...stylex.props(...buttonStyles("secondary"))}
                   >
                     {t("openPr")}

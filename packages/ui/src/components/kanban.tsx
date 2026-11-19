@@ -1,4 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
+import { useId } from "react";
 import type { ReactNode, Ref } from "react";
 import { textStyles } from "./text";
 import { colors, fontSize, radius, size, space } from "../tokens.stylex";
@@ -41,6 +42,7 @@ export interface KanbanCardProps {
   onOpen: () => void;
   openRef?: Ref<HTMLButtonElement>;
   selected?: boolean;
+  titleId?: string;
 }
 
 export function KanbanCard({
@@ -53,8 +55,19 @@ export function KanbanCard({
   onOpen,
   openRef,
   selected = false,
+  titleId,
 }: KanbanCardProps) {
+  const ownId = useId();
+  const nameId = titleId ?? `${ownId}title`;
+  const tagId = `${ownId}tag`;
+  const detailId = `${ownId}detail`;
+  const footId = `${ownId}foot`;
   const hasFoot = meta !== undefined || time !== undefined || action !== undefined;
+  const described = [
+    tag === undefined ? null : tagId,
+    detail === undefined ? null : detailId,
+    hasFoot ? footId : null,
+  ].filter((id) => id !== null);
   return (
     <div {...stylex.props(styles.card)}>
       <button
@@ -62,16 +75,29 @@ export function KanbanCard({
         {...(openRef === undefined ? {} : { ref: openRef })}
         aria-haspopup="dialog"
         aria-expanded={selected}
+        aria-labelledby={nameId}
+        {...(described.length === 0 ? {} : { "aria-describedby": described.join(" ") })}
         onClick={onOpen}
         {...stylex.props(styles.open, selected && styles.selected)}
       >
-        {tag === undefined ? null : <span {...stylex.props(styles.tag)}>{tag}</span>}
-        <span {...stylex.props(styles.title)}>{title}</span>
+        {tag === undefined ? null : (
+          <span id={tagId} {...stylex.props(styles.tag)}>
+            {tag}
+          </span>
+        )}
+        <span id={nameId} {...stylex.props(styles.title)}>
+          {title}
+        </span>
         {detail === undefined ? null : (
-          <span {...stylex.props(textStyles("ui"), styles.detail)}>{detail}</span>
+          <span id={detailId} {...stylex.props(textStyles("ui"), styles.detail)}>
+            {detail}
+          </span>
         )}
         {hasFoot ? (
-          <span {...stylex.props(styles.foot, action !== undefined && styles.footWithAction)}>
+          <span
+            id={footId}
+            {...stylex.props(styles.foot, action !== undefined && styles.footWithAction)}
+          >
             <span {...stylex.props(textStyles("meta"), styles.meta)}>{meta}</span>
             {time === undefined ? null : (
               <span {...stylex.props(textStyles("meta"), styles.time)}>{time}</span>
@@ -158,19 +184,21 @@ const styles = stylex.create({
   },
   foot: {
     display: "flex",
-    alignItems: "center",
+    alignItems: "baseline",
     gap: space.s2,
     minWidth: 0,
-    minHeight: size.control,
+    paddingTop: space.s1,
   },
-  footWithAction: { paddingInlineEnd: size.rowActionColumn },
+  footWithAction: {
+    alignItems: "center",
+    minHeight: size.control,
+    paddingInlineEnd: size.rowActionColumn,
+  },
   meta: {
     flexGrow: 1,
     flexShrink: 1,
     minWidth: 0,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
+    overflowWrap: "anywhere",
   },
   time: { flexShrink: 0, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" },
   action: {

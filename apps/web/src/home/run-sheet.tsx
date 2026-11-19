@@ -65,7 +65,6 @@ export function RunSheet({
       onOpenChange={onOpenChange}
       status={<SheetStatus run={run} status={status} />}
       title={run.ticketTitle === null ? run.ticketKey : `${run.ticketKey} ${run.ticketTitle}`}
-      subtitle={<SheetSubtitle run={run} all={all} />}
       closeLabel={t("close")}
       {...(initialFocus === undefined ? {} : { initialFocus })}
       finalFocus={finalFocus}
@@ -109,11 +108,6 @@ function SheetStatus({ run, status }: { run: HomeRun; status: PillStatus }) {
       {since === null ? null : <span>{since}</span>}
     </>
   );
-}
-
-function SheetSubtitle({ run, all }: { run: HomeRun; all: boolean }) {
-  const { runnerLine } = useRunText();
-  return <>{runnerLine(run, all)}</>;
 }
 
 function SheetBody({

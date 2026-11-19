@@ -448,10 +448,17 @@ describe("서버 렌더", () => {
     expect(open).toContain("12분째");
     expect(open).not.toContain("답하기");
     expect(html.indexOf("답하기")).toBeGreaterThan(html.indexOf("</button>"));
+    const named = /aria-labelledby="([^"]+)" aria-describedby="([^"]+)"/.exec(html);
+    expect(named).not.toBeNull();
+    const [, nameId = "", described = ""] = named ?? [];
+    expect(html).toMatch(new RegExp(`<span id="${nameId}"[^>]*>ACME-1</span>`));
+    expect(described.split(" ")).toHaveLength(3);
     expect(html).not.toMatch(/draggable|grab/);
 
-    const plain = renderToString(<KanbanCard title="ACME-2" onOpen={noop} />);
+    const plain = renderToString(<KanbanCard title="ACME-2" titleId="card-2" onOpen={noop} />);
     expect(plain).toContain('aria-expanded="false"');
+    expect(plain).toContain('aria-labelledby="card-2"');
+    expect(plain).not.toContain("aria-describedby");
     expect(plain).not.toContain("data-status=");
   });
 
