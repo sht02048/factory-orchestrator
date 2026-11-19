@@ -62,6 +62,7 @@ function useKeepFocusClear(slot: HTMLElement | null): void {
     reserve();
     const observer = new ResizeObserver(reserve);
     observer.observe(slot);
+    const reserved = new Map<HTMLElement, string>();
     const onFocus = (event: FocusEvent) => {
       const target = event.target;
       if (!(target instanceof HTMLElement) || slot.contains(target)) return;
@@ -70,13 +71,23 @@ function useKeepFocusClear(slot: HTMLElement | null): void {
       const overlapsSideways = focused.right > covered.left && focused.left < covered.right;
       const hiddenBy = focused.bottom - covered.top;
       if (!overlapsSideways || hiddenBy <= 0) return;
-      scrollerOf(target)?.scrollBy({ top: hiddenBy + covered.height / 4 });
+      const scroller = scrollerOf(target);
+      if (scroller === null) return;
+      const lift = hiddenBy + covered.height / 4;
+      const room = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
+      if (room < lift) {
+        if (!reserved.has(scroller)) reserved.set(scroller, scroller.style.paddingBlockEnd);
+        const current = getComputedStyle(scroller).paddingBlockEnd;
+        scroller.style.paddingBlockEnd = `calc(${current} + ${lift - room}px)`;
+      }
+      scroller.scrollBy({ top: lift });
     };
     document.addEventListener("focusin", onFocus);
     return () => {
       observer.disconnect();
       document.removeEventListener("focusin", onFocus);
       root.style.removeProperty(PINNED_TOAST_SPACE);
+      for (const [scroller, original] of reserved) scroller.style.paddingBlockEnd = original;
     };
   }, [slot]);
 }
@@ -84,11 +95,7 @@ function useKeepFocusClear(slot: HTMLElement | null): void {
 function scrollerOf(element: HTMLElement): HTMLElement | null {
   for (let parent = element.parentElement; parent !== null; parent = parent.parentElement) {
     const { overflowY } = getComputedStyle(parent);
-    if (
-      (overflowY === "auto" || overflowY === "scroll") &&
-      parent.scrollHeight > parent.clientHeight
-    )
-      return parent;
+    if (overflowY === "auto" || overflowY === "scroll") return parent;
   }
   return null;
 }

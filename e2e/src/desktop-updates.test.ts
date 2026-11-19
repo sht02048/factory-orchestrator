@@ -201,6 +201,36 @@ describe("데스크톱 업데이트 토스트(브라우저, 0083)", () => {
       .toMatch(/^\d+(\.\d+)?px$/);
   });
 
+  it("스크롤 끝의 컨트롤에 포커스가 가도 토스트 아래에 가려지지 않는다", async (context) => {
+    const page = await newPage(context, { width: 1280, height: 800 });
+    await withUpdates(page, READY);
+    await open(page, "/");
+    const toast = pinnedToast(page);
+    await toast.waitFor();
+    await page.evaluate(() => {
+      const scroller = document.createElement("div");
+      scroller.style.cssText = "position:fixed;inset:0;overflow:auto;z-index:1";
+      const filler = document.createElement("div");
+      filler.style.cssText = "position:relative;height:100vh";
+      const last = document.createElement("button");
+      last.textContent = "last";
+      last.style.cssText = "position:absolute;right:40px;bottom:20px";
+      filler.append(last);
+      scroller.append(filler);
+      document.body.append(scroller);
+    });
+    const last = page.getByRole("button", { name: "last", exact: true });
+    await last.focus();
+    const covered = await toast.boundingBox();
+    if (covered === null) throw new Error("toast has no box");
+    await expect
+      .poll(async () => {
+        const box = await last.boundingBox();
+        return box === null ? Number.POSITIVE_INFINITY : box.y + box.height;
+      })
+      .toBeLessThanOrEqual(covered.y);
+  });
+
   it("나중에를 누르면 닫히고, 다시 시작을 누르면 앱에 다시 시작을 보낸다", async (context) => {
     const page = await newPage(context, { width: 1280, height: 800 });
     await withUpdates(page, READY);
