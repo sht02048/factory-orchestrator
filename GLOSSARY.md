@@ -207,3 +207,7 @@ _Avoid_: health 경로(살아 있는지만 묻는 것처럼 들린다)
 **Operator**:
 오케스트레이터 설치 하나를 운영하는 사람. 설치 하나에 운영자는 한 명이며, 1단계에는 다중 사용자 개념이 없다.
 _Avoid_: User, Admin
+
+**MCP 클라이언트**:
+Ganger가 도는 기계에서 MCP로 Ganger를 읽고 다루는 에이전트(예: Hermes). Operator를 대신해 일하지만 Operator가 아니고, 한 일은 Operator가 한 일과 구분된다. 할 수 있는 범위는 [ADR 0013](docs/adr/0013-mcp-client-scope.md).
+_Avoid_: 봇, 자동화(무엇이 했는지 흐리다), 사용자(다중 사용자로 읽힌다)
