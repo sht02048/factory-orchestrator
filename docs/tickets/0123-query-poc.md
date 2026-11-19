@@ -13,7 +13,7 @@ blocked_by: [0119, 0120]
 
 - 지금 클라이언트 캐시는 라우터 로더 캐시 하나다(research [0016](../research/0016-web-data-loading.md)).
 - 공식 결합 방식과 열린 이슈는 research [0015](../research/0015-tanstack-query.md) 1·7절에 있다.
-- 0119(Settings 개편)와 0120(러너 쪽 멈춤 감지)이 머지된 뒤 최신 `develop`에서 시작한다(C8).
+- 0119(Settings 개편)와 0120(러너 쪽 멈춤 감지)은 머지됐다. 최신 `develop`에서 시작한다(C8).
 
 ## 할 일
 
@@ -37,7 +37,7 @@ blocked_by: [0119, 0120]
 - [ ] 8·9·10의 확인 결과를 이 티켓에 적었다. 재현된 이슈가 없다.
 - [ ] 시험: 서버 렌더한 화면에서 hydration이 끝날 때까지 서버 함수 호출이 늘지 않는다(지금과 같은 수).
 - [ ] 시험: 쿠키가 다른 동시 서버 렌더 요청이 서로의 값을 담지 않는다(요청별 `QueryClient`).
-- [ ] 0117 브라우저 시험(`e2e/src/navigation.test.ts`)이 그대로 통과한다.
+- [ ] 0117 브라우저 시험(`e2e/src/navigation.test.ts`)이 같은 뜻으로 통과한다(스펙 7절 5번).
 - [ ] 클라이언트 묶음 크기 전·후(`e2e/src/measure-navigation.ts --client`)를 적었다.
 
 ## 머지 위험

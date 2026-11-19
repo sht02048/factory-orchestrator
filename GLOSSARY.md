@@ -184,7 +184,7 @@ _Avoid_: 막힘, 인증 깨짐, 러너 오류(모두 종류 이름으로. 설명
 _Avoid_: Attention, 알림(OS에 뜨는 알림 자체를 말할 때만 쓴다), 이벤트(단독으로. 런 상태 기록과 헷갈린다)
 
 **변경 기록**:
-무엇이 바뀌었는지 남긴 줄. DB 표 `change_events`에 번호, 대상 종류(run, runner, assignment, workspace, settings, tracker), 대상 id, Workspace, 시각을 담는다. 바꾸는 코드가 같은 트랜잭션에서 쓰고, web이 SSE(`/api/change-events/stream`)로 보내 열린 화면이 그 대상의 데이터만 다시 읽게 한다. 내용은 담지 않는다. 하루 지나면 지운다(ADR 0019). 운영자에게 알릴 일만 담는 알림 사건과 다르다.
+무엇이 바뀌었는지 남긴 줄. DB 표 `change_events`에 번호, 대상 종류(run, runner, assignment, workspace, settings, tracker), 대상 id, Workspace, 시각을 담는다. DB를 바꾸는 코드는 같은 트랜잭션에서 쓰고 트래커 API·설치 설정 쓰기는 그 뒤에 쓰며, 바뀐 것이 있을 때만 쓴다. web이 SSE(`/api/change-events/stream`)로 보내 열린 화면이 그 대상의 데이터만 다시 읽게 한다. 내용은 담지 않는다. 하루 지나면 지운다(ADR 0019). 운영자에게 알릴 일만 담는 알림 사건과 다르다.
 _Avoid_: 이벤트(단독으로), 알림 사건, 변경 로그
 
 ### Tickets 필터

@@ -14,7 +14,7 @@
 - mutation 하나는 그 mutation이 바꾼 query만 다시 읽는다. 루트와 셸은 다시 읽지 않는다.
 - worker가 바꾼 런 상태가 열린 화면(Dashboard, Runs, Run 상세)에 3초 안에 보인다.
 - SSE가 끊기면 열린 화면이 30초마다 다시 읽는다.
-- 0117의 화면 이동 브라우저 시험(`e2e/src/navigation.test.ts`)이 그대로 통과한다.
+- 0117의 화면 이동 브라우저 시험(`e2e/src/navigation.test.ts`)이 같은 뜻으로 통과한다(7절 5번).
 - 0117 측정과 원격 지연 측정(0122)을 다시 돌려 전·후 표를 남긴다(0129).
 
 ## 2. 범위와 제외
@@ -34,7 +34,7 @@
 
 ## 3. 선행과 순서
 
-- 0118(런 멈추기·재개), 0115(Mapping 저장소 여럿), 0119(Settings 개편)는 `develop`에 머지됐다. 0120(러너 쪽 멈춤 감지)이 머지된 뒤 Query 작업을 시작한다(C8). 0120이 런 상태를 쓰는 worker 코드를 바꾸기 때문이다.
+- 0118(런 멈추기·재개), 0115(Mapping 저장소 여럿), 0119(Settings 개편), 0120(러너 쪽 멈춤 감지)은 `develop`에 머지됐다. 그래서 Query 작업의 선행 조건(C8)은 채워졌다. 0120이 더한 런 상태 바꾸기(`followRunnerStop`의 Paused·Running 옮김)도 `changeRunState`를 지나 `run` 줄에 든다.
 - 0129는 0122의 원격 지연 측정 스크립트로 다시 재므로 0122 뒤에 한다.
 - 0122는 0127·0128과 같은 로더 파일(`packages/app/src/tickets/load.ts`, `packages/app/src/settings/load.ts`)을 고친다. 0127·0128은 0123·0124 뒤라 0122가 먼저 머지될 가능성이 크고, 그러면 0122의 서버 캐시 위에서 서버 함수를 나눈다. 함께 돌면 늦게 머지하는 쪽이 맞춘다.
 - 순서(C14): 0123 → 0124 → (0125, 0126, 0127 함께) → 0128(0127 뒤) → 0129.
@@ -132,7 +132,7 @@ graph LR
 
 ### 5.2 기록하는 곳(C9, C12)
 
-무엇을 바꾸는 코드가 같은 트랜잭션에서 줄을 쓴다. 실제로 바뀐 것이 있을 때만 쓴다. worker는 바뀐 것이 없어도 쓰기 함수를 주기마다 부른다(감시마다 `recordRunQuestions`·`recordPermissionWaits`, `apps/worker/src/watch.ts:118-130`, 러너마다 60초마다 `recordRunnerCheck`, 5분마다 `recordProviderUsage`, `apps/worker/src/runner-check.ts`). 그래서 바뀐 행이 없거나(`changes` 0) 화면에 보이는 값(점검 결과, Online, 사용량 한도 등)이 그대로면 줄을 쓰지 않는다. 점검 시각(`checkedAt`)이나 사용량 읽은 시각(`readAt`)만 바뀐 것은 바뀜으로 치지 않는다. 그래서 "N분 전 점검" 같은 시각 표시는 SSE가 붙어 있는 동안 30초 staleTime 뒤 탭 복귀나 다른 바뀜 때 새로 고쳐진다. 그러지 않으면 열린 화면이 끊임없이 다시 읽어 C4의 "해당 key만"이 뜻을 잃는다. 쓰는 일을 `packages/db`의 쓰기 함수 안에 두면 web, worker, `ganger mcp` 어느 프로세스가 불러도 빠지지 않는다.
+무엇을 바꾸는 코드가 같은 트랜잭션에서 줄을 쓴다. 실제로 바뀐 것이 있을 때만 쓴다. worker는 바뀐 것이 없어도 쓰기 함수를 주기마다 부른다(감시마다 `recordRunQuestions`·`recordPermissionWaits`·`resolvePermissionWaits`, `apps/worker/src/watch.ts:125-130`, 러너마다 60초마다 `recordRunnerCheck`, 5분마다 `recordProviderUsage`, `apps/worker/src/runner-check.ts`). 그래서 화면에 보이는 값을 쓰기 전과 뒤로 견줘 바뀐 것이 없으면 줄을 쓰지 않는다. `changes` 수만으로는 부족하다. `recordRunnerCheck`는 늘 `checkedAt`을 쓰고 러너 프로젝트를 지웠다 다시 넣으며(`packages/db/src/settings.ts:265-293`), `updateRunRecords`도 같은 값을 다시 쓸 수 있다. 화면에 보이는 값(점검 결과, Online, 사용량 한도 등)이 그대로면 줄을 쓰지 않는다. 점검 시각(`checkedAt`)이나 사용량 읽은 시각(`readAt`)만 바뀐 것은 바뀜으로 치지 않는다. 그래서 "N분 전 점검" 같은 시각 표시는 SSE가 붙어 있는 동안 30초 staleTime 뒤 탭 복귀나 다른 바뀜 때 새로 고쳐진다. 그러지 않으면 열린 화면이 끊임없이 다시 읽어 C4의 "해당 key만"이 뜻을 잃는다. 쓰는 일을 `packages/db`의 쓰기 함수 안에 두면 web, worker, `ganger mcp` 어느 프로세스가 불러도 빠지지 않는다.
 
 | 대상         | 언제(지금 코드의 쓰는 곳 예)                                                                                                                                        |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -147,7 +147,7 @@ graph LR
 
 web 안의 트래커 쓰기(라벨 만들기, 트래커 연결·프로젝트 저장, Linear에서 다시 읽기)는 같은 요청에서 0122의 서버 캐시를 직접 비운 뒤 결과를 돌려준다. 그래야 mutation이 곧바로 다시 읽을 때 새 값을 받는다. 아래 1초 읽기는 다른 프로세스가 쓴 줄을 위한 것이다. 0122의 트래커 서버 캐시는 web 프로세스 메모리에 있어 worker나 `ganger mcp`가 직접 비울 수 없다. 그래서 web의 변경 기록 읽기가 `tracker` 줄을 보면, 브라우저에 보내기 전에 그 트래커 연결의 서버 캐시를 비운다. 어느 프로세스가 줄을 썼든 통한다. 그러지 않으면 브라우저가 다시 읽어도 서버 캐시가 낡은 값을 돌려준다. 0124와 0122 가운데 늦게 머지하는 쪽이 이 연결을 만든다. worker가 트래커를 바꾸는 일(In Progress로 옮기기 `apps/worker/src/after-run.ts`의 `markInProgress`, 댓글)도 `run`과 함께 `tracker` 줄을 쓴다. webhook이 없는 설치에서도 Tickets의 티켓 상태가 5분 동안 낡지 않게 하려는 것이다.
 
-한 쓰기가 둘 이상에 해당하면 줄을 둘 이상 쓴다(라벨 만들기는 `tracker`와 `settings`, 트래커 프로젝트 더하기·지우기는 `settings`와 `tracker`). "Linear에서 다시 읽기"와 라벨 만들기는 트래커 API 호출이라 DB 트랜잭션이 없다. 지금 "Linear에서 다시 읽기"는 클라이언트의 `router.invalidate()`뿐이라(research 0016 3절), 0124가 `tracker` 줄을 쓰는 서버 동작을 더한다(0122가 서버 캐시를 비우는 동작을 먼저 만들었으면 거기에 붙인다). 위 함수 이름은 `develop`(`1e287f6`) 기준 예다. 0120이 바꾼 쓰는 곳도 0124가 함께 찾는다. 빠진 쓰는 곳은 그 바뀜이 30초 폴링이나 탭 복귀 때까지 화면에 닿지 않는 것으로 드러나므로, 0124는 쓰기 함수마다 줄이 생기는지 시험한다.
+한 쓰기가 둘 이상에 해당하면 줄을 둘 이상 쓴다(라벨 만들기는 `tracker`와 `settings`, 트래커 프로젝트 더하기·지우기는 `settings`와 `tracker`). "Linear에서 다시 읽기"와 라벨 만들기는 트래커 API 호출이라 DB 트랜잭션이 없다. 지금 "Linear에서 다시 읽기"는 클라이언트의 `router.invalidate()`뿐이라(research 0016 3절), 0124가 `tracker` 줄을 쓰는 서버 동작을 더한다(0122가 서버 캐시를 비우는 동작을 먼저 만들었으면 거기에 붙인다). 위 함수 이름은 `develop`(`95dd2ef`) 기준 예다. 0120이 바꾼 쓰는 곳도 0124가 함께 찾는다. 빠진 쓰는 곳은 그 바뀜이 30초 폴링이나 탭 복귀 때까지 화면에 닿지 않는 것으로 드러나므로, 0124는 쓰기 함수마다 줄이 생기는지 시험한다.
 
 ### 5.3 SSE 통로 `/api/change-events/stream`(C10, C11)
 
@@ -159,7 +159,7 @@ web 안의 트래커 쓰기(라벨 만들기, 트래커 연결·프로젝트 저
 - "지금 번호"(서버 렌더가 넘기는 번호와 `ready`의 번호)는 `max(가장 큰 seq, sqlite_sequence)`다. 하루가 지나 표가 비어도 처음 연결이 `reset`을 받지 않게 한다.
 - 첫 연결에는 `Last-Event-ID`가 없다. 서버 렌더와 첫 연결 사이의 바뀜을 놓치지 않도록, 서버 렌더가 어떤 데이터보다 먼저 가장 큰 번호를 읽어 넘기고(요청을 시작할 때나 루트 `beforeLoad`. 라우터는 로더를 동시에 돌려 루트 로더가 먼저라는 보장이 없으므로 로더에서 읽지 않는다. 루트 `beforeLoad`는 온보딩 완료를 안 뒤나 열린 경로에서 일찍 돌아가므로, 그 앞에서 서버에서만 읽고 클라이언트 이동 때는 읽지 않는다), 구독 모듈이 그 번호로 `?after=`를 주어 처음 연결한다. 셸처럼 다시 읽히는 query에서 번호를 읽지 않고, 구독 모듈은 첫 연결 때 받은 번호만 쓴다. 번호는 루트 route context로 브라우저에 넘기고(dehydrate) 구독 모듈이 한 번 읽는다. 정확한 길은 0124가 정한다. 0124가 맡는다.
   - `reset`: 받은 번호(`Last-Event-ID` 또는 `?after=`)로 이어 받을 수 없을 때. 브라우저는 모든 query를 무효화한다(C11). 두 경우다.
-    - 받은 번호가 지운 줄의 가장 큰 번호보다 작다. 지운 번호의 상한은 표에 줄이 있으면 남은 가장 작은 번호 − 1, 표가 비었으면 SQLite가 마지막으로 준 번호(`sqlite_sequence`)다. 정리 때 지운 상한을 따로 남겨도 된다.
+    - 받은 번호가 지운 줄의 가장 큰 번호보다 작다. 지운 번호의 상한은 정리 때 반드시 따로 남긴다. `at` 순서와 `seq` 순서가 다를 수 있어(시계 조정, 쓰기 잠금을 기다린 긴 트랜잭션) "남은 가장 작은 번호 − 1"은 틈을 숨길 수 있다. 정리도 번호로 한다(`at`이 하루 지난 줄 가운데 가장 큰 `seq` 이하를 지운다).
     - 받은 번호가 지금 가장 큰 번호보다 크다. DB 파일을 이전 것으로 되돌렸을 때 생긴다.
 - 다시 연결은 브라우저 `EventSource`의 `Last-Event-ID`로 이어 받는다(C11).
 - 요청 검사(Host·Origin, 0048)는 다른 웹 경로와 같다.
@@ -178,8 +178,8 @@ web 안의 트래커 쓰기(라벨 만들기, 트래커 연결·프로젝트 저
 | `tracker`    | `["tracker"]`(Tickets와 Settings의 Linear query, C12)                                                                                                  |
 | `reset`      | 모든 query                                                                                                                                             |
 
-- `run`이 `["runs", "detail"]` 접두사 전체를 무효화하는 것은 Run 상세가 같은 티켓의 다른 런과 그 상태(`run-detail/load.ts:298-312`), 모든 Queued 런으로 계산한 Queued 사유(`:172-195`)를 보여서다. 실제로 다시 읽는 것은 열린 상세뿐이다. 로그 요청과 그 결과는 예외로 그 런의 상세만 무효화할지 0124가 정한다(8절).
-- C12의 화면 매핑에 더해, `run`은 Runners(러너마다 도는 런을 보인다)와 Stats(끝난 런 집계)도 무효화한다. 두 로더가 런을 읽기 때문이다(research 0016 2절). 셸(`["shell"]`)은 Workspace 목록과 Runner Issue 배지만 담아 `workspace`와 `runner`에만 무효화한다. `workspace`·`settings`가 Dashboard와 Tickets 런 표시를 무효화하는 것은 대기 사유와 할당할 수 있음이 Mapping·러너 설정에 달려서다. `runner`가 Tickets 런 표시와 Settings를 무효화하는 것은 Tickets가 러너의 Online·할당 막힘·사용량 한도로 할당할 수 있음을 정하고(`packages/app/src/tickets/load.ts:61-83`), Settings가 러너 목록과 점검을 읽어서다. `workspace`가 Runners를 무효화하는 것은 Runners가 Workspace 이름을 보여서다. `runner`·`workspace`가 Runs 목록·Run 상세·Stats를 무효화하는 것은 Queued 사유가 러너 상태(Online, capacity, 프로젝트)로 정해지고(`packages/app/src/runs/load.ts:47, 81-86`, `run-detail/load.ts:172-195`), Run 상세와 Stats가 러너·Workspace 이름을 보여서다(`run-detail/load.ts:52`, `stats/load.ts:29, 36`). `settings`가 Runs와 Stats를 무효화하는 것은 두 화면이 트래커 프로젝트 이름을 보여서다(`run-detail/load.ts:67`, `stats/load.ts`). `run`·`assignment`가 Settings를 무효화하는 것은 Settings가 트래커 프로젝트마다 Queued 런 수를 보여서다(`settings/load.ts:352`).
+- `run`이 `["runs", "detail"]` 접두사 전체를 무효화하는 것은 Run 상세가 같은 티켓의 다른 런과 그 상태(`run-detail/load.ts:301-315`), 모든 Queued 런으로 계산한 Queued 사유(`:175-198`)를 보여서다. 실제로 다시 읽는 것은 열린 상세뿐이다. 로그 요청과 그 결과는 예외로 그 런의 상세만 무효화할지 0124가 정한다(8절).
+- C12의 화면 매핑에 더해, `run`은 Runners(러너마다 도는 런을 보인다)와 Stats(끝난 런 집계)도 무효화한다. 두 로더가 런을 읽기 때문이다(research 0016 2절). 셸(`["shell"]`)은 Workspace 목록과 Runner Issue 배지만 담아 `workspace`와 `runner`에만 무효화한다. `workspace`·`settings`가 Dashboard와 Tickets 런 표시를 무효화하는 것은 대기 사유와 할당할 수 있음이 Mapping·러너 설정에 달려서다. `runner`가 Tickets 런 표시와 Settings를 무효화하는 것은 Tickets가 러너의 Online·할당 막힘·사용량 한도로 할당할 수 있음을 정하고(`packages/app/src/tickets/load.ts:61-83`), Settings가 러너 목록과 점검을 읽어서다. `workspace`가 Runners를 무효화하는 것은 Runners가 Workspace 이름을 보여서다. `runner`·`workspace`가 Runs 목록·Run 상세·Stats를 무효화하는 것은 Queued 사유가 러너 상태(Online, capacity, 프로젝트)로 정해지고(`packages/app/src/runs/load.ts:47, 81-86`, `run-detail/load.ts:175-198`), Run 상세와 Stats가 러너·Workspace 이름을 보여서다(`run-detail/load.ts:52`, `stats/load.ts:29, 36`). `settings`가 Runs와 Stats를 무효화하는 것은 두 화면이 트래커 프로젝트 이름을 보여서다(`run-detail/load.ts:67`, `stats/load.ts`). `run`·`assignment`가 Settings를 무효화하는 것은 Settings가 트래커 프로젝트마다 Queued 런 수를 보여서다(`settings/load.ts:352`).
 - `workspaceId`가 있으면 그 Workspace의 key만 무효화해도 되지만, 모든 Workspace를 함께 보이는 key(`ws` 없음)가 있어 첫 구현은 접두사 전체를 무효화한다. 이것도 C4의 "해당 key"에 든다. 그 Workspace의 바뀜은 `ws` 없는 key의 결과도 바꾸고, 관찰자가 없는 key는 stale 표시만 되어 실제로 다시 읽는 것은 보이는 화면뿐이다.
 
 ### 5.5 끊겼을 때(C4, C11)
@@ -217,7 +217,7 @@ web 안의 트래커 쓰기(라벨 만들기, 트래커 연결·프로젝트 저
 - **쓰는 곳 빠뜨림.** `change_events`를 쓰지 않는 쓰기는 화면에 늦게 닿는다(최대 30초 폴링, 탭 복귀). 5.2의 시험으로 막는다.
 - **탭 여러 개의 연결 수.** HTTP/1.1에서 브라우저는 한 주소에 연결을 6개까지 연다. 탭마다 SSE 하나를 열어 두면 탭이 많을 때 다른 요청이 막힐 수 있다. 0124가 탭 여러 개로 확인한다(열린 질문 1).
 - **런 시작마다 트래커를 다시 읽음.** worker가 In Progress로 옮길 때 `tracker` 줄을 쓰므로(5.2), 런이 시작될 때마다 서버 트래커 캐시가 비고 열린 Tickets 탭이 트래커를 다시 읽는다. 옳은 동작이지만 비용이 있다. 0127의 "할당 뒤 트래커를 다시 읽지 않는다" 시험은 변경 기록 통로를 끈 채 돈다. 0124가 로그 요청과 함께 잰다.
-- **로그 요청이 무효화를 넓게 퍼뜨림.** Run 상세를 열면 실행 중인 런마다 로그 요청을 쓰고(`packages/app/src/run-detail/load.ts:106-111`) worker가 결과를 쓴다. 이것이 `run` 줄이면 모든 탭의 Dashboard·Runs·Tickets·Runners·Stats가 무효화된다. 0124는 로그 요청과 그 결과를 `["runs", "detail", id]`만 무효화하도록 줄에서 가르거나(필드나 종류), 비용을 재서 그대로 둘지 정한다.
+- **로그 요청이 무효화를 넓게 퍼뜨림.** 열린 런이 실행 중이면 Run 상세가 그 런의 로그 요청을 쓰고(`apps/web/src/routes/_app/runs_.$runId.tsx:49-53`,`packages/app/src/run-detail/load.ts:106-111`) worker가 결과를 쓴다. 이것이 `run` 줄이면 모든 탭의 Dashboard·Runs·Tickets·Runners·Stats가 무효화된다. 0124는 로그 요청과 그 결과를 `["runs", "detail", id]`만 무효화하도록 줄에서 가르거나(필드나 종류), 비용을 재서 그대로 둘지 정한다.
 - **같은 탭의 쓰기가 돌아옴.** 쓰기 하나가 남긴 줄이 1초 뒤 SSE로 같은 탭에 돌아와, mutation이 이미 다시 읽은 query를 한 번 더 읽는다. 보이는 query만 읽고 트래커 query는 `tracker` 줄에만 무효화되어 크지 않다. 줄이면 0124가 "방금 다시 읽은 key는 건너뛰기" 같은 방법을 재 보고 정한다.
 - **쓰기 비용.** 쓰기마다 줄 하나가 는다. 하루 지난 줄을 지워 표는 작게 유지된다.
 - **두 캐시가 섞인 기간.** 옮기는 동안 Router와 Query 캐시가 함께 있어, 둘 다 바꾸는 쓰기에서 하나만 무효화하면 낡은 값이 남는다. 6절 3번처럼 둘 다 부르고, 0129에서 Router 쪽을 지운다.
