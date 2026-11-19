@@ -238,6 +238,7 @@ describe("MCP 쓰기 도구", () => {
       client: "Operator",
       tool: "answer_question",
       outcome: "done",
+      reason: null,
       at: at(60).toISOString(),
     });
     expect(listRecentMcpActions(seeded.db, 10)).toEqual([]);

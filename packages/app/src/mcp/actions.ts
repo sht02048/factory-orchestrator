@@ -48,12 +48,41 @@ export function mcpClientName(raw: string | undefined): string {
   return cut === "" ? UNNAMED_MCP_CLIENT : cut;
 }
 
+export const MCP_REJECT_REASONS = [
+  "not-found",
+  "workspace",
+  "no-mapping",
+  "active-run",
+  "unknown-agent",
+  "unknown-runner",
+  "runner-assignment-blocked",
+  "no-question",
+  "already-answered",
+  "no-permission",
+  "already-denied",
+  "resolved",
+  "already-ended",
+  "not-running",
+  "taken",
+  "unauthorized",
+  "rate-limited",
+  "network",
+  "invalid",
+  "unavailable",
+] as const;
+export type McpRejectReason = (typeof MCP_REJECT_REASONS)[number];
+
+export function isMcpRejectReason(reason: string | null): reason is McpRejectReason {
+  return MCP_REJECT_REASONS.some((known) => known === reason);
+}
+
 export interface McpActionView {
   at: string;
   client: string;
   tool: string;
   target: string | null;
   outcome: McpActionOutcome;
+  reason: string | null;
 }
 
 export function mcpActionView(action: StoredMcpAction): McpActionView {
@@ -63,5 +92,6 @@ export function mcpActionView(action: StoredMcpAction): McpActionView {
     tool: action.tool,
     target: action.target,
     outcome: action.outcome,
+    reason: action.reason,
   };
 }

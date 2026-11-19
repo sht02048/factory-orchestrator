@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { isMcpRunTool } from "@ganger/app/mcp/actions";
+import { isMcpRejectReason, isMcpRunTool } from "@ganger/app/mcp/actions";
 import {
   Actions,
   Button,
@@ -543,9 +543,13 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
   const eventDetail = (event: TimelineEvent): string | null => {
     switch (event.kind) {
       case "mcp":
-        return event.outcome === "done"
-          ? toolName(event.tool)
-          : t("mcpRejected", { tool: toolName(event.tool) });
+        if (event.outcome === "done") return toolName(event.tool);
+        return isMcpRejectReason(event.reason)
+          ? t("mcpRejected", {
+              tool: toolName(event.tool),
+              reason: t(`mcpReason.${event.reason}`),
+            })
+          : t("mcpRejectedUnknown", { tool: toolName(event.tool) });
       case "question":
       case "answer":
       case "permission":

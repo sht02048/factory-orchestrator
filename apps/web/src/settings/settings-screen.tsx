@@ -44,7 +44,7 @@ import {
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { prerequisiteHint } from "@ganger/app/prerequisites";
-import { isMcpWriteTool } from "@ganger/app/mcp/actions";
+import { isMcpRejectReason, isMcpWriteTool } from "@ganger/app/mcp/actions";
 import type { McpActionView } from "@ganger/app/mcp/actions";
 import { hermesConfig, jsonConfig } from "@ganger/app/settings/mcp-launch";
 import { useAgentName, usePrerequisiteName } from "../labels";
@@ -1409,14 +1409,19 @@ function McpRecent({ recent, now }: { recent: ReadonlyArray<McpActionView>; now:
                       {t("actor", { client: action.client })}
                     </Text>
                     <Text variant="meta">
-                      {[
-                        toolName(action.tool),
-                        action.target,
-                        action.outcome === "done" ? null : t("rejected"),
-                      ]
-                        .filter((part) => part !== null)
-                        .join(" · ")}
+                      {t("detail", {
+                        tool: toolName(action.tool),
+                        target: action.target ?? "",
+                        hasTarget: action.target === null ? "no" : "yes",
+                      })}
                     </Text>
+                    {action.outcome === "done" ? null : (
+                      <Text variant="meta" tone="problem">
+                        {isMcpRejectReason(action.reason)
+                          ? t("rejected", { reason: t(`reason.${action.reason}`) })
+                          : t("rejectedUnknown")}
+                      </Text>
+                    )}
                   </span>
                   <time dateTime={action.at} {...stylex.props(textStyles("meta"))}>
                     {stamp(action.at, now)}

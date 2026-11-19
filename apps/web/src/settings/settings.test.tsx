@@ -1094,7 +1094,7 @@ describe("MCP 쓰기 허용과 최근 작업(0089)", () => {
   it("런과 상관없는 MCP 쓰기는 최근 작업에 MCP · 이름, 도구, 대상, 결과로 보이고 Operator라고 보내도 MCP가 붙는다", async () => {
     const f = fixture();
     expect(panelText(render(await loadSettingsPage(f.context, commerce, now), "mcp"))).toContain(
-      "아직 MCP로 한 쓰기가 없어요",
+      "아직 MCP 클라이언트가 한 작업이 없어요",
     );
     recordMcpAction(f.context.db, {
       at: new Date(now.getTime() - 60_000),
@@ -1120,7 +1120,7 @@ describe("MCP 쓰기 허용과 최근 작업(0089)", () => {
     expect(shown).toContain("러너 Capacity 바꾸기 · runner-a");
     expect(shown).toContain("MCP · hermes");
     expect(shown).not.toContain("\u202e");
-    expect(shown).toContain("러너 다시 확인 · runner-b · 하지 못했어요");
+    expect(shown).toContain("러너 다시 확인 · runner-b 하지 못했어요: 대상을 찾지 못했어요");
     expect(shown.indexOf("MCP · hermes")).toBeLessThan(shown.indexOf("MCP · Operator"));
   });
 });

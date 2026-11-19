@@ -470,7 +470,7 @@ describe("Run 상세 화면", () => {
     expect(run.timeline.map((e) => e.kind)).toContain("mcp");
     const body = text(render({ kind: "found", run }));
     expect(body).toContain("MCP · Operator 로그 요청");
-    expect(body).toContain("MCP · hermes 런 취소 · 하지 못했어요");
+    expect(body).toContain("MCP · hermes 런 취소 · 하지 못했어요: 이미 끝난 런이에요");
     expect(body.indexOf("할당")).toBeLessThan(body.indexOf("MCP · Operator"));
   });
 

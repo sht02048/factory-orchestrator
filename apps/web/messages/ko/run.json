@@ -98,13 +98,36 @@
     "later-pr": "이후 PR 상태",
     "denied": "거절",
     "mcp": "MCP · {client}",
-    "mcpRejected": "{tool} · 하지 못했어요",
+    "mcpRejected": "{tool} · 하지 못했어요: {reason}",
     "mcpTool": {
       "assign_ticket": "티켓 할당",
       "answer_question": "답하기",
       "deny_permission": "Permission 거절",
       "cancel_run": "런 취소",
       "request_run_log": "로그 요청"
+    },
+    "mcpRejectedUnknown": "{tool} · 하지 못했어요",
+    "mcpReason": {
+      "not-found": "대상을 찾지 못했어요",
+      "workspace": "Workspace를 고르지 못했어요",
+      "no-mapping": "Mapping이 아직 없어요",
+      "active-run": "이미 진행 중인 런이 있어요",
+      "unknown-agent": "모르는 에이전트예요",
+      "unknown-runner": "그 러너로 보낼 수 없어요",
+      "runner-assignment-blocked": "러너가 새 할당을 막고 있어요",
+      "no-question": "기다리는 Question이 없어요",
+      "already-answered": "이미 답했어요",
+      "no-permission": "기다리는 Permission이 없어요",
+      "already-denied": "이미 거절했어요",
+      "resolved": "이미 끝난 Permission이에요",
+      "already-ended": "이미 끝난 런이에요",
+      "not-running": "로그를 받을 수 있는 런이 아니에요",
+      "taken": "다른 Workspace가 이미 쓰고 있어요",
+      "unauthorized": "키나 토큰이 맞지 않아요",
+      "rate-limited": "요청이 많아 잠시 막혔어요",
+      "network": "연결하지 못했어요",
+      "invalid": "설정이 맞지 않아요",
+      "unavailable": "MCP 서버가 설치 폴더를 몰라요"
     }
   },
   "report": {

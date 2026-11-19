@@ -203,6 +203,7 @@ function timelineOf(
       client: view.client,
       tool: view.tool,
       outcome: view.outcome,
+      reason: view.reason,
       at: view.at,
     });
   }

@@ -13,7 +13,13 @@ export type TimelineEvent = { at: string } & (
   | { kind: "cancel-requested" }
   | { kind: "ended"; agentResult: AgentResult }
   | { kind: "later-pr"; state: "merged" | "closed" }
-  | { kind: "mcp"; client: string; tool: string; outcome: McpActionOutcome }
+  | {
+      kind: "mcp";
+      client: string;
+      tool: string;
+      outcome: McpActionOutcome;
+      reason: string | null;
+    }
 );
 
 export type PendingInput = InputWait | { kind: "unknown" };
