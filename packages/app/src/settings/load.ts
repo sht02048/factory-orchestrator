@@ -212,7 +212,7 @@ async function loadWorkspaceSettings(
     name: connections.find((c) => c.id === id)?.name ?? id,
   });
 
-  const trackerProjects = await trackerProjectChoices(
+  const readingTrackerProjects = trackerProjectChoices(
     context,
     workspace.id,
     connections,
@@ -220,7 +220,7 @@ async function loadWorkspaceSettings(
     trackers,
   );
 
-  const bound = await Promise.all(
+  const readingBound = Promise.all(
     mine.map(async (project): Promise<BoundProject> => {
       const tracker = trackers.get(project.connection) ?? null;
       const mapping = getMapping(db, project.connection, project.projectId);
@@ -245,7 +245,7 @@ async function loadWorkspaceSettings(
   );
 
   const labelConnections = [...new Set(mine.map((p) => p.connection))];
-  const labels = await Promise.all(
+  const readingLabels = Promise.all(
     labelConnections.map(async (connectionId): Promise<ConnectionLabel> => {
       const tracker = trackers.get(connectionId) ?? null;
       const projects = mine.filter((p) => p.connection === connectionId);
@@ -265,6 +265,11 @@ async function loadWorkspaceSettings(
       };
     }),
   );
+  const [trackerProjects, bound, labels] = await Promise.all([
+    readingTrackerProjects,
+    readingBound,
+    readingLabels,
+  ]);
 
   return {
     general: {
