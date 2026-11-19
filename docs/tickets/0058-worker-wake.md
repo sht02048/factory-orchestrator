@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 blocked_by: []
 ---
 
@@ -97,17 +97,17 @@ web과 worker는 SQLite 파일 하나로만 주고받는다(ADR 0002). web이 DB
 
 `[unit]`은 CI의 `pnpm test`, `[smoke]`는 로컬 `pnpm --filter @ganger/desktop smoke`다.
 
-- [ ] 앞 바퀴가 끝나고 1초가 지난 뒤 쉬는 중에 `wake()`를 부르면 폴링 간격보다 먼저(250ms 뒤) 바퀴가 돈다. `[unit]`
-- [ ] `wake()`가 끊임없이 와도 바퀴 사이에 적어도 1초 쉰다. `[unit]`
-- [ ] 바퀴 도중에 `wake()`를 여러 번 불러도 추가 바퀴는 정확히 하나다. `[unit]`
-- [ ] `wake()`를 250ms보다 짧은 간격으로 계속 불러도 첫 `wake()` 뒤 250ms에 바퀴가 돈다(뒤 신호가 바퀴를 미루지 않는다). `[unit]`
-- [ ] `wake()`를 부르지 않으면 폴링 간격대로 돈다. 바퀴가 실패해도 루프는 이어진다. `[unit]`
-- [ ] 기다리는 중에 `stop()`을 부르면 바로 멈춘다. `[unit]`
-- [ ] `start`에서 web 자식이 보낸 `{ type: "wake" }`가 worker 자식에 닿고, 다른 메시지는 넘기지 않는다. worker가 끝난 뒤 온 신호는 `start`를 멈추거나 띄우기 실패로 기록하지 않는다. 가짜 자식 스크립트로 시험한다. `[unit]`
-- [ ] web 서버 진입은 2xx로 응답한 POST 요청(server function, webhook)에만 신호를 보내고, GET 요청, Host·Origin 검사에서 거절한 요청, 서명이 틀린 webhook, 2xx가 아닌 응답에는 보내지 않는다. `GANGER_WORKER_WAKE=ipc`가 없거나 통로가 닫혀 있으면 아무것도 보내지 않고 예외도 내지 않는다. `[unit]`
-- [ ] web을 거친 할당이 폴링을 기다리지 않는다. e2e에서 vite 플러그인으로 web의 신호 모듈을 같은 프로세스 worker의 `wake()`로 갈아 끼우고(demo와 같은 방식), 폴링 간격을 60초로 둔 worker의 첫 바퀴가 끝나기를 기다린 뒤 web의 server function으로 할당한 런이 몇 초 안에 시작되고, 갈아 끼운 `wake()`가 불렸다. 첫 바퀴 전에 할당하면 신호 없이도 시작돼 시험이 아무것도 확인하지 못한다. 지금 e2e 얇은 경로 시험은 DB에 직접 할당해(`e2e/src/thin-path.test.ts`의 `assignRun`) 이 경로를 지나지 않는다. `start`의 중계는 위 `start` 시험이 맡는다. `[unit]`
-- [ ] `ELECTRON_RUN_AS_NODE=1`인 Electron 실행 파일이 같은 방식으로 띄운 자식과 IPC 메시지를 주고받는다. `[smoke]`
-- [ ] ADR 0002 단락과 README 문장이 들어간다.
+- [x] 앞 바퀴가 끝나고 1초가 지난 뒤 쉬는 중에 `wake()`를 부르면 폴링 간격보다 먼저(250ms 뒤) 바퀴가 돈다. `[unit]`
+- [x] `wake()`가 끊임없이 와도 바퀴 사이에 적어도 1초 쉰다. `[unit]`
+- [x] 바퀴 도중에 `wake()`를 여러 번 불러도 추가 바퀴는 정확히 하나다. `[unit]`
+- [x] `wake()`를 250ms보다 짧은 간격으로 계속 불러도 첫 `wake()` 뒤 250ms에 바퀴가 돈다(뒤 신호가 바퀴를 미루지 않는다). `[unit]`
+- [x] `wake()`를 부르지 않으면 폴링 간격대로 돈다. 바퀴가 실패해도 루프는 이어진다. `[unit]`
+- [x] 기다리는 중에 `stop()`을 부르면 바로 멈춘다. `[unit]`
+- [x] `start`에서 web 자식이 보낸 `{ type: "wake" }`가 worker 자식에 닿고, 다른 메시지는 넘기지 않는다. worker가 끝난 뒤 온 신호는 `start`를 멈추거나 띄우기 실패로 기록하지 않는다. 가짜 자식 스크립트로 시험한다. `[unit]`
+- [x] web 서버 진입은 2xx로 응답한 POST 요청(server function, webhook)에만 신호를 보내고, GET 요청, Host·Origin 검사에서 거절한 요청, 서명이 틀린 webhook, 2xx가 아닌 응답에는 보내지 않는다. `GANGER_WORKER_WAKE=ipc`가 없거나 통로가 닫혀 있으면 아무것도 보내지 않고 예외도 내지 않는다. `[unit]`
+- [x] web을 거친 할당이 폴링을 기다리지 않는다. e2e에서 vite 플러그인으로 web의 신호 모듈을 같은 프로세스 worker의 `wake()`로 갈아 끼우고(demo와 같은 방식), 폴링 간격을 60초로 둔 worker의 첫 바퀴가 끝나기를 기다린 뒤 web의 server function으로 할당한 런이 몇 초 안에 시작되고, 갈아 끼운 `wake()`가 불렸다. 첫 바퀴 전에 할당하면 신호 없이도 시작돼 시험이 아무것도 확인하지 못한다. 지금 e2e 얇은 경로 시험은 DB에 직접 할당해(`e2e/src/thin-path.test.ts`의 `assignRun`) 이 경로를 지나지 않는다. `start`의 중계는 위 `start` 시험이 맡는다. `[unit]`
+- [x] `ELECTRON_RUN_AS_NODE=1`인 Electron 실행 파일이 같은 방식으로 띄운 자식과 IPC 메시지를 주고받는다. `[smoke]`
+- [x] ADR 0002 단락과 README 문장이 들어간다.
 
 ## 남은 위험
 
