@@ -7,7 +7,14 @@ import { buttonsOf } from "../testing/buttons";
 import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
 import { addTitledRun, now, seedDatabase } from "../testing/seed";
-import { HomeScreen, QuestionForm, STOPPED_VISIBLE, runHref } from "./home-screen";
+import {
+  COLUMN_VISIBLE,
+  DONE_TODO_VISIBLE,
+  HomeScreen,
+  QuestionForm,
+  SETTLED_VISIBLE,
+} from "./home-screen";
+import type { DashboardView } from "./home-screen";
 import { loadHomePage } from "@ganger/app/home/load";
 import { homeMessages } from "./messages";
 import type { HomePage, HomeRun, InputWait } from "@ganger/app/home/model";
@@ -17,6 +24,13 @@ const reject = () => Promise.reject(new Error("unused"));
 function render(page: HomePage) {
   return renderWithMessages(
     <HomeScreen page={page} onAnswer={reject} onDeny={reject} />,
+    homeMessages,
+  );
+}
+
+function renderView(page: HomePage, view: DashboardView) {
+  return renderWithMessages(
+    <HomeScreen page={page} view={view} onAnswer={reject} onDeny={reject} />,
     homeMessages,
   );
 }
@@ -47,9 +61,12 @@ function section(html: string, name: string): string {
   return start < 0 ? "" : balanced(html, start, "section");
 }
 
-function group(html: string, kind: string): string {
-  const start = html.indexOf(`<div data-group="${kind}"`);
-  return start < 0 ? "" : balanced(html, start, "div");
+function actionsOf(html: string) {
+  return buttonsOf(html).filter((button) => button.variant !== "other");
+}
+
+function tagsOf(html: string): Array<string | null> {
+  return rows(html).map((li) => /^<li[^>]*data-tag="([^"]+)"/.exec(li)?.[1] ?? null);
 }
 
 function rows(html: string): string[] {
@@ -149,101 +166,59 @@ describe("Dashboard 제목(ADR 0010 8번, 0068 갱신)", () => {
   });
 });
 
-describe("Dashboard 배치(0068 갱신)", () => {
-  it("왼쪽 To do·In progress, 오른쪽 Runners·Done today 순서이고 To do·In progress 제목은 h2, 오른쪽 열 제목은 h3 이다", () => {
+describe("Dashboard 칸반(티켓 0100)", () => {
+  it("Queued·Running·Done today 칸과 Runners 열이 이 순서이고 칸 제목은 h2 다", () => {
     const html = render(seededPage());
-    const names = ["To do", "In progress", "Runners", "Done today"];
+    const names = ["Queued", "Running", "Done today", "Runners"];
     const order = names.map((name) => html.indexOf(`<section aria-label="${name}"`));
     expect(order.every((at) => at >= 0)).toBe(true);
     expect(order).toEqual(order.toSorted((a, b) => a - b));
-    expect(section(html, "To do")).toMatch(/<h2[^>]*>To do<\/h2>/);
-    expect(section(html, "In progress")).toMatch(/<h2[^>]*>In progress<\/h2>/);
-    expect(section(html, "Runners")).toMatch(/<h3[^>]*>Runners<\/h3>/);
-    expect(section(html, "Done today")).toMatch(/<h3[^>]*>Done today<\/h3>/);
+    for (const name of names)
+      expect(section(html, name)).toMatch(new RegExp(`<h2[^>]*>${name}</h2>`));
   });
 
-  it("To do 행은 알약 없이 묶음 머리의 색 점이 상태를 대신한다(ADR 0010 4번 예외)", () => {
-    const todo = section(render(withPermission(withInput(seededPage(), question))), "To do");
-    expect(pillsOf(todo)).toEqual([]);
-    expect([...todo.matchAll(/<div data-status="([^"]+)"/g)].map((m) => m[1])).toEqual([
-      "question",
-      "human-check",
-      "failed",
-    ]);
-  });
-});
-
-describe("To do 묶음", () => {
-  it("답이 필요해요·확인해 주세요·멈췄어요 순서로 묶고 머리에 수와 설명을 한 번만 둔다", () => {
-    const html = render(withPermission(withInput(seededPage(), question)));
-    const todo = section(html, "To do");
-    expect(text(todo)).toMatch(/^To do 9/);
-    const expected = [
-      ["answer", homeJson.group.answer, 2],
-      ["check", homeJson.group.check, 1],
-      ["stopped", homeJson.group.stopped, 6],
-    ] as const;
-    for (const [kind, messages, count] of expected) {
-      const block = group(todo, kind);
-      expect(block).toMatch(
-        new RegExp(`<h3[^>]*>${messages.title}<span[^>]*> <!-- -->${count}</span></h3>`),
-      );
-      expect(block.split(messages.description)).toHaveLength(2);
-      expect(rows(block)).toHaveLength(
-        Math.min(count, kind === "stopped" ? STOPPED_VISIBLE : count),
-      );
-    }
-  });
-
-  it("묶음 행은 Run 상세로 가는 키 링크이고 행동 버튼은 링크 밖에 둔다", () => {
+  it("Queued 칸은 Queued 런을 까닭·러너·경과와 함께 보이고 꼬리표가 없다", () => {
     const page = seededPage();
-    const todo = section(render(page), "To do");
-    const human = row(todo, "ACME-2");
-    expect(human).toContain(`href="${runHref(runOf(page, "ACME-2"))}"`);
-    expect(text(human)).toContain("PR #2");
-    expect(human).toMatch(
-      /<\/a><\/span><span[^>]*><span data-slot="action"[^>]*><a href="https:\/\/example.com\/acme\/web\/pull\/2"[^>]*>PR 보기<\/a>/,
-    );
-    expect(todo).not.toContain('href="/runners');
+    const queued = section(render(page), "Queued");
+    expect(rows(queued)).toHaveLength(page.queued.length);
+    expect(pillsOf(queued)).toEqual([]);
+    expect(text(row(queued, "ACME-14"))).toContain(homeJson.card.queuedAnyOffline);
+    expect(text(row(queued, "ACME-14"))).toMatch(/째$/);
   });
 
-  it("시간은 링크 안 같은 폭 시간 칸에, 버튼은 같은 폭 버튼 칸에 두고 버튼 없는 행도 빈 칸을 남긴다(티켓 0091)", () => {
+  it("Running 칸은 꼬리표 카드(Question·Permission·Disconnected)를 맨 위에, 그 아래 Running 런을 둔다", () => {
     const page = withPermission(withInput(seededPage(), question));
-    const todo = section(render(page), "To do");
-    const slots = (html: string, slot: string) =>
-      html.match(new RegExp(`data-slot="${slot}"`, "g"))?.length ?? 0;
-    const shown = rows(todo).length;
-    expect(shown).toBeGreaterThan(3);
-    expect(slots(todo, "time")).toBe(shown);
-    expect(slots(todo, "action")).toBe(shown);
-    const asking = row(todo, "ACME-11");
-    expect(asking).toMatch(/<span data-slot="time"[^>]*>\d+분째<\/span><\/span><\/a>/);
-    expect(asking).toMatch(/<span data-slot="action"[^>]*><button/);
-    const failed = row(group(todo, "stopped"), "ACME-7");
-    expect(failed).toMatch(/<span data-slot="action"[^>]*><\/span>/);
+    const running = section(render(page), "Running");
+    expect(tagsOf(running)).toEqual(["question", "disconnected", "permission", null]);
+    expect(pillsOf(running).map((pill) => pill.status)).toEqual([
+      "question",
+      "disconnected",
+      "permission",
+    ]);
+    expect(pillsOf(running).map((pill) => pill.label)).toEqual([
+      "Question",
+      "Disconnected",
+      "Permission",
+    ]);
+    expect(text(row(running, "ACME-10"))).toContain("runner-a · Claude Code");
   });
 
-  it("멈췄어요는 Disconnected 를 러너와 함께, Failed 를 끝난 시간과 함께 보이고 처음 3개만 그린 뒤 더 보기를 둔다", () => {
-    const page = seededPage();
-    const stopped = group(section(render(page), "To do"), "stopped");
-    expect(text(row(stopped, "ACME-12"))).toContain("runner-a에 닿지 않아요");
-    expect(text(row(stopped, "ACME-7"))).toContain("Failed · 1시간 전");
-    expect(rows(stopped)).toHaveLength(STOPPED_VISIBLE);
-    expect(buttonsOf(stopped)).toEqual([{ variant: "ghost", label: "3개 더 보기" }]);
+  it("Question 카드는 질문 한 줄·기다린 경과·답하기를 보이고 선택지는 패널 전까지 그리지 않는다", () => {
+    const running = section(render(withInput(seededPage(), question)), "Running");
+    const card = row(running, "ACME-11");
+    expect(text(card)).toContain(question.body);
+    expect(text(card)).toContain("25분째");
+    expect(actionsOf(card)).toEqual([{ variant: "secondary", label: homeJson.card.answer }]);
+    expect(card).not.toContain('type="radio"');
   });
 
-  it("멈췄어요가 3개 이하면 더 보기를 두지 않는다", () => {
-    const page = seededPage();
-    const keep = new Set(["ACME-12", "ACME-7", "ACME-6"]);
-    const html = render({
-      ...page,
-      attention: page.attention.filter((item) => keep.has(item.run.ticketKey)),
-    });
-    expect(buttonsOf(group(html, "stopped"))).toEqual([]);
-    expect(rows(group(html, "stopped"))).toHaveLength(3);
+  it("Permission 카드는 명령을 보이고 카드에 거절 버튼을 두지 않는다", () => {
+    const card = row(section(render(withPermission(seededPage())), "Running"), "ACME-22");
+    expect(text(card)).toContain("git push --force");
+    expect(actionsOf(card)).toEqual([]);
   });
 
-  it("Disconnected 런의 닿지 않은 시간은 경과로 쓴다", () => {
+  it("Disconnected 카드는 닿지 않은 러너와 경과를 보인다", () => {
     const page = seededPage();
     const html = render({
       ...page,
@@ -253,48 +228,142 @@ describe("To do 묶음", () => {
           : item,
       ),
     });
-    expect(text(row(html, "ACME-12"))).toContain("runner-a에 7분째 닿지 않아요");
+    expect(text(row(section(html, "Running"), "ACME-12"))).toContain(
+      "runner-a에 7분째 닿지 않아요",
+    );
   });
 
-  it("Question 행은 질문 문장과 기다린 경과, 답하기를 보이고 선택지는 레이어 전까지 그리지 않는다", () => {
+  it("Done today 칸은 꼬리표 카드(Human Check·Failed)를 앞 4장만 보이고 N개 더 보기를 둔다", () => {
+    const page = seededPage();
+    const done = section(render(page), "Done today");
+    const tagged = tagsOf(done).filter((tag) => tag !== null);
+    expect(tagged).toEqual(["human-check", "failed", "failed", "failed"]);
+    expect(DONE_TODO_VISIBLE).toBe(4);
+    expect(actionsOf(done)).toContainEqual({ variant: "ghost", label: "2개 더 보기" });
+    const human = row(done, "ACME-2");
+    expect(text(human)).toContain("PR #2");
+    expect(human).toMatch(/<a href="https:\/\/example.com\/acme\/web\/pull\/2"[^>]*>PR 보기<\/a>/);
+    expect(text(row(done, "ACME-7"))).toContain("1시간 전");
+  });
+
+  it("처리할 일 없이 끝난 카드는 소제목 아래에 꼬리표 없이 상태 이름과 함께 모은다", () => {
+    const done = section(render(seededPage()), "Done today");
+    const subheading = done.indexOf(homeJson.board.settled);
+    expect(subheading).toBeGreaterThan(0);
+    const merged = row(done, "ACME-1");
+    expect(done.indexOf(merged)).toBeGreaterThan(subheading);
+    expect(merged).not.toContain("data-tag=");
+    expect(text(merged)).toContain("Merged");
+    for (const tagged of ["ACME-2", "ACME-7"])
+      expect(done.indexOf(row(done, tagged))).toBeLessThan(subheading);
+  });
+
+  it("처리할 일 없이 끝난 카드가 3장을 넘으면 3장만 보이고 Runs 링크를 둔다", () => {
+    const page = seededPage();
+    const merged = page.endedToday.find((run) => run.ticketKey === "ACME-1");
+    if (merged === undefined) throw new Error("no ACME-1");
+    const extra = [1, 2, 3, 4].map((n) => ({
+      ...merged,
+      id: toRunId(`run-extra-${n}`),
+      ticketKey: toTicketKey(`ACME-${40 + n}`),
+    }));
+    const done = section(
+      render({ ...page, endedToday: [...page.endedToday, ...extra] }),
+      "Done today",
+    );
+    const settled = done.slice(done.indexOf(homeJson.board.settled));
+    expect(rows(settled)).toHaveLength(SETTLED_VISIBLE);
+    expect(settled).toMatch(/<a href="\/runs\?ws=ws-commerce"[^>]*>Runs에서 2개 더 보기<\/a>/);
+  });
+
+  it("Queued·Running 칸은 6장이 넘으면 앞 6장과 N개 더 보기를 보인다", () => {
+    const page = seededPage();
+    const base = page.queued[0];
+    if (base === undefined) throw new Error("no queued run");
+    const queued = Array.from({ length: COLUMN_VISIBLE + 3 }, (_, n) => ({
+      ...base,
+      id: toRunId(`run-q-${n}`),
+      ticketKey: toTicketKey(`ACME-${60 + n}`),
+    }));
+    const column = section(render({ ...page, queued }), "Queued");
+    expect(rows(column)).toHaveLength(COLUMN_VISIBLE);
+    expect(actionsOf(column)).toEqual([{ variant: "ghost", label: "3개 더 보기" }]);
+  });
+
+  it("빈 칸은 칸마다 한 줄로 알린다", () => {
+    const page = seededPage();
+    const html = render({ ...page, attention: [], queued: [], running: [], endedToday: [] });
+    expect(text(section(html, "Queued"))).toContain(homeJson.columnEmpty.queued);
+    expect(text(section(html, "Running"))).toContain(homeJson.columnEmpty.running);
+    expect(text(section(html, "Done today"))).toContain(homeJson.columnEmpty.done);
+  });
+
+  it("처리할 일만 보기는 꼬리표 카드만 남기고, 꼬리표 카드가 없는 칸은 처리할 일이 없다고 한다", () => {
+    const page = seededPage();
+    const html = renderView(page, "todo");
+    expect(rows(section(html, "Queued"))).toEqual([]);
+    expect(text(section(html, "Queued"))).toContain(homeJson.columnEmpty.todo);
+    expect(tagsOf(section(html, "Running"))).toEqual(["waiting-for-input", "disconnected"]);
+    expect(html).not.toContain(homeJson.board.settled);
+    expect(rows(section(html, "Running")).every((card) => card.includes("data-tag="))).toBe(true);
+  });
+
+  it("모두 / 처리할 일만 {n} 분할 버튼을 머리 오른쪽에 두고 지금 보기를 고른 상태로 보인다", () => {
+    const page = seededPage();
+    const html = renderView(page, "todo");
+    expect(html).toMatch(
+      /<div[^>]*aria-label="보기"[^>]*role="tablist"|role="tablist"[^>]*aria-label="보기"/,
+    );
+    const tabs = html.slice(html.indexOf(">", html.indexOf('role="tablist"')) + 1);
+    expect(text(tabs)).toMatch(new RegExp(`^모두 처리할 일만 ${page.attention.length} Queued`));
+    expect(tabs).toMatch(/aria-selected="true"[^>]*>처리할 일만/);
+  });
+
+  it("카드는 패널을 여는 버튼이고, 행동 버튼과 링크는 그 버튼 밖에 둔다", () => {
     const html = render(withInput(seededPage(), question));
-    const q = row(group(html, "answer"), "ACME-11");
-    expect(text(q)).toContain(question.body);
-    expect(text(q)).toContain("25분째");
-    expect(buttonsOf(q)).toEqual([{ variant: "secondary", label: homeJson.row.answer }]);
-    expect(q).not.toContain("지수 백오프");
-    expect(q).not.toContain('type="radio"');
+    for (const key of ["ACME-11", "ACME-2", "ACME-10"]) {
+      const card = row(html, key);
+      expect(card).toMatch(/<button type="button" aria-haspopup="dialog" aria-expanded="false"/);
+    }
+    expect(html).not.toMatch(
+      /<button[^>]*aria-haspopup="dialog"[^>]*>(?:(?!<\/button>).)*<(a|button)\b/s,
+    );
   });
 
-  it("Permission 행은 명령과 허용 안내를 보이고 거절하기는 빨간 글자 보조 버튼이다(ADR 0010 6번)", () => {
-    const html = render(withPermission(seededPage()));
-    const p = row(group(html, "answer"), "ACME-22");
-    expect(text(p)).toContain("git push --force · 허용은 러너에서 할 수 있어요");
-    expect(buttonsOf(p)).toEqual([{ variant: "danger", label: homeJson.row.deny }]);
+  it("카드를 끌 수 있어 보이는 모양(손잡이, grab 커서)이 없다", () => {
+    const html = render(seededPage());
+    expect(html).not.toMatch(/draggable|grab/);
   });
 
-  it("화면의 버튼은 보조·위험·덜 중요한 버튼뿐이고, 노란 주 버튼은 레이어 안의 보내기 하나다(ADR 0010 6번)", () => {
+  it("화면의 버튼은 보조·덜 중요한 버튼뿐이고 노란 주 버튼이 없다(ADR 0010 6번)", () => {
     const html = render(withPermission(withInput(seededPage(), question)));
     const variants = [...html.matchAll(/data-variant="([^"]+)"/g)].map((m) => m[1]);
     expect(variants).not.toContain("primary");
-    expect(new Set(variants)).toEqual(new Set(["secondary", "danger", "ghost"]));
     const layer = buttonsOf(renderForm(question));
     expect(layer.filter((b) => b.variant === "primary")).toEqual([
       { variant: "primary", label: homeJson.question.send },
     ]);
   });
 
-  it("답을 보낸 질문과 거절을 보낸 권한 대기는 결과 문장을 status 로 보인다", () => {
-    const answered = render(withInput(seededPage(), { ...question, answered: true }));
-    const q = row(answered, "ACME-11");
-    expect(buttonsOf(q)).toEqual([]);
-    expect(q).toMatch(/<span role="status" tabindex="-1"[^>]*>답을 보냈어요/);
-    const denied = render(
-      withInput(seededPage(), { kind: "permission", promptId: "p-1", detail: "rm", denied: true }),
+  it("답을 보낸 질문과 거절을 보낸 권한 대기는 카드에 결과를 보이고 답하기를 두지 않는다", () => {
+    const answered = row(
+      render(withInput(seededPage(), { ...question, answered: true })),
+      "ACME-11",
     );
-    expect(row(denied, "ACME-11")).toMatch(
-      /<span role="status" tabindex="-1"[^>]*>거절을 보냈어요/,
+    expect(actionsOf(answered)).toEqual([]);
+    expect(text(answered)).toContain(homeJson.card.answered);
+    const denied = row(
+      render(
+        withInput(seededPage(), {
+          kind: "permission",
+          promptId: "p-1",
+          detail: "rm",
+          denied: true,
+        }),
+      ),
+      "ACME-11",
     );
+    expect(text(denied)).toContain(homeJson.card.denied);
   });
 
   it("취소를 요청한 런에는 '취소 중'을 함께 보인다(Q82.21)", () => {
@@ -307,18 +376,49 @@ describe("To do 묶음", () => {
           : item,
       ),
     });
-    expect(text(row(html, "ACME-12"))).toContain(homeJson.row.cancelling);
+    expect(text(row(html, "ACME-12"))).toContain(homeJson.card.cancelling);
   });
 
-  it("To do 가 비면 안내 한 줄을 둔다", () => {
-    const todo = section(render({ ...seededPage(), attention: [] }), "To do");
-    expect(text(todo)).toContain(homeJson.empty.todo);
+  it("할당 때 저장한 티켓 제목을 회색 키 옆에 보인다(ADR 0010 9번, 0064)", () => {
+    const { db } = seedDatabase();
+    const id = addTitledRun(db, "ACME-30", "결제 실패 재시도");
+    const html = render(loadHomePage(db, "ws-commerce", now, "UTC"));
+    const titled = rows(html).find((li) => li.includes(`data-run="${id}"`)) ?? "";
+    expect(text(titled)).toContain("ACME-30 결제 실패 재시도");
+    expect(titled).toContain(
+      renderWithMessages(
+        <Text variant="meta" numeric>
+          ACME-30
+        </Text>,
+      ),
+    );
   });
 
-  it("To do 가 비면 쉬는 반장을 장식으로 두고, 할 일이 있으면 두지 않는다(0077)", () => {
-    const empty = section(render({ ...seededPage(), attention: [] }), "To do");
-    expect(empty).toMatch(/<svg[^>]*aria-hidden="true"[^>]*data-mascot="resting"/);
-    expect(render(seededPage())).not.toContain("data-mascot");
+  it("Queued 까닭은 러너 이름에 맞는 조사로 쓴다", () => {
+    const page = seededPage();
+    const queued = page.queued.map((run) =>
+      run.state === "queued"
+        ? {
+            ...run,
+            queuedReason: { kind: "runner-offline" as const },
+            runner: { name: "build-farm", online: false },
+          }
+        : run,
+    );
+    expect(text(section(render({ ...page, queued }), "Queued"))).toContain(
+      "build-farm이 Offline이라 기다려요",
+    );
+  });
+});
+
+describe("모든 Workspace 보기(0066)", () => {
+  it("칸과 Runners 열을 모두 보이고 카드에 Workspace 이름을 붙인다", () => {
+    const html = render(seededPage("all"));
+    for (const name of ["Queued", "Running", "Done today", "Runners"])
+      expect(section(html, name)).not.toBe("");
+    expect(text(row(section(html, "Done today"), "ACME-2"))).toContain("Acme Commerce");
+    expect(text(row(section(html, "Running"), "ACME-10"))).toContain("Acme Commerce");
+    expect(text(row(section(html, "Done today"), "ACME-1"))).toContain("Acme Commerce");
   });
 });
 
@@ -341,72 +441,6 @@ describe("질문 레이어", () => {
     const html = renderForm({ ...question, choices: [long, "30초 고정"] });
     expect(html).toContain(`>${long}</span>`);
     expect(html).not.toContain("…");
-  });
-});
-
-describe("In progress", () => {
-  it("Running·Queued 런을 상태 점·키·러너나 까닭·경과로 보이고 머리에 수와 Runs 링크를 둔다", () => {
-    const page = seededPage();
-    const html = section(render(page), "In progress");
-    const total = page.running.length + page.queued.length;
-    expect(html).toMatch(new RegExp(`<h2[^>]*>In progress</h2><span[^>]*>${total}</span>`));
-    expect(html).toMatch(/<a href="\/runs\?ws=ws-commerce"[^>]*>Runs에서 보기<\/a>/);
-    expect(rows(html)).toHaveLength(total);
-    expect(pillsOf(html)).toEqual([]);
-    const running = row(html, "ACME-10");
-    expect(dots(running)).toEqual(["running"]);
-    expect(text(running)).toContain("runner-a");
-    expect(text(running)).toMatch(/째$/);
-    expect(dots(row(html, "ACME-14"))).toEqual(["queued"]);
-    expect(text(row(html, "ACME-14"))).toContain(homeJson.row.queuedAnyOffline);
-  });
-
-  it("할당 때 저장한 티켓 제목을 회색 키 옆에 보인다(ADR 0010 9번, 0064)", () => {
-    const { db } = seedDatabase();
-    const id = addTitledRun(db, "ACME-30", "결제 실패 재시도");
-    const html = section(render(loadHomePage(db, "ws-commerce", now, "UTC")), "In progress");
-    const titled = rows(html).find((li) => li.includes(`data-run="${id}"`)) ?? "";
-    expect(text(titled)).toContain("ACME-30 결제 실패 재시도");
-    expect(titled).toContain(
-      renderWithMessages(
-        <Text variant="meta" numeric>
-          ACME-30
-        </Text>,
-      ),
-    );
-    expect(titled).toContain(
-      renderWithMessages(
-        <Text variant="title" truncate>
-          결제 실패 재시도
-        </Text>,
-      ),
-    );
-  });
-
-  it("제목을 모르는 런(0064 전에 할당한 런)은 키만 행 제목으로 보인다", () => {
-    const html = section(render(seededPage()), "In progress");
-    expect(row(html, "ACME-10")).toContain(
-      renderWithMessages(
-        <Text variant="title" numeric>
-          ACME-10
-        </Text>,
-      ),
-    );
-  });
-
-  it("Queued 까닭은 러너 이름에 맞는 조사로 쓴다", () => {
-    const page = seededPage();
-    const queued = page.queued.map((run) =>
-      run.state === "queued"
-        ? {
-            ...run,
-            queuedReason: { kind: "runner-offline" as const },
-            runner: { name: "build-farm", online: false },
-          }
-        : run,
-    );
-    const html = section(render({ ...page, queued }), "In progress");
-    expect(text(html)).toContain("build-farm이 Offline이라 기다려요");
   });
 });
 
@@ -584,34 +618,6 @@ describe("Runners", () => {
   });
 });
 
-describe("Done today", () => {
-  it("상태 점·키·요약 결과·상대 시간과 Runs 링크를 보인다", () => {
-    const page = seededPage();
-    const html = section(render(page), "Done today");
-    expect(html).toMatch(
-      new RegExp(`<h3[^>]*>Done today</h3><span[^>]*>${page.doneToday.total}</span>`),
-    );
-    expect(html).toMatch(/<a href="\/runs\?ws=ws-commerce"[^>]*>Runs에서 모두 보기<\/a>/);
-    const done = row(html, "ACME-7");
-    expect(dots(done)).toEqual(["failed"]);
-    expect(done).toContain(`href="${runHref(page.doneToday.recent[0] ?? runOf(page, "ACME-7"))}"`);
-    expect(done).toMatch(/<time dateTime="[^"]+"[^>]*>1시간 전<\/time>/);
-    expect(rows(html)).toHaveLength(page.doneToday.recent.length);
-  });
-});
-
-describe("모든 Workspace 보기(0066)", () => {
-  it("네 구역을 모두 보이고 To do·In progress·Done today 행에 Workspace 이름을 붙인다", () => {
-    const html = render(seededPage("all"));
-    for (const name of ["To do", "In progress", "Runners", "Done today"])
-      expect(section(html, name)).not.toBe("");
-    expect(text(row(section(html, "To do"), "ACME-2"))).toContain("Acme Commerce");
-    expect(text(row(section(html, "In progress"), "ACME-10"))).toContain("Acme Commerce");
-    expect(text(row(section(html, "Done today"), "ACME-7"))).toContain("Acme Commerce");
-    expect(section(html, "Done today")).toMatch(/<a href="\/runs"[^>]*>Runs에서 모두 보기<\/a>/);
-  });
-});
-
 describe("문구", () => {
   it("상태 이름은 GLOSSARY 영어 용어다(ADR 0010 1번)", () => {
     const html = render(seededPage());
@@ -621,13 +627,14 @@ describe("문구", () => {
       ...Object.entries(domain.runnerState),
       ...Object.entries(domain.attention),
     ]);
-    const named = [
+    const dotted = [
       ...html.matchAll(
         /<span data-status="([^"]+)" data-tone="[^"]+"[^>]*><span aria-hidden="true"[^>]*><\/span><span[^>]*>([^<]+)<\/span>/g,
       ),
-    ];
+    ].map(([, status, label]) => ({ status: status ?? "", label: label ?? "" }));
+    const named = [...dotted, ...pillsOf(html)];
     expect(named.length).toBeGreaterThan(5);
-    for (const [, status, label] of named) expect(label).toBe(terms.get(status ?? ""));
+    for (const { status, label } of named) expect(label).toBe(terms.get(status));
   });
 
   it("문구는 메시지 파일에서 온다", () => {
