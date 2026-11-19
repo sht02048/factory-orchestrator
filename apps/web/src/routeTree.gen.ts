@@ -21,6 +21,8 @@ import { Route as AppTicketsRouteImport } from './routes/_app/tickets'
 import { Route as ApiAttentionRouteImport } from './routes/api/attention'
 import { Route as ApiIdentityRouteImport } from './routes/api/identity'
 import { Route as AppRunsRunIdRouteImport } from './routes/_app/runs_.$runId'
+import { Route as ApiNotificationEventsIndexRouteImport } from './routes/api/notification-events/index'
+import { Route as ApiNotificationEventsStreamRouteImport } from './routes/api/notification-events/stream'
 import { Route as ApiRunnerEnrollmentIndexRouteImport } from './routes/api/runner-enrollment/index'
 import { Route as ApiRunnerEnrollmentScriptRouteImport } from './routes/api/runner-enrollment/script'
 import { Route as ApiRunnerEnrollmentOfferIndexRouteImport } from './routes/api/runner-enrollment/offer/index'
@@ -86,6 +88,18 @@ const AppRunsRunIdRoute = AppRunsRunIdRouteImport.update({
   path: '/runs/$runId',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiNotificationEventsIndexRoute =
+  ApiNotificationEventsIndexRouteImport.update({
+    id: '/api/notification-events/',
+    path: '/api/notification-events/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiNotificationEventsStreamRoute =
+  ApiNotificationEventsStreamRouteImport.update({
+    id: '/api/notification-events/stream',
+    path: '/api/notification-events/stream',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiRunnerEnrollmentIndexRoute =
   ApiRunnerEnrollmentIndexRouteImport.update({
     id: '/api/runner-enrollment/',
@@ -129,7 +143,9 @@ export interface FileRoutesByFullPath {
   '/api/attention': typeof ApiAttentionRoute
   '/api/identity': typeof ApiIdentityRoute
   '/runs/$runId': typeof AppRunsRunIdRoute
+  '/api/notification-events/stream': typeof ApiNotificationEventsStreamRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
+  '/api/notification-events/': typeof ApiNotificationEventsIndexRoute
   '/api/runner-enrollment/': typeof ApiRunnerEnrollmentIndexRoute
   '/api/runner-enrollment/offer/accept': typeof ApiRunnerEnrollmentOfferAcceptRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
@@ -147,7 +163,9 @@ export interface FileRoutesByTo {
   '/api/identity': typeof ApiIdentityRoute
   '/': typeof AppIndexRoute
   '/runs/$runId': typeof AppRunsRunIdRoute
+  '/api/notification-events/stream': typeof ApiNotificationEventsStreamRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
+  '/api/notification-events': typeof ApiNotificationEventsIndexRoute
   '/api/runner-enrollment': typeof ApiRunnerEnrollmentIndexRoute
   '/api/runner-enrollment/offer/accept': typeof ApiRunnerEnrollmentOfferAcceptRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
@@ -167,7 +185,9 @@ export interface FileRoutesById {
   '/api/identity': typeof ApiIdentityRoute
   '/_app/': typeof AppIndexRoute
   '/_app/runs_/$runId': typeof AppRunsRunIdRoute
+  '/api/notification-events/stream': typeof ApiNotificationEventsStreamRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
+  '/api/notification-events/': typeof ApiNotificationEventsIndexRoute
   '/api/runner-enrollment/': typeof ApiRunnerEnrollmentIndexRoute
   '/api/runner-enrollment/offer/accept': typeof ApiRunnerEnrollmentOfferAcceptRoute
   '/api/webhooks/tracker/$connectionId': typeof ApiWebhooksTrackerConnectionIdRoute
@@ -187,7 +207,9 @@ export interface FileRouteTypes {
     | '/api/attention'
     | '/api/identity'
     | '/runs/$runId'
+    | '/api/notification-events/stream'
     | '/api/runner-enrollment/script'
+    | '/api/notification-events/'
     | '/api/runner-enrollment/'
     | '/api/runner-enrollment/offer/accept'
     | '/api/webhooks/tracker/$connectionId'
@@ -205,7 +227,9 @@ export interface FileRouteTypes {
     | '/api/identity'
     | '/'
     | '/runs/$runId'
+    | '/api/notification-events/stream'
     | '/api/runner-enrollment/script'
+    | '/api/notification-events'
     | '/api/runner-enrollment'
     | '/api/runner-enrollment/offer/accept'
     | '/api/webhooks/tracker/$connectionId'
@@ -224,7 +248,9 @@ export interface FileRouteTypes {
     | '/api/identity'
     | '/_app/'
     | '/_app/runs_/$runId'
+    | '/api/notification-events/stream'
     | '/api/runner-enrollment/script'
+    | '/api/notification-events/'
     | '/api/runner-enrollment/'
     | '/api/runner-enrollment/offer/accept'
     | '/api/webhooks/tracker/$connectionId'
@@ -237,7 +263,9 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   ApiAttentionRoute: typeof ApiAttentionRoute
   ApiIdentityRoute: typeof ApiIdentityRoute
+  ApiNotificationEventsStreamRoute: typeof ApiNotificationEventsStreamRoute
   ApiRunnerEnrollmentScriptRoute: typeof ApiRunnerEnrollmentScriptRoute
+  ApiNotificationEventsIndexRoute: typeof ApiNotificationEventsIndexRoute
   ApiRunnerEnrollmentIndexRoute: typeof ApiRunnerEnrollmentIndexRoute
   ApiRunnerEnrollmentOfferAcceptRoute: typeof ApiRunnerEnrollmentOfferAcceptRoute
   ApiWebhooksTrackerConnectionIdRoute: typeof ApiWebhooksTrackerConnectionIdRoute
@@ -330,6 +358,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRunsRunIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/api/notification-events/': {
+      id: '/api/notification-events/'
+      path: '/api/notification-events'
+      fullPath: '/api/notification-events/'
+      preLoaderRoute: typeof ApiNotificationEventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/notification-events/stream': {
+      id: '/api/notification-events/stream'
+      path: '/api/notification-events/stream'
+      fullPath: '/api/notification-events/stream'
+      preLoaderRoute: typeof ApiNotificationEventsStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/runner-enrollment/': {
       id: '/api/runner-enrollment/'
       path: '/api/runner-enrollment'
@@ -396,7 +438,9 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   ApiAttentionRoute: ApiAttentionRoute,
   ApiIdentityRoute: ApiIdentityRoute,
+  ApiNotificationEventsStreamRoute: ApiNotificationEventsStreamRoute,
   ApiRunnerEnrollmentScriptRoute: ApiRunnerEnrollmentScriptRoute,
+  ApiNotificationEventsIndexRoute: ApiNotificationEventsIndexRoute,
   ApiRunnerEnrollmentIndexRoute: ApiRunnerEnrollmentIndexRoute,
   ApiRunnerEnrollmentOfferAcceptRoute: ApiRunnerEnrollmentOfferAcceptRoute,
   ApiWebhooksTrackerConnectionIdRoute: ApiWebhooksTrackerConnectionIdRoute,

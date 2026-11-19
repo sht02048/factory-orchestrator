@@ -1,5 +1,6 @@
 import { AGENT_RESULTS, NOT_STARTED_AGENT_RESULTS, PR_STATES, RUN_STATES } from "@ganger/core";
 import { MCP_ACTION_OUTCOMES } from "./mcp-actions-model.js";
+import { NOTIFICATION_EVENT_KINDS } from "./notification-events-model.js";
 import type {
   AgentId,
   AgentRef,
@@ -452,4 +453,47 @@ export const mcpActions = sqliteTable(
     index("mcp_actions_run").on(t.runId, t.at),
     index("mcp_actions_at").on(t.at),
   ],
+);
+
+export const notificationEvents = sqliteTable(
+  "notification_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    seq: integer("seq").notNull(),
+    kind: text("kind").notNull().$type<(typeof NOTIFICATION_EVENT_KINDS)[number]>(),
+    cause: text("cause").notNull(),
+    runId: text("run_id")
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    workspaceId: text("workspace_id").$type<WorkspaceId>(),
+    ticketKey: text("ticket_key").$type<TicketKey>(),
+    runnerId: text("runner_id")
+      .references(() => runners.id, { onDelete: "cascade" })
+      .$type<RunnerId>(),
+    subject: text("subject").notNull(),
+    detail: text("detail"),
+    createdAt: timeMs("created_at").notNull(),
+    resolvedAt: timeMs("resolved_at"),
+  },
+  (t) => [
+    check("notification_events_kind", sql`${t.kind} IN ${inList(NOTIFICATION_EVENT_KINDS)}`),
+    check(
+      "notification_events_target",
+      sql`(${t.runId} IS NULL) <> (${t.runnerId} IS NULL) AND (${t.runId} IS NULL) = (${t.workspaceId} IS NULL) AND (${t.runId} IS NULL) = (${t.ticketKey} IS NULL)`,
+    ),
+    uniqueIndex("notification_events_seq").on(t.seq),
+    uniqueIndex("notification_events_open_cause")
+      .on(t.cause)
+      .where(sql`${t.resolvedAt} IS NULL`),
+    index("notification_events_resolved").on(t.resolvedAt),
+  ],
+);
+
+export const notificationSequence = sqliteTable(
+  "notification_sequence",
+  {
+    id: integer("id").primaryKey(),
+    last: integer("last").notNull(),
+  },
+  (t) => [check("notification_sequence_single", sql`${t.id} = 1`)],
 );
