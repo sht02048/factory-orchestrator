@@ -59,29 +59,41 @@ export function readVolume(mount: string): MountedVolume {
   const dsStore = join(mount, ".DS_Store");
   return {
     names: readdirSync(mount),
-    applicationsLink:
-      existsSync(link) && lstatSync(link).isSymbolicLink() ? readlinkSync(link) : null,
+    applicationsLink: lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink()
+      ? readlinkSync(link)
+      : null,
     dsStore: existsSync(dsStore) ? readFileSync(dsStore) : null,
   };
 }
 
-function hdiutil(args: ReadonlyArray<string>): void {
+function hdiutil(args: ReadonlyArray<string>): Error | null {
   const result = spawnSync("hdiutil", args, { stdio: ["ignore", "ignore", "inherit"] });
-  if (result.status !== 0) {
-    throw new Error(`hdiutil ${args[0] ?? ""} exited with ${result.status ?? "unknown"}`);
-  }
+  return result.status === 0
+    ? null
+    : new Error(`hdiutil ${args[0] ?? ""} exited with ${result.status ?? "unknown"}`);
 }
 
 export function checkDmg(dmg: string): void {
   const mount = mkdtempSync(join(tmpdir(), "ganger-dmg-check-"));
-  hdiutil(["attach", dmg, "-nobrowse", "-readonly", "-noautoopen", "-mountpoint", mount]);
+  const attachError = hdiutil([
+    "attach",
+    dmg,
+    "-nobrowse",
+    "-readonly",
+    "-noautoopen",
+    "-mountpoint",
+    mount,
+  ]);
+  if (attachError !== null) throw attachError;
   let problems: string[];
+  let detachError: Error | null = null;
   try {
     problems = dmgProblems(readVolume(mount));
   } finally {
-    hdiutil(["detach", mount]);
-    rmSync(mount, { recursive: true, force: true });
+    detachError = hdiutil(["detach", mount]);
+    if (detachError === null) rmSync(mount, { recursive: true, force: true });
   }
+  if (detachError !== null) throw detachError;
   if (problems.length > 0) {
     throw new Error(`${dmg} has no install window:\n- ${problems.join("\n- ")}`);
   }

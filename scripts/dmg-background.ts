@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 
 export const BACKGROUND_SIZE = { width: 540, height: 380 } as const;
 
-const BRAND = fileURLToPath(new URL("../packages/ui/brand/", import.meta.url));
-export const BACKGROUND_SVG = join(BRAND, "dmg-background.svg");
-export const BACKGROUND_PNG = join(BRAND, "dmg-background.png");
-export const BACKGROUND_PNG_2X = join(BRAND, "dmg-background@2x.png");
+const BRAND = fileURLToPath(new URL("../packages/ui/brand/dmg/", import.meta.url));
+export const BACKGROUND_SVG = join(BRAND, "background.svg");
+export const BACKGROUND_PNG = join(BRAND, "background.png");
+export const BACKGROUND_PNG_2X = join(BRAND, "background@2x.png");
 
 const CHROME =
   process.env["CHROME_PATH"] ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";

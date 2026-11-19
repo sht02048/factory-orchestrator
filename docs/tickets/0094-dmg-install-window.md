@@ -15,7 +15,7 @@ blocked_by: []
 
 - **dmg를 dmgbuild로 만든다.** Finder·AppleScript 없이 `.DS_Store`를 직접 써서 CI에서도 같은 창이 나온다. 버전을 해시까지 고정해 설치한다(`scripts/dmgbuild-requirements.txt`, `uv pip install --require-hashes`). 릴리스 워크플로와 로컬 `pnpm release:mac`이 같은 방법으로 설치한다. 설정 파일은 `scripts/dmg-settings.py`다.
 - **창.** 540×380, 아이콘 크기 128, 앱은 왼쪽·Applications는 오른쪽 가운데 높이, 툴바·사이드바·상태 막대를 숨긴다.
-- **배경 그림.** 540×380과 @2x(1080×760). Ink 바탕, Paper 글자, Ganger Yellow 화살표, 위쪽 가운데 호루라기, 짧은 영어 안내("Drag Ganger to Applications"). 원본은 `packages/ui/brand/dmg-background.svg`이고, `node scripts/dmg-background.ts`가 PNG 둘을 다시 만든다. 브랜드 가이드에 한 줄 더한다.
+- **배경 그림.** 540×380과 @2x(1080×760). Ink 바탕, Paper 글자, Ganger Yellow 화살표, 위쪽 가운데 호루라기, 짧은 영어 안내("Drag Ganger to Applications"). 원본은 `packages/ui/brand/dmg/background.svg`이고(로고 원본 시험이 글자 패스·파일 목록을 보는 brand 폴더 바로 아래를 피해 하위 폴더에 둔다), `node scripts/dmg-background.ts`가 PNG 둘을 다시 만든다. 브랜드 가이드에 한 줄 더한다.
 - **볼륨 아이콘.** [0077](0077-ganger-logo-and-icon.md)의 `apps/desktop/icons/icon.icns`를 dmg 볼륨 아이콘으로 쓴다.
 - **서명·공증 흐름 유지.** dmg를 만든 뒤 지금처럼 서명·공증·staple한다. 서명 없는 경로도 같은 창이다.
 - **검사.** `node scripts/check-dmg.ts <dmg>`가 dmg를 마운트해 `.DS_Store`(두 아이콘 위치와 창 설정)·배경·볼륨 아이콘·Applications 링크·앱을 확인한다. 판정 함수는 scripts 시험이 덮고, 릴리스 워크플로 확인 단계와 `pnpm release:mac` 끝에서 돈다.
