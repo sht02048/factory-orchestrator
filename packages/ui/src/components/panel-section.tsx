@@ -23,6 +23,17 @@ export function PanelSection({ title, meta, children }: PanelSectionProps) {
   );
 }
 
+export function PanelRows({
+  ordered = false,
+  children,
+}: {
+  ordered?: boolean;
+  children: ReactNode;
+}) {
+  const List = ordered ? "ol" : "ul";
+  return <List {...stylex.props(styles.rows)}>{children}</List>;
+}
+
 const styles = stylex.create({
   section: {
     display: "flex",
@@ -44,6 +55,16 @@ const styles = stylex.create({
     color: colors.textTertiary,
     fontSize: fontSize.small,
     fontWeight: fontWeight.medium,
+  },
+  rows: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.px2,
+    marginBlock: 0,
+    marginInline: `calc(${space.s3} * -1)`,
+    padding: 0,
+    listStyle: "none",
+    minWidth: 0,
   },
   meta: {
     display: "inline-flex",

@@ -40,7 +40,11 @@ import {
   Tooltip,
   UsageBar,
   UsageMeter,
+  PanelRows,
   PanelSection,
+  ResponsiveColumns,
+  ResponsiveColumnsHead,
+  responsiveColumnTemplates,
   statusTone,
   surfaceStyles,
   textStyles,
@@ -571,6 +575,37 @@ describe("새 컴포넌트(티켓 0073)", () => {
     const over = renderToString(<UsageMeter name="주간" percent={130} label="주간" />);
     expect(over).toContain('aria-valuenow="100"');
     expect(over).toContain('data-tone="neutral"');
+  });
+
+  it("ResponsiveColumns 는 앞 칸 + 고정 폭 칸 격자이고 좁으면 마지막 칸만 늘린다", () => {
+    expect(responsiveColumnTemplates(["120px", "200px"])).toEqual({
+      wide: "minmax(0, 1fr) 120px 200px",
+      split: "120px minmax(0, 1fr)",
+    });
+    const row = renderToString(
+      <ResponsiveColumns
+        id="row-1"
+        lead={<b>이름</b>}
+        columns={[
+          { width: "120px", content: "1/2" },
+          { width: "200px", content: "72%" },
+        ]}
+      />,
+    );
+    expect(row).toMatch(/<span id="row-1" data-columns="responsive"/);
+    expect(row).toMatch(
+      /<span[^>]*><b>이름<\/b><\/span><span[^>]*>1\/2<\/span><span[^>]*>72%<\/span>/,
+    );
+    const head = renderToString(
+      <ResponsiveColumnsHead lead="러너" columns={[{ width: "120px", content: "자리" }]} />,
+    );
+    expect(head).toContain('data-columns="head"');
+    expect(head).toMatch(/>러너<\/span><span>자리<\/span>/);
+  });
+
+  it("PanelRows 는 목록 태그를 고르고 목록 표시를 지운다", () => {
+    expect(renderToString(<PanelRows>x</PanelRows>)).toMatch(/^<ul /);
+    expect(renderToString(<PanelRows ordered>x</PanelRows>)).toMatch(/^<ol /);
   });
 
   it("PanelSection 은 제목 h3 로 이름 붙은 section 이고 meta 를 제목 줄 끝에 둔다", () => {

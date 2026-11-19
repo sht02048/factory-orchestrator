@@ -10,7 +10,10 @@ import {
   Mascot,
   MASCOT_MOODS,
   MascotMessage,
+  PanelRows,
   PanelSection,
+  ResponsiveColumns,
+  ResponsiveColumnsHead,
   ProblemCallout,
   Row,
   Section,
@@ -272,7 +275,29 @@ export function RoleSections() {
               </span>
               <PanelSection title={t("usage.panelTitle")} meta={t("usage.panelMeta")}>
                 <Text variant="ui">{t("usage.panelBody")}</Text>
+                <PanelRows>
+                  <li>
+                    <Row interactive={false}>
+                      <Text variant="ui">{t("usage.panelRow")}</Text>
+                    </Row>
+                  </li>
+                </PanelRows>
               </PanelSection>
+              <ResponsiveColumnsHead
+                lead={t("usage.columnsLead")}
+                columns={[{ width: "200px", content: t("usage.columnsUsage") }]}
+              />
+              <ResponsiveColumns
+                lead={<Text variant="title">{t("usage.columnsLead")}</Text>}
+                columns={[
+                  {
+                    width: "200px",
+                    content: (
+                      <UsageMeter name={t("usage.weekly")} percent={72} label={t("usage.label")} />
+                    ),
+                  },
+                ]}
+              />
             </div>
           </Demo>
         </Section>

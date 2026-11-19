@@ -6,7 +6,10 @@ import {
   DetailPanel,
   MascotMessage,
   PageHeader,
+  PanelRows,
   PanelSection,
+  ResponsiveColumns,
+  ResponsiveColumnsHead,
   ProblemCallout,
   Row,
   RowTitle,
@@ -14,8 +17,6 @@ import {
   StatusPill,
   Table,
   TableCell,
-  TableHead,
-  TableHeader,
   TableRow,
   TableRows,
   Text,
@@ -104,17 +105,13 @@ export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: Runne
             <EmptyRunners />
           ) : (
             <Table columns="minmax(0, 1fr)">
-              <div {...stylex.props(styles.head)}>
-                <TableHead>
-                  <TableHeader>
-                    <span {...stylex.props(styles.rowGrid)}>
-                      <span>{t("columns.runner")}</span>
-                      <span>{t("columns.capacity")}</span>
-                      <span>{t("columns.usage")}</span>
-                    </span>
-                  </TableHeader>
-                </TableHead>
-              </div>
+              <ResponsiveColumnsHead
+                lead={t("columns.runner")}
+                columns={[
+                  { width: size.capacityCellsColumn, content: t("columns.capacity") },
+                  { width: size.usageColumn, content: t("columns.usage") },
+                ]}
+              />
               <TableRows
                 label={t("listLabel")}
                 value={selected?.id ?? null}
@@ -163,32 +160,33 @@ function RunnerRow({ runner }: { runner: RunnerView }) {
   return (
     <TableRow value={runner.id} label={runner.name}>
       <TableCell>
-        <span id={rowMarkerId(runner.id)} {...stylex.props(styles.rowGrid)}>
-          <span {...stylex.props(styles.rowText)}>
-            <span {...stylex.props(styles.rowHead)}>
-              <StatusPill status={status}>{statusName(status)}</StatusPill>
-              <span {...stylex.props(styles.rowName)}>
-                <RowTitle>{runner.name}</RowTitle>
-              </span>
-              {runner.sshTarget === null ? null : (
-                <span {...stylex.props(styles.rowHost)}>
-                  <Text variant="meta" mono truncate>
-                    {runner.sshTarget}
-                  </Text>
+        <ResponsiveColumns
+          id={rowMarkerId(runner.id)}
+          columns={[
+            { width: size.capacityCellsColumn, content: <RunnerCapacity runner={runner} /> },
+            { width: size.usageColumn, content: <HighestUsage runner={runner} /> },
+          ]}
+          lead={
+            <>
+              <span {...stylex.props(styles.rowHead)}>
+                <StatusPill status={status}>{statusName(status)}</StatusPill>
+                <span {...stylex.props(styles.rowName)}>
+                  <RowTitle>{runner.name}</RowTitle>
                 </span>
-              )}
-            </span>
-            <Text variant="ui" {...(status === "online" ? {} : { tone: "problem" })} truncate>
-              <RowSentence runner={runner} />
-            </Text>
-          </span>
-          <span {...stylex.props(styles.capacityCell)}>
-            <RunnerCapacity runner={runner} />
-          </span>
-          <span {...stylex.props(styles.usageCell)}>
-            <HighestUsage runner={runner} />
-          </span>
-        </span>
+                {runner.sshTarget === null ? null : (
+                  <span {...stylex.props(styles.rowHost)}>
+                    <Text variant="meta" mono truncate>
+                      {runner.sshTarget}
+                    </Text>
+                  </span>
+                )}
+              </span>
+              <Text variant="ui" {...(status === "online" ? {} : { tone: "problem" })} truncate>
+                <RowSentence runner={runner} />
+              </Text>
+            </>
+          }
+        />
       </TableCell>
     </TableRow>
   );
@@ -371,7 +369,7 @@ function CapacityRuns({ runner }: { runner: RunnerView }) {
       {empty ? (
         <Text variant="ui">{t("noRuns")}</Text>
       ) : (
-        <ol {...stylex.props(styles.list, styles.rowList)}>
+        <PanelRows ordered>
           {runner.occupying.map((run) => (
             <li key={run.id}>
               <Row
@@ -394,7 +392,7 @@ function CapacityRuns({ runner }: { runner: RunnerView }) {
               </Row>
             </li>
           ))}
-        </ol>
+        </PanelRows>
       )}
     </PanelSection>
   );
@@ -498,7 +496,7 @@ function LeftWorktrees({ runner }: { runner: RunnerView }) {
       title={t("leftWorktrees")}
       meta={t("leftWorktreesCount", { count: runner.leftWorktrees.length })}
     >
-      <ul {...stylex.props(styles.list, styles.rowList)}>
+      <PanelRows>
         {runner.leftWorktrees.map((run) => (
           <li key={run.id}>
             <Row href={runHref(run.workspace.id, run.id)}>
@@ -512,7 +510,7 @@ function LeftWorktrees({ runner }: { runner: RunnerView }) {
             </Row>
           </li>
         ))}
-      </ul>
+      </PanelRows>
     </PanelSection>
   );
 }
@@ -683,31 +681,8 @@ function runHref(workspaceId: string, runId: string): string {
 
 const styles = stylex.create({
   listColumn: {
-    containerType: "inline-size",
     maxWidth: size.runnerListMaxWidth,
     minWidth: 0,
-  },
-  rowGrid: {
-    display: "grid",
-    gridTemplateColumns: {
-      default: `minmax(0, 1fr) ${size.capacityCellsColumn} ${size.usageColumn}`,
-      [breakpoints.runnerRowTwoColumns]: `${size.capacityCellsColumn} minmax(0, 1fr)`,
-      [breakpoints.runnerRowOneColumn]: "minmax(0, 1fr)",
-    },
-    alignItems: "center",
-    columnGap: space.s5,
-    rowGap: space.s2,
-    minWidth: 0,
-  },
-  head: {
-    display: { default: "block", [breakpoints.runnerRowStacked]: "none" },
-  },
-  rowText: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.px2,
-    minWidth: 0,
-    gridColumn: { default: "auto", [breakpoints.runnerRowStacked]: "1 / -1" },
   },
   rowHead: {
     display: "flex",
@@ -719,11 +694,15 @@ const styles = stylex.create({
   },
   rowName: { display: "flex", flexShrink: 0, maxWidth: "100%" },
   rowHost: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 },
-  capacityCell: { display: "flex", minWidth: 0 },
-  usageCell: { minWidth: 0 },
-  highestUsage: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
+  highestUsage: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.px2,
+    justifySelf: "stretch",
+    minWidth: 0,
+  },
   highestQualifier: {
-    display: { default: "none", [breakpoints.runnerRowStacked]: "block" },
+    display: { default: "none", [breakpoints.responsiveColumnsStacked]: "block" },
   },
   panelHead: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   statusLine: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },

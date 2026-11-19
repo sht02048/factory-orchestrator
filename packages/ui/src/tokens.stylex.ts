@@ -136,6 +136,7 @@ export const size = stylex.defineVars({
   control: "32px",
   input: "36px",
   rowMinHeight: "52px",
+  tableHeadHeight: "30px",
   dot: "6px",
   pill: "22px",
   icon: "14px",
@@ -176,7 +177,7 @@ export const breakpoints = stylex.defineConsts({
   detailStacked: "@media (max-width: 960px)",
   dashboardOneColumn: "@container (max-width: 719px)",
   statTilesStacked: "@container (max-width: 704px)",
-  runnerRowStacked: "@container (width < 600px)",
-  runnerRowTwoColumns: "@container (400px <= width < 600px)",
-  runnerRowOneColumn: "@container (width < 400px)",
+  responsiveColumnsStacked: "@container (width < 600px)",
+  responsiveColumnsSplit: "@container (400px <= width < 600px)",
+  responsiveColumnsSingle: "@container (width < 400px)",
 });
