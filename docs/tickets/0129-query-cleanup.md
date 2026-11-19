@@ -12,7 +12,7 @@ blocked_by: [0122, 0125, 0126, 0127, 0128]
 ## 할 일
 
 1. `apps/web/src`에 남은 `router.invalidate()`를 지운다. 루트(`routes/__root.tsx`), 온보딩(`routes/onboarding.tsx`와 그것이 넘기는 저장 뒤 동작), 온보딩이 넘기는 러너 설정 동작의 것은 남긴다(C1). Runners가 쓰는 러너 설정 동작은 0127이 key 무효화로 바꿨다. 루트 `TimeZoneSync`의 필터는 루트만 남긴다(화면은 시간대가 든 key로 새로 읽는다).
-2. 라우터 전역 `defaultPreloadStaleTime`을 0으로 바꾸고(C6), 화면마다 준 `preloadStaleTime`을 지운다. `PRELOAD_FRESH_MS`는 로더의 "방금 읽음" 기준(스펙 4.2)이 계속 쓰므로 query 기본값 모듈로 옮긴다(이름은 바꿔도 된다). 의미가 없어진 `shouldReload` 설정(루트와 `_app` 밖, `_app`은 0127)을 지운다. 전역 0이 라우터 로더로 남는 온보딩 route의 미리 읽기를 바꾸지 않는지(포인터를 올릴 때마다 서버 함수를 더 부르지 않는지) 확인한다.
+2. 라우터 전역 `defaultPreloadStaleTime`을 0으로 바꾸고(C6), 화면마다 준 `preloadStaleTime`을 지운다. `PRELOAD_FRESH_MS`는 로더의 "방금 읽음" 기준(스펙 4.2)이 계속 쓰므로 query 기본값 모듈로 옮긴다(이름은 바꿔도 된다). 루트의 `shouldReload: false`는 그대로 둔다(C1). 0127이 `reloadOnEnter`와 `_app`의 것을 정리했으므로 지울 `shouldReload`가 남지 않았는지 확인한다. 전역 0이 라우터 로더로 남는 온보딩 route의 미리 읽기를 바꾸지 않는지(포인터를 올릴 때마다 서버 함수를 더 부르지 않는지) 확인한다.
 3. ADR [0019](../adr/0019-query-cache-and-change-events.md)와 스펙 0003을 실제 결과에 맞춰 고친다(정한 로더 API, key 모양, 탭 여러 개 결정).
 4. 0117 측정(`e2e/src/measure-navigation.ts`)과 0122의 원격 지연 측정을 돌려 전·후 표를 이 티켓에 남긴다. "전"은 0125~0127 가운데 처음 머지된 것 바로 앞의 `develop` 커밋이다(0123·0124는 화면을 옮기지 않는다). 그 커밋을 빌드해 띄우고 이 티켓 head의 측정 스크립트로 잰다. "후"는 이 티켓의 head다. "전" 커밋에 0122가 들어 있는지 적고, 들어 있지 않으면 0122 머지 직후 값을 따로 한 줄 남겨 Query의 효과와 0122의 효과를 나눠 보인다.
 5. 남은 폴링을 정리한다. 0124의 30초 대비와 query `refetchInterval` 말고는 화면 폴링이 없어야 한다(온보딩·러너 설정 흐름의 것은 남긴다).

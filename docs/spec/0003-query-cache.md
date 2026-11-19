@@ -89,7 +89,7 @@ graph LR
 | Run 상세                           | `["runs", "detail", runId]`                                | `getRunDetail`            | 30초      |
 | Runners                            | `["runners", "list"]`                                      | `getRunnersPage`          | 30초      |
 | Stats                              | `["stats", ws, days, timeZone]`                            | `getStatsPage`            | 30초      |
-| Tickets의 DB 부분(런 표시 등)      | `["tickets", "runs", ws]`                                  | 새로 나눈 서버 함수(0127) | 30초      |
+| Tickets의 DB 부분(런, Mapping 등)  | `["tickets", "runs", ws]`                                  | 새로 나눈 서버 함수(0127) | 30초      |
 | Tickets의 트래커 티켓 목록         | `["tracker", "tickets", ws]`                               | 새로 나눈 서버 함수(0127) | 5분       |
 | 트래커 라벨(Tickets·Settings 함께) | `["tracker", "labels", connectionId, projectId]`           | 새로 나눈 서버 함수(0127) | 5분       |
 | Settings의 DB 설정                 | `["settings", ...]`(0119의 세 route에 맞춰 0128이 정함)    | 나눈 서버 함수(0128)      | 30초      |
@@ -111,8 +111,8 @@ graph LR
 
 - **Runs·Run 상세(0125).** 로그 다시 받기·답하기·거절·취소·멈추기와 재개를 mutation으로. Run 상세를 열 때의 로그 요청 뒤에는 `["runs", "detail", runId]`만 무효화한다. 로그·멈추기 처리 중 2초 폴링은 그 query의 `refetchInterval`로 옮긴다(로그는 지금처럼 최대 15번).
 - **Dashboard·Stats(0126).** `home/refresh.ts`의 15초 폴링을 지우고 Query와 변경 기록으로 바꾼다. 멈추기·재개 처리 중 2초 다시 읽기는 `refetchInterval`로 옮긴다.
-- **셸·Runners·Tickets(0127).** 셸 query는 runner·workspace 변경 기록으로 무효화한다. Runners의 `reloadOnEnter`(들어올 때마다 또 읽기)를 지운다. Tickets는 DB 부분과 트래커 부분을 다른 query로 나눈다. 할당은 `["tickets", "runs", ws]`(와 런 쪽 key)만 무효화하고 트래커 query는 건드리지 않는다. 러너 점검 3초 폴링은 지금처럼 가벼운 `getRunnerChecksPending`을 읽는 작은 query(`["runners", "checks-pending"]`)의 `refetchInterval`로 옮기고, 점검이 끝나면 `["runners", "list"]`와 `["shell"]`을 무효화한다. Runners 전체를 3초마다 읽지 않는다. `useSettingsActions`·`useReloadOnSuccess`는 Settings, Runners, 온보딩이, `useRunnerCheckPolling`과 `useRunnerSetupActions`는 Runners와 온보딩이 함께 쓰므로, 0127이 저장 뒤 동작을 부르는 쪽이 넘기게 나눈다. Runners는 key 무효화를 넘기고, Settings와 온보딩은 아직 `router.invalidate()`를 넘긴다.
-- **Settings(0128, C7).** 0115의 직렬 저장(`serial-save.ts`)과 초안 맞추기(`synced-save.ts`) 동작은 그대로다. 저장 뒤의 `router.invalidate()`(Settings 전체와 트래커 세 읽기)만 바꾼 key 무효화나 `setQueryData`로 바꾼다. Linear 프로젝트·상태·라벨은 따로 query(5분)다. 0119가 나눈 Settings 세 route(`/settings`, `/settings/mcp`, 트래커 프로젝트 상세)가 대상이다. 온보딩(C1)은 라우터 로더로 남아 저장 뒤에도 `router.invalidate()`를 쓴다.
+- **셸·Runners·Tickets(0127).** 셸 query는 runner·workspace 변경 기록으로 무효화한다. Runners의 `reloadOnEnter`(들어올 때마다 또 읽기)를 지운다. Tickets는 DB 부분과 트래커 부분을 다른 query로 나눈다. 할당은 `["tickets", "runs", ws]`(와 런 쪽 key)만 무효화하고 트래커 query는 건드리지 않는다. 러너 점검 3초 폴링은 지금처럼 가벼운 `getRunnerChecksPending`을 읽는 작은 query(`["runners", "checks-pending"]`)의 `refetchInterval`로 옮기고, 점검이 끝나면 `["runners", "list"]`와 `["shell"]`을 무효화한다. Runners 전체를 3초마다 읽지 않는다. `useSettingsActions`·`useReloadOnSuccess`는 Settings, Runners, 온보딩이, `useRunnerSetupActions`는 Runners와 온보딩이 함께 쓰므로(Runners의 점검 요청·점검 끝은 `routes/_app/runners.tsx:49-58`에 따로 있다), 0127이 저장 뒤 동작을 부르는 쪽이 넘기게 나눈다. Runners는 key 무효화를 넘기고, Settings와 온보딩은 아직 `router.invalidate()`를 넘긴다.
+- **Settings(0128, C7).** 0115의 직렬 저장(`serial-save.ts`)과 초안 맞추기(`synced-save.ts`) 동작은 그대로다. 저장 뒤의 `router.invalidate()`(Settings 전체와 트래커 세 읽기)만 바꾼 key 무효화나 `setQueryData`로 바꾼다. 트래커 프로젝트·상태·라벨은 따로 query(5분)다. 0119가 나눈 Settings 세 route(`/settings`, `/settings/mcp`, 트래커 프로젝트 상세)가 대상이다. 온보딩(C1)은 라우터 로더로 남아 저장 뒤에도 `router.invalidate()`를 쓴다.
 
 ## 5. 변경 기록 설계
 
