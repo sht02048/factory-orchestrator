@@ -507,6 +507,19 @@ describe("Mapping 여러 저장소와 Auto-assign Label 만들기(0115)", () => 
         }),
       ),
     ).toEqual({ ok: false, reason: "label-in-use" });
+    saveLabel(f.context, { ws: commerce, connectionId: project.connectionId, labelId: "lb-auto" });
+    expect(
+      saveMappingState(
+        f.context,
+        mappingStateInput.parse({
+          ...state,
+          repos: [
+            state.repos[0],
+            { runnerProjectId: "github:acme/api", isDefault: false, labelId: "lb-auto" },
+          ],
+        }),
+      ),
+    ).toEqual({ ok: false, reason: "auto-assign-label" });
     const page = await loadSettingsPage(f.context, commerce, now);
     expect(page.workspace?.bound[0]?.mapping?.repos).toEqual([
       { id: "github:acme/web", isDefault: true, labelId: null },

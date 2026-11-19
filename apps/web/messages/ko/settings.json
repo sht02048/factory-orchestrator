@@ -128,14 +128,16 @@
       "no-default": "기본 저장소가 하나 있어야 해요.",
       "many-defaults": "기본 저장소는 하나만 둘 수 있어요.",
       "default-has-label": "기본 저장소에는 라벨을 붙이지 않아요.",
-      "duplicate-repo": "같은 저장소가 이미 있어요."
+      "duplicate-repo": "같은 저장소가 이미 있어요.",
+      "auto-assign-label": "Auto-assign Label은 저장소를 가르는 라벨로 쓸 수 없어요. 다른 라벨을 골라 주세요."
     },
     "reload": "Linear에서 다시 읽기",
     "reloading": "읽는 중…",
     "reloaded": "Linear에서 다시 읽었어요",
     "reloadFailed": "다시 읽지 못했어요. 잠시 뒤 다시 해 주세요.",
     "revertedRetry": "저장하지 못해 원래대로 되돌렸어요. 연결을 확인하고 다시 골라 주세요.",
-    "addFirstLabel": "{project}의 기본 저장소 고르기"
+    "addFirstLabel": "{project}의 기본 저장소 고르기",
+    "labelUnread": "읽지 못한 라벨"
   },
   "progress": {
     "hint": "런이 실제로 시작될 때 티켓을 이 상태로 바꿔요. 상태는 트래커 프로젝트마다 달라요.",

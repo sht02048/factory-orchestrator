@@ -234,7 +234,7 @@ export function AssignForm({
                 <span {...stylex.props(styles.repo)}>
                   <span {...stylex.props(styles.repoName)}>
                     <Text variant="ui" tone="strong" mono wrap="anywhere">
-                      {choice.id}
+                      {choice.name}
                     </Text>
                     {choice.isDefault ? <Chip strong>{t("repoDefault")}</Chip> : null}
                     {choice.label === null ? null : (

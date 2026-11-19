@@ -186,7 +186,8 @@ export type MappingSaveReason =
   | "many-defaults"
   | "default-has-label"
   | "duplicate-repo"
-  | "label-in-use";
+  | "label-in-use"
+  | "auto-assign-label";
 
 export type LabelCreateResult =
   | { ok: true; labelId: string; name: string; created: boolean }

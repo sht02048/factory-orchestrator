@@ -22,6 +22,7 @@ export type TicketRun =
 
 export interface AssignRepo {
   id: string;
+  name: string;
   isDefault: boolean;
   label: string | null;
 }

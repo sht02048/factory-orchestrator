@@ -53,7 +53,7 @@ import { PushProblems } from "../push-check";
 import { browserClipboard, copyText } from "./clipboard";
 import { UpdatesPanel, UpdatesScope, UpdatesSummary } from "./updates-panel";
 import { AutoAssignLabelPicker } from "./label-picker";
-import { MappingEditor, ReloadFromTracker } from "./mapping-editor";
+import { MappingEditor, ReloadFromTracker, autoAssignLabelOf } from "./mapping-editor";
 import { DEFAULT_ORCA_PATH } from "@ganger/runner-orca/config";
 import { shellQuote } from "../onboarding/model";
 import { useStatusName } from "../status";
@@ -838,6 +838,7 @@ export function MappingPanel({
                 runnerProjects={page.runnerProjects}
                 agents={page.agents}
                 actions={actions}
+                autoAssignLabelId={autoAssignLabelOf(workspace, bound.connection.id)}
                 heading={<ProjectHeading bound={bound} />}
               />
             </DividedItem>

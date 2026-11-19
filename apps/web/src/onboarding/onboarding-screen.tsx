@@ -76,7 +76,12 @@ import {
 } from "./model";
 import type { OnboardingStep } from "./model";
 import { AutoAssignLabelPicker } from "../settings/label-picker";
-import { MappingEditor, ReloadFromTracker, SaveStatusText } from "../settings/mapping-editor";
+import {
+  MappingEditor,
+  ReloadFromTracker,
+  autoAssignLabelOf,
+  SaveStatusText,
+} from "../settings/mapping-editor";
 import { useSyncedSave } from "../settings/synced-save";
 import { RunnerSetup } from "../runner-setup/runner-setup";
 import type { DirectEntry, RunnerSetupActions } from "../runner-setup/runner-setup";
@@ -1201,6 +1206,7 @@ function MappingStep({
             agents={page.agents}
             actions={actions}
             showModel={false}
+            autoAssignLabelId={autoAssignLabelOf(workspace, bound.connection.id)}
             heading={<MappingHeading bound={bound} />}
           >
             <ProgressChoice ws={workspace.general.id} bound={bound} actions={actions} />

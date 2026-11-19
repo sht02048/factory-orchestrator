@@ -171,8 +171,8 @@ describe("여러 저장소 수동 할당(0115)", () => {
       runnerProject: apiRepo,
       agent: "claude",
       repos: [
-        { id: webRepo, isDefault: true, label: null },
-        { id: apiRepo, isDefault: false, label: "bug" },
+        { id: webRepo, name: webRepo, isDefault: true, label: null },
+        { id: apiRepo, name: apiRepo, isDefault: false, label: "bug" },
       ],
     });
     expect(defaults("ACME-1")?.runnerProject).toBe(webRepo);
@@ -197,8 +197,8 @@ describe("여러 저장소 수동 할당(0115)", () => {
           runnerProject: apiRepo,
           agent: "claude",
           repos: [
-            { id: webRepo, isDefault: true, label: null },
-            { id: apiRepo, isDefault: false, label: "bug" },
+            { id: webRepo, name: webRepo, isDefault: true, label: null },
+            { id: apiRepo, name: apiRepo, isDefault: false, label: "bug" },
           ],
         },
         page.runners,

@@ -72,6 +72,9 @@ export async function loadTicketsPage(
   }));
   const agents = mappingAgents(db);
   const runnerNames = new Map(storedRunners.map((runner) => [runner.id, runner.name]));
+  const repoNames = new Map(
+    storedRunners.flatMap((runner) => runner.projects.map((p) => [p.id, p.displayName] as const)),
+  );
   if (workspace.kind !== "one")
     return {
       workspace,
@@ -163,8 +166,8 @@ export async function loadTicketsPage(
           autoAssign: label.id === autoAssign,
         })),
         runs: runs.toReversed().map((run) => toTicketRun(db, run, runnerNames, now)),
-        mapping: assignDefaultsOf(db, project, ticket, runs, labelNames),
-        assignability: assignabilityOf(db, project, ticket, runs, labelNames),
+        mapping: assignDefaultsOf(db, project, ticket, runs, { labelNames, repoNames }),
+        assignability: assignabilityOf(db, project, ticket, runs, { labelNames, repoNames }),
       };
     });
 
@@ -269,7 +272,7 @@ function assignabilityOf(
   project: StoredWorkspaceTrackerProject,
   ticket: TrackerTicket,
   runs: ReadonlyArray<StoredRun>,
-  labelNames: ReadonlyMap<string, string>,
+  names: RepoNames,
 ): TicketView["assignability"] {
   const check = checkAssignment({
     ticket: { connection: project.connection, key: ticket.key },
@@ -279,9 +282,14 @@ function assignabilityOf(
     const active = runs.findLast((run) => run.state !== "ended");
     return { kind: "active-run", runId: active?.id ?? "" };
   }
-  const defaults = assignDefaultsOf(db, project, ticket, runs, labelNames);
+  const defaults = assignDefaultsOf(db, project, ticket, runs, names);
   if (defaults === null) return { kind: "no-mapping" };
   return { kind: "ready", defaults };
+}
+
+interface RepoNames {
+  labelNames: ReadonlyMap<string, string>;
+  repoNames: ReadonlyMap<string, string>;
 }
 
 function assignDefaultsOf(
@@ -289,7 +297,7 @@ function assignDefaultsOf(
   project: StoredWorkspaceTrackerProject,
   ticket: TrackerTicket,
   runs: ReadonlyArray<StoredRun>,
-  labelNames: ReadonlyMap<string, string>,
+  { labelNames, repoNames }: RepoNames,
 ): AssignDefaults | null {
   const mapping = getMapping(db, project.connection, project.projectId);
   if (mapping === null) return null;
@@ -305,6 +313,7 @@ function assignDefaultsOf(
     agent: mapping.agent,
     repos: mapping.repos.map((repo) => ({
       id: repo.project,
+      name: repoNames.get(repo.project) ?? repo.project,
       isDefault: repo.isDefault,
       label: repo.labelId === null ? null : (labelNames.get(repo.labelId) ?? null),
     })),

@@ -255,9 +255,9 @@ describe("수동 할당 폼", () => {
           runnerProject: "q",
           agent: "claude",
           repos: [
-            { id: "p", isDefault: true, label: null },
-            { id: "q", isDefault: false, label: "api" },
-            { id: "r", isDefault: false, label: "infra" },
+            { id: "p", name: "acme/p", isDefault: true, label: null },
+            { id: "q", name: "acme/q", isDefault: false, label: "api" },
+            { id: "r", name: "acme/r", isDefault: false, label: "infra" },
           ],
         }}
         runners={[...runners, choice("runner-f", { projects: ["r"], blockedProjects: ["r"] })]}
@@ -281,6 +281,7 @@ describe("수동 할당 폼", () => {
     expect(all).toContain("러너 4대에 있어요");
     expect(all).toContain("러너 2대에 있어요");
     expect(all).toContain("라벨 api");
+    expect(all).toContain("acme/q");
     expect(all).toContain("push가 막혀 맡길 수 있는 러너가 없어요");
     expect(all).toContain("할당 때 자동으로 고르기");
     expect(all).toContain("Claude Code");
@@ -321,7 +322,7 @@ describe("수동 할당 폼", () => {
         defaults={{
           runnerProject: "p",
           agent: "claude",
-          repos: [{ id: "p", isDefault: true, label: null }],
+          repos: [{ id: "p", name: "acme/p", isDefault: true, label: null }],
         }}
         runners={[
           choice("runner-a", { usageLimits: [{ provider: "claude", resetsInMs: 68 * 60_000 }] }),

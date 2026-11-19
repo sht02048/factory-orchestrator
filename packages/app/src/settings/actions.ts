@@ -14,6 +14,7 @@ import {
 } from "@ganger/core";
 import type { RunnerId, RunnerKind } from "@ganger/core";
 import {
+  getAutoAssignLabel,
   getTrackerConnection,
   getWorkspaceTrackerProject,
   listCodeHostConnections,
@@ -189,6 +190,10 @@ export function saveMappingState(
 ): SaveResult<MappingSaveReason> {
   const project = boundProject(context, input);
   if (project === null) return { ok: false, reason: "not-found" };
+  const autoAssignLabel = getAutoAssignLabel(context.db, project.workspaceId, project.connection);
+  if (autoAssignLabel !== null && input.repos.some((repo) => repo.labelId === autoAssignLabel)) {
+    return { ok: false, reason: "auto-assign-label" };
+  }
   return replaceMapping(context.db, {
     connection: project.connection,
     trackerProject: project.projectId,

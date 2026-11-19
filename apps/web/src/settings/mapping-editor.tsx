@@ -4,7 +4,7 @@ import type { SelectOption } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
-import type { BoundProject, Choice } from "@ganger/app/settings/model";
+import type { BoundProject, Choice, WorkspaceSettings } from "@ganger/app/settings/model";
 import { useAgentName } from "../labels";
 import {
   isCompleteDraft,
@@ -23,7 +23,15 @@ import { useSyncedSave } from "./synced-save";
 import type { SaveStatus } from "./synced-save";
 
 const NO_LABEL = "\u0000none";
+const RELOADED_NOTICE_MS = 5000;
 const MAPPING_TARGET = "\u0000mapping";
+
+export function autoAssignLabelOf(
+  workspace: WorkspaceSettings,
+  connectionId: string,
+): string | null {
+  return workspace.labels.find((label) => label.connection.id === connectionId)?.labelId ?? null;
+}
 
 export function useMappingReason(): (reason: string) => string {
   const t = useTranslations("settings.mapping.error");
@@ -36,6 +44,7 @@ export function useMappingReason(): (reason: string) => string {
       case "many-defaults":
       case "default-has-label":
       case "duplicate-repo":
+      case "auto-assign-label":
         return t(value);
       default:
         return reason(value);
@@ -62,6 +71,7 @@ export interface MappingEditorProps {
   actions: Pick<SettingsActions, "saveMapping">;
   onSaved?: () => void;
   showModel?: boolean;
+  autoAssignLabelId: string | null;
   heading: ReactNode;
   children?: ReactNode;
 }
@@ -74,6 +84,7 @@ export function MappingEditor({
   actions,
   onSaved,
   showModel = true,
+  autoAssignLabelId,
   heading,
   children,
 }: MappingEditorProps) {
@@ -173,6 +184,7 @@ export function MappingEditor({
             name={nameOf(repo.id)}
             draft={draft}
             bound={bound}
+            autoAssignLabelId={autoAssignLabelId}
             nameOf={nameOf}
             status={statusTarget === repo.id ? save.status : "idle"}
             failureLine={statusTarget === repo.id ? failureLine : null}
@@ -283,6 +295,7 @@ function RepoRow({
   name,
   draft,
   bound,
+  autoAssignLabelId,
   nameOf,
   status,
   failureLine,
@@ -295,6 +308,7 @@ function RepoRow({
   name: string;
   draft: MappingDraft;
   bound: BoundProject;
+  autoAssignLabelId: string | null;
   nameOf: (id: string) => string;
   status: SaveStatus;
   failureLine: ReactNode;
@@ -305,9 +319,12 @@ function RepoRow({
 }) {
   const t = useTranslations("settings.mapping");
   const goneId = useId();
-  const labels = bound.labels.ok ? bound.labels.items : [];
-  const gone =
-    repo.labelId !== null && bound.labels.ok && !labels.some((l) => l.id === repo.labelId);
+  const routeHintId = useId();
+  const labels = (bound.labels.ok ? bound.labels.items : []).filter(
+    (label) => label.id !== autoAssignLabelId,
+  );
+  const known = repo.labelId === null || labels.some((l) => l.id === repo.labelId);
+  const gone = !known && bound.labels.ok;
   const options: SelectOption[] = [
     { value: NO_LABEL, label: t("noLabel") },
     ...labels.map((label): SelectOption => {
@@ -320,10 +337,14 @@ function RepoRow({
             disabled: true,
           };
     }),
-    ...(repo.labelId !== null && !labels.some((l) => l.id === repo.labelId)
-      ? [{ value: repo.labelId, label: t("labelMissing") }]
+    ...(repo.labelId !== null && !known
+      ? [{ value: repo.labelId, label: bound.labels.ok ? t("labelMissing") : t("labelUnread") }]
       : []),
   ];
+  const routeHint = !repo.isDefault && repo.labelId === null;
+  const describedBy = [gone ? goneId : null, routeHint ? routeHintId : null]
+    .filter((id) => id !== null)
+    .join(" ");
   return (
     <div {...stylex.props(styles.repoBlock)}>
       <div {...stylex.props(styles.repoRow)}>
@@ -337,13 +358,20 @@ function RepoRow({
           {repo.isDefault ? (
             <Text variant="meta">{t("defaultRoute")}</Text>
           ) : (
-            <Select
-              aria-label={t("repoLabel", { repo: name })}
-              {...(gone ? { "aria-describedby": goneId } : {})}
-              options={options}
-              value={repo.labelId ?? NO_LABEL}
-              onValueChange={(value) => onLabel(value === NO_LABEL ? null : value)}
-            />
+            <>
+              <Select
+                aria-label={t("repoLabel", { repo: name })}
+                {...(describedBy === "" ? {} : { "aria-describedby": describedBy })}
+                options={options}
+                value={repo.labelId ?? NO_LABEL}
+                onValueChange={(value) => onLabel(value === NO_LABEL ? null : value)}
+              />
+              {routeHint ? (
+                <Text variant="meta" id={routeHintId}>
+                  {t("noLabelRoute")}
+                </Text>
+              ) : null}
+            </>
           )}
         </span>
         <span {...stylex.props(styles.repoStatus)}>
@@ -371,9 +399,6 @@ function RepoRow({
           {t("labelGone")}
         </Text>
       ) : null}
-      {repo.isDefault || repo.labelId !== null ? null : (
-        <Text variant="meta">{t("noLabelRoute")}</Text>
-      )}
       {failureLine}
     </div>
   );
@@ -383,6 +408,11 @@ export function ReloadFromTracker({ onReload }: { onReload: () => Promise<void> 
   const t = useTranslations("settings.mapping");
   const [state, setState] = useState<"idle" | "reading" | "done" | "failed">("idle");
   const reading = state === "reading";
+  useEffect(() => {
+    if (state !== "done") return;
+    const timer = setTimeout(() => setState("idle"), RELOADED_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [state]);
   return (
     <span {...stylex.props(styles.reload)}>
       <Button
@@ -442,6 +472,9 @@ const styles = stylex.create({
     minWidth: 0,
   },
   repoLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
     flexGrow: 1,
     flexBasis: size.labelSelectWidth,
     minWidth: size.mappingCellMinWidth,

@@ -284,8 +284,8 @@ describe("Tickets 수동 할당(브라우저, 0054)", () => {
     const dialog = page.getByRole("dialog", { name: fill(tickets.assign.title, { key }) });
     const repos = dialog.getByRole("radiogroup", { name: tickets.assign.project });
     expect(await repos.getByRole("radio").count()).toBe(2);
-    expect(await repos.getByRole("radio", { name: /fake:acme\/api/ }).isChecked()).toBe(true);
-    expect(await repos.getByRole("radio", { name: /fake:acme\/web/ }).isChecked()).toBe(false);
+    expect(await repos.getByRole("radio", { name: /^acme\/api/ }).isChecked()).toBe(true);
+    expect(await repos.getByRole("radio", { name: /^acme\/web/ }).isChecked()).toBe(false);
 
     await dialog.getByRole("button", { name: tickets.assign.submit }).click();
     await dialog.waitFor({ state: "hidden" });
