@@ -1,6 +1,9 @@
 import type { AdapterRegistry } from "@ganger/core";
 import { SecretBox, parseBootConfig } from "@ganger/db";
+import type { RunnerEnrollments } from "@ganger/app/runner-setup/enrollment";
+import type { GangerSsh } from "@ganger/app/runner-setup/ganger-ssh";
 import type { ThisMac } from "@ganger/app/runner-setup/model";
+import { demoEnrollment } from "./enrollment.js";
 import { demoThisMac } from "./this-mac.js";
 import { demoWorld } from "./world.js";
 
@@ -19,4 +22,12 @@ export function getSecretBox(): SecretBox {
 
 export function getThisMac(): ThisMac {
   return demoThisMac();
+}
+
+export function getGangerSsh(): GangerSsh | null {
+  return demoEnrollment().ssh;
+}
+
+export function getRunnerEnrollments(): RunnerEnrollments {
+  return demoEnrollment().enrollments;
 }

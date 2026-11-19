@@ -32,6 +32,10 @@ _Avoid_: Team, Org, Space, Organization
 티켓을 처리하는 실행 환경 하나. 1단계에서 러너는 ssh로 닿는 Orca 환경이며, 여러 개를 등록할 수 있다. 러너는 어느 Workspace에도 속하지 않고 모든 Workspace가 공유한다.
 _Avoid_: Worker, Agent, Host, Machine
 
+**Runner Enrollment(러너 등록 토큰)**:
+다른 맥이 이 서버에 러너로 붙을 때 한 번 쓰는 토큰. 서버 화면이 내주고 10분 동안 한 번만 쓸 수 있으며, 그 맥이 이 토큰과 함께 이름·tailnet 주소·호스트 키·orca 경로를 보내면 서버가 Ganger 관리 러너로 저장한다. 터미널 명령(0097)과 Ganger 앱(0099)이 같은 토큰을 쓴다.
+_Avoid_: 초대, 페어링 코드
+
 **Capacity**:
 한 러너가 동시에 돌릴 수 있는 런의 최대 수. 화면 문구에서는 capacity 한 단위를 "자리"라고 쓴다(런 하나가 자리 하나를 차지한다).
 _Avoid_: Slot, Concurrency

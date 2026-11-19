@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { renderWithMessages } from "../testing/render";
 import { runnerSetupMessages } from "./messages";
+import { CommandFlow, remainingLabel } from "./command-flow";
 import { RunnerSetup, canOpenSharingSettings } from "./runner-setup";
 import type { RunnerSetupActions } from "./runner-setup";
 
 const pending: RunnerSetupActions = {
   thisMacStatus: () => new Promise(() => undefined),
   runThisMacStep: () => Promise.reject(new Error("unused")),
+  startEnrollment: () => new Promise(() => undefined),
+  saveWebAddress: () => new Promise(() => undefined),
+  enrollment: () => new Promise(() => undefined),
+  cancelEnrollment: () => Promise.resolve(),
 };
 
 function render(primary = true, directOpen = false): string {
@@ -58,16 +63,14 @@ describe("러너 고르기 화면(0095)", () => {
     expect(text(html)).toContain("약 1분");
   });
 
-  it("다른 맥 두 선택지는 고를 수 없게 흐리고, 제목 옆 꼬리표로 곧 지원한다고 알린다", () => {
+  it("Ganger 앱 선택지만 흐리고 곧 지원 꼬리표를 달며, 터미널 명령 선택지는 고를 수 있다(0097)", () => {
     const html = render();
-    for (const value of ["appMac", "commandMac"]) {
-      expect(html.match(new RegExp(`<input[^>]*value="${value}"[^>]*>`))?.[0]).toContain(
-        'disabled=""',
-      );
-    }
+    expect(html.match(/<input[^>]*value="appMac"[^>]*>/)?.[0]).toContain('disabled=""');
+    expect(html.match(/<input[^>]*value="commandMac"[^>]*>/)?.[0]).not.toContain("disabled");
     const shown = text(html);
-    expect(shown.match(/곧 지원/g)).toHaveLength(2);
-    expect(shown).toContain("다른 맥 · 터미널 명령으로 곧 지원");
+    expect(shown.match(/곧 지원/g)).toHaveLength(1);
+    expect(shown).toContain("다른 맥 · 그 맥에 Ganger 앱이 있어요 곧 지원");
+    expect(shown).not.toContain("다른 맥 · 터미널 명령으로 곧 지원");
     expect(shown).not.toContain("지금은 아래");
     expect(shown).not.toContain("직접 입력하기'로");
   });
@@ -121,6 +124,37 @@ describe("러너 고르기 화면(0095)", () => {
   it("계속 버튼은 화면의 주 버튼일 때만 노랗다", () => {
     expect(render(true)).toMatch(/data-variant="primary"[^>]*>이 방법으로 계속/);
     expect(render(false)).toMatch(/data-variant="secondary"[^>]*>이 방법으로 계속/);
+  });
+});
+
+describe("명령으로 등록(0097)", () => {
+  it("남은 시간을 분:초로 보인다", () => {
+    expect(remainingLabel(10 * 60_000)).toBe("10:00");
+    expect(remainingLabel(9 * 60_000 + 41_200)).toBe("9:42");
+    expect(remainingLabel(999)).toBe("0:01");
+    expect(remainingLabel(-5)).toBe("0:00");
+  });
+
+  it("명령을 받기 전에는 두 단계와 만드는 중 상태, 하는 일과 안 될 때 안내를 보이고, 새 명령 받기는 멈췄을 때만 둔다", () => {
+    const html = renderWithMessages(
+      <CommandFlow
+        actions={pending}
+        titleRef={{ current: null }}
+        onBack={() => undefined}
+        primary
+      />,
+      runnerSetupMessages,
+    );
+    const shown = text(html);
+    expect(html).toContain('aria-label="다른 맥을 명령으로 등록해요"');
+    expect(shown).toContain("러너로 쓸 맥에서 원격 로그인을 켜요");
+    expect(shown).toContain("그 맥의 터미널에 붙여 넣어요");
+    expect(shown).toContain("명령을 만들고 있어요");
+    expect(html).toContain("<details");
+    expect(shown).toContain("이 명령이 하는 일");
+    expect(shown).toContain("관리자 암호를 묻지 않고, 비밀 값을 서버로 보내지 않아요.");
+    expect(shown).toContain("명령이 안 되면");
+    expect(text(html)).not.toContain("새 명령 받기");
   });
 });
 

@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 blocked_by: [0095]
 ---
 
@@ -25,3 +25,18 @@ blocked_by: [0095]
 
 - 한 번 쓴 명령과 10분이 지난 명령이 거절되는지 시험한다.
 - 명령이 등록한 러너가 Ganger 관리 러너로 저장되고 확인을 통과하는지 시험한다.
+
+## 정한 것(구현 때)
+
+- **러너 등록 토큰.** 서버가 `RunnerEnrollments`(`packages/app/src/runner-setup/enrollment.ts`)로 일회용 토큰(24바이트 base64url)을 내준다. 서버는 SHA-256 해시만 메모리에 두고 토큰 자체는 두지 않는다. 10분이 지나거나 한 번 쓰면(성공이든 실패 보고든) 거절한다. "새 명령 받기"와 흐름에서 나가기는 앞 토큰을 지운다. 서버를 다시 켜면 받던 토큰은 모두 사라진다(DB 스키마는 바꾸지 않았다).
+- **받는 끝점.** `POST /api/runner-enrollment`(form 또는 JSON). 토큰을 먼저 소비하고, 토큰이 없거나 틀리면 403, 만료·사용이면 410이며 그 밖에는 아무것도 하지 않는다. 받은 값(이름, tailnet 주소, 계정, 호스트 공개 키, orca 경로, GitHub 정리 결과)은 zod로 검사하고, 호스트 키를 Ganger known_hosts에 그 주소로 고정(같은 주소의 옛 키는 바꾼다)한 뒤 0095와 같은 저장 함수(`saveGangerRunner`)로 Ganger 관리 러너(`access.kind = "ganger"`, 자리 1)를 저장하고 확인을 요청한다. 실패 보고(`outcome=failed`, 문제 이름과 300자 이내 이유)도 같은 끝점으로 받아 화면에 보인다.
+- **스크립트.** `GET /api/runner-enrollment/script?t=<토큰>`은 살아 있는 토큰일 때만 서버가 그 자리에서 만든 sh 스크립트를 준다. 내용은 고정 틀이고 넣는 값(서버 주소, 토큰, Ganger 공개 키)은 모두 작은따옴표로 감싼다(`shellLiteral`, 시험 있음). 스크립트는 원격 로그인 확인(꺼져 있으면 공유 설정을 열어 5분 기다림) → Orca 찾기 → tailnet 주소 → 호스트 키 → authorized_keys → `serviceInstallArgs`와 같은 서비스 설치 → gh 정리 → 서버에 알리기 순서로, 바꾸기 전에 검사부터 한다. 토큰은 curl의 stdin으로만 보내 인자·출력에 남기지 않는다. gh 토큰은 gh끼리 파이프로만 넘긴다. 쉘 기록에는 명령 한 줄(이미 쓴 토큰이나 10분 뒤 죽는 토큰)만 남는다.
+- **주소.** 명령은 Settings의 "다른 기기에서 열 주소"(`webAddress`)를 쓴다. 비어 있으면 명령 화면 안에서 그 주소를 바로 넣게 한다(온보딩에서는 Settings로 갈 수 없어서).
+- **고르기 화면.** "다른 맥 · 터미널 명령으로"를 고를 수 있게 열었다. 고른 카드에만 칩(직접 해요: 원격 로그인 켜기 → 직접 해요: 명령 붙여 넣기 → 키·서비스·GitHub → 확인)과 "약 2분"을 둔다. Ganger 앱 선택지는 그대로 곧 지원이다.
+- **직접 입력의 orca 경로.** 비우면 저장할 때 서버가 사용자의 ssh 설정으로 그 맥에 들어가 Orca 앱 기본 경로, 없으면 로그인 셸의 `command -v orca`를 찾아 채운다. 못 찾거나 ssh가 안 되면 저장하지 않고 이유를 보인다.
+- **개발 진입점.** `pnpm dev`의 개발 도구에 "다른 맥에서 등록 명령 실행하기"(가짜 macbook-pro가 실제 끝점에 알린다)와 "등록 명령 만료시키기"를 더했다.
+
+## 다음 티켓에 넘김
+
+- **0099(Ganger 앱으로 등록).** 같은 토큰과 끝점을 그대로 쓴다. 앱이 할 일: 서버 화면이 낸 토큰을 받아(예: 서버 화면이 보이는 코드나 링크), 그 맥에서 스크립트와 같은 준비를 한 뒤 `POST <webAddress>/api/runner-enrollment`에 JSON `{ token, outcome: "ready", name, host, account, hostKey, orcaPath, github }` 또는 `{ token, outcome: "failed", problem, detail }`을 보낸다. 서버 쪽 `startEnrollment`·`receiveEnrollment`·`RunnerEnrollments`는 명령 전용 이름이 아니다. 서버 화면의 기다림·만료·실패·등록 표시는 `EnrollmentView`를 그대로 쓰면 된다.
+- 토큰은 메모리에만 있어 서버를 다시 켜면 사라진다. 여러 서버 프로세스로 나누게 되면 DB로 옮겨야 한다.

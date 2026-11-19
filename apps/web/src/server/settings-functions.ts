@@ -28,11 +28,11 @@ import {
   saveMappingSetting,
   saveMcpWriteSetting,
   savePowerSetting,
-  saveRunnerSetting,
   saveTrackerConnectionSetting,
   trackerConnectionInput,
   trackerProjectInput,
 } from "@ganger/app/settings/actions";
+import { saveRunnerFindingOrca } from "@ganger/app/runner-setup/remote-orca";
 import { hasPendingRunnerChecks, loadSettingsPage } from "@ganger/app/settings/load";
 import type { SettingsContext } from "@ganger/app/settings/load";
 import { getAdapterRegistry, getSecretBox } from "./adapters";
@@ -101,7 +101,7 @@ export const checkGitHubTokenNow = createServerFn({ method: "POST" }).handler(()
 
 export const saveRunnerSettings = createServerFn({ method: "POST" })
   .validator(runnerInput)
-  .handler(({ data }) => saveRunnerSetting(context(), data, new Date()));
+  .handler(({ data }) => saveRunnerFindingOrca(context(), data, new Date()));
 
 export const requestRunnerCheckNow = createServerFn({ method: "POST" })
   .validator(runnerIdInput)

@@ -25,6 +25,16 @@ const ACTIONS: ReadonlyArray<{ path: string; label: string; help: string }> = [
     help: '가짜 "이 맥"의 원격 로그인을 바꿔요. 러너 단계의 "이 맥을 러너로"가 기다리다 다음 단계로 가요.',
   },
   {
+    path: "enroll-mac",
+    label: "다른 맥에서 등록 명령 실행하기",
+    help: '러너 단계의 "다른 맥 · 터미널 명령으로"에서 받은 명령을 가짜 macbook-pro 가 실행한 것처럼 서버에 알려요.',
+  },
+  {
+    path: "expire-enrollment",
+    label: "등록 명령 만료시키기",
+    help: "지금 화면에 보이는 등록 명령을 10분이 지난 것처럼 만료시켜요.",
+  },
+  {
     path: "life",
     label: "자동 진행 켜기·끄기",
     help: "가짜 에이전트가 시간에 따라 일하고 PR 을 여는 진행을 멈추거나 다시 켜요.",

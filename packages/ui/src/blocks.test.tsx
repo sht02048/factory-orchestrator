@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AppFrame,
+  BulletList,
   Button,
   CheckTick,
   RadioGroup,
@@ -249,5 +250,15 @@ describe("Tooltip action 트리거(0062 후속)", () => {
     expect(html).toContain('data-variant="ghost"');
     expect(html).toContain('aria-disabled="true"');
     expect(html).toMatch(/<button[^>]*aria-label(ledby)?="[^"]+"/);
+  });
+});
+
+describe("BulletList", () => {
+  it("순서 없는 목록으로 항목마다 li를 두고, 흐린 안내 모양을 고를 수 있다", () => {
+    const html = renderToString(<BulletList items={["하나", "둘"]} />);
+    expect(html.startsWith("<ul")).toBe(true);
+    expect(html.match(/<li>/g)).toHaveLength(2);
+    const tertiary = renderToString(<BulletList items={["하나"]} tone="tertiary" />);
+    expect(tertiary.match(/class="([^"]+)"/)?.[1]).not.toBe(html.match(/class="([^"]+)"/)?.[1]);
   });
 });

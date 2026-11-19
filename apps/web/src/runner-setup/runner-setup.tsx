@@ -26,14 +26,18 @@ import { SHARING_SETTINGS_URL } from "@ganger/app/runner-setup/model";
 import type { StepProblem, ThisMacStatus, ThisMacStep } from "@ganger/app/runner-setup/model";
 import type { RegisterResult } from "@ganger/app/runner-setup/register";
 import type { RunnerId } from "@ganger/core";
+import { CommandFlow } from "./command-flow";
+import type { CommandFlowActions } from "./command-flow";
 
-export interface RunnerSetupActions {
+export interface RunnerSetupActions extends CommandFlowActions {
   thisMacStatus: () => Promise<ThisMacStatus>;
   runThisMacStep: (step: ThisMacStep) => Promise<RegisterResult>;
 }
 
 export const SETUP_CHOICES = ["thisMac", "appMac", "commandMac"] as const;
 export type SetupChoice = (typeof SETUP_CHOICES)[number];
+type OpenChoice = Exclude<SetupChoice, "appMac">;
+const OPEN_CHOICES: ReadonlySet<SetupChoice> = new Set<SetupChoice>(["thisMac", "commandMac"]);
 
 export interface DirectEntry {
   open: boolean;
@@ -58,6 +62,13 @@ const THIS_MAC_CHIPS = [
   { key: "check", you: false },
 ] as const;
 
+const COMMAND_CHIPS = [
+  { key: "remoteLogin", you: true },
+  { key: "pasteCommand", you: true },
+  { key: "keyServiceGithub", you: false },
+  { key: "check", you: false },
+] as const;
+
 const DIRECT_CHIPS = [
   { key: "sshTarget", you: true },
   { key: "connect", you: false },
@@ -65,7 +76,10 @@ const DIRECT_CHIPS = [
   { key: "githubCheck", you: false },
 ] as const;
 
-type ChipStep = (typeof THIS_MAC_CHIPS)[number] | (typeof DIRECT_CHIPS)[number];
+type ChipStep =
+  | (typeof THIS_MAC_CHIPS)[number]
+  | (typeof COMMAND_CHIPS)[number]
+  | (typeof DIRECT_CHIPS)[number];
 
 function followLink(event: MouseEvent<HTMLAnchorElement>, go: () => void) {
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
@@ -153,10 +167,12 @@ export function RunnerSetup({
   onRegistered?: (runnerId: RunnerId) => void;
   primary: boolean;
 }) {
-  const [flowOpen, setFlowOpen] = useState(false);
+  const [choice, setChoice] = useState<OpenChoice>("thisMac");
+  const [flow, setFlow] = useState<OpenChoice | null>(null);
+  const flowOpen = flow !== null;
   const [status, reloadStatus] = useThisMacStatus(
     actions.thisMacStatus,
-    (current) => flowOpen && !current.remoteLogin,
+    (current) => flow === "thisMac" && !current.remoteLogin,
   );
   const flowTitle = useRef<HTMLSpanElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
@@ -167,11 +183,11 @@ export function RunnerSetup({
     if (flowOpen) {
       opened.current = true;
       flowTitle.current?.focus();
-      reloadStatus();
+      if (flow === "thisMac") reloadStatus();
     } else if (opened.current) {
       continueRef.current?.focus();
     }
-  }, [flowOpen, reloadStatus]);
+  }, [flowOpen, flow, reloadStatus]);
 
   if (direct.open) {
     return (
@@ -181,13 +197,22 @@ export function RunnerSetup({
 
   return (
     <div {...stylex.props(styles.stack)}>
-      <ServerFacts status={status} onRetry={reloadStatus} />
-      {flowOpen && status.kind === "ready" ? (
+      {flow === "commandMac" ? null : <ServerFacts status={status} onRetry={reloadStatus} />}
+      {flow === "commandMac" ? (
+        <CommandFlow
+          actions={actions}
+          titleRef={flowTitle}
+          onBack={() => setFlow(null)}
+          primary={primary}
+          {...(onOpenRunner === undefined ? {} : { onOpenRunner })}
+          {...(onRegistered === undefined ? {} : { onRegistered })}
+        />
+      ) : flow === "thisMac" && status.kind === "ready" ? (
         <ThisMacFlow
           status={status.status}
           actions={actions}
           titleRef={flowTitle}
-          onBack={() => setFlowOpen(false)}
+          onBack={() => setFlow(null)}
           onLookAgain={reloadStatus}
           primary={primary}
           {...(onOpenRunner === undefined ? {} : { onOpenRunner })}
@@ -196,10 +221,12 @@ export function RunnerSetup({
       ) : (
         <Chooser
           name={status.kind === "ready" ? status.status.name : null}
-          ready={status.kind === "ready"}
+          ready={status.kind === "ready" || choice === "commandMac"}
+          choice={choice}
+          onChoose={setChoice}
           continueRef={continueRef}
           primary={primary}
-          onContinue={() => setFlowOpen(true)}
+          onContinue={() => setFlow(choice)}
           direct={direct}
           directLinkRef={directFocus.linkRef}
         />
@@ -301,6 +328,8 @@ function ServerFacts({ status, onRetry }: { status: StatusState; onRetry: () => 
 function Chooser({
   name,
   ready,
+  choice,
+  onChoose,
   continueRef,
   primary,
   onContinue,
@@ -309,6 +338,8 @@ function Chooser({
 }: {
   name: string | null;
   ready: boolean;
+  choice: OpenChoice;
+  onChoose: (choice: OpenChoice) => void;
   continueRef: RefObject<HTMLButtonElement | null>;
   primary: boolean;
   onContinue: () => void;
@@ -329,38 +360,49 @@ function Chooser({
         </span>
       </div>
       <RadioGroup labelledBy={questionId}>
-        {SETUP_CHOICES.map((option) => (
-          <RadioOption
-            key={option}
-            name="runner-setup"
-            value={option}
-            checked={option === "thisMac"}
-            disabled={option !== "thisMac"}
-            onCheck={() => undefined}
-          >
-            <span {...stylex.props(styles.optionBody)}>
-              <span {...stylex.props(styles.inline)}>
-                <Text variant="ui" tone={option === "thisMac" ? "strong" : "disabled"}>
-                  {option === "thisMac"
-                    ? name === null
-                      ? t("choose.thisMacFallback")
-                      : t("choose.thisMac", { name })
-                    : t(`choose.${option}`)}
-                </Text>
-                {option === "thisMac" ? null : <Chip>{t("choose.soon")}</Chip>}
-              </span>
-              <Text variant="meta" {...(option === "thisMac" ? {} : { tone: "disabled" as const })}>
-                {t(`choose.${option}Body`)}
-              </Text>
-              {option === "thisMac" ? (
-                <span {...stylex.props(styles.chipRow)}>
-                  <StepChips steps={THIS_MAC_CHIPS} label={t("choose.stepsLabel")} />
-                  <Text variant="meta">{t("choose.about")}</Text>
+        {SETUP_CHOICES.map((option) => {
+          const open = OPEN_CHOICES.has(option);
+          const chosen = option === choice;
+          return (
+            <RadioOption
+              key={option}
+              name="runner-setup"
+              value={option}
+              checked={chosen}
+              disabled={!open}
+              onCheck={() => {
+                if (option !== "appMac") onChoose(option);
+              }}
+            >
+              <span {...stylex.props(styles.optionBody)}>
+                <span {...stylex.props(styles.inline)}>
+                  <Text variant="ui" tone={open ? "strong" : "disabled"}>
+                    {option === "thisMac"
+                      ? name === null
+                        ? t("choose.thisMacFallback")
+                        : t("choose.thisMac", { name })
+                      : t(`choose.${option}`)}
+                  </Text>
+                  {open ? null : <Chip>{t("choose.soon")}</Chip>}
                 </span>
-              ) : null}
-            </span>
-          </RadioOption>
-        ))}
+                <Text variant="meta" {...(open ? {} : { tone: "disabled" as const })}>
+                  {t(`choose.${option}Body`)}
+                </Text>
+                {chosen ? (
+                  <span {...stylex.props(styles.chipRow)}>
+                    <StepChips
+                      steps={option === "commandMac" ? COMMAND_CHIPS : THIS_MAC_CHIPS}
+                      label={t("choose.stepsLabel")}
+                    />
+                    <Text variant="meta">
+                      {option === "commandMac" ? t("choose.aboutCommand") : t("choose.about")}
+                    </Text>
+                  </span>
+                ) : null}
+              </span>
+            </RadioOption>
+          );
+        })}
       </RadioGroup>
       <div {...stylex.props(styles.actionRow)}>
         <Button

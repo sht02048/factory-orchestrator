@@ -63,7 +63,7 @@ The browser tests in `e2e` drive the Google Chrome installed on the machine thro
 
 - `pnpm dev --onboarding` starts from step 1 of onboarding with an empty database. **Fill with fake values** (bottom right) fills the form fields with values that pass every check. To see a failed check, put `invalid` in a key or token, or `offline`, `no-orca`, or `push-auth` in the runner's ssh target.
 - `--reset` deletes the data of that mode and starts over. `--static` stops the fake agents from moving on their own.
-- `/__dev` (the **Dev tools** link at the bottom right) labels a ticket for auto-assignment, adds a ticket, makes an agent ask a question, and fixes or breaks a runner's GitHub authentication.
+- `/__dev` (the **Dev tools** link at the bottom right) labels a ticket for auto-assignment, adds a ticket, makes an agent ask a question, fixes or breaks a runner's GitHub authentication, and stands in for another Mac that runs the runner setup command (or lets that command expire).
 - Data lives in `.dev/<mode>/` in the repository (ignored by git), or under `GANGER_DEV_DIR`. It never touches `~/.ganger`. The server binds to `127.0.0.1:3000`; set `WEB_HOST` and `WEB_PORT` to change that (for example, `WEB_HOST=0.0.0.0 pnpm dev` to open it from another machine on your network). Anyone who can reach that address can use the dev server and `/__dev`, so bind to an address only trusted machines can reach.
 - The fake adapters and the dev tools are registered only by `pnpm dev`. They are not part of the production build or the server bundle; the bundle check (`scripts/bundle-check.ts`, run by `pnpm bundle` and `pnpm smoke:bundle`) fails if fake adapters or dev-only values end up in the bundle.
 
@@ -81,6 +81,7 @@ The orchestrator is a self-hosted tool. One operator runs one installation on th
 
 - `apps/web` and `apps/worker` run on the same machine and share one SQLite file.
 - A runner is an Orca environment that the orchestrator can reach over ssh.
+- To add another Mac as a runner, pick **Another Mac · terminal command** in onboarding or under Runners > Add runner. Ganger shows a one-line `curl … | sh` command that works once within 10 minutes. It needs Orca on that Mac, the same tailnet, and the address other devices use to reach this server (Settings > Addresses).
 - The orchestrator does not change your projects' agent settings. We recommend adding a rule to each project's agent instructions (for example, `AGENTS.md`) to put the ticket key in the pull request title. Otherwise, if an agent opens the pull request from a branch other than the one the orchestrator created (including by renaming that branch), the orchestrator may not find it and may record the run's pull request as missing or closed.
 - Tracker connections, the GitHub token, runners, workspaces, and mappings are set up in web onboarding on first launch. Tokens are stored encrypted in the database.
 - `.env` holds only the minimum values needed to boot: port, bind address, data path, and encryption key. `ganger init` writes it, as described below. The addresses that other devices and your tracker use are set in Settings, as described in [Open it from other devices](#open-it-from-other-devices).
