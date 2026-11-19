@@ -93,12 +93,12 @@ afterAll(async () => {
   if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
 });
 
-async function openPage(context: TestContext): Promise<Page> {
+async function openPage(context: TestContext, width = 1280): Promise<Page> {
   const browserContext: BrowserContext = await browser.newContext({
     baseURL: baseUrl,
     locale: "ko-KR",
     timezoneId: "UTC",
-    viewport: { width: 1280, height: 900 },
+    viewport: { width, height: 900 },
   });
   const page = await browserContext.newPage();
   page.setDefaultTimeout(30_000);
@@ -181,7 +181,7 @@ describe("Stats 나눠 보기에서 Runs 열기(브라우저, 0075)", () => {
     await page.goto(`/stats?ws=${workspaceId}&days=7`);
     await hydrated(page);
 
-    const breakdown = page.getByRole("table", { name: "러너별 런 결과와 리드 타임" });
+    const breakdown = page.getByRole("table", { name: "러너별 끝난 런, 병합률, 리드 타임" });
     await breakdown
       .getByRole("row")
       .filter({ hasText: "runner-a" })
@@ -218,6 +218,70 @@ describe("Stats 나눠 보기에서 Runs 열기(브라우저, 0075)", () => {
     const conditions = page.getByRole("group", { name: runs.conditions.label });
     await conditions.getByRole("button", { name: "프로젝트: Web 조건 지우기" }).waitFor();
     expect(await page.getByRole("option").count()).toBe(2);
+  });
+});
+
+describe("Stats 배치(브라우저, 0093)", () => {
+  async function layout(context: TestContext, width: number) {
+    const page = await openPage(context, width);
+    await page.goto(`/stats?ws=${workspaceId}`);
+    await hydrated(page);
+    const tiles = await page
+      .getByRole("region", { name: stats.figures.label })
+      .getByRole("group")
+      .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top));
+    const chart = await page.getByRole("region", { name: stats.throughput.title }).boundingBox();
+    const failures = await page.getByRole("region", { name: stats.failures.title }).boundingBox();
+    const frame = await page.getByRole("heading", { level: 1 }).evaluate((h1) => {
+      const header = h1.closest("header");
+      return header?.parentElement?.getBoundingClientRect().width ?? 0;
+    });
+    await page.context().close();
+    return {
+      tileRows: new Set(tiles.map((top) => Math.round(top))).size,
+      sideBySide: chart !== null && failures !== null && Math.abs(chart.y - failures.y) < 1,
+      chartRatio: chart !== null && failures !== null ? chart.width / failures.width : 0,
+      frame,
+    };
+  }
+
+  it("넓으면 숫자 카드 가로 넷, 차트와 실패 이유는 1.4:1 로 나란히, 본문은 1100px 까지다", async (context) => {
+    const wide = await layout(context, 1728);
+    expect(wide.tileRows).toBe(1);
+    expect(wide.sideBySide).toBe(true);
+    expect(wide.chartRatio).toBeCloseTo(1.4, 1);
+    expect(wide.frame).toBe(1100);
+  });
+
+  it("중간 폭은 숫자 카드 2×2, 차트와 실패 이유는 위아래로 쌓는다", async (context) => {
+    const middle = await layout(context, 800);
+    expect(middle.tileRows).toBe(2);
+    expect(middle.sideBySide).toBe(false);
+  });
+
+  it("본문이 480px 이하일 때만 숫자 카드를 한 줄에 하나씩 둔다", async (context) => {
+    expect((await layout(context, 640)).tileRows).toBe(2);
+    expect((await layout(context, 400)).tileRows).toBe(4);
+  });
+});
+
+describe("Stats 'Failed 런 보기'(브라우저, 0093)", () => {
+  it("누르면 Failed 와 Stats 기간 조건으로 Runs 를 연다", async (context) => {
+    const page = await openPage(context);
+    await page.goto(`/stats?ws=${workspaceId}&days=30`);
+    await hydrated(page);
+
+    await page.getByRole("link", { name: stats.failures.openRuns }).click();
+
+    await page.waitForURL(/\/runs\?/);
+    const search = new URL(page.url()).searchParams;
+    expect(search.get("f")).toBe("failed");
+    expect(search.get("days")).toBe("30");
+    expect(search.get("ws")).toBe(workspaceId);
+    await page.getByRole("option").filter({ hasText: "ACME-2" }).waitFor();
+    expect(await page.getByRole("option").allTextContents()).toEqual([
+      expect.stringContaining("ACME-2"),
+    ]);
   });
 });
 

@@ -70,6 +70,12 @@ function StatsRoute() {
             search: { ws, ...conditionsForStatsGroup(dimension, key, days) },
           });
         }}
+        failedRunsHref={(days) =>
+          router.buildLocation({ to: "/runs", search: { ws, f: "failed", days } }).href
+        }
+        onOpenFailedRuns={(days) => {
+          void navigate({ to: "/runs", search: { ws, f: "failed", days } });
+        }}
       />
     </ScreenMessages>
   );

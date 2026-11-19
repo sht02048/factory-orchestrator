@@ -89,9 +89,9 @@
 - `shadow.popover`: 떠 있는 면(메뉴, Select 목록, 툴팁, 다이얼로그, 토스트)에만. 구역에는 그림자를 쓰지 않는다.
 - `motion`: `easeOut`, `durationFast 150ms`(hover·팝업), `durationToast 180ms`. 상태가 바뀔 때만 짧게 움직이고, `prefers-reduced-motion`에서는 끈다.
 - `size`: `sidebarWidth 216`, `railWidth 84`(아이콘 레일), `iconButton 40`(아이콘만 있는 버튼), `railAvatar 36`·`railIcon 24`·`issueBadge 16`(레일 Workspace 글자·메뉴 아이콘 칸·문제 수 점), `panelWidth 384`, `editorListWidth 320`, `control 32`(버튼), `input 36`, `rowMinHeight 52`, `dot 6`(알약 점), `pill 22`(알약 높이·단계 표시), `icon 14`, `tick 18`(확인 표시), `markerLarge 28`(끝난 표시).
-  - 화면 틀: `noticeWidth 720`(공지·빈 화면), `formWidth 640`(설정 폼·목록), `detailPageWidth 1280`·`detailAsideWidth 360`(Run 상세), `logMaxHeight 480`, `stepNavWidth 240`·`stepContentWidth 760`(온보딩), `dashboardSideWidth 340`, `todoTextMinWidth 256`, `searchMinWidth 216`·`searchMaxWidth 320`, `textareaMinHeight 72`.
+  - 화면 틀: `noticeWidth 720`(공지·빈 화면), `formWidth 640`(설정 폼·목록), `detailPageWidth 1280`·`detailAsideWidth 360`(Run 상세), `statsPageWidth 1100`(Stats 본문), `failureBarWidth 160`(Stats 실패 이유 막대), `statsCountColumn 64`·`statsDurationColumn 80`(Stats 나눠 보기 숫자 열의 가장 좁은 폭), `logMaxHeight 480`, `stepNavWidth 240`·`stepContentWidth 760`(온보딩), `dashboardSideWidth 340`, `todoTextMinWidth 256`, `searchMinWidth 216`·`searchMaxWidth 320`, `textareaMinHeight 72`.
   - 표 열: `ticketKeyColumn 112`, `projectColumn 128`, `lastRunColumn 160`, `runStatusColumn 160`, `elapsedColumn 88`, `runnerStatusColumn 112`, `capacityColumn 160`, `usageColumn 160`, `mappingTableMinWidth 640`, `mappingCellMinWidth 140`. 자동 맞춤 격자 최소 폭은 `fieldMinWidth 200`, `compareMinWidth 220`, 라벨 행은 `labelTextMinWidth 280`·`labelSelectWidth 240`.
-- `breakpoints`(`stylex.defineConsts`): `narrowScreen`(600), `stepsStacked`(900), `detailStacked`(960), `dashboardOneColumn`(컨테이너 719), `statTilesStacked`(컨테이너 704). `[breakpoints.이름]: 값`으로 쓴다.
+- `breakpoints`(`stylex.defineConsts`): `narrowScreen`(600), `stepsStacked`(900), `detailStacked`(960), `dashboardOneColumn`(컨테이너 719), `statTilesTwoColumns`(컨테이너 481~880, Stats 숫자 카드 2×2. `statTilesStacked`와 겹치지 않게 범위로 쓴다), `statTilesStacked`(컨테이너 480, 숫자 카드 한 줄에 하나), `statsChartsStacked`(컨테이너 880, Stats 차트·실패 이유 위아래), `chartLabelsSparse`(차트 컨테이너 400, `StackedBarChart`의 `minorBarLabels` 이름을 숨긴다), `failureBarsBelow`(컨테이너 400, Stats 실패 이유 막대를 글 아래로). `[breakpoints.이름]: 값`으로 쓴다.
 
 ### 테마
 

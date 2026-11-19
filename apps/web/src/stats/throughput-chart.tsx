@@ -12,19 +12,37 @@ import {
   Text,
   visuallyHiddenStyles,
 } from "@ganger/ui";
+import type { OutcomeSegment } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
 import { useId, useState } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import type { DailyThroughput } from "./model";
-import { outcomeSegments } from "./outcome-bar";
+import type { DailyThroughput, OutcomeCounts } from "./model";
 
 const GRID_LINES = 4;
+
+export function outcomeSegments(outcomes: OutcomeCounts): ReadonlyArray<OutcomeSegment> {
+  return [
+    { tone: "merged", value: outcomes.merged },
+    { tone: "check", value: outcomes["human-check"] },
+    { tone: "failed", value: outcomes.failed },
+    { tone: "canceled", value: outcomes.canceled },
+  ];
+}
 const MAX_DAY_LABELS = 8;
+const MAX_DAY_LABELS_WHEN_NARROW = 4;
+
+function labelEvery(index: number, days: number, most: number): boolean {
+  const every = Math.ceil(days / most);
+  return (days - 1 - index) % every === 0;
+}
 
 export function dayLabelShown(index: number, days: number): boolean {
-  const every = Math.ceil(days / MAX_DAY_LABELS);
-  return (days - 1 - index) % every === 0;
+  return labelEvery(index, days, MAX_DAY_LABELS);
+}
+
+export function dayLabelShownWhenNarrow(index: number, days: number): boolean {
+  return labelEvery(index, days, MAX_DAY_LABELS_WHEN_NARROW);
 }
 
 export function ThroughputChart({
@@ -75,6 +93,7 @@ export function ThroughputChart({
               ? dayLabel(d.day).short
               : null,
         )}
+        minorBarLabels={daily.map((_, i) => !dayLabelShownWhenNarrow(i, daily.length))}
       />
       <div {...stylex.props(styles.actions)}>
         <Button variant="ghost" onClick={() => setShowTable((shown) => !shown)}>
