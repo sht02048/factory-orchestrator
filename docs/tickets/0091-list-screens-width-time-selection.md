@@ -27,7 +27,7 @@ blocked_by: []
   - 아래 줄(`Tabs variant="chips"`, 작은 칩으로 바꿨다. 이 변형은 Runs만 쓴다): 상태별 칩과 개수. Running·Waiting for Input·Disconnected·Queued·Merged·Human Check·Failed·Canceled. 시안에는 Running이 없지만 지금 주소 `f=running`을 남기려고 넣었다.
   - 두 줄은 각각 이름 붙은 tablist이고 값 하나(주소 `f`)를 함께 바꾼다. 지금 고른 값이 없는 줄은 고른 탭이 없다.
 - **고른 행.** `bgSelected`를 무채색으로 바꾸고 `TableRow`의 노란 막대를 뺀다. 바탕 차이만으로는 카드와 대비가 1.2:1이라(WCAG 1.4.11) 행 전체를 1px 중립 테두리(`borderSelected`, 둘레 바탕과 3.3~4.1:1)로 둘러 모양으로도 구분한다(코디네이터 결정, 왼쪽 막대는 쓰지 않는다). Tickets·Runs·Runners 목록이 함께 바뀐다. 키보드 포커스 링은 그대로다.
-- **좁은 컨테이너의 시간·버튼 칸.** 가장 가까운 컨테이너가 559px 이하(`breakpoints.rowSlotsFit`)이면 `TimeSlot`·`RowActionSlot`이 고정 폭을 놓아 To do 제목·키 자리를 남긴다.
+- **좁은 컨테이너의 시간·버튼 칸.** 가장 가까운 컨테이너가 399px 이하(`breakpoints.rowSlotsFit`, To do 버튼이 다음 줄로 넘어가는 폭)이면 `TimeSlot`·`RowActionSlot`이 고정 폭을 놓아 To do 제목·키 자리를 남긴다.
 - **Tickets.** 목록 행에 시간 글이 없어 시간 칸을 더하지 않았다. 고른 행 모양과 좁은 폭 배치만 바뀐다.
 - **좁은 폭(마무리 리뷰에서 찾음).** 400px에서 Runs 제목 칸이 0이 되고 Tickets 제목·마지막 런이 화면 밖으로 밀렸다. `Table`에 `narrowColumns`를 더해 표 폭이 559px 이하(`breakpoints.tableStacked`)이면 Runs·Tickets 칸을 한 열로 쌓고 머리글을 숨긴다. `SegmentedTabs`는 좁으면 가로 스크롤 대신 다음 줄로 넘긴다. 줄바꿈된 To do 버튼은 오른쪽 끝에 붙인다.
 
