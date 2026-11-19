@@ -4,7 +4,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadMigrations, openDatabase } from "@ganger/db";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MissingEnvFileError } from "./home.js";
 import { init } from "./init.js";
 import type { HoldSleepAssertion } from "./keep-awake.js";
@@ -391,6 +391,92 @@ describe("start의 잠자기 방지", () => {
     expect(await (await fetch(started.url)).json()).toEqual({
       cliEntry: "/opt/ganger/cli/bin/cli.js",
     });
+  });
+});
+
+const MESSAGE_SENDING_WEB = `
+import { createServer } from "node:http";
+const sent = [{ error: "no-entry" }, { type: "sleep" }, "wake", { type: "wake" }];
+const server = createServer((req, res) => {
+  if (req.url === "/send") for (const message of sent) process.send(message);
+  res.end("ok");
+});
+server.listen(Number(process.env.WEB_PORT), process.env.WEB_HOST);
+process.on("SIGTERM", () => server.close(() => process.exit(0)));
+`;
+
+function messageRecordingWorker(out: string): string {
+  return `
+import { appendFileSync } from "node:fs";
+appendFileSync(${JSON.stringify(out)}, JSON.stringify({ env: process.env.GANGER_WORKER_WAKE }) + "\\n");
+process.on("message", (message) => appendFileSync(${JSON.stringify(out)}, JSON.stringify(message) + "\\n"));
+process.on("SIGTERM", () => process.exit(0));
+`;
+}
+
+const WAKING_UNTIL_STOPPED_WEB = `
+import { createServer } from "node:http";
+const server = createServer((_req, res) => res.end("ok"));
+server.listen(Number(process.env.WEB_PORT), process.env.WEB_HOST);
+const timer = setInterval(() => process.send({ type: "wake" }, () => undefined), 5);
+process.on("SIGTERM", () => setTimeout(() => { clearInterval(timer); process.exit(0); }, 200));
+`;
+
+function readLines(file: string): unknown[] {
+  if (!existsSync(file)) return [];
+  return readFileSync(file, "utf8")
+    .split("\n")
+    .filter((line) => line !== "")
+    .map((line): unknown => JSON.parse(line));
+}
+
+describe("start 의 worker 깨우기 중계", () => {
+  it.each([
+    ["출력을 넘겨받을 때", quiet],
+    ["출력을 그대로 둘 때", undefined],
+  ])("%s web 이 보낸 { type: wake } 만 worker 에 닿는다", async (_case, onOutput) => {
+    const home = join(dir, "home");
+    init({ home, port: String(await freePort()) });
+    const out = join(dir, "worker-messages.jsonl");
+    const layout = fakeLayout(messageRecordingWorker(out));
+    const web = join(dir, "sending-web.mjs");
+    writeFileSync(web, MESSAGE_SENDING_WEB);
+    started = await start({
+      home,
+      env: {},
+      layout: {
+        web: (config) => ({ ...layout.web(config), args: [web], requires: [web] }),
+        worker: () => layout.worker(),
+      },
+      ...(onOutput === undefined ? {} : { onOutput }),
+    });
+
+    await fetch(`${started.url}/send`);
+    await vi.waitFor(() => expect(readLines(out)).toHaveLength(2));
+    await fetch(`${started.url}/send`);
+    await vi.waitFor(() => expect(readLines(out)).toHaveLength(3));
+    expect(readLines(out)).toEqual([{ env: "ipc" }, { type: "wake" }, { type: "wake" }]);
+  });
+
+  it("worker 가 끝난 뒤 web 이 보낸 신호는 멈춘 이유를 바꾸지 않는다", async () => {
+    const home = join(dir, "home");
+    init({ home, port: String(await freePort()) });
+    const crashTrigger = join(dir, "crash-worker");
+    const layout = fakeLayout(workerExitingOnceExists(crashTrigger));
+    const web = join(dir, "waking-web.mjs");
+    writeFileSync(web, WAKING_UNTIL_STOPPED_WEB);
+    started = await start({
+      home,
+      env: {},
+      layout: {
+        web: (config) => ({ ...layout.web(config), args: [web], requires: [web] }),
+        worker: () => layout.worker(),
+      },
+      onOutput: quiet,
+    });
+
+    writeFileSync(crashTrigger, "");
+    expect(await started.exited).toEqual({ failure: "worker exited with code 3" });
   });
 });
 

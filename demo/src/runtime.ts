@@ -20,6 +20,7 @@ export interface DevStartOptions {
 export interface DevRuntime {
   seeded: boolean;
   life: DemoLife;
+  wake(): void;
   stop(): Promise<void>;
 }
 
@@ -60,6 +61,7 @@ async function start(options: DevStartOptions): Promise<DevRuntime> {
   const runtime: DevRuntime = {
     seeded,
     life,
+    wake: () => worker.wake(),
     stop: async () => {
       clearInterval(timer);
       await worker.stop();
