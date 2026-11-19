@@ -33,12 +33,10 @@ const styles = stylex.create({
   time: {
     display: "inline-block",
     flexShrink: 0,
-    inlineSize: { default: size.timeColumn, [breakpoints.rowSlotsFit]: "auto" },
-    overflow: "hidden",
+    minInlineSize: { default: size.timeColumn, [breakpoints.rowSlotsFit]: 0 },
     fontVariantNumeric: "tabular-nums",
     textAlign: "end",
     whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
   },
   action: {
     display: "inline-flex",

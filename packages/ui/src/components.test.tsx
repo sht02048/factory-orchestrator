@@ -243,6 +243,7 @@ describe("서버 렌더", () => {
     const time = renderToString(<TimeSlot dateTime="2026-11-17T09:00:00.000Z">11월 17일</TimeSlot>);
     expect(time).toMatch(/^<time dateTime="2026-11-17T09:00:00.000Z" data-slot="time"/);
     expect(classOf(time)).toBe(classOf(short));
+    expect(renderToString(<TimeSlot>123시간 45분째</TimeSlot>)).toContain(">123시간 45분째<");
   });
 
   it("RowActionSlot 은 버튼이 없어도 같은 폭 칸을 남긴다(티켓 0091)", () => {
