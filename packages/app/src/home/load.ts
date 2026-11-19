@@ -24,6 +24,7 @@ import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
 import { isWebUrl } from "../format/url.js";
 import { resolveWorkspace, runnerIssueCause } from "../shell/model.js";
 import { calendarDay } from "../time-zone.js";
+import { ticketId } from "../tickets/load.js";
 import type { QueuedReason } from "../runs/model.js";
 import type { DashboardRunner, DoneRun, HomePage, HomeRun, InputWait } from "./model.js";
 import { partitionHome } from "./model.js";
@@ -42,6 +43,7 @@ export function loadHomePage(
       runs: [],
       runners: { list: [] },
       doneToday: [],
+      endedToday: [],
     });
 
   const workspaceNames = new Map(workspaces.map((w) => [w.id, w]));
@@ -104,6 +106,7 @@ export function loadHomePage(
     const pr = records?.pullRequest;
     const base = {
       id: run.id,
+      ticketId: ticketId(run.ticket.connection, run.ticket.key),
       ticketKey: run.ticket.key,
       ticketTitle: run.ticketTitle,
       trackerProject: projectName(run),
@@ -177,15 +180,20 @@ export function loadHomePage(
       ...dashboardUsage(runner, now),
     }))
     .toSorted((a, b) => Number(a.cause === null) - Number(b.cause === null));
+  const endedToday = (run: StoredRun): boolean =>
+    run.state === "ended" && calendarDay(run.endedAt, timeZone) === today;
+  const views = runs.map((run) => ({
+    ticket: `${run.ticket.connection}\u0000${run.ticket.key}`,
+    run: toView(run),
+    endedToday: endedToday(run),
+  }));
   return partitionHome({
     workspace,
-    runs: runs.map((run) => ({
-      ticket: `${run.ticket.connection}\u0000${run.ticket.key}`,
-      run: toView(run),
-    })),
+    runs: views,
+    endedToday: views.flatMap((view) => (view.endedToday ? [view.run] : [])),
     runners: { list: dashboardRunners },
     doneToday: runs.flatMap((run): DoneRun[] =>
-      run.state === "ended" && calendarDay(run.endedAt, timeZone) === today
+      run.state === "ended" && endedToday(run)
         ? [
             {
               id: run.id,

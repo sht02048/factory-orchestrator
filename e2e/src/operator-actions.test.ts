@@ -128,20 +128,20 @@ beforeEach(async (context) => {
 });
 
 describe("운영자 핵심 동작(브라우저)", () => {
-  it("answer: To do 에서 답하기 레이어로 에이전트 질문에 답하면 DB 에 답이 하나 남고 화면에 보인다", async () => {
+  it("answer: Dashboard 카드의 답하기 패널로 에이전트 질문에 답하면 DB 에 답이 하나 남고 화면에 보인다", async () => {
     await page.goto(`/?ws=${workspaceId}`);
     await hydrated(page);
     const row = page
-      .getByRole("region", { name: home.section.todo })
+      .getByRole("region", { name: home.column.running })
       .getByRole("listitem")
       .filter({ has: page.getByText("ACME-1", { exact: true }) });
     await row.getByText(questionBody).waitFor();
-    await row.getByRole("button", { name: home.row.answer }).click();
+    await row.getByRole("button", { name: home.card.answer }).click();
     const layer = page.getByRole("dialog");
     await layer.getByRole("radio", { name: home.question.other }).check();
     await layer.getByLabel(home.question.otherLabel).fill(answerText);
     await layer.getByRole("button", { name: home.question.send }).click();
-    await row.getByRole("status").getByText(home.question.answered).waitFor();
+    await layer.getByRole("status").getByText(home.question.answered).waitFor();
 
     const answered = listRunQuestions(db, questionRun).filter((q) => q.answer !== null);
     expect(answered.map((q) => [q.id, q.answer?.text])).toEqual([[questionId, answerText]]);
