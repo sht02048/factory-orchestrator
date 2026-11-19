@@ -1,5 +1,4 @@
 import { PRODUCT_DISPLAY_NAME } from "@ganger/cli/home";
-import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -17,6 +16,7 @@ import type { IpcMainEvent, IpcMainInvokeEvent, MenuItemConstructorOptions } fro
 import { createTranslator } from "use-intl";
 import system from "../../messages/ko/system.json" with { type: "json" };
 import { NotificationFeed } from "../core/notification-feed.js";
+import { notificationId, serverKey, staleNotificationIds } from "../core/notification-ids.js";
 import type { FeedBatch } from "../core/notification-feed.js";
 import { DEFAULT_NOTIFICATION_PREFS, notificationPrefsSchema } from "../core/notification-prefs.js";
 import type { NotificationPrefs } from "../core/notification-prefs.js";
@@ -539,12 +539,13 @@ export class Controller {
 
   private async removeStaleNotifications(url: string, open: ReadonlyArray<number>): Promise<void> {
     if (process.platform !== "darwin") return;
-    const prefix = notificationId(url, "event-");
-    const stillOpen = new Set(open.map((id) => notificationId(url, `event-${id}`)));
     const history = await Notification.getHistory().catch(() => []);
-    const stale = history
-      .map((notification) => notification.id)
-      .filter((id) => id.startsWith(prefix) && !stillOpen.has(id) && !this.delivered.has(id));
+    const stale = staleNotificationIds(
+      url,
+      history.map((notification) => notification.id),
+      open,
+      new Set(this.delivered.keys()),
+    );
     if (stale.length > 0) Notification.remove(stale);
   }
 
@@ -769,14 +770,6 @@ export class Controller {
     if (server === this.options.serverVersion) return undefined;
     return t("tray.versionDiffers", { server, app: this.options.serverVersion });
   }
-}
-
-export function serverKey(url: string): string {
-  return createHash("sha256").update(url).digest("hex").slice(0, 12);
-}
-
-export function notificationId(url: string, id: string): string {
-  return `ganger:${serverKey(url)}:${id}`;
 }
 
 export function appPaths(base: string): {

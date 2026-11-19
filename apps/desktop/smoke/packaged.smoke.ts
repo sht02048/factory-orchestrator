@@ -197,7 +197,9 @@ describe("패키징한 앱, 로컬 모드", () => {
     await sleep(16_000);
     const titles = await notifications(app);
     console.log(`notifications: ${titles.join(", ")}`);
-    expect(titles).toEqual(expect.arrayContaining(["Human Check", "Permission", "Question"]));
+    expect(titles).toEqual(
+      expect.arrayContaining(["Human Check", "Permission", "Question", "Runner Issue"]),
+    );
     expect(titles.some((title) => title === "Failed" || title === "To do")).toBe(true);
     expect(titles).not.toContain("Merged");
     await app.close();

@@ -64,7 +64,7 @@ export interface HomeScreenProps {
   onViewChange?: (view: DashboardView) => void;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
-  openRunId?: string | undefined;
+  openRunId?: RunId | undefined;
   onOpenRunShown?: () => void;
 }
 
@@ -95,7 +95,7 @@ export function HomeScreen({
   const [target, setTarget] = useState<SheetTarget | null>(null);
   const [open, setOpen] = useState(false);
   const [revealedId, setRevealedId] = useState<RunId | null>(null);
-  const shownRunId = useRef<string | undefined>(undefined);
+  const shownRunId = useRef<RunId | undefined>(undefined);
   useEffect(() => {
     if (openRunId === undefined || shownRunId.current === openRunId) return;
     if (page.workspace.kind === "none") return;

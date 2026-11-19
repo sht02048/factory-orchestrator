@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useCallback, useState } from "react";
 import { createTranslator } from "use-intl";
+import { toRunId } from "@ganger/core";
 import { z } from "zod";
 import { HomeScreen } from "../../home/home-screen";
 import { homeMessages } from "../../home/messages";
@@ -63,7 +64,7 @@ function HomeRoute() {
           await denyPermission({ data: input });
           await router.invalidate();
         }}
-        openRunId={run}
+        openRunId={run === undefined ? undefined : toRunId(run)}
         onOpenRunShown={clearOpenRun}
       />
     </ScreenMessages>
