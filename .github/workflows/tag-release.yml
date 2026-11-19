@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 concurrency:
-  group: tag-release
+  group: tag-release-${{ github.sha }}
   cancel-in-progress: false
 
 permissions:
@@ -57,7 +57,11 @@ jobs:
           TAG: ${{ needs.decide.outputs.tag }}
           COMMIT: ${{ needs.decide.outputs.commit }}
         run: |
-          if existing="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/${TAG:?}" --jq .object.sha 2> /dev/null)"; then
+          if existing="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/${TAG:?}" --jq '.object.type + " " + .object.sha' 2> /dev/null)"; then
+            read -r existing_type existing <<< "$existing"
+            if [ "$existing_type" = "tag" ]; then
+              existing="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$existing" --jq .object.sha)"
+            fi
             if [ "$existing" = "${COMMIT:?}" ]; then
               echo "$TAG already points at $COMMIT; nothing to do."
               exit 0

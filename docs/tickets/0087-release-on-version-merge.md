@@ -30,7 +30,7 @@ blocked_by: []
 - `scripts/release-version.ts`: 버전 형식 검사, 버전 비교(semver 우선순위, prerelease 포함), 두 `package.json`의 버전 바꾸기. CLI `bump <version>`은 새 버전이 지금보다 높지 않으면 멈춘다.
 - `scripts/release-tag.ts`: 앞 커밋과 지금 커밋의 루트·`apps/desktop` 버전을 보고 태그를 만들지 정한다. 둘 다 그대로면 만들지 않는다. 바뀌었으면 둘이 같고 형식이 맞고 앞 버전보다 높아야 하며, 아니면 실패한다. 같은 태그가 이미 이 커밋에 있으면 건너뛰고, 다른 커밋에 있으면 실패한다.
 - `.github/workflows/prepare-release.yml`("Prepare release"): workflow_dispatch(입력 `version`). `release-bot` environment에서 앱 토큰을 만들어 `release/v<version>` 브랜치에 버전 커밋을 push하고 PR을 연다. 브랜치가 이미 있으면 멈춘다.
-- `.github/workflows/tag-release.yml`("Tag release"): `main` push. secret 없는 잡이 태그를 정하고, 태그가 필요할 때만 `release-bot` environment 잡이 앱 토큰으로 태그 ref를 만든다. 동시 실행은 하나씩 돈다.
+- `.github/workflows/tag-release.yml`("Tag release"): `main` push. secret 없는 잡이 태그를 정하고, 태그가 필요할 때만 `release-bot` environment 잡이 앱 토큰으로 태그 ref를 만든다. 동시 실행 그룹은 커밋마다 따로 둔다. 그룹 하나로 묶으면 대기 중인 앞 실행이 뒤 실행에 밀려 취소돼 버전 머지를 놓친다. 태그 만들기는 이미 있는 태그를 보고 건너뛰거나 실패해 몇 번 돌아도 안전하다.
 - `release.yml`: tag push와 workflow_call(입력 `tag`) 둘 다로 돈다. 태그를 명시해 체크아웃하고, plan에서 이미 같은 Release가 있으면 macOS 단계 전에 멈춘다. 태그=버전, 태그 커밋이 `origin/main`에 있는지 보는 검사는 그대로다.
 - 앱이나 secret이 아직 없으면 두 워크플로는 무엇을 설정할지 알려 주는 오류로 멈춘다.
 - README 릴리스 절에 새 흐름과 운영자 설정 단계를 영어로 적는다. 0031의 "버전과 변경 기록" 줄을 새 흐름으로 고친다.

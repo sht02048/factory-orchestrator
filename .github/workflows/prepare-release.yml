@@ -17,10 +17,14 @@ permissions:
 
 jobs:
   pull-request:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: release-bot
     steps:
+      - name: Check that this runs on main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Run Prepare release on main, not $GITHUB_REF."
+          exit 1
       - name: Check the release app settings
         env:
           APP_ID: ${{ secrets.RELEASE_APP_ID }}

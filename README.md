@@ -229,17 +229,13 @@ Tags and pull requests made with the default `GITHUB_TOKEN` do not start other w
    gh secret set RELEASE_APP_PRIVATE_KEY --env release-bot --repo OWNER/REPO < <key>.pem
    ```
 
-6. If a ruleset limits who can create `v*` tags, add the app to its bypass list. `PUT` replaces the whole list, so include the actors that are already there (here, the repository admin role):
+6. If a ruleset limits who can create `v*` tags, add the app to its bypass list. `PUT` replaces the whole list, so this keeps the actors that are already there and adds the app:
 
    ```sh
    ruleset_id="$(gh api repos/OWNER/REPO/rulesets --jq '.[] | select(.name == "Release tags") | .id')"
-   gh api "repos/OWNER/REPO/rulesets/$ruleset_id" --jq .bypass_actors
-   gh api --method PUT "repos/OWNER/REPO/rulesets/$ruleset_id" --input - <<'JSON'
-   {"bypass_actors": [
-     {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"},
-     {"actor_id": <app-id>, "actor_type": "Integration", "bypass_mode": "always"}
-   ]}
-   JSON
+   gh api "repos/OWNER/REPO/rulesets/$ruleset_id" \
+     | jq --argjson app <app-id> '{bypass_actors: (.bypass_actors + [{actor_id: $app, actor_type: "Integration", bypass_mode: "always"}])}' \
+     | gh api --method PUT "repos/OWNER/REPO/rulesets/$ruleset_id" --input -
    ```
 
 Without these settings, Prepare release and Tag release stop with an error that points here. If a job runs before the `release-bot` environment exists, GitHub creates the environment without the branch rule, so do step 4 first. After you finish, re-run a failed Tag release run to create the tag.
