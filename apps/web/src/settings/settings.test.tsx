@@ -59,7 +59,7 @@ import type { SettingsContext } from "@ganger/app/settings/load";
 import { settingsMessages } from "./messages";
 import { INSTALL_ITEMS, WORKSPACE_ITEMS } from "@ganger/app/settings/model";
 import type { SettingsItem, SettingsPage } from "@ganger/app/settings/model";
-import { SettingsScreen } from "./settings-screen";
+import { RunnerForm, SettingsScreen, nameFromSshTarget, sshCheckCommand } from "./settings-screen";
 import type { SettingsActions } from "./settings-screen";
 
 const now = new Date("2026-11-17T09:00:00Z");
@@ -1157,5 +1157,57 @@ describe("MCP 쓰기 허용과 최근 작업(0089)", () => {
     expect(shown).not.toContain("\u202e");
     expect(shown).toContain("러너 다시 확인 · runner-b 하지 못했어요: 대상을 찾지 못했어요");
     expect(shown.indexOf("MCP · hermes")).toBeLessThan(shown.indexOf("MCP · Operator"));
+  });
+});
+
+describe("직접 입력 러너 폼(0095 M2b)", () => {
+  const html = renderWithMessages(
+    <RunnerForm runner={null} actions={noopActions} primary={false} direct />,
+    settingsMessages,
+  );
+  const shown = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
+  it("ssh 대상을 맨 앞에 두고, 이름·동시에 돌릴 런·orca 경로가 뒤따른다", () => {
+    const order = ["ssh 대상", "러너 이름", "동시에 돌릴 런", "orca 실행 파일 경로"].map((label) =>
+      shown.indexOf(label),
+    );
+    expect(order.every((at) => at >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it("orca 경로는 고칠 수 있는 Orca 앱 기본 경로로 채워 둔다", () => {
+    expect(html).toMatch(
+      /name="orcaPath"[^>]*value="\/Applications\/Orca.app\/Contents\/Resources\/bin\/orca"/,
+    );
+  });
+
+  it("먼저 돌려 볼 ssh 명령과 복사 버튼, 확인하고 등록 버튼을 보인다", () => {
+    expect(shown).toContain("이 서버 맥에서 먼저 확인해 볼 수 있어요");
+    expect(shown).toContain("ssh -o BatchMode=yes user@host true");
+    expect(shown).toContain("명령 복사");
+    expect(html).toMatch(/type="submit"[^>]*>확인하고 등록/);
+  });
+
+  it("ssh 대상의 호스트 첫 부분으로 이름을 미리 정한다", () => {
+    expect(nameFromSshTarget("dev@mac-mini.example.com")).toBe("mac-mini");
+    expect(nameFromSshTarget("  studio ")).toBe("studio");
+    expect(nameFromSshTarget("me@runner-a:2222")).toBe("runner-a");
+    expect(nameFromSshTarget("")).toBe("");
+  });
+
+  it("먼저 돌려 볼 명령은 입력한 대상을 그대로 넣는다", () => {
+    expect(sshCheckCommand("dev@mac-mini.example.com")).toBe(
+      "ssh -o BatchMode=yes dev@mac-mini.example.com true",
+    );
+  });
+
+  it("Settings의 러너 추가 폼은 지금처럼 이름부터 받고 orca 경로를 비워 둔다", () => {
+    const plain = renderWithMessages(
+      <RunnerForm runner={null} actions={noopActions} />,
+      settingsMessages,
+    );
+    expect(plain).toMatch(/name="orcaPath"[^>]*value=""/);
+    expect(plain).not.toContain("BatchMode");
+    expect(plain).toMatch(/type="submit"[^>]*>등록하고 확인/);
   });
 });

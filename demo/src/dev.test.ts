@@ -85,9 +85,9 @@ describe("pnpm dev", () => {
       await page.getByRole("button", { name: settings.github.save }).click();
       await enabled(next);
       await next.click();
-      await page.getByText(runnerSetup.choose.manual).click();
+      await page.getByRole("link", { name: runnerSetup.choose.directLink }).click();
       await fill.click();
-      await page.getByRole("button", { name: settings.runners.add }).click();
+      await page.getByRole("button", { name: settings.runners.direct.submit }).click();
       await main.getByText(onboarding.runner.ready.replace("{name}", "runner-a")).waitFor();
       await next.click();
       await fill.click();

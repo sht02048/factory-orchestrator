@@ -8,18 +8,18 @@ import {
   Chip,
   DefinitionItem,
   DefinitionList,
-  Disclosure,
   NumberedList,
   PanelBlock,
   RadioGroup,
   RadioOption,
   Text,
+  TextLink,
   VisuallyHidden,
   buttonStyles,
   focusStyles,
 } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
-import type { ReactNode, RefObject } from "react";
+import type { MouseEvent, ReactNode, RefObject } from "react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
 import { SHARING_SETTINGS_URL } from "@ganger/app/runner-setup/model";
@@ -35,6 +35,13 @@ export interface RunnerSetupActions {
 export const SETUP_CHOICES = ["thisMac", "appMac", "commandMac"] as const;
 export type SetupChoice = (typeof SETUP_CHOICES)[number];
 
+export interface DirectEntry {
+  open: boolean;
+  openHref: string;
+  closeHref: string;
+  onChange: (open: boolean) => void;
+}
+
 export const FLOW_STEPS = ["key", "hostKey", "service", "github", "register"] as const;
 type FlowStep = (typeof FLOW_STEPS)[number];
 
@@ -43,13 +50,43 @@ export type StepRow =
   | { state: "warning" | "failed"; problem: StepProblem | "request-failed"; detail: string | null };
 
 const STATUS_POLL_MS = 2500;
-const CHIP_STEPS = [
+const THIS_MAC_CHIPS = [
   { key: "remoteLogin", you: true },
   { key: "key", you: false },
   { key: "service", you: false },
   { key: "github", you: false },
   { key: "check", you: false },
 ] as const;
+
+const DIRECT_CHIPS = [
+  { key: "sshTarget", you: true },
+  { key: "connect", you: false },
+  { key: "findOrca", you: false },
+  { key: "githubCheck", you: false },
+] as const;
+
+type ChipStep = (typeof THIS_MAC_CHIPS)[number] | (typeof DIRECT_CHIPS)[number];
+
+function followLink(event: MouseEvent<HTMLAnchorElement>, go: () => void) {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+    return;
+  }
+  event.preventDefault();
+  go();
+}
+
+function useFocusOnSwitch(open: boolean) {
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const linkRef = useRef<HTMLAnchorElement>(null);
+  const shown = useRef(open);
+  useEffect(() => {
+    if (shown.current === open) return;
+    shown.current = open;
+    if (open) titleRef.current?.focus();
+    else linkRef.current?.focus();
+  }, [open]);
+  return { titleRef, linkRef };
+}
 
 export function canOpenSharingSettings(userAgent: string, hostname: string): boolean {
   const loopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
@@ -104,18 +141,18 @@ function useThisMacStatus(
 export function RunnerSetup({
   actions,
   manualForm,
+  direct,
   onOpenRunner,
   onRegistered,
   primary,
 }: {
   actions: RunnerSetupActions;
   manualForm: ReactNode;
+  direct: DirectEntry;
   onOpenRunner?: (runnerId: RunnerId) => void;
   onRegistered?: (runnerId: RunnerId) => void;
   primary: boolean;
 }) {
-  const t = useTranslations("runnerSetup");
-  const [choice, setChoice] = useState<SetupChoice>("thisMac");
   const [flowOpen, setFlowOpen] = useState(false);
   const [status, reloadStatus] = useThisMacStatus(
     actions.thisMacStatus,
@@ -124,6 +161,7 @@ export function RunnerSetup({
   const flowTitle = useRef<HTMLSpanElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
   const opened = useRef(false);
+  const directFocus = useFocusOnSwitch(direct.open);
 
   useEffect(() => {
     if (flowOpen) {
@@ -134,6 +172,12 @@ export function RunnerSetup({
       continueRef.current?.focus();
     }
   }, [flowOpen, reloadStatus]);
+
+  if (direct.open) {
+    return (
+      <DirectEntryView direct={direct} titleRef={directFocus.titleRef} manualForm={manualForm} />
+    );
+  }
 
   return (
     <div {...stylex.props(styles.stack)}>
@@ -151,19 +195,55 @@ export function RunnerSetup({
         />
       ) : (
         <Chooser
-          choice={choice}
-          onChoice={setChoice}
           name={status.kind === "ready" ? status.status.name : null}
           ready={status.kind === "ready"}
           continueRef={continueRef}
           primary={primary}
           onContinue={() => setFlowOpen(true)}
+          direct={direct}
+          directLinkRef={directFocus.linkRef}
         />
       )}
-      <Disclosure summary={t("choose.manual")}>
-        <Text variant="body">{t("choose.manualBody")}</Text>
-        {manualForm}
-      </Disclosure>
+    </div>
+  );
+}
+
+function DirectEntryView({
+  direct,
+  titleRef,
+  manualForm,
+}: {
+  direct: DirectEntry;
+  titleRef: RefObject<HTMLSpanElement | null>;
+  manualForm: ReactNode;
+}) {
+  const t = useTranslations("runnerSetup");
+  return (
+    <div {...stylex.props(styles.stack)}>
+      <span>
+        <TextLink
+          href={direct.closeHref}
+          tone="action"
+          onClick={(event) => followLink(event, () => direct.onChange(false))}
+        >
+          <span aria-hidden>←</span>
+          {t("direct.back")}
+        </TextLink>
+      </span>
+      <div {...stylex.props(styles.group)}>
+        <Text variant="title">
+          <span ref={titleRef} tabIndex={-1} {...stylex.props(focusStyles.ring)}>
+            {t("direct.title")}
+          </span>
+        </Text>
+        <Text variant="body">{t("direct.body")}</Text>
+      </div>
+      <Card label={t("direct.title")}>
+        <div {...stylex.props(styles.stack)}>
+          <StepChips steps={DIRECT_CHIPS} label={t("direct.stepsLabel")} />
+          {manualForm}
+        </div>
+      </Card>
     </div>
   );
 }
@@ -219,33 +299,33 @@ function ServerFacts({ status, onRetry }: { status: StatusState; onRetry: () => 
 }
 
 function Chooser({
-  choice,
-  onChoice,
   name,
   ready,
   continueRef,
   primary,
   onContinue,
+  direct,
+  directLinkRef,
 }: {
-  choice: SetupChoice;
-  onChoice: (choice: SetupChoice) => void;
   name: string | null;
   ready: boolean;
   continueRef: RefObject<HTMLButtonElement | null>;
   primary: boolean;
   onContinue: () => void;
+  direct: DirectEntry;
+  directLinkRef: RefObject<HTMLAnchorElement | null>;
 }) {
-  const t = useTranslations("runnerSetup.choose");
+  const t = useTranslations("runnerSetup");
   const questionId = useId();
   return (
     <div {...stylex.props(styles.group)}>
       <div {...stylex.props(styles.questionRow)}>
         <Text variant="title" id={questionId}>
-          {t("question")}
+          {t("choose.question")}
         </Text>
         <span aria-hidden {...stylex.props(styles.inline)}>
-          <Chip tone="accent">{t("you")}</Chip>
-          <Chip>{t("ganger")}</Chip>
+          <Chip tone="accent">{t("choose.you")}</Chip>
+          <Chip>{t("choose.ganger")}</Chip>
         </span>
       </div>
       <RadioGroup labelledBy={questionId}>
@@ -254,71 +334,85 @@ function Chooser({
             key={option}
             name="runner-setup"
             value={option}
-            checked={choice === option}
-            onCheck={() => onChoice(option)}
+            checked={option === "thisMac"}
+            disabled={option !== "thisMac"}
+            onCheck={() => undefined}
           >
             <span {...stylex.props(styles.optionBody)}>
-              <Text variant="ui" tone="strong">
-                {option === "thisMac"
-                  ? name === null
-                    ? t("thisMacFallback")
-                    : t("thisMac", { name })
-                  : t(option)}
+              <span {...stylex.props(styles.inline)}>
+                <Text variant="ui" tone={option === "thisMac" ? "strong" : "disabled"}>
+                  {option === "thisMac"
+                    ? name === null
+                      ? t("choose.thisMacFallback")
+                      : t("choose.thisMac", { name })
+                    : t(`choose.${option}`)}
+                </Text>
+                {option === "thisMac" ? null : <Chip>{t("choose.soon")}</Chip>}
+              </span>
+              <Text variant="meta" {...(option === "thisMac" ? {} : { tone: "disabled" as const })}>
+                {t(`choose.${option}Body`)}
               </Text>
-              <Text variant="meta">{t(`${option}Body`)}</Text>
-              {option !== "thisMac" ? (
-                <Text variant="meta">{t("soon")}</Text>
-              ) : choice === option ? (
-                <ThisMacChips />
+              {option === "thisMac" ? (
+                <span {...stylex.props(styles.chipRow)}>
+                  <StepChips steps={THIS_MAC_CHIPS} label={t("choose.stepsLabel")} />
+                  <Text variant="meta">{t("choose.about")}</Text>
+                </span>
               ) : null}
             </span>
           </RadioOption>
         ))}
       </RadioGroup>
-      {choice === "thisMac" ? (
-        <Actions>
-          <Button
-            ref={continueRef}
-            variant={primary ? "primary" : "secondary"}
-            disabled={!ready}
-            onClick={onContinue}
+      <div {...stylex.props(styles.actionRow)}>
+        <Button
+          ref={continueRef}
+          variant={primary ? "primary" : "secondary"}
+          disabled={!ready}
+          onClick={onContinue}
+        >
+          {t("choose.continue")}
+        </Button>
+        <span {...stylex.props(styles.inline)}>
+          <Text variant="meta">{t("choose.directHint")}</Text>
+          <TextLink
+            ref={directLinkRef}
+            href={direct.openHref}
+            tone="action"
+            onClick={(event) => followLink(event, () => direct.onChange(true))}
           >
-            {t("continue")}
-          </Button>
-        </Actions>
-      ) : null}
+            {t("choose.directLink")}
+            <span aria-hidden>→</span>
+          </TextLink>
+        </span>
+      </div>
     </div>
   );
 }
 
-function ThisMacChips() {
-  const t = useTranslations("runnerSetup");
+function StepChips({ steps, label }: { steps: readonly ChipStep[]; label: string }) {
+  const t = useTranslations("runnerSetup.chips");
   return (
-    <span {...stylex.props(styles.chipRow)}>
-      <ol aria-label={t("choose.stepsLabel")} {...stylex.props(styles.chips)}>
-        {CHIP_STEPS.map((step, i) => {
-          const name = t(`chips.${step.key}`);
-          return (
-            <li key={step.key} {...stylex.props(styles.chipItem)}>
-              {i === 0 ? null : (
-                <span aria-hidden {...stylex.props(styles.arrow)}>
-                  <Text variant="meta">→</Text>
-                </span>
-              )}
-              {step.you ? (
-                <Chip tone="accent">{t("chips.you", { step: name })}</Chip>
-              ) : (
-                <Chip>
-                  <VisuallyHidden>{t("chips.ganger", { step: name })}</VisuallyHidden>
-                  <span aria-hidden>{name}</span>
-                </Chip>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-      <Text variant="meta">{t("choose.about")}</Text>
-    </span>
+    <ol aria-label={label} {...stylex.props(styles.chips)}>
+      {steps.map((step, i) => {
+        const name = t(step.key);
+        return (
+          <li key={step.key} {...stylex.props(styles.chipItem)}>
+            {i === 0 ? null : (
+              <span aria-hidden {...stylex.props(styles.arrow)}>
+                <Text variant="meta">→</Text>
+              </span>
+            )}
+            {step.you ? (
+              <Chip tone="accent">{t("you", { step: name })}</Chip>
+            ) : (
+              <Chip>
+                <VisuallyHidden>{t("ganger", { step: name })}</VisuallyHidden>
+                <span aria-hidden>{name}</span>
+              </Chip>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -616,5 +710,12 @@ const styles = stylex.create({
   },
   chipItem: { display: "inline-flex", alignItems: "center", gap: space.s1 },
   arrow: { display: "inline-flex" },
+  actionRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.s3,
+  },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
 });

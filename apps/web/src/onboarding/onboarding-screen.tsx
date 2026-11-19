@@ -94,13 +94,12 @@ import {
   runnerPassed,
   runnerProblems,
   serviceInstallCommand,
-  serviceInstallTemplate,
   stepPassed,
 } from "./model";
 import type { OnboardingStep } from "./model";
 import { createSerialSaver } from "./serial-save";
 import { RunnerSetup } from "../runner-setup/runner-setup";
-import type { RunnerSetupActions } from "../runner-setup/runner-setup";
+import type { DirectEntry, RunnerSetupActions } from "../runner-setup/runner-setup";
 
 export interface WorkspaceSetupInput {
   name: string;
@@ -122,6 +121,7 @@ export interface OnboardingScreenProps {
   onStep: (index: number) => void;
   onFinish: () => void;
   actions: OnboardingActions;
+  direct: DirectEntry;
 }
 
 export function OnboardingScreen({
@@ -131,6 +131,7 @@ export function OnboardingScreen({
   onStep,
   onFinish,
   actions,
+  direct,
 }: OnboardingScreenProps) {
   const t = useTranslations("onboarding");
   const step: OnboardingStep = ONBOARDING_STEPS[index] ?? "tracker";
@@ -176,6 +177,7 @@ export function OnboardingScreen({
             trackerProjects={trackerProjects}
             actions={actions}
             workerSilent={workerSilent}
+            direct={direct}
           />
         </div>
         <div {...stylex.props(styles.footer)}>
@@ -366,12 +368,14 @@ function StepBody({
   trackerProjects,
   actions,
   workerSilent,
+  direct,
 }: {
   step: OnboardingStep;
   page: SettingsPage;
   trackerProjects: ConnectionProjects[];
   actions: OnboardingActions;
   workerSilent: boolean;
+  direct: DirectEntry;
 }) {
   switch (step) {
     case "tracker":
@@ -380,7 +384,12 @@ function StepBody({
       return <GitHubStep saved={page.install.githubToken} actions={actions} />;
     case "runner":
       return (
-        <RunnerStep runners={page.install.runners} actions={actions} workerSilent={workerSilent} />
+        <RunnerStep
+          runners={page.install.runners}
+          actions={actions}
+          workerSilent={workerSilent}
+          direct={direct}
+        />
       );
     case "workspace":
       return <WorkspaceStep page={page} trackerProjects={trackerProjects} actions={actions} />;
@@ -685,10 +694,12 @@ function RunnerStep({
   runners,
   actions,
   workerSilent,
+  direct,
 }: {
   runners: RunnerSettingsView[];
   actions: OnboardingActions;
   workerSilent: boolean;
+  direct: DirectEntry;
 }) {
   const added = useFocusWhenAdded(runners.length);
   const [registeredId, setRegisteredId] = useState<string | null>(null);
@@ -709,11 +720,9 @@ function RunnerStep({
         <RunnerSetup
           actions={actions}
           manualForm={
-            <>
-              <RunnerBefore />
-              <RunnerForm runner={null} actions={actions} primary={false} />
-            </>
+            <RunnerForm runner={null} actions={actions} primary={runners.length === 0} direct />
           }
+          direct={direct}
           primary={runners.length === 0}
           onRegistered={setRegisteredId}
         />
@@ -902,19 +911,6 @@ function RunnerPushWarning({ push }: { push: PushSummary | null }) {
       <Text variant="body">{t(`${kind}Body`)}</Text>
       <PushProblems summary={push} />
     </div>
-  );
-}
-
-function RunnerBefore() {
-  const t = useTranslations("onboarding.runner");
-  return (
-    <PanelBlock title={t("beforeTitle")}>
-      <div {...stylex.props(styles.stack)}>
-        <Text variant="body">{t("beforeService")}</Text>
-        <Command value={serviceInstallTemplate(t("pathPlaceholder"))} />
-        <Text variant="body">{t("beforeAuth")}</Text>
-      </div>
-    </PanelBlock>
   );
 }
 

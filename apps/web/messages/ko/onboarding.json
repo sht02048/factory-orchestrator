@@ -82,14 +82,10 @@
     "tokenPlaceholder": "github_pat_…"
   },
   "runner": {
-    "beforeTitle": "등록하기 전에 러너에서 해 둘 일",
     "checkTitle": "{name} 러너",
     "ready": "{name} 러너가 준비됐어요",
     "target": "{sshTarget} · capacity {capacity}",
     "checklist": "확인 결과",
-    "beforeService": "Orca 상시 서비스를 설치해요. 러너가 꺼졌다 켜져도 Orca가 다시 떠요.",
-    "pathPlaceholder": "orca 절대 경로",
-    "beforeAuth": "비대화형 ssh 세션에서도 GitHub에 push할 수 있게 인증해 둬요. 에이전트가 러너에서 push하고 PR을 열어야 PR 상태를 정할 수 있어요.",
     "waiting": "확인 결과를 기다리고 있어요.",
     "offline": "러너에 닿지 않았어요. ssh 대상과 orca 실행 파일 경로를 확인하고 저장하면 다시 확인해요.",
     "serviceTitle": "Orca 상시 서비스가 없어요",

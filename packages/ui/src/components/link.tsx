@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import type { MouseEventHandler, ReactNode } from "react";
+import type { MouseEventHandler, ReactNode, Ref } from "react";
 import type { StyleArg } from "../cx";
 import { colors, fontWeight, space } from "../tokens.stylex";
 import { focusStyles } from "./focus";
@@ -15,12 +15,14 @@ export interface TextLinkProps {
   tone?: LinkTone;
   external?: boolean;
   onClick?: MouseEventHandler<HTMLAnchorElement>;
+  ref?: Ref<HTMLAnchorElement>;
   children: ReactNode;
 }
 
-export function TextLink({ href, tone, external, onClick, children }: TextLinkProps) {
+export function TextLink({ href, tone, external, onClick, ref, children }: TextLinkProps) {
   return (
     <a
+      {...(ref === undefined ? {} : { ref })}
       href={href}
       {...(external === true ? { target: "_blank", rel: "noreferrer" } : {})}
       {...(onClick === undefined ? {} : { onClick })}

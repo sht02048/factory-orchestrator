@@ -28,12 +28,12 @@
     "appMacBody": "그 맥의 Ganger 앱에서 버튼 하나로 등록해요.",
     "commandMac": "다른 맥 · 터미널 명령으로",
     "commandMacBody": "등록 명령 한 줄을 그 맥 터미널에 붙여 넣어요.",
-    "soon": "곧 지원해요. 지금은 아래 '직접 입력하기'로 다른 맥을 등록할 수 있어요.",
+    "soon": "곧 지원",
     "stepsLabel": "할 일 순서",
     "about": "약 1분",
     "continue": "이 방법으로 계속",
-    "manual": "직접 입력하기(ssh 설정을 이미 해 둔 경우)",
-    "manualBody": "ssh 대상, orca 경로, 자리 수를 직접 넣어요. 이렇게 등록한 러너는 이 서버 맥의 ssh 설정을 그대로 써요."
+    "directHint": "ssh 설정을 이미 해 뒀나요?",
+    "directLink": "주소 직접 입력하기"
   },
   "chips": {
     "remoteLogin": "원격 로그인 켜기",
@@ -42,7 +42,17 @@
     "github": "GitHub 정리",
     "check": "확인",
     "you": "직접 해요: {step}",
-    "ganger": "Ganger가 해요: {step}"
+    "ganger": "Ganger가 해요: {step}",
+    "sshTarget": "ssh 대상 넣기",
+    "connect": "접속 확인",
+    "findOrca": "Orca 찾기",
+    "githubCheck": "GitHub 확인"
+  },
+  "direct": {
+    "back": "맥 고르기로",
+    "title": "ssh로 닿는 맥을 직접 넣어요",
+    "body": "이미 이 서버 맥에서 비밀번호 없이 ssh로 들어갈 수 있는 맥이면, 주소만 넣으면 Ganger가 나머지를 확인해요.",
+    "stepsLabel": "할 일 순서"
   },
   "thisMac": {
     "title": "이 맥을 러너로 준비해요",

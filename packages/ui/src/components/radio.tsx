@@ -19,6 +19,7 @@ export interface RadioOptionProps {
   checked: boolean;
   onCheck: () => void;
   onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
+  disabled?: boolean;
   children: ReactNode;
 }
 
@@ -28,16 +29,18 @@ export function RadioOption({
   checked,
   onCheck,
   onKeyDown,
+  disabled = false,
   children,
 }: RadioOptionProps) {
   return (
-    <label {...stylex.props(styles.option)}>
+    <label {...stylex.props(styles.option, disabled && styles.disabled)}>
       <input
         type="radio"
         name={name}
         value={value}
         checked={checked}
         onChange={onCheck}
+        disabled={disabled}
         {...(onKeyDown === undefined ? {} : { onKeyDown })}
         {...stylex.props(styles.radio)}
       />
@@ -63,6 +66,11 @@ const styles = stylex.create({
     },
     color: colors.textPrimary,
     cursor: "pointer",
+  },
+  disabled: {
+    backgroundColor: "transparent",
+    color: colors.textDisabled,
+    cursor: "default",
   },
   radio: {
     flexShrink: 0,

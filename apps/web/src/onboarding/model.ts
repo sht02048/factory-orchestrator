@@ -154,8 +154,3 @@ export function shellQuote(value: string): string {
 export function serviceInstallCommand(orcaPath: string): string {
   return serviceInstallArgs(orcaPath).map(shellQuote).join(" ");
 }
-
-export function serviceInstallTemplate(placeholder: string): string {
-  const [, ...args] = serviceInstallArgs(`<${placeholder}>`);
-  return ["orca", ...args].join(" ");
-}

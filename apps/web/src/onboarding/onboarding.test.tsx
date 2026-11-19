@@ -129,6 +129,7 @@ function render(
       onStep={() => {}}
       onFinish={() => {}}
       actions={noopActions}
+      direct={{ open: false, openHref: "", closeHref: "", onChange: () => {} }}
     />,
     { ...onboardingMessages, ...runnerSetupMessages },
   );

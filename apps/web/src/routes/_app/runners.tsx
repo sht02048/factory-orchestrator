@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
 import { runnersMessages } from "../../runners/messages";
 import { RunnerSetup } from "../../runner-setup/runner-setup";
+import type { DirectEntry } from "../../runner-setup/runner-setup";
 import { runnerSetupMessages } from "../../runner-setup/messages";
 import { useRunnerSetupActions } from "../../runner-setup/use-runner-setup-actions";
 import { RunnersScreen } from "../../runners/runners-screen";
@@ -27,7 +28,10 @@ export function reloadOnEnter({ cause }: { cause: "preload" | "enter" | "stay" }
 }
 
 export const Route = createFileRoute("/_app/runners")({
-  validateSearch: z.object({ sel: z.string().optional() }),
+  validateSearch: z.object({
+    sel: z.string().optional(),
+    direct: z.boolean().optional().catch(undefined),
+  }),
   loader: () => getRunnersPage(),
   shouldReload: reloadOnEnter,
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
@@ -36,7 +40,8 @@ export const Route = createFileRoute("/_app/runners")({
 
 function RunnersRoute() {
   const page = Route.useLoaderData();
-  const { sel, ws } = Route.useSearch();
+  const search = Route.useSearch();
+  const { sel, ws } = search;
   const navigate = Route.useNavigate();
   const router = useRouter();
   const actions = useMemo(
@@ -57,8 +62,20 @@ function RunnersRoute() {
   const settingsActions = useSettingsActions();
   const setupActions = useRunnerSetupActions();
   const select = (id: string) => {
-    void navigate({ search: (prev) => ({ ...prev, sel: id }), replace: true });
+    void navigate({ search: (prev) => ({ ...prev, sel: id, direct: undefined }), replace: true });
   };
+  const direct = useMemo(
+    (): DirectEntry => ({
+      open: search.direct === true,
+      openHref: router.buildLocation({ to: "/runners", search: { ...search, direct: true } }).href,
+      closeHref: router.buildLocation({ to: "/runners", search: { ...search, direct: undefined } })
+        .href,
+      onChange: (open) => {
+        void navigate({ search: (prev) => ({ ...prev, direct: open ? true : undefined }) });
+      },
+    }),
+    [router, navigate, search],
+  );
   const knownBeforeAdd = useRef<ReadonlySet<string> | null>(null);
   const addActions = useMemo(
     (): SettingsActions => ({
@@ -78,7 +95,10 @@ function RunnersRoute() {
     const added = page.runners.find((runner) => !known.has(runner.id));
     if (added === undefined) return;
     knownBeforeAdd.current = null;
-    void navigate({ search: (prev) => ({ ...prev, sel: added.id }), replace: true });
+    void navigate({
+      search: (prev) => ({ ...prev, sel: added.id, direct: undefined }),
+      replace: true,
+    });
   }, [page.runners, navigate]);
   return (
     <ScreenMessages messages={{ ...runnersMessages, ...settingsMessages, ...runnerSetupMessages }}>
@@ -91,7 +111,8 @@ function RunnersRoute() {
         setup={
           <RunnerSetup
             actions={setupActions}
-            manualForm={<RunnerForm runner={null} actions={addActions} primary={false} />}
+            manualForm={<RunnerForm runner={null} actions={addActions} primary={false} direct />}
+            direct={direct}
             onOpenRunner={select}
             primary={false}
           />

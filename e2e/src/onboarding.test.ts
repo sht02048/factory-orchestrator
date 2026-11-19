@@ -132,11 +132,11 @@ describe("온보딩 포커스(브라우저, 0052)", () => {
 
   it("첫 러너를 등록하면 포커스가 body 가 아니라 러너 확인 제목에 간다", async () => {
     await open(3);
-    await page.getByText(runnerSetup.choose.manual).click();
+    await page.getByRole("link", { name: runnerSetup.choose.directLink }).click();
     await page.getByLabel(settings.runners.name).fill("runner-a");
     await page.getByLabel(settings.runners.sshTarget).fill("ganger@runner-a.example.com");
     await page.getByLabel(settings.runners.orcaPath).fill("/opt/orca/bin/orca");
-    await page.getByRole("button", { name: settings.runners.add }).click();
+    await page.getByRole("button", { name: settings.runners.direct.submit }).click();
 
     await expect.poll(focused).toBe("runner-a 러너");
   });

@@ -119,8 +119,7 @@ describe("이 맥을 러너로(브라우저, 0095)", () => {
     expect(
       await page.getByRole("radio", { name: /이 맥\(studio-mac\)에서 돌리기/ }).isChecked(),
     ).toBe(true);
-    const manual = page.locator("details").filter({ hasText: runnerSetup.choose.manual });
-    expect(await manual.evaluate((el) => el.hasAttribute("open"))).toBe(false);
+    expect(await page.locator("details").count()).toBe(0);
 
     await page.getByRole("button", { name: runnerSetup.choose.continue }).click();
     await expect.poll(focused).toBe(thisMac.title);
@@ -152,15 +151,74 @@ describe("이 맥을 러너로(브라우저, 0095)", () => {
     });
   });
 
-  it("400px 에서도 고르기 화면이 가로로 넘치지 않는다", async () => {
+  it("주소 직접 입력하기는 주소로 화면을 바꾸고, 뒤로 가기·새로 고침·맥 고르기로에 맞게 포커스를 옮긴다", async () => {
     resetFakeThisMac();
-    await page.setViewportSize({ width: 400, height: 844 });
     await page.goto("/onboarding?step=3");
     await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
     await page.getByText(runnerSetup.choose.question).waitFor();
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - window.innerWidth,
+    for (const name of [/다른 맥 · 그 맥에 Ganger 앱이 있어요/, /다른 맥 · 터미널 명령으로/]) {
+      expect(await page.getByRole("radio", { name }).isDisabled()).toBe(true);
+    }
+
+    const link = page.getByRole("link", { name: runnerSetup.choose.directLink });
+    await link.click();
+    await page.waitForURL(/direct=true/);
+    await expect.poll(focused).toBe(runnerSetup.direct.title);
+    expect(await page.getByText(runnerSetup.choose.question).count()).toBe(0);
+
+    const target = page.getByRole("textbox", { name: "ssh 대상" });
+    await target.fill("dev@mac-mini.example.com");
+    expect(await page.getByRole("textbox", { name: "러너 이름" }).inputValue()).toBe("mac-mini");
+    await page.getByText("ssh -o BatchMode=yes dev@mac-mini.example.com true").waitFor();
+    expect(await page.getByRole("textbox", { name: "orca 실행 파일 경로" }).inputValue()).toBe(
+      "/Applications/Orca.app/Contents/Resources/bin/orca",
     );
-    expect(overflow).toBeLessThanOrEqual(0);
+
+    await page.goBack();
+    await page.getByText(runnerSetup.choose.question).waitFor();
+    await expect.poll(focused).toBe(runnerSetup.choose.directLink + "→");
+
+    await page.goForward();
+    await page.getByText(runnerSetup.direct.title).waitFor();
+    await page.reload();
+    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+    await page.getByText(runnerSetup.direct.title).waitFor();
+
+    await page.getByRole("link", { name: runnerSetup.direct.back }).click();
+    await page.waitForURL((url) => !url.search.includes("direct"));
+    await expect.poll(focused).toBe(runnerSetup.choose.directLink + "→");
   });
+
+  it("직접 입력으로 등록하면 그 러너가 아래에 나타난다", async () => {
+    resetFakeThisMac();
+    await page.goto("/onboarding?step=3&direct=true");
+    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+    await page.getByRole("textbox", { name: "ssh 대상" }).fill("dev@direct-mac.example.com");
+    await page.getByRole("button", { name: "확인하고 등록" }).click();
+    await expect
+      .poll(() => listRunners(db).some((runner) => runner.name === "direct-mac"))
+      .toBe(true);
+    const runner = listRunners(db).find((r) => r.name === "direct-mac");
+    expect(runner?.config).toMatchObject({
+      sshTarget: "dev@direct-mac.example.com",
+      orcaPath: "/Applications/Orca.app/Contents/Resources/bin/orca",
+    });
+    expect(runner?.config).not.toHaveProperty("access");
+  });
+
+  for (const direct of [false, true]) {
+    it(`400px 에서도 ${direct ? "직접 입력" : "고르기"} 화면이 가로로 넘치지 않는다`, async () => {
+      resetFakeThisMac();
+      await page.setViewportSize({ width: 400, height: 844 });
+      await page.goto(`/onboarding?step=3${direct ? "&direct=true" : ""}`);
+      await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+      await page
+        .getByText(direct ? runnerSetup.direct.title : runnerSetup.choose.question)
+        .waitFor();
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - window.innerWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+    });
+  }
 });
