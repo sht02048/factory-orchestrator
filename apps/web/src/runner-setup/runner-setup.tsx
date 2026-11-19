@@ -223,10 +223,10 @@ function DirectEntryView({
       <span>
         <TextLink
           href={direct.closeHref}
-          tone="action"
+          tone="quiet"
           onClick={(event) => followLink(event, () => direct.onChange(false))}
         >
-          <span aria-hidden>←</span>
+          <span aria-hidden>{"← "}</span>
           {t("direct.back")}
         </TextLink>
       </span>

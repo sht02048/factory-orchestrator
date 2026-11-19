@@ -169,7 +169,9 @@ describe("이 맥을 러너로(브라우저, 0095)", () => {
     const target = page.getByRole("textbox", { name: "ssh 대상" });
     await target.fill("dev@mac-mini.example.com");
     expect(await page.getByRole("textbox", { name: "러너 이름" }).inputValue()).toBe("mac-mini");
-    await page.getByText("ssh -o BatchMode=yes dev@mac-mini.example.com true").waitFor();
+    await page.getByText("ssh -o BatchMode=yes -- dev@mac-mini.example.com true").waitFor();
+    expect(await page.getByRole("button", { name: "확인하고 등록" }).isEnabled()).toBe(true);
+    expect(await page.getByRole("button", { name: "명령 복사" }).isEnabled()).toBe(true);
     expect(await page.getByRole("textbox", { name: "orca 실행 파일 경로" }).inputValue()).toBe(
       "/Applications/Orca.app/Contents/Resources/bin/orca",
     );

@@ -51,6 +51,7 @@ import { useAgentName, usePrerequisiteName } from "../labels";
 import { PushProblems } from "../push-check";
 import { browserClipboard, copyText } from "./clipboard";
 import { DEFAULT_ORCA_PATH } from "@ganger/runner-orca/config";
+import { shellQuote } from "../onboarding/model";
 import { useStatusName } from "../status";
 import {
   INSTALL_ITEMS,
@@ -1674,11 +1675,16 @@ function RunnersPanel({
 
 export function nameFromSshTarget(sshTarget: string): string {
   const host = sshTarget.trim().split("@").at(-1) ?? "";
-  return host.split(/[.:]/u)[0] ?? "";
+  if (host.startsWith("["))
+    return host.slice(1, host.indexOf("]") === -1 ? undefined : host.indexOf("]"));
+  if ((host.match(/:/gu)?.length ?? 0) > 1) return host;
+  const withoutPort = host.split(":")[0] ?? "";
+  if (/^\d+(\.\d+){3}$/u.test(withoutPort)) return withoutPort;
+  return withoutPort.split(".")[0] ?? "";
 }
 
 export function sshCheckCommand(sshTarget: string): string {
-  return `ssh -o BatchMode=yes ${sshTarget} true`;
+  return ["ssh", "-o", "BatchMode=yes", "--", sshTarget, "true"].map(shellQuote).join(" ");
 }
 
 export function RunnerForm({
@@ -1734,6 +1740,7 @@ export function RunnerForm({
   const capacityField = (
     <Field
       label={direct ? t("runners.direct.capacity") : t("runners.capacity")}
+      {...(direct ? { description: t("runners.direct.capacityDescription") } : {})}
       error={
         capacityOk || !validation.isTouched("capacity") ? undefined : t("runners.capacityInvalid")
       }
@@ -1846,7 +1853,8 @@ export function RunnerForm({
 
 function SshCheckCommand({ sshTarget }: { sshTarget: string }) {
   const t = useTranslations("settings.runners.direct");
-  const command = sshCheckCommand(sshTarget === "" ? t("targetPlaceholder") : sshTarget);
+  const empty = sshTarget === "";
+  const command = sshCheckCommand(empty ? t("targetPlaceholder") : sshTarget);
   const copy = () => {
     void copyText(command, browserClipboard()).then((copied) =>
       showToast(copied ? t("copied") : t("copyFailed")),
@@ -1859,7 +1867,7 @@ function SshCheckCommand({ sshTarget }: { sshTarget: string }) {
           {command}
         </CodeBlock>
         <Actions>
-          <Button variant="secondary" onClick={copy}>
+          <Button variant="ghost" disabled={empty} onClick={copy}>
             {t("copy")}
           </Button>
         </Actions>

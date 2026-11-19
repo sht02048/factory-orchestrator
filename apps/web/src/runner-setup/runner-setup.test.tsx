@@ -68,7 +68,7 @@ describe("러너 고르기 화면(0095)", () => {
     const shown = text(html);
     expect(shown.match(/곧 지원/g)).toHaveLength(2);
     expect(shown).toContain("다른 맥 · 터미널 명령으로 곧 지원");
-    expect(shown).not.toContain("곧 지원해요");
+    expect(shown).not.toContain("지금은 아래");
     expect(shown).not.toContain("직접 입력하기'로");
   });
 

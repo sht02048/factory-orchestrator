@@ -1167,8 +1167,8 @@ describe("직접 입력 러너 폼(0095 M2b)", () => {
   );
   const shown = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
-  it("ssh 대상을 맨 앞에 두고, 이름·동시에 돌릴 런·orca 경로가 뒤따른다", () => {
-    const order = ["ssh 대상", "러너 이름", "동시에 돌릴 런", "orca 실행 파일 경로"].map((label) =>
+  it("ssh 대상을 맨 앞에 두고, 이름·자리·orca 경로가 뒤따른다", () => {
+    const order = ["ssh 대상", "러너 이름", "자리", "orca 실행 파일 경로"].map((label) =>
       shown.indexOf(label),
     );
     expect(order.every((at) => at >= 0)).toBe(true);
@@ -1183,8 +1183,8 @@ describe("직접 입력 러너 폼(0095 M2b)", () => {
 
   it("먼저 돌려 볼 ssh 명령과 복사 버튼, 확인하고 등록 버튼을 보인다", () => {
     expect(shown).toContain("이 서버 맥에서 먼저 확인해 볼 수 있어요");
-    expect(shown).toContain("ssh -o BatchMode=yes user@host true");
-    expect(shown).toContain("명령 복사");
+    expect(shown).toContain("ssh -o BatchMode=yes -- user@host true");
+    expect(html).toMatch(/data-variant="ghost"[^>]*disabled=""[^>]*>명령 복사/);
     expect(html).toMatch(/type="submit"[^>]*>확인하고 등록/);
   });
 
@@ -1193,11 +1193,18 @@ describe("직접 입력 러너 폼(0095 M2b)", () => {
     expect(nameFromSshTarget("  studio ")).toBe("studio");
     expect(nameFromSshTarget("me@runner-a:2222")).toBe("runner-a");
     expect(nameFromSshTarget("")).toBe("");
+    expect(nameFromSshTarget("dev@192.168.0.5")).toBe("192.168.0.5");
+    expect(nameFromSshTarget("dev@10.0.0.5:2222")).toBe("10.0.0.5");
+    expect(nameFromSshTarget("dev@[fe80::1]:22")).toBe("fe80::1");
+    expect(nameFromSshTarget("fe80::1")).toBe("fe80::1");
   });
 
   it("먼저 돌려 볼 명령은 입력한 대상을 그대로 넣는다", () => {
     expect(sshCheckCommand("dev@mac-mini.example.com")).toBe(
-      "ssh -o BatchMode=yes dev@mac-mini.example.com true",
+      "ssh -o BatchMode=yes -- dev@mac-mini.example.com true",
+    );
+    expect(sshCheckCommand("my mac; rm -rf ~")).toBe(
+      "ssh -o BatchMode=yes -- 'my mac; rm -rf ~' true",
     );
   });
 
