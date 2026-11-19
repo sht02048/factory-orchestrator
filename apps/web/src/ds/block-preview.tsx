@@ -100,7 +100,7 @@ function ShellPreview({ titleBarHidden }: { titleBarHidden: boolean }) {
         <Text variant="label">{titleBarHidden ? t("shell.desktop") : t("shell.web")}</Text>
       </figcaption>
       <WindowChrome titleBarHidden={titleBarHidden}>
-        <div {...stylex.props(styles.frame)}>
+        <div inert={titleBarHidden} {...stylex.props(styles.frame)}>
           <AppFrame
             fill={false}
             rail={

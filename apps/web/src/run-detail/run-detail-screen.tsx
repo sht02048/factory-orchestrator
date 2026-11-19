@@ -844,7 +844,7 @@ const styles = stylex.create({
     gap: space.s6,
     maxWidth: size.detailPageWidth,
     paddingTop: space.s6,
-    paddingInline: space.s8,
+    paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
     paddingBottom: space.s10,
   },
   crumb: { display: "flex" },

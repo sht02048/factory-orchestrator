@@ -12,9 +12,8 @@ import {
   radius,
   size,
   space,
+  breakpoints,
 } from "../tokens.stylex";
-
-const NARROW_SCREEN = "@media (max-width: 600px)";
 
 export interface SplitViewProps {
   list: ReactNode;
@@ -208,7 +207,7 @@ const styles = stylex.create({
     minWidth: 0,
     overflow: "auto",
     paddingTop: space.s8,
-    paddingInline: space.s8,
+    paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
     paddingBottom: space.s10,
   },
   panelEditor: { backgroundColor: colors.bgCanvas },
@@ -218,11 +217,17 @@ const styles = stylex.create({
     backgroundColor: colors.bgPanel,
   },
   screen: {
-    display: "grid",
+    display: { default: "grid", [breakpoints.narrowScreen]: "block" },
     gridTemplateRows: "auto minmax(0, 1fr)",
     minWidth: 0,
+    overflow: { default: null, [breakpoints.narrowScreen]: "auto" },
   },
-  screenBody: { minWidth: 0, minHeight: 0, overflow: "auto" },
+  screenBody: {
+    height: { default: null, [breakpoints.narrowScreen]: "100%" },
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "auto",
+  },
   pageHead: {
     display: "flex",
     flexWrap: "wrap",
@@ -231,7 +236,7 @@ const styles = stylex.create({
     rowGap: space.s2,
     minHeight: size.titleBar,
     paddingBlock: space.s2,
-    paddingInline: { default: space.s8, [NARROW_SCREEN]: space.s4 },
+    paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: colors.borderSubtle,

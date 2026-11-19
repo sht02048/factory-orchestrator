@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
-import { size } from "../tokens.stylex";
+import { colors, size } from "../tokens.stylex";
 import { windowRegion } from "../window-frame";
 
 const TitleBarHiddenContext = createContext(false);
@@ -31,9 +31,10 @@ export function WindowDragStrip() {
 
 const styles = stylex.create({
   strip: {
-    position: "fixed",
+    position: "sticky",
     top: 0,
-    insetInline: 0,
+    zIndex: 1,
     height: size.titleBar,
+    backgroundColor: colors.bgCanvas,
   },
 });
