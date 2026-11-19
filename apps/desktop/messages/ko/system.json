@@ -38,16 +38,29 @@
     "settings": "Settings"
   },
   "notifications": {
-    "question": { "title": "Question", "body": "{ticket} 에이전트가 답을 기다려요." },
+    "question": {
+      "title": "Question",
+      "body": "{ticket} 에이전트가 답을 기다려요."
+    },
     "permission": {
       "title": "Permission",
       "body": "{ticket} 에이전트가 허용을 기다려요. 러너 화면에서 허용해 주세요."
     },
-    "humanCheck": { "title": "Human Check", "body": "{ticket} PR 을 확인해 주세요." },
-    "runnerOffline": { "title": "Runner Issue", "body": "{runner} 러너가 Offline 이에요." },
+    "humanCheck": {
+      "title": "Human Check",
+      "body": "{ticket} PR 을 확인해 주세요."
+    },
+    "runnerOffline": {
+      "title": "Runner Issue",
+      "body": "{runner} 러너가 Offline 이에요."
+    },
     "versionDiffers": {
       "title": "서버 버전이 앱과 달라요",
       "body": "이 기계의 서비스는 {server}, 앱은 {app}이에요. 서비스를 다시 설치하면 맞출 수 있어요."
+    },
+    "runnerEnrollment": {
+      "title": "이 맥을 러너로 등록할까요?",
+      "body": "{server}의 Ganger가 이 맥에서 에이전트를 돌리려고 해요. 눌러서 확인해요."
     }
   }
 }

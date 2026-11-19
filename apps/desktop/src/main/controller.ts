@@ -25,6 +25,16 @@ import { openLog } from "../core/open-log.js";
 import { connectAddress, reopenSaved, savedFromFound } from "../core/remote.js";
 import type { SavedServer } from "../core/remote.js";
 import type { SettingsStore } from "../core/settings.js";
+import { RunnerEnrollmentFlow } from "../core/runner-enrollment.js";
+import type { EnrollmentState } from "../core/runner-enrollment.js";
+import {
+  OFFER_POLL_MS,
+  acceptOffer,
+  fetchOffer,
+  isServerMac,
+  runSetupScript,
+} from "../core/runner-offer.js";
+import { SHARING_SETTINGS_URL } from "@ganger/app/runner-setup/model";
 import { ServerWatch } from "../core/watch.js";
 import type { WatchState } from "../core/watch.js";
 import type { FindResult, ViewState } from "../shared/view.js";
@@ -62,6 +72,8 @@ export class Controller {
   private diffUrl: string | undefined;
   private attentionTimer: NodeJS.Timeout | undefined;
   private remoteTimer: NodeJS.Timeout | undefined;
+  private offerTimer: NodeJS.Timeout | undefined;
+  private readonly enrollment: RunnerEnrollmentFlow;
   private found: FoundServer[] = [];
   private remote: { server: SavedServer; reachable: boolean } | undefined;
   private notifiedVersion = false;
@@ -70,6 +82,16 @@ export class Controller {
   constructor(options: ControllerOptions) {
     this.options = options;
     this.watch = new ServerWatch(options.local, { onChange: (state) => this.onWatch(state) });
+    this.enrollment = new RunnerEnrollmentFlow({
+      fetchOffer: (origin) => fetchOffer(origin),
+      acceptOffer: (origin, id) => acceptOffer(origin, id),
+      runScript: (script, onProgress) => runSetupScript(script, onProgress),
+      isServerMac: (server) =>
+        isServerMac(server, (origin, timeoutMs) => probeIdentity(origin, timeoutMs), [
+          this.options.settings.read().discoveryPort ?? DEFAULT_SERVER_PORT,
+        ]),
+      onChange: (state, previous) => this.onEnrollment(state, previous),
+    });
   }
 
   start(): void {
@@ -77,6 +99,7 @@ export class Controller {
     this.tray = new Tray(nativeImage.createFromPath(this.options.trayIcon));
     this.tray.setToolTip(t("tray.tooltip"));
     this.attentionTimer = setInterval(() => void this.pollAttention(), ATTENTION_INTERVAL_MS);
+    this.offerTimer = setInterval(() => void this.pollOffer(), OFFER_POLL_MS);
     const settings = this.options.settings.read();
     if (!this.options.openedAtLogin || settings.mode === undefined) this.showWindow();
     switch (settings.mode) {
@@ -111,6 +134,8 @@ export class Controller {
     this.quitting = true;
     this.watch.stop();
     if (this.attentionTimer !== undefined) clearInterval(this.attentionTimer);
+    if (this.offerTimer !== undefined) clearInterval(this.offerTimer);
+    this.enrollment.stop();
     this.stopRemoteRetry();
     app.quit();
   }
@@ -396,6 +421,47 @@ export class Controller {
     });
     handle("choose-mode", () => this.chooseMode());
     handle("open-log", () => this.openLog());
+    handle("enrollment-accept", () => {
+      void this.enrollment.accept();
+    });
+    handle("enrollment-cancel", () => this.enrollment.cancel());
+    handle("enrollment-close", () => this.enrollment.close());
+    handle("open-sharing", () => shell.openExternal(SHARING_SETTINGS_URL));
+  }
+
+  private pollOffer(): Promise<void> {
+    const remote =
+      this.mode === "remote" && this.remote?.reachable === true ? this.remote : undefined;
+    return this.enrollment.tick(remote?.server);
+  }
+
+  private onEnrollment(state: EnrollmentState | null, previous: EnrollmentState | null): void {
+    if (state === null) {
+      if (this.view.screen !== "runner-enrollment") return;
+      if (this.mode === "remote" && this.remote !== undefined) {
+        const path = previous?.step.phase === "registered" ? "/runners" : "/";
+        if (this.remote.reachable) this.openServer(this.remote.server.url, path);
+        else void this.openRemote(this.remote.server);
+      } else {
+        this.chooseMode();
+      }
+      return;
+    }
+    this.setView({ screen: "runner-enrollment", server: state.server, enrollment: state.step });
+    if (previous?.offerId === state.offerId) return;
+    const focused = this.window?.isFocused() === true;
+    this.showWindow();
+    if (!focused) this.notifyEnrollment(state.server);
+  }
+
+  private notifyEnrollment(server: string): void {
+    if (!Notification.isSupported()) return;
+    const notification = new Notification({
+      title: t("notifications.runnerEnrollment.title"),
+      body: t("notifications.runnerEnrollment.body", { server }),
+    });
+    notification.on("click", () => this.showWindow());
+    notification.show();
   }
 
   private openLog(): Promise<void> {
@@ -420,6 +486,7 @@ export class Controller {
     const notification = new Notification({ title, body });
     notification.on("click", () => {
       this.showWindow();
+      if (this.view.screen === "runner-enrollment") return;
       if (this.serverUrl === url || (this.serverUrl === undefined && this.diffUrl === url)) {
         this.openServer(url, attentionPath(event));
       }

@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { serviceInstallArgs } from "@ganger/runner-orca";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { renderSetupScript, setupCommand, shellLiteral } from "./setup-script.js";
+import { PROGRESS_ENV, renderSetupScript, setupCommand, shellLiteral } from "./setup-script.js";
 import type { SetupScriptInput } from "./setup-script.js";
 
 const TOKEN = "tok_Abc-123_xyz";
@@ -104,7 +104,7 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-function run(overrides: Partial<SetupScriptInput> = {}) {
+function run(overrides: Partial<SetupScriptInput> = {}, env: Record<string, string> = {}) {
   const script = renderSetupScript({
     serverUrl: "https://ganger.example.ts.net/",
     token: TOKEN,
@@ -119,7 +119,7 @@ function run(overrides: Partial<SetupScriptInput> = {}) {
   const result = spawnSync("/bin/sh", ["-s"], {
     input: script,
     encoding: "utf8",
-    env: { HOME: home, PATH: `${bin}:${system}` },
+    env: { HOME: home, PATH: `${bin}:${system}`, ...env },
   });
   return { ...result, output: `${result.stdout}${result.stderr}` };
 }
@@ -244,6 +244,83 @@ describe("setup script for another Mac", () => {
     const result = run();
     expect(result.status).toBe(1);
     expect(curlCall(0).args).toContain("problem=tailscale-missing");
+  });
+});
+
+const progressLines = (stdout: string) =>
+  stdout.split("\n").filter((line) => line.startsWith("ganger-"));
+
+describe("progress lines for the Ganger app", () => {
+  test("prints no progress lines for the terminal command", () => {
+    expect(progressLines(run().stdout)).toEqual([]);
+  });
+
+  test("prints each step without the token or the gh token", () => {
+    const result = run({}, { [PROGRESS_ENV]: "1" });
+    expect(result.status).toBe(0);
+    expect(progressLines(result.stdout)).toEqual([
+      "ganger-step:remote-login",
+      "ganger-step:key",
+      "ganger-step:service",
+      "ganger-github:done",
+      "ganger-step:github",
+      "ganger-step:report",
+    ]);
+    expect(result.output).not.toContain(TOKEN);
+    expect(result.output).not.toContain(GH_TOKEN);
+  });
+
+  test("says it waits for Remote Login and names the problem when it gives up", () => {
+    stub("nc", "exit 1");
+    const result = run({}, { [PROGRESS_ENV]: "1" });
+    expect(progressLines(result.stdout)).toEqual([
+      "ganger-step:remote-login-wait",
+      "ganger-fail:remote-login-off",
+    ]);
+  });
+
+  test("names a server refusal and an unreachable server apart", () => {
+    stub("curl", "cat >/dev/null; exit 22");
+    expect(progressLines(run({}, { [PROGRESS_ENV]: "1" }).stdout).at(-1)).toBe(
+      "ganger-fail:refused",
+    );
+    stub("curl", "cat >/dev/null; exit 7");
+    expect(progressLines(run({}, { [PROGRESS_ENV]: "1" }).stdout).at(-1)).toBe(
+      "ganger-fail:unreachable",
+    );
+  });
+
+  test("reports canceled to the server when stopped while waiting", () => {
+    stub("nc", "exit 1");
+    stub("sleep", "kill -TERM $PPID");
+    const result = run({}, { [PROGRESS_ENV]: "1" });
+    expect(result.status).toBe(130);
+    expect(progressLines(result.stdout)).toEqual([
+      "ganger-step:remote-login-wait",
+      "ganger-fail:canceled",
+    ]);
+    const report = curlCall(0);
+    expect(report.stdin).toBe(TOKEN);
+    expect(report.args).toContain("problem=canceled");
+    expect(existsSync(join(log, "curl-args-1"))).toBe(false);
+  });
+});
+
+describe("stopping while the result is being sent", () => {
+  test("lets the report to the server finish instead of dying half way", () => {
+    stub(
+      "curl",
+      [
+        `cat >"${log}/curl-stdin-0"`,
+        "kill -TERM $PPID",
+        "kill -TERM $$",
+        "printf 'Ganger: registered\\n'",
+      ].join("\n"),
+    );
+    const result = run({}, { [PROGRESS_ENV]: "1" });
+    expect(result.status).toBe(0);
+    expect(progressLines(result.stdout).at(-1)).toBe("ganger-step:report");
+    expect(result.stdout).toContain("Ganger: registered");
   });
 });
 

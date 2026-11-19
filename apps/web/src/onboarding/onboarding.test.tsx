@@ -114,6 +114,7 @@ const noopActions: OnboardingActions = {
   thisMacStatus: () => new Promise(() => undefined),
   runThisMacStep: reject,
   startEnrollment: () => new Promise(() => undefined),
+  startAppEnrollment: () => new Promise(() => undefined),
   saveWebAddress: reject,
   enrollment: reject,
   cancelEnrollment: () => Promise.resolve(),

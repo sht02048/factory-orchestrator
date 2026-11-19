@@ -3,8 +3,16 @@ import { publicKeyLineOf } from "./ganger-ssh.js";
 import type { PublicKey } from "./ganger-ssh.js";
 import { SHARING_SETTINGS_URL } from "./model.js";
 
-export const ENROLLMENT_PATH = "/api/runner-enrollment";
-export const SETUP_SCRIPT_PATH = `${ENROLLMENT_PATH}/script`;
+import {
+  ENROLLMENT_PATH,
+  PROGRESS_ENV,
+  PROGRESS_FAIL_PREFIX,
+  PROGRESS_GITHUB_PREFIX,
+  PROGRESS_STEP_PREFIX,
+  SETUP_SCRIPT_PATH,
+} from "./enrollment-protocol.js";
+
+export { ENROLLMENT_PATH, PROGRESS_ENV, SETUP_SCRIPT_PATH } from "./enrollment-protocol.js";
 export const SETUP_SCRIPT_TOKEN_PARAM = "t";
 export const SYSTEM_HOST_KEY_FILE = "/etc/ssh/ssh_host_ed25519_key.pub";
 export const SCRIPT_FILE_NAME = "ganger-runner-setup.sh";
@@ -79,6 +87,13 @@ ${settings}
 
 say() { printf '%s\\n' "$*"; }
 
+progress() {
+  [ "\${${PROGRESS_ENV}:-}" = 1 ] && printf '%s%s\\n' "$1" "$2"
+  return 0
+}
+
+step() { progress ${shellLiteral(PROGRESS_STEP_PREFIX)} "$1"; }
+
 report_failure() {
   printf '%s' "$GANGER_TOKEN" | curl -fsS -o /dev/null -X POST "$ENROLL_URL" \\
     --data-urlencode 'token@-' \\
@@ -88,6 +103,8 @@ report_failure() {
 }
 
 fail() {
+  trap - INT TERM
+  progress ${shellLiteral(PROGRESS_FAIL_PREFIX)} "$1"
   say "Ganger: $3" >&2
   report_failure "$1" "$2"
   say "Ganger: get a new command on the Ganger screen and run it again." >&2
@@ -98,8 +115,17 @@ remote_login_on() {
   nc -z -G 2 127.0.0.1 22 </dev/null >/dev/null 2>&1
 }
 
+stop_on_signal() {
+  trap - INT TERM
+  report_failure canceled ""
+  progress ${shellLiteral(PROGRESS_FAIL_PREFIX)} canceled
+  say "Ganger: stopped before this Mac was registered." >&2
+  exit 130
+}
+
 wait_for_remote_login() {
   remote_login_on && return 0
+  step remote-login-wait
   say "Remote Login is off. Opening System Settings > General > Sharing."
   say "Turn on Remote Login there. Ganger waits for it here."
   open "$SHARING_URL" </dev/null >/dev/null 2>&1 || true
@@ -179,8 +205,10 @@ setup_github() {
 }
 
 main() {
+  trap stop_on_signal INT TERM
   say "Ganger: setting up this Mac as a runner for $GANGER_URL"
   wait_for_remote_login
+  step remote-login
   say "  - Remote Login is on"
 
   orca=$(find_orca) || fail orca-not-found "" "Could not find Orca. Install the Orca app and try again."
@@ -194,6 +222,7 @@ main() {
   [ -n "$host_key" ] || fail host-key-missing "$HOST_KEY_FILE" "Could not read $HOST_KEY_FILE."
 
   authorize_ganger_key || fail authorized-keys-failed "" "Could not add the Ganger key to ~/.ssh/authorized_keys."
+  step key
   say "  - Added the Ganger key to ~/.ssh/authorized_keys"
 
   service_log=$(mktemp)
@@ -203,9 +232,12 @@ main() {
     fail service-failed "$detail" "Could not install the Orca background service: $detail"
   fi
   rm -f "$service_log"
+  step service
   say "  - Installed the Orca background service"
 
   setup_github
+  progress ${shellLiteral(PROGRESS_GITHUB_PREFIX)} "$github"
+  step github
   case "$github" in
     done) say "  - Set up GitHub sign-in for git" ;;
     gh-missing) say "  - Skipped GitHub: gh is not installed" ;;
@@ -215,6 +247,7 @@ main() {
 
   name=$(scutil --get ComputerName 2>/dev/null </dev/null || hostname -s)
   account=$(id -un)
+  trap '' INT TERM
   printf '%s' "$GANGER_TOKEN" | curl -sS --fail-with-body -X POST "$ENROLL_URL" \\
     --data-urlencode 'token@-' \\
     --data-urlencode 'outcome=ready' \\
@@ -225,8 +258,16 @@ main() {
     --data-urlencode "orcaPath=$orca" \\
     --data-urlencode "github=$github"
   sent=$?
-  [ "$sent" -eq 0 ] && exit 0
-  [ "$sent" -eq 22 ] || say "Ganger: could not reach $GANGER_URL. Check that both Macs are on the same tailnet." >&2
+  if [ "$sent" -eq 0 ]; then
+    step report
+    exit 0
+  fi
+  if [ "$sent" -eq 22 ]; then
+    progress ${shellLiteral(PROGRESS_FAIL_PREFIX)} refused
+  else
+    progress ${shellLiteral(PROGRESS_FAIL_PREFIX)} unreachable
+    say "Ganger: could not reach $GANGER_URL. Check that both Macs are on the same tailnet." >&2
+  fi
   exit 1
 }
 
