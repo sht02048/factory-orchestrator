@@ -26,7 +26,6 @@ export const Route = createFileRoute("/_app/runs")({
   }),
   loader: ({ deps }) =>
     getRunsPage({ data: { ...deps, ended: deps.ended ?? ENDED_RUNS_PAGE_SIZE } }),
-  shouldReload: false,
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: RunsRoute,
 });
