@@ -22,6 +22,7 @@ import {
   linkStyles,
   NoticeLayout,
   RemovableChip,
+  SegmentedTabs,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useRef } from "react";
@@ -33,16 +34,24 @@ import { runStatus, useStatusName } from "../status";
 import type { WorkspaceSummary } from "../shell/model";
 import {
   ENDED_RUNS_PAGE_SIZE,
-  RUN_FILTERS,
+  RUN_GROUP_FILTERS,
+  RUN_STATUS_FILTERS,
   elapsedMs,
-  filterKeyOf,
+  isGroupFilter,
   matchesFilter,
   needsAttention,
 } from "./model";
 import type { ConditionKey } from "./conditions";
-import type { RunCondition, RunFilter, RunView, RunsPage } from "./model";
+import type {
+  RunCondition,
+  RunFilter,
+  RunFilterKey,
+  RunGroupFilter,
+  RunView,
+  RunsPage,
+} from "./model";
 
-const columns = `minmax(0, 1fr) ${size.runStatusColumn} ${size.elapsedColumn}`;
+const columns = `minmax(0, 1fr) ${size.runStatusColumn} ${size.timeColumn}`;
 
 export interface RunsScreenProps {
   page: RunsPage;
@@ -125,18 +134,11 @@ function RunsList({
   runHref,
 }: RunsScreenProps) {
   const t = useTranslations("runs");
-  const label = useFilterLabel();
+  const statusName = useStatusName();
   const visible = page.runs.filter((run) => matchesFilter(run, filter));
   const selected = visible.find((run) => run.id === selectedId) ?? visible[0];
   const attention = page.runs.filter(needsAttention).length;
-  const counts = new Map<RunFilter, number>([
-    ["all", page.runs.length],
-    ["attention", attention],
-  ]);
-  for (const run of page.runs) {
-    const key = filterKeyOf(run);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
+  const countOf = (key: RunFilter) => page.runs.filter((run) => matchesFilter(run, key)).length;
   const showMoreButton = useRef<HTMLButtonElement>(null);
   const endedStatus = useRef<HTMLParagraphElement>(null);
   const focusAfterMore = useRef(false);
@@ -161,7 +163,7 @@ function RunsList({
   return (
     <SplitView
       list={
-        <>
+        <div {...stylex.props(styles.listColumn)}>
           <PageHeader
             title={t("title")}
             subtitle={t(page.moreEnded ? "subtitleRecent" : "subtitle", {
@@ -170,20 +172,25 @@ function RunsList({
             })}
           />
           <div ref={filterBar} {...stylex.props(styles.filterBar)}>
-            <Tabs<RunFilter>
-              value={filter}
+            <SegmentedTabs<RunGroupFilter>
+              value={isGroupFilter(filter) ? filter : null}
               onValueChange={onFilterChange}
-              label={t("filter.label")}
+              label={t("filter.groupLabel")}
+              items={RUN_GROUP_FILTERS.map((key) => ({
+                value: key,
+                label: t(`filter.${key}`),
+                count: countOf(key),
+              }))}
+            />
+            <Tabs<RunFilterKey>
+              value={isGroupFilter(filter) ? null : filter}
+              onValueChange={onFilterChange}
+              label={t("filter.statusLabel")}
               variant="chips"
             >
-              {RUN_FILTERS.map((key) => (
-                <Tab
-                  key={key}
-                  value={key}
-                  count={counts.get(key) ?? 0}
-                  attention={key === "attention"}
-                >
-                  {label(key)}
+              {RUN_STATUS_FILTERS.map((key) => (
+                <Tab key={key} value={key} count={countOf(key)}>
+                  {statusName(key)}
                 </Tab>
               ))}
             </Tabs>
@@ -240,7 +247,7 @@ function RunsList({
               ) : null}
             </div>
           ) : null}
-        </>
+        </div>
       }
       panel={
         <section aria-label={t("panel.label")}>
@@ -352,7 +359,7 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
           <Text variant="meta">{meta.join(t("metaSeparator"))}</Text>
         </span>
       </TableCell>
-      <TableCell align="end">
+      <TableCell>
         <StatusPill status={status}>{statusName(status)}</StatusPill>
       </TableCell>
       <TableCell align="end" numeric>
@@ -487,20 +494,15 @@ function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 }
 
-function useFilterLabel(): (filter: RunFilter) => string {
-  const t = useTranslations("runs.filter");
-  const statusName = useStatusName();
-  return (filter) => (filter === "all" || filter === "attention" ? t(filter) : statusName(filter));
-}
-
 const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
+  listColumn: { maxWidth: size.runsListWidth },
   filterBar: {
     display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    columnGap: space.s4,
-    rowGap: space.s2,
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: space.s3,
+    marginBottom: space.s4,
   },
   conditions: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
   inline: { display: "inline-flex", alignItems: "center", gap: space.s2 },

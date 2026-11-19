@@ -168,7 +168,6 @@ const styles = stylex.create({
   },
   rowSelected: {
     backgroundColor: { default: colors.bgSelected, ":hover": colors.bgSelected },
-    boxShadow: `inset 2px 0 0 ${colors.accent}`,
   },
   cell: {
     minWidth: 0,

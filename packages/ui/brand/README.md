@@ -40,7 +40,7 @@ The brand has three colors.
 
 How the app uses them (ticket 0080):
 
-- Backgrounds and surfaces are Ink with only the lightness changed (`colors.bg*`, `colors.border*`): raised surfaces are lighter, insets and the backdrop are darker. The selected surface (`colors.bgSelected`) carries a faint yellow tint.
+- Backgrounds and surfaces are Ink with only the lightness changed (`colors.bg*`, `colors.border*`): raised surfaces are lighter, insets and the backdrop are darker. The selected surface (`colors.bgSelected`) is neutral too; yellow marks emphasis, not selection.
 - Text is Paper, with only the lightness lowered for secondary text (`colors.text*`).
 - Ganger Yellow is the one accent (`colors.accent*`): the primary button, links, the selected row, tab, and rail item, the focus ring, the whistle's mouthpiece, and the mascot's cap.
 - Text on yellow is Ink (`colors.textOnAccent`).

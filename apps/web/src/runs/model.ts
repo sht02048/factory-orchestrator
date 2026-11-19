@@ -56,9 +56,10 @@ export type RunCondition =
 export const ENDED_RUNS_PAGE_SIZE = 50;
 export const MAX_ENDED_RUNS = 5000;
 
-export const RUN_FILTERS = [
-  "all",
-  "attention",
+export const RUN_GROUP_FILTERS = ["all", "attention", "in-progress", "done"] as const;
+export type RunGroupFilter = (typeof RUN_GROUP_FILTERS)[number];
+
+export const RUN_STATUS_FILTERS = [
   "running",
   "waiting-for-input",
   "disconnected",
@@ -68,9 +69,14 @@ export const RUN_FILTERS = [
   "failed",
   "canceled",
 ] as const;
+export type RunFilterKey = (typeof RUN_STATUS_FILTERS)[number];
+
+export const RUN_FILTERS = [...RUN_GROUP_FILTERS, ...RUN_STATUS_FILTERS] as const;
 export type RunFilter = (typeof RUN_FILTERS)[number];
 
-export type RunFilterKey = Exclude<RunFilter, "all" | "attention">;
+export function isGroupFilter(filter: RunFilter): filter is RunGroupFilter {
+  return RUN_GROUP_FILTERS.some((group) => group === filter);
+}
 
 export function filterKeyOf(run: RunView): RunFilterKey {
   return run.state === "ended" ? run.summary : run.state;
@@ -80,10 +86,29 @@ export function needsAttention(run: RunView): boolean {
   return run.attention;
 }
 
+export function isInProgress(run: RunView): boolean {
+  return run.state === "queued" || run.state === "running";
+}
+
+export function isDone(run: RunView): boolean {
+  return run.state === "ended" && !run.attention;
+}
+
 export function matchesFilter(run: RunView, filter: RunFilter): boolean {
-  if (filter === "all") return true;
-  if (filter === "attention") return needsAttention(run);
-  return filterKeyOf(run) === filter;
+  return isGroupFilter(filter) ? matchesGroup(run, filter) : filterKeyOf(run) === filter;
+}
+
+function matchesGroup(run: RunView, group: RunGroupFilter): boolean {
+  switch (group) {
+    case "all":
+      return true;
+    case "attention":
+      return needsAttention(run);
+    case "in-progress":
+      return isInProgress(run);
+    case "done":
+      return isDone(run);
+  }
 }
 
 export function elapsedMs(run: RunView): number {

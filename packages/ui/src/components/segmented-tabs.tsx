@@ -11,7 +11,7 @@ export interface SegmentedTabsItem<T extends string> {
 }
 
 export interface SegmentedTabsProps<T extends string> {
-  value: T;
+  value: T | null;
   onValueChange: (value: T) => void;
   label: string;
   items: ReadonlyArray<SegmentedTabsItem<T>>;

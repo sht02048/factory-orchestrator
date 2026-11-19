@@ -21,6 +21,7 @@ import {
   Popover,
   ProblemCallout,
   Row,
+  RowActionSlot,
   SURFACE_ROLES,
   Section,
   SegmentedTabs,
@@ -37,6 +38,7 @@ import {
   Tabs,
   TEXT_VARIANTS,
   Text,
+  TimeSlot,
   Tooltip,
   UsageBar,
   statusTone,
@@ -194,6 +196,53 @@ describe("서버 렌더", () => {
     const chips = listClass(html);
     const under = listClass(underline);
     expect(chips?.[1] ?? chips?.[2]).not.toBe(under?.[1] ?? under?.[2]);
+  });
+
+  it("Tabs 는 값이 null 이면 아무 탭도 고르지 않는다(티켓 0091)", () => {
+    for (const html of [
+      renderToString(
+        <Tabs<string> value={null} onValueChange={noop} label="상태로 거르기" variant="chips">
+          <Tab value="queued" count={1}>
+            Queued
+          </Tab>
+        </Tabs>,
+      ),
+      renderToString(
+        <SegmentedTabs<string>
+          value={null}
+          onValueChange={noop}
+          label="묶음으로 거르기"
+          items={[{ value: "all", label: "모두", count: 3 }]}
+        />,
+      ),
+    ]) {
+      expect(html).toContain('role="tab"');
+      expect(html).not.toContain('aria-selected="true"');
+    }
+  });
+
+  it("TimeSlot 은 시간 글을 같은 폭 칸에 두고, dateTime 을 주면 time 요소다(티켓 0091)", () => {
+    const classOf = (html: string) => /class="([^"]*)"/.exec(html)?.[1] ?? "";
+    const short = renderToString(<TimeSlot>42초째</TimeSlot>);
+    const long = renderToString(<TimeSlot>1시간 3분째</TimeSlot>);
+    expect(short).toMatch(/^<span data-slot="time"/);
+    expect(classOf(short)).toBe(classOf(long));
+    const time = renderToString(<TimeSlot dateTime="2026-11-17T09:00:00.000Z">11월 17일</TimeSlot>);
+    expect(time).toMatch(/^<time dateTime="2026-11-17T09:00:00.000Z" data-slot="time"/);
+    expect(classOf(time)).toBe(classOf(short));
+  });
+
+  it("RowActionSlot 은 버튼이 없어도 같은 폭 칸을 남긴다(티켓 0091)", () => {
+    const classOf = (html: string) => /class="([^"]*)"/.exec(html)?.[1] ?? "";
+    const empty = renderToString(<RowActionSlot />);
+    const filled = renderToString(
+      <RowActionSlot>
+        <Button>답하기</Button>
+      </RowActionSlot>,
+    );
+    expect(empty).toMatch(/^<span data-slot="action"/);
+    expect(filled).toContain("답하기");
+    expect(classOf(empty)).toBe(classOf(filled));
   });
 
   it("Field 의 오류는 입력을 invalid 로 만들고 라벨을 잇는다", () => {

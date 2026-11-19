@@ -9,7 +9,7 @@ export type TabsVariant = "underline" | "chips";
 const VariantContext = createContext<TabsVariant>("underline");
 
 export interface TabsProps<T extends string> {
-  value: T;
+  value: T | null;
   onValueChange: (value: T) => void;
   label: string;
   children: ReactNode;
@@ -129,22 +129,21 @@ const styles = stylex.create({
   chipList: {
     display: "flex",
     flexWrap: "wrap",
-    gap: space.s2,
-    marginBottom: space.s4,
+    gap: space.px6,
   },
   chip: {
     alignItems: "center",
-    height: 32,
-    paddingInline: space.s3,
+    height: 28,
+    paddingInline: space.s2,
     borderRadius: radius.control,
-    backgroundColor: { default: colors.bgControl, ":hover": colors.bgControlHover },
+    backgroundColor: { default: colors.bgHover, ":hover": colors.bgControlHover },
     color: { default: colors.textSecondary, ":hover": colors.textPrimary },
-    fontSize: fontSize.ui,
+    fontSize: fontSize.small,
     fontWeight: fontWeight.medium,
-    lineHeight: "32px",
+    lineHeight: "28px",
     transitionProperty: "color, background-color",
   },
-  chipCount: { opacity: 0.6 },
+  chipCount: { fontSize: fontSize.small, opacity: 0.7 },
   chipAttention: { opacity: 1, fontWeight: fontWeight.semibold },
   chipSelected: {
     backgroundColor: { default: colors.textPrimary, ":hover": colors.textPrimary },

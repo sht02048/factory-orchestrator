@@ -129,13 +129,20 @@ describe("색 토큰", () => {
     const surfaces = entries.filter(([key]) => /^(bg|border|backdrop)/.test(key));
     expect(surfaces.length).toBeGreaterThan(10);
     const tinted = surfaces.filter(([, v]) => parts(v).c > 0).map(([key]) => key);
-    expect(tinted).toEqual(["bgSelected"]);
-    expect(parts(value("bgSelected")).c).toBeLessThanOrEqual(0.03);
+    expect(tinted).toEqual([]);
     const ink = parts(INK).l;
     expect(parts(value("bgInset")).l).toBeLessThan(ink);
     expect(parts(value("backdrop")).l).toBeLessThan(ink);
     const lighter = surfaces.filter(([key]) => !["bgCanvas", "bgInset", "backdrop"].includes(key));
     expect(lighter.filter(([, v]) => parts(v).l <= ink)).toEqual([]);
+  });
+
+  it("고른 행은 노랑 없이 hover 보다 밝은 무채색 바탕이다(티켓 0091)", () => {
+    const selected = parts(value("bgSelected"));
+    expect(selected.c).toBe(0);
+    expect(selected.l).toBeGreaterThan(parts(value("bgHover")).l);
+    expect(selected.l).toBeGreaterThan(parts(value("bgCard")).l);
+    expect(selected.l).toBeGreaterThan(parts(value("bgCardHover")).l);
   });
 
   it("글자는 Paper 의 따뜻한 무채색에서 밝기만 내린 단계다", () => {
