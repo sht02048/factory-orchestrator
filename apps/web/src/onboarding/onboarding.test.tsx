@@ -32,10 +32,10 @@ import {
   saveMappingSetting,
   saveRunnerSetting,
   saveTrackerConnectionSetting,
-} from "../settings/actions";
-import { loadSettingsPage, loadTrackerProjectChoices } from "../settings/load";
-import type { SettingsContext } from "../settings/load";
-import type { ConnectionProjects, SettingsPage } from "../settings/model";
+} from "@ganger/app/settings/actions";
+import { loadSettingsPage, loadTrackerProjectChoices } from "@ganger/app/settings/load";
+import type { SettingsContext } from "@ganger/app/settings/load";
+import type { ConnectionProjects, SettingsPage } from "@ganger/app/settings/model";
 import { settingsMessages } from "../settings/messages";
 import { SettingsScreen } from "../settings/settings-screen";
 import { buttonsOf } from "../testing/buttons";

@@ -23,11 +23,11 @@ import {
   denyInput,
   submitAnswer,
   submitDenial,
-} from "../home/actions";
-import { cancelRunRequest } from "./actions";
-import { loadRunDetail, requestRunLogTail, toCiView } from "./load";
+} from "@ganger/app/home/actions";
+import { cancelRunRequest } from "@ganger/app/run-detail/actions";
+import { loadRunDetail, requestRunLogTail, toCiView } from "@ganger/app/run-detail/load";
 import { addExtraEnded, assign, extraEndedCases, startedOn, walk } from "./testing";
-import type { RunDetail } from "./model";
+import type { RunDetail } from "@ganger/app/run-detail/model";
 
 function detail(db: Parameters<typeof loadRunDetail>[0], id: RunId | undefined): RunDetail {
   if (id === undefined) throw new Error("no run id");

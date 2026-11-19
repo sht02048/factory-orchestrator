@@ -7,6 +7,8 @@ Commands:
   start                Apply database migrations, then run the web server and the worker.
   service install      Register start as a background service (launchd on macOS, systemd on Linux).
   service uninstall    Stop and remove the background service.
+  mcp                  Run an MCP server on stdin and stdout that reads Ganger's state.
+                       Start it from an MCP client on this machine.
 
 Options:
   --home <dir>         Installation folder for .env, data, and logs
@@ -24,6 +26,17 @@ Options:
     exists: (envFile: string) =>
       `Boot settings already exist at ${envFile}. Left them unchanged, including the encryption key.`,
     next: "Next: run `ganger start`, then open the web address to finish onboarding.",
+  },
+
+  mcp: {
+    noDatabase: (path: string) =>
+      `The database ${path} does not exist yet. Start the server first (ganger start).`,
+    databaseBehind: (missing: ReadonlyArray<string>) =>
+      `The database is older than this version of Ganger (missing migrations: ${missing.join(", ")}). Start the server first (ganger start); it updates the database.`,
+    databaseAhead: (unknown: ReadonlyArray<string>) =>
+      `The database is newer than this version of Ganger (unknown migrations: ${unknown.join(", ")}). Update Ganger, then point your MCP client at the new version.`,
+    databaseEdited: (changed: ReadonlyArray<string>) =>
+      `The database was migrated by a different build of Ganger (changed migrations: ${changed.join(", ")}). Update Ganger to the version the server runs.`,
   },
 
   start: {

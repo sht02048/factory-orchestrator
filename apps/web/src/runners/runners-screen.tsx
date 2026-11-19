@@ -33,7 +33,7 @@ import { usePrerequisiteName, useUsageNames } from "../labels";
 import { useRunnerCheckPolling } from "../settings/settings-screen";
 import type { ActionResult } from "../settings/settings-screen";
 import { useStatusName } from "../status";
-import { failedChecksFirst, problemRunnersFirst, runnerRowStatus } from "./model";
+import { failedChecksFirst, problemRunnersFirst, runnerRowStatus } from "@ganger/app/runners/model";
 import type {
   ProviderUsageView,
   RunnerCheckItem,
@@ -41,7 +41,7 @@ import type {
   RunnerView,
   RunnersPage,
   UsageWindowView,
-} from "./model";
+} from "@ganger/app/runners/model";
 
 export function addRunnerHref(ws: string | undefined): string {
   const search = new URLSearchParams(ws === undefined ? {} : { ws });

@@ -1,11 +1,19 @@
 import { spawnSync } from "node:child_process";
+import type { Readable, Writable } from "node:stream";
 import { parseArgs } from "node:util";
-import { BootConfigError, parseBootConfig } from "@ganger/db";
+import { createAdapterRegistry } from "@ganger/app/adapters";
+import { ELECTRON_RUN_AS_NODE_ENV, mcpLaunch } from "@ganger/app/settings/mcp-launch";
+import { localTimeZone } from "@ganger/app/time-zone";
+import { BootConfigError, SecretBox, parseBootConfig } from "@ganger/db";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { MissingEnvFileError, homePaths, readBootEnv, resolveHome } from "./home.js";
 import { EnvFileFormatError, init } from "./init.js";
 import type { HoldSleepAssertion } from "./keep-awake.js";
 import type { AppLayout } from "./layout.js";
+import { McpStartError, openMcpDatabase } from "./mcp/open.js";
+import { createMcpServer } from "./mcp/server.js";
 import { messages } from "./messages.js";
+import { readLiveServerLock } from "./server-lock.js";
 import {
   SERVICE_NAME,
   ServiceError,
@@ -29,6 +37,9 @@ export interface ProgramContext {
   layout: AppLayout;
   runCommand: CommandRunner;
   holdSleepAssertion: HoldSleepAssertion;
+  version: string;
+  stdin: Readable;
+  stdout: Writable;
   out(line: string): void;
   err(line: string): void;
   onStopSignal(handler: (signal: NodeJS.Signals) => void): void;
@@ -90,6 +101,7 @@ export async function runProgram(
       });
     }
     if (command === "start" && subcommand === undefined) return await runStart(context, home);
+    if (command === "mcp" && subcommand === undefined) return await runMcp(context, home);
     if (command === "service" && rest.length === 0) {
       if (subcommand === "install") return runServiceInstall(context, home, values["dry-run"]);
       if (subcommand === "uninstall") return runServiceUninstall(context, home, values["dry-run"]);
@@ -130,6 +142,7 @@ async function runStart(context: ProgramContext, home: string): Promise<number> 
       env: context.env,
       layout: context.layout,
       signal: abort.signal,
+      ...(context.cliEntry === "" ? {} : { cliEntry: context.cliEntry }),
       keepAwake: {
         platform: context.platform,
         hold: context.holdSleepAssertion,
@@ -160,6 +173,44 @@ async function runStart(context: ProgramContext, home: string): Promise<number> 
     return 1;
   }
   context.out(messages.start.stopped);
+  return 0;
+}
+
+async function runMcp(context: ProgramContext, home: string): Promise<number> {
+  const config = parseBootConfig(readBootEnv(homePaths(home).envFile, context.env));
+  const db = openMcpDatabase(config.databasePath);
+  const server = createMcpServer({
+    db,
+    secretBox: new SecretBox(config.encryptionKey),
+    registry: createAdapterRegistry(),
+    home,
+    mcpLaunch: mcpLaunch({
+      nodePath: context.nodePath,
+      cliEntry: context.cliEntry === "" ? undefined : context.cliEntry,
+      home,
+      electron: context.env[ELECTRON_RUN_AS_NODE_ENV] === "1",
+    }),
+    version: context.version,
+    timeZone: localTimeZone(),
+    now: () => new Date(),
+    serverStatus: () => {
+      const lock = readLiveServerLock(home);
+      return { running: lock !== undefined, url: lock?.url ?? null };
+    },
+  });
+  const closed = new Promise<void>((resolve) => {
+    server.server.onclose = resolve;
+  });
+  const close = () => void server.close();
+  context.stdin.once("end", close);
+  context.onStopSignal(close);
+  try {
+    await server.connect(new StdioServerTransport(context.stdin, context.stdout));
+    await closed;
+  } finally {
+    context.stdin.off("end", close);
+    db.$client.close();
+  }
   return 0;
 }
 
@@ -252,6 +303,7 @@ function describeError(error: unknown): string {
     error instanceof BootConfigError ||
     error instanceof StartError ||
     error instanceof ServiceError ||
+    error instanceof McpStartError ||
     error instanceof EnvFileFormatError
   ) {
     return error.message;

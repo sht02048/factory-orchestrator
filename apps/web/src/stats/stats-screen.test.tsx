@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { renderWithMessages } from "../testing/render";
 import { addRunDecisionCases, now, seedStatsDatabase } from "../testing/stats-seed";
-import { loadStatsPage } from "./load";
+import { loadStatsPage } from "@ganger/app/stats/load";
 import { statsMessages } from "./messages";
-import type { StatsDimension, StatsPage, StatsPeriodDays } from "./model";
+import type { StatsDimension, StatsPage, StatsPeriodDays } from "@ganger/app/stats/model";
 import { StatsScreen } from "./stats-screen";
 
 const noop = () => {};

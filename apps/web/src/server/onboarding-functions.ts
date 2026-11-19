@@ -6,7 +6,7 @@ import {
   loadOnboardingPage,
   setUpFirstWorkspace,
 } from "../onboarding/load";
-import type { SettingsContext } from "../settings/load";
+import type { SettingsContext } from "@ganger/app/settings/load";
 import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
 

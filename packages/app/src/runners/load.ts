@@ -3,7 +3,7 @@ import type { UsageWindow } from "@ganger/core";
 import { getRunWithRecords, listRunners, listRuns, listWorkspaces } from "@ganger/db";
 import type { Database, StoredProviderUsage, StoredRun } from "@ganger/db";
 import { z } from "zod";
-import { prerequisiteHint, prerequisiteProject } from "../labels";
+import { prerequisiteHint, prerequisiteProject } from "../prerequisites.js";
 import type {
   LeftWorktree,
   OccupyingRun,
@@ -13,7 +13,7 @@ import type {
   RunnersPage,
   UsageWindowView,
   QueuedRunView,
-} from "./model";
+} from "./model.js";
 
 const runnerConfigSchema = z.object({
   sshTarget: z.string().min(1).optional().catch(undefined),

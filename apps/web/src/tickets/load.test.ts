@@ -1,9 +1,9 @@
 import { toTicketKey, toTrackerStateId } from "@ganger/core";
 import type { FakeTracker } from "@ganger/core/testing";
 import { describe, expect, it } from "vitest";
-import { MAX_PAGES, PAGE_SIZE, loadTicketsPage, ticketId } from "./load";
-import { TICKET_FILTERS, lastRun, matchesFilter } from "./model";
-import type { TicketFilter, TicketView, TicketsPage } from "./model";
+import { MAX_PAGES, PAGE_SIZE, loadTicketsPage, ticketId } from "@ganger/app/tickets/load";
+import { TICKET_FILTERS, lastRun, matchesFilter } from "@ganger/app/tickets/model";
+import type { TicketFilter, TicketView, TicketsPage } from "@ganger/app/tickets/model";
 import { T0, connection, docsProject, labs, now, setupTickets } from "./test-fixtures";
 
 function byKey(page: TicketsPage, key: string): TicketView {

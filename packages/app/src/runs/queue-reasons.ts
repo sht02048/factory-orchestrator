@@ -7,7 +7,7 @@ import type {
   RunnerSnapshot,
   UnplacedReason,
 } from "@ganger/core";
-import type { QueuedReason } from "./model";
+import type { QueuedReason } from "./model.js";
 
 export type QueuedReasonCode =
   | { kind: "starting" | "behind" | UnplacedReason }

@@ -2,6 +2,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { homePaths } from "./home.js";
 import type { AppLayout, ProcessSpec } from "./layout.js";
@@ -36,6 +37,9 @@ function context(overrides: Partial<ProgramContext> = {}): ProgramContext {
       return { ok: true };
     },
     holdSleepAssertion: () => ({ exited: new Promise(() => undefined), release: () => undefined }),
+    version: "0.0.0-test",
+    stdin: new PassThrough(),
+    stdout: new PassThrough(),
     out: (line) => out.push(line),
     err: (line) => err.push(line),
     onStopSignal: () => undefined,

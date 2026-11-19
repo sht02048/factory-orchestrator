@@ -5,8 +5,8 @@ import {
   hostnameOfHostHeader,
   rejectionLogLine,
   rejectionResponse,
-} from "./request-guard";
-import type { AllowedHostsInput } from "./request-guard";
+} from "@ganger/app/request-guard";
+import type { AllowedHostsInput } from "@ganger/app/request-guard";
 
 const configured: AllowedHostsInput = {
   bindHost: "127.0.0.1",

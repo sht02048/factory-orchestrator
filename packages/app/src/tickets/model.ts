@@ -1,5 +1,5 @@
 import type { AgentResult, PrState, SummaryOutcome, TrackerStateCategory } from "@ganger/core";
-import type { WorkspaceChoice } from "../shell/model";
+import type { WorkspaceChoice } from "../shell/model.js";
 
 export type TicketRun =
   | {

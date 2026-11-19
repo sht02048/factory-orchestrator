@@ -1,8 +1,8 @@
 import { PR_STATES, SUMMARY_OUTCOMES, runDurations, summarizeRunOutcome } from "@ganger/core";
 import type { AgentResult, PrState, SummaryOutcome } from "@ganger/core";
 import { z } from "zod";
-import type { WorkspaceChoice } from "../shell/model";
-import { DAY_MS, calendarDay } from "../time-zone";
+import type { WorkspaceChoice } from "../shell/model.js";
+import { DAY_MS, calendarDay } from "../time-zone.js";
 
 export const STATS_PERIOD_DAYS = [7, 14, 30] as const;
 export type StatsPeriodDays = (typeof STATS_PERIOD_DAYS)[number];
