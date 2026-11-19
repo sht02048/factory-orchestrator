@@ -1,0 +1,308 @@
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { MCP_WRITE_TOOLS } from "@ganger/app/mcp/actions";
+import { powerSettingsPath } from "@ganger/app/power-settings";
+import { loadRunDetail } from "@ganger/app/run-detail/load";
+import { loadSettingsPage } from "@ganger/app/settings/load";
+import {
+  SecretBox,
+  getRunCancelRequest,
+  listRecentMcpActions,
+  listRunMcpActions,
+  listRunQuestions,
+  listRunners,
+  saveMcpWriteAllowed,
+} from "@ganger/db";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
+import { toRunId } from "@ganger/core";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { z } from "zod";
+import { createMcpServer } from "./server.js";
+import type { McpContext, ServerStatus } from "./server.js";
+import { SERVER_OFF_NOTE, WRITES_OFF_ERROR } from "./write-tools.js";
+import { KEY, at, fakeRegistry, queueRun, runnerId, seedMcpDatabase } from "./test-seed.js";
+
+let home: string;
+let client: Client;
+let seeded: ReturnType<typeof seedMcpDatabase>;
+let status: ServerStatus;
+let problem: string | null;
+let listChanges: number;
+
+async function connect(clientName = "hermes", syncBeforeMessages = true): Promise<void> {
+  const context: McpContext = {
+    db: seeded.db,
+    secretBox: new SecretBox(KEY),
+    registry: fakeRegistry(),
+    home,
+    mcpLaunch: { located: true, command: "/opt/node", args: ["/opt/cli.js", "mcp"], env: {} },
+    version: "0.0.0-test",
+    timeZone: "UTC",
+    now: () => at(60),
+    serverStatus: () => status,
+    schemaProblem: () => problem,
+  };
+  const mcp = createMcpServer(context);
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  client = new Client({ name: clientName, version: "0.0.0" });
+  client.setNotificationHandler(ToolListChangedNotificationSchema, () => {
+    listChanges += 1;
+  });
+  const serving = syncBeforeMessages ? mcp.connect(serverSide) : mcp.server.connect(serverSide);
+  await Promise.all([serving, client.connect(clientSide)]);
+}
+
+const textContent = z.object({
+  content: z.array(z.object({ type: z.literal("text"), text: z.string() })),
+});
+
+const jsonObject = z.record(z.string(), z.unknown());
+
+async function call(name: string, args: Record<string, unknown> = {}) {
+  const raw = await client.callTool({ name, arguments: args });
+  const text = textContent
+    .parse(raw)
+    .content.map((c) => c.text)
+    .join("");
+  const parsed = jsonObject.safeParse(text.startsWith("{") ? JSON.parse(text) : null);
+  return { isError: raw.isError === true, text, json: parsed.success ? parsed.data : {} };
+}
+
+async function toolNames(): Promise<string[]> {
+  return (await client.listTools()).tools.map((t) => t.name);
+}
+
+function allowWrites(allowed = true): void {
+  saveMcpWriteAllowed(seeded.db, allowed, at(59));
+}
+
+beforeEach(() => {
+  home = mkdtempSync(join(tmpdir(), "ganger-mcp-write-"));
+  status = { running: true, url: "http://127.0.0.1:3000" };
+  problem = null;
+  listChanges = 0;
+  seeded = seedMcpDatabase(":memory:");
+});
+
+afterEach(async () => {
+  await client.close();
+  seeded.db.$client.close();
+  rmSync(home, { recursive: true, force: true });
+});
+
+describe("MCP 쓰기 허용 스위치", () => {
+  it("꺼져 있으면 쓰기 도구가 목록에 없고, 불러도 거절하고 기록하지 않는다", async () => {
+    await connect();
+    const names = await toolNames();
+    for (const tool of MCP_WRITE_TOOLS) expect(names).not.toContain(tool);
+
+    const answered = await call("answer_question", { runId: seeded.waiting, answer: "yes" });
+    expect(answered.isError).toBe(true);
+    expect(answered.text).toContain("answer_question disabled");
+    expect(listRunQuestions(seeded.db, seeded.waiting)[0]?.answer).toBeNull();
+    expect(listRunMcpActions(seeded.db, seeded.waiting)).toEqual([]);
+  });
+
+  it("켜면 다시 시작하지 않아도 쓰기 도구가 보이고, 끄면 다시 사라진다", async () => {
+    await connect();
+    allowWrites();
+    expect((await toolNames()).toSorted()).toEqual(
+      expect.arrayContaining([...MCP_WRITE_TOOLS].toSorted()),
+    );
+    expect(listChanges).toBeGreaterThan(0);
+
+    allowWrites(false);
+    const names = await toolNames();
+    for (const tool of MCP_WRITE_TOOLS) expect(names).not.toContain(tool);
+  });
+
+  it("목록을 다시 읽기 전에 꺼도 쓰기 호출은 거절한다", async () => {
+    allowWrites();
+    await connect();
+    expect(await toolNames()).toContain("cancel_run");
+    allowWrites(false);
+    const canceled = await call("cancel_run", { runId: seeded.waiting });
+    expect(canceled.isError).toBe(true);
+    expect(canceled.text).toContain("cancel_run disabled");
+    expect(getRunCancelRequest(seeded.db, seeded.waiting)).toBeNull();
+  });
+
+  it("목록이 아직 켜진 채여도 도구를 부를 때 스위치를 다시 확인한다", async () => {
+    allowWrites();
+    await connect("hermes", false);
+    allowWrites(false);
+    const off = await call("cancel_run", { runId: seeded.waiting });
+    expect(off.isError).toBe(true);
+    expect(off.json["error"]).toBe(WRITES_OFF_ERROR);
+    expect(listRunMcpActions(seeded.db, seeded.waiting)).toEqual([]);
+  });
+
+  it("목록이 아직 켜진 채여도 도구를 부를 때 스키마 판을 다시 확인한다", async () => {
+    allowWrites();
+    await connect("hermes", false);
+    problem = "The database is newer than this version of Ganger.";
+    const behind = await call("cancel_run", { runId: seeded.waiting });
+    expect(behind.json["error"]).toBe(problem);
+    expect(getRunCancelRequest(seeded.db, seeded.waiting)).toBeNull();
+    expect(listRunMcpActions(seeded.db, seeded.waiting)).toEqual([]);
+  });
+
+  it("그사이 서버가 DB를 다른 판으로 올렸으면 쓰지 않고 판이 다르다고 알린다", async () => {
+    allowWrites();
+    await connect();
+    problem = "The database is newer than this version of Ganger.";
+    const canceled = await call("cancel_run", { runId: seeded.waiting });
+    expect(canceled.isError).toBe(true);
+    expect(getRunCancelRequest(seeded.db, seeded.waiting)).toBeNull();
+    for (const tool of MCP_WRITE_TOOLS) expect(await toolNames()).not.toContain(tool);
+  });
+});
+
+describe("MCP 쓰기 도구", () => {
+  beforeEach(() => allowWrites());
+
+  it("화면의 쓰기 기능과 1:1이고, 막는 넷(비밀 값, 러너 추가·ssh 대상·Orca 경로, 주소, 허용 스위치)의 도구가 없다", async () => {
+    await connect();
+    const { tools } = await client.listTools();
+    const writes = tools.filter((t) => t.annotations?.readOnlyHint !== true);
+    expect(writes.map((t) => t.name).toSorted()).toEqual([...MCP_WRITE_TOOLS].toSorted());
+    const blocked =
+      /secret|token_save|save_token|api_key|apikey|add_runner|save_runner|ssh|orca|address|webhook|allow|switch|mcp/i;
+    for (const tool of tools) expect(tool.name).not.toMatch(blocked);
+    const blockedArgs = [
+      "apiKey",
+      "webhookSecret",
+      "token",
+      "sshTarget",
+      "orcaPath",
+      "webAddress",
+      "webhookAddress",
+      "allowed",
+      "mcpWriteAllowed",
+    ];
+    for (const tool of tools) {
+      const properties = Object.keys(tool.inputSchema.properties ?? {});
+      for (const arg of blockedArgs) expect(properties).not.toContain(arg);
+    }
+  });
+
+  it("Capacity 도구는 러너와 Capacity만 받고, ssh 대상·Orca 경로를 보내도 바꾸지 않는다", async () => {
+    await connect();
+    const { tools } = await client.listTools();
+    const capacityTool = tools.find((t) => t.name === "set_runner_capacity");
+    expect(Object.keys(capacityTool?.inputSchema.properties ?? {}).toSorted()).toEqual([
+      "capacity",
+      "runner",
+    ]);
+    const before = listRunners(seeded.db).find((r) => r.id === runnerId);
+
+    const saved = await call("set_runner_capacity", {
+      runner: "runner-a",
+      capacity: 5,
+      sshTarget: "attacker@evil.example.com",
+      orcaPath: "/tmp/evil",
+    });
+    expect(saved.isError).toBe(false);
+    const after = listRunners(seeded.db).find((r) => r.id === runnerId);
+    expect(after).toEqual({ ...before, capacity: 5 });
+  });
+
+  it("되돌릴 수 없는 도구에만 파괴적 표시를 단다", async () => {
+    await connect();
+    const { tools } = await client.listTools();
+    const destructive = tools
+      .filter((t) => t.annotations?.destructiveHint === true)
+      .map((t) => t.name)
+      .toSorted();
+    expect(destructive).toEqual(["cancel_run", "remove_tracker_project"]);
+    for (const tool of tools.filter((t) => MCP_WRITE_TOOLS.some((name) => name === t.name))) {
+      expect(tool.annotations?.readOnlyHint).toBe(false);
+    }
+  });
+
+  it("질문에 답하면 답을 저장하고, Run 상세 상태 기록 사이에 MCP · 클라이언트 이름으로 남긴다", async () => {
+    await connect("Operator");
+    const answered = await call("answer_question", { runId: seeded.waiting, answer: "no" });
+    expect(answered.isError).toBe(false);
+    expect(answered.json["outcome"]).toBe("done");
+    expect(listRunQuestions(seeded.db, seeded.waiting)[0]?.answer?.text).toBe("no");
+
+    const detail = loadRunDetail(seeded.db, seeded.waiting, at(61));
+    if (detail.kind !== "found") throw new Error("run not found");
+    const event = detail.run.timeline.find((e) => e.kind === "mcp");
+    expect(event).toEqual({
+      kind: "mcp",
+      client: "Operator",
+      tool: "answer_question",
+      outcome: "done",
+      at: at(60).toISOString(),
+    });
+    expect(listRecentMcpActions(seeded.db, 10)).toEqual([]);
+  });
+
+  it("런과 상관없는 쓰기는 Settings MCP 구역의 최근 작업에 대상과 함께 남는다", async () => {
+    await connect("hermes\u0007‮ bot");
+    await call("request_runner_check", { runner: "runner-a" });
+    await call("update_workspace", { maxRunMinutes: 90 });
+
+    const page = await loadSettingsPage(
+      { db: seeded.db, secretBox: new SecretBox(KEY), registry: fakeRegistry() },
+      undefined,
+      at(61),
+    );
+    expect(page.install.mcp.writeAllowed).toBe(true);
+    expect(page.install.mcp.recent.map((a) => [a.client, a.tool, a.target, a.outcome])).toEqual([
+      ["hermes bot", "update_workspace", "Acme Commerce", "done"],
+      ["hermes bot", "request_runner_check", "runner-a", "done"],
+    ]);
+    expect(page.workspace?.general.maxRunMinutes).toBe(90);
+  });
+
+  it("거절된 쓰기도 결과와 함께 남긴다", async () => {
+    await connect();
+    const missing = await call("request_runner_check", { runner: "nope" });
+    expect(missing.isError).toBe(true);
+    expect(listRecentMcpActions(seeded.db, 10).map((a) => [a.tool, a.outcome, a.reason])).toEqual([
+      ["request_runner_check", "rejected", "not-found"],
+    ]);
+  });
+
+  it("서버가 꺼져 있으면 worker가 처리하는 쓰기의 결과에 서버가 켜지면 처리한다고 알린다", async () => {
+    status = { running: false, url: null };
+    await connect();
+    const queued = queueRun(seeded.db, "ACME-5", 40);
+    const canceled = await call("cancel_run", { runId: queued });
+    expect(canceled.json["pending"]).toBe(SERVER_OFF_NOTE);
+    expect(listRunMcpActions(seeded.db, queued).map((a) => a.tool)).toEqual(["cancel_run"]);
+
+    const capacity = await call("set_runner_capacity", { runner: "runner-a", capacity: 3 });
+    expect(capacity.json["pending"]).toBeUndefined();
+  });
+
+  it("서버가 켜져 있으면 처리 대기 알림을 붙이지 않는다", async () => {
+    await connect();
+    const requested = await call("request_run_log", { runId: seeded.waiting });
+    expect(requested.isError).toBe(false);
+    expect(requested.json["pending"]).toBeUndefined();
+  });
+
+  it("티켓을 할당하면 새 런의 기록에 남는다", async () => {
+    await connect();
+    const assigned = await call("assign_ticket", { ticket: "ACME-9" });
+    expect(assigned.isError).toBe(false);
+    const runId = z.string().parse(assigned.json["runId"]);
+    expect(listRunMcpActions(seeded.db, toRunId(runId))).toHaveLength(1);
+  });
+
+  it("잠자기 설정은 설치 폴더의 파일에 쓴다", async () => {
+    await connect();
+    const saved = await call("set_prevent_sleep", { preventSleep: false });
+    expect(saved.isError).toBe(false);
+    expect(JSON.parse(readFileSync(powerSettingsPath(home), "utf8"))).toEqual({
+      preventSleep: false,
+    });
+  });
+});

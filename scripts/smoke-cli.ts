@@ -96,6 +96,50 @@ async function checkMcp(input: {
       throw new Error(`ganger mcp did not report the running server: ${text}`);
     }
     console.log(`ganger mcp: ${tools.length} tools; get_dashboard returned the smoke workspace`);
+
+    if (tools.some((tool) => tool.name === "set_runner_capacity")) {
+      throw new Error("ganger mcp listed write tools while MCP writes were off");
+    }
+    const db = new DatabaseSync(join(input.home, "data", "ganger.db"));
+    try {
+      db.exec("PRAGMA busy_timeout = 5000");
+      db.prepare(
+        "INSERT INTO install_settings (id, instance_id, mcp_write_allowed, updated_at) VALUES (1, 'smoke', 1, ?) ON CONFLICT(id) DO UPDATE SET mcp_write_allowed = 1",
+      ).run(Date.now());
+      const turnedOn = db
+        .prepare("SELECT count(*) AS n FROM install_settings WHERE mcp_write_allowed = 1")
+        .get()?.["n"];
+      if (turnedOn !== 1) throw new Error("could not turn on MCP writes in install_settings");
+    } finally {
+      db.close();
+    }
+    const allowed = await client.listTools();
+    if (!allowed.tools.some((tool) => tool.name === "set_runner_capacity")) {
+      throw new Error("ganger mcp listed no write tools after MCP writes were turned on");
+    }
+    const capacity = await client.callTool({
+      name: "set_runner_capacity",
+      arguments: { runner: "Smoke runner", capacity: 2 },
+    });
+    if (capacity.isError === true) {
+      throw new Error(
+        `ganger mcp set_runner_capacity returned ${JSON.stringify(capacity.content)}`,
+      );
+    }
+    const check = new DatabaseSync(join(input.home, "data", "ganger.db"));
+    try {
+      const row = check
+        .prepare("SELECT client, tool, outcome FROM mcp_actions ORDER BY id DESC LIMIT 1")
+        .get();
+      if (row?.["client"] !== "ganger-smoke" || row["outcome"] !== "done") {
+        throw new Error(`ganger mcp recorded ${JSON.stringify(row)}`);
+      }
+    } finally {
+      check.close();
+    }
+    console.log(
+      "ganger mcp: write tools appeared after MCP writes were turned on, and the write was recorded",
+    );
   } finally {
     await client.close();
   }
