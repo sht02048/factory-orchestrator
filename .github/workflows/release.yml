@@ -85,6 +85,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: pnpm install --frozen-lockfile
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
       - name: Import signing certificate into a temporary keychain
         env:
           MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
@@ -133,6 +134,10 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$mount/Ganger.app"
           xcrun stapler validate "$mount/Ganger.app"
           spctl --assess --type execute --verbose=2 "$mount/Ganger.app"
+      - name: Check the dmg install window
+        env:
+          DMG: ${{ steps.release.outputs.dmg }}
+        run: node scripts/check-dmg.ts "${DMG:?}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: macos-dmg

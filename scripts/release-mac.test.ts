@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { developerIdIdentity, notaryStatus, signingFromEnv } from "./release-mac.ts";
+import { existsSync } from "node:fs";
+
+import { BACKGROUND_PNG } from "./dmg-background.ts";
+import { developerIdIdentity, dmgbuildArgs, notaryStatus, signingFromEnv } from "./release-mac.ts";
 
 describe("signingFromEnv", () => {
   it("공증 값이 하나도 없으면 서명하지 않는다", () => {
@@ -77,5 +80,32 @@ describe("notaryStatus", () => {
   it("모양이 다르면 멈춘다", () => {
     expect(() => notaryStatus('{"message":"no"}')).toThrow("Unexpected notarytool output");
     expect(() => notaryStatus("")).toThrow("Unexpected notarytool output");
+  });
+});
+
+describe("dmgbuildArgs", () => {
+  const args = dmgbuildArgs({
+    root: "/repo",
+    app: "/repo/dist/release/work/app/Ganger.app",
+    dmg: "/repo/dist/release/Ganger-1.0.0-arm64.dmg",
+  });
+
+  it("저장소의 설정 파일과 앱·배경·볼륨 아이콘으로 Ganger 볼륨을 만든다", () => {
+    expect(args).toEqual([
+      "-s",
+      "/repo/scripts/dmg-settings.py",
+      "-D",
+      "app=/repo/dist/release/work/app/Ganger.app",
+      "-D",
+      `background=${BACKGROUND_PNG}`,
+      "-D",
+      "icon=/repo/apps/desktop/icons/icon.icns",
+      "Ganger",
+      "/repo/dist/release/Ganger-1.0.0-arm64.dmg",
+    ]);
+  });
+
+  it("배경 그림은 저장소에 있는 파일을 쓴다", () => {
+    expect(existsSync(BACKGROUND_PNG)).toBe(true);
   });
 });

@@ -83,6 +83,11 @@ In app code, use the tokens above and never a literal color. The SVG files in th
 
 Don't edit the derived files by hand. Change the source in this folder and run the script again.
 
+## dmg install window
+
+- **Source**: [`dmg-background.svg`](dmg-background.svg), 540 × 380, the size of the window the dmg opens. Ink background, a Paper whistle at the top, a Ganger Yellow arrow between the app (left) and Applications (right), and one Paper line, "Drag Ganger to Applications". The icon positions live in `scripts/dmg-settings.py`; move the arrow when you move them.
+- **Outputs**: `node scripts/dmg-background.ts` renders `dmg-background.png` and `dmg-background@2x.png` with Google Chrome. `pnpm release:mac` puts them, with `apps/desktop/icons/icon.icns` as the volume icon, into the dmg.
+
 ## Source files
 
 | File                                         | Use                                                                                             |
@@ -98,6 +103,7 @@ Don't edit the derived files by hand. Change the source in this folder and run t
 | [`mascot-resting.svg`](mascot-resting.svg)   | Mascot, `resting` mood.                                                                         |
 | [`mascot-worried.svg`](mascot-worried.svg)   | Mascot, `worried` mood.                                                                         |
 | [`app-icon.svg`](app-icon.svg)               | App icon source (1024 square, layered).                                                         |
+| [`dmg-background.svg`](dmg-background.svg)   | dmg window background (540 × 380).                                                              |
 | [`OFL-Manrope.txt`](OFL-Manrope.txt)         | Manrope font license notice for the wordmark.                                                   |
 
 ## In the app
