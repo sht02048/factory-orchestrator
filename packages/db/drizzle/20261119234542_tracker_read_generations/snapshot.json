@@ -1,8 +1,8 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "df46c562-61da-43df-b902-5ccd3f38538a",
-  "prevIds": ["e1429521-6e20-48fb-b76b-b45ac828328b"],
+  "id": "b4a6f8c4-ef14-4c42-a4f3-f6e98d89ae5f",
+  "prevIds": ["2a33d0ff-ba7b-4f87-810d-8cbc3febf517"],
   "ddl": [
     {
       "name": "auto_assign_labels",
@@ -2678,7 +2678,7 @@
     {
       "table": "runs",
       "name": "runs_pause_source",
-      "value": "\"pause_source\" IN ('operator')",
+      "value": "\"pause_source\" IN ('operator', 'runner', 'unreported')",
       "entityType": "checks"
     },
     {
