@@ -137,7 +137,7 @@ export function AppFlow({
                         : t("starting")
               }
               detail={failed?.detail ?? null}
-              problem={failed !== null}
+              problem={failed !== null && failed.problem !== "canceled"}
               retryLabel={stopped ? t("askAgain") : null}
               primary={primary}
               onRetry={askAgain}

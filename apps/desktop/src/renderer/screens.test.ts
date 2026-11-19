@@ -243,3 +243,20 @@ describe("등록 끝 화면(브라우저, 0099)", () => {
     await page.getByRole("button", { name: screens.enrollment.backToServer }).waitFor();
   });
 });
+
+describe("이 맥에서 취소한 등록(브라우저, 0099)", () => {
+  it("취소는 문제로 칠하지 않고 어느 단계도 실패로 표시하지 않는다", async () => {
+    await openScreen({
+      screen: "runner-enrollment",
+      server: "mac-mini",
+      enrollment: {
+        phase: "failed",
+        progress: { ...START, done: ["remoteLogin"], problem: "canceled" },
+      },
+    });
+    await expect.poll(focusedHeading).toBe(screens.enrollment.canceledTitle);
+    const steps = page.getByRole("list", { name: screens.enrollment.stepsLabel });
+    expect(await steps.getByText(screens.enrollment.state.failed).count()).toBe(0);
+    expect(await steps.getByRole("img", { name: screens.enrollment.state.failed }).count()).toBe(0);
+  });
+});

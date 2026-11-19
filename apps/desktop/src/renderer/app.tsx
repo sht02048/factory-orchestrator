@@ -639,10 +639,14 @@ export function enrollmentRows(
         ? "waiting"
         : enrollment.phase === "running"
           ? "running"
-          : enrollment.phase === "failed"
+          : enrollment.phase === "failed" && stoppedAtStep(enrollment.progress)
             ? "failed"
             : "waiting",
   }));
+}
+
+function stoppedAtStep(progress: SetupProgress): boolean {
+  return progress.problem !== "canceled" && progress.problem !== "server-unavailable";
 }
 
 function RunnerEnrollment({ server, enrollment }: { server: string; enrollment: EnrollmentPhase }) {
@@ -736,9 +740,15 @@ function RunnerEnrollment({ server, enrollment }: { server: string; enrollment: 
       const problem = enrollment.progress.problem ?? "script-failed";
       return (
         <Frame width="status" centered>
-          <StatusIcon tone="problem">
-            <AlertIcon size={26} />
-          </StatusIcon>
+          {problem === "canceled" ? (
+            <StatusIcon tone="neutral">
+              <PauseIcon />
+            </StatusIcon>
+          ) : (
+            <StatusIcon tone="problem">
+              <AlertIcon size={26} />
+            </StatusIcon>
+          )}
           <Header
             title={problem === "canceled" ? t("canceledTitle") : t("failedTitle")}
             summary={`${t(`problem.${problem}`)} ${t("failedNext")}`}

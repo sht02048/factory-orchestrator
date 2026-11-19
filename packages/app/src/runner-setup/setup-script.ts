@@ -117,9 +117,9 @@ remote_login_on() {
 
 stop_on_signal() {
   trap - INT TERM
+  report_failure canceled ""
   progress ${shellLiteral(PROGRESS_FAIL_PREFIX)} canceled
   say "Ganger: stopped before this Mac was registered." >&2
-  report_failure canceled ""
   exit 130
 }
 

@@ -123,7 +123,7 @@ export function CommandFlow({
                       : ""
               }
               detail={failed?.detail ?? null}
-              problem={failed !== null}
+              problem={failed !== null && failed.problem !== "canceled"}
               retryLabel={expired || failed !== null ? t("newCommand") : null}
               primary={primary}
               onRetry={newCommand}
