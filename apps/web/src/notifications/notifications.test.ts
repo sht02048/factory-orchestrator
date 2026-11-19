@@ -67,7 +67,7 @@ describe("알림 사건", () => {
     ]);
     syncNotifications(db, now);
     const question = listOpenNotificationEvents(db).find((event) => event.kind === "question");
-    expect(question?.cause).toBe("question:q-1");
+    expect(question?.cause).toBe(`question:${runId}:q-1`);
 
     answerRunQuestion(
       db,

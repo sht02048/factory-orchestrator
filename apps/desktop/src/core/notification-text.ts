@@ -8,11 +8,13 @@ const t = createTranslator({
   namespace: "system.notifications",
 });
 
-const PROVIDER_NAMES: Readonly<Record<string, string>> = { claude: "Claude", codex: "Codex" };
+const providers = createTranslator({ locale: "ko", messages: { system }, namespace: "system" });
 
 function providerName(provider: string | null): string {
   if (provider === null) return "";
-  return PROVIDER_NAMES[provider] ?? provider;
+  return provider === "claude" || provider === "codex"
+    ? providers(`providers.${provider}`)
+    : provider;
 }
 
 export function notificationText(content: NotificationContent): { title: string; body: string } {

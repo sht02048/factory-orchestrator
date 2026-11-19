@@ -5,11 +5,12 @@ import {
   documentStyles,
   Checkbox,
   ProblemCallout,
+  Section,
   Text,
   textStyles,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
 import screens from "../../messages/ko/screens.json" with { type: "json" };
 import { NOTIFICATION_GROUPS } from "../core/notification-prefs";
@@ -49,7 +50,6 @@ export function NotificationSettings({
 }) {
   const t = useTranslations("screens.notificationSettings");
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const groupsId = useId();
   useEffect(() => {
     titleRef.current?.focus();
   }, []);
@@ -92,13 +92,11 @@ export function NotificationSettings({
             onCheckedChange={(enabled) => save({ ...view, enabled })}
           />
         </Card>
-        <section aria-labelledby={groupsId} {...stylex.props(styles.section)}>
-          <div {...stylex.props(styles.sectionHead)}>
-            <Text variant="label" as="h2" id={groupsId}>
-              {t("groupsLabel")}
-            </Text>
-            {view.enabled ? null : <Text variant="meta">{t("groupsOff")}</Text>}
-          </div>
+        <Section
+          title={t("groupsLabel")}
+          headingLevel="h2"
+          {...(view.enabled ? {} : { note: t("groupsOff") })}
+        >
           <Card padding="compact">
             <div {...stylex.props(styles.groups)}>
               {NOTIFICATION_GROUPS.map((group) => (
@@ -114,7 +112,7 @@ export function NotificationSettings({
             </div>
           </Card>
           <Text variant="meta">{t("note")}</Text>
-        </section>
+        </Section>
       </div>
     </main>
   );
@@ -140,14 +138,5 @@ const styles = stylex.create({
   },
   header: { display: "flex", flexDirection: "column", gap: space.s2 },
   title: { outline: "none" },
-  section: { display: "flex", flexDirection: "column", gap: space.s3 },
-  sectionHead: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    columnGap: space.s3,
-    rowGap: space.s1,
-  },
   groups: { display: "flex", flexDirection: "column", gap: space.s1 },
 });

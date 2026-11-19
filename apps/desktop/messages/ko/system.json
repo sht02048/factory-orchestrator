@@ -88,5 +88,9 @@
   },
   "settingsWindow": {
     "title": "알림 설정"
+  },
+  "providers": {
+    "claude": "Claude",
+    "codex": "Codex"
   }
 }

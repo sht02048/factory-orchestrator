@@ -21,10 +21,10 @@ function runCause(run: HomeRun): NotificationCause | null {
     case "waiting-for-input": {
       const input = run.input;
       if (input?.kind === "question" && !input.answered) {
-        return { ...base, kind: "question", cause: `question:${input.questionId}` };
+        return { ...base, kind: "question", cause: `question:${run.id}:${input.questionId}` };
       }
       if (input?.kind === "permission" && !input.denied) {
-        return { ...base, kind: "permission", cause: `permission:${input.promptId}` };
+        return { ...base, kind: "permission", cause: `permission:${run.id}:${input.promptId}` };
       }
       return null;
     }
