@@ -93,14 +93,21 @@ export function readVolume(mount: string): MountedVolume {
   };
 }
 
+const XATTR_OUTPUT_LIMIT = 256 * 1024 * 1024;
+
 function xattrRecursive(path: string): string {
-  const result = spawnSync("xattr", ["-r", path], { stdio: ["ignore", "pipe", "inherit"] });
+  const result = spawnSync("xattr", ["-r", path], {
+    stdio: ["ignore", "pipe", "inherit"],
+    maxBuffer: XATTR_OUTPUT_LIMIT,
+  });
+  if (result.error !== undefined) throw new Error(`xattr -r failed: ${result.error.message}`);
   if (result.status !== 0) throw new Error(`xattr -r exited with ${result.status ?? "unknown"}`);
   return result.stdout.toString();
 }
 
 function codesign(args: ReadonlyArray<string>): string | null {
   const result = spawnSync("codesign", args, { stdio: ["ignore", "ignore", "pipe"] });
+  if (result.error !== undefined) return `codesign failed: ${result.error.message}`;
   return result.status === 0 ? null : result.stderr.toString().trim();
 }
 
