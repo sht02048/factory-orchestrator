@@ -25,6 +25,7 @@ import {
   TableRow,
   TableRows,
   Text,
+  VisuallyHidden,
   showToast,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
@@ -114,44 +115,43 @@ function AllWorkspaces({
   );
 }
 
-type RereadResult = "idle" | "reading" | "checking" | "failed";
+type RereadResult = "idle" | "reading" | "checking" | "failed" | "partial";
 
-function RereadButton({
-  onReread,
-  failedProjects,
-}: {
-  onReread: () => Promise<void>;
-  failedProjects: number;
-}) {
+function useReread(onReread: () => Promise<void>, failedProjects: number) {
   const t = useTranslations("tickets.reread");
   const [result, setResult] = useState<RereadResult>("idle");
   useEffect(() => {
     if (result !== "checking") return;
     if (failedProjects > 0) {
-      setResult("failed");
+      setResult("partial");
       return;
     }
     setResult("idle");
     showToast(t("done"));
   }, [result, failedProjects, t]);
+  const start = () => {
+    setResult("reading");
+    onReread().then(
+      () => setResult("checking"),
+      () => setResult("failed"),
+    );
+  };
+  return { result, start };
+}
+
+function RereadButton({ result, onStart }: { result: RereadResult; onStart: () => void }) {
+  const t = useTranslations("tickets.reread");
   return (
-    <div {...stylex.props(styles.reread)}>
-      <Button
-        busy={{ active: result === "reading", label: t("reading") }}
-        onClick={() => {
-          setResult("reading");
-          onReread().then(
-            () => setResult("checking"),
-            () => setResult("failed"),
-          );
-        }}
-      >
+    <>
+      <Button busy={{ active: result === "reading", label: t("reading") }} onClick={onStart}>
         {t("action")}
       </Button>
-      <Text variant="meta" tone="problem" role="status">
-        {result === "failed" ? t("failed") : ""}
-      </Text>
-    </div>
+      <VisuallyHidden>
+        <span role="status">
+          {result === "failed" ? t("failed") : result === "partial" ? t("partial") : ""}
+        </span>
+      </VisuallyHidden>
+    </>
   );
 }
 
@@ -176,6 +176,7 @@ function TicketsList({
   onReread,
 }: TicketsScreenProps) {
   const t = useTranslations("tickets");
+  const reread = useReread(onReread, page.errors.length);
   const [query, setQuery] = useState("");
   const visible = useMemo(
     () =>
@@ -213,7 +214,7 @@ function TicketsList({
           {...(page.trackerProjectCount === 0
             ? {}
             : {
-                actions: <RereadButton onReread={onReread} failedProjects={page.errors.length} />,
+                actions: <RereadButton result={reread.result} onStart={reread.start} />,
               })}
         />
       }
@@ -223,9 +224,12 @@ function TicketsList({
         list={
           <div {...stylex.props(styles.listFrame)}>
             <div {...stylex.props(styles.listTop)}>
-              {page.errors.length === 0 ? null : (
+              {page.errors.length === 0 && reread.result !== "failed" ? null : (
                 <Card surface="problem">
                   <div {...stylex.props(styles.lines)}>
+                    {reread.result === "failed" ? (
+                      <Text variant="body">{t("reread.failed")}</Text>
+                    ) : null}
                     {page.errors.map((error) => (
                       <Text key={error.trackerProject} variant="body">
                         {t(`loadError.${error.reason}`, { project: error.trackerProject })}
@@ -562,7 +566,6 @@ function RunTiming({ run }: { run: TicketRun }) {
 
 const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
-  reread: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: space.s1 },
   listFrame: {
     display: "grid",
     gridTemplateRows: "auto minmax(0, 1fr)",
