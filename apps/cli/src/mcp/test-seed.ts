@@ -238,3 +238,15 @@ export function fakeRegistry(): AdapterRegistry {
     .registerTracker({ kind: tracker.kind, create: () => tracker })
     .registerCodeHost({ kind: codeHost.kind, create: () => codeHost });
 }
+
+export function queueRun(db: Database, key: string, minute: number): RunId {
+  const result = assignRun(db, {
+    ticket: { connection, key: toTicketKey(key) },
+    trackerProject: webProject,
+    runnerProject: webRepo,
+    agent,
+    now: at(minute),
+  });
+  if (!result.ok) throw new Error(`assign ${key}: ${result.reason}`);
+  return result.run.id;
+}

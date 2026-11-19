@@ -686,9 +686,11 @@ describe("Runners 공급자 사용량(0086)", () => {
     const runners = section(html, "Runners");
     expect(text(runners)).toContain("러너 1대에 문제가 있어요");
     expect(text(runners)).toContain(
-      "Claude 5시간 한도에 닿았어요: runner-c · 1시간 12분 뒤 풀려요",
+      "Claude 5시간 한도에 닿았어요: runner-c · 1시간 12분 뒤 한도가 풀리면 다시 런을 받아요",
     );
-    expect(text(html)).toContain("한도에 닿은 러너 1대는 1시간 12분 뒤 한도가 풀려요.");
+    expect(text(html)).toContain(
+      "한도에 닿은 러너 1대는 1시간 12분 뒤 한도가 풀리면 다시 런을 받아요.",
+    );
   });
 
   it("한도에 닿은 러너가 없으면 문제 상자와 머리 문장에 한도 이야기가 없다", () => {

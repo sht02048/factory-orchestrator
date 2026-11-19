@@ -20,7 +20,7 @@ import {
   toWorkspaceId,
 } from "@ganger/db";
 import type { Database, StoredRun, StoredRunner } from "@ganger/db";
-import { explainQueue } from "../runs/queue-reasons.js";
+import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
 import { isWebUrl } from "../format/url.js";
 import { resolveWorkspace, runnerIssueCause } from "../shell/model.js";
 import { calendarDay } from "../time-zone.js";
@@ -60,22 +60,24 @@ export function loadHomePage(
               id: run.id,
               assignedAt: run.assignedAt,
               project: run.runnerProject,
+              agent: run.agent,
               runnerId: run.runnerId,
               unstartable: false,
             },
           ]
         : [],
     ),
-    runners: listRunnerSnapshots(db),
+    runners: listRunnerSnapshots(db, now),
     runs: placements,
   });
   const cancelling = new Set<string>(listPendingCancelRequests(db).map((r) => r.runId));
 
-  const queuedReason = (id: RunId): QueuedReason => {
-    const code = queueReasons.get(id) ?? { kind: "behind" };
-    if (code.kind !== "no-capacity") return code;
-    return { kind: "no-capacity", runner: runners.get(code.runnerId)?.name ?? code.runnerId };
-  };
+  const queuedReason = (id: RunId): QueuedReason =>
+    describeQueuedReason(
+      queueReasons.get(id) ?? { kind: "behind" },
+      (runnerId) => runners.get(runnerId)?.name ?? runnerId,
+      now,
+    );
 
   const projectNames = new Map<string, string>();
   const projectName = (run: StoredRun): string => {

@@ -1,6 +1,8 @@
-import type { LabelId, RunnerId, RunnerProjectId } from "./ids.js";
+import type { AgentId, LabelId, RunnerId, RunnerProjectId } from "./ids.js";
 import { ACTIVE_RUN_STATES, CAPACITY_OCCUPYING_STATES, sameTicket } from "./run.js";
 import type { AgentResult, RunState, TicketRef } from "./run.js";
+import { usageLimitOf } from "./usage-limit.js";
+import type { UsageLimit } from "./usage-limit.js";
 
 export interface RunnerSnapshot {
   id: RunnerId;
@@ -8,6 +10,7 @@ export interface RunnerSnapshot {
   assignmentBlocked: boolean;
   capacity: number;
   projects: ReadonlyArray<RunnerProjectId>;
+  usageLimits: ReadonlyArray<UsageLimit>;
 }
 
 export interface RunPlacement {
@@ -87,12 +90,14 @@ export function canRunnerTake(runner: RunnerSnapshot, project: RunnerProjectId):
 
 export function pickRunner(input: {
   project: RunnerProjectId;
+  agent: AgentId;
   runners: ReadonlyArray<RunnerSnapshot>;
   runs: ReadonlyArray<RunPlacement>;
 }): RunnerId | null {
   let best: { id: RunnerId; remaining: number } | null = null;
   for (const runner of input.runners) {
     if (!canRunnerTake(runner, input.project)) continue;
+    if (usageLimitOf(runner.usageLimits, input.agent) !== null) continue;
     const remaining = remainingCapacity(runner, input.runs);
     if (best === null || remaining > best.remaining) {
       best = { id: runner.id, remaining };

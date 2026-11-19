@@ -222,12 +222,28 @@ describe("Tickets 화면", () => {
 });
 
 describe("수동 할당 폼", () => {
+  const choice = (id: string, overrides: Partial<RunnerChoice> = {}): RunnerChoice => ({
+    id,
+    name: id,
+    online: true,
+    assignmentBlocked: false,
+    projects: ["p"],
+    usageLimits: [],
+    ...overrides,
+  });
   const runners: RunnerChoice[] = [
-    { id: "runner-a", name: "runner-a", online: true, assignmentBlocked: false, projects: ["p"] },
-    { id: "runner-b", name: "runner-b", online: false, assignmentBlocked: false, projects: ["p"] },
-    { id: "runner-c", name: "runner-c", online: true, assignmentBlocked: true, projects: ["p"] },
-    { id: "runner-d", name: "runner-d", online: true, assignmentBlocked: false, projects: ["q"] },
+    choice("runner-a"),
+    choice("runner-b", { online: false }),
+    choice("runner-c", { assignmentBlocked: true }),
+    choice("runner-d", { projects: ["q"] }),
   ];
+  const labels = {
+    auto: "auto",
+    offline: (n: string) => `${n} offline`,
+    blocked: (n: string) => `${n} blocked`,
+    limited: (n: string, limit: { provider: string; resetsInMs: number }) =>
+      `${n} ${limit.provider} ${limit.resetsInMs}`,
+  };
 
   it("Mapping 기본값으로 채우고 러너 쪽 프로젝트는 읽기 전용이다", () => {
     const html = renderWithMessages(
@@ -251,17 +267,44 @@ describe("수동 할당 폼", () => {
   });
 
   it("러너 목록: 자동 고르기가 맨 앞, 그 프로젝트가 있는 러너만, 인증이 깨진 러너는 비활성+이유", () => {
-    expect(
-      runnerOptionsFor(runners, "p", {
-        auto: "auto",
-        offline: (n) => `${n} offline`,
-        blocked: (n) => `${n} blocked`,
-      }),
-    ).toEqual([
+    expect(runnerOptionsFor(runners, "p", "claude", labels)).toEqual([
       { value: AUTO_RUNNER, label: "auto" },
       { value: "runner-a", label: "runner-a" },
       { value: "runner-b", label: "runner-b offline" },
       { value: "runner-c", label: "runner-c blocked", disabled: true },
     ]);
+  });
+
+  it("고른 에이전트의 공급자 한도에 닿은 러너는 막지 않고 경고만 붙인다", () => {
+    const limited = [
+      choice("runner-a", { usageLimits: [{ provider: "claude", resetsInMs: 60_000 }] }),
+    ];
+
+    expect(runnerOptionsFor(limited, "p", "claude", labels)).toEqual([
+      { value: AUTO_RUNNER, label: "auto" },
+      { value: "runner-a", label: "runner-a claude 60000" },
+    ]);
+    expect(runnerOptionsFor(limited, "p", "codex", labels)).toEqual([
+      { value: AUTO_RUNNER, label: "auto" },
+      { value: "runner-a", label: "runner-a" },
+    ]);
+  });
+
+  it("한도 경고 문구에 공급자 이름과 풀리는 시간을 보인다", () => {
+    const html = renderWithMessages(
+      <AssignForm
+        defaults={{ runnerProject: "p", agent: "claude" }}
+        runners={[
+          choice("runner-a", { usageLimits: [{ provider: "claude", resetsInMs: 68 * 60_000 }] }),
+        ]}
+        agents={["claude"]}
+        runner="runner-a"
+        agent="claude"
+        onRunnerChange={noop}
+        onAgentChange={noop}
+      />,
+      ticketsMessages,
+    );
+    expect(text(html)).toContain("runner-a · Claude 한도에 닿았어요. 1시간 8분 뒤 풀려요");
   });
 });

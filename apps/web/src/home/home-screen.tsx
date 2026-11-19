@@ -25,7 +25,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { useUsageNames } from "../labels";
+import { useQueuedReasonText, useUsageNames } from "../labels";
 import { useStatusName } from "../status";
 import type {
   DashboardRunner,
@@ -413,6 +413,7 @@ function InProgressSection({ page, all }: { page: HomePage; all: boolean }) {
 function ProgressRow({ run, all }: { run: HomeRun; all: boolean }) {
   const t = useTranslations("home.row");
   const tDomain = useTranslations("domain");
+  const queuedReasonText = useQueuedReasonText();
   const statusName = useStatusName();
   const { elapsed } = useTime();
   const item = (status: PillStatus, detail: string | undefined, since: number | null) => (
@@ -458,6 +459,8 @@ function ProgressRow({ run, all }: { run: HomeRun; all: boolean }) {
         case "project-missing":
         case "assignment-blocked":
           return item("queued", tDomain(`queuedReason.${reason.kind}`), run.waitMs);
+        case "usage-limit":
+          return item("queued", queuedReasonText(reason), run.waitMs);
       }
       return null;
     }

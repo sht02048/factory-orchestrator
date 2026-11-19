@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SecretBox, saveWorkspace, toWorkspaceId } from "@ganger/db";
+import { SecretBox, recordProviderUsage, saveWorkspace, toWorkspaceId } from "@ganger/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -15,6 +15,7 @@ import {
   SECRETS,
   at,
   fakeRegistry,
+  queueRun,
   runnerId,
   seedMcpDatabase,
 } from "./test-seed.js";
@@ -233,6 +234,38 @@ describe("ganger mcp 서버", () => {
       total: 1,
       tickets: [{ key: "ACME-9", [EXTERNAL_FIELD]: { title: EXTERNAL.trackerTitle } }],
       trackerErrors: [],
+    });
+  });
+
+  it("공급자 한도에 닿은 러너를 기다리는 런은 한도 대기 사유와 풀릴 때까지 남은 시간을 준다", async () => {
+    recordProviderUsage(seeded.db, {
+      runnerId,
+      readAt: at(55),
+      reading: {
+        kind: "read",
+        providers: [
+          {
+            provider: "claude",
+            status: "ok",
+            windows: [{ kind: "session", usedPercent: 100, resetsAt: at(90) }],
+          },
+        ],
+      },
+    });
+    const queued = queueRun(seeded.db, "ACME-3", 56);
+    const { json } = await call("get_dashboard");
+    expect(json).toMatchObject({
+      queued: [
+        {
+          id: queued,
+          state: "queued",
+          queuedReason: { kind: "usage-limit", provider: "claude", resetsInMs: 30 * 60_000 },
+        },
+      ],
+    });
+    const detail = await call("get_run", { runId: queued });
+    expect(detail.json).toMatchObject({
+      run: { status: { state: "queued", queuedReason: { kind: "usage-limit" } } },
     });
   });
 

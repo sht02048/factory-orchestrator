@@ -50,6 +50,12 @@ export interface RunnerChoice {
   online: boolean;
   assignmentBlocked: boolean;
   projects: ReadonlyArray<string>;
+  usageLimits: ReadonlyArray<RunnerUsageLimit>;
+}
+
+export interface RunnerUsageLimit {
+  provider: string;
+  resetsInMs: number;
 }
 
 export interface TrackerLoadError {

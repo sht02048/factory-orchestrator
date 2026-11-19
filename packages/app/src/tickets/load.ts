@@ -1,4 +1,4 @@
-import { AdapterError, checkAssignment, summarizeRunOutcome } from "@ganger/core";
+import { AdapterError, checkAssignment, summarizeRunOutcome, usageLimitsAt } from "@ganger/core";
 import type {
   AdapterRegistry,
   LabelId,
@@ -57,6 +57,10 @@ export async function loadTicketsPage(
     online: runner.online,
     assignmentBlocked: runner.assignmentBlocked,
     projects: runner.projects.map((p) => p.id),
+    usageLimits: usageLimitsAt(runner.providerUsage, now).map((limit) => ({
+      provider: limit.provider,
+      resetsInMs: limit.until.getTime() - now.getTime(),
+    })),
   }));
   const agents = mappingAgents(db);
   const runnerNames = new Map(storedRunners.map((runner) => [runner.id, runner.name]));
