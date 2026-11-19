@@ -7,6 +7,7 @@ Local paths, host names, user names and accounts are replaced with `<path>`, `<h
 | File                                       | Command and situation                                                         |
 | ------------------------------------------ | ----------------------------------------------------------------------------- |
 | `status-ready.json`                        | `status --json`, runtime ready                                                |
+| `account-list.json`                        | `account list --json` shaped like the real output; accounts are made up       |
 | `serve-service-status-live.json`           | `serve service status --json`, service installed and live                     |
 | `project-list.json`                        | `project list --json`                                                         |
 | `project-setups.json`                      | `project setups --json`                                                       |
