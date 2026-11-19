@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
+import { z } from "zod";
 import { CLI_ENTRY_ENV } from "@ganger/app/settings/mcp-launch";
+import { WORKER_WAKE_ENV, WORKER_WAKE_MESSAGE, WORKER_WAKE_VIA_IPC } from "@ganger/core";
 import { BOOT_ENV, migrate, openDatabase, parseBootConfig } from "@ganger/db";
 import type { BootConfig } from "@ganger/db";
 import { HOME_ENV, homePaths, readBootEnv } from "./home.js";
@@ -51,7 +54,9 @@ export class StartError extends Error {
 export async function start(options: StartOptions): Promise<Started> {
   const bootEnv = readBootEnv(homePaths(options.home).envFile, options.env);
   const config = parseBootConfig(bootEnv);
-  const specs = [options.layout.web(config), options.layout.worker()];
+  const webSpec = options.layout.web(config);
+  const workerSpec = options.layout.worker();
+  const specs = [webSpec, workerSpec];
   const missing = specs.flatMap((spec) => spec.requires.filter((path) => !existsSync(path)));
   if (missing.length > 0) {
     throw new StartError(`build output not found (run pnpm build): ${missing.join(", ")}`);
@@ -91,11 +96,12 @@ export async function start(options: StartOptions): Promise<Started> {
     [BOOT_ENV.port]: String(config.port),
     [BOOT_ENV.databasePath]: config.databasePath,
     [BOOT_ENV.encryptionKey]: Buffer.from(config.encryptionKey).toString("base64"),
+    [WORKER_WAKE_ENV]: WORKER_WAKE_VIA_IPC,
   };
-  const group = superviseChildren(
-    specs.map((spec) => spawnChild(spec, childEnv, options.onOutput)),
-    options.stopTimeoutMs ?? STOP_TIMEOUT_MS,
-  );
+  const web = spawnChild(webSpec, childEnv, options.onOutput);
+  const worker = spawnChild(workerSpec, childEnv, options.onOutput);
+  relayWorkerWake(web.process, worker.process);
+  const group = superviseChildren([web, worker], options.stopTimeoutMs ?? STOP_TIMEOUT_MS);
 
   const awake =
     options.keepAwake === undefined
@@ -136,8 +142,20 @@ export async function start(options: StartOptions): Promise<Started> {
 
 interface Child {
   name: ProcessSpec["name"];
+  process: ChildProcess;
   exit: Promise<string>;
   kill(signal: NodeJS.Signals): void;
+}
+
+const workerWakeSchema = z.object({ type: z.literal("wake") });
+
+const ignoreSendFailure = (): void => undefined;
+
+function relayWorkerWake(web: ChildProcess, worker: ChildProcess): void {
+  web.on("message", (message) => {
+    if (!workerWakeSchema.safeParse(message).success || !worker.connected) return;
+    worker.send(WORKER_WAKE_MESSAGE, ignoreSendFailure);
+  });
 }
 
 function spawnChild(
@@ -148,7 +166,10 @@ function spawnChild(
   const child = spawn(spec.command, spec.args, {
     cwd: spec.cwd,
     env,
-    stdio: onOutput === undefined ? ["ignore", "inherit", "inherit"] : ["ignore", "pipe", "pipe"],
+    stdio:
+      onOutput === undefined
+        ? ["ignore", "inherit", "inherit", "ipc"]
+        : ["ignore", "pipe", "pipe", "ipc"],
   });
   if (onOutput !== undefined) {
     child.stdout?.on("data", (chunk: Buffer) => onOutput(spec.name, chunk.toString()));
@@ -167,6 +188,7 @@ function spawnChild(
   });
   return {
     name: spec.name,
+    process: child,
     exit,
     kill: (signal) => {
       if (running) child.kill(signal);

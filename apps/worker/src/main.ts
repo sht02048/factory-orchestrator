@@ -1,4 +1,5 @@
 import { bootWorker } from "./boot.js";
+import { listenForWake } from "./wake-listener.js";
 
 const { migrated, worker } = bootWorker({ env: process.env });
 console.info(
@@ -6,6 +7,7 @@ console.info(
     ? "[worker] started"
     : `[worker] applied ${migrated.length} migration(s) and started`,
 );
+listenForWake(process, () => worker.wake());
 
 let stopping = false;
 const stop = (signal: NodeJS.Signals): void => {
