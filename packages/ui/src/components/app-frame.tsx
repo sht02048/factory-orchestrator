@@ -50,25 +50,23 @@ export function AppFrame({ rail, fill = true, pending, children }: AppFrameProps
         {...(pending?.active === true ? { "aria-busy": true } : {})}
         {...stylex.props(styles.main, pending !== undefined && styles.mainWithPending)}
       >
-        {pending === undefined ? null : <PendingBar pending={pending} />}
+        {pending?.active === true ? <PendingBar /> : null}
         {children}
       </main>
+      {pending === undefined ? null : (
+        <span role="status" {...stylex.props(visuallyHiddenStyles.hidden)}>
+          {pending.active ? pending.label : ""}
+        </span>
+      )}
     </div>
   );
 }
 
-function PendingBar({ pending }: { pending: AppFramePending }) {
+function PendingBar() {
   return (
-    <>
-      <span role="status" {...stylex.props(visuallyHiddenStyles.hidden)}>
-        {pending.active ? pending.label : ""}
-      </span>
-      {pending.active ? (
-        <span aria-hidden="true" data-pending-bar {...stylex.props(styles.pendingTrack)}>
-          <span {...stylex.props(styles.pendingBar)} />
-        </span>
-      ) : null}
-    </>
+    <span aria-hidden="true" data-pending-bar {...stylex.props(styles.pendingTrack)}>
+      <span {...stylex.props(styles.pendingBar)} />
+    </span>
   );
 }
 

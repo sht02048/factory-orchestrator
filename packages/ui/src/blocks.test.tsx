@@ -250,6 +250,7 @@ describe("DataTable·차트·단계(티켓 0074)", () => {
       </AppFrame>,
     );
     expect(busy).toMatch(/<main aria-busy="true"/);
+    expect(busy).toMatch(/<\/main><span role="status"/);
     expect(busy).toMatch(/role="status"[^>]*>화면을 여는 중이에요</);
     expect(busy).toContain("data-pending-bar");
   });

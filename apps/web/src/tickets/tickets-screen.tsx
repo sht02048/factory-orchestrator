@@ -25,7 +25,7 @@ import {
   TableRow,
   TableRows,
   Text,
-  VisuallyHidden,
+  showToast,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -114,14 +114,17 @@ function AllWorkspaces({
   );
 }
 
-type RereadResult = "idle" | "reading" | "done" | "failed";
+type RereadResult = "idle" | "reading" | "failed";
 
 function RereadButton({ onReread }: { onReread: () => Promise<void> }) {
   const t = useTranslations("tickets.reread");
   const [result, setResult] = useState<RereadResult>("idle");
   const reading = result === "reading";
   return (
-    <>
+    <div {...stylex.props(styles.reread)}>
+      <Text variant="meta" tone="problem" role="status">
+        {result === "failed" ? t("failed") : ""}
+      </Text>
       <Button
         aria-disabled={reading}
         aria-busy={reading}
@@ -129,17 +132,24 @@ function RereadButton({ onReread }: { onReread: () => Promise<void> }) {
           if (reading) return;
           setResult("reading");
           onReread().then(
-            () => setResult("done"),
+            () => {
+              setResult("idle");
+              showToast(t("done"));
+            },
             () => setResult("failed"),
           );
         }}
       >
-        {reading ? t("reading") : t("action")}
+        <span {...stylex.props(styles.stackedLabels)}>
+          <span {...stylex.props(styles.stackedLabel, reading && styles.hiddenLabel)}>
+            {t("action")}
+          </span>
+          <span {...stylex.props(styles.stackedLabel, !reading && styles.hiddenLabel)}>
+            {t("reading")}
+          </span>
+        </span>
       </Button>
-      <VisuallyHidden>
-        <span role="status">{result === "done" || result === "failed" ? t(result) : ""}</span>
-      </VisuallyHidden>
-    </>
+    </div>
   );
 }
 
@@ -548,6 +558,10 @@ function RunTiming({ run }: { run: TicketRun }) {
 
 const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
+  reread: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: space.s3 },
+  stackedLabels: { display: "grid" },
+  stackedLabel: { gridArea: "1 / 1" },
+  hiddenLabel: { visibility: "hidden" },
   listFrame: {
     display: "grid",
     gridTemplateRows: "auto minmax(0, 1fr)",

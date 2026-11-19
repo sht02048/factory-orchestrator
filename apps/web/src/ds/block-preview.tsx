@@ -114,7 +114,7 @@ function ShellPreview({ titleBarHidden }: { titleBarHidden: boolean }) {
   const t = useTranslations("ds.blocks");
   return (
     <figure {...stylex.props(styles.shell)}>
-      <figcaption>
+      <figcaption {...stylex.props(styles.caption)}>
         <Text variant="label">{titleBarHidden ? t("shell.desktop") : t("shell.web")}</Text>
         {titleBarHidden ? null : <Text variant="meta">{t("shell.pending")}</Text>}
       </figcaption>
@@ -682,6 +682,7 @@ const styles = stylex.create({
   columns: { display: "flex", flexWrap: "wrap", gap: space.s10 },
   shells: { display: "flex", flexDirection: "column", gap: space.s6 },
   shell: { display: "flex", flexDirection: "column", gap: space.s2, margin: 0 },
+  caption: { display: "flex", flexDirection: "column", gap: space.s1 },
   frame: { height: 320, overflow: "hidden" },
   kanban: { width: "100%", maxWidth: 360, paddingBlock: space.s5 },
 });
