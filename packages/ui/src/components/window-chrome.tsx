@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
-import { colors, size } from "../tokens.stylex";
+import { size } from "../tokens.stylex";
 import { windowRegion } from "../window-frame";
 
 const TitleBarHiddenContext = createContext(false);
@@ -23,18 +23,22 @@ export function useTitleBarHidden(): boolean {
   return useContext(TitleBarHiddenContext);
 }
 
-export function WindowDragStrip() {
+export function WindowDragFrame({ children }: { children: ReactNode }) {
   const titleBarHidden = useTitleBarHidden();
-  if (!titleBarHidden) return null;
-  return <div aria-hidden="true" {...windowRegion("drag")} {...stylex.props(styles.strip)} />;
+  if (!titleBarHidden) return children;
+  return (
+    <div {...stylex.props(styles.frame)}>
+      <div aria-hidden="true" {...windowRegion("drag")} />
+      <div {...stylex.props(styles.body)}>{children}</div>
+    </div>
+  );
 }
 
 const styles = stylex.create({
-  strip: {
-    position: "sticky",
-    top: 0,
-    zIndex: 1,
-    height: size.titleBar,
-    backgroundColor: colors.bgCanvas,
+  frame: {
+    display: "grid",
+    gridTemplateRows: `${size.titleBar} minmax(0, 1fr)`,
+    height: "100dvh",
   },
+  body: { position: "relative", minWidth: 0, minHeight: 0, overflow: "auto" },
 });

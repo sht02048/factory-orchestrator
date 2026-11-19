@@ -28,7 +28,7 @@ import {
   StepNavItem,
   Text,
   VisuallyHidden,
-  WindowDragStrip,
+  WindowDragFrame,
   useTitleBarHidden,
   buttonStyles,
   focusStyles,
@@ -156,8 +156,7 @@ export function OnboardingScreen({
   const titleBarHidden = useTitleBarHidden();
 
   return (
-    <>
-      <WindowDragStrip />
+    <WindowDragFrame>
       <div {...stylex.props(styles.page, titleBarHidden && styles.pageBelowTitleBar)}>
         <StepList page={page} index={index} onStep={onStep} />
         <main {...stylex.props(styles.column)}>
@@ -209,7 +208,7 @@ export function OnboardingScreen({
           </div>
         </main>
       </div>
-    </>
+    </WindowDragFrame>
   );
 }
 

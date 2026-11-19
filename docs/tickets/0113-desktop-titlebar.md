@@ -30,9 +30,9 @@ blocked_by: []
 
 ## 범위
 
-- `packages/ui`: `PageHeader`를 한 줄 머리로 바꾸고 선택 속성 `lead`(제목 앞 링크)를 더한다. 머리 줄을 본문 위에 두는 `ScreenLayout`, 창 문맥 `WindowChrome`·`useTitleBarHidden`, 레일 없는 화면의 끌기 띠 `WindowDragStrip`, 창 틀 값(`@ganger/ui/window-frame`)을 더한다. `AppFrame`은 제목 표시줄을 숨긴 창에서 레일 위 56px을 비운다. `Sheet`·`Dialog`는 끌기에서 뺀다. 토큰 `size.titleBar`, `size.pageHeadingMinWidth`.
-- `apps/web`: 모든 화면(Dashboard·Tickets·Runs·Run 상세·Runners·Stats·Settings, 준비 중 화면)의 머리를 한 줄 머리로 옮긴다. 레일 순서를 Workspace → 메뉴 → 마크로 바꾼다. 온보딩·없는 주소 화면에 끌기 띠를 둔다. 전역 CSS에 `data-app-region` 규칙.
-- `apps/desktop`: 본 창·알림 설정 창 옵션을 `window-options.ts`로 빼고 제목 표시줄을 숨긴다. 서버 화면을 열 때 쿠키를 심는다. 로컬 화면·알림 설정 창에 끌기 띠를 둔다.
+- `packages/ui`: `PageHeader`를 한 줄 머리로 바꾸고 선택 속성 `lead`(제목 앞 링크)를 더한다. 머리 줄을 본문 위에 두는 `ScreenLayout`, 창 문맥 `WindowChrome`·`useTitleBarHidden`, 레일 없는 화면을 감싸 맨 위 끌기 줄 아래에서만 내용을 스크롤하는 `WindowDragFrame`, 창 틀 값(`@ganger/ui/window-frame`)을 더한다. `AppFrame`은 제목 표시줄을 숨긴 창에서 레일 위 56px을 비운다. `Sheet`·`Dialog`는 끌기에서 뺀다. 토큰 `size.titleBar`, `size.pageHeadingMinWidth`.
+- `apps/web`: 모든 화면(Dashboard·Tickets·Runs·Run 상세·Runners·Stats·Settings, 준비 중 화면)의 머리를 한 줄 머리로 옮긴다. 레일 순서를 Workspace → 메뉴 → 마크로 바꾼다. 온보딩·없는 주소 화면을 `WindowDragFrame`으로 감싼다. 전역 CSS에 `data-app-region` 규칙.
+- `apps/desktop`: 본 창·알림 설정 창 옵션을 `window-options.ts`로 빼고 제목 표시줄을 숨긴다. 서버 화면을 열 때 쿠키를 심는다. 로컬 화면·알림 설정 창을 `WindowDragFrame`으로 감싼다.
 - 문서: ADR 0010, `packages/ui/DESIGN.md`, `/ds` 앱 틀 미리보기(웹·데스크톱).
 
 ## 완료 조건

@@ -15,6 +15,8 @@ import {
   breakpoints,
 } from "../tokens.stylex";
 
+const FIRST_LINE = `calc(${size.titleBar} - 2 * ${space.s2})`;
+
 export interface SplitViewProps {
   list: ReactNode;
   panel: ReactNode;
@@ -217,31 +219,26 @@ const styles = stylex.create({
     backgroundColor: colors.bgPanel,
   },
   screen: {
-    display: { default: "grid", [breakpoints.narrowScreen]: "block" },
+    display: "grid",
     gridTemplateRows: "auto minmax(0, 1fr)",
     minWidth: 0,
-    overflow: { default: null, [breakpoints.narrowScreen]: "auto" },
   },
-  screenBody: {
-    height: { default: null, [breakpoints.narrowScreen]: "100%" },
-    minWidth: 0,
-    minHeight: 0,
-    overflow: "auto",
-  },
+  screenBody: { minWidth: 0, minHeight: 0, overflow: "auto" },
   pageHead: {
     display: "flex",
     flexWrap: "wrap",
-    alignItems: "center",
+    alignItems: "flex-start",
     columnGap: space.s4,
     rowGap: space.s2,
     minHeight: size.titleBar,
-    paddingBlock: space.s2,
+    paddingTop: space.s2,
+    paddingBottom: `calc(${space.s2} - 1px)`,
     paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
     borderBottomWidth: 1,
     borderBottomStyle: "solid",
     borderBottomColor: colors.borderSubtle,
   },
-  pageLead: { display: "flex", alignItems: "center", flexShrink: 0 },
+  pageLead: { display: "flex", alignItems: "center", flexShrink: 0, minHeight: FIRST_LINE },
   pageHeading: {
     display: "flex",
     flexWrap: "wrap",
@@ -253,6 +250,9 @@ const styles = stylex.create({
     minWidth: 0,
   },
   pageTitle: {
+    display: "flex",
+    alignItems: "center",
+    minHeight: FIRST_LINE,
     flexShrink: 0,
     maxWidth: "100%",
     margin: 0,
@@ -274,6 +274,7 @@ const styles = stylex.create({
     display: "flex",
     flexWrap: "wrap",
     alignItems: "center",
+    minHeight: FIRST_LINE,
     gap: space.s2,
     marginInlineStart: "auto",
   },

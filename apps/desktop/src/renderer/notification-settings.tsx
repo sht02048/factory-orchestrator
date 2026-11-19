@@ -8,7 +8,7 @@ import {
   Section,
   Text,
   WindowChrome,
-  WindowDragStrip,
+  WindowDragFrame,
   textStyles,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
@@ -38,8 +38,9 @@ export function NotificationSettingsWindow() {
     <IntlProvider locale="ko" messages={{ screens }}>
       <WindowChrome titleBarHidden>
         <div {...stylex.props(documentStyles.body, styles.canvas)}>
-          <WindowDragStrip />
-          {view === null ? null : <NotificationSettings view={view} onChange={setView} />}
+          <WindowDragFrame>
+            {view === null ? null : <NotificationSettings view={view} onChange={setView} />}
+          </WindowDragFrame>
         </div>
       </WindowChrome>
     </IntlProvider>

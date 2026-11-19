@@ -103,7 +103,7 @@ export {
 export { CheckIcon, ChevronDownIcon, CloseIcon } from "./components/icons";
 export {
   WindowChrome,
-  WindowDragStrip,
+  WindowDragFrame,
   useTitleBarHidden,
   type WindowChromeProps,
 } from "./components/window-chrome";

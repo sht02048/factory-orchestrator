@@ -83,7 +83,7 @@ describe("/ds 서버 렌더", () => {
   });
 });
 
-const RENDERED_ONCE_AT_APP_ROOT = new Set(["Toaster", "WindowDragStrip"]);
+const RENDERED_ONCE_AT_APP_ROOT = new Set(["Toaster", "WindowDragFrame"]);
 
 function exportedComponents(): string[] {
   return Object.entries(ui)

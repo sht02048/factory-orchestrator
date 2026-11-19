@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { MascotMessage, Text, WindowDragStrip, buttonStyles, useTitleBarHidden } from "@ganger/ui";
+import { MascotMessage, Text, WindowDragFrame, buttonStyles, useTitleBarHidden } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
 import { Link } from "@tanstack/react-router";
 import { useTranslations } from "use-intl";
@@ -18,8 +18,7 @@ function NotFound() {
   const t = useTranslations("notFound");
   const titleBarHidden = useTitleBarHidden();
   return (
-    <>
-      <WindowDragStrip />
+    <WindowDragFrame>
       <main {...stylex.props(styles.page, titleBarHidden && styles.pageBelowTitleBar)}>
         <MascotMessage mood="worried" size="large">
           <Text variant="page">{t("title")}</Text>
@@ -29,7 +28,7 @@ function NotFound() {
           </Link>
         </MascotMessage>
       </main>
-    </>
+    </WindowDragFrame>
   );
 }
 

@@ -11,7 +11,7 @@ import {
   Tooltip,
   VisuallyHidden,
   WindowChrome,
-  WindowDragStrip,
+  WindowDragFrame,
   buttonStyles,
   textStyles,
 } from "@ganger/ui";
@@ -64,8 +64,9 @@ export function App() {
     <IntlProvider locale="ko" messages={messages}>
       <WindowChrome titleBarHidden>
         <div {...stylex.props(styles.canvas)}>
-          <WindowDragStrip />
-          {view === null ? null : <Screen key={screenKey(view)} view={view} />}
+          <WindowDragFrame>
+            {view === null ? null : <Screen key={screenKey(view)} view={view} />}
+          </WindowDragFrame>
         </div>
       </WindowChrome>
     </IntlProvider>

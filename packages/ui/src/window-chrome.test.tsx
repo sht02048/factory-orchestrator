@@ -9,7 +9,7 @@ import {
   RailBrand,
   ScreenLayout,
   WindowChrome,
-  WindowDragStrip,
+  WindowDragFrame,
   windowFrame,
 } from "./index";
 
@@ -82,10 +82,10 @@ describe("앱 셸과 창 제목 표시줄(0113)", () => {
     expect(html.indexOf("Workspace")).toBeLessThan(html.indexOf("data-rail-brand"));
   });
 
-  it("창 끌기 띠는 제목 표시줄을 숨긴 창에서만 그린다", () => {
-    expect(inWindow(false, <WindowDragStrip />)).toBe("");
-    expect(inWindow(true, <WindowDragStrip />)).toMatch(
-      /^<div aria-hidden="true" data-app-region="drag"[^>]*><\/div>$/,
+  it("레일 없는 화면은 제목 표시줄을 숨긴 창에서만 맨 위 끌기 줄을 두고, 내용은 그 아래에서만 스크롤한다", () => {
+    expect(inWindow(false, <WindowDragFrame>내용</WindowDragFrame>)).toBe("내용");
+    expect(inWindow(true, <WindowDragFrame>내용</WindowDragFrame>)).toMatch(
+      /^<div[^>]*><div aria-hidden="true" data-app-region="drag"><\/div><div[^>]*>내용<\/div><\/div>$/,
     );
   });
 });
