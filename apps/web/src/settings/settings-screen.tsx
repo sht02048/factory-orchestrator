@@ -8,18 +8,17 @@ import {
   Field,
   Input,
   PanelBlock,
-  Select,
   StatusPill,
   Text,
   showToast,
   textStyles,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
-import { useEffect, useState, type FocusEvent } from "react";
+import { createContext, use, useEffect, useId, useState, type FocusEvent } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { isPushCheck, prerequisiteHint, summarizePushChecks } from "@ganger/app/prerequisites";
-import { useAgentName, usePrerequisiteName } from "../labels";
+import { usePrerequisiteName } from "../labels";
 import { PushProblems } from "../push-check";
 import { browserClipboard, copyText } from "./clipboard";
 import { DEFAULT_ORCA_PATH } from "@ganger/runner-orca/config";
@@ -27,14 +26,16 @@ import { shellQuote } from "../onboarding/model";
 import { useStatusName } from "../status";
 import { RUNNER_CHECK_POLL_LIMIT_MS, RUNNER_CHECK_POLL_MS } from "@ganger/app/settings/model";
 import type {
-  BoundProject,
-  Choice,
   PrerequisiteView,
   RunnerCheckView,
   RunnerSettingsView,
 } from "@ganger/app/settings/model";
 
 export type ActionResult = { ok: true } | { ok: false; reason: string };
+
+export type CreateLabelResult =
+  | { ok: true; labelId: string; name: string; created: boolean }
+  | { ok: false; reason: string };
 
 export interface ProjectRef {
   ws: string;
@@ -51,7 +52,11 @@ export interface SettingsActions {
   addProject: (input: ProjectRef & { name: string }) => Promise<ActionResult>;
   removeProject: (input: ProjectRef) => Promise<ActionResult>;
   saveMapping: (
-    input: ProjectRef & { runnerProjectId: string; agentId: string; model: string },
+    input: ProjectRef & {
+      agentId: string;
+      model: string;
+      repos: Array<{ runnerProjectId: string; isDefault: boolean; labelId: string | null }>;
+    },
   ) => Promise<ActionResult>;
   saveInProgress: (input: ProjectRef & { stateId: string }) => Promise<ActionResult>;
   saveLabel: (input: {
@@ -59,6 +64,8 @@ export interface SettingsActions {
     connectionId: string;
     labelId: string;
   }) => Promise<ActionResult>;
+  createLabel: (input: { ws: string; connectionId: string }) => Promise<CreateLabelResult>;
+  reloadFromTracker: () => Promise<void>;
   saveConnection: (input: {
     id?: string;
     name?: string;
@@ -80,6 +87,17 @@ export interface SettingsActions {
   savePower: (input: { preventSleep: boolean }) => Promise<ActionResult>;
   saveMcpWrite: (input: { allowed: boolean }) => Promise<ActionResult>;
   pollRunnerChecks: () => Promise<boolean>;
+}
+
+const ReportUnsavedContext = createContext<(formId: string, unsaved: boolean) => void>(() => {});
+
+export function useReportUnsaved(unsaved: boolean): void {
+  const report = use(ReportUnsavedContext);
+  const formId = useId();
+  useEffect(() => {
+    report(formId, unsaved);
+  }, [report, formId, unsaved]);
+  useEffect(() => () => report(formId, false), [report, formId]);
 }
 
 export function useRunnerCheckPolling(pendingKey: string, poll: () => Promise<boolean>): boolean {
@@ -202,104 +220,6 @@ export const passwordManagerIgnoredSecretProps = {
   "data-1p-ignore": true,
   "data-lpignore": "true",
 } as const;
-
-function ProjectHeading({ bound }: { bound: BoundProject }) {
-  return (
-    <span {...stylex.props(styles.rowText)}>
-      <Text variant="ui" tone="strong">
-        {bound.project.name}
-      </Text>
-      <Text variant="meta">{bound.connection.name}</Text>
-    </span>
-  );
-}
-
-export function MappingRow({
-  ws,
-  bound,
-  runnerProjects,
-  agents,
-  actions,
-}: {
-  ws: string;
-  bound: BoundProject;
-  runnerProjects: Choice[];
-  agents: string[];
-  actions: SettingsActions;
-}) {
-  const t = useTranslations("settings");
-  const agentName = useAgentName();
-  const [runnerProject, setRunnerProject] = useState(bound.mapping?.runnerProject ?? null);
-  const [agent, setAgent] = useState(bound.mapping?.agent ?? null);
-  const [model, setModel] = useState(bound.mapping?.model ?? "");
-  const submit = useSubmit();
-  const projectOptions = withCurrent(
-    runnerProjects.map((p) => ({ value: p.id, label: p.name })),
-    bound.mapping?.runnerProject,
-  );
-  return (
-    <DividedItem>
-      <form
-        {...stylex.props(styles.form)}
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (runnerProject === null || agent === null) return;
-          submit.run(
-            () =>
-              actions.saveMapping({
-                ws,
-                connectionId: bound.connection.id,
-                projectId: bound.project.id,
-                runnerProjectId: runnerProject,
-                agentId: agent,
-                model: model.trim(),
-              }),
-            t("saved"),
-          );
-        }}
-      >
-        <ProjectHeading bound={bound} />
-        <div {...stylex.props(styles.fieldRow)}>
-          <Field label={t("mapping.runnerProject")}>
-            <Select
-              options={projectOptions}
-              value={runnerProject}
-              onValueChange={setRunnerProject}
-              placeholder={t("mapping.choose")}
-            />
-          </Field>
-          <Field label={t("mapping.agent")}>
-            <Select
-              options={agents.map((a) => ({ value: a, label: agentName(a) }))}
-              value={agent}
-              onValueChange={setAgent}
-              placeholder={t("mapping.choose")}
-            />
-          </Field>
-        </div>
-        <Field label={t("mapping.model")} description={t("mapping.modelDescription")}>
-          <Input
-            name="model"
-            value={model}
-            onValueChange={setModel}
-            placeholder={t("mapping.modelPlaceholder")}
-            autoComplete="off"
-            mono
-          />
-        </Field>
-        <SubmitError state={submit.state} />
-        <Actions>
-          <Button
-            type="submit"
-            disabled={submit.sending || runnerProject === null || agent === null}
-          >
-            {submit.sending ? t("saving") : t("save")}
-          </Button>
-        </Actions>
-      </form>
-    </DividedItem>
-  );
-}
 
 export function withCurrent(
   options: ReadonlyArray<{ value: string; label: string }>,

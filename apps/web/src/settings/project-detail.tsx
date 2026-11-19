@@ -1,10 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import {
-  Card,
   ChevronRightIcon,
   Dialog,
   DialogClose,
-  DividedList,
   InfoTip,
   NoticeLayout,
   PageHeader,
@@ -15,6 +13,7 @@ import {
   SettingsRow,
   SettingsSection,
   Text,
+  VisuallyHidden,
   linkStyles,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
@@ -27,8 +26,9 @@ import type {
   WorkspaceSettings,
 } from "@ganger/app/settings/model";
 import { AutoSaveStatusText, RevertedMessage, useAutoSave } from "./row-state";
+import { AutoAssignLabelPicker } from "./label-picker";
+import { MappingEditor, ReloadFromTracker, autoAssignLabelOf } from "./mapping-editor";
 import {
-  MappingRow,
   SubmitError,
   useReason,
   useSubmit,
@@ -100,7 +100,12 @@ export function ProjectDetailScreen({
   return (
     <ScreenLayout
       header={
-        <PageHeader lead={back} title={bound.project.name} subtitle={bound.connection.name} />
+        <PageHeader
+          lead={back}
+          title={bound.project.name}
+          subtitle={bound.connection.name}
+          actions={<ReloadFromTracker onReload={actions.reloadFromTracker} />}
+        />
       }
     >
       <SettingsLayout>
@@ -109,17 +114,19 @@ export function ProjectDetailScreen({
           title={t("repo")}
           info={<InfoTip label={t("repo")} content={t("repoInfo")} />}
         >
-          <Card>
-            <DividedList>
-              <MappingRow
+          <SettingsGroup>
+            <div {...stylex.props(styles.mapping)}>
+              <MappingEditor
                 ws={workspace.general.id}
                 bound={bound}
                 runnerProjects={page.runnerProjects}
                 agents={page.agents}
                 actions={actions}
+                autoAssignLabelId={autoAssignLabelOf(workspace, bound.connection.id)}
+                heading={<VisuallyHidden>{bound.project.name}</VisuallyHidden>}
               />
-            </DividedList>
-          </Card>
+            </div>
+          </SettingsGroup>
         </SettingsSection>
         <SettingsSection id="assign" title={t("assign")}>
           <SettingsGroup>
@@ -152,45 +159,19 @@ function LabelRow({
   label: ConnectionLabel;
   actions: SettingsActions;
 }) {
-  const t = useTranslations("settings.project");
-  const reason = useReason();
-  const autoSave = useAutoSave(label.labelId, (labelId: string | null) =>
-    labelId === null
-      ? Promise.resolve({ ok: true as const })
-      : actions.saveLabel({ ws, connectionId: label.connection.id, labelId }),
-  );
-  const options = label.labels.ok
-    ? label.labels.items.map((l) => ({ value: l.id, label: l.name }))
-    : [];
-  const current = label.labelId;
-  const allOptions =
-    current === null || options.some((o) => o.value === current)
-      ? options
-      : [...options, { value: current, label: t("labelUnknown", { id: current }) }];
+  const t = useTranslations("settings");
   return (
     <SettingsRow
-      label={t("label")}
-      detail={t("labelScope", { connection: label.connection.name })}
-      status={<AutoSaveStatusText status={autoSave.status} />}
-      control={
-        <span {...stylex.props(styles.select)}>
-          <Select
-            aria-label={t("label")}
-            options={allOptions}
-            value={autoSave.value}
-            onValueChange={autoSave.change}
-            placeholder={t("labelChoose")}
-          />
-        </span>
-      }
+      label={t("project.label")}
+      detail={t("project.labelScope", { connection: label.connection.name })}
       message={
-        label.labels.ok ? (
-          <RevertedMessage error={autoSave.error} />
-        ) : (
-          <Text variant="meta" as="p" tone="problem">
-            {t("labelsFailed", { reason: reason(label.labels.error) })}
-          </Text>
-        )
+        <AutoAssignLabelPicker
+          ws={ws}
+          label={label}
+          actions={actions}
+          selectLabel={t("label.selectFor", { connection: label.connection.name })}
+          showReload={false}
+        />
       }
     />
   );
@@ -322,6 +303,7 @@ function RemoveRow({
 }
 
 const styles = stylex.create({
+  mapping: { paddingBlock: space.s4, paddingInline: space.s5 },
   crumb: { display: "inline-flex", alignItems: "center", gap: space.s1 },
   select: { display: "flex", width: size.settingsControlWidth, minWidth: 0 },
 });

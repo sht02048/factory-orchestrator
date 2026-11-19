@@ -192,6 +192,8 @@ export const size = stylex.defineVars({
   switchThumb: "20px",
   infoTip: "24px",
   infoTipWidth: "320px",
+  repoSelectWidth: "240px",
+  saveStatusColumn: "88px",
 });
 
 export const breakpoints = stylex.defineConsts({

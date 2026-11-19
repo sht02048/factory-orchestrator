@@ -1,4 +1,4 @@
-import type { ActionResult, SubmitState } from "../settings/settings-screen";
+import type { ActionResult, SubmitState } from "./settings-screen";
 
 export interface SerialSaveHandlers<V> {
   send: (value: V) => Promise<ActionResult>;

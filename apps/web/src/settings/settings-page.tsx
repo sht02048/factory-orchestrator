@@ -581,11 +581,7 @@ function ProjectLinkRow({
   const t = useTranslations("settings.projects");
   const agentName = useAgentName();
   const mapping = bound.mapping;
-  const repo =
-    mapping === null
-      ? null
-      : (page.runnerProjects.find((p) => p.id === mapping.runnerProject)?.name ??
-        mapping.runnerProject);
+  const repo = mapping === null ? null : repoSummary(mapping.repos, page, t);
   const label = autoLabelName(workspace, bound.connection.id);
   const prefix = workspace.trackerProjects.length > 1 ? `${bound.connection.name} · ` : "";
   return (
@@ -609,6 +605,17 @@ function ProjectLinkRow({
       }
     />
   );
+}
+
+function repoSummary(
+  repos: ReadonlyArray<{ id: string; isDefault: boolean }>,
+  page: SettingsPage,
+  t: ReturnType<typeof useTranslations<"settings.projects">>,
+): string | null {
+  const main = repos.find((r) => r.isDefault) ?? repos[0];
+  if (main === undefined) return null;
+  const name = page.runnerProjects.find((p) => p.id === main.id)?.name ?? main.id;
+  return repos.length > 1 ? t("repoMore", { repo: name, count: repos.length - 1 }) : name;
 }
 
 export function autoLabelName(workspace: WorkspaceSettings, connectionId: string): string | null {

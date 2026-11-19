@@ -4,6 +4,7 @@ import {
   addWorkspaceTrackerProject,
   checkGitHubTokenNow,
   checkTrackerConnectionNow,
+  createWorkspaceAutoAssignLabel,
   getRunnerChecksPending,
   removeWorkspaceTrackerProject,
   requestRunnerCheckNow,
@@ -47,6 +48,12 @@ export function useSettingsActions(): SettingsActions {
       saveMapping: then((data) => saveWorkspaceMapping({ data })),
       saveInProgress: then((data) => saveWorkspaceInProgressState({ data })),
       saveLabel: then((data) => saveWorkspaceLabel({ data })),
+      createLabel: async (data) => {
+        const result = await createWorkspaceAutoAssignLabel({ data });
+        if (result.ok) await router.invalidate();
+        return result;
+      },
+      reloadFromTracker: () => router.invalidate(),
       saveConnection: then((data) => saveTrackerConnection({ data })),
       checkConnection: (data) => checkTrackerConnectionNow({ data }),
       saveGitHubToken: then((data) => saveGitHubTokenSetting({ data })),

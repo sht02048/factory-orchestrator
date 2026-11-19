@@ -32,12 +32,16 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { GANGER_YELLOW_HEX } from "@ganger/ui/brand-color";
 import { serverMcpLaunch } from "../server/mcp-launch";
 import { installPowerSettings } from "../server/power-settings";
 import { renderWithMessages } from "../testing/render";
 import {
   addTrackerProject,
+  createAutoAssignLabel,
+  mappingStateInput,
   removeTrackerProject,
+  saveMappingState,
   requestRunnerCheckSetting,
   saveGeneral,
   saveAddresses,
@@ -160,6 +164,8 @@ const noopActions: SettingsActions = {
   saveAddresses: () => Promise.resolve({ ok: true }),
   savePower: () => Promise.resolve({ ok: true }),
   saveMcpWrite: () => Promise.resolve({ ok: true }),
+  createLabel: () => Promise.resolve({ ok: false, reason: "not-found" }),
+  reloadFromTracker: () => Promise.resolve(),
   pollRunnerChecks: () => Promise.resolve(false),
 };
 
@@ -274,7 +280,11 @@ describe("Settings 저장하고 다시 열기", () => {
       {
         connection: { id: connection, name: "Acme" },
         project: { id: webProject, name: "Web" },
-        mapping: { runnerProject: repo, agent: "codex", model: "gpt-example" },
+        mapping: {
+          agent: "codex",
+          model: "gpt-example",
+          repos: [{ id: repo, isDefault: true, labelId: null }],
+        },
         inProgressStateId: "st-doing",
         states: {
           ok: true,
@@ -283,6 +293,7 @@ describe("Settings 저장하고 다시 열기", () => {
             { id: "st-doing", name: "In Progress" },
           ],
         },
+        labels: { ok: true, items: [{ id: "lb-auto", name: "factory" }] },
       },
     ]);
     expect(page.workspace?.labels).toEqual([
@@ -290,6 +301,7 @@ describe("Settings 저장하고 다시 열기", () => {
         connection: { id: connection, name: "Acme" },
         labelId: "lb-auto",
         labels: { ok: true, items: [{ id: "lb-auto", name: "factory" }] },
+        repoLabels: [],
       },
     ]);
     expect(page.install.connections).toEqual([
@@ -492,7 +504,7 @@ describe("Settings 저장하고 다시 열기", () => {
     const html = renderProject(page, connection, webProject);
     const text = textOf(html);
     expect(html).toContain('aria-label="저장소"');
-    expect(text).toContain("러너 쪽 프로젝트");
+    expect(text).toContain("에이전트");
     expect(text).not.toContain("러너 이름");
     expect(text).toContain("모델");
     expect(text).toContain("러너 Orca의 기본값");
@@ -520,6 +532,107 @@ describe("Settings 저장하고 다시 열기", () => {
         ok: false,
       });
     }
+  });
+});
+
+describe("Mapping 여러 저장소와 Auto-assign Label 만들기(0115)", () => {
+  async function bound(f: Fixture) {
+    const connectionId = await addConnection(f);
+    const project = { ws: commerce, connectionId, projectId: webProject };
+    addTrackerProject(f.context, { ...project, name: "Web" });
+    return { connectionId, project };
+  }
+
+  it("저장소 목록을 한 번에 저장하고, 한 라벨을 두 저장소에 붙이면 거절한다", async () => {
+    const f = fixture();
+    const { project } = await bound(f);
+    const state = {
+      ...project,
+      agentId: "claude",
+      model: "",
+      repos: [
+        { runnerProjectId: "github:acme/web", isDefault: true, labelId: null },
+        { runnerProjectId: "github:acme/api", isDefault: false, labelId: "lb-api" },
+      ],
+    };
+    expect(saveMappingState(f.context, mappingStateInput.parse(state))).toEqual({ ok: true });
+    expect(
+      saveMappingState(
+        f.context,
+        mappingStateInput.parse({
+          ...state,
+          repos: [
+            ...state.repos,
+            { runnerProjectId: "github:acme/infra", isDefault: false, labelId: "lb-api" },
+          ],
+        }),
+      ),
+    ).toEqual({ ok: false, reason: "label-in-use" });
+    saveLabel(f.context, { ws: commerce, connectionId: project.connectionId, labelId: "lb-auto" });
+    expect(
+      saveMappingState(
+        f.context,
+        mappingStateInput.parse({
+          ...state,
+          repos: [
+            state.repos[0],
+            { runnerProjectId: "github:acme/api", isDefault: false, labelId: "lb-auto" },
+          ],
+        }),
+      ),
+    ).toEqual({ ok: false, reason: "auto-assign-label" });
+    expect(
+      saveLabel(f.context, { ws: commerce, connectionId: project.connectionId, labelId: "lb-api" }),
+    ).toEqual({ ok: false, reason: "repo-label" });
+    const page = await loadSettingsPage(f.context, commerce, now);
+    expect(page.workspace?.bound[0]?.mapping?.repos).toEqual([
+      { id: "github:acme/web", isDefault: true, labelId: null },
+      { id: "github:acme/api", isDefault: false, labelId: "lb-api" },
+    ]);
+    expect(mappingStateInput.safeParse({ ...state, repos: [] }).success).toBe(false);
+  });
+
+  it("ganger 라벨이 없으면 Ganger Yellow로 만들어 고르고, 있으면 만들지 않고 그것을 고른다", async () => {
+    const f = fixture();
+    const { connectionId } = await bound(f);
+
+    const created = await createAutoAssignLabel(
+      f.context,
+      { ws: commerce, connectionId },
+      GANGER_YELLOW_HEX,
+    );
+    expect(created).toEqual({
+      ok: true,
+      labelId: "label-created-1",
+      name: "ganger",
+      created: true,
+    });
+    expect(f.tracker.createdLabels).toEqual([
+      { label: { id: "label-created-1", name: "ganger" }, color: GANGER_YELLOW_HEX },
+    ]);
+
+    const again = await createAutoAssignLabel(
+      f.context,
+      { ws: commerce, connectionId },
+      GANGER_YELLOW_HEX,
+    );
+    expect(again).toEqual({ ok: true, labelId: "label-created-1", name: "ganger", created: false });
+    expect(f.tracker.createdLabels).toHaveLength(1);
+    const page = await loadSettingsPage(f.context, commerce, now);
+    expect(page.workspace?.labels[0]?.labelId).toBe("label-created-1");
+  });
+
+  it("트래커가 라벨 만들기를 거절하면 저장하지 않고 이유를 돌려준다", async () => {
+    const f = fixture();
+    const { connectionId } = await bound(f);
+    f.tracker.createLabel = () => Promise.reject(new Error("Only admins can create labels"));
+
+    expect(
+      await createAutoAssignLabel(f.context, { ws: commerce, connectionId }, GANGER_YELLOW_HEX),
+    ).toEqual({ ok: false, reason: "rejected" });
+    expect((await loadSettingsPage(f.context, commerce, now)).workspace?.labels[0]?.labelId).toBe(
+      null,
+    );
   });
 });
 

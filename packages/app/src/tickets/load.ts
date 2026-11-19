@@ -1,6 +1,14 @@
-import { AdapterError, checkAssignment, summarizeRunOutcome, usageLimitsAt } from "@ganger/core";
+import {
+  AdapterError,
+  blockedProjectsOf,
+  checkAssignment,
+  routeToRepo,
+  summarizeRunOutcome,
+  usageLimitsAt,
+} from "@ganger/core";
 import type {
   AdapterRegistry,
+  SummaryOutcome,
   LabelId,
   RunnerId,
   Tracker,
@@ -57,6 +65,7 @@ export async function loadTicketsPage(
     online: runner.online,
     assignmentBlocked: runner.assignmentBlocked,
     projects: runner.projects.map((p) => p.id),
+    blockedProjects: runner.online ? blockedProjectsOf(runner.prerequisites ?? []) : [],
     usageLimits: usageLimitsAt(runner.providerUsage, now).map((limit) => ({
       provider: limit.provider,
       resetsInMs: limit.until.getTime() - now.getTime(),
@@ -64,6 +73,9 @@ export async function loadTicketsPage(
   }));
   const agents = mappingAgents(db);
   const runnerNames = new Map(storedRunners.map((runner) => [runner.id, runner.name]));
+  const repoNames = new Map(
+    storedRunners.flatMap((runner) => runner.projects.map((p) => [p.id, p.displayName] as const)),
+  );
   if (workspace.kind !== "one")
     return {
       workspace,
@@ -98,6 +110,7 @@ export async function loadTicketsPage(
 
   const errors: TrackerLoadError[] = [];
   const truncated: TrackerTruncation[] = [];
+  const labelNames = new Map<string, string>();
   const results = await Promise.all(
     projects.map(async (project) => {
       try {
@@ -106,8 +119,12 @@ export async function loadTicketsPage(
           errors.push({ trackerProject: project.name, reason: "unknown-connection" });
           return [];
         }
-        const { tickets, more } = await readProjectTickets(tracker, project);
+        const [{ tickets, more }, labels] = await Promise.all([
+          readProjectTickets(tracker, project),
+          tracker.listLabels(project.projectId).catch(() => []),
+        ]);
         if (more) truncated.push({ trackerProject: project.name, limit: tickets.length });
+        for (const label of labels) labelNames.set(label.id, label.name);
         return tickets.map((ticket) => ({ project, ticket }));
       } catch (error) {
         errors.push({ trackerProject: project.name, reason: loadErrorReason(error) });
@@ -125,6 +142,10 @@ export async function loadTicketsPage(
     }
     return label;
   };
+
+  for (const { ticket } of results.flat()) {
+    for (const label of ticket.labels) labelNames.set(label.id, label.name);
+  }
 
   const tickets = results
     .flat()
@@ -146,8 +167,8 @@ export async function loadTicketsPage(
           autoAssign: label.id === autoAssign,
         })),
         runs: runs.toReversed().map((run) => toTicketRun(db, run, runnerNames, now)),
-        mapping: mappingOf(db, project),
-        assignability: assignabilityOf(db, project, ticket, runs),
+        mapping: assignDefaultsOf(db, project, ticket, runs, { labelNames, repoNames }),
+        assignability: assignabilityOf(db, project, ticket, runs, { labelNames, repoNames }),
       };
     });
 
@@ -252,6 +273,7 @@ function assignabilityOf(
   project: StoredWorkspaceTrackerProject,
   ticket: TrackerTicket,
   runs: ReadonlyArray<StoredRun>,
+  names: RepoNames,
 ): TicketView["assignability"] {
   const check = checkAssignment({
     ticket: { connection: project.connection, key: ticket.key },
@@ -261,14 +283,59 @@ function assignabilityOf(
     const active = runs.findLast((run) => run.state !== "ended");
     return { kind: "active-run", runId: active?.id ?? "" };
   }
-  const mapping = mappingOf(db, project);
-  if (mapping === null) return { kind: "no-mapping" };
-  return { kind: "ready", defaults: mapping };
+  const defaults = assignDefaultsOf(db, project, ticket, runs, names);
+  if (defaults === null) return { kind: "no-mapping" };
+  return { kind: "ready", defaults };
 }
 
-function mappingOf(db: Database, project: StoredWorkspaceTrackerProject): AssignDefaults | null {
+function retriesLastRepo(outcome: SummaryOutcome): boolean {
+  switch (outcome) {
+    case "failed":
+    case "canceled":
+      return true;
+    case "merged":
+    case "human-check":
+      return false;
+  }
+}
+
+interface RepoNames {
+  labelNames: ReadonlyMap<string, string>;
+  repoNames: ReadonlyMap<string, string>;
+}
+
+function assignDefaultsOf(
+  db: Database,
+  project: StoredWorkspaceTrackerProject,
+  ticket: TrackerTicket,
+  runs: ReadonlyArray<StoredRun>,
+  { labelNames, repoNames }: RepoNames,
+): AssignDefaults | null {
   const mapping = getMapping(db, project.connection, project.projectId);
-  return mapping === null ? null : { runnerProject: mapping.runnerProject, agent: mapping.agent };
+  if (mapping === null) return null;
+  const routed =
+    routeToRepo(
+      mapping.repos,
+      ticket.labels.map((label) => label.id),
+    ) ?? mapping.defaultRepo;
+  const last = runs.at(-1);
+  const lastRepo =
+    last !== undefined &&
+    last.state === "ended" &&
+    retriesLastRepo(summarizeRunOutcome(last).outcome)
+      ? last.runnerProject
+      : undefined;
+  const previous = mapping.repos.some((repo) => repo.project === lastRepo) ? lastRepo : undefined;
+  return {
+    runnerProject: previous ?? routed,
+    agent: mapping.agent,
+    repos: mapping.repos.map((repo) => ({
+      id: repo.project,
+      name: repoNames.get(repo.project) ?? repo.project,
+      isDefault: repo.isDefault,
+      label: repo.labelId === null ? null : (labelNames.get(repo.labelId) ?? null),
+    })),
+  };
 }
 
 function mappingAgents(db: Database): string[] {

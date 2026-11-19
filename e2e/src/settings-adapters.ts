@@ -18,11 +18,11 @@ export function getAdapterRegistry(): AdapterRegistry {
         { id: toTrackerStateId("todo"), name: "Todo", category: "unstarted" },
         { id: toTrackerStateId("in-progress"), name: "In Progress", category: "started" },
       ]);
-      tracker.labels.set(project, [
-        { id: toLabelId("factory"), name: "factory" },
-        { id: toLabelId("ganger"), name: "ganger" },
-      ]);
     }
+    tracker.labels.set(trackerProject, [
+      { id: toLabelId("label-api"), name: "api" },
+      { id: toLabelId("label-infra"), name: "infra" },
+    ]);
     registry = new AdapterRegistry().registerTracker({ kind: fakeKind, create: () => tracker });
   }
   return registry;

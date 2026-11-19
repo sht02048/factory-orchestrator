@@ -244,7 +244,7 @@ function assign(ticketKey: TicketKey): StoredRun {
   const result = assignRun(db, {
     ticket: { connection, key: ticketKey },
     trackerProject,
-    runnerProject: mapping.runnerProject,
+    runnerProject: mapping.defaultRepo,
     agent: mapping.agent,
   });
   if (!result.ok) throw new Error(`assign ${ticketKey} failed: ${result.reason}`);

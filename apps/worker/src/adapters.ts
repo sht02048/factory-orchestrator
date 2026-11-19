@@ -215,6 +215,10 @@ class PausableTracker implements Tracker {
     return this.pause.run(() => this.inner.listLabels(...args));
   }
 
+  createLabel(...args: Parameters<Tracker["createLabel"]>): ReturnType<Tracker["createLabel"]> {
+    return this.pause.run(() => this.inner.createLabel(...args));
+  }
+
   listStates(...args: Parameters<Tracker["listStates"]>): ReturnType<Tracker["listStates"]> {
     return this.pause.run(() => this.inner.listStates(...args));
   }

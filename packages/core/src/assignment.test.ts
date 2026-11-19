@@ -4,10 +4,13 @@ import {
   checkAssignment,
   checkAutoAssignment,
   checkManualRunnerChoice,
+  checkMappingRepos,
+  findLabelNamed,
   pickRunner,
   remainingCapacity,
+  routeToRepo,
 } from "./assignment.js";
-import type { RunnerSnapshot } from "./assignment.js";
+import type { MappingRepo, RunnerSnapshot } from "./assignment.js";
 import {
   toAgentId,
   toLabelId,
@@ -295,5 +298,97 @@ describe("push가 깨진 프로젝트 (0096)", () => {
     const runners = [runner({ id: r1, blockedProjects: [app] })];
 
     expect(pickRunner({ project: app, agent: claude, runners, runs: [] })).toBeNull();
+  });
+});
+
+describe("routeToRepo (0115)", () => {
+  const api = toRunnerProjectId("github:acme/api");
+  const apiLabel = toLabelId("label-api");
+  const webLabel = toLabelId("label-web");
+  const bug = toLabelId("label-bug");
+  const repos: MappingRepo[] = [
+    { project: app, isDefault: true, labelId: null },
+    { project: api, isDefault: false, labelId: apiLabel },
+    { project: web, isDefault: false, labelId: webLabel },
+  ];
+
+  it("저장소에 붙인 라벨이 티켓에 정확히 하나 있으면 그 저장소로 간다", () => {
+    expect(routeToRepo(repos, [bug, apiLabel])).toBe(api);
+  });
+
+  it("맞는 라벨이 없으면 기본 저장소로 간다", () => {
+    expect(routeToRepo(repos, [bug])).toBe(app);
+    expect(routeToRepo(repos, [])).toBe(app);
+  });
+
+  it("저장소 라벨이 둘 이상 맞으면 어느 쪽인지 모르니 기본 저장소로 간다", () => {
+    expect(routeToRepo(repos, [apiLabel, webLabel])).toBe(app);
+  });
+
+  it("라벨 없는 저장소가 하나뿐이면 그것이 기본이다", () => {
+    expect(routeToRepo([{ project: app, isDefault: true, labelId: null }], [apiLabel])).toBe(app);
+  });
+
+  it("저장소가 없으면 갈 곳이 없다", () => {
+    expect(routeToRepo([], [apiLabel])).toBeNull();
+  });
+});
+
+describe("checkMappingRepos (0115)", () => {
+  const label = toLabelId("label-api");
+  const repo = (
+    project: string,
+    isDefault: boolean,
+    labelId: string | null = null,
+  ): MappingRepo => ({
+    project: toRunnerProjectId(project),
+    isDefault,
+    labelId: labelId === null ? null : toLabelId(labelId),
+  });
+
+  it("기본 하나와 서로 다른 라벨이면 받는다", () => {
+    expect(checkMappingRepos([repo("a", true), repo("b", false, "x"), repo("c", false)])).toEqual({
+      ok: true,
+    });
+  });
+
+  it("같은 트래커 프로젝트에서 한 라벨을 두 저장소에 붙이면 거절한다", () => {
+    expect(
+      checkMappingRepos([repo("a", true), repo("b", false, label), repo("c", false, label)]),
+    ).toEqual({ ok: false, reason: "label-in-use" });
+  });
+
+  it("기본이 없거나 둘이면 거절한다", () => {
+    expect(checkMappingRepos([repo("a", false)])).toEqual({ ok: false, reason: "no-default" });
+    expect(checkMappingRepos([repo("a", true), repo("b", true)])).toEqual({
+      ok: false,
+      reason: "many-defaults",
+    });
+  });
+
+  it("기본 저장소에는 라벨을 붙이지 않는다", () => {
+    expect(checkMappingRepos([repo("a", true, "x")])).toEqual({
+      ok: false,
+      reason: "default-has-label",
+    });
+  });
+
+  it("같은 저장소를 두 번 넣거나 저장소가 없으면 거절한다", () => {
+    expect(checkMappingRepos([repo("a", true), repo("a", false)])).toEqual({
+      ok: false,
+      reason: "duplicate-repo",
+    });
+    expect(checkMappingRepos([])).toEqual({ ok: false, reason: "no-repos" });
+  });
+});
+
+describe("findLabelNamed (0115)", () => {
+  it("이름의 대소문자와 앞뒤 빈칸을 가리지 않고 찾는다", () => {
+    const labels = [
+      { id: "1", name: "bug" },
+      { id: "2", name: " Ganger " },
+    ];
+    expect(findLabelNamed(labels, "ganger")?.id).toBe("2");
+    expect(findLabelNamed(labels, "infra")).toBeNull();
   });
 });

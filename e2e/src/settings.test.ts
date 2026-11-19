@@ -13,8 +13,12 @@ import {
 } from "@ganger/core";
 import {
   SecretBox,
+  getAutoAssignLabel,
+  getMapping,
   migrate,
   openDatabase,
+  recordRunnerCheck,
+  replaceMapping,
   saveAutoAssignLabel,
   saveCodeHostConnection,
   saveInstallAddresses,
@@ -27,7 +31,7 @@ import {
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { chromium } from "playwright-core";
-import type { Browser, Locator, Page } from "playwright-core";
+import type { Browser, Locator, Page, Route } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
 import settings from "../../apps/web/messages/ko/settings.json" with { type: "json" };
@@ -50,6 +54,7 @@ let browser: Browser;
 let page: Page;
 
 const lockedHost = "settings.example.test";
+const projectPath = `/settings/projects/${connection}/${trackerProject}`;
 
 const settingsAdapters: Plugin = {
   name: "e2e-settings-adapters",
@@ -291,10 +296,10 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     const crumb = page.getByRole("main").getByRole("link", { name: settings.project.breadcrumb });
     expect(await crumb.getAttribute("aria-current")).toBeNull();
     await shot(page, "settings-project-1280");
-    const label = page.getByRole("combobox", { name: settings.project.label });
-    await label.click();
-    await page.getByRole("option", { name: "ganger" }).click();
-    await page.getByText(settings.status.saved).first().waitFor();
+    const state = page.getByRole("combobox", { name: settings.project.state });
+    await state.click();
+    await page.getByRole("option", { name: "Todo", exact: true }).click();
+    await page.getByText(settings.status.saved, { exact: true }).first().waitFor();
   });
 
   it("MCP 하위 화면은 클라이언트 설정을 탭으로 바꿔 보이고 위험을 도움말로 알린다", async () => {
@@ -376,6 +381,111 @@ async function shot(target: Page, name: string): Promise<void> {
   mkdirSync(dir, { recursive: true });
   await target.screenshot({ path: join(dir, `${name}.png`), fullPage: true });
 }
+describe("프로젝트 상세의 저장소 여러 개와 즉시 저장(브라우저, 0115·0119)", () => {
+  beforeEach(() => resetMapping());
+
+  it("저장소를 더하고 라벨을 붙이면 바로 저장하고 그 행에 저장했어요를 보인다", async () => {
+    await openSettings(page, projectPath);
+    await addRepo(page, "Web", "acme/api");
+    await page.getByRole("status").getByText(settings.mapping.status.saved).first().waitFor();
+    await expect
+      .poll(() => savedRepos().map((r) => r.project))
+      .toEqual(["fake:acme/web", "fake:acme/api"]);
+
+    await pick(page, fill(settings.mapping.repoLabel, { repo: "acme/api" }), "api");
+    await expect.poll(() => savedRepos()[1]?.labelId ?? null).toBe("label-api");
+
+    await addRepo(page, "Web", "acme/infra");
+    await page
+      .getByRole("combobox", { name: fill(settings.mapping.repoLabel, { repo: "acme/infra" }) })
+      .click();
+    const used = page.getByRole("option", {
+      name: fill(settings.mapping.labelUsed, { label: "api", repo: "acme/api" }),
+    });
+    expect(await used.getAttribute("aria-disabled")).toBe("true");
+    await page.keyboard.press("Escape");
+
+    await page
+      .getByRole("button", { name: fill(settings.mapping.makeDefaultLabel, { repo: "acme/api" }) })
+      .click();
+    await expect
+      .poll(() => savedRepos().find((r) => r.isDefault)?.project ?? null)
+      .toBe("fake:acme/api");
+    expect(savedRepos().find((r) => r.project === "fake:acme/api")?.labelId ?? null).toBeNull();
+    await page
+      .getByRole("status")
+      .getByText(fill(settings.mapping.labelDropped, { repo: "acme/api", label: "api" }))
+      .waitFor();
+    await expect.poll(focused).toBe(settings.mapping.makeDefault);
+  });
+
+  it("저장하지 못하면 원래 값으로 되돌리고 이유를 그 행 아래에 보인다", async () => {
+    await openSettings(page, projectPath);
+    const fail = (route: Route) =>
+      route.request().method() === "POST" ? route.abort() : route.continue();
+    await page.route("**/_serverFn/**", fail);
+    await addRepo(page, "Web", "acme/api");
+
+    await page.getByRole("status").getByText(settings.mapping.status.reverted).waitFor();
+    await page.getByRole("alert").getByText(settings.mapping.revertedRetry).waitFor();
+    expect(
+      await page
+        .getByRole("button", { name: fill(settings.mapping.removeLabel, { repo: "acme/api" }) })
+        .count(),
+    ).toBe(0);
+    expect(
+      await page.evaluate(() => document.activeElement?.closest('[role="group"]') !== null),
+    ).toBe(true);
+    await page.unroute("**/_serverFn/**", fail);
+    expect(savedRepos().map((r) => r.project)).toEqual(["fake:acme/web"]);
+  });
+
+  it("Linear에서 다시 읽으면 지금 값을 둔 채 새 값을 읽어 온다", async () => {
+    await openSettings(page, projectPath);
+    replaceMapping(db, {
+      connection,
+      trackerProject,
+      agent: toAgentId("claude"),
+      repos: [
+        { project: toRunnerProjectId("fake:acme/web"), isDefault: true, labelId: null },
+        { project: toRunnerProjectId("fake:acme/infra"), isDefault: false, labelId: null },
+      ],
+    });
+    expect(await page.getByText("acme/infra", { exact: true }).count()).toBe(0);
+    await page.getByRole("button", { name: settings.mapping.reload }).first().click();
+    await page.getByRole("status").getByText(settings.mapping.reloaded).first().waitFor();
+    await page.getByText("acme/infra", { exact: true }).waitFor();
+    await page.getByText("acme/web", { exact: true }).waitFor();
+  });
+});
+
+describe("프로젝트 상세의 Auto-assign Label 만들기(브라우저, 0115·0119)", () => {
+  it("고른 라벨이 Linear에 없으면 알리고, ganger 라벨을 만들어 고른 뒤 첫 줄은 고르기가 된다", async () => {
+    saveAutoAssignLabel(db, { workspaceId, connection, labelId: toLabelId("factory") });
+    await openSettings(page, projectPath);
+    await page.getByText(fill(settings.label.gone, { name: "ganger" })).waitFor();
+
+    const select = fill(settings.label.selectFor, { connection: "Acme" });
+    await pick(page, select, fill(settings.label.create, { name: "ganger" }));
+    await expect
+      .poll(() => getAutoAssignLabel(db, workspaceId, connection))
+      .toBe("label-created-1");
+    await page
+      .getByText(fill(settings.label.gone, { name: "ganger" }))
+      .waitFor({ state: "detached" });
+
+    await page.getByRole("combobox", { name: select }).click();
+    await page
+      .getByRole("option", { name: fill(settings.label.pickExisting, { name: "ganger" }) })
+      .waitFor();
+    expect(
+      await page
+        .getByRole("option", { name: fill(settings.label.create, { name: "ganger" }) })
+        .count(),
+    ).toBe(0);
+    await page.keyboard.press("Escape");
+  });
+});
 
 async function secretAttributes(): Promise<
   Array<{ autocomplete: string | null; onePassword: boolean; lastPass: string | null }>
@@ -437,4 +547,43 @@ function seed(target: Database): void {
     config: {},
     capacity: 8,
   });
+  recordRunnerCheck(target, {
+    runnerId: toRunnerId("runner-a"),
+    online: true,
+    checkedAt: new Date(),
+    error: null,
+    assignmentBlocked: false,
+    projects: ["web", "api", "infra"].map((name) => ({
+      id: toRunnerProjectId(`fake:acme/${name}`),
+      displayName: `acme/${name}`,
+      setupState: "ready" as const,
+    })),
+  });
+}
+
+function resetMapping(): void {
+  replaceMapping(db, {
+    connection,
+    trackerProject,
+    agent: toAgentId("claude"),
+    repos: [{ project: toRunnerProjectId("fake:acme/web"), isDefault: true, labelId: null }],
+  });
+}
+
+function savedRepos() {
+  return getMapping(db, connection, trackerProject)?.repos ?? [];
+}
+
+async function pick(target: Page, combobox: string, option: string): Promise<void> {
+  await target.getByRole("combobox", { name: combobox }).click();
+  await target.getByRole("option", { name: option, exact: true }).click();
+}
+
+async function addRepo(target: Page, project: string, repo: string): Promise<void> {
+  await target.getByRole("button", { name: fill(settings.mapping.addLabel, { project }) }).click();
+  await target.getByRole("menuitem", { name: repo, exact: true }).click();
+}
+
+function fill(message: string, values: Record<string, string>): string {
+  return message.replace(/\{(\w+)\}/g, (all, name: string) => values[name] ?? all);
 }

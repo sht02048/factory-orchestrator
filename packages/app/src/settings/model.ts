@@ -37,18 +37,38 @@ export interface ConnectionProjects {
   projects: TrackerProjectChoice[];
 }
 
+export interface MappingRepoView {
+  id: string;
+  isDefault: boolean;
+  labelId: string | null;
+}
+
+export interface MappingView {
+  agent: string;
+  model: string | null;
+  repos: MappingRepoView[];
+}
+
 export interface BoundProject {
   connection: Choice;
   project: Choice;
-  mapping: { runnerProject: string; agent: string; model: string | null } | null;
+  mapping: MappingView | null;
   inProgressStateId: string | null;
   states: Remote<Choice>;
+  labels: Remote<Choice>;
+}
+
+export interface RepoLabelUse {
+  labelId: string;
+  repo: string;
+  project: string;
 }
 
 export interface ConnectionLabel {
   connection: Choice;
   labelId: string | null;
   labels: Remote<Choice>;
+  repoLabels: RepoLabelUse[];
 }
 
 export interface WorkspaceSettings {
@@ -144,5 +164,19 @@ export const KNOWN_AGENTS = ["claude", "codex"] as const;
 export const MAX_MODEL_LENGTH = 200;
 
 export type SaveResult<R extends string = never> = { ok: true } | { ok: false; reason: R };
+
+export type MappingSaveReason =
+  | "not-found"
+  | "no-repos"
+  | "no-default"
+  | "many-defaults"
+  | "default-has-label"
+  | "duplicate-repo"
+  | "label-in-use"
+  | "auto-assign-label";
+
+export type LabelCreateResult =
+  | { ok: true; labelId: string; name: string; created: boolean }
+  | { ok: false; reason: RemoteError | "not-found" | "rejected" | "repo-label" };
 
 export type ConnectionSaveReason = RemoteError | "missing-key" | "not-found";
