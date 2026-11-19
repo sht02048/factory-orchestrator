@@ -48,7 +48,7 @@
 
 APNs 키(.p8)는 앱 게시자의 Apple 팀에 묶인다. 셀프호스팅 서버마다 키를 줄 수 없으니 선택지는 넷이다.
 
-1. **프로젝트가 운영하는 중앙 릴레이.** Home Assistant가 이 방식이다(공식 릴레이, 기기 하나당 하루 500건 제한, 옵트아웃과 Android 로컬 푸시) **[문서]**([HA 알림](https://developers.home-assistant.io/docs/api/native-app-integration/notifications)). 운영 부담이 있고, ADR 0005(필수 의존성은 Orca, GitHub, Linear뿐)와 부딪히는지 따져야 한다. 릴레이를 둔다면 페이로드에 티켓 제목을 넣지 않고 "확인할 일 있음" 신호만 보내, 앱이 tailnet으로 내용을 가져온다.
+1. **프로젝트가 운영하는 중앙 릴레이.** Home Assistant가 이 방식이다(공식 릴레이, 기기 하나당 하루 500건 제한, 옵트아웃과 Android 로컬 푸시) **[문서]**([HA 알림](https://contributors.home-assistant.io/companion/mobile-app-api/notifications/)). 운영 부담이 있고, ADR 0005(필수 의존성은 Orca, GitHub, Linear뿐)와 부딪히는지 따져야 한다. 릴레이를 둔다면 페이로드에 티켓 제목을 넣지 않고 "확인할 일 있음" 신호만 보내, 앱이 tailnet으로 내용을 가져온다.
 2. **각자 빌드·서명.** 사용자 부담이 너무 크다.
 3. **ntfy·Pushover 연동.** 서버가 `/api/attention`과 같은 사건을 ntfy 토픽으로 보내는 설정이다. 앱 없이 바로 쓸 수 있고 가장 싸다 **[추정]**.
 4. **PWA 웹 푸시.** 브라우저 공급자의 푸시 서비스만 거친다. (a)를 고를 때만 의미가 있다.
