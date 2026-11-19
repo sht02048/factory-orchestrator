@@ -32,6 +32,7 @@ export interface DialogProps {
   actions: ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  scrollBody?: boolean;
 }
 
 export function Dialog({
@@ -43,6 +44,7 @@ export function Dialog({
   actions,
   open,
   onOpenChange,
+  scrollBody = false,
 }: DialogProps) {
   return (
     <SdkDialog
@@ -55,14 +57,17 @@ export function Dialog({
         {trigger}
       </DialogTrigger>
       <DialogBackdrop {...windowRegion("no-drag")} className={cx(styles.backdrop)} />
-      <DialogContent {...windowRegion("no-drag")} className={cx(styles.content)}>
+      <DialogContent
+        {...windowRegion("no-drag")}
+        className={cx(styles.content, scrollBody && styles.contentFits)}
+      >
         <div {...stylex.props(styles.head)}>
           <DialogTitle className={cx(styles.title)}>{title}</DialogTitle>
           {description === undefined ? null : (
             <DialogDescription className={cx(styles.description)}>{description}</DialogDescription>
           )}
         </div>
-        {children}
+        {scrollBody ? <div {...stylex.props(styles.body)}>{children}</div> : children}
         <div {...stylex.props(styles.actions)}>{actions}</div>
       </DialogContent>
     </SdkDialog>
@@ -124,7 +129,20 @@ const styles = stylex.create({
     animationDuration: motion.durationFast,
     animationTimingFunction: motion.easeOut,
   },
-  head: { display: "flex", flexDirection: "column", gap: space.s2 },
+  contentFits: { maxHeight: "calc(100dvh - 32px)" },
+  body: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s5,
+    flexGrow: 1,
+    flexShrink: 1,
+    minHeight: 0,
+    marginInline: `calc(-1 * ${space.s2})`,
+    paddingInline: space.s2,
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+  },
+  head: { display: "flex", flexDirection: "column", gap: space.s2, flexShrink: 0 },
   title: {
     margin: 0,
     fontSize: fontSize.panel,
@@ -140,6 +158,7 @@ const styles = stylex.create({
   },
   actions: {
     display: "flex",
+    flexShrink: 0,
     justifyContent: "flex-end",
     gap: space.s2,
   },

@@ -38,11 +38,18 @@ export function labelOptions(
   const items = label.labels.ok ? [...label.labels.items] : [];
   if (extra !== null && !items.some((item) => item.id === extra.id)) items.push(extra);
   const existing = findLabelNamed(items, AUTO_ASSIGN_LABEL_NAME);
-  const first: SelectOption = {
-    value: CREATE_LABEL,
-    label:
-      existing === null ? text.create(AUTO_ASSIGN_LABEL_NAME) : text.pickExisting(existing.name),
-  };
+  const existingUse =
+    existing === null ? undefined : label.repoLabels.find((use) => use.labelId === existing.id);
+  const first: SelectOption =
+    existing === null
+      ? { value: CREATE_LABEL, label: text.create(AUTO_ASSIGN_LABEL_NAME) }
+      : existingUse === undefined
+        ? { value: CREATE_LABEL, label: text.pickExisting(existing.name) }
+        : {
+            value: CREATE_LABEL,
+            label: text.repoLabel(existing.name, existingUse.repo),
+            disabled: true,
+          };
   const options = items.map((item): SelectOption => {
     const use = label.repoLabels.find((repo) => repo.labelId === item.id);
     return use === undefined

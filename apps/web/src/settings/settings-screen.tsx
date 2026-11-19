@@ -960,7 +960,12 @@ export function LabelPanel({
   const t = useTranslations("settings");
   return (
     <>
-      <Text variant="body">{t("label.hint")}</Text>
+      <div {...stylex.props(styles.panelIntro)}>
+        <span {...stylex.props(styles.panelIntroText)}>
+          <Text variant="body">{t("label.hint")}</Text>
+        </span>
+        <ReloadFromTracker onReload={actions.reloadFromTracker} />
+      </div>
       {workspace.labels.length === 0 ? (
         <Text variant="meta">{t("mapping.noProjects")}</Text>
       ) : (
@@ -976,6 +981,7 @@ export function LabelPanel({
                   label={label}
                   actions={actions}
                   selectLabel={t("label.selectFor", { connection: label.connection.name })}
+                  showReload={false}
                 />
               </div>
             </DividedItem>

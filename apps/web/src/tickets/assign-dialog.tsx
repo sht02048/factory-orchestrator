@@ -101,6 +101,7 @@ export function AssignDialog({
       title={t("title", { key: ticket.key })}
       description={t("description")}
       open={open}
+      scrollBody
       onOpenChange={(next) => {
         if (!next && pending) return;
         if (next) reset();
@@ -260,6 +261,11 @@ export function AssignForm({
         <Text variant="meta" id={repoHintId}>
           {t("projectHint")}
         </Text>
+        {repoReach(runners, repo).pushBlockedEverywhere ? (
+          <Text variant="ui" as="p" tone="problem">
+            {t("repoBlockedChosen")}
+          </Text>
+        ) : null}
       </div>
       <Field label={t("runner")} description={t("runnerHint")}>
         <Select

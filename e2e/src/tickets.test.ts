@@ -287,7 +287,14 @@ describe("Tickets 수동 할당(브라우저, 0054)", () => {
     expect(await repos.getByRole("radio", { name: /^acme\/api/ }).isChecked()).toBe(true);
     expect(await repos.getByRole("radio", { name: /^acme\/web/ }).isChecked()).toBe(false);
 
-    await dialog.getByRole("button", { name: tickets.assign.submit }).click();
+    await page.setViewportSize({ width: 320, height: 568 });
+    const submit = dialog.getByRole("button", { name: tickets.assign.submit });
+    const box = await submit.boundingBox();
+    const title = await dialog.getByRole("heading").first().boundingBox();
+    expect(box !== null && box.y >= 0 && box.y + box.height <= 568).toBe(true);
+    expect(title !== null && title.y >= 0).toBe(true);
+
+    await submit.click();
     await dialog.waitFor({ state: "hidden" });
     await expect
       .poll(() =>
