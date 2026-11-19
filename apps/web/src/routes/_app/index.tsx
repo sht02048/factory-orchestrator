@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { HomeScreen } from "../../home/home-screen";
@@ -14,6 +14,7 @@ const t = createTranslator({ locale: defaultLocale, messages: homeMessages, name
 export const Route = createFileRoute("/_app/")({
   validateSearch: z.object({
     view: z.enum(["todo"]).optional().catch(undefined),
+    run: z.string().optional().catch(undefined),
   }),
   loaderDeps: ({ search }) => ({ ws: search.ws }),
   loader: ({ deps }) => getHomePage({ data: { ws: deps.ws } }),
@@ -24,11 +25,18 @@ export const Route = createFileRoute("/_app/")({
 function HomeRoute() {
   const loaded = Route.useLoaderData();
   const { ws } = Route.useLoaderDeps();
-  const { view } = Route.useSearch();
+  const { view, run } = Route.useSearch();
   const navigate = Route.useNavigate();
   const router = useRouter();
   const [polled, setPolled] = useState<{ base: HomePage; page: HomePage } | null>(null);
   const page = polled !== null && polled.base === loaded ? polled.page : loaded;
+  const clearOpenRun = useCallback(() => {
+    void navigate({
+      search: (prev) => ({ ...prev, run: undefined }),
+      replace: true,
+      resetScroll: false,
+    });
+  }, [navigate]);
   useRefreshWhileVisible(() => {
     void getHomePage({ data: { ws } }).then(
       (next) => setPolled({ base: loaded, page: next }),
@@ -55,6 +63,8 @@ function HomeRoute() {
           await denyPermission({ data: input });
           await router.invalidate();
         }}
+        openRunId={run}
+        onOpenRunShown={clearOpenRun}
       />
     </ScreenMessages>
   );

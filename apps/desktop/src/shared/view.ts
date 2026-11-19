@@ -1,3 +1,11 @@
+import type {
+  NotificationPermission,
+  NotificationPrefs,
+  NotificationSettingsView,
+} from "../core/notification-prefs.js";
+
+export type { NotificationPermission, NotificationPrefs, NotificationSettingsView };
+
 export type ConnectError = "invalid" | "unreachable" | "not-ours" | "host-not-allowed";
 
 export interface FoundServerView {
@@ -23,6 +31,13 @@ export type ViewState =
   | { screen: "enter-address"; checking: boolean; error: ConnectError | null }
   | { screen: "unreachable"; name: string; url: string; checking: boolean };
 
+export interface NotificationSettingsApi {
+  getNotificationSettings(): Promise<NotificationSettingsView>;
+  onNotificationSettings(listener: (view: NotificationSettingsView) => void): () => void;
+  setNotificationSettings(settings: NotificationPrefs): Promise<void>;
+  openSystemNotificationSettings(): Promise<void>;
+}
+
 export interface DesktopApi {
   getView(): Promise<ViewState>;
   onView(listener: (view: ViewState) => void): () => void;
@@ -41,3 +56,5 @@ export interface DesktopApi {
 export const IPC_PREFIX = "desktop:";
 export const VIEW_CHANNEL = "desktop:view";
 export const NAVIGATE_CHANNEL = "desktop:navigate";
+export const NOTIFICATION_SETTINGS_CHANNEL = "desktop:notification-settings";
+export const NOTIFICATION_SETTINGS_WINDOW = "notifications";

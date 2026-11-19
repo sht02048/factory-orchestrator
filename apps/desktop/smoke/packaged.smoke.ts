@@ -8,7 +8,7 @@ import { _electron } from "playwright-core";
 import type { ElectronApplication, Page } from "playwright-core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sleep } from "../src/core/local-server.js";
-import { freePort, nodeEnv, seedAttention } from "./helpers.js";
+import { freePort, nodeEnv, seedNotificationCauses } from "./helpers.js";
 
 const DESKTOP = resolve(import.meta.dirname, "..");
 const APP =
@@ -182,22 +182,24 @@ describe("패키징한 앱, 로컬 모드", () => {
     await app.close();
   });
 
-  it("Q4 의 네 사건에만 알림을 띄우고 Merged·Failed 에는 띄우지 않는다", async () => {
+  it("알림 사건(0103)에 알림을 띄우고 Merged 에는 띄우지 않는다", async () => {
     const app = await launch(userData());
     await recordNotifications(app);
     const page = await app.firstWindow();
     await page.waitForURL(new RegExp(`^${url()}`), { timeout: 30_000 });
     await sleep(2_000);
-    seedAttention(home);
+    seedNotificationCauses(home);
     await waitFor(
-      async () => (await notifications(app)).length >= 4,
+      async () => (await notifications(app)).length >= 5,
       150_000,
       "notifications did not arrive",
     );
     await sleep(16_000);
     const titles = await notifications(app);
     console.log(`notifications: ${titles.join(", ")}`);
-    expect(titles.toSorted()).toEqual(["Human Check", "Permission", "Question", "Runner Issue"]);
+    expect(titles).toEqual(expect.arrayContaining(["Human Check", "Permission", "Question"]));
+    expect(titles.some((title) => title === "Failed" || title === "To do")).toBe(true);
+    expect(titles).not.toContain("Merged");
     await app.close();
   });
 

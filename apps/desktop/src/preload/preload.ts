@@ -6,8 +6,14 @@ import {
   navPathKeepingWorkspace,
 } from "@ganger/app/shell/nav-shortcuts";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
-import type { DesktopApi, ViewState } from "../shared/view.js";
-import { IPC_PREFIX, NAVIGATE_CHANNEL, VIEW_CHANNEL } from "../shared/view.js";
+import { notificationSettingsViewSchema } from "../core/notification-prefs.js";
+import type { DesktopApi, NotificationSettingsApi, ViewState } from "../shared/view.js";
+import {
+  IPC_PREFIX,
+  NAVIGATE_CHANNEL,
+  NOTIFICATION_SETTINGS_CHANNEL,
+  VIEW_CHANNEL,
+} from "../shared/view.js";
 
 if (window.location.protocol === "file:") {
   const invoke = (action: string, ...args: unknown[]): Promise<void> =>
@@ -38,6 +44,24 @@ if (window.location.protocol === "file:") {
     openLog: () => invoke("open-log"),
   };
   contextBridge.exposeInMainWorld("desktop", api);
+
+  const notifications: NotificationSettingsApi = {
+    getNotificationSettings: () =>
+      ipcRenderer
+        .invoke(`${IPC_PREFIX}get-notification-settings`)
+        .then((value: unknown) => notificationSettingsViewSchema.parse(value)),
+    onNotificationSettings: (listener) => {
+      const handler = (_event: IpcRendererEvent, value: unknown) => {
+        const parsed = notificationSettingsViewSchema.safeParse(value);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(NOTIFICATION_SETTINGS_CHANNEL, handler);
+      return () => ipcRenderer.off(NOTIFICATION_SETTINGS_CHANNEL, handler);
+    },
+    setNotificationSettings: (settings) => invoke("set-notification-settings", settings),
+    openSystemNotificationSettings: () => invoke("open-system-notification-settings"),
+  };
+  contextBridge.exposeInMainWorld("desktopNotifications", notifications);
 }
 
 if (window.location.protocol === "http:" || window.location.protocol === "https:") {

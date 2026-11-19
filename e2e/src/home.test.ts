@@ -123,6 +123,27 @@ beforeEach(async (test) => {
 const longChoice =
   "Keep the cache in SQLite so that it survives restarts, and add a nightly job that removes entries older than thirty days from every table";
 
+describe("알림에서 Dashboard 열기(브라우저, 0103)", () => {
+  it("주소의 run 으로 그 카드 상세 패널을 연 채로 열고, 주소에서 run 을 지운다", async () => {
+    await page.goto(`/?ws=${workspaceId}&run=${runIds.get("ACME-34")}`);
+    await hydrated(page);
+    const panel = page.getByRole("dialog");
+    await panel.getByRole("heading", { name: /ACME-34/ }).waitFor();
+    await page.waitForURL((url) => !url.searchParams.has("run"));
+    await page.keyboard.press("Escape");
+    await panel.waitFor({ state: "hidden" });
+    expect(await focusedSoon(cardButton(page, "ACME-34"))).toBe(true);
+  });
+
+  it("Question 런은 답하기 상태로 열어 첫 선택지에 포커스를 준다", async () => {
+    await page.goto(`/?ws=${workspaceId}&run=${runIds.get("ACME-1")}`);
+    await hydrated(page);
+    expect(await focusedSoon(page.getByRole("dialog").getByRole("radio", { name: "SQLite" }))).toBe(
+      true,
+    );
+  });
+});
+
 describe("Dashboard 상세 패널(브라우저, 0100)", () => {
   it("카드를 누르면 패널이 열리고 닫기·Escape·바깥 누르기로 닫으면 포커스가 카드로 돌아온다", async () => {
     await openHome(page);

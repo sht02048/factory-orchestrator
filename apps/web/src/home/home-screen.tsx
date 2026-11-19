@@ -64,6 +64,8 @@ export interface HomeScreenProps {
   onViewChange?: (view: DashboardView) => void;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
+  openRunId?: string | undefined;
+  onOpenRunShown?: () => void;
 }
 
 export const COLUMN_VISIBLE = 6;
@@ -84,11 +86,25 @@ export function HomeScreen({
   onViewChange = () => {},
   onAnswer,
   onDeny,
+  openRunId,
+  onOpenRunShown = () => {},
 }: HomeScreenProps) {
   const t = useTranslations("home");
   const cards = useRef(new Map<RunId, HTMLButtonElement>());
   const [target, setTarget] = useState<SheetTarget | null>(null);
   const [open, setOpen] = useState(false);
+  const shownRunId = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (openRunId === undefined || shownRunId.current === openRunId) return;
+    if (page.workspace.kind === "none") return;
+    shownRunId.current = openRunId;
+    const run = boardRuns(dashboardBoard(page)).find((candidate) => candidate.id === openRunId);
+    onOpenRunShown();
+    if (run === undefined) return;
+    const tagged = page.attention.some((item) => item.run.id === run.id);
+    setTarget({ run, tagged, mode: opensAnswer(run) ? "answer" : "summary" });
+    setOpen(true);
+  }, [openRunId, page, onOpenRunShown]);
   if (page.workspace.kind === "none") {
     return (
       <div {...stylex.props(styles.page)}>
@@ -108,15 +124,7 @@ export function HomeScreen({
   const board = dashboardBoard(page);
   const todoOnly = view === "todo";
   const fresh =
-    target === null
-      ? undefined
-      : [
-          ...board.queued,
-          ...board.running.todo,
-          ...board.running.rest,
-          ...board.done.todo,
-          ...board.done.rest,
-        ].find((run) => run.id === target.run.id);
+    target === null ? undefined : boardRuns(board).find((run) => run.id === target.run.id);
   const host: CardHost = {
     all,
     selectedId: open && target !== null ? target.run.id : null,
@@ -221,6 +229,20 @@ export function HomeScreen({
       />
     </div>
   );
+}
+
+function boardRuns(board: ReturnType<typeof dashboardBoard>): HomeRun[] {
+  return [
+    ...board.queued,
+    ...board.running.todo,
+    ...board.running.rest,
+    ...board.done.todo,
+    ...board.done.rest,
+  ];
+}
+
+function opensAnswer(run: HomeRun): boolean {
+  return run.state === "waiting-for-input" && run.input?.kind === "question" && !run.input.answered;
 }
 
 function DashboardHeader({ page, all }: { page: HomePage; all: boolean }) {
