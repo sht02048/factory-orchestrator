@@ -247,7 +247,7 @@ main() {
 
   name=$(scutil --get ComputerName 2>/dev/null </dev/null || hostname -s)
   account=$(id -un)
-  trap - INT TERM
+  trap '' INT TERM
   printf '%s' "$GANGER_TOKEN" | curl -sS --fail-with-body -X POST "$ENROLL_URL" \\
     --data-urlencode 'token@-' \\
     --data-urlencode 'outcome=ready' \\

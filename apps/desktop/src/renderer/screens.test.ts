@@ -244,6 +244,22 @@ describe("등록 끝 화면(브라우저, 0099)", () => {
   });
 });
 
+describe("서버에 알리는 중에는 취소를 막기(브라우저, 0099)", () => {
+  it("GitHub 단계가 끝나면 취소 버튼을 못 쓰게 한다", async () => {
+    await openScreen({
+      screen: "runner-enrollment",
+      server: "mac-mini",
+      enrollment: {
+        phase: "running",
+        progress: { ...START, done: ["remoteLogin", "key", "service", "github"] },
+        canceling: false,
+      },
+    });
+    const cancel = page.getByRole("button", { name: screens.enrollment.cancel });
+    expect(await cancel.getAttribute("aria-disabled")).toBe("true");
+  });
+});
+
 describe("이 맥에서 취소한 등록(브라우저, 0099)", () => {
   it("취소는 문제로 칠하지 않고 어느 단계도 실패로 표시하지 않는다", async () => {
     await openScreen({

@@ -306,6 +306,24 @@ describe("progress lines for the Ganger app", () => {
   });
 });
 
+describe("stopping while the result is being sent", () => {
+  test("lets the report to the server finish instead of dying half way", () => {
+    stub(
+      "curl",
+      [
+        `cat >"${log}/curl-stdin-0"`,
+        "kill -TERM $PPID",
+        "kill -TERM $$",
+        "printf 'Ganger: registered\\n'",
+      ].join("\n"),
+    );
+    const result = run({}, { [PROGRESS_ENV]: "1" });
+    expect(result.status).toBe(0);
+    expect(progressLines(result.stdout).at(-1)).toBe("ganger-step:report");
+    expect(result.stdout).toContain("Ganger: registered");
+  });
+});
+
 describe("shell quoting for values put into the script", () => {
   const nasty = [
     "plain",

@@ -707,7 +707,7 @@ function RunnerEnrollment({ server, enrollment }: { server: string; enrollment: 
           <CenteredActions>
             <ActionButton
               variant="danger"
-              disabled={enrollment.canceling}
+              disabled={enrollment.canceling || enrollment.progress.done.includes("github")}
               onClick={() => void api().cancelEnrollment()}
             >
               {enrollment.canceling ? t("canceling") : t("cancel")}

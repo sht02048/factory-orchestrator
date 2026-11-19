@@ -486,6 +486,7 @@ export class Controller {
     const notification = new Notification({ title, body });
     notification.on("click", () => {
       this.showWindow();
+      if (this.view.screen === "runner-enrollment") return;
       if (this.serverUrl === url || (this.serverUrl === undefined && this.diffUrl === url)) {
         this.openServer(url, attentionPath(event));
       }
