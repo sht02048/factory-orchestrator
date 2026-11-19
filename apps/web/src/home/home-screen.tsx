@@ -154,7 +154,9 @@ function DashboardHeader({
       <Text variant="display" as="h1">
         {total === 0 ? t("headlineEmpty") : t("headline", { count: total })}
       </Text>
-      <Text variant="body">{limitSentence === null ? work : `${work} ${limitSentence}`}</Text>
+      <Text variant="body">
+        {limitSentence === null ? work : t("summary.withLimit", { work, limit: limitSentence })}
+      </Text>
     </header>
   );
 }
