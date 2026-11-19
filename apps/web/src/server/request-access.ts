@@ -1,7 +1,12 @@
 import { getInstallSettings, parseBootConfig } from "@ganger/db";
 import type { InstallAddresses } from "@ganger/db";
-import { allowedHosts, checkRequest, rejectionLogLine, rejectionResponse } from "./request-guard";
-import type { AllowedHosts } from "./request-guard";
+import {
+  allowedHosts,
+  checkRequest,
+  rejectionLogLine,
+  rejectionResponse,
+} from "@ganger/app/request-guard";
+import type { AllowedHosts } from "@ganger/app/request-guard";
 import { getDatabase } from "./database";
 
 function bindHost(): string | null {

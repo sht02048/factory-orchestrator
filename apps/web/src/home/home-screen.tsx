@@ -35,8 +35,14 @@ import type {
   InputWait,
   TodoGroup,
   TodoGroupKind,
-} from "./model";
-import { freeCapacity, limitedRunners, readyAgainInMs, runnerIssues, todoGroups } from "./model";
+} from "@ganger/app/home/model";
+import {
+  freeCapacity,
+  limitedRunners,
+  readyAgainInMs,
+  runnerIssues,
+  todoGroups,
+} from "@ganger/app/home/model";
 import { subjectParticle } from "./particle";
 import { QuestionForm } from "./question-form";
 import type { Question, SendState } from "./question-form";

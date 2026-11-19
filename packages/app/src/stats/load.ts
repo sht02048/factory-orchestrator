@@ -6,8 +6,8 @@ import {
   toWorkspaceId,
 } from "@ganger/db";
 import type { Database, StoredRun } from "@ganger/db";
-import { resolveWorkspace } from "../shell/model";
-import { calendarDay } from "../time-zone";
+import { resolveWorkspace } from "../shell/model.js";
+import { calendarDay } from "../time-zone.js";
 import {
   dailyThroughput,
   groupStats,
@@ -15,8 +15,8 @@ import {
   previousPeriod,
   statsPeriod,
   summarizeStats,
-} from "./model";
-import type { StatsPage, StatsPeriodDays, StatsRun } from "./model";
+} from "./model.js";
+import type { StatsPage, StatsPeriodDays, StatsRun } from "./model.js";
 
 export function loadStatsPage(
   db: Database,

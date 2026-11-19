@@ -23,7 +23,7 @@ const MODULE_REFERENCES = [
   /^(?:import|export)\b[^;]*?\bfrom\s*["']([^"']+)["']/gm,
   /^import\s*["']([^"']+)["']/gm,
   /\bimport\(\s*["']([^"']+)["']\s*\)/g,
-  /\b(?:__)?require\(\s*["']([^"']+)["']\s*\)/g,
+  /(?<!`)\b(?:__)?require\(\s*["']([^"']+)["']\s*\)/g,
 ];
 
 const BUILTINS = new Set(builtinModules);

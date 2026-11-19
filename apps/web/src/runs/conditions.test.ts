@@ -5,7 +5,7 @@ import {
   pickConditions,
   runConditionsSchema,
   trackerProjectKey,
-} from "./conditions";
+} from "@ganger/app/runs/conditions";
 
 describe("Runs 조건", () => {
   it("트래커 프로젝트 키는 콜론이 든 이름도 되돌리고, 모양이 틀리면 버린다", () => {

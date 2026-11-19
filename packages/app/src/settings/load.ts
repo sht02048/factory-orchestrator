@@ -13,12 +13,14 @@ import {
   listWorkspaceTrackerProjects,
   listWorkspaces,
 } from "@ganger/db";
-import type { PowerSettings } from "@ganger/cli/power-settings";
+import type { PowerSettingsStore } from "../power-settings.js";
+import { mcpLaunch } from "./mcp-launch.js";
+import type { McpLaunch } from "./mcp-launch.js";
 import type { Database, SecretBox, StoredTrackerConnection, WorkspaceId } from "@ganger/db";
 import { z } from "zod";
-import { prerequisiteProject } from "../labels";
-import { resolveWorkspace } from "../shell/model";
-import { KNOWN_AGENTS } from "./model";
+import { prerequisiteProject } from "../prerequisites.js";
+import { resolveWorkspace } from "../shell/model.js";
+import { KNOWN_AGENTS } from "./model.js";
 import type {
   AddressesView,
   BoundProject,
@@ -33,18 +35,16 @@ import type {
   SettingsPage,
   TrackerProjectChoice,
   WorkspaceSettings,
-} from "./model";
+} from "./model.js";
 
-export interface PowerSettingsStore {
-  read(): PowerSettings;
-  write(settings: PowerSettings): void;
-}
+export type { PowerSettingsStore };
 
 export interface SettingsContext {
   db: Database;
   secretBox: SecretBox;
   registry: AdapterRegistry;
   power?: PowerSettingsStore;
+  mcpLaunch?: McpLaunch;
 }
 
 function powerView(store: PowerSettingsStore | undefined): PowerView {
@@ -171,6 +171,9 @@ export async function loadSettingsPage(
       githubToken: listCodeHostConnections(db, secretBox).length > 0,
       addresses: addressesView(getInstallSettings(db)),
       power: powerView(context.power),
+      mcp:
+        context.mcpLaunch ??
+        mcpLaunch({ nodePath: "node", cliEntry: undefined, home: undefined, electron: false }),
       runners: runners.map((runner): RunnerSettingsView => {
         const config = runnerConfigSchema.safeParse(runner.config);
         return {

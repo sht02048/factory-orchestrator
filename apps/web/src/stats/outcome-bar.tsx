@@ -14,7 +14,7 @@ import type { OutcomeSegment } from "@ganger/ui";
 import type { MouseEvent } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import type { OutcomeCounts, StatsGroup } from "./model";
+import type { OutcomeCounts, StatsGroup } from "@ganger/app/stats/model";
 
 export function outcomeSegments(outcomes: OutcomeCounts): ReadonlyArray<OutcomeSegment> {
   return [

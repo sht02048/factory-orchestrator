@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { keepAwake } from "./keep-awake.js";
 import type { HoldSleepAssertion, KeepAwakeOptions } from "./keep-awake.js";
-import type { PowerSettingsRead } from "./power-settings.js";
+import type { PowerSettingsRead } from "@ganger/app/power-settings";
 
 interface FakeAssertion {
   pid: number;

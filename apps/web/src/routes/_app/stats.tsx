@@ -1,5 +1,5 @@
 import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
-import { conditionsForStatsGroup } from "../../runs/conditions";
+import { conditionsForStatsGroup } from "@ganger/app/runs/conditions";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
@@ -9,7 +9,7 @@ import {
   DEFAULT_STATS_PERIOD_DAYS,
   STATS_DIMENSIONS,
   statsPeriodDaysSchema,
-} from "../../stats/model";
+} from "@ganger/app/stats/model";
 import { StatsScreen } from "../../stats/stats-screen";
 
 const t = createTranslator({ locale: defaultLocale, messages: statsMessages, namespace: "stats" });

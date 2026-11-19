@@ -8,9 +8,9 @@ import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
 import { addTitledRun, now, seedDatabase } from "../testing/seed";
 import { HomeScreen, QuestionForm, STOPPED_VISIBLE, runHref } from "./home-screen";
-import { loadHomePage } from "./load";
+import { loadHomePage } from "@ganger/app/home/load";
 import { homeMessages } from "./messages";
-import type { HomePage, HomeRun, InputWait } from "./model";
+import type { HomePage, HomeRun, InputWait } from "@ganger/app/home/model";
 
 const reject = () => Promise.reject(new Error("unused"));
 

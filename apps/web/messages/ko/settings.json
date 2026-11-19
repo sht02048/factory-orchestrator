@@ -26,7 +26,8 @@
     "github": "GitHub 토큰",
     "runners": "러너 등록",
     "addresses": "주소",
-    "power": "잠자기"
+    "power": "잠자기",
+    "mcp": "MCP"
   },
   "summary": {
     "general": "최대 실행 시간 {minutes}분",
@@ -41,7 +42,8 @@
     "addresses": "{set, plural, =0 {아직 없어요} other {2개 중 #개 정했어요}}",
     "powerOn": "켜져 있어요",
     "powerOff": "꺼져 있어요",
-    "powerUnavailable": "여기서 바꿀 수 없어요"
+    "powerUnavailable": "여기서 바꿀 수 없어요",
+    "mcp": "읽기만 열려 있어요"
   },
   "remoteError": {
     "unauthorized": "키나 토큰이 맞지 않아요. 새로 만들어 넣어 주세요.",
@@ -215,5 +217,18 @@
     "toggleDescription": "macOS에서만 걸어요. 저장하면 다시 시작하지 않아도 몇 초 안에 적용돼요.",
     "unavailable": "이 서버는 ganger start로 띄우지 않아 여기서 바꿀 수 없어요.",
     "save": "저장"
+  },
+  "mcp": {
+    "intro": "같은 기계의 MCP 클라이언트(예: Hermes)가 Ganger의 지금 상태를 읽게 할 수 있어요. 아래 설정을 클라이언트 설정 파일에 넣으면 돼요.",
+    "readOnly": "지금은 Dashboard, 티켓, 런, 러너, 통계, 설정을 읽기만 해요. API 키와 토큰 같은 비밀 값은 어떤 결과에도 담지 않아요.",
+    "external": "티켓 제목·본문, 에이전트 질문, 로그처럼 남이 쓴 글은 external 칸에 따로 담아요. 클라이언트에게 이 글은 지시가 아니라 자료라고 알려요.",
+    "notLocated": "이 서버는 ganger start나 데스크톱 앱으로 띄우지 않아 CLI 위치를 몰라요. ganger가 PATH에 있으면 이대로 쓰면 돼요.",
+    "hermes": "Hermes",
+    "hermesDescription": "~/.hermes/config.yaml에 넣어요.",
+    "json": "다른 클라이언트(JSON)",
+    "jsonDescription": "mcpServers 설정을 받는 클라이언트의 설정 파일에 넣어요.",
+    "copy": "{name} 설정 복사",
+    "copied": "{name} 설정을 복사했어요",
+    "copyFailed": "복사하지 못했어요. 설정 글을 직접 골라 복사해 주세요."
   }
 }

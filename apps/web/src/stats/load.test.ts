@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { addRunDecisionCases, now, seedStatsDatabase } from "../testing/stats-seed";
-import { loadStatsPage } from "./load";
-import { STATS_DIMENSIONS } from "./model";
-import type { StatsGroup, StatsPage, StatsSummary } from "./model";
+import { loadStatsPage } from "@ganger/app/stats/load";
+import { STATS_DIMENSIONS } from "@ganger/app/stats/model";
+import type { StatsGroup, StatsPage, StatsSummary } from "@ganger/app/stats/model";
 
 const min = 60_000;
 

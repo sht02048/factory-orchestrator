@@ -1,0 +1,19 @@
+{
+  "name": "@ganger/app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ganger/codehost-github": "workspace:*",
+    "@ganger/core": "workspace:*",
+    "@ganger/db": "workspace:*",
+    "@ganger/tracker-linear": "workspace:*",
+    "zod": "4.6.7"
+  }
+}

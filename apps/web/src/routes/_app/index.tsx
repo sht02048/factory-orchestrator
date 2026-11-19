@@ -3,7 +3,7 @@ import { useState } from "react";
 import { createTranslator } from "use-intl";
 import { HomeScreen } from "../../home/home-screen";
 import { homeMessages } from "../../home/messages";
-import type { HomePage } from "../../home/model";
+import type { HomePage } from "@ganger/app/home/model";
 import { useRefreshWhileVisible } from "../../home/refresh";
 import { ScreenMessages, defaultLocale } from "../../i18n";
 import { answerQuestion, denyPermission, getHomePage } from "../../server/functions";

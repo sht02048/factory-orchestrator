@@ -3,7 +3,7 @@ import { renderToString } from "react-dom/server";
 import { IntlProvider } from "use-intl";
 import { appMessages, defaultLocale } from "../i18n";
 import type { AppMessages } from "../i18n";
-import { DEFAULT_TIME_ZONE } from "../time-zone";
+import { DEFAULT_TIME_ZONE } from "@ganger/app/time-zone";
 
 export function renderWithMessages(
   node: ReactNode,

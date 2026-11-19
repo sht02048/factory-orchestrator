@@ -16,7 +16,7 @@ import { space } from "@ganger/ui/tokens.stylex";
 import { useId, useState } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import type { DailyThroughput } from "./model";
+import type { DailyThroughput } from "@ganger/app/stats/model";
 import { outcomeSegments } from "./outcome-bar";
 
 const GRID_LINES = 4;

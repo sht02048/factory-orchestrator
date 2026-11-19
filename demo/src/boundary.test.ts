@@ -10,6 +10,7 @@ const PRODUCT_DIRS = [
   "apps/web/src",
   "apps/worker/src",
   "apps/cli/src",
+  "packages/app/src",
   "packages/codehost-github/src",
   "packages/runner-orca/src",
   "packages/tracker-linear/src",
