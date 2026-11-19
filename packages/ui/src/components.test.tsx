@@ -27,6 +27,7 @@ import {
   Sheet,
   Row,
   RowActionSlot,
+  RowTitle,
   SURFACE_ROLES,
   Section,
   SegmentedTabs,
@@ -39,7 +40,9 @@ import {
   Table,
   TableCell,
   TableHead,
+  TableFoldedOnly,
   TableHeader,
+  tableColumnTemplates,
   TableRow,
   TableRows,
   Tabs,
@@ -163,7 +166,9 @@ describe("서버 렌더", () => {
     expect(html).toContain('aria-label="런 목록"');
     expect(html.match(/role="option"/g)).toHaveLength(2);
     expect(html).toMatch(/aria-selected="true"[^>]*>.*둘째|둘째.*aria-selected="true"/s);
-    expect(html).toMatch(/style="--[^:]+:minmax\(0, 1fr\) 80px;--[^:]+:minmax\(0, 1fr\) 80px"/);
+    expect(html).toMatch(
+      /style="(?:--[^:]+:minmax\(0, 1fr\) 80px;){3}--[^:]+:minmax\(0, 1fr\) 80px"/,
+    );
   });
 
   it("Table 은 좁은 폭 열 값을 따로 받는다(티켓 0091)", () => {
@@ -176,7 +181,65 @@ describe("서버 렌더", () => {
         </TableRows>
       </Table>,
     );
-    expect(html).toMatch(/style="--[^:]+:minmax\(0, 1fr\) 152px 88px;--[^:]+:minmax\(0, 1fr\)"/);
+    expect(html).toMatch(
+      /style="(?:--[^:]+:minmax\(0, 1fr\) 152px 88px;){3}--[^:]+:minmax\(0, 1fr\)"/,
+    );
+  });
+
+  it("Table 은 접힌 폭의 열 값을 차례로 받고, 빠진 값은 앞 단계를 따른다(티켓 0101)", () => {
+    expect(
+      tableColumnTemplates({
+        columns: "a b c",
+        foldedColumns: { first: "a b", second: "a" },
+        narrowColumns: "z",
+      }),
+    ).toEqual({ wide: "a b c", first: "a b", second: "a", third: null, narrow: "z" });
+    expect(
+      tableColumnTemplates({
+        columns: "a b c",
+        foldedColumns: { first: "a b", second: "a", third: "y" },
+      }),
+    ).toEqual({ wide: "a b c", first: "a b", second: "a", third: "y", narrow: "y" });
+    expect(tableColumnTemplates({ columns: "a b c", foldedColumns: { first: "a b" } })).toEqual({
+      wide: "a b c",
+      first: "a b",
+      second: "a b",
+      third: null,
+      narrow: "a b",
+    });
+    expect(tableColumnTemplates({ columns: "a b" })).toEqual({
+      wide: "a b",
+      first: "a b",
+      second: "a b",
+      third: null,
+      narrow: "a b",
+    });
+  });
+
+  it("접히면 숨는 칸과 접혔을 때만 보이는 내용은 접힘 단계를 드러낸다(티켓 0101)", () => {
+    const html = renderToString(
+      <Table columns="1fr 80px" foldedColumns={{ first: "1fr" }}>
+        <TableHead>
+          <TableHeader>제목</TableHeader>
+          <TableHeader hideWhen="first">러너</TableHeader>
+        </TableHead>
+        <TableRows label="런 목록" value="a" onValueChange={noop}>
+          <TableRow value="a" label="첫째">
+            <TableCell>
+              <RowTitle fullText="아주 긴 첫째 제목">아주 긴 첫째 제목</RowTitle>
+              <TableFoldedOnly when="first" block>
+                runner-a
+              </TableFoldedOnly>
+            </TableCell>
+            <TableCell hideWhen="first">runner-a</TableCell>
+          </TableRow>
+        </TableRows>
+      </Table>,
+    );
+    expect(html).toContain('data-hide-when="first"');
+    expect(html).toContain('data-folded-only="first"');
+    expect(html).toContain('title="아주 긴 첫째 제목"');
+    expect(renderToString(<RowTitle>짧음</RowTitle>)).not.toContain("title=");
   });
 
   it("Table 은 narrowColumns 를 준 표에서만 좁을 때 머리글을 숨긴다(티켓 0091)", () => {

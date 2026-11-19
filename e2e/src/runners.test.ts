@@ -237,6 +237,35 @@ describe("Runners 다시 그리기(브라우저, 0092)", () => {
     expect(overflow).toBe(0);
     expect(await page.getByText(runners.columns.usage, { exact: true }).isVisible()).toBe(false);
   });
+
+  it("넓은 창에서 목록이 패널 바로 앞까지 채우고, 어느 폭에서도 가로로 넘치지 않는다(0101)", async (context) => {
+    const layoutAt = async (width: number) => {
+      const page = await openPage(`${context.task.name}-${String(width)}`, { width, height: 900 });
+      await page.goto(`/runners?ws=${workspaceId}`);
+      await hydrated(page);
+      const layout = await page.evaluate(() => {
+        const list = document.querySelector('[role="listbox"]');
+        const panel = document.querySelector("main aside");
+        if (list === null || panel === null) throw new Error("runners layout not found");
+        const listBox = list.getBoundingClientRect();
+        const panelBox = panel.getBoundingClientRect();
+        return {
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          gap: Math.round(panelBox.left - listBox.right),
+          beside: panelBox.top < listBox.bottom && panelBox.left > listBox.left,
+        };
+      });
+      await page.context().close();
+      return layout;
+    };
+
+    const wide = await layoutAt(1728);
+    expect(wide).toMatchObject({ overflow: 0, beside: true });
+    expect(wide.gap).toBeLessThanOrEqual(64);
+    for (const width of [1280, 900, 400]) {
+      expect((await layoutAt(width)).overflow).toBe(0);
+    }
+  });
 });
 
 interface TextLayout {
