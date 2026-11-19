@@ -29,8 +29,9 @@ export function throttledSync(
   };
 }
 
-export function readNotificationFeed(db: Database, after: number | null): NotificationFeed {
+export function readNotificationFeed(db: Database, requested: number | null): NotificationFeed {
   const cursor = notificationCursor(db);
+  const after = requested !== null && requested > cursor ? null : requested;
   const events =
     after === null ? listOpenNotificationEvents(db) : listNotificationChanges(db, after);
   return {

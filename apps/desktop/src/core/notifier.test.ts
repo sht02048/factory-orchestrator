@@ -202,7 +202,40 @@ describe("알림 고르기", () => {
       },
     ]);
     expect(effects).toContainEqual({ type: "seen", lastId: 10 });
+    expect(shows(notifier.tick(T + REMIND_AFTER_MS)).map((show) => show.id)).toEqual([
+      "event-3",
+      "event-6",
+    ]);
     expect(shows(notifier.tick(T + REMIND_AFTER_MS * 2))).toEqual([]);
+  });
+
+  it("앱을 다시 켰을 때 10분이 안 된 열린 Question 은 생긴 지 10분에 다시 알리고, 지난 것은 다시 알리지 않는다", () => {
+    const { notifier } = setup(5);
+    notifier.receive(
+      {
+        events: [
+          event(1, "question", { createdAt: T - REMIND_AFTER_MS - 1 }),
+          event(2, "permission", { createdAt: T - 60_000 }),
+        ],
+        open: [1, 2],
+        initial: true,
+      },
+      "catch-up",
+      T,
+    );
+    expect(shows(notifier.tick(T + REMIND_AFTER_MS)).map((show) => show.id)).toEqual(["event-2"]);
+  });
+
+  it("서버 번호가 기억한 번호보다 작으면 새 서버로 보고 열린 처리할 일을 놓친 일로 모은다", () => {
+    const { notifier } = setup(500);
+    const effects = notifier.receive(
+      { events: [event(1), event(2, "failed")], open: [1, 2], cursor: 2, initial: true },
+      "catch-up",
+      T,
+    );
+    expect(shows(effects).map((show) => show.content)).toEqual([{ kind: "missed", count: 2 }]);
+    expect(effects).toContainEqual({ type: "seen", lastId: 2 });
+    expect(shows(live(notifier, [event(3)], T + 1)).map((show) => show.id)).toEqual(["event-3"]);
   });
 
   it("처음 붙는 서버는 기준만 잡고 알리지 않는다", () => {

@@ -23,6 +23,7 @@ export type CatchUp = "catch-up" | "live";
 export interface NotifierBatch {
   events: ReadonlyArray<NotificationRecord>;
   open: ReadonlyArray<number> | null;
+  cursor?: number;
   initial: boolean;
 }
 
@@ -67,6 +68,9 @@ export class Notifier {
 
   receive(batch: NotifierBatch, mode: CatchUp, now: number): NotifierEffect[] {
     const effects: NotifierEffect[] = [];
+    if (batch.initial && batch.cursor !== undefined && this.lastSeen !== null) {
+      if (batch.cursor < this.lastSeen) this.lastSeen = 0;
+    }
     if (batch.open !== null) {
       const stillOpen = new Set(batch.open);
       for (const id of this.open.keys()) {
@@ -81,6 +85,7 @@ export class Notifier {
       } else {
         const known = this.open.has(record.id);
         this.open.set(record.id, record);
+        if (!known) this.scheduleReminder(record, now);
         if (!known && this.lastSeen !== null && record.id > this.lastSeen) fresh.push(record);
       }
       highest = Math.max(highest ?? 0, record.id);
@@ -149,9 +154,6 @@ export class Notifier {
 
   private deliver(record: NotificationRecord, now: number, effects: NotifierEffect[]): void {
     if (!allows(this.prefs(), record.kind)) return;
-    if (remindsKind(record.kind)) {
-      this.reminders.set(record.id, Math.max(Date.parse(record.createdAt), now) + REMIND_AFTER_MS);
-    }
     if (!isTodoKind(record.kind)) {
       this.showEvent(record, false, effects);
       return;
@@ -190,6 +192,12 @@ export class Notifier {
       silent: members.every((member) => isSilentKind(member.kind)),
       path: TODO_VIEW_PATH,
     });
+  }
+
+  private scheduleReminder(record: NotificationRecord, now: number): void {
+    if (!remindsKind(record.kind)) return;
+    const due = Date.parse(record.createdAt) + REMIND_AFTER_MS;
+    if (due > now) this.reminders.set(record.id, due);
   }
 
   private newGroup(kind: Group["kind"], members: ReadonlyArray<NotificationRecord>): Group {

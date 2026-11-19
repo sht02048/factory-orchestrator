@@ -1,6 +1,14 @@
 import * as stylex from "@stylexjs/stylex";
-import { Card, Checkbox, ProblemCallout, Text, buttonStyles, textStyles } from "@ganger/ui";
-import { colors, fonts, fontSize, lineHeight, space } from "@ganger/ui/tokens.stylex";
+import {
+  Button,
+  Card,
+  documentStyles,
+  Checkbox,
+  ProblemCallout,
+  Text,
+  textStyles,
+} from "@ganger/ui";
+import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useId, useRef, useState } from "react";
 import { IntlProvider, useTranslations } from "use-intl";
 import screens from "../../messages/ko/screens.json" with { type: "json" };
@@ -25,7 +33,7 @@ export function NotificationSettingsWindow() {
   }, []);
   return (
     <IntlProvider locale="ko" messages={{ screens }}>
-      <div {...stylex.props(styles.canvas)}>
+      <div {...stylex.props(documentStyles.body, styles.canvas)}>
         {view === null ? null : <NotificationSettings view={view} onChange={setView} />}
       </div>
     </IntlProvider>
@@ -60,19 +68,17 @@ export function NotificationSettings({
           <h1 ref={titleRef} tabIndex={-1} {...stylex.props(...textStyles("page"), styles.title)}>
             {t("title")}
           </h1>
-          <p {...stylex.props(styles.summary)}>{t("summary")}</p>
+          <Text variant="body">{t("summary")}</Text>
         </header>
         {view.permission === "denied" ? (
           <ProblemCallout
             title={t("permissionOff.title")}
             actions={
-              <button
-                type="button"
+              <Button
                 onClick={() => void window.desktopNotifications?.openSystemNotificationSettings()}
-                {...stylex.props(...buttonStyles("secondary", false), styles.button)}
               >
                 {t("permissionOff.action")}
-              </button>
+              </Button>
             }
           >
             {t("permissionOff.body")}
@@ -115,14 +121,7 @@ export function NotificationSettings({
 }
 
 const styles = stylex.create({
-  canvas: {
-    minHeight: "100vh",
-    backgroundColor: colors.bgCanvas,
-    color: colors.textPrimary,
-    fontFamily: fonts.sans,
-    fontSize: fontSize.body,
-    lineHeight: lineHeight.normal,
-  },
+  canvas: { minHeight: "100vh" },
   frame: {
     boxSizing: "border-box",
     display: "flex",
@@ -136,19 +135,11 @@ const styles = stylex.create({
     flexDirection: "column",
     gap: space.s6,
     width: "100%",
-    maxWidth: 520,
+    maxWidth: size.formWidth,
     minWidth: 0,
   },
   header: { display: "flex", flexDirection: "column", gap: space.s2 },
   title: { outline: "none" },
-  summary: {
-    margin: 0,
-    color: colors.textSecondary,
-    fontSize: fontSize.body,
-    lineHeight: lineHeight.relaxed,
-    textWrap: "pretty",
-  },
-  button: { alignSelf: "flex-start" },
   section: { display: "flex", flexDirection: "column", gap: space.s3 },
   sectionHead: {
     display: "flex",

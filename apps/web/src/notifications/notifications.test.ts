@@ -127,6 +127,15 @@ describe("알림 사건 읽기", () => {
     expect(readNotificationFeed(db, next.cursor).events).toEqual([]);
   });
 
+  it("서버의 지금 번호보다 큰 번호를 주면 처음부터 열린 사건을 준다", () => {
+    const { db } = seedDatabase();
+    syncNotifications(db, now);
+    const fresh = readNotificationFeed(db, null);
+    const ahead = readNotificationFeed(db, fresh.cursor + 100);
+    expect(ahead.events).toEqual(fresh.events);
+    expect(ahead.cursor).toBe(fresh.cursor);
+  });
+
   it("짧은 간격의 동기화는 한 번만 돈다", () => {
     let clock = 0;
     let runs = 0;

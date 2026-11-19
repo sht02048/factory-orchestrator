@@ -3,7 +3,7 @@ import { listRunners, toWorkspaceId } from "@ganger/db";
 import type { Database, NotificationCause, NotificationTarget, StoredRunner } from "@ganger/db";
 import { loadHomePage } from "../home/load.js";
 import type { HomePage, HomeRun } from "../home/model.js";
-import { ALL_WORKSPACES } from "../shell/model.js";
+import { ALL_WORKSPACES, runnerIssueCause } from "../shell/model.js";
 import { localTimeZone } from "../time-zone.js";
 
 function runTarget(run: HomeRun): NotificationTarget {
@@ -47,13 +47,14 @@ function runnerCauses(runner: StoredRunner, now: Date): NotificationCause[] {
     target: { kind: "runner", runnerId: runner.id } satisfies NotificationTarget,
     subject: runner.name,
   };
-  if (!runner.online) {
+  const issue = runnerIssueCause(runner);
+  if (issue === "offline") {
     return runner.checkedAt === null
       ? []
       : [{ ...base, kind: "runner-offline", cause: `runner-offline:${runner.id}`, detail: null }];
   }
   const causes: NotificationCause[] = [];
-  if (runner.assignmentBlocked) {
+  if (issue === "auth") {
     causes.push({ ...base, kind: "runner-auth", cause: `runner-auth:${runner.id}`, detail: null });
   }
   for (const limit of usageLimitsAt(runner.providerUsage, now)) {

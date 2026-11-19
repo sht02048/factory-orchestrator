@@ -10,6 +10,7 @@ import type { NotificationRecord } from "@ganger/app/notifications/feed";
 export interface FeedBatch {
   events: NotificationRecord[];
   open: number[] | null;
+  cursor: number;
   initial: boolean;
 }
 
@@ -26,6 +27,7 @@ export interface NotificationFeedOptions {
   streamRetryMs?: number;
   streamFailuresBeforePolling?: number;
   requestTimeoutMs?: number;
+  idleTimeoutMs?: number;
 }
 
 export interface SseMessage {
@@ -89,6 +91,7 @@ export const FEED_POLL_MS = 5_000;
 export const FEED_RECONNECT_MS = 1_000;
 export const FEED_MAX_RECONNECT_MS = 30_000;
 export const FEED_STREAM_RETRY_MS = 60_000;
+export const FEED_IDLE_TIMEOUT_MS = 45_000;
 
 export class NotificationFeed {
   private readonly options: NotificationFeedOptions;
@@ -156,17 +159,25 @@ export class NotificationFeed {
   }
 
   private emit(events: NotificationRecord[], open: number[] | null, cursor: number): void {
-    this.cursor = Math.max(this.cursor ?? 0, cursor, ...events.map((event) => event.seq));
+    const latest = Math.max(cursor, ...events.map((event) => event.seq));
+    this.cursor = open === null ? Math.max(this.cursor ?? 0, latest) : latest;
     const initial = this.needsInitial;
     this.needsInitial = false;
-    this.options.onBatch({ events, open, initial });
+    this.options.onBatch({ events, open, cursor: this.cursor, initial });
   }
 
   private async stream(generation: number): Promise<void> {
     const abort = new AbortController();
     this.abort = abort;
     let ready = false;
+    const idleMs = this.options.idleTimeoutMs ?? FEED_IDLE_TIMEOUT_MS;
+    let idle: ReturnType<typeof setTimeout> | undefined;
+    const watch = () => {
+      if (idle !== undefined) clearTimeout(idle);
+      idle = setTimeout(() => abort.abort(), idleMs);
+    };
     try {
+      watch();
       const headers: Record<string, string> = { accept: "text/event-stream" };
       if (this.cursor !== null) headers["last-event-id"] = String(this.cursor);
       const response = await this.fetch(new URL(NOTIFICATION_STREAM_PATH, this.options.origin), {
@@ -183,8 +194,9 @@ export class NotificationFeed {
       const decoder = new TextDecoder();
       const backlog: NotificationRecord[] = [];
       const reader = response.body.getReader();
+      watch();
       for (;;) {
-        const { done, value } = await reader.read();
+        const { done, value } = await reader.read().finally(watch);
         if (generation !== this.generation) return;
         if (done) break;
         for (const message of parser.push(decoder.decode(value, { stream: true }))) {
@@ -208,7 +220,9 @@ export class NotificationFeed {
     } catch {
       if (generation !== this.generation) return;
     } finally {
+      if (idle !== undefined) clearTimeout(idle);
       if (this.abort === abort) this.abort = undefined;
+      abort.abort();
     }
     if (generation !== this.generation || this.stopped) return;
     if (!ready) this.streamFailures += 1;

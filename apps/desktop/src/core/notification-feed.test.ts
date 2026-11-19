@@ -123,7 +123,10 @@ async function startServer(): Promise<FakeServer> {
   return server;
 }
 
-function startFeed(server: FakeServer, overrides: { streamRetryMs?: number } = {}) {
+function startFeed(
+  server: FakeServer,
+  overrides: { streamRetryMs?: number; idleTimeoutMs?: number } = {},
+) {
   const batches: FeedBatch[] = [];
   const transports: FeedTransport[] = [];
   const feed = new NotificationFeed({
@@ -134,6 +137,7 @@ function startFeed(server: FakeServer, overrides: { streamRetryMs?: number } = {
     reconnectMs: 10,
     maxReconnectMs: 20,
     streamRetryMs: overrides.streamRetryMs ?? 60_000,
+    idleTimeoutMs: overrides.idleTimeoutMs ?? 5_000,
   });
   feeds.push(feed);
   feed.start();
@@ -209,6 +213,26 @@ describe("알림 사건 받기", () => {
     expect(server.pollRequests).toContain("1");
     expect(transports).toContain("polling");
     expect(batches.filter((batch) => batch.initial)).toHaveLength(1);
+  });
+
+  it("하트비트도 오지 않고 멈춘 연결은 끊고 다시 붙는다", async () => {
+    const server = await startServer();
+    server.add(record(1, 1));
+    const { batches } = startFeed(server, { idleTimeoutMs: 60 });
+    await waitFor(() => server.streamRequests.length >= 2);
+    expect(server.streamRequests.slice(0, 2)).toEqual([null, "1"]);
+    expect(batches[0]).toMatchObject({ initial: true });
+  });
+
+  it("다시 붙었을 때 서버 번호가 더 작으면 그 번호를 따른다", async () => {
+    const server = await startServer();
+    server.add(record(1, 9));
+    const { batches } = startFeed(server);
+    await waitFor(() => batches.length === 1);
+    server.log = [record(1, 1)];
+    server.dropClients();
+    await waitFor(() => batches.length === 2);
+    expect(batches[1]).toMatchObject({ initial: true, cursor: 1 });
   });
 
   it("폴링하다가 SSE 가 돌아오면 다시 SSE 로 받는다", async () => {
