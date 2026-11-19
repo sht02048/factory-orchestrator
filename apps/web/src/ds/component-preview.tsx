@@ -43,6 +43,7 @@ import {
   Text,
   TimeSlot,
   Tooltip,
+  linkStyles,
   showToast,
   statusTone,
   type PillStatus,
@@ -501,6 +502,13 @@ export function ComponentSections() {
               action={{ variant: "ghost", onClick: () => showToast(t("tooltip.iconAction")) }}
             >
               <CloseIcon />
+            </Tooltip>
+            <Tooltip
+              content={t("tooltip.linkContent")}
+              labelsTrigger
+              render={<a href="#tooltip" {...stylex.props(linkStyles())} />}
+            >
+              {t("tooltip.linkLabel")}
             </Tooltip>
           </Demo>
         </Section>

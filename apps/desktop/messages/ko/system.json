@@ -26,7 +26,16 @@
     "server": "서버",
     "edit": "편집",
     "view": "보기",
-    "window": "창"
+    "window": "창",
+    "navigate": "이동"
+  },
+  "navigate": {
+    "dashboard": "Dashboard",
+    "tickets": "Tickets",
+    "runs": "Runs",
+    "runners": "Runners",
+    "stats": "Stats",
+    "settings": "Settings"
   },
   "notifications": {
     "question": { "title": "Question", "body": "{ticket} 에이전트가 답을 기다려요." },

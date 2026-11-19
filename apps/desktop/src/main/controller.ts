@@ -28,7 +28,9 @@ import type { SettingsStore } from "../core/settings.js";
 import { ServerWatch } from "../core/watch.js";
 import type { WatchState } from "../core/watch.js";
 import type { FindResult, ViewState } from "../shared/view.js";
-import { IPC_PREFIX, VIEW_CHANNEL } from "../shared/view.js";
+import { IPC_PREFIX, NAVIGATE_CHANNEL, VIEW_CHANNEL } from "../shared/view.js";
+import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
+import { navigationMenu } from "./navigation-menu.js";
 
 const t = createTranslator({ locale: "ko", messages: { system }, namespace: "system" });
 
@@ -283,6 +285,7 @@ export class Controller {
     if (window === undefined || window.isDestroyed()) return;
     if (this.serverUrl !== undefined) {
       this.serverUrl = undefined;
+      this.refreshMenus();
       void window.loadFile(this.options.rendererFile);
       return;
     }
@@ -456,10 +459,23 @@ export class Controller {
         },
         { label: t("menu.edit"), role: "editMenu" },
         { label: t("menu.view"), role: "viewMenu" },
+        navigationMenu({
+          label: t("menu.navigate"),
+          screenLabel: (screen) => t(`navigate.${screen}`),
+          enabled: this.serverUrl !== undefined,
+          onNavigate: (screen) => this.navigateTo(screen),
+        }),
         { label: t("menu.server"), submenu: items },
         { label: t("menu.window"), role: "windowMenu" },
       ]),
     );
+  }
+
+  private navigateTo(screen: NavScreen): void {
+    const window = this.window;
+    if (this.serverUrl === undefined || window === undefined || window.isDestroyed()) return;
+    this.showWindow();
+    window.webContents.send(NAVIGATE_CHANNEL, screen);
   }
 
   private menuItems(): MenuItemConstructorOptions[] {
