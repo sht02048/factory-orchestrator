@@ -85,7 +85,7 @@ describe("Tickets 화면", () => {
     const html = render(await loadTicketsPage(context, undefined, now));
     const button = /<button[^>]*data-variant="secondary"[^>]*>([\s\S]*?)<\/button>/.exec(html);
     expect(text(button?.[1] ?? "")).toContain("트래커에서 다시 읽기");
-    expect(html).toMatch(/<span role="status"[^>]*><\/span><button/);
+    expect(html).toMatch(/<\/button><span role="status"[^>]*><\/span>/);
 
     const empty = render({
       ...(await loadTicketsPage(context, undefined, now)),

@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import {
+  Actions,
   AppFrame,
   Button,
   ChevronRightIcon,
@@ -110,19 +111,37 @@ function Demo({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.demo)}>{children}</div>;
 }
 
+const PENDING_DEMO_MS = 2_000;
+
 function ShellPreview({ titleBarHidden }: { titleBarHidden: boolean }) {
   const t = useTranslations("ds.blocks");
+  const [pending, setPending] = useState(false);
   return (
     <figure {...stylex.props(styles.shell)}>
       <figcaption {...stylex.props(styles.caption)}>
         <Text variant="label">{titleBarHidden ? t("shell.desktop") : t("shell.web")}</Text>
-        {titleBarHidden ? null : <Text variant="meta">{t("shell.pending")}</Text>}
+        {titleBarHidden ? null : (
+          <Actions>
+            <Text variant="meta">{t("shell.pending")}</Text>
+            <Button
+              variant="ghost"
+              aria-disabled={pending}
+              onClick={() => {
+                if (pending) return;
+                setPending(true);
+                setTimeout(() => setPending(false), PENDING_DEMO_MS);
+              }}
+            >
+              {t("shell.pendingDemo")}
+            </Button>
+          </Actions>
+        )}
       </figcaption>
       <WindowChrome titleBarHidden={titleBarHidden}>
         <div inert={titleBarHidden} {...stylex.props(styles.frame)}>
           <AppFrame
             fill={false}
-            pending={{ active: !titleBarHidden, label: t("shell.pendingLabel") }}
+            pending={{ active: pending, label: t("shell.pendingLabel") }}
             rail={
               <>
                 <RailStatic>

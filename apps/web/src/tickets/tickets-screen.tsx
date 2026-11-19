@@ -122,9 +122,6 @@ function RereadButton({ onReread }: { onReread: () => Promise<void> }) {
   const reading = result === "reading";
   return (
     <div {...stylex.props(styles.reread)}>
-      <Text variant="meta" tone="problem" role="status">
-        {result === "failed" ? t("failed") : ""}
-      </Text>
       <Button
         aria-disabled={reading}
         aria-busy={reading}
@@ -149,6 +146,9 @@ function RereadButton({ onReread }: { onReread: () => Promise<void> }) {
           </span>
         </span>
       </Button>
+      <Text variant="meta" tone="problem" role="status">
+        {result === "failed" ? t("failed") : ""}
+      </Text>
     </div>
   );
 }
@@ -558,7 +558,7 @@ function RunTiming({ run }: { run: TicketRun }) {
 
 const styles = stylex.create({
   stack: { display: "flex", flexDirection: "column", gap: space.s4 },
-  reread: { display: "flex", alignItems: "center", flexWrap: "wrap", gap: space.s3 },
+  reread: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: space.s1 },
   stackedLabels: { display: "grid" },
   stackedLabel: { gridArea: "1 / 1" },
   hiddenLabel: { visibility: "hidden" },
