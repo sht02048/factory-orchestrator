@@ -52,7 +52,7 @@
     },
     "humanCheck": {
       "title": "Human Check",
-      "body": "{ticket} PR 을 확인해 주세요."
+      "body": "{ticket} PR을 확인해 주세요."
     },
     "failed": {
       "title": "Failed",
@@ -64,7 +64,7 @@
     },
     "runnerOffline": {
       "title": "Runner Issue",
-      "body": "{runner} 러너가 Offline 이에요."
+      "body": "{runner} 러너가 Offline이에요."
     },
     "runnerAuth": {
       "title": "Runner Issue",

@@ -36,7 +36,7 @@ describe("알림 문구", () => {
     expect(text("disconnected").title).toBe("Disconnected");
     expect(text("runner-offline")).toEqual({
       title: "Runner Issue",
-      body: "runner-a 러너가 Offline 이에요.",
+      body: "runner-a 러너가 Offline이에요.",
     });
     expect(text("runner-auth").body).toBe("runner-a 러너의 GitHub 인증이 깨져 할당에서 빠졌어요.");
     expect(text("runner-usage-limit", "claude").body).toBe(
