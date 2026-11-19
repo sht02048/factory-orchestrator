@@ -362,7 +362,7 @@ describe("Dashboard 칸반 배치(브라우저, 0100)", () => {
     expect(await count.textContent()).toBe("7");
     await page.getByRole("tab", { name: new RegExp(`^${home.view.todo}`) }).click();
     await page.waitForURL(/view=todo/);
-    expect(await count.textContent()).toBe("6");
+    await expect.poll(() => count.textContent()).toBe("6");
     expect(await running.locator("li:not([data-tag])").count()).toBe(0);
     await card(page, "ACME-40").waitFor({ state: "detached" });
     await page.reload();
