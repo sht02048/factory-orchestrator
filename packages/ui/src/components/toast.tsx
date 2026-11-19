@@ -93,11 +93,14 @@ function useKeepFocusClear(slot: HTMLElement | null): void {
 }
 
 function scrollerOf(element: HTMLElement): HTMLElement | null {
+  let outermost: HTMLElement | null = null;
   for (let parent = element.parentElement; parent !== null; parent = parent.parentElement) {
     const { overflowY } = getComputedStyle(parent);
-    if (overflowY === "auto" || overflowY === "scroll") return parent;
+    if (overflowY !== "auto" && overflowY !== "scroll") continue;
+    if (parent.scrollHeight > parent.clientHeight) return parent;
+    outermost = parent;
   }
-  return null;
+  return outermost;
 }
 
 function useRestoreFocusOnClose(section: { current: HTMLElement | null }) {

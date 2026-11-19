@@ -214,8 +214,10 @@ describe("데스크톱 업데이트 토스트(브라우저, 0083)", () => {
       filler.style.cssText = "position:relative;height:100vh";
       const last = document.createElement("button");
       last.textContent = "last";
-      last.style.cssText = "position:absolute;right:40px;bottom:20px";
-      filler.append(last);
+      const wide = document.createElement("div");
+      wide.style.cssText = "position:absolute;right:40px;bottom:20px;overflow-x:auto";
+      wide.append(last);
+      filler.append(wide);
       scroller.append(filler);
       document.body.append(scroller);
     });
