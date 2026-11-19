@@ -3,27 +3,6 @@ import type { McpActionView } from "../mcp/actions.js";
 import type { CheckFailure } from "../prerequisites.js";
 import type { McpLaunch } from "./mcp-launch.js";
 
-export const WORKSPACE_ITEMS = ["general", "projects", "mapping", "progress", "label"] as const;
-export const INSTALL_ITEMS = [
-  "connections",
-  "github",
-  "runners",
-  "addresses",
-  "power",
-  "mcp",
-  "updates",
-] as const;
-export type WorkspaceItem = (typeof WORKSPACE_ITEMS)[number];
-export type InstallItem = (typeof INSTALL_ITEMS)[number];
-export type SettingsItem = WorkspaceItem | InstallItem;
-
-export function isSettingsItem(value: string | undefined): value is SettingsItem {
-  return (
-    value !== undefined &&
-    (WORKSPACE_ITEMS.some((item) => item === value) || INSTALL_ITEMS.some((item) => item === value))
-  );
-}
-
 export type RemoteError = "unauthorized" | "rate-limited" | "not-found" | "network" | "invalid";
 
 export type Remote<T> = { ok: true; items: T[] } | { ok: false; error: RemoteError };

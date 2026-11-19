@@ -3,16 +3,19 @@ import {
   Button,
   Chip,
   Field,
+  InfoTip,
   Input,
   Menu,
   MenuItem,
   Select,
+  SettingsGroup,
+  SettingsRow,
   Text,
   VisuallyHidden,
   showToast,
 } from "@ganger/ui";
 import type { SelectOption } from "@ganger/ui";
-import { size, space } from "@ganger/ui/tokens.stylex";
+import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import type { BoundProject, Choice, WorkspaceSettings } from "@ganger/app/settings/model";
@@ -86,6 +89,7 @@ export interface MappingEditorProps {
   autoAssignLabelId: string | null;
   heading: ReactNode;
   children?: ReactNode;
+  renderSections?: (parts: { repos: ReactNode; agent: ReactNode }) => ReactNode;
 }
 
 export function MappingEditor({
@@ -99,11 +103,14 @@ export function MappingEditor({
   autoAssignLabelId,
   heading,
   children,
+  renderSections,
 }: MappingEditorProps) {
   const t = useTranslations("settings.mapping");
+  const ts = useTranslations("settings");
   const mappingReason = useMappingReason();
   const agentName = useAgentName();
   const headingId = useId();
+  const agentLabelId = useId();
   const missingId = useId();
   const saved = mappingDraftOf(bound);
   const [target, setTarget] = useState(MAPPING_TARGET);
@@ -185,122 +192,292 @@ export function MappingEditor({
     change({ ...draft, model: trimmed }, AGENT_TARGET);
   };
 
-  return (
-    <div ref={editorRef} role="group" aria-labelledby={headingId} {...stylex.props(styles.editor)}>
-      <div {...stylex.props(styles.header)}>
-        <span id={headingId}>{heading}</span>
-        <SaveStatusText status={statusTarget === MAPPING_TARGET ? save.status : "idle"} />
-      </div>
-      {statusTarget === MAPPING_TARGET ? failureLine : null}
-      <Text variant="meta" role="status">
-        {labelDropped === null || failure !== null ? null : t("labelDropped", labelDropped)}
-      </Text>
-      <div {...stylex.props(styles.repos)}>
-        <Text variant="label">{t("repos")}</Text>
-        {bound.labels.ok ? null : (
-          <Text variant="ui" as="p" tone="problem">
-            {t("labelsFailed", { reason: mappingReason(bound.labels.error) })}
-          </Text>
-        )}
-        {draft.repos.map((repo) => (
-          <RepoRow
-            key={repo.id}
-            repo={repo}
-            name={nameOf(repo.id)}
-            draft={draft}
-            bound={bound}
-            autoAssignLabelId={autoAssignLabelId}
-            labelName={labelName}
-            nameOf={nameOf}
-            status={statusTarget === repo.id ? save.status : "idle"}
-            failureLine={statusTarget === repo.id ? failureLine : null}
-            rowRef={(node) => {
-              if (node === null) rowRefs.current.delete(repo.id);
-              else rowRefs.current.set(repo.id, node);
-            }}
-            actionRef={(node) => {
-              if (node === null) actionRefs.current.delete(repo.id);
-              else actionRefs.current.set(repo.id, node);
-            }}
-            onLabel={(labelId) => change(withRepoLabel(draft, repo.id, labelId), repo.id)}
-            onMakeDefault={() => {
-              const previous = draft.repos.find((r) => r.isDefault)?.id ?? null;
-              if (previous !== null) setFocusAfter({ kind: "make-default", repo: previous });
-              change(withDefaultRepo(draft, repo.id), repo.id);
-              if (repo.labelId !== null) {
-                setLabelDropped({ repo: nameOf(repo.id), label: labelName(repo.labelId) });
-              }
-            }}
-            onRemove={() => {
-              setFocusAfter({ kind: "add" });
-              change(withRepoRemoved(draft, repo.id), repo.id);
-            }}
-          />
-        ))}
-        {addable.length === 0 ? null : (
-          <span ref={addRef} {...stylex.props(styles.add)}>
-            <Menu
-              label={
-                draft.repos.length === 0
-                  ? t("addFirstLabel", { project: bound.project.name })
-                  : t("addLabel", { project: bound.project.name })
-              }
-              {...(draft.repos.length === 0 && missing !== null ? { describedBy: missingId } : {})}
-              trigger={draft.repos.length === 0 ? t("addFirst") : t("add")}
-            >
-              {addable.map((p) => (
-                <MenuItem
-                  key={p.id}
-                  value={p.id}
-                  onSelect={() => change(withRepoAdded(draft, p.id), p.id)}
-                >
-                  {p.name}
-                </MenuItem>
-              ))}
-            </Menu>
+  const agentOptions = agents.map((a) => ({ value: a, label: agentName(a) }));
+  const agentStatus =
+    statusTarget === AGENT_TARGET && save.status !== "idle" ? t(`status.${save.status}`) : null;
+  const splitAgent = (
+    <SettingsGroup>
+      <SettingsRow
+        label={t("agent")}
+        labelId={agentLabelId}
+        status={agentStatus}
+        wideControl
+        control={
+          <span {...stylex.props(styles.rowControl)}>
+            <Select
+              aria-label={t("agent")}
+              {...(draft.agent === null && missing !== null
+                ? { "aria-describedby": missingId }
+                : {})}
+              options={agentOptions}
+              value={draft.agent}
+              onValueChange={(value) => change({ ...draft, agent: value }, AGENT_TARGET)}
+              placeholder={t("choose")}
+            />
           </span>
-        )}
-        {draft.repos.length > 1 ? <Text variant="meta">{t("routeHint")}</Text> : null}
-      </div>
-      <div {...stylex.props(styles.fields)}>
-        <Field label={t("agent")}>
-          <Select
-            {...(draft.agent === null && missing !== null ? { "aria-describedby": missingId } : {})}
-            options={agents.map((a) => ({ value: a, label: agentName(a) }))}
-            value={draft.agent}
-            onValueChange={(value) => change({ ...draft, agent: value }, AGENT_TARGET)}
-            placeholder={t("choose")}
-          />
-        </Field>
-        {showModel ? (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              saveModel();
-            }}
-            onBlur={saveModel}
-          >
-            <Field label={t("model")} description={`${t("modelDescription")} ${t("modelSave")}`}>
+        }
+        message={
+          <>
+            {statusTarget === AGENT_TARGET ? failureLine : null}
+            {missing === null ? null : (
+              <Text variant="meta" id={missingId}>
+                {missing}
+              </Text>
+            )}
+          </>
+        }
+      />
+      {showModel ? (
+        <SettingsRow
+          label={t("model")}
+          info={
+            <InfoTip
+              label={ts("infoLabel", { label: t("model") })}
+              content={`${t("modelDescription")} ${t("modelSave")}`}
+            />
+          }
+          wideControl
+          control={
+            <form
+              {...stylex.props(styles.rowControl)}
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveModel();
+              }}
+              onBlur={saveModel}
+            >
               <Input
                 name="model"
+                aria-label={t("model")}
                 value={model}
                 onValueChange={setModel}
                 placeholder={t("modelPlaceholder")}
                 autoComplete="off"
                 mono
               />
+            </form>
+          }
+        />
+      ) : null}
+    </SettingsGroup>
+  );
+
+  return (
+    <div
+      ref={editorRef}
+      role="group"
+      aria-labelledby={headingId}
+      {...stylex.props(styles.editor, renderSections !== undefined && styles.editorSections)}
+    >
+      {renderSections === undefined ? (
+        <>
+          <div {...stylex.props(styles.header)}>
+            <span id={headingId}>{heading}</span>
+            <SaveStatusText status={statusTarget === MAPPING_TARGET ? save.status : "idle"} />
+          </div>
+          {statusTarget === MAPPING_TARGET ? failureLine : null}
+          <Text variant="meta" role="status">
+            {labelDropped === null || failure !== null ? null : t("labelDropped", labelDropped)}
+          </Text>
+          <div {...stylex.props(styles.repos)}>
+            <Text variant="label">{t("repos")}</Text>
+            {bound.labels.ok ? null : (
+              <Text variant="ui" as="p" tone="problem">
+                {t("labelsFailed", { reason: mappingReason(bound.labels.error) })}
+              </Text>
+            )}
+            {draft.repos.map((repo) => (
+              <RepoRow
+                key={repo.id}
+                repo={repo}
+                name={nameOf(repo.id)}
+                draft={draft}
+                bound={bound}
+                autoAssignLabelId={autoAssignLabelId}
+                labelName={labelName}
+                nameOf={nameOf}
+                status={statusTarget === repo.id ? save.status : "idle"}
+                failureLine={statusTarget === repo.id ? failureLine : null}
+                rowRef={(node) => {
+                  if (node === null) rowRefs.current.delete(repo.id);
+                  else rowRefs.current.set(repo.id, node);
+                }}
+                actionRef={(node) => {
+                  if (node === null) actionRefs.current.delete(repo.id);
+                  else actionRefs.current.set(repo.id, node);
+                }}
+                onLabel={(labelId) => change(withRepoLabel(draft, repo.id, labelId), repo.id)}
+                onMakeDefault={() => {
+                  const previous = draft.repos.find((r) => r.isDefault)?.id ?? null;
+                  if (previous !== null) setFocusAfter({ kind: "make-default", repo: previous });
+                  change(withDefaultRepo(draft, repo.id), repo.id);
+                  if (repo.labelId !== null) {
+                    setLabelDropped({ repo: nameOf(repo.id), label: labelName(repo.labelId) });
+                  }
+                }}
+                onRemove={() => {
+                  setFocusAfter({ kind: "add" });
+                  change(withRepoRemoved(draft, repo.id), repo.id);
+                }}
+              />
+            ))}
+            {addable.length === 0 ? null : (
+              <span ref={addRef} {...stylex.props(styles.add)}>
+                <Menu
+                  label={
+                    draft.repos.length === 0
+                      ? t("addFirstLabel", { project: bound.project.name })
+                      : t("addLabel", { project: bound.project.name })
+                  }
+                  {...(draft.repos.length === 0 && missing !== null
+                    ? { describedBy: missingId }
+                    : {})}
+                  trigger={draft.repos.length === 0 ? t("addFirst") : t("add")}
+                >
+                  {addable.map((p) => (
+                    <MenuItem
+                      key={p.id}
+                      value={p.id}
+                      onSelect={() => change(withRepoAdded(draft, p.id), p.id)}
+                    >
+                      {p.name}
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </span>
+            )}
+            {draft.repos.length > 1 ? <Text variant="meta">{t("routeHint")}</Text> : null}
+          </div>
+          <div {...stylex.props(styles.fields)}>
+            <Field label={t("agent")}>
+              <Select
+                {...(draft.agent === null && missing !== null
+                  ? { "aria-describedby": missingId }
+                  : {})}
+                options={agents.map((a) => ({ value: a, label: agentName(a) }))}
+                value={draft.agent}
+                onValueChange={(value) => change({ ...draft, agent: value }, AGENT_TARGET)}
+                placeholder={t("choose")}
+              />
             </Field>
-          </form>
-        ) : null}
-      </div>
-      <SaveStatusText status={statusTarget === AGENT_TARGET ? save.status : "idle"} />
-      {statusTarget === AGENT_TARGET ? failureLine : null}
-      {missing === null ? null : (
-        <Text variant="ui" id={missingId}>
-          {missing}
-        </Text>
+            {showModel ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  saveModel();
+                }}
+                onBlur={saveModel}
+              >
+                <Field
+                  label={t("model")}
+                  description={`${t("modelDescription")} ${t("modelSave")}`}
+                >
+                  <Input
+                    name="model"
+                    value={model}
+                    onValueChange={setModel}
+                    placeholder={t("modelPlaceholder")}
+                    autoComplete="off"
+                    mono
+                  />
+                </Field>
+              </form>
+            ) : null}
+          </div>
+          <SaveStatusText status={statusTarget === AGENT_TARGET ? save.status : "idle"} />
+          {statusTarget === AGENT_TARGET ? failureLine : null}
+          {missing === null ? null : (
+            <Text variant="ui" id={missingId}>
+              {missing}
+            </Text>
+          )}
+          {children}
+        </>
+      ) : (
+        renderSections({
+          repos: (
+            <>
+              <div {...stylex.props(styles.header)}>
+                <span id={headingId}>{heading}</span>
+                <SaveStatusText status={statusTarget === MAPPING_TARGET ? save.status : "idle"} />
+              </div>
+              {statusTarget === MAPPING_TARGET ? failureLine : null}
+              <Text variant="meta" role="status">
+                {labelDropped === null || failure !== null ? null : t("labelDropped", labelDropped)}
+              </Text>
+              <div {...stylex.props(styles.repos)}>
+                {bound.labels.ok ? null : (
+                  <Text variant="ui" as="p" tone="problem">
+                    {t("labelsFailed", { reason: mappingReason(bound.labels.error) })}
+                  </Text>
+                )}
+                {draft.repos.map((repo) => (
+                  <RepoRow
+                    key={repo.id}
+                    repo={repo}
+                    name={nameOf(repo.id)}
+                    draft={draft}
+                    bound={bound}
+                    autoAssignLabelId={autoAssignLabelId}
+                    labelName={labelName}
+                    nameOf={nameOf}
+                    status={statusTarget === repo.id ? save.status : "idle"}
+                    failureLine={statusTarget === repo.id ? failureLine : null}
+                    rowRef={(node) => {
+                      if (node === null) rowRefs.current.delete(repo.id);
+                      else rowRefs.current.set(repo.id, node);
+                    }}
+                    actionRef={(node) => {
+                      if (node === null) actionRefs.current.delete(repo.id);
+                      else actionRefs.current.set(repo.id, node);
+                    }}
+                    onLabel={(labelId) => change(withRepoLabel(draft, repo.id, labelId), repo.id)}
+                    onMakeDefault={() => {
+                      const previous = draft.repos.find((r) => r.isDefault)?.id ?? null;
+                      if (previous !== null)
+                        setFocusAfter({ kind: "make-default", repo: previous });
+                      change(withDefaultRepo(draft, repo.id), repo.id);
+                      if (repo.labelId !== null) {
+                        setLabelDropped({ repo: nameOf(repo.id), label: labelName(repo.labelId) });
+                      }
+                    }}
+                    onRemove={() => {
+                      setFocusAfter({ kind: "add" });
+                      change(withRepoRemoved(draft, repo.id), repo.id);
+                    }}
+                  />
+                ))}
+                {addable.length === 0 ? null : (
+                  <span ref={addRef} {...stylex.props(styles.add)}>
+                    <Menu
+                      label={
+                        draft.repos.length === 0
+                          ? t("addFirstLabel", { project: bound.project.name })
+                          : t("addLabel", { project: bound.project.name })
+                      }
+                      {...(draft.repos.length === 0 && missing !== null
+                        ? { describedBy: missingId }
+                        : {})}
+                      trigger={draft.repos.length === 0 ? t("addFirst") : t("add")}
+                    >
+                      {addable.map((p) => (
+                        <MenuItem
+                          key={p.id}
+                          value={p.id}
+                          onSelect={() => change(withRepoAdded(draft, p.id), p.id)}
+                        >
+                          {p.name}
+                        </MenuItem>
+                      ))}
+                    </Menu>
+                  </span>
+                )}
+              </div>
+            </>
+          ),
+          agent: splitAgent,
+        })
       )}
-      {children}
     </div>
   );
 }
@@ -499,6 +676,7 @@ export function useLabelCreatedToast(): (result: { name: string; created: boolea
 
 const styles = stylex.create({
   editor: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
+  editorSections: { gap: space.s10 },
   header: {
     display: "flex",
     flexWrap: "wrap",
@@ -539,6 +717,11 @@ const styles = stylex.create({
     display: "grid",
     gridTemplateColumns: `repeat(auto-fit, minmax(min(${size.fieldMinWidth}, 100%), 1fr))`,
     gap: space.s3,
+  },
+  rowControl: {
+    display: "flex",
+    width: { default: size.settingsControlWidth, [breakpoints.settingsRowStacked]: "100%" },
+    minWidth: 0,
   },
   reload: { display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
 });

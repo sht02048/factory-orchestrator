@@ -201,7 +201,7 @@ export function AutoAssignLabelPicker({
 }
 
 const styles = stylex.create({
-  picker: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
+  picker: { display: "flex", flexDirection: "column", gap: space.s2, flexGrow: 1, minWidth: 0 },
   controls: {
     display: "flex",
     flexWrap: "wrap",
