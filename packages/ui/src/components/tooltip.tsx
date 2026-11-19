@@ -135,6 +135,5 @@ const styles = stylex.create({
   shortcut: {
     marginInlineStart: space.s2,
     color: colors.textSecondary,
-    fontVariantNumeric: "tabular-nums",
   },
 });
