@@ -113,6 +113,10 @@ const noopActions: OnboardingActions = {
   pollRunnerChecks: () => Promise.resolve(false),
   thisMacStatus: () => new Promise(() => undefined),
   runThisMacStep: reject,
+  startEnrollment: () => new Promise(() => undefined),
+  saveWebAddress: reject,
+  enrollment: reject,
+  cancelEnrollment: () => Promise.resolve(),
   setUpWorkspace: reject,
 };
 

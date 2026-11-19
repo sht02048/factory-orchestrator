@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,6 +21,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } f
 import runnerSetup from "../../apps/web/messages/ko/runnerSetup.json" with { type: "json" };
 import { connection, fakeKind } from "./browser/fixtures.js";
 import { resetFakeThisMac } from "./browser/fake-this-mac.js";
+import { resetFakeEnrollment } from "./browser/fake-enrollment.js";
 import { startWebServer } from "./web-server.js";
 
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
@@ -29,6 +31,8 @@ const resultsDir = fileURLToPath(new URL("../test-results", import.meta.url));
 
 const encryptionKey = new Uint8Array(32).fill(7);
 const thisMac = runnerSetup.thisMac;
+const command = runnerSetup.command;
+const HOST_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE2eOtherMacHostKey root@other-mac";
 
 let dir: string;
 let db: Database;
@@ -156,9 +160,12 @@ describe("이 맥을 러너로(브라우저, 0095)", () => {
     await page.goto("/onboarding?step=3");
     await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
     await page.getByText(runnerSetup.choose.question).waitFor();
-    for (const name of [/다른 맥 · 그 맥에 Ganger 앱이 있어요/, /다른 맥 · 터미널 명령으로/]) {
-      expect(await page.getByRole("radio", { name }).isDisabled()).toBe(true);
-    }
+    expect(
+      await page.getByRole("radio", { name: /다른 맥 · 그 맥에 Ganger 앱이 있어요/ }).isDisabled(),
+    ).toBe(true);
+    expect(await page.getByRole("radio", { name: /다른 맥 · 터미널 명령으로/ }).isDisabled()).toBe(
+      false,
+    );
 
     const link = page.getByRole("link", { name: runnerSetup.choose.directLink });
     await link.click();
@@ -223,4 +230,171 @@ describe("이 맥을 러너로(브라우저, 0095)", () => {
       expect(overflow).toBeLessThanOrEqual(0);
     });
   }
+});
+
+function otherMac(root: string): { home: string; bin: string; orca: string } {
+  const home = join(root, "home");
+  const bin = join(root, "bin");
+  const orca = join(root, "orca");
+  mkdirSync(home, { recursive: true });
+  mkdirSync(bin, { recursive: true });
+  const stub = (path: string, body: string) => {
+    writeFileSync(path, `#!/bin/sh\n${body}\n`);
+    chmodSync(path, 0o755);
+  };
+  stub(join(bin, "nc"), "exit 0");
+  stub(join(bin, "scutil"), "printf 'other-mac\\n'");
+  stub(join(bin, "tailscale"), `[ "$1" = ip ] && printf '100.64.0.9\\n'`);
+  stub(join(bin, "plutil"), "cat >/dev/null; exit 1");
+  stub(join(bin, "gh"), "exit 1");
+  stub(orca, `printf '%s\\n' "$*" >>"${join(root, "orca.log")}"`);
+  return { home, bin, orca };
+}
+
+function runCommandOn(
+  mac: { home: string; bin: string; orca: string },
+  root: string,
+  commandLine: string,
+) {
+  const hostKeyFile = join(root, "host_key.pub");
+  writeFileSync(hostKeyFile, `${HOST_KEY}\n`);
+  const patched = commandLine.replace(
+    / \| sh$/u,
+    ` | sed -e "s#^DEFAULT_ORCA=.*#DEFAULT_ORCA='${mac.orca}'#" -e "s#^HOST_KEY_FILE=.*#HOST_KEY_FILE='${hostKeyFile}'#" | sh`,
+  );
+  return spawnSync("/bin/sh", ["-c", patched], {
+    encoding: "utf8",
+    env: { HOME: mac.home, PATH: `${mac.bin}:/usr/bin:/bin` },
+  });
+}
+
+async function openCommandFlow(path: string): Promise<string> {
+  await page.goto(path);
+  await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+  await page.getByText(runnerSetup.choose.question).waitFor();
+  await page.getByRole("radio", { name: /다른 맥 · 터미널 명령으로/ }).check();
+  const chips = page.getByRole("list", { name: runnerSetup.choose.stepsLabel });
+  await chips.getByText("직접 해요: 명령 붙여 넣기").waitFor({ state: "attached" });
+  await page.getByText(runnerSetup.choose.aboutCommand).waitFor();
+  await page.getByRole("button", { name: runnerSetup.choose.continue }).click();
+  await expect.poll(focused).toBe(command.title);
+  const address = page.getByRole("textbox", { name: command.address.label });
+  const code = page.getByRole("region", { name: command.commandLabel });
+  await Promise.race([address.waitFor(), code.waitFor()]);
+  if (await address.isVisible()) {
+    await address.fill(baseUrl);
+    await page.getByRole("button", { name: command.address.save }).click();
+  }
+  await code.waitFor();
+  return (await code.textContent()) ?? "";
+}
+
+describe("다른 맥 · 명령으로 등록(브라우저, 0097)", () => {
+  it("명령을 그 맥에서 실행하면 Ganger 관리 러너로 저장하고 화면이 등록을 알린다", async () => {
+    resetFakeThisMac();
+    const world = resetFakeEnrollment();
+    const line = await openCommandFlow("/onboarding?step=3");
+    expect(line).toMatch(/^curl -fsSL '.+\/api\/runner-enrollment\/script\?t=[\w-]+' \| sh$/u);
+    await page.getByText(/\d+:\d\d 뒤 만료 · 한 번만 쓸 수 있어요/u).waitFor();
+
+    const root = mkdtempSync(join(tmpdir(), "ganger-other-mac-"));
+    try {
+      const mac = otherMac(root);
+      const ran = runCommandOn(mac, root, line);
+      expect([ran.status, ran.stderr]).toEqual([0, ""]);
+      expect(ran.stdout).toContain("registered other-mac as a runner");
+      expect(readFileSync(join(mac.home, ".ssh", "authorized_keys"), "utf8")).toContain(
+        "AAAAC3NzaC1lZDI1NTE5AAAAIGangerKeyForE2e ganger",
+      );
+      expect(readFileSync(join(root, "orca.log"), "utf8")).toContain("serve service install");
+
+      await page
+        .getByRole("status")
+        .filter({ hasText: "other-mac 러너를 등록했어요" })
+        .waitFor({ timeout: 10_000 });
+      await expect.poll(focused, { timeout: 10_000 }).toBe("other-mac 러너");
+      const runner = listRunners(db).find((r) => r.name === "other-mac");
+      expect(runner?.capacity).toBe(1);
+      expect(runner?.config).toMatchObject({ access: { kind: "ganger" } });
+      expect(JSON.stringify(runner?.config)).toMatch(/"sshTarget":"[\w.-]+@100\.64\.0\.9"/u);
+      expect(world.ssh.pinned.get("100.64.0.9")?.body).toBe(
+        "AAAAC3NzaC1lZDI1NTE5AAAAIE2eOtherMacHostKey",
+      );
+
+      const again = runCommandOn(mac, root, line);
+      expect(again.status).not.toBe(0);
+      expect(again.stderr).toContain("expired or was already used");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("10분이 지난 명령은 거절하고, 새 명령 받기는 앞 명령을 버리고 포커스를 그대로 둔다", async () => {
+    resetFakeThisMac();
+    const world = resetFakeEnrollment();
+    const first = await openCommandFlow("/runners?sel=new");
+    const token = /t=([\w-]+)/u.exec(first)?.[1] ?? "";
+    world.clockOffsetMs = 10 * 60_000;
+    await page.getByRole("status").filter({ hasText: command.expired }).waitFor();
+    expect(await page.getByRole("region", { name: command.commandLabel }).count()).toBe(0);
+    const late = await fetch(`${baseUrl}/api/runner-enrollment`, {
+      method: "POST",
+      body: new URLSearchParams({ token, outcome: "ready" }),
+    });
+    expect(late.status).toBe(410);
+    expect(await late.text()).toContain("expired after 10 minutes");
+
+    world.clockOffsetMs = 0;
+    const renew = page.getByRole("button", { name: command.newCommand });
+    await renew.click();
+    const code = page.getByRole("region", { name: command.commandLabel });
+    await code.waitFor();
+    expect(await code.textContent()).not.toBe(first);
+    await page.getByRole("status").filter({ hasText: command.newCommandReady }).waitFor();
+    await expect.poll(focused).toBe(command.newCommand);
+    const replaced = await fetch(`${baseUrl}/api/runner-enrollment/script?t=${token}`);
+    expect(replaced.status).toBe(410);
+  });
+
+  it("그 맥이 알린 실패를 이유와 함께 보인다", async () => {
+    resetFakeThisMac();
+    resetFakeEnrollment();
+    const line = await openCommandFlow("/runners?sel=new");
+    const token = /t=([\w-]+)/u.exec(line)?.[1] ?? "";
+    const reported = await fetch(`${baseUrl}/api/runner-enrollment`, {
+      method: "POST",
+      body: new URLSearchParams({
+        token,
+        outcome: "failed",
+        problem: "orca-not-found",
+        detail: "",
+      }),
+    });
+    expect(reported.status).toBe(200);
+    await page.getByRole("status").filter({ hasText: command.problem["orca-not-found"] }).waitFor();
+  });
+
+  it("400px 에서도 명령 화면이 가로로 넘치지 않는다", async () => {
+    resetFakeThisMac();
+    resetFakeEnrollment();
+    await page.setViewportSize({ width: 400, height: 844 });
+    await openCommandFlow("/onboarding?step=3");
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
+  it("직접 입력에서 orca 경로를 비우면 ssh로 찾고, 닿지 않으면 저장하지 않고 이유를 보인다", async () => {
+    resetFakeThisMac();
+    await page.goto("/onboarding?step=3&direct=true");
+    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+    await page.getByRole("textbox", { name: "ssh 대상" }).fill("dev@nowhere.invalid");
+    await page.getByRole("textbox", { name: "orca 실행 파일 경로" }).fill("");
+    await page.getByRole("button", { name: "확인하고 등록" }).click();
+    await page.getByRole("alert").filter({ hasText: "ssh로 그 맥에 들어가지 못해" }).waitFor({
+      timeout: 30_000,
+    });
+    expect(listRunners(db).some((r) => r.name === "nowhere")).toBe(false);
+  });
 });

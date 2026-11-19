@@ -503,6 +503,9 @@ export function useReason(): (reason: string) => string {
         return t(`addresses.error.${reason}`);
       case "unavailable":
         return t("power.unavailable");
+      case "orca-not-found":
+      case "ssh-failed":
+        return t(`runners.direct.error.${reason}`);
       default:
         return t("failed");
     }
@@ -1710,7 +1713,10 @@ export function RunnerForm({
   const capacityValue = parseWholeNumber(capacity);
   const capacityOk = capacityValue !== null && capacityValue >= 1 && capacityValue <= 100;
   const ready =
-    name.trim() !== "" && sshTarget.trim() !== "" && orcaPath.trim() !== "" && capacityOk;
+    name.trim() !== "" &&
+    sshTarget.trim() !== "" &&
+    (direct || orcaPath.trim() !== "") &&
+    capacityOk;
   const validation = useValidateAfterBlur();
   useReportUnsaved(
     name.trim() !== (runner?.name ?? "") ||

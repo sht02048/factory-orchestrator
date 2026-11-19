@@ -33,7 +33,8 @@
     "about": "약 1분",
     "continue": "이 방법으로 계속",
     "directHint": "ssh 설정을 이미 해 뒀나요?",
-    "directLink": "주소 직접 입력하기"
+    "directLink": "주소 직접 입력하기",
+    "aboutCommand": "약 2분"
   },
   "chips": {
     "remoteLogin": "원격 로그인 켜기",
@@ -46,7 +47,9 @@
     "sshTarget": "ssh 대상 넣기",
     "connect": "접속 확인",
     "findOrca": "Orca 찾기",
-    "githubCheck": "GitHub 확인"
+    "githubCheck": "GitHub 확인",
+    "pasteCommand": "명령 붙여 넣기",
+    "keyServiceGithub": "키·서비스·GitHub"
   },
   "direct": {
     "back": "맥 고르기로",
@@ -113,5 +116,88 @@
     "stopped": "{step}에서 멈췄어요. 이유를 보고 다시 시도해요.",
     "registeredHere": "{name} 러너를 등록했어요. 러너 보기에서 확인 결과를 봐요.",
     "openRunner": "{name} 러너 보기"
+  },
+  "command": {
+    "title": "다른 맥을 명령으로 등록해요",
+    "body": "러너로 쓸 맥에서 두 가지만 직접 해요. 나머지는 명령이 해요.",
+    "stepsLabel": "그 맥에서 할 일",
+    "remoteLoginTitle": "러너로 쓸 맥에서 원격 로그인을 켜요",
+    "remoteLoginBody": "시스템 설정 › 일반 › 공유 › 원격 로그인. 이 단계만 그 맥에서 직접 해요.",
+    "pasteTitle": "그 맥의 터미널에 붙여 넣어요",
+    "commandLabel": "등록 명령",
+    "reviewCommandLabel": "내려받아 확인한 뒤 실행하는 명령",
+    "copy": "명령 복사",
+    "copied": "명령을 복사했어요",
+    "copyFailed": "복사하지 못했어요. 명령을 직접 골라 복사해 주세요.",
+    "viewScript": "스크립트 내용 보기",
+    "reviewFirst": "내려받아 확인한 뒤 실행",
+    "oneLine": "한 줄로 실행",
+    "expiresIn": "{time} 뒤 만료 · 한 번만 쓸 수 있어요",
+    "starting": "명령을 만들고 있어요",
+    "whatTitle": "이 명령이 하는 일",
+    "what": {
+      "remoteLogin": "원격 로그인이 켜졌는지 보고, 꺼져 있으면 공유 설정을 열어 기다려요",
+      "key": "Ganger 공개 키를 ~/.ssh/authorized_keys에 넣어요",
+      "service": "Orca를 찾아 상시 서비스를 설치해요",
+      "github": "gh에 로그인돼 있으면 토큰을 파일로 옮기고 git이 gh를 쓰게 해요",
+      "report": "이 맥의 이름, tailnet 주소, 호스트 공개 키, orca 경로를 이 서버에 보내요"
+    },
+    "whatNote": "관리자 암호를 묻지 않고, 비밀 값을 서버로 보내지 않아요.",
+    "waiting": "러너를 기다리고 있어요",
+    "newCommand": "새 명령 받기",
+    "newCommandReady": "새 명령을 받았어요. 앞 명령은 더 쓸 수 없어요.",
+    "expired": "명령이 만료됐어요. 새 명령을 받아 다시 붙여 넣어요.",
+    "helpTitle": "명령이 안 되면",
+    "help": {
+      "unreachable": "\"could not reach\": 두 맥이 같은 tailnet에 있는지 봐요",
+      "orca": "\"Could not find Orca\": 그 맥에 Orca 앱을 설치해요",
+      "other": "그 밖의 오류는 이유와 함께 이 화면에 보여요"
+    },
+    "back": "다른 방법 고르기",
+    "unavailable": {
+      "no-home": "Ganger 홈 폴더를 몰라요. ganger start로 서버를 다시 켠 뒤 시도해요.",
+      "keygen-failed": "Ganger ssh 키를 만들지 못했어요. 서버 로그를 확인한 뒤 다시 시도해요.",
+      "request-failed": "서버에 닿지 못했어요. 다시 시도해요."
+    },
+    "retry": "다시 시도",
+    "failed": "{problem} 새 명령을 받아 다시 붙여 넣어요.",
+    "problem": {
+      "remote-login-off": "그 맥의 원격 로그인이 꺼져 있었어요.",
+      "orca-not-found": "그 맥에서 Orca를 찾지 못했어요. Orca 앱을 설치해요.",
+      "tailscale-missing": "그 맥의 tailnet 주소를 읽지 못했어요. Tailscale에 연결해요.",
+      "host-key-missing": "그 맥의 ssh 호스트 키를 읽지 못했어요. 원격 로그인이 켜져 있는지 봐요.",
+      "authorized-keys-failed": "그 맥의 ~/.ssh/authorized_keys에 Ganger 키를 넣지 못했어요.",
+      "service-failed": "그 맥에 Orca 상시 서비스를 설치하지 못했어요.",
+      "invalid-report": "그 맥이 보낸 정보를 읽지 못했어요.",
+      "register-failed": "러너를 저장하지 못했어요."
+    },
+    "registered": "{name} 러너를 등록했어요. 아래에서 확인 결과를 봐요.",
+    "registeredHere": "{name} 러너를 등록했어요. 러너 보기에서 확인 결과를 봐요.",
+    "sshTarget": "ssh 대상",
+    "orcaPath": "orca 경로",
+    "capacity": "자리",
+    "capacityValue": "1 · 한 번에 돌릴 런 수예요. 나중에 바꿀 수 있어요.",
+    "github": {
+      "gh-missing": "그 맥에 gh가 없어서 GitHub 인증 정리를 건너뛰었어요. 저장소에 push하려면 gh를 설치하고 로그인해요.",
+      "gh-logged-out": "그 맥의 gh에 로그인돼 있지 않아서 GitHub 인증 정리를 건너뛰었어요.",
+      "gh-failed": "그 맥의 gh 인증을 정리하지 못했어요."
+    },
+    "openRunner": "{name} 러너 보기",
+    "formLabel": "명령 모양",
+    "address": {
+      "body": "다른 맥은 이 주소로 이 서버에 닿아요. 아직 정하지 않았어요.",
+      "label": "다른 기기에서 열 주소",
+      "description": "예: Tailscale Serve 주소. Settings › 주소에서도 바꿀 수 있어요.",
+      "placeholder": "https://server.example.ts.net",
+      "save": "저장하고 명령 받기",
+      "saving": "저장하는 중",
+      "error": {
+        "invalid-web-address": "https://server.example.ts.net 처럼 경로 없이 넣어 주세요.",
+        "invalid-webhook-address": "저장된 webhook 공개 주소가 올바르지 않아요. Settings › 주소에서 고쳐 주세요.",
+        "locks-out": "저장하면 지금 보는 이 화면의 주소가 막혀요. 지금 주소를 넣거나, 이 기계의 http://127.0.0.1 에서 정해 주세요.",
+        "request-failed": "서버에 닿지 못했어요. 다시 해 주세요."
+      }
+    },
+    "expiredHere": "새 명령을 받으면 여기에 보여요."
   }
 }
