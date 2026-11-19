@@ -263,6 +263,30 @@ describe("Stats 배치(브라우저, 0093)", () => {
     expect((await layout(context, 640)).tileRows).toBe(2);
     expect((await layout(context, 400)).tileRows).toBe(4);
   });
+
+  it("나눠 보기 표가 본문보다 넓어지면 표만 옆으로 밀리고 그렇다고 알려 준다", async (context) => {
+    for (const [width, scrolls] of [
+      [1280, false],
+      [400, true],
+    ] as const) {
+      const page = await openPage(context, width);
+      await page.goto(`/stats?ws=${workspaceId}`);
+      await hydrated(page);
+      const region = page.getByRole("region", { name: "러너별 끝난 런, 병합률, 리드 타임" });
+      const [scrollWidth, clientWidth] = await region.evaluate((el) => [
+        el.scrollWidth,
+        el.clientWidth,
+      ]);
+      expect(scrollWidth > clientWidth).toBe(scrolls);
+      expect(await page.getByText(stats.scrollHint).isVisible()).toBe(scrolls);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+      ).toBe(0);
+      await page.context().close();
+    }
+  });
 });
 
 describe("Stats 'Failed 런 보기'(브라우저, 0093)", () => {

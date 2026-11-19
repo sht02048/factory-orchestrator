@@ -7,6 +7,7 @@ import {
   DataTableHeader,
   DataTableRow,
   DataTableRowHeader,
+  focusStyles,
   linkStyles,
 } from "@ganger/ui";
 import { size } from "@ganger/ui/tokens.stylex";
@@ -39,64 +40,79 @@ export function BreakdownTable({
   const t = useTranslations("stats");
   const { duration } = useTime();
   return (
-    <DataTable caption={caption} captionHidden fixed columnWidths={BREAKDOWN_COLUMN_WIDTHS}>
-      <DataTableHead>
-        <DataTableHeader>{t("columns.name")}</DataTableHeader>
-        <DataTableHeader align="end">{t("columns.runs")}</DataTableHeader>
-        <DataTableHeader align="end">{t("columns.mergedRate")}</DataTableHeader>
-        <DataTableHeader align="end">{t("columns.leadTime")}</DataTableHeader>
-      </DataTableHead>
-      <DataTableBody>
-        {groups.map((group) => {
-          const rate = mergedRate(group);
-          return (
-            <DataTableRow
-              key={group.key}
-              {...(onOpenRuns === undefined
-                ? {}
-                : {
-                    onClick: (event: MouseEvent<HTMLTableRowElement>) => {
-                      if (event.target instanceof Element && event.target.closest("a") !== null)
-                        return;
-                      if ((window.getSelection()?.toString() ?? "") !== "") return;
-                      onOpenRuns(group);
-                    },
-                  })}
-            >
-              <DataTableRowHeader strong truncate>
-                {runsHref === undefined ? (
-                  nameOf(group)
-                ) : (
-                  <a
-                    href={runsHref(group)}
-                    aria-label={t("openRuns", { name: nameOf(group) })}
-                    onClick={(event) => {
-                      if (onOpenRuns === undefined || !isPlainClick(event)) return;
-                      event.preventDefault();
-                      onOpenRuns(group);
-                    }}
-                    {...stylex.props(linkStyles("plain"))}
-                  >
-                    {nameOf(group)}
-                  </a>
-                )}
-              </DataTableRowHeader>
-              <DataTableCell align="end" numeric>
-                {group.runs}
-              </DataTableCell>
-              <DataTableCell align="end" numeric>
-                {rate === null ? t("notApplicable") : t("percent", { percent: rate })}
-              </DataTableCell>
-              <DataTableCell align="end" numeric>
-                {group.leadTime === null ? t("notApplicable") : duration(group.leadTime.p50Ms)}
-              </DataTableCell>
-            </DataTableRow>
-          );
-        })}
-      </DataTableBody>
-    </DataTable>
+    <div
+      role="region"
+      aria-label={caption}
+      tabIndex={0}
+      {...stylex.props(styles.scroller, focusStyles.ringInset)}
+    >
+      <div {...stylex.props(styles.minWidth)}>
+        <DataTable caption={caption} captionHidden fixed columnWidths={BREAKDOWN_COLUMN_WIDTHS}>
+          <DataTableHead>
+            <DataTableHeader>{t("columns.name")}</DataTableHeader>
+            <DataTableHeader align="end">{t("columns.runs")}</DataTableHeader>
+            <DataTableHeader align="end">{t("columns.mergedRate")}</DataTableHeader>
+            <DataTableHeader align="end">{t("columns.leadTime")}</DataTableHeader>
+          </DataTableHead>
+          <DataTableBody>
+            {groups.map((group) => {
+              const rate = mergedRate(group);
+              return (
+                <DataTableRow
+                  key={group.key}
+                  {...(onOpenRuns === undefined
+                    ? {}
+                    : {
+                        onClick: (event: MouseEvent<HTMLTableRowElement>) => {
+                          if (event.target instanceof Element && event.target.closest("a") !== null)
+                            return;
+                          if ((window.getSelection()?.toString() ?? "") !== "") return;
+                          onOpenRuns(group);
+                        },
+                      })}
+                >
+                  <DataTableRowHeader strong>
+                    {runsHref === undefined ? (
+                      <span {...stylex.props(styles.name)}>{nameOf(group)}</span>
+                    ) : (
+                      <a
+                        href={runsHref(group)}
+                        aria-label={t("openRuns", { name: nameOf(group) })}
+                        onClick={(event) => {
+                          if (onOpenRuns === undefined || !isPlainClick(event)) return;
+                          event.preventDefault();
+                          onOpenRuns(group);
+                        }}
+                        {...stylex.props(linkStyles("plain"), styles.name)}
+                      >
+                        {nameOf(group)}
+                      </a>
+                    )}
+                  </DataTableRowHeader>
+                  <DataTableCell align="end" numeric>
+                    {group.runs}
+                  </DataTableCell>
+                  <DataTableCell align="end" numeric>
+                    {rate === null ? t("notApplicable") : t("percent", { percent: rate })}
+                  </DataTableCell>
+                  <DataTableCell align="end" numeric>
+                    {group.leadTime === null ? t("notApplicable") : duration(group.leadTime.p50Ms)}
+                  </DataTableCell>
+                </DataTableRow>
+              );
+            })}
+          </DataTableBody>
+        </DataTable>
+      </div>
+    </div>
   );
 }
+
+const styles = stylex.create({
+  scroller: { overflowX: "auto" },
+  minWidth: { minWidth: size.statsBreakdownMinWidth },
+  name: { overflowWrap: "anywhere" },
+});
 
 export function isPlainClick(event: MouseEvent<HTMLAnchorElement>): boolean {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;

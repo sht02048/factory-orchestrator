@@ -163,8 +163,9 @@ function StatsView({
             <Section
               title={t("throughput.title")}
               titleRole="heading"
-              note={page.total.runs === 0 ? undefined : <Legend />}
+              note={page.total.runs === 0 ? undefined : <Legend placement="head" />}
             >
+              {page.total.runs === 0 ? null : <Legend placement="body" />}
               <ThroughputChart daily={page.daily} days={days} />
             </Section>
           </Card>
@@ -225,10 +226,15 @@ function Headline({ total, days }: { total: StatsSummary; days: number }) {
   return <>{t("rated", { runs: total.rated, percent: rate })}</>;
 }
 
-function Legend() {
+function Legend({ placement }: { placement: "head" | "body" }) {
   const t = useTranslations("stats.throughput.columns");
   return (
-    <span {...stylex.props(styles.legend)}>
+    <span
+      {...stylex.props(
+        styles.legend,
+        placement === "head" ? styles.legendInHead : styles.legendInBody,
+      )}
+    >
       <span {...stylex.props(styles.legendItem)}>
         <OutcomeSwatch tone="merged" />
         {t("merged")}
@@ -387,6 +393,9 @@ function Breakdown({
               <Text variant="meta">{t("empty", { days })}</Text>
             ) : (
               <>
+                <span {...stylex.props(styles.scrollHint)}>
+                  <Text variant="meta">{t("scrollHint")}</Text>
+                </span>
                 <BreakdownTable
                   caption={t("tableCaption", { dimension: t(`dimension.${dimension}`) })}
                   groups={groups}
@@ -457,7 +466,13 @@ const styles = stylex.create({
     columnGap: space.s4,
     rowGap: space.s1,
   },
+  legendInHead: { display: { default: "inline-flex", [breakpoints.statsLegendBelow]: "none" } },
+  legendInBody: {
+    display: { default: "none", [breakpoints.statsLegendBelow]: "flex" },
+    marginBottom: space.s2,
+  },
   legendItem: { display: "inline-flex", alignItems: "center", gap: space.px6 },
+  scrollHint: { display: { default: "none", [breakpoints.statsBreakdownScrolls]: "block" } },
   reasonsFrame: { containerType: "inline-size" },
   reasons: {
     display: "grid",

@@ -87,5 +87,6 @@
   "tableCaption": "{dimension}별 끝난 런, 병합률, 리드 타임",
   "empty": "최근 {days}일 동안 끝난 런이 없어요. 런이 끝나면 여기에 보여요.",
   "openRuns": "{name}의 런 보기",
-  "openRunsHint": "이름을 누르면 그 조건과 기간으로 Runs가 열려요."
+  "openRunsHint": "이름을 누르면 그 조건과 기간으로 Runs가 열려요.",
+  "scrollHint": "표를 옆으로 밀면 병합률과 리드 타임이 보여요."
 }

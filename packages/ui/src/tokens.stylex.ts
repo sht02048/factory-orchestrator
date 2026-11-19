@@ -150,6 +150,7 @@ export const size = stylex.defineVars({
   failureBarWidth: "160px",
   statsCountColumn: "64px",
   statsDurationColumn: "80px",
+  statsBreakdownMinWidth: "360px",
   logMaxHeight: "480px",
   stepNavWidth: "240px",
   stepContentWidth: "760px",
@@ -183,4 +184,6 @@ export const breakpoints = stylex.defineConsts({
   statsChartsStacked: "@container (max-width: 880px)",
   chartLabelsSparse: "@container (max-width: 400px)",
   failureBarsBelow: "@container (max-width: 400px)",
+  statsLegendBelow: "@container (max-width: 480px)",
+  statsBreakdownScrolls: "@container (max-width: 359px)",
 });
