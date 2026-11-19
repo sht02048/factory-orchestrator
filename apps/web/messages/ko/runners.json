@@ -88,11 +88,12 @@
       "unreadable": "사용량을 읽지 못했어요. 다음 점검 때 다시 읽어요.",
       "resetsAt": "{time}에 초기화돼요",
       "atLimit": "한도에 닿았어요",
+      "resetsAtLimit": "{time}에 초기화돼요 · 한도에 닿았어요",
       "noWindows": "사용량 창이 없어요.",
       "error": "사용량을 읽지 못했어요.",
       "signedOut": "{providers} · 로그인하지 않았어요",
       "unavailable": "쓰지 않는 공급자 {count}개",
-      "others": "{signedOut} · {unavailable}",
+      "others": "{signedOut} · 그 밖에 {unavailable}",
       "privacy": "계정 정보는 저장하지 않아요."
     }
   }

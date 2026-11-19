@@ -645,14 +645,11 @@ function ProviderWindows({
                 {window.resetsAt === null && !atLimit ? null : (
                   <span {...stylex.props(styles.labelGridRest)}>
                     <Text variant="meta">
-                      {[
-                        window.resetsAt === null
-                          ? null
-                          : t("resetsAt", { time: stamp(window.resetsAt, now) }),
-                        atLimit ? t("atLimit") : null,
-                      ]
-                        .filter((part) => part !== null)
-                        .join(" · ")}
+                      {window.resetsAt === null
+                        ? t("atLimit")
+                        : t(atLimit ? "resetsAtLimit" : "resetsAt", {
+                            time: stamp(window.resetsAt, now),
+                          })}
                     </Text>
                   </span>
                 )}
@@ -684,7 +681,8 @@ const styles = stylex.create({
     display: "grid",
     gridTemplateColumns: {
       default: `minmax(0, 1fr) ${size.slotsColumn} ${size.usageColumn}`,
-      [breakpoints.runnerRowStacked]: "auto minmax(0, 1fr)",
+      [breakpoints.runnerRowTwoColumns]: `${size.slotsColumn} minmax(0, 1fr)`,
+      [breakpoints.runnerRowOneColumn]: "minmax(0, 1fr)",
     },
     alignItems: "center",
     columnGap: space.s5,
@@ -701,9 +699,16 @@ const styles = stylex.create({
     minWidth: 0,
     gridColumn: { default: "auto", [breakpoints.runnerRowStacked]: "1 / -1" },
   },
-  rowHead: { display: "flex", alignItems: "center", gap: space.s2, minWidth: 0 },
+  rowHead: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: space.s2,
+    rowGap: space.px2,
+    minWidth: 0,
+  },
   rowName: { display: "flex", flexShrink: 0, maxWidth: "100%" },
-  rowHost: { minWidth: 0 },
+  rowHost: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 },
   slotsCell: { display: "flex", minWidth: 0 },
   usageCell: { minWidth: 0 },
   panelHead: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },

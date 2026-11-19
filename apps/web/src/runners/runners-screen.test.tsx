@@ -490,7 +490,7 @@ describe("공급자 사용량(0086)", () => {
     expect(text).toContain("주간 72% Fable 주간 9%");
     expect(text).toContain("Fable 주간");
     expect(text).not.toContain("월간");
-    expect(text).toContain("Kimi, Cursor · 로그인하지 않았어요 · 쓰지 않는 공급자 1개");
+    expect(text).toContain("Kimi, Cursor · 로그인하지 않았어요 · 그 밖에 쓰지 않는 공급자 1개");
     expect(html).not.toContain("<details");
     expect(text).toContain("newbie");
     expect(text).toContain(panel.usage.error);

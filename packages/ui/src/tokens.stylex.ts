@@ -177,4 +177,6 @@ export const breakpoints = stylex.defineConsts({
   dashboardOneColumn: "@container (max-width: 719px)",
   statTilesStacked: "@container (max-width: 704px)",
   runnerRowStacked: "@container (max-width: 599px)",
+  runnerRowTwoColumns: "@container (min-width: 400px) and (max-width: 599px)",
+  runnerRowOneColumn: "@container (max-width: 399px)",
 });
