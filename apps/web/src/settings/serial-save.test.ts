@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ActionResult, SubmitState } from "../settings/settings-screen";
+import type { ActionResult, SubmitState } from "./settings-screen";
 import { createSerialSaver } from "./serial-save";
 
 function deferred() {

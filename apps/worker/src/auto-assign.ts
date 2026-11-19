@@ -1,4 +1,4 @@
-import { checkAutoAssignment, labelJustAttached } from "@ganger/core";
+import { checkAutoAssignment, labelJustAttached, routeToRepo } from "@ganger/core";
 import type {
   AutoAssignmentRun,
   LabelId,
@@ -96,7 +96,7 @@ function assignForEvent(
     runs: listRuns(context.db, { ticket }).map(toAutoAssignmentRun),
   });
   if (!check.ok) return;
-  assign(context, ticket, event.projectId, target.mapping, null);
+  assign(context, ticket, event.projectId, target.mapping, latestLabelIds ?? event.labelIds, null);
 }
 
 async function correctByPolling(context: TickContext): Promise<void> {
@@ -195,7 +195,14 @@ function assignForPolledTicket(
     runs: runs.map(toAutoAssignmentRun),
   });
   if (!check.ok) return;
-  assign(context, ref, ticket.project.id, target.mapping, ticket.title);
+  assign(
+    context,
+    ref,
+    ticket.project.id,
+    target.mapping,
+    ticket.labels.map((label) => label.id),
+    ticket.title,
+  );
 }
 
 function autoAssignTarget(
@@ -218,13 +225,14 @@ function assign(
   ticket: TicketRef,
   trackerProject: TrackerProjectId,
   mapping: StoredMapping,
+  ticketLabelIds: ReadonlyArray<LabelId>,
   ticketTitle: string | null,
 ): void {
   const result = assignRun(context.db, {
     ticket,
     ticketTitle,
     trackerProject,
-    runnerProject: mapping.runnerProject,
+    runnerProject: routeToRepo(mapping.repos, ticketLabelIds) ?? mapping.defaultRepo,
     agent: mapping.agent,
     model: mapping.model,
     now: context.now(),

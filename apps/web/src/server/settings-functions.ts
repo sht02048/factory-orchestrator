@@ -9,11 +9,13 @@ import {
   checkGitHubToken,
   checkTrackerConnection,
   connectionIdInput,
+  createAutoAssignLabel,
+  createLabelInput,
   generalInput,
   githubTokenInput,
   inProgressInput,
   labelInput,
-  mappingInput,
+  mappingStateInput,
   mcpWriteInput,
   powerInput,
   removeTrackerProject,
@@ -25,13 +27,14 @@ import {
   saveGitHubToken,
   saveInProgressState,
   saveLabel,
-  saveMappingSetting,
+  saveMappingState,
   saveMcpWriteSetting,
   savePowerSetting,
   saveTrackerConnectionSetting,
   trackerConnectionInput,
   trackerProjectInput,
 } from "@ganger/app/settings/actions";
+import { GANGER_YELLOW_HEX } from "@ganger/ui/brand-color";
 import { saveRunnerFindingOrca } from "@ganger/app/runner-setup/remote-orca";
 import { hasPendingRunnerChecks, loadSettingsPage } from "@ganger/app/settings/load";
 import type { SettingsContext } from "@ganger/app/settings/load";
@@ -72,8 +75,8 @@ export const removeWorkspaceTrackerProject = createServerFn({ method: "POST" })
   .handler(({ data }) => removeTrackerProject(context(), data));
 
 export const saveWorkspaceMapping = createServerFn({ method: "POST" })
-  .validator(mappingInput)
-  .handler(({ data }) => saveMappingSetting(context(), data));
+  .validator(mappingStateInput)
+  .handler(({ data }) => saveMappingState(context(), data));
 
 export const saveWorkspaceInProgressState = createServerFn({ method: "POST" })
   .validator(inProgressInput)
@@ -82,6 +85,10 @@ export const saveWorkspaceInProgressState = createServerFn({ method: "POST" })
 export const saveWorkspaceLabel = createServerFn({ method: "POST" })
   .validator(labelInput)
   .handler(({ data }) => saveLabel(context(), data));
+
+export const createWorkspaceAutoAssignLabel = createServerFn({ method: "POST" })
+  .validator(createLabelInput)
+  .handler(({ data }) => createAutoAssignLabel(context(), data, GANGER_YELLOW_HEX));
 
 export const saveTrackerConnection = createServerFn({ method: "POST" })
   .validator(trackerConnectionInput)

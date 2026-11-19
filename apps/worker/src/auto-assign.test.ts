@@ -10,6 +10,7 @@ import {
   listRuns,
   listUnprocessedTrackerEvents,
   recordTrackerEvent,
+  replaceMapping,
   requestRunCancel,
   saveAutoAssignLabel,
   saveMapping,
@@ -23,6 +24,8 @@ import {
   agent,
   connection,
   projectA,
+  projectB,
+  projectC,
   trackerProject,
   workspaceId,
 } from "./test-fixtures.js";
@@ -241,6 +244,52 @@ describe("webhook 이벤트로 자동 할당", () => {
     await worker.tick();
 
     expect(runsOf("ENG-1")).toHaveLength(1);
+  });
+});
+
+describe("라벨로 저장소 가르기(0115)", () => {
+  const apiLabel = toLabelId("label-api");
+  const infraLabel = toLabelId("label-infra");
+
+  beforeEach(() => {
+    h.addRunner({ id: "runner-b", capacity: 2, projects: [projectB, projectC] });
+    replaceMapping(h.db, {
+      connection,
+      trackerProject,
+      agent,
+      repos: [
+        { project: projectA, isDefault: true, labelId: null },
+        { project: projectB, isDefault: false, labelId: apiLabel },
+        { project: projectC, isDefault: false, labelId: infraLabel },
+      ],
+    });
+  });
+
+  it("저장소 라벨이 하나 붙은 티켓은 webhook으로 그 저장소에 할당한다", async () => {
+    webhook("ENG-1", { labelIds: [autoLabel, apiLabel], previousLabelIds: [apiLabel] });
+
+    await h.worker().tick();
+
+    expect(runsOf("ENG-1")[0]).toMatchObject({ runnerProject: projectB });
+  });
+
+  it("저장소 라벨이 없거나 둘 이상이면 기본 저장소로 할당한다", async () => {
+    webhook("ENG-1", { labelIds: [autoLabel], previousLabelIds: [] });
+    webhook("ENG-2", { labelIds: [autoLabel, apiLabel, infraLabel], previousLabelIds: [] });
+
+    await h.worker().tick();
+
+    expect(runsOf("ENG-1")[0]).toMatchObject({ runnerProject: projectA });
+    expect(runsOf("ENG-2")[0]).toMatchObject({ runnerProject: projectA });
+  });
+
+  it("폴링 보정도 티켓 라벨로 저장소를 고른다", async () => {
+    putTicket("ENG-3", [autoLabel, infraLabel]);
+    const worker = h.worker();
+
+    await worker.tick();
+
+    expect(runsOf("ENG-3")[0]).toMatchObject({ runnerProject: projectC });
   });
 });
 
