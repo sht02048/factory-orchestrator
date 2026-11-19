@@ -115,6 +115,48 @@ describe("the app's runner enrollment prompt", () => {
     expect(w.flow.state).toBeNull();
   });
 
+  test("a new request still shows after an earlier one finished and was never closed", async () => {
+    const w = world();
+    await w.flow.tick(SERVER);
+    const accepting = w.flow.accept();
+    await flush();
+    w.finish({ ...START_PROGRESS, problem: "orca-not-found" });
+    await accepting;
+    w.setOffer(OFFER);
+    await w.flow.tick(SERVER);
+    expect(w.flow.state?.step.phase).toBe("failed");
+    w.setOffer({ id: "offer-2", expiresInMs: 600_000 });
+    await w.flow.tick(SERVER);
+    expect(w.flow.state).toMatchObject({ offerId: "offer-2", step: { phase: "ask" } });
+  });
+
+  test("keeps a finished result on screen when the server briefly drops away", async () => {
+    const w = world({ acceptOffer: async () => ({ ok: false, gone: null }) });
+    await w.flow.tick(SERVER);
+    await w.flow.accept();
+    await w.flow.tick(undefined);
+    expect(w.flow.state?.step.phase).toBe("failed");
+  });
+
+  test("checks again whether this is the server Mac until it finds that it is", async () => {
+    let answers = [false, true];
+    let asked = 0;
+    const w = world({
+      isServerMac: async () => {
+        asked += 1;
+        const [next, ...rest] = answers;
+        answers = rest;
+        return next ?? true;
+      },
+    });
+    await w.flow.tick(SERVER);
+    expect(w.flow.state?.step.phase).toBe("ask");
+    w.flow.cancel();
+    await w.flow.tick(SERVER);
+    await w.flow.tick(SERVER);
+    expect(asked).toBe(2);
+  });
+
   test("leaving remote mode drops a prompt nobody answered", async () => {
     const w = world();
     await w.flow.tick(SERVER);

@@ -24,7 +24,7 @@ export class RunnerEnrollmentFlow {
   private run: SetupRun | null = null;
   private ticking = false;
   private readonly declined = new Set<string>();
-  private readonly serverMac = new Map<string, boolean>();
+  private readonly serverMac = new Set<string>();
 
   constructor(deps: RunnerEnrollmentDeps) {
     this.deps = deps;
@@ -40,8 +40,7 @@ export class RunnerEnrollmentFlow {
   }
 
   async tick(server: SavedServer | undefined): Promise<void> {
-    const phase = this.current?.step.phase;
-    if (this.ticking || this.busy || phase === "registered" || phase === "failed") return;
+    if (this.ticking || this.busy) return;
     this.ticking = true;
     try {
       await this.look(server);
@@ -52,7 +51,8 @@ export class RunnerEnrollmentFlow {
 
   private async look(server: SavedServer | undefined): Promise<void> {
     if (server === undefined) {
-      if (this.current !== null) this.set(null);
+      const phase = this.current?.step.phase;
+      if (phase === "ask" || phase === "gone") this.set(null);
       return;
     }
     if (await this.isServerMac(server)) return;
@@ -60,7 +60,7 @@ export class RunnerEnrollmentFlow {
     if (offer === undefined || this.busy) return;
     const current = this.current;
     const fresh = offer !== null && !this.declined.has(offer.id) ? offer : null;
-    if (current === null || current.step.phase === "gone") {
+    if (current === null || current.step.phase !== "ask") {
       if (fresh !== null && fresh.id !== current?.offerId) this.ask(server, fresh);
       return;
     }
@@ -75,10 +75,9 @@ export class RunnerEnrollmentFlow {
   }
 
   private async isServerMac(server: SavedServer): Promise<boolean> {
-    const known = this.serverMac.get(server.instanceId);
-    if (known !== undefined) return known;
+    if (this.serverMac.has(server.instanceId)) return true;
     const same = await this.deps.isServerMac(server);
-    this.serverMac.set(server.instanceId, same);
+    if (same) this.serverMac.add(server.instanceId);
     return same;
   }
 
