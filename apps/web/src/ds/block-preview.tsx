@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import {
   AppFrame,
+  Button,
   CheckIcon,
   CheckTick,
   Checklist,
@@ -21,6 +22,10 @@ import {
   DividedList,
   DoneMark,
   FailureBar,
+  KanbanCard,
+  KanbanCards,
+  KanbanColumn,
+  KanbanSubheading,
   NoticeLayout,
   NumberedList,
   BulletList,
@@ -49,6 +54,8 @@ import {
   WorkspaceBadge,
   railLinkStyles,
   ScrollRegion,
+  Sheet,
+  StatusPill,
 } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
 import { useId, useState, type ReactNode } from "react";
@@ -66,6 +73,8 @@ export const blockSectionIds = [
   "disclosure",
   "dividedList",
   "popover",
+  "kanban",
+  "sheet",
   "icons",
 ] as const;
 
@@ -89,6 +98,7 @@ export function BlockSections() {
   const [note, setNote] = useState("");
   const [chips, setChips] = useState<ReadonlyArray<string>>([t("chips.runner"), t("chips.days")]);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
     <>
@@ -433,6 +443,55 @@ export function BlockSections() {
         </Section>
       </div>
 
+      <div id="kanban">
+        <Section title={tNav("kanban")} note={t("kanban.note")}>
+          <div {...stylex.props(styles.kanban)}>
+            <KanbanColumn title={t("kanban.column")} count={2}>
+              <KanbanCards>
+                <li>
+                  <KanbanCard
+                    tag={<StatusPill status="question">{t("kanban.tag")}</StatusPill>}
+                    title={t("kanban.title")}
+                    detail={t("kanban.detail")}
+                    meta={t("kanban.meta")}
+                    time={t("kanban.time")}
+                    action={<Button>{t("kanban.action")}</Button>}
+                    onOpen={() => setSheetOpen(true)}
+                  />
+                </li>
+                <li>
+                  <KanbanCard
+                    title={t("kanban.plainTitle")}
+                    meta={t("kanban.meta")}
+                    time={t("kanban.time")}
+                    onOpen={() => setSheetOpen(true)}
+                  />
+                </li>
+              </KanbanCards>
+              <KanbanSubheading>{t("kanban.subheading")}</KanbanSubheading>
+            </KanbanColumn>
+          </div>
+        </Section>
+      </div>
+
+      <div id="sheet">
+        <Section title={tNav("sheet")} note={t("sheet.note")}>
+          <Demo>
+            <Button onClick={() => setSheetOpen(true)}>{t("sheet.open")}</Button>
+            <Sheet
+              open={sheetOpen}
+              onOpenChange={setSheetOpen}
+              status={<StatusPill status="question">{t("kanban.tag")}</StatusPill>}
+              title={t("kanban.title")}
+              subtitle={t("kanban.meta")}
+              closeLabel={t("sheet.close")}
+            >
+              <Text variant="body">{t("kanban.detail")}</Text>
+            </Sheet>
+          </Demo>
+        </Section>
+      </div>
+
       <div id="icons">
         <Section title={tNav("icons")} note={t("icons.note")}>
           <Demo>
@@ -467,4 +526,5 @@ const styles = stylex.create({
   },
   columns: { display: "flex", flexWrap: "wrap", gap: space.s10 },
   frame: { height: 320, overflow: "hidden" },
+  kanban: { width: "100%", maxWidth: 360, paddingBlock: space.s5 },
 });
