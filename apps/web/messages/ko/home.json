@@ -17,38 +17,32 @@
     "withLimit": "{work} {limit}"
   },
   "noWorkspace": "아직 Workspace가 없어요. Workspace를 만들면 런이 보여요.",
-  "section": {
-    "todo": "To do",
-    "inProgress": "In progress",
-    "runners": "Runners",
-    "doneToday": "Done today"
+  "view": {
+    "label": "보기",
+    "all": "모두",
+    "todo": "처리할 일만"
   },
-  "group": {
-    "answer": {
-      "title": "답이 필요해요",
-      "description": "에이전트가 멈춰 기다려요"
-    },
-    "check": {
-      "title": "확인해 주세요",
-      "description": "PR이 열려 있어요"
-    },
-    "stopped": {
-      "title": "멈췄어요",
-      "description": "런이 실패했거나 러너에 닿지 않아요"
-    },
-    "more": "{count}개 더 보기"
+  "column": {
+    "queued": "Queued",
+    "running": "Running",
+    "done": "Done today"
+  },
+  "columnEmpty": {
+    "queued": "Queued 런이 없어요",
+    "running": "Running 런이 없어요",
+    "done": "오늘 끝난 런이 없어요",
+    "todo": "처리할 일이 없어요"
+  },
+  "board": {
+    "more": "{count}개 더 보기",
+    "settled": "처리할 일 없이 끝났어요",
+    "allRuns": "Runs에서 모두 보기"
+  },
+  "section": {
+    "runners": "Runners"
   },
   "empty": {
-    "todo": "사람이 할 일이 생기면 여기에 보여요.",
-    "inProgress": "진행 중인 런이 없어요.",
-    "doneToday": "오늘 끝난 런이 없어요.",
     "runners": "아직 러너가 없어요."
-  },
-  "inProgress": {
-    "link": "Runs에서 보기"
-  },
-  "doneToday": {
-    "link": "Runs에서 모두 보기"
   },
   "runners": {
     "capacity": "{total}자리 중 {used}자리 사용",
@@ -62,22 +56,48 @@
     "limit": "{provider} {window} 한도에 닿았어요: {name} · {duration} 뒤 한도가 풀리면 다시 런을 받아요",
     "limitUnknown": "{provider} {window} 한도에 닿았어요: {name}"
   },
-  "row": {
+  "card": {
     "cancelling": "취소 중",
     "inputUnknown": "무엇을 기다리는지 아직 읽지 못했어요",
-    "permission": "{command} · 허용은 러너에서 할 수 있어요",
+    "permission": "{command}",
     "pullRequest": "PR {pr}",
     "humanCheckNoPr": "완료 보고를 확인해 주세요",
-    "failedAt": "Failed · {time}",
     "unreachableFor": "{runner}에 {duration}째 닿지 않아요",
     "unreachable": "{runner}에 닿지 않아요",
-    "noRunner": "러너",
+    "noRunner": "러너 없음",
     "queuedFree": "빈 러너를 기다려요",
     "queuedOffline": "{runner}{subject, select, i {이} other {가}} Offline이라 기다려요",
     "queuedAnyOffline": "맞는 러너가 Offline이라 기다려요",
     "answer": "답하기",
-    "deny": "거절하기",
+    "answered": "답을 보냈어요",
+    "denied": "거절을 보냈어요",
     "openPr": "PR 보기"
+  },
+  "sheet": {
+    "title": "{key} {title}",
+    "close": "닫기",
+    "runDetail": "Run 상세 보기",
+    "since": {
+      "waiting": "{elapsed} 기다려요",
+      "running": "{elapsed} 일하고 있어요",
+      "ended": "{ago} 끝났어요"
+    },
+    "running": "에이전트가 일하고 있어요. 끝나면 Done today로 옮겨요.",
+    "inputUnknown": "무엇을 기다리는지 아직 읽지 못했어요",
+    "disconnected": "워크트리는 그대로 두었어요. 러너에 다시 닿으면 실제 상태를 확인해 이어 가요.",
+    "humanCheck": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. PR을 확인해 주세요.",
+    "humanCheckNoPr": "완료 보고를 확인해 주세요",
+    "openPr": "PR {pr} 보기",
+    "failed": "런이 실패했어요. 이유를 보고 Tickets에서 새 런을 맡길 수 있어요.",
+    "agentResult": "에이전트 결과",
+    "prState": "PR 상태",
+    "retry": "Tickets에서 다시 맡기기",
+    "ticket": "티켓",
+    "ticketValue": "{key} · {project}",
+    "workspace": "Workspace",
+    "runner": "러너",
+    "noRunner": "아직 없어요",
+    "agent": "에이전트"
   },
   "question": {
     "other": "직접 쓰기",
@@ -89,7 +109,6 @@
     "shortcut": "⌘ Enter로 보낼 수 있어요",
     "send": "보내기",
     "sending": "보내는 중…",
-    "close": "닫기",
     "answered": "답을 보냈어요. worker가 에이전트에게 전해요.",
     "failed": "답을 보내지 못했어요. 다시 해주세요."
   },
@@ -98,8 +117,8 @@
     "reasonDescription": "에이전트가 대신 할 일을 적으면 함께 전해요",
     "send": "거절 보내기",
     "denying": "거절하는 중…",
-    "close": "닫기",
     "denied": "거절을 보냈어요. worker가 에이전트에게 전해요.",
-    "failed": "거절을 보내지 못했어요. 다시 해주세요."
+    "failed": "거절을 보내지 못했어요. 다시 해주세요.",
+    "allowOnRunner": "허용은 러너 화면에서만 할 수 있어요. 여기서는 거절만 할 수 있어요."
   }
 }

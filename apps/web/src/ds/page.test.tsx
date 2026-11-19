@@ -55,6 +55,8 @@ describe("/ds 서버 렌더", () => {
       "disclosure",
       "dividedList",
       "popover",
+      "kanban",
+      "sheet",
       "icons",
     ];
     expect(ids.filter((id) => !html.includes(`id="${id}"`))).toEqual([]);

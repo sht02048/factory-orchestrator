@@ -38,7 +38,8 @@ import {
 import { loadShell } from "@ganger/app/shell/load";
 import { loadHomePage } from "@ganger/app/home/load";
 import type { AttentionItem, HomeRun } from "@ganger/app/home/model";
-import { runnerIssues } from "@ganger/app/home/model";
+import { dashboardBoard, runnerIssues } from "@ganger/app/home/model";
+import { ticketId } from "@ganger/app/tickets/load";
 
 const keys = (runs: ReadonlyArray<HomeRun>) => runs.map((run) => run.ticketKey);
 const attentionKeys = (items: ReadonlyArray<AttentionItem>) =>
@@ -371,6 +372,52 @@ describe("loadHomePage", () => {
     expect(withCanceled.total).toBe(8);
     expect(withCanceled.recent.map((run) => run.summary)).toContain("canceled");
     expect(loadHomePage(db, "all", now, "UTC").doneToday.total).toBeGreaterThanOrEqual(8);
+  });
+
+  it("endedToday 는 운영자 시간대의 오늘 끝난 런을 모두 새 것부터 HomeRun 으로 담는다(티켓 0100)", () => {
+    const { db } = seedDatabase();
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    expect(keys(page.endedToday)).toEqual([
+      "ACME-7",
+      "ACME-6",
+      "ACME-5",
+      "ACME-4",
+      "ACME-3",
+      "ACME-2",
+      "ACME-1",
+    ]);
+    expect(page.endedToday.every((run) => run.state === "ended")).toBe(true);
+    const ended = page.endedToday.map((run) =>
+      run.state === "ended" ? Date.parse(run.endedAt) : 0,
+    );
+    expect(ended).toEqual(ended.toSorted((a, b) => b - a));
+    expect(loadHomePage(db, "ws-commerce", now, "Pacific/Kiritimati").endedToday).toEqual([]);
+  });
+
+  it("런마다 Tickets 가 고르는 티켓 ID 를 담는다(티켓 0100)", () => {
+    const { db } = seedDatabase();
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    const runs = [...page.queued, ...page.running, ...page.endedToday];
+    expect(runs.length).toBeGreaterThan(3);
+    for (const run of runs) expect(run.ticketId).toBe(ticketId(connection, run.ticketKey));
+  });
+
+  it("보드는 To do 런을 Running·Done today 칸의 꼬리표 카드로 나누고 나머지 오늘 끝난 런과 겹치지 않는다(티켓 0100)", () => {
+    const { db } = seedDatabase();
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    const board = dashboardBoard(page);
+    expect(keys(board.queued)).toEqual(keys(page.queued));
+    expect(keys(board.running.todo)).toEqual(["ACME-11", "ACME-12"]);
+    expect(keys(board.running.rest)).toEqual(keys(page.running));
+    expect(keys(board.done.todo)).toEqual([
+      "ACME-2",
+      "ACME-7",
+      "ACME-6",
+      "ACME-5",
+      "ACME-4",
+      "ACME-3",
+    ]);
+    expect(keys(board.done.rest)).toEqual(["ACME-1"]);
   });
 
   it("질문을 기다리는 런은 가장 오래된 대기부터 지난 시간을 담는다", () => {

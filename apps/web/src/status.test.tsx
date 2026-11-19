@@ -78,7 +78,8 @@ describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
   });
 
   it("To do 는 이름 자리에서 To do, 필터와 문장 안에서는 처리할 일이다(ADR 0010 0068 갱신)", () => {
-    expect(ds.typography.sampleHeading).toBe(home.section.todo);
+    expect(ds.typography.sampleHeading).toBe("To do");
+    expect(home.view.todo).toBe("처리할 일만");
     expect([runs.filter.attention, ds.tabs.todo]).toEqual([
       tickets.filter.todo,
       tickets.filter.todo,

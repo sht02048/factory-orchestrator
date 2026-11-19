@@ -20,6 +20,7 @@ export type InputWait =
 
 interface HomeRunBase {
   id: RunId;
+  ticketId: string;
   ticketKey: TicketKey;
   ticketTitle: string | null;
   trackerProject: string;
@@ -139,6 +140,7 @@ export interface HomePage {
   queued: HomeRun[];
   runners: RunnersSummary;
   doneToday: DoneToday;
+  endedToday: HomeRun[];
 }
 
 export const DONE_TODAY_LIMIT = 5;
@@ -195,6 +197,7 @@ export function partitionHome(input: {
   runs: ReadonlyArray<{ ticket: string; run: HomeRun }>;
   runners: RunnersSummary;
   doneToday: ReadonlyArray<DoneRun>;
+  endedToday: ReadonlyArray<HomeRun>;
 }): HomePage {
   const { workspace } = input;
   if (workspace.kind === "none")
@@ -205,6 +208,7 @@ export function partitionHome(input: {
       queued: [],
       runners: noRunners,
       doneToday: nothingDone,
+      endedToday: [],
     };
 
   const latestByTicket = new Map<string, string>();
@@ -230,6 +234,62 @@ export function partitionHome(input: {
     doneToday: {
       recent: done.slice(0, DONE_TODAY_LIMIT),
       total: done.length,
+    },
+    endedToday: input.endedToday.toSorted((a, b) => endedTime(b) - endedTime(a)),
+  };
+}
+
+function groupRank(run: HomeRun): number {
+  const kind = todoGroupOf(run);
+  return kind === null ? TODO_GROUPS.length : TODO_GROUPS.indexOf(kind);
+}
+
+function endedTime(run: HomeRun): number {
+  return run.state === "ended" ? Date.parse(run.endedAt) : 0;
+}
+
+export type TodoTag =
+  | "question"
+  | "permission"
+  | "waiting-for-input"
+  | "disconnected"
+  | "human-check"
+  | "failed";
+
+export function todoTagOf(run: HomeRun): TodoTag | null {
+  switch (run.state) {
+    case "waiting-for-input":
+      return run.input === null ? "waiting-for-input" : run.input.kind;
+    case "disconnected":
+      return "disconnected";
+    case "ended":
+      return run.summary === "human-check" || run.summary === "failed" ? run.summary : null;
+    case "queued":
+    case "running":
+      return null;
+  }
+}
+
+export interface DashboardBoard {
+  queued: HomeRun[];
+  running: { todo: HomeRun[]; rest: HomeRun[] };
+  done: { todo: HomeRun[]; rest: HomeRun[] };
+}
+
+export function dashboardBoard(page: HomePage): DashboardBoard {
+  const todo = page.attention.map(({ run }) => run);
+  const tagged = new Set(todo.map((run) => run.id));
+  return {
+    queued: page.queued,
+    running: {
+      todo: todo.filter((run) => run.state !== "ended"),
+      rest: page.running,
+    },
+    done: {
+      todo: todo
+        .filter((run) => run.state === "ended")
+        .toSorted((a, b) => groupRank(a) - groupRank(b)),
+      rest: page.endedToday.filter((run) => !tagged.has(run.id)),
     },
   };
 }

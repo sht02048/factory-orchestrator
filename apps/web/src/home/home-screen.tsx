@@ -4,52 +4,43 @@ import {
   buttonStyles,
   CapacityCells,
   Card,
-  Field,
-  GroupHeader,
-  Input,
-  MascotMessage,
-  Popover,
+  KanbanCards,
+  KanbanColumn,
+  KanbanSubheading,
   ProblemCallout,
   Row,
-  RowActionSlot,
   Section,
+  SegmentedTabs,
   StatusDot,
-  StatusPill,
   Text,
-  TimeSlot,
-  textStyles,
+  TextLink,
 } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
 import { USAGE_HIGH_PERCENT } from "@ganger/core";
 import type { RunId } from "@ganger/core";
 import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { useQueuedReasonText, useUsageNames } from "../labels";
+import { useUsageNames } from "../labels";
 import { useStatusName } from "../status";
-import type {
-  DashboardRunner,
-  DoneRun,
-  HomePage,
-  HomeRun,
-  InputWait,
-  TodoGroup,
-  TodoGroupKind,
-} from "@ganger/app/home/model";
+import type { DashboardRunner, HomePage, HomeRun } from "@ganger/app/home/model";
 import {
+  dashboardBoard,
   freeCapacity,
   limitedRunners,
   readyAgainInMs,
   runnerIssues,
   todoGroups,
 } from "@ganger/app/home/model";
-import { subjectParticle } from "./particle";
-import { QuestionForm } from "./question-form";
-import type { Question, SendState } from "./question-form";
+import { RunCard } from "./run-card";
+import type { SheetMode } from "./run-card";
+import { RunSheet } from "./run-sheet";
+import type { SheetTarget } from "./run-sheet";
+import { href } from "./run-text";
 
 export { QuestionForm } from "./question-form";
+export { runHref } from "./run-text";
 
 export interface AnswerInput {
   runId: string;
@@ -63,18 +54,41 @@ export interface DenyInput {
   reason: string;
 }
 
+export const DASHBOARD_VIEWS = ["all", "todo"] as const;
+
+export type DashboardView = (typeof DASHBOARD_VIEWS)[number];
+
 export interface HomeScreenProps {
   page: HomePage;
+  view?: DashboardView;
+  onViewChange?: (view: DashboardView) => void;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
 }
 
-type Permission = Extract<InputWait, { kind: "permission" }>;
+export const COLUMN_VISIBLE = 6;
+export const DONE_TODO_VISIBLE = 4;
+export const SETTLED_VISIBLE = 3;
 
-export const STOPPED_VISIBLE = 3;
+interface CardHost {
+  all: boolean;
+  selectedId: RunId | null;
+  cardRef: (id: RunId) => (element: HTMLButtonElement | null) => void;
+  focusCard: (id: RunId) => void;
+  onOpen: (run: HomeRun, tagged: boolean, mode: SheetMode) => void;
+}
 
-export function HomeScreen({ page, onAnswer, onDeny }: HomeScreenProps) {
+export function HomeScreen({
+  page,
+  view = "all",
+  onViewChange = () => {},
+  onAnswer,
+  onDeny,
+}: HomeScreenProps) {
   const t = useTranslations("home");
+  const cards = useRef(new Map<RunId, HTMLButtonElement>());
+  const [target, setTarget] = useState<SheetTarget | null>(null);
+  const [open, setOpen] = useState(false);
   if (page.workspace.kind === "none") {
     return (
       <div {...stylex.props(styles.page)}>
@@ -91,45 +105,128 @@ export function HomeScreen({ page, onAnswer, onDeny }: HomeScreenProps) {
     );
   }
   const all = page.workspace.kind === "all";
-  const groups = todoGroups(page.attention);
+  const board = dashboardBoard(page);
+  const todoOnly = view === "todo";
+  const fresh =
+    target === null
+      ? undefined
+      : [
+          ...board.queued,
+          ...board.running.todo,
+          ...board.running.rest,
+          ...board.done.todo,
+          ...board.done.rest,
+        ].find((run) => run.id === target.run.id);
+  const host: CardHost = {
+    all,
+    selectedId: open && target !== null ? target.run.id : null,
+    cardRef: (id) => (element) => {
+      if (element === null) cards.current.delete(id);
+      else cards.current.set(id, element);
+    },
+    focusCard: (id) => cards.current.get(id)?.focus(),
+    onOpen: (run, tagged, mode) => {
+      setTarget({ run, tagged, mode });
+      setOpen(true);
+    },
+  };
+  const runningTodo = new Set(board.running.todo.map((run) => run.id));
+  const todoIds = new Set(page.attention.map(({ run }) => run.id));
   return (
     <div {...stylex.props(styles.page)}>
-      <div {...stylex.props(styles.content)}>
-        <DashboardHeader page={page} groups={groups} all={all} />
-        <div {...stylex.props(styles.frame)}>
-          <div {...stylex.props(styles.columns)}>
-            <div {...stylex.props(styles.mainColumn)}>
-              <TodoSection
-                groups={groups}
-                total={page.attention.length}
-                all={all}
-                onAnswer={onAnswer}
-                onDeny={onDeny}
-              />
-              <InProgressSection page={page} all={all} />
-            </div>
-            <div {...stylex.props(styles.sideColumn)}>
-              <RunnersSection runners={page.runners.list} />
-              <DoneTodaySection page={page} all={all} />
-            </div>
+      <div {...stylex.props(styles.top)}>
+        <DashboardHeader page={page} all={all} />
+        <SegmentedTabs<DashboardView>
+          value={view}
+          onValueChange={onViewChange}
+          label={t("view.label")}
+          items={[
+            { value: "all", label: t("view.all") },
+            {
+              value: "todo",
+              label: t("view.todo"),
+              count: page.attention.length,
+              attention: true,
+            },
+          ]}
+        />
+      </div>
+      <div {...stylex.props(styles.frame)}>
+        <div {...stylex.props(styles.board)}>
+          <KanbanColumn title={t("column.queued")} count={todoOnly ? 0 : board.queued.length}>
+            <CardList
+              runs={todoOnly ? [] : board.queued}
+              tagged={() => false}
+              limit={COLUMN_VISIBLE}
+              empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.queued")}
+              host={host}
+            />
+          </KanbanColumn>
+          <KanbanColumn
+            title={t("column.running")}
+            count={
+              todoOnly
+                ? board.running.todo.length
+                : board.running.todo.length + board.running.rest.length
+            }
+          >
+            <CardList
+              runs={todoOnly ? board.running.todo : [...board.running.todo, ...board.running.rest]}
+              tagged={(run) => runningTodo.has(run.id)}
+              limit={COLUMN_VISIBLE}
+              empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.running")}
+              host={host}
+            />
+          </KanbanColumn>
+          <KanbanColumn
+            title={t("column.done")}
+            count={
+              todoOnly ? board.done.todo.length : board.done.todo.length + board.done.rest.length
+            }
+          >
+            <CardList
+              runs={board.done.todo}
+              tagged={() => true}
+              limit={DONE_TODO_VISIBLE}
+              empty={
+                todoOnly
+                  ? t("columnEmpty.todo")
+                  : board.done.rest.length === 0
+                    ? t("columnEmpty.done")
+                    : null
+              }
+              host={host}
+            />
+            {todoOnly || board.done.rest.length === 0 ? null : (
+              <SettledCards runs={board.done.rest} page={page} host={host} />
+            )}
+          </KanbanColumn>
+          <div {...stylex.props(styles.runners)}>
+            <RunnersSection runners={page.runners.list} />
           </div>
         </div>
       </div>
+      <RunSheet
+        target={
+          fresh === undefined || target === null
+            ? target
+            : { ...target, run: fresh, tagged: todoIds.has(fresh.id) }
+        }
+        open={open}
+        onOpenChange={setOpen}
+        finalFocus={() => (target === null ? null : (cards.current.get(target.run.id) ?? null))}
+        all={all}
+        onAnswer={onAnswer}
+        onDeny={onDeny}
+      />
     </div>
   );
 }
 
-function DashboardHeader({
-  page,
-  groups,
-  all,
-}: {
-  page: HomePage;
-  groups: TodoGroup[];
-  all: boolean;
-}) {
+function DashboardHeader({ page, all }: { page: HomePage; all: boolean }) {
   const t = useTranslations("home");
   const { duration } = useTime();
+  const groups = todoGroups(page.attention);
   const total = page.attention.length;
   const inProgress = page.running.length + page.queued.length;
   const limited = limitedRunners(page.runners);
@@ -171,102 +268,57 @@ function DashboardHeader({
   );
 }
 
-function TodoSection({
-  groups,
-  total,
-  all,
-  onAnswer,
-  onDeny,
+function CardList({
+  runs,
+  tagged,
+  limit,
+  empty,
+  host,
 }: {
-  groups: TodoGroup[];
-  total: number;
-  all: boolean;
-  onAnswer: HomeScreenProps["onAnswer"];
-  onDeny: HomeScreenProps["onDeny"];
+  runs: HomeRun[];
+  tagged: (run: HomeRun) => boolean;
+  limit: number;
+  empty: string | null;
+  host: CardHost;
 }) {
-  const t = useTranslations("home");
-  return (
-    <Card label={t("section.todo")}>
-      <Section title={t("section.todo")} titleRole="heading" count={total}>
-        {groups.length === 0 ? (
-          <MascotMessage mood="resting" size="small">
-            <Text variant="meta" as="p">
-              {t("empty.todo")}
-            </Text>
-          </MascotMessage>
-        ) : (
-          <div {...stylex.props(styles.groups)}>
-            {groups.map((group) => (
-              <TodoGroupBlock
-                key={group.kind}
-                group={group}
-                all={all}
-                onAnswer={onAnswer}
-                onDeny={onDeny}
-              />
-            ))}
-          </div>
-        )}
-      </Section>
-    </Card>
-  );
-}
-
-const GROUP_STATUS: Record<TodoGroupKind, PillStatus> = {
-  answer: "question",
-  check: "human-check",
-  stopped: "failed",
-};
-
-function TodoGroupBlock({
-  group,
-  all,
-  onAnswer,
-  onDeny,
-}: {
-  group: TodoGroup;
-  all: boolean;
-  onAnswer: HomeScreenProps["onAnswer"];
-  onDeny: HomeScreenProps["onDeny"];
-}) {
-  const t = useTranslations("home.group");
+  const t = useTranslations("home.board");
   const [expanded, setExpanded] = useState(false);
-  const firstHiddenRef = useRef<HTMLLIElement>(null);
-  const focusFirstHidden = useRef(false);
+  const focusAfterExpand = useRef<RunId | null>(null);
   useEffect(() => {
-    if (!expanded || !focusFirstHidden.current) return;
-    focusFirstHidden.current = false;
-    firstHiddenRef.current?.querySelector("a")?.focus();
-  }, [expanded]);
-  const limited = group.kind === "stopped" && !expanded;
-  const visible = limited ? group.runs.slice(0, STOPPED_VISIBLE) : group.runs;
-  const hidden = group.runs.length - visible.length;
+    const id = focusAfterExpand.current;
+    if (!expanded || id === null) return;
+    focusAfterExpand.current = null;
+    host.focusCard(id);
+  }, [expanded, host]);
+  if (runs.length === 0)
+    return empty === null ? null : (
+      <Text variant="meta" as="p">
+        {empty}
+      </Text>
+    );
+  const visible = expanded ? runs : runs.slice(0, limit);
+  const hidden = runs.length - visible.length;
   return (
-    <div data-group={group.kind} {...stylex.props(styles.group)}>
-      <GroupHeader
-        status={GROUP_STATUS[group.kind]}
-        title={t(`${group.kind}.title`)}
-        count={group.runs.length}
-        description={t(`${group.kind}.description`)}
-      />
-      <ul {...stylex.props(styles.rows)}>
-        {visible.map((run, index) => (
-          <TodoRow
+    <>
+      <KanbanCards>
+        {visible.map((run) => (
+          <RunCard
             key={run.id}
             run={run}
-            all={all}
-            onAnswer={onAnswer}
-            onDeny={onDeny}
-            itemRef={index === STOPPED_VISIBLE ? firstHiddenRef : undefined}
+            tagged={tagged(run)}
+            all={host.all}
+            selected={host.selectedId === run.id}
+            openRef={host.cardRef(run.id)}
+            onOpen={(mode) => host.onOpen(run, tagged(run), mode)}
           />
         ))}
-      </ul>
+      </KanbanCards>
       {hidden > 0 ? (
         <div>
           <Button
             variant="ghost"
             onClick={() => {
-              focusFirstHidden.current = true;
+              focusAfterExpand.current = runs[limit]?.id ?? null;
               setExpanded(true);
             }}
           >
@@ -274,207 +326,36 @@ function TodoGroupBlock({
           </Button>
         </div>
       ) : null}
+    </>
+  );
+}
+
+function SettledCards({ runs, page, host }: { runs: HomeRun[]; page: HomePage; host: CardHost }) {
+  const t = useTranslations("home.board");
+  const visible = runs.slice(0, SETTLED_VISIBLE);
+  return (
+    <div data-settled="" {...stylex.props(styles.settled)}>
+      <KanbanSubheading>{t("settled")}</KanbanSubheading>
+      <KanbanCards>
+        {visible.map((run) => (
+          <RunCard
+            key={run.id}
+            run={run}
+            tagged={false}
+            all={host.all}
+            selected={host.selectedId === run.id}
+            openRef={host.cardRef(run.id)}
+            onOpen={(mode) => host.onOpen(run, false, mode)}
+          />
+        ))}
+      </KanbanCards>
+      {runs.length > visible.length ? (
+        <div {...stylex.props(styles.allRuns)}>
+          <TextLink href={runsHref(page)}>{t("allRuns")}</TextLink>
+        </div>
+      ) : null}
     </div>
   );
-}
-
-function RunKey({ run, all }: { run: HomeRun | DoneRun; all: boolean }) {
-  return (
-    <span {...stylex.props(styles.keyLine)}>
-      {run.ticketTitle === null ? (
-        <Text variant="title" numeric>
-          {run.ticketKey}
-        </Text>
-      ) : (
-        <span {...stylex.props(styles.titleLine)}>
-          <span {...stylex.props(styles.keyPart)}>
-            <Text variant="meta" numeric>
-              {run.ticketKey}
-            </Text>
-          </span>
-          <Text variant="title" truncate>
-            {run.ticketTitle}
-          </Text>
-        </span>
-      )}
-      {all ? <Text variant="meta">{run.workspace.name}</Text> : null}
-    </span>
-  );
-}
-
-function TodoRow({
-  run,
-  all,
-  onAnswer,
-  onDeny,
-  itemRef,
-}: {
-  run: HomeRun;
-  all: boolean;
-  onAnswer: HomeScreenProps["onAnswer"];
-  onDeny: HomeScreenProps["onDeny"];
-  itemRef: RefObject<HTMLLIElement | null> | undefined;
-}) {
-  const t = useTranslations("home.row");
-  const { ago, duration, elapsed } = useTime();
-  const line = (detail: ReactNode, since?: string, action?: ReactNode) => (
-    <li data-run={run.id} ref={itemRef} {...stylex.props(styles.todoItem)}>
-      <span {...stylex.props(styles.todoLink)}>
-        <Row href={runHref(run)} trailing={<TimeSlot>{since}</TimeSlot>}>
-          <span {...stylex.props(styles.todoBody)}>
-            <span {...stylex.props(styles.keyLine)}>
-              <RunKey run={run} all={all} />
-              {run.cancelling ? <Text variant="meta">{t("cancelling")}</Text> : null}
-            </span>
-            <Text variant="ui">{detail}</Text>
-          </span>
-        </Row>
-      </span>
-      <span {...stylex.props(styles.todoAction)}>
-        <RowActionSlot>{action}</RowActionSlot>
-      </span>
-    </li>
-  );
-  switch (run.state) {
-    case "waiting-for-input": {
-      const since = run.waitingMs === null ? undefined : elapsed(run.waitingMs);
-      const input = run.input;
-      if (input === null) return line(t("inputUnknown"), since);
-      switch (input.kind) {
-        case "question":
-          return line(
-            input.body,
-            since,
-            <QuestionAction run={run} question={input} onAnswer={onAnswer} />,
-          );
-        case "permission":
-          return line(
-            t("permission", { command: input.detail }),
-            since,
-            <PermissionAction run={run} permission={input} onDeny={onDeny} />,
-          );
-      }
-      return null;
-    }
-    case "disconnected": {
-      const runner = run.runner?.name ?? t("noRunner");
-      return line(
-        run.unreachableMs === null
-          ? t("unreachable", { runner })
-          : t("unreachableFor", { runner, duration: duration(run.unreachableMs) }),
-      );
-    }
-    case "ended": {
-      if (run.summary !== "human-check")
-        return line(t("failedAt", { time: ago(run.endedAt, run.endedAgoMs) }));
-      const pr = run.pullRequest;
-      if (pr === null) return line(t("humanCheckNoPr"));
-      return line(
-        t("pullRequest", { pr: pr.displayId }),
-        undefined,
-        <a
-          href={pr.url}
-          target="_blank"
-          rel="noreferrer"
-          data-variant="secondary"
-          {...stylex.props(...buttonStyles("secondary"))}
-        >
-          {t("openPr")}
-        </a>,
-      );
-    }
-    case "queued":
-    case "running":
-      return null;
-  }
-}
-
-function InProgressSection({ page, all }: { page: HomePage; all: boolean }) {
-  const t = useTranslations("home");
-  const runs = [...page.running, ...page.queued];
-  return (
-    <Card surface="plain" label={t("section.inProgress")}>
-      <Section
-        title={t("section.inProgress")}
-        titleRole="heading"
-        count={runs.length}
-        link={{ href: runsHref(page), label: t("inProgress.link") }}
-      >
-        {runs.length === 0 ? (
-          <Text variant="meta" as="p">
-            {t("empty.inProgress")}
-          </Text>
-        ) : (
-          <ul {...stylex.props(styles.rows)}>
-            {runs.map((run) => (
-              <ProgressRow key={run.id} run={run} all={all} />
-            ))}
-          </ul>
-        )}
-      </Section>
-    </Card>
-  );
-}
-
-function ProgressRow({ run, all }: { run: HomeRun; all: boolean }) {
-  const t = useTranslations("home.row");
-  const tDomain = useTranslations("domain");
-  const queuedReasonText = useQueuedReasonText();
-  const statusName = useStatusName();
-  const { elapsed } = useTime();
-  const item = (status: PillStatus, detail: string | undefined, since: number | null) => (
-    <li data-run={run.id}>
-      <Row
-        href={runHref(run)}
-        leading={<StatusDot status={status}>{statusName(status)}</StatusDot>}
-        trailing={<TimeSlot>{since === null ? null : elapsed(since)}</TimeSlot>}
-      >
-        <span {...stylex.props(styles.keyLine)}>
-          <RunKey run={run} all={all} />
-          {detail === undefined ? null : (
-            <Text variant="meta" truncate>
-              {detail}
-            </Text>
-          )}
-          {run.cancelling ? <Text variant="meta">{t("cancelling")}</Text> : null}
-        </span>
-      </Row>
-    </li>
-  );
-  switch (run.state) {
-    case "running":
-      return item("running", run.runner?.name, run.executionMs);
-    case "queued": {
-      const reason = run.queuedReason;
-      switch (reason.kind) {
-        case "behind":
-        case "no-capacity":
-          return item("queued", t("queuedFree"), run.waitMs);
-        case "runner-offline":
-          return item(
-            "queued",
-            run.runner === null
-              ? t("queuedAnyOffline")
-              : t("queuedOffline", {
-                  runner: run.runner.name,
-                  subject: subjectParticle(run.runner.name),
-                }),
-            run.waitMs,
-          );
-        case "starting":
-        case "project-missing":
-        case "assignment-blocked":
-          return item("queued", tDomain(`queuedReason.${reason.kind}`), run.waitMs);
-        case "usage-limit":
-          return item("queued", queuedReasonText(reason), run.waitMs);
-      }
-      return null;
-    }
-    case "waiting-for-input":
-    case "disconnected":
-    case "ended":
-      return null;
-  }
 }
 
 function RunnersSection({ runners }: { runners: DashboardRunner[] }) {
@@ -513,6 +394,7 @@ function RunnersSection({ runners }: { runners: DashboardRunner[] }) {
       <Section
         title={t("section.runners")}
         titleRole="subheading"
+        headingLevel="h2"
         count={runners.length}
         {...(runners.length === 0
           ? {}
@@ -626,263 +508,10 @@ function RunnerUsage({ runner }: { runner: DashboardRunner }) {
   );
 }
 
-function DoneTodaySection({ page, all }: { page: HomePage; all: boolean }) {
-  const t = useTranslations("home");
-  const done = page.doneToday;
-  return (
-    <Card surface="plain" label={t("section.doneToday")}>
-      <Section
-        title={t("section.doneToday")}
-        titleRole="subheading"
-        count={done.total}
-        link={{ href: runsHref(page), label: t("doneToday.link") }}
-      >
-        {done.recent.length === 0 ? (
-          <Text variant="meta" as="p">
-            {t("empty.doneToday")}
-          </Text>
-        ) : (
-          <ul {...stylex.props(styles.rows)}>
-            {done.recent.map((run) => (
-              <DoneRow key={run.id} run={run} all={all} />
-            ))}
-          </ul>
-        )}
-      </Section>
-    </Card>
-  );
-}
-
-function DoneRow({ run, all }: { run: DoneRun; all: boolean }) {
-  const statusName = useStatusName();
-  const { ago } = useTime();
-  return (
-    <li data-run={run.id}>
-      <Row
-        href={runHref(run)}
-        leading={<StatusDot status={run.summary}>{statusName(run.summary)}</StatusDot>}
-        trailing={<TimeSlot dateTime={run.endedAt}>{ago(run.endedAt, run.endedAgoMs)}</TimeSlot>}
-      >
-        <span {...stylex.props(styles.keyLine)}>
-          <RunKey run={run} all={all} />
-          <Text variant="meta">{statusName(run.summary)}</Text>
-        </span>
-      </Row>
-    </li>
-  );
-}
-
-function useResultFocus(done: boolean) {
-  const resultRef = useRef<HTMLSpanElement>(null);
-  const awaiting = useRef(false);
-  useEffect(() => {
-    if (!done || !awaiting.current) return;
-    awaiting.current = false;
-    resultRef.current?.focus();
-  }, [done]);
-  return {
-    resultRef,
-    sending: () => {
-      awaiting.current = true;
-    },
-    failed: () => {
-      awaiting.current = false;
-    },
-  };
-}
-
-function useLayer(onOpen: () => void = () => {}) {
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const focusTriggerOnClose = useRef(false);
-  useEffect(() => {
-    if (open || !focusTriggerOnClose.current) return;
-    focusTriggerOnClose.current = false;
-    triggerRef.current?.focus();
-  }, [open]);
-  return {
-    open,
-    triggerRef,
-    onOpenChange: (next: boolean) => {
-      if (next) onOpen();
-      focusTriggerOnClose.current = !next;
-      setOpen(next);
-    },
-    closeAfterSend: () => {
-      focusTriggerOnClose.current = false;
-      setOpen(false);
-    },
-  };
-}
-
-function ResultText({
-  resultRef,
-  children,
-}: {
-  resultRef: RefObject<HTMLSpanElement | null>;
-  children: string;
-}) {
-  return (
-    <span
-      ref={resultRef}
-      role="status"
-      tabIndex={-1}
-      {...stylex.props(textStyles("ui"), styles.result)}
-    >
-      {children}
-    </span>
-  );
-}
-
-function LayerTitle({ run, status, since }: { run: HomeRun; status: PillStatus; since: string }) {
-  const statusName = useStatusName();
-  return (
-    <>
-      <StatusPill status={status}>{statusName(status)}</StatusPill>
-      <Text variant="meta" numeric>
-        {run.ticketKey}
-      </Text>
-      {since === "" ? null : <span>{since}</span>}
-    </>
-  );
-}
-
-function QuestionAction({
-  run,
-  question,
-  onAnswer,
-}: {
-  run: HomeRun;
-  question: Question;
-  onAnswer: HomeScreenProps["onAnswer"];
-}) {
-  const t = useTranslations("home");
-  const { elapsed } = useTime();
-  const layer = useLayer();
-  const result = useResultFocus(question.answered);
-  if (question.answered)
-    return <ResultText resultRef={result.resultRef}>{t("question.answered")}</ResultText>;
-  const waitingMs = run.state === "waiting-for-input" ? run.waitingMs : null;
-  return (
-    <Popover
-      trigger={t("row.answer")}
-      triggerRef={layer.triggerRef}
-      title={
-        <LayerTitle
-          run={run}
-          status="question"
-          since={waitingMs === null ? "" : elapsed(waitingMs)}
-        />
-      }
-      closeLabel={t("question.close")}
-      initialFocus='input[type="radio"]'
-      open={layer.open}
-      onOpenChange={layer.onOpenChange}
-    >
-      <QuestionForm
-        question={question}
-        onSend={async (answer) => {
-          result.sending();
-          try {
-            await onAnswer({ runId: run.id, questionId: question.questionId, answer });
-          } catch (error) {
-            result.failed();
-            throw error;
-          }
-          layer.closeAfterSend();
-        }}
-      />
-    </Popover>
-  );
-}
-
-function PermissionAction({
-  run,
-  permission,
-  onDeny,
-}: {
-  run: HomeRun;
-  permission: Permission;
-  onDeny: HomeScreenProps["onDeny"];
-}) {
-  const t = useTranslations("home");
-  const { elapsed } = useTime();
-  const [reason, setReason] = useState("");
-  const [state, setState] = useState<SendState>("idle");
-  const layer = useLayer(() => setState("idle"));
-  const result = useResultFocus(permission.denied);
-  if (permission.denied)
-    return <ResultText resultRef={result.resultRef}>{t("permission.denied")}</ResultText>;
-  const sending = state === "sending";
-  const waitingMs = run.state === "waiting-for-input" ? run.waitingMs : null;
-  return (
-    <Popover
-      trigger={t("row.deny")}
-      triggerVariant="danger"
-      triggerRef={layer.triggerRef}
-      title={
-        <LayerTitle
-          run={run}
-          status="permission"
-          since={waitingMs === null ? "" : elapsed(waitingMs)}
-        />
-      }
-      closeLabel={t("permission.close")}
-      initialFocus='input[name="reason"]'
-      open={layer.open}
-      onOpenChange={layer.onOpenChange}
-    >
-      <form
-        {...stylex.props(styles.layerForm)}
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (sending) return;
-          setState("sending");
-          result.sending();
-          onDeny({ runId: run.id, promptId: permission.promptId, reason: reason.trim() }).then(
-            () => {
-              setState("idle");
-              layer.closeAfterSend();
-            },
-            () => {
-              result.failed();
-              setState("failed");
-            },
-          );
-        }}
-      >
-        <Text variant="title" as="p" wrap="anywhere">
-          {permission.detail}
-        </Text>
-        <Field
-          label={t("permission.reasonLabel")}
-          description={t("permission.reasonDescription")}
-          error={state === "failed" ? t("permission.failed") : undefined}
-        >
-          <Input name="reason" value={reason} onValueChange={setReason} autoComplete="off" />
-        </Field>
-        <div {...stylex.props(styles.layerFoot)}>
-          <Button variant="danger" type="submit" disabled={sending}>
-            {sending ? t("permission.denying") : t("permission.send")}
-          </Button>
-        </div>
-      </form>
-    </Popover>
-  );
-}
-
 function runsHref(page: HomePage): string {
   return page.workspace.kind === "one"
     ? href("/runs", { ws: page.workspace.workspace.id })
     : "/runs";
-}
-
-export function runHref(run: { id: RunId; workspace: { id: string } }): string {
-  return href(`/runs/${encodeURIComponent(run.id)}`, { ws: run.workspace.id });
-}
-
-function href(path: string, search: Record<string, string>): string {
-  return `${path}?${new URLSearchParams(search).toString()}`;
 }
 
 const styles = stylex.create({
@@ -893,30 +522,51 @@ const styles = stylex.create({
     paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
     paddingBottom: space.s10,
   },
-  content: { maxWidth: size.dashboardWidth },
+  top: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    columnGap: space.s6,
+    rowGap: space.s4,
+    marginBottom: space.s8,
+  },
   header: {
     display: "flex",
     flexDirection: "column",
     gap: space.s2,
-    marginBottom: space.s8,
+    minWidth: 0,
   },
   frame: { containerType: "inline-size" },
-  columns: {
+  board: {
     display: "grid",
     gridTemplateColumns: {
-      default: `minmax(0, 1fr) ${size.dashboardSideWidth}`,
-      [breakpoints.dashboardOneColumn]: "minmax(0, 1fr)",
+      default: `repeat(3, minmax(0, 1fr)) ${size.dashboardSideWidth}`,
+      [breakpoints.kanbanRunnersBelow]: "repeat(3, minmax(0, 1fr))",
+      [breakpoints.kanbanStacked]: "minmax(0, 1fr)",
     },
     alignItems: "start",
-    columnGap: space.s8,
-    rowGap: space.s10,
+    columnGap: space.s4,
+    rowGap: { default: space.s4, [breakpoints.kanbanRunnersBelow]: space.s8 },
   },
-  mainColumn: { display: "flex", flexDirection: "column", gap: space.s10, minWidth: 0 },
-  sideColumn: { display: "flex", flexDirection: "column", gap: space.s10, minWidth: 0 },
+  runners: {
+    gridColumn: {
+      default: "auto",
+      [breakpoints.kanbanRunnersBelow]: "1 / -1",
+      [breakpoints.kanbanStacked]: "1 / -1",
+    },
+    minWidth: 0,
+    paddingInlineStart: {
+      default: space.s4,
+      [breakpoints.kanbanRunnersBelow]: 0,
+      [breakpoints.kanbanStacked]: 0,
+    },
+    paddingTop: { default: space.s3, [breakpoints.kanbanStacked]: space.s4 },
+  },
+  settled: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
+  allRuns: { paddingInline: space.s1 },
   sideBlock: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
   runnerText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  groups: { display: "flex", flexDirection: "column", gap: space.s6, minWidth: 0 },
-  group: { display: "flex", flexDirection: "column", gap: space.s1, minWidth: 0 },
   rows: {
     display: "flex",
     flexDirection: "column",
@@ -925,45 +575,5 @@ const styles = stylex.create({
     padding: 0,
     listStyle: "none",
   },
-  todoItem: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    columnGap: space.s2,
-    minWidth: 0,
-  },
-  todoLink: {
-    flexGrow: 1,
-    flexShrink: 1,
-    flexBasis: 0,
-    minWidth: `min(100%, ${size.todoTextMinWidth})`,
-  },
-  todoAction: {
-    display: "flex",
-    flexShrink: 0,
-    marginInlineStart: "auto",
-    alignItems: "center",
-    maxWidth: "100%",
-    paddingInline: { default: 0, [breakpoints.dashboardOneColumn]: space.s3 },
-  },
-  todoBody: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
-  keyLine: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "baseline",
-    columnGap: space.s2,
-    minWidth: 0,
-  },
-  titleLine: {
-    display: "flex",
-    alignItems: "baseline",
-    columnGap: space.s2,
-    minWidth: 0,
-    maxWidth: "100%",
-  },
-  keyPart: { flexShrink: 0 },
   reset: { margin: 0 },
-  result: { flexShrink: 1, minWidth: 0, outline: "none" },
-  layerForm: { display: "flex", flexDirection: "column", gap: space.s3, minWidth: 0 },
-  layerFoot: { display: "flex", justifyContent: "flex-end", gap: space.s3 },
 });
