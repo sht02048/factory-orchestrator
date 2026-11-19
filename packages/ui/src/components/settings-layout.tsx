@@ -540,7 +540,10 @@ const styles = stylex.create({
     borderTopStyle: "solid",
     borderTopColor: colors.borderSubtle,
   },
-  rowOpen: { backgroundColor: colors.bgCardHover },
+  rowOpen: {
+    backgroundColor: colors.bgCardHover,
+    scrollMarginTop: { default: space.s8, [breakpoints.settingsNavTop]: NAV_TOP_HEIGHT },
+  },
   rowMain: {
     display: "flex",
     alignItems: "center",

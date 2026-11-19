@@ -29,7 +29,7 @@ import {
 import { USAGE_HIGH_PERCENT } from "@ganger/core";
 import { breakpoints, fonts, size, space } from "@ganger/ui/tokens.stylex";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useLocale, useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { usePrerequisiteName, useUsageNames } from "../labels";
@@ -116,6 +116,14 @@ export function RunnersScreen({
     }),
     [],
   );
+  const guardLinks = (event: MouseEvent<HTMLDivElement>) => {
+    if (!guard.isDirty() || !(event.target instanceof Element)) return;
+    const link = event.target.closest("a[href]");
+    if (link === null || link.getAttribute("href")?.startsWith("#") === true) return;
+    event.preventDefault();
+    event.stopPropagation();
+    guard.onBlocked();
+  };
   const selectUnlessUnsaved = (id: string) => {
     if (guard.isDirty()) {
       guard.onBlocked();
@@ -135,7 +143,7 @@ export function RunnersScreen({
   }, [selectedId]);
 
   return (
-    <>
+    <div {...stylex.props(styles.guardFrame)} onClickCapture={guardLinks}>
       {renderGuard?.(guard)}
       <ScreenLayout
         header={
@@ -149,11 +157,6 @@ export function RunnersScreen({
             actions={
               <a
                 href={addRunnerHref(ws)}
-                onClick={(event) => {
-                  if (!guard.isDirty()) return;
-                  event.preventDefault();
-                  guard.onBlocked();
-                }}
                 data-variant="primary"
                 {...stylex.props(...buttonStyles("primary"))}
               >
@@ -219,7 +222,7 @@ export function RunnersScreen({
           }
         />
       </ScreenLayout>
-    </>
+    </div>
   );
 }
 
@@ -916,6 +919,7 @@ const styles = stylex.create({
   panelHead: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   statusLine: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
   wrap: { minWidth: 0, overflowWrap: "anywhere" },
+  guardFrame: { display: "contents" },
   nameLine: {
     display: "flex",
     alignItems: "flex-start",
