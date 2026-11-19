@@ -51,6 +51,7 @@ const runnerProject = toRunnerProjectId("fake:acme/web");
 const agent = toAgentId("claude");
 const encryptionKey = new Uint8Array(32).fill(7);
 const runningKey = "ACME-RUN";
+const runningTitle = "Retry failed payment webhooks";
 const endedRunCount = 55;
 const endedPageSize = 50;
 
@@ -112,7 +113,7 @@ describe("Runs 화면(브라우저, 0056)", () => {
 
     await page.getByRole("link", { name: runsJson.panel.openDetail }).click();
     await page.waitForURL(/\/runs\/[^/?]+/);
-    await page.getByRole("heading", { name: runningKey }).first().waitFor();
+    await page.getByRole("heading", { name: runningTitle }).first().waitFor();
 
     expect(await page.evaluate(() => "runsDocumentMarker" in globalThis)).toBe(true);
   });
@@ -152,6 +153,65 @@ describe("Runs 화면(브라우저, 0056)", () => {
     expect(listBox.width).toBeGreaterThan(500);
     expect(panelBox.y).toBeGreaterThanOrEqual(listBox.y);
     expect(panelBox.width).toBeGreaterThan(500);
+  });
+
+  it("넓은 창에서는 열로 나눈 한 줄 행이 패널 바로 앞까지 채우고, 좁아지면 결과 → 러너 순으로 접는다(0101)", async (context) => {
+    const layoutAt = async (width: number) => {
+      const page = await newPage(context, { width, height: 900 });
+      await openRuns(page);
+      const row = page.getByRole("option", { name: runningKey });
+      await row.waitFor();
+      return page.evaluate((key) => {
+        const option = [...document.querySelectorAll('[role="option"]')].find((e) =>
+          e.textContent?.includes(key),
+        );
+        const list = document.querySelector('[role="listbox"]');
+        const panel = document.querySelector("main aside");
+        if (option === undefined || list === null || panel === null)
+          throw new Error("runs layout not found");
+        const shown = (selector: string) =>
+          [...option.querySelectorAll(selector)].some((e) => e.getBoundingClientRect().width > 0);
+        const listBox = list.getBoundingClientRect();
+        const panelBox = panel.getBoundingClientRect();
+        const title = option.querySelector("[title]");
+        const titleCell = title?.closest('[role="option"] > *');
+        if (title === null || title === undefined || titleCell === null || titleCell === undefined)
+          throw new Error("runs title not found");
+        return {
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          gap: Math.round(panelBox.left - listBox.right),
+          result: shown('[data-hide-when="first"]'),
+          runner: shown('[data-hide-when="second"]'),
+          secondLine: shown('[data-folded-only="first"]'),
+          rowHeight: Math.round(option.getBoundingClientRect().height),
+          titleShortBy: Math.round(
+            titleCell.getBoundingClientRect().width - title.getBoundingClientRect().width,
+          ),
+        };
+      }, runningKey);
+    };
+
+    const wide = await layoutAt(1728);
+    expect(wide).toMatchObject({ overflow: 0, result: true, runner: true, secondLine: false });
+    expect(wide.gap).toBeLessThanOrEqual(64);
+
+    const middle = await layoutAt(1280);
+    expect(middle).toMatchObject({ overflow: 0, result: false, runner: false, secondLine: true });
+
+    const laptop = await layoutAt(1100);
+    expect(laptop).toMatchObject({ overflow: 0, secondLine: true, titleShortBy: 0 });
+    expect(laptop.rowHeight).toBeLessThan(middle.rowHeight + 8);
+
+    for (const width of [900, 400, 320]) {
+      const narrow = await layoutAt(width);
+      expect(narrow).toMatchObject({
+        overflow: 0,
+        result: false,
+        runner: false,
+        secondLine: true,
+        titleShortBy: 0,
+      });
+    }
   });
 
   it("editor 변형(Settings)은 800px 에서 두 열이고 700px 에서 편집 영역이 아래로 내려간다", async (context) => {
@@ -330,7 +390,7 @@ function seed(db: Database): void {
     const id = assign(db, `ACME-END-${i}`, at);
     ok(changeRunState(db, id, { to: "ended", agentResult: "canceled", prState: "none" }, at));
   }
-  const running = assign(db, runningKey, new Date());
+  const running = assign(db, runningKey, new Date(), runningTitle);
   ok(
     changeRunState(db, running, {
       to: "running",
@@ -343,9 +403,10 @@ function seed(db: Database): void {
   );
 }
 
-function assign(db: Database, key: string, now: Date) {
+function assign(db: Database, key: string, now: Date, ticketTitle?: string) {
   const assigned = assignRun(db, {
     ticket: { connection, key: toTicketKey(key) },
+    ...(ticketTitle === undefined ? {} : { ticketTitle }),
     trackerProject,
     runnerProject,
     agent,
