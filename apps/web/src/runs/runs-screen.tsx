@@ -31,7 +31,7 @@ import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
-import type { WorkspaceSummary } from "../shell/model";
+import type { WorkspaceSummary } from "@ganger/app/shell/model";
 import {
   ENDED_RUNS_PAGE_SIZE,
   RUN_GROUP_FILTERS,
@@ -40,8 +40,8 @@ import {
   isGroupFilter,
   matchesFilter,
   needsAttention,
-} from "./model";
-import type { ConditionKey } from "./conditions";
+} from "@ganger/app/runs/model";
+import type { ConditionKey } from "@ganger/app/runs/conditions";
 import type {
   RunCondition,
   RunFilter,
@@ -49,7 +49,7 @@ import type {
   RunGroupFilter,
   RunView,
   RunsPage,
-} from "./model";
+} from "@ganger/app/runs/model";
 
 const columns = `minmax(0, 1fr) ${size.runStatusColumn} ${size.timeColumn}`;
 

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "./database.js";
 import type { Database } from "./database.js";
-import { MigrationError, loadMigrations, migrate } from "./migrate.js";
+import { MigrationError, checkSchema, loadMigrations, migrate } from "./migrate.js";
 import { seededDatabase, tempDatabasePath } from "./test-fixtures.js";
 
 function schemaDump(db: Database): unknown[] {
@@ -250,5 +250,50 @@ describe("migrate", () => {
         start_requested_at: 1,
       },
     ]);
+  });
+});
+
+describe("checkSchema", () => {
+  it("마이그레이션을 돌리지 않은 DB는 뒤처졌다고 알리고 아무것도 만들지 않는다", () => {
+    const db = openDatabase(":memory:");
+    expect(checkSchema(db)).toEqual({
+      kind: "behind",
+      missing: loadMigrations().map((m) => m.name),
+    });
+    expect(schemaDump(db)).toEqual([]);
+  });
+
+  it("모든 마이그레이션을 적용한 DB는 지금 판이다", () => {
+    const db = openDatabase(":memory:");
+    migrate(db);
+    expect(checkSchema(db)).toEqual({ kind: "current" });
+  });
+
+  it("마지막 마이그레이션이 빠졌으면 뒤처졌다고 알린다", () => {
+    const db = openDatabase(":memory:");
+    const all = loadMigrations();
+    migrate(db, all.slice(0, -1));
+    expect(checkSchema(db, all)).toEqual({ kind: "behind", missing: [all.at(-1)?.name] });
+  });
+
+  it("모르는 마이그레이션이 있으면 앞섰다고 알린다", () => {
+    const db = openDatabase(":memory:");
+    migrate(db);
+    db.$client
+      .prepare(
+        "INSERT INTO schema_migrations (name, hash, applied_at) VALUES ('99990101000000_future', 'x', 0)",
+      )
+      .run();
+    expect(checkSchema(db)).toEqual({ kind: "ahead", unknown: ["99990101000000_future"] });
+  });
+
+  it("적용한 마이그레이션의 SQL이 바뀌었으면 고쳐졌다고 알린다", () => {
+    const db = openDatabase(":memory:");
+    migrate(db);
+    const edited = loadMigrations().map((m) => ({ ...m, hash: `${m.hash}-edited` }));
+    expect(checkSchema(db, edited)).toEqual({
+      kind: "edited",
+      changed: edited.map((m) => m.name),
+    });
   });
 });

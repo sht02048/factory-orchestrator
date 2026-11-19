@@ -45,3 +45,15 @@ export function writePowerSettings(home: string, settings: PowerSettings): void 
   chmodSync(temp, 0o600);
   renameSync(temp, path);
 }
+
+export interface PowerSettingsStore {
+  read(): PowerSettings;
+  write(settings: PowerSettings): void;
+}
+
+export function powerSettingsStore(home: string): PowerSettingsStore {
+  return {
+    read: () => readPowerSettings(home).settings,
+    write: (settings) => writePowerSettings(home, settings),
+  };
+}

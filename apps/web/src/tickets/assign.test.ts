@@ -2,8 +2,8 @@ import { toRunId } from "@ganger/core";
 import { getRun } from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import { TICKET_TITLE_MAX_LENGTH } from "@ganger/db";
-import { assignInput, submitAssignment } from "./assign";
-import type { AssignInput } from "./assign";
+import { assignInput, submitAssignment } from "@ganger/app/tickets/assign";
+import type { AssignInput } from "@ganger/app/tickets/assign";
 import { connection, docsProject, now, setupTickets, webProject } from "./test-fixtures";
 
 const base: AssignInput = {

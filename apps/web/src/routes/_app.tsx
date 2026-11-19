@@ -8,7 +8,7 @@ import {
 import { z } from "zod";
 import { getShell } from "../server/functions";
 import { AppShell } from "../shell/app-shell";
-import { resolveWorkspace } from "../shell/model";
+import { resolveWorkspace } from "@ganger/app/shell/model";
 
 export const Route = createFileRoute("/_app")({
   validateSearch: z.object({ ws: z.string().optional() }),

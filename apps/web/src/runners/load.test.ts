@@ -20,8 +20,8 @@ import {
   now,
   seedDatabase,
 } from "../testing/seed";
-import { loadRunnersPage } from "./load";
-import type { RunnerView } from "./model";
+import { loadRunnersPage } from "@ganger/app/runners/load";
+import type { RunnerView } from "@ganger/app/runners/model";
 
 function runner(db: Database, name: string): RunnerView {
   const found = loadRunnersPage(db, now).runners.find((r) => r.name === name);

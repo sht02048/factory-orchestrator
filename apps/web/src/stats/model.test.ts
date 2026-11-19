@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DAY_MS } from "../time-zone";
+import { DAY_MS } from "@ganger/app/time-zone";
 import {
   failureReasonOf,
   mergedRateChange,
@@ -8,8 +8,8 @@ import {
   previousPeriod,
   statsPeriod,
   summarizeStats,
-} from "./model";
-import type { StatsRun } from "./model";
+} from "@ganger/app/stats/model";
+import type { StatsRun } from "@ganger/app/stats/model";
 
 describe("percentile", () => {
   it("nearest-rank: n 개 중 ceil(p × n) 번째 값이다", () => {

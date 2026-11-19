@@ -4,7 +4,7 @@ import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
 import { assignTicket, getTicketsPage } from "../../server/functions";
 import { ticketsMessages } from "../../tickets/messages";
-import { TICKET_FILTERS } from "../../tickets/model";
+import { TICKET_FILTERS } from "@ganger/app/tickets/model";
 import { TicketsScreen } from "../../tickets/tickets-screen";
 
 const t = createTranslator({

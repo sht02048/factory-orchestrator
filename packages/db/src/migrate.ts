@@ -98,3 +98,38 @@ function runPending(db: Database, migrations: ReadonlyArray<Migration>, now: Dat
     return ran;
   });
 }
+
+export type SchemaCheck =
+  | { kind: "current" }
+  | { kind: "behind"; missing: string[] }
+  | { kind: "ahead"; unknown: string[] }
+  | { kind: "edited"; changed: string[] };
+
+export function checkSchema(
+  db: Database,
+  migrations: ReadonlyArray<Migration> = loadMigrations(),
+): SchemaCheck {
+  const client = db.$client;
+  const table = client
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'")
+    .get();
+  const applied = new Map(
+    table === undefined
+      ? []
+      : client
+          .prepare("SELECT name, hash FROM schema_migrations")
+          .all()
+          .map((raw) => {
+            const row = appliedRow.parse(raw);
+            return [row.name, row.hash] as const;
+          }),
+  );
+  const known = new Map(migrations.map((m) => [m.name, m.hash]));
+  const unknown = [...applied.keys()].filter((name) => !known.has(name));
+  if (unknown.length > 0) return { kind: "ahead", unknown };
+  const changed = [...applied].filter(([name, hash]) => known.get(name) !== hash);
+  if (changed.length > 0) return { kind: "edited", changed: changed.map(([name]) => name) };
+  const missing = migrations.map((m) => m.name).filter((name) => !applied.has(name));
+  if (missing.length > 0) return { kind: "behind", missing };
+  return { kind: "current" };
+}

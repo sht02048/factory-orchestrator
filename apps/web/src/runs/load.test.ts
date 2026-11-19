@@ -18,11 +18,11 @@ import {
   offlineQueuedKey,
   seedDatabase,
 } from "../testing/seed";
-import { loadStatsPage } from "../stats/load";
-import { startOfCalendarDay, trackerProjectKey } from "./conditions";
-import { loadRunsPage } from "./load";
-import { ENDED_RUNS_PAGE_SIZE } from "./model";
-import type { RunView } from "./model";
+import { loadStatsPage } from "@ganger/app/stats/load";
+import { startOfCalendarDay, trackerProjectKey } from "@ganger/app/runs/conditions";
+import { loadRunsPage } from "@ganger/app/runs/load";
+import { ENDED_RUNS_PAGE_SIZE } from "@ganger/app/runs/model";
+import type { RunView } from "@ganger/app/runs/model";
 
 function addEndedRun(db: Database, key: string, at: Date): void {
   const assigned = assignRun(db, {

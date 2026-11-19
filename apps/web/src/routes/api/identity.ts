@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { identityOf } from "../../identity/identity";
 import { getDatabase } from "../../server/database";
 import { currentAllowedHosts } from "../../server/request-access";
-import { hostnameOfHostHeader, isHostAllowed } from "../../server/request-guard";
+import { hostnameOfHostHeader, isHostAllowed } from "@ganger/app/request-guard";
 
 export const Route = createFileRoute("/api/identity")({
   server: {
