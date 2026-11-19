@@ -10,6 +10,7 @@ import { runnerSetupMessages } from "../../runner-setup/messages";
 import { useRunnerSetupActions } from "../../runner-setup/use-runner-setup-actions";
 import { RunnersScreen } from "../../runners/runners-screen";
 import { settingsMessages } from "../../settings/messages";
+import { NavigationGuard } from "../../settings/navigation-guard";
 import { RunnerForm } from "../../settings/settings-screen";
 import type { SettingsActions } from "../../settings/settings-screen";
 import { useSettingsActions } from "../../settings/use-settings-actions";
@@ -117,6 +118,23 @@ function RunnersRoute() {
             primary={false}
           />
         }
+        renderGuard={(guard) => <NavigationGuard {...guard} />}
+        renderEdit={(runner, controls) => (
+          <RunnerForm
+            runner={{
+              id: runner.id,
+              name: runner.name,
+              sshTarget: runner.sshTarget ?? "",
+              orcaPath: runner.orcaPath ?? "",
+              capacity: runner.capacity,
+            }}
+            actions={settingsActions}
+            primary={false}
+            onDone={controls.onDone}
+            onClose={controls.onClose}
+            hints="info"
+          />
+        )}
       />
     </ScreenMessages>
   );

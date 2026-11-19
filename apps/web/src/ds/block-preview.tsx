@@ -2,6 +2,17 @@ import * as stylex from "@stylexjs/stylex";
 import {
   AppFrame,
   Button,
+  ChevronRightIcon,
+  ExternalIcon,
+  InfoIcon,
+  InfoTip,
+  SectionNav,
+  SettingsGroup,
+  SettingsLayout,
+  SettingsLinkRow,
+  SettingsRow,
+  SettingsSection,
+  Switch,
   CheckIcon,
   CheckTick,
   Checklist,
@@ -64,7 +75,7 @@ import {
   Sheet,
   StatusPill,
 } from "@ganger/ui";
-import { space } from "@ganger/ui/tokens.stylex";
+import { size, space } from "@ganger/ui/tokens.stylex";
 import { useId, useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 
@@ -83,6 +94,8 @@ export const blockSectionIds = [
   "popover",
   "kanban",
   "sheet",
+  "settingsRows",
+  "sectionNav",
   "icons",
 ] as const;
 
@@ -555,6 +568,38 @@ export function BlockSections() {
         </Section>
       </div>
 
+      <div id="settingsRows">
+        <Section title={tNav("settingsRows")} note={t("settingsRows.note")}>
+          <Demo>
+            <SettingsRowsPreview />
+          </Demo>
+        </Section>
+      </div>
+      <div id="sectionNav">
+        <Section title={tNav("sectionNav")} note={t("sectionNav.note")}>
+          <Demo>
+            <SettingsLayout
+              nav={
+                <SectionNav
+                  label={t("sectionNav.label")}
+                  problemLabel={t("sectionNav.problem")}
+                  items={[
+                    { id: "ds-section-first", label: t("sectionNav.first") },
+                    { id: "ds-section-second", label: t("sectionNav.second"), problem: true },
+                  ]}
+                />
+              }
+            >
+              <SettingsSection id="ds-section-first" title={t("sectionNav.first")}>
+                <Text variant="meta">{t("sectionNav.body")}</Text>
+              </SettingsSection>
+              <SettingsSection id="ds-section-second" title={t("sectionNav.second")}>
+                <Text variant="meta">{t("sectionNav.body")}</Text>
+              </SettingsSection>
+            </SettingsLayout>
+          </Demo>
+        </Section>
+      </div>
       <div id="icons">
         <Section title={tNav("icons")} note={t("icons.note")}>
           <Demo>
@@ -562,6 +607,9 @@ export function BlockSections() {
               <CheckIcon />
               <CloseIcon />
               <ChevronDownIcon />
+              <ChevronRightIcon />
+              <InfoIcon />
+              <ExternalIcon />
               <VisuallyHidden>{t("icons.hidden")}</VisuallyHidden>
             </span>
           </Demo>
@@ -571,7 +619,49 @@ export function BlockSections() {
   );
 }
 
+function SettingsRowsPreview() {
+  const t = useTranslations("ds.blocks.settingsRows");
+  const [awake, setAwake] = useState(true);
+  return (
+    <div {...stylex.props(styles.settingsDemo)}>
+      <SettingsGroup label={t("group")}>
+        <SettingsRow
+          label={t("name")}
+          value={t("nameValue")}
+          control={<Button>{t("change")}</Button>}
+        />
+        <SettingsRow
+          label={t("minutes")}
+          info={<InfoTip label={t("info")} content={t("infoContent")} />}
+          value="120"
+        />
+        <SettingsRow
+          label={t("sleep")}
+          detail={t("sleepDetail")}
+          status={t("saved")}
+          control={<Switch aria-label={t("sleep")} checked={awake} onCheckedChange={setAwake} />}
+        />
+        <SettingsRow
+          label={t("token")}
+          detail={t("tokenDetail")}
+          detailTone="problem"
+          control={
+            <Switch aria-label={t("token")} checked={false} onCheckedChange={() => {}} disabled />
+          }
+        />
+        <SettingsLinkRow
+          label={t("runners")}
+          detail={t("runnersDetail")}
+          value={t("runnersValue")}
+          render={(props) => <a href="#settingsRows" {...props} />}
+        />
+      </SettingsGroup>
+    </div>
+  );
+}
+
 const styles = stylex.create({
+  settingsDemo: { width: "100%", maxWidth: size.settingsBodyWidth },
   demo: {
     display: "flex",
     flexDirection: "column",

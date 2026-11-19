@@ -52,7 +52,8 @@ describe("Settings 업데이트 구역(0083)", () => {
   it("받은 새 버전이 있으면 다시 시작과 바뀐 내용을 보인다", () => {
     const html = render(view({ check: { kind: "ready", version: "0.3.0", notesUrl: NOTES } }));
     expect(text(html)).toContain("새 버전 0.3.0을 받았어요. 다시 시작하면 바뀌어요");
-    expect([...html.matchAll(/data-variant="primary"/g)]).toHaveLength(1);
+    expect([...html.matchAll(/data-variant="primary"/g)]).toHaveLength(0);
+    expect(html).toMatch(/data-variant="secondary"[^>]*>다시 시작</);
     expect(html).toContain(`href="${NOTES}"`);
   });
 

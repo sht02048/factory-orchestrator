@@ -98,6 +98,9 @@
       "unavailable": "쓰지 않아요: {unavailable}",
       "others": "로그인하지 않았어요: {signedOut}. 쓰지 않아요: {unavailable}",
       "privacy": "계정 정보는 저장하지 않아요."
-    }
+    },
+    "edit": "고치기",
+    "editLabel": "{name} 러너 고치기",
+    "unsavedBlocked": "고친 값을 저장하지 않았어요. 저장하거나 닫아 주세요. 버리고 옮기려면 한 번 더 누르면 돼요."
   }
 }
