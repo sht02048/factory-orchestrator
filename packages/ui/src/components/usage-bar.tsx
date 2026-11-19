@@ -51,7 +51,7 @@ const styles = stylex.create({
     height: 6,
     overflow: "hidden",
     borderRadius: radius.full,
-    backgroundColor: colors.idleSoft,
+    backgroundColor: colors.meterTrack,
   },
   indicator: {
     height: "100%",

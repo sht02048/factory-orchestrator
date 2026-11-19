@@ -32,7 +32,7 @@
 |      | `bgControl`, `bgControlHover`                                     | 보조·위험 버튼 바탕과 그 hover                                          |
 | 선   | `borderSubtle`                                                    | 구역·행 사이 선. 가장 많이 쓴다                                         |
 |      | `borderDefault`, `borderStrong`                                   | 입력·버튼 테두리, 그 hover                                              |
-| 막대 | `meterFill`                                                       | 상태가 아닌 막대 채움(`UsageBar` 90% 미만). 무채색                      |
+| 막대 | `meterFill`, `meterTrack`                                         | 상태가 아닌 막대 채움(`UsageBar` 90% 미만)과 빈 트랙. 무채색            |
 | 글자 | `textPrimary` > `textSecondary` > `textTertiary` > `textDisabled` | 제목·값 > 본문·설명 > ID·러너·시간·머리글 > 못 쓰는 상태                |
 |      | `textOnAccent`                                                    | `accent`(노랑) 바탕 위 글자. Ink                                        |
 |      | `textOnProblem`                                                   | `problem` 바탕 위 글자(Runner Issue 개수 점)                            |
