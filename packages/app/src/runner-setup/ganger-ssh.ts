@@ -7,6 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
+import type { GangerSshAccess } from "@ganger/runner-orca";
 import { z } from "zod";
 import type { CommandRunner } from "./commands.js";
 import { failureDetail } from "./commands.js";
@@ -118,4 +119,41 @@ export function pinHostKey(knownHostsFile: string, host: string, key: PublicKey)
   });
   if (present) return;
   appendLine(knownHostsFile, `${host} ${key.type} ${key.body}`, 0o600);
+}
+
+export function replaceHostKey(knownHostsFile: string, host: string, key: PublicKey): void {
+  mkdirSync(dirname(knownHostsFile), { recursive: true, mode: 0o700 });
+  const kept = keyLines(knownHostsFile).filter((line) => {
+    if (line.trim() === "") return false;
+    const [hosts] = line.split(/\s+/);
+    return hosts?.split(",").includes(host) !== true;
+  });
+  writeFileSync(knownHostsFile, [...kept, `${host} ${key.type} ${key.body}`, ""].join("\n"), {
+    mode: 0o600,
+  });
+  chmodSync(knownHostsFile, 0o600);
+}
+
+export function publicKeyLineOf(key: PublicKey): string {
+  return `${key.type} ${key.body} ganger`;
+}
+
+export interface GangerSsh {
+  publicKey(): Promise<KeyResult>;
+  pinHostKey(host: string, key: PublicKey): GangerSshAccess;
+}
+
+export function localGangerSsh(gangerHome: string, run: CommandRunner): GangerSsh {
+  const paths = gangerSshPaths(gangerHome);
+  return {
+    publicKey: () => ensureGangerSshKey(paths, run),
+    pinHostKey(host, key) {
+      replaceHostKey(paths.knownHostsFile, host, key);
+      return {
+        kind: "ganger",
+        identityFile: paths.identityFile,
+        knownHostsFile: paths.knownHostsFile,
+      };
+    },
+  };
 }
