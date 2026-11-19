@@ -1,5 +1,5 @@
 ---
-status: doing
+status: done
 blocked_by: []
 ---
 
@@ -40,6 +40,8 @@ Runners 목록과 상세 패널을 시안 U8대로 다시 그려, 러너 상태�
 
 - 컴포넌트 시험: `UsageMeter`(이름·% 한 줄, 막대 아래, meter 이름·값), `PanelSection`(이름 붙은 section, meta 위치)(`packages/ui/src/components.test.tsx`).
 - 화면 시험(`apps/web/src/runners/runners-screen.test.tsx`): 열 머리, 행의 자리 칸과 "n/m", 사용량 한 줄 + 막대, 읽지 못함 한 줄, 문제 이유 색, 패널 순서, 블록 머리의 읽은 시각·통과 수, 확인 상태 낱말 칸, 초기화 시각이 지난 100% 창.
+- 쓰지 않는 공급자 이름은 접은 한 줄에 함께 쓴다("로그인하지 않았어요: Codex. 쓰지 않아요: Gemini 및 Antigravity"). 목록 폭이 600px 밑이라 열 머리를 숨기면 사용량 위에 "가장 높은 사용량"을 보인다. 확인 상태 낱말 unknown은 72px 칸에 맞게 "모르겠어요"로 줄였다.
+- `/ds` 사용량 미리보기에 두 새 컴포넌트를 더했다(`page.test.tsx`가 내보내는 컴포넌트마다 미리보기를 요구한다, 코디네이터 허락).
 - 브라우저 시험(`e2e/src/runners.test.ts`): 1280px에서 행의 세 칸이 열 머리와 같은 x에서 시작하고 목록이 900px를 넘지 않는다. 패널의 창 막대와 확인 항목 이름이 같은 x에서 시작한다. 400px에서 가로로 넘치지 않는다.
 - 스크린숏: Runners 1728px·1280px 전·뒤(문제 러너·한도 러너·정상 러너가 함께), 좁은 폭(800px) 한 장.
 - 마무리 리뷰: `better-interface`로 1728·1280·1100·800·400px을 띄워 리뷰하고 HIGH·MEDIUM을 고친다. 고친 뒤 `interface-review`로 Introduced·Regression이 0인지 확인한다. 두 리뷰의 표를 PR 본문에 붙인다.
