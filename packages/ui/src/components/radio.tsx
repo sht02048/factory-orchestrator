@@ -2,8 +2,15 @@ import * as stylex from "@stylexjs/stylex";
 import type { KeyboardEventHandler, ReactNode } from "react";
 import { colors, lineHeight, radius, space } from "../tokens.stylex";
 
-export function RadioGroup({ children }: { children: ReactNode }) {
-  return <div {...stylex.props(styles.group)}>{children}</div>;
+export function RadioGroup({ labelledBy, children }: { labelledBy?: string; children: ReactNode }) {
+  return (
+    <div
+      {...(labelledBy === undefined ? {} : { role: "radiogroup", "aria-labelledby": labelledBy })}
+      {...stylex.props(styles.group)}
+    >
+      {children}
+    </div>
+  );
 }
 
 export interface RadioOptionProps {
@@ -12,6 +19,7 @@ export interface RadioOptionProps {
   checked: boolean;
   onCheck: () => void;
   onKeyDown?: KeyboardEventHandler<HTMLInputElement>;
+  disabled?: boolean;
   children: ReactNode;
 }
 
@@ -21,16 +29,18 @@ export function RadioOption({
   checked,
   onCheck,
   onKeyDown,
+  disabled = false,
   children,
 }: RadioOptionProps) {
   return (
-    <label {...stylex.props(styles.option)}>
+    <label {...stylex.props(styles.option, disabled && styles.disabled)}>
       <input
         type="radio"
         name={name}
         value={value}
         checked={checked}
         onChange={onCheck}
+        disabled={disabled}
         {...(onKeyDown === undefined ? {} : { onKeyDown })}
         {...stylex.props(styles.radio)}
       />
@@ -56,6 +66,11 @@ const styles = stylex.create({
     },
     color: colors.textPrimary,
     cursor: "pointer",
+  },
+  disabled: {
+    backgroundColor: "transparent",
+    color: colors.textDisabled,
+    cursor: "default",
   },
   radio: {
     flexShrink: 0,

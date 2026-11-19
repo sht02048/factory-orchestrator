@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   AppFrame,
   Button,
+  CheckTick,
+  RadioGroup,
   Chip,
   CodeBlock,
   ScrollRegion,
@@ -107,6 +109,32 @@ describe("칩·링크·코드(티켓 0074)", () => {
     expect(html).toMatch(/^<button[^>]*aria-label="러너 조건 지우기"[^>]*data-variant="secondary"/);
     expect(html).toContain(">러너: a<svg");
     expect(renderToString(<Chip strong>필수</Chip>)).toMatch(/^<span class="[^"]+">필수<\/span>$/);
+  });
+
+  it("RadioGroup 에 labelledBy 를 주면 그 제목을 이름으로 가진 radiogroup 이고, 주지 않으면 그대로다", () => {
+    expect(renderToString(<RadioGroup labelledBy="q-title">a</RadioGroup>)).toMatch(
+      /^<div role="radiogroup" aria-labelledby="q-title" class="[^"]+">a<\/div>$/,
+    );
+    expect(renderToString(<RadioGroup>a</RadioGroup>)).toMatch(/^<div class="[^"]+">a<\/div>$/);
+  });
+
+  it("Chip tone=accent 는 기본 칩과 다른 강조 면을 입고, 기본 칩은 그대로다", () => {
+    const plain = renderToString(<Chip>선택</Chip>);
+    const accent = renderToString(<Chip tone="accent">직접 해요</Chip>);
+    const classOf = (html: string) => /class="([^"]+)"/.exec(html)?.[1] ?? "";
+    expect(classOf(accent)).not.toBe(classOf(plain));
+    expect(classOf(accent).split(" ")).toEqual(
+      expect.arrayContaining(classOf(plain).split(" ").slice(0, 2)),
+    );
+  });
+
+  it("CheckTick running 은 이름을 가진 진행 표시이고 끝나면 체크로 바뀐다", () => {
+    const running = renderToString(<CheckTick done={false} running label="진행 중" />);
+    const waiting = renderToString(<CheckTick done={false} label="아직이에요" />);
+    const done = renderToString(<CheckTick done running label="완료" />);
+    expect(running).toMatch(/^<span role="img" aria-label="진행 중" class="[^"]+"><\/span>$/);
+    expect(/class="([^"]+)"/.exec(running)?.[1]).not.toBe(/class="([^"]+)"/.exec(waiting)?.[1]);
+    expect(done).toContain("<svg");
   });
 
   it("TextLink 는 바깥 링크면 새 탭으로 연다", () => {

@@ -22,3 +22,5 @@ export function getSecretBox(): SecretBox {
   secretBox ??= new SecretBox(parseBootConfig(process.env).encryptionKey);
   return secretBox;
 }
+
+export { getThisMac } from "./browser/fake-adapters.js";

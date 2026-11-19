@@ -47,10 +47,12 @@ import type {
   UsageWindowView,
 } from "@ganger/app/runners/model";
 
+export const ADD_RUNNER_SELECTION = "new";
+
 export function addRunnerHref(ws: string | undefined): string {
   const search = new URLSearchParams(ws === undefined ? {} : { ws });
-  search.set("sel", "runners");
-  return `/settings?${search.toString()}`;
+  search.set("sel", ADD_RUNNER_SELECTION);
+  return `/runners?${search.toString()}`;
 }
 
 export interface RunnerActions {
@@ -64,19 +66,28 @@ export interface RunnersScreenProps {
   ws: string | undefined;
   onSelect: (id: string) => void;
   actions: RunnerActions;
+  setup?: ReactNode;
 }
 
-export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: RunnersScreenProps) {
+export function RunnersScreen({
+  page,
+  selectedId,
+  ws,
+  onSelect,
+  actions,
+  setup,
+}: RunnersScreenProps) {
   const t = useTranslations("runners");
   const runners = problemRunnersFirst(page.runners);
   const issues = runners.filter((r) => runnerRowStatus(r) !== "online").length;
   const available = runners.filter(
     (r) => runnerRowStatus(r) === "online" && r.occupying.length < r.capacity,
   ).length;
-  const selected = runners.find((r) => r.id === selectedId) ?? runners[0];
+  const adding = selectedId === ADD_RUNNER_SELECTION && setup !== undefined;
+  const selected = adding ? undefined : (runners.find((r) => r.id === selectedId) ?? runners[0]);
 
   useEffect(() => {
-    if (selectedId === undefined) return;
+    if (selectedId === undefined || selectedId === ADD_RUNNER_SELECTION) return;
     const option = document.getElementById(rowMarkerId(selectedId))?.closest('[role="option"]');
     if (!(option instanceof HTMLElement) || option.contains(document.activeElement)) return;
     option.scrollIntoView({ block: "nearest" });
@@ -129,8 +140,15 @@ export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: Runne
         </div>
       }
       panel={
-        <section aria-label={t("panel.label")}>
-          {selected === undefined ? (
+        <section aria-label={adding ? t("add") : t("panel.label")}>
+          {adding ? (
+            <DetailPanel>
+              <div {...stylex.props(styles.setup)}>
+                <Text variant="heading">{t("add")}</Text>
+                {setup}
+              </div>
+            </DetailPanel>
+          ) : selected === undefined ? (
             <DetailPanel>
               {runners.length === 0 ? null : <Text variant="meta">{t("panel.empty")}</Text>}
             </DetailPanel>
@@ -745,6 +763,7 @@ function runHref(workspaceId: string, runId: string): string {
 }
 
 const styles = stylex.create({
+  setup: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
   listColumn: { minWidth: 0 },
   rowHead: {
     display: "flex",

@@ -7,10 +7,21 @@ import { colors, fontSize, fontWeight, radius, space } from "../tokens.stylex";
 export interface ChipProps {
   children: ReactNode;
   strong?: boolean;
+  tone?: "accent";
 }
 
-export function Chip({ children, strong }: ChipProps) {
-  return <span {...stylex.props(styles.chip, strong === true && styles.strong)}>{children}</span>;
+export function Chip({ children, strong, tone }: ChipProps) {
+  return (
+    <span
+      {...stylex.props(
+        styles.chip,
+        strong === true && styles.strong,
+        tone === "accent" && styles.accent,
+      )}
+    >
+      {children}
+    </span>
+  );
 }
 
 export interface RemovableChipProps {
@@ -39,4 +50,5 @@ const styles = stylex.create({
     fontWeight: fontWeight.medium,
   },
   strong: { color: colors.textPrimary },
+  accent: { backgroundColor: colors.accentSoft, color: colors.accentText },
 });

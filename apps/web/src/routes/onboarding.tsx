@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
@@ -7,7 +7,10 @@ import { onboardingMessages } from "../onboarding/messages";
 import { HOME_PATH, ONBOARDING_PATH, resolveStep, stepToPin } from "../onboarding/model";
 import { OnboardingScreen } from "../onboarding/onboarding-screen";
 import type { OnboardingActions } from "../onboarding/onboarding-screen";
+import type { DirectEntry } from "../runner-setup/runner-setup";
 import { getOnboardingPage, setUpWorkspace } from "../server/onboarding-functions";
+import { runnerSetupMessages } from "../runner-setup/messages";
+import { useRunnerSetupActions } from "../runner-setup/use-runner-setup-actions";
 import { useReloadOnSuccess, useSettingsActions } from "../settings/use-settings-actions";
 
 const t = createTranslator({
@@ -17,7 +20,10 @@ const t = createTranslator({
 });
 
 export const Route = createFileRoute("/onboarding")({
-  validateSearch: z.object({ step: z.number().int().optional().catch(undefined) }),
+  validateSearch: z.object({
+    step: z.number().int().optional().catch(undefined),
+    direct: z.boolean().optional().catch(undefined),
+  }),
   loaderDeps: ({ search }) => ({ step: search.step }),
   loader: async ({ deps }) => {
     const loaded = await getOnboardingPage({
@@ -35,20 +41,39 @@ export const Route = createFileRoute("/onboarding")({
 
 function OnboardingRoute() {
   const { page, trackerProjects } = Route.useLoaderData();
-  const { step } = Route.useSearch();
+  const search = Route.useSearch();
+  const { step } = search;
   const navigate = Route.useNavigate();
+  const router = useRouter();
+  const direct = useMemo(
+    (): DirectEntry => ({
+      open: search.direct === true,
+      openHref: router.buildLocation({ to: ONBOARDING_PATH, search: { ...search, direct: true } })
+        .href,
+      closeHref: router.buildLocation({
+        to: ONBOARDING_PATH,
+        search: { ...search, direct: undefined },
+      }).href,
+      onChange: (open) => {
+        void navigate({ search: (prev) => ({ ...prev, direct: open ? true : undefined }) });
+      },
+    }),
+    [router, navigate, search],
+  );
   const settingsActions = useSettingsActions();
   const then = useReloadOnSuccess();
+  const setupActions = useRunnerSetupActions();
   const actions = useMemo(
     (): OnboardingActions => ({
       ...settingsActions,
+      ...setupActions,
       setUpWorkspace: then((data) => setUpWorkspace({ data })),
     }),
-    [settingsActions, then],
+    [settingsActions, setupActions, then],
   );
 
   return (
-    <ScreenMessages messages={onboardingMessages}>
+    <ScreenMessages messages={{ ...onboardingMessages, ...runnerSetupMessages }}>
       <OnboardingScreen
         page={page}
         trackerProjects={trackerProjects}
@@ -60,6 +85,7 @@ function OnboardingRoute() {
           void navigate({ to: HOME_PATH });
         }}
         actions={actions}
+        direct={direct}
       />
     </ScreenMessages>
   );

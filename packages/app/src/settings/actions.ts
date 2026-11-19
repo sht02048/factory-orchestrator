@@ -372,7 +372,7 @@ export function saveRunnerSetting(
       kind: existing?.kind ?? RUNNER_KIND,
       name: input.name,
       config: {
-        ...looseConfig(existing?.config),
+        ...configKeepingAccessFor(existing?.config, input.sshTarget),
         sshTarget: input.sshTarget,
         orcaPath: input.orcaPath,
       },
@@ -387,6 +387,11 @@ export function saveRunnerSetting(
 function looseConfig(config: unknown): Record<string, unknown> {
   const parsed = z.record(z.string(), z.unknown()).safeParse(config);
   return parsed.success ? parsed.data : {};
+}
+
+function configKeepingAccessFor(config: unknown, sshTarget: string): Record<string, unknown> {
+  const { access, ...rest } = looseConfig(config);
+  return rest["sshTarget"] === sshTarget && access !== undefined ? { ...rest, access } : rest;
 }
 
 export const runnerCapacityInput = z.object({ id, capacity });

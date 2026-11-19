@@ -15,6 +15,7 @@
     "@ganger/codehost-github": "workspace:*",
     "@ganger/core": "workspace:*",
     "@ganger/db": "workspace:*",
+    "@ganger/runner-orca": "workspace:*",
     "@ganger/tracker-linear": "workspace:*",
     "@ganger/ui": "workspace:*",
     "@stylexjs/stylex": "0.19.2",
