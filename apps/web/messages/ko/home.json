@@ -78,8 +78,7 @@
     "resumeFailed": "재개하지 못했어요. {reason}",
     "menu": "{key} 런 메뉴",
     "pause": "멈추기",
-    "resume": "재개하기",
-    "pausedFor": "{elapsed} 멈춰 있어요"
+    "resume": "재개하기"
   },
   "sheet": {
     "title": "{key} {title}",
@@ -107,7 +106,7 @@
     "runner": "러너",
     "noRunner": "아직 없어요",
     "agent": "에이전트",
-    "paused": "운영자가 멈춘 런이에요. 워크트리와 러너 자리는 그대로 두고, 최대 실행 시간도 멈춰 있어요. 재개하면 같은 자리에서 이어서 해요."
+    "paused": "운영자가 멈춰 둔 런이에요. 워크트리와 러너 자리는 그대로 두고, 최대 실행 시간도 멈춰 있어요. 재개하면 같은 자리에서 이어서 해요."
   },
   "question": {
     "other": "직접 쓰기",
@@ -133,9 +132,11 @@
   },
   "control": {
     "pauseRequested": "{key} 런을 멈추고 있어요.",
-    "resumeRequested": "{key} 런을 이어서 하고 있어요.",
+    "resumeRequested": "{key} 런을 재개하고 있어요.",
     "pauseRejected": "{key} 런을 멈추지 못했어요. 잠시 뒤 다시 해 주세요.",
     "resumeRejected": "{key} 런을 재개하지 못했어요. 잠시 뒤 다시 해 주세요.",
-    "stateChanged": "{key} 런의 상태가 그사이 바뀌었어요. 지금 상태를 확인해 주세요."
+    "stateChanged": "{key} 런의 상태가 그사이 바뀌었어요. 지금 상태를 확인해 주세요.",
+    "pauseFailed": "{key} 런을 멈추지 못했어요. {reason}",
+    "resumeFailed": "{key} 런을 재개하지 못했어요. {reason}"
   }
 }

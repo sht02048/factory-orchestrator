@@ -37,6 +37,7 @@ export interface KanbanCardProps {
   tag?: ReactNode;
   title: ReactNode;
   detail?: ReactNode;
+  detailTone?: "problem";
   meta?: ReactNode;
   time?: ReactNode;
   action?: ReactNode;
@@ -51,6 +52,7 @@ export function KanbanCard({
   tag,
   title,
   detail,
+  detailTone,
   meta,
   time,
   action,
@@ -104,7 +106,14 @@ export function KanbanCard({
           {title}
         </span>
         {detail === undefined ? null : (
-          <span id={detailId} {...stylex.props(textStyles("ui"), styles.detail)}>
+          <span
+            id={detailId}
+            {...stylex.props(
+              textStyles("ui"),
+              styles.detail,
+              detailTone === "problem" && styles.detailProblem,
+            )}
+          >
             {detail}
           </span>
         )}
@@ -197,6 +206,7 @@ const styles = stylex.create({
   selected: { boxShadow: `inset 0 0 0 1px ${colors.borderSelected}` },
   tag: { display: "flex", paddingBottom: space.s1 },
   title: { display: "block", minWidth: 0, overflowWrap: "anywhere" },
+  detailProblem: { color: colors.problem },
   detail: {
     display: "-webkit-box",
     minWidth: 0,

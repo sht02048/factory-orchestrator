@@ -602,6 +602,14 @@ describe("서버 렌더", () => {
     expect(trigger).not.toBeNull();
     expect(trigger?.[0]).toContain('aria-haspopup="menu"');
     expect(html.slice(openEnd)).not.toContain('d="M4 6l4 4 4-4"');
+
+    const plain = renderToString(<KanbanCard title="ACME-1" detail="설명" onOpen={noop} />);
+    const problem = renderToString(
+      <KanbanCard title="ACME-1" detail="멈추지 못했어요" detailTone="problem" onOpen={noop} />,
+    );
+    const classOf = (rendered: string, word: string) =>
+      new RegExp(`class="([^"]*)"[^>]*>${word}<`).exec(rendered)?.[1];
+    expect(classOf(problem, "멈추지 못했어요")).not.toBe(classOf(plain, "설명"));
   });
 
   it("Sheet 는 닫혀 있으면 아무것도 그리지 않는다(티켓 0100)", () => {

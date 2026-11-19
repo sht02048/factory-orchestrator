@@ -16,6 +16,7 @@ export type SheetMode = "summary" | "answer";
 
 interface CardParts {
   detail?: ReactNode;
+  detailTone?: "problem";
   meta?: ReactNode;
   time?: ReactNode;
   action?: ReactNode;
@@ -92,6 +93,7 @@ function useCardParts(
           detail: t(run.control.control === "pause" ? "pauseFailed" : "resumeFailed", {
             reason: tDomain(`runControlFailure.${run.control.reason}`),
           }),
+          detailTone: "problem" as const,
         }
       : {};
   const workspace = all ? ` · ${run.workspace.name}` : "";
@@ -123,9 +125,7 @@ function useCardParts(
       return {
         ...failed,
         meta: runner,
-        ...(run.pausedMs === null
-          ? {}
-          : { time: t("pausedFor", { elapsed: elapsed(run.pausedMs) }) }),
+        ...(run.pausedMs === null ? {} : { time: elapsed(run.pausedMs) }),
         ...(available === "resume"
           ? {
               action: (

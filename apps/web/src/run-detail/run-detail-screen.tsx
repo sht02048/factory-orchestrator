@@ -18,6 +18,7 @@ import {
   focusStyles,
   linkStyles,
   NoticeLayout,
+  showToast,
   textStyles,
 } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
@@ -138,7 +139,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
             </Actions>
           )}
         </div>
-        {run.control?.status === "failed" ? <ControlFailed control={run.control} /> : null}
+        <ControlFailed control={run.control} />
         <Text variant="meta">
           {[
             ...(run.ticketTitle === null ? [] : [run.ticketKey]),
@@ -566,7 +567,7 @@ function ControlRun({
 }) {
   const t = useTranslations("run.control");
   const domain = useTranslations("domain");
-  const [state, setState] = useState<"idle" | "sending" | "changed" | "failed">("idle");
+  const [state, setState] = useState<"idle" | "sending" | "failed">("idle");
   return (
     <>
       <Button
@@ -576,7 +577,10 @@ function ControlRun({
           setState("sending");
           onControl(control).then(
             (outcome) => {
-              setState(outcome === "requested" ? "idle" : "changed");
+              setState("idle");
+              if (outcome === "state-changed") {
+                showToast(domain("runControlFailure.state-changed"));
+              }
               focusAfter();
             },
             () => setState("failed"),
@@ -586,23 +590,20 @@ function ControlRun({
         {t(control)}
       </Button>
       {state === "failed" ? <ActionFailed /> : null}
-      {state === "changed" ? (
-        <Text variant="ui" as="p" tone="problem" role="alert">
-          {domain("runControlFailure.state-changed")}
-        </Text>
-      ) : null}
     </>
   );
 }
 
-function ControlFailed({ control }: { control: Extract<RunControlView, { status: "failed" }> }) {
+function ControlFailed({ control }: { control: RunControlView | null }) {
   const t = useTranslations("run.control");
   const domain = useTranslations("domain");
   return (
-    <Text variant="ui" as="p" tone="problem">
-      {t(control.control === "pause" ? "pauseFailed" : "resumeFailed", {
-        reason: domain(`runControlFailure.${control.reason}`),
-      })}
+    <Text variant="ui" as="p" tone="problem" role="status">
+      {control?.status === "failed"
+        ? t(control.control === "pause" ? "pauseFailed" : "resumeFailed", {
+            reason: domain(`runControlFailure.${control.reason}`),
+          })
+        : null}
     </Text>
   );
 }

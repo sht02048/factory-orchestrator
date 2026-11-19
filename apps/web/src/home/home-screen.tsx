@@ -106,6 +106,7 @@ export function HomeScreen({
   const [open, setOpen] = useState(false);
   const [revealedId, setRevealedId] = useState<RunId | null>(null);
   const shownRunId = useRef<RunId | undefined>(undefined);
+  useControlFailureToasts(page);
   useEffect(() => {
     if (openRunId === undefined || shownRunId.current === openRunId) return;
     if (page.workspace.kind === "none") return;
@@ -634,3 +635,25 @@ const styles = stylex.create({
   },
   reset: { margin: 0 },
 });
+
+function useControlFailureToasts(page: HomePage): void {
+  const t = useTranslations("home");
+  const domain = useTranslations("domain");
+  const pending = useRef(new Set<RunId>());
+  useEffect(() => {
+    const nowPending = new Set<RunId>();
+    for (const run of page.running) {
+      const control = run.control;
+      if (control?.status === "pending") nowPending.add(run.id);
+      if (control?.status === "failed" && pending.current.has(run.id)) {
+        showToast(
+          t(control.control === "pause" ? "control.pauseFailed" : "control.resumeFailed", {
+            key: run.ticketKey,
+            reason: domain(`runControlFailure.${control.reason}`),
+          }),
+        );
+      }
+    }
+    pending.current = nowPending;
+  }, [page, t, domain]);
+}

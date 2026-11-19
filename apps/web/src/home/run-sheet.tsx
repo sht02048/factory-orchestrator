@@ -202,13 +202,13 @@ function ControlBlock({
   return (
     <Block>
       <Text variant="body">{children}</Text>
-      {control?.status === "failed" ? (
-        <Text variant="ui" as="p" tone="problem">
-          {t(control.control === "pause" ? "card.pauseFailed" : "card.resumeFailed", {
-            reason: domain(`runControlFailure.${control.reason}`),
-          })}
-        </Text>
-      ) : null}
+      <Text variant="ui" as="p" tone="problem" role="status">
+        {control?.status === "failed"
+          ? t(control.control === "pause" ? "card.pauseFailed" : "card.resumeFailed", {
+              reason: domain(`runControlFailure.${control.reason}`),
+            })
+          : null}
+      </Text>
       <Text variant="meta" as="p" ref={statusRef} role="status" tabIndex={-1}>
         {pending}
       </Text>
