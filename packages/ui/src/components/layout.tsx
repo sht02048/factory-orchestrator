@@ -73,7 +73,11 @@ export function PageHeader({ title, subtitle, lead, actions }: PageHeaderProps) 
       )}
       <div {...stylex.props(styles.pageHeading)}>
         <h1 {...stylex.props(styles.pageTitle)}>{title}</h1>
-        {subtitle === undefined ? null : <p {...stylex.props(styles.pageSub)}>{subtitle}</p>}
+        {subtitle === undefined ? null : (
+          <p {...windowRegion("no-drag")} {...stylex.props(styles.pageSub)}>
+            {subtitle}
+          </p>
+        )}
       </div>
       {actions === undefined ? null : (
         <div {...windowRegion("no-drag")} {...stylex.props(styles.pageActions)}>

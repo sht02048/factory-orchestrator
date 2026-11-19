@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
-import { Toaster, WindowChrome, documentStyles } from "@ganger/ui";
+import { Toaster, WindowChrome, WindowDragFrame, documentStyles } from "@ganger/ui";
 import {
+  ErrorComponent,
   HeadContent,
   Outlet,
   Scripts,
@@ -8,9 +9,12 @@ import {
   redirect,
   rootRouteId,
   useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
+import type { ErrorComponentProps } from "@tanstack/react-router";
+import { z } from "zod";
 import { IntlProvider, useTranslations } from "use-intl";
 import { appMessages, defaultLocale, t } from "../i18n";
 import { NotFoundScreen } from "../not-found/not-found-screen";
@@ -53,6 +57,7 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
   component: RootLayout,
   notFoundComponent: NotFoundScreen,
+  errorComponent: RootError,
 });
 
 function RootDocument({ children }: { children: ReactNode }) {
@@ -67,6 +72,22 @@ function RootDocument({ children }: { children: ReactNode }) {
         <Scripts />
       </body>
     </html>
+  );
+}
+
+const rootLoaderSchema = z.object({ titleBarHidden: z.boolean() });
+
+function RootError({ error }: ErrorComponentProps) {
+  const titleBarHidden = useRouterState({
+    select: (state) =>
+      rootLoaderSchema.safeParse(state.matches[0]?.loaderData).data?.titleBarHidden ?? false,
+  });
+  return (
+    <WindowChrome titleBarHidden={titleBarHidden}>
+      <WindowDragFrame>
+        <ErrorComponent error={error} />
+      </WindowDragFrame>
+    </WindowChrome>
   );
 }
 

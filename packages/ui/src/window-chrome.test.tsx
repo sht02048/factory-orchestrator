@@ -69,8 +69,9 @@ describe("앱 셸과 창 제목 표시줄(0113)", () => {
     expect(html).toMatch(/<header data-app-region="drag"/);
   });
 
-  it("머리 줄 안의 링크·버튼은 끌기에서 뺀다", () => {
+  it("머리 줄 안의 링크·버튼과 요약 글은 끌기에서 빼 누르고 고를 수 있다", () => {
     const html = inWindow(true, shell());
+    expect(html).toMatch(/<p data-app-region="no-drag"[^>]*>러너 3대 모두 문제가 없어요.<\/p>/);
     expect(html).toMatch(/<div data-app-region="no-drag"[^>]*><a href="\/runs">Runs<\/a><\/div>/);
     expect(html).toMatch(
       /<div data-app-region="no-drag"[^>]*><a href="\/runners\/new">러너 추가<\/a><\/div><\/header>/,
