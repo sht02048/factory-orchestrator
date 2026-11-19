@@ -325,9 +325,6 @@ function RemoveRow({
 
 const styles = stylex.create({
   mapping: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s3,
     paddingBlock: space.s4,
     paddingInline: { default: space.s5, [breakpoints.settingsRowStacked]: space.s4 },
   },
