@@ -1,4 +1,5 @@
 import type { WorkspaceId } from "@ganger/db";
+import type { McpActionView } from "../mcp/actions.js";
 import type { McpLaunch } from "./mcp-launch.js";
 
 export const WORKSPACE_ITEMS = ["general", "projects", "mapping", "progress", "label"] as const;
@@ -125,13 +126,20 @@ export interface PowerView {
   preventSleep: boolean;
 }
 
+export interface McpView {
+  launch: McpLaunch;
+  writeAllowed: boolean;
+  recent: McpActionView[];
+  now: string;
+}
+
 export interface InstallSettings {
   connections: TrackerConnectionView[];
   githubToken: boolean;
   runners: RunnerSettingsView[];
   addresses: AddressesView;
   power: PowerView;
-  mcp: McpLaunch;
+  mcp: McpView;
 }
 
 export interface SettingsPage {

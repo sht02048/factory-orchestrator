@@ -22,7 +22,9 @@ import {
   saveCodeHostConnection,
   saveInstallAddresses,
   saveMapping,
+  saveMcpWriteAllowed,
   saveRunner,
+  saveRunnerCapacity,
   saveTrackerConnection,
   saveWorkspace,
   saveWorkspaceTrackerProject,
@@ -338,6 +340,9 @@ async function checkWith<C extends { ok: true }>(
   }
 }
 
+export const RUNNER_CAPACITY_MAX = 100;
+const capacity = z.number().int().min(1).max(RUNNER_CAPACITY_MAX);
+
 export const runnerInput = z.object({
   id: id.optional(),
   name,
@@ -348,7 +353,7 @@ export const runnerInput = z.object({
     .max(500)
     .regex(/^[^-\s\p{Cc}][^\s\p{Cc}]*$/u),
   orcaPath: z.string().trim().min(1).max(1000),
-  capacity: z.number().int().min(1).max(100),
+  capacity,
 });
 
 export function saveRunnerSetting(
@@ -382,6 +387,17 @@ export function saveRunnerSetting(
 function looseConfig(config: unknown): Record<string, unknown> {
   const parsed = z.record(z.string(), z.unknown()).safeParse(config);
   return parsed.success ? parsed.data : {};
+}
+
+export const runnerCapacityInput = z.object({ id, capacity });
+
+export function saveRunnerCapacitySetting(
+  context: SettingsContext,
+  input: z.infer<typeof runnerCapacityInput>,
+): SaveResult<"not-found"> {
+  return saveRunnerCapacity(context.db, toRunnerId(input.id), input.capacity)
+    ? { ok: true }
+    : { ok: false, reason: "not-found" };
 }
 
 export const runnerIdInput = z.object({ id });
@@ -454,5 +470,16 @@ export function savePowerSetting(
 ): SaveResult<"unavailable"> {
   if (context.power === undefined) return { ok: false, reason: "unavailable" };
   context.power.write({ preventSleep: input.preventSleep });
+  return { ok: true };
+}
+
+export const mcpWriteInput = z.object({ allowed: z.boolean() });
+
+export function saveMcpWriteSetting(
+  context: SettingsContext,
+  input: z.infer<typeof mcpWriteInput>,
+  now: Date,
+): SaveResult {
+  saveMcpWriteAllowed(context.db, input.allowed, now);
   return { ok: true };
 }

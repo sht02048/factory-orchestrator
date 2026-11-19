@@ -44,8 +44,9 @@ import {
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { prerequisiteHint } from "@ganger/app/prerequisites";
+import { isMcpRejectReason, isMcpWriteTool } from "@ganger/app/mcp/actions";
+import type { McpActionView } from "@ganger/app/mcp/actions";
 import { hermesConfig, jsonConfig } from "@ganger/app/settings/mcp-launch";
-import type { McpLaunch } from "@ganger/app/settings/mcp-launch";
 import { useAgentName, usePrerequisiteName } from "../labels";
 import { browserClipboard, copyText } from "./clipboard";
 import { useStatusName } from "../status";
@@ -62,6 +63,7 @@ import type {
   Choice,
   ConnectionLabel,
   ConnectionProjects,
+  McpView,
   PowerView,
   PrerequisiteView,
   RunnerCheckView,
@@ -117,6 +119,7 @@ export interface SettingsActions {
   recheckRunner: (input: { id: string }) => Promise<ActionResult>;
   saveAddresses: (input: { webAddress: string; webhookAddress: string }) => Promise<ActionResult>;
   savePower: (input: { preventSleep: boolean }) => Promise<ActionResult>;
+  saveMcpWrite: (input: { allowed: boolean }) => Promise<ActionResult>;
   pollRunnerChecks: () => Promise<boolean>;
 }
 
@@ -387,7 +390,7 @@ function InstallSummary({ item, page }: { item: SettingsItem; page: SettingsPage
       return preventSleep ? t("powerOn") : t("powerOff");
     }
     case "mcp":
-      return t("mcp");
+      return page.install.mcp.writeAllowed ? t("mcpWrite") : t("mcpRead");
     case "general":
     case "projects":
     case "mapping":
@@ -431,7 +434,7 @@ function ItemPanel({
     case "power":
       return <PowerPanel power={page.install.power} actions={actions} />;
     case "mcp":
-      return <McpPanel launch={page.install.mcp} />;
+      return <McpPanel mcp={page.install.mcp} actions={actions} />;
     case "general":
     case "projects":
     case "mapping":
@@ -1317,14 +1320,15 @@ function AddressesPanel({
   );
 }
 
-function McpPanel({ launch }: { launch: McpLaunch }) {
+function McpPanel({ mcp, actions }: { mcp: McpView; actions: SettingsActions }) {
   const t = useTranslations("settings.mcp");
+  const { launch } = mcp;
   return (
     <>
       <PanelBlock>
         <ul {...stylex.props(textStyles("ui"), styles.bullets)}>
           <li>{t("intro")}</li>
-          <li>{t("readOnly")}</li>
+          <li>{t("secrets")}</li>
           <li>{t("external")}</li>
           {launch.located ? null : <li>{t("notLocated")}</li>}
         </ul>
@@ -1335,7 +1339,100 @@ function McpPanel({ launch }: { launch: McpLaunch }) {
         text={hermesConfig(launch)}
       />
       <McpSnippet name={t("json")} description={t("jsonDescription")} text={jsonConfig(launch)} />
+      <McpWriteForm allowed={mcp.writeAllowed} actions={actions} />
+      <McpRecent recent={mcp.recent} now={mcp.now} />
     </>
+  );
+}
+
+function McpWriteForm({ allowed, actions }: { allowed: boolean; actions: SettingsActions }) {
+  const t = useTranslations("settings.mcp");
+  const ts = useTranslations("settings");
+  const [checked, setChecked] = useState(allowed);
+  const [submitted, setSubmitted] = useState(allowed);
+  const submit = useSubmit();
+  useReportUnsaved(checked !== submitted);
+  return (
+    <PanelBlock title={t("writeTitle")}>
+      <form
+        {...stylex.props(styles.form)}
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit.run(
+            () => actions.saveMcpWrite({ allowed: checked }),
+            ts("saved"),
+            () => setSubmitted(checked),
+          );
+        }}
+      >
+        <ul {...stylex.props(textStyles("ui"), styles.bullets)}>
+          <li>{t("writeBlocked")}</li>
+          <li>{t("writeRisk")}</li>
+        </ul>
+        <Checkbox
+          name="mcpWriteAllowed"
+          label={t("writeToggle")}
+          description={t("writeToggleDescription")}
+          checked={checked}
+          onCheckedChange={setChecked}
+        />
+        <SubmitError state={submit.state} />
+        <Actions>
+          <Button variant="primary" type="submit" disabled={submit.sending}>
+            {submit.sending ? ts("saving") : t("save")}
+          </Button>
+        </Actions>
+      </form>
+    </PanelBlock>
+  );
+}
+
+function McpRecent({ recent, now }: { recent: ReadonlyArray<McpActionView>; now: string }) {
+  const t = useTranslations("settings.mcp");
+  const { stamp } = useTime();
+  const toolName = (tool: string): string => (isMcpWriteTool(tool) ? t(`tool.${tool}`) : tool);
+  return (
+    <PanelBlock title={t("recentTitle")}>
+      <div {...stylex.props(styles.snippet)}>
+        <Text variant="ui" as="p" tone="muted">
+          {t("recentNote")}
+        </Text>
+        {recent.length === 0 ? (
+          <Text variant="meta">{t("recentEmpty")}</Text>
+        ) : (
+          <DividedList>
+            {recent.map((action, index) => (
+              <DividedItem key={`${action.at}-${index}`}>
+                <div {...stylex.props(styles.row)}>
+                  <span {...stylex.props(styles.rowText)}>
+                    <Text variant="ui" tone="strong">
+                      {t("actor", { client: action.client })}
+                    </Text>
+                    <Text variant="meta">
+                      {t("detail", {
+                        tool: toolName(action.tool),
+                        target: action.target ?? "",
+                        hasTarget: action.target === null ? "no" : "yes",
+                      })}
+                    </Text>
+                    {action.outcome === "done" ? null : (
+                      <Text variant="meta" tone="problem">
+                        {isMcpRejectReason(action.reason)
+                          ? t("rejected", { reason: t(`reason.${action.reason}`) })
+                          : t("rejectedUnknown")}
+                      </Text>
+                    )}
+                  </span>
+                  <time dateTime={action.at} {...stylex.props(textStyles("meta"))}>
+                    {stamp(action.at, now)}
+                  </time>
+                </div>
+              </DividedItem>
+            ))}
+          </DividedList>
+        )}
+      </div>
+    </PanelBlock>
   );
 }
 

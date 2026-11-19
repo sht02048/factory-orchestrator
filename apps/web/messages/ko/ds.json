@@ -298,7 +298,13 @@
     "note": "공급자 사용량 창의 쓴 비율이에요. 90% 이상이면 빨간 막대예요.",
     "label": "사용량",
     "session": "Claude 5시간",
-    "weekly": "Claude 주간"
+    "weekly": "Claude 주간",
+    "panelTitle": "공급자 사용량",
+    "panelMeta": "3분 전 읽었어요",
+    "panelRow": "PanelRows는 Row의 안쪽 여백만큼 밖으로 내어 글자를 블록 제목 선에 맞춰요.",
+    "columnsLead": "ResponsiveColumns 행",
+    "columnsUsage": "사용량",
+    "panelBody": "UsageMeter는 이름과 %를 한 줄에 두고 막대를 아래에 둬요. PanelSection은 블록 제목 줄 끝에 숫자·시각을 둬요."
   },
   "capacityCells": {
     "title": "Runners",
@@ -380,7 +386,7 @@
       "log": "10:45 clone 시작\n10:46 의존성 설치\n10:48 시험 통과"
     },
     "dataTable": {
-      "note": "고를 수 없는 정적 표는 DataTable이에요. 카드 안 넓은 표는 framed, 작은 숫자 표는 density=\"compact\"예요.",
+      "note": "고를 수 없는 정적 표는 DataTable이에요. 카드 안 넓은 표는 framed, 작은 숫자 표는 density=\"compact\"예요. 좁은 폭에서 표만 옆으로 넘기려면 ScrollRegion에 담아요. 넘칠 때만 이름 있는 영역이 돼요.",
       "label": "매핑 미리보기",
       "project": "트래커 프로젝트",
       "runs": "런",
@@ -391,10 +397,11 @@
       "empty": "아직 비어 있어요",
       "caption": "날마다 끝난 런",
       "day": "날짜",
-      "today": "오늘"
+      "today": "오늘",
+      "scrollLabel": "옆으로 넘기는 표"
     },
     "outcomes": {
-      "note": "Stats의 결과 막대와 쌓은 막대 차트예요. 결과 색은 상태 뜻 그대로 써요.",
+      "note": "Stats의 범례·실패 이유 막대·날짜별 쌓은 막대 차트예요. 결과 막대(OutcomeBar)는 지금 화면에서 쓰지 않아요. 결과 색은 상태 뜻 그대로 써요.",
       "merged": "Merged",
       "check": "Human Check",
       "failed": "Failed",

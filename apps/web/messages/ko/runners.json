@@ -4,17 +4,24 @@
   "subtitle": "{issues, plural, =0 {러너 {total}대 모두 문제가 없어요.} other {{total}대 중 #대에 문제가 있어요.}} {available, plural, =0 {지금 새 런을 받을 수 있는 러너가 없어요.} other {#대가 지금 새 런을 받을 수 있어요.}}",
   "add": "러너 추가",
   "listLabel": "러너 목록",
-  "capacityLabel": "{name} capacity",
+  "columns": {
+    "runner": "러너",
+    "capacity": "자리",
+    "usage": "사용량(가장 높은 값)"
+  },
+  "capacityCellsLabel": "{total}자리 중 {used}자리 사용",
   "usage": {
     "name": "{provider} {window}",
     "barLabel": "{runner} {provider} {window} 사용량",
+    "highestBarLabel": "{runner} 가장 높은 사용량: {provider} {window}",
+    "highest": "가장 높은 사용량",
     "notRead": "사용량을 아직 읽지 않았어요",
     "unreadable": "사용량을 읽지 못했어요",
     "noWindows": "읽은 사용량이 없어요"
   },
   "empty": {
     "title": "등록한 러너가 없어요",
-    "body": "러너를 추가하면 여기에서 capacity와 맡은 런, 확인 항목을 볼 수 있어요."
+    "body": "러너를 추가하면 여기에서 자리와 맡은 런, 확인 항목을 볼 수 있어요."
   },
   "row": {
     "offline": "오케스트레이터가 이 러너에 닿지 않아요.",
@@ -57,19 +64,20 @@
       "failed": "확인을 요청하지 못했어요. 잠시 뒤 다시 눌러 주세요.",
       "silent": "2분이 지나도 결과가 오지 않았어요. worker가 돌고 있는지 확인하고 다시 확인해 주세요."
     },
-    "runs": "지금 하는 런 · {occupied}/{capacity}",
+    "capacity": "자리",
     "noRuns": "지금 하는 런이 없어요.",
     "queuedFor": "{duration}째 기다려요",
-    "checks": "확인 항목 · {passed}/{total} 통과",
     "checksTitle": "확인 항목",
+    "checksPassed": "{passed}/{total} 통과",
     "unreachable": "ssh로 닿지 않아요",
     "noChecks": "아직 확인하지 않았어요",
     "check": {
       "ok": "통과",
       "broken": "깨졌어요",
-      "unknown": "확인하지 못했어요"
+      "unknown": "모르겠어요"
     },
-    "leftWorktrees": "남은 워크트리 {count}",
+    "leftWorktrees": "남은 워크트리",
+    "leftWorktreesCount": "{count}개",
     "worktree": {
       "keep-until-pr-settles": "PR이 병합되거나 닫힐 때까지 남겨요",
       "operator-decides": "사람이 지워야 해요"
@@ -78,14 +86,17 @@
     "usage": {
       "title": "공급자 사용량",
       "readAgo": "{time} 읽었어요",
-      "notRead": "아직 사용량을 읽지 않았어요. 러너가 Online 이면 몇 분 안에 읽어요.",
+      "notRead": "아직 사용량을 읽지 않았어요. 러너가 Online이면 몇 분 안에 읽어요.",
       "unreadable": "사용량을 읽지 못했어요. 다음 점검 때 다시 읽어요.",
       "resetsAt": "{time}에 초기화돼요",
+      "atLimit": "한도에 닿았어요",
+      "resetsAtLimit": "{time}에 초기화돼요 · 한도에 닿았어요",
       "noWindows": "사용량 창이 없어요.",
       "error": "사용량을 읽지 못했어요.",
-      "signedOut": "로그인하지 않았어요: {providers}",
-      "unavailable": "쓰지 않는 공급자 {count}개",
-      "privacy": "계정 이메일·조직 같은 계정 정보는 저장하지 않아요. 지금 쓰는 계정의 사용량만 보여요."
+      "signedOut": "로그인하지 않았어요: {signedOut}",
+      "unavailable": "쓰지 않아요: {unavailable}",
+      "others": "로그인하지 않았어요: {signedOut}. 쓰지 않아요: {unavailable}",
+      "privacy": "계정 정보는 저장하지 않아요."
     }
   }
 }

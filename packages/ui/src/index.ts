@@ -47,6 +47,7 @@ export {
 export { Checkbox, type CheckboxProps } from "./components/checkbox";
 export { Chip, RemovableChip, type ChipProps, type RemovableChipProps } from "./components/chip";
 export { CodeBlock, type CodeBlockProps } from "./components/code-block";
+export { ScrollRegion, type ScrollRegionProps } from "./components/scroll-region";
 export {
   DataTable,
   DataTableBody,
@@ -192,4 +193,14 @@ export { RowActionSlot, TimeSlot, type TimeSlotProps } from "./components/time-s
 export { Toaster, showToast, type ToasterProps } from "./components/toast";
 export { Tooltip, type TooltipAction, type TooltipProps } from "./components/tooltip";
 export { UsageBar, usageText, type UsageBarProps, type UsageTone } from "./components/usage-bar";
+export { UsageMeter, type UsageMeterProps } from "./components/usage-meter";
+export { PanelRows, PanelSection, type PanelSectionProps } from "./components/panel-section";
+export {
+  ResponsiveColumns,
+  ResponsiveColumnsHead,
+  responsiveColumnTemplates,
+  type ResponsiveColumn,
+  type ResponsiveColumnsHeadProps,
+  type ResponsiveColumnsProps,
+} from "./components/responsive-columns";
 export { VisuallyHidden, visuallyHiddenStyles } from "./components/visually-hidden";

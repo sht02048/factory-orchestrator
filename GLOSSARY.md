@@ -217,3 +217,11 @@ _Avoid_: User, Admin
 **MCP 클라이언트**:
 Ganger가 도는 기계에서 MCP로 Ganger를 읽고 다루는 에이전트(예: Hermes). Operator를 대신해 일하지만 Operator가 아니고, 한 일은 Operator가 한 일과 구분된다. 할 수 있는 범위는 [ADR 0013](docs/adr/0013-mcp-client-scope.md).
 _Avoid_: 봇, 자동화(무엇이 했는지 흐리다), 사용자(다중 사용자로 읽힌다)
+
+**MCP 쓰기 허용**:
+Settings MCP 구역의 스위치. 켜야 MCP 클라이언트에게 쓰기 도구가 보인다. 기본은 꺼짐이고 화면에서만 바꾼다. 티켓 0089.
+_Avoid_: 쓰기 모드, 권한(런의 Permission과 헷갈린다)
+
+**MCP 작업 기록**:
+MCP 클라이언트가 한 쓰기 하나의 기록. 시각, "MCP · 〈클라이언트 이름〉", 도구, 대상, 결과를 둔다. 런에 대한 것은 Run 상세 상태 기록 사이에, 나머지는 Settings MCP 구역의 최근 작업에 보인다. 티켓 0089.
+_Avoid_: 감사 로그, 활동 로그(런 로그와 헷갈린다)

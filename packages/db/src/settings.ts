@@ -184,6 +184,16 @@ export interface StoredProviderUsage {
   reading: ProviderUsageReading;
 }
 
+export function saveRunnerCapacity(db: Database, runnerId: RunnerId, capacity: number): boolean {
+  const updated = db
+    .update(runners)
+    .set({ capacity })
+    .where(eq(runners.id, runnerId))
+    .returning({ id: runners.id })
+    .all();
+  return updated.length > 0;
+}
+
 export function saveRunner(
   db: Database,
   input: { id: RunnerId; kind: RunnerKind; name: string; config: unknown; capacity: number },
@@ -634,6 +644,27 @@ export function getInstallSettings(db: Database): StoredInstallSettings {
   const created = read();
   if (created === undefined) throw new Error("install settings row is missing after insert");
   return created;
+}
+
+export function getMcpWriteAllowed(db: Database): boolean {
+  return (
+    db
+      .select({ allowed: installSettings.mcpWriteAllowed })
+      .from(installSettings)
+      .where(eq(installSettings.id, INSTALL_SETTINGS_ROW))
+      .get()?.allowed ?? false
+  );
+}
+
+export function saveMcpWriteAllowed(db: Database, allowed: boolean, now: Date): void {
+  const { instanceId } = getInstallSettings(db);
+  db.insert(installSettings)
+    .values({ id: INSTALL_SETTINGS_ROW, instanceId, mcpWriteAllowed: allowed, updatedAt: now })
+    .onConflictDoUpdate({
+      target: installSettings.id,
+      set: { mcpWriteAllowed: allowed, updatedAt: now },
+    })
+    .run();
 }
 
 export function saveInstallAddresses(db: Database, input: InstallAddresses, now: Date): void {
