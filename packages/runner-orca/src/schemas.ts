@@ -55,7 +55,12 @@ export const terminalCreateResultSchema = z.object({
 });
 
 export const terminalShowResultSchema = z.object({
-  terminal: z.object({ handle: text, connected: z.boolean().nullish() }),
+  terminal: z.object({
+    handle: text,
+    connected: z.boolean().nullish(),
+    tabId: optionalText,
+    leafId: optionalText,
+  }),
 });
 
 export const runBindResultSchema = z.object({ runId: text });
@@ -128,6 +133,7 @@ export const mailPayloadSchema = z.object({
   dispatchId: optionalText,
   options: z.array(z.string()).nullish(),
   stopReason: optionalText,
+  reason: optionalText,
   outcome: optionalText,
   approval: z
     .object({
@@ -138,18 +144,33 @@ export const mailPayloadSchema = z.object({
     .nullish(),
 });
 
+const worktreeAgentSchema = z.object({
+  paneKey: optionalText,
+  state: optionalText,
+  interrupted: z.boolean().nullish(),
+  stateStartedAt: z.number().nullish(),
+  mainAgent: z
+    .object({
+      state: optionalText,
+      outcome: optionalText,
+      stateStartedAt: z.number().nullish(),
+    })
+    .nullish(),
+});
+
 export const worktreePsResultSchema = z.object({
   worktrees: z.array(
     z.object({
       worktreeId: text,
       liveTerminalCount: z.number().nullish(),
-      agents: z.array(z.object({ state: optionalText })).nullish(),
+      agents: z.array(worktreeAgentSchema).nullish(),
     }),
   ),
   truncated: z.boolean().nullish(),
 });
 
 export const replyResultSchema = z.object({ messageId: text });
+export const sendResultSchema = z.object({ messageId: text });
 export const denyResultSchema = z.object({ approvalId: optionalText });
 export const workerStopResultSchema = z.object({ state: text });
 export const workerReleaseResultSchema = z.object({ state: text });
@@ -178,4 +199,5 @@ export type MailRow = z.infer<typeof mailRowSchema>;
 export type MailPayload = z.infer<typeof mailPayloadSchema>;
 export type WorkerShowResult = z.infer<typeof workerShowResultSchema>;
 export type WorktreePsResult = z.infer<typeof worktreePsResultSchema>;
+export type WorktreeAgent = z.infer<typeof worktreeAgentSchema>;
 export type WorkerReadResult = z.infer<typeof workerReadResultSchema>;

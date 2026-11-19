@@ -36,7 +36,12 @@ export type LogTailView =
 export type RunDetailStatus =
   | { state: "queued"; queuedReason: QueuedReason }
   | { state: "running" }
-  | { state: "paused"; pausedSince: string | null; pauseSource: PauseSource }
+  | {
+      state: "paused";
+      pausedSince: string | null;
+      pauseSource: PauseSource;
+      lastOutput: string[] | null;
+    }
   | {
       state: "waiting-for-input";
       input: PendingInput;

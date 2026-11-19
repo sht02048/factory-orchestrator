@@ -52,6 +52,7 @@ import {
   getRun,
   storedTicketTitle,
   getRunWithRecords,
+  lastChangedTo,
   lastStateBeforeDisconnect,
   listRunStateChanges,
   listRuns,
@@ -632,6 +633,33 @@ describe("Paused(0118)", () => {
     expect(() =>
       db.$client.prepare("UPDATE runs SET pause_source = NULL WHERE id = ?").run(id),
     ).toThrow(/CHECK/);
+  });
+
+  it("러너에서 멈춤·보고 없이 멈춤을 멈춘 이유로 저장하고, 모르는 이유는 막는다(0120)", () => {
+    const db = seededDatabase();
+    const id = runningRun(db);
+    changeRunState(db, id, { to: "paused", source: "runner" }, at(1));
+    expect(getRunWithRecords(db, id)?.records.pauseSource).toBe("runner");
+    changeRunState(db, id, { to: "disconnected" }, at(7));
+    changeRunState(db, id, { to: "paused" }, at(9));
+    expect(getRunWithRecords(db, id)?.records.pauseSource).toBe("runner");
+    changeRunState(db, id, { to: "running" }, at(10));
+    changeRunState(db, id, { to: "paused", source: "unreported" }, at(11));
+    expect(getRunWithRecords(db, id)?.records.pauseSource).toBe("unreported");
+    expect(() =>
+      db.$client.prepare("UPDATE runs SET pause_source = 'agent' WHERE id = ?").run(id),
+    ).toThrow(/CHECK/);
+  });
+
+  it("마지막으로 어떤 상태가 된 시각을 상태 이력에서 읽는다(0120)", () => {
+    const db = seededDatabase();
+    const id = runningRun(db);
+    expect(lastChangedTo(db, id, "paused")).toBeNull();
+    changeRunState(db, id, { to: "paused" }, at(1));
+    changeRunState(db, id, { to: "running" }, at(5));
+    changeRunState(db, id, { to: "paused" }, at(8));
+    expect(lastChangedTo(db, id, "running")).toEqual(at(5));
+    expect(lastChangedTo(db, id, "paused")).toEqual(at(8));
   });
 
   it("DB가 Paused 런에만 멈춘 시각을 허용한다", () => {

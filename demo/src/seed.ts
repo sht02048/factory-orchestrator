@@ -61,6 +61,8 @@ export interface SeededRuns {
   question: RunId;
   permission: RunId;
   paused: RunId;
+  pausedOnRunner: RunId;
+  pausedUnreported: RunId;
   disconnected: RunId;
 }
 
@@ -318,7 +320,7 @@ function end(
   });
 }
 
-const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 21, 22, 23, 24], GLX: [2] };
+const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 21, 22, 23, 24, 25, 26], GLX: [2] };
 const HISTORY_TICKETS = [
   range(1, 35).filter((n) => !ACTIVE_TICKETS.ACME.includes(n)),
   range(1, 10).filter((n) => !ACTIVE_TICKETS.GLX.includes(n)),
@@ -409,6 +411,21 @@ function seedActive(db: Database, now: Date): SeededRuns {
   const paused = startedRun(db, ticket("ACME", 24), runnerB.id, ago(70), ago(68));
   ok(changeRunState(db, paused, { to: "paused" }, ago(18)));
 
+  const pausedOnRunner = startedRun(db, ticket("ACME", 25), runnerB.id, ago(55), ago(54));
+  ok(changeRunState(db, pausedOnRunner, { to: "paused", source: "runner" }, ago(9)));
+
+  const pausedUnreported = startedRun(db, ticket("ACME", 26), runnerB.id, ago(65), ago(64));
+  ok(changeRunState(db, pausedUnreported, { to: "paused", source: "unreported" }, ago(4)));
+  updateRunRecords(db, pausedUnreported, {
+    lastLog: [
+      "Added the index on runs.created_at and a migration for it.",
+      "Tests pass locally: 42 passed.",
+      "",
+      "I have not opened a PR yet.",
+      "❯",
+    ],
+  });
+
   const disconnected = startedRun(db, ticket("ACME", 23), runnerC.id, ago(45), ago(44));
   updateRunRecords(db, disconnected, { unreachableSince: ago(20) });
   ok(changeRunState(db, disconnected, { to: "disconnected" }, ago(15)));
@@ -431,7 +448,16 @@ function seedActive(db: Database, now: Date): SeededRuns {
     prNumber += 1;
     end(db, runId, { ending, at: ago(120 - n * 15), prNumber, repo: t.project.repo });
   }
-  return { queued, running, question, permission, paused, disconnected };
+  return {
+    queued,
+    running,
+    question,
+    permission,
+    paused,
+    pausedOnRunner,
+    pausedUnreported,
+    disconnected,
+  };
 }
 
 function startedRun(

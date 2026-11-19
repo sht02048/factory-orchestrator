@@ -947,3 +947,131 @@ describe("멈추기·재개(0118)", () => {
     });
   });
 });
+
+describe("러너에서 멈춘·막힌 에이전트(0120)", () => {
+  function recordsOf(run: StoredRun) {
+    const records = getRunWithRecords(h.db, run.id)?.records;
+    if (records === undefined) throw new Error(`run ${run.id} has no records`);
+    return records;
+  }
+
+  it("러너에서 에이전트 세션이 중단되면 '러너에서 멈춤' Paused가 되고 러너 자리를 지키며, 재개하면 같은 세션으로 이어 간다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.advance(MINUTE);
+    h.runner(runnerId).interruptOnRunner(worktreeOf(run), h.now);
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+    expect(recordsOf(run).pauseSource).toBe("runner");
+
+    h.assign("ENG-2", projectA);
+    await worker.tick();
+    expect(listRuns(h.db, { states: ["queued"] })).toHaveLength(1);
+
+    h.advance(MINUTE);
+    expect(requestRunControl(h.db, run.id, "resume", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(recordsOf(run).pauseSource).toBeNull();
+    expect(agentOf(run, runnerId).resumes).toHaveLength(1);
+  });
+
+  it("재개 뒤에는 그 전에 남은 중단 표시로 다시 멈추지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.advance(MINUTE);
+    h.runner(runnerId).interruptOnRunner(worktreeOf(run), h.now);
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+
+    h.advance(MINUTE);
+    expect(requestRunControl(h.db, run.id, "resume", h.now)).toMatchObject({ ok: true });
+    h.runner(runnerId).interruptOnRunner(worktreeOf(run), new Date(h.now.getTime() - MINUTE));
+    await worker.tick();
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+  });
+
+  it("보고 없이 턴을 끝냈다는 러너 알림은 '보고 없이 멈춤' Paused가 되고 마지막 출력을 남긴다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.advance(MINUTE);
+    h.runner(runnerId).stopWithoutReport(worktreeOf(run), {
+      at: h.now,
+      lastOutput: ["로그인 버튼을 고쳤어요", "❯"],
+    });
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+    expect(recordsOf(run)).toMatchObject({
+      pauseSource: "unreported",
+      lastLog: ["로그인 버튼을 고쳤어요", "❯"],
+    });
+  });
+
+  it("알림이 없어도 질문·보고 없이 끝난 턴이 10분 이어지면 '보고 없이 멈춤'이 되고 러너 로그 끝을 남긴다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.advance(MINUTE);
+    h.runner(runnerId).appendLog(worktreeOf(run), "테스트를 돌렸어요");
+    h.runner(runnerId).stopWithoutReport(worktreeOf(run), { at: h.now, notified: false });
+    h.advance(9 * MINUTE);
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+
+    h.advance(MINUTE);
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+    expect(recordsOf(run)).toMatchObject({
+      pauseSource: "unreported",
+      lastLog: ["테스트를 돌렸어요"],
+    });
+  });
+
+  it("러너에서 사람이 다시 일을 시키면 Running으로 돌아간다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.advance(MINUTE);
+    h.runner(runnerId).stopWithoutReport(worktreeOf(run), { at: h.now });
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+
+    h.advance(MINUTE);
+    h.runner(runnerId).continueOnRunner(worktreeOf(run), h.now);
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(recordsOf(run).pauseSource).toBeNull();
+  });
+
+  it("러너에서 멈춘 동안에도 최대 실행 시간 시계가 멈춘다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.advance(DEFAULT_MAX_RUN_MS - 10 * MINUTE);
+    h.runner(runnerId).interruptOnRunner(worktreeOf(run), h.now);
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+
+    h.advance(3 * DEFAULT_MAX_RUN_MS);
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+
+    h.runner(runnerId).continueOnRunner(worktreeOf(run), h.now);
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    h.advance(10 * MINUTE - 1);
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    h.advance(1);
+    await worker.tick();
+    expect(ended(run).agentResult).toBe("timed-out");
+  });
+
+  it("질문이 열려 있으면 보고 없이 멈춘 알림이 와도 Waiting for Input으로 둔다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.advance(MINUTE);
+    h.runner(runnerId).ask(worktreeOf(run), { body: "시안이 없어요. 어떻게 할까요?", at: h.now });
+    h.runner(runnerId).stopWithoutReport(worktreeOf(run), { at: h.now });
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+  });
+
+  it("에이전트 상태를 모르면 Running 그대로 둔다", async () => {
+    const { run, worker } = await startOne();
+    h.advance(30 * MINUTE);
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+  });
+});

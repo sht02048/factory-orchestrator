@@ -146,10 +146,15 @@ function SheetBody({
     case "queued":
       return <Text variant="body">{text.queued(run)}</Text>;
     case "running":
+      return (
+        <ControlBlock run={run} onControl={onControl}>
+          {t("running")}
+        </ControlBlock>
+      );
     case "paused":
       return (
         <ControlBlock run={run} onControl={onControl}>
-          {t(run.state)}
+          {t(`paused.${run.pauseSource}`)}
         </ControlBlock>
       );
     case "disconnected":

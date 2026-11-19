@@ -1,4 +1,9 @@
-import { decideConnection, decideTimeout, resolveRunProgress } from "@ganger/core";
+import {
+  decideConnection,
+  decideRunnerStop,
+  decideTimeout,
+  resolveRunProgress,
+} from "@ganger/core";
 import type {
   AgentResult,
   CompletionReport,
@@ -16,6 +21,7 @@ import {
   getRunWithRecords,
   hasPendingCancelRequest,
   inTransaction,
+  lastChangedTo,
   lastStateBeforeDisconnect,
   listRunners,
   listRuns,
@@ -159,6 +165,7 @@ async function watchRun(
         })
       : { agentResult: pending.agentResult, report: pending.report, agent: "none" as const };
   if (ending === null) {
+    if (await followRunnerStop(context, run, { progress, resolution, runner, onRunner })) return;
     if (resolution.kind === "continue" && resolution.state !== run.state) {
       reportFailure(
         logger,
@@ -187,6 +194,65 @@ async function watchRun(
     lastLog,
   });
   if (recorded) context.pendingEndings.delete(run.id);
+}
+
+async function followRunnerStop(
+  context: TickContext,
+  run: ActiveRun,
+  input: {
+    progress: RunProgress;
+    resolution: WatchResolution;
+    runner: Runner;
+    onRunner: RunOnRunner;
+  },
+): Promise<boolean> {
+  const { db, logger } = context;
+  const { progress, resolution } = input;
+  if (progress.kind !== "active" || resolution.kind !== "continue") return false;
+  const state =
+    run.state === "running" && resolution.state === "running"
+      ? "running"
+      : run.state === "paused" && resolution.state === "paused"
+        ? "paused"
+        : null;
+  if (state === null) return false;
+  const records = getRunWithRecords(db, run.id)?.records;
+  if (records === undefined) return false;
+  const decision = decideRunnerStop({
+    state,
+    activity: progress.activity ?? { kind: "unknown" },
+    unreportedStop: progress.unreportedStop ?? null,
+    runningSince: lastChangedTo(db, run.id, "running"),
+    pausedSince: records.pausedSince,
+    now: context.now(),
+  });
+  if (decision === null) return false;
+  if (decision.to === "running") {
+    reportFailure(logger, run.id, changeRunState(db, run.id, { to: "running" }, context.now()));
+    return true;
+  }
+  const lastOutput =
+    decision.source !== "unreported"
+      ? null
+      : decision.lastOutput !== null && decision.lastOutput.length > 0
+        ? decision.lastOutput
+        : await readLastLog(context, run, input.runner, input.onRunner);
+  inTransaction(db, () => {
+    const result = changeRunState(
+      db,
+      run.id,
+      { to: "paused", source: decision.source },
+      context.now(),
+    );
+    if (!result.ok) {
+      reportFailure(logger, run.id, result);
+      return;
+    }
+    if (decision.source === "unreported") {
+      updateRunRecords(db, run.id, { lastLog: lastOutput === null ? null : [...lastOutput] });
+    }
+  });
+  return true;
 }
 
 async function endWithoutProgress(

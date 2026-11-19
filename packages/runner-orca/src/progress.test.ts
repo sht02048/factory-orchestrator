@@ -1,7 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { decideProgress } from "./progress.js";
+import { decideProgress, escalationQuestionId, lastOutputOf } from "./progress.js";
 import type { ProgressInput } from "./progress.js";
-import { checkResultSchema, workerShowResultSchema } from "./schemas.js";
+import {
+  checkResultSchema,
+  terminalShowResultSchema,
+  workerShowResultSchema,
+  worktreePsResultSchema,
+} from "./schemas.js";
 import { peekOf, research } from "./test-support.js";
 
 function worker(file: string): ProgressInput["worker"] {
@@ -33,6 +38,8 @@ describe("decideProgress", () => {
     });
     expect(progress).toEqual({
       kind: "active",
+      activity: { kind: "unknown" },
+      unreportedStop: null,
       questions: [],
       permissionWaits: [
         {
@@ -50,7 +57,13 @@ describe("decideProgress", () => {
       worker: { ...r2.worker, liveness: "live" },
       mails: mails("escalation-needs-input-full.json", "status-approval-answered-full.json"),
     });
-    expect(progress).toEqual({ kind: "active", questions: [], permissionWaits: [] });
+    expect(progress).toEqual({
+      kind: "active",
+      questions: [],
+      permissionWaits: [],
+      activity: { kind: "unknown" },
+      unreportedStop: null,
+    });
   });
 
   test("mail for another run is ignored", () => {
@@ -60,7 +73,13 @@ describe("decideProgress", () => {
       worker: { ...r2.worker, liveness: "live" },
       mails: mails("escalation-needs-input-full.json", "escalation-lost-full.json"),
     });
-    expect(progress).toEqual({ kind: "active", questions: [], permissionWaits: [] });
+    expect(progress).toEqual({
+      kind: "active",
+      questions: [],
+      permissionWaits: [],
+      activity: { kind: "unknown" },
+      unreportedStop: null,
+    });
   });
 
   test("an agent that died and left only its shell is ended without report", () => {
@@ -126,5 +145,184 @@ describe("decideProgress", () => {
       mails: [],
     });
     expect(progress.kind).toBe("active");
+  });
+});
+
+function envelope(file: string): unknown {
+  const parsed: unknown = JSON.parse(research(file));
+  if (typeof parsed !== "object" || parsed === null || !("result" in parsed)) throw new Error();
+  return parsed.result;
+}
+
+function psRow(file: string): ProgressInput["worktreeRow"] {
+  const row = worktreePsResultSchema.parse(envelope(`0120/${file}`)).worktrees[0];
+  if (row === undefined) throw new Error(`no worktree row in ${file}`);
+  return row;
+}
+
+function mails0120(...files: string[]): ProgressInput["mails"] {
+  const parsed: unknown = JSON.parse(peekOf(...files.map((f) => research(`0120/${f}`))));
+  if (typeof parsed !== "object" || parsed === null || !("result" in parsed)) throw new Error();
+  return checkResultSchema.parse(parsed.result).messages;
+}
+
+const runnerStopRun = {
+  dispatchId: "ctx_000000000120",
+  taskResult: null,
+  worker: workerShowResultSchema.parse(envelope("0120/worker-show-unverifiable-retained.json")),
+  mails: [],
+  worktreeRow: psRow("worktree-ps-agent-working.json"),
+  worktreeExists: true,
+} satisfies ProgressInput;
+
+describe("decideProgress: 러너에서 멈춘·막힌 에이전트(0120)", () => {
+  test("러너에서 중단된 에이전트 세션은 interrupted로 알린다", () => {
+    const progress = decideProgress({
+      ...runnerStopRun,
+      worktreeRow: psRow("worktree-ps-agent-interrupted.json"),
+    });
+    expect(progress).toMatchObject({
+      kind: "active",
+      activity: { kind: "interrupted", since: new Date(1795084992430) },
+      unreportedStop: null,
+    });
+  });
+
+  test("Orca의 '보고 없이 멈춤' 알림은 마지막 출력과 함께 알리고 질문으로 만들지 않는다", () => {
+    const progress = decideProgress({
+      ...runnerStopRun,
+      worktreeRow: psRow("worktree-ps-agent-turn-ended.json"),
+      mails: mails0120("escalation-stop-finished-full.json"),
+    });
+    expect(progress).toMatchObject({
+      kind: "active",
+      questions: [],
+      activity: { kind: "turn-ended", since: new Date(1795084924263) },
+      unreportedStop: {
+        at: new Date("2026-11-19T10:42:05Z"),
+        lastOutput: [
+          "로그인 버튼 색을 고쳤어요. 시험은 아직 돌리지 못했어요.",
+          "",
+          "- `src/login.tsx` 를 바꿨어요.",
+          "❯",
+        ],
+      },
+    });
+  });
+
+  test("오류로 턴을 끝낸 알림(errored)도 보고 없이 멈춘 것이다", () => {
+    const progress = decideProgress({
+      ...runnerStopRun,
+      mails: mails0120("escalation-stop-errored-full.json"),
+    });
+    expect(progress).toMatchObject({
+      kind: "active",
+      unreportedStop: { at: new Date("2026-11-19T03:30:27Z") },
+    });
+  });
+
+  test("이유 칸(stopReason)이 없는 옛 Orca의 알림은 msg_stop_ id로 알아본다", () => {
+    const [stop] = mails0120("escalation-stop-finished-full.json");
+    if (stop === undefined) throw new Error();
+    const progress = decideProgress({
+      ...runnerStopRun,
+      mails: [
+        {
+          ...stop,
+          payload: JSON.stringify({ taskId: "task_000000000120", dispatchId: "ctx_000000000120" }),
+        },
+      ],
+    });
+    expect(progress).toMatchObject({
+      kind: "active",
+      questions: [],
+      unreportedStop: { at: new Date("2026-11-19T10:42:05Z") },
+    });
+  });
+
+  test("에이전트가 막혔다고 보낸 escalation은 그 본문을 질문으로 만든다", () => {
+    const progress = decideProgress({
+      ...runnerStopRun,
+      worktreeRow: psRow("worktree-ps-agent-turn-ended.json"),
+      mails: mails0120("escalation-blocked-full.json", "escalation-stop-finished-full.json"),
+    });
+    expect(progress).toMatchObject({
+      kind: "active",
+      questions: [
+        {
+          id: escalationQuestionId("msg_000000000122"),
+          body: "로그인 화면은 디자인 시안이 정해져야 고칠 수 있다. 시안 링크를 알려 주면 그 위에서 이어 하겠다.",
+          options: [],
+          askedAt: new Date("2026-11-19T10:41:59Z"),
+        },
+      ],
+    });
+  });
+
+  test("Orca가 메일을 전하지 못했다는 알림은 질문도 멈춤도 아니다", () => {
+    const progress = decideProgress({
+      ...runnerStopRun,
+      mails: mails0120("escalation-followup-full.json"),
+    });
+    expect(progress).toMatchObject({ kind: "active", questions: [], unreportedStop: null });
+  });
+
+  test("본 차례는 끝났어도 뒤에서 셸이 도는 에이전트는 working이다", () => {
+    expect(
+      decideProgress({
+        ...runnerStopRun,
+        worktreeRow: psRow("worktree-ps-agent-background-shell.json"),
+      }),
+    ).toMatchObject({ activity: { kind: "working", since: new Date(1795096571496) } });
+  });
+
+  test("다시 일하는 에이전트는 working으로 알린다", () => {
+    expect(decideProgress(runnerStopRun)).toMatchObject({
+      kind: "active",
+      activity: { kind: "working" },
+    });
+  });
+
+  test("에이전트 행이 여럿이면 런의 터미널 칸(paneKey)으로 고르고, 고를 수 없으면 모른다", () => {
+    const two = psRow("worktree-ps-two-agents.json");
+    const terminal = terminalShowResultSchema.parse(envelope("0120/terminal-show.json")).terminal;
+    expect(
+      decideProgress({
+        ...runnerStopRun,
+        worktreeRow: two,
+        agentPaneKey: `${terminal.tabId ?? ""}:${terminal.leafId ?? ""}`,
+      }),
+    ).toMatchObject({ activity: { kind: "interrupted" } });
+    expect(decideProgress({ ...runnerStopRun, worktreeRow: two })).toMatchObject({
+      activity: { kind: "unknown" },
+    });
+  });
+
+  test("모르는 형식의 에이전트 행이나 행이 없으면 모르는 상태로 둔다", () => {
+    expect(
+      decideProgress({
+        ...runnerStopRun,
+        worktreeRow: {
+          worktreeId: "w",
+          agents: [{ state: "sleeping", stateStartedAt: 1795084992430 }],
+        },
+      }),
+    ).toMatchObject({ activity: { kind: "unknown" } });
+    expect(decideProgress({ ...runnerStopRun, worktreeRow: "unknown" })).toMatchObject({
+      activity: { kind: "unknown" },
+    });
+    expect(
+      decideProgress({ ...runnerStopRun, worktreeRow: { worktreeId: "w", agents: [{}] } }),
+    ).toMatchObject({ activity: { kind: "unknown" } });
+  });
+});
+
+describe("lastOutputOf", () => {
+  test("'Last output:' 다음 줄부터 'Full output:' 앞까지를 마지막 출력으로 본다", () => {
+    expect(
+      lastOutputOf("head\nLast output:\na\nb\nFull output: orchestration worker-read"),
+    ).toEqual(["a", "b"]);
+    expect(lastOutputOf("no output here")).toEqual([]);
+    expect(lastOutputOf(null)).toEqual([]);
   });
 });

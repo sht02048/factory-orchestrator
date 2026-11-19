@@ -1,0 +1,21 @@
+{
+  "id": "msg_followup_000000000000000000123",
+  "run_id": "run_000000000100",
+  "delivery_contract": "current_delivery",
+  "from_handle": "dispatch:ctx_000000000120",
+  "to_handle": "run:run_000000000100",
+  "subject": "Mail did not reach the finished worker",
+  "body": "Orca could not continue the worker of \"ganger-ACME-7-1\" (task_000000000120) with the mail it had not read before reporting: Agent startup blocked: agent-interactive-prompt. The mail is kept for your next send to dispatch:ctx_000000000120.",
+  "type": "escalation",
+  "priority": "high",
+  "thread_id": null,
+  "payload": "{\"dispatchId\":\"ctx_000000000120\",\"reason\":\"Agent startup blocked: agent-interactive-prompt\"}",
+  "read": 1,
+  "sequence": 7,
+  "created_at": "2026-11-18T13:25:10Z",
+  "delivered_at": null,
+  "sender_pane_key": null,
+  "pointer_enter_pending": 0,
+  "pointer_pty_id": null,
+  "pointer_process_incarnation": null
+}

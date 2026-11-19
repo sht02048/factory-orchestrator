@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "result": {
+    "dispatchId": "ctx_000000000120",
+    "taskId": "task_000000000120",
+    "runId": "run_000000000120",
+    "state": "ready",
+    "stage": "input_accepted",
+    "liveness": "unverifiable",
+    "terminal": "term_30000000-0000-4000-8000-000000000001",
+    "terminalState": "retained",
+    "workspace": "20000000-0000-4000-8000-000000000001::<path>/workspaces/acme/ganger-ACME-7-1"
+  }
+}

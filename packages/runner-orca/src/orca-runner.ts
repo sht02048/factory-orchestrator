@@ -25,7 +25,12 @@ import { briefFor } from "./agent-brief.js";
 import { parseOrcaRunnerConfig } from "./config.js";
 import type { OrcaRunnerConfig } from "./config.js";
 import { workerReadLines } from "./log-tail.js";
-import { completionReport, decideProgress } from "./progress.js";
+import {
+  completionReport,
+  decideProgress,
+  isEscalationQuestion,
+  needsAgentPaneKey,
+} from "./progress.js";
 import { parseProviderUsage } from "./provider-usage.js";
 import {
   PUSH_CHECK_CONCURRENCY,
@@ -50,6 +55,7 @@ import {
   replyResultSchema,
   runBindResultSchema,
   runCurrentResultSchema,
+  sendResultSchema,
   serviceStatusResultSchema,
   statusResultSchema,
   taskListResultSchema,
@@ -84,6 +90,7 @@ export const LOG_MAX_PAGES = 200;
 export const LOG_CUT_MARKER = `[log tail cut: the transcript is longer than ${LOG_PAGE_SIZE * LOG_MAX_PAGES} messages, so these are not its last lines]`;
 const RAW_LIMIT = 4000;
 export const INTERRUPT_KEY = "\u001b";
+export const ESCALATION_ANSWER_SUBJECT = "Answer from the operator";
 
 const SENDER_ERROR_CODES = new Set([
   "no_active_sender_terminal",
@@ -531,7 +538,22 @@ export class OrcaRunner implements Runner {
       mails,
       worktreeRow,
       worktreeExists,
+      agentPaneKey: needsAgentPaneKey(worktreeRow) ? await this.paneKeyOf(worker.terminal) : null,
     });
+  }
+
+  private async paneKeyOf(terminal: string | null | undefined): Promise<string | null> {
+    if (terminal === null || terminal === undefined) return null;
+    const shown = await this.orcaOutcome(
+      ["terminal", "show", "--terminal", terminal],
+      terminalShowResultSchema,
+    );
+    if (!shown.ok) return null;
+    const { tabId, leafId } = shown.result.terminal;
+    if (tabId === null || tabId === undefined || leafId === null || leafId === undefined) {
+      return null;
+    }
+    return `${tabId}:${leafId}`;
   }
 
   private async taskResult(agent: OrcaAgent): Promise<string | Record<string, unknown> | null> {
@@ -576,6 +598,25 @@ export class OrcaRunner implements Runner {
   ): Promise<void> {
     const agent = this.agentOf(run);
     const mailbox = this.mailboxOf(run.mailbox);
+    if (isEscalationQuestion(input.questionId)) {
+      await this.orca(
+        [
+          "orchestration",
+          "send",
+          "--from",
+          mailbox.terminal,
+          "--to",
+          `dispatch:${agent.dispatchId}`,
+          "--subject",
+          ESCALATION_ANSWER_SUBJECT,
+          "--body",
+          input.answer,
+        ],
+        sendResultSchema,
+        { usesMailbox: true },
+      );
+      return;
+    }
     await this.orca(
       [
         "orchestration",

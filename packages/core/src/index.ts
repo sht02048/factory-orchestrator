@@ -6,6 +6,7 @@ export * from "./provider-usage.js";
 export * from "./queue.js";
 export * from "./registry.js";
 export * from "./run.js";
+export * from "./runner-stop.js";
 export * from "./summary.js";
 export * from "./timing.js";
 export * from "./transition.js";
