@@ -22,7 +22,7 @@
 
 - `apps/web/src/router.tsx:4-12`: `defaultPreload: "intent"`, `defaultPreloadStaleTime: PRELOAD_FRESH_MS`(5초). 그 밖은 라우터 기본값이다(`defaultStaleTime` 0, `defaultGcTime` 5분, `defaultPendingMs` 1초, pending 컴포넌트 없음) **[코드]**.
 - 루트 `apps/web/src/routes/__root.tsx:39-43`: 로더가 `getTimeZone`·`getTitleBarHidden`을 읽고 `shouldReload: false`. 셸 `apps/web/src/routes/_app.tsx:16-17`: 로더가 `getShell`을 읽고 `shouldReload: false` **[코드]**.
-- 루트 `beforeLoad`(`__root.tsx:29-38`)는 브라우저에서 온보딩 완료를 한 번 확인하면(`completeInBrowser`) 다시 묻지 않는다. 그래서 첫 클라이언트 이동 한 번은 `getOnboardingComplete` 왕복을 더 한다 **[코드]**.
+- 루트 `beforeLoad`(`__root.tsx:29, 32-38`)는 브라우저에서 온보딩 완료를 한 번 확인하면(`completeInBrowser`) 다시 묻지 않는다. 그래서 첫 클라이언트 이동 한 번은 `getOnboardingComplete` 왕복을 더 한다 **[코드]**.
 - Runners(`apps/web/src/routes/_app/runners.tsx:27-29, 37`)는 `shouldReload: reloadOnEnter`로 들어올 때만 다시 읽는다. 포인터를 올려 미리 읽은 뒤 5초 안에 들어와도 `cause`가 `"enter"`라 한 번 더 읽는다 **[추정]**(라우터 소스의 `shouldReload` 함수와 preload 신선도의 우선순위를 시험으로 확인하지 않았다).
 - 설치된 `@tanstack/router-core` 1.171.39에서는 `match.invalid`가 `shouldReload: false`보다 앞선다. 필터 없는 `router.invalidate()`는 루트·셸·지금 화면을 모두 다시 읽고, 캐시에 남은 다른 화면은 invalid로 표시한다 **[코드]**(`node_modules`의 router-core `load-client`).
 

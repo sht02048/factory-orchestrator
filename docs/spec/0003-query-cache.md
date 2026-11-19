@@ -36,6 +36,7 @@
 
 - 0118(런 멈추기·재개), 0115(Mapping 저장소 여럿), 0119(Settings 개편)는 `develop`에 머지됐다. 0120(러너 쪽 멈춤 감지)이 머지된 뒤 Query 작업을 시작한다(C8). 0120이 런 상태를 쓰는 worker 코드를 바꾸기 때문이다.
 - 0129는 0122의 원격 지연 측정 스크립트로 다시 재므로 0122 뒤에 한다.
+- 0122는 0127·0128과 같은 로더 파일(`packages/app/src/tickets/load.ts`, `packages/app/src/settings/load.ts`)을 고친다. 0127·0128은 0123·0124 뒤라 0122가 먼저 머지될 가능성이 크고, 그러면 0122의 서버 캐시 위에서 서버 함수를 나눈다. 함께 돌면 늦게 머지하는 쪽이 맞춘다.
 - 순서(C14): 0123 → 0124 → (0125, 0126, 0127 함께) → 0128(0127 뒤) → 0129.
 
 ```mermaid
@@ -73,7 +74,7 @@ graph LR
 | `refetchOnWindowFocus`, `refetchOnReconnect` | 켬(stale일 때)                      |
 | 라우터 `defaultPreloadStaleTime`             | 0(모든 `_app` 화면을 옮긴 뒤, 0129) |
 
-- 0117 계약을 지킨다(C6). 레일 링크에 포인터를 올리면 그 화면의 query를 미리 읽는다. 다시 들어간 화면은 캐시로 바로 그리고 낡았으면 뒤에서 새로 읽는다. 그래서 로더는 캐시가 있으면 신선도와 상관없이 바로 넘어가는 변형(`queryClient.query({ ...options, staleTime: "static" })` 또는 그와 같은 API)을 쓰고, 새로 읽기는 컴포넌트의 `useSuspenseQuery`가 맡는다. 어느 API를 쓸지는 0123이 설치한 버전에서 정한다(research 0015 1.4의 문서 사이 불일치).
+- 0117 계약을 지킨다(C6). 레일 링크에 포인터를 올리면 그 화면의 query를 미리 읽는다. 다시 들어간 화면은 캐시로 바로 그리고 낡았으면 뒤에서 새로 읽는다. 그래서 로더는 캐시가 있으면 신선도와 상관없이 바로 넘어가는 변형(`queryClient.query({ ...options, staleTime: "static" })` 또는 그와 같은 API)을 쓴다. 0117 시험은 다시 들어갈 때 staleTime 안이어도 뒤에서 새로 읽기를 요구하므로, 클라이언트에서 화면에 들어올 때(미리 읽기와 서버 렌더 뒤 hydration이 아닐 때) 로더가 그 query의 다시 읽기를 기다리지 않고 시작한다. 그래서 30초 staleTime은 미리 읽기와 hydration, 다른 컴포넌트의 같은 query에 쓰이고, 화면에 다시 들어오는 것은 C6의 0117 계약을 따른다. 어느 API를 쓸지는 0123이 설치한 버전에서 정한다(research 0015 1.4의 문서 사이 불일치).
 - 옮기는 동안 라우터 전역 `defaultPreloadStaleTime`은 지금 값(5초)으로 두고, 옮긴 화면의 route에만 0을 준다. route 옵션 이름은 0123이 확인한다(research 0015 9절). 모두 옮기면 0129가 전역을 0으로 바꾸고 route별 값을 지운다. 이 단계 나눔은 C6(전역 0)을 이행 순서(C14)에 맞춰 적용하는 구현 선택이고 새 결정이 아니다. 전역 0이 라우터 로더로 남는 온보딩·러너 설정 route(C1)의 미리 읽기에 주는 영향은 0129가 확인한다.
 
 ### 4.3 query key
@@ -132,15 +133,16 @@ graph LR
 
 무엇을 바꾸는 코드가 같은 트랜잭션에서 줄을 쓴다. 쓰는 일을 `packages/db`의 쓰기 함수 안에 두면 web, worker, `ganger mcp` 어느 프로세스가 불러도 빠지지 않는다.
 
-| 대상                   | 언제(지금 코드의 쓰는 곳 예)                                                                                                                                        |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `run`                  | 상태 바뀜과 Paused(`changeRunState`), PR·CI 바뀜(`updateRunRecords`), Question·Permission 생김과 답·거절, 취소·멈추기·재개·로그 요청과 그 처리 결과, 티켓 제목 채움 |
-| `runner`               | 점검 결과와 Online/Offline(`recordRunnerCheck`), 공급자 사용량(`recordProviderUsage`), 러너 저장·capacity                                                           |
-| `assignment`           | 새 런(`assignRun`, 자동·수동·MCP)                                                                                                                                   |
-| `workspace`·`settings` | 설정 저장(Settings 쓰기, Mapping, Auto-assign Label, 트래커 연결, 설치 전체 설정, MCP 쓰기 허용)                                                                    |
-| `tracker`              | 트래커 webhook을 받음(`recordTrackerEvent`), "Linear에서 다시 읽기", Ganger 안에서 트래커를 바꿈(라벨 만들기)                                                       |
+| 대상         | 언제(지금 코드의 쓰는 곳 예)                                                                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run`        | 상태 바뀜과 Paused(`changeRunState`), PR·CI 바뀜(`updateRunRecords`), Question·Permission 생김과 답·거절, 취소·멈추기·재개·로그 요청과 그 처리 결과, 티켓 제목 채움 |
+| `runner`     | 점검 결과와 Online/Offline(`recordRunnerCheck`), 공급자 사용량(`recordProviderUsage`), 러너 저장·capacity                                                           |
+| `assignment` | 새 런(`assignRun`, 자동·수동·MCP)                                                                                                                                   |
+| `workspace`  | Workspace 목록이 바뀜(더하기, 지우기, 이름)                                                                                                                         |
+| `settings`   | 그 밖의 설정 저장(Mapping, Auto-assign Label, In Progress 상태, 트래커 연결, 설치 전체 설정, MCP 쓰기 허용)                                                         |
+| `tracker`    | 트래커 webhook을 받음(`recordTrackerEvent`), "Linear에서 다시 읽기", Ganger 안에서 트래커를 바꿈(라벨 만들기), 트래커 연결이나 Workspace의 트래커 프로젝트가 바뀜   |
 
-위 함수 이름은 `develop`(`cd336db`) 기준 예다. 0120이 바꾼 쓰는 곳도 0124가 함께 찾는다. 빠진 쓰는 곳은 그 바뀜이 30초 폴링이나 탭 복귀 때까지 화면에 닿지 않는 것으로 드러나므로, 0124는 쓰기 함수마다 줄이 생기는지 시험한다.
+한 쓰기가 둘 이상에 해당하면 줄을 둘 이상 쓴다(라벨 만들기는 `tracker`와 `settings`, 트래커 프로젝트 더하기·지우기는 `settings`와 `tracker`). "Linear에서 다시 읽기"와 라벨 만들기는 트래커 API 호출이라 DB 트랜잭션이 없다. 지금 "Linear에서 다시 읽기"는 클라이언트의 `router.invalidate()`뿐이라(research 0016 3절), 0124가 `tracker` 줄을 쓰는 서버 동작을 더한다(0122가 서버 캐시를 비우는 동작을 먼저 만들었으면 거기에 붙인다). 위 함수 이름은 `develop`(`1e287f6`) 기준 예다. 0120이 바꾼 쓰는 곳도 0124가 함께 찾는다. 빠진 쓰는 곳은 그 바뀜이 30초 폴링이나 탭 복귀 때까지 화면에 닿지 않는 것으로 드러나므로, 0124는 쓰기 함수마다 줄이 생기는지 시험한다.
 
 ### 5.3 SSE 통로 `/api/change-events/stream`(C10, C11)
 
@@ -150,7 +152,7 @@ graph LR
   - `change`: `id`는 `seq`, 데이터는 `{ kind, targetId, workspaceId }`.
   - `ready`: 연결 직후, 이어 받을 줄을 다 보낸 뒤. 데이터는 지금 번호.
   - `reset`: 받은 번호(`Last-Event-ID` 또는 `?after=`)로 이어 받을 수 없을 때. 브라우저는 모든 query를 무효화한다(C11). 두 경우다.
-    - 받은 번호가 지운 줄의 가장 큰 번호보다 작다. 표가 비어 있어도 판단할 수 있게, 서버는 남은 줄이 아니라 지운 번호의 상한(정리 때 남기는 표시나 SQLite의 `sqlite_sequence`)과 비교한다.
+    - 받은 번호가 지운 줄의 가장 큰 번호보다 작다. 지운 번호의 상한은 표에 줄이 있으면 남은 가장 작은 번호 − 1, 표가 비었으면 SQLite가 마지막으로 준 번호(`sqlite_sequence`)다. 정리 때 지운 상한을 따로 남겨도 된다.
     - 받은 번호가 지금 가장 큰 번호보다 크다. DB 파일을 이전 것으로 되돌렸을 때 생긴다.
 - 다시 연결은 브라우저 `EventSource`의 `Last-Event-ID`로 이어 받는다(C11).
 - 요청 검사(Host·Origin, 0048)는 다른 웹 경로와 같다.
@@ -159,16 +161,17 @@ graph LR
 
 웹 앱에 구독 모듈 하나를 둔다. 셸이 마운트될 때 연결하고, 받은 `change`를 아래 표대로 key 접두사 무효화로 바꾼다. 한 번 읽기(1초)에 온 줄은 한 번에 모아 무효화한다. 관찰자가 없는 query는 stale 표시만 되고 다음에 화면에 들어올 때 읽는다.
 
-| 대상                   | 무효화하는 key                                                                                                                      |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `run`                  | `["runs", "detail", targetId]`, `["runs", "list"]`, `["dashboard"]`, `["tickets", "runs"]`(C12), `["runners", "list"]`, `["stats"]` |
-| `assignment`           | `run`과 같다(새 런 id)                                                                                                              |
-| `runner`               | `["shell"]`, `["runners", "list"]`, `["dashboard"]`(C12)                                                                            |
-| `workspace`·`settings` | `["shell"]`, `["settings"]`, `["dashboard"]`, `["tickets", "runs"]`                                                                 |
-| `tracker`              | `["tracker"]`(Tickets와 Settings의 Linear query, C12)                                                                               |
-| `reset`                | 모든 query                                                                                                                          |
+| 대상         | 무효화하는 key                                                                                                                      |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `run`        | `["runs", "detail", targetId]`, `["runs", "list"]`, `["dashboard"]`, `["tickets", "runs"]`(C12), `["runners", "list"]`, `["stats"]` |
+| `assignment` | `run`과 같다(새 런 id)                                                                                                              |
+| `runner`     | `["shell"]`, `["runners", "list"]`, `["dashboard"]`(C12)                                                                            |
+| `workspace`  | `["shell"]`, `["settings"]`, `["dashboard"]`, `["tickets", "runs"]`                                                                 |
+| `settings`   | `["settings"]`, `["dashboard"]`, `["tickets", "runs"]`                                                                              |
+| `tracker`    | `["tracker"]`(Tickets와 Settings의 Linear query, C12)                                                                               |
+| `reset`      | 모든 query                                                                                                                          |
 
-- C12의 화면 매핑에 더해, `run`은 Runners(러너마다 도는 런을 보인다)와 Stats(끝난 런 집계)도 무효화한다. 두 로더가 런을 읽기 때문이다(research 0016 2절). `workspace`·`settings`가 Dashboard와 Tickets 런 표시를 무효화하는 것도 대기 사유와 할당할 수 있음이 Mapping·러너 설정에 달려서다.
+- C12의 화면 매핑에 더해, `run`은 Runners(러너마다 도는 런을 보인다)와 Stats(끝난 런 집계)도 무효화한다. 두 로더가 런을 읽기 때문이다(research 0016 2절). 셸(`["shell"]`)은 Workspace 목록과 Runner Issue 배지만 담아 `workspace`와 `runner`에만 무효화한다. `workspace`·`settings`가 Dashboard와 Tickets 런 표시를 무효화하는 것은 대기 사유와 할당할 수 있음이 Mapping·러너 설정에 달려서다.
 - `workspaceId`가 있으면 그 Workspace의 key만 무효화해도 되지만, 모든 Workspace를 함께 보이는 key(`ws` 없음)가 있어 첫 구현은 접두사 전체를 무효화한다.
 
 ### 5.5 끊겼을 때(C4, C11)
@@ -189,10 +192,10 @@ graph LR
 모든 Query 티켓이 자기 화면에 대해 아래 다섯을 지키고, 0129가 전체로 다시 확인한다.
 
 1. **hydration은 더 읽지 않는다.** 서버 렌더한 화면을 연 뒤 hydration이 끝날 때까지 서버 함수 호출이 0번이다(research 0015 7절의 공식 예제 검사와 같다).
-2. **mutation은 자기 query만 다시 읽는다.** 쓰기 하나 뒤 다시 읽는 서버 함수가 그 mutation이 바꾼 query뿐이다. 루트(`getTimeZone`, `getTitleBarHidden`)와 셸(`getShell`)은 다시 읽지 않는다(셸을 바꾸는 쓰기는 예외).
+2. **mutation은 자기 query만 다시 읽는다.** 쓰기 하나 뒤 mutation이 다시 읽게 하는 서버 함수가 그 mutation이 바꾼 query뿐이다. 루트(`getTimeZone`, `getTitleBarHidden`)와 셸(`getShell`)은 다시 읽지 않는다(Workspace 목록을 바꾸는 쓰기는 예외). 이 시험은 변경 기록 통로를 끈 채 돈다. 같은 탭의 쓰기가 남긴 줄이 1초 뒤 돌아와 그 query를 한 번 더 읽는 것은 8절의 위험으로 따로 본다.
 3. **worker 쪽 런 상태 바뀜이 3초 안에 보인다.** 화면을 연 채 DB에서 런 상태를 바꾸고(worker와 같은 함수), 3초 안에 화면이 바뀐다.
 4. **SSE가 끊기면 30초 폴링.** 통로를 막으면 보이는 query가 30초마다 다시 읽힌다(가짜 시계).
-5. **0117 브라우저 시험이 통과한다.** `e2e/src/navigation.test.ts` 세 시험을 고치지 않고 통과한다.
+5. **0117 브라우저 시험이 통과한다.** `e2e/src/navigation.test.ts` 세 시험이 같은 뜻으로 통과한다. 0127이 `getTicketsPage`를 나누면 시험이 기다리는 서버 함수 이름만 트래커를 읽는 새 함수로 바꾼다. 그 밖의 기대는 바꾸지 않는다.
 
 이 밖에 0124는 쓰기 함수마다 `change_events` 줄이 같은 트랜잭션에 생기는지(롤백하면 줄도 없는지), `Last-Event-ID` 이어 받기, `reset`의 두 경우(표가 빈 경우와 지금보다 큰 번호 포함), 하루 지난 줄 지우기를 시험한다.
 
@@ -205,6 +208,7 @@ graph LR
   - **#8234**: 실패한 배경 reload가 성공한 match를 error로 바꾼다. Router 쪽이라 루트 로더에 남는다.
 - **쓰는 곳 빠뜨림.** `change_events`를 쓰지 않는 쓰기는 화면에 늦게 닿는다(최대 30초 폴링, 탭 복귀). 5.2의 시험으로 막는다.
 - **탭 여러 개의 연결 수.** HTTP/1.1에서 브라우저는 한 주소에 연결을 6개까지 연다. 탭마다 SSE 하나를 열어 두면 탭이 많을 때 다른 요청이 막힐 수 있다. 0124가 탭 여러 개로 확인한다(열린 질문 1).
+- **같은 탭의 쓰기가 돌아옴.** 쓰기 하나가 남긴 줄이 1초 뒤 SSE로 같은 탭에 돌아와, mutation이 이미 다시 읽은 query를 한 번 더 읽는다. 보이는 query만 읽고 트래커 query는 `tracker` 줄에만 무효화되어 크지 않다. 줄이면 0124가 "방금 다시 읽은 key는 건너뛰기" 같은 방법을 재 보고 정한다.
 - **쓰기 비용.** 쓰기마다 줄 하나가 는다. 하루 지난 줄을 지워 표는 작게 유지된다.
 - **두 캐시가 섞인 기간.** 옮기는 동안 Router와 Query 캐시가 함께 있어, 둘 다 바꾸는 쓰기에서 하나만 무효화하면 낡은 값이 남는다. 6절 3번처럼 둘 다 부르고, 0129에서 Router 쪽을 지운다.
 
