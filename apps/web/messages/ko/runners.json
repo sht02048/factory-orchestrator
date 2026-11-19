@@ -6,10 +6,10 @@
   "listLabel": "러너 목록",
   "columns": {
     "runner": "러너",
-    "slots": "자리",
+    "capacity": "자리",
     "usage": "사용량(가장 높은 값)"
   },
-  "slotsLabel": "{total}자리 중 {used}자리 사용",
+  "capacityCellsLabel": "{total}자리 중 {used}자리 사용",
   "usage": {
     "name": "{provider} {window}",
     "barLabel": "{runner} {provider} {window} 사용량",
@@ -64,7 +64,7 @@
       "failed": "확인을 요청하지 못했어요. 잠시 뒤 다시 눌러 주세요.",
       "silent": "2분이 지나도 결과가 오지 않았어요. worker가 돌고 있는지 확인하고 다시 확인해 주세요."
     },
-    "slots": "자리",
+    "capacity": "자리",
     "noRuns": "지금 하는 런이 없어요.",
     "queuedFor": "{duration}째 기다려요",
     "checksTitle": "확인 항목",

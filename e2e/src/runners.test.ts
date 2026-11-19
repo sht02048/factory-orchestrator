@@ -175,20 +175,20 @@ describe("Runners 다시 그리기(브라우저, 0092)", () => {
     const header = page
       .getByRole("main")
       .locator("span")
-      .filter({ hasText: new RegExp(`^${runners.columns.slots}$`) })
+      .filter({ hasText: new RegExp(`^${runners.columns.capacity}$`) })
       .first();
     const usageHeader = page.getByText(runners.columns.usage, { exact: true });
     const row = page.getByRole("option").filter({ has: page.locator(`#runner-${longRunner}`) });
-    const slots = row.getByRole("img", { name: "2자리 중 0자리 사용" });
+    const capacityCells = row.getByRole("img", { name: "2자리 중 0자리 사용" });
     const meter = row.getByRole("meter");
-    const [headerBox, usageHeaderBox, slotsBox, meterBox, listBox] = await Promise.all([
+    const [headerBox, usageHeaderBox, capacityBox, meterBox, listBox] = await Promise.all([
       header.boundingBox(),
       usageHeader.boundingBox(),
-      slots.boundingBox(),
+      capacityCells.boundingBox(),
       meter.boundingBox(),
       page.getByRole("listbox", { name: runners.listLabel }).boundingBox(),
     ]);
-    expect(Math.round(slotsBox?.x ?? -1)).toBe(Math.round(headerBox?.x ?? -2));
+    expect(Math.round(capacityBox?.x ?? -1)).toBe(Math.round(headerBox?.x ?? -2));
     expect(Math.round(meterBox?.x ?? -1)).toBe(Math.round(usageHeaderBox?.x ?? -2));
     expect(listBox?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(900);
   });

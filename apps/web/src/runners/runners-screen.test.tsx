@@ -283,7 +283,7 @@ describe("Runners 고른 러너 패널", () => {
   it("지금 하는 런 블록은 n/capacity 와 쓰는 런·기다리는 런을 Run 상세 링크로 보인다", () => {
     const { db, ids } = seedDatabase();
     const a = panelHtml(render(loadRunnersPage(db, now), "runner-a"));
-    expect(textOf(a)).toContain(`${panel.slots} 4/10`);
+    expect(textOf(a)).toContain(`${panel.capacity} 4/10`);
     expect(a).toMatch(
       /<h3[^>]*>자리<\/h3><span[^>]*><span role="img" aria-label="10자리 중 4자리 사용"/,
     );
@@ -527,7 +527,7 @@ describe("Runners 다시 그리기(0092)", () => {
     const html = render(withUsage([]));
     const head = html.slice(0, html.indexOf('role="listbox"'));
     expect(textOf(head)).toContain(
-      `${runnersJson.columns.runner} ${runnersJson.columns.slots} ${runnersJson.columns.usage}`,
+      `${runnersJson.columns.runner} ${runnersJson.columns.capacity} ${runnersJson.columns.usage}`,
     );
     expect(head).toMatch(/aria-hidden="true"/);
   });
@@ -577,7 +577,7 @@ describe("Runners 다시 그리기(0092)", () => {
     const order = [
       at("<h2"),
       at(panel.fix.assignmentBlocked.title),
-      at(`>${panel.slots}</h3>`),
+      at(`>${panel.capacity}</h3>`),
       at(`>${panel.usage.title}</h3>`),
       at(`>${panel.checksTitle}</h3>`),
     ];

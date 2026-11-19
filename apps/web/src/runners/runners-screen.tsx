@@ -109,7 +109,7 @@ export function RunnersScreen({ page, selectedId, ws, onSelect, actions }: Runne
                   <TableHeader>
                     <span {...stylex.props(styles.rowGrid)}>
                       <span>{t("columns.runner")}</span>
-                      <span>{t("columns.slots")}</span>
+                      <span>{t("columns.capacity")}</span>
                       <span>{t("columns.usage")}</span>
                     </span>
                   </TableHeader>
@@ -182,8 +182,8 @@ function RunnerRow({ runner }: { runner: RunnerView }) {
               <RowSentence runner={runner} />
             </Text>
           </span>
-          <span {...stylex.props(styles.slotsCell)}>
-            <RunnerSlots runner={runner} />
+          <span {...stylex.props(styles.capacityCell)}>
+            <RunnerCapacity runner={runner} />
           </span>
           <span {...stylex.props(styles.usageCell)}>
             <HighestUsage runner={runner} />
@@ -194,14 +194,14 @@ function RunnerRow({ runner }: { runner: RunnerView }) {
   );
 }
 
-function RunnerSlots({ runner }: { runner: RunnerView }) {
+function RunnerCapacity({ runner }: { runner: RunnerView }) {
   const t = useTranslations("runners");
   const used = runner.occupying.length;
   return (
     <CapacityCells
       used={used}
       total={runner.capacity}
-      label={t("slotsLabel", { used, total: runner.capacity })}
+      label={t("capacityCellsLabel", { used, total: runner.capacity })}
       tone={runnerRowStatus(runner) === "online" ? "progress" : "problem"}
     />
   );
@@ -261,7 +261,7 @@ function RunnerPanel({ runner, actions }: { runner: RunnerView; actions: RunnerA
           onRecheck={recheck.request}
         />
       )}
-      <SlotRuns runner={runner} />
+      <CapacityRuns runner={runner} />
       <ProviderUsage runner={runner} />
       <CheckList runner={runner} />
       <LeftWorktrees runner={runner} />
@@ -361,13 +361,13 @@ function FixCallout({
   );
 }
 
-function SlotRuns({ runner }: { runner: RunnerView }) {
+function CapacityRuns({ runner }: { runner: RunnerView }) {
   const t = useTranslations("runners.panel");
   const statusName = useStatusName();
   const { elapsed, duration } = useTime();
   const empty = runner.occupying.length === 0 && runner.queued.length === 0;
   return (
-    <PanelSection title={t("slots")} meta={<RunnerSlots runner={runner} />}>
+    <PanelSection title={t("capacity")} meta={<RunnerCapacity runner={runner} />}>
       {empty ? (
         <Text variant="ui">{t("noRuns")}</Text>
       ) : (
@@ -690,8 +690,8 @@ const styles = stylex.create({
   rowGrid: {
     display: "grid",
     gridTemplateColumns: {
-      default: `minmax(0, 1fr) ${size.slotsColumn} ${size.usageColumn}`,
-      [breakpoints.runnerRowTwoColumns]: `${size.slotsColumn} minmax(0, 1fr)`,
+      default: `minmax(0, 1fr) ${size.capacityCellsColumn} ${size.usageColumn}`,
+      [breakpoints.runnerRowTwoColumns]: `${size.capacityCellsColumn} minmax(0, 1fr)`,
       [breakpoints.runnerRowOneColumn]: "minmax(0, 1fr)",
     },
     alignItems: "center",
@@ -719,7 +719,7 @@ const styles = stylex.create({
   },
   rowName: { display: "flex", flexShrink: 0, maxWidth: "100%" },
   rowHost: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 },
-  slotsCell: { display: "flex", minWidth: 0 },
+  capacityCell: { display: "flex", minWidth: 0 },
   usageCell: { minWidth: 0 },
   highestUsage: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   highestQualifier: {
