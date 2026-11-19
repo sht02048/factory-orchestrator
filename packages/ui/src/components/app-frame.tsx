@@ -12,7 +12,9 @@ import {
   size,
   space,
 } from "../tokens.stylex";
+import { windowRegion } from "../window-frame";
 import { focusStyles } from "./focus";
+import { useTitleBarHidden } from "./window-chrome";
 
 export interface AppFrameProps {
   rail: ReactNode;
@@ -21,9 +23,22 @@ export interface AppFrameProps {
 }
 
 export function AppFrame({ rail, fill = true, children }: AppFrameProps) {
+  const titleBarHidden = useTitleBarHidden();
   return (
     <div {...stylex.props(styles.app, fill ? styles.fill : styles.contained)}>
-      <aside {...stylex.props(styles.rail)}>{rail}</aside>
+      <aside {...stylex.props(styles.rail)}>
+        {titleBarHidden ? (
+          <div
+            aria-hidden="true"
+            data-window-controls
+            {...windowRegion("drag")}
+            {...stylex.props(styles.windowControls)}
+          />
+        ) : null}
+        <div {...stylex.props(styles.railBody, titleBarHidden && styles.railBodyUnderControls)}>
+          {rail}
+        </div>
+      </aside>
       <main {...stylex.props(styles.main)}>{children}</main>
     </div>
   );
@@ -103,17 +118,25 @@ const styles = stylex.create({
   rail: {
     display: "flex",
     flexDirection: "column",
+    minHeight: 0,
+    backgroundColor: colors.bgSidebar,
+  },
+  windowControls: { flexShrink: 0, height: size.titleBar },
+  railBody: {
+    display: "flex",
+    flexDirection: "column",
+    flexGrow: 1,
     gap: space.s4,
     minHeight: 0,
     paddingBlock: space.s4,
     paddingInline: space.s2,
     overflow: "auto",
-    backgroundColor: colors.bgSidebar,
   },
+  railBodyUnderControls: { paddingTop: space.s2 },
   brand: {
     display: "flex",
     justifyContent: "center",
-    paddingTop: space.s1,
+    paddingBlock: space.s1,
     color: colors.textPrimary,
   },
   workspace: {

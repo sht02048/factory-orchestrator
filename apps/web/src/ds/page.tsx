@@ -55,12 +55,12 @@ export function DesignSystemPage() {
         </NavGroup>
       </nav>
       <main {...stylex.props(styles.main)}>
+        <PageHeader
+          title={tDs("title")}
+          subtitle={tDs("subtitle")}
+          actions={<Text variant="meta">{tDs("theme")}</Text>}
+        />
         <div {...stylex.props(styles.content)}>
-          <PageHeader
-            title={tDs("title")}
-            subtitle={tDs("subtitle")}
-            actions={<Text variant="meta">{tDs("theme")}</Text>}
-          />
           <div {...stylex.props(styles.sections)}>
             <TokenSections />
             <ComponentSections />

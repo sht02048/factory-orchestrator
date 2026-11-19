@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
-import { Toaster, documentStyles } from "@ganger/ui";
+import { Toaster, WindowChrome, WindowDragFrame, documentStyles } from "@ganger/ui";
 import {
+  ErrorComponent,
   HeadContent,
   Outlet,
   Scripts,
@@ -8,16 +9,19 @@ import {
   redirect,
   rootRouteId,
   useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
+import type { ErrorComponentProps } from "@tanstack/react-router";
+import { z } from "zod";
 import { IntlProvider, useTranslations } from "use-intl";
 import { appMessages, defaultLocale, t } from "../i18n";
 import { NotFoundScreen } from "../not-found/not-found-screen";
 import { useDesktopUpdates } from "../shell/desktop-updates";
 import { UpdateToast } from "../shell/update-toast";
 import { ONBOARDING_PATH, isOpenPath, onboardingRedirect } from "../onboarding/model";
-import { getTimeZone } from "../server/functions";
+import { getTimeZone, getTitleBarHidden } from "../server/functions";
 import { getOnboardingComplete } from "../server/onboarding-functions";
 import { localTimeZone, timeZoneCookie, timeZoneFromCookies } from "@ganger/app/time-zone";
 import appCss from "../styles/app.css?url";
@@ -32,7 +36,10 @@ export const Route = createRootRoute({
     if (onboardingRedirect(location.pathname, complete) !== null)
       throw redirect({ to: ONBOARDING_PATH });
   },
-  loader: () => getTimeZone(),
+  loader: async () => {
+    const [timeZone, titleBarHidden] = await Promise.all([getTimeZone(), getTitleBarHidden()]);
+    return { timeZone, titleBarHidden };
+  },
   shouldReload: false,
   head: () => ({
     meta: [
@@ -50,6 +57,7 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
   component: RootLayout,
   notFoundComponent: NotFoundScreen,
+  errorComponent: RootError,
 });
 
 function RootDocument({ children }: { children: ReactNode }) {
@@ -67,13 +75,31 @@ function RootDocument({ children }: { children: ReactNode }) {
   );
 }
 
+const rootLoaderSchema = z.object({ titleBarHidden: z.boolean() });
+
+function RootError({ error }: ErrorComponentProps) {
+  const titleBarHidden = useRouterState({
+    select: (state) =>
+      rootLoaderSchema.safeParse(state.matches[0]?.loaderData).data?.titleBarHidden ?? false,
+  });
+  return (
+    <WindowChrome titleBarHidden={titleBarHidden}>
+      <WindowDragFrame>
+        <ErrorComponent error={error} />
+      </WindowDragFrame>
+    </WindowChrome>
+  );
+}
+
 function RootLayout() {
-  const timeZone = Route.useLoaderData();
+  const { timeZone, titleBarHidden } = Route.useLoaderData();
   return (
     <IntlProvider locale={defaultLocale} messages={appMessages} timeZone={timeZone}>
-      <TimeZoneSync timeZone={timeZone} />
-      <Outlet />
-      <AppToaster />
+      <WindowChrome titleBarHidden={titleBarHidden}>
+        <TimeZoneSync timeZone={timeZone} />
+        <Outlet />
+        <AppToaster />
+      </WindowChrome>
     </IntlProvider>
   );
 }

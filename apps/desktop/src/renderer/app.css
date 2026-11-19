@@ -45,4 +45,15 @@
     padding: 0;
     list-style: none;
   }
+
+  [data-app-region="drag"] {
+    -webkit-app-region: drag;
+  }
+
+  [data-app-region="drag"]
+    :is(a, button, input, select, textarea, summary, [tabindex], [role="tab"]),
+  [data-app-region="no-drag"],
+  :is([role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]) {
+    -webkit-app-region: no-drag;
+  }
 }
