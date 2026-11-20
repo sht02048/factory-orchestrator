@@ -22,13 +22,26 @@ export interface SplitViewProps {
   panel: ReactNode;
   fill?: boolean;
   variant?: "list" | "editor";
+  stackedListShare?: "half" | "larger";
 }
 
-export function SplitView({ list, panel, fill = true, variant = "list" }: SplitViewProps) {
+export function SplitView({
+  list,
+  panel,
+  fill = true,
+  variant = "list",
+  stackedListShare = "half",
+}: SplitViewProps) {
   const editor = variant === "editor";
   return (
     <div {...stylex.props(styles.frame, fill ? styles.fill : styles.contained)}>
-      <div {...stylex.props(styles.split, editor && styles.splitEditor)}>
+      <div
+        {...stylex.props(
+          styles.split,
+          !editor && stackedListShare === "larger" && styles.splitListLarger,
+          editor && styles.splitEditor,
+        )}
+      >
         <div {...stylex.props(styles.list)}>{list}</div>
         <aside {...stylex.props(styles.panel, editor && styles.panelEditor)}>{panel}</aside>
       </div>
@@ -194,6 +207,9 @@ const styles = stylex.create({
     gridTemplateRows: { default: null, [LIST_STACKED]: "minmax(0, 1fr) minmax(0, 1fr)" },
     height: "100%",
     minHeight: 0,
+  },
+  splitListLarger: {
+    gridTemplateRows: { default: null, [LIST_STACKED]: "minmax(0, 3fr) minmax(0, 2fr)" },
   },
   splitEditor: {
     gridTemplateColumns: {

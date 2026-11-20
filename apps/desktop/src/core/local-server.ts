@@ -1,10 +1,11 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import { homePaths, readBootEnv } from "@ganger/cli/home";
 import { isProcessAlive, isSameProcess, readLiveServerLock } from "@ganger/cli/server-lock";
 import { webUrl } from "@ganger/cli/web-url";
 import { parseBootConfig } from "@ganger/db";
+import { log, readLogSettings, rotateIfOver } from "@ganger/log";
 import { z } from "zod";
 import type { Identity, Probe } from "./identity.js";
 import { probeIdentity } from "./identity.js";
@@ -39,6 +40,17 @@ export function fileRecordStore(path: string): RecordStore {
       writeFileSync(path, record === undefined ? "{}\n" : `${JSON.stringify(record)}\n`);
     },
   };
+}
+
+export function rotateOutputLog(
+  logFile: string,
+  env: Readonly<Record<string, string | undefined>>,
+): void {
+  try {
+    rotateIfOver(logFile, readLogSettings(env).limits);
+  } catch (error) {
+    log().warn("log.rotate_failed", { path: basename(logFile), error });
+  }
 }
 
 export type Owner = "app" | "external";
@@ -222,6 +234,7 @@ export class LocalServer {
     const init = this.initHome();
     if (!init.ok) return { kind: "failed", reason: init.reason };
     mkdirSync(dirname(this.options.logFile), { recursive: true });
+    rotateOutputLog(this.options.logFile, this.options.node.env);
     const log = openSync(this.options.logFile, "a");
     let pid: number | undefined;
     try {

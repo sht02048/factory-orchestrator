@@ -51,7 +51,7 @@ describe("레일로 화면 옮기기(브라우저, 0117)", () => {
     await open(page, "/runs", "runs");
 
     const preloaded = page.waitForResponse(
-      (response) => serverFnName(response.url()) === "getTicketsPage",
+      (response) => serverFnName(response.url()) === "getTrackerTickets",
     );
     await page.getByRole("link", { name: /^Tickets/ }).hover();
     await (await preloaded).finished();
@@ -68,7 +68,7 @@ describe("레일로 화면 옮기기(브라우저, 0117)", () => {
 
     const again = await navigateByRail(page, "tickets", "again");
     expect(again.ms).toBeLessThan(TRACKER_DELAY_MS);
-    expect(again.serverCalls.map((call) => call.name)).toContain("getTicketsPage");
+    expect(again.serverCalls.map((call) => call.name)).toContain("getTicketRuns");
   });
 
   it("다시 들어간 화면은 그사이 바뀐 런 상태를 반영한다", async (context) => {

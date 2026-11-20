@@ -5,6 +5,7 @@ import { createAdapterRegistry } from "@ganger/app/adapters";
 import { ELECTRON_RUN_AS_NODE_ENV, mcpLaunch } from "@ganger/app/settings/mcp-launch";
 import { localTimeZone } from "@ganger/app/time-zone";
 import { BootConfigError, SecretBox, loadMigrations, parseBootConfig } from "@ganger/db";
+import { log, processStartFields } from "@ganger/log";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { MissingEnvFileError, homePaths, readBootEnv, resolveHome } from "./home.js";
 import { EnvFileFormatError, init } from "./init.js";
@@ -43,6 +44,7 @@ export interface ProgramContext {
   out(line: string): void;
   err(line: string): void;
   onStopSignal(handler: (signal: NodeJS.Signals) => void): void;
+  setupLog?: (proc: "cli" | "mcp", home: string) => () => void;
 }
 
 export async function runProgram(
@@ -127,11 +129,23 @@ function runInit(context: ProgramContext, options: Parameters<typeof init>[0]): 
 }
 
 async function runStart(context: ProgramContext, home: string): Promise<number> {
+  const closeLog = context.setupLog?.("cli", home);
+  log().info("process.started", processStartFields());
+  try {
+    return await superviseStart(context, home);
+  } finally {
+    log().info("process.stopped");
+    closeLog?.();
+  }
+}
+
+async function superviseStart(context: ProgramContext, home: string): Promise<number> {
   const abort = new AbortController();
   let started: Started | undefined;
   context.onStopSignal((signal) => {
     if (abort.signal.aborted) return;
     abort.abort();
+    log().info("process.stopping", { signal });
     context.out(messages.start.stopping(signal));
     void started?.stop();
   });
@@ -178,6 +192,17 @@ async function runStart(context: ProgramContext, home: string): Promise<number> 
 }
 
 async function runMcp(context: ProgramContext, home: string): Promise<number> {
+  const closeLog = context.setupLog?.("mcp", home);
+  log().info("process.started", processStartFields());
+  try {
+    return await serveMcp(context, home);
+  } finally {
+    log().info("process.stopped");
+    closeLog?.();
+  }
+}
+
+async function serveMcp(context: ProgramContext, home: string): Promise<number> {
   const config = parseBootConfig(readBootEnv(homePaths(home).envFile, context.env));
   const migrations = loadMigrations();
   const db = openMcpDatabase(config.databasePath, migrations);

@@ -703,6 +703,17 @@ describe("서버 렌더", () => {
     expect(html.match(/<dd/g)).toHaveLength(2);
   });
 
+  it("SplitView stackedListShare larger 는 쌓였을 때 목록에 더 큰 몫을 주고, 주지 않으면 지금 배치 그대로다(0127)", () => {
+    const half = renderToString(<SplitView list="목록" panel="패널" />);
+    const explicitHalf = renderToString(
+      <SplitView stackedListShare="half" list="목록" panel="패널" />,
+    );
+    const larger = renderToString(<SplitView stackedListShare="larger" list="목록" panel="패널" />);
+    expect(explicitHalf).toEqual(half);
+    expect(larger).toContain("목록");
+    expect(larger).not.toEqual(half);
+  });
+
   it("SplitView editor 는 목록 변형과 다른 열 배치를 쓴다", () => {
     const list = renderToString(<SplitView list="목록" panel="패널" />);
     const editor = renderToString(<SplitView variant="editor" list="목록" panel="패널" />);

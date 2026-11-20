@@ -1,4 +1,5 @@
 import type { AgentResult, PrState, SummaryOutcome, TrackerStateCategory } from "@ganger/core";
+import type { Remote } from "../settings/model.js";
 import type { WorkspaceChoice } from "../shell/model.js";
 
 export type TicketRun =
@@ -92,6 +93,82 @@ export interface TicketsPage {
   truncated: TrackerTruncation[];
   trackerProjectCount: number;
 }
+
+export interface TicketMappingRepoFacts {
+  project: string;
+  isDefault: boolean;
+  labelId: string | null;
+}
+
+export interface TicketMappingFacts {
+  agent: string;
+  defaultRepo: string;
+  repos: ReadonlyArray<TicketMappingRepoFacts>;
+}
+
+export interface TicketProjectFacts {
+  connection: string;
+  projectId: string;
+  name: string;
+  mapping: TicketMappingFacts | null;
+  autoAssignLabel: string | null;
+}
+
+export interface TicketRunFacts {
+  runs: TicketRun[];
+  activeRunId: string | null;
+  retryRepo: string | null;
+}
+
+export interface TicketRunsData {
+  workspace: WorkspaceChoice;
+  runners: RunnerChoice[];
+  agents: string[];
+  projects: TicketProjectFacts[];
+  repoNames: Record<string, string>;
+  runsByTicket: Record<string, TicketRunFacts>;
+}
+
+export interface TrackerLabel {
+  id: string;
+  name: string;
+}
+
+export interface TrackerTicketView {
+  connection: string;
+  projectId: string;
+  projectName: string;
+  key: string;
+  title: string;
+  url: string | null;
+  state: { name: string; category: TrackerStateCategory };
+  labels: ReadonlyArray<TrackerLabel>;
+}
+
+export interface TrackerProjectLabels {
+  connection: string;
+  projectId: string;
+  labels: Remote<TrackerLabel>;
+}
+
+export interface TrackerTicketsData {
+  workspace: WorkspaceChoice;
+  tickets: TrackerTicketView[];
+  labels: TrackerProjectLabels[];
+  errors: TrackerLoadError[];
+  truncated: TrackerTruncation[];
+}
+
+export const ASSIGN_REJECT_REASONS = [
+  "active-run",
+  "no-mapping",
+  "unknown-repo",
+  "unknown-agent",
+  "unknown-runner",
+  "runner-assignment-blocked",
+] as const;
+
+export type AssignRejectReason = (typeof ASSIGN_REJECT_REASONS)[number];
 
 export const TICKET_FILTERS = ["all", "assignable", "todo", "in-progress", "done"] as const;
 export type TicketFilter = (typeof TICKET_FILTERS)[number];

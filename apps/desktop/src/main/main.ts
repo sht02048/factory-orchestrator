@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { PRODUCT_DISPLAY_NAME, resolveHome } from "@ganger/cli/home";
 import { app, dialog } from "electron";
+import { useConsoleLogger } from "@ganger/log";
 import { z } from "zod";
 import { LocalServer, fileRecordStore } from "../core/local-server.js";
 import { SERVER_BUNDLE_ENV, loadServerBundle } from "../core/server-bundle.js";
@@ -15,6 +16,8 @@ import { Updater } from "../core/updater.js";
 import type { UpdateStore } from "../core/updater.js";
 import { Controller, appPaths } from "./controller.js";
 import { installBlock, squirrelInstaller } from "./update-installer.js";
+
+useConsoleLogger("desktop");
 
 const USER_DATA_ENV = "GANGER_DESKTOP_USER_DATA";
 

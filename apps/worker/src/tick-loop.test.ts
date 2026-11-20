@@ -1,3 +1,4 @@
+import { silentLogger } from "@ganger/log/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MIN_REST_AFTER_TICK_MS, WAKE_BATCH_MS, startTickLoop } from "./tick-loop.js";
 import type { TickLoop } from "./tick-loop.js";
@@ -37,7 +38,7 @@ function startRecording(
       }
     },
     pollIntervalMs: POLL_INTERVAL_MS,
-    logger: { warn: (message) => recorded.warnings.push(message) },
+    logger: { ...silentLogger, warn: (event) => recorded.warnings.push(event) },
   });
   return recorded;
 }
@@ -119,7 +120,7 @@ describe("바퀴 사이의 기다림", () => {
     await advance(POLL_INTERVAL_MS * 2);
 
     expect(recorded.starts).toEqual([0, POLL_INTERVAL_MS, POLL_INTERVAL_MS * 2]);
-    expect(recorded.warnings).toEqual(["tick failed"]);
+    expect(recorded.warnings).toEqual(["worker.tick_failed"]);
   });
 
   it("바퀴 사이에 시스템 시계가 뒤로 가도 wake 는 250ms 뒤, 폴링은 폴링 간격 뒤에 돈다", async () => {

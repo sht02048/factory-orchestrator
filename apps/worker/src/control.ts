@@ -1,3 +1,4 @@
+import { withLogContext } from "@ganger/log";
 import { planRunControl } from "@ganger/core";
 import type { RunControlFailure, RunnerErrorDetail } from "@ganger/core";
 import {
@@ -18,16 +19,18 @@ export async function processRunControlRequests(context: TickContext): Promise<v
   try {
     pending = listPendingRunControlRequests(context.db);
   } catch (error) {
-    context.logger.warn("could not read run control requests", { error });
+    context.logger.warn("run_control.read_failed", { error });
     return;
   }
   for (const request of pending) {
     let failure: RunControlFailure | null;
     let detail: RunnerErrorDetail | null = null;
     try {
-      failure = await applyRunControl(context, request);
+      failure = await withLogContext({ runId: request.runId }, () =>
+        applyRunControl(context, request),
+      );
     } catch (error) {
-      context.logger.warn("could not apply a run control request", {
+      context.logger.warn("run_control.apply_failed", {
         runId: request.runId,
         control: request.control,
         error,
@@ -102,7 +105,7 @@ function recorded(
 ): RunControlFailure | null {
   const result = tryWrite(context, run.id, write);
   if (result?.ok === true) return null;
-  context.logger.warn("could not record a run control change", {
+  context.logger.warn("run_control.record_failed", {
     runId: run.id,
     error: result?.ok === false ? result.error : "write failed",
   });
@@ -118,7 +121,7 @@ async function restartPromptFor(context: TickContext, run: ActiveRun): Promise<s
       const ticket = await tracker.getTicket(run.ticket.key);
       if (ticket !== null) ticketText = `${ticket.title}\n\n${ticket.body}`;
     } catch (error) {
-      context.logger.warn("could not read the ticket for a restarted agent", {
+      context.logger.warn("run_control.ticket_read_failed", {
         runId: run.id,
         error,
       });

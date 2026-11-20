@@ -87,19 +87,23 @@ export function recordSettingsChange(
   insertChange(db, { kind: "settings", ...target }, now);
 }
 
+export function markTrackerReadsStale(db: Database, connection: TrackerConnectionId): void {
+  db.insert(trackerReadGenerations)
+    .values({ trackerConnectionId: connection, generation: 1 })
+    .onConflictDoUpdate({
+      target: trackerReadGenerations.trackerConnectionId,
+      set: { generation: sql`${trackerReadGenerations.generation} + 1` },
+    })
+    .run();
+}
+
 export function markTrackerChanged(
   db: Database,
   connection: TrackerConnectionId,
   now: Date = new Date(),
 ): void {
   inTransaction(db, () => {
-    db.insert(trackerReadGenerations)
-      .values({ trackerConnectionId: connection, generation: 1 })
-      .onConflictDoUpdate({
-        target: trackerReadGenerations.trackerConnectionId,
-        set: { generation: sql`${trackerReadGenerations.generation} + 1` },
-      })
-      .run();
+    markTrackerReadsStale(db, connection);
     insertChange(db, { kind: "tracker", targetId: connection, workspaceId: null }, now);
   });
 }

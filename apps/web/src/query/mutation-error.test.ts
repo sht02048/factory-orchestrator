@@ -6,6 +6,7 @@ import {
   MutationRejectedError,
   okOrThrow,
   rejectedAs,
+  rejectionReasonOf,
   toMutationError,
 } from "./mutation-error";
 
@@ -54,5 +55,21 @@ describe("mutation 오류 변환(스펙 0003 4.4, C5)", () => {
     await expect(rejectedAs(() => Promise.resolve("done"), ANSWER_REJECT_REASONS)).resolves.toBe(
       "done",
     );
+  });
+});
+
+describe("rejectionReasonOf(0127)", () => {
+  const REASONS = ["active-run", "no-mapping"] as const;
+
+  it("okOrThrow 가 던진 오류와 서버 함수 경계를 넘은 메시지에서 목록의 이유를 꺼낸다", () => {
+    expect(rejectionReasonOf(new MutationRejectedError("no-mapping"), REASONS)).toBe("no-mapping");
+    expect(rejectionReasonOf(new Error("mutation rejected: active-run"), REASONS)).toBe(
+      "active-run",
+    );
+  });
+
+  it("목록에 없는 이유나 다른 오류는 null 이다", () => {
+    expect(rejectionReasonOf(new MutationRejectedError("other"), REASONS)).toBeNull();
+    expect(rejectionReasonOf(new TypeError("Failed to fetch"), REASONS)).toBeNull();
   });
 });

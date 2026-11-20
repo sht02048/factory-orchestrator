@@ -1,7 +1,24 @@
-import { toTicketKey, toTrackerStateId } from "@ganger/core";
+import {
+  toAgentId,
+  toLabelId,
+  toRunnerProjectId,
+  toTicketKey,
+  toTrackerConnectionId,
+  toTrackerProjectId,
+  toTrackerStateId,
+} from "@ganger/core";
+import { assignRun } from "@ganger/db";
 import type { FakeTracker } from "@ganger/core/testing";
 import { describe, expect, it } from "vitest";
-import { MAX_PAGES, PAGE_SIZE, loadTicketsPage, ticketId } from "@ganger/app/tickets/load";
+import {
+  MAX_PAGES,
+  PAGE_SIZE,
+  loadTicketRuns,
+  loadTicketsPage,
+  loadTrackerTickets,
+  ticketId,
+} from "@ganger/app/tickets/load";
+import { mergeTicketsPage } from "@ganger/app/tickets/merge";
 import { TICKET_FILTERS, lastRun, matchesFilter } from "@ganger/app/tickets/model";
 import type { TicketFilter, TicketView, TicketsPage } from "@ganger/app/tickets/model";
 import { T0, connection, docsProject, labs, now, setupTickets } from "./test-fixtures";
@@ -172,5 +189,79 @@ describe("Tickets 읽기", () => {
     expect(page.workspace.kind).toBe("all");
     expect(page.tickets).toEqual([]);
     expect(calls).toBe(0);
+  });
+});
+
+describe("Tickets 를 DB 부분과 트래커 부분으로 나눠 읽기(0127)", () => {
+  function countTrackerReads(tracker: FakeTracker): () => number {
+    let calls = 0;
+    const tickets = tracker.listProjectTickets.bind(tracker);
+    const labels = tracker.listLabels.bind(tracker);
+    tracker.listProjectTickets = (...args) => {
+      calls += 1;
+      return tickets(...args);
+    };
+    tracker.listLabels = (...args) => {
+      calls += 1;
+      return labels(...args);
+    };
+    return () => calls;
+  }
+
+  it("DB 부분은 트래커를 읽지 않는다", () => {
+    const { context, tracker } = setupTickets();
+    const calls = countTrackerReads(tracker);
+    const runs = loadTicketRuns(context.db, undefined, now);
+    expect(calls()).toBe(0);
+    expect(runs.projects.map((p) => p.name).toSorted()).toEqual(["Broken", "Docs", "Web"]);
+  });
+
+  it("두 부분을 합치면 MCP 가 쓰는 loadTicketsPage 와 같은 모양이다", async () => {
+    const { context } = setupTickets();
+    const merged = mergeTicketsPage(
+      loadTicketRuns(context.db, undefined, now),
+      await loadTrackerTickets(context, undefined),
+    );
+    expect(merged).toEqual(await loadTicketsPage(context, undefined, now));
+  });
+
+  it("트래커 부분은 트래커 프로젝트마다 라벨을 함께 돌려준다", async () => {
+    const { context, tracker } = setupTickets();
+    tracker.labels.set(toTrackerProjectId("tp-web"), [
+      { id: toLabelId("label-z"), name: "zeta" },
+      { id: toLabelId("label-a"), name: "alpha" },
+    ]);
+    const data = await loadTrackerTickets(context, undefined);
+    expect(data.labels.find((p) => p.projectId === "tp-web")?.labels).toEqual({
+      ok: true,
+      items: [
+        { id: "label-a", name: "alpha" },
+        { id: "label-z", name: "zeta" },
+      ],
+    });
+  });
+
+  it("런이 바뀌면 트래커를 다시 읽지 않고 DB 부분만으로 할당할 수 있음을 다시 계산한다", async () => {
+    const { context, tracker } = setupTickets();
+    const trackerData = await loadTrackerTickets(context, undefined);
+    const calls = countTrackerReads(tracker);
+    const before = mergeTicketsPage(loadTicketRuns(context.db, undefined, now), trackerData);
+    expect(byKey(before, "ACME-6").assignability.kind).toBe("ready");
+
+    const assigned = assignRun(context.db, {
+      ticket: { connection: toTrackerConnectionId(connection), key: toTicketKey("ACME-6") },
+      trackerProject: toTrackerProjectId("tp-web"),
+      runnerProject: toRunnerProjectId("github:acme/web"),
+      agent: toAgentId("claude"),
+      now,
+    });
+    if (!assigned.ok) throw new Error(assigned.reason);
+    const after = mergeTicketsPage(loadTicketRuns(context.db, undefined, now), trackerData);
+
+    expect(byKey(after, "ACME-6").assignability).toEqual({
+      kind: "active-run",
+      runId: assigned.run.id,
+    });
+    expect(calls()).toBe(0);
   });
 });

@@ -12,9 +12,10 @@ import {
   getMapping,
   listRunners,
   listWorkspaceTrackerProjects,
-  markTrackerChanged,
+  markTrackerReadsStale,
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
+import type { AssignRejectReason } from "./model.js";
 import { z } from "zod";
 
 export const assignInput = z.object({
@@ -29,18 +30,7 @@ export const assignInput = z.object({
 
 export type AssignInput = z.infer<typeof assignInput>;
 
-export type AssignResult =
-  | { ok: true; runId: string }
-  | {
-      ok: false;
-      reason:
-        | "active-run"
-        | "no-mapping"
-        | "unknown-repo"
-        | "unknown-agent"
-        | "unknown-runner"
-        | "runner-assignment-blocked";
-    };
+export type AssignResult = { ok: true; runId: string } | { ok: false; reason: AssignRejectReason };
 
 export function submitAssignment(db: Database, input: AssignInput, now: Date): AssignResult {
   const connection = toTrackerConnectionId(input.connection);
@@ -78,7 +68,7 @@ export function submitAssignment(db: Database, input: AssignInput, now: Date): A
     now,
   });
   if (result.ok) {
-    markTrackerChanged(db, connection);
+    markTrackerReadsStale(db, connection);
     return { ok: true, runId: result.run.id };
   }
   switch (result.reason) {

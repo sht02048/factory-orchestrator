@@ -1,3 +1,4 @@
+import { silentLogger } from "@ganger/log/testing";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -102,7 +103,7 @@ beforeAll(async () => {
       .registerCodeHost({ kind: githubKind, create: () => new FakeCodeHost(githubKind) })
       .registerRunner({ kind: runnerKind, create: () => runner }),
     secretBox: new SecretBox(encryptionKey),
-    logger: { warn: () => undefined },
+    logger: silentLogger,
   });
   loop = startTickLoop({
     tick: async () => {
@@ -110,7 +111,7 @@ beforeAll(async () => {
       ticks += 1;
     },
     pollIntervalMs: POLL_INTERVAL_MS,
-    logger: { warn: () => undefined },
+    logger: silentLogger,
   });
   globalThis.__gangerE2eWakeWorker = () => {
     ticksAtWake.push(ticks);

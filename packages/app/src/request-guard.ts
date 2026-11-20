@@ -126,14 +126,26 @@ export function rejectionResponse(reason: RejectReason): Response {
   });
 }
 
-export function rejectionLogLine(
+export interface RejectionLogFields {
+  status: number;
+  reason: RejectReason;
+  method: string;
+  path: string;
+  host: string;
+  origin: string | null;
+}
+
+export function rejectionLogFields(
   request: Request,
   verdict: Extract<GuardVerdict, { ok: false }>,
-): string {
-  const clip = (value: string) => JSON.stringify(value.slice(0, 200));
-  const { pathname } = new URL(request.url);
-  return (
-    `request rejected: ${verdict.status} ${verdict.reason} ${request.method} ${clip(pathname)} ` +
-    `host=${clip(verdict.host)} origin=${verdict.origin === null ? "-" : clip(verdict.origin)}`
-  );
+): RejectionLogFields {
+  const clip = (value: string) => value.slice(0, 200);
+  return {
+    status: verdict.status,
+    reason: verdict.reason,
+    method: request.method,
+    path: clip(new URL(request.url).pathname),
+    host: clip(verdict.host),
+    origin: verdict.origin === null ? null : clip(verdict.origin),
+  };
 }

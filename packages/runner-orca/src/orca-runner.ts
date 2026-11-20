@@ -1,3 +1,6 @@
+import { log } from "@ganger/log";
+import type { Logger } from "@ganger/log";
+import { describeRunnerCall, logRunnerCall } from "./runner-call-log.js";
 import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@ganger/core";
 import type {
   AgentRef,
@@ -115,6 +118,7 @@ interface ProjectRow {
 
 export interface OrcaRunnerOptions {
   sleep?: (ms: number) => Promise<void>;
+  logger?: () => Logger;
 }
 
 const realSleep = (ms: number): Promise<void> =>
@@ -127,11 +131,13 @@ export class OrcaRunner implements Runner {
   private readonly config: OrcaRunnerConfig;
   private readonly exec: RemoteExec;
   private readonly sleep: (ms: number) => Promise<void>;
+  private readonly logger: () => Logger;
 
   constructor(config: OrcaRunnerConfig, exec?: RemoteExec, options: OrcaRunnerOptions = {}) {
     this.config = config;
     this.exec = exec ?? sshExec(config);
     this.sleep = options.sleep ?? realSleep;
+    this.logger = options.logger ?? log;
   }
 
   async checkHealth(): Promise<RunnerHealth> {
@@ -1022,12 +1028,17 @@ export class OrcaRunner implements Runner {
       }
       throw error;
     }
+    const call = describeRunnerCall(argv, this.config.orcaPath);
+    const startedAt = performance.now();
     try {
-      return await this.exec.run(command, {
+      const result = await this.exec.run(command, {
         timeoutMs: options.timeoutMs ?? this.config.commandTimeoutMs,
         ...(options.stdin === undefined ? {} : { stdin: options.stdin }),
       });
+      logRunnerCall(this.logger(), call, performance.now() - startedAt, { kind: "result", result });
+      return result;
     } catch (error) {
+      logRunnerCall(this.logger(), call, performance.now() - startedAt, { kind: "threw", error });
       throw new AdapterError<RunnerErrorDetail>(
         { kind: "unreachable", detail: `could not run ssh: ${String(error)}` },
         { cause: error },

@@ -3,7 +3,7 @@ import {
   allowedHosts,
   checkRequest,
   hostnameOfHostHeader,
-  rejectionLogLine,
+  rejectionLogFields,
   rejectionResponse,
 } from "@ganger/app/request-guard";
 import type { AllowedHostsInput } from "@ganger/app/request-guard";
@@ -224,8 +224,13 @@ describe("거절 응답과 로그", () => {
     const response = rejectionResponse(verdict.reason);
     expect(response.status).toBe(403);
     expect(await response.text()).toContain("does not accept the host name");
-    expect(rejectionLogLine(req, verdict)).toBe(
-      'request rejected: 403 host-not-allowed GET "/runs" host="evil.example:3000" origin=-',
-    );
+    expect(rejectionLogFields(req, verdict)).toEqual({
+      status: 403,
+      reason: "host-not-allowed",
+      method: "GET",
+      path: "/runs",
+      host: "evil.example:3000",
+      origin: null,
+    });
   });
 });

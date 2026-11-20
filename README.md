@@ -191,7 +191,18 @@ Enter `https://hooks.example.com` as the address. The address must use HTTPS and
 - Add `--dry-run` to either command to print the file and the commands without changing anything.
 - Run `init` first. `service install` refuses to register a service that would fail to boot, and refuses to overwrite an existing service file.
 - The service runs the Node and CLI paths you installed it with, and uses your current `PATH`. After you move or upgrade Node, or move the server bundle to another folder, run `service uninstall` and `service install` again.
-- On macOS, logs go to `<home>/logs/ganger.log`. On Linux, read them with `journalctl --user -u ganger.service`, and run `loginctl enable-linger` once so the service keeps running after you log out.
+- On macOS, the service's console output goes to `<home>/logs/ganger.log`. On Linux, read it with `journalctl --user -u ganger.service`, and run `loginctl enable-linger` once so the service keeps running after you log out. The server logs below are the same however you start the server.
+
+### Server logs
+
+The web server, the worker, `ganger mcp`, and `ganger start` each write a server log to `<home>/logs/web.jsonl`, `worker.jsonl`, `mcp.jsonl`, and `cli.jsonl`. Each line is one JSON object that starts with `t` (time), `level`, `proc`, `pid`, `v` (version), `event` (a fixed dotted name such as `run.state_changed`), and `msg`, followed by context such as `runId`, `ticketKey`, `runnerId`, or `deliveryId`.
+
+- The default level is `info`, which records only changes: start and stop, each tracker webhook, assignments, run state changes, runner calls that change something, runners going online or offline, and a worker line every 10 minutes. Set `GANGER_LOG_LEVEL=debug` to also record every runner call and worker tick.
+- The console shows only warnings and errors.
+- A file that passes 10 MB moves to `.1`, and up to five old files are kept. Change this with `GANGER_LOG_MAX_MB` and `GANGER_LOG_FILES`. `ganger.log` and the desktop app's `desktop-server.log` follow the same limits when the server starts.
+- Secret values and token-shaped text are replaced with `[redacted]`. Ticket bodies, agent briefs, webhook bodies, and environment variables are never written. Ticket keys and runner names are kept, so check a log before you share it.
+
+For example, to follow one run across all processes: `jq -c 'select(.runId == "<run id>")' ~/.ganger/logs/*.jsonl`.
 
 ### Connect an MCP client
 

@@ -1,23 +1,28 @@
+import { exitOnFatal, log, processStartFields, setupProcessLog } from "@ganger/log";
 import { bootWorker } from "./boot.js";
 import { listenForWake } from "./wake-listener.js";
 
+const processLog = setupProcessLog({ proc: "worker", env: process.env });
+exitOnFatal(process, log, (code) => process.exit(code));
+
 const { migrated, worker } = bootWorker({ env: process.env });
-console.info(
-  migrated.length === 0
-    ? "[worker] started"
-    : `[worker] applied ${migrated.length} migration(s) and started`,
-);
+log().info("process.started", { ...processStartFields(), migrated: migrated.length });
 listenForWake(process, () => worker.wake());
 
 let stopping = false;
 const stop = (signal: NodeJS.Signals): void => {
   if (stopping) return;
   stopping = true;
-  console.info(`[worker] ${signal} received, stopping`);
+  log().info("process.stopping", { signal });
   worker.stop().then(
-    () => process.exit(0),
+    () => {
+      log().info("process.stopped");
+      processLog.close();
+      process.exit(0);
+    },
     (error: unknown) => {
-      console.error("[worker] could not stop cleanly", error);
+      log().error("process.stop_failed", { error });
+      processLog.close();
       process.exit(1);
     },
   );

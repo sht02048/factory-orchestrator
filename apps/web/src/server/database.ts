@@ -1,3 +1,4 @@
+import { log } from "@ganger/log";
 import { migrate, openDatabase, parseBootConfig, pruneChangeEvents } from "@ganger/db";
 import type { Database } from "@ganger/db";
 
@@ -25,7 +26,7 @@ export function startChangePruning(
     try {
       pruneChangeEvents(db, now());
     } catch (error) {
-      console.warn("could not prune change events", error);
+      log().warn("change_events.prune_failed", { error });
     }
   };
   prune();

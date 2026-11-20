@@ -8,7 +8,7 @@ import { ProjectDetailScreen, findBoundProject } from "../../settings/project-de
 import type { SettingsActions } from "../../settings/settings-screen";
 import { NavigationGuard } from "../../settings/navigation-guard";
 import { routerSettingsLink } from "../../settings/settings-link";
-import { useSettingsActions } from "../../settings/use-settings-actions";
+import { useSettingsActions, useSettingsReload } from "../../settings/use-settings-actions";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -44,7 +44,7 @@ function ProjectDetailRoute() {
   const { ws } = Route.useSearch();
   const navigate = Route.useNavigate();
   const router = useRouter();
-  const settingsActions = useSettingsActions();
+  const settingsActions = useSettingsActions(useSettingsReload());
   const actions = useMemo(
     (): SettingsActions => ({
       ...settingsActions,

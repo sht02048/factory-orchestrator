@@ -1,7 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DB_STALE_TIME_MS, createQueryClient } from "./query-client";
-import { PRELOAD_FRESH_MS, loadRouteQuery } from "./route-query";
+import { PRELOAD_FRESH_MS, loadCachedRouteQuery, loadRouteQuery } from "./route-query";
 import type { RouteQueryLoad } from "./route-query";
 
 function probeWorld() {
@@ -39,6 +39,10 @@ function probeWorld() {
     preload: () => loadRouteQuery(load("preload"), probeQuery),
     enter: () => loadRouteQuery(load("enter"), probeQuery),
     stay: () => loadRouteQuery(load("stay"), probeQuery),
+    cachedPreload: (staleTime: number) =>
+      loadCachedRouteQuery(load("preload"), { ...probeQuery, staleTime }),
+    cachedEnter: (staleTime: number) =>
+      loadCachedRouteQuery(load("enter"), { ...probeQuery, staleTime }),
   };
 }
 
@@ -191,5 +195,51 @@ describe("loadRouteQuery(스펙 0003 4.2)", () => {
 
     expect(data).toBe("same-request");
     expect(world.calls()).toBe(0);
+  });
+});
+
+describe("loadCachedRouteQuery(0127, 다시 들어가도 staleTime 을 지키는 query)", () => {
+  const FIVE_MINUTES = 5 * 60_000;
+
+  it("다시 들어가면 staleTime 안에서는 캐시만 쓰고 뒤에서 읽지 않는다", async () => {
+    const world = probeWorld();
+    await world.cachedEnter(FIVE_MINUTES);
+    vi.advanceTimersByTime(FIVE_MINUTES - 1);
+
+    const data = await world.cachedEnter(FIVE_MINUTES);
+    await flush();
+
+    expect(data).toBe("answer-1");
+    expect(world.calls()).toBe(1);
+  });
+
+  it("다시 들어갈 때 staleTime 이 지났으면 캐시를 바로 돌려주고 뒤에서 새로 읽는다", async () => {
+    const world = probeWorld();
+    const ONE_MINUTE = 60_000;
+    await world.cachedEnter(ONE_MINUTE);
+    vi.advanceTimersByTime(ONE_MINUTE * 2);
+    world.holdFetches();
+
+    const data = await world.cachedEnter(ONE_MINUTE);
+    await flush();
+
+    expect(data).toBe("answer-1");
+    expect(world.calls()).toBe(2);
+    world.releaseFetches();
+    await flush();
+    expect(world.cached()).toBe("answer-2");
+  });
+
+  it("미리 읽기는 staleTime 안이면 읽지 않고 지나면 읽는다", async () => {
+    const world = probeWorld();
+    await world.cachedEnter(FIVE_MINUTES);
+
+    vi.advanceTimersByTime(FIVE_MINUTES - 1);
+    await world.cachedPreload(FIVE_MINUTES);
+    expect(world.calls()).toBe(1);
+
+    vi.advanceTimersByTime(2);
+    await world.cachedPreload(FIVE_MINUTES);
+    expect(world.calls()).toBe(2);
   });
 });
