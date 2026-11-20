@@ -36,6 +36,7 @@ import {
 import type { Database, StoredRun } from "@ganger/db";
 import { createWorker } from "./worker.js";
 import type { Worker, WorkerLogger } from "./worker.js";
+import { memoryLogger } from "@ganger/log/testing";
 
 export const connection = toTrackerConnectionId("conn-1");
 export const trackerProject = toTrackerProjectId("tp-1");
@@ -59,7 +60,13 @@ export class Harness {
   readonly codeHost = new FakeCodeHost(toCodeHostKind(fakeKind));
   readonly runners = new Map<RunnerId, FakeRunner>();
   readonly registry: AdapterRegistry;
-  readonly warnings: Array<{ message: string; fields: unknown }> = [];
+  readonly log = memoryLogger();
+
+  get warnings(): Array<{ message: string; event: string; fields: unknown }> {
+    return this.log.entries
+      .filter((entry) => entry.level === "warn")
+      .map((entry) => ({ message: entry.msg, event: entry.event, fields: entry.fields }));
+  }
   now = new Date("2026-11-17T00:00:00Z");
   codeHostBroken = false;
   private readonly dir: string;
@@ -222,9 +229,7 @@ export class Harness {
   }
 
   worker(): Worker {
-    const logger: WorkerLogger = {
-      warn: (message, fields) => this.warnings.push({ message, fields }),
-    };
+    const logger: WorkerLogger = this.log;
     const worker = createWorker({
       dbPath: this.dbPath,
       registry: this.registry,

@@ -35,7 +35,8 @@ import {
   recordSettingsChange,
 } from "./change-events.js";
 import type { Database } from "./database.js";
-import { inTransaction } from "./database.js";
+import { inTransaction, onCommit } from "./database.js";
+import { log } from "@ganger/log";
 import type { CodeHostConnectionId, WorkspaceId } from "./ids.js";
 import {
   autoAssignLabels,
@@ -282,9 +283,23 @@ export interface RunnerCheckInput {
 
 export function recordRunnerCheck(db: Database, input: RunnerCheckInput): void {
   inTransaction(db, () => {
+    const wasOnline = db
+      .select({ online: runners.online })
+      .from(runners)
+      .where(eq(runners.id, input.runnerId))
+      .get()?.online;
     const before = visibleRunnerCheck(db, input.runnerId);
     writeRunnerCheck(db, input);
     if (before !== visibleRunnerCheck(db, input.runnerId)) recordRunnerChange(db, input.runnerId);
+    if (wasOnline !== undefined && wasOnline !== input.online) {
+      onCommit(db, () =>
+        log().info("runner.online_changed", {
+          runnerId: input.runnerId,
+          online: input.online,
+          ...(input.error === null ? {} : { kind: input.error.kind }),
+        }),
+      );
+    }
   });
 }
 

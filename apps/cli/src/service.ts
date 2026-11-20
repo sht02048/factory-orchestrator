@@ -52,7 +52,7 @@ export function servicePlan(context: ServiceContext): ServicePlan {
             label: SERVICE_NAME,
             programArguments,
             path: context.path,
-            logFile: join(logDir, `${SERVICE_NAME}.log`),
+            logFile: serviceLogFile(context.gangerHome),
           }),
         },
         directories: [dirname(path), logDir],
@@ -216,4 +216,8 @@ export function formatCommand(command: ReadonlyArray<string>): string {
   return command
     .map((arg) => (/^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", `'\\''`)}'`))
     .join(" ");
+}
+
+export function serviceLogFile(home: string): string {
+  return join(homePaths(home).logDir, `${SERVICE_NAME}.log`);
 }

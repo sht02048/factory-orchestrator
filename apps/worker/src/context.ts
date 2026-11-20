@@ -15,12 +15,11 @@ import type {
 } from "@ganger/core";
 import { changeRunState, listRunners, setRunnerMailbox } from "@ganger/db";
 import type { Database, StoredRun, StoredRunner } from "@ganger/db";
+import type { LogContext, Logger } from "@ganger/log";
 import type { WorkerAdapters } from "./adapters.js";
 import type { AutoAssignState } from "./auto-assign.js";
 
-export interface WorkerLogger {
-  warn(message: string, fields?: Readonly<Record<string, unknown>>): void;
-}
+export type WorkerLogger = Logger;
 
 export interface TickContext {
   db: Database;
@@ -86,7 +85,10 @@ export async function decideRunPrState(
   let unavailable = 0;
   const codeHosts = context.adapters.allCodeHosts(context.db, (connectionId, error) => {
     unavailable += 1;
-    context.logger.warn("could not create code host adapter", { connectionId, error });
+    context.logger.warn("run.code_host_adapter_failed", {
+      codeHostConnectionId: connectionId,
+      error,
+    });
   });
   for (const codeHost of codeHosts) {
     const repo = codeHost.repoOf(run.runnerProject);
@@ -108,7 +110,7 @@ export async function decideRunPrState(
       "no code host reads the run's project while some code host adapters are unavailable",
     );
   }
-  context.logger.warn("no code host reads the run's project; recording no pull request", {
+  context.logger.warn("run.code_host_missing", {
     runId: run.id,
     runnerProject: run.runnerProject,
   });
@@ -119,7 +121,7 @@ export function tryWrite<T>(context: TickContext, runId: RunId, write: () => T):
   try {
     return write();
   } catch (error) {
-    context.logger.warn("could not write run", { runId, error });
+    context.logger.warn("run.write_failed", { runId, error });
     return undefined;
   }
 }
@@ -165,5 +167,17 @@ export function reportFailure(
   runId: RunId,
   result: ReturnType<typeof changeRunState>,
 ): void {
-  if (!result.ok) logger.warn("could not change run state", { runId, error: result.error });
+  if (!result.ok) logger.warn("run.state_change_failed", { runId, error: result.error });
+}
+
+export function runLogContext(
+  run: Pick<StoredRun, "id" | "ticket" | "runnerId" | "workspaceId" | "worktreeName">,
+): LogContext {
+  return {
+    runId: run.id,
+    ticketKey: run.ticket.key,
+    runnerId: run.runnerId,
+    workspaceId: run.workspaceId,
+    worktreeName: run.worktreeName,
+  };
 }

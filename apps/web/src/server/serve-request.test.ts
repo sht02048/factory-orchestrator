@@ -1,3 +1,4 @@
+import { silentLogger } from "@ganger/log/testing";
 import { readFileSync } from "node:fs";
 import { AdapterRegistry, toTrackerConnectionId } from "@ganger/core";
 import { SecretBox, migrate, openDatabase, saveTrackerConnection } from "@ganger/db";
@@ -153,6 +154,6 @@ function webhookContext(): WebhookContext {
     db,
     secretBox,
     registry: new AdapterRegistry().registerTracker(linearTrackerFactory),
-    logger: { warn: () => undefined },
+    logger: silentLogger,
   };
 }

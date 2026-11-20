@@ -1,3 +1,4 @@
+import { log } from "@ganger/log";
 import type { ChangeEvent, ChangeResume } from "@ganger/db";
 import { sseMessage } from "../notifications/stream";
 
@@ -72,7 +73,7 @@ export class ChangeFeed {
       try {
         this.poll();
       } catch (error) {
-        console.warn("could not read change events", error);
+        log().warn("change_events.read_failed", { error });
       }
     }, this.#pollMs);
   }

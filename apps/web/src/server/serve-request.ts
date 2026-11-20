@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { withLogContext } from "@ganger/log";
 export interface ServeRequestOptions {
   guard(request: Request): Response | null;
   handle(request: Request): Response | Promise<Response>;
@@ -10,7 +12,7 @@ export async function serveRequest(
 ): Promise<Response> {
   const rejected = options.guard(request);
   if (rejected !== null) return rejected;
-  const response = await options.handle(request);
+  const response = await withLogContext({ requestId: randomUUID() }, () => options.handle(request));
   if (request.method === "POST" && response.ok) options.wakeWorker();
   return response;
 }

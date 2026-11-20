@@ -185,7 +185,21 @@ _Avoid_: Attention, 알림(OS에 뜨는 알림 자체를 말할 때만 쓴다), 
 
 **변경 기록**:
 무엇이 바뀌었는지 남긴 줄. DB 표 `change_events`에 번호, 대상 종류(run, runner, assignment, workspace, settings, tracker), 대상 id, Workspace, 시각을 담는다. DB를 바꾸는 코드는 같은 트랜잭션에서 쓰고 트래커 API·설치 설정 쓰기는 그 뒤에 쓰며, 바뀐 것이 있을 때만 쓴다. web이 SSE(`/api/change-events/stream`)로 보내 열린 화면이 그 대상의 데이터만 다시 읽게 한다. 내용은 담지 않는다. 하루 지나면 지운다(ADR 0019). 운영자에게 알릴 일만 담는 알림 사건과 다르다.
-_Avoid_: 이벤트(단독으로), 알림 사건, 변경 로그
+_Avoid_: 이벤트(단독으로), 알림 사건, 변경 로그(서버 로그와 헷갈린다)
+
+### 진단
+
+**서버 로그**:
+web·worker·`ganger mcp`·`ganger start`가 각자 `<home>/logs/{web,worker,mcp,cli}.jsonl`에 쓰는 진단 줄. 한 줄이 JSON 객체 하나이고 고정 키(`t`, `level`, `proc`, `pid`, `v`, `event`, `msg`)와 정해 둔 문맥 키(`runId`, `ticketKey`, `runnerId`, `deliveryId` 등)만 담는다. 수준은 error·warn·info·debug이고 기본은 info로 바뀐 것만 남긴다. 10MB에서 회전하고 회전본을 5개까지 둔다. DB에 넣지 않는다. 런에서 일어난 사실의 원천은 DB 표(런 상태 기록 등)이고, 서버 로그는 문제를 볼 때 읽는 문맥이다(스펙 0004, ADR 0021). `event` 이름은 이 용어집의 낱말을 쓴다(`run.*`, `runner.*`, `webhook.*`). Orca 쪽 실행은 `orcaRunId`·`worktreeName`으로 부르고 dispatch라고 쓰지 않는다. 화면·README에서는 "server log"로 쓴다.
+_Avoid_: 로그(단독으로. Run 상세의 에이전트 로그와 헷갈린다), 변경 로그(변경 기록과 헷갈린다), 디버그 로그(수준 이름일 뿐이다), 이벤트 로그
+
+**런 타임라인**:
+런 하나에 대해 DB에 이미 있는 기록(런의 할당·시작·끝 시각, 런 상태 기록, 그 티켓의 트래커 이벤트, MCP 작업 기록, 알림 사건, 질문·Permission·취소 요청)을 시각순으로 합친 읽기 결과. 새 표를 만들지 않는다. `ganger logs`·MCP 읽기 도구·진단 묶음이 함께 쓰고, 그 런의 서버 로그 줄과 나란히 보인다(티켓 0133). 변경 기록은 하루 뒤 지우고 내용이 없어 쓰지 않는다.
+_Avoid_: 런 히스토리, 활동 로그, 이벤트 타임라인
+
+**진단 묶음**:
+운영자가 이슈에 붙이려고 만드는 zip 하나. 버전과 실행 환경, 비밀을 뺀 설정 요약, 러너·최근 런·webhook 수신 기록, 고른 런의 런 타임라인, 최근 서버 로그를 담는다. 기본으로 ssh 대상·호스트·홈 경로·티켓 키 접두어를 익명화하고 끌 수 있다(티켓 0134). 화면·README에서는 "diagnostics bundle"로 쓴다.
+_Avoid_: support dump, 버그 리포트, 로그 내보내기
 
 ### Tickets 필터
 
