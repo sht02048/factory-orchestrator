@@ -62,6 +62,8 @@ blocked_by: []
 
 ## 남은 것
 
+- 이 티켓을 하는 동안 0140 이 머지돼 `pnpm dev`는 데스크톱 앱, 브라우저 개발 진입점은 `pnpm dev:web`이 됐다. 위 확인은 모두 브라우저(`node demo/src/main.ts`, 지금의 `pnpm dev:web`)로 했다. StyleX 런타임 스크립트는 데스크톱 앱 창에도 같은 웹 앱이 떠 똑같이 먹는다. 데스크톱 앱에서는 `/__dev`가 바깥 브라우저로 열려 `BroadcastChannel`이 앱 창에 닿지 않으므로, Query devtools 는 창의 개발자 도구 콘솔에서 `ganger:set-query-devtools` 이벤트로 켠다(README).
+
 - 개발 도구 칩 묶음(0047 부터, 이 티켓에서 바꾸지 않음)은 오른쪽 아래에 떠서 좁은 폭에서 스크롤 끝 내용 일부(400 폭 Runners 마지막 줄, Runs 의 PR 열 이름, 1280 Settings MCP 행 모서리)를 가린다. 개발 전용이라 따로 다룬다.
 
 - 쿠키 없는 첫 방문 hydration 불일치(0129 에서 넘어온 개발 서버 전용 문제)는 그대로다. 이 티켓의 원인과 다르다.

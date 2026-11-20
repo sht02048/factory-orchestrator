@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -36,7 +36,16 @@ afterAll(async () => {
   if (devRoot !== undefined) rmSync(devRoot, { recursive: true, force: true });
 });
 
-describe("pnpm dev", () => {
+describe("pnpm dev:web", () => {
+  it("dev:web 은 웹 개발 서버만, dev 는 같은 서버에 데스크톱 앱을 붙여 띄운다", () => {
+    const pkg: unknown = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
+    const scripts = typeof pkg === "object" && pkg !== null && "scripts" in pkg ? pkg.scripts : {};
+    expect(scripts).toMatchObject({
+      "dev:web": "node demo/src/main.ts",
+      dev: "node demo/src/desktop.ts",
+    });
+  });
+
   it("미리 채운 모드: 홈이 온보딩으로 보내지 않고 200 이고, SIGTERM 에 포트를 닫는다", async () => {
     const dev = await startDev([]);
     let code: number | null;
@@ -221,10 +230,10 @@ async function startDev(args: string[], extraEnv: Record<string, string> = {}): 
 
   const deadline = Date.now() + STARTUP_TIMEOUT_MS;
   while (!output.includes("Web is listening at")) {
-    if (exitCode !== undefined) throw new Error(`pnpm dev exited with ${exitCode}\n${output}`);
+    if (exitCode !== undefined) throw new Error(`pnpm dev:web exited with ${exitCode}\n${output}`);
     if (Date.now() > deadline) {
       child.kill("SIGKILL");
-      throw new Error(`pnpm dev did not start\n${output}`);
+      throw new Error(`pnpm dev:web did not start\n${output}`);
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
