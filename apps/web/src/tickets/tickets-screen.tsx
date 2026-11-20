@@ -20,6 +20,7 @@ import {
   Table,
   TableCell,
   TableEmpty,
+  TableFoldedOnly,
   TableHead,
   TableHeader,
   TableRow,
@@ -178,14 +179,16 @@ function RereadButton({ result, onStart }: { result: RereadResult; onStart: () =
   );
 }
 
-function tableColumns(showTrackerProject: boolean): string {
-  return [
-    size.ticketKeyColumn,
-    "minmax(0, 1fr)",
-    ...(showTrackerProject ? [size.projectColumn] : []),
-    size.lastRunColumn,
-  ].join(" ");
-}
+const withoutTrackerProject = [size.ticketKeyColumn, "minmax(0, 1fr)", size.lastRunColumn].join(
+  " ",
+);
+const withTrackerProject = [
+  size.ticketKeyColumn,
+  "minmax(0, 1fr)",
+  size.projectColumn,
+  size.lastRunColumn,
+].join(" ");
+const trackerProjectFolded = { first: withTrackerProject, second: withoutTrackerProject };
 
 function TicketsList({
   page,
@@ -244,6 +247,7 @@ function TicketsList({
     >
       <SplitView
         fill={false}
+        stackedListShare="larger"
         list={
           <div {...stylex.props(styles.listFrame)}>
             <div {...stylex.props(styles.listTop)}>
@@ -294,12 +298,16 @@ function TicketsList({
               </div>
             </div>
             <div {...stylex.props(styles.tableFrame)}>
-              <Table columns={tableColumns(showTrackerProject)} narrowColumns="minmax(0, 1fr)">
+              <Table
+                columns={showTrackerProject ? withTrackerProject : withoutTrackerProject}
+                {...(showTrackerProject ? { foldedColumns: trackerProjectFolded } : {})}
+                narrowColumns="minmax(0, 1fr)"
+              >
                 <TableHead>
                   <TableHeader>{t("columns.key")}</TableHeader>
                   <TableHeader>{t("columns.title")}</TableHeader>
                   {showTrackerProject ? (
-                    <TableHeader>{t("columns.trackerProject")}</TableHeader>
+                    <TableHeader hideWhen="second">{t("columns.trackerProject")}</TableHeader>
                   ) : null}
                   <TableHeader>{t("columns.lastRun")}</TableHeader>
                 </TableHead>
@@ -411,10 +419,15 @@ function TicketRow({
         </Text>
       </TableCell>
       <TableCell>
-        <RowTitle>{ticket.title}</RowTitle>
+        <RowTitle fullText={ticket.title}>{ticket.title}</RowTitle>
+        {showTrackerProject ? (
+          <TableFoldedOnly when="second" block>
+            <Text variant="meta">{ticket.trackerProject.name}</Text>
+          </TableFoldedOnly>
+        ) : null}
       </TableCell>
       {showTrackerProject ? (
-        <TableCell>
+        <TableCell hideWhen="second">
           <Text variant="meta">{ticket.trackerProject.name}</Text>
         </TableCell>
       ) : null}

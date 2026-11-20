@@ -5,7 +5,7 @@ import { getSettingsPage } from "../../server/settings-functions";
 import { McpScreen } from "../../settings/mcp-screen";
 import { settingsMessages } from "../../settings/messages";
 import { routerSettingsLink } from "../../settings/settings-link";
-import { useSettingsActions } from "../../settings/use-settings-actions";
+import { useSettingsActions, useSettingsReload } from "../../settings/use-settings-actions";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_app/settings_/mcp")({
 function McpRoute() {
   const page = Route.useLoaderData();
   const { ws } = Route.useSearch();
-  const actions = useSettingsActions();
+  const actions = useSettingsActions(useSettingsReload());
   return (
     <ScreenMessages messages={settingsMessages}>
       <McpScreen mcp={page.install.mcp} ws={ws} actions={actions} renderLink={routerSettingsLink} />

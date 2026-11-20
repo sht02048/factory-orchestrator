@@ -22,6 +22,7 @@ import {
   latestChangeSeq,
   listChangesAfter,
   markTrackerChanged,
+  markTrackerReadsStale,
   prunedChangeSeq,
   pruneChangeEvents,
   recordSettingsChange,
@@ -538,6 +539,17 @@ describe("쓰기 함수는 같은 트랜잭션에서 변경 기록 줄을 쓴다
 
     writeCase.write(w);
     expect(kindsSince(w.db, before).toSorted()).toEqual(writeCase.kinds.toSorted());
+  });
+
+  it("markTrackerReadsStale 은 트래커 읽기 세대만 올리고 변경 기록 줄은 쓰지 않는다(0127, Ganger 할당)", () => {
+    const w = world();
+    const before = latestChangeSeq(w.db);
+    const generation = trackerReadGeneration(w.db, connection);
+
+    markTrackerReadsStale(w.db, connection);
+
+    expect(trackerReadGeneration(w.db, connection)).toBe(generation + 1);
+    expect(listChangesAfter(w.db, before)).toEqual([]);
   });
 
   it("런 줄은 그 런의 id와 Workspace를 싣는다", () => {
