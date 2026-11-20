@@ -5,7 +5,6 @@ export const FAIL_PUSH_AUTH = "push-auth";
 export const SLOW_CHECK = "slow";
 export const SLOW_CHECK_MS = 20_000;
 export const DEV_CHANNEL = "ganger-dev";
-export const TOGGLE_QUERY_DEVTOOLS = "toggle-query-devtools";
 export const ASK_QUERY_DEVTOOLS = "ask-query-devtools";
 
 export const DEMO_WEB_ADDRESS = "https://orchestrator.example.ts.net";

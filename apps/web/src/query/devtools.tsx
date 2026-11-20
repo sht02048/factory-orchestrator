@@ -1,7 +1,7 @@
 import { ClientOnly } from "@tanstack/react-router";
 import { Suspense, lazy, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
-import { announceQueryDevtools, onQueryDevtoolsToggle } from "./devtools-toggle";
+import { announceQueryDevtools, onQueryDevtoolsSet } from "./devtools-toggle";
 
 const ReactQueryDevtoolsPanel = import.meta.env.DEV
   ? lazy(() =>
@@ -25,7 +25,7 @@ export function QueryDevtools() {
 
 function ToggledQueryDevtools() {
   const [shown, setShown] = useState(false);
-  useEffect(() => onQueryDevtoolsToggle(window, () => setShown((current) => !current)), []);
+  useEffect(() => onQueryDevtoolsSet(window, setShown), []);
   useEffect(() => announceQueryDevtools(window, shown), [shown]);
   if (ReactQueryDevtoolsPanel === null || !shown) return null;
   return (

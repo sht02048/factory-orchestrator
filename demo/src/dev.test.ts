@@ -58,7 +58,7 @@ describe("pnpm dev", () => {
     await expect(fetch(dev.url + "/")).rejects.toThrow("fetch failed");
   });
 
-  it("Query devtools 는 기본으로 그리지 않고, 개발 도구 페이지에서 켜고 끈다(0139)", async () => {
+  it("Query devtools 는 기본으로 그리지 않고, 개발 도구 페이지에서 켜고 끄며, 열린 앱 탭이 모두 같은 상태다(0139)", async () => {
     const dev = await startDev(["--static"], { NODE_ENV: "development" });
     const context = await browser.newContext({ baseURL: dev.url, locale: "ko-KR" });
     context.setDefaultTimeout(30_000);
@@ -88,10 +88,23 @@ describe("pnpm dev", () => {
       await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("true");
       expect(await floatingButton.count()).toBe(0);
 
-      await app.getByRole("button", { name: /close/i }).first().click();
+      const second = await context.newPage();
+      await second.goto("/runs");
+      await hydrated(second);
+      const secondPanel = second.locator(".tsqd-parent-container");
+      await secondPanel.waitFor({ state: "attached" });
+
+      await second.getByRole("button", { name: /close/i }).first().click();
+      await secondPanel.waitFor({ state: "detached" });
       await panel.waitFor({ state: "detached" });
       await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("false");
       expect(await floatingButton.count()).toBe(0);
+
+      await toggle.click();
+      await panel.waitFor({ state: "attached" });
+      await secondPanel.waitFor({ state: "attached" });
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("true");
+      expect(await second.locator(".tsqd-open-btn").count()).toBe(0);
     } finally {
       await context.close();
       await dev.stop();

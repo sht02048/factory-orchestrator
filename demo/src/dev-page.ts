@@ -1,4 +1,4 @@
-import { ASK_QUERY_DEVTOOLS, DEV_CHANNEL, TOGGLE_QUERY_DEVTOOLS } from "./values.ts";
+import { ASK_QUERY_DEVTOOLS, DEV_CHANNEL } from "./values.ts";
 
 const ACTIONS: ReadonlyArray<{ path: string; label: string; help: string }> = [
   {
@@ -82,12 +82,21 @@ export function devPage(lifeEnabled: boolean): string {
   const result = document.getElementById("result");
   const channel = new BroadcastChannel(${JSON.stringify(DEV_CHANNEL)});
   const queryDevtools = document.getElementById("query-devtools");
+  const pressed = () => queryDevtools.getAttribute("aria-pressed") === "true";
   channel.addEventListener("message", (event) => {
-    if (typeof event.data?.queryDevtools === "boolean") {
-      queryDevtools.setAttribute("aria-pressed", String(event.data.queryDevtools));
+    if (event.data === ${JSON.stringify(ASK_QUERY_DEVTOOLS)}) {
+      channel.postMessage({ setQueryDevtools: pressed() });
+    } else if (typeof event.data?.setQueryDevtools === "boolean") {
+      queryDevtools.setAttribute("aria-pressed", String(event.data.setQueryDevtools));
+    } else if (event.data?.queryDevtools === true) {
+      queryDevtools.setAttribute("aria-pressed", "true");
     }
   });
-  queryDevtools.addEventListener("click", () => channel.postMessage(${JSON.stringify(TOGGLE_QUERY_DEVTOOLS)}));
+  queryDevtools.addEventListener("click", () => {
+    const shown = !pressed();
+    queryDevtools.setAttribute("aria-pressed", String(shown));
+    channel.postMessage({ setQueryDevtools: shown });
+  });
   channel.postMessage(${JSON.stringify(ASK_QUERY_DEVTOOLS)});
   for (const button of document.querySelectorAll("button[data-path]")) {
     button.addEventListener("click", async () => {

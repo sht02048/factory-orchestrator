@@ -7,11 +7,10 @@ import {
   FAIL_PUSH_AUTH,
   PREFILL,
   PREFILL_RUNNER_NAME,
-  TOGGLE_QUERY_DEVTOOLS,
 } from "../values.ts";
 import {
   onQueryDevtoolsState,
-  toggleQueryDevtools,
+  setQueryDevtools,
 } from "../../../apps/web/src/query/devtools-toggle.ts";
 
 const ROOT_ID = "ganger-dev-tools";
@@ -71,13 +70,22 @@ function mount(): void {
 function bridgeQueryDevtools(): void {
   const channel = new BroadcastChannel(DEV_CHANNEL);
   let shown = false;
+  let asked = false;
   onQueryDevtoolsState(window, (next) => {
+    if (shown && !next) channel.postMessage({ setQueryDevtools: false });
     shown = next;
-    channel.postMessage({ queryDevtools: shown });
+    if (asked) return;
+    asked = true;
+    channel.postMessage(ASK_QUERY_DEVTOOLS);
   });
   channel.addEventListener("message", (event: MessageEvent<unknown>) => {
-    if (event.data === TOGGLE_QUERY_DEVTOOLS) toggleQueryDevtools(window);
-    if (event.data === ASK_QUERY_DEVTOOLS) channel.postMessage({ queryDevtools: shown });
+    const message = event.data;
+    if (message === ASK_QUERY_DEVTOOLS) channel.postMessage({ queryDevtools: shown });
+    const wanted: unknown =
+      typeof message === "object" && message !== null
+        ? Reflect.get(message, "setQueryDevtools")
+        : undefined;
+    if (typeof wanted === "boolean") setQueryDevtools(window, wanted);
   });
 }
 
