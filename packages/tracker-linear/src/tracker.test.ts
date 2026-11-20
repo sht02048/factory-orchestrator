@@ -124,6 +124,22 @@ describe("checkConnection", () => {
     }
   });
 
+  it("조직 urlKey 를 읽으면 그 조직의 webhook 설정 주소를 함께 돌려준다", async () => {
+    const withKey = (urlKey: string) =>
+      withBody(fixture("organization-ok"), () => ({
+        data: { viewer: { organization: { name: "Acme", urlKey } } },
+      }));
+    const { tracker: t } = tracker(fixture("connection-ok"), withKey("acme"));
+    await expect(t.checkConnection()).resolves.toEqual({
+      ok: true,
+      organizationName: "Acme",
+      webhookSettingsUrl: "https://linear.app/acme/settings/api",
+    });
+
+    const { tracker: odd } = tracker(fixture("connection-ok"), withKey("../evil"));
+    await expect(odd.checkConnection()).resolves.toEqual({ ok: true, organizationName: "Acme" });
+  });
+
   it("인증 실패를 unauthorized로 돌려준다", async () => {
     const { tracker: t } = tracker(fixture("error-unauthorized"));
 

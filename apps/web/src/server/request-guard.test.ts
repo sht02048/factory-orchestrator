@@ -97,7 +97,7 @@ describe("Host 검사", () => {
     });
   });
 
-  it("webhook 공개 주소의 호스트는 webhook 경로에서만 받는다", () => {
+  it("Linear가 이 서버에 닿을 주소의 호스트는 webhook 경로에서만 받는다", () => {
     const webhook = request("/api/webhooks/tracker/c-1", {
       method: "POST",
       host: "hooks.example.com",
@@ -116,6 +116,29 @@ describe("Host 검사", () => {
     expect(
       verdictOf(request("/api/identity", { method: "POST", host: "evil.example" }), unset),
     ).toMatchObject({ ok: false, reason: "host-not-allowed" });
+  });
+
+  it("webhook 확인 경로(GET)는 아직 저장하지 않은 닿을 주소에서도 받는다", () => {
+    const ping = "/api/webhooks/ping/instance-1";
+    expect(verdictOf(request(ping, { host: "new.example.ts.net:8443" }), unset)).toEqual({
+      ok: true,
+    });
+    expect(
+      verdictOf(request(ping, { method: "POST", host: "new.example.ts.net" }), unset),
+    ).toMatchObject({ ok: false, reason: "host-not-allowed" });
+    expect(
+      verdictOf(request("/api/webhooks/tracker/conn-1", { host: "new.example.ts.net" }), unset),
+    ).toMatchObject({ ok: false, reason: "host-not-allowed" });
+  });
+
+  it("닿을 주소 호스트로는 확인 경로가 있어도 webhook 경로 밖을 받지 않는다", () => {
+    expect(
+      verdictOf(request("/api/webhooks/../settings", { host: "hooks.example.com" })),
+    ).toMatchObject({ ok: false, reason: "host-not-allowed" });
+    expect(verdictOf(request("/settings", { host: "hooks.example.com" }))).toMatchObject({
+      ok: false,
+      reason: "host-not-allowed",
+    });
   });
 });
 
@@ -156,7 +179,7 @@ describe("Origin 검사", () => {
     }
   });
 
-  it("webhook 공개 주소는 화면의 Origin 으로 받지 않는다", () => {
+  it("Linear가 이 서버에 닿을 주소는 화면의 Origin 으로 받지 않는다", () => {
     expect(
       verdictOf(
         request(serverFn, {

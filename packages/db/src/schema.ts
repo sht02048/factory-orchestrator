@@ -85,6 +85,7 @@ export const installSettings = sqliteTable(
     instanceId: text("instance_id").notNull(),
     webAddress: text("web_address"),
     webhookAddress: text("webhook_address"),
+    webhookAddressCheckedAt: timeMs("webhook_address_checked_at"),
     mcpWriteAllowed: integer("mcp_write_allowed", { mode: "boolean" }).notNull().default(false),
     updatedAt: timeMs("updated_at").notNull(),
   },
@@ -569,6 +570,26 @@ export const trackerReadGenerations = sqliteTable(
     generation: integer("generation").notNull(),
   },
   (t) => [check("tracker_read_generations_positive", sql`${t.generation} > 0`)],
+);
+
+export const trackerWebhookReceipts = sqliteTable(
+  "tracker_webhook_receipts",
+  {
+    trackerConnectionId: text("tracker_connection_id")
+      .primaryKey()
+      .references(() => trackerConnections.id, { onDelete: "cascade" })
+      .$type<TrackerConnectionId>(),
+    lastReceivedAt: timeMs("last_received_at"),
+    rejectedCount: integer("rejected_count").notNull().default(0),
+    firstRejectedAt: timeMs("first_rejected_at"),
+  },
+  (t) => [
+    check("tracker_webhook_receipts_rejected_count", sql`${t.rejectedCount} >= 0`),
+    check(
+      "tracker_webhook_receipts_first_rejected",
+      sql`(${t.rejectedCount} = 0) = (${t.firstRejectedAt} IS NULL)`,
+    ),
+  ],
 );
 
 export const changeEvents = sqliteTable(

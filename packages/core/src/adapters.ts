@@ -121,7 +121,7 @@ export type TrackerErrorDetail =
   | { kind: "network"; cause: unknown };
 
 export type TrackerConnectionCheck =
-  | { ok: true; organizationName: string | null }
+  | { ok: true; organizationName: string | null; webhookSettingsUrl?: string }
   | { ok: false; error: TrackerErrorDetail };
 
 export interface Tracker {

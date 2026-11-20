@@ -33,7 +33,13 @@ import {
   saveTrackerConnectionSetting,
   trackerConnectionInput,
   trackerProjectInput,
+  turnOffWebhook,
+  verifyWebhookAddress,
+  webhookAddressInput,
+  webhookStateNow,
 } from "@ganger/app/settings/actions";
+import { funnelAddress, funnelCommand } from "@ganger/app/webhook-address";
+import type { WebhookSetupView } from "@ganger/app/settings/model";
 import { GANGER_YELLOW_HEX } from "@ganger/ui/brand-color";
 import { saveRunnerFindingOrca } from "@ganger/app/runner-setup/remote-orca";
 import { hasPendingRunnerChecks, loadSettingsPage } from "@ganger/app/settings/load";
@@ -43,6 +49,7 @@ import { getDatabase } from "./database";
 import { serverMcpLaunch } from "./mcp-launch";
 import { installPowerSettings } from "./power-settings";
 import { getTrackerReads } from "./tracker-reads";
+import { getThisTailnetDevice, getWebhookPingFetch } from "./webhook-reach";
 
 function context(): SettingsContext {
   const power = installPowerSettings(process.env);
@@ -132,3 +139,35 @@ export const savePowerSettings = createServerFn({ method: "POST" })
 export const saveMcpWriteSettings = createServerFn({ method: "POST" })
   .validator(mcpWriteInput)
   .handler(({ data }) => saveMcpWriteSetting(context(), data, new Date()));
+
+export const turnOffTrackerWebhook = createServerFn({ method: "POST" })
+  .validator(connectionIdInput)
+  .handler(({ data }) => turnOffWebhook(context(), data, new Date()));
+
+export const getTrackerWebhookState = createServerFn({ method: "GET" })
+  .validator(connectionIdInput)
+  .handler(({ data }) => webhookStateNow(context(), data, new Date()));
+
+export const checkWebhookAddressNow = createServerFn({ method: "POST" })
+  .validator(webhookAddressInput)
+  .handler(({ data }) => verifyWebhookAddress(context(), data, new Date(), getWebhookPingFetch()));
+
+function webPort(): number {
+  try {
+    return parseBootConfig(process.env).port;
+  } catch {
+    return 3000;
+  }
+}
+
+export const getWebhookSetup = createServerFn({ method: "GET" }).handler(
+  async (): Promise<WebhookSetupView> => {
+    const device = await getThisTailnetDevice();
+    return {
+      funnel:
+        device === null
+          ? null
+          : { command: funnelCommand(device.cli, webPort()), address: funnelAddress(device.host) },
+    };
+  },
+);

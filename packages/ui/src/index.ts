@@ -257,6 +257,8 @@ export {
   SettingsLinkRow,
   SettingsRow,
   SettingsSection,
+  SettingsStep,
+  SettingsSteps,
   type SectionNavItem,
   type SectionNavProps,
   type SettingsDetailTone,
@@ -265,6 +267,8 @@ export {
   type SettingsLinkRowRenderProps,
   type SettingsRowProps,
   type SettingsSectionProps,
+  type SettingsStepProps,
+  type SettingsStepState,
 } from "./components/settings-layout";
 export { UsageBar, usageText, type UsageBarProps, type UsageTone } from "./components/usage-bar";
 export { UsageMeter, type UsageMeterProps } from "./components/usage-meter";

@@ -3,7 +3,7 @@ import { deviceOrigins, discoverServers } from "./discovery.js";
 import type { Identity, Probe, ProbeResult } from "./identity.js";
 import { identitySchema, probeIdentity } from "./identity.js";
 import { connectAddress, normalizeAddress, reopenSaved } from "./remote.js";
-import { findTailscaleCli, parseTailnetStatus, readTailnet } from "./tailscale.js";
+import { findTailscaleCli, parseTailnetStatus, readTailnet } from "@ganger/app/tailscale";
 
 const identity = (instanceId: string, extra: Partial<Identity> = {}): ProbeResult => ({
   kind: "ours",
@@ -51,6 +51,7 @@ describe("Tailscale 상태 읽기", () => {
   it("Online 이고 휴대폰이 아닌 기기만 고르고, DNSName 끝의 점을 뗀다", () => {
     expect(parseTailnetStatus(STATUS)).toEqual({
       kind: "running",
+      self: "laptop.example.ts.net",
       devices: [
         { name: "build-box", host: "build-box.example.ts.net" },
         { name: "mini", host: "mini.example.ts.net" },
@@ -81,6 +82,7 @@ describe("Tailscale 상태 읽기", () => {
     });
     expect(parseTailnetStatus(status)).toEqual({
       kind: "running",
+      self: null,
       devices: [
         { name: "mini", host: "mini.example.ts.net", ipv4: "100.64.0.2" },
         { name: "box", host: "box.example.ts.net" },
@@ -108,6 +110,7 @@ describe("Tailscale 상태 읽기", () => {
     });
     expect(parseTailnetStatus(status)).toEqual({
       kind: "running",
+      self: null,
       devices: [
         { name: "mini", host: "mini.example.ts.net" },
         { name: "box", host: "box.example.ts.net", ipv4: "100.64.0.3" },
@@ -141,6 +144,7 @@ describe("Tailscale 상태 읽기", () => {
     });
     expect(parseTailnetStatus(status)).toEqual({
       kind: "running",
+      self: null,
       devices: [
         { name: "a", host: "a.example.ts.net", ipv4: "100.64.0.2" },
         { name: "b", host: "b.example.ts.net", ipv4: "100.64.0.3" },
@@ -233,6 +237,7 @@ describe("서버 찾기", () => {
       tailnet: () =>
         Promise.resolve({
           kind: "running",
+          self: null,
           devices: [{ name: "mini", host: "mini.example.ts.net" }],
         }),
       probe: fakeProbe({ "http://mini.example.ts.net:4100": identity("inst-2") }),
@@ -248,6 +253,7 @@ describe("서버 찾기", () => {
       tailnet: () =>
         Promise.resolve({
           kind: "running",
+          self: null,
           devices: [{ name: "mini", host: "mini.example.ts.net", ipv4: "100.64.0.2" }],
         }),
       probe: fakeProbe({
@@ -275,6 +281,7 @@ describe("서버 찾기", () => {
       tailnet: () =>
         Promise.resolve({
           kind: "running",
+          self: null,
           devices: [{ name: "box", host: "box.example.ts.net", ipv4: "100.64.0.3" }],
         }),
       probe: fakeProbe(
@@ -298,6 +305,7 @@ describe("서버 찾기", () => {
       tailnet: () =>
         Promise.resolve({
           kind: "running",
+          self: null,
           devices: [
             { name: "mini", host: "mini.example.ts.net", ipv4: "100.64.0.2" },
             { name: "box", host: "box.example.ts.net", ipv4: "100.64.0.3" },
@@ -347,6 +355,7 @@ describe("서버 찾기", () => {
       tailnet: () =>
         Promise.resolve({
           kind: "running",
+          self: null,
           devices: [{ name: "mini", host: "mini.example.ts.net", ipv4: "100.64.0.2" }],
         }),
       probe: fakeProbe(
@@ -382,6 +391,7 @@ describe("서버 찾기", () => {
       tailnet: () =>
         Promise.resolve({
           kind: "running",
+          self: null,
           devices: [{ name: "mini", host: "mini.example.ts.net" }],
         }),
       probe: fakeProbe({
@@ -407,6 +417,7 @@ describe("서버 찾기", () => {
       tailnet: () =>
         Promise.resolve({
           kind: "running",
+          self: null,
           devices: [{ name: "mini", host: "mini.example.ts.net", ipv4: "100.64.0.2" }],
         }),
       probe: fakeProbe({ "http://mini.example.ts.net:3000": identity("inst-2") }, asked),

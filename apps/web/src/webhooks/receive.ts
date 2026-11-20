@@ -1,5 +1,11 @@
 import type { AdapterRegistry, TrackerConnectionId, WebhookVerifyError } from "@ganger/core";
-import { getTrackerConnection, recordTrackerEvent } from "@ganger/db";
+import {
+  getTrackerConnection,
+  inTransaction,
+  recordTrackerEvent,
+  recordWebhookAccepted,
+  recordWebhookBadSignature,
+} from "@ganger/db";
 import type { Database, SecretBox } from "@ganger/db";
 
 export const MAX_WEBHOOK_REQUEST_BYTES = 5 * 1024 * 1024;
@@ -134,8 +140,15 @@ async function handle(
       headers: Object.fromEntries(request.headers),
       now,
     });
-    if (!result.ok) return result.error;
-    return recordTrackerEvent(context.db, connection.id, result.event);
+    if (!result.ok) {
+      if (result.error === "bad-signature")
+        recordWebhookBadSignature(context.db, connection.id, now);
+      return result.error;
+    }
+    return inTransaction(context.db, () => {
+      recordWebhookAccepted(context.db, connection.id, now);
+      return recordTrackerEvent(context.db, connection.id, result.event);
+    });
   } catch (error) {
     context.logger.warn("could not handle a tracker webhook", { connectionId, error });
     await cancelBody(request);
