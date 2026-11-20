@@ -3,7 +3,13 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { createServer } from "vite";
-import { devPageRoutes, injectDevTools, swapWebAdapters, swapWebWorkerWake } from "./plugins.ts";
+import {
+  devPageRoutes,
+  injectDevTools,
+  swapWebAdapters,
+  swapWebWebhookReach,
+  swapWebWorkerWake,
+} from "./plugins.ts";
 import type { DevMode } from "./runtime.ts";
 
 const repoRoot = resolve(import.meta.dirname, "../..");
@@ -48,7 +54,13 @@ process.env["WEB_PORT"] = String(port);
 const server = await createServer({
   root: webRoot,
   configFile: join(webRoot, "vite.config.ts"),
-  plugins: [swapWebAdapters(), swapWebWorkerWake(), injectDevTools(), devPageRoutes()],
+  plugins: [
+    swapWebAdapters(),
+    swapWebWorkerWake(),
+    swapWebWebhookReach(),
+    injectDevTools(),
+    devPageRoutes(),
+  ],
   server: {
     host,
     port,

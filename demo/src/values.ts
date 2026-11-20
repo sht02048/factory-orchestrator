@@ -7,6 +7,7 @@ export const SLOW_CHECK_MS = 20_000;
 
 export const DEMO_WEB_ADDRESS = "https://orchestrator.example.ts.net";
 export const DEMO_WEBHOOK_ADDRESS = "https://hooks.example.com";
+export const DEMO_TAILNET_HOST = "ganger.example.ts.net";
 
 export const PREFILL: Readonly<Record<string, string>> = {
   name: "Acme",

@@ -52,6 +52,7 @@
     "sheet": "Sheet",
     "icons": "아이콘",
     "settingsRows": "설정 줄",
+    "settingsSteps": "설정 단계",
     "sectionNav": "설정 목차"
   },
   "colors": {
@@ -524,6 +525,21 @@
       "runners": "러너",
       "runnersDetail": "3대",
       "runnersValue": "Runners 에서 더하고 고쳐요"
+    },
+    "settingsSteps": {
+      "note": "설정 화면에서 차례로 따라 할 단계를 카드 하나에 쌓아요. 앞 단계를 끝내기 전의 단계는 잠그고 이름만 보여요. 구역 제목 옆에는 지금 상태를 짧게 둬요(detail).",
+      "title": "Webhook",
+      "status": "꺼져 있어요 · 지금은 1분마다 읽어요",
+      "label": "예시 단계",
+      "done": "끝냈어요",
+      "current": "지금 할 단계",
+      "locked": "앞 단계를 끝내면 열려요",
+      "first": "Linear가 이 서버에 닿을 주소",
+      "firstDetail": "https://hooks.example.com · 닿는 걸 확인했어요",
+      "change": "바꾸기",
+      "second": "Linear에서 webhook 만들기",
+      "secondBody": "이 주소를 넣고 Data change events에서 Issues만 골라요.",
+      "third": "signing secret 넣고 켜기"
     },
     "sectionNav": {
       "note": "한 페이지 설정의 목차예요. 스크롤 위치를 따라 지금 구역을 표시하고, 문제가 있는 구역에 점을 붙여요. 좁으면 가로 칩 줄이 돼요.",

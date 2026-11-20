@@ -12,6 +12,7 @@ import {
   recordRunnerCheck,
   removeWorkspaceTrackerProject,
   replaceMapping,
+  saveCheckedWebhookAddress,
   saveInstallAddresses,
   saveMapping,
   saveWorkspace,
@@ -302,6 +303,7 @@ describe("설치 설정(0048)", () => {
       instanceId,
       webAddress: "https://server.example.ts.net",
       webhookAddress: null,
+      webhookAddressCheckedAt: null,
     });
   });
 });
@@ -394,5 +396,39 @@ describe("Mapping 저장소 목록(0115)", () => {
       { project: repoA, isDefault: false, labelId: null },
       { project: repoC, isDefault: false, labelId: null },
     ]);
+  });
+});
+
+describe("Linear가 이 서버에 닿을 주소의 확인 시각(0130)", () => {
+  const at = new Date("2026-11-20T09:00:00Z");
+  const later = new Date("2026-11-20T10:00:00Z");
+
+  it("확인한 주소로 저장하면 확인 시각을 남기고, 다른 주소만 바꾸는 저장은 그대로 둔다", () => {
+    const db = seededDatabase();
+    saveCheckedWebhookAddress(db, "https://hooks.example.com", at);
+    expect(getInstallSettings(db)).toMatchObject({
+      webhookAddress: "https://hooks.example.com",
+      webhookAddressCheckedAt: at,
+    });
+    saveInstallAddresses(
+      db,
+      { webAddress: "https://server.example.ts.net", webhookAddress: "https://hooks.example.com" },
+      later,
+    );
+    expect(getInstallSettings(db)).toMatchObject({
+      webAddress: "https://server.example.ts.net",
+      webhookAddressCheckedAt: at,
+    });
+  });
+
+  it("확인 없이 닿을 주소를 바꾸면 확인 시각을 지운다", () => {
+    const db = seededDatabase();
+    saveCheckedWebhookAddress(db, "https://hooks.example.com", at);
+    saveInstallAddresses(
+      db,
+      { webAddress: null, webhookAddress: "http://192.168.0.10:3000" },
+      later,
+    );
+    expect(getInstallSettings(db).webhookAddressCheckedAt).toBeNull();
   });
 });

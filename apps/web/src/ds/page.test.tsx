@@ -59,6 +59,7 @@ describe("/ds 서버 렌더", () => {
       "kanban",
       "sheet",
       "settingsRows",
+      "settingsSteps",
       "sectionNav",
       "icons",
     ];
