@@ -10,7 +10,7 @@ import { homeMessages } from "../../home/messages";
 import { useDashboardActions } from "../../home/mutations";
 import { dashboardQuery } from "../../home/query";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { requestTimeZone, useRequestTimeZone } from "../../query/request-time-zone";
+import { requestTimeZone, useRenderedTimeZone } from "../../query/request-time-zone";
 import { loadRouteQuery } from "../../query/route-query";
 
 const t = createTranslator({ locale: defaultLocale, messages: homeMessages, namespace: "home" });
@@ -29,9 +29,12 @@ export const Route = createFileRoute("/_app/")({
 
 function HomeRoute() {
   const { ws } = Route.useLoaderDeps();
-  const timeZone = useRequestTimeZone();
-  const { data: loaded } = useSuspenseQuery(dashboardQuery(ws, timeZone));
-  const page = useAgedHomePage(loaded);
+  const timeZone = useRenderedTimeZone();
+  const { data: loaded, refetch } = useSuspenseQuery(dashboardQuery(ws, timeZone));
+  const readAgainWhenLimitLifts = useCallback(() => {
+    void refetch();
+  }, [refetch]);
+  const page = useAgedHomePage(loaded, readAgainWhenLimitLifts);
   const { view, run } = Route.useSearch();
   const navigate = Route.useNavigate();
   const actions = useDashboardActions();

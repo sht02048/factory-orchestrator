@@ -4,7 +4,7 @@ import { conditionsForStatsGroup } from "@ganger/app/runs/conditions";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { requestTimeZone, useRequestTimeZone } from "../../query/request-time-zone";
+import { requestTimeZone, useRenderedTimeZone } from "../../query/request-time-zone";
 import { loadRouteQuery } from "../../query/route-query";
 import { statsMessages } from "../../stats/messages";
 import { statsQuery } from "../../stats/query";
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_app/stats")({
 
 function StatsRoute() {
   const { ws, days } = Route.useLoaderDeps();
-  const timeZone = useRequestTimeZone();
+  const timeZone = useRenderedTimeZone();
   const { data: page } = useSuspenseQuery(statsQuery(ws, days, timeZone));
   const shell = appRoute.useLoaderData();
   const { by } = Route.useSearch();

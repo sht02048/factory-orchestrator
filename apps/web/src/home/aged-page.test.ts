@@ -2,7 +2,7 @@ import { loadHomePage } from "@ganger/app/home/load";
 import type { HomeRun } from "@ganger/app/home/model";
 import { describe, expect, it } from "vitest";
 import { now, seedDatabase } from "../testing/seed";
-import { agedHomePage } from "./aged-page";
+import { agedHomePage, soonestLimitLiftMs } from "./aged-page";
 
 const MINUTE = 60_000;
 
@@ -74,5 +74,25 @@ describe("Dashboard 시간 글자는 다시 읽지 않아도 흐른다", () => {
     const { db } = seedDatabase();
     const page = loadHomePage(db, "ws-commerce", now, "UTC");
     expect(agedHomePage(page, 0)).toBe(page);
+  });
+
+  it("가장 먼저 풀리는 한도까지 남은 시간을 알려, 풀리면 다시 읽게 한다", () => {
+    const { db } = seedDatabase();
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    const runner = page.runners.list[0];
+    if (runner === undefined) throw new Error("no runner");
+    const limit = (resetsInMs: number | null) => ({
+      provider: "claude",
+      window: "session" as const,
+      resetsInMs,
+    });
+    const withLimits = (limits: ReturnType<typeof limit>[]) => ({
+      ...page,
+      runners: { list: [{ ...runner, limits }] },
+    });
+
+    expect(soonestLimitLiftMs(withLimits([]))).toBeNull();
+    expect(soonestLimitLiftMs(withLimits([limit(null)]))).toBeNull();
+    expect(soonestLimitLiftMs(withLimits([limit(5 * MINUTE), limit(2 * MINUTE)]))).toBe(2 * MINUTE);
   });
 });

@@ -9,7 +9,6 @@ export const requestTimeZone = createIsomorphicFn()
 
 const rootRoute = getRouteApi("__root__");
 
-export function useRequestTimeZone(): string {
-  rootRoute.useLoaderData({ select: (root) => root.timeZone });
-  return requestTimeZone();
+export function useRenderedTimeZone(): string {
+  return rootRoute.useLoaderData({ select: (root) => root.timeZone });
 }

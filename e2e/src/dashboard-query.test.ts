@@ -433,6 +433,36 @@ describe("시간 글자(브라우저, 0126)", () => {
   });
 });
 
+describe("시간대 쿠키가 없는 첫 방문(브라우저, 0126)", () => {
+  it.for([
+    { name: "Dashboard", path: dashboardPath, pathname: "/" },
+    { name: "Stats", path: statsPath, pathname: "/stats" },
+  ])(
+    "$name는 쿠키를 맞추는 동안에도 hydration이 어긋나지 않는다",
+    async ({ path, pathname }, context) => {
+      const { page } = await newPage(context, {
+        browserTimeZone: "Pacific/Kiritimati",
+        timeZoneCookie: false,
+      });
+      const hydrationErrors: string[] = [];
+      page.on("console", (message) => {
+        if (message.type() === "error" && /hydrat/i.test(message.text()))
+          hydrationErrors.push(message.text());
+      });
+
+      await page.goto(path);
+      await waitForRouterIdle(page, pathname);
+      await expect
+        .poll(async () => (await page.context().cookies()).find((c) => c.name === "tz")?.value)
+        .toBe("Pacific/Kiritimati");
+      await waitForRouterIdle(page, pathname);
+      await page.waitForTimeout(SETTLE_MS);
+
+      expect(hydrationErrors).toEqual([]);
+    },
+  );
+});
+
 describe("오래 떠났다 돌아오기(브라우저, 0126)", () => {
   it.for([
     { name: "Dashboard", path: dashboardPath, pathname: "/", away: "runs", back: "dashboard" },
@@ -459,6 +489,7 @@ describe("오래 떠났다 돌아오기(브라우저, 0126)", () => {
 
 interface PageOptions {
   stream?: "open" | "blocked";
+  timeZoneCookie?: boolean;
   fakeClock?: boolean;
   browserTimeZone?: string;
 }
@@ -472,7 +503,9 @@ async function newPage(
     locale: "ko-KR",
     timezoneId: options.browserTimeZone ?? "UTC",
   });
-  await browserContext.addCookies([{ name: "tz", value: "UTC", url: baseUrl }]);
+  if (options.timeZoneCookie !== false) {
+    await browserContext.addCookies([{ name: "tz", value: "UTC", url: baseUrl }]);
+  }
   const page = await browserContext.newPage();
   page.setDefaultTimeout(30_000);
   if (options.fakeClock === true) await page.clock.install();

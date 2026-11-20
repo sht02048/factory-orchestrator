@@ -39,7 +39,8 @@ Dashboard와 Stats를 Query로 옮기고, Dashboard의 15초 폴링을 변경 �
 ### 만든 것
 
 - **query.** `apps/web/src/home/query.ts`의 `dashboardQuery(ws, timeZone)`(`["dashboard", ws ?? null, timeZone]`), `apps/web/src/stats/query.ts`의 `statsQuery(ws, days, timeZone)`(`["stats", ws ?? null, days, timeZone]`). 로더는 `loadRouteQuery`(0123)로, 컴포넌트는 `useSuspenseQuery`로 같은 `queryOptions`를 쓴다. 두 route에 `preloadStaleTime: 0`을 주고 `shouldReload`는 두지 않는다.
-- **시간대.** `apps/web/src/query/request-time-zone.ts`의 `requestTimeZone`(서버는 요청 쿠키, 브라우저는 `document.cookie`를 서버 함수와 같은 `parseTimeZone`으로 읽는다)을 로더와 컴포넌트가 함께 쓴다. 컴포넌트는 `useRequestTimeZone`으로 루트 로더의 `timeZone`을 구독해 쿠키가 바뀐 뒤 다시 그린다. 처음에는 컴포넌트가 루트 로더 값을 key에 썼는데, `TimeZoneSync`가 쿠키를 맞추는 동안(루트를 다시 읽기 전) 로더 key와 달라 첫 이동에서 같은 화면을 두 번 읽었다(측정에서 발견). 그래서 둘 다 쿠키에서 읽는다. `TimeZoneSync`의 필터에서 `/_app/`·`/_app/stats`를 뺐다(루트만 남음, 정리는 0129).
+- **시간대.** 로더는 `apps/web/src/query/request-time-zone.ts`의 `requestTimeZone`(서버는 요청 쿠키, 브라우저는 `document.cookie`를 서버 함수와 같은 `parseTimeZone`으로 읽는다)으로, 컴포넌트는 `useRenderedTimeZone`(루트 로더의 `timeZone`)으로 key를 만든다. 로더는 루트 로더 값을 읽을 수 없어 쿠키를 읽는다. 컴포넌트까지 쿠키를 읽게 하면 `TimeZoneSync`가 effect에서 쿠키를 바꾸는 순간 아직 hydration 중인 부분이 다른 key로 그려질 수 있어(독립 interface-review가 시간대 쿠키 없는 첫 방문에서 hydration 불일치를 봄, 이 맥에서는 두 방식 모두 재현되지 않음) 루트 로더 값을 쓴다. 맞바꿈으로, 처음 쿠키를 맞추는 동안(루트를 다시 읽기 전) 다른 화면에서 Dashboard·Stats로 옮기면 로더와 컴포넌트 key가 달라 그 화면을 한 번 더 읽는다(측정의 왕복 100·200 첫 회차에서 봄). 브라우저마다 처음 한 번이다. `TimeZoneSync`의 필터에서 `/_app/`·`/_app/stats`를 뺐다(루트만 남음, 정리는 0129).
+- **한도가 풀릴 때.** 시간 글자를 클라이언트에서 흘리면 한도가 풀린 뒤에도 "0초 뒤 한도가 풀리면…"이 남는다(두 번째 interface-review의 LOW). 가장 먼저 풀리는 한도 시각 1초 뒤에 Dashboard query를 한 번 다시 읽어 서버 상태(풀린 한도는 빠짐)를 그린다.
 - **15초 폴링을 지움.** `home/refresh.ts`와 그 시험, `_app/index.tsx`의 `polled` state를 지웠다. 갱신은 변경 기록 구독(0124)의 `["dashboard"]`·`["stats"]` 무효화, 끊겼을 때 30초 폴링, 창 포커스 다시 읽기가 맡는다.
 - **시간 글자.** 15초 폴링은 "N분째", "N분 뒤 한도가 풀려요" 같은 서버가 계산한 시간도 새로 고치고 있었다(독립 interface-review가 찾은 Regression). `apps/web/src/home/aged-page.ts`의 `useAgedHomePage`가 받은 뒤 지난 시간만큼 지난 시간은 늘리고 남은 시간은 줄여 15초마다 다시 그린다. 서버 왕복은 없다.
 - **멈추기·재개 처리 중.** `refetchInterval`이 처리 중인 요청이 있으면 2초, 없으면 끈다(`pollWhileControlPending`).
@@ -82,8 +83,10 @@ Dashboard와 Stats를 Query로 옮기고, Dashboard의 15초 폴링을 변경 �
 
 ### 시험
 
-- `e2e/src/dashboard-query.test.ts`(브라우저 18개): hydration 동안 서버 함수 0번(Dashboard, Stats), 답하기·거절 뒤 `[쓰기, getHomePage]`만, 멈추기 뒤 2초 다시 읽기와 끝나면 멈춤, "상태가 바뀜"도 같은 key만, 거절 이유 문장 둘, worker 함수로 런 상태를 바꾸면 3초 안, 러너 Offline, SSE가 끊기면 30초마다(가짜 시계), 변경 기록 통로를 막은 채 다시 들어간 Dashboard·Stats, 시간 글자가 서버 왕복 없이 흐름, 시간대 쿠키가 바뀌면 새 시간대로 한 번 다시 읽고 화면을 비우지 않음(Dashboard, Stats), 6분 떠났다 돌아와도 빈 화면 없음(Dashboard, Stats).
-- 단위: `home/query.test.ts`(key와 2초 다시 읽기), `home/aged-page.test.ts`, `home/rejection.test.ts`.
+- `e2e/src/dashboard-query.test.ts`(브라우저 20개): hydration 동안 서버 함수 0번(Dashboard, Stats), 답하기·거절 뒤 `[쓰기, getHomePage]`만, 멈추기 뒤 2초 다시 읽기와 끝나면 멈춤, "상태가 바뀜"도 같은 key만, 거절 이유 문장 둘, worker 함수로 런 상태를 바꾸면 3초 안, 러너 Offline, SSE가 끊기면 30초마다(가짜 시계), 변경 기록 통로를 막은 채 다시 들어간 Dashboard·Stats, 시간 글자가 서버 왕복 없이 흐름, 시간대 쿠키가 바뀌면 새 시간대로 한 번 다시 읽고 화면을 비우지 않음(Dashboard, Stats), 6분 떠났다 돌아와도 빈 화면 없음(Dashboard, Stats).
+- 시간대 쿠키가 없는 첫 방문에 hydration 불일치가 없다(Dashboard, Stats). 이 맥에서는 고치기 전 방식에서도 재현되지 않아 회귀 방지용이다.
+- 단위: `home/query.test.ts`(key와 2초 다시 읽기), `home/aged-page.test.ts`(시간 흘리기, 가장 먼저 풀리는 한도), `home/rejection.test.ts`.
+- 전체 e2e(PR 전 한 번): 197개 가운데 195개 통과. 실패 둘(`runner-setup.test.ts` "직접 입력으로 등록하면…", `settings.test.ts` "목차를 누르면…")은 이 티켓이 닿지 않는 화면이고 단독으로 다시 돌리면 통과했다(러너 설정은 파일 전체 16개 통과, 시험 순서에 기대어 `-t`로 하나만 돌리면 실패). 부하로 흔들린 것으로 본다(0131).
 - `e2e/src/home.test.ts`의 "다시 읽기가 실패해도 열린 패널과 쓰던 답을 그대로 둔다"는 15초 폴링 대신 변경 기록이 일으킨 다시 읽기를 실패시키도록 바꿨다(같은 뜻).
 
 ## 머지 위험

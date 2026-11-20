@@ -52,7 +52,16 @@ export function agedHomePage(page: HomePage, by: number): HomePage {
   };
 }
 
-export function useAgedHomePage(page: HomePage): HomePage {
+export const LIMIT_LIFT_MARGIN_MS = 1_000;
+
+export function soonestLimitLiftMs(page: HomePage): number | null {
+  const lifts = page.runners.list.flatMap((runner) =>
+    runner.limits.flatMap((limit) => (limit.resetsInMs === null ? [] : [limit.resetsInMs])),
+  );
+  return lifts.length === 0 ? null : Math.min(...lifts);
+}
+
+export function useAgedHomePage(page: HomePage, onLimitLifted: () => void): HomePage {
   const [clock, setClock] = useState({ page, sinceReceived: 0 });
   useEffect(() => {
     const receivedAt = Date.now();
@@ -61,6 +70,12 @@ export function useAgedHomePage(page: HomePage): HomePage {
     }, TIME_TEXT_TICK_MS);
     return () => clearInterval(timer);
   }, [page]);
+  useEffect(() => {
+    const lift = soonestLimitLiftMs(page);
+    if (lift === null || lift === 0) return undefined;
+    const timer = setTimeout(onLimitLifted, lift + LIMIT_LIFT_MARGIN_MS);
+    return () => clearTimeout(timer);
+  }, [page, onLimitLifted]);
   const sinceReceived = clock.page === page ? clock.sinceReceived : 0;
   return useMemo(() => agedHomePage(page, sinceReceived), [page, sinceReceived]);
 }
