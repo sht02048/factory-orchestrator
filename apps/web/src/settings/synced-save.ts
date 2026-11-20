@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type SetStateAction } from "react";
 import { createSerialSaver } from "./serial-save";
 import type { ActionResult, SubmitState } from "./settings-screen";
 
@@ -16,11 +16,20 @@ export function saveStatusOf(state: SubmitState, savedOnce: boolean): SaveStatus
 }
 
 export function createSavedResync(): {
+  chosen: () => void;
+  draftEdited: () => void;
   savedChanged: (sending: boolean) => boolean;
   stateChanged: (kind: SubmitState["kind"]) => boolean;
 } {
   let changedWhileSending = false;
+  let editedSinceChosen = false;
   return {
+    chosen: () => {
+      editedSinceChosen = false;
+    },
+    draftEdited: () => {
+      editedSinceChosen = true;
+    },
     savedChanged: (sending) => {
       if (!sending) return true;
       changedWhileSending = true;
@@ -28,7 +37,7 @@ export function createSavedResync(): {
     },
     stateChanged: (kind) => {
       if (kind === "sending") return false;
-      const resync = changedWhileSending && kind === "idle";
+      const resync = changedWhileSending && kind === "idle" && !editedSinceChosen;
       changedWhileSending = false;
       return resync;
     },
@@ -75,10 +84,14 @@ export function useSyncedSave<V>({
   }, [state.kind, resync]);
   return {
     draft,
-    setDraft,
+    setDraft: (value: SetStateAction<V>) => {
+      resync.draftEdited();
+      setDraft(value);
+    },
     state,
     status: saveStatusOf(state, savedOnce),
     choose: (value: V) => {
+      resync.chosen();
       setDraft(value);
       saver.choose(value);
     },

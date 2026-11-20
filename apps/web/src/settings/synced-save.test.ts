@@ -28,4 +28,22 @@ describe("저장된 값으로 초안 다시 맞추기(0128)", () => {
     expect(resync.stateChanged("sending")).toBe(false);
     expect(resync.stateChanged("idle")).toBe(false);
   });
+
+  it("저장하는 동안 저장하지 않은 초안을 고쳤으면 저장이 끝나도 그 초안을 지킨다", () => {
+    const resync = createSavedResync();
+    resync.chosen();
+    expect(resync.stateChanged("sending")).toBe(false);
+    resync.draftEdited();
+    expect(resync.savedChanged(true)).toBe(false);
+    expect(resync.stateChanged("idle")).toBe(false);
+  });
+
+  it("초안을 고친 뒤 다시 골라 저장하면 그 저장이 끝난 뒤에는 맞춘다", () => {
+    const resync = createSavedResync();
+    resync.draftEdited();
+    resync.chosen();
+    expect(resync.stateChanged("sending")).toBe(false);
+    expect(resync.savedChanged(true)).toBe(false);
+    expect(resync.stateChanged("idle")).toBe(true);
+  });
 });
