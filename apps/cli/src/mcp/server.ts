@@ -120,7 +120,11 @@ function timelineView(timeline: RunTimeline): Record<string, unknown> {
       ...run,
       [EXTERNAL_FIELD]: { startError: startError === null ? null : scrubText(startError) },
     })),
-    entries: timeline.entries,
+    entries: timeline.entries.map((entry) => {
+      if (entry.source !== "mcp") return entry;
+      const { client, ...rest } = entry;
+      return { ...rest, [EXTERNAL_FIELD]: { client } };
+    }),
   };
 }
 

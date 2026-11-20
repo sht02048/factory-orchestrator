@@ -28,7 +28,7 @@ blocked_by: [0132]
 - `@ganger/log`의 `readServerLogs`·`followServerLogs`(`packages/log/src/read.ts`): 회전본까지 합쳐 시각순, 같은 시각이면 파일 안 순서. 깨진 줄은 건너뛴다. follow는 inode로 회전을 알아채고 옮겨 간 파일의 남은 줄과 그 사이 회전본을 읽은 뒤 새 파일로 넘어간다.
 - `ganger logs`(`apps/cli/src/logs.ts`): 사람에게는 `YYYY-MM-DD HH:MM:SS.mmm LEVEL [proc] msg 키=값` 한 줄, TTY이고 `NO_COLOR`가 없을 때만 수준에 색. `--json`은 저장된 줄 그대로. Linux에서 systemd unit 파일이 있으면 stderr에 journald 안내.
 - `runTimeline`·`ticketTimeline`(`packages/db/src/run-timeline.ts`): 본문 글(질문·Permission 내용, 알림 제목·내용)은 담지 않는다. 제어 요청(멈추기·이어 하기)도 넣었다.
-- MCP `get_server_logs`: 읽기 전용 표시, `limit` 기본 200·최대 1000. 런을 주면 그 런의 줄과 런 id 없는 그 티켓의 줄(webhook 등)을 준다. 파일에서 읽은 줄을 한 번 더 가린다. 로그 줄은 고정 키·문맥 id 키·숫자와 참거짓만 바깥에 두고, 나머지 문자열과 `err`(러너 stderr, 요청 경로·호스트 등)는 `external` 칸에 둔다. 런의 `startError`는 가린 뒤 `external` 칸에 둔다.
+- MCP `get_server_logs`: 읽기 전용 표시, `limit` 기본 200·최대 1000. 런을 주면 그 런의 줄과 런 id 없는 그 티켓의 줄(webhook 등)을 준다. 파일에서 읽은 줄을 한 번 더 가린다. 로그 줄은 고정 키·문맥 id 키·숫자와 참거짓만 바깥에 두고, 나머지 문자열과 `err`(러너 stderr, 요청 경로·호스트 등)는 `external` 칸에 둔다. 런의 `startError`는 가린 뒤, MCP 작업 기록의 `client`(클라이언트가 보낸 이름)는 그대로 `external` 칸에 둔다.
 
 ## ADR 0013 범위
 
@@ -43,6 +43,8 @@ stdio 하나(결정 1), DB와 파일을 직접 읽기(결정 2), 비밀 값 없�
 
 - follow는 한 번 폴링하는 사이(500ms)에 회전본 개수를 넘게 회전해 따라가던 파일이 지워지면 그 사이 줄을 잃는다. 기본 한도에서는 거의 없다.
 - `LogFilter`의 `runId`·`ticketKey`는 `@ganger/log`가 core에 기대지 않으려고 맨 `string`이다.
+
+- `--json`은 파싱한 줄을 다시 `JSON.stringify`한다. 키와 순서는 같지만 바이트까지 같다고 보장하지 않는다.
 
 ## 머지 위험
 

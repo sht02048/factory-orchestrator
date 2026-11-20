@@ -35,6 +35,7 @@ const procSchema = z.enum(PROCESS_NAMES);
 const levelSchema = z.string().trim().toLowerCase().pipe(z.enum(LOG_LEVELS));
 const DURATION = /^(\d+)\s*([smhd])$/i;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
 const UNIT_MS: Readonly<Record<string, number>> = {
   s: 1_000,
   m: 60_000,
@@ -79,8 +80,11 @@ function parseSince(value: string, now: Date): Date | undefined {
     if (unit === undefined) return undefined;
     return new Date(now.getTime() - Number(duration[1]) * unit);
   }
-  if (!ISO_DATE.test(value.trim())) return undefined;
-  const at = Date.parse(value);
+  const trimmed = value.trim();
+  if (!ISO_DATE.test(trimmed)) return undefined;
+  const day = DATE_ONLY.exec(trimmed);
+  if (day !== null) return new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]));
+  const at = Date.parse(trimmed);
   return Number.isNaN(at) ? undefined : new Date(at);
 }
 

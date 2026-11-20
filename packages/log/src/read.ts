@@ -114,11 +114,13 @@ export function followServerLogs(dir: string, filter: LogFilter = {}): LogFollow
 
   for (const proc of procs) {
     const current = logFilePath(dir, proc);
-    for (const file of logFilesOldestFirst(dir, proc).filter((path) => path !== current)) {
-      initial.push(...parseText(readText(file)));
-    }
     const state: FollowState = { ino: undefined, offset: 0, pending: Buffer.alloc(0) };
-    initial.push(...readCurrent(current, state));
+    const currentLines = readCurrent(current, state);
+    const rotated = logFilesOldestFirst(dir, proc).filter(
+      (path) => path !== current && inodeOf(path) !== state.ino,
+    );
+    for (const file of rotated) initial.push(...parseText(readText(file)));
+    initial.push(...currentLines);
     states.set(proc, state);
   }
 
