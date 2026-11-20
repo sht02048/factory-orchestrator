@@ -167,6 +167,9 @@ const noopActions: SettingsActions = {
   createLabel: () => Promise.resolve({ ok: false, reason: "not-found" }),
   reloadFromTracker: () => Promise.resolve(),
   pollRunnerChecks: () => Promise.resolve(false),
+  checkWebhookAddress: () => Promise.resolve({ ok: true }),
+  turnOffWebhook: () => Promise.resolve({ ok: true }),
+  pollWebhookState: () => Promise.resolve(true),
 };
 
 function render(page: SettingsPage, runnerIssues = 0): string {
@@ -310,6 +313,8 @@ describe("Settings 저장하고 다시 열기", () => {
         name: "Acme",
         hasWebhookSecret: true,
         webhookPath: `/api/webhooks/tracker/${connection}`,
+        webhook: { kind: "waiting" },
+        webhookSettingsUrl: null,
       },
     ]);
     expect(page.install.githubToken).toBe(true);
@@ -645,6 +650,7 @@ describe("주소(0048)", () => {
     expect((await loadSettingsPage(f.context, undefined, now)).install.addresses).toEqual({
       webAddress: null,
       webhookAddress: null,
+      webhookAddressChecked: false,
     });
     expect(
       saveAddresses(
@@ -661,11 +667,12 @@ describe("주소(0048)", () => {
     expect(page.install.addresses).toEqual({
       webAddress: "https://server.example.ts.net",
       webhookAddress: "https://hooks.example.com",
+      webhookAddressChecked: false,
     });
     const server = textOf(sectionOf(render(page), "server"));
     expect(server).toContain("다른 기기에서 열 주소");
     expect(server).toContain("https://server.example.ts.net");
-    expect(textOf(sectionOf(render(page), "advanced"))).toContain("https://hooks.example.com");
+    expect(textOf(sectionOf(render(page), "advanced"))).not.toContain("https://hooks.example.com");
 
     expect(saveAddresses(f.context, { webAddress: "", webhookAddress: "" }, now, local)).toEqual({
       ok: true,
@@ -673,6 +680,7 @@ describe("주소(0048)", () => {
     expect((await loadSettingsPage(f.context, undefined, now)).install.addresses).toEqual({
       webAddress: null,
       webhookAddress: null,
+      webhookAddressChecked: false,
     });
   });
 
@@ -1178,12 +1186,14 @@ describe("Settings 화면", () => {
 
   it("처음 열 때는 비밀값 입력칸을 띄우지 않고 노란 주 버튼도 없다(ADR 0010 6번)", async () => {
     const f = fixture();
-    await addConnection(f);
+    const connection = await addConnection(f);
     const page = await loadSettingsPage(f.context, commerce, now);
     const html = render(page);
     expect(html).not.toContain('type="password"');
     expect(html).not.toContain('data-variant="primary"');
-    expect(textOf(sectionOf(html, "connections"))).toContain("관리");
+    expect(sectionOf(html, "connections")).toContain(
+      `href="/settings/connections/${connection}?ws=${commerce}"`,
+    );
   });
 
   it("최대 실행 시간 칸은 숫자 키보드를 쓰고, 처음 열 때는 오류를 보이지 않는다(0055)", async () => {

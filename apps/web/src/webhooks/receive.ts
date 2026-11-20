@@ -2,8 +2,9 @@ import type { AdapterRegistry, TrackerConnectionId, WebhookVerifyError } from "@
 import {
   getTrackerConnection,
   inTransaction,
-  markTrackerChanged,
   recordTrackerEvent,
+  recordWebhookAccepted,
+  recordWebhookBadSignature,
 } from "@ganger/db";
 import type { Database, SecretBox } from "@ganger/db";
 
@@ -139,11 +140,14 @@ async function handle(
       headers: Object.fromEntries(request.headers),
       now,
     });
-    if (!result.ok) return result.error;
+    if (!result.ok) {
+      if (result.error === "bad-signature")
+        recordWebhookBadSignature(context.db, connection.id, now);
+      return result.error;
+    }
     return inTransaction(context.db, () => {
-      const outcome = recordTrackerEvent(context.db, connection.id, result.event);
-      if (outcome === "recorded") markTrackerChanged(context.db, connection.id);
-      return outcome;
+      recordWebhookAccepted(context.db, connection.id, now);
+      return recordTrackerEvent(context.db, connection.id, result.event);
     });
   } catch (error) {
     context.logger.warn("could not handle a tracker webhook", { connectionId, error });

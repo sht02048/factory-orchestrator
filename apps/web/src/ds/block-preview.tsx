@@ -13,6 +13,8 @@ import {
   SettingsLinkRow,
   SettingsRow,
   SettingsSection,
+  SettingsStep,
+  SettingsSteps,
   Switch,
   CheckIcon,
   CheckTick,
@@ -96,6 +98,7 @@ export const blockSectionIds = [
   "kanban",
   "sheet",
   "settingsRows",
+  "settingsSteps",
   "sectionNav",
   "icons",
 ] as const;
@@ -600,6 +603,13 @@ export function BlockSections() {
           </Demo>
         </Section>
       </div>
+      <div id="settingsSteps">
+        <Section title={tNav("settingsSteps")} note={t("settingsSteps.note")}>
+          <Demo>
+            <SettingsStepsPreview />
+          </Demo>
+        </Section>
+      </div>
       <div id="sectionNav">
         <Section title={tNav("sectionNav")} note={t("sectionNav.note")}>
           <Demo>
@@ -641,6 +651,32 @@ export function BlockSections() {
         </Section>
       </div>
     </>
+  );
+}
+
+function SettingsStepsPreview() {
+  const t = useTranslations("ds.blocks.settingsSteps");
+  return (
+    <div {...stylex.props(styles.settingsDemo)}>
+      <SettingsSection id="ds-settings-steps" title={t("title")} detail={t("status")}>
+        <SettingsSteps label={t("label")}>
+          <SettingsStep
+            number={1}
+            state="done"
+            stateLabel={t("done")}
+            label={t("first")}
+            detail={t("firstDetail")}
+            control={<Button>{t("change")}</Button>}
+          />
+          <SettingsStep number={2} state="current" stateLabel={t("current")} label={t("second")}>
+            <Text variant="meta" as="p">
+              {t("secondBody")}
+            </Text>
+          </SettingsStep>
+          <SettingsStep number={3} state="locked" stateLabel={t("locked")} label={t("third")} />
+        </SettingsSteps>
+      </SettingsSection>
+    </div>
   );
 }
 

@@ -7,6 +7,8 @@ import type {
   TrackerProjectId,
 } from "@ganger/core";
 import { and, asc, eq, isNull } from "drizzle-orm";
+import { markTrackerChanged } from "./change-events.js";
+import { inTransaction } from "./database.js";
 import type { Database } from "./database.js";
 import { trackerEvents } from "./schema.js";
 
@@ -15,6 +17,18 @@ export function recordTrackerEvent(
   connection: TrackerConnectionId,
   event: TrackerEvent,
 ): "recorded" | "duplicate" {
+  return inTransaction(db, () => {
+    const recorded = insertTrackerEvent(db, connection, event);
+    if (recorded) markTrackerChanged(db, connection, event.receivedAt);
+    return recorded ? "recorded" : "duplicate";
+  });
+}
+
+function insertTrackerEvent(
+  db: Database,
+  connection: TrackerConnectionId,
+  event: TrackerEvent,
+): boolean {
   const result = db
     .insert(trackerEvents)
     .values({
@@ -29,7 +43,7 @@ export function recordTrackerEvent(
     })
     .onConflictDoNothing({ target: [trackerEvents.trackerConnectionId, trackerEvents.deliveryId] })
     .run();
-  return result.changes > 0 ? "recorded" : "duplicate";
+  return result.changes > 0;
 }
 
 export interface StoredTrackerEvent {

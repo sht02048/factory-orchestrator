@@ -6,6 +6,7 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { z } from "zod";
+import { ChangeEventsSubscription } from "../change-events/subscription";
 import { getShell } from "../server/functions";
 import { AppShell } from "../shell/app-shell";
 import { resolveWorkspace } from "@ganger/app/shell/model";
@@ -32,6 +33,7 @@ function AppLayout() {
         void navigate({ to: ".", search: { ws: next } });
       }}
     >
+      <ChangeEventsSubscription />
       <Outlet />
     </AppShell>
   );

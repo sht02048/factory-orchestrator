@@ -14,7 +14,10 @@ import {
 } from "@ganger/core";
 import type { RunnerId, RunnerKind, TrackerConnectionId } from "@ganger/core";
 import {
+  forgetWebhookReceipt,
+  inTransaction,
   getAutoAssignLabel,
+  getInstallSettings,
   getMapping,
   getTrackerConnection,
   getWorkspaceTrackerProject,
@@ -23,10 +26,12 @@ import {
   listRunners,
   listWorkspaces,
   markTrackerChanged,
+  recordSettingsChange,
   removeWorkspaceTrackerProject,
   requestRunnerCheck,
   saveAutoAssignLabel,
   saveCodeHostConnection,
+  saveCheckedWebhookAddress,
   saveInstallAddresses,
   replaceMapping,
   saveMapping,
@@ -41,7 +46,9 @@ import {
 import type { WorkspaceId } from "@ganger/db";
 import { z } from "zod";
 import { allowedHosts, hostnameOfHostHeader } from "../request-guard.js";
-import { remoteErrorOf, remoteErrorOfDetail, trackerOf } from "./load.js";
+import { checkWebhookAddress } from "../webhook-address.js";
+import type { PingFetch, WebhookAddressFailure } from "../webhook-address.js";
+import { remoteErrorOf, remoteErrorOfDetail, trackerConnectionView, trackerOf } from "./load.js";
 import type { SettingsContext } from "./load.js";
 import { MAX_MODEL_LENGTH, MAX_RUN_MINUTES } from "./model.js";
 import type {
@@ -50,6 +57,7 @@ import type {
   MappingSaveReason,
   RemoteError,
   SaveResult,
+  WebhookStateView,
 } from "./model.js";
 
 export const RUNNER_KIND: RunnerKind = toRunnerKind("orca");
@@ -121,7 +129,6 @@ export function addTrackerProject(
     inProgressStateId: null,
   });
   if (!saved) return { ok: false, reason: "taken" };
-  markTrackerChanged(context.db, connection);
   return { ok: true };
 }
 
@@ -138,7 +145,6 @@ export function removeTrackerProject(
     projectId: toTrackerProjectId(input.projectId),
   });
   if (!removed) return { ok: false, reason: "not-found" };
-  markTrackerChanged(context.db, connection);
   return { ok: true };
 }
 
@@ -347,34 +353,105 @@ export async function saveTrackerConnectionSetting(
   const webhookSecret =
     input.webhookSecret === "" ? (previous?.webhookSecret ?? null) : input.webhookSecret;
   const secrets = { ...previous, apiKey, webhookSecret };
-  const config = existing?.config ?? {};
+  let config: unknown = existing?.config ?? {};
 
   let organizationName: string | null = null;
   if (input.apiKey !== "") {
-    const check = await checkWith<{ ok: true; organizationName: string | null }>(() =>
-      context.registry.createTracker(kind, { config, secrets }).checkConnection(),
-    );
+    const check = await checkWith<{
+      ok: true;
+      organizationName: string | null;
+      webhookSettingsUrl?: string;
+    }>(() => context.registry.createTracker(kind, { config, secrets }).checkConnection());
     if (!check.ok) return { ok: false, reason: check.reason };
     organizationName = connectionNameOf(check.organizationName);
+    if (check.webhookSettingsUrl !== undefined) {
+      config = { ...configObject(config), webhookSettingsUrl: check.webhookSettingsUrl };
+    }
   }
   const id = existing?.id ?? toTrackerConnectionId(randomUUID());
-  saveTrackerConnection(
-    context.db,
-    context.secretBox,
-    {
-      id,
-      kind,
-      name: input.name ?? existing?.name ?? organizationName ?? DEFAULT_CONNECTION_NAME,
-      config,
-      secrets,
-    },
-    now,
-  );
-  markTrackerChanged(context.db, id);
+  inTransaction(context.db, () => {
+    saveTrackerConnection(
+      context.db,
+      context.secretBox,
+      {
+        id,
+        kind,
+        name: input.name ?? existing?.name ?? organizationName ?? DEFAULT_CONNECTION_NAME,
+        config,
+        secrets,
+      },
+      now,
+    );
+    if (webhookSecret !== (previous?.webhookSecret ?? null))
+      forgetWebhookReceipt(context.db, id, now);
+  });
   return { ok: true };
 }
 
+const configObjectSchema = z.record(z.string(), z.unknown());
+
+function configObject(config: unknown): Record<string, unknown> {
+  const parsed = configObjectSchema.safeParse(config);
+  return parsed.success ? parsed.data : {};
+}
+
 export const connectionIdInput = z.object({ id });
+
+export function turnOffWebhook(
+  context: SettingsContext,
+  input: z.infer<typeof connectionIdInput>,
+  now: Date,
+): SaveResult<"not-found"> {
+  const existing = getTrackerConnection(
+    context.db,
+    context.secretBox,
+    toTrackerConnectionId(input.id),
+  );
+  if (existing === null) return { ok: false, reason: "not-found" };
+  const stored = trackerSecretsSchema.safeParse(existing.secrets);
+  if (!stored.success) return { ok: false, reason: "not-found" };
+  inTransaction(context.db, () => {
+    saveTrackerConnection(
+      context.db,
+      context.secretBox,
+      { ...existing, secrets: { ...stored.data, webhookSecret: null } },
+      now,
+    );
+    forgetWebhookReceipt(context.db, existing.id, now);
+  });
+  return { ok: true };
+}
+
+export function webhookStateNow(
+  context: SettingsContext,
+  input: z.infer<typeof connectionIdInput>,
+  now: Date,
+): WebhookStateView | null {
+  const connection = getTrackerConnection(
+    context.db,
+    context.secretBox,
+    toTrackerConnectionId(input.id),
+  );
+  return connection === null ? null : trackerConnectionView(context.db, connection, now).webhook;
+}
+
+export const webhookAddressInput = z.object({ address: z.string().trim().max(2000) });
+
+export async function verifyWebhookAddress(
+  context: SettingsContext,
+  input: z.infer<typeof webhookAddressInput>,
+  now: Date,
+  fetch: PingFetch,
+): Promise<SaveResult<WebhookAddressFailure>> {
+  const install = getInstallSettings(context.db);
+  const check = await checkWebhookAddress(input.address, {
+    fetch,
+    instanceId: install.instanceId,
+  });
+  if (!check.ok) return check;
+  saveCheckedWebhookAddress(context.db, check.address, now);
+  return { ok: true };
+}
 
 export async function checkTrackerConnection(
   context: SettingsContext,
@@ -584,6 +661,7 @@ export function savePowerSetting(
 ): SaveResult<"unavailable"> {
   if (context.power === undefined) return { ok: false, reason: "unavailable" };
   context.power.write({ preventSleep: input.preventSleep });
+  recordSettingsChange(context.db);
   return { ok: true };
 }
 

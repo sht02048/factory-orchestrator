@@ -1,18 +1,24 @@
 import { Text } from "@ganger/ui";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { createRoute } from "@tanstack/react-router";
 import type { AnyRoute } from "@tanstack/react-router";
 import { loadRouteQuery } from "../query/route-query";
 import { Route as appLayoutRoute } from "../routes/_app";
 import { routeTree as appRouteTree } from "../routeTree.gen";
-import { getTimeZone } from "../server/functions";
+import { ANSWER_REJECT_REASONS, rejectedAs } from "../query/mutation-error";
+import { answerQuestion, getTimeZone } from "../server/functions";
 
 const QUERY_PROBE_PATH = "/query-probe";
 const QUERY_PROBE_AWAY_PATH = "/query-probe-away";
 const QUERY_PROBE_ERROR_PATH = "/query-probe-error";
 const QUERY_PROBE_SHELL_ERROR_PATH = "/query-probe-shell-error";
 const QUERY_PROBE_ERROR_MESSAGE = "query-probe-read-failed";
+const QUERY_PROBE_RUN_PATH = "/query-probe-run";
+const QUERY_PROBE_ANSWER_PATH = "/query-probe-answer";
 const QUERY_PROBE_ID = "query-probe";
+const QUERY_PROBE_RUN_ID = "query-probe-run";
+const QUERY_PROBE_ANSWER_ID = "query-probe-answer";
 const QUERY_PROBE_AWAY_ID = "query-probe-away";
 
 const probeQuery = queryOptions({
@@ -25,6 +31,51 @@ const failingProbeQuery = queryOptions({
   queryFn: (): Promise<string> => Promise.reject(new Error(QUERY_PROBE_ERROR_MESSAGE)),
   retryDelay: 0,
 });
+
+const runProbeQuery = queryOptions({
+  queryKey: ["runs", "detail", "query-probe"],
+  queryFn: ({ signal }) => getTimeZone({ signal }),
+});
+
+function QueryProbeRun() {
+  const { data, dataUpdatedAt } = useSuspenseQuery(runProbeQuery);
+  return (
+    <Text variant="body" id={QUERY_PROBE_RUN_ID} data-updated-at={dataUpdatedAt}>
+      {data}
+    </Text>
+  );
+}
+
+function reasonOf(value: unknown): unknown {
+  return typeof value === "object" && value !== null ? Reflect.get(value, "reason") : undefined;
+}
+
+function describeRejection(error: unknown) {
+  const cause: unknown = error instanceof Error ? error.cause : undefined;
+  return {
+    name: error instanceof Error ? error.name : null,
+    reason: reasonOf(error) ?? null,
+    causeReason: reasonOf(cause) ?? null,
+  };
+}
+
+function QueryProbeAnswer() {
+  const [outcome, setOutcome] = useState("pending");
+  useEffect(() => {
+    rejectedAs(
+      () => answerQuestion({ data: { runId: "missing-run", questionId: "missing", answer: "네" } }),
+      ANSWER_REJECT_REASONS,
+    ).then(
+      () => setOutcome("resolved"),
+      (error: unknown) => setOutcome(JSON.stringify(describeRejection(error))),
+    );
+  }, []);
+  return (
+    <Text variant="body" id={QUERY_PROBE_ANSWER_ID}>
+      {outcome}
+    </Text>
+  );
+}
 
 function QueryProbe() {
   const { data } = useSuspenseQuery(probeQuery);
@@ -57,6 +108,19 @@ const awayRoute = createRoute({
   component: QueryProbeAway,
 });
 
+const runRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: QUERY_PROBE_RUN_PATH,
+  loader: (load) => loadRouteQuery(load, runProbeQuery),
+  component: QueryProbeRun,
+});
+
+const answerRoute = createRoute({
+  getParentRoute: () => appRouteTree,
+  path: QUERY_PROBE_ANSWER_PATH,
+  component: QueryProbeAnswer,
+});
+
 const errorRoute = createRoute({
   getParentRoute: () => appRouteTree,
   path: QUERY_PROBE_ERROR_PATH,
@@ -81,11 +145,12 @@ function childRoutesOf(route: { children?: unknown }): AnyRoute[] {
   return Object.values(children).filter(isRoute);
 }
 
-appLayoutRoute.addChildren([...childRoutesOf(appLayoutRoute), shellErrorRoute]);
+appLayoutRoute.addChildren([...childRoutesOf(appLayoutRoute), shellErrorRoute, runRoute]);
 
 export const routeTree = appRouteTree.addChildren([
   ...childRoutesOf(appRouteTree),
   probeRoute,
   awayRoute,
   errorRoute,
+  answerRoute,
 ]);

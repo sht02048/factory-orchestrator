@@ -25,8 +25,11 @@ const peerSchema = z.object({
   TailscaleIPs: z.array(z.unknown()).nullish().catch(undefined),
 });
 
+const selfSchema = z.object({ DNSName: z.string().optional() });
+
 const statusSchema = z.object({
   BackendState: z.string(),
+  Self: selfSchema.nullish().catch(null),
   Peer: z.record(z.string(), peerSchema).nullish(),
 });
 
@@ -40,7 +43,12 @@ export type TailnetStatus =
   | { kind: "missing" }
   | { kind: "stopped" }
   | { kind: "unreadable" }
-  | { kind: "running"; devices: TailnetDevice[] };
+  | { kind: "running"; self: string | null; devices: TailnetDevice[] };
+
+function hostOfDnsName(dnsName: string | undefined): string | null {
+  const host = (dnsName ?? "").trim().replace(/\.$/, "").toLowerCase();
+  return /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/u.test(host) ? host : null;
+}
 
 export function parseTailnetStatus(output: string): TailnetStatus {
   let json: unknown;
@@ -66,7 +74,7 @@ export function parseTailnetStatus(output: string): TailnetStatus {
       ...(ipv4 === undefined ? {} : { ipv4 }),
     });
   }
-  return { kind: "running", devices };
+  return { kind: "running", self: hostOfDnsName(parsed.data.Self?.DNSName), devices };
 }
 
 export interface TailnetDeps {
@@ -104,3 +112,20 @@ export const defaultTailnetDeps: TailnetDeps = {
       );
     }),
 };
+
+export interface ThisTailnetDevice {
+  cli: string;
+  host: string;
+}
+
+export async function readThisTailnetDevice(
+  deps: TailnetDeps = defaultTailnetDeps,
+): Promise<ThisTailnetDevice | null> {
+  const cli = findTailscaleCli(deps);
+  if (cli === undefined) return null;
+  const output = await deps.run(cli, ["status", "--json"], 3_000);
+  if (output === undefined) return null;
+  const status = parseTailnetStatus(output);
+  if (status.kind !== "running" || status.self === null) return null;
+  return { cli, host: status.self };
+}

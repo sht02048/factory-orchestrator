@@ -13,6 +13,7 @@ import {
 } from "@ganger/core";
 import {
   SecretBox,
+  forgetWebhookReceipt,
   getAutoAssignLabel,
   getMapping,
   migrate,
@@ -20,6 +21,7 @@ import {
   recordRunnerCheck,
   replaceMapping,
   saveAutoAssignLabel,
+  saveCheckedWebhookAddress,
   saveCodeHostConnection,
   saveInstallAddresses,
   saveMapping,
@@ -56,6 +58,7 @@ let page: Page;
 
 const lockedHost = "settings.example.test";
 const projectPath = `/settings/projects/${connection}/${trackerProject}`;
+const connectionPath = `/settings/connections/${connection}`;
 
 const settingsAdapters: Plugin = {
   name: "e2e-settings-adapters",
@@ -77,6 +80,7 @@ beforeAll(async () => {
 
   process.env["DATABASE_PATH"] = dbPath;
   process.env["ENCRYPTION_KEY"] = Buffer.from(encryptionKey).toString("base64");
+  process.env["GANGER_TAILSCALE_CLI"] = join(dir, "no-tailscale");
   ({ server: web, baseUrl } = await startWebServer({
     plugins: [settingsAdapters],
     cacheDir: join(dir, "vite-cache"),
@@ -99,6 +103,7 @@ afterAll(async () => {
   db?.$client.close();
   delete process.env["DATABASE_PATH"];
   delete process.env["ENCRYPTION_KEY"];
+  delete process.env["GANGER_TAILSCALE_CLI"];
   if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -239,22 +244,23 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     await openSettings(page);
     expect(await page.locator('input[type="password"]').count()).toBe(0);
     const connections = section(settings.sections.connections);
-    await connections.getByRole("button", { name: settings.connections.manage }).click();
-    const connectionSecrets = await secretAttributes();
-    expect(connectionSecrets.length).toBe(2);
-
     await connections.getByRole("button", { name: settings.change }).click();
-    expect(
-      await connections.getByRole("button", { name: settings.connections.manage }).count(),
-    ).toBe(1);
     const githubSecrets = await secretAttributes();
     expect(githubSecrets.length).toBe(1);
-    for (const secret of [...connectionSecrets, ...githubSecrets]) {
-      expect(secret).toEqual({ autocomplete: "off", onePassword: true, lastPass: "true" });
-    }
     await connections.getByRole("link", { name: settings.github.guideLink }).waitFor();
     await connections.getByRole("button", { name: settings.github.permissionsLabel }).hover();
     await page.getByRole("tooltip").getByText("Pull requests 읽기", { exact: false }).waitFor();
+
+    await openSettings(page, connectionPath);
+    expect(await page.locator('input[type="password"]').count()).toBe(0);
+    await page
+      .getByRole("button", { name: `${settings.connection.apiKey} ${settings.change}` })
+      .click();
+    const keySecrets = await secretAttributes();
+    expect(keySecrets.length).toBe(1);
+    for (const secret of [...keySecrets, ...githubSecrets]) {
+      expect(secret).toEqual({ autocomplete: "off", onePassword: true, lastPass: "true" });
+    }
   });
 
   it("주소를 잘못 넣으면 그 줄에 이유를 보이고 저장하지 않는다", async () => {
@@ -297,17 +303,19 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     }
   });
 
-  it("서버가 다듬어 저장한 Webhook 주소를 줄에 보인다", async () => {
+  it("고급에는 webhook 주소 줄이 없고, 연결 줄이 그 연결의 상세로 간다", async () => {
     await openSettings(page);
     const advanced = section(settings.sections.advanced);
-    await advanced.getByRole("button", { name: settings.addresses.set }).click();
-    await advanced
-      .getByRole("textbox", { name: settings.addresses.webhook, exact: true })
-      .fill("https://Hooks.example.com/");
-    await advanced.getByRole("button", { name: settings.save }).click();
-    await advanced.getByText("https://hooks.example.com", { exact: true }).waitFor();
-    expect(await advanced.getByRole("textbox").count()).toBe(0);
-    saveInstallAddresses(db, { webAddress: null, webhookAddress: null }, new Date());
+    await advanced.getByRole("link", { name: /^MCP/ }).waitFor();
+    expect(await advanced.getByText(settings.webhook.address.label).count()).toBe(0);
+    expect(await advanced.getByRole("button").count()).toBe(0);
+    await section(settings.sections.connections)
+      .getByRole("link", { name: /^Acme/ })
+      .getByText(settings.connections.rowOff)
+      .waitFor();
+    await section(settings.sections.connections).getByRole("link", { name: /^Acme/ }).click();
+    await page.waitForURL((url) => url.pathname === connectionPath);
+    await page.getByRole("heading", { level: 1, name: "Acme" }).waitFor();
   });
 
   it("프로젝트를 넣으면 새 줄로 포커스가 가고, 상세에서 빼면 Settings 로 돌아온다", async () => {
@@ -462,9 +470,9 @@ describe("Settings 폼과 도움말(브라우저, 0119 리뷰 후속)", () => {
   it("다른 줄이 막히면 고친 값이 남은 줄을 화면에 보이고 그 칸으로 포커스를 옮긴다", async () => {
     await page.setViewportSize({ width: 1280, height: 700 });
     await openSettings(page);
-    const advanced = section(settings.sections.advanced);
-    await advanced.getByRole("button", { name: /^Webhook 공개 주소 (정하기|바꾸기)$/ }).click();
-    const webhook = page.getByRole("textbox", { name: settings.addresses.webhook, exact: true });
+    const server = section(settings.sections.server);
+    await server.getByRole("button", { name: settings.addresses.set }).click();
+    const webhook = page.getByRole("textbox", { name: settings.addresses.web, exact: true });
     await webhook.fill("https://draft.example.com");
     await page
       .getByRole("navigation", { name: settings.nav.label })
@@ -836,3 +844,138 @@ async function addRepo(target: Page, project: string, repo: string): Promise<voi
 function fill(message: string, values: Record<string, string>): string {
   return message.replace(/\{(\w+)\}/g, (all, name: string) => values[name] ?? all);
 }
+
+describe("트래커 연결 상세의 webhook 켜기(브라우저, 0130)", () => {
+  const address = "https://hooks.example.com";
+  const webhookUrl = `${address}/api/webhooks/tracker/${connection}`;
+
+  const deliver = (body: string) =>
+    fetch(new URL(`/api/webhooks/tracker/${connection}`, baseUrl), { method: "POST", body });
+
+  const resetWebhook = () => {
+    saveInstallAddresses(db, { webAddress: null, webhookAddress: null }, new Date());
+    saveTrackerConnection(db, new SecretBox(encryptionKey), {
+      id: connection,
+      kind: fakeKind,
+      name: "Acme",
+      config: {},
+      secrets: { apiKey: "lin_api_example" },
+    });
+    forgetWebhookReceipt(db, connection);
+  };
+
+  beforeEach(() => resetWebhook());
+
+  it("닿을 주소를 정하기 전에는 2·3단계가 잠겨 있고, 주소 형식이 틀리면 묻지 않고 이유를 보인다", async () => {
+    await openSettings(page, connectionPath);
+    const steps = page.getByRole("list", { name: settings.webhook.steps });
+    const current = steps.locator('[aria-current="step"]');
+    await current.getByText(settings.webhook.address.label).waitFor();
+    expect(await steps.getByText(settings.webhook.create.urlLabel).count()).toBe(0);
+    expect(await steps.getByRole("textbox", { name: settings.webhook.secret.field }).count()).toBe(
+      0,
+    );
+    expect(await steps.getByText(settings.webhook.stepState.locked).count()).toBe(2);
+    expect(await steps.getByText(settings.webhook.address.funnelTitle).count()).toBe(0);
+
+    const field = steps.getByRole("textbox", { name: settings.webhook.address.field });
+    await field.fill("http://hooks.example.com");
+    await steps.getByRole("button", { name: settings.webhook.address.check }).click();
+    await steps.getByText(settings.webhook.address.error["invalid-address"]).waitFor();
+    expect(await field.getAttribute("aria-invalid")).toBe("true");
+    await expect.poll(() => field.evaluate((el) => el === document.activeElement)).toBe(true);
+    await steps.getByRole("button", { name: settings.webhook.address.recheck }).waitFor();
+  });
+
+  it("주소를 확인한 뒤 secret 을 넣고 켜면 기다리고, 가짜 webhook 을 받으면 켜짐으로 바뀐다", async () => {
+    saveCheckedWebhookAddress(db, address, new Date());
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await openSettings(page, connectionPath);
+    const webhook = section(settings.webhook.title);
+    await webhook.getByText(settings.webhook.status.off).waitFor();
+    await webhook.getByText(address, { exact: true }).waitFor();
+    await webhook.getByText(webhookUrl, { exact: true }).waitFor();
+    await webhook.getByRole("link", { name: new RegExp(settings.webhook.create.open) }).waitFor();
+    await shot(page, "webhook-create-open-1280");
+
+    await webhook
+      .getByRole("button", { name: `${settings.webhook.address.label} ${settings.change}` })
+      .click();
+    const addressField = webhook.getByRole("textbox", { name: settings.webhook.address.field });
+    await expect
+      .poll(() => addressField.evaluate((el) => el === document.activeElement))
+      .toBe(true);
+    await page.keyboard.press("Escape");
+    await expect.poll(focused).toBe(settings.change);
+
+    const secret = webhook.getByRole("textbox", { name: settings.webhook.secret.field });
+    await webhook.getByRole("button", { name: settings.webhook.secret.turnOn }).click();
+    await webhook.getByText(settings.webhook.secret.required).waitFor();
+    await secret.fill("whsec_example");
+    await webhook.getByRole("button", { name: settings.webhook.secret.turnOn }).click();
+    await webhook.getByRole("status").getByText(settings.webhook.status.waiting).waitFor();
+    const waiting = webhook.locator("#webhook-waiting");
+    await waiting.waitFor();
+    await expect
+      .poll(() => waiting.evaluate((el) => el.contains(document.activeElement)))
+      .toBe(true);
+    await shot(page, "webhook-waiting-1280");
+
+    expect((await deliver("signed:delivery-1")).status).toBe(200);
+    await webhook.getByText(settings.webhook.status.receiving).waitFor({ timeout: 15_000 });
+    await webhook.getByText(settings.webhook.lastReceived).waitFor();
+    await shot(page, "webhook-receiving-1280");
+
+    expect((await deliver("tampered")).status).toBe(401);
+    expect((await deliver("tampered")).status).toBe(401);
+    await page.reload();
+    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+    await webhook.getByText(fill(settings.webhook.rejected.title, { count: "2" })).waitFor();
+    await webhook.getByText(settings.webhook.status.rejected).waitFor();
+    await shot(page, "webhook-rejected-1280");
+
+    await openSettings(page);
+    const row = section(settings.sections.connections).getByRole("link", { name: /^Acme/ });
+    await row.getByText("webhook 서명이 맞지 않아 받지 못해요", { exact: false }).waitFor();
+    const nav = page.getByRole("navigation", { name: settings.nav.label });
+    await nav
+      .getByRole("link", { name: settings.sections.connections })
+      .getByText(settings.nav.problem)
+      .waitFor();
+    await shot(page, "webhook-settings-rows-1280");
+
+    await openSettings(page, connectionPath);
+    await webhook
+      .getByRole("button", { name: settings.webhook.rejected.reenter, exact: true })
+      .click();
+    const again = webhook.getByRole("textbox", { name: settings.webhook.secret.field });
+    await expect.poll(() => again.evaluate((el) => el === document.activeElement)).toBe(true);
+    await again.fill("whsec_new");
+    await webhook.getByRole("button", { name: settings.webhook.secret.save }).click();
+    await webhook.getByText(settings.webhook.status.waiting).waitFor();
+
+    await webhook.getByRole("button", { name: settings.webhook.off.trigger }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: settings.webhook.off.confirm })
+      .click();
+    await webhook.getByText(settings.webhook.status.off).waitFor();
+    await expect.poll(focused).toContain(settings.webhook.title);
+    await openSettings(page);
+    await section(settings.sections.connections)
+      .getByRole("link", { name: /^Acme/ })
+      .getByText(settings.connections.rowOff)
+      .waitFor();
+  });
+
+  it("400px 에서도 단계와 주소가 가로로 넘치지 않는다", async () => {
+    saveCheckedWebhookAddress(db, address, new Date());
+    await page.setViewportSize({ width: 400, height: 1000 });
+    await openSettings(page, connectionPath);
+    await page.getByText(webhookUrl, { exact: true }).waitFor();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      400,
+    );
+    await shot(page, "webhook-400");
+  });
+});

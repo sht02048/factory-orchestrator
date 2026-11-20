@@ -318,13 +318,13 @@ describe("폴링 보정", () => {
   it("폴링 보정이 바뀐 티켓을 읽으면 웹이 담아 둔 트래커 읽기를 지우게 표시하고, 바뀐 티켓이 없으면 두지 않는다(0122)", async () => {
     const worker = h.worker();
     await worker.tick();
-    expect(trackerReadGeneration(h.db, connection)).toBe(0);
+    const seeded = trackerReadGeneration(h.db, connection);
 
     putTicket("ENG-1", [autoLabel]);
     h.advance(POLL_CORRECTION_INTERVAL_MS);
     await worker.tick();
     const marked = trackerReadGeneration(h.db, connection);
-    expect(marked).toBeGreaterThan(0);
+    expect(marked).toBeGreaterThan(seeded);
 
     h.advance(POLL_CORRECTION_INTERVAL_MS);
     await worker.tick();
