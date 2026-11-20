@@ -71,6 +71,7 @@ import {
 } from "../shared/view.js";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 import { navigationMenu } from "./navigation-menu.js";
+import { hideWindow } from "./window-close.js";
 import { mainWindowOptions, settingsWindowOptions, titleBarCookie } from "./window-options.js";
 
 async function loadServerScreen(window: BrowserWindow, url: string): Promise<void> {
@@ -461,7 +462,7 @@ export class Controller {
     window.on("close", (event) => {
       if (this.quitting) return;
       event.preventDefault();
-      window.hide();
+      hideWindow(window);
     });
     window.webContents.setWindowOpenHandler(({ url }) => {
       if (opensOutsideApp(url)) void shell.openExternal(url);
