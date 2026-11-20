@@ -1,5 +1,8 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { SHELL_KEY } from "../shell/shell-query";
+import { TRACKER_KEY } from "../tickets/tickets-query";
 import { rereadTrackers } from "../server/functions";
 import { webhookReceiptKey } from "@ganger/app/settings/model";
 import {
@@ -30,39 +33,62 @@ export type ReloadOnSuccess = <I>(
   call: (input: I) => Promise<ActionResult>,
 ) => (input: I) => Promise<ActionResult>;
 
-export function useReloadOnSuccess(): ReloadOnSuccess {
+export type AfterSave = () => Promise<unknown>;
+
+export function useSettingsReload(): AfterSave {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  return useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: SHELL_KEY });
+    await router.invalidate({ sync: true });
+  }, [router, queryClient]);
+}
+
+export function useReloadOnSuccess(afterSave: AfterSave): ReloadOnSuccess {
   return useMemo(
     (): ReloadOnSuccess => (call) => async (input) => {
       const result = await call(input);
-      if (result.ok) await router.invalidate({ sync: true });
+      if (result.ok) await afterSave();
       return result;
     },
-    [router],
+    [afterSave],
   );
 }
 
-export function useSettingsActions(): SettingsActions {
+export function useSettingsActions(afterSave: AfterSave): SettingsActions {
   const router = useRouter();
-  const then = useReloadOnSuccess();
+  const queryClient = useQueryClient();
+  const then = useReloadOnSuccess(afterSave);
+  const afterTrackerSave = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: TRACKER_KEY });
+    await afterSave();
+  }, [queryClient, afterSave]);
+  const thenTracker = useReloadOnSuccess(afterTrackerSave);
   return useMemo(
     (): SettingsActions => ({
       saveGeneral: then((data) => saveWorkspaceGeneral({ data })),
-      addProject: then((data) => addWorkspaceTrackerProject({ data })),
-      removeProject: then((data) => removeWorkspaceTrackerProject({ data })),
+      addProject: thenTracker((data) => addWorkspaceTrackerProject({ data })),
+      removeProject: thenTracker((data) => removeWorkspaceTrackerProject({ data })),
       saveMapping: then((data) => saveWorkspaceMapping({ data })),
       saveInProgress: then((data) => saveWorkspaceInProgressState({ data })),
       saveLabel: then((data) => saveWorkspaceLabel({ data })),
       createLabel: async (data) => {
         const result = await createWorkspaceAutoAssignLabel({ data });
-        if (result.ok) await router.invalidate({ sync: true });
+        if (result.ok)
+          await Promise.all([
+            router.invalidate({ sync: true }),
+            queryClient.invalidateQueries({ queryKey: TRACKER_KEY }),
+          ]);
         return result;
       },
       reloadFromTracker: async () => {
         await rereadTrackers();
-        await router.invalidate({ sync: true });
+        await Promise.all([
+          router.invalidate({ sync: true }),
+          queryClient.invalidateQueries({ queryKey: TRACKER_KEY }),
+        ]);
       },
-      saveConnection: then((data) => saveTrackerConnection({ data })),
+      saveConnection: thenTracker((data) => saveTrackerConnection({ data })),
       checkConnection: (data) => checkTrackerConnectionNow({ data }),
       saveGitHubToken: then((data) => saveGitHubTokenSetting({ data })),
       checkGitHubToken: () => checkGitHubTokenNow(),
@@ -85,6 +111,6 @@ export function useSettingsActions(): SettingsActions {
         return false;
       },
     }),
-    [router, then],
+    [router, queryClient, then, thenTracker],
   );
 }

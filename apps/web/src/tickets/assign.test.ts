@@ -5,8 +5,16 @@ import {
   toRunnerId,
   toRunnerProjectId,
   toTicketKey,
+  toTrackerConnectionId,
 } from "@ganger/core";
-import { getRun, recordRunnerCheck, replaceMapping } from "@ganger/db";
+import {
+  getRun,
+  latestChangeSeq,
+  listChangesAfter,
+  recordRunnerCheck,
+  replaceMapping,
+  trackerReadGeneration,
+} from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import { TICKET_TITLE_MAX_LENGTH } from "@ganger/db";
 import { assignInput, submitAssignment } from "@ganger/app/tickets/assign";
@@ -36,6 +44,17 @@ function assignedRun(
 }
 
 describe("수동 할당", () => {
+  it("할당은 트래커 서버 캐시 세대만 올리고 tracker 변경 기록 줄을 쓰지 않아, 열린 Tickets 가 트래커를 다시 읽지 않는다(0127)", () => {
+    const { db } = setupTickets();
+    const before = latestChangeSeq(db);
+    const generation = trackerReadGeneration(db, toTrackerConnectionId(connection));
+
+    assignedRun(db, submitAssignment(db, base, now));
+
+    expect(trackerReadGeneration(db, toTrackerConnectionId(connection))).toBe(generation + 1);
+    expect(listChangesAfter(db, before).map((change) => change.kind)).toEqual(["assignment"]);
+  });
+
   it("Mapping 기본값 그대로 할당하면 러너를 자동으로 골라 Queued 런을 만든다", () => {
     const { db } = setupTickets();
     const run = assignedRun(db, submitAssignment(db, base, now));

@@ -14,6 +14,7 @@ import { loadRunnersPage } from "@ganger/app/runners/load";
 import { loadRunsPage } from "@ganger/app/runs/load";
 import { loadShell } from "@ganger/app/shell/load";
 import { loadStatsPage } from "@ganger/app/stats/load";
+import { loadTicketRuns } from "@ganger/app/tickets/load";
 import { commerce, connection, minutes, now, seedDatabase } from "../testing/seed";
 
 function statementsFor(db: Database, read: () => unknown): number {
@@ -70,6 +71,7 @@ const loaders: ReadonlyArray<[string, (db: Database) => unknown]> = [
   ["Runs", (db) => loadRunsPage(db, commerce, now, 20, {}, "UTC")],
   ["Runners", (db) => loadRunnersPage(db, now)],
   ["Stats", (db) => loadStatsPage(db, commerce, now, "UTC", 30)],
+  ["Tickets 의 DB 부분", (db) => loadTicketRuns(db, commerce, now)],
 ];
 
 describe("화면 로더의 쿼리 수(0117)", () => {

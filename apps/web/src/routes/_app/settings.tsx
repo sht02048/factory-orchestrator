@@ -7,7 +7,7 @@ import { settingsMessages } from "../../settings/messages";
 import { SettingsScreen } from "../../settings/settings-page";
 import { NavigationGuard } from "../../settings/navigation-guard";
 import { routerSettingsLink } from "../../settings/settings-link";
-import { useSettingsActions } from "../../settings/use-settings-actions";
+import { useSettingsActions, useSettingsReload } from "../../settings/use-settings-actions";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -26,7 +26,7 @@ function SettingsRoute() {
   const page = Route.useLoaderData();
   const { ws } = Route.useSearch();
   const shell = useLoaderData({ from: "/_app" });
-  const actions = useSettingsActions();
+  const actions = useSettingsActions(useSettingsReload());
   return (
     <ScreenMessages messages={settingsMessages}>
       <SettingsScreen

@@ -16,7 +16,7 @@ import { TITLE_BAR_COOKIE, isTitleBarHidden } from "@ganger/app/shell/window-chr
 import { loadStatsPage } from "@ganger/app/stats/load";
 import { statsPeriodDaysSchema } from "@ganger/app/stats/model";
 import { assignInput, submitAssignment } from "@ganger/app/tickets/assign";
-import { loadTicketsPage } from "@ganger/app/tickets/load";
+import { loadTicketRuns, loadTrackerTickets } from "@ganger/app/tickets/load";
 import { TIME_ZONE_COOKIE, parseTimeZone } from "@ganger/app/time-zone";
 import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
@@ -96,10 +96,14 @@ export const controlRun = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string(), control: z.enum(["pause", "resume"]) }))
   .handler(({ data }) => requestControl(getDatabase(), data.runId, data.control, new Date()));
 
-export const getTicketsPage = createServerFn({ method: "GET" })
+export const getTicketRuns = createServerFn({ method: "GET" })
+  .validator(z.object({ ws: z.string().optional() }))
+  .handler(({ data }) => loadTicketRuns(getDatabase(), data.ws, new Date()));
+
+export const getTrackerTickets = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
   .handler(({ data }) =>
-    loadTicketsPage(
+    loadTrackerTickets(
       {
         db: getDatabase(),
         secretBox: getSecretBox(),
@@ -107,7 +111,6 @@ export const getTicketsPage = createServerFn({ method: "GET" })
         trackerReads: getTrackerReads(),
       },
       data.ws,
-      new Date(),
     ),
   );
 

@@ -63,6 +63,13 @@ export function toMutationError<Reason extends string>(
   return error instanceof Error ? error : new Error(String(error), { cause: error });
 }
 
+export function rejectionReasonOf<Reason extends string>(
+  error: unknown,
+  reasons: ReadonlyArray<Reason>,
+): Reason | null {
+  return thrownReason(error, reasons);
+}
+
 export async function rejectedAs<Value, Reason extends string>(
   call: () => Promise<Value>,
   reasons: ReadonlyArray<Reason>,
