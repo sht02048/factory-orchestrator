@@ -5,6 +5,7 @@ import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import type { RunControlActionResult } from "@ganger/app/run-control";
 import type { RunActionResult } from "@ganger/app/run-detail/actions";
 import type { RunDetailPage } from "@ganger/app/run-detail/model";
+import { toRunId } from "@ganger/core";
 import type { RunControl } from "@ganger/core";
 import {
   ANSWER_REJECT_REASONS,
@@ -62,7 +63,9 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
   const { queryClient, calls } = world;
   const refreshRun = async (): Promise<void> => {
     await Promise.all(
-      keysChangedByRunWrite(runId).map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+      keysChangedByRunWrite(toRunId(runId)).map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
     );
   };
   const refreshLog = async (): Promise<void> => {

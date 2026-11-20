@@ -1,7 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import { Button, NoticeLayout, PageHeader, ScreenLayout, Text, focusStyles } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
-import { useQueryErrorResetBoundary } from "@tanstack/react-query";
+import { useQueryClient, useQueryErrorResetBoundary } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { useEffect, useRef, useSyncExternalStore } from "react";
@@ -14,6 +15,7 @@ type RetryState =
 
 let retryState: RetryState = { kind: "idle" };
 let failedAttempts = 0;
+let mountedErrorScreens = 0;
 const listeners = new Set<() => void>();
 
 function setRetryState(next: RetryState): void {
@@ -36,6 +38,28 @@ function idleRetryState(): RetryState {
   return IDLE;
 }
 
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+function queriesSettled(queryClient: QueryClient): Promise<void> {
+  if (queryClient.isFetching() === 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    const stop = queryClient.getQueryCache().subscribe(() => {
+      if (queryClient.isFetching() !== 0) return;
+      stop();
+      resolve();
+    });
+  });
+}
+
+async function retrySettled(queryClient: QueryClient): Promise<void> {
+  await nextFrame();
+  await queriesSettled(queryClient);
+  await nextFrame();
+  await nextFrame();
+}
+
 function focusCurrentScreenLinkIfLost(): void {
   requestAnimationFrame(() => {
     const active = document.activeElement;
@@ -44,9 +68,10 @@ function focusCurrentScreenLinkIfLost(): void {
   });
 }
 
-export function ScreenError(_props: ErrorComponentProps) {
+export function ScreenError({ reset }: ErrorComponentProps) {
   const t = useTranslations("shell.screenError");
   const router = useRouter();
+  const queryClient = useQueryClient();
   const queryErrorReset = useQueryErrorResetBoundary();
   const href = useRouterState({ select: (state) => state.location.href });
   const state = useSyncExternalStore(subscribe, currentRetryState, idleRetryState);
@@ -55,6 +80,13 @@ export function ScreenError(_props: ErrorComponentProps) {
   const failedRef = useRef<HTMLElement>(null);
   const retrying = state.kind === "retrying" && state.href === href;
   const failedAttempt = state.kind === "failed" && state.href === href ? state.attempt : null;
+
+  useEffect(() => {
+    mountedErrorScreens += 1;
+    return () => {
+      mountedErrorScreens -= 1;
+    };
+  }, []);
 
   useEffect(() => {
     if (failedAttempt !== null) failedRef.current?.focus();
@@ -75,13 +107,19 @@ export function ScreenError(_props: ErrorComponentProps) {
         if (retryState.kind === "failed" && retryState.href === href) setRetryState(IDLE);
       });
     };
-    router.invalidate({ filter: (match) => match.status === "error", sync: true }).then(() => {
-      if (router.state.matches.some((match) => match.status === "error")) failed();
-      else {
-        setRetryState(IDLE);
-        focusCurrentScreenLinkIfLost();
-      }
-    }, failed);
+    router
+      .invalidate({ filter: (match) => match.status === "error", sync: true })
+      .then(() => {
+        reset();
+        return retrySettled(queryClient);
+      })
+      .then(() => {
+        if (mountedErrorScreens > 0) failed();
+        else {
+          setRetryState(IDLE);
+          focusCurrentScreenLinkIfLost();
+        }
+      }, failed);
   };
 
   return (

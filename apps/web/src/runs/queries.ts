@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
+import type { RunId } from "@ganger/core";
 import type { RunConditions } from "@ganger/app/runs/conditions";
 import { RUNNERS_LIST_KEY } from "../runners/runners-query";
 import { getRunDetail, getRunsPage } from "../server/functions";
@@ -11,7 +12,7 @@ export function runDetailKey(runId: string) {
   return ["runs", "detail", runId] as const;
 }
 
-export function keysChangedByRunWrite(runId: string): ReadonlyArray<QueryKey> {
+export function keysChangedByRunWrite(runId: RunId): ReadonlyArray<QueryKey> {
   return [
     runDetailKey(runId),
     runsListKey,

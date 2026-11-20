@@ -16,6 +16,7 @@ const QUERY_PROBE_ERROR_PATH = "/query-probe-error";
 const QUERY_PROBE_SHELL_ERROR_PATH = "/query-probe-shell-error";
 const QUERY_PROBE_ERROR_MESSAGE = "query-probe-read-failed";
 const QUERY_PROBE_RETRY_PATH = "/stats/query-probe-retry";
+const QUERY_PROBE_RENDER_RETRY_PATH = "/stats/query-probe-render-retry";
 const QUERY_PROBE_HEAL_FLAG = "__gangerQueryProbeHealed";
 const QUERY_PROBE_RUN_PATH = "/query-probe-run";
 const QUERY_PROBE_ANSWER_PATH = "/query-probe-answer";
@@ -47,6 +48,24 @@ const healingProbeQuery = queryOptions({
       : Promise.reject(new Error(QUERY_PROBE_ERROR_MESSAGE)),
   retryDelay: 0,
 });
+
+const healingRenderProbeQuery = queryOptions({
+  queryKey: ["query-probe", "healing-render"],
+  queryFn: (): Promise<string> =>
+    probeHealed()
+      ? Promise.resolve(QUERY_PROBE_RENDER_RETRY_PATH)
+      : Promise.reject(new Error(QUERY_PROBE_ERROR_MESSAGE)),
+  retryDelay: 0,
+});
+
+function QueryProbeHealingRender() {
+  const { data } = useSuspenseQuery(healingRenderProbeQuery);
+  return (
+    <Text variant="body" id={QUERY_PROBE_ID}>
+      {data}
+    </Text>
+  );
+}
 
 function QueryProbeHealing() {
   const { data } = useSuspenseQuery(healingProbeQuery);
@@ -168,6 +187,13 @@ const retryRoute = createRoute({
   component: QueryProbeHealing,
 });
 
+const renderRetryRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: QUERY_PROBE_RENDER_RETRY_PATH,
+  errorComponent: ScreenError,
+  component: QueryProbeHealingRender,
+});
+
 function isRoute(value: unknown): value is AnyRoute {
   return typeof value === "object" && value !== null && "id" in value && "options" in value;
 }
@@ -182,6 +208,7 @@ appLayoutRoute.addChildren([
   ...childRoutesOf(appLayoutRoute),
   shellErrorRoute,
   retryRoute,
+  renderRetryRoute,
   runRoute,
 ]);
 

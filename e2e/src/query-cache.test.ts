@@ -52,6 +52,7 @@ const ERROR_PATH = "/query-probe-error";
 const SHELL_ERROR_PATH = "/query-probe-shell-error";
 const PROBE_ERROR_MESSAGE = "query-probe-read-failed";
 const RETRY_PATH = "/stats/query-probe-retry";
+const RENDER_RETRY_PATH = "/stats/query-probe-render-retry";
 const HEAL_FLAG = "__gangerQueryProbeHealed";
 const PRELOAD_FRESH_MS = 5_000;
 const SETTLE_MS = 500;
@@ -305,6 +306,21 @@ describe("query 읽기 실패(0123 할 일 10)", () => {
     await page.waitForTimeout(SETTLE_MS);
 
     expect(await page.getByText(shell.screenError.retryFailed).count()).toBe(0);
+  });
+
+  it("화면 컴포넌트가 읽다 실패한 오류도 다시 읽기로 읽히면 화면으로 바뀌고, 또 실패하면 실패 문장으로 알린다", async (context) => {
+    const { page } = await newPage(context);
+    await openRuns(page);
+    await routerCall(page, "navigate", RENDER_RETRY_PATH);
+    await page.getByRole("heading", { name: shell.screenError.title }).waitFor();
+
+    await page.getByRole("button", { name: shell.screenError.retry }).click();
+    await page.getByRole("status").filter({ hasText: shell.screenError.retryFailed }).waitFor();
+
+    await page.evaluate((flag) => Reflect.set(window, flag, true), HEAL_FLAG);
+    await page.getByRole("button", { name: shell.screenError.retry }).click();
+    await page.locator(PROBE_SELECTOR).filter({ hasText: RENDER_RETRY_PATH }).waitFor();
+    expect(await page.getByRole("navigation", { name: shell.nav.label }).count()).toBe(1);
   });
 });
 
