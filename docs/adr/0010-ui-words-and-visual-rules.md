@@ -4,7 +4,7 @@
 
 ## 낱말
 
-1. **상태 이름은 GLOSSARY의 영어 용어 그대로 쓴다.** 런 상태 Queued·Running·Waiting for Input·Paused·Disconnected, 요약 결과 Merged·Human Check·Failed·Canceled, 러너 Online·Offline. To do 종류는 Question·Permission·Human Check·Failed·Disconnected다. 운영자가 정한 종류 목록에는 Failed가 없었지만, Failed 런은 지금도 To do에 오르고(스펙 Q82.9) 색 규칙에도 있어 종류에 넣었다. 러너 문제는 Runner Issue로 부르고 세부 원인(GitHub 인증 깨짐, Offline 등)은 설명 문장으로 쓴다. Runner Issue는 To do에 올리지 않고, Dashboard에서는 오른쪽 Runners 열에 보인다(아래 갱신). Runner Issue에 Offline 러너를 넣는 것은 운영자 결정(규칙 1의 "러너 인증 깨짐·Offline 등")이고 0049에서 적용했다.
+1. **상태 이름은 GLOSSARY의 영어 용어 그대로 쓴다.** 런 상태 Queued·Running·Waiting for Input·Paused·Disconnected, 요약 결과 Succeeded·Failed·Canceled(아래 0145 갱신. 앞서 Merged·Human Check·Failed·Canceled), 러너 Online·Offline. To do 종류는 Question·Permission·Failed·Disconnected다(0145 갱신으로 Human Check가 빠졌다). 운영자가 정한 종류 목록에는 Failed가 없었지만, Failed 런은 지금도 To do에 오르고(스펙 Q82.9) 색 규칙에도 있어 종류에 넣었다. 러너 문제는 Runner Issue로 부르고 세부 원인(GitHub 인증 깨짐, Offline 등)은 설명 문장으로 쓴다. Runner Issue는 To do에 올리지 않고, Dashboard에서는 오른쪽 Runners 열에 보인다(아래 갱신). Runner Issue에 Offline 러너를 넣는 것은 운영자 결정(규칙 1의 "러너 인증 깨짐·Offline 등")이고 0049에서 적용했다.
 2. **설명 문장·버튼·안내는 한국어 해요체로 쓴다.** "모두"처럼 상태가 아닌 개념 낱말도 한국어로 둔다. 예외로 Dashboard 칸·열 이름(Queued·Running·Done today·Runners)은 메뉴·화면 이름처럼 영어로 쓴다(아래 0100 갱신). 에이전트 결과와 PR 상태의 값(완료 보고(성공), 병합됨 등)은 상태 이름이 아니라 런이 어떻게 끝났는지 설명하는 값이라 한국어 그대로 둔다.
 3. **메뉴·화면 이름은 Dashboard·Tickets·Runs·Runners·Stats·Settings다.** 온보딩 단계 이름은 Tracker·GitHub·Runner·Workspace·Mapping이다.
 
@@ -16,10 +16,10 @@
    | 색   | 뜻             | 상태                                        |
    | ---- | -------------- | ------------------------------------------- |
    | 보라 | 사람이 답·허용 | Question, Permission, Waiting for Input     |
-   | 청록 | 사람이 확인    | Human Check                                 |
+   | 청록 | 사람이 확인    | (지금 쓰는 상태 없음, 0145 갱신)            |
    | 빨강 | 문제           | Failed, Disconnected, Runner Issue, Offline |
    | 초록 | 진행·정상      | Running, Online                             |
-   | 파랑 | 병합           | Merged                                      |
+   | 파랑 | 성공           | Succeeded                                   |
    | 회색 | 대기·멈춤      | Queued, Paused, Canceled                    |
 
    강조색(티켓 [0080](../tickets/0080-apply-brand-to-app-ui.md)): 상태가 아닌 강조는 Ganger Yellow `oklch(0.84 0.15 75)` 하나다(`accent*`). 주 버튼, 링크, 고른 탭·레일 항목 표시, 포커스 링, 로고 취구와 마스코트 모자에 쓴다. 노랑 바탕 위 글자는 Ink다. 바탕·면은 Ink `oklch(0.14 0 0)`에서 밝기만 바꾼 무채색, 글자는 Paper `oklch(0.97 0.003 85)`에서 밝기만 내린 따뜻한 무채색이다. 상태 색은 강조색과 색상(hue)이 40° 넘게 떨어진다. 앞서 0077은 노랑을 Human Check 색과 겹치지 않게 그림 안에만 두었으나, 0080에서 Human Check가 노랑을 내놓고 청록이 되어 이 예외를 강조색 규칙으로 바꿨다. 마스코트는 화면이 장난스러워지지 않게 상태를 나타내는 자리 곁에 두지 않는다.
@@ -68,6 +68,14 @@
 - **레일.** 데스크톱 앱에서는 레일 맨 위 56px을 신호등 자리로 비운다. 제품 기호는 레일 맨 아래로 옮긴다. 웹 브라우저에서는 레일 위를 비우지 않는다.
 - **창 끌기.** 데스크톱 앱에서는 머리 줄 전체와 레일 위 56px이 창을 끄는 자리다. 그 안의 버튼·링크·입력은 끌기에서 뺀다.
 
+**갱신(2026-11-21, 운영자 결정 R1·R5, 티켓 [0145](../tickets/0145-run-outcome-names.md)).** 요약 결과를 에이전트 보고로만 정하기로 했다(ADR [0022](0022-run-outcome-from-agent-report.md), 스펙 [0005](../spec/0005-run-outcome.md)). 위 1·5번에 반영했다.
+
+- **요약 결과 이름.** Merged·Human Check는 Succeeded가 된다. 완료 보고(성공)는 Succeeded, 완료 보고(실패)와 그 밖의 비정상 종료는 Failed, 운영자 취소는 Canceled다. Succeeded 색은 앞선 Merged의 파랑이다.
+- **To do 종류.** Human Check가 빠진다. Dashboard Done today 칸의 꼬리표는 Failed뿐이고, 머리 요약 문장의 "확인할 PR"도 빠진다. Human Check는 나중에 에이전트가 사람 확인을 요청하는 Waiting for Input 종류로 돌아온다(범위 밖). 그때까지 청록은 쓰는 상태가 없다.
+- **PR 정보는 결과 곁에.** PR은 결과를 정하지 않고 "PR #n 열림·병합됨·닫힘·못 읽음"으로 결과 알약 곁에 보인다(Runs 행의 에이전트·결과 열, Run 상세 상태 줄, Tickets 마지막 런 상자). 이후 PR 상태가 있으면 그것을 보인다. PR 상태 없음은 보이지 않는다.
+- **Stats.** 결과(Succeeded·Failed·Canceled)로 세고, 병합률 대신 성공률을 보인다. PR 병합 수는 PR 정보(끝날 때나 그 뒤 병합)에서 따로 세어 숫자 카드 하나로 보인다. 앞선 "사람이 손댄 비율" 카드는 뺀다.
+- **남긴 워크트리.** Run 상세는 worker가 워크트리를 남긴 이유("PR이 없어 워크트리를 남겼어요" 등)를 다음 할 일 자리에 빨간 제목으로 보이고, 머리 행동에 위험 표시 "워크트리 지우기"(확인 대화상자)를 둔다.
+
 이유: 제목 표시줄을 숨기면 창 맨 위 줄이 비어 신호등과 화면 제목이 따로 논다. 화면 제목과 요약을 신호등 높이의 한 줄로 모으면 그 줄이 제목 표시줄 노릇을 하면서 세로 공간도 아낀다. 제목 아래에 요약을 따로 두던 두 줄 구조와 결론 문장 제목은 이 한 줄에 들어가지 않아 요약 문장으로 바꿨다. 머리 줄 배치와 제품 기호 위치는 웹과 데스크톱이 같아야 화면 구조가 둘로 갈리지 않고, 신호등 자리만 데스크톱 앱에서 비운다. 제품 기호를 맨 위에 두면 데스크톱 앱에서 신호등과 겹쳐 맨 아래로 옮겼다.
 
 **갱신(2026-11-19, 운영자 결정, 티켓 [0119](../tickets/0119-settings-redesign.md)).** 운영자가 Settings가 쓸데없는 정보를 다 보여 주고 온보딩과 톤이 맞지 않는다고 짚고 시안 S1(한 페이지에 모아 보기)을 골랐다. 아래 "ADR 0007과의 관계"의 Settings 항목을 바꾼다.
@@ -104,7 +112,7 @@
 
 - **Done today는 DB에 이미 있는 런 끝 기록만으로 보인다.** 처음 정한 "지금 일어나는 일" 흐름(런 상태 바뀜, 질문, 권한 대기, 런 끝·PR 기록)은 위 갱신에서 뺐다. 런 중간 진행(시안의 "커밋 n개")은 러너에서 받아 오는 데이터가 없어 넣지 않았고, 넣으려면 러너 어댑터가 무엇을 얼마나 자주 읽을지 따로 정해야 한다.
 - **`packages/ui`의 규칙 문서(`DESIGN.md`)와 토큰 시험이 바뀐다.** 지금 문서는 "카드와 배지를 쓰지 않는다", "색은 손댈 일에만", 반경 `md 6`을 적고, `tokens.test.ts`는 채도 있는 색을 포인트·Human Check·Failed·Online에만 허락한다. 적용 티켓([0049](../tickets/0049-ui-redesign.md))이 토큰·컴포넌트와 함께 고친다. 그 전까지 이 ADR과 `DESIGN.md`가 다르면 이 ADR이 앞선다.
-- **파랑은 Merged 하나에만 쓴다.** 처음에는 포인트 파랑이 Merged 알약과 주 버튼·링크 둘에 쓰였다. 0080에서 강조색이 노랑이 되어 주 버튼·링크는 노랑이고, 파랑은 Merged 상태 색으로만 남는다.
+- **파랑은 Succeeded 하나에만 쓴다.** 처음에는 포인트 파랑이 Merged 알약과 주 버튼·링크 둘에 쓰였다. 0080에서 강조색이 노랑이 되어 주 버튼·링크는 노랑이고, 파랑은 Merged 상태 색으로만 남았다. 0145에서 요약 결과 Merged가 Succeeded가 되어 파랑은 Succeeded 색이다. Stats 차트의 Succeeded 막대도 파랑이다.
 - **이 ADR이 앞선 문서의 화면 낱말보다 앞선다.** [1단계 스펙](../spec/0001-phase-1.md)(Disconnected를 "연결 끊김", Canceled를 "취소"로 쓴다는 문장)과 `design/prototype/README.md`(Running을 "실행 중"으로 쓴다는 문장), 끝난 티켓들의 같은 문구는 그때의 기록이다. 상태 이름의 화면 낱말은 이 ADR과 GLOSSARY를 따른다.
 - **메시지 파일 낱말을 바꾼다.** "실행 중", "입력 기다림", "연결 끊김", "취소", "인증 깨짐", "권한 대기", "홈" 같은 상태·화면 이름을 영어 용어로 바꾸고, 시간 표기는 함수 하나로 모은다. 적용은 0049에서 한다.
 
