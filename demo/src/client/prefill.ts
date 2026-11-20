@@ -6,6 +6,7 @@ import {
   PREFILL,
   PREFILL_RUNNER_NAME,
 } from "../values.ts";
+import { toggleQueryDevtools } from "../../../apps/web/src/query/devtools-toggle.ts";
 
 const ROOT_ID = "ganger-dev-tools";
 
@@ -57,7 +58,14 @@ function mount(): void {
   link.textContent = "개발 도구";
   link.setAttribute("style", chip);
 
-  root.append(fillButton, link);
+  const queryButton = document.createElement("button");
+  queryButton.type = "button";
+  queryButton.textContent = "Query 도구";
+  queryButton.title = "TanStack Query devtools 를 켜거나 꺼요.";
+  queryButton.setAttribute("style", chip);
+  queryButton.addEventListener("click", () => toggleQueryDevtools(window));
+
+  root.append(fillButton, queryButton, link);
   document.body.append(root);
 }
 
