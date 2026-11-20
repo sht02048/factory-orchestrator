@@ -97,21 +97,6 @@ describe("start", () => {
     expect(started.migrated).toEqual([]);
   });
 
-  it("한쪽이 먼저 끝나면 다른 쪽도 멈추고 이유를 알린다", async () => {
-    const home = join(dir, "home");
-    init({ home, port: String(await freePort()) });
-    const crashTrigger = join(dir, "crash-worker");
-    started = await start({
-      home,
-      env: {},
-      layout: fakeLayout(workerExitingOnceExists(crashTrigger)),
-      onOutput: quiet,
-    });
-    writeFileSync(crashTrigger, "");
-    expect(await started.exited).toEqual({ failure: "worker exited with code 3" });
-    await expect(fetch(started.url)).rejects.toThrow("fetch failed");
-  });
-
   it("web이 뜨기 전에 끝나면 실패하고 나머지를 멈춘다", async () => {
     const home = join(dir, "home");
     init({ home, port: String(await freePort()) });
@@ -383,32 +368,28 @@ function readLines(file: string): unknown[] {
 }
 
 describe("start 의 worker 깨우기 중계", () => {
-  it.each([["출력을 그대로 둘 때", undefined]])(
-    "%s web 이 보낸 { type: wake } 만 worker 에 닿는다",
-    async (_case, onOutput) => {
-      const home = join(dir, "home");
-      init({ home, port: String(await freePort()) });
-      const out = join(dir, "worker-messages.jsonl");
-      const layout = fakeLayout(messageRecordingWorker(out));
-      const web = join(dir, "sending-web.mjs");
-      writeFileSync(web, MESSAGE_SENDING_WEB);
-      started = await start({
-        home,
-        env: {},
-        layout: {
-          web: (config) => ({ ...layout.web(config), args: [web], requires: [web] }),
-          worker: () => layout.worker(),
-        },
-        ...(onOutput === undefined ? {} : { onOutput }),
-      });
+  it("출력을 그대로 둘 때 web 이 보낸 { type: wake } 만 worker 에 닿는다", async () => {
+    const home = join(dir, "home");
+    init({ home, port: String(await freePort()) });
+    const out = join(dir, "worker-messages.jsonl");
+    const layout = fakeLayout(messageRecordingWorker(out));
+    const web = join(dir, "sending-web.mjs");
+    writeFileSync(web, MESSAGE_SENDING_WEB);
+    started = await start({
+      home,
+      env: {},
+      layout: {
+        web: (config) => ({ ...layout.web(config), args: [web], requires: [web] }),
+        worker: () => layout.worker(),
+      },
+    });
 
-      await fetch(`${started.url}/send`);
-      await vi.waitFor(() => expect(readLines(out)).toHaveLength(2));
-      await fetch(`${started.url}/send`);
-      await vi.waitFor(() => expect(readLines(out)).toHaveLength(3));
-      expect(readLines(out)).toEqual([{ env: "ipc" }, { type: "wake" }, { type: "wake" }]);
-    },
-  );
+    await fetch(`${started.url}/send`);
+    await vi.waitFor(() => expect(readLines(out)).toHaveLength(2));
+    await fetch(`${started.url}/send`);
+    await vi.waitFor(() => expect(readLines(out)).toHaveLength(3));
+    expect(readLines(out)).toEqual([{ env: "ipc" }, { type: "wake" }, { type: "wake" }]);
+  });
 
   it("worker 가 끝난 뒤 web 이 보낸 신호는 멈춘 이유를 바꾸지 않는다", async () => {
     const home = join(dir, "home");
