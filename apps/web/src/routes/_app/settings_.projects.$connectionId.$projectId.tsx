@@ -1,14 +1,22 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { createTranslator } from "use-intl";
+import type { SettingsPage } from "@ganger/app/settings/model";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { getSettingsPage, removeWorkspaceTrackerProject } from "../../server/settings-functions";
+import { loadCachedRouteQuery, loadRouteQuery } from "../../query/route-query";
 import { settingsMessages } from "../../settings/messages";
 import { ProjectDetailScreen, findBoundProject } from "../../settings/project-detail";
 import type { SettingsActions } from "../../settings/settings-screen";
 import { NavigationGuard } from "../../settings/navigation-guard";
+import {
+  boundProjectReadsQuery,
+  settingsQuery,
+  trackerProjectsQuery,
+  useSettingsPage,
+} from "../../settings/settings-query";
+import { useTitleFollowsQuery } from "../../settings/route-title";
 import { routerSettingsLink } from "../../settings/settings-link";
-import { useSettingsActions, useSettingsReload } from "../../settings/use-settings-actions";
+import { useSettingsActions, useSettingsQueryRefresh } from "../../settings/use-settings-actions";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -18,44 +26,63 @@ const t = createTranslator({
 
 export const Route = createFileRoute("/_app/settings_/projects/$connectionId/$projectId")({
   loaderDeps: ({ search }) => ({ ws: search.ws }),
-  loader: ({ deps }) => getSettingsPage({ data: { ws: deps.ws } }),
-  head: ({ loaderData, params }) => {
-    const bound =
-      loaderData === undefined
-        ? null
-        : findBoundProject(loaderData.workspace, params.connectionId, params.projectId);
-    return {
-      meta: [
-        {
-          title:
-            bound === null
-              ? t("documentTitle")
-              : t("project.documentTitle", { name: bound.project.name }),
-        },
-      ],
-    };
+  preloadStaleTime: 0,
+  loader: async (load) => {
+    const [page] = await Promise.all([
+      loadRouteQuery(load, settingsQuery(load.deps.ws)),
+      loadCachedRouteQuery(load, trackerProjectsQuery),
+      loadCachedRouteQuery(load, boundProjectReadsQuery(load.context.queryClient, load.deps.ws)),
+    ]);
+    return (
+      findBoundProject(page.workspace, load.params.connectionId, load.params.projectId)?.project
+        .name ?? null
+    );
   },
+  head: ({ loaderData }) => ({
+    meta: [
+      {
+        title:
+          loaderData === undefined || loaderData === null
+            ? t("documentTitle")
+            : t("project.documentTitle", { name: loaderData }),
+      },
+    ],
+  }),
   component: ProjectDetailRoute,
 });
 
 function ProjectDetailRoute() {
-  const page = Route.useLoaderData();
   const { connectionId, projectId } = Route.useParams();
   const { ws } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const router = useRouter();
-  const settingsActions = useSettingsActions(useSettingsReload());
+  const page = useSettingsPage(ws);
+  const [pageBeforeRemoval, setPageBeforeRemoval] = useState<SettingsPage | null>(null);
+  const settingsActions = useSettingsActions(useSettingsQueryRefresh());
+  useTitleFollowsQuery(
+    Route.id,
+    Route.useLoaderData(),
+    findBoundProject((pageBeforeRemoval ?? page).workspace, connectionId, projectId)?.project
+      .name ?? null,
+  );
   const actions = useMemo(
     (): SettingsActions => ({
       ...settingsActions,
-      removeProject: (data) => removeWorkspaceTrackerProject({ data }),
+      removeProject: async (data) => {
+        setPageBeforeRemoval(page);
+        const result = await settingsActions.removeProject(data).catch((error: unknown) => {
+          setPageBeforeRemoval(null);
+          throw error;
+        });
+        if (!result.ok) setPageBeforeRemoval(null);
+        return result;
+      },
     }),
-    [settingsActions],
+    [settingsActions, page],
   );
   return (
     <ScreenMessages messages={settingsMessages}>
       <ProjectDetailScreen
-        page={page}
+        page={pageBeforeRemoval ?? page}
         connectionId={connectionId}
         projectId={projectId}
         ws={ws}
@@ -63,9 +90,7 @@ function ProjectDetailRoute() {
         renderLink={routerSettingsLink}
         renderGuard={(guard) => <NavigationGuard {...guard} />}
         onRemoved={() => {
-          void router
-            .invalidate({ filter: (match) => match.routeId === "/_app/settings" })
-            .then(() => navigate({ to: "/settings", ignoreBlocker: true }));
+          void navigate({ to: "/settings", ignoreBlocker: true });
         }}
       />
     </ScreenMessages>

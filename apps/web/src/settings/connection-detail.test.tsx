@@ -25,7 +25,6 @@ import {
 } from "@ganger/app/settings/actions";
 import { loadSettingsPage, webhookStateOf } from "@ganger/app/settings/load";
 import type { SettingsContext } from "@ganger/app/settings/load";
-import { webhookReceiptKey } from "@ganger/app/settings/model";
 import type { SettingsPage, WebhookSetupView } from "@ganger/app/settings/model";
 import { webhookPingAnswer } from "@ganger/app/webhook-address";
 import type { PingFetch } from "@ganger/app/webhook-address";
@@ -61,7 +60,6 @@ const noopActions: SettingsActions = {
   pollRunnerChecks: () => Promise.resolve(false),
   checkWebhookAddress: () => Promise.resolve({ ok: true }),
   turnOffWebhook: () => Promise.resolve({ ok: true }),
-  pollWebhookState: () => Promise.resolve(true),
 };
 
 interface Fixture {
@@ -184,22 +182,6 @@ describe("webhook 상태", () => {
       lastReceivedAt: at(60).toISOString(),
       lastReceivedAgoMs: 60 * 60_000,
     });
-  });
-
-  it("폴링 열쇠는 받은 때나 실패 수가 바뀔 때만 바뀐다", () => {
-    const waiting = webhookReceiptKey({ kind: "waiting" });
-    const received = webhookReceiptKey({
-      kind: "receiving",
-      lastReceivedAt: at(3).toISOString(),
-      lastReceivedAgoMs: 1,
-    });
-    const laterAgo = webhookReceiptKey({
-      kind: "receiving",
-      lastReceivedAt: at(3).toISOString(),
-      lastReceivedAgoMs: 99_000,
-    });
-    expect(received).not.toBe(waiting);
-    expect(laterAgo).toBe(received);
   });
 });
 

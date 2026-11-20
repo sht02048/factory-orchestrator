@@ -1,5 +1,6 @@
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import type { ChangeKind } from "@ganger/db/change-events-model";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../i18n";
@@ -22,6 +23,9 @@ const t = createTranslator({
   messages: onboardingMessages,
   namespace: "onboarding",
 });
+
+const RUNNER_ADDED: ReadonlyArray<ChangeKind> = ["runner"];
+const WORKSPACE_SET_UP: ReadonlyArray<ChangeKind> = ["workspace", "settings", "tracker"];
 
 export const Route = createFileRoute("/onboarding")({
   validateSearch: z.object({
@@ -67,12 +71,13 @@ function OnboardingRoute() {
   const reload = useSettingsReload();
   const settingsActions = useSettingsActions(reload);
   const then = useReloadOnSuccess(reload);
-  const setupActions = useRunnerSetupActions(reload);
+  const reloadAfterRunnerAdded = useCallback(() => reload(RUNNER_ADDED), [reload]);
+  const setupActions = useRunnerSetupActions(reloadAfterRunnerAdded);
   const actions = useMemo(
     (): OnboardingActions => ({
       ...settingsActions,
       ...setupActions,
-      setUpWorkspace: then((data) => setUpWorkspace({ data })),
+      setUpWorkspace: then((data) => setUpWorkspace({ data }), WORKSPACE_SET_UP),
     }),
     [settingsActions, setupActions, then],
   );

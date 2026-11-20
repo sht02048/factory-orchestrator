@@ -22,11 +22,6 @@ import {
 import { space } from "@ganger/ui/tokens.stylex";
 import { createContext, use, useEffect, useId, useRef, useState, type RefObject } from "react";
 import { useTranslations } from "use-intl";
-import {
-  WEBHOOK_WAIT_POLL_LIMIT_MS,
-  WEBHOOK_WAIT_POLL_MS,
-  webhookReceiptKey,
-} from "@ganger/app/settings/model";
 import type {
   TrackerConnectionView,
   WebhookSetupView,
@@ -84,7 +79,6 @@ export function WebhookSection({
   const t = useTranslations("settings.webhook");
   const ts = useTranslations("settings");
   const state = connection.webhook;
-  useWebhookWaitPolling(connection.id, state, actions.pollWebhookState);
   const requestFocus = useFocusAfterRender(state);
   return (
     <FocusRequestContext value={requestFocus}>
@@ -125,39 +119,6 @@ export function WebhookSection({
       </SettingsSection>
     </FocusRequestContext>
   );
-}
-
-export function useWebhookWaitPolling(
-  id: string,
-  state: WebhookStateView,
-  poll: (input: { id: string; key: string }) => Promise<boolean>,
-): void {
-  const waiting = state.kind === "waiting" || state.kind === "rejected";
-  const key = webhookReceiptKey(state);
-  useEffect(() => {
-    if (!waiting) return undefined;
-    const started = Date.now();
-    let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const next = () => {
-      timer = setTimeout(() => {
-        if (stopped || Date.now() - started > WEBHOOK_WAIT_POLL_LIMIT_MS) return;
-        poll({ id, key }).then(
-          (same) => {
-            if (same && !stopped) next();
-          },
-          () => {
-            if (!stopped) next();
-          },
-        );
-      }, WEBHOOK_WAIT_POLL_MS);
-    };
-    next();
-    return () => {
-      stopped = true;
-      if (timer !== undefined) clearTimeout(timer);
-    };
-  }, [id, key, waiting, poll]);
 }
 
 const STEP_IDS = { address: "webhook-step-address", create: "webhook-step-create" } as const;

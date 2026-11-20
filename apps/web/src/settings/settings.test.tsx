@@ -169,7 +169,6 @@ const noopActions: SettingsActions = {
   pollRunnerChecks: () => Promise.resolve(false),
   checkWebhookAddress: () => Promise.resolve({ ok: true }),
   turnOffWebhook: () => Promise.resolve({ ok: true }),
-  pollWebhookState: () => Promise.resolve(true),
 };
 
 function render(page: SettingsPage, runnerIssues = 0): string {

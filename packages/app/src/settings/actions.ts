@@ -26,6 +26,7 @@ import {
   listRunners,
   listWorkspaces,
   markTrackerChanged,
+  markTrackerReadsStale,
   recordSettingsChange,
   removeWorkspaceTrackerProject,
   requestRunnerCheck,
@@ -218,7 +219,7 @@ export function saveMappingState(
       labelId: repo.labelId === null ? null : toLabelId(repo.labelId),
     })),
   });
-  if (saved.ok) markTrackerChanged(context.db, project.connection);
+  if (saved.ok) markTrackerReadsStale(context.db, project.connection);
   return saved;
 }
 
