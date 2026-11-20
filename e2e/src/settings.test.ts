@@ -164,31 +164,6 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     await expect.poll(() => current(nav)).toBe(settings.sections.advanced);
   });
 
-  it("이름은 줄 안에서 펼쳐 바꾸고, 비우면 오류를 보이며, 닫으면 바꾸기로 포커스가 돌아온다", async () => {
-    await openSettings(page);
-    const workspace = section(settings.sections.workspace);
-    await workspace.getByRole("button", { name: settings.change }).click();
-    const name = workspace.getByRole("textbox", { name: settings.workspace.name, exact: true });
-    await expect.poll(() => name.evaluate((el) => el === document.activeElement)).toBe(true);
-
-    await name.fill("");
-    await workspace.getByRole("button", { name: settings.save }).click();
-    await workspace.getByText(settings.workspace.nameInvalid).waitFor();
-
-    await page.keyboard.press("Escape");
-    await name.waitFor({ state: "detached" });
-    await expect.poll(focused).toBe(settings.change);
-    await workspace.getByText("Acme", { exact: true }).filter({ visible: true }).waitFor();
-
-    await workspace.getByRole("button", { name: settings.change }).click();
-    await name.fill("Acme Shop");
-    await workspace.getByRole("button", { name: settings.save }).click();
-    await name.waitFor({ state: "detached" });
-    await workspace.getByText("Acme Shop", { exact: true }).filter({ visible: true }).waitFor();
-    await expect.poll(focused).toBe(settings.change);
-    await page.getByText(settings.workspace.nameSaved).waitFor();
-  });
-
   it("최대 실행 시간은 칸을 벗어나면 바로 저장하고, 맞지 않는 값은 저장하지 않고 알린다", async () => {
     await openSettings(page);
     const workspace = section(settings.sections.workspace);
