@@ -123,6 +123,9 @@ export class Controller {
   private readonly delivered = new Map<string, Notification>();
   private reminderTimer: NodeJS.Timeout | undefined;
   private notificationPermission: NotificationPermission = "unknown";
+  private diagnosticsListener:
+    | ((event: Electron.Event, item: Electron.DownloadItem) => void)
+    | undefined;
   private settingsWindow: BrowserWindow | undefined;
   private remoteTimer: NodeJS.Timeout | undefined;
   private offerTimer: NodeJS.Timeout | undefined;
@@ -634,9 +637,13 @@ export class Controller {
     if (window === undefined || window.isDestroyed()) return;
     this.showWindow();
     const session = window.webContents.session;
+    if (this.diagnosticsListener !== undefined) {
+      session.off("will-download", this.diagnosticsListener);
+    }
     const onDownload = (_event: Electron.Event, item: Electron.DownloadItem) => {
       if (item.getURL() !== url) return;
       session.off("will-download", onDownload);
+      this.diagnosticsListener = undefined;
       item.once("done", (_done, state) => {
         const notice = diagnosticsDownloadNotice(state);
         if (notice === null || window.isDestroyed()) return;
@@ -646,6 +653,7 @@ export class Controller {
         });
       });
     };
+    this.diagnosticsListener = onDownload;
     session.on("will-download", onDownload);
     window.webContents.downloadURL(url);
   }
