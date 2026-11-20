@@ -210,6 +210,7 @@ describe("Runs·Run 상세를 Query로(브라우저, 0125)", () => {
   it("변경 기록 통로가 끊기면 열린 Run 상세를 30초마다 다시 읽는다(가짜 시계)", async (context) => {
     const detail = await newPage(context, { stream: "blocked", clock: true });
     await open(detail, `/runs/${endedRun}`);
+    await detail.page.clock.pauseAt((await detail.page.evaluate(() => Date.now())) + 100);
     await detail.page.clock.runFor(SETTLE_MS);
     const before = countOf(detail.serverCalls, "getRunDetail");
 
@@ -223,6 +224,7 @@ describe("Runs·Run 상세를 Query로(브라우저, 0125)", () => {
     const detail = await newPage(context, { stream: "blocked", clock: true });
     await open(detail, `/runs/${stalledLogRun}`);
     await expect.poll(() => detail.page.locator("main").innerText()).toContain(run.log.pending);
+    await detail.page.clock.pauseAt((await detail.page.evaluate(() => Date.now())) + 100);
 
     for (let poll = 0; poll < LOG_POLL_LIMIT; poll += 1) {
       const polled = countOf(detail.serverCalls, "getRunDetail");
