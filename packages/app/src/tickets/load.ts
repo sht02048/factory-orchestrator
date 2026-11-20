@@ -2,15 +2,13 @@ import {
   AdapterError,
   blockedProjectsOf,
   checkAssignment,
-  routeToRepo,
   summarizeRunOutcome,
   usageLimitsAt,
 } from "@ganger/core";
 import type {
   AdapterRegistry,
-  SummaryOutcome,
-  LabelId,
   RunnerId,
+  SummaryOutcome,
   Tracker,
   TrackerConnectionId,
   TrackerTicket,
@@ -18,10 +16,9 @@ import type {
 import {
   getAutoAssignLabel,
   getMapping,
-  getRunWithRecords,
   getTrackerConnection,
   listRunners,
-  listRuns,
+  listRunsWithRecords,
   listWorkspaceTrackerProjects,
   listWorkspaces,
   toWorkspaceId,
@@ -29,20 +26,29 @@ import {
 import type {
   Database,
   SecretBox,
-  StoredRun,
   StoredTrackerConnection,
   StoredWorkspaceTrackerProject,
 } from "@ganger/db";
 import { z } from "zod";
 import { isWebUrl } from "../format/url.js";
+import { remoteErrorOf } from "../settings/load.js";
+import type { Remote } from "../settings/model.js";
 import { resolveWorkspace } from "../shell/model.js";
+import type { WorkspaceChoice } from "../shell/model.js";
 import type { TrackerReads } from "../tracker-reads.js";
+import { mergeTicketsPage, ticketId } from "./merge.js";
 import type {
-  AssignDefaults,
+  TicketMappingFacts,
+  TicketProjectFacts,
   TicketRun,
-  TicketView,
+  TicketRunFacts,
+  TicketRunsData,
   TicketsPage,
+  TrackerLabel,
   TrackerLoadError,
+  TrackerProjectLabels,
+  TrackerTicketView,
+  TrackerTicketsData,
   TrackerTruncation,
 } from "./model.js";
 
@@ -61,11 +67,20 @@ export async function loadTicketsPage(
   ws: string | undefined,
   now: Date,
 ): Promise<TicketsPage> {
-  const { db } = context;
-  const workspace = resolveWorkspace(
+  const runs = loadTicketRuns(context.db, ws, now);
+  const tracker = await loadTrackerTickets(context, ws);
+  return mergeTicketsPage(runs, tracker);
+}
+
+function workspaceOf(db: Database, ws: string | undefined): WorkspaceChoice {
+  return resolveWorkspace(
     listWorkspaces(db).map((w) => ({ id: w.id, name: w.name })),
     ws,
   );
+}
+
+export function loadTicketRuns(db: Database, ws: string | undefined, now: Date): TicketRunsData {
+  const workspace = workspaceOf(db, ws);
   const storedRunners = listRunners(db);
   const runners = storedRunners.map((runner) => ({
     id: runner.id,
@@ -80,25 +95,80 @@ export async function loadTicketsPage(
     })),
   }));
   const agents = mappingAgents(db);
-  const runnerNames = new Map(storedRunners.map((runner) => [runner.id, runner.name]));
-  const repoNames = new Map(
-    storedRunners.flatMap((runner) => runner.projects.map((p) => [p.id, p.displayName] as const)),
-  );
-  if (workspace.kind !== "one")
-    return {
-      workspace,
-      tickets: [],
-      runners,
-      agents,
-      errors: [],
-      truncated: [],
-      trackerProjectCount: 0,
-    };
+  const base = { workspace, runners, agents };
+  if (workspace.kind !== "one") return { ...base, projects: [], repoNames: {}, runsByTicket: {} };
 
   const workspaceId = toWorkspaceId(workspace.workspace.id);
-  const projects = listWorkspaceTrackerProjects(db, workspaceId);
-  const runsByTicket = groupRuns(listRuns(db, { workspaceId }));
+  const runnerNames = new Map(storedRunners.map((runner) => [runner.id, runner.name]));
+  const repoNames = Object.fromEntries(
+    storedRunners.flatMap((runner) => runner.projects.map((p) => [p.id, p.displayName] as const)),
+  );
+  const projects = listWorkspaceTrackerProjects(db, workspaceId).map(
+    (project): TicketProjectFacts => ({
+      connection: project.connection,
+      projectId: project.projectId,
+      name: project.name,
+      mapping: mappingFacts(db, project),
+      autoAssignLabel: getAutoAssignLabel(db, workspaceId, project.connection),
+    }),
+  );
+  const runsByTicket: Record<string, TicketRunFacts> = {};
+  for (const [id, runs] of groupRuns(listRunsWithRecords(db, { workspaceId }))) {
+    runsByTicket[id] = runFacts(runs, runnerNames, now);
+  }
+  return { ...base, projects, repoNames, runsByTicket };
+}
 
+function mappingFacts(
+  db: Database,
+  project: StoredWorkspaceTrackerProject,
+): TicketMappingFacts | null {
+  const mapping = getMapping(db, project.connection, project.projectId);
+  if (mapping === null) return null;
+  return {
+    agent: mapping.agent,
+    defaultRepo: mapping.defaultRepo,
+    repos: mapping.repos.map((repo) => ({
+      project: repo.project,
+      isDefault: repo.isDefault,
+      labelId: repo.labelId,
+    })),
+  };
+}
+
+function runFacts(
+  runs: ReadonlyArray<RunWithRecords>,
+  runnerNames: ReadonlyMap<RunnerId, string>,
+  now: Date,
+): TicketRunFacts {
+  const stored = runs.map(({ run }) => run);
+  const first = stored[0];
+  const check =
+    first === undefined ? { ok: true } : checkAssignment({ ticket: first.ticket, runs: stored });
+  const active = stored.findLast((run) => run.state !== "ended");
+  const last = stored.at(-1);
+  return {
+    runs: runs.toReversed().map((run) => toTicketRun(run, runnerNames, now)),
+    activeRunId: check.ok ? null : (active?.id ?? ""),
+    retryRepo:
+      last !== undefined &&
+      last.state === "ended" &&
+      retriesLastRepo(summarizeRunOutcome(last).outcome)
+        ? last.runnerProject
+        : null,
+  };
+}
+
+export async function loadTrackerTickets(
+  context: TicketsContext,
+  ws: string | undefined,
+): Promise<TrackerTicketsData> {
+  const { db } = context;
+  const workspace = workspaceOf(db, ws);
+  const empty = { workspace, tickets: [], labels: [], errors: [], truncated: [] };
+  if (workspace.kind !== "one") return empty;
+
+  const projects = listWorkspaceTrackerProjects(db, toWorkspaceId(workspace.workspace.id));
   const trackers = new Map<TrackerConnectionId, Tracker | null>();
   const trackerOf = (connection: TrackerConnectionId): Tracker | null => {
     let tracker = trackers.get(connection);
@@ -112,7 +182,7 @@ export async function loadTicketsPage(
 
   const errors: TrackerLoadError[] = [];
   const truncated: TrackerTruncation[] = [];
-  const labelNames = new Map<string, string>();
+  const labels: TrackerProjectLabels[] = [];
   const results = await Promise.all(
     projects.map(async (project) => {
       try {
@@ -121,12 +191,16 @@ export async function loadTicketsPage(
           errors.push({ trackerProject: project.name, reason: "unknown-connection" });
           return [];
         }
-        const [{ tickets, more }, labels] = await Promise.all([
+        const [{ tickets, more }, projectLabels] = await Promise.all([
           readProjectTickets(tracker, project),
-          tracker.listLabels(project.projectId).catch(() => []),
+          readProjectLabels(tracker, project),
         ]);
         if (more) truncated.push({ trackerProject: project.name, limit: tickets.length });
-        for (const label of labels) labelNames.set(label.id, label.name);
+        labels.push({
+          connection: project.connection,
+          projectId: project.projectId,
+          labels: projectLabels,
+        });
         return tickets.map((ticket) => ({ project, ticket }));
       } catch (error) {
         errors.push({ trackerProject: project.name, reason: loadErrorReason(error) });
@@ -135,56 +209,43 @@ export async function loadTicketsPage(
     }),
   );
 
-  const autoAssignLabels = new Map<TrackerConnectionId, LabelId | null>();
-  const autoAssignLabelOf = (connection: TrackerConnectionId): LabelId | null => {
-    let label = autoAssignLabels.get(connection);
-    if (label === undefined) {
-      label = getAutoAssignLabel(db, workspaceId, connection);
-      autoAssignLabels.set(connection, label);
-    }
-    return label;
-  };
-
-  for (const { ticket } of results.flat()) {
-    for (const label of ticket.labels) labelNames.set(label.id, label.name);
-  }
-
   const tickets = results
     .flat()
     .toSorted((a, b) => b.ticket.updatedAt.getTime() - a.ticket.updatedAt.getTime())
-    .map(({ project, ticket }): TicketView => {
-      const id = ticketId(project.connection, ticket.key);
-      const runs = runsByTicket.get(id) ?? [];
-      const autoAssign = autoAssignLabelOf(project.connection);
-      return {
-        id,
-        connection: project.connection,
-        key: ticket.key,
-        title: ticket.title,
-        url: isWebUrl(ticket.url) ? ticket.url : null,
-        trackerProject: { id: project.projectId, name: project.name },
-        trackerState: { name: ticket.state.name, category: ticket.state.category },
-        labels: ticket.labels.map((label) => ({
-          name: label.name,
-          autoAssign: label.id === autoAssign,
-        })),
-        runs: runs.toReversed().map((run) => toTicketRun(db, run, runnerNames, now)),
-        mapping: assignDefaultsOf(db, project, ticket, runs, { labelNames, repoNames }),
-        assignability: assignabilityOf(db, project, ticket, runs, { labelNames, repoNames }),
-      };
-    });
+    .map(({ project, ticket }): TrackerTicketView => ({
+      connection: project.connection,
+      projectId: project.projectId,
+      projectName: project.name,
+      key: ticket.key,
+      title: ticket.title,
+      url: isWebUrl(ticket.url) ? ticket.url : null,
+      state: { name: ticket.state.name, category: ticket.state.category },
+      labels: ticket.labels.map((label) => ({ id: label.id, name: label.name })),
+    }));
 
   errors.sort((a, b) => a.trackerProject.localeCompare(b.trackerProject));
   truncated.sort((a, b) => a.trackerProject.localeCompare(b.trackerProject));
-  return {
-    workspace,
-    tickets,
-    runners,
-    agents,
-    errors,
-    truncated,
-    trackerProjectCount: projects.length,
-  };
+  labels.sort(
+    (a, b) => a.connection.localeCompare(b.connection) || a.projectId.localeCompare(b.projectId),
+  );
+  return { workspace, tickets, labels, errors, truncated };
+}
+
+async function readProjectLabels(
+  tracker: Tracker,
+  project: StoredWorkspaceTrackerProject,
+): Promise<Remote<TrackerLabel>> {
+  try {
+    const labels = await tracker.listLabels(project.projectId);
+    return {
+      ok: true,
+      items: labels
+        .map((label) => ({ id: label.id, name: label.name }))
+        .toSorted((a, b) => a.name.localeCompare(b.name)),
+    };
+  } catch (error) {
+    return { ok: false, error: remoteErrorOf(error) };
+  }
 }
 
 function readingTracker(context: TicketsContext, stored: StoredTrackerConnection): Tracker {
@@ -197,9 +258,7 @@ function readingTracker(context: TicketsContext, stored: StoredTrackerConnection
     : context.trackerReads.wrap(context.db, stored.id, tracker);
 }
 
-export function ticketId(connection: string, key: string): string {
-  return JSON.stringify([connection, key]);
-}
+export { ticketId };
 
 async function readProjectTickets(
   tracker: Tracker,
@@ -238,20 +297,21 @@ function loadErrorReason(error: unknown): TrackerLoadError["reason"] {
   }
 }
 
-function groupRuns(runs: ReadonlyArray<StoredRun>): Map<string, StoredRun[]> {
-  const byTicket = new Map<string, StoredRun[]>();
-  for (const run of runs) {
-    const id = ticketId(run.ticket.connection, run.ticket.key);
+type RunWithRecords = ReturnType<typeof listRunsWithRecords>[number];
+
+function groupRuns(runs: ReadonlyArray<RunWithRecords>): Map<string, RunWithRecords[]> {
+  const byTicket = new Map<string, RunWithRecords[]>();
+  for (const entry of runs) {
+    const id = ticketId(entry.run.ticket.connection, entry.run.ticket.key);
     const list = byTicket.get(id);
-    if (list === undefined) byTicket.set(id, [run]);
-    else list.push(run);
+    if (list === undefined) byTicket.set(id, [entry]);
+    else list.push(entry);
   }
   return byTicket;
 }
 
 function toTicketRun(
-  db: Database,
-  run: StoredRun,
+  { run, records }: RunWithRecords,
   runnerNames: ReadonlyMap<RunnerId, string>,
   now: Date,
 ): TicketRun {
@@ -272,32 +332,12 @@ function toTicketRun(
     agentResult: run.agentResult,
     prState: run.prState,
     summary: summarizeRunOutcome(run).outcome,
-    prSettledLater: (getRunWithRecords(db, run.id)?.records.laterPrState ?? null) !== null,
+    prSettledLater: records.laterPrState !== null,
   };
 }
 
 function msSince(at: Date, now: Date): number {
   return Math.max(0, now.getTime() - at.getTime());
-}
-
-function assignabilityOf(
-  db: Database,
-  project: StoredWorkspaceTrackerProject,
-  ticket: TrackerTicket,
-  runs: ReadonlyArray<StoredRun>,
-  names: RepoNames,
-): TicketView["assignability"] {
-  const check = checkAssignment({
-    ticket: { connection: project.connection, key: ticket.key },
-    runs,
-  });
-  if (!check.ok) {
-    const active = runs.findLast((run) => run.state !== "ended");
-    return { kind: "active-run", runId: active?.id ?? "" };
-  }
-  const defaults = assignDefaultsOf(db, project, ticket, runs, names);
-  if (defaults === null) return { kind: "no-mapping" };
-  return { kind: "ready", defaults };
 }
 
 function retriesLastRepo(outcome: SummaryOutcome): boolean {
@@ -309,45 +349,6 @@ function retriesLastRepo(outcome: SummaryOutcome): boolean {
     case "human-check":
       return false;
   }
-}
-
-interface RepoNames {
-  labelNames: ReadonlyMap<string, string>;
-  repoNames: ReadonlyMap<string, string>;
-}
-
-function assignDefaultsOf(
-  db: Database,
-  project: StoredWorkspaceTrackerProject,
-  ticket: TrackerTicket,
-  runs: ReadonlyArray<StoredRun>,
-  { labelNames, repoNames }: RepoNames,
-): AssignDefaults | null {
-  const mapping = getMapping(db, project.connection, project.projectId);
-  if (mapping === null) return null;
-  const routed =
-    routeToRepo(
-      mapping.repos,
-      ticket.labels.map((label) => label.id),
-    ) ?? mapping.defaultRepo;
-  const last = runs.at(-1);
-  const lastRepo =
-    last !== undefined &&
-    last.state === "ended" &&
-    retriesLastRepo(summarizeRunOutcome(last).outcome)
-      ? last.runnerProject
-      : undefined;
-  const previous = mapping.repos.some((repo) => repo.project === lastRepo) ? lastRepo : undefined;
-  return {
-    runnerProject: previous ?? routed,
-    agent: mapping.agent,
-    repos: mapping.repos.map((repo) => ({
-      id: repo.project,
-      name: repoNames.get(repo.project) ?? repo.project,
-      isDefault: repo.isDefault,
-      label: repo.labelId === null ? null : (labelNames.get(repo.labelId) ?? null),
-    })),
-  };
 }
 
 function mappingAgents(db: Database): string[] {

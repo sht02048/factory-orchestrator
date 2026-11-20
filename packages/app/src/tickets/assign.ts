@@ -29,18 +29,18 @@ export const assignInput = z.object({
 
 export type AssignInput = z.infer<typeof assignInput>;
 
-export type AssignResult =
-  | { ok: true; runId: string }
-  | {
-      ok: false;
-      reason:
-        | "active-run"
-        | "no-mapping"
-        | "unknown-repo"
-        | "unknown-agent"
-        | "unknown-runner"
-        | "runner-assignment-blocked";
-    };
+export const ASSIGN_REJECT_REASONS = [
+  "active-run",
+  "no-mapping",
+  "unknown-repo",
+  "unknown-agent",
+  "unknown-runner",
+  "runner-assignment-blocked",
+] as const;
+
+export type AssignRejectReason = (typeof ASSIGN_REJECT_REASONS)[number];
+
+export type AssignResult = { ok: true; runId: string } | { ok: false; reason: AssignRejectReason };
 
 export function submitAssignment(db: Database, input: AssignInput, now: Date): AssignResult {
   const connection = toTrackerConnectionId(input.connection);
