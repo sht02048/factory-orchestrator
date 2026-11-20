@@ -41,6 +41,7 @@ import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" 
 import run from "../../apps/web/messages/ko/run.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 import { navigateByRail, serverFnName, waitForRouterIdle } from "./navigation-timing.js";
+import { waitForScreenQuerySettled } from "./query-settled.js";
 import { startWebServer } from "./web-server.js";
 
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
@@ -62,6 +63,8 @@ const ROOT_AND_SHELL_FNS = [
   "getShell",
   "getOnboardingComplete",
 ];
+
+const runsListQueryKey = ["runs", "list"];
 
 const runnerProject = toRunnerProjectId("fake:acme/web");
 const runnerId = toRunnerId("runner-a");
@@ -127,18 +130,18 @@ afterAll(async () => {
 describe("Runs·Run 상세를 Query로(브라우저, 0125)", () => {
   it("서버 렌더한 Runs와 Run 상세는 hydration이 끝날 때까지 자기 서버 함수를 다시 부르지 않는다", async (context) => {
     const runsPage = await newPage(context);
-    await open(runsPage, "/runs");
+    await open(runsPage, "/runs", runsListQueryKey);
     expect(runsPage.serverCalls).toEqual([]);
 
     const detailPage = await newPage(context);
-    await open(detailPage, `/runs/${endedRun}`);
+    await open(detailPage, `/runs/${endedRun}`, runDetailQueryKey(endedRun));
     expect(detailPage.serverCalls).not.toContain("getRunDetail");
     expect(new Set(detailPage.serverCalls)).toEqual(new Set(["requestRunLog"]));
   });
 
   it("취소 하나 뒤에는 그 런의 상세만 다시 읽고 루트와 셸은 다시 읽지 않는다", async (context) => {
     const detail = await newPage(context, { stream: "blocked" });
-    await open(detail, `/runs/${cancelRun}`);
+    await open(detail, `/runs/${cancelRun}`, runDetailQueryKey(cancelRun));
     detail.serverCalls.length = 0;
 
     await detail.page.getByRole("button", { name: run.cancel.trigger }).click();
@@ -156,7 +159,7 @@ describe("Runs·Run 상세를 Query로(브라우저, 0125)", () => {
 
   it("로그 다시 받기 뒤에는 그 런의 상세만 다시 읽는다", async (context) => {
     const detail = await newPage(context, { stream: "blocked" });
-    await open(detail, `/runs/${logRun}`);
+    await open(detail, `/runs/${logRun}`, runDetailQueryKey(logRun));
     await detail.page.waitForTimeout(SETTLE_MS);
     const before = detail.serverCalls.length;
 
@@ -172,12 +175,12 @@ describe("Runs·Run 상세를 Query로(브라우저, 0125)", () => {
 
   it("worker와 같은 함수로 런 상태를 바꾸면 열린 Runs와 Run 상세가 3초 안에 바뀐다", async (context) => {
     const runsPage = await newPage(context);
-    await open(runsPage, "/runs");
+    await open(runsPage, "/runs", runsListQueryKey);
     const row = runsPage.page.getByRole("option").filter({ hasText: watchedTicket });
     await expect.poll(() => row.innerText()).toContain(domain.runState.queued);
 
     const detail = await newPage(context);
-    await open(detail, `/runs/${watchedRun}`);
+    await open(detail, `/runs/${watchedRun}`, runDetailQueryKey(watchedRun));
     const state = detail.page.locator("main");
     await expect.poll(() => state.innerText()).toContain(domain.runState.queued);
 
@@ -195,7 +198,7 @@ describe("Runs·Run 상세를 Query로(브라우저, 0125)", () => {
 
   it("변경 기록 통로 없이도 다시 들어간 Runs는 뒤에서 새로 읽어 그사이 바뀐 상태를 그린다", async (context) => {
     const runsPage = await newPage(context, { stream: "blocked" });
-    await open(runsPage, "/runs");
+    await open(runsPage, "/runs", runsListQueryKey);
     const row = runsPage.page.getByRole("option").filter({ hasText: revisitedTicket });
     await expect.poll(() => row.innerText()).toContain(domain.runState.queued);
 
@@ -209,20 +212,21 @@ describe("Runs·Run 상세를 Query로(브라우저, 0125)", () => {
 
   it("변경 기록 통로가 끊기면 열린 Run 상세를 30초마다 다시 읽는다(가짜 시계)", async (context) => {
     const detail = await newPage(context, { stream: "blocked", clock: true });
-    await open(detail, `/runs/${endedRun}`);
+    await open(detail, `/runs/${endedRun}`, runDetailQueryKey(endedRun));
     await detail.page.clock.pauseAt((await detail.page.evaluate(() => Date.now())) + 100);
     await detail.page.clock.runFor(SETTLE_MS);
     const before = countOf(detail.serverCalls, "getRunDetail");
 
     await detail.page.clock.runFor(DISCONNECTED_POLL_MS);
     await expect.poll(() => countOf(detail.serverCalls, "getRunDetail")).toBe(before + 1);
+    await waitForScreenQuerySettled(detail.page, runDetailQueryKey(endedRun));
     await detail.page.clock.runFor(DISCONNECTED_POLL_MS);
     await expect.poll(() => countOf(detail.serverCalls, "getRunDetail")).toBe(before + 2);
   });
 
   it("로그 받는 중 폴링 15번이 끝나도 로그가 오지 않으면 다시 요청하는 길을 보인다(가짜 시계)", async (context) => {
     const detail = await newPage(context, { stream: "blocked", clock: true });
-    await open(detail, `/runs/${stalledLogRun}`);
+    await open(detail, `/runs/${stalledLogRun}`, runDetailQueryKey(stalledLogRun));
     await expect.poll(() => detail.page.locator("main").innerText()).toContain(run.log.pending);
     await detail.page.clock.pauseAt((await detail.page.evaluate(() => Date.now())) + 100);
 
@@ -230,7 +234,7 @@ describe("Runs·Run 상세를 Query로(브라우저, 0125)", () => {
       const polled = countOf(detail.serverCalls, "getRunDetail");
       await detail.page.clock.runFor(LOG_POLL_MS);
       await expect.poll(() => countOf(detail.serverCalls, "getRunDetail")).toBe(polled + 1);
-      await detail.page.waitForLoadState("networkidle");
+      await waitForScreenQuerySettled(detail.page, runDetailQueryKey(stalledLogRun));
     }
     const afterLimit = countOf(detail.serverCalls, "getRunDetail");
     await detail.page.clock.runFor(LOG_POLL_MS * 3);
@@ -288,11 +292,20 @@ async function newPage(
   return { page, serverCalls };
 }
 
-async function open(opened: OpenedPage, path: string): Promise<void> {
+async function open(
+  opened: OpenedPage,
+  path: string,
+  screenQueryKey: ReadonlyArray<string>,
+): Promise<void> {
   await opened.page.goto(`${path}?ws=${workspaceId}`);
   await opened.page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
   await waitForRouterIdle(opened.page, path);
   await opened.page.waitForLoadState("networkidle");
+  await waitForScreenQuerySettled(opened.page, screenQueryKey);
+}
+
+function runDetailQueryKey(id: RunId): string[] {
+  return ["runs", "detail", id];
 }
 
 async function timeZoneCookieOf(request: Request): Promise<string | undefined> {
