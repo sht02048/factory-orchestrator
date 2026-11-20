@@ -23,6 +23,7 @@ import {
   listRunners,
   listWorkspaces,
   markTrackerChanged,
+  recordSettingsChange,
   removeWorkspaceTrackerProject,
   requestRunnerCheck,
   saveAutoAssignLabel,
@@ -121,7 +122,6 @@ export function addTrackerProject(
     inProgressStateId: null,
   });
   if (!saved) return { ok: false, reason: "taken" };
-  markTrackerChanged(context.db, connection);
   return { ok: true };
 }
 
@@ -138,7 +138,6 @@ export function removeTrackerProject(
     projectId: toTrackerProjectId(input.projectId),
   });
   if (!removed) return { ok: false, reason: "not-found" };
-  markTrackerChanged(context.db, connection);
   return { ok: true };
 }
 
@@ -370,7 +369,6 @@ export async function saveTrackerConnectionSetting(
     },
     now,
   );
-  markTrackerChanged(context.db, id);
   return { ok: true };
 }
 
@@ -584,6 +582,7 @@ export function savePowerSetting(
 ): SaveResult<"unavailable"> {
   if (context.power === undefined) return { ok: false, reason: "unavailable" };
   context.power.write({ preventSleep: input.preventSleep });
+  recordSettingsChange(context.db);
   return { ok: true };
 }
 

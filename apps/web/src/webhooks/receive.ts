@@ -1,10 +1,5 @@
 import type { AdapterRegistry, TrackerConnectionId, WebhookVerifyError } from "@ganger/core";
-import {
-  getTrackerConnection,
-  inTransaction,
-  markTrackerChanged,
-  recordTrackerEvent,
-} from "@ganger/db";
+import { getTrackerConnection, recordTrackerEvent } from "@ganger/db";
 import type { Database, SecretBox } from "@ganger/db";
 
 export const MAX_WEBHOOK_REQUEST_BYTES = 5 * 1024 * 1024;
@@ -140,11 +135,7 @@ async function handle(
       now,
     });
     if (!result.ok) return result.error;
-    return inTransaction(context.db, () => {
-      const outcome = recordTrackerEvent(context.db, connection.id, result.event);
-      if (outcome === "recorded") markTrackerChanged(context.db, connection.id);
-      return outcome;
-    });
+    return recordTrackerEvent(context.db, connection.id, result.event);
   } catch (error) {
     context.logger.warn("could not handle a tracker webhook", { connectionId, error });
     await cancelBody(request);

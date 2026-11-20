@@ -5,6 +5,7 @@ import {
   getWorkspaceTrackerProject,
   listRunners,
   listRuns,
+  inTransaction,
   markTrackerChanged,
   updateRunRecords,
 } from "@ganger/db";
@@ -93,10 +94,12 @@ async function markInProgress(
     forgetGoneTicket(context, run);
     return;
   }
-  tryWrite(context, run.id, () => {
-    updateRunRecords(context.db, run.id, { trackerStateSetAt: context.now() });
-    markTrackerChanged(context.db, run.ticket.connection);
-  });
+  tryWrite(context, run.id, () =>
+    inTransaction(context.db, () => {
+      updateRunRecords(context.db, run.id, { trackerStateSetAt: context.now() });
+      markTrackerChanged(context.db, run.ticket.connection);
+    }),
+  );
 }
 
 async function commentResult(
@@ -121,7 +124,10 @@ async function commentResult(
     context.unrecordedComments.set(run.id, comment);
   }
   const recorded = tryWrite(context, run.id, () =>
-    updateRunRecords(context.db, run.id, { trackerComment: comment }),
+    inTransaction(context.db, () => {
+      updateRunRecords(context.db, run.id, { trackerComment: comment });
+      markTrackerChanged(context.db, run.ticket.connection);
+    }),
   );
   if (recorded !== undefined) context.unrecordedComments.delete(run.id);
 }
