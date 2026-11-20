@@ -151,12 +151,7 @@ function TimeZoneSync({ timeZone }: { timeZone: string }) {
     const local = localTimeZone();
     if (local === timeZone || timeZoneFromCookies(document.cookie) === local) return;
     document.cookie = timeZoneCookie(local);
-    void router.invalidate({
-      filter: (match) =>
-        match.routeId === rootRouteId ||
-        match.routeId === "/_app/stats" ||
-        match.routeId === "/_app/",
-    });
+    void router.invalidate({ filter: (match) => match.routeId === rootRouteId });
   }, [router, timeZone]);
   return null;
 }

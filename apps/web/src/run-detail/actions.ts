@@ -52,8 +52,10 @@ export interface RunDetailWorld {
 export const MOVED_TO_QUERY_ROUTE_IDS: ReadonlySet<string> = new Set([
   rootRouteId,
   "/_app",
+  "/_app/",
   "/_app/runs",
   "/_app/runs_/$runId",
+  "/_app/stats",
 ]);
 
 export function isUnmovedScreen(match: { routeId: string }): boolean {
@@ -77,6 +79,8 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: runDetailKey(runId) }),
       queryClient.invalidateQueries({ queryKey: runsListKey }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      queryClient.invalidateQueries({ queryKey: ["stats"] }),
       world.refreshUnmovedScreens(),
     ]);
   };
