@@ -60,11 +60,16 @@ export function useSettingsActions(afterSave: AfterSave): SettingsActions {
   const router = useRouter();
   const queryClient = useQueryClient();
   const then = useReloadOnSuccess(afterSave);
+  const afterTrackerSave = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: TRACKER_KEY });
+    await afterSave();
+  }, [queryClient, afterSave]);
+  const thenTracker = useReloadOnSuccess(afterTrackerSave);
   return useMemo(
     (): SettingsActions => ({
       saveGeneral: then((data) => saveWorkspaceGeneral({ data })),
-      addProject: then((data) => addWorkspaceTrackerProject({ data })),
-      removeProject: then((data) => removeWorkspaceTrackerProject({ data })),
+      addProject: thenTracker((data) => addWorkspaceTrackerProject({ data })),
+      removeProject: thenTracker((data) => removeWorkspaceTrackerProject({ data })),
       saveMapping: then((data) => saveWorkspaceMapping({ data })),
       saveInProgress: then((data) => saveWorkspaceInProgressState({ data })),
       saveLabel: then((data) => saveWorkspaceLabel({ data })),
@@ -84,7 +89,7 @@ export function useSettingsActions(afterSave: AfterSave): SettingsActions {
           queryClient.invalidateQueries({ queryKey: TRACKER_KEY }),
         ]);
       },
-      saveConnection: then((data) => saveTrackerConnection({ data })),
+      saveConnection: thenTracker((data) => saveTrackerConnection({ data })),
       checkConnection: (data) => checkTrackerConnectionNow({ data }),
       saveGitHubToken: then((data) => saveGitHubTokenSetting({ data })),
       checkGitHubToken: () => checkGitHubTokenNow(),
@@ -99,6 +104,6 @@ export function useSettingsActions(afterSave: AfterSave): SettingsActions {
         return pending;
       },
     }),
-    [router, queryClient, then],
+    [router, queryClient, then, thenTracker],
   );
 }

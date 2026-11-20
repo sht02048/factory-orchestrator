@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
+import type { TrackerTicketsData } from "@ganger/app/tickets/model";
 import { getTicketRuns, getTrackerTickets } from "../server/functions";
 
 export const TRACKER_STALE_TIME_MS = 5 * 60_000;
@@ -21,6 +22,10 @@ export function trackerLabelsKey(connectionId: string, projectId: string) {
   return [...TRACKER_KEY, "labels", connectionId, projectId] as const;
 }
 
+export function trackerStaleTime(data: TrackerTicketsData | undefined): number {
+  return data !== undefined && data.errors.length > 0 ? 0 : TRACKER_STALE_TIME_MS;
+}
+
 export function trackerTicketsQuery(queryClient: QueryClient, ws: string | undefined) {
   return queryOptions({
     queryKey: [...TRACKER_KEY, "tickets", wsKey(ws)],
@@ -34,6 +39,6 @@ export function trackerTicketsQuery(queryClient: QueryClient, ws: string | undef
       }
       return data;
     },
-    staleTime: TRACKER_STALE_TIME_MS,
+    staleTime: (query) => trackerStaleTime(query.state.data),
   });
 }

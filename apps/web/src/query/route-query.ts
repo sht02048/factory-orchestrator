@@ -103,5 +103,7 @@ export async function loadCachedRouteQuery<
 ): Promise<TQueryFnData> {
   const queryClient = load.context.queryClient;
   if (load.preload) return preloadRouteQuery(queryClient, options);
-  return queryClient.query({ ...options, staleTime: "static" });
+  const data = await queryClient.query({ ...options, staleTime: "static" });
+  if (inBrowser() && load.cause === "enter") queryClient.query(options).catch(() => undefined);
+  return data;
 }

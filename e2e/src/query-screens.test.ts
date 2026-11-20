@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  AdapterError,
   AdapterRegistry,
   toAgentId,
   toCodeHostKind,
@@ -78,12 +79,14 @@ const virtualAdapters = "\0e2e-query-screens-adapters";
 class CountingTracker extends FakeTracker {
   ticketReads = 0;
   labelReads = 0;
+  failing = false;
 
   override listProjectTickets(
     projectId: TrackerProjectId,
     page?: TrackerPage,
   ): Promise<Paged<TrackerTicket>> {
     this.ticketReads += 1;
+    if (this.failing) return Promise.reject(new AdapterError({ kind: "rate-limited" }));
     return super.listProjectTickets(projectId, page);
   }
 
@@ -398,6 +401,33 @@ describe("셸·Runners·Tickets 의 Query(브라우저, 0127)", () => {
     expect(await list.getByRole("option", { name: `${ticket.key} Before webhook` }).count()).toBe(
       0,
     );
+  });
+
+  it("트래커를 읽지 못한 결과는 5분을 기다리지 않고 Tickets 에 다시 들어가면 다시 읽는다", async (context) => {
+    const ticket = addTicket("Recovered after failure");
+    tracker.failing = true;
+    const { page } = await newPage(context, { stream: false });
+    try {
+      await open(page, "/tickets", "tickets");
+      await page
+        .getByText(/티켓을 읽지 못했어요/)
+        .first()
+        .waitFor();
+      tracker.failing = false;
+      await railLink(page, shell.nav.runners).click();
+      await waitForScreen(page, "runners");
+      await page.mouse.move(0, 0);
+
+      await railLink(page, shell.nav.tickets).click();
+      await waitForScreen(page, "tickets");
+      await page
+        .getByRole("listbox", { name: tickets.listLabel })
+        .getByRole("option", { name: `${ticket.key} ${ticket.title}` })
+        .waitFor({ timeout: VISIBLE_WITHIN_MS });
+      expect(await page.getByText(/티켓을 읽지 못했어요/).count()).toBe(0);
+    } finally {
+      tracker.failing = false;
+    }
   });
 
   it("포인터를 올려 미리 읽은 뒤 Runners 에 들어가면 서버 함수를 더 부르지 않는다", async (context) => {
