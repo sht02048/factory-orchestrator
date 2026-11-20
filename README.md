@@ -41,7 +41,8 @@ pnpm install   # also installs the lefthook pre-commit hook
 
 | Command              | What it does                                                    |
 | -------------------- | --------------------------------------------------------------- |
-| `pnpm dev`           | Runs the web app (hot reload) and the worker with fake adapters |
+| `pnpm dev`           | Runs `pnpm dev:web` and opens the desktop app on it             |
+| `pnpm dev:web`       | Runs the web app (hot reload) and the worker with fake adapters |
 | `pnpm typecheck`     | Type-checks every package with TypeScript 7 (`tsc`)             |
 | `pnpm lint`          | Runs oxlint in type-aware mode                                  |
 | `pnpm format`        | Formats with oxfmt                                              |
@@ -59,13 +60,20 @@ The browser tests in `e2e` drive the Google Chrome installed on the machine thro
 
 ### Development
 
-`pnpm dev` starts the web app in development mode (hot reload) and the worker in one process. The tracker, the runners, and the code host are fake adapters, so it needs no Linear key, ssh access, or GitHub token, and it never reaches those services. By default it opens on the Dashboard of a finished setup with sample data: two tracker connections and workspaces, three runners (one online, one with broken GitHub authentication, one offline) with sample provider usage, runs in every state, and two weeks of past runs for Stats. The fake agents keep working over time: they ask questions now and then, open pull requests, and send completion reports. Answer questions, cancel runs, and assign tickets in the app as usual.
+`pnpm dev:web` starts the web app in development mode (hot reload) and the worker in one process; open the address it prints in a browser. `pnpm dev` starts the same dev server and opens the desktop app on it, described below. The tracker, the runners, and the code host are fake adapters, so it needs no Linear key, ssh access, or GitHub token, and it never reaches those services. By default it opens on the Dashboard of a finished setup with sample data: two tracker connections and workspaces, three runners (one online, one with broken GitHub authentication, one offline) with sample provider usage, runs in every state, and two weeks of past runs for Stats. The fake agents keep working over time: they ask questions now and then, open pull requests, and send completion reports. Answer questions, cancel runs, and assign tickets in the app as usual.
 
-- `pnpm dev --onboarding` starts from step 1 of onboarding with an empty database. **Fill with fake values** (bottom right) fills the form fields with values that pass every check. To see a failed check, put `invalid` in a key or token, or `offline`, `no-orca`, or `push-auth` in the runner's ssh target.
+- `pnpm dev:web --onboarding` (or `pnpm dev --onboarding`) starts from step 1 of onboarding with an empty database. **Fill with fake values** (bottom right) fills the form fields with values that pass every check. To see a failed check, put `invalid` in a key or token, or `offline`, `no-orca`, or `push-auth` in the runner's ssh target.
 - `--reset` deletes the data of that mode and starts over. `--static` stops the fake agents from moving on their own.
 - `/__dev` (the **Dev tools** link at the bottom right) labels a ticket for auto-assignment, adds a ticket, makes an agent ask a question, fixes or breaks a runner's GitHub authentication, and stands in for another Mac that runs the runner setup command (or lets that command expire).
-- Data lives in `.dev/<mode>/` in the repository (ignored by git), or under `GANGER_DEV_DIR`. It never touches `~/.ganger`. The server binds to `127.0.0.1:3000`; set `WEB_HOST` and `WEB_PORT` to change that (for example, `WEB_HOST=0.0.0.0 pnpm dev` to open it from another machine on your network). Anyone who can reach that address can use the dev server and `/__dev`, so bind to an address only trusted machines can reach.
-- The fake adapters and the dev tools are registered only by `pnpm dev`. They are not part of the production build or the server bundle; the bundle check (`scripts/bundle-check.ts`, run by `pnpm bundle` and `pnpm smoke:bundle`) fails if fake adapters or dev-only values end up in the bundle.
+- Data lives in `.dev/<mode>/` in the repository (ignored by git), or under `GANGER_DEV_DIR`. It never touches `~/.ganger`. The server binds to `127.0.0.1:3000`; set `WEB_HOST` and `WEB_PORT` to change that (for example, `WEB_HOST=0.0.0.0 pnpm dev:web` to open it from another machine on your network). Anyone who can reach that address can use the dev server and `/__dev`, so bind to an address only trusted machines can reach.
+- The fake adapters and the dev tools are registered only by `pnpm dev` and `pnpm dev:web`. They are not part of the production build or the server bundle; the bundle check (`scripts/bundle-check.ts`, run by `pnpm bundle` and `pnpm smoke:bundle`) fails if fake adapters or dev-only values end up in the bundle.
+
+`pnpm dev` takes the same options and environment variables as `pnpm dev:web`. It builds the desktop app's main process, preload, and renderer once, starts the dev server, and then opens the desktop app with `GANGER_DESKTOP_DEV_SERVER` set to the dev server's address:
+
+- The app connects to that address like a server on another machine and does not start a server bundle of its own. Changes to the web app reload inside the app window. Changes to `apps/desktop` need a restart of `pnpm dev`.
+- The app keeps its data in `.dev/desktop/user-data` and uses `.dev/desktop/home` as its Ganger home (under `GANGER_DEV_DIR` when set), so it does not touch the settings or saved servers of an installed Ganger app, or `~/.ganger`. It can run next to an installed app.
+- Quitting the app (⌘Q or **Quit** in the tray menu) stops the dev server too. Ctrl+C quits the app and then stops the dev server. Closing the window only hides it, as in the installed app.
+- The `electron` package downloads its binary the first time `pnpm dev` runs. If the binary is still missing (for example, offline), `pnpm dev` stops before starting anything and prints the install command (`pnpm --filter @ganger/desktop exec node node_modules/electron/install.js`). Use `pnpm dev:web` to work in a browser instead.
 
 `pnpm --filter @ganger/web dev` still starts only the web app; open `http://127.0.0.1:3000/ds` to see the design system. Run the production build with `pnpm --filter @ganger/web start`. It binds to `127.0.0.1` by default. To change that, set the shell environment variables `WEB_HOST` and `WEB_PORT` (for example, `WEB_PORT=4000 pnpm --filter @ganger/web start`).
 
@@ -287,7 +295,7 @@ pnpm --filter @ganger/desktop exec node node_modules/electron/install.js   # dow
 pnpm --filter @ganger/desktop run package
 ```
 
-This writes `apps/desktop/dist/app/Ganger-darwin-<arch>/Ganger.app` and a `.zip` of it. The app carries the server bundle unchanged in `Contents/Resources/server/` and runs it with its own Node (Electron's), so the machine does not need Node. For development, `pnpm --filter @ganger/desktop start` runs the app from the repository with the bundle in `dist/`.
+This writes `apps/desktop/dist/app/Ganger-darwin-<arch>/Ganger.app` and a `.zip` of it. The app carries the server bundle unchanged in `Contents/Resources/server/` and runs it with its own Node (Electron's), so the machine does not need Node. `pnpm --filter @ganger/desktop start` runs the app from the repository with the bundle in `dist/`. To work on the app with the dev server instead, run `pnpm dev` (see [Development](#development)).
 
 A build you package yourself is not signed, so macOS asks you to confirm before it opens the first time (Control-click the app, then **Open**).
 

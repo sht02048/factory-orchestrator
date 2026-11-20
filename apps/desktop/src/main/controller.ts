@@ -106,6 +106,7 @@ export interface ControllerOptions {
   trayIcon: string;
   openedAtLogin: boolean;
   updater: Updater;
+  devServerUrl: string | undefined;
 }
 
 type Mode = "choosing" | "local" | "remote";
@@ -166,6 +167,13 @@ export class Controller {
       void this.options.updater.tick();
       this.updateTimer = setInterval(() => void this.options.updater.tick(), UPDATE_TICK_MS);
     }, FIRST_CHECK_DELAY_MS);
+    const devServerUrl = this.options.devServerUrl;
+    if (devServerUrl !== undefined) {
+      this.showWindow();
+      void this.openDevServer(devServerUrl);
+      this.refreshMenus();
+      return;
+    }
     const settings = this.options.settings.read();
     if (!this.options.openedAtLogin || settings.mode === undefined) this.showWindow();
     switch (settings.mode) {
@@ -383,6 +391,19 @@ export class Controller {
     void this.readRemoteVersion(server);
   }
 
+  private async openDevServer(url: string): Promise<void> {
+    this.mode = "remote";
+    const result = await connectAddress(url, (origin, timeoutMs) =>
+      probeIdentity(origin, timeoutMs),
+    );
+    if (result.ok) {
+      this.useRemote(result.server);
+      return;
+    }
+    this.setView({ screen: "unreachable", name: new URL(url).host, url, checking: false });
+    this.refreshMenus();
+  }
+
   private async readRemoteVersion(server: SavedServer): Promise<void> {
     const probed = await probeIdentity(server.url, 3_000);
     if (probed.kind !== "ours" || this.remote?.server.instanceId !== server.instanceId) return;
@@ -539,6 +560,8 @@ export class Controller {
     handle("retry", () => {
       if (this.mode === "local") return this.restartLocal();
       if (this.remote !== undefined) return this.openRemote(this.remote.server);
+      if (this.options.devServerUrl !== undefined)
+        return this.openDevServer(this.options.devServerUrl);
       return this.chooseRemote();
     });
     handle("choose-mode", () => this.chooseMode());
