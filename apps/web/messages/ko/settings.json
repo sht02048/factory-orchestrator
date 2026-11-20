@@ -469,7 +469,8 @@
     "stepState": {
       "done": "끝냈어요",
       "current": "지금 할 단계",
-      "locked": "앞 단계를 끝내면 열려요"
+      "locked": "앞 단계를 끝내면 열려요",
+      "open": "이어서 할 단계"
     },
     "copy": "복사하기",
     "copyLabel": "{label} 복사하기",
@@ -499,6 +500,7 @@
         "invalid-address": "https://hooks.example.com 처럼 https로 시작하고 경로가 없는 주소를 넣어 주세요. IP 주소와 localhost는 쓸 수 없어요.",
         "name-not-found": "이 이름을 찾지 못했어요. Funnel을 막 켰다면 이름이 퍼지는 데 몇 분 걸려요. 몇 분 뒤에 다시 확인해 주세요.",
         "unreachable": "이 주소에서 아무도 답하지 않아요. Funnel이 꺼져 있거나 위 명령을 아직 실행하지 않았는지 확인해 주세요.",
+        "unreachableNoFunnel": "이 주소에서 아무도 답하지 않아요. 터널이나 리버스 프록시가 켜져 있고 이 서버를 가리키는지 확인해 주세요.",
         "other-server": "이 주소에 닿았지만 다른 서버가 답했어요. 주소의 포트와 터널이 이 서버를 가리키는지 확인해 주세요.",
         "check-failed": "이 주소를 확인하지 못했어요. HTTPS 인증서가 아직 준비되지 않았을 수 있어요. 잠시 뒤에 다시 확인해 주세요."
       },

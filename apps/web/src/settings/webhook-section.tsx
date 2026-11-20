@@ -78,7 +78,15 @@ export function WebhookSection({
       id={WEBHOOK_SECTION_ID}
       title={t("title")}
       info={<InfoTip label={ts("infoLabel", { label: t("infoLabel") })} content={t("info")} />}
-      detail={t(`status.${state.kind}`)}
+      detail={
+        <Text
+          variant="meta"
+          role="status"
+          {...(state.kind === "rejected" ? { tone: "problem" as const } : {})}
+        >
+          {t(`status.${state.kind}`)}
+        </Text>
+      }
       detailTone={state.kind === "rejected" ? "problem" : "default"}
     >
       {state.kind === "off" ? (
@@ -159,8 +167,7 @@ function WebhookSteps({
     createCopyRef.current?.focus();
     setFocusCreate(false);
   }, [focusCreate, addressDone]);
-  const stateLabel = (state: SettingsStepState) =>
-    t(`stepState.${state === "open" ? "current" : state}`);
+  const stateLabel = (state: SettingsStepState) => t(`stepState.${state}`);
   const addressState: SettingsStepState = addressDone ? "done" : "current";
   const laterState: SettingsStepState = addressDone ? "open" : "locked";
   const createState: SettingsStepState = addressDone ? "current" : "locked";
@@ -365,8 +372,10 @@ function AddressEditor({
     if (knownReason !== null) inputRef.current?.focus();
   }, [failedState]);
   const known = reason !== null && failed !== null;
+  const errorKey =
+    failed === "unreachable" && setup.funnel === null ? "unreachableNoFunnel" : failed;
   return (
-    <>
+    <div {...stylex.props(styles.editor)}>
       <Text variant="meta" as="p">
         {t("description")}
       </Text>
@@ -398,7 +407,7 @@ function AddressEditor({
       >
         <Field
           label={t("field")}
-          error={known && !submit.sending ? t(`error.${failed}`) : undefined}
+          error={errorKey !== null && known && !submit.sending ? t(`error.${errorKey}`) : undefined}
         >
           <Input
             ref={inputRef}
@@ -413,7 +422,7 @@ function AddressEditor({
         </Field>
         {known ? null : <SubmitError state={submit.state} />}
       </CredentialFormFrame>
-    </>
+    </div>
   );
 }
 
@@ -535,7 +544,7 @@ function WebhookOn({
       ) : null}
       <SettingsGroup>
         {state.kind === "waiting" ? (
-          <div id={WAITING_ID} tabIndex={-1} role="status" {...stylex.props(focusStyles.target)}>
+          <div id={WAITING_ID} tabIndex={-1} {...stylex.props(focusStyles.target)}>
             <SettingsRow label={t("waiting.title")} detail={t("waiting.detail")} />
           </div>
         ) : (
@@ -679,5 +688,6 @@ const styles = stylex.create({
   funnel: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   funnelHead: { display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: space.s2 },
   on: { display: "flex", flexDirection: "column", gap: space.s3 },
+  editor: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
   fields: { display: "flex", flexDirection: "column", gap: space.s4 },
 });

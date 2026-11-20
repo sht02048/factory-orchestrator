@@ -347,6 +347,8 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
     expect(stepOf(html, 2)).toContain('href="https://linear.app/acme/settings/api"');
     expect(stepOf(html, 3)).toContain('type="password"');
     expect(textOf(stepOf(html, 3))).toContain(settings.webhook.secret.turnOn);
+    expect(textOf(stepOf(html, 3))).toContain(settings.webhook.stepState.open);
+    expect(textOf(stepOf(html, 2))).toContain(settings.webhook.stepState.current);
   });
 
   it("조직 주소를 모르면 Linear 일반 webhook 설정으로 보낸다", async () => {
@@ -364,7 +366,7 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
     const html = renderDetail(await loadSettingsPage(f.context, workspace, now), id);
     const text = textOf(html);
     expect(text).toContain(settings.webhook.status.waiting);
-    expect(html).toContain('role="status"');
+    expect(html).toMatch(new RegExp(`role="status"[^>]*>${settings.webhook.status.waiting}`));
     expect(text).toContain(settings.webhook.waiting.title);
     expect(text).toContain(`${ADDRESS}/api/webhooks/tracker/${id}`);
     expect(text).toContain(settings.webhook.off.label);

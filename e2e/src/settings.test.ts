@@ -872,8 +872,8 @@ describe("트래커 연결 상세의 webhook 켜기(브라우저, 0130)", () => 
     await webhook.getByText(settings.webhook.secret.required).waitFor();
     await secret.fill("whsec_example");
     await webhook.getByRole("button", { name: settings.webhook.secret.turnOn }).click();
-    await webhook.getByText(settings.webhook.status.waiting).waitFor();
-    const waiting = webhook.getByRole("status").filter({ hasText: settings.webhook.waiting.title });
+    await webhook.getByRole("status").getByText(settings.webhook.status.waiting).waitFor();
+    const waiting = webhook.locator("#webhook-waiting");
     await waiting.waitFor();
     await expect
       .poll(() => waiting.evaluate((el) => el.contains(document.activeElement)))
