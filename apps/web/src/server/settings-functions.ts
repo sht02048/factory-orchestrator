@@ -36,13 +36,17 @@ import {
   turnOffWebhook,
   verifyWebhookAddress,
   webhookAddressInput,
-  webhookStateNow,
 } from "@ganger/app/settings/actions";
 import { funnelAddress, funnelCommand } from "@ganger/app/webhook-address";
 import type { WebhookSetupView } from "@ganger/app/settings/model";
 import { GANGER_YELLOW_HEX } from "@ganger/ui/brand-color";
 import { saveRunnerFindingOrca } from "@ganger/app/runner-setup/remote-orca";
-import { hasPendingRunnerChecks, loadSettingsPage } from "@ganger/app/settings/load";
+import {
+  hasPendingRunnerChecks,
+  loadBoundProjectReads,
+  loadSettingsDb,
+  loadTrackerProjectLists,
+} from "@ganger/app/settings/load";
 import type { SettingsContext } from "@ganger/app/settings/load";
 import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
@@ -63,9 +67,19 @@ function context(): SettingsContext {
   };
 }
 
-export const getSettingsPage = createServerFn({ method: "GET" })
-  .validator(z.object({ ws: z.string().optional() }))
-  .handler(({ data }) => loadSettingsPage(context(), data.ws, new Date()));
+const wsInput = z.object({ ws: z.string().optional() });
+
+export const getSettings = createServerFn({ method: "GET" })
+  .validator(wsInput)
+  .handler(({ data }) => loadSettingsDb(context(), data.ws, new Date()));
+
+export const getTrackerProjects = createServerFn({ method: "GET" }).handler(() =>
+  loadTrackerProjectLists(context()),
+);
+
+export const getBoundProjectReads = createServerFn({ method: "GET" })
+  .validator(wsInput)
+  .handler(({ data }) => loadBoundProjectReads(context(), data.ws));
 
 export const getRunnerChecksPending = createServerFn({ method: "GET" }).handler(() =>
   hasPendingRunnerChecks(getDatabase()),
@@ -143,10 +157,6 @@ export const saveMcpWriteSettings = createServerFn({ method: "POST" })
 export const turnOffTrackerWebhook = createServerFn({ method: "POST" })
   .validator(connectionIdInput)
   .handler(({ data }) => turnOffWebhook(context(), data, new Date()));
-
-export const getTrackerWebhookState = createServerFn({ method: "GET" })
-  .validator(connectionIdInput)
-  .handler(({ data }) => webhookStateNow(context(), data, new Date()));
 
 export const checkWebhookAddressNow = createServerFn({ method: "POST" })
   .validator(webhookAddressInput)

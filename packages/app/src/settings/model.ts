@@ -78,6 +78,39 @@ export interface WorkspaceSettings {
   labels: ConnectionLabel[];
 }
 
+export interface TrackerProjectList {
+  connection: string;
+  projects: Remote<Choice>;
+}
+
+export interface BoundProjectReads {
+  connection: string;
+  projectId: string;
+  states: Remote<Choice>;
+  labels: Remote<Choice>;
+}
+
+export interface ProjectOwnership {
+  connection: string;
+  projectId: string;
+  name: string;
+  owner: ProjectOwner;
+  mappings: number;
+  queuedRuns: number;
+}
+
+export type BoundProjectSettings = Omit<BoundProject, "states" | "labels">;
+
+export type ConnectionLabelSettings = Omit<ConnectionLabel, "labels"> & { projectIds: string[] };
+
+export interface WorkspaceDbSettings {
+  general: WorkspaceGeneral;
+  connections: Choice[];
+  ownership: ProjectOwnership[];
+  bound: BoundProjectSettings[];
+  labels: ConnectionLabelSettings[];
+}
+
 export type WebhookStateView =
   | { kind: "off" }
   | { kind: "waiting" }
@@ -98,21 +131,6 @@ export interface TrackerConnectionView {
   webhook: WebhookStateView;
   webhookSettingsUrl: string | null;
 }
-
-export function webhookReceiptKey(state: WebhookStateView): string {
-  switch (state.kind) {
-    case "off":
-    case "waiting":
-      return state.kind;
-    case "receiving":
-      return `receiving:${state.lastReceivedAt}`;
-    case "rejected":
-      return `rejected:${state.lastReceivedAt ?? ""}:${String(state.rejectedCount)}`;
-  }
-}
-
-export const WEBHOOK_WAIT_POLL_MS = 3000;
-export const WEBHOOK_WAIT_POLL_LIMIT_MS = 15 * 60 * 1000;
 
 export interface FunnelSetupView {
   command: string;
@@ -188,6 +206,13 @@ export interface InstallSettings {
 
 export interface SettingsPage {
   workspace: WorkspaceSettings | null;
+  install: InstallSettings;
+  runnerProjects: Choice[];
+  agents: string[];
+}
+
+export interface SettingsDbPage {
+  workspace: WorkspaceDbSettings | null;
   install: InstallSettings;
   runnerProjects: Choice[];
   agents: string[];
