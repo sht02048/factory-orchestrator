@@ -15,6 +15,7 @@ import {
   markTrackerChanged,
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
+import type { AssignRejectReason } from "./model.js";
 import { z } from "zod";
 
 export const assignInput = z.object({
@@ -28,17 +29,6 @@ export const assignInput = z.object({
 });
 
 export type AssignInput = z.infer<typeof assignInput>;
-
-export const ASSIGN_REJECT_REASONS = [
-  "active-run",
-  "no-mapping",
-  "unknown-repo",
-  "unknown-agent",
-  "unknown-runner",
-  "runner-assignment-blocked",
-] as const;
-
-export type AssignRejectReason = (typeof ASSIGN_REJECT_REASONS)[number];
 
 export type AssignResult = { ok: true; runId: string } | { ok: false; reason: AssignRejectReason };
 

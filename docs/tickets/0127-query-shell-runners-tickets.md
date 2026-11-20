@@ -49,6 +49,36 @@ blocked_by: [0124]
 - [ ] 로더 SQL 수 시험(`apps/web/src/server/loader-queries.test.ts`)에 Tickets DB 부분을 더했다.
 - [ ] 0117 브라우저 시험이 같은 뜻으로 통과한다(포인터를 올린 뒤 Tickets를 누르면 느린 트래커를 기다리지 않는다). 시험이 기다리는 `getTicketsPage` 이름만 트래커를 읽는 새 서버 함수로 바꾼다(스펙 7절 5번).
 
+## 확인 결과(2026-11-20)
+
+### 시작할 때 정한 것
+
+- **C1 해석(스펙 2절).** Runners 안의 러너 설정(`RunnerForm`의 러너 저장, This Mac 설정, 러너 등록 끝)은 `["runners", "list"]`와 `["shell"]` 무효화를 쓰고, 온보딩 안에서는 `router.invalidate()`를 쓴다. 코디네이터가 운영자 해석대로 승인했다.
+- **트래커 query를 다시 들어갈 때(스펙 열린 질문 2).** 운영자 결정 A: 다시 들어가도 5분을 지킨다. 다시 들어갈 때 뒤에서 새로 읽는 것은 DB 부분뿐이다. `navigation.test.ts`의 다시 들어가기 시험은 `getTicketRuns`를 기다린다. webhook이 없는 설치의 한계는 스펙 열린 질문 2에 적었다.
+
+### 만든 것
+
+- **Tickets 나누기(`packages/app/src/tickets/`).** `loadTicketRuns`(DB 부분: 티켓별 런과 할당 막힘·다시 쓸 저장소, Mapping·저장소 이름, 러너, Auto-assign Label id)와 `loadTrackerTickets`(트래커 티켓과 프로젝트별 라벨 `Remote<{id, name}>`). 할당할 수 있음·할당 기본값(`assignabilityOf`·`assignDefaultsOf`)과 합치기(`mergeTicketsPage`)는 `merge.ts`의 순수 함수로 서버(MCP의 `loadTicketsPage`)와 브라우저가 함께 쓴다. MCP 출력 모양은 그대로다(시험: 합친 결과가 `loadTicketsPage`와 같다). DB 부분은 끝난 런마다 `getRunWithRecords`를 부르던 것을 `listRunsWithRecords` 한 번으로 바꿔 런 수와 상관없는 SQL 수로 읽는다.
+- **서버 함수.** `getTicketsPage`를 `getTicketRuns`와 `getTrackerTickets`로 나눴다.
+- **query.** `apps/web/src/shell/shell-query.ts`(`["shell"]`, `useShell`), `runners/runners-query.ts`(`["runners", "list"]`, `["runners", "checks-pending"]` staleTime 0), `tickets/tickets-query.ts`(`["tickets", "runs", ws]` 30초, `["tracker", "tickets", ws]` 5분). 트래커 티켓 query의 `queryFn`이 받은 라벨을 `["tracker", "labels", connectionId, projectId]`에 `setQueryData`로 채운다. 그래서 Tickets 화면 이동 한 번은 서버 함수 둘(`getTicketRuns`, `getTrackerTickets`)이고 라벨을 따로 읽지 않는다(브라우저 시험).
+- **셸.** `_app` 로더는 `queryClient.query({ ...shellQuery, staleTime: "static" })`로 데우기만 하고 `shouldReload: false`를 지웠다. 미리 읽기와 이동마다 로더가 돌아도 캐시만 돌려줘 `getShell`을 부르지 않는다. 셸은 `useShell()`로 그린다. 로더가 셸 값을 그대로 돌려주므로 아직 `useLoaderData({ from: "/_app" })`를 읽는 Runs·Stats·Settings는 바뀌지 않는다(이동할 때 그 값도 캐시를 따라간다).
+- **Runners.** `preloadStaleTime: 0`, `loadRouteQuery`, `reloadOnEnter` 지움. 다시 점검은 mutation(`okOrThrow`)이고 성공하면 `["runners", "list"]`만 무효화한다. 점검 끝 확인은 `["runners", "checks-pending"]`를 읽고(`runnerChecksStillPending`) 끝났으면 `["runners", "list"]`와 `["shell"]`만 무효화한다. 3초 간격과 2분 한도는 온보딩과 함께 쓰는 `useRunnerCheckPolling`이 그대로 정한다(티켓 할 일 3이 이 훅은 나누지 않는다고 적어서, `refetchInterval` 대신 이 훅의 타이머가 그 작은 query를 3초마다 읽는다. Runners 전체는 3초마다 읽지 않는다).
+- **Tickets.** `preloadStaleTime: 0`. 로더는 DB 부분을 `loadRouteQuery`로, 트래커 부분을 새 공용 도구 `loadCachedRouteQuery`(다시 들어가면 캐시를 쓰고 뒤에서 읽지 않으며, 미리 읽기는 query의 staleTime을 본다)로 함께 기다린다. 화면은 두 결과를 `mergeTicketsPage`로 합쳐 그린다. 할당은 mutation이고 성공하면 변경 기록 `assignment`와 같은 key(`["tickets", "runs"]`와 런 쪽 key)만 무효화한다. "Linear에서 다시 읽기"는 서버 함수 뒤 `["tracker"]`를 무효화한다. `router.invalidate()`를 지웠다.
+- **함께 쓰는 훅.** `useSettingsActions(afterSave)`, `useReloadOnSuccess(afterSave)`, `useRunnerSetupActions(afterRunnerAdded)`가 저장 뒤 동작을 받는다. Runners는 `refreshRunnersAndShell`, 온보딩은 `useRouterReload()`(`router.invalidate()`), Settings 세 route는 `useSettingsReload()`(`["shell"]` 무효화 뒤 `router.invalidate()`)를 넘긴다. 라벨 만들기와 Settings의 "Linear에서 다시 읽기"는 `router.invalidate()`에 더해 `["tracker"]`를 무효화한다. `pollRunnerChecks`(온보딩만 씀)는 `router.invalidate()` 그대로다.
+- **공용 파일에 더한 것(작게).** `query/route-query.ts`에 `loadCachedRouteQuery`, `query/mutation-error.ts`에 `rejectionReasonOf`(목록의 이유만 꺼냄)를 더했다. 기존 함수는 바꾸지 않았다. 할당 거절 이유 목록 `ASSIGN_REJECT_REASONS`는 클라이언트가 읽을 수 있게 `tickets/model.ts`에 두었다(`assign.ts`는 `@ganger/db`를 불러 클라이언트 묶음에 넣을 수 없다).
+
+### 찾은 것
+
+- **`signal`을 서버 함수에 넘기면 다시 들어갈 때의 뒤 읽기가 끊긴다.** 처음에는 0123의 예대로 `queryFn: ({ signal }) => getTicketRuns({ data, signal })`로 썼다. 그러자 `navigation.test.ts`의 다시 들어가기 시험이 60초 넘게 멈췄다. 로더가 시작한 뒤 읽기(`getTicketRuns`)가 브라우저에서 취소(request failed)됐다. query-core는 `signal`을 읽은 요청을 관찰자가 모두 빠지면 취소하는데, 화면에 다시 들어가 컴포넌트가 붙는 사이 이 일이 생긴다 **[추정: 원인 함수까지는 좇지 않았고, `signal`을 빼면 요청이 끝까지 가는 것으로 확인]**. 그래서 이 티켓의 query는 `signal`을 넘기지 않는다. 0125·0126도 같은 모양이면 같은 일이 난다.
+- **0123 독립 리뷰 MEDIUM(gcTime 5분이 라우터 match 캐시보다 짧음).** 이 화면들에서는 재현되지 않았다. Runners·Tickets를 열고 다른 화면으로 옮긴 뒤 가짜 시계로 6분을 보내 query가 지워진 것(돌아올 때 Tickets가 트래커 함수를 다시 읽음)을 확인하고 돌아와도, 빈 대체 화면 없이 앞 화면을 둔 채 읽기를 기다렸다가 그린다. 라우터 이동이 transition이라 React가 앞 화면을 남긴다. 다만 5분이 지나면 다시 들어가기도 첫 방문처럼 읽기를 기다린다(라우터 캐시만 쓰던 지난 동작은 30분까지 바로 그렸다). 공용 기본값은 바꾸지 않았다. 시험: `query-screens.test.ts`의 "5분 넘게 떠났다 돌아와도" 둘.
+
+### 시험
+
+- `e2e/src/query-screens.test.ts`(브라우저): hydration 동안 서버 함수 0번(Tickets, Runners), 할당 뒤 `assignTicket`·`getTicketRuns`만 부르고 트래커 가짜 어댑터 호출 수가 그대로, Tickets 이동 한 번의 서버 함수 둘, 다시 점검 뒤 `getRunnersPage`만·점검 끝에 `getRunnersPage`·`getShell`만(루트 없음), Offline이 3초 안에 셸 배지와 Runners에, Workspace 더하기가 셸 목록에, webhook 뒤 0122 서버 캐시가 있어도 새 트래커 값, 미리 읽은 뒤 Runners 진입에 서버 함수 0번, Settings 저장 뒤 `getSettingsPage`·`getShell`을 다시 읽고 셸에 새 이름, 끊기면 Runners 30초마다(가짜 시계), 5분 넘게 떠났다 돌아와도 빈 대체 화면 없음(Runners, Tickets). mutation 시험은 변경 기록 통로를 막고 돈다(스펙 7절 2번).
+- 온보딩 저장·러너 등록 뒤 다시 읽기는 `e2e/src/onboarding.test.ts`·`runner-setup.test.ts`가 그대로 통과하는 것으로 확인한다(단계가 넘어가려면 다시 읽어야 한다).
+- `apps/web/src/tickets/load.test.ts`: DB 부분은 트래커를 읽지 않음, 합친 결과가 `loadTicketsPage`와 같음, 라벨을 프로젝트마다 돌려줌, 런이 바뀌면 트래커를 다시 읽지 않고 할당할 수 있음을 다시 계산함. `loader-queries.test.ts`에 Tickets DB 부분. `route-query.test.ts`에 `loadCachedRouteQuery` 둘, `mutation-error.test.ts`에 `rejectionReasonOf` 둘.
+- `navigation.test.ts`: 미리 읽기 시험은 `getTrackerTickets`, 다시 들어가기 시험은 `getTicketRuns`를 기다린다(운영자 결정 A). 그 밖의 기대는 그대로다.
+
 ## 머지 위험
 
 저장 형식은 바꾸지 않아 two-way다. 닿는 곳은 web(셸, Runners, Tickets)과 `packages/app`의 Tickets 로더다.

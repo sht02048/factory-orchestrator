@@ -9,12 +9,12 @@ export const RUNNER_CHECKS_PENDING_KEY = ["runners", "checks-pending"] as const;
 
 export const runnersQuery = queryOptions({
   queryKey: RUNNERS_LIST_KEY,
-  queryFn: ({ signal }) => getRunnersPage({ signal }),
+  queryFn: () => getRunnersPage(),
 });
 
 export const runnerChecksPendingQuery = queryOptions({
   queryKey: RUNNER_CHECKS_PENDING_KEY,
-  queryFn: ({ signal }) => getRunnerChecksPending({ signal }),
+  queryFn: () => getRunnerChecksPending(),
   staleTime: 0,
 });
 

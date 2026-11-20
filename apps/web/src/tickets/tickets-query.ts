@@ -13,7 +13,7 @@ function wsKey(ws: string | undefined): string {
 export function ticketRunsQuery(ws: string | undefined) {
   return queryOptions({
     queryKey: [...TICKET_RUNS_KEY, wsKey(ws)],
-    queryFn: ({ signal }) => getTicketRuns({ data: { ws }, signal }),
+    queryFn: () => getTicketRuns({ data: { ws } }),
   });
 }
 
@@ -24,8 +24,8 @@ export function trackerLabelsKey(connectionId: string, projectId: string) {
 export function trackerTicketsQuery(queryClient: QueryClient, ws: string | undefined) {
   return queryOptions({
     queryKey: [...TRACKER_KEY, "tickets", wsKey(ws)],
-    queryFn: async ({ signal }) => {
-      const data = await getTrackerTickets({ data: { ws }, signal });
+    queryFn: async () => {
+      const data = await getTrackerTickets({ data: { ws } });
       for (const project of data.labels) {
         queryClient.setQueryData(
           trackerLabelsKey(project.connection, project.projectId),

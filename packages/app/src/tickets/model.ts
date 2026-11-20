@@ -159,6 +159,17 @@ export interface TrackerTicketsData {
   truncated: TrackerTruncation[];
 }
 
+export const ASSIGN_REJECT_REASONS = [
+  "active-run",
+  "no-mapping",
+  "unknown-repo",
+  "unknown-agent",
+  "unknown-runner",
+  "runner-assignment-blocked",
+] as const;
+
+export type AssignRejectReason = (typeof ASSIGN_REJECT_REASONS)[number];
+
 export const TICKET_FILTERS = ["all", "assignable", "todo", "in-progress", "done"] as const;
 export type TicketFilter = (typeof TICKET_FILTERS)[number];
 

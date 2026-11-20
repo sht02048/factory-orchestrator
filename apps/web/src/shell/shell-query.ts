@@ -6,7 +6,7 @@ export const SHELL_KEY = ["shell"] as const;
 
 export const shellQuery = queryOptions({
   queryKey: SHELL_KEY,
-  queryFn: ({ signal }) => getShell({ signal }),
+  queryFn: () => getShell(),
 });
 
 export function useShell(): ShellData {
