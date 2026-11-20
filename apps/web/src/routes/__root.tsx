@@ -22,6 +22,7 @@ import { appMessages, defaultLocale, t } from "../i18n";
 import { renderedChangeSeq } from "../change-events/rendered-seq";
 import { RenderedChangeSeqProvider } from "../change-events/subscription";
 import { NotFoundScreen } from "../not-found/not-found-screen";
+import { useBrowserErrorWatch, useReportCaughtError } from "../shell/browser-error-watch";
 import { useDesktopUpdates } from "../shell/desktop-updates";
 import { UpdateToast } from "../shell/update-toast";
 import { ONBOARDING_PATH, isOpenPath, onboardingRedirect } from "../onboarding/model";
@@ -94,6 +95,7 @@ function RootDocument({ children }: { children: ReactNode }) {
 const rootLoaderSchema = z.object({ titleBarHidden: z.boolean() });
 
 function RootError({ error }: ErrorComponentProps) {
+  useReportCaughtError(error);
   const titleBarHidden = useRouterState({
     select: (state) =>
       rootLoaderSchema.safeParse(state.matches[0]?.loaderData).data?.titleBarHidden ?? false,
@@ -109,6 +111,7 @@ function RootError({ error }: ErrorComponentProps) {
 
 function RootLayout() {
   const { timeZone, titleBarHidden, onboardingComplete, changeSeq } = Route.useLoaderData();
+  useBrowserErrorWatch();
   useEffect(() => {
     rememberOnboardingComplete(onboardingComplete);
   }, [onboardingComplete]);

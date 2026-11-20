@@ -69,3 +69,5 @@ export const NOTIFICATION_SETTINGS_WINDOW = "notifications";
 export const UPDATE_CHANNEL = "desktop:update";
 export const UPDATE_GET = "desktop:update-get";
 export const UPDATE_ACT = "desktop:update-act";
+export const LOGS_CAN_OPEN = "desktop:logs-can-open";
+export const LOGS_OPEN = "desktop:logs-open";

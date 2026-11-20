@@ -1,8 +1,11 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { createTranslator } from "use-intl";
 import { resolveWorkspace } from "@ganger/app/shell/model";
 import { ScreenMessages, defaultLocale } from "../../i18n";
 import { loadCachedRouteQuery, loadRouteQuery } from "../../query/route-query";
+import { LogSection } from "../../settings/log-section";
+import { logSettingsQuery, useLogActions } from "../../settings/log-query";
 import { settingsMessages } from "../../settings/messages";
 import { SettingsScreen } from "../../settings/settings-page";
 import { NavigationGuard } from "../../settings/navigation-guard";
@@ -29,6 +32,7 @@ export const Route = createFileRoute("/_app/settings")({
   loader: async (load) => {
     await Promise.all([
       loadRouteQuery(load, settingsQuery(load.deps.ws)),
+      loadRouteQuery(load, logSettingsQuery),
       loadCachedRouteQuery(load, trackerProjectsQuery),
       loadCachedRouteQuery(load, boundProjectReadsQuery(load.context.queryClient, load.deps.ws)),
     ]);
@@ -42,6 +46,8 @@ function SettingsRoute() {
   const page = useSettingsPage(ws);
   const shell = useShell();
   const actions = useSettingsActions(useSettingsQueryRefresh());
+  const { data: logView } = useSuspenseQuery(logSettingsQuery);
+  const logActions = useLogActions();
   return (
     <ScreenMessages messages={settingsMessages}>
       <SettingsScreen
@@ -52,6 +58,7 @@ function SettingsRoute() {
         actions={actions}
         renderLink={routerSettingsLink}
         renderGuard={(guard) => <NavigationGuard {...guard} />}
+        logs={<LogSection view={logView} actions={logActions} />}
       />
     </ScreenMessages>
   );

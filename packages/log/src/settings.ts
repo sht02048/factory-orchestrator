@@ -30,6 +30,7 @@ export interface LogSettings {
   level: LogLevel;
   limits: RotationLimits;
   dir: string | null;
+  home: string | null;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -52,6 +53,7 @@ export function readLogSettings(env: Env): LogSettings {
       files: files === undefined ? DEFAULT_LOG_FILES : filesSchema.parse(files),
     },
     dir: home === undefined ? null : logDir(home),
+    home: home ?? null,
   };
 }
 

@@ -6,7 +6,7 @@ import type {
   TrackerEvent,
   TrackerProjectId,
 } from "@ganger/core";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { markTrackerChanged } from "./change-events.js";
 import { inTransaction } from "./database.js";
 import type { Database } from "./database.js";
@@ -94,4 +94,29 @@ export function markTrackerEventProcessed(
       )
       .run().changes > 0
   );
+}
+
+export interface RecentTrackerEvent {
+  connection: TrackerConnectionId;
+  deliveryId: DeliveryId;
+  kind: string;
+  ticketKey: TicketKey | null;
+  receivedAt: Date;
+  processedAt: Date | null;
+}
+
+export function listRecentTrackerEvents(db: Database, limit: number): RecentTrackerEvent[] {
+  return db
+    .select({
+      connection: trackerEvents.trackerConnectionId,
+      deliveryId: trackerEvents.deliveryId,
+      kind: trackerEvents.kind,
+      ticketKey: trackerEvents.ticketKey,
+      receivedAt: trackerEvents.receivedAt,
+      processedAt: trackerEvents.processedAt,
+    })
+    .from(trackerEvents)
+    .orderBy(desc(trackerEvents.receivedAt), desc(trackerEvents.deliveryId))
+    .limit(limit)
+    .all();
 }
