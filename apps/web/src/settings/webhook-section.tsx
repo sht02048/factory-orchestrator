@@ -20,7 +20,7 @@ import {
   type SettingsStepState,
 } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
-import { useEffect, useId, useRef, useState, type RefObject } from "react";
+import { createContext, use, useEffect, useId, useRef, useState, type RefObject } from "react";
 import { useTranslations } from "use-intl";
 import {
   WEBHOOK_WAIT_POLL_LIMIT_MS,
@@ -54,8 +54,18 @@ export interface WebhookSectionProps {
   actions: SettingsActions;
 }
 
-function focusById(id: string): void {
-  requestAnimationFrame(() => document.getElementById(id)?.focus());
+const FocusRequestContext = createContext<(id: string) => void>(() => {});
+
+function useFocusAfterRender(rendered: unknown): (id: string) => void {
+  const [pending, setPending] = useState<string | null>(null);
+  useEffect(() => {
+    if (pending === null) return;
+    const target = document.getElementById(pending);
+    if (target === null) return;
+    target.focus();
+    setPending(null);
+  }, [pending, rendered]);
+  return setPending;
 }
 
 export function webhookUrl(address: string | null, path: string): string | null {
@@ -73,40 +83,43 @@ export function WebhookSection({
   const ts = useTranslations("settings");
   const state = connection.webhook;
   useWebhookWaitPolling(connection.id, state, actions.pollWebhookState);
+  const requestFocus = useFocusAfterRender(state);
   return (
-    <SettingsSection
-      id={WEBHOOK_SECTION_ID}
-      title={t("title")}
-      info={<InfoTip label={ts("infoLabel", { label: t("infoLabel") })} content={t("info")} />}
-      detail={
-        <Text
-          variant="meta"
-          role="status"
-          {...(state.kind === "rejected" ? { tone: "problem" as const } : {})}
-        >
-          {t(`status.${state.kind}`)}
-        </Text>
-      }
-      detailTone={state.kind === "rejected" ? "problem" : "default"}
-    >
-      {state.kind === "off" ? (
-        <WebhookSteps
-          connection={connection}
-          webhookAddress={webhookAddress}
-          setup={setup}
-          actions={actions}
-        />
-      ) : (
-        <WebhookOn
-          connection={connection}
-          state={state}
-          webhookAddress={webhookAddress}
-          setup={setup}
-          now={now}
-          actions={actions}
-        />
-      )}
-    </SettingsSection>
+    <FocusRequestContext value={requestFocus}>
+      <SettingsSection
+        id={WEBHOOK_SECTION_ID}
+        title={t("title")}
+        info={<InfoTip label={ts("infoLabel", { label: t("infoLabel") })} content={t("info")} />}
+        detail={
+          <Text
+            variant="meta"
+            role="status"
+            {...(state.kind === "rejected" ? { tone: "problem" as const } : {})}
+          >
+            {t(`status.${state.kind}`)}
+          </Text>
+        }
+        detailTone={state.kind === "rejected" ? "problem" : "default"}
+      >
+        {state.kind === "off" ? (
+          <WebhookSteps
+            connection={connection}
+            webhookAddress={webhookAddress}
+            setup={setup}
+            actions={actions}
+          />
+        ) : (
+          <WebhookOn
+            connection={connection}
+            state={state}
+            webhookAddress={webhookAddress}
+            setup={setup}
+            now={now}
+            actions={actions}
+          />
+        )}
+      </SettingsSection>
+    </FocusRequestContext>
   );
 }
 
@@ -157,6 +170,7 @@ function WebhookSteps({
   actions: SettingsActions;
 }) {
   const t = useTranslations("settings.webhook");
+  const requestFocus = use(FocusRequestContext);
   const edit = useInlineEdit("webhook-address");
   const createCopyRef = useRef<HTMLButtonElement>(null);
   const [focusCreate, setFocusCreate] = useState(false);
@@ -243,7 +257,7 @@ function WebhookSteps({
           actions={actions}
           success={t("secret.turnedOn")}
           primaryLabel={t("secret.turnOn")}
-          onDone={() => focusById(WAITING_ID)}
+          onDone={() => requestFocus(WAITING_ID)}
         />
       </SettingsStep>
     </SettingsSteps>
@@ -516,6 +530,7 @@ function WebhookOn({
   actions: SettingsActions;
 }) {
   const t = useTranslations("settings.webhook");
+  const requestFocus = use(FocusRequestContext);
   const time = useTime();
   const secretEdit = useInlineEdit("webhook-secret");
   const addressEdit = useInlineEdit("webhook-address");
@@ -607,7 +622,7 @@ function WebhookOn({
                   success={t("secretSaved")}
                   primaryLabel={t("secret.save")}
                   onClose={secretEdit.close}
-                  onDone={() => focusById(WAITING_ID)}
+                  onDone={() => requestFocus(WAITING_ID)}
                 />
               </FocusFirst>
             ) : null
@@ -643,6 +658,7 @@ function TurnOffRow({
   actions: SettingsActions;
 }) {
   const t = useTranslations("settings.webhook.off");
+  const requestFocus = use(FocusRequestContext);
   const submit = useSubmit();
   return (
     <SettingsRow
@@ -669,7 +685,7 @@ function TurnOffRow({
                   submit.run(
                     () => actions.turnOffWebhook({ id: connection.id }),
                     t("done"),
-                    () => focusById(`${WEBHOOK_SECTION_ID}-heading`),
+                    () => requestFocus(`${WEBHOOK_SECTION_ID}-heading`),
                   )
                 }
               >
