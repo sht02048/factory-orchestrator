@@ -113,7 +113,11 @@
   },
   "question": {
     "title": "에이전트 질문",
-    "answered": "답을 보냈어요. worker가 에이전트에게 전해요."
+    "answered": "답을 보냈어요. worker가 에이전트에게 전해요.",
+    "rejected": {
+      "already-answered": "다른 곳에서 이미 답한 질문이에요. 다시 보내지 않아도 돼요.",
+      "not-found": "질문을 찾지 못했어요. 런이 끝났는지 Run 상세에서 확인해 주세요."
+    }
   },
   "permission": {
     "reasonLabel": "거절 이유",
@@ -121,7 +125,12 @@
     "send": "거절 보내기",
     "denying": "거절하는 중…",
     "denied": "거절을 보냈어요. worker가 에이전트에게 전해요.",
-    "failed": "거절을 보내지 못했어요. 다시 해주세요.",
+    "failed": "거절을 보내지 못했어요. 다시 보내 주세요.",
+    "rejected": {
+      "already-denied": "다른 곳에서 이미 거절했어요. 다시 보내지 않아도 돼요.",
+      "resolved": "러너에서 이미 처리한 요청이에요. 다시 보내지 않아도 돼요.",
+      "not-found": "요청을 찾지 못했어요. 런이 끝났는지 Run 상세에서 확인해 주세요."
+    },
     "allowOnRunner": "허용은 러너 화면에서만 할 수 있어요. 여기서는 거절만 할 수 있어요."
   },
   "control": {

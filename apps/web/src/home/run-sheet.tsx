@@ -28,6 +28,8 @@ import { QuestionAnswer } from "../question/question-answer";
 import type { SheetMode } from "./run-card";
 import { RunKey, cardStatus, runHref, ticketHref, useRunText } from "./run-text";
 import type { AnswerInput, DenyInput } from "./home-screen";
+import { answerRejection, denyRejection } from "./rejection";
+import type { AnswerRejectReason, DenyRejectReason } from "./rejection";
 
 type Permission = Extract<InputWait, { kind: "permission" }>;
 
@@ -372,16 +374,25 @@ function AnswerBlock({
 }) {
   const t = useTranslations("home.question");
   const result = useResultFocus();
+  const [rejected, setRejected] = useState<AnswerRejectReason | null>(null);
   return (
     <PanelSection title={t("title")}>
-      {result.sent || question.answered ? (
+      {rejected !== null ? (
+        <ResultText resultRef={result.resultRef}>{t(`rejected.${rejected}`)}</ResultText>
+      ) : result.sent || question.answered ? (
         <ResultText resultRef={result.resultRef}>{t("answered")}</ResultText>
       ) : (
         <QuestionAnswer
           body={question.body}
           options={question.choices}
           onSend={async (answer) => {
-            await onAnswer({ runId: run.id, questionId: question.questionId, answer });
+            try {
+              await onAnswer({ runId: run.id, questionId: question.questionId, answer });
+            } catch (error) {
+              const reason = answerRejection(error);
+              if (reason === null) throw error;
+              setRejected(reason);
+            }
             result.markSent();
           }}
         />
@@ -402,7 +413,10 @@ function DenyBlock({
   const t = useTranslations("home.permission");
   const [reason, setReason] = useState("");
   const [state, setState] = useState<SendState>("idle");
+  const [rejected, setRejected] = useState<DenyRejectReason | null>(null);
   const result = useResultFocus();
+  if (rejected !== null)
+    return <ResultText resultRef={result.resultRef}>{t(`rejected.${rejected}`)}</ResultText>;
   if (result.sent || permission.denied)
     return <ResultText resultRef={result.resultRef}>{t("denied")}</ResultText>;
   const sending = state === "sending";
@@ -418,7 +432,16 @@ function DenyBlock({
             setState("idle");
             result.markSent();
           },
-          () => setState("failed"),
+          (error: unknown) => {
+            const reason = denyRejection(error);
+            if (reason === null) {
+              setState("failed");
+              return;
+            }
+            setState("idle");
+            setRejected(reason);
+            result.markSent();
+          },
         );
       }}
     >
