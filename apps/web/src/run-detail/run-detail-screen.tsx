@@ -700,7 +700,11 @@ function LogTail({
       body = <Text variant="meta">{t("none")}</Text>;
       break;
     case "pending":
-      body = <Text variant="meta">{t(stalled ? "stalled" : "pending")}</Text>;
+      body = (
+        <Text variant="meta" role="status">
+          {t(stalled ? "stalled" : "pending")}
+        </Text>
+      );
       break;
     case "failed":
       note = time(log.at);

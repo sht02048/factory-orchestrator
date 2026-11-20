@@ -372,23 +372,23 @@ describe("Run 상세 화면", () => {
     const id = ids.get("ACME-10");
     if (id === undefined) throw new Error("no ACME-10");
     requestRunLogTail(db, id, minutes(100));
-    const body = text(
-      renderWithMessages(
-        <RunDetailScreen
-          page={page(db, id)}
-          runsHref="/runs"
-          runHref={(other) => `/runs/${other}`}
-          logStalled
-          onAnswer={resolved}
-          onDeny={resolved}
-          onCancel={resolved}
-          onControl={() => Promise.resolve("requested" as const)}
-          onRefreshLog={resolved}
-        />,
-        runMessages,
-      ),
+    const html = renderWithMessages(
+      <RunDetailScreen
+        page={page(db, id)}
+        runsHref="/runs"
+        runHref={(other) => `/runs/${other}`}
+        logStalled
+        onAnswer={resolved}
+        onDeny={resolved}
+        onCancel={resolved}
+        onControl={() => Promise.resolve("requested" as const)}
+        onRefreshLog={resolved}
+      />,
+      runMessages,
     );
+    const body = text(html);
 
+    expect(html).toMatch(new RegExp(`role="status"[^>]*>${runJson.log.stalled}<`));
     expect(body).toContain(runJson.log.stalled);
     expect(body).not.toContain(runJson.log.pending);
     expect(body).toContain(runJson.log.refresh);
