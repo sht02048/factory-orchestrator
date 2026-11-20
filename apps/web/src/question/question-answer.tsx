@@ -6,10 +6,12 @@ export function QuestionAnswer({
   body,
   options,
   onSend,
+  failed,
 }: {
   body: string;
   options: ReadonlyArray<string>;
   onSend: (answer: string) => Promise<void>;
+  failed?: string | undefined;
 }) {
   const t = useTranslations("question");
   const { lead, choices, after } = readQuestion(body, options);
@@ -29,7 +31,7 @@ export function QuestionAnswer({
         shortcut: t("shortcut"),
         send: t("send"),
         sending: t("sending"),
-        failed: t("failed"),
+        failed: failed ?? t("failed"),
       }}
       onSend={onSend}
     />

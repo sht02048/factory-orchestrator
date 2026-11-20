@@ -28,6 +28,8 @@ import { QuestionAnswer } from "../question/question-answer";
 import type { SheetMode } from "./run-card";
 import { RunKey, cardStatus, runHref, ticketHref, useRunText } from "./run-text";
 import type { AnswerInput, DenyInput } from "./home-screen";
+import { answerRejection, denyRejection } from "./rejection";
+import type { AnswerRejectReason, DenyRejectReason } from "./rejection";
 
 type Permission = Extract<InputWait, { kind: "permission" }>;
 
@@ -372,6 +374,7 @@ function AnswerBlock({
 }) {
   const t = useTranslations("home.question");
   const result = useResultFocus();
+  const [rejected, setRejected] = useState<AnswerRejectReason | null>(null);
   return (
     <PanelSection title={t("title")}>
       {result.sent || question.answered ? (
@@ -380,8 +383,14 @@ function AnswerBlock({
         <QuestionAnswer
           body={question.body}
           options={question.choices}
+          failed={rejected === null ? undefined : t(`rejected.${rejected}`)}
           onSend={async (answer) => {
-            await onAnswer({ runId: run.id, questionId: question.questionId, answer });
+            try {
+              await onAnswer({ runId: run.id, questionId: question.questionId, answer });
+            } catch (error) {
+              setRejected(answerRejection(error));
+              throw error;
+            }
             result.markSent();
           }}
         />
@@ -402,6 +411,7 @@ function DenyBlock({
   const t = useTranslations("home.permission");
   const [reason, setReason] = useState("");
   const [state, setState] = useState<SendState>("idle");
+  const [rejected, setRejected] = useState<DenyRejectReason | null>(null);
   const result = useResultFocus();
   if (result.sent || permission.denied)
     return <ResultText resultRef={result.resultRef}>{t("denied")}</ResultText>;
@@ -418,7 +428,10 @@ function DenyBlock({
             setState("idle");
             result.markSent();
           },
-          () => setState("failed"),
+          (error: unknown) => {
+            setRejected(denyRejection(error));
+            setState("failed");
+          },
         );
       }}
     >
@@ -427,7 +440,13 @@ function DenyBlock({
       <Field
         label={t("reasonLabel")}
         description={t("reasonDescription")}
-        error={state === "failed" ? t("failed") : undefined}
+        error={
+          state !== "failed"
+            ? undefined
+            : rejected === null
+              ? t("failed")
+              : t(`rejected.${rejected}`)
+        }
       >
         <Input name="reason" value={reason} onValueChange={setReason} autoComplete="off" />
       </Field>

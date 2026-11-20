@@ -21,6 +21,7 @@ import {
 import type { RunId, TicketKey } from "@ganger/core";
 import {
   SecretBox,
+  answerRunQuestion,
   assignRun,
   changeRunState,
   completeRunControlRequest,
@@ -30,6 +31,7 @@ import {
   recordPermissionWaits,
   recordRunQuestions,
   recordRunnerCheck,
+  resolvePermissionWaits,
   saveAutoAssignLabel,
   saveCodeHostConnection,
   saveMapping,
@@ -235,6 +237,40 @@ describe("Dashboard mutation(브라우저, 0126)", () => {
     expect(await page.getByText(fill(home.control.pauseRejected, { key: "ACME-4" })).count()).toBe(
       0,
     );
+  });
+});
+
+describe("답하기·거절의 거절 이유(브라우저, 0126)", () => {
+  it("그사이 다른 곳에서 답한 질문은 다시 보내라고 하지 않고 이미 답했다고 알린다", async (context) => {
+    const { page } = await newPage(context, { stream: "blocked" });
+    await openDashboard(page);
+    answerRunQuestion(db, {
+      runId: runOf("ACME-7"),
+      questionId: toQuestionId("q-7"),
+      answer: "No",
+    });
+
+    await card(page, "ACME-7").getByRole("button", { name: home.card.answer }).click();
+    const panel = page.getByRole("dialog");
+    await panel.getByRole("radio", { name: "Yes" }).check();
+    await panel.getByRole("button", { name: questionJson.send }).click();
+
+    await panel.getByText(home.question.rejected["already-answered"]).waitFor();
+    expect(await panel.getByText(questionJson.failed).count()).toBe(0);
+  });
+
+  it("그사이 러너에서 처리한 Permission은 다시 보내라고 하지 않고 이미 처리했다고 알린다", async (context) => {
+    const { page } = await newPage(context, { stream: "blocked" });
+    await openDashboard(page);
+    resolvePermissionWaits(db, runOf("ACME-8"), []);
+
+    await cardButton(page, "ACME-8").click();
+    const panel = page.getByRole("dialog");
+    await panel.getByLabel(home.permission.reasonLabel).fill("Not now.");
+    await panel.getByRole("button", { name: home.permission.send }).click();
+
+    await panel.getByText(home.permission.rejected.resolved).waitFor();
+    expect(await panel.getByText(home.permission.failed).count()).toBe(0);
   });
 });
 
@@ -540,6 +576,20 @@ function seed(database: Database): void {
   ok(changeRunState(database, permissionRun, { to: "waiting-for-input" }));
   recordPermissionWaits(database, permissionRun, [
     { id: toPermissionRequestId("p-2"), detail: "git push --force", requestedAt: new Date() },
+  ]);
+
+  const lateQuestionRun = assign(toTicketKey("ACME-7"));
+  start(lateQuestionRun);
+  ok(changeRunState(database, lateQuestionRun, { to: "waiting-for-input" }));
+  recordRunQuestions(database, lateQuestionRun, [
+    { id: toQuestionId("q-7"), body: "Ship it?", options: ["Yes", "No"], askedAt: new Date() },
+  ]);
+
+  const latePermissionRun = assign(toTicketKey("ACME-8"));
+  start(latePermissionRun);
+  ok(changeRunState(database, latePermissionRun, { to: "waiting-for-input" }));
+  recordPermissionWaits(database, latePermissionRun, [
+    { id: toPermissionRequestId("p-8"), detail: "rm -rf dist", requestedAt: new Date() },
   ]);
 
   start(assign(toTicketKey("ACME-3")));
