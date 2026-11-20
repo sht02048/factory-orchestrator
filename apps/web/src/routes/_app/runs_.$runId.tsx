@@ -13,6 +13,7 @@ import {
 import { runMessages } from "../../run-detail/messages";
 import { RunDetailScreen } from "../../run-detail/run-detail-screen";
 import { runDetailQuery } from "../../runs/queries";
+import type { RunDetailPage } from "@ganger/app/run-detail/model";
 
 const t = createTranslator({ locale: defaultLocale, messages: runMessages, namespace: "run" });
 
@@ -38,6 +39,10 @@ function useFetchCount(runId: string): () => number {
     const state = queryClient.getQueryState(runDetailQuery(runId).queryKey);
     return state === undefined ? 0 : fetchCountOf(state);
   }, [queryClient, runId]);
+}
+
+function controlPending(page: RunDetailPage): boolean {
+  return page.kind === "found" && page.run.control?.status === "pending";
 }
 
 function RunDetailRoute() {
@@ -70,7 +75,7 @@ function RunDetail({ runId }: { runId: string }) {
         page={page}
         runsHref={`/runs${search}`}
         runHref={(id) => `/runs/${encodeURIComponent(id)}${search}`}
-        logStalled={fetchCount() - logPollsFrom >= LOG_POLL_LIMIT}
+        logStalled={!controlPending(page) && fetchCount() - logPollsFrom >= LOG_POLL_LIMIT}
         {...actions}
       />
     </ScreenMessages>
