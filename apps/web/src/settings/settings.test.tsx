@@ -1170,6 +1170,58 @@ describe("Settings 화면", () => {
     );
   });
 
+  it("PR 정보를 읽지 못한 런이 있으면 GitHub 줄에 문제로 보이고 목차에 점을 붙인다 (0144)", async () => {
+    const f = fixture();
+    const connection = await addConnection(f);
+    await saveGitHubToken(f.context, { token: "github_pat_example" }, now);
+    const runnerId = addRunner(f);
+    const project = { ws: commerce, connectionId: connection, projectId: webProject };
+    addTrackerProject(f.context, { ...project, name: "Web" });
+    saveMappingSetting(f.context, { ...project, runnerProjectId: repo, agentId: "claude" });
+    const ids = ["ACME-1", "ACME-2"].map((key) => {
+      const result = assignRun(f.context.db, {
+        ticket: { connection, key: toTicketKey(key) },
+        trackerProject: webProject,
+        runnerProject: repo,
+        agent: toAgentId("claude"),
+        now,
+      });
+      if (!result.ok) throw new Error("assign failed");
+      return result.run.id;
+    });
+    const endUnread = (id: string, reason: "no-access" | "other"): void => {
+      f.context.db.$client
+        .prepare(
+          `UPDATE runs SET state = 'ended', runner_id = ?, started_at = 1, ended_at = 2,
+            worktree_ref = 'wt', branch = 'b', agent_ref = 'a', agent_result = 'reported-success',
+            pr_state = 'unknown', pr_read_error = ? WHERE id = ?`,
+        )
+        .run(runnerId, reason, id);
+    };
+
+    const clean = await loadSettingsPage(f.context, commerce, now);
+    expect(textOf(sectionOf(render(clean), "connections"))).toContain("넣어 뒀어요");
+    expect([...sectionProblems(clean, 0)]).toEqual([]);
+
+    endUnread(ids[0] ?? "", "other");
+    const other = await loadSettingsPage(f.context, commerce, now);
+    expect(other.install.unreadPrRuns).toEqual({ "no-access": 0, other: 1 });
+    expect(textOf(sectionOf(render(other), "connections"))).toContain(
+      "런 1개의 PR 정보를 읽지 못했어요. 다시 읽고 있어요",
+    );
+    expect([...sectionProblems(other, 0)]).toEqual(["connections"]);
+
+    endUnread(ids[1] ?? "", "no-access");
+    const noAccess = await loadSettingsPage(f.context, commerce, now);
+    const html = render(noAccess);
+    expect(textOf(sectionOf(html, "connections"))).toContain(
+      "런 1개의 PR 정보를 읽지 못했어요. 토큰이 그 저장소를 볼 수 없어요",
+    );
+    expect(textOf(sectionOf(html, "connections"))).not.toContain("넣어 뒀어요");
+    const nav = /<nav aria-label="Settings 목차"[^>]*>.*?<\/nav>/s.exec(html)?.[0] ?? "";
+    expect(nav.match(/확인할 것이 있어요/g)).toHaveLength(1);
+  });
+
   it("프로젝트 줄은 그 프로젝트 상세 주소로 가는 링크다", async () => {
     const f = fixture();
     const connection = await addConnection(f);

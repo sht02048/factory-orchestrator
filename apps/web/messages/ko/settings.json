@@ -181,6 +181,8 @@
     "label": "GitHub 토큰",
     "set": "넣어 뒀어요",
     "unset": "아직 없어요. PR 상태를 읽으려면 넣어 주세요",
+    "unreadNoAccess": "런 {count}개의 PR 정보를 읽지 못했어요. 토큰이 그 저장소를 볼 수 없어요",
+    "unreadOther": "런 {count}개의 PR 정보를 읽지 못했어요. 다시 읽고 있어요",
     "enter": "넣기",
     "token": "토큰",
     "save": "확인하고 저장",

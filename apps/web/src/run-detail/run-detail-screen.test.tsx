@@ -24,7 +24,7 @@ import questionJson from "../../messages/ko/question.json" with { type: "json" }
 import { runMessages } from "./messages";
 import type { RunDetail, RunDetailPage } from "@ganger/app/run-detail/model";
 import { RunDetailScreen } from "./run-detail-screen";
-import { addExtraEnded, assign, extraEndedCases, walk } from "./testing";
+import { addExtraEnded, assign, extraEndedCases, startedOn, walk } from "./testing";
 import { answerInput, submitAnswer } from "@ganger/app/home/actions";
 import { cancelRunRequest } from "@ganger/app/run-detail/actions";
 
@@ -97,6 +97,34 @@ describe("Run 상세 화면", () => {
       });
     }
   });
+
+  it.each(["no-access", "other"] as const)(
+    "PR 정보를 읽지 못한 런(%s)은 못 읽음과 이유, 할 일을 보인다 (0144)",
+    (reason) => {
+      const { db } = seedDatabase();
+      const id = assign(db, "ACME-40", 400);
+      walk(db, id, 400, [
+        startedOn("ACME-40"),
+        {
+          to: "ended",
+          agentResult: "reported-success",
+          prState: "unknown",
+          prReadError: reason,
+        },
+      ]);
+      expect(found(db, id).status).toMatchObject({ prState: "unknown", prReadError: reason });
+      const html = render(page(db, id));
+      expect(valueOf(html, runJson.props.prState)).toBe(
+        `${domain.prState.unknown} ${runJson.props.prUnreadReason[reason]}`,
+      );
+      const body = text(html);
+      expect(body).toContain(`${runJson.prUnread.title} ${runJson.prUnread[reason]}`);
+      expect(body).toContain(runJson.reason.prUnread);
+      expect(body).toContain(runJson.next.prUnread);
+      expect(body).not.toContain(runJson.reason["human-check"]);
+      expect(pillsOf(html).map((pill) => pill.label)).toContain(domain.summary["human-check"]);
+    },
+  );
 
   it("제목은 할당 때 저장한 티켓 제목이고, 회색 줄에 키를 함께 보인다(ADR 0010 9번, 0064)", () => {
     const { db } = seedDatabase();

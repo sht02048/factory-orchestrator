@@ -34,7 +34,8 @@
     "denied": "권한 요청을 거절했어요. worker가 에이전트에게 거절을 보내요.",
     "paused": "{source}. 워크트리와 러너 자리는 그대로이고, 최대 실행 시간도 멈춰 있어요.",
     "disconnectedPaused": "멈춰 둔 런인데 러너에 5분 넘게 닿지 않았어요. 다시 닿으면 멈춘 채로 돌아와요. 최대 실행 시간은 멈춰 있어요.",
-    "disconnectedPausedSince": "멈춰 둔 런인데 {time}부터 러너에 닿지 않아요. 다시 닿으면 멈춘 채로 돌아와요. 최대 실행 시간은 멈춰 있어요."
+    "disconnectedPausedSince": "멈춰 둔 런인데 {time}부터 러너에 닿지 않아요. 다시 닿으면 멈춘 채로 돌아와요. 최대 실행 시간은 멈춰 있어요.",
+    "prUnread": "에이전트가 완료 보고를 보냈지만 PR 정보를 읽지 못했어요. 사람이 확인해야 해요."
   },
   "next": {
     "queued": "할 일이 없어요. 러너가 비면 worker가 시작해요.",
@@ -50,7 +51,8 @@
     "canceled": "할 일이 없어요. 필요하면 티켓을 다시 할당해 주세요.",
     "answered": "할 일이 없어요. worker가 답을 보내요.",
     "denied": "할 일이 없어요. worker가 거절을 보내요.",
-    "paused": "이어서 하려면 재개하기를 눌러 주세요. 같은 러너와 워크트리에서 이어서 해요."
+    "paused": "이어서 하려면 재개하기를 눌러 주세요. 같은 러너와 워크트리에서 이어서 해요.",
+    "prUnread": "PR을 직접 확인해 주세요. PR 정보를 읽으면 결과를 다시 계산해요."
   },
   "manualRemoval": "사람이 지워야 함",
   "openPr": "PR {pr} 열기",
@@ -170,7 +172,11 @@
     "defaultModel": "러너 기본값을 써요",
     "runnerOffline": "Offline",
     "laterPr": "{state} · {time}",
-    "started": "시작"
+    "started": "시작",
+    "prUnreadReason": {
+      "no-access": "토큰이 이 저장소를 볼 수 없음",
+      "other": "GitHub에서 읽지 못함"
+    }
   },
   "ci": {
     "success": "통과",
@@ -204,5 +210,10 @@
     "body": "러너에 남은 마지막 출력이에요. 무엇을 하다 멈췄는지 확인하고 재개해 주세요.",
     "none": "러너에서 마지막 출력을 읽지 못했어요.",
     "linesLabel": "마지막 출력 줄"
+  },
+  "prUnread": {
+    "title": "PR 정보를 읽지 못했어요",
+    "no-access": "GitHub 토큰이 이 저장소를 볼 수 없어요. Settings에서 토큰의 저장소 권한을 확인해 주세요. 읽을 때까지 워크트리를 남겨 두고 worker가 다시 읽어요.",
+    "other": "GitHub에서 PR을 읽지 못했어요. 읽을 때까지 워크트리를 남겨 두고 worker가 간격을 늘려 가며 다시 읽어요."
   }
 }

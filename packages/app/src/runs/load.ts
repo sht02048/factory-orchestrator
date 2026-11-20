@@ -195,6 +195,7 @@ export function loadRunsPage(
           endedAgoMs: Math.max(0, now.getTime() - run.endedAt.getTime()),
           agentResult: run.agentResult,
           prState: run.prState,
+          prReadError: records.prReadError,
           summary,
           attention: latest && isUnresolvedEndedRun(run, records),
         };

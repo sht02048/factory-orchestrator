@@ -302,7 +302,9 @@ function Reason({ run }: { run: RunDetail }) {
         ? t("disconnected")
         : t("disconnectedSince", { time: clock(status.unreachableSince) });
     case "ended":
-      return t(status.summary);
+      return status.prState === "unknown" && status.summary === "human-check"
+        ? t("prUnread")
+        : t(status.summary);
   }
 }
 
@@ -334,19 +336,35 @@ function NextAction({ run }: { run: RunDetail }) {
       next = t(`next.${inputKey(status.input)}`);
       break;
     case "ended":
-      next = t(`next.${status.summary}`);
+      next =
+        status.prState === "unknown" && status.summary === "human-check"
+          ? t("next.prUnread")
+          : t(`next.${status.summary}`);
       break;
   }
   const manual = status.state === "ended" && status.worktreeNeedsManualRemoval;
-  return manual ? (
-    <p {...stylex.props(styles.flat)}>
-      <Text variant="title" tone="problem">
-        {t("manualRemoval")}
-      </Text>{" "}
-      <Text variant="body">{t("next.manualRemoval")}</Text>
-    </p>
-  ) : (
-    <Text variant="body">{next}</Text>
+  const prReadError = status.state === "ended" ? status.prReadError : null;
+  return (
+    <>
+      {manual ? (
+        <p {...stylex.props(styles.flat)}>
+          <Text variant="title" tone="problem">
+            {t("manualRemoval")}
+          </Text>{" "}
+          <Text variant="body">{t("next.manualRemoval")}</Text>
+        </p>
+      ) : (
+        <Text variant="body">{next}</Text>
+      )}
+      {prReadError === null ? null : (
+        <p {...stylex.props(styles.flat)}>
+          <Text variant="title" tone="problem">
+            {t("prUnread.title")}
+          </Text>{" "}
+          <Text variant="body">{t(`prUnread.${prReadError}`)}</Text>
+        </p>
+      )}
+    </>
   );
 }
 
@@ -819,7 +837,16 @@ function Properties({ run }: { run: RunDetail }) {
               {domain(`agentResult.${ended.agentResult}`)}
             </DefinitionItem>
             <DefinitionItem label={t("prState")}>
-              {domain(`prState.${ended.prState}`)}
+              {ended.prReadError === null ? (
+                domain(`prState.${ended.prState}`)
+              ) : (
+                <span {...stylex.props(styles.inline)}>
+                  {domain(`prState.${ended.prState}`)}
+                  <Text variant="meta" tone="problem">
+                    {t(`prUnreadReason.${ended.prReadError}`)}
+                  </Text>
+                </span>
+              )}
             </DefinitionItem>
             {ended.laterPrState === null ? null : (
               <DefinitionItem label={t("laterPrState")}>

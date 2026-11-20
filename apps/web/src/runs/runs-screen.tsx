@@ -428,7 +428,13 @@ function useRunResultText(run: RunView): string {
   const parts: string[] = [];
   if (run.state === "ended") {
     parts.push(domain(`agentResult.${run.agentResult}`));
-    if (run.pullRequest !== null)
+    if (run.prState === "unknown")
+      parts.push(
+        run.pullRequest === null
+          ? t("prUnread")
+          : t("prUnreadWithPr", { pr: run.pullRequest.displayId }),
+      );
+    else if (run.pullRequest !== null)
       parts.push(
         t("prWithState", {
           pr: run.pullRequest.displayId,
@@ -482,7 +488,8 @@ function RunPanel({
       break;
     case "ended":
       when = t("endedAfter", { duration: duration(run.executionMs ?? 0) });
-      reason = t(`reason.${run.summary}`);
+      reason =
+        run.prReadError === null ? t(`reason.${run.summary}`) : t(`prUnread.${run.prReadError}`);
       break;
   }
   if (run.state !== "ended" && run.cancelling) reason = t("cancellingReason");

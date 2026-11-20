@@ -25,9 +25,21 @@ describe("loadStatsPage", () => {
   it("Failed 런을 실패 이유별로 세고 이유마다 PR 상태를 함께 센다(0068)", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC", 14));
     expect(page.total.failureReasons).toEqual([
-      { reason: "reported-failure", runs: 2, prStates: { none: 2, open: 0, merged: 0, closed: 0 } },
-      { reason: "pr-closed", runs: 1, prStates: { none: 0, open: 0, merged: 0, closed: 1 } },
-      { reason: "timed-out", runs: 1, prStates: { none: 0, open: 1, merged: 0, closed: 0 } },
+      {
+        reason: "reported-failure",
+        runs: 2,
+        prStates: { none: 2, open: 0, merged: 0, closed: 0, unknown: 0 },
+      },
+      {
+        reason: "pr-closed",
+        runs: 1,
+        prStates: { none: 0, open: 0, merged: 0, closed: 1, unknown: 0 },
+      },
+      {
+        reason: "timed-out",
+        runs: 1,
+        prStates: { none: 0, open: 1, merged: 0, closed: 0, unknown: 0 },
+      },
     ]);
   });
 
