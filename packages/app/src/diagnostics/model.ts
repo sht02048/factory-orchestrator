@@ -1,4 +1,4 @@
-import type { RunState } from "@ganger/core";
+import type { RunId, RunState, TicketKey } from "@ganger/core";
 import { z } from "zod";
 
 export const DIAGNOSTICS_PATH = "/api/diagnostics";
@@ -8,8 +8,8 @@ export const RUN_CHOICES = 20;
 export const DESKTOP_LOGS_GLOBAL = "gangerDesktopLogs";
 
 export interface DiagnosticsRunChoice {
-  id: string;
-  ticketKey: string;
+  id: RunId;
+  ticketKey: TicketKey;
   state: RunState;
 }
 

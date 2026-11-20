@@ -91,6 +91,11 @@ export function buildDiagnostics(input: DiagnosticsInput): DiagnosticsBundle {
     ticketKeys: [
       ...runs.map((run) => run.ticket.key),
       ...webhooks.flatMap((event) => (event.ticketKey === null ? [] : [event.ticketKey])),
+      ...(timeline?.runs.map((run) => run.ticketKey) ?? []),
+      ...logs.flatMap((line) => {
+        const key = line["ticketKey"];
+        return typeof key === "string" ? [key] : [];
+      }),
     ],
     userHome: system.userHome,
     gangerHome: input.gangerHome,
@@ -202,7 +207,10 @@ export function bundleLogLines(logDir: string, now: Date): StoredLogLine[] {
     level: "warn",
     since: new Date(now.getTime() - WARN_LOG_DAYS * DAY_MS),
   });
-  const info = readServerLogs(logDir, { level: "info" })
+  const info = readServerLogs(logDir, {
+    level: "info",
+    since: new Date(now.getTime() - WARN_LOG_DAYS * DAY_MS),
+  })
     .filter((line) => line.level === "info")
     .slice(-RECENT_INFO_LINES);
   return [...warnings, ...info]

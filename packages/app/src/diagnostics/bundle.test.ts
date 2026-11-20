@@ -165,6 +165,7 @@ function world(): World {
         reason: `ssh ${SSH_TARGET} failed with ${SECRETS.join(" ")}`,
         err: { name: "Error", message: `open ${userHome}/.ssh/id_ed25519`, stack: SECRETS[1] },
       }),
+      line(8.5, "warn", "tracker_event.process_failed", { ticketKey: "OPS-9" }),
       line(8, "info", "run.assigned", { ticketKey: TICKET, host: SERVER_HOST, origin: THIS_HOST }),
       line(7, "warn", "run.start_failed", { authorization: "Basic dXNlcjpwYXNzd29yZA==" }),
       line(60 * 24 * 8, "warn", "run.watch_failed", { reason: "eight days old" }),
@@ -228,6 +229,7 @@ describe("diagnostics bundle", () => {
     expect(logEvents).toEqual([
       "process.started",
       "runner.check_failed",
+      "tracker_event.process_failed",
       "run.assigned",
       "run.start_failed",
       "browser.error",
@@ -261,6 +263,8 @@ describe("diagnostics bundle", () => {
       expect(hidden).not.toContain(value);
     }
     expect(hidden).not.toContain("ACME");
+    expect(shown).toContain("OPS-9");
+    expect(hidden).not.toContain("OPS-9");
     expect(hidden).toContain("PROJ1-42");
     expect(hidden).toContain("ssh-target-1");
     expect(hidden).toContain("~/.ssh/id_ed25519");

@@ -633,9 +633,9 @@ export class Controller {
   }
 
   private downloadDiagnostics(url: string): void {
+    this.showWindow();
     const window = this.window;
     if (window === undefined || window.isDestroyed()) return;
-    this.showWindow();
     const session = window.webContents.session;
     if (this.diagnosticsListener !== undefined) {
       session.off("will-download", this.diagnosticsListener);
