@@ -9,6 +9,7 @@ Commands:
   service uninstall    Stop and remove the background service.
   mcp                  Run an MCP server on stdin and stdout that reads Ganger's state.
                        Start it from an MCP client on this machine.
+  logs                 Show the server logs of web, worker, mcp, and start, merged in time order.
 
 Options:
   --home <dir>         Installation folder for .env, data, and logs
@@ -17,6 +18,14 @@ Options:
   --port <port>        init: port the web server listens on (default: 3000)
   --database-path <p>  init: SQLite file (default: <home>/data/ganger.db)
   --dry-run            service: print what would be written and run, and change nothing
+  --proc <name>        logs: only these processes (web, worker, mcp, cli, desktop);
+                       repeat it or separate names with commas
+  --run <id>           logs: only lines about this run
+  --ticket <key>       logs: only lines about this ticket
+  --level <level>      logs: only this level and more severe (error, warn, info, debug)
+  --since <time>       logs: only lines after this time: 30s, 10m, 2h, 1d, or an ISO 8601 date
+  -f, --follow         logs: keep printing new lines until stopped
+  --json               logs: print each line as it is stored, one JSON object per line
   -h, --help           Show this help`,
 
   init: {
@@ -52,6 +61,18 @@ Options:
     childFailed: (reason: string) => `Stopping because ${reason}.`,
     sshKeyFailed: (reason: string) =>
       `Could not create the Ganger ssh key, so "This Mac as a runner" will not work: ${reason}`,
+  },
+
+  logs: {
+    none: (dir: string) =>
+      `No server logs in ${dir} yet. Ganger writes them while it runs with ganger start.`,
+    noMatch: "No server log lines match these filters.",
+    journald: (unit: string) =>
+      `The background service also writes console output to journald: journalctl --user -u ${unit}`,
+    badProc: (name: string) => `Unknown process "${name}". Use web, worker, mcp, cli, or desktop.`,
+    badLevel: (level: string) => `Unknown level "${level}". Use error, warn, info, or debug.`,
+    badSince: (value: string) =>
+      `Cannot read --since "${value}". Use 30s, 10m, 2h, 1d, or an ISO 8601 date.`,
   },
 
   service: {

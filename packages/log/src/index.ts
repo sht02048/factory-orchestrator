@@ -11,7 +11,7 @@ export {
 } from "./file-sink.js";
 export type { FileSink, RotationLimits } from "./file-sink.js";
 export { buildLine, formatLine, humanLine, localIsoTime, serializeError } from "./line.js";
-export type { LogLine, SerializedError } from "./line.js";
+export type { DisplayLine, HumanLineStyle, LogLine, SerializedError } from "./line.js";
 export { createLogger, currentLogContext, withLogContext } from "./logger.js";
 export type { Logger, LoggerOptions, LogSink } from "./logger.js";
 export {
@@ -25,6 +25,15 @@ export {
   useLogger,
 } from "./process-log.js";
 export type { ConsoleStream, ProcessLog, ProcessLogOptions } from "./process-log.js";
+export {
+  followServerLogs,
+  logFilesOldestFirst,
+  matchesLogFilter,
+  parseLogLine,
+  readServerLogs,
+  redactStoredLine,
+} from "./read.js";
+export type { LogFilter, LogFollower, StoredLogLine } from "./read.js";
 export { REDACTED, isSecretKey, redactValue, scrubText } from "./redact.js";
 export {
   DEFAULT_LOG_FILES,
