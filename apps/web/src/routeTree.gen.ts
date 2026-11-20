@@ -19,6 +19,7 @@ import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppStatsRouteImport } from './routes/_app/stats'
 import { Route as AppTicketsRouteImport } from './routes/_app/tickets'
 import { Route as ApiAttentionRouteImport } from './routes/api/attention'
+import { Route as ApiDiagnosticsRouteImport } from './routes/api/diagnostics'
 import { Route as ApiIdentityRouteImport } from './routes/api/identity'
 import { Route as AppRunsRunIdRouteImport } from './routes/_app/runs_.$runId'
 import { Route as AppSettingsMcpRouteImport } from './routes/_app/settings_.mcp'
@@ -81,6 +82,11 @@ const AppTicketsRoute = AppTicketsRouteImport.update({
 const ApiAttentionRoute = ApiAttentionRouteImport.update({
   id: '/api/attention',
   path: '/api/attention',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDiagnosticsRoute = ApiDiagnosticsRouteImport.update({
+  id: '/api/diagnostics',
+  path: '/api/diagnostics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiIdentityRoute = ApiIdentityRouteImport.update({
@@ -174,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/stats': typeof AppStatsRoute
   '/tickets': typeof AppTicketsRoute
   '/api/attention': typeof ApiAttentionRoute
+  '/api/diagnostics': typeof ApiDiagnosticsRoute
   '/api/identity': typeof ApiIdentityRoute
   '/runs/$runId': typeof AppRunsRunIdRoute
   '/settings/mcp': typeof AppSettingsMcpRoute
@@ -198,6 +205,7 @@ export interface FileRoutesByTo {
   '/stats': typeof AppStatsRoute
   '/tickets': typeof AppTicketsRoute
   '/api/attention': typeof ApiAttentionRoute
+  '/api/diagnostics': typeof ApiDiagnosticsRoute
   '/api/identity': typeof ApiIdentityRoute
   '/': typeof AppIndexRoute
   '/runs/$runId': typeof AppRunsRunIdRoute
@@ -225,6 +233,7 @@ export interface FileRoutesById {
   '/_app/stats': typeof AppStatsRoute
   '/_app/tickets': typeof AppTicketsRoute
   '/api/attention': typeof ApiAttentionRoute
+  '/api/diagnostics': typeof ApiDiagnosticsRoute
   '/api/identity': typeof ApiIdentityRoute
   '/_app/': typeof AppIndexRoute
   '/_app/runs_/$runId': typeof AppRunsRunIdRoute
@@ -253,6 +262,7 @@ export interface FileRouteTypes {
     | '/stats'
     | '/tickets'
     | '/api/attention'
+    | '/api/diagnostics'
     | '/api/identity'
     | '/runs/$runId'
     | '/settings/mcp'
@@ -277,6 +287,7 @@ export interface FileRouteTypes {
     | '/stats'
     | '/tickets'
     | '/api/attention'
+    | '/api/diagnostics'
     | '/api/identity'
     | '/'
     | '/runs/$runId'
@@ -303,6 +314,7 @@ export interface FileRouteTypes {
     | '/_app/stats'
     | '/_app/tickets'
     | '/api/attention'
+    | '/api/diagnostics'
     | '/api/identity'
     | '/_app/'
     | '/_app/runs_/$runId'
@@ -325,6 +337,7 @@ export interface RootRouteChildren {
   DsRoute: typeof DsRoute
   OnboardingRoute: typeof OnboardingRoute
   ApiAttentionRoute: typeof ApiAttentionRoute
+  ApiDiagnosticsRoute: typeof ApiDiagnosticsRoute
   ApiIdentityRoute: typeof ApiIdentityRoute
   ApiChangeEventsStreamRoute: typeof ApiChangeEventsStreamRoute
   ApiNotificationEventsStreamRoute: typeof ApiNotificationEventsStreamRoute
@@ -407,6 +420,13 @@ declare module '@tanstack/react-router' {
       path: '/api/attention'
       fullPath: '/api/attention'
       preLoaderRoute: typeof ApiAttentionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/diagnostics': {
+      id: '/api/diagnostics'
+      path: '/api/diagnostics'
+      fullPath: '/api/diagnostics'
+      preLoaderRoute: typeof ApiDiagnosticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/identity': {
@@ -545,6 +565,7 @@ const rootRouteChildren: RootRouteChildren = {
   DsRoute: DsRoute,
   OnboardingRoute: OnboardingRoute,
   ApiAttentionRoute: ApiAttentionRoute,
+  ApiDiagnosticsRoute: ApiDiagnosticsRoute,
   ApiIdentityRoute: ApiIdentityRoute,
   ApiChangeEventsStreamRoute: ApiChangeEventsStreamRoute,
   ApiNotificationEventsStreamRoute: ApiNotificationEventsStreamRoute,
