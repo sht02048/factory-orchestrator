@@ -1,19 +1,19 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, getRouteApi } from "@tanstack/react-router";
+import { useCallback } from "react";
 import { createTranslator } from "use-intl";
 import { toRunId } from "@ganger/core";
 import { z } from "zod";
 import { HomeScreen } from "../../home/home-screen";
 import { homeMessages } from "../../home/messages";
-import type { HomePage } from "@ganger/app/home/model";
-import { useRefreshWhileVisible } from "../../home/refresh";
+import { useDashboardActions } from "../../home/mutations";
+import { dashboardQuery } from "../../home/query";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { hasPendingControl } from "@ganger/app/home/model";
-import { answerQuestion, controlRun, denyPermission, getHomePage } from "../../server/functions";
-
-const CONTROL_POLL_MS = 2_000;
+import { requestTimeZone } from "../../query/request-time-zone";
+import { loadRouteQuery } from "../../query/route-query";
 
 const t = createTranslator({ locale: defaultLocale, messages: homeMessages, namespace: "home" });
+const rootRoute = getRouteApi("__root__");
 
 export const Route = createFileRoute("/_app/")({
   validateSearch: z.object({
@@ -21,19 +21,19 @@ export const Route = createFileRoute("/_app/")({
     run: z.string().optional().catch(undefined),
   }),
   loaderDeps: ({ search }) => ({ ws: search.ws }),
-  loader: ({ deps }) => getHomePage({ data: { ws: deps.ws } }),
+  loader: (load) => loadRouteQuery(load, dashboardQuery(load.deps.ws, requestTimeZone())),
+  preloadStaleTime: 0,
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: HomeRoute,
 });
 
 function HomeRoute() {
-  const loaded = Route.useLoaderData();
   const { ws } = Route.useLoaderDeps();
+  const timeZone = rootRoute.useLoaderData({ select: (root) => root.timeZone });
+  const { data: page } = useSuspenseQuery(dashboardQuery(ws, timeZone));
   const { view, run } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const router = useRouter();
-  const [polled, setPolled] = useState<{ base: HomePage; page: HomePage } | null>(null);
-  const page = polled !== null && polled.base === loaded ? polled.page : loaded;
+  const actions = useDashboardActions();
   const clearOpenRun = useCallback(() => {
     void navigate({
       search: (prev) => ({ ...prev, run: undefined }),
@@ -41,19 +41,6 @@ function HomeRoute() {
       resetScroll: false,
     });
   }, [navigate]);
-  const refresh = useCallback(() => {
-    void getHomePage({ data: { ws } }).then(
-      (next) => setPolled({ base: loaded, page: next }),
-      () => {},
-    );
-  }, [ws, loaded]);
-  useRefreshWhileVisible(refresh);
-  const controlPending = hasPendingControl(page);
-  useEffect(() => {
-    if (!controlPending) return undefined;
-    const timer = setTimeout(refresh, CONTROL_POLL_MS);
-    return () => clearTimeout(timer);
-  }, [controlPending, page, refresh]);
   return (
     <ScreenMessages messages={homeMessages}>
       <HomeScreen
@@ -66,19 +53,9 @@ function HomeRoute() {
             resetScroll: false,
           });
         }}
-        onAnswer={async (input) => {
-          await answerQuestion({ data: input });
-          await router.invalidate();
-        }}
-        onDeny={async (input) => {
-          await denyPermission({ data: input });
-          await router.invalidate();
-        }}
-        onControl={async (input) => {
-          const result = await controlRun({ data: input });
-          await router.invalidate();
-          return result.ok ? "requested" : "state-changed";
-        }}
+        onAnswer={actions.onAnswer}
+        onDeny={actions.onDeny}
+        onControl={actions.onControl}
         openRunId={run === undefined ? undefined : toRunId(run)}
         onOpenRunShown={clearOpenRun}
       />

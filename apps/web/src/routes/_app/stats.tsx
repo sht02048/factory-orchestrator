@@ -1,10 +1,13 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
 import { conditionsForStatsGroup } from "@ganger/app/runs/conditions";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { getStatsPage } from "../../server/functions";
+import { requestTimeZone } from "../../query/request-time-zone";
+import { loadRouteQuery } from "../../query/route-query";
 import { statsMessages } from "../../stats/messages";
+import { statsQuery } from "../../stats/query";
 import {
   DEFAULT_STATS_PERIOD_DAYS,
   STATS_DIMENSIONS,
@@ -14,23 +17,27 @@ import { StatsScreen } from "../../stats/stats-screen";
 
 const t = createTranslator({ locale: defaultLocale, messages: statsMessages, namespace: "stats" });
 const appRoute = getRouteApi("/_app");
+const rootRoute = getRouteApi("__root__");
 
 export const Route = createFileRoute("/_app/stats")({
   validateSearch: z.object({
     by: z.enum(STATS_DIMENSIONS).optional().catch(undefined),
     days: statsPeriodDaysSchema.optional().catch(undefined),
   }),
-  loaderDeps: ({ search }) => ({ ws: search.ws, days: search.days }),
-  loader: ({ deps }) =>
-    getStatsPage({ data: { ws: deps.ws, days: deps.days ?? DEFAULT_STATS_PERIOD_DAYS } }),
+  loaderDeps: ({ search }) => ({ ws: search.ws, days: search.days ?? DEFAULT_STATS_PERIOD_DAYS }),
+  loader: (load) =>
+    loadRouteQuery(load, statsQuery(load.deps.ws, load.deps.days, requestTimeZone())),
+  preloadStaleTime: 0,
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: StatsRoute,
 });
 
 function StatsRoute() {
-  const page = Route.useLoaderData();
+  const { ws, days } = Route.useLoaderDeps();
+  const timeZone = rootRoute.useLoaderData({ select: (root) => root.timeZone });
+  const { data: page } = useSuspenseQuery(statsQuery(ws, days, timeZone));
   const shell = appRoute.useLoaderData();
-  const { by, ws } = Route.useSearch();
+  const { by } = Route.useSearch();
   const navigate = Route.useNavigate();
   const router = useRouter();
   return (
