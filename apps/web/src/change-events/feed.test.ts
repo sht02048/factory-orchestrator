@@ -15,6 +15,7 @@ import { startChangePruning } from "../server/database";
 import { changeSourceOf } from "../server/change-events";
 import { connection, seedDatabase } from "../testing/seed";
 import { ChangeFeed, changeStream } from "./feed";
+import type { ChangeSource } from "./feed";
 
 interface Message {
   event: string | null;
@@ -137,6 +138,34 @@ describe("변경 기록 SSE 통로(스펙 0003 5.3)", () => {
       kind: "run",
       targetId: runId,
     });
+  });
+
+  it("이어 받을 줄을 읽은 바로 뒤 다른 프로세스가 쓴 줄도 빠뜨리지 않는다", async () => {
+    const { db } = seedDatabase();
+    const source = changeSourceOf(db);
+    let written = false;
+    const racing: ChangeSource = {
+      ...source,
+      after: (seq, limit) => {
+        const page = source.after(seq, limit);
+        if (!written) {
+          written = true;
+          recordSettingsChange(db);
+        }
+        return page;
+      },
+    };
+    const feed = new ChangeFeed(racing, { pollMs: 10 });
+    const reader = changeStream({ after: latestChangeSeq(db), feed, source: racing }).getReader();
+    cleanups.push(() => reader.cancel());
+    const decoder = new TextDecoder();
+    let text = "";
+    while (!parse(text).some((m) => m.event === "change")) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value);
+    }
+    expect(parse(text).find((m) => m.event === "change")?.data).toMatchObject({ kind: "settings" });
   });
 
   it("지운 번호보다 앞이면 reset을 보낸다(표가 빈 경우 포함)", async () => {

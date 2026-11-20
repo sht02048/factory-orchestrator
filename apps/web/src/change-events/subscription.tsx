@@ -15,7 +15,11 @@ export function queryClientTarget(queryClient: QueryClient): ChangeChannelTarget
   };
 }
 
-const RenderedChangeSeq = createContext<number | null>(null);
+interface ChangeSeqMemory {
+  seq: number | null;
+}
+
+const RenderedChangeSeq = createContext<ChangeSeqMemory>({ seq: null });
 
 export function RenderedChangeSeqProvider({
   seq,
@@ -24,17 +28,16 @@ export function RenderedChangeSeqProvider({
   seq: number | null;
   children: ReactNode;
 }) {
-  const [first] = useState(seq);
-  return <RenderedChangeSeq.Provider value={first}>{children}</RenderedChangeSeq.Provider>;
+  const [memory] = useState<ChangeSeqMemory>(() => ({ seq }));
+  return <RenderedChangeSeq.Provider value={memory}>{children}</RenderedChangeSeq.Provider>;
 }
 
 export function ChangeEventsSubscription() {
   const queryClient = useQueryClient();
-  const renderedSeq = useContext(RenderedChangeSeq);
-  const [after] = useState(renderedSeq);
+  const memory = useContext(RenderedChangeSeq);
   useEffect(() => {
     const channel = new ChangeChannel({
-      after,
+      after: memory.seq,
       open: (url) => new EventSource(url),
       target: queryClientTarget(queryClient),
     });
@@ -47,8 +50,9 @@ export function ChangeEventsSubscription() {
     document.addEventListener("visibilitychange", followVisibility);
     return () => {
       document.removeEventListener("visibilitychange", followVisibility);
+      memory.seq = channel.lastSeq;
       channel.close();
     };
-  }, [after, queryClient]);
+  }, [memory, queryClient]);
   return null;
 }

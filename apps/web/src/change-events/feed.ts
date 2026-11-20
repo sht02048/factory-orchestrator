@@ -71,8 +71,8 @@ export class ChangeFeed {
     this.#timer = setInterval(() => {
       try {
         this.poll();
-      } catch {
-        return;
+      } catch (error) {
+        console.warn("could not read change events", error);
       }
     }, this.#pollMs);
   }
@@ -123,8 +123,7 @@ export function changeStream(options: ChangeStreamOptions): ReadableStream<Uint8
         }
       };
       send(`retry: ${CHANGE_RETRY_MS}\n\n`);
-      let cursor = startCursor(options, send);
-      send(sseMessage({ event: "ready", id: cursor, data: { seq: cursor } }));
+      let cursor = Number.POSITIVE_INFINITY;
       unsubscribe = options.feed.subscribe((changes) => {
         for (const change of changes) {
           if (change.seq <= cursor) continue;
@@ -132,6 +131,8 @@ export function changeStream(options: ChangeStreamOptions): ReadableStream<Uint8
           cursor = change.seq;
         }
       });
+      cursor = startCursor(options, send);
+      send(sseMessage({ event: "ready", id: cursor, data: { seq: cursor } }));
       heartbeat = setInterval(
         () => send(sseMessage({ event: "heartbeat", data: null })),
         heartbeatMs,
