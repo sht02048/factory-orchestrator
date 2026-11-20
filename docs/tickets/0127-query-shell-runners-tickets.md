@@ -69,15 +69,36 @@ blocked_by: [0124]
 
 ### 찾은 것
 
-- **`signal`을 서버 함수에 넘기면 다시 들어갈 때의 뒤 읽기가 끊긴다.** 처음에는 0123의 예대로 `queryFn: ({ signal }) => getTicketRuns({ data, signal })`로 썼다. 그러자 `navigation.test.ts`의 다시 들어가기 시험이 60초 넘게 멈췄다. 로더가 시작한 뒤 읽기(`getTicketRuns`)가 브라우저에서 취소(request failed)됐다. query-core는 `signal`을 읽은 요청을 관찰자가 모두 빠지면 취소하는데, 화면에 다시 들어가 컴포넌트가 붙는 사이 이 일이 생긴다 **[추정: 원인 함수까지는 좇지 않았고, `signal`을 빼면 요청이 끝까지 가는 것으로 확인]**. 그래서 이 티켓의 query는 `signal`을 넘기지 않는다. 0125·0126도 같은 모양이면 같은 일이 난다.
+- **`signal`을 서버 함수에 넘기면 다시 들어갈 때의 뒤 읽기가 끊긴다.** 처음에는 0123의 예대로 `queryFn: ({ signal }) => getTicketRuns({ data, signal })`로 썼다. 그러자 `navigation.test.ts`의 다시 들어가기 시험이 60초 넘게 멈췄다. 로더가 시작한 뒤 읽기가 브라우저에서 취소(request failed)됐다. query-core는 `signal`을 읽은 요청을 관찰자가 모두 빠지면 취소하고, 개발 빌드의 StrictMode 이중 마운트가 다시 들어간 화면의 관찰자를 한 번 뗐다 붙인다(0125가 같은 것을 찾아 코디네이터가 알려 줌). 그래서 이 티켓의 query는 `signal`을 넘기지 않는다. 시험: 변경 기록 통로를 막은 채 다시 들어간 Runners·Tickets가 그사이 바뀐 러너 상태·생긴 런을 그린다. `signal`을 되돌리면 이 두 시험이 실패하는 것을 확인했다.
 - **0123 독립 리뷰 MEDIUM(gcTime 5분이 라우터 match 캐시보다 짧음).** 이 화면들에서는 재현되지 않았다. Runners·Tickets를 열고 다른 화면으로 옮긴 뒤 가짜 시계로 6분을 보내 query가 지워진 것(돌아올 때 Tickets가 트래커 함수를 다시 읽음)을 확인하고 돌아와도, 빈 대체 화면 없이 앞 화면을 둔 채 읽기를 기다렸다가 그린다. 라우터 이동이 transition이라 React가 앞 화면을 남긴다. 다만 5분이 지나면 다시 들어가기도 첫 방문처럼 읽기를 기다린다(라우터 캐시만 쓰던 지난 동작은 30분까지 바로 그렸다). 공용 기본값은 바꾸지 않았다. 시험: `query-screens.test.ts`의 "5분 넘게 떠났다 돌아와도" 둘.
 
 ### 시험
 
-- `e2e/src/query-screens.test.ts`(브라우저): hydration 동안 서버 함수 0번(Tickets, Runners), 할당 뒤 `assignTicket`·`getTicketRuns`만 부르고 트래커 가짜 어댑터 호출 수가 그대로, Tickets 이동 한 번의 서버 함수 둘, 다시 점검 뒤 `getRunnersPage`만·점검 끝에 `getRunnersPage`·`getShell`만(루트 없음), Offline이 3초 안에 셸 배지와 Runners에, Workspace 더하기가 셸 목록에, webhook 뒤 0122 서버 캐시가 있어도 새 트래커 값, 미리 읽은 뒤 Runners 진입에 서버 함수 0번, Settings 저장 뒤 `getSettingsPage`·`getShell`을 다시 읽고 셸에 새 이름, 끊기면 Runners 30초마다(가짜 시계), 5분 넘게 떠났다 돌아와도 빈 대체 화면 없음(Runners, Tickets). mutation 시험은 변경 기록 통로를 막고 돈다(스펙 7절 2번).
+- `e2e/src/query-screens.test.ts`(브라우저): hydration 동안 서버 함수 0번(Tickets, Runners), 할당 뒤 `assignTicket`·`getTicketRuns`만 부르고 트래커 가짜 어댑터 호출 수가 그대로, Tickets 이동 한 번의 서버 함수 둘, 다시 점검 뒤 `getRunnersPage`만·점검 끝에 `getRunnersPage`·`getShell`만(루트 없음), Offline이 3초 안에 셸 배지와 Runners에, Workspace 더하기가 셸 목록에, webhook 뒤 0122 서버 캐시가 있어도 새 트래커 값, 미리 읽은 뒤 Runners 진입에 서버 함수 0번, Settings 저장 뒤 `getSettingsPage`·`getShell`을 다시 읽고 셸에 새 이름, 끊기면 Runners 30초마다(가짜 시계), 5분 넘게 떠났다 돌아와도 빈 대체 화면 없음(Runners, Tickets), 통로를 막은 채 다시 들어간 Runners·Tickets가 바뀐 상태를 그림. mutation 시험은 변경 기록 통로를 막고 돈다(스펙 7절 2번).
 - 온보딩 저장·러너 등록 뒤 다시 읽기는 `e2e/src/onboarding.test.ts`·`runner-setup.test.ts`가 그대로 통과하는 것으로 확인한다(단계가 넘어가려면 다시 읽어야 한다).
 - `apps/web/src/tickets/load.test.ts`: DB 부분은 트래커를 읽지 않음, 합친 결과가 `loadTicketsPage`와 같음, 라벨을 프로젝트마다 돌려줌, 런이 바뀌면 트래커를 다시 읽지 않고 할당할 수 있음을 다시 계산함. `loader-queries.test.ts`에 Tickets DB 부분. `route-query.test.ts`에 `loadCachedRouteQuery` 둘, `mutation-error.test.ts`에 `rejectionReasonOf` 둘.
 - `navigation.test.ts`: 미리 읽기 시험은 `getTrackerTickets`, 다시 들어가기 시험은 `getTicketRuns`를 기다린다(운영자 결정 A). 그 밖의 기대는 그대로다.
+
+### 측정(0117 시험 계약과 `--rtt`)
+
+`MEASURE_RTT=0,100,200 MEASURE_TRACKER_DELAY=500 pnpm exec vitest run -c e2e/vitest.measure.config.ts`, 개발 서버, 트래커 읽기마다 500ms, 3번 중앙값(ms). 전은 `develop` 99b58b8, 후는 이 브랜치다. 화면 이동 시간(누름 → 그림)과 그 사이 부른 서버 함수다.
+
+| 왕복 | 경우                      | Tickets 시간 | Tickets 서버 함수(전 → 후)                             | Runners 시간 | Runners 서버 함수(전 → 후)    |
+| ---: | ------------------------- | -----------: | ------------------------------------------------------ | -----------: | ----------------------------- |
+|    0 | 첫 방문, 바로 누름        |     100 → 96 | `getTicketsPage` → `getTicketRuns`·`getTrackerTickets` |    102 → 103 | `getRunnersPage` 그대로       |
+|    0 | 다시 들어가기             |      68 → 68 | `getTicketsPage` → `getTicketRuns`                     |      83 → 83 | `getRunnersPage` 그대로       |
+|    0 | 첫 방문, 300ms 올려 둔 뒤 |      78 → 79 | 없음                                                   |      64 → 80 | `getRunnersPage` 1ms → 없음   |
+|  100 | 첫 방문, 바로 누름        |    397 → 418 | 위와 같음(둘을 함께 부름, 각 108ms)                    |    512 → 520 | 그대로                        |
+|  100 | 다시 들어가기             |      84 → 78 | `getTicketsPage` → `getTicketRuns`                     |      85 → 84 | 그대로                        |
+|  100 | 첫 방문, 300ms 올려 둔 뒤 |    115 → 115 | 없음                                                   |    245 → 230 | `getRunnersPage` 165ms → 없음 |
+|  200 | 첫 방문, 바로 누름        |    701 → 719 | 위와 같음(각 209ms)                                    |    919 → 933 | 그대로                        |
+|  200 | 다시 들어가기             |      66 → 73 | `getTicketsPage` → `getTicketRuns`                     |      66 → 68 | 그대로                        |
+|  200 | 첫 방문, 300ms 올려 둔 뒤 |    415 → 425 | 없음                                                   |    848 → 833 | `getRunnersPage` 353ms → 없음 |
+
+- 이동 시간은 측정 흔들림 안에서 같다. 이 티켓은 이동을 빠르게 하는 일이 아니라 다시 읽는 범위를 좁히는 일이라 예상대로다.
+- Runners는 `reloadOnEnter`를 지워, 포인터를 올려 미리 읽은 뒤 누를 때 `getRunnersPage`를 한 번 더 부르지 않는다.
+- Tickets 다시 들어가기의 뒤 읽기가 트래커를 함께 읽던 `getTicketsPage`에서 DB만 읽는 `getTicketRuns`로 바뀌었다(운영자 결정 A).
+- 첫 방문의 Tickets는 서버 함수 둘을 함께 부른다. 왕복은 겹쳐 한 번만큼 든다(100 → 108ms씩, 200 → 209ms씩).
 
 ## 머지 위험
 

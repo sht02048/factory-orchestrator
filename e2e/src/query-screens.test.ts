@@ -24,6 +24,7 @@ import type {
 import { FakeTracker } from "@ganger/core/testing";
 import {
   SecretBox,
+  assignRun,
   completeRunnerCheckRequest,
   listPendingRunnerCheckRequests,
   markTrackerChanged,
@@ -469,6 +470,51 @@ describe("셸·Runners·Tickets 의 Query(브라우저, 0127)", () => {
       expect(serverCalls).toContain(reread);
     },
   );
+
+  it("변경 기록 통로가 막혀도 다시 들어간 Runners 는 그사이 바뀐 러너 상태를 그린다", async (context) => {
+    const { page } = await newPage(context, { stream: false });
+    await open(page, `/runners?sel=${runnerId}`, "runners");
+    const panel = page.getByRole("region", { name: runners.panel.label });
+    const offlineFix = panel.getByRole("region", { name: runners.panel.fix.offline.title });
+    expect(await offlineFix.count()).toBe(0);
+    await railLink(page, shell.nav.tickets).click();
+    await waitForScreen(page, "tickets");
+    await page.mouse.move(0, 0);
+
+    runnerOffline();
+    await railLink(page, shell.nav.runners).click();
+    await waitForScreen(page, "runners");
+
+    await offlineFix.waitFor({ timeout: VISIBLE_WITHIN_MS });
+  });
+
+  it("변경 기록 통로가 막혀도 다시 들어간 Tickets 는 그사이 생긴 런을 그린다", async (context) => {
+    const ticket = addTicket("Assigned elsewhere");
+    const { page } = await newPage(context, { stream: false });
+    await open(page, "/tickets", "tickets");
+    const option = page
+      .getByRole("listbox", { name: tickets.listLabel })
+      .getByRole("option", { name: `${ticket.key} ${ticket.title}` });
+    expect(await option.innerText()).toContain(tickets.unassigned);
+    await railLink(page, shell.nav.runners).click();
+    await waitForScreen(page, "runners");
+    await page.mouse.move(0, 0);
+
+    const assigned = assignRun(db, {
+      ticket: { connection, key: ticket.key },
+      trackerProject,
+      runnerProject,
+      agent,
+      now: new Date(),
+    });
+    if (!assigned.ok) throw new Error(assigned.reason);
+    await railLink(page, shell.nav.tickets).click();
+    await waitForScreen(page, "tickets");
+
+    await expect
+      .poll(() => option.innerText(), { timeout: VISIBLE_WITHIN_MS })
+      .not.toContain(tickets.unassigned);
+  });
 
   it("변경 기록이 끊기면 열린 Runners 가 30초마다 다시 읽는다(가짜 시계)", async (context) => {
     const { page, serverCalls } = await newPage(context, { stream: false, clock: true });
