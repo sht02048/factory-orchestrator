@@ -1,3 +1,10 @@
+export {
+  LOG_SWITCH_FILE,
+  debugSwitchPath,
+  readDebugSwitch,
+  watchDebugSwitch,
+  writeDebugSwitch,
+} from "./debug-switch.js";
 export { LOG_EVENTS, messageOf } from "./events.js";
 export type { LogEvent } from "./events.js";
 export { CONTEXT_KEYS, DETAIL_KEYS, LOG_LEVELS, PROCESS_NAMES, isEnabled } from "./fields.js";
