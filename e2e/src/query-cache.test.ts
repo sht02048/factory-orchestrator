@@ -51,7 +51,7 @@ const PROBE_SERVER_FN = "getTimeZone";
 const ERROR_PATH = "/query-probe-error";
 const SHELL_ERROR_PATH = "/query-probe-shell-error";
 const PROBE_ERROR_MESSAGE = "query-probe-read-failed";
-const RETRY_PATH = "/query-probe-retry";
+const RETRY_PATH = "/stats/query-probe-retry";
 const HEAL_FLAG = "__gangerQueryProbeHealed";
 const PRELOAD_FRESH_MS = 5_000;
 const SETTLE_MS = 500;
@@ -254,7 +254,7 @@ describe("query 읽기 실패(0123 할 일 10)", () => {
     await expect.poll(() => focusedHeadingText(page)).toBe(shell.screenError.title);
   });
 
-  it("다시 읽기를 누르면 실패했던 화면만 다시 읽고, 읽히면 오류 화면이 화면으로 바뀐다", async (context) => {
+  it("다시 읽기를 누르면 실패했던 화면만 다시 읽고, 읽히면 오류 화면이 화면으로 바뀌며 포커스는 레일의 지금 화면 링크로 간다", async (context) => {
     const { page, serverCalls } = await newPage(context);
     await openRuns(page);
     await routerCall(page, "navigate", RETRY_PATH);
@@ -267,6 +267,9 @@ describe("query 읽기 실패(0123 할 일 10)", () => {
 
     await page.locator(PROBE_SELECTOR).filter({ hasText: RETRY_PATH }).waitFor();
     expect(await page.getByRole("navigation", { name: shell.nav.label }).count()).toBe(1);
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.getAttribute("aria-current") ?? null))
+      .toBe("page");
     await page.waitForLoadState("networkidle");
     expect(serverCalls.slice(callsBeforeRetry)).toEqual([]);
   });

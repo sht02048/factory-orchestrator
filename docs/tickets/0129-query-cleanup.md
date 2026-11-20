@@ -1,5 +1,5 @@
 ---
-status: doing
+status: done
 blocked_by: [0122, 0125, 0126, 0127, 0128]
 ---
 
@@ -32,7 +32,7 @@ blocked_by: [0122, 0125, 0126, 0127, 0128]
 - **쓰기 뒤 라우터 다시 읽기를 지웠다.** Run 상세(`run-detail/actions.ts`의 `refreshUnmovedScreens`, `MOVED_TO_QUERY_ROUTE_IDS`)와 Dashboard(`home/mutations.ts`의 `ROUTER_ROUTES_SHOWING_RUNS`)의 답하기·거절·취소·멈추기와 재개가 함께 부르던 `router.invalidate({ filter })`를 지웠다. 0127·0128 뒤 그 route들도 query로 읽어, 라우터 다시 읽기는 캐시만 다시 읽어 아무것도 새로 받지 못하고 있었다. 대신 두 화면이 같은 `keysChangedByRunWrite(runId)`(`runs/queries.ts`)로 그 런의 상세, Runs 목록, Dashboard, Stats, Tickets의 DB 부분, Runners, Settings를 무효화한다. 보이지 않는 key는 stale 표시만 된다. Dashboard 쓰기는 지금까지 Stats를 무효화하지 않았는데 이제 한다.
 - **셸을 셸 query로 읽는다.** Runs·Stats가 `_app` 로더 데이터(`getRouteApi("/_app").useLoaderData()`)로 읽던 Workspace 목록을 `useShell()`로 바꿨다. 로더 데이터는 로더가 돌던 때의 값이라 셸 query가 다시 읽혀도 두 화면의 Workspace 고르기가 낡아 있었다.
 - **미리 읽기 신선도.** 라우터 전역 `defaultPreloadStaleTime`을 0으로 바꾸고 `_app` route 열 곳과 시험용 route의 `preloadStaleTime: 0`을 지웠다. `PRELOAD_FRESH_MS`(5초)는 `query/query-client.ts`로 옮겼다. 라우터 로더로 남은 온보딩 route는 Settings의 "Workspace 만들기" 링크가 미리 읽으므로 route에 `preloadStaleTime: PRELOAD_FRESH_MS`를 남겨 포인터를 올릴 때마다 `getOnboardingPage`를 다시 부르지 않게 했다(지금까지와 같은 5초). 루트의 `shouldReload: false`는 그대로이고 다른 `shouldReload`는 남지 않았다.
-- **셸 안 공용 오류 화면(스펙 0003 열린 질문 4, 0125에서 넘어옴).** `shell/screen-error.tsx`를 `_app` 아래 화면 route 열 곳의 `errorComponent`로 둔다. 서버 렌더와 hydration 뒤 모두 레일이 남고 화면 칸에 "화면을 열지 못했어요", 복구 안내, "다시 읽기" 단추가 보인다. 오류 화면이 뜨면 머리로 포커스를 옮겨 화면 읽기 프로그램이 알린다. 다시 읽기는 실패한 match만 다시 돌리고, 또 실패하면 머리로 포커스를 옮기고 "다시 읽지 못했어요…"를 `role="status"`로 알린다. 이 실패 문장은 다른 화면으로 옮기면 걷힌다. 셸 자신(`getShell`)이 실패하면 레일을 그릴 수 없어 지금처럼 루트 `RootError`가 대신한다. 문구는 `messages/ko/shell.json`의 `screenError`.
+- **셸 안 공용 오류 화면(스펙 0003 열린 질문 4, 0125에서 넘어옴).** `shell/screen-error.tsx`를 `_app` 아래 화면 route 열 곳의 `errorComponent`로 둔다. 서버 렌더와 hydration 뒤 모두 레일이 남고 화면 칸에 "화면을 열지 못했어요", 복구 안내, "다시 읽기" 단추가 보인다. 오류 화면이 뜨면 머리로 포커스를 옮겨 화면 읽기 프로그램이 알린다. 다시 읽기는 실패한 match만 다시 돌린다. 그동안 포커스는 단추에 있고, 또 실패하면 "다시 읽지 못했어요…"(`role="status"`) 문장으로 포커스를 옮겨 읽히게 한다. 성공하면 단추가 사라지므로 포커스를 레일의 지금 화면 링크로 옮긴다. 다시 읽는 동안 라우터가 오류 경계를 다시 그려 오류 화면이 두세 번 다시 마운트되고 그때마다 새 단추로 포커스를 다시 준다(interface-review LOW, 화면 읽기가 "다시 읽는 중…"을 여러 번 읽을 수 있음). 경계를 다시 그리지 않게 하려면 라우터 오류 경계를 우회해야 해 남겼다. 이 실패 문장은 다른 화면으로 옮기면 걷힌다. 셸 자신(`getShell`)이 실패하면 레일을 그릴 수 없어 지금처럼 루트 `RootError`가 대신한다. 문구는 `messages/ko/shell.json`의 `screenError`.
 - **문서.** ADR 0019(로더 API, `_app` 안의 라우터 다시 읽기, 오류 화면, 숨은 탭의 SSE)와 스펙 0003(4.2 로더 API와 온보딩 미리 읽기, 4.3 실제 key 표, 6절 5번 결과와 예외, 7절 전체 확인, 열린 질문 4 결과)을 고쳤다.
 
 ### 남긴 라우터 다시 읽기
@@ -101,7 +101,7 @@ blocked_by: [0122, 0125, 0126, 0127, 0128]
 
 - `apps/web/src/run-detail/actions.test.ts`: 성공한 쓰기는 런을 보이는 key만 무효화하고 셸과 다른 런의 상세는 그대로(라우터 다시 읽기 시험과 "아직 옮기지 않은 화면 고르기"는 지웠다).
 - `apps/web/src/shell/screen-error.test.ts`: `_app` 아래 화면 route가 모두 공용 오류 화면을 쓰고, 셸 자신과 셸 밖 route는 루트 오류 화면에 맡긴다.
-- `e2e/src/query-cache.test.ts`(0123의 오류 시험 둘을 새 동작으로 바꾸고 셋을 더함): 서버 렌더·hydration 뒤 레일이 남고 화면 칸에만 오류, 화면으로 옮기다 실패해도 레일이 남고 머리로 포커스, 다시 읽기는 실패한 화면만 다시 읽음(루트·셸 0번), 또 실패하면 머리로 포커스와 상태 문장, 다른 화면에 갔다 오면 지난 실패 문장이 남지 않음.
+- `e2e/src/query-cache.test.ts`(0123의 오류 시험 둘을 새 동작으로 바꾸고 셋을 더함): 서버 렌더·hydration 뒤 레일이 남고 화면 칸에만 오류, 화면으로 옮기다 실패해도 레일이 남고 머리로 포커스, 다시 읽기는 실패한 화면만 다시 읽고(루트·셸 0번) 성공하면 레일의 지금 화면 링크로 포커스, 또 실패하면 실패 문장으로 포커스, 다른 화면에 갔다 오면 지난 실패 문장이 남지 않음.
 - `e2e/src/query-screens.test.ts`: 변경 기록이 끊기면 열린 Tickets·Runs·Stats가 30초마다 자기 query를 다시 읽고 루트는 읽지 않는다(가짜 시계). 스펙 7절 4번이 빠져 있던 화면이다.
 - 그대로 통과: `navigation.test.ts`(0117), `runs-query`, `dashboard-query`, `query-screens`, `settings-query`, `change-events`, `run-detail`, `home`.
 

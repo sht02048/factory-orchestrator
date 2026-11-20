@@ -36,6 +36,14 @@ function idleRetryState(): RetryState {
   return IDLE;
 }
 
+function focusCurrentScreenLinkIfLost(): void {
+  requestAnimationFrame(() => {
+    const active = document.activeElement;
+    if (active !== null && active !== document.body) return;
+    document.querySelector<HTMLElement>('nav a[aria-current="page"]')?.focus();
+  });
+}
+
 export function ScreenError(_props: ErrorComponentProps) {
   const t = useTranslations("shell.screenError");
   const router = useRouter();
@@ -69,7 +77,10 @@ export function ScreenError(_props: ErrorComponentProps) {
     };
     router.invalidate({ filter: (match) => match.status === "error", sync: true }).then(() => {
       if (router.state.matches.some((match) => match.status === "error")) failed();
-      else setRetryState(IDLE);
+      else {
+        setRetryState(IDLE);
+        focusCurrentScreenLinkIfLost();
+      }
     }, failed);
   };
 
