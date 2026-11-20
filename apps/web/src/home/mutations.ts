@@ -5,18 +5,17 @@ import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import { toRunId } from "@ganger/core";
 import type { RunId } from "@ganger/core";
 import { ANSWER_REJECT_REASONS, DENY_REJECT_REASONS, rejectedAs } from "../query/mutation-error";
+import { runDetailKey, runsListKey } from "../runs/queries";
 import { answerQuestion, controlRun, denyPermission } from "../server/functions";
 import type { AnswerInput, ControlInput, DenyInput } from "./home-screen";
 
 export const ROUTER_ROUTES_SHOWING_RUNS: ReadonlySet<string> = new Set([
-  "/_app/runs",
-  "/_app/runs_/$runId",
   "/_app/tickets",
   "/_app/runners",
 ]);
 
 export function keysChangedByRunWrite(runId: RunId): ReadonlyArray<QueryKey> {
-  return [["dashboard"], ["runs", "detail", runId], ["runs", "list"]];
+  return [["dashboard"], runDetailKey(runId), runsListKey];
 }
 
 async function invalidateRunWrite(

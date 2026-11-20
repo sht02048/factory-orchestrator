@@ -55,6 +55,7 @@ export interface RunDetailScreenProps extends RunDetailActions {
   page: RunDetailPage;
   runsHref: string;
   runHref: (runId: string) => string;
+  logStalled?: boolean;
 }
 
 export function RunDetailScreen(props: RunDetailScreenProps) {
@@ -214,7 +215,12 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
 
           <div {...stylex.props(styles.column)}>
             <Properties run={run} />
-            <LogTail log={run.log} now={run.now} onRefresh={props.onRefreshLog} />
+            <LogTail
+              log={run.log}
+              now={run.now}
+              stalled={props.logStalled === true}
+              onRefresh={props.onRefreshLog}
+            />
             <OtherRuns run={run} runHref={props.runHref} />
           </div>
         </div>
@@ -674,10 +680,12 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
 function LogTail({
   log,
   now,
+  stalled,
   onRefresh,
 }: {
   log: LogTailView;
   now: string;
+  stalled: boolean;
   onRefresh: RunDetailActions["onRefreshLog"];
 }) {
   const t = useTranslations("run.log");
@@ -692,7 +700,11 @@ function LogTail({
       body = <Text variant="meta">{t("none")}</Text>;
       break;
     case "pending":
-      body = <Text variant="meta">{t("pending")}</Text>;
+      body = (
+        <Text variant="meta" role="status">
+          {t(stalled ? "stalled" : "pending")}
+        </Text>
+      );
       break;
     case "failed":
       note = time(log.at);

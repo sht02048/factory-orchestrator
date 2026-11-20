@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import onboarding from "../../apps/web/messages/ko/onboarding.json" with { type: "json" };
 import runnerSetup from "../../apps/web/messages/ko/runnerSetup.json" with { type: "json" };
 import settings from "../../apps/web/messages/ko/settings.json" with { type: "json" };
@@ -62,10 +62,6 @@ describe("pnpm dev", () => {
     const dev = await startDev(["--onboarding", "--static"]);
     const page = await browser.newPage({ baseURL: dev.url, locale: "ko-KR" });
     page.setDefaultTimeout(30_000);
-    onTestFailed(async () => {
-      mkdirSync(resultsDir, { recursive: true });
-      await page.screenshot({ path: join(resultsDir, "dev-onboarding.png"), fullPage: true });
-    });
     try {
       const first = await fetch(dev.url + "/", { redirect: "manual" });
       expect(first.status).toBe(307);
@@ -77,30 +73,47 @@ describe("pnpm dev", () => {
       const fill = page.getByRole("button", { name: "가짜 값 채우기" });
       const next = page.getByRole("button", { name: onboarding.next });
 
+      const openStep = async (title: string) => {
+        await next.click();
+        await main.getByText(title, { exact: true }).waitFor();
+      };
+
+      await main.getByText(onboarding.steps.tracker.title, { exact: true }).waitFor();
       await fill.click();
       await page.getByRole("button", { name: settings.credentials.keyCheck }).click();
       await main.getByText(onboarding.tracker.checked).waitFor();
-      await next.click();
+      await openStep(onboarding.steps.github.title);
       await fill.click();
       await page.getByRole("button", { name: settings.github.save }).click();
       await enabled(next);
-      await next.click();
+      await openStep(onboarding.steps.runner.title);
       await page.getByRole("link", { name: runnerSetup.choose.directLink }).click();
+      await main.getByRole("textbox", { name: settings.runners.sshTarget }).waitFor();
       await fill.click();
       await page.getByRole("button", { name: settings.runners.direct.submit }).click();
       await main.getByText(onboarding.runner.ready.replace("{name}", "runner-a")).waitFor();
-      await next.click();
+      await openStep(onboarding.steps.workspace.title);
       await fill.click();
       await page.getByRole("checkbox", { name: "Web" }).click();
       await page.getByRole("button", { name: onboarding.workspace.create }).click();
       await enabled(next);
-      await next.click();
+      await openStep(onboarding.steps.mapping.title);
+      const settled = async (popup: "listbox" | "menu") => {
+        await page.getByRole(popup).waitFor({ state: "detached" });
+        await expect
+          .poll(() => main.getByText(settings.mapping.status.saving, { exact: true }).count(), {
+            timeout: 30_000,
+          })
+          .toBe(0);
+      };
       const choose = async (index: number, option: string) => {
         await main.getByRole("combobox").nth(index).click();
         await page.getByRole("option", { name: option, exact: true }).click();
+        await settled("listbox");
       };
       await main.getByRole("button", { name: "Web의 기본 저장소 고르기" }).click();
       await page.getByRole("menuitem", { name: "acme/web", exact: true }).click();
+      await settled("menu");
       await choose(0, "Claude Code");
       await choose(1, "In Progress");
       await choose(2, "factory");
@@ -111,6 +124,10 @@ describe("pnpm dev", () => {
 
       const home = await fetch(dev.url + "/", { redirect: "manual" });
       expect(home.status).toBe(200);
+    } catch (error) {
+      mkdirSync(resultsDir, { recursive: true });
+      await page.screenshot({ path: join(resultsDir, "dev-onboarding.png"), fullPage: true });
+      throw error;
     } finally {
       await page.close();
       await dev.stop();

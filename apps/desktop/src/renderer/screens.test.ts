@@ -83,6 +83,9 @@ beforeAll(async () => {
   if (address === undefined) throw new Error("renderer dev server has no address");
   baseUrl = address;
   browser = await chromium.launch({ channel: "chrome" });
+  const warm = await browser.newPage();
+  await warm.goto(baseUrl, { waitUntil: "networkidle", timeout: 110_000 });
+  await warm.close();
 }, 120_000);
 
 afterAll(async () => {
