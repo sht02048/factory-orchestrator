@@ -330,6 +330,8 @@ export class Controller {
   }
 
   private async chooseRemote(): Promise<void> {
+    if (this.options.devServerUrl !== undefined)
+      return this.openDevServer(this.options.devServerUrl);
     this.mode = "remote";
     this.stopRemoteRetry();
     this.refreshMenus();
@@ -381,6 +383,10 @@ export class Controller {
   }
 
   private useRemote(server: SavedServer): void {
+    if (this.options.devServerUrl !== undefined) {
+      this.showRemote(server);
+      return;
+    }
     const settings = this.options.settings.read();
     this.options.settings.write({ ...settings, mode: "remote", remote: server });
     this.showRemote(server);
@@ -397,6 +403,7 @@ export class Controller {
 
   private async openDevServer(url: string): Promise<void> {
     this.mode = "remote";
+    this.stopRemoteRetry();
     const name = new URL(url).host;
     this.setView({ screen: "unreachable", name, url, checking: true });
     const result = await connectAddress(url, (origin, timeoutMs) =>
@@ -418,6 +425,8 @@ export class Controller {
   }
 
   private async openRemote(saved: SavedServer): Promise<void> {
+    if (this.options.devServerUrl !== undefined)
+      return this.openDevServer(this.options.devServerUrl);
     this.mode = "remote";
     this.remote = { server: saved, reachable: false };
     this.setView({ screen: "unreachable", name: saved.name, url: saved.url, checking: true });
@@ -570,9 +579,9 @@ export class Controller {
     handle("start-local", () => this.restartLocal());
     handle("retry", () => {
       if (this.mode === "local") return this.restartLocal();
-      if (this.remote !== undefined) return this.openRemote(this.remote.server);
       if (this.options.devServerUrl !== undefined)
         return this.openDevServer(this.options.devServerUrl);
+      if (this.remote !== undefined) return this.openRemote(this.remote.server);
       return this.chooseRemote();
     });
     handle("choose-mode", () => this.chooseMode());
@@ -962,7 +971,7 @@ export class Controller {
         },
       });
     }
-    if (this.mode === "remote") {
+    if (this.mode === "remote" && this.options.devServerUrl === undefined) {
       items.push({
         id: "choose-server",
         label: t("tray.chooseServer"),
