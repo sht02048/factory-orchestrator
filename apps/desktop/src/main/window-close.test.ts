@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hideWindow } from "./window-close.js";
+import { cancelPendingHide, hideWindow } from "./window-close.js";
 import type { HideableWindow } from "./window-close.js";
 
 class FakeWindow implements HideableWindow {
@@ -28,6 +28,17 @@ class FakeWindow implements HideableWindow {
   once(_event: "leave-full-screen", listener: () => void): this {
     this.leaveListeners.push(listener);
     return this;
+  }
+
+  removeListener(_event: "leave-full-screen", listener: () => void): this {
+    const index = this.leaveListeners.indexOf(listener);
+    if (index >= 0) this.leaveListeners.splice(index, 1);
+    return this;
+  }
+
+  show(): void {
+    this.calls.push("show");
+    this.visible = true;
   }
 
   finishLeavingFullScreen(): void {
@@ -63,5 +74,23 @@ describe("창 닫기(0138)", () => {
 
     window.finishLeavingFullScreen();
     expect(window.visible).toBe(false);
+    expect(window.calls.filter((call) => call === "hide")).toHaveLength(1);
+  });
+
+  it("전체 화면에서 나오는 동안 다시 열면 나온 뒤에도 숨기지 않는다", () => {
+    const window = new FakeWindow(true);
+    hideWindow(window);
+    cancelPendingHide(window);
+    window.show();
+
+    window.finishLeavingFullScreen();
+    expect(window.visible).toBe(true);
+    expect(window.calls).toEqual(["setFullScreen(false)", "show"]);
+  });
+
+  it("숨기기를 기다리지 않는 창에서 취소해도 아무 일도 하지 않는다", () => {
+    const window = new FakeWindow(false);
+    cancelPendingHide(window);
+    expect(window.calls).toEqual([]);
   });
 });

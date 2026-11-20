@@ -71,7 +71,7 @@ import {
 } from "../shared/view.js";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 import { navigationMenu } from "./navigation-menu.js";
-import { hideWindow } from "./window-close.js";
+import { cancelPendingHide, hideWindow } from "./window-close.js";
 import { mainWindowOptions, settingsWindowOptions, titleBarCookie } from "./window-options.js";
 
 async function loadServerScreen(window: BrowserWindow, url: string): Promise<void> {
@@ -175,6 +175,7 @@ export class Controller {
 
   showWindow(): void {
     const window = this.ensureWindow();
+    cancelPendingHide(window);
     window.show();
     window.focus();
   }
