@@ -123,7 +123,7 @@ describe("PR을 읽지 못해도 런을 끝낸다", () => {
       expect(found.records.reportBody).toBe("끝났어요");
       expect(current(waiting).state).toBe("running");
       expect(summarizeRunOutcome(found.run)).toEqual({
-        outcome: "human-check",
+        outcome: "succeeded",
         worktree: "keep-until-pr-settles",
       });
       const readFailed = h.warnings.find((w) => w.event === "run.pr_read_failed");
@@ -287,7 +287,8 @@ describe("PR 다시 읽기", () => {
 
   it.each([
     { pr: "merged", removed: true },
-    { pr: "none", removed: true },
+    { pr: "closed", removed: true },
+    { pr: "none", removed: false },
     { pr: "open", removed: false },
   ] as const)(
     "읽으면 PR 상태($pr)를 채우고 그 tick에 워크트리 규칙을 적용한다",

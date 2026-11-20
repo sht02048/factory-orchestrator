@@ -1061,6 +1061,71 @@ describe("worktreeExists and removeWorktree", () => {
   });
 });
 
+describe("checkWorktreeWork", () => {
+  const STATUS = "git -C '<path>/workspaces/sandbox/fo-t0013-probe1' status";
+  const REV_LIST = "git -C '<path>/workspaces/sandbox/fo-t0013-probe1' rev-list";
+  const shown = (): ScriptedExec =>
+    new ScriptedExec().orca("worktree show", stdout(own("worktree-show.json")));
+
+  test("reads git status and commits missing from every remote in the worktree", async () => {
+    const exec = shown().on(STATUS, stdout("")).on(REV_LIST, stdout("0\n"));
+    expect(await runnerWith(exec).checkWorktreeWork(WORKTREE)).toEqual({
+      kind: "checked",
+      uncommittedChanges: false,
+      unpushedCommits: false,
+    });
+    expect(exec.commands()).toEqual([
+      `/Applications/Orca.app/Contents/Resources/bin/orca worktree show --worktree 'id:${WORKTREE}' --json`,
+      "git -C '<path>/workspaces/sandbox/fo-t0013-probe1' status --porcelain '--untracked-files=all'",
+      "git -C '<path>/workspaces/sandbox/fo-t0013-probe1' rev-list --count HEAD --not --remotes",
+    ]);
+  });
+
+  test("tracked or untracked changes and unpushed commits count as work", async () => {
+    const changed = shown()
+      .on(STATUS, stdout("?? notes.md\n M src/a.ts\n"))
+      .on(REV_LIST, stdout("0"));
+    expect(await runnerWith(changed).checkWorktreeWork(WORKTREE)).toMatchObject({
+      uncommittedChanges: true,
+      unpushedCommits: false,
+    });
+    const ahead = shown().on(STATUS, stdout("")).on(REV_LIST, stdout("2\n"));
+    expect(await runnerWith(ahead).checkWorktreeWork(WORKTREE)).toMatchObject({
+      uncommittedChanges: false,
+      unpushedCommits: true,
+    });
+  });
+
+  test("a worktree already gone has nothing to keep", async () => {
+    const gone = new ScriptedExec().orca(
+      "worktree show",
+      stdout(own("worktree-show-not-found.json"), 1),
+    );
+    expect(await runnerWith(gone).checkWorktreeWork(WORKTREE)).toEqual({ kind: "gone" });
+  });
+
+  test("a failed git command, ssh failure or odd output is an error, not a clean worktree", async () => {
+    const failed = shown().on(STATUS, {
+      exitCode: 128,
+      stdout: "",
+      stderr: "fatal",
+      timedOut: false,
+    });
+    expect(await adapterError(runnerWith(failed).checkWorktreeWork(WORKTREE))).toMatchObject({
+      kind: "runner-error",
+      code: "git_failed",
+    });
+    const unreachable = shown().on(STATUS, stdout("")).on(REV_LIST, stdout("", 255));
+    expect(await adapterError(runnerWith(unreachable).checkWorktreeWork(WORKTREE))).toMatchObject({
+      kind: "unreachable",
+    });
+    const odd = shown().on(STATUS, stdout("")).on(REV_LIST, stdout("many"));
+    expect(await adapterError(runnerWith(odd).checkWorktreeWork(WORKTREE))).toMatchObject({
+      kind: "malformed-output",
+    });
+  });
+});
+
 describe("pauseAgent and resumeAgent", () => {
   const ORCA = "/Applications/Orca.app/Contents/Resources/bin/orca";
   const AGENT_TERMINAL = "term_9c1d6b7e-2f0a-4c55-9a3e-0d5f1e2b7a10";

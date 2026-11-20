@@ -34,6 +34,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
+import { currentPrState } from "@ganger/app/runs/model";
 import type { WorkspaceSummary } from "@ganger/app/shell/model";
 import { runStatus, useStatusName } from "../status";
 import type { AssignInput, AssignResult } from "@ganger/app/tickets/assign";
@@ -454,9 +455,7 @@ type NextStep =
   | "waiting-for-input"
   | "paused"
   | "disconnected"
-  | "merged"
-  | "human-check"
-  | "human-check-settled"
+  | "succeeded"
   | "failed"
   | "canceled";
 
@@ -465,7 +464,6 @@ function nextStepOf(ticket: TicketView): NextStep {
   if (ticket.assignability.kind === "no-mapping") return "no-mapping";
   if (run === undefined) return "unassigned";
   if (run.state !== "ended") return run.state;
-  if (run.summary === "human-check" && run.prSettledLater) return "human-check-settled";
   return run.summary;
 }
 
@@ -514,6 +512,7 @@ function TicketPanel({
           <div {...stylex.props(styles.lastRunState)}>
             <LastRunStatus run={run} />
             {run === undefined ? null : <RunTiming run={run} />}
+            {run?.state === "ended" ? <RunPullRequest run={run} /> : null}
           </div>
           <Text variant="body">{t(`next.${nextStepOf(ticket)}`)}</Text>
           <Actions>
@@ -584,6 +583,21 @@ function TicketPanel({
         </PanelFooter>
       )}
     </DetailPanel>
+  );
+}
+
+function RunPullRequest({ run }: { run: TicketRun & { state: "ended" } }) {
+  const t = useTranslations("tickets.panel");
+  const domain = useTranslations("domain");
+  const state = currentPrState(run);
+  if (state === "none") return null;
+  const stateName = domain(`prState.${state}`);
+  return (
+    <Text variant="meta">
+      {run.pullRequest === null
+        ? t("prState", { state: stateName })
+        : t("pullRequest", { pr: run.pullRequest, state: stateName })}
+    </Text>
   );
 }
 

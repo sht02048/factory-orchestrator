@@ -3,12 +3,11 @@ import type { ReactNode } from "react";
 import { colors, fontSize, fontWeight, radius, size, space } from "../tokens.stylex";
 
 export type RunStateStatus = "queued" | "running" | "waiting-for-input" | "paused" | "disconnected";
-export type SummaryStatus = "merged" | "human-check" | "failed" | "canceled";
+export type SummaryStatus = "succeeded" | "failed" | "canceled";
 export type RunnerStatus = "online" | "offline";
 export type AttentionStatus =
   | "question"
   | "permission"
-  | "human-check"
   | "failed"
   | "disconnected"
   | "runner-issue";
@@ -23,8 +22,7 @@ export const PILL_STATUSES = [
   "waiting-for-input",
   "paused",
   "disconnected",
-  "merged",
-  "human-check",
+  "succeeded",
   "failed",
   "canceled",
   "online",
@@ -40,8 +38,6 @@ export function statusTone(status: PillStatus): StatusTone {
     case "permission":
     case "waiting-for-input":
       return "answer";
-    case "human-check":
-      return "check";
     case "failed":
     case "disconnected":
     case "runner-issue":
@@ -50,7 +46,7 @@ export function statusTone(status: PillStatus): StatusTone {
     case "running":
     case "online":
       return "progress";
-    case "merged":
+    case "succeeded":
       return "merged";
     case "queued":
     case "paused":

@@ -4,7 +4,6 @@ import type { NotificationRecord } from "@ganger/app/notifications/feed";
 export const NOTIFICATION_GROUPS = [
   "question",
   "permission",
-  "humanCheck",
   "failedDisconnected",
   "runnerIssue",
 ] as const;
@@ -15,7 +14,6 @@ export const notificationPrefsSchema = z.object({
   groups: z.object({
     question: z.boolean(),
     permission: z.boolean(),
-    humanCheck: z.boolean(),
     failedDisconnected: z.boolean(),
     runnerIssue: z.boolean(),
   }),
@@ -35,7 +33,6 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   groups: {
     question: true,
     permission: true,
-    humanCheck: true,
     failedDisconnected: true,
     runnerIssue: true,
   },
@@ -49,8 +46,6 @@ export function groupOf(kind: NotificationKind): NotificationGroup {
       return "question";
     case "permission":
       return "permission";
-    case "human-check":
-      return "humanCheck";
     case "failed":
     case "disconnected":
       return "failedDisconnected";
@@ -63,10 +58,6 @@ export function groupOf(kind: NotificationKind): NotificationGroup {
 
 export function isTodoKind(kind: NotificationKind): boolean {
   return groupOf(kind) !== "runnerIssue";
-}
-
-export function isSilentKind(kind: NotificationKind): boolean {
-  return kind === "human-check";
 }
 
 export function remindsKind(kind: NotificationKind): boolean {

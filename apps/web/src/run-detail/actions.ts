@@ -19,6 +19,7 @@ import {
   cancelRun,
   controlRun,
   denyPermission,
+  removeRunWorktree,
   requestRunLog,
 } from "../server/functions";
 import type { RunDetailActions } from "./run-detail-screen";
@@ -30,6 +31,7 @@ export interface RunDetailCalls {
   answer(input: { runId: string; questionId: string; answer: string }): Promise<unknown>;
   deny(input: { runId: string; promptId: string; reason: string }): Promise<unknown>;
   cancel(runId: string): Promise<RunActionResult>;
+  removeWorktree(runId: string): Promise<RunActionResult>;
   control(runId: string, control: RunControl): Promise<RunControlActionResult>;
   requestLog(runId: string): Promise<boolean>;
 }
@@ -38,6 +40,7 @@ export const serverRunDetailCalls: RunDetailCalls = {
   answer: (data) => answerQuestion({ data }),
   deny: (data) => denyPermission({ data }),
   cancel: (runId) => cancelRun({ data: { runId } }),
+  removeWorktree: (runId) => removeRunWorktree({ data: { runId } }),
   control: (runId, control) => controlRun({ data: { runId, control } }),
   requestLog: (runId) => requestRunLog({ data: { runId } }),
 };
@@ -87,6 +90,10 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
       mutationFn: async () => okOrThrow<object, string>(await calls.cancel(runId)),
       onSuccess: refreshRun,
     }),
+    removeWorktree: mutationOptions({
+      mutationFn: async () => okOrThrow<object, string>(await calls.removeWorktree(runId)),
+      onSuccess: refreshRun,
+    }),
     control: mutationOptions({
       mutationFn: async (control: RunControl): Promise<RunControlOutcome> =>
         (await calls.control(runId, control)).ok ? "requested" : "state-changed",
@@ -112,6 +119,7 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
   const answer = useMutation(mutations.answer);
   const deny = useMutation(mutations.deny);
   const cancel = useMutation(mutations.cancel);
+  const removeWorktree = useMutation(mutations.removeWorktree);
   const control = useMutation(mutations.control);
   const refreshLog = useMutation(mutations.refreshLog);
   const openLog = useMutation(mutations.openLog);
@@ -124,6 +132,9 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
     },
     onCancel: async () => {
       await cancel.mutateAsync();
+    },
+    onRemoveWorktree: async () => {
+      await removeWorktree.mutateAsync();
     },
     onControl: (next) => control.mutateAsync(next),
     onRefreshLog: async () => {

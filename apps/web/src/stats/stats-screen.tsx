@@ -26,9 +26,8 @@ import {
   PR_STATE_ORDER,
   STATS_DIMENSIONS,
   STATS_PERIOD_DAYS,
-  humanTouchedRate,
-  mergedRate,
-  mergedRateChange,
+  successRate,
+  successRateChange,
 } from "@ganger/app/stats/model";
 import type {
   FailureReasonCount,
@@ -222,7 +221,7 @@ function StatsView({
 
 function Headline({ total, days }: { total: StatsSummary; days: number }) {
   const t = useTranslations("stats.headline");
-  const rate = mergedRate(total);
+  const rate = successRate(total);
   if (total.runs === 0) return <>{t("empty", { days })}</>;
   if (rate === null) return <>{t("onlyCanceled", { runs: total.runs })}</>;
   return <>{t("rated", { runs: total.rated, percent: rate })}</>;
@@ -238,12 +237,8 @@ function Legend({ placement }: { placement: "head" | "body" }) {
       )}
     >
       <span {...stylex.props(styles.legendItem)}>
-        <OutcomeSwatch tone="merged" />
-        <Text variant="meta">{t("merged")}</Text>
-      </span>
-      <span {...stylex.props(styles.legendItem)}>
-        <OutcomeSwatch tone="check" />
-        <Text variant="meta">{t("check")}</Text>
+        <OutcomeSwatch tone="succeeded" />
+        <Text variant="meta">{t("succeeded")}</Text>
       </span>
       <span {...stylex.props(styles.legendItem)}>
         <OutcomeSwatch tone="failed" />
@@ -274,15 +269,15 @@ function Figures({
   const t = useTranslations("stats");
   const { duration } = useTime();
   const percentText = usePercentText();
-  const change = mergedRateChange(total, previous);
-  const rate = mergedRate(total);
+  const change = successRateChange(total, previous);
+  const rate = successRate(total);
   const trend: StatTrend | undefined =
     change === null || change === 0 ? undefined : change > 0 ? "better" : "worse";
 
   return (
     <section aria-label={t("figures.label")} {...stylex.props(styles.figures)}>
       <StatTile
-        label={t("figures.mergedRate")}
+        label={t("figures.successRate")}
         value={percentText(rate)}
         {...(rate === null
           ? {}
@@ -300,12 +295,9 @@ function Figures({
         {...(trend === undefined ? {} : { trend })}
       />
       <StatTile
-        label={t("figures.humanTouched")}
-        value={percentText(humanTouchedRate(total))}
-        detail={t("figures.humanTouchedDetail", {
-          check: total.outcomes["human-check"],
-          failed: total.outcomes.failed,
-        })}
+        label={t("figures.prMerged")}
+        value={total.prMerged}
+        detail={t("figures.prMergedDetail")}
       />
       <StatTile
         label={t("figures.leadTime")}

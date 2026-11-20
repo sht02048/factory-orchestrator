@@ -10,7 +10,15 @@ import {
   toTicketKey,
   toWorktreeRef,
 } from "@ganger/core";
-import type { AgentId, AgentResult, PrState, RunId, RunnerId, TicketKey } from "@ganger/core";
+import type {
+  AgentId,
+  AgentResult,
+  PrState,
+  RunId,
+  RunnerId,
+  TicketKey,
+  WorktreeKeptReason,
+} from "@ganger/core";
 import {
   assignRun,
   changeRunState,
@@ -293,6 +301,7 @@ function ok(result: { ok: true } | { ok: false; error: unknown }): void {
 interface Ending {
   agentResult: AgentResult;
   prState: PrState;
+  worktreeKept?: WorktreeKeptReason;
 }
 
 function end(
@@ -319,10 +328,11 @@ function end(
   updateRunRecords(db, runId, {
     trackerComment: { id: toCommentId(`demo-comment-${runId}`), at },
     worktreeRemovedAt:
-      summarizeRunOutcome({ ...ending, runnerUnreached: false }).worktree ===
-      "keep-until-pr-settles"
-        ? null
-        : at,
+      ending.worktreeKept === undefined &&
+      summarizeRunOutcome({ ...ending, runnerUnreached: false }).worktree === "remove-now"
+        ? at
+        : null,
+    worktreeKept: ending.worktreeKept ?? null,
     lastLog: ["$ pnpm test", "✓ 42 tests passed", "$ git push", "done"],
     ...(ending.prState === "none"
       ? {}
@@ -338,7 +348,7 @@ function end(
   });
 }
 
-const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 21, 22, 23, 24, 25, 26], GLX: [2] };
+const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 8, 9, 21, 22, 23, 24, 25, 26], GLX: [2] };
 const HISTORY_TICKETS = [
   range(1, 35).filter((n) => !ACTIVE_TICKETS.ACME.includes(n)),
   range(1, 10).filter((n) => !ACTIVE_TICKETS.GLX.includes(n)),
@@ -458,6 +468,8 @@ function seedActive(db: Database, now: Date): SeededRuns {
     [5, { agentResult: "reported-success", prState: "open" }],
     [6, { agentResult: "ended-without-report", prState: "none" }],
     [7, { agentResult: "canceled", prState: "none" }],
+    [8, { agentResult: "reported-success", prState: "none" }],
+    [9, { agentResult: "reported-failure", prState: "none", worktreeKept: "unpushed-commits" }],
   ];
   let prNumber = 900;
   for (const [n, ending] of endings) {

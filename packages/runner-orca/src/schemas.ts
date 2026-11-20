@@ -79,6 +79,10 @@ export const worktreeShowResultSchema = z.object({
   worktree: z.object({ id: text, branch: optionalText }),
 });
 
+export const worktreePathResultSchema = z.object({
+  worktree: z.object({ path: text }),
+});
+
 export const workerListResultSchema = z.object({
   workers: z.array(z.object({ dispatchId: text, taskId: text, workspace: optionalText })),
   nextCursor: optionalText,

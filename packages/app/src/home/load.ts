@@ -163,7 +163,6 @@ export function loadHomePage(
           agentResult: run.agentResult,
           prState: run.prState,
           summary: summarizeRunOutcome(run).outcome,
-          prSettledLater: records.laterPrState !== null,
           endedAt: run.endedAt.toISOString(),
           endedAgoMs: Math.max(0, now.getTime() - run.endedAt.getTime()),
         };

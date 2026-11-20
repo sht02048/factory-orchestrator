@@ -1,5 +1,5 @@
 import { runDurations, summarizeRunOutcome, toRunId } from "@ganger/core";
-import type { CiState, QueuedRun, RunId } from "@ganger/core";
+import type { CiState, QueuedRun, RunId, WorktreeDisposition } from "@ganger/core";
 import {
   getLogTailRequest,
   getRun,
@@ -33,6 +33,8 @@ import type { QueuedReason } from "../runs/model.js";
 import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
 import type {
   CiView,
+  KeptWorktree,
+  KeptWorktreeReason,
   LogTailView,
   OtherRun,
   PendingInput,
@@ -143,8 +145,7 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date):
         prState: run.prState,
         prReadError: records.prReadError,
         summary: outcome.outcome,
-        worktreeNeedsManualRemoval:
-          outcome.worktree === "operator-decides" && records.worktreeRemovedAt === null,
+        keptWorktree: keptWorktreeOf(run, records, outcome.worktree),
         laterPrState:
           records.laterPrState === null
             ? null
@@ -152,6 +153,28 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date):
       };
     }
   }
+}
+
+function keptWorktreeOf(
+  run: Extract<StoredRun, { state: "ended" }>,
+  records: RunRecords,
+  disposition: WorktreeDisposition,
+): KeptWorktree | null {
+  if (run.startedAt === null || records.worktreeRemovedAt !== null) return null;
+  const reason = keptWorktreeReason(run, records, disposition);
+  return reason === null ? null : { reason, removing: records.worktreeRemoveRequestedAt !== null };
+}
+
+function keptWorktreeReason(
+  run: Extract<StoredRun, { state: "ended" }>,
+  records: RunRecords,
+  disposition: WorktreeDisposition,
+): KeptWorktreeReason | null {
+  if (records.worktreeKept !== null) return records.worktreeKept;
+  if (disposition !== "operator-decides") return null;
+  if (run.agentResult === "runner-disconnected") return "runner-disconnected";
+  if (run.agentResult === "canceled") return "runner-unreached";
+  return "no-pr";
 }
 
 function inputSinceOf(db: Database, runId: RunId, input: PendingInput): string | null {

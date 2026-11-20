@@ -235,14 +235,14 @@ describe("DataTable·차트·단계(티켓 0074)", () => {
   it("OutcomeBar 는 이름 있는 그림이고 0 인 결과는 그리지 않는다", () => {
     const html = renderToString(
       <OutcomeBar
-        label="Merged 2"
+        label="Succeeded 2"
         segments={[
-          { tone: "merged", value: 2 },
+          { tone: "succeeded", value: 2 },
           { tone: "failed", value: 0 },
         ]}
       />,
     );
-    expect(html).toMatch(/^<span role="img" aria-label="Merged 2"/);
+    expect(html).toMatch(/^<span role="img" aria-label="Succeeded 2"/);
     expect(html.match(/flex-grow/g)).toHaveLength(1);
   });
 

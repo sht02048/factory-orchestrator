@@ -19,8 +19,7 @@ export function useStatusName(): (status: PillStatus) => string {
       case "paused":
       case "disconnected":
         return t(`runState.${status}`);
-      case "merged":
-      case "human-check":
+      case "succeeded":
       case "failed":
       case "canceled":
         return t(`summary.${status}`);

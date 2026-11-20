@@ -26,7 +26,7 @@ import type { RunDetail, RunDetailPage } from "@ganger/app/run-detail/model";
 import { RunDetailScreen } from "./run-detail-screen";
 import { addExtraEnded, assign, extraEndedCases, startedOn, walk } from "./testing";
 import { answerInput, submitAnswer } from "@ganger/app/home/actions";
-import { cancelRunRequest } from "@ganger/app/run-detail/actions";
+import { cancelRunRequest, removeWorktreeRequest } from "@ganger/app/run-detail/actions";
 
 const resolved = () => Promise.resolve();
 
@@ -41,6 +41,7 @@ function render(page: RunDetailPage, timeZone?: string): string {
       onAnswer={resolved}
       onDeny={resolved}
       onCancel={resolved}
+      onRemoveWorktree={resolved}
       onControl={() => Promise.resolve("requested" as const)}
       onRefreshLog={resolved}
     />,
@@ -119,10 +120,9 @@ describe("Run 상세 화면", () => {
       );
       const body = text(html);
       expect(body).toContain(`${runJson.prUnread.title} ${runJson.prUnread[reason]}`);
-      expect(body).toContain(runJson.reason.prUnread);
-      expect(body).toContain(runJson.next.prUnread);
-      expect(body).not.toContain(runJson.reason["human-check"]);
-      expect(pillsOf(html).map((pill) => pill.label)).toContain(domain.summary["human-check"]);
+      expect(body).toContain(runJson.reason.succeeded);
+      expect(body).toContain(`${domain.summary.succeeded} PR ${domain.prState.unknown}`);
+      expect(pillsOf(html).map((pill) => pill.label)).toEqual([domain.summary.succeeded]);
     },
   );
 
@@ -152,11 +152,68 @@ describe("Run 상세 화면", () => {
     expect(valueOf(render(page(db, id)), runJson.props.model)).toBe("sonnet");
   });
 
-  it("러너에 닿지 못한 채 끝난 취소 런도 사람이 지워야 함을 보인다", () => {
+  it("러너에 닿지 못한 채 끝난 취소 런은 워크트리를 남긴 이유와 지우기 버튼을 보인다", () => {
     const { db } = seedDatabase();
     const extra = addExtraEnded(db);
-    expect(text(render(page(db, extra.get("ACME-22"))))).toContain(runJson.manualRemoval);
-    expect(text(render(page(db, extra.get("ACME-21"))))).not.toContain(runJson.manualRemoval);
+    const kept = render(page(db, extra.get("ACME-22")));
+    expect(text(kept)).toContain(runJson.keptWorktree["runner-unreached"]);
+    expect(labels(kept)).toContain(runJson.removeWorktree.trigger);
+    const removed = render(page(db, extra.get("ACME-21")));
+    expect(text(removed)).not.toContain(runJson.keptWorktree["runner-unreached"]);
+    expect(labels(removed)).not.toContain(runJson.removeWorktree.trigger);
+  });
+
+  it("결과 곁에 PR 번호와 지금 PR 상태를 보이고, 이후 PR 상태가 있으면 그것을 보인다 (0145)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-2");
+    if (id === undefined) throw new Error("no ACME-2");
+    const stateLine = (): string => text(render(page(db, id)));
+    expect(stateLine()).toContain(`${domain.summary.failed} PR #2 ${domain.prState.open}`);
+    updateRunRecords(db, id, { laterPrState: { state: "merged", at: minutes(110) } });
+    expect(stateLine()).toContain(`${domain.summary.failed} PR #2 ${domain.prState.merged}`);
+    const noPr = text(render(page(db, ids.get("ACME-4"))));
+    expect(noPr).not.toContain(`${domain.summary.failed} PR `);
+  });
+
+  it("Succeeded 인데 PR 이 없으면 워크트리를 남겼다고 보이고 워크트리 지우기를 둔다 (0145 R7-2·R7-3)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-41", 400);
+    walk(db, id, 400, [
+      startedOn("ACME-41"),
+      { to: "ended", agentResult: "reported-success", prState: "none" },
+    ]);
+    const html = render(page(db, id));
+    const body = text(html);
+    expect(body).toContain(`${runJson.keptWorktree["no-pr"]} ${runJson.keptWorktreeNext["no-pr"]}`);
+    expect(body).not.toContain(runJson.next.succeeded);
+    expect(labels(html)).toContain(runJson.removeWorktree.trigger);
+    expect(html).toMatch(/data-variant="danger"[^>]*>워크트리 지우기|워크트리 지우기/);
+  });
+
+  it.each(["uncommitted-changes", "unpushed-commits", "check-failed"] as const)(
+    "worker 가 일이 남아 남긴 워크트리(%s)는 그 이유를 보인다 (0145 R7-1)",
+    (reason) => {
+      const { db, ids } = seedDatabase();
+      const id = ids.get("ACME-3");
+      if (id === undefined) throw new Error("no ACME-3");
+      updateRunRecords(db, id, { worktreeKept: reason });
+      const html = render(page(db, id));
+      expect(text(html)).toContain(
+        `${runJson.keptWorktree[reason]} ${runJson.keptWorktreeNext[reason]}`,
+      );
+      expect(labels(html)).toContain(runJson.removeWorktree.trigger);
+    },
+  );
+
+  it("워크트리 지우기를 요청하면 버튼 대신 지우는 중을 상태 문장으로 보인다 (0145 R7-3)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-3");
+    if (id === undefined) throw new Error("no ACME-3");
+    updateRunRecords(db, id, { worktreeKept: "unpushed-commits" });
+    removeWorktreeRequest(db, id, minutes(110));
+    const html = render(page(db, id));
+    expect(labels(html)).not.toContain(runJson.removeWorktree.trigger);
+    expect(html).toMatch(new RegExp(`role="status"[^>]*>${runJson.removeWorktree.pending}<`));
   });
 
   it("시작하지 않고 끝난 런은 0초 만에 끝났다고 하지 않는다", () => {
@@ -199,13 +256,16 @@ describe("Run 상세 화면", () => {
     expect(text(render(detail, "America/Los_Angeles"))).toContain("01:40부터 러너에 닿지 않아요");
   });
 
-  it("워크트리를 지우지 않은 러너 연결 끊김 런은 사람이 지워야 함을 보이고 지우기 버튼은 없다", () => {
+  it("워크트리를 지우지 않은 러너 연결 끊김 런은 워크트리를 남긴 이유와 지우기 버튼을 보인다", () => {
     const { db, ids } = seedDatabase();
-    const body = text(render(page(db, ids.get("ACME-5"))));
-    expect(body).toContain(runJson.manualRemoval);
-    expect(body).toContain(runJson.next.manualRemoval);
-    expect(body).not.toContain("지우기");
-    expect(text(render(page(db, ids.get("ACME-3"))))).not.toContain(runJson.manualRemoval);
+    const html = render(page(db, ids.get("ACME-5")));
+    expect(text(html)).toContain(
+      `${runJson.keptWorktree["runner-disconnected"]} ${runJson.keptWorktreeNext["runner-disconnected"]}`,
+    );
+    expect(labels(html)).toContain(runJson.removeWorktree.trigger);
+    const removed = render(page(db, ids.get("ACME-3")));
+    expect(text(removed)).not.toContain(runJson.keptWorktree["runner-disconnected"]);
+    expect(labels(removed)).not.toContain(runJson.removeWorktree.trigger);
   });
 
   it("Ended 가 아닌 런에서만 취소 행동이 보이고, 취소 요청이 있으면 취소 중을 보인다", () => {
@@ -392,7 +452,7 @@ describe("Run 상세 화면", () => {
       }),
     );
     expect(body).toContain(runJson.ci.unavailable);
-    expect(body).toContain(domain.summary["human-check"]);
+    expect(body).toContain(domain.summary.failed);
   });
 
   it("로그 꼬리: 폴링이 끝나도 로그가 오지 않았으면 가져오는 중 대신 다시 요청하는 길을 보인다", () => {
@@ -409,6 +469,7 @@ describe("Run 상세 화면", () => {
         onAnswer={resolved}
         onDeny={resolved}
         onCancel={resolved}
+        onRemoveWorktree={resolved}
         onControl={() => Promise.resolve("requested" as const)}
         onRefreshLog={resolved}
       />,
@@ -546,8 +607,7 @@ describe("Run 상세 화면", () => {
       ["running", "Running"],
       ["waiting-for-input", "Waiting for Input"],
       ["disconnected", "Disconnected"],
-      ["merged", "Merged"],
-      ["human-check", "Human Check"],
+      ["succeeded", "Succeeded"],
       ["failed", "Failed"],
       ["canceled", "Canceled"],
       ["question", "Question"],

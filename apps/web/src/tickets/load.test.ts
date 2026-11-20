@@ -67,11 +67,13 @@ describe("Tickets 읽기", () => {
       state: "ended",
       agentResult: "reported-success",
       prState: "merged",
-      summary: "merged",
+      pullRequest: null,
+      summary: "succeeded",
     });
     expect(lastRun(byKey(page, "ACME-2"))).toMatchObject({
       state: "ended",
-      summary: "human-check",
+      prState: "open",
+      summary: "failed",
     });
     expect(lastRun(byKey(page, "ACME-3"))).toMatchObject({ state: "running" });
     expect(lastRun(byKey(page, "ACME-4"))).toMatchObject({ state: "queued" });
@@ -157,7 +159,7 @@ describe("Tickets 읽기", () => {
     const page = await loadTicketsPage(context, undefined, now);
     expect(Object.fromEntries(TICKET_FILTERS.map((f) => [f, keysIn(page, f)]))).toEqual({
       all: ["ACME-6", "ACME-5", "ACME-4", "ACME-3", "ACME-2", "ACME-1", "DOC-1"],
-      assignable: ["ACME-6", "DOC-1"],
+      assignable: ["ACME-6", "ACME-2", "DOC-1"],
       todo: ["ACME-5", "ACME-2"],
       "in-progress": ["ACME-4", "ACME-3"],
       done: ["ACME-1"],

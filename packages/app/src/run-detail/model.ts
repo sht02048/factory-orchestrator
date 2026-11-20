@@ -65,9 +65,24 @@ export type RunDetailStatus =
       prState: PrState;
       prReadError: PrReadError | null;
       summary: SummaryOutcome;
-      worktreeNeedsManualRemoval: boolean;
+      keptWorktree: KeptWorktree | null;
       laterPrState: { state: "merged" | "closed"; at: string } | null;
     };
+
+export const KEPT_WORKTREE_REASONS = [
+  "no-pr",
+  "uncommitted-changes",
+  "unpushed-commits",
+  "check-failed",
+  "runner-disconnected",
+  "runner-unreached",
+] as const;
+export type KeptWorktreeReason = (typeof KEPT_WORKTREE_REASONS)[number];
+
+export interface KeptWorktree {
+  reason: KeptWorktreeReason;
+  removing: boolean;
+}
 
 export type OtherRun = { id: string; assignedAt: string } & (
   | { state: Exclude<RunState, "ended"> }

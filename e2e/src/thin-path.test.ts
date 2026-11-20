@@ -73,7 +73,7 @@ const scenarios: ReadonlyArray<Scenario> = [
     pr: "merged",
     agentResult: "reported-success",
     prState: "merged",
-    summary: "merged",
+    summary: "succeeded",
   },
   {
     key: toTicketKey("ACME-2"),
@@ -81,7 +81,7 @@ const scenarios: ReadonlyArray<Scenario> = [
     pr: "open",
     agentResult: "reported-failure",
     prState: "open",
-    summary: "human-check",
+    summary: "failed",
   },
   {
     key: toTicketKey("ACME-3"),
@@ -89,7 +89,7 @@ const scenarios: ReadonlyArray<Scenario> = [
     pr: null,
     agentResult: "reported-success",
     prState: "none",
-    summary: "failed",
+    summary: "succeeded",
   },
 ];
 

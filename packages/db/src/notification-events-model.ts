@@ -1,7 +1,6 @@
 export const NOTIFICATION_EVENT_KINDS = [
   "question",
   "permission",
-  "human-check",
   "failed",
   "disconnected",
   "runner-offline",

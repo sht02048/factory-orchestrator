@@ -28,6 +28,7 @@ import type {
   RunnerProjectId,
   TicketRef,
   TrackerConnectionId,
+  WorktreeKeptReason,
   TrackerProjectId,
   WorktreeRef,
 } from "@ganger/core";
@@ -75,6 +76,8 @@ export interface RunRecords {
   laterPrState: { state: (typeof LATER_PR_STATES)[number]; at: Date } | null;
   prReadError: PrReadError | null;
   worktreeRemovedAt: Date | null;
+  worktreeKept: WorktreeKeptReason | null;
+  worktreeRemoveRequestedAt: Date | null;
   trackerStateSetAt: Date | null;
   trackerComment: { id: CommentId; at: Date } | null;
   unreachableSince: Date | null;
@@ -188,6 +191,8 @@ function toRunRecords(row: RunRow): RunRecords {
         : { state: row.laterPrState, at: row.laterPrStateAt },
     prReadError: row.prReadError,
     worktreeRemovedAt: row.worktreeRemovedAt,
+    worktreeKept: row.worktreeKept,
+    worktreeRemoveRequestedAt: row.worktreeRemoveRequestedAt,
     trackerStateSetAt: row.trackerStateSetAt,
     trackerComment:
       row.trackerCommentId === null || row.trackerCommentedAt === null
@@ -718,7 +723,12 @@ export function updateRunRecords(
   patch: Partial<
     Omit<
       RunRecords,
-      "startRequestedAt" | "startFailures" | "startError" | "reportBody" | "prReadError"
+      | "startRequestedAt"
+      | "startFailures"
+      | "startError"
+      | "reportBody"
+      | "prReadError"
+      | "worktreeRemoveRequestedAt"
     >
   >,
 ): boolean {
@@ -735,7 +745,11 @@ export function updateRunRecords(
     set.laterPrState = patch.laterPrState?.state ?? null;
     set.laterPrStateAt = patch.laterPrState?.at ?? null;
   }
-  if (patch.worktreeRemovedAt !== undefined) set.worktreeRemovedAt = patch.worktreeRemovedAt;
+  if (patch.worktreeRemovedAt !== undefined) {
+    set.worktreeRemovedAt = patch.worktreeRemovedAt;
+    if (patch.worktreeRemovedAt !== null) set.worktreeRemoveRequestedAt = null;
+  }
+  if (patch.worktreeKept !== undefined) set.worktreeKept = patch.worktreeKept;
   if (patch.trackerStateSetAt !== undefined) set.trackerStateSetAt = patch.trackerStateSetAt;
   if (patch.trackerComment !== undefined) {
     set.trackerCommentId = patch.trackerComment?.id ?? null;
@@ -785,6 +799,29 @@ export function recordPrReadError(db: Database, runId: RunId, error: PrReadError
         .run().changes > 0;
     if (changed) recordRunChange(db, runId);
     return changed;
+  });
+}
+
+export type RequestWorktreeRemovalResult =
+  | { ok: true }
+  | { ok: false; reason: "not-found" | "not-ended" | "nothing-to-remove" };
+
+export function requestWorktreeRemoval(
+  db: Database,
+  runId: RunId,
+  now: Date,
+): RequestWorktreeRemovalResult {
+  return inTransaction(db, (): RequestWorktreeRemovalResult => {
+    const row = getRunRow(db, runId);
+    if (row === undefined) return { ok: false, reason: "not-found" };
+    if (row.state !== "ended") return { ok: false, reason: "not-ended" };
+    if (row.worktreeRef === null || row.worktreeRemovedAt !== null) {
+      return { ok: false, reason: "nothing-to-remove" };
+    }
+    if (row.worktreeRemoveRequestedAt !== null) return { ok: true };
+    db.update(runs).set({ worktreeRemoveRequestedAt: now }).where(eq(runs.id, runId)).run();
+    recordRunChange(db, runId, { now });
+    return { ok: true };
   });
 }
 

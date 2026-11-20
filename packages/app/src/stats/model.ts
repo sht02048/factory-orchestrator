@@ -14,8 +14,6 @@ export type StatsDimension = (typeof STATS_DIMENSIONS)[number];
 
 export const FAILURE_REASONS = [
   "reported-failure",
-  "no-pr",
-  "pr-closed",
   "ended-without-report",
   "timed-out",
   "stopped-waiting-for-input",
@@ -34,6 +32,7 @@ export interface StatsRun {
   agent: GroupKey;
   agentResult: AgentResult;
   prState: PrState;
+  prMerged: boolean;
   runnerUnreached: boolean;
   assignedAt: Date;
   startedAt: Date | null;
@@ -60,6 +59,7 @@ export interface StatsSummary {
   runs: number;
   rated: number;
   outcomes: OutcomeCounts;
+  prMerged: number;
   leadTime: LeadTimeStats | null;
   failureReasons: FailureReasonCount[];
 }
@@ -108,11 +108,10 @@ export function inPeriod(day: number, period: StatsPeriod): boolean {
   return day >= period.firstDay && day <= period.lastDay;
 }
 
-export function failureReasonOf(agentResult: AgentResult, prState: PrState): FailureReason | null {
+export function failureReasonOf(agentResult: AgentResult): FailureReason | null {
   switch (agentResult) {
     case "reported-success":
-      if (prState === "none") return "no-pr";
-      if (prState === "closed") return "pr-closed";
+    case "canceled":
       return null;
     case "reported-failure":
     case "ended-without-report":
@@ -122,13 +121,11 @@ export function failureReasonOf(agentResult: AgentResult, prState: PrState): Fai
     case "worktree-missing":
     case "could-not-start":
       return agentResult;
-    case "canceled":
-      return null;
   }
 }
 
 function emptyOutcomes(): OutcomeCounts {
-  return { merged: 0, "human-check": 0, failed: 0, canceled: 0 };
+  return { succeeded: 0, failed: 0, canceled: 0 };
 }
 
 function emptyPrStates(): PrStateCounts {
@@ -146,12 +143,14 @@ export function summarizeStats(runs: ReadonlyArray<StatsRun>): StatsSummary {
   const outcomes = emptyOutcomes();
   const reasons = new Map<FailureReason, FailureReasonCount>();
   const lead: number[] = [];
+  let prMerged = 0;
 
   for (const run of runs) {
     const { outcome } = summarizeRunOutcome(run);
     outcomes[outcome] += 1;
+    if (run.prMerged) prMerged += 1;
     if (outcome === "failed") {
-      const reason = failureReasonOf(run.agentResult, run.prState);
+      const reason = failureReasonOf(run.agentResult);
       if (reason !== null) {
         const count = reasons.get(reason) ?? { reason, runs: 0, prStates: emptyPrStates() };
         count.runs += 1;
@@ -172,6 +171,7 @@ export function summarizeStats(runs: ReadonlyArray<StatsRun>): StatsSummary {
     runs: runs.length,
     rated: runs.length - outcomes.canceled,
     outcomes,
+    prMerged,
     leadTime:
       leadSorted.length === 0
         ? null
@@ -220,16 +220,12 @@ export function percent(part: number, whole: number): number | null {
   return whole === 0 ? null : Math.round((part / whole) * 100);
 }
 
-export function mergedRate(summary: StatsSummary): number | null {
-  return percent(summary.outcomes.merged, summary.rated);
+export function successRate(summary: StatsSummary): number | null {
+  return percent(summary.outcomes.succeeded, summary.rated);
 }
 
-export function humanTouchedRate(summary: StatsSummary): number | null {
-  return percent(summary.outcomes["human-check"] + summary.outcomes.failed, summary.rated);
-}
-
-export function mergedRateChange(current: StatsSummary, previous: StatsSummary): number | null {
-  const now = mergedRate(current);
-  const before = mergedRate(previous);
+export function successRateChange(current: StatsSummary, previous: StatsSummary): number | null {
+  const now = successRate(current);
+  const before = successRate(previous);
   return now === null || before === null ? null : now - before;
 }

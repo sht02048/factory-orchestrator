@@ -254,6 +254,53 @@ describe("migrate", () => {
     ).toThrow(/runs_pr_read_error/);
   });
 
+  it("0145 마이그레이션이 기존 런을 그대로 옮기고 워크트리를 남긴 이유와 지우기 요청 칸을 비워 더하며, Human Check 알림 사건을 지운다", () => {
+    const db = openDatabase(":memory:");
+    const all = loadMigrations();
+    const added = all.findIndex((m) => m.name.endsWith("_run_outcome_names"));
+    expect(added).toBeGreaterThan(0);
+    migrate(db, all.slice(0, added));
+    db.$client.exec(`
+      INSERT INTO tracker_connections (id, kind, name, secrets, created_at) VALUES ('c', 'fake', 'c', '{}', 0);
+      INSERT INTO workspaces (id, name, created_at) VALUES ('w', 'w', 0);
+      INSERT INTO runners (id, kind, name, capacity, online, checked_at, created_at)
+        VALUES ('r', 'fake', 'r', 1, 1, 5, 0);
+      INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
+        runner_project_id, agent_id, worktree_name, branch, state, runner_id, assigned_at, started_at,
+        ended_at, worktree_ref, agent_ref, agent_result, pr_state, worktree_removed_at)
+        VALUES ('ended', 'c', 'ENG-1', 'w', 'tp', 'rp', 'a', 'ganger-ENG-1-1', 'b', 'ended', 'r', 1, 2,
+          3, 'wt', 'ag', 'reported-success', 'none', 4);
+      INSERT INTO notification_events (id, seq, kind, cause, run_id, workspace_id, ticket_key, subject, created_at)
+        VALUES (1, 1, 'human-check', 'human-check:ended', 'ended', 'w', 'ENG-1', 'ENG-1', 5),
+          (2, 2, 'failed', 'failed:ended', 'ended', 'w', 'ENG-1', 'ENG-1', 6);
+    `);
+
+    expect(migrate(db)).toEqual(all.slice(added).map((m) => m.name));
+    expect(
+      db.$client
+        .prepare(
+          "SELECT id, agent_result, pr_state, worktree_removed_at, worktree_kept, worktree_remove_requested_at FROM runs",
+        )
+        .all(),
+    ).toEqual([
+      {
+        id: "ended",
+        agent_result: "reported-success",
+        pr_state: "none",
+        worktree_removed_at: 4,
+        worktree_kept: null,
+        worktree_remove_requested_at: null,
+      },
+    ]);
+    expect(db.$client.prepare("SELECT id, kind FROM notification_events").all()).toEqual([
+      { id: 2, kind: "failed" },
+    ]);
+    db.$client.exec("UPDATE runs SET worktree_kept = 'uncommitted-changes' WHERE id = 'ended'");
+    expect(() =>
+      db.$client.exec("UPDATE runs SET worktree_kept = 'dirty' WHERE id = 'ended'"),
+    ).toThrow(/runs_worktree_kept/);
+  });
+
   it("0089 마이그레이션이 기존 설치 설정·런을 남긴 채 MCP 쓰기 허용을 끈 채로 더하고 작업 기록 테이블을 만든다", () => {
     const db = openDatabase(":memory:");
     const all = loadMigrations();

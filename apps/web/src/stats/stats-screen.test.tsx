@@ -79,7 +79,7 @@ describe("Stats 화면(0072)", () => {
     const html = render(seeded());
     const header = between(html, "<header", "</header>");
     expect(header).toMatch(/<h1[^>]*>Stats<\/h1>/);
-    expect(text(header)).toContain("끝난 런 9개 중 22%를 에이전트가 병합까지 끝냈어요.");
+    expect(text(header)).toContain("끝난 런 9개 중 56%가 Succeeded예요.");
     expect(text(html)).toContain("Acme Commerce · 11월 4일–11월 17일");
     expect(text(html)).not.toContain("Stats · Acme Commerce");
   });
@@ -91,21 +91,21 @@ describe("Stats 화면(0072)", () => {
     expect(periods).toMatch(/aria-selected="true"[^>]*>7일/);
   });
 
-  it("숫자 넷은 같은 모양 카드로 병합률·사람이 손댄 비율·리드 타임·끝난 런이다", () => {
+  it("숫자 넷은 같은 모양 카드로 성공률·PR 병합·리드 타임·끝난 런이다 (R5)", () => {
     expect(tiles(render(seeded()))).toEqual([
-      "병합률 22% 앞 14일보다 78%p 내렸어요",
-      "사람이 손댄 비율 78% Human Check 3 · Failed 4",
+      "성공률 56% 앞 14일보다 44%p 내렸어요",
+      "PR 병합 3 이 기간에 끝난 런 중 PR이 병합된 런 수예요",
       "리드 타임 중앙값 22분 느린 10%는 2시간 1분 넘게 걸렸어요",
       "끝난 런 9",
     ]);
   });
 
-  it("병합률은 같은 길이의 바로 앞 기간과 비교하고 좋아지면 better, 나빠지면 worse 다", () => {
+  it("성공률은 같은 길이의 바로 앞 기간과 비교하고 좋아지면 better, 나빠지면 worse 다", () => {
     const fourteen = render(seeded(14));
-    expect(fourteen).toMatch(/data-trend="worse"[^>]*>앞 14일보다 78%p 내렸어요/);
+    expect(fourteen).toMatch(/data-trend="worse"[^>]*>앞 14일보다 44%p 내렸어요/);
     const seven = render(seeded(7));
-    expect(seven).toMatch(/data-trend="better"[^>]*>앞 7일보다 29%p 올랐어요/);
-    expect(text(seven)).toContain("끝난 런 7개 중 29%를 에이전트가 병합까지 끝냈어요");
+    expect(seven).toMatch(/data-trend="better"[^>]*>앞 7일보다 7%p 올랐어요/);
+    expect(text(seven)).toContain("끝난 런 7개 중 57%가 Succeeded예요");
   });
 
   it("앞 기간에 비율을 낼 런이 없으면 비교할 런이 없다고 말한다", () => {
@@ -120,22 +120,23 @@ describe("Stats 화면(0072)", () => {
     const seven = render(seeded(7));
     expect(tiles(fourteen)[3]).toBe("끝난 런 9");
     expect(tiles(seven)[3]).toBe("끝난 런 7");
-    expect(fourteen.match(/title="[^"]*: Merged/g)).toHaveLength(14);
-    expect(seven.match(/title="[^"]*: Merged/g)).toHaveLength(7);
+    expect(fourteen.match(/title="[^"]*: Succeeded/g)).toHaveLength(14);
+    expect(seven.match(/title="[^"]*: Succeeded/g)).toHaveLength(7);
     expect(between(seven, "<tbody", "</tbody>").match(/<th scope="row"/g)).toHaveLength(7);
   });
 
   it("차트의 마지막 날 이름은 오늘이고 범례는 제목 옆에 있다", () => {
     const html = render(seeded());
     const head = text(between(html, "날짜별로 끝난 런</h2>", 'role="img"'));
-    expect(head).toContain("Merged Human Check Failed Canceled");
+    expect(head).toContain("Succeeded Failed Canceled");
+    expect(head).not.toContain("Human Check");
     const days = text(between(html, 'role="img"', "표로 보기")).trim();
     expect(days.endsWith("오늘")).toBe(true);
   });
 
   it("날짜별 막대에 마우스로 볼 날마다 요약 결과 수를 단다", () => {
     const html = render(seeded());
-    expect(html).toContain('title="11월 16일: Merged 1 · Human Check 1 · Failed 0 · Canceled 0"');
+    expect(html).toContain('title="11월 16일: Succeeded 1 · Failed 1 · Canceled 0"');
   });
 
   it("날짜별 값을 차트와 이은 표로 접근성 트리에 둔다(0053)", () => {
@@ -146,11 +147,9 @@ describe("Stats 화면(0072)", () => {
     const table = html.slice(html.indexOf(`<table id="${tableId ?? ""}"`));
     const throughput = table.slice(0, table.indexOf("</table>"));
     expect(throughput).toContain("<caption");
-    expect(text(throughput)).toContain(
-      "날짜별로 끝난 런 수 날짜 Merged Human Check Failed Canceled",
-    );
+    expect(text(throughput)).toContain("날짜별로 끝난 런 수 날짜 Succeeded Failed Canceled");
     expect(throughput.match(/<th scope="row"/g)).toHaveLength(14);
-    expect(text(throughput)).toContain("11월 16일 1 1 0 0");
+    expect(text(throughput)).toContain("11월 16일 1 1 0");
     expect(throughput).not.toMatch(/\shidden|display:\s*none|aria-hidden/);
     expect(html).toContain("표로 보기");
   });
@@ -159,10 +158,10 @@ describe("Stats 화면(0072)", () => {
     const html = render(seeded());
     const failures = between(html, "왜 실패했나요</h2>", "나눠 보기");
     expect(text(failures)).toContain("왜 실패했나요 4");
-    expect(text(failures)).toContain("에이전트가 실패를 보고했어요 PR 없음 2개 2개");
-    expect(text(failures)).toContain("PR이 병합되지 않고 닫혔어요 PR 닫힘 1개 1개");
+    expect(text(failures)).toContain("에이전트가 실패를 보고했어요 PR 없음 2개 · 열림 1개 3개");
     expect(text(failures)).toContain("최대 실행 시간을 넘겼어요 PR 열림 1개 1개");
-    expect(failures.match(/<li/g)).toHaveLength(3);
+    expect(text(failures)).not.toContain("PR이 병합되지 않고 닫혔어요");
+    expect(failures.match(/<li/g)).toHaveLength(2);
     expect(failures).not.toContain("완료 보고");
   });
 
@@ -181,14 +180,14 @@ describe("Stats 화면(0072)", () => {
     expect(failures).not.toContain("Canceled");
   });
 
-  it("나눠 보기는 러너 · 트래커 프로젝트 · 에이전트 탭과 이름 · 끝난 런 · 병합률 · 리드 타임 숫자 열이다", () => {
+  it("나눠 보기는 러너 · 트래커 프로젝트 · 에이전트 탭과 이름 · 끝난 런 · 성공률 · 리드 타임 숫자 열이다", () => {
     const html = render(seeded());
     expect(text(between(html, 'aria-label="나눠 볼 기준"', "</div>"))).toContain(
       "러너 트래커 프로젝트 에이전트",
     );
     expect(breakdownRows(html)).toEqual([
-      ["runner-a", "5", "40%", "22분", ""],
-      ["runner-b", "4", "0%", "18분", ""],
+      ["runner-a", "5", "80%", "22분", ""],
+      ["runner-b", "4", "25%", "18분", ""],
     ]);
     expect(breakdownRows(render(seeded(), { dimension: "agent" })).map((r) => r[0])).toEqual([
       "Claude Code",
@@ -210,11 +209,11 @@ describe("Stats 화면(0072)", () => {
     expect(render(seeded())).not.toContain("의 런 보기");
   });
 
-  it("나눠 보기 표의 열 머리는 이름 · 끝난 런 · 병합률 · 리드 타임이다", () => {
+  it("나눠 보기 표의 열 머리는 이름 · 끝난 런 · 성공률 · 리드 타임이다", () => {
     const html = render(seeded());
     const breakdown = html.slice(html.lastIndexOf("<table"));
     expect(text(between(breakdown, "<thead", "</thead>")).trim()).toBe(
-      "이름 끝난 런 병합률 리드 타임",
+      "이름 끝난 런 성공률 리드 타임",
     );
   });
 
@@ -283,14 +282,14 @@ describe("Stats 화면(0072)", () => {
     it("제목은 Canceled 를 뺀 수로 말하고 뺐다는 설명은 끝난 런 카드가 맡는다", () => {
       const html = render(page());
       expect(text(between(html, "<header", "</header>"))).toContain(
-        "끝난 런 11개 중 18%를 에이전트가 병합까지 끝냈어요.",
+        "끝난 런 11개 중 45%가 Succeeded예요.",
       );
       expect(html).not.toContain("Canceled를 뺀");
       expect(tiles(html)[3]).toBe("끝난 런 13 Canceled 2개를 빼고 11개로 비율을 내요");
-      expect(html).toContain('title="11월 17일: Merged 1 · Human Check 0 · Failed 2 · Canceled 2"');
+      expect(html).toContain('title="11월 17일: Succeeded 1 · Failed 2 · Canceled 2"');
     });
 
-    it("나눠 보기 끝난 런은 Canceled 를 세고 병합률은 Canceled 를 빼고 낸다", () => {
+    it("나눠 보기 끝난 런은 Canceled 를 세고 성공률은 Canceled 를 빼고 낸다", () => {
       const rows = breakdownRows(render(page(), { dimension: "agent" }));
       expect(rows.find((r) => r[0] === "gemini")).toEqual(["gemini", "2", "0%", "11분", ""]);
     });

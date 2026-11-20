@@ -23,7 +23,7 @@ describe("앱 설정의 알림", () => {
     const { store: settings } = store();
     const notifications = {
       ...DEFAULT_NOTIFICATION_PREFS,
-      groups: { ...DEFAULT_NOTIFICATION_PREFS.groups, humanCheck: false },
+      groups: { ...DEFAULT_NOTIFICATION_PREFS.groups, failedDisconnected: false },
     };
     settings.write({
       mode: "local",
@@ -41,5 +41,18 @@ describe("앱 설정의 알림", () => {
     const { path, store: settings } = store();
     writeFileSync(path, JSON.stringify({ mode: "remote", notifications: { enabled: "yes" } }));
     expect(settings.read()).toEqual({ mode: "remote" });
+  });
+
+  it("예전 Human Check 알림 종류 값이 남아 있어도 나머지 알림 설정을 그대로 읽는다 (0145)", () => {
+    const { path, store: settings } = store();
+    const groups = { ...DEFAULT_NOTIFICATION_PREFS.groups, permission: false };
+    writeFileSync(
+      path,
+      JSON.stringify({
+        mode: "local",
+        notifications: { enabled: true, groups: { ...groups, humanCheck: false } },
+      }),
+    );
+    expect(settings.read()).toEqual({ mode: "local", notifications: { enabled: true, groups } });
   });
 });

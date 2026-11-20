@@ -285,6 +285,10 @@ export type RunProgress =
   | { kind: "ended-without-report"; detail: string }
   | { kind: "worktree-gone" };
 
+export type WorktreeWork =
+  | { kind: "gone" }
+  | { kind: "checked"; uncommittedChanges: boolean; unpushedCommits: boolean };
+
 export interface Runner {
   readonly kind: RunnerKind;
 
@@ -314,6 +318,7 @@ export interface Runner {
   closeAgent(run: RunOnRunner): Promise<void>;
   readLogTail(run: RunOnRunner, opts: { lines: number }): Promise<ReadonlyArray<string>>;
   worktreeExists(worktree: WorktreeRef): Promise<boolean>;
+  checkWorktreeWork(worktree: WorktreeRef): Promise<WorktreeWork>;
   removeWorktree(worktree: WorktreeRef): Promise<void>;
 }
 

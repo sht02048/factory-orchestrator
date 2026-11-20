@@ -778,7 +778,6 @@ export class Controller {
       groupId: serverKey(url),
       title,
       body,
-      silent: effect.silent,
     });
     notification.on("click", () => {
       this.delivered.delete(id);

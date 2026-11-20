@@ -107,8 +107,11 @@ async function confirmRemovedWorktrees(
 ): Promise<void> {
   for (const run of listRuns(context.db, { states: ["ended"] })) {
     if (run.state !== "ended" || run.worktree === null || run.runnerId !== stored.id) continue;
-    if (summarizeRunOutcome(run).worktree !== "operator-decides") continue;
-    if (getRunWithRecords(context.db, run.id)?.records.worktreeRemovedAt !== null) continue;
+    const records = getRunWithRecords(context.db, run.id)?.records;
+    if (records === undefined || records.worktreeRemovedAt !== null) continue;
+    if (summarizeRunOutcome(run).worktree !== "operator-decides" && records.worktreeKept === null) {
+      continue;
+    }
     let exists: boolean;
     try {
       exists = await runner.worktreeExists(run.worktree);

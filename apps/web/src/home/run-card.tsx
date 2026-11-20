@@ -1,5 +1,4 @@
-import * as stylex from "@stylexjs/stylex";
-import { Button, KanbanCard, Menu, MenuItem, MoreIcon, StatusPill, buttonStyles } from "@ganger/ui";
+import { Button, KanbanCard, Menu, MenuItem, MoreIcon, StatusPill } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
 import type { RunControl } from "@ganger/core";
 import { useId, useState } from "react";
@@ -108,7 +107,6 @@ function useCardParts(
           detailTone: "problem" as const,
         }
       : {};
-  const workspace = all ? ` · ${run.workspace.name}` : "";
   switch (run.state) {
     case "queued":
       return { detail: text.queued(run), meta: runner, time: elapsed(run.waitMs) };
@@ -194,27 +192,6 @@ function useCardParts(
       const time = ago(run.endedAt, run.endedAgoMs);
       const pr = run.pullRequest;
       const prLine = pr === null ? null : t("pullRequest", { pr: pr.displayId });
-      if (tagged && run.summary === "human-check")
-        return {
-          meta: `${prLine ?? t("humanCheckNoPr")}${workspace}`,
-          time,
-          ...(pr === null
-            ? {}
-            : {
-                action: (
-                  <a
-                    href={pr.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    data-variant="secondary"
-                    aria-describedby={titleId}
-                    {...stylex.props(...buttonStyles("secondary"))}
-                  >
-                    {t("openPr")}
-                  </a>
-                ),
-              }),
-        };
       if (tagged && run.summary === "failed")
         return { detail: text.agentResult(run), meta: runner, time };
       return {

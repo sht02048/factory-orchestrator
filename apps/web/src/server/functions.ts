@@ -4,7 +4,7 @@ import { markAllTrackersChanged } from "@ganger/db";
 import { z } from "zod";
 import { answerInput, denyInput, submitAnswer, submitDenial } from "@ganger/app/home/actions";
 import { loadHomePage } from "@ganger/app/home/load";
-import { cancelRunRequest } from "@ganger/app/run-detail/actions";
+import { cancelRunRequest, removeWorktreeRequest } from "@ganger/app/run-detail/actions";
 import { requestControl } from "@ganger/app/run-control";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
 import { loadRunnersPage } from "@ganger/app/runners/load";
@@ -91,6 +91,10 @@ export const requestRunLog = createServerFn({ method: "POST" })
 export const cancelRun = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string() }))
   .handler(({ data }) => cancelRunRequest(getDatabase(), data.runId, new Date()));
+
+export const removeRunWorktree = createServerFn({ method: "POST" })
+  .validator(z.object({ runId: z.string() }))
+  .handler(({ data }) => removeWorktreeRequest(getDatabase(), data.runId, new Date()));
 
 export const controlRun = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string(), control: z.enum(["pause", "resume"]) }))

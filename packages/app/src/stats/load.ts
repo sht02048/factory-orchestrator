@@ -1,7 +1,7 @@
 import {
   getWorkspaceTrackerProject,
   listRunners,
-  listRuns,
+  listRunsWithRecords,
   listWorkspaces,
   toWorkspaceId,
 } from "@ganger/db";
@@ -49,7 +49,7 @@ export function loadStatsPage(
 
   const current: StatsRun[] = [];
   const before: StatsRun[] = [];
-  for (const run of listRuns(db, {
+  for (const { run, records } of listRunsWithRecords(db, {
     workspaceId: toWorkspaceId(workspace.workspace.id),
     states: ["ended"],
   })) {
@@ -69,6 +69,7 @@ export function loadStatsPage(
       agent: { key: run.agent, name: run.agent },
       agentResult: run.agentResult,
       prState: run.prState,
+      prMerged: run.prState === "merged" || records.laterPrState?.state === "merged",
       runnerUnreached: run.runnerUnreached,
       assignedAt: run.assignedAt,
       startedAt: run.startedAt,

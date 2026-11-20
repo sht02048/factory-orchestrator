@@ -52,9 +52,10 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
         });
         break;
       case "ended": {
-        const { worktree } = summarizeRunOutcome(run);
-        if (worktree !== "keep-until-pr-settles" && worktree !== "operator-decides") break;
         if (records.worktreeRemovedAt !== null) break;
+        const worktree =
+          records.worktreeKept === null ? summarizeRunOutcome(run).worktree : "operator-decides";
+        if (worktree !== "keep-until-pr-settles" && worktree !== "operator-decides") break;
         push(leftWorktrees, run.runnerId, { ...base, worktree });
         break;
       }

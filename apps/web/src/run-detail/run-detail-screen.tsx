@@ -47,6 +47,7 @@ export interface RunDetailActions {
   onAnswer: (questionId: string, body: string) => Promise<void>;
   onDeny: (promptId: string, reason: string) => Promise<void>;
   onCancel: () => Promise<void>;
+  onRemoveWorktree: () => Promise<void>;
   onControl: (control: RunControl) => Promise<RunControlOutcome>;
   onRefreshLog: () => Promise<void>;
 }
@@ -87,12 +88,16 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const statusName = useStatusName();
   const { status, when } = statusLine(run);
   const pr = run.pullRequest;
+  const prInfo = usePrInfo()(run);
   const cancelable = canCancel(run) && !run.cancelPending;
   const control = availableRunControl(run.status.state, run.cancelPending, run.control);
+  const keptWorktree = run.status.state === "ended" ? run.status.keptWorktree : null;
+  const removable = keptWorktree !== null && !keptWorktree.removing;
   const headRef = useRef<HTMLDivElement>(null);
   const cancelStatusRef = useRef<HTMLSpanElement>(null);
   const pending = [
     run.cancelPending ? t("cancelPending") : null,
+    keptWorktree?.removing === true ? t("removeWorktree.pending") : null,
     run.control?.status === "pending"
       ? t(run.control.control === "pause" ? "control.pausePending" : "control.resumePending")
       : null,
@@ -125,6 +130,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
           <div {...stylex.props(styles.stateRow)}>
             <p {...stylex.props(styles.stateLine)}>
               <StatusPill status={status}>{statusName(status)}</StatusPill>
+              {prInfo === null ? null : <Text variant="meta">{prInfo}</Text>}
               <Text variant="meta">{when}</Text>
               <span {...stylex.props(failure !== null && styles.statusOwnLine)}>
                 <Text
@@ -138,7 +144,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                 </Text>
               </span>
             </p>
-            {pr === null && !cancelable && control === null ? null : (
+            {pr === null && !cancelable && control === null && !removable ? null : (
               <Actions>
                 {pr === null ? null : (
                   <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
@@ -156,6 +162,12 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                 {cancelable ? (
                   <CancelRun
                     onCancel={props.onCancel}
+                    focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+                  />
+                ) : null}
+                {removable ? (
+                  <RemoveWorktree
+                    onRemove={props.onRemoveWorktree}
                     focusAfter={() => focusFirst(cancelStatusRef, headRef)}
                   />
                 ) : null}
@@ -302,9 +314,7 @@ function Reason({ run }: { run: RunDetail }) {
         ? t("disconnected")
         : t("disconnectedSince", { time: clock(status.unreachableSince) });
     case "ended":
-      return status.prState === "unknown" && status.summary === "human-check"
-        ? t("prUnread")
-        : t(status.summary);
+      return t(status.summary);
   }
 }
 
@@ -336,22 +346,21 @@ function NextAction({ run }: { run: RunDetail }) {
       next = t(`next.${inputKey(status.input)}`);
       break;
     case "ended":
-      next =
-        status.prState === "unknown" && status.summary === "human-check"
-          ? t("next.prUnread")
-          : t(`next.${status.summary}`);
+      next = t(`next.${status.summary}`);
       break;
   }
-  const manual = status.state === "ended" && status.worktreeNeedsManualRemoval;
+  const kept = status.state === "ended" ? status.keptWorktree : null;
   const prReadError = status.state === "ended" ? status.prReadError : null;
   return (
     <>
-      {manual ? (
+      {kept !== null ? (
         <p {...stylex.props(styles.flat)}>
           <Text variant="title" tone="problem">
-            {t("manualRemoval")}
+            {t(`keptWorktree.${kept.reason}`)}
           </Text>{" "}
-          <Text variant="body">{t("next.manualRemoval")}</Text>
+          <Text variant="body" as="span">
+            {t(`keptWorktreeNext.${kept.reason}`)}
+          </Text>
         </p>
       ) : (
         <Text variant="body">{next}</Text>
@@ -361,7 +370,9 @@ function NextAction({ run }: { run: RunDetail }) {
           <Text variant="title" tone="problem">
             {t("prUnread.title")}
           </Text>{" "}
-          <Text variant="body">{t(`prUnread.${prReadError}`)}</Text>
+          <Text variant="body" as="span">
+            {t(`prUnread.${prReadError}`)}
+          </Text>
         </p>
       )}
     </>
@@ -563,6 +574,42 @@ function CancelRun({
               }}
             >
               {t("cancel.confirm")}
+            </DialogClose>
+          </>
+        }
+      />
+      {failed ? <ActionFailed /> : null}
+    </>
+  );
+}
+
+function RemoveWorktree({
+  onRemove,
+  focusAfter,
+}: {
+  onRemove: RunDetailActions["onRemoveWorktree"];
+  focusAfter: () => void;
+}) {
+  const t = useTranslations("run.removeWorktree");
+  const [failed, setFailed] = useState(false);
+  return (
+    <>
+      <Dialog
+        trigger={t("trigger")}
+        triggerVariant="danger"
+        title={t("title")}
+        description={t("body")}
+        actions={
+          <>
+            <DialogClose>{t("dismiss")}</DialogClose>
+            <DialogClose
+              variant="danger"
+              onClick={() => {
+                setFailed(false);
+                onRemove().then(focusAfter, () => setFailed(true));
+              }}
+            >
+              {t("confirm")}
             </DialogClose>
           </>
         }
@@ -907,6 +954,20 @@ function OtherRuns({ run, runHref }: { run: RunDetail; runHref: (runId: string) 
       </ol>
     </Block>
   );
+}
+
+function usePrInfo(): (run: RunDetail) => string | null {
+  const t = useTranslations("run");
+  const domain = useTranslations("domain");
+  return (run) => {
+    if (run.status.state !== "ended") return null;
+    const state = run.status.laterPrState?.state ?? run.status.prState;
+    if (state === "none") return null;
+    const stateName = domain(`prState.${state}`);
+    return run.pullRequest === null
+      ? t("prStateInfo", { state: stateName })
+      : t("prInfo", { pr: run.pullRequest.displayId, state: stateName });
+  };
 }
 
 function useStatusLine(): (run: RunDetail) => { status: PillStatus; when: string } {

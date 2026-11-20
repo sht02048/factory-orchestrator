@@ -38,6 +38,7 @@ export type RunView =
       endedAgoMs: number;
       agentResult: AgentResult;
       prState: PrState;
+      laterPrState: "merged" | "closed" | null;
       prReadError: PrReadError | null;
       summary: SummaryOutcome;
     });
@@ -68,8 +69,7 @@ export const RUN_STATUS_FILTERS = [
   "waiting-for-input",
   "disconnected",
   "queued",
-  "merged",
-  "human-check",
+  "succeeded",
   "failed",
   "canceled",
 ] as const;
@@ -84,6 +84,13 @@ export function isGroupFilter(filter: RunFilter): filter is RunGroupFilter {
 
 export function filterKeyOf(run: RunView): RunFilterKey {
   return run.state === "ended" ? run.summary : run.state;
+}
+
+export function currentPrState(run: {
+  prState: PrState;
+  laterPrState: "merged" | "closed" | null;
+}): PrState {
+  return run.laterPrState ?? run.prState;
 }
 
 export function needsAttention(run: RunView): boolean {
