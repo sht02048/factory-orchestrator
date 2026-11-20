@@ -578,11 +578,11 @@ describe("Dashboard 칸반 배치(브라우저, 0100)", () => {
       failed += 1;
       await route.abort();
     });
-    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    ok(changeRunState(db, startRun(toTicketKey("ACME-10")), { to: "waiting-for-input" }));
+    await expect.poll(() => failed, { timeout: 10_000 }).toBeGreaterThan(0);
     await page.waitForTimeout(1_000);
     await page.unroute("**/_serverFn/**");
 
-    expect(failed).toBeGreaterThan(0);
     expect(await input.inputValue()).toBe("half-written answer");
   });
 });
