@@ -69,7 +69,6 @@ jobs:
         run: pnpm run check:lengths
       - name: Format check
         run: pnpm run format:check
-      # 브라우저 시험(e2e·demo)은 browser 잡이 shard 로 나눠 돈다.
       - name: Unit tests
         run: pnpm exec vitest run --project '!e2e' --project '!demo'
       - name: Build
@@ -115,7 +114,6 @@ jobs:
           path: e2e/test-results/
           if-no-files-found: ignore
 
-  # develop·main ruleset 이 필수 상태 검사로 이 잡 이름(check)을 본다.
   check:
     needs: [scope, static, browser]
     if: always()
