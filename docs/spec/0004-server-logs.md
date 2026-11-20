@@ -144,7 +144,7 @@ debug 줄: `runner.call`(읽기), `worker.tick`(`ms`, `watched`). 나머지 warn
 
 ## 8. 위험
 
-- **srvx 요청 줄.** srvx `--prod`가 요청마다 stdout에 한 줄을 쓴다. launchd에서는 `ganger.log`로 가 L1의 "stdout에는 warn 이상만"과 어긋난다. srvx CLI에 끄는 옵션이 없다. `ganger.log` 회전으로 크기는 묶인다. 끄려면 srvx를 CLI 대신 코드로 띄워야 한다(열린 질문).
+- **srvx 요청 줄.** srvx `--prod`가 요청마다 stdout에 한 줄을 쓴다. launchd에서는 `ganger.log`로 가 L1의 "stdout에는 warn 이상만"과 어긋난다. srvx CLI에 끄는 옵션이 없다. `ganger.log`는 `ganger start`가 시작할 때만 회전하므로(L9) 서비스가 오래 도는 동안은 묶이지 않고 다시 시작할 때 묶인다. 끄려면 srvx를 CLI 대신 코드로 띄워야 한다(열린 질문).
 - **db 패키지가 로그를 쓴다.** `run.state_changed` 같은 줄은 어느 프로세스든 `changeRunState`를 부른 쪽의 파일에 남는다(웹 화면에서 취소하면 `web.jsonl`). `ganger logs`(0133)가 파일을 합쳐 보이므로 괜찮다고 봤다.
 - **`onCommit`은 `inTransaction`으로 연 트랜잭션만 안다.** 다른 방법으로 연 트랜잭션 안에서 부르면 바로 쓴다. 지금 그런 코드는 없다.
 - **같은 파일을 여러 프로세스가 쓴다.** `ganger mcp`는 클라이언트마다 하나라 `mcp.jsonl`을 함께 쓴다. 한 줄은 `O_APPEND` 쓰기 한 번이라 섞이지 않지만, 두 프로세스가 동시에 넘치면 회전이 한 번 더 일어날 수 있다(줄은 잃지 않고 오래된 회전본 하나가 먼저 지워진다).

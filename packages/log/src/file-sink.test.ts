@@ -1,6 +1,7 @@
 import {
   appendFileSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -124,6 +125,34 @@ describe("rotating an existing log before start", () => {
     expect(rotateIfOver(path, { maxBytes: 100, files: 2 })).toBe(true);
     expect(existsSync(path)).toBe(false);
     expect(readFileSync(`${path}.1`, "utf8")).toHaveLength(150);
+  });
+
+  it("empties a held-open file in place without removing it when no copies are kept", () => {
+    const dir = tempDir();
+    const path = join(dir, "ganger.log");
+    writeFileSync(path, "old\n".repeat(50));
+    expect(rotateInPlaceIfOver(path, { maxBytes: 100, files: 0 })).toBe(true);
+    expect(readFileSync(path, "utf8")).toBe("");
+    expect(readdirSync(dir)).toEqual(["ganger.log"]);
+  });
+
+  it("keeps writing to the current file when rotation fails", () => {
+    const dir = tempDir();
+    const path = join(dir, "worker.jsonl");
+    mkdirSync(`${path}.2`);
+    writeFileSync(join(`${path}.2`, "keep"), "");
+    writeFileSync(`${path}.1`, line(-1));
+    const sink = fileSink(path, { maxBytes: 200, files: 2 });
+    for (let index = 0; index < 10; index += 1) sink.write(line(index));
+    sink.close();
+    const kept = [path, `${path}.1`]
+      .flatMap((file) => readFileSync(file, "utf8").split("\n"))
+      .filter((text) => text !== "")
+      .flatMap((text) => {
+        const parsed = z.object({ n: z.number() }).safeParse(JSON.parse(text));
+        return parsed.success ? [parsed.data.n] : [];
+      });
+    expect(kept).toContain(9);
   });
 
   it("copies and empties a file another process still holds open", () => {

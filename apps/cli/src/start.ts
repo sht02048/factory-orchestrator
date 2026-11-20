@@ -118,6 +118,10 @@ export async function start(options: StartOptions): Promise<Started> {
       ? undefined
       : keepAwake({
           ...options.keepAwake,
+          warn: (line) => {
+            log().warn("supervisor.keep_awake_failed", { reason: line });
+            options.keepAwake?.warn(line);
+          },
           serverPid: process.pid,
           readSettings: () => readPowerSettings(options.home),
         });

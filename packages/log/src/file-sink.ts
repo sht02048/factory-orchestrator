@@ -44,8 +44,10 @@ export function rotateIfOver(path: string, limits: RotationLimits): boolean {
 
 export function rotateInPlaceIfOver(path: string, limits: RotationLimits): boolean {
   if (!existsSync(path) || statSync(path).size <= limits.maxBytes) return false;
-  shiftRotated(path, limits.files);
-  if (limits.files > 0) copyFileSync(path, rotatedPath(path, 1));
+  if (limits.files > 0) {
+    shiftRotated(path, limits.files);
+    copyFileSync(path, rotatedPath(path, 1));
+  }
   truncateSync(path, 0);
   return true;
 }
@@ -55,8 +57,11 @@ export interface FileSink {
   close(): void;
 }
 
+export const ROTATE_RETRY_MS = 60_000;
+
 export function fileSink(path: string, limits: RotationLimits): FileSink {
   let fd: number | undefined;
+  let rotateRetryAt = 0;
 
   const open = (): number => {
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
@@ -82,13 +87,17 @@ export function fileSink(path: string, limits: RotationLimits): FileSink {
       let current = fd ?? open();
       const bytes = Buffer.byteLength(text);
       const size = fstatSync(current).size;
-      if (size > 0 && size + bytes > limits.maxBytes) {
+      if (size > 0 && size + bytes > limits.maxBytes && Date.now() >= rotateRetryAt) {
         if (!rotatedByOther(current)) {
           closeSync(current);
           fd = undefined;
-          shiftRotated(path, limits.files);
-          if (limits.files > 0 && existsSync(path)) renameSync(path, rotatedPath(path, 1));
-          else rmSync(path, { force: true });
+          try {
+            shiftRotated(path, limits.files);
+            if (limits.files > 0 && existsSync(path)) renameSync(path, rotatedPath(path, 1));
+            else rmSync(path, { force: true });
+          } catch {
+            rotateRetryAt = Date.now() + ROTATE_RETRY_MS;
+          }
         }
         current = reopen();
       }

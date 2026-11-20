@@ -21,8 +21,8 @@ export function startWebLog(env: Readonly<Record<string, string | undefined>>): 
   for (const signal of ["SIGTERM", "SIGINT"] as const) {
     process.once(signal, () => log().info("process.stopping", { signal }));
   }
-  process.once("exit", () => {
-    if (!crashed) log().info("process.stopped");
+  process.once("exit", (code) => {
+    if (!crashed) log().info("process.stopped", { exit: code });
   });
 }
 
