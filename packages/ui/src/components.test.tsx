@@ -1,5 +1,6 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { sectionScrollTop } from "./components/settings-layout";
 
 import {
   InfoTip,
@@ -1196,5 +1197,13 @@ describe("설정 한 페이지 부품(티켓 0119)", () => {
     expect(html.match(/확인할 것이 있어요/g)).toHaveLength(1);
     expect(html).toContain('<section id="a" aria-labelledby="a-heading"');
     expect(html).toMatch(/<h2 id="a-heading" tabindex="-1" data-section-heading=""/);
+  });
+
+  it("SectionNav 는 구역을 스크롤 칸 안에서만 맨 위로 옮기고, 끝까지 못 가면 끝에서 멈춘다", () => {
+    const base = { scrollerTop: 100, scrollTop: 200, marginTop: 32, maxScrollTop: 784 };
+    expect(sectionScrollTop({ ...base, sectionTop: 400 })).toBe(468);
+    expect(sectionScrollTop({ ...base, sectionTop: 2000 })).toBe(784);
+    expect(sectionScrollTop({ ...base, sectionTop: -500 })).toBe(0);
+    expect(sectionScrollTop({ ...base, sectionTop: 400, maxScrollTop: -10 })).toBe(0);
   });
 });

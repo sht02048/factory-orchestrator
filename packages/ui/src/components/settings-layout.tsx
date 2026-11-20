@@ -112,7 +112,7 @@ export function SectionNav({ label, items, problemLabel }: SectionNavProps) {
     pinned.current = true;
     setCurrent(id);
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    section.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    scrollSectionToTop(section, reduce ? "auto" : "smooth");
     const heading = section.querySelector<HTMLElement>("[data-section-heading]");
     (heading ?? section).focus({ preventScroll: true });
   }, []);
@@ -149,6 +149,47 @@ export function SectionNav({ label, items, problemLabel }: SectionNavProps) {
       </ul>
     </nav>
   );
+}
+
+export function sectionScrollTop(input: {
+  sectionTop: number;
+  scrollerTop: number;
+  scrollTop: number;
+  marginTop: number;
+  maxScrollTop: number;
+}): number {
+  const wanted = input.sectionTop - input.scrollerTop + input.scrollTop - input.marginTop;
+  return Math.min(Math.max(wanted, 0), Math.max(input.maxScrollTop, 0));
+}
+
+function scrollSectionToTop(section: HTMLElement, behavior: ScrollBehavior): void {
+  const scroller = scrollParent(section);
+  const marginTop = Number.parseFloat(getComputedStyle(section).scrollMarginTop) || 0;
+  const sectionTop = section.getBoundingClientRect().top;
+  if (scroller === null) {
+    const root = document.documentElement;
+    window.scrollTo({
+      top: sectionScrollTop({
+        sectionTop,
+        scrollerTop: 0,
+        scrollTop: window.scrollY,
+        marginTop,
+        maxScrollTop: root.scrollHeight - window.innerHeight,
+      }),
+      behavior,
+    });
+    return;
+  }
+  scroller.scrollTo({
+    top: sectionScrollTop({
+      sectionTop,
+      scrollerTop: scroller.getBoundingClientRect().top,
+      scrollTop: scroller.scrollTop,
+      marginTop,
+      maxScrollTop: scroller.scrollHeight - scroller.clientHeight,
+    }),
+    behavior,
+  });
 }
 
 function scrollParent(element: HTMLElement): HTMLElement | null {
