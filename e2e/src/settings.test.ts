@@ -125,12 +125,13 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     await expect.poll(focused).toBe(settings.sections.advanced);
     await expect.poll(() => current(nav)).toBe(settings.sections.advanced);
     expect(page.url()).toBe(before);
+    await expect.poll(() => scrollSettledAt("advanced")).toBe(true);
 
     await page.mouse.wheel(0, -5000);
     await expect.poll(() => current(nav)).toBe(settings.sections.workspace);
 
     await nav.getByRole("link", { name: settings.sections.server }).click();
-    await page.waitForTimeout(800);
+    await expect.poll(() => scrollSettledAt("server")).toBe(true);
     await page.evaluate(() => {
       let node = document.querySelector("section#workspace")?.parentElement ?? null;
       while (node !== null && getComputedStyle(node).overflowY !== "auto")
@@ -213,6 +214,25 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     expect(await write.getAttribute("aria-checked")).toBe("true");
     await page.getByRole("main").getByRole("link", { name: settings.project.breadcrumb }).click();
     await section(settings.sections.advanced).getByText(settings.mcp.rowWrite).waitFor();
+  });
+
+  it("바로 저장하는 스위치는 화면이 새 값을 늦게 읽어도 저장했다고 알릴 때 이미 새 값을 보인다", async () => {
+    await openSettings(page, "/settings/mcp");
+    const write = page.getByRole("switch", { name: settings.mcp.writeToggle });
+    const next = (await write.getAttribute("aria-checked")) === "true" ? "false" : "true";
+
+    await page.route("**/_serverFn/**", async (route) => {
+      if (route.request().method() === "GET") await new Promise((done) => setTimeout(done, 500));
+      await route.continue();
+    });
+    await write.click();
+    await page.getByText(settings.status.saved, { exact: true }).waitFor();
+    expect(await write.getAttribute("aria-checked")).toBe(next);
+
+    await page.unrouteAll();
+    await page.reload();
+    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+    expect(await write.getAttribute("aria-checked")).toBe(next);
   });
 
   it("비밀값은 펼친 뒤에만 입력칸이 생기고, 새 비밀번호를 권하지 않고 비밀번호 관리자가 건너뛴다", async () => {
@@ -576,6 +596,26 @@ describe("Runners 고치는 중 다른 러너 고르기(브라우저, 0119 리�
 async function current(nav: Locator): Promise<string | null> {
   const link = nav.locator('[aria-current="location"]');
   return (await link.count()) === 0 ? null : link.first().textContent();
+}
+
+async function scrollSettledAt(id: string): Promise<boolean> {
+  return page.evaluate(async (target) => {
+    const section = document.getElementById(target);
+    let scroller = section?.parentElement ?? null;
+    while (scroller !== null && getComputedStyle(scroller).overflowY !== "auto")
+      scroller = scroller.parentElement;
+    if (section === null || scroller === null) return false;
+    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+    const before = scroller.scrollTop;
+    await frame();
+    await frame();
+    if (scroller.scrollTop !== before) return false;
+    const margin = Number.parseFloat(getComputedStyle(section).scrollMarginTop);
+    const offset =
+      section.getBoundingClientRect().top - scroller.getBoundingClientRect().top - margin;
+    const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+    return Math.abs(offset) < 1 || (offset > 0 && atEnd);
+  }, id);
 }
 
 function section(name: string): Locator {
