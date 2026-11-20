@@ -17,7 +17,7 @@ import type { AdapterRegistry } from "@ganger/core";
 import { toRunId, toTicketKey } from "@ganger/core";
 import { listRunners, runTimeline, ticketTimeline } from "@ganger/db";
 import type { RunTimeline } from "@ganger/db";
-import { logDir, readServerLogs, redactStoredLine } from "@ganger/log";
+import { CONTEXT_KEYS, logDir, readServerLogs, redactStoredLine, scrubText } from "@ganger/log";
 import type { StoredLogLine } from "@ganger/log";
 import type { Database, SecretBox } from "@ganger/db";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -118,19 +118,29 @@ function timelineView(timeline: RunTimeline): Record<string, unknown> {
   return {
     runs: timeline.runs.map(({ startError, ...run }) => ({
       ...run,
-      [EXTERNAL_FIELD]: { startError },
+      [EXTERNAL_FIELD]: { startError: startError === null ? null : scrubText(startError) },
     })),
     entries: timeline.entries,
   };
 }
 
-const OUTSIDE_TEXT_KEYS: ReadonlySet<string> = new Set(["reason", "err"]);
+const OWN_LOG_KEYS: ReadonlySet<string> = new Set([
+  "t",
+  "level",
+  "proc",
+  "pid",
+  "v",
+  "event",
+  "msg",
+  ...CONTEXT_KEYS,
+]);
 
 function logLineView(line: StoredLogLine): Record<string, unknown> {
   const own: Record<string, unknown> = {};
   const external: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(line)) {
-    if (OUTSIDE_TEXT_KEYS.has(key)) external[key] = value;
+    const fromOutside = typeof value === "string" || typeof value === "object";
+    if (fromOutside && !OWN_LOG_KEYS.has(key)) external[key] = value;
     else own[key] = value;
   }
   return Object.keys(external).length === 0 ? own : { ...own, [EXTERNAL_FIELD]: external };

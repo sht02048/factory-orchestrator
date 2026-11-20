@@ -136,6 +136,7 @@ describe("ganger logs", () => {
 
     expect(await runProgram(["logs", "--home", home, "--since", "yesterday"], context())).toBe(2);
     expect(err.join("\n")).toContain('Cannot read --since "yesterday"');
+    expect(parseLogsArgs({ since: "2" }, now)).toMatchObject({ ok: false });
     expect(await runProgram(["logs", "--home", home, "--proc", "db"], context())).toBe(2);
     expect(await runProgram(["logs", "--home", home, "--level", "loud"], context())).toBe(2);
     expect(await runProgram(["start", "--home", home, "--json"], context())).toBe(2);

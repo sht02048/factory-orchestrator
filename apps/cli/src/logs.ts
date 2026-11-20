@@ -34,6 +34,7 @@ export type ParsedLogs = { ok: true; request: LogsRequest } | { ok: false; error
 const procSchema = z.enum(PROCESS_NAMES);
 const levelSchema = z.string().trim().toLowerCase().pipe(z.enum(LOG_LEVELS));
 const DURATION = /^(\d+)\s*([smhd])$/i;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
 const UNIT_MS: Readonly<Record<string, number>> = {
   s: 1_000,
   m: 60_000,
@@ -78,6 +79,7 @@ function parseSince(value: string, now: Date): Date | undefined {
     if (unit === undefined) return undefined;
     return new Date(now.getTime() - Number(duration[1]) * unit);
   }
+  if (!ISO_DATE.test(value.trim())) return undefined;
   const at = Date.parse(value);
   return Number.isNaN(at) ? undefined : new Date(at);
 }
