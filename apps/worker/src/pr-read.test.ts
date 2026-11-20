@@ -309,6 +309,45 @@ describe("PR 다시 읽기", () => {
   );
 });
 
+describe("두 PR 찾기 중 하나만 권한 오류", () => {
+  it("다른 찾기가 먼저 다른 오류로 실패해도 이유는 no-access 다", async () => {
+    const { run, worker } = await startTwoOnOneSlot();
+    vi.spyOn(h.codeHost, "findPullRequestsByBranch").mockRejectedValue(
+      codeHostError({ kind: "not-found" }),
+    );
+    vi.spyOn(h.codeHost, "findPullRequestsByTicketKey").mockRejectedValue(
+      codeHostError({ kind: "network", cause: new Error("reset") }),
+    );
+    finish(run);
+
+    await worker.tick();
+
+    expect(ended(run).records.prReadError).toBe("no-access");
+  });
+});
+
+describe("다시 읽어 PR 이 없으면", () => {
+  it("런 도중 읽어 둔 PR 기록을 지운다", async () => {
+    const { run, worker } = await startTwoOnOneSlot();
+    h.putPullRequest(current(run), "open");
+    h.advance(MINUTE);
+    await worker.tick();
+    const reads = codeHostFails(codeHostError({ kind: "not-found" }));
+    finish(run);
+    await worker.tick();
+    expect(ended(run).records.pullRequest?.displayId).toBe("#1");
+
+    reads.mockResolvedValue([]);
+    vi.spyOn(h.codeHost, "findPullRequestsByTicketKey").mockResolvedValue([]);
+    h.advance(MINUTE);
+    await worker.tick();
+
+    const found = ended(run);
+    expect(found.run.prState).toBe("none");
+    expect(found.records.pullRequest).toBeNull();
+  });
+});
+
 describe("이유 구분", () => {
   it.each([
     [codeHostError({ kind: "not-found" }), "no-access"],

@@ -489,6 +489,22 @@ describe("Runs 화면", () => {
     expect(text).not.toContain(runsJson.panel.reason["human-check"]);
   });
 
+  it("PR 정보를 읽지 못해도 Human Check 가 아닌 끝난 런은 제 이유를 보인다 (0144)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("seed");
+    const ended = changeRunState(
+      db,
+      id,
+      { to: "ended", agentResult: "timed-out", prState: "unknown", prReadError: "other" },
+      minutes(110),
+    );
+    expect(ended.ok).toBe(true);
+    const text = panelText(render(loadRunsPage(db, undefined, now), { selectedId: id }));
+    expect(text).toContain(runsJson.panel.reason.failed);
+    expect(text).not.toContain(runsJson.panel.prUnread.other);
+  });
+
   it('Canceled 필터는 운영자가 취소한 런만 "취소"로 보인다(Q82.18)', () => {
     const { db, ids } = seedDatabase();
     const id = ids.get("ACME-13");

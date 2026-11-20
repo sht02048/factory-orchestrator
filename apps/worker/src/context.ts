@@ -102,10 +102,15 @@ export async function decideRunPrState(
   for (const codeHost of codeHosts) {
     const repo = codeHost.repoOf(run.runnerProject);
     if (repo === null) continue;
-    const [byBranch, byTicketKey] = await Promise.all([
+    const [branchRead, keyRead] = await Promise.allSettled([
       codeHost.findPullRequestsByBranch(repo, run.branch),
       codeHost.findPullRequestsByTicketKey(repo, run.ticket.key, { createdSince: run.startedAt }),
     ]);
+    if (branchRead.status === "rejected" || keyRead.status === "rejected") {
+      throw firstNoAccessOrAny([branchRead, keyRead]);
+    }
+    const byBranch = branchRead.value;
+    const byTicketKey = keyRead.value;
     return decidePrState({
       repo,
       ticketKey: run.ticket.key,
@@ -138,6 +143,14 @@ export async function readRunPrState(context: TickContext, run: StartedStoredRun
     context.logger.warn("run.pr_read_failed", { runId: run.id, reason, error });
     return { kind: "failed", error: reason };
   }
+}
+
+function firstNoAccessOrAny(reads: ReadonlyArray<PromiseSettledResult<unknown>>): unknown {
+  const reasons: unknown[] = [];
+  for (const read of reads) {
+    if (read.status === "rejected") reasons.push(read.reason);
+  }
+  return reasons.find((reason) => prReadErrorOf(reason) === "no-access") ?? reasons[0];
 }
 
 const noAccessDetail = z.object({ kind: z.enum(["unauthorized", "not-found"]) });

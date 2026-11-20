@@ -282,12 +282,18 @@ async function readUnreadPullRequest(
   const { prState, pr } = prRead.decision;
   const filled = tryWrite(context, run.id, () =>
     inTransaction(context.db, () => {
-      if (pr !== null) {
-        const { id, displayId, url, ci } = pr;
-        updateRunRecords(context.db, run.id, {
-          pullRequest: { id, displayId, url, ci, checkedAt: context.now() },
-        });
-      }
+      updateRunRecords(context.db, run.id, {
+        pullRequest:
+          pr === null
+            ? null
+            : {
+                id: pr.id,
+                displayId: pr.displayId,
+                url: pr.url,
+                ci: pr.ci,
+                checkedAt: context.now(),
+              },
+      });
       return fillUnreadPrState(context.db, run.id, prState);
     }),
   );

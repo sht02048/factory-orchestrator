@@ -489,7 +489,9 @@ function RunPanel({
     case "ended":
       when = t("endedAfter", { duration: duration(run.executionMs ?? 0) });
       reason =
-        run.prReadError === null ? t(`reason.${run.summary}`) : t(`prUnread.${run.prReadError}`);
+        run.prReadError === null || run.summary !== "human-check"
+          ? t(`reason.${run.summary}`)
+          : t(`prUnread.${run.prReadError}`);
       break;
   }
   if (run.state !== "ended" && run.cancelling) reason = t("cancellingReason");
