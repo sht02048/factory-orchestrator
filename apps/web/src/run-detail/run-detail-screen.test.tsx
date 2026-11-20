@@ -367,6 +367,33 @@ describe("Run 상세 화면", () => {
     expect(body).toContain(domain.summary["human-check"]);
   });
 
+  it("로그 꼬리: 폴링이 끝나도 로그가 오지 않았으면 가져오는 중 대신 다시 요청하는 길을 보인다", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    requestRunLogTail(db, id, minutes(100));
+    const body = text(
+      renderWithMessages(
+        <RunDetailScreen
+          page={page(db, id)}
+          runsHref="/runs"
+          runHref={(other) => `/runs/${other}`}
+          logStalled
+          onAnswer={resolved}
+          onDeny={resolved}
+          onCancel={resolved}
+          onControl={() => Promise.resolve("requested" as const)}
+          onRefreshLog={resolved}
+        />,
+        runMessages,
+      ),
+    );
+
+    expect(body).toContain(runJson.log.stalled);
+    expect(body).not.toContain(runJson.log.pending);
+    expect(body).toContain(runJson.log.refresh);
+  });
+
   it("로그 꼬리: 요청 중이면 가져오는 중을, 결과가 들어오면 그 줄을 보인다", () => {
     const { db, ids } = seedDatabase();
     const id = ids.get("ACME-10");

@@ -52,6 +52,8 @@ const STREAM_PATH = "/api/change-events/stream";
 const VISIBLE_WITHIN_MS = 3_000;
 const DISCONNECTED_POLL_MS = 30_000;
 const SETTLE_MS = 1_500;
+const LOG_POLL_MS = 2_000;
+const LOG_POLL_LIMIT = 15;
 const SERVER_TIME_ZONE = "UTC";
 const BROWSER_TIME_ZONE = "Asia/Seoul";
 const ROOT_AND_SHELL_FNS = [
@@ -76,6 +78,7 @@ let cancelRun: RunId;
 let logRun: RunId;
 let watchedRun: RunId;
 let revisitedRun: RunId;
+let stalledLogRun: RunId;
 const watchedTicket = "ACME-24";
 const revisitedTicket = "ACME-25";
 
@@ -216,6 +219,24 @@ describe("Runs·Run 상세를 Query로(브라우저, 0125)", () => {
     await expect.poll(() => countOf(detail.serverCalls, "getRunDetail")).toBe(before + 2);
   });
 
+  it("로그 받는 중 폴링 15번이 끝나도 로그가 오지 않으면 다시 요청하는 길을 보인다(가짜 시계)", async (context) => {
+    const detail = await newPage(context, { stream: "blocked", clock: true });
+    await open(detail, `/runs/${stalledLogRun}`);
+    await expect.poll(() => detail.page.locator("main").innerText()).toContain(run.log.pending);
+
+    for (let poll = 0; poll < LOG_POLL_LIMIT; poll += 1) {
+      const polled = countOf(detail.serverCalls, "getRunDetail");
+      await detail.page.clock.runFor(LOG_POLL_MS);
+      await expect.poll(() => countOf(detail.serverCalls, "getRunDetail")).toBe(polled + 1);
+      await detail.page.waitForLoadState("networkidle");
+    }
+    const afterLimit = countOf(detail.serverCalls, "getRunDetail");
+    await detail.page.clock.runFor(LOG_POLL_MS * 3);
+
+    await expect.poll(() => detail.page.locator("main").innerText()).toContain(run.log.stalled);
+    expect(countOf(detail.serverCalls, "getRunDetail")).toBe(afterLimit);
+  });
+
   it("시간대 쿠키가 바뀌면 Runs가 새 시간대로 다시 읽는다", async (context) => {
     const runsPage = await newPage(context, { timeZone: BROWSER_TIME_ZONE });
     const reread = runsPage.page.waitForRequest(
@@ -339,6 +360,8 @@ function seed(database: Database): void {
   start(logRun, "wt-log");
   watchedRun = assign(watchedTicket);
   revisitedRun = assign(revisitedTicket);
+  stalledLogRun = assign("ACME-26");
+  start(stalledLogRun, "wt-stalled");
 }
 
 function assign(key: string): RunId {

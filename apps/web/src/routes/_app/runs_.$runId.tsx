@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { createTranslator } from "use-intl";
 import { ScreenMessages, defaultLocale } from "../../i18n";
 import { loadRouteQuery } from "../../query/route-query";
-import { fetchCountOf, runDetailPollMs, useRunDetailMutations } from "../../run-detail/actions";
+import {
+  LOG_POLL_LIMIT,
+  fetchCountOf,
+  runDetailPollMs,
+  useRunDetailMutations,
+} from "../../run-detail/actions";
 import { runMessages } from "../../run-detail/messages";
 import { RunDetailScreen } from "../../run-detail/run-detail-screen";
 import { runDetailQuery } from "../../runs/queries";
@@ -65,6 +70,7 @@ function RunDetail({ runId }: { runId: string }) {
         page={page}
         runsHref={`/runs${search}`}
         runHref={(id) => `/runs/${encodeURIComponent(id)}${search}`}
+        logStalled={fetchCount() - logPollsFrom >= LOG_POLL_LIMIT}
         {...actions}
       />
     </ScreenMessages>
