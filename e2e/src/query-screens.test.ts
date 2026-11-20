@@ -67,7 +67,8 @@ const SETTLE_MS = 700;
 const DISCONNECTED_POLL_MS = 30_000;
 const QUERY_GC_MS = 5 * 60_000;
 const DB_STALE_MS = 30_000;
-const ROOT_AND_SHELL = ["getTimeZone", "getTitleBarHidden", "getShell"];
+const ROOT_READS = ["getTimeZone", "getTitleBarHidden"];
+const ROOT_AND_SHELL = [...ROOT_READS, "getShell"];
 
 const runnerId = toRunnerId("runner-a");
 const runnerProject = toRunnerProjectId("fake:acme/web");
@@ -214,7 +215,11 @@ async function newPage(
   return { page, serverCalls };
 }
 
-async function open(page: Page, path: string, screen: "runners" | "tickets"): Promise<void> {
+async function open(
+  page: Page,
+  path: string,
+  screen: "runners" | "tickets" | "runs" | "stats",
+): Promise<void> {
   await page.goto(`${path}${path.includes("?") ? "&" : "?"}ws=${workspaceId}`);
   await waitForScreen(page, screen);
   await waitForRouterIdle(page, new URL(path, baseUrl).pathname);
@@ -584,6 +589,28 @@ describe("셸·Runners·Tickets 의 Query(브라우저, 0127)", () => {
     await page.clock.runFor(DISCONNECTED_POLL_MS);
     await expect.poll(reads).toBe(before + 2);
   });
+});
+
+describe("변경 기록이 끊겼을 때 남은 화면(브라우저, 0129)", () => {
+  it.for([
+    { name: "Tickets", path: "/tickets", screen: "tickets", serverFn: "getTicketRuns" },
+    { name: "Runs", path: "/runs", screen: "runs", serverFn: "getRunsPage" },
+    { name: "Stats", path: "/stats", screen: "stats", serverFn: "getStatsPage" },
+  ] as const)(
+    "변경 기록이 끊기면 열린 $name 가 30초마다 자기 query 를 다시 읽고 루트는 읽지 않는다(가짜 시계)",
+    async ({ path, screen, serverFn }, context) => {
+      const { page, serverCalls } = await newPage(context, { stream: false, clock: true });
+      await open(page, path, screen);
+      const reads = () => serverCalls.filter((call) => call === serverFn).length;
+      const before = reads();
+
+      await page.clock.runFor(DISCONNECTED_POLL_MS);
+      await expect.poll(reads).toBe(before + 1);
+      await page.clock.runFor(DISCONNECTED_POLL_MS);
+      await expect.poll(reads).toBe(before + 2);
+      expect(serverCalls.filter((call) => ROOT_READS.includes(call))).toEqual([]);
+    },
+  );
 });
 
 function seed(database: Database): void {

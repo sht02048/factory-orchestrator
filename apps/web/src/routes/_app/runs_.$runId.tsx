@@ -14,11 +14,12 @@ import { runMessages } from "../../run-detail/messages";
 import { RunDetailScreen } from "../../run-detail/run-detail-screen";
 import { runDetailQuery } from "../../runs/queries";
 import type { RunDetailPage } from "@ganger/app/run-detail/model";
+import { ScreenError } from "../../shell/screen-error";
 
 const t = createTranslator({ locale: defaultLocale, messages: runMessages, namespace: "run" });
 
 export const Route = createFileRoute("/_app/runs_/$runId")({
-  preloadStaleTime: 0,
+  errorComponent: ScreenError,
   loader: (load) => loadRouteQuery(load, runDetailQuery(load.params.runId)),
   head: ({ loaderData }) => ({
     meta: [

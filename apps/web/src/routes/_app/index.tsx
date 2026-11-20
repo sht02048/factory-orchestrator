@@ -12,17 +12,18 @@ import { dashboardQuery } from "../../home/query";
 import { ScreenMessages, defaultLocale } from "../../i18n";
 import { requestTimeZone, useRequestTimeZone } from "../../query/request-time-zone";
 import { loadRouteQuery } from "../../query/route-query";
+import { ScreenError } from "../../shell/screen-error";
 
 const t = createTranslator({ locale: defaultLocale, messages: homeMessages, namespace: "home" });
 
 export const Route = createFileRoute("/_app/")({
+  errorComponent: ScreenError,
   validateSearch: z.object({
     view: z.enum(["todo"]).optional().catch(undefined),
     run: z.string().optional().catch(undefined),
   }),
   loaderDeps: ({ search }) => ({ ws: search.ws }),
   loader: (load) => loadRouteQuery(load, dashboardQuery(load.deps.ws, requestTimeZone())),
-  preloadStaleTime: 0,
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: HomeRoute,
 });

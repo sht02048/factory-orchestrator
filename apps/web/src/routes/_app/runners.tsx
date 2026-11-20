@@ -26,6 +26,7 @@ import {
 import { okOrThrow, rejectionReasonOf, toMutationError } from "../../query/mutation-error";
 import { loadRouteQuery } from "../../query/route-query";
 import { requestRunnerCheckNow } from "../../server/settings-functions";
+import { ScreenError } from "../../shell/screen-error";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -42,11 +43,11 @@ function recheckResultOf(error: unknown): ActionResult {
 }
 
 export const Route = createFileRoute("/_app/runners")({
+  errorComponent: ScreenError,
   validateSearch: z.object({
     sel: z.string().optional(),
     direct: z.boolean().optional().catch(undefined),
   }),
-  preloadStaleTime: 0,
   loader: (load) => loadRouteQuery(load, runnersQuery),
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: RunnersRoute,
