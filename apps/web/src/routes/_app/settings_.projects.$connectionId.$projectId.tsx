@@ -14,6 +14,7 @@ import {
   trackerProjectsQuery,
   useSettingsPage,
 } from "../../settings/settings-query";
+import { useTitleFollowsQuery } from "../../settings/route-title";
 import { routerSettingsLink } from "../../settings/settings-link";
 import { useSettingsActions, useSettingsQueryRefresh } from "../../settings/use-settings-actions";
 
@@ -57,6 +58,12 @@ function ProjectDetailRoute() {
   const page = useSettingsPage(ws);
   const [pageBeforeRemoval, setPageBeforeRemoval] = useState<SettingsPage | null>(null);
   const settingsActions = useSettingsActions(useSettingsQueryRefresh());
+  useTitleFollowsQuery(
+    Route.id,
+    Route.useLoaderData(),
+    findBoundProject((pageBeforeRemoval ?? page).workspace, connectionId, projectId)?.project
+      .name ?? null,
+  );
   const actions = useMemo(
     (): SettingsActions => ({
       ...settingsActions,

@@ -394,6 +394,25 @@ describe("Settings 의 Query(브라우저, 0128)", () => {
     expect(serverCalls).toEqual(["getSettings"]);
   });
 
+  it("연결 이름을 바꾸면 제목과 문서 제목이 함께 바뀐다", async (context) => {
+    const { page } = await newPage(context, { stream: false });
+    await open(page, connectionPath);
+    const section = page.getByRole("region", { name: settings.connection.section, exact: true });
+    await section
+      .getByRole("button", { name: `${settings.connection.name} ${settings.change}` })
+      .click();
+    await section
+      .getByRole("textbox", { name: settings.connection.name, exact: true })
+      .fill("Acme Two");
+    await section.getByRole("button", { name: settings.save }).click();
+    await page.getByRole("heading", { level: 1, name: "Acme Two" }).waitFor();
+
+    await expect
+      .poll(() => page.title())
+      .toBe(fill(settings.connection.documentTitle, { name: "Acme Two" }));
+    seedConnection(db);
+  });
+
   it("변경 기록이 끊기면 열린 Settings 가 30초마다 다시 읽는다(가짜 시계)", async (context) => {
     const { page, serverCalls } = await newPage(context, { stream: false, clock: true });
     await open(page, "/settings");
@@ -436,15 +455,19 @@ describe("Settings 의 Query(브라우저, 0128)", () => {
   });
 });
 
-function seed(database: Database): void {
-  const secretBox = new SecretBox(encryptionKey);
-  saveTrackerConnection(database, secretBox, {
+function seedConnection(database: Database): void {
+  saveTrackerConnection(database, new SecretBox(encryptionKey), {
     id: connection,
     kind: fakeKind,
     name: "Acme",
     config: {},
     secrets: { apiKey: "secret", webhookSecret: "whsec_example" },
   });
+}
+
+function seed(database: Database): void {
+  const secretBox = new SecretBox(encryptionKey);
+  seedConnection(database);
   saveCodeHostConnection(database, secretBox, {
     id: toCodeHostConnectionId("github"),
     kind: toCodeHostKind("github"),

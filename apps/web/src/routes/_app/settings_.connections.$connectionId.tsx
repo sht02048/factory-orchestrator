@@ -7,6 +7,7 @@ import { ConnectionDetailScreen, findConnection } from "../../settings/connectio
 import { settingsMessages } from "../../settings/messages";
 import { NavigationGuard } from "../../settings/navigation-guard";
 import { settingsQuery, webhookSetupQuery } from "../../settings/settings-query";
+import { useTitleFollowsQuery } from "../../settings/route-title";
 import { routerSettingsLink } from "../../settings/settings-link";
 import { useSettingsActions, useSettingsQueryRefresh } from "../../settings/use-settings-actions";
 
@@ -45,6 +46,11 @@ function ConnectionDetailRoute() {
   const { data: page } = useSuspenseQuery(settingsQuery(ws));
   const { data: setup } = useSuspenseQuery(webhookSetupQuery);
   const actions = useSettingsActions(useSettingsQueryRefresh());
+  useTitleFollowsQuery(
+    Route.id,
+    Route.useLoaderData(),
+    findConnection(page, connectionId)?.name ?? null,
+  );
   return (
     <ScreenMessages messages={settingsMessages}>
       <ConnectionDetailScreen
