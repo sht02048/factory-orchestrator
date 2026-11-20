@@ -80,7 +80,9 @@ function bridgeQueryDevtools(): void {
   });
   channel.addEventListener("message", (event: MessageEvent<unknown>) => {
     const message = event.data;
-    if (message === ASK_QUERY_DEVTOOLS) channel.postMessage({ queryDevtools: shown });
+    if (message === ASK_QUERY_DEVTOOLS) {
+      channel.postMessage(shown ? { setQueryDevtools: true } : { queryDevtools: false });
+    }
     const wanted: unknown =
       typeof message === "object" && message !== null
         ? Reflect.get(message, "setQueryDevtools")

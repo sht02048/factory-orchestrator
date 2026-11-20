@@ -105,6 +105,12 @@ describe("pnpm dev", () => {
       await secondPanel.waitFor({ state: "attached" });
       await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("true");
       expect(await second.locator(".tsqd-open-btn").count()).toBe(0);
+
+      await tools.close();
+      const third = await context.newPage();
+      await third.goto("/stats");
+      await hydrated(third);
+      await third.locator(".tsqd-parent-container").waitFor({ state: "attached" });
     } finally {
       await context.close();
       await dev.stop();

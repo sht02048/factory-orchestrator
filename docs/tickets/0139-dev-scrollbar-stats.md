@@ -43,7 +43,7 @@ blocked_by: []
 
 - `apps/web/src/routes/__root.tsx`: 개발 빌드의 `<head>`에 `/virtual:stylex.css` 링크와 함께 StyleX 런타임 스크립트(`/@id/virtual:stylex:runtime`)를 단다. 스크립트가 CSS 를 `<style>`로 받아 두고 새 규칙 이벤트마다 다시 읽는다. 링크는 hydration 이 어긋나지 않게 그대로 두고 스크립트가 끈다.
 - `apps/web/src/query/devtools.tsx`, `devtools-toggle.ts`: devtools 를 루트에서 떼어 켜기 이벤트로만 그린다.
-- `demo/src/client/prefill.ts`, `demo/src/dev-page.ts`, `demo/src/values.ts`: 개발 도구 페이지 단추와 앱 탭 사이의 `BroadcastChannel` 다리. 단추가 원하는 상태(켬·끔)를 보내고, 새 앱 탭은 그 상태를 물어 따른다. 한 탭에서 패널을 닫으면 모든 탭과 단추가 꺼진다. 앱은 표시 상태를 `ganger:query-devtools-state`, 원하는 상태를 `ganger:set-query-devtools` 이벤트로 주고받는다.
+- `demo/src/client/prefill.ts`, `demo/src/dev-page.ts`, `demo/src/values.ts`: 개발 도구 페이지 단추와 앱 탭 사이의 `BroadcastChannel` 다리. 단추가 원하는 상태(켬·끔)를 보내고, 새 앱 탭은 상태를 물어 따른다(개발 도구 페이지가 닫혀 있어도 켜진 다른 앱 탭이 답한다). 한 탭에서 패널을 닫으면 모든 탭과 단추가 꺼진다. 앱은 표시 상태를 `ganger:query-devtools-state`, 원하는 상태를 `ganger:set-query-devtools` 이벤트로 주고받는다.
 - `e2e/src/web-server.ts`: 시험 서버에 `hmr` 선택값(기본 꺼짐 그대로).
 
 ## 완료 조건
@@ -52,7 +52,7 @@ blocked_by: []
 - [x] Stats 가 1280·1440 에서 숫자 카드 네 칸 한 줄, 차트·실패 이유 두 칸으로 보인다. Tickets 는 목록만 스크롤한다.
 - [x] Query devtools 가 기본으로 화면을 가리지 않고, 개발 도구 페이지에서 켜고 끈다. 패널로 닫아도 떠 있는 단추가 남지 않는다.
 - [x] 브라우저 시험 `e2e/src/dev-styles.test.ts`: 개발 서버(HMR 켬)에서 `/ds`를 연 뒤 앱 안에서 `/onboarding`으로 옮겨도 화면의 StyleX 클래스마다 규칙이 있다. 고치기 전 코드에서는 6개가 빠져 실패하는 것을 확인했다.
-- [x] 데모 시험 `demo/src/dev.test.ts` 'Query devtools 는 기본으로 그리지 않고, 개발 도구 페이지에서 켜고 끄며, 열린 앱 탭이 모두 같은 상태다': 처음에는 패널이 없고 칩 묶음은 두 개, `/__dev` 단추의 `aria-pressed`가 `false`. 누르면 앱 탭에 패널이 붙고 `true`, 떠 있는 단추는 없다. 둘째 앱 탭을 열면 켜진 상태를 따라 패널이 열린다. 둘째 탭에서 패널의 닫기를 누르면 두 탭 모두 패널이 빠지고 단추가 `false`, 떠 있는 단추는 없다. 다시 누르면 두 탭 모두 열린다. `@tanstack/react-query-devtools`는 `NODE_ENV`가 `development`일 때만 그려, 이 시험만 개발 서버를 `NODE_ENV=development`로 띄운다(vitest 는 `test`를 물려준다). 개발 서버가 첫 화면 뒤 의존성을 다시 최적화하며 한 번 새로 고치면 첫 누름이 사라질 수 있어, 꺼져 있으면 다시 누른다.
+- [x] 데모 시험 `demo/src/dev.test.ts` 'Query devtools 는 기본으로 그리지 않고, 개발 도구 페이지에서 켜고 끄며, 열린 앱 탭이 모두 같은 상태다': 처음에는 패널이 없고 칩 묶음은 두 개, `/__dev` 단추의 `aria-pressed`가 `false`. 누르면 앱 탭에 패널이 붙고 `true`, 떠 있는 단추는 없다. 둘째 앱 탭을 열면 켜진 상태를 따라 패널이 열린다. 둘째 탭에서 패널의 닫기를 누르면 두 탭 모두 패널이 빠지고 단추가 `false`, 떠 있는 단추는 없다. 다시 누르면 두 탭 모두 열린다. 개발 도구 페이지를 닫은 뒤 연 셋째 앱 탭도 켜진 상태를 따른다. `@tanstack/react-query-devtools`는 `NODE_ENV`가 `development`일 때만 그려, 이 시험만 개발 서버를 `NODE_ENV=development`로 띄운다(vitest 는 `test`를 물려준다). 개발 서버가 첫 화면 뒤 의존성을 다시 최적화하며 한 번 새로 고치면 첫 누름이 사라질 수 있어, 꺼져 있으면 다시 누른다.
 - [x] 프로덕션 묶음에 devtools 와 개발 CSS 런타임이 없다.
 
 ## 남은 것

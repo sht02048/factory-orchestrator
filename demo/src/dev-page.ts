@@ -88,8 +88,6 @@ export function devPage(lifeEnabled: boolean): string {
       channel.postMessage({ setQueryDevtools: pressed() });
     } else if (typeof event.data?.setQueryDevtools === "boolean") {
       queryDevtools.setAttribute("aria-pressed", String(event.data.setQueryDevtools));
-    } else if (event.data?.queryDevtools === true) {
-      queryDevtools.setAttribute("aria-pressed", "true");
     }
   });
   queryDevtools.addEventListener("click", () => {
