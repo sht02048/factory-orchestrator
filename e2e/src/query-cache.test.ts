@@ -242,7 +242,7 @@ describe("query 읽기 실패(0123 할 일 10)", () => {
     expect(await page.getByRole("button", { name: shell.screenError.retry }).count()).toBe(1);
   });
 
-  it("셸 안 화면으로 옮기다 query가 throw해도 레일은 남고 화면 칸에 오류와 다시 읽기 단추가 보인다", async (context) => {
+  it("셸 안 화면으로 옮기다 query가 throw해도 레일은 남고, 오류 화면 머리로 포커스가 옮겨 가며 다시 읽기 단추가 보인다", async (context) => {
     const { page } = await newPage(context);
     await openRuns(page);
 
@@ -251,6 +251,7 @@ describe("query 읽기 실패(0123 할 일 10)", () => {
 
     expect(await page.getByRole("navigation", { name: shell.nav.label }).count()).toBe(1);
     expect(await page.getByRole("button", { name: shell.screenError.retry }).count()).toBe(1);
+    await expect.poll(() => focusedHeadingText(page)).toBe(shell.screenError.title);
   });
 
   it("다시 읽기를 누르면 실패했던 화면만 다시 읽고, 읽히면 오류 화면이 화면으로 바뀐다", async (context) => {
@@ -279,13 +280,32 @@ describe("query 읽기 실패(0123 할 일 10)", () => {
     await page.getByRole("button", { name: shell.screenError.retry }).click();
 
     await page.getByRole("status").filter({ hasText: shell.screenError.retryFailed }).waitFor();
-    const focusedHasHeading = await page.evaluate(
-      () => document.activeElement?.querySelector("h1") !== null,
-    );
-    expect(focusedHasHeading).toBe(true);
+    await expect.poll(() => focusedHeadingText(page)).toBe(shell.screenError.title);
     expect(await page.getByRole("navigation", { name: shell.nav.label }).count()).toBe(1);
   });
+
+  it("다시 읽기가 실패한 뒤 다른 화면에 갔다 돌아와 또 실패하면 지난 실패 문장은 남지 않는다", async (context) => {
+    const { page } = await newPage(context);
+    await openRuns(page);
+    await routerCall(page, "navigate", RETRY_PATH);
+    await page.getByRole("heading", { name: shell.screenError.title }).waitFor();
+    await page.getByRole("button", { name: shell.screenError.retry }).click();
+    await page.getByRole("status").filter({ hasText: shell.screenError.retryFailed }).waitFor();
+
+    await routerCall(page, "navigate", "/runs");
+    await waitForRouterIdle(page, "/runs");
+    await routerCall(page, "navigate", RETRY_PATH);
+    await page.getByRole("heading", { name: shell.screenError.title }).waitFor();
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(SETTLE_MS);
+
+    expect(await page.getByText(shell.screenError.retryFailed).count()).toBe(0);
+  });
 });
+
+function focusedHeadingText(page: Page): Promise<string | null> {
+  return page.evaluate(() => document.activeElement?.querySelector("h1")?.textContent ?? null);
+}
 
 async function openRuns(page: Page): Promise<void> {
   await page.goto(`/runs?ws=${workspaceId}`);

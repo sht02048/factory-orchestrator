@@ -2,48 +2,71 @@ import * as stylex from "@stylexjs/stylex";
 import { Button, NoticeLayout, PageHeader, ScreenLayout, Text, focusStyles } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
+import { useRouter, useRouterState } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useTranslations } from "use-intl";
 
-let retryFailedPending = false;
+type RetryState =
+  | { kind: "idle" }
+  | { kind: "retrying"; href: string }
+  | { kind: "failed"; href: string; attempt: number };
 
-export function takeRetryFailed(): boolean {
-  const failed = retryFailedPending;
-  retryFailedPending = false;
-  return failed;
+let retryState: RetryState = { kind: "idle" };
+let failedAttempts = 0;
+const listeners = new Set<() => void>();
+
+function setRetryState(next: RetryState): void {
+  retryState = next;
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function currentRetryState(): RetryState {
+  return retryState;
+}
+
+const IDLE: RetryState = { kind: "idle" };
+
+function idleRetryState(): RetryState {
+  return IDLE;
 }
 
 export function ScreenError(_props: ErrorComponentProps) {
   const t = useTranslations("shell.screenError");
   const router = useRouter();
   const queryErrorReset = useQueryErrorResetBoundary();
+  const href = useRouterState({ select: (state) => state.location.href });
+  const state = useSyncExternalStore(subscribe, currentRetryState, idleRetryState);
   const headingRef = useRef<HTMLDivElement>(null);
-  const [retrying, setRetrying] = useState(false);
-  const [retryFailed, setRetryFailed] = useState(false);
+  const retrying = state.kind === "retrying" && state.href === href;
+  const failedAttempt = state.kind === "failed" && state.href === href ? state.attempt : null;
 
   useEffect(() => {
-    if (!takeRetryFailed()) return;
-    setRetryFailed(true);
     headingRef.current?.focus();
-  }, []);
+  }, [failedAttempt]);
 
   const retry = () => {
     if (retrying) return;
-    setRetrying(true);
-    setRetryFailed(false);
+    setRetryState({ kind: "retrying", href });
     queryErrorReset.reset();
-    retryFailedPending = true;
-    router.invalidate({ filter: (match) => match.status === "error", sync: true }).then(
-      () => {
-        retryFailedPending = false;
-        setRetrying(false);
-      },
-      () => {
-        setRetrying(false);
-      },
-    );
+    const failed = () => {
+      failedAttempts += 1;
+      setRetryState({ kind: "failed", href, attempt: failedAttempts });
+      const stopWatching = router.subscribe("onResolved", (event) => {
+        if (event.toLocation.href === href) return;
+        stopWatching();
+        if (retryState.kind === "failed" && retryState.href === href) setRetryState(IDLE);
+      });
+    };
+    router.invalidate({ filter: (match) => match.status === "error", sync: true }).then(() => {
+      if (router.state.matches.some((match) => match.status === "error")) failed();
+      else setRetryState(IDLE);
+    }, failed);
   };
 
   return (
@@ -56,10 +79,14 @@ export function ScreenError(_props: ErrorComponentProps) {
     >
       <NoticeLayout>
         <div {...stylex.props(styles.body)}>
-          <Text variant="body">{t("body")}</Text>
-          <Text variant="body" role="status">
-            {retryFailed ? t("retryFailed") : ""}
-          </Text>
+          <div>
+            <Text variant="body">{t("body")}</Text>
+            <div {...stylex.props(failedAttempt !== null && styles.retryFailed)}>
+              <Text variant="body" role="status">
+                {failedAttempt === null ? "" : t("retryFailed")}
+              </Text>
+            </div>
+          </div>
           <div>
             <Button
               variant="secondary"
@@ -77,4 +104,5 @@ export function ScreenError(_props: ErrorComponentProps) {
 
 const styles = stylex.create({
   body: { display: "flex", flexDirection: "column", alignItems: "flex-start", gap: space.s4 },
+  retryFailed: { marginTop: space.s2 },
 });
