@@ -1,12 +1,13 @@
 import { PRODUCT_DISPLAY_NAME } from "@ganger/cli/home";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   BrowserWindow,
   Menu,
   Notification,
   Tray,
   app,
+  dialog,
   ipcMain,
   nativeImage,
   powerMonitor,
@@ -61,6 +62,8 @@ import type {
 } from "../shared/view.js";
 import {
   IPC_PREFIX,
+  LOGS_CAN_OPEN,
+  LOGS_OPEN,
   NAVIGATE_CHANNEL,
   NOTIFICATION_SETTINGS_CHANNEL,
   NOTIFICATION_SETTINGS_WINDOW,
@@ -71,6 +74,11 @@ import {
 } from "../shared/view.js";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 import { navigationMenu } from "./navigation-menu.js";
+import {
+  diagnosticsDownloadNotice,
+  diagnosticsMenuItem,
+  logFolderOpenable,
+} from "./diagnostics-menu.js";
 import { mainWindowOptions, settingsWindowOptions, titleBarCookie } from "./window-options.js";
 
 async function loadServerScreen(window: BrowserWindow, url: string): Promise<void> {
@@ -115,6 +123,9 @@ export class Controller {
   private readonly delivered = new Map<string, Notification>();
   private reminderTimer: NodeJS.Timeout | undefined;
   private notificationPermission: NotificationPermission = "unknown";
+  private diagnosticsListener:
+    | ((event: Electron.Event, item: Electron.DownloadItem) => void)
+    | undefined;
   private settingsWindow: BrowserWindow | undefined;
   private remoteTimer: NodeJS.Timeout | undefined;
   private offerTimer: NodeJS.Timeout | undefined;
@@ -548,6 +559,13 @@ export class Controller {
     handle("enrollment-cancel", () => this.enrollment.cancel());
     handle("enrollment-close", () => this.enrollment.close());
     handle("open-sharing", () => shell.openExternal(SHARING_SETTINGS_URL));
+    ipcMain.handle(
+      LOGS_CAN_OPEN,
+      (event) => this.fromServerPage(event) && logFolderOpenable(this.mode),
+    );
+    ipcMain.handle(LOGS_OPEN, (event) =>
+      this.fromServerPage(event) && logFolderOpenable(this.mode) ? this.openLogFolder() : false,
+    );
     ipcMain.handle(UPDATE_GET, (event) => (this.fromServerPage(event) ? this.updateView() : null));
     ipcMain.handle(UPDATE_ACT, (event, action: unknown) => {
       if (this.fromServerPage(event) && isUpdateAction(action)) this.runUpdateAction(action);
@@ -607,6 +625,37 @@ export class Controller {
       openPath: (path) => shell.openPath(path),
       showItemInFolder: (path) => shell.showItemInFolder(path),
     });
+  }
+
+  private async openLogFolder(): Promise<boolean> {
+    const error = await shell.openPath(dirname(this.options.logFile));
+    return error === "";
+  }
+
+  private downloadDiagnostics(url: string): void {
+    this.showWindow();
+    const window = this.window;
+    if (window === undefined || window.isDestroyed()) return;
+    const session = window.webContents.session;
+    if (this.diagnosticsListener !== undefined) {
+      session.off("will-download", this.diagnosticsListener);
+    }
+    const onDownload = (_event: Electron.Event, item: Electron.DownloadItem) => {
+      if (item.getURL() !== url) return;
+      session.off("will-download", onDownload);
+      this.diagnosticsListener = undefined;
+      item.once("done", (_done, state) => {
+        const notice = diagnosticsDownloadNotice(state);
+        if (notice === null || window.isDestroyed()) return;
+        void dialog.showMessageBox(window, {
+          type: notice === "saved" ? "info" : "warning",
+          message: t(`diagnostics.${notice}`),
+        });
+      });
+    };
+    this.diagnosticsListener = onDownload;
+    session.on("will-download", onDownload);
+    window.webContents.downloadURL(url);
   }
 
   private notificationPrefs(): NotificationPrefs {
@@ -890,6 +939,11 @@ export class Controller {
       });
     }
     items.push(
+      diagnosticsMenuItem({
+        label: t("menu.makeDiagnostics"),
+        serverUrl: this.serverUrl,
+        download: (url) => this.downloadDiagnostics(url),
+      }),
       {
         id: "change-mode",
         label: t("tray.changeMode"),

@@ -12,6 +12,8 @@ export const LOG_EVENTS = {
   "supervisor.keep_awake_failed": "could not keep this computer awake",
 
   "request.rejected": "rejected a request",
+  "browser.error": "the browser reported an error",
+  "diagnostics.created": "created a diagnostics bundle",
   "change_events.prune_failed": "could not prune change events",
   "change_events.read_failed": "could not read change events",
 

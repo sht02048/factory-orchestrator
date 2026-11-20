@@ -121,6 +121,19 @@ export function listTrackerConnections(db: Database, box: SecretBox): StoredTrac
     .map((row) => openTrackerConnection(box, row));
 }
 
+export interface TrackerConnectionSummary {
+  id: TrackerConnectionId;
+  kind: string;
+}
+
+export function listTrackerConnectionSummaries(db: Database): TrackerConnectionSummary[] {
+  return db
+    .select({ id: trackerConnections.id, kind: trackerConnections.kind })
+    .from(trackerConnections)
+    .orderBy(asc(trackerConnections.createdAt), asc(trackerConnections.id))
+    .all();
+}
+
 export function getTrackerConnection(
   db: Database,
   box: SecretBox,

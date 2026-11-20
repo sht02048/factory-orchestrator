@@ -67,6 +67,7 @@ export const SETTINGS_SECTIONS = [
   "projects",
   "connections",
   "server",
+  "logs",
   "advanced",
 ] as const;
 export type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number];
@@ -120,6 +121,7 @@ export interface SettingsScreenProps {
   actions: SettingsActions;
   renderLink?: RenderSettingsLink;
   renderGuard?: (guard: UnsavedGuard) => ReactNode;
+  logs?: ReactNode;
 }
 
 export function SettingsScreen({
@@ -130,12 +132,13 @@ export function SettingsScreen({
   actions,
   renderLink = plainSettingsLink(ws),
   renderGuard,
+  logs,
 }: SettingsScreenProps) {
   const t = useTranslations("settings");
   const workspace = page.workspace;
   const problems = sectionProblems(page, runnerIssues);
   const navItems: SectionNavItem[] = SETTINGS_SECTIONS.filter(
-    (id) => workspace !== null || id !== "projects",
+    (id) => (workspace !== null || id !== "projects") && (logs !== undefined || id !== "logs"),
   ).map((id) => ({
     id,
     label: t(`sections.${id}`),
@@ -177,6 +180,7 @@ export function SettingsScreen({
               <UpdatesRows />
             </SettingsGroup>
           </SettingsSection>
+          {logs}
           <SettingsSection id="advanced" title={t("sections.advanced")}>
             <SettingsGroup>
               <SettingsLinkRow
