@@ -58,36 +58,42 @@ describe("pnpm dev", () => {
     await expect(fetch(dev.url + "/")).rejects.toThrow("fetch failed");
   });
 
-  it("Query devtools 는 기본으로 그리지 않고, Query 도구 칩으로 켜고 끈다(0139)", async () => {
+  it("Query devtools 는 기본으로 그리지 않고, 개발 도구 페이지에서 켜고 끈다(0139)", async () => {
     const dev = await startDev(["--static"], { NODE_ENV: "development" });
-    const page = await browser.newPage({ baseURL: dev.url, locale: "ko-KR" });
-    page.setDefaultTimeout(30_000);
+    const context = await browser.newContext({ baseURL: dev.url, locale: "ko-KR" });
+    context.setDefaultTimeout(30_000);
     try {
-      await page.goto("/");
-      await hydrated(page);
-      const toggle = page.getByRole("button", { name: "Query 도구" });
-      const devtools = page.locator(".tsqd-parent-container");
+      const app = await context.newPage();
+      await app.goto("/");
+      await hydrated(app);
+      const panel = app.locator(".tsqd-parent-container");
+      const floatingButton = app.locator(".tsqd-open-btn");
+      expect(await panel.count()).toBe(0);
+      expect(await app.locator("#ganger-dev-tools > *").count()).toBe(2);
 
-      await toggle.waitFor();
-      expect(await toggle.getAttribute("aria-pressed")).toBe("false");
-      expect(await devtools.count()).toBe(0);
+      const tools = await context.newPage();
+      await tools.goto("/__dev");
+      const toggle = tools.getByRole("button", { name: "Query devtools 켜기·끄기" });
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("false");
 
       await expect
         .poll(
           async () => {
             if ((await toggle.getAttribute("aria-pressed")) === "false") await toggle.click();
-            return devtools.count();
+            return panel.count();
           },
           { timeout: 30_000 },
         )
         .toBe(1);
-      expect(await toggle.getAttribute("aria-pressed")).toBe("true");
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("true");
+      expect(await floatingButton.count()).toBe(0);
 
-      await toggle.click();
-      await devtools.waitFor({ state: "detached" });
-      expect(await toggle.getAttribute("aria-pressed")).toBe("false");
+      await app.getByRole("button", { name: /close/i }).first().click();
+      await panel.waitFor({ state: "detached" });
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("false");
+      expect(await floatingButton.count()).toBe(0);
     } finally {
-      await page.close();
+      await context.close();
       await dev.stop();
     }
   });

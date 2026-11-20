@@ -1,12 +1,18 @@
 import {
+  ASK_QUERY_DEVTOOLS,
+  DEV_CHANNEL,
   FAIL_AUTH,
   FAIL_NO_ORCA,
   FAIL_OFFLINE,
   FAIL_PUSH_AUTH,
   PREFILL,
   PREFILL_RUNNER_NAME,
+  TOGGLE_QUERY_DEVTOOLS,
 } from "../values.ts";
-import { toggleQueryDevtools } from "../../../apps/web/src/query/devtools-toggle.ts";
+import {
+  onQueryDevtoolsState,
+  toggleQueryDevtools,
+} from "../../../apps/web/src/query/devtools-toggle.ts";
 
 const ROOT_ID = "ganger-dev-tools";
 
@@ -58,21 +64,24 @@ function mount(): void {
   link.textContent = "개발 도구";
   link.setAttribute("style", chip);
 
-  const queryButton = document.createElement("button");
-  queryButton.type = "button";
-  queryButton.textContent = "Query 도구";
-  queryButton.title = "TanStack Query devtools 를 켜거나 꺼요.";
-  queryButton.setAttribute("style", chip);
-  queryButton.setAttribute("aria-pressed", "false");
-  queryButton.addEventListener("click", () => {
-    const shown = queryButton.getAttribute("aria-pressed") === "true";
-    queryButton.setAttribute("aria-pressed", String(!shown));
-    toggleQueryDevtools(window);
-  });
-
-  root.append(fillButton, queryButton, link);
+  root.append(fillButton, link);
   document.body.append(root);
 }
+
+function bridgeQueryDevtools(): void {
+  const channel = new BroadcastChannel(DEV_CHANNEL);
+  let shown = false;
+  onQueryDevtoolsState(window, (next) => {
+    shown = next;
+    channel.postMessage({ queryDevtools: shown });
+  });
+  channel.addEventListener("message", (event: MessageEvent<unknown>) => {
+    if (event.data === TOGGLE_QUERY_DEVTOOLS) toggleQueryDevtools(window);
+    if (event.data === ASK_QUERY_DEVTOOLS) channel.postMessage({ queryDevtools: shown });
+  });
+}
+
+bridgeQueryDevtools();
 
 const waitForHydration = setInterval(() => {
   if (!("__TSR_ROUTER__" in globalThis)) return;
