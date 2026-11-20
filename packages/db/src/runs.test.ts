@@ -47,6 +47,9 @@ import {
 import {
   assignRun,
   changeRunState,
+  countUnreadPrRuns,
+  fillUnreadPrState,
+  recordPrReadError,
   TICKET_TITLE_MAX_LENGTH,
   fillRunTicketTitle,
   getRun,
@@ -367,7 +370,12 @@ describe("Run 테이블과 두 축", () => {
     addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
     const id = assignOk(db, "ENG-1");
     change(db, id, { to: "running", started });
-    change(db, id, { to: "ended", agentResult, prState });
+    change(db, id, {
+      to: "ended",
+      agentResult,
+      prState,
+      ...(prState === "unknown" ? { prReadError: "no-access" as const } : {}),
+    });
 
     const stored = getRunWithRecords(db, id)?.run;
     expect(stored).toMatchObject({
@@ -381,6 +389,69 @@ describe("Run 테이블과 두 축", () => {
     expect(summarizeRunOutcome(stored)).toEqual(
       summarizeRunOutcome({ agentResult, prState, runnerUnreached: false }),
     );
+  });
+
+  it("PR 못 읽음은 이유와 함께만 저장하고, 이유는 못 읽음에만 붙는다 (0144)", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 2, online: true, projects: [repoA] });
+    const unread = assignOk(db, "ENG-1");
+    const read = assignOk(db, "ENG-2");
+    change(db, unread, { to: "running", started });
+    change(db, read, { to: "running", started });
+
+    expect(() =>
+      changeRunState(db, unread, {
+        to: "ended",
+        agentResult: "reported-success",
+        prState: "unknown",
+      }),
+    ).toThrow(/Failed query/);
+    expect(() =>
+      changeRunState(db, read, {
+        to: "ended",
+        agentResult: "reported-success",
+        prState: "open",
+        prReadError: "other",
+      }),
+    ).toThrow(/Failed query/);
+    expect(getRun(db, unread)?.state).toBe("running");
+    expect(getRun(db, read)?.state).toBe("running");
+
+    change(db, unread, {
+      to: "ended",
+      agentResult: "reported-success",
+      prState: "unknown",
+      prReadError: "no-access",
+    });
+    expect(getRunWithRecords(db, unread)?.records.prReadError).toBe("no-access");
+    expect(countUnreadPrRuns(db)).toEqual({ "no-access": 1, other: 0 });
+  });
+
+  it("못 읽은 PR 상태는 이유를 바꾸고, 읽으면 채우며 이유를 지운다. 읽은 런은 다시 바꾸지 않는다 (0144)", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    change(db, id, { to: "running", started });
+    change(db, id, {
+      to: "ended",
+      agentResult: "reported-success",
+      prState: "unknown",
+      prReadError: "no-access",
+    });
+
+    expect(recordPrReadError(db, id, "no-access")).toBe(false);
+    expect(recordPrReadError(db, id, "other")).toBe(true);
+    expect(countUnreadPrRuns(db)).toEqual({ "no-access": 0, other: 1 });
+
+    expect(fillUnreadPrState(db, id, "merged")).toBe(true);
+    const found = getRunWithRecords(db, id);
+    expect(found?.run).toMatchObject({ state: "ended", prState: "merged" });
+    expect(found?.records.prReadError).toBeNull();
+    expect(countUnreadPrRuns(db)).toEqual({ "no-access": 0, other: 0 });
+
+    expect(fillUnreadPrState(db, id, "closed")).toBe(false);
+    expect(recordPrReadError(db, id, "other")).toBe(false);
+    expect(getRunWithRecords(db, id)?.run).toMatchObject({ prState: "merged" });
   });
 
   it("Queued에서 취소해 러너·워크트리·시작 시각 없이 PR 상태 없음으로 끝난 런을 저장한다 (Q77·Q82.10)", () => {

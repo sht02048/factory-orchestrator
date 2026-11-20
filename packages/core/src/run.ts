@@ -54,8 +54,12 @@ export type AgentResult = (typeof AGENT_RESULTS)[number];
 export const NOT_STARTED_AGENT_RESULTS = ["canceled", "could-not-start"] as const;
 export type NotStartedAgentResult = (typeof NOT_STARTED_AGENT_RESULTS)[number];
 
-export const PR_STATES = ["none", "open", "merged", "closed"] as const;
+export const PR_STATES = ["none", "open", "merged", "closed", "unknown"] as const;
 export type PrState = (typeof PR_STATES)[number];
+export type ReadPrState = Exclude<PrState, "unknown">;
+
+export const PR_READ_ERRORS = ["no-access", "other"] as const;
+export type PrReadError = (typeof PR_READ_ERRORS)[number];
 
 export const SUMMARY_OUTCOMES = ["merged", "human-check", "failed", "canceled"] as const;
 export type SummaryOutcome = (typeof SUMMARY_OUTCOMES)[number];

@@ -8,6 +8,7 @@ import {
   getRunnerCheckRequest,
   getWebhookReceipt,
   listPendingRunnerCheckRequests,
+  countUnreadPrRuns,
   listCodeHostConnections,
   listRecentMcpActions,
   listRunners,
@@ -242,6 +243,7 @@ export function loadSettingsDb(
     install: {
       connections: connections.map((connection) => trackerConnectionView(db, connection, now)),
       githubToken: listCodeHostConnections(db, secretBox).length > 0,
+      unreadPrRuns: countUnreadPrRuns(db),
       addresses: addressesView(getInstallSettings(db)),
       power: powerView(context.power),
       mcp: {

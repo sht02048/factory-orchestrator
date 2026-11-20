@@ -132,7 +132,7 @@ function emptyOutcomes(): OutcomeCounts {
 }
 
 function emptyPrStates(): PrStateCounts {
-  return { none: 0, open: 0, merged: 0, closed: 0 };
+  return { none: 0, open: 0, merged: 0, closed: 0, unknown: 0 };
 }
 
 export function percentile(sorted: ReadonlyArray<number>, p: number): number {

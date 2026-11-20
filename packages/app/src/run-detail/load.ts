@@ -141,6 +141,7 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date):
         state: "ended",
         agentResult: run.agentResult,
         prState: run.prState,
+        prReadError: records.prReadError,
         summary: outcome.outcome,
         worktreeNeedsManualRemoval:
           outcome.worktree === "operator-decides" && records.worktreeRemovedAt === null,

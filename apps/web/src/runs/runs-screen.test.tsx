@@ -457,6 +457,54 @@ describe("Runs 화면", () => {
     expect(attentionIds(page)).toEqual(homeRunIds());
   });
 
+  it("PR 정보를 읽지 못한 런은 행에 PR 못 읽음을, 패널에 이유를 보인다 (0144)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("seed");
+    const ended = changeRunState(
+      db,
+      id,
+      {
+        to: "ended",
+        agentResult: "reported-success",
+        prState: "unknown",
+        prReadError: "no-access",
+      },
+      minutes(110),
+    );
+    expect(ended.ok).toBe(true);
+    const page = loadRunsPage(db, undefined, now);
+    expect(page.runs.find((run) => run.id === id)).toMatchObject({
+      prState: "unknown",
+      prReadError: "no-access",
+    });
+    const row = rowTexts(render(page)).get("ACME-10");
+    expect(row?.result).toBe(
+      [domain.agentResult["reported-success"], runsJson.prUnread].join(runsJson.metaSeparator),
+    );
+    expect(row?.pill).toBe(domain.summary["human-check"]);
+    const text = panelText(render(page, { selectedId: id }));
+    expect(text).toContain(runsJson.panel.prUnread["no-access"]);
+    expect(text).toContain(domain.prState.unknown);
+    expect(text).not.toContain(runsJson.panel.reason["human-check"]);
+  });
+
+  it("PR 정보를 읽지 못해도 Human Check 가 아닌 끝난 런은 제 이유를 보인다 (0144)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("seed");
+    const ended = changeRunState(
+      db,
+      id,
+      { to: "ended", agentResult: "timed-out", prState: "unknown", prReadError: "other" },
+      minutes(110),
+    );
+    expect(ended.ok).toBe(true);
+    const text = panelText(render(loadRunsPage(db, undefined, now), { selectedId: id }));
+    expect(text).toContain(runsJson.panel.reason.failed);
+    expect(text).not.toContain(runsJson.panel.prUnread.other);
+  });
+
   it('Canceled 필터는 운영자가 취소한 런만 "취소"로 보인다(Q82.18)', () => {
     const { db, ids } = seedDatabase();
     const id = ids.get("ACME-13");

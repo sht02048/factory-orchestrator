@@ -2,6 +2,7 @@ import {
   AGENT_RESULTS,
   NOT_STARTED_AGENT_RESULTS,
   PAUSE_SOURCES,
+  PR_READ_ERRORS,
   PR_STATES,
   RUN_STATES,
 } from "@ganger/core";
@@ -267,6 +268,7 @@ export const runs = sqliteTable(
     startError: text("start_error"),
     agentResult: text("agent_result", { enum: AGENT_RESULTS }),
     prState: text("pr_state", { enum: PR_STATES }),
+    prReadError: text("pr_read_error", { enum: PR_READ_ERRORS }),
     runnerUnreached: integer("runner_unreached", { mode: "boolean" }).notNull().default(false),
     reportBody: text("report_body"),
     prId: text("pr_id").$type<PullRequestId>(),
@@ -291,6 +293,11 @@ export const runs = sqliteTable(
     check("runs_agent_result", sql`${t.agentResult} IN ${inList(AGENT_RESULTS)}`),
     check("runs_pr_state", sql`${t.prState} IN ${inList(PR_STATES)}`),
     check("runs_later_pr_state", sql`${t.laterPrState} IN ${inList(LATER_PR_STATES)}`),
+    check("runs_pr_read_error", sql`${t.prReadError} IN ${inList(PR_READ_ERRORS)}`),
+    check(
+      "runs_pr_read_error_iff_unknown",
+      sql`(${t.prState} IS 'unknown') = (${t.prReadError} IS NOT NULL)`,
+    ),
     check("runs_last_log_json", sql`${t.lastLog} IS NULL OR json_valid(${t.lastLog})`),
     check("runs_runner_unreached", sql`${t.runnerUnreached} IN (0, 1)`),
     check("runs_queued_not_started", sql`${t.state} <> 'queued' OR ${t.startedAt} IS NULL`),

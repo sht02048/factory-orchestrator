@@ -9,7 +9,6 @@ import type {
   AgentResult,
   CompletionReport,
   PermissionRequestId,
-  PrStateDecision,
   QuestionId,
   RunOnRunner,
   RunProgress,
@@ -42,15 +41,16 @@ import {
 import type { RunRecords, StoredRunner } from "@ganger/db";
 import {
   answerKey,
-  decideRunPrState,
   denialKey,
   isUnreachable,
   mailboxFor,
+  readRunPrState,
+  rememberPrReadFailure,
   reportFailure,
   tryWrite,
   runLogContext,
 } from "./context.js";
-import type { ActiveRun, PendingEnding, TickContext } from "./context.js";
+import type { ActiveRun, PendingEnding, PrRead, TickContext } from "./context.js";
 
 export async function watchActiveRuns(context: TickContext): Promise<void> {
   const { db, logger } = context;
@@ -180,7 +180,7 @@ async function watchRun(
     return;
   }
 
-  const decision = await decideRunPrState(context, run);
+  const prRead = await readRunPrState(context, run);
   const lastLog =
     pending === undefined ? await readLastLog(context, run, runner, onRunner) : pending.lastLog;
   if (ending.agent === "stop") await runner.stopAgent(onRunner);
@@ -192,7 +192,7 @@ async function watchRun(
   });
   const recorded = endRun(context, run, {
     agentResult: ending.agentResult,
-    decision,
+    prRead,
     runnerUnreached: false,
     report: ending.report,
     lastLog,
@@ -281,7 +281,7 @@ async function endWithoutProgress(
       ? { agentResult: "canceled" as const, stopAgent: true, runnerUnreached: false }
       : null);
   if (ending === null) return false;
-  const decision = await decideRunPrState(context, run);
+  const prRead = await readRunPrState(context, run);
   if (ending.stopAgent && !context.pendingEndings.has(run.id)) {
     const mailbox = context.mailboxes.get(storedRunner.id) ?? storedRunner.mailbox;
     if (mailbox === null) return false;
@@ -292,7 +292,7 @@ async function endWithoutProgress(
   }
   const recorded = endRun(context, run, {
     agentResult: ending.agentResult,
-    decision,
+    prRead,
     runnerUnreached: ending.runnerUnreached,
     report: null,
     lastLog: context.pendingEndings.get(run.id)?.lastLog ?? null,
@@ -316,10 +316,10 @@ async function endIfTimedOut(
     cancelRequested: input.cancelRequested,
   });
   if (timeout === null) return;
-  const decision = await decideRunPrState(context, run);
+  const prRead = await readRunPrState(context, run);
   endRun(context, run, {
     agentResult: timeout.agentResult,
-    decision,
+    prRead,
     runnerUnreached: timeout.runnerUnreached,
     report: null,
     lastLog: null,
@@ -429,7 +429,7 @@ function endRun(
   run: ActiveRun,
   input: {
     agentResult: AgentResult;
-    decision: PrStateDecision;
+    prRead: PrRead;
     runnerUnreached: boolean;
     report: CompletionReport | null;
     lastLog: ReadonlyArray<string> | null;
@@ -437,14 +437,17 @@ function endRun(
 ): boolean {
   const { db, logger } = context;
   const endedAt = context.now();
-  return inTransaction(db, () => {
+  const { prRead } = input;
+  const ended = inTransaction(db, () => {
     const result = changeRunState(
       db,
       run.id,
       {
         to: "ended",
         agentResult: input.agentResult,
-        prState: input.decision.prState,
+        ...(prRead.kind === "read"
+          ? { prState: prRead.decision.prState }
+          : { prState: "unknown" as const, prReadError: prRead.error }),
         runnerUnreached: input.runnerUnreached,
         ...(input.report === null ? {} : { reportBody: input.report.body }),
       },
@@ -457,15 +460,19 @@ function endRun(
     if (input.agentResult === "canceled") markCancelRequestProcessed(db, run.id, endedAt);
     resolvePermissionWaits(db, run.id, [], endedAt);
     if (input.lastLog !== null) updateRunRecords(db, run.id, { lastLog: [...input.lastLog] });
-    const pr = input.decision.pr;
-    updateRunRecords(db, run.id, {
-      pullRequest:
-        pr === null
-          ? null
-          : { id: pr.id, displayId: pr.displayId, url: pr.url, ci: pr.ci, checkedAt: endedAt },
-    });
+    if (prRead.kind === "read") {
+      const pr = prRead.decision.pr;
+      updateRunRecords(db, run.id, {
+        pullRequest:
+          pr === null
+            ? null
+            : { id: pr.id, displayId: pr.displayId, url: pr.url, ci: pr.ci, checkedAt: endedAt },
+      });
+    }
     return true;
   });
+  if (ended && prRead.kind === "failed") rememberPrReadFailure(context, run.id);
+  return ended;
 }
 
 async function sendAnswers(

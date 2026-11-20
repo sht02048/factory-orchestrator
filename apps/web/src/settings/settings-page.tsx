@@ -196,6 +196,10 @@ export function SettingsScreen({
   );
 }
 
+function unreadPrRuns(install: SettingsPage["install"]): number {
+  return install.unreadPrRuns["no-access"] + install.unreadPrRuns.other;
+}
+
 export function sectionProblems(
   page: SettingsPage,
   runnerIssues: number,
@@ -215,6 +219,7 @@ export function sectionProblems(
     install.connections.length === 0 ||
     install.connections.some((connection) => connection.webhook.kind === "rejected") ||
     !install.githubToken ||
+    unreadPrRuns(install) > 0 ||
     install.runners.length === 0 ||
     runnerIssues > 0
   ) {
@@ -810,7 +815,11 @@ function ConnectionsSection({
             }
           />
         ) : null}
-        <GitHubRow saved={page.install.githubToken} actions={actions} />
+        <GitHubRow
+          saved={page.install.githubToken}
+          unread={page.install.unreadPrRuns}
+          actions={actions}
+        />
         <SettingsLinkRow
           label={t("runnersRow.label")}
           detail={
@@ -887,8 +896,22 @@ export function useConnectionWebhookDetail(connection: TrackerConnectionView, no
   }
 }
 
-function GitHubRow({ saved, actions }: { saved: boolean; actions: SettingsActions }) {
+function GitHubRow({
+  saved,
+  unread,
+  actions,
+}: {
+  saved: boolean;
+  unread: SettingsPage["install"]["unreadPrRuns"];
+  actions: SettingsActions;
+}) {
   const t = useTranslations("settings");
+  const unreadDetail =
+    unread["no-access"] > 0
+      ? t("github.unreadNoAccess", { count: unread["no-access"] })
+      : unread.other > 0
+        ? t("github.unreadOther", { count: unread.other })
+        : null;
   const edit = useInlineEdit("github");
   const labelId = useId();
   const describeGitHub = useCredentialReason("github");
@@ -897,8 +920,8 @@ function GitHubRow({ saved, actions }: { saved: boolean; actions: SettingsAction
     <SettingsRow
       label={t("github.label")}
       labelId={labelId}
-      detail={saved ? t("github.set") : t("github.unset")}
-      detailTone={saved ? "default" : "problem"}
+      detail={saved ? (unreadDetail ?? t("github.set")) : t("github.unset")}
+      detailTone={saved && unreadDetail === null ? "default" : "problem"}
       control={
         edit.open ? undefined : (
           <ChangeButton

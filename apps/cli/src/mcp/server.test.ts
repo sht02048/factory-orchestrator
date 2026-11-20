@@ -214,6 +214,23 @@ describe("ganger mcp 서버", () => {
     });
   });
 
+  it("PR 정보를 읽지 못한 런은 PR 상태 unknown 과 이유 값을 그대로 준다 (0144)", async () => {
+    seeded.db.$client
+      .prepare("UPDATE runs SET pr_state = 'unknown', pr_read_error = 'no-access' WHERE id = ?")
+      .run(seeded.ended);
+    const detail = await call("get_run", { runId: seeded.ended });
+    expect(detail.json).toMatchObject({
+      run: { status: { state: "ended", prState: "unknown", prReadError: "no-access" } },
+    });
+    const list = z
+      .object({ runs: z.array(z.object({ id: z.string() }).passthrough()) })
+      .parse((await call("list_runs")).json);
+    expect(list.runs.find((run) => run.id === seeded.ended)).toMatchObject({
+      prState: "unknown",
+      prReadError: "no-access",
+    });
+  });
+
   it("없는 런·러너는 오류로 알린다", async () => {
     expect((await call("get_run", { runId: "nope" })).isError).toBe(true);
     const runner = await call("get_runner", { runner: "nope" });

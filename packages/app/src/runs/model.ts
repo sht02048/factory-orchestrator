@@ -1,4 +1,4 @@
-import type { AgentResult, PrState, SummaryOutcome } from "@ganger/core";
+import type { AgentResult, PrReadError, PrState, SummaryOutcome } from "@ganger/core";
 import type { WorkspaceChoice } from "../shell/model.js";
 import type { StatsPeriodDays } from "../stats/model.js";
 
@@ -38,6 +38,7 @@ export type RunView =
       endedAgoMs: number;
       agentResult: AgentResult;
       prState: PrState;
+      prReadError: PrReadError | null;
       summary: SummaryOutcome;
     });
 

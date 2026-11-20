@@ -16,8 +16,10 @@ import type {
   InvalidRunTransition,
   NotStartedAgentResult,
   PauseSource,
+  PrReadError,
   PrState,
   PullRequestId,
+  ReadPrState,
   Run,
   RunId,
   RunPlacement,
@@ -71,6 +73,7 @@ export interface RunRecords {
     checkedAt: Date;
   } | null;
   laterPrState: { state: (typeof LATER_PR_STATES)[number]; at: Date } | null;
+  prReadError: PrReadError | null;
   worktreeRemovedAt: Date | null;
   trackerStateSetAt: Date | null;
   trackerComment: { id: CommentId; at: Date } | null;
@@ -183,6 +186,7 @@ function toRunRecords(row: RunRow): RunRecords {
       row.laterPrState === null || row.laterPrStateAt === null
         ? null
         : { state: row.laterPrState, at: row.laterPrStateAt },
+    prReadError: row.prReadError,
     worktreeRemovedAt: row.worktreeRemovedAt,
     trackerStateSetAt: row.trackerStateSetAt,
     trackerComment:
@@ -452,6 +456,7 @@ export type RunStateChange =
       to: "ended";
       agentResult: AgentResult;
       prState: PrState;
+      prReadError?: PrReadError;
       runnerUnreached?: boolean;
       reportBody?: string;
     };
@@ -499,6 +504,7 @@ export function changeRunState(
           endedAt: now,
           agentResult: change.agentResult,
           prState: change.prState,
+          prReadError: change.prReadError ?? null,
           runnerUnreached,
           reportBody: change.reportBody ?? null,
           ...pauseClock,
@@ -710,7 +716,10 @@ export function updateRunRecords(
   db: Database,
   runId: RunId,
   patch: Partial<
-    Omit<RunRecords, "startRequestedAt" | "startFailures" | "startError" | "reportBody">
+    Omit<
+      RunRecords,
+      "startRequestedAt" | "startFailures" | "startError" | "reportBody" | "prReadError"
+    >
   >,
 ): boolean {
   const set: Partial<typeof runs.$inferInsert> = {};
@@ -751,6 +760,46 @@ export function updateRunRecords(
       recordRunChange(db, runId);
     return updated;
   });
+}
+
+export function fillUnreadPrState(db: Database, runId: RunId, prState: ReadPrState): boolean {
+  return inTransaction(db, () => {
+    const filled =
+      db
+        .update(runs)
+        .set({ prState, prReadError: null })
+        .where(and(eq(runs.id, runId), eq(runs.state, "ended"), eq(runs.prState, "unknown")))
+        .run().changes > 0;
+    if (filled) recordRunChange(db, runId);
+    return filled;
+  });
+}
+
+export function recordPrReadError(db: Database, runId: RunId, error: PrReadError): boolean {
+  return inTransaction(db, () => {
+    const changed =
+      db
+        .update(runs)
+        .set({ prReadError: error })
+        .where(and(eq(runs.id, runId), eq(runs.prState, "unknown"), ne(runs.prReadError, error)))
+        .run().changes > 0;
+    if (changed) recordRunChange(db, runId);
+    return changed;
+  });
+}
+
+export function countUnreadPrRuns(db: Database): Record<PrReadError, number> {
+  const counts: Record<PrReadError, number> = { "no-access": 0, other: 0 };
+  const rows = db
+    .select({ error: runs.prReadError, runs: count() })
+    .from(runs)
+    .where(eq(runs.prState, "unknown"))
+    .groupBy(runs.prReadError)
+    .all();
+  for (const row of rows) {
+    if (row.error !== null) counts[row.error] += row.runs;
+  }
+  return counts;
 }
 
 const UNSEEN_RUN_COLUMNS: ReadonlySet<string> = new Set(["prCheckedAt"]);

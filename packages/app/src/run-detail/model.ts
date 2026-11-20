@@ -1,4 +1,11 @@
-import type { AgentResult, PauseSource, PrState, RunState, SummaryOutcome } from "@ganger/core";
+import type {
+  AgentResult,
+  PauseSource,
+  PrReadError,
+  PrState,
+  RunState,
+  SummaryOutcome,
+} from "@ganger/core";
 import type { McpActionOutcome } from "@ganger/db";
 import type { InputWait } from "../home/model.js";
 import type { RunControlView } from "../run-control-view.js";
@@ -56,6 +63,7 @@ export type RunDetailStatus =
       state: "ended";
       agentResult: AgentResult;
       prState: PrState;
+      prReadError: PrReadError | null;
       summary: SummaryOutcome;
       worktreeNeedsManualRemoval: boolean;
       laterPrState: { state: "merged" | "closed"; at: string } | null;

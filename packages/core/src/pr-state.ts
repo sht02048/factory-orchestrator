@@ -1,9 +1,9 @@
 import type { PullRequestSnapshot } from "./adapters.js";
 import type { RepoRef, TicketKey } from "./ids.js";
-import type { PrState } from "./run.js";
+import type { ReadPrState } from "./run.js";
 
 export interface PrStateDecision {
-  prState: PrState;
+  prState: ReadPrState;
   pr: PullRequestSnapshot | null;
 }
 
@@ -50,7 +50,7 @@ function latest(prs: ReadonlyArray<PullRequestSnapshot>): PullRequestSnapshot | 
   return best;
 }
 
-function toPrState(state: PullRequestSnapshot["state"]): PrState {
+function toPrState(state: PullRequestSnapshot["state"]): ReadPrState {
   switch (state) {
     case "merged":
       return "merged";
