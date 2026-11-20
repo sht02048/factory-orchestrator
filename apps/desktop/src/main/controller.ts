@@ -7,6 +7,7 @@ import {
   Notification,
   Tray,
   app,
+  dialog,
   ipcMain,
   nativeImage,
   powerMonitor,
@@ -73,7 +74,11 @@ import {
 } from "../shared/view.js";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 import { navigationMenu } from "./navigation-menu.js";
-import { diagnosticsMenuItem, logFolderOpenable } from "./diagnostics-menu.js";
+import {
+  diagnosticsDownloadNotice,
+  diagnosticsMenuItem,
+  logFolderOpenable,
+} from "./diagnostics-menu.js";
 import { mainWindowOptions, settingsWindowOptions, titleBarCookie } from "./window-options.js";
 
 async function loadServerScreen(window: BrowserWindow, url: string): Promise<void> {
@@ -628,6 +633,20 @@ export class Controller {
     const window = this.window;
     if (window === undefined || window.isDestroyed()) return;
     this.showWindow();
+    const session = window.webContents.session;
+    const onDownload = (_event: Electron.Event, item: Electron.DownloadItem) => {
+      if (item.getURL() !== url) return;
+      session.off("will-download", onDownload);
+      item.once("done", (_done, state) => {
+        const notice = diagnosticsDownloadNotice(state);
+        if (notice === null || window.isDestroyed()) return;
+        void dialog.showMessageBox(window, {
+          type: notice === "saved" ? "info" : "warning",
+          message: t(`diagnostics.${notice}`),
+        });
+      });
+    };
+    session.on("will-download", onDownload);
     window.webContents.downloadURL(url);
   }
 

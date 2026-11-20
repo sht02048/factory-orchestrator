@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { diagnosticsMenuItem, diagnosticsUrl, logFolderOpenable } from "./diagnostics-menu";
+import {
+  diagnosticsDownloadNotice,
+  diagnosticsMenuItem,
+  diagnosticsUrl,
+  logFolderOpenable,
+} from "./diagnostics-menu";
 
 describe("diagnostics menu", () => {
   it("downloads the anonymized bundle from the connected server", () => {
@@ -26,5 +31,13 @@ describe("diagnostics menu", () => {
     expect(logFolderOpenable("local")).toBe(true);
     expect(logFolderOpenable("remote")).toBe(false);
     expect(logFolderOpenable("choosing")).toBe(false);
+  });
+});
+
+describe("diagnostics download notice", () => {
+  it("asks to check the saved file, reports a failed download and stays quiet when canceled", () => {
+    expect(diagnosticsDownloadNotice("completed")).toBe("saved");
+    expect(diagnosticsDownloadNotice("interrupted")).toBe("failed");
+    expect(diagnosticsDownloadNotice("cancelled")).toBeNull();
   });
 });

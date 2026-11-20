@@ -97,5 +97,9 @@
   "providers": {
     "claude": "Claude",
     "codex": "Codex"
+  },
+  "diagnostics": {
+    "saved": "진단 묶음을 저장했어요. 공개하기 전에 파일을 직접 열어 확인해 주세요.",
+    "failed": "진단 묶음을 만들지 못했어요. 다시 해 주세요."
   }
 }

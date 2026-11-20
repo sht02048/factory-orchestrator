@@ -10,7 +10,7 @@
     "projects": "프로젝트",
     "connections": "연결",
     "server": "이 서버",
-    "logs": "로그와 진단",
+    "logs": "서버 로그와 진단",
     "advanced": "고급"
   },
   "save": "저장하기",
@@ -570,11 +570,11 @@
     "copyPath": "경로 복사",
     "copied": "경로를 복사했어요",
     "copyFailed": "경로를 복사하지 못했어요",
-    "debug": "자세한 로그",
-    "debugDetail": "모든 러너 호출과 tick 요약까지 남겨요",
-    "debugInfo": "다시 시작하지 않아도 web·worker·mcp가 다음 줄부터 따라요. 로그가 빨리 커지니 원인을 찾으면 꺼 주세요.",
+    "debug": "자세한 서버 로그",
+    "debugDetail": "모든 러너 호출과 worker 점검 주기 요약까지 남겨요",
+    "debugInfo": "다시 시작하지 않아도 web·worker·mcp가 다음 줄부터 따라요. 서버 로그가 빨리 커지니 원인을 찾으면 꺼 주세요.",
     "diagnostics": "진단 묶음",
-    "diagnosticsDetail": "버전, 설정 요약, 최근 런과 로그를 zip 하나로 내려받아요",
+    "diagnosticsDetail": "버전, 설정 요약, 최근 런과 서버 로그를 zip 하나로 내려받아요",
     "diagnosticsInfo": "이슈에 붙일 파일이에요. 비밀 값과 환경 변수는 넣지 않아요.",
     "make": "만들기",
     "making": "만드는 중…",
@@ -585,7 +585,7 @@
     "runNone": "넣지 않기",
     "runOption": "{ticket} · {state}",
     "review": "공개하기 전에 파일을 직접 열어 확인해 주세요.",
-    "made": "{name}을 내려받았어요.",
+    "made": "{name}을 만들었어요.",
     "makeFailed": "진단 묶음을 만들지 못했어요. 다시 해 주세요."
   }
 }

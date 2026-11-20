@@ -13,7 +13,7 @@ import {
   showToast,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
-import { useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { useFormatter, useTranslations } from "use-intl";
 import type { DiagnosticsRunChoice, LogSettingsView } from "@ganger/app/diagnostics/model";
 import { browserClipboard, copyText } from "./clipboard";
@@ -197,7 +197,6 @@ function DiagnosticsRow({
   const edit = useInlineEdit("logs-diagnostics");
   const label = t("logs.diagnostics");
   const [state, setState] = useState<MakeState>({ kind: "idle" });
-  const resultRef = useRef<HTMLParagraphElement>(null);
   const close = () => {
     setState({ kind: "idle" });
     edit.close();
@@ -216,7 +215,6 @@ function DiagnosticsRow({
             <DiagnosticsForm
               runs={view.available ? view.runs : []}
               state={state}
-              resultRef={resultRef}
               onClose={close}
               onMake={(input) => {
                 if (state.kind === "making") return;
@@ -224,12 +222,8 @@ function DiagnosticsRow({
                 makeDiagnostics(input).then(
                   (result) => {
                     setState(result.ok ? { kind: "made", name: result.name } : { kind: "failed" });
-                    resultRef.current?.focus();
                   },
-                  () => {
-                    setState({ kind: "failed" });
-                    resultRef.current?.focus();
-                  },
+                  () => setState({ kind: "failed" }),
                 );
               }}
             />
@@ -243,13 +237,11 @@ function DiagnosticsRow({
 function DiagnosticsForm({
   runs,
   state,
-  resultRef,
   onClose,
   onMake,
 }: {
   runs: ReadonlyArray<DiagnosticsRunChoice>;
   state: MakeState;
-  resultRef: React.RefObject<HTMLParagraphElement | null>;
   onClose: () => void;
   onMake: (input: { anonymize: boolean; runId: string | null }) => void;
 }) {
@@ -281,19 +273,12 @@ function DiagnosticsForm({
         onCheckedChange={setAnonymize}
       />
       <Field label={t("logs.run")} description={t("logs.runDescription")}>
-        <Select
-          aria-label={t("logs.run")}
-          options={runOptions}
-          value={runId}
-          onValueChange={setRunId}
-        />
+        <Select options={runOptions} value={runId} onValueChange={setRunId} />
       </Field>
       <Text id={reviewId} variant="ui" as="p" tone="strong">
         {t("logs.review")}
       </Text>
       <Text
-        ref={resultRef}
-        tabIndex={-1}
         variant="ui"
         as="p"
         role="status"

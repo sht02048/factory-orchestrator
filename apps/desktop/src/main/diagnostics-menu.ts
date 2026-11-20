@@ -24,3 +24,18 @@ export function diagnosticsMenuItem(options: {
 export function logFolderOpenable(mode: "choosing" | "local" | "remote"): boolean {
   return mode === "local";
 }
+
+export type DiagnosticsDownloadState = "completed" | "cancelled" | "interrupted";
+
+export function diagnosticsDownloadNotice(
+  state: DiagnosticsDownloadState,
+): "saved" | "failed" | null {
+  switch (state) {
+    case "completed":
+      return "saved";
+    case "cancelled":
+      return null;
+    case "interrupted":
+      return "failed";
+  }
+}

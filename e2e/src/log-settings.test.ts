@@ -143,7 +143,7 @@ describe("Settings 로그와 진단(브라우저, 0134)", () => {
     expect(JSON.parse(readFileSync(join(home, "logging.json"), "utf8"))).toEqual({ debug: false });
   });
 
-  it("진단 묶음을 펼쳐 만들면 가린 zip을 내려받고 결과 문장으로 포커스가 간다", async () => {
+  it("진단 묶음을 펼쳐 만들면 가린 zip을 내려받고 결과를 알린다", async () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await openSettings(page);
     const logs = page.locator("section#logs");
@@ -159,7 +159,6 @@ describe("Settings 로그와 진단(브라우저, 0134)", () => {
     expect(name).toMatch(/^ganger-diagnostics-\d{8}-\d{4}-[0-9a-f]{6}\.zip$/);
     const status = logs.getByRole("status").filter({ hasText: name });
     await status.waitFor();
-    await expect.poll(() => status.evaluate((el) => el === document.activeElement)).toBe(true);
 
     const saved = join(dir, name);
     await file.saveAs(saved);
