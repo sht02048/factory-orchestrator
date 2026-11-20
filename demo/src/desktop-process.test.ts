@@ -116,6 +116,19 @@ describe("superviseDesktop", () => {
     expect(stopServer).toHaveBeenCalledOnce();
   });
 
+  it("Ctrl+C 가 앱에 먼저 닿아 앱이 신호로 끝나도 개발 서버를 멈추고 0 으로 끝난다", async () => {
+    const { child, stopServer, done } = setup();
+    child.emit("exit", null, "SIGINT");
+    await expect(done).resolves.toBe(0);
+    expect(stopServer).toHaveBeenCalledOnce();
+  });
+
+  it("앱이 다른 신호로 죽으면 1 로 끝난다", async () => {
+    const { child, done } = setup();
+    child.emit("exit", null, "SIGKILL");
+    await expect(done).resolves.toBe(1);
+  });
+
   it("신호를 받고도 앱이 끝나지 않으면 SIGKILL 로 끝낸다", async () => {
     vi.useFakeTimers();
     const { child, signals, done } = setup();

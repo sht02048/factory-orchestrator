@@ -43,7 +43,10 @@ export function desktopDevEnv(
 
 export interface DesktopChild {
   kill(signal: NodeJS.Signals): boolean;
-  once(event: "exit", listener: (code: number | null) => void): unknown;
+  once(
+    event: "exit",
+    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
+  ): unknown;
   once(event: "error", listener: (error: Error) => void): unknown;
 }
 
@@ -92,8 +95,11 @@ export function superviseDesktop({
     };
     signals.on("SIGINT", () => quit("SIGINT"));
     signals.on("SIGTERM", () => quit("SIGTERM"));
-    child.once("exit", (code) =>
-      finish(signalled || code === 0 ? 0 : (code ?? 1), "desktop app quit"),
+    child.once("exit", (code, signal) =>
+      finish(
+        signalled || code === 0 || signal === "SIGINT" || signal === "SIGTERM" ? 0 : (code ?? 1),
+        "desktop app quit",
+      ),
     );
     child.once("error", (error) => finish(1, `desktop app could not start (${error.message})`));
   });

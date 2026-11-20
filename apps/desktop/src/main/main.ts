@@ -40,7 +40,7 @@ if (!app.requestSingleInstanceLock()) {
     let bundle;
     let devServer;
     try {
-      devServer = devServerUrl(process.env);
+      devServer = app.isPackaged ? undefined : devServerUrl(process.env);
       bundle =
         devServer === undefined
           ? loadServerBundle(serverBundleRoot())

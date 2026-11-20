@@ -103,7 +103,8 @@ export async function startDevServer(args: readonly string[]): Promise<DevServer
   await server.listen();
   const address = server.httpServer?.address();
   const listening = typeof address === "object" && address !== null ? address.port : port;
-  const shown = host === "0.0.0.0" ? "127.0.0.1" : host.includes(":") ? `[${host}]` : host;
+  const shown =
+    host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host.includes(":") ? `[${host}]` : host;
   const url = `http://${shown}:${listening}`;
   console.info(
     [

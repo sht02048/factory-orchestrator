@@ -383,6 +383,10 @@ export class Controller {
   private useRemote(server: SavedServer): void {
     const settings = this.options.settings.read();
     this.options.settings.write({ ...settings, mode: "remote", remote: server });
+    this.showRemote(server);
+  }
+
+  private showRemote(server: SavedServer): void {
     this.mode = "remote";
     this.remote = { server, reachable: true };
     this.watch.stop();
@@ -393,14 +397,16 @@ export class Controller {
 
   private async openDevServer(url: string): Promise<void> {
     this.mode = "remote";
+    const name = new URL(url).host;
+    this.setView({ screen: "unreachable", name, url, checking: true });
     const result = await connectAddress(url, (origin, timeoutMs) =>
       probeIdentity(origin, timeoutMs),
     );
     if (result.ok) {
-      this.useRemote(result.server);
+      this.showRemote(result.server);
       return;
     }
-    this.setView({ screen: "unreachable", name: new URL(url).host, url, checking: false });
+    this.setView({ screen: "unreachable", name, url, checking: false });
     this.refreshMenus();
   }
 
@@ -442,6 +448,10 @@ export class Controller {
   }
 
   private chooseMode(): void {
+    if (this.options.devServerUrl !== undefined) {
+      void this.openDevServer(this.options.devServerUrl);
+      return;
+    }
     this.stopFeed();
     this.mode = "choosing";
     this.stopRemoteRetry();
@@ -451,6 +461,7 @@ export class Controller {
   }
 
   private chooseLocal(openAtLogin: boolean): void {
+    if (this.options.devServerUrl !== undefined) return;
     const settings = this.options.settings.read();
     this.options.settings.write({ ...settings, mode: "local", openAtLogin });
     this.applyLoginItem(openAtLogin);
