@@ -40,6 +40,19 @@ function railLink(page: Page, screen: NavScreen) {
     .getByRole("link", { name: new RegExp(`^${shell.nav[screen]}(,|$)`) });
 }
 
+function settled(page: Page, request: Request): Promise<void> {
+  return new Promise((resolve) => {
+    const done = (other: Request) => {
+      if (other !== request) return;
+      page.off("requestfinished", done);
+      page.off("requestfailed", done);
+      resolve();
+    };
+    page.on("requestfinished", done);
+    page.on("requestfailed", done);
+  });
+}
+
 export async function waitForRouterIdle(page: Page, pathname: string): Promise<void> {
   await page.waitForFunction(
     (path) => {
@@ -85,10 +98,10 @@ export async function navigateByRail(
     if (!request.url().includes(SERVER_FN_PATH)) return;
     const started = Date.now();
     calls.push(
-      request.response().then(async (response) => {
-        await response?.finished();
-        return { name: serverFnName(request.url()), ms: Date.now() - started };
-      }),
+      settled(page, request).then(() => ({
+        name: serverFnName(request.url()),
+        ms: Date.now() - started,
+      })),
     );
   };
   if (round === "hover") {

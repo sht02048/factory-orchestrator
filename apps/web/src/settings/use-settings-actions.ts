@@ -37,7 +37,7 @@ export type AfterSave = () => Promise<unknown>;
 
 export function useRouterReload(): AfterSave {
   const router = useRouter();
-  return useCallback(() => router.invalidate(), [router]);
+  return useCallback(() => router.invalidate({ sync: true }), [router]);
 }
 
 export function useSettingsReload(): AfterSave {
@@ -45,7 +45,7 @@ export function useSettingsReload(): AfterSave {
   const queryClient = useQueryClient();
   return useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: SHELL_KEY });
-    await router.invalidate();
+    await router.invalidate({ sync: true });
   }, [router, queryClient]);
 }
 
@@ -81,7 +81,7 @@ export function useSettingsActions(afterSave: AfterSave): SettingsActions {
         const result = await createWorkspaceAutoAssignLabel({ data });
         if (result.ok)
           await Promise.all([
-            router.invalidate(),
+            router.invalidate({ sync: true }),
             queryClient.invalidateQueries({ queryKey: TRACKER_KEY }),
           ]);
         return result;
