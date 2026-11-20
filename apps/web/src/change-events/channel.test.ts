@@ -216,6 +216,29 @@ describe("변경 기록 구독(스펙 0003 5.3·5.4·5.5)", () => {
     h.channel.close();
   });
 
+  it("숨은 탭은 연결을 닫고(모아 둔 줄은 먼저 무효화), 다시 보이면 마지막 번호로 이어 받는다", () => {
+    const h = start(3);
+    h.latest().open();
+    h.latest().emit("change", runChange("run-1"), 8);
+    h.latest().fail(0);
+
+    h.channel.hide();
+    expect(h.invalidated).toHaveLength(1);
+    expect(h.sources[0]?.closed).toBe(true);
+    expect(h.channel.disconnected).toBe(false);
+    vi.advanceTimersByTime(CHANGE_SILENCE_MS + DISCONNECTED_POLL_MS * 2);
+    expect(h.refetches).toBe(0);
+    expect(h.sources).toHaveLength(1);
+    expect(vi.getTimerCount()).toBe(0);
+
+    h.channel.show();
+    expect(h.sources).toHaveLength(2);
+    expect(h.latest().url).toBe("/api/change-events/stream?after=8");
+    h.channel.show();
+    expect(h.sources).toHaveLength(2);
+    h.channel.close();
+  });
+
   it("닫으면 연결과 타이머를 모두 거둔다", () => {
     const h = start(0);
     h.latest().fail(CONNECTING);

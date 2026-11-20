@@ -38,8 +38,17 @@ export function ChangeEventsSubscription() {
       open: (url) => new EventSource(url),
       target: queryClientTarget(queryClient),
     });
+    const followVisibility = () => {
+      if (document.visibilityState === "hidden") channel.hide();
+      else channel.show();
+    };
     channel.start();
-    return () => channel.close();
+    followVisibility();
+    document.addEventListener("visibilitychange", followVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", followVisibility);
+      channel.close();
+    };
   }, [after, queryClient]);
   return null;
 }

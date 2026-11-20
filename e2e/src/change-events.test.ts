@@ -57,6 +57,7 @@ const PROBE_SERVER_FN = "getTimeZone";
 const STREAM_PATH = "/api/change-events/stream";
 const VISIBLE_WITHIN_MS = 3_000;
 const BROWSER_TIME_ZONE = "UTC";
+const CONNECTIONS_PER_HOST = 6;
 
 const runnerId = toRunnerId("runner-a");
 const runnerProject = toRunnerProjectId("fake:acme/web");
@@ -149,6 +150,30 @@ describe("변경 기록 통로(브라우저, 0124)", () => {
       .poll(() => countOf(serverCalls, PROBE_SERVER_FN), { timeout: VISIBLE_WITHIN_MS })
       .toBe(1);
     expect(Date.now() - changedAt).toBeLessThan(VISIBLE_WITHIN_MS);
+  });
+
+  it("숨은 탭은 연결을 내려놓아, 탭을 여럿 열어도 새 탭이 HTTP/1.1 연결 한도에 막히지 않는다", async () => {
+    const browserContext = await browser.newContext({
+      baseURL: baseUrl,
+      locale: "ko-KR",
+      timezoneId: BROWSER_TIME_ZONE,
+    });
+    await browserContext.addCookies([{ name: "tz", value: BROWSER_TIME_ZONE, url: baseUrl }]);
+    try {
+      for (let tab = 0; tab < CONNECTIONS_PER_HOST + 1; tab += 1) {
+        const page = await browserContext.newPage();
+        await openRunProbe(page);
+        await page.evaluate(() => {
+          Object.defineProperty(document, "visibilityState", { value: "hidden" });
+          document.dispatchEvent(new Event("visibilitychange"));
+        });
+      }
+      const next = await browserContext.newPage();
+      await openRunProbe(next);
+      expect(await next.locator(RUN_PROBE_SELECTOR).isVisible()).toBe(true);
+    } finally {
+      await browserContext.close();
+    }
   });
 
   it("서버 함수가 throw한 답 거절은 경계를 넘어도 이유를 지켜 같은 오류 타입이 된다", async (context) => {

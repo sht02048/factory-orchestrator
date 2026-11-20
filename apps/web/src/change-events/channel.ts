@@ -60,6 +60,7 @@ export class ChangeChannel {
   #reopen: ReturnType<typeof setTimeout> | undefined;
   #poll: ReturnType<typeof setInterval> | undefined;
   #closed = false;
+  #hidden = false;
 
   constructor(options: ChangeChannelOptions) {
     this.#options = options;
@@ -80,6 +81,28 @@ export class ChangeChannel {
 
   close(): void {
     this.#closed = true;
+    this.#stop();
+  }
+
+  hide(): void {
+    if (this.#closed || this.#hidden) return;
+    this.#hidden = true;
+    clearTimeout(this.#batch);
+    this.#flush();
+    this.#stop();
+  }
+
+  show(): void {
+    if (this.#closed || !this.#hidden) return;
+    this.#hidden = false;
+    this.#connect();
+  }
+
+  get #idle(): boolean {
+    return this.#closed || this.#hidden;
+  }
+
+  #stop(): void {
     this.#source?.close();
     this.#source = null;
     for (const timer of [this.#batch, this.#silence, this.#reopen]) clearTimeout(timer);
@@ -91,7 +114,7 @@ export class ChangeChannel {
   }
 
   #connect(): void {
-    if (this.#closed) return;
+    if (this.#idle) return;
     const source = this.#options.open(
       changeStreamUrl(this.#options.path ?? CHANGE_STREAM_PATH, this.#lastSeq),
     );
@@ -143,7 +166,7 @@ export class ChangeChannel {
   }
 
   #failed(source: ChangeEventSource): void {
-    if (this.#closed || source !== this.#source) return;
+    if (this.#idle || source !== this.#source) return;
     if (source.readyState === EVENT_SOURCE_OPEN) return;
     this.#startPolling();
     if (source.readyState === EVENT_SOURCE_CLOSED) this.#scheduleReopen();
@@ -160,7 +183,7 @@ export class ChangeChannel {
   }
 
   #scheduleReopen(): void {
-    if (this.#closed || this.#reopen !== undefined) return;
+    if (this.#idle || this.#reopen !== undefined) return;
     this.#source?.close();
     this.#source = null;
     this.#reopen = setTimeout(() => {
@@ -170,7 +193,7 @@ export class ChangeChannel {
   }
 
   #startPolling(): void {
-    if (this.#closed || this.#poll !== undefined) return;
+    if (this.#idle || this.#poll !== undefined) return;
     this.#poll = setInterval(() => this.#options.target.refetchVisible(), DISCONNECTED_POLL_MS);
   }
 }
