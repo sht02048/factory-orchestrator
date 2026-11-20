@@ -35,7 +35,7 @@ import { SubmitError, useSubmit, type SettingsActions } from "./settings-screen"
 import { WebhookSection } from "./webhook-section";
 
 export interface ConnectionDetailScreenProps {
-  page: SettingsPage;
+  page: Pick<SettingsPage, "install">;
   setup: WebhookSetupView;
   connectionId: string;
   ws: string | undefined;
@@ -45,7 +45,7 @@ export interface ConnectionDetailScreenProps {
 }
 
 export function findConnection(
-  page: SettingsPage,
+  page: Pick<SettingsPage, "install">,
   connectionId: string,
 ): TrackerConnectionView | null {
   return page.install.connections.find((connection) => connection.id === connectionId) ?? null;

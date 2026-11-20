@@ -1,11 +1,13 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { createTranslator } from "use-intl";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { getSettingsPage } from "../../server/settings-functions";
+import { loadRouteQuery } from "../../query/route-query";
 import { McpScreen } from "../../settings/mcp-screen";
 import { settingsMessages } from "../../settings/messages";
+import { settingsQuery } from "../../settings/settings-query";
 import { routerSettingsLink } from "../../settings/settings-link";
-import { useSettingsActions, useSettingsReload } from "../../settings/use-settings-actions";
+import { useSettingsActions, useSettingsQueryRefresh } from "../../settings/use-settings-actions";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -15,15 +17,18 @@ const t = createTranslator({
 
 export const Route = createFileRoute("/_app/settings_/mcp")({
   loaderDeps: ({ search }) => ({ ws: search.ws }),
-  loader: ({ deps }) => getSettingsPage({ data: { ws: deps.ws } }),
+  preloadStaleTime: 0,
+  loader: async (load) => {
+    await loadRouteQuery(load, settingsQuery(load.deps.ws));
+  },
   head: () => ({ meta: [{ title: t("project.documentTitle", { name: t("mcp.title") }) }] }),
   component: McpRoute,
 });
 
 function McpRoute() {
-  const page = Route.useLoaderData();
   const { ws } = Route.useSearch();
-  const actions = useSettingsActions(useSettingsReload());
+  const { data: page } = useSuspenseQuery(settingsQuery(ws));
+  const actions = useSettingsActions(useSettingsQueryRefresh());
   return (
     <ScreenMessages messages={settingsMessages}>
       <McpScreen mcp={page.install.mcp} ws={ws} actions={actions} renderLink={routerSettingsLink} />

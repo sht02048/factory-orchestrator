@@ -15,6 +15,26 @@ export function saveStatusOf(state: SubmitState, savedOnce: boolean): SaveStatus
   }
 }
 
+export function createSavedResync(): {
+  savedChanged: (sending: boolean) => boolean;
+  stateChanged: (kind: SubmitState["kind"]) => boolean;
+} {
+  let changedWhileSending = false;
+  return {
+    savedChanged: (sending) => {
+      if (!sending) return true;
+      changedWhileSending = true;
+      return false;
+    },
+    stateChanged: (kind) => {
+      if (kind === "sending") return false;
+      const resync = changedWhileSending && kind === "idle";
+      changedWhileSending = false;
+      return resync;
+    },
+  };
+}
+
 export function useSyncedSave<V>({
   saved,
   savedKey,
@@ -46,9 +66,13 @@ export function useSyncedSave<V>({
   );
   const sending = useRef(false);
   sending.current = state.kind === "sending";
+  const [resync] = useState(createSavedResync);
   useEffect(() => {
-    if (!sending.current) setDraft(latest.current.saved);
-  }, [savedKey]);
+    if (resync.savedChanged(sending.current)) setDraft(latest.current.saved);
+  }, [savedKey, resync]);
+  useEffect(() => {
+    if (resync.stateChanged(state.kind)) setDraft(latest.current.saved);
+  }, [state.kind, resync]);
   return {
     draft,
     setDraft,

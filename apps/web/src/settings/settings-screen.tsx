@@ -98,7 +98,6 @@ export interface SettingsActions {
   pollRunnerChecks: () => Promise<boolean>;
   checkWebhookAddress: (input: { address: string }) => Promise<ActionResult>;
   turnOffWebhook: (input: { id: string }) => Promise<ActionResult>;
-  pollWebhookState: (input: { id: string; key: string }) => Promise<boolean>;
 }
 
 export const ReportUnsavedContext = createContext<(formId: string, unsaved: boolean) => void>(

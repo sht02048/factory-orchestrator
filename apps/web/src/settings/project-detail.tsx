@@ -55,11 +55,11 @@ export interface ProjectDetailScreenProps {
   renderGuard?: (guard: UnsavedGuard) => ReactNode;
 }
 
-export function findBoundProject(
-  workspace: WorkspaceSettings | null,
+export function findBoundProject<B extends Pick<BoundProject, "connection" | "project">>(
+  workspace: { bound: ReadonlyArray<B> } | null,
   connectionId: string,
   projectId: string,
-): BoundProject | null {
+): B | null {
   return (
     workspace?.bound.find(
       (bound) => bound.connection.id === connectionId && bound.project.id === projectId,

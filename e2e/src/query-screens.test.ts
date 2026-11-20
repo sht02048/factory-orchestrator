@@ -495,7 +495,7 @@ describe("셸·Runners·Tickets 의 Query(브라우저, 0127)", () => {
     await settle(page);
 
     expect(serverCalls).toContain("saveWorkspaceGeneral");
-    expect(serverCalls).toContain("getSettingsPage");
+    expect(serverCalls).toContain("getSettings");
     expect(serverCalls).toContain("getShell");
     saveWorkspace(db, { id: workspaceId, name: "Acme" });
   });
