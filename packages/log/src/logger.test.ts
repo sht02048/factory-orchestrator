@@ -1,9 +1,15 @@
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import {
+  debugSwitchPath,
+  readDebugSwitch,
+  watchDebugSwitch,
+  writeDebugSwitch,
+} from "./debug-switch.js";
 import { LOG_EVENTS } from "./events.js";
 import type { LogLevel } from "./fields.js";
 import type { LogLine } from "./line.js";
@@ -318,6 +324,55 @@ describe("process log", () => {
     expect(statSync(file).mode & 0o777).toBe(0o600);
     expect(statSync(join(gangerHome, "logs")).mode & 0o777).toBe(0o700);
     expect(statSync(join(gangerHome, "logs", "reports")).mode & 0o777).toBe(0o700);
+  });
+
+  it("follows the Settings debug switch from the next line in web, worker and mcp without a restart", () => {
+    const gangerHome = home();
+    const procs = ["web", "worker", "mcp"] as const;
+    const logs = procs.map((proc) =>
+      setupProcessLog({ proc, env: { GANGER_HOME: gangerHome }, console: null }),
+    );
+    const tickAll = () => {
+      for (const processLog of logs) processLog.logger.debug("worker.tick");
+    };
+    tickAll();
+    writeDebugSwitch(gangerHome, true);
+    tickAll();
+    tickAll();
+    writeDebugSwitch(gangerHome, false);
+    tickAll();
+    for (const processLog of logs) processLog.close();
+    for (const proc of procs) {
+      const lines = readFileSync(join(gangerHome, "logs", `${proc}.jsonl`), "utf8")
+        .trim()
+        .split("\n");
+      expect(lines.map((line) => eventLine.parse(JSON.parse(line)).event)).toEqual([
+        "worker.tick",
+        "worker.tick",
+      ]);
+    }
+  });
+
+  it("treats a missing or broken switch file as off and keeps GANGER_LOG_LEVEL", () => {
+    const gangerHome = home();
+    const switchOf = watchDebugSwitch(gangerHome);
+    expect(switchOf()).toBe(false);
+    writeFileSync(debugSwitchPath(gangerHome), "{not json");
+    expect(switchOf()).toBe(false);
+    writeDebugSwitch(gangerHome, true);
+    expect(switchOf()).toBe(true);
+    expect(readDebugSwitch(gangerHome)).toBe(true);
+    expect(statSync(debugSwitchPath(gangerHome)).mode & 0o777).toBe(0o600);
+    rmSync(debugSwitchPath(gangerHome));
+    expect(switchOf()).toBe(false);
+    const processLog = setupProcessLog({
+      proc: "worker",
+      env: { GANGER_HOME: gangerHome, GANGER_LOG_LEVEL: "debug" },
+      console: null,
+    });
+    processLog.logger.debug("worker.tick");
+    processLog.close();
+    expect(readFileSync(join(gangerHome, "logs", "worker.jsonl"), "utf8")).toContain("worker.tick");
   });
 
   it("keeps a console line on one line when a value has a newline", () => {

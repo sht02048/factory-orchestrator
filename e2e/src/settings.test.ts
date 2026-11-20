@@ -131,6 +131,15 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     await expect.poll(() => current(nav)).toBe(settings.sections.advanced);
     expect(page.url()).toBe(before);
     await expect.poll(() => scrollSettledAt("advanced")).toBe(true);
+    expect(await page.evaluate(() => document.querySelector("main")?.scrollTop)).toBe(0);
+    await page.getByRole("heading", { level: 1, name: settings.title }).waitFor();
+
+    await nav.getByRole("link", { name: settings.sections.logs }).click();
+    await expect.poll(focused).toBe(settings.sections.logs);
+    await page.waitForTimeout(800);
+    expect(await current(nav)).toBe(settings.sections.logs);
+    await nav.getByRole("link", { name: settings.sections.advanced }).click();
+    await expect.poll(() => current(nav)).toBe(settings.sections.advanced);
 
     await page.mouse.wheel(0, -5000);
     await expect.poll(() => current(nav)).toBe(settings.sections.workspace);

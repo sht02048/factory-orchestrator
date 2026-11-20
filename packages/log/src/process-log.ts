@@ -5,6 +5,7 @@ import { fileSink } from "./file-sink.js";
 import { humanLine } from "./line.js";
 import type { Logger, LogSink } from "./logger.js";
 import { createLogger } from "./logger.js";
+import { watchDebugSwitch } from "./debug-switch.js";
 import { logFilePath, readLogSettings, REPORT_DIR_NAME } from "./settings.js";
 import { GANGER_VERSION } from "./version.js";
 
@@ -69,11 +70,12 @@ export function setupProcessLog(options: ProcessLogOptions): ProcessLog {
   const stream = options.console === undefined ? process.stderr : options.console;
   if (stream !== null) sinks.push(consoleSink(stream, options.consoleLevel ?? "warn"));
   let level = settings.level;
+  const debugSwitch = settings.home === null ? () => false : watchDebugSwitch(settings.home);
   let sinkFailed = false;
   const logger = createLogger({
     proc: options.proc,
     version: options.version ?? GANGER_VERSION,
-    level: () => level,
+    level: () => (debugSwitch() ? "debug" : level),
     sinks,
     onSinkError: (error) => {
       if (sinkFailed) return;
