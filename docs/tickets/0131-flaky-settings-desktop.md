@@ -36,7 +36,7 @@ develop CI 를 부하에서만 실패하게 만드는 시험의 원인을 찾아
 
 - `beforeAll`은 Vite 개발 서버를 띄우기만 하고, 첫 시험의 `page.goto`가 렌더러 모듈 전체(React, StyleX, `@ganger/ui`)를 처음 변환했다. 부하에서는 이것만으로 5초를 넘는다. 실패는 늘 파일의 첫 시험이었다(16개 동시 실행·CPU 부하 16회 중 8회, 모두 첫 시험).
 - `e2e/src/settings.test.ts`처럼 `beforeAll`(제한 120초)에서 한 번 페이지를 열어 네트워크가 쉴 때까지 기다리면 각 시험은 시험할 동작만 잰다.
-- 같은 구조인 `apps/desktop/src/renderer/screens.test.ts`는 같은 조건 16회에서 실패하지 않아 고치지 않았다.
+- 같은 구조인 `apps/desktop/src/renderer/screens.test.ts`는 로컬 같은 조건 16회에서 실패하지 않았지만, 이 PR 의 CI(457b2a2)에서 첫 시험 '서버 찾기를 눌러 화면이 바뀌면 …'이 같은 5초 초과로 실패했다. 같은 데우기를 넣었다.
 
 ### demo 온보딩 모드: 다음 단계가 그려지기 전에 가짜 값을 채웠다
 
@@ -61,7 +61,7 @@ develop CI 를 부하에서만 실패하게 만드는 시험의 원인을 찾아
 - `e2e/src/settings.test.ts` 목차 시험: 휠을 굴리기 전과 `scrollTo` 전에 `scrollSettledAt(id)`(두 프레임 동안 스크롤 위치가 그대로이고, 그 구역이 `scroll-margin-top` 자리에 있거나 더 내려갈 수 없는 끝)를 기다린다. `waitForTimeout(800)`을 뺐다.
 - `apps/web/src/settings/use-settings-actions.ts`: 저장 뒤 다시 읽기를 `router.invalidate({ sync: true })`로 기다린다(`useReloadOnSuccess`, `createLabel`). 저장 결과를 알릴 때 화면은 이미 새 값이다.
 - 새 e2e '바로 저장하는 스위치는 화면이 새 값을 늦게 읽어도 저장했다고 알릴 때 이미 새 값을 보인다': 화면 읽기(GET 서버 함수)를 500ms 늦추고 저장 직후 스위치 값을 본다. 고치기 전 코드에서 실패하고 고친 뒤 통과한다.
-- `apps/desktop/src/renderer/notification-settings.test.ts`: `beforeAll`에서 렌더러를 한 번 열어 네트워크가 쉴 때까지 기다린다.
+- `apps/desktop/src/renderer/notification-settings.test.ts`, `screens.test.ts`: `beforeAll`에서 렌더러를 한 번 열어 네트워크가 쉴 때까지 기다린다.
 - `demo/src/dev.test.ts`: "다음"을 누른 뒤 새 단계 제목이 보일 때까지, "직접 입력"을 누른 뒤 ssh 대상 칸이 생길 때까지 기다리고 채운다. 5단계에서는 고른 뒤 목록·메뉴가 닫히고 "저장하는 중…"이 없어질 때까지 기다린다. 실패 스크린숏은 페이지를 닫기 전에 `catch`에서 찍는다.
 
 ## 완료 조건
