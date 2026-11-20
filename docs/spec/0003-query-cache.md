@@ -15,7 +15,7 @@
 - worker가 바꾼 런 상태가 열린 화면(Dashboard, Runs, Run 상세)에 3초 안에 보인다.
 - SSE가 끊기면 열린 화면이 30초마다 다시 읽는다.
 - 0117의 화면 이동 브라우저 시험(`e2e/src/navigation.test.ts`)이 같은 뜻으로 통과한다(7절 5번).
-- 0117 측정과 원격 지연 측정(0122)을 다시 돌려 전·후 표를 남긴다(0129).
+- 0117 측정과 원격 지연 측정(0122)을 다시 돌려 전·후 표를 남긴다(0129). 표는 티켓 [0129](../tickets/0129-query-cleanup.md)의 「잰 결과」에 있다.
 
 ## 2. 범위와 제외
 
@@ -64,37 +64,44 @@ graph LR
 
 ### 4.2 기본값(C6)
 
-| 설정                                         | 값                                  |
-| -------------------------------------------- | ----------------------------------- |
-| `staleTime`, DB 데이터                       | 30초                                |
-| `staleTime`, Linear 데이터                   | 5분(C3)                             |
-| `gcTime`                                     | 5분                                 |
-| 읽기 `retry`                                 | 1                                   |
-| 쓰기(mutation) `retry`                       | 0(Query 기본)                       |
-| `refetchOnWindowFocus`, `refetchOnReconnect` | 켬(stale일 때)                      |
-| 라우터 `defaultPreloadStaleTime`             | 0(모든 `_app` 화면을 옮긴 뒤, 0129) |
+| 설정                                         | 값               |
+| -------------------------------------------- | ---------------- |
+| `staleTime`, DB 데이터                       | 30초             |
+| `staleTime`, Linear 데이터                   | 5분(C3)          |
+| `gcTime`                                     | 5분              |
+| 읽기 `retry`                                 | 1                |
+| 쓰기(mutation) `retry`                       | 0(Query 기본)    |
+| `refetchOnWindowFocus`, `refetchOnReconnect` | 켬(stale일 때)   |
+| 라우터 `defaultPreloadStaleTime`             | 0(0129에서 바꿈) |
 
 - 0117 계약을 지킨다(C6). 레일 링크에 포인터를 올리면 그 화면의 query를 미리 읽는다. 다시 들어간 화면은 캐시로 바로 그리고 낡았으면 뒤에서 새로 읽는다. 그래서 로더는 캐시가 있으면 신선도와 상관없이 바로 넘어가는 변형(`queryClient.query({ ...options, staleTime: "static" })` 또는 그와 같은 API)을 쓴다. 0117 시험은 다시 들어갈 때 staleTime 안이어도 뒤에서 새로 읽기를 요구하므로, 클라이언트에서 화면에 들어올 때(미리 읽기와 서버 렌더 뒤 hydration이 아닐 때) 로더가 그 query의 다시 읽기를 기다리지 않고 시작한다. 다만 이번 이동을 위해 미리 읽은 데이터(같은 route의 미리 읽기가 5초 안, 지금 `PRELOAD_FRESH_MS`와 같은 값)면 다시 읽지 않는다. 기준은 "미리 읽기에서 왔는가"이지 `dataUpdatedAt`만이 아니다. 그래서 포인터를 올려 미리 읽은 뒤 바로 누르면 더 읽지 않고, 서버 렌더로 연 화면을 떠났다가 1~2초 안에 돌아와도(0117 시험 `navigation.test.ts:122-131`) 뒤에서 새로 읽는다. 미리 읽기를 알아보는 방법(라우터의 `preload`·`cause` 정보나 미리 읽기 때 붙이는 표시)은 0123이 정하고, 이 0117 시나리오를 그대로 시험한다. 30초 staleTime은 hydration과 다른 컴포넌트의 같은 query에 쓰이고, 화면에 다시 들어오는 것은 C6의 0117 계약을 따른다. `'static'` 변형은 캐시가 있으면 미리 읽기에서도 요청하지 않으므로, 한 번 본 화면에 포인터를 올렸을 때 staleTime이 지났으면 미리 읽기에서 다시 읽을지(로더가 staleTime을 보게 할지) 0123이 정한다. 어느 API를 쓸지는 0123이 설치한 버전에서 정한다(research 0015 1.4의 문서 사이 불일치).
-- 옮기는 동안 라우터 전역 `defaultPreloadStaleTime`은 지금 값(5초)으로 두고, 옮긴 화면의 route에만 0을 준다. route 옵션 이름은 0123이 확인한다(research 0015 9절). 모두 옮기면 0129가 전역을 0으로 바꾸고 route별 값을 지운다. 이 단계 나눔은 C6(전역 0)을 이행 순서(C14)에 맞춰 적용하는 구현 선택이고 새 결정이 아니다. 전역 0이 라우터 로더로 남는 온보딩 route(C1)의 미리 읽기에 주는 영향은 0129가 확인한다.
+- **정한 로더 API(0123, 0129에서 정리).** `apps/web/src/query/route-query.ts`의 `loadRouteQuery`가 위 계약을 맡는다. 미리 읽기(`load.preload`)는 `queryClient.query`로 읽고 새로 받은 데이터의 `dataUpdatedAt`을 표시해 둔다. 화면에 들어올 때는 `staleTime: "static"`으로 캐시를 바로 쓰고, 클라이언트에서 `cause: "enter"`이며 들어오기 전에 캐시가 있었고 5초(`PRELOAD_FRESH_MS`, `apps/web/src/query/query-client.ts`) 안에 미리 읽은 바로 그 데이터가 아니면 기다리지 않고 다시 읽는다. 트래커 query는 `loadCachedRouteQuery`로, 화면에 들어올 때 캐시를 바로 쓰고 staleTime(5분)이 지났을 때만 뒤에서 다시 읽는다(열린 질문 2의 결정 A).
+- 옮기는 동안 라우터 전역 `defaultPreloadStaleTime`은 지금 값(5초)으로 두고, 옮긴 화면의 route에만 0을 준다. route 옵션 이름은 0123이 확인한다(research 0015 9절). 모두 옮기면 0129가 전역을 0으로 바꾸고 route별 값을 지운다. 이 단계 나눔은 C6(전역 0)을 이행 순서(C14)에 맞춰 적용하는 구현 선택이고 새 결정이 아니다. 전역 0이 라우터 로더로 남는 온보딩 route(C1)의 미리 읽기에 주는 영향은 0129가 확인한다. 0129 결과: 전역을 0으로 바꾸고 `_app` route별 `preloadStaleTime`을 지웠다. 온보딩 route는 Settings의 "Workspace 만들기" 링크(`settings/settings-link.tsx`)가 미리 읽으므로, 포인터를 올릴 때마다 `getOnboardingPage`를 다시 부르지 않게 route에 `preloadStaleTime: PRELOAD_FRESH_MS`(5초)를 남겼다. 지금까지와 같은 값이다. 루트의 `shouldReload: false`는 그대로이고 그 밖에 `shouldReload`는 남지 않았다.
 
 ### 4.3 query key
 
 엔터티 접두사 계층으로 둔다. 시간대가 결과를 바꾸는 query는 시간대를 key에 넣는다. 시간대 값은 루트 로더가 읽은 쿠키 값이다. 그래서 시간대 쿠키가 바뀌면 key가 바뀌어 새로 읽고, 지금 `TimeZoneSync`의 필터에서 Runs가 빠진 문제(research 0016 8절 4번)가 없어진다.
 
-| 화면·부분                          | key(모양)                                                  | 서버 함수                 | staleTime |
-| ---------------------------------- | ---------------------------------------------------------- | ------------------------- | --------- |
-| 셸 배지·Workspace 목록             | `["shell"]`                                                | `getShell`                | 30초      |
-| Dashboard                          | `["dashboard", ws, timeZone]`                              | `getHomePage`             | 30초      |
-| Runs 목록                          | `["runs", "list", { ws, ended, ...conditions }, timeZone]` | `getRunsPage`             | 30초      |
-| Run 상세                           | `["runs", "detail", runId]`                                | `getRunDetail`            | 30초      |
-| Runners                            | `["runners", "list"]`                                      | `getRunnersPage`          | 30초      |
-| Stats                              | `["stats", ws, days, timeZone]`                            | `getStatsPage`            | 30초      |
-| Tickets의 DB 부분(런, Mapping 등)  | `["tickets", "runs", ws]`                                  | 새로 나눈 서버 함수(0127) | 30초      |
-| Tickets의 트래커 티켓 목록         | `["tracker", "tickets", ws]`                               | 새로 나눈 서버 함수(0127) | 5분       |
-| 트래커 라벨(Tickets·Settings 함께) | `["tracker", "labels", connectionId, projectId]`           | 새로 나눈 서버 함수(0127) | 5분       |
-| Settings의 DB 설정                 | `["settings", ...]`(0119의 세 route에 맞춰 0128이 정함)    | 나눈 서버 함수(0128)      | 30초      |
-| Settings의 트래커 프로젝트·상태    | `["tracker", "projects" \| "states", ...]`                 | 나눈 서버 함수(0128)      | 5분       |
+실제로 쓰는 key(0129에서 코드에 맞춤):
 
+| 화면·부분                          | key(모양)                                                  | 서버 함수                  | staleTime |
+| ---------------------------------- | ---------------------------------------------------------- | -------------------------- | --------- |
+| 셸 배지·Workspace 목록             | `["shell"]`                                                | `getShell`                 | 30초      |
+| Dashboard                          | `["dashboard", ws \| null, timeZone]`                      | `getHomePage`              | 30초      |
+| Runs 목록                          | `["runs", "list", { ws, ended, ...conditions }, timeZone]` | `getRunsPage`              | 30초      |
+| Run 상세                           | `["runs", "detail", runId]`                                | `getRunDetail`             | 30초      |
+| Runners                            | `["runners", "list"]`                                      | `getRunnersPage`           | 30초      |
+| 러너 점검이 끝났는지               | `["runners", "checks-pending"]`                            | `getRunnerChecksPending`   | 0         |
+| Stats                              | `["stats", ws \| null, days, timeZone]`                    | `getStatsPage`             | 30초      |
+| Tickets의 DB 부분(런, Mapping 등)  | `["tickets", "runs", ws]`                                  | `getTicketRuns`            | 30초      |
+| Tickets의 트래커 티켓 목록         | `["tracker", "tickets", ws]`                               | `getTrackerTickets`        | 5분       |
+| 트래커 라벨(Tickets·Settings 함께) | `["tracker", "labels", connectionId, projectId]`           | 티켓·상태 읽기가 함께 채움 | 5분       |
+| Settings의 DB 설정(세 route 함께)  | `["settings", ws]`                                         | `getSettings`              | 30초      |
+| Settings의 트래커 프로젝트         | `["tracker", "projects"]`                                  | `getTrackerProjects`       | 5분       |
+| Settings의 트래커 상태·라벨        | `["tracker", "states", ws]`                                | `getBoundProjectReads`     | 5분       |
+| 트래커 연결의 webhook 설정 안내    | `["webhook-setup"]`                                        | `getWebhookSetup`          | 30초      |
+
+- 트래커를 읽지 못한 결과는 5분이 아니라 30초 뒤 낡은 것으로 본다(0127, 0128). `ws` 없음은 Dashboard·Stats가 `null`, 나머지가 빈 문자열이다.
 - `ws`가 없으면(기본 Workspace) key에도 빈 값으로 넣는다. 같은 화면을 `ws` 있이 열 때와 다른 key가 되게 한다.
 - 트래커 라벨처럼 Tickets와 Settings가 같은 것을 읽으면 같은 key를 쓴다. 두 로더 모두 트래커 프로젝트마다 라벨을 읽으므로 key도 프로젝트 단위다. 0127이 만들고 0128이 다시 쓴다. 지금 따로 읽는 중복(research 0016 9절)이 없어진다.
 - 비밀값은 key에 넣지 않는다.
@@ -193,7 +200,13 @@ web 안의 트래커 쓰기(라벨 만들기, 트래커 연결·프로젝트 저
 2. **0124 변경 기록과 SSE.** 표, 쓰는 곳, 통로, 구독 모듈, 폴링 대비.
 3. **0125·0126·0127 화면 옮기기.** 서로 다른 화면이라 함께 한다. 옮긴 화면은 그 route에서 `router.invalidate()`를 지우고 key 무효화로 바꾼다. 옮긴 화면과 남은 화면을 함께 바꾸는 쓰기는 옮기는 동안 둘 다 부른다. 라우터 쪽은 아직 옮기지 않은 route id만 고른 `router.invalidate({ filter })`로 불러, 루트와 셸을 다시 읽지 않게 한다.
 4. **0128 Settings.** 셸 query(0127)가 생긴 뒤 한다. Settings 저장이 셸의 Workspace 목록을 바꾸기 때문이다.
-5. **0129 정리.** `_app`에 남은 `router.invalidate()`와 라우터 캐시 설정을 지우고, 측정을 다시 돌린다.
+5. **0129 정리.** `_app`에 남은 `router.invalidate()`와 라우터 캐시 설정을 지우고, 측정을 다시 돌린다. 결과:
+   - Run 상세·Dashboard의 쓰기(답하기·거절·취소·멈추기와 재개)가 함께 부르던 `router.invalidate({ filter })`를 지우고, 런을 보이는 key(그 런의 상세, Runs 목록, Dashboard, Stats, Tickets의 DB 부분, Runners, Settings)를 무효화한다(`apps/web/src/runs/queries.ts`의 `keysChangedByRunWrite`). 보이지 않는 key는 stale 표시만 되어 실제로 다시 읽는 것은 열린 화면뿐이다. 루트와 셸은 다시 읽지 않는다.
+   - Runs·Stats가 `_app` 로더 데이터로 읽던 셸을 셸 query(`useShell`)로 바꿨다. 셸 query가 다시 읽혀도 두 화면의 Workspace 목록이 낡지 않는다.
+   - 남은 `router.invalidate()`: 루트 `TimeZoneSync`(루트만), 온보딩 저장 뒤(`useSettingsReload`, 온보딩만 씀)와 그 안의 러너 설정 흐름. 운영자 결정(2026-11-20, 0129)으로 서버를 다시 읽지 않는 두 곳을 예외로 남긴다.
+     - Settings 연결 상세·프로젝트 상세의 문서 제목 따라가기(`settings/route-title.ts`). 라우터 `head`는 로더가 돌 때만 다시 계산되어, 이름이 바뀌면 그 route 하나만 다시 읽어 `<title>`을 고친다. 로더는 query 캐시만 읽어(`staleTime: "static"`, 원인 `stay`라 뒤 읽기도 없음) 서버 왕복이 없다. 시험: `e2e/src/settings-query.test.ts` "연결 이름을 바꾸면 제목과 문서 제목이 함께 바뀐다".
+     - 셸 안 오류 화면의 다시 읽기(`shell/screen-error.tsx`). 로더가 실패한 match는 라우터가 다시 돌리기 전까지 오류로 남아, 실패한 match만 고른 `router.invalidate({ filter })`로 다시 돌린다. 시험: `e2e/src/query-cache.test.ts` "다시 읽기를 누르면 실패했던 화면만 다시 읽고…"(루트·셸 서버 함수 0번).
+   - 화면 폴링: 0124의 30초 대비, Run 상세·Dashboard의 처리 중 `refetchInterval`, Runners의 러너 점검 끝 기다림(작은 query `["runners", "checks-pending"]`를 3초마다, 점검이 끝나거나 제한 시간이 지나면 멈춤)만 남았다. 온보딩의 러너 점검 기다림과 러너 설정 흐름의 상태 읽기는 C1대로 둔다.
 
 ## 7. 시험(C13)
 
@@ -204,6 +217,8 @@ web 안의 트래커 쓰기(라벨 만들기, 트래커 연결·프로젝트 저
 3. **worker 쪽 런 상태 바뀜이 3초 안에 보인다.** 화면을 연 채 DB에서 런 상태를 바꾸고(worker와 같은 함수), 3초 안에 화면이 바뀐다.
 4. **SSE가 끊기면 30초 폴링.** 통로를 막으면 보이는 query가 30초마다 다시 읽힌다(가짜 시계).
 5. **0117 브라우저 시험이 통과한다.** `e2e/src/navigation.test.ts` 세 시험이 같은 뜻으로 통과한다. 0127이 `getTicketsPage`를 나누면 시험이 기다리는 서버 함수 이름만 트래커를 읽는 새 함수로 바꾼다. 그 밖의 기대는 바꾸지 않는다.
+
+0129 전체 확인: 1번은 모든 `_app` 화면(`dashboard-query`·`runs-query`·`query-screens`·`settings-query`·`query-cache`), 2번은 쓰기가 있는 화면(Dashboard, Run 상세, Tickets 할당, Runners 점검, Settings 저장), 3번은 Dashboard·Runs·Run 상세(그 밖에 Runners 러너 Offline, Settings 다른 탭 저장), 4번은 Dashboard, Run 상세, Runners, Settings에 더해 0129가 Tickets·Runs·Stats(`query-screens.test.ts` "변경 기록이 끊기면 열린 $name 가…")를 더했다. 5번은 `navigation.test.ts`다.
 
 이 밖에 0124는 쓰기 함수마다 `change_events` 줄이 같은 트랜잭션에 생기는지(롤백하면 줄도 없는지), `Last-Event-ID` 이어 받기, `reset`의 두 경우(표가 빈 경우와 지금보다 큰 번호 포함), 하루 지난 줄 지우기를 시험한다.
 
@@ -233,7 +248,7 @@ web 안의 트래커 쓰기(라벨 만들기, 트래커 연결·프로젝트 저
 1. 탭 여러 개가 SSE를 하나씩 열어 연결 수 한도에 닿으면, 탭 하나만 연결하고 나머지에 나눠 줄지(`BroadcastChannel` 등). 0124에서 재 보고 운영자와 정한다. 0124 측정(2026-11-20, Chrome, HTTP/1.1): SSE를 연 탭이 5개일 때 6번째 탭은 바로 열리고, 6개일 때 7번째 탭은 문서부터 열리지 않는다. 한도에 닿는다. 운영자 결정(2026-11-20): 숨은 탭은 SSE를 닫고, 다시 보이면 마지막 번호로 이어 받는다(0124가 구현). 남은 한도는 동시에 보이는 창이 6개를 넘고 HTTP/1.1일 때뿐이다.
 2. (0117 시험과 엮임) Tickets에 다시 들어갈 때마다 뒤에서 새로 읽기(4.2, C6의 0117 계약)는 트래커 query에도 걸려, 5분 staleTime(C3)은 미리 읽기·hydration과 다른 화면의 같은 query에만 쓰인다. 0122의 서버 캐시가 트래커 왕복을 흡수하면 비용은 서버 함수 왕복 하나다. 트래커 query는 다시 들어갈 때도 5분을 지킬지 0127을 시작할 때 운영자와 정한다. 5분을 지키기로 하면 `navigation.test.ts:130`은 다시 들어갈 때 트래커 함수가 아니라 Tickets의 DB 부분 함수를 기다리도록 이름을 바꾼다(그래도 C6의 "뒤에서 새로 읽기"는 DB 부분에 지켜진다). 운영자 결정(2026-11-20, 0127): 트래커 query는 다시 들어가도 5분을 지킨다(C3). 다시 들어갈 때 뒤에서 새로 읽는 것은 DB 부분(`["tickets", "runs", ws]`)뿐이고, 트래커 query는 `tracker` 변경 기록(webhook, worker의 In Progress 옮기기·결과 댓글, 트래커 연결·프로젝트 바뀜), "Linear에서 다시 읽기", 라벨 만들기로 무효화한다. `navigation.test.ts`는 DB 부분 함수(`getTicketRuns`)를 기다리게 바꿨다. 한계: webhook이 없는 설치에서는 Linear에서 직접 바꾼 티켓(제목, 상태, 라벨)이 Tickets에 브라우저 query의 5분만큼 늦게 보인다. 5분 뒤 다시 읽을 때 0122 서버 캐시가 아직 5분이 안 된 값을 돌려주면(30초가 지나면 뒤에서 새로 읽음) 한 번 더 늦어져, 가장 나쁜 경우 10분 가까이다. "Linear에서 다시 읽기"를 누르면 두 캐시를 모두 건너뛰어 바로 보인다.
 3. 트래커 webhook이 없는 설치(webhook 공개 주소를 두지 않음)에서는 Linear query가 5분 staleTime과 0122의 서버 캐시를 겹쳐 받는다. 운영자가 볼 수 있는 가장 오래된 트래커 값이 몇 분인지는 0122가 서버 쪽 최대 시간을 정한 뒤 이 문서에 적는다.
-4. query 읽기가 throw하면(C5) 어디에 보일지. 지금은 route별 `errorComponent`가 없어 루트의 `RootError`가 화면 전체를 대신한다(research 0016 3절). 0123이 지금 동작을 확인해 적고, route별 오류 화면을 둘지는 0125를 시작할 때 운영자와 정한다. 결정(2026-11-20, 0125를 시작할 때 코디네이터): 0125~0127은 route별 `errorComponent`를 두지 않고 지금 동작 그대로 둔다. `_app` 안 공용 오류 화면 하나(셸·레일 유지와 다시 읽기 단추)는 0129가 맡는다.
+4. query 읽기가 throw하면(C5) 어디에 보일지. 지금은 route별 `errorComponent`가 없어 루트의 `RootError`가 화면 전체를 대신한다(research 0016 3절). 0123이 지금 동작을 확인해 적고, route별 오류 화면을 둘지는 0125를 시작할 때 운영자와 정한다. 결정(2026-11-20, 0125를 시작할 때 코디네이터): 0125~0127은 route별 `errorComponent`를 두지 않고 지금 동작 그대로 둔다. `_app` 안 공용 오류 화면 하나(셸·레일 유지와 다시 읽기 단추)는 0129가 맡는다. 0129 결과: `_app` 아래 화면 route가 모두 `apps/web/src/shell/screen-error.tsx`를 `errorComponent`로 쓴다. 서버 렌더와 hydration 뒤 모두 레일이 남고 화면 칸에 "화면을 열지 못했어요"와 다시 읽기 단추가 보인다. 다시 읽기가 또 실패하면 오류 화면 머리로 포커스를 옮기고 실패를 `role="status"` 문장으로 알린다. 셸 자신(`/_app` 로더의 `getShell`)이 실패하면 레일을 그릴 수 없어 지금처럼 루트 `RootError`가 대신한다.
 
 ## 11. 운영자 결정 목록(2026-11-19)
 

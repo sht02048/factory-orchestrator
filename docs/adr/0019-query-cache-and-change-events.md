@@ -5,10 +5,12 @@
 ## 결정
 
 - **`_app` 데이터 화면과 셸의 클라이언트 캐시는 TanStack Query 하나다.** Dashboard, Tickets, Runs, Run 상세, Runners, Stats, Settings와 셸(레일 배지, Workspace 목록)이 대상이다. 신선도는 Query의 `staleTime`이 정한다.
-- **라우터 로더는 Query를 부른다.** 로더와 컴포넌트가 같은 `queryOptions`를 쓰고, 로더는 캐시가 있으면 기다리지 않고 넘어간다. 다시 들어온 화면은 캐시로 바로 그리고 뒤에서 새로 읽는다(0117 계약, 스펙 0003 4.2). 서버 렌더와 hydration은 `@tanstack/react-router-ssr-query`가 맡고, `QueryClient`는 요청마다 `getRouter()` 안에서 만든다. 다 옮긴 뒤 라우터 `defaultPreloadStaleTime`은 0이다(공식 권장).
+- **라우터 로더는 Query를 부른다.** 로더와 컴포넌트가 같은 `queryOptions`를 쓰고, 로더는 `apps/web/src/query/route-query.ts`의 `loadRouteQuery`(트래커 query는 `loadCachedRouteQuery`)로 읽는다. 캐시가 있으면 기다리지 않고 넘어가고, 클라이언트에서 화면에 들어올 때는 5초 안에 미리 읽은 데이터가 아니면 뒤에서 새로 읽는다(0117 계약, 스펙 0003 4.2). 서버 렌더와 hydration은 `@tanstack/react-router-ssr-query`가 맡고, `QueryClient`는 요청마다 `getRouter()` 안에서 만든다. 라우터 `defaultPreloadStaleTime`은 0이다(공식 권장, 0129). 라우터 로더로 남은 온보딩 route만 route 단위로 5초를 둔다.
+- **`_app` 안에서 라우터를 다시 읽지 않는다.** 쓰기 뒤에는 바꾼 query key만 무효화한다. `router.invalidate()`는 루트(시간대 쿠키), 온보딩과 그 안의 러너 설정 흐름, 서버를 다시 읽지 않는 두 곳(Settings 상세의 문서 제목 따라가기, 셸 안 오류 화면의 다시 읽기)에만 남는다(스펙 0003 6절 5번).
+- **셸 안 화면의 읽기 실패는 셸 안에 보인다.** `_app` 아래 화면 route는 모두 공용 오류 화면(`apps/web/src/shell/screen-error.tsx`)을 `errorComponent`로 쓴다. 레일은 남고, 화면 칸에 실패와 다시 읽기 단추가 보인다. 셸 자신의 읽기가 실패하면 지금처럼 루트 오류 화면이 대신한다.
 - **루트와 온보딩·러너 설정 흐름은 라우터 로더로 남는다.** 루트는 시간대·제목 표시줄 쿠키와 온보딩 완료 확인을 읽는다. 앱 전체의 context라 주인이 라우터다. 온보딩과 러너 설정은 한 번 지나가는 흐름이라 캐시로 얻는 것이 없다.
 - **바뀐 것은 DB의 변경 기록 표 `change_events`에 남긴다.** 무엇을 바꾸는 코드가 같은 트랜잭션에서 대상 종류·id·Workspace·시각을 한 줄 쓴다. web·worker·`ganger mcp` 중 누가 썼든 같은 표에 남는다.
-- **web은 새 SSE 통로 `/api/change-events/stream`으로 그 줄을 보낸다.** 서버가 1초마다 표를 읽어 새 줄을 보내고, 브라우저는 대상에 맞는 query key만 무효화한다. 보이는 화면의 query만 다시 읽는다. 다시 연결하면 `Last-Event-ID`로 놓친 줄부터 받고, 그 번호로 이어 받을 수 없으면(이미 지워졌거나, DB를 되돌려 지금 번호보다 크면) 모든 query를 무효화한다. SSE가 끊긴 동안은 30초 폴링으로 버틴다.
+- **web은 새 SSE 통로 `/api/change-events/stream`으로 그 줄을 보낸다.** 서버가 1초마다 표를 읽어 새 줄을 보내고, 브라우저는 대상에 맞는 query key만 무효화한다. 보이는 화면의 query만 다시 읽는다. 다시 연결하면 `Last-Event-ID`로 놓친 줄부터 받고, 그 번호로 이어 받을 수 없으면(이미 지워졌거나, DB를 되돌려 지금 번호보다 크면) 모든 query를 무효화한다. SSE가 끊긴 동안은 30초 폴링으로 버틴다. 숨은 탭은 연결을 닫고 다시 보이면 마지막 번호로 이어 받는다(운영자 결정 2026-11-20, HTTP/1.1 연결 수 한도 때문).
 
 ## 고려한 대안
 
