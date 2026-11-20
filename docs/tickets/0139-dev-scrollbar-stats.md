@@ -1,5 +1,5 @@
 ---
-status: doing
+status: done
 blocked_by: []
 ---
 
@@ -54,6 +54,11 @@ blocked_by: []
 - [x] 브라우저 시험 `e2e/src/dev-styles.test.ts`: 개발 서버(HMR 켬)에서 `/ds`를 연 뒤 앱 안에서 `/onboarding`으로 옮겨도 화면의 StyleX 클래스마다 규칙이 있다. 고치기 전 코드에서는 6개가 빠져 실패하는 것을 확인했다.
 - [x] 데모 시험 `demo/src/dev.test.ts` 'Query devtools 는 기본으로 그리지 않고, 개발 도구 페이지에서 켜고 끄며, 열린 앱 탭이 모두 같은 상태다': 처음에는 패널이 없고 칩 묶음은 두 개, `/__dev` 단추의 `aria-pressed`가 `false`. 누르면 앱 탭에 패널이 붙고 `true`, 떠 있는 단추는 없다. 둘째 앱 탭을 열면 켜진 상태를 따라 패널이 열린다. 둘째 탭에서 패널의 닫기를 누르면 두 탭 모두 패널이 빠지고 단추가 `false`, 떠 있는 단추는 없다. 다시 누르면 두 탭 모두 열린다. 개발 도구 페이지를 닫은 뒤 연 셋째 앱 탭도 켜진 상태를 따른다. `@tanstack/react-query-devtools`는 `NODE_ENV`가 `development`일 때만 그려, 이 시험만 개발 서버를 `NODE_ENV=development`로 띄운다(vitest 는 `test`를 물려준다). 개발 서버가 첫 화면 뒤 의존성을 다시 최적화하며 한 번 새로 고치면 첫 누름이 사라질 수 있어, 꺼져 있으면 다시 누른다.
 - [x] 프로덕션 묶음에 devtools 와 개발 CSS 런타임이 없다.
+
+## 리뷰
+
+- better-interface(Stats·Tickets·개발 도구, 1728·1280·1100·800·400): MEDIUM 1(Query 도구 칩이 켜짐을 알리지 않음, WCAG 4.1.2)을 고쳤다.
+- interface-review(새 서브에이전트, 네 번): 1차 Introduced MEDIUM 1(패널을 닫으면 떠 있는 단추가 레일을 다시 덮고 칩 상태가 어긋남)·LOW 1(칩 묶음이 넓어져 화면 끝을 더 가림), 2차 LOW 1(앱 탭 여럿일 때 상태 어긋남), 3차 LOW 1(개발 도구 페이지를 닫은 사이 연 탭만 꺼짐)을 고쳤고, 4차(1214c4d)에서 Introduced·Regression 0.
 
 ## 남은 것
 
