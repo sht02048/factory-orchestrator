@@ -9,6 +9,8 @@ import {
   SecretBox,
   getMapping,
   getRunCancelRequest,
+  latestChangeSeq,
+  listChangesAfter,
   listRecentMcpActions,
   listRunMcpActions,
   listRunQuestions,
@@ -327,6 +329,29 @@ describe("MCP 쓰기 도구", () => {
     expect(assigned.isError).toBe(false);
     const runId = z.string().parse(assigned.json["runId"]);
     expect(listRunMcpActions(seeded.db, toRunId(runId))).toHaveLength(1);
+  });
+
+  it("쓰기 도구로 바꾼 것도 화면이 알 수 있게 변경 기록 줄을 남긴다(0124)", async () => {
+    await connect();
+    const kindsAfter = async (name: string, args: Record<string, unknown>) => {
+      const before = latestChangeSeq(seeded.db);
+      const result = await call(name, args);
+      expect(result.isError).toBe(false);
+      return listChangesAfter(seeded.db, before).map((change) => [change.kind, change.targetId]);
+    };
+
+    expect(await kindsAfter("answer_question", { runId: seeded.waiting, answer: "no" })).toEqual([
+      ["run", seeded.waiting],
+      ["run", seeded.waiting],
+      ["settings", null],
+    ]);
+    expect(await kindsAfter("set_runner_capacity", { runner: "runner-a", capacity: 3 })).toEqual([
+      ["runner", "runner-a"],
+      ["settings", null],
+    ]);
+    expect((await kindsAfter("assign_ticket", { ticket: "ACME-9" })).map(([kind]) => kind)).toEqual(
+      expect.arrayContaining(["assignment", "settings"]),
+    );
   });
 
   it("잠자기 설정은 설치 폴더의 파일에 쓴다", async () => {

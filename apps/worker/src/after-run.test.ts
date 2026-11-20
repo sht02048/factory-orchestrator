@@ -111,13 +111,14 @@ describe("트래커 갱신", () => {
     await worker.tick();
     expect(current(run).state).toBe("queued");
     expect(h.tracker.stateChanges).toEqual([]);
+    const generation = trackerReadGeneration(h.db, run.ticket.connection);
 
     h.setRunnerOnline(runnerId, true);
     await worker.tick();
     expect(current(run).state).toBe("running");
     expect(h.tracker.stateChanges).toEqual([{ key: run.ticket.key, stateId: inProgress }]);
     expect(recordsOf(run).trackerStateSetAt).toEqual(h.now);
-    expect(trackerReadGeneration(h.db, run.ticket.connection)).toBe(1);
+    expect(trackerReadGeneration(h.db, run.ticket.connection)).toBe(generation + 1);
 
     await worker.tick();
     expect(h.tracker.stateChanges).toHaveLength(1);
@@ -134,6 +135,7 @@ describe("트래커 갱신", () => {
     expect(comments[0]?.body).toContain("https://code.example.com/acme/pull/1");
     expect(comments[0]?.body).toContain(run.id);
     expect(recordsOf(run).trackerComment).toEqual({ id: comments[0]?.id, at: h.now });
+    expect(trackerReadGeneration(h.db, run.ticket.connection)).toBe(generation + 2);
 
     await worker.close();
     const restarted = h.worker();

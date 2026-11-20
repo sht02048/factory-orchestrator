@@ -1,5 +1,7 @@
 import type { AgentQuestion, QuestionId, RunId } from "@ganger/core";
 import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
+import { recordRunChange } from "./change-events.js";
+import { inTransaction } from "./database.js";
 import type { Database } from "./database.js";
 import { runQuestions } from "./schema.js";
 
@@ -17,23 +19,26 @@ export function recordRunQuestions(
   runId: RunId,
   questions: ReadonlyArray<AgentQuestion>,
 ): number {
-  let recorded = 0;
-  for (const question of questions) {
-    recorded += Number(
-      db
-        .insert(runQuestions)
-        .values({
-          runId,
-          questionId: question.id,
-          body: question.body,
-          options: [...question.options],
-          askedAt: question.askedAt,
-        })
-        .onConflictDoNothing()
-        .run().changes,
-    );
-  }
-  return recorded;
+  return inTransaction(db, () => {
+    let recorded = 0;
+    for (const question of questions) {
+      recorded += Number(
+        db
+          .insert(runQuestions)
+          .values({
+            runId,
+            questionId: question.id,
+            body: question.body,
+            options: [...question.options],
+            askedAt: question.askedAt,
+          })
+          .onConflictDoNothing()
+          .run().changes,
+      );
+    }
+    if (recorded > 0) recordRunChange(db, runId);
+    return recorded;
+  });
 }
 
 export type AnswerRunQuestionResult =
@@ -49,14 +54,19 @@ export function answerRunQuestion(
     eq(runQuestions.runId, input.runId),
     eq(runQuestions.questionId, input.questionId),
   );
-  const changed = db
-    .update(runQuestions)
-    .set({ answer: input.answer, answeredAt: now })
-    .where(and(where, isNull(runQuestions.answer)))
-    .run().changes;
-  if (changed > 0) return { ok: true };
-  const exists = db.select({ id: runQuestions.questionId }).from(runQuestions).where(where).get();
-  return { ok: false, reason: exists === undefined ? "not-found" : "already-answered" };
+  return inTransaction(db, (): AnswerRunQuestionResult => {
+    const changed = db
+      .update(runQuestions)
+      .set({ answer: input.answer, answeredAt: now })
+      .where(and(where, isNull(runQuestions.answer)))
+      .run().changes;
+    if (changed > 0) {
+      recordRunChange(db, input.runId, { now });
+      return { ok: true };
+    }
+    const exists = db.select({ id: runQuestions.questionId }).from(runQuestions).where(where).get();
+    return { ok: false, reason: exists === undefined ? "not-found" : "already-answered" };
+  });
 }
 
 export function listUnsentAnswers(
@@ -85,20 +95,23 @@ export function markAnswerSent(
   input: { runId: RunId; questionId: QuestionId },
   now: Date = new Date(),
 ): boolean {
-  return (
-    db
-      .update(runQuestions)
-      .set({ answerSentAt: now })
-      .where(
-        and(
-          eq(runQuestions.runId, input.runId),
-          eq(runQuestions.questionId, input.questionId),
-          isNotNull(runQuestions.answer),
-          isNull(runQuestions.answerSentAt),
-        ),
-      )
-      .run().changes > 0
-  );
+  return inTransaction(db, () => {
+    const sent =
+      db
+        .update(runQuestions)
+        .set({ answerSentAt: now })
+        .where(
+          and(
+            eq(runQuestions.runId, input.runId),
+            eq(runQuestions.questionId, input.questionId),
+            isNotNull(runQuestions.answer),
+            isNull(runQuestions.answerSentAt),
+          ),
+        )
+        .run().changes > 0;
+    if (sent) recordRunChange(db, input.runId, { now });
+    return sent;
+  });
 }
 
 export function sentQuestionIds(db: Database, runId: RunId): Set<QuestionId> {

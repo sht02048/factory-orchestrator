@@ -1,5 +1,7 @@
 import type { RunId } from "@ganger/core";
 import { desc, eq, isNull } from "drizzle-orm";
+import { recordRunChange, recordSettingsChange } from "./change-events.js";
+import { inTransaction } from "./database.js";
 import type { Database } from "./database.js";
 import type { McpActionOutcome } from "./mcp-actions-model.js";
 import { mcpActions } from "./schema.js";
@@ -22,7 +24,11 @@ export interface StoredMcpAction extends McpActionInput {
 }
 
 export function recordMcpAction(db: Database, input: McpActionInput): void {
-  db.insert(mcpActions).values(input).run();
+  inTransaction(db, () => {
+    db.insert(mcpActions).values(input).run();
+    if (input.runId !== null) recordRunChange(db, input.runId, { now: input.at });
+    recordSettingsChange(db, undefined, input.at);
+  });
 }
 
 const columns = {
