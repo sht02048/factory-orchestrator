@@ -14,7 +14,8 @@ import {
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
 import { useId, useState } from "react";
-import { useFormatter, useTranslations } from "use-intl";
+import { useTranslations } from "use-intl";
+import { useByteSize } from "../format/size";
 import type { DiagnosticsRunChoice, LogSettingsView } from "@ganger/app/diagnostics/model";
 import { browserClipboard, copyText } from "./clipboard";
 import { AutoSaveStatusText, RevertedMessage, useAutoSave, useInlineEdit } from "./row-state";
@@ -38,20 +39,6 @@ export interface LogSectionProps {
 }
 
 const NO_RUN = "";
-const MEGABYTE = 1024 * 1024;
-
-export function useByteSize(): (bytes: number) => string {
-  const format = useFormatter();
-  return (bytes) =>
-    bytes < MEGABYTE
-      ? format.number(Math.ceil(bytes / 1024), { style: "unit", unit: "kilobyte" })
-      : format.number(bytes / MEGABYTE, {
-          style: "unit",
-          unit: "megabyte",
-          maximumFractionDigits: 1,
-        });
-}
-
 export function LogSection({ view, actions }: LogSectionProps) {
   const t = useTranslations("settings");
   return (
