@@ -58,6 +58,40 @@ describe("pnpm dev", () => {
     await expect(fetch(dev.url + "/")).rejects.toThrow("fetch failed");
   });
 
+  it("Query devtools 는 기본으로 그리지 않고, Query 도구 칩으로 켜고 끈다(0139)", async () => {
+    const dev = await startDev(["--static"], { NODE_ENV: "development" });
+    const page = await browser.newPage({ baseURL: dev.url, locale: "ko-KR" });
+    page.setDefaultTimeout(30_000);
+    try {
+      await page.goto("/");
+      await hydrated(page);
+      const toggle = page.getByRole("button", { name: "Query 도구" });
+      const devtools = page.locator(".tsqd-parent-container");
+
+      await toggle.waitFor();
+      expect(await toggle.getAttribute("aria-pressed")).toBe("false");
+      expect(await devtools.count()).toBe(0);
+
+      await expect
+        .poll(
+          async () => {
+            if ((await toggle.getAttribute("aria-pressed")) === "false") await toggle.click();
+            return devtools.count();
+          },
+          { timeout: 30_000 },
+        )
+        .toBe(1);
+      expect(await toggle.getAttribute("aria-pressed")).toBe("true");
+
+      await toggle.click();
+      await devtools.waitFor({ state: "detached" });
+      expect(await toggle.getAttribute("aria-pressed")).toBe("false");
+    } finally {
+      await page.close();
+      await dev.stop();
+    }
+  });
+
   it("온보딩 모드: 가짜 값으로 5단계를 마치면 홈이 열린다", async () => {
     const dev = await startDev(["--onboarding", "--static"]);
     const page = await browser.newPage({ baseURL: dev.url, locale: "ko-KR" });
@@ -135,13 +169,14 @@ describe("pnpm dev", () => {
   });
 });
 
-async function startDev(args: string[]): Promise<Dev> {
+async function startDev(args: string[], extraEnv: Record<string, string> = {}): Promise<Dev> {
   const port = await freePort();
   const env: Record<string, string | undefined> = {
     ...process.env,
     GANGER_DEV_DIR: devRoot,
     WEB_HOST: "127.0.0.1",
     WEB_PORT: String(port),
+    ...extraEnv,
   };
   delete env["DATABASE_PATH"];
   delete env["ENCRYPTION_KEY"];

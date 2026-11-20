@@ -63,7 +63,12 @@ function mount(): void {
   queryButton.textContent = "Query 도구";
   queryButton.title = "TanStack Query devtools 를 켜거나 꺼요.";
   queryButton.setAttribute("style", chip);
-  queryButton.addEventListener("click", () => toggleQueryDevtools(window));
+  queryButton.setAttribute("aria-pressed", "false");
+  queryButton.addEventListener("click", () => {
+    const shown = queryButton.getAttribute("aria-pressed") === "true";
+    queryButton.setAttribute("aria-pressed", String(!shown));
+    toggleQueryDevtools(window);
+  });
 
   root.append(fillButton, queryButton, link);
   document.body.append(root);

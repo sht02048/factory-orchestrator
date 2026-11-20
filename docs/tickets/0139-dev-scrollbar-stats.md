@@ -43,7 +43,7 @@ blocked_by: []
 
 - `apps/web/src/routes/__root.tsx`: 개발 빌드의 `<head>`에 `/virtual:stylex.css` 링크와 함께 StyleX 런타임 스크립트(`/@id/virtual:stylex:runtime`)를 단다. 스크립트가 CSS 를 `<style>`로 받아 두고 새 규칙 이벤트마다 다시 읽는다. 링크는 hydration 이 어긋나지 않게 그대로 두고 스크립트가 끈다.
 - `apps/web/src/query/devtools.tsx`, `devtools-toggle.ts`: devtools 를 루트에서 떼어 켜기 이벤트로만 그린다.
-- `demo/src/client/prefill.ts`: 개발 도구 묶음에 Query 도구 칩.
+- `demo/src/client/prefill.ts`: 개발 도구 묶음에 Query 도구 칩. 켜짐·꺼짐을 `aria-pressed`로 알린다(better-interface 리뷰).
 - `e2e/src/web-server.ts`: 시험 서버에 `hmr` 선택값(기본 꺼짐 그대로).
 
 ## 완료 조건
@@ -52,8 +52,11 @@ blocked_by: []
 - [x] Stats 가 1280·1440 에서 숫자 카드 네 칸 한 줄, 차트·실패 이유 두 칸으로 보인다. Tickets 는 목록만 스크롤한다.
 - [x] Query devtools 단추가 기본으로 화면을 가리지 않고, Query 도구 칩으로 켜고 끈다.
 - [x] 브라우저 시험 `e2e/src/dev-styles.test.ts`: 개발 서버(HMR 켬)에서 `/ds`를 연 뒤 앱 안에서 `/onboarding`으로 옮겨도 화면의 StyleX 클래스마다 규칙이 있다. 고치기 전 코드에서는 6개가 빠져 실패하는 것을 확인했다.
+- [x] 데모 시험 `demo/src/dev.test.ts` 'Query devtools 는 기본으로 그리지 않고, Query 도구 칩으로 켜고 끈다': 처음에는 devtools 가 없고 칩의 `aria-pressed`가 `false`, 누르면 devtools 가 붙고 `true`, 다시 누르면 빠지고 `false`. `@tanstack/react-query-devtools`는 `NODE_ENV`가 `development`일 때만 그려, 이 시험만 개발 서버를 `NODE_ENV=development`로 띄운다(vitest 는 `test`를 물려준다). 개발 서버가 첫 화면 뒤 의존성을 다시 최적화하며 한 번 새로 고치면 칩 상태가 사라져, 꺼져 있으면 다시 누른다.
 - [x] 프로덕션 묶음에 devtools 와 개발 CSS 런타임이 없다.
 
 ## 남은 것
+
+- 개발 도구 칩 묶음(0047 부터)은 오른쪽 아래에 떠서 좁은 폭에서 화면 맨 아래 여백 위에 걸친다. 400 폭 Stats 끝에서 마지막 안내 문장 바로 아래에 붙지만 글을 가리지 않는다. 칩 하나를 더해 묶음이 172px 에서 263px 로 넓어졌다. 개발 전용이고 화면 글을 가리지 않아 그대로 둔다.
 
 - 쿠키 없는 첫 방문 hydration 불일치(0129 에서 넘어온 개발 서버 전용 문제)는 그대로다. 이 티켓의 원인과 다르다.
