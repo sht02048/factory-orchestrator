@@ -30,17 +30,22 @@ import appCss from "../styles/app.css?url";
 
 let completeInBrowser = false;
 
+function rememberOnboardingComplete(complete: boolean): void {
+  if (complete && typeof window !== "undefined") completeInBrowser = true;
+}
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ location }) => {
-    if (completeInBrowser || isOpenPath(location.pathname)) return;
+    if (completeInBrowser || isOpenPath(location.pathname)) return { onboardingComplete: null };
     const complete = await getOnboardingComplete();
-    if (complete && typeof window !== "undefined") completeInBrowser = true;
+    rememberOnboardingComplete(complete);
     if (onboardingRedirect(location.pathname, complete) !== null)
       throw redirect({ to: ONBOARDING_PATH });
+    return { onboardingComplete: complete };
   },
-  loader: async () => {
+  loader: async ({ context }) => {
     const [timeZone, titleBarHidden] = await Promise.all([getTimeZone(), getTitleBarHidden()]);
-    return { timeZone, titleBarHidden };
+    return { timeZone, titleBarHidden, onboardingComplete: context.onboardingComplete === true };
   },
   shouldReload: false,
   head: () => ({
@@ -94,7 +99,10 @@ function RootError({ error }: ErrorComponentProps) {
 }
 
 function RootLayout() {
-  const { timeZone, titleBarHidden } = Route.useLoaderData();
+  const { timeZone, titleBarHidden, onboardingComplete } = Route.useLoaderData();
+  useEffect(() => {
+    rememberOnboardingComplete(onboardingComplete);
+  }, [onboardingComplete]);
   return (
     <IntlProvider locale={defaultLocale} messages={appMessages} timeZone={timeZone}>
       <WindowChrome titleBarHidden={titleBarHidden}>

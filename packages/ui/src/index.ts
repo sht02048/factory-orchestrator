@@ -19,6 +19,7 @@ export {
   WorkspaceBadge,
   documentStyles,
   railLinkStyles,
+  type AppFramePending,
   type AppFrameProps,
   type RailLinkContentProps,
 } from "./components/app-frame";

@@ -14,6 +14,7 @@ import {
   requestRunnerCheck,
   saveWorkspaceTrackerProject,
   toWorkspaceId,
+  trackerReadGeneration,
   updateRunRecords,
 } from "@ganger/db";
 import type { StoredRun } from "@ganger/db";
@@ -116,6 +117,7 @@ describe("트래커 갱신", () => {
     expect(current(run).state).toBe("running");
     expect(h.tracker.stateChanges).toEqual([{ key: run.ticket.key, stateId: inProgress }]);
     expect(recordsOf(run).trackerStateSetAt).toEqual(h.now);
+    expect(trackerReadGeneration(h.db, run.ticket.connection)).toBe(1);
 
     await worker.tick();
     expect(h.tracker.stateChanges).toHaveLength(1);

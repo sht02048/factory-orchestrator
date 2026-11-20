@@ -150,6 +150,9 @@ export function ComponentSections() {
               <Button variant="danger">{t("buttons.danger")}</Button>
               <Button variant="ghost">{t("buttons.ghost")}</Button>
               <Button disabled>{t("buttons.disabled")}</Button>
+              <Button busy={{ active: true, label: t("buttons.busyLabel") }}>
+                {t("buttons.busy")}
+              </Button>
             </Actions>
           </Demo>
         </Section>

@@ -1,5 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import {
+  Actions,
   AppFrame,
   Button,
   ChevronRightIcon,
@@ -76,7 +77,7 @@ import {
   StatusPill,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 
 export const blockSectionIds = [
@@ -110,17 +111,41 @@ function Demo({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.demo)}>{children}</div>;
 }
 
+const PENDING_DEMO_MS = 2_000;
+
 function ShellPreview({ titleBarHidden }: { titleBarHidden: boolean }) {
   const t = useTranslations("ds.blocks");
+  const [pending, setPending] = useState(false);
+  useEffect(() => {
+    if (!pending) return;
+    const timer = setTimeout(() => setPending(false), PENDING_DEMO_MS);
+    return () => clearTimeout(timer);
+  }, [pending]);
   return (
     <figure {...stylex.props(styles.shell)}>
-      <figcaption>
+      <figcaption {...stylex.props(styles.caption)}>
         <Text variant="label">{titleBarHidden ? t("shell.desktop") : t("shell.web")}</Text>
+        {titleBarHidden ? null : (
+          <Actions>
+            <Text variant="meta">{t("shell.pending")}</Text>
+            <Button
+              variant="ghost"
+              aria-disabled={pending}
+              onClick={() => {
+                if (pending) return;
+                setPending(true);
+              }}
+            >
+              {t("shell.pendingDemo")}
+            </Button>
+          </Actions>
+        )}
       </figcaption>
       <WindowChrome titleBarHidden={titleBarHidden}>
         <div inert={titleBarHidden} {...stylex.props(styles.frame)}>
           <AppFrame
             fill={false}
+            pending={{ active: pending, label: t("shell.pendingLabel") }}
             rail={
               <>
                 <RailStatic>
@@ -680,6 +705,7 @@ const styles = stylex.create({
   columns: { display: "flex", flexWrap: "wrap", gap: space.s10 },
   shells: { display: "flex", flexDirection: "column", gap: space.s6 },
   shell: { display: "flex", flexDirection: "column", gap: space.s2, margin: 0 },
+  caption: { display: "flex", flexDirection: "column", gap: space.s1 },
   frame: { height: 320, overflow: "hidden" },
   kanban: { width: "100%", maxWidth: 360, paddingBlock: space.s5 },
 });

@@ -30,6 +30,7 @@ import type { Database, SecretBox, StoredTrackerConnection, WorkspaceId } from "
 import { z } from "zod";
 import { prerequisiteProject } from "../prerequisites.js";
 import { resolveWorkspace } from "../shell/model.js";
+import type { TrackerReads } from "../tracker-reads.js";
 import { KNOWN_AGENTS } from "./model.js";
 import type {
   AddressesView,
@@ -55,6 +56,7 @@ export interface SettingsContext {
   registry: AdapterRegistry;
   power?: PowerSettingsStore;
   mcpLaunch?: McpLaunch;
+  trackerReads?: TrackerReads;
 }
 
 function powerView(store: PowerSettingsStore | undefined): PowerView {
@@ -130,6 +132,15 @@ export function trackerOf(
   } catch {
     return null;
   }
+}
+
+function readingTrackerOf(
+  context: SettingsContext,
+  connection: StoredTrackerConnection,
+): Tracker | null {
+  const tracker = trackerOf(context, connection);
+  if (tracker === null || context.trackerReads === undefined) return tracker;
+  return context.trackerReads.wrap(context.db, connection.id, tracker);
 }
 
 const toChoice = (item: { id: string; name: string }): Choice => ({ id: item.id, name: item.name });
@@ -212,7 +223,7 @@ async function loadWorkspaceSettings(
   const { db } = context;
   const allBound = listWorkspaceTrackerProjects(db);
   const mine = allBound.filter((p) => p.workspaceId === workspace.id);
-  const trackers = new Map(connections.map((c) => [c.id, trackerOf(context, c)]));
+  const trackers = new Map(connections.map((c) => [c.id, readingTrackerOf(context, c)]));
   const connectionChoice = (id: TrackerConnectionId): Choice => ({
     id,
     name: connections.find((c) => c.id === id)?.name ?? id,
@@ -334,7 +345,7 @@ export async function loadTrackerProjectChoices(
     workspaceId,
     connections,
     listWorkspaces(context.db),
-    new Map(connections.map((c) => [c.id, trackerOf(context, c)])),
+    new Map(connections.map((c) => [c.id, readingTrackerOf(context, c)])),
   );
 }
 

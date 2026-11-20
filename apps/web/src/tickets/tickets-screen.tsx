@@ -25,6 +25,8 @@ import {
   TableRow,
   TableRows,
   Text,
+  VisuallyHidden,
+  showToast,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -56,6 +58,7 @@ export interface TicketsScreenProps {
   onOpenRun: (runId: string) => void;
   onAssign: (input: AssignInput) => Promise<AssignResult>;
   onAssigned: (ticketId: string) => void;
+  onReread: () => Promise<void>;
 }
 
 export function TicketsScreen(props: TicketsScreenProps) {
@@ -112,6 +115,69 @@ function AllWorkspaces({
   );
 }
 
+type RereadResult = "idle" | "reading" | "checking" | "failed" | "partial";
+
+function useReread(onReread: () => Promise<void>, page: TicketsPage) {
+  const t = useTranslations("tickets.reread");
+  const [result, setResult] = useState<RereadResult>("idle");
+  const failedProjects = page.errors.length;
+  const [failedOn, setFailedOn] = useState<TicketsPage | null>(null);
+  if (result === "failed" && failedOn !== null && failedOn !== page) {
+    setResult("idle");
+    setFailedOn(null);
+  }
+  useEffect(() => {
+    if (result !== "checking") return;
+    if (failedProjects > 0) {
+      setResult("partial");
+      return;
+    }
+    setResult("idle");
+    showToast(t("done"));
+  }, [result, failedProjects, t]);
+  const start = () => {
+    setResult("reading");
+    onReread().then(
+      () => setResult("checking"),
+      () => {
+        setFailedOn(page);
+        setResult("failed");
+      },
+    );
+  };
+  return { result, start };
+}
+
+export const REREAD_ANNOUNCE_MS = 5_000;
+
+function useAnnouncement(result: RereadResult): RereadResult {
+  const [announced, setAnnounced] = useState<RereadResult>("idle");
+  useEffect(() => {
+    setAnnounced(result);
+    if (result !== "failed" && result !== "partial") return;
+    const timer = setTimeout(() => setAnnounced("idle"), REREAD_ANNOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [result]);
+  return announced;
+}
+
+function RereadButton({ result, onStart }: { result: RereadResult; onStart: () => void }) {
+  const t = useTranslations("tickets.reread");
+  const announced = useAnnouncement(result);
+  return (
+    <>
+      <Button busy={{ active: result === "reading", label: t("reading") }} onClick={onStart}>
+        {t("action")}
+      </Button>
+      <VisuallyHidden>
+        <span role="status">
+          {announced === "failed" ? t("failed") : announced === "partial" ? t("partial") : ""}
+        </span>
+      </VisuallyHidden>
+    </>
+  );
+}
+
 function tableColumns(showTrackerProject: boolean): string {
   return [
     size.ticketKeyColumn,
@@ -130,8 +196,10 @@ function TicketsList({
   onOpenRun,
   onAssign,
   onAssigned,
+  onReread,
 }: TicketsScreenProps) {
   const t = useTranslations("tickets");
+  const reread = useReread(onReread, page);
   const [query, setQuery] = useState("");
   const visible = useMemo(
     () =>
@@ -163,7 +231,15 @@ function TicketsList({
   return (
     <ScreenLayout
       header={
-        <PageHeader title={t("title")} subtitle={t("summary", { count: counts.assignable })} />
+        <PageHeader
+          title={t("title")}
+          subtitle={t("summary", { count: counts.assignable })}
+          {...(page.trackerProjectCount === 0
+            ? {}
+            : {
+                actions: <RereadButton result={reread.result} onStart={reread.start} />,
+              })}
+        />
       }
     >
       <SplitView
@@ -171,9 +247,12 @@ function TicketsList({
         list={
           <div {...stylex.props(styles.listFrame)}>
             <div {...stylex.props(styles.listTop)}>
-              {page.errors.length === 0 ? null : (
+              {page.errors.length === 0 && reread.result !== "failed" ? null : (
                 <Card surface="problem">
                   <div {...stylex.props(styles.lines)}>
+                    {reread.result === "failed" ? (
+                      <Text variant="body">{t("reread.failed")}</Text>
+                    ) : null}
                     {page.errors.map((error) => (
                       <Text key={error.trackerProject} variant="body">
                         {t(`loadError.${error.reason}`, { project: error.trackerProject })}

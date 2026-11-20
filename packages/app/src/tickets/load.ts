@@ -26,10 +26,17 @@ import {
   listWorkspaces,
   toWorkspaceId,
 } from "@ganger/db";
-import type { Database, SecretBox, StoredRun, StoredWorkspaceTrackerProject } from "@ganger/db";
+import type {
+  Database,
+  SecretBox,
+  StoredRun,
+  StoredTrackerConnection,
+  StoredWorkspaceTrackerProject,
+} from "@ganger/db";
 import { z } from "zod";
 import { isWebUrl } from "../format/url.js";
 import { resolveWorkspace } from "../shell/model.js";
+import type { TrackerReads } from "../tracker-reads.js";
 import type {
   AssignDefaults,
   TicketRun,
@@ -43,6 +50,7 @@ export interface TicketsContext {
   db: Database;
   secretBox: SecretBox;
   registry: AdapterRegistry;
+  trackerReads?: TrackerReads;
 }
 
 export const PAGE_SIZE = 250;
@@ -96,13 +104,7 @@ export async function loadTicketsPage(
     let tracker = trackers.get(connection);
     if (tracker === undefined) {
       const stored = getTrackerConnection(db, context.secretBox, connection);
-      tracker =
-        stored === null
-          ? null
-          : context.registry.createTracker(stored.kind, {
-              config: stored.config,
-              secrets: stored.secrets,
-            });
+      tracker = stored === null ? null : readingTracker(context, stored);
       trackers.set(connection, tracker);
     }
     return tracker;
@@ -183,6 +185,16 @@ export async function loadTicketsPage(
     truncated,
     trackerProjectCount: projects.length,
   };
+}
+
+function readingTracker(context: TicketsContext, stored: StoredTrackerConnection): Tracker {
+  const tracker = context.registry.createTracker(stored.kind, {
+    config: stored.config,
+    secrets: stored.secrets,
+  });
+  return context.trackerReads === undefined
+    ? tracker
+    : context.trackerReads.wrap(context.db, stored.id, tracker);
 }
 
 export function ticketId(connection: string, key: string): string {

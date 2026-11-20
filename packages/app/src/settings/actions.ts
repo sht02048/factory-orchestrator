@@ -22,6 +22,7 @@ import {
   listWorkspaceTrackerProjects,
   listRunners,
   listWorkspaces,
+  markTrackerChanged,
   removeWorkspaceTrackerProject,
   requestRunnerCheck,
   saveAutoAssignLabel,
@@ -119,7 +120,9 @@ export function addTrackerProject(
     name: input.name,
     inProgressStateId: null,
   });
-  return saved ? { ok: true } : { ok: false, reason: "taken" };
+  if (!saved) return { ok: false, reason: "taken" };
+  markTrackerChanged(context.db, connection);
+  return { ok: true };
 }
 
 export function removeTrackerProject(
@@ -128,12 +131,15 @@ export function removeTrackerProject(
 ): SaveResult<"not-found"> {
   const workspaceId = workspaceOf(context, input.ws);
   if (workspaceId === null) return { ok: false, reason: "not-found" };
+  const connection = toTrackerConnectionId(input.connectionId);
   const removed = removeWorkspaceTrackerProject(context.db, {
     workspaceId,
-    connection: toTrackerConnectionId(input.connectionId),
+    connection,
     projectId: toTrackerProjectId(input.projectId),
   });
-  return removed ? { ok: true } : { ok: false, reason: "not-found" };
+  if (!removed) return { ok: false, reason: "not-found" };
+  markTrackerChanged(context.db, connection);
+  return { ok: true };
 }
 
 function boundProject(context: SettingsContext, input: z.infer<typeof trackerProjectInput>) {
@@ -195,7 +201,7 @@ export function saveMappingState(
   if (autoAssignLabel !== null && input.repos.some((repo) => repo.labelId === autoAssignLabel)) {
     return { ok: false, reason: "auto-assign-label" };
   }
-  return replaceMapping(context.db, {
+  const saved = replaceMapping(context.db, {
     connection: project.connection,
     trackerProject: project.projectId,
     agent: toAgentId(input.agentId),
@@ -206,6 +212,8 @@ export function saveMappingState(
       labelId: repo.labelId === null ? null : toLabelId(repo.labelId),
     })),
   });
+  if (saved.ok) markTrackerChanged(context.db, project.connection);
+  return saved;
 }
 
 export const inProgressInput = trackerProjectInput.extend({ stateId: id });
@@ -251,6 +259,7 @@ export async function createAutoAssignLabel(
       return { ok: false, reason: "repo-label" };
     }
     saveAutoAssignLabel(context.db, { workspaceId, connection, labelId: label.id });
+    markTrackerChanged(context.db, connection);
     return { ok: true, labelId: label.id, name: label.name, created };
   } catch (error) {
     return { ok: false, reason: error instanceof AdapterError ? remoteErrorOf(error) : "rejected" };
@@ -348,11 +357,12 @@ export async function saveTrackerConnectionSetting(
     if (!check.ok) return { ok: false, reason: check.reason };
     organizationName = connectionNameOf(check.organizationName);
   }
+  const id = existing?.id ?? toTrackerConnectionId(randomUUID());
   saveTrackerConnection(
     context.db,
     context.secretBox,
     {
-      id: existing?.id ?? toTrackerConnectionId(randomUUID()),
+      id,
       kind,
       name: input.name ?? existing?.name ?? organizationName ?? DEFAULT_CONNECTION_NAME,
       config,
@@ -360,6 +370,7 @@ export async function saveTrackerConnectionSetting(
     },
     now,
   );
+  markTrackerChanged(context.db, id);
   return { ok: true };
 }
 
@@ -375,6 +386,7 @@ export async function checkTrackerConnection(
     toTrackerConnectionId(input.id),
   );
   if (connection === null) return { ok: false, reason: "not-found" };
+  markTrackerChanged(context.db, connection.id);
   return checkWith(() =>
     context.registry
       .createTracker(connection.kind, { config: connection.config, secrets: connection.secrets })

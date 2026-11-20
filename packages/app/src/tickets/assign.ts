@@ -12,6 +12,7 @@ import {
   getMapping,
   listRunners,
   listWorkspaceTrackerProjects,
+  markTrackerChanged,
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { z } from "zod";
@@ -76,7 +77,10 @@ export function submitAssignment(db: Database, input: AssignInput, now: Date): A
     ...(input.runnerId === null ? {} : { runnerId: toRunnerId(input.runnerId) }),
     now,
   });
-  if (result.ok) return { ok: true, runId: result.run.id };
+  if (result.ok) {
+    markTrackerChanged(db, connection);
+    return { ok: true, runId: result.run.id };
+  }
   switch (result.reason) {
     case "active-run":
     case "unknown-runner":

@@ -1,95 +1,40 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  toAgentId,
-  toAgentRef,
-  toCodeHostKind,
-  toLabelId,
-  toRunnerId,
-  toRunnerKind,
-  toRunnerProjectId,
-  toTicketKey,
-  toTrackerStateId,
-  toWorktreeRef,
-} from "@ganger/core";
+import { toAgentRef, toWorktreeRef } from "@ganger/core";
 import type { RunId } from "@ganger/core";
-import {
-  SecretBox,
-  assignRun,
-  changeRunState,
-  migrate,
-  openDatabase,
-  recordRunnerCheck,
-  saveAutoAssignLabel,
-  saveCodeHostConnection,
-  saveMapping,
-  saveRunner,
-  saveTrackerConnection,
-  saveWorkspace,
-  saveWorkspaceTrackerProject,
-  toCodeHostConnectionId,
-} from "@ganger/db";
+import { changeRunState, markAllTrackersChanged } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { chromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
-import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 import type { TestContext } from "vitest";
 import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" };
-import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
+import tickets from "../../apps/web/messages/ko/tickets.json" with { type: "json" };
 import { TRACKER_DELAY_MS } from "./browser/slow-tracker-adapters.js";
-import { navigateByRail, serverFnName, waitForScreen } from "./navigation-timing.js";
-import { startWebServer } from "./web-server.js";
+import { navigationWorkspace, startNavigationWorld, watchedTicket } from "./navigation-world.js";
+import type { NavigationWorld } from "./navigation-world.js";
+import {
+  PENDING_BAR_SELECTOR,
+  navigateByRail,
+  serverFnName,
+  watchPendingBar,
+  waitForScreen,
+} from "./navigation-timing.js";
 
-const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
-const adaptersModule = join(webRoot, "src/server/adapters.ts");
-const slowAdaptersModule = fileURLToPath(
-  new URL("./browser/slow-tracker-adapters.ts", import.meta.url),
-);
 const resultsDir = fileURLToPath(new URL("../test-results", import.meta.url));
 
-const runnerId = toRunnerId("runner-a");
-const runnerProject = toRunnerProjectId("fake:acme/web");
-const encryptionKey = new Uint8Array(32).fill(7);
-const watchedTicket = toTicketKey("ACME-7");
-
-let dir: string;
-let db: Database;
-let web: ViteDevServer;
-let baseUrl: string;
+let world: NavigationWorld;
 let browser: Browser;
-let watchedRun: RunId;
-
-const slowAdapters: Plugin = {
-  name: "e2e-slow-tracker-adapters",
-  enforce: "pre",
-  async resolveId(source, importer, options) {
-    if (importer === undefined || !source.endsWith("/adapters")) return null;
-    const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
-    return resolved?.id === adaptersModule ? slowAdaptersModule : null;
-  },
-};
 
 beforeAll(async () => {
-  dir = mkdtempSync(join(tmpdir(), "ganger-navigation-"));
-  const dbPath = join(dir, "ganger.db");
-  db = openDatabase(dbPath);
-  migrate(db);
-  watchedRun = seed(db);
-  process.env["DATABASE_PATH"] = dbPath;
-  process.env["ENCRYPTION_KEY"] = Buffer.from(encryptionKey).toString("base64");
-  ({ server: web, baseUrl } = await startWebServer({
-    plugins: [slowAdapters],
-    cacheDir: join(dir, "vite-cache"),
-  }));
+  world = await startNavigationWorld();
   browser = await chromium.launch({ channel: "chrome" });
 
-  const warm = await browser.newPage({ baseURL: baseUrl, locale: "ko-KR" });
+  const warm = await browser.newPage({ baseURL: world.baseUrl, locale: "ko-KR" });
   warm.setDefaultTimeout(110_000);
   for (const path of ["/runs", "/tickets", "/"]) {
-    await warm.goto(`${path}?ws=${workspaceId}`);
+    await warm.goto(`${path}?ws=${navigationWorkspace}`);
     await warm.waitForLoadState("networkidle");
   }
   await warm.close();
@@ -97,11 +42,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await browser?.close();
-  await web?.close();
-  db?.$client.close();
-  delete process.env["DATABASE_PATH"];
-  delete process.env["ENCRYPTION_KEY"];
-  if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
+  await world?.close();
 });
 
 describe("레일로 화면 옮기기(브라우저, 0117)", () => {
@@ -137,10 +78,71 @@ describe("레일로 화면 옮기기(브라우저, 0117)", () => {
     await expect.poll(() => row.innerText()).toContain(domain.runState.queued);
 
     await navigateByRail(page, "dashboard", "first");
-    start(db, watchedRun);
+    start(world.db, world.watchedRun);
     await navigateByRail(page, "runs", "again");
 
     await expect.poll(() => row.innerText()).toContain(domain.runState.running);
+  });
+});
+
+describe("원격에서 화면 옮기기(브라우저, 0122)", () => {
+  it("서버에 담아 둔 트래커 읽기 덕에 바로 누른 Tickets 첫 방문도 트래커를 기다리지 않는다", async (context) => {
+    const page = await newPage(context);
+    await open(page, "/runs", "runs");
+    await page.mouse.move(0, 0);
+
+    const sample = await navigateByRail(page, "tickets", "first");
+    expect(sample.ms).toBeLessThan(TRACKER_DELAY_MS);
+  });
+
+  it("첫 클라이언트 이동은 온보딩 완료를 다시 묻지 않아, 화면 이동 한 번에 서버 왕복이 한 번이다", async (context) => {
+    const page = await newPage(context);
+    await open(page, "/runs", "runs");
+    await page.mouse.move(0, 0);
+
+    const dashboard = await navigateByRail(page, "dashboard", "first");
+    expect(dashboard.serverCalls.map((call) => call.name)).toEqual(["getHomePage"]);
+    const stats = await navigateByRail(page, "stats", "first");
+    expect(stats.serverCalls.map((call) => call.name)).toEqual(["getStatsPage"]);
+  });
+
+  it("빨리 끝나는 이동에는 진행 표시가 나타나지 않는다", async (context) => {
+    const page = await newPage(context);
+    await open(page, "/runs", "runs");
+    await page.mouse.move(0, 0);
+
+    const seen = await watchPendingBar(page);
+    await navigateByRail(page, "dashboard", "first");
+    expect(await seen()).toBe(false);
+  });
+
+  it("화면 이동이 아닌 다시 읽기(Linear에서 다시 읽기)에는 진행 줄을 켜지 않는다", async (context) => {
+    const page = await newPage(context);
+    await open(page, "/tickets", "tickets");
+
+    const seen = await watchPendingBar(page);
+    const started = Date.now();
+    await page.getByRole("button", { name: tickets.reread.action }).click();
+    await page.getByText(tickets.reread.done).first().waitFor();
+    expect(Date.now() - started).toBeGreaterThanOrEqual(TRACKER_DELAY_MS);
+    expect(await seen()).toBe(false);
+  });
+
+  it("트래커를 기다리는 늦은 이동은 본문 맨 위에 진행 표시와 상태 문장을 두고, 끝나면 걷는다", async (context) => {
+    const page = await newPage(context);
+    await open(page, "/runs", "runs");
+    await page.mouse.move(0, 0);
+    markAllTrackersChanged(world.db);
+
+    const navigation = navigateByRail(page, "tickets", "first");
+    await page.locator(PENDING_BAR_SELECTOR).waitFor({ state: "visible" });
+    await expect.poll(() => page.locator("main").getAttribute("aria-busy")).toBe("true");
+    await expect.poll(() => page.getByRole("status").first().innerText()).not.toBe("");
+    const sample = await navigation;
+
+    expect(sample.ms).toBeGreaterThanOrEqual(TRACKER_DELAY_MS);
+    await page.locator(PENDING_BAR_SELECTOR).waitFor({ state: "detached" });
+    expect(await page.locator("main").getAttribute("aria-busy")).toBeNull();
   });
 });
 
@@ -163,7 +165,7 @@ function start(database: Database, id: RunId): void {
 
 async function newPage(context: TestContext): Promise<Page> {
   const browserContext = await browser.newContext({
-    baseURL: baseUrl,
+    baseURL: world.baseUrl,
     locale: "ko-KR",
     timezoneId: "UTC",
     viewport: { width: 1280, height: 800 },
@@ -179,63 +181,7 @@ async function newPage(context: TestContext): Promise<Page> {
 }
 
 async function open(page: Page, path: string, screen: "runs" | "tickets"): Promise<void> {
-  await page.goto(`${path}?ws=${workspaceId}`);
+  await page.goto(`${path}?ws=${navigationWorkspace}`);
   await waitForScreen(page, screen);
   await page.waitForLoadState("networkidle");
-}
-
-function seed(database: Database): RunId {
-  saveTrackerConnection(database, new SecretBox(encryptionKey), {
-    id: connection,
-    kind: fakeKind,
-    name: "Acme",
-    config: {},
-    secrets: { apiKey: "secret" },
-  });
-  saveCodeHostConnection(database, new SecretBox(encryptionKey), {
-    id: toCodeHostConnectionId("github"),
-    kind: toCodeHostKind("github"),
-    name: "github",
-    config: {},
-    secrets: { token: "github_pat_example" },
-  });
-  saveWorkspace(database, { id: workspaceId, name: "Acme" });
-  saveWorkspaceTrackerProject(database, {
-    workspaceId,
-    connection,
-    projectId: trackerProject,
-    name: "Web",
-    inProgressStateId: toTrackerStateId("in-progress"),
-  });
-  saveMapping(database, {
-    connection,
-    trackerProject,
-    runnerProject,
-    agent: toAgentId("claude"),
-  });
-  saveAutoAssignLabel(database, { workspaceId, connection, labelId: toLabelId("factory") });
-  saveRunner(database, {
-    id: runnerId,
-    kind: toRunnerKind("fake"),
-    name: "runner-a",
-    config: {},
-    capacity: 4,
-  });
-  recordRunnerCheck(database, {
-    runnerId,
-    online: true,
-    checkedAt: new Date(),
-    error: null,
-    projects: [{ id: runnerProject, displayName: "acme/web", setupState: "ready" as const }],
-    assignmentBlocked: false,
-  });
-  const assigned = assignRun(database, {
-    ticket: { connection, key: watchedTicket },
-    trackerProject,
-    runnerProject,
-    agent: toAgentId("claude"),
-    runnerId,
-  });
-  if (!assigned.ok) throw new Error(assigned.reason);
-  return assigned.run.id;
 }

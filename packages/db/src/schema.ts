@@ -557,3 +557,15 @@ export const notificationSequence = sqliteTable(
   },
   (t) => [check("notification_sequence_single", sql`${t.id} = 1`)],
 );
+
+export const trackerReadGenerations = sqliteTable(
+  "tracker_read_generations",
+  {
+    trackerConnectionId: text("tracker_connection_id")
+      .primaryKey()
+      .references(() => trackerConnections.id, { onDelete: "cascade" })
+      .$type<TrackerConnectionId>(),
+    generation: integer("generation").notNull(),
+  },
+  (t) => [check("tracker_read_generations_positive", sql`${t.generation} > 0`)],
+);
