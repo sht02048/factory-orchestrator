@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, getRouteApi } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { createTranslator } from "use-intl";
 import { toRunId } from "@ganger/core";
@@ -10,11 +10,10 @@ import { homeMessages } from "../../home/messages";
 import { useDashboardActions } from "../../home/mutations";
 import { dashboardQuery } from "../../home/query";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { requestTimeZone } from "../../query/request-time-zone";
+import { requestTimeZone, useRequestTimeZone } from "../../query/request-time-zone";
 import { loadRouteQuery } from "../../query/route-query";
 
 const t = createTranslator({ locale: defaultLocale, messages: homeMessages, namespace: "home" });
-const rootRoute = getRouteApi("__root__");
 
 export const Route = createFileRoute("/_app/")({
   validateSearch: z.object({
@@ -30,7 +29,7 @@ export const Route = createFileRoute("/_app/")({
 
 function HomeRoute() {
   const { ws } = Route.useLoaderDeps();
-  const timeZone = rootRoute.useLoaderData({ select: (root) => root.timeZone });
+  const timeZone = useRequestTimeZone();
   const { data: loaded } = useSuspenseQuery(dashboardQuery(ws, timeZone));
   const page = useAgedHomePage(loaded);
   const { view, run } = Route.useSearch();
