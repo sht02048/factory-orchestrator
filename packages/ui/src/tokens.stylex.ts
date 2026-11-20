@@ -131,6 +131,7 @@ export const motion = stylex.defineVars({
   durationFast: "150ms",
   durationToast: "180ms",
   durationSpin: "900ms",
+  durationSweep: "1100ms",
 });
 
 export const size = stylex.defineVars({

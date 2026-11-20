@@ -16,6 +16,7 @@ import {
   listRuns,
   listUnprocessedTrackerEvents,
   listWorkspaces,
+  markTrackerChanged,
   markTrackerEventProcessed,
 } from "@ganger/db";
 import type { StoredMapping, StoredRun, StoredTrackerEvent } from "@ganger/db";
@@ -30,10 +31,11 @@ const POLL_CORRECTION_OVERLAP_MS = 60_000;
 export interface AutoAssignState {
   nextPollAt: number;
   polledAt: Map<string, number>;
+  changedUpTo: Map<string, number>;
 }
 
 export function createAutoAssignState(): AutoAssignState {
-  return { nextPollAt: 0, polledAt: new Map() };
+  return { nextPollAt: 0, polledAt: new Map(), changedUpTo: new Map() };
 }
 
 export async function assignAutomatically(context: TickContext): Promise<void> {
@@ -118,6 +120,16 @@ async function correctByPolling(context: TickContext): Promise<void> {
     } catch (error) {
       logger.warn("could not list labeled tickets", { connection, labelId, error });
       continue;
+    }
+    const changedUpTo = autoAssign.changedUpTo.get(key) ?? Number.NEGATIVE_INFINITY;
+    const latest = Math.max(changedUpTo, ...tickets.map((ticket) => ticket.updatedAt.getTime()));
+    if (latest > changedUpTo) {
+      try {
+        markTrackerChanged(context.db, connection);
+        autoAssign.changedUpTo.set(key, latest);
+      } catch (error) {
+        logger.warn("could not mark tracker reads changed", { connection, error });
+      }
     }
     let complete = true;
     for (const ticket of tickets) {

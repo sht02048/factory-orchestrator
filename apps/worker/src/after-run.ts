@@ -5,6 +5,7 @@ import {
   getWorkspaceTrackerProject,
   listRunners,
   listRuns,
+  markTrackerChanged,
   updateRunRecords,
 } from "@ganger/db";
 import type { RunRecords, StoredRun, StoredRunner } from "@ganger/db";
@@ -92,9 +93,10 @@ async function markInProgress(
     forgetGoneTicket(context, run);
     return;
   }
-  tryWrite(context, run.id, () =>
-    updateRunRecords(context.db, run.id, { trackerStateSetAt: context.now() }),
-  );
+  tryWrite(context, run.id, () => {
+    updateRunRecords(context.db, run.id, { trackerStateSetAt: context.now() });
+    markTrackerChanged(context.db, run.ticket.connection);
+  });
 }
 
 async function commentResult(

@@ -115,3 +115,27 @@ export async function measureRail(
   for (const screen of order) samples.push(await navigateByRail(page, screen, round));
   return samples;
 }
+
+export const PENDING_BAR_SELECTOR = "[data-pending-bar]";
+
+export async function watchPendingBar(page: Page): Promise<() => Promise<boolean>> {
+  await page.evaluate((selector) => {
+    Reflect.set(window, "__pendingBarSeen", document.querySelector(selector) !== null);
+    new MutationObserver(() => {
+      if (document.querySelector(selector) !== null) Reflect.set(window, "__pendingBarSeen", true);
+    }).observe(document.body, { childList: true, subtree: true });
+  }, PENDING_BAR_SELECTOR);
+  return () => page.evaluate(() => Reflect.get(window, "__pendingBarSeen") === true);
+}
+
+export async function emulateRoundTrip(page: Page, roundTripMs: number): Promise<void> {
+  if (roundTripMs <= 0) return;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Network.enable");
+  await cdp.send("Network.emulateNetworkConditions", {
+    offline: false,
+    latency: roundTripMs,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+  });
+}
