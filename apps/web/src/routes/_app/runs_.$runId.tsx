@@ -1,30 +1,19 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { useCallback, useEffect, useState } from "react";
 import { createTranslator } from "use-intl";
 import { ScreenMessages, defaultLocale } from "../../i18n";
+import { loadRouteQuery } from "../../query/route-query";
+import { fetchCountOf, runDetailPollMs, useRunDetailMutations } from "../../run-detail/actions";
 import { runMessages } from "../../run-detail/messages";
 import { RunDetailScreen } from "../../run-detail/run-detail-screen";
-import type { RunActionResult } from "@ganger/app/run-detail/actions";
-import {
-  answerQuestion,
-  cancelRun,
-  controlRun,
-  denyPermission,
-  getRunDetail,
-  requestRunLog,
-} from "../../server/functions";
+import { runDetailQuery } from "../../runs/queries";
 
 const t = createTranslator({ locale: defaultLocale, messages: runMessages, namespace: "run" });
 
-function expectOk(result: RunActionResult): void {
-  if (!result.ok) throw new Error(result.reason);
-}
-
-const LOG_POLL_MS = 2_000;
-const LOG_POLL_LIMIT = 15;
-
 export const Route = createFileRoute("/_app/runs_/$runId")({
-  loader: ({ params }) => getRunDetail({ data: { runId: params.runId } }),
+  preloadStaleTime: 0,
+  loader: (load) => loadRouteQuery(load, runDetailQuery(load.params.runId)),
   head: ({ loaderData }) => ({
     meta: [
       {
@@ -38,36 +27,36 @@ export const Route = createFileRoute("/_app/runs_/$runId")({
   component: RunDetailRoute,
 });
 
+function useFetchCount(runId: string): () => number {
+  const queryClient = useQueryClient();
+  return useCallback(() => {
+    const state = queryClient.getQueryState(runDetailQuery(runId).queryKey);
+    return state === undefined ? 0 : fetchCountOf(state);
+  }, [queryClient, runId]);
+}
+
 function RunDetailRoute() {
-  const page = Route.useLoaderData();
   const { runId } = Route.useParams();
+  return <RunDetail key={runId} runId={runId} />;
+}
+
+function RunDetail({ runId }: { runId: string }) {
   const { ws } = Route.useSearch();
-  const router = useRouter();
-  const reload = () => router.invalidate();
-  const pendingLog = page.kind === "found" && page.run.log.kind === "pending";
-  const pendingControl = page.kind === "found" && page.run.control?.status === "pending";
+  const fetchCount = useFetchCount(runId);
+  const [logPollsFrom, setLogPollsFrom] = useState(fetchCount);
+  const logRequested = useCallback(() => setLogPollsFrom(fetchCount()), [fetchCount]);
+  const { data: page } = useSuspenseQuery({
+    ...runDetailQuery(runId),
+    refetchInterval: (query) =>
+      query.state.data === undefined
+        ? false
+        : runDetailPollMs(query.state.data, fetchCountOf(query.state) - logPollsFrom),
+  });
+  const { actions, openLog } = useRunDetailMutations(runId, logRequested);
 
   useEffect(() => {
-    requestRunLog({ data: { runId } })
-      .then((requested) => (requested ? router.invalidate() : undefined))
-      .catch(() => undefined);
-  }, [runId, router]);
-
-  const [polls, setPolls] = useState(0);
-  useEffect(() => {
-    if (!pendingLog || polls >= LOG_POLL_LIMIT) return undefined;
-    const timer = setTimeout(() => {
-      setPolls((n) => n + 1);
-      void router.invalidate();
-    }, LOG_POLL_MS);
-    return () => clearTimeout(timer);
-  }, [pendingLog, polls, router]);
-
-  useEffect(() => {
-    if (!pendingControl) return undefined;
-    const timer = setTimeout(() => void router.invalidate(), LOG_POLL_MS);
-    return () => clearTimeout(timer);
-  }, [pendingControl, page, router]);
+    openLog();
+  }, [openLog]);
 
   const search = ws === undefined ? "" : `?ws=${encodeURIComponent(ws)}`;
   return (
@@ -76,28 +65,7 @@ function RunDetailRoute() {
         page={page}
         runsHref={`/runs${search}`}
         runHref={(id) => `/runs/${encodeURIComponent(id)}${search}`}
-        onAnswer={async (questionId, answer) => {
-          await answerQuestion({ data: { runId, questionId, answer } });
-          await reload();
-        }}
-        onDeny={async (promptId, reason) => {
-          await denyPermission({ data: { runId, promptId, reason } });
-          await reload();
-        }}
-        onCancel={async () => {
-          expectOk(await cancelRun({ data: { runId } }));
-          await reload();
-        }}
-        onControl={async (control) => {
-          const result = await controlRun({ data: { runId, control } });
-          await reload();
-          return result.ok ? "requested" : "state-changed";
-        }}
-        onRefreshLog={async () => {
-          setPolls(0);
-          await requestRunLog({ data: { runId } });
-          await reload();
-        }}
+        {...actions}
       />
     </ScreenMessages>
   );

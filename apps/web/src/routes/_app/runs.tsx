@@ -1,4 +1,6 @@
-import { createFileRoute, getRouteApi } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, getRouteApi, rootRouteId } from "@tanstack/react-router";
+import { useDeferredValue } from "react";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
@@ -7,10 +9,13 @@ import type { ConditionKey } from "@ganger/app/runs/conditions";
 import { runsMessages } from "../../runs/messages";
 import { ENDED_RUNS_PAGE_SIZE, MAX_ENDED_RUNS, RUN_FILTERS } from "@ganger/app/runs/model";
 import { RunsScreen } from "../../runs/runs-screen";
-import { getRunsPage } from "../../server/functions";
+import { requestTimeZone } from "../../query/request-time-zone";
+import { loadRouteQuery } from "../../query/route-query";
+import { runsListQuery } from "../../runs/queries";
 
 const t = createTranslator({ locale: defaultLocale, messages: runsMessages, namespace: "runs" });
 const appRoute = getRouteApi("/_app");
+const rootRoute = getRouteApi(rootRouteId);
 
 export const Route = createFileRoute("/_app/runs")({
   validateSearch: z.object({
@@ -24,14 +29,25 @@ export const Route = createFileRoute("/_app/runs")({
     ended: search.ended,
     ...pickConditions(search),
   }),
-  loader: ({ deps }) =>
-    getRunsPage({ data: { ...deps, ended: deps.ended ?? ENDED_RUNS_PAGE_SIZE } }),
+  preloadStaleTime: 0,
+  loader: (load) =>
+    loadRouteQuery(
+      load,
+      runsListQuery(
+        { ...load.deps, ended: load.deps.ended ?? ENDED_RUNS_PAGE_SIZE },
+        requestTimeZone(),
+      ),
+    ),
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: RunsRoute,
 });
 
 function RunsRoute() {
-  const page = Route.useLoaderData();
+  const deps = Route.useLoaderDeps();
+  const timeZone = useDeferredValue(rootRoute.useLoaderData({ select: (root) => root.timeZone }));
+  const { data: page } = useSuspenseQuery(
+    runsListQuery({ ...deps, ended: deps.ended ?? ENDED_RUNS_PAGE_SIZE }, timeZone),
+  );
   const shell = appRoute.useLoaderData();
   const { f, sel, ws, ended } = Route.useSearch();
   const navigate = Route.useNavigate();
