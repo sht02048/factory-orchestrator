@@ -83,6 +83,7 @@ const styles = stylex.create({
   head: {
     display: { default: "grid", [breakpoints.responsiveColumnsStacked]: "none" },
     height: size.tableHeadHeight,
+    marginBottom: space.s2,
     color: colors.textTertiary,
     fontSize: fontSize.small,
     whiteSpace: "nowrap",

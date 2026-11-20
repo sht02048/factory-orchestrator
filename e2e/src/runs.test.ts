@@ -214,6 +214,34 @@ describe("Runs 화면(브라우저, 0056)", () => {
     }
   });
 
+  it("머리글과 첫 행 사이에 8px 을 두고, 머리글을 숨긴 좁은 폭에서는 빈 틈을 남기지 않는다(0141)", async (context) => {
+    const headGapAt = async (width: number) => {
+      const page = await newPage(context, { width, height: 900 });
+      await openRuns(page);
+      const list = page.getByRole("listbox", { name: runsJson.listLabel });
+      await list.getByRole("option").first().click();
+      return list.evaluate((listbox) => {
+        const table = listbox.parentElement;
+        const head = listbox.previousElementSibling;
+        const firstRow = listbox.querySelector('[role="option"]');
+        if (table === null || head === null || firstRow === null)
+          throw new Error("runs table not found");
+        const rowTop = firstRow.getBoundingClientRect().top;
+        return {
+          headShown: getComputedStyle(head).display !== "none",
+          belowHead: Math.round(rowTop - head.getBoundingClientRect().bottom),
+          belowTableTop: Math.round(rowTop - table.getBoundingClientRect().top),
+        };
+      });
+    };
+
+    const wide = await headGapAt(1440);
+    expect(wide).toMatchObject({ headShown: true, belowHead: 8 });
+
+    const narrow = await headGapAt(400);
+    expect(narrow).toMatchObject({ headShown: false, belowTableTop: 0 });
+  });
+
   it("Settings 목차는 1100px 에서 본문 왼쪽에, 800px 에서 본문 위 한 줄에 둔다(0119)", async (context) => {
     const boxes = async (width: number) => {
       const page = await newPage(context, { width, height: 900 });
