@@ -17,7 +17,7 @@ blocked_by: []
 
 ## 흐름
 
-1. **Linear가 이 서버에 닿을 주소**(예전 "Webhook 공개 주소"). Tailscale이 있으면 "Tailscale Funnel로 열기"(처음 허용 안내+링크, 포트·경로를 채운 명령과 복사, "명령이 끝나면 확인하기를 눌러요"). 주소 입력(미리 채움)+확인하기. 다른 방법은 README 새 절로 가는 링크 하나. 확인에 성공해야 저장하고 ✓"닿는 걸 확인했어요". 서버에 하나라 모든 트래커 연결이 같이 쓴다. Settings › 고급의 줄은 뺀다.
+1. **Linear가 이 서버에 닿을 주소**(예전 "Webhook 공개 주소"). Tailscale이 있으면 "Tailscale Funnel로 열기"(처음 허용 안내+링크, 포트·경로를 채운 명령과 복사, "명령이 끝나면 확인하기를 눌러요"). 주소 입력(미리 채움)+확인하기. 다른 방법은 Cloudflare Tunnel 공식 문서로 가는 바깥 링크 하나와 리버스 프록시 ⓘ 툴팁 한 줄(웹 앱은 공개 저장소 주소를 몰라 README로 보내지 않는다, 코디네이터 결정 2026-11-20). 자세한 단계는 README `Turn on the webhook` 절. 확인에 성공해야 저장하고 ✓"닿는 걸 확인했어요". 서버에 하나라 모든 트래커 연결이 같이 쓴다. Settings › 고급의 줄은 뺀다.
 2. **Linear에서 webhook 만들기**: 완성한 주소(닿을 주소+이 연결의 경로)와 복사, "Data change events에서 Issues만 골라요", Linear webhook 설정 링크(조직 urlKey를 알면 그 조직, 모르면 `https://linear.app/settings/api`). 1이 끝나기 전에는 잠근다.
 3. **signing secret 넣고 켜기**. 켜면 "켰어요 · 첫 webhook을 기다려요". 기다리는 동안 3초마다 수신 상태만 묻고(15분까지), 바뀌면 지금 router 로더를 다시 읽어 그 자리에서 바뀐다.
 

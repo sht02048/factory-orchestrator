@@ -312,6 +312,10 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
     expect(textOf(stepOf(html, 2))).not.toContain(settings.webhook.create.urlLabel);
     expect(stepOf(html, 3)).not.toContain('type="password"');
     expect(text).not.toContain(settings.webhook.address.funnelTitle);
+    expect(stepOf(html, 1)).toContain(
+      'href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/"',
+    );
+    expect(stepOf(html, 1)).toContain(`${settings.webhook.address.reverseProxy} 도움말`);
   });
 
   it("Tailscale 이 있으면 명령과 처음 허용 안내를 보이고 주소를 미리 채운다", async () => {

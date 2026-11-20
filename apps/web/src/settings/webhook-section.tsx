@@ -33,7 +33,11 @@ import type {
   WebhookStateView,
 } from "@ganger/app/settings/model";
 import { useTime } from "../format/time";
-import { LINEAR_WEBHOOK_SETTINGS_URL, TAILSCALE_FUNNEL_GUIDE_URL } from "../onboarding/model";
+import {
+  CLOUDFLARE_TUNNEL_GUIDE_URL,
+  LINEAR_WEBHOOK_SETTINGS_URL,
+  TAILSCALE_FUNNEL_GUIDE_URL,
+} from "../onboarding/model";
 import { browserClipboard, copyText } from "./clipboard";
 import { CredentialFormFrame, ExternalLink, SecretField } from "./credential-forms";
 import { useInlineEdit } from "./row-state";
@@ -41,8 +45,6 @@ import { ChangeButton, FocusFirst } from "./settings-page";
 import { SubmitError, useReportUnsaved, useSubmit, type SettingsActions } from "./settings-screen";
 
 export const WEBHOOK_SECTION_ID = "webhook";
-export const WEBHOOK_OTHER_WAYS_URL =
-  "https://github.com/search?q=ganger+%22Turn+on+the+webhook%22&type=code";
 
 export interface WebhookSectionProps {
   connection: TrackerConnectionView;
@@ -329,6 +331,7 @@ function AddressEditor({
   onSaved: () => void;
 }) {
   const t = useTranslations("settings.webhook.address");
+  const ts = useTranslations("settings");
   const [value, setValue] = useState(initial);
   const [failed, setFailed] = useState<(typeof ADDRESS_ERRORS)[number] | null>(null);
   const [tried, setTried] = useState(false);
@@ -357,7 +360,15 @@ function AddressEditor({
             onSaved,
           );
         }}
-        footer={<ExternalLink href={WEBHOOK_OTHER_WAYS_URL}>{t("otherWays")}</ExternalLink>}
+        footer={
+          <>
+            <ExternalLink href={CLOUDFLARE_TUNNEL_GUIDE_URL}>{t("otherWays")}</ExternalLink>
+            <InfoTip
+              label={ts("infoLabel", { label: t("reverseProxy") })}
+              content={t("reverseProxyInfo")}
+            />
+          </>
+        }
         submit={
           <Button variant="primary" type="submit" disabled={submit.sending}>
             {submit.sending ? t("checking") : tried ? t("recheck") : t("check")}
