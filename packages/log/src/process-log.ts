@@ -80,6 +80,9 @@ export function setupProcessLog(options: ProcessLogOptions): ProcessLog {
       sinkFailed = true;
       process.stderr.write(`could not write the server log: ${String(error)}\n`);
     },
+    onSinkRecovered: () => {
+      sinkFailed = false;
+    },
   });
   current = logger;
   if (settings.dir !== null) setupFatalReport(join(settings.dir, REPORT_DIR_NAME));
@@ -102,8 +105,8 @@ export function processStartFields(): {
 }
 
 export interface FatalTarget {
-  on(event: "uncaughtException", listener: (error: Error) => void): unknown;
-  on(event: "unhandledRejection", listener: (reason: unknown) => void): unknown;
+  prependListener(event: "uncaughtException", listener: (error: Error) => void): unknown;
+  prependListener(event: "unhandledRejection", listener: (reason: unknown) => void): unknown;
 }
 
 export function exitOnFatal(
@@ -111,11 +114,11 @@ export function exitOnFatal(
   logger: () => Logger,
   exit: (code: number) => void,
 ): void {
-  target.on("uncaughtException", (error) => {
+  target.prependListener("uncaughtException", (error) => {
     logger().error("process.crashed", { reason: "uncaught-exception", error });
     exit(1);
   });
-  target.on("unhandledRejection", (reason) => {
+  target.prependListener("unhandledRejection", (reason) => {
     logger().error("process.crashed", { reason: "unhandled-rejection", error: reason });
     exit(1);
   });
@@ -124,7 +127,7 @@ export function exitOnFatal(
 function setupFatalReport(directory: string): void {
   const report = process.report;
   try {
-    mkdirSync(directory, { recursive: true });
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
     pruneReports(directory, REPORTS_KEPT);
     report.directory = directory;
     report.excludeEnv = true;

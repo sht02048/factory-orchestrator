@@ -151,7 +151,7 @@ export function humanLine(line: LogLine): string {
 }
 
 function humanValue(value: unknown): string {
-  if (typeof value === "string" && !/[\s"]/.test(value)) return value;
+  if (typeof value === "string" && !/[\s"\p{Cc}]/u.test(value)) return value;
   return JSON.stringify(value) ?? String(value);
 }
 

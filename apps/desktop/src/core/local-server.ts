@@ -1,11 +1,11 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import { homePaths, readBootEnv } from "@ganger/cli/home";
 import { isProcessAlive, isSameProcess, readLiveServerLock } from "@ganger/cli/server-lock";
 import { webUrl } from "@ganger/cli/web-url";
 import { parseBootConfig } from "@ganger/db";
-import { readLogSettings, rotateIfOver } from "@ganger/log";
+import { log, readLogSettings, rotateIfOver } from "@ganger/log";
 import { z } from "zod";
 import type { Identity, Probe } from "./identity.js";
 import { probeIdentity } from "./identity.js";
@@ -48,8 +48,8 @@ export function rotateOutputLog(
 ): void {
   try {
     rotateIfOver(logFile, readLogSettings(env).limits);
-  } catch {
-    return;
+  } catch (error) {
+    log().warn("log.rotate_failed", { path: basename(logFile), error });
   }
 }
 

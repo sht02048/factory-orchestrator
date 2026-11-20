@@ -1,4 +1,5 @@
 import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -315,6 +316,8 @@ describe("process log", () => {
     const file = join(gangerHome, "logs", "worker.jsonl");
     expect(readFileSync(file, "utf8").trim().split("\n")).toHaveLength(1);
     expect(statSync(file).mode & 0o777).toBe(0o600);
+    expect(statSync(join(gangerHome, "logs")).mode & 0o777).toBe(0o700);
+    expect(statSync(join(gangerHome, "logs", "reports")).mode & 0o777).toBe(0o700);
   });
 
   it("keeps a console line on one line when a value has a newline", () => {
@@ -338,11 +341,24 @@ describe("process log", () => {
 });
 
 describe("fatal errors", () => {
+  it("runs before handlers a host such as srvx registered earlier", () => {
+    const target = new EventEmitter();
+    const order: string[] = [];
+    target.on("uncaughtException", () => order.push("host"));
+    exitOnFatal(
+      target,
+      () => ({ ...memoryLogger(), error: () => order.push("log") }),
+      () => order.push("exit"),
+    );
+    target.emit("uncaughtException", new Error("boom"));
+    expect(order).toEqual(["log", "exit", "host"]);
+  });
+
   it("writes an error line and exits on uncaught exceptions and rejections", () => {
     let onException: (error: Error) => void = () => undefined;
     let onRejection: (reason: unknown) => void = () => undefined;
     const target: FatalTarget = {
-      on: (event: "uncaughtException" | "unhandledRejection", listener: never) => {
+      prependListener: (event: "uncaughtException" | "unhandledRejection", listener: never) => {
         if (event === "uncaughtException") onException = listener;
         else onRejection = listener;
       },

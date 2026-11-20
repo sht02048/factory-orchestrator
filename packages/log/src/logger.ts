@@ -26,6 +26,7 @@ export interface LoggerOptions {
   sinks: ReadonlyArray<LogSink>;
   now?: () => Date;
   onSinkError?: (error: unknown) => void;
+  onSinkRecovered?: () => void;
 }
 
 const contextStore = new AsyncLocalStorage<LogContext>();
@@ -47,13 +48,16 @@ export function createLogger(options: LoggerOptions): Logger {
     if (sinks.length === 0) return;
     const line = buildLine(source, now(), level, event, currentLogContext(), fields);
     const text = formatLine(line);
+    let failed = false;
     for (const sink of sinks) {
       try {
         sink.write(line, text);
       } catch (error) {
+        failed = true;
         options.onSinkError?.(error);
       }
     }
+    if (!failed) options.onSinkRecovered?.();
   };
   return {
     error: (event, fields) => write("error", event, fields),

@@ -92,7 +92,13 @@ export function fileSink(path: string, limits: RotationLimits): FileSink {
         }
         current = reopen();
       }
-      writeSync(current, text);
+      try {
+        writeSync(current, text);
+      } catch (error) {
+        closeSync(current);
+        fd = undefined;
+        throw error;
+      }
     },
     close() {
       if (fd !== undefined) closeSync(fd);
