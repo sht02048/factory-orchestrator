@@ -226,6 +226,31 @@ describe("Runners 다시 그리기(브라우저, 0092)", () => {
     expect(await panel.getByText(runners.panel.usage.atLimit, { exact: false }).count()).toBe(1);
   });
 
+  it("열 머리와 첫 행 사이에 8px 을 두고, 열 머리를 숨긴 좁은 폭에서는 빈 틈을 남기지 않는다(0141)", async (context) => {
+    const headGapAt = async (width: number) => {
+      const page = await openPage(`${context.task.name}-${width}`, { width, height: 800 });
+      await page.goto(`/runners?ws=${workspaceId}&sel=${longRunner}`);
+      await hydrated(page);
+      return page.getByRole("listbox", { name: runners.listLabel }).evaluate((listbox) => {
+        const table = listbox.parentElement;
+        const headFrame = listbox.previousElementSibling;
+        const head = headFrame?.querySelector('[data-columns="head"]') ?? null;
+        const firstRow = listbox.querySelector('[role="option"]');
+        if (table === null || head === null || firstRow === null)
+          throw new Error("runners table not found");
+        const rowTop = firstRow.getBoundingClientRect().top;
+        return {
+          headShown: getComputedStyle(head).display !== "none",
+          belowHead: Math.round(rowTop - head.getBoundingClientRect().bottom),
+          belowTableTop: Math.round(rowTop - table.getBoundingClientRect().top),
+        };
+      });
+    };
+
+    expect(await headGapAt(1280)).toMatchObject({ headShown: true, belowHead: 8 });
+    expect(await headGapAt(400)).toMatchObject({ headShown: false, belowTableTop: 0 });
+  });
+
   it("400px에서 페이지가 가로로 넘치지 않는다", async (context) => {
     const page = await openPage(context.task.name, { width: 400, height: 800 });
     await page.goto(`/runners?ws=${workspaceId}&sel=${longRunner}`);
