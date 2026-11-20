@@ -97,6 +97,21 @@ describe("start", () => {
     expect(started.migrated).toEqual([]);
   });
 
+  it("한쪽이 먼저 끝나면 다른 쪽도 멈추고 이유를 알린다", async () => {
+    const home = join(dir, "home");
+    init({ home, port: String(await freePort()) });
+    const crashTrigger = join(dir, "crash-worker");
+    started = await start({
+      home,
+      env: {},
+      layout: fakeLayout(workerExitingOnceExists(crashTrigger)),
+      onOutput: quiet,
+    });
+    writeFileSync(crashTrigger, "");
+    expect(await started.exited).toEqual({ failure: "worker exited with code 3" });
+    await expect(fetch(started.url)).rejects.toThrow("fetch failed");
+  });
+
   it("web이 뜨기 전에 끝나면 실패하고 나머지를 멈춘다", async () => {
     const home = join(dir, "home");
     init({ home, port: String(await freePort()) });

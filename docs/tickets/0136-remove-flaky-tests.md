@@ -12,7 +12,7 @@ blocked_by: []
 ## 확인한 방법
 
 - CI 워크플로의 실패 실행 중 run 44666327159(2026-11-20 03:14 UTC)까지의 30개(`gh run list --workflow CI`)와 다시 돌린 실행의 첫 시도 로그, 코디네이터가 더한 run 44674241278 첫 시도 로그(`actions/runs/<id>/attempts/1/logs`)에서 실패한 시험 이름을 모았다.
-- 이미 고쳐 그 뒤 CI 에서 흔들리지 않은 시험은 지우지 않았다. 0121: nav-shortcuts·desktop-updates 토스트. 0131: Settings 목차, desktop 알림 설정·화면 전환, demo 온보딩 모드. 0135: runs-query.
+- 이미 고쳐 그 뒤 CI 에서 흔들리지 않은 시험은 지우지 않았다. 0121: nav-shortcuts·desktop-updates 토스트. 0131: Settings 목차, desktop 알림 설정·화면 전환, demo 온보딩 모드. 0135: runs-query. 0065: `apps/cli/src/start.test.ts` '한쪽이 먼저 끝나면 다른 쪽도 멈추고 이유를 알린다'(PR #80 run 44241958153 실패를 고쳤고 그 뒤 CI 실패 기록 없음).
 
 ## 지운 시험과 잃은 확인 범위
 
@@ -21,7 +21,7 @@ blocked_by: []
   - 잃은 확인: Enter 로 맞지 않는 분 값(0)을 넣으면 칸에 넣은 값이 그대로 남고, 오류 문장이 그 칸의 `aria-describedby`로 이어지며, 맞는 값을 넣으면 오류가 사라진다.
   - 남은 확인: 같은 파일 '최대 실행 시간은 칸을 벗어나면 바로 저장하고, 맞지 않는 값은 저장하지 않고 알린다'가 오류 문장·`aria-invalid`·저장을 본다. `apps/web/src/settings/settings.test.tsx` '최대 실행 시간 칸은 숫자 키보드를 쓰고, 처음 열 때는 오류를 보이지 않는다(0055)'가 칸의 처음 상태를 본다. 넣은 값 유지와 `aria-describedby` 연결은 이제 시험하지 않는다.
 - `e2e/src/runs.test.ts` '주소의 조건으로 거르고, 끝난 런 상한은 조건 안에서 적용하며, 칩을 지우면 포커스가 남은 칩으로 간다'
-  - CI: PR #170(0126, Dashboard·Stats) run 44662245743 에서 실패(포커스가 body), 같은 브랜치의 다음 실행(run 44664322539)에서 이 시험은 통과했지만, 그 사이에 develop(0125·0131)을 받아 코드가 달랐다. CI 실패 근거는 이 한 번뿐이다.
+  - CI: PR #170(0126, Dashboard·Stats) run 44662245743 에서 실패(포커스가 body), 같은 브랜치의 다음 실행(run 44664322539)에서 이 시험은 통과했지만, 그 사이에 develop(0125·0131)을 받아 코드가 달랐다. CI 실패 근거는 이 한 번뿐이다. PR #170 은 Runs 화면 코드(`apps/web/src/runs/`)를 바꾸지 않았다.
   - 잃은 확인: 브라우저에서 주소의 조건이 조건 칩 줄로 보이고 목록을 거르는 것, 칩 하나를 지우면 포커스가 남은 칩으로, 모두 지우면 상태 탭으로 가는 것.
   - 남은 확인: `apps/web/src/runs/load.test.ts`가 러너·에이전트·기간 조건과 '끝난 런 상한은 조건 안에서 적용하고, 조건 밖 런은 담지 않는다'를, `apps/web/src/runs/conditions.test.ts`가 주소에서 조건 고르기를, `apps/web/src/runs/runs-screen.test.tsx` '걸린 조건을 지울 수 있는 버튼 줄로 보이고…(0075)'가 칩 줄 그리기를 본다. 칩을 지운 뒤 포커스가 옮겨 가는 것은 이제 시험하지 않는다.
 - `e2e/src/runner-setup.test.ts` '직접 입력에서 orca 경로를 비우면 ssh로 찾고, 닿지 않으면 저장하지 않고 이유를 보인다'
@@ -42,12 +42,8 @@ blocked_by: []
     - 남은 확인: '출력을 그대로 둘 때 web 이 보낸 { type: wake } 만 worker 에 닿는다'가 같은 중계를 본다. 한 줄만 남은 `it.each`는 평범한 `it`으로 바꿨다.
   - `ganger mcp` '실제 SDK 클라이언트로 stdio에 붙으면 … 질문에 답하고 기록을 남긴다'
     - 잃은 확인: 실제 MCP SDK 클라이언트가 stdio 로 붙어 스위치를 켜면 `tools/list_changed` 알림을 받고, 쓰기 도구로 답을 저장하고 MCP 기록을 남기는 것.
-    - 남은 확인: `apps/cli/src/mcp/write-tools.test.ts` '켜면 다시 시작하지 않아도 쓰기 도구가 보이고, 끄면 다시 사라진다', '질문에 답하면 답을 저장하고, Run 상세 상태 기록 사이에 MCP · 클라이언트 이름으로 남긴다'와 같은 파일 '판이 같으면 stdin·stdout으로 MCP를 주고받고…'가 본다. SDK 클라이언트와 stdio 로 주고받는 알림은 이제 시험하지 않는다.
+    - 남은 확인: `apps/cli/src/mcp/write-tools.test.ts` '켜면 다시 시작하지 않아도 쓰기 도구가 보이고, 끄면 다시 사라진다', '질문에 답하면 답을 저장하고, Run 상세 상태 기록 사이에 MCP · 클라이언트 이름으로 남긴다'와 `apps/cli/src/mcp/program-mcp.test.ts` '판이 같으면 stdin·stdout으로 MCP를 주고받고…'가 본다. SDK 클라이언트와 stdio 로 주고받는 알림은 이제 시험하지 않는다.
     - 이 시험만 쓰던 `PipeClientTransport`와 import 를 함께 지웠다.
-- `apps/cli/src/start.test.ts` '한쪽이 먼저 끝나면 다른 쪽도 멈추고 이유를 알린다'(독립 리뷰가 더한 후보)
-  - CI: PR #80(0050, Home 화면, CLI 를 바꾸지 않음) run 44241958153 에서 web 이 응답하기 전에 `worker exited with code 3`로 실패. 이 흔들림을 고친 티켓은 없다.
-  - 잃은 확인: worker 가 먼저 끝나면 start 가 web 도 멈추고 멈춘 이유를 `exited`로 알리며, 그 뒤 web 주소가 응답하지 않는 것.
-  - 남은 확인: 같은 파일 'worker 가 끝난 뒤 web 이 보낸 신호는 멈춘 이유를 바꾸지 않는다'가 worker 가 끝나면 `exited`가 그 이유를 갖는 것을, '한쪽이 먼저 끝나 서버가 멈춰도 푼다'가 한쪽이 끝나면 서버가 멈추는 것을 본다. 멈춘 뒤 web 주소가 닫히는 것은 이제 시험하지 않는다.
 
 ## 확인하지 못해 남긴 것
 
