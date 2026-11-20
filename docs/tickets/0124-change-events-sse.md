@@ -1,0 +1,62 @@
+---
+status: todo
+blocked_by: [0123]
+---
+
+# 0124 change_events 표와 SSE 통로
+
+## 목표
+
+DB에서 바뀐 것을 열린 웹 화면이 몇 초 안에 알게 한다. 바꾸는 코드가 `change_events`에 줄을 남기고, web이 새 SSE 통로로 보내며, 브라우저가 그 대상의 query key만 무효화한다. 스펙 [0003](../spec/0003-query-cache.md) 5절, ADR [0019](../adr/0019-query-cache-and-change-events.md), 운영자 결정 C4·C9~C12.
+
+## 배경
+
+- worker·트래커 webhook·MCP·다른 기기가 바꾼 것을 웹으로 밀어 넣는 길이 없다(research [0016](../research/0016-web-data-loading.md) 8절).
+- 알림 사건 SSE(`/api/notification-events/stream`)는 알릴 일만 싣고 데스크톱 앱이 쓴다. 건드리지 않는다(C10).
+- web, worker, `ganger mcp` 세 프로세스가 SQLite 파일 하나를 연다. 그래서 바뀜은 메모리가 아니라 DB 표로 넘긴다(C9).
+
+## 할 일
+
+1. **표.** `packages/db`에 `change_events`(`seq` 단조 증가, `kind`, `target_id`, `workspace_id`, `at`)와 마이그레이션을 더한다. `kind`는 `run`, `runner`, `assignment`, `workspace`, `settings`, `tracker`다(C12). `at`에 지우기용 색인을 둔다.
+2. **쓰는 곳(같은 트랜잭션, 바뀐 것이 있을 때만).** worker가 주기마다 부르는 쓰기 함수(`recordRunQuestions`, `recordPermissionWaits`, `resolvePermissionWaits`, `recordRunnerCheck`, `recordProviderUsage`, 같은 값을 다시 쓰는 `updateRunRecords`)는 화면에 보이는 값을 쓰기 전과 뒤로 견줘 그대로면 줄을 쓰지 않는다. `checkedAt`·`readAt`만 바뀐 것은 바뀜이 아니다(스펙 5.2). `packages/db`의 쓰기 함수 안에서 줄을 써서 web·worker·MCP 어느 프로세스가 불러도 빠지지 않게 한다. 스펙 5.2의 표를 따른다.
+   - run: 상태 바뀜과 Paused, PR·CI 바뀜, Question·Permission 생김과 답·거절, 취소·멈추기·재개·로그 요청과 처리 결과, 티켓 제목 채움. 0120이 더한 쓰는 곳도 찾는다.
+   - runner: 점검 결과와 Online/Offline, 공급자 사용량, 러너 저장·capacity, Mailbox Terminal(`setRunnerMailbox`).
+   - assignment: 새 런(자동, 수동, MCP).
+   - workspace: Workspace 더하기·이름(지우기가 생기면 지우기).
+   - settings: 그 밖의 Settings 쓰기 모두(0119 뒤 모양), Mapping, Auto-assign Label, In Progress 상태, 트래커 연결, 설치 전체 설정, MCP 쓰기 허용.
+   - tracker: 트래커 webhook을 받음, "Linear에서 다시 읽기", 라벨 만들기, 트래커 연결이나 Workspace의 트래커 프로젝트가 바뀜. 한 쓰기가 둘 이상에 해당하면 줄을 둘 이상 쓴다(스펙 5.2).
+   - "Linear에서 다시 읽기"는 지금 클라이언트의 `router.invalidate()`뿐이다. `tracker` 줄을 쓰는 서버 동작을 더한다(0122가 서버 캐시를 비우는 동작을 먼저 만들었으면 거기에 붙인다). 이 줄과 라벨 만들기의 `tracker` 줄은 트래커 API 호출 뒤에 쓰며, DB 트랜잭션에 묶이지 않는다.
+   - web의 변경 기록 읽기가 `tracker` 줄을 보면 브라우저에 보내기 전에 0122의 그 연결 서버 캐시를 비운다(스펙 5.2). 0122가 아직 없으면 0122가 이 연결을 만든다.
+   - worker가 트래커를 바꾸는 일(`apps/worker/src/after-run.ts`의 `markInProgress`, 댓글)도 `tracker` 줄을 쓴다. 지금 `markInProgress`는 범용 `updateRunRecords({ trackerStateSetAt })`만 부르므로, 줄을 쓰는 곳(전용 db 함수인지 부르는 곳인지)을 정해 적는다.
+   - 표에 없는 쓰기 함수(`setQueuedRunRunner`, `recordStartRequested`, `recordStartFailure`, `saveCodeHostConnection`, `recordMcpAction`, 점검 요청 `requestRunnerCheckSetting`, Run 상세가 보이는 트래커 프로젝트 이름을 바꾸는 Settings 쓰기)도 하나씩 본다. 잠자기 설정은 DB 밖이라 저장 뒤 `settings` 줄을 따로 쓴다.
+   - MCP 프로세스(`ganger mcp`)의 쓰기도 같은 함수를 지나 줄을 남기는지 시험으로 확인한다.
+3. **통로 `/api/change-events/stream`.** `apps/web/src/routes/api/`에 둔다. web 프로세스 하나가 1초마다 마지막 번호 뒤의 줄을 읽어 열린 연결 모두에 보낸다. 메시지는 `change`(`id`=`seq`, `{ kind, targetId, workspaceId }`), `ready`, `reset`, 15초 하트비트, `retry`. `Last-Event-ID`(또는 `?after=`)로 이어 받고, 이어 받을 수 없으면 `reset`을 보낸다(C11, 스펙 5.3). 받은 번호가 지운 번호의 상한(정리 때 반드시 따로 남긴다. 정리도 번호로 한다, 스펙 5.3)보다 작을 때와, 지금 가장 큰 번호보다 클 때(DB 파일을 되돌림)다. 표가 비어 있어도 판단할 수 있어야 한다. 요청 검사(Host·Origin)는 다른 웹 경로와 같다.
+4. **지우기.** 하루 지난 줄을 지운다(C9). 열린 연결 수와 상관없이 정한 주기로 돈다. 주기를 정해 적는다.
+5. **웹 구독 모듈.** 이 티켓이 `_app` 셸에 마운트해 연결한다(아직 query가 없어도 해가 없다). 0125~0128은 자기 key가 무효화되는지만 확인한다. `change`를 스펙 5.4 표의 key 접두사 무효화로 바꾸고, 한 번에 온 줄은 모아 한 번 무효화한다. `reset`은 모든 query를 무효화한다. 첫 연결은 서버 렌더가 어떤 데이터보다 먼저(요청 시작이나 루트 `beforeLoad`, 로더가 아님) 읽어 넘긴 가장 큰 번호로 `?after=`를 주어 그사이 바뀜을 놓치지 않는다. 구독 모듈은 첫 연결 때 받은 번호만 쓴다(스펙 5.3). 아직 Query로 옮긴 화면이 없으므로, 구독 모듈과 대상→key 표는 시험으로 검증하고 화면 연결은 0125~0128이 한다.
+6. **폴링 대비.** "끊김"을 알아보는 기준을 정한다(`EventSource`는 조용히 다시 붙는다. 예: `onerror` 뒤 `readyState`가 OPEN이 아님, 하트비트가 N초 넘게 없음). SSE가 끊기고 다시 붙지 않는 동안 30초마다 보이는 query를 다시 읽는다(C4). 다시 붙으면 멈춘다. 탭 복귀·재연결 다시 읽기(C6)는 Query 기본값으로 둔다.
+7. **mutation 오류 타입.** 이유가 담긴 오류 타입과, 서버 함수의 `{ ok: false, reason }` 결과와 지금 throw하는 오류(`answerQuestion`·`denyPermission`)를 그 타입으로 바꾸는 함수를 `apps/web`에 둔다(C5, 스펙 4.4). 서버 함수는 바꾸지 않는다. 함께 도는 0125~0127이 이것을 쓴다. 서버 함수 경계를 넘은 오류에 `reason`(`AnswerRejectedError`·`DenyRejectedError`의 속성, `packages/app/src/home/actions.ts`)이 남는지 확인하고, 안 남으면 `message`에서 읽거나 이유 목록으로 맞춘다.
+8. **탭 여러 개.** 탭 여러 개(HTTP/1.1)에서 연결 수 한도에 닿는지 재고 결과를 스펙 0003 열린 질문 1에 적는다. 닿으면 운영자와 정한다.
+9. **같은 탭의 쓰기가 돌아옴.** 쓰기가 남긴 줄이 같은 탭에 돌아와 query를 한 번 더 읽는 횟수를 재고, 줄일 방법이 필요한지 스펙 0003 8절에 적는다.
+10. **로그 요청의 무효화 범위.** 로그 요청과 그 결과가 `["runs", "detail", id]`만 무효화하도록 줄에서 가를지 재고 정한다. 런 시작마다 `tracker` 줄이 트래커를 다시 읽게 하는 비용도 함께 잰다(스펙 8절).
+
+## 완료 조건
+
+- [ ] 시험: 2번의 쓰기 함수마다 같은 트랜잭션에서 `change_events` 줄이 생기고, 트랜잭션이 롤백되면 줄도 없다.
+- [ ] 시험: 바뀌는 것이 없는 호출(같은 Question을 다시 기록, 같은 점검 결과)은 줄을 남기지 않는다.
+- [ ] 시험: 표가 비어 있을 때 첫 연결의 번호(`max(가장 큰 seq, sqlite_sequence)`)로는 `reset`이 나지 않는다.
+- [ ] 시험: MCP 쓰기 도구로 바꾼 것도 줄을 남긴다.
+- [ ] 시험: 통로가 `Last-Event-ID` 뒤의 줄부터 보낸다. 지운 번호(표가 빈 경우 포함)와 지금보다 큰 번호면 `reset`을 보낸다. 하루 지난 줄을 지운다.
+- [ ] 시험: 오류 변환 함수가 `{ ok: false, reason }`과 throw한 오류를 같은 타입으로 바꾸고 이유를 지킨다.
+- [ ] 시험: 구독 모듈이 대상마다 스펙 5.4 표의 key만 무효화하고, `reset`에 모든 query를 무효화한다.
+- [ ] 시험: worker와 같은 함수로 런 상태를 바꾸면 열린 브라우저의 구독 모듈이 3초 안에 그 런의 key를 무효화한다.
+- [ ] 시험: SSE가 끊기면 30초마다 다시 읽고(가짜 시계), 다시 붙으면 멈춘다.
+- [ ] 0117 브라우저 시험이 같은 뜻으로 통과한다(스펙 7절 5번).
+- [ ] 되돌리는 방법을 이 티켓에 적었다(아래).
+
+## 되돌리기
+
+새 표를 더하는 마이그레이션이라 one-way다. 머지 전에 DB 파일을 복사해 두고, 되돌릴 때 이전 버전 앱과 그 파일로 돌아간다. 이전 버전 앱은 자기보다 앞선 스키마를 거부한다. web과 worker는 마이그레이션을 돌릴 때 모르는 마이그레이션이 있으면 `MigrationError`로 멈추고(`packages/db/src/migrate.ts:66-71`), `ganger mcp`는 `checkSchema`의 `ahead`로 거부한다(`apps/cli/src/mcp/open.ts`의 `schemaProblem`). 그래서 이전 버전으로는 백업한 DB 파일로만 돌아갈 수 있다. 실제 동작을 확인해 여기에 적는다.
+
+## 머지 위험
+
+DB 스키마를 바꾸는 one-way 변경이고, `packages/db` 쓰기 함수와 worker·web·MCP가 모두 닿아 blast radius가 크다. 사람이 병합한다.
