@@ -79,6 +79,7 @@ import {
   diagnosticsMenuItem,
   logFolderOpenable,
 } from "./diagnostics-menu.js";
+import { cancelPendingHide, hideWindow } from "./window-close.js";
 import { mainWindowOptions, settingsWindowOptions, titleBarCookie } from "./window-options.js";
 
 async function loadServerScreen(window: BrowserWindow, url: string): Promise<void> {
@@ -193,6 +194,7 @@ export class Controller {
 
   showWindow(): void {
     const window = this.ensureWindow();
+    cancelPendingHide(window);
     window.show();
     window.focus();
   }
@@ -513,7 +515,7 @@ export class Controller {
     window.on("close", (event) => {
       if (this.quitting) return;
       event.preventDefault();
-      window.hide();
+      hideWindow(window);
     });
     window.webContents.setWindowOpenHandler(({ url }) => {
       if (opensOutsideApp(url)) void shell.openExternal(url);
