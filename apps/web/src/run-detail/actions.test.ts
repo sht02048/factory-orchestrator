@@ -1,6 +1,5 @@
 import { MutationObserver, QueryObserver, environmentManager } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
-import { rootRouteId } from "@tanstack/react-router";
 import { loadRunDetail } from "@ganger/app/run-detail/load";
 import type { RunDetail, RunDetailPage } from "@ganger/app/run-detail/model";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,7 +11,6 @@ import {
   LOG_POLL_LIMIT,
   RUN_POLL_MS,
   fetchCountOf,
-  isUnmovedScreen,
   runDetailMutations,
   runDetailPollMs,
 } from "./actions";
@@ -29,7 +27,18 @@ const KEYS_IN_CACHE: ReadonlyArray<QueryKey> = [
   ["tickets", "runs", ""],
   ["runners", "list"],
   ["stats", "", 7, "UTC"],
+  ["settings", ""],
   ["shell"],
+];
+
+const KEYS_CHANGED_BY_RUN_WRITE: ReadonlyArray<QueryKey> = [
+  runDetailKey(RUN_ID),
+  ["runs", "list", { ws: "" }, "UTC"],
+  ["dashboard", "", "UTC"],
+  ["tickets", "runs", ""],
+  ["runners", "list"],
+  ["stats", "", 7, "UTC"],
+  ["settings", ""],
 ];
 
 function runningDetail(): RunDetail {
@@ -61,19 +70,15 @@ function okCalls(overrides: Partial<RunDetailCalls> = {}): RunDetailCalls {
 function mutationWorld(calls: RunDetailCalls) {
   const queryClient = createQueryClient();
   for (const queryKey of KEYS_IN_CACHE) queryClient.setQueryData(queryKey, "cached");
-  const refreshUnmovedScreens = vi.fn<() => Promise<void>>(() => Promise.resolve());
   const logRequested = vi.fn<() => void>();
-  const mutations = runDetailMutations(
-    { queryClient, calls, refreshUnmovedScreens, logRequested },
-    RUN_ID,
-  );
+  const mutations = runDetailMutations({ queryClient, calls, logRequested }, RUN_ID);
   const invalidated = (): QueryKey[] =>
     queryClient
       .getQueryCache()
       .getAll()
       .filter((query) => query.state.isInvalidated)
       .map((query) => query.queryKey);
-  return { queryClient, mutations, refreshUnmovedScreens, logRequested, invalidated };
+  return { queryClient, mutations, logRequested, invalidated };
 }
 
 function mutate<TData, TVariables>(
@@ -85,17 +90,11 @@ function mutate<TData, TVariables>(
 }
 
 describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
-  it("답하기가 성공하면 그 런의 상세, Runs 목록, Dashboard, Stats만 무효화하고 아직 옮기지 않은 화면을 함께 다시 읽게 한다", async () => {
+  it("답하기가 성공하면 런을 보이는 query만 무효화하고 셸과 다른 런의 상세는 그대로 둔다", async () => {
     const world = mutationWorld(okCalls());
     await mutate(world.queryClient, world.mutations.answer, { questionId: "q-1", answer: "네" });
 
-    expect(world.invalidated()).toEqual([
-      runDetailKey(RUN_ID),
-      ["runs", "list", { ws: "" }, "UTC"],
-      ["dashboard", "", "UTC"],
-      ["stats", "", 7, "UTC"],
-    ]);
-    expect(world.refreshUnmovedScreens).toHaveBeenCalledTimes(1);
+    expect(world.invalidated()).toEqual(KEYS_CHANGED_BY_RUN_WRITE);
   });
 
   it("거절·취소·멈추기도 성공하면 같은 key만 무효화한다", async () => {
@@ -107,12 +106,7 @@ describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
     await mutate(pause.queryClient, pause.mutations.control, "pause");
 
     for (const world of [deny, cancel, pause]) {
-      expect(world.invalidated()).toEqual([
-        runDetailKey(RUN_ID),
-        ["runs", "list", { ws: "" }, "UTC"],
-        ["dashboard", "", "UTC"],
-        ["stats", "", 7, "UTC"],
-      ]);
+      expect(world.invalidated()).toEqual(KEYS_CHANGED_BY_RUN_WRITE);
     }
   });
 
@@ -125,7 +119,6 @@ describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
     await expect(failure).rejects.toBeInstanceOf(MutationRejectedError);
     await expect(failure).rejects.toMatchObject({ reason: "not-cancelable" });
     expect(world.invalidated()).toEqual([]);
-    expect(world.refreshUnmovedScreens).not.toHaveBeenCalled();
   });
 
   it("서버 함수 경계를 넘어 message만 남은 답 거절도 이유가 담긴 같은 오류가 된다", async () => {
@@ -165,12 +158,7 @@ describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
     const outcome = await mutate(world.queryClient, world.mutations.control, "pause");
 
     expect(outcome).toBe("state-changed");
-    expect(world.invalidated()).toEqual([
-      runDetailKey(RUN_ID),
-      ["runs", "list", { ws: "" }, "UTC"],
-      ["dashboard", "", "UTC"],
-      ["stats", "", 7, "UTC"],
-    ]);
+    expect(world.invalidated()).toEqual(KEYS_CHANGED_BY_RUN_WRITE);
   });
 
   it("로그 다시 받기는 그 런의 상세만 무효화하고 로그 폴링을 새로 센다", async () => {
@@ -178,7 +166,6 @@ describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
     await mutate(world.queryClient, world.mutations.refreshLog, undefined);
 
     expect(world.invalidated()).toEqual([runDetailKey(RUN_ID)]);
-    expect(world.refreshUnmovedScreens).not.toHaveBeenCalled();
     expect(world.logRequested).toHaveBeenCalledTimes(1);
   });
 
@@ -191,22 +178,6 @@ describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
     await mutate(ended.queryClient, ended.mutations.openLog, undefined);
     expect(ended.invalidated()).toEqual([]);
     expect(ended.logRequested).not.toHaveBeenCalled();
-  });
-});
-
-describe("아직 옮기지 않은 화면 고르기(스펙 0003 6절 3번)", () => {
-  it("루트, 셸, Runs, Run 상세, Dashboard, Stats는 고르지 않고 나머지 route는 고른다", () => {
-    const picked = [
-      rootRouteId,
-      "/_app",
-      "/_app/runs",
-      "/_app/runs_/$runId",
-      "/_app/",
-      "/_app/tickets",
-      "/_app/stats",
-    ].filter((routeId) => isUnmovedScreen({ routeId }));
-
-    expect(picked).toEqual(["/_app/tickets"]);
   });
 });
 

@@ -4,8 +4,7 @@ import type {
   QueryExecuteOptions,
   QueryKey,
 } from "@tanstack/react-query";
-
-export const PRELOAD_FRESH_MS = 5_000;
+import { PRELOAD_FRESH_MS } from "./query-client";
 
 export interface RouteQueryLoad {
   context: { queryClient: QueryClient };

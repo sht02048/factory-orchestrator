@@ -1,6 +1,5 @@
 import { mutationOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient, QueryState } from "@tanstack/react-query";
-import { rootRouteId, useRouter } from "@tanstack/react-router";
 import { useMemo } from "react";
 import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import type { RunControlActionResult } from "@ganger/app/run-control";
@@ -13,7 +12,7 @@ import {
   okOrThrow,
   rejectedAs,
 } from "../query/mutation-error";
-import { runDetailKey, runsListKey } from "../runs/queries";
+import { keysChangedByRunWrite, runDetailKey } from "../runs/queries";
 import {
   answerQuestion,
   cancelRun,
@@ -45,21 +44,7 @@ export const serverRunDetailCalls: RunDetailCalls = {
 export interface RunDetailWorld {
   queryClient: QueryClient;
   calls: RunDetailCalls;
-  refreshUnmovedScreens: () => Promise<void>;
   logRequested: () => void;
-}
-
-export const MOVED_TO_QUERY_ROUTE_IDS: ReadonlySet<string> = new Set([
-  rootRouteId,
-  "/_app",
-  "/_app/",
-  "/_app/runs",
-  "/_app/runs_/$runId",
-  "/_app/stats",
-]);
-
-export function isUnmovedScreen(match: { routeId: string }): boolean {
-  return !MOVED_TO_QUERY_ROUTE_IDS.has(match.routeId);
 }
 
 export function fetchCountOf(state: Pick<QueryState, "dataUpdateCount" | "errorUpdateCount">) {
@@ -76,13 +61,9 @@ export function runDetailPollMs(page: RunDetailPage, logPolls: number): number |
 export function runDetailMutations(world: RunDetailWorld, runId: string) {
   const { queryClient, calls } = world;
   const refreshRun = async (): Promise<void> => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: runDetailKey(runId) }),
-      queryClient.invalidateQueries({ queryKey: runsListKey }),
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
-      queryClient.invalidateQueries({ queryKey: ["stats"] }),
-      world.refreshUnmovedScreens(),
-    ]);
+    await Promise.all(
+      keysChangedByRunWrite(runId).map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    );
   };
   const refreshLog = async (): Promise<void> => {
     await queryClient.invalidateQueries({ queryKey: runDetailKey(runId) });
@@ -121,19 +102,9 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
 
 export function useRunDetailMutations(runId: string, logRequested: () => void) {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const mutations = useMemo(
-    () =>
-      runDetailMutations(
-        {
-          queryClient,
-          calls: serverRunDetailCalls,
-          refreshUnmovedScreens: () => router.invalidate({ filter: isUnmovedScreen }),
-          logRequested,
-        },
-        runId,
-      ),
-    [queryClient, router, runId, logRequested],
+    () => runDetailMutations({ queryClient, calls: serverRunDetailCalls, logRequested }, runId),
+    [queryClient, runId, logRequested],
   );
   const answer = useMutation(mutations.answer);
   const deny = useMutation(mutations.deny);

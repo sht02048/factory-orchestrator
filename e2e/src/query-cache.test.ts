@@ -51,7 +51,8 @@ const PROBE_SERVER_FN = "getTimeZone";
 const ERROR_PATH = "/query-probe-error";
 const SHELL_ERROR_PATH = "/query-probe-shell-error";
 const PROBE_ERROR_MESSAGE = "query-probe-read-failed";
-const ROUTER_ERROR_TEXT = "Something went wrong!";
+const RETRY_PATH = "/query-probe-retry";
+const HEAL_FLAG = "__gangerQueryProbeHealed";
 const PRELOAD_FRESH_MS = 5_000;
 const SETTLE_MS = 500;
 const BROWSER_TIME_ZONE = "UTC";
@@ -226,34 +227,72 @@ describe("query 읽기 실패(0123 할 일 10)", () => {
     expect(html).toContain(`fetchFailureCount:2,fetchFailureReason:${errorRef},`);
   });
 
-  it("셸 안 화면의 query가 throw하면 서버 렌더는 셸 안에 오류를 그리고, hydration 뒤에는 루트 오류 화면이 셸까지 대신한다", async (context) => {
+  it("셸 안 화면의 query가 throw하면 서버 렌더와 hydration 뒤 모두 레일을 남기고 화면 칸에만 오류를 그린다", async (context) => {
     const response = await fetch(new URL(SHELL_ERROR_PATH, baseUrl));
     const html = await response.text();
     expect(html).toContain(`aria-label="${shell.nav.label}"`);
-    expect(html).toContain(ROUTER_ERROR_TEXT);
+    expect(html).toContain(shell.screenError.title);
 
     const { page } = await newPage(context);
     await page.goto(SHELL_ERROR_PATH);
-    await page.getByText(ROUTER_ERROR_TEXT).waitFor();
+    await page.getByRole("heading", { name: shell.screenError.title }).waitFor();
     await page.waitForLoadState("networkidle");
-    await expect
-      .poll(() => page.getByRole("navigation", { name: shell.nav.label }).count())
-      .toBe(0);
+
+    expect(await page.getByRole("navigation", { name: shell.nav.label }).count()).toBe(1);
+    expect(await page.getByRole("button", { name: shell.screenError.retry }).count()).toBe(1);
   });
 
-  it("셸 안 화면으로 옮기다 query가 throw하면 루트 오류 화면이 레일까지 화면 전체를 대신한다", async (context) => {
+  it("셸 안 화면으로 옮기다 query가 throw해도 레일은 남고 화면 칸에 오류와 다시 읽기 단추가 보인다", async (context) => {
     const { page } = await newPage(context);
-    await page.goto(`/runs?ws=${workspaceId}`);
-    await waitForRouterIdle(page, "/runs");
-    await page.waitForLoadState("networkidle");
-    await expect(page.getByRole("navigation", { name: shell.nav.label }).count()).resolves.toBe(1);
+    await openRuns(page);
 
     await routerCall(page, "navigate", SHELL_ERROR_PATH);
-    await page.getByText(ROUTER_ERROR_TEXT).waitFor();
+    await page.getByRole("heading", { name: shell.screenError.title }).waitFor();
 
-    expect(await page.getByRole("navigation", { name: shell.nav.label }).count()).toBe(0);
+    expect(await page.getByRole("navigation", { name: shell.nav.label }).count()).toBe(1);
+    expect(await page.getByRole("button", { name: shell.screenError.retry }).count()).toBe(1);
+  });
+
+  it("다시 읽기를 누르면 실패했던 화면만 다시 읽고, 읽히면 오류 화면이 화면으로 바뀐다", async (context) => {
+    const { page, serverCalls } = await newPage(context);
+    await openRuns(page);
+    await routerCall(page, "navigate", RETRY_PATH);
+    await page.getByRole("heading", { name: shell.screenError.title }).waitFor();
+    await page.waitForLoadState("networkidle");
+    const callsBeforeRetry = serverCalls.length;
+
+    await page.evaluate((flag) => Reflect.set(window, flag, true), HEAL_FLAG);
+    await page.getByRole("button", { name: shell.screenError.retry }).click();
+
+    await page.locator(PROBE_SELECTOR).filter({ hasText: RETRY_PATH }).waitFor();
+    expect(await page.getByRole("navigation", { name: shell.nav.label }).count()).toBe(1);
+    await page.waitForLoadState("networkidle");
+    expect(serverCalls.slice(callsBeforeRetry)).toEqual([]);
+  });
+
+  it("다시 읽기가 또 실패하면 오류 화면 머리로 포커스를 옮기고 실패를 상태 문장으로 알린다", async (context) => {
+    const { page } = await newPage(context);
+    await openRuns(page);
+    await routerCall(page, "navigate", RETRY_PATH);
+    await page.getByRole("heading", { name: shell.screenError.title }).waitFor();
+
+    await page.getByRole("button", { name: shell.screenError.retry }).click();
+
+    await page.getByRole("status").filter({ hasText: shell.screenError.retryFailed }).waitFor();
+    const focusedHasHeading = await page.evaluate(
+      () => document.activeElement?.querySelector("h1") !== null,
+    );
+    expect(focusedHasHeading).toBe(true);
+    expect(await page.getByRole("navigation", { name: shell.nav.label }).count()).toBe(1);
   });
 });
+
+async function openRuns(page: Page): Promise<void> {
+  await page.goto(`/runs?ws=${workspaceId}`);
+  await waitForRouterIdle(page, "/runs");
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("navigation", { name: shell.nav.label }).count()).resolves.toBe(1);
+}
 
 async function newPage(context: TestContext): Promise<{ page: Page; serverCalls: string[] }> {
   const browserContext = await browser.newContext({

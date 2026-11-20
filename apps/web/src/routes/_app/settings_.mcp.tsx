@@ -8,6 +8,7 @@ import { settingsMessages } from "../../settings/messages";
 import { settingsQuery } from "../../settings/settings-query";
 import { routerSettingsLink } from "../../settings/settings-link";
 import { useSettingsActions, useSettingsQueryRefresh } from "../../settings/use-settings-actions";
+import { ScreenError } from "../../shell/screen-error";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -16,8 +17,8 @@ const t = createTranslator({
 });
 
 export const Route = createFileRoute("/_app/settings_/mcp")({
+  errorComponent: ScreenError,
   loaderDeps: ({ search }) => ({ ws: search.ws }),
-  preloadStaleTime: 0,
   loader: async (load) => {
     await loadRouteQuery(load, settingsQuery(load.deps.ws));
   },
