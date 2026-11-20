@@ -1,17 +1,19 @@
 import * as stylex from "@stylexjs/stylex";
 import { Toaster, WindowChrome, WindowDragFrame, documentStyles } from "@ganger/ui";
+import type { QueryClient } from "@tanstack/react-query";
 import {
+  ClientOnly,
   ErrorComponent,
   HeadContent,
   Outlet,
   Scripts,
-  createRootRoute,
+  createRootRouteWithContext,
   redirect,
   rootRouteId,
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import type { ReactNode } from "react";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { z } from "zod";
@@ -28,7 +30,7 @@ import appCss from "../styles/app.css?url";
 
 let completeInBrowser = false;
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ location }) => {
     if (completeInBrowser || isOpenPath(location.pathname)) return;
     const complete = await getOnboardingComplete();
@@ -99,8 +101,28 @@ function RootLayout() {
         <TimeZoneSync timeZone={timeZone} />
         <Outlet />
         <AppToaster />
+        <QueryDevtools />
       </WindowChrome>
     </IntlProvider>
+  );
+}
+
+const ReactQueryDevtools = import.meta.env.DEV
+  ? lazy(() =>
+      import("@tanstack/react-query-devtools").then((devtools) => ({
+        default: devtools.ReactQueryDevtools,
+      })),
+    )
+  : null;
+
+function QueryDevtools() {
+  if (ReactQueryDevtools === null) return null;
+  return (
+    <ClientOnly>
+      <Suspense fallback={null}>
+        <ReactQueryDevtools buttonPosition="bottom-left" />
+      </Suspense>
+    </ClientOnly>
   );
 }
 
