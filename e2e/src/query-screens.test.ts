@@ -297,6 +297,31 @@ describe("셸·Runners·Tickets 의 Query(브라우저, 0127)", () => {
     expect(tracker.ticketReads + tracker.labelReads).toBe(trackerReads);
   });
 
+  it("변경 기록 통로가 켜져 있어도 할당 뒤 트래커를 다시 읽지 않는다", async (context) => {
+    const ticket = addTicket("Assign with change feed");
+    const { page, serverCalls } = await newPage(context, { stream: true });
+    await open(page, "/tickets?f=assignable", "tickets");
+    await page
+      .getByRole("listbox", { name: tickets.listLabel })
+      .getByRole("option", { name: `${ticket.key} ${ticket.title}` })
+      .click();
+    const panel = page.getByRole("region", { name: tickets.panel.label });
+    await panel.getByRole("button", { name: tickets.panel.assign }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: tickets.assign.submit }).waitFor();
+    await settle(page);
+    const trackerReads = tracker.ticketReads + tracker.labelReads;
+    serverCalls.length = 0;
+
+    await dialog.getByRole("button", { name: tickets.assign.submit }).click();
+    await dialog.waitFor({ state: "hidden" });
+    await page.waitForTimeout(VISIBLE_WITHIN_MS);
+    await settle(page);
+
+    expect(serverCalls).not.toContain("getTrackerTickets");
+    expect(tracker.ticketReads + tracker.labelReads).toBe(trackerReads);
+  });
+
   it("화면 이동 한 번에 Tickets 는 서버 함수 둘(DB 부분, 트래커 부분)만 부르고 라벨을 따로 읽지 않는다", async (context) => {
     const { page, serverCalls } = await newPage(context, { stream: false });
     await open(page, "/runners", "runners");

@@ -33,6 +33,7 @@ export function trackerTicketsQuery(queryClient: QueryClient, ws: string | undef
     queryFn: async () => {
       const data = await getTrackerTickets({ data: { ws } });
       for (const project of data.labels) {
+        if (!project.labels.ok) continue;
         queryClient.setQueryData(
           trackerLabelsKey(project.connection, project.projectId),
           project.labels,

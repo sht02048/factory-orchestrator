@@ -12,7 +12,7 @@ import {
   getMapping,
   listRunners,
   listWorkspaceTrackerProjects,
-  markTrackerChanged,
+  markTrackerReadsStale,
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import type { AssignRejectReason } from "./model.js";
@@ -68,7 +68,7 @@ export function submitAssignment(db: Database, input: AssignInput, now: Date): A
     now,
   });
   if (result.ok) {
-    markTrackerChanged(db, connection);
+    markTrackerReadsStale(db, connection);
     return { ok: true, runId: result.run.id };
   }
   switch (result.reason) {
