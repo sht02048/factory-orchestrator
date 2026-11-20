@@ -59,8 +59,8 @@ export function fileSink(path: string, limits: RotationLimits): FileSink {
   let fd: number | undefined;
 
   const open = (): number => {
-    mkdirSync(dirname(path), { recursive: true });
-    const opened = openSync(path, "a+");
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+    const opened = openSync(path, "a+", 0o600);
     endPartialLine(opened);
     fd = opened;
     return opened;

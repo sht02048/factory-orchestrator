@@ -144,10 +144,15 @@ export function humanLine(line: LogLine): string {
   const time = line.t.slice(11, 19);
   const extras = Object.entries(line)
     .filter(([key]) => !FIXED_KEYS.has(key))
-    .map(([key, value]) => `${key}=${typeof value === "string" ? value : JSON.stringify(value)}`);
+    .map(([key, value]) => `${key}=${humanValue(value)}`);
   const err = line.err === undefined ? "" : ` error=${JSON.stringify(errorSummary(line.err))}`;
   const tail = extras.length === 0 ? "" : ` ${extras.join(" ")}`;
   return `${time} ${line.level.toUpperCase()} [${line.proc}] ${line.msg}${tail}${err}\n`;
+}
+
+function humanValue(value: unknown): string {
+  if (typeof value === "string" && !/[\s"]/.test(value)) return value;
+  return JSON.stringify(value) ?? String(value);
 }
 
 function errorSummary(err: SerializedError): string {

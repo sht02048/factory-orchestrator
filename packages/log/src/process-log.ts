@@ -23,12 +23,13 @@ export interface ProcessLogOptions {
 export interface ProcessLog {
   logger: Logger;
   file: string | null;
+  setLevel(level: LogLevel): void;
   close(): void;
 }
 
 export const REPORTS_KEPT = 3;
 
-let current: Logger = fallbackLogger();
+let current: Logger = fallbackLogger("cli");
 
 export function log(): Logger {
   return current;
@@ -42,9 +43,13 @@ export function useLogger(logger: Logger): () => void {
   };
 }
 
-function fallbackLogger(): Logger {
+export function useConsoleLogger(proc: ProcessName): void {
+  current = fallbackLogger(proc);
+}
+
+function fallbackLogger(proc: ProcessName): Logger {
   return createLogger({
-    proc: "cli",
+    proc,
     version: GANGER_VERSION,
     level: () => "warn",
     sinks: [consoleSink(process.stderr, "warn")],
@@ -63,11 +68,12 @@ export function setupProcessLog(options: ProcessLogOptions): ProcessLog {
   if (sink !== undefined) sinks.push({ write: (_line, text) => sink.write(text) });
   const stream = options.console === undefined ? process.stderr : options.console;
   if (stream !== null) sinks.push(consoleSink(stream, options.consoleLevel ?? "warn"));
+  let level = settings.level;
   let sinkFailed = false;
   const logger = createLogger({
     proc: options.proc,
     version: options.version ?? GANGER_VERSION,
-    level: () => settings.level,
+    level: () => level,
     sinks,
     onSinkError: (error) => {
       if (sinkFailed) return;
@@ -80,6 +86,9 @@ export function setupProcessLog(options: ProcessLogOptions): ProcessLog {
   return {
     logger,
     file,
+    setLevel: (next) => {
+      level = next;
+    },
     close: () => sink?.close(),
   };
 }

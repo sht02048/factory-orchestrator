@@ -90,24 +90,24 @@ web·worker·`ganger mcp`·`ganger start`가 무슨 일을 했는지 운영자�
 
 info 줄 목록:
 
-| event                                | 어디서                         | 무엇                                                                                                           |
-| ------------------------------------ | ------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `process.started`                    | 네 프로세스 시작               | node·platform·arch, worker는 적용한 마이그레이션 수                                                            |
-| `process.stopping`·`process.stopped` | 정지 신호와 끝                 | 신호 이름                                                                                                      |
-| `supervisor.child_exited`            | `ganger start`                 | 멈추라고 해서 끝난 자식(예기치 않게 끝나면 warn)                                                               |
-| `webhook.received`                   | web `receive.ts`               | webhook 하나 처리 끝: `deliveryId`, `ticketKey`, 종류, `outcome`(recorded·duplicate), `ms`. 본문은 쓰지 않는다 |
-| `run.assigned`                       | db `assignRun`                 | 할당 결정: 런·티켓·Workspace·러너·저장소, `reason`(picked·chosen)                                              |
-| `run.runner_chosen`                  | db `setQueuedRunRunner`        | Queued 런의 러너가 바뀜                                                                                        |
-| `run.state_changed`                  | db `changeRunState`            | 런 상태 옮김 `from`·`to`, Ended면 에이전트 결과                                                                |
-| `runner.online_changed`              | db `recordRunnerCheck`         | 러너 Online↔Offline이 바뀜                                                                                     |
-| `runner.call`                        | runner-orca `OrcaRunner.run()` | 러너 쓰기 호출(worker-start, 답 보내기, 취소, 워크트리 지우기 등). 읽기 호출은 debug                           |
-| `process.alive`                      | worker, 10분마다               | 지켜보는 런 수, 마지막 tick ms, 가동 초                                                                        |
+| event                                | 어디서                         | 무엇                                                                                                                                                    |
+| ------------------------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `process.started`                    | 네 프로세스 시작               | node·platform·arch, worker는 적용한 마이그레이션 수                                                                                                     |
+| `process.stopping`·`process.stopped` | 정지 신호와 끝                 | 신호 이름                                                                                                                                               |
+| `supervisor.child_exited`            | `ganger start`                 | 멈추라고 해서 끝난 자식(예기치 않게 끝나면 warn)                                                                                                        |
+| `webhook.received`                   | web `receive.ts`               | webhook 하나 처리 끝: `deliveryId`, `ticketKey`, 종류, `outcome`(recorded·duplicate), `ms`. 본문은 쓰지 않는다                                          |
+| `run.assigned`                       | db `assignRun`                 | 할당 결정: 런·티켓·Workspace·러너·저장소, `reason`(picked·chosen)                                                                                       |
+| `run.runner_chosen`                  | db `setQueuedRunRunner`        | Queued 런의 러너가 바뀜                                                                                                                                 |
+| `run.state_changed`                  | db `changeRunState`            | 런 상태 옮김 `from`·`to`, Ended면 에이전트 결과                                                                                                         |
+| `runner.online_changed`              | db `recordRunnerCheck`         | 러너 Online↔Offline이 바뀜                                                                                                                              |
+| `runner.call`                        | runner-orca `OrcaRunner.run()` | 러너 쓰기 호출. 쓰기 동사는 `runner-call-log.ts`의 `WRITE_VERBS` 목록(worker-start, 답 보내기, 멈추기, 워크트리 지우기 등)이고 목록에 없는 호출은 debug |
+| `process.alive`                      | worker, 10분마다               | 지켜보는 런 수, 마지막 tick ms, 가동 초                                                                                                                 |
 
 db의 세 줄은 `onCommit`으로 바깥 트랜잭션이 커밋된 뒤에 쓴다. 롤백된 변경은 줄을 남기지 않는다.
 
 debug 줄: `runner.call`(읽기), `worker.tick`(`ms`, `watched`). 나머지 warn 줄은 지금까지의 경고 문장을 그대로 `msg`로 두고 이름만 붙였다(`run.watch_failed` 등).
 
-수준 바꾸기(L3): `GANGER_LOG_LEVEL`(`error`·`warn`·`info`·`debug`, 대소문자 무시, 그 밖의 값은 info). 로거는 줄마다 수준을 다시 읽으므로 0134의 Settings 스위치가 재시작 없이 바꿀 수 있다.
+수준 바꾸기(L3): `GANGER_LOG_LEVEL`(`error`·`warn`·`info`·`debug`, 대소문자 무시, 그 밖의 값은 info). 로거는 줄마다 수준을 다시 읽고 `setupProcessLog`가 돌려주는 `setLevel`로 바꿀 수 있어, 0134의 Settings 스위치가 재시작 없이 바꾼다.
 
 ## 5. 가리기(L6)
 
@@ -161,7 +161,7 @@ debug 줄: `runner.call`(읽기), `worker.tick`(`ms`, `watched`). 나머지 warn
 
 ## 11. 보안
 
-- 로그 파일은 `<home>/logs` 아래 운영자 계정 권한으로 만든다. 다른 사용자가 읽을 수 없는 홈 아래에 둔다는 기존 가정(ADR 0005)을 따른다.
+- 로그 파일은 `0600`, 새로 만드는 `<home>/logs` 폴더는 `0700`으로 만든다. 홈 권한이 느슨한 서버에서도 다른 계정이 읽지 못한다.
 - 진단 묶음은 이슈에 붙이는 용도라 익명화를 기본으로 켠다(L6, 0134).
 
 ## 12. 운영자 결정 목록(2026-11-20)

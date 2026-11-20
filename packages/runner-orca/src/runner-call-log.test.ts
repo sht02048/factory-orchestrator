@@ -2,7 +2,8 @@ import { memoryLogger } from "@ganger/log/testing";
 import { describe, expect, it } from "vitest";
 import { parseOrcaRunnerConfig } from "./config.js";
 import { OrcaRunner } from "./orca-runner.js";
-import { describeRunnerCall, logRunnerCall } from "./runner-call-log.js";
+import { describeRunnerCall, logRunnerCall, WRITE_VERBS } from "./runner-call-log.js";
+import { readFileSync } from "node:fs";
 import { own, ScriptedExec, stdout } from "./test-support.js";
 
 const ORCA = "orca";
@@ -17,6 +18,30 @@ function runnerLogging(exec: ScriptedExec) {
 }
 
 describe("describeRunnerCall", () => {
+  it("treats only the listed write verbs as writes, so health and project reads stay at debug", () => {
+    for (const read of [
+      ["serve", "service", "status"],
+      ["project", "list"],
+      ["project", "setups"],
+      ["orchestration", "worker-list"],
+      ["orchestration", "worker-read"],
+      ["worktree", "ps"],
+    ]) {
+      expect(describeRunnerCall([ORCA, ...read, "--json"], ORCA).write).toBe(false);
+    }
+  });
+
+  it("knows every write verb by a name the runner really calls", () => {
+    const source = readFileSync(new URL("./orca-runner.ts", import.meta.url), "utf8").replace(
+      /\s+/g,
+      " ",
+    );
+    for (const verb of WRITE_VERBS) {
+      const [first, second] = verb.split(" ");
+      expect(source).toContain(`"${first}", "${second}"`);
+    }
+  });
+
   it("names the orca verb by its first two words and marks reads", () => {
     expect(describeRunnerCall([ORCA, "terminal", "show", "--terminal", "t1"], ORCA)).toEqual({
       verb: "terminal show",

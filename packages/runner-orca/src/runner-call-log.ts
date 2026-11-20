@@ -1,20 +1,19 @@
 import type { LogFields, Logger } from "@ganger/log";
 import type { RemoteResult } from "./ssh.js";
 
-const READ_VERBS: ReadonlySet<string> = new Set([
-  "status",
-  "account list",
-  "terminal show",
-  "terminal list",
-  "worktree show",
-  "worktree ps",
-  "worktree list",
-  "orchestration run-current",
-  "orchestration run-show",
-  "orchestration worker-show",
-  "orchestration task-list",
-  "orchestration check",
-  "orchestration inbox",
+export const WRITE_VERBS: ReadonlySet<string> = new Set([
+  "terminal create",
+  "terminal send",
+  "terminal close",
+  "orchestration run-create",
+  "orchestration run-use",
+  "orchestration worker-start",
+  "orchestration worker-stop",
+  "orchestration worker-release",
+  "orchestration send",
+  "orchestration reply",
+  "orchestration deny",
+  "worktree rm",
 ]);
 
 export interface RunnerCall {
@@ -32,7 +31,7 @@ export function describeRunnerCall(argv: ReadonlyArray<string>, orcaPath: string
   }
   const words = rest.filter((word) => !word.startsWith("--")).slice(0, 2);
   const verb = rest[0] === "status" ? "status" : words.join(" ");
-  const call: RunnerCall = { verb, write: !READ_VERBS.has(verb) };
+  const call: RunnerCall = { verb, write: WRITE_VERBS.has(verb) };
   if (verb === "orchestration worker-start") {
     const orcaRunId = valueAfter(rest, "--run");
     const worktreeName = valueAfter(rest, "--name");

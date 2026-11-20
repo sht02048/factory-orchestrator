@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -299,6 +299,35 @@ describe("process log", () => {
       stdout.mockRestore();
     }
     expect(readFileSync(join(gangerHome, "logs", "mcp.jsonl"), "utf8")).toContain("boom");
+  });
+
+  it("changes the level without a restart and creates the file for the owner only", () => {
+    const gangerHome = home();
+    const processLog = setupProcessLog({
+      proc: "worker",
+      env: { GANGER_HOME: gangerHome },
+      console: null,
+    });
+    processLog.logger.debug("worker.tick");
+    processLog.setLevel("debug");
+    processLog.logger.debug("worker.tick");
+    processLog.close();
+    const file = join(gangerHome, "logs", "worker.jsonl");
+    expect(readFileSync(file, "utf8").trim().split("\n")).toHaveLength(1);
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+  });
+
+  it("keeps a console line on one line when a value has a newline", () => {
+    const consoleText: string[] = [];
+    const processLog = setupProcessLog({
+      proc: "worker",
+      env: {},
+      console: { write: (text) => consoleText.push(text) },
+    });
+    processLog.logger.warn("run.start_failed", { reason: "first\nsecond" });
+    processLog.close();
+    expect(consoleText.join("").trimEnd().split("\n")).toHaveLength(1);
+    expect(consoleText.join("")).toContain('reason="first\\nsecond"');
   });
 
   it("writes no file without a home, as in development", () => {

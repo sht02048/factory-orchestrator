@@ -21,6 +21,7 @@ export {
   processStartFields,
   pruneReports,
   setupProcessLog,
+  useConsoleLogger,
   useLogger,
 } from "./process-log.js";
 export type { ConsoleStream, ProcessLog, ProcessLogOptions } from "./process-log.js";
