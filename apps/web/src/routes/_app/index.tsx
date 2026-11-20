@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { createTranslator } from "use-intl";
 import { toRunId } from "@ganger/core";
 import { z } from "zod";
+import { useAgedHomePage } from "../../home/aged-page";
 import { HomeScreen } from "../../home/home-screen";
 import { homeMessages } from "../../home/messages";
 import { useDashboardActions } from "../../home/mutations";
@@ -30,7 +31,8 @@ export const Route = createFileRoute("/_app/")({
 function HomeRoute() {
   const { ws } = Route.useLoaderDeps();
   const timeZone = rootRoute.useLoaderData({ select: (root) => root.timeZone });
-  const { data: page } = useSuspenseQuery(dashboardQuery(ws, timeZone));
+  const { data: loaded } = useSuspenseQuery(dashboardQuery(ws, timeZone));
+  const page = useAgedHomePage(loaded);
   const { view, run } = Route.useSearch();
   const navigate = Route.useNavigate();
   const actions = useDashboardActions();

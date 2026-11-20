@@ -15,7 +15,7 @@ export function pollWhileControlPending(query: {
 export function dashboardQuery(ws: string | undefined, timeZone: string) {
   return queryOptions({
     queryKey: ["dashboard", ws ?? null, timeZone] as const,
-    queryFn: ({ signal }) => getHomePage({ data: { ws }, signal }),
+    queryFn: () => getHomePage({ data: { ws } }),
     refetchInterval: pollWhileControlPending,
   });
 }

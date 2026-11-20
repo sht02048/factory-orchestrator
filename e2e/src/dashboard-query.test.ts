@@ -66,6 +66,7 @@ const CONTROL_POLL_MS = 2_000;
 const DISCONNECTED_POLL_MS = 30_000;
 const SETTLE_MS = 1_500;
 const QUERY_GC_TIME_MS = 5 * 60_000;
+const TIME_TEXT_TICK_MS = 15_000;
 const ROOT_AND_SHELL_READS = ["getTimeZone", "getTitleBarHidden", "getShell"];
 
 const runnerKind = toRunnerKind("fake");
@@ -241,8 +242,8 @@ describe("Dashboard mutation(브라우저, 0126)", () => {
 });
 
 describe("답하기·거절의 거절 이유(브라우저, 0126)", () => {
-  it("그사이 다른 곳에서 답한 질문은 다시 보내라고 하지 않고 이미 답했다고 알린다", async (context) => {
-    const { page } = await newPage(context, { stream: "blocked" });
+  it("그사이 다른 곳에서 답한 질문은 다시 보내라고 하지 않고 이미 답했다고 알리고 보내기를 거둔다", async (context) => {
+    const { page, serverCalls } = await newPage(context, { stream: "blocked" });
     await openDashboard(page);
     answerRunQuestion(db, {
       runId: runOf("ACME-7"),
@@ -253,24 +254,32 @@ describe("답하기·거절의 거절 이유(브라우저, 0126)", () => {
     await card(page, "ACME-7").getByRole("button", { name: home.card.answer }).click();
     const panel = page.getByRole("dialog");
     await panel.getByRole("radio", { name: "Yes" }).check();
+
     await panel.getByRole("button", { name: questionJson.send }).click();
 
-    await panel.getByText(home.question.rejected["already-answered"]).waitFor();
+    await panel.getByRole("status").getByText(home.question.rejected["already-answered"]).waitFor();
+    await page.waitForTimeout(SETTLE_MS);
+    expect(serverCalls).toEqual(["answerQuestion"]);
     expect(await panel.getByText(questionJson.failed).count()).toBe(0);
+    expect(await panel.getByRole("button", { name: questionJson.send }).count()).toBe(0);
   });
 
-  it("그사이 러너에서 처리한 Permission은 다시 보내라고 하지 않고 이미 처리했다고 알린다", async (context) => {
-    const { page } = await newPage(context, { stream: "blocked" });
+  it("그사이 러너에서 처리한 Permission은 다시 보내라고 하지 않고 이미 처리했다고 알리고 보내기를 거둔다", async (context) => {
+    const { page, serverCalls } = await newPage(context, { stream: "blocked" });
     await openDashboard(page);
     resolvePermissionWaits(db, runOf("ACME-8"), []);
 
     await cardButton(page, "ACME-8").click();
     const panel = page.getByRole("dialog");
     await panel.getByLabel(home.permission.reasonLabel).fill("Not now.");
+    serverCalls.length = 0;
     await panel.getByRole("button", { name: home.permission.send }).click();
 
-    await panel.getByText(home.permission.rejected.resolved).waitFor();
+    await panel.getByRole("status").getByText(home.permission.rejected.resolved).waitFor();
+    await page.waitForTimeout(SETTLE_MS);
+    expect(serverCalls).toEqual(["denyPermission"]);
     expect(await panel.getByText(home.permission.failed).count()).toBe(0);
+    expect(await panel.getByRole("button", { name: home.permission.send }).count()).toBe(0);
   });
 });
 
@@ -278,12 +287,14 @@ describe("열린 Dashboard의 변경 기록(브라우저, 0126)", () => {
   it("worker와 같은 함수로 런 상태를 바꾸면 열린 Dashboard가 3초 안에 바뀐다", async (context) => {
     const { page } = await newPage(context);
     await openDashboard(page);
-    const running = page.getByRole("region", { name: home.column.running });
-    expect(await card(running, "ACME-40").count()).toBe(0);
+    const queued = page.getByRole("region", { name: home.column.queued });
+    await card(queued, "ACME-40").waitFor();
 
     const changedAt = Date.now();
     start(runOf("ACME-40"));
-    await card(running, "ACME-40").waitFor({ timeout: VISIBLE_WITHIN_MS });
+    await expect
+      .poll(() => card(queued, "ACME-40").count(), { timeout: VISIBLE_WITHIN_MS })
+      .toBe(0);
 
     expect(Date.now() - changedAt).toBeLessThan(VISIBLE_WITHIN_MS);
   });
@@ -366,6 +377,60 @@ describe("시간대 쿠키(브라우저, 0126)", () => {
       expect(await page.locator("h1").first().innerText()).toContain(title);
     },
   );
+});
+
+describe("다시 들어간 화면(브라우저, 0126)", () => {
+  it("변경 기록 통로가 막혀도 다시 들어간 Dashboard는 그사이 바뀐 런 상태를 그린다", async (context) => {
+    const { page } = await newPage(context, { stream: "blocked" });
+    await openDashboard(page);
+    const queued = page.getByRole("region", { name: home.column.queued });
+    await card(queued, "ACME-50").waitFor();
+
+    await railLink(page, "runs").click();
+    await waitForRouterIdle(page, "/runs");
+    start(runOf("ACME-50"));
+    await railLink(page, "dashboard").click();
+    await waitForRouterIdle(page, "/");
+
+    await expect
+      .poll(() => card(queued, "ACME-50").count(), { timeout: VISIBLE_WITHIN_MS })
+      .toBe(0);
+  });
+
+  it("변경 기록 통로가 막혀도 다시 들어간 Stats는 그사이 끝난 런을 센다", async (context) => {
+    const { page } = await newPage(context, { stream: "blocked" });
+    await page.goto(statsPath);
+    await waitForRouterIdle(page, "/stats");
+    const ended = page.getByRole("group", { name: stats.figures.ended });
+    const before = await ended.innerText();
+
+    await railLink(page, "runs").click();
+    await waitForRouterIdle(page, "/runs");
+    const run = runOf("ACME-51");
+    start(run);
+    ok(changeRunState(db, run, { to: "ended", agentResult: "reported-success", prState: "none" }));
+    await railLink(page, "stats").click();
+    await waitForRouterIdle(page, "/stats");
+
+    await expect.poll(() => ended.innerText(), { timeout: VISIBLE_WITHIN_MS }).not.toBe(before);
+  });
+});
+
+describe("시간 글자(브라우저, 0126)", () => {
+  it("다시 읽지 않아도 카드의 지난 시간이 흐른다", async (context) => {
+    const { page, serverCalls } = await newPage(context, { stream: "blocked" });
+    assign(toTicketKey("ACME-60"));
+    await openDashboard(page);
+    const queued = card(page.getByRole("region", { name: home.column.queued }), "ACME-60");
+    const before = await queued.innerText();
+    serverCalls.length = 0;
+
+    await expect
+      .poll(() => queued.innerText(), { timeout: TIME_TEXT_TICK_MS * 2 })
+      .not.toBe(before);
+
+    expect(serverCalls).toEqual([]);
+  });
 });
 
 describe("오래 떠났다 돌아오기(브라우저, 0126)", () => {
@@ -595,6 +660,8 @@ function seed(database: Database): void {
   start(assign(toTicketKey("ACME-3")));
   start(assign(toTicketKey("ACME-4")));
   assign(toTicketKey("ACME-40"));
+  assign(toTicketKey("ACME-50"));
+  assign(toTicketKey("ACME-51"));
 
   for (const key of ["ACME-30", "ACME-31"]) {
     const run = assign(toTicketKey(key));
