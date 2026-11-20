@@ -19,6 +19,8 @@ import type { ErrorComponentProps } from "@tanstack/react-router";
 import { z } from "zod";
 import { IntlProvider, useTranslations } from "use-intl";
 import { appMessages, defaultLocale, t } from "../i18n";
+import { renderedChangeSeq } from "../change-events/rendered-seq";
+import { RenderedChangeSeqProvider } from "../change-events/subscription";
 import { NotFoundScreen } from "../not-found/not-found-screen";
 import { useDesktopUpdates } from "../shell/desktop-updates";
 import { UpdateToast } from "../shell/update-toast";
@@ -36,16 +38,23 @@ function rememberOnboardingComplete(complete: boolean): void {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ location }) => {
-    if (completeInBrowser || isOpenPath(location.pathname)) return { onboardingComplete: null };
+    const changeSeq = renderedChangeSeq();
+    if (completeInBrowser || isOpenPath(location.pathname))
+      return { onboardingComplete: null, changeSeq };
     const complete = await getOnboardingComplete();
     rememberOnboardingComplete(complete);
     if (onboardingRedirect(location.pathname, complete) !== null)
       throw redirect({ to: ONBOARDING_PATH });
-    return { onboardingComplete: complete };
+    return { onboardingComplete: complete, changeSeq };
   },
   loader: async ({ context }) => {
     const [timeZone, titleBarHidden] = await Promise.all([getTimeZone(), getTitleBarHidden()]);
-    return { timeZone, titleBarHidden, onboardingComplete: context.onboardingComplete === true };
+    return {
+      timeZone,
+      titleBarHidden,
+      onboardingComplete: context.onboardingComplete === true,
+      changeSeq: context.changeSeq,
+    };
   },
   shouldReload: false,
   head: () => ({
@@ -99,7 +108,7 @@ function RootError({ error }: ErrorComponentProps) {
 }
 
 function RootLayout() {
-  const { timeZone, titleBarHidden, onboardingComplete } = Route.useLoaderData();
+  const { timeZone, titleBarHidden, onboardingComplete, changeSeq } = Route.useLoaderData();
   useEffect(() => {
     rememberOnboardingComplete(onboardingComplete);
   }, [onboardingComplete]);
@@ -107,7 +116,9 @@ function RootLayout() {
     <IntlProvider locale={defaultLocale} messages={appMessages} timeZone={timeZone}>
       <WindowChrome titleBarHidden={titleBarHidden}>
         <TimeZoneSync timeZone={timeZone} />
-        <Outlet />
+        <RenderedChangeSeqProvider seq={changeSeq}>
+          <Outlet />
+        </RenderedChangeSeqProvider>
         <AppToaster />
         <QueryDevtools />
       </WindowChrome>
