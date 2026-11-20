@@ -1,7 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DB_STALE_TIME_MS, createQueryClient } from "./query-client";
-import { PRELOAD_FRESH_MS, loadCachedRouteQuery, loadRouteQuery } from "./route-query";
+import { DB_STALE_TIME_MS, PRELOAD_FRESH_MS, createQueryClient } from "./query-client";
+import { loadCachedRouteQuery, loadRouteQuery } from "./route-query";
 import type { RouteQueryLoad } from "./route-query";
 
 function probeWorld() {

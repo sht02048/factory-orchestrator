@@ -3,6 +3,7 @@ import { QueryClient } from "@tanstack/react-query";
 export const DB_STALE_TIME_MS = 30_000;
 export const QUERY_GC_TIME_MS = 5 * 60_000;
 export const READ_RETRY_COUNT = 1;
+export const PRELOAD_FRESH_MS = 5_000;
 
 export function createQueryClient(): QueryClient {
   return new QueryClient({

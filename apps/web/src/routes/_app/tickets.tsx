@@ -16,6 +16,7 @@ import { useShell } from "../../shell/shell-query";
 import { ticketsMessages } from "../../tickets/messages";
 import { TRACKER_KEY, ticketRunsQuery, trackerTicketsQuery } from "../../tickets/tickets-query";
 import { TicketsScreen } from "../../tickets/tickets-screen";
+import { ScreenError } from "../../shell/screen-error";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -30,12 +31,12 @@ function assignResultOf(error: unknown): AssignResult {
 }
 
 export const Route = createFileRoute("/_app/tickets")({
+  errorComponent: ScreenError,
   validateSearch: z.object({
     f: z.enum(TICKET_FILTERS).optional().catch(undefined),
     sel: z.string().optional(),
   }),
   loaderDeps: ({ search }) => ({ ws: search.ws }),
-  preloadStaleTime: 0,
   loader: async (load) => {
     await Promise.all([
       loadRouteQuery(load, ticketRunsQuery(load.deps.ws)),

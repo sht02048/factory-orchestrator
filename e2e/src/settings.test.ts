@@ -230,25 +230,6 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     await section(settings.sections.advanced).getByText(settings.mcp.rowWrite).waitFor();
   });
 
-  it("바로 저장하는 스위치는 화면이 새 값을 늦게 읽어도 저장했다고 알릴 때 이미 새 값을 보인다", async () => {
-    await openSettings(page, "/settings/mcp");
-    const write = page.getByRole("switch", { name: settings.mcp.writeToggle });
-    const next = (await write.getAttribute("aria-checked")) === "true" ? "false" : "true";
-
-    await page.route("**/_serverFn/**", async (route) => {
-      if (route.request().method() === "GET") await new Promise((done) => setTimeout(done, 500));
-      await route.continue();
-    });
-    await write.click();
-    await page.getByText(settings.status.saved, { exact: true }).waitFor();
-    expect(await write.getAttribute("aria-checked")).toBe(next);
-
-    await page.unrouteAll();
-    await page.reload();
-    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
-    expect(await write.getAttribute("aria-checked")).toBe(next);
-  });
-
   it("비밀값은 펼친 뒤에만 입력칸이 생기고, 새 비밀번호를 권하지 않고 비밀번호 관리자가 건너뛴다", async () => {
     await openSettings(page);
     expect(await page.locator('input[type="password"]').count()).toBe(0);

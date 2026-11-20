@@ -1,32 +1,17 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { QueryClient, QueryKey } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
+import type { QueryClient } from "@tanstack/react-query";
 import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import { toRunId } from "@ganger/core";
 import type { RunId } from "@ganger/core";
 import { ANSWER_REJECT_REASONS, DENY_REJECT_REASONS, rejectedAs } from "../query/mutation-error";
-import { runDetailKey, runsListKey } from "../runs/queries";
+import { keysChangedByRunWrite } from "../runs/queries";
 import { answerQuestion, controlRun, denyPermission } from "../server/functions";
 import type { AnswerInput, ControlInput, DenyInput } from "./home-screen";
 
-export const ROUTER_ROUTES_SHOWING_RUNS: ReadonlySet<string> = new Set([
-  "/_app/tickets",
-  "/_app/runners",
-]);
-
-export function keysChangedByRunWrite(runId: RunId): ReadonlyArray<QueryKey> {
-  return [["dashboard"], runDetailKey(runId), runsListKey];
-}
-
-async function invalidateRunWrite(
-  queryClient: QueryClient,
-  invalidateRouterRoutes: () => Promise<void>,
-  runId: RunId,
-): Promise<void> {
-  await Promise.all([
-    ...keysChangedByRunWrite(runId).map((queryKey) => queryClient.invalidateQueries({ queryKey })),
-    invalidateRouterRoutes(),
-  ]);
+async function invalidateRunWrite(queryClient: QueryClient, runId: RunId): Promise<void> {
+  await Promise.all(
+    keysChangedByRunWrite(runId).map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+  );
 }
 
 export interface DashboardActions {
@@ -37,13 +22,7 @@ export interface DashboardActions {
 
 export function useDashboardActions(): DashboardActions {
   const queryClient = useQueryClient();
-  const router = useRouter();
-  const afterWrite = (runId: RunId) =>
-    invalidateRunWrite(
-      queryClient,
-      () => router.invalidate({ filter: (match) => ROUTER_ROUTES_SHOWING_RUNS.has(match.routeId) }),
-      runId,
-    );
+  const afterWrite = (runId: RunId) => invalidateRunWrite(queryClient, runId);
   const answer = useMutation({
     mutationFn: (input: AnswerInput) =>
       rejectedAs(() => answerQuestion({ data: input }), ANSWER_REJECT_REASONS),

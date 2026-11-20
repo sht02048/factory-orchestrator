@@ -17,6 +17,7 @@ import {
 import { useTitleFollowsQuery } from "../../settings/route-title";
 import { routerSettingsLink } from "../../settings/settings-link";
 import { useSettingsActions, useSettingsQueryRefresh } from "../../settings/use-settings-actions";
+import { ScreenError } from "../../shell/screen-error";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -25,8 +26,8 @@ const t = createTranslator({
 });
 
 export const Route = createFileRoute("/_app/settings_/projects/$connectionId/$projectId")({
+  errorComponent: ScreenError,
   loaderDeps: ({ search }) => ({ ws: search.ws }),
-  preloadStaleTime: 0,
   loader: async (load) => {
     const [page] = await Promise.all([
       loadRouteQuery(load, settingsQuery(load.deps.ws)),

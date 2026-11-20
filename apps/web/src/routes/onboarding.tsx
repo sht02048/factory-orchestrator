@@ -5,6 +5,7 @@ import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../i18n";
 import { onboardingMessages } from "../onboarding/messages";
+import { PRELOAD_FRESH_MS } from "../query/query-client";
 import { HOME_PATH, ONBOARDING_PATH, resolveStep, stepToPin } from "../onboarding/model";
 import { OnboardingScreen } from "../onboarding/onboarding-screen";
 import type { OnboardingActions } from "../onboarding/onboarding-screen";
@@ -33,6 +34,7 @@ export const Route = createFileRoute("/onboarding")({
     direct: z.boolean().optional().catch(undefined),
   }),
   loaderDeps: ({ search }) => ({ step: search.step }),
+  preloadStaleTime: PRELOAD_FRESH_MS,
   loader: async ({ deps }) => {
     const loaded = await getOnboardingPage({
       data: deps.step === undefined ? {} : { step: deps.step },

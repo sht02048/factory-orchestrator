@@ -8,12 +8,16 @@ import { Route as appLayoutRoute } from "../routes/_app";
 import { routeTree as appRouteTree } from "../routeTree.gen";
 import { ANSWER_REJECT_REASONS, rejectedAs } from "../query/mutation-error";
 import { answerQuestion, getTimeZone } from "../server/functions";
+import { ScreenError } from "../shell/screen-error";
 
 const QUERY_PROBE_PATH = "/query-probe";
 const QUERY_PROBE_AWAY_PATH = "/query-probe-away";
 const QUERY_PROBE_ERROR_PATH = "/query-probe-error";
 const QUERY_PROBE_SHELL_ERROR_PATH = "/query-probe-shell-error";
 const QUERY_PROBE_ERROR_MESSAGE = "query-probe-read-failed";
+const QUERY_PROBE_RETRY_PATH = "/stats/query-probe-retry";
+const QUERY_PROBE_RENDER_RETRY_PATH = "/stats/query-probe-render-retry";
+const QUERY_PROBE_HEAL_FLAG = "__gangerQueryProbeHealed";
 const QUERY_PROBE_RUN_PATH = "/query-probe-run";
 const QUERY_PROBE_ANSWER_PATH = "/query-probe-answer";
 const QUERY_PROBE_ID = "query-probe";
@@ -31,6 +35,46 @@ const failingProbeQuery = queryOptions({
   queryFn: (): Promise<string> => Promise.reject(new Error(QUERY_PROBE_ERROR_MESSAGE)),
   retryDelay: 0,
 });
+
+function probeHealed(): boolean {
+  return typeof window !== "undefined" && Reflect.get(window, QUERY_PROBE_HEAL_FLAG) === true;
+}
+
+const healingProbeQuery = queryOptions({
+  queryKey: ["query-probe", "healing"],
+  queryFn: (): Promise<string> =>
+    probeHealed()
+      ? Promise.resolve(QUERY_PROBE_RETRY_PATH)
+      : Promise.reject(new Error(QUERY_PROBE_ERROR_MESSAGE)),
+  retryDelay: 0,
+});
+
+const healingRenderProbeQuery = queryOptions({
+  queryKey: ["query-probe", "healing-render"],
+  queryFn: (): Promise<string> =>
+    probeHealed()
+      ? Promise.resolve(QUERY_PROBE_RENDER_RETRY_PATH)
+      : Promise.reject(new Error(QUERY_PROBE_ERROR_MESSAGE)),
+  retryDelay: 0,
+});
+
+function QueryProbeHealingRender() {
+  const { data } = useSuspenseQuery(healingRenderProbeQuery);
+  return (
+    <Text variant="body" id={QUERY_PROBE_ID}>
+      {data}
+    </Text>
+  );
+}
+
+function QueryProbeHealing() {
+  const { data } = useSuspenseQuery(healingProbeQuery);
+  return (
+    <Text variant="body" id={QUERY_PROBE_ID}>
+      {data}
+    </Text>
+  );
+}
 
 const runProbeQuery = queryOptions({
   queryKey: ["runs", "detail", "query-probe"],
@@ -97,7 +141,6 @@ function QueryProbeAway() {
 const probeRoute = createRoute({
   getParentRoute: () => appRouteTree,
   path: QUERY_PROBE_PATH,
-  preloadStaleTime: 0,
   loader: (load) => loadRouteQuery(load, probeQuery),
   component: QueryProbe,
 });
@@ -130,9 +173,25 @@ const errorRoute = createRoute({
 
 const shellErrorRoute = createRoute({
   getParentRoute: () => appLayoutRoute,
+  errorComponent: ScreenError,
   path: QUERY_PROBE_SHELL_ERROR_PATH,
   loader: (load) => loadRouteQuery(load, failingProbeQuery),
   component: QueryProbe,
+});
+
+const retryRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: QUERY_PROBE_RETRY_PATH,
+  errorComponent: ScreenError,
+  loader: (load) => loadRouteQuery(load, healingProbeQuery),
+  component: QueryProbeHealing,
+});
+
+const renderRetryRoute = createRoute({
+  getParentRoute: () => appLayoutRoute,
+  path: QUERY_PROBE_RENDER_RETRY_PATH,
+  errorComponent: ScreenError,
+  component: QueryProbeHealingRender,
 });
 
 function isRoute(value: unknown): value is AnyRoute {
@@ -145,7 +204,13 @@ function childRoutesOf(route: { children?: unknown }): AnyRoute[] {
   return Object.values(children).filter(isRoute);
 }
 
-appLayoutRoute.addChildren([...childRoutesOf(appLayoutRoute), shellErrorRoute, runRoute]);
+appLayoutRoute.addChildren([
+  ...childRoutesOf(appLayoutRoute),
+  shellErrorRoute,
+  retryRoute,
+  renderRetryRoute,
+  runRoute,
+]);
 
 export const routeTree = appRouteTree.addChildren([
   ...childRoutesOf(appRouteTree),

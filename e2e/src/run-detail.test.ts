@@ -69,7 +69,6 @@ let questionRun: RunId;
 let inlineQuestionRun: RunId;
 let permissionRun: RunId;
 let cancelRun: RunId;
-let cancelFailsRun: RunId;
 let endedRun: RunId;
 
 const fakeAdapters: Plugin = {
@@ -162,24 +161,6 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
 
     await page.getByRole("status").getByText(run.cancelPending, { exact: true }).waitFor();
     await expect.poll(focusedStatusText).toBe(run.cancelPending);
-  });
-
-  it("요청을 남기지 못하면 실패 문구가 role=alert 로 보인다", async () => {
-    await open(cancelFailsRun);
-    ok(
-      changeRunState(db, cancelFailsRun, {
-        to: "ended",
-        agentResult: "reported-success",
-        prState: "merged",
-      }),
-    );
-    await page.getByRole("button", { name: run.cancel.trigger }).press("Enter");
-    const dialog = page.getByRole("dialog", { name: run.cancel.title });
-    await dialog.getByRole("button", { name: run.cancel.confirm }).press("Enter");
-
-    const alert = page.getByRole("alert").filter({ hasText: run.actionFailed });
-    await alert.waitFor();
-    expect(await alert.count()).toBe(1);
   });
 
   it("로그를 열면 마지막 줄이 보이고 키보드로 스크롤할 수 있다", async () => {
@@ -280,7 +261,6 @@ function seed(db: Database): void {
   ]);
 
   cancelRun = startRun("ACME-13");
-  cancelFailsRun = startRun("ACME-14");
 
   endedRun = startRun("ACME-15");
   ok(

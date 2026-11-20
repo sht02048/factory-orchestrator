@@ -215,7 +215,7 @@ describe("Workspace 범위(ADR 0006)", () => {
   it("라우트 loader 는 ws 에 기대지 않아 Workspace 를 바꿔도 같은 러너 목록을 보인다", () => {
     expect(Route.options.loaderDeps).toBeUndefined();
     expect(Route.options.shouldReload).toBeUndefined();
-    expect(Route.options.preloadStaleTime).toBe(0);
+    expect(Route.options.preloadStaleTime).toBeUndefined();
   });
 });
 

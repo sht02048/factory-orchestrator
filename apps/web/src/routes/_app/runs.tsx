@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, getRouteApi } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useDeferredValue } from "react";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
@@ -12,11 +12,13 @@ import { RunsScreen } from "../../runs/runs-screen";
 import { requestTimeZone, useRequestTimeZone } from "../../query/request-time-zone";
 import { loadRouteQuery } from "../../query/route-query";
 import { runsListQuery } from "../../runs/queries";
+import { useShell } from "../../shell/shell-query";
+import { ScreenError } from "../../shell/screen-error";
 
 const t = createTranslator({ locale: defaultLocale, messages: runsMessages, namespace: "runs" });
-const appRoute = getRouteApi("/_app");
 
 export const Route = createFileRoute("/_app/runs")({
+  errorComponent: ScreenError,
   validateSearch: z.object({
     f: z.enum(RUN_FILTERS).optional().catch(undefined),
     sel: z.string().optional(),
@@ -28,7 +30,6 @@ export const Route = createFileRoute("/_app/runs")({
     ended: search.ended,
     ...pickConditions(search),
   }),
-  preloadStaleTime: 0,
   loader: (load) =>
     loadRouteQuery(
       load,
@@ -47,7 +48,7 @@ function RunsRoute() {
   const { data: page } = useSuspenseQuery(
     runsListQuery({ ...deps, ended: deps.ended ?? ENDED_RUNS_PAGE_SIZE }, timeZone),
   );
-  const shell = appRoute.useLoaderData();
+  const shell = useShell();
   const { f, sel, ws, ended } = Route.useSearch();
   const navigate = Route.useNavigate();
   const nextEnded = (ended ?? ENDED_RUNS_PAGE_SIZE) + ENDED_RUNS_PAGE_SIZE;
