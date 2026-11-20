@@ -458,6 +458,9 @@ importers:
       '@ganger/db':
         specifier: workspace:*
         version: link:../db
+      '@ganger/log':
+        specifier: workspace:*
+        version: link:../log
       '@ganger/runner-orca':
         specifier: workspace:*
         version: link:../runner-orca
