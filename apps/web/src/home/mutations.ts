@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import type { RunControlOutcome } from "@ganger/app/run-control-view";
+import { toRunId } from "@ganger/core";
+import type { RunId } from "@ganger/core";
 import { ANSWER_REJECT_REASONS, DENY_REJECT_REASONS, rejectedAs } from "../query/mutation-error";
 import { answerQuestion, controlRun, denyPermission } from "../server/functions";
 import type { AnswerInput, ControlInput, DenyInput } from "./home-screen";
@@ -13,14 +15,14 @@ export const ROUTER_ROUTES_SHOWING_RUNS: ReadonlySet<string> = new Set([
   "/_app/runners",
 ]);
 
-export function keysChangedByRunWrite(runId: string): ReadonlyArray<QueryKey> {
+export function keysChangedByRunWrite(runId: RunId): ReadonlyArray<QueryKey> {
   return [["dashboard"], ["runs", "detail", runId], ["runs", "list"]];
 }
 
 async function invalidateRunWrite(
   queryClient: QueryClient,
   invalidateRouterRoutes: () => Promise<void>,
-  runId: string,
+  runId: RunId,
 ): Promise<void> {
   await Promise.all([
     ...keysChangedByRunWrite(runId).map((queryKey) => queryClient.invalidateQueries({ queryKey })),
@@ -41,7 +43,7 @@ export function useDashboardActions(): DashboardActions {
     invalidateRunWrite(
       queryClient,
       () => router.invalidate({ filter: (match) => ROUTER_ROUTES_SHOWING_RUNS.has(match.routeId) }),
-      runId,
+      toRunId(runId),
     );
   const answer = useMutation({
     mutationFn: (input: AnswerInput) =>

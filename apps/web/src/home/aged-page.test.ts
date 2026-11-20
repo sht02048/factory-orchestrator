@@ -95,4 +95,24 @@ describe("Dashboard 시간 글자는 다시 읽지 않아도 흐른다", () => {
     expect(soonestLimitLiftMs(withLimits([limit(null)]))).toBeNull();
     expect(soonestLimitLiftMs(withLimits([limit(5 * MINUTE), limit(2 * MINUTE)]))).toBe(2 * MINUTE);
   });
+
+  it("한도 때문에 기다리는 Queued 런도 한도가 풀릴 때까지 남은 시간이 줄고, 가장 먼저 풀리는 한도에 든다", () => {
+    const { db } = seedDatabase();
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    const queued = page.queued[0];
+    if (queued?.state !== "queued") throw new Error("no queued run");
+    const waiting: HomeRun = {
+      ...queued,
+      queuedReason: { kind: "usage-limit", provider: "claude", resetsInMs: 3 * MINUTE },
+    };
+    const withLimit = { ...page, queued: [waiting], runners: { list: [] } };
+
+    expect(agedHomePage(withLimit, 2 * MINUTE).queued[0]).toMatchObject({
+      queuedReason: { kind: "usage-limit", resetsInMs: MINUTE },
+    });
+    expect(agedHomePage(withLimit, 5 * MINUTE).queued[0]).toMatchObject({
+      queuedReason: { resetsInMs: 0 },
+    });
+    expect(soonestLimitLiftMs(withLimit)).toBe(3 * MINUTE);
+  });
 });
