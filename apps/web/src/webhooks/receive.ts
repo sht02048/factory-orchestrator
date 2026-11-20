@@ -4,6 +4,8 @@ import {
   inTransaction,
   markTrackerChanged,
   recordTrackerEvent,
+  recordWebhookAccepted,
+  recordWebhookBadSignature,
 } from "@ganger/db";
 import type { Database, SecretBox } from "@ganger/db";
 
@@ -139,8 +141,13 @@ async function handle(
       headers: Object.fromEntries(request.headers),
       now,
     });
-    if (!result.ok) return result.error;
+    if (!result.ok) {
+      if (result.error === "bad-signature")
+        recordWebhookBadSignature(context.db, connection.id, now);
+      return result.error;
+    }
     return inTransaction(context.db, () => {
+      recordWebhookAccepted(context.db, connection.id, now);
       const outcome = recordTrackerEvent(context.db, connection.id, result.event);
       if (outcome === "recorded") markTrackerChanged(context.db, connection.id);
       return outcome;

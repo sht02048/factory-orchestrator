@@ -569,3 +569,23 @@ export const trackerReadGenerations = sqliteTable(
   },
   (t) => [check("tracker_read_generations_positive", sql`${t.generation} > 0`)],
 );
+
+export const trackerWebhookReceipts = sqliteTable(
+  "tracker_webhook_receipts",
+  {
+    trackerConnectionId: text("tracker_connection_id")
+      .primaryKey()
+      .references(() => trackerConnections.id, { onDelete: "cascade" })
+      .$type<TrackerConnectionId>(),
+    lastReceivedAt: timeMs("last_received_at"),
+    rejectedCount: integer("rejected_count").notNull().default(0),
+    firstRejectedAt: timeMs("first_rejected_at"),
+  },
+  (t) => [
+    check("tracker_webhook_receipts_rejected_count", sql`${t.rejectedCount} >= 0`),
+    check(
+      "tracker_webhook_receipts_first_rejected",
+      sql`(${t.rejectedCount} = 0) = (${t.firstRejectedAt} IS NULL)`,
+    ),
+  ],
+);

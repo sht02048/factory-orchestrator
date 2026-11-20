@@ -19,6 +19,8 @@ import {
   recordProviderUsage,
   recordRunQuestions,
   recordRunnerCheck,
+  recordWebhookAccepted,
+  recordWebhookBadSignature,
   saveAutoAssignLabel,
   saveCodeHostConnection,
   saveInstallAddresses,
@@ -126,6 +128,19 @@ export async function seedDemo(
   });
 }
 
+const MINUTE_MS = 60_000;
+
+function seedWebhookReceipts(db: Database, now: Date): void {
+  const [receiving, rejected] = seededConnections;
+  const ago = (minutes: number) => new Date(now.getTime() - minutes * MINUTE_MS);
+  if (receiving !== undefined) recordWebhookAccepted(db, receiving.id, ago(3));
+  if (rejected !== undefined) {
+    recordWebhookAccepted(db, rejected.id, ago(26 * 60));
+    for (const minutes of [180, 95, 40, 12])
+      recordWebhookBadSignature(db, rejected.id, ago(minutes));
+  }
+}
+
 function seedSettings(db: Database, box: SecretBox, now: Date): void {
   saveInstallAddresses(
     db,
@@ -181,6 +196,7 @@ function seedSettings(db: Database, box: SecretBox, now: Date): void {
       labelId: autoAssignLabel,
     });
   }
+  seedWebhookReceipts(db, now);
   saveCodeHostConnection(
     db,
     box,

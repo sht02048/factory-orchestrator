@@ -13,6 +13,10 @@ const webWorkerWake = fileURLToPath(
   new URL("../../apps/web/src/server/worker-wake.ts", import.meta.url),
 );
 const demoWorkerWake = fileURLToPath(new URL("./web-worker-wake.ts", import.meta.url));
+const webWebhookReach = fileURLToPath(
+  new URL("../../apps/web/src/server/webhook-reach.ts", import.meta.url),
+);
+const demoWebhookReach = fileURLToPath(new URL("./web-webhook-reach.ts", import.meta.url));
 const webRouter = fileURLToPath(new URL("../../apps/web/src/router.tsx", import.meta.url));
 const prefill = fileURLToPath(new URL("./client/prefill.ts", import.meta.url));
 
@@ -36,6 +40,18 @@ export function swapWebWorkerWake(): Plugin {
       if (importer === undefined || !source.endsWith("/worker-wake")) return null;
       const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
       return resolved?.id === webWorkerWake ? demoWorkerWake : null;
+    },
+  };
+}
+
+export function swapWebWebhookReach(): Plugin {
+  return {
+    name: "ganger-dev-webhook-reach",
+    enforce: "pre",
+    async resolveId(source, importer, options) {
+      if (importer === undefined || !source.endsWith("/webhook-reach")) return null;
+      const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
+      return resolved?.id === webWebhookReach ? demoWebhookReach : null;
     },
   };
 }

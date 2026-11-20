@@ -80,7 +80,13 @@ const PAGE_INFO = "pageInfo { hasNextPage endCursor }";
 
 const QUERY_CONNECTION = "query Connection { viewer { id } }";
 
-const QUERY_ORGANIZATION = "query Organization { viewer { organization { name } } }";
+const QUERY_ORGANIZATION = "query Organization { viewer { organization { name urlKey } } }";
+
+const URL_KEY = /^[a-z0-9][a-z0-9-]*$/iu;
+
+export function linearWebhookSettingsUrl(urlKey: string): string | null {
+  return URL_KEY.test(urlKey) ? `https://linear.app/${urlKey}/settings/api` : null;
+}
 
 const QUERY_TICKET = `query Ticket($id: String!) { issue(id: $id) { ...TicketFields } }
 ${TICKET_FIELDS}`;
@@ -251,21 +257,35 @@ export class LinearTracker implements Tracker {
         {},
         z.object({ viewer: z.object({ id: idSchema }) }),
       );
-      return { ok: true, organizationName: await this.organizationName() };
+      const organization = await this.organization();
+      const webhookSettingsUrl =
+        organization?.urlKey === undefined ? null : linearWebhookSettingsUrl(organization.urlKey);
+      return {
+        ok: true,
+        organizationName: organization?.name ?? null,
+        ...(webhookSettingsUrl === null ? {} : { webhookSettingsUrl }),
+      };
     } catch (error) {
       if (error instanceof LinearTrackerError) return { ok: false, error: error.detail };
       throw error;
     }
   }
 
-  private async organizationName(): Promise<string | null> {
+  private async organization(): Promise<{ name: string; urlKey?: string | undefined } | null> {
     try {
       const data = await this.client.request(
         QUERY_ORGANIZATION,
         {},
-        z.object({ viewer: z.object({ organization: z.object({ name: z.string() }) }) }),
+        z.object({
+          viewer: z.object({
+            organization: z.object({
+              name: z.string(),
+              urlKey: z.string().optional().catch(undefined),
+            }),
+          }),
+        }),
       );
-      return data.viewer.organization.name;
+      return data.viewer.organization;
     } catch {
       return null;
     }

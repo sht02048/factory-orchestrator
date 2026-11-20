@@ -78,11 +78,49 @@ export interface WorkspaceSettings {
   labels: ConnectionLabel[];
 }
 
+export type WebhookStateView =
+  | { kind: "off" }
+  | { kind: "waiting" }
+  | { kind: "receiving"; lastReceivedAt: string; lastReceivedAgoMs: number }
+  | {
+      kind: "rejected";
+      rejectedCount: number;
+      firstRejectedAt: string;
+      lastReceivedAt: string | null;
+      lastReceivedAgoMs: number | null;
+    };
+
 export interface TrackerConnectionView {
   id: string;
   name: string;
   hasWebhookSecret: boolean;
   webhookPath: string;
+  webhook: WebhookStateView;
+  webhookSettingsUrl: string | null;
+}
+
+export function webhookReceiptKey(state: WebhookStateView): string {
+  switch (state.kind) {
+    case "off":
+    case "waiting":
+      return state.kind;
+    case "receiving":
+      return `receiving:${state.lastReceivedAt}`;
+    case "rejected":
+      return `rejected:${state.lastReceivedAt ?? ""}:${String(state.rejectedCount)}`;
+  }
+}
+
+export const WEBHOOK_WAIT_POLL_MS = 3000;
+export const WEBHOOK_WAIT_POLL_LIMIT_MS = 15 * 60 * 1000;
+
+export interface FunnelSetupView {
+  command: string;
+  address: string;
+}
+
+export interface WebhookSetupView {
+  funnel: FunnelSetupView | null;
 }
 
 export interface PrerequisiteView {
@@ -180,3 +218,5 @@ export type LabelCreateResult =
   | { ok: false; reason: RemoteError | "not-found" | "rejected" | "repo-label" };
 
 export type ConnectionSaveReason = RemoteError | "missing-key" | "not-found";
+
+export type { WebhookAddressFailure } from "../webhook-address.js";

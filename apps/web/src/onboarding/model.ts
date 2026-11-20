@@ -14,6 +14,8 @@ export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 export const ONBOARDING_PATH = "/onboarding";
 
 export const LINEAR_API_KEY_URL = "https://linear.app/settings/account/security";
+export const LINEAR_WEBHOOK_SETTINGS_URL = "https://linear.app/settings/api";
+export const TAILSCALE_FUNNEL_GUIDE_URL = "https://tailscale.com/kb/1223/funnel";
 export const GITHUB_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
 export const HOME_PATH = "/";
 

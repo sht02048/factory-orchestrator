@@ -10,7 +10,8 @@ import {
   type Ref,
 } from "react";
 import { focusStyles } from "./focus";
-import { ChevronRightIcon } from "./icons";
+import { CheckIcon, ChevronRightIcon } from "./icons";
+import { StepMarker } from "./steps";
 import { textStyles } from "./text";
 import { VisuallyHidden } from "./visually-hidden";
 import { breakpoints, colors, fonts, fontSize, radius, size, space } from "../tokens.stylex";
@@ -182,11 +183,21 @@ export interface SettingsSectionProps {
   id: string;
   title: ReactNode;
   info?: ReactNode;
+  detail?: ReactNode;
+  detailTone?: SettingsDetailTone;
   actions?: ReactNode;
   children: ReactNode;
 }
 
-export function SettingsSection({ id, title, info, actions, children }: SettingsSectionProps) {
+export function SettingsSection({
+  id,
+  title,
+  info,
+  detail,
+  detailTone = "default",
+  actions,
+  children,
+}: SettingsSectionProps) {
   const headingId = `${id}-heading`;
   return (
     <section id={id} aria-labelledby={headingId} {...stylex.props(styles.section)}>
@@ -200,6 +211,16 @@ export function SettingsSection({ id, title, info, actions, children }: Settings
           {title}
         </h2>
         {info}
+        {detail === undefined || detail === null ? null : (
+          <span
+            {...stylex.props(
+              textStyles("meta", detailTone === "problem" ? "problem" : undefined),
+              styles.sectionDetail,
+            )}
+          >
+            {detail}
+          </span>
+        )}
         {actions === undefined ? null : (
           <div {...stylex.props(styles.sectionActions)}>{actions}</div>
         )}
@@ -316,6 +337,92 @@ export function SettingsRow({
       )}
       {open ? <div {...stylex.props(styles.editor)}>{expanded}</div> : null}
     </div>
+  );
+}
+
+export function SettingsSteps({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <ol aria-label={label} {...stylex.props(styles.group, styles.steps)}>
+      {children}
+    </ol>
+  );
+}
+
+export type SettingsStepState = "locked" | "open" | "current" | "done";
+
+export interface SettingsStepProps {
+  id?: string;
+  number: number;
+  state: SettingsStepState;
+  label: ReactNode;
+  stateLabel: string;
+  info?: ReactNode;
+  detail?: ReactNode;
+  detailMono?: boolean;
+  control?: ReactNode;
+  children?: ReactNode;
+}
+
+export function SettingsStep({
+  id,
+  number,
+  state,
+  label,
+  stateLabel,
+  info,
+  detail,
+  detailMono = false,
+  control,
+  children,
+}: SettingsStepProps) {
+  const current = state === "current";
+  return (
+    <li
+      {...(id === undefined ? {} : { id })}
+      {...(current ? { "aria-current": "step" as const } : {})}
+      {...stylex.props(styles.row, styles.step, current && styles.rowOpen)}
+    >
+      <span {...stylex.props(styles.stepMarker)}>
+        <StepMarker state={state === "locked" || state === "open" ? "todo" : state}>
+          {state === "done" ? (
+            <>
+              <CheckIcon />
+              <VisuallyHidden>{number}</VisuallyHidden>
+            </>
+          ) : (
+            number
+          )}
+        </StepMarker>
+      </span>
+      <div {...stylex.props(styles.stepBody)}>
+        <div {...stylex.props(styles.stepHead)}>
+          <span {...stylex.props(styles.rowText)}>
+            <span {...stylex.props(styles.labelLine)}>
+              <span
+                {...stylex.props(textStyles("title", state === "locked" ? "disabled" : "strong"))}
+              >
+                {label}
+              </span>
+              <VisuallyHidden>{stateLabel}</VisuallyHidden>
+              {info === undefined || info === null ? null : (
+                <span {...stylex.props(styles.infoSlot)}>{info}</span>
+              )}
+            </span>
+            {detail === undefined || detail === null ? null : (
+              <span {...stylex.props(textStyles("meta"), detailMono && styles.mono, styles.detail)}>
+                {detail}
+              </span>
+            )}
+          </span>
+          {control === undefined || control === null ? null : (
+            <span {...stylex.props(styles.stepControl)}>{control}</span>
+          )}
+        </div>
+        {children === undefined || children === null || state === "locked" ? null : (
+          <div {...stylex.props(styles.stepContent)}>{children}</div>
+        )}
+      </div>
+    </li>
   );
 }
 
@@ -536,6 +643,26 @@ const styles = stylex.create({
     minHeight: size.control,
   },
   sectionTitle: { margin: 0 },
+  sectionDetail: { marginInlineStart: space.s2, minWidth: 0, overflowWrap: "anywhere" },
+  steps: { margin: 0, padding: 0, listStyle: "none" },
+  step: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: { default: space.s4, [breakpoints.settingsRowStacked]: space.s3 },
+    paddingBlock: space.s4,
+    paddingInline: { default: space.s5, [breakpoints.settingsRowStacked]: space.s4 },
+  },
+  stepMarker: { display: "flex", alignItems: "center", minHeight: size.control },
+  stepBody: { display: "flex", flexDirection: "column", gap: space.s4, flexGrow: 1, minWidth: 0 },
+  stepHead: {
+    display: "flex",
+    alignItems: "center",
+    gap: space.s3,
+    minHeight: size.control,
+    minWidth: 0,
+  },
+  stepControl: { display: "flex", flexShrink: 0, marginInlineStart: "auto" },
+  stepContent: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
   sectionActions: { display: "flex", gap: space.s2, marginInlineStart: "auto" },
   group: {
     display: "flex",
