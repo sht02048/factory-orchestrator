@@ -271,7 +271,7 @@ describe("query 읽기 실패(0123 할 일 10)", () => {
     expect(serverCalls.slice(callsBeforeRetry)).toEqual([]);
   });
 
-  it("다시 읽기가 또 실패하면 오류 화면 머리로 포커스를 옮기고 실패를 상태 문장으로 알린다", async (context) => {
+  it("다시 읽기가 또 실패하면 실패를 알리는 상태 문장으로 포커스를 옮긴다", async (context) => {
     const { page } = await newPage(context);
     await openRuns(page);
     await routerCall(page, "navigate", RETRY_PATH);
@@ -280,7 +280,9 @@ describe("query 읽기 실패(0123 할 일 10)", () => {
     await page.getByRole("button", { name: shell.screenError.retry }).click();
 
     await page.getByRole("status").filter({ hasText: shell.screenError.retryFailed }).waitFor();
-    await expect.poll(() => focusedHeadingText(page)).toBe(shell.screenError.title);
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.textContent ?? null))
+      .toBe(shell.screenError.retryFailed);
     expect(await page.getByRole("navigation", { name: shell.nav.label }).count()).toBe(1);
   });
 

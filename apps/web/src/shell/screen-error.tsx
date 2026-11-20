@@ -43,11 +43,15 @@ export function ScreenError(_props: ErrorComponentProps) {
   const href = useRouterState({ select: (state) => state.location.href });
   const state = useSyncExternalStore(subscribe, currentRetryState, idleRetryState);
   const headingRef = useRef<HTMLDivElement>(null);
+  const retryRef = useRef<HTMLButtonElement>(null);
+  const failedRef = useRef<HTMLElement>(null);
   const retrying = state.kind === "retrying" && state.href === href;
   const failedAttempt = state.kind === "failed" && state.href === href ? state.attempt : null;
 
   useEffect(() => {
-    headingRef.current?.focus();
+    if (failedAttempt !== null) failedRef.current?.focus();
+    else if (retryState.kind === "retrying") retryRef.current?.focus();
+    else headingRef.current?.focus();
   }, [failedAttempt]);
 
   const retry = () => {
@@ -82,13 +86,14 @@ export function ScreenError(_props: ErrorComponentProps) {
           <div>
             <Text variant="body">{t("body")}</Text>
             <div {...stylex.props(failedAttempt !== null && styles.retryFailed)}>
-              <Text variant="body" role="status">
+              <Text variant="body" role="status" tabIndex={-1} ref={failedRef}>
                 {failedAttempt === null ? "" : t("retryFailed")}
               </Text>
             </div>
           </div>
           <div>
             <Button
+              ref={retryRef}
               variant="secondary"
               busy={{ active: retrying, label: t("retrying") }}
               onClick={retry}
