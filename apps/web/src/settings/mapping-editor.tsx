@@ -646,10 +646,8 @@ export function ReloadFromTracker({ onReload }: { onReload: () => Promise<void> 
   return (
     <span {...stylex.props(styles.reload)}>
       <Button
-        aria-disabled={reading}
-        aria-busy={reading}
+        busy={{ active: reading, label: t("reloading") }}
         onClick={() => {
-          if (reading) return;
           setState("reading");
           onReload().then(
             () => setState("done"),
@@ -657,7 +655,7 @@ export function ReloadFromTracker({ onReload }: { onReload: () => Promise<void> 
           );
         }}
       >
-        {reading ? t("reloading") : t("reload")}
+        {t("reload")}
       </Button>
       <Text variant="meta" role="status" {...(state === "failed" ? { tone: "problem" } : {})}>
         {state === "done" ? t("reloaded") : state === "failed" ? t("reloadFailed") : null}
