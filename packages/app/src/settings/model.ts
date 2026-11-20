@@ -1,3 +1,4 @@
+import type { PrReadError } from "@ganger/core";
 import type { WorkspaceId } from "@ganger/db";
 import type { McpActionView } from "../mcp/actions.js";
 import type { CheckFailure } from "../prerequisites.js";
@@ -198,6 +199,7 @@ export interface McpView {
 export interface InstallSettings {
   connections: TrackerConnectionView[];
   githubToken: boolean;
+  unreadPrRuns: Record<PrReadError, number>;
   runners: RunnerSettingsView[];
   addresses: AddressesView;
   power: PowerView;

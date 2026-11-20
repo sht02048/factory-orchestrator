@@ -56,6 +56,16 @@ export class WorkerAdapters {
     return listTrackerConnections(db, this.secretBox).map((stored) => stored.id);
   }
 
+  codeHostsKey(db: Database): string {
+    const settings = listCodeHostConnections(db, this.secretBox).map((stored) => ({
+      id: stored.id,
+      kind: stored.kind,
+      config: stored.config,
+      secrets: stored.secrets,
+    }));
+    return createHash("sha256").update(JSON.stringify(settings)).digest("hex");
+  }
+
   allCodeHosts(
     db: Database,
     onError: (id: CodeHostConnectionId, error: unknown) => void,

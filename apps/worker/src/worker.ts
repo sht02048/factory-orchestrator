@@ -132,6 +132,7 @@ export function createWorker(options: WorkerOptions): Worker {
     unmarkedDenials: new Set(),
     pendingEndings: new Map(),
     prPolledAt: new Map(),
+    prReadRetries: new Map(),
     unrecordedComments: new Map(),
     ticketsGone: new Set(),
     autoAssign: createAutoAssignState(),

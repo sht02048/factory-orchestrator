@@ -37,5 +37,6 @@ export const messages = {
     open: "열림",
     merged: "병합됨",
     closed: "닫힘",
+    unknown: "못 읽음",
   } satisfies Record<PrState, string>,
 } as const;

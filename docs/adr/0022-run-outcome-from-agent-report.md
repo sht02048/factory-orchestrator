@@ -20,7 +20,7 @@
 
 ## 결과
 
-- `packages/core` `PR_STATES`에 `unknown`, `PR_READ_ERRORS`(`no-access`·`other`), 워크트리 처리 `keep-until-pr-read`가 생긴다. DB `runs`에 `pr_read_error` 열과 제약이 생긴다.
+- `packages/core` `PR_STATES`에 `unknown`, `PR_READ_ERRORS`(`no-access`·`other`)가 생긴다. 못 읽은 런의 워크트리 처리는 PR이 열린 런과 같은 남김(`keep-until-pr-settles`)이다. DB `runs`에 `pr_read_error` 열과 제약이 생긴다.
 - worker 끝내기는 코드 호스트를 읽지 못해도 멈추지 않는다. 다시 읽기는 1분에서 30분까지 두 배씩 늘리고 토큰이 바뀌면 바로 한다. 못 읽은 동안 워크트리를 지우지 않는다.
 - 0144와 0145 사이에는 PR을 못 읽은 보고 런이 Human Check로 To do에 오른다. 0145 뒤에는 Succeeded·Failed와 "PR 정보를 읽지 못했어요"로 보인다.
 - GLOSSARY의 PR 상태는 0144에서 `unknown`을 더하고, 요약 결과·To do·Assignable·끝남은 0145에서 고친다.

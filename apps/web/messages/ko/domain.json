@@ -22,7 +22,8 @@
     "none": "없음",
     "open": "열림",
     "merged": "병합됨",
-    "closed": "닫힘"
+    "closed": "닫힘",
+    "unknown": "못 읽음"
   },
   "summary": {
     "merged": "Merged",

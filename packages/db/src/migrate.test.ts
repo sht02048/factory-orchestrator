@@ -205,6 +205,55 @@ describe("migrate", () => {
     expect(db.$client.prepare("SELECT runner_id FROM runs").all()).toEqual([{ runner_id: "r" }]);
   });
 
+  it("0144 마이그레이션이 기존 런을 그대로 옮기고 PR 못 읽음과 이유 칸을 더한다", () => {
+    const db = openDatabase(":memory:");
+    const all = loadMigrations();
+    const added = all.findIndex((m) => m.name.endsWith("_pr_read_unknown"));
+    expect(added).toBeGreaterThan(0);
+    migrate(db, all.slice(0, added));
+    db.$client.exec(`
+      INSERT INTO tracker_connections (id, kind, name, secrets, created_at) VALUES ('c', 'fake', 'c', '{}', 0);
+      INSERT INTO workspaces (id, name, created_at) VALUES ('w', 'w', 0);
+      INSERT INTO runners (id, kind, name, capacity, online, checked_at, created_at)
+        VALUES ('r', 'fake', 'r', 1, 1, 5, 0);
+      INSERT INTO runs (id, tracker_connection_id, ticket_key, workspace_id, tracker_project_id,
+        runner_project_id, agent_id, worktree_name, branch, state, runner_id, assigned_at, started_at,
+        ended_at, worktree_ref, agent_ref, agent_result, pr_state, pr_id, pr_display_id, pr_url,
+        pr_ci_state, pr_checked_at)
+        VALUES ('ended', 'c', 'ENG-1', 'w', 'tp', 'rp', 'a', 'ganger-ENG-1-1', 'b', 'ended', 'r', 1, 2,
+          3, 'wt', 'ag', 'reported-success', 'open', 'pr-1', '#1', 'https://code.example.com/acme/pull/1',
+          'success', 3);
+    `);
+    expect(() =>
+      db.$client.exec("UPDATE runs SET pr_state = 'unknown' WHERE id = 'ended'"),
+    ).toThrow(/CHECK constraint/);
+
+    expect(migrate(db)).toEqual(all.slice(added).map((m) => m.name));
+    expect(
+      db.$client
+        .prepare("SELECT id, state, agent_result, pr_state, pr_display_id, pr_read_error FROM runs")
+        .all(),
+    ).toEqual([
+      {
+        id: "ended",
+        state: "ended",
+        agent_result: "reported-success",
+        pr_state: "open",
+        pr_display_id: "#1",
+        pr_read_error: null,
+      },
+    ]);
+    expect(() =>
+      db.$client.exec("UPDATE runs SET pr_state = 'unknown' WHERE id = 'ended'"),
+    ).toThrow(/runs_pr_read_error_iff_unknown/);
+    db.$client.exec(
+      "UPDATE runs SET pr_state = 'unknown', pr_read_error = 'no-access' WHERE id = 'ended'",
+    );
+    expect(() =>
+      db.$client.exec("UPDATE runs SET pr_read_error = 'forbidden' WHERE id = 'ended'"),
+    ).toThrow(/runs_pr_read_error/);
+  });
+
   it("0089 마이그레이션이 기존 설치 설정·런을 남긴 채 MCP 쓰기 허용을 끈 채로 더하고 작업 기록 테이블을 만든다", () => {
     const db = openDatabase(":memory:");
     const all = loadMigrations();

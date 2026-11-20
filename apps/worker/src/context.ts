@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { AdapterError, decidePrState } from "@ganger/core";
 import type {
   AgentResult,
@@ -5,6 +6,7 @@ import type {
   CompletionReport,
   MailboxRef,
   PermissionRequestId,
+  PrReadError,
   PrStateDecision,
   QuestionId,
   RunId,
@@ -33,6 +35,7 @@ export interface TickContext {
   unmarkedDenials: Set<string>;
   pendingEndings: Map<RunId, PendingEnding>;
   prPolledAt: Map<RunId, number>;
+  prReadRetries: Map<RunId, PrReadRetry>;
   unrecordedComments: Map<RunId, { id: CommentId; at: Date }>;
   ticketsGone: Set<RunId>;
   autoAssign: AutoAssignState;
@@ -42,6 +45,12 @@ export interface PendingEnding {
   agentResult: AgentResult;
   report: CompletionReport | null;
   lastLog: ReadonlyArray<string> | null;
+}
+
+export interface PrReadRetry {
+  failures: number;
+  nextAt: number;
+  codeHosts: string;
 }
 
 export interface PendingStart {
@@ -115,6 +124,51 @@ export async function decideRunPrState(
     runnerProject: run.runnerProject,
   });
   return { prState: "none", pr: null };
+}
+
+export type PrRead =
+  | { kind: "read"; decision: PrStateDecision }
+  | { kind: "failed"; error: PrReadError };
+
+export async function readRunPrState(context: TickContext, run: StartedStoredRun): Promise<PrRead> {
+  try {
+    return { kind: "read", decision: await decideRunPrState(context, run) };
+  } catch (error) {
+    const reason = prReadErrorOf(error);
+    context.logger.warn("run.pr_read_failed", { runId: run.id, reason, error });
+    return { kind: "failed", error: reason };
+  }
+}
+
+const noAccessDetail = z.object({ kind: z.enum(["unauthorized", "not-found"]) });
+
+export function prReadErrorOf(error: unknown): PrReadError {
+  return error instanceof AdapterError && noAccessDetail.safeParse(error.detail).success
+    ? "no-access"
+    : "other";
+}
+
+export const PR_READ_RETRY_FIRST_MS = 60_000;
+export const PR_READ_RETRY_MAX_MS = 30 * 60_000;
+
+export function prReadRetryDelayMs(failures: number): number {
+  return Math.min(PR_READ_RETRY_FIRST_MS * 2 ** Math.max(failures - 1, 0), PR_READ_RETRY_MAX_MS);
+}
+
+export function rememberPrReadFailure(context: TickContext, runId: RunId): void {
+  const failures = (context.prReadRetries.get(runId)?.failures ?? 0) + 1;
+  context.prReadRetries.set(runId, {
+    failures,
+    nextAt: context.now().getTime() + prReadRetryDelayMs(failures),
+    codeHosts: context.adapters.codeHostsKey(context.db),
+  });
+}
+
+export function prReadDue(context: TickContext, runId: RunId): boolean {
+  const retry = context.prReadRetries.get(runId);
+  if (retry === undefined) return true;
+  if (retry.codeHosts !== context.adapters.codeHostsKey(context.db)) return true;
+  return context.now().getTime() >= retry.nextAt;
 }
 
 export function tryWrite<T>(context: TickContext, runId: RunId, write: () => T): T | undefined {

@@ -43,6 +43,8 @@ export const LOG_EVENTS = {
   "run.follow_up_failed": "could not follow up a run",
   "run.tracker_update_failed": "could not update the tracker",
   "run.pr_poll_failed": "could not poll the run's pull request",
+  "run.pr_read_failed":
+    "could not read the run's pull request; ending or keeping the run without it",
   "run.result_comment_failed": "could not comment the run result",
   "run.worktree_follow_up_failed": "could not follow up the run's worktree",
   "run.worktree_remove_failed": "could not remove a worktree",

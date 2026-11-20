@@ -3,16 +3,25 @@ import type { LogEvent } from "@ganger/log";
 import { AdapterError, summarizeRunOutcome } from "@ganger/core";
 import type { PullRequestSnapshot, Tracker } from "@ganger/core";
 import {
+  fillUnreadPrState,
   getRunWithRecords,
   getWorkspaceTrackerProject,
   listRunners,
   listRuns,
   inTransaction,
   markTrackerChanged,
+  recordPrReadError,
   updateRunRecords,
 } from "@ganger/db";
 import type { RunRecords, StoredRun, StoredRunner } from "@ganger/db";
-import { decideRunPrState, runLogContext, tryWrite } from "./context.js";
+import {
+  decideRunPrState,
+  prReadDue,
+  readRunPrState,
+  rememberPrReadFailure,
+  runLogContext,
+  tryWrite,
+} from "./context.js";
 import type { ActiveRun, StartedStoredRun, TickContext } from "./context.js";
 import { messages } from "./messages.js";
 
@@ -225,10 +234,16 @@ function recordPullRequest(
 
 async function followWorktree(
   context: TickContext,
-  run: StartedEndedRun,
-  records: RunRecords,
+  ended: StartedEndedRun,
+  endedRecords: RunRecords,
   runnersById: ReadonlyMap<StoredRunner["id"], StoredRunner>,
 ): Promise<void> {
+  const read =
+    ended.prState === "unknown"
+      ? await readUnreadPullRequest(context, ended)
+      : { run: ended, records: endedRecords };
+  if (read === null) return;
+  const { run, records } = read;
   const disposition = summarizeRunOutcome(run).worktree;
   if (records.worktreeRemovedAt !== null || disposition !== "keep-until-pr-settles") {
     context.prPolledAt.delete(run.id);
@@ -251,6 +266,36 @@ async function followWorktree(
     case "nothing-to-remove":
       return;
   }
+}
+
+async function readUnreadPullRequest(
+  context: TickContext,
+  run: StartedEndedRun,
+): Promise<{ run: StartedEndedRun; records: RunRecords } | null> {
+  if (!prReadDue(context, run.id)) return null;
+  const prRead = await readRunPrState(context, run);
+  if (prRead.kind === "failed") {
+    tryWrite(context, run.id, () => recordPrReadError(context.db, run.id, prRead.error));
+    rememberPrReadFailure(context, run.id);
+    return null;
+  }
+  const { prState, pr } = prRead.decision;
+  const filled = tryWrite(context, run.id, () =>
+    inTransaction(context.db, () => {
+      if (pr !== null) {
+        const { id, displayId, url, ci } = pr;
+        updateRunRecords(context.db, run.id, {
+          pullRequest: { id, displayId, url, ci, checkedAt: context.now() },
+        });
+      }
+      return fillUnreadPrState(context.db, run.id, prState);
+    }),
+  );
+  if (filled !== true) return null;
+  context.prReadRetries.delete(run.id);
+  const found = getRunWithRecords(context.db, run.id);
+  if (found === null || found.run.state !== "ended" || found.run.startedAt === null) return null;
+  return { run: found.run, records: found.records };
 }
 
 async function recordSettledPullRequest(

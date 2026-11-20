@@ -115,44 +115,6 @@ describe("두 축 기록", () => {
       expect(found.records.reportBody).toBe(`보고: ${report}`);
     },
   );
-
-  it("코드 호스트 어댑터를 만들지 못하면 PR 상태를 없음으로 확정하지 않고 다음 바퀴에 다시 본다", async () => {
-    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
-    const run = h.assign("ENG-1", projectA);
-    const worker = h.worker();
-    h.codeHostBroken = true;
-    await worker.tick();
-    h.putPullRequest(current(run), "open");
-    finish(run);
-
-    await worker.tick();
-    expect(stateOf(run)).toBe("running");
-
-    h.codeHostBroken = false;
-    await worker.tick();
-    const ended = current(run);
-    expect(ended.state === "ended" && ended.prState).toBe("open");
-  });
-
-  it("코드 호스트가 실패하면 끝내지 않고 다음 바퀴에 다시 기록한다", async () => {
-    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
-    const run = h.assign("ENG-1", projectA);
-    const worker = h.worker();
-    await worker.tick();
-    h.putPullRequest(current(run), "open");
-    finish(run);
-
-    const spy = vi
-      .spyOn(h.codeHost, "findPullRequestsByBranch")
-      .mockRejectedValueOnce(new Error("network"));
-    await worker.tick();
-    expect(stateOf(run)).toBe("running");
-
-    await worker.tick();
-    spy.mockRestore();
-    const ended = current(run);
-    expect(ended.state === "ended" && ended.prState).toBe("open");
-  });
 });
 
 describe("엄격한 FIFO", () => {

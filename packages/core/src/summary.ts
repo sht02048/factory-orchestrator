@@ -30,7 +30,7 @@ export function summarizeRunOutcome(axes: RunAxes): RunOutcomeSummary {
 }
 
 function keepIfOpen(prState: PrState): WorktreeDisposition {
-  return prState === "open" ? "keep-until-pr-settles" : "remove-now";
+  return prState === "open" || prState === "unknown" ? "keep-until-pr-settles" : "remove-now";
 }
 
 function summarizeReportedRun(prState: PrState): RunOutcomeSummary {
@@ -38,6 +38,7 @@ function summarizeReportedRun(prState: PrState): RunOutcomeSummary {
     case "merged":
       return { outcome: "merged", worktree: "remove-now" };
     case "open":
+    case "unknown":
       return { outcome: "human-check", worktree: "keep-until-pr-settles" };
     case "closed":
     case "none":
