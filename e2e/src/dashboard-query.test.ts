@@ -67,7 +67,8 @@ const DISCONNECTED_POLL_MS = 30_000;
 const SETTLE_MS = 1_500;
 const QUERY_GC_TIME_MS = 5 * 60_000;
 const TIME_TEXT_TICK_MS = 15_000;
-const ROOT_AND_SHELL_READS = ["getTimeZone", "getTitleBarHidden", "getShell"];
+const ROOT_READS = ["getTimeZone", "getTitleBarHidden"];
+const ROOT_AND_SHELL_READS = [...ROOT_READS, "getShell"];
 
 const runnerKind = toRunnerKind("fake");
 const runnerId = toRunnerId("runner-a");
@@ -326,13 +327,15 @@ describe("열린 Dashboard의 변경 기록(브라우저, 0126)", () => {
     await openDashboard(page);
     await page.waitForTimeout(SETTLE_MS);
     const before = countOf(serverCalls, "getHomePage");
+    const shellBefore = countOf(serverCalls, "getShell");
 
     await page.clock.runFor(DISCONNECTED_POLL_MS);
     await expect.poll(() => countOf(serverCalls, "getHomePage")).toBe(before + 1);
     await page.clock.runFor(DISCONNECTED_POLL_MS);
     await expect.poll(() => countOf(serverCalls, "getHomePage")).toBe(before + 2);
 
-    expect(serverCalls.filter((call) => ROOT_AND_SHELL_READS.includes(call))).toEqual([]);
+    expect(serverCalls.filter((call) => ROOT_READS.includes(call))).toEqual([]);
+    expect(countOf(serverCalls, "getShell")).toBe(shellBefore + 2);
   });
 });
 

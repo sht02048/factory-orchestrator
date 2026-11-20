@@ -59,6 +59,10 @@ Settings를 Query로 옮긴다. 저장 뒤에 Settings 전체와 트래커 세 �
 - **변경 기록(할 일 5).** 0119 뒤 Settings 쓰기(`packages/app/src/settings/actions.ts`)가 부르는 `packages/db` 쓰기 함수를 모두 대 보았다. Workspace(`saveWorkspace` → `workspace`), 트래커 프로젝트 더하기·빼기(`settings`·`tracker`), Mapping(`replaceMapping` → `settings`), In Progress 상태·Auto-assign Label·GitHub 토큰·주소·확인한 webhook 주소·MCP 쓰기 허용(`settings`), 트래커 연결 저장·webhook 끄기(`settings`·`tracker`), 잠자기(`recordSettingsChange`), 러너 저장·점검 요청(`runner`), 라벨 만들기(`saveAutoAssignLabel` + `markTrackerChanged`). 빠진 곳은 없었다(0124의 `change-events.test.ts`가 함수마다 시험한다).
 - **Settings 화면 이동 왕복.** 첫 방문은 서버 함수 셋(`getSettings`, `getTrackerProjects`, `getBoundProjectReads`)을 함께 불러 왕복은 한 번만큼 든다. MCP와 연결 상세는 트래커를 읽지 않는다.
 
+### 남긴 것
+
+- **0126 시험과 0127 셸 query의 어긋남(develop CI).** 0126 머지(47ae5d7) 뒤 develop push마다 `dashboard-query.test.ts`의 "SSE가 끊기면 열린 Dashboard가 30초마다 다시 읽는다"가 `getShell` 두 번으로 실패했다. 0126은 셸이 라우터 로더이던 때 쓴 시험이라 폴링 대비가 셸을 읽지 않기를 기대했고, 0127이 셸을 Query로 옮겨 폴링 대비가 셸 query도 다시 읽는다. 스펙 0003 5.5는 "SSE가 끊기고 다시 붙지 않는 동안 웹은 30초마다 보이는 query를 다시 읽는다"이고 셸(레일 배지, Workspace 목록)은 보이는 query다. "셸은 다시 읽지 않는다"(7절 2번)는 mutation 뒤의 규칙이다. 그래서 제품이 맞고 시험의 기대를 고쳤다: 루트는 여전히 읽지 않고, 셸은 폴링마다 한 번씩만 읽는다. Settings와 Runners의 끊김 시험도 같은 뜻이다.
+
 ### 시험
 
 - `e2e/src/settings-query.test.ts`(브라우저, 변경 기록 통로를 막은 채가 기본): 서버 렌더한 네 화면은 hydration 동안 서버 함수 0번, Mapping 저장 뒤 `saveWorkspaceMapping`·`getSettings`만 부르고 트래커 가짜 어댑터 호출 수가 그대로, 통로를 켜도 Mapping 저장 뒤 트래커를 다시 읽지 않음, In Progress 상태 저장 뒤 `getSettings`만, MCP 쓰기 허용 저장 뒤 `getSettings`만(루트·셸 없음)이고 "저장했어요" 때 이미 새 값, Workspace 이름 저장 뒤 `getSettings`·`getShell`만, "Linear에서 다시 읽기" 뒤 트래커 함수 둘만, 다른 탭의 저장이 3초 안에, webhook 첫 수신이 3초 안에, 끊기면 30초마다(가짜 시계), 프로젝트 빼기.
