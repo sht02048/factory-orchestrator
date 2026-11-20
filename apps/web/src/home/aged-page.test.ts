@@ -2,7 +2,7 @@ import { loadHomePage } from "@ganger/app/home/load";
 import type { HomeRun } from "@ganger/app/home/model";
 import { describe, expect, it } from "vitest";
 import { now, seedDatabase } from "../testing/seed";
-import { agedHomePage, soonestLimitLiftMs } from "./aged-page";
+import { LIMIT_LIFT_WATCH_MS, agedHomePage, soonestLimitLiftMs } from "./aged-page";
 
 const MINUTE = 60_000;
 
@@ -76,7 +76,7 @@ describe("Dashboard 시간 글자는 다시 읽지 않아도 흐른다", () => {
     expect(agedHomePage(page, 0)).toBe(page);
   });
 
-  it("가장 먼저 풀리는 한도까지 남은 시간을 알려, 풀리면 다시 읽게 한다", () => {
+  it("하루 안에 가장 먼저 풀리는 한도까지 남은 시간을 알려, 풀리면 다시 읽게 한다(한 달 한도처럼 먼 것은 타이머가 넘치므로 보지 않는다)", () => {
     const { db } = seedDatabase();
     const page = loadHomePage(db, "ws-commerce", now, "UTC");
     const runner = page.runners.list[0];
@@ -94,6 +94,8 @@ describe("Dashboard 시간 글자는 다시 읽지 않아도 흐른다", () => {
     expect(soonestLimitLiftMs(withLimits([]))).toBeNull();
     expect(soonestLimitLiftMs(withLimits([limit(null)]))).toBeNull();
     expect(soonestLimitLiftMs(withLimits([limit(5 * MINUTE), limit(2 * MINUTE)]))).toBe(2 * MINUTE);
+    expect(soonestLimitLiftMs(withLimits([limit(30 * 24 * 60 * MINUTE)]))).toBeNull();
+    expect(soonestLimitLiftMs(withLimits([limit(LIMIT_LIFT_WATCH_MS)]))).toBe(LIMIT_LIFT_WATCH_MS);
   });
 
   it("한도 때문에 기다리는 Queued 런도 한도가 풀릴 때까지 남은 시간이 줄고, 가장 먼저 풀리는 한도에 든다", () => {

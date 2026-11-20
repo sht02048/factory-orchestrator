@@ -68,6 +68,7 @@ export function agedHomePage(page: HomePage, by: number): HomePage {
 }
 
 export const LIMIT_LIFT_MARGIN_MS = 1_000;
+export const LIMIT_LIFT_WATCH_MS = 24 * 60 * 60_000;
 
 export function soonestLimitLiftMs(page: HomePage): number | null {
   const runnerLifts = page.runners.list.flatMap((runner) =>
@@ -78,7 +79,9 @@ export function soonestLimitLiftMs(page: HomePage): number | null {
       ? [run.queuedReason.resetsInMs]
       : [],
   );
-  const lifts = [...runnerLifts, ...queuedLifts].filter((ms) => ms > 0);
+  const lifts = [...runnerLifts, ...queuedLifts].filter(
+    (ms) => ms > 0 && ms <= LIMIT_LIFT_WATCH_MS,
+  );
   return lifts.length === 0 ? null : Math.min(...lifts);
 }
 
