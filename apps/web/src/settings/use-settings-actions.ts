@@ -35,7 +35,7 @@ export function useReloadOnSuccess(): ReloadOnSuccess {
   return useMemo(
     (): ReloadOnSuccess => (call) => async (input) => {
       const result = await call(input);
-      if (result.ok) await router.invalidate();
+      if (result.ok) await router.invalidate({ sync: true });
       return result;
     },
     [router],
@@ -55,7 +55,7 @@ export function useSettingsActions(): SettingsActions {
       saveLabel: then((data) => saveWorkspaceLabel({ data })),
       createLabel: async (data) => {
         const result = await createWorkspaceAutoAssignLabel({ data });
-        if (result.ok) await router.invalidate();
+        if (result.ok) await router.invalidate({ sync: true });
         return result;
       },
       reloadFromTracker: async () => {
