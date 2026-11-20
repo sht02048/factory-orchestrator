@@ -21,6 +21,9 @@ function toVariant(value: string | undefined): ButtonVariant | "other" {
 export function buttonsOf(html: string): RenderedButton[] {
   return [...html.matchAll(/<button\b([^>]*)>(.*?)<\/button>/gs)].map((m) => ({
     variant: toVariant(/data-variant="([^"]+)"/.exec(m[1] ?? "")?.[1]),
-    label: (m[2] ?? "").replace(/<[^>]+>/g, "").trim(),
+    label: (m[2] ?? "")
+      .replace(/<span aria-hidden="true"[^>]*>.*?<\/span>/gs, "")
+      .replace(/<[^>]+>/g, "")
+      .trim(),
   }));
 }

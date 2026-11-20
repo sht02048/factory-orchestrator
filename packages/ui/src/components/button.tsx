@@ -45,8 +45,16 @@ export function Button({ variant = "secondary", children, onClick, busy, ...prop
         children
       ) : (
         <span {...stylex.props(styles.labels)}>
-          <span {...stylex.props(styles.label, busy.active && styles.labelHidden)}>{children}</span>
-          <span {...stylex.props(styles.label, !busy.active && styles.labelHidden)}>
+          <span
+            {...(busy.active ? { "aria-hidden": true } : {})}
+            {...stylex.props(styles.label, busy.active && styles.labelHidden)}
+          >
+            {children}
+          </span>
+          <span
+            {...(busy.active ? {} : { "aria-hidden": true })}
+            {...stylex.props(styles.label, !busy.active && styles.labelHidden)}
+          >
             {busy.label}
           </span>
         </span>

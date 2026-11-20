@@ -61,11 +61,16 @@ describe("Button aria 속성(티켓 0067·0074)", () => {
       <Button busy={{ active: true, label: "다시 읽는 중…" }}>다시 읽기</Button>,
     );
     expect(idle).toContain('aria-busy="false"');
-    expect(idle).toMatch(/<span[^>]*>다시 읽기<\/span><span[^>]*>다시 읽는 중…<\/span>/);
+    expect(idle).toMatch(
+      /<span class="[^"]*">다시 읽기<\/span><span aria-hidden="true" class="[^"]*">다시 읽는 중…<\/span>/,
+    );
+    expect(busy).toMatch(
+      /<span aria-hidden="true" class="[^"]*">다시 읽기<\/span><span class="[^"]*">다시 읽는 중…<\/span>/,
+    );
     expect(busy).toContain('aria-busy="true"');
     expect(busy).toContain('aria-disabled="true"');
     const hiddenClass = (html: string, label: string) =>
-      new RegExp(`<span class="([^"]*)">${label}</span>`).exec(html)?.[1];
+      new RegExp(`<span (?:aria-hidden="true" )?class="([^"]*)">${label}</span>`).exec(html)?.[1];
     expect(hiddenClass(idle, "다시 읽는 중…")).toBe(hiddenClass(busy, "다시 읽기"));
     expect(hiddenClass(idle, "다시 읽기")).toBe(hiddenClass(busy, "다시 읽는 중…"));
 
