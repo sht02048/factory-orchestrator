@@ -1,3 +1,4 @@
+import { silentLogger } from "@ganger/log/testing";
 import { toDeliveryId, toTicketKey, toTrackerStateId } from "@ganger/core";
 import type { TrackerTicket } from "@ganger/core";
 import {
@@ -81,7 +82,7 @@ describe("담아 둔 트래커 읽기를 지우는 경로(0122)", () => {
     });
 
     const response = await receiveTrackerWebhook(
-      { db, secretBox: context.secretBox, registry: context.registry, logger: { warn: () => {} } },
+      { db, secretBox: context.secretBox, registry: context.registry, logger: silentLogger },
       connection,
       { headers: new Headers(), body: null },
       now,

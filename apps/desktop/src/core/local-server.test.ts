@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { LocalServer, fileRecordStore, sleep } from "./local-server.js";
+import { LocalServer, fileRecordStore, rotateOutputLog, sleep } from "./local-server.js";
 import type { LocalServerOptions } from "./local-server.js";
 import { ServerWatch } from "./watch.js";
 
@@ -410,5 +410,23 @@ describe("ServerWatch", () => {
     watch.setWanted(true);
     await watch.tick();
     expect(watch.state).toMatchObject({ kind: "running" });
+  });
+});
+
+describe("rotateOutputLog", () => {
+  it("서버를 띄우기 전에 한도를 넘은 desktop-server.log 를 .1 로 옮긴다", () => {
+    const folder = mkdtempSync(join(tmpdir(), "ganger-desktop-log-"));
+    try {
+      const logFile = join(folder, "desktop-server.log");
+      writeFileSync(logFile, "x".repeat(2 * 1024 * 1024));
+      rotateOutputLog(logFile, { GANGER_LOG_MAX_MB: "1" });
+      expect(existsSync(logFile)).toBe(false);
+      expect(readFileSync(`${logFile}.1`, "utf8")).toHaveLength(2 * 1024 * 1024);
+      writeFileSync(logFile, "small");
+      rotateOutputLog(logFile, { GANGER_LOG_MAX_MB: "1" });
+      expect(readFileSync(logFile, "utf8")).toBe("small");
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
   });
 });

@@ -16,6 +16,7 @@
   "dependencies": {
     "@ganger/cli": "workspace:*",
     "@ganger/db": "workspace:*",
+    "@ganger/log": "workspace:*",
     "@ganger/ui": "workspace:*",
     "@stylexjs/stylex": "0.19.2",
     "react": "19.3.1",

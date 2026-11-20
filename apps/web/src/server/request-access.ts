@@ -1,9 +1,10 @@
+import { log } from "@ganger/log";
 import { getInstallSettings, parseBootConfig } from "@ganger/db";
 import type { InstallAddresses } from "@ganger/db";
 import {
   allowedHosts,
   checkRequest,
-  rejectionLogLine,
+  rejectionLogFields,
   rejectionResponse,
 } from "@ganger/app/request-guard";
 import type { AllowedHosts } from "@ganger/app/request-guard";
@@ -32,6 +33,6 @@ export function currentAllowedHosts(): AllowedHosts {
 export function guardRequest(request: Request): Response | null {
   const verdict = checkRequest(request, currentAllowedHosts());
   if (verdict.ok) return null;
-  console.warn(rejectionLogLine(request, verdict));
+  log().warn("request.rejected", rejectionLogFields(request, verdict));
   return rejectionResponse(verdict.reason);
 }

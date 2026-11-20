@@ -1,3 +1,5 @@
+import { useLogger } from "@ganger/log";
+import { memoryLogger, silentLogger } from "@ganger/log/testing";
 import { AdapterError, MAX_START_RETRIES, summarizeRunOutcome } from "@ganger/core";
 import type { CompletionReport, PrState, WorktreeRef } from "@ganger/core";
 import { getRun, getRunWithRecords } from "@ganger/db";
@@ -596,7 +598,7 @@ describe("startWorker", () => {
       secretBox: h.secretBox,
       now: () => h.now,
       pollIntervalMs: 5,
-      logger: { warn: () => undefined },
+      logger: silentLogger,
     });
     try {
       await vi.waitFor(() => expect(stateOf(run)).toBe("running"));
@@ -605,5 +607,53 @@ describe("startWorker", () => {
     } finally {
       await worker.stop();
     }
+  });
+
+  it("정해 둔 간격마다 지켜보는 런 수와 마지막 tick 시간을 담은 생존 줄을 남긴다", async () => {
+    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    const logger = memoryLogger();
+    const worker = startWorker({
+      dbPath: h.dbPath,
+      registry: h.registry,
+      secretBox: h.secretBox,
+      now: () => h.now,
+      pollIntervalMs: 5,
+      aliveIntervalMs: 20,
+      logger,
+    });
+    try {
+      await vi.waitFor(() => expect(stateOf(run)).toBe("running"));
+      await vi.waitFor(() =>
+        expect(logger.entries.some((entry) => entry.event === "process.alive")).toBe(true),
+      );
+    } finally {
+      await worker.stop();
+    }
+    const alive = logger.entries.find((entry) => entry.event === "process.alive");
+    expect(alive?.level).toBe("info");
+    expect(alive?.fields).toMatchObject({ watched: 1 });
+    expect(typeof alive?.fields.lastTickMs).toBe("number");
+  });
+});
+
+describe("info 줄", () => {
+  it("바뀐 것이 없는 tick 은 info 를 쓰지 않고 debug tick 요약만 남긴다", async () => {
+    const restore = useLogger(h.log);
+    try {
+      h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+      const run = h.assign("ENG-1", projectA);
+      const worker = h.worker();
+      await worker.tick();
+      expect(stateOf(run)).toBe("running");
+      expect(h.log.entries.map((entry) => entry.event)).toContain("run.state_changed");
+      h.log.entries.length = 0;
+      await worker.tick();
+      await worker.tick();
+    } finally {
+      restore();
+    }
+    expect(h.log.entries.filter((entry) => entry.level === "info")).toEqual([]);
+    expect(h.log.entries.map((entry) => entry.event)).toEqual(["worker.tick", "worker.tick"]);
   });
 });

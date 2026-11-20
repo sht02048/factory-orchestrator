@@ -19,7 +19,7 @@ export async function processWebRequests(
     if (kind === "log-tail") await processLogTailRequests(context);
     else await processRunnerCheckRequests(context);
   } catch (error) {
-    context.logger.warn("could not process web requests", { kind, error });
+    context.logger.warn("worker.web_requests_failed", { kind, error });
   }
 }
 
@@ -38,7 +38,7 @@ async function processLogTailRequests(context: TickContext): Promise<void> {
     try {
       complete(await readLogTail(context, request.runId));
     } catch (error) {
-      context.logger.warn("could not read a log tail", { runId: request.runId, error });
+      context.logger.warn("worker.log_tail_failed", { runId: request.runId, error });
       complete({ error: errorText(error) });
     }
   }
@@ -75,7 +75,7 @@ async function processRunnerCheckRequests(context: TickContext): Promise<void> {
         ...outcome,
       });
     } catch (error) {
-      context.logger.warn("could not write a runner check result", {
+      context.logger.warn("runner.check_result_write_failed", {
         runnerId: request.runnerId,
         error,
       });
@@ -93,7 +93,7 @@ async function checkRequestedRunner(
     const checked = await checkRunner(context, stored);
     return checked.ok ? { result: checked.health } : { error: describe(checked.error) };
   } catch (error) {
-    context.logger.warn("could not check a runner on request", { runnerId, error });
+    context.logger.warn("runner.check_request_failed", { runnerId, error });
     return { error: errorText(error) };
   }
 }

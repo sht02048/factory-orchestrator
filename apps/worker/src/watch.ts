@@ -1,3 +1,4 @@
+import { withLogContext } from "@ganger/log";
 import {
   decideConnection,
   decideRunnerStop,
@@ -47,6 +48,7 @@ import {
   mailboxFor,
   reportFailure,
   tryWrite,
+  runLogContext,
 } from "./context.js";
 import type { ActiveRun, PendingEnding, TickContext } from "./context.js";
 
@@ -59,11 +61,13 @@ export async function watchActiveRuns(context: TickContext): Promise<void> {
   })) {
     if (run.state === "queued" || run.state === "ended") continue;
     try {
-      await watchRun(context, run, runnersById.get(run.runnerId), {
-        maxRunMs: maxRunMs.get(run.workspaceId) ?? DEFAULT_MAX_RUN_MS,
-      });
+      await withLogContext(runLogContext(run), () =>
+        watchRun(context, run, runnersById.get(run.runnerId), {
+          maxRunMs: maxRunMs.get(run.workspaceId) ?? DEFAULT_MAX_RUN_MS,
+        }),
+      );
     } catch (error) {
-      logger.warn("could not watch run", { runId: run.id, error });
+      logger.warn("run.watch_failed", { ...runLogContext(run), error });
     }
   }
 }
@@ -90,7 +94,7 @@ async function watchRun(
   };
   const cancelRequested = hasPendingCancelRequest(db, run.id);
   if (storedRunner === undefined) {
-    logger.warn("run's runner is not registered", { runId: run.id, runnerId: run.runnerId });
+    logger.warn("run.runner_missing", { runId: run.id, runnerId: run.runnerId });
     await endIfTimedOut(context, run, { ...settings, cancelRequested, state: "disconnected" });
     return;
   }
@@ -331,7 +335,7 @@ async function readLastLog(
   try {
     return await runner.readLogTail(onRunner, { lines: LAST_LOG_LINES });
   } catch (error) {
-    context.logger.warn("could not read the last log of an ending run", { runId: run.id, error });
+    context.logger.warn("run.last_log_failed", { runId: run.id, error });
     return null;
   }
 }
@@ -481,7 +485,7 @@ async function sendAnswers(
           answer: answer.answer,
         });
       } catch (error) {
-        logger.warn("could not send an answer", {
+        logger.warn("run.answer_failed", {
           runId: run.id,
           questionId: answer.questionId,
           error,
@@ -515,7 +519,7 @@ async function sendDenials(
           reason: denial.reason,
         });
       } catch (error) {
-        logger.warn("could not send a permission denial", {
+        logger.warn("run.denial_failed", {
           runId: run.id,
           permissionId: denial.permissionId,
           error,

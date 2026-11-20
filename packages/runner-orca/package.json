@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ganger/core": "workspace:*",
+    "@ganger/log": "workspace:*",
     "zod": "4.6.7"
   }
 }

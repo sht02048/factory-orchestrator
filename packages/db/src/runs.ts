@@ -49,7 +49,8 @@ import { sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { recordChange, recordRunChange } from "./change-events.js";
 import type { Database } from "./database.js";
-import { inTransaction } from "./database.js";
+import { inTransaction, onCommit } from "./database.js";
+import { log } from "@ganger/log";
 import type { WorkspaceId } from "./ids.js";
 import { runStateChanges, runs } from "./schema.js";
 import type { LATER_PR_STATES } from "./schema.js";
@@ -401,6 +402,17 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
       .run();
     recordStateChange(db, id, null, "queued", now);
     recordChange(db, { kind: "assignment", targetId: id, workspaceId: project.workspaceId }, now);
+    onCommit(db, () =>
+      log().info("run.assigned", {
+        runId: id,
+        ticketKey: input.ticket.key,
+        trackerConnectionId: input.ticket.connection,
+        workspaceId: project.workspaceId,
+        runnerId,
+        runnerProject: input.runnerProject,
+        reason: input.runnerId === undefined ? "picked" : "chosen",
+      }),
+    );
 
     const run = getRun(db, id);
     if (run === null) throw new RunRowError(id, "missing right after insert");
@@ -515,6 +527,16 @@ export function changeRunState(
     }
     recordStateChange(db, runId, current.state, change.to, now);
     recordRunChange(db, runId, { now });
+    onCommit(db, () =>
+      log().info("run.state_changed", {
+        runId,
+        ticketKey: current.ticket.key,
+        runnerId: current.runnerId,
+        from: current.state,
+        to: change.to,
+        ...(change.to === "ended" ? { outcome: change.agentResult } : {}),
+      }),
+    );
 
     const run = getRun(db, runId);
     if (run === null) throw new RunRowError(runId, "missing right after update");
@@ -647,7 +669,10 @@ export function setQueuedRunRunner(db: Database, runId: RunId, runnerId: RunnerI
         .set({ runnerId })
         .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
         .run().changes > 0;
-    if (updated && before?.runnerId !== runnerId) recordRunChange(db, runId);
+    if (updated && before?.runnerId !== runnerId) {
+      recordRunChange(db, runId);
+      onCommit(db, () => log().info("run.runner_chosen", { runId, runnerId }));
+    }
     return updated;
   });
 }

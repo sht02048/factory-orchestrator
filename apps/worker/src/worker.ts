@@ -1,4 +1,10 @@
-import { canRunnerTake, decideStartFailure, MAX_START_RETRIES, planQueue } from "@ganger/core";
+import {
+  ACTIVE_RUN_STATES,
+  canRunnerTake,
+  decideStartFailure,
+  MAX_START_RETRIES,
+  planQueue,
+} from "@ganger/core";
 import type {
   AdapterRegistry,
   MailboxRef,
@@ -31,6 +37,7 @@ import {
   setRunnerMailbox,
 } from "@ganger/db";
 import type { SecretBox, StoredRun } from "@ganger/db";
+import { log, withLogContext } from "@ganger/log";
 import { WorkerAdapters } from "./adapters.js";
 import {
   describe,
@@ -61,29 +68,45 @@ export interface WorkerOptions {
 
 export interface Worker {
   tick(): Promise<void>;
+  health(): WorkerHealth;
   close(): Promise<void>;
 }
+
+export interface WorkerHealth {
+  watched: number;
+  lastTickMs: number | null;
+}
+
+export const ALIVE_INTERVAL_MS = 10 * 60_000;
 
 export interface RunningWorker {
   wake(): void;
   stop(): Promise<void>;
 }
 
-const consoleLogger: WorkerLogger = {
-  warn: (message, fields) => console.warn(`[worker] ${message}`, fields ?? {}),
-};
-
-export function startWorker(options: WorkerOptions & { pollIntervalMs: number }): RunningWorker {
+export function startWorker(
+  options: WorkerOptions & { pollIntervalMs: number; aliveIntervalMs?: number },
+): RunningWorker {
   const worker = createWorker(options);
+  const logger = options.logger ?? log();
   const loop = startTickLoop({
     tick: () => worker.tick(),
     pollIntervalMs: options.pollIntervalMs,
-    logger: options.logger ?? consoleLogger,
+    logger,
   });
+  const startedAt = performance.now();
+  const alive = setInterval(() => {
+    logger.info("process.alive", {
+      ...worker.health(),
+      uptimeS: Math.round((performance.now() - startedAt) / 1000),
+    });
+  }, options.aliveIntervalMs ?? ALIVE_INTERVAL_MS);
+  alive.unref();
 
   return {
     wake: () => loop.wake(),
     stop: async () => {
+      clearInterval(alive);
       loop.stop();
       await worker.close();
     },
@@ -93,7 +116,7 @@ export function startWorker(options: WorkerOptions & { pollIntervalMs: number })
 export function createWorker(options: WorkerOptions): Worker {
   const db = openDatabase(options.dbPath);
   const now = options.now ?? (() => new Date());
-  const logger = options.logger ?? consoleLogger;
+  const logger = options.logger ?? log();
   const adapters = new WorkerAdapters(options.registry, options.secretBox, now);
   const context: TickContext = {
     db,
@@ -113,15 +136,29 @@ export function createWorker(options: WorkerOptions): Worker {
   };
   let running: Promise<void> | null = null;
   let closed = false;
+  let lastTickMs: number | null = null;
+  const watched = (): number => listRuns(db, { states: [...ACTIVE_RUN_STATES] }).length;
+
+  const timedTick = async (): Promise<void> => {
+    const startedAt = performance.now();
+    try {
+      await tick(context);
+    } finally {
+      lastTickMs = Math.round(performance.now() - startedAt);
+      if (logger.enabled("debug"))
+        logger.debug("worker.tick", { ms: lastTickMs, watched: watched() });
+    }
+  };
 
   return {
     tick: () => {
       if (closed) return Promise.reject(new Error("worker is closed"));
-      running ??= tick(context).finally(() => {
+      running ??= timedTick().finally(() => {
         running = null;
       });
       return running;
     },
+    health: () => ({ watched: closed ? 0 : watched(), lastTickMs }),
     close: async () => {
       if (closed) return;
       closed = true;
@@ -182,7 +219,7 @@ async function findStartedForCancel(
 ): Promise<StartedRun | null | "unknown"> {
   const storedRunner = findRunner(context.db, runnerId);
   if (storedRunner === undefined) {
-    context.logger.warn("canceling a queued run whose runner is not registered", {
+    context.logger.warn("run.cancel_runner_missing", {
       runId: run.id,
       runnerId,
     });
@@ -193,7 +230,7 @@ async function findStartedForCancel(
     const mailbox = await mailboxFor(context, storedRunner, runner);
     return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
   } catch (error) {
-    context.logger.warn("could not look up a started run to cancel", { runId: run.id, error });
+    context.logger.warn("run.cancel_lookup_failed", { runId: run.id, error });
     return "unknown";
   }
 }
@@ -250,7 +287,9 @@ async function processQueue(context: TickContext): Promise<void> {
   });
 
   for (const choice of plan ?? []) {
-    const outcome = await startQueuedRun(context, choice);
+    const outcome = await withLogContext({ runId: choice.runId, runnerId: choice.runnerId }, () =>
+      startQueuedRun(context, choice),
+    );
     if (outcome === "blocked") return;
   }
 }
@@ -347,7 +386,7 @@ async function startOnRunner(
   const { db, logger, adapters } = context;
   const storedRunner = findRunner(db, runnerId);
   if (storedRunner === undefined) {
-    logger.warn("run's runner is not registered", { runId: run.id, runnerId });
+    logger.warn("run.runner_missing", { runId: run.id, runnerId });
     return { kind: "blocked" };
   }
   const runner = adapters.runner(storedRunner);
@@ -356,7 +395,7 @@ async function startOnRunner(
   try {
     mailbox = await mailboxFor(context, storedRunner, runner);
   } catch (error) {
-    logger.warn("could not prepare the runner's mailbox", { runId: run.id, error });
+    logger.warn("run.mailbox_failed", { runId: run.id, error });
     if (!isOfflineLike(error)) return { kind: "blocked" };
     markUnreachable(context, runnerId);
     if (!unverified) tryWrite(context, run.id, () => setQueuedRunRunner(db, run.id, null));
@@ -406,7 +445,7 @@ async function startOnRunner(
     });
     return { kind: "started", started };
   } catch (error) {
-    logger.warn("could not start run", { runId: run.id, error });
+    logger.warn("run.start_failed", { runId: run.id, error });
     return handleStartFailure(context, run, { runnerId, unverified }, records.startFailures, error);
   }
 }
@@ -420,7 +459,7 @@ async function findStarted(
   try {
     return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
   } catch (error) {
-    context.logger.warn("could not look up a started run", { runId: run.id, error });
+    context.logger.warn("run.lookup_failed", { runId: run.id, error });
     return isOfflineLike(error) ? "unreachable" : "unknown";
   }
 }
@@ -513,12 +552,12 @@ async function promptFor(
 ): Promise<{ text: string; ticket: { key: TicketKey; url: string } } | null | "ticket-gone"> {
   const tracker = context.adapters.tracker(context.db, run.ticket.connection);
   if (tracker === null) {
-    context.logger.warn("run's tracker connection is not registered", { runId: run.id });
+    context.logger.warn("run.tracker_connection_missing", { runId: run.id });
     return null;
   }
   const ticket = await tracker.getTicket(run.ticket.key);
   if (ticket === null) {
-    context.logger.warn("run's ticket was not found in the tracker", { runId: run.id });
+    context.logger.warn("run.ticket_missing", { runId: run.id });
     return "ticket-gone";
   }
   tryWrite(context, run.id, () => fillRunTicketTitle(context.db, run.id, ticket.title));

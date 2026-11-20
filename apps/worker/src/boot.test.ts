@@ -1,3 +1,4 @@
+import { silentLogger } from "@ganger/log/testing";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,7 +22,7 @@ afterEach(() => {
 describe("bootWorker", () => {
   it("띄우기 전에 마이그레이션을 돌리고, 다시 띄우면 돌릴 것이 없다 (ADR 0005)", async () => {
     const env = { DATABASE_PATH: join(dir, "data", "ganger.db"), ENCRYPTION_KEY: key };
-    const quiet = { warn: () => undefined };
+    const quiet = silentLogger;
     const first = bootWorker({ env, registry: new AdapterRegistry(), logger: quiet });
     expect(first.migrated).toEqual(loadMigrations().map((m) => m.name));
     await first.worker.stop();

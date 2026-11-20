@@ -1,9 +1,20 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
+import { PassThrough } from "node:stream";
 import { join } from "node:path";
 import { loadMigrations, openDatabase } from "@ganger/db";
+import { useLogger } from "@ganger/log";
+import { memoryLogger } from "@ganger/log/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MissingEnvFileError } from "./home.js";
 import { init } from "./init.js";
@@ -11,19 +22,24 @@ import type { HoldSleepAssertion } from "./keep-awake.js";
 import type { AppLayout, ProcessSpec } from "./layout.js";
 import { writePowerSettings } from "@ganger/app/power-settings";
 import { readServerLock, serverLockPath } from "./server-lock.js";
-import { StartError, start, webUrl } from "./start.js";
+import { StartError, forEachLine, rotateServiceLog, start, webUrl } from "./start.js";
 import type { Started } from "./start.js";
 
 let dir: string;
 let started: Started | undefined;
+let logger = memoryLogger();
+let restoreLogger: () => void = () => undefined;
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "ganger-cli-start-"));
+  logger = memoryLogger();
+  restoreLogger = useLogger(logger);
 });
 
 afterEach(async () => {
   await started?.stop();
   started = undefined;
+  restoreLogger();
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -486,5 +502,54 @@ describe("webUrl", () => {
     expect(webUrl({ host: "0.0.0.0", port: 3000 })).toBe("http://127.0.0.1:3000");
     expect(webUrl({ host: "::", port: 3000 })).toBe("http://[::1]:3000");
     expect(webUrl({ host: "fd7a::1", port: 80 })).toBe("http://[fd7a::1]:80");
+  });
+});
+
+describe("server log around start", () => {
+  it("넘겨받은 출력을 조각이 아니라 온전한 줄로 넘긴다", async () => {
+    const stream = new PassThrough();
+    const lines: string[] = [];
+    forEachLine(stream, (line) => lines.push(line));
+    stream.write("first li");
+    stream.write("ne\nsecond ");
+    stream.write(Buffer.from("줄\n", "utf8").subarray(0, 2));
+    stream.write(Buffer.from("줄\n", "utf8").subarray(2));
+    stream.end("tail without newline");
+    await new Promise((resolve) => stream.on("close", resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(lines).toEqual(["first line", "second 줄", "tail without newline"]);
+  });
+
+  it("자식이 예기치 않게 끝나면 warn 줄을, 멈추라고 해서 끝나면 info 줄을 남긴다", async () => {
+    const home = join(dir, "home");
+    init({ home, port: String(await freePort()) });
+    const trigger = join(dir, "exit-now");
+    started = await start({
+      home,
+      env: {},
+      layout: fakeLayout(workerExitingOnceExists(trigger)),
+      onOutput: quiet,
+    });
+    writeFileSync(trigger, "");
+    await started.exited;
+    started = undefined;
+    expect(
+      logger.entries
+        .filter((entry) => entry.event === "supervisor.child_exited")
+        .map((entry) => [entry.level, entry.fields.child]),
+    ).toEqual([
+      ["warn", "worker"],
+      ["info", "web"],
+    ]);
+  });
+
+  it("서비스 출력 파일(ganger.log)이 한도를 넘으면 시작 전에 .1 로 옮기고 비운다", () => {
+    const home = join(dir, "home");
+    const logs = join(home, "logs");
+    mkdirSync(logs, { recursive: true });
+    writeFileSync(join(logs, "ganger.log"), "x".repeat(2 * 1024 * 1024));
+    rotateServiceLog(home, { GANGER_LOG_MAX_MB: "1" });
+    expect(statSync(join(logs, "ganger.log")).size).toBe(0);
+    expect(statSync(join(logs, "ganger.log.1")).size).toBe(2 * 1024 * 1024);
   });
 });

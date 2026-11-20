@@ -1,11 +1,15 @@
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
+import { basename } from "node:path";
+import { createInterface } from "node:readline";
+import type { Readable } from "node:stream";
 import { z } from "zod";
 import { CLI_ENTRY_ENV } from "@ganger/app/settings/mcp-launch";
 import { WORKER_WAKE_ENV, WORKER_WAKE_MESSAGE, WORKER_WAKE_VIA_IPC } from "@ganger/core";
 import { BOOT_ENV, migrate, openDatabase, parseBootConfig } from "@ganger/db";
 import type { BootConfig } from "@ganger/db";
+import { log, readLogSettings, rotateInPlaceIfOver } from "@ganger/log";
 import { HOME_ENV, homePaths, readBootEnv } from "./home.js";
 import { keepAwake } from "./keep-awake.js";
 import type { KeepAwakeOptions } from "./keep-awake.js";
@@ -15,6 +19,7 @@ import { runCommand } from "@ganger/app/runner-setup/commands";
 import { ensureGangerSshKey, gangerSshPaths } from "@ganger/app/runner-setup/ganger-ssh";
 import { ServerAlreadyRunningError, acquireServerLock } from "./server-lock.js";
 import { messages } from "./messages.js";
+import { serviceLogFile } from "./service.js";
 import { webUrl } from "./web-url.js";
 
 export { webUrl };
@@ -26,7 +31,7 @@ export interface StartOptions {
   home: string;
   env: Readonly<Record<string, string | undefined>>;
   layout: AppLayout;
-  onOutput?: (name: ProcessSpec["name"], chunk: string) => void;
+  onOutput?: (name: ProcessSpec["name"], line: string) => void;
   onMigrated?: (config: BootConfig, migrated: ReadonlyArray<string>) => void;
   signal?: AbortSignal;
   readyTimeoutMs?: number;
@@ -85,8 +90,13 @@ export async function start(options: StartOptions): Promise<Started> {
     throw error;
   }
 
+  rotateServiceLog(options.home, options.env);
+
   const sshKey = await ensureGangerSshKey(gangerSshPaths(options.home), runCommand);
-  if (!sshKey.ok) options.warn?.(messages.start.sshKeyFailed(sshKey.detail));
+  if (!sshKey.ok) {
+    log().warn("supervisor.ssh_key_failed", { reason: sshKey.detail });
+    options.warn?.(messages.start.sshKeyFailed(sshKey.detail));
+  }
 
   const childEnv: Record<string, string | undefined> = {
     ...options.env,
@@ -140,6 +150,10 @@ export async function start(options: StartOptions): Promise<Started> {
   };
 }
 
+export function forEachLine(stream: Readable, onLine: (line: string) => void): void {
+  createInterface({ input: stream, crlfDelay: Infinity }).on("line", onLine);
+}
+
 interface Child {
   name: ProcessSpec["name"];
   process: ChildProcess;
@@ -172,8 +186,9 @@ function spawnChild(
         : ["ignore", "pipe", "pipe", "ipc"],
   });
   if (onOutput !== undefined) {
-    child.stdout?.on("data", (chunk: Buffer) => onOutput(spec.name, chunk.toString()));
-    child.stderr?.on("data", (chunk: Buffer) => onOutput(spec.name, chunk.toString()));
+    for (const stream of [child.stdout, child.stderr]) {
+      if (stream !== null) forEachLine(stream, (line) => onOutput(spec.name, line));
+    }
   }
   let running = true;
   const exit = new Promise<string>((resolve) => {
@@ -217,7 +232,11 @@ function superviseChildren(children: Child[], stopTimeoutMs: number) {
 
   for (const child of children) {
     void child.exit.then((reason) => {
-      if (stopping) return;
+      if (stopping) {
+        log().info("supervisor.child_exited", { child: child.name, reason });
+        return;
+      }
+      log().warn("supervisor.child_exited", { child: child.name, reason });
       failure = `${child.name} ${reason}`;
       notifyFailure(failure);
       void stopAll();
@@ -229,6 +248,17 @@ function superviseChildren(children: Child[], stopTimeoutMs: number) {
     firstFailure,
     exited: allExited.then(() => (failure === undefined ? {} : { failure })),
   };
+}
+
+export function rotateServiceLog(
+  home: string,
+  env: Readonly<Record<string, string | undefined>>,
+): void {
+  try {
+    rotateInPlaceIfOver(serviceLogFile(home), readLogSettings(env).limits);
+  } catch (error) {
+    log().warn("log.rotate_failed", { path: basename(serviceLogFile(home)), error });
+  }
 }
 
 async function waitForWeb(

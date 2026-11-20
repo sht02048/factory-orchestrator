@@ -1,3 +1,5 @@
+import { withLogContext } from "@ganger/log";
+import type { LogContext } from "@ganger/log";
 import { checkAutoAssignment, labelJustAttached, routeToRepo } from "@ganger/core";
 import type {
   AutoAssignmentRun,
@@ -43,7 +45,7 @@ export async function assignAutomatically(context: TickContext): Promise<void> {
     processTrackerEvents(context);
     await correctByPolling(context);
   } catch (error) {
-    context.logger.warn("could not assign automatically", { error });
+    context.logger.warn("auto_assign.failed", { error });
   }
 }
 
@@ -59,20 +61,18 @@ function processTrackerEvents(context: TickContext): void {
   }
   for (const event of events) {
     try {
-      inTransaction(db, () => {
-        const latest =
-          event.ticketKey === null
-            ? undefined
-            : latestLabels.get(`${event.connection}\n${event.ticketKey}`);
-        assignForEvent(context, event, latest ?? null);
-        markTrackerEventProcessed(db, event.connection, event.deliveryId, now());
-      });
+      withLogContext(trackerEventLogContext(event), () =>
+        inTransaction(db, () => {
+          const latest =
+            event.ticketKey === null
+              ? undefined
+              : latestLabels.get(`${event.connection}\n${event.ticketKey}`);
+          assignForEvent(context, event, latest ?? null);
+          markTrackerEventProcessed(db, event.connection, event.deliveryId, now());
+        }),
+      );
     } catch (error) {
-      logger.warn("could not process tracker event", {
-        connection: event.connection,
-        deliveryId: event.deliveryId,
-        error,
-      });
+      logger.warn("tracker_event.process_failed", { ...trackerEventLogContext(event), error });
     }
   }
 }
@@ -118,7 +118,11 @@ async function correctByPolling(context: TickContext): Promise<void> {
     try {
       tickets = await tracker.listLabeledTickets({ labelId, updatedSince: new Date(since) });
     } catch (error) {
-      logger.warn("could not list labeled tickets", { connection, labelId, error });
+      logger.warn("auto_assign.list_labeled_failed", {
+        trackerConnectionId: connection,
+        labelId,
+        error,
+      });
       continue;
     }
     const changedUpTo = autoAssign.changedUpTo.get(key) ?? Number.NEGATIVE_INFINITY;
@@ -128,7 +132,10 @@ async function correctByPolling(context: TickContext): Promise<void> {
         markTrackerChanged(context.db, connection);
         autoAssign.changedUpTo.set(key, latest);
       } catch (error) {
-        logger.warn("could not mark tracker reads changed", { connection, error });
+        logger.warn("auto_assign.tracker_reads_mark_failed", {
+          trackerConnectionId: connection,
+          error,
+        });
       }
     }
     let complete = true;
@@ -139,8 +146,8 @@ async function correctByPolling(context: TickContext): Promise<void> {
         );
       } catch (error) {
         complete = false;
-        logger.warn("could not assign a labeled ticket", {
-          connection,
+        logger.warn("auto_assign.labeled_ticket_failed", {
+          trackerConnectionId: connection,
           ticketKey: ticket.key,
           error,
         });
@@ -158,7 +165,7 @@ function labelsToPoll(
   try {
     connections = context.adapters.trackerConnectionIds(db);
   } catch (error) {
-    logger.warn("could not read tracker connections", { error });
+    logger.warn("auto_assign.connections_read_failed", { error });
     return [];
   }
   const workspaces = listWorkspaces(db);
@@ -181,7 +188,10 @@ function trackerFor(context: TickContext, connection: TrackerConnectionId) {
   try {
     return context.adapters.tracker(context.db, connection);
   } catch (error) {
-    context.logger.warn("could not create tracker adapter", { connection, error });
+    context.logger.warn("auto_assign.tracker_adapter_failed", {
+      trackerConnectionId: connection,
+      error,
+    });
     return null;
   }
 }
@@ -250,7 +260,7 @@ function assign(
     now: context.now(),
   });
   if (!result.ok && result.reason !== "active-run") {
-    context.logger.warn("could not assign ticket automatically", {
+    context.logger.warn("auto_assign.ticket_failed", {
       ticketKey: ticket.key,
       reason: result.reason,
     });
@@ -264,5 +274,13 @@ function toAutoAssignmentRun(run: StoredRun): AutoAssignmentRun {
     assignedAt: run.assignedAt,
     agentResult: run.state === "ended" ? run.agentResult : null,
     endedAt: run.state === "ended" ? run.endedAt : null,
+  };
+}
+
+function trackerEventLogContext(event: StoredTrackerEvent): LogContext {
+  return {
+    trackerConnectionId: event.connection,
+    deliveryId: event.deliveryId,
+    ticketKey: event.ticketKey,
   };
 }
