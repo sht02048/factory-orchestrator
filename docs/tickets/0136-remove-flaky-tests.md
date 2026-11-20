@@ -11,7 +11,7 @@ blocked_by: []
 
 ## 확인한 방법
 
-- 2026-11-20 기준 CI 워크플로의 실패 실행 30개(`gh run list --workflow CI`)와 다시 돌린 실행의 첫 시도 로그(`actions/runs/<id>/attempts/1/logs`)에서 실패한 시험 이름을 모았다.
+- CI 워크플로의 실패 실행 중 run 44666327159(2026-11-20 03:14 UTC)까지의 30개(`gh run list --workflow CI`)와 다시 돌린 실행의 첫 시도 로그, 코디네이터가 더한 run 44674241278 첫 시도 로그(`actions/runs/<id>/attempts/1/logs`)에서 실패한 시험 이름을 모았다.
 - 0121·0131·0135 가 이미 고쳐 그 뒤 CI 에서 흔들리지 않은 시험(Settings 목차, runs-query, desktop 알림 설정·화면 전환)은 지우지 않았다.
 
 ## 지운 시험과 잃은 확인 범위
@@ -29,6 +29,22 @@ blocked_by: []
   - 잃은 확인: 실제 서버와 브라우저에서 orca 경로를 비우고 등록하면 ssh 실패 경고를 보이고 러너를 저장하지 않는 것.
   - 남은 확인: `packages/app/src/runner-setup/remote-orca.test.ts`가 ssh 실패와 orca 없음 구분('tells an ssh failure apart from a missing orca'), 찾지 못하면 저장하지 않기('saves nothing when orca cannot be found')를 가짜 ssh 로 본다. 화면의 경고 문장은 이제 시험하지 않는다.
 
+- `apps/cli/src/start.test.ts`·`apps/cli/src/mcp/program-mcp.test.ts`의 시험 넷(코디네이터가 더한 후보)
+  - CI: PR #170(0126, Dashboard·Stats) run 44674241278 첫 시도에서 넷 모두 5초 시간 초과(`Test timed out in 5000ms`). 실제 자식 프로세스나 stdio MCP 서버를 띄우는 시험이라 부하에 밀린다. 단독으로는 통과한다.
+  - `start` '마이그레이션을 돌린 뒤 web이 바인딩 주소에서 응답한다'
+    - 잃은 확인: 첫 start 가 모든 마이그레이션을 돌리고 DB 에 남기며, web 이 `.env`의 포트에서 응답하고, 멈추면 실패 없이 끝나는 것.
+    - 남은 확인: 같은 파일 '다시 띄우면 돌릴 마이그레이션이 없다'가 start 와 web 응답을, CI `smoke:cli`·`smoke:bundle`(`scripts/smoke-cli.ts`)이 실제 `ganger start`로 web 과 worker 가 뜨는 것을 본다. 처음 돌린 마이그레이션 목록과 `schema_migrations` 행 수는 이제 시험하지 않는다.
+  - `start` '뜨는 중에 멈추라는 신호를 받으면 web을 더 기다리지 않고 자식을 멈춘다'
+    - 잃은 확인: web 이 응답하기 전에 멈추라는 신호를 받으면 기다림을 끝내고 `stop requested`로 실패하는 것.
+    - 남은 확인: 같은 파일 'web이 응답하는 중에 신호를 받으면 뜬 것으로 치지 않고 멈춘다'가 응답 중의 신호를 본다. 응답하지 않는 web 을 기다리는 중의 신호는 이제 시험하지 않는다.
+  - `start 의 worker 깨우기 중계` '출력을 넘겨받을 때 web 이 보낸 { type: wake } 만 worker 에 닿는다'(`it.each`의 한 줄)
+    - 잃은 확인: `onOutput`으로 자식 출력을 넘겨받을 때도 web 의 깨우기 메시지가 worker 에 닿는 것.
+    - 남은 확인: 같은 표의 '출력을 그대로 둘 때' 줄이 같은 중계를 본다.
+  - `ganger mcp` '실제 SDK 클라이언트로 stdio에 붙으면 … 질문에 답하고 기록을 남긴다'
+    - 잃은 확인: 실제 MCP SDK 클라이언트가 stdio 로 붙어 스위치를 켜면 `tools/list_changed` 알림을 받고, 쓰기 도구로 답을 저장하고 MCP 기록을 남기는 것.
+    - 남은 확인: `apps/cli/src/mcp/write-tools.test.ts` '켜면 다시 시작하지 않아도 쓰기 도구가 보이고, 끄면 다시 사라진다', '질문에 답하면 답을 저장하고, Run 상세 상태 기록 사이에 MCP · 클라이언트 이름으로 남긴다'와 같은 파일 '판이 같으면 stdin·stdout으로 MCP를 주고받고…'가 본다. SDK 클라이언트와 stdio 로 주고받는 알림은 이제 시험하지 않는다.
+    - 이 시험만 쓰던 `PipeClientTransport`와 import 를 함께 지웠다.
+
 ## 확인하지 못해 남긴 것
 
 CI 실패 기록에서 찾지 못해 지우지 않았다. 다시 CI 에서 흔들리면 지운다.
@@ -43,10 +59,11 @@ CI 실패 기록에서 찾지 못해 지우지 않았다. 다시 CI 에서 흔�
 
 - `e2e/src/nav-shortcuts.test.ts` '데스크톱 메뉴가 보낸 화면으로…'(PR #157, 2026-11-19 두 번)
 - `e2e/src/desktop-updates.test.ts` '다른 토스트가 와도 밀려나지 않고…'(PR #157 첫 시도)
+- `apps/cli/src/start.test.ts` '한쪽이 먼저 끝나면 다른 쪽도 멈추고 이유를 알린다'(PR #80(0050) run 44241958153, 2026-11-18 한 번, `worker exited with code 3`로 web 응답 전 실패)
 - `demo/src/dev.test.ts` '온보딩 모드: 가짜 값으로 5단계를 마치면 홈이 열린다'(PR #166 첫 시도)
 
 ## 완료 조건
 
-- [x] 위 세 시험을 지우고 `.skip`·`.only`를 남기지 않는다.
+- [x] 위 시험을 지우고 `.skip`·`.only`를 남기지 않는다.
 - [x] 지운 시험마다 잃은 확인 범위와 남은 단위 시험을 적는다.
 - [x] 로컬에서 typecheck·lint·format 과 바뀐 시험 파일을 돌린다. 전체 시험은 CI `check`에 맡긴다.
