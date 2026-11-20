@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SecretBox, recordProviderUsage, saveWorkspace, toWorkspaceId } from "@ganger/db";
@@ -24,6 +24,7 @@ const READ_TOOLS = [
   "get_dashboard",
   "get_run",
   "get_runner",
+  "get_server_logs",
   "get_settings",
   "get_stats",
   "list_runners",
@@ -95,6 +96,11 @@ async function everyResult(): Promise<Array<{ name: string; text: string; json: 
     call("get_runner", { runner: "runner-a" }).then((r) => ({ name: "get_runner", ...r })),
     call("get_stats").then((r) => ({ name: "get_stats", ...r })),
     call("get_settings").then((r) => ({ name: "get_settings", ...r })),
+    call("get_server_logs", { runId: seeded.waiting }).then((r) => ({
+      name: "get_server_logs run",
+      ...r,
+    })),
+    call("get_server_logs").then((r) => ({ name: "get_server_logs recent", ...r })),
   ]);
 }
 
@@ -333,5 +339,124 @@ describe("ganger mcp 서버", () => {
     expect(byName.text).toContain("Pass its id");
     const byId = await call("get_dashboard", { workspace: "ws-twin" });
     expect(byId.json).toMatchObject({ workspace: { id: "ws-twin" } });
+  });
+});
+
+describe("get_server_logs", () => {
+  function logLine(second: number, fields: Record<string, unknown>): string {
+    return JSON.stringify({
+      t: `2026-11-17T09:00:${String(second).padStart(2, "0")}.000+00:00`,
+      level: "info",
+      proc: "worker",
+      pid: 7,
+      v: "0.1.0",
+      event: `test.s${second}`,
+      msg: "a fixed sentence",
+      ...fields,
+    });
+  }
+
+  function writeLogs(): string {
+    const dir = join(home, "logs");
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, "worker.jsonl");
+    writeFileSync(
+      path,
+      [
+        logLine(1, { runId: seeded.waiting, ticketKey: "ACME-1" }),
+        logLine(2, { level: "warn", runId: seeded.ended, reason: "other run" }),
+        logLine(3, { ticketKey: "ACME-1", deliveryId: "d-1" }),
+        logLine(4, {
+          level: "warn",
+          runId: seeded.waiting,
+          reason: `runner said ${SECRETS.githubToken}`,
+          apiKey: SECRETS.apiKey,
+        }),
+        logLine(5, { level: "debug", runId: seeded.waiting }),
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(join(dir, "web.jsonl.1"), `${logLine(0, { level: "error" })}\n`);
+    return path;
+  }
+
+  it("런의 타임라인과 그 런·그 티켓의 서버 로그 줄을 시각순으로 준다", async () => {
+    writeLogs();
+    const { isError, json } = await call("get_server_logs", { runId: seeded.waiting });
+    expect(isError).toBe(false);
+    expect(json).toMatchObject({
+      logDir: join(home, "logs"),
+      timeline: {
+        runs: [{ id: seeded.waiting, ticketKey: "ACME-1" }],
+      },
+      serverLog: { total: 4, truncated: false },
+    });
+    const parsed = z
+      .object({
+        timeline: z.object({
+          entries: z.array(z.looseObject({ source: z.string(), event: z.string().optional() })),
+        }),
+        serverLog: z.object({ logLines: z.array(z.object({ event: z.string() })) }),
+      })
+      .parse(json);
+    const sources = parsed.timeline.entries.map((entry) => `${entry.source}:${entry.event ?? ""}`);
+    expect(sources.slice(0, 2)).toEqual(["run:assigned", "state:"]);
+    expect(sources).toContain("run:started");
+    const events = parsed.serverLog.logLines.map((line) => line.event);
+    expect(events).toEqual(["test.s1", "test.s3", "test.s4", "test.s5"]);
+  });
+
+  it("티켓 키로도 읽고, limit 은 가장 최근 줄만 남긴다", async () => {
+    writeLogs();
+    const { json } = await call("get_server_logs", { ticketKey: "ACME-1", limit: 2 });
+    expect(json).toMatchObject({
+      timeline: { runs: [{ id: seeded.waiting }] },
+      serverLog: {
+        total: 4,
+        truncated: true,
+        logLines: [{ event: "test.s4" }, { event: "test.s5" }],
+      },
+    });
+  });
+
+  it("아무것도 주지 않으면 최근 warn·error 줄만 준다", async () => {
+    writeLogs();
+    const { json } = await call("get_server_logs");
+    expect(json).toMatchObject({
+      serverLog: {
+        total: 3,
+        logLines: [{ event: "test.s0" }, { event: "test.s2" }, { event: "test.s4" }],
+      },
+    });
+    expect(json).not.toHaveProperty("timeline");
+  });
+
+  it("읽기만 하고 파일에 남은 비밀 값도 가려서 준다", async () => {
+    const path = writeLogs();
+    const before = readFileSync(path, "utf8");
+    const tables = () =>
+      ["mcp_actions", "change_events", "runs", "run_state_changes"].map((table) =>
+        JSON.stringify(seeded.db.$client.prepare(`SELECT * FROM ${table}`).all()),
+      );
+    const tablesBefore = tables();
+
+    const { text } = await call("get_server_logs", { runId: seeded.waiting });
+    await call("get_server_logs");
+    await call("get_server_logs", { ticketKey: "ACME-1" });
+
+    expect(text).not.toContain(SECRETS.githubToken);
+    expect(text).not.toContain(SECRETS.apiKey);
+    expect(text).toContain("[redacted]");
+    expect(readFileSync(path, "utf8")).toBe(before);
+    expect(tables()).toEqual(tablesBefore);
+  });
+
+  it("로그 파일이 없어도 타임라인을 주고, 없는 런과 둘 다 준 입력은 오류로 알린다", async () => {
+    const { json } = await call("get_server_logs", { runId: seeded.waiting });
+    expect(json).toMatchObject({ serverLog: { total: 0, logLines: [] } });
+    expect((await call("get_server_logs", { runId: "run-missing" })).isError).toBe(true);
+    expect(
+      (await call("get_server_logs", { runId: seeded.waiting, ticketKey: "ACME-1" })).isError,
+    ).toBe(true);
   });
 });
