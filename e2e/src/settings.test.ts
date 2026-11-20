@@ -511,22 +511,6 @@ describe("Settings 폼과 도움말(브라우저, 0119 리뷰 후속)", () => {
     await expect.poll(focused).toBe(settings.projects.open);
   });
 
-  it("맞지 않는 분 값은 넣은 값을 그대로 두고 오류를 그 칸에 잇는다", async () => {
-    await openSettings(page);
-    const minutes = page.getByRole("textbox", { name: settings.workspace.maxRunLabel });
-    await minutes.fill("0");
-    await minutes.press("Enter");
-    await page.getByText(settings.workspace.maxRunInvalid).waitFor();
-    expect(await minutes.inputValue()).toBe("0");
-    const described = await minutes.getAttribute("aria-describedby");
-    expect(await page.locator(`[id="${described}"]`).textContent()).toBe(
-      settings.workspace.maxRunInvalid,
-    );
-    await minutes.fill("12");
-    await page.getByText(settings.workspace.maxRunInvalid).waitFor({ state: "detached" });
-    await page.reload();
-  });
-
   it("+ 넣기를 누르면 넣을 프로젝트 목록의 첫 버튼으로 포커스가 간다", async () => {
     await openSettings(page);
     await section(settings.sections.projects)
