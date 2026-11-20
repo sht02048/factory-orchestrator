@@ -90,7 +90,7 @@ describe("담아 둔 트래커 읽기를 지우는 경로(0122)", () => {
     expect(await stateOf("ACME-1")).toBe("Done");
   });
 
-  it("트래커에서 다시 읽기를 누르면 다음 Tickets 읽기는 트래커의 새 값을 보인다", async () => {
+  it("Linear에서 다시 읽기를 누르면 다음 Tickets 읽기는 트래커의 새 값을 보인다", async () => {
     const { db, stateOf, moveToDone } = cachedSetup();
     await stateOf("ACME-1");
     moveToDone("ACME-1");

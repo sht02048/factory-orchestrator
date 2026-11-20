@@ -116,7 +116,7 @@ describe("원격에서 화면 옮기기(브라우저, 0122)", () => {
     expect(await seen()).toBe(false);
   });
 
-  it("화면 이동이 아닌 다시 읽기(트래커에서 다시 읽기)에는 진행 줄을 켜지 않는다", async (context) => {
+  it("화면 이동이 아닌 다시 읽기(Linear에서 다시 읽기)에는 진행 줄을 켜지 않는다", async (context) => {
     const page = await newPage(context);
     await open(page, "/tickets", "tickets");
 

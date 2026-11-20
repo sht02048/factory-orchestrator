@@ -117,9 +117,15 @@ function AllWorkspaces({
 
 type RereadResult = "idle" | "reading" | "checking" | "failed" | "partial";
 
-function useReread(onReread: () => Promise<void>, failedProjects: number) {
+function useReread(onReread: () => Promise<void>, page: TicketsPage) {
   const t = useTranslations("tickets.reread");
   const [result, setResult] = useState<RereadResult>("idle");
+  const failedProjects = page.errors.length;
+  const [failedOn, setFailedOn] = useState<TicketsPage | null>(null);
+  if (result === "failed" && failedOn !== null && failedOn !== page) {
+    setResult("idle");
+    setFailedOn(null);
+  }
   useEffect(() => {
     if (result !== "checking") return;
     if (failedProjects > 0) {
@@ -133,7 +139,10 @@ function useReread(onReread: () => Promise<void>, failedProjects: number) {
     setResult("reading");
     onReread().then(
       () => setResult("checking"),
-      () => setResult("failed"),
+      () => {
+        setFailedOn(page);
+        setResult("failed");
+      },
     );
   };
   return { result, start };
@@ -190,7 +199,7 @@ function TicketsList({
   onReread,
 }: TicketsScreenProps) {
   const t = useTranslations("tickets");
-  const reread = useReread(onReread, page.errors.length);
+  const reread = useReread(onReread, page);
   const [query, setQuery] = useState("");
   const visible = useMemo(
     () =>

@@ -80,11 +80,11 @@ describe("Tickets 화면", () => {
     expect(text(html)).toContain("할당할 수 있는 티켓이 2개 있어요.");
   });
 
-  it("트래커 프로젝트가 있으면 머리 오른쪽에 트래커에서 다시 읽기를 두고, 없으면 두지 않는다(0122)", async () => {
+  it("트래커 프로젝트가 있으면 머리 오른쪽에 Linear에서 다시 읽기를 두고, 없으면 두지 않는다(0122)", async () => {
     const { context } = setupTickets();
     const html = render(await loadTicketsPage(context, undefined, now));
     const button = /<button[^>]*data-variant="secondary"[^>]*>([\s\S]*?)<\/button>/.exec(html);
-    expect(text(button?.[1] ?? "")).toContain("트래커에서 다시 읽기");
+    expect(text(button?.[1] ?? "")).toContain("Linear에서 다시 읽기");
     expect(html).toMatch(/<\/button><span[^>]*><span role="status"><\/span><\/span>/);
     expect(html).toContain('aria-busy="false"');
 
@@ -93,7 +93,7 @@ describe("Tickets 화면", () => {
       tickets: [],
       trackerProjectCount: 0,
     });
-    expect(empty).not.toContain("트래커에서 다시 읽기");
+    expect(empty).not.toContain("Linear에서 다시 읽기");
   });
 
   it("필터는 한 줄 묶음 탭이고 각 개수를 보인다", async () => {
