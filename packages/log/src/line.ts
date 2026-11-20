@@ -140,14 +140,31 @@ function pad(value: number): string {
   return String(value).padStart(2, "0");
 }
 
-export function humanLine(line: LogLine): string {
-  const time = line.t.slice(11, 19);
+export interface DisplayLine {
+  t: string;
+  level: LogLevel;
+  proc: string;
+  msg: string;
+  [key: string]: unknown;
+}
+
+export interface HumanLineStyle {
+  date?: boolean;
+  paint?: (level: LogLevel, text: string) => string;
+}
+
+export function humanLine(line: DisplayLine, style: HumanLineStyle = {}): string {
+  const time =
+    style.date === true ? `${line.t.slice(0, 10)} ${line.t.slice(11, 23)}` : line.t.slice(11, 19);
+  const levelText = line.level.toUpperCase();
+  const level = style.paint === undefined ? levelText : style.paint(line.level, levelText);
   const extras = Object.entries(line)
     .filter(([key]) => !FIXED_KEYS.has(key))
     .map(([key, value]) => `${key}=${humanValue(value)}`);
-  const err = line.err === undefined ? "" : ` error=${JSON.stringify(errorSummary(line.err))}`;
+  const error = line["err"];
+  const err = error === undefined ? "" : ` error=${JSON.stringify(errorSummary(error))}`;
   const tail = extras.length === 0 ? "" : ` ${extras.join(" ")}`;
-  return `${time} ${line.level.toUpperCase()} [${line.proc}] ${line.msg}${tail}${err}\n`;
+  return `${time} ${level} [${line.proc}] ${line.msg}${tail}${err}\n`;
 }
 
 function humanValue(value: unknown): string {
@@ -155,10 +172,15 @@ function humanValue(value: unknown): string {
   return JSON.stringify(value) ?? String(value);
 }
 
-function errorSummary(err: SerializedError): string {
-  const parts = [`${err.name}: ${err.message}`];
-  if (err.kind !== undefined) parts.push(`kind=${err.kind}`);
-  if (err.detail !== undefined) parts.push(err.detail);
+function errorSummary(err: unknown): string {
+  if (typeof err !== "object" || err === null) return describe(err);
+  const parts = [
+    `${stringProperty(err, "name") ?? "Error"}: ${stringProperty(err, "message") ?? ""}`,
+  ];
+  const kind = stringProperty(err, "kind");
+  if (kind !== undefined) parts.push(`kind=${kind}`);
+  const detail = stringProperty(err, "detail");
+  if (detail !== undefined) parts.push(detail);
   return parts.join(" ");
 }
 

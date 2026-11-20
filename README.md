@@ -202,13 +202,35 @@ The web server, the worker, `ganger mcp`, and `ganger start` each write a server
 - A file that passes 10 MB moves to `.1`, and up to five old files are kept. Change this with `GANGER_LOG_MAX_MB` and `GANGER_LOG_FILES`. `ganger.log` and the desktop app's `desktop-server.log` follow the same limits when the server starts.
 - Secret values and token-shaped text are replaced with `[redacted]`. Ticket bodies, agent briefs, webhook bodies, and environment variables are never written. Ticket keys and runner names are kept, so check a log before you share it.
 
-For example, to follow one run across all processes: `jq -c 'select(.runId == "<run id>")' ~/.ganger/logs/*.jsonl`.
+Read them with `ganger logs`. It merges the four files and their rotated copies in time order and prints one line per entry, colored when the output is a terminal:
+
+```sh
+ganger logs --run <run id>              # everything about one run, from every process
+ganger logs --ticket ACME-12 --since 2h # one ticket over the last two hours
+ganger logs --level warn -f             # warnings and errors, then keep printing new ones
+ganger logs --proc worker --json        # the stored JSON lines, for jq or a coding agent
+```
+
+`--proc` takes `web`, `worker`, `mcp`, `cli`, or `desktop` (repeat it or separate names with commas), `--level` shows that level and more severe ones, and `--since` takes `30s`, `10m`, `2h`, `1d`, or an ISO 8601 date. `-f` keeps reading across rotation until you stop it. On Linux, when the systemd service is installed, it also reminds you that the service's console output is in journald. Lines that a crashed process left half-written are skipped.
+
+The files are plain JSON Lines, so `jq` works too. These read only the current files; `ganger logs` also reads the rotated ones.
+
+```sh
+# One run across all processes (one file after another, not merged by time)
+jq -c 'select(.runId == "<run id>")' ~/.ganger/logs/*.jsonl
+
+# Warnings and errors of the worker, as time, event, and error message
+jq -r 'select(.level == "warn" or .level == "error") | [.t, .event, (.err.message // "")] | @tsv' ~/.ganger/logs/worker.jsonl
+
+# Count events by name, to see what the server has been doing
+jq -r '.event' ~/.ganger/logs/*.jsonl | sort | uniq -c | sort -rn
+```
 
 ### Connect an MCP client
 
 `ganger mcp` runs an [MCP](https://modelcontextprotocol.io) server over stdin and stdout, so an agent on the same machine (for example, Hermes) can read Ganger's current state and, when you allow it, use the app's write actions. The MCP client starts the command itself; it opens no network port. It reads the database of the installation folder (`--home` or `GANGER_HOME`) directly, so it works even while the server is stopped, and every result says whether the server is running.
 
-- The read tools cover the Dashboard summary (including runners' provider usage), tickets, runs and run detail (with the last stored lines of the log), runners and their provider usage, stats, and settings. They are marked read-only. Tools that take a workspace accept its id or name, and you can leave it out when there is only one.
+- The read tools cover the Dashboard summary (including runners' provider usage), tickets, runs and run detail (with the last stored lines of the log), runners and their provider usage, stats, settings, and server logs. They are marked read-only. `get_server_logs` takes a run id or a ticket key and returns that run's or ticket's run timeline (assignment, state changes, tracker webhooks, MCP actions, notifications, questions, permission requests, and cancel requests in time order) with the matching server log lines; with neither, it returns the latest warnings and errors. It masks secrets again before it answers. Tools that take a workspace accept its id or name, and you can leave it out when there is only one.
 - Write tools appear only after you turn on **Allow MCP writes** in Settings > MCP (off by default); turning it on or off takes effect without restarting the client. They match the app's write actions: assigning a ticket, answering a question, denying a permission request, canceling a run, refreshing a run's log, the workspace name and longest run time, adding and removing tracker projects, Mapping, the In Progress state, the Auto-assign Label, checking the tracker connection and the GitHub token again, changing an existing runner's capacity, checking a runner again, and keeping the Mac awake. Canceling a run and removing a tracker project are marked destructive.
 - These stay in the app only, with no MCP tool: saving secrets (tracker API keys, webhook secrets, the GitHub token), adding a runner or changing its ssh target or Orca path, the addresses, and the **Allow MCP writes** switch itself.
 - Every MCP write is recorded as "MCP · client name" (the `clientInfo.name` the client sends, shortened and with control characters removed), with the tool, the target, and the result. Requests about a run show up in that run's timeline on Run detail; other writes show up under Recent activity in Settings > MCP. When the server is stopped, writes the worker handles are saved, and the result says the server handles them when it starts.

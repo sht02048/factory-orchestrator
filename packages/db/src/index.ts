@@ -8,6 +8,7 @@ export * from "./migrate.js";
 export * from "./permissions.js";
 export * from "./questions.js";
 export * from "./requests.js";
+export * from "./run-timeline.js";
 export * from "./runs.js";
 export * as schema from "./schema.js";
 export * from "./secret-box.js";
