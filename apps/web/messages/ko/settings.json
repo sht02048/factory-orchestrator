@@ -473,7 +473,6 @@
     },
     "copy": "복사하기",
     "copyLabel": "{label} 복사하기",
-    "copied": "{label}을 복사했어요",
     "copyFailed": "복사하지 못했어요. 직접 골라 복사해 주세요.",
     "address": {
       "label": "Linear가 이 서버에 닿을 주소",
@@ -521,7 +520,8 @@
       "turningOn": "켜는 중…",
       "required": "signing secret을 붙여 넣어 주세요.",
       "turnedOn": "webhook을 켰어요",
-      "save": "저장하기"
+      "save": "저장하기",
+      "reenter": "다시 넣기"
     },
     "waiting": {
       "title": "Linear에서 아무 티켓이나 하나 고쳐 보세요",
@@ -546,9 +546,11 @@
       "trigger": "webhook 끄기",
       "confirmTitle": "webhook을 끌까요?",
       "confirmBody": "signing secret을 지우고 1분마다 Linear를 읽어요. 다시 켜려면 signing secret을 다시 넣어야 해요. Linear에 만든 webhook은 Linear에서 지워 주세요.",
-      "confirm": "끄기",
+      "confirm": "webhook 끄기",
       "cancel": "닫기",
       "done": "webhook을 껐어요"
-    }
+    },
+    "copiedUrl": "주소를 복사했어요",
+    "copiedCommand": "명령을 복사했어요"
   }
 }

@@ -842,6 +842,7 @@ describe("트래커 연결 상세의 webhook 켜기(브라우저, 0130)", () => 
     await steps.getByRole("button", { name: settings.webhook.address.check }).click();
     await steps.getByText(settings.webhook.address.error["invalid-address"]).waitFor();
     expect(await field.getAttribute("aria-invalid")).toBe("true");
+    await expect.poll(() => field.evaluate((el) => el === document.activeElement)).toBe(true);
     await steps.getByRole("button", { name: settings.webhook.address.recheck }).waitFor();
   });
 
@@ -855,6 +856,16 @@ describe("트래커 연결 상세의 webhook 켜기(브라우저, 0130)", () => 
     await webhook.getByText(webhookUrl, { exact: true }).waitFor();
     await webhook.getByRole("link", { name: new RegExp(settings.webhook.create.open) }).waitFor();
     await shot(page, "webhook-create-open-1280");
+
+    await webhook
+      .getByRole("button", { name: `${settings.webhook.address.label} ${settings.change}` })
+      .click();
+    const addressField = webhook.getByRole("textbox", { name: settings.webhook.address.field });
+    await expect
+      .poll(() => addressField.evaluate((el) => el === document.activeElement))
+      .toBe(true);
+    await page.keyboard.press("Escape");
+    await expect.poll(focused).toBe(settings.change);
 
     const secret = webhook.getByRole("textbox", { name: settings.webhook.secret.field });
     await webhook.getByRole("button", { name: settings.webhook.secret.turnOn }).click();
@@ -893,7 +904,9 @@ describe("트래커 연결 상세의 webhook 켜기(브라우저, 0130)", () => 
     await shot(page, "webhook-settings-rows-1280");
 
     await openSettings(page, connectionPath);
-    await webhook.getByRole("button", { name: settings.webhook.rejected.reenter }).click();
+    await webhook
+      .getByRole("button", { name: settings.webhook.rejected.reenter, exact: true })
+      .click();
     const again = webhook.getByRole("textbox", { name: settings.webhook.secret.field });
     await expect.poll(() => again.evaluate((el) => el === document.activeElement)).toBe(true);
     await again.fill("whsec_new");

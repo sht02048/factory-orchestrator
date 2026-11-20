@@ -201,7 +201,12 @@ export function SettingsSection({
   const headingId = `${id}-heading`;
   return (
     <section id={id} aria-labelledby={headingId} {...stylex.props(styles.section)}>
-      <div {...stylex.props(styles.sectionHead)}>
+      <div
+        {...stylex.props(
+          styles.sectionHead,
+          detail !== undefined && detail !== null && styles.sectionHeadWrap,
+        )}
+      >
         <h2
           id={headingId}
           tabIndex={-1}
@@ -394,34 +399,32 @@ export function SettingsStep({
           )}
         </StepMarker>
       </span>
-      <div {...stylex.props(styles.stepBody)}>
-        <div {...stylex.props(styles.stepHead)}>
-          <span {...stylex.props(styles.rowText)}>
-            <span {...stylex.props(styles.labelLine)}>
-              <span
-                {...stylex.props(textStyles("title", state === "locked" ? "disabled" : "strong"))}
-              >
-                {label}
-              </span>
-              <VisuallyHidden>{stateLabel}</VisuallyHidden>
-              {info === undefined || info === null ? null : (
-                <span {...stylex.props(styles.infoSlot)}>{info}</span>
-              )}
+      <div {...stylex.props(styles.stepHead)}>
+        <span {...stylex.props(styles.rowText)}>
+          <span {...stylex.props(styles.labelLine)}>
+            <span
+              {...stylex.props(textStyles("title", state === "locked" ? "disabled" : "strong"))}
+            >
+              {label}
             </span>
-            {detail === undefined || detail === null ? null : (
-              <span {...stylex.props(textStyles("meta"), detailMono && styles.mono, styles.detail)}>
-                {detail}
-              </span>
+            <VisuallyHidden>{stateLabel}</VisuallyHidden>
+            {info === undefined || info === null ? null : (
+              <span {...stylex.props(styles.infoSlot)}>{info}</span>
             )}
           </span>
-          {control === undefined || control === null ? null : (
-            <span {...stylex.props(styles.stepControl)}>{control}</span>
+          {detail === undefined || detail === null ? null : (
+            <span {...stylex.props(textStyles("meta"), detailMono && styles.mono, styles.detail)}>
+              {detail}
+            </span>
           )}
-        </div>
-        {children === undefined || children === null || state === "locked" ? null : (
-          <div {...stylex.props(styles.stepContent)}>{children}</div>
+        </span>
+        {control === undefined || control === null ? null : (
+          <span {...stylex.props(styles.stepControl)}>{control}</span>
         )}
       </div>
+      {children === undefined || children === null || state === "locked" ? null : (
+        <div {...stylex.props(styles.stepContent)}>{children}</div>
+      )}
     </li>
   );
 }
@@ -643,17 +646,19 @@ const styles = stylex.create({
     minHeight: size.control,
   },
   sectionTitle: { margin: 0 },
-  sectionDetail: { marginInlineStart: space.s2, minWidth: 0, overflowWrap: "anywhere" },
+  sectionHeadWrap: { flexWrap: "wrap", columnGap: space.s2, rowGap: space.px2 },
+  sectionDetail: { flexShrink: 0, maxWidth: "100%", overflowWrap: "anywhere" },
   steps: { margin: 0, padding: 0, listStyle: "none" },
   step: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: { default: space.s4, [breakpoints.settingsRowStacked]: space.s3 },
+    display: "grid",
+    gridTemplateColumns: "auto minmax(0, 1fr)",
+    alignItems: "start",
+    columnGap: { default: space.s4, [breakpoints.settingsRowStacked]: space.s3 },
+    rowGap: space.s4,
     paddingBlock: space.s4,
     paddingInline: { default: space.s5, [breakpoints.settingsRowStacked]: space.s4 },
   },
   stepMarker: { display: "flex", alignItems: "center", minHeight: size.control },
-  stepBody: { display: "flex", flexDirection: "column", gap: space.s4, flexGrow: 1, minWidth: 0 },
   stepHead: {
     display: "flex",
     alignItems: "center",
@@ -662,7 +667,13 @@ const styles = stylex.create({
     minWidth: 0,
   },
   stepControl: { display: "flex", flexShrink: 0, marginInlineStart: "auto" },
-  stepContent: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
+  stepContent: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s4,
+    minWidth: 0,
+    gridColumn: { default: "2", [breakpoints.settingsRowStacked]: "1 / -1" },
+  },
   sectionActions: { display: "flex", gap: space.s2, marginInlineStart: "auto" },
   group: {
     display: "flex",

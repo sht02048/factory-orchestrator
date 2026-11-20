@@ -176,16 +176,26 @@ function WebhookSteps({
         detail={addressDone ? <VerifiedAddress address={webhookAddress} /> : undefined}
         control={addressDone ? <ChangeButton edit={edit} label={t("address.label")} /> : undefined}
       >
-        {addressDone ? null : (
+        {addressDone ? null : edit.open ? (
+          <FocusFirst>
+            <AddressEditor
+              initial={webhookAddress ?? setup.funnel?.address ?? ""}
+              setup={setup}
+              actions={actions}
+              onClose={edit.close}
+              onSaved={() => {
+                edit.close();
+                setFocusCreate(true);
+              }}
+            />
+          </FocusFirst>
+        ) : (
           <AddressEditor
             initial={webhookAddress ?? setup.funnel?.address ?? ""}
             setup={setup}
             actions={actions}
-            onClose={webhookAddress === null ? undefined : edit.close}
-            onSaved={() => {
-              if (edit.open) edit.close();
-              setFocusCreate(true);
-            }}
+            onClose={undefined}
+            onSaved={() => setFocusCreate(true)}
           />
         )}
       </SettingsStep>
@@ -198,7 +208,12 @@ function WebhookSteps({
       >
         {url === null ? null : (
           <>
-            <CopyValue ref={createCopyRef} label={t("create.urlLabel")} value={url} />
+            <CopyValue
+              ref={createCopyRef}
+              label={t("create.urlLabel")}
+              value={url}
+              copied={t("copiedUrl")}
+            />
             <Text variant="meta" as="p">
               {t("create.events")}
             </Text>
@@ -252,16 +267,18 @@ function VerifiedAddress({ address }: { address: string | null }) {
 function CopyValue({
   label,
   value,
+  copied,
   ref,
 }: {
   label: string;
   value: string;
+  copied: string;
   ref?: RefObject<HTMLButtonElement | null>;
 }) {
   const t = useTranslations("settings.webhook");
   const copy = () => {
-    void copyText(value, browserClipboard()).then((copied) =>
-      showToast(copied ? t("copied", { label }) : t("copyFailed")),
+    void copyText(value, browserClipboard()).then((done) =>
+      showToast(done ? copied : t("copyFailed")),
     );
   };
   return (
@@ -285,6 +302,7 @@ function CopyValue({
 
 function FunnelGuide({ command }: { command: string }) {
   const t = useTranslations("settings.webhook.address");
+  const tw = useTranslations("settings.webhook");
   const titleId = useId();
   return (
     <section aria-labelledby={titleId} {...stylex.props(styles.funnel)}>
@@ -301,7 +319,7 @@ function FunnelGuide({ command }: { command: string }) {
       <Text variant="meta" as="p">
         {t("funnelRun")}
       </Text>
-      <CopyValue label={t("commandLabel")} value={command} />
+      <CopyValue label={t("commandLabel")} value={command} copied={tw("copiedCommand")} />
       <Text variant="meta" as="p">
         {t("funnelThen")}
       </Text>
@@ -339,10 +357,13 @@ function AddressEditor({
   const submit = useSubmit();
   useReportUnsaved(onClose !== undefined && value !== initial);
   const reason = submit.state.kind === "failed" ? submit.state.reason : null;
+  const failedState = submit.state.kind === "failed" ? submit.state : null;
   useEffect(() => {
-    if (reason === null) return;
-    setFailed(ADDRESS_ERRORS.find((known) => known === reason) ?? null);
-  }, [reason]);
+    if (failedState === null) return;
+    const knownReason = ADDRESS_ERRORS.find((known) => known === failedState.reason) ?? null;
+    setFailed(knownReason);
+    if (knownReason !== null) inputRef.current?.focus();
+  }, [failedState]);
   const known = reason !== null && failed !== null;
   return (
     <>
@@ -412,6 +433,7 @@ function SecretForm({
   onDone: () => void;
 }) {
   const t = useTranslations("settings.webhook.secret");
+  const fieldsRef = useRef<HTMLDivElement>(null);
   const [secret, setSecret] = useState("");
   const [missing, setMissing] = useState(false);
   useReportUnsaved(secret !== "");
@@ -423,7 +445,10 @@ function SecretForm({
       onSubmit={() => {
         const ready = secret.trim() !== "";
         setMissing(!ready);
-        if (!ready) return;
+        if (!ready) {
+          fieldsRef.current?.querySelector("input")?.focus();
+          return;
+        }
         submit.run(
           () =>
             actions.saveConnection({
@@ -444,19 +469,21 @@ function SecretForm({
         </Button>
       }
     >
-      <SecretField
-        name="webhookSecret"
-        label={t("field")}
-        hint={t("info")}
-        hints="info"
-        error={missing ? t("required") : undefined}
-        placeholder={t("placeholder")}
-        value={secret}
-        onValueChange={(value) => {
-          setSecret(value);
-          if (missing) setMissing(value.trim() === "");
-        }}
-      />
+      <div ref={fieldsRef} {...stylex.props(styles.fields)}>
+        <SecretField
+          name="webhookSecret"
+          label={t("field")}
+          hint={t("info")}
+          hints="info"
+          error={missing ? t("required") : undefined}
+          placeholder={t("placeholder")}
+          value={secret}
+          onValueChange={(value) => {
+            setSecret(value);
+            if (missing) setMissing(value.trim() === "");
+          }}
+        />
+      </div>
       <SubmitError state={submit.state} />
     </CredentialFormFrame>
   );
@@ -548,13 +575,19 @@ function WebhookOn({
           label={t("url")}
           detail={url ?? t("urlMissing")}
           detailMono={url !== null}
-          control={url === null ? undefined : <CopyButton label={t("url")} value={url} />}
+          control={
+            url === null ? undefined : (
+              <CopyButton label={t("url")} value={url} copied={t("copiedUrl")} />
+            )
+          }
         />
         <SettingsRow
           label={t("secretRow")}
           detail={secretEdit.open ? undefined : t("secretSet")}
           control={
-            secretEdit.open ? undefined : <ChangeButton edit={secretEdit} label={t("secretRow")} />
+            secretEdit.open ? undefined : (
+              <ChangeButton edit={secretEdit} label={t("secretRow")} action={t("secret.reenter")} />
+            )
           }
           expanded={
             secretEdit.open ? (
@@ -577,14 +610,14 @@ function WebhookOn({
   );
 }
 
-function CopyButton({ label, value }: { label: string; value: string }) {
+function CopyButton({ label, value, copied }: { label: string; value: string; copied: string }) {
   const t = useTranslations("settings.webhook");
   return (
     <Button
       aria-label={t("copyLabel", { label })}
       onClick={() => {
-        void copyText(value, browserClipboard()).then((copied) =>
-          showToast(copied ? t("copied", { label }) : t("copyFailed")),
+        void copyText(value, browserClipboard()).then((done) =>
+          showToast(done ? copied : t("copyFailed")),
         );
       }}
     >
@@ -646,4 +679,5 @@ const styles = stylex.create({
   funnel: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   funnelHead: { display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: space.s2 },
   on: { display: "flex", flexDirection: "column", gap: space.s3 },
+  fields: { display: "flex", flexDirection: "column", gap: space.s4 },
 });
