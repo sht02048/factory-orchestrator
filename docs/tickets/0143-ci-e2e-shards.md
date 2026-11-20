@@ -1,0 +1,43 @@
+---
+status: doing
+blocked_by: []
+---
+
+# 0143 CI 를 나눠 e2e 를 shard 로 동시에 돌리기
+
+## 목표
+
+CI `check` 가 한 잡에서 9~13분 걸리고 그 대부분이 e2e 다([research 0018](../research/0018-e2e-speed.md)). 운영자 결정(2026-11-20)으로 리서치 권장 순서의 1단계를 한다: 시험 코드를 바꾸지 않고 CI 를 잡 여럿으로 나누고, 브라우저 시험을 shard 로 동시에 돌린다.
+
+## 할 일
+
+- [ ] `.github/workflows/ci.yml` 을 잡 여럿으로 나눈다.
+  - `scope`: Markdown 만 바꿨는지 가린다(지금 규칙 그대로).
+  - `static`: typecheck → lint → 색 검사 → 길이 값 검사 → format check → 단위 시험(`e2e`·`demo` 밖 project) → build → smoke:web → smoke:cli → bundle → smoke:bundle. 순서와 내용은 지금 그대로다.
+  - `browser`: `e2e`·`demo` project 를 matrix shard 로 나눠 `vitest --shard` 로 돌린다. 실패 스크린숏은 shard 마다 다른 이름으로 올린다.
+  - `check`: 모든 잡을 기다려(`if: always()`) 결과를 본다. 어느 잡이든 실패·취소이거나, 돌아야 했는데 건너뛰었으면 실패한다. Markdown 만 바꾼 변경이면 나머지 잡을 건너뛰고 성공한다. develop·main ruleset 의 필수 상태 검사 이름 `check` 를 그대로 둔다.
+- [ ] `workflow_call` 로 부르는 Release 가 그대로 동작하는지 확인한다.
+- [ ] shard 를 일부러 실패시켜 `check` 가 실패하는지 한 번 확인하고, 그 커밋은 되돌린다.
+- [ ] README·AGENTS.md 의 CI 단계 설명을 바뀐 구조에 맞춘다.
+- [ ] 잡별·shard 별 CI 시간을 재어 shard 수와 shard 당 워커 수를 정하고 근거를 아래에 적는다.
+
+## shard 수와 워커 수
+
+리서치 권장(shard 4개, shard 당 `--maxWorkers=2`)으로 시작한다.
+
+## 범위 밖
+
+리서치 권장 순서의 2~4단계는 후속 후보로 남긴다(티켓은 아직 만들지 않는다).
+
+- 2단계: 파일당 첫 열기 시간을 나눠 잰다(`createServer`·`chromium.launch`·첫 페이지). 의존성 묶기 몫이 크면 Vite 의존성 캐시를 미리 만들어 나눠 쓴다(리서치 선택지 B).
+- 3단계: hash shard 가 기울면(가장 긴 shard 가 가장 짧은 shard 의 1.5배 넘음) 시간으로 나누는 sequencer 를 쓴다.
+- 4단계: 흔들림 티켓이 나오는 파일부터 고정 기다림·`networkidle` 을 가짜 시계·화면 신호로 바꾼다(리서치 선택지 D).
+
+시험 코드와 앱 코드는 바꾸지 않는다.
+
+## 완료 조건
+
+- PR 의 CI 에서 `static`, `browser` shard 들, `check` 가 모두 통과한다.
+- shard 하나를 일부러 실패시킨 커밋에서 `check` 가 실패한다(그 커밋은 PR 에 남기지 않는다).
+- Markdown 만 바꾼 변경에서 `check` 가 성공한다.
+- 화면 변경 없음. DB 변경 없음. two-way.
