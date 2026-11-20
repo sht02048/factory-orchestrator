@@ -30,6 +30,7 @@ import type { McpLaunch } from "./mcp-launch.js";
 import type {
   Database,
   SecretBox,
+  StoredInstallSettings,
   StoredTrackerConnection,
   WebhookReceipt,
   WorkspaceId,
@@ -77,8 +78,13 @@ export function webhookPath(connectionId: string): string {
   return `/api/webhooks/tracker/${encodeURIComponent(connectionId)}`;
 }
 
-function addressesView(settings: AddressesView): AddressesView {
-  return { webAddress: settings.webAddress, webhookAddress: settings.webhookAddress };
+function addressesView(settings: StoredInstallSettings): AddressesView {
+  return {
+    webAddress: settings.webAddress,
+    webhookAddress: settings.webhookAddress,
+    webhookAddressChecked:
+      settings.webhookAddress !== null && settings.webhookAddressCheckedAt !== null,
+  };
 }
 
 const runnerConfigSchema = z.object({

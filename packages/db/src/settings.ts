@@ -731,6 +731,7 @@ export interface InstallAddresses {
 
 export interface StoredInstallSettings extends InstallAddresses {
   instanceId: string;
+  webhookAddressCheckedAt: Date | null;
 }
 
 export function getInstallSettings(db: Database): StoredInstallSettings {
@@ -740,6 +741,7 @@ export function getInstallSettings(db: Database): StoredInstallSettings {
         instanceId: installSettings.instanceId,
         webAddress: installSettings.webAddress,
         webhookAddress: installSettings.webhookAddress,
+        webhookAddressCheckedAt: installSettings.webhookAddressCheckedAt,
       })
       .from(installSettings)
       .where(eq(installSettings.id, INSTALL_SETTINGS_ROW))
@@ -777,12 +779,33 @@ export function saveMcpWriteAllowed(db: Database, allowed: boolean, now: Date): 
 }
 
 export function saveInstallAddresses(db: Database, input: InstallAddresses, now: Date): void {
-  const { instanceId } = getInstallSettings(db);
+  const current = getInstallSettings(db);
+  const checkedAt =
+    current.webhookAddress === input.webhookAddress ? current.webhookAddressCheckedAt : null;
+  writeInstallAddresses(db, current.instanceId, input, checkedAt, now);
+}
+
+export function saveCheckedWebhookAddress(db: Database, webhookAddress: string, now: Date): void {
+  const current = getInstallSettings(db);
+  writeInstallAddresses(
+    db,
+    current.instanceId,
+    { webAddress: current.webAddress, webhookAddress },
+    now,
+    now,
+  );
+}
+
+function writeInstallAddresses(
+  db: Database,
+  instanceId: string,
+  input: InstallAddresses,
+  webhookAddressCheckedAt: Date | null,
+  now: Date,
+): void {
+  const values = { ...input, webhookAddressCheckedAt, updatedAt: now };
   db.insert(installSettings)
-    .values({ id: INSTALL_SETTINGS_ROW, instanceId, ...input, updatedAt: now })
-    .onConflictDoUpdate({
-      target: installSettings.id,
-      set: { webAddress: input.webAddress, webhookAddress: input.webhookAddress, updatedAt: now },
-    })
+    .values({ id: INSTALL_SETTINGS_ROW, instanceId, ...values })
+    .onConflictDoUpdate({ target: installSettings.id, set: values })
     .run();
 }

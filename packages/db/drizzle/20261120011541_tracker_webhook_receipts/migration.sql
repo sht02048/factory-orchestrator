@@ -7,3 +7,5 @@ CREATE TABLE `tracker_webhook_receipts` (
 	CONSTRAINT "tracker_webhook_receipts_rejected_count" CHECK("rejected_count" >= 0),
 	CONSTRAINT "tracker_webhook_receipts_first_rejected" CHECK(("rejected_count" = 0) = ("first_rejected_at" IS NULL))
 );
+--> statement-breakpoint
+ALTER TABLE `install_settings` ADD `webhook_address_checked_at` integer;

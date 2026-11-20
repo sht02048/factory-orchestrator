@@ -29,6 +29,7 @@ import {
   requestRunnerCheck,
   saveAutoAssignLabel,
   saveCodeHostConnection,
+  saveCheckedWebhookAddress,
   saveInstallAddresses,
   replaceMapping,
   saveMapping,
@@ -445,11 +446,7 @@ export async function verifyWebhookAddress(
     instanceId: install.instanceId,
   });
   if (!check.ok) return check;
-  saveInstallAddresses(
-    context.db,
-    { webAddress: install.webAddress, webhookAddress: check.address },
-    now,
-  );
+  saveCheckedWebhookAddress(context.db, check.address, now);
   return { ok: true };
 }
 

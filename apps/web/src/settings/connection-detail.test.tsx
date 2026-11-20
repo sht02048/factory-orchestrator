@@ -11,6 +11,7 @@ import {
   openDatabase,
   recordWebhookAccepted,
   recordWebhookBadSignature,
+  saveCheckedWebhookAddress,
   saveInstallAddresses,
   saveWorkspace,
   toWorkspaceId,
@@ -338,7 +339,7 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
       webhookSettingsUrl: "https://linear.app/acme/settings/api",
     };
     const id = await addConnection(f);
-    saveInstallAddresses(f.context.db, { webAddress: null, webhookAddress: ADDRESS }, now);
+    saveCheckedWebhookAddress(f.context.db, ADDRESS, now);
     const html = renderDetail(await loadSettingsPage(f.context, workspace, now), id);
     expect(textOf(stepOf(html, 1))).toContain(settings.webhook.address.verified);
     expect(textOf(stepOf(html, 1))).toContain(settings.webhook.stepState.done);
@@ -351,10 +352,33 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
     expect(textOf(stepOf(html, 2))).toContain(settings.webhook.stepState.current);
   });
 
+  it("확인하지 않고 저장된 예전 주소는 끝난 단계로 보지 않고 확인 칸에 채워 둔다", async () => {
+    const f = fixture();
+    const id = await addConnection(f);
+    saveInstallAddresses(
+      f.context.db,
+      { webAddress: null, webhookAddress: "http://192.168.0.10:3000" },
+      now,
+    );
+    const html = renderDetail(await loadSettingsPage(f.context, workspace, now), id);
+    expect(stepOf(html, 1)).toContain('aria-current="step"');
+    expect(textOf(stepOf(html, 1))).not.toContain(settings.webhook.address.verified);
+    expect(stepOf(html, 1)).toContain('value="http://192.168.0.10:3000"');
+    expect(textOf(stepOf(html, 2))).toContain(settings.webhook.stepState.locked);
+  });
+
+  it("켜진 연결도 확인하지 않은 주소면 확인하라고 알린다", async () => {
+    const f = fixture();
+    const id = await addConnection(f, "whsec_example");
+    saveInstallAddresses(f.context.db, { webAddress: null, webhookAddress: ADDRESS }, now);
+    const text = textOf(renderDetail(await loadSettingsPage(f.context, workspace, now), id));
+    expect(text).toContain(`${ADDRESS} · 아직 닿는지 확인하지 않았어요`);
+  });
+
   it("조직 주소를 모르면 Linear 일반 webhook 설정으로 보낸다", async () => {
     const f = fixture();
     const id = await addConnection(f);
-    saveInstallAddresses(f.context.db, { webAddress: null, webhookAddress: ADDRESS }, now);
+    saveCheckedWebhookAddress(f.context.db, ADDRESS, now);
     const html = renderDetail(await loadSettingsPage(f.context, workspace, now), id);
     expect(stepOf(html, 2)).toContain('href="https://linear.app/settings/api"');
   });
@@ -362,7 +386,7 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
   it("켠 직후에는 첫 webhook 을 기다린다고 알리고, 비밀값 입력칸을 띄우지 않는다", async () => {
     const f = fixture();
     const id = await addConnection(f, "whsec_example");
-    saveInstallAddresses(f.context.db, { webAddress: null, webhookAddress: ADDRESS }, now);
+    saveCheckedWebhookAddress(f.context.db, ADDRESS, now);
     const html = renderDetail(await loadSettingsPage(f.context, workspace, now), id);
     const text = textOf(html);
     expect(text).toContain(settings.webhook.status.waiting);
@@ -377,7 +401,7 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
   it("받고 있으면 마지막으로 받은 때를 보인다", async () => {
     const f = fixture();
     const id = await addConnection(f, "whsec_example");
-    saveInstallAddresses(f.context.db, { webAddress: null, webhookAddress: ADDRESS }, now);
+    saveCheckedWebhookAddress(f.context.db, ADDRESS, now);
     recordWebhookAccepted(f.context.db, id, at(3));
     const text = textOf(renderDetail(await loadSettingsPage(f.context, workspace, now), id));
     expect(text).toContain(settings.webhook.status.receiving);
@@ -387,7 +411,7 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
   it("서명이 맞지 않으면 받지 못한 수와 처음 실패 시각, secret 다시 넣기를 보인다", async () => {
     const f = fixture();
     const id = await addConnection(f, "whsec_example");
-    saveInstallAddresses(f.context.db, { webAddress: null, webhookAddress: ADDRESS }, now);
+    saveCheckedWebhookAddress(f.context.db, ADDRESS, now);
     recordWebhookAccepted(f.context.db, id, at(120));
     for (const minutes of [42, 30, 20, 10])
       recordWebhookBadSignature(f.context.db, id, at(minutes));
@@ -468,7 +492,7 @@ describe("Settings 연결 줄의 webhook 상태(0130)", () => {
   it("고급에는 webhook 주소 줄이 없다", async () => {
     const f = fixture();
     await addConnection(f);
-    saveInstallAddresses(f.context.db, { webAddress: null, webhookAddress: ADDRESS }, now);
+    saveCheckedWebhookAddress(f.context.db, ADDRESS, now);
     const html = renderSettings(await loadSettingsPage(f.context, workspace, now));
     const advanced = html.slice(html.indexOf('<section id="advanced"'));
     expect(textOf(advanced)).not.toContain(settings.webhook.address.label);

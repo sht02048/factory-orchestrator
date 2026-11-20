@@ -21,6 +21,7 @@ import {
   recordRunnerCheck,
   replaceMapping,
   saveAutoAssignLabel,
+  saveCheckedWebhookAddress,
   saveCodeHostConnection,
   saveInstallAddresses,
   saveMapping,
@@ -847,7 +848,7 @@ describe("트래커 연결 상세의 webhook 켜기(브라우저, 0130)", () => 
   });
 
   it("주소를 확인한 뒤 secret 을 넣고 켜면 기다리고, 가짜 webhook 을 받으면 켜짐으로 바뀐다", async () => {
-    saveInstallAddresses(db, { webAddress: null, webhookAddress: address }, new Date());
+    saveCheckedWebhookAddress(db, address, new Date());
     await page.setViewportSize({ width: 1280, height: 1000 });
     await openSettings(page, connectionPath);
     const webhook = section(settings.webhook.title);
@@ -928,7 +929,7 @@ describe("트래커 연결 상세의 webhook 켜기(브라우저, 0130)", () => 
   });
 
   it("400px 에서도 단계와 주소가 가로로 넘치지 않는다", async () => {
-    saveInstallAddresses(db, { webAddress: null, webhookAddress: address }, new Date());
+    saveCheckedWebhookAddress(db, address, new Date());
     await page.setViewportSize({ width: 400, height: 1000 });
     await openSettings(page, connectionPath);
     await page.getByText(webhookUrl, { exact: true }).waitFor();

@@ -49,6 +49,7 @@ export const WEBHOOK_SECTION_ID = "webhook";
 export interface WebhookSectionProps {
   connection: TrackerConnectionView;
   webhookAddress: string | null;
+  webhookAddressChecked: boolean;
   setup: WebhookSetupView;
   now: string;
   actions: SettingsActions;
@@ -75,6 +76,7 @@ export function webhookUrl(address: string | null, path: string): string | null 
 export function WebhookSection({
   connection,
   webhookAddress,
+  webhookAddressChecked,
   setup,
   now,
   actions,
@@ -105,6 +107,7 @@ export function WebhookSection({
           <WebhookSteps
             connection={connection}
             webhookAddress={webhookAddress}
+            webhookAddressChecked={webhookAddressChecked}
             setup={setup}
             actions={actions}
           />
@@ -113,6 +116,7 @@ export function WebhookSection({
             connection={connection}
             state={state}
             webhookAddress={webhookAddress}
+            webhookAddressChecked={webhookAddressChecked}
             setup={setup}
             now={now}
             actions={actions}
@@ -161,11 +165,13 @@ const STEP_IDS = { address: "webhook-step-address", create: "webhook-step-create
 function WebhookSteps({
   connection,
   webhookAddress,
+  webhookAddressChecked,
   setup,
   actions,
 }: {
   connection: TrackerConnectionView;
   webhookAddress: string | null;
+  webhookAddressChecked: boolean;
   setup: WebhookSetupView;
   actions: SettingsActions;
 }) {
@@ -174,7 +180,7 @@ function WebhookSteps({
   const edit = useInlineEdit("webhook-address");
   const createCopyRef = useRef<HTMLButtonElement>(null);
   const [focusCreate, setFocusCreate] = useState(false);
-  const addressDone = webhookAddress !== null && !edit.open;
+  const addressDone = webhookAddressChecked && !edit.open;
   const url = webhookUrl(webhookAddress, connection.webhookPath);
   useEffect(() => {
     if (!focusCreate || !addressDone) return;
@@ -518,6 +524,7 @@ function WebhookOn({
   connection,
   state,
   webhookAddress,
+  webhookAddressChecked,
   setup,
   now,
   actions,
@@ -525,6 +532,7 @@ function WebhookOn({
   connection: TrackerConnectionView;
   state: Exclude<WebhookStateView, { kind: "off" }>;
   webhookAddress: string | null;
+  webhookAddressChecked: boolean;
   setup: WebhookSetupView;
   now: string;
   actions: SettingsActions;
@@ -565,18 +573,24 @@ function WebhookOn({
         ) : (
           <SettingsRow label={t("lastReceived")} value={last ?? t("lastReceivedNone")} />
         )}
-        {webhookAddress === null ? (
+        {webhookAddressChecked ? null : (
           <SettingsRow
             label={t("address.label")}
             info={<AddressInfo />}
-            detail={addressEdit.open ? undefined : t("address.notSet")}
+            detail={
+              addressEdit.open
+                ? undefined
+                : webhookAddress === null
+                  ? t("address.notSet")
+                  : t("address.notChecked", { address: webhookAddress })
+            }
             detailTone="problem"
             control={
               addressEdit.open ? undefined : (
                 <ChangeButton
                   edit={addressEdit}
                   label={t("address.label")}
-                  action={t("address.set")}
+                  action={webhookAddress === null ? t("address.set") : t("address.check")}
                 />
               )
             }
@@ -584,7 +598,7 @@ function WebhookOn({
               addressEdit.open ? (
                 <FocusFirst>
                   <AddressEditor
-                    initial={setup.funnel?.address ?? ""}
+                    initial={webhookAddress ?? setup.funnel?.address ?? ""}
                     setup={setup}
                     actions={actions}
                     onClose={addressEdit.close}
@@ -594,7 +608,7 @@ function WebhookOn({
               ) : null
             }
           />
-        ) : null}
+        )}
         <SettingsRow
           label={t("url")}
           detail={url ?? t("urlMissing")}

@@ -650,6 +650,7 @@ describe("주소(0048)", () => {
     expect((await loadSettingsPage(f.context, undefined, now)).install.addresses).toEqual({
       webAddress: null,
       webhookAddress: null,
+      webhookAddressChecked: false,
     });
     expect(
       saveAddresses(
@@ -666,6 +667,7 @@ describe("주소(0048)", () => {
     expect(page.install.addresses).toEqual({
       webAddress: "https://server.example.ts.net",
       webhookAddress: "https://hooks.example.com",
+      webhookAddressChecked: false,
     });
     const server = textOf(sectionOf(render(page), "server"));
     expect(server).toContain("다른 기기에서 열 주소");
@@ -678,6 +680,7 @@ describe("주소(0048)", () => {
     expect((await loadSettingsPage(f.context, undefined, now)).install.addresses).toEqual({
       webAddress: null,
       webhookAddress: null,
+      webhookAddressChecked: false,
     });
   });
 

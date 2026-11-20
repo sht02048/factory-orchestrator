@@ -100,6 +100,7 @@ export function ConnectionDetailScreen({
           <WebhookSection
             connection={connection}
             webhookAddress={page.install.addresses.webhookAddress}
+            webhookAddressChecked={page.install.addresses.webhookAddressChecked}
             setup={setup}
             now={page.install.mcp.now}
             actions={actions}

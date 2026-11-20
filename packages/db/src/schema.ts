@@ -84,6 +84,7 @@ export const installSettings = sqliteTable(
     instanceId: text("instance_id").notNull(),
     webAddress: text("web_address"),
     webhookAddress: text("webhook_address"),
+    webhookAddressCheckedAt: timeMs("webhook_address_checked_at"),
     mcpWriteAllowed: integer("mcp_write_allowed", { mode: "boolean" }).notNull().default(false),
     updatedAt: timeMs("updated_at").notNull(),
   },

@@ -481,6 +481,7 @@
       "description": "webhook 경로만 인터넷에 여는 주소를 만들고 확인해요.",
       "verified": "닿는 걸 확인했어요",
       "notSet": "아직 정하지 않았어요",
+      "notChecked": "{address} · 아직 닿는지 확인하지 않았어요",
       "set": "정하기",
       "funnelTitle": "Tailscale Funnel로 열기",
       "funnelFound": "이 맥에 Tailscale이 있어요",

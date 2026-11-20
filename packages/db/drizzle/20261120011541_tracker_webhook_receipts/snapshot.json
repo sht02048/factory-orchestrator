@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "690c9a34-eb01-4277-b546-aee2ba1d0ee7",
+  "id": "44fcab00-df88-48fe-bb01-a4497e82ee4e",
   "prevIds": ["b4a6f8c4-ef14-4c42-a4f3-f6e98d89ae5f"],
   "ddl": [
     {
@@ -224,6 +224,16 @@
       "table": "install_settings",
       "name": "webhook_address",
       "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "install_settings",
+      "name": "webhook_address_checked_at",
+      "type": "integer",
       "notNull": false,
       "autoincrement": false,
       "default": null,

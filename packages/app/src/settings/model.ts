@@ -162,6 +162,7 @@ export type RunnerAccess = "ganger" | "manual";
 export interface AddressesView {
   webAddress: string | null;
   webhookAddress: string | null;
+  webhookAddressChecked: boolean;
 }
 
 export interface PowerView {

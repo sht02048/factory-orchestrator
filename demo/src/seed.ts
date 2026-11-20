@@ -22,6 +22,7 @@ import {
   recordWebhookAccepted,
   recordWebhookBadSignature,
   saveAutoAssignLabel,
+  saveCheckedWebhookAddress,
   saveCodeHostConnection,
   saveInstallAddresses,
   replaceMapping,
@@ -147,6 +148,7 @@ function seedSettings(db: Database, box: SecretBox, now: Date): void {
     { webAddress: DEMO_WEB_ADDRESS, webhookAddress: DEMO_WEBHOOK_ADDRESS },
     now,
   );
+  saveCheckedWebhookAddress(db, DEMO_WEBHOOK_ADDRESS, now);
   for (const connection of seededConnections) {
     saveTrackerConnection(
       db,
