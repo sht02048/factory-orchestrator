@@ -3,7 +3,9 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { PRODUCT_DISPLAY_NAME, resolveHome } from "@ganger/cli/home";
 import { app, dialog } from "electron";
+import { useConsoleLogger } from "@ganger/log";
 import { z } from "zod";
+import { bundlelessServer, devServerUrl } from "../core/dev-server.js";
 import { LocalServer, fileRecordStore } from "../core/local-server.js";
 import { SERVER_BUNDLE_ENV, loadServerBundle } from "../core/server-bundle.js";
 import { serviceInstalledFor } from "../core/service.js";
@@ -15,6 +17,8 @@ import { Updater } from "../core/updater.js";
 import type { UpdateStore } from "../core/updater.js";
 import { Controller, appPaths } from "./controller.js";
 import { installBlock, squirrelInstaller } from "./update-installer.js";
+
+useConsoleLogger("desktop");
 
 const USER_DATA_ENV = "GANGER_DESKTOP_USER_DATA";
 
@@ -34,8 +38,13 @@ if (!app.requestSingleInstanceLock()) {
 
   void app.whenReady().then(() => {
     let bundle;
+    let devServer;
     try {
-      bundle = loadServerBundle(serverBundleRoot());
+      devServer = app.isPackaged ? undefined : devServerUrl(process.env);
+      bundle =
+        devServer === undefined
+          ? loadServerBundle(serverBundleRoot())
+          : bundlelessServer(app.getVersion());
     } catch (error) {
       dialog.showErrorBox(
         PRODUCT_DISPLAY_NAME,
@@ -80,6 +89,7 @@ if (!app.requestSingleInstanceLock()) {
       updater,
       local,
       serverVersion: bundle.version,
+      devServerUrl: devServer,
       logFile,
       ...appPaths(app.getAppPath()),
       openedAtLogin: app.getLoginItemSettings().wasOpenedAtLogin === true,

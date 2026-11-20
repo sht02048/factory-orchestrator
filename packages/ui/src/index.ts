@@ -19,6 +19,7 @@ export {
   WorkspaceBadge,
   documentStyles,
   railLinkStyles,
+  type AppFramePending,
   type AppFrameProps,
   type RailLinkContentProps,
 } from "./components/app-frame";
@@ -89,16 +90,38 @@ export {
   PanelBlock,
   PanelFooter,
   PanelHeader,
+  ScreenLayout,
   Section,
   SplitView,
   type PageHeaderProps,
   type PanelHeaderProps,
+  type ScreenLayoutProps,
   type SectionLink,
   type SectionProps,
   type SectionTitleRole,
   type SplitViewProps,
 } from "./components/layout";
-export { CheckIcon, ChevronDownIcon, CloseIcon } from "./components/icons";
+export {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  ExternalIcon,
+  InfoIcon,
+  MoreIcon,
+} from "./components/icons";
+export {
+  WindowChrome,
+  WindowDragFrame,
+  useTitleBarHidden,
+  type WindowChromeProps,
+} from "./components/window-chrome";
+export {
+  WINDOW_REGION_ATTRIBUTE,
+  windowFrame,
+  windowRegion,
+  type WindowRegion,
+} from "./window-frame";
 export {
   KanbanCard,
   KanbanCards,
@@ -137,6 +160,12 @@ export {
 export { Popover, type PopoverProps } from "./components/popover";
 export { ProblemCallout, type ProblemCalloutProps } from "./components/problem-callout";
 export { RadioGroup, RadioOption, type RadioOptionProps } from "./components/radio";
+export {
+  QuestionForm,
+  type QuestionChoiceItem,
+  type QuestionFormLabels,
+  type QuestionFormProps,
+} from "./components/question-form";
 export {
   SegmentedTabs,
   type SegmentedTabsItem,
@@ -213,7 +242,34 @@ export {
   type PinnedToastProps,
   type ToasterProps,
 } from "./components/toast";
-export { Tooltip, type TooltipAction, type TooltipProps } from "./components/tooltip";
+export {
+  InfoTip,
+  Tooltip,
+  type InfoTipProps,
+  type TooltipAction,
+  type TooltipProps,
+} from "./components/tooltip";
+export { Switch, type SwitchProps } from "./components/switch";
+export {
+  SectionNav,
+  SettingsGroup,
+  SettingsLayout,
+  SettingsLinkRow,
+  SettingsRow,
+  SettingsSection,
+  SettingsStep,
+  SettingsSteps,
+  type SectionNavItem,
+  type SectionNavProps,
+  type SettingsDetailTone,
+  type SettingsLayoutProps,
+  type SettingsLinkRowProps,
+  type SettingsLinkRowRenderProps,
+  type SettingsRowProps,
+  type SettingsSectionProps,
+  type SettingsStepProps,
+  type SettingsStepState,
+} from "./components/settings-layout";
 export { UsageBar, usageText, type UsageBarProps, type UsageTone } from "./components/usage-bar";
 export { UsageMeter, type UsageMeterProps } from "./components/usage-meter";
 export { PanelRows, PanelSection, type PanelSectionProps } from "./components/panel-section";

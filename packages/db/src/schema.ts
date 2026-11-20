@@ -1,4 +1,11 @@
-import { AGENT_RESULTS, NOT_STARTED_AGENT_RESULTS, PR_STATES, RUN_STATES } from "@ganger/core";
+import {
+  AGENT_RESULTS,
+  NOT_STARTED_AGENT_RESULTS,
+  PAUSE_SOURCES,
+  PR_STATES,
+  RUN_STATES,
+} from "@ganger/core";
+import { CHANGE_KINDS, CHANGE_PARTS } from "./change-events-model.js";
 import { MCP_ACTION_OUTCOMES } from "./mcp-actions-model.js";
 import { NOTIFICATION_EVENT_KINDS } from "./notification-events-model.js";
 import type {
@@ -12,6 +19,7 @@ import type {
   PullRequestId,
   PermissionRequestId,
   QuestionId,
+  RunControl,
   RunId,
   RunnerId,
   RunnerKind,
@@ -77,6 +85,7 @@ export const installSettings = sqliteTable(
     instanceId: text("instance_id").notNull(),
     webAddress: text("web_address"),
     webhookAddress: text("webhook_address"),
+    webhookAddressCheckedAt: timeMs("webhook_address_checked_at"),
     mcpWriteAllowed: integer("mcp_write_allowed", { mode: "boolean" }).notNull().default(false),
     updatedAt: timeMs("updated_at").notNull(),
   },
@@ -166,7 +175,6 @@ export const mappings = sqliteTable(
   {
     trackerConnectionId: text("tracker_connection_id").notNull().$type<TrackerConnectionId>(),
     trackerProjectId: text("tracker_project_id").notNull().$type<TrackerProjectId>(),
-    runnerProjectId: text("runner_project_id").notNull().$type<RunnerProjectId>(),
     agentId: text("agent_id").notNull().$type<AgentId>(),
     model: text("model"),
   },
@@ -179,6 +187,33 @@ export const mappings = sqliteTable(
         workspaceTrackerProjects.trackerProjectId,
       ],
     }).onDelete("cascade"),
+  ],
+);
+
+export const mappingRepos = sqliteTable(
+  "mapping_repos",
+  {
+    trackerConnectionId: text("tracker_connection_id").notNull().$type<TrackerConnectionId>(),
+    trackerProjectId: text("tracker_project_id").notNull().$type<TrackerProjectId>(),
+    runnerProjectId: text("runner_project_id").notNull().$type<RunnerProjectId>(),
+    isDefault: integer("is_default", { mode: "boolean" }).notNull(),
+    labelId: text("label_id").$type<LabelId>(),
+    position: integer("position").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.trackerConnectionId, t.trackerProjectId, t.runnerProjectId] }),
+    foreignKey({
+      columns: [t.trackerConnectionId, t.trackerProjectId],
+      foreignColumns: [mappings.trackerConnectionId, mappings.trackerProjectId],
+    }).onDelete("cascade"),
+    uniqueIndex("mapping_repos_one_default")
+      .on(t.trackerConnectionId, t.trackerProjectId)
+      .where(sql`${t.isDefault} = 1`),
+    uniqueIndex("mapping_repos_label_once")
+      .on(t.trackerConnectionId, t.trackerProjectId, t.labelId)
+      .where(sql`${t.labelId} IS NOT NULL`),
+    check("mapping_repos_is_default", sql`${t.isDefault} IN (0, 1)`),
+    check("mapping_repos_default_no_label", sql`${t.isDefault} = 0 OR ${t.labelId} IS NULL`),
   ],
 );
 
@@ -246,6 +281,9 @@ export const runs = sqliteTable(
     trackerCommentId: text("tracker_comment_id").$type<CommentId>(),
     trackerCommentedAt: timeMs("tracker_commented_at"),
     unreachableSince: timeMs("unreachable_since"),
+    pausedSince: timeMs("paused_since"),
+    pausedMs: integer("paused_ms").notNull().default(0),
+    pauseSource: text("pause_source", { enum: PAUSE_SOURCES }),
     lastLog: text("last_log", { mode: "json" }).$type<string[]>(),
   },
   (t) => [
@@ -258,8 +296,15 @@ export const runs = sqliteTable(
     check("runs_queued_not_started", sql`${t.state} <> 'queued' OR ${t.startedAt} IS NULL`),
     check(
       "runs_active_started",
-      sql`${t.state} NOT IN ('running', 'waiting-for-input', 'disconnected') OR ${t.startedAt} IS NOT NULL`,
+      sql`${t.state} NOT IN ('running', 'waiting-for-input', 'paused', 'disconnected') OR ${t.startedAt} IS NOT NULL`,
     ),
+    check(
+      "runs_paused_since_while_paused",
+      sql`(${t.state} <> 'paused' OR ${t.pausedSince} IS NOT NULL) AND (${t.pausedSince} IS NULL OR ${t.state} IN ('paused', 'disconnected'))`,
+    ),
+    check("runs_paused_ms", sql`${t.pausedMs} >= 0`),
+    check("runs_pause_source", sql`${t.pauseSource} IN ${inList(PAUSE_SOURCES)}`),
+    check("runs_paused_has_source", sql`${t.state} <> 'paused' OR ${t.pauseSource} IS NOT NULL`),
     check(
       "runs_started_has_runner_worktree",
       sql`${t.startedAt} IS NULL OR (${t.runnerId} IS NOT NULL AND ${t.worktreeRef} IS NOT NULL AND ${t.branch} IS NOT NULL AND ${t.agentRef} IS NOT NULL)`,
@@ -425,6 +470,23 @@ export const runPermissionWaits = sqliteTable(
   ],
 );
 
+export const RUN_CONTROLS = ["pause", "resume"] as const satisfies ReadonlyArray<RunControl>;
+
+export const runControlRequests = sqliteTable(
+  "run_control_requests",
+  {
+    runId: text("run_id")
+      .primaryKey()
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    control: text("control", { enum: RUN_CONTROLS }).notNull(),
+    requestedAt: timeMs("requested_at").notNull(),
+    completedAt: timeMs("completed_at"),
+    error: text("error"),
+  },
+  (t) => [check("run_control_requests_control", sql`${t.control} IN ${inList(RUN_CONTROLS)}`)],
+);
+
 export const runCancelRequests = sqliteTable("run_cancel_requests", {
   runId: text("run_id")
     .primaryKey()
@@ -496,4 +558,65 @@ export const notificationSequence = sqliteTable(
     last: integer("last").notNull(),
   },
   (t) => [check("notification_sequence_single", sql`${t.id} = 1`)],
+);
+
+export const trackerReadGenerations = sqliteTable(
+  "tracker_read_generations",
+  {
+    trackerConnectionId: text("tracker_connection_id")
+      .primaryKey()
+      .references(() => trackerConnections.id, { onDelete: "cascade" })
+      .$type<TrackerConnectionId>(),
+    generation: integer("generation").notNull(),
+  },
+  (t) => [check("tracker_read_generations_positive", sql`${t.generation} > 0`)],
+);
+
+export const trackerWebhookReceipts = sqliteTable(
+  "tracker_webhook_receipts",
+  {
+    trackerConnectionId: text("tracker_connection_id")
+      .primaryKey()
+      .references(() => trackerConnections.id, { onDelete: "cascade" })
+      .$type<TrackerConnectionId>(),
+    lastReceivedAt: timeMs("last_received_at"),
+    rejectedCount: integer("rejected_count").notNull().default(0),
+    firstRejectedAt: timeMs("first_rejected_at"),
+  },
+  (t) => [
+    check("tracker_webhook_receipts_rejected_count", sql`${t.rejectedCount} >= 0`),
+    check(
+      "tracker_webhook_receipts_first_rejected",
+      sql`(${t.rejectedCount} = 0) = (${t.firstRejectedAt} IS NULL)`,
+    ),
+  ],
+);
+
+export const changeEvents = sqliteTable(
+  "change_events",
+  {
+    seq: integer("seq").primaryKey({ autoIncrement: true }),
+    kind: text("kind").notNull().$type<(typeof CHANGE_KINDS)[number]>(),
+    targetId: text("target_id"),
+    workspaceId: text("workspace_id").$type<WorkspaceId>(),
+    part: text("part").$type<(typeof CHANGE_PARTS)[number]>(),
+    at: timeMs("at").notNull(),
+  },
+  (t) => [
+    check("change_events_kind", sql`${t.kind} IN ${inList(CHANGE_KINDS)}`),
+    check("change_events_part", sql`${t.part} IN ${inList(CHANGE_PARTS)}`),
+    index("change_events_at").on(t.at),
+  ],
+);
+
+export const changeEventsPruned = sqliteTable(
+  "change_events_pruned",
+  {
+    id: integer("id").primaryKey(),
+    throughSeq: integer("through_seq").notNull(),
+  },
+  (t) => [
+    check("change_events_pruned_single", sql`${t.id} = 1`),
+    check("change_events_pruned_through", sql`${t.throughSeq} >= 0`),
+  ],
 );

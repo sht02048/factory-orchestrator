@@ -6,6 +6,7 @@ import {
   DefinitionList,
   Field,
   Input,
+  PanelSection,
   Sheet,
   StatusPill,
   Text,
@@ -21,13 +22,18 @@ import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import type { HomeRun, InputWait } from "@ganger/app/home/model";
 import { todoTagOf } from "@ganger/app/home/model";
-import { QuestionForm } from "./question-form";
-import type { SendState } from "./question-form";
+import { availableRunControl } from "@ganger/app/run-control-view";
+import type { RunControl } from "@ganger/core";
+import { QuestionAnswer } from "../question/question-answer";
 import type { SheetMode } from "./run-card";
-import { cardStatus, runHref, ticketHref, useRunText } from "./run-text";
+import { RunKey, cardStatus, runHref, ticketHref, useRunText } from "./run-text";
 import type { AnswerInput, DenyInput } from "./home-screen";
+import { answerRejection, denyRejection } from "./rejection";
+import type { AnswerRejectReason, DenyRejectReason } from "./rejection";
 
 type Permission = Extract<InputWait, { kind: "permission" }>;
+
+type SendState = "idle" | "sending" | "failed";
 
 export interface SheetTarget {
   run: HomeRun;
@@ -43,6 +49,7 @@ export function RunSheet({
   all,
   onAnswer,
   onDeny,
+  onControl,
 }: {
   target: SheetTarget | null;
   open: boolean;
@@ -51,6 +58,7 @@ export function RunSheet({
   all: boolean;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
+  onControl: SheetControl;
 }) {
   const t = useTranslations("home.sheet");
   if (target === null) return null;
@@ -58,23 +66,28 @@ export function RunSheet({
   const tag = tagged ? todoTagOf(run) : null;
   const status = cardStatus(run, tag);
   const firstRadio = run.state === "waiting-for-input" && run.input?.kind === "question";
-  const initialFocus = target.mode === "answer" && firstRadio ? 'input[type="radio"]' : undefined;
+  const initialFocus =
+    target.mode === "answer" && firstRadio
+      ? '[data-question] input[type="radio"], [data-question] textarea'
+      : undefined;
   return (
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
       status={<SheetStatus run={run} status={status} />}
-      title={
-        run.ticketTitle === null
-          ? run.ticketKey
-          : t("title", { key: run.ticketKey, title: run.ticketTitle })
-      }
+      title={<RunKey run={run} size="panel" />}
       closeLabel={t("close")}
       {...(initialFocus === undefined ? {} : { initialFocus })}
       finalFocus={finalFocus}
     >
       <div key={run.id} {...stylex.props(styles.body)}>
-        <SheetBody run={run} tagged={tag !== null} onAnswer={onAnswer} onDeny={onDeny} />
+        <SheetBody
+          run={run}
+          tagged={tag !== null}
+          onAnswer={onAnswer}
+          onDeny={onDeny}
+          onControl={onControl}
+        />
         <RunFacts run={run} all={all} />
         <div>
           <TextLink href={runHref(run)}>{t("runDetail")}</TextLink>
@@ -96,6 +109,8 @@ function SheetStatus({ run, status }: { run: HomeRun; status: PillStatus }) {
         return run.executionMs === null
           ? null
           : t("since.running", { elapsed: elapsed(run.executionMs) });
+      case "paused":
+        return run.pausedMs === null ? null : t("since.paused", { elapsed: elapsed(run.pausedMs) });
       case "waiting-for-input":
         return run.waitingMs === null
           ? null
@@ -119,11 +134,13 @@ function SheetBody({
   tagged,
   onAnswer,
   onDeny,
+  onControl,
 }: {
   run: HomeRun;
   tagged: boolean;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
+  onControl: SheetControl;
 }) {
   const t = useTranslations("home.sheet");
   const text = useRunText();
@@ -131,7 +148,17 @@ function SheetBody({
     case "queued":
       return <Text variant="body">{text.queued(run)}</Text>;
     case "running":
-      return <Text variant="body">{t("running")}</Text>;
+      return (
+        <ControlBlock run={run} onControl={onControl}>
+          {t("running")}
+        </ControlBlock>
+      );
+    case "paused":
+      return (
+        <ControlBlock run={run} onControl={onControl}>
+          {t(`paused.${run.pauseSource}`)}
+        </ControlBlock>
+      );
     case "disconnected":
       return (
         <Block>
@@ -157,6 +184,77 @@ function SheetBody({
       if (tagged && run.summary === "failed") return <FailedBlock run={run} />;
       return <EndedBlock run={run} />;
   }
+}
+
+type SheetControl = (
+  run: HomeRun,
+  control: RunControl,
+  focusAfter?: () => void,
+) => Promise<boolean>;
+
+function ControlBlock({
+  run,
+  onControl,
+  children,
+}: {
+  run: HomeRun;
+  onControl: SheetControl;
+  children: ReactNode;
+}) {
+  const t = useTranslations("home");
+  const domain = useTranslations("domain");
+  const statusRef = useRef<HTMLParagraphElement>(null);
+  const [sending, setSending] = useState(false);
+  const [rejected, setRejected] = useState(false);
+  const control = run.control;
+  const available = availableRunControl(run.state, run.cancelling, control);
+  const pending =
+    control?.status === "pending"
+      ? t(control.control === "pause" ? "card.pausing" : "card.resuming")
+      : null;
+  const failure = rejected
+    ? t("card.requestFailed")
+    : control?.status === "failed"
+      ? t(control.control === "pause" ? "card.pauseFailed" : "card.resumeFailed", {
+          reason: domain(`runControlFailure.${control.reason}`),
+        })
+      : null;
+  return (
+    <Block>
+      <Text variant="body">{children}</Text>
+      <div {...stylex.props(styles.controlGroup)}>
+        <Text
+          variant="ui"
+          as="p"
+          ref={statusRef}
+          role="status"
+          tabIndex={-1}
+          {...(failure === null ? { tone: "muted" as const } : { tone: "problem" as const })}
+        >
+          {failure ?? pending}
+        </Text>
+        {available === null ? null : (
+          <div {...stylex.props((failure ?? pending) !== null && styles.controlBelowStatus)}>
+            <Button
+              variant={available === "resume" ? "primary" : "secondary"}
+              aria-disabled={sending}
+              aria-busy={sending}
+              onClick={() => {
+                if (sending) return;
+                setSending(true);
+                setRejected(false);
+                void onControl(run, available, () => statusRef.current?.focus())
+                  .then((reached) => setRejected(!reached))
+                  .finally(() => setSending(false));
+              }}
+            >
+              {t(available === "resume" ? "card.resume" : "card.pause")}
+            </Button>
+          </div>
+        )}
+      </div>
+    </Block>
+  );
 }
 
 function Block({ children }: { children: ReactNode }) {
@@ -276,16 +374,30 @@ function AnswerBlock({
 }) {
   const t = useTranslations("home.question");
   const result = useResultFocus();
-  if (result.sent || question.answered)
-    return <ResultText resultRef={result.resultRef}>{t("answered")}</ResultText>;
+  const [rejected, setRejected] = useState<AnswerRejectReason | null>(null);
   return (
-    <QuestionForm
-      question={question}
-      onSend={async (answer) => {
-        await onAnswer({ runId: run.id, questionId: question.questionId, answer });
-        result.markSent();
-      }}
-    />
+    <PanelSection title={t("title")}>
+      {rejected !== null ? (
+        <ResultText resultRef={result.resultRef}>{t(`rejected.${rejected}`)}</ResultText>
+      ) : result.sent || question.answered ? (
+        <ResultText resultRef={result.resultRef}>{t("answered")}</ResultText>
+      ) : (
+        <QuestionAnswer
+          body={question.body}
+          options={question.choices}
+          onSend={async (answer) => {
+            try {
+              await onAnswer({ runId: run.id, questionId: question.questionId, answer });
+            } catch (error) {
+              const reason = answerRejection(error);
+              if (reason === null) throw error;
+              setRejected(reason);
+            }
+            result.markSent();
+          }}
+        />
+      )}
+    </PanelSection>
   );
 }
 
@@ -301,7 +413,10 @@ function DenyBlock({
   const t = useTranslations("home.permission");
   const [reason, setReason] = useState("");
   const [state, setState] = useState<SendState>("idle");
+  const [rejected, setRejected] = useState<DenyRejectReason | null>(null);
   const result = useResultFocus();
+  if (rejected !== null)
+    return <ResultText resultRef={result.resultRef}>{t(`rejected.${rejected}`)}</ResultText>;
   if (result.sent || permission.denied)
     return <ResultText resultRef={result.resultRef}>{t("denied")}</ResultText>;
   const sending = state === "sending";
@@ -317,7 +432,16 @@ function DenyBlock({
             setState("idle");
             result.markSent();
           },
-          () => setState("failed"),
+          (error: unknown) => {
+            const reason = denyRejection(error);
+            if (reason === null) {
+              setState("failed");
+              return;
+            }
+            setState("idle");
+            setRejected(reason);
+            result.markSent();
+          },
         );
       }}
     >
@@ -342,6 +466,8 @@ function DenyBlock({
 const styles = stylex.create({
   body: { display: "flex", flexDirection: "column", gap: space.s6, minWidth: 0 },
   block: { display: "flex", flexDirection: "column", gap: space.s3, minWidth: 0 },
+  controlGroup: { display: "flex", flexDirection: "column", alignItems: "flex-start", minWidth: 0 },
+  controlBelowStatus: { paddingTop: space.s2 },
   foot: { display: "flex", justifyContent: "flex-end", gap: space.s3 },
   result: { outline: "none" },
 });

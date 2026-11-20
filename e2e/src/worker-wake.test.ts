@@ -1,3 +1,4 @@
+import { silentLogger } from "@ganger/log/testing";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,6 +36,8 @@ import { chromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" };
+import home from "../../apps/web/messages/ko/home.json" with { type: "json" };
 import shell from "../../apps/web/messages/ko/shell.json" with { type: "json" };
 import tickets from "../../apps/web/messages/ko/tickets.json" with { type: "json" };
 import {
@@ -68,6 +71,7 @@ const ticksAtWake: number[] = [];
 let web: ViteDevServer;
 let baseUrl: string;
 let browser: Browser;
+let fakeRunner: FakeRunner;
 
 function swapWebModule(name: string, replacement: string): Plugin {
   const original = join(webServerDir, `${name}.ts`);
@@ -88,6 +92,7 @@ beforeAll(async () => {
   db = openDatabase(dbPath);
   migrate(db);
   const runner = seed(db);
+  fakeRunner = runner;
 
   const tracker = new FakeTracker(fakeKind);
   tracker.addTicket(unassignedTicket);
@@ -98,7 +103,7 @@ beforeAll(async () => {
       .registerCodeHost({ kind: githubKind, create: () => new FakeCodeHost(githubKind) })
       .registerRunner({ kind: runnerKind, create: () => runner }),
     secretBox: new SecretBox(encryptionKey),
-    logger: { warn: () => undefined },
+    logger: silentLogger,
   });
   loop = startTickLoop({
     tick: async () => {
@@ -106,7 +111,7 @@ beforeAll(async () => {
       ticks += 1;
     },
     pollIntervalMs: POLL_INTERVAL_MS,
-    logger: { warn: () => undefined },
+    logger: silentLogger,
   });
   globalThis.__gangerE2eWakeWorker = () => {
     ticksAtWake.push(ticks);
@@ -157,6 +162,81 @@ describe("web 이 DB 에 쓴 직후 worker 깨우기", () => {
     });
     expect(Date.now() - assignedAt).toBeLessThan(START_WITHIN_MS);
     expect(ticks).toBeGreaterThan(1);
+  });
+});
+
+describe("멈추기·재개(0118, 가짜 어댑터)", () => {
+  it("Dashboard 카드 메뉴로 멈추면 Paused 꼬리표가 보이고, 재개 버튼으로 같은 에이전트가 이어서 Running이 된다", async () => {
+    await vi.waitFor(() => expect(runOfTicket()?.state).toBe("running"), { timeout: 30_000 });
+    const key = unassignedTicket.key;
+    const page = await browser.newPage({ baseURL: baseUrl, locale: "ko-KR" });
+    page.setDefaultTimeout(30_000);
+    try {
+      await page.goto(`/?ws=${workspaceId}`);
+      await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+      await page.waitForLoadState("networkidle");
+      const card = page
+        .getByRole("region", { name: home.column.running })
+        .getByRole("listitem")
+        .filter({ has: page.getByText(key, { exact: true }) });
+      await card.getByRole("button", { name: fill(home.card.menu, { key }) }).click();
+      await page.getByRole("menuitem", { name: home.card.pause }).click();
+      await page
+        .getByRole("region", { name: shell.toastRegion })
+        .getByText(fill(home.control.pauseRequested, { key }))
+        .waitFor();
+      await vi.waitFor(() => expect(runOfTicket()?.state).toBe("paused"), { timeout: 10_000 });
+      await card.getByText(domain.runState.paused, { exact: true }).waitFor();
+
+      await card.getByRole("button", { name: home.card.resume }).click();
+      await vi.waitFor(() => expect(runOfTicket()?.state).toBe("running"), { timeout: 10_000 });
+      await card.getByRole("button", { name: fill(home.card.menu, { key }) }).waitFor();
+    } finally {
+      await page.close();
+    }
+    const run = runOfTicket();
+    const agent =
+      run === undefined || run.state === "queued" || run.state === "ended"
+        ? undefined
+        : fakeRunner.runAt(run.worktree);
+    expect(agent?.paused).toBe(false);
+    expect(agent?.resumes).toHaveLength(1);
+    expect(agent?.agentStopped).toBe(false);
+  });
+});
+
+describe("러너에서 멈춘 에이전트(0120, 가짜 어댑터)", () => {
+  it("러너에서 에이전트 세션이 중단되면 카드가 '러너에서 멈췄어요' Paused가 되고, 재개 버튼으로 Running이 된다", async () => {
+    await vi.waitFor(() => expect(runOfTicket()?.state).toBe("running"), { timeout: 30_000 });
+    const run = runOfTicket();
+    if (run === undefined || run.state === "queued" || run.state === "ended") {
+      throw new Error("run has not started");
+    }
+    const key = unassignedTicket.key;
+    fakeRunner.interruptOnRunner(run.worktree);
+    loop.wake();
+    await vi.waitFor(() => expect(runOfTicket()?.state).toBe("paused"), { timeout: 10_000 });
+
+    const page = await browser.newPage({ baseURL: baseUrl, locale: "ko-KR" });
+    page.setDefaultTimeout(30_000);
+    try {
+      await page.goto(`/?ws=${workspaceId}`);
+      await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+      await page.waitForLoadState("networkidle");
+      const card = page
+        .getByRole("region", { name: home.column.running })
+        .getByRole("listitem")
+        .filter({ has: page.getByText(key, { exact: true }) });
+      await card.getByText(domain.runState.paused, { exact: true }).waitFor();
+      await card.getByText(domain.pauseSource.runner, { exact: true }).waitFor();
+
+      await card.getByRole("button", { name: home.card.resume }).click();
+      await vi.waitFor(() => expect(runOfTicket()?.state).toBe("running"), { timeout: 10_000 });
+      await card.getByRole("button", { name: fill(home.card.menu, { key }) }).waitFor();
+    } finally {
+      await page.close();
+    }
+    expect(fakeRunner.runAt(run.worktree).resumes).toHaveLength(2);
   });
 });
 

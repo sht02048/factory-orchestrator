@@ -1,4 +1,4 @@
-import { toTicketKey, toTrackerProjectId } from "@ganger/core";
+import { toLabelId, toRunnerProjectId, toTicketKey, toTrackerProjectId } from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import { toWorkspaceId } from "./ids.js";
 import { assignRun, changeRunState, getRun, listRuns } from "./runs.js";
@@ -11,7 +11,10 @@ import {
   recordProviderUsage,
   recordRunnerCheck,
   removeWorkspaceTrackerProject,
+  replaceMapping,
+  saveCheckedWebhookAddress,
   saveInstallAddresses,
+  saveMapping,
   saveWorkspace,
   saveWorkspaceTrackerProject,
 } from "./settings.js";
@@ -300,6 +303,132 @@ describe("설치 설정(0048)", () => {
       instanceId,
       webAddress: "https://server.example.ts.net",
       webhookAddress: null,
+      webhookAddressCheckedAt: null,
     });
+  });
+});
+
+describe("Mapping 저장소 목록(0115)", () => {
+  const repoB = toRunnerProjectId("fake:acme/b");
+  const repoC = toRunnerProjectId("fake:acme/c");
+  const api = toLabelId("label-api");
+
+  it("기본 하나와 라벨 붙은 저장소를 순서대로 저장하고 읽는다", () => {
+    const db = seededDatabase();
+    expect(
+      replaceMapping(db, {
+        connection,
+        trackerProject,
+        agent,
+        model: "opus",
+        repos: [
+          { project: repoA, isDefault: true, labelId: null },
+          { project: repoC, isDefault: false, labelId: api },
+          { project: repoB, isDefault: false, labelId: null },
+        ],
+      }),
+    ).toEqual({ ok: true });
+
+    expect(getMapping(db, connection, trackerProject)).toEqual({
+      connection,
+      trackerProject,
+      agent,
+      model: "opus",
+      defaultRepo: repoA,
+      repos: [
+        { project: repoA, isDefault: true, labelId: null },
+        { project: repoC, isDefault: false, labelId: api },
+        { project: repoB, isDefault: false, labelId: null },
+      ],
+    });
+  });
+
+  it("같은 트래커 프로젝트에서 한 라벨을 두 저장소에 붙이면 거절하고 저장된 값을 바꾸지 않는다", () => {
+    const db = seededDatabase();
+    const before = getMapping(db, connection, trackerProject);
+
+    expect(
+      replaceMapping(db, {
+        connection,
+        trackerProject,
+        agent,
+        repos: [
+          { project: repoA, isDefault: true, labelId: null },
+          { project: repoB, isDefault: false, labelId: api },
+          { project: repoC, isDefault: false, labelId: api },
+        ],
+      }),
+    ).toEqual({ ok: false, reason: "label-in-use" });
+    expect(getMapping(db, connection, trackerProject)).toEqual(before);
+  });
+
+  it("DB도 기본 둘·라벨 중복·기본의 라벨을 막는다", () => {
+    const db = seededDatabase();
+    const insert = (runner: string, isDefault: number, label: string | null) =>
+      db.$client
+        .prepare(
+          "INSERT INTO mapping_repos (tracker_connection_id, tracker_project_id, runner_project_id, is_default, label_id, position) VALUES (?, ?, ?, ?, ?, 9)",
+        )
+        .run(connection, trackerProject, runner, isDefault, label);
+    expect(() => insert("x", 1, null)).toThrow(/UNIQUE/);
+    expect(() => insert("y", 1, "l")).toThrow(/CHECK/);
+    insert("z", 0, "l");
+    expect(() => insert("w", 0, "l")).toThrow(/UNIQUE/);
+  });
+
+  it("saveMapping은 기본 저장소를 바꾸고 나머지 저장소는 그대로 둔다(MCP set_mapping)", () => {
+    const db = seededDatabase();
+    replaceMapping(db, {
+      connection,
+      trackerProject,
+      agent,
+      repos: [
+        { project: repoA, isDefault: true, labelId: null },
+        { project: repoB, isDefault: false, labelId: api },
+        { project: repoC, isDefault: false, labelId: null },
+      ],
+    });
+
+    saveMapping(db, { connection, trackerProject, runnerProject: repoB, agent });
+
+    expect(getMapping(db, connection, trackerProject)?.repos).toEqual([
+      { project: repoB, isDefault: true, labelId: null },
+      { project: repoA, isDefault: false, labelId: null },
+      { project: repoC, isDefault: false, labelId: null },
+    ]);
+  });
+});
+
+describe("Linear가 이 서버에 닿을 주소의 확인 시각(0130)", () => {
+  const at = new Date("2026-11-20T09:00:00Z");
+  const later = new Date("2026-11-20T10:00:00Z");
+
+  it("확인한 주소로 저장하면 확인 시각을 남기고, 다른 주소만 바꾸는 저장은 그대로 둔다", () => {
+    const db = seededDatabase();
+    saveCheckedWebhookAddress(db, "https://hooks.example.com", at);
+    expect(getInstallSettings(db)).toMatchObject({
+      webhookAddress: "https://hooks.example.com",
+      webhookAddressCheckedAt: at,
+    });
+    saveInstallAddresses(
+      db,
+      { webAddress: "https://server.example.ts.net", webhookAddress: "https://hooks.example.com" },
+      later,
+    );
+    expect(getInstallSettings(db)).toMatchObject({
+      webAddress: "https://server.example.ts.net",
+      webhookAddressCheckedAt: at,
+    });
+  });
+
+  it("확인 없이 닿을 주소를 바꾸면 확인 시각을 지운다", () => {
+    const db = seededDatabase();
+    saveCheckedWebhookAddress(db, "https://hooks.example.com", at);
+    saveInstallAddresses(
+      db,
+      { webAddress: null, webhookAddress: "http://192.168.0.10:3000" },
+      later,
+    );
+    expect(getInstallSettings(db).webhookAddressCheckedAt).toBeNull();
   });
 });

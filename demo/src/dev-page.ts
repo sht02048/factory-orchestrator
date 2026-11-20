@@ -1,3 +1,5 @@
+import { ASK_QUERY_DEVTOOLS, DEV_CHANNEL } from "./values.ts";
+
 const ACTIONS: ReadonlyArray<{ path: string; label: string; help: string }> = [
   {
     path: "label",
@@ -60,6 +62,7 @@ export function devPage(lifeEnabled: boolean): string {
   body { max-width: 560px; margin: 32px auto; padding: 0 16px; }
   ul { list-style: none; padding: 0; display: grid; gap: 12px; }
   button { font: inherit; padding: 6px 12px; cursor: pointer; }
+  button[aria-pressed="true"] { background: Highlight; color: HighlightText; }
   p { margin: 4px 0 0; color: GrayText; }
   output { display: block; margin-top: 16px; font-family: ui-monospace, monospace; }
 </style>
@@ -68,10 +71,31 @@ export function devPage(lifeEnabled: boolean): string {
 <h1>개발 도구</h1>
 <p>가짜 어댑터로 도는 개발 진입점이에요. 실제 트래커·러너·GitHub 에 닿지 않아요.
 자동 진행: <strong id="life">${lifeEnabled ? "켜짐" : "꺼짐"}</strong> · <a href="/">Dashboard로</a></p>
-<ul>${buttons}</ul>
+<ul>${buttons}
+  <li>
+    <button type="button" id="query-devtools" aria-pressed="false">Query devtools 켜기·끄기</button>
+    <p>열린 앱 탭 아래쪽에 TanStack Query devtools 를 열거나 닫아요. 앱 탭이 열려 있어야 해요.</p>
+  </li>
+</ul>
 <output id="result"></output>
 <script type="module">
   const result = document.getElementById("result");
+  const channel = new BroadcastChannel(${JSON.stringify(DEV_CHANNEL)});
+  const queryDevtools = document.getElementById("query-devtools");
+  const pressed = () => queryDevtools.getAttribute("aria-pressed") === "true";
+  channel.addEventListener("message", (event) => {
+    if (event.data === ${JSON.stringify(ASK_QUERY_DEVTOOLS)}) {
+      channel.postMessage({ setQueryDevtools: pressed() });
+    } else if (typeof event.data?.setQueryDevtools === "boolean") {
+      queryDevtools.setAttribute("aria-pressed", String(event.data.setQueryDevtools));
+    }
+  });
+  queryDevtools.addEventListener("click", () => {
+    const shown = !pressed();
+    queryDevtools.setAttribute("aria-pressed", String(shown));
+    channel.postMessage({ setQueryDevtools: shown });
+  });
+  channel.postMessage(${JSON.stringify(ASK_QUERY_DEVTOOLS)});
   for (const button of document.querySelectorAll("button[data-path]")) {
     button.addEventListener("click", async () => {
       const response = await fetch("/__dev/" + button.dataset.path, { method: "POST" });

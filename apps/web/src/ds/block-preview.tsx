@@ -1,7 +1,21 @@
 import * as stylex from "@stylexjs/stylex";
 import {
+  Actions,
   AppFrame,
   Button,
+  ChevronRightIcon,
+  ExternalIcon,
+  InfoIcon,
+  InfoTip,
+  SectionNav,
+  SettingsGroup,
+  SettingsLayout,
+  SettingsLinkRow,
+  SettingsRow,
+  SettingsSection,
+  SettingsStep,
+  SettingsSteps,
+  Switch,
   CheckIcon,
   CheckTick,
   Checklist,
@@ -22,8 +36,12 @@ import {
   DividedList,
   DoneMark,
   FailureBar,
+  GangerMark,
   KanbanCard,
   KanbanCards,
+  Menu,
+  MenuItem,
+  MoreIcon,
   KanbanColumn,
   KanbanSubheading,
   NoticeLayout,
@@ -34,6 +52,7 @@ import {
   OutcomeSwatch,
   PageHeader,
   Popover,
+  QuestionForm,
   RadioGroup,
   RadioOption,
   RailBrand,
@@ -42,6 +61,7 @@ import {
   RailNavList,
   RailStatic,
   RemovableChip,
+  ScreenLayout,
   Section,
   StackedBarChart,
   StepMarker,
@@ -51,14 +71,15 @@ import {
   TextLink,
   Textarea,
   VisuallyHidden,
+  WindowChrome,
   WorkspaceBadge,
   railLinkStyles,
   ScrollRegion,
   Sheet,
   StatusPill,
 } from "@ganger/ui";
-import { space } from "@ganger/ui/tokens.stylex";
-import { useId, useState, type ReactNode } from "react";
+import { size, space } from "@ganger/ui/tokens.stylex";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 
 export const blockSectionIds = [
@@ -66,6 +87,7 @@ export const blockSectionIds = [
   "links",
   "chips",
   "choices",
+  "question",
   "codeBlock",
   "dataTable",
   "outcomes",
@@ -75,6 +97,9 @@ export const blockSectionIds = [
   "popover",
   "kanban",
   "sheet",
+  "settingsRows",
+  "settingsSteps",
+  "sectionNav",
   "icons",
 ] as const;
 
@@ -87,6 +112,91 @@ const sampleSegments = [
 
 function Demo({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.demo)}>{children}</div>;
+}
+
+const PENDING_DEMO_MS = 2_000;
+
+function ShellPreview({ titleBarHidden }: { titleBarHidden: boolean }) {
+  const t = useTranslations("ds.blocks");
+  const [pending, setPending] = useState(false);
+  useEffect(() => {
+    if (!pending) return;
+    const timer = setTimeout(() => setPending(false), PENDING_DEMO_MS);
+    return () => clearTimeout(timer);
+  }, [pending]);
+  return (
+    <figure {...stylex.props(styles.shell)}>
+      <figcaption {...stylex.props(styles.caption)}>
+        <Text variant="label">{titleBarHidden ? t("shell.desktop") : t("shell.web")}</Text>
+        {titleBarHidden ? null : (
+          <Actions>
+            <Text variant="meta">{t("shell.pending")}</Text>
+            <Button
+              variant="ghost"
+              aria-disabled={pending}
+              onClick={() => {
+                if (pending) return;
+                setPending(true);
+              }}
+            >
+              {t("shell.pendingDemo")}
+            </Button>
+          </Actions>
+        )}
+      </figcaption>
+      <WindowChrome titleBarHidden={titleBarHidden}>
+        <div inert={titleBarHidden} {...stylex.props(styles.frame)}>
+          <AppFrame
+            fill={false}
+            pending={{ active: pending, label: t("shell.pendingLabel") }}
+            rail={
+              <>
+                <RailStatic>
+                  <WorkspaceBadge name={t("shell.workspace")} initial="A" />
+                </RailStatic>
+                <RailNav label={t("shell.navLabel")}>
+                  <RailNavList>
+                    <li>
+                      <a href="#shell" aria-current="page" {...stylex.props(railLinkStyles(true))}>
+                        <RailLinkContent
+                          icon={<CheckIcon />}
+                          name={t("shell.current")}
+                          issues={0}
+                        />
+                      </a>
+                    </li>
+                    <li>
+                      <a href="#shell" {...stylex.props(railLinkStyles(false))}>
+                        <RailLinkContent icon={<CloseIcon />} name={t("shell.issues")} issues={2} />
+                      </a>
+                    </li>
+                  </RailNavList>
+                </RailNav>
+                <RailBrand>
+                  <GangerMark tone="brand" label={t("shell.brand")} />
+                </RailBrand>
+              </>
+            }
+          >
+            <ScreenLayout
+              fill={false}
+              header={
+                <PageHeader
+                  title={t("shell.pageTitle")}
+                  subtitle={t("shell.summary")}
+                  actions={<Button variant="primary">{t("shell.action")}</Button>}
+                />
+              }
+            >
+              <NoticeLayout>
+                <Text variant="body">{t("shell.notice")}</Text>
+              </NoticeLayout>
+            </ScreenLayout>
+          </AppFrame>
+        </div>
+      </WindowChrome>
+    </figure>
+  );
 }
 
 export function BlockSections() {
@@ -104,51 +214,9 @@ export function BlockSections() {
     <>
       <div id="shell">
         <Section title={tNav("shell")} note={t("shell.note")}>
-          <div {...stylex.props(styles.frame)}>
-            <AppFrame
-              fill={false}
-              rail={
-                <>
-                  <RailBrand>
-                    <Text variant="label">{t("shell.brand")}</Text>
-                  </RailBrand>
-                  <RailStatic>
-                    <WorkspaceBadge name={t("shell.workspace")} initial="A" />
-                  </RailStatic>
-                  <RailNav label={t("shell.navLabel")}>
-                    <RailNavList>
-                      <li>
-                        <a
-                          href="#shell"
-                          aria-current="page"
-                          {...stylex.props(railLinkStyles(true))}
-                        >
-                          <RailLinkContent
-                            icon={<CheckIcon />}
-                            name={t("shell.current")}
-                            issues={0}
-                          />
-                        </a>
-                      </li>
-                      <li>
-                        <a href="#shell" {...stylex.props(railLinkStyles(false))}>
-                          <RailLinkContent
-                            icon={<CloseIcon />}
-                            name={t("shell.issues")}
-                            issues={2}
-                          />
-                        </a>
-                      </li>
-                    </RailNavList>
-                  </RailNav>
-                </>
-              }
-            >
-              <NoticeLayout>
-                <PageHeader title={t("shell.pageTitle")} />
-                <Text variant="body">{t("shell.notice")}</Text>
-              </NoticeLayout>
-            </AppFrame>
+          <div {...stylex.props(styles.shells)}>
+            <ShellPreview titleBarHidden={false} />
+            <ShellPreview titleBarHidden />
           </div>
         </Section>
       </div>
@@ -225,6 +293,37 @@ export function BlockSections() {
                 value={note}
                 onValueChange={setNote}
                 placeholder={t("choices.textareaPlaceholder")}
+              />
+            </div>
+          </Demo>
+        </Section>
+      </div>
+
+      <div id="question">
+        <Section title={tNav("question")} note={t("question.note")}>
+          <Demo>
+            <div {...stylex.props(styles.narrow)}>
+              <QuestionForm
+                lead={[t("question.lead")]}
+                choices={[
+                  { marker: "A", text: t("question.wait"), answer: `(A) ${t("question.wait")}` },
+                  { marker: "B", text: t("question.start"), answer: `(B) ${t("question.start")}` },
+                ]}
+                after={[t("question.after")]}
+                labels={{
+                  other: t("question.other"),
+                  otherLabel: t("question.otherLabel"),
+                  otherPlaceholder: t("question.otherPlaceholder"),
+                  answerLabel: t("question.answerLabel"),
+                  pick: t("question.pick"),
+                  empty: t("question.empty"),
+                  note: t("question.sendNote"),
+                  shortcut: t("question.shortcut"),
+                  send: t("question.send"),
+                  sending: t("question.sending"),
+                  failed: t("question.failed"),
+                }}
+                onSend={() => Promise.resolve()}
               />
             </div>
           </Demo>
@@ -464,6 +563,11 @@ export function BlockSections() {
                     title={t("kanban.plainTitle")}
                     meta={t("kanban.meta")}
                     time={t("kanban.time")}
+                    menu={
+                      <Menu variant="icon" label={t("kanban.menuLabel")} trigger={<MoreIcon />}>
+                        <MenuItem value="pause">{t("kanban.pause")}</MenuItem>
+                      </Menu>
+                    }
                     onOpen={() => setSheetOpen(true)}
                   />
                 </li>
@@ -492,6 +596,45 @@ export function BlockSections() {
         </Section>
       </div>
 
+      <div id="settingsRows">
+        <Section title={tNav("settingsRows")} note={t("settingsRows.note")}>
+          <Demo>
+            <SettingsRowsPreview />
+          </Demo>
+        </Section>
+      </div>
+      <div id="settingsSteps">
+        <Section title={tNav("settingsSteps")} note={t("settingsSteps.note")}>
+          <Demo>
+            <SettingsStepsPreview />
+          </Demo>
+        </Section>
+      </div>
+      <div id="sectionNav">
+        <Section title={tNav("sectionNav")} note={t("sectionNav.note")}>
+          <Demo>
+            <SettingsLayout
+              nav={
+                <SectionNav
+                  label={t("sectionNav.label")}
+                  problemLabel={t("sectionNav.problem")}
+                  items={[
+                    { id: "ds-section-first", label: t("sectionNav.first") },
+                    { id: "ds-section-second", label: t("sectionNav.second"), problem: true },
+                  ]}
+                />
+              }
+            >
+              <SettingsSection id="ds-section-first" title={t("sectionNav.first")}>
+                <Text variant="meta">{t("sectionNav.body")}</Text>
+              </SettingsSection>
+              <SettingsSection id="ds-section-second" title={t("sectionNav.second")}>
+                <Text variant="meta">{t("sectionNav.body")}</Text>
+              </SettingsSection>
+            </SettingsLayout>
+          </Demo>
+        </Section>
+      </div>
       <div id="icons">
         <Section title={tNav("icons")} note={t("icons.note")}>
           <Demo>
@@ -499,6 +642,9 @@ export function BlockSections() {
               <CheckIcon />
               <CloseIcon />
               <ChevronDownIcon />
+              <ChevronRightIcon />
+              <InfoIcon />
+              <ExternalIcon />
               <VisuallyHidden>{t("icons.hidden")}</VisuallyHidden>
             </span>
           </Demo>
@@ -508,7 +654,75 @@ export function BlockSections() {
   );
 }
 
+function SettingsStepsPreview() {
+  const t = useTranslations("ds.blocks.settingsSteps");
+  return (
+    <div {...stylex.props(styles.settingsDemo)}>
+      <SettingsSection id="ds-settings-steps" title={t("title")} detail={t("status")}>
+        <SettingsSteps label={t("label")}>
+          <SettingsStep
+            number={1}
+            state="done"
+            stateLabel={t("done")}
+            label={t("first")}
+            detail={t("firstDetail")}
+            control={<Button>{t("change")}</Button>}
+          />
+          <SettingsStep number={2} state="current" stateLabel={t("current")} label={t("second")}>
+            <Text variant="meta" as="p">
+              {t("secondBody")}
+            </Text>
+          </SettingsStep>
+          <SettingsStep number={3} state="locked" stateLabel={t("locked")} label={t("third")} />
+        </SettingsSteps>
+      </SettingsSection>
+    </div>
+  );
+}
+
+function SettingsRowsPreview() {
+  const t = useTranslations("ds.blocks.settingsRows");
+  const [awake, setAwake] = useState(true);
+  return (
+    <div {...stylex.props(styles.settingsDemo)}>
+      <SettingsGroup label={t("group")}>
+        <SettingsRow
+          label={t("name")}
+          value={t("nameValue")}
+          control={<Button>{t("change")}</Button>}
+        />
+        <SettingsRow
+          label={t("minutes")}
+          info={<InfoTip label={t("info")} content={t("infoContent")} />}
+          value="120"
+        />
+        <SettingsRow
+          label={t("sleep")}
+          detail={t("sleepDetail")}
+          status={t("saved")}
+          control={<Switch aria-label={t("sleep")} checked={awake} onCheckedChange={setAwake} />}
+        />
+        <SettingsRow
+          label={t("token")}
+          detail={t("tokenDetail")}
+          detailTone="problem"
+          control={
+            <Switch aria-label={t("token")} checked={false} onCheckedChange={() => {}} disabled />
+          }
+        />
+        <SettingsLinkRow
+          label={t("runners")}
+          detail={t("runnersDetail")}
+          value={t("runnersValue")}
+          render={(props) => <a href="#settingsRows" {...props} />}
+        />
+      </SettingsGroup>
+    </div>
+  );
+}
+
 const styles = stylex.create({
+  settingsDemo: { width: "100%", maxWidth: size.settingsBodyWidth },
   demo: {
     display: "flex",
     flexDirection: "column",
@@ -525,6 +739,9 @@ const styles = stylex.create({
     maxWidth: 640,
   },
   columns: { display: "flex", flexWrap: "wrap", gap: space.s10 },
+  shells: { display: "flex", flexDirection: "column", gap: space.s6 },
+  shell: { display: "flex", flexDirection: "column", gap: space.s2, margin: 0 },
+  caption: { display: "flex", flexDirection: "column", gap: space.s1 },
   frame: { height: 320, overflow: "hidden" },
   kanban: { width: "100%", maxWidth: 360, paddingBlock: space.s5 },
 });

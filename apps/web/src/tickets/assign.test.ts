@@ -1,16 +1,34 @@
-import { toRunId } from "@ganger/core";
-import { getRun } from "@ganger/db";
+import {
+  toAgentId,
+  toLabelId,
+  toRunId,
+  toRunnerId,
+  toRunnerProjectId,
+  toTicketKey,
+  toTrackerConnectionId,
+} from "@ganger/core";
+import {
+  getRun,
+  latestChangeSeq,
+  listChangesAfter,
+  recordRunnerCheck,
+  replaceMapping,
+  trackerReadGeneration,
+} from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import { TICKET_TITLE_MAX_LENGTH } from "@ganger/db";
 import { assignInput, submitAssignment } from "@ganger/app/tickets/assign";
 import type { AssignInput } from "@ganger/app/tickets/assign";
-import { connection, docsProject, now, setupTickets, webProject } from "./test-fixtures";
+import { loadTicketsPage } from "@ganger/app/tickets/load";
+import { firstAssignableRepo, repoReach } from "@ganger/app/tickets/model";
+import { connection, docsProject, now, setupTickets, webProject, webRepo } from "./test-fixtures";
 
 const base: AssignInput = {
   connection,
   ticketKey: "ACME-6",
   ticketTitle: "Checkout retry",
   trackerProject: webProject,
+  runnerProject: webRepo,
   runnerId: null,
   agent: "claude",
 };
@@ -26,6 +44,17 @@ function assignedRun(
 }
 
 describe("수동 할당", () => {
+  it("할당은 트래커 서버 캐시 세대만 올리고 tracker 변경 기록 줄을 쓰지 않아, 열린 Tickets 가 트래커를 다시 읽지 않는다(0127)", () => {
+    const { db } = setupTickets();
+    const before = latestChangeSeq(db);
+    const generation = trackerReadGeneration(db, toTrackerConnectionId(connection));
+
+    assignedRun(db, submitAssignment(db, base, now));
+
+    expect(trackerReadGeneration(db, toTrackerConnectionId(connection))).toBe(generation + 1);
+    expect(listChangesAfter(db, before).map((change) => change.kind)).toEqual(["assignment"]);
+  });
+
   it("Mapping 기본값 그대로 할당하면 러너를 자동으로 골라 Queued 런을 만든다", () => {
     const { db } = setupTickets();
     const run = assignedRun(db, submitAssignment(db, base, now));
@@ -90,11 +119,12 @@ describe("수동 할당", () => {
     expect(assignInput.parse({ ...base, model: "opus" })).not.toHaveProperty("model");
   });
 
-  it("러너 쪽 프로젝트는 바꿀 수 없다: 입력에 넣어도 버리고 Mapping 값을 쓴다", () => {
+  it("Mapping에 없는 저장소로는 할당하지 않는다(0115)", () => {
     const { db } = setupTickets();
-    const input = assignInput.parse({ ...base, runnerProject: "github:acme/lab" });
-    expect(input).not.toHaveProperty("runnerProject");
-    expect(assignedRun(db, submitAssignment(db, input, now)).runnerProject).toBe("github:acme/web");
+    expect(submitAssignment(db, { ...base, runnerProject: "github:acme/lab" }, now)).toEqual({
+      ok: false,
+      reason: "unknown-repo",
+    });
   });
 
   it("진행 중이거나 Queued 인 런이 있는 티켓은 할당하지 않는다", () => {
@@ -135,4 +165,113 @@ describe("수동 할당", () => {
       submitAssignment(db, { ...base, ticketKey: "DOC-1", trackerProject: docsProject }, now),
     ).toEqual({ ok: false, reason: "no-mapping" });
   });
+});
+
+describe("여러 저장소 수동 할당(0115)", () => {
+  const apiRepo = toRunnerProjectId("github:acme/api");
+  const bug = toLabelId("label-bug");
+
+  function withApiRepo() {
+    const fixture = setupTickets();
+    replaceMapping(fixture.db, {
+      connection,
+      trackerProject: webProject,
+      agent: toAgentId("claude"),
+      model: "sonnet",
+      repos: [
+        { project: webRepo, isDefault: true, labelId: null },
+        { project: apiRepo, isDefault: false, labelId: bug },
+      ],
+    });
+    return fixture;
+  }
+
+  it("할당 창은 티켓 라벨에 맞는 저장소를, 다시 맡길 때는 지난 런의 저장소를 먼저 고른다", async () => {
+    const { context } = withApiRepo();
+    const page = await loadTicketsPage(context, undefined, now);
+    const defaults = (key: string) => {
+      const found = page.tickets.find((t) => t.key === key);
+      return found?.assignability.kind === "ready" ? found.assignability.defaults : null;
+    };
+    expect(defaults("ACME-6")).toEqual({
+      runnerProject: apiRepo,
+      agent: "claude",
+      repos: [
+        { id: webRepo, name: webRepo, isDefault: true, label: null },
+        { id: apiRepo, name: apiRepo, isDefault: false, label: "bug" },
+      ],
+    });
+    expect(defaults("ACME-1")?.runnerProject).toBe(webRepo);
+    expect(defaults("ACME-2")?.runnerProject).toBe(webRepo);
+  });
+
+  it("지난 런이 Failed·취소가 아니면 지난 저장소가 아니라 라벨 규칙으로 고른다", async () => {
+    const { context, tracker } = withApiRepo();
+    const ticket = await tracker.getTicket(toTicketKey("ACME-1"));
+    if (ticket === null) throw new Error("no ACME-1");
+    tracker.addTicket({ ...ticket, labels: [{ id: bug, name: "bug" }] });
+    const page = await loadTicketsPage(context, undefined, now);
+    const found = page.tickets.find((t) => t.key === "ACME-1");
+    expect(
+      found?.assignability.kind === "ready" ? found.assignability.defaults.runnerProject : null,
+    ).toBe(apiRepo);
+  });
+
+  it("고른 저장소로 런을 만든다", () => {
+    const { db } = withApiRepo();
+    addApiRunner(db, false);
+    const run = assignedRun(db, submitAssignment(db, { ...base, runnerProject: apiRepo }, now));
+    expect(run).toMatchObject({ runnerProject: apiRepo, runnerId: "runner-api" });
+  });
+
+  it("그 저장소가 있는 러너 모두 push가 막혔으면 할당 창에서 끄고 다음 저장소를 고른다", async () => {
+    const { db, context } = withApiRepo();
+    addApiRunner(db, true);
+    const page = await loadTicketsPage(context, undefined, now);
+    expect(repoReach(page.runners, apiRepo)).toEqual({ runners: 1, pushBlockedEverywhere: true });
+    expect(repoReach(page.runners, webRepo)).toEqual({ runners: 3, pushBlockedEverywhere: false });
+    expect(
+      firstAssignableRepo(
+        {
+          runnerProject: apiRepo,
+          agent: "claude",
+          repos: [
+            { id: webRepo, name: webRepo, isDefault: true, label: null },
+            { id: apiRepo, name: apiRepo, isDefault: false, label: "bug" },
+          ],
+        },
+        page.runners,
+      ),
+    ).toBe(webRepo);
+    expect(
+      submitAssignment(db, { ...base, runnerProject: apiRepo, runnerId: "runner-api" }, now),
+    ).toEqual({ ok: false, reason: "runner-assignment-blocked" });
+  });
+
+  function addApiRunner(db: Parameters<typeof getRun>[0], pushBlocked: boolean) {
+    const runnerId = toRunnerId("runner-api");
+    db.$client
+      .prepare(
+        "INSERT INTO runners (id, kind, name, config, capacity, online, created_at) VALUES (?, 'fake', 'runner-api', '{}', 2, 1, 0)",
+      )
+      .run(runnerId);
+    recordRunnerCheck(db, {
+      runnerId,
+      online: true,
+      checkedAt: now,
+      error: null,
+      assignmentBlocked: false,
+      projects: [{ id: apiRepo, displayName: apiRepo, setupState: "ready" }],
+      prerequisites: [
+        {
+          id: `push:${apiRepo}`,
+          name: "push",
+          satisfied: !pushBlocked,
+          hint: null,
+          blocksAssignment: true,
+          project: apiRepo,
+        },
+      ],
+    });
+  }
 });

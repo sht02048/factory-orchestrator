@@ -7,6 +7,14 @@
     "all": "전체",
     "none": "Workspace 없음"
   },
+  "navigationPending": "화면을 여는 중이에요",
+  "screenError": {
+    "title": "화면을 열지 못했어요",
+    "body": "서버에서 이 화면의 내용을 읽지 못했어요. 서버가 켜져 있는지 확인하고 다시 읽어 보세요.",
+    "retry": "다시 읽기",
+    "retrying": "다시 읽는 중…",
+    "retryFailed": "다시 읽지 못했어요. 잠시 뒤 다시 해 주세요."
+  },
   "nav": {
     "label": "화면",
     "withIssues": "{name}, Runner Issue {count}개",

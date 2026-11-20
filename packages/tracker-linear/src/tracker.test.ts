@@ -124,6 +124,22 @@ describe("checkConnection", () => {
     }
   });
 
+  it("조직 urlKey 를 읽으면 그 조직의 webhook 설정 주소를 함께 돌려준다", async () => {
+    const withKey = (urlKey: string) =>
+      withBody(fixture("organization-ok"), () => ({
+        data: { viewer: { organization: { name: "Acme", urlKey } } },
+      }));
+    const { tracker: t } = tracker(fixture("connection-ok"), withKey("acme"));
+    await expect(t.checkConnection()).resolves.toEqual({
+      ok: true,
+      organizationName: "Acme",
+      webhookSettingsUrl: "https://linear.app/acme/settings/api",
+    });
+
+    const { tracker: odd } = tracker(fixture("connection-ok"), withKey("../evil"));
+    await expect(odd.checkConnection()).resolves.toEqual({ ok: true, organizationName: "Acme" });
+  });
+
   it("인증 실패를 unauthorized로 돌려준다", async () => {
     const { tracker: t } = tracker(fixture("error-unauthorized"));
 
@@ -364,6 +380,30 @@ describe("갱신", () => {
       id: "00000000-0000-4000-8000-000000000100",
       url: "https://linear.app/acme/issue/ENG-123/example-ticket#comment-00000000",
     });
+  });
+
+  const labelColor = "given-color";
+
+  it("createLabel이 팀 없이 워크스페이스 라벨을 받은 색 그대로 만들고 새 라벨을 돌려준다(0115)", async () => {
+    const { tracker: t, sent } = tracker(fixture("create-label"));
+
+    const label = await t.createLabel({ name: "ganger", color: labelColor });
+
+    expect(sent[0]?.query).toContain("issueLabelCreate");
+    expect(sent[0]?.query).not.toContain("teamId");
+    expect(sent[0]?.variables).toEqual({ name: "ganger", color: labelColor });
+    expect(label).toEqual({
+      id: toLabelId("00000000-0000-4000-8000-000000000200"),
+      name: "ganger",
+    });
+  });
+
+  it("createLabel이 Linear가 거절한 라벨 만들기를 LinearApiError로 던진다(0115)", async () => {
+    const { tracker: t } = tracker(fixture("error-create-label-forbidden"));
+
+    const error = await rejection(t.createLabel({ name: "ganger", color: labelColor }));
+
+    expect(error).toBeInstanceOf(LinearApiError);
   });
 
   it("addComment가 없는 티켓에 not-found를 던진다", async () => {

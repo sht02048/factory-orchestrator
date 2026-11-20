@@ -1,7 +1,16 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { sectionScrollTop } from "./components/settings-layout";
 
 import {
+  InfoTip,
+  SectionNav,
+  SettingsGroup,
+  SettingsLayout,
+  SettingsLinkRow,
+  SettingsRow,
+  SettingsSection,
+  Switch,
   Button,
   CAPACITY_CELLS_MAX,
   CapacityBar,
@@ -16,7 +25,10 @@ import {
   GroupHeader,
   Input,
   Menu,
+  RadioGroup,
+  RadioOption,
   MenuItem,
+  MoreIcon,
   PILL_STATUSES,
   KanbanCard,
   KanbanCards,
@@ -118,7 +130,7 @@ describe("서버 렌더", () => {
       problem: ["disconnected", "failed", "offline", "runner-issue"],
       progress: ["running", "online"],
       merged: ["merged"],
-      idle: ["queued", "canceled"],
+      idle: ["queued", "paused", "canceled"],
     };
     const actual: Record<StatusTone, PillStatus[]> = {
       answer: [],
@@ -460,6 +472,25 @@ describe("서버 렌더", () => {
     expect(field).toContain("<svg");
   });
 
+  it("Menu 트리거와 RadioGroup 은 설명 글을 aria-describedby 로 잇는다(0115)", () => {
+    const html = renderToString(
+      <>
+        <Menu label="Web에 저장소 더하기" describedBy="hint-a" trigger="저장소 더하기">
+          <MenuItem value="a">A</MenuItem>
+        </Menu>
+        <RadioGroup labelledBy="title-b" describedBy="hint-b">
+          <RadioOption name="r" value="a" checked onCheck={noop}>
+            A
+          </RadioOption>
+        </RadioGroup>
+      </>,
+    );
+    expect(html).toMatch(
+      /aria-label="Web에 저장소 더하기"[^>]*aria-describedby="hint-a"|aria-describedby="hint-a"[^>]*aria-label="Web에 저장소 더하기"/,
+    );
+    expect(html).toContain('role="radiogroup" aria-labelledby="title-b" aria-describedby="hint-b"');
+  });
+
   it("팝업(Menu·Select·Dialog·Tooltip)은 닫힌 채 트리거만 보인다", () => {
     const html = renderToString(
       <>
@@ -580,6 +611,37 @@ describe("서버 렌더", () => {
     expect(plain).not.toContain("data-status=");
   });
 
+  it("KanbanCard 의 menu 는 카드 버튼 밖에 두고, 아이콘 메뉴 단추는 label 을 이름으로 가진다(티켓 0118)", () => {
+    const html = renderToString(
+      <KanbanCard
+        title="ACME-1"
+        meta="runner-a"
+        time="24분째"
+        menu={
+          <Menu variant="icon" label="ACME-1 런 메뉴" trigger={<MoreIcon />}>
+            <MenuItem value="pause">멈추기</MenuItem>
+          </Menu>
+        }
+        onOpen={noop}
+      />,
+    );
+    const openEnd = html.indexOf("</button>") + "</button>".length;
+    const open = html.slice(html.indexOf("<button"), openEnd);
+    expect(open).not.toContain("ACME-1 런 메뉴");
+    const trigger = /<button[^>]*aria-label="ACME-1 런 메뉴"[^>]*>/.exec(html.slice(openEnd));
+    expect(trigger).not.toBeNull();
+    expect(trigger?.[0]).toContain('aria-haspopup="menu"');
+    expect(html.slice(openEnd)).not.toContain('d="M4 6l4 4 4-4"');
+
+    const plain = renderToString(<KanbanCard title="ACME-1" detail="설명" onOpen={noop} />);
+    const problem = renderToString(
+      <KanbanCard title="ACME-1" detail="멈추지 못했어요" detailTone="problem" onOpen={noop} />,
+    );
+    const classOf = (rendered: string, word: string) =>
+      new RegExp(`class="([^"]*)"[^>]*>${word}<`).exec(rendered)?.[1];
+    expect(classOf(problem, "멈추지 못했어요")).not.toBe(classOf(plain, "설명"));
+  });
+
   it("Sheet 는 닫혀 있으면 아무것도 그리지 않는다(티켓 0100)", () => {
     const html = renderToString(
       <Sheet open={false} onOpenChange={noop} title="ACME-1" closeLabel="닫기">
@@ -640,6 +702,17 @@ describe("서버 렌더", () => {
     );
     expect(html.match(/<dt/g)).toHaveLength(2);
     expect(html.match(/<dd/g)).toHaveLength(2);
+  });
+
+  it("SplitView stackedListShare larger 는 쌓였을 때 목록에 더 큰 몫을 주고, 주지 않으면 지금 배치 그대로다(0127)", () => {
+    const half = renderToString(<SplitView list="목록" panel="패널" />);
+    const explicitHalf = renderToString(
+      <SplitView stackedListShare="half" list="목록" panel="패널" />,
+    );
+    const larger = renderToString(<SplitView stackedListShare="larger" list="목록" panel="패널" />);
+    expect(explicitHalf).toEqual(half);
+    expect(larger).toContain("목록");
+    expect(larger).not.toEqual(half);
   });
 
   it("SplitView editor 는 목록 변형과 다른 열 배치를 쓴다", () => {
@@ -992,5 +1065,145 @@ describe("새 컴포넌트(티켓 0073)", () => {
       )?.[1];
     expect(dotClass("failed")).not.toEqual(dotClass("running"));
     expect(dotClass("failed")).toEqual(dotClass("offline"));
+  });
+});
+
+describe("설정 한 페이지 부품(티켓 0119)", () => {
+  it("SettingsRow labelFor 는 라벨을 그 스위치에 잇고, 누르면 바뀌는 label 로 그린다", () => {
+    const html = renderToString(
+      <SettingsRow
+        label="잠자기"
+        labelFor="sleep"
+        control={<Switch id="sleep" checked onCheckedChange={noop} />}
+      />,
+    );
+    expect(html).toMatch(/<label for="sleep"[^>]*>잠자기<\/label>/);
+    expect(html).toMatch(/id="sleep"[^>]*role="switch"|role="switch"[^>]*id="sleep"/);
+  });
+
+  it("Field info 는 라벨 옆에 도움말을 두고, mono Input 은 맞춤법 검사를 끈다", () => {
+    const html = renderToString(
+      <Field label="토큰" info={<InfoTip label="토큰 도움말" content="암호화해 저장해요." />}>
+        <Input value="" onValueChange={noop} mono />
+      </Field>,
+    );
+    expect(html).toContain('aria-label="토큰 도움말"');
+    expect(html).toMatch(/spellcheck="false"/i);
+    expect(renderToString(<Input value="" onValueChange={noop} />)).not.toMatch(/spellcheck/i);
+  });
+
+  it("SettingsGroup padded 는 내용을 줄과 같은 안쪽 여백 상자로 감싼다", () => {
+    const plain = renderToString(<SettingsGroup>내용</SettingsGroup>);
+    const padded = renderToString(<SettingsGroup padded>내용</SettingsGroup>);
+    expect(plain).not.toMatch(/<div[^>]*><div[^>]*>내용/);
+    expect(padded).toMatch(/<div[^>]*><div[^>]*>내용<\/div><\/div>/);
+  });
+
+  it("Input invalid 는 aria-invalid 를 단다", () => {
+    expect(
+      renderToString(<Input aria-label="분" value="0" onValueChange={noop} invalid />),
+    ).toContain('aria-invalid="true"');
+  });
+
+  it("Switch 는 role=switch 이고 켜짐·못 씀을 aria 로 알린다", () => {
+    const on = renderToString(<Switch aria-label="잠자기" checked onCheckedChange={noop} />);
+    expect(on).toMatch(/role="switch"/);
+    expect(on).toContain('aria-checked="true"');
+    expect(on).toContain('aria-label="잠자기"');
+    const off = renderToString(
+      <Switch aria-label="잠자기" checked={false} onCheckedChange={noop} disabled />,
+    );
+    expect(off).toContain('aria-checked="false"');
+    expect(off).toMatch(/role="switch"[^>]*disabled|disabled[^>]*role="switch"/);
+  });
+
+  it("InfoTip 은 이름 있는 단추이고 설명을 aria-describedby 로 잇는 툴팁에 담는다", () => {
+    const html = renderToString(<InfoTip label="최대 실행 시간 도움말" content="멈추고 끝내요." />);
+    expect(html).toContain('aria-label="최대 실행 시간 도움말"');
+    expect(html).toMatch(/<button[^>]*aria-describedby="([^"]+)"/);
+    const id = /aria-describedby="([^"]+)"/.exec(html)?.[1] ?? "";
+    expect(html).toMatch(new RegExp(`role="tooltip"[^>]*id="${id}"[^>]*>멈추고 끝내요.`));
+  });
+
+  it("SettingsRow 는 라벨·값·동작을 한 줄에 두고 상태 칸을 늘 그려 둔다", () => {
+    const html = renderToString(
+      <SettingsGroup label="예시">
+        <SettingsRow
+          label="이름"
+          labelId="name-label"
+          value="Acme"
+          detail="두 번째 줄"
+          detailTone="problem"
+          control={<Button>바꾸기</Button>}
+        />
+        <SettingsRow label="빈 줄" />
+      </SettingsGroup>,
+    );
+    expect(html).toContain('role="group" aria-label="예시"');
+    expect(html).toContain('id="name-label"');
+    expect(html.match(/role="status"/g)).toHaveLength(2);
+    expect(html).toContain(">바꾸기</button>");
+    expect(html.match(/>Acme</g)).toHaveLength(2);
+  });
+
+  it("SettingsRow 는 펼치면 편집 영역을 그리고, formOnly 이면 줄 대신 편집 영역만 그린다", () => {
+    const open = renderToString(
+      <SettingsRow label="토큰" detail="저장했어요" expanded={<form />} />,
+    );
+    expect(open).toContain("토큰");
+    expect(open).toContain("<form>");
+    const only = renderToString(
+      <SettingsRow label="이름" control={<Button>바꾸기</Button>} formOnly expanded={<form />} />,
+    );
+    expect(only).not.toContain("바꾸기");
+    expect(only).toContain("<form>");
+  });
+
+  it("SettingsLinkRow 는 넘긴 링크 요소로 줄 전체를 감싸고 화살표를 붙인다", () => {
+    const html = renderToString(
+      <SettingsLinkRow
+        id="runners-row"
+        label="러너"
+        detail="3대"
+        render={(props) => <a href="/runners" {...props} />}
+      />,
+    );
+    expect(html).toMatch(/<div id="runners-row"[^>]*><a href="\/runners"[^>]*>/);
+    expect(html).toContain('<path d="M6 4l4 4-4 4"');
+  });
+
+  it("SectionNav 는 이름 있는 nav 안에 구역 링크를 두고 첫 구역을 지금 위치로, 문제 구역에 점과 읽을 글을 붙인다", () => {
+    const html = renderToString(
+      <SettingsLayout
+        nav={
+          <SectionNav
+            label="목차"
+            problemLabel="확인할 것이 있어요"
+            items={[
+              { id: "a", label: "가" },
+              { id: "b", label: "나", problem: true },
+            ]}
+          />
+        }
+      >
+        <SettingsSection id="a" title="가">
+          본문
+        </SettingsSection>
+      </SettingsLayout>,
+    );
+    expect(html).toContain('<nav aria-label="목차"');
+    expect(html).toMatch(/href="#a" aria-current="location"/);
+    expect(html).not.toMatch(/href="#b" aria-current/);
+    expect(html.match(/확인할 것이 있어요/g)).toHaveLength(1);
+    expect(html).toContain('<section id="a" aria-labelledby="a-heading"');
+    expect(html).toMatch(/<h2 id="a-heading" tabindex="-1" data-section-heading=""/);
+  });
+
+  it("SectionNav 는 구역을 스크롤 칸 안에서만 맨 위로 옮기고, 끝까지 못 가면 끝에서 멈춘다", () => {
+    const base = { scrollerTop: 100, scrollTop: 200, marginTop: 32, maxScrollTop: 784 };
+    expect(sectionScrollTop({ ...base, sectionTop: 400 })).toBe(468);
+    expect(sectionScrollTop({ ...base, sectionTop: 2000 })).toBe(784);
+    expect(sectionScrollTop({ ...base, sectionTop: -500 })).toBe(0);
+    expect(sectionScrollTop({ ...base, sectionTop: 400, maxScrollTop: -10 })).toBe(0);
   });
 });

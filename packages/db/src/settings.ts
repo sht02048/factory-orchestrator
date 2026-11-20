@@ -2,6 +2,7 @@ import type {
   AgentId,
   CodeHostKind,
   LabelId,
+  MappingReposProblem,
   MailboxRef,
   ProviderUsageReading,
   RunnerErrorDetail,
@@ -20,19 +21,28 @@ import {
   PREREQUISITE_FAILURE_KINDS,
   USAGE_WINDOW_KINDS,
   blockedProjectsOf,
+  checkMappingRepos,
   toRunnerProjectId,
   usageLimitsAt,
 } from "@ganger/core";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import {
+  markTrackerChanged,
+  recordChange,
+  recordRunnerChange,
+  recordSettingsChange,
+} from "./change-events.js";
 import type { Database } from "./database.js";
-import { inTransaction } from "./database.js";
+import { inTransaction, onCommit } from "./database.js";
+import { log } from "@ganger/log";
 import type { CodeHostConnectionId, WorkspaceId } from "./ids.js";
 import {
   autoAssignLabels,
   codeHostConnections,
   installSettings,
+  mappingRepos,
   mappings,
   runnerProjects,
   runners,
@@ -92,10 +102,14 @@ export function saveTrackerConnection(
       sealContext("tracker_connections", input.id),
     ),
   };
-  db.insert(trackerConnections)
-    .values({ ...values, createdAt: now })
-    .onConflictDoUpdate({ target: trackerConnections.id, set: values })
-    .run();
+  inTransaction(db, () => {
+    db.insert(trackerConnections)
+      .values({ ...values, createdAt: now })
+      .onConflictDoUpdate({ target: trackerConnections.id, set: values })
+      .run();
+    recordSettingsChange(db, { targetId: input.id, workspaceId: null }, now);
+    markTrackerChanged(db, input.id, now);
+  });
 }
 
 export function listTrackerConnections(db: Database, box: SecretBox): StoredTrackerConnection[] {
@@ -105,6 +119,19 @@ export function listTrackerConnections(db: Database, box: SecretBox): StoredTrac
     .orderBy(asc(trackerConnections.createdAt), asc(trackerConnections.id))
     .all()
     .map((row) => openTrackerConnection(box, row));
+}
+
+export interface TrackerConnectionSummary {
+  id: TrackerConnectionId;
+  kind: string;
+}
+
+export function listTrackerConnectionSummaries(db: Database): TrackerConnectionSummary[] {
+  return db
+    .select({ id: trackerConnections.id, kind: trackerConnections.kind })
+    .from(trackerConnections)
+    .orderBy(asc(trackerConnections.createdAt), asc(trackerConnections.id))
+    .all();
 }
 
 export function getTrackerConnection(
@@ -147,10 +174,13 @@ export function saveCodeHostConnection(
       sealContext("code_host_connections", input.id),
     ),
   };
-  db.insert(codeHostConnections)
-    .values({ ...values, createdAt: now })
-    .onConflictDoUpdate({ target: codeHostConnections.id, set: values })
-    .run();
+  inTransaction(db, () => {
+    db.insert(codeHostConnections)
+      .values({ ...values, createdAt: now })
+      .onConflictDoUpdate({ target: codeHostConnections.id, set: values })
+      .run();
+    recordSettingsChange(db, { targetId: input.id, workspaceId: null }, now);
+  });
 }
 
 export function listCodeHostConnections(db: Database, box: SecretBox): StoredCodeHostConnection[] {
@@ -191,13 +221,17 @@ export interface StoredProviderUsage {
 }
 
 export function saveRunnerCapacity(db: Database, runnerId: RunnerId, capacity: number): boolean {
-  const updated = db
-    .update(runners)
-    .set({ capacity })
-    .where(eq(runners.id, runnerId))
-    .returning({ id: runners.id })
-    .all();
-  return updated.length > 0;
+  return inTransaction(db, () => {
+    const before = db
+      .select({ capacity: runners.capacity })
+      .from(runners)
+      .where(eq(runners.id, runnerId))
+      .get();
+    if (before === undefined) return false;
+    db.update(runners).set({ capacity }).where(eq(runners.id, runnerId)).run();
+    if (before.capacity !== capacity) recordRunnerChange(db, runnerId);
+    return true;
+  });
 }
 
 export function saveRunner(
@@ -212,10 +246,13 @@ export function saveRunner(
     config: toJson(input.config, "runner config"),
     capacity: input.capacity,
   };
-  db.insert(runners)
-    .values({ ...values, createdAt: now })
-    .onConflictDoUpdate({ target: runners.id, set: values })
-    .run();
+  inTransaction(db, () => {
+    db.insert(runners)
+      .values({ ...values, createdAt: now })
+      .onConflictDoUpdate({ target: runners.id, set: values })
+      .run();
+    recordRunnerChange(db, input.id, now);
+  });
 }
 
 export const runnerPrerequisiteSchema = z
@@ -247,48 +284,92 @@ function readPrerequisites(text: string | null): RunnerPrerequisite[] | null {
   return parsed.success ? parsed.data : null;
 }
 
-export function recordRunnerCheck(
-  db: Database,
-  input: {
-    runnerId: RunnerId;
-    online: boolean;
-    checkedAt: Date;
-    error: RunnerErrorDetail | null;
-    projects: ReadonlyArray<RunnerProject> | null;
-    assignmentBlocked: boolean | null;
-    prerequisites?: ReadonlyArray<RunnerPrerequisite> | null;
-  },
-): void {
+export interface RunnerCheckInput {
+  runnerId: RunnerId;
+  online: boolean;
+  checkedAt: Date;
+  error: RunnerErrorDetail | null;
+  projects: ReadonlyArray<RunnerProject> | null;
+  assignmentBlocked: boolean | null;
+  prerequisites?: ReadonlyArray<RunnerPrerequisite> | null;
+}
+
+export function recordRunnerCheck(db: Database, input: RunnerCheckInput): void {
   inTransaction(db, () => {
-    db.update(runners)
-      .set({
-        online: input.online,
-        checkedAt: input.checkedAt,
-        offlineSince: input.online
-          ? null
-          : sql`coalesce(${runners.offlineSince}, ${input.checkedAt.getTime()})`,
-        checkError: input.error === null ? null : toJson(input.error, "runner check error"),
-        ...(input.assignmentBlocked === null ? {} : { assignmentBlocked: input.assignmentBlocked }),
-        ...(input.prerequisites === undefined || input.prerequisites === null
-          ? {}
-          : { prerequisites: toJson(input.prerequisites, "runner prerequisites") }),
-      })
+    const wasOnline = db
+      .select({ online: runners.online })
+      .from(runners)
       .where(eq(runners.id, input.runnerId))
-      .run();
-    if (input.projects === null) return;
-    db.delete(runnerProjects).where(eq(runnerProjects.runnerId, input.runnerId)).run();
-    if (input.projects.length === 0) return;
-    db.insert(runnerProjects)
-      .values(
-        input.projects.map((project) => ({
+      .get()?.online;
+    const before = visibleRunnerCheck(db, input.runnerId);
+    writeRunnerCheck(db, input);
+    if (before !== visibleRunnerCheck(db, input.runnerId)) recordRunnerChange(db, input.runnerId);
+    if (wasOnline !== undefined && wasOnline !== input.online) {
+      onCommit(db, () =>
+        log().info("runner.online_changed", {
           runnerId: input.runnerId,
-          projectId: project.id,
-          displayName: project.displayName,
-          setupState: project.setupState,
-        })),
-      )
-      .run();
+          online: input.online,
+          ...(input.error === null ? {} : { kind: input.error.kind }),
+        }),
+      );
+    }
   });
+}
+
+function visibleRunnerCheck(db: Database, runnerId: RunnerId): string {
+  const runner = db
+    .select({
+      online: runners.online,
+      assignmentBlocked: runners.assignmentBlocked,
+      prerequisites: runners.prerequisites,
+      checkError: runners.checkError,
+      offlineSince: runners.offlineSince,
+    })
+    .from(runners)
+    .where(eq(runners.id, runnerId))
+    .get();
+  const projects = db
+    .select({
+      id: runnerProjects.projectId,
+      displayName: runnerProjects.displayName,
+      setupState: runnerProjects.setupState,
+    })
+    .from(runnerProjects)
+    .where(eq(runnerProjects.runnerId, runnerId))
+    .orderBy(asc(runnerProjects.projectId))
+    .all();
+  return JSON.stringify({ ...runner, offlineSince: runner?.offlineSince?.getTime(), projects });
+}
+
+function writeRunnerCheck(db: Database, input: RunnerCheckInput): void {
+  db.update(runners)
+    .set({
+      online: input.online,
+      checkedAt: input.checkedAt,
+      offlineSince: input.online
+        ? null
+        : sql`coalesce(${runners.offlineSince}, ${input.checkedAt.getTime()})`,
+      checkError: input.error === null ? null : toJson(input.error, "runner check error"),
+      ...(input.assignmentBlocked === null ? {} : { assignmentBlocked: input.assignmentBlocked }),
+      ...(input.prerequisites === undefined || input.prerequisites === null
+        ? {}
+        : { prerequisites: toJson(input.prerequisites, "runner prerequisites") }),
+    })
+    .where(eq(runners.id, input.runnerId))
+    .run();
+  if (input.projects === null) return;
+  db.delete(runnerProjects).where(eq(runnerProjects.runnerId, input.runnerId)).run();
+  if (input.projects.length === 0) return;
+  db.insert(runnerProjects)
+    .values(
+      input.projects.map((project) => ({
+        runnerId: input.runnerId,
+        projectId: project.id,
+        displayName: project.displayName,
+        setupState: project.setupState,
+      })),
+    )
+    .run();
 }
 
 const storedProviderUsage = z.discriminatedUnion("kind", [
@@ -362,10 +443,21 @@ export function recordProviderUsage(
   db: Database,
   input: { runnerId: RunnerId; readAt: Date; reading: ProviderUsageReading },
 ): void {
-  db.update(runners)
-    .set({ providerUsage: providerUsageJson(input.reading), providerUsageReadAt: input.readAt })
-    .where(eq(runners.id, input.runnerId))
-    .run();
+  const providerUsage = providerUsageJson(input.reading);
+  inTransaction(db, () => {
+    const before = db
+      .select({ providerUsage: runners.providerUsage, readAt: runners.providerUsageReadAt })
+      .from(runners)
+      .where(eq(runners.id, input.runnerId))
+      .get();
+    if (before === undefined) return;
+    db.update(runners)
+      .set({ providerUsage, providerUsageReadAt: input.readAt })
+      .where(eq(runners.id, input.runnerId))
+      .run();
+    if (before.readAt === null || before.providerUsage !== providerUsage)
+      recordRunnerChange(db, input.runnerId, input.readAt);
+  });
 }
 
 export function listRunners(db: Database): StoredRunner[] {
@@ -404,7 +496,16 @@ export function setRunnerMailbox(
   runnerId: RunnerId,
   mailbox: MailboxRef | null,
 ): void {
-  db.update(runners).set({ mailboxRef: mailbox }).where(eq(runners.id, runnerId)).run();
+  inTransaction(db, () => {
+    const before = db
+      .select({ mailbox: runners.mailboxRef })
+      .from(runners)
+      .where(eq(runners.id, runnerId))
+      .get();
+    if (before === undefined || before.mailbox === mailbox) return;
+    db.update(runners).set({ mailboxRef: mailbox }).where(eq(runners.id, runnerId)).run();
+    recordRunnerChange(db, runnerId);
+  });
 }
 
 export function listRunnerSnapshots(db: Database, now: Date = new Date()): RunnerSnapshot[] {
@@ -433,10 +534,19 @@ export function saveWorkspace(
   now: Date = new Date(),
 ): void {
   const values = { name: input.name, maxRunMs: input.maxRunMs ?? DEFAULT_MAX_RUN_MS };
-  db.insert(workspaces)
-    .values({ id: input.id, ...values, createdAt: now })
-    .onConflictDoUpdate({ target: workspaces.id, set: values })
-    .run();
+  inTransaction(db, () => {
+    const before = db
+      .select({ name: workspaces.name, maxRunMs: workspaces.maxRunMs })
+      .from(workspaces)
+      .where(eq(workspaces.id, input.id))
+      .get();
+    db.insert(workspaces)
+      .values({ id: input.id, ...values, createdAt: now })
+      .onConflictDoUpdate({ target: workspaces.id, set: values })
+      .run();
+    if (before?.name !== values.name || before.maxRunMs !== values.maxRunMs)
+      recordChange(db, { kind: "workspace", targetId: input.id, workspaceId: input.id }, now);
+  });
 }
 
 export function listWorkspaces(db: Database): StoredWorkspace[] {
@@ -456,6 +566,25 @@ export interface StoredWorkspaceTrackerProject {
 }
 
 export function saveWorkspaceTrackerProject(
+  db: Database,
+  input: StoredWorkspaceTrackerProject,
+): boolean {
+  return inTransaction(db, () => {
+    const before = getWorkspaceTrackerProject(db, input.connection, input.projectId);
+    const saved = upsertWorkspaceTrackerProject(db, input);
+    if (!saved) return false;
+    const unchanged =
+      before !== null &&
+      before.name === input.name &&
+      before.inProgressStateId === input.inProgressStateId;
+    if (!unchanged)
+      recordSettingsChange(db, { targetId: input.projectId, workspaceId: input.workspaceId });
+    if (before === null) markTrackerChanged(db, input.connection);
+    return true;
+  });
+}
+
+function upsertWorkspaceTrackerProject(
   db: Database,
   input: StoredWorkspaceTrackerProject,
 ): boolean {
@@ -532,46 +661,125 @@ export function removeWorkspaceTrackerProject(
   db: Database,
   input: { workspaceId: WorkspaceId; connection: TrackerConnectionId; projectId: TrackerProjectId },
 ): boolean {
-  return (
-    db
-      .delete(workspaceTrackerProjects)
-      .where(
-        and(
-          eq(workspaceTrackerProjects.workspaceId, input.workspaceId),
-          eq(workspaceTrackerProjects.trackerConnectionId, input.connection),
-          eq(workspaceTrackerProjects.trackerProjectId, input.projectId),
-        ),
-      )
-      .run().changes > 0
-  );
+  return inTransaction(db, () => {
+    const removed =
+      db
+        .delete(workspaceTrackerProjects)
+        .where(
+          and(
+            eq(workspaceTrackerProjects.workspaceId, input.workspaceId),
+            eq(workspaceTrackerProjects.trackerConnectionId, input.connection),
+            eq(workspaceTrackerProjects.trackerProjectId, input.projectId),
+          ),
+        )
+        .run().changes > 0;
+    if (!removed) return false;
+    recordSettingsChange(db, { targetId: input.projectId, workspaceId: input.workspaceId });
+    markTrackerChanged(db, input.connection);
+    return true;
+  });
+}
+
+export interface StoredMappingRepo {
+  project: RunnerProjectId;
+  isDefault: boolean;
+  labelId: LabelId | null;
 }
 
 export interface StoredMapping {
   connection: TrackerConnectionId;
   trackerProject: TrackerProjectId;
-  runnerProject: RunnerProjectId;
   agent: AgentId;
   model: string | null;
+  repos: StoredMappingRepo[];
+  defaultRepo: RunnerProjectId;
+}
+
+export type MappingSaveResult = { ok: true } | { ok: false; reason: MappingReposProblem };
+
+export function replaceMapping(
+  db: Database,
+  input: {
+    connection: TrackerConnectionId;
+    trackerProject: TrackerProjectId;
+    agent: AgentId;
+    model?: string | null;
+    repos: ReadonlyArray<StoredMappingRepo>;
+  },
+): MappingSaveResult {
+  const check = checkMappingRepos(
+    input.repos.map((repo) => ({
+      project: repo.project,
+      isDefault: repo.isDefault,
+      labelId: repo.labelId,
+    })),
+  );
+  if (!check.ok) return check;
+  const model = input.model ?? null;
+  inTransaction(db, () => {
+    db.insert(mappings)
+      .values({
+        trackerConnectionId: input.connection,
+        trackerProjectId: input.trackerProject,
+        agentId: input.agent,
+        model,
+      })
+      .onConflictDoUpdate({
+        target: [mappings.trackerConnectionId, mappings.trackerProjectId],
+        set: { agentId: input.agent, model },
+      })
+      .run();
+    db.delete(mappingRepos)
+      .where(
+        and(
+          eq(mappingRepos.trackerConnectionId, input.connection),
+          eq(mappingRepos.trackerProjectId, input.trackerProject),
+        ),
+      )
+      .run();
+    db.insert(mappingRepos)
+      .values(
+        input.repos.map((repo, position) => ({
+          trackerConnectionId: input.connection,
+          trackerProjectId: input.trackerProject,
+          runnerProjectId: repo.project,
+          isDefault: repo.isDefault,
+          labelId: repo.labelId,
+          position,
+        })),
+      )
+      .run();
+    recordSettingsChange(db, {
+      targetId: input.trackerProject,
+      workspaceId:
+        getWorkspaceTrackerProject(db, input.connection, input.trackerProject)?.workspaceId ?? null,
+    });
+  });
+  return { ok: true };
 }
 
 export function saveMapping(
   db: Database,
-  input: Omit<StoredMapping, "model"> & { model?: string | null },
+  input: {
+    connection: TrackerConnectionId;
+    trackerProject: TrackerProjectId;
+    runnerProject: RunnerProjectId;
+    agent: AgentId;
+    model?: string | null;
+  },
 ): void {
-  const model = input.model ?? null;
-  db.insert(mappings)
-    .values({
-      trackerConnectionId: input.connection,
-      trackerProjectId: input.trackerProject,
-      runnerProjectId: input.runnerProject,
-      agentId: input.agent,
-      model,
-    })
-    .onConflictDoUpdate({
-      target: [mappings.trackerConnectionId, mappings.trackerProjectId],
-      set: { runnerProjectId: input.runnerProject, agentId: input.agent, model },
-    })
-    .run();
+  const current = getMapping(db, input.connection, input.trackerProject)?.repos ?? [];
+  const others = current
+    .filter((repo) => repo.project !== input.runnerProject)
+    .map((repo) => ({ ...repo, isDefault: false }));
+  const saved = replaceMapping(db, {
+    connection: input.connection,
+    trackerProject: input.trackerProject,
+    agent: input.agent,
+    model: input.model ?? null,
+    repos: [{ project: input.runnerProject, isDefault: true, labelId: null }, ...others],
+  });
+  if (!saved.ok) throw new Error(`mapping could not be saved: ${saved.reason}`);
 }
 
 export function getMapping(
@@ -583,7 +791,6 @@ export function getMapping(
     .select({
       connection: mappings.trackerConnectionId,
       trackerProject: mappings.trackerProjectId,
-      runnerProject: mappings.runnerProjectId,
       agent: mappings.agentId,
       model: mappings.model,
     })
@@ -595,24 +802,45 @@ export function getMapping(
       ),
     )
     .get();
-  return row ?? null;
+  if (row === undefined) return null;
+  const repos = db
+    .select({
+      project: mappingRepos.runnerProjectId,
+      isDefault: mappingRepos.isDefault,
+      labelId: mappingRepos.labelId,
+    })
+    .from(mappingRepos)
+    .where(
+      and(
+        eq(mappingRepos.trackerConnectionId, connection),
+        eq(mappingRepos.trackerProjectId, trackerProject),
+      ),
+    )
+    .orderBy(asc(mappingRepos.position), asc(mappingRepos.runnerProjectId))
+    .all();
+  const defaultRepo = repos.find((repo) => repo.isDefault)?.project;
+  if (defaultRepo === undefined) return null;
+  return { ...row, repos, defaultRepo };
 }
 
 export function saveAutoAssignLabel(
   db: Database,
   input: { workspaceId: WorkspaceId; connection: TrackerConnectionId; labelId: LabelId },
 ): void {
-  db.insert(autoAssignLabels)
-    .values({
-      workspaceId: input.workspaceId,
-      trackerConnectionId: input.connection,
-      labelId: input.labelId,
-    })
-    .onConflictDoUpdate({
-      target: [autoAssignLabels.workspaceId, autoAssignLabels.trackerConnectionId],
-      set: { labelId: input.labelId },
-    })
-    .run();
+  inTransaction(db, () => {
+    db.insert(autoAssignLabels)
+      .values({
+        workspaceId: input.workspaceId,
+        trackerConnectionId: input.connection,
+        labelId: input.labelId,
+      })
+      .onConflictDoUpdate({
+        target: [autoAssignLabels.workspaceId, autoAssignLabels.trackerConnectionId],
+        set: { labelId: input.labelId },
+      })
+      .run();
+    recordSettingsChange(db, { targetId: input.connection, workspaceId: input.workspaceId });
+  });
 }
 
 export function getAutoAssignLabel(
@@ -642,6 +870,7 @@ export interface InstallAddresses {
 
 export interface StoredInstallSettings extends InstallAddresses {
   instanceId: string;
+  webhookAddressCheckedAt: Date | null;
 }
 
 export function getInstallSettings(db: Database): StoredInstallSettings {
@@ -651,6 +880,7 @@ export function getInstallSettings(db: Database): StoredInstallSettings {
         instanceId: installSettings.instanceId,
         webAddress: installSettings.webAddress,
         webhookAddress: installSettings.webhookAddress,
+        webhookAddressCheckedAt: installSettings.webhookAddressCheckedAt,
       })
       .from(installSettings)
       .where(eq(installSettings.id, INSTALL_SETTINGS_ROW))
@@ -677,23 +907,50 @@ export function getMcpWriteAllowed(db: Database): boolean {
 }
 
 export function saveMcpWriteAllowed(db: Database, allowed: boolean, now: Date): void {
-  const { instanceId } = getInstallSettings(db);
-  db.insert(installSettings)
-    .values({ id: INSTALL_SETTINGS_ROW, instanceId, mcpWriteAllowed: allowed, updatedAt: now })
-    .onConflictDoUpdate({
-      target: installSettings.id,
-      set: { mcpWriteAllowed: allowed, updatedAt: now },
-    })
-    .run();
+  inTransaction(db, () => {
+    const { instanceId } = getInstallSettings(db);
+    db.insert(installSettings)
+      .values({ id: INSTALL_SETTINGS_ROW, instanceId, mcpWriteAllowed: allowed, updatedAt: now })
+      .onConflictDoUpdate({
+        target: installSettings.id,
+        set: { mcpWriteAllowed: allowed, updatedAt: now },
+      })
+      .run();
+    recordSettingsChange(db, undefined, now);
+  });
 }
 
 export function saveInstallAddresses(db: Database, input: InstallAddresses, now: Date): void {
-  const { instanceId } = getInstallSettings(db);
-  db.insert(installSettings)
-    .values({ id: INSTALL_SETTINGS_ROW, instanceId, ...input, updatedAt: now })
-    .onConflictDoUpdate({
-      target: installSettings.id,
-      set: { webAddress: input.webAddress, webhookAddress: input.webhookAddress, updatedAt: now },
-    })
-    .run();
+  const current = getInstallSettings(db);
+  const checkedAt =
+    current.webhookAddress === input.webhookAddress ? current.webhookAddressCheckedAt : null;
+  writeInstallAddresses(db, current.instanceId, input, checkedAt, now);
+}
+
+export function saveCheckedWebhookAddress(db: Database, webhookAddress: string, now: Date): void {
+  const current = getInstallSettings(db);
+  writeInstallAddresses(
+    db,
+    current.instanceId,
+    { webAddress: current.webAddress, webhookAddress },
+    now,
+    now,
+  );
+}
+
+function writeInstallAddresses(
+  db: Database,
+  instanceId: string,
+  input: InstallAddresses,
+  webhookAddressCheckedAt: Date | null,
+  now: Date,
+): void {
+  const values = { ...input, webhookAddressCheckedAt, updatedAt: now };
+  inTransaction(db, () => {
+    db.insert(installSettings)
+      .values({ id: INSTALL_SETTINGS_ROW, instanceId, ...values })
+      .onConflictDoUpdate({ target: installSettings.id, set: values })
+      .run();
+    recordSettingsChange(db, undefined, now);
+  });
 }

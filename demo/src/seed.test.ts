@@ -67,7 +67,7 @@ describe("seedDemo", () => {
     const seeded = await seedDemo(db, box, new DemoWorld(() => now), now);
     const runs = listRuns(db);
     expect(new Set(runs.map((run) => run.state))).toEqual(
-      new Set(["queued", "running", "waiting-for-input", "disconnected", "ended"]),
+      new Set(["queued", "running", "waiting-for-input", "paused", "disconnected", "ended"]),
     );
     const outcomes = new Set(
       runs.flatMap((run) => (run.state === "ended" ? [summarizeRunOutcome(run).outcome] : [])),

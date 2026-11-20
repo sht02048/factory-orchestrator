@@ -7,17 +7,20 @@ import {
   KanbanCards,
   KanbanColumn,
   KanbanSubheading,
+  PageHeader,
   ProblemCallout,
   Row,
+  ScreenLayout,
   Section,
   SegmentedTabs,
   StatusDot,
   Text,
   TextLink,
+  showToast,
 } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
 import { USAGE_HIGH_PERCENT } from "@ganger/core";
-import type { RunId } from "@ganger/core";
+import type { RunControl, RunId } from "@ganger/core";
 import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "use-intl";
@@ -25,6 +28,7 @@ import { useTime } from "../format/time";
 import { useUsageNames } from "../labels";
 import { useStatusName } from "../status";
 import type { DashboardRunner, HomePage, HomeRun } from "@ganger/app/home/model";
+import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import {
   dashboardBoard,
   freeCapacity,
@@ -39,7 +43,6 @@ import { RunSheet } from "./run-sheet";
 import type { SheetTarget } from "./run-sheet";
 import { href } from "./run-text";
 
-export { QuestionForm } from "./question-form";
 export { runHref } from "./run-text";
 
 export interface AnswerInput {
@@ -54,6 +57,11 @@ export interface DenyInput {
   reason: string;
 }
 
+export interface ControlInput {
+  runId: string;
+  control: RunControl;
+}
+
 export const DASHBOARD_VIEWS = ["all", "todo"] as const;
 
 export type DashboardView = (typeof DASHBOARD_VIEWS)[number];
@@ -64,6 +72,7 @@ export interface HomeScreenProps {
   onViewChange?: (view: DashboardView) => void;
   onAnswer: (input: AnswerInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
+  onControl: (input: ControlInput) => Promise<RunControlOutcome>;
   openRunId?: RunId | undefined;
   onOpenRunShown?: () => void;
 }
@@ -79,6 +88,7 @@ interface CardHost {
   cardRef: (id: RunId) => (element: HTMLButtonElement | null) => void;
   focusCard: (id: RunId) => void;
   onOpen: (run: HomeRun, tagged: boolean, mode: SheetMode) => void;
+  onControl: (run: HomeRun, control: RunControl, focusAfter?: () => void) => Promise<boolean>;
 }
 
 export function HomeScreen({
@@ -87,6 +97,7 @@ export function HomeScreen({
   onViewChange = () => {},
   onAnswer,
   onDeny,
+  onControl,
   openRunId,
   onOpenRunShown = () => {},
 }: HomeScreenProps) {
@@ -96,6 +107,7 @@ export function HomeScreen({
   const [open, setOpen] = useState(false);
   const [revealedId, setRevealedId] = useState<RunId | null>(null);
   const shownRunId = useRef<RunId | undefined>(undefined);
+  useControlFailureToasts(page);
   useEffect(() => {
     if (openRunId === undefined || shownRunId.current === openRunId) return;
     if (page.workspace.kind === "none") return;
@@ -110,17 +122,9 @@ export function HomeScreen({
   }, [openRunId, page, onOpenRunShown]);
   if (page.workspace.kind === "none") {
     return (
-      <div {...stylex.props(styles.page)}>
-        <header {...stylex.props(styles.header)}>
-          <Text variant="label" as="p">
-            {t("title")}
-          </Text>
-          <Text variant="display" as="h1">
-            {t("headlineEmpty")}
-          </Text>
-          <Text variant="body">{t("noWorkspace")}</Text>
-        </header>
-      </div>
+      <ScreenLayout header={<PageHeader title={t("title")} subtitle={t("noWorkspace")} />}>
+        {null}
+      </ScreenLayout>
     );
   }
   const all = page.workspace.kind === "all";
@@ -141,97 +145,127 @@ export function HomeScreen({
       setTarget({ run, tagged, mode });
       setOpen(true);
     },
+    onControl: (run, control, focusAfter) => {
+      const key = run.ticketKey;
+      return onControl({ runId: run.id, control }).then(
+        (outcome) => {
+          if (focusAfter === undefined) cards.current.get(run.id)?.focus();
+          else focusAfter();
+          showToast(
+            outcome === "requested"
+              ? t(`control.${control}Requested`, { key })
+              : t("control.stateChanged", { key }),
+          );
+          return true;
+        },
+        () => {
+          showToast(t(`control.${control}Rejected`, { key }));
+          return false;
+        },
+      );
+    },
   };
   const runningTodo = new Set(board.running.todo.map((run) => run.id));
   const todoIds = new Set(page.attention.map(({ run }) => run.id));
   return (
-    <div {...stylex.props(styles.page)}>
-      <div {...stylex.props(styles.top)}>
-        <DashboardHeader page={page} all={all} />
-        <SegmentedTabs<DashboardView>
-          value={view}
-          onValueChange={onViewChange}
-          label={t("view.label")}
-          items={[
-            { value: "all", label: t("view.all") },
-            {
-              value: "todo",
-              label: t("view.todo"),
-              count: page.attention.length,
-              attention: true,
-            },
-          ]}
+    <ScreenLayout
+      header={
+        <PageHeader
+          title={all ? `${t("title")} · ${t("allWorkspaces")}` : t("title")}
+          subtitle={<DashboardSummary page={page} />}
+          actions={
+            <SegmentedTabs<DashboardView>
+              value={view}
+              onValueChange={onViewChange}
+              label={t("view.label")}
+              items={[
+                { value: "all", label: t("view.all") },
+                {
+                  value: "todo",
+                  label: t("view.todo"),
+                  count: page.attention.length,
+                  attention: true,
+                },
+              ]}
+            />
+          }
         />
-      </div>
-      <div {...stylex.props(styles.frame)}>
-        <div {...stylex.props(styles.board)}>
-          <KanbanColumn title={t("column.queued")} count={todoOnly ? 0 : board.queued.length}>
-            <CardList
-              runs={todoOnly ? [] : board.queued}
-              tagged={() => false}
-              limit={COLUMN_VISIBLE}
-              empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.queued")}
-              host={host}
-            />
-          </KanbanColumn>
-          <KanbanColumn
-            title={t("column.running")}
-            count={
-              todoOnly
-                ? board.running.todo.length
-                : board.running.todo.length + board.running.rest.length
-            }
-          >
-            <CardList
-              runs={todoOnly ? board.running.todo : [...board.running.todo, ...board.running.rest]}
-              tagged={(run) => runningTodo.has(run.id)}
-              limit={COLUMN_VISIBLE}
-              empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.running")}
-              host={host}
-            />
-          </KanbanColumn>
-          <KanbanColumn
-            title={t("column.done")}
-            count={
-              todoOnly ? board.done.todo.length : board.done.todo.length + board.done.rest.length
-            }
-          >
-            <CardList
-              runs={board.done.todo}
-              tagged={() => true}
-              limit={DONE_TODO_VISIBLE}
-              empty={
+      }
+    >
+      <div {...stylex.props(styles.page)}>
+        <div {...stylex.props(styles.frame)}>
+          <div {...stylex.props(styles.board)}>
+            <KanbanColumn title={t("column.queued")} count={todoOnly ? 0 : board.queued.length}>
+              <CardList
+                runs={todoOnly ? [] : board.queued}
+                tagged={() => false}
+                limit={COLUMN_VISIBLE}
+                empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.queued")}
+                host={host}
+              />
+            </KanbanColumn>
+            <KanbanColumn
+              title={t("column.running")}
+              count={
                 todoOnly
-                  ? t("columnEmpty.todo")
-                  : board.done.rest.length === 0
-                    ? t("columnEmpty.done")
-                    : null
+                  ? board.running.todo.length
+                  : board.running.todo.length + board.running.rest.length
               }
-              host={host}
-            />
-            {todoOnly || board.done.rest.length === 0 ? null : (
-              <SettledCards runs={board.done.rest} page={page} host={host} />
-            )}
-          </KanbanColumn>
-          <div {...stylex.props(styles.runners)}>
-            <RunnersSection runners={page.runners.list} />
+            >
+              <CardList
+                runs={
+                  todoOnly ? board.running.todo : [...board.running.todo, ...board.running.rest]
+                }
+                tagged={(run) => runningTodo.has(run.id)}
+                limit={COLUMN_VISIBLE}
+                empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.running")}
+                host={host}
+              />
+            </KanbanColumn>
+            <KanbanColumn
+              title={t("column.done")}
+              count={
+                todoOnly ? board.done.todo.length : board.done.todo.length + board.done.rest.length
+              }
+            >
+              <CardList
+                runs={board.done.todo}
+                tagged={() => true}
+                limit={DONE_TODO_VISIBLE}
+                empty={
+                  todoOnly
+                    ? t("columnEmpty.todo")
+                    : board.done.rest.length === 0
+                      ? t("columnEmpty.done")
+                      : null
+                }
+                host={host}
+              />
+              {todoOnly || board.done.rest.length === 0 ? null : (
+                <SettledCards runs={board.done.rest} page={page} host={host} />
+              )}
+            </KanbanColumn>
+            <div {...stylex.props(styles.runners)}>
+              <RunnersSection runners={page.runners.list} />
+            </div>
           </div>
         </div>
+        <RunSheet
+          target={
+            fresh === undefined || target === null
+              ? target
+              : { ...target, run: fresh, tagged: todoIds.has(fresh.id) }
+          }
+          open={open}
+          onOpenChange={setOpen}
+          finalFocus={() => (target === null ? null : (cards.current.get(target.run.id) ?? null))}
+          all={all}
+          onAnswer={onAnswer}
+          onDeny={onDeny}
+          onControl={host.onControl}
+        />
       </div>
-      <RunSheet
-        target={
-          fresh === undefined || target === null
-            ? target
-            : { ...target, run: fresh, tagged: todoIds.has(fresh.id) }
-        }
-        open={open}
-        onOpenChange={setOpen}
-        finalFocus={() => (target === null ? null : (cards.current.get(target.run.id) ?? null))}
-        all={all}
-        onAnswer={onAnswer}
-        onDeny={onDeny}
-      />
-    </div>
+    </ScreenLayout>
   );
 }
 
@@ -249,7 +283,7 @@ function opensAnswer(run: HomeRun): boolean {
   return run.state === "waiting-for-input" && run.input?.kind === "question" && !run.input.answered;
 }
 
-function DashboardHeader({ page, all }: { page: HomePage; all: boolean }) {
+function DashboardSummary({ page }: { page: HomePage }) {
   const t = useTranslations("home");
   const { duration } = useTime();
   const groups = todoGroups(page.attention);
@@ -279,19 +313,7 @@ function DashboardHeader({ page, all }: { page: HomePage; all: boolean }) {
             .map((group) => t(`summary.${group.kind}`, { count: group.runs.length }))
             .join(t("summary.separator")),
         });
-  return (
-    <header {...stylex.props(styles.header)}>
-      <Text variant="label" as="p">
-        {all ? `${t("title")} · ${t("allWorkspaces")}` : t("title")}
-      </Text>
-      <Text variant="display" as="h1">
-        {total === 0 ? t("headlineEmpty") : t("headline", { count: total })}
-      </Text>
-      <Text variant="body">
-        {limitSentence === null ? work : t("summary.withLimit", { work, limit: limitSentence })}
-      </Text>
-    </header>
-  );
+  return limitSentence === null ? work : t("summary.withLimit", { work, limit: limitSentence });
 }
 
 function CardList({
@@ -337,6 +359,7 @@ function CardList({
             selected={host.selectedId === run.id}
             openRef={host.cardRef(run.id)}
             onOpen={(mode) => host.onOpen(run, tagged(run), mode)}
+            onControl={(control) => host.onControl(run, control)}
           />
         ))}
       </KanbanCards>
@@ -375,6 +398,7 @@ function SettledCards({ runs, page, host }: { runs: HomeRun[]; page: HomePage; h
             selected={host.selectedId === run.id}
             openRef={host.cardRef(run.id)}
             onOpen={(mode) => host.onOpen(run, false, mode)}
+            onControl={(control) => host.onControl(run, control)}
           />
         ))}
       </KanbanCards>
@@ -551,21 +575,6 @@ const styles = stylex.create({
     paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
     paddingBottom: space.s10,
   },
-  top: {
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    columnGap: space.s6,
-    rowGap: space.s4,
-    marginBottom: space.s8,
-  },
-  header: {
-    display: "flex",
-    flexDirection: "column",
-    gap: space.s2,
-    minWidth: 0,
-  },
   frame: { containerType: "inline-size" },
   board: {
     display: "grid",
@@ -606,3 +615,25 @@ const styles = stylex.create({
   },
   reset: { margin: 0 },
 });
+
+function useControlFailureToasts(page: HomePage): void {
+  const t = useTranslations("home");
+  const domain = useTranslations("domain");
+  const pending = useRef(new Set<RunId>());
+  useEffect(() => {
+    const nowPending = new Set<RunId>();
+    for (const run of page.running) {
+      const control = run.control;
+      if (control?.status === "pending") nowPending.add(run.id);
+      if (control?.status === "failed" && pending.current.has(run.id)) {
+        showToast(
+          t(control.control === "pause" ? "control.pauseFailed" : "control.resumeFailed", {
+            key: run.ticketKey,
+            reason: domain(`runControlFailure.${control.reason}`),
+          }),
+        );
+      }
+    }
+    pending.current = nowPending;
+  }, [page, t, domain]);
+}

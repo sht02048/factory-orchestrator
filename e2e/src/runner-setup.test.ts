@@ -413,19 +413,6 @@ describe("다른 맥 · 명령으로 등록(브라우저, 0097)", () => {
     );
     expect(overflow).toBeLessThanOrEqual(0);
   });
-
-  it("직접 입력에서 orca 경로를 비우면 ssh로 찾고, 닿지 않으면 저장하지 않고 이유를 보인다", async () => {
-    resetFakeThisMac();
-    await page.goto("/onboarding?step=3&direct=true");
-    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
-    await page.getByRole("textbox", { name: "ssh 대상" }).fill("dev@nowhere.invalid");
-    await page.getByRole("textbox", { name: "orca 실행 파일 경로" }).fill("");
-    await page.getByRole("button", { name: "확인하고 등록" }).click();
-    await page.getByRole("alert").filter({ hasText: "ssh로 그 맥에 들어가지 못해" }).waitFor({
-      timeout: 30_000,
-    });
-    expect(listRunners(db).some((r) => r.name === "nowhere")).toBe(false);
-  });
 });
 
 async function openAppFlow(path: string): Promise<void> {

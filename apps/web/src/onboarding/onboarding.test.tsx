@@ -38,7 +38,7 @@ import { loadSettingsPage, loadTrackerProjectChoices } from "@ganger/app/setting
 import type { SettingsContext } from "@ganger/app/settings/load";
 import type { ConnectionProjects, SettingsPage } from "@ganger/app/settings/model";
 import { settingsMessages } from "../settings/messages";
-import { SettingsScreen } from "../settings/settings-screen";
+import { SettingsScreen } from "../settings/settings-page";
 import { buttonsOf } from "../testing/buttons";
 import { renderWithMessages } from "../testing/render";
 import { isOnboardingComplete, loadOnboardingPage, setUpFirstWorkspace } from "./load";
@@ -110,7 +110,11 @@ const noopActions: OnboardingActions = {
   saveAddresses: reject,
   savePower: reject,
   saveMcpWrite: reject,
+  createLabel: reject,
+  reloadFromTracker: reject,
   pollRunnerChecks: () => Promise.resolve(false),
+  checkWebhookAddress: reject,
+  turnOffWebhook: reject,
   thisMacStatus: () => new Promise(() => undefined),
   runThisMacStep: reject,
   startEnrollment: () => new Promise(() => undefined),
@@ -592,21 +596,20 @@ describe("다섯 단계를 마치기", () => {
     await locked(["mapping", "progress", "label"]);
     const table = render(await page(f), "mapping");
     const shown = text(table);
-    expect(shown).toContain("러너 쪽 프로젝트");
+    expect(shown).toContain(settingsMessages.settings.mapping.repos);
+    expect(shown).toContain(settingsMessages.settings.mapping.agent);
     expect(shown).toContain("시작하면 옮길 상태");
     expect(shown).toContain("Auto-assign Label");
-    expect(table).toContain('aria-label="Web의 러너 쪽 프로젝트"');
-    expect(table).toContain('aria-label="Web의 에이전트"');
-    expect(table).toContain('aria-label="Web의 시작하면 옮길 상태"');
+    expect(table).toContain('aria-label="Web Mapping"');
+    expect(table).toContain('aria-label="Web의 기본 저장소 고르기"');
     expect(table).toContain('aria-label="Acme의 Auto-assign Label"');
-    expect(table).toMatch(/<th scope="row"[^>]*>.*?Web/);
     expect(table).not.toContain('name="model"');
     expect(shown).not.toContain(settingsMessages.settings.mapping.model);
     expect(
       buttonsOf(table)
         .filter((b) => b.variant !== "other")
         .map((b) => b.label),
-    ).toEqual(["이전", "설정 마치기"]);
+    ).toEqual([settingsMessages.settings.mapping.reload, "이전", "설정 마치기"]);
 
     expect(
       saveMappingSetting(f.context, { ...project, runnerProjectId: repo, agentId: "claude" }),
@@ -617,7 +620,7 @@ describe("다섯 단계를 마치기", () => {
       ok: true,
     });
     await locked(["label"]);
-    expect(render(await page(f), "mapping")).toMatch(/<tr[^>]*>.*?aria-label="다 채웠어요"/s);
+    expect(render(await page(f), "mapping")).toContain('aria-label="다 채웠어요"');
     expect(saveLabel(f.context, { ws, connectionId: connectionId(f), labelId: "lb-auto" })).toEqual(
       { ok: true },
     );
@@ -625,7 +628,6 @@ describe("다섯 단계를 마치기", () => {
     const settings = await page(f);
     const ready = render(settings, "mapping");
     expect(ready).toMatch(/<div class="[^"]*"><p[^>]*>라벨만 붙이면/);
-    expect(ready.match(/role="status"/g)).toHaveLength(1);
     expect(text(ready)).toContain(onboardingMessages.onboarding.mapping.ready);
     expect(ONBOARDING_STEPS.every((step) => stepPassed(settings, step))).toBe(true);
     expect(isDisabled(nextButton(render(settings, "mapping"), "설정 마치기"))).toBe(false);
@@ -633,13 +635,15 @@ describe("다섯 단계를 마치기", () => {
     const settingsHtml = renderWithMessages(
       <SettingsScreen
         page={settings}
-        selected="progress"
-        onSelect={() => {}}
+        runnerIssues={0}
+        workspaceView="one"
+        ws={ws}
         actions={noopActions}
       />,
       settingsMessages,
     );
-    expect(text(settingsHtml).match(/1\/1개 정함/g)).toHaveLength(3);
+    expect(text(settingsHtml)).toContain("factory 라벨이면 바로 할당");
+    expect(text(settingsHtml)).not.toContain(settingsMessages.settings.projects.noRepo);
 
     const complete = isOnboardingComplete(f.context.db, f.context.secretBox);
     expect(complete).toBe(true);
@@ -666,13 +670,19 @@ describe("다섯 단계를 마치기", () => {
       mapping: null,
       inProgressStateId: "st-doing",
       states: { ok: true as const, items: [] },
+      labels: { ok: true as const, items: [] },
     };
     const workspace = {
       general: { id: toWorkspaceId("ws-1"), name: "Acme", maxRunMinutes: 120 },
       trackerProjects: [],
       bound: [bound],
       labels: [
-        { connection: choice, labelId: "lb-auto", labels: { ok: true as const, items: [] } },
+        {
+          connection: choice,
+          labelId: "lb-auto",
+          labels: { ok: true as const, items: [] },
+          repoLabels: [],
+        },
       ],
     };
     expect(missingMappingParts(workspace)).toEqual(["mapping"]);
@@ -684,7 +694,16 @@ describe("다섯 단계를 마치기", () => {
     expect(
       missingMappingParts({
         ...workspace,
-        bound: [{ ...bound, mapping: { runnerProject: "r", agent: "claude", model: null } }],
+        bound: [
+          {
+            ...bound,
+            mapping: {
+              agent: "claude",
+              model: null,
+              repos: [{ id: "r", isDefault: true, labelId: null }],
+            },
+          },
+        ],
       }),
     ).toEqual([]);
   });

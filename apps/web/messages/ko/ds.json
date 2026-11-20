@@ -40,6 +40,7 @@
     "links": "링크·글 톤",
     "chips": "칩",
     "choices": "라디오·여러 줄 입력",
+    "question": "에이전트 질문",
     "codeBlock": "코드 블록",
     "dataTable": "데이터 표",
     "outcomes": "결과 막대·차트",
@@ -49,7 +50,10 @@
     "popover": "팝오버",
     "kanban": "KanbanColumn·KanbanCard",
     "sheet": "Sheet",
-    "icons": "아이콘"
+    "icons": "아이콘",
+    "settingsRows": "설정 줄",
+    "settingsSteps": "설정 단계",
+    "sectionNav": "설정 목차"
   },
   "colors": {
     "note": "OKLCH 다크 값이에요. packages/ui 밖에서는 이 토큰만 써요.",
@@ -104,7 +108,9 @@
     "secondary": "ssh 연결 확인",
     "danger": "런 취소",
     "ghost": "연결 확인",
-    "disabled": "할당하기"
+    "disabled": "할당하기",
+    "busy": "Linear에서 다시 읽기",
+    "busyLabel": "읽는 중…"
   },
   "status": {
     "note": "상태는 점 + 이름 알약 하나로만 보여요. 색은 상태 값이 정해요.",
@@ -356,7 +362,14 @@
   },
   "blocks": {
     "shell": {
-      "note": "AppFrame은 왼쪽 아이콘 레일과 본문이에요. 레일 링크는 railLinkStyles로, 공지 화면은 NoticeLayout으로 그려요.",
+      "note": "AppFrame은 왼쪽 아이콘 레일과 본문이에요. 화면은 ScreenLayout 맨 위에 PageHeader 한 줄 머리(제목·요약·행동)를 두고, 레일 맨 아래에 제품 기호를 둬요. 데스크톱 앱에서는 레일 위 56px을 창 신호등 자리로 비우고 머리 줄과 함께 창을 끄는 자리로 써요.",
+      "web": "웹 브라우저",
+      "desktop": "데스크톱 앱(신호등 자리)",
+      "pending": "화면 이동이 150ms를 넘으면 본문 맨 위에 진행 줄이 지나가요.",
+      "pendingLabel": "화면을 여는 중이에요",
+      "pendingDemo": "진행 줄 2초 보기",
+      "summary": "런 12개 중 2개가 처리할 일이에요.",
+      "action": "런 맡기기",
       "brand": "Ganger",
       "workspace": "Acme",
       "navLabel": "미리보기 메뉴",
@@ -390,6 +403,24 @@
       "skip": "건너뛰어요",
       "textareaLabel": "직접 쓰기",
       "textareaPlaceholder": "답을 직접 써요"
+    },
+    "question": {
+      "note": "에이전트 질문에 답하는 폼이에요. 질문 문단, 고르는 라디오, 직접 쓰기, 보내기를 한 번에 둬요. 선택지가 없으면 라디오 없이 답 칸만 보여요.",
+      "lead": "시계 티켓이 아직 main에 없어요. 어떻게 할까요?",
+      "wait": "시계 티켓이 머지될 때까지 기다린다",
+      "start": "지금 main에서 먼저 시작하고 나중에 맞춘다",
+      "after": "기본 제안은 B예요.",
+      "other": "직접 쓰기",
+      "otherLabel": "직접 쓴 답",
+      "otherPlaceholder": "에이전트에게 보낼 답을 써 주세요",
+      "answerLabel": "답",
+      "pick": "답을 하나 골라 주세요",
+      "empty": "답을 써 주세요",
+      "sendNote": "보낸 답은 바로 에이전트에게 전해져요",
+      "shortcut": "⌘ Enter로 보낼 수 있어요",
+      "send": "보내기",
+      "sending": "보내는 중…",
+      "failed": "답을 보내지 못했어요. 다시 보내 주세요."
     },
     "codeBlock": {
       "note": "명령·출력·로그는 CodeBlock이에요. 복사할 명령은 tone=\"command\", 긴 로그는 scroll과 label을 줘요.",
@@ -464,6 +495,8 @@
       "time": "12분째",
       "action": "답하기",
       "plainTitle": "ACME-10 결제 실패 재시도",
+      "menuLabel": "ACME-10 런 메뉴",
+      "pause": "멈추기",
       "subheading": "처리할 일 없이 끝났어요"
     },
     "sheet": {
@@ -474,6 +507,47 @@
     "icons": {
       "note": "버튼과 표시에 쓰는 아이콘이에요. 이름이 필요하면 VisuallyHidden으로 줘요.",
       "hidden": "확인, 닫기, 펼치기"
+    },
+    "settingsRows": {
+      "note": "설정 화면의 카드 하나에 줄(라벨 · 값 · 동작 하나)을 쌓아요. 보조 설명은 라벨 옆 ⓘ 도움말로 둬요.",
+      "group": "예시 설정",
+      "name": "이름",
+      "nameValue": "Acme",
+      "change": "바꾸기",
+      "minutes": "최대 실행 시간",
+      "info": "최대 실행 시간 도움말",
+      "infoContent": "런이 이 시간을 넘기면 멈추고 Failed 로 끝내요.",
+      "sleep": "서버가 도는 동안 맥이 잠들지 않게",
+      "sleepDetail": "뚜껑을 닫으면 그래도 잠들어요",
+      "saved": "저장했어요",
+      "token": "GitHub 토큰",
+      "tokenDetail": "아직 없어요",
+      "runners": "러너",
+      "runnersDetail": "3대",
+      "runnersValue": "Runners 에서 더하고 고쳐요"
+    },
+    "settingsSteps": {
+      "note": "설정 화면에서 차례로 따라 할 단계를 카드 하나에 쌓아요. 앞 단계를 끝내기 전의 단계는 잠그고 이름만 보여요. 구역 제목 옆에는 지금 상태를 짧게 둬요(detail).",
+      "title": "Webhook",
+      "status": "꺼져 있어요 · 지금은 1분마다 읽어요",
+      "label": "예시 단계",
+      "done": "끝냈어요",
+      "current": "지금 할 단계",
+      "locked": "앞 단계를 끝내면 열려요",
+      "first": "Linear가 이 서버에 닿을 주소",
+      "firstDetail": "https://hooks.example.com · 닿는 걸 확인했어요",
+      "change": "바꾸기",
+      "second": "Linear에서 webhook 만들기",
+      "secondBody": "이 주소를 넣고 Data change events에서 Issues만 골라요.",
+      "third": "signing secret 넣고 켜기"
+    },
+    "sectionNav": {
+      "note": "한 페이지 설정의 목차예요. 스크롤 위치를 따라 지금 구역을 표시하고, 문제가 있는 구역에 점을 붙여요. 좁으면 가로 칩 줄이 돼요.",
+      "label": "예시 목차",
+      "problem": "확인할 것이 있어요",
+      "first": "첫째 구역",
+      "second": "둘째 구역",
+      "body": "구역 안 내용"
     }
   }
 }

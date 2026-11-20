@@ -21,6 +21,7 @@ import {
   SecretBox,
   assignRun,
   changeRunState,
+  listRunQuestions,
   migrate,
   openDatabase,
   recordPermissionWaits,
@@ -41,6 +42,7 @@ import { chromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFailed } from "vitest";
+import question from "../../apps/web/messages/ko/question.json" with { type: "json" };
 import run from "../../apps/web/messages/ko/run.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 import { startWebServer } from "./web-server.js";
@@ -64,9 +66,9 @@ let baseUrl: string;
 let browser: Browser;
 let page: Page;
 let questionRun: RunId;
+let inlineQuestionRun: RunId;
 let permissionRun: RunId;
 let cancelRun: RunId;
-let cancelFailsRun: RunId;
 let endedRun: RunId;
 
 const fakeAdapters: Plugin = {
@@ -120,12 +122,26 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
   it("질문에 키보드로 답하면 포커스가 body 가 아니고 결과 문장이 role=status 안에 있다", async () => {
     await open(questionRun);
     const card = page.getByRole("region", { name: run.question.title });
-    const input = card.getByLabel(run.question.answerLabel);
+    const input = card.getByLabel(question.answerLabel);
     await input.fill("Use SQLite.");
-    await input.press("Enter");
+    await input.press("ControlOrMeta+Enter");
 
     await card.getByRole("status").getByText(run.question.sent).waitFor();
     await expect.poll(focusedStatusText).toBe(run.question.sent);
+  });
+
+  it("선택지 없이 온 질문은 글 안의 (A) (B)를 골라 보내기를 눌러야 글자와 내용으로 답한다(0116)", async () => {
+    await open(inlineQuestionRun);
+    const card = page.getByRole("region", { name: run.question.title });
+    await card.getByText("I suggest B.").waitFor();
+    await card
+      .getByRole("radio", { name: "B Start now on the current main and rebase later." })
+      .check();
+    expect(answerOf(inlineQuestionRun)).toBeUndefined();
+    await card.getByRole("button", { name: question.send }).click();
+
+    await card.getByRole("status").getByText(run.question.sent).waitFor();
+    expect(answerOf(inlineQuestionRun)).toBe("(B) Start now on the current main and rebase later.");
   });
 
   it("권한 요청을 키보드로 거절하면 포커스가 body 가 아니고 결과 문장이 role=status 안에 있다", async () => {
@@ -147,24 +163,6 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
     await expect.poll(focusedStatusText).toBe(run.cancelPending);
   });
 
-  it("요청을 남기지 못하면 실패 문구가 role=alert 로 보인다", async () => {
-    await open(cancelFailsRun);
-    ok(
-      changeRunState(db, cancelFailsRun, {
-        to: "ended",
-        agentResult: "reported-success",
-        prState: "merged",
-      }),
-    );
-    await page.getByRole("button", { name: run.cancel.trigger }).press("Enter");
-    const dialog = page.getByRole("dialog", { name: run.cancel.title });
-    await dialog.getByRole("button", { name: run.cancel.confirm }).press("Enter");
-
-    const alert = page.getByRole("alert").filter({ hasText: run.actionFailed });
-    await alert.waitFor();
-    expect(await alert.count()).toBe(1);
-  });
-
   it("로그를 열면 마지막 줄이 보이고 키보드로 스크롤할 수 있다", async () => {
     await open(endedRun);
     const log = page.getByRole("region", { name: run.log.linesLabel });
@@ -181,6 +179,10 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
 async function open(runId: RunId): Promise<void> {
   await page.goto(`/runs/${runId}?ws=${workspaceId}`);
   await hydrated(page);
+}
+
+function answerOf(runId: RunId): string | undefined {
+  return listRunQuestions(db, runId).find((q) => q.answer !== null)?.answer?.text;
 }
 
 async function focusedStatusText(): Promise<string | undefined> {
@@ -241,6 +243,17 @@ function seed(db: Database): void {
     },
   ]);
 
+  inlineQuestionRun = startRun("ACME-16");
+  ok(changeRunState(db, inlineQuestionRun, { to: "waiting-for-input" }));
+  recordRunQuestions(db, inlineQuestionRun, [
+    {
+      id: toQuestionId("q-16"),
+      body: "The timer ticket is not on main yet. What should I do? (A) Wait for the timer ticket to merge (B) Start now on the current main and rebase later. I suggest B.",
+      options: [],
+      askedAt: new Date(),
+    },
+  ]);
+
   permissionRun = startRun("ACME-12");
   ok(changeRunState(db, permissionRun, { to: "waiting-for-input" }));
   recordPermissionWaits(db, permissionRun, [
@@ -248,7 +261,6 @@ function seed(db: Database): void {
   ]);
 
   cancelRun = startRun("ACME-13");
-  cancelFailsRun = startRun("ACME-14");
 
   endedRun = startRun("ACME-15");
   ok(

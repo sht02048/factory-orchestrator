@@ -1,4 +1,5 @@
 import run from "../../messages/ko/run.json" with { type: "json" };
+import { questionMessages } from "../question/messages";
 
 declare module "../i18n" {
   interface AppMessages {
@@ -6,4 +7,4 @@ declare module "../i18n" {
   }
 }
 
-export const runMessages = { run };
+export const runMessages = { run, ...questionMessages };

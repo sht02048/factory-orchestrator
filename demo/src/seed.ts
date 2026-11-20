@@ -19,9 +19,13 @@ import {
   recordProviderUsage,
   recordRunQuestions,
   recordRunnerCheck,
+  recordWebhookAccepted,
+  recordWebhookBadSignature,
   saveAutoAssignLabel,
+  saveCheckedWebhookAddress,
   saveCodeHostConnection,
   saveInstallAddresses,
+  replaceMapping,
   saveMapping,
   saveRunner,
   saveTrackerConnection,
@@ -34,6 +38,7 @@ import type { Database, SecretBox } from "@ganger/db";
 import {
   RUNNER_PROJECTS,
   agent,
+  apiRepoLabel,
   autoAssignLabel,
   inProgressState,
   providerUsageFor,
@@ -58,6 +63,9 @@ export interface SeededRuns {
   running: RunId[];
   question: RunId;
   permission: RunId;
+  paused: RunId;
+  pausedOnRunner: RunId;
+  pausedUnreported: RunId;
   disconnected: RunId;
 }
 
@@ -121,12 +129,26 @@ export async function seedDemo(
   });
 }
 
+const MINUTE_MS = 60_000;
+
+function seedWebhookReceipts(db: Database, now: Date): void {
+  const [receiving, rejected] = seededConnections;
+  const ago = (minutes: number) => new Date(now.getTime() - minutes * MINUTE_MS);
+  if (receiving !== undefined) recordWebhookAccepted(db, receiving.id, ago(3));
+  if (rejected !== undefined) {
+    recordWebhookAccepted(db, rejected.id, ago(26 * 60));
+    for (const minutes of [180, 95, 40, 12])
+      recordWebhookBadSignature(db, rejected.id, ago(minutes));
+  }
+}
+
 function seedSettings(db: Database, box: SecretBox, now: Date): void {
   saveInstallAddresses(
     db,
     { webAddress: DEMO_WEB_ADDRESS, webhookAddress: DEMO_WEBHOOK_ADDRESS },
     now,
   );
+  saveCheckedWebhookAddress(db, DEMO_WEBHOOK_ADDRESS, now);
   for (const connection of seededConnections) {
     saveTrackerConnection(
       db,
@@ -157,12 +179,26 @@ function seedSettings(db: Database, box: SecretBox, now: Date): void {
         model: project.repo.endsWith("api") ? "sonnet" : "opus",
       });
     }
+    const [first, second] = connection.spec.projects;
+    if (first !== undefined && second !== undefined) {
+      replaceMapping(db, {
+        connection: connection.id,
+        trackerProject: trackerProjectId(first),
+        agent,
+        model: "opus",
+        repos: [
+          { project: runnerProjectId(first), isDefault: true, labelId: null },
+          { project: runnerProjectId(second), isDefault: false, labelId: apiRepoLabel },
+        ],
+      });
+    }
     saveAutoAssignLabel(db, {
       workspaceId: connection.workspaceId,
       connection: connection.id,
       labelId: autoAssignLabel,
     });
   }
+  seedWebhookReceipts(db, now);
   saveCodeHostConnection(
     db,
     box,
@@ -302,7 +338,7 @@ function end(
   });
 }
 
-const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 21, 22, 23], GLX: [2] };
+const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 21, 22, 23, 24, 25, 26], GLX: [2] };
 const HISTORY_TICKETS = [
   range(1, 35).filter((n) => !ACTIVE_TICKETS.ACME.includes(n)),
   range(1, 10).filter((n) => !ACTIVE_TICKETS.GLX.includes(n)),
@@ -390,6 +426,24 @@ function seedActive(db: Database, now: Date): SeededRuns {
     },
   ]);
 
+  const paused = startedRun(db, ticket("ACME", 24), runnerB.id, ago(70), ago(68));
+  ok(changeRunState(db, paused, { to: "paused" }, ago(18)));
+
+  const pausedOnRunner = startedRun(db, ticket("ACME", 25), runnerB.id, ago(55), ago(54));
+  ok(changeRunState(db, pausedOnRunner, { to: "paused", source: "runner" }, ago(9)));
+
+  const pausedUnreported = startedRun(db, ticket("ACME", 26), runnerB.id, ago(65), ago(64));
+  ok(changeRunState(db, pausedUnreported, { to: "paused", source: "unreported" }, ago(4)));
+  updateRunRecords(db, pausedUnreported, {
+    lastLog: [
+      "Added page and per_page to GET /projects with a default of 50.",
+      "Tests pass locally: 42 passed.",
+      "",
+      "I have not opened a PR yet.",
+      "❯",
+    ],
+  });
+
   const disconnected = startedRun(db, ticket("ACME", 23), runnerC.id, ago(45), ago(44));
   updateRunRecords(db, disconnected, { unreachableSince: ago(20) });
   ok(changeRunState(db, disconnected, { to: "disconnected" }, ago(15)));
@@ -412,7 +466,16 @@ function seedActive(db: Database, now: Date): SeededRuns {
     prNumber += 1;
     end(db, runId, { ending, at: ago(120 - n * 15), prNumber, repo: t.project.repo });
   }
-  return { queued, running, question, permission, disconnected };
+  return {
+    queued,
+    running,
+    question,
+    permission,
+    paused,
+    pausedOnRunner,
+    pausedUnreported,
+    disconnected,
+  };
 }
 
 function startedRun(

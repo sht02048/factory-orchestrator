@@ -1,38 +1,62 @@
 import * as stylex from "@stylexjs/stylex";
-import { Toaster, documentStyles } from "@ganger/ui";
+import { Toaster, WindowChrome, WindowDragFrame, documentStyles } from "@ganger/ui";
+import type { QueryClient } from "@tanstack/react-query";
 import {
+  ErrorComponent,
   HeadContent,
   Outlet,
   Scripts,
-  createRootRoute,
+  createRootRouteWithContext,
   redirect,
   rootRouteId,
   useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
+import type { ErrorComponentProps } from "@tanstack/react-router";
+import { z } from "zod";
 import { IntlProvider, useTranslations } from "use-intl";
 import { appMessages, defaultLocale, t } from "../i18n";
+import { renderedChangeSeq } from "../change-events/rendered-seq";
+import { QueryDevtools } from "../query/devtools";
+import { RenderedChangeSeqProvider } from "../change-events/subscription";
 import { NotFoundScreen } from "../not-found/not-found-screen";
+import { useBrowserErrorWatch, useReportCaughtError } from "../shell/browser-error-watch";
 import { useDesktopUpdates } from "../shell/desktop-updates";
 import { UpdateToast } from "../shell/update-toast";
 import { ONBOARDING_PATH, isOpenPath, onboardingRedirect } from "../onboarding/model";
-import { getTimeZone } from "../server/functions";
+import { getTimeZone, getTitleBarHidden } from "../server/functions";
 import { getOnboardingComplete } from "../server/onboarding-functions";
 import { localTimeZone, timeZoneCookie, timeZoneFromCookies } from "@ganger/app/time-zone";
 import appCss from "../styles/app.css?url";
 
 let completeInBrowser = false;
 
-export const Route = createRootRoute({
+function rememberOnboardingComplete(complete: boolean): void {
+  if (complete && typeof window !== "undefined") completeInBrowser = true;
+}
+
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   beforeLoad: async ({ location }) => {
-    if (completeInBrowser || isOpenPath(location.pathname)) return;
+    const changeSeq = renderedChangeSeq();
+    if (completeInBrowser || isOpenPath(location.pathname))
+      return { onboardingComplete: null, changeSeq };
     const complete = await getOnboardingComplete();
-    if (complete && typeof window !== "undefined") completeInBrowser = true;
+    rememberOnboardingComplete(complete);
     if (onboardingRedirect(location.pathname, complete) !== null)
       throw redirect({ to: ONBOARDING_PATH });
+    return { onboardingComplete: complete, changeSeq };
   },
-  loader: () => getTimeZone(),
+  loader: async ({ context }) => {
+    const [timeZone, titleBarHidden] = await Promise.all([getTimeZone(), getTitleBarHidden()]);
+    return {
+      timeZone,
+      titleBarHidden,
+      onboardingComplete: context.onboardingComplete === true,
+      changeSeq: context.changeSeq,
+    };
+  },
   shouldReload: false,
   head: () => ({
     meta: [
@@ -50,6 +74,7 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
   component: RootLayout,
   notFoundComponent: NotFoundScreen,
+  errorComponent: RootError,
 });
 
 function RootDocument({ children }: { children: ReactNode }) {
@@ -57,7 +82,7 @@ function RootDocument({ children }: { children: ReactNode }) {
     <html lang={defaultLocale}>
       <head>
         <HeadContent />
-        {import.meta.env.DEV ? <link rel="stylesheet" href="/virtual:stylex.css" /> : null}
+        {import.meta.env.DEV ? <DevStyleXStyles /> : null}
       </head>
       <body {...stylex.props(documentStyles.body)}>
         {children}
@@ -67,13 +92,48 @@ function RootDocument({ children }: { children: ReactNode }) {
   );
 }
 
+function DevStyleXStyles() {
+  return (
+    <>
+      <link rel="stylesheet" href="/virtual:stylex.css" />
+      <script type="module" src="/@id/virtual:stylex:runtime" />
+    </>
+  );
+}
+
+const rootLoaderSchema = z.object({ titleBarHidden: z.boolean() });
+
+function RootError({ error }: ErrorComponentProps) {
+  useReportCaughtError(error);
+  const titleBarHidden = useRouterState({
+    select: (state) =>
+      rootLoaderSchema.safeParse(state.matches[0]?.loaderData).data?.titleBarHidden ?? false,
+  });
+  return (
+    <WindowChrome titleBarHidden={titleBarHidden}>
+      <WindowDragFrame>
+        <ErrorComponent error={error} />
+      </WindowDragFrame>
+    </WindowChrome>
+  );
+}
+
 function RootLayout() {
-  const timeZone = Route.useLoaderData();
+  const { timeZone, titleBarHidden, onboardingComplete, changeSeq } = Route.useLoaderData();
+  useBrowserErrorWatch();
+  useEffect(() => {
+    rememberOnboardingComplete(onboardingComplete);
+  }, [onboardingComplete]);
   return (
     <IntlProvider locale={defaultLocale} messages={appMessages} timeZone={timeZone}>
-      <TimeZoneSync timeZone={timeZone} />
-      <Outlet />
-      <AppToaster />
+      <WindowChrome titleBarHidden={titleBarHidden}>
+        <TimeZoneSync timeZone={timeZone} />
+        <RenderedChangeSeqProvider seq={changeSeq}>
+          <Outlet />
+        </RenderedChangeSeqProvider>
+        <AppToaster />
+        <QueryDevtools />
+      </WindowChrome>
     </IntlProvider>
   );
 }
@@ -84,12 +144,7 @@ function TimeZoneSync({ timeZone }: { timeZone: string }) {
     const local = localTimeZone();
     if (local === timeZone || timeZoneFromCookies(document.cookie) === local) return;
     document.cookie = timeZoneCookie(local);
-    void router.invalidate({
-      filter: (match) =>
-        match.routeId === rootRouteId ||
-        match.routeId === "/_app/stats" ||
-        match.routeId === "/_app/",
-    });
+    void router.invalidate({ filter: (match) => match.routeId === rootRouteId });
   }, [router, timeZone]);
   return null;
 }

@@ -1,0 +1,21 @@
+{
+  "id": "msg_000000000122",
+  "run_id": "run_000000000100",
+  "delivery_contract": "current_delivery",
+  "from_handle": "term_30000000-0000-4000-8000-000000000001",
+  "to_handle": "run:run_000000000100",
+  "subject": "Blocked: 로그인 화면 시안이 없음",
+  "body": "로그인 화면은 디자인 시안이 정해져야 고칠 수 있다. 시안 링크를 알려 주면 그 위에서 이어 하겠다.",
+  "type": "escalation",
+  "priority": "normal",
+  "thread_id": null,
+  "payload": "{\"taskId\":\"task_000000000120\",\"dispatchId\":\"ctx_000000000120\"}",
+  "read": 0,
+  "sequence": 7,
+  "created_at": "2026-11-19T10:41:59Z",
+  "delivered_at": null,
+  "sender_pane_key": "30000000-0000-4000-8000-000000000001:31000000-0000-4000-8000-000000000001",
+  "pointer_enter_pending": 0,
+  "pointer_pty_id": null,
+  "pointer_process_incarnation": null
+}

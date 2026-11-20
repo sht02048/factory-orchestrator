@@ -2,11 +2,11 @@
   "documentTitle": "Stats · Ganger",
   "title": "Stats",
   "summary": "끝난 런을 요약 결과로 나눠 봐요.",
-  "meta": "Stats · {workspace} · {from}–{to}",
+  "meta": "{workspace} · {from}–{to}",
   "headline": {
-    "rated": "끝난 런 {runs}개 중 {percent}%를 에이전트가 병합까지 끝냈어요",
-    "onlyCanceled": "끝난 런 {runs}개가 모두 Canceled예요",
-    "empty": "최근 {days}일 동안 끝난 런이 없어요"
+    "rated": "끝난 런 {runs}개 중 {percent}%를 에이전트가 병합까지 끝냈어요.",
+    "onlyCanceled": "끝난 런 {runs}개가 모두 Canceled예요.",
+    "empty": "최근 {days}일 동안 끝난 런이 없어요."
   },
   "period": {
     "label": "기간",

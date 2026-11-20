@@ -2,16 +2,14 @@
   "documentTitle": "Dashboard · Ganger",
   "title": "Dashboard",
   "allWorkspaces": "모든 Workspace",
-  "headline": "처리할 일이 {count}개 있어요",
-  "headlineEmpty": "처리할 일이 없어요",
   "summary": {
-    "sentence": "{list}예요.",
+    "sentence": "처리할 일은 {list}예요.",
     "separator": ", ",
     "answer": "답할 질문 {count}개",
     "check": "확인할 PR {count}개",
     "stopped": "멈춘 런 {count}개",
-    "inProgress": "진행 중인 런이 {count}개 있어요.",
-    "idle": "진행 중인 런도 없어요.",
+    "inProgress": "처리할 일은 없고, 진행 중인 런이 {count}개 있어요.",
+    "idle": "처리할 일도, 진행 중인 런도 없어요.",
     "limit": "한도에 닿은 러너 {count}대는 {duration} 뒤 한도가 풀리면 다시 런을 받아요.",
     "limitUnknown": "한도에 닿은 러너가 {count}대 있어요.",
     "withLimit": "{work} {limit}"
@@ -71,16 +69,25 @@
     "answer": "답하기",
     "answered": "답을 보냈어요",
     "denied": "거절을 보냈어요",
-    "openPr": "PR 보기"
+    "openPr": "PR 보기",
+    "pausing": "멈추는 중",
+    "resuming": "재개하는 중",
+    "pauseFailed": "멈추지 못했어요. {reason}",
+    "resumeFailed": "재개하지 못했어요. {reason}",
+    "menu": "{key} 런 메뉴",
+    "pause": "멈추기",
+    "resume": "재개하기",
+    "pausedFor": "{elapsed} 멈춤",
+    "requestFailed": "요청을 남기지 못했어요. 잠시 뒤 다시 해 주세요."
   },
   "sheet": {
-    "title": "{key} {title}",
     "close": "닫기",
     "runDetail": "Run 상세 보기",
     "since": {
       "waiting": "{elapsed} 기다려요",
       "running": "{elapsed} 일하고 있어요",
-      "ended": "{ago} 끝났어요"
+      "ended": "{ago} 끝났어요",
+      "paused": "{elapsed} 멈춰 있어요"
     },
     "running": "에이전트가 일하고 있어요. 끝나면 Done today로 옮겨요.",
     "inputUnknown": "무엇을 기다리는지 아직 읽지 못했어요",
@@ -97,20 +104,20 @@
     "workspace": "Workspace",
     "runner": "러너",
     "noRunner": "아직 없어요",
-    "agent": "에이전트"
+    "agent": "에이전트",
+    "paused": {
+      "operator": "운영자가 멈춰 둔 런이에요. 워크트리와 러너 자리는 그대로 두고, 최대 실행 시간도 멈춰 있어요. 재개하면 같은 자리에서 이어서 해요.",
+      "runner": "러너에서 사람이 에이전트 세션을 멈춘 런이에요. 워크트리와 러너 자리는 그대로 두고, 최대 실행 시간도 멈춰 있어요. 재개하면 같은 자리에서 이어서 하고, 러너에서 다시 일을 시켜도 Running으로 돌아가요.",
+      "unreported": "에이전트가 질문이나 완료 보고 없이 차례를 끝낸 런이에요. 마지막 출력은 Run 상세에서 볼 수 있어요. 워크트리와 러너 자리는 그대로 두고, 최대 실행 시간도 멈춰 있어요. 재개하면 같은 자리에서 이어서 해요."
+    }
   },
   "question": {
-    "other": "직접 쓰기",
-    "otherLabel": "직접 쓴 답",
-    "otherPlaceholder": "에이전트에게 보낼 답을 써주세요",
-    "choices": "선택지",
-    "pick": "답을 하나 골라주세요",
-    "note": "보낸 답은 바로 에이전트에게 전해져요",
-    "shortcut": "⌘ Enter로 보낼 수 있어요",
-    "send": "보내기",
-    "sending": "보내는 중…",
+    "title": "에이전트 질문",
     "answered": "답을 보냈어요. worker가 에이전트에게 전해요.",
-    "failed": "답을 보내지 못했어요. 다시 해주세요."
+    "rejected": {
+      "already-answered": "다른 곳에서 이미 답한 질문이에요. 다시 보내지 않아도 돼요.",
+      "not-found": "질문을 찾지 못했어요. 런이 끝났는지 Run 상세에서 확인해 주세요."
+    }
   },
   "permission": {
     "reasonLabel": "거절 이유",
@@ -118,7 +125,21 @@
     "send": "거절 보내기",
     "denying": "거절하는 중…",
     "denied": "거절을 보냈어요. worker가 에이전트에게 전해요.",
-    "failed": "거절을 보내지 못했어요. 다시 해주세요.",
+    "failed": "거절을 보내지 못했어요. 다시 보내 주세요.",
+    "rejected": {
+      "already-denied": "다른 곳에서 이미 거절했어요. 다시 보내지 않아도 돼요.",
+      "resolved": "러너에서 이미 처리한 요청이에요. 다시 보내지 않아도 돼요.",
+      "not-found": "요청을 찾지 못했어요. 런이 끝났는지 Run 상세에서 확인해 주세요."
+    },
     "allowOnRunner": "허용은 러너 화면에서만 할 수 있어요. 여기서는 거절만 할 수 있어요."
+  },
+  "control": {
+    "pauseRequested": "{key} 런을 멈추고 있어요.",
+    "resumeRequested": "{key} 런을 재개하고 있어요.",
+    "pauseRejected": "{key} 런 멈추기 요청을 남기지 못했어요. 잠시 뒤 다시 해 주세요.",
+    "resumeRejected": "{key} 런 재개 요청을 남기지 못했어요. 잠시 뒤 다시 해 주세요.",
+    "stateChanged": "{key} 런의 상태가 그사이 바뀌었어요. 지금 상태를 확인해 주세요.",
+    "pauseFailed": "{key} 런을 멈추지 못했어요. {reason}",
+    "resumeFailed": "{key} 런을 재개하지 못했어요. {reason}"
   }
 }

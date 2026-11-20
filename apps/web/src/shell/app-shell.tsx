@@ -25,6 +25,7 @@ import { navShortcuts } from "@ganger/app/shell/nav-shortcuts";
 import type { NavScreen, NavShortcut } from "@ganger/app/shell/nav-shortcuts";
 import { navIcons } from "./nav-icons";
 import { useDesktopNavigation } from "./desktop-navigation";
+import { useNavigationPending } from "./navigation-pending";
 
 const mainItems = navShortcuts.filter((item) => item.screen !== "settings");
 const bottomItems = navShortcuts.filter((item) => item.screen === "settings");
@@ -47,15 +48,14 @@ export function AppShell({
   const t = useTranslations("shell");
   const railLinks = useRef(new Map<NavScreen, HTMLAnchorElement>());
   const { inDesktopApp } = useDesktopNavigation((screen) => railLinks.current.get(screen)?.focus());
+  const navigationPending = useNavigationPending();
   const isCurrent = (to: string) =>
     to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`);
   return (
     <AppFrame
+      pending={{ active: navigationPending, label: t("navigationPending") }}
       rail={
         <>
-          <RailBrand>
-            <GangerMark tone="brand" label={t("brand")} />
-          </RailBrand>
           <WorkspaceSwitcher
             shell={shell}
             workspace={workspace}
@@ -81,6 +81,9 @@ export function AppShell({
               </RailNavList>
             ))}
           </RailNav>
+          <RailBrand>
+            <GangerMark tone="brand" label={t("brand")} />
+          </RailBrand>
         </>
       }
     >

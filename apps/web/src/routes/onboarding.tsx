@@ -1,9 +1,11 @@
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import type { ChangeKind } from "@ganger/db/change-events-model";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../i18n";
 import { onboardingMessages } from "../onboarding/messages";
+import { PRELOAD_FRESH_MS } from "../query/query-client";
 import { HOME_PATH, ONBOARDING_PATH, resolveStep, stepToPin } from "../onboarding/model";
 import { OnboardingScreen } from "../onboarding/onboarding-screen";
 import type { OnboardingActions } from "../onboarding/onboarding-screen";
@@ -11,7 +13,11 @@ import type { DirectEntry } from "../runner-setup/runner-setup";
 import { getOnboardingPage, setUpWorkspace } from "../server/onboarding-functions";
 import { runnerSetupMessages } from "../runner-setup/messages";
 import { useRunnerSetupActions } from "../runner-setup/use-runner-setup-actions";
-import { useReloadOnSuccess, useSettingsActions } from "../settings/use-settings-actions";
+import {
+  useReloadOnSuccess,
+  useSettingsActions,
+  useSettingsReload,
+} from "../settings/use-settings-actions";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -19,12 +25,16 @@ const t = createTranslator({
   namespace: "onboarding",
 });
 
+const RUNNER_ADDED: ReadonlyArray<ChangeKind> = ["runner"];
+const WORKSPACE_SET_UP: ReadonlyArray<ChangeKind> = ["workspace", "settings", "tracker"];
+
 export const Route = createFileRoute("/onboarding")({
   validateSearch: z.object({
     step: z.number().int().optional().catch(undefined),
     direct: z.boolean().optional().catch(undefined),
   }),
   loaderDeps: ({ search }) => ({ step: search.step }),
+  preloadStaleTime: PRELOAD_FRESH_MS,
   loader: async ({ deps }) => {
     const loaded = await getOnboardingPage({
       data: deps.step === undefined ? {} : { step: deps.step },
@@ -60,14 +70,16 @@ function OnboardingRoute() {
     }),
     [router, navigate, search],
   );
-  const settingsActions = useSettingsActions();
-  const then = useReloadOnSuccess();
-  const setupActions = useRunnerSetupActions();
+  const reload = useSettingsReload();
+  const settingsActions = useSettingsActions(reload);
+  const then = useReloadOnSuccess(reload);
+  const reloadAfterRunnerAdded = useCallback(() => reload(RUNNER_ADDED), [reload]);
+  const setupActions = useRunnerSetupActions(reloadAfterRunnerAdded);
   const actions = useMemo(
     (): OnboardingActions => ({
       ...settingsActions,
       ...setupActions,
-      setUpWorkspace: then((data) => setUpWorkspace({ data })),
+      setUpWorkspace: then((data) => setUpWorkspace({ data }), WORKSPACE_SET_UP),
     }),
     [settingsActions, setupActions, then],
   );

@@ -6,20 +6,20 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { z } from "zod";
-import { getShell } from "../server/functions";
+import { ChangeEventsSubscription } from "../change-events/subscription";
 import { AppShell } from "../shell/app-shell";
+import { shellQuery, useShell } from "../shell/shell-query";
 import { resolveWorkspace } from "@ganger/app/shell/model";
 
 export const Route = createFileRoute("/_app")({
   validateSearch: z.object({ ws: z.string().optional() }),
   search: { middlewares: [retainSearchParams(["ws"])] },
-  loader: () => getShell(),
-  shouldReload: false,
+  loader: ({ context }) => context.queryClient.query({ ...shellQuery, staleTime: "static" }),
   component: AppLayout,
 });
 
 function AppLayout() {
-  const shell = Route.useLoaderData();
+  const shell = useShell();
   const { ws } = Route.useSearch();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const navigate = useNavigate();
@@ -32,6 +32,7 @@ function AppLayout() {
         void navigate({ to: ".", search: { ws: next } });
       }}
     >
+      <ChangeEventsSubscription />
       <Outlet />
     </AppShell>
   );

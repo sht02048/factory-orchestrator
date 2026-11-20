@@ -1,4 +1,10 @@
-import { decideConnection, decideTimeout, resolveRunProgress } from "@ganger/core";
+import { withLogContext } from "@ganger/log";
+import {
+  decideConnection,
+  decideRunnerStop,
+  decideTimeout,
+  resolveRunProgress,
+} from "@ganger/core";
 import type {
   AgentResult,
   CompletionReport,
@@ -16,6 +22,8 @@ import {
   getRunWithRecords,
   hasPendingCancelRequest,
   inTransaction,
+  lastStateBeforeDisconnect,
+  runningSince,
   listRunners,
   listRuns,
   listUnsentAnswers,
@@ -40,6 +48,7 @@ import {
   mailboxFor,
   reportFailure,
   tryWrite,
+  runLogContext,
 } from "./context.js";
 import type { ActiveRun, PendingEnding, TickContext } from "./context.js";
 
@@ -47,34 +56,45 @@ export async function watchActiveRuns(context: TickContext): Promise<void> {
   const { db, logger } = context;
   const runnersById = new Map(listRunners(db).map((runner) => [runner.id, runner]));
   const maxRunMs = new Map(listWorkspaces(db).map((ws) => [ws.id, ws.maxRunMs]));
-  for (const run of listRuns(db, { states: ["running", "waiting-for-input", "disconnected"] })) {
+  for (const run of listRuns(db, {
+    states: ["running", "waiting-for-input", "paused", "disconnected"],
+  })) {
     if (run.state === "queued" || run.state === "ended") continue;
     try {
-      await watchRun(context, run, runnersById.get(run.runnerId), {
-        maxRunMs: maxRunMs.get(run.workspaceId) ?? DEFAULT_MAX_RUN_MS,
-      });
+      await withLogContext(runLogContext(run), () =>
+        watchRun(context, run, runnersById.get(run.runnerId), {
+          maxRunMs: maxRunMs.get(run.workspaceId) ?? DEFAULT_MAX_RUN_MS,
+        }),
+      );
     } catch (error) {
-      logger.warn("could not watch run", { runId: run.id, error });
+      logger.warn("run.watch_failed", { ...runLogContext(run), error });
     }
   }
 }
 
 interface WatchSettings {
   maxRunMs: number;
+  pausedMs: number;
+  pausedSince: Date | null;
 }
 
 async function watchRun(
   context: TickContext,
   run: ActiveRun,
   storedRunner: StoredRunner | undefined,
-  settings: WatchSettings,
+  limits: { maxRunMs: number },
 ): Promise<void> {
   const { db, logger, adapters } = context;
   const records = getRunWithRecords(db, run.id)?.records;
   if (records === undefined) return;
+  const settings: WatchSettings = {
+    maxRunMs: limits.maxRunMs,
+    pausedMs: records.pausedMs,
+    pausedSince: records.pausedSince,
+  };
   const cancelRequested = hasPendingCancelRequest(db, run.id);
   if (storedRunner === undefined) {
-    logger.warn("run's runner is not registered", { runId: run.id, runnerId: run.runnerId });
+    logger.warn("run.runner_missing", { runId: run.id, runnerId: run.runnerId });
     await endIfTimedOut(context, run, { ...settings, cancelRequested, state: "disconnected" });
     return;
   }
@@ -128,10 +148,14 @@ async function watchRun(
     );
   }
 
-  const resolution = resolveRunProgress(progress, {
-    answered: answeredQuestions(context, run),
-    denied: deniedPermissions(context, run),
-  });
+  const resolution = keepPausedRunPaused(
+    context,
+    run,
+    resolveRunProgress(progress, {
+      answered: answeredQuestions(context, run),
+      denied: deniedPermissions(context, run),
+    }),
+  );
   const pending = context.pendingEndings.get(run.id);
   const ending =
     pending === undefined
@@ -140,9 +164,12 @@ async function watchRun(
           resolution,
           cancelRequested,
           maxRunMs: settings.maxRunMs,
+          pausedMs: settings.pausedMs,
+          pausedSince: settings.pausedSince,
         })
       : { agentResult: pending.agentResult, report: pending.report, agent: "none" as const };
   if (ending === null) {
+    if (await followRunnerStop(context, run, { progress, resolution, runner, onRunner })) return;
     if (resolution.kind === "continue" && resolution.state !== run.state) {
       reportFailure(
         logger,
@@ -173,6 +200,65 @@ async function watchRun(
   if (recorded) context.pendingEndings.delete(run.id);
 }
 
+async function followRunnerStop(
+  context: TickContext,
+  run: ActiveRun,
+  input: {
+    progress: RunProgress;
+    resolution: WatchResolution;
+    runner: Runner;
+    onRunner: RunOnRunner;
+  },
+): Promise<boolean> {
+  const { db, logger } = context;
+  const { progress, resolution } = input;
+  if (progress.kind !== "active" || resolution.kind !== "continue") return false;
+  const state =
+    run.state === "running" && resolution.state === "running"
+      ? "running"
+      : run.state === "paused" && resolution.state === "paused"
+        ? "paused"
+        : null;
+  if (state === null) return false;
+  const records = getRunWithRecords(db, run.id)?.records;
+  if (records === undefined) return false;
+  const decision = decideRunnerStop({
+    state,
+    activity: progress.activity ?? { kind: "unknown" },
+    unreportedStop: progress.unreportedStop ?? null,
+    runningSince: runningSince(db, run.id),
+    pausedSince: records.pausedSince,
+    now: context.now(),
+  });
+  if (decision === null) return false;
+  if (decision.to === "running") {
+    reportFailure(logger, run.id, changeRunState(db, run.id, { to: "running" }, context.now()));
+    return true;
+  }
+  const lastOutput =
+    decision.source !== "unreported"
+      ? null
+      : decision.lastOutput !== null && decision.lastOutput.length > 0
+        ? decision.lastOutput
+        : await readLastLog(context, run, input.runner, input.onRunner);
+  inTransaction(db, () => {
+    const result = changeRunState(
+      db,
+      run.id,
+      { to: "paused", source: decision.source },
+      context.now(),
+    );
+    if (!result.ok) {
+      reportFailure(logger, run.id, result);
+      return;
+    }
+    if (decision.source === "unreported") {
+      updateRunRecords(db, run.id, { lastLog: lastOutput === null ? null : [...lastOutput] });
+    }
+  });
+  return true;
+}
+
 async function endWithoutProgress(
   context: TickContext,
   run: ActiveRun,
@@ -185,6 +271,8 @@ async function endWithoutProgress(
     startedAt: run.startedAt,
     now: context.now(),
     maxRunMs: input.maxRunMs,
+    pausedMs: input.pausedMs,
+    pausedSince: input.pausedSince,
     cancelRequested: input.cancelRequested,
   });
   const ending =
@@ -223,6 +311,8 @@ async function endIfTimedOut(
     startedAt: run.startedAt,
     now: context.now(),
     maxRunMs: input.maxRunMs,
+    pausedMs: input.pausedMs,
+    pausedSince: input.pausedSince,
     cancelRequested: input.cancelRequested,
   });
   if (timeout === null) return;
@@ -245,9 +335,28 @@ async function readLastLog(
   try {
     return await runner.readLogTail(onRunner, { lines: LAST_LOG_LINES });
   } catch (error) {
-    context.logger.warn("could not read the last log of an ending run", { runId: run.id, error });
+    context.logger.warn("run.last_log_failed", { runId: run.id, error });
     return null;
   }
+}
+
+type WatchResolution =
+  | ReturnType<typeof resolveRunProgress>
+  | { kind: "continue"; state: "paused" };
+
+function keepPausedRunPaused(
+  context: TickContext,
+  run: ActiveRun,
+  resolution: ReturnType<typeof resolveRunProgress>,
+): WatchResolution {
+  const paused =
+    run.state === "paused" ||
+    (run.state === "disconnected" && lastStateBeforeDisconnect(context.db, run.id) === "paused");
+  if (!paused) return resolution;
+  if (resolution.kind === "continue" || resolution.agentResult === "ended-without-report") {
+    return { kind: "continue", state: "paused" };
+  }
+  return resolution;
 }
 
 interface Ending extends Omit<PendingEnding, "lastLog"> {
@@ -259,9 +368,11 @@ function decideEnding(
   run: ActiveRun,
   input: {
     progress: RunProgress;
-    resolution: ReturnType<typeof resolveRunProgress>;
+    resolution: WatchResolution;
     cancelRequested: boolean;
     maxRunMs: number;
+    pausedMs: number;
+    pausedSince: Date | null;
   },
 ): Ending | null {
   const { progress, resolution } = input;
@@ -284,6 +395,8 @@ function decideEnding(
     startedAt: run.startedAt,
     now: context.now(),
     maxRunMs: input.maxRunMs,
+    pausedMs: input.pausedMs,
+    pausedSince: input.pausedSince,
     cancelRequested: false,
   });
   if (timeout === null) return null;
@@ -372,7 +485,7 @@ async function sendAnswers(
           answer: answer.answer,
         });
       } catch (error) {
-        logger.warn("could not send an answer", {
+        logger.warn("run.answer_failed", {
           runId: run.id,
           questionId: answer.questionId,
           error,
@@ -406,7 +519,7 @@ async function sendDenials(
           reason: denial.reason,
         });
       } catch (error) {
-        logger.warn("could not send a permission denial", {
+        logger.warn("run.denial_failed", {
           runId: run.id,
           permissionId: denial.permissionId,
           error,

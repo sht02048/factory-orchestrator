@@ -2,6 +2,13 @@
   "documentTitle": "Tickets · Ganger",
   "title": "Tickets",
   "intro": "트래커 티켓을 보고 런을 맡겨요.",
+  "reread": {
+    "action": "Linear에서 다시 읽기",
+    "reading": "읽는 중…",
+    "done": "Linear에서 티켓을 다시 읽었어요.",
+    "failed": "Linear에서 다시 읽지 못했어요. 잠시 뒤 다시 해 주세요.",
+    "partial": "다시 읽었지만 일부 트래커 프로젝트를 읽지 못했어요. 목록 위 안내를 확인해 주세요."
+  },
   "summary": "할당할 수 있는 티켓이 {count, number}개 있어요.",
   "filter": {
     "label": "티켓 거르기",
@@ -36,10 +43,10 @@
   "loadError": {
     "unauthorized": "{project} 티켓을 읽지 못했어요. 트래커가 API 키를 받지 않았어요. Settings에서 연결을 확인해 주세요.",
     "rate-limited": "{project} 티켓을 읽지 못했어요. 트래커 요청 한도를 넘었어요. 잠시 뒤 다시 열어 주세요.",
-    "not-found": "{project} 티켓을 읽지 못했어요. 트래커에 이 프로젝트가 없어요.",
-    "network": "{project} 티켓을 읽지 못했어요. 트래커에 닿지 않았어요.",
-    "unknown-connection": "{project} 티켓을 읽지 못했어요. 묶인 트래커 연결이 없어졌어요.",
-    "failed": "{project} 티켓을 읽지 못했어요. 트래커가 알 수 없는 오류를 냈어요."
+    "not-found": "{project} 티켓을 읽지 못했어요. 트래커에 이 프로젝트가 없어요. Settings에서 트래커 프로젝트를 확인해 주세요.",
+    "network": "{project} 티켓을 읽지 못했어요. 트래커에 닿지 않았어요. 잠시 뒤 Linear에서 다시 읽기를 눌러 주세요.",
+    "unknown-connection": "{project} 티켓을 읽지 못했어요. 묶인 트래커 연결이 없어졌어요. Settings에서 트래커 연결을 확인해 주세요.",
+    "failed": "{project} 티켓을 읽지 못했어요. 트래커가 알 수 없는 오류를 냈어요. 잠시 뒤 Linear에서 다시 읽기를 눌러 주세요."
   },
   "panel": {
     "label": "고른 티켓 요약",
@@ -47,11 +54,12 @@
     "runner": "{runner} · {time}",
     "noRunner": "러너 정하기 전 · {time}",
     "next": {
-      "unassigned": "아직 런이 없어요. 할당하면 Mapping이 정한 러너 쪽 프로젝트와 에이전트로 처리해요.",
+      "unassigned": "아직 런이 없어요. 할당하면 Mapping이 정한 저장소와 에이전트로 처리해요.",
       "no-mapping": "이 트래커 프로젝트에 Mapping이 없어 할당할 수 없어요. Settings에서 Mapping을 만들면 할당할 수 있어요.",
       "queued": "러너에 자리가 나기를 기다려요. 시작하면 진행 중으로 바뀌어요.",
       "running": "에이전트가 작업하고 있어요. 끝나면 결과가 여기에 보여요.",
       "waiting-for-input": "에이전트가 운영자를 기다려요. 런 보기에서 답하거나 확인해 주세요.",
+      "paused": "멈춰 둔 런이에요. 런 보기에서 재개할 수 있어요.",
       "disconnected": "러너에 닿지 않아요. 런 보기에서 러너 상태를 확인해 주세요.",
       "merged": "에이전트가 완료 보고를 보냈고 PR이 병합됐어요.",
       "human-check": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
@@ -75,14 +83,15 @@
   },
   "assign": {
     "title": "{key} 티켓을 할당할까요?",
-    "description": "Mapping 기본값으로 채웠어요. 러너와 에이전트만 바꿀 수 있어요.",
-    "project": "러너 쪽 프로젝트",
-    "projectHint": "Mapping이 정한 값이라 여기서 바꿀 수 없어요.",
+    "description": "Mapping 기본값으로 채웠어요. 저장소, 러너, 에이전트를 바꿀 수 있어요.",
+    "project": "저장소",
+    "projectHint": "티켓 라벨에 맞는 저장소, 다시 맡길 때는 지난 런의 저장소를 골라 두었어요. 맞는 라벨이 없거나 둘 이상이면 기본 저장소예요. 그 저장소에 맡길 러너가 없으면 다른 저장소를 골라 두었어요.",
     "runner": "러너",
     "runnerAuto": "할당 때 자동으로 고르기",
-    "runnerHint": "자동으로 고르면 이 프로젝트가 있는 Online 러너 중 에이전트 한도에 닿지 않은 러너에서 남은 capacity가 가장 많은 러너를 골라요.",
+    "runnerHint": "자동으로 고르면 이 저장소가 있는 Online 러너 중 에이전트 한도에 닿지 않은 러너에서 남은 capacity가 가장 많은 러너를 골라요.",
     "runnerOffline": "{name} · Offline",
     "runnerBlocked": "{name} · GitHub 인증이 깨져 고를 수 없어요",
+    "runnerRepoBlocked": "{name} · 이 저장소에 push할 수 없어 고를 수 없어요",
     "runnerLimited": "{name} · {provider} 한도에 닿았어요. {duration} 뒤 풀려요",
     "agent": "에이전트",
     "cancel": "취소",
@@ -91,11 +100,17 @@
     "done": "{key} 티켓을 할당했어요",
     "error": {
       "active-run": "그사이 이 티켓에 진행 중인 런이 생겼어요. 목록을 다시 열어 확인해 주세요.",
-      "no-mapping": "이 트래커 프로젝트의 Mapping이 없어졌어요.",
-      "unknown-agent": "Mapping에 쓰인 에이전트만 고를 수 있어요.",
-      "unknown-runner": "고른 러너가 없어졌거나 이 프로젝트가 빠졌어요. 다른 러너를 골라 주세요.",
-      "runner-assignment-blocked": "고른 러너의 GitHub 인증이 깨졌어요. 다른 러너를 골라 주세요.",
+      "no-mapping": "이 트래커 프로젝트의 Mapping이 없어졌어요. Settings에서 Mapping을 정한 뒤 다시 할당해 주세요.",
+      "unknown-repo": "고른 저장소가 Mapping에서 빠졌어요. 창을 닫고 다시 열어 주세요.",
+      "unknown-agent": "Mapping에 쓰인 에이전트만 고를 수 있어요. 다른 에이전트를 골라 주세요.",
+      "unknown-runner": "고른 러너가 없어졌거나 그 러너에서 이 저장소가 빠졌어요. 다른 러너를 골라 주세요.",
+      "runner-assignment-blocked": "고른 러너가 이 저장소에 push할 수 없거나 GitHub 인증이 깨졌어요. 다른 러너를 골라 주세요.",
       "failed": "할당하지 못했어요. 다시 시도해 주세요."
-    }
+    },
+    "repoDefault": "기본",
+    "repoLabel": "라벨 {label}",
+    "repoRunners": "{count, plural, =0 {아직 이 저장소가 있는 러너가 없어요} other {러너 #대에 있어요}}",
+    "repoBlocked": "push가 막혀 맡길 수 있는 러너가 없어요",
+    "repoBlockedChosen": "이 저장소는 지금 맡길 수 있는 러너가 없어요. 할당하면 러너의 push가 풀릴 때까지 Queued로 기다려요."
   }
 }

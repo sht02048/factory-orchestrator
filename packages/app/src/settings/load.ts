@@ -1,4 +1,4 @@
-import { AdapterError, toTrackerConnectionId, toTrackerProjectId } from "@ganger/core";
+import { AdapterError, toTrackerConnectionId } from "@ganger/core";
 import type { AdapterRegistry, RunnerId, Tracker, TrackerConnectionId } from "@ganger/core";
 import {
   getAutoAssignLabel,
@@ -6,6 +6,7 @@ import {
   getMapping,
   getMcpWriteAllowed,
   getRunnerCheckRequest,
+  getWebhookReceipt,
   listPendingRunnerCheckRequests,
   listCodeHostConnections,
   listRecentMcpActions,
@@ -20,25 +21,39 @@ import { RECENT_MCP_ACTIONS, mcpActionView } from "../mcp/actions.js";
 import type { PowerSettingsStore } from "../power-settings.js";
 import { mcpLaunch } from "./mcp-launch.js";
 import type { McpLaunch } from "./mcp-launch.js";
-import type { Database, SecretBox, StoredTrackerConnection, WorkspaceId } from "@ganger/db";
+import type {
+  Database,
+  SecretBox,
+  StoredInstallSettings,
+  StoredTrackerConnection,
+  WebhookReceipt,
+  WorkspaceId,
+} from "@ganger/db";
 import { z } from "zod";
 import { prerequisiteProject } from "../prerequisites.js";
 import { resolveWorkspace } from "../shell/model.js";
+import type { TrackerReads } from "../tracker-reads.js";
 import { KNOWN_AGENTS } from "./model.js";
+import { connectionProjectsOf, mergeSettingsPage } from "./merge.js";
 import type {
   AddressesView,
-  BoundProject,
+  BoundProjectReads,
+  BoundProjectSettings,
   Choice,
-  ConnectionLabel,
+  ConnectionLabelSettings,
   ConnectionProjects,
   PowerView,
+  ProjectOwnership,
   Remote,
   RemoteError,
   RunnerCheckView,
   RunnerSettingsView,
+  SettingsDbPage,
   SettingsPage,
-  TrackerProjectChoice,
-  WorkspaceSettings,
+  TrackerConnectionView,
+  TrackerProjectList,
+  WebhookStateView,
+  WorkspaceDbSettings,
 } from "./model.js";
 
 export type { PowerSettingsStore };
@@ -49,6 +64,7 @@ export interface SettingsContext {
   registry: AdapterRegistry;
   power?: PowerSettingsStore;
   mcpLaunch?: McpLaunch;
+  trackerReads?: TrackerReads;
 }
 
 function powerView(store: PowerSettingsStore | undefined): PowerView {
@@ -60,8 +76,13 @@ export function webhookPath(connectionId: string): string {
   return `/api/webhooks/tracker/${encodeURIComponent(connectionId)}`;
 }
 
-function addressesView(settings: AddressesView): AddressesView {
-  return { webAddress: settings.webAddress, webhookAddress: settings.webhookAddress };
+function addressesView(settings: StoredInstallSettings): AddressesView {
+  return {
+    webAddress: settings.webAddress,
+    webhookAddress: settings.webhookAddress,
+    webhookAddressChecked:
+      settings.webhookAddress !== null && settings.webhookAddressCheckedAt !== null,
+  };
 }
 
 const runnerConfigSchema = z.object({
@@ -80,6 +101,58 @@ const connectionSecretsSchema = z.object({
 function hasWebhookSecret(secrets: unknown): boolean {
   const parsed = connectionSecretsSchema.safeParse(secrets);
   return parsed.success && typeof parsed.data.webhookSecret === "string";
+}
+
+const connectionConfigSchema = z.object({
+  webhookSettingsUrl: z
+    .url({ protocol: /^https$/ })
+    .nullish()
+    .catch(null),
+});
+
+function webhookSettingsUrlOf(config: unknown): string | null {
+  const parsed = connectionConfigSchema.safeParse(config);
+  return parsed.success ? (parsed.data.webhookSettingsUrl ?? null) : null;
+}
+
+export function webhookStateOf(
+  secretSet: boolean,
+  receipt: WebhookReceipt,
+  now: Date,
+): WebhookStateView {
+  if (!secretSet) return { kind: "off" };
+  const last = receipt.lastReceivedAt;
+  if (receipt.firstRejectedAt !== null && receipt.rejectedCount > 0) {
+    return {
+      kind: "rejected",
+      rejectedCount: receipt.rejectedCount,
+      firstRejectedAt: receipt.firstRejectedAt.toISOString(),
+      lastReceivedAt: last?.toISOString() ?? null,
+      lastReceivedAgoMs: last === null ? null : Math.max(0, now.getTime() - last.getTime()),
+    };
+  }
+  if (last === null) return { kind: "waiting" };
+  return {
+    kind: "receiving",
+    lastReceivedAt: last.toISOString(),
+    lastReceivedAgoMs: Math.max(0, now.getTime() - last.getTime()),
+  };
+}
+
+export function trackerConnectionView(
+  db: Database,
+  connection: StoredTrackerConnection,
+  now: Date,
+): TrackerConnectionView {
+  const secretSet = hasWebhookSecret(connection.secrets);
+  return {
+    id: connection.id,
+    name: connection.name,
+    hasWebhookSecret: secretSet,
+    webhookPath: webhookPath(connection.id),
+    webhook: webhookStateOf(secretSet, getWebhookReceipt(db, connection.id), now),
+    webhookSettingsUrl: webhookSettingsUrlOf(connection.config),
+  };
 }
 
 const runnerHealthSchema = z.object({
@@ -126,19 +199,26 @@ export function trackerOf(
   }
 }
 
+function readingTrackerOf(
+  context: SettingsContext,
+  connection: StoredTrackerConnection,
+): Tracker | null {
+  const tracker = trackerOf(context, connection);
+  if (tracker === null || context.trackerReads === undefined) return tracker;
+  return context.trackerReads.wrap(context.db, connection.id, tracker);
+}
+
 const toChoice = (item: { id: string; name: string }): Choice => ({ id: item.id, name: item.name });
 
-export async function loadSettingsPage(
+export function loadSettingsDb(
   context: SettingsContext,
   ws: string | undefined,
   now: Date,
-): Promise<SettingsPage> {
+): SettingsDbPage {
   const { db, secretBox } = context;
   const connections = listTrackerConnections(db, secretBox);
   const workspaces = listWorkspaces(db);
-  const choice = resolveWorkspace(workspaces, ws);
-  const current =
-    choice.kind === "one" ? workspaces.find((w) => w.id === choice.workspace.id) : undefined;
+  const current = currentWorkspace(workspaces, ws);
 
   const runners = listRunners(db);
   const runnerProjects = new Map<string, Choice>();
@@ -150,9 +230,7 @@ export async function loadSettingsPage(
   }
 
   const workspace =
-    current === undefined
-      ? null
-      : await loadWorkspaceSettings(context, current, connections, workspaces);
+    current === undefined ? null : workspaceDbSettings(db, current, connections, workspaces);
 
   const agents = new Set<string>(KNOWN_AGENTS);
   for (const bound of workspace?.bound ?? []) {
@@ -162,12 +240,7 @@ export async function loadSettingsPage(
   return {
     workspace,
     install: {
-      connections: connections.map((connection) => ({
-        id: connection.id,
-        name: connection.name,
-        hasWebhookSecret: hasWebhookSecret(connection.secrets),
-        webhookPath: webhookPath(connection.id),
-      })),
+      connections: connections.map((connection) => trackerConnectionView(db, connection, now)),
       githubToken: listCodeHostConnections(db, secretBox).length > 0,
       addresses: addressesView(getInstallSettings(db)),
       power: powerView(context.power),
@@ -197,32 +270,35 @@ export async function loadSettingsPage(
   };
 }
 
-async function loadWorkspaceSettings(
-  context: SettingsContext,
+function currentWorkspace<W extends { id: WorkspaceId; name: string }>(
+  workspaces: ReadonlyArray<W>,
+  ws: string | undefined,
+): W | undefined {
+  const choice = resolveWorkspace(workspaces, ws);
+  return choice.kind === "one" ? workspaces.find((w) => w.id === choice.workspace.id) : undefined;
+}
+
+function workspaceDbSettings(
+  db: Database,
   workspace: { id: WorkspaceId; name: string; maxRunMs: number },
   connections: ReadonlyArray<StoredTrackerConnection>,
   workspaces: ReadonlyArray<{ id: WorkspaceId; name: string }>,
-): Promise<WorkspaceSettings> {
-  const { db } = context;
-  const allBound = listWorkspaceTrackerProjects(db);
-  const mine = allBound.filter((p) => p.workspaceId === workspace.id);
-  const trackers = new Map(connections.map((c) => [c.id, trackerOf(context, c)]));
+): WorkspaceDbSettings {
+  const mine = listWorkspaceTrackerProjects(db, workspace.id);
   const connectionChoice = (id: TrackerConnectionId): Choice => ({
     id,
     name: connections.find((c) => c.id === id)?.name ?? id,
   });
-
-  const trackerProjects = await trackerProjectChoices(
-    context,
-    workspace.id,
-    connections,
-    workspaces,
-    trackers,
-  );
-
-  const bound = await Promise.all(
-    mine.map(async (project): Promise<BoundProject> => {
-      const tracker = trackers.get(project.connection) ?? null;
+  const labelConnections = [...new Set(mine.map((p) => p.connection))];
+  return {
+    general: {
+      id: workspace.id,
+      name: workspace.name,
+      maxRunMinutes: Math.round(workspace.maxRunMs / 60_000),
+    },
+    connections: connections.map(toChoice),
+    ownership: projectOwnership(db, workspace.id, workspaces),
+    bound: mine.map((project): BoundProjectSettings => {
       const mapping = getMapping(db, project.connection, project.projectId);
       return {
         connection: connectionChoice(project.connection),
@@ -231,131 +307,141 @@ async function loadWorkspaceSettings(
           mapping === null
             ? null
             : {
-                runnerProject: mapping.runnerProject,
                 agent: mapping.agent,
                 model: mapping.model,
+                repos: mapping.repos.map((repo) => ({
+                  id: repo.project,
+                  isDefault: repo.isDefault,
+                  labelId: repo.labelId,
+                })),
               },
         inProgressStateId: project.inProgressStateId,
-        states:
-          tracker === null
-            ? { ok: false, error: "invalid" }
-            : await remote(async () => (await tracker.listStates(project.projectId)).map(toChoice)),
       };
     }),
-  );
-
-  const labelConnections = [...new Set(mine.map((p) => p.connection))];
-  const labels = await Promise.all(
-    labelConnections.map(async (connectionId): Promise<ConnectionLabel> => {
-      const tracker = trackers.get(connectionId) ?? null;
+    labels: labelConnections.map((connectionId): ConnectionLabelSettings => {
       const projects = mine.filter((p) => p.connection === connectionId);
-      const read: Remote<Choice> =
-        tracker === null
-          ? { ok: false, error: "invalid" }
-          : await remote(async () => {
-              const lists = await Promise.all(projects.map((p) => tracker.listLabels(p.projectId)));
-              const unique = new Map<string, Choice>();
-              for (const label of lists.flat()) unique.set(label.id, toChoice(label));
-              return [...unique.values()].toSorted((a, b) => a.name.localeCompare(b.name));
-            });
       return {
         connection: connectionChoice(connectionId),
+        projectIds: projects.map((p) => p.projectId),
         labelId: getAutoAssignLabel(db, workspace.id, toTrackerConnectionId(connectionId)),
-        labels: read,
+        repoLabels: projects.flatMap((project) =>
+          (getMapping(db, project.connection, project.projectId)?.repos ?? []).flatMap((repo) =>
+            repo.labelId === null
+              ? []
+              : [{ labelId: repo.labelId, repo: repo.project, project: project.name }],
+          ),
+        ),
+      };
+    }),
+  };
+}
+
+function projectOwnership(
+  db: Database,
+  workspaceId: WorkspaceId | null,
+  workspaces: ReadonlyArray<{ id: WorkspaceId; name: string }>,
+): ProjectOwnership[] {
+  const workspaceName = new Map(workspaces.map((w) => [w.id, w.name]));
+  const queued = workspaceId === null ? [] : listRuns(db, { states: ["queued"], workspaceId });
+  return listWorkspaceTrackerProjects(db).map((bound): ProjectOwnership => {
+    const isMine = bound.workspaceId === workspaceId;
+    return {
+      connection: bound.connection,
+      projectId: bound.projectId,
+      name: bound.name,
+      owner: isMine
+        ? { kind: "this" }
+        : {
+            kind: "other",
+            workspace: {
+              id: bound.workspaceId,
+              name: workspaceName.get(bound.workspaceId) ?? bound.workspaceId,
+            },
+          },
+      mappings: isMine && getMapping(db, bound.connection, bound.projectId) !== null ? 1 : 0,
+      queuedRuns: isMine
+        ? queued.filter(
+            (run) =>
+              run.ticket.connection === bound.connection && run.trackerProject === bound.projectId,
+          ).length
+        : 0,
+    };
+  });
+}
+
+export async function loadTrackerProjectLists(
+  context: SettingsContext,
+): Promise<TrackerProjectList[]> {
+  const connections = listTrackerConnections(context.db, context.secretBox);
+  return Promise.all(
+    connections.map(async (connection): Promise<TrackerProjectList> => {
+      const tracker = readingTrackerOf(context, connection);
+      return {
+        connection: connection.id,
+        projects:
+          tracker === null
+            ? { ok: false, error: "invalid" }
+            : await remote(async () => (await tracker.listProjects()).map(toChoice)),
       };
     }),
   );
+}
 
-  return {
-    general: {
-      id: workspace.id,
-      name: workspace.name,
-      maxRunMinutes: Math.round(workspace.maxRunMs / 60_000),
-    },
-    trackerProjects,
-    bound,
-    labels,
-  };
+export async function loadBoundProjectReads(
+  context: SettingsContext,
+  ws: string | undefined,
+): Promise<BoundProjectReads[]> {
+  const { db, secretBox } = context;
+  const current = currentWorkspace(listWorkspaces(db), ws);
+  if (current === undefined) return [];
+  const connections = listTrackerConnections(db, secretBox);
+  const trackers = new Map(connections.map((c) => [c.id, readingTrackerOf(context, c)]));
+  return Promise.all(
+    listWorkspaceTrackerProjects(db, current.id).map(
+      async (project): Promise<BoundProjectReads> => {
+        const tracker = trackers.get(project.connection) ?? null;
+        const [states, labels] =
+          tracker === null
+            ? [UNREADABLE, UNREADABLE]
+            : await Promise.all([
+                remote(async () => (await tracker.listStates(project.projectId)).map(toChoice)),
+                remote(async () =>
+                  (await tracker.listLabels(project.projectId))
+                    .map(toChoice)
+                    .toSorted((a, b) => a.name.localeCompare(b.name)),
+                ),
+              ]);
+        return { connection: project.connection, projectId: project.projectId, states, labels };
+      },
+    ),
+  );
+}
+
+const UNREADABLE: Remote<Choice> = { ok: false, error: "invalid" };
+
+export async function loadSettingsPage(
+  context: SettingsContext,
+  ws: string | undefined,
+  now: Date,
+): Promise<SettingsPage> {
+  const db = loadSettingsDb(context, ws, now);
+  if (db.workspace === null) return mergeSettingsPage(db, { projects: [], reads: [] });
+  const [projects, reads] = await Promise.all([
+    loadTrackerProjectLists(context),
+    loadBoundProjectReads(context, ws),
+  ]);
+  return mergeSettingsPage(db, { projects, reads });
 }
 
 export async function loadTrackerProjectChoices(
   context: SettingsContext,
   workspaceId: WorkspaceId | null,
 ): Promise<ConnectionProjects[]> {
-  const connections = listTrackerConnections(context.db, context.secretBox);
-  return trackerProjectChoices(
-    context,
-    workspaceId,
-    connections,
-    listWorkspaces(context.db),
-    new Map(connections.map((c) => [c.id, trackerOf(context, c)])),
-  );
-}
-
-async function trackerProjectChoices(
-  context: SettingsContext,
-  workspaceId: WorkspaceId | null,
-  connections: ReadonlyArray<StoredTrackerConnection>,
-  workspaces: ReadonlyArray<{ id: WorkspaceId; name: string }>,
-  trackers: ReadonlyMap<TrackerConnectionId, Tracker | null>,
-): Promise<ConnectionProjects[]> {
-  const { db } = context;
-  const allBound = listWorkspaceTrackerProjects(db);
-  const mine = allBound.filter((p) => p.workspaceId === workspaceId);
-  const workspaceName = new Map(workspaces.map((w) => [w.id, w.name]));
-  const queued = workspaceId === null ? [] : listRuns(db, { states: ["queued"], workspaceId });
-  return Promise.all(
-    connections.map(async (connection): Promise<ConnectionProjects> => {
-      const tracker = trackers.get(connection.id) ?? null;
-      const listed: Remote<{ id: string; name: string }> =
-        tracker === null
-          ? { ok: false, error: "invalid" }
-          : await remote(() => tracker.listProjects());
-      const seen = new Map<string, { id: string; name: string }>();
-      for (const project of listed.ok ? listed.items : []) seen.set(project.id, project);
-      for (const project of mine) {
-        if (project.connection === connection.id && !seen.has(project.projectId))
-          seen.set(project.projectId, { id: project.projectId, name: project.name });
-      }
-      const projects = [...seen.values()].map((project): TrackerProjectChoice => {
-        const bound = allBound.find(
-          (p) => p.connection === connection.id && p.projectId === project.id,
-        );
-        const owner: TrackerProjectChoice["owner"] =
-          bound === undefined
-            ? { kind: "free" }
-            : bound.workspaceId === workspaceId
-              ? { kind: "this" }
-              : {
-                  kind: "other",
-                  workspace: {
-                    id: bound.workspaceId,
-                    name: workspaceName.get(bound.workspaceId) ?? bound.workspaceId,
-                  },
-                };
-        const isMine = owner.kind === "this";
-        return {
-          id: project.id,
-          name: project.name,
-          owner,
-          mappings:
-            isMine && getMapping(db, connection.id, toTrackerProjectId(project.id)) !== null
-              ? 1
-              : 0,
-          queuedRuns: isMine
-            ? queued.filter(
-                (run) =>
-                  run.ticket.connection === connection.id && run.trackerProject === project.id,
-              ).length
-            : 0,
-        };
-      });
-      return {
-        connection: toChoice(connection),
-        error: listed.ok ? null : listed.error,
-        projects,
-      };
-    }),
+  const { db, secretBox } = context;
+  return connectionProjectsOf(
+    listTrackerConnections(db, secretBox).map(toChoice),
+    projectOwnership(db, workspaceId, listWorkspaces(db)),
+    await loadTrackerProjectLists(context),
   );
 }
 

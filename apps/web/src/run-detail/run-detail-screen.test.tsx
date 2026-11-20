@@ -1,5 +1,8 @@
 import { toPermissionRequestId, toQuestionId, toRunId, toRunnerId } from "@ganger/core";
 import {
+  changeRunState,
+  completeRunControlRequest,
+  requestRunControl,
   recordMcpAction,
   completeLogTailRequest,
   recordProviderUsage,
@@ -17,6 +20,7 @@ import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
 import { addTitledRun, endedCases, minutes, now, seedDatabase } from "../testing/seed";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
+import questionJson from "../../messages/ko/question.json" with { type: "json" };
 import { runMessages } from "./messages";
 import type { RunDetail, RunDetailPage } from "@ganger/app/run-detail/model";
 import { RunDetailScreen } from "./run-detail-screen";
@@ -25,6 +29,8 @@ import { answerInput, submitAnswer } from "@ganger/app/home/actions";
 import { cancelRunRequest } from "@ganger/app/run-detail/actions";
 
 const resolved = () => Promise.resolve();
+
+const labels = (html: string): string[] => buttonsOf(html).map((button) => button.label);
 
 function render(page: RunDetailPage, timeZone?: string): string {
   return renderWithMessages(
@@ -35,6 +41,7 @@ function render(page: RunDetailPage, timeZone?: string): string {
       onAnswer={resolved}
       onDeny={resolved}
       onCancel={resolved}
+      onControl={() => Promise.resolve("requested" as const)}
       onRefreshLog={resolved}
     />,
     runMessages,
@@ -192,6 +199,99 @@ describe("Run 상세 화면", () => {
     expect(pending).not.toContain(runJson.cancel.trigger);
   });
 
+  it("Running 런은 멈추기, 요청 중이면 멈추는 중, 실패하면 이유를 알림 역할 없이 보인다(0118)", () => {
+    const { db, ids } = seedDatabase();
+    const running = ids.get("ACME-10");
+    if (running === undefined) throw new Error("no ACME-10");
+    expect(labels(render(page(db, running)))).toContain(runJson.control.pause);
+
+    expect(requestRunControl(db, running, "pause", minutes(100))).toMatchObject({ ok: true });
+    const pending = render(page(db, running));
+    expect(text(pending)).toContain(runJson.control.pausePending);
+    expect(labels(pending)).not.toContain(runJson.control.pause);
+
+    completeRunControlRequest(db, {
+      runId: running,
+      requestedAt: minutes(100),
+      completedAt: minutes(115),
+      error: "runner-unreachable",
+    });
+    const failed = render(page(db, running));
+    const reason = runJson.control.pauseFailed.replace(
+      "{reason}",
+      domain.runControlFailure["runner-unreachable"],
+    );
+    expect(text(failed)).toContain(reason);
+    expect(failed).not.toMatch(/role="alert"[^>]*>[^<]*멈추지 못했어요/);
+    expect(labels(failed)).toContain(runJson.control.pause);
+
+    const later = loadRunDetail(db, running, minutes(126));
+    expect(later.kind === "found" ? later.run.control : "missing").toBeNull();
+  });
+
+  it("러너에서 멈춘 런과 보고 없이 멈춘 런은 이유를 다르게 보이고, 보고 없이 멈추면 마지막 출력을 접지 않고 보인다(0120)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    expect(changeRunState(db, id, { to: "paused", source: "runner" }, minutes(90))).toMatchObject({
+      ok: true,
+    });
+    const onRunner = text(render(page(db, id)));
+    expect(onRunner).toContain(
+      runJson.reason.paused.replace("{source}", domain.pauseSource.runner),
+    );
+    expect(onRunner).not.toContain(runJson.lastOutput.title);
+
+    expect(changeRunState(db, id, { to: "running" }, minutes(95))).toMatchObject({ ok: true });
+    expect(
+      changeRunState(db, id, { to: "paused", source: "unreported" }, minutes(100)),
+    ).toMatchObject({ ok: true });
+    updateRunRecords(db, id, { lastLog: ["로그인 버튼을 고쳤어요", "❯"] });
+    const detail = found(db, id);
+    expect(detail.status).toMatchObject({
+      state: "paused",
+      pauseSource: "unreported",
+      lastOutput: ["로그인 버튼을 고쳤어요", "❯"],
+    });
+    const html = render(page(db, id));
+    expect(text(html)).toContain(
+      runJson.reason.paused.replace("{source}", domain.pauseSource.unreported),
+    );
+    expect(text(html)).toContain(runJson.lastOutput.title);
+    expect(text(html)).toContain("로그인 버튼을 고쳤어요");
+    expect(html).not.toContain("<details");
+
+    updateRunRecords(db, id, { lastLog: null });
+    expect(text(render(page(db, id)))).toContain(runJson.lastOutput.none);
+  });
+
+  it("Paused 런은 Paused 알약, 멈춘 시간, 재개하기를 보이고 실행 시간에서 멈춘 시간을 뺀다(0118)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    const before = found(db, id).executionMs ?? 0;
+    expect(changeRunState(db, id, { to: "paused" }, minutes(90))).toMatchObject({ ok: true });
+    const detail = found(db, id);
+    expect(detail.status.state).toBe("paused");
+    const html = render(page(db, id));
+    expect(pillsOf(html)).toContainEqual({ status: "paused", label: domain.runState.paused });
+    expect(buttonsOf(html)).toContainEqual({ variant: "primary", label: runJson.control.resume });
+    expect(labels(html)).not.toContain(runJson.control.pause);
+    expect(text(html)).toContain(runJson.next.paused);
+    expect(text(html)).toContain(
+      runJson.reason.paused.replace("{source}", domain.pauseSource.operator),
+    );
+    expect(text(html)).toContain(runJson.timeline.paused);
+    expect(detail.executionMs).toBe(before - 30 * 60_000);
+
+    expect(changeRunState(db, id, { to: "disconnected" }, minutes(110))).toMatchObject({
+      ok: true,
+    });
+    const offline = text(render(page(db, id)));
+    expect(offline).toContain(runJson.reason.disconnectedPaused);
+    expect(offline).not.toContain(runJson.reason.disconnected);
+  });
+
   it("질문으로 기다리는 런은 질문 내용, 선택지, 답하기 칸을 보인다", () => {
     const { db, ids } = seedDatabase();
     const id = ids.get("ACME-11");
@@ -208,8 +308,8 @@ describe("Run 상세 화면", () => {
     const body = text(html);
     expect(body).toContain("마이그레이션을 지금 돌릴까요?");
     expect(body).toContain("돌려 주세요");
-    expect(body).toContain(runJson.question.submit);
-    expect(html).toContain('name="answer"');
+    expect(body).toContain(questionJson.send);
+    expect(html).toMatch(/<input type="radio"[^>]*value="0"/);
     expect(body).toContain(runJson.next.question);
     expect(body).not.toContain(runJson.permission.deny);
   });
@@ -232,7 +332,7 @@ describe("Run 상세 화면", () => {
     expect(body).toContain(runJson.permission.deny);
     expect(body).not.toContain("허용하기");
     expect(html).not.toMatch(/<button[^>]*>[^<]*허용/);
-    expect(body).not.toContain(runJson.question.submit);
+    expect(body).not.toContain(questionJson.send);
   });
 
   it("답이나 거절을 남긴 뒤에는 입력 칸을 닫고 worker 가 보낸다고 보인다", () => {
@@ -265,6 +365,33 @@ describe("Run 상세 화면", () => {
     );
     expect(body).toContain(runJson.ci.unavailable);
     expect(body).toContain(domain.summary["human-check"]);
+  });
+
+  it("로그 꼬리: 폴링이 끝나도 로그가 오지 않았으면 가져오는 중 대신 다시 요청하는 길을 보인다", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    requestRunLogTail(db, id, minutes(100));
+    const html = renderWithMessages(
+      <RunDetailScreen
+        page={page(db, id)}
+        runsHref="/runs"
+        runHref={(other) => `/runs/${other}`}
+        logStalled
+        onAnswer={resolved}
+        onDeny={resolved}
+        onCancel={resolved}
+        onControl={() => Promise.resolve("requested" as const)}
+        onRefreshLog={resolved}
+      />,
+      runMessages,
+    );
+    const body = text(html);
+
+    expect(html).toMatch(new RegExp(`role="status"[^>]*>${runJson.log.stalled}<`));
+    expect(body).toContain(runJson.log.stalled);
+    expect(body).not.toContain(runJson.log.pending);
+    expect(body).toContain(runJson.log.refresh);
   });
 
   it("로그 꼬리: 요청 중이면 가져오는 중을, 결과가 들어오면 그 줄을 보인다", () => {
@@ -309,7 +436,7 @@ describe("Run 상세 화면", () => {
     expect(body).toContain(domain.summary.failed);
   });
 
-  it("노란 주 버튼은 하나 이하이고, 질문 선택지는 모두 보조 버튼, 런 취소는 위험 버튼이다(ADR 0010 6번)", () => {
+  it("노란 주 버튼은 하나 이하이고, 질문 선택지는 버튼이 아닌 라디오, 런 취소는 위험 버튼이다(ADR 0010 6번)", () => {
     const { db, ids } = seedDatabase();
     const question = ids.get("ACME-11");
     if (question === undefined) throw new Error("no ACME-11");
@@ -324,10 +451,11 @@ describe("Run 상세 화면", () => {
     const html = render(page(db, question));
     const buttons = buttonsOf(html);
     expect(buttons.filter((b) => b.variant === "primary").map((b) => b.label)).toEqual([
-      runJson.question.submit,
+      questionJson.send,
     ]);
     for (const choice of ["지수 백오프", "30초 고정"]) {
-      expect(buttons.find((b) => b.label === choice)?.variant).toBe("secondary");
+      expect(buttons.some((b) => b.label === choice)).toBe(false);
+      expect(html).toMatch(new RegExp(`<input type="radio"[^>]*>\\s*<span[^>]*>${choice}</span>`));
     }
     expect(buttons.find((b) => b.label === runJson.cancel.trigger)?.variant).toBe("danger");
     expect(buttons.some((b) => b.variant === "other")).toBe(false);

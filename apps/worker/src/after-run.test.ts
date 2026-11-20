@@ -10,9 +10,11 @@ import {
   listRunners,
   requestLogTail,
   requestRunCancel,
+  requestRunControl,
   requestRunnerCheck,
   saveWorkspaceTrackerProject,
   toWorkspaceId,
+  trackerReadGeneration,
   updateRunRecords,
 } from "@ganger/db";
 import type { StoredRun } from "@ganger/db";
@@ -109,12 +111,14 @@ describe("트래커 갱신", () => {
     await worker.tick();
     expect(current(run).state).toBe("queued");
     expect(h.tracker.stateChanges).toEqual([]);
+    const generation = trackerReadGeneration(h.db, run.ticket.connection);
 
     h.setRunnerOnline(runnerId, true);
     await worker.tick();
     expect(current(run).state).toBe("running");
     expect(h.tracker.stateChanges).toEqual([{ key: run.ticket.key, stateId: inProgress }]);
     expect(recordsOf(run).trackerStateSetAt).toEqual(h.now);
+    expect(trackerReadGeneration(h.db, run.ticket.connection)).toBe(generation + 1);
 
     await worker.tick();
     expect(h.tracker.stateChanges).toHaveLength(1);
@@ -131,6 +135,7 @@ describe("트래커 갱신", () => {
     expect(comments[0]?.body).toContain("https://code.example.com/acme/pull/1");
     expect(comments[0]?.body).toContain(run.id);
     expect(recordsOf(run).trackerComment).toEqual({ id: comments[0]?.id, at: h.now });
+    expect(trackerReadGeneration(h.db, run.ticket.connection)).toBe(generation + 2);
 
     await worker.close();
     const restarted = h.worker();
@@ -165,6 +170,17 @@ describe("트래커 갱신", () => {
     const { run, worker } = await startOne();
     expect(recordsOf(run).trackerStateSetAt).toBeNull();
     await worker.tick();
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(recordsOf(run).trackerStateSetAt).toEqual(h.now);
+  });
+
+  it("멈춘 런도 In Progress 표시를 마저 한다(0118)", async () => {
+    chooseInProgress();
+    const spy = vi.spyOn(h.tracker, "setState").mockRejectedValueOnce(new Error("network"));
+    const { run, worker } = await startOne();
+    expect(requestRunControl(h.db, run.id, "pause", h.now)).toMatchObject({ ok: true });
+    await worker.tick();
+    expect(current(run).state).toBe("paused");
     expect(spy).toHaveBeenCalledTimes(2);
     expect(recordsOf(run).trackerStateSetAt).toEqual(h.now);
   });

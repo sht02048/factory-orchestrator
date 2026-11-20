@@ -11,6 +11,7 @@ import {
   MascotMessage,
   NoticeLayout,
   PageHeader,
+  ScreenLayout,
   PanelFooter,
   RowTitle,
   SegmentedTabs,
@@ -19,11 +20,14 @@ import {
   Table,
   TableCell,
   TableEmpty,
+  TableFoldedOnly,
   TableHead,
   TableHeader,
   TableRow,
   TableRows,
   Text,
+  VisuallyHidden,
+  showToast,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -55,6 +59,7 @@ export interface TicketsScreenProps {
   onOpenRun: (runId: string) => void;
   onAssign: (input: AssignInput) => Promise<AssignResult>;
   onAssigned: (ticketId: string) => void;
+  onReread: () => Promise<void>;
 }
 
 export function TicketsScreen(props: TicketsScreenProps) {
@@ -78,10 +83,9 @@ export function TicketsScreen(props: TicketsScreenProps) {
 function Notice({ body }: { body: ReactNode }) {
   const t = useTranslations("tickets");
   return (
-    <NoticeLayout>
-      <PageHeader title={t("title")} subtitle={t("intro")} />
-      {body}
-    </NoticeLayout>
+    <ScreenLayout header={<PageHeader title={t("title")} subtitle={t("intro")} />}>
+      <NoticeLayout>{body}</NoticeLayout>
+    </ScreenLayout>
   );
 }
 
@@ -112,14 +116,79 @@ function AllWorkspaces({
   );
 }
 
-function tableColumns(showTrackerProject: boolean): string {
-  return [
-    size.ticketKeyColumn,
-    "minmax(0, 1fr)",
-    ...(showTrackerProject ? [size.projectColumn] : []),
-    size.lastRunColumn,
-  ].join(" ");
+type RereadResult = "idle" | "reading" | "checking" | "failed" | "partial";
+
+function useReread(onReread: () => Promise<void>, page: TicketsPage) {
+  const t = useTranslations("tickets.reread");
+  const [result, setResult] = useState<RereadResult>("idle");
+  const failedProjects = page.errors.length;
+  const [failedOn, setFailedOn] = useState<TicketsPage | null>(null);
+  if (result === "failed" && failedOn !== null && failedOn !== page) {
+    setResult("idle");
+    setFailedOn(null);
+  }
+  useEffect(() => {
+    if (result !== "checking") return;
+    if (failedProjects > 0) {
+      setResult("partial");
+      return;
+    }
+    setResult("idle");
+    showToast(t("done"));
+  }, [result, failedProjects, t]);
+  const start = () => {
+    setResult("reading");
+    onReread().then(
+      () => setResult("checking"),
+      () => {
+        setFailedOn(page);
+        setResult("failed");
+      },
+    );
+  };
+  return { result, start };
 }
+
+export const REREAD_ANNOUNCE_MS = 5_000;
+
+function useAnnouncement(result: RereadResult): RereadResult {
+  const [announced, setAnnounced] = useState<RereadResult>("idle");
+  useEffect(() => {
+    setAnnounced(result);
+    if (result !== "failed" && result !== "partial") return;
+    const timer = setTimeout(() => setAnnounced("idle"), REREAD_ANNOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [result]);
+  return announced;
+}
+
+function RereadButton({ result, onStart }: { result: RereadResult; onStart: () => void }) {
+  const t = useTranslations("tickets.reread");
+  const announced = useAnnouncement(result);
+  return (
+    <>
+      <Button busy={{ active: result === "reading", label: t("reading") }} onClick={onStart}>
+        {t("action")}
+      </Button>
+      <VisuallyHidden>
+        <span role="status">
+          {announced === "failed" ? t("failed") : announced === "partial" ? t("partial") : ""}
+        </span>
+      </VisuallyHidden>
+    </>
+  );
+}
+
+const withoutTrackerProject = [size.ticketKeyColumn, "minmax(0, 1fr)", size.lastRunColumn].join(
+  " ",
+);
+const withTrackerProject = [
+  size.ticketKeyColumn,
+  "minmax(0, 1fr)",
+  size.projectColumn,
+  size.lastRunColumn,
+].join(" ");
+const trackerProjectFolded = { first: withTrackerProject, second: withoutTrackerProject };
 
 function TicketsList({
   page,
@@ -130,8 +199,10 @@ function TicketsList({
   onOpenRun,
   onAssign,
   onAssigned,
+  onReread,
 }: TicketsScreenProps) {
   const t = useTranslations("tickets");
+  const reread = useReread(onReread, page);
   const [query, setQuery] = useState("");
   const visible = useMemo(
     () =>
@@ -161,127 +232,149 @@ function TicketsList({
   else empty = t("noTickets");
 
   return (
-    <SplitView
-      list={
-        <div {...stylex.props(styles.listFrame)}>
-          <div {...stylex.props(styles.listTop)}>
-            <PageHeader title={t("title")} subtitle={t("summary", { count: counts.assignable })} />
-            {page.errors.length === 0 ? null : (
-              <Card surface="problem">
+    <ScreenLayout
+      header={
+        <PageHeader
+          title={t("title")}
+          subtitle={t("summary", { count: counts.assignable })}
+          {...(page.trackerProjectCount === 0
+            ? {}
+            : {
+                actions: <RereadButton result={reread.result} onStart={reread.start} />,
+              })}
+        />
+      }
+    >
+      <SplitView
+        fill={false}
+        stackedListShare="larger"
+        list={
+          <div {...stylex.props(styles.listFrame)}>
+            <div {...stylex.props(styles.listTop)}>
+              {page.errors.length === 0 && reread.result !== "failed" ? null : (
+                <Card surface="problem">
+                  <div {...stylex.props(styles.lines)}>
+                    {reread.result === "failed" ? (
+                      <Text variant="body">{t("reread.failed")}</Text>
+                    ) : null}
+                    {page.errors.map((error) => (
+                      <Text key={error.trackerProject} variant="body">
+                        {t(`loadError.${error.reason}`, { project: error.trackerProject })}
+                      </Text>
+                    ))}
+                  </div>
+                </Card>
+              )}
+              {page.truncated.length === 0 ? null : (
                 <div {...stylex.props(styles.lines)}>
-                  {page.errors.map((error) => (
-                    <Text key={error.trackerProject} variant="body">
-                      {t(`loadError.${error.reason}`, { project: error.trackerProject })}
+                  {page.truncated.map((cut) => (
+                    <Text key={cut.trackerProject} variant="meta">
+                      {t("truncated", { project: cut.trackerProject, limit: cut.limit })}
                     </Text>
                   ))}
                 </div>
-              </Card>
-            )}
-            {page.truncated.length === 0 ? null : (
-              <div {...stylex.props(styles.lines)}>
-                {page.truncated.map((cut) => (
-                  <Text key={cut.trackerProject} variant="meta">
-                    {t("truncated", { project: cut.trackerProject, limit: cut.limit })}
-                  </Text>
-                ))}
-              </div>
-            )}
-            <div {...stylex.props(styles.toolbar)}>
-              <SegmentedTabs<TicketFilter>
-                value={filter}
-                onValueChange={onFilterChange}
-                label={t("filter.label")}
-                items={TICKET_FILTERS.map((key) => ({
-                  value: key,
-                  label: t(`filter.${key}`),
-                  count: counts[key],
-                }))}
-              />
-              <div {...stylex.props(styles.search)}>
-                <Input
-                  type="search"
-                  aria-label={t("search.label")}
-                  value={query}
-                  onValueChange={setQuery}
-                  placeholder={t("search.placeholder")}
-                  autoComplete="off"
+              )}
+              <div {...stylex.props(styles.toolbar)}>
+                <SegmentedTabs<TicketFilter>
+                  value={filter}
+                  onValueChange={onFilterChange}
+                  label={t("filter.label")}
+                  items={TICKET_FILTERS.map((key) => ({
+                    value: key,
+                    label: t(`filter.${key}`),
+                    count: counts[key],
+                  }))}
                 />
-              </div>
-            </div>
-          </div>
-          <div {...stylex.props(styles.tableFrame)}>
-            <Table columns={tableColumns(showTrackerProject)} narrowColumns="minmax(0, 1fr)">
-              <TableHead>
-                <TableHeader>{t("columns.key")}</TableHeader>
-                <TableHeader>{t("columns.title")}</TableHeader>
-                {showTrackerProject ? (
-                  <TableHeader>{t("columns.trackerProject")}</TableHeader>
-                ) : null}
-                <TableHeader>{t("columns.lastRun")}</TableHeader>
-              </TableHead>
-              <div
-                ref={scrollRef}
-                data-more-below={moreBelow}
-                {...stylex.props(styles.scroll, moreBelow && styles.fadeBottom)}
-              >
-                <div ref={listRef}>
-                  {visible.length === 0 ? (
-                    <TableEmpty>
-                      {page.tickets.length === 0 && page.errors.length === 0 ? (
-                        <MascotMessage mood="resting" size="small">
-                          {empty}
-                        </MascotMessage>
-                      ) : (
-                        empty
-                      )}
-                    </TableEmpty>
-                  ) : (
-                    <TableRows
-                      label={t("listLabel")}
-                      value={visible[selectedIndex]?.id ?? null}
-                      onValueChange={onSelect}
-                    >
-                      {rows.spaceBefore > 0 ? (
-                        <div aria-hidden="true" style={{ height: rows.spaceBefore }} />
-                      ) : null}
-                      {visible.slice(rows.start, rows.end).map((ticket) => (
-                        <TicketRow
-                          key={ticket.id}
-                          ticket={ticket}
-                          showTrackerProject={showTrackerProject}
-                        />
-                      ))}
-                      {rows.spaceAfter > 0 ? (
-                        <div aria-hidden="true" style={{ height: rows.spaceAfter }} />
-                      ) : null}
-                    </TableRows>
-                  )}
+                <div {...stylex.props(styles.search)}>
+                  <Input
+                    type="search"
+                    aria-label={t("search.label")}
+                    value={query}
+                    onValueChange={setQuery}
+                    placeholder={t("search.placeholder")}
+                    autoComplete="off"
+                  />
                 </div>
               </div>
-            </Table>
+            </div>
+            <div {...stylex.props(styles.tableFrame)}>
+              <Table
+                columns={showTrackerProject ? withTrackerProject : withoutTrackerProject}
+                {...(showTrackerProject ? { foldedColumns: trackerProjectFolded } : {})}
+                narrowColumns="minmax(0, 1fr)"
+              >
+                <TableHead>
+                  <TableHeader>{t("columns.key")}</TableHeader>
+                  <TableHeader>{t("columns.title")}</TableHeader>
+                  {showTrackerProject ? (
+                    <TableHeader hideWhen="second">{t("columns.trackerProject")}</TableHeader>
+                  ) : null}
+                  <TableHeader>{t("columns.lastRun")}</TableHeader>
+                </TableHead>
+                <div
+                  ref={scrollRef}
+                  data-more-below={moreBelow}
+                  {...stylex.props(styles.scroll, moreBelow && styles.fadeBottom)}
+                >
+                  <div ref={listRef}>
+                    {visible.length === 0 ? (
+                      <TableEmpty>
+                        {page.tickets.length === 0 && page.errors.length === 0 ? (
+                          <MascotMessage mood="resting" size="small">
+                            {empty}
+                          </MascotMessage>
+                        ) : (
+                          empty
+                        )}
+                      </TableEmpty>
+                    ) : (
+                      <TableRows
+                        label={t("listLabel")}
+                        value={visible[selectedIndex]?.id ?? null}
+                        onValueChange={onSelect}
+                      >
+                        {rows.spaceBefore > 0 ? (
+                          <div aria-hidden="true" style={{ height: rows.spaceBefore }} />
+                        ) : null}
+                        {visible.slice(rows.start, rows.end).map((ticket) => (
+                          <TicketRow
+                            key={ticket.id}
+                            ticket={ticket}
+                            showTrackerProject={showTrackerProject}
+                          />
+                        ))}
+                        {rows.spaceAfter > 0 ? (
+                          <div aria-hidden="true" style={{ height: rows.spaceAfter }} />
+                        ) : null}
+                      </TableRows>
+                    )}
+                  </div>
+                </div>
+              </Table>
+            </div>
           </div>
-        </div>
-      }
-      panel={
-        selected === undefined ? null : (
-          <section aria-label={t("panel.label")}>
-            <TicketPanel
-              key={selected.id}
-              ticket={selected}
-              page={page}
-              onOpenRun={onOpenRun}
-              onAssign={onAssign}
-              onAssigned={() => {
-                setAssignedId(selected.id);
-                onAssigned(selected.id);
-              }}
-              focusOpenRun={assignedId === selected.id}
-              onFocusedOpenRun={() => setAssignedId(null)}
-            />
-          </section>
-        )
-      }
-    />
+        }
+        panel={
+          selected === undefined ? null : (
+            <section aria-label={t("panel.label")}>
+              <TicketPanel
+                key={selected.id}
+                ticket={selected}
+                page={page}
+                onOpenRun={onOpenRun}
+                onAssign={onAssign}
+                onAssigned={() => {
+                  setAssignedId(selected.id);
+                  onAssigned(selected.id);
+                }}
+                focusOpenRun={assignedId === selected.id}
+                onFocusedOpenRun={() => setAssignedId(null)}
+              />
+            </section>
+          )
+        }
+      />
+    </ScreenLayout>
   );
 }
 
@@ -326,10 +419,15 @@ function TicketRow({
         </Text>
       </TableCell>
       <TableCell>
-        <RowTitle>{ticket.title}</RowTitle>
+        <RowTitle fullText={ticket.title}>{ticket.title}</RowTitle>
+        {showTrackerProject ? (
+          <TableFoldedOnly when="second" block>
+            <Text variant="meta">{ticket.trackerProject.name}</Text>
+          </TableFoldedOnly>
+        ) : null}
       </TableCell>
       {showTrackerProject ? (
-        <TableCell>
+        <TableCell hideWhen="second">
           <Text variant="meta">{ticket.trackerProject.name}</Text>
         </TableCell>
       ) : null}
@@ -354,6 +452,7 @@ type NextStep =
   | "queued"
   | "running"
   | "waiting-for-input"
+  | "paused"
   | "disconnected"
   | "merged"
   | "human-check"

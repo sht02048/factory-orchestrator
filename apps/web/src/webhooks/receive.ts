@@ -1,18 +1,24 @@
-import type { AdapterRegistry, TrackerConnectionId, WebhookVerifyError } from "@ganger/core";
-import { getTrackerConnection, recordTrackerEvent } from "@ganger/db";
+import type {
+  AdapterRegistry,
+  TrackerConnectionId,
+  TrackerEvent,
+  WebhookVerifyError,
+} from "@ganger/core";
+import {
+  getTrackerConnection,
+  inTransaction,
+  recordTrackerEvent,
+  recordWebhookAccepted,
+  recordWebhookBadSignature,
+} from "@ganger/db";
 import type { Database, SecretBox } from "@ganger/db";
+import type { Logger } from "@ganger/log";
 
 export const MAX_WEBHOOK_REQUEST_BYTES = 5 * 1024 * 1024;
 
 export const WEBHOOK_BODY_TIMEOUT_MS = 5_000;
 
-export interface WebhookLogger {
-  warn(message: string, fields?: Readonly<Record<string, unknown>>): void;
-}
-
-export const consoleWebhookLogger: WebhookLogger = {
-  warn: (message, fields) => console.warn(`[web] ${message}`, fields ?? {}),
-};
+export type WebhookLogger = Logger;
 
 export interface WebhookContext {
   db: Database;
@@ -75,7 +81,7 @@ export async function rejectTrackerWebhook(
   request: WebhookRequest,
   error: unknown,
 ): Promise<Response> {
-  logger.warn("could not handle a tracker webhook", { connectionId, error });
+  logger.warn("webhook.failed", { trackerConnectionId: connectionId, error });
   await cancelBody(request);
   return respond("error");
 }
@@ -93,19 +99,34 @@ export async function receiveTrackerWebhook(
   request: WebhookRequest,
   now: Date,
 ): Promise<Response> {
-  const outcome = await handle(context, connectionId, request, now);
-  if (outcome !== "recorded" && outcome !== "duplicate" && outcome !== "internal-error") {
-    context.logger.warn("rejected a tracker webhook", { connectionId, reason: outcome });
+  const startedAt = performance.now();
+  const handled = await handle(context, connectionId, request, now);
+  const outcome = typeof handled === "string" ? handled : handled.outcome;
+  if (typeof handled !== "string") {
+    context.logger.info("webhook.received", {
+      trackerConnectionId: connectionId,
+      deliveryId: handled.event.deliveryId,
+      ticketKey: handled.event.ticketKey,
+      kind: handled.event.kind,
+      outcome,
+      ms: Math.round(performance.now() - startedAt),
+    });
+  } else if (outcome !== "internal-error") {
+    context.logger.warn("webhook.rejected", { trackerConnectionId: connectionId, reason: outcome });
   }
   return respond(replyFor(outcome));
 }
+
+type Handled =
+  | Exclude<WebhookOutcome, "recorded" | "duplicate">
+  | { outcome: "recorded" | "duplicate"; event: TrackerEvent };
 
 async function handle(
   context: WebhookContext,
   connectionId: TrackerConnectionId,
   request: WebhookRequest,
   now: Date,
-): Promise<WebhookOutcome> {
+): Promise<Handled> {
   if (declaredLength(request) > MAX_WEBHOOK_REQUEST_BYTES) {
     await cancelBody(request);
     return "declared-too-large";
@@ -134,10 +155,18 @@ async function handle(
       headers: Object.fromEntries(request.headers),
       now,
     });
-    if (!result.ok) return result.error;
-    return recordTrackerEvent(context.db, connection.id, result.event);
+    if (!result.ok) {
+      if (result.error === "bad-signature")
+        recordWebhookBadSignature(context.db, connection.id, now);
+      return result.error;
+    }
+    const recorded = inTransaction(context.db, () => {
+      recordWebhookAccepted(context.db, connection.id, now);
+      return recordTrackerEvent(context.db, connection.id, result.event);
+    });
+    return { outcome: recorded, event: result.event };
   } catch (error) {
-    context.logger.warn("could not handle a tracker webhook", { connectionId, error });
+    context.logger.warn("webhook.failed", { trackerConnectionId: connectionId, error });
     await cancelBody(request);
     return "internal-error";
   }
@@ -157,7 +186,10 @@ export type BodyRead =
   | { ok: true; body: Uint8Array }
   | { ok: false; reason: "too-large" | "timeout" | "aborted" };
 
-const BODY_OUTCOME: Record<"too-large" | "timeout" | "aborted", WebhookOutcome> = {
+const BODY_OUTCOME: Record<
+  "too-large" | "timeout" | "aborted",
+  "body-too-large" | "body-timeout" | "body-aborted"
+> = {
   "too-large": "body-too-large",
   timeout: "body-timeout",
   aborted: "body-aborted",

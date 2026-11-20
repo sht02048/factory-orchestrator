@@ -89,7 +89,7 @@ export class DemoLife {
     if (now - this.lastNewWork >= NEW_WORK_EVERY_MS) {
       this.lastNewWork = now;
       const active = listRuns(this.db, {
-        states: ["queued", "running", "waiting-for-input"],
+        states: ["queued", "running", "waiting-for-input", "paused"],
       }).length;
       if (active < BUSY_RUNS) this.labelTicket();
     }
@@ -97,6 +97,7 @@ export class DemoLife {
 
   private step(runner: FakeRunner, run: FakeRunnerRun, elapsed: number): void {
     if (run.report !== null || run.endedWithoutReport !== null || run.agentStopped) return;
+    if (run.paused) return;
     const worktree = run.started.worktree;
     let tracked = this.tracked.get(worktree);
     if (tracked === undefined) {
@@ -200,9 +201,9 @@ export class DemoLife {
     const target = this.trackerConnections()[0];
     if (target === undefined) return null;
     const busy = new Set(
-      listRuns(this.db, { states: ["queued", "running", "waiting-for-input", "disconnected"] }).map(
-        (run) => run.ticket.key,
-      ),
+      listRuns(this.db, {
+        states: ["queued", "running", "waiting-for-input", "paused", "disconnected"],
+      }).map((run) => run.ticket.key),
     );
     const candidates = [...target.tracker.tickets.values()].filter(
       (ticket) =>

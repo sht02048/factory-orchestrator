@@ -3,6 +3,7 @@
     "queued": "Queued",
     "running": "Running",
     "waiting-for-input": "Waiting for Input",
+    "paused": "Paused",
     "disconnected": "Disconnected",
     "ended": "Ended"
   },
@@ -115,5 +116,17 @@
     },
     "checking": "확인하는 중이에요 · {duration}째",
     "elapsed": "{duration}째"
+  },
+  "runControlFailure": {
+    "runner-unreachable": "러너에 닿지 않아요. 러너가 켜져 있는지 확인해 주세요.",
+    "agent-not-running": "러너에서 에이전트를 찾지 못했어요. 이어 갈 수 없으면 런을 취소하고 티켓을 다시 맡겨 주세요.",
+    "runner-error": "러너가 요청을 처리하지 못했어요. 잠시 뒤 다시 해 주세요.",
+    "state-changed": "그사이 런 상태가 바뀌었어요. 지금 상태를 확인하고 다시 해 주세요.",
+    "unknown": "잠시 뒤 다시 해 주세요."
+  },
+  "pauseSource": {
+    "operator": "멈췄어요",
+    "runner": "러너에서 멈췄어요",
+    "unreported": "보고 없이 멈췄어요"
   }
 }

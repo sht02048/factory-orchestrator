@@ -56,7 +56,7 @@ export function startTickLoop(options: TickLoopOptions): TickLoop {
       try {
         await options.tick();
       } catch (error) {
-        options.logger.warn("tick failed", { error });
+        options.logger.warn("worker.tick_failed", { error });
       }
       tickEndedAt = performance.now();
       if (!stopped) await sleep();

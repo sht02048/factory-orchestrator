@@ -27,6 +27,7 @@ const TERMS: Record<PillStatus, string> = {
   queued: "Queued",
   running: "Running",
   "waiting-for-input": "Waiting for Input",
+  paused: "Paused",
   disconnected: "Disconnected",
   merged: "Merged",
   "human-check": "Human Check",
@@ -47,6 +48,7 @@ describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
       queued: TERMS.queued,
       running: TERMS.running,
       "waiting-for-input": TERMS["waiting-for-input"],
+      paused: TERMS.paused,
       disconnected: TERMS.disconnected,
       ended: "Ended",
     });
@@ -110,6 +112,7 @@ describe("화면의 상태 알약", () => {
             page={loadHomePage(db, "ws-commerce", now, "UTC")}
             onAnswer={() => Promise.resolve()}
             onDeny={() => Promise.resolve()}
+            onControl={() => Promise.resolve("requested" as const)}
           />,
           homeMessages,
         ),

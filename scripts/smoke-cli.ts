@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -58,6 +58,21 @@ function installBundle(installDir: string): string {
   if (problems.length > 0) throw new Error(`server bundle check failed:\n${problems.join("\n")}`);
   console.log(`extracted ${tarball} to ${root}; bundle check passed`);
   return join(root, "cli", "bin", "cli.js");
+}
+
+function logEvents(home: string, proc: string): string[] {
+  const file = join(home, "logs", `${proc}.jsonl`);
+  if (!existsSync(file)) return [];
+  return readFileSync(file, "utf8")
+    .split("\n")
+    .filter((line) => line !== "")
+    .map((line) => {
+      const parsed: unknown = JSON.parse(line);
+      if (typeof parsed !== "object" || parsed === null || !("event" in parsed)) {
+        throw new Error(`${proc}.jsonl has a line without an event: ${line}`);
+      }
+      return String(parsed.event);
+    });
 }
 
 async function checkMcp(input: {
@@ -200,10 +215,16 @@ try {
     "start did not report that web is listening",
   );
   await waitFor(
-    () => output.includes("[worker] started"),
+    () => logEvents(home, "worker").includes("process.started"),
     STARTUP_TIMEOUT_MS,
-    "worker did not start",
+    "worker did not write process.started to logs/worker.jsonl",
   );
+  for (const proc of ["web", "cli"]) {
+    if (!logEvents(home, proc).includes("process.started")) {
+      throw new Error(`${proc} did not write process.started to logs/${proc}.jsonl`);
+    }
+  }
+  console.log("server logs: web, worker and cli wrote process.started");
 
   const response = await fetch(`http://127.0.0.1:${port}/runs`);
   if (response.status !== 200) throw new Error(`GET /runs returned ${response.status}`);
@@ -259,6 +280,9 @@ try {
   }
 
   await checkMcp({ cli, cwd, home, env });
+  if (!logEvents(home, "mcp").includes("process.started")) {
+    throw new Error("mcp did not write process.started to logs/mcp.jsonl");
+  }
 
   started.kill("SIGTERM");
   await waitFor(() => exitCode !== undefined, STOP_TIMEOUT_MS, "start did not stop after SIGTERM");
@@ -268,6 +292,11 @@ try {
     throw new Error("web still responds after start stopped");
   } catch (error) {
     if (error instanceof Error && error.message.startsWith("web still")) throw error;
+  }
+  for (const proc of ["worker", "cli"]) {
+    if (!logEvents(home, proc).includes("process.stopped")) {
+      throw new Error(`${proc} did not write process.stopped to logs/${proc}.jsonl`);
+    }
   }
   console.log("start stopped web and worker on SIGTERM");
 } catch (error) {

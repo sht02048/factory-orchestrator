@@ -1,37 +1,68 @@
-import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
+import type { AssignInput, AssignResult } from "@ganger/app/tickets/assign";
+import { mergeTicketsPage } from "@ganger/app/tickets/merge";
+import { ASSIGN_REJECT_REASONS, TICKET_FILTERS } from "@ganger/app/tickets/model";
+import type { AssignRejectReason } from "@ganger/app/tickets/model";
+import { INVALIDATED_KEYS } from "../../change-events/invalidation";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { assignTicket, getTicketsPage } from "../../server/functions";
+import { okOrThrow, rejectionReasonOf, toMutationError } from "../../query/mutation-error";
+import { loadCachedRouteQuery, loadRouteQuery } from "../../query/route-query";
+import { assignTicket, rereadTrackers } from "../../server/functions";
+import { useShell } from "../../shell/shell-query";
 import { ticketsMessages } from "../../tickets/messages";
-import { TICKET_FILTERS } from "@ganger/app/tickets/model";
+import { TRACKER_KEY, ticketRunsQuery, trackerTicketsQuery } from "../../tickets/tickets-query";
 import { TicketsScreen } from "../../tickets/tickets-screen";
+import { ScreenError } from "../../shell/screen-error";
 
 const t = createTranslator({
   locale: defaultLocale,
   messages: ticketsMessages,
   namespace: "tickets",
 });
-const appRoute = getRouteApi("/_app");
+
+function assignResultOf(error: unknown): AssignResult {
+  const reason = rejectionReasonOf(error, ASSIGN_REJECT_REASONS);
+  if (reason === null) throw toMutationError(error, ASSIGN_REJECT_REASONS);
+  return { ok: false, reason };
+}
 
 export const Route = createFileRoute("/_app/tickets")({
+  errorComponent: ScreenError,
   validateSearch: z.object({
     f: z.enum(TICKET_FILTERS).optional().catch(undefined),
     sel: z.string().optional(),
   }),
   loaderDeps: ({ search }) => ({ ws: search.ws }),
-  loader: ({ deps }) => getTicketsPage({ data: { ws: deps.ws } }),
-  shouldReload: false,
+  loader: async (load) => {
+    await Promise.all([
+      loadRouteQuery(load, ticketRunsQuery(load.deps.ws)),
+      loadCachedRouteQuery(load, trackerTicketsQuery(load.context.queryClient, load.deps.ws)),
+    ]);
+  },
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: TicketsRoute,
 });
 
 function TicketsRoute() {
-  const page = Route.useLoaderData();
-  const shell = appRoute.useLoaderData();
-  const { f, sel } = Route.useSearch();
+  const { f, sel, ws } = Route.useSearch();
+  const queryClient = useQueryClient();
+  const { data: runs } = useSuspenseQuery(ticketRunsQuery(ws));
+  const { data: tracker } = useSuspenseQuery(trackerTicketsQuery(queryClient, ws));
+  const page = useMemo(() => mergeTicketsPage(runs, tracker), [runs, tracker]);
+  const shell = useShell();
   const navigate = Route.useNavigate();
-  const router = useRouter();
+  const assign = useMutation({
+    mutationFn: async (input: AssignInput) =>
+      okOrThrow<{ runId: string }, AssignRejectReason>(await assignTicket({ data: input })),
+    onSuccess: () =>
+      Promise.all(
+        INVALIDATED_KEYS.assignment.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+      ),
+  });
   return (
     <ScreenMessages messages={ticketsMessages}>
       <TicketsScreen
@@ -52,19 +83,25 @@ function TicketsRoute() {
             resetScroll: false,
           });
         }}
-        onPickWorkspace={(ws) => {
-          void navigate({ search: (prev) => ({ ...prev, ws, sel: undefined }) });
+        onPickWorkspace={(next) => {
+          void navigate({ search: (prev) => ({ ...prev, ws: next, sel: undefined }) });
         }}
         onOpenRun={(runId) => {
           void navigate({ to: "/runs", search: (prev) => ({ ws: prev.ws, sel: runId }) });
         }}
-        onAssign={(input) => assignTicket({ data: input })}
+        onAssign={(input) =>
+          assign.mutateAsync(input).then((result): AssignResult => result, assignResultOf)
+        }
         onAssigned={(id) => {
           void navigate({
             search: (prev) => ({ ...prev, sel: id }),
             replace: true,
             resetScroll: false,
-          }).then(() => router.invalidate());
+          });
+        }}
+        onReread={async () => {
+          await rereadTrackers();
+          await queryClient.invalidateQueries({ queryKey: TRACKER_KEY });
         }}
       />
     </ScreenMessages>

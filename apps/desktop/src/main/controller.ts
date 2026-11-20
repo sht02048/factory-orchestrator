@@ -1,12 +1,13 @@
 import { PRODUCT_DISPLAY_NAME } from "@ganger/cli/home";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   BrowserWindow,
   Menu,
   Notification,
   Tray,
   app,
+  dialog,
   ipcMain,
   nativeImage,
   powerMonitor,
@@ -61,6 +62,8 @@ import type {
 } from "../shared/view.js";
 import {
   IPC_PREFIX,
+  LOGS_CAN_OPEN,
+  LOGS_OPEN,
   NAVIGATE_CHANNEL,
   NOTIFICATION_SETTINGS_CHANNEL,
   NOTIFICATION_SETTINGS_WINDOW,
@@ -71,6 +74,20 @@ import {
 } from "../shared/view.js";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 import { navigationMenu } from "./navigation-menu.js";
+import {
+  diagnosticsDownloadNotice,
+  diagnosticsMenuItem,
+  logFolderOpenable,
+} from "./diagnostics-menu.js";
+import { cancelPendingHide, hideWindow } from "./window-close.js";
+import { mainWindowOptions, settingsWindowOptions, titleBarCookie } from "./window-options.js";
+
+async function loadServerScreen(window: BrowserWindow, url: string): Promise<void> {
+  await Promise.resolve()
+    .then(() => window.webContents.session.cookies.set(titleBarCookie(url)))
+    .catch(() => undefined);
+  await window.loadURL(url).catch(() => undefined);
+}
 
 const t = createTranslator({ locale: "ko", messages: { system }, namespace: "system" });
 
@@ -90,6 +107,7 @@ export interface ControllerOptions {
   trayIcon: string;
   openedAtLogin: boolean;
   updater: Updater;
+  devServerUrl: string | undefined;
 }
 
 type Mode = "choosing" | "local" | "remote";
@@ -107,6 +125,9 @@ export class Controller {
   private readonly delivered = new Map<string, Notification>();
   private reminderTimer: NodeJS.Timeout | undefined;
   private notificationPermission: NotificationPermission = "unknown";
+  private diagnosticsListener:
+    | ((event: Electron.Event, item: Electron.DownloadItem) => void)
+    | undefined;
   private settingsWindow: BrowserWindow | undefined;
   private remoteTimer: NodeJS.Timeout | undefined;
   private offerTimer: NodeJS.Timeout | undefined;
@@ -147,6 +168,13 @@ export class Controller {
       void this.options.updater.tick();
       this.updateTimer = setInterval(() => void this.options.updater.tick(), UPDATE_TICK_MS);
     }, FIRST_CHECK_DELAY_MS);
+    const devServerUrl = this.options.devServerUrl;
+    if (devServerUrl !== undefined) {
+      this.showWindow();
+      void this.openDevServer(devServerUrl);
+      this.refreshMenus();
+      return;
+    }
     const settings = this.options.settings.read();
     if (!this.options.openedAtLogin || settings.mode === undefined) this.showWindow();
     switch (settings.mode) {
@@ -166,6 +194,7 @@ export class Controller {
 
   showWindow(): void {
     const window = this.ensureWindow();
+    cancelPendingHide(window);
     window.show();
     window.focus();
   }
@@ -303,6 +332,8 @@ export class Controller {
   }
 
   private async chooseRemote(): Promise<void> {
+    if (this.options.devServerUrl !== undefined)
+      return this.openDevServer(this.options.devServerUrl);
     this.mode = "remote";
     this.stopRemoteRetry();
     this.refreshMenus();
@@ -354,14 +385,38 @@ export class Controller {
   }
 
   private useRemote(server: SavedServer): void {
+    if (this.options.devServerUrl !== undefined) {
+      this.showRemote(server);
+      return;
+    }
     const settings = this.options.settings.read();
     this.options.settings.write({ ...settings, mode: "remote", remote: server });
+    this.showRemote(server);
+  }
+
+  private showRemote(server: SavedServer): void {
     this.mode = "remote";
     this.remote = { server, reachable: true };
     this.watch.stop();
     this.serverVersion = null;
     this.openServer(server.url);
     void this.readRemoteVersion(server);
+  }
+
+  private async openDevServer(url: string): Promise<void> {
+    this.mode = "remote";
+    this.stopRemoteRetry();
+    const name = new URL(url).host;
+    this.setView({ screen: "unreachable", name, url, checking: true });
+    const result = await connectAddress(url, (origin, timeoutMs) =>
+      probeIdentity(origin, timeoutMs),
+    );
+    if (result.ok) {
+      this.showRemote(result.server);
+      return;
+    }
+    this.setView({ screen: "unreachable", name, url, checking: false });
+    this.refreshMenus();
   }
 
   private async readRemoteVersion(server: SavedServer): Promise<void> {
@@ -372,6 +427,8 @@ export class Controller {
   }
 
   private async openRemote(saved: SavedServer): Promise<void> {
+    if (this.options.devServerUrl !== undefined)
+      return this.openDevServer(this.options.devServerUrl);
     this.mode = "remote";
     this.remote = { server: saved, reachable: false };
     this.setView({ screen: "unreachable", name: saved.name, url: saved.url, checking: true });
@@ -402,6 +459,10 @@ export class Controller {
   }
 
   private chooseMode(): void {
+    if (this.options.devServerUrl !== undefined) {
+      void this.openDevServer(this.options.devServerUrl);
+      return;
+    }
     this.stopFeed();
     this.mode = "choosing";
     this.stopRemoteRetry();
@@ -411,6 +472,7 @@ export class Controller {
   }
 
   private chooseLocal(openAtLogin: boolean): void {
+    if (this.options.devServerUrl !== undefined) return;
     const settings = this.options.settings.read();
     this.options.settings.write({ ...settings, mode: "local", openAtLogin });
     this.applyLoginItem(openAtLogin);
@@ -441,30 +503,19 @@ export class Controller {
     this.refreshMenus();
     const window = this.window;
     if (window === undefined || window.isDestroyed()) return;
-    void window.loadURL(new URL(path, url).toString());
+    void loadServerScreen(window, new URL(path, url).toString());
   }
 
   private ensureWindow(): BrowserWindow {
     if (this.window !== undefined && !this.window.isDestroyed()) return this.window;
-    const window = new BrowserWindow({
-      width: 1280,
-      height: 840,
-      minWidth: 720,
-      minHeight: 520,
-      show: false,
-      title: PRODUCT_DISPLAY_NAME,
-      webPreferences: {
-        preload: this.options.preloadFile,
-        contextIsolation: true,
-        sandbox: true,
-        nodeIntegration: false,
-      },
-    });
+    const window = new BrowserWindow(
+      mainWindowOptions(PRODUCT_DISPLAY_NAME, this.options.preloadFile),
+    );
     window.once("ready-to-show", () => window.show());
     window.on("close", (event) => {
       if (this.quitting) return;
       event.preventDefault();
-      window.hide();
+      hideWindow(window);
     });
     window.webContents.setWindowOpenHandler(({ url }) => {
       if (opensOutsideApp(url)) void shell.openExternal(url);
@@ -484,7 +535,7 @@ export class Controller {
       else if (this.mode === "local") void this.watch.tick();
     });
     this.window = window;
-    if (this.serverUrl !== undefined) void window.loadURL(this.serverUrl);
+    if (this.serverUrl !== undefined) void loadServerScreen(window, this.serverUrl);
     else void window.loadFile(this.options.rendererFile);
     return window;
   }
@@ -530,6 +581,8 @@ export class Controller {
     handle("start-local", () => this.restartLocal());
     handle("retry", () => {
       if (this.mode === "local") return this.restartLocal();
+      if (this.options.devServerUrl !== undefined)
+        return this.openDevServer(this.options.devServerUrl);
       if (this.remote !== undefined) return this.openRemote(this.remote.server);
       return this.chooseRemote();
     });
@@ -551,6 +604,13 @@ export class Controller {
     handle("enrollment-cancel", () => this.enrollment.cancel());
     handle("enrollment-close", () => this.enrollment.close());
     handle("open-sharing", () => shell.openExternal(SHARING_SETTINGS_URL));
+    ipcMain.handle(
+      LOGS_CAN_OPEN,
+      (event) => this.fromServerPage(event) && logFolderOpenable(this.mode),
+    );
+    ipcMain.handle(LOGS_OPEN, (event) =>
+      this.fromServerPage(event) && logFolderOpenable(this.mode) ? this.openLogFolder() : false,
+    );
     ipcMain.handle(UPDATE_GET, (event) => (this.fromServerPage(event) ? this.updateView() : null));
     ipcMain.handle(UPDATE_ACT, (event, action: unknown) => {
       if (this.fromServerPage(event) && isUpdateAction(action)) this.runUpdateAction(action);
@@ -610,6 +670,37 @@ export class Controller {
       openPath: (path) => shell.openPath(path),
       showItemInFolder: (path) => shell.showItemInFolder(path),
     });
+  }
+
+  private async openLogFolder(): Promise<boolean> {
+    const error = await shell.openPath(dirname(this.options.logFile));
+    return error === "";
+  }
+
+  private downloadDiagnostics(url: string): void {
+    this.showWindow();
+    const window = this.window;
+    if (window === undefined || window.isDestroyed()) return;
+    const session = window.webContents.session;
+    if (this.diagnosticsListener !== undefined) {
+      session.off("will-download", this.diagnosticsListener);
+    }
+    const onDownload = (_event: Electron.Event, item: Electron.DownloadItem) => {
+      if (item.getURL() !== url) return;
+      session.off("will-download", onDownload);
+      this.diagnosticsListener = undefined;
+      item.once("done", (_done, state) => {
+        const notice = diagnosticsDownloadNotice(state);
+        if (notice === null || window.isDestroyed()) return;
+        void dialog.showMessageBox(window, {
+          type: notice === "saved" ? "info" : "warning",
+          message: t(`diagnostics.${notice}`),
+        });
+      });
+    };
+    this.diagnosticsListener = onDownload;
+    session.on("will-download", onDownload);
+    window.webContents.downloadURL(url);
   }
 
   private notificationPrefs(): NotificationPrefs {
@@ -765,20 +856,9 @@ export class Controller {
       existing.focus();
       return;
     }
-    const window = new BrowserWindow({
-      width: 560,
-      height: 680,
-      minWidth: 400,
-      minHeight: 480,
-      show: false,
-      title: t("settingsWindow.title"),
-      webPreferences: {
-        preload: this.options.preloadFile,
-        contextIsolation: true,
-        sandbox: true,
-        nodeIntegration: false,
-      },
-    });
+    const window = new BrowserWindow(
+      settingsWindowOptions(t("settingsWindow.title"), this.options.preloadFile),
+    );
     window.once("ready-to-show", () => window.show());
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     window.webContents.on("will-navigate", (event) => event.preventDefault());
@@ -893,7 +973,7 @@ export class Controller {
         },
       });
     }
-    if (this.mode === "remote") {
+    if (this.mode === "remote" && this.options.devServerUrl === undefined) {
       items.push({
         id: "choose-server",
         label: t("tray.chooseServer"),
@@ -904,6 +984,11 @@ export class Controller {
       });
     }
     items.push(
+      diagnosticsMenuItem({
+        label: t("menu.makeDiagnostics"),
+        serverUrl: this.serverUrl,
+        download: (url) => this.downloadDiagnostics(url),
+      }),
       {
         id: "change-mode",
         label: t("tray.changeMode"),

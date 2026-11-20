@@ -10,10 +10,12 @@ import {
   listRuns,
   listUnprocessedTrackerEvents,
   recordTrackerEvent,
+  replaceMapping,
   requestRunCancel,
   saveAutoAssignLabel,
   saveMapping,
   saveWorkspaceTrackerProject,
+  trackerReadGeneration,
 } from "@ganger/db";
 import type { StoredRun } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,6 +25,8 @@ import {
   agent,
   connection,
   projectA,
+  projectB,
+  projectC,
   trackerProject,
   workspaceId,
 } from "./test-fixtures.js";
@@ -244,6 +248,52 @@ describe("webhook 이벤트로 자동 할당", () => {
   });
 });
 
+describe("라벨로 저장소 가르기(0115)", () => {
+  const apiLabel = toLabelId("label-api");
+  const infraLabel = toLabelId("label-infra");
+
+  beforeEach(() => {
+    h.addRunner({ id: "runner-b", capacity: 2, projects: [projectB, projectC] });
+    replaceMapping(h.db, {
+      connection,
+      trackerProject,
+      agent,
+      repos: [
+        { project: projectA, isDefault: true, labelId: null },
+        { project: projectB, isDefault: false, labelId: apiLabel },
+        { project: projectC, isDefault: false, labelId: infraLabel },
+      ],
+    });
+  });
+
+  it("저장소 라벨이 하나 붙은 티켓은 webhook으로 그 저장소에 할당한다", async () => {
+    webhook("ENG-1", { labelIds: [autoLabel, apiLabel], previousLabelIds: [apiLabel] });
+
+    await h.worker().tick();
+
+    expect(runsOf("ENG-1")[0]).toMatchObject({ runnerProject: projectB });
+  });
+
+  it("저장소 라벨이 없거나 둘 이상이면 기본 저장소로 할당한다", async () => {
+    webhook("ENG-1", { labelIds: [autoLabel], previousLabelIds: [] });
+    webhook("ENG-2", { labelIds: [autoLabel, apiLabel, infraLabel], previousLabelIds: [] });
+
+    await h.worker().tick();
+
+    expect(runsOf("ENG-1")[0]).toMatchObject({ runnerProject: projectA });
+    expect(runsOf("ENG-2")[0]).toMatchObject({ runnerProject: projectA });
+  });
+
+  it("폴링 보정도 티켓 라벨로 저장소를 고른다", async () => {
+    putTicket("ENG-3", [autoLabel, infraLabel]);
+    const worker = h.worker();
+
+    await worker.tick();
+
+    expect(runsOf("ENG-3")[0]).toMatchObject({ runnerProject: projectC });
+  });
+});
+
 describe("폴링 보정", () => {
   it("webhook을 놓쳐도 폴링 보정으로 런이 생긴다", async () => {
     const worker = h.worker();
@@ -263,6 +313,22 @@ describe("폴링 보정", () => {
     const runs = runsOf("ENG-1");
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ state: "running", runnerProject: projectA, agent });
+  });
+
+  it("폴링 보정이 바뀐 티켓을 읽으면 웹이 담아 둔 트래커 읽기를 지우게 표시하고, 바뀐 티켓이 없으면 두지 않는다(0122)", async () => {
+    const worker = h.worker();
+    await worker.tick();
+    const seeded = trackerReadGeneration(h.db, connection);
+
+    putTicket("ENG-1", [autoLabel]);
+    h.advance(POLL_CORRECTION_INTERVAL_MS);
+    await worker.tick();
+    const marked = trackerReadGeneration(h.db, connection);
+    expect(marked).toBeGreaterThan(seeded);
+
+    h.advance(POLL_CORRECTION_INTERVAL_MS);
+    await worker.tick();
+    expect(trackerReadGeneration(h.db, connection)).toBe(marked);
   });
 
   it("폴링 보정으로 할당한 런은 트래커에서 읽은 티켓 제목을 할당 때 저장한다(0064)", async () => {

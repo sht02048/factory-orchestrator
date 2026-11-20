@@ -1,0 +1,725 @@
+import * as stylex from "@stylexjs/stylex";
+import {
+  Button,
+  Chip,
+  Field,
+  InfoTip,
+  Input,
+  Menu,
+  MenuItem,
+  Select,
+  SettingsGroup,
+  SettingsRow,
+  Text,
+  VisuallyHidden,
+  showToast,
+} from "@ganger/ui";
+import type { SelectOption } from "@ganger/ui";
+import { breakpoints, size, space } from "@ganger/ui/tokens.stylex";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useTranslations } from "use-intl";
+import type { BoundProject, Choice, WorkspaceSettings } from "@ganger/app/settings/model";
+import { useAgentName } from "../labels";
+import {
+  isCompleteDraft,
+  labelOwner,
+  mappingDraftKey,
+  mappingDraftOf,
+  withDefaultRepo,
+  withRepoAdded,
+  withRepoLabel,
+  withRepoRemoved,
+} from "./mapping-draft";
+import type { MappingDraft, RepoDraft } from "./mapping-draft";
+import { useReason, useReportUnsaved } from "./settings-screen";
+import type { ActionResult, SettingsActions } from "./settings-screen";
+import { useSyncedSave } from "./synced-save";
+import type { SaveStatus } from "./synced-save";
+
+const NO_LABEL = "\u0000none";
+const RELOADED_NOTICE_MS = 5000;
+const MAPPING_TARGET = "\u0000mapping";
+const AGENT_TARGET = "\u0000agent";
+
+export function autoAssignLabelOf(
+  workspace: WorkspaceSettings,
+  connectionId: string,
+): string | null {
+  return workspace.labels.find((label) => label.connection.id === connectionId)?.labelId ?? null;
+}
+
+export function useMappingReason(): (reason: string) => string {
+  const t = useTranslations("settings.mapping.error");
+  const reason = useReason();
+  return (value) => {
+    switch (value) {
+      case "label-in-use":
+      case "no-repos":
+      case "no-default":
+      case "many-defaults":
+      case "default-has-label":
+      case "duplicate-repo":
+      case "auto-assign-label":
+        return t(value);
+      default:
+        return reason(value);
+    }
+  };
+}
+
+export function SaveStatusText({ status }: { status: SaveStatus }) {
+  const t = useTranslations("settings.mapping.status");
+  return (
+    <Text variant="meta" role="status" {...(status === "reverted" ? { tone: "problem" } : {})}>
+      {status === "idle" ? null : t(status)}
+    </Text>
+  );
+}
+
+type FocusAfterChange = { kind: "add" } | { kind: "make-default"; repo: string } | null;
+
+export interface MappingEditorProps {
+  ws: string;
+  bound: BoundProject;
+  runnerProjects: ReadonlyArray<Choice>;
+  agents: ReadonlyArray<string>;
+  actions: Pick<SettingsActions, "saveMapping">;
+  onSaved?: () => void;
+  showModel?: boolean;
+  autoAssignLabelId: string | null;
+  heading: ReactNode;
+  children?: ReactNode;
+  renderSections?: (parts: { repos: ReactNode; agent: ReactNode }) => ReactNode;
+}
+
+export function MappingEditor({
+  ws,
+  bound,
+  runnerProjects,
+  agents,
+  actions,
+  onSaved,
+  showModel = true,
+  autoAssignLabelId,
+  heading,
+  children,
+  renderSections,
+}: MappingEditorProps) {
+  const t = useTranslations("settings.mapping");
+  const ts = useTranslations("settings");
+  const mappingReason = useMappingReason();
+  const agentName = useAgentName();
+  const headingId = useId();
+  const agentLabelId = useId();
+  const missingId = useId();
+  const saved = mappingDraftOf(bound);
+  const [target, setTarget] = useState(MAPPING_TARGET);
+  const [labelDropped, setLabelDropped] = useState<{ repo: string; label: string } | null>(null);
+  const save = useSyncedSave<MappingDraft>({
+    saved,
+    savedKey: mappingDraftKey(saved),
+    send: (draft) => sendMapping(actions, { ws, bound }, draft),
+    onSaved: () => onSaved?.(),
+  });
+  const draft = save.draft;
+  const statusTarget =
+    target === AGENT_TARGET || draft.repos.some((repo) => repo.id === target)
+      ? target
+      : MAPPING_TARGET;
+  const [model, setModel] = useState(draft.model);
+  useEffect(() => setModel(draft.model), [draft.model]);
+
+  const editorRef = useRef<HTMLDivElement>(null);
+  const addRef = useRef<HTMLSpanElement>(null);
+  const actionRefs = useRef(new Map<string, HTMLSpanElement>());
+  const rowRefs = useRef(new Map<string, HTMLDivElement>());
+  const [focusAfter, setFocusAfter] = useState<FocusAfterChange>(null);
+  useEffect(() => {
+    if (focusAfter === null) return;
+    const holder =
+      focusAfter.kind === "add" ? addRef.current : actionRefs.current.get(focusAfter.repo);
+    const control = holder?.querySelector("button") ?? null;
+    if (control !== null) {
+      control.focus();
+      setFocusAfter(null);
+    }
+  }, [focusAfter, draft]);
+
+  const labelName = (id: string) =>
+    (bound.labels.ok ? bound.labels.items.find((l) => l.id === id)?.name : undefined) ?? id;
+  const change = (next: MappingDraft, changed: string) => {
+    setTarget(changed);
+    setLabelDropped(null);
+    if (isCompleteDraft(next)) save.choose(next);
+    else save.setDraft(next);
+  };
+  const nameOf = (id: string) => runnerProjects.find((p) => p.id === id)?.name ?? id;
+  const addable = runnerProjects.filter((p) => !draft.repos.some((repo) => repo.id === p.id));
+  const failure = save.state.kind === "failed" ? save.state.reason : null;
+  useEffect(() => {
+    if (failure === null) return;
+    const editor = editorRef.current;
+    if (editor === null) return;
+    const row = rowRefs.current.get(statusTarget);
+    if (row?.contains(document.activeElement) ?? editor.contains(document.activeElement)) return;
+    const control =
+      actionRefs.current.get(statusTarget)?.querySelector("button") ??
+      addRef.current?.querySelector("button") ??
+      editor.querySelector("button");
+    control?.focus();
+  }, [failure, statusTarget]);
+  useReportUnsaved(
+    (!isCompleteDraft(draft) && mappingDraftKey(draft) !== mappingDraftKey(saved)) ||
+      model.trim() !== draft.model,
+  );
+  const missing =
+    draft.repos.length === 0 && draft.agent !== null
+      ? t("needRepo")
+      : draft.repos.length > 0 && draft.agent === null
+        ? t("needAgent")
+        : null;
+  const failureLine =
+    failure === null ? null : (
+      <Text variant="ui" as="p" tone="problem" role="alert">
+        {failure === "unknown" || failure === "failed"
+          ? t("revertedRetry")
+          : t("reverted", { reason: mappingReason(failure) })}
+      </Text>
+    );
+  const saveModel = () => {
+    const trimmed = model.trim();
+    if (trimmed === draft.model) return;
+    change({ ...draft, model: trimmed }, AGENT_TARGET);
+  };
+
+  const agentOptions = agents.map((a) => ({ value: a, label: agentName(a) }));
+  const agentStatus =
+    statusTarget === AGENT_TARGET && save.status !== "idle" ? t(`status.${save.status}`) : null;
+  const splitAgent = (
+    <SettingsGroup>
+      <SettingsRow
+        label={t("agent")}
+        labelId={agentLabelId}
+        status={agentStatus}
+        wideControl
+        control={
+          <span {...stylex.props(styles.rowControl)}>
+            <Select
+              aria-label={t("agent")}
+              {...(draft.agent === null && missing !== null
+                ? { "aria-describedby": missingId }
+                : {})}
+              options={agentOptions}
+              value={draft.agent}
+              onValueChange={(value) => change({ ...draft, agent: value }, AGENT_TARGET)}
+              placeholder={t("choose")}
+            />
+          </span>
+        }
+        message={
+          <>
+            {statusTarget === AGENT_TARGET ? failureLine : null}
+            {missing === null ? null : (
+              <Text variant="meta" id={missingId}>
+                {missing}
+              </Text>
+            )}
+          </>
+        }
+      />
+      {showModel ? (
+        <SettingsRow
+          label={t("model")}
+          info={
+            <InfoTip
+              label={ts("infoLabel", { label: t("model") })}
+              content={`${t("modelDescription")} ${t("modelSave")}`}
+            />
+          }
+          wideControl
+          control={
+            <form
+              {...stylex.props(styles.rowControl)}
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveModel();
+              }}
+              onBlur={saveModel}
+            >
+              <Input
+                name="model"
+                aria-label={t("model")}
+                value={model}
+                onValueChange={setModel}
+                placeholder={t("modelPlaceholder")}
+                autoComplete="off"
+                mono
+              />
+            </form>
+          }
+        />
+      ) : null}
+    </SettingsGroup>
+  );
+
+  return (
+    <div
+      ref={editorRef}
+      role="group"
+      aria-labelledby={headingId}
+      {...stylex.props(styles.editor, renderSections !== undefined && styles.editorSections)}
+    >
+      {renderSections === undefined ? (
+        <>
+          <div {...stylex.props(styles.header)}>
+            <span id={headingId}>{heading}</span>
+            <SaveStatusText status={statusTarget === MAPPING_TARGET ? save.status : "idle"} />
+          </div>
+          {statusTarget === MAPPING_TARGET ? failureLine : null}
+          <Text variant="meta" role="status">
+            {labelDropped === null || failure !== null ? null : t("labelDropped", labelDropped)}
+          </Text>
+          <div {...stylex.props(styles.repos)}>
+            <Text variant="label">{t("repos")}</Text>
+            {bound.labels.ok ? null : (
+              <Text variant="ui" as="p" tone="problem">
+                {t("labelsFailed", { reason: mappingReason(bound.labels.error) })}
+              </Text>
+            )}
+            {draft.repos.map((repo) => (
+              <RepoRow
+                key={repo.id}
+                repo={repo}
+                name={nameOf(repo.id)}
+                draft={draft}
+                bound={bound}
+                autoAssignLabelId={autoAssignLabelId}
+                labelName={labelName}
+                nameOf={nameOf}
+                status={statusTarget === repo.id ? save.status : "idle"}
+                failureLine={statusTarget === repo.id ? failureLine : null}
+                rowRef={(node) => {
+                  if (node === null) rowRefs.current.delete(repo.id);
+                  else rowRefs.current.set(repo.id, node);
+                }}
+                actionRef={(node) => {
+                  if (node === null) actionRefs.current.delete(repo.id);
+                  else actionRefs.current.set(repo.id, node);
+                }}
+                onLabel={(labelId) => change(withRepoLabel(draft, repo.id, labelId), repo.id)}
+                onMakeDefault={() => {
+                  const previous = draft.repos.find((r) => r.isDefault)?.id ?? null;
+                  if (previous !== null) setFocusAfter({ kind: "make-default", repo: previous });
+                  change(withDefaultRepo(draft, repo.id), repo.id);
+                  if (repo.labelId !== null) {
+                    setLabelDropped({ repo: nameOf(repo.id), label: labelName(repo.labelId) });
+                  }
+                }}
+                onRemove={() => {
+                  setFocusAfter({ kind: "add" });
+                  change(withRepoRemoved(draft, repo.id), repo.id);
+                }}
+              />
+            ))}
+            {addable.length === 0 ? null : (
+              <span ref={addRef} {...stylex.props(styles.add)}>
+                <Menu
+                  label={
+                    draft.repos.length === 0
+                      ? t("addFirstLabel", { project: bound.project.name })
+                      : t("addLabel", { project: bound.project.name })
+                  }
+                  {...(draft.repos.length === 0 && missing !== null
+                    ? { describedBy: missingId }
+                    : {})}
+                  trigger={draft.repos.length === 0 ? t("addFirst") : t("add")}
+                >
+                  {addable.map((p) => (
+                    <MenuItem
+                      key={p.id}
+                      value={p.id}
+                      onSelect={() => change(withRepoAdded(draft, p.id), p.id)}
+                    >
+                      {p.name}
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </span>
+            )}
+            {draft.repos.length > 1 ? <Text variant="meta">{t("routeHint")}</Text> : null}
+          </div>
+          <div {...stylex.props(styles.fields)}>
+            <Field label={t("agent")}>
+              <Select
+                {...(draft.agent === null && missing !== null
+                  ? { "aria-describedby": missingId }
+                  : {})}
+                options={agents.map((a) => ({ value: a, label: agentName(a) }))}
+                value={draft.agent}
+                onValueChange={(value) => change({ ...draft, agent: value }, AGENT_TARGET)}
+                placeholder={t("choose")}
+              />
+            </Field>
+            {showModel ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  saveModel();
+                }}
+                onBlur={saveModel}
+              >
+                <Field
+                  label={t("model")}
+                  description={`${t("modelDescription")} ${t("modelSave")}`}
+                >
+                  <Input
+                    name="model"
+                    value={model}
+                    onValueChange={setModel}
+                    placeholder={t("modelPlaceholder")}
+                    autoComplete="off"
+                    mono
+                  />
+                </Field>
+              </form>
+            ) : null}
+          </div>
+          <SaveStatusText status={statusTarget === AGENT_TARGET ? save.status : "idle"} />
+          {statusTarget === AGENT_TARGET ? failureLine : null}
+          {missing === null ? null : (
+            <Text variant="ui" id={missingId}>
+              {missing}
+            </Text>
+          )}
+          {children}
+        </>
+      ) : (
+        renderSections({
+          repos: (
+            <>
+              <div {...stylex.props(styles.header)}>
+                <span id={headingId}>{heading}</span>
+                <SaveStatusText status={statusTarget === MAPPING_TARGET ? save.status : "idle"} />
+              </div>
+              {statusTarget === MAPPING_TARGET ? failureLine : null}
+              <Text variant="meta" role="status">
+                {labelDropped === null || failure !== null ? null : t("labelDropped", labelDropped)}
+              </Text>
+              <div {...stylex.props(styles.repos)}>
+                {bound.labels.ok ? null : (
+                  <Text variant="ui" as="p" tone="problem">
+                    {t("labelsFailed", { reason: mappingReason(bound.labels.error) })}
+                  </Text>
+                )}
+                {draft.repos.map((repo) => (
+                  <RepoRow
+                    key={repo.id}
+                    repo={repo}
+                    name={nameOf(repo.id)}
+                    draft={draft}
+                    bound={bound}
+                    autoAssignLabelId={autoAssignLabelId}
+                    labelName={labelName}
+                    nameOf={nameOf}
+                    status={statusTarget === repo.id ? save.status : "idle"}
+                    failureLine={statusTarget === repo.id ? failureLine : null}
+                    rowRef={(node) => {
+                      if (node === null) rowRefs.current.delete(repo.id);
+                      else rowRefs.current.set(repo.id, node);
+                    }}
+                    actionRef={(node) => {
+                      if (node === null) actionRefs.current.delete(repo.id);
+                      else actionRefs.current.set(repo.id, node);
+                    }}
+                    onLabel={(labelId) => change(withRepoLabel(draft, repo.id, labelId), repo.id)}
+                    onMakeDefault={() => {
+                      const previous = draft.repos.find((r) => r.isDefault)?.id ?? null;
+                      if (previous !== null)
+                        setFocusAfter({ kind: "make-default", repo: previous });
+                      change(withDefaultRepo(draft, repo.id), repo.id);
+                      if (repo.labelId !== null) {
+                        setLabelDropped({ repo: nameOf(repo.id), label: labelName(repo.labelId) });
+                      }
+                    }}
+                    onRemove={() => {
+                      setFocusAfter({ kind: "add" });
+                      change(withRepoRemoved(draft, repo.id), repo.id);
+                    }}
+                  />
+                ))}
+                {addable.length === 0 ? null : (
+                  <span ref={addRef} {...stylex.props(styles.add)}>
+                    <Menu
+                      label={
+                        draft.repos.length === 0
+                          ? t("addFirstLabel", { project: bound.project.name })
+                          : t("addLabel", { project: bound.project.name })
+                      }
+                      {...(draft.repos.length === 0 && missing !== null
+                        ? { describedBy: missingId }
+                        : {})}
+                      trigger={draft.repos.length === 0 ? t("addFirst") : t("add")}
+                    >
+                      {addable.map((p) => (
+                        <MenuItem
+                          key={p.id}
+                          value={p.id}
+                          onSelect={() => change(withRepoAdded(draft, p.id), p.id)}
+                        >
+                          {p.name}
+                        </MenuItem>
+                      ))}
+                    </Menu>
+                  </span>
+                )}
+              </div>
+            </>
+          ),
+          agent: splitAgent,
+        })
+      )}
+    </div>
+  );
+}
+
+function sendMapping(
+  actions: Pick<SettingsActions, "saveMapping">,
+  { ws, bound }: { ws: string; bound: BoundProject },
+  draft: MappingDraft,
+): Promise<ActionResult> {
+  if (!isCompleteDraft(draft)) return Promise.resolve({ ok: true });
+  return actions.saveMapping({
+    ws,
+    connectionId: bound.connection.id,
+    projectId: bound.project.id,
+    agentId: draft.agent,
+    model: draft.model,
+    repos: draft.repos.map((repo) => ({
+      runnerProjectId: repo.id,
+      isDefault: repo.isDefault,
+      labelId: repo.labelId,
+    })),
+  });
+}
+
+function RepoRow({
+  repo,
+  name,
+  draft,
+  bound,
+  autoAssignLabelId,
+  labelName,
+  nameOf,
+  status,
+  failureLine,
+  rowRef,
+  actionRef,
+  onLabel,
+  onMakeDefault,
+  onRemove,
+}: {
+  repo: RepoDraft;
+  name: string;
+  draft: MappingDraft;
+  bound: BoundProject;
+  autoAssignLabelId: string | null;
+  labelName: (id: string) => string;
+  nameOf: (id: string) => string;
+  status: SaveStatus;
+  failureLine: ReactNode;
+  rowRef: (node: HTMLDivElement | null) => void;
+  actionRef: (node: HTMLSpanElement | null) => void;
+  onLabel: (labelId: string | null) => void;
+  onMakeDefault: () => void;
+  onRemove: () => void;
+}) {
+  const t = useTranslations("settings.mapping");
+  const goneId = useId();
+  const routeHintId = useId();
+  const dropsLabelId = useId();
+  const labels = (bound.labels.ok ? bound.labels.items : []).filter(
+    (label) => label.id !== autoAssignLabelId,
+  );
+  const isAutoAssign = repo.labelId !== null && repo.labelId === autoAssignLabelId;
+  const known = repo.labelId === null || isAutoAssign || labels.some((l) => l.id === repo.labelId);
+  const gone = !known && bound.labels.ok;
+  const options: SelectOption[] = [
+    { value: NO_LABEL, label: t("noLabel") },
+    ...labels.map((label): SelectOption => {
+      const owner = labelOwner(draft, label.id, repo.id);
+      return owner === null
+        ? { value: label.id, label: label.name }
+        : {
+            value: label.id,
+            label: t("labelUsed", { label: label.name, repo: nameOf(owner) }),
+            disabled: true,
+          };
+    }),
+    ...(repo.labelId !== null && isAutoAssign
+      ? [{ value: repo.labelId, label: t("labelAutoAssign") }]
+      : []),
+    ...(repo.labelId !== null && !known
+      ? [{ value: repo.labelId, label: bound.labels.ok ? t("labelMissing") : t("labelUnread") }]
+      : []),
+  ];
+  const routeHint = !repo.isDefault && repo.labelId === null;
+  const describedBy = [gone || isAutoAssign ? goneId : null, routeHint ? routeHintId : null]
+    .filter((id) => id !== null)
+    .join(" ");
+  return (
+    <div ref={rowRef} {...stylex.props(styles.repoBlock)}>
+      <div {...stylex.props(styles.repoRow)}>
+        <span {...stylex.props(styles.repoName)}>
+          <Text variant="ui" tone="strong" mono wrap="anywhere">
+            {name}
+          </Text>
+          {repo.isDefault ? <Chip strong>{t("default")}</Chip> : null}
+        </span>
+        <span {...stylex.props(styles.repoLabel)}>
+          {repo.isDefault ? (
+            <Text variant="meta">{t("defaultRoute")}</Text>
+          ) : (
+            <>
+              <Select
+                aria-label={t("repoLabel", { repo: name })}
+                {...(describedBy === "" ? {} : { "aria-describedby": describedBy })}
+                options={options}
+                value={repo.labelId ?? NO_LABEL}
+                onValueChange={(value) => onLabel(value === NO_LABEL ? null : value)}
+              />
+              {routeHint ? (
+                <Text variant="meta" id={routeHintId}>
+                  {t("noLabelRoute")}
+                </Text>
+              ) : null}
+            </>
+          )}
+        </span>
+        <span {...stylex.props(styles.repoStatus)}>
+          <SaveStatusText status={status} />
+        </span>
+        <span ref={actionRef} {...stylex.props(styles.repoActions)}>
+          {repo.isDefault ? null : (
+            <>
+              <Button
+                aria-label={t("makeDefaultLabel", { repo: name })}
+                {...(repo.labelId === null ? {} : { "aria-describedby": dropsLabelId })}
+                onClick={onMakeDefault}
+              >
+                {t("makeDefault")}
+              </Button>
+              {repo.labelId === null ? null : (
+                <VisuallyHidden id={dropsLabelId}>
+                  {t("makeDefaultDropsLabel", { label: labelName(repo.labelId) })}
+                </VisuallyHidden>
+              )}
+              <Button
+                variant="danger"
+                aria-label={t("removeLabel", { repo: name })}
+                onClick={onRemove}
+              >
+                {t("remove")}
+              </Button>
+            </>
+          )}
+        </span>
+      </div>
+      {gone || isAutoAssign ? (
+        <Text variant="ui" as="p" tone="problem" id={goneId}>
+          {isAutoAssign ? t("labelIsAutoAssign") : t("labelGone")}
+        </Text>
+      ) : null}
+      {failureLine}
+    </div>
+  );
+}
+
+export function ReloadFromTracker({ onReload }: { onReload: () => Promise<void> }) {
+  const t = useTranslations("settings.mapping");
+  const [state, setState] = useState<"idle" | "reading" | "done" | "failed">("idle");
+  const reading = state === "reading";
+  useEffect(() => {
+    if (state !== "done") return;
+    const timer = setTimeout(() => setState("idle"), RELOADED_NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [state]);
+  return (
+    <span {...stylex.props(styles.reload)}>
+      <Button
+        busy={{ active: reading, label: t("reloading") }}
+        onClick={() => {
+          setState("reading");
+          onReload().then(
+            () => setState("done"),
+            () => setState("failed"),
+          );
+        }}
+      >
+        {t("reload")}
+      </Button>
+      <Text variant="meta" role="status" {...(state === "failed" ? { tone: "problem" } : {})}>
+        {state === "done" ? t("reloaded") : state === "failed" ? t("reloadFailed") : null}
+      </Text>
+    </span>
+  );
+}
+
+export function useLabelCreatedToast(): (result: { name: string; created: boolean }) => void {
+  const t = useTranslations("settings.label");
+  return (result) =>
+    showToast(
+      result.created ? t("created", { name: result.name }) : t("picked", { name: result.name }),
+    );
+}
+
+const styles = stylex.create({
+  editor: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
+  editorSections: { gap: space.s10 },
+  header: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: space.s2,
+  },
+  repos: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
+  repoBlock: { display: "flex", flexDirection: "column", gap: space.s1, minWidth: 0 },
+  repoRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: space.s3,
+    rowGap: space.s2,
+    minWidth: 0,
+  },
+  repoName: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: space.s2,
+    flexGrow: 1,
+    flexBasis: size.mappingCellMinWidth,
+    minWidth: 0,
+  },
+  repoLabel: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s1,
+    flexGrow: 1,
+    flexBasis: size.labelSelectWidth,
+    minWidth: size.mappingCellMinWidth,
+  },
+  repoStatus: { flexShrink: 0, minWidth: size.saveStatusColumn },
+  repoActions: { display: "inline-flex", gap: space.s2, flexShrink: 0 },
+  add: { display: "block", maxWidth: size.repoSelectWidth },
+  fields: {
+    display: "grid",
+    gridTemplateColumns: `repeat(auto-fit, minmax(min(${size.fieldMinWidth}, 100%), 1fr))`,
+    gap: space.s3,
+  },
+  rowControl: {
+    display: "flex",
+    width: { default: size.settingsControlWidth, [breakpoints.settingsRowStacked]: "100%" },
+    minWidth: 0,
+  },
+  reload: { display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
+});

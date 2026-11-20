@@ -6,6 +6,14 @@ export type ServiceManager = "launchd" | "systemd";
 
 export const SERVICE_NAME = PRODUCT_NAME;
 
+export const SYSTEMD_UNIT = `${SERVICE_NAME}.service`;
+
+export function systemdUnitPath(userHome: string, xdgConfigHome: string | undefined): string {
+  const configHome =
+    xdgConfigHome === undefined || xdgConfigHome === "" ? join(userHome, ".config") : xdgConfigHome;
+  return join(configHome, "systemd", "user", SYSTEMD_UNIT);
+}
+
 export interface ServiceContext {
   manager: ServiceManager;
   userHome: string;
@@ -52,7 +60,7 @@ export function servicePlan(context: ServiceContext): ServicePlan {
             label: SERVICE_NAME,
             programArguments,
             path: context.path,
-            logFile: join(logDir, `${SERVICE_NAME}.log`),
+            logFile: serviceLogFile(context.gangerHome),
           }),
         },
         directories: [dirname(path), logDir],
@@ -62,9 +70,8 @@ export function servicePlan(context: ServiceContext): ServicePlan {
       };
     }
     case "systemd": {
-      const configHome = context.xdgConfigHome ?? join(context.userHome, ".config");
-      const unit = `${SERVICE_NAME}.service`;
-      const path = join(configHome, "systemd", "user", unit);
+      const unit = SYSTEMD_UNIT;
+      const path = systemdUnitPath(context.userHome, context.xdgConfigHome);
       return {
         manager: "systemd",
         file: {
@@ -216,4 +223,8 @@ export function formatCommand(command: ReadonlyArray<string>): string {
   return command
     .map((arg) => (/^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", `'\\''`)}'`))
     .join(" ");
+}
+
+export function serviceLogFile(home: string): string {
+  return join(homePaths(home).logDir, `${SERVICE_NAME}.log`);
 }

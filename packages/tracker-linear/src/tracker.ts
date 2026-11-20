@@ -24,7 +24,7 @@ import type {
   TrackerTicket,
 } from "@ganger/core";
 import { z } from "zod";
-import { LinearClient, LinearTrackerError, connectionSchema } from "./client.js";
+import { LinearApiError, LinearClient, LinearTrackerError, connectionSchema } from "./client.js";
 import type { Fetch } from "./client.js";
 import { verifyLinearWebhook } from "./webhook.js";
 import type { WebhookResult } from "./webhook.js";
@@ -80,7 +80,13 @@ const PAGE_INFO = "pageInfo { hasNextPage endCursor }";
 
 const QUERY_CONNECTION = "query Connection { viewer { id } }";
 
-const QUERY_ORGANIZATION = "query Organization { viewer { organization { name } } }";
+const QUERY_ORGANIZATION = "query Organization { viewer { organization { name urlKey } } }";
+
+const URL_KEY = /^[a-z0-9][a-z0-9-]*$/iu;
+
+export function linearWebhookSettingsUrl(urlKey: string): string | null {
+  return URL_KEY.test(urlKey) ? `https://linear.app/${urlKey}/settings/api` : null;
+}
 
 const QUERY_TICKET = `query Ticket($id: String!) { issue(id: $id) { ...TicketFields } }
 ${TICKET_FIELDS}`;
@@ -133,6 +139,10 @@ const QUERY_TEAM_LABELS = `query TeamLabels($teamIds: [ID!]!, $first: Int!, $aft
     nodes { id name isGroup }
     ${PAGE_INFO}
   }
+}`;
+
+const MUTATION_CREATE_LABEL = `mutation CreateLabel($name: String!, $color: String!) {
+  issueLabelCreate(input: { name: $name, color: $color }) { success issueLabel { id name } }
 }`;
 
 const MUTATION_SET_STATE = `mutation SetState($id: String!, $stateId: String!) {
@@ -247,21 +257,35 @@ export class LinearTracker implements Tracker {
         {},
         z.object({ viewer: z.object({ id: idSchema }) }),
       );
-      return { ok: true, organizationName: await this.organizationName() };
+      const organization = await this.organization();
+      const webhookSettingsUrl =
+        organization?.urlKey === undefined ? null : linearWebhookSettingsUrl(organization.urlKey);
+      return {
+        ok: true,
+        organizationName: organization?.name ?? null,
+        ...(webhookSettingsUrl === null ? {} : { webhookSettingsUrl }),
+      };
     } catch (error) {
       if (error instanceof LinearTrackerError) return { ok: false, error: error.detail };
       throw error;
     }
   }
 
-  private async organizationName(): Promise<string | null> {
+  private async organization(): Promise<{ name: string; urlKey?: string | undefined } | null> {
     try {
       const data = await this.client.request(
         QUERY_ORGANIZATION,
         {},
-        z.object({ viewer: z.object({ organization: z.object({ name: z.string() }) }) }),
+        z.object({
+          viewer: z.object({
+            organization: z.object({
+              name: z.string(),
+              urlKey: z.string().optional().catch(undefined),
+            }),
+          }),
+        }),
       );
-      return data.viewer.organization.name;
+      return data.viewer.organization;
     } catch {
       return null;
     }
@@ -359,6 +383,24 @@ export class LinearTracker implements Tracker {
     return states
       .toSorted((a, b) => categoryRank(a.type) - categoryRank(b.type) || a.position - b.position)
       .map(toState);
+  }
+
+  async createLabel(input: { name: string; color: string }): Promise<TrackerLabel> {
+    const data = await this.client.request(
+      MUTATION_CREATE_LABEL,
+      { name: input.name, color: input.color },
+      z.object({
+        issueLabelCreate: z.object({
+          success: z.boolean(),
+          issueLabel: z.object({ id: idSchema, name: z.string() }).nullable(),
+        }),
+      }),
+    );
+    const label = data.issueLabelCreate.issueLabel;
+    if (!data.issueLabelCreate.success || label === null) {
+      throw new LinearApiError("Linear가 라벨을 만들지 않았다", { code: null, status: 200 });
+    }
+    return toLabel(label);
   }
 
   async setState(key: TicketKey, stateId: TrackerStateId): Promise<void> {

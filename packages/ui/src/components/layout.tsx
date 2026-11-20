@@ -1,6 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 import { textStyles } from "./text";
+import { useTitleBarHidden } from "./window-chrome";
+import { windowRegion } from "../window-frame";
 import {
   colors,
   fontSize,
@@ -10,21 +12,37 @@ import {
   radius,
   size,
   space,
+  breakpoints,
 } from "../tokens.stylex";
+
+const FIRST_LINE = `calc(${size.titleBar} - 2 * ${space.s2})`;
 
 export interface SplitViewProps {
   list: ReactNode;
   panel: ReactNode;
   fill?: boolean;
   variant?: "list" | "editor";
+  stackedListShare?: "half" | "larger";
 }
 
-export function SplitView({ list, panel, fill = true, variant = "list" }: SplitViewProps) {
+export function SplitView({
+  list,
+  panel,
+  fill = true,
+  variant = "list",
+  stackedListShare = "half",
+}: SplitViewProps) {
   const editor = variant === "editor";
   return (
     <div {...stylex.props(styles.frame, fill ? styles.fill : styles.contained)}>
-      <div {...stylex.props(styles.split, editor && styles.splitEditor)}>
-        <div {...stylex.props(styles.list, editor && styles.listEditor)}>{list}</div>
+      <div
+        {...stylex.props(
+          styles.split,
+          !editor && stackedListShare === "larger" && styles.splitListLarger,
+          editor && styles.splitEditor,
+        )}
+      >
+        <div {...stylex.props(styles.list)}>{list}</div>
         <aside {...stylex.props(styles.panel, editor && styles.panelEditor)}>{panel}</aside>
       </div>
     </div>
@@ -35,20 +53,50 @@ export function NoticeLayout({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.notice)}>{children}</div>;
 }
 
+export interface ScreenLayoutProps {
+  header: ReactNode;
+  fill?: boolean;
+  children: ReactNode;
+}
+
+export function ScreenLayout({ header, fill = true, children }: ScreenLayoutProps) {
+  return (
+    <div {...stylex.props(styles.screen, fill ? styles.fill : styles.contained)}>
+      {header}
+      <div {...stylex.props(styles.screenBody)}>{children}</div>
+    </div>
+  );
+}
+
 export interface PageHeaderProps {
   title: ReactNode;
   subtitle?: ReactNode;
+  lead?: ReactNode;
   actions?: ReactNode;
 }
 
-export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, lead, actions }: PageHeaderProps) {
+  const titleBarHidden = useTitleBarHidden();
   return (
-    <header {...stylex.props(styles.pageHead)}>
-      <div>
+    <header {...(titleBarHidden ? windowRegion("drag") : {})} {...stylex.props(styles.pageHead)}>
+      {lead === undefined ? null : (
+        <div {...windowRegion("no-drag")} {...stylex.props(styles.pageLead)}>
+          {lead}
+        </div>
+      )}
+      <div {...stylex.props(styles.pageHeading)}>
         <h1 {...stylex.props(styles.pageTitle)}>{title}</h1>
-        {subtitle === undefined ? null : <p {...stylex.props(styles.pageSub)}>{subtitle}</p>}
+        {subtitle === undefined ? null : (
+          <p {...windowRegion("no-drag")} {...stylex.props(styles.pageSub)}>
+            {subtitle}
+          </p>
+        )}
       </div>
-      {actions}
+      {actions === undefined ? null : (
+        <div {...windowRegion("no-drag")} {...stylex.props(styles.pageActions)}>
+          {actions}
+        </div>
+      )}
     </header>
   );
 }
@@ -160,6 +208,9 @@ const styles = stylex.create({
     height: "100%",
     minHeight: 0,
   },
+  splitListLarger: {
+    gridTemplateRows: { default: null, [LIST_STACKED]: "minmax(0, 3fr) minmax(0, 2fr)" },
+  },
   splitEditor: {
     gridTemplateColumns: {
       default: `${size.editorListWidth} minmax(0, 1fr)`,
@@ -178,10 +229,9 @@ const styles = stylex.create({
     minWidth: 0,
     overflow: "auto",
     paddingTop: space.s8,
-    paddingInline: space.s8,
+    paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
     paddingBottom: `max(${space.s10}, var(--pinned-toast-space, 0px) + ${space.s10})`,
   },
-  listEditor: { paddingInline: space.s6 },
   panelEditor: { backgroundColor: colors.bgCanvas },
   panel: {
     minWidth: 0,
@@ -189,15 +239,43 @@ const styles = stylex.create({
     backgroundColor: colors.bgPanel,
     scrollPaddingBlockEnd: "var(--pinned-toast-space, 0px)",
   },
+  screen: {
+    display: "grid",
+    gridTemplateRows: "auto minmax(0, 1fr)",
+    minWidth: 0,
+  },
+  screenBody: { minWidth: 0, minHeight: 0, overflow: "auto" },
   pageHead: {
     display: "flex",
     flexWrap: "wrap",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: space.s4,
-    marginBottom: space.s6,
+    alignItems: "flex-start",
+    columnGap: space.s4,
+    rowGap: space.s2,
+    minHeight: size.titleBar,
+    paddingTop: space.s2,
+    paddingBottom: `calc(${space.s2} - 1px)`,
+    paddingInline: { default: space.s8, [breakpoints.narrowScreen]: space.s4 },
+    borderBottomWidth: 1,
+    borderBottomStyle: "solid",
+    borderBottomColor: colors.borderSubtle,
+  },
+  pageLead: { display: "flex", alignItems: "center", flexShrink: 0, minHeight: FIRST_LINE },
+  pageHeading: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    columnGap: space.s3,
+    rowGap: space.px2,
+    flexGrow: 1,
+    flexBasis: size.pageHeadingMinWidth,
+    minWidth: 0,
   },
   pageTitle: {
+    display: "flex",
+    alignItems: "center",
+    minHeight: FIRST_LINE,
+    flexShrink: 0,
+    maxWidth: "100%",
     margin: 0,
     color: colors.textPrimary,
     fontSize: fontSize.page,
@@ -207,10 +285,19 @@ const styles = stylex.create({
     textWrap: "balance",
   },
   pageSub: {
+    minWidth: 0,
     margin: 0,
-    marginTop: space.s1,
     color: colors.textTertiary,
     fontSize: fontSize.ui,
+    textWrap: "pretty",
+  },
+  pageActions: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    minHeight: FIRST_LINE,
+    gap: space.s2,
+    marginInlineStart: "auto",
   },
   section: {
     marginTop: { default: 0, ":not(:first-child)": space.s10 },

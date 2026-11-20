@@ -10,6 +10,7 @@ const PRODUCT_DIRS = [
   "apps/web/src",
   "apps/worker/src",
   "apps/cli/src",
+  "apps/desktop/src",
   "packages/app/src",
   "packages/codehost-github/src",
   "packages/runner-orca/src",
@@ -44,7 +45,7 @@ describe("개발 경로와 제품 코드의 경계", () => {
   });
 
   it("제품 앱은 @ganger/demo 에 기대지 않는다", () => {
-    for (const app of ["web", "worker", "cli"]) {
+    for (const app of ["web", "worker", "cli", "desktop"]) {
       const pkg = readFileSync(join(repoRoot, "apps", app, "package.json"), "utf8");
       expect([app, pkg.includes("@ganger/demo")]).toEqual([app, false]);
     }

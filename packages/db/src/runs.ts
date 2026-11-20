@@ -15,6 +15,7 @@ import type {
   CommentId,
   InvalidRunTransition,
   NotStartedAgentResult,
+  PauseSource,
   PrState,
   PullRequestId,
   Run,
@@ -46,8 +47,10 @@ import {
 import { alias } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
+import { recordChange, recordRunChange } from "./change-events.js";
 import type { Database } from "./database.js";
-import { inTransaction } from "./database.js";
+import { inTransaction, onCommit } from "./database.js";
+import { log } from "@ganger/log";
 import type { WorkspaceId } from "./ids.js";
 import { runStateChanges, runs } from "./schema.js";
 import type { LATER_PR_STATES } from "./schema.js";
@@ -72,6 +75,9 @@ export interface RunRecords {
   trackerStateSetAt: Date | null;
   trackerComment: { id: CommentId; at: Date } | null;
   unreachableSince: Date | null;
+  pausedSince: Date | null;
+  pausedMs: number;
+  pauseSource: PauseSource | null;
   lastLog: string[] | null;
 }
 
@@ -184,6 +190,9 @@ function toRunRecords(row: RunRow): RunRecords {
         ? null
         : { id: row.trackerCommentId, at: row.trackerCommentedAt },
     unreachableSince: row.unreachableSince,
+    pausedSince: row.pausedSince,
+    pausedMs: row.pausedMs,
+    pauseSource: row.pauseSource,
     lastLog: row.lastLog,
   };
 }
@@ -392,6 +401,18 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
       })
       .run();
     recordStateChange(db, id, null, "queued", now);
+    recordChange(db, { kind: "assignment", targetId: id, workspaceId: project.workspaceId }, now);
+    onCommit(db, () =>
+      log().info("run.assigned", {
+        runId: id,
+        ticketKey: input.ticket.key,
+        trackerConnectionId: input.ticket.connection,
+        workspaceId: project.workspaceId,
+        runnerId,
+        runnerProject: input.runnerProject,
+        reason: input.runnerId === undefined ? "picked" : "chosen",
+      }),
+    );
 
     const run = getRun(db, id);
     if (run === null) throw new RunRowError(id, "missing right after insert");
@@ -409,14 +430,23 @@ export function storedTicketTitle(title: string | null | undefined): string | nu
 export function fillRunTicketTitle(db: Database, id: RunId, title: string): void {
   const stored = storedTicketTitle(title);
   if (stored === null) return;
-  db.update(runs)
-    .set({ ticketTitle: stored })
-    .where(and(eq(runs.id, id), isNull(runs.ticketTitle)))
-    .run();
+  inTransaction(db, () => {
+    const filled = db
+      .update(runs)
+      .set({ ticketTitle: stored })
+      .where(and(eq(runs.id, id), isNull(runs.ticketTitle)))
+      .run().changes;
+    if (filled > 0) recordRunChange(db, id);
+  });
 }
 
 export type RunStateChange =
-  | { to: "running"; started?: { worktree: WorktreeRef; branch: string; agentRef: AgentRef } }
+  | {
+      to: "running";
+      started?: { worktree: WorktreeRef; branch: string; agentRef: AgentRef };
+      resumedAgentRef?: AgentRef;
+    }
+  | { to: "paused"; source?: PauseSource }
   | { to: "waiting-for-input" | "disconnected" }
   | {
       to: "ended";
@@ -451,6 +481,10 @@ export function changeRunState(
     if (!transition.ok) return { ok: false, error: transition.error };
 
     const where = and(eq(runs.id, runId), eq(runs.state, current.state));
+    const pauseClock = {
+      ...pauseClockAfter(db, runId, change.to, now),
+      ...pauseSourceAfter(db, runId, change),
+    };
     if (change.to === "ended") {
       const notStarted = current.state === "queued";
       const runnerUnreached = change.runnerUnreached ?? false;
@@ -467,6 +501,7 @@ export function changeRunState(
           prState: change.prState,
           runnerUnreached,
           reportBody: change.reportBody ?? null,
+          ...pauseClock,
         })
         .where(where)
         .run();
@@ -481,14 +516,101 @@ export function changeRunState(
         .where(where)
         .run();
     } else {
-      db.update(runs).set({ state: change.to }).where(where).run();
+      const agentRef =
+        change.to === "running" && (current.state === "paused" || current.state === "disconnected")
+          ? change.resumedAgentRef
+          : undefined;
+      db.update(runs)
+        .set({ state: change.to, ...pauseClock, ...(agentRef === undefined ? {} : { agentRef }) })
+        .where(where)
+        .run();
     }
     recordStateChange(db, runId, current.state, change.to, now);
+    recordRunChange(db, runId, { now });
+    onCommit(db, () =>
+      log().info("run.state_changed", {
+        runId,
+        ticketKey: current.ticket.key,
+        runnerId: current.runnerId,
+        from: current.state,
+        to: change.to,
+        ...(change.to === "ended" ? { outcome: change.agentResult } : {}),
+      }),
+    );
 
     const run = getRun(db, runId);
     if (run === null) throw new RunRowError(runId, "missing right after update");
     return { ok: true, run };
   });
+}
+
+function pauseClockAfter(
+  db: Database,
+  runId: RunId,
+  to: RunState,
+  now: Date,
+): { pausedSince: Date | null; pausedMs?: number } {
+  const row = db
+    .select({ pausedSince: runs.pausedSince, pausedMs: runs.pausedMs })
+    .from(runs)
+    .where(eq(runs.id, runId))
+    .get();
+  const since = row?.pausedSince ?? null;
+  if (to === "paused") return { pausedSince: since ?? now };
+  if (to === "disconnected") return { pausedSince: since };
+  const counted =
+    since === null
+      ? {}
+      : { pausedMs: (row?.pausedMs ?? 0) + Math.max(0, now.getTime() - since.getTime()) };
+  return { pausedSince: null, ...counted };
+}
+
+function pauseSourceAfter(
+  db: Database,
+  runId: RunId,
+  change: RunStateChange,
+): { pauseSource: PauseSource | null } | Record<string, never> {
+  if (change.to === "disconnected") return {};
+  if (change.to !== "paused") return { pauseSource: null };
+  const kept = db
+    .select({ pauseSource: runs.pauseSource })
+    .from(runs)
+    .where(eq(runs.id, runId))
+    .get()?.pauseSource;
+  return { pauseSource: change.source ?? kept ?? "operator" };
+}
+
+export function lastStateBeforeDisconnect(db: Database, runId: RunId): RunState | null {
+  const change = db
+    .select({ from: runStateChanges.fromState })
+    .from(runStateChanges)
+    .where(and(eq(runStateChanges.runId, runId), eq(runStateChanges.toState, "disconnected")))
+    .orderBy(desc(runStateChanges.id))
+    .limit(1)
+    .get();
+  return change?.from ?? null;
+}
+
+export function runningSince(db: Database, runId: RunId): Date | null {
+  const changes = db
+    .select({
+      from: runStateChanges.fromState,
+      to: runStateChanges.toState,
+      at: runStateChanges.changedAt,
+    })
+    .from(runStateChanges)
+    .where(eq(runStateChanges.runId, runId))
+    .orderBy(desc(runStateChanges.id))
+    .all();
+  for (const [index, change] of changes.entries()) {
+    if (change.to !== "running") continue;
+    if (change.from !== "disconnected") return change.at;
+    const intoDisconnect = changes
+      .slice(index + 1)
+      .find((earlier) => earlier.to === "disconnected");
+    if (intoDisconnect?.from !== "running") return change.at;
+  }
+  return null;
 }
 
 export function recordStartRequested(db: Database, runId: RunId, now: Date = new Date()): boolean {
@@ -516,22 +638,43 @@ export function recordStartFailure(
   runId: RunId,
   input: { failures: number; error: string },
 ): boolean {
-  return (
-    db
-      .update(runs)
-      .set({ startFailures: input.failures, startError: input.error })
-      .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
-      .run().changes > 0
-  );
+  return inTransaction(db, () => {
+    const before = db
+      .select({ failures: runs.startFailures, error: runs.startError })
+      .from(runs)
+      .where(eq(runs.id, runId))
+      .get();
+    const updated =
+      db
+        .update(runs)
+        .set({ startFailures: input.failures, startError: input.error })
+        .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
+        .run().changes > 0;
+    if (updated && (before?.failures !== input.failures || before.error !== input.error))
+      recordRunChange(db, runId);
+    return updated;
+  });
 }
 
 export function setQueuedRunRunner(db: Database, runId: RunId, runnerId: RunnerId | null): boolean {
-  const result = db
-    .update(runs)
-    .set({ runnerId })
-    .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
-    .run();
-  return result.changes > 0;
+  return inTransaction(db, () => {
+    const before = db
+      .select({ runnerId: runs.runnerId })
+      .from(runs)
+      .where(eq(runs.id, runId))
+      .get();
+    const updated =
+      db
+        .update(runs)
+        .set({ runnerId })
+        .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
+        .run().changes > 0;
+    if (updated && before?.runnerId !== runnerId) {
+      recordRunChange(db, runId);
+      onCommit(db, () => log().info("run.runner_chosen", { runId, runnerId }));
+    }
+    return updated;
+  });
 }
 
 function recordStateChange(
@@ -595,5 +738,33 @@ export function updateRunRecords(
   }
   if (Object.keys(set).length === 0) return false;
 
-  return db.update(runs).set(set).where(eq(runs.id, runId)).run().changes > 0;
+  return inTransaction(db, () => {
+    const before = getRunRow(db, runId);
+    const updated = db.update(runs).set(set).where(eq(runs.id, runId)).run().changes > 0;
+    const after = getRunRow(db, runId);
+    if (
+      updated &&
+      before !== undefined &&
+      after !== undefined &&
+      visiblyChanged(set, before, after)
+    )
+      recordRunChange(db, runId);
+    return updated;
+  });
+}
+
+const UNSEEN_RUN_COLUMNS: ReadonlySet<string> = new Set(["prCheckedAt"]);
+
+function visiblyChanged(set: Partial<typeof runs.$inferInsert>, before: RunRow, after: RunRow) {
+  return Object.keys(set).some((column) => {
+    if (UNSEEN_RUN_COLUMNS.has(column)) return false;
+    const was: unknown = Reflect.get(before, column);
+    const now: unknown = Reflect.get(after, column);
+    return comparable(was) !== comparable(now);
+  });
+}
+
+function comparable(value: unknown): string {
+  if (value instanceof Date) return `date:${value.getTime()}`;
+  return JSON.stringify(value) ?? "undefined";
 }

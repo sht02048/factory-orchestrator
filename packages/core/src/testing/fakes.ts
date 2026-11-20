@@ -1,6 +1,7 @@
 import { AdapterError } from "../adapters.js";
 import type { ProviderUsageReading } from "../provider-usage.js";
 import type {
+  AgentActivity,
   AgentQuestion,
   CodeHost,
   CodeHostErrorDetail,
@@ -10,6 +11,8 @@ import type {
   Paged,
   PermissionWait,
   PullRequestSnapshot,
+  ResumeAgentInput,
+  ResumedAgent,
   RunOnRunner,
   RunProgress,
   Runner,
@@ -26,6 +29,7 @@ import type {
   TrackerLabel,
   TrackerProject,
   TrackerState,
+  UnreportedStop,
   TrackerTicket,
   WebhookVerifyError,
 } from "../adapters.js";
@@ -33,6 +37,7 @@ import {
   toAgentRef,
   toCodeHostKind,
   toCommentId,
+  toLabelId,
   toMailboxRef,
   toPermissionRequestId,
   toQuestionId,
@@ -78,6 +83,7 @@ export class FakeTracker implements Tracker {
   readonly comments = new Map<TicketKey, TrackerComment[]>();
   readonly projects: TrackerProject[] = [];
   readonly labels = new Map<TrackerProjectId, TrackerLabel[]>();
+  readonly createdLabels: Array<{ label: TrackerLabel; color: string }> = [];
   readonly states = new Map<TrackerProjectId, TrackerState[]>();
   readonly stateChanges: Array<{ key: TicketKey; stateId: TrackerStateId }> = [];
   connection: TrackerConnectionCheck = { ok: true, organizationName: null };
@@ -145,6 +151,18 @@ export class FakeTracker implements Tracker {
     return Promise.resolve(this.states.get(projectId) ?? []);
   }
 
+  createLabel(input: { name: string; color: string }): Promise<TrackerLabel> {
+    const label: TrackerLabel = {
+      id: toLabelId(`label-created-${this.createdLabels.length + 1}`),
+      name: input.name,
+    };
+    this.createdLabels.push({ label, color: input.color });
+    for (const project of new Set([...this.labels.keys(), ...this.projects.map((p) => p.id)])) {
+      this.labels.set(project, [...(this.labels.get(project) ?? []), label]);
+    }
+    return Promise.resolve(label);
+  }
+
   setState(key: TicketKey, stateId: TrackerStateId): Promise<void> {
     const ticket = this.tickets.get(key);
     if (ticket === undefined) return Promise.reject(new AdapterError({ kind: "not-found" }));
@@ -177,7 +195,11 @@ export interface FakeRunnerRun {
   endedWithoutReport: string | null;
   agentStopped: boolean;
   agentClosed: boolean;
+  paused: boolean;
+  resumes: ResumeAgentInput[];
   log: string[];
+  activity: AgentActivity;
+  unreportedStop: UnreportedStop | null;
 }
 
 export class FakeRunner implements Runner {
@@ -205,6 +227,8 @@ export class FakeRunner implements Runner {
   projects: RunnerProject[] = [];
   providerUsage: ProviderUsageReading = { kind: "read", providers: [] };
   failNextStart: RunnerErrorDetail | null = null;
+  failNextControl: RunnerErrorDetail | null = null;
+  loseNextResumeResponse = false;
   loseNextStartResponse = false;
   private readonly mailboxes = new Set<MailboxRef>();
   private seq = 0;
@@ -271,6 +295,26 @@ export class FakeRunner implements Runner {
 
   vanish(worktree: WorktreeRef, detail = "agent terminal is gone"): void {
     this.runAt(worktree).endedWithoutReport = detail;
+  }
+
+  interruptOnRunner(worktree: WorktreeRef, at: Date = new Date()): void {
+    this.runAt(worktree).activity = { kind: "interrupted", since: at };
+  }
+
+  stopWithoutReport(
+    worktree: WorktreeRef,
+    stop: { lastOutput?: string[]; at?: Date; notified?: boolean } = {},
+  ): void {
+    const run = this.runAt(worktree);
+    const at = stop.at ?? new Date();
+    run.activity = { kind: "turn-ended", since: at };
+    run.unreportedStop = stop.notified === false ? null : { at, lastOutput: stop.lastOutput ?? [] };
+  }
+
+  continueOnRunner(worktree: WorktreeRef, at: Date = new Date()): void {
+    const run = this.runAt(worktree);
+    run.activity = { kind: "working", since: at };
+    run.unreportedStop = null;
   }
 
   deleteWorktree(worktree: WorktreeRef): void {
@@ -352,7 +396,11 @@ export class FakeRunner implements Runner {
         endedWithoutReport: null,
         agentStopped: false,
         agentClosed: false,
+        paused: false,
+        resumes: [],
         log: [],
+        activity: { kind: "unknown" },
+        unreportedStop: null,
       });
       if (this.loseNextStartResponse) {
         this.loseNextStartResponse = false;
@@ -381,6 +429,8 @@ export class FakeRunner implements Runner {
         kind: "active",
         questions: [...found.questions],
         permissionWaits: [...found.permissionWaits],
+        activity: found.activity,
+        unreportedStop: found.unreportedStop,
       };
     });
   }
@@ -412,6 +462,56 @@ export class FakeRunner implements Runner {
       const found = this.runAt(run.worktree);
       found.permissionWaits = found.permissionWaits.filter((p) => p.id !== input.permissionId);
       found.denials.push({ ...input });
+    });
+  }
+
+  pauseAgent(run: RunOnRunner): Promise<void> {
+    return this.reach(() => {
+      this.takeControlFailure();
+      const found = this.runAt(run.worktree);
+      if (found.endedWithoutReport !== null) {
+        throw new AdapterError<RunnerErrorDetail>({
+          kind: "runner-error",
+          code: "agent_not_running",
+          message: "the agent is not running",
+        });
+      }
+      found.paused = true;
+    });
+  }
+
+  resumeAgent(run: RunOnRunner, input: ResumeAgentInput): Promise<ResumedAgent> {
+    return this.reach((): ResumedAgent => {
+      this.takeControlFailure();
+      this.mustHaveMailbox(run.mailbox);
+      const found = this.runAt(run.worktree);
+      found.resumes.push({ ...input });
+      found.paused = false;
+      found.activity = { kind: "unknown" };
+      found.unreportedStop = null;
+      if (found.endedWithoutReport === null) {
+        return { agentRef: found.started.agentRef, restarted: false };
+      }
+      if (input.startIfGone === false) {
+        found.paused = true;
+        throw new AdapterError<RunnerErrorDetail>({
+          kind: "runner-error",
+          code: "agent_not_running",
+          message: "no agent session is running in the worktree",
+        });
+      }
+      const agentRef = toAgentRef(`fake-agent-${this.next()}`);
+      found.started = { ...found.started, agentRef };
+      found.endedWithoutReport = null;
+      found.agentStopped = false;
+      if (this.loseNextResumeResponse) {
+        this.loseNextResumeResponse = false;
+        throw new AdapterError<RunnerErrorDetail>({
+          kind: "start-outcome-unknown",
+          detail: "fake runner lost the resume response",
+        });
+      }
+      return { agentRef, restarted: true };
     });
   }
 
@@ -452,6 +552,13 @@ export class FakeRunner implements Runner {
       if (run.started.worktree === worktree) return run;
     }
     return null;
+  }
+
+  private takeControlFailure(): void {
+    const failure = this.failNextControl;
+    if (failure === null) return;
+    this.failNextControl = null;
+    throw new AdapterError(failure);
   }
 
   private mustHaveMailbox(mailbox: MailboxRef): void {

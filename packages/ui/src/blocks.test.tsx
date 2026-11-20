@@ -53,6 +53,35 @@ describe("Text tone·속성(티켓 0074)", () => {
 });
 
 describe("Button aria 속성(티켓 0067·0074)", () => {
+  it("busy 는 두 라벨을 겹쳐 폭을 그대로 두고, 진행 중이면 aria-busy·aria-disabled 와 진행 라벨만 이름으로 남긴다(0122)", () => {
+    const idle = renderToString(
+      <Button busy={{ active: false, label: "다시 읽는 중…" }}>다시 읽기</Button>,
+    );
+    const busy = renderToString(
+      <Button busy={{ active: true, label: "다시 읽는 중…" }}>다시 읽기</Button>,
+    );
+    expect(idle).toContain('aria-busy="false"');
+    expect(idle).toMatch(
+      /<span class="[^"]*">다시 읽기<\/span><span aria-hidden="true" class="[^"]*">다시 읽는 중…<\/span>/,
+    );
+    expect(busy).toMatch(
+      /<span aria-hidden="true" class="[^"]*">다시 읽기<\/span><span class="[^"]*">다시 읽는 중…<\/span>/,
+    );
+    expect(busy).toContain('aria-busy="true"');
+    expect(busy).toContain('aria-disabled="true"');
+    const hiddenClass = (html: string, label: string) =>
+      new RegExp(`<span (?:aria-hidden="true" )?class="([^"]*)">${label}</span>`).exec(html)?.[1];
+    expect(hiddenClass(idle, "다시 읽는 중…")).toBe(hiddenClass(busy, "다시 읽기"));
+    expect(hiddenClass(idle, "다시 읽기")).toBe(hiddenClass(busy, "다시 읽는 중…"));
+
+    const callerDisabled = renderToString(
+      <Button aria-disabled busy={{ active: false, label: "다시 읽는 중…" }}>
+        다시 읽기
+      </Button>,
+    );
+    expect(callerDisabled).toContain('aria-disabled="true"');
+  });
+
   it("aria-pressed·aria-describedby 를 넘긴다", () => {
     const html = renderToString(
       <Button aria-pressed aria-describedby="hint">
@@ -231,7 +260,28 @@ describe("DataTable·차트·단계(티켓 0074)", () => {
 
   it("AppFrame 은 레일과 본문을 나눈다", () => {
     const html = renderToString(<AppFrame rail="레일">본문</AppFrame>);
-    expect(html).toMatch(/<aside[^>]*>레일<\/aside><main[^>]*>본문<\/main>/);
+    expect(html).toMatch(/<aside[^>]*><div[^>]*>레일<\/div><\/aside><main[^>]*>본문<\/main>/);
+  });
+
+  it("AppFrame pending 은 진행 중일 때만 진행 줄·aria-busy·상태 문장을 두고, 상태 칸은 늘 그려 둔다(0122)", () => {
+    const idle = renderToString(
+      <AppFrame rail="레일" pending={{ active: false, label: "화면을 여는 중이에요" }}>
+        본문
+      </AppFrame>,
+    );
+    expect(idle).toMatch(/<span role="status"[^>]*><\/span>/);
+    expect(idle).not.toContain("data-pending-bar");
+    expect(idle).not.toContain("aria-busy");
+
+    const busy = renderToString(
+      <AppFrame rail="레일" pending={{ active: true, label: "화면을 여는 중이에요" }}>
+        본문
+      </AppFrame>,
+    );
+    expect(busy).toMatch(/<main aria-busy="true"/);
+    expect(busy).toMatch(/<\/main><span role="status"/);
+    expect(busy).toMatch(/role="status"[^>]*>화면을 여는 중이에요</);
+    expect(busy).toContain("data-pending-bar");
   });
 });
 

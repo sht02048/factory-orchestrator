@@ -121,7 +121,7 @@ export type TrackerErrorDetail =
   | { kind: "network"; cause: unknown };
 
 export type TrackerConnectionCheck =
-  | { ok: true; organizationName: string | null }
+  | { ok: true; organizationName: string | null; webhookSettingsUrl?: string }
   | { ok: false; error: TrackerErrorDetail };
 
 export interface Tracker {
@@ -144,6 +144,7 @@ export interface Tracker {
   listComments(key: TicketKey, page?: Page): Promise<Paged<TrackerComment>>;
   listProjects(): Promise<ReadonlyArray<TrackerProject>>;
   listLabels(projectId: TrackerProjectId): Promise<ReadonlyArray<TrackerLabel>>;
+  createLabel(input: { name: string; color: string }): Promise<TrackerLabel>;
   listStates(projectId: TrackerProjectId): Promise<ReadonlyArray<TrackerState>>;
 
   setState(key: TicketKey, stateId: TrackerStateId): Promise<void>;
@@ -231,6 +232,19 @@ export interface RunOnRunner {
   agentRef: AgentRef;
 }
 
+export interface ResumeAgentInput {
+  agent: AgentId;
+  model?: string;
+  message: string;
+  restartPrompt: string;
+  startIfGone?: boolean;
+}
+
+export interface ResumedAgent {
+  agentRef: AgentRef;
+  restarted: boolean;
+}
+
 export interface AgentQuestion {
   id: QuestionId;
   body: string;
@@ -250,11 +264,22 @@ export interface CompletionReport {
   reportedAt: Date | null;
 }
 
+export type AgentActivity =
+  | { kind: "working" | "interrupted" | "turn-ended"; since: Date }
+  | { kind: "unknown" };
+
+export interface UnreportedStop {
+  at: Date;
+  lastOutput: ReadonlyArray<string>;
+}
+
 export type RunProgress =
   | {
       kind: "active";
       questions: ReadonlyArray<AgentQuestion>;
       permissionWaits: ReadonlyArray<PermissionWait>;
+      activity?: AgentActivity;
+      unreportedStop?: UnreportedStop | null;
     }
   | { kind: "reported"; report: CompletionReport }
   | { kind: "ended-without-report"; detail: string }
@@ -281,6 +306,9 @@ export interface Runner {
     run: RunOnRunner,
     input: { permissionId: PermissionRequestId; reason: string },
   ): Promise<void>;
+
+  pauseAgent(run: RunOnRunner): Promise<void>;
+  resumeAgent(run: RunOnRunner, input: ResumeAgentInput): Promise<ResumedAgent>;
 
   stopAgent(run: RunOnRunner): Promise<void>;
   closeAgent(run: RunOnRunner): Promise<void>;

@@ -1,25 +1,33 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
+import { markAllTrackersChanged } from "@ganger/db";
 import { z } from "zod";
 import { answerInput, denyInput, submitAnswer, submitDenial } from "@ganger/app/home/actions";
 import { loadHomePage } from "@ganger/app/home/load";
 import { cancelRunRequest } from "@ganger/app/run-detail/actions";
+import { requestControl } from "@ganger/app/run-control";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
 import { loadRunnersPage } from "@ganger/app/runners/load";
 import { pickConditions, runConditionsSchema } from "@ganger/app/runs/conditions";
 import { loadRunsPage } from "@ganger/app/runs/load";
 import { MAX_ENDED_RUNS } from "@ganger/app/runs/model";
 import { loadShell } from "@ganger/app/shell/load";
+import { TITLE_BAR_COOKIE, isTitleBarHidden } from "@ganger/app/shell/window-chrome";
 import { loadStatsPage } from "@ganger/app/stats/load";
 import { statsPeriodDaysSchema } from "@ganger/app/stats/model";
 import { assignInput, submitAssignment } from "@ganger/app/tickets/assign";
-import { loadTicketsPage } from "@ganger/app/tickets/load";
+import { loadTicketRuns, loadTrackerTickets } from "@ganger/app/tickets/load";
 import { TIME_ZONE_COOKIE, parseTimeZone } from "@ganger/app/time-zone";
 import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
+import { getTrackerReads } from "./tracker-reads";
 
 export const getTimeZone = createServerFn({ method: "GET" }).handler(() =>
   parseTimeZone(getCookie(TIME_ZONE_COOKIE)),
+);
+
+export const getTitleBarHidden = createServerFn({ method: "GET" }).handler(() =>
+  isTitleBarHidden(getCookie(TITLE_BAR_COOKIE)),
 );
 
 export const getShell = createServerFn({ method: "GET" }).handler(() => loadShell(getDatabase()));
@@ -84,15 +92,31 @@ export const cancelRun = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string() }))
   .handler(({ data }) => cancelRunRequest(getDatabase(), data.runId, new Date()));
 
-export const getTicketsPage = createServerFn({ method: "GET" })
+export const controlRun = createServerFn({ method: "POST" })
+  .validator(z.object({ runId: z.string(), control: z.enum(["pause", "resume"]) }))
+  .handler(({ data }) => requestControl(getDatabase(), data.runId, data.control, new Date()));
+
+export const getTicketRuns = createServerFn({ method: "GET" })
+  .validator(z.object({ ws: z.string().optional() }))
+  .handler(({ data }) => loadTicketRuns(getDatabase(), data.ws, new Date()));
+
+export const getTrackerTickets = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
   .handler(({ data }) =>
-    loadTicketsPage(
-      { db: getDatabase(), secretBox: getSecretBox(), registry: getAdapterRegistry() },
+    loadTrackerTickets(
+      {
+        db: getDatabase(),
+        secretBox: getSecretBox(),
+        registry: getAdapterRegistry(),
+        trackerReads: getTrackerReads(),
+      },
       data.ws,
-      new Date(),
     ),
   );
+
+export const rereadTrackers = createServerFn({ method: "POST" }).handler(() => {
+  markAllTrackersChanged(getDatabase());
+});
 
 export const assignTicket = createServerFn({ method: "POST" })
   .validator(assignInput)

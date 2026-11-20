@@ -13,14 +13,28 @@ export interface TimeoutDecision {
   runnerUnreached: boolean;
 }
 
+export function countedRunMs(input: {
+  startedAt: Date;
+  now: Date;
+  pausedMs: number;
+  pausedSince: Date | null;
+}): number {
+  const currentPauseMs =
+    input.pausedSince === null ? 0 : Math.max(0, input.now.getTime() - input.pausedSince.getTime());
+  return input.now.getTime() - input.startedAt.getTime() - input.pausedMs - currentPauseMs;
+}
+
 export function decideTimeout(input: {
   state: RunState;
   startedAt: Date;
   now: Date;
   maxRunMs: number;
+  pausedMs: number;
+  pausedSince: Date | null;
   cancelRequested: boolean;
 }): TimeoutDecision | null {
-  if (input.now.getTime() - input.startedAt.getTime() < input.maxRunMs) return null;
+  const counted = countedRunMs(input);
+  if (counted < input.maxRunMs) return null;
   switch (input.state) {
     case "running":
     case "waiting-for-input":
@@ -38,6 +52,7 @@ export function decideTimeout(input: {
         ? { agentResult: "canceled", stopAgent: false, runnerUnreached: true }
         : { agentResult: "runner-disconnected", stopAgent: false, runnerUnreached: false };
     case "queued":
+    case "paused":
     case "ended":
       return null;
   }
@@ -48,7 +63,13 @@ export function decideConnection(input: {
   unreachableSince: Date | null;
   now: Date;
 }): "disconnect" | "keep-watching" {
-  if (input.state !== "running" && input.state !== "waiting-for-input") return "keep-watching";
+  if (
+    input.state !== "running" &&
+    input.state !== "waiting-for-input" &&
+    input.state !== "paused"
+  ) {
+    return "keep-watching";
+  }
   if (input.unreachableSince === null) return "keep-watching";
   const failingMs = input.now.getTime() - input.unreachableSince.getTime();
   return failingMs >= DISCONNECT_AFTER_MS ? "disconnect" : "keep-watching";

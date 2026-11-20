@@ -1,9 +1,15 @@
+import { log } from "@ganger/log";
+import type { Logger } from "@ganger/log";
+import { describeRunnerCall, logRunnerCall } from "./runner-call-log.js";
 import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@ganger/core";
 import type {
+  AgentRef,
   MailboxRef,
   PermissionRequestId,
   ProviderUsageReading,
   QuestionId,
+  ResumeAgentInput,
+  ResumedAgent,
   Runner,
   RunnerErrorDetail,
   RunnerFactory,
@@ -18,10 +24,16 @@ import type {
   WorktreeRef,
 } from "@ganger/core";
 import { z } from "zod";
+import { briefFor } from "./agent-brief.js";
 import { parseOrcaRunnerConfig } from "./config.js";
 import type { OrcaRunnerConfig } from "./config.js";
 import { workerReadLines } from "./log-tail.js";
-import { completionReport, decideProgress } from "./progress.js";
+import {
+  completionReport,
+  decideProgress,
+  isEscalationQuestion,
+  needsAgentPaneKey,
+} from "./progress.js";
 import { parseProviderUsage } from "./provider-usage.js";
 import {
   PUSH_CHECK_CONCURRENCY,
@@ -46,10 +58,12 @@ import {
   replyResultSchema,
   runBindResultSchema,
   runCurrentResultSchema,
+  sendResultSchema,
   serviceStatusResultSchema,
   statusResultSchema,
   taskListResultSchema,
   terminalCreateResultSchema,
+  terminalSendResultSchema,
   terminalShowResultSchema,
   workerListResultSchema,
   workerReadResultSchema,
@@ -78,6 +92,8 @@ const WORKER_LIST_MAX_PAGES = 50;
 export const LOG_MAX_PAGES = 200;
 export const LOG_CUT_MARKER = `[log tail cut: the transcript is longer than ${LOG_PAGE_SIZE * LOG_MAX_PAGES} messages, so these are not its last lines]`;
 const RAW_LIMIT = 4000;
+export const INTERRUPT_KEY = "\u001b";
+export const ESCALATION_ANSWER_SUBJECT = "Answer from the operator";
 
 const SENDER_ERROR_CODES = new Set([
   "no_active_sender_terminal",
@@ -102,6 +118,7 @@ interface ProjectRow {
 
 export interface OrcaRunnerOptions {
   sleep?: (ms: number) => Promise<void>;
+  logger?: () => Logger;
 }
 
 const realSleep = (ms: number): Promise<void> =>
@@ -114,11 +131,13 @@ export class OrcaRunner implements Runner {
   private readonly config: OrcaRunnerConfig;
   private readonly exec: RemoteExec;
   private readonly sleep: (ms: number) => Promise<void>;
+  private readonly logger: () => Logger;
 
   constructor(config: OrcaRunnerConfig, exec?: RemoteExec, options: OrcaRunnerOptions = {}) {
     this.config = config;
     this.exec = exec ?? sshExec(config);
     this.sleep = options.sleep ?? realSleep;
+    this.logger = options.logger ?? log;
   }
 
   async checkHealth(): Promise<RunnerHealth> {
@@ -368,7 +387,7 @@ export class OrcaRunner implements Runner {
     let started: z.infer<typeof workerStartResultSchema>;
     try {
       started = await this.orca(args, workerStartResultSchema, {
-        stdin: input.prompt,
+        stdin: briefFor(input.prompt),
         timeoutMs: this.config.startTimeoutMs,
         usesMailbox: true,
       });
@@ -525,7 +544,22 @@ export class OrcaRunner implements Runner {
       mails,
       worktreeRow,
       worktreeExists,
+      agentPaneKey: needsAgentPaneKey(worktreeRow) ? await this.paneKeyOf(worker.terminal) : null,
     });
+  }
+
+  private async paneKeyOf(terminal: string | null | undefined): Promise<string | null> {
+    if (terminal === null || terminal === undefined) return null;
+    const shown = await this.orcaOutcome(
+      ["terminal", "show", "--terminal", terminal],
+      terminalShowResultSchema,
+    );
+    if (!shown.ok) return null;
+    const { tabId, leafId } = shown.result.terminal;
+    if (tabId === null || tabId === undefined || leafId === null || leafId === undefined) {
+      return null;
+    }
+    return `${tabId}:${leafId}`;
   }
 
   private async taskResult(agent: OrcaAgent): Promise<string | Record<string, unknown> | null> {
@@ -570,6 +604,25 @@ export class OrcaRunner implements Runner {
   ): Promise<void> {
     const agent = this.agentOf(run);
     const mailbox = this.mailboxOf(run.mailbox);
+    if (isEscalationQuestion(input.questionId)) {
+      await this.orca(
+        [
+          "orchestration",
+          "send",
+          "--from",
+          mailbox.terminal,
+          "--to",
+          `dispatch:${agent.dispatchId}`,
+          "--subject",
+          ESCALATION_ANSWER_SUBJECT,
+          "--body",
+          input.answer,
+        ],
+        sendResultSchema,
+        { usesMailbox: true },
+      );
+      return;
+    }
     await this.orca(
       [
         "orchestration",
@@ -609,6 +662,204 @@ export class OrcaRunner implements Runner {
       denyResultSchema,
       { usesMailbox: true },
     );
+  }
+
+  async pauseAgent(run: RunOnRunner): Promise<void> {
+    const terminal = await this.liveAgentTerminal(this.agentOf(run), run.worktree);
+    if (terminal === null) {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "agent_not_running",
+        message: "the agent has no live terminal to pause",
+      });
+    }
+    await this.sendToTerminal(terminal, ["--text", INTERRUPT_KEY]);
+  }
+
+  async resumeAgent(run: RunOnRunner, input: ResumeAgentInput): Promise<ResumedAgent> {
+    const agent = this.agentOf(run);
+    const terminal = await this.liveAgentTerminal(agent, run.worktree);
+    if (terminal !== null) {
+      try {
+        await this.sendToTerminal(terminal, ["--text", input.message, "--enter"]);
+      } catch (error) {
+        const detail = detailOf(error);
+        if (detail.kind === "unreachable" || detail.kind === "malformed-output") {
+          throw new AdapterError<RunnerErrorDetail>(
+            {
+              kind: "start-outcome-unknown",
+              detail: detail.kind === "unreachable" ? detail.detail : detail.raw,
+            },
+            { cause: error },
+          );
+        }
+        throw error;
+      }
+      return { agentRef: run.agentRef, restarted: false };
+    }
+    const mailbox = this.mailboxOf(run.mailbox);
+    const adopted = await this.liveWorkerAt(run.worktree, {
+      runId: mailbox.runId,
+      exceptDispatch: agent.dispatchId,
+    });
+    if (adopted !== null) return { agentRef: adopted, restarted: true };
+    if (input.startIfGone === false) {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "agent_not_running",
+        message: "no agent session is running in the worktree",
+      });
+    }
+    let started: z.infer<typeof workerStartResultSchema>;
+    try {
+      started = await this.orca(
+        [
+          "orchestration",
+          "worker-start",
+          "--from",
+          mailbox.terminal,
+          "--run",
+          mailbox.runId,
+          "--spec-file",
+          "-",
+          "--task-title",
+          `resume ${agent.taskId}`,
+          "--worktree",
+          `id:${run.worktree}`,
+          "--agent",
+          input.agent,
+          ...modelArgs(input.model ?? this.config.model),
+        ],
+        workerStartResultSchema,
+        { stdin: input.restartPrompt, timeoutMs: this.config.startTimeoutMs, usesMailbox: true },
+      );
+    } catch (error) {
+      const detail = detailOf(error);
+      if (detail.kind === "unreachable" || detail.kind === "malformed-output") {
+        throw new AdapterError<RunnerErrorDetail>(
+          {
+            kind: "start-outcome-unknown",
+            detail: detail.kind === "unreachable" ? detail.detail : detail.raw,
+          },
+          { cause: error },
+        );
+      }
+      throw error;
+    }
+    if (started.state !== "ready") {
+      throw new AdapterError<RunnerErrorDetail>(
+        started.state === "failed"
+          ? {
+              kind: "runner-error",
+              code: "worker_start_failed",
+              message: "worker-start ended in state failed",
+            }
+          : {
+              kind: "start-outcome-unknown",
+              detail: `worker-start ended in state ${started.state}`,
+            },
+      );
+    }
+    return {
+      agentRef: encodeAgent({
+        dispatchId: started.dispatchId,
+        taskId: started.taskId,
+        runId: started.runId,
+      }),
+      restarted: true,
+    };
+  }
+
+  private async liveWorkerAt(
+    worktree: WorktreeRef,
+    { runId, exceptDispatch }: { runId: string; exceptDispatch: string },
+  ): Promise<AgentRef | null> {
+    for (const run of [runId, null]) {
+      const found = await this.unsettledWorkerAt(worktree, { runId: run, exceptDispatch });
+      if (found !== null) return found;
+    }
+    return null;
+  }
+
+  private async unsettledWorkerAt(
+    worktree: WorktreeRef,
+    { runId, exceptDispatch }: { runId: string | null; exceptDispatch: string },
+  ): Promise<AgentRef | null> {
+    let cursor: string | null = null;
+    for (let page = 0; page < WORKER_LIST_MAX_PAGES; page += 1) {
+      const result: z.infer<typeof workerListResultSchema> = await this.orca(
+        [
+          "orchestration",
+          "worker-list",
+          ...(runId === null ? [] : ["--run", runId]),
+          "--limit",
+          "100",
+          ...(cursor === null ? [] : ["--cursor", cursor]),
+        ],
+        workerListResultSchema,
+      );
+      for (const worker of result.workers) {
+        if (worker.workspace !== worktree || worker.dispatchId === exceptDispatch) continue;
+        const shown = await this.orca(
+          ["orchestration", "worker-show", "--dispatch", worker.dispatchId],
+          workerShowResultSchema,
+        );
+        if (!(await this.provenUnsettled(shown, worktree))) continue;
+        return encodeAgent({
+          dispatchId: worker.dispatchId,
+          taskId: worker.taskId,
+          runId: shown.runId,
+        });
+      }
+      const next = result.nextCursor ?? null;
+      if (next === null || next === cursor || result.workers.length === 0) return null;
+      cursor = next;
+    }
+    return null;
+  }
+
+  private async provenUnsettled(
+    worker: z.infer<typeof workerShowResultSchema>,
+    worktree: WorktreeRef,
+  ): Promise<boolean> {
+    if (worker.liveness === "exited" || worker.state === "failed") return false;
+    if (worker.liveness === "live" || worker.state !== "ready") return true;
+    return (await this.liveAgentTerminal(worker, worktree)) !== null;
+  }
+
+  private async liveAgentTerminal(agent: OrcaAgent, worktree: WorktreeRef): Promise<string | null> {
+    const worker = await this.orca(
+      ["orchestration", "worker-show", "--dispatch", agent.dispatchId],
+      workerShowResultSchema,
+    );
+    const terminal = worker.terminal ?? null;
+    if (terminal === null || worker.liveness === "exited") return null;
+    if (worker.liveness === "live") return terminal;
+    const row = await this.worktreeRow(worktree);
+    if (row !== null && row !== "unknown" && (row.agents ?? []).length === 0) return null;
+    const shown = await this.orcaOutcome(
+      ["terminal", "show", "--terminal", terminal],
+      terminalShowResultSchema,
+    );
+    if (!shown.ok) {
+      if (shown.code === "terminal_handle_stale") return null;
+      throw this.errorFor(shown, {});
+    }
+    return shown.result.terminal.connected === true ? terminal : null;
+  }
+
+  private async sendToTerminal(terminal: string, input: ReadonlyArray<string>): Promise<void> {
+    const sent = await this.orca(
+      ["terminal", "send", "--terminal", terminal, ...input],
+      terminalSendResultSchema,
+    );
+    if (!sent.send.accepted) {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "input_not_accepted",
+        message: "the agent terminal did not accept the input",
+      });
+    }
   }
 
   async stopAgent(run: RunOnRunner): Promise<void> {
@@ -777,12 +1028,17 @@ export class OrcaRunner implements Runner {
       }
       throw error;
     }
+    const call = describeRunnerCall(argv, this.config.orcaPath);
+    const startedAt = performance.now();
     try {
-      return await this.exec.run(command, {
+      const result = await this.exec.run(command, {
         timeoutMs: options.timeoutMs ?? this.config.commandTimeoutMs,
         ...(options.stdin === undefined ? {} : { stdin: options.stdin }),
       });
+      logRunnerCall(this.logger(), call, performance.now() - startedAt, { kind: "result", result });
+      return result;
     } catch (error) {
+      logRunnerCall(this.logger(), call, performance.now() - startedAt, { kind: "threw", error });
       throw new AdapterError<RunnerErrorDetail>(
         { kind: "unreachable", detail: `could not run ssh: ${String(error)}` },
         { cause: error },

@@ -1,37 +1,43 @@
-import { createFileRoute, getRouteApi, useRouter } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { conditionsForStatsGroup } from "@ganger/app/runs/conditions";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { getStatsPage } from "../../server/functions";
+import { requestTimeZone, useRequestTimeZone } from "../../query/request-time-zone";
+import { loadRouteQuery } from "../../query/route-query";
 import { statsMessages } from "../../stats/messages";
+import { statsQuery } from "../../stats/query";
 import {
   DEFAULT_STATS_PERIOD_DAYS,
   STATS_DIMENSIONS,
   statsPeriodDaysSchema,
 } from "@ganger/app/stats/model";
 import { StatsScreen } from "../../stats/stats-screen";
+import { useShell } from "../../shell/shell-query";
+import { ScreenError } from "../../shell/screen-error";
 
 const t = createTranslator({ locale: defaultLocale, messages: statsMessages, namespace: "stats" });
-const appRoute = getRouteApi("/_app");
 
 export const Route = createFileRoute("/_app/stats")({
+  errorComponent: ScreenError,
   validateSearch: z.object({
     by: z.enum(STATS_DIMENSIONS).optional().catch(undefined),
     days: statsPeriodDaysSchema.optional().catch(undefined),
   }),
-  loaderDeps: ({ search }) => ({ ws: search.ws, days: search.days }),
-  loader: ({ deps }) =>
-    getStatsPage({ data: { ws: deps.ws, days: deps.days ?? DEFAULT_STATS_PERIOD_DAYS } }),
-  shouldReload: false,
+  loaderDeps: ({ search }) => ({ ws: search.ws, days: search.days ?? DEFAULT_STATS_PERIOD_DAYS }),
+  loader: (load) =>
+    loadRouteQuery(load, statsQuery(load.deps.ws, load.deps.days, requestTimeZone())),
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: StatsRoute,
 });
 
 function StatsRoute() {
-  const page = Route.useLoaderData();
-  const shell = appRoute.useLoaderData();
-  const { by, ws } = Route.useSearch();
+  const { ws, days } = Route.useLoaderDeps();
+  const timeZone = useRequestTimeZone();
+  const { data: page } = useSuspenseQuery(statsQuery(ws, days, timeZone));
+  const shell = useShell();
+  const { by } = Route.useSearch();
   const navigate = Route.useNavigate();
   const router = useRouter();
   return (

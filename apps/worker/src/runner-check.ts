@@ -1,3 +1,4 @@
+import { withLogContext } from "@ganger/log";
 import { isAssignmentBlocked, summarizeRunOutcome } from "@ganger/core";
 import type { Runner, RunnerErrorDetail, RunnerHealth, RunnerProject } from "@ganger/core";
 import {
@@ -22,9 +23,9 @@ export async function checkRunners(context: TickContext): Promise<void> {
       continue;
     }
     try {
-      await checkRunner(context, stored);
+      await withLogContext({ runnerId: stored.id }, () => checkRunner(context, stored));
     } catch (error) {
-      context.logger.warn("could not record runner check", { runnerId: stored.id, error });
+      context.logger.warn("runner.check_record_failed", { runnerId: stored.id, error });
     }
   }
 }
@@ -38,7 +39,7 @@ export async function checkRunner(
   try {
     health = await runner.checkHealth();
   } catch (error) {
-    context.logger.warn("could not check runner", { runnerId: stored.id, error });
+    context.logger.warn("runner.check_failed", { runnerId: stored.id, error });
     recordRunnerCheck(context.db, {
       runnerId: stored.id,
       online: false,
@@ -55,7 +56,7 @@ export async function checkRunner(
     try {
       projects = await runner.listProjects();
     } catch (error) {
-      context.logger.warn("could not list runner projects", { runnerId: stored.id, error });
+      context.logger.warn("runner.projects_failed", { runnerId: stored.id, error });
     }
   }
   recordRunnerCheck(context.db, {
@@ -72,7 +73,7 @@ export async function checkRunner(
     try {
       await confirmRemovedWorktrees(context, stored, runner);
     } catch (error) {
-      context.logger.warn("could not confirm removed worktrees", { runnerId: stored.id, error });
+      context.logger.warn("runner.removed_worktrees_failed", { runnerId: stored.id, error });
     }
   }
   return { ok: true, health };
@@ -95,7 +96,7 @@ async function readProviderUsage(
     const reading = await runner.readProviderUsage();
     recordProviderUsage(context.db, { runnerId: stored.id, readAt: context.now(), reading });
   } catch {
-    context.logger.warn("could not read runner provider usage", { runnerId: stored.id });
+    context.logger.warn("runner.provider_usage_failed", { runnerId: stored.id });
   }
 }
 
@@ -112,7 +113,7 @@ async function confirmRemovedWorktrees(
     try {
       exists = await runner.worktreeExists(run.worktree);
     } catch (error) {
-      context.logger.warn("could not check whether a kept worktree still exists", {
+      context.logger.warn("runner.kept_worktree_check_failed", {
         runId: run.id,
         error,
       });

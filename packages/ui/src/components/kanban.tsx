@@ -37,9 +37,11 @@ export interface KanbanCardProps {
   tag?: ReactNode;
   title: ReactNode;
   detail?: ReactNode;
+  detailTone?: "problem";
   meta?: ReactNode;
   time?: ReactNode;
   action?: ReactNode;
+  menu?: ReactNode;
   onOpen: () => void;
   openRef?: Ref<HTMLButtonElement>;
   selected?: boolean;
@@ -50,9 +52,11 @@ export function KanbanCard({
   tag,
   title,
   detail,
+  detailTone,
   meta,
   time,
   action,
+  menu,
   onOpen,
   openRef,
   selected = false,
@@ -88,15 +92,28 @@ export function KanbanCard({
         )}
       >
         {tag === undefined ? null : (
-          <span id={tagId} {...stylex.props(styles.tag)}>
+          <span id={tagId} {...stylex.props(styles.tag, menu !== undefined && styles.besideMenu)}>
             {tag}
           </span>
         )}
-        <span id={nameId} {...stylex.props(styles.title)}>
+        <span
+          id={nameId}
+          {...stylex.props(
+            styles.title,
+            menu !== undefined && tag === undefined && styles.besideMenu,
+          )}
+        >
           {title}
         </span>
         {detail === undefined ? null : (
-          <span id={detailId} {...stylex.props(textStyles("ui"), styles.detail)}>
+          <span
+            id={detailId}
+            {...stylex.props(
+              textStyles("ui"),
+              styles.detail,
+              detailTone === "problem" && styles.detailProblem,
+            )}
+          >
             {detail}
           </span>
         )}
@@ -113,6 +130,7 @@ export function KanbanCard({
         ) : null}
       </button>
       {action === undefined ? null : <span {...stylex.props(styles.action)}>{action}</span>}
+      {menu === undefined ? null : <span {...stylex.props(styles.menu)}>{menu}</span>}
     </div>
   );
 }
@@ -184,9 +202,18 @@ const styles = stylex.create({
       [breakpoints.kanbanCardActionBelow]: `calc(${space.s3} + ${size.control} + ${space.s2})`,
     },
   },
+  besideMenu: { paddingInlineEnd: `calc(${size.control} - ${space.s2})` },
   selected: { boxShadow: `inset 0 0 0 1px ${colors.borderSelected}` },
   tag: { display: "flex", paddingBottom: space.s1 },
-  title: { display: "block", minWidth: 0, overflowWrap: "anywhere" },
+  title: {
+    display: "-webkit-box",
+    minWidth: 0,
+    overflow: "hidden",
+    overflowWrap: "anywhere",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: 2,
+  },
+  detailProblem: { color: colors.problem },
   detail: {
     display: "-webkit-box",
     minWidth: 0,
@@ -215,6 +242,12 @@ const styles = stylex.create({
     overflowWrap: "break-word",
   },
   time: { flexShrink: 0, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" },
+  menu: {
+    position: "absolute",
+    insetInlineEnd: space.s1,
+    insetBlockStart: space.s1,
+    display: "flex",
+  },
   action: {
     position: "absolute",
     insetInlineEnd: space.s3,

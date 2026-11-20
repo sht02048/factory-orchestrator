@@ -1,6 +1,6 @@
 import { blockedProjectsOf, currentWindows, highestUsage, summarizeRunOutcome } from "@ganger/core";
 import type { UsageWindow } from "@ganger/core";
-import { getRunWithRecords, listRunners, listRuns, listWorkspaces } from "@ganger/db";
+import { listRunners, listRunsWithRecords, listWorkspaces } from "@ganger/db";
 import type { Database, StoredProviderUsage, StoredRun } from "@ganger/db";
 import { z } from "zod";
 import { prerequisiteHint, prerequisiteProject } from "../prerequisites.js";
@@ -17,6 +17,7 @@ import type {
 
 const runnerConfigSchema = z.object({
   sshTarget: z.string().min(1).optional().catch(undefined),
+  orcaPath: z.string().min(1).optional().catch(undefined),
 });
 
 export function loadRunnersPage(db: Database, now: Date): RunnersPage {
@@ -33,7 +34,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
     else list.push(item);
   };
 
-  for (const run of listRuns(db)) {
+  for (const { run, records } of listRunsWithRecords(db)) {
     if (run.runnerId === null) continue;
     const base = { id: run.id, ticketKey: run.ticket.key, workspace: workspaceOf(run) };
     switch (run.state) {
@@ -42,6 +43,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
         break;
       case "running":
       case "waiting-for-input":
+      case "paused":
       case "disconnected":
         push(occupying, run.runnerId, {
           ...base,
@@ -52,7 +54,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
       case "ended": {
         const { worktree } = summarizeRunOutcome(run);
         if (worktree !== "keep-until-pr-settles" && worktree !== "operator-decides") break;
-        if (getRunWithRecords(db, run.id)?.records.worktreeRemovedAt !== null) break;
+        if (records.worktreeRemovedAt !== null) break;
         push(leftWorktrees, run.runnerId, { ...base, worktree });
         break;
       }
@@ -98,6 +100,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
       queued: queued.get(runner.id) ?? [],
       leftWorktrees: leftWorktrees.get(runner.id) ?? [],
       sshTarget: config.sshTarget ?? null,
+      orcaPath: config.orcaPath ?? null,
       usage: usageView(runner.providerUsage, now),
     };
   });

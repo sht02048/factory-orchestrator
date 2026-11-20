@@ -1,36 +1,44 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { useCallback } from "react";
 import { createTranslator } from "use-intl";
 import { toRunId } from "@ganger/core";
 import { z } from "zod";
+import { useAgedHomePage } from "../../home/aged-page";
 import { HomeScreen } from "../../home/home-screen";
 import { homeMessages } from "../../home/messages";
-import type { HomePage } from "@ganger/app/home/model";
-import { useRefreshWhileVisible } from "../../home/refresh";
+import { useDashboardActions } from "../../home/mutations";
+import { dashboardQuery } from "../../home/query";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { answerQuestion, denyPermission, getHomePage } from "../../server/functions";
+import { requestTimeZone, useRequestTimeZone } from "../../query/request-time-zone";
+import { loadRouteQuery } from "../../query/route-query";
+import { ScreenError } from "../../shell/screen-error";
 
 const t = createTranslator({ locale: defaultLocale, messages: homeMessages, namespace: "home" });
 
 export const Route = createFileRoute("/_app/")({
+  errorComponent: ScreenError,
   validateSearch: z.object({
     view: z.enum(["todo"]).optional().catch(undefined),
     run: z.string().optional().catch(undefined),
   }),
   loaderDeps: ({ search }) => ({ ws: search.ws }),
-  loader: ({ deps }) => getHomePage({ data: { ws: deps.ws } }),
+  loader: (load) => loadRouteQuery(load, dashboardQuery(load.deps.ws, requestTimeZone())),
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: HomeRoute,
 });
 
 function HomeRoute() {
-  const loaded = Route.useLoaderData();
   const { ws } = Route.useLoaderDeps();
+  const timeZone = useRequestTimeZone();
+  const { data: loaded, refetch } = useSuspenseQuery(dashboardQuery(ws, timeZone));
+  const readAgainWhenLimitLifts = useCallback(() => {
+    void refetch();
+  }, [refetch]);
+  const page = useAgedHomePage(loaded, readAgainWhenLimitLifts);
   const { view, run } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const router = useRouter();
-  const [polled, setPolled] = useState<{ base: HomePage; page: HomePage } | null>(null);
-  const page = polled !== null && polled.base === loaded ? polled.page : loaded;
+  const actions = useDashboardActions();
   const clearOpenRun = useCallback(() => {
     void navigate({
       search: (prev) => ({ ...prev, run: undefined }),
@@ -38,12 +46,6 @@ function HomeRoute() {
       resetScroll: false,
     });
   }, [navigate]);
-  useRefreshWhileVisible(() => {
-    void getHomePage({ data: { ws } }).then(
-      (next) => setPolled({ base: loaded, page: next }),
-      () => {},
-    );
-  });
   return (
     <ScreenMessages messages={homeMessages}>
       <HomeScreen
@@ -56,14 +58,9 @@ function HomeRoute() {
             resetScroll: false,
           });
         }}
-        onAnswer={async (input) => {
-          await answerQuestion({ data: input });
-          await router.invalidate();
-        }}
-        onDeny={async (input) => {
-          await denyPermission({ data: input });
-          await router.invalidate();
-        }}
+        onAnswer={actions.onAnswer}
+        onDeny={actions.onDeny}
+        onControl={actions.onControl}
         openRunId={run === undefined ? undefined : toRunId(run)}
         onOpenRunShown={clearOpenRun}
       />

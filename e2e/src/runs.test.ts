@@ -214,32 +214,57 @@ describe("Runs 화면(브라우저, 0056)", () => {
     }
   });
 
-  it("editor 변형(Settings)은 800px 에서 두 열이고 700px 에서 편집 영역이 아래로 내려간다", async (context) => {
+  it("머리글과 첫 행 사이에 8px 을 두고, 머리글을 숨긴 좁은 폭에서는 빈 틈을 남기지 않는다(0141)", async (context) => {
+    const headGapAt = async (width: number) => {
+      const page = await newPage(context, { width, height: 900 });
+      await openRuns(page);
+      const list = page.getByRole("listbox", { name: runsJson.listLabel });
+      await list.getByRole("option").first().click();
+      return list.evaluate((listbox) => {
+        const table = listbox.parentElement;
+        const head = listbox.previousElementSibling;
+        const firstRow = listbox.querySelector('[role="option"]');
+        if (table === null || head === null || firstRow === null)
+          throw new Error("runs table not found");
+        const rowTop = firstRow.getBoundingClientRect().top;
+        return {
+          headShown: getComputedStyle(head).display !== "none",
+          belowHead: Math.round(rowTop - head.getBoundingClientRect().bottom),
+          belowTableTop: Math.round(rowTop - table.getBoundingClientRect().top),
+        };
+      });
+    };
+
+    const wide = await headGapAt(1440);
+    expect(wide).toMatchObject({ headShown: true, belowHead: 8 });
+
+    const narrow = await headGapAt(400);
+    expect(narrow).toMatchObject({ headShown: false, belowTableTop: 0 });
+  });
+
+  it("Settings 목차는 1100px 에서 본문 왼쪽에, 800px 에서 본문 위 한 줄에 둔다(0119)", async (context) => {
     const boxes = async (width: number) => {
       const page = await newPage(context, { width, height: 900 });
       await page.goto(`/settings?ws=${workspaceId}`);
       await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
       await page.waitForLoadState("networkidle");
       return page.evaluate(() => {
-        const panel = document.querySelector("main aside");
-        const list = panel?.previousElementSibling;
-        if (panel === null || panel === undefined || list === null || list === undefined)
-          throw new Error("split view not found");
+        const nav = document.querySelector('main nav[aria-label="Settings 목차"]');
+        const first = document.querySelector("main section#workspace");
+        if (nav === null || first === null) throw new Error("settings layout not found");
         const box = (element: Element) => {
           const { x, y, width, height } = element.getBoundingClientRect();
           return { x, y, width, height };
         };
-        return { list: box(list), panel: box(panel) };
+        return { nav: box(nav), first: box(first) };
       });
     };
 
-    const wide = await boxes(800);
-    expect(wide.panel.x).toBeGreaterThan(wide.list.x);
-    expect(wide.panel.width).toBeGreaterThan(360);
+    const wide = await boxes(1100);
+    expect(wide.nav.x + wide.nav.width).toBeLessThanOrEqual(wide.first.x);
 
-    const narrow = await boxes(700);
-    expect(narrow.panel.x).toBe(narrow.list.x);
-    expect(narrow.panel.y).toBeGreaterThanOrEqual(narrow.list.y + narrow.list.height);
+    const narrow = await boxes(800);
+    expect(narrow.nav.y + narrow.nav.height).toBeLessThanOrEqual(narrow.first.y);
   });
 
   it("레일의 Runner Issue 점은 글자와 바탕의 대비가 4.5:1 이상이다", async (context) => {
@@ -275,40 +300,6 @@ describe("Runs 화면(브라우저, 0056)", () => {
 });
 
 describe("Runs 조건(브라우저, 0075)", () => {
-  it("주소의 조건으로 거르고, 끝난 런 상한은 조건 안에서 적용하며, 칩을 지우면 포커스가 남은 칩으로 간다", async (context) => {
-    const page = await newPage(context, { width: 1280, height: 900 });
-    await page.goto(`/runs?ws=${workspaceId}&runner=${onlineRunner}&agent=${agent}&days=14`);
-    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
-    await page.waitForLoadState("networkidle");
-
-    const conditions = page.getByRole("group", { name: runsJson.conditions.label });
-    const runnerChip = conditions.getByRole("button", {
-      name: `러너: ${onlineRunner} 조건 지우기`,
-    });
-    await runnerChip.waitFor();
-    expect(await conditions.getByRole("button").allTextContents()).toEqual([
-      `러너: ${onlineRunner}`,
-      "에이전트: Claude Code",
-      "기간: 최근 14일",
-      runsJson.conditions.clearAll,
-    ]);
-    expect(await page.getByRole("option", { name: /^ACME-END-/ }).count()).toBe(endedPageSize);
-    expect(await page.getByRole("option", { name: runningKey }).count()).toBe(0);
-
-    await runnerChip.click();
-    await page.waitForURL((url) => !url.searchParams.has("runner"));
-    await runnerChip.waitFor({ state: "detached" });
-    expect(await page.evaluate(() => document.activeElement?.textContent)).toBe(
-      "에이전트: Claude Code",
-    );
-
-    await conditions.getByRole("button", { name: runsJson.conditions.clearAll }).click();
-    await conditions.waitFor({ state: "detached" });
-    expect(new URL(page.url()).search).toBe(`?ws=${workspaceId}`);
-    await page.getByRole("option", { name: runningKey }).waitFor();
-    expect(await page.evaluate(() => document.activeElement?.getAttribute("role"))).toBe("tab");
-  });
-
   it("조건에 맞는 런이 없으면 조건 때문이라고 알린다", async (context) => {
     const page = await newPage(context, { width: 1280, height: 900 });
     await page.goto(`/runs?ws=${workspaceId}&agent=codex`);

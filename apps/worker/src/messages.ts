@@ -1,6 +1,11 @@
 import type { AgentResult, PrState, SummaryOutcome } from "@ganger/core";
 
 export const messages = {
+  resume: {
+    message: "운영자가 멈춘 작업을 다시 시작했어요. 멈춘 데서 이어서 진행해 주세요.",
+    restartPreamble:
+      "이 워크트리에서 앞 에이전트가 하던 작업을 운영자가 멈췄어요. git 상태와 커밋 기록으로 어디까지 했는지 확인하고, 멈춘 데서 이어서 아래 티켓을 끝내 주세요.",
+  },
   resultComment: {
     title: "Ganger 런이 끝났어요.",
     summary: "요약 결과",

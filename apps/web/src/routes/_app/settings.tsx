@@ -1,11 +1,24 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
 import { createTranslator } from "use-intl";
-import { z } from "zod";
+import { resolveWorkspace } from "@ganger/app/shell/model";
 import { ScreenMessages, defaultLocale } from "../../i18n";
-import { getSettingsPage } from "../../server/settings-functions";
+import { loadCachedRouteQuery, loadRouteQuery } from "../../query/route-query";
+import { LogSection } from "../../settings/log-section";
+import { logSettingsQuery, useLogActions } from "../../settings/log-query";
 import { settingsMessages } from "../../settings/messages";
-import { SettingsScreen } from "../../settings/settings-screen";
-import { useSettingsActions } from "../../settings/use-settings-actions";
+import { SettingsScreen } from "../../settings/settings-page";
+import { NavigationGuard } from "../../settings/navigation-guard";
+import {
+  boundProjectReadsQuery,
+  settingsQuery,
+  trackerProjectsQuery,
+  useSettingsPage,
+} from "../../settings/settings-query";
+import { routerSettingsLink } from "../../settings/settings-link";
+import { useSettingsActions, useSettingsQueryRefresh } from "../../settings/use-settings-actions";
+import { useShell } from "../../shell/shell-query";
+import { ScreenError } from "../../shell/screen-error";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -14,29 +27,38 @@ const t = createTranslator({
 });
 
 export const Route = createFileRoute("/_app/settings")({
-  validateSearch: z.object({ sel: z.string().optional() }),
+  errorComponent: ScreenError,
   loaderDeps: ({ search }) => ({ ws: search.ws }),
-  loader: ({ deps }) => getSettingsPage({ data: { ws: deps.ws } }),
+  loader: async (load) => {
+    await Promise.all([
+      loadRouteQuery(load, settingsQuery(load.deps.ws)),
+      loadRouteQuery(load, logSettingsQuery),
+      loadCachedRouteQuery(load, trackerProjectsQuery),
+      loadCachedRouteQuery(load, boundProjectReadsQuery(load.context.queryClient, load.deps.ws)),
+    ]);
+  },
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: SettingsRoute,
 });
 
 function SettingsRoute() {
-  const page = Route.useLoaderData();
-  const { sel } = Route.useSearch();
-  const navigate = Route.useNavigate();
-  const actions = useSettingsActions();
-
+  const { ws } = Route.useSearch();
+  const page = useSettingsPage(ws);
+  const shell = useShell();
+  const actions = useSettingsActions(useSettingsQueryRefresh());
+  const { data: logView } = useSuspenseQuery(logSettingsQuery);
+  const logActions = useLogActions();
   return (
     <ScreenMessages messages={settingsMessages}>
       <SettingsScreen
         page={page}
-        selected={sel}
-        onSelect={(item) => {
-          void navigate({ search: (prev) => ({ ...prev, sel: item }), replace: true });
-        }}
+        runnerIssues={shell.runnerIssues}
+        workspaceView={resolveWorkspace(shell.workspaces, ws).kind}
+        ws={ws}
         actions={actions}
-        renderRunnersLink={(props) => <Link to="/runners" {...props} />}
+        renderLink={routerSettingsLink}
+        renderGuard={(guard) => <NavigationGuard {...guard} />}
+        logs={<LogSection view={logView} actions={logActions} />}
       />
     </ScreenMessages>
   );

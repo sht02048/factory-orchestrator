@@ -1,3 +1,4 @@
+import { silentLogger } from "@ganger/log/testing";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -117,7 +118,7 @@ beforeAll(async () => {
       .registerRunner({ kind: toRunnerKind(fakeKind), create: () => runner }),
     secretBox: new SecretBox(encryptionKey),
     pollIntervalMs: 20,
-    logger: { warn: (message, fields) => warnings.push({ message, fields }) },
+    logger: { ...silentLogger, warn: (event, fields) => warnings.push({ event, fields }) },
   });
 
   process.env["DATABASE_PATH"] = dbPath;
@@ -244,7 +245,7 @@ function assign(ticketKey: TicketKey): StoredRun {
   const result = assignRun(db, {
     ticket: { connection, key: ticketKey },
     trackerProject,
-    runnerProject: mapping.runnerProject,
+    runnerProject: mapping.defaultRepo,
     agent: mapping.agent,
   });
   if (!result.ok) throw new Error(`assign ${ticketKey} failed: ${result.reason}`);

@@ -1,3 +1,5 @@
+import { withLogContext } from "@ganger/log";
+import type { LogEvent } from "@ganger/log";
 import { AdapterError, summarizeRunOutcome } from "@ganger/core";
 import type { PullRequestSnapshot, Tracker } from "@ganger/core";
 import {
@@ -5,10 +7,12 @@ import {
   getWorkspaceTrackerProject,
   listRunners,
   listRuns,
+  inTransaction,
+  markTrackerChanged,
   updateRunRecords,
 } from "@ganger/db";
 import type { RunRecords, StoredRun, StoredRunner } from "@ganger/db";
-import { decideRunPrState, tryWrite } from "./context.js";
+import { decideRunPrState, runLogContext, tryWrite } from "./context.js";
 import type { ActiveRun, StartedStoredRun, TickContext } from "./context.js";
 import { messages } from "./messages.js";
 
@@ -20,13 +24,13 @@ type StartedEndedRun = Extract<EndedRun, { startedAt: Date }>;
 export async function processAfterRuns(context: TickContext): Promise<void> {
   const runnersById = new Map(listRunners(context.db).map((runner) => [runner.id, runner]));
   const runs = listRuns(context.db, {
-    states: ["running", "waiting-for-input", "disconnected", "ended"],
+    states: ["running", "waiting-for-input", "paused", "disconnected", "ended"],
   });
   for (const run of runs) {
     try {
-      await afterRun(context, run, runnersById);
+      await withLogContext(runLogContext(run), () => afterRun(context, run, runnersById));
     } catch (error) {
-      context.logger.warn("could not follow up a run", { runId: run.id, error });
+      context.logger.warn("run.follow_up_failed", { ...runLogContext(run), error });
     }
   }
 }
@@ -40,19 +44,17 @@ async function afterRun(
   const records = getRunWithRecords(context.db, run.id)?.records;
   if (records === undefined) return;
   if (run.state !== "ended") {
-    await attempt(context, run, "could not update the tracker", () =>
+    await attempt(context, run, "run.tracker_update_failed", () =>
       markInProgress(context, run, records),
     );
-    await attempt(context, run, "could not poll the run's pull request", () =>
-      pollActivePullRequest(context, run),
-    );
+    await attempt(context, run, "run.pr_poll_failed", () => pollActivePullRequest(context, run));
     return;
   }
-  await attempt(context, run, "could not comment the run result", () =>
+  await attempt(context, run, "run.result_comment_failed", () =>
     commentResult(context, run, records),
   );
   if (run.startedAt !== null) {
-    await attempt(context, run, "could not follow up the run's worktree", () =>
+    await attempt(context, run, "run.worktree_follow_up_failed", () =>
       followWorktree(context, run, records, runnersById),
     );
   } else {
@@ -63,13 +65,13 @@ async function afterRun(
 async function attempt(
   context: TickContext,
   run: StoredRun,
-  message: string,
+  event: LogEvent,
   work: () => Promise<void>,
 ): Promise<void> {
   try {
     await work();
   } catch (error) {
-    context.logger.warn(message, { runId: run.id, error });
+    context.logger.warn(event, { runId: run.id, error });
   }
 }
 
@@ -93,7 +95,10 @@ async function markInProgress(
     return;
   }
   tryWrite(context, run.id, () =>
-    updateRunRecords(context.db, run.id, { trackerStateSetAt: context.now() }),
+    inTransaction(context.db, () => {
+      updateRunRecords(context.db, run.id, { trackerStateSetAt: context.now() });
+      markTrackerChanged(context.db, run.ticket.connection);
+    }),
   );
 }
 
@@ -119,7 +124,10 @@ async function commentResult(
     context.unrecordedComments.set(run.id, comment);
   }
   const recorded = tryWrite(context, run.id, () =>
-    updateRunRecords(context.db, run.id, { trackerComment: comment }),
+    inTransaction(context.db, () => {
+      updateRunRecords(context.db, run.id, { trackerComment: comment });
+      markTrackerChanged(context.db, run.ticket.connection);
+    }),
   );
   if (recorded !== undefined) context.unrecordedComments.delete(run.id);
 }
@@ -167,7 +175,7 @@ export function resultCommentBody(run: EndedRun, records: RunRecords): string {
 function trackerFor(context: TickContext, run: StoredRun): Tracker | null {
   const tracker = context.adapters.tracker(context.db, run.ticket.connection);
   if (tracker === null) {
-    context.logger.warn("run's tracker connection is not registered", { runId: run.id });
+    context.logger.warn("run.tracker_connection_missing", { runId: run.id });
   }
   return tracker;
 }
@@ -181,7 +189,7 @@ function isTicketGone(error: unknown): boolean {
 }
 
 function forgetGoneTicket(context: TickContext, run: StoredRun): void {
-  context.logger.warn("run's ticket was not found in the tracker; skipping tracker updates", {
+  context.logger.warn("run.ticket_missing_skip_updates", {
     runId: run.id,
   });
   context.ticketsGone.add(run.id);
@@ -270,7 +278,10 @@ async function currentPullRequest(
   const linked = records.pullRequest;
   if (linked === null) return (await decideRunPrState(context, run)).pr;
   const codeHosts = context.adapters.allCodeHosts(context.db, (connectionId, error) => {
-    context.logger.warn("could not create code host adapter", { connectionId, error });
+    context.logger.warn("run.code_host_adapter_failed", {
+      codeHostConnectionId: connectionId,
+      error,
+    });
   });
   for (const codeHost of codeHosts) {
     const repo = codeHost.repoOf(run.runnerProject);
@@ -292,7 +303,7 @@ async function removeWorktree(
   } catch (error) {
     const exists = await runner.worktreeExists(run.worktree).catch(() => true);
     if (exists) {
-      context.logger.warn("could not remove a worktree", { runId: run.id, error });
+      context.logger.warn("run.worktree_remove_failed", { runId: run.id, error });
       return;
     }
   }

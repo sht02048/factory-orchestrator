@@ -1,11 +1,12 @@
 import type { AgentResult, PrState, SummaryOutcome, TrackerStateCategory } from "@ganger/core";
+import type { Remote } from "../settings/model.js";
 import type { WorkspaceChoice } from "../shell/model.js";
 
 export type TicketRun =
   | {
       id: string;
       runnerName: string | null;
-      state: "queued" | "running" | "waiting-for-input" | "disconnected";
+      state: "queued" | "running" | "waiting-for-input" | "paused" | "disconnected";
       elapsedMs: number;
     }
   | {
@@ -20,9 +21,17 @@ export type TicketRun =
       prSettledLater: boolean;
     };
 
+export interface AssignRepo {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  label: string | null;
+}
+
 export interface AssignDefaults {
   runnerProject: string;
   agent: string;
+  repos: ReadonlyArray<AssignRepo>;
 }
 
 export type Assignability =
@@ -50,6 +59,7 @@ export interface RunnerChoice {
   online: boolean;
   assignmentBlocked: boolean;
   projects: ReadonlyArray<string>;
+  blockedProjects: ReadonlyArray<string>;
   usageLimits: ReadonlyArray<RunnerUsageLimit>;
 }
 
@@ -84,6 +94,82 @@ export interface TicketsPage {
   trackerProjectCount: number;
 }
 
+export interface TicketMappingRepoFacts {
+  project: string;
+  isDefault: boolean;
+  labelId: string | null;
+}
+
+export interface TicketMappingFacts {
+  agent: string;
+  defaultRepo: string;
+  repos: ReadonlyArray<TicketMappingRepoFacts>;
+}
+
+export interface TicketProjectFacts {
+  connection: string;
+  projectId: string;
+  name: string;
+  mapping: TicketMappingFacts | null;
+  autoAssignLabel: string | null;
+}
+
+export interface TicketRunFacts {
+  runs: TicketRun[];
+  activeRunId: string | null;
+  retryRepo: string | null;
+}
+
+export interface TicketRunsData {
+  workspace: WorkspaceChoice;
+  runners: RunnerChoice[];
+  agents: string[];
+  projects: TicketProjectFacts[];
+  repoNames: Record<string, string>;
+  runsByTicket: Record<string, TicketRunFacts>;
+}
+
+export interface TrackerLabel {
+  id: string;
+  name: string;
+}
+
+export interface TrackerTicketView {
+  connection: string;
+  projectId: string;
+  projectName: string;
+  key: string;
+  title: string;
+  url: string | null;
+  state: { name: string; category: TrackerStateCategory };
+  labels: ReadonlyArray<TrackerLabel>;
+}
+
+export interface TrackerProjectLabels {
+  connection: string;
+  projectId: string;
+  labels: Remote<TrackerLabel>;
+}
+
+export interface TrackerTicketsData {
+  workspace: WorkspaceChoice;
+  tickets: TrackerTicketView[];
+  labels: TrackerProjectLabels[];
+  errors: TrackerLoadError[];
+  truncated: TrackerTruncation[];
+}
+
+export const ASSIGN_REJECT_REASONS = [
+  "active-run",
+  "no-mapping",
+  "unknown-repo",
+  "unknown-agent",
+  "unknown-runner",
+  "runner-assignment-blocked",
+] as const;
+
+export type AssignRejectReason = (typeof ASSIGN_REJECT_REASONS)[number];
+
 export const TICKET_FILTERS = ["all", "assignable", "todo", "in-progress", "done"] as const;
 export type TicketFilter = (typeof TICKET_FILTERS)[number];
 
@@ -100,6 +186,7 @@ export function isTodo(run: TicketRun): boolean {
       return run.summary === "failed" || (run.summary === "human-check" && !run.prSettledLater);
     case "queued":
     case "running":
+    case "paused":
       return false;
   }
 }
@@ -130,7 +217,7 @@ export function matchesFilter(ticket: TicketView, filter: TicketFilter): boolean
     case "todo":
       return run !== undefined && isTodo(run);
     case "in-progress":
-      return run?.state === "queued" || run?.state === "running";
+      return run?.state === "queued" || run?.state === "running" || run?.state === "paused";
     case "done":
       return run !== undefined && isDone(run);
   }
@@ -164,6 +251,35 @@ export function runnersFor(
   runnerProject: string,
 ): RunnerChoice[] {
   return runners.filter((runner) => runner.projects.includes(runnerProject));
+}
+
+export interface RepoReach {
+  runners: number;
+  pushBlockedEverywhere: boolean;
+}
+
+export function repoReach(runners: ReadonlyArray<RunnerChoice>, runnerProject: string): RepoReach {
+  const having = runnersFor(runners, runnerProject);
+  return {
+    runners: having.length,
+    pushBlockedEverywhere:
+      having.length > 0 && having.every((runner) => runner.blockedProjects.includes(runnerProject)),
+  };
+}
+
+export function firstAssignableRepo(
+  defaults: AssignDefaults,
+  runners: ReadonlyArray<RunnerChoice>,
+): string {
+  const ordered = [
+    defaults.runnerProject,
+    ...defaults.repos.filter((repo) => repo.isDefault).map((repo) => repo.id),
+    ...defaults.repos.map((repo) => repo.id),
+  ];
+  return (
+    ordered.find((repo) => !repoReach(runners, repo).pushBlockedEverywhere) ??
+    defaults.runnerProject
+  );
 }
 
 export function agentsFor(agents: ReadonlyArray<string>, defaultAgent: string): string[] {

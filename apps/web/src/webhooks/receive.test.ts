@@ -1,8 +1,12 @@
+import { memoryLogger as recordingLogger } from "@ganger/log/testing";
+import type { MemoryEntry } from "@ganger/log/testing";
 import { readFileSync } from "node:fs";
 import { AdapterRegistry, toTrackerConnectionId } from "@ganger/core";
 import type { TrackerConnectionId } from "@ganger/core";
 import {
+  NO_WEBHOOK_RECEIPT,
   SecretBox,
+  getWebhookReceipt,
   listUnprocessedTrackerEvents,
   migrate,
   openDatabase,
@@ -44,9 +48,19 @@ interface LogEntry {
   fields: Readonly<Record<string, unknown>>;
 }
 
-function memoryLogger(): WebhookLogger & { entries: LogEntry[] } {
-  const entries: LogEntry[] = [];
-  return { entries, warn: (message, fields = {}) => entries.push({ message, fields }) };
+function memoryLogger(): WebhookLogger & { entries: LogEntry[]; infos: MemoryEntry[] } {
+  const recorded = recordingLogger();
+  return {
+    ...recorded,
+    get entries(): LogEntry[] {
+      return recorded.entries
+        .filter((entry) => entry.level === "warn")
+        .map((entry) => ({ message: entry.msg, fields: entry.fields }));
+    },
+    get infos(): MemoryEntry[] {
+      return recorded.entries.filter((entry) => entry.level === "info");
+    },
+  };
 }
 
 const TEST_BODY_TIMEOUT_MS = 50;
@@ -152,6 +166,50 @@ function stored(context: WebhookContext) {
   return listUnprocessedTrackerEvents(context.db);
 }
 
+describe("webhook 수신 기록", () => {
+  const tamperedBody = () =>
+    new TextEncoder().encode(
+      new TextDecoder().decode(labelAdded.rawBody).replace("ENG-123", "ENG-124"),
+    );
+
+  it("서명이 맞으면 마지막으로 받은 때를 남긴다", async () => {
+    const context = setup();
+    await send(context, acme, request(labelAdded.rawBody, labelAdded.headers));
+    expect(getWebhookReceipt(context.db, acme)).toEqual({
+      lastReceivedAt: receivedAt,
+      rejectedCount: 0,
+      firstRejectedAt: null,
+    });
+    expect(getWebhookReceipt(context.db, other)).toEqual(NO_WEBHOOK_RECEIPT);
+  });
+
+  it("서명이 맞지 않으면 실패 수와 처음 실패 시각을 남기고, 다음 성공이 지운다", async () => {
+    const context = setup();
+    const later = new Date(receivedAt.getTime() + 1000);
+    await send(context, acme, request(tamperedBody(), labelAdded.headers));
+    await send(context, acme, request(tamperedBody(), labelAdded.headers), later);
+    expect(getWebhookReceipt(context.db, acme)).toEqual({
+      lastReceivedAt: null,
+      rejectedCount: 2,
+      firstRejectedAt: receivedAt,
+    });
+
+    await send(context, acme, request(labelAdded.rawBody, labelAdded.headers), later);
+    expect(getWebhookReceipt(context.db, acme)).toEqual({
+      lastReceivedAt: later,
+      rejectedCount: 0,
+      firstRejectedAt: null,
+    });
+  });
+
+  it("서명 말고 다른 이유로 막으면 수신 기록을 바꾸지 않는다", async () => {
+    const context = setup();
+    const stale = new Date(receivedAt.getTime() + 10 * 60_000);
+    await send(context, acme, request(labelAdded.rawBody, labelAdded.headers), stale);
+    expect(getWebhookReceipt(context.db, acme)).toEqual(NO_WEBHOOK_RECEIPT);
+  });
+});
+
 describe("receiveTrackerWebhook", () => {
   it("서명이 맞는 픽스처를 하나 기록하고 200으로 응답한다", async () => {
     const context = setup();
@@ -189,6 +247,33 @@ describe("receiveTrackerWebhook", () => {
     expect(stored(context)).toHaveLength(1);
   });
 
+  it("처리한 webhook 마다 배달 id·티켓·결과를 담은 info 한 줄을 남기고 본문은 남기지 않는다", async () => {
+    const context = setup();
+
+    await send(context, acme, request(labelAdded.rawBody, labelAdded.headers));
+    await send(
+      context,
+      acme,
+      request(labelAdded.rawBody, labelAdded.headers),
+      new Date(receivedAt.getTime() + 1000),
+    );
+
+    expect(context.logger.infos.map((entry) => [entry.event, entry.fields])).toEqual([
+      [
+        "webhook.received",
+        expect.objectContaining({
+          trackerConnectionId: acme,
+          deliveryId: "00000000-0000-4000-8000-000000000008",
+          ticketKey: "ENG-123",
+          kind: "ticket.updated",
+          outcome: "recorded",
+        }),
+      ],
+      ["webhook.received", expect.objectContaining({ outcome: "duplicate" })],
+    ]);
+    expect(JSON.stringify(context.logger.infos)).not.toContain("labelIds");
+  });
+
   it("본문이 바뀌어 서명이 틀리면 401로 응답하고 기록하지 않는다", async () => {
     const context = setup();
     const tampered = new TextEncoder().encode(
@@ -202,7 +287,7 @@ describe("receiveTrackerWebhook", () => {
     expect(context.logger.entries).toEqual([
       {
         message: "rejected a tracker webhook",
-        fields: { connectionId: acme, reason: "bad-signature" },
+        fields: { trackerConnectionId: acme, reason: "bad-signature" },
       },
     ]);
     expect(stored(context)).toEqual([]);
@@ -271,7 +356,7 @@ describe("receiveTrackerWebhook", () => {
     expect(context.logger.entries).toEqual([
       {
         message: "rejected a tracker webhook",
-        fields: { connectionId: missing, reason: "unknown-connection" },
+        fields: { trackerConnectionId: missing, reason: "unknown-connection" },
       },
     ]);
     expect(stored(context)).toEqual([]);
@@ -463,7 +548,7 @@ describe("receiveTrackerWebhook", () => {
     expect(logger.entries).toEqual([
       {
         message: "could not handle a tracker webhook",
-        fields: { connectionId: acme, error: failure },
+        fields: { trackerConnectionId: acme, error: failure },
       },
     ]);
   });

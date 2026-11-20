@@ -41,7 +41,8 @@ pnpm install   # also installs the lefthook pre-commit hook
 
 | Command              | What it does                                                    |
 | -------------------- | --------------------------------------------------------------- |
-| `pnpm dev`           | Runs the web app (hot reload) and the worker with fake adapters |
+| `pnpm dev`           | Runs `pnpm dev:web` and opens the desktop app on it             |
+| `pnpm dev:web`       | Runs the web app (hot reload) and the worker with fake adapters |
 | `pnpm typecheck`     | Type-checks every package with TypeScript 7 (`tsc`)             |
 | `pnpm lint`          | Runs oxlint in type-aware mode                                  |
 | `pnpm format`        | Formats with oxfmt                                              |
@@ -59,13 +60,21 @@ The browser tests in `e2e` drive the Google Chrome installed on the machine thro
 
 ### Development
 
-`pnpm dev` starts the web app in development mode (hot reload) and the worker in one process. The tracker, the runners, and the code host are fake adapters, so it needs no Linear key, ssh access, or GitHub token, and it never reaches those services. By default it opens on the Dashboard of a finished setup with sample data: two tracker connections and workspaces, three runners (one online, one with broken GitHub authentication, one offline) with sample provider usage, runs in every state, and two weeks of past runs for Stats. The fake agents keep working over time: they ask questions now and then, open pull requests, and send completion reports. Answer questions, cancel runs, and assign tickets in the app as usual.
+`pnpm dev:web` starts the web app in development mode (hot reload) and the worker in one process; open the address it prints in a browser. `pnpm dev` starts the same dev server and opens the desktop app on it, described below. The tracker, the runners, and the code host are fake adapters, so it needs no Linear key, ssh access, or GitHub token, and it never reaches those services. By default it opens on the Dashboard of a finished setup with sample data: two tracker connections and workspaces, three runners (one online, one with broken GitHub authentication, one offline) with sample provider usage, runs in every state, and two weeks of past runs for Stats. The fake agents keep working over time: they ask questions now and then, open pull requests, and send completion reports. Answer questions, cancel runs, and assign tickets in the app as usual.
 
-- `pnpm dev --onboarding` starts from step 1 of onboarding with an empty database. **Fill with fake values** (bottom right) fills the form fields with values that pass every check. To see a failed check, put `invalid` in a key or token, or `offline`, `no-orca`, or `push-auth` in the runner's ssh target.
+- `pnpm dev:web --onboarding` (or `pnpm dev --onboarding`) starts from step 1 of onboarding with an empty database. **Fill with fake values** (bottom right) fills the form fields with values that pass every check. To see a failed check, put `invalid` in a key or token, or `offline`, `no-orca`, or `push-auth` in the runner's ssh target.
 - `--reset` deletes the data of that mode and starts over. `--static` stops the fake agents from moving on their own.
 - `/__dev` (the **Dev tools** link at the bottom right) labels a ticket for auto-assignment, adds a ticket, makes an agent ask a question, fixes or breaks a runner's GitHub authentication, and stands in for another Mac that runs the runner setup command (or lets that command expire).
-- Data lives in `.dev/<mode>/` in the repository (ignored by git), or under `GANGER_DEV_DIR`. It never touches `~/.ganger`. The server binds to `127.0.0.1:3000`; set `WEB_HOST` and `WEB_PORT` to change that (for example, `WEB_HOST=0.0.0.0 pnpm dev` to open it from another machine on your network). Anyone who can reach that address can use the dev server and `/__dev`, so bind to an address only trusted machines can reach.
-- The fake adapters and the dev tools are registered only by `pnpm dev`. They are not part of the production build or the server bundle; the bundle check (`scripts/bundle-check.ts`, run by `pnpm bundle` and `pnpm smoke:bundle`) fails if fake adapters or dev-only values end up in the bundle.
+- The TanStack Query devtools stay closed by default so they never cover the app. **Query devtools 켜기·끄기** on `/__dev` opens or closes them at the bottom of the app tabs open in the same browser. In the desktop app (`pnpm dev`), or without the dev tools, run `dispatchEvent(new CustomEvent("ganger:set-query-devtools", { detail: true }))` (`false` to close) in the console of the window's developer tools.
+- Data lives in `.dev/<mode>/` in the repository (ignored by git), or under `GANGER_DEV_DIR`. It never touches `~/.ganger`. The server binds to `127.0.0.1:3000`; set `WEB_HOST` and `WEB_PORT` to change that (for example, `WEB_HOST=0.0.0.0 pnpm dev:web` to open it from another machine on your network). Anyone who can reach that address can use the dev server and `/__dev`, so bind to an address only trusted machines can reach.
+- The fake adapters and the dev tools are registered only by `pnpm dev` and `pnpm dev:web`. They are not part of the production build or the server bundle; the bundle check (`scripts/bundle-check.ts`, run by `pnpm bundle` and `pnpm smoke:bundle`) fails if fake adapters or dev-only values end up in the bundle.
+
+`pnpm dev` takes the same options and environment variables as `pnpm dev:web`. It builds the desktop app's main process, preload, and renderer once, starts the dev server, and then opens the desktop app with `GANGER_DESKTOP_DEV_SERVER` set to the dev server's address:
+
+- The app connects to that address like a server on another machine and does not start a server bundle of its own. Changes to the web app reload inside the app window. Changes to `apps/desktop` need a restart of `pnpm dev`.
+- The app keeps its data in `.dev/desktop/user-data` and uses `.dev/desktop/home` as its Ganger home (under `GANGER_DEV_DIR` when set), so it does not touch the settings or saved servers of an installed Ganger app, or `~/.ganger`. It can run next to an installed app.
+- Quitting the app (⌘Q or **Quit** in the tray menu) stops the dev server too. Ctrl+C quits the app and then stops the dev server. Closing the window only hides it, as in the installed app.
+- The `electron` package downloads its binary the first time `pnpm dev` runs. If the binary is still missing (for example, offline), `pnpm dev` stops before starting anything and prints the install command (`pnpm --filter @ganger/desktop exec node node_modules/electron/install.js`). Use `pnpm dev:web` to work in a browser instead.
 
 `pnpm --filter @ganger/web dev` still starts only the web app; open `http://127.0.0.1:3000/ds` to see the design system. Run the production build with `pnpm --filter @ganger/web start`. It binds to `127.0.0.1` by default. To change that, set the shell environment variables `WEB_HOST` and `WEB_PORT` (for example, `WEB_PORT=4000 pnpm --filter @ganger/web start`).
 
@@ -132,9 +141,57 @@ The web app has no login. Anyone who can reach its address can change settings a
 The server accepts a request only when its host name is one it knows, which blocks DNS rebinding and requests that other sites make from your browser. `127.0.0.1`, `localhost`, and `[::1]` always work, and so does the bind address (`WEB_HOST`) when it is a specific address rather than `0.0.0.0`. To use any other name, set it in Settings > Addresses (open Settings at `http://127.0.0.1:<port>` on the server machine the first time):
 
 - **Web address**: where you open the app from other devices, for example the Tailscale Serve address `https://server.example.ts.net`. Requests to this host name reach the whole app.
-- **Webhook address**: the public address your tracker sends webhooks to, for example a Tailscale Funnel or Cloudflare Tunnel address. Set it in Settings, then create the webhook in your tracker with this address followed by the connection's webhook path (shown under the tracker connection in Settings). Browser requests to this host name reach only the webhook path. Onboarding does not ask for a webhook. A webhook is optional. Without one, the worker checks the tracker for tickets with the Auto-assign Label about once a minute and assigns the ones that have never had a run. Retrying a ticket that already had a run by removing and adding the label again needs the webhook; without it, assign the ticket again from Tickets. The check only looks back 24 hours after the worker starts, so tickets labeled while the worker was stopped for longer are not picked up; assign them from Tickets.
+- **Address Linear reaches this server at**: the address your tracker sends webhooks to over the internet. Set it in the tracker connection's Webhook section, not under Addresses; see [Turn on the webhook](#turn-on-the-webhook). Browser requests to this host name reach only the webhook path.
 
-Requests that change data (including server functions) must also come from a page on an allowed host (the `Origin` header), except the webhook path, which checks the tracker's signature instead. Rejected requests get `403` and a line in the web server log. If you upgrade an installation that you already open by another name, such as a tailnet name with `WEB_HOST=0.0.0.0`, that name is blocked until you add it as the web address. The host check protects you from web pages in your browser; it is not access control, because any other client can send whatever host name it likes. So still publish only the webhook path through your tunnel (for example, a Tailscale Funnel or Cloudflare Tunnel route for `/api/webhooks/` only). `GET /api/identity` answers on any host name with the product name, version, and installation ID, so a client can tell this server apart from other machines.
+Requests that change data (including server functions) must also come from a page on an allowed host (the `Origin` header), except the webhook path, which checks the tracker's signature instead. Rejected requests get `403` and a line in the web server log. If you upgrade an installation that you already open by another name, such as a tailnet name with `WEB_HOST=0.0.0.0`, that name is blocked until you add it as the web address. The host check protects you from web pages in your browser; it is not access control, because any other client can send whatever host name it likes. So still publish only the webhook path through your tunnel (for example, a Tailscale Funnel or Cloudflare Tunnel route for `/api/webhooks/` only). `GET /api/identity` answers on any host name with the product name, version, and installation ID, so a client can tell this server apart from other machines. `GET /api/webhooks/ping/<installation ID>` also answers on any host name, but only says whether the ID you send is this installation's; the webhook check uses it.
+
+### Turn on the webhook
+
+A webhook is optional. Without one, the worker checks the tracker for tickets with the Auto-assign Label about once a minute and assigns the ones that have never had a run. With one, Linear tells the server the moment a ticket changes, so a labeled ticket is assigned within seconds, and removing and adding the label again retries a ticket that already had a run. Without it, assign such tickets again from Tickets. The once-a-minute check only looks back 24 hours after the worker starts, so tickets labeled while the worker was stopped for longer are not picked up; assign them from Tickets. Onboarding does not ask for a webhook.
+
+Open Settings > Connections, select the tracker connection, and follow the three steps in its **Webhook** section:
+
+1. **Address Linear reaches this server at.** Linear sends webhooks from the internet, but the server usually listens only on this machine or inside your tailnet. Open only the webhook path (`/api/webhooks/`) to the internet, enter the address, and select **Check**. The server requests `<address>/api/webhooks/ping/<installation ID>` itself and saves the address only when this installation answers. The address is shared by every tracker connection on the server. If the check fails, the screen says whether the name was not found, nothing answered, or another server answered.
+2. **Create the webhook in Linear.** Copy the full address the screen shows (the address followed by the connection's webhook path), open Linear's webhook settings from the link, paste it, and select only **Issues** under Data change events.
+3. **Enter the signing secret and turn it on.** Paste the signing secret Linear shows for the new webhook. The section then waits for the first webhook; change any ticket in Linear and it switches to on. If webhooks keep arriving with a signature that does not match (for example, you recreated the webhook in Linear), the section and the connection's line in Settings show how many were rejected and since when; enter the new secret. **Turn off** deletes the secret and goes back to checking once a minute; delete the webhook in Linear as well.
+
+Only the webhook path should be public. Never publish the whole app: it has no login.
+
+#### Tailscale Funnel
+
+If Tailscale is installed on the server Mac, the Webhook section fills in this Mac's Tailscale name and shows the command with this server's port. Run it once on the server Mac:
+
+```sh
+tailscale funnel --bg --https=8443 --set-path /api/webhooks/ http://127.0.0.1:3000/api/webhooks/
+```
+
+The address is then `https://<device>.<tailnet>.ts.net:8443`.
+
+- Funnel makes a whole port public: "If the most recent command to configure the port was `funnel`, then the port will be completely public" ([Tailscale Funnel](https://tailscale.com/kb/1223/funnel)). So keep the webhook on its own port. If you serve the app to your tailnet with Tailscale Serve on 443, do not run `funnel` on 443, or the whole app becomes public. On 8443, only `/api/webhooks/` is mapped, so nothing else is reachable.
+- Funnel can listen only on ports 443, 8443, and 10000.
+- The first time, Funnel needs MagicDNS, HTTPS certificates, and the `funnel` node attribute in your tailnet policy. Running the command prompts you to approve Funnel in the Tailscale admin console ([Tailscale Funnel](https://tailscale.com/kb/1223/funnel)).
+- Public DNS for a new Funnel name can take up to 10 minutes. If the check says the name was not found, wait a few minutes and check again.
+- `--bg` keeps Funnel running after reboots until you turn it off. To turn it off, run the same command with `off` added at the end ([`tailscale funnel`](https://tailscale.com/kb/1311/tailscale-funnel)).
+- The check runs from the server itself, so it reaches the address over your tailnet. It proves the port serves this installation, but not that the internet can reach it: `tailscale serve --https=8443` (Serve, not Funnel) also passes. Run `tailscale funnel status` to confirm the port is on Funnel.
+
+#### Cloudflare Tunnel
+
+Create a tunnel with `cloudflared` and add a public hostname whose service is `http://127.0.0.1:<port>` and whose path is `api/webhooks/*`, so Cloudflare forwards only the webhook path. Enter `https://<public hostname>` as the address.
+
+#### Reverse proxy
+
+If the server is behind a reverse proxy that already has a public HTTPS name (nginx, Caddy), forward only `/api/webhooks/` to `http://127.0.0.1:<port>/api/webhooks/` and keep the host name. For Caddy:
+
+```text
+hooks.example.com {
+  handle /api/webhooks/* {
+    reverse_proxy 127.0.0.1:3000
+  }
+  respond 404
+}
+```
+
+Enter `https://hooks.example.com` as the address. The address must use HTTPS and a DNS name; the check refuses IP addresses, `localhost`, and addresses with a path, and it does not follow redirects.
 
 ### Run as a service
 
@@ -143,13 +200,46 @@ Requests that change data (including server functions) must also come from a pag
 - Add `--dry-run` to either command to print the file and the commands without changing anything.
 - Run `init` first. `service install` refuses to register a service that would fail to boot, and refuses to overwrite an existing service file.
 - The service runs the Node and CLI paths you installed it with, and uses your current `PATH`. After you move or upgrade Node, or move the server bundle to another folder, run `service uninstall` and `service install` again.
-- On macOS, logs go to `<home>/logs/ganger.log`. On Linux, read them with `journalctl --user -u ganger.service`, and run `loginctl enable-linger` once so the service keeps running after you log out.
+- On macOS, the service's console output goes to `<home>/logs/ganger.log`. On Linux, read it with `journalctl --user -u ganger.service`, and run `loginctl enable-linger` once so the service keeps running after you log out. The server logs below are the same however you start the server.
+
+### Server logs
+
+The web server, the worker, `ganger mcp`, and `ganger start` each write a server log to `<home>/logs/web.jsonl`, `worker.jsonl`, `mcp.jsonl`, and `cli.jsonl`. Each line is one JSON object that starts with `t` (time), `level`, `proc`, `pid`, `v` (version), `event` (a fixed dotted name such as `run.state_changed`), and `msg`, followed by context such as `runId`, `ticketKey`, `runnerId`, or `deliveryId`.
+
+- The default level is `info`, which records only changes: start and stop, each tracker webhook, assignments, run state changes, runner calls that change something, runners going online or offline, and a worker line every 10 minutes. Set `GANGER_LOG_LEVEL=debug` to also record every runner call and worker tick.
+- The console shows only warnings and errors.
+- A file that passes 10 MB moves to `.1`, and up to five old files are kept. Change this with `GANGER_LOG_MAX_MB` and `GANGER_LOG_FILES`. `ganger.log` and the desktop app's `desktop-server.log` follow the same limits when the server starts.
+- Secret values and token-shaped text are replaced with `[redacted]`. Ticket bodies, agent briefs, webhook bodies, and environment variables are never written. Ticket keys and runner names are kept, so check a log before you share it.
+
+Read them with `ganger logs`. It merges the four files and their rotated copies in time order and prints one line per entry, colored when the output is a terminal:
+
+```sh
+ganger logs --run <run id>              # everything about one run, from every process
+ganger logs --ticket ACME-12 --since 2h # one ticket over the last two hours
+ganger logs --level warn -f             # warnings and errors, then keep printing new ones
+ganger logs --proc worker --json        # the stored JSON lines, for jq or a coding agent
+```
+
+`--proc` takes `web`, `worker`, `mcp`, `cli`, or `desktop` (repeat it or separate names with commas), `--level` shows that level and more severe ones, and `--since` takes `30s`, `10m`, `2h`, `1d`, or an ISO 8601 date. `-f` keeps reading across rotation until you stop it. On Linux, when the systemd service is installed, it also reminds you that the service's console output is in journald. Lines that a crashed process left half-written are skipped.
+
+The files are plain JSON Lines, so `jq` works too. These read only the current files; `ganger logs` also reads the rotated ones.
+
+```sh
+# One run across all processes (one file after another, not merged by time)
+jq -c 'select(.runId == "<run id>")' ~/.ganger/logs/*.jsonl
+
+# Warnings and errors of the worker, as time, event, and error message
+jq -r 'select(.level == "warn" or .level == "error") | [.t, .event, (.err.message // "")] | @tsv' ~/.ganger/logs/worker.jsonl
+
+# Count events by name, to see what the server has been doing
+jq -r '.event' ~/.ganger/logs/*.jsonl | sort | uniq -c | sort -rn
+```
 
 ### Connect an MCP client
 
 `ganger mcp` runs an [MCP](https://modelcontextprotocol.io) server over stdin and stdout, so an agent on the same machine (for example, Hermes) can read Ganger's current state and, when you allow it, use the app's write actions. The MCP client starts the command itself; it opens no network port. It reads the database of the installation folder (`--home` or `GANGER_HOME`) directly, so it works even while the server is stopped, and every result says whether the server is running.
 
-- The read tools cover the Dashboard summary (including runners' provider usage), tickets, runs and run detail (with the last stored lines of the log), runners and their provider usage, stats, and settings. They are marked read-only. Tools that take a workspace accept its id or name, and you can leave it out when there is only one.
+- The read tools cover the Dashboard summary (including runners' provider usage), tickets, runs and run detail (with the last stored lines of the log), runners and their provider usage, stats, settings, and server logs. They are marked read-only. `get_server_logs` takes a run id or a ticket key and returns that run's or ticket's run timeline (assignment, state changes, tracker webhooks, MCP actions, notifications, questions, permission requests, and cancel requests in time order) with the matching server log lines; with neither, it returns the latest warnings and errors. It masks secrets again before it answers. Tools that take a workspace accept its id or name, and you can leave it out when there is only one.
 - Write tools appear only after you turn on **Allow MCP writes** in Settings > MCP (off by default); turning it on or off takes effect without restarting the client. They match the app's write actions: assigning a ticket, answering a question, denying a permission request, canceling a run, refreshing a run's log, the workspace name and longest run time, adding and removing tracker projects, Mapping, the In Progress state, the Auto-assign Label, checking the tracker connection and the GitHub token again, changing an existing runner's capacity, checking a runner again, and keeping the Mac awake. Canceling a run and removing a tracker project are marked destructive.
 - These stay in the app only, with no MCP tool: saving secrets (tracker API keys, webhook secrets, the GitHub token), adding a runner or changing its ssh target or Orca path, the addresses, and the **Allow MCP writes** switch itself.
 - Every MCP write is recorded as "MCP · client name" (the `clientInfo.name` the client sends, shortened and with control characters removed), with the tool, the target, and the result. Requests about a run show up in that run's timeline on Run detail; other writes show up under Recent activity in Settings > MCP. When the server is stopped, writes the worker handles are saved, and the result says the server handles them when it starts.
@@ -206,7 +296,7 @@ pnpm --filter @ganger/desktop exec node node_modules/electron/install.js   # dow
 pnpm --filter @ganger/desktop run package
 ```
 
-This writes `apps/desktop/dist/app/Ganger-darwin-<arch>/Ganger.app` and a `.zip` of it. The app carries the server bundle unchanged in `Contents/Resources/server/` and runs it with its own Node (Electron's), so the machine does not need Node. For development, `pnpm --filter @ganger/desktop start` runs the app from the repository with the bundle in `dist/`.
+This writes `apps/desktop/dist/app/Ganger-darwin-<arch>/Ganger.app` and a `.zip` of it. The app carries the server bundle unchanged in `Contents/Resources/server/` and runs it with its own Node (Electron's), so the machine does not need Node. `pnpm --filter @ganger/desktop start` runs the app from the repository with the bundle in `dist/`. To work on the app with the dev server instead, run `pnpm dev` (see [Development](#development)).
 
 A build you package yourself is not signed, so macOS asks you to confirm before it opens the first time (Control-click the app, then **Open**).
 

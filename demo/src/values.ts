@@ -4,9 +4,12 @@ export const FAIL_NO_ORCA = "no-orca";
 export const FAIL_PUSH_AUTH = "push-auth";
 export const SLOW_CHECK = "slow";
 export const SLOW_CHECK_MS = 20_000;
+export const DEV_CHANNEL = "ganger-dev";
+export const ASK_QUERY_DEVTOOLS = "ask-query-devtools";
 
 export const DEMO_WEB_ADDRESS = "https://orchestrator.example.ts.net";
 export const DEMO_WEBHOOK_ADDRESS = "https://hooks.example.com";
+export const DEMO_TAILNET_HOST = "ganger.example.ts.net";
 
 export const PREFILL: Readonly<Record<string, string>> = {
   name: "Acme",

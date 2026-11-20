@@ -14,6 +14,7 @@ export const RUN_STATES = [
   "queued",
   "running",
   "waiting-for-input",
+  "paused",
   "disconnected",
   "ended",
 ] as const;
@@ -23,14 +24,19 @@ export const ACTIVE_RUN_STATES: ReadonlySet<RunState> = new Set([
   "queued",
   "running",
   "waiting-for-input",
+  "paused",
   "disconnected",
 ]);
 
 export const CAPACITY_OCCUPYING_STATES: ReadonlySet<RunState> = new Set([
   "running",
   "waiting-for-input",
+  "paused",
   "disconnected",
 ]);
+
+export const PAUSE_SOURCES = ["operator", "runner", "unreported"] as const;
+export type PauseSource = (typeof PAUSE_SOURCES)[number];
 
 export const AGENT_RESULTS = [
   "reported-success",
@@ -122,6 +128,6 @@ export type Run =
   | (RunBase & { state: "queued"; runnerId: RunnerId | null })
   | (RunBase &
       StartedRunFields & {
-        state: "running" | "waiting-for-input" | "disconnected";
+        state: "running" | "waiting-for-input" | "paused" | "disconnected";
       })
   | EndedRun;

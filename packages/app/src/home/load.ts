@@ -7,7 +7,6 @@ import {
 } from "@ganger/core";
 import type { QueuedRun, RunId } from "@ganger/core";
 import {
-  getRunWithRecords,
   listPendingCancelRequests,
   listRunPermissionWaits,
   listRunQuestions,
@@ -16,10 +15,12 @@ import {
   listRunnerSnapshots,
   listRunners,
   listRuns,
+  listRunsWithRecords,
   listWorkspaces,
   toWorkspaceId,
 } from "@ganger/db";
-import type { Database, StoredRun, StoredRunner } from "@ganger/db";
+import type { Database, RunRecords, StoredRun, StoredRunner } from "@ganger/db";
+import { runControlOf, withoutPauses } from "../run-control.js";
 import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
 import { isWebUrl } from "../format/url.js";
 import { resolveWorkspace, runnerIssueCause } from "../shell/model.js";
@@ -48,10 +49,11 @@ export function loadHomePage(
 
   const workspaceNames = new Map(workspaces.map((w) => [w.id, w]));
   const runners = new Map(listRunners(db).map((r) => [r.id, r]));
-  const runs = listRuns(
+  const runsWithRecords = listRunsWithRecords(
     db,
     workspace.kind === "one" ? { workspaceId: toWorkspaceId(workspace.workspace.id) } : {},
   );
+  const runs = runsWithRecords.map(({ run }) => run);
 
   const placements = listRunPlacements(db);
   const queueReasons = explainQueue({
@@ -94,8 +96,7 @@ export function loadHomePage(
     return name;
   };
 
-  const toView = (run: StoredRun): HomeRun => {
-    const records = getRunWithRecords(db, run.id)?.records;
+  const toView = (run: StoredRun, records: RunRecords): HomeRun => {
     const runner = run.runnerId === null ? undefined : runners.get(run.runnerId);
     const durations = runDurations({
       assignedAt: run.assignedAt,
@@ -103,7 +104,7 @@ export function loadHomePage(
       endedAt: run.state === "ended" ? run.endedAt : null,
       now,
     });
-    const pr = records?.pullRequest;
+    const pr = records.pullRequest;
     const base = {
       id: run.id,
       ticketId: ticketId(run.ticket.connection, run.ticket.key),
@@ -117,18 +118,27 @@ export function loadHomePage(
       runner: runner === undefined ? null : { name: runner.name, online: runner.online },
       agent: run.agent,
       waitMs: durations.waitMs ?? 0,
-      executionMs: durations.executionMs,
+      executionMs: withoutPauses(durations.executionMs, records, now),
       pullRequest:
-        pr === null || pr === undefined || !isWebUrl(pr.url)
-          ? null
-          : { displayId: pr.displayId, url: pr.url },
+        pr === null || !isWebUrl(pr.url) ? null : { displayId: pr.displayId, url: pr.url },
       cancelling: cancelling.has(run.id),
+      control:
+        run.state === "running" || run.state === "paused" ? runControlOf(db, run, now) : null,
     };
     switch (run.state) {
       case "queued":
         return { ...base, state: run.state, queuedReason: queuedReason(run.id) };
       case "running":
         return { ...base, state: run.state };
+      case "paused": {
+        const since = records.pausedSince;
+        return {
+          ...base,
+          state: run.state,
+          pauseSource: records.pauseSource ?? "operator",
+          pausedMs: since === null ? null : Math.max(0, now.getTime() - since.getTime()),
+        };
+      }
       case "waiting-for-input": {
         const pending = oldestPendingInput(db, run.id);
         return {
@@ -139,7 +149,7 @@ export function loadHomePage(
         };
       }
       case "disconnected": {
-        const since = records?.unreachableSince ?? null;
+        const since = records.unreachableSince;
         return {
           ...base,
           state: run.state,
@@ -153,7 +163,7 @@ export function loadHomePage(
           agentResult: run.agentResult,
           prState: run.prState,
           summary: summarizeRunOutcome(run).outcome,
-          prSettledLater: (records?.laterPrState ?? null) !== null,
+          prSettledLater: records.laterPrState !== null,
           endedAt: run.endedAt.toISOString(),
           endedAgoMs: Math.max(0, now.getTime() - run.endedAt.getTime()),
         };
@@ -182,9 +192,9 @@ export function loadHomePage(
     .toSorted((a, b) => Number(a.cause === null) - Number(b.cause === null));
   const endedToday = (run: StoredRun): boolean =>
     run.state === "ended" && calendarDay(run.endedAt, timeZone) === today;
-  const views = runs.map((run) => ({
+  const views = runsWithRecords.map(({ run, records }) => ({
     ticket: `${run.ticket.connection}\u0000${run.ticket.key}`,
-    run: toView(run),
+    run: toView(run, records),
     endedToday: endedToday(run),
   }));
   return partitionHome({

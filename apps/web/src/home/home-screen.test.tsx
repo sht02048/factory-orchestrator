@@ -3,17 +3,14 @@ import { Text } from "@ganger/ui";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import homeJson from "../../messages/ko/home.json" with { type: "json" };
+import questionJson from "../../messages/ko/question.json" with { type: "json" };
+import { QuestionAnswer } from "../question/question-answer";
 import { buttonsOf } from "../testing/buttons";
 import { pillsOf } from "../testing/pills";
 import { renderWithMessages } from "../testing/render";
-import { addTitledRun, now, seedDatabase } from "../testing/seed";
-import {
-  COLUMN_VISIBLE,
-  DONE_TODO_VISIBLE,
-  HomeScreen,
-  QuestionForm,
-  SETTLED_VISIBLE,
-} from "./home-screen";
+import { addTitledRun, minutes, now, seedDatabase } from "../testing/seed";
+import { changeRunState, completeRunControlRequest, requestRunControl } from "@ganger/db";
+import { COLUMN_VISIBLE, DONE_TODO_VISIBLE, HomeScreen, SETTLED_VISIBLE } from "./home-screen";
 import type { DashboardView } from "./home-screen";
 import { loadHomePage } from "@ganger/app/home/load";
 import { homeMessages } from "./messages";
@@ -23,20 +20,23 @@ const reject = () => Promise.reject(new Error("unused"));
 
 function render(page: HomePage) {
   return renderWithMessages(
-    <HomeScreen page={page} onAnswer={reject} onDeny={reject} />,
+    <HomeScreen page={page} onAnswer={reject} onDeny={reject} onControl={reject} />,
     homeMessages,
   );
 }
 
 function renderView(page: HomePage, view: DashboardView) {
   return renderWithMessages(
-    <HomeScreen page={page} view={view} onAnswer={reject} onDeny={reject} />,
+    <HomeScreen page={page} view={view} onAnswer={reject} onDeny={reject} onControl={reject} />,
     homeMessages,
   );
 }
 
 function renderForm(question: Extract<InputWait, { kind: "question" }>) {
-  return renderWithMessages(<QuestionForm question={question} onSend={reject} />, homeMessages);
+  return renderWithMessages(
+    <QuestionAnswer body={question.body} options={question.choices} onSend={reject} />,
+    homeMessages,
+  );
 }
 
 function seededPage(ws = "ws-commerce"): HomePage {
@@ -129,13 +129,20 @@ const question: Extract<InputWait, { kind: "question" }> = {
   answered: false,
 };
 
-describe("Dashboard 제목(ADR 0010 8번, 0068 갱신)", () => {
-  it("메타 줄 Dashboard, 결론 제목, 묶음별 요약 문장을 보인다", () => {
-    const page = seededPage();
-    const html = render(page);
-    expect(html).toMatch(/<p[^>]*>Dashboard<\/p>/);
-    expect(html).toMatch(/<h1[^>]*>처리할 일이 8개 있어요<\/h1>/);
-    expect(text(html)).toContain("답할 질문 1개, 확인할 PR 1개, 멈춘 런 6개예요.");
+describe("Dashboard 한 줄 머리(ADR 0010 8번, 0113 갱신)", () => {
+  const header = (html: string) => html.slice(html.indexOf("<header"), html.indexOf("</header>"));
+
+  it("제목은 화면 이름 Dashboard 이고, 그 옆 요약 한 줄이 처리할 일을 묶음별로 말한다", () => {
+    const html = render(seededPage());
+    expect(header(html)).toMatch(/<h1[^>]*>Dashboard<\/h1>/);
+    expect(text(header(html))).toContain(
+      "처리할 일은 답할 질문 1개, 확인할 PR 1개, 멈춘 런 6개예요.",
+    );
+    expect(html.match(/<h1/g)).toHaveLength(1);
+  });
+
+  it("보기(모두 / 처리할 일만)는 머리 줄 오른쪽 행동이다", () => {
+    expect(header(render(seededPage()))).toContain(`aria-label="${homeJson.view.label}"`);
   });
 
   it("요약 문장에서 0인 묶음은 뺀다", () => {
@@ -144,25 +151,24 @@ describe("Dashboard 제목(ADR 0010 8번, 0068 갱신)", () => {
       ...page,
       attention: page.attention.filter((item) => item.run.ticketKey === "ACME-2"),
     });
-    expect(html).toMatch(/<h1[^>]*>처리할 일이 1개 있어요<\/h1>/);
-    expect(text(html)).toContain("확인할 PR 1개예요.");
-    expect(text(html)).not.toContain("답할 질문");
-    expect(text(html)).not.toContain("멈춘 런");
+    expect(text(header(html))).toContain("처리할 일은 확인할 PR 1개예요.");
+    expect(text(header(html))).not.toContain("답할 질문");
+    expect(text(header(html))).not.toContain("멈춘 런");
   });
 
   it("To do 가 0이면 처리할 일이 없다고 하고 In progress 수를 요약한다", () => {
     const page = seededPage();
     const empty = { ...page, attention: [] };
-    const html = render(empty);
-    expect(html).toMatch(/<h1[^>]*>처리할 일이 없어요<\/h1>/);
-    expect(text(html)).toContain(
-      `진행 중인 런이 ${page.running.length + page.queued.length}개 있어요.`,
+    expect(text(header(render(empty)))).toContain(
+      `처리할 일은 없고, 진행 중인 런이 ${page.running.length + page.queued.length}개 있어요.`,
     );
-    expect(text(render({ ...empty, running: [], queued: [] }))).toContain(homeJson.summary.idle);
+    expect(text(header(render({ ...empty, running: [], queued: [] })))).toContain(
+      homeJson.summary.idle,
+    );
   });
 
-  it("모든 Workspace 보기는 메타 줄에 모든 Workspace 를 붙인다", () => {
-    expect(render(seededPage("all"))).toMatch(/<p[^>]*>Dashboard · 모든 Workspace<\/p>/);
+  it("모든 Workspace 보기는 제목에 모든 Workspace 를 붙인다", () => {
+    expect(render(seededPage("all"))).toMatch(/<h1[^>]*>Dashboard · 모든 Workspace<\/h1>/);
   });
 });
 
@@ -341,7 +347,7 @@ describe("Dashboard 칸반(티켓 0100)", () => {
     expect(variants).not.toContain("primary");
     const layer = buttonsOf(renderForm(question));
     expect(layer.filter((b) => b.variant === "primary")).toEqual([
-      { variant: "primary", label: homeJson.question.send },
+      { variant: "primary", label: questionJson.send },
     ]);
   });
 
@@ -423,16 +429,16 @@ describe("모든 Workspace 보기(0066)", () => {
 });
 
 describe("질문 레이어", () => {
-  it("질문, 선택지 라디오, 마지막 직접 쓰기를 보이고 고르기 전에는 보내기가 꺼져 있다", () => {
+  it("질문, 선택지 라디오, 마지막 직접 쓰기를 보이고 고르기 전에는 고르라고 안내한다", () => {
     const html = renderForm(question);
-    expect(html).toMatch(/<legend[^>]*>재시도 간격을 바꿀까요\?<\/legend>/);
+    expect(html).toMatch(/<p[^>]*>재시도 간격을 바꿀까요\?<\/p>/);
+    const labelledBy = /role="radiogroup" aria-labelledby="([^"]+)"/.exec(html)?.[1];
+    expect(html).toContain(`<div id="${labelledBy}"`);
     const radios = [...html.matchAll(/<input type="radio"[^>]*>\s*<span[^>]*>([^<]+)<\/span>/g)];
-    expect(radios.map((m) => m[1])).toEqual([...question.choices, homeJson.question.other]);
+    expect(radios.map((m) => m[1])).toEqual([...question.choices, questionJson.other]);
     expect(html).not.toContain("checked");
-    expect(html).toMatch(
-      /<button[^>]*data-variant="primary"[^>]*disabled=""[^>]*>보내기<\/button>/,
-    );
-    expect(text(html)).toContain(homeJson.question.pick);
+    expect(html).toMatch(/<button[^>]*data-variant="primary"[^>]*>보내기<\/button>/);
+    expect(text(html)).toContain(questionJson.pick);
     expect(html).not.toContain("<textarea");
   });
 
@@ -441,6 +447,49 @@ describe("질문 레이어", () => {
     const html = renderForm({ ...question, choices: [long, "30초 고정"] });
     expect(html).toContain(`>${long}</span>`);
     expect(html).not.toContain("…");
+  });
+});
+
+describe("질문 레이어: 선택지 없이 온 질문(0116)", () => {
+  const inline = {
+    ...question,
+    body: "02 작업 전제인 01이 main에 없어요. 어떻게 할까요? (A) 01 이 머지될 때까지 기다린다 (B) 02 를 먼저 한다(충돌 가능). 기본 제안은 B 예요.",
+    choices: [],
+  };
+
+  it("글 안의 (A) (B)를 글자와 함께 선택지로 나누고 추천 문장은 선택지 아래에 둔다", () => {
+    const html = renderForm(inline);
+    const radios = [
+      ...html.matchAll(/<input type="radio"[^>]*>\s*<span[^>]*>([\s\S]*?)<\/span><\/label>/g),
+    ];
+    expect(radios.map((m) => text(m[1] ?? ""))).toEqual([
+      "A 01 이 머지될 때까지 기다린다",
+      "B 02 를 먼저 한다(충돌 가능).",
+      questionJson.other,
+    ]);
+    expect(html).toMatch(/<p[^>]*>02 작업 전제인 01이 main에 없어요. 어떻게 할까요\?<\/p>/);
+    expect(html.indexOf("기본 제안은 B 예요.")).toBeGreaterThan(html.indexOf(questionJson.other));
+    expect(html).not.toContain("(A)");
+  });
+
+  it("나눌 수 없으면 문단을 그대로 두고 라디오 없이 바로 쓰는 답 칸을 보인다", () => {
+    const html = renderForm({
+      ...question,
+      body: "첫 줄\n둘째 줄\n\n테스트를 건너뛸까요?",
+      choices: [],
+    });
+    expect(html).not.toContain('type="radio"');
+    expect(html).toMatch(/<p[^>]*>첫 줄\n둘째 줄<\/p>/);
+    expect(html).toMatch(/<p[^>]*>테스트를 건너뛸까요\?<\/p>/);
+    expect(html).toContain("<textarea");
+    expect(text(html)).toContain(questionJson.answerLabel);
+    expect(text(html)).toContain(questionJson.shortcut);
+  });
+
+  it("카드는 선택지를 뺀 질문만 두 줄 요약으로 보인다", () => {
+    const card = row(section(render(withInput(seededPage(), inline)), "Running"), "ACME-11");
+    expect(text(card)).toContain("어떻게 할까요?");
+    expect(text(card)).not.toContain("머지될 때까지");
   });
 });
 
@@ -639,7 +688,7 @@ describe("문구", () => {
 
   it("문구는 메시지 파일에서 온다", () => {
     const html = render(withPermission(withInput(seededPage(), question))) + renderForm(question);
-    expect(html).not.toMatch(/\b(home|domain)\.[a-zA-Z]/);
+    expect(html).not.toMatch(/\b(home|domain|question)\.[a-zA-Z]/);
   });
 });
 
@@ -722,5 +771,72 @@ describe("Runners 공급자 사용량(0086)", () => {
       runners: { list: [{ ...base, id: "r-a", name: "runner-a", usage: null }] },
     });
     expect(text(html)).not.toContain("한도");
+  });
+});
+
+describe("Dashboard 멈추기·재개(0118)", () => {
+  function pausedPage() {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    expect(changeRunState(db, id, { to: "paused" }, minutes(100))).toMatchObject({ ok: true });
+    return { db, id };
+  }
+
+  it("Running 카드는 오른쪽 위 메뉴로 멈추고, Paused 카드는 Running 칸에 꼬리표와 재개하기를 단다", () => {
+    const running = row(section(render(seededPage()), homeJson.column.running), "ACME-10");
+    expect(running).toContain(`aria-label="${homeJson.card.menu.replace("{key}", "ACME-10")}"`);
+
+    const { db } = pausedPage();
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    expect(page.attention.some((item) => item.run.ticketKey === "ACME-10")).toBe(false);
+    const paused = row(section(render(page), homeJson.column.running), "ACME-10");
+    expect(pillsOf(paused)).toEqual([{ status: "paused", label: domain.runState.paused }]);
+    expect(buttonsOf(paused).map((button) => button.label)).toContain(homeJson.card.resume);
+    expect(paused).not.toContain(homeJson.card.menu.replace("{key}", "ACME-10"));
+    expect(text(paused)).toContain("20분째");
+    expect(text(paused)).toContain(domain.pauseSource.operator);
+  });
+
+  it("러너에서 멈춘 런도 Running 칸의 Paused 카드로 두고 누가 멈췄는지만 다르게 보인다(0120)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    expect(changeRunState(db, id, { to: "paused", source: "runner" }, minutes(100))).toMatchObject({
+      ok: true,
+    });
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    expect(page.attention.some((item) => item.run.ticketKey === "ACME-10")).toBe(false);
+    const paused = row(section(render(page), homeJson.column.running), "ACME-10");
+    expect(pillsOf(paused)).toEqual([{ status: "paused", label: domain.runState.paused }]);
+    expect(buttonsOf(paused).map((button) => button.label)).toContain(homeJson.card.resume);
+    expect(text(paused)).toContain(domain.pauseSource.runner);
+  });
+
+  it("요청 중이면 카드 아래 줄에 멈추는 중을 보이고 행동을 숨기며, 실패하면 이유를 보인다", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("no ACME-10");
+    requestRunControl(db, id, "pause", minutes(110));
+    const pending = row(
+      section(render(loadHomePage(db, "ws-commerce", now, "UTC")), homeJson.column.running),
+      "ACME-10",
+    );
+    expect(text(pending)).toContain(homeJson.card.pausing);
+    expect(pending).not.toContain('aria-haspopup="menu"');
+
+    completeRunControlRequest(db, {
+      runId: id,
+      requestedAt: minutes(110),
+      completedAt: minutes(111),
+      error: "agent-not-running",
+    });
+    const failed = row(
+      section(render(loadHomePage(db, "ws-commerce", now, "UTC")), homeJson.column.running),
+      "ACME-10",
+    );
+    expect(text(failed)).toContain(
+      homeJson.card.pauseFailed.replace("{reason}", domain.runControlFailure["agent-not-running"]),
+    );
   });
 });

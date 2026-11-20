@@ -2,10 +2,19 @@ import * as stylex from "@stylexjs/stylex";
 import type { KeyboardEventHandler, ReactNode } from "react";
 import { colors, lineHeight, radius, space } from "../tokens.stylex";
 
-export function RadioGroup({ labelledBy, children }: { labelledBy?: string; children: ReactNode }) {
+export function RadioGroup({
+  labelledBy,
+  describedBy,
+  children,
+}: {
+  labelledBy?: string;
+  describedBy?: string;
+  children: ReactNode;
+}) {
   return (
     <div
       {...(labelledBy === undefined ? {} : { role: "radiogroup", "aria-labelledby": labelledBy })}
+      {...(describedBy === undefined ? {} : { "aria-describedby": describedBy })}
       {...stylex.props(styles.group)}
     >
       {children}

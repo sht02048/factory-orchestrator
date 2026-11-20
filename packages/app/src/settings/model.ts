@@ -3,27 +3,6 @@ import type { McpActionView } from "../mcp/actions.js";
 import type { CheckFailure } from "../prerequisites.js";
 import type { McpLaunch } from "./mcp-launch.js";
 
-export const WORKSPACE_ITEMS = ["general", "projects", "mapping", "progress", "label"] as const;
-export const INSTALL_ITEMS = [
-  "connections",
-  "github",
-  "runners",
-  "addresses",
-  "power",
-  "mcp",
-  "updates",
-] as const;
-export type WorkspaceItem = (typeof WORKSPACE_ITEMS)[number];
-export type InstallItem = (typeof INSTALL_ITEMS)[number];
-export type SettingsItem = WorkspaceItem | InstallItem;
-
-export function isSettingsItem(value: string | undefined): value is SettingsItem {
-  return (
-    value !== undefined &&
-    (WORKSPACE_ITEMS.some((item) => item === value) || INSTALL_ITEMS.some((item) => item === value))
-  );
-}
-
 export type RemoteError = "unauthorized" | "rate-limited" | "not-found" | "network" | "invalid";
 
 export type Remote<T> = { ok: true; items: T[] } | { ok: false; error: RemoteError };
@@ -58,18 +37,38 @@ export interface ConnectionProjects {
   projects: TrackerProjectChoice[];
 }
 
+export interface MappingRepoView {
+  id: string;
+  isDefault: boolean;
+  labelId: string | null;
+}
+
+export interface MappingView {
+  agent: string;
+  model: string | null;
+  repos: MappingRepoView[];
+}
+
 export interface BoundProject {
   connection: Choice;
   project: Choice;
-  mapping: { runnerProject: string; agent: string; model: string | null } | null;
+  mapping: MappingView | null;
   inProgressStateId: string | null;
   states: Remote<Choice>;
+  labels: Remote<Choice>;
+}
+
+export interface RepoLabelUse {
+  labelId: string;
+  repo: string;
+  project: string;
 }
 
 export interface ConnectionLabel {
   connection: Choice;
   labelId: string | null;
   labels: Remote<Choice>;
+  repoLabels: RepoLabelUse[];
 }
 
 export interface WorkspaceSettings {
@@ -79,11 +78,67 @@ export interface WorkspaceSettings {
   labels: ConnectionLabel[];
 }
 
+export interface TrackerProjectList {
+  connection: string;
+  projects: Remote<Choice>;
+}
+
+export interface BoundProjectReads {
+  connection: string;
+  projectId: string;
+  states: Remote<Choice>;
+  labels: Remote<Choice>;
+}
+
+export interface ProjectOwnership {
+  connection: string;
+  projectId: string;
+  name: string;
+  owner: ProjectOwner;
+  mappings: number;
+  queuedRuns: number;
+}
+
+export type BoundProjectSettings = Omit<BoundProject, "states" | "labels">;
+
+export type ConnectionLabelSettings = Omit<ConnectionLabel, "labels"> & { projectIds: string[] };
+
+export interface WorkspaceDbSettings {
+  general: WorkspaceGeneral;
+  connections: Choice[];
+  ownership: ProjectOwnership[];
+  bound: BoundProjectSettings[];
+  labels: ConnectionLabelSettings[];
+}
+
+export type WebhookStateView =
+  | { kind: "off" }
+  | { kind: "waiting" }
+  | { kind: "receiving"; lastReceivedAt: string; lastReceivedAgoMs: number }
+  | {
+      kind: "rejected";
+      rejectedCount: number;
+      firstRejectedAt: string;
+      lastReceivedAt: string | null;
+      lastReceivedAgoMs: number | null;
+    };
+
 export interface TrackerConnectionView {
   id: string;
   name: string;
   hasWebhookSecret: boolean;
   webhookPath: string;
+  webhook: WebhookStateView;
+  webhookSettingsUrl: string | null;
+}
+
+export interface FunnelSetupView {
+  command: string;
+  address: string;
+}
+
+export interface WebhookSetupView {
+  funnel: FunnelSetupView | null;
 }
 
 export interface PrerequisiteView {
@@ -125,6 +180,7 @@ export type RunnerAccess = "ganger" | "manual";
 export interface AddressesView {
   webAddress: string | null;
   webhookAddress: string | null;
+  webhookAddressChecked: boolean;
 }
 
 export interface PowerView {
@@ -155,6 +211,13 @@ export interface SettingsPage {
   agents: string[];
 }
 
+export interface SettingsDbPage {
+  workspace: WorkspaceDbSettings | null;
+  install: InstallSettings;
+  runnerProjects: Choice[];
+  agents: string[];
+}
+
 export const MAX_RUN_MINUTES = 7 * 24 * 60;
 
 export const RUNNER_CHECK_POLL_MS = 3000;
@@ -166,4 +229,20 @@ export const MAX_MODEL_LENGTH = 200;
 
 export type SaveResult<R extends string = never> = { ok: true } | { ok: false; reason: R };
 
+export type MappingSaveReason =
+  | "not-found"
+  | "no-repos"
+  | "no-default"
+  | "many-defaults"
+  | "default-has-label"
+  | "duplicate-repo"
+  | "label-in-use"
+  | "auto-assign-label";
+
+export type LabelCreateResult =
+  | { ok: true; labelId: string; name: string; created: boolean }
+  | { ok: false; reason: RemoteError | "not-found" | "rejected" | "repo-label" };
+
 export type ConnectionSaveReason = RemoteError | "missing-key" | "not-found";
+
+export type { WebhookAddressFailure } from "../webhook-address.js";

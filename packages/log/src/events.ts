@@ -1,0 +1,87 @@
+export const LOG_EVENTS = {
+  "process.started": "process started",
+  "process.stopping": "process is stopping",
+  "process.stopped": "process stopped",
+  "process.stop_failed": "could not stop cleanly",
+  "process.crashed": "process crashed",
+  "process.alive": "process is alive",
+  "log.rotate_failed": "could not rotate a log file",
+
+  "supervisor.child_exited": "a server process exited",
+  "supervisor.ssh_key_failed": "could not prepare the ssh key",
+  "supervisor.keep_awake_failed": "could not keep this computer awake",
+
+  "request.rejected": "rejected a request",
+  "browser.error": "the browser reported an error",
+  "diagnostics.created": "created a diagnostics bundle",
+  "change_events.prune_failed": "could not prune change events",
+  "change_events.read_failed": "could not read change events",
+
+  "webhook.received": "handled a tracker webhook",
+  "webhook.rejected": "rejected a tracker webhook",
+  "webhook.failed": "could not handle a tracker webhook",
+
+  "worker.tick": "finished a tick",
+  "worker.tick_failed": "tick failed",
+  "worker.web_requests_failed": "could not process web requests",
+  "worker.log_tail_failed": "could not read a log tail",
+
+  "run.assigned": "assigned a ticket to a run",
+  "run.runner_chosen": "chose a runner for a queued run",
+  "run.state_changed": "changed run state",
+  "run.state_change_failed": "could not change run state",
+  "run.write_failed": "could not write run",
+  "run.watch_failed": "could not watch run",
+  "run.runner_missing": "run's runner is not registered",
+  "run.start_failed": "could not start run",
+  "run.lookup_failed": "could not look up a started run",
+  "run.cancel_lookup_failed": "could not look up a started run to cancel",
+  "run.cancel_runner_missing": "canceling a queued run whose runner is not registered",
+  "run.last_log_failed": "could not read the last log of an ending run",
+  "run.answer_failed": "could not send an answer",
+  "run.denial_failed": "could not send a permission denial",
+  "run.follow_up_failed": "could not follow up a run",
+  "run.tracker_update_failed": "could not update the tracker",
+  "run.pr_poll_failed": "could not poll the run's pull request",
+  "run.result_comment_failed": "could not comment the run result",
+  "run.worktree_follow_up_failed": "could not follow up the run's worktree",
+  "run.worktree_remove_failed": "could not remove a worktree",
+  "run.ticket_missing": "run's ticket was not found in the tracker",
+  "run.ticket_missing_skip_updates":
+    "run's ticket was not found in the tracker; skipping tracker updates",
+  "run.tracker_connection_missing": "run's tracker connection is not registered",
+  "run.code_host_missing": "no code host reads the run's project; recording no pull request",
+  "run.code_host_adapter_failed": "could not create code host adapter",
+  "run.mailbox_failed": "could not prepare the runner's mailbox",
+
+  "run_control.read_failed": "could not read run control requests",
+  "run_control.apply_failed": "could not apply a run control request",
+  "run_control.record_failed": "could not record a run control change",
+  "run_control.ticket_read_failed": "could not read the ticket for a restarted agent",
+
+  "runner.call": "called the runner",
+  "runner.online_changed": "runner went online or offline",
+  "runner.check_failed": "could not check runner",
+  "runner.check_record_failed": "could not record runner check",
+  "runner.check_result_write_failed": "could not write a runner check result",
+  "runner.check_request_failed": "could not check a runner on request",
+  "runner.projects_failed": "could not list runner projects",
+  "runner.removed_worktrees_failed": "could not confirm removed worktrees",
+  "runner.kept_worktree_check_failed": "could not check whether a kept worktree still exists",
+  "runner.provider_usage_failed": "could not read runner provider usage",
+
+  "auto_assign.failed": "could not assign automatically",
+  "auto_assign.ticket_failed": "could not assign ticket automatically",
+  "auto_assign.labeled_ticket_failed": "could not assign a labeled ticket",
+  "auto_assign.list_labeled_failed": "could not list labeled tickets",
+  "auto_assign.tracker_reads_mark_failed": "could not mark tracker reads changed",
+  "auto_assign.connections_read_failed": "could not read tracker connections",
+  "auto_assign.tracker_adapter_failed": "could not create tracker adapter",
+  "tracker_event.process_failed": "could not process tracker event",
+} as const;
+
+export type LogEvent = keyof typeof LOG_EVENTS;
+
+export function messageOf(event: LogEvent): string {
+  return LOG_EVENTS[event];
+}

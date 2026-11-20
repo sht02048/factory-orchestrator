@@ -1,13 +1,13 @@
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import type { Browser, Page } from "playwright-core";
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import onboarding from "../../apps/web/messages/ko/onboarding.json" with { type: "json" };
 import runnerSetup from "../../apps/web/messages/ko/runnerSetup.json" with { type: "json" };
 import settings from "../../apps/web/messages/ko/settings.json" with { type: "json" };
@@ -36,7 +36,16 @@ afterAll(async () => {
   if (devRoot !== undefined) rmSync(devRoot, { recursive: true, force: true });
 });
 
-describe("pnpm dev", () => {
+describe("pnpm dev:web", () => {
+  it("dev:web 은 웹 개발 서버만, dev 는 같은 서버에 데스크톱 앱을 붙여 띄운다", () => {
+    const pkg: unknown = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
+    const scripts = typeof pkg === "object" && pkg !== null && "scripts" in pkg ? pkg.scripts : {};
+    expect(scripts).toMatchObject({
+      "dev:web": "node demo/src/main.ts",
+      dev: "node demo/src/desktop.ts",
+    });
+  });
+
   it("미리 채운 모드: 홈이 온보딩으로 보내지 않고 200 이고, SIGTERM 에 포트를 닫는다", async () => {
     const dev = await startDev([]);
     let code: number | null;
@@ -58,14 +67,69 @@ describe("pnpm dev", () => {
     await expect(fetch(dev.url + "/")).rejects.toThrow("fetch failed");
   });
 
+  it("Query devtools 는 기본으로 그리지 않고, 개발 도구 페이지에서 켜고 끄며, 열린 앱 탭이 모두 같은 상태다(0139)", async () => {
+    const dev = await startDev(["--static"], { NODE_ENV: "development" });
+    const context = await browser.newContext({ baseURL: dev.url, locale: "ko-KR" });
+    context.setDefaultTimeout(30_000);
+    try {
+      const app = await context.newPage();
+      await app.goto("/");
+      await hydrated(app);
+      const panel = app.locator(".tsqd-parent-container");
+      const floatingButton = app.locator(".tsqd-open-btn");
+      expect(await panel.count()).toBe(0);
+      expect(await app.locator("#ganger-dev-tools > *").count()).toBe(2);
+
+      const tools = await context.newPage();
+      await tools.goto("/__dev");
+      const toggle = tools.getByRole("button", { name: "Query devtools 켜기·끄기" });
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("false");
+
+      await expect
+        .poll(
+          async () => {
+            if ((await toggle.getAttribute("aria-pressed")) === "false") await toggle.click();
+            return panel.count();
+          },
+          { timeout: 30_000 },
+        )
+        .toBe(1);
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("true");
+      expect(await floatingButton.count()).toBe(0);
+
+      const second = await context.newPage();
+      await second.goto("/runs");
+      await hydrated(second);
+      const secondPanel = second.locator(".tsqd-parent-container");
+      await secondPanel.waitFor({ state: "attached" });
+
+      await second.getByRole("button", { name: /close/i }).first().click();
+      await secondPanel.waitFor({ state: "detached" });
+      await panel.waitFor({ state: "detached" });
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("false");
+      expect(await floatingButton.count()).toBe(0);
+
+      await toggle.click();
+      await panel.waitFor({ state: "attached" });
+      await secondPanel.waitFor({ state: "attached" });
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("true");
+      expect(await second.locator(".tsqd-open-btn").count()).toBe(0);
+
+      await tools.close();
+      const third = await context.newPage();
+      await third.goto("/stats");
+      await hydrated(third);
+      await third.locator(".tsqd-parent-container").waitFor({ state: "attached" });
+    } finally {
+      await context.close();
+      await dev.stop();
+    }
+  });
+
   it("온보딩 모드: 가짜 값으로 5단계를 마치면 홈이 열린다", async () => {
     const dev = await startDev(["--onboarding", "--static"]);
     const page = await browser.newPage({ baseURL: dev.url, locale: "ko-KR" });
     page.setDefaultTimeout(30_000);
-    onTestFailed(async () => {
-      mkdirSync(resultsDir, { recursive: true });
-      await page.screenshot({ path: join(resultsDir, "dev-onboarding.png"), fullPage: true });
-    });
     try {
       const first = await fetch(dev.url + "/", { redirect: "manual" });
       expect(first.status).toBe(307);
@@ -77,32 +141,50 @@ describe("pnpm dev", () => {
       const fill = page.getByRole("button", { name: "가짜 값 채우기" });
       const next = page.getByRole("button", { name: onboarding.next });
 
+      const openStep = async (title: string) => {
+        await next.click();
+        await main.getByText(title, { exact: true }).waitFor();
+      };
+
+      await main.getByText(onboarding.steps.tracker.title, { exact: true }).waitFor();
       await fill.click();
-      await page.getByRole("button", { name: onboarding.tracker.check }).click();
+      await page.getByRole("button", { name: settings.credentials.keyCheck }).click();
       await main.getByText(onboarding.tracker.checked).waitFor();
-      await next.click();
+      await openStep(onboarding.steps.github.title);
       await fill.click();
       await page.getByRole("button", { name: settings.github.save }).click();
       await enabled(next);
-      await next.click();
+      await openStep(onboarding.steps.runner.title);
       await page.getByRole("link", { name: runnerSetup.choose.directLink }).click();
+      await main.getByRole("textbox", { name: settings.runners.sshTarget }).waitFor();
       await fill.click();
       await page.getByRole("button", { name: settings.runners.direct.submit }).click();
       await main.getByText(onboarding.runner.ready.replace("{name}", "runner-a")).waitFor();
-      await next.click();
+      await openStep(onboarding.steps.workspace.title);
       await fill.click();
       await page.getByRole("checkbox", { name: "Web" }).click();
       await page.getByRole("button", { name: onboarding.workspace.create }).click();
       await enabled(next);
-      await next.click();
+      await openStep(onboarding.steps.mapping.title);
+      const settled = async (popup: "listbox" | "menu") => {
+        await page.getByRole(popup).waitFor({ state: "detached" });
+        await expect
+          .poll(() => main.getByText(settings.mapping.status.saving, { exact: true }).count(), {
+            timeout: 30_000,
+          })
+          .toBe(0);
+      };
       const choose = async (index: number, option: string) => {
         await main.getByRole("combobox").nth(index).click();
         await page.getByRole("option", { name: option, exact: true }).click();
+        await settled("listbox");
       };
-      await choose(0, "acme/web");
-      await choose(1, "Claude Code");
-      await choose(2, "In Progress");
-      await choose(3, "factory");
+      await main.getByRole("button", { name: "Web의 기본 저장소 고르기" }).click();
+      await page.getByRole("menuitem", { name: "acme/web", exact: true }).click();
+      await settled("menu");
+      await choose(0, "Claude Code");
+      await choose(1, "In Progress");
+      await choose(2, "factory");
       const finish = page.getByRole("button", { name: onboarding.finish });
       await enabled(finish);
       await finish.click();
@@ -110,6 +192,10 @@ describe("pnpm dev", () => {
 
       const home = await fetch(dev.url + "/", { redirect: "manual" });
       expect(home.status).toBe(200);
+    } catch (error) {
+      mkdirSync(resultsDir, { recursive: true });
+      await page.screenshot({ path: join(resultsDir, "dev-onboarding.png"), fullPage: true });
+      throw error;
     } finally {
       await page.close();
       await dev.stop();
@@ -117,13 +203,14 @@ describe("pnpm dev", () => {
   });
 });
 
-async function startDev(args: string[]): Promise<Dev> {
+async function startDev(args: string[], extraEnv: Record<string, string> = {}): Promise<Dev> {
   const port = await freePort();
   const env: Record<string, string | undefined> = {
     ...process.env,
     GANGER_DEV_DIR: devRoot,
     WEB_HOST: "127.0.0.1",
     WEB_PORT: String(port),
+    ...extraEnv,
   };
   delete env["DATABASE_PATH"];
   delete env["ENCRYPTION_KEY"];
@@ -143,10 +230,10 @@ async function startDev(args: string[]): Promise<Dev> {
 
   const deadline = Date.now() + STARTUP_TIMEOUT_MS;
   while (!output.includes("Web is listening at")) {
-    if (exitCode !== undefined) throw new Error(`pnpm dev exited with ${exitCode}\n${output}`);
+    if (exitCode !== undefined) throw new Error(`pnpm dev:web exited with ${exitCode}\n${output}`);
     if (Date.now() > deadline) {
       child.kill("SIGKILL");
-      throw new Error(`pnpm dev did not start\n${output}`);
+      throw new Error(`pnpm dev:web did not start\n${output}`);
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }

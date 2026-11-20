@@ -1,9 +1,16 @@
-import { planCancel } from "@ganger/core";
-import type { RunId, RunnerHealth, RunnerId } from "@ganger/core";
+import { planCancel, planRunControl } from "@ganger/core";
+import type { RunControl, RunId, RunnerHealth, RunnerId } from "@ganger/core";
 import { and, asc, eq, isNull } from "drizzle-orm";
+import { recordRunChange, recordRunnerChange } from "./change-events.js";
 import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";
-import { logTailRequests, runCancelRequests, runnerCheckRequests, runs } from "./schema.js";
+import {
+  logTailRequests,
+  runCancelRequests,
+  runControlRequests,
+  runnerCheckRequests,
+  runs,
+} from "./schema.js";
 
 export type RequestStatus<T> =
   | { status: "pending"; requestedAt: Date }
@@ -23,13 +30,16 @@ function toStatus<T>(row: {
 }
 
 export function requestLogTail(db: Database, runId: RunId, now: Date = new Date()): void {
-  db.insert(logTailRequests)
-    .values({ runId, requestedAt: now })
-    .onConflictDoUpdate({
-      target: logTailRequests.runId,
-      set: { requestedAt: now, completedAt: null, lines: null, error: null },
-    })
-    .run();
+  inTransaction(db, () => {
+    db.insert(logTailRequests)
+      .values({ runId, requestedAt: now })
+      .onConflictDoUpdate({
+        target: logTailRequests.runId,
+        set: { requestedAt: now, completedAt: null, lines: null, error: null },
+      })
+      .run();
+    recordRunChange(db, runId, { part: "log", now });
+  });
 }
 
 export function listPendingLogTailRequests(
@@ -50,23 +60,26 @@ export function completeLogTailRequest(
     | { error: string }
   ),
 ): boolean {
-  return (
-    db
-      .update(logTailRequests)
-      .set({
-        completedAt: input.completedAt,
-        lines: "lines" in input ? [...input.lines] : null,
-        error: "error" in input ? input.error : null,
-      })
-      .where(
-        and(
-          eq(logTailRequests.runId, input.runId),
-          eq(logTailRequests.requestedAt, input.requestedAt),
-          isNull(logTailRequests.completedAt),
-        ),
-      )
-      .run().changes > 0
-  );
+  return inTransaction(db, () => {
+    const completed =
+      db
+        .update(logTailRequests)
+        .set({
+          completedAt: input.completedAt,
+          lines: "lines" in input ? [...input.lines] : null,
+          error: "error" in input ? input.error : null,
+        })
+        .where(
+          and(
+            eq(logTailRequests.runId, input.runId),
+            eq(logTailRequests.requestedAt, input.requestedAt),
+            isNull(logTailRequests.completedAt),
+          ),
+        )
+        .run().changes > 0;
+    if (completed) recordRunChange(db, input.runId, { part: "log", now: input.completedAt });
+    return completed;
+  });
 }
 
 export function getLogTailRequest(db: Database, runId: RunId): RequestStatus<string[]> | null {
@@ -75,13 +88,16 @@ export function getLogTailRequest(db: Database, runId: RunId): RequestStatus<str
 }
 
 export function requestRunnerCheck(db: Database, runnerId: RunnerId, now: Date = new Date()): void {
-  db.insert(runnerCheckRequests)
-    .values({ runnerId, requestedAt: now })
-    .onConflictDoUpdate({
-      target: runnerCheckRequests.runnerId,
-      set: { requestedAt: now, completedAt: null, result: null, error: null },
-    })
-    .run();
+  inTransaction(db, () => {
+    db.insert(runnerCheckRequests)
+      .values({ runnerId, requestedAt: now })
+      .onConflictDoUpdate({
+        target: runnerCheckRequests.runnerId,
+        set: { requestedAt: now, completedAt: null, result: null, error: null },
+      })
+      .run();
+    recordRunnerChange(db, runnerId, now);
+  });
 }
 
 export function listPendingRunnerCheckRequests(
@@ -105,23 +121,26 @@ export function completeRunnerCheckRequest(
     | { error: string }
   ),
 ): boolean {
-  return (
-    db
-      .update(runnerCheckRequests)
-      .set({
-        completedAt: input.completedAt,
-        result: "result" in input ? JSON.stringify(input.result) : null,
-        error: "error" in input ? input.error : null,
-      })
-      .where(
-        and(
-          eq(runnerCheckRequests.runnerId, input.runnerId),
-          eq(runnerCheckRequests.requestedAt, input.requestedAt),
-          isNull(runnerCheckRequests.completedAt),
-        ),
-      )
-      .run().changes > 0
-  );
+  return inTransaction(db, () => {
+    const completed =
+      db
+        .update(runnerCheckRequests)
+        .set({
+          completedAt: input.completedAt,
+          result: "result" in input ? JSON.stringify(input.result) : null,
+          error: "error" in input ? input.error : null,
+        })
+        .where(
+          and(
+            eq(runnerCheckRequests.runnerId, input.runnerId),
+            eq(runnerCheckRequests.requestedAt, input.requestedAt),
+            isNull(runnerCheckRequests.completedAt),
+          ),
+        )
+        .run().changes > 0;
+    if (completed) recordRunnerChange(db, input.runnerId, input.completedAt);
+    return completed;
+  });
 }
 
 export function getRunnerCheckRequest(
@@ -152,7 +171,12 @@ export function requestRunCancel(
     if (run === undefined) return { ok: false, reason: "not-found" };
     const plan = planCancel(run.state);
     if (!plan.ok) return { ok: false, reason: plan.reason };
-    db.insert(runCancelRequests).values({ runId, requestedAt: now }).onConflictDoNothing().run();
+    const inserted = db
+      .insert(runCancelRequests)
+      .values({ runId, requestedAt: now })
+      .onConflictDoNothing()
+      .run().changes;
+    if (inserted > 0) recordRunChange(db, runId, { now });
     const stored = db
       .select({ requestedAt: runCancelRequests.requestedAt })
       .from(runCancelRequests)
@@ -204,11 +228,135 @@ export function markCancelRequestProcessed(
   runId: RunId,
   now: Date = new Date(),
 ): boolean {
-  return (
-    db
-      .update(runCancelRequests)
-      .set({ processedAt: now })
-      .where(and(eq(runCancelRequests.runId, runId), isNull(runCancelRequests.processedAt)))
-      .run().changes > 0
-  );
+  return inTransaction(db, () => {
+    const processed =
+      db
+        .update(runCancelRequests)
+        .set({ processedAt: now })
+        .where(and(eq(runCancelRequests.runId, runId), isNull(runCancelRequests.processedAt)))
+        .run().changes > 0;
+    if (processed) recordRunChange(db, runId, { now });
+    return processed;
+  });
+}
+
+export type RequestRunControlResult =
+  | { ok: true; requestedAt: Date }
+  | {
+      ok: false;
+      reason: "not-found" | "already-ended" | "not-running" | "not-paused" | "cancelling";
+    };
+
+export function requestRunControl(
+  db: Database,
+  runId: RunId,
+  control: RunControl,
+  now: Date = new Date(),
+): RequestRunControlResult {
+  return inTransaction(db, (): RequestRunControlResult => {
+    const run = db.select({ state: runs.state }).from(runs).where(eq(runs.id, runId)).get();
+    if (run === undefined) return { ok: false, reason: "not-found" };
+    const plan = planRunControl(run.state, control);
+    if (!plan.ok) return { ok: false, reason: plan.reason };
+    if (hasPendingCancelRequest(db, runId)) return { ok: false, reason: "cancelling" };
+    const pending = db
+      .select({ requestedAt: runControlRequests.requestedAt })
+      .from(runControlRequests)
+      .where(and(eq(runControlRequests.runId, runId), isNull(runControlRequests.completedAt)))
+      .get();
+    if (pending !== undefined) return { ok: true, requestedAt: pending.requestedAt };
+    db.insert(runControlRequests)
+      .values({ runId, control, requestedAt: now })
+      .onConflictDoUpdate({
+        target: runControlRequests.runId,
+        set: { control, requestedAt: now, completedAt: null, error: null },
+      })
+      .run();
+    recordRunChange(db, runId, { now });
+    return { ok: true, requestedAt: now };
+  });
+}
+
+export const RUN_CONTROL_OUTCOME_UNKNOWN = "outcome-unknown";
+
+export interface PendingRunControlRequest {
+  runId: RunId;
+  control: RunControl;
+  requestedAt: Date;
+  outcomeUnknown: boolean;
+}
+
+export function listPendingRunControlRequests(db: Database): PendingRunControlRequest[] {
+  return db
+    .select({
+      runId: runControlRequests.runId,
+      control: runControlRequests.control,
+      requestedAt: runControlRequests.requestedAt,
+      error: runControlRequests.error,
+    })
+    .from(runControlRequests)
+    .where(isNull(runControlRequests.completedAt))
+    .orderBy(asc(runControlRequests.requestedAt), asc(runControlRequests.runId))
+    .all()
+    .map(({ error, ...request }) => ({
+      ...request,
+      outcomeUnknown: error === RUN_CONTROL_OUTCOME_UNKNOWN,
+    }));
+}
+
+export function markRunControlOutcomeUnknown(
+  db: Database,
+  input: { runId: RunId; requestedAt: Date },
+): boolean {
+  return inTransaction(db, () => {
+    const before = db
+      .select({ error: runControlRequests.error })
+      .from(runControlRequests)
+      .where(eq(runControlRequests.runId, input.runId))
+      .get();
+    const marked =
+      db
+        .update(runControlRequests)
+        .set({ error: RUN_CONTROL_OUTCOME_UNKNOWN })
+        .where(
+          and(
+            eq(runControlRequests.runId, input.runId),
+            eq(runControlRequests.requestedAt, input.requestedAt),
+            isNull(runControlRequests.completedAt),
+          ),
+        )
+        .run().changes > 0;
+    if (marked && before?.error !== RUN_CONTROL_OUTCOME_UNKNOWN) recordRunChange(db, input.runId);
+    return marked;
+  });
+}
+
+export function completeRunControlRequest(
+  db: Database,
+  input: { runId: RunId; requestedAt: Date; completedAt: Date; error: string | null },
+): boolean {
+  return inTransaction(db, () => {
+    const completed =
+      db
+        .update(runControlRequests)
+        .set({ completedAt: input.completedAt, error: input.error })
+        .where(
+          and(
+            eq(runControlRequests.runId, input.runId),
+            eq(runControlRequests.requestedAt, input.requestedAt),
+            isNull(runControlRequests.completedAt),
+          ),
+        )
+        .run().changes > 0;
+    if (completed) recordRunChange(db, input.runId, { now: input.completedAt });
+    return completed;
+  });
+}
+
+export function getRunControlRequest(
+  db: Database,
+  runId: RunId,
+): (RequestStatus<null> & { control: RunControl }) | null {
+  const row = db.select().from(runControlRequests).where(eq(runControlRequests.runId, runId)).get();
+  return row === undefined ? null : { ...toStatus({ ...row, result: null }), control: row.control };
 }

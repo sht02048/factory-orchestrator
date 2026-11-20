@@ -287,6 +287,7 @@ const styles = stylex.create({
   },
   head: {
     height: 30,
+    marginBottom: space.s2,
     color: colors.textTertiary,
     fontSize: fontSize.small,
   },

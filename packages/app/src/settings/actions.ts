@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import {
+  AUTO_ASSIGN_LABEL_NAME,
+  AdapterError,
+  findLabelNamed,
   toAgentId,
   toLabelId,
   toRunnerId,
@@ -9,18 +12,29 @@ import {
   toTrackerProjectId,
   toTrackerStateId,
 } from "@ganger/core";
-import type { RunnerId, RunnerKind } from "@ganger/core";
+import type { RunnerId, RunnerKind, TrackerConnectionId } from "@ganger/core";
 import {
+  forgetWebhookReceipt,
+  inTransaction,
+  getAutoAssignLabel,
+  getInstallSettings,
+  getMapping,
   getTrackerConnection,
   getWorkspaceTrackerProject,
   listCodeHostConnections,
+  listWorkspaceTrackerProjects,
   listRunners,
   listWorkspaces,
+  markTrackerChanged,
+  markTrackerReadsStale,
+  recordSettingsChange,
   removeWorkspaceTrackerProject,
   requestRunnerCheck,
   saveAutoAssignLabel,
   saveCodeHostConnection,
+  saveCheckedWebhookAddress,
   saveInstallAddresses,
+  replaceMapping,
   saveMapping,
   saveMcpWriteAllowed,
   saveRunner,
@@ -33,10 +47,19 @@ import {
 import type { WorkspaceId } from "@ganger/db";
 import { z } from "zod";
 import { allowedHosts, hostnameOfHostHeader } from "../request-guard.js";
-import { remoteErrorOf, remoteErrorOfDetail } from "./load.js";
+import { checkWebhookAddress } from "../webhook-address.js";
+import type { PingFetch, WebhookAddressFailure } from "../webhook-address.js";
+import { remoteErrorOf, remoteErrorOfDetail, trackerConnectionView, trackerOf } from "./load.js";
 import type { SettingsContext } from "./load.js";
 import { MAX_MODEL_LENGTH, MAX_RUN_MINUTES } from "./model.js";
-import type { ConnectionSaveReason, RemoteError, SaveResult } from "./model.js";
+import type {
+  ConnectionSaveReason,
+  LabelCreateResult,
+  MappingSaveReason,
+  RemoteError,
+  SaveResult,
+  WebhookStateView,
+} from "./model.js";
 
 export const RUNNER_KIND: RunnerKind = toRunnerKind("orca");
 
@@ -106,7 +129,8 @@ export function addTrackerProject(
     name: input.name,
     inProgressStateId: null,
   });
-  return saved ? { ok: true } : { ok: false, reason: "taken" };
+  if (!saved) return { ok: false, reason: "taken" };
+  return { ok: true };
 }
 
 export function removeTrackerProject(
@@ -115,12 +139,14 @@ export function removeTrackerProject(
 ): SaveResult<"not-found"> {
   const workspaceId = workspaceOf(context, input.ws);
   if (workspaceId === null) return { ok: false, reason: "not-found" };
+  const connection = toTrackerConnectionId(input.connectionId);
   const removed = removeWorkspaceTrackerProject(context.db, {
     workspaceId,
-    connection: toTrackerConnectionId(input.connectionId),
+    connection,
     projectId: toTrackerProjectId(input.projectId),
   });
-  return removed ? { ok: true } : { ok: false, reason: "not-found" };
+  if (!removed) return { ok: false, reason: "not-found" };
+  return { ok: true };
 }
 
 function boundProject(context: SettingsContext, input: z.infer<typeof trackerProjectInput>) {
@@ -161,6 +187,42 @@ export function saveMappingSetting(
   return { ok: true };
 }
 
+export const MAX_MAPPING_REPOS = 50;
+
+export const mappingStateInput = trackerProjectInput.extend({
+  agentId: id,
+  model: mappingInput.shape.model,
+  repos: z
+    .array(z.object({ runnerProjectId: id, isDefault: z.boolean(), labelId: id.nullable() }))
+    .min(1)
+    .max(MAX_MAPPING_REPOS),
+});
+
+export function saveMappingState(
+  context: SettingsContext,
+  input: z.infer<typeof mappingStateInput>,
+): SaveResult<MappingSaveReason> {
+  const project = boundProject(context, input);
+  if (project === null) return { ok: false, reason: "not-found" };
+  const autoAssignLabel = getAutoAssignLabel(context.db, project.workspaceId, project.connection);
+  if (autoAssignLabel !== null && input.repos.some((repo) => repo.labelId === autoAssignLabel)) {
+    return { ok: false, reason: "auto-assign-label" };
+  }
+  const saved = replaceMapping(context.db, {
+    connection: project.connection,
+    trackerProject: project.projectId,
+    agent: toAgentId(input.agentId),
+    model: input.model === undefined || input.model === "" ? null : input.model,
+    repos: input.repos.map((repo) => ({
+      project: toRunnerProjectId(repo.runnerProjectId),
+      isDefault: repo.isDefault,
+      labelId: repo.labelId === null ? null : toLabelId(repo.labelId),
+    })),
+  });
+  if (saved.ok) markTrackerReadsStale(context.db, project.connection);
+  return saved;
+}
+
 export const inProgressInput = trackerProjectInput.extend({ stateId: id });
 
 export function saveInProgressState(
@@ -178,10 +240,58 @@ export function saveInProgressState(
 
 export const labelInput = z.object({ ws: id, connectionId: id, labelId: id });
 
+export const createLabelInput = z.object({ ws: id, connectionId: id });
+
+export async function createAutoAssignLabel(
+  context: SettingsContext,
+  input: z.infer<typeof createLabelInput>,
+  color: string,
+): Promise<LabelCreateResult> {
+  const workspaceId = workspaceOf(context, input.ws);
+  const connection = toTrackerConnectionId(input.connectionId);
+  const stored =
+    workspaceId === null ? null : getTrackerConnection(context.db, context.secretBox, connection);
+  const tracker = stored === null ? null : trackerOf(context, stored);
+  if (workspaceId === null || tracker === null) return { ok: false, reason: "not-found" };
+  const projects = listWorkspaceTrackerProjects(context.db, workspaceId).filter(
+    (project) => project.connection === connection,
+  );
+  try {
+    const lists = await Promise.all(projects.map((p) => tracker.listLabels(p.projectId)));
+    const label =
+      findLabelNamed(lists.flat(), AUTO_ASSIGN_LABEL_NAME) ??
+      (await tracker.createLabel({ name: AUTO_ASSIGN_LABEL_NAME, color }));
+    const created = !lists.flat().some((existing) => existing.id === label.id);
+    if (repoLabelIds(context, workspaceId, connection).has(label.id)) {
+      return { ok: false, reason: "repo-label" };
+    }
+    saveAutoAssignLabel(context.db, { workspaceId, connection, labelId: label.id });
+    markTrackerChanged(context.db, connection);
+    return { ok: true, labelId: label.id, name: label.name, created };
+  } catch (error) {
+    return { ok: false, reason: error instanceof AdapterError ? remoteErrorOf(error) : "rejected" };
+  }
+}
+
+export function repoLabelIds(
+  context: SettingsContext,
+  workspaceId: WorkspaceId,
+  connection: TrackerConnectionId,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const project of listWorkspaceTrackerProjects(context.db, workspaceId)) {
+    if (project.connection !== connection) continue;
+    for (const repo of getMapping(context.db, connection, project.projectId)?.repos ?? []) {
+      if (repo.labelId !== null) ids.add(repo.labelId);
+    }
+  }
+  return ids;
+}
+
 export function saveLabel(
   context: SettingsContext,
   input: z.infer<typeof labelInput>,
-): SaveResult<"not-found"> {
+): SaveResult<"not-found" | "repo-label"> {
   const workspaceId = workspaceOf(context, input.ws);
   const connection = toTrackerConnectionId(input.connectionId);
   if (
@@ -189,6 +299,9 @@ export function saveLabel(
     getTrackerConnection(context.db, context.secretBox, connection) === null
   ) {
     return { ok: false, reason: "not-found" };
+  }
+  if (repoLabelIds(context, workspaceId, connection).has(input.labelId)) {
+    return { ok: false, reason: "repo-label" };
   }
   saveAutoAssignLabel(context.db, {
     workspaceId,
@@ -241,32 +354,105 @@ export async function saveTrackerConnectionSetting(
   const webhookSecret =
     input.webhookSecret === "" ? (previous?.webhookSecret ?? null) : input.webhookSecret;
   const secrets = { ...previous, apiKey, webhookSecret };
-  const config = existing?.config ?? {};
+  let config: unknown = existing?.config ?? {};
 
   let organizationName: string | null = null;
   if (input.apiKey !== "") {
-    const check = await checkWith<{ ok: true; organizationName: string | null }>(() =>
-      context.registry.createTracker(kind, { config, secrets }).checkConnection(),
-    );
+    const check = await checkWith<{
+      ok: true;
+      organizationName: string | null;
+      webhookSettingsUrl?: string;
+    }>(() => context.registry.createTracker(kind, { config, secrets }).checkConnection());
     if (!check.ok) return { ok: false, reason: check.reason };
     organizationName = connectionNameOf(check.organizationName);
+    if (check.webhookSettingsUrl !== undefined) {
+      config = { ...configObject(config), webhookSettingsUrl: check.webhookSettingsUrl };
+    }
   }
-  saveTrackerConnection(
-    context.db,
-    context.secretBox,
-    {
-      id: existing?.id ?? toTrackerConnectionId(randomUUID()),
-      kind,
-      name: input.name ?? existing?.name ?? organizationName ?? DEFAULT_CONNECTION_NAME,
-      config,
-      secrets,
-    },
-    now,
-  );
+  const id = existing?.id ?? toTrackerConnectionId(randomUUID());
+  inTransaction(context.db, () => {
+    saveTrackerConnection(
+      context.db,
+      context.secretBox,
+      {
+        id,
+        kind,
+        name: input.name ?? existing?.name ?? organizationName ?? DEFAULT_CONNECTION_NAME,
+        config,
+        secrets,
+      },
+      now,
+    );
+    if (webhookSecret !== (previous?.webhookSecret ?? null))
+      forgetWebhookReceipt(context.db, id, now);
+  });
   return { ok: true };
 }
 
+const configObjectSchema = z.record(z.string(), z.unknown());
+
+function configObject(config: unknown): Record<string, unknown> {
+  const parsed = configObjectSchema.safeParse(config);
+  return parsed.success ? parsed.data : {};
+}
+
 export const connectionIdInput = z.object({ id });
+
+export function turnOffWebhook(
+  context: SettingsContext,
+  input: z.infer<typeof connectionIdInput>,
+  now: Date,
+): SaveResult<"not-found"> {
+  const existing = getTrackerConnection(
+    context.db,
+    context.secretBox,
+    toTrackerConnectionId(input.id),
+  );
+  if (existing === null) return { ok: false, reason: "not-found" };
+  const stored = trackerSecretsSchema.safeParse(existing.secrets);
+  if (!stored.success) return { ok: false, reason: "not-found" };
+  inTransaction(context.db, () => {
+    saveTrackerConnection(
+      context.db,
+      context.secretBox,
+      { ...existing, secrets: { ...stored.data, webhookSecret: null } },
+      now,
+    );
+    forgetWebhookReceipt(context.db, existing.id, now);
+  });
+  return { ok: true };
+}
+
+export function webhookStateNow(
+  context: SettingsContext,
+  input: z.infer<typeof connectionIdInput>,
+  now: Date,
+): WebhookStateView | null {
+  const connection = getTrackerConnection(
+    context.db,
+    context.secretBox,
+    toTrackerConnectionId(input.id),
+  );
+  return connection === null ? null : trackerConnectionView(context.db, connection, now).webhook;
+}
+
+export const webhookAddressInput = z.object({ address: z.string().trim().max(2000) });
+
+export async function verifyWebhookAddress(
+  context: SettingsContext,
+  input: z.infer<typeof webhookAddressInput>,
+  now: Date,
+  fetch: PingFetch,
+): Promise<SaveResult<WebhookAddressFailure>> {
+  const install = getInstallSettings(context.db);
+  const check = await checkWebhookAddress(input.address, {
+    fetch,
+    instanceId: install.instanceId,
+  });
+  if (!check.ok) return check;
+  saveCheckedWebhookAddress(context.db, check.address, now);
+  return { ok: true };
+}
 
 export async function checkTrackerConnection(
   context: SettingsContext,
@@ -278,6 +464,7 @@ export async function checkTrackerConnection(
     toTrackerConnectionId(input.id),
   );
   if (connection === null) return { ok: false, reason: "not-found" };
+  markTrackerChanged(context.db, connection.id);
   return checkWith(() =>
     context.registry
       .createTracker(connection.kind, { config: connection.config, secrets: connection.secrets })
@@ -475,6 +662,7 @@ export function savePowerSetting(
 ): SaveResult<"unavailable"> {
   if (context.power === undefined) return { ok: false, reason: "unavailable" };
   context.power.write({ preventSleep: input.preventSleep });
+  recordSettingsChange(context.db);
   return { ok: true };
 }
 

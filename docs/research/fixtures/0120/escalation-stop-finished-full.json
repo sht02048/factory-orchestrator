@@ -1,0 +1,21 @@
+{
+  "id": "msg_stop_000000000000000000000120",
+  "run_id": "run_000000000100",
+  "delivery_contract": "current_delivery",
+  "from_handle": "term_30000000-0000-4000-8000-000000000001",
+  "to_handle": "run:run_000000000100",
+  "subject": "Worker stopped without reporting",
+  "body": "Worker term_30000000-0000-4000-8000-000000000001 ended its turn without sending worker_done for task \"ganger-ACME-7-1\" (task_000000000120).\nThe Dispatch is still open. Answer it with your Orca CLI's `orchestration send --to dispatch:ctx_000000000120 --subject \"<topic>\" --body \"<guidance>\"`, retry it, or stop the worker.\nLast output:\n로그인 버튼 색을 고쳤어요. 시험은 아직 돌리지 못했어요.\n\n- `src/login.tsx` 를 바꿨어요.\n❯",
+  "type": "escalation",
+  "priority": "high",
+  "thread_id": null,
+  "payload": "{\"taskId\":\"task_000000000120\",\"dispatchId\":\"ctx_000000000120\",\"handle\":\"term_30000000-0000-4000-8000-000000000001\",\"stopReason\":\"finished\"}",
+  "read": 0,
+  "sequence": 7,
+  "created_at": "2026-11-19T10:42:05Z",
+  "delivered_at": null,
+  "sender_pane_key": null,
+  "pointer_enter_pending": 0,
+  "pointer_pty_id": null,
+  "pointer_process_incarnation": null
+}

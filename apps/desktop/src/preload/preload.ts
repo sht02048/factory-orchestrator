@@ -6,11 +6,15 @@ import {
   navPathKeepingWorkspace,
 } from "@ganger/app/shell/nav-shortcuts";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
+import { addDragHandleIfMissing } from "./drag-handle.js";
 import { notificationSettingsViewSchema } from "../core/notification-prefs.js";
 import { DESKTOP_UPDATES_GLOBAL } from "@ganger/app/updates/view";
+import { DESKTOP_LOGS_GLOBAL } from "@ganger/app/diagnostics/model";
 import type { DesktopApi, NotificationSettingsApi, ViewState } from "../shared/view.js";
 import {
   IPC_PREFIX,
+  LOGS_CAN_OPEN,
+  LOGS_OPEN,
   NAVIGATE_CHANNEL,
   NOTIFICATION_SETTINGS_CHANNEL,
   UPDATE_ACT,
@@ -73,6 +77,9 @@ if (window.location.protocol === "file:") {
 }
 
 if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+  window.addEventListener("DOMContentLoaded", () =>
+    addDragHandleIfMissing<HTMLDivElement>(document),
+  );
   const listeners = new Set<(screen: NavScreen) => void>();
   ipcRenderer.on(NAVIGATE_CHANNEL, (_event: IpcRendererEvent, screen: unknown) => {
     if (!isNavScreen(screen)) return;
@@ -93,6 +100,10 @@ if (window.location.protocol === "http:" || window.location.protocol === "https:
     },
     act: (action: string): Promise<void> =>
       ipcRenderer.invoke(UPDATE_ACT, action).then(() => undefined),
+  });
+  contextBridge.exposeInMainWorld(DESKTOP_LOGS_GLOBAL, {
+    canOpenFolder: (): Promise<unknown> => ipcRenderer.invoke(LOGS_CAN_OPEN),
+    openFolder: (): Promise<unknown> => ipcRenderer.invoke(LOGS_OPEN),
   });
   contextBridge.exposeInMainWorld(DESKTOP_NAVIGATION_GLOBAL, {
     onNavigate: (listener: (screen: NavScreen) => void) => {

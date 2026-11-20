@@ -10,7 +10,7 @@ export interface OccupyingRun {
   id: string;
   ticketKey: string;
   workspace: RunWorkspace;
-  state: "running" | "waiting-for-input" | "disconnected";
+  state: "running" | "waiting-for-input" | "paused" | "disconnected";
   executionMs: number;
 }
 
@@ -73,6 +73,7 @@ export interface RunnerView {
   queued: QueuedRunView[];
   leftWorktrees: LeftWorktree[];
   sshTarget: string | null;
+  orcaPath: string | null;
   usage: RunnerUsageView | null;
 }
 

@@ -1,5 +1,6 @@
 export const WEBHOOK_PATH_PREFIX = "/api/webhooks/";
 export const IDENTITY_PATH = "/api/identity";
+export const WEBHOOK_PING_PREFIX = `${WEBHOOK_PATH_PREFIX}ping/`;
 
 export const LOOPBACK_HOSTS: ReadonlyArray<string> = ["127.0.0.1", "localhost", "[::1]"];
 
@@ -62,6 +63,10 @@ export function allowedHosts(input: AllowedHostsInput): AllowedHosts {
   return { web, webhook };
 }
 
+function isAnswerableOnAnyHost(pathname: string): boolean {
+  return pathname === IDENTITY_PATH || pathname.startsWith(WEBHOOK_PING_PREFIX);
+}
+
 export function isWebhookPath(pathname: string): boolean {
   return pathname.startsWith(WEBHOOK_PATH_PREFIX);
 }
@@ -91,7 +96,7 @@ export function checkRequest(request: Request, allowed: AllowedHosts): GuardVerd
   const hostHeader = request.headers.get("host");
   const origin = request.headers.get("origin");
   const host = hostHeader ?? "";
-  if (pathname === IDENTITY_PATH && SAFE_METHODS.has(request.method)) return { ok: true };
+  if (SAFE_METHODS.has(request.method) && isAnswerableOnAnyHost(pathname)) return { ok: true };
   if (!isHostAllowed(hostnameOfHostHeader(hostHeader), pathname, allowed)) {
     return { ok: false, status: 403, reason: "host-not-allowed", host, origin };
   }
@@ -121,14 +126,26 @@ export function rejectionResponse(reason: RejectReason): Response {
   });
 }
 
-export function rejectionLogLine(
+export interface RejectionLogFields {
+  status: number;
+  reason: RejectReason;
+  method: string;
+  path: string;
+  host: string;
+  origin: string | null;
+}
+
+export function rejectionLogFields(
   request: Request,
   verdict: Extract<GuardVerdict, { ok: false }>,
-): string {
-  const clip = (value: string) => JSON.stringify(value.slice(0, 200));
-  const { pathname } = new URL(request.url);
-  return (
-    `request rejected: ${verdict.status} ${verdict.reason} ${request.method} ${clip(pathname)} ` +
-    `host=${clip(verdict.host)} origin=${verdict.origin === null ? "-" : clip(verdict.origin)}`
-  );
+): RejectionLogFields {
+  const clip = (value: string) => value.slice(0, 200);
+  return {
+    status: verdict.status,
+    reason: verdict.reason,
+    method: request.method,
+    path: clip(new URL(request.url).pathname),
+    host: clip(verdict.host),
+    origin: verdict.origin === null ? null : clip(verdict.origin),
+  };
 }
