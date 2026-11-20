@@ -2,7 +2,6 @@ import * as stylex from "@stylexjs/stylex";
 import { Toaster, WindowChrome, WindowDragFrame, documentStyles } from "@ganger/ui";
 import type { QueryClient } from "@tanstack/react-query";
 import {
-  ClientOnly,
   ErrorComponent,
   HeadContent,
   Outlet,
@@ -13,13 +12,14 @@ import {
   useRouter,
   useRouterState,
 } from "@tanstack/react-router";
-import { Suspense, lazy, useEffect } from "react";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { z } from "zod";
 import { IntlProvider, useTranslations } from "use-intl";
 import { appMessages, defaultLocale, t } from "../i18n";
 import { renderedChangeSeq } from "../change-events/rendered-seq";
+import { QueryDevtools } from "../query/devtools";
 import { RenderedChangeSeqProvider } from "../change-events/subscription";
 import { NotFoundScreen } from "../not-found/not-found-screen";
 import { useBrowserErrorWatch, useReportCaughtError } from "../shell/browser-error-watch";
@@ -82,13 +82,22 @@ function RootDocument({ children }: { children: ReactNode }) {
     <html lang={defaultLocale}>
       <head>
         <HeadContent />
-        {import.meta.env.DEV ? <link rel="stylesheet" href="/virtual:stylex.css" /> : null}
+        {import.meta.env.DEV ? <DevStyleXStyles /> : null}
       </head>
       <body {...stylex.props(documentStyles.body)}>
         {children}
         <Scripts />
       </body>
     </html>
+  );
+}
+
+function DevStyleXStyles() {
+  return (
+    <>
+      <link rel="stylesheet" href="/virtual:stylex.css" />
+      <script type="module" src="/@id/virtual:stylex:runtime" />
+    </>
   );
 }
 
@@ -126,25 +135,6 @@ function RootLayout() {
         <QueryDevtools />
       </WindowChrome>
     </IntlProvider>
-  );
-}
-
-const ReactQueryDevtools = import.meta.env.DEV
-  ? lazy(() =>
-      import("@tanstack/react-query-devtools").then((devtools) => ({
-        default: devtools.ReactQueryDevtools,
-      })),
-    )
-  : null;
-
-function QueryDevtools() {
-  if (ReactQueryDevtools === null) return null;
-  return (
-    <ClientOnly>
-      <Suspense fallback={null}>
-        <ReactQueryDevtools buttonPosition="bottom-left" />
-      </Suspense>
-    </ClientOnly>
   );
 }
 

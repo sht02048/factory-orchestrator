@@ -13,6 +13,7 @@ export interface WebServer {
 export async function startWebServer(options: {
   plugins: Plugin[];
   cacheDir: string;
+  hmr?: boolean;
 }): Promise<WebServer> {
   const server = await createServer({
     root: webRoot,
@@ -20,7 +21,13 @@ export async function startWebServer(options: {
     cacheDir: options.cacheDir,
     logLevel: "warn",
     plugins: options.plugins,
-    server: { host: "127.0.0.1", port: 0, strictPort: false, hmr: false, watch: null },
+    server: {
+      host: "127.0.0.1",
+      port: 0,
+      strictPort: false,
+      hmr: options.hmr ?? false,
+      watch: null,
+    },
   });
   await server.listen();
   const address = server.httpServer?.address();

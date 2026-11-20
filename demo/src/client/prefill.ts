@@ -1,4 +1,6 @@
 import {
+  ASK_QUERY_DEVTOOLS,
+  DEV_CHANNEL,
   FAIL_AUTH,
   FAIL_NO_ORCA,
   FAIL_OFFLINE,
@@ -6,6 +8,10 @@ import {
   PREFILL,
   PREFILL_RUNNER_NAME,
 } from "../values.ts";
+import {
+  onQueryDevtoolsState,
+  setQueryDevtools,
+} from "../../../apps/web/src/query/devtools-toggle.ts";
 
 const ROOT_ID = "ganger-dev-tools";
 
@@ -60,6 +66,32 @@ function mount(): void {
   root.append(fillButton, link);
   document.body.append(root);
 }
+
+function bridgeQueryDevtools(): void {
+  const channel = new BroadcastChannel(DEV_CHANNEL);
+  let shown = false;
+  let asked = false;
+  onQueryDevtoolsState(window, (next) => {
+    if (shown && !next) channel.postMessage({ setQueryDevtools: false });
+    shown = next;
+    if (asked) return;
+    asked = true;
+    channel.postMessage(ASK_QUERY_DEVTOOLS);
+  });
+  channel.addEventListener("message", (event: MessageEvent<unknown>) => {
+    const message = event.data;
+    if (message === ASK_QUERY_DEVTOOLS) {
+      channel.postMessage(shown ? { setQueryDevtools: true } : { queryDevtools: false });
+    }
+    const wanted: unknown =
+      typeof message === "object" && message !== null
+        ? Reflect.get(message, "setQueryDevtools")
+        : undefined;
+    if (typeof wanted === "boolean") setQueryDevtools(window, wanted);
+  });
+}
+
+bridgeQueryDevtools();
 
 const waitForHydration = setInterval(() => {
   if (!("__TSR_ROUTER__" in globalThis)) return;

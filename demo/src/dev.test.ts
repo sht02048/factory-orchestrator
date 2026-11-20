@@ -67,6 +67,65 @@ describe("pnpm dev:web", () => {
     await expect(fetch(dev.url + "/")).rejects.toThrow("fetch failed");
   });
 
+  it("Query devtools 는 기본으로 그리지 않고, 개발 도구 페이지에서 켜고 끄며, 열린 앱 탭이 모두 같은 상태다(0139)", async () => {
+    const dev = await startDev(["--static"], { NODE_ENV: "development" });
+    const context = await browser.newContext({ baseURL: dev.url, locale: "ko-KR" });
+    context.setDefaultTimeout(30_000);
+    try {
+      const app = await context.newPage();
+      await app.goto("/");
+      await hydrated(app);
+      const panel = app.locator(".tsqd-parent-container");
+      const floatingButton = app.locator(".tsqd-open-btn");
+      expect(await panel.count()).toBe(0);
+      expect(await app.locator("#ganger-dev-tools > *").count()).toBe(2);
+
+      const tools = await context.newPage();
+      await tools.goto("/__dev");
+      const toggle = tools.getByRole("button", { name: "Query devtools 켜기·끄기" });
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("false");
+
+      await expect
+        .poll(
+          async () => {
+            if ((await toggle.getAttribute("aria-pressed")) === "false") await toggle.click();
+            return panel.count();
+          },
+          { timeout: 30_000 },
+        )
+        .toBe(1);
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("true");
+      expect(await floatingButton.count()).toBe(0);
+
+      const second = await context.newPage();
+      await second.goto("/runs");
+      await hydrated(second);
+      const secondPanel = second.locator(".tsqd-parent-container");
+      await secondPanel.waitFor({ state: "attached" });
+
+      await second.getByRole("button", { name: /close/i }).first().click();
+      await secondPanel.waitFor({ state: "detached" });
+      await panel.waitFor({ state: "detached" });
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("false");
+      expect(await floatingButton.count()).toBe(0);
+
+      await toggle.click();
+      await panel.waitFor({ state: "attached" });
+      await secondPanel.waitFor({ state: "attached" });
+      await expect.poll(() => toggle.getAttribute("aria-pressed")).toBe("true");
+      expect(await second.locator(".tsqd-open-btn").count()).toBe(0);
+
+      await tools.close();
+      const third = await context.newPage();
+      await third.goto("/stats");
+      await hydrated(third);
+      await third.locator(".tsqd-parent-container").waitFor({ state: "attached" });
+    } finally {
+      await context.close();
+      await dev.stop();
+    }
+  });
+
   it("온보딩 모드: 가짜 값으로 5단계를 마치면 홈이 열린다", async () => {
     const dev = await startDev(["--onboarding", "--static"]);
     const page = await browser.newPage({ baseURL: dev.url, locale: "ko-KR" });
@@ -144,13 +203,14 @@ describe("pnpm dev:web", () => {
   });
 });
 
-async function startDev(args: string[]): Promise<Dev> {
+async function startDev(args: string[], extraEnv: Record<string, string> = {}): Promise<Dev> {
   const port = await freePort();
   const env: Record<string, string | undefined> = {
     ...process.env,
     GANGER_DEV_DIR: devRoot,
     WEB_HOST: "127.0.0.1",
     WEB_PORT: String(port),
+    ...extraEnv,
   };
   delete env["DATABASE_PATH"];
   delete env["ENCRYPTION_KEY"];
