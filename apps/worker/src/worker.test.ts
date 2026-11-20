@@ -638,6 +638,14 @@ describe("startWorker", () => {
 });
 
 describe("info 줄", () => {
+  it("Queued 런은 지켜보는 런 수에 넣지 않고, DB 를 읽지 못해도 생존 줄이 프로세스를 멈추지 않는다", async () => {
+    h.assign("ENG-9", projectA);
+    const worker = h.worker();
+    expect(worker.health().watched).toBe(0);
+    await worker.close();
+    expect(worker.health()).toEqual({ watched: null, lastTickMs: null });
+  });
+
   it("바뀐 것이 없는 tick 은 info 를 쓰지 않고 debug tick 요약만 남긴다", async () => {
     const restore = useLogger(h.log);
     try {

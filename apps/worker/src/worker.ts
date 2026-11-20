@@ -73,11 +73,13 @@ export interface Worker {
 }
 
 export interface WorkerHealth {
-  watched: number;
+  watched: number | null;
   lastTickMs: number | null;
 }
 
 export const ALIVE_INTERVAL_MS = 10 * 60_000;
+
+const WATCHED_RUN_STATES = [...ACTIVE_RUN_STATES].filter((state) => state !== "queued");
 
 export interface RunningWorker {
   wake(): void;
@@ -137,7 +139,13 @@ export function createWorker(options: WorkerOptions): Worker {
   let running: Promise<void> | null = null;
   let closed = false;
   let lastTickMs: number | null = null;
-  const watched = (): number => listRuns(db, { states: [...ACTIVE_RUN_STATES] }).length;
+  const watched = (): number | null => {
+    try {
+      return listRuns(db, { states: WATCHED_RUN_STATES }).length;
+    } catch {
+      return null;
+    }
+  };
 
   const timedTick = async (): Promise<void> => {
     const startedAt = performance.now();
@@ -158,7 +166,7 @@ export function createWorker(options: WorkerOptions): Worker {
       });
       return running;
     },
-    health: () => ({ watched: closed ? 0 : watched(), lastTickMs }),
+    health: () => ({ watched: closed ? null : watched(), lastTickMs }),
     close: async () => {
       if (closed) return;
       closed = true;
