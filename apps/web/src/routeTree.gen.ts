@@ -22,6 +22,7 @@ import { Route as ApiAttentionRouteImport } from './routes/api/attention'
 import { Route as ApiIdentityRouteImport } from './routes/api/identity'
 import { Route as AppRunsRunIdRouteImport } from './routes/_app/runs_.$runId'
 import { Route as AppSettingsMcpRouteImport } from './routes/_app/settings_.mcp'
+import { Route as ApiChangeEventsStreamRouteImport } from './routes/api/change-events/stream'
 import { Route as ApiNotificationEventsIndexRouteImport } from './routes/api/notification-events/index'
 import { Route as ApiNotificationEventsStreamRouteImport } from './routes/api/notification-events/stream'
 import { Route as ApiRunnerEnrollmentIndexRouteImport } from './routes/api/runner-enrollment/index'
@@ -97,6 +98,11 @@ const AppSettingsMcpRoute = AppSettingsMcpRouteImport.update({
   path: '/settings/mcp',
   getParentRoute: () => AppRoute,
 } as any)
+const ApiChangeEventsStreamRoute = ApiChangeEventsStreamRouteImport.update({
+  id: '/api/change-events/stream',
+  path: '/api/change-events/stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNotificationEventsIndexRoute =
   ApiNotificationEventsIndexRouteImport.update({
     id: '/api/notification-events/',
@@ -171,6 +177,7 @@ export interface FileRoutesByFullPath {
   '/api/identity': typeof ApiIdentityRoute
   '/runs/$runId': typeof AppRunsRunIdRoute
   '/settings/mcp': typeof AppSettingsMcpRoute
+  '/api/change-events/stream': typeof ApiChangeEventsStreamRoute
   '/api/notification-events/stream': typeof ApiNotificationEventsStreamRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
   '/api/notification-events/': typeof ApiNotificationEventsIndexRoute
@@ -195,6 +202,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/runs/$runId': typeof AppRunsRunIdRoute
   '/settings/mcp': typeof AppSettingsMcpRoute
+  '/api/change-events/stream': typeof ApiChangeEventsStreamRoute
   '/api/notification-events/stream': typeof ApiNotificationEventsStreamRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
   '/api/notification-events': typeof ApiNotificationEventsIndexRoute
@@ -221,6 +229,7 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/runs_/$runId': typeof AppRunsRunIdRoute
   '/_app/settings_/mcp': typeof AppSettingsMcpRoute
+  '/api/change-events/stream': typeof ApiChangeEventsStreamRoute
   '/api/notification-events/stream': typeof ApiNotificationEventsStreamRoute
   '/api/runner-enrollment/script': typeof ApiRunnerEnrollmentScriptRoute
   '/api/notification-events/': typeof ApiNotificationEventsIndexRoute
@@ -247,6 +256,7 @@ export interface FileRouteTypes {
     | '/api/identity'
     | '/runs/$runId'
     | '/settings/mcp'
+    | '/api/change-events/stream'
     | '/api/notification-events/stream'
     | '/api/runner-enrollment/script'
     | '/api/notification-events/'
@@ -271,6 +281,7 @@ export interface FileRouteTypes {
     | '/'
     | '/runs/$runId'
     | '/settings/mcp'
+    | '/api/change-events/stream'
     | '/api/notification-events/stream'
     | '/api/runner-enrollment/script'
     | '/api/notification-events'
@@ -296,6 +307,7 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/runs_/$runId'
     | '/_app/settings_/mcp'
+    | '/api/change-events/stream'
     | '/api/notification-events/stream'
     | '/api/runner-enrollment/script'
     | '/api/notification-events/'
@@ -314,6 +326,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   ApiAttentionRoute: typeof ApiAttentionRoute
   ApiIdentityRoute: typeof ApiIdentityRoute
+  ApiChangeEventsStreamRoute: typeof ApiChangeEventsStreamRoute
   ApiNotificationEventsStreamRoute: typeof ApiNotificationEventsStreamRoute
   ApiRunnerEnrollmentScriptRoute: typeof ApiRunnerEnrollmentScriptRoute
   ApiNotificationEventsIndexRoute: typeof ApiNotificationEventsIndexRoute
@@ -416,6 +429,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/mcp'
       preLoaderRoute: typeof AppSettingsMcpRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/api/change-events/stream': {
+      id: '/api/change-events/stream'
+      path: '/api/change-events/stream'
+      fullPath: '/api/change-events/stream'
+      preLoaderRoute: typeof ApiChangeEventsStreamRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/notification-events/': {
       id: '/api/notification-events/'
@@ -526,6 +546,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   ApiAttentionRoute: ApiAttentionRoute,
   ApiIdentityRoute: ApiIdentityRoute,
+  ApiChangeEventsStreamRoute: ApiChangeEventsStreamRoute,
   ApiNotificationEventsStreamRoute: ApiNotificationEventsStreamRoute,
   ApiRunnerEnrollmentScriptRoute: ApiRunnerEnrollmentScriptRoute,
   ApiNotificationEventsIndexRoute: ApiNotificationEventsIndexRoute,

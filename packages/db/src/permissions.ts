@@ -1,5 +1,7 @@
 import type { PermissionRequestId, PermissionWait, RunId } from "@ganger/core";
 import { and, asc, eq, inArray, isNotNull, isNull, not } from "drizzle-orm";
+import { recordRunChange } from "./change-events.js";
+import { inTransaction } from "./database.js";
 import type { Database } from "./database.js";
 import { runPermissionWaits } from "./schema.js";
 
@@ -17,22 +19,25 @@ export function recordPermissionWaits(
   runId: RunId,
   waits: ReadonlyArray<PermissionWait>,
 ): number {
-  let recorded = 0;
-  for (const wait of waits) {
-    recorded += Number(
-      db
-        .insert(runPermissionWaits)
-        .values({
-          runId,
-          permissionId: wait.id,
-          detail: wait.detail,
-          requestedAt: wait.requestedAt,
-        })
-        .onConflictDoNothing()
-        .run().changes,
-    );
-  }
-  return recorded;
+  return inTransaction(db, () => {
+    let recorded = 0;
+    for (const wait of waits) {
+      recorded += Number(
+        db
+          .insert(runPermissionWaits)
+          .values({
+            runId,
+            permissionId: wait.id,
+            detail: wait.detail,
+            requestedAt: wait.requestedAt,
+          })
+          .onConflictDoNothing()
+          .run().changes,
+      );
+    }
+    if (recorded > 0) recordRunChange(db, runId);
+    return recorded;
+  });
 }
 
 export function resolvePermissionWaits(
@@ -41,18 +46,25 @@ export function resolvePermissionWaits(
   open: ReadonlyArray<PermissionRequestId>,
   now: Date = new Date(),
 ): number {
-  const result = db
-    .update(runPermissionWaits)
-    .set({ resolvedAt: now })
-    .where(
-      and(
-        eq(runPermissionWaits.runId, runId),
-        isNull(runPermissionWaits.resolvedAt),
-        open.length === 0 ? undefined : not(inArray(runPermissionWaits.permissionId, [...open])),
-      ),
-    )
-    .run();
-  return Number(result.changes);
+  return inTransaction(db, () => {
+    const resolved = Number(
+      db
+        .update(runPermissionWaits)
+        .set({ resolvedAt: now })
+        .where(
+          and(
+            eq(runPermissionWaits.runId, runId),
+            isNull(runPermissionWaits.resolvedAt),
+            open.length === 0
+              ? undefined
+              : not(inArray(runPermissionWaits.permissionId, [...open])),
+          ),
+        )
+        .run().changes,
+    );
+    if (resolved > 0) recordRunChange(db, runId, { now });
+    return resolved;
+  });
 }
 
 export type DenyPermissionWaitResult =
@@ -68,12 +80,24 @@ export function denyPermissionWait(
     eq(runPermissionWaits.runId, input.runId),
     eq(runPermissionWaits.permissionId, input.permissionId),
   );
+  return inTransaction(db, () => denyOpenWait(db, input, where, now));
+}
+
+function denyOpenWait(
+  db: Database,
+  input: { runId: RunId; reason: string },
+  where: ReturnType<typeof and>,
+  now: Date,
+): DenyPermissionWaitResult {
   const changed = db
     .update(runPermissionWaits)
     .set({ denyReason: input.reason, deniedAt: now })
     .where(and(where, isNull(runPermissionWaits.deniedAt), isNull(runPermissionWaits.resolvedAt)))
     .run().changes;
-  if (changed > 0) return { ok: true };
+  if (changed > 0) {
+    recordRunChange(db, input.runId, { now });
+    return { ok: true };
+  }
   const row = db
     .select({
       deniedAt: runPermissionWaits.deniedAt,
@@ -115,20 +139,23 @@ export function markDenialSent(
   input: { runId: RunId; permissionId: PermissionRequestId },
   now: Date = new Date(),
 ): boolean {
-  return (
-    db
-      .update(runPermissionWaits)
-      .set({ denySentAt: now })
-      .where(
-        and(
-          eq(runPermissionWaits.runId, input.runId),
-          eq(runPermissionWaits.permissionId, input.permissionId),
-          isNotNull(runPermissionWaits.deniedAt),
-          isNull(runPermissionWaits.denySentAt),
-        ),
-      )
-      .run().changes > 0
-  );
+  return inTransaction(db, () => {
+    const sent =
+      db
+        .update(runPermissionWaits)
+        .set({ denySentAt: now })
+        .where(
+          and(
+            eq(runPermissionWaits.runId, input.runId),
+            eq(runPermissionWaits.permissionId, input.permissionId),
+            isNotNull(runPermissionWaits.deniedAt),
+            isNull(runPermissionWaits.denySentAt),
+          ),
+        )
+        .run().changes > 0;
+    if (sent) recordRunChange(db, input.runId, { now });
+    return sent;
+  });
 }
 
 export function sentDenialIds(db: Database, runId: RunId): Set<PermissionRequestId> {

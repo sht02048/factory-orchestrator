@@ -5,6 +5,7 @@ import {
   PR_STATES,
   RUN_STATES,
 } from "@ganger/core";
+import { CHANGE_KINDS, CHANGE_PARTS } from "./change-events-model.js";
 import { MCP_ACTION_OUTCOMES } from "./mcp-actions-model.js";
 import { NOTIFICATION_EVENT_KINDS } from "./notification-events-model.js";
 import type {
@@ -588,5 +589,34 @@ export const trackerWebhookReceipts = sqliteTable(
       "tracker_webhook_receipts_first_rejected",
       sql`(${t.rejectedCount} = 0) = (${t.firstRejectedAt} IS NULL)`,
     ),
+  ],
+);
+
+export const changeEvents = sqliteTable(
+  "change_events",
+  {
+    seq: integer("seq").primaryKey({ autoIncrement: true }),
+    kind: text("kind").notNull().$type<(typeof CHANGE_KINDS)[number]>(),
+    targetId: text("target_id"),
+    workspaceId: text("workspace_id").$type<WorkspaceId>(),
+    part: text("part").$type<(typeof CHANGE_PARTS)[number]>(),
+    at: timeMs("at").notNull(),
+  },
+  (t) => [
+    check("change_events_kind", sql`${t.kind} IN ${inList(CHANGE_KINDS)}`),
+    check("change_events_part", sql`${t.part} IN ${inList(CHANGE_PARTS)}`),
+    index("change_events_at").on(t.at),
+  ],
+);
+
+export const changeEventsPruned = sqliteTable(
+  "change_events_pruned",
+  {
+    id: integer("id").primaryKey(),
+    throughSeq: integer("through_seq").notNull(),
+  },
+  (t) => [
+    check("change_events_pruned_single", sql`${t.id} = 1`),
+    check("change_events_pruned_through", sql`${t.throughSeq} >= 0`),
   ],
 );

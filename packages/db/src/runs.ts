@@ -47,6 +47,7 @@ import {
 import { alias } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
+import { recordChange, recordRunChange } from "./change-events.js";
 import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";
 import type { WorkspaceId } from "./ids.js";
@@ -399,6 +400,7 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
       })
       .run();
     recordStateChange(db, id, null, "queued", now);
+    recordChange(db, { kind: "assignment", targetId: id, workspaceId: project.workspaceId }, now);
 
     const run = getRun(db, id);
     if (run === null) throw new RunRowError(id, "missing right after insert");
@@ -416,10 +418,14 @@ export function storedTicketTitle(title: string | null | undefined): string | nu
 export function fillRunTicketTitle(db: Database, id: RunId, title: string): void {
   const stored = storedTicketTitle(title);
   if (stored === null) return;
-  db.update(runs)
-    .set({ ticketTitle: stored })
-    .where(and(eq(runs.id, id), isNull(runs.ticketTitle)))
-    .run();
+  inTransaction(db, () => {
+    const filled = db
+      .update(runs)
+      .set({ ticketTitle: stored })
+      .where(and(eq(runs.id, id), isNull(runs.ticketTitle)))
+      .run().changes;
+    if (filled > 0) recordRunChange(db, id);
+  });
 }
 
 export type RunStateChange =
@@ -508,6 +514,7 @@ export function changeRunState(
         .run();
     }
     recordStateChange(db, runId, current.state, change.to, now);
+    recordRunChange(db, runId, { now });
 
     const run = getRun(db, runId);
     if (run === null) throw new RunRowError(runId, "missing right after update");
@@ -609,22 +616,40 @@ export function recordStartFailure(
   runId: RunId,
   input: { failures: number; error: string },
 ): boolean {
-  return (
-    db
-      .update(runs)
-      .set({ startFailures: input.failures, startError: input.error })
-      .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
-      .run().changes > 0
-  );
+  return inTransaction(db, () => {
+    const before = db
+      .select({ failures: runs.startFailures, error: runs.startError })
+      .from(runs)
+      .where(eq(runs.id, runId))
+      .get();
+    const updated =
+      db
+        .update(runs)
+        .set({ startFailures: input.failures, startError: input.error })
+        .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
+        .run().changes > 0;
+    if (updated && (before?.failures !== input.failures || before.error !== input.error))
+      recordRunChange(db, runId);
+    return updated;
+  });
 }
 
 export function setQueuedRunRunner(db: Database, runId: RunId, runnerId: RunnerId | null): boolean {
-  const result = db
-    .update(runs)
-    .set({ runnerId })
-    .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
-    .run();
-  return result.changes > 0;
+  return inTransaction(db, () => {
+    const before = db
+      .select({ runnerId: runs.runnerId })
+      .from(runs)
+      .where(eq(runs.id, runId))
+      .get();
+    const updated =
+      db
+        .update(runs)
+        .set({ runnerId })
+        .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
+        .run().changes > 0;
+    if (updated && before?.runnerId !== runnerId) recordRunChange(db, runId);
+    return updated;
+  });
 }
 
 function recordStateChange(
@@ -688,5 +713,33 @@ export function updateRunRecords(
   }
   if (Object.keys(set).length === 0) return false;
 
-  return db.update(runs).set(set).where(eq(runs.id, runId)).run().changes > 0;
+  return inTransaction(db, () => {
+    const before = getRunRow(db, runId);
+    const updated = db.update(runs).set(set).where(eq(runs.id, runId)).run().changes > 0;
+    const after = getRunRow(db, runId);
+    if (
+      updated &&
+      before !== undefined &&
+      after !== undefined &&
+      visiblyChanged(set, before, after)
+    )
+      recordRunChange(db, runId);
+    return updated;
+  });
+}
+
+const UNSEEN_RUN_COLUMNS: ReadonlySet<string> = new Set(["prCheckedAt"]);
+
+function visiblyChanged(set: Partial<typeof runs.$inferInsert>, before: RunRow, after: RunRow) {
+  return Object.keys(set).some((column) => {
+    if (UNSEEN_RUN_COLUMNS.has(column)) return false;
+    const was: unknown = Reflect.get(before, column);
+    const now: unknown = Reflect.get(after, column);
+    return comparable(was) !== comparable(now);
+  });
+}
+
+function comparable(value: unknown): string {
+  if (value instanceof Date) return `date:${value.getTime()}`;
+  return JSON.stringify(value) ?? "undefined";
 }

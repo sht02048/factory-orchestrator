@@ -2,7 +2,6 @@ import type { AdapterRegistry, TrackerConnectionId, WebhookVerifyError } from "@
 import {
   getTrackerConnection,
   inTransaction,
-  markTrackerChanged,
   recordTrackerEvent,
   recordWebhookAccepted,
   recordWebhookBadSignature,
@@ -148,9 +147,7 @@ async function handle(
     }
     return inTransaction(context.db, () => {
       recordWebhookAccepted(context.db, connection.id, now);
-      const outcome = recordTrackerEvent(context.db, connection.id, result.event);
-      if (outcome === "recorded") markTrackerChanged(context.db, connection.id);
-      return outcome;
+      return recordTrackerEvent(context.db, connection.id, result.event);
     });
   } catch (error) {
     context.logger.warn("could not handle a tracker webhook", { connectionId, error });

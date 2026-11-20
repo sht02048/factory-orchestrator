@@ -47,8 +47,9 @@ blocked_by: []
 - 표 `tracker_webhook_receipts`(연결 ID PK, 연결을 지우면 같이 지움): `last_received_at`, `rejected_count`, `first_rejected_at`. 0122의 `tracker_read_generations`(트래커 읽기 다시 하기)와 다른 이름·뜻이다.
 - `apps/web/src/webhooks/receive.ts`가 서명이 맞으면 받은 때를 남기고 실패 수를 지우며, `bad-signature`면 수를 하나 올리고 처음 실패 시각을 지킨다. 다른 거절 이유(오래된 타임스탬프 등)는 기록하지 않는다.
 - 새 signing secret을 저장하거나 끄면 그 연결의 기록을 지워 다시 기다림에서 시작한다.
+- 0124 변경 기록: 수신 기록이 화면에 보이는 상태를 바꿀 때(첫 수신, 실패 뒤 수신, 서명 실패, 기록 지우기)와 닿을 주소 저장 때 같은 트랜잭션에서 settings 변경(`targetId`=연결)을 남긴다. 실패 없이 이어 받는 webhook은 남기지 않는다(마지막으로 받은 때는 다음 읽기에 바뀜). secret 켜기·끄기는 0124의 `saveTrackerConnection`이 남긴다. 켠 직후 기다림의 3초 폴링은 그대로 둔다: Settings 화면이 아직 router 로더라 SSE가 Query 키만 무효화하고 이 화면을 다시 읽지 않는다(0128에서 Query로 옮길 때 구독으로 바꾼다).
 - 닿을 주소를 확인한 때: `install_settings.webhook_address_checked_at`. 확인하기가 성공하면 남기고, 확인 없이 다른 주소로 바꾸면(예전 `saveAddresses` 경로) 지운다. 화면은 이 값이 있는 주소만 끝난 단계(✓ 닿는 걸 확인했어요)로 보이고, 이 PR 전에 확인 없이 저장한 예전 주소는 1단계 확인 칸에 채워 다시 확인하게 한다(독립 리뷰 지적).
-- 되돌리는 법: 이 마이그레이션 앞 커밋으로 앱을 되돌리고 `DROP TABLE tracker_webhook_receipts;`, `ALTER TABLE install_settings DROP COLUMN webhook_address_checked_at;`, drizzle 마이그레이션 기록(`__drizzle_migrations`)에서 `20261120011541_tracker_webhook_receipts` 줄을 지운다. 앞 코드는 새 표와 열을 읽지 않으므로 지우지 않아도 앞 버전은 돈다.
+- 되돌리는 법: 이 마이그레이션 앞 커밋으로 앱을 되돌리고 `DROP TABLE tracker_webhook_receipts;`, `ALTER TABLE install_settings DROP COLUMN webhook_address_checked_at;`, drizzle 마이그레이션 기록(`__drizzle_migrations`)에서 `20261120014106_tracker_webhook_receipts` 줄을 지운다. 앞 코드는 새 표와 열을 읽지 않으므로 지우지 않아도 앞 버전은 돈다.
 
 ## 고칠 파일
 

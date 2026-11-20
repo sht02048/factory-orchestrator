@@ -15,6 +15,7 @@ import {
 import type { RunnerId, RunnerKind, TrackerConnectionId } from "@ganger/core";
 import {
   forgetWebhookReceipt,
+  inTransaction,
   getAutoAssignLabel,
   getInstallSettings,
   getMapping,
@@ -25,6 +26,7 @@ import {
   listRunners,
   listWorkspaces,
   markTrackerChanged,
+  recordSettingsChange,
   removeWorkspaceTrackerProject,
   requestRunnerCheck,
   saveAutoAssignLabel,
@@ -127,7 +129,6 @@ export function addTrackerProject(
     inProgressStateId: null,
   });
   if (!saved) return { ok: false, reason: "taken" };
-  markTrackerChanged(context.db, connection);
   return { ok: true };
 }
 
@@ -144,7 +145,6 @@ export function removeTrackerProject(
     projectId: toTrackerProjectId(input.projectId),
   });
   if (!removed) return { ok: false, reason: "not-found" };
-  markTrackerChanged(context.db, connection);
   return { ok: true };
 }
 
@@ -369,20 +369,22 @@ export async function saveTrackerConnectionSetting(
     }
   }
   const id = existing?.id ?? toTrackerConnectionId(randomUUID());
-  saveTrackerConnection(
-    context.db,
-    context.secretBox,
-    {
-      id,
-      kind,
-      name: input.name ?? existing?.name ?? organizationName ?? DEFAULT_CONNECTION_NAME,
-      config,
-      secrets,
-    },
-    now,
-  );
-  if (webhookSecret !== (previous?.webhookSecret ?? null)) forgetWebhookReceipt(context.db, id);
-  markTrackerChanged(context.db, id);
+  inTransaction(context.db, () => {
+    saveTrackerConnection(
+      context.db,
+      context.secretBox,
+      {
+        id,
+        kind,
+        name: input.name ?? existing?.name ?? organizationName ?? DEFAULT_CONNECTION_NAME,
+        config,
+        secrets,
+      },
+      now,
+    );
+    if (webhookSecret !== (previous?.webhookSecret ?? null))
+      forgetWebhookReceipt(context.db, id, now);
+  });
   return { ok: true };
 }
 
@@ -408,14 +410,15 @@ export function turnOffWebhook(
   if (existing === null) return { ok: false, reason: "not-found" };
   const stored = trackerSecretsSchema.safeParse(existing.secrets);
   if (!stored.success) return { ok: false, reason: "not-found" };
-  saveTrackerConnection(
-    context.db,
-    context.secretBox,
-    { ...existing, secrets: { ...stored.data, webhookSecret: null } },
-    now,
-  );
-  forgetWebhookReceipt(context.db, existing.id);
-  markTrackerChanged(context.db, existing.id);
+  inTransaction(context.db, () => {
+    saveTrackerConnection(
+      context.db,
+      context.secretBox,
+      { ...existing, secrets: { ...stored.data, webhookSecret: null } },
+      now,
+    );
+    forgetWebhookReceipt(context.db, existing.id, now);
+  });
   return { ok: true };
 }
 
@@ -658,6 +661,7 @@ export function savePowerSetting(
 ): SaveResult<"unavailable"> {
   if (context.power === undefined) return { ok: false, reason: "unavailable" };
   context.power.write({ preventSleep: input.preventSleep });
+  recordSettingsChange(context.db);
   return { ok: true };
 }
 

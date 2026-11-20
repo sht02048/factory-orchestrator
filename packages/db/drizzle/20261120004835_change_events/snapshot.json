@@ -1,11 +1,19 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "44fcab00-df88-48fe-bb01-a4497e82ee4e",
+  "id": "2147711a-bc3d-4fab-aaed-1c144b93563c",
   "prevIds": ["b4a6f8c4-ef14-4c42-a4f3-f6e98d89ae5f"],
   "ddl": [
     {
       "name": "auto_assign_labels",
+      "entityType": "tables"
+    },
+    {
+      "name": "change_events",
+      "entityType": "tables"
+    },
+    {
+      "name": "change_events_pruned",
       "entityType": "tables"
     },
     {
@@ -89,10 +97,6 @@
       "entityType": "tables"
     },
     {
-      "name": "tracker_webhook_receipts",
-      "entityType": "tables"
-    },
-    {
       "name": "workspace_tracker_projects",
       "entityType": "tables"
     },
@@ -124,6 +128,86 @@
       "table": "auto_assign_labels",
       "name": "label_id",
       "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "change_events",
+      "name": "seq",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": true,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "change_events",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "change_events",
+      "name": "target_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "change_events",
+      "name": "workspace_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "change_events",
+      "name": "part",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "change_events",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "change_events_pruned",
+      "name": "id",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "change_events_pruned",
+      "name": "through_seq",
+      "type": "integer",
       "notNull": true,
       "autoincrement": false,
       "default": null,
@@ -224,16 +308,6 @@
       "table": "install_settings",
       "name": "webhook_address",
       "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "install_settings",
-      "name": "webhook_address_checked_at",
-      "type": "integer",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -1741,46 +1815,6 @@
       "entityType": "columns"
     },
     {
-      "table": "tracker_webhook_receipts",
-      "name": "tracker_connection_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "tracker_webhook_receipts",
-      "name": "last_received_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "tracker_webhook_receipts",
-      "name": "rejected_count",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "tracker_webhook_receipts",
-      "name": "first_rejected_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
       "table": "workspace_tracker_projects",
       "name": "tracker_connection_id",
       "type": "text",
@@ -1869,6 +1903,20 @@
       "default": null,
       "generated": null,
       "entityType": "columns"
+    },
+    {
+      "table": "change_events",
+      "name": "change_events_at",
+      "columns": [
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
     },
     {
       "table": "mapping_repos",
@@ -2355,17 +2403,6 @@
       "entityType": "fks"
     },
     {
-      "table": "tracker_webhook_receipts",
-      "name": "fk_tracker_webhook_receipts_tracker_connection_id_tracker_connections_id_fk",
-      "columns": ["tracker_connection_id"],
-      "tableTo": "tracker_connections",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
       "table": "workspace_tracker_projects",
       "name": "fk_workspace_tracker_projects_tracker_connection_id_tracker_connections_id_fk",
       "columns": ["tracker_connection_id"],
@@ -2440,6 +2477,20 @@
       "table": "workspace_tracker_projects",
       "name": "workspace_tracker_projects_pk",
       "columns": ["tracker_connection_id", "tracker_project_id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "change_events",
+      "name": "change_events_pk",
+      "columns": ["seq"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "change_events_pruned",
+      "name": "change_events_pruned_pk",
+      "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
     },
@@ -2542,18 +2593,35 @@
       "entityType": "pks"
     },
     {
-      "table": "tracker_webhook_receipts",
-      "name": "tracker_webhook_receipts_pk",
-      "columns": ["tracker_connection_id"],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "workspaces",
       "name": "workspaces_pk",
       "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"
+    },
+    {
+      "table": "change_events",
+      "name": "change_events_kind",
+      "value": "\"kind\" IN ('run', 'runner', 'assignment', 'workspace', 'settings', 'tracker')",
+      "entityType": "checks"
+    },
+    {
+      "table": "change_events",
+      "name": "change_events_part",
+      "value": "\"part\" IN ('log')",
+      "entityType": "checks"
+    },
+    {
+      "table": "change_events_pruned",
+      "name": "change_events_pruned_single",
+      "value": "\"id\" = 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "change_events_pruned",
+      "name": "change_events_pruned_through",
+      "value": "\"through_seq\" >= 0",
+      "entityType": "checks"
     },
     {
       "table": "code_host_connections",
@@ -2829,18 +2897,6 @@
       "table": "tracker_read_generations",
       "name": "tracker_read_generations_positive",
       "value": "\"generation\" > 0",
-      "entityType": "checks"
-    },
-    {
-      "table": "tracker_webhook_receipts",
-      "name": "tracker_webhook_receipts_rejected_count",
-      "value": "\"rejected_count\" >= 0",
-      "entityType": "checks"
-    },
-    {
-      "table": "tracker_webhook_receipts",
-      "name": "tracker_webhook_receipts_first_rejected",
-      "value": "(\"rejected_count\" = 0) = (\"first_rejected_at\" IS NULL)",
       "entityType": "checks"
     },
     {

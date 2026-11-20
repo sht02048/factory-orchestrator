@@ -1,5 +1,6 @@
 import { toTrackerConnectionId } from "@ganger/core";
 import { describe, expect, it } from "vitest";
+import { latestChangeSeq, listChangesAfter } from "./change-events.js";
 import { connection, seededDatabase } from "./test-fixtures.js";
 import {
   NO_WEBHOOK_RECEIPT,
@@ -69,5 +70,30 @@ describe("webhook 수신 기록", () => {
     forgetWebhookReceipt(db, connection);
     forgetWebhookReceipt(db, other);
     expect(getWebhookReceipt(db, connection)).toEqual(NO_WEBHOOK_RECEIPT);
+  });
+
+  it("보이는 상태가 바뀔 때만 이 연결의 settings 변경을 남긴다(0124)", () => {
+    const db = seededDatabase();
+    const changesAfter = (seq: number) =>
+      listChangesAfter(db, seq).map((change) => [change.kind, change.targetId]);
+    let seq = latestChangeSeq(db);
+    recordWebhookAccepted(db, connection, at(1));
+    expect(changesAfter(seq)).toEqual([["settings", connection]]);
+
+    seq = latestChangeSeq(db);
+    recordWebhookAccepted(db, connection, at(2));
+    expect(changesAfter(seq)).toEqual([]);
+
+    recordWebhookBadSignature(db, connection, at(3));
+    expect(changesAfter(seq)).toEqual([["settings", connection]]);
+
+    seq = latestChangeSeq(db);
+    recordWebhookAccepted(db, connection, at(4));
+    expect(changesAfter(seq)).toEqual([["settings", connection]]);
+
+    seq = latestChangeSeq(db);
+    forgetWebhookReceipt(db, connection, at(5));
+    forgetWebhookReceipt(db, connection, at(6));
+    expect(changesAfter(seq)).toEqual([["settings", connection]]);
   });
 });
