@@ -107,6 +107,7 @@ export interface ControllerOptions {
   trayIcon: string;
   openedAtLogin: boolean;
   updater: Updater;
+  devServerUrl: string | undefined;
 }
 
 type Mode = "choosing" | "local" | "remote";
@@ -167,6 +168,13 @@ export class Controller {
       void this.options.updater.tick();
       this.updateTimer = setInterval(() => void this.options.updater.tick(), UPDATE_TICK_MS);
     }, FIRST_CHECK_DELAY_MS);
+    const devServerUrl = this.options.devServerUrl;
+    if (devServerUrl !== undefined) {
+      this.showWindow();
+      void this.openDevServer(devServerUrl);
+      this.refreshMenus();
+      return;
+    }
     const settings = this.options.settings.read();
     if (!this.options.openedAtLogin || settings.mode === undefined) this.showWindow();
     switch (settings.mode) {
@@ -324,6 +332,8 @@ export class Controller {
   }
 
   private async chooseRemote(): Promise<void> {
+    if (this.options.devServerUrl !== undefined)
+      return this.openDevServer(this.options.devServerUrl);
     this.mode = "remote";
     this.stopRemoteRetry();
     this.refreshMenus();
@@ -375,14 +385,38 @@ export class Controller {
   }
 
   private useRemote(server: SavedServer): void {
+    if (this.options.devServerUrl !== undefined) {
+      this.showRemote(server);
+      return;
+    }
     const settings = this.options.settings.read();
     this.options.settings.write({ ...settings, mode: "remote", remote: server });
+    this.showRemote(server);
+  }
+
+  private showRemote(server: SavedServer): void {
     this.mode = "remote";
     this.remote = { server, reachable: true };
     this.watch.stop();
     this.serverVersion = null;
     this.openServer(server.url);
     void this.readRemoteVersion(server);
+  }
+
+  private async openDevServer(url: string): Promise<void> {
+    this.mode = "remote";
+    this.stopRemoteRetry();
+    const name = new URL(url).host;
+    this.setView({ screen: "unreachable", name, url, checking: true });
+    const result = await connectAddress(url, (origin, timeoutMs) =>
+      probeIdentity(origin, timeoutMs),
+    );
+    if (result.ok) {
+      this.showRemote(result.server);
+      return;
+    }
+    this.setView({ screen: "unreachable", name, url, checking: false });
+    this.refreshMenus();
   }
 
   private async readRemoteVersion(server: SavedServer): Promise<void> {
@@ -393,6 +427,8 @@ export class Controller {
   }
 
   private async openRemote(saved: SavedServer): Promise<void> {
+    if (this.options.devServerUrl !== undefined)
+      return this.openDevServer(this.options.devServerUrl);
     this.mode = "remote";
     this.remote = { server: saved, reachable: false };
     this.setView({ screen: "unreachable", name: saved.name, url: saved.url, checking: true });
@@ -423,6 +459,10 @@ export class Controller {
   }
 
   private chooseMode(): void {
+    if (this.options.devServerUrl !== undefined) {
+      void this.openDevServer(this.options.devServerUrl);
+      return;
+    }
     this.stopFeed();
     this.mode = "choosing";
     this.stopRemoteRetry();
@@ -432,6 +472,7 @@ export class Controller {
   }
 
   private chooseLocal(openAtLogin: boolean): void {
+    if (this.options.devServerUrl !== undefined) return;
     const settings = this.options.settings.read();
     this.options.settings.write({ ...settings, mode: "local", openAtLogin });
     this.applyLoginItem(openAtLogin);
@@ -540,6 +581,8 @@ export class Controller {
     handle("start-local", () => this.restartLocal());
     handle("retry", () => {
       if (this.mode === "local") return this.restartLocal();
+      if (this.options.devServerUrl !== undefined)
+        return this.openDevServer(this.options.devServerUrl);
       if (this.remote !== undefined) return this.openRemote(this.remote.server);
       return this.chooseRemote();
     });
@@ -930,7 +973,7 @@ export class Controller {
         },
       });
     }
-    if (this.mode === "remote") {
+    if (this.mode === "remote" && this.options.devServerUrl === undefined) {
       items.push({
         id: "choose-server",
         label: t("tray.chooseServer"),
