@@ -157,7 +157,7 @@ export function useSettingsActions(afterChange: AfterChange): SettingsActions {
   );
   const recheckRunner = useSaveMutation(
     (data: Parameters<SettingsActions["recheckRunner"]>[0]) => requestRunnerCheckNow({ data }),
-    RUNNER,
+    SETTINGS,
     afterChange,
   );
   const saveAddresses = useSaveMutation(
