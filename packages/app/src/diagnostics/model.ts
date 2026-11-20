@@ -18,6 +18,7 @@ export type LogSettingsView =
   | {
       available: true;
       folder: string;
+      folderShown: string;
       totalBytes: number;
       debug: boolean;
       runs: DiagnosticsRunChoice[];
@@ -51,4 +52,10 @@ export function diagnosticsRequest(url: URL): { anonymize: boolean; runId: strin
     anonymize: url.searchParams.get(DIAGNOSTICS_ANONYMIZE_PARAM) !== "0",
     runId: run === "" ? null : run,
   };
+}
+
+export function shownPath(path: string, userHome: string): string {
+  if (userHome === "" || userHome === "/") return path;
+  if (path === userHome) return "~";
+  return path.startsWith(`${userHome}/`) ? `~${path.slice(userHome.length)}` : path;
 }

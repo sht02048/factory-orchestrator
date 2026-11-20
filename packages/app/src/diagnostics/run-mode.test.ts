@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diagnosticsHref, diagnosticsRequest } from "./model.js";
+import { diagnosticsHref, diagnosticsRequest, shownPath } from "./model.js";
 import { runModeOf } from "./run-mode.js";
 
 describe("run mode", () => {
@@ -26,5 +26,13 @@ describe("diagnostics request", () => {
       anonymize: true,
       runId: null,
     });
+  });
+});
+
+describe("shown path", () => {
+  it("shortens the user's home to ~ and leaves other paths alone", () => {
+    expect(shownPath("/Users/alice/.ganger/logs", "/Users/alice")).toBe("~/.ganger/logs");
+    expect(shownPath("/Users/alicea/logs", "/Users/alice")).toBe("/Users/alicea/logs");
+    expect(shownPath("/srv/ganger/logs", "/Users/alice")).toBe("/srv/ganger/logs");
   });
 });

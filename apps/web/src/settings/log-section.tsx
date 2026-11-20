@@ -58,7 +58,13 @@ export function LogSection({ view, actions }: LogSectionProps) {
     <SettingsSection id="logs" title={t("sections.logs")}>
       <SettingsGroup>
         <SizeRow view={view} />
-        {view.available ? <FolderRow folder={view.folder} openFolder={actions.openFolder} /> : null}
+        {view.available ? (
+          <FolderRow
+            folder={view.folder}
+            shown={view.folderShown}
+            openFolder={actions.openFolder}
+          />
+        ) : null}
         <DebugRow view={view} saveDebug={actions.saveDebug} />
         <DiagnosticsRow view={view} makeDiagnostics={actions.makeDiagnostics} />
       </SettingsGroup>
@@ -85,9 +91,11 @@ function SizeRow({ view }: { view: LogSettingsView }) {
 
 function FolderRow({
   folder,
+  shown,
   openFolder,
 }: {
   folder: string;
+  shown: string;
   openFolder: (() => Promise<boolean>) | null;
 }) {
   const t = useTranslations("settings");
@@ -121,7 +129,7 @@ function FolderRow({
           content={openFolder === null ? t("logs.folderInfoBrowser") : t("logs.folderInfo")}
         />
       }
-      detail={folder}
+      detail={shown}
       detailMono
       control={
         openFolder === null ? (
@@ -156,7 +164,7 @@ function DebugRow({
       labelFor={switchId}
       disabled={!available}
       info={<InfoTip label={t("infoLabel", { label })} content={t("logs.debugInfo")} />}
-      detail={available ? t("logs.debugDetail") : t("logs.unavailable")}
+      detail={t("logs.debugDetail")}
       status={<AutoSaveStatusText status={autoSave.status} />}
       control={
         <Switch
@@ -250,6 +258,7 @@ function DiagnosticsForm({
   const [anonymize, setAnonymize] = useState(true);
   const [runId, setRunId] = useState(NO_RUN);
   const making = state.kind === "making";
+  const reviewId = useId();
   const runOptions = [
     { value: NO_RUN, label: t("logs.runNone") },
     ...runs.map((run) => ({
@@ -279,7 +288,7 @@ function DiagnosticsForm({
           onValueChange={setRunId}
         />
       </Field>
-      <Text variant="ui" as="p" tone="strong">
+      <Text id={reviewId} variant="ui" as="p" tone="strong">
         {t("logs.review")}
       </Text>
       <Text
@@ -300,7 +309,7 @@ function DiagnosticsForm({
         <Button variant="ghost" onClick={onClose}>
           {t("close")}
         </Button>
-        <Button variant="primary" type="submit" aria-busy={making}>
+        <Button variant="primary" type="submit" aria-busy={making} aria-describedby={reviewId}>
           {making ? t("logs.making") : t("logs.make")}
         </Button>
       </div>

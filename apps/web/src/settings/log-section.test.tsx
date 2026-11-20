@@ -33,13 +33,14 @@ describe("Settings 로그와 진단 구역(0134)", () => {
     const html = render({
       available: true,
       folder: "/srv/ganger/logs",
+      folderShown: "/srv/ganger/logs",
       totalBytes: 12.4 * 1024 * 1024,
       debug: false,
       runs: [],
     });
     const shown = text(html);
     expect(shown).toContain(settings.sections.logs);
-    expect(shown).toContain("12.4MB 쓰는 중");
+    expect(shown).toContain("모두 12.4MB");
     expect(shown).toContain("/srv/ganger/logs");
     expect(shown).toContain(settings.logs.copyPath);
     expect(shown).not.toContain(settings.logs.openFolder);
@@ -51,8 +52,17 @@ describe("Settings 로그와 진단 구역(0134)", () => {
   });
 
   it("작은 로그는 kB로 보이고 켜 둔 자세한 로그는 켜진 채로 보인다", () => {
-    const html = render({ available: true, folder: "/l", totalBytes: 2048, debug: true, runs: [] });
-    expect(text(html)).toContain("2kB 쓰는 중");
+    const html = render({
+      available: true,
+      folder: "/Users/alice/.ganger/logs",
+      folderShown: "~/.ganger/logs",
+      totalBytes: 2048,
+      debug: true,
+      runs: [],
+    });
+    expect(text(html)).toContain("모두 2kB");
+    expect(text(html)).toContain("~/.ganger/logs");
+    expect(text(html)).not.toContain("/Users/alice");
     expect(html).toMatch(
       /role="switch"[^>]*aria-checked="true"|aria-checked="true"[^>]*role="switch"/,
     );

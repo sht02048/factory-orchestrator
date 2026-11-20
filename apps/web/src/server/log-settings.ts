@@ -6,7 +6,7 @@ import { listRuns, parseBootConfig } from "@ganger/db";
 import { GANGER_VERSION, log, logDir, readDebugSwitch, writeDebugSwitch } from "@ganger/log";
 import { buildDiagnostics, folderSummary } from "@ganger/app/diagnostics/bundle";
 import type { DiagnosticsBundle } from "@ganger/app/diagnostics/bundle";
-import { RUN_CHOICES } from "@ganger/app/diagnostics/model";
+import { RUN_CHOICES, shownPath } from "@ganger/app/diagnostics/model";
 import type { BrowserErrorInput, LogSettingsView } from "@ganger/app/diagnostics/model";
 import { runModeOf } from "@ganger/app/diagnostics/run-mode";
 import type { SaveResult } from "@ganger/app/settings/model";
@@ -29,6 +29,7 @@ export function readLogSettingsView(env: Env): LogSettingsView {
   return {
     available: true,
     folder,
+    folderShown: shownPath(folder, homedir()),
     totalBytes: folderSummary(folder).totalBytes,
     debug: readDebugSwitch(home),
     runs: listRuns(getDatabase(), { order: "newest", limit: RUN_CHOICES }).map((run) => ({
