@@ -132,9 +132,57 @@ The web app has no login. Anyone who can reach its address can change settings a
 The server accepts a request only when its host name is one it knows, which blocks DNS rebinding and requests that other sites make from your browser. `127.0.0.1`, `localhost`, and `[::1]` always work, and so does the bind address (`WEB_HOST`) when it is a specific address rather than `0.0.0.0`. To use any other name, set it in Settings > Addresses (open Settings at `http://127.0.0.1:<port>` on the server machine the first time):
 
 - **Web address**: where you open the app from other devices, for example the Tailscale Serve address `https://server.example.ts.net`. Requests to this host name reach the whole app.
-- **Webhook address**: the public address your tracker sends webhooks to, for example a Tailscale Funnel or Cloudflare Tunnel address. Set it in Settings, then create the webhook in your tracker with this address followed by the connection's webhook path (shown under the tracker connection in Settings). Browser requests to this host name reach only the webhook path. Onboarding does not ask for a webhook. A webhook is optional. Without one, the worker checks the tracker for tickets with the Auto-assign Label about once a minute and assigns the ones that have never had a run. Retrying a ticket that already had a run by removing and adding the label again needs the webhook; without it, assign the ticket again from Tickets. The check only looks back 24 hours after the worker starts, so tickets labeled while the worker was stopped for longer are not picked up; assign them from Tickets.
+- **Address Linear reaches this server at**: the address your tracker sends webhooks to over the internet. Set it in the tracker connection's Webhook section, not under Addresses; see [Turn on the webhook](#turn-on-the-webhook). Browser requests to this host name reach only the webhook path.
 
-Requests that change data (including server functions) must also come from a page on an allowed host (the `Origin` header), except the webhook path, which checks the tracker's signature instead. Rejected requests get `403` and a line in the web server log. If you upgrade an installation that you already open by another name, such as a tailnet name with `WEB_HOST=0.0.0.0`, that name is blocked until you add it as the web address. The host check protects you from web pages in your browser; it is not access control, because any other client can send whatever host name it likes. So still publish only the webhook path through your tunnel (for example, a Tailscale Funnel or Cloudflare Tunnel route for `/api/webhooks/` only). `GET /api/identity` answers on any host name with the product name, version, and installation ID, so a client can tell this server apart from other machines.
+Requests that change data (including server functions) must also come from a page on an allowed host (the `Origin` header), except the webhook path, which checks the tracker's signature instead. Rejected requests get `403` and a line in the web server log. If you upgrade an installation that you already open by another name, such as a tailnet name with `WEB_HOST=0.0.0.0`, that name is blocked until you add it as the web address. The host check protects you from web pages in your browser; it is not access control, because any other client can send whatever host name it likes. So still publish only the webhook path through your tunnel (for example, a Tailscale Funnel or Cloudflare Tunnel route for `/api/webhooks/` only). `GET /api/identity` answers on any host name with the product name, version, and installation ID, so a client can tell this server apart from other machines. `GET /api/webhooks/ping/<installation ID>` also answers on any host name, but only says whether the ID you send is this installation's; the webhook check uses it.
+
+### Turn on the webhook
+
+A webhook is optional. Without one, the worker checks the tracker for tickets with the Auto-assign Label about once a minute and assigns the ones that have never had a run. With one, Linear tells the server the moment a ticket changes, so a labeled ticket is assigned within seconds, and removing and adding the label again retries a ticket that already had a run. Without it, assign such tickets again from Tickets. The once-a-minute check only looks back 24 hours after the worker starts, so tickets labeled while the worker was stopped for longer are not picked up; assign them from Tickets. Onboarding does not ask for a webhook.
+
+Open Settings > Connections, select the tracker connection, and follow the three steps in its **Webhook** section:
+
+1. **Address Linear reaches this server at.** Linear sends webhooks from the internet, but the server usually listens only on this machine or inside your tailnet. Open only the webhook path (`/api/webhooks/`) to the internet, enter the address, and select **Check**. The server requests `<address>/api/webhooks/ping/<installation ID>` itself and saves the address only when this installation answers. The address is shared by every tracker connection on the server. If the check fails, the screen says whether the name was not found, nothing answered, or another server answered.
+2. **Create the webhook in Linear.** Copy the full address the screen shows (the address followed by the connection's webhook path), open Linear's webhook settings from the link, paste it, and select only **Issues** under Data change events.
+3. **Enter the signing secret and turn it on.** Paste the signing secret Linear shows for the new webhook. The section then waits for the first webhook; change any ticket in Linear and it switches to on. If webhooks keep arriving with a signature that does not match (for example, you recreated the webhook in Linear), the section and the connection's line in Settings show how many were rejected and since when; enter the new secret. **Turn off** deletes the secret and goes back to checking once a minute; delete the webhook in Linear as well.
+
+Only the webhook path should be public. Never publish the whole app: it has no login.
+
+#### Tailscale Funnel
+
+If Tailscale is installed on the server Mac, the Webhook section fills in this Mac's Tailscale name and shows the command with this server's port. Run it once on the server Mac:
+
+```sh
+tailscale funnel --bg --https=8443 --set-path /api/webhooks/ http://127.0.0.1:3000/api/webhooks/
+```
+
+The address is then `https://<device>.<tailnet>.ts.net:8443`.
+
+- Funnel makes a whole port public: "If the most recent command to configure the port was `funnel`, then the port will be completely public" ([Tailscale Funnel](https://tailscale.com/kb/1223/funnel)). So keep the webhook on its own port. If you serve the app to your tailnet with Tailscale Serve on 443, do not run `funnel` on 443, or the whole app becomes public. On 8443, only `/api/webhooks/` is mapped, so nothing else is reachable.
+- Funnel can listen only on ports 443, 8443, and 10000.
+- The first time, Funnel needs MagicDNS, HTTPS certificates, and the `funnel` node attribute in your tailnet policy. Running the command prompts you to approve Funnel in the Tailscale admin console ([Tailscale Funnel](https://tailscale.com/kb/1223/funnel)).
+- Public DNS for a new Funnel name can take up to 10 minutes. If the check says the name was not found, wait a few minutes and check again.
+- `--bg` keeps Funnel running after reboots until you turn it off. To turn it off, run the same command with `off` added at the end ([`tailscale funnel`](https://tailscale.com/kb/1311/tailscale-funnel)).
+- The check runs from the server itself, so it reaches the address over your tailnet. It proves the port serves this installation, but not that the internet can reach it: `tailscale serve --https=8443` (Serve, not Funnel) also passes. Run `tailscale funnel status` to confirm the port is on Funnel.
+
+#### Cloudflare Tunnel
+
+Create a tunnel with `cloudflared` and add a public hostname whose service is `http://127.0.0.1:<port>` and whose path is `api/webhooks/*`, so Cloudflare forwards only the webhook path. Enter `https://<public hostname>` as the address.
+
+#### Reverse proxy
+
+If the server is behind a reverse proxy that already has a public HTTPS name (nginx, Caddy), forward only `/api/webhooks/` to `http://127.0.0.1:<port>/api/webhooks/` and keep the host name. For Caddy:
+
+```text
+hooks.example.com {
+  handle /api/webhooks/* {
+    reverse_proxy 127.0.0.1:3000
+  }
+  respond 404
+}
+```
+
+Enter `https://hooks.example.com` as the address. The address must use HTTPS and a DNS name; the check refuses IP addresses, `localhost`, and addresses with a path, and it does not follow redirects.
 
 ### Run as a service
 

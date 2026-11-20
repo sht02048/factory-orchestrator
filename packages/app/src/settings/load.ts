@@ -12,6 +12,7 @@ import {
   getMapping,
   getMcpWriteAllowed,
   getRunnerCheckRequest,
+  getWebhookReceipt,
   listPendingRunnerCheckRequests,
   listCodeHostConnections,
   listRecentMcpActions,
@@ -26,7 +27,14 @@ import { RECENT_MCP_ACTIONS, mcpActionView } from "../mcp/actions.js";
 import type { PowerSettingsStore } from "../power-settings.js";
 import { mcpLaunch } from "./mcp-launch.js";
 import type { McpLaunch } from "./mcp-launch.js";
-import type { Database, SecretBox, StoredTrackerConnection, WorkspaceId } from "@ganger/db";
+import type {
+  Database,
+  SecretBox,
+  StoredInstallSettings,
+  StoredTrackerConnection,
+  WebhookReceipt,
+  WorkspaceId,
+} from "@ganger/db";
 import { z } from "zod";
 import { prerequisiteProject } from "../prerequisites.js";
 import { resolveWorkspace } from "../shell/model.js";
@@ -44,7 +52,9 @@ import type {
   RunnerCheckView,
   RunnerSettingsView,
   SettingsPage,
+  TrackerConnectionView,
   TrackerProjectChoice,
+  WebhookStateView,
   WorkspaceSettings,
 } from "./model.js";
 
@@ -68,8 +78,13 @@ export function webhookPath(connectionId: string): string {
   return `/api/webhooks/tracker/${encodeURIComponent(connectionId)}`;
 }
 
-function addressesView(settings: AddressesView): AddressesView {
-  return { webAddress: settings.webAddress, webhookAddress: settings.webhookAddress };
+function addressesView(settings: StoredInstallSettings): AddressesView {
+  return {
+    webAddress: settings.webAddress,
+    webhookAddress: settings.webhookAddress,
+    webhookAddressChecked:
+      settings.webhookAddress !== null && settings.webhookAddressCheckedAt !== null,
+  };
 }
 
 const runnerConfigSchema = z.object({
@@ -88,6 +103,58 @@ const connectionSecretsSchema = z.object({
 function hasWebhookSecret(secrets: unknown): boolean {
   const parsed = connectionSecretsSchema.safeParse(secrets);
   return parsed.success && typeof parsed.data.webhookSecret === "string";
+}
+
+const connectionConfigSchema = z.object({
+  webhookSettingsUrl: z
+    .url({ protocol: /^https$/ })
+    .nullish()
+    .catch(null),
+});
+
+function webhookSettingsUrlOf(config: unknown): string | null {
+  const parsed = connectionConfigSchema.safeParse(config);
+  return parsed.success ? (parsed.data.webhookSettingsUrl ?? null) : null;
+}
+
+export function webhookStateOf(
+  secretSet: boolean,
+  receipt: WebhookReceipt,
+  now: Date,
+): WebhookStateView {
+  if (!secretSet) return { kind: "off" };
+  const last = receipt.lastReceivedAt;
+  if (receipt.firstRejectedAt !== null && receipt.rejectedCount > 0) {
+    return {
+      kind: "rejected",
+      rejectedCount: receipt.rejectedCount,
+      firstRejectedAt: receipt.firstRejectedAt.toISOString(),
+      lastReceivedAt: last?.toISOString() ?? null,
+      lastReceivedAgoMs: last === null ? null : Math.max(0, now.getTime() - last.getTime()),
+    };
+  }
+  if (last === null) return { kind: "waiting" };
+  return {
+    kind: "receiving",
+    lastReceivedAt: last.toISOString(),
+    lastReceivedAgoMs: Math.max(0, now.getTime() - last.getTime()),
+  };
+}
+
+export function trackerConnectionView(
+  db: Database,
+  connection: StoredTrackerConnection,
+  now: Date,
+): TrackerConnectionView {
+  const secretSet = hasWebhookSecret(connection.secrets);
+  return {
+    id: connection.id,
+    name: connection.name,
+    hasWebhookSecret: secretSet,
+    webhookPath: webhookPath(connection.id),
+    webhook: webhookStateOf(secretSet, getWebhookReceipt(db, connection.id), now),
+    webhookSettingsUrl: webhookSettingsUrlOf(connection.config),
+  };
 }
 
 const runnerHealthSchema = z.object({
@@ -179,12 +246,7 @@ export async function loadSettingsPage(
   return {
     workspace,
     install: {
-      connections: connections.map((connection) => ({
-        id: connection.id,
-        name: connection.name,
-        hasWebhookSecret: hasWebhookSecret(connection.secrets),
-        webhookPath: webhookPath(connection.id),
-      })),
+      connections: connections.map((connection) => trackerConnectionView(db, connection, now)),
       githubToken: listCodeHostConnections(db, secretBox).length > 0,
       addresses: addressesView(getInstallSettings(db)),
       power: powerView(context.power),

@@ -54,7 +54,7 @@
     "withBody": "라벨을 붙이는 순간 Linear가 바로 알려 줘서 10초쯤 안에 할당해요. 끝난 런이 있던 티켓도 라벨을 뺐다가 다시 붙이면 다시 할당해요.",
     "retry": "webhook이 없으면 끝난 런이 있던 티켓은 라벨로 다시 할당하지 않아요. 그런 티켓은 Tickets에서 직접 할당해요.",
     "stopped": "webhook 없이 worker가 하루 넘게 멈춰 있었다면 그동안 라벨을 붙인 티켓은 놓칠 수 있어요. 그런 티켓은 Tickets에서 할당해요.",
-    "address": "켜려면 Linear가 인터넷에서 이 서버에 닿을 webhook 공개 주소가 따로 있어야 해요. 이 서버는 보통 이 기기나 tailnet 안에서만 열려 있어서, Tailscale Funnel이나 Cloudflare Tunnel로 webhook 경로만 밖에 열어야 해요. 그래서 설정을 마친 뒤 Settings의 주소와 트래커 연결에서 켜요."
+    "address": "켜려면 Linear가 인터넷에서 이 서버에 닿을 주소가 따로 있어야 해요. 이 서버는 보통 이 기기나 tailnet 안에서만 열려 있어서, Tailscale Funnel이나 Cloudflare Tunnel로 webhook 경로만 밖에 열어야 해요. 설정을 마친 뒤 Settings › 연결에서 트래커 연결을 열어 Webhook 구역에서 차례로 켜요."
   },
   "github": {
     "saved": "GitHub 토큰을 저장했어요",

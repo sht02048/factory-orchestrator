@@ -4,9 +4,12 @@ import { useCallback, useMemo } from "react";
 import { SHELL_KEY } from "../shell/shell-query";
 import { TRACKER_KEY } from "../tickets/tickets-query";
 import { rereadTrackers } from "../server/functions";
+import { webhookReceiptKey } from "@ganger/app/settings/model";
 import {
   addWorkspaceTrackerProject,
   checkGitHubTokenNow,
+  checkWebhookAddressNow,
+  getTrackerWebhookState,
   checkTrackerConnectionNow,
   createWorkspaceAutoAssignLabel,
   getRunnerChecksPending,
@@ -22,6 +25,7 @@ import {
   saveWorkspaceInProgressState,
   saveWorkspaceLabel,
   saveWorkspaceMapping,
+  turnOffTrackerWebhook,
 } from "../server/settings-functions";
 import type { ActionResult, SettingsActions } from "./settings-screen";
 
@@ -102,6 +106,14 @@ export function useSettingsActions(afterSave: AfterSave): SettingsActions {
         const pending = await getRunnerChecksPending();
         if (!pending) await router.invalidate();
         return pending;
+      },
+      checkWebhookAddress: then((data) => checkWebhookAddressNow({ data })),
+      turnOffWebhook: then((data) => turnOffTrackerWebhook({ data })),
+      pollWebhookState: async ({ id, key }) => {
+        const state = await getTrackerWebhookState({ data: { id } });
+        if (state !== null && webhookReceiptKey(state) === key) return true;
+        await router.invalidate();
+        return false;
       },
     }),
     [router, queryClient, then, thenTracker],

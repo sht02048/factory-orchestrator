@@ -33,10 +33,10 @@ import type {
   TrackerProjectChoice,
   WorkspaceSettings,
 } from "@ganger/app/settings/model";
+import { useTime } from "../format/time";
 import { useAgentName } from "../labels";
 import { GITHUB_TOKEN_URL, LINEAR_API_KEY_URL } from "../onboarding/model";
 import {
-  SecretField,
   useCredentialReason,
   CredentialFormFrame,
   ExternalLink,
@@ -73,6 +73,7 @@ export type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number];
 
 export type SettingsLinkTarget =
   | { kind: "project"; connectionId: string; projectId: string }
+  | { kind: "connection"; connectionId: string }
   | { kind: "runners" }
   | { kind: "mcp" }
   | { kind: "settings" }
@@ -90,6 +91,8 @@ export function settingsHref(target: SettingsLinkTarget, ws: string | undefined)
   switch (target.kind) {
     case "project":
       return `/settings/projects/${encodeURIComponent(target.connectionId)}/${encodeURIComponent(target.projectId)}${search}`;
+    case "connection":
+      return `/settings/connections/${encodeURIComponent(target.connectionId)}${search}`;
     case "runners":
       return `/runners${search}`;
     case "mcp":
@@ -169,18 +172,13 @@ export function SettingsScreen({
           />
           <SettingsSection id="server" title={t("sections.server")}>
             <SettingsGroup>
-              <AddressRow field="webAddress" addresses={page.install.addresses} actions={actions} />
+              <WebAddressRow addresses={page.install.addresses} actions={actions} />
               <PowerRow power={page.install.power} actions={actions} />
               <UpdatesRows />
             </SettingsGroup>
           </SettingsSection>
           <SettingsSection id="advanced" title={t("sections.advanced")}>
             <SettingsGroup>
-              <AddressRow
-                field="webhookAddress"
-                addresses={page.install.addresses}
-                actions={actions}
-              />
               <SettingsLinkRow
                 label={t("mcp.title")}
                 detail={page.install.mcp.writeAllowed ? t("mcp.rowWrite") : t("mcp.rowRead")}
@@ -211,6 +209,7 @@ export function sectionProblems(
   const install = page.install;
   if (
     install.connections.length === 0 ||
+    install.connections.some((connection) => connection.webhook.kind === "rejected") ||
     !install.githubToken ||
     install.runners.length === 0 ||
     runnerIssues > 0
@@ -245,7 +244,7 @@ function NoWorkspace({
   );
 }
 
-function ChangeButton({
+export function ChangeButton({
   edit,
   label,
   action,
@@ -323,7 +322,7 @@ function WorkspaceNameRow({
   );
 }
 
-function TextEditor({
+export function TextEditor({
   label,
   initial,
   validate,
@@ -778,7 +777,12 @@ function ConnectionsSection({
           <SettingsRow label={t("connections.none")} />
         ) : null}
         {connections.map((connection) => (
-          <ConnectionRow key={connection.id} connection={connection} actions={actions} />
+          <ConnectionRow
+            key={connection.id}
+            connection={connection}
+            now={page.install.mcp.now}
+            renderLink={renderLink}
+          />
         ))}
         {add.open ? (
           <SettingsRow
@@ -819,7 +823,7 @@ function ConnectionsSection({
   );
 }
 
-function FocusFirst({ children, onEscape }: { children: ReactNode; onEscape?: () => void }) {
+export function FocusFirst({ children, onEscape }: { children: ReactNode; onEscape?: () => void }) {
   const ref = useFocusFirstField();
   return (
     <div
@@ -843,143 +847,40 @@ function FocusFirst({ children, onEscape }: { children: ReactNode; onEscape?: ()
 
 function ConnectionRow({
   connection,
-  actions,
+  now,
+  renderLink,
 }: {
   connection: TrackerConnectionView;
-  actions: SettingsActions;
+  now: string;
+  renderLink: RenderSettingsLink;
 }) {
-  const t = useTranslations("settings");
-  const edit = useInlineEdit(`connection-${connection.id}`);
-  const labelId = useId();
+  const detail = useConnectionWebhookDetail(connection, now);
   return (
-    <SettingsRow
+    <SettingsLinkRow
       label={connection.name}
-      labelId={labelId}
-      detail={
-        connection.hasWebhookSecret ? t("connections.webhookOn") : t("connections.webhookOff")
-      }
-      control={
-        edit.open ? undefined : (
-          <ChangeButton edit={edit} label={connection.name} action={t("connections.manage")} />
-        )
-      }
-      expanded={
-        edit.open ? (
-          <FocusFirst>
-            <ConnectionEditor connection={connection} actions={actions} onClose={edit.close} />
-          </FocusFirst>
-        ) : null
-      }
+      detail={detail}
+      detailTone={connection.webhook.kind === "rejected" ? "problem" : "default"}
+      render={(props) => renderLink({ kind: "connection", connectionId: connection.id }, props)}
     />
   );
 }
 
-function ConnectionEditor({
-  connection,
-  actions,
-  onClose,
-}: {
-  connection: TrackerConnectionView;
-  actions: SettingsActions;
-  onClose: () => void;
-}) {
-  const t = useTranslations("settings");
-  const describeTracker = useCredentialReason("tracker");
-  const [name, setName] = useState(connection.name);
-  const [apiKey, setApiKey] = useState("");
-  const [webhookSecret, setWebhookSecret] = useState("");
-  useReportUnsaved(name.trim() !== connection.name || apiKey !== "" || webhookSecret !== "");
-  const submit = useSubmit();
-  const check = useSubmit();
-  const ready = name.trim() !== "";
-  const [nameMissing, setNameMissing] = useState(false);
-  return (
-    <CredentialFormFrame
-      onClose={onClose}
-      onSubmit={() => {
-        setNameMissing(!ready);
-        if (!ready) return;
-        submit.run(
-          () =>
-            actions.saveConnection({
-              id: connection.id,
-              name: name.trim(),
-              apiKey: apiKey.trim(),
-              webhookSecret: webhookSecret.trim(),
-            }),
-          t("saved"),
-          onClose,
-        );
-      }}
-      footer={
-        <Button
-          variant="ghost"
-          disabled={check.sending}
-          onClick={() =>
-            check.run(
-              () => actions.checkConnection({ id: connection.id }),
-              t("connections.checkOk", { name: connection.name }),
-            )
-          }
-        >
-          {check.sending ? t("connections.checking") : t("connections.check")}
-        </Button>
-      }
-      submit={
-        <Button variant="primary" type="submit" disabled={submit.sending}>
-          {submit.sending ? t("saving") : t("save")}
-        </Button>
-      }
-    >
-      <SubmitError state={check.state} describe={describeTracker} />
-      <Field
-        label={t("connections.name")}
-        error={nameMissing ? t("connections.nameRequired") : undefined}
-      >
-        <Input
-          name="name"
-          value={name}
-          onValueChange={(value) => {
-            setName(value);
-            if (nameMissing) setNameMissing(value.trim() === "");
-          }}
-          placeholder={t("connections.namePlaceholder")}
-          autoComplete="off"
-        />
-      </Field>
-      <SecretField
-        name="apiKey"
-        label={t("connections.apiKey")}
-        hint={t("connections.keepSecret")}
-        hints="info"
-        error={undefined}
-        placeholder={t("credentials.keyPlaceholder")}
-        value={apiKey}
-        onValueChange={setApiKey}
-      />
-      <SecretField
-        name="webhookSecret"
-        label={t("connections.webhookSecret")}
-        hint={`${t("connections.webhookSecretInfo")} ${t("connections.keepSecret")}`}
-        hints="info"
-        error={undefined}
-        value={webhookSecret}
-        onValueChange={setWebhookSecret}
-      />
-      <Field
-        label={t("connections.webhookPath")}
-        info={
-          <InfoTip
-            label={t("infoLabel", { label: t("connections.webhookPath") })}
-            content={t("connections.webhookPathInfo")}
-          />
-        }
-      >
-        <Input value={connection.webhookPath} readOnly mono />
-      </Field>
-      <SubmitError state={submit.state} describe={describeTracker} />
-    </CredentialFormFrame>
-  );
+export function useConnectionWebhookDetail(connection: TrackerConnectionView, now: string): string {
+  const t = useTranslations("settings.connections");
+  const time = useTime();
+  const webhook = connection.webhook;
+  switch (webhook.kind) {
+    case "off":
+      return t("rowOff");
+    case "waiting":
+      return t("rowWaiting");
+    case "receiving":
+      return t("rowReceiving", {
+        time: time.ago(webhook.lastReceivedAt, webhook.lastReceivedAgoMs),
+      });
+    case "rejected":
+      return t("rowRejected", { time: time.stamp(webhook.firstRejectedAt, now) });
+  }
 }
 
 function GitHubRow({ saved, actions }: { saved: boolean; actions: SettingsActions }) {
@@ -1041,33 +942,24 @@ function GitHubRow({ saved, actions }: { saved: boolean; actions: SettingsAction
   );
 }
 
-function AddressRow({
-  field,
+function WebAddressRow({
   addresses,
   actions,
 }: {
-  field: "webAddress" | "webhookAddress";
   addresses: AddressesView;
   actions: SettingsActions;
 }) {
   const t = useTranslations("settings");
-  const edit = useInlineEdit(`address-${field}`);
+  const edit = useInlineEdit("address-webAddress");
   const labelId = useId();
-  const current = addresses[field];
-  const label = field === "webAddress" ? t("addresses.web") : t("addresses.webhook");
+  const current = addresses.webAddress;
+  const label = t("addresses.web");
   return (
     <SettingsRow
       label={label}
       labelId={labelId}
-      info={
-        <InfoTip
-          label={t("infoLabel", { label })}
-          content={field === "webAddress" ? t("addresses.webInfo") : t("addresses.webhookInfo")}
-        />
-      }
-      detail={
-        current ?? (field === "webAddress" ? t("addresses.webNone") : t("addresses.webhookNone"))
-      }
+      info={<InfoTip label={t("infoLabel", { label })} content={t("addresses.webInfo")} />}
+      detail={current ?? t("addresses.webNone")}
       detailMono={current !== null}
       control={
         edit.open ? undefined : (
@@ -1086,17 +978,12 @@ function AddressRow({
             initial={current ?? ""}
             type="url"
             mono
-            placeholder={
-              field === "webAddress"
-                ? t("addresses.webPlaceholder")
-                : t("addresses.webhookPlaceholder")
-            }
+            placeholder={t("addresses.webPlaceholder")}
             validate={() => null}
             save={(value) =>
               actions.saveAddresses({
-                webAddress: field === "webAddress" ? value.trim() : (addresses.webAddress ?? ""),
-                webhookAddress:
-                  field === "webhookAddress" ? value.trim() : (addresses.webhookAddress ?? ""),
+                webAddress: value.trim(),
+                webhookAddress: addresses.webhookAddress ?? "",
               })
             }
             saved={t("saved")}

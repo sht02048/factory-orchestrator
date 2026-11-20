@@ -221,11 +221,19 @@ _Avoid_: 패키지(npm 패키지와 헷갈린다), 빌드 산출물(앱 하나�
 
 **다른 기기에서 열 주소**:
 운영자가 노트북·휴대폰에서 이 서버의 화면을 여는 주소(예: Tailscale Serve 주소). Settings의 주소에서 정하고 DB 설치 설정에 둔다. 서버는 이 주소의 호스트와 127.0.0.1·localhost·바인드 주소로 온 요청만 받는다(Host 검사, 티켓 0048). 화면·README에서는 "web address"로 쓴다.
-_Avoid_: 바인드 주소(`WEB_HOST`, 서버가 듣는 인터페이스다), 공개 주소
+_Avoid_: 바인드 주소(`WEB_HOST`, 서버가 듣는 인터페이스다), 공개 주소(단독으로)
 
-**webhook 공개 주소**:
-트래커가 webhook을 보내는 공개 인터넷 주소(예: Tailscale Funnel, Cloudflare Tunnel). Settings의 주소에서 정한다. 이 주소의 호스트로는 webhook 경로만 받는다. 온보딩은 webhook을 묻지 않고, 1단계에서 webhook 없이도 자동 할당이 도는 방식과 켜는 곳만 안내한다. 화면·README에서는 "webhook address"로 쓴다.
-_Avoid_: 공개 주소(어느 주소인지 흐리다), 터널 주소
+**Linear가 이 서버에 닿을 주소**:
+트래커가 인터넷에서 webhook을 보내 이 서버에 닿는 주소(예: Tailscale Funnel `https://<기기>.<tailnet>.ts.net:8443`, Cloudflare Tunnel 주소). 서버에 하나이고 모든 트래커 연결이 같이 쓴다. 트래커 연결 상세의 Webhook 구역 1단계에서 정하고, 서버가 그 주소로 webhook 확인 경로를 물어 이 설치가 답할 때만 저장한다(티켓 0130). 이 주소의 호스트로는 webhook 경로만 받는다. 코드·DB에서는 `webhookAddress`, 영어 화면·README에서는 "address Linear reaches this server at"으로 쓴다. 온보딩은 webhook을 묻지 않고, 1단계에서 webhook 없이도 자동 할당이 도는 방식과 켜는 곳만 안내한다.
+_Avoid_: 공개 주소(단독으로, 어느 주소인지 흐리다), webhook 공개 주소(예전 화면 이름), 터널 주소
+
+**webhook 확인 경로**:
+`GET /api/webhooks/ping/<설치 ID>`. 묻는 설치 ID가 이 설치와 같으면 200, 다르면 404로 답하고 설치 ID를 돌려주지 않는다. webhook 경로 아래라 터널이 webhook 경로만 열어도 닿고, 아직 저장하지 않은 주소에서도 확인하도록 Host 검사를 받지 않는다. 확인하기가 쓴다(티켓 0130).
+_Avoid_: health 경로
+
+**webhook 수신 기록**:
+트래커 연결마다 마지막으로 서명이 맞는 webhook을 받은 때와, 그 뒤 서명이 맞지 않아 받지 못한 수·처음 실패 시각. 표 `tracker_webhook_receipts`. webhook 상태(꺼짐·기다림·받는 중·서명 실패)를 여기서 정한다. 새 signing secret을 넣거나 webhook을 끄면 지운다(티켓 0130). 트래커 읽기를 다시 하게 하는 `tracker_read_generations`(0122)와 다르다.
+_Avoid_: webhook 로그, 이벤트 기록(트래커 이벤트 표 `tracker_events`와 헷갈린다)
 
 **신원 확인 경로**:
 `GET /api/identity`. 인증 없이 제품 이름·버전·설치 ID와 요청한 Host로 화면을 열 수 있는지를 돌려주는 경로다. 데스크톱 앱(0046)이 tailnet 기기 중 오케스트레이터를 가려내는 데 쓴다. Host 검사를 받지 않는다. 계약은 티켓 0048.

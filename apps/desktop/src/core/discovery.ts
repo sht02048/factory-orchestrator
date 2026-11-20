@@ -1,7 +1,7 @@
 import type { Identity, Probe } from "./identity.js";
 import { probeIdentity } from "./identity.js";
-import type { TailnetDevice, TailnetStatus } from "./tailscale.js";
-import { readTailnet } from "./tailscale.js";
+import type { TailnetDevice, TailnetStatus } from "@ganger/app/tailscale";
+import { readTailnet } from "@ganger/app/tailscale";
 
 export const DEFAULT_SERVER_PORT = 3000;
 export const PROBE_TIMEOUT_MS = 1_000;

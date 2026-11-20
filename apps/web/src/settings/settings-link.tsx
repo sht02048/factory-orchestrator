@@ -12,6 +12,14 @@ export function routerSettingsLink(target: SettingsLinkTarget, props: SettingsLi
           {...props}
         />
       );
+    case "connection":
+      return (
+        <Link
+          to="/settings/connections/$connectionId"
+          params={{ connectionId: target.connectionId }}
+          {...props}
+        />
+      );
     case "runners":
       return <Link to="/runners" {...props} />;
     case "mcp":

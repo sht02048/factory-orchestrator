@@ -1,4 +1,10 @@
-import { AdapterRegistry, toLabelId, toTrackerProjectId, toTrackerStateId } from "@ganger/core";
+import {
+  AdapterRegistry,
+  toDeliveryId,
+  toLabelId,
+  toTrackerProjectId,
+  toTrackerStateId,
+} from "@ganger/core";
 import { FakeTracker } from "@ganger/core/testing";
 import { SecretBox, parseBootConfig } from "@ganger/db";
 import { fakeKind, trackerProject } from "./browser/fixtures.js";
@@ -23,6 +29,22 @@ export function getAdapterRegistry(): AdapterRegistry {
       { id: toLabelId("label-api"), name: "api" },
       { id: toLabelId("label-infra"), name: "infra" },
     ]);
+    tracker.verifyWebhookWith = ({ rawBody, now }) => {
+      const body = new TextDecoder().decode(rawBody);
+      if (!body.startsWith("signed:")) return { ok: false, error: "bad-signature" };
+      return {
+        ok: true,
+        event: {
+          deliveryId: toDeliveryId(body.slice("signed:".length)),
+          kind: "other",
+          ticketKey: null,
+          projectId: null,
+          labelIds: null,
+          previousLabelIds: null,
+          receivedAt: now,
+        },
+      };
+    };
     registry = new AdapterRegistry().registerTracker({ kind: fakeKind, create: () => tracker });
   }
   return registry;
