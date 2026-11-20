@@ -40,7 +40,7 @@ import type { TestContext } from "vitest";
 import domain from "../../apps/web/messages/ko/domain.json" with { type: "json" };
 import run from "../../apps/web/messages/ko/run.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
-import { serverFnName, waitForRouterIdle } from "./navigation-timing.js";
+import { navigateByRail, serverFnName, waitForRouterIdle } from "./navigation-timing.js";
 import { startWebServer } from "./web-server.js";
 
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
@@ -75,7 +75,9 @@ let endedRun: RunId;
 let cancelRun: RunId;
 let logRun: RunId;
 let watchedRun: RunId;
+let revisitedRun: RunId;
 const watchedTicket = "ACME-24";
+const revisitedTicket = "ACME-25";
 
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
@@ -186,6 +188,20 @@ describe("Runs·Run 상세를 Query로(브라우저, 0125)", () => {
       .poll(() => state.innerText(), { timeout: VISIBLE_WITHIN_MS })
       .toContain(domain.runState.running);
     expect(Date.now() - changedAt).toBeLessThan(VISIBLE_WITHIN_MS);
+  });
+
+  it("변경 기록 통로 없이도 다시 들어간 Runs는 뒤에서 새로 읽어 그사이 바뀐 상태를 그린다", async (context) => {
+    const runsPage = await newPage(context, { stream: "blocked" });
+    await open(runsPage, "/runs");
+    const row = runsPage.page.getByRole("option").filter({ hasText: revisitedTicket });
+    await expect.poll(() => row.innerText()).toContain(domain.runState.queued);
+
+    await navigateByRail(runsPage.page, "dashboard", "first");
+    await runsPage.page.mouse.move(0, 0);
+    start(revisitedRun, "wt-revisited");
+    await navigateByRail(runsPage.page, "runs", "again");
+
+    await expect.poll(() => row.innerText()).toContain(domain.runState.running);
   });
 
   it("변경 기록 통로가 끊기면 열린 Run 상세를 30초마다 다시 읽는다(가짜 시계)", async (context) => {
@@ -322,6 +338,7 @@ function seed(database: Database): void {
   logRun = assign("ACME-23");
   start(logRun, "wt-log");
   watchedRun = assign(watchedTicket);
+  revisitedRun = assign(revisitedTicket);
 }
 
 function assign(key: string): RunId {

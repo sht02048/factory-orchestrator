@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, getRouteApi, rootRouteId } from "@tanstack/react-router";
+import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { useDeferredValue } from "react";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
@@ -9,13 +9,12 @@ import type { ConditionKey } from "@ganger/app/runs/conditions";
 import { runsMessages } from "../../runs/messages";
 import { ENDED_RUNS_PAGE_SIZE, MAX_ENDED_RUNS, RUN_FILTERS } from "@ganger/app/runs/model";
 import { RunsScreen } from "../../runs/runs-screen";
-import { requestTimeZone } from "../../query/request-time-zone";
+import { requestTimeZone, useRequestTimeZone } from "../../query/request-time-zone";
 import { loadRouteQuery } from "../../query/route-query";
 import { runsListQuery } from "../../runs/queries";
 
 const t = createTranslator({ locale: defaultLocale, messages: runsMessages, namespace: "runs" });
 const appRoute = getRouteApi("/_app");
-const rootRoute = getRouteApi(rootRouteId);
 
 export const Route = createFileRoute("/_app/runs")({
   validateSearch: z.object({
@@ -44,7 +43,7 @@ export const Route = createFileRoute("/_app/runs")({
 
 function RunsRoute() {
   const deps = Route.useLoaderDeps();
-  const timeZone = useDeferredValue(rootRoute.useLoaderData({ select: (root) => root.timeZone }));
+  const timeZone = useDeferredValue(useRequestTimeZone());
   const { data: page } = useSuspenseQuery(
     runsListQuery({ ...deps, ended: deps.ended ?? ENDED_RUNS_PAGE_SIZE }, timeZone),
   );

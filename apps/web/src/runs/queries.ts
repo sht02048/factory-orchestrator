@@ -17,14 +17,13 @@ export function runsListQuery(params: RunsListParams, timeZone: string) {
   const { ws, ...rest } = params;
   return queryOptions({
     queryKey: [...runsListKey, { ws: ws ?? "", ...rest }, timeZone] as const,
-    queryFn: ({ signal }) =>
-      getRunsPage({ data: ws === undefined ? rest : { ...rest, ws }, signal }),
+    queryFn: () => getRunsPage({ data: ws === undefined ? rest : { ...rest, ws } }),
   });
 }
 
 export function runDetailQuery(runId: string) {
   return queryOptions({
     queryKey: runDetailKey(runId),
-    queryFn: ({ signal }) => getRunDetail({ data: { runId }, signal }),
+    queryFn: () => getRunDetail({ data: { runId } }),
   });
 }
