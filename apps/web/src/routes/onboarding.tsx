@@ -13,8 +13,8 @@ import { runnerSetupMessages } from "../runner-setup/messages";
 import { useRunnerSetupActions } from "../runner-setup/use-runner-setup-actions";
 import {
   useReloadOnSuccess,
-  useRouterReload,
   useSettingsActions,
+  useSettingsReload,
 } from "../settings/use-settings-actions";
 
 const t = createTranslator({
@@ -64,7 +64,7 @@ function OnboardingRoute() {
     }),
     [router, navigate, search],
   );
-  const reload = useRouterReload();
+  const reload = useSettingsReload();
   const settingsActions = useSettingsActions(reload);
   const then = useReloadOnSuccess(reload);
   const setupActions = useRunnerSetupActions(reload);

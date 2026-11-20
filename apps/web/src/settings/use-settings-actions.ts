@@ -35,11 +35,6 @@ export type ReloadOnSuccess = <I>(
 
 export type AfterSave = () => Promise<unknown>;
 
-export function useRouterReload(): AfterSave {
-  const router = useRouter();
-  return useCallback(() => router.invalidate({ sync: true }), [router]);
-}
-
 export function useSettingsReload(): AfterSave {
   const router = useRouter();
   const queryClient = useQueryClient();
