@@ -335,7 +335,7 @@ describe("열린 Dashboard의 변경 기록(브라우저, 0126)", () => {
     await expect.poll(() => countOf(serverCalls, "getHomePage")).toBe(before + 2);
 
     expect(serverCalls.filter((call) => ROOT_READS.includes(call))).toEqual([]);
-    expect(countOf(serverCalls, "getShell")).toBe(shellBefore + 2);
+    await expect.poll(() => countOf(serverCalls, "getShell")).toBe(shellBefore + 2);
   });
 });
 
