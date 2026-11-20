@@ -1,6 +1,6 @@
 import { PRODUCT_DISPLAY_NAME } from "@ganger/cli/home";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   BrowserWindow,
   Menu,
@@ -61,6 +61,8 @@ import type {
 } from "../shared/view.js";
 import {
   IPC_PREFIX,
+  LOGS_CAN_OPEN,
+  LOGS_OPEN,
   NAVIGATE_CHANNEL,
   NOTIFICATION_SETTINGS_CHANNEL,
   NOTIFICATION_SETTINGS_WINDOW,
@@ -71,6 +73,7 @@ import {
 } from "../shared/view.js";
 import type { NavScreen } from "@ganger/app/shell/nav-shortcuts";
 import { navigationMenu } from "./navigation-menu.js";
+import { diagnosticsMenuItem, logFolderOpenable } from "./diagnostics-menu.js";
 import { mainWindowOptions, settingsWindowOptions, titleBarCookie } from "./window-options.js";
 
 async function loadServerScreen(window: BrowserWindow, url: string): Promise<void> {
@@ -548,6 +551,13 @@ export class Controller {
     handle("enrollment-cancel", () => this.enrollment.cancel());
     handle("enrollment-close", () => this.enrollment.close());
     handle("open-sharing", () => shell.openExternal(SHARING_SETTINGS_URL));
+    ipcMain.handle(
+      LOGS_CAN_OPEN,
+      (event) => this.fromServerPage(event) && logFolderOpenable(this.mode),
+    );
+    ipcMain.handle(LOGS_OPEN, (event) =>
+      this.fromServerPage(event) && logFolderOpenable(this.mode) ? this.openLogFolder() : false,
+    );
     ipcMain.handle(UPDATE_GET, (event) => (this.fromServerPage(event) ? this.updateView() : null));
     ipcMain.handle(UPDATE_ACT, (event, action: unknown) => {
       if (this.fromServerPage(event) && isUpdateAction(action)) this.runUpdateAction(action);
@@ -607,6 +617,18 @@ export class Controller {
       openPath: (path) => shell.openPath(path),
       showItemInFolder: (path) => shell.showItemInFolder(path),
     });
+  }
+
+  private async openLogFolder(): Promise<boolean> {
+    const error = await shell.openPath(dirname(this.options.logFile));
+    return error === "";
+  }
+
+  private downloadDiagnostics(url: string): void {
+    const window = this.window;
+    if (window === undefined || window.isDestroyed()) return;
+    this.showWindow();
+    window.webContents.downloadURL(url);
   }
 
   private notificationPrefs(): NotificationPrefs {
@@ -890,6 +912,11 @@ export class Controller {
       });
     }
     items.push(
+      diagnosticsMenuItem({
+        label: t("menu.makeDiagnostics"),
+        serverUrl: this.serverUrl,
+        download: (url) => this.downloadDiagnostics(url),
+      }),
       {
         id: "change-mode",
         label: t("tray.changeMode"),
