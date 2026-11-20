@@ -124,11 +124,23 @@ function timelineView(timeline: RunTimeline): Record<string, unknown> {
   };
 }
 
+const OUTSIDE_TEXT_KEYS: ReadonlySet<string> = new Set(["reason", "err"]);
+
+function logLineView(line: StoredLogLine): Record<string, unknown> {
+  const own: Record<string, unknown> = {};
+  const external: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(line)) {
+    if (OUTSIDE_TEXT_KEYS.has(key)) external[key] = value;
+    else own[key] = value;
+  }
+  return Object.keys(external).length === 0 ? own : { ...own, [EXTERNAL_FIELD]: external };
+}
+
 function latest(lines: ReadonlyArray<StoredLogLine>, count: number): Record<string, unknown> {
   return {
     total: lines.length,
     truncated: lines.length > count,
-    logLines: lines.slice(-count).map(redactStoredLine),
+    logLines: lines.slice(-count).map((line) => logLineView(redactStoredLine(line))),
   };
 }
 

@@ -447,6 +447,18 @@ describe("get_server_logs", () => {
     expect(text).not.toContain(SECRETS.githubToken);
     expect(text).not.toContain(SECRETS.apiKey);
     expect(text).toContain("[redacted]");
+    const warned = z
+      .object({
+        serverLog: z.object({
+          logLines: z.array(
+            z.looseObject({ event: z.string(), [EXTERNAL_FIELD]: z.unknown().optional() }),
+          ),
+        }),
+      })
+      .parse(JSON.parse(text))
+      .serverLog.logLines.find((line) => line.event === "test.s4");
+    expect(warned).not.toHaveProperty("reason");
+    expect(warned?.[EXTERNAL_FIELD]).toMatchObject({ reason: "runner said [redacted]" });
     expect(readFileSync(path, "utf8")).toBe(before);
     expect(tables()).toEqual(tablesBefore);
   });

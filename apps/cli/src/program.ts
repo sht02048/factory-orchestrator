@@ -270,7 +270,7 @@ async function runLogs(context: ProgramContext, home: string, args: LogsArgs): P
     {
       out: (line) => context.out(line),
       err: (line) => context.err(line),
-      color: writesToTerminal(context.stdout) && context.env["NO_COLOR"] === undefined,
+      color: writesToTerminal(context.stdout) && (context.env["NO_COLOR"] ?? "") === "",
       onStopSignal: (handler) => context.onStopSignal(handler),
     },
     homePaths(home).logDir,

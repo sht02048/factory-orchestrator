@@ -167,6 +167,10 @@ describe("ganger logs", () => {
     const noColor = context({ stdout: tty, env: { NO_COLOR: "1" } });
     expect(await runProgram(["logs", "--home", home], noColor)).toBe(0);
     expect(out[0]).not.toContain("\u001b[");
+    out = [];
+    const emptyNoColor = context({ stdout: tty, env: { NO_COLOR: "" } });
+    expect(await runProgram(["logs", "--home", home], emptyNoColor)).toBe(0);
+    expect(out[0]).toContain("\u001b[");
   });
 
   it("-f 는 멈출 때까지 회전을 넘어 새 줄을 이어 보인다", async () => {
