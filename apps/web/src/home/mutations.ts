@@ -38,28 +38,28 @@ export interface DashboardActions {
 export function useDashboardActions(): DashboardActions {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const afterWrite = (runId: string) =>
+  const afterWrite = (runId: RunId) =>
     invalidateRunWrite(
       queryClient,
       () => router.invalidate({ filter: (match) => ROUTER_ROUTES_SHOWING_RUNS.has(match.routeId) }),
-      toRunId(runId),
+      runId,
     );
   const answer = useMutation({
     mutationFn: (input: AnswerInput) =>
       rejectedAs(() => answerQuestion({ data: input }), ANSWER_REJECT_REASONS),
-    onSuccess: (_result, input) => afterWrite(input.runId),
+    onSuccess: (_result, input) => afterWrite(toRunId(input.runId)),
   });
   const deny = useMutation({
     mutationFn: (input: DenyInput) =>
       rejectedAs(() => denyPermission({ data: input }), DENY_REJECT_REASONS),
-    onSuccess: (_result, input) => afterWrite(input.runId),
+    onSuccess: (_result, input) => afterWrite(toRunId(input.runId)),
   });
   const control = useMutation({
     mutationFn: async (input: ControlInput): Promise<RunControlOutcome> => {
       const result = await controlRun({ data: input });
       return result.ok ? "requested" : "state-changed";
     },
-    onSuccess: (_outcome, input) => afterWrite(input.runId),
+    onSuccess: (_outcome, input) => afterWrite(toRunId(input.runId)),
   });
   return {
     onAnswer: async (input) => {

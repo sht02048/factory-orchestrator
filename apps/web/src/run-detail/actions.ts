@@ -79,6 +79,8 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: runDetailKey(runId) }),
       queryClient.invalidateQueries({ queryKey: runsListKey }),
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      queryClient.invalidateQueries({ queryKey: ["stats"] }),
       world.refreshUnmovedScreens(),
     ]);
   };

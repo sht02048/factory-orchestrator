@@ -46,7 +46,7 @@ Dashboard와 Stats를 Query로 옮기고, Dashboard의 15초 폴링을 변경 �
 - **멈추기·재개 처리 중.** `refetchInterval`이 처리 중인 요청이 있으면 2초, 없으면 끈다(`pollWhileControlPending`).
 - **mutation.** `apps/web/src/home/mutations.ts`의 `useDashboardActions`. 답하기·거절은 `rejectedAs`(0124)로 이유가 담긴 `MutationRejectedError`가 되고, 멈추기·재개의 `ok: false`는 오류가 아니라 `"state-changed"` 결과다(코디네이터 승인). 성공하면 `["dashboard"]`, `["runs", "detail", runId]`, `["runs", "list"]`만 무효화하고, 아직 라우터 로더인 런 표시 route(`/_app/tickets`, `/_app/runners`, 0125 머지 전에는 Runs·Run 상세도)만 `router.invalidate({ filter })`로 고른다(스펙 6절 3번). 무효화 promise를 기다린 뒤 끝난다.
 - **거절 이유 문구.** 이유가 있는 거절(이미 답함, 이미 거절함, 러너에서 처리함, 찾지 못함)은 다시 보내도 같은 실패라, 폼 대신 이유 문장을 `role="status"`로 남긴다(`home.json`의 `question.rejected`, `permission.rejected`). 거절 뒤 바로 다시 읽으면 Permission이 사라져 설명도 함께 사라지므로, 다시 읽기는 다른 곳의 쓰기가 남긴 변경 기록에 맡긴다.
-- **0125와 맞춤.** 0125 머지 뒤 Dashboard 쓰기의 key는 0125의 `runDetailKey`·`runsListKey`를 쓴다. 0125 Run 상세 쓰기가 라우터로 다시 읽는 "아직 옮기지 않은 화면"(`MOVED_TO_QUERY_ROUTE_IDS`)에 `/_app/`·`/_app/stats`를 더했다.
+- **0125와 맞춤.** 0125 머지 뒤 Dashboard 쓰기의 key는 0125의 `runDetailKey`·`runsListKey`를 쓴다. 0125 Run 상세 쓰기가 라우터로 다시 읽는 "아직 옮기지 않은 화면"(`MOVED_TO_QUERY_ROUTE_IDS`)에 `/_app/`·`/_app/stats`를 더하고, 그 대신 Run 상세 쓰기가 `["dashboard"]`·`["stats"]`를 무효화하게 했다(독립 리뷰가 찾음: 빼기만 하면 변경 기록이 없을 때 Run 상세에서 바꾼 런이 Dashboard·Stats에 30초 동안 낡게 남는다).
 - **`signal`을 넘기지 않음.** 0125가 찾은 대로 `queryFn`에 `signal`을 넘기면 개발 빌드(StrictMode 두 번 마운트)에서 다시 들어간 화면의 뒤 다시 읽기가 시작 직후 취소되고 30초 안이라 다시 읽지 않는다. 두 query에서 뺐고, 변경 기록 통로를 막은 채 다시 들어간 화면이 바뀐 상태를 그리는 시험 둘을 더했다. `signal`을 되돌리면 두 시험이 실패하는 것을 확인했다. 첫 '후' 측정이 30분 넘게 멈춘 것도 이 취소된 요청을 측정 도구가 기다려서였다.
 
 ### 0123 리뷰 MEDIUM(gcTime)

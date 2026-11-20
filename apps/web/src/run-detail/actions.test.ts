@@ -85,18 +85,20 @@ function mutate<TData, TVariables>(
 }
 
 describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
-  it("답하기가 성공하면 그 런의 상세와 Runs 목록만 무효화하고 아직 옮기지 않은 화면을 함께 다시 읽게 한다", async () => {
+  it("답하기가 성공하면 그 런의 상세, Runs 목록, Dashboard, Stats만 무효화하고 아직 옮기지 않은 화면을 함께 다시 읽게 한다", async () => {
     const world = mutationWorld(okCalls());
     await mutate(world.queryClient, world.mutations.answer, { questionId: "q-1", answer: "네" });
 
     expect(world.invalidated()).toEqual([
       runDetailKey(RUN_ID),
       ["runs", "list", { ws: "" }, "UTC"],
+      ["dashboard", "", "UTC"],
+      ["stats", "", 7, "UTC"],
     ]);
     expect(world.refreshUnmovedScreens).toHaveBeenCalledTimes(1);
   });
 
-  it("거절·취소·멈추기도 성공하면 같은 두 key만 무효화한다", async () => {
+  it("거절·취소·멈추기도 성공하면 같은 key만 무효화한다", async () => {
     const deny = mutationWorld(okCalls());
     await mutate(deny.queryClient, deny.mutations.deny, { promptId: "p-1", reason: "" });
     const cancel = mutationWorld(okCalls());
@@ -108,6 +110,8 @@ describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
       expect(world.invalidated()).toEqual([
         runDetailKey(RUN_ID),
         ["runs", "list", { ws: "" }, "UTC"],
+        ["dashboard", "", "UTC"],
+        ["stats", "", 7, "UTC"],
       ]);
     }
   });
@@ -164,6 +168,8 @@ describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
     expect(world.invalidated()).toEqual([
       runDetailKey(RUN_ID),
       ["runs", "list", { ws: "" }, "UTC"],
+      ["dashboard", "", "UTC"],
+      ["stats", "", 7, "UTC"],
     ]);
   });
 
