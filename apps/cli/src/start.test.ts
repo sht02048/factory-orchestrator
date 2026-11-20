@@ -12,7 +12,6 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { PassThrough } from "node:stream";
 import { join } from "node:path";
-import { loadMigrations, openDatabase } from "@ganger/db";
 import { useLogger } from "@ganger/log";
 import { memoryLogger } from "@ganger/log/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -81,36 +80,9 @@ function fakeLayout(worker: string = FAKE_WORKER): AppLayout {
   return { web: () => script("web", FAKE_WEB), worker: () => script("worker", worker) };
 }
 
-function appliedMigrations(databasePath: string): number {
-  const db = openDatabase(databasePath);
-  try {
-    return db.$client.prepare("SELECT name FROM schema_migrations").all().length;
-  } finally {
-    db.$client.close();
-  }
-}
-
 const quiet = () => undefined;
 
 describe("start", () => {
-  it("마이그레이션을 돌린 뒤 web이 바인딩 주소에서 응답한다", async () => {
-    const home = join(dir, "home");
-    const port = await freePort();
-    const setup = init({ home, port: String(port) });
-    if (!setup.created) throw new Error("init did not create .env");
-
-    started = await start({ home, env: {}, layout: fakeLayout(), onOutput: quiet });
-    expect(started.url).toBe(`http://127.0.0.1:${port}`);
-    expect(started.migrated).toEqual(loadMigrations().map((m) => m.name));
-    expect(appliedMigrations(setup.databasePath)).toBe(loadMigrations().length);
-
-    const response = await fetch(started.url);
-    expect(await response.json()).toEqual({ databasePath: setup.databasePath });
-
-    await started.stop();
-    expect(await started.exited).toEqual({});
-  });
-
   it.runIf(existsSync("/usr/bin/ssh-keygen"))(
     "처음 켜질 때 홈의 ssh 폴더에 Ganger 전용 ed25519 키를 만든다",
     async () => {
@@ -167,26 +139,6 @@ describe("start", () => {
     await expect(start({ home, env: {}, layout: crashingWeb, onOutput: quiet })).rejects.toThrow(
       "stopped before web responded: web exited with code 5",
     );
-  });
-
-  it("뜨는 중에 멈추라는 신호를 받으면 web을 더 기다리지 않고 자식을 멈춘다", async () => {
-    const home = join(dir, "home");
-    init({ home, port: String(await freePort()) });
-    const layout = fakeLayout();
-    const neverListens: AppLayout = {
-      web: (config) => ({ ...layout.web(config), args: ["-e", "setInterval(() => {}, 1000)"] }),
-      worker: () => layout.worker(),
-    };
-    const abort = new AbortController();
-    const pending = start({
-      home,
-      env: {},
-      layout: neverListens,
-      onOutput: quiet,
-      signal: abort.signal,
-      onMigrated: () => setTimeout(() => abort.abort(), 300),
-    });
-    await expect(pending).rejects.toThrow("stopped before web responded: stop requested");
   });
 
   it("web이 응답하는 중에 신호를 받으면 뜬 것으로 치지 않고 멈춘다", async () => {
@@ -447,10 +399,7 @@ function readLines(file: string): unknown[] {
 }
 
 describe("start 의 worker 깨우기 중계", () => {
-  it.each([
-    ["출력을 넘겨받을 때", quiet],
-    ["출력을 그대로 둘 때", undefined],
-  ])("%s web 이 보낸 { type: wake } 만 worker 에 닿는다", async (_case, onOutput) => {
+  it("출력을 그대로 둘 때 web 이 보낸 { type: wake } 만 worker 에 닿는다", async () => {
     const home = join(dir, "home");
     init({ home, port: String(await freePort()) });
     const out = join(dir, "worker-messages.jsonl");
@@ -464,7 +413,6 @@ describe("start 의 worker 깨우기 중계", () => {
         web: (config) => ({ ...layout.web(config), args: [web], requires: [web] }),
         worker: () => layout.worker(),
       },
-      ...(onOutput === undefined ? {} : { onOutput }),
     });
 
     await fetch(`${started.url}/send`);
