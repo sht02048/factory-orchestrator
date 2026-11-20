@@ -114,5 +114,10 @@ describe("Dashboard 시간 글자는 다시 읽지 않아도 흐른다", () => {
       queuedReason: { resetsInMs: 0 },
     });
     expect(soonestLimitLiftMs(withLimit)).toBe(3 * MINUTE);
+    const alreadyLifted: HomeRun = {
+      ...waiting,
+      queuedReason: { kind: "usage-limit", provider: "claude", resetsInMs: 0 },
+    };
+    expect(soonestLimitLiftMs({ ...withLimit, queued: [alreadyLifted, waiting] })).toBe(3 * MINUTE);
   });
 });

@@ -78,7 +78,7 @@ export function soonestLimitLiftMs(page: HomePage): number | null {
       ? [run.queuedReason.resetsInMs]
       : [],
   );
-  const lifts = [...runnerLifts, ...queuedLifts];
+  const lifts = [...runnerLifts, ...queuedLifts].filter((ms) => ms > 0);
   return lifts.length === 0 ? null : Math.min(...lifts);
 }
 
@@ -93,7 +93,7 @@ export function useAgedHomePage(page: HomePage, onLimitLifted: () => void): Home
   }, [page]);
   useEffect(() => {
     const lift = soonestLimitLiftMs(page);
-    if (lift === null || lift === 0) return undefined;
+    if (lift === null) return undefined;
     const timer = setTimeout(onLimitLifted, lift + LIMIT_LIFT_MARGIN_MS);
     return () => clearTimeout(timer);
   }, [page, onLimitLifted]);
