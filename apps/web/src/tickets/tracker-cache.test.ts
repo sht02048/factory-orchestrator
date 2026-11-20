@@ -1,11 +1,15 @@
 import { toDeliveryId, toTicketKey, toTrackerStateId } from "@ganger/core";
 import type { TrackerTicket } from "@ganger/core";
-import { createAutoAssignLabel } from "@ganger/app/settings/actions";
+import {
+  addTrackerProject,
+  createAutoAssignLabel,
+  removeTrackerProject,
+} from "@ganger/app/settings/actions";
 import { loadSettingsPage } from "@ganger/app/settings/load";
 import { submitAssignment } from "@ganger/app/tickets/assign";
 import { loadTicketsPage } from "@ganger/app/tickets/load";
 import { TrackerReads } from "@ganger/app/tracker-reads";
-import { markAllTrackersChanged } from "@ganger/db";
+import { markAllTrackersChanged, trackerReadGeneration } from "@ganger/db";
 import { GANGER_YELLOW_HEX } from "@ganger/ui/brand-color";
 import { describe, expect, it } from "vitest";
 import { receiveTrackerWebhook } from "../webhooks/receive";
@@ -110,5 +114,26 @@ describe("담아 둔 트래커 읽기를 지우는 경로(0122)", () => {
     );
     expect(created).toMatchObject({ ok: true, created: true });
     expect(await labelNames()).toContain(created.ok ? created.name : "");
+  });
+
+  it("트래커 프로젝트를 더하거나 빼면 그 연결의 담아 둔 읽기를 지운다(Query 스펙 0003)", () => {
+    const { db, context } = cachedSetup();
+    const before = trackerReadGeneration(db, connection);
+    expect(
+      addTrackerProject(context, {
+        ws: commerce,
+        connectionId: connection,
+        projectId: "tp-new",
+        name: "New",
+      }),
+    ).toEqual({ ok: true });
+    expect(
+      removeTrackerProject(context, {
+        ws: commerce,
+        connectionId: connection,
+        projectId: "tp-new",
+      }),
+    ).toEqual({ ok: true });
+    expect(trackerReadGeneration(db, connection)).toBe(before + 2);
   });
 });

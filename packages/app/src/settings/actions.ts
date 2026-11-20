@@ -120,7 +120,9 @@ export function addTrackerProject(
     name: input.name,
     inProgressStateId: null,
   });
-  return saved ? { ok: true } : { ok: false, reason: "taken" };
+  if (!saved) return { ok: false, reason: "taken" };
+  markTrackerChanged(context.db, connection);
+  return { ok: true };
 }
 
 export function removeTrackerProject(
@@ -129,12 +131,15 @@ export function removeTrackerProject(
 ): SaveResult<"not-found"> {
   const workspaceId = workspaceOf(context, input.ws);
   if (workspaceId === null) return { ok: false, reason: "not-found" };
+  const connection = toTrackerConnectionId(input.connectionId);
   const removed = removeWorkspaceTrackerProject(context.db, {
     workspaceId,
-    connection: toTrackerConnectionId(input.connectionId),
+    connection,
     projectId: toTrackerProjectId(input.projectId),
   });
-  return removed ? { ok: true } : { ok: false, reason: "not-found" };
+  if (!removed) return { ok: false, reason: "not-found" };
+  markTrackerChanged(context.db, connection);
+  return { ok: true };
 }
 
 function boundProject(context: SettingsContext, input: z.infer<typeof trackerProjectInput>) {

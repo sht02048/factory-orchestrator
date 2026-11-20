@@ -77,7 +77,7 @@ import {
   StatusPill,
 } from "@ganger/ui";
 import { size, space } from "@ganger/ui/tokens.stylex";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { useTranslations } from "use-intl";
 
 export const blockSectionIds = [
@@ -116,6 +116,11 @@ const PENDING_DEMO_MS = 2_000;
 function ShellPreview({ titleBarHidden }: { titleBarHidden: boolean }) {
   const t = useTranslations("ds.blocks");
   const [pending, setPending] = useState(false);
+  useEffect(() => {
+    if (!pending) return;
+    const timer = setTimeout(() => setPending(false), PENDING_DEMO_MS);
+    return () => clearTimeout(timer);
+  }, [pending]);
   return (
     <figure {...stylex.props(styles.shell)}>
       <figcaption {...stylex.props(styles.caption)}>
@@ -129,7 +134,6 @@ function ShellPreview({ titleBarHidden }: { titleBarHidden: boolean }) {
               onClick={() => {
                 if (pending) return;
                 setPending(true);
-                setTimeout(() => setPending(false), PENDING_DEMO_MS);
               }}
             >
               {t("shell.pendingDemo")}

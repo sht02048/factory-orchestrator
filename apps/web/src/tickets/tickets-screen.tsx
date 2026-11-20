@@ -139,8 +139,22 @@ function useReread(onReread: () => Promise<void>, failedProjects: number) {
   return { result, start };
 }
 
+export const REREAD_ANNOUNCE_MS = 5_000;
+
+function useAnnouncement(result: RereadResult): RereadResult {
+  const [announced, setAnnounced] = useState<RereadResult>("idle");
+  useEffect(() => {
+    setAnnounced(result);
+    if (result !== "failed" && result !== "partial") return;
+    const timer = setTimeout(() => setAnnounced("idle"), REREAD_ANNOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [result]);
+  return announced;
+}
+
 function RereadButton({ result, onStart }: { result: RereadResult; onStart: () => void }) {
   const t = useTranslations("tickets.reread");
+  const announced = useAnnouncement(result);
   return (
     <>
       <Button busy={{ active: result === "reading", label: t("reading") }} onClick={onStart}>
@@ -148,7 +162,7 @@ function RereadButton({ result, onStart }: { result: RereadResult; onStart: () =
       </Button>
       <VisuallyHidden>
         <span role="status">
-          {result === "failed" ? t("failed") : result === "partial" ? t("partial") : ""}
+          {announced === "failed" ? t("failed") : announced === "partial" ? t("partial") : ""}
         </span>
       </VisuallyHidden>
     </>
