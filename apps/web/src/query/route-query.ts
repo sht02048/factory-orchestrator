@@ -92,3 +92,16 @@ export async function loadRouteQuery<
   }
   return data;
 }
+
+export async function loadCachedRouteQuery<
+  TQueryFnData,
+  TError = DefaultError,
+  TQueryKey extends QueryKey = QueryKey,
+>(
+  load: RouteQueryLoad,
+  options: RouteQueryOptions<TQueryFnData, TError, TQueryKey>,
+): Promise<TQueryFnData> {
+  const queryClient = load.context.queryClient;
+  if (load.preload) return preloadRouteQuery(queryClient, options);
+  return queryClient.query({ ...options, staleTime: "static" });
+}

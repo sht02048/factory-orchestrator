@@ -1,5 +1,8 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { SHELL_KEY } from "../shell/shell-query";
+import { TRACKER_KEY } from "../tickets/tickets-query";
 import { rereadTrackers } from "../server/functions";
 import {
   addWorkspaceTrackerProject,
@@ -26,21 +29,37 @@ export type ReloadOnSuccess = <I>(
   call: (input: I) => Promise<ActionResult>,
 ) => (input: I) => Promise<ActionResult>;
 
-export function useReloadOnSuccess(): ReloadOnSuccess {
+export type AfterSave = () => Promise<unknown>;
+
+export function useRouterReload(): AfterSave {
   const router = useRouter();
+  return useCallback(() => router.invalidate(), [router]);
+}
+
+export function useSettingsReload(): AfterSave {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  return useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: SHELL_KEY });
+    await router.invalidate();
+  }, [router, queryClient]);
+}
+
+export function useReloadOnSuccess(afterSave: AfterSave): ReloadOnSuccess {
   return useMemo(
     (): ReloadOnSuccess => (call) => async (input) => {
       const result = await call(input);
-      if (result.ok) await router.invalidate();
+      if (result.ok) await afterSave();
       return result;
     },
-    [router],
+    [afterSave],
   );
 }
 
-export function useSettingsActions(): SettingsActions {
+export function useSettingsActions(afterSave: AfterSave): SettingsActions {
   const router = useRouter();
-  const then = useReloadOnSuccess();
+  const queryClient = useQueryClient();
+  const then = useReloadOnSuccess(afterSave);
   return useMemo(
     (): SettingsActions => ({
       saveGeneral: then((data) => saveWorkspaceGeneral({ data })),
@@ -51,12 +70,19 @@ export function useSettingsActions(): SettingsActions {
       saveLabel: then((data) => saveWorkspaceLabel({ data })),
       createLabel: async (data) => {
         const result = await createWorkspaceAutoAssignLabel({ data });
-        if (result.ok) await router.invalidate();
+        if (result.ok)
+          await Promise.all([
+            router.invalidate(),
+            queryClient.invalidateQueries({ queryKey: TRACKER_KEY }),
+          ]);
         return result;
       },
       reloadFromTracker: async () => {
         await rereadTrackers();
-        await router.invalidate({ sync: true });
+        await Promise.all([
+          router.invalidate({ sync: true }),
+          queryClient.invalidateQueries({ queryKey: TRACKER_KEY }),
+        ]);
       },
       saveConnection: then((data) => saveTrackerConnection({ data })),
       checkConnection: (data) => checkTrackerConnectionNow({ data }),
@@ -73,6 +99,6 @@ export function useSettingsActions(): SettingsActions {
         return pending;
       },
     }),
-    [router, then],
+    [router, queryClient, then],
   );
 }

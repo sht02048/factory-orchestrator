@@ -1,5 +1,6 @@
+import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { createTranslator } from "use-intl";
 import { z } from "zod";
 import { ScreenMessages, defaultLocale } from "../../i18n";
@@ -14,9 +15,17 @@ import { NavigationGuard } from "../../settings/navigation-guard";
 import { RunnerForm } from "../../settings/settings-screen";
 import type { SettingsActions } from "../../settings/settings-screen";
 import { useSettingsActions } from "../../settings/use-settings-actions";
+import type { ActionResult } from "../../settings/settings-screen";
 import type { RunnerActions } from "../../runners/runners-screen";
-import { getRunnersPage } from "../../server/functions";
-import { getRunnerChecksPending, requestRunnerCheckNow } from "../../server/settings-functions";
+import {
+  RUNNERS_LIST_KEY,
+  refreshRunnersAndShell,
+  runnerChecksStillPending,
+  runnersQuery,
+} from "../../runners/runners-query";
+import { okOrThrow, rejectionReasonOf, toMutationError } from "../../query/mutation-error";
+import { loadRouteQuery } from "../../query/route-query";
+import { requestRunnerCheckNow } from "../../server/settings-functions";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -24,8 +33,12 @@ const t = createTranslator({
   namespace: "runners",
 });
 
-export function reloadOnEnter({ cause }: { cause: "preload" | "enter" | "stay" }): boolean {
-  return cause === "enter";
+const RECHECK_REJECT_REASONS = ["not-found"] as const;
+
+function recheckResultOf(error: unknown): ActionResult {
+  const reason = rejectionReasonOf(error, RECHECK_REJECT_REASONS);
+  if (reason === null) throw toMutationError(error, RECHECK_REJECT_REASONS);
+  return { ok: false, reason };
 }
 
 export const Route = createFileRoute("/_app/runners")({
@@ -33,35 +46,38 @@ export const Route = createFileRoute("/_app/runners")({
     sel: z.string().optional(),
     direct: z.boolean().optional().catch(undefined),
   }),
-  loader: () => getRunnersPage(),
-  shouldReload: reloadOnEnter,
+  preloadStaleTime: 0,
+  loader: (load) => loadRouteQuery(load, runnersQuery),
   head: () => ({ meta: [{ title: t("documentTitle") }] }),
   component: RunnersRoute,
 });
 
 function RunnersRoute() {
-  const page = Route.useLoaderData();
+  const { data: page } = useSuspenseQuery(runnersQuery);
   const search = Route.useSearch();
   const { sel, ws } = search;
   const navigate = Route.useNavigate();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const requestCheck = useMutation({
+    mutationFn: async (data: { id: string }) =>
+      okOrThrow<unknown, (typeof RECHECK_REJECT_REASONS)[number]>(
+        await requestRunnerCheckNow({ data }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: RUNNERS_LIST_KEY }),
+  });
+  const { mutateAsync: requestCheckAsync } = requestCheck;
   const actions = useMemo(
     (): RunnerActions => ({
-      recheck: async (data) => {
-        const result = await requestRunnerCheckNow({ data });
-        if (result.ok) await router.invalidate();
-        return result;
-      },
-      pollChecks: async () => {
-        const pending = await getRunnerChecksPending();
-        if (!pending) await router.invalidate();
-        return pending;
-      },
+      recheck: (data) =>
+        requestCheckAsync(data).then((): ActionResult => ({ ok: true }), recheckResultOf),
+      pollChecks: () => runnerChecksStillPending(queryClient),
     }),
-    [router],
+    [requestCheckAsync, queryClient],
   );
-  const settingsActions = useSettingsActions();
-  const setupActions = useRunnerSetupActions();
+  const refreshRunners = useCallback(() => refreshRunnersAndShell(queryClient), [queryClient]);
+  const settingsActions = useSettingsActions(refreshRunners);
+  const setupActions = useRunnerSetupActions(refreshRunners);
   const select = (id: string) => {
     void navigate({ search: (prev) => ({ ...prev, sel: id, direct: undefined }), replace: true });
   };

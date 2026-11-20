@@ -11,7 +11,11 @@ import type { DirectEntry } from "../runner-setup/runner-setup";
 import { getOnboardingPage, setUpWorkspace } from "../server/onboarding-functions";
 import { runnerSetupMessages } from "../runner-setup/messages";
 import { useRunnerSetupActions } from "../runner-setup/use-runner-setup-actions";
-import { useReloadOnSuccess, useSettingsActions } from "../settings/use-settings-actions";
+import {
+  useReloadOnSuccess,
+  useRouterReload,
+  useSettingsActions,
+} from "../settings/use-settings-actions";
 
 const t = createTranslator({
   locale: defaultLocale,
@@ -60,9 +64,10 @@ function OnboardingRoute() {
     }),
     [router, navigate, search],
   );
-  const settingsActions = useSettingsActions();
-  const then = useReloadOnSuccess();
-  const setupActions = useRunnerSetupActions();
+  const reload = useRouterReload();
+  const settingsActions = useSettingsActions(reload);
+  const then = useReloadOnSuccess(reload);
+  const setupActions = useRunnerSetupActions(reload);
   const actions = useMemo(
     (): OnboardingActions => ({
       ...settingsActions,
