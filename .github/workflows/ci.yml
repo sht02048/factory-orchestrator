@@ -87,7 +87,6 @@ jobs:
   browser:
     needs: scope
     if: needs.scope.outputs.code == 'true'
-    name: browser (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

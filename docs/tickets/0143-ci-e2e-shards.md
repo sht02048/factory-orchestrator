@@ -1,5 +1,5 @@
 ---
-status: doing
+status: done
 blocked_by: []
 ---
 
@@ -11,19 +11,36 @@ CI `check` 가 한 잡에서 9~13분 걸리고 그 대부분이 e2e 다([researc
 
 ## 할 일
 
-- [ ] `.github/workflows/ci.yml` 을 잡 여럿으로 나눈다.
+- [x] `.github/workflows/ci.yml` 을 잡 여럿으로 나눈다.
   - `scope`: Markdown 만 바꿨는지 가린다(지금 규칙 그대로).
   - `static`: typecheck → lint → 색 검사 → 길이 값 검사 → format check → 단위 시험(`e2e`·`demo` 밖 project) → build → smoke:web → smoke:cli → bundle → smoke:bundle. 순서와 내용은 지금 그대로다.
   - `browser`: `e2e`·`demo` project 를 matrix shard 로 나눠 `vitest --shard` 로 돌린다. 실패 스크린숏은 shard 마다 다른 이름으로 올린다.
   - `check`: 모든 잡을 기다려(`if: always()`) 결과를 본다. 어느 잡이든 실패·취소이거나, 돌아야 했는데 건너뛰었으면 실패한다. Markdown 만 바꾼 변경이면 나머지 잡을 건너뛰고 성공한다. develop·main ruleset 의 필수 상태 검사 이름 `check` 를 그대로 둔다.
-- [ ] `workflow_call` 로 부르는 Release 가 그대로 동작하는지 확인한다.
-- [ ] shard 를 일부러 실패시켜 `check` 가 실패하는지 한 번 확인하고, 그 커밋은 되돌린다.
-- [ ] README·AGENTS.md 의 CI 단계 설명을 바뀐 구조에 맞춘다.
-- [ ] 잡별·shard 별 CI 시간을 재어 shard 수와 shard 당 워커 수를 정하고 근거를 아래에 적는다.
+- [x] `workflow_call` 로 부르는 Release 가 그대로 동작하는지 확인한다.
+- [x] shard 를 일부러 실패시켜 `check` 가 실패하는지 한 번 확인한다. 이 브랜치를 베이스로 한 검증용 PR 두 개에서 확인하고 닫아, 이 PR 에는 그 커밋이 없다.
+- [x] README·AGENTS.md 의 CI 단계 설명을 바뀐 구조에 맞춘다.
+- [x] 잡별·shard 별 CI 시간을 재어 shard 수와 shard 당 워커 수를 정하고 근거를 아래에 적는다.
 
 ## shard 수와 워커 수
 
-리서치 권장(shard 4개, shard 당 `--maxWorkers=2`)으로 시작한다.
+리서치 권장(shard 4개, shard 당 `--maxWorkers=2`)을 그대로 쓴다.
+
+검증용 PR 의 CI(2026-11-20, run 44731529017, 이 PR 의 워크플로에 실패하는 시험 파일 하나만 더함)에서 잰 값:
+
+| 잡              |  잡 시간 | vitest `Duration` | 파일 수 |
+| --------------- | -------: | ----------------: | ------: |
+| `scope`         |      5초 |                 — |       — |
+| `static`        | 2분 26초 |                 — |       — |
+| `browser (1/4)` | 3분 19초 |             166초 |       9 |
+| `browser (2/4)` | 2분 24초 |             127초 |       8 |
+| `browser (3/4)` | 2분 49초 |             152초 |       8 |
+| `browser (4/4)` | 3분 30초 |             185초 |       8 |
+| `check`         |      4초 |                 — |       — |
+| 실행 전체       | 3분 43초 |                 — |       — |
+
+- 실행 전체 3분 43초로 리서치 예상(3~4분) 안이다. 나누기 전에는 9~13분이었다.
+- 가장 긴 shard(185초)가 가장 짧은 shard(127초)의 1.46배로, 리서치가 sequencer 를 쓰자고 한 기준(1.5배)보다 작다.
+- 가장 긴 shard 가 `static`(2분 26초)보다 1분 남짓 길다. shard 를 늘리면 잡마다 준비 시간(체크아웃·pnpm·node·install 약 15초, pnpm 캐시를 그대로 씀)이 더 들고 hash 로 나누는 몫이 고르지 않아 얻는 것이 작다. 워커를 3으로 올리면 리서치가 흔들림의 원인으로 본 부하가 다시 커진다.
 
 ## 범위 밖
 
@@ -33,7 +50,7 @@ CI `check` 가 한 잡에서 9~13분 걸리고 그 대부분이 e2e 다([researc
 - 3단계: hash shard 가 기울면(가장 긴 shard 가 가장 짧은 shard 의 1.5배 넘음) 시간으로 나누는 sequencer 를 쓴다.
 - 4단계: 흔들림 티켓이 나오는 파일부터 고정 기다림·`networkidle` 을 가짜 시계·화면 신호로 바꾼다(리서치 선택지 D).
 
-시험 코드와 앱 코드는 바꾸지 않는다.
+시험 코드와 앱 코드는 바꾸지 않는다. shard 별 시간은 한 실행에서만 쟀다. 리서치 「확인할 것」의 10회 이상 측정과 흔들림 횟수 비교는 머지 뒤 후속에서 한다.
 
 ## 완료 조건
 
