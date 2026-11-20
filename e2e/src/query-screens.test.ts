@@ -66,6 +66,7 @@ const VISIBLE_WITHIN_MS = 3_000;
 const SETTLE_MS = 700;
 const DISCONNECTED_POLL_MS = 30_000;
 const QUERY_GC_MS = 5 * 60_000;
+const DB_STALE_MS = 30_000;
 const ROOT_AND_SHELL = ["getTimeZone", "getTitleBarHidden", "getShell"];
 
 const runnerId = toRunnerId("runner-a");
@@ -403,10 +404,10 @@ describe("셸·Runners·Tickets 의 Query(브라우저, 0127)", () => {
     );
   });
 
-  it("트래커를 읽지 못한 결과는 5분을 기다리지 않고 Tickets 에 다시 들어가면 다시 읽는다", async (context) => {
+  it("트래커를 읽지 못한 결과는 5분이 아니라 30초 뒤 Tickets 에 다시 들어가면 다시 읽는다(가짜 시계)", async (context) => {
     const ticket = addTicket("Recovered after failure");
     tracker.failing = true;
-    const { page } = await newPage(context, { stream: false });
+    const { page } = await newPage(context, { stream: false, clock: true });
     try {
       await open(page, "/tickets", "tickets");
       await page
@@ -417,6 +418,7 @@ describe("셸·Runners·Tickets 의 Query(브라우저, 0127)", () => {
       await railLink(page, shell.nav.runners).click();
       await waitForScreen(page, "runners");
       await page.mouse.move(0, 0);
+      await page.clock.runFor(DB_STALE_MS + 1_000);
 
       await railLink(page, shell.nav.tickets).click();
       await waitForScreen(page, "tickets");
