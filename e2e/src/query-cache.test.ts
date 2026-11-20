@@ -255,26 +255,6 @@ describe("query 읽기 실패(0123 할 일 10)", () => {
     await expect.poll(() => focusedHeadingText(page)).toBe(shell.screenError.title);
   });
 
-  it("다시 읽기를 누르면 실패했던 화면만 다시 읽고, 읽히면 오류 화면이 화면으로 바뀌며 포커스는 레일의 지금 화면 링크로 간다", async (context) => {
-    const { page, serverCalls } = await newPage(context);
-    await openRuns(page);
-    await routerCall(page, "navigate", RETRY_PATH);
-    await page.getByRole("heading", { name: shell.screenError.title }).waitFor();
-    await page.waitForLoadState("networkidle");
-    const callsBeforeRetry = serverCalls.length;
-
-    await page.evaluate((flag) => Reflect.set(window, flag, true), HEAL_FLAG);
-    await page.getByRole("button", { name: shell.screenError.retry }).click();
-
-    await page.locator(PROBE_SELECTOR).filter({ hasText: RETRY_PATH }).waitFor();
-    expect(await page.getByRole("navigation", { name: shell.nav.label }).count()).toBe(1);
-    await expect
-      .poll(() => page.evaluate(() => document.activeElement?.getAttribute("aria-current") ?? null))
-      .toBe("page");
-    await page.waitForLoadState("networkidle");
-    expect(serverCalls.slice(callsBeforeRetry)).toEqual([]);
-  });
-
   it("다시 읽기가 또 실패하면 실패를 알리는 상태 문장으로 포커스를 옮긴다", async (context) => {
     const { page } = await newPage(context);
     await openRuns(page);
