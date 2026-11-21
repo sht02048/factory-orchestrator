@@ -115,6 +115,13 @@ export function chooseMoveStyle(input: MoveStyleInput): MoveStyle {
   return "slide";
 }
 
+export function keepsViewTransition(
+  changeCount: number,
+  changedStyles: readonly MoveStyle[],
+): boolean {
+  return changeCount <= MOTION_BURST_LIMIT && changedStyles.every((style) => style === "slide");
+}
+
 export function reconcileMotionRows<T>(
   previous: readonly MotionRow<T>[],
   items: readonly T[],

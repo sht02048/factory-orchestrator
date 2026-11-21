@@ -3,6 +3,7 @@ import {
   MOTION_BURST_LIMIT,
   chooseMoveStyle,
   diffMotionOrders,
+  keepsViewTransition,
   reconcileMotionRows,
   type MotionBox,
   type MotionRow,
@@ -64,6 +65,20 @@ describe("한꺼번에 많이 바뀜 판단(M3)", () => {
     const stacked = { ...slideInput, to: box(0, 400) };
     expect(chooseMoveStyle(stacked)).toBe("fade");
     expect(chooseMoveStyle({ ...stacked, crossesList: false })).toBe("slide");
+  });
+});
+
+describe("View Transition 유지 판단(M3)", () => {
+  it("옮긴 행 없이 4건이 들어와도 전환을 건너뛴다", () => {
+    expect(keepsViewTransition(MOTION_BURST_LIMIT + 1, [])).toBe(false);
+  });
+
+  it("3건 이하이고 바뀐 행이 모두 미끄러지면 유지한다", () => {
+    expect(keepsViewTransition(MOTION_BURST_LIMIT, ["slide"])).toBe(true);
+  });
+
+  it("바뀐 행 하나라도 흐려지면 건너뛴다", () => {
+    expect(keepsViewTransition(1, ["fade"])).toBe(false);
   });
 });
 

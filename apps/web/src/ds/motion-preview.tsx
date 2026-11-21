@@ -68,6 +68,9 @@ function BoardDemo() {
   const [exited, setExited] = useState(0);
   const nextId = useRef(FIRST_NEW_ITEM);
   const lastRemoved = useRef<number | null>(null);
+  const [filterKey, setFilterKey] = useState(0);
+  const [boardShown, setBoardShown] = useState(true);
+  const [highlight, setHighlight] = useState(true);
 
   const renderCard = (id: number) => (
     <div data-motion-card={id} {...stylex.props(styles.card)}>
@@ -85,7 +88,9 @@ function BoardDemo() {
         <MotionList
           items={ids}
           getKey={cardKey}
+          highlight={highlight}
           highlightRadius="card"
+          resetKey={String(filterKey)}
           onExited={() => setExited((count) => count + 1)}
         >
           {renderCard}
@@ -134,11 +139,16 @@ function BoardDemo() {
           {t("reorder")}
         </Button>
         <Button onClick={() => setBoard(moveBurst)}>{t("burst")}</Button>
+        <Button onClick={() => setFilterKey((current) => current + 1)}>{t("resetList")}</Button>
+        <Button onClick={() => setBoardShown((current) => !current)}>{t("toggleBoard")}</Button>
+        <Button onClick={() => setHighlight((current) => !current)}>{t("toggleHighlight")}</Button>
       </div>
-      <div {...stylex.props(styles.board)}>
-        {column(t("queued"), board.queued)}
-        {column(t("running"), board.running)}
-      </div>
+      {boardShown ? (
+        <div {...stylex.props(styles.board)}>
+          {column(t("queued"), board.queued)}
+          {column(t("running"), board.running)}
+        </div>
+      ) : null}
       <Text variant="meta" role="status">
         {t("exited", { count: exited })}
       </Text>

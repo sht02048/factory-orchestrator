@@ -22,6 +22,7 @@ declare global {
   var motionCalls: string[];
   var viewTransitionCalls: number;
   var motionSlow: boolean;
+  var motionAnimations: Animation[];
 }
 
 let dir: string;
@@ -89,12 +90,14 @@ async function openDs(
       const names = keyframes === null ? [] : Object.keys(keyframes);
       seen.push(names.join(","));
       const animation = original.call(this, keyframes, options);
+      globalThis.motionAnimations.push(animation);
       if (globalThis.motionSlow) animation.playbackRate = 0.01;
       return animation;
     };
     globalThis.motionCalls = seen;
     globalThis.viewTransitionCalls = 0;
     globalThis.motionSlow = false;
+    globalThis.motionAnimations = [];
   });
   await page.addInitScript((mode) => {
     if (mode === "absent") {
@@ -380,5 +383,48 @@ describe("공용 움직임(브라우저, 0152)", () => {
       expect(closing).toEqual({ duration, moved: moves });
       await page.context().close();
     }
+  });
+
+  for (const [name, action] of [
+    ["필터를 바꾸면", text.resetList],
+    ["목록이 사라지면", text.toggleBoard],
+  ] as const) {
+    it(`빠지는 중 ${name} 빠짐 알림이 오지 않는다`, async (context) => {
+      const page = await openDs(context.task.name, "no-preference");
+      await slowMotion(page);
+      await page.locator("#motionPrimitives").evaluate(
+        async (section, names) => {
+          const button = (name: string) =>
+            [...section.querySelectorAll("button")].find((node) => node.textContent === name);
+          button(names.remove)?.click();
+          await new Promise(requestAnimationFrame);
+          button(names.action)?.click();
+          await new Promise(requestAnimationFrame);
+        },
+        { remove: text.remove, action },
+      );
+      await page.evaluate(async () => {
+        const running = globalThis.motionAnimations.filter(
+          (animation) => animation.playState === "running",
+        );
+        running.forEach((animation) => animation.finish());
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      expect(await exitedStatus(page)).toBe(exitedText(0));
+      await page.context().close();
+    });
+  }
+
+  it("도착 비추기를 끈 목록은 칸을 옮겨도 비추지 않는다", async (context) => {
+    const page = await openDs(context.task.name, "no-preference", "absent");
+    await press(page, text.toggleHighlight);
+    await slowMotion(page);
+    await press(page, text.move);
+    await expect.poll(() => cards(page, text.running)).toEqual(["1", "5", "6"]);
+    const flashes = await page
+      .locator("[data-motion-flash]")
+      .evaluateAll((nodes) => nodes.flatMap((node) => node.getAnimations()).length);
+    expect(flashes).toBe(0);
+    await page.context().close();
   });
 });
