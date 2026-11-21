@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "0163c814-4c6f-466b-805a-6e06908c9703",
+  "id": "6e95d660-b15a-4edc-a936-56e2453ab225",
   "prevIds": ["ae5cd444-cfea-4a40-88d3-5b8f743f075b"],
   "ddl": [
     {
@@ -1654,8 +1654,18 @@
     },
     {
       "table": "runs",
-      "name": "final_branch",
+      "name": "agent_check",
       "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "agent_stop_requested_at",
+      "type": "integer",
       "notNull": false,
       "autoincrement": false,
       "default": null,

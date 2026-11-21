@@ -117,7 +117,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
             displayId: pr.displayId,
             url: pr.url,
             ci: toCiView(pr.ci),
-            signals: prSignalsViewOf(run, records),
+            signals: continuedBy === null ? prSignalsViewOf(run, records) : null,
           },
     report: records.reportBody,
     brief:
@@ -180,6 +180,8 @@ function continueOfferOf(
         : "recreated",
     hasReport: (records.reportBody?.trim() ?? "") !== "",
     hasWorkspaceBrief: brief !== null && (brief.before.trim() !== "" || brief.after.trim() !== ""),
+    agent: records.agentCheck ?? "checking",
+    agentStopRequested: records.agentStopRequestedAt !== null,
   };
 }
 

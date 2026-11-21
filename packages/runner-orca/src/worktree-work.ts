@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { RemoteResult } from "./ssh.js";
 
 const SSH_EXIT = 255;
-const BRANCH_REF_PREFIX = "refs/heads/";
+const ORIGIN = "origin";
 
 export function uncommittedChangesArgv(path: string): string[] {
   return ["git", "-C", path, "status", "--porcelain", "--untracked-files=all"];
@@ -29,26 +29,10 @@ export function hasUnpushedCommits(result: RemoteResult): boolean {
   return parseGitOutput(result, countSchema, "git rev-list") > 0;
 }
 
-interface RemoteBranch {
-  repoPath: string;
-  remote: string;
-  branch: string;
-}
-
 interface WorktreeTarget {
   repoPath: string;
   path: string;
   branch: string;
-}
-
-export function currentBranchArgv(path: string): string[] {
-  return ["git", "-C", path, "symbolic-ref", "--quiet", "HEAD"];
-}
-
-export function parseCurrentBranch(result: RemoteResult): string | null {
-  if (!result.timedOut && (result.exitCode === 1 || result.exitCode === 128)) return null;
-  const ref = parseGitOutput(result, z.string().trim().min(1), "git symbolic-ref");
-  return ref.startsWith(BRANCH_REF_PREFIX) ? ref.slice(BRANCH_REF_PREFIX.length) : null;
 }
 
 export function worktreeListArgv(repoPath: string): string[] {
@@ -63,18 +47,18 @@ export function localBranchArgv(repoPath: string, branch: string): string[] {
   return ["git", "-C", repoPath, "show-ref", "--verify", "--quiet", `refs/heads/${branch}`];
 }
 
-export function remoteBranchArgv({ repoPath, remote, branch }: RemoteBranch): string[] {
-  return ["git", "-C", repoPath, "ls-remote", "--exit-code", remote, `refs/heads/${branch}`];
+export function originBranchArgv(repoPath: string, branch: string): string[] {
+  return ["git", "-C", repoPath, "ls-remote", "--exit-code", ORIGIN, `refs/heads/${branch}`];
 }
 
-export function fetchBranchArgv({ repoPath, remote, branch }: RemoteBranch): string[] {
+export function fetchOriginBranchArgv(repoPath: string, branch: string): string[] {
   return [
     "git",
     "-C",
     repoPath,
     "fetch",
-    remote,
-    `+refs/heads/${branch}:refs/remotes/${remote}/${branch}`,
+    ORIGIN,
+    `+refs/heads/${branch}:refs/remotes/${ORIGIN}/${branch}`,
   ];
 }
 
@@ -82,30 +66,18 @@ export function addWorktreeArgv({ repoPath, path, branch }: WorktreeTarget): str
   return ["git", "-C", repoPath, "worktree", "add", path, branch];
 }
 
-export function addWorktreeFromRemoteArgv({
-  repoPath,
-  path,
-  branch,
-  remote,
-}: WorktreeTarget & RemoteBranch): string[] {
+export function addOriginWorktreeArgv({ repoPath, path, branch }: WorktreeTarget): string[] {
   return [
     "git",
     "-C",
     repoPath,
     "worktree",
     "add",
-    "--no-track",
+    "--track",
     "-b",
     branch,
     path,
-    `refs/remotes/${remote}/${branch}`,
-  ];
-}
-
-export function branchUpstreamArgvs({ repoPath, remote, branch }: RemoteBranch): string[][] {
-  return [
-    ["git", "-C", repoPath, "config", `branch.${branch}.remote`, remote],
-    ["git", "-C", repoPath, "config", `branch.${branch}.merge`, `refs/heads/${branch}`],
+    `refs/remotes/${ORIGIN}/${branch}`,
   ];
 }
 

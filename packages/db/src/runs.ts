@@ -11,6 +11,7 @@ import {
 import type {
   AgentId,
   AgentRef,
+  AgentCheck,
   AgentResult,
   CiState,
   CommentId,
@@ -78,7 +79,8 @@ export interface RunRecords {
   agentBrief: string | null;
   continueMessage: string | null;
   continuePlace: ContinuationPlace | null;
-  finalBranch: string | null;
+  agentCheck: AgentCheck | null;
+  agentStopRequestedAt: Date | null;
   pullRequest: {
     id: PullRequestId;
     displayId: string;
@@ -195,7 +197,8 @@ function toRunRecords(row: RunRow): RunRecords {
     agentBrief: row.agentBrief,
     continueMessage: row.continueMessage,
     continuePlace: row.continuePlace,
-    finalBranch: row.finalBranch,
+    agentCheck: row.agentCheck,
+    agentStopRequestedAt: row.agentStopRequestedAt,
     pullRequest:
       row.prId === null || row.prCheckedAt === null
         ? null
@@ -462,7 +465,8 @@ export type ContinueRunBlock =
   | "superseded"
   | "worktree-removing"
   | "worktree-settled"
-  | "active-run";
+  | "active-run"
+  | "previous-agent";
 
 export type ContinueRunResult =
   | { ok: true; run: StoredRun }
@@ -497,6 +501,9 @@ export function continueRun(
   return inTransaction(db, (): ContinueRunResult => {
     const block = continueRunBlock(db, input.from);
     if (block !== null) return { ok: false, reason: block };
+    if (getRunRow(db, input.from)?.agentCheck !== "gone") {
+      return { ok: false, reason: "previous-agent" };
+    }
     const source = getRun(db, input.from);
     if (source?.state !== "ended" || source.startedAt === null) {
       return { ok: false, reason: "not-found" };
@@ -587,6 +594,46 @@ export function listTakenOverRunIds(db: Database): Set<RunId> {
     )
     .all();
   return new Set(rows.flatMap((row) => (row.id === null ? [] : [row.id])));
+}
+
+export function recordAgentCheck(
+  db: Database,
+  runId: RunId,
+  check: AgentCheck,
+  options: { stopHandled: boolean },
+): void {
+  inTransaction(db, () => {
+    const before = getRunRow(db, runId);
+    if (before === undefined) return;
+    const stopRequestedAt = options.stopHandled ? null : before.agentStopRequestedAt;
+    if (before.agentCheck === check && before.agentStopRequestedAt === stopRequestedAt) return;
+    db.update(runs)
+      .set({ agentCheck: check, agentStopRequestedAt: stopRequestedAt })
+      .where(eq(runs.id, runId))
+      .run();
+    recordRunChange(db, runId);
+  });
+}
+
+export type RequestAgentStopResult =
+  | { ok: true }
+  | { ok: false; reason: "not-found" | "not-ended" | "not-alive" };
+
+export function requestPreviousAgentStop(
+  db: Database,
+  runId: RunId,
+  now: Date,
+): RequestAgentStopResult {
+  return inTransaction(db, (): RequestAgentStopResult => {
+    const row = getRunRow(db, runId);
+    if (row === undefined) return { ok: false, reason: "not-found" };
+    if (row.state !== "ended" || row.startedAt === null) return { ok: false, reason: "not-ended" };
+    if (row.agentCheck !== "alive") return { ok: false, reason: "not-alive" };
+    if (row.agentStopRequestedAt !== null) return { ok: true };
+    db.update(runs).set({ agentStopRequestedAt: now }).where(eq(runs.id, runId)).run();
+    recordRunChange(db, runId, { now });
+    return { ok: true };
+  });
 }
 
 export function reclaimSourceWorktree(db: Database, sourceRunId: RunId): void {
@@ -922,6 +969,8 @@ export function updateRunRecords(
       | "agentBrief"
       | "continueMessage"
       | "continuePlace"
+      | "agentCheck"
+      | "agentStopRequestedAt"
       | "prReadError"
       | "worktreeRemoveRequestedAt"
     >
@@ -952,7 +1001,6 @@ export function updateRunRecords(
     if (patch.worktreeRemovedAt !== null) set.worktreeRemoveRequestedAt = null;
   }
   if (patch.worktreeKept !== undefined) set.worktreeKept = patch.worktreeKept;
-  if (patch.finalBranch !== undefined) set.finalBranch = patch.finalBranch;
   if (patch.trackerStateSetAt !== undefined) set.trackerStateSetAt = patch.trackerStateSetAt;
   if (patch.trackerComment !== undefined) {
     set.trackerCommentId = patch.trackerComment?.id ?? null;

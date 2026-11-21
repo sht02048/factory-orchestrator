@@ -14,6 +14,7 @@ import {
   listRunPlacements,
   listRunnerSnapshots,
   listRunsWithRecords,
+  listTakenOverRunIds,
   listRunners,
   listWorkspaces,
   toWorkspaceId,
@@ -46,6 +47,7 @@ export function loadRunsPage(
 
   const runners = new Map(listRunners(db).map((r) => [r.id, r]));
   const cancelling = new Set<RunId>(listPendingCancelRequests(db).map((r) => r.runId));
+  const takenOver = listTakenOverRunIds(db);
   const queueReasons = explainQueue({
     queued: listRunsWithRecords(db, { states: ["queued"] }).flatMap(
       ({ run, records }): QueuedRun[] =>
@@ -151,7 +153,7 @@ export function loadRunsPage(
           : {
               displayId: pr.displayId,
               url: pr.url,
-              signals: prSignalsViewOf(run, records),
+              signals: takenOver.has(run.id) ? null : prSignalsViewOf(run, records),
             },
       attention: false,
     };

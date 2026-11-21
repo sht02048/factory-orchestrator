@@ -40,6 +40,7 @@ import {
   markCancelRequestProcessed,
   openDatabase,
   reclaimSourceWorktree,
+  recordAgentCheck,
   recordContinuePlace,
   recordStartFailure,
   recordStartRequested,
@@ -59,6 +60,7 @@ import {
 } from "./context.js";
 import type { QueuedStoredRun, TickContext, WorkerLogger } from "./context.js";
 import { processAfterRuns } from "./after-run.js";
+import { messages } from "./messages.js";
 import { assignAutomatically, createAutoAssignState } from "./auto-assign.js";
 import { processAgentMessages } from "./agent-messages.js";
 import { processRunControlRequests } from "./control.js";
@@ -145,7 +147,7 @@ export function createWorker(options: WorkerOptions): Worker {
     pendingEndings: new Map(),
     prPolledAt: new Map(),
     prReadRetries: new Map(),
-    finalBranchRead: new Set(),
+    agentCheckedAt: new Map(),
     unrecordedComments: new Map(),
     ticketsGone: new Set(),
     autoAssign: createAutoAssignState(),
@@ -454,6 +456,21 @@ async function startOnRunner(
     const place =
       source === null ? null : await continuationPlace(context, run, runner, source, records);
     if (place === "write-failed") return { kind: "blocked" };
+    if (place === "previous-agent-alive") {
+      const sourceRunId = run.continuedFromRunId;
+      tryWrite(context, run.id, () =>
+        inTransaction(db, () => {
+          if (sourceRunId !== null) {
+            recordAgentCheck(db, sourceRunId, "alive", { stopHandled: false });
+          }
+          recordStartFailure(db, run.id, {
+            failures: records.startFailures,
+            error: messages.continuation.previousAgentAlive,
+          });
+        }),
+      );
+      return endCouldNotStart(context, run);
+    }
     const prompt =
       place === null || place === "from-scratch" ? await promptFor(context, run) : undefined;
     if (prompt === null) return { kind: "blocked" };
@@ -531,7 +548,6 @@ interface ContinuationSource {
   branch: string;
   report: string | null;
   agentRef: AgentRef;
-  agentMayBeAlive: boolean;
 }
 
 function continuationSource(
@@ -543,26 +559,22 @@ function continuationSource(
   if (found?.run.state !== "ended" || found.run.startedAt === null) return "missing";
   return {
     worktree: found.run.worktree,
-    branch: found.records.finalBranch ?? found.run.branch,
+    branch: found.run.branch,
     report: found.records.reportBody,
     agentRef: found.run.agentRef,
-    agentMayBeAlive:
-      found.run.agentResult === "runner-disconnected" ||
-      found.run.agentResult === "worktree-missing" ||
-      found.run.runnerUnreached,
   };
 }
 
 function continueInOf(
   context: TickContext,
   run: QueuedStoredRun,
-): { continueIn: WorktreeRef; continueBranch: string } | Record<string, never> {
+): { continueIn: WorktreeRef; previousAgent: AgentRef } | Record<string, never> {
   const source = continuationSource(context, run);
   if (source === null || source === "missing") return {};
   const place = getRunWithRecords(context.db, run.id)?.records.continuePlace ?? null;
   return place === null || place === "from-scratch"
     ? {}
-    : { continueIn: source.worktree, continueBranch: source.branch };
+    : { continueIn: source.worktree, previousAgent: source.agentRef };
 }
 
 async function continuationPlace(
@@ -571,14 +583,14 @@ async function continuationPlace(
   runner: Runner,
   source: ContinuationSource,
   records: RunRecords,
-): Promise<ContinuationPlace | "write-failed"> {
+): Promise<ContinuationPlace | "write-failed" | "previous-agent-alive"> {
+  const { worktree, agentRef } = source;
+  if (await runner.isAgentAlive({ worktree, agentRef })) return "previous-agent-alive";
   if (records.continuePlace === "from-scratch") return "from-scratch";
   const prepared = await runner.prepareContinuation({
     project: run.runnerProject,
     worktree: source.worktree,
     branch: source.branch,
-    ...(source.agentMayBeAlive ? { stopAgent: source.agentRef } : {}),
-    beforeRecreate: () => recordContinuePlace(context.db, run.id, "recreated"),
   });
   const place = prepared === "same-worktree" ? (records.continuePlace ?? prepared) : prepared;
   const written = tryWrite(context, run.id, () =>

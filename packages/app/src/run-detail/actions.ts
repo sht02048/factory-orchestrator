@@ -3,6 +3,7 @@ import type { RunId } from "@ganger/core";
 import {
   continueRun,
   requestAgentMessage,
+  requestPreviousAgentStop,
   requestRunCancel,
   requestWorktreeRemoval,
 } from "@ganger/db";
@@ -33,6 +34,10 @@ export function continueRunRequest(
 ): ContinueRunActionResult {
   const result = continueRun(db, { from: runId, message, now });
   return result.ok ? { ok: true, runId: result.run.id } : result;
+}
+
+export function stopPreviousAgentRequest(db: Database, runId: RunId, now: Date): RunActionResult {
+  return requestPreviousAgentStop(db, runId, now);
 }
 
 export const agentMessageInput = z.object({

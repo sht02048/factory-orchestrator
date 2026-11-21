@@ -60,18 +60,15 @@ import {
 import type { PushCheckOutcome } from "./push-check.js";
 import {
   hasUncommittedChanges,
-  addWorktreeFromRemoteArgv,
+  addOriginWorktreeArgv,
   addWorktreeArgv,
-  branchUpstreamArgvs,
-  currentBranchArgv,
-  fetchBranchArgv,
+  fetchOriginBranchArgv,
+  originBranchArgv,
   gitSucceeded,
   hasUnpushedCommits,
   localBranchArgv,
-  parseCurrentBranch,
   parseWorktreeList,
   refFound,
-  remoteBranchArgv,
   worktreeListArgv,
   worktreePruneArgv,
   uncommittedChangesArgv,
@@ -508,27 +505,12 @@ export class OrcaRunner implements Runner {
           message: `worktree ${path} is not on a branch`,
         });
       }
-      if (input.stopAgent !== undefined) {
-        await this.stopPreviousAgent(input.stopAgent, input.worktree);
-      }
       return "same-worktree";
-    }
-    const elsewhere = entries.find((entry) => entry.branch === input.branch && !entry.prunable);
-    if (elsewhere !== undefined) {
-      throw new AdapterError<RunnerErrorDetail>({
-        kind: "runner-error",
-        code: "branch_in_use",
-        message: `branch ${input.branch} is checked out at ${elsewhere.path}`,
-      });
-    }
-    if (input.stopAgent !== undefined) {
-      await this.stopPreviousAgent(input.stopAgent, input.worktree);
     }
     gitSucceeded(await this.run(worktreePruneArgv(repoPath)), "git worktree prune");
     const timeout = { timeoutMs: this.config.startTimeoutMs };
     const local = await this.run(localBranchArgv(repoPath, input.branch));
     if (refFound(local, "git show-ref", 1)) {
-      input.beforeRecreate?.();
       const added = await this.run(
         addWorktreeArgv({ repoPath, path, branch: input.branch }),
         timeout,
@@ -536,62 +518,23 @@ export class OrcaRunner implements Runner {
       gitSucceeded(added, "git worktree add");
       return "recreated";
     }
-    const remote = await this.remoteHolding({
-      repoPath,
-      projectRemote: project.remoteName,
-      branch: input.branch,
-    });
-    if (remote === null) return "from-scratch";
-    input.beforeRecreate?.();
+    const onOrigin = withinRemoteTimeout(
+      await this.run(originBranchArgv(repoPath, input.branch), timeout),
+    );
+    if (!refFound(onOrigin, "git ls-remote", 2)) return "from-scratch";
     gitSucceeded(
-      withinRemoteTimeout(
-        await this.run(fetchBranchArgv({ repoPath, remote, branch: input.branch }), timeout),
-      ),
+      withinRemoteTimeout(await this.run(fetchOriginBranchArgv(repoPath, input.branch), timeout)),
       "git fetch",
     );
-    for (const argv of branchUpstreamArgvs({ repoPath, remote, branch: input.branch })) {
-      gitSucceeded(await this.run(argv), "git config");
-    }
     gitSucceeded(
-      await this.run(
-        addWorktreeFromRemoteArgv({ repoPath, path, branch: input.branch, remote }),
-        timeout,
-      ),
+      await this.run(addOriginWorktreeArgv({ repoPath, path, branch: input.branch }), timeout),
       "git worktree add",
     );
     return "recreated";
   }
 
-  private async remoteHolding({
-    repoPath,
-    projectRemote,
-    branch,
-  }: {
-    repoPath: string;
-    projectRemote: string;
-    branch: string;
-  }): Promise<string | null> {
-    const config = await this.run(remoteConfigArgv(repoPath));
-    const pushRemote = refFound(config, "git config", 1)
-      ? choosePushRemote(config.stdout, projectRemote)
-      : projectRemote;
-    for (const remote of new Set([pushRemote, projectRemote])) {
-      const found = withinRemoteTimeout(
-        await this.run(remoteBranchArgv({ repoPath, remote, branch }), {
-          timeoutMs: this.config.startTimeoutMs,
-        }),
-      );
-      if (refFound(found, "git ls-remote", 2)) return remote;
-    }
-    return null;
-  }
-
-  async readWorktreeBranch(worktree: WorktreeRef): Promise<string | null> {
-    return parseCurrentBranch(await this.run(currentBranchArgv(worktreePathOf(worktree))));
-  }
-
-  private async stopPreviousAgent(agentRef: AgentRef, worktree: WorktreeRef): Promise<void> {
-    const agent = decodeAgent(agentRef);
+  async isAgentAlive(run: Pick<RunOnRunner, "worktree" | "agentRef">): Promise<boolean> {
+    const agent = decodeAgent(run.agentRef);
     if (agent === null) {
       throw new AdapterError<RunnerErrorDetail>({
         kind: "runner-error",
@@ -599,77 +542,27 @@ export class OrcaRunner implements Runner {
         message: "the agent reference was not made by the orca runner",
       });
     }
-    const stopped = await this.orcaOutcome(
-      ["orchestration", "worker-stop", "--dispatch", agent.dispatchId],
-      workerStopResultSchema,
-    );
-    if (stopped.ok || stopped.code === "dispatch_not_found") return;
-    if (stopped.code !== "stop_unknown") {
-      const shown = await this.orcaOutcome(
-        ["orchestration", "worker-show", "--dispatch", agent.dispatchId],
-        workerShowResultSchema,
-      );
-      if (
-        shown.ok &&
-        settledState(shown.result) &&
-        (await this.liveAgentTerminal(agent, worktree)) === null
-      ) {
-        return;
-      }
-    }
-    throw this.errorFor(stopped, {});
-  }
-
-  private async findContinuedRun(
-    worktreeName: string,
-    worktree: WorktreeRef,
-    recordedBranch: string | undefined,
-  ): Promise<StartedRun | null> {
-    const worker = await this.findWorker(worktree, null);
-    if (worker === undefined) return null;
-    const shownWorker = await this.orca(
-      ["orchestration", "worker-show", "--dispatch", worker.dispatchId],
+    const shown = await this.orcaOutcome(
+      ["orchestration", "worker-show", "--dispatch", agent.dispatchId],
       workerShowResultSchema,
     );
-    const { tasks } = await this.orca(
-      ["orchestration", "task-list", "--run", shownWorker.runId, "--brief"],
-      taskListResultSchema,
-    );
-    const task = tasks.find((candidate) => candidate.id === worker.taskId);
-    if (task?.title !== worktreeName || task.status === "failed") return null;
-    const agentRef = encodeAgent({
-      dispatchId: worker.dispatchId,
-      taskId: worker.taskId,
-      runId: shownWorker.runId,
-    });
-    const shown = await this.orcaOutcome(
-      ["worktree", "show", "--worktree", `id:${worktree}`],
-      worktreeShowResultSchema,
-    );
-    if (shown.ok) {
-      return {
-        worktree: toWorktreeRef(shown.result.worktree.id),
-        branch: branchName(shown.result.worktree.branch, shown.result.worktree.id),
-        agentRef,
-      };
-    }
-    if (shown.code !== "selector_not_found" || recordedBranch === undefined) {
+    if (!shown.ok) {
+      if (shown.code === "dispatch_not_found") return false;
       throw this.errorFor(shown, {});
     }
-    return { worktree, branch: recordedBranch, agentRef };
+    return (await this.liveAgentTerminal(agent, run.worktree)) !== null;
   }
 
   async findStartedRun(input: {
     mailbox: MailboxRef;
     worktreeName: string;
     continueIn?: WorktreeRef;
-    continueBranch?: string;
+    previousAgent?: AgentRef;
   }): Promise<StartedRun | null> {
-    if (input.continueIn !== undefined) {
-      return this.findContinuedRun(input.worktreeName, input.continueIn, input.continueBranch);
-    }
+    const selector =
+      input.continueIn === undefined ? `name:${input.worktreeName}` : `id:${input.continueIn}`;
     const shown = await this.orcaOutcome(
-      ["worktree", "show", "--worktree", `name:${input.worktreeName}`],
+      ["worktree", "show", "--worktree", selector],
       worktreeShowResultSchema,
     );
     if (!shown.ok) {
@@ -681,6 +574,10 @@ export class OrcaRunner implements Runner {
     const worker =
       (mailbox === null ? undefined : await this.findWorker(worktree.id, mailbox.runId)) ??
       (await this.findWorker(worktree.id, null));
+    if (input.continueIn !== undefined) {
+      const previous = previousDispatchOf(input.previousAgent);
+      if (worker === undefined || worker.dispatchId === previous) return null;
+    }
     if (worker === undefined) {
       throw new AdapterError<RunnerErrorDetail>({
         kind: "runner-error",
@@ -1364,17 +1261,6 @@ export const orcaRunnerFactory: RunnerFactory = {
     return new OrcaRunner(parseOrcaRunnerConfig(config));
   },
 };
-
-const ENDED_WORKER_STATES: ReadonlySet<string> = new Set([
-  "succeeded",
-  "failed",
-  "stopped",
-  "abandoned",
-]);
-
-function settledState(worker: { state: string; liveness?: string | null | undefined }): boolean {
-  return worker.liveness === "exited" || ENDED_WORKER_STATES.has(worker.state);
-}
 
 function withinRemoteTimeout(result: RemoteResult): RemoteResult {
   if (!result.timedOut) return result;

@@ -18,6 +18,7 @@ import {
   continueRunRequest,
   removeWorktreeRequest,
   sendAgentMessageRequest,
+  stopPreviousAgentRequest,
 } from "@ganger/app/run-detail/actions";
 import { requestControl } from "@ganger/app/run-control";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
@@ -125,6 +126,10 @@ export const continueRunFrom = createServerFn({ method: "POST" })
   .handler(({ data }) =>
     continueRunRequest(getDatabase(), toRunId(data.runId), data.message, new Date()),
   );
+
+export const stopPreviousAgent = createServerFn({ method: "POST" })
+  .validator(z.object({ runId: z.string() }))
+  .handler(({ data }) => stopPreviousAgentRequest(getDatabase(), toRunId(data.runId), new Date()));
 
 export const sendAgentMessage = createServerFn({ method: "POST" })
   .validator(agentMessageInput)

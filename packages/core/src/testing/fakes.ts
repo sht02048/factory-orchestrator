@@ -224,7 +224,7 @@ export class FakeRunner implements Runner {
   readonly startCalls: StartRunInput[] = [];
   readonly prepareCalls: PrepareContinuationInput[] = [];
   readonly goneBranches = new Set<string>();
-  readonly currentBranches = new Map<WorktreeRef, string>();
+  readonly liveAgents = new Set<AgentRef>();
   readonly recreatedWorktrees = new Map<WorktreeRef, string>();
   failNextPrepare: RunnerErrorDetail | null = null;
   online = true;
@@ -442,7 +442,7 @@ export class FakeRunner implements Runner {
     mailbox: MailboxRef;
     worktreeName: string;
     continueIn?: WorktreeRef;
-    continueBranch?: string;
+    previousAgent?: AgentRef;
   }): Promise<StartedRun | null> {
     return this.reach(() => this.runs.get(input.worktreeName)?.started ?? null);
   }
@@ -455,32 +455,15 @@ export class FakeRunner implements Runner {
         this.failNextPrepare = null;
         throw new AdapterError(failure);
       }
-      if (this.liveWorktree(input.worktree)) {
-        if (input.stopAgent !== undefined) this.stopByRef(input.stopAgent);
-        return "same-worktree";
-      }
+      if (this.liveWorktree(input.worktree)) return "same-worktree";
       if (this.goneBranches.has(input.branch)) return "from-scratch";
-      input.beforeRecreate?.();
       this.recreatedWorktrees.set(input.worktree, input.branch);
       return "recreated";
     });
   }
 
-  readWorktreeBranch(worktree: WorktreeRef): Promise<string | null> {
-    return this.reach(() => {
-      const moved = this.currentBranches.get(worktree);
-      if (moved !== undefined) return moved;
-      const found = [...this.runs.values()].find((run) => run.started.worktree === worktree);
-      return found?.started.branch ?? null;
-    });
-  }
-
-  private stopByRef(agentRef: AgentRef): void {
-    for (const run of this.runs.values()) {
-      if (run.started.agentRef !== agentRef) continue;
-      run.agentStopped = true;
-      run.endedWithoutReport ??= "stopped by the orchestrator";
-    }
+  isAgentAlive(run: Pick<RunOnRunner, "worktree" | "agentRef">): Promise<boolean> {
+    return this.reach(() => this.liveAgents.has(run.agentRef));
   }
 
   private liveWorktree(worktree: WorktreeRef): boolean {
@@ -490,8 +473,6 @@ export class FakeRunner implements Runner {
 
   private branchOf(input: StartRunInput): string {
     if (input.continueIn === undefined) return `fake/${input.worktreeName}`;
-    const moved = this.currentBranches.get(input.continueIn);
-    if (moved !== undefined) return moved;
     const recreated = this.recreatedWorktrees.get(input.continueIn);
     if (recreated !== undefined) return recreated;
     const source = [...this.runs.values()].find((run) => run.started.worktree === input.continueIn);
@@ -621,6 +602,7 @@ export class FakeRunner implements Runner {
 
   stopAgent(run: RunOnRunner): Promise<void> {
     return this.reach(() => {
+      if (this.liveAgents.delete(run.agentRef)) return;
       const found = this.runAt(run.worktree);
       found.agentStopped = true;
       found.endedWithoutReport ??= "stopped by the orchestrator";

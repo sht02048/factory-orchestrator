@@ -1557,175 +1557,85 @@ describe("prepareContinuation", () => {
     branch,
   };
   const list = (...blocks: string[]) => stdout(`${blocks.join("\n\n")}\n`);
-  const main = `worktree <path>/sandbox\nHEAD aaa\nbranch refs/heads/main`;
+  const main = "worktree <path>/sandbox\nHEAD aaa\nbranch refs/heads/main";
   const here = (name: string) => `worktree ${path}\nHEAD bbb\nbranch refs/heads/${name}`;
 
   function git(exec: ScriptedExec, verb: string, ...replies: RemoteResult[]): ScriptedExec {
     return exec.on(`git -C ${repoPath} ${verb}`, ...replies);
   }
 
-  function projectExec(config = "remote.origin.url https://example.com/acme/sandbox.git\n") {
-    return git(withProjects(new ScriptedExec()), "config", stdout(config));
+  function missingWorktree(): ScriptedExec {
+    const exec = withProjects(new ScriptedExec());
+    git(exec, "worktree list", list(main));
+    git(exec, "worktree prune", stdout(""));
+    return exec;
   }
 
-  test("워크트리가 그 브랜치에 있으면 같은 워크트리다", async () => {
-    const exec = git(projectExec(), "worktree list", list(main, here(branch)));
+  test("워크트리가 있으면 같은 워크트리다", async () => {
+    const exec = git(withProjects(new ScriptedExec()), "worktree list", list(main, here(branch)));
     expect(await runnerWith(exec).prepareContinuation(input)).toBe("same-worktree");
     expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
   });
 
   test("에이전트가 브랜치를 바꿨어도 워크트리가 있으면 그 자리에서 이어 간다", async () => {
-    const exec = git(projectExec(), "worktree list", list(main, here("other")));
+    const exec = git(withProjects(new ScriptedExec()), "worktree list", list(main, here("other")));
     expect(await runnerWith(exec).prepareContinuation(input)).toBe("same-worktree");
   });
 
   test("워크트리가 브랜치에 있지 않으면 그 자리에서 일하지 않는다", async () => {
     const detached = `worktree ${path}\nHEAD bbb\ndetached`;
-    const exec = git(projectExec(), "worktree list", list(main, detached));
+    const exec = git(withProjects(new ScriptedExec()), "worktree list", list(main, detached));
     expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
       kind: "runner-error",
       code: "worktree_detached",
     });
   });
 
-  test("같은 이름의 태그가 있어도 전체 ref에서 브랜치 이름을 읽는다", async () => {
-    const exec = new ScriptedExec().on(
-      `git -C ${path} symbolic-ref --quiet HEAD`,
-      stdout("refs/heads/work-1\n"),
-    );
-    expect(await runnerWith(exec).readWorktreeBranch(input.worktree)).toBe("work-1");
-  });
-
-  test("끝난 때의 브랜치를 읽고, 워크트리가 없거나 브랜치가 아니면 null이다", async () => {
-    const at = `git -C ${path} symbolic-ref`;
-    expect(
-      await runnerWith(
-        new ScriptedExec().on(at, stdout("refs/heads/heads/feat/x\n")),
-      ).readWorktreeBranch(input.worktree),
-    ).toBe("heads/feat/x");
-    for (const code of [1, 128]) {
-      expect(
-        await runnerWith(new ScriptedExec().on(at, stdout("", code))).readWorktreeBranch(
-          input.worktree,
-        ),
-      ).toBeNull();
-    }
-  });
-
-  test("워크트리가 없고 로컬 브랜치가 있으면 같은 경로에 다시 만든다", async () => {
-    const exec = projectExec();
-    git(exec, "worktree list", list(main));
-    git(exec, "worktree prune", stdout(""));
+  test("로컬 브랜치가 있으면 같은 경로에 다시 만든다", async () => {
+    const exec = missingWorktree();
     git(exec, "show-ref", stdout(""));
     git(exec, "worktree add", stdout(""));
     expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
     expect(exec.commands()).toContain(`git -C ${repoPath} worktree add ${path} ${branch}`);
   });
 
-  test("다시 만든다는 기록을 남기지 못하면 워크트리를 만들지 않는다", async () => {
-    const exec = projectExec();
-    git(exec, "worktree list", list(main));
-    git(exec, "worktree prune", stdout(""));
-    git(exec, "show-ref", stdout(""));
-    const failing = {
-      ...input,
-      beforeRecreate: () => {
-        throw new Error("db write failed");
-      },
-    };
-    await expect(runnerWith(exec).prepareContinuation(failing)).rejects.toThrow("db write failed");
-    expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
-  });
-
-  test("지워진 워크트리를 다시 만들기 전에 살아 있을 수 있는 이전 에이전트를 멈춘다", async () => {
-    const stopAgent = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
-    const exec = projectExec();
-    git(exec, "worktree list", list(main));
-    exec.orca(
-      "orchestration worker-stop",
-      stdout(JSON.stringify({ ok: false, error: { code: "stop_unknown", message: "x" } }), 1),
-    );
-    expect(
-      await adapterError(runnerWith(exec).prepareContinuation({ ...input, stopAgent })),
-    ).toMatchObject({ kind: "runner-error", code: "stop_unknown" });
-    expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
-  });
-
-  test("로컬에 없고 원격에만 있으면 받아서 추적 브랜치로 만든다", async () => {
-    const exec = projectExec();
-    git(exec, "worktree list", list(main));
-    git(exec, "worktree prune", stdout(""));
+  test("로컬에 없고 origin에 있으면 받아서 추적 브랜치로 만든다", async () => {
+    const exec = missingWorktree();
     git(exec, "show-ref", stdout("", 1));
-    git(exec, "ls-remote", stdout(`ccc\trefs/heads/${branch}\n`));
-    git(exec, "fetch", stdout(""));
-    git(exec, "worktree add", stdout(""));
-    expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
-    expect(exec.commands()).toContain(
-      `git -C ${repoPath} worktree add --no-track -b ${branch} ${path} refs/remotes/origin/${branch}`,
-    );
-  });
-
-  test("push remote에만 있는 브랜치를 그 remote에서 받아 다시 만든다", async () => {
-    const exec = projectExec(
-      "remote.pushdefault fork\nremote.origin.url https://example.com/a.git\nremote.fork.url https://example.com/b.git\n",
-    );
-    git(exec, "worktree list", list(main));
-    git(exec, "worktree prune", stdout(""));
-    git(exec, "show-ref", stdout("", 1));
-    git(exec, "ls-remote --exit-code fork", stdout(`ccc\trefs/heads/${branch}\n`));
-    git(exec, "fetch", stdout(""));
-    git(exec, "worktree add", stdout(""));
-    expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
-    expect(exec.commands()).toContain(
-      `git -C ${repoPath} worktree add --no-track -b ${branch} ${path} refs/remotes/fork/${branch}`,
-    );
-  });
-
-  test("push remote에 없어도 프로젝트 remote에 있으면 처음부터 시작하지 않는다", async () => {
-    const exec = projectExec(
-      "remote.pushdefault fork\nremote.origin.url https://example.com/a.git\nremote.fork.url https://example.com/b.git\n",
-    );
-    git(exec, "worktree list", list(main));
-    git(exec, "worktree prune", stdout(""));
-    git(exec, "show-ref", stdout("", 1));
-    git(exec, "ls-remote --exit-code fork", stdout("", 2));
     git(exec, "ls-remote --exit-code origin", stdout(`ccc\trefs/heads/${branch}\n`));
-    git(exec, "fetch", stdout(""));
+    git(exec, "fetch origin", stdout(""));
     git(exec, "worktree add", stdout(""));
     expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
+    expect(exec.commands()).toContain(
+      `git -C ${repoPath} worktree add --track -b ${branch} ${path} refs/remotes/origin/${branch}`,
+    );
   });
 
-  test("remote 설정을 읽지 못하면 처음부터 시작하지 않고 실패로 돌려준다", async () => {
-    const exec = withProjects(new ScriptedExec());
-    git(exec, "config", stdout("", 128));
-    git(exec, "worktree list", list(main));
-    git(exec, "worktree prune", stdout(""));
+  test("로컬과 origin 모두 없으면 처음부터 시작한다", async () => {
+    const exec = missingWorktree();
     git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote --exit-code origin", stdout("", 2));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("from-scratch");
+    expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
+  });
+
+  test("origin을 읽지 못하면 처음부터 시작하지 않고 실패로 돌려준다", async () => {
+    const exec = missingWorktree();
+    git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote", stdout("", 128));
     expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
       kind: "runner-error",
       code: "git_failed",
     });
   });
 
-  test("브랜치가 어디에도 없으면 처음부터 시작한다", async () => {
-    const exec = projectExec();
-    git(exec, "worktree list", list(main));
-    git(exec, "worktree prune", stdout(""));
+  test("origin 읽기가 시간 초과되면 러너 Offline이 아니라 시작 실패로 돌려준다", async () => {
+    const exec = missingWorktree();
     git(exec, "show-ref", stdout("", 1));
-    git(exec, "ls-remote", stdout("", 2));
-    expect(await runnerWith(exec).prepareContinuation(input)).toBe("from-scratch");
-    expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
-  });
-
-  test("원격을 읽지 못하면 처음부터 시작하지 않고 실패로 돌려준다", async () => {
-    const exec = projectExec();
-    git(exec, "worktree list", list(main));
-    git(exec, "worktree prune", stdout(""));
-    git(exec, "show-ref", stdout("", 1));
-    git(exec, "ls-remote", stdout("", 128));
+    git(exec, "ls-remote", { exitCode: 124, stdout: "", stderr: "", timedOut: true });
     expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
       kind: "runner-error",
-      code: "git_failed",
+      code: "remote_read_timeout",
     });
   });
 
@@ -1745,245 +1655,126 @@ describe("prepareContinuation", () => {
     });
     const command = exec.calls.find((c) => c.command.includes("worker-start"))?.command ?? "";
     expect(command).toContain(`--worktree 'id:${WORKTREE}' --keep-open`);
-    expect(command).toContain("--task-title ganger-ENG-1-2");
     for (const flag of ["--repo", "--name", "--base-branch", "--comment"]) {
       expect(command).not.toContain(flag);
     }
   });
 
-  function recoveryExec(
-    newest: { dispatchId: string; taskId: string },
-    task: { id: string; status: string; title: string },
-  ): ScriptedExec {
-    return new ScriptedExec()
-      .orca(
-        "orchestration worker-list",
-        stdout(
-          JSON.stringify({
-            ok: true,
-            result: { workers: [{ ...newest, workspace: WORKTREE }] },
-          }),
-        ),
-      )
-      .orca(
-        "orchestration worker-show",
-        stdout(
-          JSON.stringify({
-            ok: true,
-            result: { ...newest, runId: "run_other", state: "ready" },
-          }),
-        ),
-      )
-      .orca(
-        "orchestration task-list --run run_other",
-        stdout(JSON.stringify({ ok: true, result: { tasks: [task] } })),
-      )
-      .orca("worktree show", stdout(own("worktree-show.json")));
-  }
-  const lookup = {
-    mailbox: MAILBOX,
-    worktreeName: "ganger-ENG-1-2",
-    continueIn: WORKTREE,
-    continueBranch: "acme/ganger-ENG-1-1",
-  };
-
-  test("우편함의 Run이 바뀌어도 워크트리의 최신 에이전트 제목으로 이어 시작을 찾는다", async () => {
-    const exec = recoveryExec(
-      { dispatchId: "ctx_new", taskId: "task_new" },
-      { id: "task_new", status: "dispatched", title: "ganger-ENG-1-2" },
+  describe("시작 결과를 모를 때(일반 런과 같은 복구)", () => {
+    const previous = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
+    const lookup = {
+      mailbox: MAILBOX,
+      worktreeName: "ganger-ENG-1-2",
+      continueIn: WORKTREE,
+      previousAgent: previous,
+    };
+    const workers = (...rows: Array<{ dispatchId: string; taskId: string }>) =>
+      stdout(
+        JSON.stringify({
+          ok: true,
+          result: { workers: rows.map((row) => ({ ...row, workspace: WORKTREE })) },
+        }),
+      );
+    const shownWorktree = stdout(
+      JSON.stringify({
+        ok: true,
+        result: { worktree: { id: WORKTREE, branch: "refs/heads/acme/ganger-ENG-1-1" } },
+      }),
     );
-    const found = await runnerWith(exec).findStartedRun(lookup);
-    expect(found === null ? null : decodeAgent(found.agentRef)).toEqual({
-      dispatchId: "ctx_new",
-      taskId: "task_new",
-      runId: "run_other",
-    });
-  });
 
-  test("시작한 에이전트의 워크트리가 지워졌어도 시작한 런으로 돌려줘 두 번 띄우지 않는다", async () => {
-    const newest = { dispatchId: "ctx_new", taskId: "task_new" };
-    const exec = new ScriptedExec()
-      .orca(
-        "orchestration worker-list",
-        stdout(
-          JSON.stringify({ ok: true, result: { workers: [{ ...newest, workspace: WORKTREE }] } }),
-        ),
-      )
-      .orca(
-        "orchestration worker-show",
-        stdout(
-          JSON.stringify({ ok: true, result: { ...newest, runId: "run_other", state: "ready" } }),
-        ),
-      )
-      .orca(
-        "orchestration task-list --run run_other",
-        stdout(
-          JSON.stringify({
-            ok: true,
-            result: { tasks: [{ id: "task_new", status: "dispatched", title: "ganger-ENG-1-2" }] },
-          }),
-        ),
-      )
-      .orca(
+    test("워크트리의 최신 에이전트가 이전 런 것이 아니면 시작한 런이다", async () => {
+      const exec = new ScriptedExec()
+        .orca("worktree show", shownWorktree)
+        .orca(
+          "orchestration worker-list",
+          workers(
+            { dispatchId: "ctx_new", taskId: "task_new" },
+            { dispatchId: "ctx_old", taskId: "task_old" },
+          ),
+        )
+        .orca(
+          "orchestration worker-show",
+          stdout(
+            JSON.stringify({
+              ok: true,
+              result: { dispatchId: "ctx_new", taskId: "task_new", runId: "run_1", state: "ready" },
+            }),
+          ),
+        );
+      const found = await runnerWith(exec).findStartedRun(lookup);
+      expect(found === null ? null : decodeAgent(found.agentRef)?.dispatchId).toBe("ctx_new");
+    });
+
+    test("워크트리의 최신 에이전트가 이전 런 것이면 시작되지 않은 것으로 본다", async () => {
+      const exec = new ScriptedExec()
+        .orca("worktree show", shownWorktree)
+        .orca("orchestration worker-list", workers({ dispatchId: "ctx_old", taskId: "task_old" }));
+      expect(await runnerWith(exec).findStartedRun(lookup)).toBeNull();
+    });
+
+    test("워크트리가 없으면 시작되지 않은 것으로 본다", async () => {
+      const exec = new ScriptedExec().orca(
         "worktree show",
         stdout(
           JSON.stringify({ ok: false, error: { code: "selector_not_found", message: "gone" } }),
           1,
         ),
       );
-    const found = await runnerWith(exec).findStartedRun(lookup);
-    expect(found?.worktree).toBe(WORKTREE);
-    expect(found?.branch).toBe("acme/ganger-ENG-1-1");
-    expect(found === null ? null : decodeAgent(found.agentRef)?.dispatchId).toBe("ctx_new");
-    expect(exec.commands().some((c) => c.includes("worker-stop"))).toBe(false);
+      expect(await runnerWith(exec).findStartedRun(lookup)).toBeNull();
+    });
   });
 
-  test("워크트리의 최신 에이전트가 이전 런의 것이면 시작되지 않은 것으로 본다", async () => {
-    const exec = recoveryExec(
-      { dispatchId: "ctx_old", taskId: "task_old" },
-      { id: "task_old", status: "completed", title: "ganger-ENG-1-1" },
-    );
-    expect(await runnerWith(exec).findStartedRun(lookup)).toBeNull();
-  });
-
-  test("이전 에이전트가 멈췄는지 알 수 없으면 같은 워크트리에서 시작하지 않는다", async () => {
-    const exec = git(projectExec(), "worktree list", list(main, here(branch))).orca(
-      "orchestration worker-stop",
+  describe("이전 에이전트가 살아 있는지", () => {
+    const run = {
+      worktree: WORKTREE,
+      agentRef: encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" }),
+    };
+    const shown = (liveness: string) =>
       stdout(
-        JSON.stringify({ ok: false, error: { code: "stop_unknown", message: "not proven" } }),
-        1,
-      ),
-    );
-    const stopAgent = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
-    expect(
-      await adapterError(runnerWith(exec).prepareContinuation({ ...input, stopAgent })),
-    ).toMatchObject({ kind: "runner-error", code: "stop_unknown" });
-  });
+        JSON.stringify({
+          ok: true,
+          result: {
+            dispatchId: "ctx_old",
+            taskId: "task_old",
+            runId: "run_1",
+            state: "ready",
+            liveness,
+            terminal: "term_old",
+          },
+        }),
+      );
 
-  test("이미 끝난 에이전트라 멈출 수 없으면 이어 가고, 아직 떠 있으면 시작하지 않는다", async () => {
-    const stopAgent = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
-    const execWith = (state: string) =>
-      git(projectExec(), "worktree list", list(main, here(branch)))
-        .orca(
-          "orchestration worker-stop",
-          stdout(
-            JSON.stringify({ ok: false, error: { code: "invalid_state", message: "settled" } }),
-            1,
-          ),
-        )
-        .orca(
-          "orchestration worker-show",
-          stdout(
-            JSON.stringify({
-              ok: true,
-              result: { dispatchId: "ctx_old", taskId: "task_old", runId: "run_1", state },
-            }),
-          ),
-        );
-    expect(await runnerWith(execWith("failed")).prepareContinuation({ ...input, stopAgent })).toBe(
-      "same-worktree",
-    );
-    expect(
-      await adapterError(
-        runnerWith(execWith("ready")).prepareContinuation({ ...input, stopAgent }),
-      ),
-    ).toMatchObject({ kind: "runner-error", code: "invalid_state" });
-  });
+    test("터미널이 살아 있으면 true다", async () => {
+      const exec = new ScriptedExec().orca("orchestration worker-show", shown("live"));
+      expect(await runnerWith(exec).isAgentAlive(run)).toBe(true);
+    });
 
-  test.each(["stopping", "stop_unknown", "starting", "start_unknown", "new_state"])(
-    "이전 에이전트가 %s 이고 종료가 증명되지 않으면 시작하지 않는다",
-    async (state) => {
-      const stopAgent = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
-      const exec = git(projectExec(), "worktree list", list(main, here(branch)))
-        .orca(
-          "orchestration worker-stop",
-          stdout(
-            JSON.stringify({ ok: false, error: { code: "invalid_state", message: "busy" } }),
-            1,
-          ),
-        )
-        .orca(
-          "orchestration worker-show",
-          stdout(
-            JSON.stringify({
-              ok: true,
-              result: {
-                dispatchId: "ctx_old",
-                taskId: "task_old",
-                runId: "run_1",
-                state,
-                liveness: "unverifiable",
-              },
-            }),
-          ),
-        );
-      expect(
-        await adapterError(runnerWith(exec).prepareContinuation({ ...input, stopAgent })),
-      ).toMatchObject({ kind: "runner-error", code: "invalid_state" });
-    },
-  );
+    test("끝났으면 false다", async () => {
+      const exec = new ScriptedExec().orca("orchestration worker-show", shown("exited"));
+      expect(await runnerWith(exec).isAgentAlive(run)).toBe(false);
+    });
 
-  test("failed 여도 이전 에이전트의 터미널이 살아 있으면 시작하지 않는다", async () => {
-    const stopAgent = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
-    const exec = git(projectExec(), "worktree list", list(main, here(branch)))
-      .orca(
-        "orchestration worker-stop",
-        stdout(JSON.stringify({ ok: false, error: { code: "invalid_state", message: "x" } }), 1),
-      )
-      .orca(
+    test("Orca에 기록이 없으면 false다", async () => {
+      const exec = new ScriptedExec().orca(
         "orchestration worker-show",
         stdout(
-          JSON.stringify({
-            ok: true,
-            result: {
-              dispatchId: "ctx_old",
-              taskId: "task_old",
-              runId: "run_1",
-              state: "failed",
-              liveness: "unverifiable",
-              terminal: "term_shared",
-            },
-          }),
-        ),
-      )
-      .orca("worktree ps", stdout(JSON.stringify({ ok: true, result: { worktrees: [] } })))
-      .orca(
-        "terminal show",
-        stdout(
-          JSON.stringify({
-            ok: true,
-            result: { terminal: { handle: "term_shared", connected: true } },
-          }),
+          JSON.stringify({ ok: false, error: { code: "dispatch_not_found", message: "gone" } }),
+          1,
         ),
       );
-    expect(
-      await adapterError(runnerWith(exec).prepareContinuation({ ...input, stopAgent })),
-    ).toMatchObject({ kind: "runner-error", code: "invalid_state" });
-  });
+      expect(await runnerWith(exec).isAgentAlive(run)).toBe(false);
+    });
 
-  test("이전 에이전트의 기록이 없으면 멈춘 것으로 보고 이어 간다", async () => {
-    const exec = git(projectExec(), "worktree list", list(main, here(branch))).orca(
-      "orchestration worker-stop",
-      stdout(
-        JSON.stringify({ ok: false, error: { code: "dispatch_not_found", message: "gone" } }),
-        1,
-      ),
-    );
-    const stopAgent = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
-    expect(await runnerWith(exec).prepareContinuation({ ...input, stopAgent })).toBe(
-      "same-worktree",
-    );
-  });
-
-  test("원격 읽기가 시간 초과되면 러너 Offline이 아니라 시작 실패로 돌려준다", async () => {
-    const exec = projectExec();
-    git(exec, "worktree list", list(main));
-    git(exec, "worktree prune", stdout(""));
-    git(exec, "show-ref", stdout("", 1));
-    git(exec, "ls-remote", { exitCode: 124, stdout: "", stderr: "", timedOut: true });
-    expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
-      kind: "runner-error",
-      code: "remote_read_timeout",
+    test("러너에 닿지 못하면 살아 있다고도 없다고도 하지 않고 실패한다", async () => {
+      const exec = new ScriptedExec().orca("orchestration worker-show", {
+        exitCode: 255,
+        stdout: "",
+        stderr: "ssh failed",
+        timedOut: false,
+      });
+      expect(await adapterError(runnerWith(exec).isAgentAlive(run))).toMatchObject({
+        kind: "unreachable",
+      });
     });
   });
 

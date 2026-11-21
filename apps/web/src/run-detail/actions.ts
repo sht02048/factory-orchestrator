@@ -23,6 +23,7 @@ import {
   controlRun,
   denyPermission,
   removeRunWorktree,
+  stopPreviousAgent,
   requestRunLog,
   sendAgentMessage,
 } from "../server/functions";
@@ -44,6 +45,7 @@ export interface RunDetailCalls {
   cancel(runId: string): Promise<RunActionResult>;
   removeWorktree(runId: string): Promise<RunActionResult>;
   continueRun(runId: RunId, message: string): Promise<ContinueRunActionResult>;
+  stopPreviousAgent(runId: RunId): Promise<RunActionResult>;
   control(runId: string, control: RunControl): Promise<RunControlActionResult>;
   sendAgentMessage(runId: RunId, input: AgentMessageRequest): Promise<RunActionResult>;
   requestLog(runId: string): Promise<boolean>;
@@ -56,6 +58,7 @@ export const serverRunDetailCalls: RunDetailCalls = {
   cancel: (runId) => cancelRun({ data: { runId } }),
   removeWorktree: (runId) => removeRunWorktree({ data: { runId } }),
   continueRun: (runId, message) => continueRunFrom({ data: { runId, message } }),
+  stopPreviousAgent: (runId) => stopPreviousAgent({ data: { runId } }),
   control: (runId, control) => controlRun({ data: { runId, control } }),
   sendAgentMessage: (runId, input) => sendAgentMessage({ data: { runId, ...input } }),
   requestLog: (runId) => requestRunLog({ data: { runId } }),
@@ -132,6 +135,11 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
         okOrThrow<{ runId: RunId }, string>(await calls.continueRun(toRunId(runId), message)),
       onSuccess: refreshRun,
     }),
+    stopPreviousAgent: mutationOptions({
+      mutationFn: async () =>
+        okOrThrow<object, string>(await calls.stopPreviousAgent(toRunId(runId))),
+      onSuccess: refreshRun,
+    }),
     control: mutationOptions({
       mutationFn: async (control: RunControl): Promise<RunControlOutcome> =>
         (await calls.control(runId, control)).ok ? "requested" : "state-changed",
@@ -165,6 +173,7 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
   const cancel = useMutation(mutations.cancel);
   const removeWorktree = useMutation(mutations.removeWorktree);
   const continueRun = useMutation(mutations.continueRun);
+  const stopAgent = useMutation(mutations.stopPreviousAgent);
   const control = useMutation(mutations.control);
   const agentMessage = useMutation(mutations.sendAgentMessage);
   const refreshLog = useMutation(mutations.refreshLog);
@@ -187,6 +196,9 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
     },
     onContinue: async (message) => {
       await continueRun.mutateAsync(message);
+    },
+    onStopPreviousAgent: async () => {
+      await stopAgent.mutateAsync();
     },
     onControl: (next) => control.mutateAsync(next),
     onSendAgentMessage: (input) => agentMessage.mutateAsync(input),

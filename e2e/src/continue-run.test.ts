@@ -23,6 +23,7 @@ import {
   listRuns,
   migrate,
   openDatabase,
+  recordAgentCheck,
   recordRunnerCheck,
   saveAutoAssignLabel,
   saveCodeHostConnection,
@@ -146,6 +147,24 @@ describe("이어서 맡기기(브라우저, 0149)", () => {
     expect(listRuns(db).length).toBe(before);
   });
 
+  it("이전 에이전트가 떠 있으면 맡길 수 없고, 멈추기를 누르면 포커스가 상태 문장으로 간다", async () => {
+    const source = keptRun();
+    recordAgentCheck(db, source, "alive", { stopHandled: true });
+    await open(source);
+    await page.getByText(run.continue.blocked.alive).waitFor();
+    const trigger = page.getByRole("button", { name: run.continue.trigger });
+    expect(await trigger.getAttribute("aria-disabled")).toBe("true");
+    await trigger.click({ force: true });
+    expect(await page.getByRole("dialog").count()).toBe(0);
+
+    await page.getByRole("button", { name: run.continue.stop }).press("Enter");
+
+    const status = page.getByRole("status").filter({ hasText: run.continue.stopPending });
+    await status.waitFor();
+    await expect.poll(() => status.evaluate((e) => e === document.activeElement)).toBe(true);
+    expect(getRunWithRecords(db, source)?.records.agentStopRequestedAt).not.toBeNull();
+  });
+
   it("400px 화면에서 대화상자와 Run 상세가 가로로 넘치지 않는다", async () => {
     await page.setViewportSize({ width: NARROW_WIDTH, height: 720 });
     const source = keptRun();
@@ -203,6 +222,7 @@ function keptRun(): RunId {
     }),
   );
   updateRunRecords(db, id, { worktreeKept: "unpushed-commits" });
+  recordAgentCheck(db, id, "gone", { stopHandled: true });
   return id;
 }
 

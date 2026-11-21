@@ -45,7 +45,7 @@ export interface TickContext {
   pendingEndings: Map<RunId, PendingEnding>;
   prPolledAt: Map<RunId, number>;
   prReadRetries: Map<RunId, PrReadRetry>;
-  finalBranchRead: Set<RunId>;
+  agentCheckedAt: Map<RunId, number>;
   unrecordedComments: Map<RunId, { id: CommentId; at: Date }>;
   ticketsGone: Set<RunId>;
   autoAssign: AutoAssignState;

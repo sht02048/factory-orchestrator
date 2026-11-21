@@ -119,6 +119,8 @@ export interface ContinueOffer {
   place: "same-worktree" | "recreated";
   hasReport: boolean;
   hasWorkspaceBrief: boolean;
+  agent: "gone" | "alive" | "unknown" | "checking";
+  agentStopRequested: boolean;
 }
 
 export interface RunDetail {

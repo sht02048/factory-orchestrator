@@ -65,6 +65,7 @@ function okCalls(overrides: Partial<RunDetailCalls> = {}): RunDetailCalls {
     cancel: () => Promise.resolve({ ok: true }),
     removeWorktree: () => Promise.resolve({ ok: true }),
     continueRun: () => Promise.resolve({ ok: true, runId: toRunId("run-next") }),
+    stopPreviousAgent: () => Promise.resolve({ ok: true }),
     control: () => Promise.resolve({ ok: true }),
     sendAgentMessage: () => Promise.resolve({ ok: true }),
     requestLog: () => Promise.resolve(true),

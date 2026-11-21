@@ -62,6 +62,7 @@ export interface RunDetailActions {
   onCancel: () => Promise<void>;
   onRemoveWorktree: () => Promise<void>;
   onContinue: (message: string) => Promise<void>;
+  onStopPreviousAgent: () => Promise<void>;
   onControl: (control: RunControl) => Promise<RunControlOutcome>;
   onSendAgentMessage: (input: AgentMessageRequest) => Promise<AgentMessageOutcome>;
   onRefreshLog: () => Promise<void>;
@@ -121,6 +122,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const pending = [
     run.cancelPending ? t("cancelPending") : null,
     keptWorktree?.removing === true ? t("removeWorktree.pending") : null,
+    run.continueOffer?.agentStopRequested === true ? t("continue.stopPending") : null,
     run.control?.status === "pending"
       ? t(run.control.control === "pause" ? "control.pausePending" : "control.resumePending")
       : null,
@@ -193,7 +195,11 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                     focusAfter={() => focusFirst(cancelStatusRef, headRef)}
                   />
                 ) : null}
-                {run.continueOffer === null ? null : (
+                {run.continueOffer === null ? null : run.continueOffer.agent !== "gone" ? (
+                  <Button variant="primary" aria-disabled aria-describedby={CONTINUE_BLOCKED_ID}>
+                    {t("continue.trigger")}
+                  </Button>
+                ) : (
                   <ContinueRun
                     offer={run.continueOffer}
                     onContinue={async (message) => {
@@ -221,6 +227,14 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
             <Reason run={run} />
           </Text>
           <NextAction run={run} />
+          {run.continueOffer === null || run.continueOffer.agent === "gone" ? null : (
+            <ContinueBlocked
+              agent={run.continueOffer.agent}
+              stopping={run.continueOffer.agentStopRequested}
+              onStop={props.onStopPreviousAgent}
+              focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+            />
+          )}
           <Continuation run={run} runHref={props.runHref} statusRef={continuationRef} />
         </div>
 
@@ -760,6 +774,50 @@ function Continuation({
   );
 }
 
+const CONTINUE_BLOCKED_ID = "continue-blocked-reason";
+
+function ContinueBlocked({
+  agent,
+  stopping,
+  onStop,
+  focusAfter,
+}: {
+  agent: "alive" | "unknown" | "checking";
+  stopping: boolean;
+  onStop: () => Promise<void>;
+  focusAfter: () => void;
+}) {
+  const t = useTranslations("run.continue");
+  const [state, setState] = useState<"idle" | "sending" | "failed">("idle");
+  return (
+    <>
+      <Text variant="body" as="p" id={CONTINUE_BLOCKED_ID}>
+        {t(`blocked.${agent}`)}
+      </Text>
+      {agent === "alive" && !stopping ? (
+        <Actions>
+          <Button
+            busy={{ active: state === "sending", label: t("stopPending") }}
+            onClick={() => {
+              setState("sending");
+              onStop().then(
+                () => {
+                  setState("idle");
+                  focusAfter();
+                },
+                () => setState("failed"),
+              );
+            }}
+          >
+            {t("stop")}
+          </Button>
+        </Actions>
+      ) : null}
+      {state === "failed" ? <ActionFailedText text={t("stopFailed")} /> : null}
+    </>
+  );
+}
+
 function ContinueRun({
   offer,
   onContinue,
@@ -1269,6 +1327,9 @@ function usePrInfo(): (run: RunDetail) => string | null {
     if (run.status.state !== "ended") return null;
     const state = run.status.laterPrState?.state ?? run.status.prState;
     if (state === "none") return null;
+    if (state === "open" && run.continuedBy !== null && run.pullRequest !== null) {
+      return t("prHandedOver", { pr: run.pullRequest.displayId });
+    }
     const stateName = domain(`prState.${state}`);
     return run.pullRequest === null
       ? t("prStateInfo", { state: stateName })

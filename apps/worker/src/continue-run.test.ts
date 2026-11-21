@@ -6,6 +6,8 @@ import {
   getRun,
   getRunWithRecords,
   listTakenOverRunIds,
+  recordAgentCheck,
+  requestPreviousAgentStop,
   requestWorktreeRemoval,
   saveWorkspaceBrief,
   setQueuedRunRunner,
@@ -13,6 +15,8 @@ import {
 } from "@ganger/db";
 import type { StoredRun } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { AGENT_CHECK_INTERVAL_MS } from "./after-run.js";
+import { messages } from "./messages.js";
 import { Harness, projectA, workspaceId } from "./test-fixtures.js";
 
 let h: Harness;
@@ -46,6 +50,7 @@ async function endedRun(runnerId: RunnerId, key = "ENG-1"): Promise<StartedEnded
 
 function continued(from: RunId, message = "Push and open the PR."): StoredRun {
   h.advance(1000);
+  recordAgentCheck(h.db, from, "gone", { stopHandled: true });
   const result = continueRun(h.db, { from, message, now: h.now });
   if (!result.ok) throw new Error(`continue failed: ${result.reason}`);
   return result.run;
@@ -166,24 +171,6 @@ describe("이어서 맡기기", () => {
     expect(getRun(h.db, other.id)?.state).toBe("running");
   });
 
-  it("에이전트가 런 중에 바꾼 브랜치로 지워진 워크트리를 다시 만든다", async () => {
-    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
-    const source = await endedRun(runnerId);
-    const fake = h.runner(source.runnerId);
-    fake.currentBranches.set(source.worktree, "acme/renamed");
-    const worker = h.worker();
-    await worker.tick();
-    expect(getRunWithRecords(h.db, source.id)?.records.finalBranch).toBe("acme/renamed");
-    fake.currentBranches.delete(source.worktree);
-    fake.deleteWorktree(source.worktree);
-
-    const next = continued(source.id);
-    await worker.tick();
-
-    expect(fake.prepareCalls.at(-1)?.branch).toBe("acme/renamed");
-    expect(getRun(h.db, next.id)).toMatchObject({ state: "running", branch: "acme/renamed" });
-  });
-
   it("다시 만든 뒤 시작이 실패해도 다음 시도에서 다시 만든 워크트리로 남는다", async () => {
     const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const source = await endedRun(runnerId);
@@ -299,51 +286,6 @@ describe("이어서 맡기기", () => {
     expect(getRun(h.db, next.id)).toMatchObject({ state: "queued", runnerId });
   });
 
-  it("러너 연결이 끊긴 채 끝난 런은 이전 에이전트를 멈춘 뒤 같은 워크트리에서 시작한다", async () => {
-    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
-    const run = h.assign("ENG-1", projectA);
-    await h.worker().tick();
-    const ended = changeRunState(
-      h.db,
-      run.id,
-      { to: "ended", agentResult: "runner-disconnected", prState: "none" },
-      h.now,
-    );
-    if (!ended.ok || ended.run.state !== "ended" || ended.run.worktree === null) {
-      throw new Error("could not end run");
-    }
-    const worktree = ended.run.worktree;
-    const fake = h.runner(runnerId);
-
-    const next = continued(run.id);
-    await h.worker().tick();
-
-    expect(fake.runs.get(run.worktreeName)?.agentStopped).toBe(true);
-    expect(getRun(h.db, next.id)).toMatchObject({ state: "running", worktree });
-  });
-
-  it("워크트리 없음으로 끝난 런의 에이전트도 멈춘 뒤 이어서 시작한다", async () => {
-    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
-    const run = h.assign("ENG-1", projectA);
-    await h.worker().tick();
-    const ended = changeRunState(
-      h.db,
-      run.id,
-      { to: "ended", agentResult: "worktree-missing", prState: "none" },
-      h.now,
-    );
-    if (!ended.ok || ended.run.state !== "ended" || ended.run.agentRef === null) {
-      throw new Error("could not end run");
-    }
-    const fake = h.runner(runnerId);
-
-    continued(run.id);
-    await h.worker().tick();
-
-    expect(fake.prepareCalls.at(-1)?.stopAgent).toBe(ended.run.agentRef);
-    expect(fake.runs.get(run.worktreeName)?.agentStopped).toBe(true);
-  });
-
   it("이어 받은 뒤에는 이전 런이 워크트리를 지우지 못한다", async () => {
     const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const source = await endedRun(runnerId);
@@ -398,9 +340,85 @@ describe("이어서 맡기기", () => {
     const source = await endedRun(runnerId);
     expect(requestWorktreeRemoval(h.db, source.id, h.now)).toEqual({ ok: true });
 
+    recordAgentCheck(h.db, source.id, "gone", { stopHandled: true });
     expect(continueRun(h.db, { from: source.id, message: "go", now: h.now })).toEqual({
       ok: false,
       reason: "worktree-removing",
+    });
+  });
+
+  describe("이전 에이전트가 살아 있으면(C5-1)", () => {
+    it("확인 전이나 살아 있거나 확인하지 못하면 이어서 맡기지 못한다", async () => {
+      const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+      const source = await endedRun(runnerId);
+      const blocked = { ok: false, reason: "previous-agent" };
+
+      for (const check of ["alive", "unknown"] as const) {
+        recordAgentCheck(h.db, source.id, check, { stopHandled: true });
+        expect(continueRun(h.db, { from: source.id, message: "go", now: h.now })).toEqual(blocked);
+      }
+    });
+
+    it("worker가 살아 있는지 읽어 적고, 끝났으면 맡길 수 있게 한다", async () => {
+      const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+      const source = await endedRun(runnerId);
+      const fake = h.runner(runnerId);
+      fake.liveAgents.add(source.agentRef);
+      const worker = h.worker();
+
+      await worker.tick();
+      expect(records(source).agentCheck).toBe("alive");
+      expect(fake.liveAgents.has(source.agentRef)).toBe(true);
+
+      fake.liveAgents.delete(source.agentRef);
+      h.advance(AGENT_CHECK_INTERVAL_MS);
+      await worker.tick();
+      expect(records(source).agentCheck).toBe("gone");
+    });
+
+    it("러너가 Offline이면 확인하지 못한 것으로 막는다", async () => {
+      const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+      const source = await endedRun(runnerId);
+      h.setRunnerOnline(runnerId, false, [projectA], false);
+
+      await h.worker().tick();
+
+      expect(records(source).agentCheck).toBe("unknown");
+    });
+
+    it("운영자가 멈추기를 누를 때만 이전 에이전트를 멈춘다", async () => {
+      const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+      const source = await endedRun(runnerId);
+      const fake = h.runner(runnerId);
+      fake.liveAgents.add(source.agentRef);
+      const worker = h.worker();
+      await worker.tick();
+      expect(fake.liveAgents.has(source.agentRef)).toBe(true);
+
+      expect(requestPreviousAgentStop(h.db, source.id, h.now)).toEqual({ ok: true });
+      await worker.tick();
+
+      expect(fake.liveAgents.has(source.agentRef)).toBe(false);
+      expect(records(source)).toMatchObject({ agentCheck: "gone", agentStopRequestedAt: null });
+    });
+
+    it("시작 직전에 살아 있으면 시작하지 않고 같은 이유로 끝낸다", async () => {
+      const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+      const source = await endedRun(runnerId);
+      const fake = h.runner(runnerId);
+      const startsBefore = fake.startCalls.length;
+      const next = continued(source.id);
+      fake.liveAgents.add(source.agentRef);
+
+      await h.worker().tick();
+
+      expect(fake.startCalls.length).toBe(startsBefore);
+      expect(getRun(h.db, next.id)).toMatchObject({
+        state: "ended",
+        agentResult: "could-not-start",
+      });
+      expect(records(next).startError).toBe(messages.continuation.previousAgentAlive);
+      expect(records(source).agentCheck).toBe("alive");
     });
   });
 });

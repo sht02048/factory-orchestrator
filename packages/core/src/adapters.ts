@@ -225,12 +225,13 @@ export interface StartRunInput {
 export const CONTINUATION_PLACES = ["same-worktree", "recreated", "from-scratch"] as const;
 export type ContinuationPlace = (typeof CONTINUATION_PLACES)[number];
 
+export const AGENT_CHECKS = ["gone", "alive", "unknown"] as const;
+export type AgentCheck = (typeof AGENT_CHECKS)[number];
+
 export interface PrepareContinuationInput {
   project: RunnerProjectId;
   worktree: WorktreeRef;
   branch: string;
-  stopAgent?: AgentRef;
-  beforeRecreate?: () => void;
 }
 
 export interface StartedRun {
@@ -327,10 +328,10 @@ export interface Runner {
     mailbox: MailboxRef;
     worktreeName: string;
     continueIn?: WorktreeRef;
-    continueBranch?: string;
+    previousAgent?: AgentRef;
   }): Promise<StartedRun | null>;
   prepareContinuation(input: PrepareContinuationInput): Promise<ContinuationPlace>;
-  readWorktreeBranch(worktree: WorktreeRef): Promise<string | null>;
+  isAgentAlive(run: Pick<RunOnRunner, "worktree" | "agentRef">): Promise<boolean>;
 
   pollRun(run: RunOnRunner): Promise<RunProgress>;
   answerQuestion(
