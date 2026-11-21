@@ -11,6 +11,7 @@ import { CHANGE_KINDS, CHANGE_PARTS } from "./change-events-model.js";
 import { MCP_ACTION_OUTCOMES } from "./mcp-actions-model.js";
 import { NOTIFICATION_EVENT_KINDS } from "./notification-events-model.js";
 import type {
+  AgentMessageRequestId,
   AgentId,
   AgentRef,
   CodeHostKind,
@@ -513,7 +514,7 @@ export const runAgentMessages = sqliteTable(
       .notNull()
       .references(() => runs.id, { onDelete: "cascade" })
       .$type<RunId>(),
-    requestId: text("request_id").notNull(),
+    requestId: text("request_id").notNull().$type<AgentMessageRequestId>(),
     body: text("body").notNull(),
     requestedAt: timeMs("requested_at").notNull(),
     sendStartedAt: timeMs("send_started_at"),

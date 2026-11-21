@@ -175,6 +175,10 @@ export const worktreePsResultSchema = z.object({
 
 export const replyResultSchema = z.object({ messageId: text });
 export const sendResultSchema = z.object({ messageId: text });
+export const operatorSendResultSchema = z.union([
+  z.object({ messageId: text }),
+  z.object({ delivery: text, dispatchId: text }),
+]);
 export const denyResultSchema = z.object({ approvalId: optionalText });
 export const workerStopResultSchema = z.object({ state: text });
 export const workerReleaseResultSchema = z.object({ state: text });

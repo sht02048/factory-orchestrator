@@ -1,4 +1,4 @@
-import { AGENT_MESSAGE_MAX_LENGTH, toRunId } from "@ganger/core";
+import { AGENT_MESSAGE_MAX_LENGTH, toAgentMessageRequestId, toRunId } from "@ganger/core";
 import { requestAgentMessage, requestRunCancel, requestWorktreeRemoval } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { z } from "zod";
@@ -28,7 +28,7 @@ export function sendAgentMessageRequest(
   const result = requestAgentMessage(
     db,
     toRunId(input.runId),
-    { requestId: input.requestId, body: input.body },
+    { requestId: toAgentMessageRequestId(input.requestId), body: input.body },
     now,
   );
   return result.ok ? { ok: true } : result;

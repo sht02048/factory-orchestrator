@@ -1,5 +1,5 @@
 import { withLogContext } from "@ganger/log";
-import { agentMessageStep } from "@ganger/core";
+import { AGENT_ALREADY_FINISHED, agentMessageStep } from "@ganger/core";
 import type { AgentMessageFailure, MailboxRef, RunnerErrorDetail } from "@ganger/core";
 import {
   completeAgentMessage,
@@ -66,15 +66,24 @@ async function deliver(context: TickContext, message: PendingAgentMessage): Prom
     finish(context, message, failureOf(runnerErrorDetail(error)));
     return;
   }
+  const onRunner = { mailbox, worktree: run.worktree, agentRef: run.agentRef };
+  try {
+    const progress = await runner.pollRun(onRunner);
+    if (progress.kind !== "active") {
+      finish(context, message, "state-changed");
+      return;
+    }
+  } catch (error) {
+    context.logger.warn("agent_message.send_failed", { runId: run.id, error });
+    finish(context, message, failureOf(runnerErrorDetail(error)));
+    return;
+  }
   const marked = tryWrite(context, run.id, () =>
     markAgentMessageSending(context.db, message.id, context.now()),
   );
   if (marked !== true) return;
   try {
-    await runner.sendToAgent(
-      { mailbox, worktree: run.worktree, agentRef: run.agentRef },
-      { body: message.body },
-    );
+    await runner.sendToAgent(onRunner, { body: message.body });
   } catch (error) {
     context.logger.warn("agent_message.send_failed", { runId: run.id, error });
     const detail = runnerErrorDetail(error);
@@ -91,6 +100,9 @@ async function deliver(context: TickContext, message: PendingAgentMessage): Prom
 function failureAfterSendStarted(detail: RunnerErrorDetail | null): AgentMessageFailure {
   if (detail === null || detail.kind === "unreachable" || detail.kind === "malformed-output") {
     return "outcome-unknown";
+  }
+  if (detail.kind === "runner-error" && detail.code === AGENT_ALREADY_FINISHED) {
+    return "state-changed";
   }
   return failureOf(detail);
 }

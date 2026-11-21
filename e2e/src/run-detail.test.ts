@@ -78,6 +78,7 @@ let draftRun: RunId;
 let rejectedRun: RunId;
 let failedSendRun: RunId;
 let retriedRun: RunId;
+let typingRun: RunId;
 
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
@@ -280,6 +281,36 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
     ]);
   });
 
+  it("보내는 동안 이어 쓴 글은 응답이 와도 지우지 않는다(0147)", async () => {
+    await open(typingRun);
+    const card = page.getByRole("region", { name: run.agentMessage.title });
+    const input = card.getByLabel(run.agentMessage.label);
+    await input.fill("먼저 보낸 말");
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route("**/_serverFn/**", async (route) => {
+      if (route.request().method() === "POST") await held;
+      await route.continue();
+    });
+    await card.getByRole("button", { name: run.agentMessage.send }).press("Enter");
+    await input.fill("이어 쓴 말");
+    release();
+
+    await expect
+      .poll(() => listRunAgentMessages(db, typingRun).map((message) => message.body))
+      .toEqual(["먼저 보낸 말"]);
+    await card.getByRole("button", { name: run.agentMessage.send }).waitFor();
+    await expect
+      .poll(() =>
+        card.getByRole("button", { name: run.agentMessage.send }).getAttribute("aria-busy"),
+      )
+      .toBe("false");
+    await page.unroute("**/_serverFn/**");
+    expect(await input.inputValue()).toBe("이어 쓴 말");
+  });
+
   it("400px 에서도 에이전트에게 보내기가 가로로 넘치지 않는다(0147)", async () => {
     await page.setViewportSize({ width: 400, height: 844 });
     await open(narrowMessageRun);
@@ -394,6 +425,7 @@ function seed(db: Database): void {
   rejectedRun = startRun("ACME-22");
   failedSendRun = startRun("ACME-23");
   retriedRun = startRun("ACME-27");
+  typingRun = startRun("ACME-28");
 
   endedRun = startRun("ACME-15");
   ok(

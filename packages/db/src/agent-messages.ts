@@ -1,5 +1,5 @@
 import { acceptsAgentMessage } from "@ganger/core";
-import type { RunId } from "@ganger/core";
+import type { AgentMessageRequestId, RunId } from "@ganger/core";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { recordRunChange } from "./change-events.js";
 import type { Database } from "./database.js";
@@ -14,7 +14,7 @@ export type RequestAgentMessageResult =
 export function requestAgentMessage(
   db: Database,
   runId: RunId,
-  input: { requestId: string; body: string },
+  input: { requestId: AgentMessageRequestId; body: string },
   now: Date = new Date(),
 ): RequestAgentMessageResult {
   return inTransaction(db, (): RequestAgentMessageResult => {

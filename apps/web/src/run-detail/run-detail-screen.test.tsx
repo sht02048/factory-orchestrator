@@ -1,4 +1,10 @@
-import { toPermissionRequestId, toQuestionId, toRunId, toRunnerId } from "@ganger/core";
+import {
+  toAgentMessageRequestId,
+  toPermissionRequestId,
+  toQuestionId,
+  toRunId,
+  toRunnerId,
+} from "@ganger/core";
 import {
   changeRunState,
   completeAgentMessage,
@@ -90,7 +96,7 @@ describe("Run 상세의 에이전트에게 보내기 (0147)", () => {
     const result = requestAgentMessage(
       db,
       id,
-      { requestId: `request-${body}`, body },
+      { requestId: toAgentMessageRequestId(`request-${body}`), body },
       minutes(910),
     );
     if (!result.ok) throw new Error("not requested");

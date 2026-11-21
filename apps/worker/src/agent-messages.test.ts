@@ -1,4 +1,4 @@
-import { toQuestionId } from "@ganger/core";
+import { toAgentMessageRequestId, toQuestionId } from "@ganger/core";
 import type { RunnerErrorDetail, RunnerId, WorktreeRef } from "@ganger/core";
 import {
   changeRunState,
@@ -65,7 +65,12 @@ describe("에이전트에게 보내기(0147)", () => {
   it("Running 런의 말을 러너로 보내고 완료로 적으며 상태는 그대로다", async () => {
     const { run, runnerId, worker } = await startOne();
     expect(
-      requestAgentMessage(h.db, run.id, { requestId: "request-1", body: "push 해 주세요" }, h.now),
+      requestAgentMessage(
+        h.db,
+        run.id,
+        { requestId: toAgentMessageRequestId("request-1"), body: "push 해 주세요" },
+        h.now,
+      ),
     ).toMatchObject({ ok: true });
     await worker.tick();
     expect(sentTo(run, runnerId)).toEqual(["push 해 주세요"]);
@@ -88,7 +93,7 @@ describe("에이전트에게 보내기(0147)", () => {
     requestAgentMessage(
       h.db,
       run.id,
-      { requestId: "request-2", body: "참고로 main 기준이에요" },
+      { requestId: toAgentMessageRequestId("request-2"), body: "참고로 main 기준이에요" },
       h.now,
     );
     await worker.tick();
@@ -103,7 +108,12 @@ describe("에이전트에게 보내기(0147)", () => {
     await worker.tick();
     expect(stateOf(run)).toBe("paused");
 
-    requestAgentMessage(h.db, run.id, { requestId: "request-3", body: "재개하면 PR 까지" }, h.now);
+    requestAgentMessage(
+      h.db,
+      run.id,
+      { requestId: toAgentMessageRequestId("request-3"), body: "재개하면 PR 까지" },
+      h.now,
+    );
     await worker.tick();
     await worker.tick();
     expect(sentTo(run, runnerId)).toEqual([]);
@@ -122,7 +132,12 @@ describe("에이전트에게 보내기(0147)", () => {
     const agent = h.runner(runnerId).runAt(worktreeOf(run));
     requestRunControl(h.db, run.id, "pause", h.now);
     await worker.tick();
-    requestAgentMessage(h.db, run.id, { requestId: "request-4", body: "보내면 안 돼요" }, h.now);
+    requestAgentMessage(
+      h.db,
+      run.id,
+      { requestId: toAgentMessageRequestId("request-4"), body: "보내면 안 돼요" },
+      h.now,
+    );
     requestRunCancel(h.db, run.id, h.now);
     await worker.tick();
     expect(agent.agentMessages).toEqual([]);
@@ -137,7 +152,12 @@ describe("에이전트에게 보내기(0147)", () => {
       message: "gone",
     };
     h.runner(runnerId).failNextControl = failure;
-    requestAgentMessage(h.db, run.id, { requestId: "request-5", body: "안 닿는 말" }, h.now);
+    requestAgentMessage(
+      h.db,
+      run.id,
+      { requestId: toAgentMessageRequestId("request-5"), body: "안 닿는 말" },
+      h.now,
+    );
     await worker.tick();
     expect(only(run).error).toBe("agent-not-running");
     await worker.tick();
@@ -150,7 +170,12 @@ describe("에이전트에게 보내기(0147)", () => {
   ])("%s 전해졌는지 모른다고 남기고 다시 보내지 않는다", async (_name, failure) => {
     const { run, runnerId, worker } = await startOne();
     h.runner(runnerId).failNextControl = failure;
-    requestAgentMessage(h.db, run.id, { requestId: "request-6", body: "한 번만" }, h.now);
+    requestAgentMessage(
+      h.db,
+      run.id,
+      { requestId: toAgentMessageRequestId("request-6"), body: "한 번만" },
+      h.now,
+    );
     await worker.tick();
     expect(only(run).error).toBe("outcome-unknown");
     await worker.tick();
@@ -166,7 +191,12 @@ describe("에이전트에게 보내기(0147)", () => {
       requestRunControl(h.db, run.id, "pause", h.now);
       return poll(onRunner);
     });
-    requestAgentMessage(h.db, run.id, { requestId: "request-7", body: "멈춘 뒤에 갈 말" }, h.now);
+    requestAgentMessage(
+      h.db,
+      run.id,
+      { requestId: toAgentMessageRequestId("request-7"), body: "멈춘 뒤에 갈 말" },
+      h.now,
+    );
     await worker.tick();
     expect(agent.agentMessages).toEqual([]);
     await worker.tick();
@@ -181,7 +211,12 @@ describe("에이전트에게 보내기(0147)", () => {
     const { run, runnerId, worker } = await startOne();
     expect(findStoredMailbox(runnerId)).not.toBeNull();
     h.runner(runnerId).failNextControl = { kind: "mailbox-missing", detail: "gone" };
-    requestAgentMessage(h.db, run.id, { requestId: "request-8", body: "안 닿는 말" }, h.now);
+    requestAgentMessage(
+      h.db,
+      run.id,
+      { requestId: toAgentMessageRequestId("request-8"), body: "안 닿는 말" },
+      h.now,
+    );
     const ensure = vi.spyOn(h.runner(runnerId), "ensureMailbox");
     await worker.tick();
     expect(only(run).error).toBe("runner-error");
@@ -190,11 +225,37 @@ describe("에이전트에게 보내기(0147)", () => {
     expect(ensure.mock.calls[0]?.[0]).toBeNull();
   });
 
+  it("런을 읽은 뒤 보내기 직전에 에이전트가 끝났으면 보내지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    const agent = fake.runAt(worktreeOf(run));
+    const poll = fake.pollRun.bind(fake);
+    vi.spyOn(fake, "pollRun").mockImplementationOnce(async (onRunner) => {
+      const progress = await poll(onRunner);
+      agent.report = { outcome: "succeeded", body: "끝났어요", reportedAt: h.now };
+      return progress;
+    });
+    requestAgentMessage(
+      h.db,
+      run.id,
+      { requestId: toAgentMessageRequestId("late"), body: "늦은 말" },
+      h.now,
+    );
+    await worker.tick();
+    expect(agent.agentMessages).toEqual([]);
+    expect(only(run).error).toBe("state-changed");
+  });
+
   it("완료 보고를 받은 틱에는 끝난 에이전트에게 보내지 않는다", async () => {
     const { run, runnerId, worker } = await startOne();
     const agent = h.runner(runnerId).runAt(worktreeOf(run));
     agent.report = { outcome: "succeeded", body: "끝났어요", reportedAt: h.now };
-    requestAgentMessage(h.db, run.id, { requestId: "request-9", body: "늦은 말" }, h.now);
+    requestAgentMessage(
+      h.db,
+      run.id,
+      { requestId: toAgentMessageRequestId("request-9"), body: "늦은 말" },
+      h.now,
+    );
     await worker.tick();
     expect(stateOf(run)).toBe("ended");
     expect(agent.agentMessages).toEqual([]);
@@ -206,7 +267,7 @@ describe("에이전트에게 보내기(0147)", () => {
     const sent = requestAgentMessage(
       h.db,
       run.id,
-      { requestId: "request-10", body: "한 번만" },
+      { requestId: toAgentMessageRequestId("request-10"), body: "한 번만" },
       h.now,
     );
     if (!sent.ok) throw new Error("not requested");
@@ -218,7 +279,7 @@ describe("에이전트에게 보내기(0147)", () => {
 
   it("같은 요청 ID로 다시 보내면 한 번만 저장하고 한 번만 전한다", async () => {
     const { run, runnerId, worker } = await startOne();
-    const input = { requestId: "retried-request", body: "한 번만 갈 말" };
+    const input = { requestId: toAgentMessageRequestId("retried-request"), body: "한 번만 갈 말" };
     const first = requestAgentMessage(h.db, run.id, input, h.now);
     const second = requestAgentMessage(h.db, run.id, input, h.now);
     expect(second).toEqual(first);
@@ -233,7 +294,12 @@ describe("에이전트에게 보내기(0147)", () => {
     const { run } = await startOne();
     requestRunCancel(h.db, run.id, h.now);
     expect(
-      requestAgentMessage(h.db, run.id, { requestId: "request-11", body: "늦은 말" }, h.now),
+      requestAgentMessage(
+        h.db,
+        run.id,
+        { requestId: toAgentMessageRequestId("request-11"), body: "늦은 말" },
+        h.now,
+      ),
     ).toEqual({
       ok: false,
       reason: "cancelling",
@@ -244,7 +310,12 @@ describe("에이전트에게 보내기(0147)", () => {
       prState: "none",
     });
     expect(
-      requestAgentMessage(h.db, run.id, { requestId: "request-12", body: "늦은 말" }, h.now),
+      requestAgentMessage(
+        h.db,
+        run.id,
+        { requestId: toAgentMessageRequestId("request-12"), body: "늦은 말" },
+        h.now,
+      ),
     ).toEqual({
       ok: false,
       reason: "not-accepting",
@@ -253,7 +324,12 @@ describe("에이전트에게 보내기(0147)", () => {
 
   it("진단용 타임라인에는 보낸 말의 본문을 넣지 않는다", async () => {
     const { run, worker } = await startOne();
-    requestAgentMessage(h.db, run.id, { requestId: "request-13", body: "비밀스러운 본문" }, h.now);
+    requestAgentMessage(
+      h.db,
+      run.id,
+      { requestId: toAgentMessageRequestId("request-13"), body: "비밀스러운 본문" },
+      h.now,
+    );
     await worker.tick();
     const entries = runTimeline(h.db, run.id)?.entries ?? [];
     expect(entries.filter((entry) => entry.source === "agent-message").map((e) => e.event)).toEqual(

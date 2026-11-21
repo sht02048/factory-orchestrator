@@ -87,7 +87,7 @@ export function AgentMessageForm({
       (outcome) => {
         if (outcome === "requested") {
           requestIdRef.current = null;
-          setDraft("");
+          setDraft((current) => (current.trim() === body ? "" : current));
           setEmptyTried(false);
           setSentHere(true);
           setSubmit("idle");
