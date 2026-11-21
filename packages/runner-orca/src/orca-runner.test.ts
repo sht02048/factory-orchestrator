@@ -1661,7 +1661,7 @@ describe("prepareContinuation", () => {
     git(exec, "worktree add", stdout(""));
     expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
     expect(exec.commands()).toContain(
-      `git -C ${repoPath} worktree add --track -b ${branch} ${path} origin/${branch}`,
+      `git -C ${repoPath} worktree add --no-track -b ${branch} ${path} refs/remotes/origin/${branch}`,
     );
   });
 
@@ -1677,7 +1677,7 @@ describe("prepareContinuation", () => {
     git(exec, "worktree add", stdout(""));
     expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
     expect(exec.commands()).toContain(
-      `git -C ${repoPath} worktree add --track -b ${branch} ${path} fork/${branch}`,
+      `git -C ${repoPath} worktree add --no-track -b ${branch} ${path} refs/remotes/fork/${branch}`,
     );
   });
 

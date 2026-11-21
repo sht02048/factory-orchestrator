@@ -60,8 +60,9 @@ import {
 import type { PushCheckOutcome } from "./push-check.js";
 import {
   hasUncommittedChanges,
-  addTrackingWorktreeArgv,
+  addWorktreeFromRemoteArgv,
   addWorktreeArgv,
+  branchUpstreamArgvs,
   currentBranchArgv,
   fetchBranchArgv,
   gitSucceeded,
@@ -550,11 +551,14 @@ export class OrcaRunner implements Runner {
     );
     gitSucceeded(
       await this.run(
-        addTrackingWorktreeArgv({ repoPath, path, branch: input.branch, remote }),
+        addWorktreeFromRemoteArgv({ repoPath, path, branch: input.branch, remote }),
         timeout,
       ),
       "git worktree add",
     );
+    for (const argv of branchUpstreamArgvs({ repoPath, remote, branch: input.branch })) {
+      gitSucceeded(await this.run(argv), "git config");
+    }
     return "recreated";
   }
 

@@ -82,7 +82,7 @@ export function addWorktreeArgv({ repoPath, path, branch }: WorktreeTarget): str
   return ["git", "-C", repoPath, "worktree", "add", path, branch];
 }
 
-export function addTrackingWorktreeArgv({
+export function addWorktreeFromRemoteArgv({
   repoPath,
   path,
   branch,
@@ -94,11 +94,18 @@ export function addTrackingWorktreeArgv({
     repoPath,
     "worktree",
     "add",
-    "--track",
+    "--no-track",
     "-b",
     branch,
     path,
-    `${remote}/${branch}`,
+    `refs/remotes/${remote}/${branch}`,
+  ];
+}
+
+export function branchUpstreamArgvs({ repoPath, remote, branch }: RemoteBranch): string[][] {
+  return [
+    ["git", "-C", repoPath, "config", `branch.${branch}.remote`, remote],
+    ["git", "-C", repoPath, "config", `branch.${branch}.merge`, `refs/heads/${branch}`],
   ];
 }
 
