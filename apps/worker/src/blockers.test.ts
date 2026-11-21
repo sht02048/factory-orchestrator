@@ -1,6 +1,7 @@
 import { toDeliveryId, toTicketKey, toTrackerStateId } from "@ganger/core";
 import type { TicketBlocker, TicketPriority } from "@ganger/core";
 import {
+  continueRun,
   getRun,
   getRunBlockerState,
   recordTrackerEvent,
@@ -8,7 +9,7 @@ import {
   skipBlockerWait,
 } from "@ganger/db";
 import type { StoredRun } from "@ganger/db";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BLOCKER_POLL_INTERVAL_MS } from "./blockers.js";
 import { Harness, connection, projectA, trackerProject } from "./test-fixtures.js";
 
@@ -161,6 +162,74 @@ describe("선행 티켓을 기다리는 런", () => {
     afterPoll();
     await worker.tick();
     expect(stateOf(run)).toBe("running");
+  });
+
+  it("트래커가 응답하지 않으면 한 tick에 그 연결을 한 번만 읽고 나머지는 다음 폴링으로 미룬다", async () => {
+    h.addRunner({ id: "runner-a", capacity: 3, projects: [projectA] });
+    const runs = [
+      h.assign("ENG-1", projectA),
+      h.assign("ENG-2", projectA),
+      h.assign("ENG-3", projectA),
+    ];
+    h.tracker.relationsError = new Error("network");
+    const reads = vi.spyOn(h.tracker, "getTicketRelations");
+
+    await h.worker().tick();
+
+    expect(reads).toHaveBeenCalledTimes(1);
+    for (const run of runs) {
+      expect(stateOf(run)).toBe("queued");
+      expect(getRunBlockerState(h.db, run.id)?.readFailed).toBe(true);
+    }
+  });
+
+  it("관계 읽기가 없다고 해도 티켓이 있으면 선행 티켓 없이 시작하지 않는다(B7)", async () => {
+    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    vi.spyOn(h.tracker, "getTicketRelations").mockResolvedValue(null);
+
+    await h.worker().tick();
+
+    expect(stateOf(run)).toBe("queued");
+    expect(getRunBlockerState(h.db, run.id)?.readFailed).toBe(true);
+  });
+
+  it("지워진 티켓의 런은 기다리지 않고 시작할 수 없음으로 끝난다", async () => {
+    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    h.tracker.tickets.delete(toTicketKey("ENG-1"));
+
+    await h.worker().tick();
+
+    expect(getRun(h.db, run.id)).toMatchObject({
+      state: "ended",
+      agentResult: "could-not-start",
+    });
+  });
+
+  it("지워진 티켓을 이어서 맡긴 런은 선행 티켓을 건너뛰고 시작하지 않는다", async () => {
+    const runner = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = h.assign("ENG-1", projectA);
+    const worker = h.worker();
+    await worker.tick();
+    const started = getRun(h.db, source.id);
+    if (started === null || started.state === "queued" || started.worktree === null) {
+      throw new Error("source run has not started");
+    }
+    h.runner(runner).report(started.worktree, { outcome: "succeeded", body: "done" });
+    await worker.tick();
+    const continued = continueRun(h.db, {
+      from: source.id,
+      message: "keep going",
+      now: h.now,
+    });
+    if (!continued.ok) throw new Error(`continue failed: ${continued.reason}`);
+    h.tracker.tickets.delete(toTicketKey("ENG-1"));
+
+    await worker.tick();
+
+    expect(getRun(h.db, continued.run.id)?.state).toBe("queued");
+    expect(getRunBlockerState(h.db, continued.run.id)?.readFailed).toBe(true);
   });
 
   it("서로 기다리는 런은 저절로 풀지 않는다(B8)", async () => {

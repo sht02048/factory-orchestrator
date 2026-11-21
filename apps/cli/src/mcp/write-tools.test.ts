@@ -10,6 +10,7 @@ import {
   answerRunQuestion,
   getMapping,
   getRunCancelRequest,
+  markRunRelationsUnread,
   latestChangeSeq,
   listChangesAfter,
   listRecentMcpActions,
@@ -338,6 +339,7 @@ describe("MCP 쓰기 도구", () => {
   it("start_run_without_waiting은 같은 요청 ID를 다시 보내도 같은 결과이고 기록을 남긴다", async () => {
     await connect();
     const queued = queueRun(seeded.db, "ACME-6", 40);
+    markRunRelationsUnread(seeded.db, queued, at(41));
     const args = { runId: queued, requestId: "request-0159-0001" };
 
     expect((await call("start_run_without_waiting", args)).json["outcome"]).toBe("done");

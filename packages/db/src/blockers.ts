@@ -187,7 +187,8 @@ export function skipBlockerWait(
     if (run.skippedAt !== null) return { ok: true };
     const state = getRunBlockerState(db, runId);
     if (state === null) return { ok: false, reason: "not-found" };
-    if (decideBlockerWait(state).kind === "none") return { ok: false, reason: "not-waiting" };
+    const wait = decideBlockerWait(state).kind;
+    if (wait === "none" || wait === "checking") return { ok: false, reason: "not-waiting" };
     db.update(runs)
       .set({ waitSkippedAt: now, waitSkipRequestId: requestId })
       .where(eq(runs.id, runId))

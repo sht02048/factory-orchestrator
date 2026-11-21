@@ -461,6 +461,7 @@ async function startQueuedRun(
   let started = pending?.started ?? null;
   if (started === null) {
     if (!(await blockersClearToStart(context, run))) return "skipped";
+    if (hasPendingCancelRequest(db, run.id)) return "skipped";
     const attempt = await startOnRunner(context, run, choice.runnerId, records);
     if (attempt.kind !== "started") return attempt.kind;
     started = attempt.started;

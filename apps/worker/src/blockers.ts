@@ -18,10 +18,11 @@ export const BLOCKER_START_FRESH_MS = 10_000;
 export interface BlockerRefreshState {
   nextPollAt: number;
   changedTickets: Set<string>;
+  failedConnections: Set<TrackerConnectionId>;
 }
 
 export function createBlockerRefreshState(): BlockerRefreshState {
-  return { nextPollAt: 0, changedTickets: new Set() };
+  return { nextPollAt: 0, changedTickets: new Set(), failedConnections: new Set() };
 }
 
 function ticketId(connection: TrackerConnectionId, key: TicketKey): string {
@@ -46,6 +47,7 @@ export async function refreshBlockers(context: TickContext): Promise<void> {
     if (pollDue) refresh.nextPollAt = nowMs + BLOCKER_POLL_INTERVAL_MS;
     const changed = new Set(refresh.changedTickets);
     refresh.changedTickets.clear();
+    refresh.failedConnections.clear();
 
     const states = listQueuedBlockerStates(db);
     const reads: RelationReads = new Map();
@@ -57,9 +59,14 @@ export async function refreshBlockers(context: TickContext): Promise<void> {
         changed.has(ticketId(connection, key)) ||
         state.blockers.some((blocker) => changed.has(ticketId(connection, blocker.key)));
       const wait = decideBlockerWait(state).kind;
-      if (wait === "checking" || touched || (pollDue && wait !== "none")) {
-        await readRunRelations(context, run, reads);
+      if (wait !== "checking" && !touched && !(pollDue && wait !== "none")) continue;
+      if (refresh.failedConnections.has(connection)) {
+        if (wait === "checking") {
+          tryWrite(context, run.id, () => markRunRelationsUnread(db, run.id, context.now()));
+        }
+        continue;
       }
+      await readRunRelations(context, run, reads);
     }
   } catch (error) {
     context.logger.warn("run.blockers_refresh_failed", { error });
@@ -75,6 +82,7 @@ export async function blockersClearToStart(context: TickContext, run: StoredRun)
       ? Number.POSITIVE_INFINITY
       : context.now().getTime() - before.readAt.getTime();
   if (age > BLOCKER_START_FRESH_MS || before.readFailed) {
+    if (context.blockerRefresh.failedConnections.has(run.ticket.connection)) return false;
     if (!(await readRunRelations(context, run, new Map()))) return false;
   }
   const after = getRunBlockerState(context.db, run.id);
@@ -88,10 +96,14 @@ async function readRunRelations(
 ): Promise<boolean> {
   const { db, logger } = context;
   const { connection, key } = run.ticket;
-  const failed = (error: unknown): false => {
+  const unread = (error: unknown): false => {
     logger.warn("run.blockers_read_failed", { runId: run.id, ticketKey: key, error });
     tryWrite(context, run.id, () => markRunRelationsUnread(db, run.id, context.now()));
     return false;
+  };
+  const failed = (error: unknown): false => {
+    context.blockerRefresh.failedConnections.add(connection);
+    return unread(error);
   };
   try {
     const tracker = context.adapters.tracker(db, connection);
@@ -104,7 +116,13 @@ async function readRunRelations(
       reads.set(id, started);
       return started;
     };
-    const relations = (await read(key)) ?? NO_TICKET_RELATIONS;
+    const ownRelations = await read(key);
+    if (ownRelations === null) {
+      const endsAsTicketGone =
+        run.continuedFromRunId === null && (await tracker.getTicket(key)) === null;
+      if (!endsAsTicketGone) return unread(new Error("ticket relations not found"));
+    }
+    const relations = ownRelations ?? NO_TICKET_RELATIONS;
     const inCycle = await findBlockersInCycle({
       ticket: key,
       blockers: relations.blockers,
