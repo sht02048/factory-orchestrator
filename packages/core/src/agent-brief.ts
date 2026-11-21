@@ -20,6 +20,10 @@ export interface AgentBriefInput {
   protocol: string;
 }
 
+export function ticketBriefText(ticket: { title: string; body: string }): string {
+  return `${ticket.title}\n\n${ticket.body}`;
+}
+
 export function workspaceBriefLength(text: string): number {
   return Array.from(text).length;
 }

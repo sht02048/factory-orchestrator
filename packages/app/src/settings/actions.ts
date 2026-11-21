@@ -102,6 +102,7 @@ export function saveGeneral(
 
 const workspaceBriefText = z
   .string()
+  .transform((value) => value.trim())
   .refine((value) => workspaceBriefLength(value) <= WORKSPACE_BRIEF_MAX_LENGTH);
 
 export const briefInput = z.object({
@@ -118,7 +119,7 @@ export function saveBrief(
   if (workspaceId === null) return { ok: false, reason: "not-found" };
   const saved = saveWorkspaceBrief(context.db, {
     id: workspaceId,
-    brief: { before: input.before.trim(), after: input.after.trim() },
+    brief: { before: input.before, after: input.after },
   });
   return saved ? { ok: true } : { ok: false, reason: "not-found" };
 }

@@ -4,6 +4,7 @@ import {
   canRunnerTake,
   composeAgentBrief,
   decideStartFailure,
+  ticketBriefText,
   MAX_START_RETRIES,
   planQueue,
 } from "@ganger/core";
@@ -580,7 +581,7 @@ async function promptFor(
   }
   tryWrite(context, run.id, () => fillRunTicketTitle(context.db, run.id, ticket.title));
   return {
-    text: `${ticket.title}\n\n${ticket.body}`,
+    text: ticketBriefText(ticket),
     ticket: { key: ticket.key, url: ticket.url },
   };
 }

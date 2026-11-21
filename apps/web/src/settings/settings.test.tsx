@@ -1567,11 +1567,14 @@ describe("Workspace 앞뒤 지시 (0146)", () => {
   it("저장하면 다시 열 때 같은 값이 보이고 앞뒤 빈 줄은 다듬어 저장한다", async () => {
     const f = fixture();
     expect(
-      saveBrief(f.context, {
-        ws: commerce,
-        before: "\nRead AGENTS.md first.\n",
-        after: "Push the branch.\nOpen a PR.",
-      }),
+      saveBrief(
+        f.context,
+        briefInput.parse({
+          ws: commerce,
+          before: "\nRead AGENTS.md first.\n",
+          after: "Push the branch.\nOpen a PR.",
+        }),
+      ),
     ).toEqual({ ok: true });
     const page = await loadSettingsPage(f.context, commerce, now);
     expect(page.workspace?.general.brief).toEqual({
@@ -1587,6 +1590,9 @@ describe("Workspace 앞뒤 지시 (0146)", () => {
     expect(briefInput.safeParse({ ...ok, before: "가".repeat(8_001) }).success).toBe(false);
     expect(briefInput.safeParse({ ...ok, after: "a".repeat(8_001) }).success).toBe(false);
     expect(briefInput.safeParse({ ws: commerce, before: 1, after: "" }).success).toBe(false);
+    expect(briefInput.safeParse({ ...ok, before: `\n${"가".repeat(8_000)}\n  ` }).success).toBe(
+      true,
+    );
   });
 
   it("없는 Workspace에는 저장하지 않는다", () => {

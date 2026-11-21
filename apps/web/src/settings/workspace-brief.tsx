@@ -13,6 +13,7 @@ import { space } from "@ganger/ui/tokens.stylex";
 import {
   WORKSPACE_BRIEF_MAX_LENGTH,
   agentBriefParts,
+  ticketBriefText,
   workspaceBriefLength,
   type AgentBriefPartKind,
   type WorkspaceBrief,
@@ -96,7 +97,7 @@ function BriefEditor({
   const submit = useSubmit();
   const focusRef = useFocusFirstField();
   const overLimit = (field: BriefField, value: string) =>
-    workspaceBriefLength(value) > WORKSPACE_BRIEF_MAX_LENGTH ? [field] : [];
+    workspaceBriefLength(value.trim()) > WORKSPACE_BRIEF_MAX_LENGTH ? [field] : [];
   const change = (field: BriefField, value: string) => {
     const next = { ...draft, [field]: value };
     setDraft(next);
@@ -206,7 +207,7 @@ export function BriefPreview({ brief, protocol }: { brief: WorkspaceBrief; proto
   const headingId = useId();
   const parts = agentBriefParts({
     workspace: brief,
-    ticket: `${t("example.key")} ${t("example.title")}\n\n${t("example.body")}`,
+    ticket: ticketBriefText({ title: t("example.title"), body: t("example.body") }),
     protocol,
   });
   return (

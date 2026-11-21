@@ -2,6 +2,7 @@ import {
   EMPTY_WORKSPACE_BRIEF,
   composeAgentBrief,
   isAssignmentBlocked,
+  ticketBriefText,
   summarizeRunOutcome,
   toAgentId,
   toAgentRef,
@@ -292,7 +293,7 @@ function sentBrief(db: Database, runId: RunId): string {
   const title = run.ticketTitle ?? run.ticket.key;
   return composeAgentBrief({
     workspace: getWorkspaceBrief(db, run.workspaceId) ?? EMPTY_WORKSPACE_BRIEF,
-    ticket: `${title}\n\n${demoTicketBody(title)}`,
+    ticket: ticketBriefText({ title, body: demoTicketBody(title) }),
     protocol: ASK_GUIDE,
   });
 }

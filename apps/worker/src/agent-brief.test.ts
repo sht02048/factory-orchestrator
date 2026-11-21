@@ -50,6 +50,24 @@ describe("런이 받은 지시서", () => {
     expect(sentBrief(run)).toBe(`${expected}\n`);
   });
 
+  it("시작 결과를 모른 채 다시 보내면 다시 보낸 지시서로 런의 받은 지시서를 바꾼다", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    saveWorkspaceBrief(h.db, { id: workspaceId, brief: { before: "Old rule.", after: "" } });
+    const run = h.assign("ENG-1", projectA);
+    h.runner(runnerA).failNextStart = { kind: "malformed-output", raw: "not json" };
+    const worker = h.worker();
+
+    await worker.tick();
+    expect(sentBrief(run)?.startsWith("Old rule.\n\n")).toBe(true);
+
+    saveWorkspaceBrief(h.db, { id: workspaceId, brief: { before: "New rule.", after: "" } });
+    await worker.tick();
+
+    const calls = h.runner(runnerA).startCalls;
+    expect(calls.at(-1)?.brief.startsWith("New rule.\n\n")).toBe(true);
+    expect(sentBrief(run)).toBe(calls.at(-1)?.brief);
+  });
+
   it("앞뒤 지시를 바꾸면 새로 시작하는 런부터 적용하고 도는 런의 지시서는 그대로 둔다", async () => {
     const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     saveWorkspaceBrief(h.db, { id: workspaceId, brief: { before: "Old rule.", after: "" } });

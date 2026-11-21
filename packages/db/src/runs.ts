@@ -633,13 +633,19 @@ export function recordStartRequested(
   now: Date = new Date(),
   agentBrief: string | null = null,
 ): boolean {
-  return (
-    db
-      .update(runs)
-      .set({ startRequestedAt: now, agentBrief })
-      .where(and(eq(runs.id, runId), eq(runs.state, "queued"), isNull(runs.startRequestedAt)))
-      .run().changes > 0
-  );
+  return inTransaction(db, () => {
+    db.update(runs)
+      .set({ agentBrief })
+      .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
+      .run();
+    return (
+      db
+        .update(runs)
+        .set({ startRequestedAt: now })
+        .where(and(eq(runs.id, runId), eq(runs.state, "queued"), isNull(runs.startRequestedAt)))
+        .run().changes > 0
+    );
+  });
 }
 
 export function clearStartRequested(db: Database, runId: RunId): boolean {
