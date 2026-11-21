@@ -25,7 +25,7 @@ import type {
   WorktreeWork,
 } from "@ganger/core";
 import { z } from "zod";
-import { briefFor } from "./agent-brief.js";
+import { ASK_GUIDE } from "./agent-brief.js";
 import { parseOrcaRunnerConfig } from "./config.js";
 import type { OrcaRunnerConfig } from "./config.js";
 import { workerReadLines } from "./log-tail.js";
@@ -136,6 +136,7 @@ const realSleep = (ms: number): Promise<void> =>
 
 export class OrcaRunner implements Runner {
   readonly kind = ORCA_RUNNER_KIND;
+  readonly agentProtocol = ASK_GUIDE;
   private readonly config: OrcaRunnerConfig;
   private readonly exec: RemoteExec;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -395,7 +396,7 @@ export class OrcaRunner implements Runner {
     let started: z.infer<typeof workerStartResultSchema>;
     try {
       started = await this.orca(args, workerStartResultSchema, {
-        stdin: briefFor(input.prompt),
+        stdin: input.brief,
         timeoutMs: this.config.startTimeoutMs,
         usesMailbox: true,
       });

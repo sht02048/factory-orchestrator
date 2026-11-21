@@ -1,4 +1,4 @@
-import type { PrReadError } from "@ganger/core";
+import type { PrReadError, WorkspaceBrief } from "@ganger/core";
 import type { WorkspaceId } from "@ganger/db";
 import type { McpActionView } from "../mcp/actions.js";
 import type { CheckFailure } from "../prerequisites.js";
@@ -17,6 +17,8 @@ export interface WorkspaceGeneral {
   id: WorkspaceId;
   name: string;
   maxRunMinutes: number;
+  brief: WorkspaceBrief;
+  agentProtocol: string;
 }
 
 export type ProjectOwner =

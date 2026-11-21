@@ -7,6 +7,7 @@ import {
 } from "@ganger/core";
 import type { RepoRef, RunnerProjectId } from "@ganger/core";
 import { FakeCodeHost, FakeRunner, FakeTracker } from "@ganger/core/testing";
+import { ASK_GUIDE } from "@ganger/runner-orca/agent-brief";
 import { RUNNER_PROJECTS, providerUsageFor, trackerCatalog, trackerSpecFor } from "./fixtures.js";
 import {
   FAIL_AUTH,
@@ -58,6 +59,7 @@ export class DemoWorld {
     const found = this.runners.get(sshTarget);
     if (found !== undefined) return found;
     const runner = new FakeRunner(RUNNER_KIND);
+    runner.agentProtocol = ASK_GUIDE;
     const target = sshTarget.toLowerCase();
     runner.setProjects(RUNNER_PROJECTS);
     runner.online = !target.includes(FAIL_OFFLINE);

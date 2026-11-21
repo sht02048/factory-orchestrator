@@ -67,6 +67,7 @@ export interface RunRecords {
   startFailures: number;
   startError: string | null;
   reportBody: string | null;
+  agentBrief: string | null;
   pullRequest: {
     id: PullRequestId;
     displayId: string;
@@ -176,6 +177,7 @@ function toRunRecords(row: RunRow): RunRecords {
     startFailures: row.startFailures,
     startError: row.startError,
     reportBody: row.reportBody,
+    agentBrief: row.agentBrief,
     pullRequest:
       row.prId === null || row.prCheckedAt === null
         ? null
@@ -625,14 +627,25 @@ export function runningSince(db: Database, runId: RunId): Date | null {
   return null;
 }
 
-export function recordStartRequested(db: Database, runId: RunId, now: Date = new Date()): boolean {
-  return (
-    db
-      .update(runs)
-      .set({ startRequestedAt: now })
-      .where(and(eq(runs.id, runId), eq(runs.state, "queued"), isNull(runs.startRequestedAt)))
-      .run().changes > 0
-  );
+export function recordStartRequested(
+  db: Database,
+  runId: RunId,
+  now: Date,
+  agentBrief: string,
+): boolean {
+  return inTransaction(db, () => {
+    db.update(runs)
+      .set({ agentBrief })
+      .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
+      .run();
+    return (
+      db
+        .update(runs)
+        .set({ startRequestedAt: now })
+        .where(and(eq(runs.id, runId), eq(runs.state, "queued"), isNull(runs.startRequestedAt)))
+        .run().changes > 0
+    );
+  });
 }
 
 export function clearStartRequested(db: Database, runId: RunId): boolean {
@@ -728,6 +741,7 @@ export function updateRunRecords(
       | "startFailures"
       | "startError"
       | "reportBody"
+      | "agentBrief"
       | "prReadError"
       | "worktreeRemoveRequestedAt"
     >

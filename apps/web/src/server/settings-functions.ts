@@ -6,6 +6,7 @@ import {
   addTrackerProject,
   addTrackerProjectInput,
   addressesInput,
+  briefInput,
   checkGitHubToken,
   checkTrackerConnection,
   connectionIdInput,
@@ -23,6 +24,7 @@ import {
   runnerIdInput,
   runnerInput,
   saveAddresses,
+  saveBrief,
   saveGeneral,
   saveGitHubToken,
   saveInProgressState,
@@ -88,6 +90,10 @@ export const getRunnerChecksPending = createServerFn({ method: "GET" }).handler(
 export const saveWorkspaceGeneral = createServerFn({ method: "POST" })
   .validator(generalInput)
   .handler(({ data }) => saveGeneral(context(), data));
+
+export const saveWorkspaceBrief = createServerFn({ method: "POST" })
+  .validator(briefInput)
+  .handler(({ data }) => saveBrief(context(), data));
 
 export const addWorkspaceTrackerProject = createServerFn({ method: "POST" })
   .validator(addTrackerProjectInput)

@@ -338,6 +338,23 @@ describe("ganger mcp 서버", () => {
     });
   });
 
+  it("설정은 Workspace 앞뒤 지시를, 런 상세는 받은 지시서를 external 칸에 담아 준다 (0146)", async () => {
+    const settings = await call("get_settings");
+    expect(settings.json).toMatchObject({
+      workspaceSettings: {
+        general: {
+          id: "ws-commerce",
+          external: { brief: { before: EXTERNAL.briefBefore, after: EXTERNAL.briefAfter } },
+        },
+      },
+    });
+    expect(settings.text).toContain("orca orchestration ask");
+    const waiting = await call("get_run", { runId: seeded.waiting });
+    expect(waiting.json).toMatchObject({ run: { external: { brief: EXTERNAL.sentBrief } } });
+    const ended = await call("get_run", { runId: seeded.ended });
+    expect(ended.json).toMatchObject({ run: { external: { brief: null } } });
+  });
+
   it("Workspace가 하나뿐이면 생략할 수 있고, 여럿이면 고르라고 알린다", async () => {
     await client.close();
     seeded.db.$client.close();

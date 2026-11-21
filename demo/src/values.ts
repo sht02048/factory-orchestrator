@@ -24,3 +24,11 @@ export const PREFILL: Readonly<Record<string, string>> = {
 };
 
 export const PREFILL_RUNNER_NAME = "runner-a";
+
+export const DEMO_WORKSPACE_BRIEF = {
+  before: "Read AGENTS.md and README.md before you change any code.",
+  after: [
+    "Finish by pushing the branch and opening a pull request to develop.",
+    "Run the project checks and write their results in the pull request body.",
+  ].join("\n"),
+};

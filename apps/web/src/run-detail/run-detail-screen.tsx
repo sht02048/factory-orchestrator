@@ -9,6 +9,7 @@ import {
   DefinitionList,
   Dialog,
   DialogClose,
+  Disclosure,
   Field,
   Input,
   PageHeader,
@@ -224,6 +225,8 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
               </Block>
             ) : null}
 
+            {run.brief === null ? null : <SentBrief brief={run.brief} />}
+
             <Timeline events={run.timeline} now={run.now} />
           </div>
 
@@ -264,6 +267,20 @@ function Block({
       </div>
       {children}
     </Card>
+  );
+}
+
+function SentBrief({ brief }: { brief: string }) {
+  const t = useTranslations("run.brief");
+  return (
+    <Disclosure summary={t("title")}>
+      <Text variant="meta" as="p">
+        {t("body")}
+      </Text>
+      <CodeBlock scroll label={t("label")}>
+        {brief}
+      </CodeBlock>
+    </Disclosure>
   );
 }
 

@@ -1,7 +1,10 @@
 import {
   ACTIVE_RUN_STATES,
+  EMPTY_WORKSPACE_BRIEF,
   canRunnerTake,
+  composeAgentBrief,
   decideStartFailure,
+  ticketBriefText,
   MAX_START_RETRIES,
   planQueue,
 } from "@ganger/core";
@@ -23,6 +26,7 @@ import {
   getMapping,
   getRun,
   getRunWithRecords,
+  getWorkspaceBrief,
   hasPendingCancelRequest,
   inTransaction,
   listPendingCancelRequests,
@@ -438,8 +442,14 @@ async function startOnRunner(
       );
       return endCouldNotStart(context, run);
     }
+    const brief = composeAgentBrief({
+      workspace: getWorkspaceBrief(db, run.workspaceId) ?? EMPTY_WORKSPACE_BRIEF,
+      ticket: prompt.text,
+      protocol: runner.agentProtocol,
+    });
     if (
-      tryWrite(context, run.id, () => recordStartRequested(db, run.id, context.now())) === undefined
+      tryWrite(context, run.id, () => recordStartRequested(db, run.id, context.now(), brief)) ===
+      undefined
     ) {
       return { kind: "blocked" };
     }
@@ -449,7 +459,7 @@ async function startOnRunner(
       worktreeName: run.worktreeName,
       agent: run.agent,
       ...(run.model === null ? {} : { model: run.model }),
-      prompt: prompt.text,
+      brief,
       ticket: prompt.ticket,
     });
     return { kind: "started", started };
@@ -571,7 +581,7 @@ async function promptFor(
   }
   tryWrite(context, run.id, () => fillRunTicketTitle(context.db, run.id, ticket.title));
   return {
-    text: `${ticket.title}\n\n${ticket.body}`,
+    text: ticketBriefText(ticket),
     ticket: { key: ticket.key, url: ticket.url },
   };
 }

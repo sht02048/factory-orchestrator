@@ -216,7 +216,7 @@ export interface StartRunInput {
   baseBranch?: string;
   agent: AgentId;
   model?: string;
-  prompt: string;
+  brief: string;
   ticket?: { key: TicketKey; url: string };
 }
 
@@ -291,6 +291,7 @@ export type WorktreeWork =
 
 export interface Runner {
   readonly kind: RunnerKind;
+  readonly agentProtocol: string;
 
   checkHealth(): Promise<RunnerHealth>;
   listProjects(): Promise<ReadonlyArray<RunnerProject>>;

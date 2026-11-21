@@ -39,7 +39,7 @@ export function hydrateWorld(db: Database, world: DemoWorld): void {
         worktreeName: run.worktreeName,
         agent: run.agent,
         ...(run.model === null ? {} : { model: run.model }),
-        prompt: "",
+        brief: "",
       },
       started: { worktree: run.worktree, branch: run.branch, agentRef: run.agentRef },
       questions: questions.map((q) => ({

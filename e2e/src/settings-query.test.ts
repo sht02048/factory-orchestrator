@@ -328,7 +328,9 @@ describe("Settings 의 Query(브라우저, 0128)", () => {
       name: settings.sections.workspace,
       exact: true,
     });
-    await workspace.getByRole("button", { name: settings.change }).click();
+    await workspace
+      .getByRole("button", { name: `${settings.workspace.name} ${settings.change}` })
+      .click();
     serverCalls.length = 0;
 
     await workspace

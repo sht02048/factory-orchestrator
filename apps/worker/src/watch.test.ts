@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Harness, projectA, projectB } from "./test-fixtures.js";
 import { RUNNER_CHECK_INTERVAL_MS } from "./runner-check.js";
 import type { Worker } from "./worker.js";
+import { FAKE_AGENT_PROTOCOL } from "@ganger/core/testing";
 import type { FakeRunnerRun } from "@ganger/core/testing";
 
 let h: Harness;
@@ -833,7 +834,9 @@ describe("멈추기·재개(0118)", () => {
       before.state === "paused" ? before.agentRef : null,
     );
     expect(after.state === "running" ? after.worktree : null).toBe(worktreeOf(run));
-    expect(agentOf(run, runnerId).resumes[0]?.restartPrompt).toContain("ENG-1");
+    const restartPrompt = agentOf(run, runnerId).resumes[0]?.restartPrompt;
+    expect(restartPrompt).toContain(agentOf(run, runnerId).input.brief);
+    expect(restartPrompt).toContain(FAKE_AGENT_PROTOCOL);
   });
 
   it("Paused 중에 취소하면 에이전트를 멈추고 운영자가 취소함으로 끝낸다", async () => {

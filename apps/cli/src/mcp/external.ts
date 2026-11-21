@@ -8,6 +8,7 @@ export const EXTERNAL_KEYS: ReadonlySet<string> = new Set([
   "report",
   "startError",
   "hint",
+  "brief",
 ]);
 
 export const EXTERNAL_FIELD = "external";

@@ -407,6 +407,9 @@ importers:
       '@ganger/db':
         specifier: workspace:*
         version: link:../packages/db
+      '@ganger/runner-orca':
+        specifier: workspace:*
+        version: link:../packages/runner-orca
       '@ganger/web':
         specifier: workspace:*
         version: link:../apps/web

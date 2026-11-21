@@ -1025,8 +1025,10 @@ describe("recordStartRequested", () => {
     const db = seededDatabase();
     const id = assignOk(db, "ENG-1");
     const first = new Date("2026-11-17T01:00:00Z");
-    expect(recordStartRequested(db, id, first)).toBe(true);
-    expect(recordStartRequested(db, id, new Date("2026-11-17T02:00:00Z"))).toBe(false);
+    expect(recordStartRequested(db, id, first, "first brief")).toBe(true);
+    expect(recordStartRequested(db, id, new Date("2026-11-17T02:00:00Z"), "second brief")).toBe(
+      false,
+    );
     expect(getRunWithRecords(db, id)?.records.startRequestedAt).toEqual(first);
   });
 });

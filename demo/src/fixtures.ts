@@ -158,6 +158,10 @@ export function runnerProjectId(spec: ProjectSpec) {
   return toRunnerProjectId(spec.repo);
 }
 
+export function demoTicketBody(title: string): string {
+  return `${title}.\n\nThis is a demo ticket with fake data.`;
+}
+
 export function trackerCatalog(spec: TrackerSpec, now: Date): TrackerCatalog {
   const tickets: TrackerTicket[] = [];
   let n = 0;
@@ -168,7 +172,7 @@ export function trackerCatalog(spec: TrackerSpec, now: Date): TrackerCatalog {
       tickets.push({
         key,
         title,
-        body: `${title}.\n\nThis is a demo ticket with fake data.`,
+        body: demoTicketBody(title),
         url: `https://tracker.example.com/${spec.name.toLowerCase()}/issue/${key}`,
         labels: [],
         project: { id: trackerProjectId(project), name: project.name },

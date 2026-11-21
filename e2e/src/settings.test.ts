@@ -15,6 +15,7 @@ import {
   SecretBox,
   forgetWebhookReceipt,
   getAutoAssignLabel,
+  getWorkspaceBrief,
   getMapping,
   migrate,
   openDatabase,
@@ -28,6 +29,7 @@ import {
   saveRunner,
   saveTrackerConnection,
   saveWorkspace,
+  saveWorkspaceBrief,
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
   trackerReadGeneration,
@@ -171,7 +173,9 @@ describe("Settings 한 페이지(브라우저, 0119)", () => {
     expect(await minutes.getAttribute("inputmode")).toBe("numeric");
 
     await minutes.fill("0");
-    await workspace.getByRole("button", { name: settings.change }).focus();
+    await workspace
+      .getByRole("button", { name: `${settings.workspace.name} ${settings.change}` })
+      .focus();
     await workspace.getByText(settings.workspace.maxRunInvalid).waitFor();
     expect(await minutes.getAttribute("aria-invalid")).toBe("true");
 
@@ -390,7 +394,9 @@ describe("Settings 폼과 도움말(브라우저, 0119 리뷰 후속)", () => {
   it("고친 값이 남은 줄이 펼쳐져 있으면 다른 줄을 펼치지 않고 알린다", async () => {
     await openSettings(page);
     const workspace = section(settings.sections.workspace);
-    await workspace.getByRole("button", { name: settings.change }).click();
+    await workspace
+      .getByRole("button", { name: `${settings.workspace.name} ${settings.change}` })
+      .click();
     const name = workspace.getByRole("textbox", { name: settings.workspace.name, exact: true });
     await name.fill("Acme Draft");
     await section(settings.sections.connections)
@@ -444,7 +450,7 @@ describe("Settings 폼과 도움말(브라우저, 0119 리뷰 후속)", () => {
       .getByRole("link", { name: settings.sections.workspace })
       .click();
     await section(settings.sections.workspace)
-      .getByRole("button", { name: settings.change })
+      .getByRole("button", { name: `${settings.workspace.name} ${settings.change}` })
       .click();
     await page.getByRole("alert").getByText(settings.unsavedBlocked).waitFor();
     await expect.poll(() => webhook.evaluate((el) => el === document.activeElement)).toBe(true);
@@ -455,7 +461,9 @@ describe("Settings 폼과 도움말(브라우저, 0119 리뷰 후속)", () => {
   it("고친 값이 남아 있으면 다른 화면으로 옮기지 않고 그 줄을 보인다", async () => {
     await openSettings(page);
     const workspace = section(settings.sections.workspace);
-    await workspace.getByRole("button", { name: settings.change }).click();
+    await workspace
+      .getByRole("button", { name: `${settings.workspace.name} ${settings.change}` })
+      .click();
     const name = workspace.getByRole("textbox", { name: settings.workspace.name, exact: true });
     await name.fill("Acme Leaving");
     await section(settings.sections.advanced).getByRole("link", { name: /^MCP/ }).click();
@@ -926,5 +934,70 @@ describe("트래커 연결 상세의 webhook 켜기(브라우저, 0130)", () => 
       400,
     );
     await shot(page, "webhook-400");
+  });
+});
+
+describe("Workspace 앞뒤 지시(브라우저, 0146)", () => {
+  const briefRow = () =>
+    section(settings.sections.workspace).getByRole("button", {
+      name: `${settings.brief.title} ${settings.change}`,
+    });
+  const field = (label: string) => page.getByRole("textbox", { name: label, exact: true });
+  const preview = () => page.getByRole("region", { name: settings.brief.preview.title });
+
+  beforeEach(() => {
+    saveWorkspaceBrief(db, { id: workspaceId, brief: { before: "", after: "" } });
+  });
+
+  it("두 칸에 쓰면 미리 보기가 바로 바뀌고, 저장하면 다시 열어도 같은 값이 보인다", async () => {
+    await openSettings(page);
+    await section(settings.sections.workspace).getByText(settings.brief.summaryEmpty).waitFor();
+    await briefRow().click();
+    const before = field(settings.brief.before.label);
+    await expect.poll(() => before.evaluate((el) => el === document.activeElement)).toBe(true);
+    await preview().getByText(settings.brief.example.title, { exact: false }).waitFor();
+    expect(await preview().getByText(settings.brief.preview.before).count()).toBe(0);
+
+    await before.fill("Read AGENTS.md first.");
+    await field(settings.brief.after.label).fill("Push the branch.\nOpen a PR to develop.");
+    await preview().getByText(settings.brief.preview.before).waitFor();
+    await preview().getByText("Open a PR to develop.", { exact: false }).waitFor();
+    await page.getByText(settings.brief.appliesToNewRuns).waitFor();
+    await shot(page, "settings-workspace-brief-1280");
+
+    await section(settings.sections.workspace).getByRole("button", { name: settings.save }).click();
+    await briefRow().waitFor();
+    expect(getWorkspaceBrief(db, workspaceId)).toEqual({
+      before: "Read AGENTS.md first.",
+      after: "Push the branch.\nOpen a PR to develop.",
+    });
+    await page.reload();
+    await page.waitForFunction(() => "__TSR_ROUTER__" in globalThis);
+    await section(settings.sections.workspace).getByText("티켓 앞 1줄 · 티켓 뒤 2줄").waitFor();
+  });
+
+  it("8,000자를 넘기면 저장하지 않고 그 칸에 이유를 보이며 포커스를 옮긴다", async () => {
+    await openSettings(page);
+    await briefRow().click();
+    const after = field(settings.brief.after.label);
+    await after.fill("a".repeat(8_001));
+    await section(settings.sections.workspace).getByRole("button", { name: settings.save }).click();
+    await page.getByText(settings.brief.tooLong.replace("{max, number}", "8,000")).waitFor();
+    expect(await after.getAttribute("aria-invalid")).toBe("true");
+    await expect.poll(() => after.evaluate((el) => el === document.activeElement)).toBe(true);
+    expect(getWorkspaceBrief(db, workspaceId)).toEqual({ before: "", after: "" });
+    await page.keyboard.press("Escape");
+  });
+
+  it("400px 에서도 두 칸과 미리 보기가 가로로 넘치지 않는다", async () => {
+    await page.setViewportSize({ width: 400, height: 900 });
+    await openSettings(page);
+    await briefRow().click();
+    await field(settings.brief.after.label).fill("Push the branch and open a pull request.");
+    await preview().getByText(settings.brief.preview.protocol).waitFor();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      400,
+    );
+    await shot(page, "settings-workspace-brief-400");
   });
 });

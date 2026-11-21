@@ -1,5 +1,8 @@
 import {
+  EMPTY_WORKSPACE_BRIEF,
+  composeAgentBrief,
   isAssignmentBlocked,
+  ticketBriefText,
   summarizeRunOutcome,
   toAgentId,
   toAgentRef,
@@ -22,11 +25,14 @@ import type {
 import {
   assignRun,
   changeRunState,
+  getRun,
+  getWorkspaceBrief,
   inTransaction,
   recordPermissionWaits,
   recordProviderUsage,
   recordRunQuestions,
   recordRunnerCheck,
+  recordStartRequested,
   recordWebhookAccepted,
   recordWebhookBadSignature,
   saveAutoAssignLabel,
@@ -38,16 +44,19 @@ import {
   saveRunner,
   saveTrackerConnection,
   saveWorkspace,
+  saveWorkspaceBrief,
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
   updateRunRecords,
 } from "@ganger/db";
 import type { Database, SecretBox } from "@ganger/db";
+import { ASK_GUIDE } from "@ganger/runner-orca/agent-brief";
 import {
   RUNNER_PROJECTS,
   agent,
   apiRepoLabel,
   autoAssignLabel,
+  demoTicketBody,
   inProgressState,
   providerUsageFor,
   runnerProjectId,
@@ -55,7 +64,7 @@ import {
   seededRunners,
   trackerProjectId,
 } from "./fixtures.js";
-import { DEMO_WEBHOOK_ADDRESS, DEMO_WEB_ADDRESS, PREFILL } from "./values.js";
+import { DEMO_WEBHOOK_ADDRESS, DEMO_WEB_ADDRESS, DEMO_WORKSPACE_BRIEF, PREFILL } from "./values.js";
 import { CODE_HOST_KIND, RUNNER_KIND, TRACKER_KIND } from "./world.js";
 import type { DemoWorld } from "./world.js";
 
@@ -171,6 +180,9 @@ function seedSettings(db: Database, box: SecretBox, now: Date): void {
       now,
     );
     saveWorkspace(db, { id: connection.workspaceId, name: connection.spec.name }, now);
+    if (connection === seededConnections[0]) {
+      saveWorkspaceBrief(db, { id: connection.workspaceId, brief: DEMO_WORKSPACE_BRIEF }, now);
+    }
     for (const project of connection.spec.projects) {
       saveWorkspaceTrackerProject(db, {
         workspaceId: connection.workspaceId,
@@ -275,7 +287,19 @@ function assign(
   return { id: result.run.id, worktreeName: result.run.worktreeName };
 }
 
+function sentBrief(db: Database, runId: RunId): string {
+  const run = getRun(db, runId);
+  if (run === null) throw new Error(`demo seed run ${runId} is gone`);
+  const title = run.ticketTitle ?? run.ticket.key;
+  return composeAgentBrief({
+    workspace: getWorkspaceBrief(db, run.workspaceId) ?? EMPTY_WORKSPACE_BRIEF,
+    ticket: ticketBriefText({ title, body: demoTicketBody(title) }),
+    protocol: ASK_GUIDE,
+  });
+}
+
 function start(db: Database, runId: RunId, worktreeName: string, at: Date): void {
+  recordStartRequested(db, runId, at, sentBrief(db, runId));
   ok(
     changeRunState(
       db,

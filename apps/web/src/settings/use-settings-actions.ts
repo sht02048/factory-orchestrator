@@ -19,6 +19,7 @@ import {
   savePowerSettings,
   saveRunnerSettings,
   saveTrackerConnection,
+  saveWorkspaceBrief,
   saveWorkspaceGeneral,
   saveWorkspaceInProgressState,
   saveWorkspaceLabel,
@@ -107,6 +108,11 @@ export function useSettingsActions(afterChange: AfterChange): SettingsActions {
     WORKSPACE,
     afterChange,
   );
+  const saveBrief = useSaveMutation(
+    (data: Parameters<SettingsActions["saveBrief"]>[0]) => saveWorkspaceBrief({ data }),
+    WORKSPACE,
+    afterChange,
+  );
   const addProject = useSaveMutation(
     (data: Parameters<SettingsActions["addProject"]>[0]) => addWorkspaceTrackerProject({ data }),
     SETTINGS_AND_TRACKER,
@@ -189,6 +195,7 @@ export function useSettingsActions(afterChange: AfterChange): SettingsActions {
   return useMemo(
     (): SettingsActions => ({
       saveGeneral,
+      saveBrief,
       addProject,
       removeProject,
       saveMapping,
@@ -219,6 +226,7 @@ export function useSettingsActions(afterChange: AfterChange): SettingsActions {
     [
       afterChange,
       saveGeneral,
+      saveBrief,
       addProject,
       removeProject,
       saveMapping,

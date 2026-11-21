@@ -38,11 +38,13 @@ import { installPowerSettings } from "../server/power-settings";
 import { renderWithMessages } from "../testing/render";
 import {
   addTrackerProject,
+  briefInput,
   createAutoAssignLabel,
   mappingStateInput,
   removeTrackerProject,
   saveMappingState,
   requestRunnerCheckSetting,
+  saveBrief,
   saveGeneral,
   saveAddresses,
   saveGitHubToken,
@@ -64,6 +66,8 @@ import { settingsMessages } from "./messages";
 import type { SettingsPage } from "@ganger/app/settings/model";
 import { jsonConfig } from "@ganger/app/settings/mcp-launch";
 import { McpScreen } from "./mcp-screen";
+import { BriefPreview } from "./workspace-brief";
+import settingsJson from "../../messages/ko/settings.json" with { type: "json" };
 import { ProjectDetailScreen, findBoundProject } from "./project-detail";
 import { ProjectCandidates, SettingsScreen, sectionProblems } from "./settings-page";
 import { RunnerCheck, RunnerForm, nameFromSshTarget, sshCheckCommand } from "./settings-screen";
@@ -150,6 +154,7 @@ function addRunner(f: Fixture): RunnerId {
 
 const noopActions: SettingsActions = {
   saveGeneral: () => Promise.resolve({ ok: true }),
+  saveBrief: () => Promise.resolve({ ok: true }),
   addProject: () => Promise.resolve({ ok: true }),
   removeProject: () => Promise.resolve({ ok: true }),
   saveMapping: () => Promise.resolve({ ok: true }),
@@ -267,7 +272,12 @@ describe("Settings 저장하고 다시 열기", () => {
     });
 
     const page = await loadSettingsPage(f.context, ws, now);
-    expect(page.workspace?.general).toEqual({ id: ws, name: "Acme Store", maxRunMinutes: 90 });
+    expect(page.workspace?.general).toMatchObject({
+      id: ws,
+      name: "Acme Store",
+      maxRunMinutes: 90,
+      brief: { before: "", after: "" },
+    });
     expect(page.workspace?.trackerProjects).toEqual([
       {
         connection: { id: connection, name: "Acme" },
@@ -1550,5 +1560,75 @@ describe("직접 입력 러너 폼(0095 M2b)", () => {
     expect(plain).toMatch(/name="orcaPath"[^>]*value=""/);
     expect(plain).not.toContain("BatchMode");
     expect(plain).toMatch(/type="submit"[^>]*>등록하고 확인/);
+  });
+});
+
+describe("Workspace 앞뒤 지시 (0146)", () => {
+  it("저장하면 다시 열 때 같은 값이 보이고 앞뒤 빈 줄은 다듬어 저장한다", async () => {
+    const f = fixture();
+    expect(
+      saveBrief(
+        f.context,
+        briefInput.parse({
+          ws: commerce,
+          before: "\nRead AGENTS.md first.\n",
+          after: "Push the branch.\nOpen a PR.",
+        }),
+      ),
+    ).toEqual({ ok: true });
+    const page = await loadSettingsPage(f.context, commerce, now);
+    expect(page.workspace?.general.brief).toEqual({
+      before: "Read AGENTS.md first.",
+      after: "Push the branch.\nOpen a PR.",
+    });
+    expect(page.workspace?.general.agentProtocol).toContain("orca orchestration ask");
+  });
+
+  it("각 칸은 8,000자까지 받고 넘으면 입력 검증이 막는다", () => {
+    const ok = { ws: commerce, before: "가".repeat(8_000), after: "" };
+    expect(briefInput.safeParse(ok).success).toBe(true);
+    expect(briefInput.safeParse({ ...ok, before: "가".repeat(8_001) }).success).toBe(false);
+    expect(briefInput.safeParse({ ...ok, after: "a".repeat(8_001) }).success).toBe(false);
+    expect(briefInput.safeParse({ ws: commerce, before: 1, after: "" }).success).toBe(false);
+    expect(briefInput.safeParse({ ...ok, before: `\n${"가".repeat(8_000)}\n  ` }).success).toBe(
+      true,
+    );
+  });
+
+  it("없는 Workspace에는 저장하지 않는다", () => {
+    const f = fixture();
+    expect(saveBrief(f.context, { ws: "ws-missing", before: "x", after: "" })).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+  });
+
+  it("Workspace 줄에 지시 줄을 두고, 비어 있으면 덧붙이는 지시가 없다고 보인다", async () => {
+    const f = fixture();
+    const empty = sectionOf(render(await loadSettingsPage(f.context, commerce, now)), "workspace");
+    expect(textOf(empty)).toContain(settingsJson.brief.title);
+    expect(textOf(empty)).toContain(settingsJson.brief.summaryEmpty);
+    saveBrief(f.context, { ws: commerce, before: "", after: "Push.\nOpen a PR.\nRun checks." });
+    const filled = sectionOf(render(await loadSettingsPage(f.context, commerce, now)), "workspace");
+    expect(textOf(filled)).toContain("티켓 앞 없음 · 티켓 뒤 3줄");
+  });
+
+  it("미리 보기는 앞 지시 → 예시 티켓 → 뒤 지시 → 통신 규약 순서로, 빈 칸은 빼고 보인다", () => {
+    const html = renderWithMessages(
+      <BriefPreview brief={{ before: "", after: "Open a PR." }} protocol={"## Protocol"} />,
+      settingsMessages,
+    );
+    const shown = textOf(html);
+    const order = [
+      settingsJson.brief.preview.ticket,
+      settingsJson.brief.example.title,
+      settingsJson.brief.preview.after,
+      "Open a PR.",
+      settingsJson.brief.preview.protocol,
+      "## Protocol",
+    ].map((part) => shown.indexOf(part));
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect(order).toEqual(order.toSorted((a, b) => a - b));
+    expect(shown).not.toContain(settingsJson.brief.preview.before);
   });
 });

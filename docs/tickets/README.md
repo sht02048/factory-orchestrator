@@ -162,6 +162,7 @@ graph LR
 - 0090(한도 러너 건너뛰기)은 0086 뒤에 한다. `packages/core` 할당·대기열, `packages/db`의 러너 스냅샷, `apps/worker` 대기열, web 대기 사유 문구와 Tickets 할당 대화상자, Dashboard 한도 문구를 고친다. 0088(MCP 읽기)과 함께 돌면 web 로더가 겹칠 수 있다.
 - 0091(목록 화면 폭·시간 칸·고른 행, 운영자 결정 2026-11-19)은 선행 티켓이 없다. Dashboard·Runs·Tickets 화면과 `packages/ui`(`TimeSlot`·`RowActionSlot`, `Table`, 탭, `bgSelected`)를 고친다. 고른 행 모양은 `packages/ui` 한 곳이라 Runners 목록에도 함께 바뀐다. 0092(Runners)·0093(Stats)과 함께 돈다.
 - 0085(Dashboard Runners를 칸으로, 운영자 결정 2026-11-19)는 선행 티켓이 없다. Dashboard Runners 구역, `packages/ui`의 `CapacityCells`, `/ds`를 고친다. 0086(공급자 사용량)과 함께 돌고, Runners 목록 화면은 0086이 고쳐 0085는 건드리지 않는다.
+- 0146~0150은 에이전트 제어다(스펙 [0006](../spec/0006-agent-control.md), 운영자 결정 2026-11-21). 0146(Workspace 티켓 앞뒤 지시, 받은 지시서)이 먼저이고, 0147(에이전트에게 보내기)·0148(Human Check 요청)·0149(이어서 맡기기)·0150(PR 정보)은 Run 상세와 지시서·통신 규약 코드를 함께 건드려 0146 뒤에 한다. 0147·0148·0150은 Run 상세 파일이 겹칠 수 있어 함께 돌리면 병합할 때 맞춘다.
 - 검증 티켓(0009~0012)과 0019·0030·0031은 운영자가 준비할 테스트 환경이나 계정이 필요하다. 필요한 것은 각 티켓에 적었다. 0009는 끝났다(7번은 1단계 이후).
 
 ## 운영자 준비 대기

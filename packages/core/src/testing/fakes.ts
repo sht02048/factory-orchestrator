@@ -203,8 +203,11 @@ export interface FakeRunnerRun {
   unreportedStop: UnreportedStop | null;
 }
 
+export const FAKE_AGENT_PROTOCOL = "## Fake protocol\n\n- ask the operator with ask.";
+
 export class FakeRunner implements Runner {
   readonly kind: RunnerKind;
+  agentProtocol = FAKE_AGENT_PROTOCOL;
   readonly runs = new Map<string, FakeRunnerRun>();
   readonly removed: WorktreeRef[] = [];
   readonly worktreeWork = new Map<

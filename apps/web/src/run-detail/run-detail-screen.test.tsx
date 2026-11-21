@@ -9,6 +9,9 @@ import {
   recordPermissionWaits,
   recordRunQuestions,
   recordStartFailure,
+  recordStartRequested,
+  saveWorkspaceBrief,
+  toWorkspaceId,
   updateRunRecords,
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
@@ -72,6 +75,44 @@ function found(db: Database, id: string | undefined): RunDetail {
   if (p.kind !== "found") throw new Error("not found");
   return p.run;
 }
+
+describe("Run 상세의 받은 지시서 (0146)", () => {
+  it("시작한 런은 받은 지시서 전체를 접은 채로 보이고, 줄바꿈을 그대로 둔다", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-90", 900);
+    const brief = "Read AGENTS.md first.\n\nACME-90 Fix totals\n\n## 운영자에게 물을 때\n";
+    recordStartRequested(db, id, minutes(900), brief);
+    walk(db, id, 900, [startedOn("ACME-90")]);
+    const html = render(page(db, id));
+    const details = html.slice(html.indexOf("<details"), html.indexOf("</details>"));
+    expect(details).not.toContain(" open");
+    expect(text(details)).toContain(runJson.brief.title);
+    expect(details).toContain(`aria-label="${runJson.brief.label}"`);
+    expect(details).toContain("Read AGENTS.md first.\n\nACME-90 Fix totals");
+  });
+
+  it("Workspace 지시를 바꿔도 이미 시작한 런의 받은 지시서는 그대로다", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-91", 910);
+    recordStartRequested(db, id, minutes(910), "Old rule.\n\nACME-91\n");
+    walk(db, id, 910, [startedOn("ACME-91")]);
+    saveWorkspaceBrief(db, {
+      id: toWorkspaceId(found(db, id).workspace.id),
+      brief: { before: "New rule.", after: "" },
+    });
+    expect(found(db, id).brief).toBe("Old rule.\n\nACME-91\n");
+  });
+
+  it("지시서를 보내기 전이거나 시작하지 못한 런에는 받은 지시서 구역이 없다", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-92", 920);
+    recordStartRequested(db, id, minutes(920), "never received");
+    expect(found(db, id).brief).toBeNull();
+    walk(db, id, 920, [{ to: "ended", agentResult: "could-not-start", prState: "none" }]);
+    expect(found(db, id).brief).toBeNull();
+    expect(render(page(db, id))).not.toContain(runJson.brief.title);
+  });
+});
 
 describe("Run 상세 화면", () => {
   it("에이전트 결과 아홉과 PR 상태 넷이 각각의 칸에, 요약 결과(Canceled 포함)가 계산 표대로 보인다", () => {

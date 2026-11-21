@@ -1,4 +1,5 @@
 export {
+  FAKE_AGENT_PROTOCOL,
   FakeCodeHost,
   FakeRunner,
   FakeTracker,

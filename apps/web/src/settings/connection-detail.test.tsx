@@ -41,6 +41,7 @@ const ADDRESS = "https://hooks.example.com";
 
 const noopActions: SettingsActions = {
   saveGeneral: () => Promise.resolve({ ok: true }),
+  saveBrief: () => Promise.resolve({ ok: true }),
   addProject: () => Promise.resolve({ ok: true }),
   removeProject: () => Promise.resolve({ ok: true }),
   saveMapping: () => Promise.resolve({ ok: true }),
