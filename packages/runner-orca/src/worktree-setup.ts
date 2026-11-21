@@ -95,6 +95,7 @@ export type SharedSetup = { kind: "found"; script: string | null } | { kind: "un
 const UNREADABLE: SharedSetup = { kind: "unreadable" };
 
 export function parseSharedSetup(yaml: string): SharedSetup {
+  if (yaml.startsWith("﻿")) return UNREADABLE;
   const lines = yaml.replaceAll("\r\n", "\n").split("\n");
   const scriptsAt = lines.findIndex((line) => /^["']?scripts["']?\s*:/.test(line));
   if (scriptsAt === -1) return { kind: "found", script: null };
@@ -109,7 +110,7 @@ export function parseSharedSetup(yaml: string): SharedSetup {
   if (firstKey === undefined) return { kind: "found", script: null };
   const keyIndent = indentOf(firstKey);
   const keys = section.filter((line) => isContent(line) && indentOf(line) === keyIndent);
-  if (keys.some((line) => /^\s*["']setup["']\s*:/.test(line))) return UNREADABLE;
+  if (keys.some((line) => /^\s*(["']setup["']|["']?<<["']?)\s*:/.test(line))) return UNREADABLE;
   const setupAt = section.findIndex(
     (line) => indentOf(line) === keyIndent && /^\s*setup\s*:/.test(line),
   );
@@ -173,13 +174,41 @@ export function effectiveSetupScript(input: {
   local: string | null | undefined;
   shared: string | null;
 }): string | null {
-  const local = input.local?.trim() ?? "";
-  const shared = input.shared?.trim() ?? "";
-  const policy = input.policy ?? (local === "" ? "shared-only" : "local-only");
+  const local = input.local?.replaceAll("\r\n", "\n").trim() ?? "";
+  const shared = input.shared?.replaceAll("\r\n", "\n").trim() ?? "";
+  const policy =
+    input.policy === undefined
+      ? local === ""
+        ? "shared-only"
+        : "local-only"
+      : (input.policy ?? "shared-only");
   const parts =
     policy === "local-only" ? [local] : policy === "run-both" ? [shared, local] : [shared];
   const script = parts.filter((part) => part !== "").join("\n\n");
-  return script === "" ? null : script;
+  return script === "" ? null : withShebangOptions(script);
+}
+
+function withShebangOptions(script: string): string {
+  const [first = "", ...rest] = script.split("\n");
+  const shebang = /^#!\s*(?:\/usr\/bin\/env\s+)?\S*\b(?:ba|z|da|k|a)?sh((?:\s+\S+)+)\s*$/.exec(
+    first,
+  );
+  const options = shebang?.[1]?.trim().split(/\s+/) ?? [];
+  if (options.length === 0 || !areShellOptions(options)) return script;
+  return [`set ${options.join(" ")}`, ...rest].join("\n");
+}
+
+function areShellOptions(tokens: ReadonlyArray<string>): boolean {
+  for (let at = 0; at < tokens.length; at += 1) {
+    const token = tokens[at] ?? "";
+    if (/^[-+][abefhkmnptuvxBCHP]*o$/.test(token)) {
+      at += 1;
+      if (!/^[a-z_]+$/.test(tokens[at] ?? "")) return false;
+    } else if (!/^[-+][abefhkmnptuvxBCHP]+$/.test(token)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function setupFailureReason(result: RemoteResult): string {

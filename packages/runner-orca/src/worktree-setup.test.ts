@@ -76,6 +76,8 @@ describe("parseSharedSetup", () => {
     ["따옴표 키", 'scripts:\n  "setup": pnpm install\n'],
     ["여러 줄 일반 값", "scripts:\n  setup: pnpm install\n    --frozen-lockfile\n"],
     ["들여쓰기 지정 블록", "scripts:\n  setup: |2\n    pnpm install\n"],
+    ["병합 키", "x: &c\n  setup: pnpm i\nscripts:\n  <<: *c\n"],
+    ["BOM", "﻿scripts:\n  setup: pnpm i\n"],
   ])("%s는 건너뛰거나 자르지 않고 읽지 못했다고 돌려준다", (_name, yaml) => {
     expect(parseSharedSetup(yaml)).toEqual({ kind: "unreadable" });
   });
@@ -91,6 +93,25 @@ describe("effectiveSetupScript", () => {
     expect(effectiveSetupScript({ policy: "local-only", local: "l", shared: "s" })).toBe("l");
     expect(effectiveSetupScript({ policy: "shared-only", local: "l", shared: "s" })).toBe("s");
     expect(effectiveSetupScript({ policy: "run-both", local: "l", shared: "s" })).toBe("s\n\nl");
+  });
+
+  test("첫 줄의 셸 옵션을 set으로 옮기고 줄바꿈을 LF로 맞춘다", () => {
+    expect(
+      effectiveSetupScript({
+        policy: "local-only",
+        local: "#!/bin/bash -eo pipefail\r\nfalse | cat\r\necho reached",
+        shared: null,
+      }),
+    ).toBe("set -eo pipefail\nfalse | cat\necho reached");
+  });
+
+  test("옵션이 없는 첫 줄은 그대로 둔다", () => {
+    const local = "#!/usr/bin/env bash\npnpm i";
+    expect(effectiveSetupScript({ policy: "local-only", local, shared: null })).toBe(local);
+  });
+
+  test("정책이 null이면 공유 스크립트를 쓴다", () => {
+    expect(effectiveSetupScript({ policy: null, local: "l", shared: "s" })).toBe("s");
   });
 
   test("고른 곳에 스크립트가 없으면 없다", () => {

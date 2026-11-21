@@ -284,7 +284,13 @@ async function processQueue(context: TickContext): Promise<void> {
     for (const pending of pendingStarts.values()) {
       runs.push({ runnerId: pending.runnerId, state: "running" });
     }
+    const settingUp = (runId: RunId): boolean =>
+      context.worktreeSetups.get(runId)?.outcome === null;
+    for (const run of queued) {
+      if (settingUp(run.id)) runs.push({ runnerId: run.runnerId, state: "running" });
+    }
     const candidates = queued
+      .filter((run) => !settingUp(run.id))
       .flatMap((run) => toQueuedRun(context, run))
       .map((run) =>
         bound.has(run.id) ? { ...run, unstartable: false, startRequested: true } : run,
