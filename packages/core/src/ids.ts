@@ -16,6 +16,8 @@ export type RunnerId = Brand<string, "RunnerId">;
 export type RunnerProjectId = Brand<string, "RunnerProjectId">;
 export type WorktreeRef = Brand<string, "WorktreeRef">;
 export type RunId = Brand<string, "RunId">;
+export type AgentMessageRequestId = Brand<string, "AgentMessageRequestId">;
+export type FollowUpRef = Brand<string, "FollowUpRef">;
 export type AgentId = Brand<string, "AgentId">;
 export type AgentRef = Brand<string, "AgentRef">;
 export type MailboxRef = Brand<string, "MailboxRef">;
@@ -60,4 +62,7 @@ export const toRunnerProjectId = (value: string): RunnerProjectId =>
   brand("RunnerProjectId", value);
 export const toWorktreeRef = (value: string): WorktreeRef => brand("WorktreeRef", value);
 export const toRunId = (value: string): RunId => brand("RunId", value);
+export const toFollowUpRef = (value: string): FollowUpRef => brand("FollowUpRef", value);
+export const toAgentMessageRequestId = (value: string): AgentMessageRequestId =>
+  brand("AgentMessageRequestId", value);
 export const toRepoRef = (value: string): RepoRef => brand("RepoRef", value);

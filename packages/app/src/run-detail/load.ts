@@ -1,5 +1,11 @@
 import { prSignalsViewOf } from "../pr-signals-view.js";
-import { runDurations, summarizeRunOutcome, toRunId } from "@ganger/core";
+import {
+  acceptsAgentMessage,
+  isAgentMessageFailure,
+  runDurations,
+  summarizeRunOutcome,
+  toRunId,
+} from "@ganger/core";
 import type { CiState, QueuedRun, RunId, WorktreeDisposition } from "@ganger/core";
 import {
   getLogTailRequest,
@@ -7,6 +13,7 @@ import {
   getRunWithRecords,
   getWorkspaceTrackerProject,
   getRunCancelRequest,
+  listRunAgentMessages,
   listRunMcpActions,
   listRunPlacements,
   listRunPermissionWaits,
@@ -22,6 +29,7 @@ import type {
   Database,
   RunRecords,
   RunStateChangeRecord,
+  StoredAgentMessage,
   StoredMcpAction,
   StoredRun,
   StoredPermissionWait,
@@ -33,6 +41,7 @@ import { mcpActionView } from "../mcp/actions.js";
 import type { QueuedReason } from "../runs/model.js";
 import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
 import type {
+  AgentMessageDelivery,
   CiView,
   KeptWorktree,
   KeptWorktreeReason,
@@ -60,6 +69,12 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
   const questions = listRunQuestions(db, run.id);
   const permissionWaits = listRunPermissionWaits(db, run.id);
   const cancelRequest = getRunCancelRequest(db, run.id);
+  const cancelPending =
+    run.state !== "ended" && cancelRequest !== null && cancelRequest.processedAt === null;
+  const agentMessages = listRunAgentMessages(db, run.id).map((message) => ({
+    message,
+    delivery: deliveryOf(message, run, records),
+  }));
 
   const detail: RunDetail = {
     id: run.id,
@@ -97,9 +112,12 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
         : records.agentBrief,
     startError:
       run.state === "ended" && run.agentResult === "could-not-start" ? records.startError : null,
-    cancelPending:
-      run.state !== "ended" && cancelRequest !== null && cancelRequest.processedAt === null,
+    cancelPending,
     control: run.state === "running" || run.state === "paused" ? runControlOf(db, run, now) : null,
+    agentMessage: {
+      accepting: acceptsAgentMessage(run.state) && !cancelPending,
+      latest: agentMessages.at(-1)?.delivery ?? null,
+    },
     timeline: timelineOf(
       run,
       records,
@@ -108,6 +126,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
       permissionWaits,
       cancelRequest?.requestedAt ?? null,
       listRunMcpActions(db, run.id),
+      agentMessages,
     ),
     log: logOf(db, run, records),
     otherRuns: otherRunsOf(db, run),
@@ -240,8 +259,17 @@ function timelineOf(
   permissionWaits: ReadonlyArray<StoredPermissionWait>,
   cancelRequestedAt: Date | null,
   mcpActions: ReadonlyArray<StoredMcpAction>,
+  agentMessages: ReadonlyArray<{ message: StoredAgentMessage; delivery: AgentMessageDelivery }>,
 ): TimelineEvent[] {
   const events: TimelineEvent[] = [];
+  for (const { message, delivery } of agentMessages) {
+    events.push({
+      kind: "operator-message",
+      body: message.body,
+      delivery,
+      at: message.requestedAt.toISOString(),
+    });
+  }
   for (const action of mcpActions) {
     const view = mcpActionView(action);
     events.push({
@@ -291,6 +319,27 @@ function timelineOf(
     });
   }
   return events.toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at));
+}
+
+function deliveryOf(
+  message: StoredAgentMessage,
+  run: StoredRun,
+  records: RunRecords,
+): AgentMessageDelivery {
+  if (message.completedAt !== null) {
+    if (message.error === null) return { status: "sent" };
+    return {
+      status: "failed",
+      reason: isAgentMessageFailure(message.error) ? message.error : "unknown",
+    };
+  }
+  if (message.followUpRef !== null) return { status: "stopping-follow-up" };
+  if (message.sendStartedAt !== null) return { status: "sending" };
+  if (run.state === "paused") return { status: "after-resume" };
+  if (run.state === "disconnected") {
+    return { status: records.pausedSince === null ? "after-reconnect" : "after-resume" };
+  }
+  return { status: "sending" };
 }
 
 function changeEvent(run: StoredRun, change: RunStateChangeRecord): TimelineEvent | null {

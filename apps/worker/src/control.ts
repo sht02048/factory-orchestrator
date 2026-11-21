@@ -137,7 +137,7 @@ async function restartPromptFor(
   return `${messages.resume.restartPreamble}\n\n${ticketText}`;
 }
 
-function failureOf(detail: RunnerErrorDetail | null): RunControlFailure {
+export function failureOf(detail: RunnerErrorDetail | null): RunControlFailure {
   if (detail === null) return "runner-error";
   switch (detail.kind) {
     case "unreachable":
