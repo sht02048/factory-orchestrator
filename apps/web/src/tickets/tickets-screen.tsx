@@ -12,6 +12,7 @@ import {
   MascotMessage,
   NoticeLayout,
   PageHeader,
+  PanelSection,
   ScreenLayout,
   PanelFooter,
   RowTitle,
@@ -137,6 +138,7 @@ function useReread(onReread: () => Promise<void>, page: TicketsPage) {
   const [result, setResult] = useState<RereadResult>("idle");
   const failedProjects = page.errors.length;
   const [failedOn, setFailedOn] = useState<TicketsPage | null>(null);
+  const [rereads, setRereads] = useState(0);
   if (result === "failed" && failedOn !== null && failedOn !== page) {
     setResult("idle");
     setFailedOn(null);
@@ -153,14 +155,17 @@ function useReread(onReread: () => Promise<void>, page: TicketsPage) {
   const start = () => {
     setResult("reading");
     onReread().then(
-      () => setResult("checking"),
+      () => {
+        setRereads((count) => count + 1);
+        setResult("checking");
+      },
       () => {
         setFailedOn(page);
         setResult("failed");
       },
     );
   };
-  return { result, start };
+  return { result, rereads, start };
 }
 
 export const REREAD_ANNOUNCE_MS = 5_000;
@@ -386,6 +391,7 @@ function TicketsList({
                 onOpenRun={onOpenRun}
                 onAssign={onAssign}
                 onReadBlockers={onReadBlockers}
+                rereads={reread.rereads}
                 onAssigned={() => {
                   setAssignedId(selected.id);
                   onAssigned(selected.id);
@@ -479,13 +485,20 @@ function WaitMark({ wait }: { wait: BlockerReason }) {
   const unfinished = wait.blockers.filter((blocker) => !isBlockerFinished(blocker.stateCategory));
   if (wait.kind === "blockers-stuck") {
     const shown = wait.blocker ?? unfinished[0];
+    const cause = t(`stuckCause.${wait.cause}`);
     return (
       <span {...stylex.props(styles.waitMark)}>
-        <BlockerChip
-          state="canceled"
-          ticketKey={shown?.key ?? ""}
-          stateName={t(`stuckCause.${wait.cause}`)}
-        />
+        {shown === undefined ? (
+          <Text variant="meta" tone="problem">
+            {cause}
+          </Text>
+        ) : (
+          <BlockerChip
+            state={wait.cause === "canceled" ? "canceled" : "stuck"}
+            ticketKey={shown.key}
+            stateName={cause}
+          />
+        )}
       </span>
     );
   }
@@ -508,6 +521,7 @@ type BlockerRead = { status: "reading" } | { status: "done"; result: TicketBlock
 function useTicketBlockers(
   ticket: TicketView,
   onReadBlockers: TicketsScreenProps["onReadBlockers"],
+  rereads: number,
 ): BlockerRead {
   const [read, setRead] = useState<BlockerRead>({ status: "reading" });
   const stored = ticket.blockerWait;
@@ -525,7 +539,7 @@ function useTicketBlockers(
     return () => {
       current = false;
     };
-  }, [ticket.id, stored === null]);
+  }, [ticket.id, stored === null, rereads]);
   return stored === null
     ? read
     : { status: "done", result: { ok: true, blockers: allBlockersOf(stored) } };
@@ -534,18 +548,17 @@ function useTicketBlockers(
 function TicketRelations({
   ticket,
   onReadBlockers,
+  rereads,
 }: {
   ticket: TicketView;
   onReadBlockers: TicketsScreenProps["onReadBlockers"];
+  rereads: number;
 }) {
   const t = useTranslations("tickets.panel");
-  const read = useTicketBlockers(ticket, onReadBlockers);
+  const read = useTicketBlockers(ticket, onReadBlockers, rereads);
   return (
     <>
-      <div {...stylex.props(styles.relation)}>
-        <Text variant="label" as="h3">
-          {t("blockers")}
-        </Text>
+      <PanelSection title={t("blockers")}>
         {read.status === "reading" ? (
           <Text variant="meta">{t("blockersReading")}</Text>
         ) : !read.result.ok ? (
@@ -557,11 +570,8 @@ function TicketRelations({
         ) : (
           <BlockerRows blockers={read.result.blockers} />
         )}
-      </div>
-      <div {...stylex.props(styles.relation)}>
-        <Text variant="label" as="h3">
-          {t("waiting")}
-        </Text>
+      </PanelSection>
+      <PanelSection title={t("waiting")}>
         {ticket.waitingTickets.length === 0 ? (
           <Text variant="meta">{t("waitingNone")}</Text>
         ) : (
@@ -576,7 +586,7 @@ function TicketRelations({
             ))}
           </ul>
         )}
-      </div>
+      </PanelSection>
       <Text variant="meta">{t("relationsNote")}</Text>
     </>
   );
@@ -616,6 +626,7 @@ function TicketPanel({
   onOpenRun,
   onAssign,
   onReadBlockers,
+  rereads,
   onAssigned,
   focusOpenRun,
   onFocusedOpenRun,
@@ -625,6 +636,7 @@ function TicketPanel({
   onOpenRun: (runId: string) => void;
   onAssign: TicketsScreenProps["onAssign"];
   onReadBlockers: TicketsScreenProps["onReadBlockers"];
+  rereads: number;
   onAssigned: () => void;
   focusOpenRun: boolean;
   onFocusedOpenRun: () => void;
@@ -691,7 +703,7 @@ function TicketPanel({
           </Actions>
         </div>
       </Card>
-      <TicketRelations ticket={ticket} onReadBlockers={onReadBlockers} />
+      <TicketRelations ticket={ticket} onReadBlockers={onReadBlockers} rereads={rereads} />
       <DefinitionList>
         <DefinitionItem label={t("labels")} empty={labels.length === 0}>
           {labels.length === 0 ? (
@@ -813,7 +825,6 @@ const styles = stylex.create({
   titleLine: { display: "flex", alignItems: "center", gap: space.s2, minWidth: 0 },
   titleText: { display: "grid", flexShrink: 1, minWidth: 0 },
   waitMark: { display: "inline-flex", flexShrink: 0, alignItems: "center", gap: space.s1 },
-  relation: { display: "flex", flexDirection: "column", gap: space.s2 },
   waitingList: {
     display: "flex",
     flexDirection: "column",

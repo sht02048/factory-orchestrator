@@ -106,8 +106,8 @@ export function KanbanCard({
           styles.openRadius,
           keyed && styles.openKeyed,
           action !== undefined && styles.openWithAction,
-          stuck && styles.stuck,
           selected && styles.selected,
+          stuck && (selected ? styles.stuckSelected : styles.stuck),
         )}
       >
         {keyed ? (
@@ -285,6 +285,7 @@ const styles = stylex.create({
     outline: { default: "none", ":focus-visible": `2px solid ${colors.textPrimary}` },
   },
   stuck: { boxShadow: `inset 0 0 0 1px ${colors.problemBorder}` },
+  stuckSelected: { boxShadow: `inset 0 0 0 1px ${colors.problem}` },
   contents: { display: "contents" },
   identity: {
     display: "grid",

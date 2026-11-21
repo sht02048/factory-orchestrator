@@ -11,10 +11,15 @@ import { INVALIDATED_KEYS } from "../../change-events/invalidation";
 import { ScreenMessages, defaultLocale } from "../../i18n";
 import { okOrThrow, rejectionReasonOf, toMutationError } from "../../query/mutation-error";
 import { loadCachedRouteQuery, loadRouteQuery } from "../../query/route-query";
-import { assignTicket, getTicketBlockers, rereadTrackers } from "../../server/functions";
+import { assignTicket, rereadTrackers } from "../../server/functions";
 import { useShell } from "../../shell/shell-query";
 import { ticketsMessages } from "../../tickets/messages";
-import { TRACKER_KEY, ticketRunsQuery, trackerTicketsQuery } from "../../tickets/tickets-query";
+import {
+  TRACKER_KEY,
+  ticketBlockersQuery,
+  ticketRunsQuery,
+  trackerTicketsQuery,
+} from "../../tickets/tickets-query";
 import { TicketsScreen } from "../../tickets/tickets-screen";
 import { ScreenError } from "../../shell/screen-error";
 
@@ -99,9 +104,7 @@ function TicketsRoute() {
             resetScroll: false,
           });
         }}
-        onReadBlockers={(ticket) =>
-          getTicketBlockers({ data: { ws, connection: ticket.connection, key: ticket.key } })
-        }
+        onReadBlockers={(ticket) => queryClient.fetchQuery(ticketBlockersQuery(ws, ticket))}
         onReread={async () => {
           await rereadTrackers();
           await queryClient.invalidateQueries({ queryKey: TRACKER_KEY });

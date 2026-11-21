@@ -3,15 +3,17 @@ import type { ReactNode } from "react";
 import { statusDotStyles } from "./status-dot";
 import type { PillStatus } from "./status-pill";
 import { textStyles } from "./text";
+import { VisuallyHidden } from "./visually-hidden";
 import { colors, radius, size, space } from "../tokens.stylex";
 
-export type BlockerChipState = "waiting" | "active" | "done" | "canceled";
+export type BlockerChipState = "waiting" | "active" | "done" | "canceled" | "stuck";
 
 const DOT_STATUS: Record<BlockerChipState, PillStatus> = {
   waiting: "queued",
   active: "running",
   done: "succeeded",
   canceled: "failed",
+  stuck: "failed",
 };
 
 export function blockerDotStyles(state: BlockerChipState) {
@@ -25,7 +27,7 @@ export interface BlockerChipProps {
 }
 
 export function BlockerChip({ state, ticketKey, stateName }: BlockerChipProps) {
-  const canceled = state === "canceled";
+  const problem = state === "canceled" || state === "stuck";
   return (
     <span
       data-blocker-state={state}
@@ -33,12 +35,12 @@ export function BlockerChip({ state, ticketKey, stateName }: BlockerChipProps) {
         textStyles("meta"),
         styles.chip,
         state === "done" && styles.chipDone,
-        canceled && styles.chipCanceled,
+        problem && styles.chipProblem,
       )}
     >
       <span aria-hidden="true" {...stylex.props(blockerDotStyles(state))} />
       <span {...stylex.props(styles.key, state === "done" && styles.keyDone)}>{ticketKey}</span>
-      <span {...stylex.props(!canceled && styles.screenReaderOnly)}>{stateName}</span>
+      {problem ? <span>{stateName}</span> : <VisuallyHidden>{stateName}</VisuallyHidden>}
     </span>
   );
 }
@@ -63,7 +65,7 @@ const styles = stylex.create({
     whiteSpace: "nowrap",
   },
   chipDone: { color: colors.textTertiary },
-  chipCanceled: { backgroundColor: colors.problemSoft, color: colors.problem },
+  chipProblem: { backgroundColor: colors.problemSoft, color: colors.problem },
   dotDone: { opacity: 0.5 },
   key: {
     minWidth: 0,
@@ -72,15 +74,4 @@ const styles = stylex.create({
     fontVariantNumeric: "tabular-nums",
   },
   keyDone: { textDecorationLine: "line-through" },
-  screenReaderOnly: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    margin: -1,
-    padding: 0,
-    overflow: "hidden",
-    clipPath: "inset(50%)",
-    whiteSpace: "nowrap",
-    borderWidth: 0,
-  },
 });

@@ -163,10 +163,12 @@ export async function loadTicketBlockers(
     secrets: stored.secrets,
   });
   try {
-    const relations = await tracker.getTicketRelations?.(toTicketKey(input.key));
+    if (tracker.getTicketRelations === undefined) return { ok: true, blockers: [] };
+    const relations = await tracker.getTicketRelations(toTicketKey(input.key));
+    if (relations === null) return { ok: false };
     return {
       ok: true,
-      blockers: (relations?.blockers ?? []).map((blocker) => ({
+      blockers: relations.blockers.map((blocker) => ({
         key: blocker.key,
         title: blocker.title,
         stateName: blocker.state.name,

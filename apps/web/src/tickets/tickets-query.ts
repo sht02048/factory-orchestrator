@@ -2,7 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import type { TrackerTicketsData } from "@ganger/app/tickets/model";
 import { DB_STALE_TIME_MS } from "../query/query-client";
-import { getTicketRuns, getTrackerTickets } from "../server/functions";
+import { getTicketBlockers, getTicketRuns, getTrackerTickets } from "../server/functions";
 
 export const TRACKER_STALE_TIME_MS = 5 * 60_000;
 export const TRACKER_KEY = ["tracker"] as const;
@@ -16,6 +16,20 @@ export function ticketRunsQuery(ws: string | undefined) {
   return queryOptions({
     queryKey: [...TICKET_RUNS_KEY, wsKey(ws)],
     queryFn: () => getTicketRuns({ data: { ws } }),
+  });
+}
+
+export const TICKET_BLOCKERS_STALE_TIME_MS = 30_000;
+
+export function ticketBlockersQuery(
+  ws: string | undefined,
+  ticket: { connection: string; key: string },
+) {
+  return queryOptions({
+    queryKey: [...TRACKER_KEY, "blockers", wsKey(ws), ticket.connection, ticket.key],
+    queryFn: () =>
+      getTicketBlockers({ data: { ws, connection: ticket.connection, key: ticket.key } }),
+    staleTime: (query) => (query.state.data?.ok === true ? TICKET_BLOCKERS_STALE_TIME_MS : 0),
   });
 }
 
