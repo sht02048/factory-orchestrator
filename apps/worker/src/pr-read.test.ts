@@ -1,4 +1,4 @@
-import { AdapterError, summarizeRunOutcome } from "@ganger/core";
+import { AdapterError, summarizeRunOutcome, toPullRequestId } from "@ganger/core";
 import type {
   CodeHostErrorDetail,
   PrReadError,
@@ -22,6 +22,7 @@ import {
   PR_READ_RETRY_MAX_MS,
   prReadErrorOf,
   prReadRetryDelayMs,
+  pullRequestRecord,
 } from "./context.js";
 import { Harness, projectA } from "./test-fixtures.js";
 import type { Worker } from "./worker.js";
@@ -360,5 +361,33 @@ describe("이유 구분", () => {
     ["not an error", "other"],
   ] as const)("%o 는 %s", (error, reason) => {
     expect(prReadErrorOf(error)).toBe(reason);
+  });
+});
+
+describe("PR 기록 만들기 (0150)", () => {
+  const snapshot = {
+    id: toPullRequestId("7"),
+    displayId: "#7",
+    url: "https://code.example.com/acme/web/pull/7",
+    title: "ACME-7",
+    body: "",
+    createdAt: new Date(0),
+    mergedAt: null,
+    headBranch: "feat/acme-7",
+    sourceRepo: null,
+    headCommit: "abc",
+    baseBranch: "main",
+    ci: "failure",
+    signals: null,
+  };
+
+  it.each(["merged", "closed"])("PR 정보를 못 읽어도 %s PR 은 열림이 아니라고 적는다", (state) => {
+    const record = pullRequestRecord({ ...snapshot, state }, new Date(1));
+    expect(record.signals).toMatchObject({ open: false, ciFailed: false, conflict: null });
+  });
+
+  it("PR 정보를 못 읽은 열린 PR 은 값을 지어내지 않는다", () => {
+    const record = pullRequestRecord({ ...snapshot, state: "open" }, new Date(1));
+    expect(record.signals).toBeNull();
   });
 });

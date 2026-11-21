@@ -49,6 +49,7 @@ import {
   reportFailure,
   tryWrite,
   runLogContext,
+  pullRequestRecord,
 } from "./context.js";
 import type { ActiveRun, PendingEnding, PrRead, TickContext } from "./context.js";
 
@@ -463,10 +464,7 @@ function endRun(
     if (prRead.kind === "read") {
       const pr = prRead.decision.pr;
       updateRunRecords(db, run.id, {
-        pullRequest:
-          pr === null
-            ? null
-            : { id: pr.id, displayId: pr.displayId, url: pr.url, ci: pr.ci, checkedAt: endedAt },
+        pullRequest: pr === null ? null : pullRequestRecord(pr, endedAt),
       });
     }
     return true;

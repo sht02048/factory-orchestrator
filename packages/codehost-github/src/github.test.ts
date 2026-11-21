@@ -97,6 +97,7 @@ describe("브랜치로 PR 찾기", () => {
       headCommit: "3333333333333333333333333333333333333333",
       baseBranch: "main",
       ci: "success",
+      signals: null,
     });
     const actions = actionsRequests(sent);
     expect(actions).toHaveLength(1);

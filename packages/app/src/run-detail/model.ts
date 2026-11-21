@@ -9,6 +9,7 @@ import type {
 } from "@ganger/core";
 import type { McpActionOutcome } from "@ganger/db";
 import type { InputWait } from "../home/model.js";
+import type { PrSignalsView } from "../pr-signals-view.js";
 import type { RunControlView } from "../run-control-view.js";
 import type { QueuedReason } from "../runs/model.js";
 
@@ -121,7 +122,12 @@ export interface RunDetail {
   waitMs: number;
   executionMs: number | null;
   status: RunDetailStatus;
-  pullRequest: { displayId: string; url: string; ci: CiView } | null;
+  pullRequest: {
+    displayId: string;
+    url: string;
+    ci: CiView;
+    signals: PrSignalsView | null;
+  } | null;
   report: string | null;
   brief: string | null;
   startError: string | null;

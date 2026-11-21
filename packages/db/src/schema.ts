@@ -1,3 +1,4 @@
+import type { PullRequestSignals } from "@ganger/core";
 import {
   AGENT_RESULTS,
   NOT_STARTED_AGENT_RESULTS,
@@ -282,6 +283,8 @@ export const runs = sqliteTable(
     prUrl: text("pr_url"),
     prCiState: text("pr_ci_state"),
     prCheckedAt: timeMs("pr_checked_at"),
+    prSignals: text("pr_signals", { mode: "json" }).$type<PullRequestSignals>(),
+    prSignalsReadAt: timeMs("pr_signals_read_at"),
     laterPrState: text("later_pr_state", { enum: LATER_PR_STATES }),
     laterPrStateAt: timeMs("later_pr_state_at"),
     worktreeRemovedAt: timeMs("worktree_removed_at"),

@@ -1,3 +1,4 @@
+import { prSignalsViewOf } from "../pr-signals-view.js";
 import {
   acceptsAgentMessage,
   isAgentMessageFailure,
@@ -98,7 +99,12 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     pullRequest:
       pr === null || !isWebUrl(pr.url)
         ? null
-        : { displayId: pr.displayId, url: pr.url, ci: toCiView(pr.ci) },
+        : {
+            displayId: pr.displayId,
+            url: pr.url,
+            ci: toCiView(pr.ci),
+            signals: prSignalsViewOf(run, records),
+          },
     report: records.reportBody,
     brief:
       run.state === "queued" || (run.state === "ended" && run.startedAt === null)

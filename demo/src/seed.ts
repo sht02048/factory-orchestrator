@@ -365,11 +365,42 @@ function end(
             id: toPullRequestId(`pr-${input.prNumber}`),
             displayId: `#${input.prNumber}`,
             url: `https://code.example.com/${input.repo}/pull/${input.prNumber}`,
-            ci: "success",
+            ...demoChecks(ending.prState, input.prNumber),
             checkedAt: at,
           },
         }),
   });
+}
+
+function demoChecks(prState: Ending["prState"], prNumber: number) {
+  const base = {
+    headCommit: `demo-${prNumber}`,
+    ciFailed: false,
+    checkTotal: 6,
+    failedCount: 0,
+    failedChecks: [],
+    checksTruncated: false,
+  };
+  if (prState !== "open") {
+    return {
+      ci: "success",
+      signals: { ...base, open: false, conflict: null, behindBy: null },
+    };
+  }
+  return prNumber % 2 === 0
+    ? {
+        ci: "failure",
+        signals: {
+          ...base,
+          open: true,
+          ciFailed: true,
+          failedCount: 1,
+          failedChecks: ["lint"],
+          conflict: true,
+          behindBy: 4,
+        },
+      }
+    : { ci: "success", signals: { ...base, open: true, conflict: false, behindBy: 2 } };
 }
 
 const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 8, 9, 21, 22, 23, 24, 25, 26], GLX: [2] };

@@ -333,6 +333,18 @@ export interface Runner {
 
 export type CiState = "success" | "failure" | "pending" | "none" | "unavailable" | (string & {});
 
+export interface PullRequestSignals {
+  open: boolean;
+  headCommit: string;
+  ciFailed: boolean;
+  checkTotal: number | null;
+  failedCount: number;
+  failedChecks: ReadonlyArray<string>;
+  checksTruncated: boolean;
+  conflict: boolean | null;
+  behindBy: number | null;
+}
+
 export interface PullRequestSnapshot {
   id: PullRequestId;
   displayId: string;
@@ -347,6 +359,7 @@ export interface PullRequestSnapshot {
   headCommit: string;
   baseBranch: string;
   ci: CiState;
+  signals?: PullRequestSignals | null;
 }
 
 export type CodeHostErrorDetail =
