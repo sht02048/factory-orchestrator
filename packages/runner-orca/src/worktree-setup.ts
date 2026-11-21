@@ -1,17 +1,47 @@
+import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import type { RemoteResult } from "./ssh.js";
 
-const SETUP_MARKER = "ganger-setup-pending";
+const SETUP_MARKER_DIR = "ganger-setup-pending";
 const FAILURE_OUTPUT_CHARS = 2000;
-const RUN_SETUP_SCRIPT =
-  'cd "$ORCA_WORKTREE_PATH" && exec "${SHELL:-/bin/sh}" -lc \'exec bash -ec "$1"\' ganger-setup "$1"';
+const KNOWN_SOURCE_POLICIES = new Set(["local-only", "shared-only", "run-both"]);
+export const SETUP_ALREADY_RUNNING_EXIT = 75;
+export const SETUP_SSH_GRACE_MS = 15_000;
 
-export function worktreeAdminDirArgv(path: string): string[] {
-  return ["git", "-C", path, "rev-parse", "--absolute-git-dir"];
+const RUN_SETUP_SCRIPT = `cd "$ORCA_WORKTREE_PATH" || exit 1
+lock=$2
+if [ -f "$lock" ] && kill -0 "$(cat "$lock")" 2>/dev/null; then exit ${String(SETUP_ALREADY_RUNNING_EXIT)}; fi
+echo $$ > "$lock"
+trap 'rm -f "$lock"' EXIT
+set -m
+"\${SHELL:-/bin/sh}" -lc 'exec bash -ec "$1"' ganger-setup "$1" </dev/null &
+job=$!
+set +m
+(
+  i=0
+  while [ "$i" -lt "$3" ]; do
+    sleep 1
+    kill -0 "$job" 2>/dev/null || exit 0
+    i=$((i + 1))
+  done
+  kill -TERM -- "-$job" 2>/dev/null
+  sleep 5
+  kill -KILL -- "-$job" 2>/dev/null
+) </dev/null >/dev/null 2>&1 &
+wait "$job"
+exit $?`;
+
+export function gitCommonDirArgv(repoPath: string): string[] {
+  return ["git", "-C", repoPath, "rev-parse", "--path-format=absolute", "--git-common-dir"];
 }
 
-export function setupMarkerPath(adminDir: string): string {
-  return `${adminDir.trim()}/${SETUP_MARKER}`;
+export function setupMarkerPath(commonDir: string, worktreePath: string): string {
+  const key = createHash("sha256").update(worktreePath).digest("hex").slice(0, 32);
+  return `${commonDir.trim()}/${SETUP_MARKER_DIR}/${key}`;
+}
+
+export function setupMarkerDirArgv(marker: string): string[] {
+  return ["mkdir", "-p", marker.slice(0, marker.lastIndexOf("/"))];
 }
 
 export function markSetupPendingArgv(marker: string): string[] {
@@ -34,8 +64,10 @@ export function runSetupArgv(input: {
   rootPath: string;
   worktreePath: string;
   script: string;
+  lock: string;
+  limitSeconds: number;
 }): string[] {
-  const { rootPath, worktreePath, script } = input;
+  const { rootPath, worktreePath, script, lock, limitSeconds } = input;
   return [
     "env",
     `ORCA_ROOT_PATH=${rootPath}`,
@@ -48,34 +80,48 @@ export function runSetupArgv(input: {
     RUN_SETUP_SCRIPT,
     "ganger-setup",
     script,
+    lock,
+    String(limitSeconds),
   ];
 }
 
 export type SharedSetup = { kind: "found"; script: string | null } | { kind: "unreadable" };
 
+const UNREADABLE: SharedSetup = { kind: "unreadable" };
+
 export function parseSharedSetup(yaml: string): SharedSetup {
   const lines = yaml.replaceAll("\r\n", "\n").split("\n");
-  const scriptsAt = lines.findIndex((line) => /^scripts:\s*(#.*)?$/.test(line));
+  const scriptsAt = lines.findIndex((line) => /^["']?scripts["']?\s*:/.test(line));
   if (scriptsAt === -1) return { kind: "found", script: null };
+  if (!/^scripts:\s*(#.*)?$/.test(lines[scriptsAt] ?? "")) return UNREADABLE;
 
   const section: string[] = [];
   for (const line of lines.slice(scriptsAt + 1)) {
     if (line.trim() !== "" && !/^\s/.test(line) && !line.startsWith("#")) break;
     section.push(line);
   }
-  const firstKey = section.find((line) => line.trim() !== "" && !line.trim().startsWith("#"));
+  const firstKey = section.find(isContent);
   if (firstKey === undefined) return { kind: "found", script: null };
   const keyIndent = indentOf(firstKey);
+  const keys = section.filter((line) => isContent(line) && indentOf(line) === keyIndent);
+  if (keys.some((line) => /^\s*["']setup["']\s*:/.test(line))) return UNREADABLE;
   const setupAt = section.findIndex(
     (line) => indentOf(line) === keyIndent && /^\s*setup\s*:/.test(line),
   );
   if (setupAt === -1) return { kind: "found", script: null };
 
+  const after = section.slice(setupAt + 1);
   const value = (section[setupAt] ?? "").replace(/^\s*setup\s*:\s*/, "");
   if (/^\|[-+]?\s*(#.*)?$/.test(value)) {
-    return { kind: "found", script: blockScalar(section.slice(setupAt + 1), keyIndent) };
+    return { kind: "found", script: blockScalar(after, keyIndent) };
   }
+  const next = after.find(isContent);
+  if (next !== undefined && indentOf(next) > keyIndent) return UNREADABLE;
   return inlineScalar(value);
+}
+
+function isContent(line: string): boolean {
+  return line.trim() !== "" && !line.trim().startsWith("#");
 }
 
 function indentOf(line: string): number {
@@ -101,15 +147,19 @@ function inlineScalar(value: string): SharedSetup {
   if (text.startsWith("'")) {
     const quoted = /^'((?:[^']|'')*)'\s*(#.*)?$/.exec(text);
     return quoted === null
-      ? { kind: "unreadable" }
+      ? UNREADABLE
       : { kind: "found", script: (quoted[1] ?? "").replaceAll("''", "'") };
   }
   if (text.startsWith('"')) {
     const quoted = /^"([^"\\]*)"\s*(#.*)?$/.exec(text);
-    return quoted === null ? { kind: "unreadable" } : { kind: "found", script: quoted[1] ?? "" };
+    return quoted === null ? UNREADABLE : { kind: "found", script: quoted[1] ?? "" };
   }
-  if (/^[>&*!{[]/.test(text)) return { kind: "unreadable" };
+  if (/^[|>&*!{[]/.test(text)) return UNREADABLE;
   return { kind: "found", script: text.replace(/\s+#.*$/, "") };
+}
+
+export function isKnownSetupPolicy(policy: string | null | undefined): boolean {
+  return policy === null || policy === undefined || KNOWN_SOURCE_POLICIES.has(policy);
 }
 
 export function effectiveSetupScript(input: {
@@ -127,6 +177,7 @@ export function effectiveSetupScript(input: {
 }
 
 export function setupFailureReason(result: RemoteResult): string {
+  if (result.exitCode === SETUP_ALREADY_RUNNING_EXIT) return "setup is already running";
   const output = `${result.stdout}\n${result.stderr}`.trim().slice(-FAILURE_OUTPUT_CHARS);
   const head = result.timedOut ? "setup timed out" : `setup exited with ${String(result.exitCode)}`;
   return output === "" ? head : `${head}\n${output}`;

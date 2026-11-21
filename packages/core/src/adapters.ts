@@ -338,6 +338,7 @@ export interface Runner {
     previousAgent?: AgentRef;
   }): Promise<StartedRun | null>;
   prepareContinuation(input: PrepareContinuationInput): Promise<ContinuationPlace>;
+  worktreeSetupPending(input: FinishWorktreeSetupInput): Promise<boolean>;
   finishWorktreeSetup(input: FinishWorktreeSetupInput): Promise<WorktreeSetupResult>;
   isAgentAlive(run: Pick<RunOnRunner, "worktree" | "agentRef">): Promise<boolean>;
 

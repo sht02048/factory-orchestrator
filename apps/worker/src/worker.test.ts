@@ -118,6 +118,28 @@ describe("두 축 기록", () => {
 });
 
 describe("러너별 대기열", () => {
+  it("모든 러너가 꽉 찼을 때 들어온 런은 먼저 빈 러너에서 들어온 순서대로 시작한다(F3)", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const onA = h.assign("ENG-1", projectA);
+    const onB = h.assign("ENG-2", projectA);
+    const worker = h.worker();
+    await worker.tick();
+    expect(new Set([current(onA).runnerId, current(onB).runnerId])).toEqual(
+      new Set([runnerA, runnerB]),
+    );
+
+    const first = h.assign("ENG-3", projectA);
+    const second = h.assign("ENG-4", projectA);
+    await worker.tick();
+    expect([stateOf(first), stateOf(second)]).toEqual(["queued", "queued"]);
+
+    finish(current(onB).runnerId === runnerB ? onB : onA);
+    await worker.tick();
+    expect(current(first)).toMatchObject({ state: "running", runnerId: runnerB });
+    expect(stateOf(second)).toBe("queued");
+  });
+
   it("맨 앞 런의 러너가 꽉 차 있어도 다른 러너의 뒤 런은 시작한다(F3)", async () => {
     const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
     h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });

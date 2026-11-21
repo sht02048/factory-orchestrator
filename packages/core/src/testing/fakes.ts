@@ -232,6 +232,7 @@ export class FakeRunner implements Runner {
   readonly setupCalls: FinishWorktreeSetupInput[] = [];
   readonly pendingSetups = new Set<WorktreeRef>();
   failNextSetup: string | null = null;
+  setupGate: Promise<void> | null = null;
   online = true;
   prerequisites: RunnerPrerequisite[] = [
     {
@@ -468,9 +469,13 @@ export class FakeRunner implements Runner {
     });
   }
 
-  finishWorktreeSetup(input: FinishWorktreeSetupInput): Promise<WorktreeSetupResult> {
+  worktreeSetupPending(input: FinishWorktreeSetupInput): Promise<boolean> {
+    return this.reach(() => this.pendingSetups.has(input.worktree));
+  }
+
+  async finishWorktreeSetup(input: FinishWorktreeSetupInput): Promise<WorktreeSetupResult> {
+    await this.setupGate;
     return this.reach((): WorktreeSetupResult => {
-      if (!this.pendingSetups.has(input.worktree)) return { kind: "done" };
       this.setupCalls.push(input);
       const reason = this.failNextSetup;
       if (reason !== null) {

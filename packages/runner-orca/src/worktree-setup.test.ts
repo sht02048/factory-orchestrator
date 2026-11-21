@@ -1,8 +1,15 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { effectiveSetupScript, parseSharedSetup, runSetupArgv } from "./worktree-setup.js";
 
 describe("parseSharedSetup", () => {
@@ -42,6 +49,15 @@ describe("parseSharedSetup", () => {
     expect(parseSharedSetup("scripts:\n  setup: >\n    a\n")).toEqual({ kind: "unreadable" });
     expect(parseSharedSetup('scripts:\n  setup: "a\\nb"\n')).toEqual({ kind: "unreadable" });
   });
+
+  test.each([
+    ["흐름 표기", "scripts: { setup: pnpm install }\n"],
+    ["따옴표 키", 'scripts:\n  "setup": pnpm install\n'],
+    ["여러 줄 일반 값", "scripts:\n  setup: pnpm install\n    --frozen-lockfile\n"],
+    ["들여쓰기 지정 블록", "scripts:\n  setup: |2\n    pnpm install\n"],
+  ])("%s는 건너뛰거나 자르지 않고 읽지 못했다고 돌려준다", (_name, yaml) => {
+    expect(parseSharedSetup(yaml)).toEqual({ kind: "unreadable" });
+  });
 });
 
 describe("effectiveSetupScript", () => {
@@ -61,10 +77,25 @@ describe("effectiveSetupScript", () => {
   });
 });
 
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 describe("runSetupArgv", () => {
-  function runIn(script: string): { dir: string; run: () => string } {
+  function runIn(script: string, limitSeconds = 30): { dir: string; run: () => string } {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), "ganger-setup-")));
-    const [command, ...args] = runSetupArgv({ rootPath: "/root-path", worktreePath: dir, script });
+    const [command, ...args] = runSetupArgv({
+      rootPath: "/root-path",
+      worktreePath: dir,
+      script,
+      lock: join(dir, "setup.lock"),
+      limitSeconds,
+    });
     return {
       dir,
       run: () =>
@@ -80,6 +111,29 @@ describe("runSetupArgv", () => {
     try {
       run();
       expect(readFileSync(join(dir, "out.txt"), "utf8")).toBe(`${dir}|/root-path`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("시간을 넘기면 스크립트의 자식 프로세스까지 끝내고 잠금을 지운다", async () => {
+    const { dir, run } = runIn("sleep 20 >/dev/null 2>&1 &\necho $! > child.pid\nwait", 1);
+    try {
+      expect(run).toThrow("Command failed");
+      expect(existsSync(join(dir, "setup.lock"))).toBe(false);
+      const child = Number(readFileSync(join(dir, "child.pid"), "utf8").trim());
+      await vi.waitFor(() => expect(isAlive(child)).toBe(false), { timeout: 3000 });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("같은 잠금의 setup이 돌고 있으면 겹쳐 돌지 않는다", () => {
+    const { dir, run } = runIn("touch ran.txt");
+    try {
+      writeFileSync(join(dir, "setup.lock"), String(process.pid));
+      expect(run).toThrow("Command failed");
+      expect(existsSync(join(dir, "ran.txt"))).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

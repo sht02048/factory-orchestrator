@@ -67,18 +67,27 @@ export function planQueue(input: {
       }
     }
 
+    const hasRoom = (candidate: RunnerSnapshot): boolean =>
+      !waitedOn.has(candidate.id) && remainingCapacity(candidate, placements) > 0;
+    const choose = (runners: ReadonlyArray<RunnerSnapshot>): RunnerId | null =>
+      pickRunner({ project: run.project, agent: run.agent, runners, runs: placements });
+
     if (runnerId === null) {
-      const freeRunners = input.runners.filter(
-        (candidate) => !waitedOn.has(candidate.id) && remainingCapacity(candidate, placements) > 0,
-      );
-      const choose = (runners: ReadonlyArray<RunnerSnapshot>): RunnerId | null =>
-        pickRunner({ project: run.project, agent: run.agent, runners, runs: placements });
-      runnerId = choose(freeRunners) ?? choose(input.runners);
+      runnerId = choose(input.runners.filter(hasRoom)) ?? choose(input.runners);
       if (runnerId === null) {
         plan.unplaced.push({ runId: run.id, ...unplacedReason(input.runners, run) });
         continue;
       }
       plan.assigned.push({ runId: run.id, runnerId });
+    } else if (run.pinnedToRunner !== true && run.startRequested !== true) {
+      const current = runnersById.get(runnerId);
+      if (current !== undefined && !hasRoom(current)) {
+        const freeRunner = choose(input.runners.filter(hasRoom));
+        if (freeRunner !== null) {
+          runnerId = freeRunner;
+          plan.assigned.push({ runId: run.id, runnerId });
+        }
+      }
     }
 
     const runner = runnersById.get(runnerId);

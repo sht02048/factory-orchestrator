@@ -24,6 +24,7 @@ import {
   setRunnerMailbox,
   worktreeTakenOverBy,
 } from "@ganger/db";
+import type { WorktreeSetupResult } from "@ganger/core";
 import type { Database, StoredRun, StoredRunner } from "@ganger/db";
 import type { LogContext, Logger } from "@ganger/log";
 import type { WorkerAdapters } from "./adapters.js";
@@ -37,6 +38,7 @@ export interface TickContext {
   logger: WorkerLogger;
   adapters: WorkerAdapters;
   pendingStarts: Map<RunId, PendingStart>;
+  worktreeSetups: Map<RunId, WorktreeSetupJob>;
   mailboxes: Map<RunnerId, MailboxRef>;
   unreachableUntil: Map<RunnerId, number>;
   unmarkedAnswers: Set<string>;
@@ -49,6 +51,10 @@ export interface TickContext {
   unrecordedComments: Map<RunId, { id: CommentId; at: Date }>;
   ticketsGone: Set<RunId>;
   autoAssign: AutoAssignState;
+}
+
+export interface WorktreeSetupJob {
+  outcome: WorktreeSetupResult | { kind: "threw"; error: unknown } | null;
 }
 
 export interface PendingEnding {

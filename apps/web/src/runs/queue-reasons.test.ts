@@ -39,8 +39,8 @@ describe("explainQueue", () => {
   it("러너가 꽉 차면 그 러너의 첫 런은 capacity 를, 뒤 런은 앞 런을 기다리고 다른 러너의 런은 시작한다(F3)", () => {
     const reasons = explainQueue({
       queued: [
-        queued("r1", 1, "runner-a"),
-        queued("r2", 2, "runner-a"),
+        { ...queued("r1", 1, "runner-a"), pinnedToRunner: true },
+        { ...queued("r2", 2, "runner-a"), pinnedToRunner: true },
         queued("r3", 3, "runner-b"),
       ],
       runners: [runner("runner-a", true, 1), runner("runner-b", true, 1)],

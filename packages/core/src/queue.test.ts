@@ -97,7 +97,7 @@ describe("planQueue", () => {
   });
 
   it("러너를 정하지 않은 런은 앞 런이 기다리는 러너를 피해 빈 러너로 간다 (F3)", () => {
-    const head = queued("head", app, r1);
+    const head = { ...queued("head", app, r1), pinnedToRunner: true };
     const free = queued("free", app, null);
 
     const plan = planQueue({
@@ -204,6 +204,33 @@ describe("planQueue", () => {
     expect(plan.start).toEqual([{ runId: head.id, runnerId: r1 }]);
   });
 
+  it("꽉 찬 러너에 정해 둔 고정되지 않은 런은 다른 러너가 비면 들어온 순서대로 옮겨 시작한다 (F3)", () => {
+    const first = queued("first", app, r1);
+    const second = queued("second", app, r1);
+
+    const plan = planQueue({
+      queued: [first, second],
+      runners: [runner({ id: r1 }), runner({ id: r2 })],
+      runs: [busy(r1)],
+    });
+
+    expect(plan.assigned).toEqual([{ runId: first.id, runnerId: r2 }]);
+    expect(plan.start).toEqual([{ runId: first.id, runnerId: r2 }]);
+  });
+
+  it("시작을 이미 요청한 런은 러너가 꽉 차도 다른 러너로 옮기지 않는다 (F3)", () => {
+    const sent = { ...queued("sent", app, r1), startRequested: true };
+
+    const plan = planQueue({
+      queued: [sent],
+      runners: [runner({ id: r1 }), runner({ id: r2 })],
+      runs: [busy(r1)],
+    });
+
+    expect(plan.assigned).toEqual([]);
+    expect(plan.start).toEqual([]);
+  });
+
   it("돌아온 런의 러너에 capacity가 없으면 그 러너에서 기다리고 다른 러너의 뒤 런은 시작한다 (Q73·F3)", () => {
     const head = queued("head", app, null);
     const behind = queued("behind", web, r2);
@@ -254,7 +281,7 @@ describe("planQueue", () => {
       runners: [runner({ id: r1, projects: [web] }), runner({ id: r2, projects: [app, web] })],
       runs: [],
     });
-    expect(back.assigned).toEqual([{ runId: head.id, runnerId: r2 }]);
+    expect(back.assigned).toContainEqual({ runId: head.id, runnerId: r2 });
     expect(back.start[0]).toEqual({ runId: head.id, runnerId: r2 });
   });
 

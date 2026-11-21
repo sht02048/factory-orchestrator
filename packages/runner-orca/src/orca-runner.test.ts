@@ -1591,22 +1591,25 @@ describe("prepareContinuation", () => {
     });
   });
 
-  const adminDir = "/repo/.git/worktrees/ganger-ENG-1-1";
-  const marker = `${adminDir}/ganger-setup-pending`;
+  const commonDir = "/repo/.git";
 
   function withSetupMarker(exec: ScriptedExec): ScriptedExec {
-    return exec
-      .on(`git -C ${path} rev-parse --absolute-git-dir`, stdout(`${adminDir}\n`))
-      .on(`touch ${marker}`, stdout(""));
+    return git(exec, "rev-parse", stdout(`${commonDir}\n`))
+      .on("mkdir -p", stdout(""))
+      .on("touch ", stdout(""));
   }
 
-  test("로컬 브랜치가 있으면 같은 경로에 다시 만들고 setup을 기다리는 표시를 남긴다", async () => {
+  test("로컬 브랜치가 있으면 표시를 먼저 남기고 같은 경로에 다시 만든다", async () => {
     const exec = withSetupMarker(missingWorktree());
     git(exec, "show-ref", stdout(""));
     git(exec, "worktree add", stdout(""));
     expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
-    expect(exec.commands()).toContain(`git -C ${repoPath} worktree add ${path} ${branch}`);
-    expect(exec.commands()).toContain(`touch ${marker}`);
+    const commands = exec.commands();
+    const added = commands.indexOf(`git -C ${repoPath} worktree add ${path} ${branch}`);
+    const marked = commands.findIndex((command) => command.startsWith("touch "));
+    expect(added).toBeGreaterThan(-1);
+    expect(marked).toBeGreaterThan(-1);
+    expect(marked).toBeLessThan(added);
   });
 
   describe("finishWorktreeSetup", () => {
@@ -1615,22 +1618,33 @@ describe("prepareContinuation", () => {
       stdout(JSON.stringify({ id: "1", ok: true, result: { repo: { hookSettings } }, _meta: {} }));
 
     function pending(yaml: string, hookSettings: object = {}): ScriptedExec {
-      return withProjects(new ScriptedExec())
-        .on(`git -C ${path} rev-parse --absolute-git-dir`, stdout(`${adminDir}\n`))
-        .on(`test -e ${marker}`, stdout(""))
+      return git(withProjects(new ScriptedExec()), "rev-parse", stdout(`${commonDir}\n`))
         .orca("repo show", repoShow(hookSettings))
         .on("sh -c", stdout(yaml))
-        .on(`rm -f ${marker}`, stdout(""));
+        .on("rm -f ", stdout(""));
     }
 
     const setupCommand = (exec: ScriptedExec) =>
       exec.commands().find((command) => command.startsWith("env "));
+    const cleared = (exec: ScriptedExec) =>
+      exec.commands().some((command) => command.startsWith("rm -f "));
 
-    test("표시가 없으면 setup을 돌리지 않는다", async () => {
-      const exec = new ScriptedExec()
-        .on(`git -C ${path} rev-parse --absolute-git-dir`, stdout(`${adminDir}\n`))
-        .on(`test -e ${marker}`, stdout("", 1));
-      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toEqual({ kind: "done" });
+    test("표시가 있을 때만 setup이 남았다고 답한다", async () => {
+      const marked = git(withProjects(new ScriptedExec()), "rev-parse", stdout(`${commonDir}\n`));
+      marked.on("test -e ", stdout(""));
+      expect(await runnerWith(marked).worktreeSetupPending(setupInput)).toBe(true);
+      const clean = git(withProjects(new ScriptedExec()), "rev-parse", stdout(`${commonDir}\n`));
+      clean.on("test -e ", stdout("", 1));
+      expect(await runnerWith(clean).worktreeSetupPending(setupInput)).toBe(false);
+    });
+
+    test("모르는 명령 출처 정책이면 돌리지 않고 실패로 돌려준다", async () => {
+      const exec = pending("scripts:\n  setup: pnpm install\n", {
+        commandSourcePolicy: "future-policy",
+      });
+      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toMatchObject({
+        kind: "failed",
+      });
       expect(setupCommand(exec)).toBeUndefined();
     });
 
@@ -1642,14 +1656,14 @@ describe("prepareContinuation", () => {
       expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toEqual({ kind: "done" });
       expect(setupCommand(exec)).toContain(`ORCA_WORKTREE_PATH=${path}`);
       expect(setupCommand(exec)).toContain("pnpm install");
-      expect(exec.commands()).toContain(`rm -f ${marker}`);
+      expect(cleared(exec)).toBe(true);
     });
 
     test("setup이 실패하면 이유를 돌려주고 표시를 남긴다", async () => {
       const exec = pending("scripts:\n  setup: pnpm install\n").on("env ", stdout("", 1));
       const result = await runnerWith(exec).finishWorktreeSetup(setupInput);
       expect(result).toMatchObject({ kind: "failed", reason: "setup exited with 1" });
-      expect(exec.commands()).not.toContain(`rm -f ${marker}`);
+      expect(cleared(exec)).toBe(false);
     });
 
     test("setup이 시간을 넘기면 결과를 모르는 것으로 보고 실패로 돌려준다", async () => {
@@ -1677,7 +1691,7 @@ describe("prepareContinuation", () => {
       const exec = pending("");
       expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toEqual({ kind: "done" });
       expect(setupCommand(exec)).toBeUndefined();
-      expect(exec.commands()).toContain(`rm -f ${marker}`);
+      expect(cleared(exec)).toBe(true);
     });
   });
 

@@ -103,7 +103,9 @@ describe("이어서 맡기기", () => {
     fake.deleteWorktree(source.worktree);
 
     const next = continued(source.id);
-    await h.worker().tick();
+    const worker = h.worker();
+    await worker.tick();
+    await worker.tick();
 
     expect(getRun(h.db, next.id)).toMatchObject({
       state: "running",
@@ -120,9 +122,38 @@ describe("이어서 맡기기", () => {
     fake.deleteWorktree(source.worktree);
 
     const next = continued(source.id);
-    await h.worker().tick();
+    const worker = h.worker();
+    await worker.tick();
+    expect(getRun(h.db, next.id)?.state).toBe("queued");
+    await worker.tick();
 
     expect(fake.setupCalls).toEqual([{ project: projectA, worktree: source.worktree }]);
+    expect(getRun(h.db, next.id)?.state).toBe("running");
+  });
+
+  it("setup이 도는 동안 틱을 붙잡지 않아 다른 러너의 런이 시작하고 setup을 두 번 돌리지 않는다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    const fake = h.runner(source.runnerId);
+    fake.deleteWorktree(source.worktree);
+    let finishSetup = (): void => undefined;
+    fake.setupGate = new Promise<void>((resolve) => {
+      finishSetup = resolve;
+    });
+    const next = continued(source.id);
+    const worker = h.worker();
+    await worker.tick();
+
+    const otherRunner = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const other = h.assign("ENG-2", projectA);
+    await worker.tick();
+    expect(getRun(h.db, next.id)?.state).toBe("queued");
+    expect(getRun(h.db, other.id)).toMatchObject({ state: "running", runnerId: otherRunner });
+
+    finishSetup();
+    await worker.tick();
+    await worker.tick();
+    expect(fake.setupCalls).toHaveLength(1);
     expect(getRun(h.db, next.id)?.state).toBe("running");
   });
 
@@ -147,7 +178,9 @@ describe("이어서 맡기기", () => {
     const startsBefore = fake.startCalls.length;
 
     const next = continued(source.id);
-    await h.worker().tick();
+    const worker = h.worker();
+    await worker.tick();
+    await worker.tick();
 
     expect(fake.startCalls.length).toBe(startsBefore);
     expect(getRun(h.db, next.id)).toMatchObject({
@@ -208,6 +241,7 @@ describe("이어서 맡기기", () => {
 
     fake.deleteWorktree(source.worktree);
     await worker.tick();
+    await worker.tick();
 
     expect(records(next).continuePlace).toBe("recreated");
     expect(getRun(h.db, next.id)?.state).toBe("running");
@@ -245,6 +279,7 @@ describe("이어서 맡기기", () => {
 
     await worker.tick();
     expect(records(next).continuePlace).toBe("recreated");
+    await worker.tick();
     await worker.tick();
 
     expect(records(next).continuePlace).toBe("recreated");
