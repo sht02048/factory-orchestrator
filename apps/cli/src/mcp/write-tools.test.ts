@@ -292,6 +292,7 @@ describe("MCP 쓰기 도구", () => {
     expect(second.isError).toBe(false);
     expect(second.json).toEqual(first.json);
     expect(listRunQuestions(seeded.db, seeded.waiting).map((q) => q.answer?.text)).toEqual(["no"]);
+    expect(listRunMcpActions(seeded.db, seeded.waiting)).toHaveLength(1);
   });
 
   it("questionId 없이 답한 뒤 다음 질문이 와도 같은 requestId 는 처음 결과를 돌려주고 새 질문에 답하지 않는다(0156)", async () => {
@@ -319,6 +320,7 @@ describe("MCP 쓰기 도구", () => {
 
     const first = await call("cancel_run", args);
     const second = await call("cancel_run", args);
+    expect(listRunMcpActions(seeded.db, seeded.waiting)).toHaveLength(1);
     const withoutId = await call("cancel_run", { runId: seeded.waiting });
 
     expect(first.isError).toBe(false);

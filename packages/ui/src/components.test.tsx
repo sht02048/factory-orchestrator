@@ -459,7 +459,7 @@ describe("서버 렌더", () => {
     const busy = renderToString(
       <Dialog
         trigger="지우기"
-        triggerBusy
+        triggerBusy={{ active: true, label: "지우는 중" }}
         title="지울까요?"
         actions={<DialogClose>취소</DialogClose>}
       />,

@@ -8,6 +8,8 @@ import type { RunControl, RunId } from "@ganger/core";
 import {
   continueRun,
   getRun,
+  getRunControlRequest,
+  getRunWithRecords,
   handleRunActionOnce,
   requestAgentMessage,
   requestPreviousAgentStop,
@@ -44,6 +46,10 @@ export function onceForRun(
   payload: ReadonlyArray<string>,
   now: Date,
   act: () => RunActionResult,
+  replayOptions: {
+    replayIsStale?: () => boolean;
+    onReplay?: () => void;
+  } = {},
 ): RunActionResult {
   return handleRunActionOnce<RunActionResult>(
     db,
@@ -54,7 +60,17 @@ export function onceForRun(
       payload,
     },
     now,
-    { act, replay: () => ({ ok: true }), reused: () => ({ ok: false, reason: REQUEST_REUSED }) },
+    {
+      act,
+      replay: () => {
+        replayOptions.onReplay?.();
+        return { ok: true };
+      },
+      reused: () => ({ ok: false, reason: REQUEST_REUSED }),
+      ...(replayOptions.replayIsStale === undefined
+        ? {}
+        : { replayIsStale: replayOptions.replayIsStale }),
+    },
   );
 }
 
@@ -110,19 +126,57 @@ export function sendAgentMessageRequest(
   return result.ok ? { ok: true } : result;
 }
 
-export function cancelRunOnce(db: Database, key: RunActionKey, now: Date): RunActionResult {
-  return onceForRun(db, key, "cancel", [], now, () => cancelRunRequest(db, key.runId, now));
+export function cancelRunOnce(
+  db: Database,
+  key: RunActionKey,
+  now: Date,
+  onReplay?: () => void,
+): RunActionResult {
+  return onceForRun(
+    db,
+    key,
+    "cancel",
+    [],
+    now,
+    () => cancelRunRequest(db, key.runId, now),
+    onReplay === undefined ? {} : { onReplay },
+  );
 }
 
 export function removeWorktreeOnce(db: Database, key: RunActionKey, now: Date): RunActionResult {
-  return onceForRun(db, key, "remove-worktree", [], now, () =>
-    removeWorktreeRequest(db, key.runId, now),
+  const removalFailed = (): boolean => {
+    const records = getRunWithRecords(db, toRunId(key.runId))?.records;
+    return (
+      records !== undefined &&
+      records.worktreeRemovedAt === null &&
+      records.worktreeRemoveRequestedAt === null
+    );
+  };
+  return onceForRun(
+    db,
+    key,
+    "remove-worktree",
+    [],
+    now,
+    () => removeWorktreeRequest(db, key.runId, now),
+    { replayIsStale: removalFailed },
   );
 }
 
 export function stopPreviousAgentOnce(db: Database, key: RunActionKey, now: Date): RunActionResult {
-  return onceForRun(db, key, "stop-previous-agent", [], now, () =>
-    stopPreviousAgentRequest(db, toRunId(key.runId), now),
+  const runId = toRunId(key.runId);
+  const stopFailed = (): boolean => {
+    const records = getRunWithRecords(db, runId)?.records;
+    return records?.agentCheck === "alive" && records.agentStopRequestedAt === null;
+  };
+  return onceForRun(
+    db,
+    key,
+    "stop-previous-agent",
+    [],
+    now,
+    () => stopPreviousAgentRequest(db, runId, now),
+    { replayIsStale: stopFailed },
   );
 }
 
@@ -132,8 +186,18 @@ export function controlRunOnce(
   control: RunControl,
   now: Date,
 ): RunActionResult {
-  return onceForRun(db, key, "control", [control], now, () =>
-    requestControl(db, key.runId, control, now),
+  const controlFailed = (): boolean => {
+    const request = getRunControlRequest(db, toRunId(key.runId));
+    return request?.control === control && request.status === "failed";
+  };
+  return onceForRun(
+    db,
+    key,
+    "control",
+    [control],
+    now,
+    () => requestControl(db, key.runId, control, now),
+    { replayIsStale: controlFailed },
   );
 }
 

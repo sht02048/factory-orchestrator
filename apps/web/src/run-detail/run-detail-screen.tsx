@@ -710,9 +710,9 @@ function ConfirmDanger({
   return (
     <>
       <Dialog
-        trigger={sending ? t("sending") : t("trigger")}
+        trigger={t("trigger")}
         triggerVariant="danger"
-        triggerBusy={sending}
+        triggerBusy={{ active: sending, label: t("sending") }}
         title={t("title")}
         description={t("body")}
         actions={

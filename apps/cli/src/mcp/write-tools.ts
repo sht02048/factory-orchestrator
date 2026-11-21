@@ -84,6 +84,7 @@ type Done = {
   runId: RunId | null;
   serverHandles: boolean;
   result?: Record<string, unknown>;
+  replayed?: boolean;
 };
 type Rejected = {
   target: string | null;
@@ -171,15 +172,17 @@ export function registerWriteTools(
         error: `Ganger could not do this: ${error instanceof Error ? error.message : String(error)}`,
       });
     }
-    recordMcpAction(context.db, {
-      at: context.now(),
-      client: mcpClientName(server.server.getClientVersion()?.name),
-      tool,
-      target: outcome.target,
-      runId: outcome.runId,
-      outcome: outcome.ok ? "done" : "rejected",
-      reason: outcome.ok ? null : outcome.reason,
-    });
+    if (!outcome.ok || outcome.replayed !== true) {
+      recordMcpAction(context.db, {
+        at: context.now(),
+        client: mcpClientName(server.server.getClientVersion()?.name),
+        tool,
+        target: outcome.target,
+        runId: outcome.runId,
+        outcome: outcome.ok ? "done" : "rejected",
+        reason: outcome.ok ? null : outcome.reason,
+      });
+    }
     if (!outcome.ok) return fail(outcome.error, { reason: outcome.reason, ...outcome.extra });
     const pending = outcome.serverHandles && !context.serverStatus().running;
     return respond({
@@ -434,7 +437,7 @@ export function registerWriteTools(
         return done({ ...base, serverHandles: true });
       };
       if (requestId === undefined) return answerNow();
-      let outcome: Outcome = done({ ...base, serverHandles: true });
+      let outcome: Outcome = done({ ...base, serverHandles: true, replayed: true });
       const handled = onceForRun(
         context.db,
         { runId: run.id, requestId },
@@ -516,10 +519,13 @@ export function registerWriteTools(
       const run = findRun(runId);
       if (run === null) return noRun(runId);
       const base = { target: run.ticket.key, runId: run.id };
+      let replayed = false;
       const canceled =
         requestId === undefined
           ? cancelRunRequest(context.db, run.id, context.now())
-          : cancelRunOnce(context.db, { runId: run.id, requestId }, context.now());
+          : cancelRunOnce(context.db, { runId: run.id, requestId }, context.now(), () => {
+              replayed = true;
+            });
       if (!canceled.ok) {
         return rejected({
           ...base,
@@ -527,7 +533,7 @@ export function registerWriteTools(
           error: `Could not cancel: ${canceled.reason}.`,
         });
       }
-      return done({ ...base, serverHandles: true });
+      return done({ ...base, serverHandles: true, replayed });
     },
   );
 

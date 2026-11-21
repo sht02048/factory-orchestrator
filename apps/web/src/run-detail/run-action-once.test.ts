@@ -12,6 +12,7 @@ import { toQuestionId, toTicketKey } from "@ganger/core";
 import type { RunId } from "@ganger/core";
 import {
   changeRunState,
+  completeRunControlRequest,
   getRunControlRequest,
   listPendingCancelRequests,
   listRunQuestions,
@@ -189,6 +190,55 @@ describe("같은 요청 ID는 한 번만 처리한다(0156)", () => {
     expect(second.ok).toBe(true);
     expect(second).not.toEqual(first);
     expect(requestRows(db, runId)).toHaveLength(1);
+  });
+
+  it("멈추기가 실패로 끝났으면 같은 ID로 다시 보내도 새로 요청한다", () => {
+    const { db } = seedDatabase();
+    const runId = runningRun(db);
+    const key = { runId, requestId: REQUEST };
+    controlRunOnce(db, key, "pause", FIRST);
+    completeRunControlRequest(db, {
+      runId,
+      requestedAt: FIRST,
+      completedAt: minutes(112),
+      error: "unreachable",
+    });
+
+    expect(controlRunOnce(db, key, "pause", LATER)).toEqual({ ok: true });
+
+    expect(getRunControlRequest(db, runId)).toMatchObject({ status: "pending", control: "pause" });
+  });
+
+  it("이전 에이전트 멈추기가 풀렸으면 같은 ID로 다시 요청한다", () => {
+    const { db } = seedDatabase();
+    const runId = endedRun(db, "alive");
+    const key = { runId, requestId: REQUEST };
+    stopPreviousAgentOnce(db, key, FIRST);
+    db.$client.prepare("UPDATE runs SET agent_stop_requested_at = NULL WHERE id = ?").run(runId);
+
+    expect(stopPreviousAgentOnce(db, key, LATER)).toEqual({ ok: true });
+
+    expect(
+      db.$client.prepare("SELECT agent_stop_requested_at AS at FROM runs WHERE id = ?").get(runId),
+    ).toEqual({ at: LATER.getTime() });
+  });
+
+  it("워크트리 지우기 요청이 풀렸으면 같은 ID로 다시 요청한다", () => {
+    const { db } = seedDatabase();
+    const runId = endedRun(db, "gone");
+    const key = { runId, requestId: REQUEST };
+    removeWorktreeOnce(db, key, FIRST);
+    db.$client
+      .prepare("UPDATE runs SET worktree_remove_requested_at = NULL WHERE id = ?")
+      .run(runId);
+
+    expect(removeWorktreeOnce(db, key, LATER)).toEqual({ ok: true });
+
+    expect(
+      db.$client
+        .prepare("SELECT worktree_remove_requested_at AS at FROM runs WHERE id = ?")
+        .get(runId),
+    ).toEqual({ at: LATER.getTime() });
   });
 
   it("같은 ID로 다른 내용을 보내면 처리하지 않고 거절한다", () => {
