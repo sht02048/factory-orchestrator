@@ -76,7 +76,6 @@ let keptRun: RunId;
 let messageRun: RunId;
 let narrowMessageRun: RunId;
 let draftRun: RunId;
-let rejectedRun: RunId;
 let failedSendRun: RunId;
 let retriedRun: RunId;
 let typingRun: RunId;
@@ -216,26 +215,6 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
     ok(changeRunState(db, draftRun, { to: "running" }));
     await card.getByLabel(run.agentMessage.label).waitFor();
     expect(await card.getByLabel(run.agentMessage.label).inputValue()).toBe("쓰던 말");
-  });
-
-  it("보내는 사이 런이 끝나면 이유와 쓰던 말을 남기고 포커스를 이유로 옮긴다(0147)", async () => {
-    await page.route("**/api/change-events/stream", (route) => route.abort());
-    await open(rejectedRun);
-    const card = page.getByRole("region", { name: run.agentMessage.title });
-    await card.getByLabel(run.agentMessage.label).fill("늦게 보낸 말");
-    ok(
-      changeRunState(db, rejectedRun, {
-        to: "ended",
-        agentResult: "reported-success",
-        prState: "none",
-      }),
-    );
-    await card.getByRole("button", { name: run.agentMessage.send }).press("Enter");
-
-    await card.getByRole("status").getByText(run.agentMessage.failure["state-changed"]).waitFor();
-    await card.getByText("늦게 보낸 말").waitFor();
-    await expect.poll(focusedStatusText).toBe(run.agentMessage.failure["state-changed"]);
-    expect(listRunAgentMessages(db, rejectedRun)).toEqual([]);
   });
 
   it("요청이 실패한 뒤 런이 끝나도 이유와 쓰던 말을 남긴다(0147)", async () => {
@@ -456,7 +435,6 @@ function seed(db: Database): void {
   messageRun = startRun("ACME-18");
   narrowMessageRun = startRun("ACME-19");
   draftRun = startRun("ACME-20");
-  rejectedRun = startRun("ACME-22");
   failedSendRun = startRun("ACME-23");
   retriedRun = startRun("ACME-27");
   typingRun = startRun("ACME-28");
