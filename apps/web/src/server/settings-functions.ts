@@ -55,7 +55,7 @@ import { getDatabase } from "./database";
 import { serverMcpLaunch } from "./mcp-launch";
 import { installPowerSettings } from "./power-settings";
 import { getTrackerReads } from "./tracker-reads";
-import { autoAllowedHosts, refreshAutoAllowedHosts } from "./request-access";
+import { autoAllowInput, autoAllowedAddresses, refreshAutoAllowedHosts } from "./request-access";
 import {
   getServeStatusOutput,
   getThisTailnetAddresses,
@@ -71,7 +71,7 @@ function context(): SettingsContext {
     registry: getAdapterRegistry(),
     mcpLaunch: serverMcpLaunch(process.env, process.execPath),
     trackerReads: getTrackerReads(),
-    autoAllowedHosts: autoAllowedHosts(),
+    autoAllowedHosts: autoAllowedAddresses(),
     ...(power === undefined ? {} : { power }),
   };
 }
@@ -159,7 +159,7 @@ export const saveAddressesSetting = createServerFn({ method: "POST" })
     saveAddresses(context(), data, new Date(), {
       host: getRequestHeader("host") ?? null,
       bindHost: parseBootConfig(process.env).host,
-      tailnetHosts: autoAllowedHosts(),
+      ...autoAllowInput(),
     }),
   );
 

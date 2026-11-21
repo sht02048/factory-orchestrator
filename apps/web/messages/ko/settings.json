@@ -329,7 +329,7 @@
     "webInfo": "노트북·휴대폰에서 이 서버를 여는 주소예요(예: Tailscale Serve 주소). 이 기계에서 http://127.0.0.1 로 연 화면은 주소와 상관없이 늘 열려요. 잘못 넣었으면 거기서 고치면 돼요.",
     "webNone": "이 기계에서만 열려요",
     "autoAllowed": "자동으로 허용했어요",
-    "autoAllowedInfo": "서버를 모든 주소(0.0.0.0)에서 받게 띄워서, 이 기기의 tailnet 주소는 따로 넣지 않아도 열려요.",
+    "autoAllowedInfo": "서버를 모든 주소(0.0.0.0)에서 받게 띄워서, 이 기기의 tailnet 주소는 이 서버 포트로 따로 넣지 않아도 열려요. Funnel로 들어온 요청은 webhook 경로만 받아요.",
     "webPlaceholder": "https://server.example.ts.net",
     "set": "정하기",
     "error": {

@@ -6,9 +6,12 @@ export const LOOPBACK_HOSTS: ReadonlyArray<string> = ["127.0.0.1", "localhost", 
 
 const WILDCARD_BIND_HOSTS = new Set(["0.0.0.0", "[::]"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const FUNNEL_LISTEN_PORTS = new Set([443, 8443, 10000]);
+const FUNNEL_REQUEST_HEADER = "tailscale-funnel-request";
 
 export interface AllowedHosts {
   web: ReadonlySet<string>;
+  tailnetWeb: ReadonlySet<string>;
   webhook: ReadonlySet<string>;
 }
 
@@ -17,6 +20,7 @@ export interface AllowedHostsInput {
   webAddress: string | null;
   webhookAddress: string | null;
   tailnetHosts?: ReadonlyArray<string>;
+  webPort?: number | null;
 }
 
 export function isWildcardBind(bindHost: string | null): boolean {
@@ -54,22 +58,50 @@ function hostnameOfAddress(address: string | null): string | null {
   }
 }
 
+function hostPortOfAddress(address: string | null): string | null {
+  if (address === null) return null;
+  const url = URL.parse(address);
+  if (url === null) return null;
+  const port = url.port === "" ? (url.protocol === "https:" ? "443" : "80") : url.port;
+  return `${normalizeHostname(url.hostname)}:${port}`;
+}
+
+function hostPortOfHostHeader(value: string | null): string | null {
+  const hostname = hostnameOfHostHeader(value);
+  const port = value === null ? undefined : /:(\d{1,5})$/u.exec(value.trim())?.[1];
+  if (hostname === null || port === undefined) return null;
+  return `${hostname}:${String(Number(port))}`;
+}
+
 export function allowedHosts(input: AllowedHostsInput): AllowedHosts {
   const web = new Set(LOOPBACK_HOSTS);
+  const tailnetWeb = new Set<string>();
+  const webhook = new Set<string>();
+  const webhookHost = hostnameOfAddress(input.webhookAddress);
+  if (webhookHost !== null) webhook.add(webhookHost);
   if (input.bindHost !== null) {
     const bind = normalizeHostname(input.bindHost);
     if (WILDCARD_BIND_HOSTS.has(bind)) {
-      for (const host of input.tailnetHosts ?? []) web.add(normalizeHostname(host));
+      const webhookHostPort = hostPortOfAddress(input.webhookAddress);
+      for (const tailnetHost of input.tailnetHosts ?? []) {
+        const host = normalizeHostname(tailnetHost);
+        webhook.add(host);
+        if (input.webPort === undefined || input.webPort === null) continue;
+        if (FUNNEL_LISTEN_PORTS.has(input.webPort)) continue;
+        const hostPort = `${host}:${String(input.webPort)}`;
+        if (hostPort !== webhookHostPort) tailnetWeb.add(hostPort);
+      }
     } else {
       web.add(bind);
     }
   }
   const webHost = hostnameOfAddress(input.webAddress);
   if (webHost !== null) web.add(webHost);
-  const webhook = new Set<string>();
-  const webhookHost = hostnameOfAddress(input.webhookAddress);
-  if (webhookHost !== null) webhook.add(webhookHost);
-  return { web, webhook };
+  return { web, tailnetWeb, webhook };
+}
+
+export function isFunnelRequest(headers: Headers): boolean {
+  return headers.has(FUNNEL_REQUEST_HEADER);
 }
 
 function isAnswerableOnAnyHost(pathname: string): boolean {
@@ -81,20 +113,26 @@ export function isWebhookPath(pathname: string): boolean {
 }
 
 export function isHostAllowed(
-  hostname: string | null,
+  hostHeader: string | null,
   pathname: string,
   allowed: AllowedHosts,
+  viaFunnel = false,
 ): boolean {
+  const hostname = hostnameOfHostHeader(hostHeader);
   if (hostname === null) return false;
   if (allowed.web.has(hostname)) return true;
+  const hostPort = hostPortOfHostHeader(hostHeader);
+  if (!viaFunnel && hostPort !== null && allowed.tailnetWeb.has(hostPort)) return true;
   return isWebhookPath(pathname) && allowed.webhook.has(hostname);
 }
 
-function originAllowed(origin: string, allowed: AllowedHosts): boolean {
+function originAllowed(origin: string, allowed: AllowedHosts, viaFunnel: boolean): boolean {
   try {
     const url = new URL(origin);
     if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-    return allowed.web.has(normalizeHostname(url.hostname));
+    const hostname = normalizeHostname(url.hostname);
+    if (allowed.web.has(hostname)) return true;
+    return !viaFunnel && url.port !== "" && allowed.tailnetWeb.has(`${hostname}:${url.port}`);
   } catch {
     return false;
   }
@@ -106,13 +144,14 @@ export function checkRequest(request: Request, allowed: AllowedHosts): GuardVerd
   const origin = request.headers.get("origin");
   const host = hostHeader ?? "";
   if (SAFE_METHODS.has(request.method) && isAnswerableOnAnyHost(pathname)) return { ok: true };
-  if (!isHostAllowed(hostnameOfHostHeader(hostHeader), pathname, allowed)) {
+  const viaFunnel = isFunnelRequest(request.headers);
+  if (!isHostAllowed(hostHeader, pathname, allowed, viaFunnel)) {
     return { ok: false, status: 403, reason: "host-not-allowed", host, origin };
   }
   if (SAFE_METHODS.has(request.method) || isWebhookPath(pathname) || origin === null) {
     return { ok: true };
   }
-  if (!originAllowed(origin, allowed)) {
+  if (!originAllowed(origin, allowed, viaFunnel)) {
     return { ok: false, status: 403, reason: "origin-not-allowed", host, origin };
   }
   return { ok: true };

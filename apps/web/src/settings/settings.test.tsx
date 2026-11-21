@@ -711,10 +711,17 @@ describe("주소(0048)", () => {
     expect(textOf(sectionOf(render(none), "server"))).not.toContain(
       settingsJson.addresses.autoAllowed,
     );
-    const from = { host: "server.example.ts.net:3000", bindHost: "0.0.0.0" };
+    const from = { host: "server.example.ts.net:3000", bindHost: "0.0.0.0", webPort: 3000 };
     const input = { webAddress: "", webhookAddress: "" };
     expect(saveAddresses(f.context, input, now, { ...from, tailnetHosts })).toEqual({ ok: true });
     expect(saveAddresses(f.context, input, now, from)).toEqual({ ok: false, reason: "locks-out" });
+    expect(
+      saveAddresses(f.context, input, now, {
+        ...from,
+        host: "server.example.ts.net:8443",
+        tailnetHosts,
+      }),
+    ).toEqual({ ok: false, reason: "locks-out" });
   });
 
   it("경로·사용자 정보가 붙거나 http·https 가 아닌 주소는 받지 않는다", () => {

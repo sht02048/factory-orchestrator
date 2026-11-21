@@ -29,20 +29,23 @@ describe("이 기기의 tailnet 주소 읽기", () => {
 });
 
 describe("와일드카드 바인드의 자동 허용", () => {
-  const base = { webAddress: null, webhookAddress: null, tailnetHosts: [HOST, IP] };
+  const base = { webAddress: null, webhookAddress: null, tailnetHosts: [HOST, IP], webPort: 3000 };
 
   it.each(["0.0.0.0", "::", "[::]"])("%s 로 띄우면 자기 tailnet 주소를 허용한다", (bindHost) => {
     expect(isWildcardBind(bindHost)).toBe(true);
-    const { web } = allowedHosts({ ...base, bindHost });
-    expect(web.has(HOST)).toBe(true);
-    expect(web.has(IP)).toBe(true);
+    const { web, tailnetWeb, webhook } = allowedHosts({ ...base, bindHost });
+    expect([...tailnetWeb]).toEqual([`${HOST}:3000`, `${IP}:3000`]);
+    expect(webhook.has(HOST)).toBe(true);
+    expect(web.has(HOST)).toBe(false);
     expect(web.has("0.0.0.0")).toBe(false);
   });
 
   it("특정 주소로 띄우면 tailnet 주소를 더하지 않는다", () => {
-    const { web } = allowedHosts({ ...base, bindHost: "127.0.0.1" });
+    const { web, tailnetWeb, webhook } = allowedHosts({ ...base, bindHost: "127.0.0.1" });
     expect(isWildcardBind("127.0.0.1")).toBe(false);
     expect(web.has(HOST)).toBe(false);
+    expect(tailnetWeb.size).toBe(0);
+    expect(webhook.has(HOST)).toBe(false);
   });
 });
 

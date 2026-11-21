@@ -5,7 +5,7 @@ import { hostBlockedResponse, wantsHostBlockedPage } from "@ganger/app/host-bloc
 import {
   allowedHosts,
   checkRequest,
-  hostnameOfHostHeader,
+  isFunnelRequest,
   isHostAllowed,
   isWildcardBind,
   rejectionLogFields,
@@ -34,6 +34,14 @@ function bindHost(): string | null {
   }
 }
 
+function webPort(): number | null {
+  try {
+    return parseBootConfig(process.env).port;
+  } catch {
+    return null;
+  }
+}
+
 function addresses(): InstallAddresses {
   try {
     return getInstallSettings(getDatabase());
@@ -42,8 +50,16 @@ function addresses(): InstallAddresses {
   }
 }
 
-export function autoAllowedHosts(): ReadonlyArray<string> {
+function tailnetHostsToAllow(): ReadonlyArray<string> {
   return isWildcardBind(bindHost()) ? tailnetHosts.hosts() : [];
+}
+
+export function autoAllowInput(): { tailnetHosts: ReadonlyArray<string>; webPort: number | null } {
+  return { tailnetHosts: tailnetHostsToAllow(), webPort: webPort() };
+}
+
+export function autoAllowedAddresses(): ReadonlyArray<string> {
+  return [...currentAllowedHosts().tailnetWeb];
 }
 
 export async function refreshAutoAllowedHosts(): Promise<void> {
@@ -51,15 +67,16 @@ export async function refreshAutoAllowedHosts(): Promise<void> {
 }
 
 export function currentAllowedHosts(): AllowedHosts {
-  return allowedHosts({ bindHost: bindHost(), ...addresses(), tailnetHosts: autoAllowedHosts() });
+  return allowedHosts({ bindHost: bindHost(), ...addresses(), ...autoAllowInput() });
 }
 
 export async function isRequestHostAllowed(request: Request): Promise<boolean> {
-  const hostname = hostnameOfHostHeader(request.headers.get("host"));
+  const hostHeader = request.headers.get("host");
   const { pathname } = new URL(request.url);
-  if (isHostAllowed(hostname, pathname, currentAllowedHosts())) return true;
+  const viaFunnel = isFunnelRequest(request.headers);
+  if (isHostAllowed(hostHeader, pathname, currentAllowedHosts(), viaFunnel)) return true;
   await refreshAutoAllowedHosts();
-  return isHostAllowed(hostname, pathname, currentAllowedHosts());
+  return isHostAllowed(hostHeader, pathname, currentAllowedHosts(), viaFunnel);
 }
 
 export async function guardRequest(request: Request): Promise<Response | null> {

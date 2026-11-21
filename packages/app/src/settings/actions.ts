@@ -49,7 +49,7 @@ import {
 } from "@ganger/db";
 import type { WorkspaceId } from "@ganger/db";
 import { z } from "zod";
-import { allowedHosts, hostnameOfHostHeader } from "../request-guard.js";
+import { allowedHosts, hostnameOfHostHeader, isHostAllowed } from "../request-guard.js";
 import { checkWebhookAddress } from "../webhook-address.js";
 import type { PingFetch, WebhookAddressFailure } from "../webhook-address.js";
 import { remoteErrorOf, remoteErrorOfDetail, trackerConnectionView, trackerOf } from "./load.js";
@@ -662,6 +662,7 @@ export interface RequestOrigin {
   host: string | null;
   bindHost: string | null;
   tailnetHosts?: ReadonlyArray<string>;
+  webPort?: number | null;
 }
 
 export function saveAddresses(
@@ -681,8 +682,9 @@ export function saveAddresses(
       webAddress,
       webhookAddress,
       tailnetHosts: from.tailnetHosts ?? [],
+      webPort: from.webPort ?? null,
     });
-    if (!next.web.has(current)) return { ok: false, reason: "locks-out" };
+    if (!isHostAllowed(from.host, "/", next)) return { ok: false, reason: "locks-out" };
   }
   saveInstallAddresses(context.db, { webAddress, webhookAddress }, now);
   return { ok: true };
