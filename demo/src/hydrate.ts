@@ -76,7 +76,8 @@ export function pullRequestOf(
     startedAt: Date | null;
     branch: string;
   },
-  pr: { id: PullRequestSnapshot["id"]; displayId: string; url: string },
+  pr: Pick<PullRequestSnapshot, "id" | "displayId" | "url"> &
+    Partial<Pick<PullRequestSnapshot, "ci" | "signals">>,
 ): Omit<PullRequestSnapshot, "state"> {
   const createdAt = new Date((run.startedAt ?? new Date()).getTime() + 60_000);
   return {
@@ -91,7 +92,8 @@ export function pullRequestOf(
     sourceRepo: toRepoRef(run.runnerProject),
     headCommit: run.headCommit,
     baseBranch: "main",
-    ci: "success",
+    ci: pr.ci ?? "success",
+    signals: pr.signals ?? null,
   };
 }
 

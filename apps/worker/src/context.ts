@@ -7,6 +7,8 @@ import type {
   MailboxRef,
   PermissionRequestId,
   PrReadError,
+  PullRequestSignals,
+  PullRequestSnapshot,
   PrStateDecision,
   QuestionId,
   RunId,
@@ -129,6 +131,30 @@ export async function decideRunPrState(
     runnerProject: run.runnerProject,
   });
   return { prState: "none", pr: null };
+}
+
+export function pullRequestRecord(pr: PullRequestSnapshot, checkedAt: Date) {
+  const { id, displayId, url, ci, signals, headCommit } = pr;
+  const read = signals ?? (isSettledPr(pr) ? settledSignals(headCommit) : null);
+  return { id, displayId, url, ci, checkedAt, headCommit, signals: read };
+}
+
+function isSettledPr(pr: PullRequestSnapshot): boolean {
+  return pr.state === "merged" || pr.state === "closed";
+}
+
+function settledSignals(headCommit: string): PullRequestSignals {
+  return {
+    open: false,
+    headCommit,
+    ciFailed: false,
+    checkTotal: null,
+    failedCount: 0,
+    failedChecks: [],
+    checksTruncated: false,
+    conflict: null,
+    behindBy: null,
+  };
 }
 
 export type PrRead =

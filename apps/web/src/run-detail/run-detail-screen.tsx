@@ -1,3 +1,4 @@
+import type { PrSignalsView } from "@ganger/app/pr-signals-view";
 import * as stylex from "@stylexjs/stylex";
 import { isMcpRejectReason, isMcpRunTool } from "@ganger/app/mcp/actions";
 import {
@@ -819,6 +820,22 @@ function LogLines({ lines }: { lines: ReadonlyArray<string> }) {
   );
 }
 
+function checksText(
+  signals: PrSignalsView,
+  total: number,
+  t: ReturnType<typeof useTranslations<"run.props">>,
+): string {
+  const names = signals.failedChecks.join(", ");
+  if (signals.failedCount > 0) {
+    return t(signals.checksTruncated ? "failedChecksPartial" : "failedChecks", {
+      total,
+      failed: signals.failedCount,
+      names,
+    });
+  }
+  return signals.ciFailed ? t("someChecksFailed", { total }) : t("checks", { total });
+}
+
 function Properties({ run }: { run: RunDetail }) {
   const agentName = useAgentName();
   const t = useTranslations("run.props");
@@ -862,7 +879,41 @@ function Properties({ run }: { run: RunDetail }) {
             </a>
           )}
         </DefinitionItem>
-        {pr === null ? null : <DefinitionItem label={t("ci")}>{ci(pr.ci)}</DefinitionItem>}
+        {pr === null ? null : (
+          <DefinitionItem label={t("ci")}>
+            <span {...stylex.props(styles.inline)}>
+              {ci(pr.ci)}
+              {pr.signals === null || pr.signals.checkTotal === null ? null : (
+                <Text variant="meta" tone={pr.signals.ciFailed ? "problem" : "muted"}>
+                  {checksText(pr.signals, pr.signals.checkTotal, t)}
+                </Text>
+              )}
+            </span>
+          </DefinitionItem>
+        )}
+        {pr?.signals == null || pr.signals.conflict === null ? null : (
+          <DefinitionItem label={t("conflict")}>
+            {pr.signals.conflict ? (
+              <Text variant="ui" tone="problem">
+                {t("hasConflict")}
+              </Text>
+            ) : (
+              t("noConflict")
+            )}
+          </DefinitionItem>
+        )}
+        {pr?.signals == null || pr.signals.behindBy === null ? null : (
+          <DefinitionItem label={t("behind")}>
+            {pr.signals.behindBy > 0
+              ? t("behindBy", { count: pr.signals.behindBy })
+              : t("upToDate")}
+          </DefinitionItem>
+        )}
+        {pr?.signals == null ? null : (
+          <DefinitionItem label={t("prReadAt")}>
+            {stamp(pr.signals.checkedAt, run.now)}
+          </DefinitionItem>
+        )}
         {ended === null ? null : (
           <>
             <DefinitionItem label={t("agentResult")}>

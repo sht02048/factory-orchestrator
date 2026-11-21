@@ -400,6 +400,7 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
               {result}
             </Text>
           </TableFoldedOnly>
+          <PrMarks run={run} />
         </span>
       </TableCell>
       <TableCell hideWhen="second">
@@ -419,6 +420,29 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
             : elapsed(elapsedMs(run))}
       </TableCell>
     </TableRow>
+  );
+}
+
+function PrMarks({ run }: { run: RunView }) {
+  const t = useTranslations("runs");
+  const signals = run.pullRequest?.signals ?? null;
+  if (signals === null) return null;
+  const behindBy = signals.behindBy ?? 0;
+  if (!signals.ciFailed && signals.conflict !== true && behindBy === 0) return null;
+  return (
+    <span data-pr-marks {...stylex.props(styles.prMarks)}>
+      {signals.ciFailed ? (
+        <Text variant="meta" tone="problem">
+          {t("prMarks.ciFailed")}
+        </Text>
+      ) : null}
+      {signals.conflict === true ? (
+        <Text variant="meta" tone="problem">
+          {t("prMarks.conflict")}
+        </Text>
+      ) : null}
+      {behindBy > 0 ? <Text variant="meta">{t("prMarks.behind", { count: behindBy })}</Text> : null}
+    </span>
   );
 }
 
@@ -609,6 +633,7 @@ const styles = stylex.create({
     marginTop: space.s4,
   },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
+  prMarks: { display: "flex", flexWrap: "wrap", columnGap: space.s2, minWidth: 0 },
 });
 
 function ticketName(run: RunView): string {
