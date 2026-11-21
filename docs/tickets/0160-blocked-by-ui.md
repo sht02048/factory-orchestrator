@@ -1,0 +1,29 @@
+---
+status: todo
+blocked_by: [0159]
+---
+
+# 0160 먼저 끝나야 하는 티켓 화면
+
+## 목표
+
+스펙 [0008](../spec/0008-blocked-by.md) B11의 화면을 만든다. 서버와 로더는 [0159](0159-blocked-by-queue.md)가 준비한다. 대기 이유와 선행 목록은 `queuedReason`(`blockers-waiting`, `blockers-stuck`)에 실려 있다.
+
+## 할 일
+
+1. Tickets 목록: 기다림 표시와 우선순위 열.
+2. Tickets 상세 패널: "먼저 끝나야 하는 티켓"과 "이 티켓을 기다리는 티켓".
+3. Dashboard Queued 카드(시안 Cards 보드의 B 안): 번호·제목 두 줄, 선행 티켓 칩(점 색이 그 티켓 상태, 끝난 것은 취소선, 취소는 빨간 칩), 멈춘 기다림은 빨간 테두리. 우선순위는 표시하지 않는다.
+4. Dashboard의 모든 카드: 번호·제목 두 줄. 상태 알약(Question·Permission·Human Check·Waiting for Input·Disconnected·Failed·Paused)은 카드 맨 위가 아니라 첫째 줄(티켓 번호 줄)의 오른쪽 끝에 둔다. 둘째 줄은 제목이다.
+   카드 안은 두 묶음이다. 정체 묶음(번호 줄·제목, 사이 2px)과 상태 묶음(선행 티켓 칩·아랫줄, 사이 6px)을 두고, 두 묶음 사이는 12px(묶음 안의 2배 이상)로 둔다. 번호 줄은 알약이 없어도 알약 높이(20px)를 유지해 카드마다 제목 위치가 같게 한다. 칸 머리와 첫 카드 사이는 카드 사이(8px)보다 넓게(12px) 둔다. 값은 `packages/ui`의 space 토큰으로 쓴다.
+5. Run 상세: 대기 이유, 선행 목록, 확인을 받는 "기다리지 않고 시작"(서버 함수 `startRunWithoutWaiting`, 요청 ID).
+6. 관계 그래프 화면은 만들지 않는다.
+
+## 시안
+
+아티팩트 "Ganger Blocked By": https://claude.ai/artifact/BwGNHD3fj3s3tMy53MVdaW
+
+## 완료 조건
+
+- 시험: 위 화면이 기다림, 멈춘 기다림, 끝난 선행 티켓을 구분해 보인다.
+- 시험: 기다리지 않고 시작은 확인을 받고, 보내는 동안 버튼을 막는다.
