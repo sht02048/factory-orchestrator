@@ -1,10 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
+import { CONTINUE_MESSAGE_MAX_LENGTH } from "@ganger/core";
 import { markAllTrackersChanged } from "@ganger/db";
 import { z } from "zod";
 import { answerInput, denyInput, submitAnswer, submitDenial } from "@ganger/app/home/actions";
 import { loadHomePage } from "@ganger/app/home/load";
-import { cancelRunRequest, removeWorktreeRequest } from "@ganger/app/run-detail/actions";
+import {
+  cancelRunRequest,
+  continueRunRequest,
+  removeWorktreeRequest,
+} from "@ganger/app/run-detail/actions";
 import { requestControl } from "@ganger/app/run-control";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
 import { loadRunnersPage } from "@ganger/app/runners/load";
@@ -95,6 +100,16 @@ export const cancelRun = createServerFn({ method: "POST" })
 export const removeRunWorktree = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string() }))
   .handler(({ data }) => removeWorktreeRequest(getDatabase(), data.runId, new Date()));
+
+const continueMessageSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((text) => Array.from(text).length <= CONTINUE_MESSAGE_MAX_LENGTH);
+
+export const continueRunFrom = createServerFn({ method: "POST" })
+  .validator(z.object({ runId: z.string(), message: continueMessageSchema }))
+  .handler(({ data }) => continueRunRequest(getDatabase(), data.runId, data.message, new Date()));
 
 export const controlRun = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string(), control: z.enum(["pause", "resume"]) }))

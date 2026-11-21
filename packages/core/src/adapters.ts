@@ -218,6 +218,16 @@ export interface StartRunInput {
   model?: string;
   brief: string;
   ticket?: { key: TicketKey; url: string };
+  continueIn?: WorktreeRef;
+}
+
+export const CONTINUATION_PLACES = ["same-worktree", "recreated", "from-scratch"] as const;
+export type ContinuationPlace = (typeof CONTINUATION_PLACES)[number];
+
+export interface PrepareContinuationInput {
+  project: RunnerProjectId;
+  worktree: WorktreeRef;
+  branch: string;
 }
 
 export interface StartedRun {
@@ -300,7 +310,12 @@ export interface Runner {
   ensureMailbox(current: MailboxRef | null): Promise<MailboxRef>;
 
   startRun(input: StartRunInput): Promise<StartedRun>;
-  findStartedRun(input: { mailbox: MailboxRef; worktreeName: string }): Promise<StartedRun | null>;
+  findStartedRun(input: {
+    mailbox: MailboxRef;
+    worktreeName: string;
+    continueIn?: WorktreeRef;
+  }): Promise<StartedRun | null>;
+  prepareContinuation(input: PrepareContinuationInput): Promise<ContinuationPlace>;
 
   pollRun(run: RunOnRunner): Promise<RunProgress>;
   answerQuestion(

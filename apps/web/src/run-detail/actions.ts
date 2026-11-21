@@ -3,7 +3,7 @@ import type { QueryClient, QueryState } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import type { RunControlActionResult } from "@ganger/app/run-control";
-import type { RunActionResult } from "@ganger/app/run-detail/actions";
+import type { ContinueRunActionResult, RunActionResult } from "@ganger/app/run-detail/actions";
 import type { RunDetailPage } from "@ganger/app/run-detail/model";
 import { toRunId } from "@ganger/core";
 import type { RunControl } from "@ganger/core";
@@ -17,6 +17,7 @@ import { keysChangedByRunWrite, runDetailKey } from "../runs/queries";
 import {
   answerQuestion,
   cancelRun,
+  continueRunFrom,
   controlRun,
   denyPermission,
   removeRunWorktree,
@@ -32,6 +33,7 @@ export interface RunDetailCalls {
   deny(input: { runId: string; promptId: string; reason: string }): Promise<unknown>;
   cancel(runId: string): Promise<RunActionResult>;
   removeWorktree(runId: string): Promise<RunActionResult>;
+  continueRun(runId: string, message: string): Promise<ContinueRunActionResult>;
   control(runId: string, control: RunControl): Promise<RunControlActionResult>;
   requestLog(runId: string): Promise<boolean>;
 }
@@ -41,6 +43,7 @@ export const serverRunDetailCalls: RunDetailCalls = {
   deny: (data) => denyPermission({ data }),
   cancel: (runId) => cancelRun({ data: { runId } }),
   removeWorktree: (runId) => removeRunWorktree({ data: { runId } }),
+  continueRun: (runId, message) => continueRunFrom({ data: { runId, message } }),
   control: (runId, control) => controlRun({ data: { runId, control } }),
   requestLog: (runId) => requestRunLog({ data: { runId } }),
 };
@@ -94,6 +97,11 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
       mutationFn: async () => okOrThrow<object, string>(await calls.removeWorktree(runId)),
       onSuccess: refreshRun,
     }),
+    continueRun: mutationOptions({
+      mutationFn: async (message: string) =>
+        okOrThrow<{ runId: string }, string>(await calls.continueRun(runId, message)),
+      onSuccess: refreshRun,
+    }),
     control: mutationOptions({
       mutationFn: async (control: RunControl): Promise<RunControlOutcome> =>
         (await calls.control(runId, control)).ok ? "requested" : "state-changed",
@@ -120,6 +128,7 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
   const deny = useMutation(mutations.deny);
   const cancel = useMutation(mutations.cancel);
   const removeWorktree = useMutation(mutations.removeWorktree);
+  const continueRun = useMutation(mutations.continueRun);
   const control = useMutation(mutations.control);
   const refreshLog = useMutation(mutations.refreshLog);
   const openLog = useMutation(mutations.openLog);
@@ -135,6 +144,9 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
     },
     onRemoveWorktree: async () => {
       await removeWorktree.mutateAsync();
+    },
+    onContinue: async (message) => {
+      await continueRun.mutateAsync(message);
     },
     onControl: (next) => control.mutateAsync(next),
     onRefreshLog: async () => {

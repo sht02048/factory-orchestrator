@@ -7,6 +7,7 @@ import {
   getRunWithRecords,
   getWorkspaceTrackerProject,
   getRunCancelRequest,
+  continueRunBlock,
   listRunMcpActions,
   listRunPlacements,
   listRunPermissionWaits,
@@ -17,6 +18,7 @@ import {
   listRuns,
   listWorkspaces,
   requestLogTail,
+  worktreeTakenOverBy,
 } from "@ganger/db";
 import type {
   Database,
@@ -34,6 +36,7 @@ import type { QueuedReason } from "../runs/model.js";
 import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
 import type {
   CiView,
+  ContinueOffer,
   KeptWorktree,
   KeptWorktreeReason,
   LogTailView,
@@ -42,6 +45,7 @@ import type {
   RunDetail,
   RunDetailPage,
   RunDetailStatus,
+  RunLink,
   TimelineEvent,
 } from "./model.js";
 
@@ -60,6 +64,14 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
   const questions = listRunQuestions(db, run.id);
   const permissionWaits = listRunPermissionWaits(db, run.id);
   const cancelRequest = getRunCancelRequest(db, run.id);
+  const ticketRuns = listRuns(db, { ticket: run.ticket });
+  const linkTo = (id: RunId | null): RunLink | null => {
+    if (id === null) return null;
+    const index = ticketRuns.findIndex((other) => other.id === id);
+    return index === -1 ? null : { id, number: index + 1 };
+  };
+  const continuedFrom = linkTo(run.continuedFromRunId);
+  const continuedBy = linkTo(worktreeTakenOverBy(db, run.id));
 
   const detail: RunDetail = {
     id: run.id,
@@ -80,7 +92,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     endedAt: endedAt?.toISOString() ?? null,
     waitMs: durations.waitMs ?? 0,
     executionMs: withoutPauses(durations.executionMs, records, now),
-    status: statusOf(db, run, records, now),
+    status: statusOf(db, run, records, now, continuedBy !== null),
     pullRequest:
       pr === null || !isWebUrl(pr.url)
         ? null
@@ -108,9 +120,14 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
       permissionWaits,
       cancelRequest?.requestedAt ?? null,
       listRunMcpActions(db, run.id),
+      continuationEvents(run, continuedFrom, continuedBy, ticketRuns),
     ),
     log: logOf(db, run, records),
     otherRuns: otherRunsOf(db, run),
+    continuedFrom,
+    continuedBy,
+    continuePlace: records.continuePlace,
+    continueOffer: continueOfferOf(db, run, records, ticketRuns, runner?.name ?? null),
   };
   return { kind: "found", run: detail };
 }
@@ -122,7 +139,57 @@ export function requestRunLogTail(db: Database, runId: string, now: Date): boole
   return true;
 }
 
-function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date): RunDetailStatus {
+function continueOfferOf(
+  db: Database,
+  run: StoredRun,
+  records: RunRecords,
+  ticketRuns: ReadonlyArray<StoredRun>,
+  runnerName: string | null,
+): ContinueOffer | null {
+  if (continueRunBlock(db, run.id) !== null) return null;
+  return {
+    sourceNumber: ticketRuns.findIndex((other) => other.id === run.id) + 1,
+    nextNumber: ticketRuns.length + 1,
+    runnerName,
+    place: records.worktreeRemovedAt === null ? "same-worktree" : "recreated",
+    hasReport: (records.reportBody?.trim() ?? "") !== "",
+  };
+}
+
+function continuationEvents(
+  run: StoredRun,
+  continuedFrom: RunLink | null,
+  continuedBy: RunLink | null,
+  ticketRuns: ReadonlyArray<StoredRun>,
+): TimelineEvent[] {
+  const events: TimelineEvent[] = [];
+  if (continuedFrom !== null) {
+    events.push({
+      kind: "continued-from",
+      runNumber: continuedFrom.number,
+      at: run.assignedAt.toISOString(),
+    });
+  }
+  if (continuedBy !== null) {
+    const next = ticketRuns.find((other) => other.id === continuedBy.id);
+    if (next !== undefined) {
+      events.push({
+        kind: "continued-by",
+        runNumber: continuedBy.number,
+        at: next.assignedAt.toISOString(),
+      });
+    }
+  }
+  return events;
+}
+
+function statusOf(
+  db: Database,
+  run: StoredRun,
+  records: RunRecords,
+  now: Date,
+  takenOver: boolean,
+): RunDetailStatus {
   switch (run.state) {
     case "queued":
       return { state: "queued", queuedReason: queuedReasonOf(db, run.id, now) };
@@ -155,7 +222,7 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date):
         prState: run.prState,
         prReadError: records.prReadError,
         summary: outcome.outcome,
-        keptWorktree: keptWorktreeOf(run, records, outcome.worktree),
+        keptWorktree: takenOver ? null : keptWorktreeOf(run, records, outcome.worktree),
         laterPrState:
           records.laterPrState === null
             ? null
@@ -218,6 +285,7 @@ function queuedReasonOf(db: Database, runId: RunId, now: Date): QueuedReason {
               agent: run.agent,
               runnerId: run.runnerId,
               unstartable: false,
+              pinnedToRunner: run.continuedFromRunId !== null,
             },
           ]
         : [],
@@ -240,8 +308,9 @@ function timelineOf(
   permissionWaits: ReadonlyArray<StoredPermissionWait>,
   cancelRequestedAt: Date | null,
   mcpActions: ReadonlyArray<StoredMcpAction>,
+  continuation: ReadonlyArray<TimelineEvent>,
 ): TimelineEvent[] {
-  const events: TimelineEvent[] = [];
+  const events: TimelineEvent[] = [...continuation];
   for (const action of mcpActions) {
     const view = mcpActionView(action);
     events.push({

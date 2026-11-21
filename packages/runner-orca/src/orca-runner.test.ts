@@ -31,6 +31,7 @@ import {
   runnerWith,
   stdout,
 } from "./test-support.js";
+import type { RemoteResult } from "./ssh.js";
 
 const MAILBOX = encodeMailbox({
   terminal: "term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7",
@@ -1436,5 +1437,159 @@ describe("pauseAgent and resumeAgent", () => {
     expect(await adapterError(runnerWith(exec).resumeAgent(RUN, resumeInput))).toMatchObject({
       kind: "start-outcome-unknown",
     });
+  });
+});
+
+describe("prepareContinuation", () => {
+  const repoPath = "'<path>/sandbox'";
+  const path = "/worktrees/ganger-ENG-1-1";
+  const branch = "acme/ganger-ENG-1-1";
+  const input = {
+    project: toRunnerProjectId("github:acme/sandbox"),
+    worktree: toWorktreeRef(`527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::${path}`),
+    branch,
+  };
+  const list = (...blocks: string[]) => stdout(`${blocks.join("\n\n")}\n`);
+  const main = `worktree <path>/sandbox\nHEAD aaa\nbranch refs/heads/main`;
+  const here = (name: string) => `worktree ${path}\nHEAD bbb\nbranch refs/heads/${name}`;
+
+  function git(exec: ScriptedExec, verb: string, ...replies: RemoteResult[]): ScriptedExec {
+    return exec.on(`git -C ${repoPath} ${verb}`, ...replies);
+  }
+
+  function projectExec(): ScriptedExec {
+    return withProjects(new ScriptedExec());
+  }
+
+  test("워크트리가 그 브랜치에 있으면 같은 워크트리다", async () => {
+    const exec = git(projectExec(), "worktree list", list(main, here(branch)));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("same-worktree");
+    expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
+  });
+
+  test("워크트리가 다른 브랜치로 바뀌었으면 그 자리에서 일하지 않는다", async () => {
+    const exec = git(projectExec(), "worktree list", list(main, here("other")));
+    expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
+      kind: "runner-error",
+      code: "worktree_branch_changed",
+    });
+  });
+
+  test("워크트리가 없고 로컬 브랜치가 있으면 같은 경로에 다시 만든다", async () => {
+    const exec = projectExec();
+    git(exec, "worktree list", list(main));
+    git(exec, "worktree prune", stdout(""));
+    git(exec, "show-ref", stdout(""));
+    git(exec, "worktree add", stdout(""));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
+    expect(exec.commands()).toContain(`git -C ${repoPath} worktree add ${path} ${branch}`);
+  });
+
+  test("로컬에 없고 원격에만 있으면 받아서 추적 브랜치로 만든다", async () => {
+    const exec = projectExec();
+    git(exec, "worktree list", list(main));
+    git(exec, "worktree prune", stdout(""));
+    git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote", stdout(`ccc\trefs/heads/${branch}\n`));
+    git(exec, "fetch", stdout(""));
+    git(exec, "worktree add", stdout(""));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
+    expect(exec.commands()).toContain(
+      `git -C ${repoPath} worktree add --track -b ${branch} ${path} origin/${branch}`,
+    );
+  });
+
+  test("브랜치가 어디에도 없으면 처음부터 시작한다", async () => {
+    const exec = projectExec();
+    git(exec, "worktree list", list(main));
+    git(exec, "worktree prune", stdout(""));
+    git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote", stdout("", 2));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("from-scratch");
+    expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
+  });
+
+  test("원격을 읽지 못하면 처음부터 시작하지 않고 실패로 돌려준다", async () => {
+    const exec = projectExec();
+    git(exec, "worktree list", list(main));
+    git(exec, "worktree prune", stdout(""));
+    git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote", stdout("", 128));
+    expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
+      kind: "runner-error",
+      code: "git_failed",
+    });
+  });
+
+  test("이어서 시작하면 그 워크트리를 고르고 새 워크트리 인자를 넘기지 않는다", async () => {
+    const exec = withProjects(
+      new ScriptedExec()
+        .orca("orchestration worker-start", stdout(own("worker-start-spec-stdin.json")))
+        .orca("worktree show", stdout(own("worktree-show.json"))),
+    );
+    await runnerWith(exec).startRun({
+      mailbox: MAILBOX,
+      project: toRunnerProjectId("github:acme/sandbox"),
+      worktreeName: "ganger-ENG-1-2",
+      agent: toAgentId("claude"),
+      brief: "brief",
+      continueIn: WORKTREE,
+    });
+    const command = exec.calls.find((c) => c.command.includes("worker-start"))?.command ?? "";
+    expect(command).toContain(`--worktree 'id:${WORKTREE}' --keep-open`);
+    expect(command).toContain("--task-title ganger-ENG-1-2");
+    for (const flag of ["--repo", "--name", "--base-branch", "--comment"]) {
+      expect(command).not.toContain(flag);
+    }
+  });
+
+  test("이어서 시작한 런은 이전 에이전트가 아니라 제목이 같은 작업으로 찾는다", async () => {
+    const tasks = {
+      ok: true,
+      result: {
+        tasks: [
+          { id: "task_old", status: "completed", title: "ganger-ENG-1-1", dispatchId: "ctx_old" },
+          { id: "task_new", status: "dispatched", title: "ganger-ENG-1-2", dispatchId: "ctx_new" },
+        ],
+      },
+    };
+    const exec = new ScriptedExec()
+      .orca("orchestration task-list", stdout(JSON.stringify(tasks)))
+      .orca(
+        "orchestration worker-show",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: { dispatchId: "ctx_new", taskId: "task_new", runId: "run_1", state: "ready" },
+          }),
+        ),
+      )
+      .orca("worktree show", stdout(own("worktree-show.json")));
+
+    const found = await runnerWith(exec).findStartedRun({
+      mailbox: MAILBOX,
+      worktreeName: "ganger-ENG-1-2",
+      continueIn: WORKTREE,
+    });
+
+    expect(found === null ? null : decodeAgent(found.agentRef)).toEqual({
+      dispatchId: "ctx_new",
+      taskId: "task_new",
+      runId: "run_1",
+    });
+  });
+
+  test("이어서 시작한 작업이 없으면 이전 에이전트를 시작된 것으로 보지 않는다", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration task-list",
+      stdout(JSON.stringify({ ok: true, result: { tasks: [] } })),
+    );
+    expect(
+      await runnerWith(exec).findStartedRun({
+        mailbox: MAILBOX,
+        worktreeName: "ganger-ENG-1-2",
+        continueIn: WORKTREE,
+      }),
+    ).toBeNull();
   });
 });

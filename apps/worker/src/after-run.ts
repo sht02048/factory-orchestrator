@@ -12,6 +12,7 @@ import {
   markTrackerChanged,
   recordPrReadError,
   updateRunRecords,
+  worktreeTakenOverBy,
 } from "@ganger/db";
 import type { RunRecords, StoredRun, StoredRunner } from "@ganger/db";
 import {
@@ -344,6 +345,7 @@ async function removeWorktreeWithoutWork(
   stored: StoredRunner | undefined,
 ): Promise<void> {
   if (stored === undefined || !stored.online) return;
+  if (worktreeTakenOverBy(context.db, run.id) !== null) return;
   const kept = await unsavedWorkIn(context, run, stored);
   if (kept === "unreachable") return;
   if (kept === null) {

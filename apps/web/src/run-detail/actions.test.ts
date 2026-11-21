@@ -62,6 +62,7 @@ function okCalls(overrides: Partial<RunDetailCalls> = {}): RunDetailCalls {
     deny: () => Promise.resolve(undefined),
     cancel: () => Promise.resolve({ ok: true }),
     removeWorktree: () => Promise.resolve({ ok: true }),
+    continueRun: () => Promise.resolve({ ok: true, runId: "run-next" }),
     control: () => Promise.resolve({ ok: true }),
     requestLog: () => Promise.resolve(true),
     ...overrides,

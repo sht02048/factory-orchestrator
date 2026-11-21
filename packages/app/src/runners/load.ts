@@ -1,6 +1,6 @@
 import { blockedProjectsOf, currentWindows, highestUsage, summarizeRunOutcome } from "@ganger/core";
 import type { UsageWindow } from "@ganger/core";
-import { listRunners, listRunsWithRecords, listWorkspaces } from "@ganger/db";
+import { listRunners, listRunsWithRecords, listWorkspaces, worktreeTakenOverBy } from "@ganger/db";
 import type { Database, StoredProviderUsage, StoredRun } from "@ganger/db";
 import { z } from "zod";
 import { prerequisiteHint, prerequisiteProject } from "../prerequisites.js";
@@ -53,6 +53,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
         break;
       case "ended": {
         if (records.worktreeRemovedAt !== null) break;
+        if (worktreeTakenOverBy(db, run.id) !== null) break;
         const worktree =
           records.worktreeKept === null ? summarizeRunOutcome(run).worktree : "operator-decides";
         if (worktree !== "keep-until-pr-settles" && worktree !== "operator-decides") break;

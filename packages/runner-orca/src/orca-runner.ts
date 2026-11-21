@@ -20,6 +20,8 @@ import type {
   RunOnRunner,
   RunProgress,
   StartedRun,
+  ContinuationPlace,
+  PrepareContinuationInput,
   StartRunInput,
   WorktreeRef,
   WorktreeWork,
@@ -50,7 +52,17 @@ import {
 import type { PushCheckOutcome } from "./push-check.js";
 import {
   hasUncommittedChanges,
+  addTrackingWorktreeArgv,
+  addWorktreeArgv,
+  fetchBranchArgv,
+  gitSucceeded,
   hasUnpushedCommits,
+  localBranchArgv,
+  parseWorktreeList,
+  refFound,
+  remoteBranchArgv,
+  worktreeListArgv,
+  worktreePruneArgv,
   uncommittedChangesArgv,
   unpushedCommitsArgv,
 } from "./worktree-work.js";
@@ -368,6 +380,7 @@ export class OrcaRunner implements Runner {
       });
     }
 
+    const isNewWorktree = input.continueIn === undefined;
     const args = [
       "orchestration",
       "worker-start",
@@ -379,19 +392,25 @@ export class OrcaRunner implements Runner {
       "-",
       "--task-title",
       input.worktreeName,
-      "--worktree",
-      "new-top-level",
-      "--repo",
-      `id:${setup.repoId}`,
-      "--name",
-      input.worktreeName,
+      ...(isNewWorktree
+        ? [
+            "--worktree",
+            "new-top-level",
+            "--repo",
+            `id:${setup.repoId}`,
+            "--name",
+            input.worktreeName,
+          ]
+        : ["--worktree", `id:${input.continueIn}`, "--keep-open"]),
       "--agent",
       input.agent,
-      ...(input.baseBranch === undefined ? [] : ["--base-branch", input.baseBranch]),
+      ...(isNewWorktree && input.baseBranch !== undefined
+        ? ["--base-branch", input.baseBranch]
+        : []),
       ...modelArgs(input.model ?? this.config.model),
-      ...(input.ticket === undefined
-        ? []
-        : ["--comment", `${input.ticket.key} ${input.ticket.url}`]),
+      ...(isNewWorktree && input.ticket !== undefined
+        ? ["--comment", `${input.ticket.key} ${input.ticket.url}`]
+        : []),
     ];
     let started: z.infer<typeof workerStartResultSchema>;
     try {
@@ -430,7 +449,9 @@ export class OrcaRunner implements Runner {
     const agent = { dispatchId: started.dispatchId, taskId: started.taskId, runId: started.runId };
     const selector =
       started.workspace === null || started.workspace === undefined
-        ? `name:${input.worktreeName}`
+        ? input.continueIn === undefined
+          ? `name:${input.worktreeName}`
+          : `id:${input.continueIn}`
         : `id:${started.workspace}`;
     try {
       return await this.startedRunAt(selector, agent);
@@ -445,10 +466,94 @@ export class OrcaRunner implements Runner {
     }
   }
 
+  async prepareContinuation(input: PrepareContinuationInput): Promise<ContinuationPlace> {
+    const project = (await this.loadProjects()).find((p) => p.id === input.project);
+    if (project?.setup == null) {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "project_not_found",
+        message: `project ${input.project} is not set up on the runner`,
+      });
+    }
+    const repoPath = project.setup.path;
+    const path = worktreePathOf(input.worktree);
+    const entries = parseWorktreeList(await this.run(worktreeListArgv(repoPath)));
+    const current = entries.find((entry) => entry.path === path && !entry.prunable);
+    if (current !== undefined) {
+      if (current.branch === input.branch) return "same-worktree";
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "worktree_branch_changed",
+        message: `worktree ${path} is no longer on branch ${input.branch}`,
+      });
+    }
+    const elsewhere = entries.find((entry) => entry.branch === input.branch && !entry.prunable);
+    if (elsewhere !== undefined) {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "branch_in_use",
+        message: `branch ${input.branch} is checked out at ${elsewhere.path}`,
+      });
+    }
+    gitSucceeded(await this.run(worktreePruneArgv(repoPath)), "git worktree prune");
+    const timeout = { timeoutMs: this.config.startTimeoutMs };
+    const local = await this.run(localBranchArgv(repoPath, input.branch));
+    if (refFound(local, "git show-ref", 1)) {
+      const added = await this.run(addWorktreeArgv(repoPath, path, input.branch), timeout);
+      gitSucceeded(added, "git worktree add");
+      return "recreated";
+    }
+    const remote = project.remoteName;
+    const onRemote = await this.run(remoteBranchArgv(repoPath, remote, input.branch), timeout);
+    if (!refFound(onRemote, "git ls-remote", 2)) return "from-scratch";
+    gitSucceeded(
+      await this.run(fetchBranchArgv(repoPath, remote, input.branch), timeout),
+      "git fetch",
+    );
+    gitSucceeded(
+      await this.run(addTrackingWorktreeArgv(repoPath, path, input.branch, remote), timeout),
+      "git worktree add",
+    );
+    return "recreated";
+  }
+
+  private async findContinuedRun(
+    mailboxRef: MailboxRef,
+    worktreeName: string,
+    worktree: WorktreeRef,
+  ): Promise<StartedRun | null> {
+    const mailbox = decodeMailbox(mailboxRef);
+    if (mailbox === null) return null;
+    const { tasks } = await this.orca(
+      ["orchestration", "task-list", "--run", mailbox.runId, "--brief"],
+      taskListResultSchema,
+    );
+    const task = tasks.findLast(
+      (candidate) =>
+        candidate.title === worktreeName &&
+        candidate.status !== "failed" &&
+        typeof candidate.dispatchId === "string",
+    );
+    if (typeof task?.dispatchId !== "string") return null;
+    const shownWorker = await this.orca(
+      ["orchestration", "worker-show", "--dispatch", task.dispatchId],
+      workerShowResultSchema,
+    );
+    return this.startedRunAt(`id:${worktree}`, {
+      dispatchId: task.dispatchId,
+      taskId: task.id,
+      runId: shownWorker.runId,
+    });
+  }
+
   async findStartedRun(input: {
     mailbox: MailboxRef;
     worktreeName: string;
+    continueIn?: WorktreeRef;
   }): Promise<StartedRun | null> {
+    if (input.continueIn !== undefined) {
+      return this.findContinuedRun(input.mailbox, input.worktreeName, input.continueIn);
+    }
     const shown = await this.orcaOutcome(
       ["worktree", "show", "--worktree", `name:${input.worktreeName}`],
       worktreeShowResultSchema,
@@ -1077,6 +1182,18 @@ export const orcaRunnerFactory: RunnerFactory = {
     return new OrcaRunner(parseOrcaRunnerConfig(config));
   },
 };
+
+function worktreePathOf(worktree: WorktreeRef): string {
+  const separator = worktree.indexOf("::");
+  if (separator === -1) {
+    throw new AdapterError<RunnerErrorDetail>({
+      kind: "runner-error",
+      code: "invalid_worktree_ref",
+      message: "the worktree reference was not made by the orca runner",
+    });
+  }
+  return worktree.slice(separator + 2);
+}
 
 function modelArgs(model: string | undefined): string[] {
   return model === undefined ? [] : ["--model", model];

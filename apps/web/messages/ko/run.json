@@ -151,7 +151,9 @@
       "unavailable": "MCP 서버가 설치 폴더를 몰라요. Settings에서 바꿔 주세요"
     },
     "paused": "멈춤",
-    "unpaused": "재개"
+    "unpaused": "재개",
+    "continued-from": "런 #{number}{particle} 이어서 시작",
+    "continued-by": "런 #{number}에 이어서 맡김"
   },
   "report": {
     "title": "완료 보고",
@@ -251,5 +253,39 @@
     "title": "PR 정보를 읽지 못했어요",
     "no-access": "GitHub 토큰이 이 저장소를 볼 수 없어요. Settings에서 토큰의 저장소 권한을 확인해 주세요. 읽을 때까지 워크트리를 남겨 두고 worker가 다시 읽어요.",
     "other": "GitHub에서 PR을 읽지 못했어요. 읽을 때까지 워크트리를 남겨 두고 worker가 간격을 늘려 가며 다시 읽어요."
+  },
+  "continue": {
+    "trigger": "이어서 맡기기",
+    "title": "이어서 맡기기",
+    "where": "이어 받는 곳",
+    "newRun": "새 런",
+    "newRunValue": "런 #{next} · 런 #{source}{particle} 이어서",
+    "place": {
+      "same-worktree": "{runner} · 같은 워크트리와 브랜치",
+      "recreated": "{runner} · 같은 브랜치로 새 워크트리"
+    },
+    "noRunner": "러너 없음",
+    "messageLabel": "에이전트에게 할 말",
+    "messageRequired": "에이전트에게 할 말을 적어 주세요.",
+    "messageTooLong": "{max}자까지 보낼 수 있어요. 지금 {count}자예요.",
+    "sendsLabel": "함께 보내요",
+    "sendsReport": "런 #{source} 완료 보고",
+    "sendsBrief": "Workspace 앞뒤 지시",
+    "sendsProtocol": "Ganger와 주고받는 법",
+    "confirm": "맡기기",
+    "sending": "맡기는 중",
+    "dismiss": "닫기",
+    "failed": "이어서 맡기지 못했어요. 런 상태를 확인하고 다시 시도해 주세요."
+  },
+  "continuation": {
+    "title": "이어서 맡긴 런",
+    "from": "런 #{number}{particle} 이어서",
+    "by": "런 #{number}에 이어서 맡겼어요",
+    "place": {
+      "pending": "시작할 때 워크트리와 브랜치를 확인해요.",
+      "same-worktree": "같은 워크트리와 브랜치에서 이어서 일해요.",
+      "recreated": "워크트리가 지워져서 같은 브랜치로 새 워크트리를 만들었어요.",
+      "from-scratch": "브랜치도 없어서 새 워크트리에서 처음부터 시작했어요."
+    }
   }
 }

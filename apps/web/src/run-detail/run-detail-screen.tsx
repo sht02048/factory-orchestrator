@@ -18,6 +18,7 @@ import {
   Row,
   StatusPill,
   Text,
+  Textarea,
   focusStyles,
   linkStyles,
   NoticeLayout,
@@ -36,8 +37,10 @@ import { runStatus, useStatusName } from "../status";
 import { canCancel } from "@ganger/app/run-detail/model";
 import { availableRunControl } from "@ganger/app/run-control-view";
 import type { RunControlOutcome, RunControlView } from "@ganger/app/run-control-view";
+import { CONTINUE_MESSAGE_MAX_LENGTH } from "@ganger/core";
 import type { RunControl } from "@ganger/core";
 import type {
+  ContinueOffer,
   LogTailView,
   PendingInput,
   RunDetail,
@@ -50,6 +53,7 @@ export interface RunDetailActions {
   onDeny: (promptId: string, reason: string) => Promise<void>;
   onCancel: () => Promise<void>;
   onRemoveWorktree: () => Promise<void>;
+  onContinue: (message: string) => Promise<void>;
   onControl: (control: RunControl) => Promise<RunControlOutcome>;
   onRefreshLog: () => Promise<void>;
 }
@@ -97,6 +101,14 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const removable = keptWorktree !== null && !keptWorktree.removing;
   const headRef = useRef<HTMLDivElement>(null);
   const cancelStatusRef = useRef<HTMLSpanElement>(null);
+  const continuationRef = useRef<HTMLParagraphElement>(null);
+  const continuedById = run.continuedBy?.id ?? null;
+  const focusContinuation = useRef(false);
+  useEffect(() => {
+    if (continuedById === null || !focusContinuation.current) return;
+    focusContinuation.current = false;
+    focusFirst(continuationRef, headRef);
+  }, [continuedById]);
   const pending = [
     run.cancelPending ? t("cancelPending") : null,
     keptWorktree?.removing === true ? t("removeWorktree.pending") : null,
@@ -146,7 +158,11 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                 </Text>
               </span>
             </p>
-            {pr === null && !cancelable && control === null && !removable ? null : (
+            {pr === null &&
+            !cancelable &&
+            control === null &&
+            !removable &&
+            run.continueOffer === null ? null : (
               <Actions>
                 {pr === null ? null : (
                   <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
@@ -168,6 +184,20 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                     focusAfter={() => focusFirst(cancelStatusRef, headRef)}
                   />
                 ) : null}
+                {run.continueOffer === null ? null : (
+                  <ContinueRun
+                    offer={run.continueOffer}
+                    onContinue={async (message) => {
+                      focusContinuation.current = true;
+                      try {
+                        await props.onContinue(message);
+                      } catch (error) {
+                        focusContinuation.current = false;
+                        throw error;
+                      }
+                    }}
+                  />
+                )}
                 {removable ? (
                   <ConfirmDanger
                     messages="run.removeWorktree"
@@ -182,6 +212,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
             <Reason run={run} />
           </Text>
           <NextAction run={run} />
+          <Continuation run={run} runHref={props.runHref} statusRef={continuationRef} />
         </div>
 
         <div {...stylex.props(styles.columns)}>
@@ -605,6 +636,156 @@ function ConfirmDanger({
   );
 }
 
+function Continuation({
+  run,
+  runHref,
+  statusRef,
+}: {
+  run: RunDetail;
+  runHref: (runId: string) => string;
+  statusRef: RefObject<HTMLParagraphElement | null>;
+}) {
+  const t = useTranslations("run.continuation");
+  const { continuedFrom, continuedBy, continuePlace } = run;
+  if (continuedFrom === null && continuedBy === null) return null;
+  return (
+    <>
+      {continuedFrom === null ? null : (
+        <p {...stylex.props(styles.flat)}>
+          <a href={runHref(continuedFrom.id)} {...stylex.props(linkStyles())}>
+            {t("from", {
+              number: continuedFrom.number,
+              particle: objectParticle(continuedFrom.number),
+            })}
+          </a>{" "}
+          <Text variant="body" as="span">
+            {t(`place.${continuePlace ?? "pending"}`)}
+          </Text>
+        </p>
+      )}
+      {continuedBy === null ? null : (
+        <p
+          ref={statusRef}
+          role="status"
+          tabIndex={-1}
+          {...stylex.props(styles.flat, focusStyles.target)}
+        >
+          <a href={runHref(continuedBy.id)} {...stylex.props(linkStyles())}>
+            {t("by", { number: continuedBy.number })}
+          </a>
+        </p>
+      )}
+    </>
+  );
+}
+
+function ContinueRun({
+  offer,
+  onContinue,
+}: {
+  offer: ContinueOffer;
+  onContinue: (message: string) => Promise<void>;
+}) {
+  const t = useTranslations("run.continue");
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [state, setState] = useState<"idle" | "sending" | "failed">("idle");
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const sending = state === "sending";
+  const submit = (): void => {
+    if (sending) return;
+    const text = message.trim();
+    const length = Array.from(text).length;
+    if (length === 0) {
+      setInvalid(t("messageRequired"));
+      return;
+    }
+    if (length > CONTINUE_MESSAGE_MAX_LENGTH) {
+      setInvalid(t("messageTooLong", { max: CONTINUE_MESSAGE_MAX_LENGTH, count: length }));
+      return;
+    }
+    setInvalid(null);
+    setState("sending");
+    onContinue(text).then(
+      () => {
+        setState("idle");
+        setMessage("");
+        setOpen(false);
+      },
+      () => setState("failed"),
+    );
+  };
+  const sends = [
+    ...(offer.hasReport ? [t("sendsReport", { source: offer.sourceNumber })] : []),
+    t("sendsBrief"),
+    t("sendsProtocol"),
+  ];
+  return (
+    <Dialog
+      trigger={t("trigger")}
+      triggerVariant="primary"
+      title={t("title")}
+      open={open}
+      onOpenChange={(next) => {
+        if (sending) return;
+        setOpen(next);
+        if (!next) {
+          setInvalid(null);
+          setState("idle");
+        }
+      }}
+      scrollBody
+      status={state === "failed" ? <ActionFailedText text={t("failed")} /> : undefined}
+      actions={
+        <>
+          <DialogClose>{t("dismiss")}</DialogClose>
+          <Button variant="primary" aria-disabled={sending} aria-busy={sending} onClick={submit}>
+            {sending ? t("sending") : t("confirm")}
+          </Button>
+        </>
+      }
+    >
+      <DefinitionList>
+        <DefinitionItem label={t("where")}>
+          {t(`place.${offer.place}`, { runner: offer.runnerName ?? t("noRunner") })}
+        </DefinitionItem>
+        <DefinitionItem label={t("newRun")}>
+          {t("newRunValue", {
+            next: offer.nextNumber,
+            source: offer.sourceNumber,
+            particle: objectParticle(offer.sourceNumber),
+          })}
+        </DefinitionItem>
+      </DefinitionList>
+      <Field label={t("messageLabel")} {...(invalid === null ? {} : { error: invalid })}>
+        <Textarea name="continue-message" rows={4} value={message} onValueChange={setMessage} />
+      </Field>
+      <div {...stylex.props(styles.stack)}>
+        <Text variant="meta" as="p">
+          {t("sendsLabel")}
+        </Text>
+        <Text variant="body" as="p">
+          {sends.join(" · ")}
+        </Text>
+      </div>
+    </Dialog>
+  );
+}
+
+const VOWEL_ENDING_DIGITS = new Set([2, 4, 5, 9]);
+
+export function objectParticle(value: number): "을" | "를" {
+  return VOWEL_ENDING_DIGITS.has(value % 10) ? "를" : "을";
+}
+
+function ActionFailedText({ text }: { text: string }) {
+  return (
+    <Text variant="ui" as="p" tone="problem" role="alert">
+      {text}
+    </Text>
+  );
+}
+
 function ControlRun({
   control,
   onControl,
@@ -661,7 +842,11 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
   const { stamp } = useTime();
   const toolName = (tool: string): string => (isMcpRunTool(tool) ? t(`mcpTool.${tool}`) : tool);
   const eventTitle = (event: TimelineEvent): string =>
-    event.kind === "mcp" ? t("mcp", { client: event.client }) : t(event.kind);
+    event.kind === "mcp"
+      ? t("mcp", { client: event.client })
+      : event.kind === "continued-from" || event.kind === "continued-by"
+        ? t(event.kind, { number: event.runNumber, particle: objectParticle(event.runNumber) })
+        : t(event.kind);
   const eventDetail = (event: TimelineEvent): string | null => {
     switch (event.kind) {
       case "mcp":
@@ -692,6 +877,8 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
       case "disconnected":
       case "reconnected":
       case "cancel-requested":
+      case "continued-from":
+      case "continued-by":
         return null;
     }
   };

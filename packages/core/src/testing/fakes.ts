@@ -7,9 +7,11 @@ import type {
   CodeHostErrorDetail,
   CompletionReport,
   ConnectionCheck,
+  ContinuationPlace,
   Page,
   Paged,
   PermissionWait,
+  PrepareContinuationInput,
   PullRequestSnapshot,
   ResumeAgentInput,
   ResumedAgent,
@@ -215,6 +217,10 @@ export class FakeRunner implements Runner {
     { uncommittedChanges: boolean; unpushedCommits: boolean } | "check-fails"
   >();
   readonly startCalls: StartRunInput[] = [];
+  readonly prepareCalls: PrepareContinuationInput[] = [];
+  readonly goneBranches = new Set<string>();
+  readonly recreatedWorktrees = new Map<WorktreeRef, string>();
+  failNextPrepare: RunnerErrorDetail | null = null;
   online = true;
   prerequisites: RunnerPrerequisite[] = [
     {
@@ -329,6 +335,7 @@ export class FakeRunner implements Runner {
     for (const [name, run] of this.runs) {
       if (run.started.worktree === worktree) this.runs.delete(name);
     }
+    this.recreatedWorktrees.delete(worktree);
   }
 
   appendLog(worktree: WorktreeRef, ...lines: string[]): void {
@@ -373,7 +380,7 @@ export class FakeRunner implements Runner {
         throw new AdapterError(failure);
       }
       this.mustHaveMailbox(input.mailbox);
-      if (this.runs.has(input.worktreeName)) {
+      if (input.continueIn === undefined && this.runs.has(input.worktreeName)) {
         throw new AdapterError<RunnerErrorDetail>({
           kind: "runner-error",
           code: "worktree_exists",
@@ -389,8 +396,8 @@ export class FakeRunner implements Runner {
       }
       const n = this.next();
       const started: StartedRun = {
-        worktree: toWorktreeRef(`fake::/fake/${input.worktreeName}`),
-        branch: `fake/${input.worktreeName}`,
+        worktree: input.continueIn ?? toWorktreeRef(`fake::/fake/${input.worktreeName}`),
+        branch: this.branchOf(input),
         agentRef: toAgentRef(`fake-agent-${n}`),
       };
       this.runs.set(input.worktreeName, {
@@ -421,8 +428,40 @@ export class FakeRunner implements Runner {
     });
   }
 
-  findStartedRun(input: { mailbox: MailboxRef; worktreeName: string }): Promise<StartedRun | null> {
+  findStartedRun(input: {
+    mailbox: MailboxRef;
+    worktreeName: string;
+    continueIn?: WorktreeRef;
+  }): Promise<StartedRun | null> {
     return this.reach(() => this.runs.get(input.worktreeName)?.started ?? null);
+  }
+
+  prepareContinuation(input: PrepareContinuationInput): Promise<ContinuationPlace> {
+    return this.reach(() => {
+      this.prepareCalls.push(input);
+      const failure = this.failNextPrepare;
+      if (failure !== null) {
+        this.failNextPrepare = null;
+        throw new AdapterError(failure);
+      }
+      if (this.liveWorktree(input.worktree)) return "same-worktree";
+      if (this.goneBranches.has(input.branch)) return "from-scratch";
+      this.recreatedWorktrees.set(input.worktree, input.branch);
+      return "recreated";
+    });
+  }
+
+  private liveWorktree(worktree: WorktreeRef): boolean {
+    if (this.recreatedWorktrees.has(worktree)) return true;
+    return [...this.runs.values()].some((run) => run.started.worktree === worktree);
+  }
+
+  private branchOf(input: StartRunInput): string {
+    if (input.continueIn === undefined) return `fake/${input.worktreeName}`;
+    const recreated = this.recreatedWorktrees.get(input.continueIn);
+    if (recreated !== undefined) return recreated;
+    const source = [...this.runs.values()].find((run) => run.started.worktree === input.continueIn);
+    return source?.started.branch ?? `fake/${input.worktreeName}`;
   }
 
   pollRun(run: RunOnRunner): Promise<RunProgress> {

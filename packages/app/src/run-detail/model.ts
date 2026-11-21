@@ -1,5 +1,6 @@
 import type {
   AgentResult,
+  ContinuationPlace,
   PauseSource,
   PrReadError,
   PrState,
@@ -23,6 +24,7 @@ export type TimelineEvent = { at: string } & (
   | { kind: "cancel-requested" }
   | { kind: "ended"; agentResult: AgentResult }
   | { kind: "later-pr"; state: "merged" | "closed" }
+  | { kind: "continued-from" | "continued-by"; runNumber: number }
   | {
       kind: "mcp";
       client: string;
@@ -93,6 +95,19 @@ export type OtherRun = { id: string; assignedAt: string } & (
     }
 );
 
+export interface RunLink {
+  id: string;
+  number: number;
+}
+
+export interface ContinueOffer {
+  sourceNumber: number;
+  nextNumber: number;
+  runnerName: string | null;
+  place: "same-worktree" | "recreated";
+  hasReport: boolean;
+}
+
 export interface RunDetail {
   id: string;
   now: string;
@@ -125,6 +140,10 @@ export interface RunDetail {
   timeline: TimelineEvent[];
   log: LogTailView;
   otherRuns: OtherRun[];
+  continuedFrom: RunLink | null;
+  continuedBy: RunLink | null;
+  continuePlace: ContinuationPlace | null;
+  continueOffer: ContinueOffer | null;
 }
 
 export type RunDetailPage = { kind: "found"; run: RunDetail } | { kind: "not-found" };

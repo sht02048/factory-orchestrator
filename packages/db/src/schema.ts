@@ -3,6 +3,7 @@ import {
   AGENT_RESULTS,
   NOT_STARTED_AGENT_RESULTS,
   PAUSE_SOURCES,
+  CONTINUATION_PLACES,
   PR_READ_ERRORS,
   PR_STATES,
   RUN_STATES,
@@ -276,6 +277,9 @@ export const runs = sqliteTable(
     runnerUnreached: integer("runner_unreached", { mode: "boolean" }).notNull().default(false),
     reportBody: text("report_body"),
     agentBrief: text("agent_brief"),
+    continuedFromRunId: text("continued_from_run_id").$type<RunId>(),
+    continueMessage: text("continue_message"),
+    continuePlace: text("continue_place", { enum: CONTINUATION_PLACES }),
     prId: text("pr_id").$type<PullRequestId>(),
     prDisplayId: text("pr_display_id"),
     prUrl: text("pr_url"),
@@ -355,6 +359,7 @@ export const runs = sqliteTable(
     index("runs_ticket").on(t.trackerConnectionId, t.ticketKey, t.assignedAt),
     index("runs_state").on(t.state, t.assignedAt),
     index("runs_workspace").on(t.workspaceId, t.assignedAt),
+    index("runs_continued_from").on(t.continuedFromRunId),
   ],
 );
 

@@ -3,6 +3,7 @@ import {
   EMPTY_WORKSPACE_BRIEF,
   canRunnerTake,
   composeAgentBrief,
+  composeContinuationBrief,
   decideStartFailure,
   ticketBriefText,
   MAX_START_RETRIES,
@@ -10,14 +11,18 @@ import {
 } from "@ganger/core";
 import type {
   AdapterRegistry,
+  AgentRef,
+  ContinuationPlace,
   MailboxRef,
   QueuedRun,
   Runner,
   RunnerChoice,
+  RunOnRunner,
   RunId,
   RunnerId,
   StartedRun,
   TicketKey,
+  WorktreeRef,
 } from "@ganger/core";
 import {
   changeRunState,
@@ -35,12 +40,13 @@ import {
   listRuns,
   markCancelRequestProcessed,
   openDatabase,
+  recordContinuePlace,
   recordStartFailure,
   recordStartRequested,
   setQueuedRunRunner,
   setRunnerMailbox,
 } from "@ganger/db";
-import type { SecretBox, StoredRun } from "@ganger/db";
+import type { RunRecords, SecretBox, StoredRun } from "@ganger/db";
 import { log, withLogContext } from "@ganger/log";
 import { WorkerAdapters } from "./adapters.js";
 import {
@@ -241,7 +247,11 @@ async function findStartedForCancel(
   const runner = context.adapters.runner(storedRunner);
   try {
     const mailbox = await mailboxFor(context, storedRunner, runner);
-    return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
+    return await runner.findStartedRun({
+      mailbox,
+      worktreeName: run.worktreeName,
+      ...continueInOf(context, run),
+    });
   } catch (error) {
     context.logger.warn("run.cancel_lookup_failed", { runId: run.id, error });
     return "unknown";
@@ -352,6 +362,7 @@ function toQueuedRun(context: TickContext, run: StoredRun): QueuedRun[] {
       agent: run.agent,
       runnerId: run.runnerId,
       unstartable: mapping === null,
+      pinnedToRunner: run.continuedFromRunId !== null,
     },
   ];
 }
@@ -394,7 +405,7 @@ async function startOnRunner(
   context: TickContext,
   run: QueuedStoredRun,
   runnerId: RunnerId,
-  records: { startRequestedAt: Date | null; startFailures: number },
+  records: RunRecords,
 ): Promise<StartAttempt> {
   const { db, logger, adapters } = context;
   const storedRunner = findRunner(db, runnerId);
@@ -431,7 +442,15 @@ async function startOnRunner(
         return endCouldNotStart(context, run);
       }
     }
-    const prompt = await promptFor(context, run);
+    const source = continuationSource(context, run);
+    if (source === "missing") return endCouldNotStart(context, run);
+    const place =
+      source === null
+        ? null
+        : await continuationPlace(context, run, { runner, mailbox }, source, records);
+    if (place === "write-failed") return { kind: "blocked" };
+    const prompt =
+      place === null || place === "from-scratch" ? await promptFor(context, run) : undefined;
     if (prompt === null) return { kind: "blocked" };
     if (prompt === "ticket-gone") {
       tryWrite(context, run.id, () =>
@@ -442,11 +461,18 @@ async function startOnRunner(
       );
       return endCouldNotStart(context, run);
     }
-    const brief = composeAgentBrief({
-      workspace: getWorkspaceBrief(db, run.workspaceId) ?? EMPTY_WORKSPACE_BRIEF,
-      ticket: prompt.text,
-      protocol: runner.agentProtocol,
-    });
+    const workspace = getWorkspaceBrief(db, run.workspaceId) ?? EMPTY_WORKSPACE_BRIEF;
+    const ticket = prompt?.text ?? "";
+    const brief =
+      source === null
+        ? composeAgentBrief({ workspace, ticket, protocol: runner.agentProtocol })
+        : composeContinuationBrief({
+            workspace,
+            ticket,
+            protocol: runner.agentProtocol,
+            operatorMessage: records.continueMessage ?? "",
+            previousReport: source.report,
+          });
     if (
       tryWrite(context, run.id, () => recordStartRequested(db, run.id, context.now(), brief)) ===
       undefined
@@ -460,7 +486,8 @@ async function startOnRunner(
       agent: run.agent,
       ...(run.model === null ? {} : { model: run.model }),
       brief,
-      ticket: prompt.ticket,
+      ...(prompt === undefined ? {} : { ticket: prompt.ticket }),
+      ...(source === null || place === "from-scratch" ? {} : { continueIn: source.worktree }),
     });
     return { kind: "started", started };
   } catch (error) {
@@ -476,11 +503,78 @@ async function findStarted(
   mailbox: MailboxRef,
 ): Promise<StartedRun | null | "unreachable" | "unknown"> {
   try {
-    return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
+    return await runner.findStartedRun({
+      mailbox,
+      worktreeName: run.worktreeName,
+      ...continueInOf(context, run),
+    });
   } catch (error) {
     context.logger.warn("run.lookup_failed", { runId: run.id, error });
     return isOfflineLike(error) ? "unreachable" : "unknown";
   }
+}
+
+interface ContinuationSource {
+  worktree: WorktreeRef;
+  branch: string;
+  report: string | null;
+  agentRef: AgentRef;
+  agentMayBeAlive: boolean;
+}
+
+function continuationSource(
+  context: TickContext,
+  run: QueuedStoredRun,
+): ContinuationSource | "missing" | null {
+  if (run.continuedFromRunId === null) return null;
+  const found = getRunWithRecords(context.db, run.continuedFromRunId);
+  if (found?.run.state !== "ended" || found.run.startedAt === null) return "missing";
+  return {
+    worktree: found.run.worktree,
+    branch: found.run.branch,
+    report: found.records.reportBody,
+    agentRef: found.run.agentRef,
+    agentMayBeAlive: found.run.agentResult === "runner-disconnected" || found.run.runnerUnreached,
+  };
+}
+
+function continueInOf(
+  context: TickContext,
+  run: QueuedStoredRun,
+): { continueIn: WorktreeRef } | Record<string, never> {
+  const source = continuationSource(context, run);
+  if (source === null || source === "missing") return {};
+  const place = getRunWithRecords(context.db, run.id)?.records.continuePlace ?? null;
+  return place === null || place === "from-scratch" ? {} : { continueIn: source.worktree };
+}
+
+async function continuationPlace(
+  context: TickContext,
+  run: QueuedStoredRun,
+  target: { runner: Runner; mailbox: MailboxRef },
+  source: ContinuationSource,
+  records: RunRecords,
+): Promise<ContinuationPlace | "write-failed"> {
+  if (records.continuePlace === "from-scratch") return "from-scratch";
+  const { runner, mailbox } = target;
+  const prepared = await runner.prepareContinuation({
+    project: run.runnerProject,
+    worktree: source.worktree,
+    branch: source.branch,
+  });
+  if (prepared === "same-worktree" && source.agentMayBeAlive) {
+    await stopPreviousAgent(context, run, runner, {
+      mailbox,
+      worktree: source.worktree,
+      agentRef: source.agentRef,
+    });
+  }
+  const place = prepared === "from-scratch" ? prepared : (records.continuePlace ?? prepared);
+  const written = tryWrite(context, run.id, () => {
+    recordContinuePlace(context.db, run.id, place);
+    return true;
+  });
+  return written === undefined ? "write-failed" : place;
 }
 
 export const START_UNREACHABLE_RETRY_MS = 60_000;
@@ -584,6 +678,20 @@ async function promptFor(
     text: ticketBriefText(ticket),
     ticket: { key: ticket.key, url: ticket.url },
   };
+}
+
+async function stopPreviousAgent(
+  context: TickContext,
+  run: QueuedStoredRun,
+  runner: Runner,
+  previous: RunOnRunner,
+): Promise<void> {
+  try {
+    await runner.stopAgent(previous);
+  } catch (error) {
+    if (runnerErrorDetail(error)?.kind !== "runner-error") throw error;
+    context.logger.info("run.previous_agent_not_stopped", { runId: run.id, error });
+  }
 }
 
 function recordStart(context: TickContext, runId: RunId, started: StartedRun): boolean {

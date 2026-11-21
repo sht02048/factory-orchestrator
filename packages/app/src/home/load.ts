@@ -67,6 +67,7 @@ export function loadHomePage(
               agent: run.agent,
               runnerId: run.runnerId,
               unstartable: false,
+              pinnedToRunner: run.continuedFromRunId !== null,
             },
           ]
         : [],

@@ -11,6 +11,7 @@ export interface QueuedRun {
   agent: AgentId;
   runnerId: RunnerId | null;
   unstartable: boolean;
+  pinnedToRunner?: boolean;
 }
 
 export interface RunnerChoice {
@@ -49,6 +50,16 @@ export function planQueue(input: {
     let runnerId = run.runnerId;
     if (runnerId !== null) {
       const runner = runnersById.get(runnerId);
+      if (
+        run.pinnedToRunner === true &&
+        (runner === undefined || !canRunnerTake(runner, run.project))
+      ) {
+        plan.unplaced.push({
+          runId: run.id,
+          reason: runner === undefined ? "runner-offline" : whyCannotTake(runner, run.project),
+        });
+        continue;
+      }
       if (runner === undefined || !canRunnerTake(runner, run.project)) {
         plan.cleared.push({
           runId: run.id,
