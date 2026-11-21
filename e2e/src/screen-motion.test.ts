@@ -23,6 +23,7 @@ import {
   answerRunQuestion,
   assignRun,
   changeRunState,
+  getRun,
   migrate,
   openDatabase,
   recordRunQuestions,
@@ -45,7 +46,7 @@ import type { TestContext } from "vitest";
 import home from "../../apps/web/messages/ko/home.json" with { type: "json" };
 import runs from "../../apps/web/messages/ko/runs.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
-import { waitForRouterIdle } from "./navigation-timing.js";
+import { serverFnName, waitForRouterIdle } from "./navigation-timing.js";
 import { startWebServer } from "./web-server.js";
 
 interface MotionCall {
@@ -131,6 +132,7 @@ afterEach(() => {
       },
     });
     changeRunState(db, run, { to: "ended", agentResult: "reported-success", prState: "none" });
+    if (getRun(db, run)?.state !== "ended") throw new Error(`run ${run} did not end`);
   }
   openRuns.clear();
 });
@@ -355,6 +357,33 @@ describe("Dashboard 움직임(브라우저, 0153)", () => {
     await card(page, run.key).locator("[data-status]").waitFor({ timeout: CHANGE_VISIBLE_MS });
     const calls = await callsFor(page, run.id);
     expect(calls.some((call) => call.pill && call.properties.includes("transform"))).toBe(true);
+  });
+
+  it("다른 보기에 있는 동안 생긴 알약은 돌아와도 움직이지 않는다", async (context) => {
+    const run = assign();
+    start(run.id);
+    const page = await newPage(context);
+    await open(page, dashboardPath, "/");
+    await card(page, run.key).waitFor();
+    await tab(page, home.view.todo).click();
+    await expect.poll(() => card(page, run.key).count()).toBe(0);
+    const reread = page.waitForResponse(
+      (response) =>
+        response.url().includes("/_serverFn/") && serverFnName(response.url()) === "getHomePage",
+      { timeout: CHANGE_VISIBLE_MS },
+    );
+
+    const paused = changeRunState(db, run.id, { to: "paused", source: "operator" });
+    if (!paused.ok) throw new Error("pause failed");
+    await reread;
+    await page.waitForTimeout(QUIET_MS);
+    await clearCalls(page);
+
+    await tab(page, home.view.all).click();
+
+    await card(page, run.key).locator('[data-status="paused"]').waitFor();
+    await page.waitForTimeout(QUIET_MS);
+    expect((await motionCalls(page)).filter((call) => call.pill)).toEqual([]);
   });
 
   it("사람 확인 묶음으로 건너가며 알약이 생겨도 한 번 커진다", async (context) => {

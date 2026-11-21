@@ -1,7 +1,7 @@
 import { Button, KanbanCard, Menu, MenuItem, MoreIcon, StatusPill } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
-import type { RunControl } from "@ganger/core";
-import { useEffect, useId, useState } from "react";
+import type { RunControl, RunId } from "@ganger/core";
+import { useId, useState } from "react";
 import type { ReactNode, Ref } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
@@ -32,7 +32,6 @@ export function RunCard({
   tagged,
   all,
   selected,
-  leaving,
   lastTags,
   openRef,
   onOpen,
@@ -42,8 +41,7 @@ export function RunCard({
   tagged: boolean;
   all: boolean;
   selected: boolean;
-  leaving: boolean;
-  lastTags: Map<string, PillStatus | null>;
+  lastTags: ReadonlyMap<RunId, PillStatus | null>;
   openRef: Ref<HTMLButtonElement>;
   onOpen: (mode: SheetMode) => void;
   onControl: (control: RunControl) => Promise<boolean>;
@@ -54,9 +52,6 @@ export function RunCard({
     () => lastTags.has(run.id) && lastTags.get(run.id) !== tag,
   );
   if (tag === null && !popNewPill) setPopNewPill(true);
-  useEffect(() => {
-    if (!leaving) lastTags.set(run.id, tag);
-  }, [lastTags, leaving, run.id, tag]);
   const titleId = useId();
   const [sending, setSending] = useState(false);
   const [rejected, setRejected] = useState(false);

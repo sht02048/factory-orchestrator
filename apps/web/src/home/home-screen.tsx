@@ -96,7 +96,7 @@ export const SETTLED_VISIBLE = 3;
 interface CardHost {
   all: boolean;
   listKey: string;
-  lastTags: Map<string, PillStatus | null>;
+  lastTags: ReadonlyMap<RunId, PillStatus | null>;
   selectedId: RunId | null;
   revealedId: RunId | null;
   cardRef: (id: RunId) => (element: HTMLButtonElement | null) => void;
@@ -118,12 +118,22 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const t = useTranslations("home");
   const cards = useRef(new Map<RunId, HTMLButtonElement>());
-  const lastTags = useRef(new Map<string, PillStatus | null>());
+  const lastTags = useRef(new Map<RunId, PillStatus | null>());
   const [target, setTarget] = useState<SheetTarget | null>(null);
   const [open, setOpen] = useState(false);
   const [revealedId, setRevealedId] = useState<RunId | null>(null);
   const shownRunId = useRef<RunId | undefined>(undefined);
   useControlFailureToasts(page);
+  useEffect(() => {
+    if (page.workspace.kind === "none") return;
+    const { queued, running, done } = dashboardBoard(page);
+    for (const run of [...running.todo, ...done.todo]) {
+      lastTags.current.set(run.id, cardTag(run, true));
+    }
+    for (const run of [...queued, ...running.rest, ...done.rest]) {
+      lastTags.current.set(run.id, cardTag(run, false));
+    }
+  }, [page]);
   useEffect(() => {
     if (openRunId === undefined || shownRunId.current === openRunId) return;
     if (page.workspace.kind === "none") return;
@@ -449,7 +459,6 @@ function AnimatedCards({
             tagged={tagged(run)}
             all={host.all}
             selected={!leaving && host.selectedId === run.id}
-            leaving={leaving}
             lastTags={host.lastTags}
             openRef={leaving ? null : host.cardRef(run.id)}
             onOpen={(mode) => host.onOpen(run, tagged(run), mode)}
