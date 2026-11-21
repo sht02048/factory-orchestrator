@@ -145,6 +145,27 @@ describe("이어서 맡기기", () => {
     expect(getRun(h.db, next.id)?.state).toBe("running");
   });
 
+  it("준비 단계의 출력을 읽지 못하면 재시도 뒤 끝내고 다른 런의 대기열을 막지 않는다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    const fake = h.runner(source.runnerId);
+    const next = continued(source.id);
+    const worker = h.worker();
+
+    for (let tick = 0; tick < 8; tick += 1) {
+      fake.failNextPrepare = { kind: "malformed-output", raw: "not git output" };
+      await worker.tick();
+    }
+
+    expect(getRun(h.db, next.id)).toMatchObject({
+      state: "ended",
+      agentResult: "could-not-start",
+    });
+    const other = h.assign("ENG-2", projectA);
+    await worker.tick();
+    expect(getRun(h.db, other.id)?.state).toBe("running");
+  });
+
   it("브랜치도 없으면 새 워크트리에서 티켓과 함께 처음부터 시작한다", async () => {
     const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const source = await endedRun(runnerId);

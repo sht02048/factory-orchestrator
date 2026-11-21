@@ -420,6 +420,7 @@ async function startOnRunner(
   }
   const runner = adapters.runner(storedRunner);
   let unverified = records.startRequestedAt !== null;
+  let startSent = unverified;
   let mailbox: MailboxRef;
   try {
     mailbox = await mailboxFor(context, storedRunner, runner);
@@ -482,6 +483,7 @@ async function startOnRunner(
     ) {
       return { kind: "blocked" };
     }
+    startSent = true;
     const started = await runner.startRun({
       mailbox,
       project: run.runnerProject,
@@ -495,7 +497,13 @@ async function startOnRunner(
     return { kind: "started", started };
   } catch (error) {
     logger.warn("run.start_failed", { runId: run.id, error });
-    return handleStartFailure(context, run, { runnerId, unverified }, records.startFailures, error);
+    return handleStartFailure(
+      context,
+      run,
+      { runnerId, unverified, startSent },
+      records.startFailures,
+      error,
+    );
   }
 }
 
@@ -592,7 +600,7 @@ function isOfflineLike(error: unknown): boolean {
 function handleStartFailure(
   context: TickContext,
   run: QueuedStoredRun,
-  target: { runnerId: RunnerId; unverified: boolean },
+  target: { runnerId: RunnerId; unverified: boolean; startSent: boolean },
   previousFailures: number,
   error: unknown,
 ): StartAttempt {
@@ -600,7 +608,7 @@ function handleStartFailure(
   if (detail === null) return { kind: "blocked" };
   const { db } = context;
   const { runnerId, unverified } = target;
-  const definite = detail.kind !== "malformed-output";
+  const definite = detail.kind !== "malformed-output" || !target.startSent;
   const forget = (): void => {
     if (!unverified && definite) clearStartRequested(db, run.id);
   };
