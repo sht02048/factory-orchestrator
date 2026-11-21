@@ -39,6 +39,9 @@ import { HumanCheckAnswer, HumanCheckRequest } from "../question/human-check-ans
 import { QuestionAnswer } from "../question/question-answer";
 import { AgentMessageForm, useDeliveryText } from "./agent-message-form";
 import type { AgentMessageOutcome, AgentMessageRequest } from "./agent-message-form";
+import { allBlockersOf, blockerReasonOf } from "@ganger/app/runs/model";
+import type { BlockerReason } from "@ganger/app/runs/model";
+import { BlockerRows } from "../blockers";
 import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import { canCancel } from "@ganger/app/run-detail/model";
@@ -65,6 +68,7 @@ export interface RunDetailActions {
   onContinue: (message: string) => Promise<void>;
   onStopPreviousAgent: () => Promise<void>;
   onControl: (control: RunControl) => Promise<RunControlOutcome>;
+  onStartWithoutWaiting: () => Promise<void>;
   onSendAgentMessage: (input: AgentMessageRequest) => Promise<AgentMessageOutcome>;
   onRefreshLog: () => Promise<void>;
 }
@@ -129,6 +133,8 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
       : null,
   ].filter((part) => part !== null);
   const failure = useControlFailure(run.cancelPending ? null : run.control);
+  const blockerWait =
+    run.status.state === "queued" ? blockerReasonOf(run.status.queuedReason) : null;
 
   return (
     <ScreenLayout
@@ -227,7 +233,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
           <Text variant="body">
             <Reason run={run} />
           </Text>
-          <NextAction run={run} />
+          {blockerWait === null ? <NextAction run={run} /> : null}
           {run.continueOffer === null || run.continueOffer.agent === "gone" ? null : (
             <ContinueBlocked
               agent={run.continueOffer.agent}
@@ -241,6 +247,15 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
 
         <div {...stylex.props(styles.columns)}>
           <div {...stylex.props(styles.column)}>
+            {blockerWait === null ? null : (
+              <BlockerWaitBlock
+                wait={blockerWait}
+                cancelPending={run.cancelPending}
+                onStart={props.onStartWithoutWaiting}
+                focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+              />
+            )}
+
             {run.status.state === "waiting-for-input" ? (
               <InputBlock
                 input={run.status.input}
@@ -736,6 +751,67 @@ function ConfirmDanger({
       />
       {failed ? <ActionFailed /> : null}
     </>
+  );
+}
+
+function BlockerWaitBlock({
+  wait,
+  cancelPending,
+  onStart,
+  focusAfter,
+}: {
+  wait: BlockerReason;
+  cancelPending: boolean;
+  onStart: () => Promise<void>;
+  focusAfter: () => void;
+}) {
+  const t = useTranslations("run.blockerWait");
+  const [failed, setFailed] = useState(false);
+  const [sending, setSending] = useState(false);
+  const stuck = wait.kind === "blockers-stuck";
+  const blockers = allBlockersOf(wait);
+  return (
+    <Card label={t("title")}>
+      <div {...stylex.props(styles.blockerWait)}>
+        <Text variant="subheading" as="h2">
+          {t("title")}
+        </Text>
+        <Text variant="body" as="p" {...(stuck ? { tone: "problem" as const } : {})}>
+          {stuck ? t(`stuck.${wait.cause}`) : t("waiting")}
+        </Text>
+        {blockers.length === 0 ? null : <BlockerRows blockers={blockers} />}
+        {cancelPending ? null : (
+          <Actions>
+            <Dialog
+              trigger={t("trigger")}
+              triggerVariant={stuck ? "primary" : "secondary"}
+              triggerBusy={{ active: sending, label: t("sending") }}
+              title={t("confirmTitle")}
+              description={t("confirmBody")}
+              actions={
+                <>
+                  <DialogClose>{t("dismiss")}</DialogClose>
+                  <DialogClose
+                    variant="primary"
+                    onClick={() => {
+                      if (sending) return;
+                      setFailed(false);
+                      setSending(true);
+                      onStart()
+                        .then(focusAfter, () => setFailed(true))
+                        .finally(() => setSending(false));
+                    }}
+                  >
+                    {t("confirm")}
+                  </DialogClose>
+                </>
+              }
+            />
+          </Actions>
+        )}
+        {failed ? <ActionFailed /> : null}
+      </div>
+    </Card>
   );
 }
 
@@ -1411,6 +1487,7 @@ function useStatusLine(): (run: RunDetail) => { status: PillStatus; when: string
 }
 
 const styles = stylex.create({
+  blockerWait: { display: "flex", flexDirection: "column", gap: space.s3 },
   noticeBody: { display: "flex", flexDirection: "column", gap: space.s4 },
   main: {
     display: "flex",

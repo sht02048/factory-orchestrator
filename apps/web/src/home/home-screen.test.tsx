@@ -403,13 +403,8 @@ describe("Dashboard 칸반(티켓 0100)", () => {
     const html = render(loadHomePage(db, "ws-commerce", now, "UTC"));
     const titled = rows(html).find((li) => li.includes(`data-run="${id}"`)) ?? "";
     expect(text(titled)).toContain("ACME-30 결제 실패 재시도");
-    expect(titled).toContain(
-      renderWithMessages(
-        <Text variant="meta" numeric>
-          ACME-30
-        </Text>,
-      ),
-    );
+    expect(titled.indexOf(">ACME-30</span>")).toBeGreaterThan(-1);
+    expect(titled.indexOf(">결제 실패 재시도<")).toBeGreaterThan(titled.indexOf(">ACME-30</span>"));
   });
 
   it("Queued 까닭은 러너 이름에 맞는 조사로 쓴다", () => {

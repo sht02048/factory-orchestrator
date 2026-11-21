@@ -67,6 +67,7 @@ function okCalls(overrides: Partial<RunDetailCalls> = {}): RunDetailCalls {
     continueRun: () => Promise.resolve({ ok: true, runId: toRunId("run-next") }),
     stopPreviousAgent: () => Promise.resolve({ ok: true }),
     control: () => Promise.resolve({ ok: true }),
+    startWithoutWaiting: () => Promise.resolve({ ok: true }),
     sendAgentMessage: () => Promise.resolve({ ok: true }),
     requestLog: () => Promise.resolve(true),
     ...overrides,
@@ -116,6 +117,30 @@ describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
     for (const world of [deny, cancel, pause, remove]) {
       expect(world.invalidated()).toEqual(KEYS_CHANGED_BY_RUN_WRITE);
     }
+  });
+
+  it("기다리지 않고 시작은 응답을 잃어 다시 보내도 같은 요청 ID를 쓴다(0160)", async () => {
+    const requestIds: string[] = [];
+    const world = mutationWorld(
+      okCalls({
+        startWithoutWaiting: (_runId, requestId) => {
+          requestIds.push(requestId);
+          return requestIds.length === 1
+            ? Promise.reject(new Error("network"))
+            : Promise.resolve({ ok: true });
+        },
+      }),
+    );
+
+    await expect(
+      mutate(world.queryClient, world.mutations.startWithoutWaiting, undefined),
+    ).rejects.toThrow("network");
+    expect(world.invalidated()).toEqual([]);
+    await mutate(world.queryClient, world.mutations.startWithoutWaiting, undefined);
+
+    expect(requestIds).toHaveLength(2);
+    expect(requestIds[1]).toBe(requestIds[0]);
+    expect(world.invalidated()).toEqual(KEYS_CHANGED_BY_RUN_WRITE);
   });
 
   it("취소의 ok:false는 이유가 담긴 오류로 throw하고 아무 key도 무효화하지 않는다", async () => {

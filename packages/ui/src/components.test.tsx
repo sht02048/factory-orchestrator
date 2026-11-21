@@ -30,6 +30,8 @@ import {
   MenuItem,
   MoreIcon,
   PILL_STATUSES,
+  BlockerChip,
+  BlockerChips,
   KanbanCard,
   KanbanCards,
   KanbanColumn,
@@ -628,6 +630,40 @@ describe("서버 렌더", () => {
     expect(plain).toContain('aria-labelledby="card-2"');
     expect(plain).not.toContain("aria-describedby");
     expect(plain).not.toContain("data-status=");
+  });
+
+  it("KanbanCard ticketKey 는 번호 줄에 알약을 두고 이름은 번호와 제목이다(티켓 0160)", () => {
+    const html = renderToString(
+      <KanbanCard
+        ticketKey="ACME-15"
+        tag={<StatusPill status="failed">Failed</StatusPill>}
+        title="알림 묶기"
+        blockers={
+          <BlockerChips>
+            <BlockerChip state="done" ticketKey="ACME-9" stateName="Done" />
+            <BlockerChip state="canceled" ticketKey="ACME-10" stateName="취소" />
+          </BlockerChips>
+        }
+        stuck
+        meta="선행 티켓이 취소됐어요"
+        metaTone="problem"
+        time="2시간째"
+        onOpen={noop}
+      />,
+    );
+    const nameId = /aria-labelledby="([^"]+)"/.exec(html)?.[1] ?? "";
+    const name = new RegExp(`<span id="${nameId}"[^>]*>(.*?)</span></span>`).exec(html)?.[1] ?? "";
+    expect(name).toContain("ACME-15");
+    expect(name).toContain("알림 묶기");
+    expect(name).not.toContain("Failed");
+    expect(html.indexOf("Failed")).toBeGreaterThan(html.indexOf("알림 묶기"));
+    expect(html).toContain('data-blocker-state="done"');
+    expect(html).toContain('data-blocker-state="canceled"');
+    expect(/aria-describedby="([^"]+)"/.exec(html)?.[1]?.split(" ")).toHaveLength(3);
+
+    const calm = renderToString(<KanbanCard ticketKey="ACME-15" title="알림 묶기" onOpen={noop} />);
+    const classOfButton = (rendered: string) => /<button[^>]*class="([^"]*)"/.exec(rendered)?.[1];
+    expect(classOfButton(html)).not.toBe(classOfButton(calm));
   });
 
   it("KanbanCard 의 menu 는 카드 버튼 밖에 두고, 아이콘 메뉴 단추는 label 을 이름으로 가진다(티켓 0118)", () => {

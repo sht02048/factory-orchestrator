@@ -2,11 +2,14 @@ import {
   AdapterError,
   blockedProjectsOf,
   checkAssignment,
+  isBlockerFinished,
   summarizeRunOutcome,
+  toTicketKey,
   usageLimitsAt,
 } from "@ganger/core";
 import type {
   AdapterRegistry,
+  RunId,
   RunnerId,
   SummaryOutcome,
   Tracker,
@@ -31,6 +34,9 @@ import type {
 } from "@ganger/db";
 import { z } from "zod";
 import { isWebUrl } from "../format/url.js";
+import type { BlockerReason } from "../runs/model.js";
+import { loadQueueReasons } from "../runs/queue-reasons.js";
+import type { QueuedReasonCode } from "../runs/queue-reasons.js";
 import { remoteErrorOf } from "../settings/load.js";
 import type { Remote } from "../settings/model.js";
 import { resolveWorkspace } from "../shell/model.js";
@@ -38,6 +44,7 @@ import type { WorkspaceChoice } from "../shell/model.js";
 import type { TrackerReads } from "../tracker-reads.js";
 import { mergeTicketsPage, ticketId } from "./merge.js";
 import type {
+  TicketBlockersResult,
   TicketMappingFacts,
   TicketProjectFacts,
   TicketRun,
@@ -50,6 +57,7 @@ import type {
   TrackerTicketView,
   TrackerTicketsData,
   TrackerTruncation,
+  WaitingTicket,
 } from "./model.js";
 
 export interface TicketsContext {
@@ -96,7 +104,8 @@ export function loadTicketRuns(db: Database, ws: string | undefined, now: Date):
   }));
   const agents = mappingAgents(db);
   const base = { workspace, runners, agents };
-  if (workspace.kind !== "one") return { ...base, projects: [], repoNames: {}, runsByTicket: {} };
+  if (workspace.kind !== "one")
+    return { ...base, projects: [], repoNames: {}, runsByTicket: {}, waitingByBlocker: {} };
 
   const workspaceId = toWorkspaceId(workspace.workspace.id);
   const runnerNames = new Map(storedRunners.map((runner) => [runner.id, runner.name]));
@@ -112,11 +121,61 @@ export function loadTicketRuns(db: Database, ws: string | undefined, now: Date):
       autoAssignLabel: getAutoAssignLabel(db, workspaceId, project.connection),
     }),
   );
+  const queueReasons = loadQueueReasons(db, now);
   const runsByTicket: Record<string, TicketRunFacts> = {};
+  const waitingByBlocker: Record<string, WaitingTicket[]> = {};
   for (const [id, runs] of groupRuns(listRunsWithRecords(db, { workspaceId }))) {
-    runsByTicket[id] = runFacts(runs, runnerNames, now);
+    const facts = runFacts(runs, runnerNames, queueReasons, now);
+    runsByTicket[id] = facts;
+    const ticket = runs[0]?.run;
+    if (ticket === undefined || facts.blockerWait === null) continue;
+    for (const blocker of facts.blockerWait.blockers) {
+      if (isBlockerFinished(blocker.stateCategory)) continue;
+      const blockerId = ticketId(ticket.ticket.connection, blocker.key);
+      (waitingByBlocker[blockerId] ??= []).push({
+        key: ticket.ticket.key,
+        title: runs.at(-1)?.run.ticketTitle ?? null,
+      });
+    }
   }
-  return { ...base, projects, repoNames, runsByTicket };
+  return { ...base, projects, repoNames, runsByTicket, waitingByBlocker };
+}
+
+function blockerWaitOf(code: QueuedReasonCode | undefined): BlockerReason | null {
+  return code?.kind === "blockers-waiting" || code?.kind === "blockers-stuck" ? code : null;
+}
+
+export async function loadTicketBlockers(
+  context: TicketsContext,
+  input: { ws: string | undefined; connection: string; key: string },
+): Promise<TicketBlockersResult> {
+  const { db } = context;
+  const workspace = workspaceOf(db, input.ws);
+  if (workspace.kind !== "one") return { ok: false };
+  const project = listWorkspaceTrackerProjects(db, toWorkspaceId(workspace.workspace.id)).find(
+    (candidate) => candidate.connection === input.connection,
+  );
+  if (project === undefined) return { ok: false };
+  const stored = getTrackerConnection(db, context.secretBox, project.connection);
+  if (stored === null) return { ok: false };
+  const tracker = context.registry.createTracker(stored.kind, {
+    config: stored.config,
+    secrets: stored.secrets,
+  });
+  try {
+    const relations = await tracker.getTicketRelations?.(toTicketKey(input.key));
+    return {
+      ok: true,
+      blockers: (relations?.blockers ?? []).map((blocker) => ({
+        key: blocker.key,
+        title: blocker.title,
+        stateName: blocker.state.name,
+        stateCategory: blocker.state.category,
+      })),
+    };
+  } catch {
+    return { ok: false };
+  }
 }
 
 function mappingFacts(
@@ -139,6 +198,7 @@ function mappingFacts(
 function runFacts(
   runs: ReadonlyArray<RunWithRecords>,
   runnerNames: ReadonlyMap<RunnerId, string>,
+  queueReasons: ReadonlyMap<RunId, QueuedReasonCode>,
   now: Date,
 ): TicketRunFacts {
   const stored = runs.map(({ run }) => run);
@@ -148,6 +208,7 @@ function runFacts(
   const active = stored.findLast((run) => run.state !== "ended");
   const last = stored.at(-1);
   return {
+    blockerWait: active?.state === "queued" ? blockerWaitOf(queueReasons.get(active.id)) : null,
     runs: runs.toReversed().map((run) => toTicketRun(run, runnerNames, now)),
     activeRunId: check.ok ? null : (active?.id ?? ""),
     retryRepo:
@@ -220,6 +281,7 @@ export async function loadTrackerTickets(
       title: ticket.title,
       url: isWebUrl(ticket.url) ? ticket.url : null,
       state: { name: ticket.state.name, category: ticket.state.category },
+      priority: ticket.priority ?? "none",
       labels: ticket.labels.map((label) => ({ id: label.id, name: label.name })),
     }));
 

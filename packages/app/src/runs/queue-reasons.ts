@@ -1,4 +1,10 @@
-import { decideBlockerWait, planQueue, priorityRank, queueOrder } from "@ganger/core";
+import {
+  decideBlockerWait,
+  isBlockerFinished,
+  planQueue,
+  priorityRank,
+  queueOrder,
+} from "@ganger/core";
 import type {
   BlockerStuckCause,
   BlockerWait,
@@ -24,7 +30,7 @@ export type QueuedReasonCode =
   | { kind: "starting" | "behind" | UnplacedReason }
   | { kind: "no-capacity"; runnerId: RunnerId }
   | { kind: "usage-limit"; provider: string; until: Date }
-  | { kind: "blockers-waiting"; blockers: BlockerView[] }
+  | { kind: "blockers-waiting"; blockers: BlockerView[]; finished?: BlockerView[] }
   | {
       kind: "blockers-stuck";
       cause: BlockerStuckCause;
@@ -133,7 +139,7 @@ export function loadQueueReasons(db: Database, now: Date): Map<RunId, QueuedReas
   const states = listQueuedBlockerStates(db);
   const waits = new Map<RunId, BlockerWait>();
   for (const [runId, state] of states) waits.set(runId, decideBlockerWait(state));
-  return explainQueue({
+  const reasons = explainQueue({
     queued: listRunsWithRecords(db, { states: ["queued"] }).flatMap(
       ({ run, records }): QueuedRun[] =>
         run.state === "queued"
@@ -156,4 +162,12 @@ export function loadQueueReasons(db: Database, now: Date): Map<RunId, QueuedReas
     runs: listRunPlacements(db),
     waits,
   });
+  for (const [runId, reason] of reasons) {
+    if (reason.kind !== "blockers-waiting") continue;
+    const finished = (states.get(runId)?.blockers ?? [])
+      .filter((blocker) => isBlockerFinished(blocker.stateCategory))
+      .map(blockerView);
+    if (finished.length > 0) reasons.set(runId, { ...reason, finished });
+  }
+  return reasons;
 }

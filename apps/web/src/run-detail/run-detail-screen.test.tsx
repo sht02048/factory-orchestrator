@@ -71,6 +71,7 @@ function render(page: RunDetailPage, timeZone?: string): string {
       onContinue={resolved}
       onStopPreviousAgent={resolved}
       onControl={() => Promise.resolve("requested" as const)}
+      onStartWithoutWaiting={resolved}
       onSendAgentMessage={() => Promise.resolve("requested" as const)}
       onRefreshLog={resolved}
     />,
@@ -101,6 +102,65 @@ function found(db: Database, id: string | undefined): RunDetail {
   if (p.kind !== "found") throw new Error("not found");
   return p.run;
 }
+
+describe("Run 상세의 먼저 끝나야 하는 티켓 (0160)", () => {
+  const blocker = (key: string, stateName: string, stateCategory: string) => ({
+    key,
+    title: `${key} 제목`,
+    stateName,
+    stateCategory,
+  });
+  const queuedWith = (queuedReason: RunDetail["status"] & { state: "queued" }) => {
+    const { db, ids } = seedDatabase();
+    return render({
+      kind: "found",
+      run: { ...found(db, ids.get("ACME-10")), status: queuedReason },
+    });
+  };
+
+  it("기다림은 선행 목록과 끝난 티켓, 기다리지 않고 시작을 보이고 자리 안내는 뺀다", () => {
+    const html = queuedWith({
+      state: "queued",
+      queuedReason: {
+        kind: "blockers-waiting",
+        blockers: [blocker("ACME-11", "In Progress", "started")],
+        finished: [blocker("ACME-9", "Done", "completed")],
+      },
+    });
+    const body = text(html);
+
+    expect(body).toContain(runJson.blockerWait.waiting);
+    expect(body).toContain("ACME-11");
+    expect(body).toContain("ACME-9");
+    expect(labels(html)).toContain(runJson.blockerWait.trigger);
+    expect(body).not.toContain(runJson.next.queued);
+  });
+
+  it("멈춘 기다림은 까닭에 맞는 안내를 보인다", () => {
+    const canceled = blocker("ACME-10", "Canceled", "canceled");
+    const body = text(
+      queuedWith({
+        state: "queued",
+        queuedReason: {
+          kind: "blockers-stuck",
+          cause: "canceled",
+          blocker: canceled,
+          blockers: [canceled],
+        },
+      }),
+    );
+
+    expect(body).toContain(runJson.blockerWait.stuck.canceled);
+    expect(body).not.toContain(runJson.blockerWait.waiting);
+  });
+
+  it("선행 티켓을 기다리지 않는 Queued 런에는 시작 버튼이 없다", () => {
+    const html = queuedWith({ state: "queued", queuedReason: { kind: "behind" } });
+
+    expect(labels(html)).not.toContain(runJson.blockerWait.trigger);
+    expect(text(html)).toContain(runJson.next.queued);
+  });
+});
 
 describe("Run 상세의 에이전트에게 보내기 (0147)", () => {
   const started = (db: Database, key: string, at: number) => {
@@ -849,6 +909,7 @@ describe("Run 상세 화면", () => {
         onContinue={resolved}
         onStopPreviousAgent={resolved}
         onControl={() => Promise.resolve("requested" as const)}
+        onStartWithoutWaiting={resolved}
         onSendAgentMessage={() => Promise.resolve("requested" as const)}
         onRefreshLog={resolved}
       />,

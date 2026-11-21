@@ -9,7 +9,7 @@ export type QueuedReason =
     }
   | { kind: "no-capacity"; runner: string }
   | { kind: "usage-limit"; provider: string; resetsInMs: number }
-  | { kind: "blockers-waiting"; blockers: BlockerView[] }
+  | { kind: "blockers-waiting"; blockers: BlockerView[]; finished?: BlockerView[] }
   | {
       kind: "blockers-stuck";
       cause: "canceled" | "unreadable" | "cycle";
@@ -22,6 +22,18 @@ export interface BlockerView {
   title: string;
   stateName: string;
   stateCategory: string;
+}
+
+export type BlockerReason = Extract<QueuedReason, { kind: "blockers-waiting" | "blockers-stuck" }>;
+
+export function blockerReasonOf(reason: QueuedReason): BlockerReason | null {
+  return reason.kind === "blockers-waiting" || reason.kind === "blockers-stuck" ? reason : null;
+}
+
+export function allBlockersOf(reason: BlockerReason): BlockerView[] {
+  return reason.kind === "blockers-waiting"
+    ? [...reason.blockers, ...(reason.finished ?? [])]
+    : reason.blockers;
 }
 
 interface RunViewBase {

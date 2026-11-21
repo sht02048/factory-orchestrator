@@ -26,7 +26,14 @@
     "key": "키",
     "title": "제목",
     "trackerProject": "트래커 프로젝트",
+    "priority": "우선순위",
     "lastRun": "마지막 런"
+  },
+  "priority": {
+    "urgent": "Urgent",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
   },
   "listLabel": "티켓 목록",
   "empty": "이 조건에 맞는 티켓이 없어요.",
@@ -79,7 +86,14 @@
     "runCount": "런 수",
     "runCountValue": "{count, number}개",
     "openInTracker": "트래커에서 열기",
-    "newTab": "새 탭에서 열려요"
+    "newTab": "새 탭에서 열려요",
+    "blockers": "먼저 끝나야 하는 티켓",
+    "blockersNone": "먼저 끝나야 하는 티켓이 없어요.",
+    "blockersReading": "Linear에서 읽고 있어요.",
+    "blockersFailed": "먼저 끝나야 하는 티켓을 읽지 못했어요.",
+    "waiting": "이 티켓을 기다리는 티켓",
+    "waitingNone": "이 티켓을 기다리는 런이 없어요.",
+    "relationsNote": "관계는 Linear의 blocked by에서 읽어요. 바꾸려면 Linear에서 고쳐요."
   },
   "assign": {
     "title": "{key} 티켓을 할당할까요?",

@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import {
   Actions,
+  BlockerChip,
   Button,
   buttonStyles,
   Card,
@@ -46,7 +47,18 @@ import {
   matchesFilter,
   matchesSearch,
 } from "@ganger/app/tickets/model";
-import type { TicketFilter, TicketRun, TicketView, TicketsPage } from "@ganger/app/tickets/model";
+import type {
+  TicketBlockersResult,
+  TicketFilter,
+  TicketRun,
+  TicketView,
+  TicketsPage,
+} from "@ganger/app/tickets/model";
+import { allBlockersOf } from "@ganger/app/runs/model";
+import type { BlockerReason } from "@ganger/app/runs/model";
+import { isBlockerFinished } from "@ganger/core";
+import { BlockerRows, blockerChipState } from "../blockers";
+import { useQueuedReasonText } from "../labels";
 import { useRowWindow } from "./row-window";
 
 export interface TicketsScreenProps {
@@ -60,6 +72,7 @@ export interface TicketsScreenProps {
   onOpenRun: (runId: string) => void;
   onAssign: (input: AssignInput) => Promise<AssignResult>;
   onAssigned: (ticketId: string) => void;
+  onReadBlockers: (ticket: TicketView) => Promise<TicketBlockersResult>;
   onReread: () => Promise<void>;
 }
 
@@ -180,16 +193,22 @@ function RereadButton({ result, onStart }: { result: RereadResult; onStart: () =
   );
 }
 
-const withoutTrackerProject = [size.ticketKeyColumn, "minmax(0, 1fr)", size.lastRunColumn].join(
-  " ",
-);
+const foldedToLastRun = [size.ticketKeyColumn, "minmax(0, 1fr)", size.lastRunColumn].join(" ");
+const withoutTrackerProject = [
+  size.ticketKeyColumn,
+  "minmax(0, 1fr)",
+  size.priorityColumn,
+  size.lastRunColumn,
+].join(" ");
 const withTrackerProject = [
   size.ticketKeyColumn,
   "minmax(0, 1fr)",
   size.projectColumn,
+  size.priorityColumn,
   size.lastRunColumn,
 ].join(" ");
-const trackerProjectFolded = { first: withTrackerProject, second: withoutTrackerProject };
+const trackerProjectFolded = { first: withTrackerProject, second: foldedToLastRun };
+const priorityFolded = { first: withoutTrackerProject, second: foldedToLastRun };
 
 function TicketsList({
   page,
@@ -200,6 +219,7 @@ function TicketsList({
   onOpenRun,
   onAssign,
   onAssigned,
+  onReadBlockers,
   onReread,
 }: TicketsScreenProps) {
   const t = useTranslations("tickets");
@@ -301,7 +321,7 @@ function TicketsList({
             <div {...stylex.props(styles.tableFrame)}>
               <Table
                 columns={showTrackerProject ? withTrackerProject : withoutTrackerProject}
-                {...(showTrackerProject ? { foldedColumns: trackerProjectFolded } : {})}
+                foldedColumns={showTrackerProject ? trackerProjectFolded : priorityFolded}
                 narrowColumns="minmax(0, 1fr)"
               >
                 <TableHead>
@@ -310,6 +330,7 @@ function TicketsList({
                   {showTrackerProject ? (
                     <TableHeader hideWhen="second">{t("columns.trackerProject")}</TableHeader>
                   ) : null}
+                  <TableHeader hideWhen="second">{t("columns.priority")}</TableHeader>
                   <TableHeader>{t("columns.lastRun")}</TableHeader>
                 </TableHead>
                 <div
@@ -364,6 +385,7 @@ function TicketsList({
                 page={page}
                 onOpenRun={onOpenRun}
                 onAssign={onAssign}
+                onReadBlockers={onReadBlockers}
                 onAssigned={() => {
                   setAssignedId(selected.id);
                   onAssigned(selected.id);
@@ -411,7 +433,12 @@ function TicketRow({
   ticket: TicketView;
   showTrackerProject: boolean;
 }) {
+  const t = useTranslations("tickets");
   const run = lastRun(ticket);
+  const priority = ticket.priority === "none" ? null : t(`priority.${ticket.priority}`);
+  const foldedLine = [showTrackerProject ? ticket.trackerProject.name : null, priority]
+    .filter((part) => part !== null)
+    .join(" · ");
   return (
     <TableRow value={ticket.id} label={`${ticket.key} ${ticket.title}`}>
       <TableCell>
@@ -420,22 +447,138 @@ function TicketRow({
         </Text>
       </TableCell>
       <TableCell>
-        <RowTitle fullText={ticket.title}>{ticket.title}</RowTitle>
-        {showTrackerProject ? (
+        <span {...stylex.props(styles.titleLine)}>
+          <span {...stylex.props(styles.titleText)}>
+            <RowTitle fullText={ticket.title}>{ticket.title}</RowTitle>
+          </span>
+          {ticket.blockerWait === null ? null : <WaitMark wait={ticket.blockerWait} />}
+        </span>
+        {foldedLine === "" ? null : (
           <TableFoldedOnly when="second" block>
-            <Text variant="meta">{ticket.trackerProject.name}</Text>
+            <Text variant="meta">{foldedLine}</Text>
           </TableFoldedOnly>
-        ) : null}
+        )}
       </TableCell>
       {showTrackerProject ? (
         <TableCell hideWhen="second">
           <Text variant="meta">{ticket.trackerProject.name}</Text>
         </TableCell>
       ) : null}
+      <TableCell hideWhen="second">
+        {priority === null ? null : <Text variant="meta">{priority}</Text>}
+      </TableCell>
       <TableCell>
         <LastRunStatus run={run} />
       </TableCell>
     </TableRow>
+  );
+}
+
+function WaitMark({ wait }: { wait: BlockerReason }) {
+  const t = useTranslations("domain.blocker");
+  const unfinished = wait.blockers.filter((blocker) => !isBlockerFinished(blocker.stateCategory));
+  if (wait.kind === "blockers-stuck") {
+    const shown = wait.blocker ?? unfinished[0];
+    return (
+      <span {...stylex.props(styles.waitMark)}>
+        <BlockerChip
+          state="canceled"
+          ticketKey={shown?.key ?? ""}
+          stateName={t(`stuckCause.${wait.cause}`)}
+        />
+      </span>
+    );
+  }
+  const [first, ...rest] = unfinished;
+  if (first === undefined) return null;
+  return (
+    <span {...stylex.props(styles.waitMark)}>
+      <BlockerChip
+        state={blockerChipState(first.stateCategory)}
+        ticketKey={first.key}
+        stateName={t("waiting")}
+      />
+      {rest.length === 0 ? null : <Text variant="meta">{t("more", { count: rest.length })}</Text>}
+    </span>
+  );
+}
+
+type BlockerRead = { status: "reading" } | { status: "done"; result: TicketBlockersResult };
+
+function useTicketBlockers(
+  ticket: TicketView,
+  onReadBlockers: TicketsScreenProps["onReadBlockers"],
+): BlockerRead {
+  const [read, setRead] = useState<BlockerRead>({ status: "reading" });
+  const stored = ticket.blockerWait;
+  useEffect(() => {
+    if (stored !== null) return;
+    let current = true;
+    onReadBlockers(ticket).then(
+      (result) => {
+        if (current) setRead({ status: "done", result });
+      },
+      () => {
+        if (current) setRead({ status: "done", result: { ok: false } });
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [ticket.id, stored === null]);
+  return stored === null
+    ? read
+    : { status: "done", result: { ok: true, blockers: allBlockersOf(stored) } };
+}
+
+function TicketRelations({
+  ticket,
+  onReadBlockers,
+}: {
+  ticket: TicketView;
+  onReadBlockers: TicketsScreenProps["onReadBlockers"];
+}) {
+  const t = useTranslations("tickets.panel");
+  const read = useTicketBlockers(ticket, onReadBlockers);
+  return (
+    <>
+      <div {...stylex.props(styles.relation)}>
+        <Text variant="label" as="h3">
+          {t("blockers")}
+        </Text>
+        {read.status === "reading" ? (
+          <Text variant="meta">{t("blockersReading")}</Text>
+        ) : !read.result.ok ? (
+          <Text variant="meta" tone="problem">
+            {t("blockersFailed")}
+          </Text>
+        ) : read.result.blockers.length === 0 ? (
+          <Text variant="meta">{t("blockersNone")}</Text>
+        ) : (
+          <BlockerRows blockers={read.result.blockers} />
+        )}
+      </div>
+      <div {...stylex.props(styles.relation)}>
+        <Text variant="label" as="h3">
+          {t("waiting")}
+        </Text>
+        {ticket.waitingTickets.length === 0 ? (
+          <Text variant="meta">{t("waitingNone")}</Text>
+        ) : (
+          <ul {...stylex.props(styles.waitingList)}>
+            {ticket.waitingTickets.map((waiter) => (
+              <li key={waiter.key} {...stylex.props(styles.waitingRow)}>
+                <Text variant="meta" numeric>
+                  {waiter.key}
+                </Text>
+                {waiter.title === null ? null : <Text variant="ui">{waiter.title}</Text>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <Text variant="meta">{t("relationsNote")}</Text>
+    </>
   );
 }
 
@@ -472,6 +615,7 @@ function TicketPanel({
   page,
   onOpenRun,
   onAssign,
+  onReadBlockers,
   onAssigned,
   focusOpenRun,
   onFocusedOpenRun,
@@ -480,11 +624,14 @@ function TicketPanel({
   page: TicketsPage;
   onOpenRun: (runId: string) => void;
   onAssign: TicketsScreenProps["onAssign"];
+  onReadBlockers: TicketsScreenProps["onReadBlockers"];
   onAssigned: () => void;
   focusOpenRun: boolean;
   onFocusedOpenRun: () => void;
 }) {
   const t = useTranslations("tickets.panel");
+  const tTickets = useTranslations("tickets");
+  const queuedReasonText = useQueuedReasonText();
   const run = lastRun(ticket);
   const { assignability } = ticket;
   const openRunRef = useRef<HTMLSpanElement>(null);
@@ -502,7 +649,12 @@ function TicketPanel({
     <DetailPanel>
       <div {...stylex.props(styles.panelHead)}>
         <Text variant="meta">
-          {[ticket.key, ticket.trackerProject.name, ticket.trackerState.name].join(" · ")}
+          {[
+            ticket.key,
+            ticket.trackerProject.name,
+            ...(ticket.priority === "none" ? [] : [tTickets(`priority.${ticket.priority}`)]),
+            ticket.trackerState.name,
+          ].join(" · ")}
         </Text>
         <Text variant="heading">{ticket.title}</Text>
       </div>
@@ -514,7 +666,11 @@ function TicketPanel({
             {run === undefined ? null : <RunTiming run={run} />}
             {run?.state === "ended" ? <RunPullRequest run={run} /> : null}
           </div>
-          <Text variant="body">{t(`next.${nextStepOf(ticket)}`)}</Text>
+          <Text variant="body">
+            {ticket.blockerWait === null
+              ? t(`next.${nextStepOf(ticket)}`)
+              : queuedReasonText(ticket.blockerWait)}
+          </Text>
           <Actions>
             {assignability.kind === "ready" ? (
               <AssignDialog
@@ -535,6 +691,7 @@ function TicketPanel({
           </Actions>
         </div>
       </Card>
+      <TicketRelations ticket={ticket} onReadBlockers={onReadBlockers} />
       <DefinitionList>
         <DefinitionItem label={t("labels")} empty={labels.length === 0}>
           {labels.length === 0 ? (
@@ -653,4 +810,17 @@ const styles = stylex.create({
   lastRun: { display: "flex", flexDirection: "column", gap: space.s3 },
   lastRunState: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: space.s2 },
   labels: { display: "inline-flex", flexWrap: "wrap", gap: space.s2 },
+  titleLine: { display: "flex", alignItems: "center", gap: space.s2, minWidth: 0 },
+  titleText: { display: "grid", flexShrink: 1, minWidth: 0 },
+  waitMark: { display: "inline-flex", flexShrink: 0, alignItems: "center", gap: space.s1 },
+  relation: { display: "flex", flexDirection: "column", gap: space.s2 },
+  waitingList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: space.s2,
+    margin: 0,
+    padding: 0,
+    listStyle: "none",
+  },
+  waitingRow: { display: "flex", alignItems: "baseline", gap: space.s2, minWidth: 0 },
 });
