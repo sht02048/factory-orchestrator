@@ -482,13 +482,11 @@ export class Controller {
     const probed = await probeIdentity(server.url, CONNECT_TIMEOUT_MS);
     if (this.remote?.server.instanceId !== server.instanceId) return;
     if (this.serverUrl !== server.url) return;
-    if (
+    const stillAllowed =
       probed.kind === "ours" &&
       probed.identity.instanceId === server.instanceId &&
-      probed.identity.webAccess !== "allowed"
-    ) {
-      await this.openRemote(server);
-    }
+      probed.identity.webAccess === "allowed";
+    if (!stillAllowed) await this.openRemote(server);
   }
 
   private stopRemoteRetry(): void {

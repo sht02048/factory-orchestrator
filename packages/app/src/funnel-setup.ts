@@ -7,9 +7,7 @@ export const FUNNEL_PORTS_BY_PREFERENCE = [8443, 10000, 443] as const;
 
 const FUNNEL_PORTS_ASCENDING = [443, 8443, 10000] as const;
 const LOCAL_TARGET = "127.0.0.1";
-const HOSTS_REACHED_ON_LOOPBACK = new Set(["127.0.0.1", "localhost", "0.0.0.0", "[::]"]);
-
-const LOCAL_PROXY_HOSTS = ["127.0.0.1", "localhost", "[::1]", "0.0.0.0", "[::]"];
+const HOSTS_REACHED_ON_LOOPBACK = new Set(["127.0.0.1", "0.0.0.0", "[::]"]);
 
 const handlerSchema = z.object({
   Proxy: z.string().optional(),
@@ -110,14 +108,12 @@ export function funnelTargetHost(bindHost: string): string {
   return HOSTS_REACHED_ON_LOOPBACK.has(bind) ? LOCAL_TARGET : bind;
 }
 
-function reachesThisApp(
-  { path, proxy }: { path: string; proxy: string },
-  webPort: number,
-  localHosts: ReadonlySet<string>,
-): boolean {
+function mayReachThisApp({ path, proxy }: { path: string; proxy: string }, webPort: number) {
+  if (proxy.startsWith("unix:")) return true;
   const url = URL.parse(/^[a-z][a-z0-9+.-]*:\/\//iu.test(proxy) ? proxy : `http://${proxy}`);
-  if (url === null || url.port !== String(webPort)) return false;
-  if (!localHosts.has(normalizeHostname(url.hostname))) return false;
+  if (url === null) return true;
+  const defaultPort = url.protocol.startsWith("https") ? "443" : "80";
+  if ((url.port === "" ? defaultPort : url.port) !== String(webPort)) return false;
   return !(path.startsWith(WEBHOOK_PATH_PREFIX) && url.pathname.startsWith(WEBHOOK_PATH_PREFIX));
 }
 
@@ -156,17 +152,11 @@ export function planFunnel(input: FunnelPlanInput): FunnelSetupView {
   if (ours !== undefined) return ready(ours, "ours");
   const free = FUNNEL_PORTS_BY_PREFERENCE.find((port) => !serve.has(port));
   if (free !== undefined) return ready(free, "free");
-  const localHosts = new Set([
-    ...LOCAL_PROXY_HOSTS,
-    host,
-    input.deviceHost,
-    ...input.deviceAddresses,
-  ]);
   const ports: FunnelPortChoice[] = FUNNEL_PORTS_ASCENDING.map((port) => {
     const use = serve.get(port);
     const usage = { port, uses: use?.uses ?? [], isPublic: use?.isPublic ?? false };
     if (use?.forwardsTcp === true) return { ...usage, unavailable: "tcp-forward" };
-    if (use?.proxies.some((proxy) => reachesThisApp(proxy, input.webPort, localHosts)) === true) {
+    if (use?.proxies.some((proxy) => mayReachThisApp(proxy, input.webPort)) === true) {
       return { ...usage, unavailable: "serves-this-app" };
     }
     return { ...usage, unavailable: null, ...onPort(port) };

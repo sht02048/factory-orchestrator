@@ -39,7 +39,7 @@ const fullStatus = JSON.stringify({
 describe("Funnel 에 넘길 주소", () => {
   it.each([
     ["127.0.0.1", "127.0.0.1"],
-    ["localhost", "127.0.0.1"],
+    ["localhost", "localhost"],
     ["0.0.0.0", "127.0.0.1"],
     ["::", "127.0.0.1"],
     ["192.168.1.20", "192.168.1.20"],
@@ -144,22 +144,39 @@ describe("Funnel 포트 고르기", () => {
     expect(funnelPrefillAddress(plan)).toBeNull();
   });
 
-  it.each(["http://localhost:3000/", `http://${IP}:3000`, `http://${HOST}:3000/runs`])(
-    "이 앱을 %s 로 여는 포트도 고를 수 없다",
-    (proxy) => {
-      const status = JSON.stringify({
-        TCP: { "443": {}, "8443": {}, "10000": {} },
-        Web: {
-          ...site(443, { "/": { Proxy: proxy } }),
-          ...site(8443, { "/": { Proxy: proxy } }),
-          ...site(10000, { "/app/": { Proxy: proxy } }),
-        },
-      });
-      const plan = planFunnel(input({ serveOutput: status }));
-      if (plan.kind !== "ports-full") throw new Error(plan.kind);
-      expect(plan.ports.every((port) => port.unavailable === "serves-this-app")).toBe(true);
-    },
-  );
+  it("기본 포트로 앱을 여는 프록시도 앱을 여는 포트로 본다", () => {
+    const status = JSON.stringify({
+      TCP: { "443": {}, "8443": {}, "10000": {} },
+      Web: {
+        ...site(443, { "/": { Proxy: "http://127.0.0.1:80" } }),
+        ...site(8443, { "/": { Proxy: "http://127.0.0.1" } }),
+        ...site(10000, { "/": { Proxy: "unix:/tmp/app.sock" } }),
+      },
+    });
+    const plan = planFunnel(input({ webPort: 80, serveOutput: status }));
+    if (plan.kind !== "ports-full") throw new Error(plan.kind);
+    expect(plan.ports.every((port) => port.unavailable === "serves-this-app")).toBe(true);
+  });
+
+  it.each([
+    "http://localhost:3000/",
+    `http://${IP}:3000`,
+    `http://${HOST}:3000/runs`,
+    "http://192.168.1.5:3000",
+    "https+insecure://127.0.0.1:3000",
+  ])("이 앱을 %s 로 여는 포트도 고를 수 없다", (proxy) => {
+    const status = JSON.stringify({
+      TCP: { "443": {}, "8443": {}, "10000": {} },
+      Web: {
+        ...site(443, { "/": { Proxy: proxy } }),
+        ...site(8443, { "/": { Proxy: proxy } }),
+        ...site(10000, { "/app/": { Proxy: proxy } }),
+      },
+    });
+    const plan = planFunnel(input({ serveOutput: status }));
+    if (plan.kind !== "ports-full") throw new Error(plan.kind);
+    expect(plan.ports.every((port) => port.unavailable === "serves-this-app")).toBe(true);
+  });
 
   it.each([undefined, "not json", "[1,2]", "null", JSON.stringify({ TCP: 7 })])(
     "이상한 출력 %s 은 모름으로 보고 8443 명령에 확인 안내를 붙인다",

@@ -385,25 +385,25 @@ function FunnelPortPicker({
               onPickAddress(port.address);
             }}
           >
-            <Text variant="ui">
-              {port.isPublic
-                ? t("funnelPortPublic", { port: port.port })
-                : t("funnelPortName", { port: port.port })}
-            </Text>
-            <Text variant="meta" as="p" mono wrap="anywhere">
-              {port.uses.length === 0 ? t("funnelPortInUse") : port.uses.join(", ")}
-            </Text>
-            {port.unavailable === null ? null : (
-              <Text variant="meta" as="p">
-                {t(`funnelPortUnavailable.${port.unavailable}`)}
+            <span {...stylex.props(styles.funnelChoice)}>
+              <Text variant="ui">
+                {port.isPublic
+                  ? t("funnelPortPublic", { port: port.port })
+                  : t("funnelPortName", { port: port.port })}
               </Text>
-            )}
+              <Text variant="meta" mono wrap="anywhere">
+                {port.uses.length === 0 ? t("funnelPortInUse") : port.uses.join(", ")}
+              </Text>
+              {port.unavailable === null ? null : (
+                <Text variant="meta">{t(`funnelPortUnavailable.${port.unavailable}`)}</Text>
+              )}
+            </span>
           </RadioOption>
         ))}
       </RadioGroup>
       {choice === undefined ? null : (
         <>
-          <Text variant="meta" tone="problem" as="p" role="status">
+          <Text variant="meta" tone="strong" as="p" role="status">
             {t("funnelPortWarning", { port: choice.port })}
           </Text>
           <FunnelCommand command={choice.command} sharedPort />
@@ -453,7 +453,7 @@ function AddressEditor({
   }, [failedState]);
   const known = reason !== null && failed !== null;
   const errorKey =
-    failed === "unreachable" && setup.funnel === null ? "unreachableNoFunnel" : failed;
+    failed === "unreachable" && setup.funnel?.kind !== "ready" ? "unreachableNoFunnel" : failed;
   return (
     <div {...stylex.props(styles.editor)}>
       <Text variant="meta" as="p">
@@ -785,6 +785,7 @@ function TurnOffRow({
 const styles = stylex.create({
   copy: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   funnel: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
+  funnelChoice: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   funnelHead: { display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: space.s2 },
   on: { display: "flex", flexDirection: "column", gap: space.s3 },
   editor: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
