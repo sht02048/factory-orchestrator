@@ -4,8 +4,10 @@ import {
   continueRun,
   getRun,
   getRunBlockerState,
+  recordStartRequested,
   recordTrackerEvent,
   requestRunCancel,
+  setQueuedRunRunner,
   skipBlockerWait,
 } from "@ganger/db";
 import type { StoredRun } from "@ganger/db";
@@ -137,6 +139,29 @@ describe("선행 티켓을 기다리는 런", () => {
 
     expect(stateOf(second)).toBe("queued");
     expect(getRunBlockerState(h.db, second.id)?.blockers.map((b) => b.key)).toEqual(["OPS-1"]);
+  });
+
+  it("시작을 보냈지만 러너에 없다고 확인한 런은 선행 티켓을 다시 기다린다(B3·B10)", async () => {
+    const runner = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    relate("ENG-1", [blocker("OPS-1")]);
+    setQueuedRunRunner(h.db, run.id, runner);
+    recordStartRequested(h.db, run.id, h.now, "brief");
+    const worker = h.worker();
+
+    await worker.tick();
+
+    expect(stateOf(run)).toBe("queued");
+    expect(h.runner(runner).startCalls).toHaveLength(0);
+    expect(getRunBlockerState(h.db, run.id)).toMatchObject({
+      startRequested: false,
+      blockers: [{ key: "OPS-1" }],
+    });
+
+    relate("ENG-1", [blocker("OPS-1", "completed")]);
+    afterPoll();
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
   });
 
   it("취소된 선행 티켓은 멈춘 기다림으로 남는다(B2)", async () => {

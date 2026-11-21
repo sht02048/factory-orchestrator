@@ -110,6 +110,7 @@ async function readRunRelations(
     context.blockerRefresh.failedConnections.add(connection);
     return unread(error);
   };
+  const readStartedAt = context.now();
   try {
     const tracker = context.adapters.tracker(db, connection);
     if (tracker === null) return failed(new Error("tracker connection missing"));
@@ -140,7 +141,7 @@ async function readRunRelations(
       },
     });
     const written = tryWrite(context, run.id, () =>
-      recordRunRelations(db, run.id, { ...relations, inCycle }, context.now()),
+      recordRunRelations(db, run.id, { ...relations, inCycle }, readStartedAt),
     );
     return written === true;
   } catch (error) {

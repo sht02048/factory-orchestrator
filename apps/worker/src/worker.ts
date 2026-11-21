@@ -516,6 +516,12 @@ async function startOnRunner(
       ) {
         return endCouldNotStart(context, run);
       }
+      if (tryWrite(context, run.id, () => clearStartRequested(db, run.id)) === undefined) {
+        return { kind: "blocked" };
+      }
+      startSent = false;
+      if (!(await blockersClearToStart(context, run))) return { kind: "skipped" };
+      if (hasPendingCancelRequest(db, run.id)) return { kind: "skipped" };
     }
     if (context.worktreeSetups.get(run.id)?.outcome === null) return { kind: "skipped" };
     const source = continuationSource(context, run);
