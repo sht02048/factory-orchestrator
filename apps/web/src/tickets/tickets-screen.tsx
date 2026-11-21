@@ -516,35 +516,51 @@ function WaitMark({ wait }: { wait: BlockerReason }) {
   );
 }
 
-type BlockerRead = { status: "reading" } | { status: "done"; result: TicketBlockersResult };
+type BlockerRead =
+  | { status: "idle" }
+  | { status: "reading" }
+  | { status: "done"; result: TicketBlockersResult };
+
+function storedBlockerRead(stored: BlockerReason): BlockerRead {
+  const blockers = allBlockersOf(stored);
+  const unread =
+    stored.kind === "blockers-stuck" && stored.cause === "unreadable" && blockers.length === 0;
+  return {
+    status: "done",
+    result: unread ? { ok: false, reason: "failed" } : { ok: true, blockers },
+  };
+}
 
 function useTicketBlockers(
   ticket: TicketView,
   onReadBlockers: TicketsScreenProps["onReadBlockers"],
   rereads: number,
-): BlockerRead {
-  const [read, setRead] = useState<BlockerRead>({ status: "reading" });
-  const stored = ticket.blockerWait;
-  useEffect(() => {
-    if (stored !== null) return;
-    let current = true;
+) {
+  const [read, setRead] = useState<BlockerRead>({ status: "idle" });
+  const latestRead = useRef(0);
+  const seenRereads = useRef(rereads);
+  const start = () => {
+    latestRead.current += 1;
+    const thisRead = latestRead.current;
+    setRead({ status: "reading" });
     onReadBlockers(ticket).then(
       (result) => {
-        if (current) setRead({ status: "done", result });
+        if (latestRead.current === thisRead) setRead({ status: "done", result });
       },
       () => {
-        if (current) setRead({ status: "done", result: { ok: false } });
+        if (latestRead.current === thisRead)
+          setRead({ status: "done", result: { ok: false, reason: "failed" } });
       },
     );
-    return () => {
-      current = false;
-    };
-  }, [ticket.id, stored === null, rereads]);
-  if (stored === null) return read;
-  const blockers = allBlockersOf(stored);
-  const unread =
-    stored.kind === "blockers-stuck" && stored.cause === "unreadable" && blockers.length === 0;
-  return { status: "done", result: unread ? { ok: false } : { ok: true, blockers } };
+  };
+  useEffect(() => {
+    if (seenRereads.current === rereads) return;
+    seenRereads.current = rereads;
+    if (ticket.blockerWait === null && read.status !== "idle") start();
+  }, [rereads]);
+  return ticket.blockerWait === null
+    ? { read, start }
+    : { read: storedBlockerRead(ticket.blockerWait), start: null };
 }
 
 function TicketRelations({
@@ -557,20 +573,30 @@ function TicketRelations({
   rereads: number;
 }) {
   const t = useTranslations("tickets.panel");
-  const read = useTicketBlockers(ticket, onReadBlockers, rereads);
+  const { read, start } = useTicketBlockers(ticket, onReadBlockers, rereads);
   return (
     <>
       <PanelSection title={t("blockers")}>
-        {read.status === "reading" ? (
-          <Text variant="meta">{t("blockersReading")}</Text>
-        ) : !read.result.ok ? (
-          <Text variant="meta" tone="problem">
-            {t("blockersFailed")}
-          </Text>
-        ) : read.result.blockers.length === 0 ? (
-          <Text variant="meta">{t("blockersNone")}</Text>
-        ) : (
-          <BlockerRows blockers={read.result.blockers} />
+        <div role="status">
+          {read.status !== "done" ? null : !read.result.ok ? (
+            <Text variant="meta" tone="problem">
+              {t(`blockersFailed.${read.result.reason}`)}
+            </Text>
+          ) : read.result.blockers.length === 0 ? (
+            <Text variant="meta">{t("blockersNone")}</Text>
+          ) : (
+            <BlockerRows blockers={read.result.blockers} />
+          )}
+        </div>
+        {start === null ? null : (
+          <Actions>
+            <Button
+              busy={{ active: read.status === "reading", label: t("blockersReading") }}
+              onClick={start}
+            >
+              {t("blockersRead")}
+            </Button>
+          </Actions>
         )}
       </PanelSection>
       <PanelSection title={t("waiting")}>

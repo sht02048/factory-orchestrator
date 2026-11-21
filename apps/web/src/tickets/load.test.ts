@@ -225,9 +225,9 @@ describe("고른 티켓의 선행 티켓 읽기(0160)", () => {
   it("트래커가 티켓을 찾지 못하거나 읽기에 실패하면 없음이 아니라 실패다", async () => {
     const { context, tracker } = setupTickets();
 
-    expect(await read(context, "ACME-404")).toEqual({ ok: false });
+    expect(await read(context, "ACME-404")).toEqual({ ok: false, reason: "not-found" });
     tracker.relationsError = new Error("network");
-    expect(await read(context, "ACME-3")).toEqual({ ok: false });
+    expect(await read(context, "ACME-3")).toEqual({ ok: false, reason: "failed" });
   });
 });
 

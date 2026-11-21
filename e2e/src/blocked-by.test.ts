@@ -110,7 +110,7 @@ beforeEach(async (context) => {
 });
 
 describe("먼저 끝나야 하는 티켓 화면(0160)", () => {
-  it("런이 없는 티켓의 패널은 Linear에서 다시 읽기로 관계를 다시 읽는다", async () => {
+  it("런이 없는 티켓은 버튼을 눌러야 관계를 읽고, 읽은 뒤에는 다시 읽기를 따른다", async () => {
     let reads = 0;
     page.on("request", (request) => {
       const url = decodeURIComponent(request.url());
@@ -118,13 +118,17 @@ describe("먼저 끝나야 하는 티켓 화면(0160)", () => {
     });
     await open(`/tickets?ws=${workspaceId}`);
     const panel = page.getByRole("region", { name: tickets.panel.label });
+    const readButton = panel.getByRole("button", { name: tickets.panel.blockersRead });
+    await readButton.waitFor();
+    expect(reads).toBe(0);
+
+    await readButton.click();
     await panel.getByText(tickets.panel.blockersNone).waitFor();
-    await expect.poll(() => reads).toBeGreaterThan(0);
-    const before = reads;
+    expect(reads).toBe(1);
+    expect(await readButton.isVisible()).toBe(true);
 
     await page.getByRole("button", { name: tickets.reread.action }).click();
-
-    await expect.poll(() => reads).toBe(before + 1);
+    await expect.poll(() => reads).toBe(2);
   });
 
   it("Dashboard 카드는 기다림, 멈춘 기다림, 끝난 선행 티켓을 구분한다", async () => {

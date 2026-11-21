@@ -52,7 +52,9 @@ export interface WaitingTicket {
   title: string | null;
 }
 
-export type TicketBlockersResult = { ok: true; blockers: BlockerView[] } | { ok: false };
+export type TicketBlockersResult =
+  | { ok: true; blockers: BlockerView[] }
+  | { ok: false; reason: TrackerLoadError["reason"] };
 
 export interface TicketView {
   id: string;

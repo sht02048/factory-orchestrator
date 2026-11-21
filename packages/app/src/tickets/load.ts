@@ -151,13 +151,13 @@ export async function loadTicketBlockers(
 ): Promise<TicketBlockersResult> {
   const { db } = context;
   const workspace = workspaceOf(db, input.ws);
-  if (workspace.kind !== "one") return { ok: false };
+  if (workspace.kind !== "one") return { ok: false, reason: "failed" };
   const project = listWorkspaceTrackerProjects(db, toWorkspaceId(workspace.workspace.id)).find(
     (candidate) => candidate.connection === input.connection,
   );
-  if (project === undefined) return { ok: false };
+  if (project === undefined) return { ok: false, reason: "unknown-connection" };
   const stored = getTrackerConnection(db, context.secretBox, project.connection);
-  if (stored === null) return { ok: false };
+  if (stored === null) return { ok: false, reason: "unknown-connection" };
   const tracker = context.registry.createTracker(stored.kind, {
     config: stored.config,
     secrets: stored.secrets,
@@ -165,7 +165,7 @@ export async function loadTicketBlockers(
   try {
     if (tracker.getTicketRelations === undefined) return { ok: true, blockers: [] };
     const relations = await tracker.getTicketRelations(toTicketKey(input.key));
-    if (relations === null) return { ok: false };
+    if (relations === null) return { ok: false, reason: "not-found" };
     return {
       ok: true,
       blockers: relations.blockers.map((blocker) => ({
@@ -175,8 +175,8 @@ export async function loadTicketBlockers(
         stateCategory: blocker.state.category,
       })),
     };
-  } catch {
-    return { ok: false };
+  } catch (error) {
+    return { ok: false, reason: loadErrorReason(error) };
   }
 }
 
