@@ -199,13 +199,15 @@
 | `MotionList`              | 항목이 생기고 빠지는 목록. `items`·`getKey`와 항목을 그리는 함수를 준다. 기본은 펼치며 들어오고 접히며 빠진다. 타임라인 새 줄은 `enter="rise"`. 빠짐이 끝나면 `onExited(key)`가 온다. 필터·탭을 바꿀 때는 `resetKey`를 바꿔 움직이지 않게 한다 |
 | `MotionScope`             | 항목이 목록 사이를 옮겨 다니는 묶음(Dashboard 칸). 칸들을 함께 감싼다. 카드는 `move="card"`(300ms), 행은 기본 `row`(240ms)                                                                                                                     |
 | `useMotionMove`           | 갱신을 직접 쥔 곳(사용자 행동)에서 `move(() => setState(...))`로 부른다. View Transitions API를 쓰고, 없으면 FLIP, 둘 다 안 되면 바로 바뀐다. props로만 바뀌는 목록은 부르지 않아도 FLIP으로 움직인다                                          |
-| `StatusPill changeMotion` | 목록에서 상태가 바뀌는 알약. 색이 150ms에 바뀌고 한 번 1.06배로 커진다. 첫 렌더에는 움직이지 않는다                                                                                                                                            |
+| `StatusPill changeMotion` | 목록에서 상태가 바뀌는 알약. 색이 150ms에 바뀌고 한 번 1.06배로 커진다. 첫 렌더에는 움직이지 않는다. 화면을 연 뒤에 새로 생긴 알약은 `popOnMount`를 함께 준다                                                                                  |
 | `Dialog`, `Sheet`         | 열기·닫기 움직임이 들어 있어 화면에서 할 일이 없다. 닫는 도중 다시 열면 그 자리에서 되돌아간다                                                                                                                                                 |
 
 - 한꺼번에 `MOTION_BURST_LIMIT`(3)건보다 많이 바뀌면 미끄러지지 않고 흐려지며 바뀐다. 건수는 들어온 것·빠진 것·칸을 옮긴 것·순서가 실제로 바뀐 것만 센다. 밀려난 이웃은 세지 않는다.
 - 옮겨 갈 자리가 보이는 영역 밖이거나 칸이 세로로 쌓여 있으면 그 항목은 흐려지며 바뀐다.
 - `prefers-reduced-motion`에서는 이동·커지기를 빼고 150ms 이하 흐려지기만 남는다.
 - `MotionList`의 부모에 `gap`을 주지 않는다. 접힌 행도 `gap`을 차지해 빠짐 끝에 튄다. 행 사이는 항목 안의 여백으로 둔다.
+- 행 사이가 필요하면 `MotionList itemGap`(`card`·`row`)을 쓰고 부모는 `KanbanCards motionItems`·`TableRows motionItems`로 둔다. 여백이 항목과 함께 접히고 도착 비추기는 여백을 덮지 않는다. 항목 요소에 붙일 `data-*`는 `itemAttributes`로 준다. `TableRow`는 빠지는 동안 `disabled`를 줘 방향키가 건너뛰게 한다.
+- 닫히는 `Sheet`는 포인터를 받지 않는다. 닫는 도중 뒤의 카드를 누르면 그 클릭이 카드에 닿아 Sheet가 바로 다시 열린다.
 - 기본 상태는 늘 보이는 상태다. 움직임이 돌지 않아도 내용이 숨지 않는다.
 
 ## 시간 표기

@@ -6,6 +6,7 @@ import {
   DefinitionItem,
   DefinitionList,
   DetailPanel,
+  MotionList,
   PageHeader,
   PanelHeader,
   RowTitle,
@@ -86,6 +87,7 @@ export interface RunsScreenProps {
   page: RunsPage;
   workspaces: ReadonlyArray<WorkspaceSummary>;
   filter: RunFilter;
+  endedLimit?: number;
   selectedId: string | undefined;
   onFilterChange: (filter: RunFilter) => void;
   onSelect: (runId: string) => void;
@@ -153,6 +155,7 @@ function AllWorkspaces({
 function RunsList({
   page,
   filter,
+  endedLimit,
   selectedId,
   onFilterChange,
   onSelect,
@@ -173,6 +176,8 @@ function RunsList({
   const filterBar = useRef<HTMLDivElement>(null);
   const focusAfterClear = useRef(false);
   const filtered = page.conditions.length > 0;
+  const workspaceId = page.workspace.kind === "one" ? page.workspace.workspace.id : "";
+  const listKey = JSON.stringify([workspaceId, filter, page.conditions, endedLimit ?? null]);
   useEffect(() => {
     if (focusAfterMore.current) {
       focusAfterMore.current = false;
@@ -256,17 +261,24 @@ function RunsList({
                         ? t("noRunsWithConditions")
                         : t("noRuns")}
                   </TableEmpty>
-                ) : (
-                  <TableRows
-                    label={t("listLabel")}
-                    value={selected?.id ?? null}
-                    onValueChange={onSelect}
+                ) : null}
+                <TableRows
+                  label={t("listLabel")}
+                  value={selected?.id ?? null}
+                  onValueChange={onSelect}
+                  motionItems
+                >
+                  <MotionList
+                    items={visible}
+                    getKey={(run) => run.id}
+                    itemGap="row"
+                    resetKey={listKey}
                   >
-                    {visible.map((run) => (
-                      <RunRow key={run.id} run={run} onOpen={() => onOpen(run.id)} />
-                    ))}
-                  </TableRows>
-                )}
+                    {(run, { leaving }) => (
+                      <RunRow run={run} leaving={leaving} onOpen={() => onOpen(run.id)} />
+                    )}
+                  </MotionList>
+                </TableRows>
               </Table>
             </Card>
             {page.moreEnded || page.recentEnded > ENDED_RUNS_PAGE_SIZE ? (
@@ -359,7 +371,7 @@ function ConditionChips({
   );
 }
 
-function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
+function RunRow({ run, leaving, onOpen }: { run: RunView; leaving: boolean; onOpen: () => void }) {
   const t = useTranslations("runs");
   const { ago, elapsed } = useTime();
   const statusName = useStatusName();
@@ -368,7 +380,7 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
   const result = useRunResultText(run);
 
   return (
-    <TableRow value={run.id} label={ticketName(run)} onOpen={onOpen}>
+    <TableRow value={run.id} label={ticketName(run)} onOpen={onOpen} disabled={leaving}>
       <TableCell hideWhen="stacked">
         {run.ticketTitle === null ? null : (
           <Text variant="meta" numeric>
@@ -410,7 +422,9 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
         <Text variant="meta">{result}</Text>
       </TableCell>
       <TableCell>
-        <StatusPill status={status}>{statusName(status)}</StatusPill>
+        <StatusPill status={status} changeMotion>
+          {statusName(status)}
+        </StatusPill>
       </TableCell>
       <TableCell align="end" numeric>
         {run.state === "ended"

@@ -193,6 +193,8 @@ export {
   useMotionMove,
   type MotionEnter,
   type MotionHighlightRadius,
+  type MotionItemAttributes,
+  type MotionItemGap,
   type MotionListProps,
   type MotionMove,
   type MotionScopeProps,

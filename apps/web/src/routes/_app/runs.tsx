@@ -58,6 +58,7 @@ function RunsRoute() {
         page={page}
         workspaces={shell.workspaces}
         filter={f ?? "all"}
+        endedLimit={ended ?? ENDED_RUNS_PAGE_SIZE}
         selectedId={sel}
         onFilterChange={(next) => {
           void navigate({

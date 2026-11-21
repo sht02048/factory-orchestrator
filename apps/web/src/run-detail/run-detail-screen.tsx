@@ -13,6 +13,7 @@ import {
   Disclosure,
   Field,
   Input,
+  MotionList,
   PageHeader,
   ScreenLayout,
   Row,
@@ -290,7 +291,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
 
             {run.brief === null ? null : <SentBrief brief={run.brief} />}
 
-            <Timeline events={run.timeline} now={run.now} />
+            <Timeline runId={run.id} events={run.timeline} now={run.now} />
           </div>
 
           <div {...stylex.props(styles.column)}>
@@ -970,7 +971,27 @@ function useControlFailure(control: RunControlView | null): string | null {
   });
 }
 
-function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: string }) {
+export function timelineRows(
+  events: ReadonlyArray<TimelineEvent>,
+): ReadonlyArray<{ key: string; event: TimelineEvent }> {
+  const seen = new Map<string, number>();
+  return events.map((event) => {
+    const identity = `${event.kind}:${event.at}`;
+    const occurrence = seen.get(identity) ?? 0;
+    seen.set(identity, occurrence + 1);
+    return { key: `${identity}:${occurrence}`, event };
+  });
+}
+
+function Timeline({
+  runId,
+  events,
+  now,
+}: {
+  runId: string;
+  events: ReadonlyArray<TimelineEvent>;
+  now: string;
+}) {
   const t = useTranslations("run.timeline");
   const domain = useTranslations("domain");
   const laterPr = useTranslations("run.laterPr");
@@ -1025,11 +1046,18 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
   };
   return (
     <Block title={t("title")} compact>
-      <ol {...stylex.props(styles.timeline)}>
-        {events.map((event, index) => {
-          const detail = eventDetail(event);
-          return (
-            <li key={`${event.kind}-${index}`}>
+      <ol {...stylex.props(styles.timeline, styles.motionTimeline)}>
+        <MotionList
+          as="li"
+          enter="rise"
+          items={timelineRows(events)}
+          getKey={(row) => row.key}
+          itemGap="row"
+          resetKey={runId}
+        >
+          {({ event }) => {
+            const detail = eventDetail(event);
+            return (
               <Row
                 trailing={
                   <time dateTime={event.at} {...stylex.props(textStyles("meta"))}>
@@ -1048,9 +1076,9 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
                   )}
                 </span>
               </Row>
-            </li>
-          );
-        })}
+            );
+          }}
+        </MotionList>
       </ol>
     </Block>
   );
@@ -1441,5 +1469,6 @@ const styles = stylex.create({
     padding: 0,
     listStyle: "none",
   },
+  motionTimeline: { gap: 0, marginBottom: `calc(${space.px2} * -1)` },
   eventBody: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
 });

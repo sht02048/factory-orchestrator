@@ -63,6 +63,7 @@ export function statusTone(status: PillStatus): StatusTone {
 export interface StatusPillProps {
   status: PillStatus;
   changeMotion?: boolean;
+  popOnMount?: boolean;
   children: ReactNode;
 }
 
@@ -72,9 +73,9 @@ const PILL_POP_KEYFRAMES: Keyframe[] = [
   { transform: "scale(1)", offset: 1 },
 ];
 
-function usePillPop(status: PillStatus, enabled: boolean) {
+function usePillPop(status: PillStatus, enabled: boolean, popOnMount: boolean) {
   const pillRef = useRef<HTMLSpanElement>(null);
-  const shownStatus = useRef(status);
+  const shownStatus = useRef<PillStatus | null>(popOnMount ? null : status);
   useEffect(() => {
     if (shownStatus.current === status) return;
     shownStatus.current = status;
@@ -95,9 +96,14 @@ function usePillPop(status: PillStatus, enabled: boolean) {
   return pillRef;
 }
 
-export function StatusPill({ status, changeMotion = false, children }: StatusPillProps) {
+export function StatusPill({
+  status,
+  changeMotion = false,
+  popOnMount = false,
+  children,
+}: StatusPillProps) {
   const tone = statusTone(status);
-  const pillRef = usePillPop(status, changeMotion);
+  const pillRef = usePillPop(status, changeMotion, popOnMount);
   return (
     <span
       ref={pillRef}

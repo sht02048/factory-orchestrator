@@ -1,6 +1,6 @@
 import { Button, KanbanCard, Menu, MenuItem, MoreIcon, StatusPill } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
-import type { RunControl } from "@ganger/core";
+import type { RunControl, RunId } from "@ganger/core";
 import { useId, useState } from "react";
 import type { ReactNode, Ref } from "react";
 import { useTranslations } from "use-intl";
@@ -23,11 +23,16 @@ interface CardParts {
   menu?: ReactNode;
 }
 
+export function cardTag(run: HomeRun, tagged: boolean): PillStatus | null {
+  return (tagged ? todoTagOf(run) : null) ?? (run.state === "paused" ? "paused" : null);
+}
+
 export function RunCard({
   run,
   tagged,
   all,
   selected,
+  lastTags,
   openRef,
   onOpen,
   onControl,
@@ -36,12 +41,17 @@ export function RunCard({
   tagged: boolean;
   all: boolean;
   selected: boolean;
+  lastTags: ReadonlyMap<RunId, PillStatus | null>;
   openRef: Ref<HTMLButtonElement>;
   onOpen: (mode: SheetMode) => void;
   onControl: (control: RunControl) => Promise<boolean>;
 }) {
   const todoTag = tagged ? todoTagOf(run) : null;
-  const tag: PillStatus | null = todoTag ?? (run.state === "paused" ? "paused" : null);
+  const tag = cardTag(run, tagged);
+  const [popNewPill, setPopNewPill] = useState(
+    () => lastTags.has(run.id) && lastTags.get(run.id) !== tag,
+  );
+  if (tag === null && !popNewPill) setPopNewPill(true);
   const titleId = useId();
   const [sending, setSending] = useState(false);
   const [rejected, setRejected] = useState(false);
@@ -60,17 +70,23 @@ export function RunCard({
   });
   const statusName = useRunText().statusName;
   return (
-    <li data-run={run.id} data-tag={tag ?? undefined}>
-      <KanbanCard
-        {...(tag === null ? {} : { tag: <StatusPill status={tag}>{statusName(tag)}</StatusPill> })}
-        title={<RunKey run={run} />}
-        titleId={titleId}
-        {...parts}
-        selected={selected}
-        openRef={openRef}
-        onOpen={() => onOpen("summary")}
-      />
-    </li>
+    <KanbanCard
+      {...(tag === null
+        ? {}
+        : {
+            tag: (
+              <StatusPill status={tag} changeMotion popOnMount={popNewPill}>
+                {statusName(tag)}
+              </StatusPill>
+            ),
+          })}
+      title={<RunKey run={run} />}
+      titleId={titleId}
+      {...parts}
+      selected={selected}
+      openRef={openRef}
+      onOpen={() => onOpen("summary")}
+    />
   );
 }
 
