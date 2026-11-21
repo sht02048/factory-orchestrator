@@ -481,7 +481,7 @@ async function sendAnswers(
   progress: Extract<RunProgress, { kind: "active" }>,
 ): Promise<void> {
   const { db, logger, unmarkedAnswers, unwokenHumanChecks } = context;
-  const delivery = humanCheckDelivery(progress);
+  const delivery = run.state === "paused" ? "hold" : humanCheckDelivery(progress);
   for (const answer of listUnsentAnswers(db)) {
     if (answer.runId !== run.id) continue;
     const key = answerKey(run.id, answer.questionId);
@@ -506,7 +506,7 @@ async function sendAnswers(
       continue;
     }
     if (answer.kind === "human-check" && delivery === "wake") {
-      const message = humanCheckWakeMessage(answer.answer);
+      const message = humanCheckWakeMessage(answer.questionId, answer.answer);
       try {
         const resumed = await runner.resumeAgent(onRunner, {
           agent: run.agent,
@@ -549,8 +549,8 @@ function humanCheckDelivery(
   }
 }
 
-function humanCheckWakeMessage(answer: string): string {
-  return `운영자가 Human Check에 답했어요: ${answer.replace(/\s*\n\s*/g, " ")}`;
+function humanCheckWakeMessage(questionId: QuestionId, answer: string): string {
+  return `운영자가 Human Check(${questionId})에 답했어요: ${answer.replace(/\s*\n\s*/g, " ")}`;
 }
 
 async function sendDenials(

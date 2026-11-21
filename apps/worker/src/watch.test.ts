@@ -193,7 +193,7 @@ describe("입력 기다림", () => {
     expect(stateOf(run)).toBe("running");
     expect(agentOf(run, runnerId).answers).toHaveLength(1);
     expect(agentOf(run, runnerId).resumes.map((r) => r.message)).toEqual([
-      "운영자가 Human Check에 답했어요: 고쳐 주세요 시험을 더해 주세요",
+      `운영자가 Human Check(${questionId})에 답했어요: 고쳐 주세요 시험을 더해 주세요`,
     ]);
   });
 

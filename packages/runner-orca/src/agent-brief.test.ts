@@ -29,6 +29,12 @@ describe("ASK_GUIDE", () => {
     expect(ASK_GUIDE).toContain("차례를 끝내지 않고");
   });
 
+  test("accepts only the reply threaded to this request, so an old answer cannot confirm a new one", () => {
+    expect(ASK_GUIDE).toContain("출력의 `messageId`를 기억한다");
+    expect(ASK_GUIDE).toContain("check --wait --full --json");
+    expect(ASK_GUIDE).toContain("`thread_id`가 기억한 `messageId`인 메일만 이 요청의 답이다");
+  });
+
   test("says how to send a Human Check but not what needs one", () => {
     expect(ASK_GUIDE).not.toMatch(/머지|one-way/);
   });

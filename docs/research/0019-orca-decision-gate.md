@@ -52,7 +52,8 @@ orca orchestration send --type decision_gate --subject "<무엇을 확인할지>
 
 ## 결정
 
-- 통신 규약은 `send --type decision_gate`로 보낸 뒤 `check --wait`로 기다리게 한다. ID 인자는 넣지 않는다.
+- 통신 규약은 `send --type decision_gate --json`으로 보내 `messageId`를 기억하고 `check --wait --full --json`으로 기다리게 한다. `--full`이 없으면 `thread_id`가 출력에 없다. ID 인자는 넣지 않는다.
+- `check`는 가장 오래된 읽지 않은 메일부터 돌려주므로, 터미널로 깨운 요청의 답 메일이 남아 다음 요청의 답으로 읽힐 수 있다. 그래서 에이전트는 `thread_id`가 자기 요청 id인 답만 받아들이고, 깨우기 문구에도 요청 id를 넣는다.
 - `gate-create`는 쓰지 않는다. 태스크를 막는 별도 기록이고 ADR 0023이 정한 메시지 종류가 아니다.
 - 답은 질문과 같은 `reply` 경로로 보낸다. 러너 어댑터에 새 명령을 더하지 않는다.
 - `reply` 뒤 런을 Running으로 돌리는 조건은 에이전트 활동으로 정한다. 일하고 있으면(`check --wait`가 답을 받음) 그대로 Running이다. 차례를 끝냈고(`turn-ended`, `interrupted`) 권한 대기가 없으면 재개와 같은 터미널 입력으로 답을 넣어 깨운다.
