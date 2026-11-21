@@ -1548,13 +1548,27 @@ describe("prepareContinuation", () => {
       ok: true,
       result: {
         tasks: [
-          { id: "task_old", status: "completed", title: "ganger-ENG-1-1", dispatchId: "ctx_old" },
-          { id: "task_new", status: "dispatched", title: "ganger-ENG-1-2", dispatchId: "ctx_new" },
+          { id: "task_old", status: "completed", title: "ganger-ENG-1-1" },
+          { id: "task_new", status: "dispatched", title: "ganger-ENG-1-2" },
         ],
       },
     };
     const exec = new ScriptedExec()
       .orca("orchestration task-list", stdout(JSON.stringify(tasks)))
+      .orca(
+        "orchestration worker-list",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: {
+              workers: [
+                { dispatchId: "ctx_new", taskId: "task_new", workspace: WORKTREE },
+                { dispatchId: "ctx_old", taskId: "task_old", workspace: WORKTREE },
+              ],
+            },
+          }),
+        ),
+      )
       .orca(
         "orchestration worker-show",
         stdout(

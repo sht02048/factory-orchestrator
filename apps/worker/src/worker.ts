@@ -40,6 +40,7 @@ import {
   listRuns,
   markCancelRequestProcessed,
   openDatabase,
+  reclaimSourceWorktree,
   recordContinuePlace,
   recordStartFailure,
   recordStartRequested,
@@ -569,11 +570,16 @@ async function continuationPlace(
       agentRef: source.agentRef,
     });
   }
-  const place = prepared === "from-scratch" ? prepared : (records.continuePlace ?? prepared);
-  const written = tryWrite(context, run.id, () => {
-    recordContinuePlace(context.db, run.id, place);
-    return true;
-  });
+  const place = prepared === "same-worktree" ? (records.continuePlace ?? prepared) : prepared;
+  const written = tryWrite(context, run.id, () =>
+    inTransaction(context.db, () => {
+      recordContinuePlace(context.db, run.id, place);
+      if (prepared !== "from-scratch" && run.continuedFromRunId !== null) {
+        reclaimSourceWorktree(context.db, run.continuedFromRunId);
+      }
+      return true;
+    }),
+  );
   return written === undefined ? "write-failed" : place;
 }
 

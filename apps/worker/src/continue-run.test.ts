@@ -5,6 +5,7 @@ import {
   continueRun,
   getRun,
   getRunWithRecords,
+  listTakenOverRunIds,
   requestWorktreeRemoval,
   saveWorkspaceBrief,
   setQueuedRunRunner,
@@ -105,6 +106,43 @@ describe("이어서 맡기기", () => {
       branch: source.branch,
     });
     expect(records(next).continuePlace).toBe("recreated");
+  });
+
+  it("다시 만든 워크트리는 시작하지 못해도 이전 런의 남은 워크트리로 돌아온다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    const fake = h.runner(source.runnerId);
+    fake.deleteWorktree(source.worktree);
+    expect(requestWorktreeRemoval(h.db, source.id, h.now)).toEqual({ ok: true });
+    updateRunRecords(h.db, source.id, { worktreeRemovedAt: h.now });
+    fake.failNextStart = { kind: "runner-error", code: "boom", message: "failed" };
+
+    const next = continued(source.id);
+    await h.worker().tick();
+
+    expect(records(next).continuePlace).toBe("recreated");
+    expect(getRunWithRecords(h.db, source.id)?.records).toMatchObject({
+      worktreeRemovedAt: null,
+      worktreeRemoveRequestedAt: null,
+    });
+    expect(fake.removed).toEqual([]);
+  });
+
+  it("재시도 사이에 워크트리가 지워지면 이어 받은 곳을 다시 만든 것으로 고친다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    const fake = h.runner(source.runnerId);
+    fake.failNextStart = { kind: "runner-error", code: "boom", message: "failed" };
+    const next = continued(source.id);
+    const worker = h.worker();
+    await worker.tick();
+    expect(records(next).continuePlace).toBe("same-worktree");
+
+    fake.deleteWorktree(source.worktree);
+    await worker.tick();
+
+    expect(records(next).continuePlace).toBe("recreated");
+    expect(getRun(h.db, next.id)?.state).toBe("running");
   });
 
   it("브랜치도 없으면 새 워크트리에서 티켓과 함께 처음부터 시작한다", async () => {
@@ -217,6 +255,18 @@ describe("이어서 맡기기", () => {
 
     expect(fake.removed).toEqual([]);
     expect(getRun(h.db, next.id)?.state).toBe("running");
+  });
+
+  it("이어 받은 런이 있는 이전 런만 넘겨준 런으로 센다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    expect(listTakenOverRunIds(h.db).has(source.id)).toBe(false);
+
+    const next = continued(source.id);
+    expect(listTakenOverRunIds(h.db).has(source.id)).toBe(true);
+
+    changeRunState(h.db, next.id, { to: "ended", agentResult: "canceled", prState: "none" }, h.now);
+    expect(listTakenOverRunIds(h.db).has(source.id)).toBe(false);
   });
 
   it("같은 런을 두 번 이어 맡기지 못하고, 시작 못 한 이어 받기 뒤에는 다시 맡길 수 있다", async () => {

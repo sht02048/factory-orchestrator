@@ -4,6 +4,7 @@ import type {
   PauseSource,
   PrReadError,
   PrState,
+  RunId,
   RunState,
   SummaryOutcome,
 } from "@ganger/core";
@@ -96,7 +97,7 @@ export type OtherRun = { id: string; assignedAt: string } & (
 );
 
 export interface RunLink {
-  id: string;
+  id: RunId;
   number: number;
 }
 

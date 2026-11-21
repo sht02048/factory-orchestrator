@@ -110,7 +110,6 @@ export const taskListResultSchema = z.object({
       id: text,
       status: text,
       title: optionalText,
-      dispatchId: optionalText,
       result: z.union([z.string(), z.record(z.string(), z.unknown())]).nullish(),
     }),
   ),

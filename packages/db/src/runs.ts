@@ -573,6 +573,31 @@ export function recordContinuePlace(db: Database, runId: RunId, place: Continuat
   });
 }
 
+export function listTakenOverRunIds(db: Database): Set<RunId> {
+  const rows = db
+    .selectDistinct({ id: runs.continuedFromRunId })
+    .from(runs)
+    .where(
+      and(
+        isNotNull(runs.continuedFromRunId),
+        or(ne(runs.state, "ended"), isNotNull(runs.startedAt)),
+      ),
+    )
+    .all();
+  return new Set(rows.flatMap((row) => (row.id === null ? [] : [row.id])));
+}
+
+export function reclaimSourceWorktree(db: Database, sourceRunId: RunId): void {
+  inTransaction(db, () => {
+    const changed = db
+      .update(runs)
+      .set({ worktreeRemovedAt: null, worktreeRemoveRequestedAt: null })
+      .where(and(eq(runs.id, sourceRunId), isNotNull(runs.worktreeRemovedAt)))
+      .run().changes;
+    if (changed > 0) recordRunChange(db, sourceRunId);
+  });
+}
+
 export const TICKET_TITLE_MAX_LENGTH = 500;
 
 export function storedTicketTitle(title: string | null | undefined): string | null {

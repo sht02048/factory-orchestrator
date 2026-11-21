@@ -1,3 +1,4 @@
+import type { RunId } from "@ganger/core";
 import { toRunId } from "@ganger/core";
 import { continueRun, requestRunCancel, requestWorktreeRemoval } from "@ganger/db";
 import type { ContinueRunBlock } from "@ganger/db";
@@ -15,7 +16,7 @@ export function removeWorktreeRequest(db: Database, runId: string, now: Date): R
 }
 
 export type ContinueRunActionResult =
-  | { ok: true; runId: string }
+  | { ok: true; runId: RunId }
   | { ok: false; reason: ContinueRunBlock };
 
 export function continueRunRequest(

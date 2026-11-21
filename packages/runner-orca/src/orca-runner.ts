@@ -499,19 +499,28 @@ export class OrcaRunner implements Runner {
     const timeout = { timeoutMs: this.config.startTimeoutMs };
     const local = await this.run(localBranchArgv(repoPath, input.branch));
     if (refFound(local, "git show-ref", 1)) {
-      const added = await this.run(addWorktreeArgv(repoPath, path, input.branch), timeout);
+      const added = await this.run(
+        addWorktreeArgv({ repoPath, path, branch: input.branch }),
+        timeout,
+      );
       gitSucceeded(added, "git worktree add");
       return "recreated";
     }
     const remote = project.remoteName;
-    const onRemote = await this.run(remoteBranchArgv(repoPath, remote, input.branch), timeout);
+    const onRemote = await this.run(
+      remoteBranchArgv({ repoPath, remote, branch: input.branch }),
+      timeout,
+    );
     if (!refFound(onRemote, "git ls-remote", 2)) return "from-scratch";
     gitSucceeded(
-      await this.run(fetchBranchArgv(repoPath, remote, input.branch), timeout),
+      await this.run(fetchBranchArgv({ repoPath, remote, branch: input.branch }), timeout),
       "git fetch",
     );
     gitSucceeded(
-      await this.run(addTrackingWorktreeArgv(repoPath, path, input.branch, remote), timeout),
+      await this.run(
+        addTrackingWorktreeArgv({ repoPath, path, branch: input.branch, remote }),
+        timeout,
+      ),
       "git worktree add",
     );
     return "recreated";
@@ -528,20 +537,21 @@ export class OrcaRunner implements Runner {
       ["orchestration", "task-list", "--run", mailbox.runId, "--brief"],
       taskListResultSchema,
     );
-    const task = tasks.findLast(
-      (candidate) =>
-        candidate.title === worktreeName &&
-        candidate.status !== "failed" &&
-        typeof candidate.dispatchId === "string",
+    const taskIds = new Set(
+      tasks
+        .filter((task) => task.title === worktreeName && task.status !== "failed")
+        .map((t) => t.id),
     );
-    if (typeof task?.dispatchId !== "string") return null;
+    if (taskIds.size === 0) return null;
+    const worker = await this.findWorkerOf(mailbox.runId, (row) => taskIds.has(row.taskId));
+    if (worker === undefined) return null;
     const shownWorker = await this.orca(
-      ["orchestration", "worker-show", "--dispatch", task.dispatchId],
+      ["orchestration", "worker-show", "--dispatch", worker.dispatchId],
       workerShowResultSchema,
     );
     return this.startedRunAt(`id:${worktree}`, {
-      dispatchId: task.dispatchId,
-      taskId: task.id,
+      dispatchId: worker.dispatchId,
+      taskId: worker.taskId,
       runId: shownWorker.runId,
     });
   }
@@ -593,6 +603,13 @@ export class OrcaRunner implements Runner {
     worktreeId: string,
     runId: string | null,
   ): Promise<{ dispatchId: string; taskId: string } | undefined> {
+    return this.findWorkerOf(runId, (row) => row.workspace === worktreeId);
+  }
+
+  private async findWorkerOf(
+    runId: string | null,
+    matches: (row: z.infer<typeof workerListResultSchema>["workers"][number]) => boolean,
+  ): Promise<{ dispatchId: string; taskId: string } | undefined> {
     let cursor: string | null = null;
     for (let page = 0; page < WORKER_LIST_MAX_PAGES; page += 1) {
       const result: z.infer<typeof workerListResultSchema> = await this.orca(
@@ -606,7 +623,7 @@ export class OrcaRunner implements Runner {
         ],
         workerListResultSchema,
       );
-      const found = result.workers.find((w) => w.workspace === worktreeId);
+      const found = result.workers.find(matches);
       if (found !== undefined) return found;
       const next = result.nextCursor ?? null;
       if (next === null || next === cursor || result.workers.length === 0) return undefined;

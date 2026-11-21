@@ -28,6 +28,18 @@ export function hasUnpushedCommits(result: RemoteResult): boolean {
   return parseGitOutput(result, countSchema, "git rev-list") > 0;
 }
 
+interface RemoteBranch {
+  repoPath: string;
+  remote: string;
+  branch: string;
+}
+
+interface WorktreeTarget {
+  repoPath: string;
+  path: string;
+  branch: string;
+}
+
 export function worktreeListArgv(repoPath: string): string[] {
   return ["git", "-C", repoPath, "worktree", "list", "--porcelain"];
 }
@@ -40,11 +52,11 @@ export function localBranchArgv(repoPath: string, branch: string): string[] {
   return ["git", "-C", repoPath, "show-ref", "--verify", "--quiet", `refs/heads/${branch}`];
 }
 
-export function remoteBranchArgv(repoPath: string, remote: string, branch: string): string[] {
+export function remoteBranchArgv({ repoPath, remote, branch }: RemoteBranch): string[] {
   return ["git", "-C", repoPath, "ls-remote", "--exit-code", remote, `refs/heads/${branch}`];
 }
 
-export function fetchBranchArgv(repoPath: string, remote: string, branch: string): string[] {
+export function fetchBranchArgv({ repoPath, remote, branch }: RemoteBranch): string[] {
   return [
     "git",
     "-C",
@@ -55,16 +67,16 @@ export function fetchBranchArgv(repoPath: string, remote: string, branch: string
   ];
 }
 
-export function addWorktreeArgv(repoPath: string, path: string, branch: string): string[] {
+export function addWorktreeArgv({ repoPath, path, branch }: WorktreeTarget): string[] {
   return ["git", "-C", repoPath, "worktree", "add", path, branch];
 }
 
-export function addTrackingWorktreeArgv(
-  repoPath: string,
-  path: string,
-  branch: string,
-  remote: string,
-): string[] {
+export function addTrackingWorktreeArgv({
+  repoPath,
+  path,
+  branch,
+  remote,
+}: WorktreeTarget & RemoteBranch): string[] {
   return [
     "git",
     "-C",
