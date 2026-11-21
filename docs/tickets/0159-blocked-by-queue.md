@@ -21,7 +21,7 @@ blocked_by: []
 
 ## 마이그레이션 (one-way)
 
-`20261121095428_run_blockers`가 표 `run_blockers`와 `runs`의 칸 다섯(`ticket_priority`, `blockers_read_at`, `blockers_read_failed`, `wait_skipped_at`, `wait_skip_request_id`)을 더한다. 기존 행은 바꾸지 않는다. 업그레이드 때 시작 전인 Queued 런은 관계를 처음 읽을 때까지 시작하지 않는다.
+`20261121102026_run_blockers`가 표 `run_blockers`·`run_wait_skip_requests`와 `runs`의 칸 넷(`ticket_priority`, `blockers_read_at`, `blockers_read_failed`, `wait_skipped_at`)을 더한다. 기존 행은 바꾸지 않는다. 업그레이드 때 시작 전인 Queued 런은 관계를 처음 읽을 때까지 시작하지 않는다.
 
 되돌리는 법: 이전 버전은 더 새로운 DB를 열지 않으므로, 업그레이드 전에 만든 DB 백업으로 되돌린다. 백업 뒤에 생긴 런 기록은 잃는다.
 

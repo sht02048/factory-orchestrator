@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "9a2e3d85-2aa6-4a6e-8a4a-771fb3abb6bb",
+  "id": "43fc43b7-b456-4f06-9a1a-96b053267304",
   "prevIds": ["d66c1942-3361-4928-a47d-ffe33fccdade"],
   "ddl": [
     {
@@ -74,6 +74,10 @@
     },
     {
       "name": "run_state_changes",
+      "entityType": "tables"
+    },
+    {
+      "name": "run_wait_skip_requests",
       "entityType": "tables"
     },
     {
@@ -1187,6 +1191,36 @@
       "entityType": "columns"
     },
     {
+      "table": "run_wait_skip_requests",
+      "name": "run_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_wait_skip_requests",
+      "name": "request_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_wait_skip_requests",
+      "name": "requested_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "runner_check_requests",
       "name": "runner_id",
       "type": "text",
@@ -1740,16 +1774,6 @@
       "table": "runs",
       "name": "wait_skipped_at",
       "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "runs",
-      "name": "wait_skip_request_id",
-      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -2848,6 +2872,17 @@
       "entityType": "fks"
     },
     {
+      "table": "run_wait_skip_requests",
+      "name": "fk_run_wait_skip_requests_run_id_runs_id_fk",
+      "columns": ["run_id"],
+      "tableTo": "runs",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "runner_check_requests",
       "name": "fk_runner_check_requests_runner_id_runners_id_fk",
       "columns": ["runner_id"],
@@ -2996,6 +3031,13 @@
       "table": "run_questions",
       "name": "run_questions_pk",
       "columns": ["run_id", "question_id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "run_wait_skip_requests",
+      "name": "run_wait_skip_requests_pk",
+      "columns": ["run_id", "request_id"],
       "nameExplicit": false,
       "entityType": "pks"
     },

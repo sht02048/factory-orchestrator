@@ -323,10 +323,26 @@ describe("기다리지 않고 시작", () => {
     await worker.tick();
     expect(stateOf(run)).toBe("running");
     expect(skipBlockerWait(h.db, run.id, REQUEST_ID, h.now)).toEqual({ ok: true });
-    expect(skipBlockerWait(h.db, run.id, "request-0159-0002", h.now)).toEqual({
+    expect(skipBlockerWait(h.db, run.id, "request-0159-0003", h.now)).toEqual({
       ok: false,
       reason: "not-queued",
     });
+  });
+
+  it("이미 건너뛴 런에 온 다른 요청 ID도 런이 시작한 뒤 재시도에 같은 결과를 돌려준다", async () => {
+    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    relate("ENG-1", [blocker("OPS-1")]);
+    const worker = h.worker();
+    await worker.tick();
+    const second = "request-0159-0002";
+
+    skipBlockerWait(h.db, run.id, REQUEST_ID, h.now);
+    expect(skipBlockerWait(h.db, run.id, second, h.now)).toEqual({ ok: true });
+    await worker.tick();
+
+    expect(stateOf(run)).toBe("running");
+    expect(skipBlockerWait(h.db, run.id, second, h.now)).toEqual({ ok: true });
   });
 
   it("기다리지 않는 런과 취소 중인 런은 거절한다", async () => {

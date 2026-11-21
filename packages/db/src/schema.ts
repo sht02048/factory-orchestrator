@@ -289,7 +289,6 @@ export const runs = sqliteTable(
       .notNull()
       .default(false),
     waitSkippedAt: timeMs("wait_skipped_at"),
-    waitSkipRequestId: text("wait_skip_request_id"),
     continuedFromRunId: text("continued_from_run_id").$type<RunId>(),
     continueMessage: text("continue_message"),
     continuePlace: text("continue_place", { enum: CONTINUATION_PLACES }),
@@ -573,6 +572,19 @@ export const runBlockers = sqliteTable(
     primaryKey({ columns: [t.runId, t.blockerKey] }),
     index("run_blockers_key").on(t.blockerKey),
   ],
+);
+
+export const runWaitSkipRequests = sqliteTable(
+  "run_wait_skip_requests",
+  {
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    requestId: text("request_id").notNull(),
+    requestedAt: timeMs("requested_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.runId, t.requestId] })],
 );
 
 export const runCancelRequests = sqliteTable("run_cancel_requests", {
