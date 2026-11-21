@@ -98,7 +98,7 @@ ${TICKET_FIELDS}`;
 const QUERY_TICKET_RELATIONS = `query TicketRelations($id: String!, $first: Int!, $after: String) {
   issue(id: $id) {
     priority
-    inverseRelations(first: $first, after: $after) {
+    inverseRelations(first: $first, after: $after, includeArchived: true) {
       nodes { type issue { identifier title state { id name type } } }
       ${PAGE_INFO}
     }

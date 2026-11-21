@@ -218,6 +218,7 @@ describe("조회", () => {
 
     const relations = await t.getTicketRelations(KEY);
 
+    expect(sent[0]?.query).toContain("includeArchived: true");
     expect(sent[1]?.variables["after"]).toBe("c1");
     expect(relations?.priority).toBe("high");
     expect(relations?.blockers.map((b) => [b.key, b.state.category])).toEqual([
