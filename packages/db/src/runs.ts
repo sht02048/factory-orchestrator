@@ -11,9 +11,11 @@ import {
 import type {
   AgentId,
   AgentRef,
+  AgentCheck,
   AgentResult,
   CiState,
   CommentId,
+  ContinuationPlace,
   InvalidRunTransition,
   NotStartedAgentResult,
   PauseSource,
@@ -28,6 +30,7 @@ import type {
   RunState,
   RunnerId,
   RunnerProjectId,
+  TicketKey,
   TicketRef,
   TrackerConnectionId,
   WorktreeKeptReason,
@@ -43,6 +46,7 @@ import {
   gt,
   gte,
   inArray,
+  isNotNull,
   isNull,
   lt,
   ne,
@@ -61,7 +65,11 @@ import { runStateChanges, runs } from "./schema.js";
 import type { LATER_PR_STATES } from "./schema.js";
 import { getWorkspaceTrackerProject, listRunnerSnapshots } from "./settings.js";
 
-export type StoredRun = Run & { workspaceId: WorkspaceId; ticketTitle: string | null };
+export type StoredRun = Run & {
+  workspaceId: WorkspaceId;
+  ticketTitle: string | null;
+  continuedFromRunId: RunId | null;
+};
 
 export interface RunRecords {
   startRequestedAt: Date | null;
@@ -69,6 +77,10 @@ export interface RunRecords {
   startError: string | null;
   reportBody: string | null;
   agentBrief: string | null;
+  continueMessage: string | null;
+  continuePlace: ContinuationPlace | null;
+  agentCheck: AgentCheck | null;
+  agentStopRequestedAt: Date | null;
   pullRequest: {
     id: PullRequestId;
     displayId: string;
@@ -110,6 +122,7 @@ function toStoredRun(row: RunRow): StoredRun {
     workspaceId: row.workspaceId,
     ticket: { connection: row.trackerConnectionId, key: row.ticketKey },
     ticketTitle: row.ticketTitle,
+    continuedFromRunId: row.continuedFromRunId,
     trackerProject: row.trackerProjectId,
     runnerProject: row.runnerProjectId,
     agent: row.agentId,
@@ -182,6 +195,10 @@ function toRunRecords(row: RunRow): RunRecords {
     startError: row.startError,
     reportBody: row.reportBody,
     agentBrief: row.agentBrief,
+    continueMessage: row.continueMessage,
+    continuePlace: row.continuePlace,
+    agentCheck: row.agentCheck,
+    agentStopRequestedAt: row.agentStopRequestedAt,
     pullRequest:
       row.prId === null || row.prCheckedAt === null
         ? null
@@ -397,9 +414,6 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
       runnerId = input.runnerId;
     }
 
-    const sameKeyRuns =
-      db.select({ n: count() }).from(runs).where(eq(runs.ticketKey, input.ticket.key)).get()?.n ??
-      0;
     const id = toRunId(randomUUID());
     db.insert(runs)
       .values({
@@ -412,7 +426,7 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
         runnerProjectId: input.runnerProject,
         agentId: input.agent,
         model: input.model ?? null,
-        worktreeName: `ganger-${input.ticket.key}-${sameKeyRuns + 1}`,
+        worktreeName: nextWorktreeName(db, input.ticket.key),
         state: "queued",
         runnerId,
         assignedAt: now,
@@ -435,6 +449,210 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
     const run = getRun(db, id);
     if (run === null) throw new RunRowError(id, "missing right after insert");
     return { ok: true, run };
+  });
+}
+
+function nextWorktreeName(db: Database, ticketKey: TicketKey): string {
+  const sameKeyRuns =
+    db.select({ n: count() }).from(runs).where(eq(runs.ticketKey, ticketKey)).get()?.n ?? 0;
+  return `ganger-${ticketKey}-${sameKeyRuns + 1}`;
+}
+
+export type ContinueRunBlock =
+  | "not-found"
+  | "not-ended"
+  | "not-started"
+  | "superseded"
+  | "worktree-removing"
+  | "worktree-settled"
+  | "active-run"
+  | "previous-agent";
+
+export type ContinueRunResult =
+  | { ok: true; run: StoredRun }
+  | { ok: false; reason: ContinueRunBlock };
+
+export function continueRunBlock(db: Database, runId: RunId): ContinueRunBlock | null {
+  const found = getRunWithRecords(db, runId);
+  if (found === null) return "not-found";
+  const { run, records } = found;
+  if (run.state !== "ended") return "not-ended";
+  if (run.startedAt === null) return "not-started";
+  const ticketRuns = listRuns(db, { ticket: run.ticket });
+  if (!checkAssignment({ ticket: run.ticket, runs: ticketRuns }).ok) return "active-run";
+  const later = ticketRuns.slice(ticketRuns.findIndex((other) => other.id === run.id) + 1);
+  if (later.some((other) => other.state !== "ended" || other.startedAt !== null)) {
+    return "superseded";
+  }
+  if (records.worktreeRemovedAt === null) {
+    return records.worktreeRemoveRequestedAt === null ? null : "worktree-removing";
+  }
+  const wasKept =
+    records.worktreeKept !== null ||
+    records.worktreeRemoveRequestedAt !== null ||
+    summarizeRunOutcome(run).worktree === "operator-decides";
+  return wasKept ? null : "worktree-settled";
+}
+
+export function continueRun(
+  db: Database,
+  input: { from: RunId; message: string; now: Date },
+): ContinueRunResult {
+  return inTransaction(db, (): ContinueRunResult => {
+    const block = continueRunBlock(db, input.from);
+    if (block !== null) return { ok: false, reason: block };
+    if (getRunRow(db, input.from)?.agentCheck !== "gone") {
+      return { ok: false, reason: "previous-agent" };
+    }
+    const source = getRun(db, input.from);
+    if (source?.state !== "ended" || source.startedAt === null) {
+      return { ok: false, reason: "not-found" };
+    }
+    const id = toRunId(randomUUID());
+    db.insert(runs)
+      .values({
+        id,
+        trackerConnectionId: source.ticket.connection,
+        ticketKey: source.ticket.key,
+        ticketTitle: source.ticketTitle,
+        workspaceId: source.workspaceId,
+        trackerProjectId: source.trackerProject,
+        runnerProjectId: source.runnerProject,
+        agentId: source.agent,
+        model: source.model,
+        worktreeName: nextWorktreeName(db, source.ticket.key),
+        state: "queued",
+        runnerId: source.runnerId,
+        assignedAt: input.now,
+        continuedFromRunId: source.id,
+        continueMessage: input.message,
+      })
+      .run();
+    recordStateChange(db, id, null, "queued", input.now);
+    recordChange(
+      db,
+      { kind: "assignment", targetId: id, workspaceId: source.workspaceId },
+      input.now,
+    );
+    recordRunChange(db, source.id, { now: input.now });
+    onCommit(db, () =>
+      log().info("run.continued", {
+        runId: id,
+        from: source.id,
+        ticketKey: source.ticket.key,
+        runnerId: source.runnerId,
+      }),
+    );
+    const run = getRun(db, id);
+    if (run === null) throw new RunRowError(id, "missing right after insert");
+    return { ok: true, run };
+  });
+}
+
+export function worktreeTakenOverBy(db: Database, runId: RunId): RunId | null {
+  const row = db
+    .select({ id: runs.id })
+    .from(runs)
+    .where(
+      and(
+        eq(runs.continuedFromRunId, runId),
+        or(ne(runs.state, "ended"), isNotNull(runs.startedAt)),
+      ),
+    )
+    .orderBy(desc(runs.assignedAt), desc(runs.id))
+    .limit(1)
+    .get();
+  return row?.id ?? null;
+}
+
+export function recordContinuePlace(db: Database, runId: RunId, place: ContinuationPlace): void {
+  inTransaction(db, () => {
+    const changed = db
+      .update(runs)
+      .set({ continuePlace: place })
+      .where(
+        and(
+          eq(runs.id, runId),
+          eq(runs.state, "queued"),
+          or(isNull(runs.continuePlace), ne(runs.continuePlace, place)),
+        ),
+      )
+      .run().changes;
+    if (changed > 0) recordRunChange(db, runId);
+  });
+}
+
+export function listTakenOverRunIds(db: Database): Set<RunId> {
+  const rows = db
+    .selectDistinct({ id: runs.continuedFromRunId })
+    .from(runs)
+    .where(
+      and(
+        isNotNull(runs.continuedFromRunId),
+        or(ne(runs.state, "ended"), isNotNull(runs.startedAt)),
+      ),
+    )
+    .all();
+  return new Set(rows.flatMap((row) => (row.id === null ? [] : [row.id])));
+}
+
+export function recordAgentCheck(
+  db: Database,
+  runId: RunId,
+  check: AgentCheck,
+  options: { stopHandled: boolean },
+): void {
+  inTransaction(db, () => {
+    const before = getRunRow(db, runId);
+    if (before === undefined) return;
+    const stopRequestedAt = options.stopHandled ? null : before.agentStopRequestedAt;
+    if (before.agentCheck === check && before.agentStopRequestedAt === stopRequestedAt) return;
+    db.update(runs)
+      .set({ agentCheck: check, agentStopRequestedAt: stopRequestedAt })
+      .where(eq(runs.id, runId))
+      .run();
+    recordRunChange(db, runId);
+  });
+}
+
+export type RequestAgentStopResult =
+  | { ok: true }
+  | { ok: false; reason: "not-found" | "not-ended" | "not-alive" };
+
+export function requestPreviousAgentStop(
+  db: Database,
+  runId: RunId,
+  now: Date,
+): RequestAgentStopResult {
+  return inTransaction(db, (): RequestAgentStopResult => {
+    const row = getRunRow(db, runId);
+    if (row === undefined) return { ok: false, reason: "not-found" };
+    if (row.state !== "ended" || row.startedAt === null) return { ok: false, reason: "not-ended" };
+    if (row.agentCheck !== "alive") return { ok: false, reason: "not-alive" };
+    if (row.agentStopRequestedAt !== null) return { ok: true };
+    db.update(runs).set({ agentStopRequestedAt: now }).where(eq(runs.id, runId)).run();
+    recordRunChange(db, runId, { now });
+    return { ok: true };
+  });
+}
+
+export function reclaimSourceWorktree(db: Database, sourceRunId: RunId): void {
+  inTransaction(db, () => {
+    const found = getRunWithRecords(db, sourceRunId);
+    if (found?.run.state !== "ended") return;
+    const { run, records } = found;
+    const unaccounted =
+      records.worktreeKept === null && summarizeRunOutcome(run).worktree === "nothing-to-remove";
+    if (records.worktreeRemovedAt === null && !unaccounted) return;
+    db.update(runs)
+      .set({
+        worktreeRemovedAt: null,
+        worktreeRemoveRequestedAt: null,
+        ...(unaccounted ? { worktreeKept: "check-failed" as const } : {}),
+      })
+      .where(eq(runs.id, sourceRunId))
+      .run();
+    recordRunChange(db, sourceRunId);
   });
 }
 
@@ -690,10 +908,11 @@ export function recordStartFailure(
 export function setQueuedRunRunner(db: Database, runId: RunId, runnerId: RunnerId | null): boolean {
   return inTransaction(db, () => {
     const before = db
-      .select({ runnerId: runs.runnerId })
+      .select({ runnerId: runs.runnerId, continuedFromRunId: runs.continuedFromRunId })
       .from(runs)
       .where(eq(runs.id, runId))
       .get();
+    if (before?.continuedFromRunId != null && before.runnerId !== runnerId) return false;
     const updated =
       db
         .update(runs)
@@ -748,6 +967,10 @@ export function updateRunRecords(
       | "startError"
       | "reportBody"
       | "agentBrief"
+      | "continueMessage"
+      | "continuePlace"
+      | "agentCheck"
+      | "agentStopRequestedAt"
       | "prReadError"
       | "worktreeRemoveRequestedAt"
     >
@@ -832,7 +1055,10 @@ export function recordPrReadError(db: Database, runId: RunId, error: PrReadError
 
 export type RequestWorktreeRemovalResult =
   | { ok: true }
-  | { ok: false; reason: "not-found" | "not-ended" | "nothing-to-remove" | "not-kept" };
+  | {
+      ok: false;
+      reason: "not-found" | "not-ended" | "nothing-to-remove" | "not-kept" | "taken-over";
+    };
 
 export function requestWorktreeRemoval(
   db: Database,
@@ -846,6 +1072,7 @@ export function requestWorktreeRemoval(
     if (row.worktreeRef === null || row.worktreeRemovedAt !== null) {
       return { ok: false, reason: "nothing-to-remove" };
     }
+    if (worktreeTakenOverBy(db, runId) !== null) return { ok: false, reason: "taken-over" };
     const run = toStoredRun(row);
     if (
       run.state === "ended" &&

@@ -1,21 +1,26 @@
 import { withLogContext } from "@ganger/log";
 import type { LogEvent } from "@ganger/log";
 import { AdapterError, summarizeRunOutcome } from "@ganger/core";
-import type { PullRequestSnapshot, Tracker, WorktreeKeptReason } from "@ganger/core";
+import type { AgentCheck, PullRequestSnapshot, Tracker, WorktreeKeptReason } from "@ganger/core";
 import {
+  continueRunBlock,
   fillUnreadPrState,
+  getRun,
   getRunWithRecords,
   getWorkspaceTrackerProject,
   listRunners,
   listRuns,
   inTransaction,
   markTrackerChanged,
+  recordAgentCheck,
   recordPrReadError,
   updateRunRecords,
+  worktreeTakenOverBy,
 } from "@ganger/db";
 import type { RunRecords, StoredRun, StoredRunner } from "@ganger/db";
 import {
   decideRunPrState,
+  mailboxFor,
   prReadDue,
   pullRequestRecord,
   readRunPrState,
@@ -28,6 +33,7 @@ import type { ActiveRun, StartedStoredRun, TickContext } from "./context.js";
 import { messages } from "./messages.js";
 
 export const PR_POLL_INTERVAL_MS = 60_000;
+export const AGENT_CHECK_INTERVAL_MS = 30_000;
 
 type EndedRun = Extract<StoredRun, { state: "ended" }>;
 type StartedEndedRun = Extract<EndedRun, { startedAt: Date }>;
@@ -239,6 +245,7 @@ async function followWorktree(
   endedRecords: RunRecords,
   runnersById: ReadonlyMap<StoredRunner["id"], StoredRunner>,
 ): Promise<void> {
+  await followPreviousAgent(context, ended, endedRecords, runnersById.get(ended.runnerId));
   if (endedRecords.worktreeRemovedAt === null && endedRecords.worktreeRemoveRequestedAt !== null) {
     await removeWorktree(context, ended, runnersById.get(ended.runnerId));
     return;
@@ -259,6 +266,10 @@ async function followWorktree(
       await removeWorktreeWithoutWork(context, run, runnersById.get(run.runnerId));
       return;
     case "keep-until-pr-settles":
+      if (prHandedOver(context, run, records)) {
+        context.prPolledAt.delete(run.id);
+        return;
+      }
       if (
         records.laterPrState === null &&
         !(await recordSettledPullRequest(context, run, records))
@@ -271,6 +282,58 @@ async function followWorktree(
     case "nothing-to-remove":
       return;
   }
+}
+
+async function followPreviousAgent(
+  context: TickContext,
+  run: StartedEndedRun,
+  records: RunRecords,
+  stored: StoredRunner | undefined,
+): Promise<void> {
+  const stopRequested = records.agentStopRequestedAt !== null;
+  if (!stopRequested && records.agentCheck === "gone") return;
+  const now = context.now().getTime();
+  const checkedAt = context.agentCheckedAt.get(run.id);
+  if (!stopRequested && checkedAt !== undefined && now - checkedAt < AGENT_CHECK_INTERVAL_MS) {
+    return;
+  }
+  context.agentCheckedAt.set(run.id, now);
+  if (continueRunBlock(context.db, run.id) !== null) {
+    if (stopRequested) writeAgentCheck(context, run, records.agentCheck ?? "unknown", true);
+    return;
+  }
+  if (stored === undefined || !stored.online) {
+    writeAgentCheck(context, run, "unknown", false);
+    return;
+  }
+  const runner = context.adapters.runner(stored);
+  const onRunner = { worktree: run.worktree, agentRef: run.agentRef };
+  try {
+    if (stopRequested) {
+      const mailbox = await mailboxFor(context, stored, runner);
+      await runner.stopAgent({ ...onRunner, mailbox }).catch((error: unknown) => {
+        if (runnerErrorDetail(error)?.kind !== "runner-error") throw error;
+        context.logger.warn("run.agent_check_failed", { runId: run.id, error });
+      });
+    }
+    const alive = await runner.isAgentAlive(onRunner);
+    writeAgentCheck(context, run, alive ? "alive" : "gone", true);
+  } catch (error) {
+    context.logger.warn("run.agent_check_failed", { runId: run.id, error });
+    writeAgentCheck(context, run, "unknown", false);
+  }
+}
+
+function writeAgentCheck(
+  context: TickContext,
+  run: StartedEndedRun,
+  check: AgentCheck,
+  stopHandled: boolean,
+): void {
+  tryWrite(context, run.id, () => {
+    recordAgentCheck(context.db, run.id, check, { stopHandled });
+    return true;
+  });
 }
 
 async function readUnreadPullRequest(
@@ -311,10 +374,34 @@ async function recordSettledPullRequest(
   recordPullRequest(context, run, pr);
   const state = pr.state === "merged" ? "merged" : pr.state === "closed" ? "closed" : null;
   if (state === null) return false;
+  if (settledAfterNextRunStarted(context, run, pr)) return false;
   const recorded = tryWrite(context, run.id, () =>
     updateRunRecords(context.db, run.id, { laterPrState: { state, at: context.now() } }),
   );
   return recorded === true;
+}
+
+function nextRunStartedAt(context: TickContext, run: StartedEndedRun): Date | null {
+  const nextId = worktreeTakenOverBy(context.db, run.id);
+  const next = nextId === null ? null : getRun(context.db, nextId);
+  return next === null || next.state === "queued" ? null : next.startedAt;
+}
+
+function prHandedOver(context: TickContext, run: StartedEndedRun, records: RunRecords): boolean {
+  const startedAt = nextRunStartedAt(context, run);
+  if (startedAt === null) return false;
+  const readAt = records.pullRequest?.checkedAt;
+  return readAt !== undefined && readAt.getTime() >= startedAt.getTime();
+}
+
+function settledAfterNextRunStarted(
+  context: TickContext,
+  run: StartedEndedRun,
+  pr: PullRequestSnapshot,
+): boolean {
+  const startedAt = nextRunStartedAt(context, run);
+  const settledAt = pr.mergedAt ?? pr.closedAt ?? null;
+  return startedAt !== null && settledAt !== null && settledAt.getTime() >= startedAt.getTime();
 }
 
 async function currentPullRequest(
@@ -344,8 +431,10 @@ async function removeWorktreeWithoutWork(
   stored: StoredRunner | undefined,
 ): Promise<void> {
   if (stored === undefined || !stored.online) return;
+  if (worktreeTakenOverBy(context.db, run.id) !== null) return;
   const kept = await unsavedWorkIn(context, run, stored);
   if (kept === "unreachable") return;
+  if (worktreeTakenOverBy(context.db, run.id) !== null) return;
   if (kept === null) {
     await removeWorktree(context, run, stored);
     return;

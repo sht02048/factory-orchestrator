@@ -6,6 +6,7 @@ const PULL_REQUEST_FIELDS = `
   state
   createdAt
   mergedAt
+  closedAt
   headRefName
   headRefOid
   baseRefName

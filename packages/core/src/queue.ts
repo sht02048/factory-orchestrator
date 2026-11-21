@@ -11,6 +11,8 @@ export interface QueuedRun {
   agent: AgentId;
   runnerId: RunnerId | null;
   unstartable: boolean;
+  pinnedToRunner?: boolean;
+  startRequested?: boolean;
 }
 
 export interface RunnerChoice {
@@ -49,6 +51,13 @@ export function planQueue(input: {
     let runnerId = run.runnerId;
     if (runnerId !== null) {
       const runner = runnersById.get(runnerId);
+      if (run.pinnedToRunner === true) {
+        const held = pinnedRunnerHold(runner, run);
+        if (held !== null) {
+          plan.unplaced.push({ runId: run.id, ...held });
+          continue;
+        }
+      }
       if (runner === undefined || !canRunnerTake(runner, run.project)) {
         plan.cleared.push({
           runId: run.id,
@@ -84,6 +93,17 @@ export function planQueue(input: {
   }
 
   return plan;
+}
+
+function pinnedRunnerHold(
+  runner: RunnerSnapshot | undefined,
+  run: Pick<QueuedRun, "project" | "agent" | "startRequested">,
+): Unplaced | null {
+  if (runner === undefined) return { reason: "runner-offline" };
+  if (!canRunnerTake(runner, run.project)) return { reason: whyCannotTake(runner, run.project) };
+  if (run.startRequested === true) return null;
+  const limit = usageLimitOf(runner.usageLimits, run.agent);
+  return limit === null ? null : { reason: "usage-limit", limit };
 }
 
 function whyCannotTake(runner: RunnerSnapshot, project: RunnerProjectId): UnplacedReason {

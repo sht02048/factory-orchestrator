@@ -38,6 +38,7 @@ const pullRequestNode = z.object({
   state: z.string(),
   createdAt: isoDate,
   mergedAt: isoDate.nullable(),
+  closedAt: isoDate.nullish(),
   headRefName: z.string(),
   headRefOid: z.string(),
   baseRefName: z.string(),
@@ -201,6 +202,7 @@ function toSnapshot(
     state: toState(node.state),
     createdAt: node.createdAt,
     mergedAt: node.mergedAt,
+    ...(node.closedAt == null ? {} : { closedAt: node.closedAt }),
     headBranch: node.headRefName,
     sourceRepo:
       node.headRepository === null ? null : normalizeRepo(node.headRepository.nameWithOwner),

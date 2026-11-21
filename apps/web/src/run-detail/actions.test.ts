@@ -1,3 +1,4 @@
+import { toRunId } from "@ganger/core";
 import { MutationObserver, QueryObserver, environmentManager } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { loadRunDetail } from "@ganger/app/run-detail/load";
@@ -63,6 +64,8 @@ function okCalls(overrides: Partial<RunDetailCalls> = {}): RunDetailCalls {
     deny: () => Promise.resolve(undefined),
     cancel: () => Promise.resolve({ ok: true }),
     removeWorktree: () => Promise.resolve({ ok: true }),
+    continueRun: () => Promise.resolve({ ok: true, runId: toRunId("run-next") }),
+    stopPreviousAgent: () => Promise.resolve({ ok: true }),
     control: () => Promise.resolve({ ok: true }),
     sendAgentMessage: () => Promise.resolve({ ok: true }),
     requestLog: () => Promise.resolve(true),

@@ -14,7 +14,6 @@ import {
   listRunPlacements,
   listRunnerSnapshots,
   listRunners,
-  listRuns,
   listRunsWithRecords,
   listWorkspaces,
   toWorkspaceId,
@@ -57,19 +56,22 @@ export function loadHomePage(
 
   const placements = listRunPlacements(db);
   const queueReasons = explainQueue({
-    queued: listRuns(db, { states: ["queued"] }).flatMap((run): QueuedRun[] =>
-      run.state === "queued"
-        ? [
-            {
-              id: run.id,
-              assignedAt: run.assignedAt,
-              project: run.runnerProject,
-              agent: run.agent,
-              runnerId: run.runnerId,
-              unstartable: false,
-            },
-          ]
-        : [],
+    queued: listRunsWithRecords(db, { states: ["queued"] }).flatMap(
+      ({ run, records }): QueuedRun[] =>
+        run.state === "queued"
+          ? [
+              {
+                id: run.id,
+                assignedAt: run.assignedAt,
+                project: run.runnerProject,
+                agent: run.agent,
+                runnerId: run.runnerId,
+                unstartable: false,
+                pinnedToRunner: run.continuedFromRunId !== null,
+                startRequested: records.startRequestedAt !== null,
+              },
+            ]
+          : [],
     ),
     runners: listRunnerSnapshots(db, now),
     runs: placements,

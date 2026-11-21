@@ -384,3 +384,64 @@ describe("planQueue", () => {
     expect(plan.start).toEqual([]);
   });
 });
+
+describe("이어서 맡긴 런(러너 고정)", () => {
+  it("러너가 Offline 이면 다른 러너로 옮기지 않고 기다리며 뒤 런을 막지 않는다", () => {
+    const pinned = { ...queued("pinned", app, r1), pinnedToRunner: true };
+    const next = queued("next", app, null);
+    const plan = planQueue({
+      queued: [pinned, next],
+      runners: [runner({ id: r1, online: false }), runner({ id: r2 })],
+      runs: [],
+    });
+    expect(plan.cleared).toEqual([]);
+    expect(plan.unplaced).toEqual([{ runId: pinned.id, reason: "runner-offline" }]);
+    expect(plan.start).toEqual([{ runId: next.id, runnerId: r2 }]);
+  });
+
+  it("러너에 남은 capacity 가 없으면 대기열 순서대로 기다린다", () => {
+    const pinned = { ...queued("pinned", app, r1), pinnedToRunner: true };
+    const plan = planQueue({
+      queued: [pinned],
+      runners: [runner({ id: r1 }), runner({ id: r2 })],
+      runs: [{ runnerId: r1, state: "running" }],
+    });
+    expect(plan.assigned).toEqual([]);
+    expect(plan.start).toEqual([]);
+  });
+
+  it("러너가 그 에이전트의 사용량 한도에 닿았으면 시작하지 않고 한도 이유로 기다린다", () => {
+    const pinned = { ...queued("pinned", app, r1), pinnedToRunner: true };
+    const until = new Date("2099-01-01T00:00:00Z");
+    const plan = planQueue({
+      queued: [pinned],
+      runners: [runner({ id: r1, usageLimits: [{ provider: "claude", until }] })],
+      runs: [],
+    });
+    expect(plan.start).toEqual([]);
+    expect(plan.unplaced).toEqual([
+      { runId: pinned.id, reason: "usage-limit", limit: { provider: "claude", until } },
+    ]);
+  });
+
+  it("시작을 이미 요청한 런은 한도 중에도 시작 여부를 확인하러 간다", () => {
+    const pinned = { ...queued("pinned", app, r1), pinnedToRunner: true, startRequested: true };
+    const until = new Date("2099-01-01T00:00:00Z");
+    const plan = planQueue({
+      queued: [pinned],
+      runners: [runner({ id: r1, usageLimits: [{ provider: "claude", until }] })],
+      runs: [],
+    });
+    expect(plan.start).toEqual([{ runId: pinned.id, runnerId: r1 }]);
+  });
+
+  it("러너에 자리가 있으면 그 러너에서 시작한다", () => {
+    const pinned = { ...queued("pinned", app, r1), pinnedToRunner: true };
+    const plan = planQueue({
+      queued: [pinned],
+      runners: [runner({ id: r1 }), runner({ id: r2, capacity: 5 })],
+      runs: [],
+    });
+    expect(plan.start).toEqual([{ runId: pinned.id, runnerId: r1 }]);
+  });
+});

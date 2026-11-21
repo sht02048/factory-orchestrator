@@ -219,6 +219,19 @@ export interface StartRunInput {
   model?: string;
   brief: string;
   ticket?: { key: TicketKey; url: string };
+  continueIn?: WorktreeRef;
+}
+
+export const CONTINUATION_PLACES = ["same-worktree", "recreated", "from-scratch"] as const;
+export type ContinuationPlace = (typeof CONTINUATION_PLACES)[number];
+
+export const AGENT_CHECKS = ["gone", "alive", "unknown"] as const;
+export type AgentCheck = (typeof AGENT_CHECKS)[number];
+
+export interface PrepareContinuationInput {
+  project: RunnerProjectId;
+  worktree: WorktreeRef;
+  branch: string;
 }
 
 export interface StartedRun {
@@ -239,6 +252,7 @@ export interface ResumeAgentInput {
   message: string;
   restartPrompt: string;
   startIfGone?: boolean;
+  previousRunAgent?: AgentRef;
 }
 
 export interface ResumedAgent {
@@ -310,7 +324,14 @@ export interface Runner {
   ensureMailbox(current: MailboxRef | null): Promise<MailboxRef>;
 
   startRun(input: StartRunInput): Promise<StartedRun>;
-  findStartedRun(input: { mailbox: MailboxRef; worktreeName: string }): Promise<StartedRun | null>;
+  findStartedRun(input: {
+    mailbox: MailboxRef;
+    worktreeName: string;
+    continueIn?: WorktreeRef;
+    previousAgent?: AgentRef;
+  }): Promise<StartedRun | null>;
+  prepareContinuation(input: PrepareContinuationInput): Promise<ContinuationPlace>;
+  isAgentAlive(run: Pick<RunOnRunner, "worktree" | "agentRef">): Promise<boolean>;
 
   pollRun(run: RunOnRunner): Promise<RunProgress>;
   answerQuestion(
@@ -359,6 +380,7 @@ export interface PullRequestSnapshot {
   state: "open" | "closed" | "merged" | (string & {});
   createdAt: Date;
   mergedAt: Date | null;
+  closedAt?: Date;
   headBranch: string;
   sourceRepo: RepoRef | null;
   headCommit: string;

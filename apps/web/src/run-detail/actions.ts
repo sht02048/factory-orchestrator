@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import type { RunControlActionResult } from "@ganger/app/run-control";
 import type { HumanCheckDecision } from "@ganger/app/home/actions";
-import type { RunActionResult } from "@ganger/app/run-detail/actions";
+import type { ContinueRunActionResult, RunActionResult } from "@ganger/app/run-detail/actions";
 import type { RunDetailPage } from "@ganger/app/run-detail/model";
 import { toRunId } from "@ganger/core";
 import type { RunControl, RunId } from "@ganger/core";
@@ -19,9 +19,11 @@ import {
   answerHumanCheck,
   answerQuestion,
   cancelRun,
+  continueRunFrom,
   controlRun,
   denyPermission,
   removeRunWorktree,
+  stopPreviousAgent,
   requestRunLog,
   sendAgentMessage,
 } from "../server/functions";
@@ -42,6 +44,8 @@ export interface RunDetailCalls {
   deny(input: { runId: string; promptId: string; reason: string }): Promise<unknown>;
   cancel(runId: string): Promise<RunActionResult>;
   removeWorktree(runId: string): Promise<RunActionResult>;
+  continueRun(runId: RunId, message: string): Promise<ContinueRunActionResult>;
+  stopPreviousAgent(runId: RunId): Promise<RunActionResult>;
   control(runId: string, control: RunControl): Promise<RunControlActionResult>;
   sendAgentMessage(runId: RunId, input: AgentMessageRequest): Promise<RunActionResult>;
   requestLog(runId: string): Promise<boolean>;
@@ -53,6 +57,8 @@ export const serverRunDetailCalls: RunDetailCalls = {
   deny: (data) => denyPermission({ data }),
   cancel: (runId) => cancelRun({ data: { runId } }),
   removeWorktree: (runId) => removeRunWorktree({ data: { runId } }),
+  continueRun: (runId, message) => continueRunFrom({ data: { runId, message } }),
+  stopPreviousAgent: (runId) => stopPreviousAgent({ data: { runId } }),
   control: (runId, control) => controlRun({ data: { runId, control } }),
   sendAgentMessage: (runId, input) => sendAgentMessage({ data: { runId, ...input } }),
   requestLog: (runId) => requestRunLog({ data: { runId } }),
@@ -124,6 +130,16 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
       mutationFn: async () => okOrThrow<object, string>(await calls.removeWorktree(runId)),
       onSuccess: refreshRun,
     }),
+    continueRun: mutationOptions({
+      mutationFn: async (message: string) =>
+        okOrThrow<{ runId: RunId }, string>(await calls.continueRun(toRunId(runId), message)),
+      onSuccess: refreshRun,
+    }),
+    stopPreviousAgent: mutationOptions({
+      mutationFn: async () =>
+        okOrThrow<object, string>(await calls.stopPreviousAgent(toRunId(runId))),
+      onSuccess: refreshRun,
+    }),
     control: mutationOptions({
       mutationFn: async (control: RunControl): Promise<RunControlOutcome> =>
         (await calls.control(runId, control)).ok ? "requested" : "state-changed",
@@ -156,6 +172,8 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
   const deny = useMutation(mutations.deny);
   const cancel = useMutation(mutations.cancel);
   const removeWorktree = useMutation(mutations.removeWorktree);
+  const continueRun = useMutation(mutations.continueRun);
+  const stopAgent = useMutation(mutations.stopPreviousAgent);
   const control = useMutation(mutations.control);
   const agentMessage = useMutation(mutations.sendAgentMessage);
   const refreshLog = useMutation(mutations.refreshLog);
@@ -175,6 +193,12 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
     },
     onRemoveWorktree: async () => {
       await removeWorktree.mutateAsync();
+    },
+    onContinue: async (message) => {
+      await continueRun.mutateAsync(message);
+    },
+    onStopPreviousAgent: async () => {
+      await stopAgent.mutateAsync();
     },
     onControl: (next) => control.mutateAsync(next),
     onSendAgentMessage: (input) => agentMessage.mutateAsync(input),

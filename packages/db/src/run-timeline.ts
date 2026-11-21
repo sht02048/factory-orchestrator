@@ -37,6 +37,7 @@ export interface TimelineRun {
   workspaceId: WorkspaceId;
   runnerId: RunnerId | null;
   worktreeName: string;
+  continuedFromRunId: RunId | null;
   state: RunState;
   agentResult: AgentResult | null;
   startFailures: number;
@@ -143,6 +144,7 @@ function selectRuns(db: Database, where: SQL): Array<TimelineRun & RunTimes> {
       workspaceId: runs.workspaceId,
       runnerId: runs.runnerId,
       worktreeName: runs.worktreeName,
+      continuedFromRunId: runs.continuedFromRunId,
       state: runs.state,
       agentResult: runs.agentResult,
       prState: runs.prState,
@@ -225,6 +227,7 @@ function summary(run: TimelineRun & RunTimes): TimelineRun {
     workspaceId: run.workspaceId,
     runnerId: run.runnerId,
     worktreeName: run.worktreeName,
+    continuedFromRunId: run.continuedFromRunId,
     state: run.state,
     agentResult: run.agentResult,
     startFailures: run.startFailures,
