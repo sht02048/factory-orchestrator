@@ -61,11 +61,9 @@ export function Sheet({
   );
 }
 
-const fadeIn = stylex.keyframes({ from: { opacity: 0 }, to: { opacity: 1 } });
-const slideIn = stylex.keyframes({
-  from: { opacity: 0, transform: "translateX(24px)" },
-  to: { opacity: 1, transform: "none" },
-});
+const REDUCED = "@media (prefers-reduced-motion: reduce)";
+const STARTING = ":is([data-starting-style])";
+const ENDING = ":is([data-ending-style])";
 
 const styles = stylex.create({
   backdrop: {
@@ -73,9 +71,14 @@ const styles = stylex.create({
     inset: 0,
     zIndex: 200,
     backgroundColor: colors.backdrop,
-    animationName: { default: fadeIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: motion.durationFast,
-    animationTimingFunction: motion.easeOut,
+    opacity: { default: 1, [STARTING]: 0, [ENDING]: 0 },
+    transitionProperty: "opacity",
+    transitionDuration: {
+      default: motion.durationSheetOpen,
+      [ENDING]: motion.durationSheetClose,
+      [REDUCED]: motion.durationReducedFade,
+    },
+    transitionTimingFunction: { default: motion.easeSheet, [ENDING]: motion.easeOut },
   },
   content: {
     position: "fixed",
@@ -95,9 +98,23 @@ const styles = stylex.create({
     boxShadow: shadow.popover,
     color: colors.textPrimary,
     outline: "none",
-    animationName: { default: slideIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: motion.durationFast,
-    animationTimingFunction: motion.easeOut,
+    opacity: {
+      default: 1,
+      [REDUCED]: { default: 1, [STARTING]: 0, [ENDING]: 0 },
+    },
+    transform: {
+      default: "none",
+      [STARTING]: "translateX(100%)",
+      [ENDING]: "translateX(100%)",
+      [REDUCED]: "none",
+    },
+    transitionProperty: "opacity, transform",
+    transitionDuration: {
+      default: motion.durationSheetOpen,
+      [ENDING]: motion.durationSheetClose,
+      [REDUCED]: motion.durationReducedFade,
+    },
+    transitionTimingFunction: { default: motion.easeSheet, [ENDING]: motion.easeOut },
   },
   head: {
     display: "flex",

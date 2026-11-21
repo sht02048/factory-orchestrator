@@ -53,7 +53,24 @@
     "icons": "아이콘",
     "settingsRows": "설정 줄",
     "settingsSteps": "설정 단계",
-    "sectionNav": "설정 목차"
+    "sectionNav": "설정 목차",
+    "motionPrimitives": "움직임"
+  },
+  "motionDemo": {
+    "title": "움직임",
+    "note": "상태가 바뀐 곳만 짧게 움직여요. 처음 그릴 때와 필터를 바꿀 때는 움직이지 않아요. 한꺼번에 3건보다 많이 바뀌면 흐려지며 바뀌어요.",
+    "card": "카드 {id}",
+    "queued": "Queued",
+    "running": "Running",
+    "add": "새 항목 넣기",
+    "remove": "맨 위 항목 빼기",
+    "move": "칸 옮기기",
+    "reorder": "맨 아래를 맨 위로",
+    "burst": "한꺼번에 4장 옮기기",
+    "exited": "빠진 항목 {count}개",
+    "addLine": "타임라인에 줄 더하기",
+    "line": "타임라인 줄 {line}",
+    "nextStatus": "상태 바꾸기"
   },
   "colors": {
     "note": "OKLCH 다크 값이에요. packages/ui 밖에서는 이 토큰만 써요.",

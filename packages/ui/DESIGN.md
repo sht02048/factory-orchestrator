@@ -90,7 +90,7 @@
   - 목록 화면 여백 `s8`, 구역 사이 `s10`, 패널 안 블록 사이 `s6`, 버튼 사이 `s2`.
 - `radius`(ADR 0010 10번): `card 12`(카드, 다이얼로그), `control 8`(버튼, 행, 입력, 메뉴·팝업), `pill 6`(알약, 팝업 항목, 툴팁), `full`(점). `tokens.test.ts`가 값을 검사한다.
 - `shadow.popover`: 떠 있는 면(메뉴, Select 목록, 툴팁, 다이얼로그, 토스트)에만. 구역에는 그림자를 쓰지 않는다.
-- `motion`: `easeOut`, `durationFast 150ms`(hover·팝업), `durationToast 180ms`, `durationSpin 900ms`(확인 목록의 진행 중 고리 한 바퀴), `durationSweep 1100ms`(화면을 여는 동안 본문 맨 위 진행 줄 한 번 지나감). 상태가 바뀔 때만 짧게 움직이고, `prefers-reduced-motion`에서는 끈다.
+- `motion`: 곡선은 `easeOut`(들어오기·나가기), `easeMove`(화면 안 이동), `easeSheet`(Sheet 열기). 시간은 `durationFast 150ms`(hover·팝업), `durationToast 180ms`, `durationSpin 900ms`(확인 목록의 진행 중 고리 한 바퀴), `durationSweep 1100ms`(화면을 여는 동안 본문 맨 위 진행 줄 한 번 지나감), `durationReducedFade 150ms`(움직임 줄이기와 한꺼번에 바뀔 때의 흐려지기), `durationItemEnter 220ms`·`durationItemExit 160ms`(목록 항목), `durationLineEnter 200ms`(타임라인 새 줄), `durationArrival 1200ms`(도착 비추기), `durationPillColor 150ms`·`durationPillPop 180ms`(상태 알약), `durationRowMove 240ms`·`durationCardMove 300ms`(자리 바꾸기), `durationDialogOpen 180ms`·`durationDialogClose 140ms`, `durationSheetOpen 260ms`·`durationSheetClose 180ms`. 쓰는 규칙은 아래 「움직임」을 따른다.
 - `size`: `sidebarWidth 216`, `railWidth 84`(아이콘 레일), `titleBar 56`(한 줄 머리 높이이자 데스크톱 앱 레일 위 신호등 자리, 0113), `pageHeadingMinWidth 280`(한 줄 머리의 제목·요약이 이보다 좁아지면 행동을 다음 줄로 내린다), `iconButton 40`(아이콘만 있는 버튼), `railAvatar 36`·`railIcon 24`·`issueBadge 16`(레일 Workspace 글자·메뉴 아이콘 칸·문제 수 점), `panelWidth 384`, `editorListWidth 320`, `control 32`(버튼), `input 36`, `rowMinHeight 52`, `tableHeadHeight 30`(`ResponsiveColumnsHead` 높이, 아래에 `Table` 머리글처럼 `space.s2`를 둔다), `dot 6`(알약 점), `pill 22`(알약 높이·단계 표시), `icon 14`, `tick 18`(확인 표시), `markerLarge 28`(끝난 표시).
   - 화면 틀: `noticeWidth 720`(공지·빈 화면), `formWidth 640`(설정 폼·목록), `detailPageWidth 1280`·`detailAsideWidth 360`(Run 상세), `statsPageWidth 1100`(Stats 본문), `failureBarWidth 160`(Stats 실패 이유 막대), `statsCountColumn 64`·`statsDurationColumn 80`(Stats 나눠 보기 숫자 열의 가장 좁은 폭), `statsBreakdownMinWidth 360`(Stats 나눠 보기 표의 가장 좁은 폭. 더 좁으면 표만 가로로 스크롤한다), `logMaxHeight 480`, `stepNavWidth 240`·`stepContentWidth 760`(온보딩), `dashboardWidth 1200`(지금 쓰는 화면 없음. Dashboard는 0100부터 최대 폭이 없다)·`dashboardSideWidth 360`(Dashboard Runners 열)·`sheetWidth 440`(`Sheet` 폭), `todoTextMinWidth 256`, `searchMinWidth 216`·`searchMaxWidth 320`, `textareaMinHeight 72`.
   - 표 열: `ticketKeyColumn 112`, `projectColumn 128`, `lastRunColumn 160`, `runStatusColumn 152`(제목 바로 옆 상태 알약 칸), `timeColumn 88`(시간 칸, `TimeSlot`과 표 시간 열), `runTitleMaxColumn 640`(Runs 제목 열 최대 폭. 넓은 창에서 남는 폭은 결과 열이 받는다)·`runRunnerColumn 128`·`runResultColumn 176`(Runs 러너·결과 열, 결과 열의 가장 좁은 폭), `rowActionColumn 96`(행 버튼 칸, `RowActionSlot`), `capacityCellsColumn 120`·`usageColumn 200`(Runners 자리·사용량), `panelLabelColumn 72`(패널 안 이름 칸: 사용량 창 이름, 확인 상태 낱말), `mappingTableMinWidth 640`, `mappingCellMinWidth 140`, `repoSelectWidth 240`(Mapping의 저장소 더하기), `saveStatusColumn 88`(자동 저장 행의 "저장 중·저장했어요·되돌렸어요" 칸). Settings(0119): `settingsBodyWidth 720`(본문 한 열), `settingsNavWidth 168`(목차 칸), `settingsControlWidth 240`(줄 안 선택 칸), `settingsNumberWidth 80`(줄 안 숫자 칸), `switchWidth 44`·`switchHeight 26`·`switchThumb 20`(`Switch`), `infoTip 24`·`infoTipWidth 320`(`InfoTip` 단추와 툴팁 최대 폭), `settingsChipHeight 40`(좁은 폭 목차 칩 높이). 자동 맞춤 격자 최소 폭은 `fieldMinWidth 200`, `compareMinWidth 220`, 라벨 행은 `labelTextMinWidth 280`·`labelSelectWidth 240`.
@@ -190,13 +190,30 @@
 - **더한 것**: 목록 + 상세 패널 분할(`SplitView`, `DetailPanel` 묶음), 정의 목록(`DefinitionList`), 글자 위계(`Text`), `PageHeader`, `Section`.
 - **Menu/Select는 둘로 나눴다**: 행동·전환 메뉴는 `Menu`, 폼 값은 `Select`.
 
+### 움직임(티켓 0152)
+
+상태가 바뀐 곳을 눈으로 따라가게 할 때만 움직인다. 키보드·탭·필터·hover·로그 흐름·계속 도는 표시와 첫 화면 렌더는 움직이지 않는다.
+
+| 쓰는 것                   | 언제                                                                                                                                                                                                                                           |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MotionList`              | 항목이 생기고 빠지는 목록. `items`·`getKey`와 항목을 그리는 함수를 준다. 기본은 펼치며 들어오고 접히며 빠진다. 타임라인 새 줄은 `enter="rise"`. 빠짐이 끝나면 `onExited(key)`가 온다. 필터·탭을 바꿀 때는 `resetKey`를 바꿔 움직이지 않게 한다 |
+| `MotionScope`             | 항목이 목록 사이를 옮겨 다니는 묶음(Dashboard 칸). 칸들을 함께 감싼다. 카드는 `move="card"`(300ms), 행은 기본 `row`(240ms)                                                                                                                     |
+| `useMotionMove`           | 갱신을 직접 쥔 곳(사용자 행동)에서 `move(() => setState(...))`로 부른다. View Transitions API를 쓰고, 없으면 FLIP, 둘 다 안 되면 바로 바뀐다. props로만 바뀌는 목록은 부르지 않아도 FLIP으로 움직인다                                          |
+| `StatusPill changeMotion` | 목록에서 상태가 바뀌는 알약. 색이 150ms에 바뀌고 한 번 1.06배로 커진다. 첫 렌더에는 움직이지 않는다                                                                                                                                            |
+| `Dialog`, `Sheet`         | 열기·닫기 움직임이 들어 있어 화면에서 할 일이 없다. 닫는 도중 다시 열면 그 자리에서 되돌아간다                                                                                                                                                 |
+
+- 한꺼번에 `MOTION_BURST_LIMIT`(3)건보다 많이 바뀌면 미끄러지지 않고 흐려지며 바뀐다. 건수는 들어온 것·빠진 것·칸을 옮긴 것·순서가 실제로 바뀐 것만 센다. 밀려난 이웃은 세지 않는다.
+- 옮겨 갈 자리가 보이는 영역 밖이거나 칸이 세로로 쌓여 있으면 그 항목은 흐려지며 바뀐다.
+- `prefers-reduced-motion`에서는 이동·커지기를 빼고 150ms 이하 흐려지기만 남는다.
+- 기본 상태는 늘 보이는 상태다. 움직임이 돌지 않아도 내용이 숨지 않는다.
+
 ## 시간 표기
 
 시간은 `apps/web/src/format/time.ts`의 `useTime()` 하나로 그린다(ADR 0010 7번). 진행 중인 것은 경과(`elapsed`, "25분째"), 지난 일은 상대 시간(`ago`, "방금"·"25분 전"·하루 넘으면 날짜), 타임라인은 시각(`clock`, "10:45"), 기다린 시간·통계 같은 양은 `duration`("12분")이다. 시각·날짜는 운영자 시간대(티켓 0044)로 그린다. "지금"은 서버가 데이터를 읽을 때 정해 경과 밀리초로 넘긴다.
 
 ## 새 컴포넌트를 더할 때
 
-1. 동작은 `@ui-sdk/react`의 부품으로, 스타일은 StyleX와 토큰으로 `src/components/`에 만든다. UI SDK 상태별 스타일은 `className={(s) => cx(...)}`로 고른다(StyleX는 `data-*` 선택자를 쓰기 어렵다).
+1. 동작은 `@ui-sdk/react`의 부품으로, 스타일은 StyleX와 토큰으로 `src/components/`에 만든다. UI SDK 상태별 스타일은 `className={(s) => cx(...)}`로 고른다(StyleX는 `data-*` 선택자를 쓰기 어렵다). 예외로 `className` 상태에 없는 열기·닫기 전환은 `":is([data-starting-style])"`·`":is([data-ending-style])"` 조건으로 쓴다(`Dialog`, `Sheet`).
 2. 문구는 props로 받는다. 기본 문구를 컴포넌트에 넣지 않는다.
 3. `src/index.ts`에서 export 하고, `components.test.tsx`에 서버 렌더 테스트를, `/ds`(`apps/web/src/ds/`)에 미리보기를, 이 문서에 언제 쓰는지를 더한다. `/ds` 미리보기가 빠지면 `apps/web/src/ds/page.test.tsx`가 실패한다.
 4. UI SDK는 `0.1.0-beta`라 버전을 고정했다. 올릴 때는 `pnpm typecheck`(특히 `exactOptionalPropertyTypes`)와 `/ds`를 다시 확인한다.
