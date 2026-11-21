@@ -17,7 +17,13 @@ import type {
   RunnerId,
   StartedRun,
 } from "@ganger/core";
-import { changeRunState, listRunners, setRunnerMailbox } from "@ganger/db";
+import {
+  changeRunState,
+  getRun,
+  listRunners,
+  setRunnerMailbox,
+  worktreeTakenOverBy,
+} from "@ganger/db";
 import type { Database, StoredRun, StoredRunner } from "@ganger/db";
 import type { LogContext, Logger } from "@ganger/log";
 import type { WorkerAdapters } from "./adapters.js";
@@ -39,6 +45,7 @@ export interface TickContext {
   pendingEndings: Map<RunId, PendingEnding>;
   prPolledAt: Map<RunId, number>;
   prReadRetries: Map<RunId, PrReadRetry>;
+  agentCheckedAt: Map<RunId, number>;
   unrecordedComments: Map<RunId, { id: CommentId; at: Date }>;
   ticketsGone: Set<RunId>;
   autoAssign: AutoAssignState;
@@ -90,6 +97,15 @@ export async function mailboxFor(
   return mailbox;
 }
 
+function handedOverAtOf(
+  context: TickContext,
+  run: StartedStoredRun,
+): { handedOverAt: Date } | Record<string, never> {
+  const nextId = worktreeTakenOverBy(context.db, run.id);
+  const next = nextId === null ? null : getRun(context.db, nextId);
+  return next === null ? {} : { handedOverAt: next.assignedAt };
+}
+
 export async function decideRunPrState(
   context: TickContext,
   run: StartedStoredRun,
@@ -118,6 +134,8 @@ export async function decideRunPrState(
       repo,
       ticketKey: run.ticket.key,
       runStartedAt: run.startedAt,
+      continuesEarlierRun: run.continuedFromRunId !== null,
+      ...handedOverAtOf(context, run),
       byBranch,
       byTicketKey,
     });

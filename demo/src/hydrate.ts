@@ -27,8 +27,13 @@ export function hydrateWorld(db: Database, world: DemoWorld): void {
         state: prStateOf(run, records.laterPrState?.state ?? null),
       });
     }
-    if (run.state === "ended") continue;
     const sshTarget = sshTargets.get(run.runnerId);
+    if (run.state === "ended") {
+      if (sshTarget !== undefined && records?.worktreeRemovedAt === null) {
+        world.runner(sshTarget).recreatedWorktrees.set(run.worktree, run.branch);
+      }
+      continue;
+    }
     if (sshTarget === undefined) continue;
     const runner = world.runner(sshTarget);
     const questions = listRunQuestions(db, run.id);

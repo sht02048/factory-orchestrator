@@ -3,6 +3,7 @@ import {
   EMPTY_WORKSPACE_BRIEF,
   canRunnerTake,
   composeAgentBrief,
+  composeContinuationBrief,
   decideStartFailure,
   ticketBriefText,
   MAX_START_RETRIES,
@@ -10,6 +11,8 @@ import {
 } from "@ganger/core";
 import type {
   AdapterRegistry,
+  AgentRef,
+  ContinuationPlace,
   MailboxRef,
   QueuedRun,
   Runner,
@@ -18,6 +21,7 @@ import type {
   RunnerId,
   StartedRun,
   TicketKey,
+  WorktreeRef,
 } from "@ganger/core";
 import {
   changeRunState,
@@ -35,12 +39,15 @@ import {
   listRuns,
   markCancelRequestProcessed,
   openDatabase,
+  reclaimSourceWorktree,
+  recordAgentCheck,
+  recordContinuePlace,
   recordStartFailure,
   recordStartRequested,
   setQueuedRunRunner,
   setRunnerMailbox,
 } from "@ganger/db";
-import type { SecretBox, StoredRun } from "@ganger/db";
+import type { RunRecords, SecretBox, StoredRun } from "@ganger/db";
 import { log, withLogContext } from "@ganger/log";
 import { WorkerAdapters } from "./adapters.js";
 import {
@@ -53,6 +60,7 @@ import {
 } from "./context.js";
 import type { QueuedStoredRun, TickContext, WorkerLogger } from "./context.js";
 import { processAfterRuns } from "./after-run.js";
+import { messages } from "./messages.js";
 import { assignAutomatically, createAutoAssignState } from "./auto-assign.js";
 import { processAgentMessages } from "./agent-messages.js";
 import { processRunControlRequests } from "./control.js";
@@ -139,6 +147,7 @@ export function createWorker(options: WorkerOptions): Worker {
     pendingEndings: new Map(),
     prPolledAt: new Map(),
     prReadRetries: new Map(),
+    agentCheckedAt: new Map(),
     unrecordedComments: new Map(),
     ticketsGone: new Set(),
     autoAssign: createAutoAssignState(),
@@ -244,7 +253,11 @@ async function findStartedForCancel(
   const runner = context.adapters.runner(storedRunner);
   try {
     const mailbox = await mailboxFor(context, storedRunner, runner);
-    return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
+    return await runner.findStartedRun({
+      mailbox,
+      worktreeName: run.worktreeName,
+      ...continueInOf(context, run),
+    });
   } catch (error) {
     context.logger.warn("run.cancel_lookup_failed", { runId: run.id, error });
     return "unknown";
@@ -271,7 +284,9 @@ async function processQueue(context: TickContext): Promise<void> {
     }
     const candidates = queued
       .flatMap((run) => toQueuedRun(context, run))
-      .map((run) => (bound.has(run.id) ? { ...run, unstartable: false } : run))
+      .map((run) =>
+        bound.has(run.id) ? { ...run, unstartable: false, startRequested: true } : run,
+      )
       .filter((run) => !hasPendingCancelRequest(db, run.id))
       .filter((run) => {
         const runnerId = bound.get(run.id);
@@ -355,6 +370,7 @@ function toQueuedRun(context: TickContext, run: StoredRun): QueuedRun[] {
       agent: run.agent,
       runnerId: run.runnerId,
       unstartable: mapping === null,
+      pinnedToRunner: run.continuedFromRunId !== null,
     },
   ];
 }
@@ -397,7 +413,7 @@ async function startOnRunner(
   context: TickContext,
   run: QueuedStoredRun,
   runnerId: RunnerId,
-  records: { startRequestedAt: Date | null; startFailures: number },
+  records: RunRecords,
 ): Promise<StartAttempt> {
   const { db, logger, adapters } = context;
   const storedRunner = findRunner(db, runnerId);
@@ -407,6 +423,7 @@ async function startOnRunner(
   }
   const runner = adapters.runner(storedRunner);
   let unverified = records.startRequestedAt !== null;
+  let startSent = unverified;
   let mailbox: MailboxRef;
   try {
     mailbox = await mailboxFor(context, storedRunner, runner);
@@ -434,7 +451,28 @@ async function startOnRunner(
         return endCouldNotStart(context, run);
       }
     }
-    const prompt = await promptFor(context, run);
+    const source = continuationSource(context, run);
+    if (source === "missing") return endCouldNotStart(context, run);
+    const place =
+      source === null ? null : await continuationPlace(context, run, runner, source, records);
+    if (place === "write-failed") return { kind: "blocked" };
+    if (place === "previous-agent-alive") {
+      const sourceRunId = run.continuedFromRunId;
+      tryWrite(context, run.id, () =>
+        inTransaction(db, () => {
+          if (sourceRunId !== null) {
+            recordAgentCheck(db, sourceRunId, "alive", { stopHandled: false });
+          }
+          recordStartFailure(db, run.id, {
+            failures: records.startFailures,
+            error: messages.continuation.previousAgentAlive,
+          });
+        }),
+      );
+      return endCouldNotStart(context, run);
+    }
+    const prompt =
+      place === null || place === "from-scratch" ? await promptFor(context, run) : undefined;
     if (prompt === null) return { kind: "blocked" };
     if (prompt === "ticket-gone") {
       tryWrite(context, run.id, () =>
@@ -445,17 +483,25 @@ async function startOnRunner(
       );
       return endCouldNotStart(context, run);
     }
-    const brief = composeAgentBrief({
-      workspace: getWorkspaceBrief(db, run.workspaceId) ?? EMPTY_WORKSPACE_BRIEF,
-      ticket: prompt.text,
-      protocol: runner.agentProtocol,
-    });
+    const workspace = getWorkspaceBrief(db, run.workspaceId) ?? EMPTY_WORKSPACE_BRIEF;
+    const ticket = prompt?.text ?? "";
+    const brief =
+      source === null
+        ? composeAgentBrief({ workspace, ticket, protocol: runner.agentProtocol })
+        : composeContinuationBrief({
+            workspace,
+            ticket,
+            protocol: runner.agentProtocol,
+            operatorMessage: records.continueMessage ?? "",
+            previousReport: source.report,
+          });
     if (
       tryWrite(context, run.id, () => recordStartRequested(db, run.id, context.now(), brief)) ===
       undefined
     ) {
       return { kind: "blocked" };
     }
+    startSent = true;
     const started = await runner.startRun({
       mailbox,
       project: run.runnerProject,
@@ -463,12 +509,19 @@ async function startOnRunner(
       agent: run.agent,
       ...(run.model === null ? {} : { model: run.model }),
       brief,
-      ticket: prompt.ticket,
+      ...(prompt === undefined ? {} : { ticket: prompt.ticket }),
+      ...(source === null || place === "from-scratch" ? {} : { continueIn: source.worktree }),
     });
     return { kind: "started", started };
   } catch (error) {
     logger.warn("run.start_failed", { runId: run.id, error });
-    return handleStartFailure(context, run, { runnerId, unverified }, records.startFailures, error);
+    return handleStartFailure(
+      context,
+      run,
+      { runnerId, unverified, startSent },
+      records.startFailures,
+      error,
+    );
   }
 }
 
@@ -479,11 +532,77 @@ async function findStarted(
   mailbox: MailboxRef,
 ): Promise<StartedRun | null | "unreachable" | "unknown"> {
   try {
-    return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
+    return await runner.findStartedRun({
+      mailbox,
+      worktreeName: run.worktreeName,
+      ...continueInOf(context, run),
+    });
   } catch (error) {
     context.logger.warn("run.lookup_failed", { runId: run.id, error });
     return isOfflineLike(error) ? "unreachable" : "unknown";
   }
+}
+
+interface ContinuationSource {
+  worktree: WorktreeRef;
+  branch: string;
+  report: string | null;
+  agentRef: AgentRef;
+}
+
+function continuationSource(
+  context: TickContext,
+  run: QueuedStoredRun,
+): ContinuationSource | "missing" | null {
+  if (run.continuedFromRunId === null) return null;
+  const found = getRunWithRecords(context.db, run.continuedFromRunId);
+  if (found?.run.state !== "ended" || found.run.startedAt === null) return "missing";
+  return {
+    worktree: found.run.worktree,
+    branch: found.run.branch,
+    report: found.records.reportBody,
+    agentRef: found.run.agentRef,
+  };
+}
+
+function continueInOf(
+  context: TickContext,
+  run: QueuedStoredRun,
+): { continueIn: WorktreeRef; previousAgent: AgentRef } | Record<string, never> {
+  const source = continuationSource(context, run);
+  if (source === null || source === "missing") return {};
+  const place = getRunWithRecords(context.db, run.id)?.records.continuePlace ?? null;
+  return place === null || place === "from-scratch"
+    ? {}
+    : { continueIn: source.worktree, previousAgent: source.agentRef };
+}
+
+async function continuationPlace(
+  context: TickContext,
+  run: QueuedStoredRun,
+  runner: Runner,
+  source: ContinuationSource,
+  records: RunRecords,
+): Promise<ContinuationPlace | "write-failed" | "previous-agent-alive"> {
+  const { worktree, agentRef } = source;
+  if (await runner.isAgentAlive({ worktree, agentRef })) return "previous-agent-alive";
+  if (records.continuePlace === "from-scratch") return "from-scratch";
+  const prepared = await runner.prepareContinuation({
+    project: run.runnerProject,
+    worktree: source.worktree,
+    branch: source.branch,
+  });
+  const place = prepared === "same-worktree" ? (records.continuePlace ?? prepared) : prepared;
+  const written = tryWrite(context, run.id, () =>
+    inTransaction(context.db, () => {
+      recordContinuePlace(context.db, run.id, place);
+      if (prepared !== "from-scratch" && run.continuedFromRunId !== null) {
+        reclaimSourceWorktree(context.db, run.continuedFromRunId);
+      }
+      return true;
+    }),
+  );
+  return written === undefined ? "write-failed" : place;
 }
 
 export const START_UNREACHABLE_RETRY_MS = 60_000;
@@ -500,7 +619,7 @@ function isOfflineLike(error: unknown): boolean {
 function handleStartFailure(
   context: TickContext,
   run: QueuedStoredRun,
-  target: { runnerId: RunnerId; unverified: boolean },
+  target: { runnerId: RunnerId; unverified: boolean; startSent: boolean },
   previousFailures: number,
   error: unknown,
 ): StartAttempt {
@@ -508,7 +627,7 @@ function handleStartFailure(
   if (detail === null) return { kind: "blocked" };
   const { db } = context;
   const { runnerId, unverified } = target;
-  const definite = detail.kind !== "malformed-output";
+  const definite = detail.kind !== "malformed-output" || !target.startSent;
   const forget = (): void => {
     if (!unverified && definite) clearStartRequested(db, run.id);
   };

@@ -13,8 +13,8 @@ import {
   listPendingCancelRequests,
   listRunPlacements,
   listRunnerSnapshots,
-  listRuns,
   listRunsWithRecords,
+  listTakenOverRunIds,
   listRunners,
   listWorkspaces,
   toWorkspaceId,
@@ -47,20 +47,24 @@ export function loadRunsPage(
 
   const runners = new Map(listRunners(db).map((r) => [r.id, r]));
   const cancelling = new Set<RunId>(listPendingCancelRequests(db).map((r) => r.runId));
+  const takenOver = listTakenOverRunIds(db);
   const queueReasons = explainQueue({
-    queued: listRuns(db, { states: ["queued"] }).flatMap((run): QueuedRun[] =>
-      run.state === "queued"
-        ? [
-            {
-              id: run.id,
-              assignedAt: run.assignedAt,
-              project: run.runnerProject,
-              agent: run.agent,
-              runnerId: run.runnerId,
-              unstartable: false,
-            },
-          ]
-        : [],
+    queued: listRunsWithRecords(db, { states: ["queued"] }).flatMap(
+      ({ run, records }): QueuedRun[] =>
+        run.state === "queued"
+          ? [
+              {
+                id: run.id,
+                assignedAt: run.assignedAt,
+                project: run.runnerProject,
+                agent: run.agent,
+                runnerId: run.runnerId,
+                unstartable: false,
+                pinnedToRunner: run.continuedFromRunId !== null,
+                startRequested: records.startRequestedAt !== null,
+              },
+            ]
+          : [],
     ),
     runners: listRunnerSnapshots(db, now),
     runs: listRunPlacements(db),
@@ -149,7 +153,7 @@ export function loadRunsPage(
           : {
               displayId: pr.displayId,
               url: pr.url,
-              signals: prSignalsViewOf(run, records),
+              signals: takenOver.has(run.id) ? null : prSignalsViewOf(run, records),
             },
       attention: false,
     };

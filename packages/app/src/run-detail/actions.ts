@@ -1,5 +1,13 @@
 import { AGENT_MESSAGE_MAX_LENGTH, toAgentMessageRequestId, toRunId } from "@ganger/core";
-import { requestAgentMessage, requestRunCancel, requestWorktreeRemoval } from "@ganger/db";
+import type { RunId } from "@ganger/core";
+import {
+  continueRun,
+  requestAgentMessage,
+  requestPreviousAgentStop,
+  requestRunCancel,
+  requestWorktreeRemoval,
+} from "@ganger/db";
+import type { ContinueRunBlock } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { z } from "zod";
 
@@ -12,6 +20,24 @@ export function cancelRunRequest(db: Database, runId: string, now: Date): RunAct
 
 export function removeWorktreeRequest(db: Database, runId: string, now: Date): RunActionResult {
   return requestWorktreeRemoval(db, toRunId(runId), now);
+}
+
+export type ContinueRunActionResult =
+  | { ok: true; runId: RunId }
+  | { ok: false; reason: ContinueRunBlock };
+
+export function continueRunRequest(
+  db: Database,
+  runId: RunId,
+  message: string,
+  now: Date,
+): ContinueRunActionResult {
+  const result = continueRun(db, { from: runId, message, now });
+  return result.ok ? { ok: true, runId: result.run.id } : result;
+}
+
+export function stopPreviousAgentRequest(db: Database, runId: RunId, now: Date): RunActionResult {
+  return requestPreviousAgentStop(db, runId, now);
 }
 
 export const agentMessageInput = z.object({

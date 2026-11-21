@@ -11,8 +11,10 @@ import {
   getLogTailRequest,
   getRun,
   getRunWithRecords,
+  getWorkspaceBrief,
   getWorkspaceTrackerProject,
   getRunCancelRequest,
+  continueRunBlock,
   listRunAgentMessages,
   listRunMcpActions,
   listRunPlacements,
@@ -22,8 +24,10 @@ import {
   listRunnerSnapshots,
   listRunners,
   listRuns,
+  listRunsWithRecords,
   listWorkspaces,
   requestLogTail,
+  worktreeTakenOverBy,
 } from "@ganger/db";
 import type {
   Database,
@@ -43,6 +47,7 @@ import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
 import type {
   AgentMessageDelivery,
   CiView,
+  ContinueOffer,
   KeptWorktree,
   KeptWorktreeReason,
   LogTailView,
@@ -51,6 +56,7 @@ import type {
   RunDetail,
   RunDetailPage,
   RunDetailStatus,
+  RunLink,
   TimelineEvent,
 } from "./model.js";
 
@@ -69,6 +75,22 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
   const questions = listRunQuestions(db, run.id);
   const permissionWaits = listRunPermissionWaits(db, run.id);
   const cancelRequest = getRunCancelRequest(db, run.id);
+  const ticketRuns = listRuns(db, { ticket: run.ticket });
+  const linkTo = (id: RunId | null): RunLink | null => {
+    if (id === null) return null;
+    const index = ticketRuns.findIndex((other) => other.id === id);
+    return index === -1 ? null : { id, number: index + 1 };
+  };
+  const continuedFrom = linkTo(run.continuedFromRunId);
+  const continuedBy = linkTo(worktreeTakenOverBy(db, run.id));
+  const nextRun = ticketRuns.find((other) => other.id === continuedBy?.id);
+  const prHandedOver =
+    run.state === "ended" &&
+    run.prState === "open" &&
+    records.laterPrState === null &&
+    nextRun !== undefined &&
+    nextRun.state !== "queued" &&
+    nextRun.startedAt !== null;
   const cancelPending =
     run.state !== "ended" && cancelRequest !== null && cancelRequest.processedAt === null;
   const agentMessages = listRunAgentMessages(db, run.id).map((message) => ({
@@ -95,7 +117,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     endedAt: endedAt?.toISOString() ?? null,
     waitMs: durations.waitMs ?? 0,
     executionMs: withoutPauses(durations.executionMs, records, now),
-    status: statusOf(db, run, records, now),
+    status: statusOf(db, run, records, now, continuedBy !== null),
     pullRequest:
       pr === null || !isWebUrl(pr.url)
         ? null
@@ -103,7 +125,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
             displayId: pr.displayId,
             url: pr.url,
             ci: toCiView(pr.ci),
-            signals: prSignalsViewOf(run, records),
+            signals: prHandedOver ? null : prSignalsViewOf(run, records),
           },
     report: records.reportBody,
     brief:
@@ -127,9 +149,15 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
       cancelRequest?.requestedAt ?? null,
       listRunMcpActions(db, run.id),
       agentMessages,
+      continuationEvents(run, continuedFrom, continuedBy, ticketRuns),
     ),
     log: logOf(db, run, records),
     otherRuns: otherRunsOf(db, run),
+    continuedFrom,
+    continuedBy,
+    prHandedOver,
+    continuePlace: records.continuePlace,
+    continueOffer: continueOfferOf(db, run, records, ticketRuns, runner?.name ?? null),
   };
   return { kind: "found", run: detail };
 }
@@ -141,7 +169,65 @@ export function requestRunLogTail(db: Database, runId: string, now: Date): boole
   return true;
 }
 
-function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date): RunDetailStatus {
+function continueOfferOf(
+  db: Database,
+  run: StoredRun,
+  records: RunRecords,
+  ticketRuns: ReadonlyArray<StoredRun>,
+  runnerName: string | null,
+): ContinueOffer | null {
+  if (continueRunBlock(db, run.id) !== null) return null;
+  const brief = getWorkspaceBrief(db, run.workspaceId);
+  return {
+    sourceNumber: ticketRuns.findIndex((other) => other.id === run.id) + 1,
+    nextNumber: ticketRuns.length + 1,
+    runnerName,
+    place:
+      records.worktreeRemovedAt === null &&
+      !(run.state === "ended" && run.agentResult === "worktree-missing")
+        ? "same-worktree"
+        : "recreated",
+    hasReport: (records.reportBody?.trim() ?? "") !== "",
+    hasWorkspaceBrief: brief !== null && (brief.before.trim() !== "" || brief.after.trim() !== ""),
+    agent: records.agentCheck ?? "checking",
+    agentStopRequested: records.agentStopRequestedAt !== null,
+  };
+}
+
+function continuationEvents(
+  run: StoredRun,
+  continuedFrom: RunLink | null,
+  continuedBy: RunLink | null,
+  ticketRuns: ReadonlyArray<StoredRun>,
+): TimelineEvent[] {
+  const events: TimelineEvent[] = [];
+  if (continuedFrom !== null) {
+    events.push({
+      kind: "continued-from",
+      runNumber: continuedFrom.number,
+      at: run.assignedAt.toISOString(),
+    });
+  }
+  if (continuedBy !== null) {
+    const next = ticketRuns.find((other) => other.id === continuedBy.id);
+    if (next !== undefined) {
+      events.push({
+        kind: "continued-by",
+        runNumber: continuedBy.number,
+        at: next.assignedAt.toISOString(),
+      });
+    }
+  }
+  return events;
+}
+
+function statusOf(
+  db: Database,
+  run: StoredRun,
+  records: RunRecords,
+  now: Date,
+  takenOver: boolean,
+): RunDetailStatus {
   switch (run.state) {
     case "queued":
       return { state: "queued", queuedReason: queuedReasonOf(db, run.id, now) };
@@ -174,7 +260,7 @@ function statusOf(db: Database, run: StoredRun, records: RunRecords, now: Date):
         prState: run.prState,
         prReadError: records.prReadError,
         summary: outcome.outcome,
-        keptWorktree: keptWorktreeOf(run, records, outcome.worktree),
+        keptWorktree: takenOver ? null : keptWorktreeOf(run, records, outcome.worktree),
         laterPrState:
           records.laterPrState === null
             ? null
@@ -228,19 +314,22 @@ function inputSinceOf(db: Database, runId: RunId, input: PendingInput): string |
 
 function queuedReasonOf(db: Database, runId: RunId, now: Date): QueuedReason {
   const reasons = explainQueue({
-    queued: listRuns(db, { states: ["queued"] }).flatMap((run): QueuedRun[] =>
-      run.state === "queued"
-        ? [
-            {
-              id: run.id,
-              assignedAt: run.assignedAt,
-              project: run.runnerProject,
-              agent: run.agent,
-              runnerId: run.runnerId,
-              unstartable: false,
-            },
-          ]
-        : [],
+    queued: listRunsWithRecords(db, { states: ["queued"] }).flatMap(
+      ({ run, records }): QueuedRun[] =>
+        run.state === "queued"
+          ? [
+              {
+                id: run.id,
+                assignedAt: run.assignedAt,
+                project: run.runnerProject,
+                agent: run.agent,
+                runnerId: run.runnerId,
+                unstartable: false,
+                pinnedToRunner: run.continuedFromRunId !== null,
+                startRequested: records.startRequestedAt !== null,
+              },
+            ]
+          : [],
     ),
     runners: listRunnerSnapshots(db, now),
     runs: listRunPlacements(db),
@@ -261,8 +350,9 @@ function timelineOf(
   cancelRequestedAt: Date | null,
   mcpActions: ReadonlyArray<StoredMcpAction>,
   agentMessages: ReadonlyArray<{ message: StoredAgentMessage; delivery: AgentMessageDelivery }>,
+  continuation: ReadonlyArray<TimelineEvent>,
 ): TimelineEvent[] {
-  const events: TimelineEvent[] = [];
+  const events: TimelineEvent[] = [...continuation];
   for (const { message, delivery } of agentMessages) {
     events.push({
       kind: "operator-message",

@@ -27,6 +27,8 @@ export const LOG_EVENTS = {
   "worker.log_tail_failed": "could not read a log tail",
 
   "run.assigned": "assigned a ticket to a run",
+  "run.continued": "started a new run that continues an ended run",
+  "run.agent_check_failed": "could not check whether an ended run's agent is still alive",
   "run.runner_chosen": "chose a runner for a queued run",
   "run.state_changed": "changed run state",
   "run.state_change_failed": "could not change run state",

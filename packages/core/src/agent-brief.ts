@@ -7,6 +7,8 @@ export interface WorkspaceBrief {
 
 export const EMPTY_WORKSPACE_BRIEF: WorkspaceBrief = { before: "", after: "" };
 
+export const CONTINUE_MESSAGE_MAX_LENGTH = 8_000;
+
 export type AgentBriefPartKind = "before" | "ticket" | "after" | "protocol";
 
 export interface AgentBriefPart {
@@ -18,6 +20,11 @@ export interface AgentBriefInput {
   workspace: WorkspaceBrief;
   ticket: string;
   protocol: string;
+}
+
+export interface ContinuationBriefInput extends AgentBriefInput {
+  operatorMessage: string;
+  previousReport: string | null;
 }
 
 export function ticketBriefText(ticket: { title: string; body: string }): string {
@@ -46,4 +53,13 @@ export function joinAgentBrief(parts: ReadonlyArray<AgentBriefPart>): string {
 
 export function composeAgentBrief(input: AgentBriefInput): string {
   return joinAgentBrief(agentBriefParts(input));
+}
+
+export function composeContinuationBrief(input: ContinuationBriefInput): string {
+  const report = input.previousReport?.trim() ?? "";
+  const lead = [
+    `## 운영자의 말\n\n${input.operatorMessage.trim()}`,
+    ...(report === "" ? [] : [`## 이전 런의 완료 보고\n\n${report}`]),
+  ];
+  return `${[...lead, ...agentBriefParts(input).map((part) => part.text)].join("\n\n")}\n`;
 }

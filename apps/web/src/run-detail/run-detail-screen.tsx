@@ -18,6 +18,8 @@ import {
   Row,
   StatusPill,
   Text,
+  Textarea,
+  TextLink,
   focusStyles,
   linkStyles,
   NoticeLayout,
@@ -41,9 +43,11 @@ import { runStatus, useStatusName } from "../status";
 import { canCancel } from "@ganger/app/run-detail/model";
 import { availableRunControl } from "@ganger/app/run-control-view";
 import type { RunControlOutcome, RunControlView } from "@ganger/app/run-control-view";
+import { CONTINUE_MESSAGE_MAX_LENGTH } from "@ganger/core";
 import type { RunControl } from "@ganger/core";
 import type { HumanCheckDecision } from "@ganger/app/home/actions";
 import type {
+  ContinueOffer,
   LogTailView,
   PendingInput,
   RunDetail,
@@ -57,6 +61,8 @@ export interface RunDetailActions {
   onDeny: (promptId: string, reason: string) => Promise<void>;
   onCancel: () => Promise<void>;
   onRemoveWorktree: () => Promise<void>;
+  onContinue: (message: string) => Promise<void>;
+  onStopPreviousAgent: () => Promise<void>;
   onControl: (control: RunControl) => Promise<RunControlOutcome>;
   onSendAgentMessage: (input: AgentMessageRequest) => Promise<AgentMessageOutcome>;
   onRefreshLog: () => Promise<void>;
@@ -105,9 +111,18 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const removable = keptWorktree !== null && !keptWorktree.removing;
   const headRef = useRef<HTMLDivElement>(null);
   const cancelStatusRef = useRef<HTMLSpanElement>(null);
+  const continuationRef = useRef<HTMLElement>(null);
+  const continuedById = run.continuedBy?.id ?? null;
+  const focusContinuation = useRef(false);
+  useEffect(() => {
+    if (continuedById === null || !focusContinuation.current) return;
+    focusContinuation.current = false;
+    focusFirst(continuationRef, headRef);
+  }, [continuedById]);
   const pending = [
     run.cancelPending ? t("cancelPending") : null,
     keptWorktree?.removing === true ? t("removeWorktree.pending") : null,
+    run.continueOffer?.agentStopRequested === true ? t("continue.stopPending") : null,
     run.control?.status === "pending"
       ? t(run.control.control === "pause" ? "control.pausePending" : "control.resumePending")
       : null,
@@ -154,7 +169,11 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                 </Text>
               </span>
             </p>
-            {pr === null && !cancelable && control === null && !removable ? null : (
+            {pr === null &&
+            !cancelable &&
+            control === null &&
+            !removable &&
+            run.continueOffer === null ? null : (
               <Actions>
                 {pr === null ? null : (
                   <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
@@ -176,6 +195,24 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                     focusAfter={() => focusFirst(cancelStatusRef, headRef)}
                   />
                 ) : null}
+                {run.continueOffer === null ? null : run.continueOffer.agent !== "gone" ? (
+                  <Button variant="primary" aria-disabled aria-describedby={CONTINUE_BLOCKED_ID}>
+                    {t("continue.trigger")}
+                  </Button>
+                ) : (
+                  <ContinueRun
+                    offer={run.continueOffer}
+                    onContinue={async (message) => {
+                      focusContinuation.current = true;
+                      try {
+                        await props.onContinue(message);
+                      } catch (error) {
+                        focusContinuation.current = false;
+                        throw error;
+                      }
+                    }}
+                  />
+                )}
                 {removable ? (
                   <ConfirmDanger
                     messages="run.removeWorktree"
@@ -190,6 +227,15 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
             <Reason run={run} />
           </Text>
           <NextAction run={run} />
+          {run.continueOffer === null || run.continueOffer.agent === "gone" ? null : (
+            <ContinueBlocked
+              agent={run.continueOffer.agent}
+              stopping={run.continueOffer.agentStopRequested}
+              onStop={props.onStopPreviousAgent}
+              focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+            />
+          )}
+          <Continuation run={run} runHref={props.runHref} statusRef={continuationRef} />
         </div>
 
         <div {...stylex.props(styles.columns)}>
@@ -686,6 +732,195 @@ function ConfirmDanger({
   );
 }
 
+function Continuation({
+  run,
+  runHref,
+  statusRef,
+}: {
+  run: RunDetail;
+  runHref: (runId: string) => string;
+  statusRef: RefObject<HTMLElement | null>;
+}) {
+  const t = useTranslations("run.continuation");
+  const { continuedFrom, continuedBy, continuePlace } = run;
+  if (continuedFrom === null && continuedBy === null) return null;
+  const endedBeforeStart = run.status.state === "ended" && run.startedAt === null;
+  const placeKey = endedBeforeStart
+    ? "notStarted"
+    : run.status.state === "queued"
+      ? "pending"
+      : (continuePlace ?? "pending");
+  return (
+    <>
+      {continuedFrom === null ? null : (
+        <Text variant="body" as="p">
+          <TextLink href={runHref(continuedFrom.id)}>
+            {t("from", {
+              number: continuedFrom.number,
+              digit: continuedFrom.number % 10,
+            })}
+          </TextLink>{" "}
+          {t(`place.${placeKey}`)}
+        </Text>
+      )}
+      {continuedBy === null ? null : (
+        <Text variant="body" as="p" ref={statusRef} role="status" tabIndex={-1}>
+          <TextLink href={runHref(continuedBy.id)}>
+            {t("by", { number: continuedBy.number })}
+          </TextLink>
+        </Text>
+      )}
+    </>
+  );
+}
+
+const CONTINUE_BLOCKED_ID = "continue-blocked-reason";
+
+function ContinueBlocked({
+  agent,
+  stopping,
+  onStop,
+  focusAfter,
+}: {
+  agent: "alive" | "unknown" | "checking";
+  stopping: boolean;
+  onStop: () => Promise<void>;
+  focusAfter: () => void;
+}) {
+  const t = useTranslations("run.continue");
+  const [state, setState] = useState<"idle" | "sending" | "failed">("idle");
+  return (
+    <>
+      <Text variant="body" as="p" id={CONTINUE_BLOCKED_ID}>
+        {t(`blocked.${agent}`)}
+      </Text>
+      {agent === "alive" && !stopping ? (
+        <Actions>
+          <Button
+            busy={{ active: state === "sending", label: t("stopPending") }}
+            onClick={() => {
+              setState("sending");
+              onStop().then(
+                () => {
+                  setState("idle");
+                  focusAfter();
+                },
+                () => setState("failed"),
+              );
+            }}
+          >
+            {t("stop")}
+          </Button>
+        </Actions>
+      ) : null}
+      {state === "failed" ? <ActionFailedText text={t("stopFailed")} /> : null}
+    </>
+  );
+}
+
+function ContinueRun({
+  offer,
+  onContinue,
+}: {
+  offer: ContinueOffer;
+  onContinue: (message: string) => Promise<void>;
+}) {
+  const t = useTranslations("run.continue");
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [state, setState] = useState<"idle" | "sending" | "failed">("idle");
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const sending = state === "sending";
+  const submit = (): void => {
+    if (sending) return;
+    const text = message.trim();
+    const length = Array.from(text).length;
+    if (length === 0) {
+      setInvalid(t("messageRequired"));
+      return;
+    }
+    if (length > CONTINUE_MESSAGE_MAX_LENGTH) {
+      setInvalid(t("messageTooLong", { max: CONTINUE_MESSAGE_MAX_LENGTH, count: length }));
+      return;
+    }
+    setInvalid(null);
+    setState("sending");
+    onContinue(text).then(
+      () => {
+        setState("idle");
+        setMessage("");
+        setOpen(false);
+      },
+      () => setState("failed"),
+    );
+  };
+  const sends = [
+    ...(offer.hasReport ? [t("sendsReport", { source: offer.sourceNumber })] : []),
+    ...(offer.hasWorkspaceBrief ? [t("sendsBrief")] : []),
+    t("sendsProtocol"),
+  ];
+  return (
+    <Dialog
+      trigger={t("trigger")}
+      triggerVariant="primary"
+      title={t("title")}
+      open={open}
+      onOpenChange={(next) => {
+        if (sending) return;
+        setOpen(next);
+        if (!next) {
+          setInvalid(null);
+          setState("idle");
+        }
+      }}
+      scrollBody
+      status={state === "failed" ? <ActionFailedText text={t("failed")} /> : undefined}
+      actions={
+        <>
+          <DialogClose>{t("dismiss")}</DialogClose>
+          <Button
+            variant="primary"
+            busy={{ active: sending, label: t("sending") }}
+            onClick={submit}
+          >
+            {t("confirm")}
+          </Button>
+        </>
+      }
+    >
+      <DefinitionList>
+        <DefinitionItem label={t("where")}>
+          {t(`place.${offer.place}`, { runner: offer.runnerName ?? t("noRunner") })}
+        </DefinitionItem>
+        <DefinitionItem label={t("newRun")}>
+          {t("newRunValue", {
+            next: offer.nextNumber,
+            source: offer.sourceNumber,
+            digit: offer.sourceNumber % 10,
+          })}
+        </DefinitionItem>
+        <DefinitionItem label={t("sendsLabel")}>{sends.join(" · ")}</DefinitionItem>
+      </DefinitionList>
+      {offer.place === "recreated" ? (
+        <Text variant="meta" as="p">
+          {t("branchGoneNote")}
+        </Text>
+      ) : null}
+      <Field label={t("messageLabel")} {...(invalid === null ? {} : { error: invalid })}>
+        <Textarea name="continue-message" rows={4} value={message} onValueChange={setMessage} />
+      </Field>
+    </Dialog>
+  );
+}
+
+function ActionFailedText({ text }: { text: string }) {
+  return (
+    <Text variant="ui" as="p" tone="problem" role="alert">
+      {text}
+    </Text>
+  );
+}
+
 function ControlRun({
   control,
   onControl,
@@ -743,7 +978,11 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
   const deliveryText = useDeliveryText();
   const toolName = (tool: string): string => (isMcpRunTool(tool) ? t(`mcpTool.${tool}`) : tool);
   const eventTitle = (event: TimelineEvent): string =>
-    event.kind === "mcp" ? t("mcp", { client: event.client }) : t(event.kind);
+    event.kind === "mcp"
+      ? t("mcp", { client: event.client })
+      : event.kind === "continued-from" || event.kind === "continued-by"
+        ? t(event.kind, { number: event.runNumber, digit: event.runNumber % 10 })
+        : t(event.kind);
   const eventDetail = (event: TimelineEvent): string | null => {
     switch (event.kind) {
       case "mcp":
@@ -779,6 +1018,8 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
       case "disconnected":
       case "reconnected":
       case "cancel-requested":
+      case "continued-from":
+      case "continued-by":
         return null;
     }
   };
@@ -1086,6 +1327,9 @@ function usePrInfo(): (run: RunDetail) => string | null {
     if (run.status.state !== "ended") return null;
     const state = run.status.laterPrState?.state ?? run.status.prState;
     if (state === "none") return null;
+    if (run.prHandedOver && run.pullRequest !== null) {
+      return t("prHandedOver", { pr: run.pullRequest.displayId });
+    }
     const stateName = domain(`prState.${state}`);
     return run.pullRequest === null
       ? t("prStateInfo", { state: stateName })
