@@ -636,11 +636,27 @@ export class OrcaRunner implements Runner {
     );
     const task = tasks.find((candidate) => candidate.id === worker.taskId);
     if (task?.title !== worktreeName || task.status === "failed") return null;
-    return this.startedRunAt(`id:${worktree}`, {
-      dispatchId: worker.dispatchId,
-      taskId: worker.taskId,
-      runId: shownWorker.runId,
-    });
+    const shown = await this.orcaOutcome(
+      ["worktree", "show", "--worktree", `id:${worktree}`],
+      worktreeShowResultSchema,
+    );
+    if (!shown.ok) {
+      if (shown.code !== "selector_not_found") throw this.errorFor(shown, {});
+      await this.orcaOutcome(
+        ["orchestration", "worker-stop", "--dispatch", worker.dispatchId],
+        workerStopResultSchema,
+      );
+      return null;
+    }
+    return {
+      worktree: toWorktreeRef(shown.result.worktree.id),
+      branch: branchName(shown.result.worktree.branch, shown.result.worktree.id),
+      agentRef: encodeAgent({
+        dispatchId: worker.dispatchId,
+        taskId: worker.taskId,
+        runId: shownWorker.runId,
+      }),
+    };
   }
 
   async findStartedRun(input: {

@@ -1799,6 +1799,45 @@ describe("prepareContinuation", () => {
     });
   });
 
+  test("시작한 에이전트의 워크트리가 지워졌으면 그 에이전트를 멈추고 시작되지 않은 것으로 본다", async () => {
+    const newest = { dispatchId: "ctx_new", taskId: "task_new" };
+    const exec = new ScriptedExec()
+      .orca(
+        "orchestration worker-list",
+        stdout(
+          JSON.stringify({ ok: true, result: { workers: [{ ...newest, workspace: WORKTREE }] } }),
+        ),
+      )
+      .orca(
+        "orchestration worker-show",
+        stdout(
+          JSON.stringify({ ok: true, result: { ...newest, runId: "run_other", state: "ready" } }),
+        ),
+      )
+      .orca(
+        "orchestration task-list --run run_other",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: { tasks: [{ id: "task_new", status: "dispatched", title: "ganger-ENG-1-2" }] },
+          }),
+        ),
+      )
+      .orca(
+        "worktree show",
+        stdout(
+          JSON.stringify({ ok: false, error: { code: "selector_not_found", message: "gone" } }),
+          1,
+        ),
+      )
+      .orca(
+        "orchestration worker-stop",
+        stdout(JSON.stringify({ ok: true, result: { state: "stopped" } })),
+      );
+    expect(await runnerWith(exec).findStartedRun(lookup)).toBeNull();
+    expect(exec.commands().some((c) => c.includes("worker-stop --dispatch ctx_new"))).toBe(true);
+  });
+
   test("워크트리의 최신 에이전트가 이전 런의 것이면 시작되지 않은 것으로 본다", async () => {
     const exec = recoveryExec(
       { dispatchId: "ctx_old", taskId: "task_old" },
