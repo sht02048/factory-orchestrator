@@ -152,10 +152,17 @@ export interface TableRowsProps {
   label: string;
   value: string | null;
   onValueChange: (value: string) => void;
+  motionItems?: boolean;
   children: ReactNode;
 }
 
-export function TableRows({ label, value, onValueChange, children }: TableRowsProps) {
+export function TableRows({
+  label,
+  value,
+  onValueChange,
+  motionItems = false,
+  children,
+}: TableRowsProps) {
   return (
     <Listbox<string>
       aria-label={label}
@@ -164,7 +171,7 @@ export function TableRows({ label, value, onValueChange, children }: TableRowsPr
       onValueChange={(next) => {
         if (next !== null) onValueChange(next);
       }}
-      className={cx(styles.rows)}
+      className={cx(styles.rows, motionItems && styles.motionRows)}
     >
       {children}
     </Listbox>
@@ -292,6 +299,7 @@ const styles = stylex.create({
     fontSize: fontSize.small,
   },
   rows: { display: "flex", flexDirection: "column", gap: space.px2, outline: "none" },
+  motionRows: { gap: 0, marginBottom: `calc(${space.px2} * -1)` },
   row: {
     position: "relative",
     minHeight: size.rowMinHeight,

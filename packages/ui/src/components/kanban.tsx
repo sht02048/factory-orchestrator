@@ -25,8 +25,14 @@ export function KanbanColumn({ title, count, note, children }: KanbanColumnProps
   );
 }
 
-export function KanbanCards({ children }: { children: ReactNode }) {
-  return <ul {...stylex.props(styles.cards)}>{children}</ul>;
+export function KanbanCards({
+  motionItems = false,
+  children,
+}: {
+  motionItems?: boolean;
+  children: ReactNode;
+}) {
+  return <ul {...stylex.props(styles.cards, motionItems && styles.motionCards)}>{children}</ul>;
 }
 
 export function KanbanSubheading({ children }: { children: ReactNode }) {
@@ -169,6 +175,11 @@ const styles = stylex.create({
     margin: 0,
     padding: 0,
     listStyle: "none",
+  },
+  motionCards: {
+    display: { default: "flex", ":empty": "none" },
+    gap: 0,
+    marginBottom: `calc(${space.s2} * -1)`,
   },
   subheading: {
     margin: 0,

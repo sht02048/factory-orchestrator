@@ -23,6 +23,10 @@ interface CardParts {
   menu?: ReactNode;
 }
 
+export function cardTag(run: HomeRun, tagged: boolean): PillStatus | null {
+  return (tagged ? todoTagOf(run) : null) ?? (run.state === "paused" ? "paused" : null);
+}
+
 export function RunCard({
   run,
   tagged,
@@ -41,7 +45,7 @@ export function RunCard({
   onControl: (control: RunControl) => Promise<boolean>;
 }) {
   const todoTag = tagged ? todoTagOf(run) : null;
-  const tag: PillStatus | null = todoTag ?? (run.state === "paused" ? "paused" : null);
+  const tag = cardTag(run, tagged);
   const titleId = useId();
   const [sending, setSending] = useState(false);
   const [rejected, setRejected] = useState(false);
@@ -60,17 +64,23 @@ export function RunCard({
   });
   const statusName = useRunText().statusName;
   return (
-    <li data-run={run.id} data-tag={tag ?? undefined}>
-      <KanbanCard
-        {...(tag === null ? {} : { tag: <StatusPill status={tag}>{statusName(tag)}</StatusPill> })}
-        title={<RunKey run={run} />}
-        titleId={titleId}
-        {...parts}
-        selected={selected}
-        openRef={openRef}
-        onOpen={() => onOpen("summary")}
-      />
-    </li>
+    <KanbanCard
+      {...(tag === null
+        ? {}
+        : {
+            tag: (
+              <StatusPill status={tag} changeMotion>
+                {statusName(tag)}
+              </StatusPill>
+            ),
+          })}
+      title={<RunKey run={run} />}
+      titleId={titleId}
+      {...parts}
+      selected={selected}
+      openRef={openRef}
+      onOpen={() => onOpen("summary")}
+    />
   );
 }
 

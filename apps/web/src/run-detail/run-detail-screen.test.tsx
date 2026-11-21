@@ -44,7 +44,7 @@ import questionJson from "../../messages/ko/question.json" with { type: "json" }
 import { LOG_POLL_LIMIT, runDetailPollMs } from "./actions";
 import { runMessages } from "./messages";
 import type { RunDetail, RunDetailPage } from "@ganger/app/run-detail/model";
-import { RunDetailScreen } from "./run-detail-screen";
+import { RunDetailScreen, timelineRows } from "./run-detail-screen";
 import { addExtraEnded, assign, extraEndedCases, startedOn, walk } from "./testing";
 import { answerInput, submitAnswer } from "@ganger/app/home/actions";
 import {
@@ -1288,4 +1288,26 @@ describe("이어서 맡기기(0149)", () => {
       expect(body).toContain(runJson.continuation.place[place]);
     },
   );
+});
+
+describe("타임라인 줄 열쇠(0153)", () => {
+  const at = "2026-01-01T00:00:00.000Z";
+  const later = "2026-01-01T00:01:00.000Z";
+
+  it("앞에 줄이 끼어들어도 이미 있던 줄의 열쇠는 그대로다", () => {
+    const before = timelineRows([{ kind: "paused", at: later }]);
+    const after = timelineRows([
+      { kind: "unpaused", at },
+      { kind: "paused", at: later },
+    ]);
+    expect(after[1]?.key).toBe(before[0]?.key);
+  });
+
+  it("종류와 시각이 같은 줄도 열쇠가 겹치지 않는다", () => {
+    const rows = timelineRows([
+      { kind: "paused", at },
+      { kind: "paused", at },
+    ]);
+    expect(new Set(rows.map((row) => row.key)).size).toBe(2);
+  });
 });

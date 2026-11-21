@@ -37,7 +37,7 @@ export function Sheet({
   children,
 }: SheetProps) {
   return (
-    <SdkDialog open={open} onOpenChange={(next: boolean) => onOpenChange(next)}>
+    <SdkDialog open={open} modal={open} onOpenChange={(next: boolean) => onOpenChange(next)}>
       <DialogBackdrop {...windowRegion("no-drag")} className={cx(styles.backdrop)} />
       <DialogContent
         {...windowRegion("no-drag")}
@@ -71,6 +71,7 @@ const styles = stylex.create({
     inset: 0,
     zIndex: 200,
     backgroundColor: colors.backdrop,
+    pointerEvents: { default: null, [ENDING]: "none" },
     opacity: { default: 1, [STARTING]: 0, [ENDING]: 0 },
     transitionProperty: "opacity",
     transitionDuration: {
@@ -98,6 +99,7 @@ const styles = stylex.create({
     boxShadow: shadow.popover,
     color: colors.textPrimary,
     outline: "none",
+    pointerEvents: { default: null, [ENDING]: "none" },
     opacity: {
       default: 1,
       [REDUCED]: { default: 1, [STARTING]: 0, [ENDING]: 0 },

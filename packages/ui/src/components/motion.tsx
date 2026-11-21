@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { flushSync } from "react-dom";
-import { colors, motion, radius } from "../tokens.stylex";
+import { colors, motion, radius, space } from "../tokens.stylex";
 import {
   chooseMoveStyle,
   diffMotionOrders,
@@ -29,6 +29,8 @@ import { motionTokenMs, motionTokenEasing } from "./motion-token";
 export type MotionEnter = "expand" | "rise";
 export type MotionMove = "row" | "card";
 export type MotionHighlightRadius = "control" | "card";
+export type MotionItemGap = "card" | "row";
+export type MotionItemAttributes = Record<`data-${string}`, string | undefined>;
 
 interface ItemParts {
   wrapper: HTMLElement;
@@ -630,6 +632,8 @@ export interface MotionListProps<T> {
   resetKey?: string;
   onExited?: (key: string) => void;
   as?: "div" | "li";
+  itemGap?: MotionItemGap;
+  itemAttributes?: (item: T, state: { leaving: boolean }) => MotionItemAttributes;
 }
 
 export function MotionList<T>(props: MotionListProps<T>) {
@@ -661,6 +665,8 @@ function ScopedMotionList<T>({
   resetKey,
   onExited,
   as = "div",
+  itemGap,
+  itemAttributes,
 }: MotionListProps<T> & { engine: MotionEngine }) {
   const id = useId();
   const [state, setState] = useState<RowsState<T>>(() => ({
@@ -710,6 +716,8 @@ function ScopedMotionList<T>({
           leaving={row.leaving}
           highlightRadius={highlightRadius}
           partsMap={partsRef.current}
+          itemGap={itemGap}
+          attributes={itemAttributes?.(row.item, { leaving: row.leaving })}
         >
           {children(row.item, { leaving: row.leaving })}
         </MotionItem>
@@ -724,6 +732,8 @@ interface MotionItemProps {
   leaving: boolean;
   highlightRadius: MotionHighlightRadius;
   partsMap: Map<string, ItemParts>;
+  itemGap: MotionItemGap | undefined;
+  attributes: MotionItemAttributes | undefined;
   children: ReactNode;
 }
 
@@ -733,6 +743,8 @@ function MotionItem({
   leaving,
   highlightRadius,
   partsMap,
+  itemGap,
+  attributes,
   children,
 }: MotionItemProps) {
   const wrapperRef = useRef<HTMLElement | null>(null);
@@ -750,6 +762,7 @@ function MotionItem({
   }, [itemKey, partsMap]);
   return (
     <Wrapper
+      {...attributes}
       ref={(node: HTMLElement | null) => {
         wrapperRef.current = node;
       }}
@@ -758,12 +771,20 @@ function MotionItem({
       {...stylex.props(styles.wrapper)}
     >
       <div ref={innerRef} {...stylex.props(styles.inner)}>
-        {children}
+        {itemGap === undefined ? (
+          children
+        ) : (
+          <div {...stylex.props(gapBelow[itemGap])}>{children}</div>
+        )}
         <span
           ref={flashRef}
           aria-hidden="true"
           data-motion-flash=""
-          {...stylex.props(styles.flash, flashRadius[highlightRadius])}
+          {...stylex.props(
+            styles.flash,
+            flashRadius[highlightRadius],
+            itemGap !== undefined && flashAboveGap[itemGap],
+          )}
         />
       </div>
     </Wrapper>
@@ -785,6 +806,16 @@ const styles = stylex.create({
     opacity: 0,
     pointerEvents: "none",
   },
+});
+
+const gapBelow = stylex.create({
+  card: { paddingBottom: space.s2 },
+  row: { paddingBottom: space.px2 },
+});
+
+const flashAboveGap = stylex.create({
+  card: { bottom: space.s2 },
+  row: { bottom: space.px2 },
 });
 
 const flashRadius = stylex.create({

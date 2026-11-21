@@ -6,6 +6,7 @@ import {
   DefinitionItem,
   DefinitionList,
   DetailPanel,
+  MotionList,
   PageHeader,
   PanelHeader,
   RowTitle,
@@ -86,6 +87,7 @@ export interface RunsScreenProps {
   page: RunsPage;
   workspaces: ReadonlyArray<WorkspaceSummary>;
   filter: RunFilter;
+  endedLimit?: number;
   selectedId: string | undefined;
   onFilterChange: (filter: RunFilter) => void;
   onSelect: (runId: string) => void;
@@ -153,6 +155,7 @@ function AllWorkspaces({
 function RunsList({
   page,
   filter,
+  endedLimit,
   selectedId,
   onFilterChange,
   onSelect,
@@ -173,6 +176,8 @@ function RunsList({
   const filterBar = useRef<HTMLDivElement>(null);
   const focusAfterClear = useRef(false);
   const filtered = page.conditions.length > 0;
+  const workspaceId = page.workspace.kind === "one" ? page.workspace.workspace.id : "";
+  const listKey = JSON.stringify([workspaceId, filter, page.conditions, endedLimit ?? null]);
   useEffect(() => {
     if (focusAfterMore.current) {
       focusAfterMore.current = false;
@@ -261,10 +266,16 @@ function RunsList({
                     label={t("listLabel")}
                     value={selected?.id ?? null}
                     onValueChange={onSelect}
+                    motionItems
                   >
-                    {visible.map((run) => (
-                      <RunRow key={run.id} run={run} onOpen={() => onOpen(run.id)} />
-                    ))}
+                    <MotionList
+                      items={visible}
+                      getKey={(run) => run.id}
+                      itemGap="row"
+                      resetKey={listKey}
+                    >
+                      {(run) => <RunRow run={run} onOpen={() => onOpen(run.id)} />}
+                    </MotionList>
                   </TableRows>
                 )}
               </Table>
@@ -410,7 +421,9 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
         <Text variant="meta">{result}</Text>
       </TableCell>
       <TableCell>
-        <StatusPill status={status}>{statusName(status)}</StatusPill>
+        <StatusPill status={status} changeMotion>
+          {statusName(status)}
+        </StatusPill>
       </TableCell>
       <TableCell align="end" numeric>
         {run.state === "ended"

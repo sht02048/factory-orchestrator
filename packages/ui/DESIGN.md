@@ -206,6 +206,8 @@
 - 옮겨 갈 자리가 보이는 영역 밖이거나 칸이 세로로 쌓여 있으면 그 항목은 흐려지며 바뀐다.
 - `prefers-reduced-motion`에서는 이동·커지기를 빼고 150ms 이하 흐려지기만 남는다.
 - `MotionList`의 부모에 `gap`을 주지 않는다. 접힌 행도 `gap`을 차지해 빠짐 끝에 튄다. 행 사이는 항목 안의 여백으로 둔다.
+- 행 사이가 필요하면 `MotionList itemGap`(`card`·`row`)을 쓰고 부모는 `KanbanCards motionItems`·`TableRows motionItems`로 둔다. 여백이 항목과 함께 접히고 도착 비추기는 여백을 덮지 않는다. 항목 요소에 붙일 `data-*`는 `itemAttributes`로 준다.
+- 닫히는 `Sheet`는 포인터를 받지 않는다. 닫는 도중 뒤의 카드를 누르면 그 클릭이 카드에 닿아 Sheet가 바로 다시 열린다.
 - 기본 상태는 늘 보이는 상태다. 움직임이 돌지 않아도 내용이 숨지 않는다.
 
 ## 시간 표기

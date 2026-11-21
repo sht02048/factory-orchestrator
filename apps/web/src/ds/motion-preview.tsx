@@ -73,7 +73,7 @@ function BoardDemo() {
   const [highlight, setHighlight] = useState(true);
 
   const renderCard = (id: number) => (
-    <div data-motion-card={id} {...stylex.props(styles.card)}>
+    <div data-motion-card={id}>
       <Card padding="compact">
         <Text variant="ui">{t("card", { id })}</Text>
       </Card>
@@ -90,6 +90,7 @@ function BoardDemo() {
           getKey={cardKey}
           highlight={highlight}
           highlightRadius="card"
+          itemGap="card"
           resetKey={String(filterKey)}
           onExited={() => setExited((count) => count + 1)}
         >
@@ -198,7 +199,6 @@ const styles = stylex.create({
   board: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: space.s4 },
   column: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   cards: { display: "flex", flexDirection: "column", minHeight: 240 },
-  card: { marginBottom: space.s1 },
   timeline: {
     display: "flex",
     flexDirection: "column",
