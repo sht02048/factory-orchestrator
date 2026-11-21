@@ -29,6 +29,7 @@ import type { Database, StoredRun, StoredRunner } from "@ganger/db";
 import type { LogContext, Logger } from "@ganger/log";
 import type { WorkerAdapters } from "./adapters.js";
 import type { AutoAssignState } from "./auto-assign.js";
+import type { BlockerRefreshState } from "./blockers.js";
 
 export type WorkerLogger = Logger;
 
@@ -51,6 +52,7 @@ export interface TickContext {
   unrecordedComments: Map<RunId, { id: CommentId; at: Date }>;
   ticketsGone: Set<RunId>;
   autoAssign: AutoAssignState;
+  blockerRefresh: BlockerRefreshState;
 }
 
 export interface WorktreeSetupJob {

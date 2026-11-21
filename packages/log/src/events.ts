@@ -39,6 +39,8 @@ export const LOG_EVENTS = {
   "run.lookup_failed": "could not look up a started run",
   "run.cancel_lookup_failed": "could not look up a started run to cancel",
   "run.cancel_runner_missing": "canceling a queued run whose runner is not registered",
+  "run.blockers_read_failed": "could not read a queued run's blocking tickets",
+  "run.blockers_refresh_failed": "could not refresh blocking tickets",
   "run.last_log_failed": "could not read the last log of an ending run",
   "run.answer_failed": "could not send an answer",
   "run.denial_failed": "could not send a permission denial",

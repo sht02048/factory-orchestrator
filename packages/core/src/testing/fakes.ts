@@ -1,4 +1,6 @@
 import { AdapterError } from "../adapters.js";
+import { NO_TICKET_RELATIONS } from "../blockers.js";
+import type { TicketRelations } from "../blockers.js";
 import type { ProviderUsageReading } from "../provider-usage.js";
 import type {
   AgentSendResult,
@@ -95,6 +97,8 @@ export class FakeTracker implements Tracker {
   readonly createdLabels: Array<{ label: TrackerLabel; color: string }> = [];
   readonly states = new Map<TrackerProjectId, TrackerState[]>();
   readonly stateChanges: Array<{ key: TicketKey; stateId: TrackerStateId }> = [];
+  readonly relations = new Map<TicketKey, TicketRelations>();
+  relationsError: Error | null = null;
   connection: TrackerConnectionCheck = { ok: true, organizationName: null };
   verifyWebhookWith: (input: { rawBody: Uint8Array; now: Date }) => WebhookResult = () => ({
     ok: false,
@@ -124,6 +128,12 @@ export class FakeTracker implements Tracker {
 
   getTicket(key: TicketKey): Promise<TrackerTicket | null> {
     return Promise.resolve(this.tickets.get(key) ?? null);
+  }
+
+  getTicketRelations(key: TicketKey): Promise<TicketRelations | null> {
+    if (this.relationsError !== null) return Promise.reject(this.relationsError);
+    if (!this.tickets.has(key)) return Promise.resolve(null);
+    return Promise.resolve(this.relations.get(key) ?? NO_TICKET_RELATIONS);
   }
 
   listProjectTickets(projectId: TrackerProjectId, page?: Page): Promise<Paged<TrackerTicket>> {

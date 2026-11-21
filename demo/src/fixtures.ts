@@ -12,6 +12,8 @@ import type {
   ProviderUsage,
   ProviderUsageReading,
   RunnerProject,
+  TicketKey,
+  TicketRelations,
   TrackerLabel,
   TrackerProject,
   TrackerState,
@@ -191,6 +193,24 @@ export function trackerCatalog(spec: TrackerSpec, now: Date): TrackerCatalog {
     labels,
     tickets,
   };
+}
+
+const DEMO_BLOCKED_TICKET_INDEX = 6;
+const DEMO_BLOCKER_TICKET_INDEX = 5;
+
+export function demoRelations(catalog: TrackerCatalog): Array<[TicketKey, TicketRelations]> {
+  const blocked = catalog.tickets[DEMO_BLOCKED_TICKET_INDEX];
+  const blocker = catalog.tickets[DEMO_BLOCKER_TICKET_INDEX];
+  if (blocked === undefined || blocker === undefined) return [];
+  return [
+    [
+      blocked.key,
+      {
+        priority: "high",
+        blockers: [{ key: blocker.key, title: blocker.title, state: blocker.state }],
+      },
+    ],
+  ];
 }
 
 export const RUNNER_PROJECTS: ReadonlyArray<RunnerProject> = TRACKERS.flatMap((spec) =>

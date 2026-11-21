@@ -5,6 +5,7 @@ export const MCP_RUN_TOOLS = [
   "answer_question",
   "deny_permission",
   "cancel_run",
+  "start_run_without_waiting",
   "request_run_log",
 ] as const;
 
@@ -63,6 +64,9 @@ export const MCP_REJECT_REASONS = [
   "resolved",
   "already-ended",
   "not-running",
+  "not-queued",
+  "not-waiting",
+  "cancelling",
   "taken",
   "unauthorized",
   "rate-limited",

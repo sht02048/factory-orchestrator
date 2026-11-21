@@ -6,7 +6,7 @@ import {
   summarizeRunOutcome,
   toRunId,
 } from "@ganger/core";
-import type { CiState, QueuedRun, RunId, WorktreeDisposition } from "@ganger/core";
+import type { CiState, RunId, WorktreeDisposition } from "@ganger/core";
 import {
   getLogTailRequest,
   getRun,
@@ -17,18 +17,14 @@ import {
   continueRunBlock,
   listRunAgentMessages,
   listRunMcpActions,
-  listRunPlacements,
   listRunPermissionWaits,
   listRunQuestions,
   listRunStateChanges,
-  listRunnerSnapshots,
   listRunners,
   listRuns,
-  listRunsWithRecords,
   listWorkspaces,
   requestLogTail,
   worktreeTakenOverBy,
-  isPinnedToRunner,
 } from "@ganger/db";
 import type {
   Database,
@@ -44,7 +40,7 @@ import { pendingInput } from "../home/load.js";
 import { runControlOf, withoutPauses } from "../run-control.js";
 import { mcpActionView } from "../mcp/actions.js";
 import type { QueuedReason } from "../runs/model.js";
-import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
+import { describeQueuedReason, loadQueueReasons } from "../runs/queue-reasons.js";
 import type {
   AgentMessageDelivery,
   CiView,
@@ -314,27 +310,7 @@ function inputSinceOf(db: Database, runId: RunId, input: PendingInput): string |
 }
 
 function queuedReasonOf(db: Database, runId: RunId, now: Date): QueuedReason {
-  const reasons = explainQueue({
-    queued: listRunsWithRecords(db, { states: ["queued"] }).flatMap(
-      ({ run, records }): QueuedRun[] =>
-        run.state === "queued"
-          ? [
-              {
-                id: run.id,
-                assignedAt: run.assignedAt,
-                project: run.runnerProject,
-                agent: run.agent,
-                runnerId: run.runnerId,
-                unstartable: false,
-                pinnedToRunner: isPinnedToRunner(run),
-                startRequested: records.startRequestedAt !== null,
-              },
-            ]
-          : [],
-    ),
-    runners: listRunnerSnapshots(db, now),
-    runs: listRunPlacements(db),
-  });
+  const reasons = loadQueueReasons(db, now);
   return describeQueuedReason(
     reasons.get(runId) ?? { kind: "behind" },
     (runnerId) => listRunners(db).find((r) => r.id === runnerId)?.name ?? runnerId,

@@ -8,7 +8,21 @@ export type QueuedReason =
       kind: "starting" | "behind" | "runner-offline" | "project-missing" | "assignment-blocked";
     }
   | { kind: "no-capacity"; runner: string }
-  | { kind: "usage-limit"; provider: string; resetsInMs: number };
+  | { kind: "usage-limit"; provider: string; resetsInMs: number }
+  | { kind: "blockers-waiting"; blockers: BlockerView[] }
+  | {
+      kind: "blockers-stuck";
+      cause: "canceled" | "unreadable" | "cycle";
+      blocker: BlockerView | null;
+      blockers: BlockerView[];
+    };
+
+export interface BlockerView {
+  key: string;
+  title: string;
+  stateName: string;
+  stateCategory: string;
+}
 
 interface RunViewBase {
   id: string;

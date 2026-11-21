@@ -22,6 +22,7 @@ import {
   markTrackerEventProcessed,
 } from "@ganger/db";
 import type { StoredMapping, StoredRun, StoredTrackerEvent } from "@ganger/db";
+import { noteTicketChanged } from "./blockers.js";
 import type { TickContext } from "./context.js";
 
 export const POLL_CORRECTION_INTERVAL_MS = 60_000;
@@ -55,6 +56,7 @@ function processTrackerEvents(context: TickContext): void {
   const latestLabels = new Map<string, ReadonlyArray<LabelId>>();
   for (const event of events) {
     if (event.ticketKey === null) continue;
+    noteTicketChanged(context.blockerRefresh, event.connection, event.ticketKey);
     const key = `${event.connection}\n${event.ticketKey}`;
     if (event.kind === "ticket.removed") latestLabels.set(key, []);
     else if (event.labelIds !== null) latestLabels.set(key, event.labelIds);

@@ -4,10 +4,12 @@ import {
   canRunnerTake,
   composeAgentBrief,
   composeContinuationBrief,
+  decideBlockerWait,
   decideStartFailure,
   ticketBriefText,
   MAX_START_RETRIES,
   planQueue,
+  priorityRank,
 } from "@ganger/core";
 import type {
   AdapterRegistry,
@@ -34,6 +36,7 @@ import {
   hasPendingCancelRequest,
   inTransaction,
   listPendingCancelRequests,
+  listQueuedBlockerStates,
   listRunPlacements,
   listRunnerSnapshots,
   listRuns,
@@ -63,6 +66,7 @@ import type { QueuedStoredRun, TickContext, WorkerLogger, WorktreeSetupJob } fro
 import { processAfterRuns } from "./after-run.js";
 import { messages } from "./messages.js";
 import { assignAutomatically, createAutoAssignState } from "./auto-assign.js";
+import { blockersClearToStart, createBlockerRefreshState, refreshBlockers } from "./blockers.js";
 import { processAgentMessages } from "./agent-messages.js";
 import { processRunControlRequests } from "./control.js";
 import { processWebRequests } from "./requests.js";
@@ -153,6 +157,7 @@ export function createWorker(options: WorkerOptions): Worker {
     unrecordedComments: new Map(),
     ticketsGone: new Set(),
     autoAssign: createAutoAssignState(),
+    blockerRefresh: createBlockerRefreshState(),
   };
   let running: Promise<void> | null = null;
   let closed = false;
@@ -203,6 +208,7 @@ async function tick(context: TickContext): Promise<void> {
   await processAgentMessages(context);
   await cancelQueuedRuns(context);
   await assignAutomatically(context);
+  await refreshBlockers(context);
   await processQueue(context);
   await processAfterRuns(context);
   await processWebRequests(context, "log-tail");
@@ -290,12 +296,22 @@ async function processQueue(context: TickContext): Promise<void> {
     for (const run of queued) {
       if (settingUp(run.id)) runs.push({ runnerId: run.runnerId, state: "running" });
     }
+    const blockerStates = listQueuedBlockerStates(db);
     const candidates = queued
       .filter((run) => !settingUp(run.id))
       .flatMap((run) => toQueuedRun(context, run))
+      .map((run) => ({
+        ...run,
+        priorityRank: priorityRank(blockerStates.get(run.id)?.priority ?? "none"),
+      }))
       .map((run) =>
         bound.has(run.id) ? { ...run, unstartable: false, startRequested: true } : run,
       )
+      .filter((run) => {
+        if (run.unstartable || bound.has(run.id)) return true;
+        const state = blockerStates.get(run.id);
+        return state === undefined || decideBlockerWait(state).kind === "none";
+      })
       .filter((run) => !hasPendingCancelRequest(db, run.id))
       .filter((run) => {
         const runnerId = bound.get(run.id);
@@ -444,6 +460,7 @@ async function startQueuedRun(
 
   let started = pending?.started ?? null;
   if (started === null) {
+    if (!(await blockersClearToStart(context, run))) return "skipped";
     const attempt = await startOnRunner(context, run, choice.runnerId, records);
     if (attempt.kind !== "started") return attempt.kind;
     started = attempt.started;

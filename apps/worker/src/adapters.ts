@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { AdapterError } from "@ganger/core";
+import { AdapterError, NO_TICKET_RELATIONS } from "@ganger/core";
 import type {
   AdapterRegistry,
   CodeHost,
@@ -9,6 +9,7 @@ import type {
   RunnerId,
   RunnerProjectId,
   TicketKey,
+  TicketRelations,
   Tracker,
   TrackerConnectionId,
   TrackerKind,
@@ -199,6 +200,12 @@ class PausableTracker implements Tracker {
 
   getTicket(key: TicketKey): ReturnType<Tracker["getTicket"]> {
     return this.pause.run(() => this.inner.getTicket(key));
+  }
+
+  getTicketRelations(key: TicketKey): Promise<TicketRelations | null> {
+    return this.pause.run(
+      () => this.inner.getTicketRelations?.(key) ?? Promise.resolve(NO_TICKET_RELATIONS),
+    );
   }
 
   listProjectTickets(

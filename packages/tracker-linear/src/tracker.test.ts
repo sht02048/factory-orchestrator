@@ -180,7 +180,56 @@ describe("조회", () => {
         category: "started",
       },
       updatedAt: new Date("2026-11-17T16:05:59.058Z"),
+      priority: "none",
     });
+  });
+
+  it("getTicketRelations가 blocks 관계만 선행 티켓으로 읽고 우선순위를 옮기며 다음 쪽까지 읽는다", async () => {
+    const relation = (type: string, identifier: string, stateType: string) => ({
+      type,
+      issue: {
+        identifier,
+        title: `Title ${identifier}`,
+        state: { id: `state-${stateType}`, name: stateType, type: stateType },
+      },
+    });
+    const page = (nodes: unknown[], endCursor: string | null) => ({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      body: {
+        data: {
+          issue: {
+            priority: 2,
+            inverseRelations: {
+              nodes,
+              pageInfo: { hasNextPage: endCursor !== null, endCursor },
+            },
+          },
+        },
+      },
+    });
+    const { tracker: t, sent } = tracker(
+      page(
+        [relation("blocks", "OPS-1", "completed"), relation("related", "OPS-2", "started")],
+        "c1",
+      ),
+      page([relation("blocks", "OPS-3", "canceled")], null),
+    );
+
+    const relations = await t.getTicketRelations(KEY);
+
+    expect(sent[1]?.variables["after"]).toBe("c1");
+    expect(relations?.priority).toBe("high");
+    expect(relations?.blockers.map((b) => [b.key, b.state.category])).toEqual([
+      ["OPS-1", "completed"],
+      ["OPS-3", "canceled"],
+    ]);
+  });
+
+  it("getTicketRelations가 없는 티켓에 null을 돌려준다", async () => {
+    const { tracker: t } = tracker(fixture("error-ticket-not-found"));
+
+    await expect(t.getTicketRelations(toTicketKey("ENG-999999"))).resolves.toBeNull();
   });
 
   it("getTicket이 없는 티켓에 null을 돌려준다", async () => {

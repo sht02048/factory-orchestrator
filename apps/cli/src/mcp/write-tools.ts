@@ -10,7 +10,7 @@ import { pendingInput } from "@ganger/app/home/load";
 import { mcpClientName } from "@ganger/app/mcp/actions";
 import type { McpWriteTool } from "@ganger/app/mcp/actions";
 import { powerSettingsStore } from "@ganger/app/power-settings";
-import { cancelRunRequest } from "@ganger/app/run-detail/actions";
+import { cancelRunRequest, skipBlockerWaitRequest } from "@ganger/app/run-detail/actions";
 import { requestRunLogTail } from "@ganger/app/run-detail/load";
 import {
   RUNNER_CAPACITY_MAX,
@@ -486,6 +486,38 @@ export function registerWriteTools(
           ...base,
           reason: canceled.reason,
           error: `Could not cancel: ${canceled.reason}.`,
+        });
+      }
+      return done({ ...base, serverHandles: true });
+    },
+  );
+
+  register(
+    "start_run_without_waiting",
+    {
+      title: "Start a run without waiting",
+      description:
+        "Moves a queued run that waits for its blocking tickets into the normal queue. It starts when its runner has room, even if the blocking tickets are not done. Sending the same requestId again does nothing more.",
+      annotations: { ...WRITE, idempotentHint: true },
+    },
+    {
+      runId: runIdArg,
+      requestId: z
+        .string()
+        .min(16)
+        .max(64)
+        .describe("A unique id for this request. Reuse it only when retrying the same request."),
+    },
+    ({ runId, requestId }) => {
+      const run = findRun(runId);
+      if (run === null) return noRun(runId);
+      const base = { target: run.ticket.key, runId: run.id };
+      const result = skipBlockerWaitRequest(context.db, { runId, requestId }, context.now());
+      if (!result.ok) {
+        return rejected({
+          ...base,
+          reason: result.reason,
+          error: `Could not start without waiting: ${result.reason}.`,
         });
       }
       return done({ ...base, serverHandles: true });

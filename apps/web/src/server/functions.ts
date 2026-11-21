@@ -18,6 +18,8 @@ import {
   continueRunRequest,
   removeWorktreeRequest,
   sendAgentMessageRequest,
+  skipBlockerWaitInput,
+  skipBlockerWaitRequest,
   stopPreviousAgentRequest,
 } from "@ganger/app/run-detail/actions";
 import { requestControl } from "@ganger/app/run-control";
@@ -134,6 +136,10 @@ export const stopPreviousAgent = createServerFn({ method: "POST" })
 export const sendAgentMessage = createServerFn({ method: "POST" })
   .validator(agentMessageInput)
   .handler(({ data }) => sendAgentMessageRequest(getDatabase(), data, new Date()));
+
+export const startRunWithoutWaiting = createServerFn({ method: "POST" })
+  .validator(skipBlockerWaitInput)
+  .handler(({ data }) => skipBlockerWaitRequest(getDatabase(), data, new Date()));
 
 export const controlRun = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string(), control: z.enum(["pause", "resume"]) }))
