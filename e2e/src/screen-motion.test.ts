@@ -293,7 +293,27 @@ async function switchWorkspace(page: Page, from: string, to: string): Promise<vo
     .waitFor();
 }
 
-async function closeSheetSlowly(page: Page, x: number, y: number): Promise<Locator> {
+async function pressSecondOfDoubleClick(page: Page): Promise<void> {
+  await page.mouse.down({ clickCount: 2 });
+  await page.mouse.up({ clickCount: 2 });
+}
+
+async function openSheetOverCard(
+  page: Page,
+  openKey: string,
+  behindKey: string,
+): Promise<{ x: number; y: number }> {
+  const queued = column(page, home.column.queued);
+  const target = await cardButton(queued, behindKey).boundingBox();
+  if (target === null) throw new Error("no card box");
+  await cardButton(queued, openKey).click();
+  const opened = page.getByRole("dialog");
+  await opened.getByText(openKey, { exact: true }).waitFor();
+  await expect.poll(() => opened.evaluate((node) => getComputedStyle(node).transform)).toBe("none");
+  return { x: target.x + target.width / 2, y: target.y + target.height / 2 };
+}
+
+async function closeSheetSlowly(page: Page, close: () => Promise<void>): Promise<Locator> {
   const sheet = page.locator('[role="dialog"]');
   const slowed = sheet.evaluate(async (node) => {
     for (let frame = 0; frame < 600 && !node.hasAttribute("data-ending-style"); frame += 1) {
@@ -302,7 +322,7 @@ async function closeSheetSlowly(page: Page, x: number, y: number): Promise<Locat
     for (const animation of document.getAnimations()) animation.playbackRate = 0.02;
     return node.hasAttribute("data-ending-style");
   });
-  await page.mouse.click(x, y);
+  await close();
   expect(await slowed).toBe(true);
   return sheet;
 }
@@ -567,21 +587,10 @@ describe("Dashboard 움직임(브라우저, 0153)", () => {
     const second = assign();
     const page = await newPage(context);
     await open(page, dashboardPath, "/");
-    const queued = column(page, home.column.queued);
-    const target = await cardButton(queued, second.key).boundingBox();
-    if (target === null) throw new Error("no card box");
-    await cardButton(queued, first.key).click();
-    const opened = page.getByRole("dialog");
-    await opened.getByText(first.key, { exact: true }).waitFor();
-    await expect
-      .poll(() => opened.evaluate((node) => getComputedStyle(node).transform))
-      .toBe("none");
-    const x = target.x + target.width / 2;
-    const y = target.y + target.height / 2;
+    const { x, y } = await openSheetOverCard(page, first.key, second.key);
 
-    const sheet = await closeSheetSlowly(page, x, y);
-    await page.mouse.down({ clickCount: 2 });
-    await page.mouse.up({ clickCount: 2 });
+    const sheet = await closeSheetSlowly(page, () => page.mouse.click(x, y));
+    await pressSecondOfDoubleClick(page);
 
     expect(await sheet.evaluate((node) => node.hasAttribute("data-ending-style"))).toBe(true);
     expect(await sheet.getByText(second.key, { exact: true }).count()).toBe(0);
@@ -589,6 +598,22 @@ describe("Dashboard 움직임(브라우저, 0153)", () => {
       for (const animation of document.getAnimations()) animation.finish();
     });
     await expect.poll(() => sheet.count()).toBe(0);
+  });
+
+  it("Sheet 가 다 닫힌 뒤에 온 둘째 클릭도 뒤 카드를 열지 않는다", async (context) => {
+    const first = assign();
+    const second = assign();
+    const page = await newPage(context);
+    await open(page, dashboardPath, "/");
+    const { x, y } = await openSheetOverCard(page, first.key, second.key);
+    const sheet = page.locator('[role="dialog"]');
+
+    await page.mouse.click(x, y);
+    await expect.poll(() => sheet.count()).toBe(0);
+    await pressSecondOfDoubleClick(page);
+
+    await page.waitForTimeout(QUIET_MS);
+    expect(await sheet.count()).toBe(0);
   });
 
   it("Workspace 를 바꿨다 돌아오면 그사이 생긴 알약이 움직이지 않는다", async (context) => {

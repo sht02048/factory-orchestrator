@@ -64,17 +64,35 @@ export function Sheet({
   );
 }
 
+type SheetPhase = "closed" | "open" | "closing";
+
+function sheetPhaseOf(popup: Element | null): SheetPhase {
+  if (popup === null) return "closed";
+  return popup.hasAttribute("data-ending-style") ? "closing" : "open";
+}
+
 function useIgnoreRepeatPressWhileClosing(insideSheet: RefObject<HTMLElement | null>): void {
   useEffect(() => {
+    let phaseAtPreviousPress: SheetPhase = "closed";
+    let phaseAtLatestPress: SheetPhase = "closed";
+    const currentPhase = () =>
+      sheetPhaseOf(insideSheet.current?.closest('[role="dialog"]') ?? null);
+    const rememberPress = () => {
+      phaseAtPreviousPress = phaseAtLatestPress;
+      phaseAtLatestPress = currentPhase();
+    };
     const ignoreRepeatPress = (event: MouseEvent) => {
-      if (event.detail < 2) return;
-      if (!insideSheet.current?.closest("[data-ending-style]")) return;
+      if (event.detail < 2 || phaseAtPreviousPress === "closed" || currentPhase() === "open") {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
     };
+    window.addEventListener("pointerdown", rememberPress, true);
     document.addEventListener("mousedown", ignoreRepeatPress, true);
     document.addEventListener("click", ignoreRepeatPress, true);
     return () => {
+      window.removeEventListener("pointerdown", rememberPress, true);
       document.removeEventListener("mousedown", ignoreRepeatPress, true);
       document.removeEventListener("click", ignoreRepeatPress, true);
     };
