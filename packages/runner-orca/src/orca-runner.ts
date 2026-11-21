@@ -524,6 +524,7 @@ export class OrcaRunner implements Runner {
     const timeout = { timeoutMs: this.config.startTimeoutMs };
     const local = await this.run(localBranchArgv(repoPath, input.branch));
     if (refFound(local, "git show-ref", 1)) {
+      input.beforeRecreate?.();
       const added = await this.run(
         addWorktreeArgv({ repoPath, path, branch: input.branch }),
         timeout,
@@ -536,6 +537,7 @@ export class OrcaRunner implements Runner {
       await this.run(remoteBranchArgv({ repoPath, remote, branch: input.branch }), timeout),
     );
     if (!refFound(onRemote, "git ls-remote", 2)) return "from-scratch";
+    input.beforeRecreate?.();
     gitSucceeded(
       withinRemoteTimeout(
         await this.run(fetchBranchArgv({ repoPath, remote, branch: input.branch }), timeout),

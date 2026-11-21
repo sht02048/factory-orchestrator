@@ -573,6 +573,7 @@ async function continuationPlace(
     worktree: source.worktree,
     branch: source.branch,
     ...(source.agentMayBeAlive ? { stopAgent: source.agentRef } : {}),
+    beforeRecreate: () => recordContinuePlace(context.db, run.id, "recreated"),
   });
   const place = prepared === "same-worktree" ? (records.continuePlace ?? prepared) : prepared;
   const written = tryWrite(context, run.id, () =>

@@ -184,6 +184,23 @@ describe("이어서 맡기기", () => {
     expect(getRun(h.db, next.id)).toMatchObject({ state: "running", branch: "acme/renamed" });
   });
 
+  it("다시 만든 뒤 시작이 실패해도 다음 시도에서 다시 만든 워크트리로 남는다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    const fake = h.runner(source.runnerId);
+    fake.deleteWorktree(source.worktree);
+    fake.failNextStart = { kind: "runner-error", code: "boom", message: "failed" };
+    const next = continued(source.id);
+    const worker = h.worker();
+
+    await worker.tick();
+    expect(records(next).continuePlace).toBe("recreated");
+    await worker.tick();
+
+    expect(records(next).continuePlace).toBe("recreated");
+    expect(getRun(h.db, next.id)?.state).toBe("running");
+  });
+
   it("브랜치도 없으면 새 워크트리에서 티켓과 함께 처음부터 시작한다", async () => {
     const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const source = await endedRun(runnerId);

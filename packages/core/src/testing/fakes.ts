@@ -459,6 +459,7 @@ export class FakeRunner implements Runner {
         return "same-worktree";
       }
       if (this.goneBranches.has(input.branch)) return "from-scratch";
+      input.beforeRecreate?.();
       this.recreatedWorktrees.set(input.worktree, input.branch);
       return "recreated";
     });

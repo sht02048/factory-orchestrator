@@ -1614,6 +1614,21 @@ describe("prepareContinuation", () => {
     expect(exec.commands()).toContain(`git -C ${repoPath} worktree add ${path} ${branch}`);
   });
 
+  test("다시 만든다는 기록을 남기지 못하면 워크트리를 만들지 않는다", async () => {
+    const exec = projectExec();
+    git(exec, "worktree list", list(main));
+    git(exec, "worktree prune", stdout(""));
+    git(exec, "show-ref", stdout(""));
+    const failing = {
+      ...input,
+      beforeRecreate: () => {
+        throw new Error("db write failed");
+      },
+    };
+    await expect(runnerWith(exec).prepareContinuation(failing)).rejects.toThrow("db write failed");
+    expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
+  });
+
   test("로컬에 없고 원격에만 있으면 받아서 추적 브랜치로 만든다", async () => {
     const exec = projectExec();
     git(exec, "worktree list", list(main));

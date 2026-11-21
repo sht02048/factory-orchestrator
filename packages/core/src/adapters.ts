@@ -230,6 +230,7 @@ export interface PrepareContinuationInput {
   worktree: WorktreeRef;
   branch: string;
   stopAgent?: AgentRef;
+  beforeRecreate?: () => void;
 }
 
 export interface StartedRun {
