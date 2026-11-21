@@ -152,6 +152,12 @@ describe("공용 움직임(브라우저, 0152)", () => {
     const page = await openDs(context.task.name, "no-preference");
     await press(page, text.remove);
     expect(await motionCalls(page)).toContain("gridTemplateRows,opacity");
+    const durations = await page.evaluate(() =>
+      globalThis.motionAnimations.map((animation) =>
+        Math.round(Number(animation.effect?.getTiming().duration)),
+      ),
+    );
+    expect(durations).toContain(160);
     await expect.poll(() => cards(page, text.queued)).toEqual(["2", "3", "4"]);
     await page
       .locator("#motionPrimitives")

@@ -4,9 +4,15 @@ function motionTokenValue(token: unknown): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+export function parseDurationMs(value: string): number {
+  const match = /^(\d*\.?\d+)(ms|s)$/.exec(value.trim());
+  if (match === null) return 0;
+  const amount = Number(match[1]);
+  return match[2] === "s" ? amount * 1000 : amount;
+}
+
 export function motionTokenMs(token: unknown): number {
-  const value = Number.parseFloat(motionTokenValue(token));
-  return Number.isFinite(value) ? value : 0;
+  return parseDurationMs(motionTokenValue(token));
 }
 
 export function motionTokenEasing(token: unknown): string {

@@ -8,6 +8,7 @@ import {
   type MotionBox,
   type MotionRow,
 } from "./components/motion-plan";
+import { parseDurationMs } from "./components/motion-token";
 
 const viewport: MotionBox = { left: 0, top: 0, right: 1000, bottom: 800 };
 const box = (left: number, top: number): MotionBox => ({
@@ -79,6 +80,19 @@ describe("View Transition 유지 판단(M3)", () => {
 
   it("바뀐 행 하나라도 흐려지면 건너뛴다", () => {
     expect(keepsViewTransition(1, ["fade"])).toBe(false);
+  });
+});
+
+describe("시간 토큰 읽기", () => {
+  it("빌드가 줄여 쓴 초 단위도 밀리초로 읽는다", () => {
+    expect(parseDurationMs("160ms")).toBe(160);
+    expect(parseDurationMs("0.16s")).toBeCloseTo(160);
+    expect(parseDurationMs(".3s")).toBeCloseTo(300);
+  });
+
+  it("읽을 수 없는 값은 움직이지 않게 0 이다", () => {
+    expect(parseDurationMs("")).toBe(0);
+    expect(parseDurationMs("fast")).toBe(0);
   });
 });
 
