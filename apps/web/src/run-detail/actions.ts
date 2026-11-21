@@ -6,7 +6,7 @@ import type { RunControlActionResult } from "@ganger/app/run-control";
 import type { RunActionResult } from "@ganger/app/run-detail/actions";
 import type { RunDetailPage } from "@ganger/app/run-detail/model";
 import { toRunId } from "@ganger/core";
-import type { RunControl } from "@ganger/core";
+import type { RunControl, RunId } from "@ganger/core";
 import {
   ANSWER_REJECT_REASONS,
   DENY_REJECT_REASONS,
@@ -35,7 +35,7 @@ export interface RunDetailCalls {
   cancel(runId: string): Promise<RunActionResult>;
   removeWorktree(runId: string): Promise<RunActionResult>;
   control(runId: string, control: RunControl): Promise<RunControlActionResult>;
-  sendAgentMessage(runId: string, body: string): Promise<RunActionResult>;
+  sendAgentMessage(runId: RunId, body: string): Promise<RunActionResult>;
   requestLog(runId: string): Promise<boolean>;
 }
 
@@ -112,7 +112,7 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
     }),
     sendAgentMessage: mutationOptions({
       mutationFn: async (body: string): Promise<AgentMessageOutcome> =>
-        (await calls.sendAgentMessage(runId, body)).ok ? "requested" : "state-changed",
+        (await calls.sendAgentMessage(toRunId(runId), body)).ok ? "requested" : "state-changed",
       onSuccess: refreshRun,
     }),
     refreshLog: mutationOptions({

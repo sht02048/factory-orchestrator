@@ -81,6 +81,8 @@ export function AgentMessageForm({
     );
   };
 
+  if (!view.accepting) return null;
+
   const latest = view.latest;
   const result =
     submit === "failed"

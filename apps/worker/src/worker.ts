@@ -187,8 +187,8 @@ async function tick(context: TickContext): Promise<void> {
   await processWebRequests(context, "runner-check");
   await checkRunners(context);
   await processRunControlRequests(context);
-  await processAgentMessages(context);
   await watchActiveRuns(context);
+  await processAgentMessages(context);
   await cancelQueuedRuns(context);
   await assignAutomatically(context);
   await processQueue(context);

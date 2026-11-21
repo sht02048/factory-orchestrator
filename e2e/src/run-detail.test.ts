@@ -74,6 +74,7 @@ let endedRun: RunId;
 let keptRun: RunId;
 let messageRun: RunId;
 let narrowMessageRun: RunId;
+let draftRun: RunId;
 
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
@@ -198,6 +199,18 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
     ]);
   });
 
+  it("런이 잠깐 Disconnected가 돼도 쓰던 말이 남는다(0147)", async () => {
+    await open(draftRun);
+    const card = page.getByRole("region", { name: run.agentMessage.title });
+    await card.getByLabel(run.agentMessage.label).fill("쓰던 말");
+
+    ok(changeRunState(db, draftRun, { to: "disconnected" }));
+    await card.waitFor({ state: "detached" });
+    ok(changeRunState(db, draftRun, { to: "running" }));
+    await card.waitFor();
+    expect(await card.getByLabel(run.agentMessage.label).inputValue()).toBe("쓰던 말");
+  });
+
   it("400px 에서도 에이전트에게 보내기가 가로로 넘치지 않는다(0147)", async () => {
     await page.setViewportSize({ width: 400, height: 844 });
     await open(narrowMessageRun);
@@ -308,6 +321,7 @@ function seed(db: Database): void {
   cancelRun = startRun("ACME-13");
   messageRun = startRun("ACME-18");
   narrowMessageRun = startRun("ACME-19");
+  draftRun = startRun("ACME-20");
 
   endedRun = startRun("ACME-15");
   ok(

@@ -132,6 +132,30 @@ describe("에이전트에게 보내기(0147)", () => {
     expect(sentTo(run, runnerId)).toEqual([]);
   });
 
+  it.each<[string, RunnerErrorDetail]>([
+    ["ssh 응답이 끊기면", { kind: "unreachable", detail: "ssh timed out" }],
+    ["출력을 읽지 못하면", { kind: "malformed-output", raw: "not json" }],
+  ])("%s 전해졌는지 모른다고 남기고 다시 보내지 않는다", async (_name, failure) => {
+    const { run, runnerId, worker } = await startOne();
+    h.runner(runnerId).failNextControl = failure;
+    requestAgentMessage(h.db, run.id, "한 번만", h.now);
+    await worker.tick();
+    expect(only(run).error).toBe("outcome-unknown");
+    await worker.tick();
+    expect(sentTo(run, runnerId)).toEqual([]);
+  });
+
+  it("완료 보고를 받은 틱에는 끝난 에이전트에게 보내지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const agent = h.runner(runnerId).runAt(worktreeOf(run));
+    agent.report = { outcome: "succeeded", body: "끝났어요", reportedAt: h.now };
+    requestAgentMessage(h.db, run.id, "늦은 말", h.now);
+    await worker.tick();
+    expect(stateOf(run)).toBe("ended");
+    expect(agent.agentMessages).toEqual([]);
+    expect(only(run).error).toBe("state-changed");
+  });
+
   it("보내기 시작만 적히고 끝나지 않은 말은 두 번 보내지 않고 확인하지 못했다고 남긴다", async () => {
     const { run, runnerId, worker } = await startOne();
     const sent = requestAgentMessage(h.db, run.id, "한 번만", h.now);

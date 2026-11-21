@@ -1,6 +1,6 @@
 import { withLogContext } from "@ganger/log";
 import { agentMessageStep } from "@ganger/core";
-import type { AgentMessageFailure } from "@ganger/core";
+import type { AgentMessageFailure, MailboxRef, RunnerErrorDetail } from "@ganger/core";
 import {
   completeAgentMessage,
   getRunWithRecords,
@@ -48,23 +48,38 @@ async function deliver(context: TickContext, message: PendingAgentMessage): Prom
     finish(context, message, "runner-error");
     return;
   }
+  let runner: ReturnType<TickContext["adapters"]["runner"]>;
+  let mailbox: MailboxRef;
   try {
-    const runner = context.adapters.runner(stored);
-    const mailbox = await mailboxFor(context, stored, runner);
-    const marked = tryWrite(context, run.id, () =>
-      markAgentMessageSending(context.db, message.id, context.now()),
-    );
-    if (marked !== true) return;
+    runner = context.adapters.runner(stored);
+    mailbox = await mailboxFor(context, stored, runner);
+  } catch (error) {
+    context.logger.warn("agent_message.send_failed", { runId: run.id, error });
+    finish(context, message, failureOf(runnerErrorDetail(error)));
+    return;
+  }
+  const marked = tryWrite(context, run.id, () =>
+    markAgentMessageSending(context.db, message.id, context.now()),
+  );
+  if (marked !== true) return;
+  try {
     await runner.sendToAgent(
       { mailbox, worktree: run.worktree, agentRef: run.agentRef },
       { body: message.body },
     );
   } catch (error) {
     context.logger.warn("agent_message.send_failed", { runId: run.id, error });
-    finish(context, message, failureOf(runnerErrorDetail(error)));
+    finish(context, message, failureAfterSendStarted(runnerErrorDetail(error)));
     return;
   }
   finish(context, message, null);
+}
+
+function failureAfterSendStarted(detail: RunnerErrorDetail | null): AgentMessageFailure {
+  if (detail === null || detail.kind === "unreachable" || detail.kind === "malformed-output") {
+    return "outcome-unknown";
+  }
+  return failureOf(detail);
 }
 
 function finish(

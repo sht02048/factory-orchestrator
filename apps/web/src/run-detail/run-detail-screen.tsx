@@ -211,13 +211,12 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
               </Block>
             ) : null}
 
-            {run.agentMessage.accepting ? (
-              <AgentMessageForm
-                view={run.agentMessage}
-                hint={agentMessageHint(run)}
-                onSend={props.onSendAgentMessage}
-              />
-            ) : null}
+            <AgentMessageForm
+              key={run.id}
+              view={run.agentMessage}
+              hint={agentMessageHint(run)}
+              onSend={props.onSendAgentMessage}
+            />
 
             {run.startError === null ? null : (
               <Block title={t("startError.title")}>
