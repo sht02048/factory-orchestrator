@@ -8,6 +8,7 @@ import {
 import { loadHomePage, pendingInput } from "@ganger/app/home/load";
 import { todoGroups, todoTagOf } from "@ganger/app/home/model";
 import { notificationCauses } from "@ganger/app/notifications/causes";
+import { HUMAN_CHECK_NOTE_MAX } from "@ganger/app/question";
 import { toQuestionId, toTicketKey } from "@ganger/core";
 import type { RunId } from "@ganger/core";
 import { changeRunState, listRunQuestions, listRuns, recordRunQuestions } from "@ganger/db";
@@ -92,6 +93,14 @@ describe("Human Check 요청", () => {
     );
   });
 
+  it("함께 보낼 말은 다듬은 뒤 글자 수로 상한을 잰다", () => {
+    const base = { runId: "r", questionId: "q", decision: "confirmed" };
+    const parsed = (note: string) => humanCheckAnswerInput.safeParse({ ...base, note }).success;
+    expect(parsed(`  ${"가".repeat(HUMAN_CHECK_NOTE_MAX)}  `)).toBe(true);
+    expect(parsed("😀".repeat(HUMAN_CHECK_NOTE_MAX))).toBe(true);
+    expect(parsed("가".repeat(HUMAN_CHECK_NOTE_MAX + 1))).toBe(false);
+  });
+
   it("일반 질문 답하기로는 Human Check 에 답하지 못한다", () => {
     const { db, runId } = seedHumanCheck();
     expect(() => {
@@ -108,6 +117,15 @@ describe("Human Check 요청", () => {
       { kind: "link", value: "https://example.com/b" },
       { kind: "text", value: ")" },
     ]);
+    const links = (body: string) =>
+      bodyParts(body).flatMap((part) => (part.kind === "link" ? [part.value] : []));
+    expect(links("https://github.com/acme/widgets/pull/1을 확인해 주세요")).toEqual([
+      "https://github.com/acme/widgets/pull/1",
+    ]);
+    expect(links("PR(https://github.com/acme/widgets/pull/2)을 봐 주세요")).toEqual([
+      "https://github.com/acme/widgets/pull/2",
+    ]);
+    expect(links("https://example.com/x_(y)")).toEqual(["https://example.com/x_(y)"]);
     expect(bodyParts("javascript:alert(1)")).toEqual([
       { kind: "text", value: "javascript:alert(1)" },
     ]);

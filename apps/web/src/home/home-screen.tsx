@@ -226,7 +226,7 @@ export function HomeScreen({
               }
             >
               {humanChecks.length === 0 ? null : (
-                <div data-todo-group="check">
+                <div data-todo-group="check" {...stylex.props(styles.settled)}>
                   <KanbanSubheading>{t("board.humanCheck")}</KanbanSubheading>
                   <CardList
                     runs={humanChecks}

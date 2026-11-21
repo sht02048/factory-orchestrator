@@ -29,7 +29,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { HumanCheckAnswer } from "../question/human-check-answer";
+import { HumanCheckAnswer, HumanCheckRequest } from "../question/human-check-answer";
 import { QuestionAnswer } from "../question/question-answer";
 import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
@@ -552,9 +552,7 @@ function HumanCheckForm({
       <InputHead kind="human-check" waitedMs={waitedMs} />
       {submit.kind === "sent" || check.answered ? (
         <>
-          <Text variant="body" as="p" wrap="pre">
-            {check.body}
-          </Text>
+          <HumanCheckRequest body={check.body} />
           <Text variant="body" as="p" ref={resultRef} role="status" tabIndex={-1}>
             {t("humanCheck.sent")}
           </Text>

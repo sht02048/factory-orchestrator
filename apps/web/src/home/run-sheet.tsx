@@ -185,7 +185,14 @@ function SheetBody({
         case "question":
           return <AnswerBlock run={run} question={input} onAnswer={onAnswer} />;
         case "human-check":
-          return <HumanCheckBlock run={run} check={input} onHumanCheck={onHumanCheck} />;
+          return (
+            <HumanCheckBlock
+              key={input.questionId}
+              run={run}
+              check={input}
+              onHumanCheck={onHumanCheck}
+            />
+          );
         case "permission":
           return <DenyBlock run={run} permission={input} onDeny={onDeny} />;
       }

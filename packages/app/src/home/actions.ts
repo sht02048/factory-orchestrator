@@ -2,6 +2,7 @@ import { toPermissionRequestId, toQuestionId, toRunId } from "@ganger/core";
 import { answerRunQuestion, denyPermissionWait } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { z } from "zod";
+import { isHumanCheckNoteTooLong } from "../question.js";
 
 export const answerInput = z.object({
   runId: z.string().min(1),
@@ -42,7 +43,10 @@ export const humanCheckAnswerInput = z.object({
   runId: z.string().min(1),
   questionId: z.string().min(1),
   decision: z.enum(HUMAN_CHECK_DECISIONS),
-  note: z.string().trim().max(10_000),
+  note: z
+    .string()
+    .trim()
+    .refine((note) => !isHumanCheckNoteTooLong(note)),
 });
 
 export function humanCheckAnswerText(decision: HumanCheckDecision, note: string): string {

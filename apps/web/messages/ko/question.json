@@ -13,6 +13,7 @@
   "humanCheck": {
     "noteLabel": "에이전트에게 함께 보낼 말",
     "noteHelp": "비워 둬도 돼요",
+    "noteTooLong": "{max}자까지 보낼 수 있어요. 조금 줄여 주세요.",
     "confirm": "확인했어요",
     "requestChanges": "고쳐 주세요",
     "sending": "보내는 중…",
