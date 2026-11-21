@@ -85,6 +85,7 @@ const narrowColumns = "minmax(0, 1fr)";
 
 export interface RunsScreenProps {
   page: RunsPage;
+  drawKey?: string;
   workspaces: ReadonlyArray<WorkspaceSummary>;
   filter: RunFilter;
   endedLimit?: number;
@@ -154,6 +155,7 @@ function AllWorkspaces({
 
 function RunsList({
   page,
+  drawKey = "",
   filter,
   endedLimit,
   selectedId,
@@ -269,6 +271,7 @@ function RunsList({
                   motionItems
                 >
                   <MotionList
+                    key={drawKey}
                     items={visible}
                     getKey={(run) => run.id}
                     itemGap="row"

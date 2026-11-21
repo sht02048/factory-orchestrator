@@ -10,6 +10,7 @@ import { homeMessages } from "../../home/messages";
 import { useDashboardActions } from "../../home/mutations";
 import { dashboardQuery } from "../../home/query";
 import { ScreenMessages, defaultLocale } from "../../i18n";
+import { useFirstDrawKey } from "../../query/first-draw";
 import { requestTimeZone, useRequestTimeZone } from "../../query/request-time-zone";
 import { loadRouteQuery } from "../../query/route-query";
 import { ScreenError } from "../../shell/screen-error";
@@ -31,7 +32,8 @@ export const Route = createFileRoute("/_app/")({
 function HomeRoute() {
   const { ws } = Route.useLoaderDeps();
   const timeZone = useRequestTimeZone();
-  const { data: loaded, refetch } = useSuspenseQuery(dashboardQuery(ws, timeZone));
+  const { data: loaded, refetch, isFetching } = useSuspenseQuery(dashboardQuery(ws, timeZone));
+  const drawKey = useFirstDrawKey(ws, isFetching);
   const readAgainWhenLimitLifts = useCallback(() => {
     void refetch();
   }, [refetch]);
@@ -50,6 +52,7 @@ function HomeRoute() {
     <ScreenMessages messages={homeMessages}>
       <HomeScreen
         page={page}
+        drawKey={drawKey}
         view={view ?? "all"}
         onViewChange={(next) => {
           void navigate({
