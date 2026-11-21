@@ -1784,6 +1784,7 @@ describe("prepareContinuation", () => {
     mailbox: MAILBOX,
     worktreeName: "ganger-ENG-1-2",
     continueIn: WORKTREE,
+    continueBranch: "acme/ganger-ENG-1-1",
   };
 
   test("우편함의 Run이 바뀌어도 워크트리의 최신 에이전트 제목으로 이어 시작을 찾는다", async () => {
@@ -1799,7 +1800,7 @@ describe("prepareContinuation", () => {
     });
   });
 
-  test("시작한 에이전트의 워크트리가 지워졌으면 그 에이전트를 멈추고 시작되지 않은 것으로 본다", async () => {
+  test("시작한 에이전트의 워크트리가 지워졌어도 시작한 런으로 돌려줘 두 번 띄우지 않는다", async () => {
     const newest = { dispatchId: "ctx_new", taskId: "task_new" };
     const exec = new ScriptedExec()
       .orca(
@@ -1829,13 +1830,12 @@ describe("prepareContinuation", () => {
           JSON.stringify({ ok: false, error: { code: "selector_not_found", message: "gone" } }),
           1,
         ),
-      )
-      .orca(
-        "orchestration worker-stop",
-        stdout(JSON.stringify({ ok: true, result: { state: "stopped" } })),
       );
-    expect(await runnerWith(exec).findStartedRun(lookup)).toBeNull();
-    expect(exec.commands().some((c) => c.includes("worker-stop --dispatch ctx_new"))).toBe(true);
+    const found = await runnerWith(exec).findStartedRun(lookup);
+    expect(found?.worktree).toBe(WORKTREE);
+    expect(found?.branch).toBe("acme/ganger-ENG-1-1");
+    expect(found === null ? null : decodeAgent(found.agentRef)?.dispatchId).toBe("ctx_new");
+    expect(exec.commands().some((c) => c.includes("worker-stop"))).toBe(false);
   });
 
   test("워크트리의 최신 에이전트가 이전 런의 것이면 시작되지 않은 것으로 본다", async () => {

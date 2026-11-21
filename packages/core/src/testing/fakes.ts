@@ -442,6 +442,7 @@ export class FakeRunner implements Runner {
     mailbox: MailboxRef;
     worktreeName: string;
     continueIn?: WorktreeRef;
+    continueBranch?: string;
   }): Promise<StartedRun | null> {
     return this.reach(() => this.runs.get(input.worktreeName)?.started ?? null);
   }

@@ -556,11 +556,13 @@ function continuationSource(
 function continueInOf(
   context: TickContext,
   run: QueuedStoredRun,
-): { continueIn: WorktreeRef } | Record<string, never> {
+): { continueIn: WorktreeRef; continueBranch: string } | Record<string, never> {
   const source = continuationSource(context, run);
   if (source === null || source === "missing") return {};
   const place = getRunWithRecords(context.db, run.id)?.records.continuePlace ?? null;
-  return place === null || place === "from-scratch" ? {} : { continueIn: source.worktree };
+  return place === null || place === "from-scratch"
+    ? {}
+    : { continueIn: source.worktree, continueBranch: source.branch };
 }
 
 async function continuationPlace(

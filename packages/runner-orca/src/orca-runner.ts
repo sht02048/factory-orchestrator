@@ -549,6 +549,9 @@ export class OrcaRunner implements Runner {
       ),
       "git fetch",
     );
+    for (const argv of branchUpstreamArgvs({ repoPath, remote, branch: input.branch })) {
+      gitSucceeded(await this.run(argv), "git config");
+    }
     gitSucceeded(
       await this.run(
         addWorktreeFromRemoteArgv({ repoPath, path, branch: input.branch, remote }),
@@ -556,9 +559,6 @@ export class OrcaRunner implements Runner {
       ),
       "git worktree add",
     );
-    for (const argv of branchUpstreamArgvs({ repoPath, remote, branch: input.branch })) {
-      gitSucceeded(await this.run(argv), "git config");
-    }
     return "recreated";
   }
 
@@ -623,6 +623,7 @@ export class OrcaRunner implements Runner {
   private async findContinuedRun(
     worktreeName: string,
     worktree: WorktreeRef,
+    recordedBranch: string | undefined,
   ): Promise<StartedRun | null> {
     const worker = await this.findWorker(worktree, null);
     if (worker === undefined) return null;
@@ -636,36 +637,36 @@ export class OrcaRunner implements Runner {
     );
     const task = tasks.find((candidate) => candidate.id === worker.taskId);
     if (task?.title !== worktreeName || task.status === "failed") return null;
+    const agentRef = encodeAgent({
+      dispatchId: worker.dispatchId,
+      taskId: worker.taskId,
+      runId: shownWorker.runId,
+    });
     const shown = await this.orcaOutcome(
       ["worktree", "show", "--worktree", `id:${worktree}`],
       worktreeShowResultSchema,
     );
-    if (!shown.ok) {
-      if (shown.code !== "selector_not_found") throw this.errorFor(shown, {});
-      await this.orcaOutcome(
-        ["orchestration", "worker-stop", "--dispatch", worker.dispatchId],
-        workerStopResultSchema,
-      );
-      return null;
+    if (shown.ok) {
+      return {
+        worktree: toWorktreeRef(shown.result.worktree.id),
+        branch: branchName(shown.result.worktree.branch, shown.result.worktree.id),
+        agentRef,
+      };
     }
-    return {
-      worktree: toWorktreeRef(shown.result.worktree.id),
-      branch: branchName(shown.result.worktree.branch, shown.result.worktree.id),
-      agentRef: encodeAgent({
-        dispatchId: worker.dispatchId,
-        taskId: worker.taskId,
-        runId: shownWorker.runId,
-      }),
-    };
+    if (shown.code !== "selector_not_found" || recordedBranch === undefined) {
+      throw this.errorFor(shown, {});
+    }
+    return { worktree, branch: recordedBranch, agentRef };
   }
 
   async findStartedRun(input: {
     mailbox: MailboxRef;
     worktreeName: string;
     continueIn?: WorktreeRef;
+    continueBranch?: string;
   }): Promise<StartedRun | null> {
     if (input.continueIn !== undefined) {
-      return this.findContinuedRun(input.worktreeName, input.continueIn);
+      return this.findContinuedRun(input.worktreeName, input.continueIn, input.continueBranch);
     }
     const shown = await this.orcaOutcome(
       ["worktree", "show", "--worktree", `name:${input.worktreeName}`],

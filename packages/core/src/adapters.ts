@@ -327,6 +327,7 @@ export interface Runner {
     mailbox: MailboxRef;
     worktreeName: string;
     continueIn?: WorktreeRef;
+    continueBranch?: string;
   }): Promise<StartedRun | null>;
   prepareContinuation(input: PrepareContinuationInput): Promise<ContinuationPlace>;
   readWorktreeBranch(worktree: WorktreeRef): Promise<string | null>;

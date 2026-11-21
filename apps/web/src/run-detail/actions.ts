@@ -129,7 +129,7 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
     }),
     continueRun: mutationOptions({
       mutationFn: async (message: string) =>
-        okOrThrow<{ runId: string }, string>(await calls.continueRun(toRunId(runId), message)),
+        okOrThrow<{ runId: RunId }, string>(await calls.continueRun(toRunId(runId), message)),
       onSuccess: refreshRun,
     }),
     control: mutationOptions({
