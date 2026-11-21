@@ -1,4 +1,5 @@
 import type {
+  FollowUpRef,
   AgentId,
   AgentRef,
   CodeHostKind,
@@ -249,6 +250,7 @@ export interface ResumeAgentInput {
   message: string;
   restartPrompt: string;
   startIfGone?: boolean;
+  previousRunAgent?: AgentRef;
 }
 
 export interface ResumedAgent {
@@ -300,6 +302,10 @@ export type WorktreeWork =
   | { kind: "gone" }
   | { kind: "checked"; uncommittedChanges: boolean; unpushedCommits: boolean };
 
+export type AgentSendResult =
+  | { kind: "delivered" }
+  | { kind: "follow-up"; followUpRef: FollowUpRef };
+
 export interface Runner {
   readonly kind: RunnerKind;
   readonly agentProtocol: string;
@@ -327,6 +333,9 @@ export interface Runner {
     run: RunOnRunner,
     input: { permissionId: PermissionRequestId; reason: string },
   ): Promise<void>;
+
+  sendToAgent(run: RunOnRunner, input: { body: string }): Promise<AgentSendResult>;
+  stopFollowUp(followUpRef: FollowUpRef): Promise<void>;
 
   pauseAgent(run: RunOnRunner): Promise<void>;
   resumeAgent(run: RunOnRunner, input: ResumeAgentInput): Promise<ResumedAgent>;

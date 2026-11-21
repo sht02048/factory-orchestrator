@@ -6,9 +6,11 @@ import { z } from "zod";
 import { answerInput, denyInput, submitAnswer, submitDenial } from "@ganger/app/home/actions";
 import { loadHomePage } from "@ganger/app/home/load";
 import {
+  agentMessageInput,
   cancelRunRequest,
   continueRunRequest,
   removeWorktreeRequest,
+  sendAgentMessageRequest,
 } from "@ganger/app/run-detail/actions";
 import { requestControl } from "@ganger/app/run-control";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
@@ -112,6 +114,10 @@ export const continueRunFrom = createServerFn({ method: "POST" })
   .handler(({ data }) =>
     continueRunRequest(getDatabase(), toRunId(data.runId), data.message, new Date()),
   );
+
+export const sendAgentMessage = createServerFn({ method: "POST" })
+  .validator(agentMessageInput)
+  .handler(({ data }) => sendAgentMessageRequest(getDatabase(), data, new Date()));
 
 export const controlRun = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string(), control: z.enum(["pause", "resume"]) }))

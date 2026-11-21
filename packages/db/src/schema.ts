@@ -13,6 +13,8 @@ import { CHANGE_KINDS, CHANGE_PARTS } from "./change-events-model.js";
 import { MCP_ACTION_OUTCOMES } from "./mcp-actions-model.js";
 import { NOTIFICATION_EVENT_KINDS } from "./notification-events-model.js";
 import type {
+  FollowUpRef,
+  AgentMessageRequestId,
   AgentId,
   AgentRef,
   CodeHostKind,
@@ -511,6 +513,31 @@ export const runControlRequests = sqliteTable(
     error: text("error"),
   },
   (t) => [check("run_control_requests_control", sql`${t.control} IN ${inList(RUN_CONTROLS)}`)],
+);
+
+export const runAgentMessages = sqliteTable(
+  "run_agent_messages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    requestId: text("request_id").notNull().$type<AgentMessageRequestId>(),
+    body: text("body").notNull(),
+    requestedAt: timeMs("requested_at").notNull(),
+    sendStartedAt: timeMs("send_started_at"),
+    followUpRef: text("follow_up_ref").$type<FollowUpRef>(),
+    completedAt: timeMs("completed_at"),
+    error: text("error"),
+  },
+  (t) => [
+    uniqueIndex("run_agent_messages_request_once").on(t.runId, t.requestId),
+    index("run_agent_messages_run").on(t.runId, t.id),
+    index("run_agent_messages_pending")
+      .on(t.id)
+      .where(sql`${t.completedAt} IS NULL`),
+  ],
 );
 
 export const runCancelRequests = sqliteTable("run_cancel_requests", {

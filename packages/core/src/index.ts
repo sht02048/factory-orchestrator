@@ -1,5 +1,6 @@
 export * from "./adapters.js";
 export * from "./agent-brief.js";
+export * from "./agent-message.js";
 export * from "./assignment.js";
 export * from "./ids.js";
 export * from "./pr-state.js";

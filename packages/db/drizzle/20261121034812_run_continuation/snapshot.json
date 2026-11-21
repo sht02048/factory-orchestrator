@@ -1,8 +1,8 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "5cae30e7-895a-4768-92c4-11be40e20fe4",
-  "prevIds": ["9ac5fcb0-a1cf-4c91-b2d0-1a8cfd7ebbc5"],
+  "id": "f1412409-7ef0-4569-9c11-c0862d27ba72",
+  "prevIds": ["f6bccc74-916d-41c1-9cd2-9ad0a2fd8ead"],
   "ddl": [
     {
       "name": "auto_assign_labels",
@@ -46,6 +46,10 @@
     },
     {
       "name": "notification_sequence",
+      "entityType": "tables"
+    },
+    {
+      "name": "run_agent_messages",
       "entityType": "tables"
     },
     {
@@ -713,6 +717,96 @@
       "name": "last",
       "type": "integer",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "id",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": true,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "run_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "request_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "body",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "requested_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "send_started_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "follow_up_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "completed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "error",
+      "type": "text",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -2197,6 +2291,56 @@
       "entityType": "indexes"
     },
     {
+      "table": "run_agent_messages",
+      "name": "run_agent_messages_request_once",
+      "columns": [
+        {
+          "value": "run_id",
+          "isExpression": false
+        },
+        {
+          "value": "request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "run_agent_messages_run",
+      "columns": [
+        {
+          "value": "run_id",
+          "isExpression": false
+        },
+        {
+          "value": "id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "run_agent_messages_pending",
+      "columns": [
+        {
+          "value": "id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "\"run_agent_messages\".\"completed_at\" IS NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "run_permission_waits",
       "name": "run_permission_waits_unsent",
       "columns": [
@@ -2442,6 +2586,17 @@
       "name": "fk_notification_events_runner_id_runners_id_fk",
       "columns": ["runner_id"],
       "tableTo": "runners",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "fk_run_agent_messages_run_id_runs_id_fk",
+      "columns": ["run_id"],
+      "tableTo": "runs",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
@@ -2721,6 +2876,13 @@
     {
       "table": "notification_sequence",
       "name": "notification_sequence_pk",
+      "columns": ["id"],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "run_agent_messages_pk",
       "columns": ["id"],
       "nameExplicit": false,
       "entityType": "pks"

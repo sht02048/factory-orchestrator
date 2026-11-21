@@ -1,9 +1,10 @@
 import { withLogContext } from "@ganger/log";
 import { planRunControl, ticketBriefText } from "@ganger/core";
-import type { RunControlFailure, RunnerErrorDetail } from "@ganger/core";
+import type { AgentRef, RunControlFailure, RunnerErrorDetail } from "@ganger/core";
 import {
   changeRunState,
   completeRunControlRequest,
+  getRun,
   getRunWithRecords,
   hasPendingCancelRequest,
   listPendingRunControlRequests,
@@ -94,10 +95,21 @@ async function applyRunControl(
     message: messages.resume.message,
     restartPrompt: await restartPromptFor(context, run, found.records.agentBrief),
     startIfGone: !cancelling,
+    ...previousRunAgentOf(context, run),
   });
   return recorded(context, run, () =>
     changeRunState(db, run.id, { to: "running", resumedAgentRef: resumed.agentRef }, context.now()),
   );
+}
+
+function previousRunAgentOf(
+  context: TickContext,
+  run: ActiveRun,
+): { previousRunAgent: AgentRef } | Record<string, never> {
+  if (run.continuedFromRunId === null) return {};
+  const source = getRun(context.db, run.continuedFromRunId);
+  if (source === null || source.state === "queued" || source.agentRef === null) return {};
+  return source.worktree === run.worktree ? { previousRunAgent: source.agentRef } : {};
 }
 
 function recorded(
@@ -137,7 +149,7 @@ async function restartPromptFor(
   return `${messages.resume.restartPreamble}\n\n${ticketText}`;
 }
 
-function failureOf(detail: RunnerErrorDetail | null): RunControlFailure {
+export function failureOf(detail: RunnerErrorDetail | null): RunControlFailure {
   if (detail === null) return "runner-error";
   switch (detail.kind) {
     case "unreachable":

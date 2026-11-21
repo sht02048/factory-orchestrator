@@ -1,8 +1,16 @@
 import { log } from "@ganger/log";
 import type { Logger } from "@ganger/log";
 import { describeRunnerCall, logRunnerCall } from "./runner-call-log.js";
-import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@ganger/core";
+import {
+  AdapterError,
+  toFollowUpRef,
+  toRunnerKind,
+  toRunnerProjectId,
+  toWorktreeRef,
+} from "@ganger/core";
 import type {
+  FollowUpRef,
+  AgentSendResult,
   AgentRef,
   MailboxRef,
   PermissionRequestId,
@@ -77,6 +85,8 @@ import {
   replyResultSchema,
   runBindResultSchema,
   runCurrentResultSchema,
+  failedFollowUpEnvelopeSchema,
+  operatorSendResultSchema,
   sendResultSchema,
   serviceStatusResultSchema,
   statusResultSchema,
@@ -114,6 +124,14 @@ export const LOG_CUT_MARKER = `[log tail cut: the transcript is longer than ${LO
 const RAW_LIMIT = 4000;
 export const INTERRUPT_KEY = "\u001b";
 export const ESCALATION_ANSWER_SUBJECT = "Answer from the operator";
+export const OPERATOR_MESSAGE_SUBJECT =
+  "Message from the operator (not an answer to any open question)";
+
+const SEND_NOT_APPLIED_CODES: ReadonlySet<string> = new Set([
+  "argument_too_long",
+  "invalid_argument",
+  "agent_not_running",
+]);
 
 const SENDER_ERROR_CODES = new Set([
   "no_active_sender_terminal",
@@ -510,13 +528,14 @@ export class OrcaRunner implements Runner {
       return "recreated";
     }
     const remote = project.remoteName;
-    const onRemote = await this.run(
-      remoteBranchArgv({ repoPath, remote, branch: input.branch }),
-      timeout,
+    const onRemote = withinRemoteTimeout(
+      await this.run(remoteBranchArgv({ repoPath, remote, branch: input.branch }), timeout),
     );
     if (!refFound(onRemote, "git ls-remote", 2)) return "from-scratch";
     gitSucceeded(
-      await this.run(fetchBranchArgv({ repoPath, remote, branch: input.branch }), timeout),
+      withinRemoteTimeout(
+        await this.run(fetchBranchArgv({ repoPath, remote, branch: input.branch }), timeout),
+      ),
       "git fetch",
     );
     gitSucceeded(
@@ -548,7 +567,7 @@ export class OrcaRunner implements Runner {
         ["orchestration", "worker-show", "--dispatch", agent.dispatchId],
         workerShowResultSchema,
       );
-      if (shown.ok && shown.result.state !== "ready") return;
+      if (shown.ok && shown.result.state !== "ready" && shown.result.liveness !== "live") return;
     }
     throw this.errorFor(stopped, {});
   }
@@ -808,6 +827,55 @@ export class OrcaRunner implements Runner {
     );
   }
 
+  async sendToAgent(run: RunOnRunner, input: { body: string }): Promise<AgentSendResult> {
+    const agent = this.agentOf(run);
+    const mailbox = this.mailboxOf(run.mailbox);
+    let sent: z.infer<typeof operatorSendResultSchema>;
+    try {
+      sent = await this.orca(
+        [
+          "orchestration",
+          "send",
+          "--from",
+          mailbox.terminal,
+          "--to",
+          `dispatch:${agent.dispatchId}`,
+          "--subject",
+          OPERATOR_MESSAGE_SUBJECT,
+          `--body=${input.body}`,
+        ],
+        operatorSendResultSchema,
+        { usesMailbox: true, timeoutMs: this.config.startTimeoutMs },
+        failedFollowUpEnvelopeSchema,
+      );
+    } catch (error) {
+      const detail = detailOf(error);
+      if (
+        detail.kind === "not-ready" ||
+        (detail.kind === "runner-error" && !SEND_NOT_APPLIED_CODES.has(detail.code))
+      ) {
+        throw new AdapterError<RunnerErrorDetail>(
+          {
+            kind: "start-outcome-unknown",
+            detail: detail.kind === "not-ready" ? detail.detail : detail.message,
+          },
+          { cause: error },
+        );
+      }
+      throw error;
+    }
+    return "delivery" in sent
+      ? { kind: "follow-up", followUpRef: toFollowUpRef(sent.dispatchId) }
+      : { kind: "delivered" };
+  }
+
+  async stopFollowUp(followUpRef: FollowUpRef): Promise<void> {
+    await this.orca(
+      ["orchestration", "worker-stop", "--dispatch", followUpRef],
+      workerStopResultSchema,
+    );
+  }
+
   async pauseAgent(run: RunOnRunner): Promise<void> {
     const terminal = await this.liveAgentTerminal(this.agentOf(run), run.worktree);
     if (terminal === null) {
@@ -845,6 +913,7 @@ export class OrcaRunner implements Runner {
     const adopted = await this.liveWorkerAt(run.worktree, {
       runId: mailbox.runId,
       exceptDispatch: agent.dispatchId,
+      olderThanDispatch: previousDispatchOf(input.previousRunAgent),
     });
     if (adopted !== null) return { agentRef: adopted, restarted: true };
     if (input.startIfGone === false) {
@@ -916,10 +985,18 @@ export class OrcaRunner implements Runner {
 
   private async liveWorkerAt(
     worktree: WorktreeRef,
-    { runId, exceptDispatch }: { runId: string; exceptDispatch: string },
+    {
+      runId,
+      exceptDispatch,
+      olderThanDispatch,
+    }: { runId: string; exceptDispatch: string; olderThanDispatch: string | null },
   ): Promise<AgentRef | null> {
-    for (const run of [runId, null]) {
-      const found = await this.unsettledWorkerAt(worktree, { runId: run, exceptDispatch });
+    for (const run of olderThanDispatch === null ? [runId, null] : [null]) {
+      const found = await this.unsettledWorkerAt(worktree, {
+        runId: run,
+        exceptDispatch,
+        olderThanDispatch,
+      });
       if (found !== null) return found;
     }
     return null;
@@ -927,7 +1004,11 @@ export class OrcaRunner implements Runner {
 
   private async unsettledWorkerAt(
     worktree: WorktreeRef,
-    { runId, exceptDispatch }: { runId: string | null; exceptDispatch: string },
+    {
+      runId,
+      exceptDispatch,
+      olderThanDispatch,
+    }: { runId: string | null; exceptDispatch: string; olderThanDispatch: string | null },
   ): Promise<AgentRef | null> {
     let cursor: string | null = null;
     for (let page = 0; page < WORKER_LIST_MAX_PAGES; page += 1) {
@@ -943,6 +1024,7 @@ export class OrcaRunner implements Runner {
         workerListResultSchema,
       );
       for (const worker of result.workers) {
+        if (worker.dispatchId === olderThanDispatch) return null;
         if (worker.workspace !== worktree || worker.dispatchId === exceptDispatch) continue;
         const shown = await this.orca(
           ["orchestration", "worker-show", "--dispatch", worker.dispatchId],
@@ -1118,8 +1200,9 @@ export class OrcaRunner implements Runner {
     args: ReadonlyArray<string>,
     schema: z.ZodType<T>,
     options: CallOptions = {},
+    failedResultSchema?: z.ZodType<T>,
   ): Promise<T> {
-    const outcome = await this.orcaOutcome(args, schema, options);
+    const outcome = await this.orcaOutcome(args, schema, options, failedResultSchema);
     if (!outcome.ok) throw this.errorFor(outcome, options);
     return outcome.result;
   }
@@ -1128,6 +1211,7 @@ export class OrcaRunner implements Runner {
     args: ReadonlyArray<string>,
     schema: z.ZodType<T>,
     options: CallOptions = {},
+    failedResultSchema?: z.ZodType<T>,
   ): Promise<Outcome<T>> {
     const result = await this.run([this.config.orcaPath, ...args, "--json"], options);
     if (result.timedOut) {
@@ -1140,7 +1224,10 @@ export class OrcaRunner implements Runner {
         detail: result.stderr.trim() || `orca not found at ${this.config.orcaPath}`,
       });
     }
-    const envelope = envelopeSchema.safeParse(parseJson(result.stdout));
+    const output = parseJson(result.stdout);
+    const failedResult = failedResultSchema?.safeParse(output);
+    if (failedResult?.success === true) return { ok: true, result: failedResult.data };
+    const envelope = envelopeSchema.safeParse(output);
     if (!envelope.success) throw malformed(result);
     if (!envelope.data.ok) {
       return {
@@ -1212,6 +1299,19 @@ export const orcaRunnerFactory: RunnerFactory = {
     return new OrcaRunner(parseOrcaRunnerConfig(config));
   },
 };
+
+function withinRemoteTimeout(result: RemoteResult): RemoteResult {
+  if (!result.timedOut) return result;
+  throw new AdapterError<RunnerErrorDetail>({
+    kind: "runner-error",
+    code: "remote_read_timeout",
+    message: "git timed out reading the remote branch",
+  });
+}
+
+function previousDispatchOf(agentRef: AgentRef | undefined): string | null {
+  return agentRef === undefined ? null : (decodeAgent(agentRef)?.dispatchId ?? null);
+}
 
 function worktreePathOf(worktree: WorktreeRef): string {
   const separator = worktree.indexOf("::");

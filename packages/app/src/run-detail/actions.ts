@@ -1,8 +1,14 @@
+import { AGENT_MESSAGE_MAX_LENGTH, toAgentMessageRequestId, toRunId } from "@ganger/core";
 import type { RunId } from "@ganger/core";
-import { toRunId } from "@ganger/core";
-import { continueRun, requestRunCancel, requestWorktreeRemoval } from "@ganger/db";
+import {
+  continueRun,
+  requestAgentMessage,
+  requestRunCancel,
+  requestWorktreeRemoval,
+} from "@ganger/db";
 import type { ContinueRunBlock } from "@ganger/db";
 import type { Database } from "@ganger/db";
+import { z } from "zod";
 
 export type RunActionResult = { ok: true } | { ok: false; reason: string };
 
@@ -27,4 +33,29 @@ export function continueRunRequest(
 ): ContinueRunActionResult {
   const result = continueRun(db, { from: runId, message, now });
   return result.ok ? { ok: true, runId: result.run.id } : result;
+}
+
+export const agentMessageInput = z.object({
+  runId: z.string().min(1),
+  requestId: z.string().min(16).max(64),
+  body: z
+    .string()
+    .trim()
+    .min(1)
+    .max(AGENT_MESSAGE_MAX_LENGTH)
+    .refine((body) => !body.includes("\0")),
+});
+
+export function sendAgentMessageRequest(
+  db: Database,
+  input: z.infer<typeof agentMessageInput>,
+  now: Date,
+): RunActionResult {
+  const result = requestAgentMessage(
+    db,
+    toRunId(input.runId),
+    { requestId: toAgentMessageRequestId(input.requestId), body: input.body },
+    now,
+  );
+  return result.ok ? { ok: true } : result;
 }

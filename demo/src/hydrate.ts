@@ -56,6 +56,7 @@ export function hydrateWorld(db: Database, world: DemoWorld): void {
       answers: questions.flatMap((q) =>
         q.answer?.sentAt == null ? [] : [{ questionId: q.id, answer: q.answer.text }],
       ),
+      agentMessages: [],
       permissionWaits: listRunPermissionWaits(db, run.id)
         .filter((wait) => wait.resolvedAt === null && wait.denial === null)
         .map((wait) => ({ id: wait.id, detail: wait.detail, requestedAt: wait.requestedAt })),

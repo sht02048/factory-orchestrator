@@ -1,5 +1,6 @@
 import {
   AdapterError,
+  toFollowUpRef,
   blockedProjectsOf,
   isAssignmentBlocked,
   toAgentId,
@@ -833,6 +834,112 @@ describe("answerQuestion and denyPermission", () => {
     ]);
   });
 
+  test("a message from the operator goes to the run's dispatch(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(research("0120/send-to-dispatch.json")),
+    );
+    await runnerWith(exec).sendToAgent(RUN, { body: "끝내기 전에 push 해 주세요" });
+    expect(exec.commands()).toEqual([
+      `/Applications/Orca.app/Contents/Resources/bin/orca orchestration send --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --to dispatch:ctx_a6e6a23a7132 --subject 'Message from the operator (not an answer to any open question)' '--body=끝내기 전에 push 해 주세요' --json`,
+    ]);
+  });
+
+  test("an operator message starting with -- stays one body argument(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(research("0120/send-to-dispatch.json")),
+    );
+    await runnerWith(exec).sendToAgent(RUN, {
+      body: "--to=dispatch:other --no-verify 쓰지 마세요",
+    });
+    expect(exec.commands()[0]).toContain(
+      "'--body=--to=dispatch:other --no-verify 쓰지 마세요' --json",
+    );
+  });
+
+  test("a send that Orca turned into a follow-up returns its dispatch(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(
+        JSON.stringify({
+          ok: true,
+          result: { delivery: "follow_up", followUpOf: "ctx_a6e6a23a7132", dispatchId: "ctx_new" },
+        }),
+      ),
+    );
+    expect(await runnerWith(exec).sendToAgent(RUN, { body: "x" })).toEqual({
+      kind: "follow-up",
+      followUpRef: "ctx_new",
+    });
+  });
+
+  test("a follow-up that did not become ready still returns its dispatch(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(
+        JSON.stringify({
+          ok: false,
+          result: { delivery: "follow_up", dispatchId: "ctx_new", state: "outcome_unknown" },
+        }),
+        1,
+      ),
+    );
+    expect(await runnerWith(exec).sendToAgent(RUN, { body: "x" })).toEqual({
+      kind: "follow-up",
+      followUpRef: "ctx_new",
+    });
+  });
+
+  test.each([
+    "runtime_unavailable",
+    "remote_runtime_unavailable",
+    "runtime_timeout",
+    "invalid_runtime_response",
+  ])("%s after a send means the outcome is unknown(0147)", async (code) => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(JSON.stringify({ ok: false, error: { code, message: "cut" } }), 1),
+    );
+    expect(await adapterError(runnerWith(exec).sendToAgent(RUN, { body: "x" }))).toMatchObject({
+      kind: "start-outcome-unknown",
+    });
+  });
+
+  test("a code Orca adds later is treated as an unknown outcome, a known refusal is not(0147)", async () => {
+    const later = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(JSON.stringify({ ok: false, error: { code: "some_new_code", message: "x" } }), 1),
+    );
+    expect(await adapterError(runnerWith(later).sendToAgent(RUN, { body: "x" }))).toMatchObject({
+      kind: "start-outcome-unknown",
+    });
+    const refused = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(JSON.stringify({ ok: false, error: { code: "invalid_argument", message: "x" } }), 1),
+    );
+    expect(await adapterError(runnerWith(refused).sendToAgent(RUN, { body: "x" }))).toMatchObject({
+      kind: "runner-error",
+      code: "invalid_argument",
+    });
+  });
+
+  test("stopping a follow-up stops that dispatch(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration worker-stop",
+      stdout(JSON.stringify({ ok: true, result: { state: "stopped" } })),
+    );
+    await runnerWith(exec).stopFollowUp(toFollowUpRef("ctx_new"));
+    expect(exec.commands()[0]).toContain("orchestration worker-stop --dispatch ctx_new");
+  });
+
+  test("broken send output for an operator message is malformed(0147)", async () => {
+    const broken = new ScriptedExec().orca("orchestration send", BROKEN);
+    expect(await adapterError(runnerWith(broken).sendToAgent(RUN, { body: "x" }))).toMatchObject({
+      kind: "malformed-output",
+    });
+  });
+
   test("a second, different answer is a runner error; broken output is malformed", async () => {
     const conflict = new ScriptedExec().orca(
       "orchestration reply",
@@ -1655,5 +1762,61 @@ describe("prepareContinuation", () => {
     expect(await runnerWith(exec).prepareContinuation({ ...input, stopAgent })).toBe(
       "same-worktree",
     );
+  });
+
+  test("원격 읽기가 시간 초과되면 러너 Offline이 아니라 시작 실패로 돌려준다", async () => {
+    const exec = projectExec();
+    git(exec, "worktree list", list(main));
+    git(exec, "worktree prune", stdout(""));
+    git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote", { exitCode: 124, stdout: "", stderr: "", timedOut: true });
+    expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
+      kind: "runner-error",
+      code: "remote_read_timeout",
+    });
+  });
+
+  test("이어 받은 런을 재개할 때 이전 런의 끝난 에이전트를 입양하지 않고 새로 띄운다", async () => {
+    const current = encodeAgent({ dispatchId: "ctx_b", taskId: "task_b", runId: "run_1" });
+    const previous = encodeAgent({ dispatchId: "ctx_a", taskId: "task_a", runId: "run_1" });
+    const shownB = {
+      dispatchId: "ctx_b",
+      taskId: "task_b",
+      runId: "run_1",
+      state: "failed",
+      liveness: "exited",
+    };
+    const exec = new ScriptedExec()
+      .orca(
+        "orchestration worker-show --dispatch ctx_b",
+        stdout(JSON.stringify({ ok: true, result: shownB })),
+      )
+      .orca(
+        "orchestration worker-list",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: {
+              workers: [
+                { dispatchId: "ctx_b", taskId: "task_b", workspace: WORKTREE },
+                { dispatchId: "ctx_a", taskId: "task_a", workspace: WORKTREE },
+              ],
+            },
+          }),
+        ),
+      )
+      .orca("orchestration worker-start", stdout(own("worker-start-spec-stdin.json")));
+    const resumed = await runnerWith(exec).resumeAgent(
+      { mailbox: MAILBOX, worktree: WORKTREE, agentRef: current },
+      {
+        agent: toAgentId("claude"),
+        message: "continue",
+        restartPrompt: "brief",
+        previousRunAgent: previous,
+      },
+    );
+    expect(resumed.restarted).toBe(true);
+    expect(exec.commands().some((c) => c.includes("worker-show --dispatch ctx_a"))).toBe(false);
+    expect(exec.commands().some((c) => c.includes("worker-start"))).toBe(true);
   });
 });
