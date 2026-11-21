@@ -50,12 +50,11 @@ function live(notifier: Notifier, records: NotificationRecord[], at = T) {
 }
 
 describe("알림 고르기", () => {
-  it("Human Check 만 소리 없이, 나머지는 소리와 함께 알린다", () => {
+  it("사건 종류마다 하나씩 알린다", () => {
     const { notifier } = setup();
     const kinds: NotificationRecord["kind"][] = [
       "question",
       "permission",
-      "human-check",
       "runner-offline",
       "runner-auth",
       "runner-usage-limit",
@@ -64,38 +63,29 @@ describe("알림 고르기", () => {
       live(notifier, [event(index + 1, kind)], T + index * BUNDLE_WINDOW_MS * 2),
     );
     expect(
-      shows(effects).map((show) => [
-        show.content.kind === "event" && show.content.record.kind,
-        show.silent,
-      ]),
-    ).toEqual([
-      ["question", false],
-      ["permission", false],
-      ["human-check", true],
-      ["runner-offline", false],
-      ["runner-auth", false],
-      ["runner-usage-limit", false],
-    ]);
+      shows(effects).map((show) => show.content.kind === "event" && show.content.record.kind),
+    ).toEqual(["question", "permission", "runner-offline", "runner-auth", "runner-usage-limit"]);
     const failed = live(
       notifier,
       [event(20, "failed"), event(21, "disconnected")],
       T + 100 * BUNDLE_WINDOW_MS,
     );
-    expect(shows(failed).map((show) => show.silent)).toEqual([false, false]);
+    expect(
+      shows(failed).map((show) => show.content.kind === "event" && show.content.record.kind),
+    ).toEqual(["failed", "disconnected"]);
   });
 
   it("5초 안에 3건을 넘으면 앞 알림을 지우고 하나로 묶는다", () => {
     const { notifier } = setup();
-    const first = live(notifier, [event(1), event(2), event(3, "human-check")], T);
+    const first = live(notifier, [event(1), event(2), event(3, "failed")], T);
     expect(shows(first).map((show) => show.id)).toEqual(["event-1", "event-2", "event-3"]);
-    const fourth = live(notifier, [event(4, "human-check")], T + 4_000);
+    const fourth = live(notifier, [event(4, "failed")], T + 4_000);
     expect(removed(fourth)).toEqual(["event-1", "event-2", "event-3"]);
     expect(shows(fourth)).toEqual([
       {
         type: "show",
         id: "bundle-1",
         content: { kind: "bundle", count: 4 },
-        silent: false,
         path: TODO_VIEW_PATH,
       },
     ]);
@@ -124,7 +114,7 @@ describe("알림 고르기", () => {
 
   it("Question·Permission 이 10분 동안 해결되지 않으면 한 번만 다시 알린다", () => {
     const { notifier } = setup();
-    live(notifier, [event(1, "question"), event(2, "permission"), event(3, "human-check")], T);
+    live(notifier, [event(1, "question"), event(2, "permission"), event(3, "failed")], T);
     expect(shows(notifier.tick(T + REMIND_AFTER_MS - 1))).toEqual([]);
     const reminded = shows(notifier.tick(T + REMIND_AFTER_MS));
     expect(
@@ -191,7 +181,7 @@ describe("알림 고르기", () => {
           event(3),
           event(6),
           event(7, "failed"),
-          event(8, "human-check"),
+          event(8, "disconnected"),
           event(9, "runner-offline"),
           event(10, "question", { resolved: true }),
         ],
@@ -206,7 +196,6 @@ describe("알림 고르기", () => {
         type: "show",
         id: "missed-1",
         content: { kind: "missed", count: 3 },
-        silent: false,
         path: TODO_VIEW_PATH,
       },
     ]);

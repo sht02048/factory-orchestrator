@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { AdapterError, decidePrState } from "@ganger/core";
 import type {
   AgentResult,
@@ -5,6 +6,9 @@ import type {
   CompletionReport,
   MailboxRef,
   PermissionRequestId,
+  PrReadError,
+  PullRequestSignals,
+  PullRequestSnapshot,
   PrStateDecision,
   QuestionId,
   RunId,
@@ -13,11 +17,19 @@ import type {
   RunnerId,
   StartedRun,
 } from "@ganger/core";
-import { changeRunState, listRunners, setRunnerMailbox } from "@ganger/db";
+import {
+  changeRunState,
+  getRun,
+  listRunners,
+  setRunnerMailbox,
+  worktreeTakenOverBy,
+} from "@ganger/db";
+import type { WorktreeSetupResult } from "@ganger/core";
 import type { Database, StoredRun, StoredRunner } from "@ganger/db";
 import type { LogContext, Logger } from "@ganger/log";
 import type { WorkerAdapters } from "./adapters.js";
 import type { AutoAssignState } from "./auto-assign.js";
+import type { BlockerRefreshState } from "./blockers.js";
 
 export type WorkerLogger = Logger;
 
@@ -27,21 +39,36 @@ export interface TickContext {
   logger: WorkerLogger;
   adapters: WorkerAdapters;
   pendingStarts: Map<RunId, PendingStart>;
+  worktreeSetups: Map<RunId, WorktreeSetupJob>;
   mailboxes: Map<RunnerId, MailboxRef>;
   unreachableUntil: Map<RunnerId, number>;
   unmarkedAnswers: Set<string>;
+  unwokenHumanChecks: Set<string>;
   unmarkedDenials: Set<string>;
   pendingEndings: Map<RunId, PendingEnding>;
   prPolledAt: Map<RunId, number>;
+  prReadRetries: Map<RunId, PrReadRetry>;
+  agentCheckedAt: Map<RunId, number>;
   unrecordedComments: Map<RunId, { id: CommentId; at: Date }>;
   ticketsGone: Set<RunId>;
   autoAssign: AutoAssignState;
+  blockerRefresh: BlockerRefreshState;
+}
+
+export interface WorktreeSetupJob {
+  outcome: WorktreeSetupResult | { kind: "threw"; error: unknown } | null;
 }
 
 export interface PendingEnding {
   agentResult: AgentResult;
   report: CompletionReport | null;
   lastLog: ReadonlyArray<string> | null;
+}
+
+export interface PrReadRetry {
+  failures: number;
+  nextAt: number;
+  codeHosts: string;
 }
 
 export interface PendingStart {
@@ -78,6 +105,15 @@ export async function mailboxFor(
   return mailbox;
 }
 
+function handedOverAtOf(
+  context: TickContext,
+  run: StartedStoredRun,
+): { handedOverAt: Date } | Record<string, never> {
+  const nextId = worktreeTakenOverBy(context.db, run.id);
+  const next = nextId === null ? null : getRun(context.db, nextId);
+  return next === null ? {} : { handedOverAt: next.assignedAt };
+}
+
 export async function decideRunPrState(
   context: TickContext,
   run: StartedStoredRun,
@@ -93,14 +129,21 @@ export async function decideRunPrState(
   for (const codeHost of codeHosts) {
     const repo = codeHost.repoOf(run.runnerProject);
     if (repo === null) continue;
-    const [byBranch, byTicketKey] = await Promise.all([
+    const [branchRead, keyRead] = await Promise.allSettled([
       codeHost.findPullRequestsByBranch(repo, run.branch),
       codeHost.findPullRequestsByTicketKey(repo, run.ticket.key, { createdSince: run.startedAt }),
     ]);
+    if (branchRead.status === "rejected" || keyRead.status === "rejected") {
+      throw firstNoAccessOrAny([branchRead, keyRead]);
+    }
+    const byBranch = branchRead.value;
+    const byTicketKey = keyRead.value;
     return decidePrState({
       repo,
       ticketKey: run.ticket.key,
       runStartedAt: run.startedAt,
+      continuesEarlierRun: run.continuedFromRunId !== null,
+      ...handedOverAtOf(context, run),
       byBranch,
       byTicketKey,
     });
@@ -115,6 +158,83 @@ export async function decideRunPrState(
     runnerProject: run.runnerProject,
   });
   return { prState: "none", pr: null };
+}
+
+export function pullRequestRecord(pr: PullRequestSnapshot, checkedAt: Date) {
+  const { id, displayId, url, ci, signals, headCommit } = pr;
+  const read = signals ?? (isSettledPr(pr) ? settledSignals(headCommit) : null);
+  return { id, displayId, url, ci, checkedAt, headCommit, signals: read };
+}
+
+function isSettledPr(pr: PullRequestSnapshot): boolean {
+  return pr.state === "merged" || pr.state === "closed";
+}
+
+function settledSignals(headCommit: string): PullRequestSignals {
+  return {
+    open: false,
+    headCommit,
+    ciFailed: false,
+    checkTotal: null,
+    failedCount: 0,
+    failedChecks: [],
+    checksTruncated: false,
+    conflict: null,
+    behindBy: null,
+  };
+}
+
+export type PrRead =
+  | { kind: "read"; decision: PrStateDecision }
+  | { kind: "failed"; error: PrReadError };
+
+export async function readRunPrState(context: TickContext, run: StartedStoredRun): Promise<PrRead> {
+  try {
+    return { kind: "read", decision: await decideRunPrState(context, run) };
+  } catch (error) {
+    const reason = prReadErrorOf(error);
+    context.logger.warn("run.pr_read_failed", { runId: run.id, reason, error });
+    return { kind: "failed", error: reason };
+  }
+}
+
+function firstNoAccessOrAny(reads: ReadonlyArray<PromiseSettledResult<unknown>>): unknown {
+  const reasons: unknown[] = [];
+  for (const read of reads) {
+    if (read.status === "rejected") reasons.push(read.reason);
+  }
+  return reasons.find((reason) => prReadErrorOf(reason) === "no-access") ?? reasons[0];
+}
+
+const noAccessDetail = z.object({ kind: z.enum(["unauthorized", "not-found"]) });
+
+export function prReadErrorOf(error: unknown): PrReadError {
+  return error instanceof AdapterError && noAccessDetail.safeParse(error.detail).success
+    ? "no-access"
+    : "other";
+}
+
+export const PR_READ_RETRY_FIRST_MS = 60_000;
+export const PR_READ_RETRY_MAX_MS = 30 * 60_000;
+
+export function prReadRetryDelayMs(failures: number): number {
+  return Math.min(PR_READ_RETRY_FIRST_MS * 2 ** Math.max(failures - 1, 0), PR_READ_RETRY_MAX_MS);
+}
+
+export function rememberPrReadFailure(context: TickContext, runId: RunId): void {
+  const failures = (context.prReadRetries.get(runId)?.failures ?? 0) + 1;
+  context.prReadRetries.set(runId, {
+    failures,
+    nextAt: context.now().getTime() + prReadRetryDelayMs(failures),
+    codeHosts: context.adapters.codeHostsKey(context.db),
+  });
+}
+
+export function prReadDue(context: TickContext, runId: RunId): boolean {
+  const retry = context.prReadRetries.get(runId);
+  if (retry === undefined) return true;
+  if (retry.codeHosts !== context.adapters.codeHostsKey(context.db)) return true;
+  return context.now().getTime() >= retry.nextAt;
 }
 
 export function tryWrite<T>(context: TickContext, runId: RunId, write: () => T): T | undefined {

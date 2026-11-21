@@ -1,14 +1,24 @@
+import type { PullRequestSignals } from "@ganger/core";
 import {
   AGENT_RESULTS,
   NOT_STARTED_AGENT_RESULTS,
   PAUSE_SOURCES,
+  AGENT_CHECKS,
+  CONTINUATION_PLACES,
+  PR_READ_ERRORS,
   PR_STATES,
+  QUESTION_KINDS,
   RUN_STATES,
+  TICKET_PRIORITIES,
+  WORKTREE_KEPT_REASONS,
 } from "@ganger/core";
 import { CHANGE_KINDS, CHANGE_PARTS } from "./change-events-model.js";
 import { MCP_ACTION_OUTCOMES } from "./mcp-actions-model.js";
 import { NOTIFICATION_EVENT_KINDS } from "./notification-events-model.js";
 import type {
+  FollowUpRef,
+  AgentMessageRequestId,
+  RunActionRequestId,
   AgentId,
   AgentRef,
   CodeHostKind,
@@ -144,6 +154,8 @@ export const workspaces = sqliteTable(
     id: text("id").primaryKey().$type<WorkspaceId>(),
     name: text("name").notNull(),
     maxRunMs: integer("max_run_ms").notNull().default(7_200_000),
+    briefBefore: text("brief_before").notNull().default(""),
+    briefAfter: text("brief_after").notNull().default(""),
     createdAt: timeMs("created_at").notNull(),
   },
   (t) => [check("workspaces_max_run_ms", sql`${t.maxRunMs} > 0`)],
@@ -267,16 +279,34 @@ export const runs = sqliteTable(
     startError: text("start_error"),
     agentResult: text("agent_result", { enum: AGENT_RESULTS }),
     prState: text("pr_state", { enum: PR_STATES }),
+    prReadError: text("pr_read_error", { enum: PR_READ_ERRORS }),
     runnerUnreached: integer("runner_unreached", { mode: "boolean" }).notNull().default(false),
     reportBody: text("report_body"),
+    agentBrief: text("agent_brief"),
+    runnerChosen: integer("runner_chosen", { mode: "boolean" }).notNull().default(false),
+    ticketPriority: text("ticket_priority", { enum: TICKET_PRIORITIES }),
+    blockersReadAt: timeMs("blockers_read_at"),
+    blockersReadFailed: integer("blockers_read_failed", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    waitSkippedAt: timeMs("wait_skipped_at"),
+    continuedFromRunId: text("continued_from_run_id").$type<RunId>(),
+    continueMessage: text("continue_message"),
+    continuePlace: text("continue_place", { enum: CONTINUATION_PLACES }),
+    agentCheck: text("agent_check", { enum: AGENT_CHECKS }),
+    agentStopRequestedAt: timeMs("agent_stop_requested_at"),
     prId: text("pr_id").$type<PullRequestId>(),
     prDisplayId: text("pr_display_id"),
     prUrl: text("pr_url"),
     prCiState: text("pr_ci_state"),
     prCheckedAt: timeMs("pr_checked_at"),
+    prSignals: text("pr_signals", { mode: "json" }).$type<PullRequestSignals>(),
+    prSignalsReadAt: timeMs("pr_signals_read_at"),
     laterPrState: text("later_pr_state", { enum: LATER_PR_STATES }),
     laterPrStateAt: timeMs("later_pr_state_at"),
     worktreeRemovedAt: timeMs("worktree_removed_at"),
+    worktreeKept: text("worktree_kept", { enum: WORKTREE_KEPT_REASONS }),
+    worktreeRemoveRequestedAt: timeMs("worktree_remove_requested_at"),
     trackerStateSetAt: timeMs("tracker_state_set_at"),
     trackerCommentId: text("tracker_comment_id").$type<CommentId>(),
     trackerCommentedAt: timeMs("tracker_commented_at"),
@@ -291,6 +321,16 @@ export const runs = sqliteTable(
     check("runs_agent_result", sql`${t.agentResult} IN ${inList(AGENT_RESULTS)}`),
     check("runs_pr_state", sql`${t.prState} IN ${inList(PR_STATES)}`),
     check("runs_later_pr_state", sql`${t.laterPrState} IN ${inList(LATER_PR_STATES)}`),
+    check("runs_pr_read_error", sql`${t.prReadError} IN ${inList(PR_READ_ERRORS)}`),
+    check("runs_worktree_kept", sql`${t.worktreeKept} IN ${inList(WORKTREE_KEPT_REASONS)}`),
+    check(
+      "runs_worktree_kept_ended",
+      sql`(${t.worktreeKept} IS NULL AND ${t.worktreeRemoveRequestedAt} IS NULL) OR ${t.state} = 'ended'`,
+    ),
+    check(
+      "runs_pr_read_error_iff_unknown",
+      sql`(${t.prState} IS 'unknown') = (${t.prReadError} IS NOT NULL)`,
+    ),
     check("runs_last_log_json", sql`${t.lastLog} IS NULL OR json_valid(${t.lastLog})`),
     check("runs_runner_unreached", sql`${t.runnerUnreached} IN (0, 1)`),
     check("runs_queued_not_started", sql`${t.state} <> 'queued' OR ${t.startedAt} IS NULL`),
@@ -334,6 +374,7 @@ export const runs = sqliteTable(
     index("runs_ticket").on(t.trackerConnectionId, t.ticketKey, t.assignedAt),
     index("runs_state").on(t.state, t.assignedAt),
     index("runs_workspace").on(t.workspaceId, t.assignedAt),
+    index("runs_continued_from").on(t.continuedFromRunId),
   ],
 );
 
@@ -421,6 +462,7 @@ export const runQuestions = sqliteTable(
       .references(() => runs.id, { onDelete: "cascade" })
       .$type<RunId>(),
     questionId: text("question_id").notNull().$type<QuestionId>(),
+    kind: text("kind", { enum: QUESTION_KINDS }).notNull().default("question"),
     body: text("body").notNull(),
     options: text("options", { mode: "json" }).notNull().$type<string[]>(),
     askedAt: timeMs("asked_at").notNull(),
@@ -430,6 +472,7 @@ export const runQuestions = sqliteTable(
   },
   (t) => [
     primaryKey({ columns: [t.runId, t.questionId] }),
+    check("run_questions_kind", sql`${t.kind} IN ('question', 'human-check')`),
     check("run_questions_options_json", sql`json_valid(${t.options})`),
     check("run_questions_answered", sql`(${t.answer} IS NULL) = (${t.answeredAt} IS NULL)`),
     check(
@@ -485,6 +528,67 @@ export const runControlRequests = sqliteTable(
     error: text("error"),
   },
   (t) => [check("run_control_requests_control", sql`${t.control} IN ${inList(RUN_CONTROLS)}`)],
+);
+
+export const runAgentMessages = sqliteTable(
+  "run_agent_messages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    requestId: text("request_id").notNull().$type<AgentMessageRequestId>(),
+    body: text("body").notNull(),
+    requestedAt: timeMs("requested_at").notNull(),
+    sendStartedAt: timeMs("send_started_at"),
+    followUpRef: text("follow_up_ref").$type<FollowUpRef>(),
+    completedAt: timeMs("completed_at"),
+    error: text("error"),
+  },
+  (t) => [
+    uniqueIndex("run_agent_messages_request_once").on(t.runId, t.requestId),
+    index("run_agent_messages_run").on(t.runId, t.id),
+    index("run_agent_messages_pending")
+      .on(t.id)
+      .where(sql`${t.completedAt} IS NULL`),
+  ],
+);
+
+export const runBlockers = sqliteTable(
+  "run_blockers",
+  {
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    blockerKey: text("blocker_key").notNull().$type<TicketKey>(),
+    title: text("title").notNull(),
+    stateName: text("state_name").notNull(),
+    stateCategory: text("state_category").notNull(),
+    inCycle: integer("in_cycle", { mode: "boolean" }).notNull().default(false),
+    readAt: timeMs("read_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.runId, t.blockerKey] }),
+    index("run_blockers_key").on(t.blockerKey),
+  ],
+);
+
+export const runActionRequests = sqliteTable(
+  "run_action_requests",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    requestId: text("request_id").notNull().$type<RunActionRequestId>(),
+    fingerprint: text("fingerprint").notNull(),
+    resultRunId: text("result_run_id").$type<RunId>(),
+    handledAt: timeMs("handled_at").notNull(),
+  },
+  (t) => [uniqueIndex("run_action_requests_once").on(t.runId, t.requestId)],
 );
 
 export const runCancelRequests = sqliteTable("run_cancel_requests", {

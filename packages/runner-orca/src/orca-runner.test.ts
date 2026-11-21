@@ -1,5 +1,6 @@
 import {
   AdapterError,
+  toFollowUpRef,
   blockedProjectsOf,
   isAssignmentBlocked,
   toAgentId,
@@ -20,7 +21,6 @@ import {
   ORCA_RUNNER_KIND,
   orcaRunnerFactory,
 } from "./orca-runner.js";
-import { briefFor } from "./agent-brief.js";
 import { escalationQuestionId } from "./progress.js";
 import { decodeAgent, decodeMailbox, encodeAgent, encodeMailbox } from "./refs.js";
 import {
@@ -32,6 +32,7 @@ import {
   runnerWith,
   stdout,
 } from "./test-support.js";
+import type { RemoteResult } from "./ssh.js";
 
 const MAILBOX = encodeMailbox({
   terminal: "term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7",
@@ -391,11 +392,11 @@ describe("startRun", () => {
     project: toRunnerProjectId("github:acme/sandbox"),
     worktreeName: "fo-t0013-probe1",
     agent: toAgentId("claude"),
-    prompt: `Fix "the bug"\nin it's $HOME \`code\``,
+    brief: `Fix "the bug"\nin it's $HOME \`code\``,
     ticket: { key: toTicketKey("ENG-1"), url: "https://linear.app/acme/issue/ENG-1" },
   };
 
-  test("starts a worker with the ticket on stdin and returns the runner's branch", async () => {
+  test("starts a worker with the whole agent brief on stdin and returns the runner's branch", async () => {
     const exec = withProjects(
       new ScriptedExec()
         .orca("orchestration worker-start", stdout(own("worker-start-spec-stdin.json")))
@@ -410,7 +411,7 @@ describe("startRun", () => {
       runId: "run_493ebb2f403d",
     });
     const start = exec.calls.find((c) => c.command.includes("worker-start"));
-    expect(start?.stdin).toBe(briefFor(input.prompt));
+    expect(start?.stdin).toBe(input.brief);
     expect(start?.command).toBe(
       "/Applications/Orca.app/Contents/Resources/bin/orca orchestration worker-start --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --run run_493ebb2f403d --spec-file - --task-title fo-t0013-probe1 --worktree new-top-level --repo id:527aed9b-0eef-4404-9d8d-9a89d7fb1dc9 --name fo-t0013-probe1 --agent claude --comment 'ENG-1 https://linear.app/acme/issue/ENG-1' --json",
     );
@@ -833,6 +834,112 @@ describe("answerQuestion and denyPermission", () => {
     ]);
   });
 
+  test("a message from the operator goes to the run's dispatch(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(research("0120/send-to-dispatch.json")),
+    );
+    await runnerWith(exec).sendToAgent(RUN, { body: "끝내기 전에 push 해 주세요" });
+    expect(exec.commands()).toEqual([
+      `/Applications/Orca.app/Contents/Resources/bin/orca orchestration send --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --to dispatch:ctx_a6e6a23a7132 --subject 'Message from the operator (not an answer to any open question)' '--body=끝내기 전에 push 해 주세요' --json`,
+    ]);
+  });
+
+  test("an operator message starting with -- stays one body argument(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(research("0120/send-to-dispatch.json")),
+    );
+    await runnerWith(exec).sendToAgent(RUN, {
+      body: "--to=dispatch:other --no-verify 쓰지 마세요",
+    });
+    expect(exec.commands()[0]).toContain(
+      "'--body=--to=dispatch:other --no-verify 쓰지 마세요' --json",
+    );
+  });
+
+  test("a send that Orca turned into a follow-up returns its dispatch(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(
+        JSON.stringify({
+          ok: true,
+          result: { delivery: "follow_up", followUpOf: "ctx_a6e6a23a7132", dispatchId: "ctx_new" },
+        }),
+      ),
+    );
+    expect(await runnerWith(exec).sendToAgent(RUN, { body: "x" })).toEqual({
+      kind: "follow-up",
+      followUpRef: "ctx_new",
+    });
+  });
+
+  test("a follow-up that did not become ready still returns its dispatch(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(
+        JSON.stringify({
+          ok: false,
+          result: { delivery: "follow_up", dispatchId: "ctx_new", state: "outcome_unknown" },
+        }),
+        1,
+      ),
+    );
+    expect(await runnerWith(exec).sendToAgent(RUN, { body: "x" })).toEqual({
+      kind: "follow-up",
+      followUpRef: "ctx_new",
+    });
+  });
+
+  test.each([
+    "runtime_unavailable",
+    "remote_runtime_unavailable",
+    "runtime_timeout",
+    "invalid_runtime_response",
+  ])("%s after a send means the outcome is unknown(0147)", async (code) => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(JSON.stringify({ ok: false, error: { code, message: "cut" } }), 1),
+    );
+    expect(await adapterError(runnerWith(exec).sendToAgent(RUN, { body: "x" }))).toMatchObject({
+      kind: "start-outcome-unknown",
+    });
+  });
+
+  test("a code Orca adds later is treated as an unknown outcome, a known refusal is not(0147)", async () => {
+    const later = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(JSON.stringify({ ok: false, error: { code: "some_new_code", message: "x" } }), 1),
+    );
+    expect(await adapterError(runnerWith(later).sendToAgent(RUN, { body: "x" }))).toMatchObject({
+      kind: "start-outcome-unknown",
+    });
+    const refused = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(JSON.stringify({ ok: false, error: { code: "invalid_argument", message: "x" } }), 1),
+    );
+    expect(await adapterError(runnerWith(refused).sendToAgent(RUN, { body: "x" }))).toMatchObject({
+      kind: "runner-error",
+      code: "invalid_argument",
+    });
+  });
+
+  test("stopping a follow-up stops that dispatch(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration worker-stop",
+      stdout(JSON.stringify({ ok: true, result: { state: "stopped" } })),
+    );
+    await runnerWith(exec).stopFollowUp(toFollowUpRef("ctx_new"));
+    expect(exec.commands()[0]).toContain("orchestration worker-stop --dispatch ctx_new");
+  });
+
+  test("broken send output for an operator message is malformed(0147)", async () => {
+    const broken = new ScriptedExec().orca("orchestration send", BROKEN);
+    expect(await adapterError(runnerWith(broken).sendToAgent(RUN, { body: "x" }))).toMatchObject({
+      kind: "malformed-output",
+    });
+  });
+
   test("a second, different answer is a runner error; broken output is malformed", async () => {
     const conflict = new ScriptedExec().orca(
       "orchestration reply",
@@ -1057,6 +1164,71 @@ describe("worktreeExists and removeWorktree", () => {
     );
     expect(await adapterError(runnerWith(off).removeWorktree(WORKTREE))).toMatchObject({
       kind: "not-ready",
+    });
+  });
+});
+
+describe("checkWorktreeWork", () => {
+  const STATUS = "git -C '<path>/workspaces/sandbox/fo-t0013-probe1' status";
+  const REV_LIST = "git -C '<path>/workspaces/sandbox/fo-t0013-probe1' rev-list";
+  const shown = (): ScriptedExec =>
+    new ScriptedExec().orca("worktree show", stdout(own("worktree-show.json")));
+
+  test("reads git status and commits missing from every remote in the worktree", async () => {
+    const exec = shown().on(STATUS, stdout("")).on(REV_LIST, stdout("0\n"));
+    expect(await runnerWith(exec).checkWorktreeWork(WORKTREE)).toEqual({
+      kind: "checked",
+      uncommittedChanges: false,
+      unpushedCommits: false,
+    });
+    expect(exec.commands()).toEqual([
+      `/Applications/Orca.app/Contents/Resources/bin/orca worktree show --worktree 'id:${WORKTREE}' --json`,
+      "git -C '<path>/workspaces/sandbox/fo-t0013-probe1' status --porcelain '--untracked-files=all'",
+      "git -C '<path>/workspaces/sandbox/fo-t0013-probe1' rev-list --count HEAD --not --remotes",
+    ]);
+  });
+
+  test("tracked or untracked changes and unpushed commits count as work", async () => {
+    const changed = shown()
+      .on(STATUS, stdout("?? notes.md\n M src/a.ts\n"))
+      .on(REV_LIST, stdout("0"));
+    expect(await runnerWith(changed).checkWorktreeWork(WORKTREE)).toMatchObject({
+      uncommittedChanges: true,
+      unpushedCommits: false,
+    });
+    const ahead = shown().on(STATUS, stdout("")).on(REV_LIST, stdout("2\n"));
+    expect(await runnerWith(ahead).checkWorktreeWork(WORKTREE)).toMatchObject({
+      uncommittedChanges: false,
+      unpushedCommits: true,
+    });
+  });
+
+  test("a worktree already gone has nothing to keep", async () => {
+    const gone = new ScriptedExec().orca(
+      "worktree show",
+      stdout(own("worktree-show-not-found.json"), 1),
+    );
+    expect(await runnerWith(gone).checkWorktreeWork(WORKTREE)).toEqual({ kind: "gone" });
+  });
+
+  test("a failed git command, ssh failure or odd output is an error, not a clean worktree", async () => {
+    const failed = shown().on(STATUS, {
+      exitCode: 128,
+      stdout: "",
+      stderr: "fatal",
+      timedOut: false,
+    });
+    expect(await adapterError(runnerWith(failed).checkWorktreeWork(WORKTREE))).toMatchObject({
+      kind: "runner-error",
+      code: "git_failed",
+    });
+    const unreachable = shown().on(STATUS, stdout("")).on(REV_LIST, stdout("", 255));
+    expect(await adapterError(runnerWith(unreachable).checkWorktreeWork(WORKTREE))).toMatchObject({
+      kind: "unreachable",
+    });
+    const odd = shown().on(STATUS, stdout("")).on(REV_LIST, stdout("many"));
+    expect(await adapterError(runnerWith(odd).checkWorktreeWork(WORKTREE))).toMatchObject({
+      kind: "malformed-output",
     });
   });
 });
@@ -1372,5 +1544,377 @@ describe("pauseAgent and resumeAgent", () => {
     expect(await adapterError(runnerWith(exec).resumeAgent(RUN, resumeInput))).toMatchObject({
       kind: "start-outcome-unknown",
     });
+  });
+});
+
+describe("prepareContinuation", () => {
+  const repoPath = "'<path>/sandbox'";
+  const path = "/worktrees/ganger-ENG-1-1";
+  const branch = "acme/ganger-ENG-1-1";
+  const input = {
+    project: toRunnerProjectId("github:acme/sandbox"),
+    worktree: toWorktreeRef(`527aed9b-0eef-4404-9d8d-9a89d7fb1dc9::${path}`),
+    branch,
+  };
+  const list = (...blocks: string[]) => stdout(`${blocks.join("\n\n")}\n`);
+  const main = "worktree <path>/sandbox\nHEAD aaa\nbranch refs/heads/main";
+  const here = (name: string) => `worktree ${path}\nHEAD bbb\nbranch refs/heads/${name}`;
+
+  function git(exec: ScriptedExec, verb: string, ...replies: RemoteResult[]): ScriptedExec {
+    return exec.on(`git -C ${repoPath} ${verb}`, ...replies);
+  }
+
+  function missingWorktree(): ScriptedExec {
+    const exec = withProjects(new ScriptedExec());
+    git(exec, "worktree list", list(main));
+    git(exec, "worktree prune", stdout(""));
+    return exec;
+  }
+
+  test("워크트리가 있으면 같은 워크트리다", async () => {
+    const exec = git(withProjects(new ScriptedExec()), "worktree list", list(main, here(branch)));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("same-worktree");
+    expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
+  });
+
+  test("에이전트가 브랜치를 바꿨어도 워크트리가 있으면 그 자리에서 이어 간다", async () => {
+    const exec = git(withProjects(new ScriptedExec()), "worktree list", list(main, here("other")));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("same-worktree");
+  });
+
+  test("워크트리가 브랜치에 있지 않으면 그 자리에서 일하지 않는다", async () => {
+    const detached = `worktree ${path}\nHEAD bbb\ndetached`;
+    const exec = git(withProjects(new ScriptedExec()), "worktree list", list(main, detached));
+    expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
+      kind: "runner-error",
+      code: "worktree_detached",
+    });
+  });
+
+  const commonDir = "/repo/.git";
+
+  function withSetupMarker(exec: ScriptedExec): ScriptedExec {
+    return git(exec, "rev-parse", stdout(`${commonDir}\n`))
+      .on("mkdir -p", stdout(""))
+      .on("touch ", stdout(""));
+  }
+
+  test("로컬 브랜치가 있으면 표시를 먼저 남기고 같은 경로에 다시 만든다", async () => {
+    const exec = withSetupMarker(missingWorktree());
+    git(exec, "show-ref", stdout(""));
+    git(exec, "worktree add", stdout(""));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
+    const commands = exec.commands();
+    const added = commands.indexOf(`git -C ${repoPath} worktree add ${path} ${branch}`);
+    const marked = commands.findIndex((command) => command.startsWith("touch "));
+    expect(added).toBeGreaterThan(-1);
+    expect(marked).toBeGreaterThan(-1);
+    expect(marked).toBeLessThan(added);
+  });
+
+  describe("finishWorktreeSetup", () => {
+    const setupInput = { project: input.project, worktree: input.worktree };
+    const repoShow = (hookSettings: object) =>
+      stdout(JSON.stringify({ id: "1", ok: true, result: { repo: { hookSettings } }, _meta: {} }));
+
+    function pending(yaml: string, hookSettings: object = {}): ScriptedExec {
+      return git(withProjects(new ScriptedExec()), "rev-parse", stdout(`${commonDir}\n`))
+        .orca("repo show", repoShow(hookSettings))
+        .on("sh -c", stdout(yaml))
+        .on("rm -f ", stdout(""));
+    }
+
+    const setupCommand = (exec: ScriptedExec) =>
+      exec.commands().find((command) => command.startsWith("env "));
+    const cleared = (exec: ScriptedExec) =>
+      exec.commands().some((command) => command.startsWith("rm -f "));
+
+    test("표시가 있을 때만 setup이 남았다고 답한다", async () => {
+      const marked = git(withProjects(new ScriptedExec()), "rev-parse", stdout(`${commonDir}\n`));
+      marked.on("test -e ", stdout(""));
+      expect(await runnerWith(marked).worktreeSetupPending(setupInput)).toBe(true);
+      const clean = git(withProjects(new ScriptedExec()), "rev-parse", stdout(`${commonDir}\n`));
+      clean.on("test -e ", stdout("", 1));
+      expect(await runnerWith(clean).worktreeSetupPending(setupInput)).toBe(false);
+    });
+
+    test("모르는 명령 출처 정책이면 돌리지 않고 실패로 돌려준다", async () => {
+      const exec = pending("scripts:\n  setup: pnpm install\n", {
+        commandSourcePolicy: "future-policy",
+      });
+      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toMatchObject({
+        kind: "failed",
+      });
+      expect(setupCommand(exec)).toBeUndefined();
+    });
+
+    test("orca.yaml의 setup을 워크트리 경로와 함께 돌리고 표시를 지운다", async () => {
+      const exec = pending("scripts:\n  setup: |\n    pnpm install\n    pnpm build\n").on(
+        "env ",
+        stdout("ok"),
+      );
+      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toEqual({ kind: "done" });
+      expect(setupCommand(exec)).toContain(`ORCA_WORKTREE_PATH=${path}`);
+      expect(setupCommand(exec)).toContain("pnpm install");
+      expect(cleared(exec)).toBe(true);
+    });
+
+    test("setup이 실패하면 이유를 돌려주고 표시를 남긴다", async () => {
+      const exec = pending("scripts:\n  setup: pnpm install\n").on("env ", stdout("", 1));
+      const result = await runnerWith(exec).finishWorktreeSetup(setupInput);
+      expect(result).toMatchObject({ kind: "failed", reason: "setup exited with 1" });
+      expect(cleared(exec)).toBe(false);
+    });
+
+    test("setup이 시간을 넘기면 결과를 모르는 것으로 보고 실패로 돌려준다", async () => {
+      const exec = pending("scripts:\n  setup: pnpm install\n").on("env ", {
+        exitCode: null,
+        stdout: "",
+        stderr: "",
+        timedOut: true,
+      });
+      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toMatchObject({
+        kind: "failed",
+        reason: "setup timed out",
+      });
+    });
+
+    test("읽을 수 없는 setup 형식은 건너뛰지 않고 실패로 돌려준다", async () => {
+      const exec = pending("scripts:\n  setup: >\n    pnpm install\n");
+      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toMatchObject({
+        kind: "failed",
+      });
+      expect(setupCommand(exec)).toBeUndefined();
+    });
+
+    test("설정한 setup이 없으면 아무것도 돌리지 않고 표시를 지운다", async () => {
+      const exec = pending("");
+      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toEqual({ kind: "done" });
+      expect(setupCommand(exec)).toBeUndefined();
+      expect(cleared(exec)).toBe(true);
+    });
+  });
+
+  test("로컬에 없고 origin에 있으면 받아서 추적 브랜치로 만든다", async () => {
+    const exec = withSetupMarker(missingWorktree());
+    git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote --exit-code origin", stdout(`ccc\trefs/heads/${branch}\n`));
+    git(exec, "fetch origin", stdout(""));
+    git(exec, "worktree add", stdout(""));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
+    expect(exec.commands()).toContain(
+      `git -C ${repoPath} worktree add --track -b ${branch} ${path} refs/remotes/origin/${branch}`,
+    );
+  });
+
+  test("로컬과 origin 모두 없으면 처음부터 시작한다", async () => {
+    const exec = missingWorktree();
+    git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote --exit-code origin", stdout("", 2));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("from-scratch");
+    expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
+  });
+
+  test("origin을 읽지 못하면 처음부터 시작하지 않고 실패로 돌려준다", async () => {
+    const exec = missingWorktree();
+    git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote", stdout("", 128));
+    expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
+      kind: "runner-error",
+      code: "git_failed",
+    });
+  });
+
+  test("origin 읽기가 시간 초과되면 러너 Offline이 아니라 시작 실패로 돌려준다", async () => {
+    const exec = missingWorktree();
+    git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote", { exitCode: 124, stdout: "", stderr: "", timedOut: true });
+    expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
+      kind: "runner-error",
+      code: "remote_read_timeout",
+    });
+  });
+
+  test("이어서 시작하면 그 워크트리를 고르고 새 워크트리 인자를 넘기지 않는다", async () => {
+    const exec = withProjects(
+      new ScriptedExec()
+        .orca("orchestration worker-start", stdout(own("worker-start-spec-stdin.json")))
+        .orca("worktree show", stdout(own("worktree-show.json"))),
+    );
+    await runnerWith(exec).startRun({
+      mailbox: MAILBOX,
+      project: toRunnerProjectId("github:acme/sandbox"),
+      worktreeName: "ganger-ENG-1-2",
+      agent: toAgentId("claude"),
+      brief: "brief",
+      continueIn: WORKTREE,
+    });
+    const command = exec.calls.find((c) => c.command.includes("worker-start"))?.command ?? "";
+    expect(command).toContain(`--worktree 'id:${WORKTREE}' --keep-open`);
+    for (const flag of ["--repo", "--name", "--base-branch", "--comment"]) {
+      expect(command).not.toContain(flag);
+    }
+  });
+
+  describe("시작 결과를 모를 때(일반 런과 같은 복구)", () => {
+    const previous = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
+    const lookup = {
+      mailbox: MAILBOX,
+      worktreeName: "ganger-ENG-1-2",
+      continueIn: WORKTREE,
+      previousAgent: previous,
+    };
+    const workers = (...rows: Array<{ dispatchId: string; taskId: string }>) =>
+      stdout(
+        JSON.stringify({
+          ok: true,
+          result: { workers: rows.map((row) => ({ ...row, workspace: WORKTREE })) },
+        }),
+      );
+    const shownWorktree = stdout(
+      JSON.stringify({
+        ok: true,
+        result: { worktree: { id: WORKTREE, branch: "refs/heads/acme/ganger-ENG-1-1" } },
+      }),
+    );
+
+    test("워크트리의 최신 에이전트가 이전 런 것이 아니면 시작한 런이다", async () => {
+      const exec = new ScriptedExec()
+        .orca("worktree show", shownWorktree)
+        .orca(
+          "orchestration worker-list",
+          workers(
+            { dispatchId: "ctx_new", taskId: "task_new" },
+            { dispatchId: "ctx_old", taskId: "task_old" },
+          ),
+        )
+        .orca(
+          "orchestration worker-show",
+          stdout(
+            JSON.stringify({
+              ok: true,
+              result: { dispatchId: "ctx_new", taskId: "task_new", runId: "run_1", state: "ready" },
+            }),
+          ),
+        );
+      const found = await runnerWith(exec).findStartedRun(lookup);
+      expect(found === null ? null : decodeAgent(found.agentRef)?.dispatchId).toBe("ctx_new");
+    });
+
+    test("워크트리의 최신 에이전트가 이전 런 것이면 시작되지 않은 것으로 본다", async () => {
+      const exec = new ScriptedExec()
+        .orca("worktree show", shownWorktree)
+        .orca("orchestration worker-list", workers({ dispatchId: "ctx_old", taskId: "task_old" }));
+      expect(await runnerWith(exec).findStartedRun(lookup)).toBeNull();
+    });
+
+    test("워크트리가 없으면 시작되지 않은 것으로 본다", async () => {
+      const exec = new ScriptedExec().orca(
+        "worktree show",
+        stdout(
+          JSON.stringify({ ok: false, error: { code: "selector_not_found", message: "gone" } }),
+          1,
+        ),
+      );
+      expect(await runnerWith(exec).findStartedRun(lookup)).toBeNull();
+    });
+  });
+
+  describe("이전 에이전트가 살아 있는지", () => {
+    const run = {
+      worktree: WORKTREE,
+      agentRef: encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" }),
+    };
+    const shown = (liveness: string) =>
+      stdout(
+        JSON.stringify({
+          ok: true,
+          result: {
+            dispatchId: "ctx_old",
+            taskId: "task_old",
+            runId: "run_1",
+            state: "ready",
+            liveness,
+            terminal: "term_old",
+          },
+        }),
+      );
+
+    test("터미널이 살아 있으면 true다", async () => {
+      const exec = new ScriptedExec().orca("orchestration worker-show", shown("live"));
+      expect(await runnerWith(exec).isAgentAlive(run)).toBe(true);
+    });
+
+    test("끝났으면 false다", async () => {
+      const exec = new ScriptedExec().orca("orchestration worker-show", shown("exited"));
+      expect(await runnerWith(exec).isAgentAlive(run)).toBe(false);
+    });
+
+    test("Orca에 기록이 없으면 false다", async () => {
+      const exec = new ScriptedExec().orca(
+        "orchestration worker-show",
+        stdout(
+          JSON.stringify({ ok: false, error: { code: "dispatch_not_found", message: "gone" } }),
+          1,
+        ),
+      );
+      expect(await runnerWith(exec).isAgentAlive(run)).toBe(false);
+    });
+
+    test("러너에 닿지 못하면 살아 있다고도 없다고도 하지 않고 실패한다", async () => {
+      const exec = new ScriptedExec().orca("orchestration worker-show", {
+        exitCode: 255,
+        stdout: "",
+        stderr: "ssh failed",
+        timedOut: false,
+      });
+      expect(await adapterError(runnerWith(exec).isAgentAlive(run))).toMatchObject({
+        kind: "unreachable",
+      });
+    });
+  });
+
+  test("이어 받은 런을 재개할 때 이전 런의 끝난 에이전트를 입양하지 않고 새로 띄운다", async () => {
+    const current = encodeAgent({ dispatchId: "ctx_b", taskId: "task_b", runId: "run_1" });
+    const previous = encodeAgent({ dispatchId: "ctx_a", taskId: "task_a", runId: "run_1" });
+    const shownB = {
+      dispatchId: "ctx_b",
+      taskId: "task_b",
+      runId: "run_1",
+      state: "failed",
+      liveness: "exited",
+    };
+    const exec = new ScriptedExec()
+      .orca(
+        "orchestration worker-show --dispatch ctx_b",
+        stdout(JSON.stringify({ ok: true, result: shownB })),
+      )
+      .orca(
+        "orchestration worker-list",
+        stdout(
+          JSON.stringify({
+            ok: true,
+            result: {
+              workers: [
+                { dispatchId: "ctx_b", taskId: "task_b", workspace: WORKTREE },
+                { dispatchId: "ctx_a", taskId: "task_a", workspace: WORKTREE },
+              ],
+            },
+          }),
+        ),
+      )
+      .orca("orchestration worker-start", stdout(own("worker-start-spec-stdin.json")));
+    const resumed = await runnerWith(exec).resumeAgent(
+      { mailbox: MAILBOX, worktree: WORKTREE, agentRef: current },
+      {
+        agent: toAgentId("claude"),
+        message: "continue",
+        restartPrompt: "brief",
+        previousRunAgent: previous,
+      },
+    );
+    expect(resumed.restarted).toBe(true);
+    expect(exec.commands().some((c) => c.includes("worker-show --dispatch ctx_a"))).toBe(false);
+    expect(exec.commands().some((c) => c.includes("worker-start"))).toBe(true);
   });
 });

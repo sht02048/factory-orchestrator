@@ -8,10 +8,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@ui-sdk/react/dialog";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { cx } from "../cx";
 import { windowRegion } from "../window-frame";
-import { buttonStyles, type ButtonVariant } from "./button";
+import { BusyLabels, buttonStyles, type ButtonVariant } from "./button";
 import {
   colors,
   fontSize,
@@ -26,6 +26,7 @@ import {
 export interface DialogProps {
   trigger: ReactNode;
   triggerVariant?: ButtonVariant;
+  triggerBusy?: { active: boolean; label: ReactNode };
   title: ReactNode;
   description?: ReactNode;
   children?: ReactNode;
@@ -39,6 +40,7 @@ export interface DialogProps {
 export function Dialog({
   trigger,
   triggerVariant = "secondary",
+  triggerBusy,
   title,
   description,
   children,
@@ -55,8 +57,26 @@ export function Dialog({
         ? {}
         : { onOpenChange: (next: boolean) => onOpenChange(next) })}
     >
-      <DialogTrigger data-variant={triggerVariant} className={cx(...buttonStyles(triggerVariant))}>
-        {trigger}
+      <DialogTrigger
+        {...(triggerBusy === undefined
+          ? {}
+          : { "aria-busy": triggerBusy.active, "aria-disabled": triggerBusy.active })}
+        {...(triggerBusy?.active === true
+          ? {
+              onClickCapture: (event: MouseEvent) => {
+                event.preventDefault();
+                event.stopPropagation();
+              },
+            }
+          : {})}
+        data-variant={triggerVariant}
+        className={cx(...buttonStyles(triggerVariant, triggerBusy?.active === true))}
+      >
+        {triggerBusy === undefined ? (
+          trigger
+        ) : (
+          <BusyLabels busy={triggerBusy}>{trigger}</BusyLabels>
+        )}
       </DialogTrigger>
       <DialogBackdrop {...windowRegion("no-drag")} className={cx(styles.backdrop)} />
       <DialogContent
@@ -104,11 +124,9 @@ export function DialogClose({ variant = "secondary", children, onClick }: Dialog
   );
 }
 
-const fadeIn = stylex.keyframes({ from: { opacity: 0 }, to: { opacity: 1 } });
-const rise = stylex.keyframes({
-  from: { opacity: 0, transform: "translate(-50%, -48%) scale(0.98)" },
-  to: { opacity: 1, transform: "translate(-50%, -50%)" },
-});
+const REDUCED = "@media (prefers-reduced-motion: reduce)";
+const STARTING = ":is([data-starting-style])";
+const ENDING = ":is([data-ending-style])";
 
 const styles = stylex.create({
   backdrop: {
@@ -116,9 +134,14 @@ const styles = stylex.create({
     inset: 0,
     zIndex: 200,
     backgroundColor: colors.backdrop,
-    animationName: { default: fadeIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: motion.durationFast,
-    animationTimingFunction: motion.easeOut,
+    opacity: { default: 1, [STARTING]: 0, [ENDING]: 0 },
+    transitionProperty: "opacity",
+    transitionDuration: {
+      default: motion.durationDialogOpen,
+      [ENDING]: motion.durationDialogClose,
+      [REDUCED]: motion.durationReducedFade,
+    },
+    transitionTimingFunction: motion.easeOut,
   },
   content: {
     position: "fixed",
@@ -135,11 +158,21 @@ const styles = stylex.create({
     backgroundColor: colors.bgRaised,
     boxShadow: shadow.popover,
     color: colors.textPrimary,
-    transform: "translate(-50%, -50%)",
+    opacity: { default: 1, [STARTING]: 0, [ENDING]: 0 },
+    transform: {
+      default: "translate(-50%, -50%)",
+      [STARTING]: "translate(-50%, -50%) scale(0.96)",
+      [ENDING]: "translate(-50%, calc(-50% + 4px)) scale(0.98)",
+      [REDUCED]: "translate(-50%, -50%)",
+    },
     outline: "none",
-    animationName: { default: rise, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: motion.durationFast,
-    animationTimingFunction: motion.easeOut,
+    transitionProperty: "opacity, transform",
+    transitionDuration: {
+      default: motion.durationDialogOpen,
+      [ENDING]: motion.durationDialogClose,
+      [REDUCED]: motion.durationReducedFade,
+    },
+    transitionTimingFunction: motion.easeOut,
   },
   contentFits: { maxHeight: "calc(100dvh - 32px)" },
   body: {

@@ -6,6 +6,10 @@ export const messages = {
     restartPreamble:
       "이 워크트리에서 앞 에이전트가 하던 작업을 운영자가 멈췄어요. git 상태와 커밋 기록으로 어디까지 했는지 확인하고, 멈춘 데서 이어서 아래 티켓을 끝내 주세요.",
   },
+  continuation: {
+    previousAgentAlive: "이전 에이전트가 아직 떠 있어요 · 먼저 멈춰 주세요",
+    setupFailed: "다시 만든 워크트리에서 저장소 설정 스크립트가 끝나지 않았어요",
+  },
   resultComment: {
     title: "Ganger 런이 끝났어요.",
     summary: "요약 결과",
@@ -16,8 +20,7 @@ export const messages = {
     runId: "런 ID",
   },
   summary: {
-    merged: "Merged",
-    "human-check": "Human Check",
+    succeeded: "Succeeded",
     failed: "Failed",
     canceled: "취소",
   } satisfies Record<SummaryOutcome, string>,
@@ -37,5 +40,6 @@ export const messages = {
     open: "열림",
     merged: "병합됨",
     closed: "닫힘",
+    unknown: "못 읽음",
   } satisfies Record<PrState, string>,
 } as const;

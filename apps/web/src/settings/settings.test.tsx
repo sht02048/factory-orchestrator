@@ -38,11 +38,13 @@ import { installPowerSettings } from "../server/power-settings";
 import { renderWithMessages } from "../testing/render";
 import {
   addTrackerProject,
+  briefInput,
   createAutoAssignLabel,
   mappingStateInput,
   removeTrackerProject,
   saveMappingState,
   requestRunnerCheckSetting,
+  saveBrief,
   saveGeneral,
   saveAddresses,
   saveGitHubToken,
@@ -64,6 +66,8 @@ import { settingsMessages } from "./messages";
 import type { SettingsPage } from "@ganger/app/settings/model";
 import { jsonConfig } from "@ganger/app/settings/mcp-launch";
 import { McpScreen } from "./mcp-screen";
+import { BriefPreview } from "./workspace-brief";
+import settingsJson from "../../messages/ko/settings.json" with { type: "json" };
 import { ProjectDetailScreen, findBoundProject } from "./project-detail";
 import { ProjectCandidates, SettingsScreen, sectionProblems } from "./settings-page";
 import { RunnerCheck, RunnerForm, nameFromSshTarget, sshCheckCommand } from "./settings-screen";
@@ -150,6 +154,7 @@ function addRunner(f: Fixture): RunnerId {
 
 const noopActions: SettingsActions = {
   saveGeneral: () => Promise.resolve({ ok: true }),
+  saveBrief: () => Promise.resolve({ ok: true }),
   addProject: () => Promise.resolve({ ok: true }),
   removeProject: () => Promise.resolve({ ok: true }),
   saveMapping: () => Promise.resolve({ ok: true }),
@@ -267,7 +272,12 @@ describe("Settings 저장하고 다시 열기", () => {
     });
 
     const page = await loadSettingsPage(f.context, ws, now);
-    expect(page.workspace?.general).toEqual({ id: ws, name: "Acme Store", maxRunMinutes: 90 });
+    expect(page.workspace?.general).toMatchObject({
+      id: ws,
+      name: "Acme Store",
+      maxRunMinutes: 90,
+      brief: { before: "", after: "" },
+    });
     expect(page.workspace?.trackerProjects).toEqual([
       {
         connection: { id: connection, name: "Acme" },
@@ -650,6 +660,7 @@ describe("주소(0048)", () => {
       webAddress: null,
       webhookAddress: null,
       webhookAddressChecked: false,
+      autoAllowedHosts: [],
     });
     expect(
       saveAddresses(
@@ -667,6 +678,7 @@ describe("주소(0048)", () => {
       webAddress: "https://server.example.ts.net",
       webhookAddress: "https://hooks.example.com",
       webhookAddressChecked: false,
+      autoAllowedHosts: [],
     });
     const server = textOf(sectionOf(render(page), "server"));
     expect(server).toContain("다른 기기에서 열 주소");
@@ -680,7 +692,36 @@ describe("주소(0048)", () => {
       webAddress: null,
       webhookAddress: null,
       webhookAddressChecked: false,
+      autoAllowedHosts: [],
     });
+  });
+
+  it("와일드카드 바인드면 자동으로 허용한 tailnet 주소를 보이고, 그 주소로 연 화면은 저장해도 막히지 않는다", async () => {
+    const f = fixture();
+    const tailnetHosts = ["server.example.ts.net", "100.64.0.10"];
+    const page = await loadSettingsPage(
+      { ...f.context, autoAllowedHosts: tailnetHosts },
+      undefined,
+      now,
+    );
+    const server = textOf(sectionOf(render(page), "server"));
+    expect(server).toContain(settingsJson.addresses.autoAllowed);
+    expect(server).toContain("server.example.ts.net, 100.64.0.10");
+    const none = await loadSettingsPage(f.context, undefined, now);
+    expect(textOf(sectionOf(render(none), "server"))).not.toContain(
+      settingsJson.addresses.autoAllowed,
+    );
+    const from = { host: "server.example.ts.net:3000", bindHost: "0.0.0.0", webPort: 3000 };
+    const input = { webAddress: "", webhookAddress: "" };
+    expect(saveAddresses(f.context, input, now, { ...from, tailnetHosts })).toEqual({ ok: true });
+    expect(saveAddresses(f.context, input, now, from)).toEqual({ ok: false, reason: "locks-out" });
+    expect(
+      saveAddresses(f.context, input, now, {
+        ...from,
+        host: "server.example.ts.net:8443",
+        tailnetHosts,
+      }),
+    ).toEqual({ ok: false, reason: "locks-out" });
   });
 
   it("경로·사용자 정보가 붙거나 http·https 가 아닌 주소는 받지 않는다", () => {
@@ -1170,6 +1211,58 @@ describe("Settings 화면", () => {
     );
   });
 
+  it("PR 정보를 읽지 못한 런이 있으면 GitHub 줄에 문제로 보이고 목차에 점을 붙인다 (0144)", async () => {
+    const f = fixture();
+    const connection = await addConnection(f);
+    await saveGitHubToken(f.context, { token: "github_pat_example" }, now);
+    const runnerId = addRunner(f);
+    const project = { ws: commerce, connectionId: connection, projectId: webProject };
+    addTrackerProject(f.context, { ...project, name: "Web" });
+    saveMappingSetting(f.context, { ...project, runnerProjectId: repo, agentId: "claude" });
+    const ids = ["ACME-1", "ACME-2"].map((key) => {
+      const result = assignRun(f.context.db, {
+        ticket: { connection, key: toTicketKey(key) },
+        trackerProject: webProject,
+        runnerProject: repo,
+        agent: toAgentId("claude"),
+        now,
+      });
+      if (!result.ok) throw new Error("assign failed");
+      return result.run.id;
+    });
+    const endUnread = (id: string, reason: "no-access" | "other"): void => {
+      f.context.db.$client
+        .prepare(
+          `UPDATE runs SET state = 'ended', runner_id = ?, started_at = 1, ended_at = 2,
+            worktree_ref = 'wt', branch = 'b', agent_ref = 'a', agent_result = 'reported-success',
+            pr_state = 'unknown', pr_read_error = ? WHERE id = ?`,
+        )
+        .run(runnerId, reason, id);
+    };
+
+    const clean = await loadSettingsPage(f.context, commerce, now);
+    expect(textOf(sectionOf(render(clean), "connections"))).toContain("넣어 뒀어요");
+    expect([...sectionProblems(clean, 0)]).toEqual([]);
+
+    endUnread(ids[0] ?? "", "other");
+    const other = await loadSettingsPage(f.context, commerce, now);
+    expect(other.install.unreadPrRuns).toEqual({ "no-access": 0, other: 1 });
+    expect(textOf(sectionOf(render(other), "connections"))).toContain(
+      "런 1개의 PR 정보를 읽지 못했어요. 다시 읽고 있어요",
+    );
+    expect([...sectionProblems(other, 0)]).toEqual(["connections"]);
+
+    endUnread(ids[1] ?? "", "no-access");
+    const noAccess = await loadSettingsPage(f.context, commerce, now);
+    const html = render(noAccess);
+    expect(textOf(sectionOf(html, "connections"))).toContain(
+      "런 1개의 PR 정보를 읽지 못했어요. 토큰이 그 저장소를 볼 수 없어요",
+    );
+    expect(textOf(sectionOf(html, "connections"))).not.toContain("넣어 뒀어요");
+    const nav = /<nav aria-label="Settings 목차"[^>]*>.*?<\/nav>/s.exec(html)?.[0] ?? "";
+    expect(nav.match(/확인할 것이 있어요/g)).toHaveLength(1);
+  });
+
   it("프로젝트 줄은 그 프로젝트 상세 주소로 가는 링크다", async () => {
     const f = fixture();
     const connection = await addConnection(f);
@@ -1498,5 +1591,75 @@ describe("직접 입력 러너 폼(0095 M2b)", () => {
     expect(plain).toMatch(/name="orcaPath"[^>]*value=""/);
     expect(plain).not.toContain("BatchMode");
     expect(plain).toMatch(/type="submit"[^>]*>등록하고 확인/);
+  });
+});
+
+describe("Workspace 앞뒤 지시 (0146)", () => {
+  it("저장하면 다시 열 때 같은 값이 보이고 앞뒤 빈 줄은 다듬어 저장한다", async () => {
+    const f = fixture();
+    expect(
+      saveBrief(
+        f.context,
+        briefInput.parse({
+          ws: commerce,
+          before: "\nRead AGENTS.md first.\n",
+          after: "Push the branch.\nOpen a PR.",
+        }),
+      ),
+    ).toEqual({ ok: true });
+    const page = await loadSettingsPage(f.context, commerce, now);
+    expect(page.workspace?.general.brief).toEqual({
+      before: "Read AGENTS.md first.",
+      after: "Push the branch.\nOpen a PR.",
+    });
+    expect(page.workspace?.general.agentProtocol).toContain("orca orchestration ask");
+  });
+
+  it("각 칸은 8,000자까지 받고 넘으면 입력 검증이 막는다", () => {
+    const ok = { ws: commerce, before: "가".repeat(8_000), after: "" };
+    expect(briefInput.safeParse(ok).success).toBe(true);
+    expect(briefInput.safeParse({ ...ok, before: "가".repeat(8_001) }).success).toBe(false);
+    expect(briefInput.safeParse({ ...ok, after: "a".repeat(8_001) }).success).toBe(false);
+    expect(briefInput.safeParse({ ws: commerce, before: 1, after: "" }).success).toBe(false);
+    expect(briefInput.safeParse({ ...ok, before: `\n${"가".repeat(8_000)}\n  ` }).success).toBe(
+      true,
+    );
+  });
+
+  it("없는 Workspace에는 저장하지 않는다", () => {
+    const f = fixture();
+    expect(saveBrief(f.context, { ws: "ws-missing", before: "x", after: "" })).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+  });
+
+  it("Workspace 줄에 지시 줄을 두고, 비어 있으면 덧붙이는 지시가 없다고 보인다", async () => {
+    const f = fixture();
+    const empty = sectionOf(render(await loadSettingsPage(f.context, commerce, now)), "workspace");
+    expect(textOf(empty)).toContain(settingsJson.brief.title);
+    expect(textOf(empty)).toContain(settingsJson.brief.summaryEmpty);
+    saveBrief(f.context, { ws: commerce, before: "", after: "Push.\nOpen a PR.\nRun checks." });
+    const filled = sectionOf(render(await loadSettingsPage(f.context, commerce, now)), "workspace");
+    expect(textOf(filled)).toContain("티켓 앞 없음 · 티켓 뒤 3줄");
+  });
+
+  it("미리 보기는 앞 지시 → 예시 티켓 → 뒤 지시 → 통신 규약 순서로, 빈 칸은 빼고 보인다", () => {
+    const html = renderWithMessages(
+      <BriefPreview brief={{ before: "", after: "Open a PR." }} protocol={"## Protocol"} />,
+      settingsMessages,
+    );
+    const shown = textOf(html);
+    const order = [
+      settingsJson.brief.preview.ticket,
+      settingsJson.brief.example.title,
+      settingsJson.brief.preview.after,
+      "Open a PR.",
+      settingsJson.brief.preview.protocol,
+      "## Protocol",
+    ].map((part) => shown.indexOf(part));
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect(order).toEqual(order.toSorted((a, b) => a - b));
+    expect(shown).not.toContain(settingsJson.brief.preview.before);
   });
 });

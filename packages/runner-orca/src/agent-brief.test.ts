@@ -1,26 +1,41 @@
 import { describe, expect, test } from "vitest";
-import { ASK_GUIDE, briefFor } from "./agent-brief.js";
+import { ASK_GUIDE } from "./agent-brief.js";
+import { ScriptedExec, runnerWith } from "./test-support.js";
 
-describe("briefFor", () => {
-  const brief = briefFor("Fix the bug\n\nSteps to reproduce");
-
-  test("keeps the ticket first and adds the ask guide after it", () => {
-    expect(brief.startsWith("Fix the bug\n\nSteps to reproduce\n\n")).toBe(true);
-    expect(brief).toContain(ASK_GUIDE);
+describe("ASK_GUIDE", () => {
+  test("is the protocol the Orca runner adds to every agent brief", () => {
+    expect(runnerWith(new ScriptedExec()).agentProtocol).toBe(ASK_GUIDE);
+    expect(ASK_GUIDE.startsWith("## 운영자에게 물을 때")).toBe(true);
   });
 
   test("tells the agent to pass choices through ask --options, not inside the question", () => {
-    expect(brief).toContain('--options "<선택지1>,<선택지2>"');
-    expect(brief).toContain("질문 문장에는 선택지를 다시 쓰지 않는다");
-    expect(brief).toContain("한 선택지 안에는 쉼표를 쓰지 않는다");
+    expect(ASK_GUIDE).toContain('--options "<선택지1>,<선택지2>"');
+    expect(ASK_GUIDE).toContain("질문 문장에는 선택지를 다시 쓰지 않는다");
+    expect(ASK_GUIDE).toContain("한 선택지 안에는 쉼표를 쓰지 않는다");
   });
 
   test("tells the agent to put the recommended choice first with a marker", () => {
-    expect(brief).toContain("첫 선택지로 두고 끝에 ` (추천)`을 붙인다");
+    expect(ASK_GUIDE).toContain("첫 선택지로 두고 끝에 ` (추천)`을 붙인다");
   });
 
   test("tells the agent to ask with options instead of escalating when blocked", () => {
-    expect(brief).toContain("`escalation`을 보내지 않고 `ask`로 묻는다");
-    expect(brief).toContain("다음 행동을 `--options`로 단다");
+    expect(ASK_GUIDE).toContain("`escalation`을 보내지 않고 `ask`로 묻는다");
+    expect(ASK_GUIDE).toContain("다음 행동을 `--options`로 단다");
+  });
+
+  test("tells the agent to send a decision_gate and keep its turn open until the reply", () => {
+    expect(ASK_GUIDE).toContain("orca orchestration send --type decision_gate");
+    expect(ASK_GUIDE).toContain("orca orchestration check --wait");
+    expect(ASK_GUIDE).toContain("차례를 끝내지 않고");
+  });
+
+  test("accepts only the reply threaded to this request, so an old answer cannot confirm a new one", () => {
+    expect(ASK_GUIDE).toContain("출력의 `messageId`를 기억한다");
+    expect(ASK_GUIDE).toContain("check --wait --full --json");
+    expect(ASK_GUIDE).toContain("`thread_id`가 기억한 `messageId`인 메일만 이 요청의 답이다");
+  });
+
+  test("says how to send a Human Check but not what needs one", () => {
+    expect(ASK_GUIDE).not.toMatch(/머지|one-way/);
   });
 });

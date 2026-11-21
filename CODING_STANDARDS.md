@@ -50,11 +50,11 @@ type TrackerStateType = "backlog" | "started" | "completed" | (string & {});
 
 ## 요약 결과는 계산 함수 하나로만 정한다
 
-런이 끝날 때 기록한 두 축(에이전트 결과, PR 상태)과, 운영자가 취소함으로 끝난 런의 러너에 닿지 못한 채 끝났는지에서 요약 결과(Merged·Human Check·Failed·Canceled)와 워크트리를 남길지를 정하는 일은 순수 함수 하나가 맡는다(스펙 4.2). 다른 곳에서 두 축을 직접 보고 요약 결과를 정하지 않는다. 요약 결과는 저장하지 않고 필요할 때 이 함수로 계산한다.
+런이 끝날 때 기록한 두 축(에이전트 결과, PR 상태)과, 운영자가 취소함으로 끝난 런의 러너에 닿지 못한 채 끝났는지에서 요약 결과(Succeeded·Failed·Canceled, 에이전트 결과로만 정한다)와 워크트리를 남길지를 정하는 일은 순수 함수 하나가 맡는다(스펙 4.2, ADR 0022). 다른 곳에서 두 축을 직접 보고 요약 결과를 정하지 않는다. 요약 결과는 저장하지 않고 필요할 때 이 함수로 계산한다.
 
 ```ts
 // 피한다: 화면·통계·폴러가 각자 두 축을 해석한다
-const outcome = run.prState === "merged" ? "merged" : "human-check";
+const outcome = run.agentResult === "reported-success" ? "succeeded" : "failed";
 
 // 이렇게 쓴다
 const { outcome } = summarizeRunOutcome(run.agentResult, run.prState, run.endedWithoutRunner);

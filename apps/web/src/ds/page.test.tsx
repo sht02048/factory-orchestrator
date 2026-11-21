@@ -62,6 +62,7 @@ describe("/ds 서버 렌더", () => {
       "settingsSteps",
       "sectionNav",
       "icons",
+      "motionPrimitives",
     ];
     expect(ids.filter((id) => !html.includes(`id="${id}"`))).toEqual([]);
     expect(ids.filter((id) => !html.includes(`href="#${id}"`))).toEqual([]);

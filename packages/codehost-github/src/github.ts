@@ -6,6 +6,7 @@ import type {
   CodeHostKind,
   ConnectionCheck,
   PullRequestId,
+  PullRequestSignals,
   PullRequestSnapshot,
   RepoRef,
   RunnerProjectId,
@@ -22,6 +23,7 @@ import {
   RATE_LIMIT_ONLY,
   VIEWER,
 } from "./queries.js";
+import { readPullRequestSignals } from "./pr-signals.js";
 import { normalizeRepo, repoOfProject, splitRepo } from "./repo.js";
 
 export const GITHUB_KIND: CodeHostKind = toCodeHostKind("github");
@@ -36,6 +38,7 @@ const pullRequestNode = z.object({
   state: z.string(),
   createdAt: isoDate,
   mergedAt: isoDate.nullable(),
+  closedAt: isoDate.nullish(),
   headRefName: z.string(),
   headRefOid: z.string(),
   baseRefName: z.string(),
@@ -174,11 +177,22 @@ export class GitHubCodeHost implements CodeHost {
       }
       return state;
     };
-    return Promise.all(nodes.map(async (node) => toSnapshot(node, await ciOf(node.headRefOid))));
+    return Promise.all(
+      nodes.map(async (node) => {
+        const read =
+          node.state === "OPEN" ? await readPullRequestSignals(this.http, owner, name, node) : null;
+        const state = read?.ci ?? (await ciOf(node.headRefOid));
+        return toSnapshot(node, state, read?.signals ?? null);
+      }),
+    );
   }
 }
 
-function toSnapshot(node: PullRequestNode, ci: CiState): PullRequestSnapshot {
+function toSnapshot(
+  node: PullRequestNode,
+  ci: CiState,
+  signals: PullRequestSignals | null,
+): PullRequestSnapshot {
   return {
     id: toPullRequestId(String(node.number)),
     displayId: `#${node.number}`,
@@ -188,12 +202,14 @@ function toSnapshot(node: PullRequestNode, ci: CiState): PullRequestSnapshot {
     state: toState(node.state),
     createdAt: node.createdAt,
     mergedAt: node.mergedAt,
+    ...(node.closedAt == null ? {} : { closedAt: node.closedAt }),
     headBranch: node.headRefName,
     sourceRepo:
       node.headRepository === null ? null : normalizeRepo(node.headRepository.nameWithOwner),
     headCommit: node.headRefOid,
     baseBranch: node.baseRefName,
     ci,
+    signals,
   };
 }
 

@@ -1,3 +1,4 @@
+import { toRunId } from "@ganger/core";
 import { MutationObserver, QueryObserver, environmentManager } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { loadRunDetail } from "@ganger/app/run-detail/load";
@@ -59,9 +60,15 @@ function pageWith(changes: Partial<RunDetail>): RunDetailPage {
 function okCalls(overrides: Partial<RunDetailCalls> = {}): RunDetailCalls {
   return {
     answer: () => Promise.resolve(undefined),
+    humanCheck: () => Promise.resolve(undefined),
     deny: () => Promise.resolve(undefined),
     cancel: () => Promise.resolve({ ok: true }),
+    removeWorktree: () => Promise.resolve({ ok: true }),
+    continueRun: () => Promise.resolve({ ok: true, runId: toRunId("run-next") }),
+    stopPreviousAgent: () => Promise.resolve({ ok: true }),
     control: () => Promise.resolve({ ok: true }),
+    startWithoutWaiting: () => Promise.resolve({ ok: true }),
+    sendAgentMessage: () => Promise.resolve({ ok: true }),
     requestLog: () => Promise.resolve(true),
     ...overrides,
   };
@@ -104,10 +111,36 @@ describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
     await mutate(cancel.queryClient, cancel.mutations.cancel, undefined);
     const pause = mutationWorld(okCalls());
     await mutate(pause.queryClient, pause.mutations.control, "pause");
+    const remove = mutationWorld(okCalls());
+    await mutate(remove.queryClient, remove.mutations.removeWorktree, undefined);
 
-    for (const world of [deny, cancel, pause]) {
+    for (const world of [deny, cancel, pause, remove]) {
       expect(world.invalidated()).toEqual(KEYS_CHANGED_BY_RUN_WRITE);
     }
+  });
+
+  it("기다리지 않고 시작은 응답을 잃어 다시 보내도 같은 요청 ID를 쓴다(0160)", async () => {
+    const requestIds: string[] = [];
+    const world = mutationWorld(
+      okCalls({
+        startWithoutWaiting: (_runId, requestId) => {
+          requestIds.push(requestId);
+          return requestIds.length === 1
+            ? Promise.reject(new Error("network"))
+            : Promise.resolve({ ok: true });
+        },
+      }),
+    );
+
+    await expect(
+      mutate(world.queryClient, world.mutations.startWithoutWaiting, undefined),
+    ).rejects.toThrow("network");
+    expect(world.invalidated()).toEqual([]);
+    await mutate(world.queryClient, world.mutations.startWithoutWaiting, undefined);
+
+    expect(requestIds).toHaveLength(2);
+    expect(requestIds[1]).toBe(requestIds[0]);
+    expect(world.invalidated()).toEqual(KEYS_CHANGED_BY_RUN_WRITE);
   });
 
   it("취소의 ok:false는 이유가 담긴 오류로 throw하고 아무 key도 무효화하지 않는다", async () => {
@@ -118,6 +151,18 @@ describe("Run 상세 mutation(스펙 0003 4.4, C5)", () => {
 
     await expect(failure).rejects.toBeInstanceOf(MutationRejectedError);
     await expect(failure).rejects.toMatchObject({ reason: "not-cancelable" });
+    expect(world.invalidated()).toEqual([]);
+  });
+
+  it("워크트리 지우기의 ok:false는 이유가 담긴 오류로 throw하고 아무 key도 무효화하지 않는다 (0145 R7-3)", async () => {
+    const world = mutationWorld(
+      okCalls({
+        removeWorktree: () => Promise.resolve({ ok: false, reason: "nothing-to-remove" }),
+      }),
+    );
+    const failure = mutate(world.queryClient, world.mutations.removeWorktree, undefined);
+
+    await expect(failure).rejects.toMatchObject({ reason: "nothing-to-remove" });
     expect(world.invalidated()).toEqual([]);
   });
 

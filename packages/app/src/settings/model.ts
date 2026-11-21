@@ -1,3 +1,4 @@
+import type { PrReadError, WorkspaceBrief } from "@ganger/core";
 import type { WorkspaceId } from "@ganger/db";
 import type { McpActionView } from "../mcp/actions.js";
 import type { CheckFailure } from "../prerequisites.js";
@@ -16,6 +17,8 @@ export interface WorkspaceGeneral {
   id: WorkspaceId;
   name: string;
   maxRunMinutes: number;
+  brief: WorkspaceBrief;
+  agentProtocol: string;
 }
 
 export type ProjectOwner =
@@ -132,10 +135,26 @@ export interface TrackerConnectionView {
   webhookSettingsUrl: string | null;
 }
 
-export interface FunnelSetupView {
-  command: string;
-  address: string;
+interface FunnelPortUsage {
+  port: number;
+  uses: string[];
+  isPublic: boolean;
 }
+
+export type FunnelPortChoice =
+  | (FunnelPortUsage & { unavailable: null; command: string; address: string })
+  | (FunnelPortUsage & { unavailable: "serves-this-app" | "tcp-forward" });
+
+export type FunnelSetupView =
+  | {
+      kind: "ready";
+      port: number;
+      portState: "free" | "ours" | "unknown";
+      command: string;
+      address: string;
+    }
+  | { kind: "ports-full"; ports: FunnelPortChoice[] }
+  | { kind: "bind-tailnet"; bindHost: string };
 
 export interface WebhookSetupView {
   funnel: FunnelSetupView | null;
@@ -181,6 +200,7 @@ export interface AddressesView {
   webAddress: string | null;
   webhookAddress: string | null;
   webhookAddressChecked: boolean;
+  autoAllowedHosts: ReadonlyArray<string>;
 }
 
 export interface PowerView {
@@ -198,6 +218,7 @@ export interface McpView {
 export interface InstallSettings {
   connections: TrackerConnectionView[];
   githubToken: boolean;
+  unreadPrRuns: Record<PrReadError, number>;
   runners: RunnerSettingsView[];
   addresses: AddressesView;
   power: PowerView;

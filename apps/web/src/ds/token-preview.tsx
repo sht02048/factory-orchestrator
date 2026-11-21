@@ -67,10 +67,25 @@ const spaceKeys = ["px2", "s1", "px6", "s2", "s3", "s4", "s5", "s6", "s8", "s10"
 const radiusKeys = ["card", "control", "pill", "full"] as const;
 const motionKeys = [
   "easeOut",
+  "easeMove",
+  "easeSheet",
   "durationFast",
   "durationToast",
   "durationSpin",
   "durationSweep",
+  "durationReducedFade",
+  "durationItemEnter",
+  "durationItemExit",
+  "durationLineEnter",
+  "durationArrival",
+  "durationPillColor",
+  "durationPillPop",
+  "durationRowMove",
+  "durationCardMove",
+  "durationDialogOpen",
+  "durationDialogClose",
+  "durationSheetOpen",
+  "durationSheetClose",
 ] as const;
 const fontSizeKeys = [
   "display",

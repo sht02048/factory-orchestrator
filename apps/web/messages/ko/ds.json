@@ -53,7 +53,28 @@
     "icons": "아이콘",
     "settingsRows": "설정 줄",
     "settingsSteps": "설정 단계",
-    "sectionNav": "설정 목차"
+    "sectionNav": "설정 목차",
+    "motionPrimitives": "움직임"
+  },
+  "motionDemo": {
+    "title": "움직임",
+    "note": "상태가 바뀐 곳만 짧게 움직여요. 처음 그릴 때와 필터를 바꿀 때는 움직이지 않아요. 한꺼번에 3건보다 많이 바뀌면 흐려지며 바뀌어요.",
+    "card": "카드 {id}",
+    "queued": "Queued",
+    "running": "Running",
+    "add": "새 항목 넣기",
+    "remove": "맨 위 항목 빼기",
+    "restore": "뺀 항목 되돌리기",
+    "resetList": "필터 바꾸기",
+    "toggleBoard": "보드 숨기기·보이기",
+    "toggleHighlight": "도착 비추기 켜기·끄기",
+    "move": "칸 옮기기",
+    "reorder": "맨 아래를 맨 위로",
+    "burst": "한꺼번에 4장 옮기기",
+    "exited": "빠진 항목 {count}개",
+    "addLine": "타임라인에 줄 더하기",
+    "line": "타임라인 줄 {line}",
+    "nextStatus": "상태 바꾸기"
   },
   "colors": {
     "note": "OKLCH 다크 값이에요. packages/ui 밖에서는 이 토큰만 써요.",
@@ -149,7 +170,7 @@
     "running": "Running",
     "queued": "Queued",
     "panelAll": "모든 런을 최근 순서로 보여 줘요.",
-    "panelTodo": "Human Check와 Failed만 보여 줘요.",
+    "panelTodo": "Failed만 보여 줘요.",
     "panelRunning": "지금 러너에서 도는 런이에요.",
     "panelQueued": "capacity를 기다리는 런이 없어요."
   },
@@ -244,6 +265,7 @@
   "dialog": {
     "note": "되돌릴 수 없는 행동을 확인할 때만 써요.",
     "trigger": "Mapping 지우기",
+    "busyTrigger": "지우는 중",
     "title": "Mapping을 지울까요?",
     "description": "acme/web으로 들어오던 티켓은 더 할당되지 않아요. 이미 도는 런은 그대로 끝나요.",
     "cancel": "취소",
@@ -301,8 +323,6 @@
     "note": "목록 묶음 머리예요. 점 색은 상태 값으로 정해져요.",
     "answerTitle": "답이 필요해요",
     "answer": "에이전트가 답이나 허용을 기다려요",
-    "checkTitle": "확인해 주세요",
-    "check": "PR을 보고 병합할지 정해 주세요",
     "stuckTitle": "멈췄어요",
     "stuck": "원인을 보고 다시 맡기거나 닫아 주세요"
   },
@@ -446,11 +466,10 @@
     },
     "outcomes": {
       "note": "Stats의 범례·실패 이유 막대·날짜별 쌓은 막대 차트예요. 결과 막대(OutcomeBar)는 지금 화면에서 쓰지 않아요. 결과 색은 상태 뜻 그대로 써요.",
-      "merged": "Merged",
-      "check": "Human Check",
+      "succeeded": "Succeeded",
       "failed": "Failed",
       "canceled": "Canceled",
-      "barLabel": "Merged 6, Human Check 2, Failed 1, Canceled 1",
+      "barLabel": "Succeeded 6, Failed 2, Canceled 1",
       "chartLabel": "날마다 끝난 런",
       "yesterday": "어제",
       "today": "오늘"
@@ -495,6 +514,15 @@
       "time": "12분째",
       "action": "답하기",
       "plainTitle": "ACME-10 결제 실패 재시도",
+      "blockedKey": "ACME-15",
+      "blockedTitle": "알림 묶기",
+      "blockedMeta": "선행 티켓 ACME-13이 취소됐어요",
+      "blockerActive": "ACME-12",
+      "blockerActiveState": "In Progress",
+      "blockerDone": "ACME-9",
+      "blockerDoneState": "Done",
+      "blockerCanceled": "ACME-13",
+      "blockerCanceledState": "취소",
       "menuLabel": "ACME-10 런 메뉴",
       "pause": "멈추기",
       "subheading": "처리할 일 없이 끝났어요"

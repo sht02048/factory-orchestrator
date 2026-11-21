@@ -1,4 +1,9 @@
-import { DISCONNECT_AFTER_MS, summarizeRunOutcome, toTrackerStateId } from "@ganger/core";
+import {
+  AdapterError,
+  DISCONNECT_AFTER_MS,
+  summarizeRunOutcome,
+  toTrackerStateId,
+} from "@ganger/core";
 import type { PullRequestSnapshot, RunnerId, WorktreeRef } from "@ganger/core";
 import {
   DEFAULT_MAX_RUN_MS,
@@ -12,6 +17,7 @@ import {
   requestRunCancel,
   requestRunControl,
   requestRunnerCheck,
+  requestWorktreeRemoval,
   saveWorkspaceTrackerProject,
   toWorkspaceId,
   trackerReadGeneration,
@@ -129,7 +135,7 @@ describe("트래커 갱신", () => {
     expect(ended(run)).toMatchObject({ agentResult: "reported-success", prState: "open" });
     const comments = h.tracker.comments.get(run.ticket.key) ?? [];
     expect(comments).toHaveLength(1);
-    expect(comments[0]?.body).toContain("Human Check");
+    expect(comments[0]?.body).toContain("Succeeded");
     expect(comments[0]?.body).toContain("완료 보고(성공)");
     expect(comments[0]?.body).toContain("열림");
     expect(comments[0]?.body).toContain("https://code.example.com/acme/pull/1");
@@ -206,9 +212,9 @@ describe("워크트리 정리", () => {
     const spy = vi
       .spyOn(h.tracker, "listComments")
       .mockRejectedValueOnce(new Error("unauthorized"));
-    report(run, runnerId);
+    report(run, runnerId, "failed");
     await worker.tick();
-    expect(ended(run).agentResult).toBe("reported-success");
+    expect(ended(run).agentResult).toBe("reported-failure");
     expect(h.runner(runnerId).removed).toHaveLength(1);
     expect(recordsOf(run).trackerComment).toBeNull();
 
@@ -239,7 +245,7 @@ describe("워크트리 정리", () => {
     await worker.tick();
     const axes = ended(run);
     expect(summarizeRunOutcome(axes)).toEqual({
-      outcome: "human-check",
+      outcome: "succeeded",
       worktree: "keep-until-pr-settles",
     });
     expect(h.runner(runnerId).removed).toEqual([]);
@@ -263,7 +269,7 @@ describe("워크트리 정리", () => {
       prState: "open",
       runnerUnreached: false,
     });
-    expect(summarizeRunOutcome(ended(run)).outcome).toBe("human-check");
+    expect(summarizeRunOutcome(ended(run)).outcome).toBe("succeeded");
   });
 
   it("PR 열린 시간 초과 런은 PR이 닫히면 이후 PR 상태 닫힘을 기록하고 지운다", async () => {
@@ -332,6 +338,185 @@ describe("워크트리 정리", () => {
     h.runner(runnerId).deleteWorktree(worktree);
     await worker.tick();
     expect(recordsOf(run).worktreeRemovedAt).toBeNull();
+    h.advance(RUNNER_CHECK_INTERVAL_MS);
+    await worker.tick();
+    expect(recordsOf(run).worktreeRemovedAt).toEqual(h.now);
+    expect(h.runner(runnerId).removed).toEqual([]);
+  });
+});
+
+describe("일을 잃지 않는 워크트리 정리 (0145 R7)", () => {
+  const keptEvents = () =>
+    h.log.entries
+      .filter((entry) => entry.event === "run.worktree_kept")
+      .map((entry) => entry.fields);
+
+  it.each([
+    {
+      name: "커밋하지 않은 변경",
+      work: { uncommittedChanges: true, unpushedCommits: false },
+      kept: "uncommitted-changes",
+    },
+    {
+      name: "push하지 않은 커밋",
+      work: { uncommittedChanges: false, unpushedCommits: true },
+      kept: "unpushed-commits",
+    },
+  ] as const)("$name 이 있으면 지우지 않고 남긴 이유를 기록한다", async ({ work, kept }) => {
+    const { run, runnerId, worker } = await startOne();
+    h.runner(runnerId).worktreeWork.set(worktreeOf(run), work);
+    report(run, runnerId, "failed");
+    await worker.tick();
+
+    expect(summarizeRunOutcome(ended(run)).worktree).toBe("remove-now");
+    expect(h.runner(runnerId).removed).toEqual([]);
+    expect(recordsOf(run)).toMatchObject({ worktreeKept: kept, worktreeRemovedAt: null });
+    expect(keptEvents()).toEqual([{ runId: run.id, reason: kept }]);
+
+    h.runner(runnerId).worktreeWork.delete(worktreeOf(run));
+    await worker.tick();
+    expect(h.runner(runnerId).removed).toEqual([]);
+    expect(keptEvents()).toHaveLength(1);
+  });
+
+  it("변경도 push하지 않은 커밋도 없으면 지운다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.runner(runnerId).worktreeWork.set(worktreeOf(run), {
+      uncommittedChanges: false,
+      unpushedCommits: false,
+    });
+    const worktree = worktreeOf(run);
+    report(run, runnerId, "failed");
+    await worker.tick();
+    expect(h.runner(runnerId).removed).toEqual([worktree]);
+    expect(recordsOf(run)).toMatchObject({ worktreeKept: null, worktreeRemovedAt: h.now });
+  });
+
+  it("러너에서 확인하는 명령이 실패하면 남기고 확인하지 못했다고 기록한다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.runner(runnerId).worktreeWork.set(worktreeOf(run), "check-fails");
+    report(run, runnerId, "failed");
+    await worker.tick();
+    expect(h.runner(runnerId).removed).toEqual([]);
+    expect(recordsOf(run).worktreeKept).toBe("check-failed");
+    expect(h.warnings.map((w) => w.event)).toContain("run.worktree_check_failed");
+  });
+
+  it("확인하는 동안 러너에 닿지 못하면 지우지 않고, 닿으면 다시 확인해 지운다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const worktree = worktreeOf(run);
+    report(run, runnerId, "failed");
+    const check = vi
+      .spyOn(h.runner(runnerId), "checkWorktreeWork")
+      .mockRejectedValueOnce(new AdapterError({ kind: "unreachable", detail: "ssh timed out" }));
+    await worker.tick();
+    expect(h.runner(runnerId).removed).toEqual([]);
+    expect(recordsOf(run).worktreeKept).toBeNull();
+
+    await worker.tick();
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(h.runner(runnerId).removed).toEqual([worktree]);
+  });
+
+  it("운영자가 취소한 런도 커밋하지 않은 변경이 있으면 남긴다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.runner(runnerId).worktreeWork.set(worktreeOf(run), {
+      uncommittedChanges: true,
+      unpushedCommits: true,
+    });
+    requestRunCancel(h.db, run.id, h.now);
+    await worker.tick();
+    await worker.tick();
+    expect(ended(run).agentResult).toBe("canceled");
+    expect(h.runner(runnerId).removed).toEqual([]);
+    expect(recordsOf(run).worktreeKept).toBe("uncommitted-changes");
+  });
+
+  it("PR이 병합된 런도 push하지 않은 커밋이 있으면 남긴다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    h.runner(runnerId).worktreeWork.set(worktreeOf(run), {
+      uncommittedChanges: false,
+      unpushedCommits: true,
+    });
+    h.putPullRequest(current(run), "merged");
+    report(run, runnerId);
+    await worker.tick();
+    expect(h.runner(runnerId).removed).toEqual([]);
+    expect(recordsOf(run).worktreeKept).toBe("unpushed-commits");
+  });
+
+  it("Succeeded인데 PR이 없으면 확인하지 않고 운영자가 보게 남긴다 (R7-2)", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const check = vi.spyOn(h.runner(runnerId), "checkWorktreeWork");
+    report(run, runnerId);
+    await worker.tick();
+    h.advance(RUNNER_CHECK_INTERVAL_MS);
+    await worker.tick();
+
+    expect(summarizeRunOutcome(ended(run))).toEqual({
+      outcome: "succeeded",
+      worktree: "operator-decides",
+    });
+    expect(check).not.toHaveBeenCalled();
+    expect(h.runner(runnerId).removed).toEqual([]);
+    expect(recordsOf(run)).toMatchObject({ worktreeKept: null, worktreeRemovedAt: null });
+  });
+
+  it.each([
+    { name: "PR 없이 Succeeded로 남긴 워크트리", outcome: "succeeded", work: undefined },
+    {
+      name: "push하지 않은 커밋 때문에 남긴 워크트리",
+      outcome: "failed",
+      work: { uncommittedChanges: true, unpushedCommits: true },
+    },
+  ] as const)(
+    "운영자가 $name 를 지우라고 하면 일이 있어도 지운다 (R7-3)",
+    async ({ outcome, work }) => {
+      const { run, runnerId, worker } = await startOne();
+      const worktree = worktreeOf(run);
+      if (work !== undefined) h.runner(runnerId).worktreeWork.set(worktree, work);
+      report(run, runnerId, outcome);
+      await worker.tick();
+      expect(h.runner(runnerId).removed).toEqual([]);
+
+      expect(requestWorktreeRemoval(h.db, run.id, h.now)).toEqual({ ok: true });
+      await worker.tick();
+      expect(h.runner(runnerId).removed).toEqual([worktree]);
+      expect(recordsOf(run)).toMatchObject({
+        worktreeRemovedAt: h.now,
+        worktreeRemoveRequestedAt: null,
+      });
+    },
+  );
+
+  it("운영자가 지우라고 했는데 러너가 Offline이면 기다렸다가 돌아오면 지운다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const worktree = worktreeOf(run);
+    report(run, runnerId);
+    await worker.tick();
+    requestWorktreeRemoval(h.db, run.id, h.now);
+    h.setRunnerOnline(runnerId, false);
+    await worker.tick();
+    expect(h.runner(runnerId).removed).toEqual([]);
+    expect(recordsOf(run).worktreeRemoveRequestedAt).not.toBeNull();
+
+    h.setRunnerOnline(runnerId, true);
+    await worker.tick();
+    expect(h.runner(runnerId).removed).toEqual([worktree]);
+  });
+
+  it("남긴 워크트리를 사람이 러너에서 지우면 러너 확인 때 지운 시각을 기록한다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const worktree = worktreeOf(run);
+    h.runner(runnerId).worktreeWork.set(worktree, {
+      uncommittedChanges: true,
+      unpushedCommits: false,
+    });
+    report(run, runnerId, "failed");
+    await worker.tick();
+    expect(recordsOf(run).worktreeKept).toBe("uncommitted-changes");
+
+    h.runner(runnerId).deleteWorktree(worktree);
     h.advance(RUNNER_CHECK_INTERVAL_MS);
     await worker.tick();
     expect(recordsOf(run).worktreeRemovedAt).toEqual(h.now);

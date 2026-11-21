@@ -7,6 +7,8 @@ import {
   KanbanCards,
   KanbanColumn,
   KanbanSubheading,
+  MotionList,
+  MotionScope,
   PageHeader,
   ProblemCallout,
   Row,
@@ -27,6 +29,7 @@ import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { useUsageNames } from "../labels";
 import { useStatusName } from "../status";
+import type { HumanCheckDecision } from "@ganger/app/home/actions";
 import type { DashboardRunner, HomePage, HomeRun } from "@ganger/app/home/model";
 import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import {
@@ -35,9 +38,10 @@ import {
   limitedRunners,
   readyAgainInMs,
   runnerIssues,
+  todoGroupOf,
   todoGroups,
 } from "@ganger/app/home/model";
-import { RunCard } from "./run-card";
+import { cardTag, RunCard } from "./run-card";
 import type { SheetMode } from "./run-card";
 import { RunSheet } from "./run-sheet";
 import type { SheetTarget } from "./run-sheet";
@@ -49,6 +53,13 @@ export interface AnswerInput {
   runId: string;
   questionId: string;
   answer: string;
+}
+
+export interface HumanCheckInput {
+  runId: string;
+  questionId: string;
+  decision: HumanCheckDecision;
+  note: string;
 }
 
 export interface DenyInput {
@@ -68,9 +79,11 @@ export type DashboardView = (typeof DASHBOARD_VIEWS)[number];
 
 export interface HomeScreenProps {
   page: HomePage;
+  drawKey?: string;
   view?: DashboardView;
   onViewChange?: (view: DashboardView) => void;
   onAnswer: (input: AnswerInput) => Promise<void>;
+  onHumanCheck: (input: HumanCheckInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
   onControl: (input: ControlInput) => Promise<RunControlOutcome>;
   openRunId?: RunId | undefined;
@@ -83,6 +96,8 @@ export const SETTLED_VISIBLE = 3;
 
 interface CardHost {
   all: boolean;
+  listKey: string;
+  lastTags: ReadonlyMap<RunId, PillStatus | null>;
   selectedId: RunId | null;
   revealedId: RunId | null;
   cardRef: (id: RunId) => (element: HTMLButtonElement | null) => void;
@@ -93,9 +108,11 @@ interface CardHost {
 
 export function HomeScreen({
   page,
+  drawKey = "",
   view = "all",
   onViewChange = () => {},
   onAnswer,
+  onHumanCheck,
   onDeny,
   onControl,
   openRunId,
@@ -103,11 +120,29 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const t = useTranslations("home");
   const cards = useRef(new Map<RunId, HTMLButtonElement>());
+  const workspaceScope = `${workspaceScopeOf(page)}:${drawKey}`;
+  const [tagMemory, setTagMemory] = useState(() => newTagMemory(workspaceScope));
+  let lastTags = tagMemory.tags;
+  if (tagMemory.scope !== workspaceScope) {
+    const cleared = newTagMemory(workspaceScope);
+    lastTags = cleared.tags;
+    setTagMemory(cleared);
+  }
   const [target, setTarget] = useState<SheetTarget | null>(null);
   const [open, setOpen] = useState(false);
   const [revealedId, setRevealedId] = useState<RunId | null>(null);
   const shownRunId = useRef<RunId | undefined>(undefined);
   useControlFailureToasts(page);
+  useEffect(() => {
+    if (page.workspace.kind === "none") return;
+    const { queued, running, done } = dashboardBoard(page);
+    for (const run of [...running.todo, ...done.todo]) {
+      lastTags.set(run.id, cardTag(run, true));
+    }
+    for (const run of [...queued, ...running.rest, ...done.rest]) {
+      lastTags.set(run.id, cardTag(run, false));
+    }
+  }, [page, lastTags]);
   useEffect(() => {
     if (openRunId === undefined || shownRunId.current === openRunId) return;
     if (page.workspace.kind === "none") return;
@@ -134,6 +169,8 @@ export function HomeScreen({
     target === null ? undefined : boardRuns(board).find((run) => run.id === target.run.id);
   const host: CardHost = {
     all,
+    lastTags,
+    listKey: `${workspaceScope}:${view}`,
     selectedId: open && target !== null ? target.run.id : null,
     revealedId,
     cardRef: (id) => (element) => {
@@ -166,6 +203,8 @@ export function HomeScreen({
     },
   };
   const runningTodo = new Set(board.running.todo.map((run) => run.id));
+  const humanChecks = board.running.todo.filter((run) => todoGroupOf(run) === "check");
+  const otherTodo = board.running.todo.filter((run) => todoGroupOf(run) !== "check");
   const todoIds = new Set(page.attention.map(({ run }) => run.id));
   return (
     <ScreenLayout
@@ -195,56 +234,77 @@ export function HomeScreen({
       <div {...stylex.props(styles.page)}>
         <div {...stylex.props(styles.frame)}>
           <div {...stylex.props(styles.board)}>
-            <KanbanColumn title={t("column.queued")} count={todoOnly ? 0 : board.queued.length}>
-              <CardList
-                runs={todoOnly ? [] : board.queued}
-                tagged={() => false}
-                limit={COLUMN_VISIBLE}
-                empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.queued")}
-                host={host}
-              />
-            </KanbanColumn>
-            <KanbanColumn
-              title={t("column.running")}
-              count={
-                todoOnly
-                  ? board.running.todo.length
-                  : board.running.todo.length + board.running.rest.length
-              }
-            >
-              <CardList
-                runs={
-                  todoOnly ? board.running.todo : [...board.running.todo, ...board.running.rest]
-                }
-                tagged={(run) => runningTodo.has(run.id)}
-                limit={COLUMN_VISIBLE}
-                empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.running")}
-                host={host}
-              />
-            </KanbanColumn>
-            <KanbanColumn
-              title={t("column.done")}
-              count={
-                todoOnly ? board.done.todo.length : board.done.todo.length + board.done.rest.length
-              }
-            >
-              <CardList
-                runs={board.done.todo}
-                tagged={() => true}
-                limit={DONE_TODO_VISIBLE}
-                empty={
+            <MotionScope key={workspaceScope} move="card">
+              <KanbanColumn title={t("column.queued")} count={todoOnly ? 0 : board.queued.length}>
+                <CardList
+                  runs={todoOnly ? [] : board.queued}
+                  tagged={() => false}
+                  limit={COLUMN_VISIBLE}
+                  empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.queued")}
+                  host={host}
+                />
+              </KanbanColumn>
+              <KanbanColumn
+                title={t("column.running")}
+                count={
                   todoOnly
-                    ? t("columnEmpty.todo")
-                    : board.done.rest.length === 0
-                      ? t("columnEmpty.done")
-                      : null
+                    ? board.running.todo.length
+                    : board.running.todo.length + board.running.rest.length
                 }
-                host={host}
-              />
-              {todoOnly || board.done.rest.length === 0 ? null : (
-                <SettledCards runs={board.done.rest} page={page} host={host} />
-              )}
-            </KanbanColumn>
+              >
+                <div
+                  data-todo-group={humanChecks.length === 0 ? undefined : "check"}
+                  {...stylex.props(styles.settled)}
+                >
+                  {humanChecks.length === 0 ? null : (
+                    <KanbanSubheading>{t("board.humanCheck")}</KanbanSubheading>
+                  )}
+                  <CardList
+                    runs={humanChecks}
+                    tagged={() => true}
+                    limit={COLUMN_VISIBLE}
+                    empty={null}
+                    host={host}
+                  />
+                </div>
+                <CardList
+                  runs={todoOnly ? otherTodo : [...otherTodo, ...board.running.rest]}
+                  tagged={(run) => runningTodo.has(run.id)}
+                  limit={COLUMN_VISIBLE}
+                  empty={
+                    humanChecks.length > 0
+                      ? null
+                      : todoOnly
+                        ? t("columnEmpty.todo")
+                        : t("columnEmpty.running")
+                  }
+                  host={host}
+                />
+              </KanbanColumn>
+              <KanbanColumn
+                title={t("column.done")}
+                count={
+                  todoOnly
+                    ? board.done.todo.length
+                    : board.done.todo.length + board.done.rest.length
+                }
+              >
+                <CardList
+                  runs={board.done.todo}
+                  tagged={() => true}
+                  limit={DONE_TODO_VISIBLE}
+                  empty={
+                    todoOnly
+                      ? t("columnEmpty.todo")
+                      : board.done.rest.length === 0
+                        ? t("columnEmpty.done")
+                        : null
+                  }
+                  host={host}
+                />
+                <SettledCards runs={todoOnly ? [] : board.done.rest} page={page} host={host} />
+              </KanbanColumn>
+            </MotionScope>
             <div {...stylex.props(styles.runners)}>
               <RunnersSection runners={page.runners.list} />
             </div>
@@ -261,12 +321,21 @@ export function HomeScreen({
           finalFocus={() => (target === null ? null : (cards.current.get(target.run.id) ?? null))}
           all={all}
           onAnswer={onAnswer}
+          onHumanCheck={onHumanCheck}
           onDeny={onDeny}
           onControl={host.onControl}
         />
       </div>
     </ScreenLayout>
   );
+}
+
+function workspaceScopeOf(page: HomePage): string {
+  return page.workspace.kind === "one" ? `one:${page.workspace.workspace.id}` : page.workspace.kind;
+}
+
+function newTagMemory(scope: string) {
+  return { scope, tags: new Map<RunId, PillStatus | null>() };
 }
 
 function boardRuns(board: ReturnType<typeof dashboardBoard>): HomeRun[] {
@@ -280,7 +349,11 @@ function boardRuns(board: ReturnType<typeof dashboardBoard>): HomeRun[] {
 }
 
 function opensAnswer(run: HomeRun): boolean {
-  return run.state === "waiting-for-input" && run.input?.kind === "question" && !run.input.answered;
+  return (
+    run.state === "waiting-for-input" &&
+    (run.input?.kind === "question" || run.input?.kind === "human-check") &&
+    !run.input.answered
+  );
 }
 
 function DashboardSummary({ page }: { page: HomePage }) {
@@ -338,31 +411,23 @@ function CardList({
     focusAfterExpand.current = null;
     host.focusCard(id);
   }, [expanded, host]);
-  if (runs.length === 0)
-    return empty === null ? null : (
-      <Text variant="meta" as="p">
-        {empty}
-      </Text>
-    );
   const revealed = runs.slice(limit).some((run) => run.id === host.revealedId);
-  const visible = expanded || revealed ? runs : runs.slice(0, limit);
+  const showAll = expanded || revealed;
+  const visible = showAll ? runs : runs.slice(0, limit);
   const hidden = runs.length - visible.length;
   return (
     <>
-      <KanbanCards>
-        {visible.map((run) => (
-          <RunCard
-            key={run.id}
-            run={run}
-            tagged={tagged(run)}
-            all={host.all}
-            selected={host.selectedId === run.id}
-            openRef={host.cardRef(run.id)}
-            onOpen={(mode) => host.onOpen(run, tagged(run), mode)}
-            onControl={(control) => host.onControl(run, control)}
-          />
-        ))}
-      </KanbanCards>
+      {runs.length === 0 && empty !== null ? (
+        <Text variant="meta" as="p">
+          {empty}
+        </Text>
+      ) : null}
+      <AnimatedCards
+        runs={visible}
+        tagged={tagged}
+        resetKey={`${host.listKey}:${showAll ? "all" : "limited"}`}
+        host={host}
+      />
       {hidden > 0 ? (
         <div>
           <Button
@@ -380,28 +445,62 @@ function CardList({
   );
 }
 
+function AnimatedCards({
+  runs,
+  tagged,
+  resetKey,
+  host,
+}: {
+  runs: HomeRun[];
+  tagged: (run: HomeRun) => boolean;
+  resetKey: string;
+  host: CardHost;
+}) {
+  return (
+    <KanbanCards motionItems>
+      <MotionList
+        as="li"
+        items={runs}
+        getKey={(run) => run.id}
+        highlightRadius="card"
+        itemGap="card"
+        resetKey={resetKey}
+        itemAttributes={(run, { leaving }) => ({
+          "data-run": leaving ? undefined : run.id,
+          "data-tag": leaving ? undefined : (cardTag(run, tagged(run)) ?? undefined),
+        })}
+      >
+        {(run, { leaving }) => (
+          <RunCard
+            run={run}
+            tagged={tagged(run)}
+            all={host.all}
+            selected={!leaving && host.selectedId === run.id}
+            lastTags={host.lastTags}
+            openRef={leaving ? null : host.cardRef(run.id)}
+            onOpen={(mode) => host.onOpen(run, tagged(run), mode)}
+            onControl={(control) => host.onControl(run, control)}
+          />
+        )}
+      </MotionList>
+    </KanbanCards>
+  );
+}
+
 function SettledCards({ runs, page, host }: { runs: HomeRun[]; page: HomePage; host: CardHost }) {
   const t = useTranslations("home.board");
   const first = runs.slice(0, SETTLED_VISIBLE);
   const revealed = runs.slice(SETTLED_VISIBLE).find((run) => run.id === host.revealedId);
   const visible = revealed === undefined ? first : [...first, revealed];
   return (
-    <div data-settled="" {...stylex.props(styles.settled)}>
-      <KanbanSubheading>{t("settled")}</KanbanSubheading>
-      <KanbanCards>
-        {visible.map((run) => (
-          <RunCard
-            key={run.id}
-            run={run}
-            tagged={false}
-            all={host.all}
-            selected={host.selectedId === run.id}
-            openRef={host.cardRef(run.id)}
-            onOpen={(mode) => host.onOpen(run, false, mode)}
-            onControl={(control) => host.onControl(run, control)}
-          />
-        ))}
-      </KanbanCards>
+    <div data-settled={runs.length === 0 ? undefined : ""} {...stylex.props(styles.settled)}>
+      {runs.length === 0 ? null : <KanbanSubheading>{t("settled")}</KanbanSubheading>}
+      <AnimatedCards
+        runs={visible}
+        tagged={() => false}
+        resetKey={`${host.listKey}:${revealed?.id ?? "first"}`}
+        host={host}
+      />
       {runs.length > visible.length ? (
         <div {...stylex.props(styles.allRuns)}>
           <TextLink href={runsHref(page)}>{t("allRuns")}</TextLink>
@@ -601,7 +700,12 @@ const styles = stylex.create({
     },
     paddingTop: { default: space.s3, [breakpoints.kanbanStacked]: space.s4 },
   },
-  settled: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
+  settled: {
+    display: { default: "flex", ":not(:has(li))": "none" },
+    flexDirection: "column",
+    gap: space.s2,
+    minWidth: 0,
+  },
   allRuns: { paddingInline: space.s1 },
   sideBlock: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
   runnerText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },

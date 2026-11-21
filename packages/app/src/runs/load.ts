@@ -1,3 +1,4 @@
+import { prSignalsViewOf } from "../pr-signals-view.js";
 import {
   AGENT_RESULTS,
   PR_STATES,
@@ -6,14 +7,12 @@ import {
   toTrackerConnectionId,
   toTrackerProjectId,
 } from "@ganger/core";
-import type { QueuedRun, RunId } from "@ganger/core";
+import type { RunId } from "@ganger/core";
 import {
   getWorkspaceTrackerProject,
   listPendingCancelRequests,
-  listRunPlacements,
-  listRunnerSnapshots,
-  listRuns,
   listRunsWithRecords,
+  listTakenOverRunIds,
   listRunners,
   listWorkspaces,
   toWorkspaceId,
@@ -27,7 +26,7 @@ import type { RunConditions } from "./conditions.js";
 import { ENDED_RUNS_PAGE_SIZE } from "./model.js";
 import type { QueuedReason, RunCondition, RunView, RunsPage } from "./model.js";
 import { withoutPauses } from "../run-control.js";
-import { describeQueuedReason, explainQueue } from "./queue-reasons.js";
+import { describeQueuedReason, loadQueueReasons } from "./queue-reasons.js";
 
 export function loadRunsPage(
   db: Database,
@@ -46,24 +45,8 @@ export function loadRunsPage(
 
   const runners = new Map(listRunners(db).map((r) => [r.id, r]));
   const cancelling = new Set<RunId>(listPendingCancelRequests(db).map((r) => r.runId));
-  const queueReasons = explainQueue({
-    queued: listRuns(db, { states: ["queued"] }).flatMap((run): QueuedRun[] =>
-      run.state === "queued"
-        ? [
-            {
-              id: run.id,
-              assignedAt: run.assignedAt,
-              project: run.runnerProject,
-              agent: run.agent,
-              runnerId: run.runnerId,
-              unstartable: false,
-            },
-          ]
-        : [],
-    ),
-    runners: listRunnerSnapshots(db, now),
-    runs: listRunPlacements(db),
-  });
+  const takenOver = listTakenOverRunIds(db);
+  const queueReasons = loadQueueReasons(db, now);
 
   const projectNames = new Map<string, string>();
   const projectName = (run: StoredRun): string => {
@@ -145,7 +128,11 @@ export function loadRunsPage(
       pullRequest:
         pr === null || pr === undefined || !isWebUrl(pr.url)
           ? null
-          : { displayId: pr.displayId, url: pr.url },
+          : {
+              displayId: pr.displayId,
+              url: pr.url,
+              signals: takenOver.has(run.id) ? null : prSignalsViewOf(run, records),
+            },
       attention: false,
     };
     switch (run.state) {
@@ -195,8 +182,10 @@ export function loadRunsPage(
           endedAgoMs: Math.max(0, now.getTime() - run.endedAt.getTime()),
           agentResult: run.agentResult,
           prState: run.prState,
+          laterPrState: records.laterPrState?.state ?? null,
+          prReadError: records.prReadError,
           summary,
-          attention: latest && isUnresolvedEndedRun(run, records),
+          attention: latest && isUnresolvedEndedRun(run),
         };
       }
     }
@@ -242,10 +231,8 @@ function describeConditions(
   return described;
 }
 
-function isUnresolvedEndedRun(run: StoredRun, records: RunRecords): boolean {
-  if (run.state !== "ended") return false;
-  const summary = summarizeRunOutcome(run).outcome;
-  return summary === "failed" || (summary === "human-check" && records.laterPrState === null);
+function isUnresolvedEndedRun(run: StoredRun): boolean {
+  return run.state === "ended" && summarizeRunOutcome(run).outcome === "failed";
 }
 
 const UNRESOLVED_ENDED_AXES: ReadonlyArray<EndedAxesFilter> = AGENT_RESULTS.flatMap((agentResult) =>
@@ -253,9 +240,7 @@ const UNRESOLVED_ENDED_AXES: ReadonlyArray<EndedAxesFilter> = AGENT_RESULTS.flat
     switch (summarizeRunOutcome({ agentResult, prState, runnerUnreached: false }).outcome) {
       case "failed":
         return [{ agentResult, prState }];
-      case "human-check":
-        return [{ agentResult, prState, laterPrState: null }];
-      case "merged":
+      case "succeeded":
       case "canceled":
         return [];
     }

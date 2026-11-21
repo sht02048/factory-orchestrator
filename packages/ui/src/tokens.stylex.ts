@@ -128,10 +128,25 @@ export const shadow = stylex.defineVars({
 
 export const motion = stylex.defineVars({
   easeOut: "cubic-bezier(0.23, 1, 0.32, 1)",
+  easeMove: "cubic-bezier(0.65, 0, 0.35, 1)",
+  easeSheet: "cubic-bezier(0.32, 0.72, 0, 1)",
   durationFast: "150ms",
   durationToast: "180ms",
   durationSpin: "900ms",
   durationSweep: "1100ms",
+  durationReducedFade: "150ms",
+  durationItemEnter: "220ms",
+  durationItemExit: "160ms",
+  durationLineEnter: "200ms",
+  durationArrival: "1200ms",
+  durationPillColor: "150ms",
+  durationPillPop: "180ms",
+  durationRowMove: "240ms",
+  durationCardMove: "300ms",
+  durationDialogOpen: "180ms",
+  durationDialogClose: "140ms",
+  durationSheetOpen: "260ms",
+  durationSheetClose: "180ms",
 });
 
 export const size = stylex.defineVars({
@@ -171,6 +186,7 @@ export const size = stylex.defineVars({
   searchMaxWidth: "320px",
   ticketKeyColumn: "112px",
   projectColumn: "128px",
+  priorityColumn: "88px",
   lastRunColumn: "160px",
   runStatusColumn: "152px",
   timeColumn: "88px",

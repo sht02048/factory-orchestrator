@@ -1,17 +1,37 @@
-import { toPermissionRequestId, toQuestionId, toRunId, toRunnerId } from "@ganger/core";
+import {
+  toAgentMessageRequestId,
+  toFollowUpRef,
+  toPermissionRequestId,
+  toPullRequestId,
+  toQuestionId,
+  toRunId,
+  toRunnerId,
+} from "@ganger/core";
 import {
   changeRunState,
+  completeAgentMessage,
+  recordAgentMessageFollowUp,
   completeRunControlRequest,
+  requestAgentMessage,
+  requestRunCancel,
   requestRunControl,
   recordMcpAction,
   completeLogTailRequest,
   recordProviderUsage,
   recordPermissionWaits,
   recordRunQuestions,
+  recordAgentCheck,
+  recordContinuePlace,
+  requestPreviousAgentStop,
   recordStartFailure,
+  recordStartRequested,
+  saveWorkspaceBrief,
+  toWorkspaceId,
   updateRunRecords,
 } from "@ganger/db";
+import type { RunId } from "@ganger/core";
 import type { Database } from "@ganger/db";
+import { createTranslator } from "use-intl";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import runJson from "../../messages/ko/run.json" with { type: "json" };
@@ -21,12 +41,17 @@ import { renderWithMessages } from "../testing/render";
 import { addTitledRun, endedCases, minutes, now, seedDatabase } from "../testing/seed";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
 import questionJson from "../../messages/ko/question.json" with { type: "json" };
+import { LOG_POLL_LIMIT, runDetailPollMs } from "./actions";
 import { runMessages } from "./messages";
 import type { RunDetail, RunDetailPage } from "@ganger/app/run-detail/model";
-import { RunDetailScreen } from "./run-detail-screen";
-import { addExtraEnded, assign, extraEndedCases, walk } from "./testing";
+import { RunDetailScreen, timelineRows } from "./run-detail-screen";
+import { addExtraEnded, assign, extraEndedCases, startedOn, walk } from "./testing";
 import { answerInput, submitAnswer } from "@ganger/app/home/actions";
-import { cancelRunRequest } from "@ganger/app/run-detail/actions";
+import {
+  cancelRunRequest,
+  continueRunRequest,
+  removeWorktreeRequest,
+} from "@ganger/app/run-detail/actions";
 
 const resolved = () => Promise.resolve();
 
@@ -39,9 +64,15 @@ function render(page: RunDetailPage, timeZone?: string): string {
       runsHref="/runs"
       runHref={(id) => `/runs/${id}`}
       onAnswer={resolved}
+      onHumanCheck={resolved}
       onDeny={resolved}
       onCancel={resolved}
+      onRemoveWorktree={resolved}
+      onContinue={resolved}
+      onStopPreviousAgent={resolved}
       onControl={() => Promise.resolve("requested" as const)}
+      onStartWithoutWaiting={resolved}
+      onSendAgentMessage={() => Promise.resolve("requested" as const)}
       onRefreshLog={resolved}
     />,
     runMessages,
@@ -72,6 +103,211 @@ function found(db: Database, id: string | undefined): RunDetail {
   return p.run;
 }
 
+describe("Run 상세의 먼저 끝나야 하는 티켓 (0160)", () => {
+  const blocker = (key: string, stateName: string, stateCategory: string) => ({
+    key,
+    title: `${key} 제목`,
+    stateName,
+    stateCategory,
+  });
+  const queuedWith = (queuedReason: RunDetail["status"] & { state: "queued" }) => {
+    const { db, ids } = seedDatabase();
+    return render({
+      kind: "found",
+      run: { ...found(db, ids.get("ACME-10")), status: queuedReason },
+    });
+  };
+
+  it("기다림은 선행 목록과 끝난 티켓, 기다리지 않고 시작을 보이고 자리 안내는 뺀다", () => {
+    const html = queuedWith({
+      state: "queued",
+      queuedReason: {
+        kind: "blockers-waiting",
+        blockers: [blocker("ACME-11", "In Progress", "started")],
+        finished: [blocker("ACME-9", "Done", "completed")],
+      },
+    });
+    const body = text(html);
+
+    expect(body).toContain(runJson.blockerWait.waiting);
+    expect(body).toContain("ACME-11");
+    expect(body).toContain("ACME-9");
+    expect(labels(html)).toContain(runJson.blockerWait.trigger);
+    expect(body).not.toContain(runJson.next.queued);
+  });
+
+  it("멈춘 기다림은 까닭에 맞는 안내를 보인다", () => {
+    const canceled = blocker("ACME-10", "Canceled", "canceled");
+    const body = text(
+      queuedWith({
+        state: "queued",
+        queuedReason: {
+          kind: "blockers-stuck",
+          cause: "canceled",
+          blocker: canceled,
+          blockers: [canceled],
+        },
+      }),
+    );
+
+    expect(body).toContain(runJson.blockerWait.stuck.canceled);
+    expect(body).not.toContain(runJson.blockerWait.waiting);
+  });
+
+  it("선행 티켓을 기다리지 않는 Queued 런에는 시작 버튼이 없다", () => {
+    const html = queuedWith({ state: "queued", queuedReason: { kind: "behind" } });
+
+    expect(labels(html)).not.toContain(runJson.blockerWait.trigger);
+    expect(text(html)).toContain(runJson.next.queued);
+  });
+});
+
+describe("Run 상세의 에이전트에게 보내기 (0147)", () => {
+  const started = (db: Database, key: string, at: number) => {
+    const id = assign(db, key, at);
+    walk(db, id, at, [startedOn(key)]);
+    return id;
+  };
+  const sent = (db: Database, id: Parameters<typeof requestAgentMessage>[1], body: string) => {
+    const result = requestAgentMessage(
+      db,
+      id,
+      { requestId: toAgentMessageRequestId(`request-${body}`), body },
+      minutes(910),
+    );
+    if (!result.ok) throw new Error("not requested");
+    return result.id;
+  };
+
+  it("Running·Waiting for Input·Paused 런에만 입력칸을 보인다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-91", 900);
+    expect(text(render(page(db, id)))).toContain(runJson.agentMessage.title);
+
+    changeRunState(db, id, { to: "waiting-for-input" }, minutes(901));
+    expect(text(render(page(db, id)))).not.toContain(runJson.agentMessage.hint.waiting);
+    recordRunQuestions(db, id, [
+      { id: toQuestionId("q-91"), body: "어느 쪽?", options: [], askedAt: minutes(901) },
+    ]);
+    const waiting = text(render(page(db, id)));
+    expect(waiting).toContain(runJson.agentMessage.title);
+    expect(waiting).toContain(runJson.agentMessage.hint.waiting);
+
+    changeRunState(db, id, { to: "running" }, minutes(902));
+    changeRunState(db, id, { to: "paused", source: "operator" }, minutes(903));
+    const paused = text(render(page(db, id)));
+    expect(paused).toContain(runJson.agentMessage.title);
+    expect(paused).toContain(runJson.agentMessage.hint.paused);
+
+    changeRunState(db, id, { to: "disconnected" }, minutes(904));
+    expect(text(render(page(db, id)))).not.toContain(runJson.agentMessage.title);
+
+    changeRunState(db, id, { to: "ended", agentResult: "canceled", prState: "none" }, minutes(905));
+    expect(text(render(page(db, id)))).not.toContain(runJson.agentMessage.title);
+  });
+
+  it("Queued 런과 취소 중인 런에는 입력칸이 없다", () => {
+    const { db } = seedDatabase();
+    const queued = assign(db, "ACME-92", 900);
+    expect(text(render(page(db, queued)))).not.toContain(runJson.agentMessage.title);
+    const id = started(db, "ACME-93", 900);
+    requestRunCancel(db, id, minutes(901));
+    expect(text(render(page(db, id)))).not.toContain(runJson.agentMessage.title);
+  });
+
+  it("타임라인에 운영자가 보냄과 보낸 말을 남기고, Paused 런은 재개하면 전한다고 보인다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-94", 900);
+    changeRunState(db, id, { to: "paused", source: "operator" }, minutes(901));
+    sent(db, id, "끝내기 전에 PR 까지 열어 줘요");
+    const html = text(render(page(db, id)));
+    expect(html).toContain(runJson.timeline["operator-message"]);
+    expect(html).toContain("끝내기 전에 PR 까지 열어 줘요");
+    expect(html).toContain(runJson.agentMessage.delivery["after-resume"]);
+  });
+
+  it("후속 워커를 멈추는 동안에는 보내는 중이라고 하지 않고 다시 읽기를 돌리지 않는다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-97", 900);
+    const messageId = sent(db, id, "다시 시작된 말");
+    recordAgentMessageFollowUp(db, messageId, toFollowUpRef("ctx_follow_up"));
+    const detail = page(db, id);
+    const html = text(render(detail));
+    expect(html).toContain(runJson.agentMessage.delivery["stopping-follow-up"]);
+    expect(html).not.toContain(runJson.agentMessage.delivery.sending);
+    expect(runDetailPollMs(detail, LOG_POLL_LIMIT)).toBe(false);
+  });
+
+  it("후속 워커를 멈추지 못하면 러너에서 직접 멈추라고 보인다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-96", 900);
+    const messageId = sent(db, id, "다시 시작된 말");
+    completeAgentMessage(db, {
+      id: messageId,
+      runId: id,
+      completedAt: minutes(911),
+      error: "follow-up-not-stopped",
+    });
+    expect(text(render(page(db, id)))).toContain(
+      runJson.agentMessage.failure["follow-up-not-stopped"],
+    );
+  });
+
+  it("보내지 못하면 입력칸과 타임라인에 이유를 보인다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-95", 900);
+    const messageId = sent(db, id, "안 닿는 말");
+    completeAgentMessage(db, {
+      id: messageId,
+      runId: id,
+      completedAt: minutes(911),
+      error: "runner-unreachable",
+    });
+    const html = render(page(db, id));
+    const reason = runJson.agentMessage.failure["runner-unreachable"];
+    expect(text(html).split(reason).length - 1).toBe(2);
+    expect(html).toMatch(/role="status"[^>]*>[^<]*보내지 못했어요/);
+  });
+});
+
+describe("Run 상세의 받은 지시서 (0146)", () => {
+  it("시작한 런은 받은 지시서 전체를 접은 채로 보이고, 줄바꿈을 그대로 둔다", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-90", 900);
+    const brief = "Read AGENTS.md first.\n\nACME-90 Fix totals\n\n## 운영자에게 물을 때\n";
+    recordStartRequested(db, id, minutes(900), brief);
+    walk(db, id, 900, [startedOn("ACME-90")]);
+    const html = render(page(db, id));
+    const details = html.slice(html.indexOf("<details"), html.indexOf("</details>"));
+    expect(details).not.toContain(" open");
+    expect(text(details)).toContain(runJson.brief.title);
+    expect(details).toContain(`aria-label="${runJson.brief.label}"`);
+    expect(details).toContain("Read AGENTS.md first.\n\nACME-90 Fix totals");
+  });
+
+  it("Workspace 지시를 바꿔도 이미 시작한 런의 받은 지시서는 그대로다", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-91", 910);
+    recordStartRequested(db, id, minutes(910), "Old rule.\n\nACME-91\n");
+    walk(db, id, 910, [startedOn("ACME-91")]);
+    saveWorkspaceBrief(db, {
+      id: toWorkspaceId(found(db, id).workspace.id),
+      brief: { before: "New rule.", after: "" },
+    });
+    expect(found(db, id).brief).toBe("Old rule.\n\nACME-91\n");
+  });
+
+  it("지시서를 보내기 전이거나 시작하지 못한 런에는 받은 지시서 구역이 없다", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-92", 920);
+    recordStartRequested(db, id, minutes(920), "never received");
+    expect(found(db, id).brief).toBeNull();
+    walk(db, id, 920, [{ to: "ended", agentResult: "could-not-start", prState: "none" }]);
+    expect(found(db, id).brief).toBeNull();
+    expect(render(page(db, id))).not.toContain(runJson.brief.title);
+  });
+});
+
 describe("Run 상세 화면", () => {
   it("에이전트 결과 아홉과 PR 상태 넷이 각각의 칸에, 요약 결과(Canceled 포함)가 계산 표대로 보인다", () => {
     const { db, ids } = seedDatabase();
@@ -96,6 +332,233 @@ describe("Run 상세 화면", () => {
         reason: true,
       });
     }
+  });
+
+  it.each(["no-access", "other"] as const)(
+    "PR 정보를 읽지 못한 런(%s)은 못 읽음과 이유, 할 일을 보인다 (0144)",
+    (reason) => {
+      const { db } = seedDatabase();
+      const id = assign(db, "ACME-40", 400);
+      walk(db, id, 400, [
+        startedOn("ACME-40"),
+        {
+          to: "ended",
+          agentResult: "reported-success",
+          prState: "unknown",
+          prReadError: reason,
+        },
+      ]);
+      expect(found(db, id).status).toMatchObject({ prState: "unknown", prReadError: reason });
+      const html = render(page(db, id));
+      expect(valueOf(html, runJson.props.prState)).toBe(
+        `${domain.prState.unknown} ${runJson.props.prUnreadReason[reason]}`,
+      );
+      const body = text(html);
+      expect(body).toContain(`${runJson.prUnread.title} ${runJson.prUnread[reason]}`);
+      expect(body).toContain(runJson.reason.succeeded);
+      expect(body).toContain(`${domain.summary.succeeded} PR ${domain.prState.unknown}`);
+      expect(pillsOf(html).map((pill) => pill.label)).toEqual([domain.summary.succeeded]);
+    },
+  );
+
+  it("열린 PR 의 검사·충돌·뒤처짐을 PR 구역에 줄로 보이고 요약 결과는 그대로다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-42", 400);
+    walk(db, id, 400, [
+      startedOn("ACME-42"),
+      { to: "ended", agentResult: "reported-success", prState: "open" },
+    ]);
+    updateRunRecords(db, id, {
+      pullRequest: {
+        id: toPullRequestId("12"),
+        displayId: "#12",
+        url: "https://code.example.com/acme/web/pull/12",
+        ci: "failure",
+        checkedAt: minutes(403),
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 4,
+          failedCount: 2,
+          failedChecks: ["lint", "e2e"],
+          checksTruncated: false,
+          conflict: true,
+          behindBy: 3,
+        },
+      },
+    });
+    const html = render(page(db, id));
+    expect(valueOf(html, runJson.props.ci)).toBe(
+      `${runJson.ci.failure} ${runJson.props.failedChecks
+        .replace("{total}", "4")
+        .replace("{failed}", "2")
+        .replace("{names}", "lint, e2e")}`,
+    );
+    expect(valueOf(html, runJson.props.conflict)).toBe(runJson.props.hasConflict);
+    expect(valueOf(html, runJson.props.behind)).toBe(
+      runJson.props.behindBy.replace("{count}", "3"),
+    );
+    expect(valueOf(html, runJson.props.prReadAt)).toBeDefined();
+    expect(pillsOf(html).map((pill) => pill.label)).toEqual([domain.summary.succeeded]);
+    expect(text(html)).not.toContain("CI 다시");
+  });
+
+  it("도는 런의 열린 PR 은 보이고, 다시 읽지 않게 된 끝난 런은 지난 값을 보이지 않는다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-44", 400);
+    walk(db, id, 400, [startedOn("ACME-44")]);
+    updateRunRecords(db, id, {
+      pullRequest: {
+        id: toPullRequestId("14"),
+        displayId: "#14",
+        url: "https://code.example.com/acme/web/pull/14",
+        ci: "failure",
+        checkedAt: minutes(403),
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 4,
+          failedCount: 1,
+          failedChecks: ["lint"],
+          checksTruncated: false,
+          conflict: true,
+          behindBy: 3,
+        },
+      },
+    });
+    expect(valueOf(render(page(db, id)), runJson.props.conflict)).toBe(runJson.props.hasConflict);
+
+    walk(db, id, 410, [{ to: "ended", agentResult: "reported-success", prState: "open" }]);
+    expect(valueOf(render(page(db, id)), runJson.props.conflict)).toBe(runJson.props.hasConflict);
+
+    updateRunRecords(db, id, { worktreeRemovedAt: minutes(420) });
+    expect(valueOf(render(page(db, id)), runJson.props.conflict)).toBeUndefined();
+  });
+
+  it("같은 커밋에서 PR 정보만 못 읽으면 지난 검사 결과 대신 새 CI 값을 따른다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-46", 400);
+    walk(db, id, 400, [startedOn("ACME-46")]);
+    const pullRequest = {
+      id: toPullRequestId("16"),
+      displayId: "#16",
+      url: "https://code.example.com/acme/web/pull/16",
+      headCommit: "abc",
+    };
+    updateRunRecords(db, id, {
+      pullRequest: {
+        ...pullRequest,
+        ci: "failure",
+        checkedAt: minutes(403),
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 4,
+          failedCount: 1,
+          failedChecks: ["lint"],
+          checksTruncated: false,
+          conflict: true,
+          behindBy: 3,
+        },
+      },
+    });
+    updateRunRecords(db, id, {
+      pullRequest: { ...pullRequest, ci: "success", checkedAt: minutes(404), signals: null },
+    });
+    expect(found(db, id).pullRequest?.signals).toMatchObject({
+      ciFailed: false,
+      checkTotal: null,
+      failedCount: 0,
+      failedChecks: [],
+      conflict: true,
+      behindBy: 3,
+    });
+  });
+
+  it("같은 커밋에서 CI 를 아예 못 읽으면 지난 CI 실패 표시를 둔다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-47", 400);
+    walk(db, id, 400, [startedOn("ACME-47")]);
+    const pullRequest = {
+      id: toPullRequestId("17"),
+      displayId: "#17",
+      url: "https://code.example.com/acme/web/pull/17",
+      headCommit: "abc",
+    };
+    updateRunRecords(db, id, {
+      pullRequest: {
+        ...pullRequest,
+        ci: "failure",
+        checkedAt: minutes(403),
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 4,
+          failedCount: 1,
+          failedChecks: ["lint"],
+          checksTruncated: false,
+          conflict: false,
+          behindBy: 0,
+        },
+      },
+    });
+    updateRunRecords(db, id, {
+      pullRequest: { ...pullRequest, ci: "unavailable", checkedAt: minutes(404), signals: null },
+    });
+    expect(found(db, id).pullRequest?.signals).toMatchObject({ ciFailed: true, checkTotal: null });
+  });
+
+  it("PR 정보를 못 읽은 도는 런도 Actions 로 읽은 CI 실패는 표시한다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-45", 400);
+    walk(db, id, 400, [startedOn("ACME-45")]);
+    updateRunRecords(db, id, {
+      pullRequest: {
+        id: toPullRequestId("15"),
+        displayId: "#15",
+        url: "https://code.example.com/acme/web/pull/15",
+        ci: "failure",
+        checkedAt: minutes(403),
+        signals: null,
+      },
+    });
+    expect(found(db, id).pullRequest?.signals).toMatchObject({ ciFailed: true, conflict: null });
+  });
+
+  it("병합된 PR 에는 충돌과 뒤처짐 줄을 보이지 않는다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-43", 400);
+    walk(db, id, 400, [
+      startedOn("ACME-43"),
+      { to: "ended", agentResult: "reported-success", prState: "merged" },
+    ]);
+    updateRunRecords(db, id, {
+      pullRequest: {
+        id: toPullRequestId("13"),
+        displayId: "#13",
+        url: "https://code.example.com/acme/web/pull/13",
+        ci: "success",
+        checkedAt: minutes(403),
+        signals: {
+          open: false,
+          headCommit: "abc",
+          ciFailed: false,
+          checkTotal: 4,
+          failedCount: 0,
+          failedChecks: [],
+          checksTruncated: false,
+          conflict: null,
+          behindBy: null,
+        },
+      },
+    });
+    const html = render(page(db, id));
+    expect(valueOf(html, runJson.props.conflict)).toBeUndefined();
+    expect(valueOf(html, runJson.props.behind)).toBeUndefined();
   });
 
   it("제목은 할당 때 저장한 티켓 제목이고, 회색 줄에 키를 함께 보인다(ADR 0010 9번, 0064)", () => {
@@ -124,11 +587,68 @@ describe("Run 상세 화면", () => {
     expect(valueOf(render(page(db, id)), runJson.props.model)).toBe("sonnet");
   });
 
-  it("러너에 닿지 못한 채 끝난 취소 런도 사람이 지워야 함을 보인다", () => {
+  it("러너에 닿지 못한 채 끝난 취소 런은 워크트리를 남긴 이유와 지우기 버튼을 보인다", () => {
     const { db } = seedDatabase();
     const extra = addExtraEnded(db);
-    expect(text(render(page(db, extra.get("ACME-22"))))).toContain(runJson.manualRemoval);
-    expect(text(render(page(db, extra.get("ACME-21"))))).not.toContain(runJson.manualRemoval);
+    const kept = render(page(db, extra.get("ACME-22")));
+    expect(text(kept)).toContain(runJson.keptWorktree["runner-unreached"]);
+    expect(labels(kept)).toContain(runJson.removeWorktree.trigger);
+    const removed = render(page(db, extra.get("ACME-21")));
+    expect(text(removed)).not.toContain(runJson.keptWorktree["runner-unreached"]);
+    expect(labels(removed)).not.toContain(runJson.removeWorktree.trigger);
+  });
+
+  it("결과 곁에 PR 번호와 지금 PR 상태를 보이고, 이후 PR 상태가 있으면 그것을 보인다 (0145)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-2");
+    if (id === undefined) throw new Error("no ACME-2");
+    const stateLine = (): string => text(render(page(db, id)));
+    expect(stateLine()).toContain(`${domain.summary.failed} PR #2 ${domain.prState.open}`);
+    updateRunRecords(db, id, { laterPrState: { state: "merged", at: minutes(110) } });
+    expect(stateLine()).toContain(`${domain.summary.failed} PR #2 ${domain.prState.merged}`);
+    const noPr = text(render(page(db, ids.get("ACME-4"))));
+    expect(noPr).not.toContain(`${domain.summary.failed} PR `);
+  });
+
+  it("Succeeded 인데 PR 이 없으면 워크트리를 남겼다고 보이고 워크트리 지우기를 둔다 (0145 R7-2·R7-3)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-41", 400);
+    walk(db, id, 400, [
+      startedOn("ACME-41"),
+      { to: "ended", agentResult: "reported-success", prState: "none" },
+    ]);
+    const html = render(page(db, id));
+    const body = text(html);
+    expect(body).toContain(`${runJson.keptWorktree["no-pr"]} ${runJson.keptWorktreeNext["no-pr"]}`);
+    expect(body).not.toContain(runJson.next.succeeded);
+    expect(labels(html)).toContain(runJson.removeWorktree.trigger);
+    expect(html).toMatch(/data-variant="danger"[^>]*>워크트리 지우기|워크트리 지우기/);
+  });
+
+  it.each(["uncommitted-changes", "unpushed-commits", "check-failed"] as const)(
+    "worker 가 일이 남아 남긴 워크트리(%s)는 그 이유를 보인다 (0145 R7-1)",
+    (reason) => {
+      const { db, ids } = seedDatabase();
+      const id = ids.get("ACME-3");
+      if (id === undefined) throw new Error("no ACME-3");
+      updateRunRecords(db, id, { worktreeKept: reason });
+      const html = render(page(db, id));
+      expect(text(html)).toContain(
+        `${runJson.keptWorktree[reason]} ${runJson.keptWorktreeNext[reason]}`,
+      );
+      expect(labels(html)).toContain(runJson.removeWorktree.trigger);
+    },
+  );
+
+  it("워크트리 지우기를 요청하면 버튼 대신 지우는 중을 상태 문장으로 보인다 (0145 R7-3)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-3");
+    if (id === undefined) throw new Error("no ACME-3");
+    updateRunRecords(db, id, { worktreeKept: "unpushed-commits" });
+    removeWorktreeRequest(db, id, minutes(110));
+    const html = render(page(db, id));
+    expect(labels(html)).not.toContain(runJson.removeWorktree.trigger);
+    expect(html).toMatch(new RegExp(`role="status"[^>]*>${runJson.removeWorktree.pending}<`));
   });
 
   it("시작하지 않고 끝난 런은 0초 만에 끝났다고 하지 않는다", () => {
@@ -171,13 +691,16 @@ describe("Run 상세 화면", () => {
     expect(text(render(detail, "America/Los_Angeles"))).toContain("01:40부터 러너에 닿지 않아요");
   });
 
-  it("워크트리를 지우지 않은 러너 연결 끊김 런은 사람이 지워야 함을 보이고 지우기 버튼은 없다", () => {
+  it("워크트리를 지우지 않은 러너 연결 끊김 런은 워크트리를 남긴 이유와 지우기 버튼을 보인다", () => {
     const { db, ids } = seedDatabase();
-    const body = text(render(page(db, ids.get("ACME-5"))));
-    expect(body).toContain(runJson.manualRemoval);
-    expect(body).toContain(runJson.next.manualRemoval);
-    expect(body).not.toContain("지우기");
-    expect(text(render(page(db, ids.get("ACME-3"))))).not.toContain(runJson.manualRemoval);
+    const html = render(page(db, ids.get("ACME-5")));
+    expect(text(html)).toContain(
+      `${runJson.keptWorktree["runner-disconnected"]} ${runJson.keptWorktreeNext["runner-disconnected"]}`,
+    );
+    expect(labels(html)).toContain(runJson.removeWorktree.trigger);
+    const removed = render(page(db, ids.get("ACME-3")));
+    expect(text(removed)).not.toContain(runJson.keptWorktree["runner-disconnected"]);
+    expect(labels(removed)).not.toContain(runJson.removeWorktree.trigger);
   });
 
   it("Ended 가 아닌 런에서만 취소 행동이 보이고, 취소 요청이 있으면 취소 중을 보인다", () => {
@@ -332,7 +855,7 @@ describe("Run 상세 화면", () => {
     expect(body).toContain(runJson.permission.deny);
     expect(body).not.toContain("허용하기");
     expect(html).not.toMatch(/<button[^>]*>[^<]*허용/);
-    expect(body).not.toContain(questionJson.send);
+    expect(body.split(runJson.agentMessage.title)[0]).not.toContain(questionJson.send);
   });
 
   it("답이나 거절을 남긴 뒤에는 입력 칸을 닫고 worker 가 보낸다고 보인다", () => {
@@ -364,7 +887,7 @@ describe("Run 상세 화면", () => {
       }),
     );
     expect(body).toContain(runJson.ci.unavailable);
-    expect(body).toContain(domain.summary["human-check"]);
+    expect(body).toContain(domain.summary.failed);
   });
 
   it("로그 꼬리: 폴링이 끝나도 로그가 오지 않았으면 가져오는 중 대신 다시 요청하는 길을 보인다", () => {
@@ -379,9 +902,15 @@ describe("Run 상세 화면", () => {
         runHref={(other) => `/runs/${other}`}
         logStalled
         onAnswer={resolved}
+        onHumanCheck={resolved}
         onDeny={resolved}
         onCancel={resolved}
+        onRemoveWorktree={resolved}
+        onContinue={resolved}
+        onStopPreviousAgent={resolved}
         onControl={() => Promise.resolve("requested" as const)}
+        onStartWithoutWaiting={resolved}
+        onSendAgentMessage={() => Promise.resolve("requested" as const)}
         onRefreshLog={resolved}
       />,
       runMessages,
@@ -518,8 +1047,7 @@ describe("Run 상세 화면", () => {
       ["running", "Running"],
       ["waiting-for-input", "Waiting for Input"],
       ["disconnected", "Disconnected"],
-      ["merged", "Merged"],
-      ["human-check", "Human Check"],
+      ["succeeded", "Succeeded"],
       ["failed", "Failed"],
       ["canceled", "Canceled"],
       ["question", "Question"],
@@ -611,5 +1139,236 @@ describe("Run 상세 화면", () => {
     for (const key of ["ACME-2", "ACME-10", "ACME-12", "ACME-13"]) {
       expect(render(page(db, ids.get(key)))).not.toMatch(/\b(run|domain)\.[a-zA-Z]/);
     }
+  });
+});
+
+describe("이어서 맡기기(0149)", () => {
+  function keptRun(db: Database, key = "ACME-40") {
+    const id = assign(db, key, 500);
+    walk(db, id, 500, [
+      startedOn(key),
+      { to: "ended", agentResult: "reported-success", prState: "none", reportBody: "push 남음" },
+    ]);
+    updateRunRecords(db, id, { worktreeKept: "unpushed-commits" });
+    recordAgentCheck(db, id, "gone", { stopHandled: true });
+    return id;
+  }
+
+  function found(db: Database, id: string): RunDetail {
+    const loaded = loadRunDetail(db, id, minutes(600));
+    if (loaded.kind !== "found") throw new Error("run not found");
+    return loaded.run;
+  }
+
+  it("워크트리가 남은 끝난 런에만 이어서 맡기기를 보이고 새 런 번호를 함께 둔다", () => {
+    const { db, ids } = seedDatabase();
+    const id = keptRun(db);
+    expect(labels(render({ kind: "found", run: found(db, id) }))).toContain(
+      runJson.continue.trigger,
+    );
+    expect(found(db, id).continueOffer).toEqual({
+      sourceNumber: 1,
+      nextNumber: 2,
+      runnerName: "runner-a",
+      place: "same-worktree",
+      hasReport: true,
+      hasWorkspaceBrief: false,
+      agent: "gone",
+      agentStopRequested: false,
+    });
+    saveWorkspaceBrief(db, {
+      id: toWorkspaceId(found(db, id).workspace.id),
+      brief: { before: "먼저 규칙을 읽어요.", after: "" },
+    });
+    expect(found(db, id).continueOffer?.hasWorkspaceBrief).toBe(true);
+    const running = ids.get("ACME-10");
+    if (running === undefined) throw new Error("no ACME-10");
+    expect(found(db, running).continueOffer).toBeNull();
+  });
+
+  it("지운 워크트리는 같은 브랜치로 새 워크트리를 만든다고 알린다", () => {
+    const { db } = seedDatabase();
+    const id = keptRun(db);
+    updateRunRecords(db, id, { worktreeRemovedAt: minutes(550) });
+    expect(found(db, id).continueOffer?.place).toBe("recreated");
+  });
+
+  it("워크트리가 없어서 끝난 런은 같은 브랜치로 새 워크트리를 만든다고 알린다", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-41", 500);
+    walk(db, id, 500, [
+      startedOn("ACME-41"),
+      { to: "ended", agentResult: "worktree-missing", prState: "none" },
+    ]);
+    expect(found(db, id).continueOffer?.place).toBe("recreated");
+  });
+
+  it.each(["alive", "unknown"] as const)(
+    "이전 에이전트가 %s이면 이어서 맡기기를 쓸 수 없게 하고 이유를 보인다",
+    (check) => {
+      const { db } = seedDatabase();
+      const id = keptRun(db);
+      recordAgentCheck(db, id, check, { stopHandled: true });
+
+      const html = render({ kind: "found", run: found(db, id) });
+      expect(html).toContain('aria-disabled="true"');
+      expect(text(html)).toContain(runJson.continue.blocked[check]);
+      expect(labels(html).includes(runJson.continue.stop)).toBe(check === "alive");
+    },
+  );
+
+  it("멈추기를 요청하면 멈추는 중을 보이고 버튼을 뺀다", () => {
+    const { db } = seedDatabase();
+    const id = keptRun(db);
+    recordAgentCheck(db, id, "alive", { stopHandled: true });
+    expect(requestPreviousAgentStop(db, id, minutes(570))).toEqual({ ok: true });
+
+    const html = render({ kind: "found", run: found(db, id) });
+    expect(text(html)).toContain(runJson.continue.stopPending);
+    expect(labels(html)).not.toContain(runJson.continue.stop);
+  });
+
+  it("열린 PR은 다음 런으로 넘겼다고 보이고, 머지된 PR은 이전 런에 남긴다", () => {
+    const { db } = seedDatabase();
+    const withPr = (key: string, prState: "open" | "merged"): RunId => {
+      const id = assign(db, key, 500);
+      walk(db, id, 500, [
+        startedOn(key),
+        { to: "ended", agentResult: "reported-failure", prState },
+      ]);
+      updateRunRecords(db, id, {
+        worktreeKept: "unpushed-commits",
+        pullRequest: {
+          id: toPullRequestId("7"),
+          displayId: "#7",
+          url: "https://code.example.com/acme/pull/7",
+          ci: "success",
+          checkedAt: minutes(520),
+        },
+      });
+      recordAgentCheck(db, id, "gone", { stopHandled: true });
+      const result = continueRunRequest(db, id, "이어 주세요", minutes(560));
+      if (!result.ok) throw new Error(result.reason);
+      queuedNext = { source: id, next: result.runId };
+      return id;
+    };
+    let queuedNext: { source: RunId; next: RunId } | null = null;
+    const handedOver = runJson.prHandedOver.replace("{pr}", "#7");
+
+    const open = withPr("ACME-42", "open");
+    expect(text(render({ kind: "found", run: found(db, open) }))).not.toContain(handedOver);
+    if (queuedNext === null) throw new Error("no continued run");
+    const { next } = queuedNext as { source: RunId; next: RunId };
+    walk(db, next, 560, [startedOn("ACME-42-2")]);
+    expect(text(render({ kind: "found", run: found(db, open) }))).toContain(handedOver);
+
+    expect(
+      text(render({ kind: "found", run: found(db, withPr("ACME-43", "merged")) })),
+    ).not.toContain(handedOver);
+  });
+
+  it("Queued 동안에는 기록한 곳이 있어도 아직 확인 중이라고 보인다", () => {
+    const { db } = seedDatabase();
+    const id = keptRun(db);
+    const result = continueRunRequest(db, id, "이어 주세요", minutes(560));
+    if (!result.ok) throw new Error(result.reason);
+    recordContinuePlace(db, result.runId, "recreated");
+
+    const body = text(render({ kind: "found", run: found(db, result.runId) }));
+    expect(body).toContain(runJson.continuation.place.pending);
+    expect(body).not.toContain(runJson.continuation.place.recreated);
+  });
+
+  it("이어 받은 런이 시작하기 전에 끝나면 이어 받은 곳 대신 그 사실을 보인다", () => {
+    const { db } = seedDatabase();
+    const id = keptRun(db);
+    const result = continueRunRequest(db, id, "이어 주세요", minutes(560));
+    if (!result.ok) throw new Error(result.reason);
+    recordContinuePlace(db, result.runId, "same-worktree");
+    walk(db, result.runId, 560, [{ to: "ended", agentResult: "canceled", prState: "none" }]);
+
+    const body = text(render({ kind: "found", run: found(db, result.runId) }));
+    expect(body).toContain(runJson.continuation.place.notStarted);
+    expect(body).not.toContain(runJson.continuation.place["same-worktree"]);
+  });
+
+  it("두 런을 잇고 양쪽 Run 상세와 지나온 일에 런 번호를 보인다", () => {
+    const { db } = seedDatabase();
+    const id = keptRun(db);
+    const result = continueRunRequest(db, id, "push 해 주세요", minutes(560));
+    if (!result.ok) throw new Error(result.reason);
+
+    const next = found(db, result.runId);
+    expect(next.continuedFrom).toEqual({ id, number: 1 });
+    const nextBody = text(render({ kind: "found", run: next }));
+    expect(nextBody).toContain("런 #1을 이어서");
+    expect(nextBody).toContain(runJson.continuation.place.pending);
+    expect(nextBody).toContain("런 #1을 이어서 시작");
+
+    const source = found(db, id);
+    expect(source.continuedBy).toEqual({ id: result.runId, number: 2 });
+    expect(source.continueOffer).toBeNull();
+    const html = render({ kind: "found", run: source });
+    expect(labels(html)).not.toContain(runJson.removeWorktree.trigger);
+    expect(text(html)).toContain("런 #2에 이어서 맡겼어요");
+    expect(text(html)).not.toContain(runJson.keptWorktree["unpushed-commits"]);
+  });
+
+  it.each([
+    [1, "을"],
+    [2, "를"],
+    [3, "을"],
+    [4, "를"],
+    [5, "를"],
+    [6, "을"],
+    [7, "을"],
+    [8, "을"],
+    [9, "를"],
+    [10, "을"],
+    [12, "를"],
+  ] as const)("런 #%i 뒤에 맞는 조사(%s)를 붙인다", (number, particle) => {
+    const t = createTranslator({
+      locale: "ko",
+      messages: runMessages,
+      namespace: "run.continuation",
+    });
+    expect(t("from", { number, digit: number % 10 })).toBe(`런 #${number}${particle} 이어서`);
+  });
+
+  it.each(["same-worktree", "recreated", "from-scratch"] as const)(
+    "어디서 이어 받았는지(%s) Run 상세에 보인다",
+    (place) => {
+      const { db } = seedDatabase();
+      const id = keptRun(db);
+      const result = continueRunRequest(db, id, "이어 주세요", minutes(560));
+      if (!result.ok) throw new Error(result.reason);
+      recordContinuePlace(db, toRunId(result.runId), place);
+      walk(db, result.runId, 560, [startedOn("ACME-40-2")]);
+
+      const body = text(render({ kind: "found", run: found(db, result.runId) }));
+      expect(body).toContain(runJson.continuation.place[place]);
+    },
+  );
+});
+
+describe("타임라인 줄 열쇠(0153)", () => {
+  const at = "2026-01-01T00:00:00.000Z";
+  const later = "2026-01-01T00:01:00.000Z";
+
+  it("앞에 줄이 끼어들어도 이미 있던 줄의 열쇠는 그대로다", () => {
+    const before = timelineRows([{ kind: "paused", at: later }]);
+    const after = timelineRows([
+      { kind: "unpaused", at },
+      { kind: "paused", at: later },
+    ]);
+    expect(after[1]?.key).toBe(before[0]?.key);
+  });
+
+  it("종류와 시각이 같은 줄도 열쇠가 겹치지 않는다", () => {
+    const rows = timelineRows([
+      { kind: "paused", at },
+      { kind: "paused", at },
+    ]);
+    expect(new Set(rows.map((row) => row.key)).size).toBe(2);
   });
 });

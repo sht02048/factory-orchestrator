@@ -1,0 +1,1 @@
+ALTER TABLE `runs` ADD `runner_chosen` integer DEFAULT false NOT NULL;

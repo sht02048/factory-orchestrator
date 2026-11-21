@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Harness, projectA, projectB } from "./test-fixtures.js";
 import { RUNNER_CHECK_INTERVAL_MS } from "./runner-check.js";
 import type { Worker } from "./worker.js";
+import { FAKE_AGENT_PROTOCOL } from "@ganger/core/testing";
 import type { FakeRunnerRun } from "@ganger/core/testing";
 
 let h: Harness;
@@ -125,6 +126,161 @@ describe("입력 기다림", () => {
     await worker.tick();
     expect(stateOf(run)).toBe("running");
     expect(agentOf(run, runnerId).answers).toHaveLength(1);
+  });
+
+  it("Human Check 를 종류와 함께 저장해 Waiting for Input 으로 바꾸고, 답을 보내면 Running 으로 돌아간다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const questionId = h.runner(runnerId).ask(worktreeOf(run), {
+      kind: "human-check",
+      body: "PR #7 머지를 확인해 주세요",
+      at: h.now,
+    });
+
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+    expect(listRunQuestions(h.db, run.id)).toEqual([
+      expect.objectContaining({ id: questionId, kind: "human-check" }),
+    ]);
+
+    answerRunQuestion(
+      h.db,
+      {
+        runId: run.id,
+        questionId,
+        answer: "고쳐 주세요\n\n시험을 더해 주세요",
+        kind: "human-check",
+      },
+      h.now,
+    );
+    await worker.tick();
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).answers).toEqual([
+      { questionId, answer: "고쳐 주세요\n\n시험을 더해 주세요" },
+    ]);
+    expect(agentOf(run, runnerId).resumes).toEqual([]);
+  });
+
+  it("Human Check 를 보내고 차례를 끝낸 에이전트는 답을 보낼 때 깨우고, 깨우지 못하면 Waiting for Input 에 두고 다시 깨운다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    const questionId = fake.ask(worktreeOf(run), {
+      kind: "human-check",
+      body: "PR #7 머지를 확인해 주세요",
+      at: h.now,
+    });
+    fake.stopWithoutReport(worktreeOf(run), { at: h.now });
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+
+    answerRunQuestion(
+      h.db,
+      {
+        runId: run.id,
+        questionId,
+        answer: "고쳐 주세요\n\n시험을 더해 주세요",
+        kind: "human-check",
+      },
+      h.now,
+    );
+    const resume = vi.spyOn(fake, "resumeAgent");
+    resume.mockRejectedValueOnce(new Error("terminal busy"));
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+    expect(listRunQuestions(h.db, run.id)[0]?.answer?.sentAt).toBeNull();
+
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).answers).toHaveLength(1);
+    expect(agentOf(run, runnerId).resumes.map((r) => r.message)).toEqual([
+      `운영자가 Human Check(${questionId})에 답했어요: 고쳐 주세요 시험을 더해 주세요`,
+    ]);
+  });
+
+  it("활동을 알 수 없으면 터미널에 입력하지 않고 Waiting for Input 에 둔 채 다음 차례에 다시 본다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const questionId = h
+      .runner(runnerId)
+      .ask(worktreeOf(run), { kind: "human-check", body: "확인", at: h.now });
+    await worker.tick();
+    answerRunQuestion(
+      h.db,
+      { runId: run.id, questionId, answer: "확인했어요", kind: "human-check" },
+      h.now,
+    );
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+    expect(listRunQuestions(h.db, run.id)[0]?.answer?.sentAt).toBeNull();
+    expect(agentOf(run, runnerId).resumes).toEqual([]);
+
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).answers).toHaveLength(1);
+    expect(agentOf(run, runnerId).resumes).toEqual([]);
+  });
+
+  it("깨우기가 다른 에이전트를 찾기만 했으면 답을 보낸 것으로 적지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    const questionId = fake.ask(worktreeOf(run), {
+      kind: "human-check",
+      body: "확인",
+      at: h.now,
+    });
+    fake.stopWithoutReport(worktreeOf(run), { at: h.now });
+    await worker.tick();
+    answerRunQuestion(
+      h.db,
+      { runId: run.id, questionId, answer: "확인했어요", kind: "human-check" },
+      h.now,
+    );
+    vi.spyOn(fake, "resumeAgent").mockResolvedValueOnce({
+      agentRef: agentOf(run, runnerId).started.agentRef,
+      restarted: true,
+    });
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+    expect(listRunQuestions(h.db, run.id)[0]?.answer?.sentAt).toBeNull();
+    expect(agentOf(run, runnerId).answers).toHaveLength(1);
+  });
+
+  it("권한 대기가 열려 있으면 차례가 끝나 보여도 터미널에 답을 넣지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    const questionId = fake.ask(worktreeOf(run), { kind: "human-check", body: "확인", at: h.now });
+    const permissionId = fake.requestPermission(worktreeOf(run), "Bash: rm -rf build", h.now);
+    fake.stopWithoutReport(worktreeOf(run), { at: h.now });
+    await worker.tick();
+    answerRunQuestion(
+      h.db,
+      { runId: run.id, questionId, answer: "확인했어요", kind: "human-check" },
+      h.now,
+    );
+
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+    expect(agentOf(run, runnerId).resumes).toEqual([]);
+
+    fake.allowPermission(worktreeOf(run), permissionId);
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).resumes).toHaveLength(1);
+  });
+
+  it("일하는 에이전트에게 간 Human Check 답은 터미널로 다시 넣지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    const questionId = fake.ask(worktreeOf(run), { kind: "human-check", body: "확인", at: h.now });
+    fake.continueOnRunner(worktreeOf(run), h.now);
+    await worker.tick();
+    answerRunQuestion(
+      h.db,
+      { runId: run.id, questionId, answer: "확인했어요", kind: "human-check" },
+      h.now,
+    );
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).resumes).toEqual([]);
   });
 
   it("같은 질문의 답은 데몬을 다시 띄워도 한 번만 보낸다", async () => {
@@ -704,13 +860,12 @@ describe("러너 상태 확인", () => {
     const behind = h.assign("ENG-3", projectB);
     await worker.tick();
     expect(current(head)).toMatchObject({ state: "queued", runnerId: runnerA });
-    expect(stateOf(behind)).toBe("queued");
+    expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
 
     h.runner(runnerA).setProjects([]);
     h.advance(RUNNER_CHECK_INTERVAL_MS);
     await worker.tick();
     expect(current(head)).toMatchObject({ state: "queued", runnerId: null });
-    expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
   });
 
   it("GitHub 인증이 깨진 러너로 정한 Queued 런은 러너 확인 뒤 러너를 비운다(Q82.22)", async () => {
@@ -833,7 +988,9 @@ describe("멈추기·재개(0118)", () => {
       before.state === "paused" ? before.agentRef : null,
     );
     expect(after.state === "running" ? after.worktree : null).toBe(worktreeOf(run));
-    expect(agentOf(run, runnerId).resumes[0]?.restartPrompt).toContain("ENG-1");
+    const restartPrompt = agentOf(run, runnerId).resumes[0]?.restartPrompt;
+    expect(restartPrompt).toContain(agentOf(run, runnerId).input.brief);
+    expect(restartPrompt).toContain(FAKE_AGENT_PROTOCOL);
   });
 
   it("Paused 중에 취소하면 에이전트를 멈추고 운영자가 취소함으로 끝낸다", async () => {

@@ -27,6 +27,8 @@ export const LOG_EVENTS = {
   "worker.log_tail_failed": "could not read a log tail",
 
   "run.assigned": "assigned a ticket to a run",
+  "run.continued": "started a new run that continues an ended run",
+  "run.agent_check_failed": "could not check whether an ended run's agent is still alive",
   "run.runner_chosen": "chose a runner for a queued run",
   "run.state_changed": "changed run state",
   "run.state_change_failed": "could not change run state",
@@ -37,15 +39,23 @@ export const LOG_EVENTS = {
   "run.lookup_failed": "could not look up a started run",
   "run.cancel_lookup_failed": "could not look up a started run to cancel",
   "run.cancel_runner_missing": "canceling a queued run whose runner is not registered",
+  "run.blockers_read_failed": "could not read a queued run's blocking tickets",
+  "run.blockers_refresh_failed": "could not refresh blocking tickets",
   "run.last_log_failed": "could not read the last log of an ending run",
   "run.answer_failed": "could not send an answer",
   "run.denial_failed": "could not send a permission denial",
   "run.follow_up_failed": "could not follow up a run",
   "run.tracker_update_failed": "could not update the tracker",
   "run.pr_poll_failed": "could not poll the run's pull request",
+  "run.pr_read_failed":
+    "could not read the run's pull request; ending or keeping the run without it",
   "run.result_comment_failed": "could not comment the run result",
   "run.worktree_follow_up_failed": "could not follow up the run's worktree",
   "run.worktree_remove_failed": "could not remove a worktree",
+  "run.worktree_kept": "kept a worktree that has work not on the remote",
+  "run.worktree_check_failed": "could not check a worktree for unsaved work; keeping it",
+  "run.worktree_check_unreachable":
+    "could not reach the runner to check a worktree for unsaved work; checking again next tick",
   "run.ticket_missing": "run's ticket was not found in the tracker",
   "run.ticket_missing_skip_updates":
     "run's ticket was not found in the tracker; skipping tracker updates",
@@ -54,6 +64,9 @@ export const LOG_EVENTS = {
   "run.code_host_adapter_failed": "could not create code host adapter",
   "run.mailbox_failed": "could not prepare the runner's mailbox",
 
+  "agent_message.read_failed": "could not read pending agent messages",
+  "agent_message.send_failed": "could not send a message to the agent",
+  "agent_message.follow_up_not_stopped": "could not stop the follow-up worker Orca started",
   "run_control.read_failed": "could not read run control requests",
   "run_control.apply_failed": "could not apply a run control request",
   "run_control.record_failed": "could not record a run control change",

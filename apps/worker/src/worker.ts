@@ -1,12 +1,20 @@
 import {
   ACTIVE_RUN_STATES,
+  EMPTY_WORKSPACE_BRIEF,
   canRunnerTake,
+  composeAgentBrief,
+  composeContinuationBrief,
+  decideBlockerWait,
   decideStartFailure,
+  ticketBriefText,
   MAX_START_RETRIES,
   planQueue,
+  priorityRank,
 } from "@ganger/core";
 import type {
   AdapterRegistry,
+  AgentRef,
+  ContinuationPlace,
   MailboxRef,
   QueuedRun,
   Runner,
@@ -15,6 +23,7 @@ import type {
   RunnerId,
   StartedRun,
   TicketKey,
+  WorktreeRef,
 } from "@ganger/core";
 import {
   changeRunState,
@@ -23,20 +32,26 @@ import {
   getMapping,
   getRun,
   getRunWithRecords,
+  getWorkspaceBrief,
   hasPendingCancelRequest,
   inTransaction,
   listPendingCancelRequests,
+  listQueuedBlockerStates,
   listRunPlacements,
   listRunnerSnapshots,
   listRuns,
   markCancelRequestProcessed,
   openDatabase,
+  reclaimSourceWorktree,
+  recordAgentCheck,
+  recordContinuePlace,
   recordStartFailure,
   recordStartRequested,
   setQueuedRunRunner,
   setRunnerMailbox,
+  isPinnedToRunner,
 } from "@ganger/db";
-import type { SecretBox, StoredRun } from "@ganger/db";
+import type { RunRecords, SecretBox, StoredRun } from "@ganger/db";
 import { log, withLogContext } from "@ganger/log";
 import { WorkerAdapters } from "./adapters.js";
 import {
@@ -47,9 +62,12 @@ import {
   runnerErrorDetail,
   tryWrite,
 } from "./context.js";
-import type { QueuedStoredRun, TickContext, WorkerLogger } from "./context.js";
+import type { QueuedStoredRun, TickContext, WorkerLogger, WorktreeSetupJob } from "./context.js";
 import { processAfterRuns } from "./after-run.js";
+import { messages } from "./messages.js";
 import { assignAutomatically, createAutoAssignState } from "./auto-assign.js";
+import { blockersClearToStart, createBlockerRefreshState, refreshBlockers } from "./blockers.js";
+import { processAgentMessages } from "./agent-messages.js";
 import { processRunControlRequests } from "./control.js";
 import { processWebRequests } from "./requests.js";
 import { checkRunners } from "./runner-check.js";
@@ -126,15 +144,20 @@ export function createWorker(options: WorkerOptions): Worker {
     logger,
     adapters,
     pendingStarts: new Map(),
+    worktreeSetups: new Map(),
     mailboxes: new Map(),
     unreachableUntil: new Map(),
     unmarkedAnswers: new Set(),
+    unwokenHumanChecks: new Set(),
     unmarkedDenials: new Set(),
     pendingEndings: new Map(),
     prPolledAt: new Map(),
+    prReadRetries: new Map(),
+    agentCheckedAt: new Map(),
     unrecordedComments: new Map(),
     ticketsGone: new Set(),
     autoAssign: createAutoAssignState(),
+    blockerRefresh: createBlockerRefreshState(),
   };
   let running: Promise<void> | null = null;
   let closed = false;
@@ -182,8 +205,10 @@ async function tick(context: TickContext): Promise<void> {
   await checkRunners(context);
   await processRunControlRequests(context);
   await watchActiveRuns(context);
+  await processAgentMessages(context);
   await cancelQueuedRuns(context);
   await assignAutomatically(context);
+  await refreshBlockers(context);
   await processQueue(context);
   await processAfterRuns(context);
   await processWebRequests(context, "log-tail");
@@ -236,7 +261,11 @@ async function findStartedForCancel(
   const runner = context.adapters.runner(storedRunner);
   try {
     const mailbox = await mailboxFor(context, storedRunner, runner);
-    return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
+    return await runner.findStartedRun({
+      mailbox,
+      worktreeName: run.worktreeName,
+      ...continueInOf(context, run),
+    });
   } catch (error) {
     context.logger.warn("run.cancel_lookup_failed", { runId: run.id, error });
     return "unknown";
@@ -246,6 +275,7 @@ async function findStartedForCancel(
 async function processQueue(context: TickContext): Promise<void> {
   const { db, pendingStarts, now } = context;
   recordPendingStarts(context);
+  forgetSettledSetupsOfLeftRuns(context);
 
   const plan = inTransaction(db, () => {
     const queued = listRuns(db, { states: ["queued"] });
@@ -261,9 +291,27 @@ async function processQueue(context: TickContext): Promise<void> {
     for (const pending of pendingStarts.values()) {
       runs.push({ runnerId: pending.runnerId, state: "running" });
     }
+    const settingUp = (runId: RunId): boolean =>
+      context.worktreeSetups.get(runId)?.outcome === null;
+    for (const run of queued) {
+      if (settingUp(run.id)) runs.push({ runnerId: run.runnerId, state: "running" });
+    }
+    const blockerStates = listQueuedBlockerStates(db);
     const candidates = queued
+      .filter((run) => !settingUp(run.id))
       .flatMap((run) => toQueuedRun(context, run))
-      .map((run) => (bound.has(run.id) ? { ...run, unstartable: false } : run))
+      .map((run) => ({
+        ...run,
+        priorityRank: priorityRank(blockerStates.get(run.id)?.priority ?? "none"),
+      }))
+      .map((run) =>
+        bound.has(run.id) ? { ...run, unstartable: false, startRequested: true } : run,
+      )
+      .filter((run) => {
+        if (run.unstartable || bound.has(run.id)) return true;
+        const state = blockerStates.get(run.id);
+        return state === undefined || decideBlockerWait(state).kind === "none";
+      })
       .filter((run) => !hasPendingCancelRequest(db, run.id))
       .filter((run) => {
         const runnerId = bound.get(run.id);
@@ -294,12 +342,51 @@ async function processQueue(context: TickContext): Promise<void> {
     return result.start;
   });
 
+  const blockedRunners = new Set<RunnerId>();
   for (const choice of plan ?? []) {
+    if (blockedRunners.has(choice.runnerId)) continue;
     const outcome = await withLogContext({ runId: choice.runId, runnerId: choice.runnerId }, () =>
       startQueuedRun(context, choice),
     );
-    if (outcome === "blocked") return;
+    if (outcome === "blocked") blockedRunners.add(choice.runnerId);
   }
+}
+
+function forgetSettledSetupsOfLeftRuns(context: TickContext): void {
+  for (const [runId, job] of context.worktreeSetups) {
+    if (job.outcome !== null && getRun(context.db, runId)?.state !== "queued") {
+      context.worktreeSetups.delete(runId);
+    }
+  }
+}
+
+async function worktreeSetupGate(
+  context: TickContext,
+  run: QueuedStoredRun,
+  runner: Runner,
+  worktree: WorktreeRef,
+): Promise<"ready" | "running" | { failed: string }> {
+  const job = context.worktreeSetups.get(run.id);
+  if (job !== undefined) {
+    if (job.outcome === null) return "running";
+    const { outcome } = job;
+    context.worktreeSetups.delete(run.id);
+    if (outcome.kind === "threw") throw outcome.error;
+    if (outcome.kind === "failed") return { failed: outcome.reason };
+  }
+  const input = { project: run.runnerProject, worktree };
+  if (!(await runner.worktreeSetupPending(input))) return "ready";
+  const started: WorktreeSetupJob = { outcome: null };
+  context.worktreeSetups.set(run.id, started);
+  void runner.finishWorktreeSetup(input).then(
+    (outcome) => {
+      started.outcome = outcome;
+    },
+    (error: unknown) => {
+      started.outcome = { kind: "threw", error };
+    },
+  );
+  return "running";
 }
 
 function recordPendingStarts(context: TickContext): void {
@@ -347,6 +434,7 @@ function toQueuedRun(context: TickContext, run: StoredRun): QueuedRun[] {
       agent: run.agent,
       runnerId: run.runnerId,
       unstartable: mapping === null,
+      pinnedToRunner: isPinnedToRunner(run),
     },
   ];
 }
@@ -372,6 +460,8 @@ async function startQueuedRun(
 
   let started = pending?.started ?? null;
   if (started === null) {
+    if (!(await blockersClearToStart(context, run))) return "skipped";
+    if (hasPendingCancelRequest(db, run.id)) return "skipped";
     const attempt = await startOnRunner(context, run, choice.runnerId, records);
     if (attempt.kind !== "started") return attempt.kind;
     started = attempt.started;
@@ -389,7 +479,7 @@ async function startOnRunner(
   context: TickContext,
   run: QueuedStoredRun,
   runnerId: RunnerId,
-  records: { startRequestedAt: Date | null; startFailures: number },
+  records: RunRecords,
 ): Promise<StartAttempt> {
   const { db, logger, adapters } = context;
   const storedRunner = findRunner(db, runnerId);
@@ -399,6 +489,7 @@ async function startOnRunner(
   }
   const runner = adapters.runner(storedRunner);
   let unverified = records.startRequestedAt !== null;
+  let startSent = unverified;
   let mailbox: MailboxRef;
   try {
     mailbox = await mailboxFor(context, storedRunner, runner);
@@ -425,8 +516,50 @@ async function startOnRunner(
       ) {
         return endCouldNotStart(context, run);
       }
+      if (tryWrite(context, run.id, () => clearStartRequested(db, run.id)) === undefined) {
+        return { kind: "blocked" };
+      }
+      startSent = false;
+      if (!(await blockersClearToStart(context, run))) return { kind: "skipped" };
+      if (hasPendingCancelRequest(db, run.id)) return { kind: "skipped" };
     }
-    const prompt = await promptFor(context, run);
+    if (context.worktreeSetups.get(run.id)?.outcome === null) return { kind: "skipped" };
+    const source = continuationSource(context, run);
+    if (source === "missing") return endCouldNotStart(context, run);
+    const place =
+      source === null ? null : await continuationPlace(context, run, runner, source, records);
+    if (place === "write-failed") return { kind: "blocked" };
+    if (source !== null && place !== "previous-agent-alive" && place !== "from-scratch") {
+      const setup = await worktreeSetupGate(context, run, runner, source.worktree);
+      if (setup === "running") return { kind: "skipped" };
+      if (setup !== "ready") {
+        logger.warn("run.start_failed", { runId: run.id, reason: "worktree-setup" });
+        tryWrite(context, run.id, () =>
+          recordStartFailure(db, run.id, {
+            failures: records.startFailures,
+            error: `${messages.continuation.setupFailed}\n${setup.failed}`,
+          }),
+        );
+        return endCouldNotStart(context, run);
+      }
+    }
+    if (place === "previous-agent-alive") {
+      const sourceRunId = run.continuedFromRunId;
+      tryWrite(context, run.id, () =>
+        inTransaction(db, () => {
+          if (sourceRunId !== null) {
+            recordAgentCheck(db, sourceRunId, "alive", { stopHandled: false });
+          }
+          recordStartFailure(db, run.id, {
+            failures: records.startFailures,
+            error: messages.continuation.previousAgentAlive,
+          });
+        }),
+      );
+      return endCouldNotStart(context, run);
+    }
+    const prompt =
+      place === null || place === "from-scratch" ? await promptFor(context, run) : undefined;
     if (prompt === null) return { kind: "blocked" };
     if (prompt === "ticket-gone") {
       tryWrite(context, run.id, () =>
@@ -437,24 +570,45 @@ async function startOnRunner(
       );
       return endCouldNotStart(context, run);
     }
+    const workspace = getWorkspaceBrief(db, run.workspaceId) ?? EMPTY_WORKSPACE_BRIEF;
+    const ticket = prompt?.text ?? "";
+    const brief =
+      source === null
+        ? composeAgentBrief({ workspace, ticket, protocol: runner.agentProtocol })
+        : composeContinuationBrief({
+            workspace,
+            ticket,
+            protocol: runner.agentProtocol,
+            operatorMessage: records.continueMessage ?? "",
+            previousReport: source.report,
+          });
     if (
-      tryWrite(context, run.id, () => recordStartRequested(db, run.id, context.now())) === undefined
+      tryWrite(context, run.id, () => recordStartRequested(db, run.id, context.now(), brief)) ===
+      undefined
     ) {
       return { kind: "blocked" };
     }
+    startSent = true;
     const started = await runner.startRun({
       mailbox,
       project: run.runnerProject,
       worktreeName: run.worktreeName,
       agent: run.agent,
       ...(run.model === null ? {} : { model: run.model }),
-      prompt: prompt.text,
-      ticket: prompt.ticket,
+      brief,
+      ...(prompt === undefined ? {} : { ticket: prompt.ticket }),
+      ...(source === null || place === "from-scratch" ? {} : { continueIn: source.worktree }),
     });
     return { kind: "started", started };
   } catch (error) {
     logger.warn("run.start_failed", { runId: run.id, error });
-    return handleStartFailure(context, run, { runnerId, unverified }, records.startFailures, error);
+    return handleStartFailure(
+      context,
+      run,
+      { runnerId, unverified, startSent },
+      records.startFailures,
+      error,
+    );
   }
 }
 
@@ -465,11 +619,77 @@ async function findStarted(
   mailbox: MailboxRef,
 ): Promise<StartedRun | null | "unreachable" | "unknown"> {
   try {
-    return await runner.findStartedRun({ mailbox, worktreeName: run.worktreeName });
+    return await runner.findStartedRun({
+      mailbox,
+      worktreeName: run.worktreeName,
+      ...continueInOf(context, run),
+    });
   } catch (error) {
     context.logger.warn("run.lookup_failed", { runId: run.id, error });
     return isOfflineLike(error) ? "unreachable" : "unknown";
   }
+}
+
+interface ContinuationSource {
+  worktree: WorktreeRef;
+  branch: string;
+  report: string | null;
+  agentRef: AgentRef;
+}
+
+function continuationSource(
+  context: TickContext,
+  run: QueuedStoredRun,
+): ContinuationSource | "missing" | null {
+  if (run.continuedFromRunId === null) return null;
+  const found = getRunWithRecords(context.db, run.continuedFromRunId);
+  if (found?.run.state !== "ended" || found.run.startedAt === null) return "missing";
+  return {
+    worktree: found.run.worktree,
+    branch: found.run.branch,
+    report: found.records.reportBody,
+    agentRef: found.run.agentRef,
+  };
+}
+
+function continueInOf(
+  context: TickContext,
+  run: QueuedStoredRun,
+): { continueIn: WorktreeRef; previousAgent: AgentRef } | Record<string, never> {
+  const source = continuationSource(context, run);
+  if (source === null || source === "missing") return {};
+  const place = getRunWithRecords(context.db, run.id)?.records.continuePlace ?? null;
+  return place === null || place === "from-scratch"
+    ? {}
+    : { continueIn: source.worktree, previousAgent: source.agentRef };
+}
+
+async function continuationPlace(
+  context: TickContext,
+  run: QueuedStoredRun,
+  runner: Runner,
+  source: ContinuationSource,
+  records: RunRecords,
+): Promise<ContinuationPlace | "write-failed" | "previous-agent-alive"> {
+  const { worktree, agentRef } = source;
+  if (await runner.isAgentAlive({ worktree, agentRef })) return "previous-agent-alive";
+  if (records.continuePlace === "from-scratch") return "from-scratch";
+  const prepared = await runner.prepareContinuation({
+    project: run.runnerProject,
+    worktree: source.worktree,
+    branch: source.branch,
+  });
+  const place = prepared === "same-worktree" ? (records.continuePlace ?? prepared) : prepared;
+  const written = tryWrite(context, run.id, () =>
+    inTransaction(context.db, () => {
+      recordContinuePlace(context.db, run.id, place);
+      if (prepared !== "from-scratch" && run.continuedFromRunId !== null) {
+        reclaimSourceWorktree(context.db, run.continuedFromRunId);
+      }
+      return true;
+    }),
+  );
+  return written === undefined ? "write-failed" : place;
 }
 
 export const START_UNREACHABLE_RETRY_MS = 60_000;
@@ -486,7 +706,7 @@ function isOfflineLike(error: unknown): boolean {
 function handleStartFailure(
   context: TickContext,
   run: QueuedStoredRun,
-  target: { runnerId: RunnerId; unverified: boolean },
+  target: { runnerId: RunnerId; unverified: boolean; startSent: boolean },
   previousFailures: number,
   error: unknown,
 ): StartAttempt {
@@ -494,7 +714,7 @@ function handleStartFailure(
   if (detail === null) return { kind: "blocked" };
   const { db } = context;
   const { runnerId, unverified } = target;
-  const definite = detail.kind !== "malformed-output";
+  const definite = detail.kind !== "malformed-output" || !target.startSent;
   const forget = (): void => {
     if (!unverified && definite) clearStartRequested(db, run.id);
   };
@@ -570,7 +790,7 @@ async function promptFor(
   }
   tryWrite(context, run.id, () => fillRunTicketTitle(context.db, run.id, ticket.title));
   return {
-    text: `${ticket.title}\n\n${ticket.body}`,
+    text: ticketBriefText(ticket),
     ticket: { key: ticket.key, url: ticket.url },
   };
 }

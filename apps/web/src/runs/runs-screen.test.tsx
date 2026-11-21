@@ -1,5 +1,11 @@
-import { toAgentId, toRunnerProjectId, toTicketKey, toTrackerProjectId } from "@ganger/core";
-import { assignRun, changeRunState, requestRunCancel } from "@ganger/db";
+import {
+  toAgentId,
+  toPullRequestId,
+  toRunnerProjectId,
+  toTicketKey,
+  toTrackerProjectId,
+} from "@ganger/core";
+import { assignRun, changeRunState, requestRunCancel, updateRunRecords } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
@@ -223,10 +229,10 @@ describe("Runs 화면", () => {
     const text = panelText(
       render(loadRunsPage(db, undefined, now), { selectedId: ids.get("ACME-2") }),
     );
-    expect(text).toContain(domain.summary["human-check"]);
+    expect(text).toContain(domain.summary.failed);
     expect(text).toContain(domain.agentResult["reported-failure"]);
     expect(text).toContain(domain.prState.open);
-    expect(text).toContain(runsJson.panel.reason["human-check"]);
+    expect(text).toContain(runsJson.panel.reason.failed);
     expect(text).toContain("runner-a");
     expect(text).toContain(domain.agent.claude);
     expect(text).toContain("29분");
@@ -278,7 +284,7 @@ describe("Runs 화면", () => {
   it("필터에 맞는 런이 없으면 패널에 빈 상태 한 줄을 둔다", () => {
     const { db } = seedDatabase();
     const page = loadRunsPage(db, labs, now);
-    expect(panelText(render(page, { filter: "merged" }))).toContain(runsJson.panel.empty);
+    expect(panelText(render(page, { filter: "succeeded" }))).toContain(runsJson.panel.empty);
     const empty: RunsPage = { ...page, runs: [] };
     expect(panelText(render(empty))).toContain(runsJson.panel.noRuns);
   });
@@ -382,8 +388,7 @@ describe("Runs 화면", () => {
       "Waiting for Input",
       "Disconnected",
       "Queued",
-      "Merged",
-      "Human Check",
+      "Succeeded",
       "Failed",
       "Canceled",
     ]);
@@ -455,6 +460,126 @@ describe("Runs 화면", () => {
     const oldFailed = ids.get(failedKey);
     expect(page.runs.find((run) => run.id === oldFailed)?.attention).toBe(false);
     expect(attentionIds(page)).toEqual(homeRunIds());
+  });
+
+  it("PR 정보를 읽지 못한 런은 행에 PR 못 읽음을, 패널에 이유를 보인다 (0144)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("seed");
+    const ended = changeRunState(
+      db,
+      id,
+      {
+        to: "ended",
+        agentResult: "reported-success",
+        prState: "unknown",
+        prReadError: "no-access",
+      },
+      minutes(110),
+    );
+    expect(ended.ok).toBe(true);
+    const page = loadRunsPage(db, undefined, now);
+    expect(page.runs.find((run) => run.id === id)).toMatchObject({
+      prState: "unknown",
+      prReadError: "no-access",
+    });
+    const row = rowTexts(render(page)).get("ACME-10");
+    expect(row?.result).toBe(
+      [domain.agentResult["reported-success"], runsJson.prUnread].join(runsJson.metaSeparator),
+    );
+    expect(row?.pill).toBe(domain.summary.succeeded);
+    const text = panelText(render(page, { selectedId: id }));
+    expect(text).toContain(
+      `${runsJson.panel.reason.succeeded} ${runsJson.panel.prUnread["no-access"]}`,
+    );
+    expect(text).toContain(domain.prState.unknown);
+  });
+
+  it("열린 PR 의 CI 실패·충돌·뒤처짐을 행에 보이고 요약 결과는 그대로다 (0150)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("seed");
+    expect(
+      changeRunState(
+        db,
+        id,
+        { to: "ended", agentResult: "reported-success", prState: "open" },
+        minutes(110),
+      ).ok,
+    ).toBe(true);
+    const pullRequest = {
+      id: toPullRequestId("12"),
+      displayId: "#12",
+      url: "https://code.example.com/acme/web/pull/12",
+      ci: "failure",
+      checkedAt: minutes(111),
+    };
+    updateRunRecords(db, id, {
+      pullRequest: {
+        ...pullRequest,
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 4,
+          failedCount: 1,
+          failedChecks: ["lint"],
+          checksTruncated: false,
+          conflict: true,
+          behindBy: 3,
+        },
+      },
+    });
+    const html = render(loadRunsPage(db, undefined, now));
+    const row = html.split('role="option"').find((chunk) => chunk.includes(">ACME-10<"));
+    const marks = row?.slice(row.indexOf("data-pr-marks")).replace(/<[^>]+>/g, " ");
+    expect(marks).toContain(runsJson.prMarks.ciFailed);
+    expect(marks).toContain(runsJson.prMarks.conflict);
+    expect(marks).toContain(runsJson.prMarks.behind.replace("{count}", "3"));
+    expect(row).toContain(domain.summary.succeeded);
+
+    updateRunRecords(db, id, { laterPrState: { state: "merged", at: minutes(112) } });
+    expect(render(loadRunsPage(db, undefined, now))).not.toContain("data-pr-marks");
+  });
+
+  it("PR 정보를 읽지 못한 Failed 런도 제 이유 곁에 못 읽은 이유를 보인다 (0145)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("seed");
+    const ended = changeRunState(
+      db,
+      id,
+      { to: "ended", agentResult: "timed-out", prState: "unknown", prReadError: "other" },
+      minutes(110),
+    );
+    expect(ended.ok).toBe(true);
+    const text = panelText(render(loadRunsPage(db, undefined, now), { selectedId: id }));
+    expect(text).toContain(`${runsJson.panel.reason.failed} ${runsJson.panel.prUnread.other}`);
+  });
+
+  it("Succeeded 필터는 성공을 보고한 런만 보이고, 처리할 일에는 Succeeded 런이 없다 (0145)", () => {
+    const { db } = seedDatabase();
+    const page = loadRunsPage(db, undefined, now);
+    const succeeded = rowTexts(render(page, { filter: "succeeded" }));
+    expect([...succeeded.keys()].toSorted()).toEqual(["ACME-1", "ACME-7"]);
+    for (const row of succeeded.values()) expect(row.pill).toBe(domain.summary.succeeded);
+    const attention = rowTexts(render(page, { filter: "attention" }));
+    expect([...attention.values()].some((row) => row.pill === domain.summary.succeeded)).toBe(
+      false,
+    );
+    expect(attention.has("ACME-2")).toBe(true);
+  });
+
+  it("행의 PR 정보는 이후 PR 상태가 있으면 그것을 보인다 (0145)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-2");
+    if (id === undefined) throw new Error("seed");
+    const before = rowTexts(render(loadRunsPage(db, undefined, now))).get("ACME-2");
+    expect(before?.result).toContain(`#2 ${domain.prState.open}`);
+    updateRunRecords(db, id, { laterPrState: { state: "merged", at: minutes(110) } });
+    const after = rowTexts(render(loadRunsPage(db, undefined, now))).get("ACME-2");
+    expect(after?.result).toContain(`#2 ${domain.prState.merged}`);
+    expect(after?.pill).toBe(domain.summary.failed);
   });
 
   it('Canceled 필터는 운영자가 취소한 런만 "취소"로 보인다(Q82.18)', () => {

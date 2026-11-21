@@ -47,7 +47,13 @@ const attentionKeys = (items: ReadonlyArray<AttentionItem>) =>
 
 function addEndedRun(
   db: Database,
-  input: { key: string; trackerProject: string; agentResult: "timed-out" | "canceled" },
+  input: {
+    key: string;
+    trackerProject: string;
+    agentResult: "timed-out" | "canceled" | "reported-success";
+    prState?: "open" | "unknown";
+    prReadError?: "no-access";
+  },
 ): RunId {
   const result = assignRun(db, {
     ticket: { connection, key: toTicketKey(input.key) },
@@ -68,7 +74,14 @@ function addEndedRun(
     changeRunState(
       db,
       id,
-      { to: "ended", agentResult: input.agentResult, prState: "open" },
+      input.prState === "unknown"
+        ? {
+            to: "ended",
+            agentResult: input.agentResult,
+            prState: "unknown",
+            prReadError: input.prReadError ?? "other",
+          }
+        : { to: "ended", agentResult: input.agentResult, prState: "open" },
       minutes(90),
     ),
   ]) {
@@ -95,7 +108,7 @@ describe("loadHomePage", () => {
     expect(attention.slice(0, 2)).toEqual(["ACME-11", "ACME-12"]);
     expect(attention.slice(2).toSorted()).toEqual(
       endedCases
-        .filter((c) => c.summary !== "merged")
+        .filter((c) => c.summary === "failed")
         .map((c) => c.key)
         .toSorted(),
     );
@@ -143,7 +156,7 @@ describe("loadHomePage", () => {
         state: "ended",
         agentResult: "reported-failure",
         prState: "open",
-        summary: "human-check",
+        summary: "failed",
       },
     });
   });
@@ -163,13 +176,25 @@ describe("loadHomePage", () => {
     expect(keys(page.queued)).toContain("ACME-3");
   });
 
-  it("Human Check 런은 사람이 PR 을 병합하거나 닫으면 To do에서 빠진다(Q89)", () => {
+  it("Succeeded 런은 PR 이 열려 있거나 없어도 To do에 없고, Failed 런은 이후 PR 상태와 상관없이 To do에 남는다 (0145)", () => {
     const { db, ids } = seedDatabase();
-    const id = ids.get("ACME-2");
-    if (id === undefined) throw new Error("ACME-2 missing");
-    updateRunRecords(db, id, { laterPrState: { state: "merged", at: minutes(110) } });
+    addEndedRun(db, {
+      key: "ACME-31",
+      trackerProject: "tp-web",
+      agentResult: "reported-success",
+      prState: "open",
+    });
+    addEndedRun(db, {
+      key: "ACME-32",
+      trackerProject: "tp-web",
+      agentResult: "reported-success",
+      prState: "unknown",
+      prReadError: "no-access",
+    });
     const page = loadHomePage(db, "ws-commerce", now, "UTC");
-    expect(attentionKeys(page.attention)).not.toContain("ACME-2");
+    expect(attentionKeys(page.attention)).not.toContain("ACME-31");
+    expect(attentionKeys(page.attention)).not.toContain("ACME-32");
+    expect(attentionKeys(page.attention)).not.toContain("ACME-7");
     const failedId = ids.get("ACME-5");
     if (failedId === undefined) throw new Error("ACME-5 missing");
     updateRunRecords(db, failedId, { laterPrState: { state: "closed", at: minutes(110) } });
@@ -358,7 +383,7 @@ describe("loadHomePage", () => {
       "ACME-3",
     ]);
     expect(doneToday.recent[0]).toMatchObject({
-      summary: "failed",
+      summary: "succeeded",
       workspace: { id: "ws-commerce" },
       endedAgoMs: 83 * 60_000,
     });
@@ -409,15 +434,8 @@ describe("loadHomePage", () => {
     expect(keys(board.queued)).toEqual(keys(page.queued));
     expect(keys(board.running.todo)).toEqual(["ACME-11", "ACME-12"]);
     expect(keys(board.running.rest)).toEqual(keys(page.running));
-    expect(keys(board.done.todo)).toEqual([
-      "ACME-2",
-      "ACME-7",
-      "ACME-6",
-      "ACME-5",
-      "ACME-4",
-      "ACME-3",
-    ]);
-    expect(keys(board.done.rest)).toEqual(["ACME-1"]);
+    expect(keys(board.done.todo)).toEqual(["ACME-6", "ACME-5", "ACME-4", "ACME-3", "ACME-2"]);
+    expect(keys(board.done.rest)).toEqual(["ACME-7", "ACME-1"]);
   });
 
   it("질문을 기다리는 런은 가장 오래된 대기부터 지난 시간을 담는다", () => {

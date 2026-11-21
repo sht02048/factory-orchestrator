@@ -1,5 +1,8 @@
 import {
+  EMPTY_WORKSPACE_BRIEF,
+  composeAgentBrief,
   isAssignmentBlocked,
+  ticketBriefText,
   summarizeRunOutcome,
   toAgentId,
   toAgentRef,
@@ -10,15 +13,26 @@ import {
   toTicketKey,
   toWorktreeRef,
 } from "@ganger/core";
-import type { AgentId, AgentResult, PrState, RunId, RunnerId, TicketKey } from "@ganger/core";
+import type {
+  AgentId,
+  AgentResult,
+  PrState,
+  RunId,
+  RunnerId,
+  TicketKey,
+  WorktreeKeptReason,
+} from "@ganger/core";
 import {
   assignRun,
   changeRunState,
+  getRun,
+  getWorkspaceBrief,
   inTransaction,
   recordPermissionWaits,
   recordProviderUsage,
   recordRunQuestions,
   recordRunnerCheck,
+  recordStartRequested,
   recordWebhookAccepted,
   recordWebhookBadSignature,
   saveAutoAssignLabel,
@@ -30,16 +44,19 @@ import {
   saveRunner,
   saveTrackerConnection,
   saveWorkspace,
+  saveWorkspaceBrief,
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
   updateRunRecords,
 } from "@ganger/db";
 import type { Database, SecretBox } from "@ganger/db";
+import { ASK_GUIDE } from "@ganger/runner-orca/agent-brief";
 import {
   RUNNER_PROJECTS,
   agent,
   apiRepoLabel,
   autoAssignLabel,
+  demoTicketBody,
   inProgressState,
   providerUsageFor,
   runnerProjectId,
@@ -47,7 +64,7 @@ import {
   seededRunners,
   trackerProjectId,
 } from "./fixtures.js";
-import { DEMO_WEBHOOK_ADDRESS, DEMO_WEB_ADDRESS, PREFILL } from "./values.js";
+import { DEMO_WEBHOOK_ADDRESS, DEMO_WEB_ADDRESS, DEMO_WORKSPACE_BRIEF, PREFILL } from "./values.js";
 import { CODE_HOST_KIND, RUNNER_KIND, TRACKER_KIND } from "./world.js";
 import type { DemoWorld } from "./world.js";
 
@@ -163,6 +180,9 @@ function seedSettings(db: Database, box: SecretBox, now: Date): void {
       now,
     );
     saveWorkspace(db, { id: connection.workspaceId, name: connection.spec.name }, now);
+    if (connection === seededConnections[0]) {
+      saveWorkspaceBrief(db, { id: connection.workspaceId, brief: DEMO_WORKSPACE_BRIEF }, now);
+    }
     for (const project of connection.spec.projects) {
       saveWorkspaceTrackerProject(db, {
         workspaceId: connection.workspaceId,
@@ -267,7 +287,19 @@ function assign(
   return { id: result.run.id, worktreeName: result.run.worktreeName };
 }
 
+function sentBrief(db: Database, runId: RunId): string {
+  const run = getRun(db, runId);
+  if (run === null) throw new Error(`demo seed run ${runId} is gone`);
+  const title = run.ticketTitle ?? run.ticket.key;
+  return composeAgentBrief({
+    workspace: getWorkspaceBrief(db, run.workspaceId) ?? EMPTY_WORKSPACE_BRIEF,
+    ticket: ticketBriefText({ title, body: demoTicketBody(title) }),
+    protocol: ASK_GUIDE,
+  });
+}
+
 function start(db: Database, runId: RunId, worktreeName: string, at: Date): void {
+  recordStartRequested(db, runId, at, sentBrief(db, runId));
   ok(
     changeRunState(
       db,
@@ -293,6 +325,7 @@ function ok(result: { ok: true } | { ok: false; error: unknown }): void {
 interface Ending {
   agentResult: AgentResult;
   prState: PrState;
+  worktreeKept?: WorktreeKeptReason;
 }
 
 function end(
@@ -319,10 +352,11 @@ function end(
   updateRunRecords(db, runId, {
     trackerComment: { id: toCommentId(`demo-comment-${runId}`), at },
     worktreeRemovedAt:
-      summarizeRunOutcome({ ...ending, runnerUnreached: false }).worktree ===
-      "keep-until-pr-settles"
-        ? null
-        : at,
+      ending.worktreeKept === undefined &&
+      summarizeRunOutcome({ ...ending, runnerUnreached: false }).worktree === "remove-now"
+        ? at
+        : null,
+    worktreeKept: ending.worktreeKept ?? null,
     lastLog: ["$ pnpm test", "✓ 42 tests passed", "$ git push", "done"],
     ...(ending.prState === "none"
       ? {}
@@ -331,14 +365,45 @@ function end(
             id: toPullRequestId(`pr-${input.prNumber}`),
             displayId: `#${input.prNumber}`,
             url: `https://code.example.com/${input.repo}/pull/${input.prNumber}`,
-            ci: "success",
+            ...demoChecks(ending.prState, input.prNumber),
             checkedAt: at,
           },
         }),
   });
 }
 
-const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 21, 22, 23, 24, 25, 26], GLX: [2] };
+function demoChecks(prState: Ending["prState"], prNumber: number) {
+  const base = {
+    headCommit: `demo-${prNumber}`,
+    ciFailed: false,
+    checkTotal: 6,
+    failedCount: 0,
+    failedChecks: [],
+    checksTruncated: false,
+  };
+  if (prState !== "open") {
+    return {
+      ci: "success",
+      signals: { ...base, open: false, conflict: null, behindBy: null },
+    };
+  }
+  return prNumber % 2 === 0
+    ? {
+        ci: "failure",
+        signals: {
+          ...base,
+          open: true,
+          ciFailed: true,
+          failedCount: 1,
+          failedChecks: ["lint"],
+          conflict: true,
+          behindBy: 4,
+        },
+      }
+    : { ci: "success", signals: { ...base, open: true, conflict: false, behindBy: 2 } };
+}
+
+const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 8, 9, 21, 22, 23, 24, 25, 26, 27], GLX: [2] };
 const HISTORY_TICKETS = [
   range(1, 35).filter((n) => !ACTIVE_TICKETS.ACME.includes(n)),
   range(1, 10).filter((n) => !ACTIVE_TICKETS.GLX.includes(n)),
@@ -426,6 +491,18 @@ function seedActive(db: Database, now: Date): SeededRuns {
     },
   ]);
 
+  const humanCheck = startedRun(db, ticket("ACME", 27), runnerA.id, ago(45), ago(44));
+  ok(changeRunState(db, humanCheck, { to: "waiting-for-input" }, ago(3)));
+  recordRunQuestions(db, humanCheck, [
+    {
+      id: toQuestionId("demo-human-check-1"),
+      kind: "human-check",
+      body: "PR #571 머지를 확인해 주세요\n\n설정 파일 형식을 바꿔 머지 위험이 one-way예요. 독립 리뷰와 CI를 통과했어요.\nhttps://github.com/acme/widgets/pull/571",
+      options: [],
+      askedAt: ago(3),
+    },
+  ]);
+
   const paused = startedRun(db, ticket("ACME", 24), runnerB.id, ago(70), ago(68));
   ok(changeRunState(db, paused, { to: "paused" }, ago(18)));
 
@@ -458,6 +535,8 @@ function seedActive(db: Database, now: Date): SeededRuns {
     [5, { agentResult: "reported-success", prState: "open" }],
     [6, { agentResult: "ended-without-report", prState: "none" }],
     [7, { agentResult: "canceled", prState: "none" }],
+    [8, { agentResult: "reported-success", prState: "none" }],
+    [9, { agentResult: "reported-failure", prState: "none", worktreeKept: "unpushed-commits" }],
   ];
   let prNumber = 900;
   for (const [n, ending] of endings) {

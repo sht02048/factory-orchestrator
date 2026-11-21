@@ -30,6 +30,8 @@ import {
   MenuItem,
   MoreIcon,
   PILL_STATUSES,
+  BlockerChip,
+  BlockerChips,
   KanbanCard,
   KanbanCards,
   KanbanColumn,
@@ -129,7 +131,7 @@ describe("서버 렌더", () => {
       check: ["human-check"],
       problem: ["disconnected", "failed", "offline", "runner-issue"],
       progress: ["running", "online"],
-      merged: ["merged"],
+      merged: ["succeeded"],
       idle: ["queued", "paused", "canceled"],
     };
     const actual: Record<StatusTone, PillStatus[]> = {
@@ -145,11 +147,11 @@ describe("서버 렌더", () => {
   });
 
   it("StatusPill 은 점과 이름을 함께 그리고, 점은 스크린 리더에서 숨긴다", () => {
-    const html = renderToString(<StatusPill status="human-check">Human Check</StatusPill>);
-    expect(html).toContain("Human Check");
-    expect(html).toContain('data-tone="check"');
+    const html = renderToString(<StatusPill status="succeeded">Succeeded</StatusPill>);
+    expect(html).toContain("Succeeded");
+    expect(html).toContain('data-tone="merged"');
     expect(html).toContain('aria-hidden="true"');
-    const failed = renderToString(<StatusPill status="failed">Human Check</StatusPill>);
+    const failed = renderToString(<StatusPill status="failed">Succeeded</StatusPill>);
     expect(failed.replace(/data-[a-z]+="[^"]*"/g, "")).not.toEqual(
       html.replace(/data-[a-z]+="[^"]*"/g, ""),
     );
@@ -455,6 +457,25 @@ describe("서버 렌더", () => {
     ]);
   });
 
+  it("Dialog 의 triggerBusy 는 트리거를 막힌 상태로 드러내고, 없으면 그대로 둔다(0156)", () => {
+    const busy = renderToString(
+      <Dialog
+        trigger="지우기"
+        triggerBusy={{ active: true, label: "지우는 중" }}
+        title="지울까요?"
+        actions={<DialogClose>취소</DialogClose>}
+      />,
+    );
+    const idle = renderToString(
+      <Dialog trigger="지우기" title="지울까요?" actions={<DialogClose>취소</DialogClose>} />,
+    );
+
+    expect(busy).toContain('aria-busy="true"');
+    expect(busy).toContain('aria-disabled="true"');
+    expect(idle).not.toContain("aria-busy");
+    expect(idle).not.toContain("aria-disabled");
+  });
+
   it("레일 Menu 는 펼침 화살표 없이 트리거 내용만 그린다", () => {
     const rail = renderToString(
       <Menu variant="rail" label="Workspace 바꾸기" trigger="Acme">
@@ -609,6 +630,40 @@ describe("서버 렌더", () => {
     expect(plain).toContain('aria-labelledby="card-2"');
     expect(plain).not.toContain("aria-describedby");
     expect(plain).not.toContain("data-status=");
+  });
+
+  it("KanbanCard ticketKey 는 번호 줄에 알약을 두고 이름은 번호와 제목이다(티켓 0160)", () => {
+    const html = renderToString(
+      <KanbanCard
+        ticketKey="ACME-15"
+        tag={<StatusPill status="failed">Failed</StatusPill>}
+        title="알림 묶기"
+        blockers={
+          <BlockerChips>
+            <BlockerChip state="done" ticketKey="ACME-9" stateName="Done" />
+            <BlockerChip state="canceled" ticketKey="ACME-10" stateName="취소" />
+          </BlockerChips>
+        }
+        stuck
+        meta="선행 티켓이 취소됐어요"
+        metaTone="problem"
+        time="2시간째"
+        onOpen={noop}
+      />,
+    );
+    const nameId = /aria-labelledby="([^"]+)"/.exec(html)?.[1] ?? "";
+    const name = new RegExp(`<span id="${nameId}"[^>]*>(.*?)</span></span>`).exec(html)?.[1] ?? "";
+    expect(name).toContain("ACME-15");
+    expect(name).toContain("알림 묶기");
+    expect(name).not.toContain("Failed");
+    expect(html.indexOf("Failed")).toBeGreaterThan(html.indexOf("알림 묶기"));
+    expect(html).toContain('data-blocker-state="done"');
+    expect(html).toContain('data-blocker-state="canceled"');
+    expect(/aria-describedby="([^"]+)"/.exec(html)?.[1]?.split(" ")).toHaveLength(3);
+
+    const calm = renderToString(<KanbanCard ticketKey="ACME-15" title="알림 묶기" onOpen={noop} />);
+    const classOfButton = (rendered: string) => /<button[^>]*class="([^"]*)"/.exec(rendered)?.[1];
+    expect(classOfButton(html)).not.toBe(classOfButton(calm));
   });
 
   it("KanbanCard 의 menu 는 카드 버튼 밖에 두고, 아이콘 메뉴 단추는 label 을 이름으로 가진다(티켓 0118)", () => {

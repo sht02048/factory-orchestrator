@@ -1,4 +1,11 @@
-import type { AgentResult, PrState, SummaryOutcome, TrackerStateCategory } from "@ganger/core";
+import type {
+  AgentResult,
+  PrState,
+  SummaryOutcome,
+  TicketPriority,
+  TrackerStateCategory,
+} from "@ganger/core";
+import type { BlockerReason, BlockerView } from "../runs/model.js";
 import type { Remote } from "../settings/model.js";
 import type { WorkspaceChoice } from "../shell/model.js";
 
@@ -17,8 +24,9 @@ export type TicketRun =
       endedAgoMs: number;
       agentResult: AgentResult;
       prState: PrState;
+      laterPrState: "merged" | "closed" | null;
+      pullRequest: string | null;
       summary: SummaryOutcome;
-      prSettledLater: boolean;
     };
 
 export interface AssignRepo {
@@ -39,6 +47,15 @@ export type Assignability =
   | { kind: "active-run"; runId: string }
   | { kind: "no-mapping" };
 
+export interface WaitingTicket {
+  key: string;
+  title: string | null;
+}
+
+export type TicketBlockersResult =
+  | { ok: true; blockers: BlockerView[] }
+  | { ok: false; reason: TrackerLoadError["reason"] };
+
 export interface TicketView {
   id: string;
   connection: string;
@@ -47,6 +64,9 @@ export interface TicketView {
   url: string | null;
   trackerProject: { id: string; name: string };
   trackerState: { name: string; category: TrackerStateCategory };
+  priority: TicketPriority;
+  blockerWait: BlockerReason | null;
+  waitingTickets: ReadonlyArray<WaitingTicket>;
   labels: ReadonlyArray<{ name: string; autoAssign: boolean }>;
   runs: ReadonlyArray<TicketRun>;
   mapping: AssignDefaults | null;
@@ -118,6 +138,7 @@ export interface TicketRunFacts {
   runs: TicketRun[];
   activeRunId: string | null;
   retryRepo: string | null;
+  blockerWait: BlockerReason | null;
 }
 
 export interface TicketRunsData {
@@ -127,6 +148,7 @@ export interface TicketRunsData {
   projects: TicketProjectFacts[];
   repoNames: Record<string, string>;
   runsByTicket: Record<string, TicketRunFacts>;
+  waitingByBlocker: Record<string, WaitingTicket[]>;
 }
 
 export interface TrackerLabel {
@@ -142,6 +164,7 @@ export interface TrackerTicketView {
   title: string;
   url: string | null;
   state: { name: string; category: TrackerStateCategory };
+  priority: TicketPriority;
   labels: ReadonlyArray<TrackerLabel>;
 }
 
@@ -183,7 +206,7 @@ export function isTodo(run: TicketRun): boolean {
     case "disconnected":
       return true;
     case "ended":
-      return run.summary === "failed" || (run.summary === "human-check" && !run.prSettledLater);
+      return run.summary === "failed";
     case "queued":
     case "running":
     case "paused":
@@ -194,11 +217,9 @@ export function isTodo(run: TicketRun): boolean {
 function isDone(run: TicketRun): boolean {
   if (run.state !== "ended") return false;
   switch (run.summary) {
-    case "merged":
+    case "succeeded":
     case "canceled":
       return true;
-    case "human-check":
-      return run.prSettledLater;
     case "failed":
       return false;
   }

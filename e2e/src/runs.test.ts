@@ -7,6 +7,7 @@ import {
   toAgentRef,
   toCodeHostKind,
   toLabelId,
+  toPullRequestId,
   toRunnerId,
   toRunnerKind,
   toRunnerProjectId,
@@ -18,6 +19,7 @@ import {
   SecretBox,
   assignRun,
   changeRunState,
+  listRuns,
   migrate,
   openDatabase,
   recordRunnerCheck,
@@ -29,6 +31,7 @@ import {
   saveWorkspace,
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
+  updateRunRecords,
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { chromium } from "playwright-core";
@@ -37,6 +40,7 @@ import type { Plugin, ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 import type { TestContext } from "vitest";
 import runsJson from "../../apps/web/messages/ko/runs.json" with { type: "json" };
+import runJson from "../../apps/web/messages/ko/run.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 import { startWebServer } from "./web-server.js";
 
@@ -212,6 +216,68 @@ describe("Runs 화면(브라우저, 0056)", () => {
         titleShortBy: 0,
       });
     }
+  });
+
+  it("400px 에서 PR 의 CI 실패·충돌·뒤처짐이 Runs 행과 Run 상세에서 넘치지 않는다(0150)", async (context) => {
+    const ended = listRuns(db)
+      .flatMap((run) => (run.state === "ended" ? [run] : []))
+      .sort((a, b) => b.endedAt.getTime() - a.endedAt.getTime())
+      .at(0);
+    if (ended === undefined) throw new Error("no ended run");
+    const { id } = ended;
+    const key = ended.ticket.key;
+    db.$client
+      .prepare(
+        `UPDATE runs SET agent_result = 'reported-success', pr_state = 'open',
+          started_at = ended_at - 60000, runner_id = ?, worktree_ref = 'wt-pr-signals',
+          worktree_removed_at = NULL, worktree_kept = NULL,
+          branch = 'feat/pr-signals', agent_ref = 'agent-pr-signals' WHERE id = ?`,
+      )
+      .run(onlineRunner, id);
+    updateRunRecords(db, id, {
+      pullRequest: {
+        id: toPullRequestId("12"),
+        displayId: "#12",
+        url: "https://code.example.com/acme/web/pull/12",
+        ci: "failure",
+        checkedAt: new Date(),
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 12,
+          failedCount: 2,
+          failedChecks: ["browser-shard-with-a-long-check-name", "static"],
+          checksTruncated: false,
+          conflict: true,
+          behindBy: 18,
+        },
+      },
+    });
+    const overflow = (page: Page) =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+
+    const page = await newPage(context, { width: 400, height: 900 });
+    await openRuns(page);
+    const row = page.getByRole("option", { name: new RegExp(`^${key}(\\D|$)`) });
+    await row.getByText(runsJson.prMarks.conflict).first().waitFor();
+    await row.getByText(runsJson.prMarks.ciFailed).first().waitFor();
+    expect(await overflow(page)).toBe(0);
+    const clipped = await row.locator("[data-pr-marks]").evaluate((marks) => {
+      const cell = marks.getBoundingClientRect();
+      return [...marks.children].some(
+        (mark) => mark.getBoundingClientRect().right > Math.ceil(cell.right),
+      );
+    });
+    expect(clipped).toBe(false);
+    await row.getByText(runsJson.prMarks.behind.replace("{count}", "18")).waitFor();
+
+    await page.goto(`/runs/${id}`);
+    await page.getByText(runJson.props.hasConflict).waitFor();
+    await page.getByText(/browser-shard-with-a-long-check-name/).waitFor();
+    expect(await overflow(page)).toBe(0);
   });
 
   it("머리글과 첫 행 사이에 8px 을 두고, 머리글을 숨긴 좁은 폭에서는 빈 틈을 남기지 않는다(0141)", async (context) => {

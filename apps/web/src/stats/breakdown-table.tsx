@@ -15,7 +15,7 @@ import { size } from "@ganger/ui/tokens.stylex";
 import type { MouseEvent } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
-import { mergedRate } from "@ganger/app/stats/model";
+import { successRate } from "@ganger/app/stats/model";
 import type { StatsGroup } from "@ganger/app/stats/model";
 
 const BREAKDOWN_COLUMN_WIDTHS = [
@@ -46,12 +46,12 @@ export function BreakdownTable({
         <DataTableHead>
           <DataTableHeader>{t("columns.name")}</DataTableHeader>
           <DataTableHeader align="end">{t("columns.runs")}</DataTableHeader>
-          <DataTableHeader align="end">{t("columns.mergedRate")}</DataTableHeader>
+          <DataTableHeader align="end">{t("columns.successRate")}</DataTableHeader>
           <DataTableHeader align="end">{t("columns.leadTime")}</DataTableHeader>
         </DataTableHead>
         <DataTableBody>
           {groups.map((group) => {
-            const rate = mergedRate(group);
+            const rate = successRate(group);
             return (
               <DataTableRow
                 key={group.key}

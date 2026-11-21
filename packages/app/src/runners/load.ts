@@ -1,6 +1,6 @@
 import { blockedProjectsOf, currentWindows, highestUsage, summarizeRunOutcome } from "@ganger/core";
 import type { UsageWindow } from "@ganger/core";
-import { listRunners, listRunsWithRecords, listWorkspaces } from "@ganger/db";
+import { listRunners, listRunsWithRecords, listWorkspaces, listTakenOverRunIds } from "@ganger/db";
 import type { Database, StoredProviderUsage, StoredRun } from "@ganger/db";
 import { z } from "zod";
 import { prerequisiteHint, prerequisiteProject } from "../prerequisites.js";
@@ -34,6 +34,7 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
     else list.push(item);
   };
 
+  const takenOver = listTakenOverRunIds(db);
   for (const { run, records } of listRunsWithRecords(db)) {
     if (run.runnerId === null) continue;
     const base = { id: run.id, ticketKey: run.ticket.key, workspace: workspaceOf(run) };
@@ -52,9 +53,11 @@ export function loadRunnersPage(db: Database, now: Date): RunnersPage {
         });
         break;
       case "ended": {
-        const { worktree } = summarizeRunOutcome(run);
-        if (worktree !== "keep-until-pr-settles" && worktree !== "operator-decides") break;
         if (records.worktreeRemovedAt !== null) break;
+        if (takenOver.has(run.id)) break;
+        const worktree =
+          records.worktreeKept === null ? summarizeRunOutcome(run).worktree : "operator-decides";
+        if (worktree !== "keep-until-pr-settles" && worktree !== "operator-decides") break;
         push(leftWorktrees, run.runnerId, { ...base, worktree });
         break;
       }

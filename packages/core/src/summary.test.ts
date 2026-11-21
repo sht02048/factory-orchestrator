@@ -8,26 +8,29 @@ type Cell = [SummaryOutcome, WorktreeDisposition];
 
 const keepIfOpen = (outcome: SummaryOutcome): Record<PrState, Cell> => ({
   open: [outcome, "keep-until-pr-settles"],
+  unknown: [outcome, "keep-until-pr-settles"],
   none: [outcome, "remove-now"],
   merged: [outcome, "remove-now"],
   closed: [outcome, "remove-now"],
 });
 const same = (cell: Cell): Record<PrState, Cell> => ({
   open: cell,
+  unknown: cell,
   none: cell,
   merged: cell,
   closed: cell,
 });
-const reported: Record<PrState, Cell> = {
-  merged: ["merged", "remove-now"],
-  open: ["human-check", "keep-until-pr-settles"],
-  closed: ["failed", "remove-now"],
-  none: ["failed", "remove-now"],
+const succeeded: Record<PrState, Cell> = {
+  merged: ["succeeded", "remove-now"],
+  open: ["succeeded", "keep-until-pr-settles"],
+  unknown: ["succeeded", "keep-until-pr-settles"],
+  closed: ["succeeded", "remove-now"],
+  none: ["succeeded", "operator-decides"],
 };
 
 const EXPECTED: Record<AgentResult, Record<PrState, Cell>> = {
-  "reported-success": reported,
-  "reported-failure": reported,
+  "reported-success": succeeded,
+  "reported-failure": keepIfOpen("failed"),
   "ended-without-report": keepIfOpen("failed"),
   "timed-out": keepIfOpen("failed"),
   "stopped-waiting-for-input": keepIfOpen("failed"),
@@ -52,10 +55,10 @@ const ALL_COMBINATIONS = AXES.flatMap(
 );
 
 describe("summarizeRunOutcome", () => {
-  it("에이전트 결과 아홉 × PR 상태 넷(시작할 수 없음은 없음만)은 서른세 조합이다", () => {
+  it("에이전트 결과 아홉 × PR 상태 다섯(시작할 수 없음은 없음만)은 마흔한 조합이다", () => {
     expect(AGENT_RESULTS).toHaveLength(9);
-    expect(AXES).toHaveLength(33);
-    expect(ALL_COMBINATIONS).toHaveLength(66);
+    expect(AXES).toHaveLength(41);
+    expect(ALL_COMBINATIONS).toHaveLength(82);
   });
 
   it.each(ALL_COMBINATIONS)(
@@ -73,15 +76,38 @@ describe("summarizeRunOutcome", () => {
     },
   );
 
-  it("완료 보고(실패) + 열림은 outcome과 상관없이 Human Check다 (Q66·Q82.2)", () => {
+  it.each(PR_STATES)("완료 보고(성공)는 PR 상태(%s)와 상관없이 Succeeded다 (R1)", (prState) => {
+    expect(
+      summarizeRunOutcome({ agentResult: "reported-success", prState, runnerUnreached: false })
+        .outcome,
+    ).toBe("succeeded");
+  });
+
+  it.each(PR_STATES)("완료 보고(실패)는 PR 상태(%s)와 상관없이 Failed다 (R1)", (prState) => {
+    expect(
+      summarizeRunOutcome({ agentResult: "reported-failure", prState, runnerUnreached: false })
+        .outcome,
+    ).toBe("failed");
+  });
+
+  it("완료 보고(성공)인데 PR 이 없으면 운영자가 보게 워크트리를 남긴다 (R7-2)", () => {
     expect(
       summarizeRunOutcome({
-        agentResult: "reported-failure",
-        prState: "open",
+        agentResult: "reported-success",
+        prState: "none",
         runnerUnreached: false,
       }),
-    ).toEqual({ outcome: "human-check", worktree: "keep-until-pr-settles" });
+    ).toEqual({ outcome: "succeeded", worktree: "operator-decides" });
   });
+
+  it.each(["reported-success", "reported-failure"] as const)(
+    "%s + PR 못 읽음은 PR을 읽을 때까지 워크트리를 남긴다 (0144)",
+    (agentResult) => {
+      expect(
+        summarizeRunOutcome({ agentResult, prState: "unknown", runnerUnreached: false }).worktree,
+      ).toBe("keep-until-pr-settles");
+    },
+  );
 
   it.each(PR_STATES)(
     "운영자가 취소함은 PR 상태(%s)와 상관없이 Canceled다 (Q77·Q82.18)",

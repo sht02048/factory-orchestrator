@@ -19,7 +19,7 @@ function projectKey(connection: string, projectId: string): string {
   return JSON.stringify([connection, projectId]);
 }
 
-const NO_RUNS: TicketRunFacts = { runs: [], activeRunId: null, retryRepo: null };
+const NO_RUNS: TicketRunFacts = { runs: [], activeRunId: null, retryRepo: null, blockerWait: null };
 
 interface Names {
   labelNames: ReadonlyMap<string, string>;
@@ -117,6 +117,9 @@ export function mergeTicketsPage(runs: TicketRunsData, tracker: TrackerTicketsDa
       url: ticket.url,
       trackerProject: { id: project.projectId, name: project.name },
       trackerState: ticket.state,
+      priority: ticket.priority,
+      blockerWait: facts.blockerWait,
+      waitingTickets: runs.waitingByBlocker[id] ?? [],
       labels: ticket.labels.map((label) => ({
         name: label.name,
         autoAssign: label.id === project.autoAssignLabel,

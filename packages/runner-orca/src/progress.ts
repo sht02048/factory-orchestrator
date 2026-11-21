@@ -51,6 +51,7 @@ export function decideProgress(input: ProgressInput): RunProgress {
     kind: "active",
     questions: mails.flatMap(({ mail, payload }) => [
       ...question(mail, payload),
+      ...humanCheck(mail),
       ...blockedEscalation(mail, payload),
     ]),
     permissionWaits: openPermissionWaits(mails),
@@ -200,6 +201,23 @@ function question(mail: MailRow, payload: MailPayload | null): AgentQuestion[] {
       id: toQuestionId(mail.id),
       body: mail.body ?? "",
       options: payload?.options ?? [],
+      askedAt: parseDate(mail.created_at) ?? new Date(0),
+    },
+  ];
+}
+
+function humanCheck(mail: MailRow): AgentQuestion[] {
+  if (mail.type !== "decision_gate") return [];
+  const body = [mail.subject, mail.body]
+    .map((part) => (part ?? "").trim())
+    .filter((part) => part !== "")
+    .join("\n\n");
+  return [
+    {
+      id: toQuestionId(mail.id),
+      kind: "human-check",
+      body,
+      options: [],
       askedAt: parseDate(mail.created_at) ?? new Date(0),
     },
   ];

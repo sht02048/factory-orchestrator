@@ -140,6 +140,30 @@ describe("데스크톱 화면 전환 포커스(브라우저, 0062)", () => {
   });
 });
 
+describe("주소가 허용되지 않은 서버(브라우저, 0157)", () => {
+  const blocked: ViewState = {
+    screen: "host-blocked",
+    host: "server.example.ts.net",
+    url: "http://server.example.ts.net:3000",
+    checking: false,
+  };
+
+  it("막힌 주소와 할 일을 보이고 다시 시도와 다른 서버 고르기를 둔다", async () => {
+    await openScreen(blocked, {
+      retry: { ...blocked, checking: true },
+      chooseRemote: { screen: "find-servers", port: 3000, searching: true, result: null },
+    });
+    const title = screens.hostBlocked.title.replace("{host}", "server.example.ts.net");
+    await page.getByRole("heading", { name: title }).waitFor();
+    await page.getByText(screens.hostBlocked.summary).waitFor();
+    await page.getByRole("button", { name: screens.hostBlocked.retry }).click();
+    await page.getByText(screens.hostBlocked.checking).waitFor();
+    await page.getByRole("button", { name: screens.hostBlocked.other }).click();
+    await page.getByRole("heading", { name: screens.find.title }).waitFor();
+    expect(await focusedHeading()).toBe(screens.find.title);
+  });
+});
+
 describe("서버 바꾸기 화면(브라우저, 0083)", () => {
   it("앱 업데이트 뒤 ②를 바꾸는 동안 반장과 버전, 런이 이어진다는 안내를 status 로 보인다", async () => {
     await page.setViewportSize({ width: 1280, height: 800 });

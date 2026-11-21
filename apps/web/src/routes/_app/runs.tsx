@@ -9,6 +9,7 @@ import type { ConditionKey } from "@ganger/app/runs/conditions";
 import { runsMessages } from "../../runs/messages";
 import { ENDED_RUNS_PAGE_SIZE, MAX_ENDED_RUNS, RUN_FILTERS } from "@ganger/app/runs/model";
 import { RunsScreen } from "../../runs/runs-screen";
+import { useFirstDrawKey } from "../../query/first-draw";
 import { requestTimeZone, useRequestTimeZone } from "../../query/request-time-zone";
 import { loadRouteQuery } from "../../query/route-query";
 import { runsListQuery } from "../../runs/queries";
@@ -45,9 +46,10 @@ export const Route = createFileRoute("/_app/runs")({
 function RunsRoute() {
   const deps = Route.useLoaderDeps();
   const timeZone = useDeferredValue(useRequestTimeZone());
-  const { data: page } = useSuspenseQuery(
+  const { data: page, isFetching } = useSuspenseQuery(
     runsListQuery({ ...deps, ended: deps.ended ?? ENDED_RUNS_PAGE_SIZE }, timeZone),
   );
+  const drawKey = useFirstDrawKey(deps.ws, isFetching);
   const shell = useShell();
   const { f, sel, ws, ended } = Route.useSearch();
   const navigate = Route.useNavigate();
@@ -56,8 +58,10 @@ function RunsRoute() {
     <ScreenMessages messages={runsMessages}>
       <RunsScreen
         page={page}
+        drawKey={drawKey}
         workspaces={shell.workspaces}
         filter={f ?? "all"}
+        endedLimit={ended ?? ENDED_RUNS_PAGE_SIZE}
         selectedId={sel}
         onFilterChange={(next) => {
           void navigate({

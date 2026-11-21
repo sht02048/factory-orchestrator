@@ -5,23 +5,21 @@ import {
   runDurations,
   summarizeRunOutcome,
 } from "@ganger/core";
-import type { QueuedRun, RunId } from "@ganger/core";
+import type { RunId } from "@ganger/core";
 import {
   listPendingCancelRequests,
   listRunPermissionWaits,
   listRunQuestions,
   getWorkspaceTrackerProject,
   listRunPlacements,
-  listRunnerSnapshots,
   listRunners,
-  listRuns,
   listRunsWithRecords,
   listWorkspaces,
   toWorkspaceId,
 } from "@ganger/db";
 import type { Database, RunRecords, StoredRun, StoredRunner } from "@ganger/db";
 import { runControlOf, withoutPauses } from "../run-control.js";
-import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
+import { describeQueuedReason, loadQueueReasons } from "../runs/queue-reasons.js";
 import { isWebUrl } from "../format/url.js";
 import { resolveWorkspace, runnerIssueCause } from "../shell/model.js";
 import { calendarDay } from "../time-zone.js";
@@ -56,24 +54,7 @@ export function loadHomePage(
   const runs = runsWithRecords.map(({ run }) => run);
 
   const placements = listRunPlacements(db);
-  const queueReasons = explainQueue({
-    queued: listRuns(db, { states: ["queued"] }).flatMap((run): QueuedRun[] =>
-      run.state === "queued"
-        ? [
-            {
-              id: run.id,
-              assignedAt: run.assignedAt,
-              project: run.runnerProject,
-              agent: run.agent,
-              runnerId: run.runnerId,
-              unstartable: false,
-            },
-          ]
-        : [],
-    ),
-    runners: listRunnerSnapshots(db, now),
-    runs: placements,
-  });
+  const queueReasons = loadQueueReasons(db, now);
   const cancelling = new Set<string>(listPendingCancelRequests(db).map((r) => r.runId));
 
   const queuedReason = (id: RunId): QueuedReason =>
@@ -163,7 +144,6 @@ export function loadHomePage(
           agentResult: run.agentResult,
           prState: run.prState,
           summary: summarizeRunOutcome(run).outcome,
-          prSettledLater: records.laterPrState !== null,
           endedAt: run.endedAt.toISOString(),
           endedAgoMs: Math.max(0, now.getTime() - run.endedAt.getTime()),
         };
@@ -233,13 +213,21 @@ function oldestPendingInput(db: Database, runId: RunId): { at: Date; input: Inpu
     if (q.answer !== null && q.answer.sentAt !== null) continue;
     inputs.push({
       at: q.askedAt,
-      input: {
-        kind: "question",
-        questionId: q.id,
-        body: q.body,
-        choices: q.options,
-        answered: q.answer !== null,
-      },
+      input:
+        q.kind === "human-check"
+          ? {
+              kind: "human-check",
+              questionId: q.id,
+              body: q.body,
+              answered: q.answer !== null,
+            }
+          : {
+              kind: "question",
+              questionId: q.id,
+              body: q.body,
+              choices: q.options,
+              answered: q.answer !== null,
+            },
     });
   }
   for (const wait of listRunPermissionWaits(db, runId)) {
@@ -254,7 +242,23 @@ function oldestPendingInput(db: Database, runId: RunId): { at: Date; input: Inpu
       },
     });
   }
-  return inputs.toSorted((a, b) => a.at.getTime() - b.at.getTime())[0] ?? null;
+  return (
+    inputs.toSorted(
+      (a, b) =>
+        Number(operatorHandled(a.input)) - Number(operatorHandled(b.input)) ||
+        a.at.getTime() - b.at.getTime(),
+    )[0] ?? null
+  );
+}
+
+function operatorHandled(input: InputWait): boolean {
+  switch (input.kind) {
+    case "question":
+    case "human-check":
+      return input.answered;
+    case "permission":
+      return input.denied;
+  }
 }
 
 function dashboardUsage(

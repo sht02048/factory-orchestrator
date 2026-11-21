@@ -5,8 +5,8 @@
   "summary": {
     "sentence": "처리할 일은 {list}예요.",
     "separator": ", ",
+    "check": "확인할 일 {count}개",
     "answer": "답할 질문 {count}개",
-    "check": "확인할 PR {count}개",
     "stopped": "멈춘 런 {count}개",
     "inProgress": "처리할 일은 없고, 진행 중인 런이 {count}개 있어요.",
     "idle": "처리할 일도, 진행 중인 런도 없어요.",
@@ -33,6 +33,7 @@
   },
   "board": {
     "more": "{count}개 더 보기",
+    "humanCheck": "확인해 주세요",
     "settled": "처리할 일 없이 끝났어요",
     "allRuns": "Runs에서 모두 보기"
   },
@@ -59,7 +60,6 @@
     "inputUnknown": "무엇을 기다리는지 아직 읽지 못했어요",
     "permission": "{command}",
     "pullRequest": "PR {pr}",
-    "humanCheckNoPr": "완료 보고를 확인해 주세요",
     "unreachableFor": "{runner}에 {duration}째 닿지 않아요",
     "unreachable": "{runner}에 닿지 않아요",
     "noRunner": "러너 없음",
@@ -67,6 +67,7 @@
     "queuedOffline": "{runner}{subject, select, i {이} other {가}} Offline이라 기다려요",
     "queuedAnyOffline": "맞는 러너가 Offline이라 기다려요",
     "answer": "답하기",
+    "check": "확인하기",
     "answered": "답을 보냈어요",
     "denied": "거절을 보냈어요",
     "openPr": "PR 보기",
@@ -92,8 +93,6 @@
     "running": "에이전트가 일하고 있어요. 끝나면 Done today로 옮겨요.",
     "inputUnknown": "무엇을 기다리는지 아직 읽지 못했어요",
     "disconnected": "워크트리는 그대로 두었어요. 러너에 다시 닿으면 실제 상태를 확인해 이어 가요.",
-    "humanCheck": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. PR을 확인해 주세요.",
-    "humanCheckNoPr": "완료 보고를 확인해 주세요",
     "openPr": "PR {pr} 보기",
     "failed": "런이 실패했어요. 이유를 보고 Tickets에서 새 런을 맡길 수 있어요.",
     "agentResult": "에이전트 결과",
@@ -117,6 +116,14 @@
     "rejected": {
       "already-answered": "다른 곳에서 이미 답한 질문이에요. 다시 보내지 않아도 돼요.",
       "not-found": "질문을 찾지 못했어요. 런이 끝났는지 Run 상세에서 확인해 주세요."
+    }
+  },
+  "humanCheck": {
+    "title": "확인해 주세요",
+    "answered": "답을 보냈어요. worker가 에이전트에게 전해요.",
+    "rejected": {
+      "already-answered": "다른 곳에서 이미 답한 요청이에요. 다시 보내지 않아도 돼요.",
+      "not-found": "요청을 찾지 못했어요. 런이 끝났는지 Run 상세에서 확인해 주세요."
     }
   },
   "permission": {

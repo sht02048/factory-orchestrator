@@ -1,3 +1,4 @@
+import type { PrSignalsView } from "@ganger/app/pr-signals-view";
 import * as stylex from "@stylexjs/stylex";
 import { isMcpRejectReason, isMcpRunTool } from "@ganger/app/mcp/actions";
 import {
@@ -9,13 +10,17 @@ import {
   DefinitionList,
   Dialog,
   DialogClose,
+  Disclosure,
   Field,
   Input,
+  MotionList,
   PageHeader,
   ScreenLayout,
   Row,
   StatusPill,
   Text,
+  Textarea,
+  TextLink,
   focusStyles,
   linkStyles,
   NoticeLayout,
@@ -28,14 +33,25 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
+import { answerRejection } from "../home/rejection";
+import type { AnswerRejectReason } from "../home/rejection";
+import { HumanCheckAnswer, HumanCheckRequest } from "../question/human-check-answer";
 import { QuestionAnswer } from "../question/question-answer";
+import { AgentMessageForm, useDeliveryText } from "./agent-message-form";
+import type { AgentMessageOutcome, AgentMessageRequest } from "./agent-message-form";
+import { allBlockersOf, blockerReasonOf } from "@ganger/app/runs/model";
+import type { BlockerReason } from "@ganger/app/runs/model";
+import { BlockerRows } from "../blockers";
 import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import { canCancel } from "@ganger/app/run-detail/model";
 import { availableRunControl } from "@ganger/app/run-control-view";
 import type { RunControlOutcome, RunControlView } from "@ganger/app/run-control-view";
+import { CONTINUE_MESSAGE_MAX_LENGTH } from "@ganger/core";
 import type { RunControl } from "@ganger/core";
+import type { HumanCheckDecision } from "@ganger/app/home/actions";
 import type {
+  ContinueOffer,
   LogTailView,
   PendingInput,
   RunDetail,
@@ -45,9 +61,15 @@ import type {
 
 export interface RunDetailActions {
   onAnswer: (questionId: string, body: string) => Promise<void>;
+  onHumanCheck: (questionId: string, decision: HumanCheckDecision, note: string) => Promise<void>;
   onDeny: (promptId: string, reason: string) => Promise<void>;
   onCancel: () => Promise<void>;
+  onRemoveWorktree: () => Promise<void>;
+  onContinue: (message: string) => Promise<void>;
+  onStopPreviousAgent: () => Promise<void>;
   onControl: (control: RunControl) => Promise<RunControlOutcome>;
+  onStartWithoutWaiting: () => Promise<void>;
+  onSendAgentMessage: (input: AgentMessageRequest) => Promise<AgentMessageOutcome>;
   onRefreshLog: () => Promise<void>;
 }
 
@@ -87,17 +109,32 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const statusName = useStatusName();
   const { status, when } = statusLine(run);
   const pr = run.pullRequest;
+  const prInfo = usePrInfo()(run);
   const cancelable = canCancel(run) && !run.cancelPending;
   const control = availableRunControl(run.status.state, run.cancelPending, run.control);
+  const keptWorktree = run.status.state === "ended" ? run.status.keptWorktree : null;
+  const removable = keptWorktree !== null && !keptWorktree.removing;
   const headRef = useRef<HTMLDivElement>(null);
   const cancelStatusRef = useRef<HTMLSpanElement>(null);
+  const continuationRef = useRef<HTMLElement>(null);
+  const continuedById = run.continuedBy?.id ?? null;
+  const focusContinuation = useRef(false);
+  useEffect(() => {
+    if (continuedById === null || !focusContinuation.current) return;
+    focusContinuation.current = false;
+    focusFirst(continuationRef, headRef);
+  }, [continuedById]);
   const pending = [
     run.cancelPending ? t("cancelPending") : null,
+    keptWorktree?.removing === true ? t("removeWorktree.pending") : null,
+    run.continueOffer?.agentStopRequested === true ? t("continue.stopPending") : null,
     run.control?.status === "pending"
       ? t(run.control.control === "pause" ? "control.pausePending" : "control.resumePending")
       : null,
   ].filter((part) => part !== null);
   const failure = useControlFailure(run.cancelPending ? null : run.control);
+  const blockerWait =
+    run.status.state === "queued" ? blockerReasonOf(run.status.queuedReason) : null;
 
   return (
     <ScreenLayout
@@ -125,6 +162,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
           <div {...stylex.props(styles.stateRow)}>
             <p {...stylex.props(styles.stateLine)}>
               <StatusPill status={status}>{statusName(status)}</StatusPill>
+              {prInfo === null ? null : <Text variant="meta">{prInfo}</Text>}
               <Text variant="meta">{when}</Text>
               <span {...stylex.props(failure !== null && styles.statusOwnLine)}>
                 <Text
@@ -138,7 +176,11 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                 </Text>
               </span>
             </p>
-            {pr === null && !cancelable && control === null ? null : (
+            {pr === null &&
+            !cancelable &&
+            control === null &&
+            !removable &&
+            run.continueOffer === null ? null : (
               <Actions>
                 {pr === null ? null : (
                   <a href={pr.url} target="_blank" rel="noreferrer" {...stylex.props(linkStyles())}>
@@ -154,8 +196,34 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                   />
                 )}
                 {cancelable ? (
-                  <CancelRun
-                    onCancel={props.onCancel}
+                  <ConfirmDanger
+                    messages="run.cancel"
+                    onConfirm={props.onCancel}
+                    focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+                  />
+                ) : null}
+                {run.continueOffer === null ? null : run.continueOffer.agent !== "gone" ? (
+                  <Button variant="primary" aria-disabled aria-describedby={CONTINUE_BLOCKED_ID}>
+                    {t("continue.trigger")}
+                  </Button>
+                ) : (
+                  <ContinueRun
+                    offer={run.continueOffer}
+                    onContinue={async (message) => {
+                      focusContinuation.current = true;
+                      try {
+                        await props.onContinue(message);
+                      } catch (error) {
+                        focusContinuation.current = false;
+                        throw error;
+                      }
+                    }}
+                  />
+                )}
+                {removable ? (
+                  <ConfirmDanger
+                    messages="run.removeWorktree"
+                    onConfirm={props.onRemoveWorktree}
                     focusAfter={() => focusFirst(cancelStatusRef, headRef)}
                   />
                 ) : null}
@@ -165,16 +233,35 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
           <Text variant="body">
             <Reason run={run} />
           </Text>
-          <NextAction run={run} />
+          {blockerWait === null ? <NextAction run={run} /> : null}
+          {run.continueOffer === null || run.continueOffer.agent === "gone" ? null : (
+            <ContinueBlocked
+              agent={run.continueOffer.agent}
+              stopping={run.continueOffer.agentStopRequested}
+              onStop={props.onStopPreviousAgent}
+              focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+            />
+          )}
+          <Continuation run={run} runHref={props.runHref} statusRef={continuationRef} />
         </div>
 
         <div {...stylex.props(styles.columns)}>
           <div {...stylex.props(styles.column)}>
+            {blockerWait === null ? null : (
+              <BlockerWaitBlock
+                wait={blockerWait}
+                cancelPending={run.cancelPending}
+                onStart={props.onStartWithoutWaiting}
+                focusAfter={() => focusFirst(cancelStatusRef, headRef)}
+              />
+            )}
+
             {run.status.state === "waiting-for-input" ? (
               <InputBlock
                 input={run.status.input}
                 waitedMs={inputWaitedMs(run)}
                 onAnswer={props.onAnswer}
+                onHumanCheck={props.onHumanCheck}
                 onDeny={props.onDeny}
                 headRef={headRef}
               />
@@ -193,6 +280,13 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
               </Block>
             ) : null}
 
+            <AgentMessageForm
+              key={run.id}
+              view={run.agentMessage}
+              hint={agentMessageHint(run)}
+              onSend={props.onSendAgentMessage}
+            />
+
             {run.startError === null ? null : (
               <Block title={t("startError.title")}>
                 <Text variant="body">{t("startError.body")}</Text>
@@ -210,7 +304,9 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
               </Block>
             ) : null}
 
-            <Timeline events={run.timeline} now={run.now} />
+            {run.brief === null ? null : <SentBrief brief={run.brief} />}
+
+            <Timeline runId={run.id} events={run.timeline} now={run.now} />
           </div>
 
           <div {...stylex.props(styles.column)}>
@@ -227,6 +323,14 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
       </div>
     </ScreenLayout>
   );
+}
+
+function agentMessageHint(run: RunDetail): "paused" | "waiting" | null {
+  if (run.status.state === "paused") return "paused";
+  return run.status.state === "waiting-for-input" &&
+    (run.status.input.kind === "question" || run.status.input.kind === "human-check")
+    ? "waiting"
+    : null;
 }
 
 function Block({
@@ -250,6 +354,20 @@ function Block({
       </div>
       {children}
     </Card>
+  );
+}
+
+function SentBrief({ brief }: { brief: string }) {
+  const t = useTranslations("run.brief");
+  return (
+    <Disclosure summary={t("title")}>
+      <Text variant="meta" as="p">
+        {t("body")}
+      </Text>
+      <CodeBlock scroll label={t("label")}>
+        {brief}
+      </CodeBlock>
+    </Disclosure>
   );
 }
 
@@ -308,10 +426,12 @@ function Reason({ run }: { run: RunDetail }) {
 
 function inputKey(
   input: PendingInput,
-): "question" | "answered" | "permission" | "denied" | "waiting-unknown" {
+): "question" | "human-check" | "answered" | "permission" | "denied" | "waiting-unknown" {
   switch (input.kind) {
     case "question":
       return input.answered ? "answered" : "question";
+    case "human-check":
+      return input.answered ? "answered" : "human-check";
     case "permission":
       return input.denied ? "denied" : "permission";
     case "unknown":
@@ -337,16 +457,33 @@ function NextAction({ run }: { run: RunDetail }) {
       next = t(`next.${status.summary}`);
       break;
   }
-  const manual = status.state === "ended" && status.worktreeNeedsManualRemoval;
-  return manual ? (
-    <p {...stylex.props(styles.flat)}>
-      <Text variant="title" tone="problem">
-        {t("manualRemoval")}
-      </Text>{" "}
-      <Text variant="body">{t("next.manualRemoval")}</Text>
-    </p>
-  ) : (
-    <Text variant="body">{next}</Text>
+  const kept = status.state === "ended" ? status.keptWorktree : null;
+  const prReadError = status.state === "ended" ? status.prReadError : null;
+  return (
+    <>
+      {kept !== null ? (
+        <p {...stylex.props(styles.flat)}>
+          <Text variant="title" tone="problem">
+            {t(`keptWorktree.${kept.reason}`)}
+          </Text>{" "}
+          <Text variant="body" as="span">
+            {t(`keptWorktreeNext.${kept.reason}`)}
+          </Text>
+        </p>
+      ) : (
+        <Text variant="body">{next}</Text>
+      )}
+      {prReadError === null ? null : (
+        <p {...stylex.props(styles.flat)}>
+          <Text variant="title" tone="problem">
+            {t("prUnread.title")}
+          </Text>{" "}
+          <Text variant="body" as="span">
+            {t(`prUnread.${prReadError}`)}
+          </Text>
+        </p>
+      )}
+    </>
   );
 }
 
@@ -354,16 +491,28 @@ function InputBlock({
   input,
   waitedMs,
   onAnswer,
+  onHumanCheck,
   onDeny,
   headRef,
 }: {
   input: PendingInput;
   waitedMs: number | null;
   onAnswer: RunDetailActions["onAnswer"];
+  onHumanCheck: RunDetailActions["onHumanCheck"];
   onDeny: RunDetailActions["onDeny"];
   headRef: RefObject<HTMLElement | null>;
 }) {
   switch (input.kind) {
+    case "human-check":
+      return (
+        <HumanCheckForm
+          key={input.questionId}
+          check={input}
+          waitedMs={waitedMs}
+          onHumanCheck={onHumanCheck}
+          headRef={headRef}
+        />
+      );
     case "question":
       return (
         <QuestionForm
@@ -416,7 +565,7 @@ function InputHead({
   kind,
   waitedMs,
 }: {
-  kind: "question" | "permission";
+  kind: "question" | "permission" | "human-check";
   waitedMs: number | null;
 }) {
   const t = useTranslations("run.input");
@@ -462,6 +611,49 @@ function QuestionForm({
           body={question.body}
           options={question.choices}
           onSend={(answer) => run(() => onAnswer(question.questionId, answer))}
+        />
+      )}
+    </Card>
+  );
+}
+
+function HumanCheckForm({
+  check,
+  waitedMs,
+  onHumanCheck,
+  headRef,
+}: {
+  check: Extract<PendingInput, { kind: "human-check" }>;
+  waitedMs: number | null;
+  onHumanCheck: RunDetailActions["onHumanCheck"];
+  headRef: RefObject<HTMLElement | null>;
+}) {
+  const t = useTranslations("run");
+  const { submit, run, resultRef } = useSubmit(headRef);
+  const [rejected, setRejected] = useState<AnswerRejectReason | null>(null);
+  const sendAnswer = async (decision: HumanCheckDecision, note: string) => {
+    try {
+      await onHumanCheck(check.questionId, decision, note);
+    } catch (error) {
+      const reason = answerRejection(error);
+      if (reason === null) throw error;
+      setRejected(reason);
+    }
+  };
+  return (
+    <Card label={t("humanCheck.title")}>
+      <InputHead kind="human-check" waitedMs={waitedMs} />
+      {submit.kind === "sent" || check.answered ? (
+        <>
+          <HumanCheckRequest body={check.body} />
+          <Text variant="body" as="p" ref={resultRef} role="status" tabIndex={-1}>
+            {rejected === null ? t("humanCheck.sent") : t(`humanCheck.rejected.${rejected}`)}
+          </Text>
+        </>
+      ) : (
+        <HumanCheckAnswer
+          body={check.body}
+          onSend={(decision, note) => run(() => sendAnswer(decision, note))}
         />
       )}
     </Card>
@@ -518,39 +710,297 @@ function PermissionWait({
   );
 }
 
-function CancelRun({
-  onCancel,
+function ConfirmDanger({
+  messages,
+  onConfirm,
   focusAfter,
 }: {
-  onCancel: RunDetailActions["onCancel"];
+  messages: "run.cancel" | "run.removeWorktree";
+  onConfirm: () => Promise<void>;
   focusAfter: () => void;
 }) {
-  const t = useTranslations("run");
+  const t = useTranslations(messages);
   const [failed, setFailed] = useState(false);
+  const [sending, setSending] = useState(false);
   return (
     <>
       <Dialog
-        trigger={t("cancel.trigger")}
+        trigger={t("trigger")}
         triggerVariant="danger"
-        title={t("cancel.title")}
-        description={t("cancel.body")}
+        triggerBusy={{ active: sending, label: t("sending") }}
+        title={t("title")}
+        description={t("body")}
         actions={
           <>
-            <DialogClose>{t("cancel.dismiss")}</DialogClose>
+            <DialogClose>{t("dismiss")}</DialogClose>
             <DialogClose
               variant="danger"
               onClick={() => {
+                if (sending) return;
                 setFailed(false);
-                onCancel().then(focusAfter, () => setFailed(true));
+                setSending(true);
+                onConfirm()
+                  .then(focusAfter, () => setFailed(true))
+                  .finally(() => setSending(false));
               }}
             >
-              {t("cancel.confirm")}
+              {t("confirm")}
             </DialogClose>
           </>
         }
       />
       {failed ? <ActionFailed /> : null}
     </>
+  );
+}
+
+function BlockerWaitBlock({
+  wait,
+  cancelPending,
+  onStart,
+  focusAfter,
+}: {
+  wait: BlockerReason;
+  cancelPending: boolean;
+  onStart: () => Promise<void>;
+  focusAfter: () => void;
+}) {
+  const t = useTranslations("run.blockerWait");
+  const [failed, setFailed] = useState(false);
+  const [sending, setSending] = useState(false);
+  const stuck = wait.kind === "blockers-stuck";
+  const blockers = allBlockersOf(wait);
+  return (
+    <Card label={t("title")}>
+      <div {...stylex.props(styles.blockerWait)}>
+        <Text variant="subheading" as="h2">
+          {t("title")}
+        </Text>
+        <Text variant="body" as="p" {...(stuck ? { tone: "problem" as const } : {})}>
+          {stuck ? t(`stuck.${wait.cause}`) : t("waiting")}
+        </Text>
+        {blockers.length === 0 ? null : <BlockerRows blockers={blockers} />}
+        {cancelPending ? null : (
+          <Actions>
+            <Dialog
+              trigger={t("trigger")}
+              triggerVariant={stuck ? "primary" : "secondary"}
+              triggerBusy={{ active: sending, label: t("sending") }}
+              title={t("confirmTitle")}
+              description={t("confirmBody")}
+              actions={
+                <>
+                  <DialogClose>{t("dismiss")}</DialogClose>
+                  <DialogClose
+                    variant="primary"
+                    onClick={() => {
+                      if (sending) return;
+                      setFailed(false);
+                      setSending(true);
+                      onStart()
+                        .then(focusAfter, () => setFailed(true))
+                        .finally(() => setSending(false));
+                    }}
+                  >
+                    {t("confirm")}
+                  </DialogClose>
+                </>
+              }
+            />
+          </Actions>
+        )}
+        {failed ? <ActionFailed /> : null}
+      </div>
+    </Card>
+  );
+}
+
+function Continuation({
+  run,
+  runHref,
+  statusRef,
+}: {
+  run: RunDetail;
+  runHref: (runId: string) => string;
+  statusRef: RefObject<HTMLElement | null>;
+}) {
+  const t = useTranslations("run.continuation");
+  const { continuedFrom, continuedBy, continuePlace } = run;
+  if (continuedFrom === null && continuedBy === null) return null;
+  const endedBeforeStart = run.status.state === "ended" && run.startedAt === null;
+  const placeKey = endedBeforeStart
+    ? "notStarted"
+    : run.status.state === "queued"
+      ? "pending"
+      : (continuePlace ?? "pending");
+  return (
+    <>
+      {continuedFrom === null ? null : (
+        <Text variant="body" as="p">
+          <TextLink href={runHref(continuedFrom.id)}>
+            {t("from", {
+              number: continuedFrom.number,
+              digit: continuedFrom.number % 10,
+            })}
+          </TextLink>{" "}
+          {t(`place.${placeKey}`)}
+        </Text>
+      )}
+      {continuedBy === null ? null : (
+        <Text variant="body" as="p" ref={statusRef} role="status" tabIndex={-1}>
+          <TextLink href={runHref(continuedBy.id)}>
+            {t("by", { number: continuedBy.number })}
+          </TextLink>
+        </Text>
+      )}
+    </>
+  );
+}
+
+const CONTINUE_BLOCKED_ID = "continue-blocked-reason";
+
+function ContinueBlocked({
+  agent,
+  stopping,
+  onStop,
+  focusAfter,
+}: {
+  agent: "alive" | "unknown" | "checking";
+  stopping: boolean;
+  onStop: () => Promise<void>;
+  focusAfter: () => void;
+}) {
+  const t = useTranslations("run.continue");
+  const [state, setState] = useState<"idle" | "sending" | "failed">("idle");
+  return (
+    <>
+      <Text variant="body" as="p" id={CONTINUE_BLOCKED_ID}>
+        {t(`blocked.${agent}`)}
+      </Text>
+      {agent === "alive" && !stopping ? (
+        <Actions>
+          <Button
+            busy={{ active: state === "sending", label: t("stopPending") }}
+            onClick={() => {
+              setState("sending");
+              onStop().then(
+                () => {
+                  setState("idle");
+                  focusAfter();
+                },
+                () => setState("failed"),
+              );
+            }}
+          >
+            {t("stop")}
+          </Button>
+        </Actions>
+      ) : null}
+      {state === "failed" ? <ActionFailedText text={t("stopFailed")} /> : null}
+    </>
+  );
+}
+
+function ContinueRun({
+  offer,
+  onContinue,
+}: {
+  offer: ContinueOffer;
+  onContinue: (message: string) => Promise<void>;
+}) {
+  const t = useTranslations("run.continue");
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [state, setState] = useState<"idle" | "sending" | "failed">("idle");
+  const [invalid, setInvalid] = useState<string | null>(null);
+  const sending = state === "sending";
+  const submit = (): void => {
+    if (sending) return;
+    const text = message.trim();
+    const length = Array.from(text).length;
+    if (length === 0) {
+      setInvalid(t("messageRequired"));
+      return;
+    }
+    if (length > CONTINUE_MESSAGE_MAX_LENGTH) {
+      setInvalid(t("messageTooLong", { max: CONTINUE_MESSAGE_MAX_LENGTH, count: length }));
+      return;
+    }
+    setInvalid(null);
+    setState("sending");
+    onContinue(text).then(
+      () => {
+        setState("idle");
+        setMessage("");
+        setOpen(false);
+      },
+      () => setState("failed"),
+    );
+  };
+  const sends = [
+    ...(offer.hasReport ? [t("sendsReport", { source: offer.sourceNumber })] : []),
+    ...(offer.hasWorkspaceBrief ? [t("sendsBrief")] : []),
+    t("sendsProtocol"),
+  ];
+  return (
+    <Dialog
+      trigger={t("trigger")}
+      triggerVariant="primary"
+      title={t("title")}
+      open={open}
+      onOpenChange={(next) => {
+        if (sending) return;
+        setOpen(next);
+        if (!next) {
+          setInvalid(null);
+          setState("idle");
+        }
+      }}
+      scrollBody
+      status={state === "failed" ? <ActionFailedText text={t("failed")} /> : undefined}
+      actions={
+        <>
+          <DialogClose>{t("dismiss")}</DialogClose>
+          <Button
+            variant="primary"
+            busy={{ active: sending, label: t("sending") }}
+            onClick={submit}
+          >
+            {t("confirm")}
+          </Button>
+        </>
+      }
+    >
+      <DefinitionList>
+        <DefinitionItem label={t("where")}>
+          {t(`place.${offer.place}`, { runner: offer.runnerName ?? t("noRunner") })}
+        </DefinitionItem>
+        <DefinitionItem label={t("newRun")}>
+          {t("newRunValue", {
+            next: offer.nextNumber,
+            source: offer.sourceNumber,
+            digit: offer.sourceNumber % 10,
+          })}
+        </DefinitionItem>
+        <DefinitionItem label={t("sendsLabel")}>{sends.join(" · ")}</DefinitionItem>
+      </DefinitionList>
+      {offer.place === "recreated" ? (
+        <Text variant="meta" as="p">
+          {t("branchGoneNote")}
+        </Text>
+      ) : null}
+      <Field label={t("messageLabel")} {...(invalid === null ? {} : { error: invalid })}>
+        <Textarea name="continue-message" rows={4} value={message} onValueChange={setMessage} />
+      </Field>
+    </Dialog>
+  );
+}
+
+function ActionFailedText({ text }: { text: string }) {
+  return (
+    <Text variant="ui" as="p" tone="problem" role="alert">
+      {text}
+    </Text>
   );
 }
 
@@ -603,14 +1053,39 @@ function useControlFailure(control: RunControlView | null): string | null {
   });
 }
 
-function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: string }) {
+export function timelineRows(
+  events: ReadonlyArray<TimelineEvent>,
+): ReadonlyArray<{ key: string; event: TimelineEvent }> {
+  const seen = new Map<string, number>();
+  return events.map((event) => {
+    const identity = `${event.kind}:${event.at}`;
+    const occurrence = seen.get(identity) ?? 0;
+    seen.set(identity, occurrence + 1);
+    return { key: `${identity}:${occurrence}`, event };
+  });
+}
+
+function Timeline({
+  runId,
+  events,
+  now,
+}: {
+  runId: string;
+  events: ReadonlyArray<TimelineEvent>;
+  now: string;
+}) {
   const t = useTranslations("run.timeline");
   const domain = useTranslations("domain");
   const laterPr = useTranslations("run.laterPr");
   const { stamp } = useTime();
+  const deliveryText = useDeliveryText();
   const toolName = (tool: string): string => (isMcpRunTool(tool) ? t(`mcpTool.${tool}`) : tool);
   const eventTitle = (event: TimelineEvent): string =>
-    event.kind === "mcp" ? t("mcp", { client: event.client }) : t(event.kind);
+    event.kind === "mcp"
+      ? t("mcp", { client: event.client })
+      : event.kind === "continued-from" || event.kind === "continued-by"
+        ? t(event.kind, { number: event.runNumber, digit: event.runNumber % 10 })
+        : t(event.kind);
   const eventDetail = (event: TimelineEvent): string | null => {
     switch (event.kind) {
       case "mcp":
@@ -621,7 +1096,12 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
               reason: t(`mcpReason.${event.reason}`),
             })
           : t("mcpRejectedUnknown", { tool: toolName(event.tool) });
+      case "operator-message":
+        return event.delivery.status === "sent"
+          ? event.body
+          : `${event.body}\n${deliveryText(event.delivery)}`;
       case "question":
+      case "human-check":
       case "answer":
       case "permission":
         return event.body;
@@ -641,16 +1121,25 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
       case "disconnected":
       case "reconnected":
       case "cancel-requested":
+      case "continued-from":
+      case "continued-by":
         return null;
     }
   };
   return (
     <Block title={t("title")} compact>
-      <ol {...stylex.props(styles.timeline)}>
-        {events.map((event, index) => {
-          const detail = eventDetail(event);
-          return (
-            <li key={`${event.kind}-${index}`}>
+      <ol {...stylex.props(styles.timeline, styles.motionTimeline)}>
+        <MotionList
+          as="li"
+          enter="rise"
+          items={timelineRows(events)}
+          getKey={(row) => row.key}
+          itemGap="row"
+          resetKey={runId}
+        >
+          {({ event }) => {
+            const detail = eventDetail(event);
+            return (
               <Row
                 trailing={
                   <time dateTime={event.at} {...stylex.props(textStyles("meta"))}>
@@ -669,9 +1158,9 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
                   )}
                 </span>
               </Row>
-            </li>
-          );
-        })}
+            );
+          }}
+        </MotionList>
       </ol>
     </Block>
   );
@@ -769,6 +1258,22 @@ function LogLines({ lines }: { lines: ReadonlyArray<string> }) {
   );
 }
 
+function checksText(
+  signals: PrSignalsView,
+  total: number,
+  t: ReturnType<typeof useTranslations<"run.props">>,
+): string {
+  const names = signals.failedChecks.join(", ");
+  if (signals.failedCount > 0) {
+    return t(signals.checksTruncated ? "failedChecksPartial" : "failedChecks", {
+      total,
+      failed: signals.failedCount,
+      names,
+    });
+  }
+  return signals.ciFailed ? t("someChecksFailed", { total }) : t("checks", { total });
+}
+
 function Properties({ run }: { run: RunDetail }) {
   const agentName = useAgentName();
   const t = useTranslations("run.props");
@@ -812,14 +1317,57 @@ function Properties({ run }: { run: RunDetail }) {
             </a>
           )}
         </DefinitionItem>
-        {pr === null ? null : <DefinitionItem label={t("ci")}>{ci(pr.ci)}</DefinitionItem>}
+        {pr === null ? null : (
+          <DefinitionItem label={t("ci")}>
+            <span {...stylex.props(styles.inline)}>
+              {ci(pr.ci)}
+              {pr.signals === null || pr.signals.checkTotal === null ? null : (
+                <Text variant="meta" tone={pr.signals.ciFailed ? "problem" : "muted"}>
+                  {checksText(pr.signals, pr.signals.checkTotal, t)}
+                </Text>
+              )}
+            </span>
+          </DefinitionItem>
+        )}
+        {pr?.signals == null || pr.signals.conflict === null ? null : (
+          <DefinitionItem label={t("conflict")}>
+            {pr.signals.conflict ? (
+              <Text variant="ui" tone="problem">
+                {t("hasConflict")}
+              </Text>
+            ) : (
+              t("noConflict")
+            )}
+          </DefinitionItem>
+        )}
+        {pr?.signals == null || pr.signals.behindBy === null ? null : (
+          <DefinitionItem label={t("behind")}>
+            {pr.signals.behindBy > 0
+              ? t("behindBy", { count: pr.signals.behindBy })
+              : t("upToDate")}
+          </DefinitionItem>
+        )}
+        {pr?.signals == null ? null : (
+          <DefinitionItem label={t("prReadAt")}>
+            {stamp(pr.signals.checkedAt, run.now)}
+          </DefinitionItem>
+        )}
         {ended === null ? null : (
           <>
             <DefinitionItem label={t("agentResult")}>
               {domain(`agentResult.${ended.agentResult}`)}
             </DefinitionItem>
             <DefinitionItem label={t("prState")}>
-              {domain(`prState.${ended.prState}`)}
+              {ended.prReadError === null ? (
+                domain(`prState.${ended.prState}`)
+              ) : (
+                <span {...stylex.props(styles.inline)}>
+                  {domain(`prState.${ended.prState}`)}
+                  <Text variant="meta" tone="problem">
+                    {t(`prUnreadReason.${ended.prReadError}`)}
+                  </Text>
+                </span>
+              )}
             </DefinitionItem>
             {ended.laterPrState === null ? null : (
               <DefinitionItem label={t("laterPrState")}>
@@ -882,6 +1430,23 @@ function OtherRuns({ run, runHref }: { run: RunDetail; runHref: (runId: string) 
   );
 }
 
+function usePrInfo(): (run: RunDetail) => string | null {
+  const t = useTranslations("run");
+  const domain = useTranslations("domain");
+  return (run) => {
+    if (run.status.state !== "ended") return null;
+    const state = run.status.laterPrState?.state ?? run.status.prState;
+    if (state === "none") return null;
+    if (run.prHandedOver && run.pullRequest !== null) {
+      return t("prHandedOver", { pr: run.pullRequest.displayId });
+    }
+    const stateName = domain(`prState.${state}`);
+    return run.pullRequest === null
+      ? t("prStateInfo", { state: stateName })
+      : t("prInfo", { pr: run.pullRequest.displayId, state: stateName });
+  };
+}
+
 function useStatusLine(): (run: RunDetail) => { status: PillStatus; when: string } {
   const t = useTranslations("run.when");
   const { duration, elapsed } = useTime();
@@ -922,6 +1487,7 @@ function useStatusLine(): (run: RunDetail) => { status: PillStatus; when: string
 }
 
 const styles = stylex.create({
+  blockerWait: { display: "flex", flexDirection: "column", gap: space.s3 },
   noticeBody: { display: "flex", flexDirection: "column", gap: space.s4 },
   main: {
     display: "flex",
@@ -986,5 +1552,6 @@ const styles = stylex.create({
     padding: 0,
     listStyle: "none",
   },
+  motionTimeline: { gap: 0, marginBottom: `calc(${space.px2} * -1)` },
   eventBody: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
 });

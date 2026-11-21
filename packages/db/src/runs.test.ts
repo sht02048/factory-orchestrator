@@ -47,6 +47,10 @@ import {
 import {
   assignRun,
   changeRunState,
+  countUnreadPrRuns,
+  fillUnreadPrState,
+  recordPrReadError,
+  requestWorktreeRemoval,
   TICKET_TITLE_MAX_LENGTH,
   fillRunTicketTitle,
   getRun,
@@ -367,7 +371,12 @@ describe("Run 테이블과 두 축", () => {
     addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
     const id = assignOk(db, "ENG-1");
     change(db, id, { to: "running", started });
-    change(db, id, { to: "ended", agentResult, prState });
+    change(db, id, {
+      to: "ended",
+      agentResult,
+      prState,
+      ...(prState === "unknown" ? { prReadError: "no-access" as const } : {}),
+    });
 
     const stored = getRunWithRecords(db, id)?.run;
     expect(stored).toMatchObject({
@@ -381,6 +390,69 @@ describe("Run 테이블과 두 축", () => {
     expect(summarizeRunOutcome(stored)).toEqual(
       summarizeRunOutcome({ agentResult, prState, runnerUnreached: false }),
     );
+  });
+
+  it("PR 못 읽음은 이유와 함께만 저장하고, 이유는 못 읽음에만 붙는다 (0144)", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 2, online: true, projects: [repoA] });
+    const unread = assignOk(db, "ENG-1");
+    const read = assignOk(db, "ENG-2");
+    change(db, unread, { to: "running", started });
+    change(db, read, { to: "running", started });
+
+    expect(() =>
+      changeRunState(db, unread, {
+        to: "ended",
+        agentResult: "reported-success",
+        prState: "unknown",
+      }),
+    ).toThrow(/Failed query/);
+    expect(() =>
+      changeRunState(db, read, {
+        to: "ended",
+        agentResult: "reported-success",
+        prState: "open",
+        prReadError: "other",
+      }),
+    ).toThrow(/Failed query/);
+    expect(getRun(db, unread)?.state).toBe("running");
+    expect(getRun(db, read)?.state).toBe("running");
+
+    change(db, unread, {
+      to: "ended",
+      agentResult: "reported-success",
+      prState: "unknown",
+      prReadError: "no-access",
+    });
+    expect(getRunWithRecords(db, unread)?.records.prReadError).toBe("no-access");
+    expect(countUnreadPrRuns(db)).toEqual({ "no-access": 1, other: 0 });
+  });
+
+  it("못 읽은 PR 상태는 이유를 바꾸고, 읽으면 채우며 이유를 지운다. 읽은 런은 다시 바꾸지 않는다 (0144)", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    change(db, id, { to: "running", started });
+    change(db, id, {
+      to: "ended",
+      agentResult: "reported-success",
+      prState: "unknown",
+      prReadError: "no-access",
+    });
+
+    expect(recordPrReadError(db, id, "no-access")).toBe(false);
+    expect(recordPrReadError(db, id, "other")).toBe(true);
+    expect(countUnreadPrRuns(db)).toEqual({ "no-access": 0, other: 1 });
+
+    expect(fillUnreadPrState(db, id, "merged")).toBe(true);
+    const found = getRunWithRecords(db, id);
+    expect(found?.run).toMatchObject({ state: "ended", prState: "merged" });
+    expect(found?.records.prReadError).toBeNull();
+    expect(countUnreadPrRuns(db)).toEqual({ "no-access": 0, other: 0 });
+
+    expect(fillUnreadPrState(db, id, "closed")).toBe(false);
+    expect(recordPrReadError(db, id, "other")).toBe(false);
+    expect(getRunWithRecords(db, id)?.run).toMatchObject({ prState: "merged" });
   });
 
   it("Queued에서 취소해 러너·워크트리·시작 시각 없이 PR 상태 없음으로 끝난 런을 저장한다 (Q77·Q82.10)", () => {
@@ -537,6 +609,24 @@ describe("changeRunState", () => {
       { from: "running", to: "ended", at: at(5) },
     ]);
     expect(getRunWithRecords(db, id)?.run).toMatchObject({ startedAt: at(1), endedAt: at(5) });
+  });
+
+  it("직접 고른 러너는 비우거나 바꿀 수 없고 자동으로 정한 러너는 바꿀 수 있다", () => {
+    const db = seededDatabase();
+    const first = addRunner(db, { id: "r1", capacity: 1, online: true, projects: [repoA] });
+    const second = addRunner(db, { id: "r2", capacity: 1, online: true, projects: [repoA] });
+
+    const chosen = assign(db, "ENG-1", { runnerId: first });
+    if (!chosen.ok) throw new Error(chosen.reason);
+    expect(chosen.run).toMatchObject({ runnerId: first, runnerChosen: true });
+    expect(setQueuedRunRunner(db, chosen.run.id, null)).toBe(false);
+    expect(setQueuedRunRunner(db, chosen.run.id, second)).toBe(false);
+    expect(getRunWithRecords(db, chosen.run.id)?.run.runnerId).toBe(first);
+
+    const automatic = assign(db, "ENG-2");
+    if (!automatic.ok) throw new Error(automatic.reason);
+    expect(automatic.run).toMatchObject({ runnerChosen: false });
+    expect(setQueuedRunRunner(db, automatic.run.id, second)).toBe(true);
   });
 
   it("Queued 런의 러너를 비우고 다시 정해도 할당 시각(대기열 자리)은 그대로다", () => {
@@ -750,12 +840,122 @@ describe("updateRunRecords", () => {
     expect(records?.lastLog?.[0]).toBe("line 50");
   });
 
+  it("PR 의 검사·충돌·뒤처짐과 읽은 때를 저장하고, 못 읽으면 같은 커밋의 지난 값만 둔다 (0150)", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    moveTo(db, id, "ended");
+    const at = new Date("2026-11-21T01:00:00Z");
+    const pullRequest = {
+      id: toPullRequestId("PR_1"),
+      displayId: "#7",
+      url: "https://example.com/pr/7",
+      ci: "failure",
+      checkedAt: at,
+      headCommit: "abc",
+    };
+    const signals = {
+      open: true,
+      headCommit: "abc",
+      ciFailed: true,
+      checkTotal: 5,
+      failedCount: 1,
+      failedChecks: ["lint"],
+      checksTruncated: false,
+      conflict: true,
+      behindBy: 3,
+    };
+
+    updateRunRecords(db, id, { pullRequest: { ...pullRequest, signals } });
+    expect(getRunWithRecords(db, id)?.records.pullRequest?.signals).toEqual(signals);
+
+    const later = new Date("2026-11-21T02:00:00Z");
+    updateRunRecords(db, id, { pullRequest: { ...pullRequest, checkedAt: later, signals: null } });
+    expect(getRunWithRecords(db, id)?.records.pullRequest).toMatchObject({
+      checkedAt: later,
+      signals,
+      signalsReadAt: at,
+    });
+
+    updateRunRecords(db, id, {
+      pullRequest: { ...pullRequest, headCommit: "def", signals: null },
+    });
+    expect(getRunWithRecords(db, id)?.records.pullRequest?.signals).toBeNull();
+
+    updateRunRecords(db, id, { pullRequest: { ...pullRequest, signals } });
+    updateRunRecords(db, id, {
+      pullRequest: { ...pullRequest, id: toPullRequestId("PR_2"), signals: null },
+    });
+    expect(getRunWithRecords(db, id)?.records.pullRequest).toMatchObject({
+      signals: null,
+      signalsReadAt: null,
+    });
+  });
+
   it("이후 PR 상태는 Ended 런에만 적는다", () => {
     const db = seededDatabase();
     const id = assignOk(db, "ENG-1");
     let caught: unknown;
     try {
       updateRunRecords(db, id, { laterPrState: { state: "merged", at: new Date() } });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught instanceof Error ? String(caught.cause) : "").toMatch(/CHECK/);
+  });
+});
+
+describe("남긴 워크트리와 운영자 지우기 요청 (0145 R7)", () => {
+  it("남긴 이유를 적고, 운영자가 지우기를 요청하면 지울 때 요청이 풀린다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    moveTo(db, id, "ended");
+    const at = new Date("2026-11-21T01:00:00Z");
+
+    updateRunRecords(db, id, { worktreeKept: "unpushed-commits" });
+    expect(getRunWithRecords(db, id)?.records).toMatchObject({
+      worktreeKept: "unpushed-commits",
+      worktreeRemoveRequestedAt: null,
+    });
+
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: true });
+    expect(requestWorktreeRemoval(db, id, new Date(at.getTime() + 1_000))).toEqual({ ok: true });
+    expect(getRunWithRecords(db, id)?.records.worktreeRemoveRequestedAt).toEqual(at);
+
+    updateRunRecords(db, id, { worktreeRemovedAt: at });
+    expect(getRunWithRecords(db, id)?.records).toMatchObject({
+      worktreeRemovedAt: at,
+      worktreeRemoveRequestedAt: null,
+    });
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: false, reason: "nothing-to-remove" });
+  });
+
+  it("남기지 않은 워크트리(PR 이 열려 PR 을 기다리는 런)는 지우기를 요청할 수 없다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    change(db, id, { to: "running", started });
+    change(db, id, { to: "ended", agentResult: "reported-failure", prState: "open" });
+    const at = new Date("2026-11-21T01:00:00Z");
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: false, reason: "not-kept" });
+    updateRunRecords(db, id, { worktreeKept: "check-failed" });
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: true });
+  });
+
+  it("끝나지 않은 런과 없는 런은 지우기를 요청할 수 없고, 남긴 이유도 끝난 런에만 적는다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    const at = new Date("2026-11-21T01:00:00Z");
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: false, reason: "not-ended" });
+    expect(requestWorktreeRemoval(db, toRunId("run_missing"), at)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+    let caught: unknown;
+    try {
+      updateRunRecords(db, id, { worktreeKept: "check-failed" });
     } catch (error) {
       caught = error;
     }
@@ -895,8 +1095,10 @@ describe("recordStartRequested", () => {
     const db = seededDatabase();
     const id = assignOk(db, "ENG-1");
     const first = new Date("2026-11-17T01:00:00Z");
-    expect(recordStartRequested(db, id, first)).toBe(true);
-    expect(recordStartRequested(db, id, new Date("2026-11-17T02:00:00Z"))).toBe(false);
+    expect(recordStartRequested(db, id, first, "first brief")).toBe(true);
+    expect(recordStartRequested(db, id, new Date("2026-11-17T02:00:00Z"), "second brief")).toBe(
+      false,
+    );
     expect(getRunWithRecords(db, id)?.records.startRequestedAt).toEqual(first);
   });
 });
@@ -975,7 +1177,9 @@ describe("질문과 답 요청 (Q82.3·Q82.5)", () => {
       ok: false,
       reason: "already-answered",
     });
-    expect(listUnsentAnswers(db)).toEqual([{ runId: id, questionId: q, answer: "A", answeredAt }]);
+    expect(listUnsentAnswers(db)).toEqual([
+      { runId: id, questionId: q, kind: "question", answer: "A", answeredAt },
+    ]);
     expect(sentQuestionIds(db, id).size).toBe(0);
 
     expect(markAnswerSent(db, { runId: id, questionId: q })).toBe(true);

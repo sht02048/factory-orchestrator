@@ -52,7 +52,7 @@ describe.skipIf(!enabled)("orca runner on a real runner", () => {
         project: toRunnerProjectId(project),
         worktreeName,
         agent: toAgentId("claude"),
-        prompt: PROMPT,
+        brief: PROMPT,
       });
       expect(started.branch.endsWith(worktreeName)).toBe(true);
       expect(await runner.findStartedRun({ mailbox, worktreeName })).toEqual(started);

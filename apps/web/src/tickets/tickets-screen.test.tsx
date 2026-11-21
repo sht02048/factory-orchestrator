@@ -25,6 +25,7 @@ function render(page: TicketsPage, options: { filter?: TicketFilter; selectedId?
       onOpenRun={noop}
       onAssign={() => Promise.resolve({ ok: false, reason: "active-run" })}
       onAssigned={noop}
+      onReadBlockers={() => Promise.resolve({ ok: true, blockers: [] })}
       onReread={() => Promise.resolve()}
     />,
     ticketsMessages,
@@ -63,8 +64,8 @@ describe("Tickets 화면", () => {
   it("행은 키 · 제목 · 마지막 런이고, 트래커 상태는 행에 두지 않는다", async () => {
     const { context } = setupTickets();
     const rows = rowTexts(render(await loadTicketsPage(context, undefined, now)));
-    expect(rows.get("ACME-1")).toContain("Merged");
-    expect(rows.get("ACME-2")).toContain("Human Check");
+    expect(rows.get("ACME-1")).toContain("Succeeded");
+    expect(rows.get("ACME-2")).toContain("Failed");
     expect(rows.get("ACME-3")).toContain("Running");
     expect(rows.get("ACME-4")).toContain("Queued");
     expect(rows.get("ACME-5")).toContain("Waiting for Input");
@@ -77,7 +78,7 @@ describe("Tickets 화면", () => {
     const html = render(await loadTicketsPage(context, undefined, now));
     const heading = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1] ?? "";
     expect(text(heading).trim()).toBe("Tickets");
-    expect(text(html)).toContain("할당할 수 있는 티켓이 2개 있어요.");
+    expect(text(html)).toContain("할당할 수 있는 티켓이 3개 있어요.");
   });
 
   it("트래커 프로젝트가 있으면 머리 오른쪽에 Linear에서 다시 읽기를 두고, 없으면 두지 않는다(0122)", async () => {
@@ -102,12 +103,12 @@ describe("Tickets 화면", () => {
     const tabs = [...html.matchAll(/role="tab"[^>]*>([\s\S]*?)<\/button>/g)].map((m) =>
       text(m[1] ?? "").trim(),
     );
-    expect(tabs).toEqual(["모두 7", "할당할 수 있음 2", "처리할 일 2", "진행 중 2", "끝남 1"]);
+    expect(tabs).toEqual(["모두 7", "할당할 수 있음 3", "처리할 일 2", "진행 중 2", "끝남 1"]);
   });
 
   it.each<[TicketFilter, string[]]>([
     ["all", ["ACME-6", "ACME-5", "ACME-4", "ACME-3", "ACME-2", "ACME-1", "DOC-1"]],
-    ["assignable", ["ACME-6", "DOC-1"]],
+    ["assignable", ["ACME-6", "ACME-2", "DOC-1"]],
     ["todo", ["ACME-5", "ACME-2"]],
     ["in-progress", ["ACME-4", "ACME-3"]],
     ["done", ["ACME-1"]],
@@ -208,6 +209,116 @@ describe("Tickets 화면", () => {
     expect(panel).toContain("새 런 시작");
     expect(panel).toContain("런 보기");
     expect(panel).toContain("런 수 2개");
+  });
+
+  it("마지막 런 상자는 결과 곁에 PR 정보를 보이고, PR 이 없으면 보이지 않는다 (0145)", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined, now);
+    const panelOf = (key: string, changed: TicketsPage = page): string =>
+      panelText(
+        render(changed, { selectedId: changed.tickets.find((t) => t.key === key)?.id ?? "" }),
+      );
+    expect(panelOf("ACME-1")).toContain("Succeeded");
+    expect(panelOf("ACME-1")).toContain("PR 병합됨");
+    expect(panelOf("ACME-1")).toContain(
+      "에이전트가 성공을 보고했어요. 사람이 더 확인할 것이 없어요.",
+    );
+    expect(panelOf("ACME-2")).toContain("PR 열림");
+    const withNumber: TicketsPage = {
+      ...page,
+      tickets: page.tickets.map((t) =>
+        t.key === "ACME-2"
+          ? {
+              ...t,
+              runs: t.runs.map((run) =>
+                run.state === "ended"
+                  ? { ...run, pullRequest: "#12", laterPrState: "merged" as const }
+                  : run,
+              ),
+            }
+          : t,
+      ),
+    };
+    expect(panelOf("ACME-2", withNumber)).toContain("PR #12 병합됨");
+    expect(panelOf("ACME-6")).not.toContain("PR ");
+  });
+
+  it("목록은 우선순위와 기다림, 멈춘 기다림을 구분하고 패널은 끝난 선행 티켓까지 보인다(0160)", async () => {
+    const { context } = setupTickets();
+    const loaded = await loadTicketsPage(context, undefined, now);
+    const blocker = (key: string, stateName: string, stateCategory: string) => ({
+      key,
+      title: `${key} 제목`,
+      stateName,
+      stateCategory,
+    });
+    const page: TicketsPage = {
+      ...loaded,
+      tickets: loaded.tickets.map((ticket) => {
+        if (ticket.key === "ACME-3")
+          return {
+            ...ticket,
+            priority: "high" as const,
+            blockerWait: {
+              kind: "blockers-waiting" as const,
+              blockers: [blocker("ACME-11", "In Progress", "started")],
+              finished: [blocker("ACME-9", "Done", "completed")],
+            },
+            waitingTickets: [{ key: "ACME-20", title: "뒤 티켓" }],
+          };
+        if (ticket.key === "ACME-6") {
+          const canceled = blocker("ACME-10", "Canceled", "canceled");
+          return {
+            ...ticket,
+            blockerWait: {
+              kind: "blockers-stuck" as const,
+              cause: "canceled" as const,
+              blocker: canceled,
+              blockers: [canceled],
+            },
+          };
+        }
+        return ticket;
+      }),
+    };
+    const selected = page.tickets.find((ticket) => ticket.key === "ACME-3");
+    const html = render(page, { selectedId: selected?.id ?? "" });
+    const listHtml = html.split("<aside")[0] ?? "";
+
+    expect(listHtml).toContain('data-blocker-state="active"');
+    expect(listHtml).toContain('data-blocker-state="canceled"');
+    expect(text(listHtml)).toContain("High");
+    const panel = panelText(html);
+    expect(panel).toContain("ACME-3 · Web · High · Todo");
+    expect(panel).toContain("ACME-11");
+    expect(panel).toContain("ACME-9");
+    expect(panel).toContain("ACME-20 뒤 티켓");
+  });
+
+  it("첫 관계 읽기에 실패한 런은 선행 티켓이 없다고 말하지 않는다(0160)", async () => {
+    const { context } = setupTickets();
+    const loaded = await loadTicketsPage(context, undefined, now);
+    const page: TicketsPage = {
+      ...loaded,
+      tickets: loaded.tickets.map((ticket) =>
+        ticket.key === "ACME-3"
+          ? {
+              ...ticket,
+              blockerWait: {
+                kind: "blockers-stuck" as const,
+                cause: "unreadable" as const,
+                blocker: null,
+                blockers: [],
+              },
+            }
+          : ticket,
+      ),
+    };
+    const selected = page.tickets.find((ticket) => ticket.key === "ACME-3");
+    const panel = panelText(render(page, { selectedId: selected?.id ?? "" }));
+
+    expect(panel).toContain("먼저 끝나야 하는 티켓을 읽지 못했어요.");
+    expect(panel).not.toContain("먼저 끝나야 하는 티켓이 없어요.");
   });
 
   it("패널은 키 · 트래커 프로젝트 · 트래커 상태 메타 줄과 제목, 마지막 런 상자를 보인다", async () => {

@@ -26,7 +26,14 @@
     "key": "키",
     "title": "제목",
     "trackerProject": "트래커 프로젝트",
+    "priority": "우선순위",
     "lastRun": "마지막 런"
+  },
+  "priority": {
+    "urgent": "Urgent",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
   },
   "listLabel": "티켓 목록",
   "empty": "이 조건에 맞는 티켓이 없어요.",
@@ -53,6 +60,8 @@
     "lastRun": "마지막 런",
     "runner": "{runner} · {time}",
     "noRunner": "러너 정하기 전 · {time}",
+    "pullRequest": "PR {pr} {state}",
+    "prState": "PR {state}",
     "next": {
       "unassigned": "아직 런이 없어요. 할당하면 Mapping이 정한 저장소와 에이전트로 처리해요.",
       "no-mapping": "이 트래커 프로젝트에 Mapping이 없어 할당할 수 없어요. Settings에서 Mapping을 만들면 할당할 수 있어요.",
@@ -61,9 +70,7 @@
       "waiting-for-input": "에이전트가 운영자를 기다려요. 런 보기에서 답하거나 확인해 주세요.",
       "paused": "멈춰 둔 런이에요. 런 보기에서 재개할 수 있어요.",
       "disconnected": "러너에 닿지 않아요. 런 보기에서 러너 상태를 확인해 주세요.",
-      "merged": "에이전트가 완료 보고를 보냈고 PR이 병합됐어요.",
-      "human-check": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
-      "human-check-settled": "에이전트가 완료 보고를 보냈고 이후 PR 상태가 기록됐어요. 사람이 더 확인할 것이 없어요.",
+      "succeeded": "에이전트가 성공을 보고했어요. 사람이 더 확인할 것이 없어요.",
       "failed": "마지막 런이 Failed예요. 자동으로 다시 시도하지 않아요. 새 런을 시작할 수 있어요.",
       "canceled": "운영자가 취소한 런이에요. 새 런을 시작할 수 있어요."
     },
@@ -79,7 +86,22 @@
     "runCount": "런 수",
     "runCountValue": "{count, number}개",
     "openInTracker": "트래커에서 열기",
-    "newTab": "새 탭에서 열려요"
+    "newTab": "새 탭에서 열려요",
+    "blockers": "먼저 끝나야 하는 티켓",
+    "blockersNone": "먼저 끝나야 하는 티켓이 없어요.",
+    "blockersRead": "선행 티켓 읽기",
+    "blockersReading": "읽는 중…",
+    "blockersFailed": {
+      "unauthorized": "선행 티켓을 읽지 못했어요. 트래커가 API 키를 받지 않았어요. Settings에서 연결을 확인해 주세요.",
+      "rate-limited": "선행 티켓을 읽지 못했어요. 트래커 요청 한도를 넘었어요. 잠시 뒤 다시 읽어 주세요.",
+      "not-found": "선행 티켓을 읽지 못했어요. 트래커에서 이 티켓을 찾지 못했어요.",
+      "network": "선행 티켓을 읽지 못했어요. 트래커에 닿지 않았어요. 잠시 뒤 다시 읽어 주세요.",
+      "unknown-connection": "선행 티켓을 읽지 못했어요. 묶인 트래커 연결이 없어졌어요. Settings에서 확인해 주세요.",
+      "failed": "먼저 끝나야 하는 티켓을 읽지 못했어요."
+    },
+    "waiting": "이 티켓을 기다리는 티켓",
+    "waitingNone": "이 티켓을 기다리는 런이 없어요.",
+    "relationsNote": "관계는 Linear의 blocked by에서 읽어요. 바꾸려면 Linear에서 고쳐요."
   },
   "assign": {
     "title": "{key} 티켓을 할당할까요?",

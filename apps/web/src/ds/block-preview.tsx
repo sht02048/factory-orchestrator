@@ -37,6 +37,8 @@ import {
   DoneMark,
   FailureBar,
   GangerMark,
+  BlockerChip,
+  BlockerChips,
   KanbanCard,
   KanbanCards,
   Menu,
@@ -104,9 +106,8 @@ export const blockSectionIds = [
 ] as const;
 
 const sampleSegments = [
-  { tone: "merged", value: 6 },
-  { tone: "check", value: 2 },
-  { tone: "failed", value: 1 },
+  { tone: "succeeded", value: 6 },
+  { tone: "failed", value: 2 },
   { tone: "canceled", value: 1 },
 ] as const;
 
@@ -555,6 +556,36 @@ export function BlockSections() {
                     meta={t("kanban.meta")}
                     time={t("kanban.time")}
                     action={<Button>{t("kanban.action")}</Button>}
+                    onOpen={() => setSheetOpen(true)}
+                  />
+                </li>
+                <li>
+                  <KanbanCard
+                    ticketKey={t("kanban.blockedKey")}
+                    title={t("kanban.blockedTitle")}
+                    stuck
+                    blockers={
+                      <BlockerChips>
+                        <BlockerChip
+                          state="active"
+                          ticketKey={t("kanban.blockerActive")}
+                          stateName={t("kanban.blockerActiveState")}
+                        />
+                        <BlockerChip
+                          state="done"
+                          ticketKey={t("kanban.blockerDone")}
+                          stateName={t("kanban.blockerDoneState")}
+                        />
+                        <BlockerChip
+                          state="canceled"
+                          ticketKey={t("kanban.blockerCanceled")}
+                          stateName={t("kanban.blockerCanceledState")}
+                        />
+                      </BlockerChips>
+                    }
+                    meta={t("kanban.blockedMeta")}
+                    metaTone="problem"
+                    time={t("kanban.time")}
                     onOpen={() => setSheetOpen(true)}
                   />
                 </li>

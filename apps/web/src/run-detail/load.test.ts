@@ -24,7 +24,7 @@ import {
   submitAnswer,
   submitDenial,
 } from "@ganger/app/home/actions";
-import { cancelRunRequest } from "@ganger/app/run-detail/actions";
+import { cancelRunRequest, removeWorktreeRequest } from "@ganger/app/run-detail/actions";
 import { loadRunDetail, requestRunLogTail, toCiView } from "@ganger/app/run-detail/load";
 import { addExtraEnded, assign, extraEndedCases, startedOn, walk } from "./testing";
 import type { RunDetail } from "@ganger/app/run-detail/model";
@@ -64,15 +64,48 @@ describe("loadRunDetail", () => {
     expect(new Set(cases.map((c) => c.prState)).size).toBe(4);
   });
 
-  it("러너에 닿지 못한 채 끝난 취소 런도 사람이 지워야 한다(Q82.21)", () => {
+  it("러너에 닿지 못한 채 끝난 취소 런은 워크트리를 남긴 이유를 담는다(Q82.21)", () => {
     const { db } = seedDatabase();
     const extra = addExtraEnded(db);
     expect(detail(db, extra.get("ACME-22")).status).toMatchObject({
       summary: "canceled",
-      worktreeNeedsManualRemoval: true,
+      keptWorktree: { reason: "runner-unreached", removing: false },
     });
-    expect(detail(db, extra.get("ACME-21")).status).toMatchObject({
-      worktreeNeedsManualRemoval: false,
+    expect(detail(db, extra.get("ACME-21")).status).toMatchObject({ keptWorktree: null });
+    expect(detail(db, extra.get("ACME-23")).status).toMatchObject({ keptWorktree: null });
+  });
+
+  it("Succeeded 인데 PR 이 없으면 워크트리를 남긴 이유가 PR 없음이다 (0145 R7-2)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-32", 60);
+    walk(db, id, 60, [
+      startedOn("ACME-32"),
+      { to: "ended", agentResult: "reported-success", prState: "none" },
+    ]);
+    expect(detail(db, id).status).toMatchObject({
+      summary: "succeeded",
+      keptWorktree: { reason: "no-pr", removing: false },
+    });
+  });
+
+  it("worker 가 남긴 워크트리는 그 이유를 담고, 지우기를 요청하면 지우는 중이며, 지우면 사라진다 (0145 R7)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-3");
+    if (id === undefined) throw new Error("no ACME-3");
+    expect(detail(db, id).status).toMatchObject({ keptWorktree: null });
+    updateRunRecords(db, id, { worktreeKept: "uncommitted-changes" });
+    expect(detail(db, id).status).toMatchObject({
+      keptWorktree: { reason: "uncommitted-changes", removing: false },
+    });
+    expect(removeWorktreeRequest(db, id, minutes(110))).toEqual({ ok: true });
+    expect(detail(db, id).status).toMatchObject({
+      keptWorktree: { reason: "uncommitted-changes", removing: true },
+    });
+    updateRunRecords(db, id, { worktreeRemovedAt: minutes(111) });
+    expect(detail(db, id).status).toMatchObject({ keptWorktree: null });
+    expect(removeWorktreeRequest(db, id, minutes(112))).toEqual({
+      ok: false,
+      reason: "nothing-to-remove",
     });
   });
 
@@ -114,20 +147,20 @@ describe("loadRunDetail", () => {
     ]);
     expect(detail(db, id)).toMatchObject({
       report: "테스트 하나를 고치지 못했어요.",
-      status: { agentResult: "reported-failure", prState: "open", summary: "human-check" },
+      status: { agentResult: "reported-failure", prState: "open", summary: "failed" },
     });
   });
 
-  it("러너 연결 끊김 런은 워크트리를 지우기 전까지 사람이 지워야 한다(Q75)", () => {
+  it("러너 연결 끊김 런은 워크트리를 지우기 전까지 남긴 이유를 담는다(Q75)", () => {
     const { db, ids } = seedDatabase();
     const id = ids.get("ACME-5");
-    expect(detail(db, id).status).toMatchObject({ worktreeNeedsManualRemoval: true });
-    expect(detail(db, ids.get("ACME-3")).status).toMatchObject({
-      worktreeNeedsManualRemoval: false,
+    expect(detail(db, id).status).toMatchObject({
+      keptWorktree: { reason: "runner-disconnected", removing: false },
     });
+    expect(detail(db, ids.get("ACME-3")).status).toMatchObject({ keptWorktree: null });
     if (id === undefined) throw new Error("no ACME-5");
     updateRunRecords(db, id, { worktreeRemovedAt: minutes(100) });
-    expect(detail(db, id).status).toMatchObject({ worktreeNeedsManualRemoval: false });
+    expect(detail(db, id).status).toMatchObject({ keptWorktree: null });
   });
 
   it("Disconnected 런은 ssh 가 실패하기 시작한 시각을 담고 타임라인에 남긴다(Q50·Q67)", () => {
@@ -195,6 +228,7 @@ describe("loadRunDetail", () => {
       displayId: "#2",
       url: "https://example.com/acme/web/pull/2",
       ci: "success",
+      signals: null,
     });
     expect(toCiView("failure")).toBe("failure");
     expect(toCiView("unavailable")).toBe("unavailable");
@@ -226,7 +260,7 @@ describe("loadRunDetail", () => {
     });
     expect(detail(db, id)).toMatchObject({
       pullRequest: { ci: "unavailable" },
-      status: { summary: "human-check" },
+      status: { summary: "failed" },
     });
   });
 
@@ -236,7 +270,7 @@ describe("loadRunDetail", () => {
     if (first === undefined) throw new Error("no ACME-1");
     const again = assign(db, "ACME-1", 90);
     expect(detail(db, again).otherRuns).toEqual([
-      { id: first, assignedAt: minutes(1).toISOString(), state: "ended", summary: "merged" },
+      { id: first, assignedAt: minutes(1).toISOString(), state: "ended", summary: "succeeded" },
     ]);
     expect(detail(db, first).otherRuns.map((o) => o.id)).toEqual([again]);
   });

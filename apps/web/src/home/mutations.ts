@@ -4,9 +4,10 @@ import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import { toRunId } from "@ganger/core";
 import type { RunId } from "@ganger/core";
 import { ANSWER_REJECT_REASONS, DENY_REJECT_REASONS, rejectedAs } from "../query/mutation-error";
+import { withRunActionRequestId } from "../query/run-action-request-ids";
 import { keysChangedByRunWrite } from "../runs/queries";
-import { answerQuestion, controlRun, denyPermission } from "../server/functions";
-import type { AnswerInput, ControlInput, DenyInput } from "./home-screen";
+import { answerHumanCheck, answerQuestion, controlRun, denyPermission } from "../server/functions";
+import type { AnswerInput, ControlInput, DenyInput, HumanCheckInput } from "./home-screen";
 
 async function invalidateRunWrite(queryClient: QueryClient, runId: RunId): Promise<void> {
   await Promise.all(
@@ -16,6 +17,7 @@ async function invalidateRunWrite(queryClient: QueryClient, runId: RunId): Promi
 
 export interface DashboardActions {
   onAnswer: (input: AnswerInput) => Promise<void>;
+  onHumanCheck: (input: HumanCheckInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
   onControl: (input: ControlInput) => Promise<RunControlOutcome>;
 }
@@ -25,7 +27,32 @@ export function useDashboardActions(): DashboardActions {
   const afterWrite = (runId: RunId) => invalidateRunWrite(queryClient, runId);
   const answer = useMutation({
     mutationFn: (input: AnswerInput) =>
-      rejectedAs(() => answerQuestion({ data: input }), ANSWER_REJECT_REASONS),
+      withRunActionRequestId(
+        queryClient,
+        input.runId,
+        `answer:${input.questionId}`,
+        input.answer,
+        (requestId) =>
+          rejectedAs(
+            () => answerQuestion({ data: { ...input, requestId } }),
+            ANSWER_REJECT_REASONS,
+          ),
+      ),
+    onSuccess: (_result, input) => afterWrite(toRunId(input.runId)),
+  });
+  const humanCheck = useMutation({
+    mutationFn: (input: HumanCheckInput) =>
+      withRunActionRequestId(
+        queryClient,
+        input.runId,
+        `human-check:${input.questionId}`,
+        `${input.decision}:${input.note}`,
+        (requestId) =>
+          rejectedAs(
+            () => answerHumanCheck({ data: { ...input, requestId } }),
+            ANSWER_REJECT_REASONS,
+          ),
+      ),
     onSuccess: (_result, input) => afterWrite(toRunId(input.runId)),
   });
   const deny = useMutation({
@@ -34,15 +61,25 @@ export function useDashboardActions(): DashboardActions {
     onSuccess: (_result, input) => afterWrite(toRunId(input.runId)),
   });
   const control = useMutation({
-    mutationFn: async (input: ControlInput): Promise<RunControlOutcome> => {
-      const result = await controlRun({ data: input });
-      return result.ok ? "requested" : "state-changed";
-    },
+    mutationFn: (input: ControlInput): Promise<RunControlOutcome> =>
+      withRunActionRequestId(
+        queryClient,
+        input.runId,
+        "control",
+        input.control,
+        async (requestId) => {
+          const result = await controlRun({ data: { ...input, requestId } });
+          return result.ok ? "requested" : "state-changed";
+        },
+      ),
     onSuccess: (_outcome, input) => afterWrite(toRunId(input.runId)),
   });
   return {
     onAnswer: async (input) => {
       await answer.mutateAsync(input);
+    },
+    onHumanCheck: async (input) => {
+      await humanCheck.mutateAsync(input);
     },
     onDeny: async (input) => {
       await deny.mutateAsync(input);

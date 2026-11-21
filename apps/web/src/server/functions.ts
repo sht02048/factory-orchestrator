@@ -1,11 +1,25 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
+import { CONTINUE_MESSAGE_MAX_LENGTH } from "@ganger/core";
 import { markAllTrackersChanged } from "@ganger/db";
 import { z } from "zod";
-import { answerInput, denyInput, submitAnswer, submitDenial } from "@ganger/app/home/actions";
+import { denyInput, submitDenial } from "@ganger/app/home/actions";
 import { loadHomePage } from "@ganger/app/home/load";
-import { cancelRunRequest } from "@ganger/app/run-detail/actions";
-import { requestControl } from "@ganger/app/run-control";
+import {
+  agentMessageInput,
+  answerOnceInput,
+  cancelRunOnce,
+  continueRunOnce,
+  controlRunOnce,
+  humanCheckOnceInput,
+  removeWorktreeOnce,
+  runActionRequestId,
+  sendAgentMessageRequest,
+  skipBlockerWaitOnce,
+  stopPreviousAgentOnce,
+  submitAnswerOnce,
+  submitHumanCheckOnce,
+} from "@ganger/app/run-detail/actions";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
 import { loadRunnersPage } from "@ganger/app/runners/load";
 import { pickConditions, runConditionsSchema } from "@ganger/app/runs/conditions";
@@ -16,7 +30,7 @@ import { TITLE_BAR_COOKIE, isTitleBarHidden } from "@ganger/app/shell/window-chr
 import { loadStatsPage } from "@ganger/app/stats/load";
 import { statsPeriodDaysSchema } from "@ganger/app/stats/model";
 import { assignInput, submitAssignment } from "@ganger/app/tickets/assign";
-import { loadTicketRuns, loadTrackerTickets } from "@ganger/app/tickets/load";
+import { loadTicketBlockers, loadTicketRuns, loadTrackerTickets } from "@ganger/app/tickets/load";
 import { TIME_ZONE_COOKIE, parseTimeZone } from "@ganger/app/time-zone";
 import { getAdapterRegistry, getSecretBox } from "./adapters";
 import { getDatabase } from "./database";
@@ -43,8 +57,12 @@ export const getHomePage = createServerFn({ method: "GET" })
   );
 
 export const answerQuestion = createServerFn({ method: "POST" })
-  .validator(answerInput)
-  .handler(({ data }) => submitAnswer(getDatabase(), data, new Date()));
+  .validator(answerOnceInput)
+  .handler(({ data }) => submitAnswerOnce(getDatabase(), data, new Date()));
+
+export const answerHumanCheck = createServerFn({ method: "POST" })
+  .validator(humanCheckOnceInput)
+  .handler(({ data }) => submitHumanCheckOnce(getDatabase(), data, new Date()));
 
 export const denyPermission = createServerFn({ method: "POST" })
   .validator(denyInput)
@@ -88,17 +106,56 @@ export const requestRunLog = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string() }))
   .handler(({ data }) => requestRunLogTail(getDatabase(), data.runId, new Date()));
 
+const runActionKey = z.object({ runId: z.string().min(1), requestId: runActionRequestId });
+
 export const cancelRun = createServerFn({ method: "POST" })
-  .validator(z.object({ runId: z.string() }))
-  .handler(({ data }) => cancelRunRequest(getDatabase(), data.runId, new Date()));
+  .validator(runActionKey)
+  .handler(({ data }) => cancelRunOnce(getDatabase(), data, new Date()));
+
+export const removeRunWorktree = createServerFn({ method: "POST" })
+  .validator(runActionKey)
+  .handler(({ data }) => removeWorktreeOnce(getDatabase(), data, new Date()));
+
+const continueMessageSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((text) => Array.from(text).length <= CONTINUE_MESSAGE_MAX_LENGTH);
+
+export const continueRunFrom = createServerFn({ method: "POST" })
+  .validator(runActionKey.extend({ message: continueMessageSchema }))
+  .handler(({ data }) => continueRunOnce(getDatabase(), data, data.message, new Date()));
+
+export const stopPreviousAgent = createServerFn({ method: "POST" })
+  .validator(runActionKey)
+  .handler(({ data }) => stopPreviousAgentOnce(getDatabase(), data, new Date()));
+
+export const sendAgentMessage = createServerFn({ method: "POST" })
+  .validator(agentMessageInput)
+  .handler(({ data }) => sendAgentMessageRequest(getDatabase(), data, new Date()));
+
+export const startRunWithoutWaiting = createServerFn({ method: "POST" })
+  .validator(runActionKey)
+  .handler(({ data }) => skipBlockerWaitOnce(getDatabase(), data, new Date()));
 
 export const controlRun = createServerFn({ method: "POST" })
-  .validator(z.object({ runId: z.string(), control: z.enum(["pause", "resume"]) }))
-  .handler(({ data }) => requestControl(getDatabase(), data.runId, data.control, new Date()));
+  .validator(runActionKey.extend({ control: z.enum(["pause", "resume"]) }))
+  .handler(({ data }) => controlRunOnce(getDatabase(), data, data.control, new Date()));
 
 export const getTicketRuns = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
   .handler(({ data }) => loadTicketRuns(getDatabase(), data.ws, new Date()));
+
+export const getTicketBlockers = createServerFn({ method: "GET" })
+  .validator(
+    z.object({ ws: z.string().optional(), connection: z.string().min(1), key: z.string().min(1) }),
+  )
+  .handler(({ data }) =>
+    loadTicketBlockers(
+      { db: getDatabase(), secretBox: getSecretBox(), registry: getAdapterRegistry() },
+      { ws: data.ws, connection: data.connection, key: data.key },
+    ),
+  );
 
 export const getTrackerTickets = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))

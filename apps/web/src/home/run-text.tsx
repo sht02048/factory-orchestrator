@@ -66,6 +66,8 @@ export function useRunText() {
       case "assignment-blocked":
         return tDomain(`queuedReason.${reason.kind}`);
       case "usage-limit":
+      case "blockers-waiting":
+      case "blockers-stuck":
         return queuedReasonText(reason);
     }
   };

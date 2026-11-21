@@ -1,0 +1,32 @@
+---
+status: done
+blocked_by: []
+---
+
+# 0142 흔들리는 시험 지우기: query 다시 읽기·Settings 이름 바꾸기
+
+## 목표
+
+운영자 규칙(2026-11-20): CI 에서 PR 탓이 아닌데 흔들리는 시험은 고치지 않고 지운다. `.skip` 으로 끄지 않고 코드를 지운다.
+
+## 실패
+
+v0.2.0 Release 의 CI 에서 아래 두 시험이 실패했다. 같은 코드가 출시 PR #184 CI 에서는 통과했다.
+
+- `e2e/src/query-cache.test.ts` > "query 읽기 실패(0123 할 일 10)" > "다시 읽기를 누르면 실패했던 화면만 다시 읽고, 읽히면 오류 화면이 화면으로 바뀌며 포커스는 레일의 지금 화면 링크로 간다": `AssertionError: expected [ 'getStatsPage' ] to deeply equal []`
+- `e2e/src/settings.test.ts` > "Settings 한 페이지(브라우저, 0119)" > "이름은 줄 안에서 펼쳐 바꾸고, 비우면 오류를 보이며, 닫으면 바꾸기로 포커스가 돌아온다": strict mode violation, `getByText('Workspace 이름을 저장했어요')` 가 요소 2개로 풀렸다.
+
+## 할 일
+
+- [x] 두 시험만 지운다. 같은 describe 의 다른 시험과 공용 도우미는 남긴다. 지운 뒤 쓰이지 않게 된 도우미·import 는 없다.
+- [x] 잃은 확인 범위를 적는다.
+
+## 잃은 확인 범위
+
+- 셸 안 화면의 loader 가 읽다 실패한 뒤 다시 읽기가 성공할 때, 오류 화면이 화면으로 바뀌는지, 실패했던 화면 밖의 서버 함수를 더 부르지 않는지, 포커스가 레일의 지금 화면 링크(`aria-current="page"`)로 가는지를 더는 시험하지 않는다(화면 컴포넌트가 읽다 실패한 경우의 다시 읽기 성공은 `RENDER_RETRY_PATH` 시험이 계속 확인한다).
+- Settings 의 Workspace 이름을 줄 안에서 바꿀 때, 펼치면 이름 칸으로 포커스가 가는지, 비우고 저장하면 오류를 보이는지, Escape·저장 뒤 바꾸기로 포커스가 돌아오는지, 저장하면 새 이름과 저장 알림을 보이는지를 더는 시험하지 않는다.
+
+## 완료 조건
+
+- `e2e/src/query-cache.test.ts`, `e2e/src/settings.test.ts` 만 로컬로 돌려 남은 시험이 모두 통과한다.
+- 화면 변경 없음. DB 변경 없음. two-way.

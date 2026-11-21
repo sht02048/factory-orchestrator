@@ -12,6 +12,8 @@ import type {
   ProviderUsage,
   ProviderUsageReading,
   RunnerProject,
+  TicketKey,
+  TicketRelations,
   TrackerLabel,
   TrackerProject,
   TrackerState,
@@ -158,6 +160,10 @@ export function runnerProjectId(spec: ProjectSpec) {
   return toRunnerProjectId(spec.repo);
 }
 
+export function demoTicketBody(title: string): string {
+  return `${title}.\n\nThis is a demo ticket with fake data.`;
+}
+
 export function trackerCatalog(spec: TrackerSpec, now: Date): TrackerCatalog {
   const tickets: TrackerTicket[] = [];
   let n = 0;
@@ -168,7 +174,7 @@ export function trackerCatalog(spec: TrackerSpec, now: Date): TrackerCatalog {
       tickets.push({
         key,
         title,
-        body: `${title}.\n\nThis is a demo ticket with fake data.`,
+        body: demoTicketBody(title),
         url: `https://tracker.example.com/${spec.name.toLowerCase()}/issue/${key}`,
         labels: [],
         project: { id: trackerProjectId(project), name: project.name },
@@ -187,6 +193,24 @@ export function trackerCatalog(spec: TrackerSpec, now: Date): TrackerCatalog {
     labels,
     tickets,
   };
+}
+
+const DEMO_BLOCKED_TICKET_INDEX = 6;
+const DEMO_BLOCKER_TICKET_INDEX = 5;
+
+export function demoRelations(catalog: TrackerCatalog): Array<[TicketKey, TicketRelations]> {
+  const blocked = catalog.tickets[DEMO_BLOCKED_TICKET_INDEX];
+  const blocker = catalog.tickets[DEMO_BLOCKER_TICKET_INDEX];
+  if (blocked === undefined || blocker === undefined) return [];
+  return [
+    [
+      blocked.key,
+      {
+        priority: "high",
+        blockers: [{ key: blocker.key, title: blocker.title, state: blocker.state }],
+      },
+    ],
+  ];
 }
 
 export const RUNNER_PROJECTS: ReadonlyArray<RunnerProject> = TRACKERS.flatMap((spec) =>

@@ -20,6 +20,7 @@ import type { NotificationEventKind } from "./notification-events-model.js";
 import {
   mcpActions,
   notificationEvents,
+  runAgentMessages,
   runCancelRequests,
   runControlRequests,
   runPermissionWaits,
@@ -36,6 +37,7 @@ export interface TimelineRun {
   workspaceId: WorkspaceId;
   runnerId: RunnerId | null;
   worktreeName: string;
+  continuedFromRunId: RunId | null;
   state: RunState;
   agentResult: AgentResult | null;
   startFailures: number;
@@ -97,6 +99,13 @@ export type RunTimelineEntry =
       runId: RunId;
       event: "requested" | "completed";
       control: RunControl;
+    }
+  | {
+      at: Date;
+      source: "agent-message";
+      runId: RunId;
+      event: "requested" | "sent" | "failed";
+      error?: string;
     };
 
 export interface RunTimeline {
@@ -135,6 +144,7 @@ function selectRuns(db: Database, where: SQL): Array<TimelineRun & RunTimes> {
       workspaceId: runs.workspaceId,
       runnerId: runs.runnerId,
       worktreeName: runs.worktreeName,
+      continuedFromRunId: runs.continuedFromRunId,
       state: runs.state,
       agentResult: runs.agentResult,
       prState: runs.prState,
@@ -217,6 +227,7 @@ function summary(run: TimelineRun & RunTimes): TimelineRun {
     workspaceId: run.workspaceId,
     runnerId: run.runnerId,
     worktreeName: run.worktreeName,
+    continuedFromRunId: run.continuedFromRunId,
     state: run.state,
     agentResult: run.agentResult,
     startFailures: run.startFailures,
@@ -346,6 +357,27 @@ function runRecordEntries(db: Database, ids: ReadonlyArray<RunId>): RunTimelineE
     entries.push({ ...base, at: control.requestedAt, event: "requested" });
     if (control.completedAt !== null) {
       entries.push({ ...base, at: control.completedAt, event: "completed" });
+    }
+  }
+  for (const message of db
+    .select({
+      runId: runAgentMessages.runId,
+      requestedAt: runAgentMessages.requestedAt,
+      completedAt: runAgentMessages.completedAt,
+      error: runAgentMessages.error,
+    })
+    .from(runAgentMessages)
+    .where(inArray(runAgentMessages.runId, [...ids]))
+    .orderBy(runAgentMessages.id)
+    .all()) {
+    const base = { source: "agent-message", runId: message.runId } as const;
+    entries.push({ ...base, at: message.requestedAt, event: "requested" });
+    if (message.completedAt !== null) {
+      entries.push(
+        message.error === null
+          ? { ...base, at: message.completedAt, event: "sent" }
+          : { ...base, at: message.completedAt, event: "failed", error: message.error },
+      );
     }
   }
   return entries;

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { AdapterError } from "@ganger/core";
+import { AdapterError, NO_TICKET_RELATIONS } from "@ganger/core";
 import type {
   AdapterRegistry,
   CodeHost,
@@ -9,6 +9,7 @@ import type {
   RunnerId,
   RunnerProjectId,
   TicketKey,
+  TicketRelations,
   Tracker,
   TrackerConnectionId,
   TrackerKind,
@@ -54,6 +55,16 @@ export class WorkerAdapters {
 
   trackerConnectionIds(db: Database): TrackerConnectionId[] {
     return listTrackerConnections(db, this.secretBox).map((stored) => stored.id);
+  }
+
+  codeHostsKey(db: Database): string {
+    const settings = listCodeHostConnections(db, this.secretBox).map((stored) => ({
+      id: stored.id,
+      kind: stored.kind,
+      config: stored.config,
+      secrets: stored.secrets,
+    }));
+    return createHash("sha256").update(JSON.stringify(settings)).digest("hex");
   }
 
   allCodeHosts(
@@ -189,6 +200,12 @@ class PausableTracker implements Tracker {
 
   getTicket(key: TicketKey): ReturnType<Tracker["getTicket"]> {
     return this.pause.run(() => this.inner.getTicket(key));
+  }
+
+  getTicketRelations(key: TicketKey): Promise<TicketRelations | null> {
+    return this.pause.run(
+      () => this.inner.getTicketRelations?.(key) ?? Promise.resolve(NO_TICKET_RELATIONS),
+    );
   }
 
   listProjectTickets(

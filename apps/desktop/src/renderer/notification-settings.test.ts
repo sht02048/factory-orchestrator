@@ -26,7 +26,7 @@ const allOn: NotificationSettingsView = {
   groups: {
     question: true,
     permission: true,
-    humanCheck: true,
+    humanCheckRequest: true,
     failedDisconnected: true,
     runnerIssue: true,
   },
@@ -147,13 +147,13 @@ describe("알림 설정 창(브라우저, 0103)", () => {
 
   it("종류 하나를 끄면 그 값만 저장하고, 전체를 끄면 종류는 고를 수 없다", async () => {
     await openSettings(allOn);
-    await page.getByRole("checkbox", { name: t.groups.humanCheck.label }).click();
+    await page.getByRole("checkbox", { name: t.groups.failedDisconnected.label }).click();
     await expect.poll(calls).toContainEqual({
-      set: { enabled: true, groups: { ...allOn.groups, humanCheck: false } },
+      set: { enabled: true, groups: { ...allOn.groups, failedDisconnected: false } },
     });
     await page.getByRole("checkbox", { name: t.enabled.label }).click();
     await expect.poll(calls).toContainEqual({
-      set: { enabled: false, groups: { ...allOn.groups, humanCheck: false } },
+      set: { enabled: false, groups: { ...allOn.groups, failedDisconnected: false } },
     });
     await page.getByText(t.groupsOff).waitFor();
     expect(

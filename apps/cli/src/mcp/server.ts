@@ -179,7 +179,7 @@ export function createMcpServer(context: McpContext): GangerMcp {
     {
       title: "Dashboard summary",
       description:
-        'The Dashboard of a workspace: runs that need the operator ("todo", grouped as answer, check, and stopped), running and queued runs, runners with used and total capacity and their highest provider usage and reached limits, and runs that ended today.',
+        'The Dashboard of a workspace: runs that need the operator ("todo", grouped as check, answer and stopped), running and queued runs, runners with used and total capacity and their highest provider usage and reached limits, and runs that ended today.',
       inputSchema: { workspace: workspaceArg },
       annotations: READ_ONLY,
     },
@@ -232,7 +232,7 @@ export function createMcpServer(context: McpContext): GangerMcp {
     {
       title: "List runs",
       description:
-        "Runs of the workspace: every run that has not ended, then the most recently ended runs.",
+        'Runs of the workspace: every run that has not ended, then the most recently ended runs. An ended run\'s "summary" is "succeeded", "failed", or "canceled", set by the agent\'s report alone; its pull request state ("prState", "laterPrState") is separate information. For an open pull request, "pullRequest.signals" holds the last read of its checks, conflict, and commits behind base; it never changes the summary.',
       inputSchema: {
         workspace: workspaceArg,
         runner: z
@@ -290,7 +290,7 @@ export function createMcpServer(context: McpContext): GangerMcp {
     {
       title: "Run detail",
       description:
-        "One run: its state, pending question, pull request and CI, timeline, the last stored lines of its log, and other runs of the same ticket.",
+        'One run: its state, pending question, pull request and CI, timeline, the last stored lines of its log, the whole agent brief it was started with ("brief"), and other runs of the same ticket. An ended run\'s "summary" is "succeeded", "failed", or "canceled", set by the agent\'s report alone; the pull request state is separate information. "keptWorktree" says why the worktree was left on the runner. For an open pull request, "pullRequest.signals" holds the last read of its checks, conflict, and commits behind base; it never changes the summary.',
       inputSchema: { runId: z.string().min(1).max(200) },
       annotations: READ_ONLY,
     },
@@ -337,7 +337,7 @@ export function createMcpServer(context: McpContext): GangerMcp {
     {
       title: "Stats",
       description:
-        "Stats of the workspace for the last 7, 14, or 30 days: outcomes, merged rate, lead time, failure reasons, daily throughput, and the same by runner, tracker project, and agent.",
+        "Stats of the workspace for the last 7, 14, or 30 days: outcomes (succeeded, failed, canceled), success rate, runs whose pull request was merged (counted apart from outcomes), lead time, failure reasons, daily throughput, and the same by runner, tracker project, and agent.",
       inputSchema: {
         workspace: workspaceArg,
         days: statsPeriodDaysSchema.optional().describe("Defaults to 14."),
@@ -363,7 +363,7 @@ export function createMcpServer(context: McpContext): GangerMcp {
     {
       title: "Settings",
       description:
-        "Settings of the workspace and of this installation. Secret values are never returned: tracker keys, webhook secrets, and the GitHub token show only whether they are set, and runners show their last check.",
+        'Settings of the workspace and of this installation. Secret values are never returned: tracker keys, webhook secrets, and the GitHub token show only whether they are set, and runners show their last check. The workspace\'s "brief" holds what the operator adds before and after the ticket in every agent brief; "agentProtocol" is how Ganger tells agents to talk to it.',
       inputSchema: { workspace: workspaceArg },
       annotations: READ_ONLY_TRACKER,
     },

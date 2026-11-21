@@ -137,6 +137,33 @@ describe("decideProgress", () => {
     });
   });
 
+  test("reads this run's decision_gate as a Human Check and ignores another dispatch's", () => {
+    const gate = (id: string, dispatchId: string) => ({
+      id,
+      type: "decision_gate",
+      subject: "PR #1 머지를 확인해 주세요",
+      body: "https://github.com/acme/widgets/pull/1",
+      payload: JSON.stringify({ dispatchId }),
+      created_at: "2026-11-21T01:28:02Z",
+    });
+    const progress = decideProgress({
+      ...r2,
+      dispatchId: "ctx_mine",
+      worker: { ...r2.worker, liveness: "live" },
+      mails: [gate("msg_mine", "ctx_mine"), gate("msg_other", "ctx_other")],
+    });
+    if (progress.kind !== "active") throw new Error(progress.kind);
+    expect(progress.questions).toEqual([
+      {
+        id: "msg_mine",
+        kind: "human-check",
+        body: "PR #1 머지를 확인해 주세요\n\nhttps://github.com/acme/widgets/pull/1",
+        options: [],
+        askedAt: new Date("2026-11-21T01:28:02Z"),
+      },
+    ]);
+  });
+
   test("a Task result that is not a worker report is not a report", () => {
     const progress = decideProgress({
       ...r2,

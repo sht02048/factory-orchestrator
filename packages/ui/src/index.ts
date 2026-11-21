@@ -174,6 +174,13 @@ export {
 export { Select, type SelectOption, type SelectProps } from "./components/select";
 export { Sheet, type SheetProps } from "./components/sheet";
 export { StatTile, type StatTileProps, type StatTrend } from "./components/stat-tile";
+export {
+  BlockerChip,
+  BlockerChips,
+  blockerDotStyles,
+  type BlockerChipProps,
+  type BlockerChipState,
+} from "./components/blocker-chip";
 export { StatusDot, statusDotStyles, type StatusDotProps } from "./components/status-dot";
 export {
   PILL_STATUSES,
@@ -187,6 +194,19 @@ export {
   type StatusTone,
   type SummaryStatus,
 } from "./components/status-pill";
+export {
+  MotionList,
+  MotionScope,
+  useMotionMove,
+  type MotionEnter,
+  type MotionHighlightRadius,
+  type MotionItemAttributes,
+  type MotionItemGap,
+  type MotionListProps,
+  type MotionMove,
+  type MotionScopeProps,
+} from "./components/motion";
+export { MOTION_BURST_LIMIT } from "./components/motion-plan";
 export {
   RowReason,
   RowTitle,

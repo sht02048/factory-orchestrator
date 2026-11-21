@@ -41,7 +41,10 @@ export function notificationText(content: NotificationContent): { title: string;
         body: reminder ? t("permission.reminder", { ticket }) : t("permission.body", { ticket }),
       };
     case "human-check":
-      return { title: t("humanCheck.title"), body: t("humanCheck.body", { ticket }) };
+      return {
+        title: t("humanCheck.title"),
+        body: reminder ? t("humanCheck.reminder", { ticket }) : t("humanCheck.body", { ticket }),
+      };
     case "failed":
       return { title: t("failed.title"), body: t("failed.body", { ticket }) };
     case "disconnected":

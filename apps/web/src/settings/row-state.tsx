@@ -193,7 +193,9 @@ export function focusEditor(container: HTMLElement | null): void {
   const typing = window.matchMedia("(pointer: fine)").matches;
   const field =
     (typing
-      ? container.querySelector<HTMLElement>("input:not([readonly]):not([disabled])")
+      ? container.querySelector<HTMLElement>(
+          "input:not([readonly]):not([disabled]), textarea:not([readonly]):not([disabled])",
+        )
       : null) ?? container.querySelector<HTMLElement>("button:not([disabled])");
   (field ?? container).focus({ preventScroll: field === null });
 }

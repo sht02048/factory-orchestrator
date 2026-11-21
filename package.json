@@ -1,6 +1,6 @@
 {
   "name": "ganger",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -20,7 +20,8 @@
     "lint": "oxlint --type-aware --deny-warnings",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "test": "vitest run"
+    "test": "vitest run",
+    "update:browser-times": "node scripts/update-browser-test-times.ts"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

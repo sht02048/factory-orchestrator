@@ -29,14 +29,14 @@ const TERMS: Record<PillStatus, string> = {
   "waiting-for-input": "Waiting for Input",
   paused: "Paused",
   disconnected: "Disconnected",
-  merged: "Merged",
-  "human-check": "Human Check",
+  succeeded: "Succeeded",
   failed: "Failed",
   canceled: "Canceled",
   online: "Online",
   offline: "Offline",
   question: "Question",
   permission: "Permission",
+  "human-check": "Human Check",
   "runner-issue": "Runner Issue",
 };
 const TERM_NAMES = new Set(Object.values(TERMS));
@@ -53,8 +53,7 @@ describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
       ended: "Ended",
     });
     expect(domain.summary).toEqual({
-      merged: TERMS.merged,
-      "human-check": TERMS["human-check"],
+      succeeded: TERMS.succeeded,
       failed: TERMS.failed,
       canceled: TERMS.canceled,
     });
@@ -111,6 +110,7 @@ describe("화면의 상태 알약", () => {
           <HomeScreen
             page={loadHomePage(db, "ws-commerce", now, "UTC")}
             onAnswer={() => Promise.resolve()}
+            onHumanCheck={() => Promise.resolve()}
             onDeny={() => Promise.resolve()}
             onControl={() => Promise.resolve("requested" as const)}
           />,

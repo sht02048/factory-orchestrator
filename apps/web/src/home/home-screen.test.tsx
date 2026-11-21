@@ -20,14 +20,27 @@ const reject = () => Promise.reject(new Error("unused"));
 
 function render(page: HomePage) {
   return renderWithMessages(
-    <HomeScreen page={page} onAnswer={reject} onDeny={reject} onControl={reject} />,
+    <HomeScreen
+      page={page}
+      onAnswer={reject}
+      onHumanCheck={reject}
+      onDeny={reject}
+      onControl={reject}
+    />,
     homeMessages,
   );
 }
 
 function renderView(page: HomePage, view: DashboardView) {
   return renderWithMessages(
-    <HomeScreen page={page} view={view} onAnswer={reject} onDeny={reject} onControl={reject} />,
+    <HomeScreen
+      page={page}
+      view={view}
+      onAnswer={reject}
+      onHumanCheck={reject}
+      onDeny={reject}
+      onControl={reject}
+    />,
     homeMessages,
   );
 }
@@ -135,9 +148,8 @@ describe("Dashboard 한 줄 머리(ADR 0010 8번, 0113 갱신)", () => {
   it("제목은 화면 이름 Dashboard 이고, 그 옆 요약 한 줄이 처리할 일을 묶음별로 말한다", () => {
     const html = render(seededPage());
     expect(header(html)).toMatch(/<h1[^>]*>Dashboard<\/h1>/);
-    expect(text(header(html))).toContain(
-      "처리할 일은 답할 질문 1개, 확인할 PR 1개, 멈춘 런 6개예요.",
-    );
+    expect(text(header(html))).toContain("처리할 일은 답할 질문 1개, 멈춘 런 6개예요.");
+    expect(text(header(html))).not.toContain("확인할 PR");
     expect(html.match(/<h1/g)).toHaveLength(1);
   });
 
@@ -151,9 +163,8 @@ describe("Dashboard 한 줄 머리(ADR 0010 8번, 0113 갱신)", () => {
       ...page,
       attention: page.attention.filter((item) => item.run.ticketKey === "ACME-2"),
     });
-    expect(text(header(html))).toContain("처리할 일은 확인할 PR 1개예요.");
+    expect(text(header(html))).toContain("처리할 일은 멈춘 런 1개예요.");
     expect(text(header(html))).not.toContain("답할 질문");
-    expect(text(header(html))).not.toContain("멈춘 런");
   });
 
   it("To do 가 0이면 처리할 일이 없다고 하고 In progress 수를 요약한다", () => {
@@ -239,17 +250,18 @@ describe("Dashboard 칸반(티켓 0100)", () => {
     );
   });
 
-  it("Done today 칸은 꼬리표 카드(Human Check·Failed)를 앞 4장만 보이고 N개 더 보기를 둔다", () => {
+  it("Done today 칸은 꼬리표 카드(Failed)를 앞 4장만 보이고 N개 더 보기를 둔다. Succeeded 런은 PR 이 열려 있어도 꼬리표가 없다 (0145)", () => {
     const page = seededPage();
     const done = section(render(page), "Done today");
     const tagged = tagsOf(done).filter((tag) => tag !== null);
-    expect(tagged).toEqual(["human-check", "failed", "failed", "failed"]);
+    expect(tagged).toEqual(["failed", "failed", "failed", "failed"]);
     expect(DONE_TODO_VISIBLE).toBe(4);
-    expect(actionsOf(done)).toContainEqual({ variant: "ghost", label: "2개 더 보기" });
-    const human = row(done, "ACME-2");
-    expect(text(human)).toContain("PR #2");
-    expect(human).toMatch(/<a href="https:\/\/example.com\/acme\/web\/pull\/2"[^>]*>PR 보기<\/a>/);
-    expect(text(row(done, "ACME-7"))).toContain("1시간 전");
+    expect(actionsOf(done)).toContainEqual({ variant: "ghost", label: "1개 더 보기" });
+    expect(done).not.toContain('data-tag="human-check"');
+    const succeeded = row(done, "ACME-7");
+    expect(succeeded).not.toContain("data-tag=");
+    expect(text(succeeded)).toContain("Succeeded · PR #7");
+    expect(text(succeeded)).toContain("1시간 전");
   });
 
   it("처리할 일 없이 끝난 카드는 소제목 아래에 꼬리표 없이 상태 이름과 함께 모은다", () => {
@@ -259,8 +271,8 @@ describe("Dashboard 칸반(티켓 0100)", () => {
     const merged = row(done, "ACME-1");
     expect(done.indexOf(merged)).toBeGreaterThan(subheading);
     expect(merged).not.toContain("data-tag=");
-    expect(text(merged)).toContain("Merged");
-    for (const tagged of ["ACME-2", "ACME-7"])
+    expect(text(merged)).toContain("Succeeded");
+    for (const tagged of ["ACME-6", "ACME-5"])
       expect(done.indexOf(row(done, tagged))).toBeLessThan(subheading);
   });
 
@@ -327,7 +339,7 @@ describe("Dashboard 칸반(티켓 0100)", () => {
 
   it("카드는 패널을 여는 버튼이고, 행동 버튼과 링크는 그 버튼 밖에 둔다", () => {
     const html = render(withInput(seededPage(), question));
-    for (const key of ["ACME-11", "ACME-2", "ACME-10"]) {
+    for (const key of ["ACME-11", "ACME-6", "ACME-10"]) {
       const card = row(html, key);
       expect(card).toMatch(/<button type="button" aria-haspopup="dialog" aria-expanded="false"/);
     }
@@ -391,13 +403,37 @@ describe("Dashboard 칸반(티켓 0100)", () => {
     const html = render(loadHomePage(db, "ws-commerce", now, "UTC"));
     const titled = rows(html).find((li) => li.includes(`data-run="${id}"`)) ?? "";
     expect(text(titled)).toContain("ACME-30 결제 실패 재시도");
-    expect(titled).toContain(
-      renderWithMessages(
-        <Text variant="meta" numeric>
-          ACME-30
-        </Text>,
-      ),
+    expect(titled.indexOf(">ACME-30</span>")).toBeGreaterThan(-1);
+    expect(titled.indexOf(">결제 실패 재시도<")).toBeGreaterThan(titled.indexOf(">ACME-30</span>"));
+  });
+
+  it("선행 티켓을 기다리는 카드도 취소 중과 Workspace 이름을 보인다(0160)", () => {
+    const page = seededPage("all");
+    const queued = page.queued.map((run) =>
+      run.state === "queued"
+        ? {
+            ...run,
+            cancelling: true,
+            queuedReason: {
+              kind: "blockers-waiting" as const,
+              blockers: [
+                {
+                  key: "ACME-11",
+                  title: "앞 티켓",
+                  stateName: "In Progress",
+                  stateCategory: "started",
+                },
+              ],
+            },
+          }
+        : run,
     );
+    const first = queued[0];
+    if (first === undefined) throw new Error("no queued run");
+    const body = text(section(render({ ...page, queued }), "Queued"));
+
+    expect(body).toContain(homeJson.card.cancelling);
+    expect(body).toContain(first.workspace.name);
   });
 
   it("Queued 까닭은 러너 이름에 맞는 조사로 쓴다", () => {
@@ -422,7 +458,7 @@ describe("모든 Workspace 보기(0066)", () => {
     const html = render(seededPage("all"));
     for (const name of ["Queued", "Running", "Done today", "Runners"])
       expect(section(html, name)).not.toBe("");
-    expect(text(row(section(html, "Done today"), "ACME-2"))).toContain("Acme Commerce");
+    expect(text(row(section(html, "Done today"), "ACME-6"))).toContain("Acme Commerce");
     expect(text(row(section(html, "Running"), "ACME-10"))).toContain("Acme Commerce");
     expect(text(row(section(html, "Done today"), "ACME-1"))).toContain("Acme Commerce");
   });

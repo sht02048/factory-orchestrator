@@ -6,7 +6,8 @@ import {
   DialogContent,
   DialogTitle,
 } from "@ui-sdk/react/dialog";
-import type { ReactNode } from "react";
+import { useEffect, useRef } from "react";
+import type { ReactNode, RefObject } from "react";
 import { cx } from "../cx";
 import { windowRegion } from "../window-frame";
 import { buttonStyles } from "./button";
@@ -36,8 +37,10 @@ export function Sheet({
   finalFocus,
   children,
 }: SheetProps) {
+  const headRef = useRef<HTMLDivElement>(null);
+  useIgnoreRepeatPressWhileClosing(headRef);
   return (
-    <SdkDialog open={open} onOpenChange={(next: boolean) => onOpenChange(next)}>
+    <SdkDialog open={open} modal={open} onOpenChange={(next: boolean) => onOpenChange(next)}>
       <DialogBackdrop {...windowRegion("no-drag")} className={cx(styles.backdrop)} />
       <DialogContent
         {...windowRegion("no-drag")}
@@ -45,7 +48,7 @@ export function Sheet({
         {...(finalFocus === undefined ? {} : { finalFocus })}
         className={cx(styles.content)}
       >
-        <div {...stylex.props(styles.head)}>
+        <div ref={headRef} {...stylex.props(styles.head)}>
           <div {...stylex.props(styles.status)}>{status}</div>
           <DialogClose data-variant="secondary" className={cx(...buttonStyles("secondary"))}>
             {closeLabel}
@@ -61,11 +64,44 @@ export function Sheet({
   );
 }
 
-const fadeIn = stylex.keyframes({ from: { opacity: 0 }, to: { opacity: 1 } });
-const slideIn = stylex.keyframes({
-  from: { opacity: 0, transform: "translateX(24px)" },
-  to: { opacity: 1, transform: "none" },
-});
+type SheetPhase = "closed" | "open" | "closing";
+
+function sheetPhaseOf(popup: Element | null): SheetPhase {
+  if (popup === null) return "closed";
+  return popup.hasAttribute("data-ending-style") ? "closing" : "open";
+}
+
+function useIgnoreRepeatPressWhileClosing(insideSheet: RefObject<HTMLElement | null>): void {
+  useEffect(() => {
+    let phaseAtPreviousPress: SheetPhase = "closed";
+    let phaseAtLatestPress: SheetPhase = "closed";
+    const currentPhase = () =>
+      sheetPhaseOf(insideSheet.current?.closest('[role="dialog"]') ?? null);
+    const rememberPress = () => {
+      phaseAtPreviousPress = phaseAtLatestPress;
+      phaseAtLatestPress = currentPhase();
+    };
+    const ignoreRepeatPress = (event: MouseEvent) => {
+      if (event.detail < 2 || phaseAtPreviousPress === "closed" || currentPhase() === "open") {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    window.addEventListener("pointerdown", rememberPress, true);
+    document.addEventListener("mousedown", ignoreRepeatPress, true);
+    document.addEventListener("click", ignoreRepeatPress, true);
+    return () => {
+      window.removeEventListener("pointerdown", rememberPress, true);
+      document.removeEventListener("mousedown", ignoreRepeatPress, true);
+      document.removeEventListener("click", ignoreRepeatPress, true);
+    };
+  }, [insideSheet]);
+}
+
+const REDUCED = "@media (prefers-reduced-motion: reduce)";
+const STARTING = ":is([data-starting-style])";
+const ENDING = ":is([data-ending-style])";
 
 const styles = stylex.create({
   backdrop: {
@@ -73,9 +109,15 @@ const styles = stylex.create({
     inset: 0,
     zIndex: 200,
     backgroundColor: colors.backdrop,
-    animationName: { default: fadeIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: motion.durationFast,
-    animationTimingFunction: motion.easeOut,
+    pointerEvents: { default: null, [ENDING]: "none" },
+    opacity: { default: 1, [STARTING]: 0, [ENDING]: 0 },
+    transitionProperty: "opacity",
+    transitionDuration: {
+      default: motion.durationSheetOpen,
+      [ENDING]: motion.durationSheetClose,
+      [REDUCED]: motion.durationReducedFade,
+    },
+    transitionTimingFunction: { default: motion.easeSheet, [ENDING]: motion.easeOut },
   },
   content: {
     position: "fixed",
@@ -95,9 +137,24 @@ const styles = stylex.create({
     boxShadow: shadow.popover,
     color: colors.textPrimary,
     outline: "none",
-    animationName: { default: slideIn, "@media (prefers-reduced-motion: reduce)": "none" },
-    animationDuration: motion.durationFast,
-    animationTimingFunction: motion.easeOut,
+    pointerEvents: { default: null, [ENDING]: "none" },
+    opacity: {
+      default: 1,
+      [REDUCED]: { default: 1, [STARTING]: 0, [ENDING]: 0 },
+    },
+    transform: {
+      default: "none",
+      [STARTING]: "translateX(100%)",
+      [ENDING]: "translateX(100%)",
+      [REDUCED]: "none",
+    },
+    transitionProperty: "opacity, transform",
+    transitionDuration: {
+      default: motion.durationSheetOpen,
+      [ENDING]: motion.durationSheetClose,
+      [REDUCED]: motion.durationReducedFade,
+    },
+    transitionTimingFunction: { default: motion.easeSheet, [ENDING]: motion.easeOut },
   },
   head: {
     display: "flex",

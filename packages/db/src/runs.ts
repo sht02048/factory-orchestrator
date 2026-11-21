@@ -4,28 +4,36 @@ import {
   checkAssignment,
   checkManualRunnerChoice,
   pickRunner,
+  summarizeRunOutcome,
   toRunId,
   transitionRun,
 } from "@ganger/core";
 import type {
   AgentId,
   AgentRef,
+  AgentCheck,
   AgentResult,
   CiState,
   CommentId,
+  ContinuationPlace,
   InvalidRunTransition,
   NotStartedAgentResult,
   PauseSource,
+  PrReadError,
   PrState,
   PullRequestId,
+  PullRequestSignals,
+  ReadPrState,
   Run,
   RunId,
   RunPlacement,
   RunState,
   RunnerId,
   RunnerProjectId,
+  TicketKey,
   TicketRef,
   TrackerConnectionId,
+  WorktreeKeptReason,
   TrackerProjectId,
   WorktreeRef,
 } from "@ganger/core";
@@ -38,6 +46,7 @@ import {
   gt,
   gte,
   inArray,
+  isNotNull,
   isNull,
   lt,
   ne,
@@ -56,22 +65,44 @@ import { runStateChanges, runs } from "./schema.js";
 import type { LATER_PR_STATES } from "./schema.js";
 import { getWorkspaceTrackerProject, listRunnerSnapshots } from "./settings.js";
 
-export type StoredRun = Run & { workspaceId: WorkspaceId; ticketTitle: string | null };
+export type StoredRun = Run & {
+  workspaceId: WorkspaceId;
+  ticketTitle: string | null;
+  continuedFromRunId: RunId | null;
+  runnerChosen: boolean;
+};
+
+export function isPinnedToRunner(
+  run: Pick<StoredRun, "continuedFromRunId" | "runnerChosen">,
+): boolean {
+  return run.continuedFromRunId !== null || run.runnerChosen;
+}
 
 export interface RunRecords {
   startRequestedAt: Date | null;
   startFailures: number;
   startError: string | null;
   reportBody: string | null;
+  agentBrief: string | null;
+  continueMessage: string | null;
+  continuePlace: ContinuationPlace | null;
+  agentCheck: AgentCheck | null;
+  agentStopRequestedAt: Date | null;
   pullRequest: {
     id: PullRequestId;
     displayId: string;
     url: string;
     ci: CiState;
     checkedAt: Date;
+    signals?: PullRequestSignals | null;
+    signalsReadAt?: Date | null;
+    headCommit?: string;
   } | null;
   laterPrState: { state: (typeof LATER_PR_STATES)[number]; at: Date } | null;
+  prReadError: PrReadError | null;
   worktreeRemovedAt: Date | null;
+  worktreeKept: WorktreeKeptReason | null;
+  worktreeRemoveRequestedAt: Date | null;
   trackerStateSetAt: Date | null;
   trackerComment: { id: CommentId; at: Date } | null;
   unreachableSince: Date | null;
@@ -98,6 +129,8 @@ function toStoredRun(row: RunRow): StoredRun {
     workspaceId: row.workspaceId,
     ticket: { connection: row.trackerConnectionId, key: row.ticketKey },
     ticketTitle: row.ticketTitle,
+    continuedFromRunId: row.continuedFromRunId,
+    runnerChosen: row.runnerChosen,
     trackerProject: row.trackerProjectId,
     runnerProject: row.runnerProjectId,
     agent: row.agentId,
@@ -169,6 +202,11 @@ function toRunRecords(row: RunRow): RunRecords {
     startFailures: row.startFailures,
     startError: row.startError,
     reportBody: row.reportBody,
+    agentBrief: row.agentBrief,
+    continueMessage: row.continueMessage,
+    continuePlace: row.continuePlace,
+    agentCheck: row.agentCheck,
+    agentStopRequestedAt: row.agentStopRequestedAt,
     pullRequest:
       row.prId === null || row.prCheckedAt === null
         ? null
@@ -178,12 +216,17 @@ function toRunRecords(row: RunRow): RunRecords {
             url: row.prUrl ?? "",
             ci: row.prCiState ?? "none",
             checkedAt: row.prCheckedAt,
+            signals: row.prSignals,
+            signalsReadAt: row.prSignalsReadAt,
           },
     laterPrState:
       row.laterPrState === null || row.laterPrStateAt === null
         ? null
         : { state: row.laterPrState, at: row.laterPrStateAt },
+    prReadError: row.prReadError,
     worktreeRemovedAt: row.worktreeRemovedAt,
+    worktreeKept: row.worktreeKept,
+    worktreeRemoveRequestedAt: row.worktreeRemoveRequestedAt,
     trackerStateSetAt: row.trackerStateSetAt,
     trackerComment:
       row.trackerCommentId === null || row.trackerCommentedAt === null
@@ -379,9 +422,6 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
       runnerId = input.runnerId;
     }
 
-    const sameKeyRuns =
-      db.select({ n: count() }).from(runs).where(eq(runs.ticketKey, input.ticket.key)).get()?.n ??
-      0;
     const id = toRunId(randomUUID());
     db.insert(runs)
       .values({
@@ -394,9 +434,10 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
         runnerProjectId: input.runnerProject,
         agentId: input.agent,
         model: input.model ?? null,
-        worktreeName: `ganger-${input.ticket.key}-${sameKeyRuns + 1}`,
+        worktreeName: nextWorktreeName(db, input.ticket.key),
         state: "queued",
         runnerId,
+        runnerChosen: input.runnerId !== undefined,
         assignedAt: now,
       })
       .run();
@@ -417,6 +458,210 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
     const run = getRun(db, id);
     if (run === null) throw new RunRowError(id, "missing right after insert");
     return { ok: true, run };
+  });
+}
+
+function nextWorktreeName(db: Database, ticketKey: TicketKey): string {
+  const sameKeyRuns =
+    db.select({ n: count() }).from(runs).where(eq(runs.ticketKey, ticketKey)).get()?.n ?? 0;
+  return `ganger-${ticketKey}-${sameKeyRuns + 1}`;
+}
+
+export type ContinueRunBlock =
+  | "not-found"
+  | "not-ended"
+  | "not-started"
+  | "superseded"
+  | "worktree-removing"
+  | "worktree-settled"
+  | "active-run"
+  | "previous-agent";
+
+export type ContinueRunResult =
+  | { ok: true; run: StoredRun }
+  | { ok: false; reason: ContinueRunBlock };
+
+export function continueRunBlock(db: Database, runId: RunId): ContinueRunBlock | null {
+  const found = getRunWithRecords(db, runId);
+  if (found === null) return "not-found";
+  const { run, records } = found;
+  if (run.state !== "ended") return "not-ended";
+  if (run.startedAt === null) return "not-started";
+  const ticketRuns = listRuns(db, { ticket: run.ticket });
+  if (!checkAssignment({ ticket: run.ticket, runs: ticketRuns }).ok) return "active-run";
+  const later = ticketRuns.slice(ticketRuns.findIndex((other) => other.id === run.id) + 1);
+  if (later.some((other) => other.state !== "ended" || other.startedAt !== null)) {
+    return "superseded";
+  }
+  if (records.worktreeRemovedAt === null) {
+    return records.worktreeRemoveRequestedAt === null ? null : "worktree-removing";
+  }
+  const wasKept =
+    records.worktreeKept !== null ||
+    records.worktreeRemoveRequestedAt !== null ||
+    summarizeRunOutcome(run).worktree === "operator-decides";
+  return wasKept ? null : "worktree-settled";
+}
+
+export function continueRun(
+  db: Database,
+  input: { from: RunId; message: string; now: Date },
+): ContinueRunResult {
+  return inTransaction(db, (): ContinueRunResult => {
+    const block = continueRunBlock(db, input.from);
+    if (block !== null) return { ok: false, reason: block };
+    if (getRunRow(db, input.from)?.agentCheck !== "gone") {
+      return { ok: false, reason: "previous-agent" };
+    }
+    const source = getRun(db, input.from);
+    if (source?.state !== "ended" || source.startedAt === null) {
+      return { ok: false, reason: "not-found" };
+    }
+    const id = toRunId(randomUUID());
+    db.insert(runs)
+      .values({
+        id,
+        trackerConnectionId: source.ticket.connection,
+        ticketKey: source.ticket.key,
+        ticketTitle: source.ticketTitle,
+        workspaceId: source.workspaceId,
+        trackerProjectId: source.trackerProject,
+        runnerProjectId: source.runnerProject,
+        agentId: source.agent,
+        model: source.model,
+        worktreeName: nextWorktreeName(db, source.ticket.key),
+        state: "queued",
+        runnerId: source.runnerId,
+        assignedAt: input.now,
+        continuedFromRunId: source.id,
+        continueMessage: input.message,
+      })
+      .run();
+    recordStateChange(db, id, null, "queued", input.now);
+    recordChange(
+      db,
+      { kind: "assignment", targetId: id, workspaceId: source.workspaceId },
+      input.now,
+    );
+    recordRunChange(db, source.id, { now: input.now });
+    onCommit(db, () =>
+      log().info("run.continued", {
+        runId: id,
+        from: source.id,
+        ticketKey: source.ticket.key,
+        runnerId: source.runnerId,
+      }),
+    );
+    const run = getRun(db, id);
+    if (run === null) throw new RunRowError(id, "missing right after insert");
+    return { ok: true, run };
+  });
+}
+
+export function worktreeTakenOverBy(db: Database, runId: RunId): RunId | null {
+  const row = db
+    .select({ id: runs.id })
+    .from(runs)
+    .where(
+      and(
+        eq(runs.continuedFromRunId, runId),
+        or(ne(runs.state, "ended"), isNotNull(runs.startedAt)),
+      ),
+    )
+    .orderBy(desc(runs.assignedAt), desc(runs.id))
+    .limit(1)
+    .get();
+  return row?.id ?? null;
+}
+
+export function recordContinuePlace(db: Database, runId: RunId, place: ContinuationPlace): void {
+  inTransaction(db, () => {
+    const changed = db
+      .update(runs)
+      .set({ continuePlace: place })
+      .where(
+        and(
+          eq(runs.id, runId),
+          eq(runs.state, "queued"),
+          or(isNull(runs.continuePlace), ne(runs.continuePlace, place)),
+        ),
+      )
+      .run().changes;
+    if (changed > 0) recordRunChange(db, runId);
+  });
+}
+
+export function listTakenOverRunIds(db: Database): Set<RunId> {
+  const rows = db
+    .selectDistinct({ id: runs.continuedFromRunId })
+    .from(runs)
+    .where(
+      and(
+        isNotNull(runs.continuedFromRunId),
+        or(ne(runs.state, "ended"), isNotNull(runs.startedAt)),
+      ),
+    )
+    .all();
+  return new Set(rows.flatMap((row) => (row.id === null ? [] : [row.id])));
+}
+
+export function recordAgentCheck(
+  db: Database,
+  runId: RunId,
+  check: AgentCheck,
+  options: { stopHandled: boolean },
+): void {
+  inTransaction(db, () => {
+    const before = getRunRow(db, runId);
+    if (before === undefined) return;
+    const stopRequestedAt = options.stopHandled ? null : before.agentStopRequestedAt;
+    if (before.agentCheck === check && before.agentStopRequestedAt === stopRequestedAt) return;
+    db.update(runs)
+      .set({ agentCheck: check, agentStopRequestedAt: stopRequestedAt })
+      .where(eq(runs.id, runId))
+      .run();
+    recordRunChange(db, runId);
+  });
+}
+
+export type RequestAgentStopResult =
+  | { ok: true }
+  | { ok: false; reason: "not-found" | "not-ended" | "not-alive" };
+
+export function requestPreviousAgentStop(
+  db: Database,
+  runId: RunId,
+  now: Date,
+): RequestAgentStopResult {
+  return inTransaction(db, (): RequestAgentStopResult => {
+    const row = getRunRow(db, runId);
+    if (row === undefined) return { ok: false, reason: "not-found" };
+    if (row.state !== "ended" || row.startedAt === null) return { ok: false, reason: "not-ended" };
+    if (row.agentCheck !== "alive") return { ok: false, reason: "not-alive" };
+    if (row.agentStopRequestedAt !== null) return { ok: true };
+    db.update(runs).set({ agentStopRequestedAt: now }).where(eq(runs.id, runId)).run();
+    recordRunChange(db, runId, { now });
+    return { ok: true };
+  });
+}
+
+export function reclaimSourceWorktree(db: Database, sourceRunId: RunId): void {
+  inTransaction(db, () => {
+    const found = getRunWithRecords(db, sourceRunId);
+    if (found?.run.state !== "ended") return;
+    const { run, records } = found;
+    const unaccounted =
+      records.worktreeKept === null && summarizeRunOutcome(run).worktree === "nothing-to-remove";
+    if (records.worktreeRemovedAt === null && !unaccounted) return;
+    db.update(runs)
+      .set({
+        worktreeRemovedAt: null,
+        worktreeRemoveRequestedAt: null,
+        ...(unaccounted ? { worktreeKept: "check-failed" as const } : {}),
+      })
+      .where(eq(runs.id, sourceRunId))
+      .run();
+    recordRunChange(db, sourceRunId);
   });
 }
 
@@ -452,6 +697,7 @@ export type RunStateChange =
       to: "ended";
       agentResult: AgentResult;
       prState: PrState;
+      prReadError?: PrReadError;
       runnerUnreached?: boolean;
       reportBody?: string;
     };
@@ -499,6 +745,7 @@ export function changeRunState(
           endedAt: now,
           agentResult: change.agentResult,
           prState: change.prState,
+          prReadError: change.prReadError ?? null,
           runnerUnreached,
           reportBody: change.reportBody ?? null,
           ...pauseClock,
@@ -613,14 +860,25 @@ export function runningSince(db: Database, runId: RunId): Date | null {
   return null;
 }
 
-export function recordStartRequested(db: Database, runId: RunId, now: Date = new Date()): boolean {
-  return (
-    db
-      .update(runs)
-      .set({ startRequestedAt: now })
-      .where(and(eq(runs.id, runId), eq(runs.state, "queued"), isNull(runs.startRequestedAt)))
-      .run().changes > 0
-  );
+export function recordStartRequested(
+  db: Database,
+  runId: RunId,
+  now: Date,
+  agentBrief: string,
+): boolean {
+  return inTransaction(db, () => {
+    db.update(runs)
+      .set({ agentBrief })
+      .where(and(eq(runs.id, runId), eq(runs.state, "queued")))
+      .run();
+    return (
+      db
+        .update(runs)
+        .set({ startRequestedAt: now })
+        .where(and(eq(runs.id, runId), eq(runs.state, "queued"), isNull(runs.startRequestedAt)))
+        .run().changes > 0
+    );
+  });
 }
 
 export function clearStartRequested(db: Database, runId: RunId): boolean {
@@ -659,10 +917,17 @@ export function recordStartFailure(
 export function setQueuedRunRunner(db: Database, runId: RunId, runnerId: RunnerId | null): boolean {
   return inTransaction(db, () => {
     const before = db
-      .select({ runnerId: runs.runnerId })
+      .select({
+        runnerId: runs.runnerId,
+        continuedFromRunId: runs.continuedFromRunId,
+        runnerChosen: runs.runnerChosen,
+      })
       .from(runs)
       .where(eq(runs.id, runId))
       .get();
+    if (before !== undefined && isPinnedToRunner(before) && before.runnerId !== runnerId) {
+      return false;
+    }
     const updated =
       db
         .update(runs)
@@ -710,7 +975,20 @@ export function updateRunRecords(
   db: Database,
   runId: RunId,
   patch: Partial<
-    Omit<RunRecords, "startRequestedAt" | "startFailures" | "startError" | "reportBody">
+    Omit<
+      RunRecords,
+      | "startRequestedAt"
+      | "startFailures"
+      | "startError"
+      | "reportBody"
+      | "agentBrief"
+      | "continueMessage"
+      | "continuePlace"
+      | "agentCheck"
+      | "agentStopRequestedAt"
+      | "prReadError"
+      | "worktreeRemoveRequestedAt"
+    >
   >,
 ): boolean {
   const set: Partial<typeof runs.$inferInsert> = {};
@@ -721,12 +999,23 @@ export function updateRunRecords(
     set.prUrl = pr?.url ?? null;
     set.prCiState = pr?.ci ?? null;
     set.prCheckedAt = pr?.checkedAt ?? null;
+    if (pr === null || (pr.signals ?? null) !== null) {
+      set.prSignals = pr?.signals ?? null;
+      set.prSignalsReadAt = pr === null ? null : pr.checkedAt;
+    } else if (!sameCommitAsStored(getRunRow(db, runId), pr)) {
+      set.prSignals = null;
+      set.prSignalsReadAt = null;
+    }
   }
   if (patch.laterPrState !== undefined) {
     set.laterPrState = patch.laterPrState?.state ?? null;
     set.laterPrStateAt = patch.laterPrState?.at ?? null;
   }
-  if (patch.worktreeRemovedAt !== undefined) set.worktreeRemovedAt = patch.worktreeRemovedAt;
+  if (patch.worktreeRemovedAt !== undefined) {
+    set.worktreeRemovedAt = patch.worktreeRemovedAt;
+    if (patch.worktreeRemovedAt !== null) set.worktreeRemoveRequestedAt = null;
+  }
+  if (patch.worktreeKept !== undefined) set.worktreeKept = patch.worktreeKept;
   if (patch.trackerStateSetAt !== undefined) set.trackerStateSetAt = patch.trackerStateSetAt;
   if (patch.trackerComment !== undefined) {
     set.trackerCommentId = patch.trackerComment?.id ?? null;
@@ -753,7 +1042,89 @@ export function updateRunRecords(
   });
 }
 
-const UNSEEN_RUN_COLUMNS: ReadonlySet<string> = new Set(["prCheckedAt"]);
+export function fillUnreadPrState(db: Database, runId: RunId, prState: ReadPrState): boolean {
+  return inTransaction(db, () => {
+    const filled =
+      db
+        .update(runs)
+        .set({ prState, prReadError: null })
+        .where(and(eq(runs.id, runId), eq(runs.state, "ended"), eq(runs.prState, "unknown")))
+        .run().changes > 0;
+    if (filled) recordRunChange(db, runId);
+    return filled;
+  });
+}
+
+export function recordPrReadError(db: Database, runId: RunId, error: PrReadError): boolean {
+  return inTransaction(db, () => {
+    const changed =
+      db
+        .update(runs)
+        .set({ prReadError: error })
+        .where(and(eq(runs.id, runId), eq(runs.prState, "unknown"), ne(runs.prReadError, error)))
+        .run().changes > 0;
+    if (changed) recordRunChange(db, runId);
+    return changed;
+  });
+}
+
+export type RequestWorktreeRemovalResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "not-found" | "not-ended" | "nothing-to-remove" | "not-kept" | "taken-over";
+    };
+
+export function requestWorktreeRemoval(
+  db: Database,
+  runId: RunId,
+  now: Date,
+): RequestWorktreeRemovalResult {
+  return inTransaction(db, (): RequestWorktreeRemovalResult => {
+    const row = getRunRow(db, runId);
+    if (row === undefined) return { ok: false, reason: "not-found" };
+    if (row.state !== "ended") return { ok: false, reason: "not-ended" };
+    if (row.worktreeRef === null || row.worktreeRemovedAt !== null) {
+      return { ok: false, reason: "nothing-to-remove" };
+    }
+    if (worktreeTakenOverBy(db, runId) !== null) return { ok: false, reason: "taken-over" };
+    const run = toStoredRun(row);
+    if (
+      run.state === "ended" &&
+      row.worktreeKept === null &&
+      summarizeRunOutcome(run).worktree !== "operator-decides"
+    ) {
+      return { ok: false, reason: "not-kept" };
+    }
+    if (row.worktreeRemoveRequestedAt !== null) return { ok: true };
+    db.update(runs).set({ worktreeRemoveRequestedAt: now }).where(eq(runs.id, runId)).run();
+    recordRunChange(db, runId, { now });
+    return { ok: true };
+  });
+}
+
+export function countUnreadPrRuns(db: Database): Record<PrReadError, number> {
+  const counts: Record<PrReadError, number> = { "no-access": 0, other: 0 };
+  const rows = db
+    .select({ error: runs.prReadError, runs: count() })
+    .from(runs)
+    .where(eq(runs.prState, "unknown"))
+    .groupBy(runs.prReadError)
+    .all();
+  for (const row of rows) {
+    if (row.error !== null) counts[row.error] += row.runs;
+  }
+  return counts;
+}
+
+function sameCommitAsStored(
+  row: RunRow | undefined,
+  pr: { id: PullRequestId; headCommit?: string },
+): boolean {
+  return row?.prId === pr.id && row.prSignals?.headCommit === pr.headCommit;
+}
+
+const UNSEEN_RUN_COLUMNS: ReadonlySet<string> = new Set(["prCheckedAt", "prSignalsReadAt"]);
 
 function visiblyChanged(set: Partial<typeof runs.$inferInsert>, before: RunRow, after: RunRow) {
   return Object.keys(set).some((column) => {

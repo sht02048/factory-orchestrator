@@ -9,7 +9,6 @@ import type {
   AgentResult,
   CompletionReport,
   PermissionRequestId,
-  PrStateDecision,
   QuestionId,
   RunOnRunner,
   RunProgress,
@@ -42,15 +41,17 @@ import {
 import type { RunRecords, StoredRunner } from "@ganger/db";
 import {
   answerKey,
-  decideRunPrState,
   denialKey,
   isUnreachable,
   mailboxFor,
+  readRunPrState,
+  rememberPrReadFailure,
   reportFailure,
   tryWrite,
   runLogContext,
+  pullRequestRecord,
 } from "./context.js";
-import type { ActiveRun, PendingEnding, TickContext } from "./context.js";
+import type { ActiveRun, PendingEnding, PrRead, TickContext } from "./context.js";
 
 export async function watchActiveRuns(context: TickContext): Promise<void> {
   const { db, logger } = context;
@@ -127,7 +128,7 @@ async function watchRun(
   }
   if (progress.kind === "active") {
     tryWrite(context, run.id, () => recordRunQuestions(db, run.id, progress.questions));
-    await sendAnswers(context, run, runner, onRunner);
+    await sendAnswers(context, run, runner, onRunner, progress);
     tryWrite(context, run.id, () =>
       inTransaction(db, () => {
         recordPermissionWaits(db, run.id, progress.permissionWaits);
@@ -180,7 +181,7 @@ async function watchRun(
     return;
   }
 
-  const decision = await decideRunPrState(context, run);
+  const prRead = await readRunPrState(context, run);
   const lastLog =
     pending === undefined ? await readLastLog(context, run, runner, onRunner) : pending.lastLog;
   if (ending.agent === "stop") await runner.stopAgent(onRunner);
@@ -192,7 +193,7 @@ async function watchRun(
   });
   const recorded = endRun(context, run, {
     agentResult: ending.agentResult,
-    decision,
+    prRead,
     runnerUnreached: false,
     report: ending.report,
     lastLog,
@@ -281,7 +282,7 @@ async function endWithoutProgress(
       ? { agentResult: "canceled" as const, stopAgent: true, runnerUnreached: false }
       : null);
   if (ending === null) return false;
-  const decision = await decideRunPrState(context, run);
+  const prRead = await readRunPrState(context, run);
   if (ending.stopAgent && !context.pendingEndings.has(run.id)) {
     const mailbox = context.mailboxes.get(storedRunner.id) ?? storedRunner.mailbox;
     if (mailbox === null) return false;
@@ -292,7 +293,7 @@ async function endWithoutProgress(
   }
   const recorded = endRun(context, run, {
     agentResult: ending.agentResult,
-    decision,
+    prRead,
     runnerUnreached: ending.runnerUnreached,
     report: null,
     lastLog: context.pendingEndings.get(run.id)?.lastLog ?? null,
@@ -316,10 +317,10 @@ async function endIfTimedOut(
     cancelRequested: input.cancelRequested,
   });
   if (timeout === null) return;
-  const decision = await decideRunPrState(context, run);
+  const prRead = await readRunPrState(context, run);
   endRun(context, run, {
     agentResult: timeout.agentResult,
-    decision,
+    prRead,
     runnerUnreached: timeout.runnerUnreached,
     report: null,
     lastLog: null,
@@ -429,7 +430,7 @@ function endRun(
   run: ActiveRun,
   input: {
     agentResult: AgentResult;
-    decision: PrStateDecision;
+    prRead: PrRead;
     runnerUnreached: boolean;
     report: CompletionReport | null;
     lastLog: ReadonlyArray<string> | null;
@@ -437,14 +438,17 @@ function endRun(
 ): boolean {
   const { db, logger } = context;
   const endedAt = context.now();
-  return inTransaction(db, () => {
+  const { prRead } = input;
+  const ended = inTransaction(db, () => {
     const result = changeRunState(
       db,
       run.id,
       {
         to: "ended",
         agentResult: input.agentResult,
-        prState: input.decision.prState,
+        ...(prRead.kind === "read"
+          ? { prState: prRead.decision.prState }
+          : { prState: "unknown" as const, prReadError: prRead.error }),
         runnerUnreached: input.runnerUnreached,
         ...(input.report === null ? {} : { reportBody: input.report.body }),
       },
@@ -457,15 +461,16 @@ function endRun(
     if (input.agentResult === "canceled") markCancelRequestProcessed(db, run.id, endedAt);
     resolvePermissionWaits(db, run.id, [], endedAt);
     if (input.lastLog !== null) updateRunRecords(db, run.id, { lastLog: [...input.lastLog] });
-    const pr = input.decision.pr;
-    updateRunRecords(db, run.id, {
-      pullRequest:
-        pr === null
-          ? null
-          : { id: pr.id, displayId: pr.displayId, url: pr.url, ci: pr.ci, checkedAt: endedAt },
-    });
+    if (prRead.kind === "read") {
+      const pr = prRead.decision.pr;
+      updateRunRecords(db, run.id, {
+        pullRequest: pr === null ? null : pullRequestRecord(pr, endedAt),
+      });
+    }
     return true;
   });
+  if (ended && prRead.kind === "failed") rememberPrReadFailure(context, run.id);
+  return ended;
 }
 
 async function sendAnswers(
@@ -473,8 +478,10 @@ async function sendAnswers(
   run: ActiveRun,
   runner: Runner,
   onRunner: RunOnRunner,
+  progress: Extract<RunProgress, { kind: "active" }>,
 ): Promise<void> {
-  const { db, logger, unmarkedAnswers } = context;
+  const { db, logger, unmarkedAnswers, unwokenHumanChecks } = context;
+  const delivery = run.state === "paused" ? "hold" : humanCheckDelivery(progress);
   for (const answer of listUnsentAnswers(db)) {
     if (answer.runId !== run.id) continue;
     const key = answerKey(run.id, answer.questionId);
@@ -494,11 +501,56 @@ async function sendAnswers(
       }
       unmarkedAnswers.add(key);
     }
+    if (answer.kind === "human-check" && delivery === "hold") {
+      unwokenHumanChecks.add(key);
+      continue;
+    }
+    if (answer.kind === "human-check" && delivery === "wake") {
+      const message = humanCheckWakeMessage(answer.questionId, answer.answer);
+      try {
+        const resumed = await runner.resumeAgent(onRunner, {
+          agent: run.agent,
+          message,
+          restartPrompt: message,
+          startIfGone: false,
+        });
+        if (resumed.restarted) throw new Error("the answer did not reach the run's agent");
+      } catch (error) {
+        logger.warn("run.answer_failed", {
+          runId: run.id,
+          questionId: answer.questionId,
+          error,
+        });
+        unwokenHumanChecks.add(key);
+        continue;
+      }
+    }
+    unwokenHumanChecks.delete(key);
     const marked = tryWrite(context, run.id, () =>
       markAnswerSent(db, { runId: run.id, questionId: answer.questionId }, context.now()),
     );
     if (marked !== undefined) unmarkedAnswers.delete(key);
   }
+}
+
+function humanCheckDelivery(
+  progress: Extract<RunProgress, { kind: "active" }>,
+): "delivered" | "wake" | "hold" {
+  if (progress.permissionWaits.length > 0) return "hold";
+  switch (progress.activity?.kind) {
+    case "working":
+      return "delivered";
+    case "turn-ended":
+    case "interrupted":
+      return "wake";
+    case "unknown":
+    case undefined:
+      return "hold";
+  }
+}
+
+function humanCheckWakeMessage(questionId: QuestionId, answer: string): string {
+  return `운영자가 Human Check(${questionId})에 답했어요: ${answer.replace(/\s*\n\s*/g, " ")}`;
 }
 
 async function sendDenials(
@@ -551,9 +603,11 @@ function deniedPermissions(context: TickContext, run: ActiveRun): Set<Permission
 function answeredQuestions(context: TickContext, run: ActiveRun): Set<QuestionId> {
   const answered = sentQuestionIds(context.db, run.id);
   for (const answer of listUnsentAnswers(context.db)) {
+    const key = answerKey(run.id, answer.questionId);
     if (
       answer.runId === run.id &&
-      context.unmarkedAnswers.has(answerKey(run.id, answer.questionId))
+      context.unmarkedAnswers.has(key) &&
+      !context.unwokenHumanChecks.has(key)
     ) {
       answered.add(answer.questionId);
     }

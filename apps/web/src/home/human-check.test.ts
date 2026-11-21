@@ -1,0 +1,165 @@
+import {
+  AnswerRejectedError,
+  humanCheckAnswerInput,
+  humanCheckAnswerText,
+  submitAnswer,
+  submitHumanCheckAnswer,
+} from "@ganger/app/home/actions";
+import { loadHomePage, pendingInput } from "@ganger/app/home/load";
+import { todoGroups, todoTagOf } from "@ganger/app/home/model";
+import { notificationCauses } from "@ganger/app/notifications/causes";
+import { HUMAN_CHECK_NOTE_MAX } from "@ganger/app/question";
+import { toPermissionRequestId, toQuestionId, toTicketKey } from "@ganger/core";
+import type { RunId } from "@ganger/core";
+import {
+  changeRunState,
+  listRunQuestions,
+  listRuns,
+  recordPermissionWaits,
+  recordRunQuestions,
+} from "@ganger/db";
+import type { Database } from "@ganger/db";
+import { describe, expect, it } from "vitest";
+import { bodyParts } from "../question/human-check-answer";
+import { minutes, now, seedDatabase } from "../testing/seed";
+
+const CHECK_ID = "msg-check";
+
+function seedHumanCheck(): { db: Database; runId: RunId } {
+  const { db } = seedDatabase();
+  const running = listRuns(db, { states: ["running"] }).find(
+    (run) => run.ticket.key === toTicketKey("ACME-10"),
+  );
+  if (running === undefined) throw new Error("no running run");
+  const changed = changeRunState(db, running.id, { to: "waiting-for-input" }, minutes(110));
+  if (!changed.ok) throw new Error("state change failed");
+  recordRunQuestions(db, running.id, [
+    {
+      id: toQuestionId(CHECK_ID),
+      kind: "human-check",
+      body: "PR #7 머지를 확인해 주세요\n\nhttps://github.com/acme/widgets/pull/7",
+      options: [],
+      askedAt: minutes(110),
+    },
+  ]);
+  return { db, runId: running.id };
+}
+
+describe("Human Check 요청", () => {
+  it("Waiting for Input 의 Human Check 종류로 읽고 Question 과 다른 묶음에 둔다", () => {
+    const { db, runId } = seedHumanCheck();
+    expect(pendingInput(db, runId)).toMatchObject({ kind: "human-check", answered: false });
+
+    const page = loadHomePage(db, "ws-commerce", now, "UTC");
+    const groups = todoGroups(page.attention);
+    expect(groups.map((group) => group.kind)).toEqual(["check", "answer", "stopped"]);
+    const [check] = groups;
+    expect(check?.runs.map((run) => run.id)).toEqual([runId]);
+    expect(check?.runs[0] === undefined ? null : todoTagOf(check.runs[0])).toBe("human-check");
+  });
+
+  it("답하기 전에는 Human Check 알림 사건을 내고, 답하면 내지 않는다", () => {
+    const { db, runId } = seedHumanCheck();
+    const causesOf = () =>
+      notificationCauses(loadHomePage(db, "ws-commerce", now, "UTC"), [], now).filter(
+        (cause) => cause.kind === "human-check",
+      );
+    expect(causesOf().map((cause) => cause.cause)).toEqual([`human-check:${runId}:${CHECK_ID}`]);
+
+    submitHumanCheckAnswer(
+      db,
+      { runId, questionId: CHECK_ID, decision: "confirmed", note: "" },
+      now,
+    );
+    expect(causesOf()).toEqual([]);
+  });
+
+  it.each([
+    ["confirmed", "", "확인했어요"],
+    ["confirmed", "좋아요", "확인했어요\n\n좋아요"],
+    ["changes-requested", "", "고쳐 주세요"],
+    ["changes-requested", "시험을 더해 주세요", "고쳐 주세요\n\n시험을 더해 주세요"],
+  ] as const)(
+    "답 %s + 함께 보낼 말 '%s' 를 에이전트에게 보낼 글로 저장한다",
+    (decision, note, text) => {
+      expect(humanCheckAnswerText(decision, note)).toBe(text);
+      const { db, runId } = seedHumanCheck();
+      submitHumanCheckAnswer(db, { runId, questionId: CHECK_ID, decision, note }, now);
+      expect(listRunQuestions(db, runId).at(-1)?.answer?.text).toBe(text);
+    },
+  );
+
+  it("함께 보낼 말의 앞뒤 빈칸을 다듬고, 정해진 두 답 밖의 값은 받지 않는다", () => {
+    const base = { runId: "r", questionId: "q" };
+    expect(
+      humanCheckAnswerInput.parse({ ...base, decision: "confirmed", note: "  네  " }).note,
+    ).toBe("네");
+    expect(humanCheckAnswerInput.safeParse({ ...base, decision: "merge", note: "" }).success).toBe(
+      false,
+    );
+  });
+
+  it("함께 보낼 말은 다듬은 뒤 글자 수로 상한을 잰다", () => {
+    const base = { runId: "r", questionId: "q", decision: "confirmed" };
+    const parsed = (note: string) => humanCheckAnswerInput.safeParse({ ...base, note }).success;
+    expect(parsed(`  ${"가".repeat(HUMAN_CHECK_NOTE_MAX)}  `)).toBe(true);
+    expect(parsed("😀".repeat(HUMAN_CHECK_NOTE_MAX))).toBe(true);
+    expect(parsed("가".repeat(HUMAN_CHECK_NOTE_MAX + 1))).toBe(false);
+  });
+
+  it("답한 Human Check 를 보내는 동안 뒤에 온 Permission 을 화면과 알림에서 가리지 않는다", () => {
+    const { db, runId } = seedHumanCheck();
+    submitHumanCheckAnswer(
+      db,
+      { runId, questionId: CHECK_ID, decision: "confirmed", note: "" },
+      now,
+    );
+    recordPermissionWaits(db, runId, [
+      {
+        id: toPermissionRequestId("p-after-check"),
+        detail: "Bash: orca orchestration check --wait",
+        requestedAt: minutes(115),
+      },
+    ]);
+
+    expect(pendingInput(db, runId)).toMatchObject({
+      kind: "permission",
+      promptId: "p-after-check",
+    });
+    expect(
+      notificationCauses(loadHomePage(db, "ws-commerce", now, "UTC"), [], now).map(
+        (cause) => cause.cause,
+      ),
+    ).toContain(`permission:${runId}:p-after-check`);
+  });
+
+  it("일반 질문 답하기로는 Human Check 에 답하지 못한다", () => {
+    const { db, runId } = seedHumanCheck();
+    expect(() => {
+      submitAnswer(db, { runId, questionId: CHECK_ID, answer: "확인했어요" }, now);
+    }).toThrow(AnswerRejectedError);
+    expect(listRunQuestions(db, runId).at(-1)?.answer).toBeNull();
+  });
+
+  it("요청 글의 http 링크만 문장 부호 없이 링크로 나눈다", () => {
+    expect(bodyParts("보세요: https://example.com/a. 그리고 (https://example.com/b)")).toEqual([
+      { kind: "text", value: "보세요: " },
+      { kind: "link", value: "https://example.com/a" },
+      { kind: "text", value: ". 그리고 (" },
+      { kind: "link", value: "https://example.com/b" },
+      { kind: "text", value: ")" },
+    ]);
+    const links = (body: string) =>
+      bodyParts(body).flatMap((part) => (part.kind === "link" ? [part.value] : []));
+    expect(links("https://github.com/acme/widgets/pull/1을 확인해 주세요")).toEqual([
+      "https://github.com/acme/widgets/pull/1",
+    ]);
+    expect(links("PR(https://github.com/acme/widgets/pull/2)을 봐 주세요")).toEqual([
+      "https://github.com/acme/widgets/pull/2",
+    ]);
+    expect(links("https://example.com/x_(y)")).toEqual(["https://example.com/x_(y)"]);
+    expect(bodyParts("javascript:alert(1)")).toEqual([
+      { kind: "text", value: "javascript:alert(1)" },
+    ]);
+  });
+});

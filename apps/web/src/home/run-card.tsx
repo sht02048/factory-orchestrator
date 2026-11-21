@@ -1,7 +1,6 @@
-import * as stylex from "@stylexjs/stylex";
-import { Button, KanbanCard, Menu, MenuItem, MoreIcon, StatusPill, buttonStyles } from "@ganger/ui";
+import { Button, KanbanCard, Menu, MenuItem, MoreIcon, StatusPill, Text } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
-import type { RunControl } from "@ganger/core";
+import type { RunControl, RunId } from "@ganger/core";
 import { useId, useState } from "react";
 import type { ReactNode, Ref } from "react";
 import { useTranslations } from "use-intl";
@@ -11,17 +10,26 @@ import { todoTagOf } from "@ganger/app/home/model";
 import { availableRunControl } from "@ganger/app/run-control-view";
 import type { RunControlView } from "@ganger/app/run-control-view";
 import { questionSummary } from "@ganger/app/question";
-import { RunKey, useRunText } from "./run-text";
+import { allBlockersOf, blockerReasonOf } from "@ganger/app/runs/model";
+import { BlockerChipList } from "../blockers";
+import { useRunText } from "./run-text";
 
 export type SheetMode = "summary" | "answer";
 
 interface CardParts {
   detail?: ReactNode;
   detailTone?: "problem";
+  blockers?: ReactNode;
+  stuck?: boolean;
   meta?: ReactNode;
+  metaTone?: "problem";
   time?: ReactNode;
   action?: ReactNode;
   menu?: ReactNode;
+}
+
+export function cardTag(run: HomeRun, tagged: boolean): PillStatus | null {
+  return (tagged ? todoTagOf(run) : null) ?? (run.state === "paused" ? "paused" : null);
 }
 
 export function RunCard({
@@ -29,6 +37,7 @@ export function RunCard({
   tagged,
   all,
   selected,
+  lastTags,
   openRef,
   onOpen,
   onControl,
@@ -37,12 +46,17 @@ export function RunCard({
   tagged: boolean;
   all: boolean;
   selected: boolean;
+  lastTags: ReadonlyMap<RunId, PillStatus | null>;
   openRef: Ref<HTMLButtonElement>;
   onOpen: (mode: SheetMode) => void;
   onControl: (control: RunControl) => Promise<boolean>;
 }) {
   const todoTag = tagged ? todoTagOf(run) : null;
-  const tag: PillStatus | null = todoTag ?? (run.state === "paused" ? "paused" : null);
+  const tag = cardTag(run, tagged);
+  const [popNewPill, setPopNewPill] = useState(
+    () => lastTags.has(run.id) && lastTags.get(run.id) !== tag,
+  );
+  if (tag === null && !popNewPill) setPopNewPill(true);
   const titleId = useId();
   const [sending, setSending] = useState(false);
   const [rejected, setRejected] = useState(false);
@@ -61,17 +75,30 @@ export function RunCard({
   });
   const statusName = useRunText().statusName;
   return (
-    <li data-run={run.id} data-tag={tag ?? undefined}>
-      <KanbanCard
-        {...(tag === null ? {} : { tag: <StatusPill status={tag}>{statusName(tag)}</StatusPill> })}
-        title={<RunKey run={run} />}
-        titleId={titleId}
-        {...parts}
-        selected={selected}
-        openRef={openRef}
-        onOpen={() => onOpen("summary")}
-      />
-    </li>
+    <KanbanCard
+      {...(tag === null
+        ? {}
+        : {
+            tag: (
+              <StatusPill status={tag} changeMotion popOnMount={popNewPill}>
+                {statusName(tag)}
+              </StatusPill>
+            ),
+          })}
+      ticketKey={run.ticketKey}
+      title={
+        run.ticketTitle === null ? null : (
+          <Text variant="title" as="span">
+            {run.ticketTitle}
+          </Text>
+        )
+      }
+      titleId={titleId}
+      {...parts}
+      selected={selected}
+      openRef={openRef}
+      onOpen={() => onOpen("summary")}
+    />
   );
 }
 
@@ -108,10 +135,27 @@ function useCardParts(
           detailTone: "problem" as const,
         }
       : {};
-  const workspace = all ? ` · ${run.workspace.name}` : "";
   switch (run.state) {
-    case "queued":
-      return { detail: text.queued(run), meta: runner, time: elapsed(run.waitMs) };
+    case "queued": {
+      const waiting = blockerReasonOf(run.queuedReason);
+      if (waiting === null)
+        return { detail: text.queued(run), meta: runner, time: elapsed(run.waitMs) };
+      const stuck = waiting.kind === "blockers-stuck";
+      const blockers = allBlockersOf(waiting);
+      return {
+        ...(blockers.length === 0 ? {} : { blockers: <BlockerChipList blockers={blockers} /> }),
+        stuck,
+        meta: [
+          run.cancelling ? t("cancelling") : null,
+          text.queued(run),
+          all ? run.workspace.name : null,
+        ]
+          .filter((part) => part !== null)
+          .join(" · "),
+        ...(stuck ? { metaTone: "problem" as const } : {}),
+        time: elapsed(run.waitMs),
+      };
+    }
     case "running":
       return {
         ...failed,
@@ -179,6 +223,23 @@ function useCardParts(
                   </Button>
                 ),
               };
+        case "human-check":
+          return input.answered
+            ? { detail: firstLineOf(input.body), meta: t("answered"), ...time }
+            : {
+                detail: firstLineOf(input.body),
+                meta: runner,
+                ...time,
+                action: (
+                  <Button
+                    variant="secondary"
+                    aria-describedby={titleId}
+                    onClick={() => onOpen("answer")}
+                  >
+                    {t("check")}
+                  </Button>
+                ),
+              };
         case "permission":
           return {
             detail: t("permission", { command: input.detail }),
@@ -194,27 +255,6 @@ function useCardParts(
       const time = ago(run.endedAt, run.endedAgoMs);
       const pr = run.pullRequest;
       const prLine = pr === null ? null : t("pullRequest", { pr: pr.displayId });
-      if (tagged && run.summary === "human-check")
-        return {
-          meta: `${prLine ?? t("humanCheckNoPr")}${workspace}`,
-          time,
-          ...(pr === null
-            ? {}
-            : {
-                action: (
-                  <a
-                    href={pr.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    data-variant="secondary"
-                    aria-describedby={titleId}
-                    {...stylex.props(...buttonStyles("secondary"))}
-                  >
-                    {t("openPr")}
-                  </a>
-                ),
-              }),
-        };
       if (tagged && run.summary === "failed")
         return { detail: text.agentResult(run), meta: runner, time };
       return {
@@ -225,6 +265,10 @@ function useCardParts(
       };
     }
   }
+}
+
+function firstLineOf(body: string): string {
+  return body.split("\n", 1)[0] ?? "";
 }
 
 function controlPendingKey(control: RunControlView | null): "pausing" | "resuming" | null {

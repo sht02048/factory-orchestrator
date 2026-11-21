@@ -117,13 +117,13 @@ describe("Stats 기간(브라우저, 0072)", () => {
     await hydrated(page);
 
     const ended = page.getByRole("group", { name: stats.figures.ended });
-    const mergedRate = page.getByRole("group", { name: stats.figures.mergedRate });
+    const successRate = page.getByRole("group", { name: stats.figures.successRate });
     const table = page.getByRole("table", { name: stats.throughput.tableCaption });
     expect(await ended.textContent()).toContain("2");
     expect(await table.getByRole("rowheader").count()).toBe(14);
     expect(await page.getByRole("heading", { level: 1 }).textContent()).toBe(stats.title);
     expect(await page.locator("main header").textContent()).toContain(
-      "끝난 런 2개 중 50%를 에이전트가 병합까지 끝냈어요.",
+      "끝난 런 2개 중 50%가 Succeeded예요.",
     );
 
     const periods = page.getByRole("tablist", { name: stats.period.label });
@@ -132,10 +132,10 @@ describe("Stats 기간(브라우저, 0072)", () => {
     await page.waitForURL(/days=7/);
     await page
       .locator("main header")
-      .getByText("끝난 런 1개 중 100%를 에이전트가 병합까지 끝냈어요.", { exact: true })
+      .getByText("끝난 런 1개 중 100%가 Succeeded예요.", { exact: true })
       .waitFor();
     expect(await ended.textContent()).toBe(`${stats.figures.ended}1`);
-    expect(await mergedRate.textContent()).toContain("앞 7일보다 100%p 올랐어요");
+    expect(await successRate.textContent()).toContain("앞 7일보다 100%p 올랐어요");
     expect(await table.getByRole("rowheader").count()).toBe(7);
     expect(await periods.getByRole("tab", { name: "7일" }).getAttribute("aria-selected")).toBe(
       "true",
@@ -170,7 +170,7 @@ describe("Stats 날짜별 처리량(브라우저, 0053)", () => {
 
     await page.getByRole("button", { name: stats.throughput.hideTable }).waitFor();
     expect((await box.boundingBox())?.height ?? 0).toBeGreaterThan(100);
-    expect(await todayRow.getByRole("cell").allTextContents()).toEqual(["1", "0", "0", "0"]);
+    expect(await todayRow.getByRole("cell").allTextContents()).toEqual(["1", "0", "0"]);
   });
 });
 
@@ -180,7 +180,7 @@ describe("Stats 나눠 보기에서 Runs 열기(브라우저, 0075)", () => {
     await page.goto(`/stats?ws=${workspaceId}&days=7`);
     await hydrated(page);
 
-    const breakdown = page.getByRole("table", { name: "러너별 끝난 런, 병합률, 리드 타임" });
+    const breakdown = page.getByRole("table", { name: "러너별 끝난 런, 성공률, 리드 타임" });
     await breakdown
       .getByRole("row")
       .filter({ hasText: "runner-a" })
@@ -273,7 +273,7 @@ describe("Stats 배치(브라우저, 0093)", () => {
     await page.goto(`/stats?ws=${workspaceId}`);
     await hydrated(page);
     const region = page.getByRole("region", {
-      name: "러너별 끝난 런, 병합률, 리드 타임",
+      name: "러너별 끝난 런, 성공률, 리드 타임",
       exact: true,
     });
     const result = {
@@ -310,7 +310,7 @@ describe("Stats 배치(브라우저, 0093)", () => {
 
 describe("Stats 날짜별 표(브라우저, 0093)", () => {
   it("좁은 폭에서 '표로 보기'로 펼친 표는 표만 옆으로 넘어가고 페이지는 넘치지 않는다", async (context) => {
-    const page = await openPage(context, 400);
+    const page = await openPage(context, 320);
     await page.goto(`/stats?ws=${workspaceId}`);
     await hydrated(page);
     await page.getByRole("button", { name: stats.throughput.showTable }).click();

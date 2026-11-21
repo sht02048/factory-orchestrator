@@ -6,6 +6,7 @@ import {
   addTrackerProject,
   addTrackerProjectInput,
   addressesInput,
+  briefInput,
   checkGitHubToken,
   checkTrackerConnection,
   connectionIdInput,
@@ -23,6 +24,7 @@ import {
   runnerIdInput,
   runnerInput,
   saveAddresses,
+  saveBrief,
   saveGeneral,
   saveGitHubToken,
   saveInProgressState,
@@ -37,7 +39,7 @@ import {
   verifyWebhookAddress,
   webhookAddressInput,
 } from "@ganger/app/settings/actions";
-import { funnelAddress, funnelCommand } from "@ganger/app/webhook-address";
+import { planFunnel } from "@ganger/app/funnel-setup";
 import type { WebhookSetupView } from "@ganger/app/settings/model";
 import { GANGER_YELLOW_HEX } from "@ganger/ui/brand-color";
 import { saveRunnerFindingOrca } from "@ganger/app/runner-setup/remote-orca";
@@ -53,7 +55,13 @@ import { getDatabase } from "./database";
 import { serverMcpLaunch } from "./mcp-launch";
 import { installPowerSettings } from "./power-settings";
 import { getTrackerReads } from "./tracker-reads";
-import { getThisTailnetDevice, getWebhookPingFetch } from "./webhook-reach";
+import { autoAllowInput, autoAllowedAddresses, refreshAutoAllowedHosts } from "./request-access";
+import {
+  getServeStatusOutput,
+  getThisTailnetAddresses,
+  getThisTailnetDevice,
+  getWebhookPingFetch,
+} from "./webhook-reach";
 
 function context(): SettingsContext {
   const power = installPowerSettings(process.env);
@@ -63,6 +71,7 @@ function context(): SettingsContext {
     registry: getAdapterRegistry(),
     mcpLaunch: serverMcpLaunch(process.env, process.execPath),
     trackerReads: getTrackerReads(),
+    autoAllowedHosts: autoAllowedAddresses(),
     ...(power === undefined ? {} : { power }),
   };
 }
@@ -71,7 +80,10 @@ const wsInput = z.object({ ws: z.string().optional() });
 
 export const getSettings = createServerFn({ method: "GET" })
   .validator(wsInput)
-  .handler(({ data }) => loadSettingsDb(context(), data.ws, new Date()));
+  .handler(async ({ data }) => {
+    await refreshAutoAllowedHosts();
+    return loadSettingsDb(context(), data.ws, new Date());
+  });
 
 export const getTrackerProjects = createServerFn({ method: "GET" }).handler(() =>
   loadTrackerProjectLists(context()),
@@ -88,6 +100,10 @@ export const getRunnerChecksPending = createServerFn({ method: "GET" }).handler(
 export const saveWorkspaceGeneral = createServerFn({ method: "POST" })
   .validator(generalInput)
   .handler(({ data }) => saveGeneral(context(), data));
+
+export const saveWorkspaceBrief = createServerFn({ method: "POST" })
+  .validator(briefInput)
+  .handler(({ data }) => saveBrief(context(), data));
 
 export const addWorkspaceTrackerProject = createServerFn({ method: "POST" })
   .validator(addTrackerProjectInput)
@@ -143,6 +159,7 @@ export const saveAddressesSetting = createServerFn({ method: "POST" })
     saveAddresses(context(), data, new Date(), {
       host: getRequestHeader("host") ?? null,
       bindHost: parseBootConfig(process.env).host,
+      ...autoAllowInput(),
     }),
   );
 
@@ -170,14 +187,31 @@ function webPort(): number {
   }
 }
 
+function webBindHost(): string {
+  try {
+    return parseBootConfig(process.env).host;
+  } catch {
+    return "127.0.0.1";
+  }
+}
+
 export const getWebhookSetup = createServerFn({ method: "GET" }).handler(
   async (): Promise<WebhookSetupView> => {
     const device = await getThisTailnetDevice();
+    if (device === null) return { funnel: null };
+    const [addresses, serveOutput] = await Promise.all([
+      getThisTailnetAddresses(),
+      getServeStatusOutput(device.cli),
+    ]);
     return {
-      funnel:
-        device === null
-          ? null
-          : { command: funnelCommand(device.cli, webPort()), address: funnelAddress(device.host) },
+      funnel: planFunnel({
+        cli: device.cli,
+        deviceHost: device.host,
+        deviceAddresses: addresses.kind === "known" ? addresses.hosts : [],
+        bindHost: webBindHost(),
+        webPort: webPort(),
+        serveOutput,
+      }),
     };
   },
 );

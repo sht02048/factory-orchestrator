@@ -1,4 +1,5 @@
-import type { AgentResult, PrState, SummaryOutcome } from "@ganger/core";
+import type { PrSignalsView } from "../pr-signals-view.js";
+import type { AgentResult, PrReadError, PrState, SummaryOutcome } from "@ganger/core";
 import type { WorkspaceChoice } from "../shell/model.js";
 import type { StatsPeriodDays } from "../stats/model.js";
 
@@ -7,7 +8,33 @@ export type QueuedReason =
       kind: "starting" | "behind" | "runner-offline" | "project-missing" | "assignment-blocked";
     }
   | { kind: "no-capacity"; runner: string }
-  | { kind: "usage-limit"; provider: string; resetsInMs: number };
+  | { kind: "usage-limit"; provider: string; resetsInMs: number }
+  | { kind: "blockers-waiting"; blockers: BlockerView[]; finished?: BlockerView[] }
+  | {
+      kind: "blockers-stuck";
+      cause: "canceled" | "unreadable" | "cycle";
+      blocker: BlockerView | null;
+      blockers: BlockerView[];
+    };
+
+export interface BlockerView {
+  key: string;
+  title: string;
+  stateName: string;
+  stateCategory: string;
+}
+
+export type BlockerReason = Extract<QueuedReason, { kind: "blockers-waiting" | "blockers-stuck" }>;
+
+export function blockerReasonOf(reason: QueuedReason): BlockerReason | null {
+  return reason.kind === "blockers-waiting" || reason.kind === "blockers-stuck" ? reason : null;
+}
+
+export function allBlockersOf(reason: BlockerReason): BlockerView[] {
+  return reason.kind === "blockers-waiting"
+    ? [...reason.blockers, ...(reason.finished ?? [])]
+    : reason.blockers;
+}
 
 interface RunViewBase {
   id: string;
@@ -19,7 +46,7 @@ interface RunViewBase {
   agent: string;
   waitMs: number;
   executionMs: number | null;
-  pullRequest: { displayId: string; url: string } | null;
+  pullRequest: { displayId: string; url: string; signals: PrSignalsView | null } | null;
   attention: boolean;
 }
 
@@ -38,6 +65,8 @@ export type RunView =
       endedAgoMs: number;
       agentResult: AgentResult;
       prState: PrState;
+      laterPrState: "merged" | "closed" | null;
+      prReadError: PrReadError | null;
       summary: SummaryOutcome;
     });
 
@@ -67,8 +96,7 @@ export const RUN_STATUS_FILTERS = [
   "waiting-for-input",
   "disconnected",
   "queued",
-  "merged",
-  "human-check",
+  "succeeded",
   "failed",
   "canceled",
 ] as const;
@@ -83,6 +111,13 @@ export function isGroupFilter(filter: RunFilter): filter is RunGroupFilter {
 
 export function filterKeyOf(run: RunView): RunFilterKey {
   return run.state === "ended" ? run.summary : run.state;
+}
+
+export function currentPrState(run: {
+  prState: PrState;
+  laterPrState: "merged" | "closed" | null;
+}): PrState {
+  return run.laterPrState ?? run.prState;
 }
 
 export function needsAttention(run: RunView): boolean {

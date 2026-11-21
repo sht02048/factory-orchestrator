@@ -44,13 +44,12 @@ export function readNotificationFeed(db: Database, requested: number | null): No
 const LEGACY_KINDS = {
   question: "question",
   permission: "permission",
-  "human-check": "human-check",
   "runner-offline": "runner-offline",
 } as const;
 
 export type LegacyAlert =
   | {
-      kind: "question" | "permission" | "human-check";
+      kind: "question" | "permission";
       key: string;
       runId: string;
       ticketKey: string;
@@ -66,7 +65,6 @@ export function legacyAlerts(db: Database): LegacyAlert[] {
     switch (event.kind) {
       case "question":
       case "permission":
-      case "human-check":
         return event.target.kind === "run"
           ? [
               {
@@ -88,6 +86,7 @@ export function legacyAlerts(db: Database): LegacyAlert[] {
               },
             ]
           : [];
+      case "human-check":
       case "failed":
       case "disconnected":
       case "runner-auth":

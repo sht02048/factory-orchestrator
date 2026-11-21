@@ -1,5 +1,6 @@
 import { canRunnerTake, isProjectBlocked, pickRunner, remainingCapacity } from "./assignment.js";
 import type { RunnerSnapshot, RunPlacement } from "./assignment.js";
+import { priorityRank } from "./blockers.js";
 import type { AgentId, RunId, RunnerId, RunnerProjectId } from "./ids.js";
 import { usageLimitOf } from "./usage-limit.js";
 import type { UsageLimit } from "./usage-limit.js";
@@ -11,6 +12,9 @@ export interface QueuedRun {
   agent: AgentId;
   runnerId: RunnerId | null;
   unstartable: boolean;
+  pinnedToRunner?: boolean;
+  startRequested?: boolean;
+  priorityRank?: number;
 }
 
 export interface RunnerChoice {
@@ -38,17 +42,24 @@ export function planQueue(input: {
   const plan: QueuePlan = { cleared: [], assigned: [], unplaced: [], couldNotStart: [], start: [] };
   const runnersById = new Map(input.runners.map((runner) => [runner.id, runner]));
   const placements: RunPlacement[] = [...input.runs];
-  let blocked = false;
+  const waitedOn = new Set<RunnerId>();
 
-  for (const run of fifoOrder(input.queued)) {
+  for (const run of queueOrder(input.queued)) {
     if (run.unstartable) {
-      if (!blocked) plan.couldNotStart.push(run.id);
+      if (run.runnerId === null || !waitedOn.has(run.runnerId)) plan.couldNotStart.push(run.id);
       continue;
     }
 
     let runnerId = run.runnerId;
     if (runnerId !== null) {
       const runner = runnersById.get(runnerId);
+      if (run.pinnedToRunner === true) {
+        const held = pinnedRunnerHold(runner, run);
+        if (held !== null) {
+          plan.unplaced.push({ runId: run.id, ...held });
+          continue;
+        }
+      }
       if (runner === undefined || !canRunnerTake(runner, run.project)) {
         plan.cleared.push({
           runId: run.id,
@@ -58,32 +69,54 @@ export function planQueue(input: {
       }
     }
 
+    const hasRoom = (candidate: RunnerSnapshot): boolean =>
+      !waitedOn.has(candidate.id) && remainingCapacity(candidate, placements) > 0;
+    const choose = (runners: ReadonlyArray<RunnerSnapshot>): RunnerId | null =>
+      pickRunner({ project: run.project, agent: run.agent, runners, runs: placements });
+
     if (runnerId === null) {
-      runnerId = pickRunner({
-        project: run.project,
-        agent: run.agent,
-        runners: input.runners,
-        runs: placements,
-      });
+      runnerId = choose(input.runners.filter(hasRoom)) ?? choose(input.runners);
       if (runnerId === null) {
         plan.unplaced.push({ runId: run.id, ...unplacedReason(input.runners, run) });
         continue;
       }
       plan.assigned.push({ runId: run.id, runnerId });
+    } else if (run.pinnedToRunner !== true && run.startRequested !== true) {
+      const current = runnersById.get(runnerId);
+      if (current !== undefined && !hasRoom(current)) {
+        const freeRunner = choose(input.runners.filter(hasRoom));
+        if (freeRunner !== null) {
+          runnerId = freeRunner;
+          plan.assigned.push({ runId: run.id, runnerId });
+        }
+      }
     }
 
-    if (blocked) continue;
-
     const runner = runnersById.get(runnerId);
-    if (runner !== undefined && remainingCapacity(runner, placements) > 0) {
+    if (
+      !waitedOn.has(runnerId) &&
+      runner !== undefined &&
+      remainingCapacity(runner, placements) > 0
+    ) {
       plan.start.push({ runId: run.id, runnerId });
       placements.push({ runnerId, state: "running" });
     } else {
-      blocked = true;
+      waitedOn.add(runnerId);
     }
   }
 
   return plan;
+}
+
+function pinnedRunnerHold(
+  runner: RunnerSnapshot | undefined,
+  run: Pick<QueuedRun, "project" | "agent" | "startRequested">,
+): Unplaced | null {
+  if (runner === undefined) return { reason: "runner-offline" };
+  if (!canRunnerTake(runner, run.project)) return { reason: whyCannotTake(runner, run.project) };
+  if (run.startRequested === true) return null;
+  const limit = usageLimitOf(runner.usageLimits, run.agent);
+  return limit === null ? null : { reason: "usage-limit", limit };
 }
 
 function whyCannotTake(runner: RunnerSnapshot, project: RunnerProjectId): UnplacedReason {
@@ -112,6 +145,13 @@ function unplacedReason(
     : { reason: "usage-limit", limit: earliest };
 }
 
-function fifoOrder(queued: ReadonlyArray<QueuedRun>): QueuedRun[] {
-  return queued.toSorted((a, b) => a.assignedAt.getTime() - b.assignedAt.getTime());
+const NO_PRIORITY_RANK = priorityRank("none");
+
+export function queueOrder<T extends QueuedRun>(queued: ReadonlyArray<T>): T[] {
+  return queued.toSorted(
+    (a, b) =>
+      Number(b.startRequested === true) - Number(a.startRequested === true) ||
+      (a.priorityRank ?? NO_PRIORITY_RANK) - (b.priorityRank ?? NO_PRIORITY_RANK) ||
+      a.assignedAt.getTime() - b.assignedAt.getTime(),
+  );
 }

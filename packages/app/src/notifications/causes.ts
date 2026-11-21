@@ -23,6 +23,9 @@ function runCause(run: HomeRun): NotificationCause | null {
       if (input?.kind === "question" && !input.answered) {
         return { ...base, kind: "question", cause: `question:${run.id}:${input.questionId}` };
       }
+      if (input?.kind === "human-check" && !input.answered) {
+        return { ...base, kind: "human-check", cause: `human-check:${run.id}:${input.questionId}` };
+      }
       if (input?.kind === "permission" && !input.denied) {
         return { ...base, kind: "permission", cause: `permission:${run.id}:${input.promptId}` };
       }
@@ -31,9 +34,6 @@ function runCause(run: HomeRun): NotificationCause | null {
     case "disconnected":
       return { ...base, kind: "disconnected", cause: `disconnected:${run.id}` };
     case "ended":
-      if (run.summary === "human-check" && !run.prSettledLater) {
-        return { ...base, kind: "human-check", cause: `human-check:${run.id}` };
-      }
       if (run.summary === "failed") return { ...base, kind: "failed", cause: `failed:${run.id}` };
       return null;
     case "queued":

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./agent-brief": "./src/agent-brief.ts",
     "./config": "./src/config.ts",
     "./service-install": "./src/service-install.ts"
   },

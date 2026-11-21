@@ -37,6 +37,11 @@
   "noRunnerEnded": "러너 없이 끝남",
   "metaSeparator": " · ",
   "prWithState": "{pr} {state}",
+  "prMarks": {
+    "ciFailed": "CI 실패",
+    "conflict": "충돌",
+    "behind": "base보다 {count}커밋 뒤"
+  },
   "cancelling": "취소 중",
   "ended": {
     "partial": "끝난 런은 최근 {count}개까지 보여요. 그보다 오래된 런은 처리할 일만 보여요.",
@@ -75,14 +80,20 @@
       "waiting-for-input": "에이전트가 사람 입력을 기다리고 있어요. 최대 실행 시간은 이 동안에도 흘러요.",
       "paused": "운영자가 멈춰 둔 런이에요. 워크트리와 러너 자리는 그대로이고, 최대 실행 시간도 멈춰 있어요. 자세히 보기에서 재개할 수 있어요.",
       "disconnected": "런 중 러너에 5분 넘게 닿지 않았어요. 다시 닿으면 실제 상태를 확인해요. 최대 실행 시간은 이 동안에도 흘러요.",
-      "merged": "에이전트가 완료 보고를 보냈고 PR이 병합됐어요.",
-      "human-check": "에이전트가 완료 보고를 보냈고 PR이 열려 있어요. 사람이 확인해야 해요.",
-      "failed": "에이전트 결과와 PR 상태 때문에 Failed예요. 자동으로 다시 시도하지 않아요.",
+      "succeeded": "에이전트가 성공을 보고했어요. PR 정보는 결과와 따로 보여요.",
+      "failed": "에이전트가 실패를 보고했거나 런이 보고 없이 끝났어요. 자동으로 다시 시도하지 않아요.",
       "canceled": "운영자가 취소한 런이에요. 처리할 일에 올리지 않아요.",
       "disconnectedPaused": "멈춰 둔 런인데 러너에 5분 넘게 닿지 않았어요. 다시 닿으면 멈춘 채로 돌아와요. 최대 실행 시간은 멈춰 있어요."
     },
     "noRunsWithConditions": "조건에 맞는 런이 생기면 여기에 요약이 보여요.",
-    "pausedFor": "{duration}째 멈춰 있어요"
+    "pausedFor": "{duration}째 멈춰 있어요",
+    "prUnread": {
+      "no-access": "PR 정보를 읽지 못했어요. GitHub 토큰이 이 저장소를 볼 수 없어요. 토큰을 고치면 worker가 다시 읽어요.",
+      "other": "PR 정보를 읽지 못했어요. worker가 간격을 늘려 가며 다시 읽어요."
+    },
+    "reasonWithPrUnread": "{reason} {prUnread}"
   },
-  "pausedFor": "{elapsed} 멈춤"
+  "pausedFor": "{elapsed} 멈춤",
+  "prUnread": "PR 못 읽음",
+  "prUnreadWithPr": "{pr} 못 읽음"
 }

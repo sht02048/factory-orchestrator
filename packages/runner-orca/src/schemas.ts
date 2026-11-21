@@ -50,6 +50,17 @@ export const projectSetupsResultSchema = z.object({
   ),
 });
 
+export const repoHooksResultSchema = z.object({
+  repo: z.object({
+    hookSettings: z
+      .object({
+        commandSourcePolicy: z.string().nullish(),
+        scripts: z.object({ setup: z.string().nullish() }).nullish(),
+      })
+      .nullish(),
+  }),
+});
+
 export const terminalCreateResultSchema = z.object({
   terminal: z.object({ handle: text }),
 });
@@ -77,6 +88,10 @@ export const workerStartResultSchema = z.object({
 
 export const worktreeShowResultSchema = z.object({
   worktree: z.object({ id: text, branch: optionalText }),
+});
+
+export const worktreePathResultSchema = z.object({
+  worktree: z.object({ path: text }),
 });
 
 export const workerListResultSchema = z.object({
@@ -171,6 +186,16 @@ export const worktreePsResultSchema = z.object({
 
 export const replyResultSchema = z.object({ messageId: text });
 export const sendResultSchema = z.object({ messageId: text });
+export const operatorSendResultSchema = z.union([
+  z.object({ messageId: text }),
+  z.object({ delivery: text, dispatchId: text }),
+]);
+export const failedFollowUpEnvelopeSchema = z
+  .object({
+    ok: z.literal(false),
+    result: z.object({ delivery: text, dispatchId: text }),
+  })
+  .transform((envelope) => envelope.result);
 export const denyResultSchema = z.object({ approvalId: optionalText });
 export const workerStopResultSchema = z.object({ state: text });
 export const workerReleaseResultSchema = z.object({ state: text });

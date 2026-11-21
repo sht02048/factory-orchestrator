@@ -1,5 +1,5 @@
 import type { NotificationRecord } from "@ganger/app/notifications/feed";
-import { allows, isSilentKind, isTodoKind, remindsKind } from "./notification-prefs.js";
+import { allows, isTodoKind, remindsKind } from "./notification-prefs.js";
 import type { NotificationPrefs } from "./notification-prefs.js";
 
 export const BUNDLE_WINDOW_MS = 5_000;
@@ -13,7 +13,7 @@ export type NotificationContent =
   | { kind: "missed"; count: number };
 
 export type NotifierEffect =
-  | { type: "show"; id: string; content: NotificationContent; silent: boolean; path: string }
+  | { type: "show"; id: string; content: NotificationContent; path: string }
   | { type: "remove"; ids: string[] }
   | { type: "badge"; count: number }
   | { type: "seen"; lastId: number };
@@ -152,7 +152,6 @@ export class Notifier {
       type: "show",
       id: group.id,
       content: { kind: "missed", count: missed.length },
-      silent: missed.every((record) => isSilentKind(record.kind)),
       path: TODO_VIEW_PATH,
     });
   }
@@ -194,7 +193,6 @@ export class Notifier {
       type: "show",
       id: group.id,
       content: { kind: "bundle", count: window.ids.length },
-      silent: members.every((member) => isSilentKind(member.kind)),
       path: TODO_VIEW_PATH,
     });
   }
@@ -227,7 +225,6 @@ export class Notifier {
       type: "show",
       id: eventNotificationId(record.id),
       content: { kind: "event", record, reminder },
-      silent: isSilentKind(record.kind),
       path: pathOf(record),
     });
   }

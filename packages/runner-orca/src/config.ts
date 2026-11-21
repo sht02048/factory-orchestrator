@@ -28,6 +28,7 @@ export const orcaRunnerConfigSchema = z.object({
   connectTimeoutSeconds: z.number().int().positive().default(10),
   commandTimeoutMs: z.number().int().positive().default(60_000),
   startTimeoutMs: z.number().int().positive().default(180_000),
+  setupTimeoutMs: z.number().int().positive().default(900_000),
   access: gangerSshAccessSchema.optional(),
 });
 

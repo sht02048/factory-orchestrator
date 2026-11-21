@@ -63,7 +63,7 @@ describe("대기열과 capacity", () => {
     await worker.tick();
     expect(stateOf(third)).toBe("queued");
 
-    finish(first);
+    finish(first, "failed");
     await worker.tick();
     expect([stateOf(first), stateOf(second), stateOf(third)]).toEqual([
       "ended",
@@ -82,12 +82,12 @@ describe("두 축 기록", () => {
     agentResult: string;
     outcome: string;
   }> = [
-    { report: "succeeded", pr: "merged", agentResult: "reported-success", outcome: "merged" },
-    { report: "failed", pr: "merged", agentResult: "reported-failure", outcome: "merged" },
-    { report: "succeeded", pr: "open", agentResult: "reported-success", outcome: "human-check" },
-    { report: "failed", pr: "open", agentResult: "reported-failure", outcome: "human-check" },
-    { report: "succeeded", pr: "closed", agentResult: "reported-success", outcome: "failed" },
-    { report: "succeeded", pr: "none", agentResult: "reported-success", outcome: "failed" },
+    { report: "succeeded", pr: "merged", agentResult: "reported-success", outcome: "succeeded" },
+    { report: "failed", pr: "merged", agentResult: "reported-failure", outcome: "failed" },
+    { report: "succeeded", pr: "open", agentResult: "reported-success", outcome: "succeeded" },
+    { report: "failed", pr: "open", agentResult: "reported-failure", outcome: "failed" },
+    { report: "succeeded", pr: "closed", agentResult: "reported-success", outcome: "succeeded" },
+    { report: "succeeded", pr: "none", agentResult: "reported-success", outcome: "succeeded" },
     { report: "failed", pr: "none", agentResult: "reported-failure", outcome: "failed" },
   ];
 
@@ -115,48 +115,32 @@ describe("두 축 기록", () => {
       expect(found.records.reportBody).toBe(`보고: ${report}`);
     },
   );
-
-  it("코드 호스트 어댑터를 만들지 못하면 PR 상태를 없음으로 확정하지 않고 다음 바퀴에 다시 본다", async () => {
-    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
-    const run = h.assign("ENG-1", projectA);
-    const worker = h.worker();
-    h.codeHostBroken = true;
-    await worker.tick();
-    h.putPullRequest(current(run), "open");
-    finish(run);
-
-    await worker.tick();
-    expect(stateOf(run)).toBe("running");
-
-    h.codeHostBroken = false;
-    await worker.tick();
-    const ended = current(run);
-    expect(ended.state === "ended" && ended.prState).toBe("open");
-  });
-
-  it("코드 호스트가 실패하면 끝내지 않고 다음 바퀴에 다시 기록한다", async () => {
-    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
-    const run = h.assign("ENG-1", projectA);
-    const worker = h.worker();
-    await worker.tick();
-    h.putPullRequest(current(run), "open");
-    finish(run);
-
-    const spy = vi
-      .spyOn(h.codeHost, "findPullRequestsByBranch")
-      .mockRejectedValueOnce(new Error("network"));
-    await worker.tick();
-    expect(stateOf(run)).toBe("running");
-
-    await worker.tick();
-    spy.mockRestore();
-    const ended = current(run);
-    expect(ended.state === "ended" && ended.prState).toBe("open");
-  });
 });
 
-describe("엄격한 FIFO", () => {
-  it("맨 앞 런의 러너가 꽉 차 있으면 다른 러너의 뒤 런도 시작하지 않는다(Q63 개정)", async () => {
+describe("러너별 대기열", () => {
+  it("모든 러너가 꽉 찼을 때 들어온 런은 먼저 빈 러너에서 들어온 순서대로 시작한다(F3)", async () => {
+    const runnerA = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const onA = h.assign("ENG-1", projectA);
+    const onB = h.assign("ENG-2", projectA);
+    const worker = h.worker();
+    await worker.tick();
+    expect(new Set([current(onA).runnerId, current(onB).runnerId])).toEqual(
+      new Set([runnerA, runnerB]),
+    );
+
+    const first = h.assign("ENG-3", projectA);
+    const second = h.assign("ENG-4", projectA);
+    await worker.tick();
+    expect([stateOf(first), stateOf(second)]).toEqual(["queued", "queued"]);
+
+    finish(current(onB).runnerId === runnerB ? onB : onA);
+    await worker.tick();
+    expect(current(first)).toMatchObject({ state: "running", runnerId: runnerB });
+    expect(stateOf(second)).toBe("queued");
+  });
+
+  it("맨 앞 런의 러너가 꽉 차 있어도 다른 러너의 뒤 런은 시작한다(F3)", async () => {
     const runnerB = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectB] });
     h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const busy = h.assign("ENG-1", projectA);
@@ -167,8 +151,8 @@ describe("엄격한 FIFO", () => {
     const head = h.assign("ENG-2", projectA);
     const behind = h.assign("ENG-3", projectB);
     await worker.tick();
-    expect([stateOf(head), stateOf(behind)]).toEqual(["queued", "queued"]);
-    expect(h.runner(runnerB).runs.size).toBe(0);
+    expect([stateOf(head), stateOf(behind)]).toEqual(["queued", "running"]);
+    expect(h.runner(runnerB).runs.size).toBe(1);
 
     finish(busy);
     await worker.tick();

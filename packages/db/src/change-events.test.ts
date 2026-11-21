@@ -77,6 +77,7 @@ import {
   saveRunnerCapacity,
   saveTrackerConnection,
   saveWorkspace,
+  saveWorkspaceBrief,
   saveWorkspaceTrackerProject,
   setRunnerMailbox,
 } from "./settings.js";
@@ -115,7 +116,6 @@ function world(): World {
       trackerProject,
       runnerProject: repoA,
       agent,
-      runnerId,
     });
     if (!result.ok) throw new Error(result.reason);
     return result.run.id;
@@ -408,6 +408,15 @@ const writes: WriteCase[] = [
     write: (w) => saveWorkspace(w.db, { id: workspaceId, name: "Acme Web" }),
   },
   {
+    name: "saveWorkspaceBrief",
+    kinds: ["workspace"],
+    write: (w) =>
+      saveWorkspaceBrief(w.db, {
+        id: workspaceId,
+        brief: { before: "Read AGENTS.md.", after: "" },
+      }),
+  },
+  {
     name: "saveTrackerConnection",
     kinds: ["settings", "tracker"],
     write: (w) =>
@@ -672,7 +681,7 @@ describe("화면에 보이는 값이 그대로면 줄을 쓰지 않는다", () =
     {
       name: "시작 요청 시각(화면에 보이지 않음)",
       write: (w) => {
-        recordStartRequested(w.db, w.queued, later());
+        recordStartRequested(w.db, w.queued, later(), "brief");
         clearStartRequested(w.db, w.queued);
       },
     },

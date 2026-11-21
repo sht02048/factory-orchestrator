@@ -73,7 +73,7 @@ const runs: ReadonlyArray<SampleRun> = [
     id: "r1051",
     number: 1051,
     ticket: "ACME-123",
-    status: "human-check",
+    status: "succeeded",
     runner: "runner-a",
     agent: "Claude Code",
     elapsed: "42:10",
@@ -106,7 +106,7 @@ const runs: ReadonlyArray<SampleRun> = [
     id: "r1044",
     number: 1044,
     ticket: "ACME-108",
-    status: "merged",
+    status: "succeeded",
     runner: "runner-c",
     agent: "Codex",
     elapsed: "23:51",
@@ -533,6 +533,12 @@ export function ComponentSections() {
                   </DialogClose>
                 </>
               }
+            />
+            <Dialog
+              trigger={t("dialog.trigger")}
+              triggerBusy={{ active: true, label: t("dialog.busyTrigger") }}
+              title={t("dialog.title")}
+              actions={<DialogClose>{t("dialog.cancel")}</DialogClose>}
             />
           </Demo>
         </Section>

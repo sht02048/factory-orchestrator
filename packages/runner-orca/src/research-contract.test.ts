@@ -144,7 +144,7 @@ describe("research 0008 contract", () => {
       project: toRunnerProjectId("github:acme/sandbox"),
       worktreeName: "fo-orch-r1",
       agent: toAgentId("claude"),
-      prompt: "ticket body",
+      brief: "ticket body",
     });
     expect(started).toEqual({
       worktree: runOf(1).worktree,

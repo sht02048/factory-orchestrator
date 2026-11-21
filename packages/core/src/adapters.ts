@@ -1,4 +1,5 @@
 import type {
+  FollowUpRef,
   AgentId,
   AgentRef,
   CodeHostKind,
@@ -18,6 +19,7 @@ import type {
   TrackerStateId,
   WorktreeRef,
 } from "./ids.js";
+import type { TicketPriority, TicketRelations } from "./blockers.js";
 import type { ProviderUsageReading } from "./provider-usage.js";
 
 export class AdapterError<D extends { kind: string }> extends Error {
@@ -71,6 +73,7 @@ export interface TrackerTicket {
   project: { id: TrackerProjectId; name: string } | null;
   state: TrackerState;
   updatedAt: Date;
+  priority?: TicketPriority;
 }
 
 export interface TrackerComment {
@@ -136,6 +139,7 @@ export interface Tracker {
   }): { ok: true; event: TrackerEvent } | { ok: false; error: WebhookVerifyError };
 
   getTicket(key: TicketKey): Promise<TrackerTicket | null>;
+  getTicketRelations?(key: TicketKey): Promise<TicketRelations | null>;
   listProjectTickets(projectId: TrackerProjectId, page?: Page): Promise<Paged<TrackerTicket>>;
   listLabeledTickets(input: {
     labelId: LabelId;
@@ -216,9 +220,29 @@ export interface StartRunInput {
   baseBranch?: string;
   agent: AgentId;
   model?: string;
-  prompt: string;
+  brief: string;
   ticket?: { key: TicketKey; url: string };
+  continueIn?: WorktreeRef;
 }
+
+export const CONTINUATION_PLACES = ["same-worktree", "recreated", "from-scratch"] as const;
+export type ContinuationPlace = (typeof CONTINUATION_PLACES)[number];
+
+export const AGENT_CHECKS = ["gone", "alive", "unknown"] as const;
+export type AgentCheck = (typeof AGENT_CHECKS)[number];
+
+export interface PrepareContinuationInput {
+  project: RunnerProjectId;
+  worktree: WorktreeRef;
+  branch: string;
+}
+
+export interface FinishWorktreeSetupInput {
+  project: RunnerProjectId;
+  worktree: WorktreeRef;
+}
+
+export type WorktreeSetupResult = { kind: "done" } | { kind: "failed"; reason: string };
 
 export interface StartedRun {
   worktree: WorktreeRef;
@@ -238,6 +262,7 @@ export interface ResumeAgentInput {
   message: string;
   restartPrompt: string;
   startIfGone?: boolean;
+  previousRunAgent?: AgentRef;
 }
 
 export interface ResumedAgent {
@@ -245,8 +270,13 @@ export interface ResumedAgent {
   restarted: boolean;
 }
 
+export const QUESTION_KINDS = ["question", "human-check"] as const;
+
+export type QuestionKind = (typeof QUESTION_KINDS)[number];
+
 export interface AgentQuestion {
   id: QuestionId;
+  kind?: QuestionKind;
   body: string;
   options: ReadonlyArray<string>;
   askedAt: Date;
@@ -285,8 +315,17 @@ export type RunProgress =
   | { kind: "ended-without-report"; detail: string }
   | { kind: "worktree-gone" };
 
+export type WorktreeWork =
+  | { kind: "gone" }
+  | { kind: "checked"; uncommittedChanges: boolean; unpushedCommits: boolean };
+
+export type AgentSendResult =
+  | { kind: "delivered" }
+  | { kind: "follow-up"; followUpRef: FollowUpRef };
+
 export interface Runner {
   readonly kind: RunnerKind;
+  readonly agentProtocol: string;
 
   checkHealth(): Promise<RunnerHealth>;
   listProjects(): Promise<ReadonlyArray<RunnerProject>>;
@@ -295,7 +334,16 @@ export interface Runner {
   ensureMailbox(current: MailboxRef | null): Promise<MailboxRef>;
 
   startRun(input: StartRunInput): Promise<StartedRun>;
-  findStartedRun(input: { mailbox: MailboxRef; worktreeName: string }): Promise<StartedRun | null>;
+  findStartedRun(input: {
+    mailbox: MailboxRef;
+    worktreeName: string;
+    continueIn?: WorktreeRef;
+    previousAgent?: AgentRef;
+  }): Promise<StartedRun | null>;
+  prepareContinuation(input: PrepareContinuationInput): Promise<ContinuationPlace>;
+  worktreeSetupPending(input: FinishWorktreeSetupInput): Promise<boolean>;
+  finishWorktreeSetup(input: FinishWorktreeSetupInput): Promise<WorktreeSetupResult>;
+  isAgentAlive(run: Pick<RunOnRunner, "worktree" | "agentRef">): Promise<boolean>;
 
   pollRun(run: RunOnRunner): Promise<RunProgress>;
   answerQuestion(
@@ -307,6 +355,9 @@ export interface Runner {
     input: { permissionId: PermissionRequestId; reason: string },
   ): Promise<void>;
 
+  sendToAgent(run: RunOnRunner, input: { body: string }): Promise<AgentSendResult>;
+  stopFollowUp(followUpRef: FollowUpRef): Promise<void>;
+
   pauseAgent(run: RunOnRunner): Promise<void>;
   resumeAgent(run: RunOnRunner, input: ResumeAgentInput): Promise<ResumedAgent>;
 
@@ -314,10 +365,23 @@ export interface Runner {
   closeAgent(run: RunOnRunner): Promise<void>;
   readLogTail(run: RunOnRunner, opts: { lines: number }): Promise<ReadonlyArray<string>>;
   worktreeExists(worktree: WorktreeRef): Promise<boolean>;
+  checkWorktreeWork(worktree: WorktreeRef): Promise<WorktreeWork>;
   removeWorktree(worktree: WorktreeRef): Promise<void>;
 }
 
 export type CiState = "success" | "failure" | "pending" | "none" | "unavailable" | (string & {});
+
+export interface PullRequestSignals {
+  open: boolean;
+  headCommit: string;
+  ciFailed: boolean;
+  checkTotal: number | null;
+  failedCount: number;
+  failedChecks: ReadonlyArray<string>;
+  checksTruncated: boolean;
+  conflict: boolean | null;
+  behindBy: number | null;
+}
 
 export interface PullRequestSnapshot {
   id: PullRequestId;
@@ -328,11 +392,13 @@ export interface PullRequestSnapshot {
   state: "open" | "closed" | "merged" | (string & {});
   createdAt: Date;
   mergedAt: Date | null;
+  closedAt?: Date;
   headBranch: string;
   sourceRepo: RepoRef | null;
   headCommit: string;
   baseBranch: string;
   ci: CiState;
+  signals?: PullRequestSignals | null;
 }
 
 export type CodeHostErrorDetail =

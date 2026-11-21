@@ -16,8 +16,10 @@ permissions:
   contents: read
 
 jobs:
-  check:
+  scope:
     runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.scope.outputs.code }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -42,54 +44,102 @@ jobs:
           else
             echo "code=true" >> "$GITHUB_OUTPUT"
           fi
+
+  static:
+    needs: scope
+    if: needs.scope.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
-        if: steps.scope.outputs.code == 'true'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        if: steps.scope.outputs.code == 'true'
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-        if: steps.scope.outputs.code == 'true'
       - name: Typecheck
-        if: steps.scope.outputs.code == 'true'
         run: pnpm run typecheck
       - name: Lint
-        if: steps.scope.outputs.code == 'true'
         run: pnpm run lint
       - name: Color literals
-        if: steps.scope.outputs.code == 'true'
         run: pnpm run check:colors
       - name: Style lengths
-        if: steps.scope.outputs.code == 'true'
         run: pnpm run check:lengths
       - name: Format check
-        if: steps.scope.outputs.code == 'true'
         run: pnpm run format:check
-      - name: Test
-        if: steps.scope.outputs.code == 'true'
-        run: pnpm run test
-      # 브라우저 시험(e2e)이 실패하면 그때의 화면을 남긴다.
-      - name: Upload browser test screenshots
-        if: failure() && steps.scope.outputs.code == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: browser-test-screenshots
-          path: e2e/test-results/
-          if-no-files-found: ignore
+      - name: Unit tests
+        run: pnpm exec vitest run --project '!e2e' --project '!demo'
       - name: Build
-        if: steps.scope.outputs.code == 'true'
         run: pnpm run build
       - name: Web production smoke test
-        if: steps.scope.outputs.code == 'true'
         run: pnpm run smoke:web
       - name: CLI smoke test
-        if: steps.scope.outputs.code == 'true'
         run: pnpm run smoke:cli
       - name: Server bundle
-        if: steps.scope.outputs.code == 'true'
         run: pnpm run bundle
       # 배포물을 저장소 밖 임시 폴더에 풀어 init·start·러너 확인을 돌린다(티켓 0029).
       - name: Server bundle smoke test
-        if: steps.scope.outputs.code == 'true'
         run: pnpm run smoke:bundle
+
+  browser:
+    needs: scope
+    if: needs.scope.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Browser tests
+        env:
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm exec vitest run --project e2e --project demo --shard="$SHARD" --maxWorkers=2
+      # 브라우저 시험(e2e)이 실패하면 그때의 화면을 남긴다.
+      - name: Upload browser test screenshots
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-test-screenshots-${{ matrix.shard }}
+          path: e2e/test-results/
+          if-no-files-found: ignore
+
+  check:
+    needs: [scope, static, browser]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every job to pass
+        env:
+          SCOPE: ${{ needs.scope.result }}
+          CODE: ${{ needs.scope.outputs.code }}
+          STATIC: ${{ needs.static.result }}
+          BROWSER: ${{ needs.browser.result }}
+        run: |
+          echo "scope=$SCOPE code=$CODE static=$STATIC browser=$BROWSER"
+          if [ "$SCOPE" != "success" ]; then
+            echo "::error::scope job did not succeed ($SCOPE)."
+            exit 1
+          fi
+          if [ "$CODE" = "false" ]; then
+            echo "Only Markdown changed; checks skipped."
+            exit 0
+          fi
+          if [ "$CODE" != "true" ]; then
+            echo "::error::scope job gave no result."
+            exit 1
+          fi
+          if [ "$STATIC" != "success" ] || [ "$BROWSER" != "success" ]; then
+            echo "::error::static=$STATIC browser=$BROWSER; every job must succeed."
+            exit 1
+          fi

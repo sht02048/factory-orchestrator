@@ -52,7 +52,8 @@
     },
     "humanCheck": {
       "title": "Human Check",
-      "body": "{ticket} PR을 확인해 주세요."
+      "body": "{ticket} 에이전트가 확인을 기다려요.",
+      "reminder": "{ticket} 에이전트가 10분째 확인을 기다려요."
     },
     "failed": {
       "title": "Failed",

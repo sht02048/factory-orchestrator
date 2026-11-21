@@ -1,3 +1,5 @@
+export * from "./agent-messages.js";
+export * from "./blockers.js";
 export * from "./change-events.js";
 export * from "./config.js";
 export * from "./database.js";
@@ -8,6 +10,7 @@ export * from "./migrate.js";
 export * from "./permissions.js";
 export * from "./questions.js";
 export * from "./requests.js";
+export * from "./run-action-requests.js";
 export * from "./run-timeline.js";
 export * from "./runs.js";
 export * as schema from "./schema.js";

@@ -14,6 +14,7 @@ import type { ReactNode } from "react";
 import { useTranslations } from "use-intl";
 import { BlockSections, blockSectionIds } from "./block-preview";
 import { ComponentSections } from "./component-preview";
+import { MotionSection } from "./motion-preview";
 import { RoleSections, roleSectionIds } from "./role-preview";
 import { TokenSections } from "./token-preview";
 
@@ -32,6 +33,7 @@ const componentLinks = [
   "toast",
   ...roleSectionIds,
   ...blockSectionIds,
+  "motionPrimitives",
 ] as const;
 
 export function DesignSystemPage() {
@@ -66,6 +68,7 @@ export function DesignSystemPage() {
             <ComponentSections />
             <RoleSections />
             <BlockSections />
+            <MotionSection />
           </div>
         </div>
       </main>

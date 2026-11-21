@@ -6,6 +6,7 @@ import {
   DefinitionItem,
   DefinitionList,
   DetailPanel,
+  MotionList,
   PageHeader,
   PanelHeader,
   RowTitle,
@@ -40,6 +41,7 @@ import {
   ENDED_RUNS_PAGE_SIZE,
   RUN_GROUP_FILTERS,
   RUN_STATUS_FILTERS,
+  currentPrState,
   elapsedMs,
   isGroupFilter,
   matchesFilter,
@@ -83,8 +85,10 @@ const narrowColumns = "minmax(0, 1fr)";
 
 export interface RunsScreenProps {
   page: RunsPage;
+  drawKey?: string;
   workspaces: ReadonlyArray<WorkspaceSummary>;
   filter: RunFilter;
+  endedLimit?: number;
   selectedId: string | undefined;
   onFilterChange: (filter: RunFilter) => void;
   onSelect: (runId: string) => void;
@@ -151,7 +155,9 @@ function AllWorkspaces({
 
 function RunsList({
   page,
+  drawKey = "",
   filter,
+  endedLimit,
   selectedId,
   onFilterChange,
   onSelect,
@@ -172,6 +178,8 @@ function RunsList({
   const filterBar = useRef<HTMLDivElement>(null);
   const focusAfterClear = useRef(false);
   const filtered = page.conditions.length > 0;
+  const workspaceId = page.workspace.kind === "one" ? page.workspace.workspace.id : "";
+  const listKey = JSON.stringify([workspaceId, filter, page.conditions, endedLimit ?? null]);
   useEffect(() => {
     if (focusAfterMore.current) {
       focusAfterMore.current = false;
@@ -255,17 +263,25 @@ function RunsList({
                         ? t("noRunsWithConditions")
                         : t("noRuns")}
                   </TableEmpty>
-                ) : (
-                  <TableRows
-                    label={t("listLabel")}
-                    value={selected?.id ?? null}
-                    onValueChange={onSelect}
+                ) : null}
+                <TableRows
+                  label={t("listLabel")}
+                  value={selected?.id ?? null}
+                  onValueChange={onSelect}
+                  motionItems
+                >
+                  <MotionList
+                    key={drawKey}
+                    items={visible}
+                    getKey={(run) => run.id}
+                    itemGap="row"
+                    resetKey={listKey}
                   >
-                    {visible.map((run) => (
-                      <RunRow key={run.id} run={run} onOpen={() => onOpen(run.id)} />
-                    ))}
-                  </TableRows>
-                )}
+                    {(run, { leaving }) => (
+                      <RunRow run={run} leaving={leaving} onOpen={() => onOpen(run.id)} />
+                    )}
+                  </MotionList>
+                </TableRows>
               </Table>
             </Card>
             {page.moreEnded || page.recentEnded > ENDED_RUNS_PAGE_SIZE ? (
@@ -358,7 +374,7 @@ function ConditionChips({
   );
 }
 
-function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
+function RunRow({ run, leaving, onOpen }: { run: RunView; leaving: boolean; onOpen: () => void }) {
   const t = useTranslations("runs");
   const { ago, elapsed } = useTime();
   const statusName = useStatusName();
@@ -367,7 +383,7 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
   const result = useRunResultText(run);
 
   return (
-    <TableRow value={run.id} label={ticketName(run)} onOpen={onOpen}>
+    <TableRow value={run.id} label={ticketName(run)} onOpen={onOpen} disabled={leaving}>
       <TableCell hideWhen="stacked">
         {run.ticketTitle === null ? null : (
           <Text variant="meta" numeric>
@@ -399,6 +415,7 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
               {result}
             </Text>
           </TableFoldedOnly>
+          <PrMarks run={run} />
         </span>
       </TableCell>
       <TableCell hideWhen="second">
@@ -408,7 +425,9 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
         <Text variant="meta">{result}</Text>
       </TableCell>
       <TableCell>
-        <StatusPill status={status}>{statusName(status)}</StatusPill>
+        <StatusPill status={status} changeMotion>
+          {statusName(status)}
+        </StatusPill>
       </TableCell>
       <TableCell align="end" numeric>
         {run.state === "ended"
@@ -421,6 +440,29 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
   );
 }
 
+function PrMarks({ run }: { run: RunView }) {
+  const t = useTranslations("runs");
+  const signals = run.pullRequest?.signals ?? null;
+  if (signals === null) return null;
+  const behindBy = signals.behindBy ?? 0;
+  if (!signals.ciFailed && signals.conflict !== true && behindBy === 0) return null;
+  return (
+    <span data-pr-marks {...stylex.props(styles.prMarks)}>
+      {signals.ciFailed ? (
+        <Text variant="meta" tone="problem">
+          {t("prMarks.ciFailed")}
+        </Text>
+      ) : null}
+      {signals.conflict === true ? (
+        <Text variant="meta" tone="problem">
+          {t("prMarks.conflict")}
+        </Text>
+      ) : null}
+      {behindBy > 0 ? <Text variant="meta">{t("prMarks.behind", { count: behindBy })}</Text> : null}
+    </span>
+  );
+}
+
 function useRunResultText(run: RunView): string {
   const t = useTranslations("runs");
   const domain = useTranslations("domain");
@@ -428,14 +470,20 @@ function useRunResultText(run: RunView): string {
   const parts: string[] = [];
   if (run.state === "ended") {
     parts.push(domain(`agentResult.${run.agentResult}`));
-    if (run.pullRequest !== null)
+    if (run.prState === "unknown")
+      parts.push(
+        run.pullRequest === null
+          ? t("prUnread")
+          : t("prUnreadWithPr", { pr: run.pullRequest.displayId }),
+      );
+    else if (run.pullRequest !== null)
       parts.push(
         t("prWithState", {
           pr: run.pullRequest.displayId,
-          state: domain(`prState.${run.prState}`),
+          state: domain(`prState.${currentPrState(run)}`),
         }),
       );
-    else if (run.prState !== "none") parts.push(domain(`prState.${run.prState}`));
+    else if (currentPrState(run) !== "none") parts.push(domain(`prState.${currentPrState(run)}`));
   } else {
     parts.push(agentName(run.agent));
     if (run.cancelling) parts.push(t("cancelling"));
@@ -482,7 +530,13 @@ function RunPanel({
       break;
     case "ended":
       when = t("endedAfter", { duration: duration(run.executionMs ?? 0) });
-      reason = t(`reason.${run.summary}`);
+      reason =
+        run.prReadError === null
+          ? t(`reason.${run.summary}`)
+          : t("reasonWithPrUnread", {
+              reason: t(`reason.${run.summary}`),
+              prUnread: t(`prUnread.${run.prReadError}`),
+            });
       break;
   }
   if (run.state !== "ended" && run.cancelling) reason = t("cancellingReason");
@@ -542,7 +596,7 @@ function RunPanel({
           {ended === null ? t("notEnded") : domain(`agentResult.${ended.agentResult}`)}
         </DefinitionItem>
         <DefinitionItem label={t("prState")} empty={ended === null}>
-          {ended === null ? t("notEnded") : domain(`prState.${ended.prState}`)}
+          {ended === null ? t("notEnded") : domain(`prState.${currentPrState(ended)}`)}
         </DefinitionItem>
         <DefinitionItem label={t("runner")} empty={run.runner === null}>
           {run.runner === null ? (
@@ -596,6 +650,7 @@ const styles = stylex.create({
     marginTop: space.s4,
   },
   rowText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
+  prMarks: { display: "flex", flexWrap: "wrap", columnGap: space.s2, minWidth: 0 },
 });
 
 function ticketName(run: RunView): string {

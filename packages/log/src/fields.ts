@@ -52,6 +52,7 @@ export const DETAIL_KEYS = [
   "arch",
   "logLevel",
   "migrated",
+  "followUpRef",
 ] as const;
 
 export type ContextKey = (typeof CONTEXT_KEYS)[number];

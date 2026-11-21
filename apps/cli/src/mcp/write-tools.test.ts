@@ -7,20 +7,25 @@ import { loadRunDetail } from "@ganger/app/run-detail/load";
 import { loadSettingsPage } from "@ganger/app/settings/load";
 import {
   SecretBox,
+  answerRunQuestion,
   getMapping,
   getRunCancelRequest,
+  markRunRelationsUnread,
   latestChangeSeq,
   listChangesAfter,
   listRecentMcpActions,
   listRunMcpActions,
   listRunQuestions,
   listRunners,
+  markAnswerSent,
+  recordRunQuestions,
   saveMcpWriteAllowed,
+  getRun,
 } from "@ganger/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
-import { toRunId, toTrackerConnectionId, toTrackerProjectId } from "@ganger/core";
+import { toQuestionId, toRunId, toTrackerConnectionId, toTrackerProjectId } from "@ganger/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createMcpServer } from "./server.js";
@@ -277,6 +282,80 @@ describe("MCP 쓰기 도구", () => {
     expect(listRecentMcpActions(seeded.db, 10)).toEqual([]);
   });
 
+  it("같은 requestId 로 다시 답하면 한 번만 처리하고 같은 결과를 돌려준다(0156)", async () => {
+    await connect();
+    const args = { runId: seeded.waiting, answer: "no", requestId: "mcp-request-id-0156" };
+
+    const first = await call("answer_question", args);
+    const second = await call("answer_question", args);
+
+    expect(first.isError).toBe(false);
+    expect(second.isError).toBe(false);
+    expect(second.json).toEqual(first.json);
+    expect(listRunQuestions(seeded.db, seeded.waiting).map((q) => q.answer?.text)).toEqual(["no"]);
+    expect(listRunMcpActions(seeded.db, seeded.waiting)).toHaveLength(1);
+  });
+
+  it("questionId 없이 답한 뒤 다음 질문이 와도 같은 requestId 는 처음 결과를 돌려주고 새 질문에 답하지 않는다(0156)", async () => {
+    await connect();
+    const args = { runId: seeded.waiting, answer: "no", requestId: "mcp-request-id-next" };
+    expect((await call("answer_question", args)).isError).toBe(false);
+    recordRunQuestions(seeded.db, seeded.waiting, [
+      { id: toQuestionId("q-next"), body: "next?", options: [], askedAt: at(61) },
+    ]);
+
+    const again = await call("answer_question", args);
+    const changed = await call("answer_question", { ...args, answer: "yes" });
+
+    expect(again.isError).toBe(false);
+    expect(changed.json["reason"]).toBe("request-reused");
+    expect(
+      listRunQuestions(seeded.db, seeded.waiting).find((q) => q.id === toQuestionId("q-next"))
+        ?.answer,
+    ).toBeNull();
+  });
+
+  it("같은 requestId 로 다시 취소하면 같은 결과이고, requestId 는 없어도 된다(0156)", async () => {
+    await connect();
+    const args = { runId: seeded.waiting, requestId: "mcp-request-id-0156" };
+
+    const first = await call("cancel_run", args);
+    const second = await call("cancel_run", args);
+    expect(listRunMcpActions(seeded.db, seeded.waiting)).toHaveLength(1);
+    const withoutId = await call("cancel_run", { runId: seeded.waiting });
+
+    expect(first.isError).toBe(false);
+    expect(second.json).toEqual(first.json);
+    expect(withoutId.isError).toBe(false);
+  });
+
+  it("Human Check 는 종류와 external 칸의 요청 내용으로 읽고, answer_question 으로는 답하지 못한다", async () => {
+    await connect("Operator");
+    const runId = seeded.waiting;
+    const first = toQuestionId("q-1");
+    answerRunQuestion(seeded.db, { runId, questionId: first, answer: "yes" }, at(20));
+    markAnswerSent(seeded.db, { runId, questionId: first }, at(21));
+    const checkId = toQuestionId("msg-check");
+    recordRunQuestions(seeded.db, runId, [
+      { id: checkId, kind: "human-check", body: "EXTERNAL-check", options: [], askedAt: at(22) },
+    ]);
+
+    const shown = await call("get_run", { runId });
+    expect(JSON.stringify(shown.json)).toContain(
+      '"kind":"human-check","questionId":"msg-check","answered":false,"external":{"body":"EXTERNAL-check"}',
+    );
+
+    const pending = await call("answer_question", { runId, answer: "확인했어요" });
+    expect(pending.json["reason"]).toBe("no-question");
+    const named = await call("answer_question", {
+      runId,
+      questionId: checkId,
+      answer: "확인했어요",
+    });
+    expect(named.json["reason"]).toBe("not-found");
+    expect(listRunQuestions(seeded.db, runId).find((q) => q.id === checkId)?.answer).toBeNull();
+  });
+
   it("런과 상관없는 쓰기는 Settings MCP 구역의 최근 작업에 대상과 함께 남는다", async () => {
     await connect("hermes\u0007‮ bot");
     await call("request_runner_check", { runner: "runner-a" });
@@ -304,6 +383,20 @@ describe("MCP 쓰기 도구", () => {
     ]);
   });
 
+  it("start_run_without_waiting은 같은 요청 ID를 다시 보내도 같은 결과이고 기록을 남긴다", async () => {
+    await connect();
+    const queued = queueRun(seeded.db, "ACME-6", 40);
+    markRunRelationsUnread(seeded.db, queued, at(41));
+    const args = { runId: queued, requestId: "request-0159-0001" };
+
+    expect((await call("start_run_without_waiting", args)).json["outcome"]).toBe("done");
+    expect((await call("start_run_without_waiting", args)).json["outcome"]).toBe("done");
+    expect(listRunMcpActions(seeded.db, queued).map((a) => a.outcome)).toEqual(["done"]);
+
+    const short = await call("start_run_without_waiting", { runId: queued, requestId: "short" });
+    expect(short.isError).toBe(true);
+  });
+
   it("서버가 꺼져 있으면 worker가 처리하는 쓰기의 결과에 서버가 켜지면 처리한다고 알린다", async () => {
     status = { running: false, url: null };
     await connect();
@@ -329,6 +422,14 @@ describe("MCP 쓰기 도구", () => {
     expect(assigned.isError).toBe(false);
     const runId = z.string().parse(assigned.json["runId"]);
     expect(listRunMcpActions(seeded.db, toRunId(runId))).toHaveLength(1);
+  });
+
+  it("러너를 넘겨 할당한 런은 그 러너에 고정된다", async () => {
+    await connect();
+    const chosen = await call("assign_ticket", { ticket: "ACME-9", runner: "runner-a" });
+    expect(chosen.isError).toBe(false);
+    const chosenId = toRunId(z.string().parse(chosen.json["runId"]));
+    expect(getRun(seeded.db, chosenId)).toMatchObject({ runnerChosen: true });
   });
 
   it("쓰기 도구로 바꾼 것도 화면이 알 수 있게 변경 기록 줄을 남긴다(0124)", async () => {

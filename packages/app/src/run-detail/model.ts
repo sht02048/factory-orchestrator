@@ -1,6 +1,17 @@
-import type { AgentResult, PauseSource, PrState, RunState, SummaryOutcome } from "@ganger/core";
+import type {
+  AgentMessageFailure,
+  AgentResult,
+  ContinuationPlace,
+  PauseSource,
+  PrReadError,
+  PrState,
+  RunId,
+  RunState,
+  SummaryOutcome,
+} from "@ganger/core";
 import type { McpActionOutcome } from "@ganger/db";
 import type { InputWait } from "../home/model.js";
+import type { PrSignalsView } from "../pr-signals-view.js";
 import type { RunControlView } from "../run-control-view.js";
 import type { QueuedReason } from "../runs/model.js";
 
@@ -10,11 +21,13 @@ export type TimelineEvent = { at: string } & (
   | { kind: "assigned" | "started" | "waiting-for-input" | "resumed" }
   | { kind: "paused" | "unpaused" }
   | { kind: "unreachable" | "disconnected" | "reconnected" }
-  | { kind: "question" | "answer" | "permission"; body: string }
+  | { kind: "question" | "human-check" | "answer" | "permission"; body: string }
   | { kind: "denied"; body: string }
   | { kind: "cancel-requested" }
+  | { kind: "operator-message"; body: string; delivery: AgentMessageDelivery }
   | { kind: "ended"; agentResult: AgentResult }
   | { kind: "later-pr"; state: "merged" | "closed" }
+  | { kind: "continued-from" | "continued-by"; runNumber: number }
   | {
       kind: "mcp";
       client: string;
@@ -23,6 +36,15 @@ export type TimelineEvent = { at: string } & (
       reason: string | null;
     }
 );
+
+export type AgentMessageDelivery =
+  | { status: "sending" | "after-resume" | "after-reconnect" | "stopping-follow-up" | "sent" }
+  | { status: "failed"; reason: AgentMessageFailure | "unknown" };
+
+export interface AgentMessageView {
+  accepting: boolean;
+  latest: AgentMessageDelivery | null;
+}
 
 export type PendingInput = InputWait | { kind: "unknown" };
 
@@ -56,10 +78,26 @@ export type RunDetailStatus =
       state: "ended";
       agentResult: AgentResult;
       prState: PrState;
+      prReadError: PrReadError | null;
       summary: SummaryOutcome;
-      worktreeNeedsManualRemoval: boolean;
+      keptWorktree: KeptWorktree | null;
       laterPrState: { state: "merged" | "closed"; at: string } | null;
     };
+
+export const KEPT_WORKTREE_REASONS = [
+  "no-pr",
+  "uncommitted-changes",
+  "unpushed-commits",
+  "check-failed",
+  "runner-disconnected",
+  "runner-unreached",
+] as const;
+export type KeptWorktreeReason = (typeof KEPT_WORKTREE_REASONS)[number];
+
+export interface KeptWorktree {
+  reason: KeptWorktreeReason;
+  removing: boolean;
+}
 
 export type OtherRun = { id: string; assignedAt: string } & (
   | { state: Exclude<RunState, "ended"> }
@@ -68,6 +106,22 @@ export type OtherRun = { id: string; assignedAt: string } & (
       summary: SummaryOutcome;
     }
 );
+
+export interface RunLink {
+  id: RunId;
+  number: number;
+}
+
+export interface ContinueOffer {
+  sourceNumber: number;
+  nextNumber: number;
+  runnerName: string | null;
+  place: "same-worktree" | "recreated";
+  hasReport: boolean;
+  hasWorkspaceBrief: boolean;
+  agent: "gone" | "alive" | "unknown" | "checking";
+  agentStopRequested: boolean;
+}
 
 export interface RunDetail {
   id: string;
@@ -87,14 +141,26 @@ export interface RunDetail {
   waitMs: number;
   executionMs: number | null;
   status: RunDetailStatus;
-  pullRequest: { displayId: string; url: string; ci: CiView } | null;
+  pullRequest: {
+    displayId: string;
+    url: string;
+    ci: CiView;
+    signals: PrSignalsView | null;
+  } | null;
   report: string | null;
+  brief: string | null;
   startError: string | null;
   cancelPending: boolean;
   control: RunControlView | null;
+  agentMessage: AgentMessageView;
   timeline: TimelineEvent[];
   log: LogTailView;
   otherRuns: OtherRun[];
+  continuedFrom: RunLink | null;
+  continuedBy: RunLink | null;
+  prHandedOver: boolean;
+  continuePlace: ContinuationPlace | null;
+  continueOffer: ContinueOffer | null;
 }
 
 export type RunDetailPage = { kind: "found"; run: RunDetail } | { kind: "not-found" };

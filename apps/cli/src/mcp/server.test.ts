@@ -178,7 +178,6 @@ describe("ganger mcp 서버", () => {
             },
           ],
         },
-        { group: "stopped", runs: [{ id: seeded.ended, summary: "failed" }] },
       ],
       running: [],
       queued: [],
@@ -193,7 +192,7 @@ describe("ganger mcp 서버", () => {
           limits: [],
         },
       ],
-      doneToday: { total: 1, recent: [{ id: seeded.ended, summary: "failed" }] },
+      doneToday: { total: 1, recent: [{ id: seeded.ended, summary: "succeeded" }] },
     });
   });
 
@@ -210,7 +209,64 @@ describe("ganger mcp 서버", () => {
     });
     const ended = await call("get_run", { runId: seeded.ended });
     expect(ended.json).toMatchObject({
-      run: { status: { state: "ended" }, [EXTERNAL_FIELD]: { report: EXTERNAL.report } },
+      run: {
+        status: {
+          state: "ended",
+          summary: "succeeded",
+          prState: "none",
+          keptWorktree: { reason: "no-pr", removing: false },
+        },
+        [EXTERNAL_FIELD]: { report: EXTERNAL.report },
+      },
+    });
+  });
+
+  it("PR 정보를 읽지 못한 런은 PR 상태 unknown 과 이유 값을 그대로 준다 (0144)", async () => {
+    seeded.db.$client
+      .prepare("UPDATE runs SET pr_state = 'unknown', pr_read_error = 'no-access' WHERE id = ?")
+      .run(seeded.ended);
+    const detail = await call("get_run", { runId: seeded.ended });
+    expect(detail.json).toMatchObject({
+      run: { status: { state: "ended", prState: "unknown", prReadError: "no-access" } },
+    });
+    const list = z
+      .object({ runs: z.array(z.object({ id: z.string() }).passthrough()) })
+      .parse((await call("list_runs")).json);
+    expect(list.runs.find((run) => run.id === seeded.ended)).toMatchObject({
+      prState: "unknown",
+      prReadError: "no-access",
+    });
+  });
+
+  it("런 읽기에 PR 의 검사·충돌·뒤처짐을 함께 주고 요약 결과는 그대로다 (0150)", async () => {
+    seeded.db.$client
+      .prepare(
+        `UPDATE runs SET pr_state = 'open', pr_read_error = NULL, later_pr_state = NULL,
+          later_pr_state_at = NULL, pr_id = '12', pr_display_id = '#12',
+          pr_url = 'https://code.example.com/acme/web/pull/12', pr_ci_state = 'failure',
+          pr_checked_at = 1000, pr_signals_read_at = 1000, worktree_removed_at = NULL,
+          worktree_kept = NULL, pr_signals = '{"open":true,"headCommit":"abc","ciFailed":true,"checkTotal":4,"failedCount":1,"failedChecks":["lint"],"checksTruncated":false,"conflict":true,"behindBy":3}'
+          WHERE id = ?`,
+      )
+      .run(seeded.ended);
+    const signals = {
+      ciFailed: true,
+      checkTotal: 4,
+      failedCount: 1,
+      conflict: true,
+      behindBy: 3,
+      [EXTERNAL_FIELD]: { failedChecks: ["lint"] },
+    };
+    const detail = await call("get_run", { runId: seeded.ended });
+    expect(detail.json).toMatchObject({
+      run: { status: { summary: "succeeded" }, pullRequest: { ci: "failure", signals } },
+    });
+    const list = z
+      .object({ runs: z.array(z.object({ id: z.string() }).passthrough()) })
+      .parse((await call("list_runs")).json);
+    expect(list.runs.find((run) => run.id === seeded.ended)).toMatchObject({
+      summary: "succeeded",
+      pullRequest: { signals },
     });
   });
 
@@ -300,7 +356,7 @@ describe("ganger mcp 서버", () => {
     const stats = await call("get_stats", { days: 7 });
     expect(stats.json).toMatchObject({
       period: { days: 7 },
-      total: { runs: 1, outcomes: { failed: 1 } },
+      total: { runs: 1, outcomes: { succeeded: 1, failed: 0, canceled: 0 }, prMerged: 0 },
     });
     const settings = await call("get_settings");
     expect(settings.json).toMatchObject({
@@ -312,6 +368,23 @@ describe("ganger mcp 서버", () => {
         power: { available: true, preventSleep: true },
       },
     });
+  });
+
+  it("설정은 Workspace 앞뒤 지시를, 런 상세는 받은 지시서를 external 칸에 담아 준다 (0146)", async () => {
+    const settings = await call("get_settings");
+    expect(settings.json).toMatchObject({
+      workspaceSettings: {
+        general: {
+          id: "ws-commerce",
+          external: { brief: { before: EXTERNAL.briefBefore, after: EXTERNAL.briefAfter } },
+        },
+      },
+    });
+    expect(settings.text).toContain("orca orchestration ask");
+    const waiting = await call("get_run", { runId: seeded.waiting });
+    expect(waiting.json).toMatchObject({ run: { external: { brief: EXTERNAL.sentBrief } } });
+    const ended = await call("get_run", { runId: seeded.ended });
+    expect(ended.json).toMatchObject({ run: { external: { brief: null } } });
   });
 
   it("Workspace가 하나뿐이면 생략할 수 있고, 여럿이면 고르라고 알린다", async () => {

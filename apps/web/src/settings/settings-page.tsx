@@ -61,6 +61,7 @@ import {
 } from "./settings-screen";
 import type { UnsavedGuard } from "./navigation-guard";
 import { UpdatesRows } from "./updates-panel";
+import { WorkspaceBriefRow } from "./workspace-brief";
 
 export const SETTINGS_SECTIONS = [
   "workspace",
@@ -176,6 +177,7 @@ export function SettingsScreen({
           <SettingsSection id="server" title={t("sections.server")}>
             <SettingsGroup>
               <WebAddressRow addresses={page.install.addresses} actions={actions} />
+              <AutoAllowedRow hosts={page.install.addresses.autoAllowedHosts} />
               <PowerRow power={page.install.power} actions={actions} />
               <UpdatesRows />
             </SettingsGroup>
@@ -194,6 +196,10 @@ export function SettingsScreen({
       </EditorProvider>
     </ScreenLayout>
   );
+}
+
+function unreadPrRuns(install: SettingsPage["install"]): number {
+  return install.unreadPrRuns["no-access"] + install.unreadPrRuns.other;
 }
 
 export function sectionProblems(
@@ -215,6 +221,7 @@ export function sectionProblems(
     install.connections.length === 0 ||
     install.connections.some((connection) => connection.webhook.kind === "rejected") ||
     !install.githubToken ||
+    unreadPrRuns(install) > 0 ||
     install.runners.length === 0 ||
     runnerIssues > 0
   ) {
@@ -282,6 +289,11 @@ function WorkspaceRows({
     <SettingsGroup>
       <WorkspaceNameRow workspace={workspace} actions={actions} />
       <MaxRunRow workspace={workspace} actions={actions} />
+      <WorkspaceBriefRow
+        workspace={workspace}
+        actions={actions}
+        changeButton={(edit, label) => <ChangeButton edit={edit} label={label} />}
+      />
     </SettingsGroup>
   );
 }
@@ -810,7 +822,11 @@ function ConnectionsSection({
             }
           />
         ) : null}
-        <GitHubRow saved={page.install.githubToken} actions={actions} />
+        <GitHubRow
+          saved={page.install.githubToken}
+          unread={page.install.unreadPrRuns}
+          actions={actions}
+        />
         <SettingsLinkRow
           label={t("runnersRow.label")}
           detail={
@@ -887,8 +903,22 @@ export function useConnectionWebhookDetail(connection: TrackerConnectionView, no
   }
 }
 
-function GitHubRow({ saved, actions }: { saved: boolean; actions: SettingsActions }) {
+function GitHubRow({
+  saved,
+  unread,
+  actions,
+}: {
+  saved: boolean;
+  unread: SettingsPage["install"]["unreadPrRuns"];
+  actions: SettingsActions;
+}) {
   const t = useTranslations("settings");
+  const unreadDetail =
+    unread["no-access"] > 0
+      ? t("github.unreadNoAccess", { count: unread["no-access"] })
+      : unread.other > 0
+        ? t("github.unreadOther", { count: unread.other })
+        : null;
   const edit = useInlineEdit("github");
   const labelId = useId();
   const describeGitHub = useCredentialReason("github");
@@ -897,8 +927,8 @@ function GitHubRow({ saved, actions }: { saved: boolean; actions: SettingsAction
     <SettingsRow
       label={t("github.label")}
       labelId={labelId}
-      detail={saved ? t("github.set") : t("github.unset")}
-      detailTone={saved ? "default" : "problem"}
+      detail={saved ? (unreadDetail ?? t("github.set")) : t("github.unset")}
+      detailTone={saved && unreadDetail === null ? "default" : "problem"}
       control={
         edit.open ? undefined : (
           <ChangeButton
@@ -995,6 +1025,20 @@ function WebAddressRow({
           />
         ) : null
       }
+    />
+  );
+}
+
+function AutoAllowedRow({ hosts }: { hosts: ReadonlyArray<string> }) {
+  const t = useTranslations("settings");
+  if (hosts.length === 0) return null;
+  const label = t("addresses.autoAllowed");
+  return (
+    <SettingsRow
+      label={label}
+      info={<InfoTip label={t("infoLabel", { label })} content={t("addresses.autoAllowedInfo")} />}
+      detail={hosts.join(", ")}
+      detailMono
     />
   );
 }

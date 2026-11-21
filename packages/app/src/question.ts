@@ -1,3 +1,9 @@
+export const HUMAN_CHECK_NOTE_MAX = 10_000;
+
+export function isHumanCheckNoteTooLong(note: string): boolean {
+  return Array.from(note).length > HUMAN_CHECK_NOTE_MAX;
+}
+
 export interface QuestionChoice {
   marker: string | null;
   text: string;

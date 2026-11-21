@@ -169,7 +169,7 @@ export function seedNotificationCauses(home: string): void {
       const changed = changeRunState(db, startRun(db, key), { to: "ended", agentResult, prState });
       if (!changed.ok) throw new Error(JSON.stringify(changed));
     };
-    ended("ACME-23", "reported-success", "open");
+    ended("ACME-23", "reported-failure", "open");
     ended("ACME-24", "reported-success", "merged");
     ended("ACME-25", "timed-out", "none");
   });

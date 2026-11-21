@@ -7,7 +7,14 @@ import {
 } from "@ganger/core";
 import type { RepoRef, RunnerProjectId } from "@ganger/core";
 import { FakeCodeHost, FakeRunner, FakeTracker } from "@ganger/core/testing";
-import { RUNNER_PROJECTS, providerUsageFor, trackerCatalog, trackerSpecFor } from "./fixtures.js";
+import { ASK_GUIDE } from "@ganger/runner-orca/agent-brief";
+import {
+  RUNNER_PROJECTS,
+  demoRelations,
+  providerUsageFor,
+  trackerCatalog,
+  trackerSpecFor,
+} from "./fixtures.js";
 import {
   FAIL_AUTH,
   FAIL_NO_ORCA,
@@ -49,6 +56,7 @@ export class DemoWorld {
         tracker.labels.set(project.id, catalog.labels);
       }
       for (const ticket of catalog.tickets) tracker.addTicket(ticket);
+      for (const [key, relations] of demoRelations(catalog)) tracker.relations.set(key, relations);
     }
     this.trackers.set(apiKey, tracker);
     return tracker;
@@ -58,6 +66,7 @@ export class DemoWorld {
     const found = this.runners.get(sshTarget);
     if (found !== undefined) return found;
     const runner = new FakeRunner(RUNNER_KIND);
+    runner.agentProtocol = ASK_GUIDE;
     const target = sshTarget.toLowerCase();
     runner.setProjects(RUNNER_PROJECTS);
     runner.online = !target.includes(FAIL_OFFLINE);

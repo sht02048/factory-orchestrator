@@ -196,7 +196,7 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
         project,
         worktreeName: `ganger-ENG-${index}-1`,
         agent: toAgentId("agent"),
-        prompt: "티켓",
+        brief: "티켓",
       });
       const branch = started.branch;
       const fake = (index === 0 ? runnersA : runnersB).created[0]!;
@@ -243,8 +243,8 @@ describe("확장 전제: 종류가 다른 어댑터를 함께 등록해도 core 
     }
 
     expect(outcomes).toEqual([
-      { outcome: "merged", worktree: "remove-now" },
-      { outcome: "human-check", worktree: "keep-until-pr-settles" },
+      { outcome: "succeeded", worktree: "remove-now" },
+      { outcome: "failed", worktree: "keep-until-pr-settles" },
     ]);
   });
 });

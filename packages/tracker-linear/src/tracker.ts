@@ -11,7 +11,10 @@ import type {
   LabelId,
   Page,
   Paged,
+  TicketBlocker,
   TicketKey,
+  TicketPriority,
+  TicketRelations,
   Tracker,
   TrackerComment,
   TrackerConnectionCheck,
@@ -71,6 +74,7 @@ fragment TicketFields on Issue {
   description
   url
   updatedAt
+  priority
   state { id name type }
   project { id name }
   labels(first: ${LABELS_PER_TICKET}) { nodes { id name } }
@@ -90,6 +94,16 @@ export function linearWebhookSettingsUrl(urlKey: string): string | null {
 
 const QUERY_TICKET = `query Ticket($id: String!) { issue(id: $id) { ...TicketFields } }
 ${TICKET_FIELDS}`;
+
+const QUERY_TICKET_RELATIONS = `query TicketRelations($id: String!, $first: Int!, $after: String) {
+  issue(id: $id) {
+    priority
+    inverseRelations(first: $first, after: $after, includeArchived: true) {
+      nodes { type issue { identifier title state { id name type } } }
+      ${PAGE_INFO}
+    }
+  }
+}`;
 
 const QUERY_PROJECT_TICKETS = `query ProjectTickets($projectId: ID!, $first: Int!, $after: String) {
   issues(filter: { project: { id: { eq: $projectId } } }, first: $first, after: $after) {
@@ -158,6 +172,31 @@ const dateSchema = z.iso.datetime({ offset: true }).transform((value) => new Dat
 
 const stateSchema = z.object({ id: idSchema, name: z.string(), type: z.string() });
 
+const LINEAR_PRIORITIES: Readonly<Record<number, TicketPriority>> = {
+  0: "none",
+  1: "urgent",
+  2: "high",
+  3: "medium",
+  4: "low",
+};
+
+const prioritySchema = z
+  .number()
+  .nullish()
+  .transform((value): TicketPriority => LINEAR_PRIORITIES[value ?? 0] ?? "none");
+
+const relationSchema = z.object({
+  type: z.string(),
+  issue: z.object({ identifier: idSchema, title: z.string(), state: stateSchema }),
+});
+
+const ticketRelationsSchema = z.object({
+  issue: z.object({
+    priority: prioritySchema,
+    inverseRelations: connectionSchema(relationSchema),
+  }),
+});
+
 const ticketSchema = z
   .object({
     identifier: idSchema,
@@ -165,6 +204,7 @@ const ticketSchema = z
     description: z.string().nullable(),
     url: z.string(),
     updatedAt: dateSchema,
+    priority: prioritySchema,
     state: stateSchema,
     project: z.object({ id: idSchema, name: z.string() }).nullable(),
     labels: z.object({ nodes: z.array(z.object({ id: idSchema, name: z.string() })) }),
@@ -181,6 +221,7 @@ const ticketSchema = z
         : { id: toTrackerProjectId(issue.project.id), name: issue.project.name },
     state: toState(issue.state),
     updatedAt: issue.updatedAt,
+    priority: issue.priority,
   }));
 
 const ticketConnectionSchema = z.object({ issues: connectionSchema(ticketSchema) });
@@ -311,6 +352,39 @@ export class LinearTracker implements Tracker {
       if (isNotFound(error)) return null;
       throw error;
     }
+  }
+
+  async getTicketRelations(key: TicketKey): Promise<TicketRelations | null> {
+    const blockers: TicketBlocker[] = [];
+    let priority: TicketPriority = "none";
+    let after: string | null = null;
+    try {
+      for (let pages = 0; pages < MAX_PAGES; pages += 1) {
+        const data: z.output<typeof ticketRelationsSchema> = await this.client.request(
+          QUERY_TICKET_RELATIONS,
+          { id: key, first: LINEAR_MAX_PAGE_SIZE, after },
+          ticketRelationsSchema,
+        );
+        priority = data.issue.priority;
+        const { nodes, pageInfo } = data.issue.inverseRelations;
+        for (const relation of nodes) {
+          if (relation.type !== "blocks") continue;
+          blockers.push({
+            key: toTicketKey(relation.issue.identifier),
+            title: relation.issue.title,
+            state: toState(relation.issue.state),
+          });
+        }
+        if (!pageInfo.hasNextPage || pageInfo.endCursor === null) {
+          return { priority, blockers };
+        }
+        after = pageInfo.endCursor;
+      }
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw error;
+    }
+    throw new Error(`Linear 목록이 ${MAX_PAGES}쪽을 넘었다`);
   }
 
   async listProjectTickets(

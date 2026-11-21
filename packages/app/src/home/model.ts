@@ -24,6 +24,12 @@ export type InputWait =
       promptId: string;
       detail: string;
       denied: boolean;
+    }
+  | {
+      kind: "human-check";
+      questionId: string;
+      body: string;
+      answered: boolean;
     };
 
 interface HomeRunBase {
@@ -60,7 +66,6 @@ export type HomeRun =
       agentResult: AgentResult;
       prState: PrState;
       summary: SummaryOutcome;
-      prSettledLater: boolean;
       endedAt: string;
       endedAgoMs: number;
     });
@@ -155,7 +160,7 @@ export interface HomePage {
 
 export const DONE_TODAY_LIMIT = 5;
 
-export const TODO_GROUPS = ["answer", "check", "stopped"] as const;
+export const TODO_GROUPS = ["check", "answer", "stopped"] as const;
 
 export type TodoGroupKind = (typeof TODO_GROUPS)[number];
 
@@ -167,11 +172,10 @@ export interface TodoGroup {
 export function todoGroupOf(run: HomeRun): TodoGroupKind | null {
   switch (run.state) {
     case "waiting-for-input":
-      return "answer";
+      return run.input?.kind === "human-check" ? "check" : "answer";
     case "disconnected":
       return "stopped";
     case "ended":
-      if (run.summary === "human-check") return "check";
       return run.summary === "failed" ? "stopped" : null;
     case "queued":
     case "running":
@@ -193,7 +197,7 @@ export function needsAttention(run: HomeRun): boolean {
     case "disconnected":
       return true;
     case "ended":
-      return (run.summary === "human-check" && !run.prSettledLater) || run.summary === "failed";
+      return run.summary === "failed";
     case "queued":
     case "running":
     case "paused":
@@ -263,9 +267,9 @@ function endedTime(run: HomeRun): number {
 export type TodoTag =
   | "question"
   | "permission"
+  | "human-check"
   | "waiting-for-input"
   | "disconnected"
-  | "human-check"
   | "failed";
 
 export function todoTagOf(run: HomeRun): TodoTag | null {
@@ -275,7 +279,7 @@ export function todoTagOf(run: HomeRun): TodoTag | null {
     case "disconnected":
       return "disconnected";
     case "ended":
-      return run.summary === "human-check" || run.summary === "failed" ? run.summary : null;
+      return run.summary === "failed" ? run.summary : null;
     case "queued":
     case "running":
     case "paused":

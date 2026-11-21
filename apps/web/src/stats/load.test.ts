@@ -1,3 +1,4 @@
+import { listRuns, updateRunRecords } from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import { addRunDecisionCases, now, seedStatsDatabase } from "../testing/stats-seed";
 import { loadStatsPage } from "@ganger/app/stats/load";
@@ -19,15 +20,35 @@ describe("loadStatsPage", () => {
   it("처리량과 요약 결과 분포를 core 요약 계산으로 센다", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC", 14));
     expect(page.total.runs).toBe(9);
-    expect(page.total.outcomes).toEqual({ merged: 2, "human-check": 3, failed: 4, canceled: 0 });
+    expect(page.total.outcomes).toEqual({ succeeded: 5, failed: 4, canceled: 0 });
+  });
+
+  it("PR 병합 수는 요약 결과와 따로, 끝날 때나 그 뒤에 병합된 PR 로 센다 (R5)", () => {
+    const db = seedStatsDatabase();
+    const page = loaded(loadStatsPage(db, undefined, now, "UTC", 14));
+    expect(page.total.prMerged).toBe(3);
+    const later = listRuns(db).find((run) => run.ticket.key === "C-4");
+    if (later === undefined) throw new Error("no C-4");
+    updateRunRecords(db, later.id, { laterPrState: { state: "merged", at: now } });
+    const after = loaded(loadStatsPage(db, undefined, now, "UTC", 14));
+    expect(after.total.prMerged).toBe(4);
+    expect(after.total.outcomes).toEqual(page.total.outcomes);
+    expect(byName(after.groups.runner).get("runner-a")?.prMerged).toBe(4);
   });
 
   it("Failed 런을 실패 이유별로 세고 이유마다 PR 상태를 함께 센다(0068)", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC", 14));
     expect(page.total.failureReasons).toEqual([
-      { reason: "reported-failure", runs: 2, prStates: { none: 2, open: 0, merged: 0, closed: 0 } },
-      { reason: "pr-closed", runs: 1, prStates: { none: 0, open: 0, merged: 0, closed: 1 } },
-      { reason: "timed-out", runs: 1, prStates: { none: 0, open: 1, merged: 0, closed: 0 } },
+      {
+        reason: "reported-failure",
+        runs: 3,
+        prStates: { none: 2, open: 1, merged: 0, closed: 0, unknown: 0 },
+      },
+      {
+        reason: "timed-out",
+        runs: 1,
+        prStates: { none: 0, open: 1, merged: 0, closed: 0, unknown: 0 },
+      },
     ]);
   });
 
@@ -40,12 +61,7 @@ describe("loadStatsPage", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC", 14));
     expect(page.period.days).toBe(14);
     expect(page.previous.runs).toBe(1);
-    expect(page.previous.outcomes).toEqual({
-      merged: 1,
-      "human-check": 0,
-      failed: 0,
-      canceled: 0,
-    });
+    expect(page.previous.outcomes).toEqual({ succeeded: 1, failed: 0, canceled: 0 });
   });
 
   it("기간을 7일로 바꾸면 그 7일과 바로 앞 7일만 센다", () => {
@@ -53,14 +69,9 @@ describe("loadStatsPage", () => {
     expect(new Date(page.period.firstDay).toISOString()).toBe("2026-11-11T00:00:00.000Z");
     expect(page.daily).toHaveLength(7);
     expect(page.total.runs).toBe(7);
-    expect(page.total.outcomes).toEqual({ merged: 2, "human-check": 3, failed: 2, canceled: 0 });
+    expect(page.total.outcomes).toEqual({ succeeded: 4, failed: 3, canceled: 0 });
     expect(page.previous.runs).toBe(2);
-    expect(page.previous.outcomes).toEqual({
-      merged: 0,
-      "human-check": 0,
-      failed: 2,
-      canceled: 0,
-    });
+    expect(page.previous.outcomes).toEqual({ succeeded: 1, failed: 1, canceled: 0 });
     expect(page.groups.runner.reduce((n, g) => n + g.runs, 0)).toBe(7);
   });
 
@@ -78,17 +89,17 @@ describe("loadStatsPage", () => {
     expect(new Date(page.period.lastDay).toISOString()).toBe("2026-11-17T00:00:00.000Z");
     const nonZero = Object.fromEntries(
       page.daily
-        .filter((d) => d.outcomes.merged + d.outcomes["human-check"] + d.outcomes.failed > 0)
+        .filter((d) => d.outcomes.succeeded + d.outcomes.failed > 0)
         .map((d) => [new Date(d.day).toISOString().slice(0, 10), d.outcomes]),
     );
     expect(nonZero).toEqual({
-      "2026-11-04": { merged: 0, "human-check": 0, failed: 1, canceled: 0 },
-      "2026-11-10": { merged: 0, "human-check": 0, failed: 1, canceled: 0 },
-      "2026-11-12": { merged: 0, "human-check": 0, failed: 1, canceled: 0 },
-      "2026-11-14": { merged: 0, "human-check": 0, failed: 1, canceled: 0 },
-      "2026-11-15": { merged: 0, "human-check": 2, failed: 0, canceled: 0 },
-      "2026-11-16": { merged: 1, "human-check": 1, failed: 0, canceled: 0 },
-      "2026-11-17": { merged: 1, "human-check": 0, failed: 0, canceled: 0 },
+      "2026-11-04": { succeeded: 1, failed: 0, canceled: 0 },
+      "2026-11-10": { succeeded: 0, failed: 1, canceled: 0 },
+      "2026-11-12": { succeeded: 0, failed: 1, canceled: 0 },
+      "2026-11-14": { succeeded: 0, failed: 1, canceled: 0 },
+      "2026-11-15": { succeeded: 2, failed: 0, canceled: 0 },
+      "2026-11-16": { succeeded: 1, failed: 1, canceled: 0 },
+      "2026-11-17": { succeeded: 1, failed: 0, canceled: 0 },
     });
   });
 
@@ -97,18 +108,13 @@ describe("loadStatsPage", () => {
     expect(seoul.total.runs).toBe(10);
     const seoulDay = (date: string) =>
       seoul.daily.find((d) => new Date(d.day).toISOString().slice(0, 10) === date)?.outcomes;
-    expect(seoulDay("2026-11-04")).toEqual({
-      merged: 1,
-      "human-check": 0,
-      failed: 1,
-      canceled: 0,
-    });
+    expect(seoulDay("2026-11-04")).toEqual({ succeeded: 2, failed: 0, canceled: 0 });
     const la = loaded(
       loadStatsPage(seedStatsDatabase(), undefined, now, "America/Los_Angeles", 14),
     );
     expect(new Date(la.period.firstDay).toISOString()).toBe("2026-11-04T00:00:00.000Z");
     expect(la.total.runs).toBe(8);
-    expect(la.daily[0]?.outcomes).toEqual({ merged: 0, "human-check": 0, failed: 0, canceled: 0 });
+    expect(la.daily[0]?.outcomes).toEqual({ succeeded: 0, failed: 0, canceled: 0 });
   });
 
   it("기간의 오늘은 운영자 시간대의 오늘이다", () => {
@@ -124,12 +130,14 @@ describe("loadStatsPage", () => {
     const runners = byName(page.groups.runner);
     expect(runners.get("runner-a")).toMatchObject({
       runs: 5,
-      outcomes: { merged: 2, "human-check": 2, failed: 1, canceled: 0 },
+      outcomes: { succeeded: 4, failed: 1, canceled: 0 },
+      prMerged: 3,
       leadTime: { p50Ms: 22 * min },
     });
     expect(runners.get("runner-b")).toMatchObject({
       runs: 4,
-      outcomes: { merged: 0, "human-check": 1, failed: 3, canceled: 0 },
+      outcomes: { succeeded: 1, failed: 3, canceled: 0 },
+      prMerged: 0,
       leadTime: { p50Ms: 18 * min },
     });
     expect(page.groups.runner.map((g) => g.name)).toEqual(["runner-a", "runner-b"]);
@@ -141,21 +149,21 @@ describe("loadStatsPage", () => {
     ]);
     expect(projects.get("Web")).toMatchObject({
       runs: 6,
-      outcomes: { merged: 2, "human-check": 2, failed: 2, canceled: 0 },
+      outcomes: { succeeded: 4, failed: 2, canceled: 0 },
     });
     expect(projects.get("API")).toMatchObject({
       runs: 3,
-      outcomes: { merged: 0, "human-check": 1, failed: 2, canceled: 0 },
+      outcomes: { succeeded: 1, failed: 2, canceled: 0 },
     });
 
     const agents = byName(page.groups.agent);
     expect(agents.get("claude")).toMatchObject({
       runs: 6,
-      outcomes: { merged: 2, "human-check": 1, failed: 3, canceled: 0 },
+      outcomes: { succeeded: 2, failed: 4, canceled: 0 },
     });
     expect(agents.get("codex")).toMatchObject({
       runs: 3,
-      outcomes: { merged: 0, "human-check": 2, failed: 1, canceled: 0 },
+      outcomes: { succeeded: 3, failed: 0, canceled: 0 },
     });
   });
 
@@ -166,8 +174,8 @@ describe("loadStatsPage", () => {
     const sum = (pick: (s: StatsSummary) => number) =>
       groups.reduce((total, g) => total + pick(g), 0);
     expect(sum((s) => s.runs)).toBe(page.total.runs);
-    expect(sum((s) => s.outcomes.merged)).toBe(page.total.outcomes.merged);
-    expect(sum((s) => s.outcomes["human-check"])).toBe(page.total.outcomes["human-check"]);
+    expect(sum((s) => s.outcomes.succeeded)).toBe(page.total.outcomes.succeeded);
+    expect(sum((s) => s.prMerged)).toBe(page.total.prMerged);
     expect(sum((s) => s.outcomes.failed)).toBe(page.total.outcomes.failed);
     expect(sum((s) => s.failureReasons.reduce((n, c) => n + c.runs, 0))).toBe(
       page.total.outcomes.failed,
@@ -176,10 +184,7 @@ describe("loadStatsPage", () => {
 
   it("날짜별 처리량의 합이 전체와 같다", () => {
     const page = loaded(loadStatsPage(seedStatsDatabase(), undefined, now, "UTC", 14));
-    const daily = page.daily.reduce(
-      (n, d) => n + d.outcomes.merged + d.outcomes["human-check"] + d.outcomes.failed,
-      0,
-    );
+    const daily = page.daily.reduce((n, d) => n + d.outcomes.succeeded + d.outcomes.failed, 0);
     expect(daily).toBe(page.total.runs);
   });
 
@@ -201,7 +206,8 @@ describe("loadStatsPage", () => {
     expect(page.total).toEqual({
       runs: 0,
       rated: 0,
-      outcomes: { merged: 0, "human-check": 0, failed: 0, canceled: 0 },
+      outcomes: { succeeded: 0, failed: 0, canceled: 0 },
+      prMerged: 0,
       leadTime: null,
       failureReasons: [],
     });
@@ -219,11 +225,11 @@ describe("loadStatsPage", () => {
     it("Canceled 런은 취소로 따로 세고 성공·실패율의 분모에서 뺀다(Q82.9·Q82.18)", () => {
       const page = withDecisions();
       expect(page.total.runs).toBe(13);
-      expect(page.total.outcomes).toEqual({ merged: 2, "human-check": 3, failed: 6, canceled: 2 });
+      expect(page.total.outcomes).toEqual({ succeeded: 5, failed: 6, canceled: 2 });
       expect(page.total.rated).toBe(11);
       const gemini = byName(page.groups.agent).get("gemini");
       expect(gemini).toMatchObject({ runs: 2, rated: 1 });
-      expect(gemini?.outcomes).toEqual({ merged: 0, "human-check": 0, failed: 1, canceled: 1 });
+      expect(gemini?.outcomes).toEqual({ succeeded: 0, failed: 1, canceled: 1 });
       expect(gemini?.failureReasons.map((r) => r.reason)).toEqual(["ended-without-report"]);
     });
 
@@ -234,8 +240,7 @@ describe("loadStatsPage", () => {
 
     it("실패 이유에 중간에 멈춤과 시작하지 못함이 보이고 취소는 빠진다(Q82.2·Q82.16·Q82.19)", () => {
       expect(withDecisions().total.failureReasons.map((r) => [r.reason, r.runs])).toEqual([
-        ["reported-failure", 2],
-        ["pr-closed", 1],
+        ["reported-failure", 3],
         ["ended-without-report", 1],
         ["timed-out", 1],
         ["could-not-start", 1],
@@ -244,7 +249,7 @@ describe("loadStatsPage", () => {
 
     it("날짜별 처리량에 취소를 따로 센다", () => {
       const day = withDecisions().daily.at(-1);
-      expect(day?.outcomes).toEqual({ merged: 1, "human-check": 0, failed: 2, canceled: 2 });
+      expect(day?.outcomes).toEqual({ succeeded: 1, failed: 2, canceled: 2 });
     });
   });
 });

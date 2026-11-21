@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   AUTO_ASSIGN_LABEL_NAME,
   AdapterError,
+  WORKSPACE_BRIEF_MAX_LENGTH,
   findLabelNamed,
   toAgentId,
   toLabelId,
@@ -11,6 +12,7 @@ import {
   toTrackerConnectionId,
   toTrackerProjectId,
   toTrackerStateId,
+  workspaceBriefLength,
 } from "@ganger/core";
 import type { RunnerId, RunnerKind, TrackerConnectionId } from "@ganger/core";
 import {
@@ -41,12 +43,13 @@ import {
   saveRunnerCapacity,
   saveTrackerConnection,
   saveWorkspace,
+  saveWorkspaceBrief,
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
 } from "@ganger/db";
 import type { WorkspaceId } from "@ganger/db";
 import { z } from "zod";
-import { allowedHosts, hostnameOfHostHeader } from "../request-guard.js";
+import { allowedHosts, hostnameOfHostHeader, isHostAllowed } from "../request-guard.js";
 import { checkWebhookAddress } from "../webhook-address.js";
 import type { PingFetch, WebhookAddressFailure } from "../webhook-address.js";
 import { remoteErrorOf, remoteErrorOfDetail, trackerConnectionView, trackerOf } from "./load.js";
@@ -95,6 +98,31 @@ export function saveGeneral(
     maxRunMs: input.maxRunMinutes * 60_000,
   });
   return { ok: true };
+}
+
+const workspaceBriefText = z
+  .string()
+  .max(WORKSPACE_BRIEF_MAX_LENGTH * 4)
+  .transform((value) => value.trim())
+  .refine((value) => workspaceBriefLength(value) <= WORKSPACE_BRIEF_MAX_LENGTH);
+
+export const briefInput = z.object({
+  ws: id,
+  before: workspaceBriefText,
+  after: workspaceBriefText,
+});
+
+export function saveBrief(
+  context: SettingsContext,
+  input: z.infer<typeof briefInput>,
+): SaveResult<"not-found"> {
+  const workspaceId = workspaceOf(context, input.ws);
+  if (workspaceId === null) return { ok: false, reason: "not-found" };
+  const saved = saveWorkspaceBrief(context.db, {
+    id: workspaceId,
+    brief: { before: input.before, after: input.after },
+  });
+  return saved ? { ok: true } : { ok: false, reason: "not-found" };
 }
 
 export const trackerProjectInput = z.object({
@@ -633,6 +661,8 @@ export type AddressSaveReason = "invalid-web-address" | "invalid-webhook-address
 export interface RequestOrigin {
   host: string | null;
   bindHost: string | null;
+  tailnetHosts?: ReadonlyArray<string>;
+  webPort?: number | null;
 }
 
 export function saveAddresses(
@@ -647,8 +677,14 @@ export function saveAddresses(
   if (webhookAddress === undefined) return { ok: false, reason: "invalid-webhook-address" };
   const current = hostnameOfHostHeader(from.host);
   if (current !== null) {
-    const next = allowedHosts({ bindHost: from.bindHost, webAddress, webhookAddress });
-    if (!next.web.has(current)) return { ok: false, reason: "locks-out" };
+    const next = allowedHosts({
+      bindHost: from.bindHost,
+      webAddress,
+      webhookAddress,
+      tailnetHosts: from.tailnetHosts ?? [],
+      webPort: from.webPort ?? null,
+    });
+    if (!isHostAllowed(from.host, "/", next)) return { ok: false, reason: "locks-out" };
   }
   saveInstallAddresses(context.db, { webAddress, webhookAddress }, now);
   return { ok: true };

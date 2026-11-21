@@ -27,8 +27,13 @@ export function hydrateWorld(db: Database, world: DemoWorld): void {
         state: prStateOf(run, records.laterPrState?.state ?? null),
       });
     }
-    if (run.state === "ended") continue;
     const sshTarget = sshTargets.get(run.runnerId);
+    if (run.state === "ended") {
+      if (sshTarget !== undefined && records?.worktreeRemovedAt === null) {
+        world.runner(sshTarget).recreatedWorktrees.set(run.worktree, run.branch);
+      }
+      continue;
+    }
     if (sshTarget === undefined) continue;
     const runner = world.runner(sshTarget);
     const questions = listRunQuestions(db, run.id);
@@ -39,11 +44,12 @@ export function hydrateWorld(db: Database, world: DemoWorld): void {
         worktreeName: run.worktreeName,
         agent: run.agent,
         ...(run.model === null ? {} : { model: run.model }),
-        prompt: "",
+        brief: "",
       },
       started: { worktree: run.worktree, branch: run.branch, agentRef: run.agentRef },
       questions: questions.map((q) => ({
         id: q.id,
+        kind: q.kind,
         body: q.body,
         options: q.options,
         askedAt: q.askedAt,
@@ -51,6 +57,7 @@ export function hydrateWorld(db: Database, world: DemoWorld): void {
       answers: questions.flatMap((q) =>
         q.answer?.sentAt == null ? [] : [{ questionId: q.id, answer: q.answer.text }],
       ),
+      agentMessages: [],
       permissionWaits: listRunPermissionWaits(db, run.id)
         .filter((wait) => wait.resolvedAt === null && wait.denial === null)
         .map((wait) => ({ id: wait.id, detail: wait.detail, requestedAt: wait.requestedAt })),
@@ -76,7 +83,8 @@ export function pullRequestOf(
     startedAt: Date | null;
     branch: string;
   },
-  pr: { id: PullRequestSnapshot["id"]; displayId: string; url: string },
+  pr: Pick<PullRequestSnapshot, "id" | "displayId" | "url"> &
+    Partial<Pick<PullRequestSnapshot, "ci" | "signals">>,
 ): Omit<PullRequestSnapshot, "state"> {
   const createdAt = new Date((run.startedAt ?? new Date()).getTime() + 60_000);
   return {
@@ -91,7 +99,8 @@ export function pullRequestOf(
     sourceRepo: toRepoRef(run.runnerProject),
     headCommit: run.headCommit,
     baseBranch: "main",
-    ci: "success",
+    ci: pr.ci ?? "success",
+    signals: pr.signals ?? null,
   };
 }
 
