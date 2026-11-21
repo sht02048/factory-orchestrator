@@ -57,6 +57,15 @@
     "blocker-unreadable-unknown": "선행 티켓을 읽지 못했어요",
     "blocker-cycle": "{ticket}{final, select, yes {과} other {와}} 서로 기다려요"
   },
+  "blocker": {
+    "waiting": "기다림",
+    "more": "외 {count, number}개",
+    "stuckCause": {
+      "canceled": "취소",
+      "unreadable": "읽지 못함",
+      "cycle": "서로 기다림"
+    }
+  },
   "duration": {
     "seconds": "{seconds}초",
     "minutes": "{minutes}분",

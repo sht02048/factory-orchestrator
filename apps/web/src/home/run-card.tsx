@@ -1,4 +1,4 @@
-import { Button, KanbanCard, Menu, MenuItem, MoreIcon, StatusPill } from "@ganger/ui";
+import { Button, KanbanCard, Menu, MenuItem, MoreIcon, StatusPill, Text } from "@ganger/ui";
 import type { PillStatus } from "@ganger/ui";
 import type { RunControl, RunId } from "@ganger/core";
 import { useId, useState } from "react";
@@ -10,14 +10,19 @@ import { todoTagOf } from "@ganger/app/home/model";
 import { availableRunControl } from "@ganger/app/run-control-view";
 import type { RunControlView } from "@ganger/app/run-control-view";
 import { questionSummary } from "@ganger/app/question";
-import { RunKey, useRunText } from "./run-text";
+import { allBlockersOf, blockerReasonOf } from "@ganger/app/runs/model";
+import { BlockerChipList } from "../blockers";
+import { useRunText } from "./run-text";
 
 export type SheetMode = "summary" | "answer";
 
 interface CardParts {
   detail?: ReactNode;
   detailTone?: "problem";
+  blockers?: ReactNode;
+  stuck?: boolean;
   meta?: ReactNode;
+  metaTone?: "problem";
   time?: ReactNode;
   action?: ReactNode;
   menu?: ReactNode;
@@ -80,7 +85,14 @@ export function RunCard({
               </StatusPill>
             ),
           })}
-      title={<RunKey run={run} />}
+      ticketKey={run.ticketKey}
+      title={
+        run.ticketTitle === null ? null : (
+          <Text variant="title" as="span">
+            {run.ticketTitle}
+          </Text>
+        )
+      }
       titleId={titleId}
       {...parts}
       selected={selected}
@@ -124,8 +136,26 @@ function useCardParts(
         }
       : {};
   switch (run.state) {
-    case "queued":
-      return { detail: text.queued(run), meta: runner, time: elapsed(run.waitMs) };
+    case "queued": {
+      const waiting = blockerReasonOf(run.queuedReason);
+      if (waiting === null)
+        return { detail: text.queued(run), meta: runner, time: elapsed(run.waitMs) };
+      const stuck = waiting.kind === "blockers-stuck";
+      const blockers = allBlockersOf(waiting);
+      return {
+        ...(blockers.length === 0 ? {} : { blockers: <BlockerChipList blockers={blockers} /> }),
+        stuck,
+        meta: [
+          run.cancelling ? t("cancelling") : null,
+          text.queued(run),
+          all ? run.workspace.name : null,
+        ]
+          .filter((part) => part !== null)
+          .join(" · "),
+        ...(stuck ? { metaTone: "problem" as const } : {}),
+        time: elapsed(run.waitMs),
+      };
+    }
     case "running":
       return {
         ...failed,

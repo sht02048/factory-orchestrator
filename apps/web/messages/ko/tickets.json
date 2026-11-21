@@ -26,7 +26,14 @@
     "key": "키",
     "title": "제목",
     "trackerProject": "트래커 프로젝트",
+    "priority": "우선순위",
     "lastRun": "마지막 런"
+  },
+  "priority": {
+    "urgent": "Urgent",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
   },
   "listLabel": "티켓 목록",
   "empty": "이 조건에 맞는 티켓이 없어요.",
@@ -79,7 +86,22 @@
     "runCount": "런 수",
     "runCountValue": "{count, number}개",
     "openInTracker": "트래커에서 열기",
-    "newTab": "새 탭에서 열려요"
+    "newTab": "새 탭에서 열려요",
+    "blockers": "먼저 끝나야 하는 티켓",
+    "blockersNone": "먼저 끝나야 하는 티켓이 없어요.",
+    "blockersRead": "선행 티켓 읽기",
+    "blockersReading": "읽는 중…",
+    "blockersFailed": {
+      "unauthorized": "선행 티켓을 읽지 못했어요. 트래커가 API 키를 받지 않았어요. Settings에서 연결을 확인해 주세요.",
+      "rate-limited": "선행 티켓을 읽지 못했어요. 트래커 요청 한도를 넘었어요. 잠시 뒤 다시 읽어 주세요.",
+      "not-found": "선행 티켓을 읽지 못했어요. 트래커에서 이 티켓을 찾지 못했어요.",
+      "network": "선행 티켓을 읽지 못했어요. 트래커에 닿지 않았어요. 잠시 뒤 다시 읽어 주세요.",
+      "unknown-connection": "선행 티켓을 읽지 못했어요. 묶인 트래커 연결이 없어졌어요. Settings에서 확인해 주세요.",
+      "failed": "먼저 끝나야 하는 티켓을 읽지 못했어요."
+    },
+    "waiting": "이 티켓을 기다리는 티켓",
+    "waitingNone": "이 티켓을 기다리는 런이 없어요.",
+    "relationsNote": "관계는 Linear의 blocked by에서 읽어요. 바꾸려면 Linear에서 고쳐요."
   },
   "assign": {
     "title": "{key} 티켓을 할당할까요?",

@@ -186,6 +186,7 @@ export const size = stylex.defineVars({
   searchMaxWidth: "320px",
   ticketKeyColumn: "112px",
   projectColumn: "128px",
+  priorityColumn: "88px",
   lastRunColumn: "160px",
   runStatusColumn: "152px",
   timeColumn: "88px",

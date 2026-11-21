@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_PAGES,
   PAGE_SIZE,
+  loadTicketBlockers,
   loadTicketRuns,
   loadTicketsPage,
   loadTrackerTickets,
@@ -22,6 +23,7 @@ import { mergeTicketsPage } from "@ganger/app/tickets/merge";
 import { TICKET_FILTERS, lastRun, matchesFilter } from "@ganger/app/tickets/model";
 import type { TicketFilter, TicketView, TicketsPage } from "@ganger/app/tickets/model";
 import { T0, connection, docsProject, labs, now, setupTickets } from "./test-fixtures";
+import type { TicketsFixture } from "./test-fixtures";
 
 function byKey(page: TicketsPage, key: string): TicketView {
   const found = page.tickets.find((t) => t.key === key);
@@ -191,6 +193,41 @@ describe("Tickets 읽기", () => {
     expect(page.workspace.kind).toBe("all");
     expect(page.tickets).toEqual([]);
     expect(calls).toBe(0);
+  });
+});
+
+describe("고른 티켓의 선행 티켓 읽기(0160)", () => {
+  const read = (context: TicketsFixture["context"], key: string, ws = "ws-commerce") =>
+    loadTicketBlockers(context, { ws, connection, key });
+
+  it("관계를 읽으면 선행 티켓을 돌려주고 없으면 빈 목록이다", async () => {
+    const { context, tracker } = setupTickets();
+    tracker.relations.set(toTicketKey("ACME-3"), {
+      priority: "high",
+      blockers: [
+        {
+          key: toTicketKey("ACME-9"),
+          title: "앞 티켓",
+          state: { id: toTrackerStateId("done"), name: "Done", category: "completed" },
+        },
+      ],
+    });
+
+    expect(await read(context, "ACME-3")).toEqual({
+      ok: true,
+      blockers: [
+        { key: "ACME-9", title: "앞 티켓", stateName: "Done", stateCategory: "completed" },
+      ],
+    });
+    expect(await read(context, "ACME-2")).toEqual({ ok: true, blockers: [] });
+  });
+
+  it("트래커가 티켓을 찾지 못하거나 읽기에 실패하면 없음이 아니라 실패다", async () => {
+    const { context, tracker } = setupTickets();
+
+    expect(await read(context, "ACME-404")).toEqual({ ok: false, reason: "not-found" });
+    tracker.relationsError = new Error("network");
+    expect(await read(context, "ACME-3")).toEqual({ ok: false, reason: "failed" });
   });
 });
 

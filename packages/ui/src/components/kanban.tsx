@@ -3,7 +3,7 @@ import { useId } from "react";
 import type { ReactNode, Ref } from "react";
 import { focusStyles } from "./focus";
 import { textStyles } from "./text";
-import { breakpoints, colors, fontSize, radius, size, space } from "../tokens.stylex";
+import { breakpoints, colors, fontSize, motion, radius, size, space } from "../tokens.stylex";
 
 export interface KanbanColumnProps {
   title: string;
@@ -40,11 +40,15 @@ export function KanbanSubheading({ children }: { children: ReactNode }) {
 }
 
 export interface KanbanCardProps {
+  ticketKey?: ReactNode;
   tag?: ReactNode;
   title: ReactNode;
   detail?: ReactNode;
   detailTone?: "problem";
+  blockers?: ReactNode;
+  stuck?: boolean;
   meta?: ReactNode;
+  metaTone?: "problem";
   time?: ReactNode;
   action?: ReactNode;
   menu?: ReactNode;
@@ -55,11 +59,15 @@ export interface KanbanCardProps {
 }
 
 export function KanbanCard({
+  ticketKey,
   tag,
   title,
   detail,
   detailTone,
+  blockers,
+  stuck = false,
   meta,
+  metaTone,
   time,
   action,
   menu,
@@ -72,11 +80,14 @@ export function KanbanCard({
   const nameId = titleId ?? `${ownId}title`;
   const tagId = `${ownId}tag`;
   const detailId = `${ownId}detail`;
+  const blockersId = `${ownId}blockers`;
   const footId = `${ownId}foot`;
   const hasFoot = meta !== undefined || time !== undefined || action !== undefined;
+  const keyed = ticketKey !== undefined;
   const described = [
     tag === undefined ? null : tagId,
     detail === undefined ? null : detailId,
+    blockers === undefined ? null : blockersId,
     hasFoot ? footId : null,
   ].filter((id) => id !== null);
   return (
@@ -93,47 +104,95 @@ export function KanbanCard({
           styles.open,
           focusStyles.ring,
           styles.openRadius,
+          keyed && styles.openKeyed,
           action !== undefined && styles.openWithAction,
           selected && styles.selected,
+          stuck && (selected ? styles.stuckSelected : styles.stuck),
         )}
       >
-        {tag === undefined ? null : (
-          <span id={tagId} {...stylex.props(styles.tag, menu !== undefined && styles.besideMenu)}>
-            {tag}
+        {keyed ? (
+          <span {...stylex.props(styles.identity)}>
+            <span id={nameId} {...stylex.props(styles.contents)}>
+              <span
+                {...stylex.props(
+                  textStyles("meta"),
+                  styles.keyLine,
+                  menu !== undefined && tag === undefined && styles.besideMenu,
+                )}
+              >
+                {ticketKey}
+              </span>{" "}
+              {title === null ? null : <span {...stylex.props(styles.keyedTitle)}>{title}</span>}
+            </span>
+            {tag === undefined ? null : (
+              <span
+                id={tagId}
+                {...stylex.props(styles.keyedTag, menu !== undefined && styles.besideMenu)}
+              >
+                {tag}
+              </span>
+            )}
           </span>
+        ) : (
+          <>
+            {tag === undefined ? null : (
+              <span
+                id={tagId}
+                {...stylex.props(styles.tag, menu !== undefined && styles.besideMenu)}
+              >
+                {tag}
+              </span>
+            )}
+            <span
+              id={nameId}
+              {...stylex.props(
+                styles.title,
+                menu !== undefined && tag === undefined && styles.besideMenu,
+              )}
+            >
+              {title}
+            </span>
+          </>
         )}
-        <span
-          id={nameId}
-          {...stylex.props(
-            styles.title,
-            menu !== undefined && tag === undefined && styles.besideMenu,
+        <span {...stylex.props(keyed ? styles.statusGroup : styles.contents)}>
+          {detail === undefined ? null : (
+            <span
+              id={detailId}
+              {...stylex.props(
+                textStyles("ui"),
+                styles.detail,
+                detailTone === "problem" && styles.detailProblem,
+              )}
+            >
+              {detail}
+            </span>
           )}
-        >
-          {title}
+          {blockers === undefined ? null : <span id={blockersId}>{blockers}</span>}
+          {hasFoot ? (
+            <span
+              id={footId}
+              {...stylex.props(
+                styles.foot,
+                keyed && styles.footKeyed,
+                action !== undefined && styles.footWithAction,
+              )}
+            >
+              <span
+                {...stylex.props(
+                  textStyles("meta"),
+                  styles.meta,
+                  keyed && styles.metaOneLine,
+                  metaTone === "problem" && styles.detailProblem,
+                )}
+              >
+                {meta}
+              </span>
+              {time === undefined ? null : (
+                <span {...stylex.props(textStyles("meta"), styles.time)}>{time}</span>
+              )}
+            </span>
+          ) : null}
         </span>
-        {detail === undefined ? null : (
-          <span
-            id={detailId}
-            {...stylex.props(
-              textStyles("ui"),
-              styles.detail,
-              detailTone === "problem" && styles.detailProblem,
-            )}
-          >
-            {detail}
-          </span>
-        )}
-        {hasFoot ? (
-          <span
-            id={footId}
-            {...stylex.props(styles.foot, action !== undefined && styles.footWithAction)}
-          >
-            <span {...stylex.props(textStyles("meta"), styles.meta)}>{meta}</span>
-            {time === undefined ? null : (
-              <span {...stylex.props(textStyles("meta"), styles.time)}>{time}</span>
-            )}
-          </span>
-        ) : null}
       </button>
       {action === undefined ? null : <span {...stylex.props(styles.action)}>{action}</span>}
       {menu === undefined ? null : <span {...stylex.props(styles.menu)}>{menu}</span>}
@@ -207,6 +266,65 @@ const styles = stylex.create({
     cursor: "pointer",
   },
   openRadius: { borderRadius: radius.control },
+  openKeyed: {
+    gap: space.s3,
+    boxShadow: {
+      default: `inset 0 0 0 1px ${colors.borderDefault}`,
+      ":hover": {
+        default: null,
+        "@media (hover: hover)": `inset 0 0 0 1px ${colors.borderStrong}`,
+      },
+    },
+    transform: {
+      default: null,
+      ":active": { default: "scale(0.97)", "@media (prefers-reduced-motion: reduce)": null },
+    },
+    transitionProperty: "background-color, box-shadow, transform",
+    transitionDuration: motion.durationFast,
+    transitionTimingFunction: motion.easeOut,
+    outline: { default: "none", ":focus-visible": `2px solid ${colors.textPrimary}` },
+  },
+  stuck: {
+    boxShadow: {
+      default: `inset 0 0 0 1px ${colors.problemBorder}`,
+      ":hover": { default: null, "@media (hover: hover)": `inset 0 0 0 1px ${colors.problem}` },
+    },
+  },
+  stuckSelected: { boxShadow: `inset 0 0 0 1px ${colors.problem}` },
+  contents: { display: "contents" },
+  identity: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    alignItems: "center",
+    columnGap: space.s2,
+    rowGap: space.px2,
+    minWidth: 0,
+  },
+  keyLine: {
+    gridColumn: 1,
+    gridRow: 1,
+    minWidth: 0,
+    minHeight: size.pill,
+    overflow: "hidden",
+    lineHeight: size.pill,
+    fontVariantNumeric: "tabular-nums",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  keyedTag: { gridColumn: 2, gridRow: 1, display: "flex" },
+  keyedTitle: {
+    gridColumn: "1 / -1",
+    gridRow: 2,
+    display: "-webkit-box",
+    minWidth: 0,
+    overflow: "hidden",
+    overflowWrap: "anywhere",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: 2,
+  },
+  statusGroup: { display: "flex", flexDirection: "column", gap: space.px6, minWidth: 0 },
+  footKeyed: { paddingTop: 0 },
+  metaOneLine: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   openWithAction: {
     paddingBottom: {
       default: space.s3,

@@ -26,6 +26,7 @@ import {
   stopPreviousAgent,
   requestRunLog,
   sendAgentMessage,
+  startRunWithoutWaiting,
 } from "../server/functions";
 import type { AgentMessageOutcome, AgentMessageRequest } from "./agent-message-form";
 import type { RunDetailActions } from "./run-detail-screen";
@@ -53,6 +54,7 @@ export interface RunDetailCalls {
   continueRun(runId: RunId, message: string, requestId: string): Promise<ContinueRunActionResult>;
   stopPreviousAgent(runId: RunId, requestId: string): Promise<RunActionResult>;
   control(runId: string, control: RunControl, requestId: string): Promise<RunActionResult>;
+  startWithoutWaiting(runId: string, requestId: string): Promise<RunActionResult>;
   sendAgentMessage(runId: RunId, input: AgentMessageRequest): Promise<RunActionResult>;
   requestLog(runId: string): Promise<boolean>;
 }
@@ -67,6 +69,7 @@ export const serverRunDetailCalls: RunDetailCalls = {
     continueRunFrom({ data: { runId, message, requestId } }),
   stopPreviousAgent: (runId, requestId) => stopPreviousAgent({ data: { runId, requestId } }),
   control: (runId, control, requestId) => controlRun({ data: { runId, control, requestId } }),
+  startWithoutWaiting: (runId, requestId) => startRunWithoutWaiting({ data: { runId, requestId } }),
   sendAgentMessage: (runId, input) => sendAgentMessage({ data: { runId, ...input } }),
   requestLog: (runId) => requestRunLog({ data: { runId } }),
 };
@@ -175,6 +178,13 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
         ),
       onSuccess: refreshRun,
     }),
+    startWithoutWaiting: mutationOptions({
+      mutationFn: () =>
+        once("skip-blocker-wait", "", async (requestId) =>
+          okOrThrow<object, string>(await calls.startWithoutWaiting(runId, requestId)),
+        ),
+      onSuccess: refreshRun,
+    }),
     sendAgentMessage: mutationOptions({
       mutationFn: async (input: AgentMessageRequest): Promise<AgentMessageOutcome> =>
         agentMessageOutcome(await calls.sendAgentMessage(toRunId(runId), input)),
@@ -205,6 +215,7 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
   const continueRun = useMutation(mutations.continueRun);
   const stopAgent = useMutation(mutations.stopPreviousAgent);
   const control = useMutation(mutations.control);
+  const startWithoutWaiting = useMutation(mutations.startWithoutWaiting);
   const agentMessage = useMutation(mutations.sendAgentMessage);
   const refreshLog = useMutation(mutations.refreshLog);
   const openLog = useMutation(mutations.openLog);
@@ -231,6 +242,9 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
       await stopAgent.mutateAsync();
     },
     onControl: (next) => control.mutateAsync(next),
+    onStartWithoutWaiting: async () => {
+      await startWithoutWaiting.mutateAsync();
+    },
     onSendAgentMessage: (input) => agentMessage.mutateAsync(input),
     onRefreshLog: async () => {
       await refreshLog.mutateAsync();

@@ -25,6 +25,7 @@ function render(page: TicketsPage, options: { filter?: TicketFilter; selectedId?
       onOpenRun={noop}
       onAssign={() => Promise.resolve({ ok: false, reason: "active-run" })}
       onAssigned={noop}
+      onReadBlockers={() => Promise.resolve({ ok: true, blockers: [] })}
       onReread={() => Promise.resolve()}
     />,
     ticketsMessages,
@@ -240,6 +241,84 @@ describe("Tickets 화면", () => {
     };
     expect(panelOf("ACME-2", withNumber)).toContain("PR #12 병합됨");
     expect(panelOf("ACME-6")).not.toContain("PR ");
+  });
+
+  it("목록은 우선순위와 기다림, 멈춘 기다림을 구분하고 패널은 끝난 선행 티켓까지 보인다(0160)", async () => {
+    const { context } = setupTickets();
+    const loaded = await loadTicketsPage(context, undefined, now);
+    const blocker = (key: string, stateName: string, stateCategory: string) => ({
+      key,
+      title: `${key} 제목`,
+      stateName,
+      stateCategory,
+    });
+    const page: TicketsPage = {
+      ...loaded,
+      tickets: loaded.tickets.map((ticket) => {
+        if (ticket.key === "ACME-3")
+          return {
+            ...ticket,
+            priority: "high" as const,
+            blockerWait: {
+              kind: "blockers-waiting" as const,
+              blockers: [blocker("ACME-11", "In Progress", "started")],
+              finished: [blocker("ACME-9", "Done", "completed")],
+            },
+            waitingTickets: [{ key: "ACME-20", title: "뒤 티켓" }],
+          };
+        if (ticket.key === "ACME-6") {
+          const canceled = blocker("ACME-10", "Canceled", "canceled");
+          return {
+            ...ticket,
+            blockerWait: {
+              kind: "blockers-stuck" as const,
+              cause: "canceled" as const,
+              blocker: canceled,
+              blockers: [canceled],
+            },
+          };
+        }
+        return ticket;
+      }),
+    };
+    const selected = page.tickets.find((ticket) => ticket.key === "ACME-3");
+    const html = render(page, { selectedId: selected?.id ?? "" });
+    const listHtml = html.split("<aside")[0] ?? "";
+
+    expect(listHtml).toContain('data-blocker-state="active"');
+    expect(listHtml).toContain('data-blocker-state="canceled"');
+    expect(text(listHtml)).toContain("High");
+    const panel = panelText(html);
+    expect(panel).toContain("ACME-3 · Web · High · Todo");
+    expect(panel).toContain("ACME-11");
+    expect(panel).toContain("ACME-9");
+    expect(panel).toContain("ACME-20 뒤 티켓");
+  });
+
+  it("첫 관계 읽기에 실패한 런은 선행 티켓이 없다고 말하지 않는다(0160)", async () => {
+    const { context } = setupTickets();
+    const loaded = await loadTicketsPage(context, undefined, now);
+    const page: TicketsPage = {
+      ...loaded,
+      tickets: loaded.tickets.map((ticket) =>
+        ticket.key === "ACME-3"
+          ? {
+              ...ticket,
+              blockerWait: {
+                kind: "blockers-stuck" as const,
+                cause: "unreadable" as const,
+                blocker: null,
+                blockers: [],
+              },
+            }
+          : ticket,
+      ),
+    };
+    const selected = page.tickets.find((ticket) => ticket.key === "ACME-3");
+    const panel = panelText(render(page, { selectedId: selected?.id ?? "" }));
+
+    expect(panel).toContain("먼저 끝나야 하는 티켓을 읽지 못했어요.");
+    expect(panel).not.toContain("먼저 끝나야 하는 티켓이 없어요.");
   });
 
   it("패널은 키 · 트래커 프로젝트 · 트래커 상태 메타 줄과 제목, 마지막 런 상자를 보인다", async () => {
