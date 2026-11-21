@@ -50,6 +50,8 @@ export const LOG_EVENTS = {
   "run.worktree_remove_failed": "could not remove a worktree",
   "run.worktree_kept": "kept a worktree that has work not on the remote",
   "run.worktree_check_failed": "could not check a worktree for unsaved work; keeping it",
+  "run.worktree_check_unreachable":
+    "could not reach the runner to check a worktree for unsaved work; checking again next tick",
   "run.ticket_missing": "run's ticket was not found in the tracker",
   "run.ticket_missing_skip_updates":
     "run's ticket was not found in the tracker; skipping tracker updates",

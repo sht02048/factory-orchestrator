@@ -861,6 +861,18 @@ describe("남긴 워크트리와 운영자 지우기 요청 (0145 R7)", () => {
     expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: false, reason: "nothing-to-remove" });
   });
 
+  it("남기지 않은 워크트리(PR 이 열려 PR 을 기다리는 런)는 지우기를 요청할 수 없다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    change(db, id, { to: "running", started });
+    change(db, id, { to: "ended", agentResult: "reported-failure", prState: "open" });
+    const at = new Date("2026-11-21T01:00:00Z");
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: false, reason: "not-kept" });
+    updateRunRecords(db, id, { worktreeKept: "check-failed" });
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: true });
+  });
+
   it("끝나지 않은 런과 없는 런은 지우기를 요청할 수 없고, 남긴 이유도 끝난 런에만 적는다", () => {
     const db = seededDatabase();
     addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });

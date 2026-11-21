@@ -376,8 +376,12 @@ async function unsavedWorkIn(
     if (work.unpushedCommits) return "unpushed-commits";
     return null;
   } catch (error) {
+    if (runnerErrorDetail(error)?.kind === "unreachable") {
+      context.logger.debug("run.worktree_check_unreachable", { runId: run.id, error });
+      return "unreachable";
+    }
     context.logger.warn("run.worktree_check_failed", { runId: run.id, error });
-    return runnerErrorDetail(error)?.kind === "unreachable" ? "unreachable" : "check-failed";
+    return "check-failed";
   }
 }
 

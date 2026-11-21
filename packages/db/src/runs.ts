@@ -4,6 +4,7 @@ import {
   checkAssignment,
   checkManualRunnerChoice,
   pickRunner,
+  summarizeRunOutcome,
   toRunId,
   transitionRun,
 } from "@ganger/core";
@@ -804,7 +805,7 @@ export function recordPrReadError(db: Database, runId: RunId, error: PrReadError
 
 export type RequestWorktreeRemovalResult =
   | { ok: true }
-  | { ok: false; reason: "not-found" | "not-ended" | "nothing-to-remove" };
+  | { ok: false; reason: "not-found" | "not-ended" | "nothing-to-remove" | "not-kept" };
 
 export function requestWorktreeRemoval(
   db: Database,
@@ -817,6 +818,14 @@ export function requestWorktreeRemoval(
     if (row.state !== "ended") return { ok: false, reason: "not-ended" };
     if (row.worktreeRef === null || row.worktreeRemovedAt !== null) {
       return { ok: false, reason: "nothing-to-remove" };
+    }
+    const run = toStoredRun(row);
+    if (
+      run.state === "ended" &&
+      row.worktreeKept === null &&
+      summarizeRunOutcome(run).worktree !== "operator-decides"
+    ) {
+      return { ok: false, reason: "not-kept" };
     }
     if (row.worktreeRemoveRequestedAt !== null) return { ok: true };
     db.update(runs).set({ worktreeRemoveRequestedAt: now }).where(eq(runs.id, runId)).run();

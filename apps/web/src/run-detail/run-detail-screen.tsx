@@ -160,14 +160,16 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                   />
                 )}
                 {cancelable ? (
-                  <CancelRun
-                    onCancel={props.onCancel}
+                  <ConfirmDanger
+                    messages="run.cancel"
+                    onConfirm={props.onCancel}
                     focusAfter={() => focusFirst(cancelStatusRef, headRef)}
                   />
                 ) : null}
                 {removable ? (
-                  <RemoveWorktree
-                    onRemove={props.onRemoveWorktree}
+                  <ConfirmDanger
+                    messages="run.removeWorktree"
+                    onConfirm={props.onRemoveWorktree}
                     focusAfter={() => focusFirst(cancelStatusRef, headRef)}
                   />
                 ) : null}
@@ -547,50 +549,16 @@ function PermissionWait({
   );
 }
 
-function CancelRun({
-  onCancel,
+function ConfirmDanger({
+  messages,
+  onConfirm,
   focusAfter,
 }: {
-  onCancel: RunDetailActions["onCancel"];
+  messages: "run.cancel" | "run.removeWorktree";
+  onConfirm: () => Promise<void>;
   focusAfter: () => void;
 }) {
-  const t = useTranslations("run");
-  const [failed, setFailed] = useState(false);
-  return (
-    <>
-      <Dialog
-        trigger={t("cancel.trigger")}
-        triggerVariant="danger"
-        title={t("cancel.title")}
-        description={t("cancel.body")}
-        actions={
-          <>
-            <DialogClose>{t("cancel.dismiss")}</DialogClose>
-            <DialogClose
-              variant="danger"
-              onClick={() => {
-                setFailed(false);
-                onCancel().then(focusAfter, () => setFailed(true));
-              }}
-            >
-              {t("cancel.confirm")}
-            </DialogClose>
-          </>
-        }
-      />
-      {failed ? <ActionFailed /> : null}
-    </>
-  );
-}
-
-function RemoveWorktree({
-  onRemove,
-  focusAfter,
-}: {
-  onRemove: RunDetailActions["onRemoveWorktree"];
-  focusAfter: () => void;
-}) {
-  const t = useTranslations("run.removeWorktree");
+  const t = useTranslations(messages);
   const [failed, setFailed] = useState(false);
   return (
     <>
@@ -606,7 +574,7 @@ function RemoveWorktree({
               variant="danger"
               onClick={() => {
                 setFailed(false);
-                onRemove().then(focusAfter, () => setFailed(true));
+                onConfirm().then(focusAfter, () => setFailed(true));
               }}
             >
               {t("confirm")}
