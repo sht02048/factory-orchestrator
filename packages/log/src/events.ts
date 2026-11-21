@@ -60,6 +60,9 @@ export const LOG_EVENTS = {
   "run.code_host_adapter_failed": "could not create code host adapter",
   "run.mailbox_failed": "could not prepare the runner's mailbox",
 
+  "agent_message.read_failed": "could not read pending agent messages",
+  "agent_message.send_failed": "could not send a message to the agent",
+  "agent_message.follow_up_not_stopped": "could not stop the follow-up worker Orca started",
   "run_control.read_failed": "could not read run control requests",
   "run_control.apply_failed": "could not apply a run control request",
   "run_control.record_failed": "could not record a run control change",

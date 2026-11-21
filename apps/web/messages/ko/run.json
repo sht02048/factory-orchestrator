@@ -130,6 +130,7 @@
     "ended": "종료",
     "later-pr": "이후 PR 상태",
     "denied": "거절",
+    "operator-message": "운영자가 보냄",
     "mcp": "MCP · {client}",
     "mcpRejected": "{tool} · 하지 못했어요: {reason}",
     "mcpTool": {
@@ -252,6 +253,38 @@
     "resumePending": "재개하는 중",
     "pauseFailed": "멈추지 못했어요. {reason}",
     "resumeFailed": "재개하지 못했어요. {reason}"
+  },
+  "agentMessage": {
+    "title": "에이전트에게 보내기",
+    "label": "보낼 말",
+    "placeholder": "예: 끝내기 전에 push하고 PR까지 열어 줘요",
+    "send": "보내기",
+    "sending": "보내는 중",
+    "empty": "보낼 말을 적어 주세요.",
+    "tooLong": "{max}자까지 보낼 수 있어요.",
+    "unsentLabel": "보내지 못한 말",
+    "hint": {
+      "paused": "지금 보내면 재개한 직후에 에이전트에게 전해요.",
+      "waiting": "질문의 답으로 쓰지 않아요. 답은 답하기 칸에서 보내 주세요."
+    },
+    "delivery": {
+      "sending": "에이전트에게 보내는 중이에요.",
+      "after-resume": "재개하면 전해요.",
+      "after-reconnect": "러너에 다시 닿으면 전해요.",
+      "stopping-follow-up": "에이전트가 이미 끝나 있어서 Orca가 이 말로 작업을 다시 시작했어요. 그 작업을 멈추는 중이에요.",
+      "sent": "에이전트에게 보냈어요.",
+      "failed": "보내지 못했어요. {reason}"
+    },
+    "failure": {
+      "runner-unreachable": "러너에 닿지 않아요. 러너가 켜져 있는지 확인해 주세요.",
+      "agent-not-running": "러너에서 에이전트를 찾지 못했어요.",
+      "runner-error": "러너가 요청을 처리하지 못했어요. 잠시 뒤 다시 해 주세요.",
+      "state-changed": "그사이 런 상태가 바뀌었어요. 지금 상태를 확인해 주세요.",
+      "outcome-unknown": "에이전트에게 전해졌는지 확인하지 못했어요. 에이전트가 이미 끝났다면 Orca가 이 말로 작업을 다시 시작했을 수 있어요. 러너 화면을 확인하고 필요하면 다시 보내 주세요.",
+      "follow-up-stopped": "에이전트가 이미 끝나 있어서 Orca가 이 말로 작업을 다시 시작했어요. 그 작업은 멈췄지만 일부 실행됐을 수 있어요. 워크트리를 확인해 주세요.",
+      "follow-up-not-stopped": "에이전트가 이미 끝나 있어서 Orca가 이 말로 작업을 다시 시작했는데 멈추지 못했어요. 러너 화면에서 직접 멈춰 주세요.",
+      "unknown": "잠시 뒤 다시 해 주세요."
+    }
   },
   "lastOutput": {
     "title": "멈추기 전 마지막 출력",

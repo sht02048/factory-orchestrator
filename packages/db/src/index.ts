@@ -1,3 +1,4 @@
+export * from "./agent-messages.js";
 export * from "./change-events.js";
 export * from "./config.js";
 export * from "./database.js";

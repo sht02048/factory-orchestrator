@@ -1,4 +1,6 @@
 import {
+  toAgentMessageRequestId,
+  toFollowUpRef,
   toPermissionRequestId,
   toPullRequestId,
   toQuestionId,
@@ -7,7 +9,11 @@ import {
 } from "@ganger/core";
 import {
   changeRunState,
+  completeAgentMessage,
+  recordAgentMessageFollowUp,
   completeRunControlRequest,
+  requestAgentMessage,
+  requestRunCancel,
   requestRunControl,
   recordMcpAction,
   completeLogTailRequest,
@@ -30,6 +36,7 @@ import { renderWithMessages } from "../testing/render";
 import { addTitledRun, endedCases, minutes, now, seedDatabase } from "../testing/seed";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
 import questionJson from "../../messages/ko/question.json" with { type: "json" };
+import { LOG_POLL_LIMIT, runDetailPollMs } from "./actions";
 import { runMessages } from "./messages";
 import type { RunDetail, RunDetailPage } from "@ganger/app/run-detail/model";
 import { RunDetailScreen } from "./run-detail-screen";
@@ -53,6 +60,7 @@ function render(page: RunDetailPage, timeZone?: string): string {
       onCancel={resolved}
       onRemoveWorktree={resolved}
       onControl={() => Promise.resolve("requested" as const)}
+      onSendAgentMessage={() => Promise.resolve("requested" as const)}
       onRefreshLog={resolved}
     />,
     runMessages,
@@ -82,6 +90,114 @@ function found(db: Database, id: string | undefined): RunDetail {
   if (p.kind !== "found") throw new Error("not found");
   return p.run;
 }
+
+describe("Run 상세의 에이전트에게 보내기 (0147)", () => {
+  const started = (db: Database, key: string, at: number) => {
+    const id = assign(db, key, at);
+    walk(db, id, at, [startedOn(key)]);
+    return id;
+  };
+  const sent = (db: Database, id: Parameters<typeof requestAgentMessage>[1], body: string) => {
+    const result = requestAgentMessage(
+      db,
+      id,
+      { requestId: toAgentMessageRequestId(`request-${body}`), body },
+      minutes(910),
+    );
+    if (!result.ok) throw new Error("not requested");
+    return result.id;
+  };
+
+  it("Running·Waiting for Input·Paused 런에만 입력칸을 보인다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-91", 900);
+    expect(text(render(page(db, id)))).toContain(runJson.agentMessage.title);
+
+    changeRunState(db, id, { to: "waiting-for-input" }, minutes(901));
+    expect(text(render(page(db, id)))).not.toContain(runJson.agentMessage.hint.waiting);
+    recordRunQuestions(db, id, [
+      { id: toQuestionId("q-91"), body: "어느 쪽?", options: [], askedAt: minutes(901) },
+    ]);
+    const waiting = text(render(page(db, id)));
+    expect(waiting).toContain(runJson.agentMessage.title);
+    expect(waiting).toContain(runJson.agentMessage.hint.waiting);
+
+    changeRunState(db, id, { to: "running" }, minutes(902));
+    changeRunState(db, id, { to: "paused", source: "operator" }, minutes(903));
+    const paused = text(render(page(db, id)));
+    expect(paused).toContain(runJson.agentMessage.title);
+    expect(paused).toContain(runJson.agentMessage.hint.paused);
+
+    changeRunState(db, id, { to: "disconnected" }, minutes(904));
+    expect(text(render(page(db, id)))).not.toContain(runJson.agentMessage.title);
+
+    changeRunState(db, id, { to: "ended", agentResult: "canceled", prState: "none" }, minutes(905));
+    expect(text(render(page(db, id)))).not.toContain(runJson.agentMessage.title);
+  });
+
+  it("Queued 런과 취소 중인 런에는 입력칸이 없다", () => {
+    const { db } = seedDatabase();
+    const queued = assign(db, "ACME-92", 900);
+    expect(text(render(page(db, queued)))).not.toContain(runJson.agentMessage.title);
+    const id = started(db, "ACME-93", 900);
+    requestRunCancel(db, id, minutes(901));
+    expect(text(render(page(db, id)))).not.toContain(runJson.agentMessage.title);
+  });
+
+  it("타임라인에 운영자가 보냄과 보낸 말을 남기고, Paused 런은 재개하면 전한다고 보인다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-94", 900);
+    changeRunState(db, id, { to: "paused", source: "operator" }, minutes(901));
+    sent(db, id, "끝내기 전에 PR 까지 열어 줘요");
+    const html = text(render(page(db, id)));
+    expect(html).toContain(runJson.timeline["operator-message"]);
+    expect(html).toContain("끝내기 전에 PR 까지 열어 줘요");
+    expect(html).toContain(runJson.agentMessage.delivery["after-resume"]);
+  });
+
+  it("후속 워커를 멈추는 동안에는 보내는 중이라고 하지 않고 다시 읽기를 돌리지 않는다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-97", 900);
+    const messageId = sent(db, id, "다시 시작된 말");
+    recordAgentMessageFollowUp(db, messageId, toFollowUpRef("ctx_follow_up"));
+    const detail = page(db, id);
+    const html = text(render(detail));
+    expect(html).toContain(runJson.agentMessage.delivery["stopping-follow-up"]);
+    expect(html).not.toContain(runJson.agentMessage.delivery.sending);
+    expect(runDetailPollMs(detail, LOG_POLL_LIMIT)).toBe(false);
+  });
+
+  it("후속 워커를 멈추지 못하면 러너에서 직접 멈추라고 보인다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-96", 900);
+    const messageId = sent(db, id, "다시 시작된 말");
+    completeAgentMessage(db, {
+      id: messageId,
+      runId: id,
+      completedAt: minutes(911),
+      error: "follow-up-not-stopped",
+    });
+    expect(text(render(page(db, id)))).toContain(
+      runJson.agentMessage.failure["follow-up-not-stopped"],
+    );
+  });
+
+  it("보내지 못하면 입력칸과 타임라인에 이유를 보인다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-95", 900);
+    const messageId = sent(db, id, "안 닿는 말");
+    completeAgentMessage(db, {
+      id: messageId,
+      runId: id,
+      completedAt: minutes(911),
+      error: "runner-unreachable",
+    });
+    const html = render(page(db, id));
+    const reason = runJson.agentMessage.failure["runner-unreachable"];
+    expect(text(html).split(reason).length - 1).toBe(2);
+    expect(html).toMatch(/role="status"[^>]*>[^<]*보내지 못했어요/);
+  });
+});
 
 describe("Run 상세의 받은 지시서 (0146)", () => {
   it("시작한 런은 받은 지시서 전체를 접은 채로 보이고, 줄바꿈을 그대로 둔다", () => {
@@ -668,7 +784,7 @@ describe("Run 상세 화면", () => {
     expect(body).toContain(runJson.permission.deny);
     expect(body).not.toContain("허용하기");
     expect(html).not.toMatch(/<button[^>]*>[^<]*허용/);
-    expect(body).not.toContain(questionJson.send);
+    expect(body.split(runJson.agentMessage.title)[0]).not.toContain(questionJson.send);
   });
 
   it("답이나 거절을 남긴 뒤에는 입력 칸을 닫고 worker 가 보낸다고 보인다", () => {
@@ -720,6 +836,7 @@ describe("Run 상세 화면", () => {
         onCancel={resolved}
         onRemoveWorktree={resolved}
         onControl={() => Promise.resolve("requested" as const)}
+        onSendAgentMessage={() => Promise.resolve("requested" as const)}
         onRefreshLog={resolved}
       />,
       runMessages,

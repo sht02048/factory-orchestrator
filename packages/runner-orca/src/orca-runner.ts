@@ -1,8 +1,16 @@
 import { log } from "@ganger/log";
 import type { Logger } from "@ganger/log";
 import { describeRunnerCall, logRunnerCall } from "./runner-call-log.js";
-import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@ganger/core";
+import {
+  AdapterError,
+  toFollowUpRef,
+  toRunnerKind,
+  toRunnerProjectId,
+  toWorktreeRef,
+} from "@ganger/core";
 import type {
+  FollowUpRef,
+  AgentSendResult,
   AgentRef,
   MailboxRef,
   PermissionRequestId,
@@ -65,6 +73,8 @@ import {
   replyResultSchema,
   runBindResultSchema,
   runCurrentResultSchema,
+  failedFollowUpEnvelopeSchema,
+  operatorSendResultSchema,
   sendResultSchema,
   serviceStatusResultSchema,
   statusResultSchema,
@@ -102,6 +112,14 @@ export const LOG_CUT_MARKER = `[log tail cut: the transcript is longer than ${LO
 const RAW_LIMIT = 4000;
 export const INTERRUPT_KEY = "\u001b";
 export const ESCALATION_ANSWER_SUBJECT = "Answer from the operator";
+export const OPERATOR_MESSAGE_SUBJECT =
+  "Message from the operator (not an answer to any open question)";
+
+const SEND_NOT_APPLIED_CODES: ReadonlySet<string> = new Set([
+  "argument_too_long",
+  "invalid_argument",
+  "agent_not_running",
+]);
 
 const SENDER_ERROR_CODES = new Set([
   "no_active_sender_terminal",
@@ -673,6 +691,55 @@ export class OrcaRunner implements Runner {
     );
   }
 
+  async sendToAgent(run: RunOnRunner, input: { body: string }): Promise<AgentSendResult> {
+    const agent = this.agentOf(run);
+    const mailbox = this.mailboxOf(run.mailbox);
+    let sent: z.infer<typeof operatorSendResultSchema>;
+    try {
+      sent = await this.orca(
+        [
+          "orchestration",
+          "send",
+          "--from",
+          mailbox.terminal,
+          "--to",
+          `dispatch:${agent.dispatchId}`,
+          "--subject",
+          OPERATOR_MESSAGE_SUBJECT,
+          `--body=${input.body}`,
+        ],
+        operatorSendResultSchema,
+        { usesMailbox: true, timeoutMs: this.config.startTimeoutMs },
+        failedFollowUpEnvelopeSchema,
+      );
+    } catch (error) {
+      const detail = detailOf(error);
+      if (
+        detail.kind === "not-ready" ||
+        (detail.kind === "runner-error" && !SEND_NOT_APPLIED_CODES.has(detail.code))
+      ) {
+        throw new AdapterError<RunnerErrorDetail>(
+          {
+            kind: "start-outcome-unknown",
+            detail: detail.kind === "not-ready" ? detail.detail : detail.message,
+          },
+          { cause: error },
+        );
+      }
+      throw error;
+    }
+    return "delivery" in sent
+      ? { kind: "follow-up", followUpRef: toFollowUpRef(sent.dispatchId) }
+      : { kind: "delivered" };
+  }
+
+  async stopFollowUp(followUpRef: FollowUpRef): Promise<void> {
+    await this.orca(
+      ["orchestration", "worker-stop", "--dispatch", followUpRef],
+      workerStopResultSchema,
+    );
+  }
+
   async pauseAgent(run: RunOnRunner): Promise<void> {
     const terminal = await this.liveAgentTerminal(this.agentOf(run), run.worktree);
     if (terminal === null) {
@@ -983,8 +1050,9 @@ export class OrcaRunner implements Runner {
     args: ReadonlyArray<string>,
     schema: z.ZodType<T>,
     options: CallOptions = {},
+    failedResultSchema?: z.ZodType<T>,
   ): Promise<T> {
-    const outcome = await this.orcaOutcome(args, schema, options);
+    const outcome = await this.orcaOutcome(args, schema, options, failedResultSchema);
     if (!outcome.ok) throw this.errorFor(outcome, options);
     return outcome.result;
   }
@@ -993,6 +1061,7 @@ export class OrcaRunner implements Runner {
     args: ReadonlyArray<string>,
     schema: z.ZodType<T>,
     options: CallOptions = {},
+    failedResultSchema?: z.ZodType<T>,
   ): Promise<Outcome<T>> {
     const result = await this.run([this.config.orcaPath, ...args, "--json"], options);
     if (result.timedOut) {
@@ -1005,7 +1074,10 @@ export class OrcaRunner implements Runner {
         detail: result.stderr.trim() || `orca not found at ${this.config.orcaPath}`,
       });
     }
-    const envelope = envelopeSchema.safeParse(parseJson(result.stdout));
+    const output = parseJson(result.stdout);
+    const failedResult = failedResultSchema?.safeParse(output);
+    if (failedResult?.success === true) return { ok: true, result: failedResult.data };
+    const envelope = envelopeSchema.safeParse(output);
     if (!envelope.success) throw malformed(result);
     if (!envelope.data.ok) {
       return {

@@ -1,6 +1,7 @@
 import { AdapterError } from "../adapters.js";
 import type { ProviderUsageReading } from "../provider-usage.js";
 import type {
+  AgentSendResult,
   AgentActivity,
   AgentQuestion,
   QuestionKind,
@@ -49,6 +50,7 @@ import {
   toWorktreeRef,
 } from "../ids.js";
 import type {
+  FollowUpRef,
   CodeHostKind,
   CommentId,
   LabelId,
@@ -193,6 +195,7 @@ export interface FakeRunnerRun {
   answers: Array<{ questionId: QuestionId; answer: string }>;
   permissionWaits: PermissionWait[];
   denials: Array<{ permissionId: PermissionRequestId; reason: string }>;
+  agentMessages: string[];
   report: CompletionReport | null;
   endedWithoutReport: string | null;
   agentStopped: boolean;
@@ -237,6 +240,8 @@ export class FakeRunner implements Runner {
   providerUsage: ProviderUsageReading = { kind: "read", providers: [] };
   failNextStart: RunnerErrorDetail | null = null;
   failNextControl: RunnerErrorDetail | null = null;
+  nextSendStartsFollowUp: FollowUpRef | null = null;
+  readonly stoppedFollowUps: FollowUpRef[] = [];
   loseNextResumeResponse = false;
   loseNextStartResponse = false;
   private readonly mailboxes = new Set<MailboxRef>();
@@ -402,6 +407,7 @@ export class FakeRunner implements Runner {
         answers: [],
         permissionWaits: [],
         denials: [],
+        agentMessages: [],
         report: null,
         endedWithoutReport: null,
         agentStopped: false,
@@ -476,6 +482,25 @@ export class FakeRunner implements Runner {
       const found = this.runAt(run.worktree);
       found.permissionWaits = found.permissionWaits.filter((p) => p.id !== input.permissionId);
       found.denials.push({ ...input });
+    });
+  }
+
+  sendToAgent(run: RunOnRunner, input: { body: string }): Promise<AgentSendResult> {
+    return this.reach((): AgentSendResult => {
+      this.takeControlFailure();
+      this.mustHaveMailbox(run.mailbox);
+      this.runAt(run.worktree).agentMessages.push(input.body);
+      if (this.nextSendStartsFollowUp === null) return { kind: "delivered" };
+      const followUpRef = this.nextSendStartsFollowUp;
+      this.nextSendStartsFollowUp = null;
+      return { kind: "follow-up", followUpRef };
+    });
+  }
+
+  stopFollowUp(followUpRef: FollowUpRef): Promise<void> {
+    return this.reach(() => {
+      this.takeControlFailure();
+      this.stoppedFollowUps.push(followUpRef);
     });
   }
 

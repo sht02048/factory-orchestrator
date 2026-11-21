@@ -11,7 +11,12 @@ import {
   submitHumanCheckAnswer,
 } from "@ganger/app/home/actions";
 import { loadHomePage } from "@ganger/app/home/load";
-import { cancelRunRequest, removeWorktreeRequest } from "@ganger/app/run-detail/actions";
+import {
+  agentMessageInput,
+  cancelRunRequest,
+  removeWorktreeRequest,
+  sendAgentMessageRequest,
+} from "@ganger/app/run-detail/actions";
 import { requestControl } from "@ganger/app/run-control";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
 import { loadRunnersPage } from "@ganger/app/runners/load";
@@ -106,6 +111,10 @@ export const cancelRun = createServerFn({ method: "POST" })
 export const removeRunWorktree = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string() }))
   .handler(({ data }) => removeWorktreeRequest(getDatabase(), data.runId, new Date()));
+
+export const sendAgentMessage = createServerFn({ method: "POST" })
+  .validator(agentMessageInput)
+  .handler(({ data }) => sendAgentMessageRequest(getDatabase(), data, new Date()));
 
 export const controlRun = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string(), control: z.enum(["pause", "resume"]) }))

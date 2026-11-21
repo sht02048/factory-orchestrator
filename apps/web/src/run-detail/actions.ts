@@ -7,7 +7,7 @@ import type { HumanCheckDecision } from "@ganger/app/home/actions";
 import type { RunActionResult } from "@ganger/app/run-detail/actions";
 import type { RunDetailPage } from "@ganger/app/run-detail/model";
 import { toRunId } from "@ganger/core";
-import type { RunControl } from "@ganger/core";
+import type { RunControl, RunId } from "@ganger/core";
 import {
   ANSWER_REJECT_REASONS,
   DENY_REJECT_REASONS,
@@ -23,7 +23,9 @@ import {
   denyPermission,
   removeRunWorktree,
   requestRunLog,
+  sendAgentMessage,
 } from "../server/functions";
+import type { AgentMessageOutcome, AgentMessageRequest } from "./agent-message-form";
 import type { RunDetailActions } from "./run-detail-screen";
 
 export const RUN_POLL_MS = 2_000;
@@ -41,6 +43,7 @@ export interface RunDetailCalls {
   cancel(runId: string): Promise<RunActionResult>;
   removeWorktree(runId: string): Promise<RunActionResult>;
   control(runId: string, control: RunControl): Promise<RunControlActionResult>;
+  sendAgentMessage(runId: RunId, input: AgentMessageRequest): Promise<RunActionResult>;
   requestLog(runId: string): Promise<boolean>;
 }
 
@@ -51,6 +54,7 @@ export const serverRunDetailCalls: RunDetailCalls = {
   cancel: (runId) => cancelRun({ data: { runId } }),
   removeWorktree: (runId) => removeRunWorktree({ data: { runId } }),
   control: (runId, control) => controlRun({ data: { runId, control } }),
+  sendAgentMessage: (runId, input) => sendAgentMessage({ data: { runId, ...input } }),
   requestLog: (runId) => requestRunLog({ data: { runId } }),
 };
 
@@ -67,8 +71,20 @@ export function fetchCountOf(state: Pick<QueryState, "dataUpdateCount" | "errorU
 export function runDetailPollMs(page: RunDetailPage, logPolls: number): number | false {
   if (page.kind !== "found") return false;
   if (page.run.control?.status === "pending") return RUN_POLL_MS;
+  if (
+    page.run.timeline.some(
+      (event) => event.kind === "operator-message" && event.delivery.status === "sending",
+    )
+  ) {
+    return RUN_POLL_MS;
+  }
   if (page.run.log.kind === "pending" && logPolls < LOG_POLL_LIMIT) return RUN_POLL_MS;
   return false;
+}
+
+function agentMessageOutcome(result: RunActionResult): AgentMessageOutcome {
+  if (result.ok) return "requested";
+  return result.reason === "previous-failed" ? "previous-failed" : "state-changed";
 }
 
 export function runDetailMutations(world: RunDetailWorld, runId: string) {
@@ -113,6 +129,11 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
         (await calls.control(runId, control)).ok ? "requested" : "state-changed",
       onSuccess: refreshRun,
     }),
+    sendAgentMessage: mutationOptions({
+      mutationFn: async (input: AgentMessageRequest): Promise<AgentMessageOutcome> =>
+        agentMessageOutcome(await calls.sendAgentMessage(toRunId(runId), input)),
+      onSettled: refreshRun,
+    }),
     refreshLog: mutationOptions({
       mutationFn: () => calls.requestLog(runId),
       onSuccess: refreshLog,
@@ -136,6 +157,7 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
   const cancel = useMutation(mutations.cancel);
   const removeWorktree = useMutation(mutations.removeWorktree);
   const control = useMutation(mutations.control);
+  const agentMessage = useMutation(mutations.sendAgentMessage);
   const refreshLog = useMutation(mutations.refreshLog);
   const openLog = useMutation(mutations.openLog);
   const actions: RunDetailActions = {
@@ -155,6 +177,7 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
       await removeWorktree.mutateAsync();
     },
     onControl: (next) => control.mutateAsync(next),
+    onSendAgentMessage: (input) => agentMessage.mutateAsync(input),
     onRefreshLog: async () => {
       await refreshLog.mutateAsync();
     },
