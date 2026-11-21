@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "f1412409-7ef0-4569-9c11-c0862d27ba72",
+  "id": "ae5cd444-cfea-4a40-88d3-5b8f743f075b",
   "prevIds": ["f6bccc74-916d-41c1-9cd2-9ad0a2fd8ead"],
   "ddl": [
     {
@@ -994,6 +994,16 @@
     },
     {
       "table": "run_questions",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'question'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_questions",
       "name": "body",
       "type": "text",
       "notNull": true,
@@ -1605,36 +1615,6 @@
     {
       "table": "runs",
       "name": "agent_brief",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "runs",
-      "name": "continued_from_run_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "runs",
-      "name": "continue_message",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "runs",
-      "name": "continue_place",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -2463,20 +2443,6 @@
       "entityType": "indexes"
     },
     {
-      "table": "runs",
-      "name": "runs_continued_from",
-      "columns": [
-        {
-          "value": "continued_from_run_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
       "table": "tracker_events",
       "name": "tracker_events_unprocessed",
       "columns": [
@@ -3020,7 +2986,7 @@
     {
       "table": "notification_events",
       "name": "notification_events_kind",
-      "value": "\"kind\" IN ('question', 'permission', 'failed', 'disconnected', 'runner-offline', 'runner-auth', 'runner-usage-limit')",
+      "value": "\"kind\" IN ('question', 'permission', 'human-check', 'failed', 'disconnected', 'runner-offline', 'runner-auth', 'runner-usage-limit')",
       "entityType": "checks"
     },
     {
@@ -3051,6 +3017,12 @@
       "table": "run_permission_waits",
       "name": "run_permission_waits_sent_after_deny",
       "value": "\"deny_sent_at\" IS NULL OR \"denied_at\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "run_questions",
+      "name": "run_questions_kind",
+      "value": "\"kind\" IN ('question', 'human-check')",
       "entityType": "checks"
     },
     {

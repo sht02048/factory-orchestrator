@@ -49,6 +49,7 @@ export function hydrateWorld(db: Database, world: DemoWorld): void {
       started: { worktree: run.worktree, branch: run.branch, agentRef: run.agentRef },
       questions: questions.map((q) => ({
         id: q.id,
+        kind: q.kind,
         body: q.body,
         options: q.options,
         askedAt: q.askedAt,

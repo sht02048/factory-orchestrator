@@ -3,7 +3,14 @@ import { getCookie } from "@tanstack/react-start/server";
 import { CONTINUE_MESSAGE_MAX_LENGTH, toRunId } from "@ganger/core";
 import { markAllTrackersChanged } from "@ganger/db";
 import { z } from "zod";
-import { answerInput, denyInput, submitAnswer, submitDenial } from "@ganger/app/home/actions";
+import {
+  answerInput,
+  denyInput,
+  humanCheckAnswerInput,
+  submitAnswer,
+  submitDenial,
+  submitHumanCheckAnswer,
+} from "@ganger/app/home/actions";
 import { loadHomePage } from "@ganger/app/home/load";
 import {
   agentMessageInput,
@@ -52,6 +59,10 @@ export const getHomePage = createServerFn({ method: "GET" })
 export const answerQuestion = createServerFn({ method: "POST" })
   .validator(answerInput)
   .handler(({ data }) => submitAnswer(getDatabase(), data, new Date()));
+
+export const answerHumanCheck = createServerFn({ method: "POST" })
+  .validator(humanCheckAnswerInput)
+  .handler(({ data }) => submitHumanCheckAnswer(getDatabase(), data, new Date()));
 
 export const denyPermission = createServerFn({ method: "POST" })
   .validator(denyInput)

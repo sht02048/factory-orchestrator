@@ -22,4 +22,20 @@ describe("ASK_GUIDE", () => {
     expect(ASK_GUIDE).toContain("`escalation`을 보내지 않고 `ask`로 묻는다");
     expect(ASK_GUIDE).toContain("다음 행동을 `--options`로 단다");
   });
+
+  test("tells the agent to send a decision_gate and keep its turn open until the reply", () => {
+    expect(ASK_GUIDE).toContain("orca orchestration send --type decision_gate");
+    expect(ASK_GUIDE).toContain("orca orchestration check --wait");
+    expect(ASK_GUIDE).toContain("차례를 끝내지 않고");
+  });
+
+  test("accepts only the reply threaded to this request, so an old answer cannot confirm a new one", () => {
+    expect(ASK_GUIDE).toContain("출력의 `messageId`를 기억한다");
+    expect(ASK_GUIDE).toContain("check --wait --full --json");
+    expect(ASK_GUIDE).toContain("`thread_id`가 기억한 `messageId`인 메일만 이 요청의 답이다");
+  });
+
+  test("says how to send a Human Check but not what needs one", () => {
+    expect(ASK_GUIDE).not.toMatch(/머지|one-way/);
+  });
 });

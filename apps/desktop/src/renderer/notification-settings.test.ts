@@ -26,6 +26,7 @@ const allOn: NotificationSettingsView = {
   groups: {
     question: true,
     permission: true,
+    humanCheckRequest: true,
     failedDisconnected: true,
     runnerIssue: true,
   },

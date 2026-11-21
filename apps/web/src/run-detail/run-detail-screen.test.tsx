@@ -61,6 +61,7 @@ function render(page: RunDetailPage, timeZone?: string): string {
       runsHref="/runs"
       runHref={(id) => `/runs/${id}`}
       onAnswer={resolved}
+      onHumanCheck={resolved}
       onDeny={resolved}
       onCancel={resolved}
       onRemoveWorktree={resolved}
@@ -837,6 +838,7 @@ describe("Run 상세 화면", () => {
         runHref={(other) => `/runs/${other}`}
         logStalled
         onAnswer={resolved}
+        onHumanCheck={resolved}
         onDeny={resolved}
         onCancel={resolved}
         onRemoveWorktree={resolved}

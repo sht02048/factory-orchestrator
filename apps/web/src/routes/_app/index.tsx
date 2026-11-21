@@ -59,6 +59,7 @@ function HomeRoute() {
           });
         }}
         onAnswer={actions.onAnswer}
+        onHumanCheck={actions.onHumanCheck}
         onDeny={actions.onDeny}
         onControl={actions.onControl}
         openRunId={run === undefined ? undefined : toRunId(run)}

@@ -28,6 +28,7 @@ export function useStatusName(): (status: PillStatus) => string {
         return t(`runnerState.${status}`);
       case "question":
       case "permission":
+      case "human-check":
       case "runner-issue":
         return t(`attention.${status}`);
     }

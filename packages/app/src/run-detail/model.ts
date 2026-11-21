@@ -21,7 +21,7 @@ export type TimelineEvent = { at: string } & (
   | { kind: "assigned" | "started" | "waiting-for-input" | "resumed" }
   | { kind: "paused" | "unpaused" }
   | { kind: "unreachable" | "disconnected" | "reconnected" }
-  | { kind: "question" | "answer" | "permission"; body: string }
+  | { kind: "question" | "human-check" | "answer" | "permission"; body: string }
   | { kind: "denied"; body: string }
   | { kind: "cancel-requested" }
   | { kind: "operator-message"; body: string; delivery: AgentMessageDelivery }

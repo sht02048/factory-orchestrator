@@ -234,13 +234,21 @@ function oldestPendingInput(db: Database, runId: RunId): { at: Date; input: Inpu
     if (q.answer !== null && q.answer.sentAt !== null) continue;
     inputs.push({
       at: q.askedAt,
-      input: {
-        kind: "question",
-        questionId: q.id,
-        body: q.body,
-        choices: q.options,
-        answered: q.answer !== null,
-      },
+      input:
+        q.kind === "human-check"
+          ? {
+              kind: "human-check",
+              questionId: q.id,
+              body: q.body,
+              answered: q.answer !== null,
+            }
+          : {
+              kind: "question",
+              questionId: q.id,
+              body: q.body,
+              choices: q.options,
+              answered: q.answer !== null,
+            },
     });
   }
   for (const wait of listRunPermissionWaits(db, runId)) {
@@ -255,7 +263,23 @@ function oldestPendingInput(db: Database, runId: RunId): { at: Date; input: Inpu
       },
     });
   }
-  return inputs.toSorted((a, b) => a.at.getTime() - b.at.getTime())[0] ?? null;
+  return (
+    inputs.toSorted(
+      (a, b) =>
+        Number(operatorHandled(a.input)) - Number(operatorHandled(b.input)) ||
+        a.at.getTime() - b.at.getTime(),
+    )[0] ?? null
+  );
+}
+
+function operatorHandled(input: InputWait): boolean {
+  switch (input.kind) {
+    case "question":
+    case "human-check":
+      return input.answered;
+    case "permission":
+      return input.denied;
+  }
 }
 
 function dashboardUsage(

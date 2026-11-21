@@ -126,7 +126,7 @@ describe("서버 렌더", () => {
   it("StatusPill 은 상태 값마다 ADR 0010 5번의 색을 고른다", () => {
     const expected: Record<StatusTone, PillStatus[]> = {
       answer: ["waiting-for-input", "question", "permission"],
-      check: [],
+      check: ["human-check"],
       problem: ["disconnected", "failed", "offline", "runner-issue"],
       progress: ["running", "online"],
       merged: ["succeeded"],

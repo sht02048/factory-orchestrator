@@ -86,6 +86,7 @@ export function legacyAlerts(db: Database): LegacyAlert[] {
               },
             ]
           : [];
+      case "human-check":
       case "failed":
       case "disconnected":
       case "runner-auth":

@@ -27,6 +27,7 @@ import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { useUsageNames } from "../labels";
 import { useStatusName } from "../status";
+import type { HumanCheckDecision } from "@ganger/app/home/actions";
 import type { DashboardRunner, HomePage, HomeRun } from "@ganger/app/home/model";
 import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import {
@@ -35,6 +36,7 @@ import {
   limitedRunners,
   readyAgainInMs,
   runnerIssues,
+  todoGroupOf,
   todoGroups,
 } from "@ganger/app/home/model";
 import { RunCard } from "./run-card";
@@ -49,6 +51,13 @@ export interface AnswerInput {
   runId: string;
   questionId: string;
   answer: string;
+}
+
+export interface HumanCheckInput {
+  runId: string;
+  questionId: string;
+  decision: HumanCheckDecision;
+  note: string;
 }
 
 export interface DenyInput {
@@ -71,6 +80,7 @@ export interface HomeScreenProps {
   view?: DashboardView;
   onViewChange?: (view: DashboardView) => void;
   onAnswer: (input: AnswerInput) => Promise<void>;
+  onHumanCheck: (input: HumanCheckInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
   onControl: (input: ControlInput) => Promise<RunControlOutcome>;
   openRunId?: RunId | undefined;
@@ -96,6 +106,7 @@ export function HomeScreen({
   view = "all",
   onViewChange = () => {},
   onAnswer,
+  onHumanCheck,
   onDeny,
   onControl,
   openRunId,
@@ -166,6 +177,8 @@ export function HomeScreen({
     },
   };
   const runningTodo = new Set(board.running.todo.map((run) => run.id));
+  const humanChecks = board.running.todo.filter((run) => todoGroupOf(run) === "check");
+  const otherTodo = board.running.todo.filter((run) => todoGroupOf(run) !== "check");
   const todoIds = new Set(page.attention.map(({ run }) => run.id));
   return (
     <ScreenLayout
@@ -212,13 +225,29 @@ export function HomeScreen({
                   : board.running.todo.length + board.running.rest.length
               }
             >
+              {humanChecks.length === 0 ? null : (
+                <div data-todo-group="check" {...stylex.props(styles.settled)}>
+                  <KanbanSubheading>{t("board.humanCheck")}</KanbanSubheading>
+                  <CardList
+                    runs={humanChecks}
+                    tagged={() => true}
+                    limit={COLUMN_VISIBLE}
+                    empty={null}
+                    host={host}
+                  />
+                </div>
+              )}
               <CardList
-                runs={
-                  todoOnly ? board.running.todo : [...board.running.todo, ...board.running.rest]
-                }
+                runs={todoOnly ? otherTodo : [...otherTodo, ...board.running.rest]}
                 tagged={(run) => runningTodo.has(run.id)}
                 limit={COLUMN_VISIBLE}
-                empty={todoOnly ? t("columnEmpty.todo") : t("columnEmpty.running")}
+                empty={
+                  humanChecks.length > 0
+                    ? null
+                    : todoOnly
+                      ? t("columnEmpty.todo")
+                      : t("columnEmpty.running")
+                }
                 host={host}
               />
             </KanbanColumn>
@@ -261,6 +290,7 @@ export function HomeScreen({
           finalFocus={() => (target === null ? null : (cards.current.get(target.run.id) ?? null))}
           all={all}
           onAnswer={onAnswer}
+          onHumanCheck={onHumanCheck}
           onDeny={onDeny}
           onControl={host.onControl}
         />
@@ -280,7 +310,11 @@ function boardRuns(board: ReturnType<typeof dashboardBoard>): HomeRun[] {
 }
 
 function opensAnswer(run: HomeRun): boolean {
-  return run.state === "waiting-for-input" && run.input?.kind === "question" && !run.input.answered;
+  return (
+    run.state === "waiting-for-input" &&
+    (run.input?.kind === "question" || run.input?.kind === "human-check") &&
+    !run.input.answered
+  );
 }
 
 function DashboardSummary({ page }: { page: HomePage }) {

@@ -121,7 +121,7 @@ _Avoid_: 실행 중(상태 이름으로)
 
 - **Question**: 에이전트가 질문하고 답을 기다린다. 아래 To do의 Question을 본다.
 - **Permission**: 에이전트가 권한 프롬프트에서 허용을 기다린다. 아래 To do의 Permission을 본다.
-- **Human Check**: 에이전트가 사람이 확인해야 끝나는 일을 요청하고 답을 기다린다. 아래 To do의 Human Check를 본다(티켓 0148에서 더한다).
+- **Human Check**: 에이전트가 사람이 확인해야 끝나는 일을 요청하고 답을 기다린다. 아래 To do의 Human Check를 본다(티켓 0148).
 
 To do에 올리며, 최대 실행 시간은 이 동안에도 흐른다. 답하거나 허용·거절해 에이전트가 다시 움직이면 Running으로 돌아간다. 화면에서도 Waiting for Input으로 쓴다(ADR 0010). capacity를 기다리는 Queued와 다르다.
 _Avoid_: 입력 기다림(상태 이름으로)
@@ -184,7 +184,7 @@ _Avoid_: Aborted, Stopped, 취소(상태 이름으로. 취소 버튼과 "취소 
 ### To do
 
 **To do**:
-운영자가 손을 대야 끝나는 런의 목록. Dashboard에서는 따로 칸을 두지 않고 칸반 카드 위 꼬리표로 보인다(Question·Permission·Disconnected는 Running 칸, Failed는 Done today 칸 맨 위, 티켓 0100). 종류는 Question, Permission, Failed, Disconnected다. Succeeded는 PR이 열려 있거나 없어도 올리지 않는다(티켓 0145). 러너 문제(Runner Issue)는 넣지 않는다. 종류 이름은 화면에서도 영어 용어 그대로 쓰고, 왜 손대야 하는지는 설명 문장(한국어)으로 쓴다(ADR 0010). 꼬리표는 종류 이름(상태 이름 글자)을 그대로 쓰는 알약이다. Dashboard 머리의 요약 문장은 종류를 하는 일로 모아 말한다(답할 질문, 멈춘 런). 이 말은 종류를 모아 부르는 화면 문장이라 종류 이름을 대신하지 않는다(ADR 0010 0100 갱신). 티켓마다 최신 런만 보인다. Canceled는 올리지 않는다. Failed는 운영자 결정 목록(Q14~Q21)에는 없었지만 지금처럼 To do에 올린다(스펙 7번, Q82.9). 문장 안에서 To do를 한국어로 말할 때는 처리할 일로 쓴다(아래 Tickets 필터).
+운영자가 손을 대야 끝나는 런의 목록. Dashboard에서는 따로 칸을 두지 않고 칸반 카드 위 꼬리표로 보인다(Question·Permission·Human Check·Disconnected는 Running 칸, Failed는 Done today 칸 맨 위, 티켓 0100). Human Check는 Running 칸 맨 위에 "확인해 주세요"로 따로 묶는다(티켓 0148). 종류는 Question, Permission, Human Check, Failed, Disconnected다. Succeeded는 PR이 열려 있거나 없어도 올리지 않는다(티켓 0145). 러너 문제(Runner Issue)는 넣지 않는다. 종류 이름은 화면에서도 영어 용어 그대로 쓰고, 왜 손대야 하는지는 설명 문장(한국어)으로 쓴다(ADR 0010). 꼬리표는 종류 이름(상태 이름 글자)을 그대로 쓰는 알약이다. Dashboard 머리의 요약 문장은 종류를 하는 일로 모아 말한다(확인할 일, 답할 질문, 멈춘 런). 이 말은 종류를 모아 부르는 화면 문장이라 종류 이름을 대신하지 않는다(ADR 0010 0100 갱신). 티켓마다 최신 런만 보인다. Canceled는 올리지 않는다. Failed는 운영자 결정 목록(Q14~Q21)에는 없었지만 지금처럼 To do에 올린다(스펙 7번, Q82.9). 문장 안에서 To do를 한국어로 말할 때는 처리할 일로 쓴다(아래 Tickets 필터).
 _Avoid_: 손댈 일(티켓 0059 전의 이름이다), Attention, Inbox, 할 일
 
 **Question**:
@@ -196,7 +196,7 @@ Waiting for Input 런 중 에이전트가 권한 프롬프트에서 허용을 �
 _Avoid_: 권한 대기(종류 이름으로), 권한 요청
 
 **Human Check**:
-Waiting for Input 런 중 에이전트가 사람이 확인해야 끝나는 일(예: 머지 위험이 one-way인 PR)을 무엇을 확인할지와 링크로 요청하고 답을 기다리는 To do. 에이전트는 Orca 오케스트레이션의 `decision_gate`로 보내고, Ganger는 Question과 따로 묶어 "확인해 주세요"로 보인다(ADR [0023](docs/adr/0023-human-check-request.md), 스펙 0006 C3·C4). 답은 "확인했어요" / "고쳐 주세요"와 함께 보낼 말(선택)이고, 답하면 런은 Running으로 돌아간다. Ganger는 머지하지 않는다. 무엇을 요청할지는 프로젝트 규칙이나 티켓 앞뒤 지시가 정한다. 0145 전에는 요약 결과 이름이었지만 지금은 요약 결과가 아니다. 티켓 0148이 To do 종류와 알림 사건 종류에 더한다.
+Waiting for Input 런 중 에이전트가 사람이 확인해야 끝나는 일(예: 머지 위험이 one-way인 PR)을 무엇을 확인할지와 링크로 요청하고 답을 기다리는 To do. 에이전트는 Orca 오케스트레이션의 `decision_gate`로 보내고, Ganger는 Question과 따로 묶어 "확인해 주세요"로 보인다(ADR [0023](docs/adr/0023-human-check-request.md), 스펙 0006 C3·C4). 답은 "확인했어요" / "고쳐 주세요"와 함께 보낼 말(선택)이고, 답하면 런은 Running으로 돌아간다. Ganger는 머지하지 않는다. 무엇을 요청할지는 프로젝트 규칙이나 티켓 앞뒤 지시가 정한다. 0145 전에는 요약 결과 이름이었지만 지금은 요약 결과가 아니다.
 _Avoid_: 승인 요청, 리뷰 요청, 결정 게이트(Orca 이름 `decision_gate` 밖에서), Human Check를 요약 결과로
 
 **Runner Issue**:
@@ -206,7 +206,7 @@ _Avoid_: 막힘, 인증 깨짐, 러너 오류(모두 종류 이름으로. 설명
 ### 알림
 
 **알림 사건**:
-운영자에게 알릴 만한 일이 생긴 기록. 서버가 사건마다 단조 증가 번호, 종류, 대상(런 또는 러너), 생긴 시각, 해결 여부와 해결 시각을 저장한다(티켓 0103). 종류는 To do 네 가지(Question, Permission, Failed, Disconnected)와 Runner Issue(Offline, GitHub 인증 깨짐, 공급자 사용량 한도)다. To do·Runner Issue와 짝을 이루지만 상태가 아니다. 원인이 사라지면(답했거나, 같은 티켓에 새 런을 맡겼거나, 러너가 돌아왔으면) 해결된다. 같은 원인은 해결 전이면 사건 하나이고, 해결된 뒤 10분 안에 같은 원인이 다시 생기면 새 사건 대신 그 사건을 다시 연다(Offline 깜빡임이 다시 울리지 않게). 해결된 사건은 7일 뒤 지운다. Succeeded·Canceled와 Queued·Running으로 옮김은 사건이 아니다. Human Check 종류는 0145에서 뺐다. 데스크톱 앱에 뜨는 러너 등록 요청(0099)도 알림 사건이 아니다. 데스크톱 앱이 SSE로 받아 OS 알림으로 보이고, 나중에 외부 알림 연동과 모바일 푸시도 같은 사건을 쓴다.
+운영자에게 알릴 만한 일이 생긴 기록. 서버가 사건마다 단조 증가 번호, 종류, 대상(런 또는 러너), 생긴 시각, 해결 여부와 해결 시각을 저장한다(티켓 0103). 종류는 To do 다섯 가지(Question, Permission, Human Check, Failed, Disconnected)와 Runner Issue(Offline, GitHub 인증 깨짐, 공급자 사용량 한도)다. To do·Runner Issue와 짝을 이루지만 상태가 아니다. 원인이 사라지면(답했거나, 같은 티켓에 새 런을 맡겼거나, 러너가 돌아왔으면) 해결된다. 같은 원인은 해결 전이면 사건 하나이고, 해결된 뒤 10분 안에 같은 원인이 다시 생기면 새 사건 대신 그 사건을 다시 연다(Offline 깜빡임이 다시 울리지 않게). 해결된 사건은 7일 뒤 지운다. Succeeded·Canceled와 Queued·Running으로 옮김은 사건이 아니다. Human Check 종류는 0145에서 뺐다가 에이전트가 요청하는 Waiting for Input 종류로 0148에서 돌아왔다. 데스크톱 앱에 뜨는 러너 등록 요청(0099)도 알림 사건이 아니다. 데스크톱 앱이 SSE로 받아 OS 알림으로 보이고, 나중에 외부 알림 연동과 모바일 푸시도 같은 사건을 쓴다.
 _Avoid_: Attention, 알림(OS에 뜨는 알림 자체를 말할 때만 쓴다), 이벤트(단독으로. 런 상태 기록과 헷갈린다)
 
 **변경 기록**:

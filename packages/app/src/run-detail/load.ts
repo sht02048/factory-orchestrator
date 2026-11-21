@@ -281,6 +281,7 @@ function keptWorktreeReason(
 function inputSinceOf(db: Database, runId: RunId, input: PendingInput): string | null {
   switch (input.kind) {
     case "question":
+    case "human-check":
       return (
         listRunQuestions(db, runId)
           .find((q) => q.id === input.questionId)
@@ -362,7 +363,11 @@ function timelineOf(
     if (event !== null) events.push(event);
   }
   for (const question of questions) {
-    events.push({ kind: "question", body: question.body, at: question.askedAt.toISOString() });
+    events.push({
+      kind: question.kind,
+      body: question.body,
+      at: question.askedAt.toISOString(),
+    });
     if (question.answer !== null) {
       events.push({
         kind: "answer",

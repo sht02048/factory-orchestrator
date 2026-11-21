@@ -403,7 +403,7 @@ function demoChecks(prState: Ending["prState"], prNumber: number) {
     : { ci: "success", signals: { ...base, open: true, conflict: false, behindBy: 2 } };
 }
 
-const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 8, 9, 21, 22, 23, 24, 25, 26], GLX: [2] };
+const ACTIVE_TICKETS = { ACME: [1, 2, 3, 4, 5, 6, 7, 8, 9, 21, 22, 23, 24, 25, 26, 27], GLX: [2] };
 const HISTORY_TICKETS = [
   range(1, 35).filter((n) => !ACTIVE_TICKETS.ACME.includes(n)),
   range(1, 10).filter((n) => !ACTIVE_TICKETS.GLX.includes(n)),
@@ -488,6 +488,18 @@ function seedActive(db: Database, now: Date): SeededRuns {
       id: toPermissionRequestId("demo-permission-1"),
       detail: "Bash(pnpm add -D @types/supertest)",
       requestedAt: ago(6),
+    },
+  ]);
+
+  const humanCheck = startedRun(db, ticket("ACME", 27), runnerA.id, ago(45), ago(44));
+  ok(changeRunState(db, humanCheck, { to: "waiting-for-input" }, ago(3)));
+  recordRunQuestions(db, humanCheck, [
+    {
+      id: toQuestionId("demo-human-check-1"),
+      kind: "human-check",
+      body: "PR #571 머지를 확인해 주세요\n\n설정 파일 형식을 바꿔 머지 위험이 one-way예요. 독립 리뷰와 CI를 통과했어요.\nhttps://github.com/acme/widgets/pull/571",
+      options: [],
+      askedAt: ago(3),
     },
   ]);
 

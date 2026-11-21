@@ -258,8 +258,13 @@ export interface ResumedAgent {
   restarted: boolean;
 }
 
+export const QUESTION_KINDS = ["question", "human-check"] as const;
+
+export type QuestionKind = (typeof QUESTION_KINDS)[number];
+
 export interface AgentQuestion {
   id: QuestionId;
+  kind?: QuestionKind;
   body: string;
   options: ReadonlyArray<string>;
   askedAt: Date;

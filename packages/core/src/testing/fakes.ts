@@ -4,6 +4,7 @@ import type {
   AgentSendResult,
   AgentActivity,
   AgentQuestion,
+  QuestionKind,
   CodeHost,
   CodeHostErrorDetail,
   CompletionReport,
@@ -278,12 +279,13 @@ export class FakeRunner implements Runner {
 
   ask(
     worktree: WorktreeRef,
-    question: { body: string; options?: string[]; at?: Date },
+    question: { body: string; options?: string[]; at?: Date; kind?: QuestionKind },
   ): QuestionId {
     const run = this.runAt(worktree);
     const id = toQuestionId(`fake-question-${this.next()}`);
     run.questions.push({
       id,
+      ...(question.kind === undefined ? {} : { kind: question.kind }),
       body: question.body,
       options: question.options ?? [],
       askedAt: question.at ?? new Date(),
@@ -507,7 +509,8 @@ export class FakeRunner implements Runner {
     return this.reach(() => {
       this.mustHaveMailbox(run.mailbox);
       const found = this.runAt(run.worktree);
-      if (!found.questions.some((q) => q.id === input.questionId)) {
+      const question = found.questions.find((q) => q.id === input.questionId);
+      if (question === undefined) {
         throw new AdapterError<RunnerErrorDetail>({
           kind: "runner-error",
           code: "message_not_found",
@@ -515,6 +518,9 @@ export class FakeRunner implements Runner {
         });
       }
       found.answers.push({ ...input });
+      if (question.kind === "human-check" && found.activity.kind === "unknown") {
+        found.activity = { kind: "working", since: new Date() };
+      }
     });
   }
 

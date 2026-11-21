@@ -1159,7 +1159,9 @@ describe("질문과 답 요청 (Q82.3·Q82.5)", () => {
       ok: false,
       reason: "already-answered",
     });
-    expect(listUnsentAnswers(db)).toEqual([{ runId: id, questionId: q, answer: "A", answeredAt }]);
+    expect(listUnsentAnswers(db)).toEqual([
+      { runId: id, questionId: q, kind: "question", answer: "A", answeredAt },
+    ]);
     expect(sentQuestionIds(db, id).size).toBe(0);
 
     expect(markAnswerSent(db, { runId: id, questionId: q })).toBe(true);

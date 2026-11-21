@@ -7,6 +7,7 @@ import { loadRunDetail } from "@ganger/app/run-detail/load";
 import { loadSettingsPage } from "@ganger/app/settings/load";
 import {
   SecretBox,
+  answerRunQuestion,
   getMapping,
   getRunCancelRequest,
   latestChangeSeq,
@@ -15,12 +16,14 @@ import {
   listRunMcpActions,
   listRunQuestions,
   listRunners,
+  markAnswerSent,
+  recordRunQuestions,
   saveMcpWriteAllowed,
 } from "@ganger/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
-import { toRunId, toTrackerConnectionId, toTrackerProjectId } from "@ganger/core";
+import { toQuestionId, toRunId, toTrackerConnectionId, toTrackerProjectId } from "@ganger/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createMcpServer } from "./server.js";
@@ -275,6 +278,33 @@ describe("MCP 쓰기 도구", () => {
       at: at(60).toISOString(),
     });
     expect(listRecentMcpActions(seeded.db, 10)).toEqual([]);
+  });
+
+  it("Human Check 는 종류와 external 칸의 요청 내용으로 읽고, answer_question 으로는 답하지 못한다", async () => {
+    await connect("Operator");
+    const runId = seeded.waiting;
+    const first = toQuestionId("q-1");
+    answerRunQuestion(seeded.db, { runId, questionId: first, answer: "yes" }, at(20));
+    markAnswerSent(seeded.db, { runId, questionId: first }, at(21));
+    const checkId = toQuestionId("msg-check");
+    recordRunQuestions(seeded.db, runId, [
+      { id: checkId, kind: "human-check", body: "EXTERNAL-check", options: [], askedAt: at(22) },
+    ]);
+
+    const shown = await call("get_run", { runId });
+    expect(JSON.stringify(shown.json)).toContain(
+      '"kind":"human-check","questionId":"msg-check","answered":false,"external":{"body":"EXTERNAL-check"}',
+    );
+
+    const pending = await call("answer_question", { runId, answer: "확인했어요" });
+    expect(pending.json["reason"]).toBe("no-question");
+    const named = await call("answer_question", {
+      runId,
+      questionId: checkId,
+      answer: "확인했어요",
+    });
+    expect(named.json["reason"]).toBe("not-found");
+    expect(listRunQuestions(seeded.db, runId).find((q) => q.id === checkId)?.answer).toBeNull();
   });
 
   it("런과 상관없는 쓰기는 Settings MCP 구역의 최근 작업에 대상과 함께 남는다", async () => {
