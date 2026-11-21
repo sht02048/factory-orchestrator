@@ -261,7 +261,23 @@ function oldestPendingInput(db: Database, runId: RunId): { at: Date; input: Inpu
       },
     });
   }
-  return inputs.toSorted((a, b) => a.at.getTime() - b.at.getTime())[0] ?? null;
+  return (
+    inputs.toSorted(
+      (a, b) =>
+        Number(operatorHandled(a.input)) - Number(operatorHandled(b.input)) ||
+        a.at.getTime() - b.at.getTime(),
+    )[0] ?? null
+  );
+}
+
+function operatorHandled(input: InputWait): boolean {
+  switch (input.kind) {
+    case "question":
+    case "human-check":
+      return input.answered;
+    case "permission":
+      return input.denied;
+  }
 }
 
 function dashboardUsage(

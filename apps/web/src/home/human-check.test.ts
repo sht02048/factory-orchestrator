@@ -9,9 +9,15 @@ import { loadHomePage, pendingInput } from "@ganger/app/home/load";
 import { todoGroups, todoTagOf } from "@ganger/app/home/model";
 import { notificationCauses } from "@ganger/app/notifications/causes";
 import { HUMAN_CHECK_NOTE_MAX } from "@ganger/app/question";
-import { toQuestionId, toTicketKey } from "@ganger/core";
+import { toPermissionRequestId, toQuestionId, toTicketKey } from "@ganger/core";
 import type { RunId } from "@ganger/core";
-import { changeRunState, listRunQuestions, listRuns, recordRunQuestions } from "@ganger/db";
+import {
+  changeRunState,
+  listRunQuestions,
+  listRuns,
+  recordPermissionWaits,
+  recordRunQuestions,
+} from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { describe, expect, it } from "vitest";
 import { bodyParts } from "../question/human-check-answer";
@@ -99,6 +105,32 @@ describe("Human Check 요청", () => {
     expect(parsed(`  ${"가".repeat(HUMAN_CHECK_NOTE_MAX)}  `)).toBe(true);
     expect(parsed("😀".repeat(HUMAN_CHECK_NOTE_MAX))).toBe(true);
     expect(parsed("가".repeat(HUMAN_CHECK_NOTE_MAX + 1))).toBe(false);
+  });
+
+  it("답한 Human Check 를 보내는 동안 뒤에 온 Permission 을 화면과 알림에서 가리지 않는다", () => {
+    const { db, runId } = seedHumanCheck();
+    submitHumanCheckAnswer(
+      db,
+      { runId, questionId: CHECK_ID, decision: "confirmed", note: "" },
+      now,
+    );
+    recordPermissionWaits(db, runId, [
+      {
+        id: toPermissionRequestId("p-after-check"),
+        detail: "Bash: orca orchestration check --wait",
+        requestedAt: minutes(115),
+      },
+    ]);
+
+    expect(pendingInput(db, runId)).toMatchObject({
+      kind: "permission",
+      promptId: "p-after-check",
+    });
+    expect(
+      notificationCauses(loadHomePage(db, "ws-commerce", now, "UTC"), [], now).map(
+        (cause) => cause.cause,
+      ),
+    ).toContain(`permission:${runId}:p-after-check`);
   });
 
   it("일반 질문 답하기로는 Human Check 에 답하지 못한다", () => {
