@@ -1,4 +1,4 @@
-import { toDeliveryId, toTicketKey, toTrackerStateId } from "@ganger/core";
+import { AdapterError, toDeliveryId, toTicketKey, toTrackerStateId } from "@ganger/core";
 import type { TicketBlocker, TicketPriority } from "@ganger/core";
 import {
   continueRun,
@@ -152,7 +152,7 @@ describe("선행 티켓을 기다리는 런", () => {
   it("읽지 못하면 시작하지 않고, 다시 읽히면 시작한다(B7)", async () => {
     h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
-    h.tracker.relationsError = new Error("network");
+    h.tracker.relationsError = new AdapterError({ kind: "network", cause: null });
     const worker = h.worker();
     await worker.tick();
     expect(stateOf(run)).toBe("queued");
@@ -171,7 +171,7 @@ describe("선행 티켓을 기다리는 런", () => {
       h.assign("ENG-2", projectA),
       h.assign("ENG-3", projectA),
     ];
-    h.tracker.relationsError = new Error("network");
+    h.tracker.relationsError = new AdapterError({ kind: "network", cause: null });
     const reads = vi.spyOn(h.tracker, "getTicketRelations");
 
     await h.worker().tick();
@@ -181,6 +181,28 @@ describe("선행 티켓을 기다리는 런", () => {
       expect(stateOf(run)).toBe("queued");
       expect(getRunBlockerState(h.db, run.id)?.readFailed).toBe(true);
     }
+  });
+
+  it("티켓 하나만 읽지 못하면 그 런만 멈추고 같은 연결의 다른 런은 시작한다(B7·B9)", async () => {
+    h.addRunner({ id: "runner-a", capacity: 2, projects: [projectA] });
+    const broken = h.assign("ENG-1", projectA);
+    const other = h.assign("ENG-2", projectA);
+    relate("ENG-2", [blocker("OPS-1")]);
+    const read = h.tracker.getTicketRelations.bind(h.tracker);
+    vi.spyOn(h.tracker, "getTicketRelations").mockImplementation((key) =>
+      key === toTicketKey("ENG-1") ? Promise.reject(new Error("bad response")) : read(key),
+    );
+    const worker = h.worker();
+    await worker.tick();
+    expect(stateOf(other)).toBe("queued");
+
+    relate("ENG-2", [blocker("OPS-1", "completed")]);
+    afterPoll();
+    await worker.tick();
+
+    expect(stateOf(broken)).toBe("queued");
+    expect(getRunBlockerState(h.db, broken.id)?.readFailed).toBe(true);
+    expect(stateOf(other)).toBe("running");
   });
 
   it("관계 읽기가 없다고 해도 티켓이 있으면 선행 티켓 없이 시작하지 않는다(B7)", async () => {

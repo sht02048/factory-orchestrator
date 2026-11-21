@@ -1,4 +1,9 @@
-import { NO_TICKET_RELATIONS, decideBlockerWait, findBlockersInCycle } from "@ganger/core";
+import {
+  AdapterError,
+  NO_TICKET_RELATIONS,
+  decideBlockerWait,
+  findBlockersInCycle,
+} from "@ganger/core";
 import type { TicketKey, TicketRelations, TrackerConnectionId } from "@ganger/core";
 import {
   getRunBlockerState,
@@ -139,6 +144,19 @@ async function readRunRelations(
     );
     return written === true;
   } catch (error) {
-    return failed(error);
+    return isConnectionWideError(error) ? failed(error) : unread(error);
   }
+}
+
+const CONNECTION_WIDE_ERRORS: ReadonlySet<string> = new Set([
+  "network",
+  "rate-limited",
+  "unauthorized",
+]);
+
+function isConnectionWideError(error: unknown): boolean {
+  if (!(error instanceof AdapterError)) return false;
+  const detail: unknown = error.detail;
+  if (typeof detail !== "object" || detail === null || !("kind" in detail)) return false;
+  return CONNECTION_WIDE_ERRORS.has(String(detail.kind));
 }
