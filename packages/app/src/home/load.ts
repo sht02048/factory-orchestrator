@@ -17,6 +17,7 @@ import {
   listRunsWithRecords,
   listWorkspaces,
   toWorkspaceId,
+  isPinnedToRunner,
 } from "@ganger/db";
 import type { Database, RunRecords, StoredRun, StoredRunner } from "@ganger/db";
 import { runControlOf, withoutPauses } from "../run-control.js";
@@ -67,7 +68,7 @@ export function loadHomePage(
                 agent: run.agent,
                 runnerId: run.runnerId,
                 unstartable: false,
-                pinnedToRunner: run.continuedFromRunId !== null,
+                pinnedToRunner: isPinnedToRunner(run),
                 startRequested: records.startRequestedAt !== null,
               },
             ]

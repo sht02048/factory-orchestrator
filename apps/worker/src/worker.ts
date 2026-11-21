@@ -46,6 +46,7 @@ import {
   recordStartRequested,
   setQueuedRunRunner,
   setRunnerMailbox,
+  isPinnedToRunner,
 } from "@ganger/db";
 import type { RunRecords, SecretBox, StoredRun } from "@ganger/db";
 import { log, withLogContext } from "@ganger/log";
@@ -58,7 +59,7 @@ import {
   runnerErrorDetail,
   tryWrite,
 } from "./context.js";
-import type { QueuedStoredRun, TickContext, WorkerLogger } from "./context.js";
+import type { QueuedStoredRun, TickContext, WorkerLogger, WorktreeSetupJob } from "./context.js";
 import { processAfterRuns } from "./after-run.js";
 import { messages } from "./messages.js";
 import { assignAutomatically, createAutoAssignState } from "./auto-assign.js";
@@ -139,6 +140,7 @@ export function createWorker(options: WorkerOptions): Worker {
     logger,
     adapters,
     pendingStarts: new Map(),
+    worktreeSetups: new Map(),
     mailboxes: new Map(),
     unreachableUntil: new Map(),
     unmarkedAnswers: new Set(),
@@ -267,6 +269,7 @@ async function findStartedForCancel(
 async function processQueue(context: TickContext): Promise<void> {
   const { db, pendingStarts, now } = context;
   recordPendingStarts(context);
+  forgetSettledSetupsOfLeftRuns(context);
 
   const plan = inTransaction(db, () => {
     const queued = listRuns(db, { states: ["queued"] });
@@ -282,7 +285,13 @@ async function processQueue(context: TickContext): Promise<void> {
     for (const pending of pendingStarts.values()) {
       runs.push({ runnerId: pending.runnerId, state: "running" });
     }
+    const settingUp = (runId: RunId): boolean =>
+      context.worktreeSetups.get(runId)?.outcome === null;
+    for (const run of queued) {
+      if (settingUp(run.id)) runs.push({ runnerId: run.runnerId, state: "running" });
+    }
     const candidates = queued
+      .filter((run) => !settingUp(run.id))
       .flatMap((run) => toQueuedRun(context, run))
       .map((run) =>
         bound.has(run.id) ? { ...run, unstartable: false, startRequested: true } : run,
@@ -317,12 +326,51 @@ async function processQueue(context: TickContext): Promise<void> {
     return result.start;
   });
 
+  const blockedRunners = new Set<RunnerId>();
   for (const choice of plan ?? []) {
+    if (blockedRunners.has(choice.runnerId)) continue;
     const outcome = await withLogContext({ runId: choice.runId, runnerId: choice.runnerId }, () =>
       startQueuedRun(context, choice),
     );
-    if (outcome === "blocked") return;
+    if (outcome === "blocked") blockedRunners.add(choice.runnerId);
   }
+}
+
+function forgetSettledSetupsOfLeftRuns(context: TickContext): void {
+  for (const [runId, job] of context.worktreeSetups) {
+    if (job.outcome !== null && getRun(context.db, runId)?.state !== "queued") {
+      context.worktreeSetups.delete(runId);
+    }
+  }
+}
+
+async function worktreeSetupGate(
+  context: TickContext,
+  run: QueuedStoredRun,
+  runner: Runner,
+  worktree: WorktreeRef,
+): Promise<"ready" | "running" | { failed: string }> {
+  const job = context.worktreeSetups.get(run.id);
+  if (job !== undefined) {
+    if (job.outcome === null) return "running";
+    const { outcome } = job;
+    context.worktreeSetups.delete(run.id);
+    if (outcome.kind === "threw") throw outcome.error;
+    if (outcome.kind === "failed") return { failed: outcome.reason };
+  }
+  const input = { project: run.runnerProject, worktree };
+  if (!(await runner.worktreeSetupPending(input))) return "ready";
+  const started: WorktreeSetupJob = { outcome: null };
+  context.worktreeSetups.set(run.id, started);
+  void runner.finishWorktreeSetup(input).then(
+    (outcome) => {
+      started.outcome = outcome;
+    },
+    (error: unknown) => {
+      started.outcome = { kind: "threw", error };
+    },
+  );
+  return "running";
 }
 
 function recordPendingStarts(context: TickContext): void {
@@ -370,7 +418,7 @@ function toQueuedRun(context: TickContext, run: StoredRun): QueuedRun[] {
       agent: run.agent,
       runnerId: run.runnerId,
       unstartable: mapping === null,
-      pinnedToRunner: run.continuedFromRunId !== null,
+      pinnedToRunner: isPinnedToRunner(run),
     },
   ];
 }
@@ -451,11 +499,26 @@ async function startOnRunner(
         return endCouldNotStart(context, run);
       }
     }
+    if (context.worktreeSetups.get(run.id)?.outcome === null) return { kind: "skipped" };
     const source = continuationSource(context, run);
     if (source === "missing") return endCouldNotStart(context, run);
     const place =
       source === null ? null : await continuationPlace(context, run, runner, source, records);
     if (place === "write-failed") return { kind: "blocked" };
+    if (source !== null && place !== "previous-agent-alive" && place !== "from-scratch") {
+      const setup = await worktreeSetupGate(context, run, runner, source.worktree);
+      if (setup === "running") return { kind: "skipped" };
+      if (setup !== "ready") {
+        logger.warn("run.start_failed", { runId: run.id, reason: "worktree-setup" });
+        tryWrite(context, run.id, () =>
+          recordStartFailure(db, run.id, {
+            failures: records.startFailures,
+            error: `${messages.continuation.setupFailed}\n${setup.failed}`,
+          }),
+        );
+        return endCouldNotStart(context, run);
+      }
+    }
     if (place === "previous-agent-alive") {
       const sourceRunId = run.continuedFromRunId;
       tryWrite(context, run.id, () =>

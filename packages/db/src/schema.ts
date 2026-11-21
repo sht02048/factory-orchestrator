@@ -281,6 +281,7 @@ export const runs = sqliteTable(
     runnerUnreached: integer("runner_unreached", { mode: "boolean" }).notNull().default(false),
     reportBody: text("report_body"),
     agentBrief: text("agent_brief"),
+    runnerChosen: integer("runner_chosen", { mode: "boolean" }).notNull().default(false),
     continuedFromRunId: text("continued_from_run_id").$type<RunId>(),
     continueMessage: text("continue_message"),
     continuePlace: text("continue_place", { enum: CONTINUATION_PLACES }),

@@ -1591,16 +1591,112 @@ describe("prepareContinuation", () => {
     });
   });
 
-  test("로컬 브랜치가 있으면 같은 경로에 다시 만든다", async () => {
-    const exec = missingWorktree();
+  const commonDir = "/repo/.git";
+
+  function withSetupMarker(exec: ScriptedExec): ScriptedExec {
+    return git(exec, "rev-parse", stdout(`${commonDir}\n`))
+      .on("mkdir -p", stdout(""))
+      .on("touch ", stdout(""));
+  }
+
+  test("로컬 브랜치가 있으면 표시를 먼저 남기고 같은 경로에 다시 만든다", async () => {
+    const exec = withSetupMarker(missingWorktree());
     git(exec, "show-ref", stdout(""));
     git(exec, "worktree add", stdout(""));
     expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
-    expect(exec.commands()).toContain(`git -C ${repoPath} worktree add ${path} ${branch}`);
+    const commands = exec.commands();
+    const added = commands.indexOf(`git -C ${repoPath} worktree add ${path} ${branch}`);
+    const marked = commands.findIndex((command) => command.startsWith("touch "));
+    expect(added).toBeGreaterThan(-1);
+    expect(marked).toBeGreaterThan(-1);
+    expect(marked).toBeLessThan(added);
+  });
+
+  describe("finishWorktreeSetup", () => {
+    const setupInput = { project: input.project, worktree: input.worktree };
+    const repoShow = (hookSettings: object) =>
+      stdout(JSON.stringify({ id: "1", ok: true, result: { repo: { hookSettings } }, _meta: {} }));
+
+    function pending(yaml: string, hookSettings: object = {}): ScriptedExec {
+      return git(withProjects(new ScriptedExec()), "rev-parse", stdout(`${commonDir}\n`))
+        .orca("repo show", repoShow(hookSettings))
+        .on("sh -c", stdout(yaml))
+        .on("rm -f ", stdout(""));
+    }
+
+    const setupCommand = (exec: ScriptedExec) =>
+      exec.commands().find((command) => command.startsWith("env "));
+    const cleared = (exec: ScriptedExec) =>
+      exec.commands().some((command) => command.startsWith("rm -f "));
+
+    test("표시가 있을 때만 setup이 남았다고 답한다", async () => {
+      const marked = git(withProjects(new ScriptedExec()), "rev-parse", stdout(`${commonDir}\n`));
+      marked.on("test -e ", stdout(""));
+      expect(await runnerWith(marked).worktreeSetupPending(setupInput)).toBe(true);
+      const clean = git(withProjects(new ScriptedExec()), "rev-parse", stdout(`${commonDir}\n`));
+      clean.on("test -e ", stdout("", 1));
+      expect(await runnerWith(clean).worktreeSetupPending(setupInput)).toBe(false);
+    });
+
+    test("모르는 명령 출처 정책이면 돌리지 않고 실패로 돌려준다", async () => {
+      const exec = pending("scripts:\n  setup: pnpm install\n", {
+        commandSourcePolicy: "future-policy",
+      });
+      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toMatchObject({
+        kind: "failed",
+      });
+      expect(setupCommand(exec)).toBeUndefined();
+    });
+
+    test("orca.yaml의 setup을 워크트리 경로와 함께 돌리고 표시를 지운다", async () => {
+      const exec = pending("scripts:\n  setup: |\n    pnpm install\n    pnpm build\n").on(
+        "env ",
+        stdout("ok"),
+      );
+      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toEqual({ kind: "done" });
+      expect(setupCommand(exec)).toContain(`ORCA_WORKTREE_PATH=${path}`);
+      expect(setupCommand(exec)).toContain("pnpm install");
+      expect(cleared(exec)).toBe(true);
+    });
+
+    test("setup이 실패하면 이유를 돌려주고 표시를 남긴다", async () => {
+      const exec = pending("scripts:\n  setup: pnpm install\n").on("env ", stdout("", 1));
+      const result = await runnerWith(exec).finishWorktreeSetup(setupInput);
+      expect(result).toMatchObject({ kind: "failed", reason: "setup exited with 1" });
+      expect(cleared(exec)).toBe(false);
+    });
+
+    test("setup이 시간을 넘기면 결과를 모르는 것으로 보고 실패로 돌려준다", async () => {
+      const exec = pending("scripts:\n  setup: pnpm install\n").on("env ", {
+        exitCode: null,
+        stdout: "",
+        stderr: "",
+        timedOut: true,
+      });
+      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toMatchObject({
+        kind: "failed",
+        reason: "setup timed out",
+      });
+    });
+
+    test("읽을 수 없는 setup 형식은 건너뛰지 않고 실패로 돌려준다", async () => {
+      const exec = pending("scripts:\n  setup: >\n    pnpm install\n");
+      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toMatchObject({
+        kind: "failed",
+      });
+      expect(setupCommand(exec)).toBeUndefined();
+    });
+
+    test("설정한 setup이 없으면 아무것도 돌리지 않고 표시를 지운다", async () => {
+      const exec = pending("");
+      expect(await runnerWith(exec).finishWorktreeSetup(setupInput)).toEqual({ kind: "done" });
+      expect(setupCommand(exec)).toBeUndefined();
+      expect(cleared(exec)).toBe(true);
+    });
   });
 
   test("로컬에 없고 origin에 있으면 받아서 추적 브랜치로 만든다", async () => {
-    const exec = missingWorktree();
+    const exec = withSetupMarker(missingWorktree());
     git(exec, "show-ref", stdout("", 1));
     git(exec, "ls-remote --exit-code origin", stdout(`ccc\trefs/heads/${branch}\n`));
     git(exec, "fetch origin", stdout(""));

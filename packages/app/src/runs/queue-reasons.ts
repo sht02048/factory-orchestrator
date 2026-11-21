@@ -48,7 +48,7 @@ export function explainQueue(input: {
   const assigned = new Map(plan.assigned.map((a) => [a.runId, a.runnerId]));
 
   const reasons = new Map<RunId, QueuedReasonCode>();
-  let blocked = false;
+  const waitedOn = new Set<RunnerId>();
   const ordered = input.queued.toSorted((a, b) => a.assignedAt.getTime() - b.assignedAt.getTime());
   for (const run of ordered) {
     if (starting.has(run.id)) {
@@ -66,10 +66,10 @@ export function explainQueue(input: {
       continue;
     }
     const runnerId = assigned.get(run.id) ?? run.runnerId;
-    if (blocked || runnerId === null) {
+    if (runnerId === null || waitedOn.has(runnerId)) {
       reasons.set(run.id, { kind: "behind" });
     } else {
-      blocked = true;
+      waitedOn.add(runnerId);
       reasons.set(run.id, { kind: "no-capacity", runnerId });
     }
   }

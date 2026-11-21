@@ -40,11 +40,11 @@ export function planQueue(input: {
   const plan: QueuePlan = { cleared: [], assigned: [], unplaced: [], couldNotStart: [], start: [] };
   const runnersById = new Map(input.runners.map((runner) => [runner.id, runner]));
   const placements: RunPlacement[] = [...input.runs];
-  let blocked = false;
+  const waitedOn = new Set<RunnerId>();
 
   for (const run of fifoOrder(input.queued)) {
     if (run.unstartable) {
-      if (!blocked) plan.couldNotStart.push(run.id);
+      if (run.runnerId === null || !waitedOn.has(run.runnerId)) plan.couldNotStart.push(run.id);
       continue;
     }
 
@@ -67,28 +67,39 @@ export function planQueue(input: {
       }
     }
 
+    const hasRoom = (candidate: RunnerSnapshot): boolean =>
+      !waitedOn.has(candidate.id) && remainingCapacity(candidate, placements) > 0;
+    const choose = (runners: ReadonlyArray<RunnerSnapshot>): RunnerId | null =>
+      pickRunner({ project: run.project, agent: run.agent, runners, runs: placements });
+
     if (runnerId === null) {
-      runnerId = pickRunner({
-        project: run.project,
-        agent: run.agent,
-        runners: input.runners,
-        runs: placements,
-      });
+      runnerId = choose(input.runners.filter(hasRoom)) ?? choose(input.runners);
       if (runnerId === null) {
         plan.unplaced.push({ runId: run.id, ...unplacedReason(input.runners, run) });
         continue;
       }
       plan.assigned.push({ runId: run.id, runnerId });
+    } else if (run.pinnedToRunner !== true && run.startRequested !== true) {
+      const current = runnersById.get(runnerId);
+      if (current !== undefined && !hasRoom(current)) {
+        const freeRunner = choose(input.runners.filter(hasRoom));
+        if (freeRunner !== null) {
+          runnerId = freeRunner;
+          plan.assigned.push({ runId: run.id, runnerId });
+        }
+      }
     }
 
-    if (blocked) continue;
-
     const runner = runnersById.get(runnerId);
-    if (runner !== undefined && remainingCapacity(runner, placements) > 0) {
+    if (
+      !waitedOn.has(runnerId) &&
+      runner !== undefined &&
+      remainingCapacity(runner, placements) > 0
+    ) {
       plan.start.push({ runId: run.id, runnerId });
       placements.push({ runnerId, state: "running" });
     } else {
-      blocked = true;
+      waitedOn.add(runnerId);
     }
   }
 

@@ -69,7 +69,14 @@ export type StoredRun = Run & {
   workspaceId: WorkspaceId;
   ticketTitle: string | null;
   continuedFromRunId: RunId | null;
+  runnerChosen: boolean;
 };
+
+export function isPinnedToRunner(
+  run: Pick<StoredRun, "continuedFromRunId" | "runnerChosen">,
+): boolean {
+  return run.continuedFromRunId !== null || run.runnerChosen;
+}
 
 export interface RunRecords {
   startRequestedAt: Date | null;
@@ -123,6 +130,7 @@ function toStoredRun(row: RunRow): StoredRun {
     ticket: { connection: row.trackerConnectionId, key: row.ticketKey },
     ticketTitle: row.ticketTitle,
     continuedFromRunId: row.continuedFromRunId,
+    runnerChosen: row.runnerChosen,
     trackerProject: row.trackerProjectId,
     runnerProject: row.runnerProjectId,
     agent: row.agentId,
@@ -429,6 +437,7 @@ export function assignRun(db: Database, input: AssignRunInput): AssignRunResult 
         worktreeName: nextWorktreeName(db, input.ticket.key),
         state: "queued",
         runnerId,
+        runnerChosen: input.runnerId !== undefined,
         assignedAt: now,
       })
       .run();
@@ -908,11 +917,17 @@ export function recordStartFailure(
 export function setQueuedRunRunner(db: Database, runId: RunId, runnerId: RunnerId | null): boolean {
   return inTransaction(db, () => {
     const before = db
-      .select({ runnerId: runs.runnerId, continuedFromRunId: runs.continuedFromRunId })
+      .select({
+        runnerId: runs.runnerId,
+        continuedFromRunId: runs.continuedFromRunId,
+        runnerChosen: runs.runnerChosen,
+      })
       .from(runs)
       .where(eq(runs.id, runId))
       .get();
-    if (before?.continuedFromRunId != null && before.runnerId !== runnerId) return false;
+    if (before !== undefined && isPinnedToRunner(before) && before.runnerId !== runnerId) {
+      return false;
+    }
     const updated =
       db
         .update(runs)

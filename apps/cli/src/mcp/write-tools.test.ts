@@ -19,6 +19,7 @@ import {
   markAnswerSent,
   recordRunQuestions,
   saveMcpWriteAllowed,
+  getRun,
 } from "@ganger/db";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -359,6 +360,14 @@ describe("MCP 쓰기 도구", () => {
     expect(assigned.isError).toBe(false);
     const runId = z.string().parse(assigned.json["runId"]);
     expect(listRunMcpActions(seeded.db, toRunId(runId))).toHaveLength(1);
+  });
+
+  it("러너를 넘겨 할당한 런은 그 러너에 고정된다", async () => {
+    await connect();
+    const chosen = await call("assign_ticket", { ticket: "ACME-9", runner: "runner-a" });
+    expect(chosen.isError).toBe(false);
+    const chosenId = toRunId(z.string().parse(chosen.json["runId"]));
+    expect(getRun(seeded.db, chosenId)).toMatchObject({ runnerChosen: true });
   });
 
   it("쓰기 도구로 바꾼 것도 화면이 알 수 있게 변경 기록 줄을 남긴다(0124)", async () => {

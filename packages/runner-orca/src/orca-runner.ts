@@ -29,7 +29,10 @@ import type {
   RunProgress,
   StartedRun,
   ContinuationPlace,
+  FinishWorktreeSetupInput,
   PrepareContinuationInput,
+  RunnerProjectId,
+  WorktreeSetupResult,
   StartRunInput,
   WorktreeRef,
   WorktreeWork,
@@ -74,6 +77,21 @@ import {
   uncommittedChangesArgv,
   unpushedCommitsArgv,
 } from "./worktree-work.js";
+import {
+  SETUP_SSH_GRACE_MS,
+  clearSetupPendingArgv,
+  effectiveSetupScript,
+  gitCommonDirArgv,
+  isKnownSetupPolicy,
+  markSetupPendingArgv,
+  parseSharedSetup,
+  readOrcaYamlArgv,
+  runSetupArgv,
+  setupFailureReason,
+  setupMarkerDirArgv,
+  setupMarkerPath,
+  setupPendingArgv,
+} from "./worktree-setup.js";
 import { decodeAgent, decodeMailbox, encodeAgent, encodeMailbox } from "./refs.js";
 import type { OrcaAgent, OrcaMailbox } from "./refs.js";
 import {
@@ -82,6 +100,7 @@ import {
   envelopeSchema,
   projectListResultSchema,
   projectSetupsResultSchema,
+  repoHooksResultSchema,
   replyResultSchema,
   runBindResultSchema,
   runCurrentResultSchema,
@@ -511,6 +530,7 @@ export class OrcaRunner implements Runner {
     const timeout = { timeoutMs: this.config.startTimeoutMs };
     const local = await this.run(localBranchArgv(repoPath, input.branch));
     if (refFound(local, "git show-ref", 1)) {
+      await this.markSetupPending(repoPath, path);
       const added = await this.run(
         addWorktreeArgv({ repoPath, path, branch: input.branch }),
         timeout,
@@ -526,11 +546,84 @@ export class OrcaRunner implements Runner {
       withinRemoteTimeout(await this.run(fetchOriginBranchArgv(repoPath, input.branch), timeout)),
       "git fetch",
     );
+    await this.markSetupPending(repoPath, path);
     gitSucceeded(
       await this.run(addOriginWorktreeArgv({ repoPath, path, branch: input.branch }), timeout),
       "git worktree add",
     );
     return "recreated";
+  }
+
+  private async setupMarker(repoPath: string, worktreePath: string): Promise<string> {
+    const commonDir = await this.run(gitCommonDirArgv(repoPath));
+    gitSucceeded(commonDir, "git rev-parse");
+    return setupMarkerPath({ repoPath, commonDir: commonDir.stdout, worktreePath });
+  }
+
+  private async markSetupPending(repoPath: string, worktreePath: string): Promise<void> {
+    const marker = await this.setupMarker(repoPath, worktreePath);
+    gitSucceeded(await this.run(setupMarkerDirArgv(marker)), "create setup marker directory");
+    gitSucceeded(await this.run(markSetupPendingArgv(marker)), "touch setup marker");
+  }
+
+  private async projectSetup(project: RunnerProjectId): Promise<{ repoId: string; path: string }> {
+    const setup = (await this.loadProjects()).find((p) => p.id === project)?.setup ?? null;
+    if (setup === null) {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "project_not_found",
+        message: `project ${project} is not set up on the runner`,
+      });
+    }
+    return setup;
+  }
+
+  async worktreeSetupPending(input: FinishWorktreeSetupInput): Promise<boolean> {
+    const setup = await this.projectSetup(input.project);
+    const marker = await this.setupMarker(setup.path, worktreePathOf(input.worktree));
+    return refFound(await this.run(setupPendingArgv(marker)), "test setup marker", 1);
+  }
+
+  async finishWorktreeSetup(input: FinishWorktreeSetupInput): Promise<WorktreeSetupResult> {
+    const worktreePath = worktreePathOf(input.worktree);
+    const setup = await this.projectSetup(input.project);
+    const marker = await this.setupMarker(setup.path, worktreePath);
+    const { repo } = await this.orca(
+      ["repo", "show", "--repo", `id:${setup.repoId}`],
+      repoHooksResultSchema,
+    );
+    const yaml = await this.run(readOrcaYamlArgv(worktreePath));
+    gitSucceeded(yaml, "read orca.yaml");
+    const shared = parseSharedSetup(yaml.stdout);
+    if (shared.kind === "unreadable") {
+      return { kind: "failed", reason: "could not read scripts.setup in orca.yaml" };
+    }
+    const policy = repo.hookSettings?.commandSourcePolicy;
+    if (!isKnownSetupPolicy(policy)) {
+      return { kind: "failed", reason: `unknown setup command policy: ${String(policy)}` };
+    }
+    const script = effectiveSetupScript({
+      policy,
+      local: repo.hookSettings?.scripts?.setup,
+      shared: shared.script,
+    });
+    if (script !== null) {
+      const argv = runSetupArgv({
+        rootPath: setup.path,
+        worktreePath,
+        script,
+        lock: `${marker}.lock`,
+        limitSeconds: Math.ceil(this.config.setupTimeoutMs / 1000),
+      });
+      const result = await this.run(argv, {
+        timeoutMs: this.config.setupTimeoutMs + SETUP_SSH_GRACE_MS,
+      });
+      if (result.timedOut || result.exitCode !== 0) {
+        return { kind: "failed", reason: setupFailureReason(result) };
+      }
+    }
+    gitSucceeded(await this.run(clearSetupPendingArgv(marker)), "clear setup marker");
+    return { kind: "done" };
   }
 
   async isAgentAlive(run: Pick<RunOnRunner, "worktree" | "agentRef">): Promise<boolean> {

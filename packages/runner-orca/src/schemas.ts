@@ -50,6 +50,17 @@ export const projectSetupsResultSchema = z.object({
   ),
 });
 
+export const repoHooksResultSchema = z.object({
+  repo: z.object({
+    hookSettings: z
+      .object({
+        commandSourcePolicy: z.string().nullish(),
+        scripts: z.object({ setup: z.string().nullish() }).nullish(),
+      })
+      .nullish(),
+  }),
+});
+
 export const terminalCreateResultSchema = z.object({
   terminal: z.object({ handle: text }),
 });
