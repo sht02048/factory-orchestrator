@@ -5,6 +5,7 @@ import { createTranslator } from "use-intl";
 import { toRunId } from "@ganger/core";
 import { z } from "zod";
 import { useAgedHomePage } from "../../home/aged-page";
+import { useFirstDrawKey } from "../../home/first-draw";
 import { HomeScreen } from "../../home/home-screen";
 import { homeMessages } from "../../home/messages";
 import { useDashboardActions } from "../../home/mutations";
@@ -31,7 +32,8 @@ export const Route = createFileRoute("/_app/")({
 function HomeRoute() {
   const { ws } = Route.useLoaderDeps();
   const timeZone = useRequestTimeZone();
-  const { data: loaded, refetch } = useSuspenseQuery(dashboardQuery(ws, timeZone));
+  const { data: loaded, refetch, isFetching } = useSuspenseQuery(dashboardQuery(ws, timeZone));
+  const drawKey = useFirstDrawKey(ws, isFetching);
   const readAgainWhenLimitLifts = useCallback(() => {
     void refetch();
   }, [refetch]);
@@ -50,6 +52,7 @@ function HomeRoute() {
     <ScreenMessages messages={homeMessages}>
       <HomeScreen
         page={page}
+        drawKey={drawKey}
         view={view ?? "all"}
         onViewChange={(next) => {
           void navigate({

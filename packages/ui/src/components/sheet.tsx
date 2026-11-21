@@ -6,7 +6,8 @@ import {
   DialogContent,
   DialogTitle,
 } from "@ui-sdk/react/dialog";
-import type { ReactNode } from "react";
+import { useEffect, useRef } from "react";
+import type { ReactNode, RefObject } from "react";
 import { cx } from "../cx";
 import { windowRegion } from "../window-frame";
 import { buttonStyles } from "./button";
@@ -36,6 +37,8 @@ export function Sheet({
   finalFocus,
   children,
 }: SheetProps) {
+  const headRef = useRef<HTMLDivElement>(null);
+  useIgnoreRepeatPressWhileClosing(headRef);
   return (
     <SdkDialog open={open} modal={open} onOpenChange={(next: boolean) => onOpenChange(next)}>
       <DialogBackdrop {...windowRegion("no-drag")} className={cx(styles.backdrop)} />
@@ -45,7 +48,7 @@ export function Sheet({
         {...(finalFocus === undefined ? {} : { finalFocus })}
         className={cx(styles.content)}
       >
-        <div {...stylex.props(styles.head)}>
+        <div ref={headRef} {...stylex.props(styles.head)}>
           <div {...stylex.props(styles.status)}>{status}</div>
           <DialogClose data-variant="secondary" className={cx(...buttonStyles("secondary"))}>
             {closeLabel}
@@ -59,6 +62,23 @@ export function Sheet({
       </DialogContent>
     </SdkDialog>
   );
+}
+
+function useIgnoreRepeatPressWhileClosing(insideSheet: RefObject<HTMLElement | null>): void {
+  useEffect(() => {
+    const ignoreRepeatPress = (event: MouseEvent) => {
+      if (event.detail < 2) return;
+      if (!insideSheet.current?.closest("[data-ending-style]")) return;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    document.addEventListener("mousedown", ignoreRepeatPress, true);
+    document.addEventListener("click", ignoreRepeatPress, true);
+    return () => {
+      document.removeEventListener("mousedown", ignoreRepeatPress, true);
+      document.removeEventListener("click", ignoreRepeatPress, true);
+    };
+  }, [insideSheet]);
 }
 
 const REDUCED = "@media (prefers-reduced-motion: reduce)";
