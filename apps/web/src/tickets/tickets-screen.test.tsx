@@ -63,8 +63,8 @@ describe("Tickets 화면", () => {
   it("행은 키 · 제목 · 마지막 런이고, 트래커 상태는 행에 두지 않는다", async () => {
     const { context } = setupTickets();
     const rows = rowTexts(render(await loadTicketsPage(context, undefined, now)));
-    expect(rows.get("ACME-1")).toContain("Merged");
-    expect(rows.get("ACME-2")).toContain("Human Check");
+    expect(rows.get("ACME-1")).toContain("Succeeded");
+    expect(rows.get("ACME-2")).toContain("Failed");
     expect(rows.get("ACME-3")).toContain("Running");
     expect(rows.get("ACME-4")).toContain("Queued");
     expect(rows.get("ACME-5")).toContain("Waiting for Input");
@@ -77,7 +77,7 @@ describe("Tickets 화면", () => {
     const html = render(await loadTicketsPage(context, undefined, now));
     const heading = /<h1[^>]*>([\s\S]*?)<\/h1>/.exec(html)?.[1] ?? "";
     expect(text(heading).trim()).toBe("Tickets");
-    expect(text(html)).toContain("할당할 수 있는 티켓이 2개 있어요.");
+    expect(text(html)).toContain("할당할 수 있는 티켓이 3개 있어요.");
   });
 
   it("트래커 프로젝트가 있으면 머리 오른쪽에 Linear에서 다시 읽기를 두고, 없으면 두지 않는다(0122)", async () => {
@@ -102,12 +102,12 @@ describe("Tickets 화면", () => {
     const tabs = [...html.matchAll(/role="tab"[^>]*>([\s\S]*?)<\/button>/g)].map((m) =>
       text(m[1] ?? "").trim(),
     );
-    expect(tabs).toEqual(["모두 7", "할당할 수 있음 2", "처리할 일 2", "진행 중 2", "끝남 1"]);
+    expect(tabs).toEqual(["모두 7", "할당할 수 있음 3", "처리할 일 2", "진행 중 2", "끝남 1"]);
   });
 
   it.each<[TicketFilter, string[]]>([
     ["all", ["ACME-6", "ACME-5", "ACME-4", "ACME-3", "ACME-2", "ACME-1", "DOC-1"]],
-    ["assignable", ["ACME-6", "DOC-1"]],
+    ["assignable", ["ACME-6", "ACME-2", "DOC-1"]],
     ["todo", ["ACME-5", "ACME-2"]],
     ["in-progress", ["ACME-4", "ACME-3"]],
     ["done", ["ACME-1"]],
@@ -208,6 +208,38 @@ describe("Tickets 화면", () => {
     expect(panel).toContain("새 런 시작");
     expect(panel).toContain("런 보기");
     expect(panel).toContain("런 수 2개");
+  });
+
+  it("마지막 런 상자는 결과 곁에 PR 정보를 보이고, PR 이 없으면 보이지 않는다 (0145)", async () => {
+    const { context } = setupTickets();
+    const page = await loadTicketsPage(context, undefined, now);
+    const panelOf = (key: string, changed: TicketsPage = page): string =>
+      panelText(
+        render(changed, { selectedId: changed.tickets.find((t) => t.key === key)?.id ?? "" }),
+      );
+    expect(panelOf("ACME-1")).toContain("Succeeded");
+    expect(panelOf("ACME-1")).toContain("PR 병합됨");
+    expect(panelOf("ACME-1")).toContain(
+      "에이전트가 성공을 보고했어요. 사람이 더 확인할 것이 없어요.",
+    );
+    expect(panelOf("ACME-2")).toContain("PR 열림");
+    const withNumber: TicketsPage = {
+      ...page,
+      tickets: page.tickets.map((t) =>
+        t.key === "ACME-2"
+          ? {
+              ...t,
+              runs: t.runs.map((run) =>
+                run.state === "ended"
+                  ? { ...run, pullRequest: "#12", laterPrState: "merged" as const }
+                  : run,
+              ),
+            }
+          : t,
+      ),
+    };
+    expect(panelOf("ACME-2", withNumber)).toContain("PR #12 병합됨");
+    expect(panelOf("ACME-6")).not.toContain("PR ");
   });
 
   it("패널은 키 · 트래커 프로젝트 · 트래커 상태 메타 줄과 제목, 마지막 런 상자를 보인다", async () => {

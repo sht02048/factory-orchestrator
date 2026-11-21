@@ -45,17 +45,17 @@ export interface EndedCase {
   key: string;
   agentResult: AgentResult;
   prState: PrState;
-  summary: "merged" | "human-check" | "failed";
+  summary: "succeeded" | "failed";
 }
 
 export const endedCases: ReadonlyArray<EndedCase> = [
-  { key: "ACME-1", agentResult: "reported-success", prState: "merged", summary: "merged" },
-  { key: "ACME-2", agentResult: "reported-failure", prState: "open", summary: "human-check" },
+  { key: "ACME-1", agentResult: "reported-success", prState: "merged", summary: "succeeded" },
+  { key: "ACME-2", agentResult: "reported-failure", prState: "open", summary: "failed" },
   { key: "ACME-3", agentResult: "timed-out", prState: "closed", summary: "failed" },
   { key: "ACME-4", agentResult: "stopped-waiting-for-input", prState: "none", summary: "failed" },
   { key: "ACME-5", agentResult: "runner-disconnected", prState: "open", summary: "failed" },
   { key: "ACME-6", agentResult: "worktree-missing", prState: "none", summary: "failed" },
-  { key: "ACME-7", agentResult: "reported-success", prState: "closed", summary: "failed" },
+  { key: "ACME-7", agentResult: "reported-success", prState: "closed", summary: "succeeded" },
 ];
 
 export const activeCases = [

@@ -82,7 +82,7 @@ describe("알림 사건 SSE", () => {
     const client = open(db, null, clock);
     const first = parse(await client.until((text) => text.includes("event: ready")));
     const notifications = first.filter((message) => message.event === "notification");
-    expect(notifications).toHaveLength(8);
+    expect(notifications).toHaveLength(7);
     const ready = first.find((message) => message.event === "ready");
     expect(typeof ready?.id).toBe("string");
     expect(ready?.data).toHaveProperty("cursor");

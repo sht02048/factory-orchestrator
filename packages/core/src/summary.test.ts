@@ -20,17 +20,17 @@ const same = (cell: Cell): Record<PrState, Cell> => ({
   merged: cell,
   closed: cell,
 });
-const reported: Record<PrState, Cell> = {
-  merged: ["merged", "remove-now"],
-  open: ["human-check", "keep-until-pr-settles"],
-  unknown: ["human-check", "keep-until-pr-settles"],
-  closed: ["failed", "remove-now"],
-  none: ["failed", "remove-now"],
+const succeeded: Record<PrState, Cell> = {
+  merged: ["succeeded", "remove-now"],
+  open: ["succeeded", "keep-until-pr-settles"],
+  unknown: ["succeeded", "keep-until-pr-settles"],
+  closed: ["succeeded", "remove-now"],
+  none: ["succeeded", "operator-decides"],
 };
 
 const EXPECTED: Record<AgentResult, Record<PrState, Cell>> = {
-  "reported-success": reported,
-  "reported-failure": reported,
+  "reported-success": succeeded,
+  "reported-failure": keepIfOpen("failed"),
   "ended-without-report": keepIfOpen("failed"),
   "timed-out": keepIfOpen("failed"),
   "stopped-waiting-for-input": keepIfOpen("failed"),
@@ -76,22 +76,36 @@ describe("summarizeRunOutcome", () => {
     },
   );
 
-  it("완료 보고(실패) + 열림은 outcome과 상관없이 Human Check다 (Q66·Q82.2)", () => {
+  it.each(PR_STATES)("완료 보고(성공)는 PR 상태(%s)와 상관없이 Succeeded다 (R1)", (prState) => {
+    expect(
+      summarizeRunOutcome({ agentResult: "reported-success", prState, runnerUnreached: false })
+        .outcome,
+    ).toBe("succeeded");
+  });
+
+  it.each(PR_STATES)("완료 보고(실패)는 PR 상태(%s)와 상관없이 Failed다 (R1)", (prState) => {
+    expect(
+      summarizeRunOutcome({ agentResult: "reported-failure", prState, runnerUnreached: false })
+        .outcome,
+    ).toBe("failed");
+  });
+
+  it("완료 보고(성공)인데 PR 이 없으면 운영자가 보게 워크트리를 남긴다 (R7-2)", () => {
     expect(
       summarizeRunOutcome({
-        agentResult: "reported-failure",
-        prState: "open",
+        agentResult: "reported-success",
+        prState: "none",
         runnerUnreached: false,
       }),
-    ).toEqual({ outcome: "human-check", worktree: "keep-until-pr-settles" });
+    ).toEqual({ outcome: "succeeded", worktree: "operator-decides" });
   });
 
   it.each(["reported-success", "reported-failure"] as const)(
-    "%s + PR 못 읽음은 사람이 보게 Human Check이고 PR을 읽을 때까지 워크트리를 남긴다 (0144)",
+    "%s + PR 못 읽음은 PR을 읽을 때까지 워크트리를 남긴다 (0144)",
     (agentResult) => {
       expect(
-        summarizeRunOutcome({ agentResult, prState: "unknown", runnerUnreached: false }),
-      ).toEqual({ outcome: "human-check", worktree: "keep-until-pr-settles" });
+        summarizeRunOutcome({ agentResult, prState: "unknown", runnerUnreached: false }).worktree,
+      ).toBe("keep-until-pr-settles");
     },
   );
 

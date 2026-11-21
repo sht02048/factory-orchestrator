@@ -29,29 +29,30 @@ function runOf(ids: Map<string, RunId>, key: string): RunId {
 }
 
 describe("알림 사건", () => {
-  it("Human Check·Failed·Disconnected·러너 Offline 을 사건으로 남기고 Merged·Queued·Running 은 남기지 않는다", () => {
+  it("Failed·Disconnected·러너 Offline 을 사건으로 남기고 Succeeded·Queued·Running 은 남기지 않는다. Human Check 종류는 없다 (0145)", () => {
     const { db } = seedDatabase();
     syncNotifications(db, now);
     expect(openKinds(db)).toEqual([
       ["disconnected", "ACME-12"],
+      ["failed", "ACME-2"],
       ["failed", "ACME-3"],
       ["failed", "ACME-4"],
       ["failed", "ACME-5"],
       ["failed", "ACME-6"],
-      ["failed", "ACME-7"],
-      ["human-check", "ACME-2"],
       ["runner-offline", "runner-b"],
     ]);
     expect(
-      openKinds(db).some(([, subject]) => ["ACME-1", "ACME-10", "ACME-13"].includes(subject)),
+      openKinds(db).some(([, subject]) =>
+        ["ACME-1", "ACME-7", "ACME-10", "ACME-13"].includes(subject),
+      ),
     ).toBe(false);
   });
 
   it("런 사건은 그 런의 Workspace 와 티켓을 대상으로 둔다", () => {
     const { db, ids } = seedDatabase();
     syncNotifications(db, now);
-    const humanCheck = listOpenNotificationEvents(db).find((event) => event.kind === "human-check");
-    expect(humanCheck?.target).toEqual({
+    const failed = listOpenNotificationEvents(db).find((event) => event.subject === "ACME-2");
+    expect(failed?.target).toEqual({
       kind: "run",
       runId: runOf(ids, "ACME-2"),
       workspaceId: "ws-commerce",
@@ -102,11 +103,11 @@ describe("알림 사건", () => {
     );
   });
 
-  it("옛 데스크톱 앱 경로에는 예전 네 종류만 예전 모양으로 준다", () => {
+  it("옛 데스크톱 앱 경로에는 예전 종류 중 남은 셋만 예전 모양으로 준다", () => {
     const { db } = seedDatabase();
     syncNotifications(db, now);
     const alerts = legacyAlerts(db);
-    expect(alerts.map((alert) => alert.kind).toSorted()).toEqual(["human-check", "runner-offline"]);
+    expect(alerts.map((alert) => alert.kind).toSorted()).toEqual(["runner-offline"]);
     expect(alerts).toContainEqual({
       kind: "runner-offline",
       key: "runner-offline:runner-b",
@@ -121,7 +122,7 @@ describe("알림 사건 읽기", () => {
     const { db, ids } = seedDatabase();
     syncNotifications(db, now);
     const first = readNotificationFeed(db, null);
-    expect(first.events).toHaveLength(8);
+    expect(first.events).toHaveLength(7);
     expect(first.open.toSorted((a, b) => a - b)).toEqual(
       first.events.map((event) => event.id).toSorted((a, b) => a - b),
     );

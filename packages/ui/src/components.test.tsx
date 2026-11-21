@@ -126,10 +126,10 @@ describe("서버 렌더", () => {
   it("StatusPill 은 상태 값마다 ADR 0010 5번의 색을 고른다", () => {
     const expected: Record<StatusTone, PillStatus[]> = {
       answer: ["waiting-for-input", "question", "permission"],
-      check: ["human-check"],
+      check: [],
       problem: ["disconnected", "failed", "offline", "runner-issue"],
       progress: ["running", "online"],
-      merged: ["merged"],
+      merged: ["succeeded"],
       idle: ["queued", "paused", "canceled"],
     };
     const actual: Record<StatusTone, PillStatus[]> = {
@@ -145,11 +145,11 @@ describe("서버 렌더", () => {
   });
 
   it("StatusPill 은 점과 이름을 함께 그리고, 점은 스크린 리더에서 숨긴다", () => {
-    const html = renderToString(<StatusPill status="human-check">Human Check</StatusPill>);
-    expect(html).toContain("Human Check");
-    expect(html).toContain('data-tone="check"');
+    const html = renderToString(<StatusPill status="succeeded">Succeeded</StatusPill>);
+    expect(html).toContain("Succeeded");
+    expect(html).toContain('data-tone="merged"');
     expect(html).toContain('aria-hidden="true"');
-    const failed = renderToString(<StatusPill status="failed">Human Check</StatusPill>);
+    const failed = renderToString(<StatusPill status="failed">Succeeded</StatusPill>);
     expect(failed.replace(/data-[a-z]+="[^"]*"/g, "")).not.toEqual(
       html.replace(/data-[a-z]+="[^"]*"/g, ""),
     );

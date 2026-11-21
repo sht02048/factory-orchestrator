@@ -17,8 +17,9 @@ export type TicketRun =
       endedAgoMs: number;
       agentResult: AgentResult;
       prState: PrState;
+      laterPrState: "merged" | "closed" | null;
+      pullRequest: string | null;
       summary: SummaryOutcome;
-      prSettledLater: boolean;
     };
 
 export interface AssignRepo {
@@ -183,7 +184,7 @@ export function isTodo(run: TicketRun): boolean {
     case "disconnected":
       return true;
     case "ended":
-      return run.summary === "failed" || (run.summary === "human-check" && !run.prSettledLater);
+      return run.summary === "failed";
     case "queued":
     case "running":
     case "paused":
@@ -194,11 +195,9 @@ export function isTodo(run: TicketRun): boolean {
 function isDone(run: TicketRun): boolean {
   if (run.state !== "ended") return false;
   switch (run.summary) {
-    case "merged":
+    case "succeeded":
     case "canceled":
       return true;
-    case "human-check":
-      return run.prSettledLater;
     case "failed":
       return false;
   }

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { breakpoints, colors, radius, space } from "../tokens.stylex";
 import { textStyles } from "./text";
 
-export const OUTCOME_TONES = ["merged", "check", "failed", "canceled"] as const;
+export const OUTCOME_TONES = ["succeeded", "failed", "canceled"] as const;
 
 export type OutcomeTone = (typeof OUTCOME_TONES)[number];
 
@@ -195,8 +195,7 @@ const styles = stylex.create({
 const hatch = `repeating-linear-gradient(135deg, transparent 0 2px, ${colors.bgCanvas} 2px 3px)`;
 
 const fill = stylex.create({
-  merged: { backgroundColor: colors.merged },
-  check: { backgroundColor: colors.check },
+  succeeded: { backgroundColor: colors.merged },
   failed: { backgroundColor: colors.problem },
   canceled: { backgroundColor: colors.idle, backgroundImage: hatch },
 });

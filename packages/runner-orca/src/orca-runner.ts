@@ -22,6 +22,7 @@ import type {
   StartedRun,
   StartRunInput,
   WorktreeRef,
+  WorktreeWork,
 } from "@ganger/core";
 import { z } from "zod";
 import { briefFor } from "./agent-brief.js";
@@ -47,6 +48,12 @@ import {
   unknownPush,
 } from "./push-check.js";
 import type { PushCheckOutcome } from "./push-check.js";
+import {
+  hasUncommittedChanges,
+  hasUnpushedCommits,
+  uncommittedChangesArgv,
+  unpushedCommitsArgv,
+} from "./worktree-work.js";
 import { decodeAgent, decodeMailbox, encodeAgent, encodeMailbox } from "./refs.js";
 import type { OrcaAgent, OrcaMailbox } from "./refs.js";
 import {
@@ -73,6 +80,7 @@ import {
   workerStopResultSchema,
   worktreePsResultSchema,
   worktreeRmResultSchema,
+  worktreePathResultSchema,
   worktreeShowResultSchema,
 } from "./schemas.js";
 import type { MailRow } from "./schemas.js";
@@ -921,6 +929,21 @@ export class OrcaRunner implements Runner {
     if (shown.ok) return true;
     if (shown.code === "selector_not_found") return false;
     throw this.errorFor(shown, {});
+  }
+
+  async checkWorktreeWork(worktree: WorktreeRef): Promise<WorktreeWork> {
+    const shown = await this.orcaOutcome(
+      ["worktree", "show", "--worktree", `id:${worktree}`],
+      worktreePathResultSchema,
+    );
+    if (!shown.ok) {
+      if (shown.code === "selector_not_found") return { kind: "gone" };
+      throw this.errorFor(shown, {});
+    }
+    const path = shown.result.worktree.path;
+    const uncommittedChanges = hasUncommittedChanges(await this.run(uncommittedChangesArgv(path)));
+    const unpushedCommits = hasUnpushedCommits(await this.run(unpushedCommitsArgv(path)));
+    return { kind: "checked", uncommittedChanges, unpushedCommits };
   }
 
   async removeWorktree(worktree: WorktreeRef): Promise<void> {

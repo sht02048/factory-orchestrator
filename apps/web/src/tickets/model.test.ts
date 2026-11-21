@@ -1,4 +1,4 @@
-import type { SummaryOutcome } from "@ganger/core";
+import type { PrState, SummaryOutcome } from "@ganger/core";
 import { describe, expect, it } from "vitest";
 import {
   TICKET_FILTERS,
@@ -28,17 +28,18 @@ function active(state: "queued" | "running" | "waiting-for-input" | "disconnecte
   return { id: `run-${state}`, runnerName: null, state, elapsedMs: 0 };
 }
 
-function ended(summary: SummaryOutcome, prSettledLater = false): TicketRun {
+function ended(summary: SummaryOutcome, prState: PrState = "open"): TicketRun {
   return {
     id: `run-${summary}`,
     runnerName: null,
     state: "ended",
     endedAt: "2026-11-18T00:00:00.000Z",
     endedAgoMs: 0,
-    agentResult: "reported-success",
-    prState: "open",
+    agentResult: summary === "succeeded" ? "reported-success" : "reported-failure",
+    prState,
+    laterPrState: null,
+    pullRequest: prState === "none" ? null : "#1",
     summary,
-    prSettledLater,
   };
 }
 
@@ -53,17 +54,18 @@ describe("Tickets 필터(GLOSSARY Tickets 필터, 0068)", () => {
     ["Canceled", [ended("canceled")], ["all", "assignable", "done"]],
     ["Waiting for Input", [active("waiting-for-input")], ["all", "todo"]],
     ["Disconnected", [active("disconnected")], ["all", "todo"]],
-    ["Human Check", [ended("human-check")], ["all", "todo"]],
-    ["이후 PR 상태가 기록된 Human Check", [ended("human-check", true)], ["all", "done"]],
+    ["PR 이 열린 Succeeded", [ended("succeeded", "open")], ["all", "done"]],
+    ["PR 이 없는 Succeeded", [ended("succeeded", "none")], ["all", "done"]],
+    ["PR 을 못 읽은 Succeeded", [ended("succeeded", "unknown")], ["all", "done"]],
+    ["PR 이 병합된 Failed", [ended("failed", "merged")], ["all", "assignable", "todo"]],
     ["Queued", [active("queued")], ["all", "in-progress"]],
     ["Running", [active("running")], ["all", "in-progress"]],
-    ["Merged", [ended("merged")], ["all", "done"]],
   ])("마지막 런이 %s인 티켓", (_, runs, expected) => {
     expect(filtersOf(ticket("ACME-1", "결제", runs))).toEqual(expected);
   });
 
   it("마지막 런(가장 최근)으로만 정한다", () => {
-    const view = ticket("ACME-1", "결제", [ended("merged"), ended("failed")]);
+    const view = ticket("ACME-1", "결제", [ended("succeeded"), ended("failed")]);
     expect(filtersOf(view)).toEqual(["all", "done"]);
   });
 

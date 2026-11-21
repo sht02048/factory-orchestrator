@@ -177,12 +177,6 @@ export function RoleSections() {
                 description={t("groupHeader.answer")}
               />
               <GroupHeader
-                status="human-check"
-                title={t("groupHeader.checkTitle")}
-                count={1}
-                description={t("groupHeader.check")}
-              />
-              <GroupHeader
                 status="failed"
                 title={t("groupHeader.stuckTitle")}
                 count={7}

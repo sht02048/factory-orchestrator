@@ -104,9 +104,8 @@ export const blockSectionIds = [
 ] as const;
 
 const sampleSegments = [
-  { tone: "merged", value: 6 },
-  { tone: "check", value: 2 },
-  { tone: "failed", value: 1 },
+  { tone: "succeeded", value: 6 },
+  { tone: "failed", value: 2 },
   { tone: "canceled", value: 1 },
 ] as const;
 

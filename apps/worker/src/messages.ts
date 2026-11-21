@@ -16,8 +16,7 @@ export const messages = {
     runId: "런 ID",
   },
   summary: {
-    merged: "Merged",
-    "human-check": "Human Check",
+    succeeded: "Succeeded",
     failed: "Failed",
     canceled: "취소",
   } satisfies Record<SummaryOutcome, string>,

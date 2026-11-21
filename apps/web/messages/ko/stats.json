@@ -1,10 +1,10 @@
 {
   "documentTitle": "Stats · Ganger",
   "title": "Stats",
-  "summary": "끝난 런을 요약 결과로 나눠 봐요.",
+  "summary": "끝난 런을 결과로 나눠 보고, PR 병합 수는 따로 세요.",
   "meta": "{workspace} · {from}–{to}",
   "headline": {
-    "rated": "끝난 런 {runs}개 중 {percent}%를 에이전트가 병합까지 끝냈어요.",
+    "rated": "끝난 런 {runs}개 중 {percent}%가 Succeeded예요.",
     "onlyCanceled": "끝난 런 {runs}개가 모두 Canceled예요.",
     "empty": "최근 {days}일 동안 끝난 런이 없어요."
   },
@@ -21,13 +21,13 @@
   "percent": "{percent}%",
   "figures": {
     "label": "기간 요약",
-    "mergedRate": "병합률",
+    "successRate": "성공률",
     "up": "앞 {days}일보다 {points}%p 올랐어요",
     "down": "앞 {days}일보다 {points}%p 내렸어요",
     "same": "앞 {days}일과 같아요",
     "noPrevious": "앞 {days}일에는 비교할 런이 없어요",
-    "humanTouched": "사람이 손댄 비율",
-    "humanTouchedDetail": "Human Check {check} · Failed {failed}",
+    "prMerged": "PR 병합",
+    "prMergedDetail": "이 기간에 끝난 런 중 PR이 병합된 런 수예요",
     "leadTime": "리드 타임 중앙값",
     "leadTimeP90": "느린 10%는 {p90} 넘게 걸렸어요",
     "ended": "끝난 런",
@@ -35,8 +35,8 @@
   },
   "throughput": {
     "title": "날짜별로 끝난 런",
-    "chartLabel": "날짜별로 끝난 런 수. 요약 결과로 나눠 쌓았어요.",
-    "day": "{day}: Merged {merged} · Human Check {check} · Failed {failed} · Canceled {canceled}",
+    "chartLabel": "날짜별로 끝난 런 수. 결과로 나눠 쌓았어요.",
+    "day": "{day}: Succeeded {succeeded} · Failed {failed} · Canceled {canceled}",
     "today": "오늘",
     "empty": "최근 {days}일 동안 끝난 런이 없어요.",
     "showTable": "표로 보기",
@@ -44,8 +44,7 @@
     "tableCaption": "날짜별로 끝난 런 수",
     "columns": {
       "day": "날짜",
-      "merged": "Merged",
-      "check": "Human Check",
+      "succeeded": "Succeeded",
       "failed": "Failed",
       "canceled": "Canceled"
     }
@@ -55,8 +54,6 @@
     "listLabel": "실패 이유",
     "reasons": {
       "reported-failure": "에이전트가 실패를 보고했어요",
-      "no-pr": "에이전트가 성공을 보고했지만 PR이 없어요",
-      "pr-closed": "PR이 병합되지 않고 닫혔어요",
       "ended-without-report": "에이전트가 중간에 멈췄어요",
       "timed-out": "최대 실행 시간을 넘겼어요",
       "stopped-waiting-for-input": "입력을 기다리다 멈췄어요",
@@ -81,10 +78,10 @@
   "columns": {
     "name": "이름",
     "runs": "끝난 런",
-    "mergedRate": "병합률",
+    "successRate": "성공률",
     "leadTime": "리드 타임"
   },
-  "tableCaption": "{dimension}별 끝난 런, 병합률, 리드 타임",
+  "tableCaption": "{dimension}별 끝난 런, 성공률, 리드 타임",
   "empty": "최근 {days}일 동안 끝난 런이 없어요. 런이 끝나면 여기에 보여요.",
   "openRuns": "{name}의 런 보기",
   "openRunsHint": "이름을 누르면 그 조건과 기간으로 Runs가 열려요.",

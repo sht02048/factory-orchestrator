@@ -63,7 +63,7 @@ describe("대기열과 capacity", () => {
     await worker.tick();
     expect(stateOf(third)).toBe("queued");
 
-    finish(first);
+    finish(first, "failed");
     await worker.tick();
     expect([stateOf(first), stateOf(second), stateOf(third)]).toEqual([
       "ended",
@@ -82,12 +82,12 @@ describe("두 축 기록", () => {
     agentResult: string;
     outcome: string;
   }> = [
-    { report: "succeeded", pr: "merged", agentResult: "reported-success", outcome: "merged" },
-    { report: "failed", pr: "merged", agentResult: "reported-failure", outcome: "merged" },
-    { report: "succeeded", pr: "open", agentResult: "reported-success", outcome: "human-check" },
-    { report: "failed", pr: "open", agentResult: "reported-failure", outcome: "human-check" },
-    { report: "succeeded", pr: "closed", agentResult: "reported-success", outcome: "failed" },
-    { report: "succeeded", pr: "none", agentResult: "reported-success", outcome: "failed" },
+    { report: "succeeded", pr: "merged", agentResult: "reported-success", outcome: "succeeded" },
+    { report: "failed", pr: "merged", agentResult: "reported-failure", outcome: "failed" },
+    { report: "succeeded", pr: "open", agentResult: "reported-success", outcome: "succeeded" },
+    { report: "failed", pr: "open", agentResult: "reported-failure", outcome: "failed" },
+    { report: "succeeded", pr: "closed", agentResult: "reported-success", outcome: "succeeded" },
+    { report: "succeeded", pr: "none", agentResult: "reported-success", outcome: "succeeded" },
     { report: "failed", pr: "none", agentResult: "reported-failure", outcome: "failed" },
   ];
 

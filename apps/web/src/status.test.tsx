@@ -29,8 +29,7 @@ const TERMS: Record<PillStatus, string> = {
   "waiting-for-input": "Waiting for Input",
   paused: "Paused",
   disconnected: "Disconnected",
-  merged: "Merged",
-  "human-check": "Human Check",
+  succeeded: "Succeeded",
   failed: "Failed",
   canceled: "Canceled",
   online: "Online",
@@ -53,8 +52,7 @@ describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
       ended: "Ended",
     });
     expect(domain.summary).toEqual({
-      merged: TERMS.merged,
-      "human-check": TERMS["human-check"],
+      succeeded: TERMS.succeeded,
       failed: TERMS.failed,
       canceled: TERMS.canceled,
     });
@@ -62,7 +60,6 @@ describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
     expect(domain.attention).toEqual({
       question: TERMS.question,
       permission: TERMS.permission,
-      "human-check": TERMS["human-check"],
       failed: TERMS.failed,
       disconnected: TERMS.disconnected,
       "runner-issue": TERMS["runner-issue"],

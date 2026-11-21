@@ -5,6 +5,7 @@ import {
   PR_READ_ERRORS,
   PR_STATES,
   RUN_STATES,
+  WORKTREE_KEPT_REASONS,
 } from "@ganger/core";
 import { CHANGE_KINDS, CHANGE_PARTS } from "./change-events-model.js";
 import { MCP_ACTION_OUTCOMES } from "./mcp-actions-model.js";
@@ -279,6 +280,8 @@ export const runs = sqliteTable(
     laterPrState: text("later_pr_state", { enum: LATER_PR_STATES }),
     laterPrStateAt: timeMs("later_pr_state_at"),
     worktreeRemovedAt: timeMs("worktree_removed_at"),
+    worktreeKept: text("worktree_kept", { enum: WORKTREE_KEPT_REASONS }),
+    worktreeRemoveRequestedAt: timeMs("worktree_remove_requested_at"),
     trackerStateSetAt: timeMs("tracker_state_set_at"),
     trackerCommentId: text("tracker_comment_id").$type<CommentId>(),
     trackerCommentedAt: timeMs("tracker_commented_at"),
@@ -294,6 +297,11 @@ export const runs = sqliteTable(
     check("runs_pr_state", sql`${t.prState} IN ${inList(PR_STATES)}`),
     check("runs_later_pr_state", sql`${t.laterPrState} IN ${inList(LATER_PR_STATES)}`),
     check("runs_pr_read_error", sql`${t.prReadError} IN ${inList(PR_READ_ERRORS)}`),
+    check("runs_worktree_kept", sql`${t.worktreeKept} IN ${inList(WORKTREE_KEPT_REASONS)}`),
+    check(
+      "runs_worktree_kept_ended",
+      sql`(${t.worktreeKept} IS NULL AND ${t.worktreeRemoveRequestedAt} IS NULL) OR ${t.state} = 'ended'`,
+    ),
     check(
       "runs_pr_read_error_iff_unknown",
       sql`(${t.prState} IS 'unknown') = (${t.prReadError} IS NOT NULL)`,

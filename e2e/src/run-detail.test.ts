@@ -70,6 +70,7 @@ let inlineQuestionRun: RunId;
 let permissionRun: RunId;
 let cancelRun: RunId;
 let endedRun: RunId;
+let keptRun: RunId;
 
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
@@ -161,6 +162,19 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
 
     await page.getByRole("status").getByText(run.cancelPending, { exact: true }).waitFor();
     await expect.poll(focusedStatusText).toBe(run.cancelPending);
+  });
+
+  it("워크트리 지우기를 키보드로 확인하면 버튼 대신 지우는 중이 상태 줄의 role=status 에 보이고 포커스가 그리로 간다 (0145 R7-3)", async () => {
+    await open(keptRun);
+    await page.getByText(run.keptWorktree["no-pr"], { exact: true }).waitFor();
+    await page.getByRole("button", { name: run.removeWorktree.trigger }).press("Enter");
+    const dialog = page.getByRole("dialog", { name: run.removeWorktree.title });
+    await dialog.getByText(run.removeWorktree.body).waitFor();
+    await dialog.getByRole("button", { name: run.removeWorktree.confirm }).press("Enter");
+
+    await page.getByRole("status").getByText(run.removeWorktree.pending, { exact: true }).waitFor();
+    await expect.poll(focusedStatusText).toBe(run.removeWorktree.pending);
+    expect(await page.getByRole("button", { name: run.removeWorktree.trigger }).count()).toBe(0);
   });
 
   it("로그를 열면 마지막 줄이 보이고 키보드로 스크롤할 수 있다", async () => {
@@ -273,6 +287,11 @@ function seed(db: Database): void {
   updateRunRecords(db, endedRun, {
     lastLog: Array.from({ length: LOG_LINES }, (_, i) => `line ${i + 1}`),
   });
+
+  keptRun = startRun("ACME-17");
+  ok(
+    changeRunState(db, keptRun, { to: "ended", agentResult: "reported-success", prState: "none" }),
+  );
 }
 
 function startRun(key: string): RunId {

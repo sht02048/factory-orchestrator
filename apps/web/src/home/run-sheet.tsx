@@ -180,7 +180,6 @@ function SheetBody({
       return null;
     }
     case "ended":
-      if (tagged && run.summary === "human-check") return <HumanCheckBlock run={run} />;
       if (tagged && run.summary === "failed") return <FailedBlock run={run} />;
       return <EndedBlock run={run} />;
   }
@@ -259,29 +258,6 @@ function ControlBlock({
 
 function Block({ children }: { children: ReactNode }) {
   return <div {...stylex.props(styles.block)}>{children}</div>;
-}
-
-function HumanCheckBlock({ run }: { run: HomeRun }) {
-  const t = useTranslations("home.sheet");
-  const pr = run.pullRequest;
-  return (
-    <Block>
-      <Text variant="body">{pr === null ? t("humanCheckNoPr") : t("humanCheck")}</Text>
-      {pr === null ? null : (
-        <div>
-          <a
-            href={pr.url}
-            target="_blank"
-            rel="noreferrer"
-            data-variant="secondary"
-            {...stylex.props(...buttonStyles("secondary"))}
-          >
-            {t("openPr", { pr: pr.displayId })}
-          </a>
-        </div>
-      )}
-    </Block>
-  );
 }
 
 function FailedBlock({ run }: { run: HomeRun & { state: "ended" } }) {

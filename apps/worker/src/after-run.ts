@@ -1,7 +1,7 @@
 import { withLogContext } from "@ganger/log";
 import type { LogEvent } from "@ganger/log";
 import { AdapterError, summarizeRunOutcome } from "@ganger/core";
-import type { PullRequestSnapshot, Tracker } from "@ganger/core";
+import type { PullRequestSnapshot, Tracker, WorktreeKeptReason } from "@ganger/core";
 import {
   fillUnreadPrState,
   getRunWithRecords,
@@ -20,6 +20,7 @@ import {
   readRunPrState,
   rememberPrReadFailure,
   runLogContext,
+  runnerErrorDetail,
   tryWrite,
 } from "./context.js";
 import type { ActiveRun, StartedStoredRun, TickContext } from "./context.js";
@@ -238,6 +239,10 @@ async function followWorktree(
   endedRecords: RunRecords,
   runnersById: ReadonlyMap<StoredRunner["id"], StoredRunner>,
 ): Promise<void> {
+  if (endedRecords.worktreeRemovedAt === null && endedRecords.worktreeRemoveRequestedAt !== null) {
+    await removeWorktree(context, ended, runnersById.get(ended.runnerId));
+    return;
+  }
   const read =
     ended.prState === "unknown"
       ? await readUnreadPullRequest(context, ended)
@@ -248,10 +253,10 @@ async function followWorktree(
   if (records.worktreeRemovedAt !== null || disposition !== "keep-until-pr-settles") {
     context.prPolledAt.delete(run.id);
   }
-  if (records.worktreeRemovedAt !== null) return;
+  if (records.worktreeRemovedAt !== null || records.worktreeKept !== null) return;
   switch (disposition) {
     case "remove-now":
-      await removeWorktree(context, run, runnersById.get(run.runnerId));
+      await removeWorktreeWithoutWork(context, run, runnersById.get(run.runnerId));
       return;
     case "keep-until-pr-settles":
       if (
@@ -260,7 +265,7 @@ async function followWorktree(
       ) {
         return;
       }
-      await removeWorktree(context, run, runnersById.get(run.runnerId));
+      await removeWorktreeWithoutWork(context, run, runnersById.get(run.runnerId));
       return;
     case "operator-decides":
     case "nothing-to-remove":
@@ -340,6 +345,44 @@ async function currentPullRequest(
     return codeHost.getPullRequest(repo, linked.id);
   }
   return null;
+}
+
+async function removeWorktreeWithoutWork(
+  context: TickContext,
+  run: StartedEndedRun,
+  stored: StoredRunner | undefined,
+): Promise<void> {
+  if (stored === undefined || !stored.online) return;
+  const kept = await unsavedWorkIn(context, run, stored);
+  if (kept === "unreachable") return;
+  if (kept === null) {
+    await removeWorktree(context, run, stored);
+    return;
+  }
+  context.logger.info("run.worktree_kept", { runId: run.id, reason: kept });
+  context.prPolledAt.delete(run.id);
+  tryWrite(context, run.id, () => updateRunRecords(context.db, run.id, { worktreeKept: kept }));
+}
+
+async function unsavedWorkIn(
+  context: TickContext,
+  run: StartedEndedRun,
+  stored: StoredRunner,
+): Promise<WorktreeKeptReason | "unreachable" | null> {
+  try {
+    const work = await context.adapters.runner(stored).checkWorktreeWork(run.worktree);
+    if (work.kind === "gone") return null;
+    if (work.uncommittedChanges) return "uncommitted-changes";
+    if (work.unpushedCommits) return "unpushed-commits";
+    return null;
+  } catch (error) {
+    if (runnerErrorDetail(error)?.kind === "unreachable") {
+      context.logger.debug("run.worktree_check_unreachable", { runId: run.id, error });
+      return "unreachable";
+    }
+    context.logger.warn("run.worktree_check_failed", { runId: run.id, error });
+    return "check-failed";
+  }
 }
 
 async function removeWorktree(

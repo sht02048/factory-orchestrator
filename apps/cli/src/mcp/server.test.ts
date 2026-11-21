@@ -178,7 +178,6 @@ describe("ganger mcp 서버", () => {
             },
           ],
         },
-        { group: "stopped", runs: [{ id: seeded.ended, summary: "failed" }] },
       ],
       running: [],
       queued: [],
@@ -193,7 +192,7 @@ describe("ganger mcp 서버", () => {
           limits: [],
         },
       ],
-      doneToday: { total: 1, recent: [{ id: seeded.ended, summary: "failed" }] },
+      doneToday: { total: 1, recent: [{ id: seeded.ended, summary: "succeeded" }] },
     });
   });
 
@@ -210,7 +209,15 @@ describe("ganger mcp 서버", () => {
     });
     const ended = await call("get_run", { runId: seeded.ended });
     expect(ended.json).toMatchObject({
-      run: { status: { state: "ended" }, [EXTERNAL_FIELD]: { report: EXTERNAL.report } },
+      run: {
+        status: {
+          state: "ended",
+          summary: "succeeded",
+          prState: "none",
+          keptWorktree: { reason: "no-pr", removing: false },
+        },
+        [EXTERNAL_FIELD]: { report: EXTERNAL.report },
+      },
     });
   });
 
@@ -317,7 +324,7 @@ describe("ganger mcp 서버", () => {
     const stats = await call("get_stats", { days: 7 });
     expect(stats.json).toMatchObject({
       period: { days: 7 },
-      total: { runs: 1, outcomes: { failed: 1 } },
+      total: { runs: 1, outcomes: { succeeded: 1, failed: 0, canceled: 0 }, prMerged: 0 },
     });
     const settings = await call("get_settings");
     expect(settings.json).toMatchObject({

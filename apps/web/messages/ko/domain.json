@@ -26,15 +26,13 @@
     "unknown": "못 읽음"
   },
   "summary": {
-    "merged": "Merged",
-    "human-check": "Human Check",
+    "succeeded": "Succeeded",
     "failed": "Failed",
     "canceled": "Canceled"
   },
   "attention": {
     "question": "Question",
     "permission": "Permission",
-    "human-check": "Human Check",
     "failed": "Failed",
     "disconnected": "Disconnected",
     "runner-issue": "Runner Issue"

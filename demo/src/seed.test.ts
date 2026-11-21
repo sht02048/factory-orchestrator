@@ -16,6 +16,7 @@ import {
   listRunnerSnapshots,
   listRunners,
   listRuns,
+  listRunsWithRecords,
   migrate,
   openDatabase,
 } from "@ganger/db";
@@ -63,7 +64,7 @@ describe("seedDemo", () => {
     }
   });
 
-  it("런의 모든 상태와 요약 결과 넷, 질문·권한 대기를 만든다", async () => {
+  it("런의 모든 상태와 요약 결과 셋, 질문·권한 대기, 남긴 워크트리를 만든다", async () => {
     const seeded = await seedDemo(db, box, new DemoWorld(() => now), now);
     const runs = listRuns(db);
     expect(new Set(runs.map((run) => run.state))).toEqual(
@@ -72,7 +73,17 @@ describe("seedDemo", () => {
     const outcomes = new Set(
       runs.flatMap((run) => (run.state === "ended" ? [summarizeRunOutcome(run).outcome] : [])),
     );
-    expect(outcomes).toEqual(new Set(["merged", "human-check", "failed", "canceled"]));
+    expect(outcomes).toEqual(new Set(["succeeded", "failed", "canceled"]));
+    const kept = listRunsWithRecords(db, { states: ["ended"] }).filter(
+      ({ run, records }) =>
+        run.state === "ended" &&
+        records.worktreeRemovedAt === null &&
+        (records.worktreeKept !== null || summarizeRunOutcome(run).worktree === "operator-decides"),
+    );
+    expect(kept.map(({ records }) => records.worktreeKept)).toEqual(
+      expect.arrayContaining(["unpushed-commits", null]),
+    );
+    expect(kept).toHaveLength(2);
     expect(listRunQuestions(db, seeded.question).filter((q) => q.answer === null)).toHaveLength(1);
     expect(listRunPermissionWaits(db, seeded.permission)).toHaveLength(1);
     const active = new Set(runs.filter((r) => r.state !== "ended").map((r) => r.ticket.key));

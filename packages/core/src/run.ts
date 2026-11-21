@@ -61,7 +61,7 @@ export type ReadPrState = Exclude<PrState, "unknown">;
 export const PR_READ_ERRORS = ["no-access", "other"] as const;
 export type PrReadError = (typeof PR_READ_ERRORS)[number];
 
-export const SUMMARY_OUTCOMES = ["merged", "human-check", "failed", "canceled"] as const;
+export const SUMMARY_OUTCOMES = ["succeeded", "failed", "canceled"] as const;
 export type SummaryOutcome = (typeof SUMMARY_OUTCOMES)[number];
 
 export const WORKTREE_DISPOSITIONS = [
@@ -71,6 +71,13 @@ export const WORKTREE_DISPOSITIONS = [
   "nothing-to-remove",
 ] as const;
 export type WorktreeDisposition = (typeof WORKTREE_DISPOSITIONS)[number];
+
+export const WORKTREE_KEPT_REASONS = [
+  "uncommitted-changes",
+  "unpushed-commits",
+  "check-failed",
+] as const;
+export type WorktreeKeptReason = (typeof WORKTREE_KEPT_REASONS)[number];
 
 export interface TicketRef {
   connection: TrackerConnectionId;

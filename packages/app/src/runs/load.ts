@@ -195,9 +195,10 @@ export function loadRunsPage(
           endedAgoMs: Math.max(0, now.getTime() - run.endedAt.getTime()),
           agentResult: run.agentResult,
           prState: run.prState,
+          laterPrState: records.laterPrState?.state ?? null,
           prReadError: records.prReadError,
           summary,
-          attention: latest && isUnresolvedEndedRun(run, records),
+          attention: latest && isUnresolvedEndedRun(run),
         };
       }
     }
@@ -243,10 +244,8 @@ function describeConditions(
   return described;
 }
 
-function isUnresolvedEndedRun(run: StoredRun, records: RunRecords): boolean {
-  if (run.state !== "ended") return false;
-  const summary = summarizeRunOutcome(run).outcome;
-  return summary === "failed" || (summary === "human-check" && records.laterPrState === null);
+function isUnresolvedEndedRun(run: StoredRun): boolean {
+  return run.state === "ended" && summarizeRunOutcome(run).outcome === "failed";
 }
 
 const UNRESOLVED_ENDED_AXES: ReadonlyArray<EndedAxesFilter> = AGENT_RESULTS.flatMap((agentResult) =>
@@ -254,9 +253,7 @@ const UNRESOLVED_ENDED_AXES: ReadonlyArray<EndedAxesFilter> = AGENT_RESULTS.flat
     switch (summarizeRunOutcome({ agentResult, prState, runnerUnreached: false }).outcome) {
       case "failed":
         return [{ agentResult, prState }];
-      case "human-check":
-        return [{ agentResult, prState, laterPrState: null }];
-      case "merged":
+      case "succeeded":
       case "canceled":
         return [];
     }

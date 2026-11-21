@@ -149,7 +149,7 @@
     "running": "Running",
     "queued": "Queued",
     "panelAll": "모든 런을 최근 순서로 보여 줘요.",
-    "panelTodo": "Human Check와 Failed만 보여 줘요.",
+    "panelTodo": "Failed만 보여 줘요.",
     "panelRunning": "지금 러너에서 도는 런이에요.",
     "panelQueued": "capacity를 기다리는 런이 없어요."
   },
@@ -301,8 +301,6 @@
     "note": "목록 묶음 머리예요. 점 색은 상태 값으로 정해져요.",
     "answerTitle": "답이 필요해요",
     "answer": "에이전트가 답이나 허용을 기다려요",
-    "checkTitle": "확인해 주세요",
-    "check": "PR을 보고 병합할지 정해 주세요",
     "stuckTitle": "멈췄어요",
     "stuck": "원인을 보고 다시 맡기거나 닫아 주세요"
   },
@@ -446,11 +444,10 @@
     },
     "outcomes": {
       "note": "Stats의 범례·실패 이유 막대·날짜별 쌓은 막대 차트예요. 결과 막대(OutcomeBar)는 지금 화면에서 쓰지 않아요. 결과 색은 상태 뜻 그대로 써요.",
-      "merged": "Merged",
-      "check": "Human Check",
+      "succeeded": "Succeeded",
       "failed": "Failed",
       "canceled": "Canceled",
-      "barLabel": "Merged 6, Human Check 2, Failed 1, Canceled 1",
+      "barLabel": "Succeeded 6, Failed 2, Canceled 1",
       "chartLabel": "날마다 끝난 런",
       "yesterday": "어제",
       "today": "오늘"

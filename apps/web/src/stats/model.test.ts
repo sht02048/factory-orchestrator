@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import { DAY_MS } from "@ganger/app/time-zone";
 import {
   failureReasonOf,
-  mergedRateChange,
+  successRateChange,
   percent,
   percentile,
   previousPeriod,
   statsPeriod,
+  successRate,
   summarizeStats,
 } from "@ganger/app/stats/model";
 import type { StatsRun } from "@ganger/app/stats/model";
@@ -56,53 +57,60 @@ describe("previousPeriod", () => {
   });
 });
 
-describe("mergedRateChange", () => {
+describe("successRateChange", () => {
   const run = (agentResult: StatsRun["agentResult"], prState: StatsRun["prState"]): StatsRun => ({
     runner: { key: "r", name: "r" },
     trackerProject: { key: "p", name: "p" },
     agent: { key: "a", name: "a" },
     agentResult,
     prState,
+    prMerged: prState === "merged",
     runnerUnreached: false,
     assignedAt: new Date(0),
     startedAt: new Date(0),
     endedAt: new Date(60_000),
   });
   const merged = run("reported-success", "merged");
-  const failed = run("reported-failure", "none");
+  const succeededWithoutPr = run("reported-success", "none");
+  const failed = run("reported-failure", "merged");
   const canceled = run("canceled", "none");
 
-  it("두 기간 병합률의 차이를 %p로 준다", () => {
+  it("두 기간 성공률의 차이를 %p로 준다", () => {
     expect(
-      mergedRateChange(summarizeStats([merged, merged, failed]), summarizeStats([merged, failed])),
+      successRateChange(summarizeStats([merged, merged, failed]), summarizeStats([merged, failed])),
     ).toBe(17);
-    expect(mergedRateChange(summarizeStats([failed]), summarizeStats([merged, failed]))).toBe(-50);
+    expect(successRateChange(summarizeStats([failed]), summarizeStats([merged, failed]))).toBe(-50);
+  });
+
+  it("성공률은 에이전트 보고로만 세고, PR 병합 수는 따로 센다 (R1·R5)", () => {
+    const summary = summarizeStats([merged, succeededWithoutPr, failed]);
+    expect(summary.outcomes).toEqual({ succeeded: 2, failed: 1, canceled: 0 });
+    expect(summary.prMerged).toBe(2);
+    expect(successRate(summary)).toBe(67);
   });
 
   it("Canceled 는 두 기간 모두 비율에서 뺀다", () => {
     expect(
-      mergedRateChange(summarizeStats([merged, canceled]), summarizeStats([merged, failed])),
+      successRateChange(summarizeStats([merged, canceled]), summarizeStats([merged, failed])),
     ).toBe(50);
   });
 
   it("어느 한 기간에 비율을 낼 런이 없으면 null 이다", () => {
-    expect(mergedRateChange(summarizeStats([merged]), summarizeStats([]))).toBeNull();
-    expect(mergedRateChange(summarizeStats([]), summarizeStats([merged]))).toBeNull();
-    expect(mergedRateChange(summarizeStats([merged]), summarizeStats([canceled]))).toBeNull();
+    expect(successRateChange(summarizeStats([merged]), summarizeStats([]))).toBeNull();
+    expect(successRateChange(summarizeStats([]), summarizeStats([merged]))).toBeNull();
+    expect(successRateChange(summarizeStats([merged]), summarizeStats([canceled]))).toBeNull();
   });
 });
 
 describe("failureReasonOf", () => {
-  it("성공을 보고한 런은 PR 상태로 이유가 갈린다", () => {
-    expect(failureReasonOf("reported-success", "none")).toBe("no-pr");
-    expect(failureReasonOf("reported-success", "closed")).toBe("pr-closed");
-    expect(failureReasonOf("reported-success", "merged")).toBeNull();
+  it("성공을 보고한 런과 취소한 런은 실패 이유가 없다", () => {
+    expect(failureReasonOf("reported-success")).toBeNull();
+    expect(failureReasonOf("canceled")).toBeNull();
   });
 
-  it("그 밖의 에이전트 결과는 결과 하나가 이유 하나이고 취소는 실패 이유가 아니다", () => {
-    expect(failureReasonOf("reported-failure", "closed")).toBe("reported-failure");
-    expect(failureReasonOf("ended-without-report", "open")).toBe("ended-without-report");
-    expect(failureReasonOf("could-not-start", "none")).toBe("could-not-start");
-    expect(failureReasonOf("canceled", "none")).toBeNull();
+  it("그 밖의 에이전트 결과는 결과 하나가 이유 하나다", () => {
+    expect(failureReasonOf("reported-failure")).toBe("reported-failure");
+    expect(failureReasonOf("ended-without-report")).toBe("ended-without-report");
+    expect(failureReasonOf("could-not-start")).toBe("could-not-start");
   });
 });

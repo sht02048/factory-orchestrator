@@ -32,6 +32,7 @@ import type {
   UnreportedStop,
   TrackerTicket,
   WebhookVerifyError,
+  WorktreeWork,
 } from "../adapters.js";
 import {
   toAgentRef,
@@ -206,6 +207,10 @@ export class FakeRunner implements Runner {
   readonly kind: RunnerKind;
   readonly runs = new Map<string, FakeRunnerRun>();
   readonly removed: WorktreeRef[] = [];
+  readonly worktreeWork = new Map<
+    WorktreeRef,
+    { uncommittedChanges: boolean; unpushedCommits: boolean } | "check-fails"
+  >();
   readonly startCalls: StartRunInput[] = [];
   online = true;
   prerequisites: RunnerPrerequisite[] = [
@@ -538,6 +543,25 @@ export class FakeRunner implements Runner {
 
   worktreeExists(worktree: WorktreeRef): Promise<boolean> {
     return this.reach(() => this.find(worktree) !== null);
+  }
+
+  checkWorktreeWork(worktree: WorktreeRef): Promise<WorktreeWork> {
+    return this.reach(() => {
+      if (this.find(worktree) === null) return { kind: "gone" };
+      const work = this.worktreeWork.get(worktree);
+      if (work === "check-fails") {
+        throw new AdapterError<RunnerErrorDetail>({
+          kind: "runner-error",
+          code: "git_failed",
+          message: "git status failed",
+        });
+      }
+      return {
+        kind: "checked",
+        uncommittedChanges: work?.uncommittedChanges ?? false,
+        unpushedCommits: work?.unpushedCommits ?? false,
+      };
+    });
   }
 
   removeWorktree(worktree: WorktreeRef): Promise<void> {

@@ -331,8 +331,9 @@ function toTicketRun(
     endedAgoMs: msSince(run.endedAt, now),
     agentResult: run.agentResult,
     prState: run.prState,
+    laterPrState: records.laterPrState?.state ?? null,
+    pullRequest: records.pullRequest?.displayId ?? null,
     summary: summarizeRunOutcome(run).outcome,
-    prSettledLater: records.laterPrState !== null,
   };
 }
 
@@ -345,8 +346,7 @@ function retriesLastRepo(outcome: SummaryOutcome): boolean {
     case "failed":
     case "canceled":
       return true;
-    case "merged":
-    case "human-check":
+    case "succeeded":
       return false;
   }
 }

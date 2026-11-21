@@ -31,9 +31,6 @@ function runCause(run: HomeRun): NotificationCause | null {
     case "disconnected":
       return { ...base, kind: "disconnected", cause: `disconnected:${run.id}` };
     case "ended":
-      if (run.summary === "human-check" && !run.prSettledLater) {
-        return { ...base, kind: "human-check", cause: `human-check:${run.id}` };
-      }
       if (run.summary === "failed") return { ...base, kind: "failed", cause: `failed:${run.id}` };
       return null;
     case "queued":

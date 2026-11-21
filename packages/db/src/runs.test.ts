@@ -50,6 +50,7 @@ import {
   countUnreadPrRuns,
   fillUnreadPrState,
   recordPrReadError,
+  requestWorktreeRemoval,
   TICKET_TITLE_MAX_LENGTH,
   fillRunTicketTitle,
   getRun,
@@ -827,6 +828,64 @@ describe("updateRunRecords", () => {
     let caught: unknown;
     try {
       updateRunRecords(db, id, { laterPrState: { state: "merged", at: new Date() } });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught instanceof Error ? String(caught.cause) : "").toMatch(/CHECK/);
+  });
+});
+
+describe("남긴 워크트리와 운영자 지우기 요청 (0145 R7)", () => {
+  it("남긴 이유를 적고, 운영자가 지우기를 요청하면 지울 때 요청이 풀린다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    moveTo(db, id, "ended");
+    const at = new Date("2026-11-21T01:00:00Z");
+
+    updateRunRecords(db, id, { worktreeKept: "unpushed-commits" });
+    expect(getRunWithRecords(db, id)?.records).toMatchObject({
+      worktreeKept: "unpushed-commits",
+      worktreeRemoveRequestedAt: null,
+    });
+
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: true });
+    expect(requestWorktreeRemoval(db, id, new Date(at.getTime() + 1_000))).toEqual({ ok: true });
+    expect(getRunWithRecords(db, id)?.records.worktreeRemoveRequestedAt).toEqual(at);
+
+    updateRunRecords(db, id, { worktreeRemovedAt: at });
+    expect(getRunWithRecords(db, id)?.records).toMatchObject({
+      worktreeRemovedAt: at,
+      worktreeRemoveRequestedAt: null,
+    });
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: false, reason: "nothing-to-remove" });
+  });
+
+  it("남기지 않은 워크트리(PR 이 열려 PR 을 기다리는 런)는 지우기를 요청할 수 없다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    change(db, id, { to: "running", started });
+    change(db, id, { to: "ended", agentResult: "reported-failure", prState: "open" });
+    const at = new Date("2026-11-21T01:00:00Z");
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: false, reason: "not-kept" });
+    updateRunRecords(db, id, { worktreeKept: "check-failed" });
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: true });
+  });
+
+  it("끝나지 않은 런과 없는 런은 지우기를 요청할 수 없고, 남긴 이유도 끝난 런에만 적는다", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    const at = new Date("2026-11-21T01:00:00Z");
+    expect(requestWorktreeRemoval(db, id, at)).toEqual({ ok: false, reason: "not-ended" });
+    expect(requestWorktreeRemoval(db, toRunId("run_missing"), at)).toEqual({
+      ok: false,
+      reason: "not-found",
+    });
+    let caught: unknown;
+    try {
+      updateRunRecords(db, id, { worktreeKept: "check-failed" });
     } catch (error) {
       caught = error;
     }

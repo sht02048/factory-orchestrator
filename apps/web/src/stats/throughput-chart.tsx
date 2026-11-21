@@ -24,8 +24,7 @@ const GRID_LINES = 4;
 
 export function outcomeSegments(outcomes: OutcomeCounts): ReadonlyArray<OutcomeSegment> {
   return [
-    { tone: "merged", value: outcomes.merged },
-    { tone: "check", value: outcomes["human-check"] },
+    { tone: "succeeded", value: outcomes.succeeded },
     { tone: "failed", value: outcomes.failed },
     { tone: "canceled", value: outcomes.canceled },
   ];
@@ -57,9 +56,7 @@ export function ThroughputChart({
   const { statsDay: dayLabel } = useTime();
   const tableId = useId();
   const [showTable, setShowTable] = useState(false);
-  const totals = daily.map(
-    (d) => d.outcomes.merged + d.outcomes["human-check"] + d.outcomes.failed + d.outcomes.canceled,
-  );
+  const totals = daily.map((d) => d.outcomes.succeeded + d.outcomes.failed + d.outcomes.canceled);
   const max = Math.max(0, ...totals);
 
   if (max === 0) return <Text variant="meta">{t("empty", { days })}</Text>;
@@ -80,8 +77,7 @@ export function ThroughputChart({
           key: String(d.day),
           title: t("day", {
             day: dayLabel(d.day).long,
-            merged: d.outcomes.merged,
-            check: d.outcomes["human-check"],
+            succeeded: d.outcomes.succeeded,
             failed: d.outcomes.failed,
             canceled: d.outcomes.canceled,
           }),
@@ -106,8 +102,7 @@ export function ThroughputChart({
           <DataTable id={tableId} caption={t("tableCaption")} density="compact">
             <DataTableHead>
               <DataTableHeader>{t("columns.day")}</DataTableHeader>
-              <DataTableHeader align="end">{t("columns.merged")}</DataTableHeader>
-              <DataTableHeader align="end">{t("columns.check")}</DataTableHeader>
+              <DataTableHeader align="end">{t("columns.succeeded")}</DataTableHeader>
               <DataTableHeader align="end">{t("columns.failed")}</DataTableHeader>
               <DataTableHeader align="end">{t("columns.canceled")}</DataTableHeader>
             </DataTableHead>
@@ -115,8 +110,7 @@ export function ThroughputChart({
               {daily.map((d) => (
                 <DataTableRow key={d.day}>
                   <DataTableRowHeader>{dayLabel(d.day).long}</DataTableRowHeader>
-                  <DataTableCell align="end">{d.outcomes.merged}</DataTableCell>
-                  <DataTableCell align="end">{d.outcomes["human-check"]}</DataTableCell>
+                  <DataTableCell align="end">{d.outcomes.succeeded}</DataTableCell>
                   <DataTableCell align="end">{d.outcomes.failed}</DataTableCell>
                   <DataTableCell align="end">{d.outcomes.canceled}</DataTableCell>
                 </DataTableRow>

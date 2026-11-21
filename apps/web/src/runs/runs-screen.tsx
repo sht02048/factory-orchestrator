@@ -40,6 +40,7 @@ import {
   ENDED_RUNS_PAGE_SIZE,
   RUN_GROUP_FILTERS,
   RUN_STATUS_FILTERS,
+  currentPrState,
   elapsedMs,
   isGroupFilter,
   matchesFilter,
@@ -438,10 +439,10 @@ function useRunResultText(run: RunView): string {
       parts.push(
         t("prWithState", {
           pr: run.pullRequest.displayId,
-          state: domain(`prState.${run.prState}`),
+          state: domain(`prState.${currentPrState(run)}`),
         }),
       );
-    else if (run.prState !== "none") parts.push(domain(`prState.${run.prState}`));
+    else if (currentPrState(run) !== "none") parts.push(domain(`prState.${currentPrState(run)}`));
   } else {
     parts.push(agentName(run.agent));
     if (run.cancelling) parts.push(t("cancelling"));
@@ -489,9 +490,12 @@ function RunPanel({
     case "ended":
       when = t("endedAfter", { duration: duration(run.executionMs ?? 0) });
       reason =
-        run.prReadError === null || run.summary !== "human-check"
+        run.prReadError === null
           ? t(`reason.${run.summary}`)
-          : t(`prUnread.${run.prReadError}`);
+          : t("reasonWithPrUnread", {
+              reason: t(`reason.${run.summary}`),
+              prUnread: t(`prUnread.${run.prReadError}`),
+            });
       break;
   }
   if (run.state !== "ended" && run.cancelling) reason = t("cancellingReason");
@@ -551,7 +555,7 @@ function RunPanel({
           {ended === null ? t("notEnded") : domain(`agentResult.${ended.agentResult}`)}
         </DefinitionItem>
         <DefinitionItem label={t("prState")} empty={ended === null}>
-          {ended === null ? t("notEnded") : domain(`prState.${ended.prState}`)}
+          {ended === null ? t("notEnded") : domain(`prState.${currentPrState(ended)}`)}
         </DefinitionItem>
         <DefinitionItem label={t("runner")} empty={run.runner === null}>
           {run.runner === null ? (
