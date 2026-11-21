@@ -282,6 +282,53 @@ describe("MCP 쓰기 도구", () => {
     expect(listRecentMcpActions(seeded.db, 10)).toEqual([]);
   });
 
+  it("같은 requestId 로 다시 답하면 한 번만 처리하고 같은 결과를 돌려준다(0156)", async () => {
+    await connect();
+    const args = { runId: seeded.waiting, answer: "no", requestId: "mcp-request-id-0156" };
+
+    const first = await call("answer_question", args);
+    const second = await call("answer_question", args);
+
+    expect(first.isError).toBe(false);
+    expect(second.isError).toBe(false);
+    expect(second.json).toEqual(first.json);
+    expect(listRunQuestions(seeded.db, seeded.waiting).map((q) => q.answer?.text)).toEqual(["no"]);
+    expect(listRunMcpActions(seeded.db, seeded.waiting)).toHaveLength(1);
+  });
+
+  it("questionId 없이 답한 뒤 다음 질문이 와도 같은 requestId 는 처음 결과를 돌려주고 새 질문에 답하지 않는다(0156)", async () => {
+    await connect();
+    const args = { runId: seeded.waiting, answer: "no", requestId: "mcp-request-id-next" };
+    expect((await call("answer_question", args)).isError).toBe(false);
+    recordRunQuestions(seeded.db, seeded.waiting, [
+      { id: toQuestionId("q-next"), body: "next?", options: [], askedAt: at(61) },
+    ]);
+
+    const again = await call("answer_question", args);
+    const changed = await call("answer_question", { ...args, answer: "yes" });
+
+    expect(again.isError).toBe(false);
+    expect(changed.json["reason"]).toBe("request-reused");
+    expect(
+      listRunQuestions(seeded.db, seeded.waiting).find((q) => q.id === toQuestionId("q-next"))
+        ?.answer,
+    ).toBeNull();
+  });
+
+  it("같은 requestId 로 다시 취소하면 같은 결과이고, requestId 는 없어도 된다(0156)", async () => {
+    await connect();
+    const args = { runId: seeded.waiting, requestId: "mcp-request-id-0156" };
+
+    const first = await call("cancel_run", args);
+    const second = await call("cancel_run", args);
+    expect(listRunMcpActions(seeded.db, seeded.waiting)).toHaveLength(1);
+    const withoutId = await call("cancel_run", { runId: seeded.waiting });
+
+    expect(first.isError).toBe(false);
+    expect(second.json).toEqual(first.json);
+    expect(withoutId.isError).toBe(false);
+  });
+
   it("Human Check 는 종류와 external 칸의 요청 내용으로 읽고, answer_question 으로는 답하지 못한다", async () => {
     await connect("Operator");
     const runId = seeded.waiting;
@@ -344,7 +391,7 @@ describe("MCP 쓰기 도구", () => {
 
     expect((await call("start_run_without_waiting", args)).json["outcome"]).toBe("done");
     expect((await call("start_run_without_waiting", args)).json["outcome"]).toBe("done");
-    expect(listRunMcpActions(seeded.db, queued).map((a) => a.outcome)).toEqual(["done", "done"]);
+    expect(listRunMcpActions(seeded.db, queued).map((a) => a.outcome)).toEqual(["done"]);
 
     const short = await call("start_run_without_waiting", { runId: queued, requestId: "short" });
     expect(short.isError).toBe(true);

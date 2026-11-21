@@ -41,25 +41,33 @@ export function Button({ variant = "secondary", children, onClick, busy, ...prop
       {...(handleClick === undefined ? {} : { onClick: handleClick })}
       className={(s) => cx(...buttonStyles(variant, s.disabled || disabled))}
     >
-      {busy === undefined ? (
-        children
-      ) : (
-        <span {...stylex.props(styles.labels)}>
-          <span
-            {...(busy.active ? { "aria-hidden": true } : {})}
-            {...stylex.props(styles.label, busy.active && styles.labelHidden)}
-          >
-            {children}
-          </span>
-          <span
-            {...(busy.active ? {} : { "aria-hidden": true })}
-            {...stylex.props(styles.label, !busy.active && styles.labelHidden)}
-          >
-            {busy.label}
-          </span>
-        </span>
-      )}
+      {busy === undefined ? children : <BusyLabels busy={busy}>{children}</BusyLabels>}
     </SdkButton>
+  );
+}
+
+export function BusyLabels({
+  busy,
+  children,
+}: {
+  busy: { active: boolean; label: ReactNode };
+  children: ReactNode;
+}) {
+  return (
+    <span {...stylex.props(styles.labels)}>
+      <span
+        {...(busy.active ? { "aria-hidden": true } : {})}
+        {...stylex.props(styles.label, busy.active && styles.labelHidden)}
+      >
+        {children}
+      </span>
+      <span
+        {...(busy.active ? {} : { "aria-hidden": true })}
+        {...stylex.props(styles.label, !busy.active && styles.labelHidden)}
+      >
+        {busy.label}
+      </span>
+    </span>
   );
 }
 

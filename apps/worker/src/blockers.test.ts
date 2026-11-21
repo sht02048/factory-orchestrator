@@ -13,8 +13,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BLOCKER_POLL_INTERVAL_MS } from "./blockers.js";
 import { Harness, connection, projectA, trackerProject } from "./test-fixtures.js";
 
-const REQUEST_ID = "request-0159-0001";
-
 let h: Harness;
 
 beforeEach(() => {
@@ -305,44 +303,24 @@ describe("기다리지 않고 시작", () => {
     await worker.tick();
     expect(stateOf(run)).toBe("queued");
 
-    expect(skipBlockerWait(h.db, run.id, REQUEST_ID, h.now)).toEqual({ ok: true });
+    expect(skipBlockerWait(h.db, run.id, h.now)).toEqual({ ok: true });
     await worker.tick();
     expect(stateOf(run)).toBe("running");
   });
 
-  it("같은 요청 ID를 다시 보내면 런이 시작한 뒤에도 같은 결과를 돌려준다", async () => {
+  it("이미 건너뛴 런은 다시 눌러도 성공이고, 시작한 런은 거절한다", async () => {
     h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const run = h.assign("ENG-1", projectA);
     relate("ENG-1", [blocker("OPS-1")]);
     const worker = h.worker();
     await worker.tick();
 
-    skipBlockerWait(h.db, run.id, REQUEST_ID, h.now);
-    h.advance(1000);
-    expect(skipBlockerWait(h.db, run.id, REQUEST_ID, h.now)).toEqual({ ok: true });
-    await worker.tick();
-    expect(stateOf(run)).toBe("running");
-    expect(skipBlockerWait(h.db, run.id, REQUEST_ID, h.now)).toEqual({ ok: true });
-    expect(skipBlockerWait(h.db, run.id, "request-0159-0003", h.now)).toEqual({
-      ok: false,
-      reason: "not-queued",
-    });
-  });
-
-  it("이미 건너뛴 런에 온 다른 요청 ID도 런이 시작한 뒤 재시도에 같은 결과를 돌려준다", async () => {
-    h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
-    const run = h.assign("ENG-1", projectA);
-    relate("ENG-1", [blocker("OPS-1")]);
-    const worker = h.worker();
-    await worker.tick();
-    const second = "request-0159-0002";
-
-    skipBlockerWait(h.db, run.id, REQUEST_ID, h.now);
-    expect(skipBlockerWait(h.db, run.id, second, h.now)).toEqual({ ok: true });
+    skipBlockerWait(h.db, run.id, h.now);
+    expect(skipBlockerWait(h.db, run.id, h.now)).toEqual({ ok: true });
     await worker.tick();
 
     expect(stateOf(run)).toBe("running");
-    expect(skipBlockerWait(h.db, run.id, second, h.now)).toEqual({ ok: true });
+    expect(skipBlockerWait(h.db, run.id, h.now)).toEqual({ ok: false, reason: "not-queued" });
   });
 
   it("기다리지 않는 런과 취소 중인 런은 거절한다", async () => {
@@ -353,12 +331,12 @@ describe("기다리지 않고 시작", () => {
     relate("ENG-2", [blocker("OPS-1")]);
     await h.worker().tick();
 
-    expect(skipBlockerWait(h.db, free.id, REQUEST_ID, h.now)).toEqual({
+    expect(skipBlockerWait(h.db, free.id, h.now)).toEqual({
       ok: false,
       reason: "not-waiting",
     });
     requestRunCancel(h.db, canceling.id, h.now);
-    expect(skipBlockerWait(h.db, canceling.id, REQUEST_ID, h.now)).toEqual({
+    expect(skipBlockerWait(h.db, canceling.id, h.now)).toEqual({
       ok: false,
       reason: "cancelling",
     });

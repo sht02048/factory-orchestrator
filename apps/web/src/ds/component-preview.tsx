@@ -534,6 +534,12 @@ export function ComponentSections() {
                 </>
               }
             />
+            <Dialog
+              trigger={t("dialog.trigger")}
+              triggerBusy={{ active: true, label: t("dialog.busyTrigger") }}
+              title={t("dialog.title")}
+              actions={<DialogClose>{t("dialog.cancel")}</DialogClose>}
+            />
           </Demo>
         </Section>
       </div>

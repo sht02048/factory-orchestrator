@@ -12,7 +12,7 @@ import { recordRunChange } from "./change-events.js";
 import type { Database } from "./database.js";
 import { inTransaction } from "./database.js";
 import { hasPendingCancelRequest } from "./requests.js";
-import { runBlockers, runWaitSkipRequests, runs } from "./schema.js";
+import { runBlockers, runs } from "./schema.js";
 
 export interface RunBlockerState extends BlockerWaitInput {
   priority: TicketPriority;
@@ -164,21 +164,8 @@ export type SkipBlockerWaitResult =
   | { ok: true }
   | { ok: false; reason: "not-found" | "not-queued" | "not-waiting" | "cancelling" };
 
-export function skipBlockerWait(
-  db: Database,
-  runId: RunId,
-  requestId: string,
-  now: Date,
-): SkipBlockerWaitResult {
+export function skipBlockerWait(db: Database, runId: RunId, now: Date): SkipBlockerWaitResult {
   return inTransaction(db, (): SkipBlockerWaitResult => {
-    const handled = db
-      .select({ runId: runWaitSkipRequests.runId })
-      .from(runWaitSkipRequests)
-      .where(
-        and(eq(runWaitSkipRequests.runId, runId), eq(runWaitSkipRequests.requestId, requestId)),
-      )
-      .get();
-    if (handled !== undefined) return { ok: true };
     const run = db
       .select({ state: runs.state, skippedAt: runs.waitSkippedAt })
       .from(runs)
@@ -187,18 +174,12 @@ export function skipBlockerWait(
     if (run === undefined) return { ok: false, reason: "not-found" };
     if (run.state !== "queued") return { ok: false, reason: "not-queued" };
     if (hasPendingCancelRequest(db, runId)) return { ok: false, reason: "cancelling" };
-    const remember = () =>
-      db.insert(runWaitSkipRequests).values({ runId, requestId, requestedAt: now }).run();
-    if (run.skippedAt !== null) {
-      remember();
-      return { ok: true };
-    }
+    if (run.skippedAt !== null) return { ok: true };
     const state = getRunBlockerState(db, runId);
     if (state === null) return { ok: false, reason: "not-found" };
     const wait = decideBlockerWait(state).kind;
     if (wait === "none" || wait === "checking") return { ok: false, reason: "not-waiting" };
     db.update(runs).set({ waitSkippedAt: now }).where(eq(runs.id, runId)).run();
-    remember();
     recordRunChange(db, runId, { now });
     return { ok: true };
   });

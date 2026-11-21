@@ -10,7 +10,16 @@ import { pendingInput } from "@ganger/app/home/load";
 import { mcpClientName } from "@ganger/app/mcp/actions";
 import type { McpWriteTool } from "@ganger/app/mcp/actions";
 import { powerSettingsStore } from "@ganger/app/power-settings";
-import { cancelRunRequest, skipBlockerWaitRequest } from "@ganger/app/run-detail/actions";
+import {
+  cancelRunOnce,
+  cancelRunRequest,
+  MCP_ANSWER_ACTION,
+  onceForRun,
+  REQUEST_REUSED,
+  runActionRequestId,
+  skipBlockerWaitOnce,
+  skipBlockerWaitRequest,
+} from "@ganger/app/run-detail/actions";
 import { requestRunLogTail } from "@ganger/app/run-detail/load";
 import {
   RUNNER_CAPACITY_MAX,
@@ -77,6 +86,7 @@ type Done = {
   runId: RunId | null;
   serverHandles: boolean;
   result?: Record<string, unknown>;
+  replayed?: boolean;
 };
 type Rejected = {
   target: string | null;
@@ -97,6 +107,11 @@ const workspaceArg = z
   .optional()
   .describe("Workspace id or name. Leave it out when there is only one workspace.");
 const runIdArg = z.string().min(1).max(200).describe("Run id, as list_runs or get_run gives it.");
+const requestIdArg = runActionRequestId
+  .optional()
+  .describe(
+    "Optional id of 16 to 64 characters. Calling again with the same id and values does the action once and returns the same result.",
+  );
 const connectionArg = z
   .string()
   .min(1)
@@ -159,15 +174,17 @@ export function registerWriteTools(
         error: `Ganger could not do this: ${error instanceof Error ? error.message : String(error)}`,
       });
     }
-    recordMcpAction(context.db, {
-      at: context.now(),
-      client: mcpClientName(server.server.getClientVersion()?.name),
-      tool,
-      target: outcome.target,
-      runId: outcome.runId,
-      outcome: outcome.ok ? "done" : "rejected",
-      reason: outcome.ok ? null : outcome.reason,
-    });
+    if (!outcome.ok || outcome.replayed !== true) {
+      recordMcpAction(context.db, {
+        at: context.now(),
+        client: mcpClientName(server.server.getClientVersion()?.name),
+        tool,
+        target: outcome.target,
+        runId: outcome.runId,
+        outcome: outcome.ok ? "done" : "rejected",
+        reason: outcome.ok ? null : outcome.reason,
+      });
+    }
     if (!outcome.ok) return fail(outcome.error, { reason: outcome.reason, ...outcome.extra });
     const pending = outcome.serverHandles && !context.serverStatus().running;
     return respond({
@@ -391,33 +408,57 @@ export function registerWriteTools(
       runId: runIdArg,
       questionId: z.string().min(1).max(200).optional(),
       answer: z.string().trim().min(1).max(10_000),
+      requestId: requestIdArg,
     },
-    ({ runId, questionId, answer }) => {
+    ({ runId, questionId, answer, requestId }) => {
       const run = findRun(runId);
       if (run === null) return noRun(runId);
       const base = { target: run.ticket.key, runId: run.id };
-      const pending = pendingInput(context.db, run.id);
-      const id = questionId ?? (pending?.kind === "question" ? pending.questionId : undefined);
-      if (id === undefined) {
+      const answerNow = (): Outcome => {
+        const pending = pendingInput(context.db, run.id);
+        const id = questionId ?? (pending?.kind === "question" ? pending.questionId : undefined);
+        if (id === undefined) {
+          return rejected({
+            ...base,
+            reason: "no-question",
+            error: "The run has no pending question.",
+          });
+        }
+        try {
+          const input = screenChecked(answerInput, { runId: run.id, questionId: id, answer }, base);
+          if (!input.ok) return input.outcome;
+          submitAnswer(context.db, input.data, context.now());
+        } catch (error) {
+          if (!(error instanceof AnswerRejectedError)) throw error;
+          return rejected({
+            ...base,
+            reason: error.reason,
+            error: `Could not answer: ${error.reason}.`,
+          });
+        }
+        return done({ ...base, serverHandles: true });
+      };
+      if (requestId === undefined) return answerNow();
+      let outcome: Outcome = done({ ...base, serverHandles: true, replayed: true });
+      const handled = onceForRun(
+        context.db,
+        { runId: run.id, requestId },
+        MCP_ANSWER_ACTION,
+        [questionId ?? "", answer],
+        context.now(),
+        () => {
+          outcome = answerNow();
+          return outcome.ok ? { ok: true } : { ok: false, reason: outcome.reason };
+        },
+      );
+      if (!handled.ok && handled.reason === REQUEST_REUSED) {
         return rejected({
           ...base,
-          reason: "no-question",
-          error: "The run has no pending question.",
+          reason: REQUEST_REUSED,
+          error: "This requestId was already used with different values.",
         });
       }
-      try {
-        const input = screenChecked(answerInput, { runId: run.id, questionId: id, answer }, base);
-        if (!input.ok) return input.outcome;
-        submitAnswer(context.db, input.data, context.now());
-      } catch (error) {
-        if (!(error instanceof AnswerRejectedError)) throw error;
-        return rejected({
-          ...base,
-          reason: error.reason,
-          error: `Could not answer: ${error.reason}.`,
-        });
-      }
-      return done({ ...base, serverHandles: true });
+      return outcome;
     },
   );
 
@@ -475,12 +516,18 @@ export function registerWriteTools(
         "Cancels a run that has not ended, the same as Cancel on Run detail. This cannot be undone.",
       annotations: DESTRUCTIVE,
     },
-    { runId: runIdArg },
-    ({ runId }) => {
+    { runId: runIdArg, requestId: requestIdArg },
+    ({ runId, requestId }) => {
       const run = findRun(runId);
       if (run === null) return noRun(runId);
       const base = { target: run.ticket.key, runId: run.id };
-      const canceled = cancelRunRequest(context.db, run.id, context.now());
+      let replayed = false;
+      const canceled =
+        requestId === undefined
+          ? cancelRunRequest(context.db, run.id, context.now())
+          : cancelRunOnce(context.db, { runId: run.id, requestId }, context.now(), () => {
+              replayed = true;
+            });
       if (!canceled.ok) {
         return rejected({
           ...base,
@@ -488,7 +535,7 @@ export function registerWriteTools(
           error: `Could not cancel: ${canceled.reason}.`,
         });
       }
-      return done({ ...base, serverHandles: true });
+      return done({ ...base, serverHandles: true, replayed });
     },
   );
 
@@ -500,19 +547,18 @@ export function registerWriteTools(
         "Moves a queued run that waits for its blocking tickets into the normal queue. It starts when its runner has room, even if the blocking tickets are not done. Sending the same requestId again does nothing more.",
       annotations: { ...WRITE, idempotentHint: true },
     },
-    {
-      runId: runIdArg,
-      requestId: z
-        .string()
-        .min(16)
-        .max(64)
-        .describe("A unique id for this request. Reuse it only when retrying the same request."),
-    },
+    { runId: runIdArg, requestId: requestIdArg },
     ({ runId, requestId }) => {
       const run = findRun(runId);
       if (run === null) return noRun(runId);
       const base = { target: run.ticket.key, runId: run.id };
-      const result = skipBlockerWaitRequest(context.db, { runId, requestId }, context.now());
+      let replayed = false;
+      const result =
+        requestId === undefined
+          ? skipBlockerWaitRequest(context.db, run.id, context.now())
+          : skipBlockerWaitOnce(context.db, { runId: run.id, requestId }, context.now(), () => {
+              replayed = true;
+            });
       if (!result.ok) {
         return rejected({
           ...base,
@@ -520,7 +566,7 @@ export function registerWriteTools(
           error: `Could not start without waiting: ${result.reason}.`,
         });
       }
-      return done({ ...base, serverHandles: true });
+      return done({ ...base, serverHandles: true, replayed });
     },
   );
 

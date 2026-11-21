@@ -107,7 +107,15 @@ function QueryProbeAnswer() {
   const [outcome, setOutcome] = useState("pending");
   useEffect(() => {
     rejectedAs(
-      () => answerQuestion({ data: { runId: "missing-run", questionId: "missing", answer: "네" } }),
+      () =>
+        answerQuestion({
+          data: {
+            runId: "missing-run",
+            requestId: "query-probe-request",
+            questionId: "missing",
+            answer: "네",
+          },
+        }),
       ANSWER_REJECT_REASONS,
     ).then(
       () => setOutcome("resolved"),

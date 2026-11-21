@@ -10,14 +10,6 @@ CREATE TABLE `run_blockers` (
 	CONSTRAINT `fk_run_blockers_run_id_runs_id_fk` FOREIGN KEY (`run_id`) REFERENCES `runs`(`id`) ON DELETE CASCADE
 );
 --> statement-breakpoint
-CREATE TABLE `run_wait_skip_requests` (
-	`run_id` text NOT NULL,
-	`request_id` text NOT NULL,
-	`requested_at` integer NOT NULL,
-	CONSTRAINT `run_wait_skip_requests_pk` PRIMARY KEY(`run_id`, `request_id`),
-	CONSTRAINT `fk_run_wait_skip_requests_run_id_runs_id_fk` FOREIGN KEY (`run_id`) REFERENCES `runs`(`id`) ON DELETE CASCADE
-);
---> statement-breakpoint
 ALTER TABLE `runs` ADD `ticket_priority` text;--> statement-breakpoint
 ALTER TABLE `runs` ADD `blockers_read_at` integer;--> statement-breakpoint
 ALTER TABLE `runs` ADD `blockers_read_failed` integer DEFAULT false NOT NULL;--> statement-breakpoint

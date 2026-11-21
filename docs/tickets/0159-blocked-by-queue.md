@@ -15,13 +15,13 @@ blocked_by: []
 2. 저장: 런별 선행 티켓과 마지막으로 읽은 상태·읽은 때.
 3. 대기열: 기다리는 런을 시작 후보에서 빼고, 러너별 줄 안에서 우선순위 순서로 세운다.
 4. 다시 읽기: webhook과 1분 폴링, 시작 직전 읽기.
-5. 멈춘 기다림 판단과 기다리지 않고 시작(서버 함수, MCP 도구, 요청 ID).
+5. 멈춘 기다림 판단과 기다리지 않고 시작(서버 함수, MCP 도구, 0156의 `run_action_requests`로 요청 ID 1회 처리).
 6. 대기 이유를 app 로더와 MCP 읽기에 싣는다.
 7. 데모 어댑터와 시드에 관계 예시를 넣는다.
 
 ## 마이그레이션 (one-way)
 
-`20261121102026_run_blockers`가 표 `run_blockers`·`run_wait_skip_requests`와 `runs`의 칸 넷(`ticket_priority`, `blockers_read_at`, `blockers_read_failed`, `wait_skipped_at`)을 더한다. 기존 행은 바꾸지 않는다. 업그레이드 때 시작 전인 Queued 런은 관계를 처음 읽을 때까지 시작하지 않는다.
+마이그레이션 `run_blockers`가 표 `run_blockers`와 `runs`의 칸 넷(`ticket_priority`, `blockers_read_at`, `blockers_read_failed`, `wait_skipped_at`)을 더한다. 기존 행은 바꾸지 않는다. 업그레이드 때 시작 전인 Queued 런은 관계를 처음 읽을 때까지 시작하지 않는다.
 
 되돌리는 법: 이전 버전은 더 새로운 DB를 열지 않으므로, 업그레이드 전에 만든 DB 백업으로 되돌린다. 백업 뒤에 생긴 런 기록은 잃는다.
 
