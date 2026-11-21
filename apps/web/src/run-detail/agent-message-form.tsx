@@ -116,6 +116,7 @@ export function AgentMessageForm({
 
   const edit = (value: string): void => {
     setDraft(value);
+    if (pendingRequestRef.current?.body !== value.trim()) pendingRequestRef.current = null;
     if (submit === "failed" || submit === "state-changed") setSubmit("idle");
   };
 

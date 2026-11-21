@@ -334,6 +334,7 @@ function deliveryOf(
     };
   }
   if (message.followUpRef !== null) return { status: "stopping-follow-up" };
+  if (message.sendStartedAt !== null) return { status: "sending" };
   if (run.state === "paused") return { status: "after-resume" };
   if (run.state === "disconnected") {
     return { status: records.pausedSince === null ? "after-reconnect" : "after-resume" };

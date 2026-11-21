@@ -13,6 +13,7 @@ import {
 } from "@ganger/db";
 import type { StoredRun } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FOLLOW_UP_STOP_RETRY_MS } from "./agent-messages.js";
 import { Harness, projectA } from "./test-fixtures.js";
 import type { Worker } from "./worker.js";
 
@@ -326,6 +327,26 @@ describe("에이전트에게 보내기(0147)", () => {
     expect(fake.stoppedFollowUps).toEqual([toFollowUpRef("ctx_follow_up")]);
     expect(only(run).error).toBe("follow-up-stopped");
     expect(agent.agentMessages).toEqual(["말"]);
+  });
+
+  it("후속 워커를 한 시간 동안 멈추지 못하면 멈추지 못했다고 끝낸다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    fake.nextSendStartsFollowUp = toFollowUpRef("ctx_follow_up");
+    vi.spyOn(fake, "stopFollowUp").mockRejectedValue(
+      new AdapterError<RunnerErrorDetail>({ kind: "unreachable", detail: "ssh" }),
+    );
+    requestAgentMessage(
+      h.db,
+      run.id,
+      { requestId: toAgentMessageRequestId("stop-deadline"), body: "말" },
+      h.now,
+    );
+    await worker.tick();
+    expect(only(run).completedAt).toBeNull();
+    h.advance(FOLLOW_UP_STOP_RETRY_MS);
+    await worker.tick();
+    expect(only(run).error).toBe("follow-up-not-stopped");
   });
 
   it("후속 워커를 멈출 수 없다고 확정되면 멈추지 못했다고 남긴다", async () => {

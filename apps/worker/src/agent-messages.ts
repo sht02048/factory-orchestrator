@@ -23,6 +23,8 @@ import { findRunner, mailboxFor, runnerErrorDetail, tryWrite } from "./context.j
 import type { TickContext } from "./context.js";
 import { failureOf } from "./control.js";
 
+export const FOLLOW_UP_STOP_RETRY_MS = 60 * 60_000;
+
 type WorkerRunner = ReturnType<TickContext["adapters"]["runner"]>;
 type StoredRunner = NonNullable<ReturnType<typeof findRunner>>;
 
@@ -49,7 +51,9 @@ export async function processAgentMessages(context: TickContext): Promise<void> 
 
 async function deliver(context: TickContext, message: PendingAgentMessage): Promise<void> {
   if (message.followUpRef !== null) {
-    await stopFollowUp(context, message, message.followUpRef, true);
+    const startedAt = message.sendStartedAt?.getTime() ?? 0;
+    const canRetry = context.now().getTime() - startedAt < FOLLOW_UP_STOP_RETRY_MS;
+    await stopFollowUp(context, message, message.followUpRef, canRetry);
     return;
   }
   if (message.sendStartedAt !== null) {
