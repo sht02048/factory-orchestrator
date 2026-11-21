@@ -648,12 +648,16 @@ function HostBlocked({ host, url, checking }: { host: string; url: string; check
   return (
     <Frame width="status" centered>
       <Mascot mood="worried" />
-      <Header
-        title={t("title", { host })}
-        summary={checking ? t("checking") : t("summary")}
-        centered
-      />
+      <Header title={t("title", { host })} summary={t("summary")} centered />
       <section aria-label={t("address")} {...stylex.props(styles.infoBox)}>
+        <span role="status" {...stylex.props(styles.live)}>
+          {checking ? (
+            <>
+              <span aria-hidden="true" {...stylex.props(styles.liveDot)} />
+              {t("checking")}
+            </>
+          ) : null}
+        </span>
         <span {...stylex.props(styles.url)}>{url}</span>
       </section>
       <CenteredActions>

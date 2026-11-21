@@ -363,11 +363,13 @@ function FunnelPortPicker({
   const labelId = useId();
   const name = useId();
   const [picked, setPicked] = useState<number | null>(null);
-  const choice = ports.find((port) => port.port === picked);
+  const pickedPort = ports.find((port) => port.port === picked);
+  const choice = pickedPort?.unavailable === null ? pickedPort : undefined;
+  const anySelectable = ports.some((port) => port.unavailable === null);
   return (
     <>
       <Text variant="meta" as="p" id={labelId}>
-        {t("funnelFull")}
+        {anySelectable ? t("funnelFull") : t("funnelFullNone")}
       </Text>
       <RadioGroup labelledBy={labelId}>
         {ports.map((port) => (
@@ -376,7 +378,9 @@ function FunnelPortPicker({
             name={name}
             value={String(port.port)}
             checked={picked === port.port}
+            disabled={port.unavailable !== null}
             onCheck={() => {
+              if (port.unavailable !== null) return;
               setPicked(port.port);
               onPickAddress(port.address);
             }}
@@ -389,6 +393,11 @@ function FunnelPortPicker({
             <Text variant="meta" as="p" mono wrap="anywhere">
               {port.uses.length === 0 ? t("funnelPortInUse") : port.uses.join(", ")}
             </Text>
+            {port.unavailable === null ? null : (
+              <Text variant="meta" as="p">
+                {t(`funnelPortUnavailable.${port.unavailable}`)}
+              </Text>
+            )}
           </RadioOption>
         ))}
       </RadioGroup>

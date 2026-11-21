@@ -235,6 +235,12 @@ describe("확인 경로 답", () => {
 });
 
 describe("Tailscale Funnel 명령", () => {
+  it("IPv6 대상은 zsh 글롭으로 읽히지 않게 따옴표로 감싼다", () => {
+    expect(funnelCommand("tailscale", 3000, { host: "[::1]" })).toContain(
+      "'http://[::1]:3000/api/webhooks/'",
+    );
+  });
+
   it("8443 에 webhook 경로만 여는 명령을 이 서버 포트로 채운다", () => {
     expect(funnelCommand("tailscale", 3000)).toBe(
       "tailscale funnel --bg --https=8443 --set-path /api/webhooks/ http://127.0.0.1:3000/api/webhooks/",

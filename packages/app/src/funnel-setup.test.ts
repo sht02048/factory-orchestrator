@@ -119,23 +119,47 @@ describe("Funnel 포트 고르기", () => {
     });
   });
 
-  it("다 차면 무엇이 쓰는지와 포트별 명령을 내주고 미리 채우지 않는다", () => {
+  it("다 차면 무엇이 쓰는지 보이고, 앱 전체를 여는 포트와 TCP 포트는 고를 수 없다", () => {
     const plan = planFunnel(input({ serveOutput: fullStatus }));
     if (plan.kind !== "ports-full") throw new Error(plan.kind);
     expect(plan.ports.map((port) => port.port)).toEqual([443, 8443, 10000]);
-    expect(plan.ports[0]).toMatchObject({
+    expect(plan.ports[0]).toEqual({
+      port: 443,
       uses: ["/ → http://127.0.0.1:3000"],
       isPublic: false,
-      address: `https://${HOST}`,
+      unavailable: "serves-this-app",
     });
     expect(plan.ports[1]).toMatchObject({
       uses: ["/docs/ → http://127.0.0.1:4000"],
       isPublic: true,
+      unavailable: null,
+      address: `https://${HOST}:8443`,
     });
-    expect(plan.ports[2]?.uses).toEqual(["TCP → 127.0.0.1:22"]);
-    expect(plan.ports[2]?.command).toContain("--https=10000");
+    expect(plan.ports[2]).toEqual({
+      port: 10000,
+      uses: ["TCP → 127.0.0.1:22"],
+      isPublic: false,
+      unavailable: "tcp-forward",
+    });
     expect(funnelPrefillAddress(plan)).toBeNull();
   });
+
+  it.each(["http://localhost:3000/", `http://${IP}:3000`, `http://${HOST}:3000/runs`])(
+    "이 앱을 %s 로 여는 포트도 고를 수 없다",
+    (proxy) => {
+      const status = JSON.stringify({
+        TCP: { "443": {}, "8443": {}, "10000": {} },
+        Web: {
+          ...site(443, { "/": { Proxy: proxy } }),
+          ...site(8443, { "/": { Proxy: proxy } }),
+          ...site(10000, { "/app/": { Proxy: proxy } }),
+        },
+      });
+      const plan = planFunnel(input({ serveOutput: status }));
+      if (plan.kind !== "ports-full") throw new Error(plan.kind);
+      expect(plan.ports.every((port) => port.unavailable === "serves-this-app")).toBe(true);
+    },
+  );
 
   it.each([undefined, "not json", "[1,2]", "null", JSON.stringify({ TCP: 7 })])(
     "이상한 출력 %s 은 모름으로 보고 8443 명령에 확인 안내를 붙인다",

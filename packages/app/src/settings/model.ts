@@ -135,13 +135,15 @@ export interface TrackerConnectionView {
   webhookSettingsUrl: string | null;
 }
 
-export interface FunnelPortChoice {
+interface FunnelPortUsage {
   port: number;
   uses: string[];
   isPublic: boolean;
-  command: string;
-  address: string;
 }
+
+export type FunnelPortChoice =
+  | (FunnelPortUsage & { unavailable: null; command: string; address: string })
+  | (FunnelPortUsage & { unavailable: "serves-this-app" | "tcp-forward" });
 
 export type FunnelSetupView =
   | {

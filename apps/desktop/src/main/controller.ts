@@ -38,6 +38,7 @@ import { openLog } from "../core/open-log.js";
 import {
   CONNECT_TIMEOUT_MS,
   connectAddress,
+  isAwaitingRemote,
   isServerForbidden,
   reopenSaved,
   savedFromFound,
@@ -448,6 +449,7 @@ export class Controller {
       discover: () => discoverServers({ port }),
     });
     if (this.mode !== "remote" || this.remote?.server.instanceId !== saved.instanceId) return;
+    if (!isAwaitingRemote(this.view.screen)) return;
     if (result.kind === "open") {
       this.stopRemoteRetry();
       this.useRemote(result.server);
@@ -479,6 +481,7 @@ export class Controller {
     if (this.mode !== "remote" || server === undefined) return;
     const probed = await probeIdentity(server.url, CONNECT_TIMEOUT_MS);
     if (this.remote?.server.instanceId !== server.instanceId) return;
+    if (this.serverUrl !== server.url) return;
     if (
       probed.kind === "ours" &&
       probed.identity.instanceId === server.instanceId &&

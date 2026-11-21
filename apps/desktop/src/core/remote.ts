@@ -66,6 +66,10 @@ export type ReopenResult =
   | { kind: "host-not-allowed" }
   | { kind: "unreachable" };
 
+export function isAwaitingRemote(screen: string): boolean {
+  return screen === "unreachable" || screen === "host-blocked";
+}
+
 export function isServerForbidden(
   httpResponseCode: number,
   url: string,

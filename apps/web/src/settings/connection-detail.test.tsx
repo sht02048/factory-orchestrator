@@ -114,13 +114,24 @@ const withTailscale: WebhookSetupView = {
 const portsFull: WebhookSetupView = {
   funnel: {
     kind: "ports-full",
-    ports: [443, 8443, 10000].map((port) => ({
-      port,
-      uses: [`/ → http://127.0.0.1:${String(port)}`],
-      isPublic: port === 8443,
-      command: `tailscale funnel --bg --https=${String(port)} --set-path /api/webhooks/ http://127.0.0.1:3000/api/webhooks/`,
-      address: `https://server.example.ts.net:${String(port)}`,
-    })),
+    ports: [
+      {
+        port: 443,
+        uses: ["/ → http://127.0.0.1:3000"],
+        isPublic: false,
+        unavailable: "serves-this-app",
+      },
+      {
+        port: 8443,
+        uses: ["/docs/ → http://127.0.0.1:4000"],
+        isPublic: true,
+        unavailable: null,
+        command:
+          "tailscale funnel --bg --https=8443 --set-path /api/webhooks/ http://127.0.0.1:3000/api/webhooks/",
+        address: "https://server.example.ts.net:8443",
+      },
+      { port: 10000, uses: ["TCP → 127.0.0.1:22"], isPublic: false, unavailable: "tcp-forward" },
+    ],
   },
 };
 const boundToTailnet: WebhookSetupView = {
@@ -326,7 +337,12 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
     const html = renderDetail(await loadSettingsPage(f.context, workspace, now), id, portsFull);
     const step = stepOf(html, 1);
     expect(textOf(step)).toContain(settings.webhook.address.funnelFull);
-    expect(textOf(step)).toContain("/ → http://127.0.0.1:443");
+    expect(textOf(step)).toContain("/ → http://127.0.0.1:3000");
+    expect(textOf(step)).toContain(
+      settings.webhook.address.funnelPortUnavailable["serves-this-app"],
+    );
+    expect(textOf(step)).toContain(settings.webhook.address.funnelPortUnavailable["tcp-forward"]);
+    expect(step.match(/type="radio"[^>]*disabled/g)).toHaveLength(2);
     expect(textOf(step)).toContain("8443 포트 · 인터넷에 공개 중");
     expect(step.match(/type="radio"/g)).toHaveLength(3);
     expect(textOf(step)).not.toContain("tailscale funnel --bg");

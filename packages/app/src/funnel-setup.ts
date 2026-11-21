@@ -9,6 +9,8 @@ const FUNNEL_PORTS_ASCENDING = [443, 8443, 10000] as const;
 const LOCAL_TARGET = "127.0.0.1";
 const HOSTS_REACHED_ON_LOOPBACK = new Set(["127.0.0.1", "localhost", "0.0.0.0", "[::]"]);
 
+const LOCAL_PROXY_HOSTS = ["127.0.0.1", "localhost", "[::1]", "0.0.0.0", "[::]"];
+
 const handlerSchema = z.object({
   Proxy: z.string().optional(),
   Path: z.string().optional(),
@@ -33,6 +35,8 @@ export interface ServePortUse {
   uses: string[];
   isPublic: boolean;
   onlyWebhookProxy: string | null;
+  proxies: Array<{ path: string; proxy: string }>;
+  forwardsTcp: boolean;
 }
 
 export type ServePorts = ReadonlyMap<number, ServePortUse>;
@@ -46,14 +50,23 @@ function collect(config: ServeConfig, ports: Map<number, ServePortUse>): void {
   const entry = (port: number): ServePortUse => {
     const existing = ports.get(port);
     if (existing !== undefined) return existing;
-    const created: ServePortUse = { uses: [], isPublic: false, onlyWebhookProxy: null };
+    const created: ServePortUse = {
+      uses: [],
+      isPublic: false,
+      onlyWebhookProxy: null,
+      proxies: [],
+      forwardsTcp: false,
+    };
     ports.set(port, created);
     return created;
   };
   for (const [key, listener] of Object.entries(config.TCP ?? {})) {
     if (!/^\d{1,5}$/u.test(key)) continue;
     const use = entry(Number(key));
-    if (listener.TCPForward !== undefined) use.uses.push(`TCP → ${listener.TCPForward}`);
+    if (listener.TCPForward !== undefined) {
+      use.uses.push(`TCP → ${listener.TCPForward}`);
+      use.forwardsTcp = true;
+    }
   }
   for (const [key, site] of Object.entries(config.Web ?? {})) {
     const port = portOfWebKey(key);
@@ -61,6 +74,7 @@ function collect(config: ServeConfig, ports: Map<number, ServePortUse>): void {
     const use = entry(port);
     for (const [path, handler] of Object.entries(site.Handlers ?? {})) {
       use.uses.push(`${path} → ${handler.Proxy ?? handler.Path ?? "text"}`);
+      if (handler.Proxy !== undefined) use.proxies.push({ path, proxy: handler.Proxy });
     }
     const handlers = Object.entries(site.Handlers ?? {});
     const only = handlers.length === 1 ? handlers[0] : undefined;
@@ -94,6 +108,17 @@ export function parseServeStatus(output: string | undefined): ServePorts | null 
 export function funnelTargetHost(bindHost: string): string {
   const bind = normalizeHostname(bindHost);
   return HOSTS_REACHED_ON_LOOPBACK.has(bind) ? LOCAL_TARGET : bind;
+}
+
+function reachesThisApp(
+  { path, proxy }: { path: string; proxy: string },
+  webPort: number,
+  localHosts: ReadonlySet<string>,
+): boolean {
+  const url = URL.parse(/^[a-z][a-z0-9+.-]*:\/\//iu.test(proxy) ? proxy : `http://${proxy}`);
+  if (url === null || url.port !== String(webPort)) return false;
+  if (!localHosts.has(normalizeHostname(url.hostname))) return false;
+  return !(path.startsWith(WEBHOOK_PATH_PREFIX) && url.pathname.startsWith(WEBHOOK_PATH_PREFIX));
 }
 
 export interface FunnelPlanInput {
@@ -131,12 +156,21 @@ export function planFunnel(input: FunnelPlanInput): FunnelSetupView {
   if (ours !== undefined) return ready(ours, "ours");
   const free = FUNNEL_PORTS_BY_PREFERENCE.find((port) => !serve.has(port));
   if (free !== undefined) return ready(free, "free");
-  const ports: FunnelPortChoice[] = FUNNEL_PORTS_ASCENDING.map((port) => ({
-    port,
-    uses: serve.get(port)?.uses ?? [],
-    isPublic: serve.get(port)?.isPublic ?? false,
-    ...onPort(port),
-  }));
+  const localHosts = new Set([
+    ...LOCAL_PROXY_HOSTS,
+    host,
+    input.deviceHost,
+    ...input.deviceAddresses,
+  ]);
+  const ports: FunnelPortChoice[] = FUNNEL_PORTS_ASCENDING.map((port) => {
+    const use = serve.get(port);
+    const usage = { port, uses: use?.uses ?? [], isPublic: use?.isPublic ?? false };
+    if (use?.forwardsTcp === true) return { ...usage, unavailable: "tcp-forward" };
+    if (use?.proxies.some((proxy) => reachesThisApp(proxy, input.webPort, localHosts)) === true) {
+      return { ...usage, unavailable: "serves-this-app" };
+    }
+    return { ...usage, unavailable: null, ...onPort(port) };
+  });
   return { kind: "ports-full", ports };
 }
 

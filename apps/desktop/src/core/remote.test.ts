@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { deviceOrigins, discoverServers } from "./discovery.js";
 import type { Identity, Probe, ProbeResult } from "./identity.js";
 import { identitySchema, probeIdentity } from "./identity.js";
-import { connectAddress, isServerForbidden, normalizeAddress, reopenSaved } from "./remote.js";
+import {
+  connectAddress,
+  isAwaitingRemote,
+  isServerForbidden,
+  normalizeAddress,
+  reopenSaved,
+} from "./remote.js";
 import { findTailscaleCli, parseTailnetStatus, readTailnet } from "@ganger/app/tailscale";
 
 const identity = (instanceId: string, extra: Partial<Identity> = {}): ProbeResult => ({
@@ -555,6 +561,13 @@ describe("저장한 서버 다시 열기", () => {
         discover: none,
       }),
     ).toEqual({ kind: "host-not-allowed" });
+  });
+
+  it("다른 서버를 고르러 간 뒤에는 끝난 확인이 화면을 덮지 않는다", () => {
+    expect(isAwaitingRemote("host-blocked")).toBe(true);
+    expect(isAwaitingRemote("unreachable")).toBe(true);
+    expect(isAwaitingRemote("find-servers")).toBe(false);
+    expect(isAwaitingRemote("enter-address")).toBe(false);
   });
 
   it("지금 서버 화면의 403 만 허용 안 됨 확인으로 보낸다", () => {

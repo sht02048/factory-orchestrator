@@ -197,7 +197,7 @@ export function funnelCommand(
     `--https=${String(funnelPort)}`,
     "--set-path",
     "/api/webhooks/",
-    target,
+    shellWord(target),
   ].join(" ");
 }
 
