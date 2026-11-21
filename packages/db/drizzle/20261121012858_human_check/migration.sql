@@ -43,6 +43,8 @@ CREATE TABLE `__new_notification_events` (
 );
 --> statement-breakpoint
 INSERT INTO `__new_notification_events`(`id`, `seq`, `kind`, `cause`, `run_id`, `workspace_id`, `ticket_key`, `runner_id`, `subject`, `detail`, `created_at`, `resolved_at`) SELECT `id`, `seq`, `kind`, `cause`, `run_id`, `workspace_id`, `ticket_key`, `runner_id`, `subject`, `detail`, `created_at`, `resolved_at` FROM `notification_events`;--> statement-breakpoint
+DELETE FROM `sqlite_sequence` WHERE `name` = '__new_notification_events';--> statement-breakpoint
+UPDATE `sqlite_sequence` SET `name` = '__new_notification_events' WHERE `name` = 'notification_events';--> statement-breakpoint
 DROP TABLE `notification_events`;--> statement-breakpoint
 ALTER TABLE `__new_notification_events` RENAME TO `notification_events`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint

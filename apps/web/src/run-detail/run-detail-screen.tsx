@@ -29,6 +29,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
+import { answerRejection } from "../home/rejection";
+import type { AnswerRejectReason } from "../home/rejection";
 import { HumanCheckAnswer, HumanCheckRequest } from "../question/human-check-answer";
 import { QuestionAnswer } from "../question/question-answer";
 import { useAgentName, useQueuedReasonText } from "../labels";
@@ -547,6 +549,16 @@ function HumanCheckForm({
 }) {
   const t = useTranslations("run");
   const { submit, run, resultRef } = useSubmit(headRef);
+  const [rejected, setRejected] = useState<AnswerRejectReason | null>(null);
+  const sendAnswer = async (decision: HumanCheckDecision, note: string) => {
+    try {
+      await onHumanCheck(check.questionId, decision, note);
+    } catch (error) {
+      const reason = answerRejection(error);
+      if (reason === null) throw error;
+      setRejected(reason);
+    }
+  };
   return (
     <Card label={t("humanCheck.title")}>
       <InputHead kind="human-check" waitedMs={waitedMs} />
@@ -554,13 +566,13 @@ function HumanCheckForm({
         <>
           <HumanCheckRequest body={check.body} />
           <Text variant="body" as="p" ref={resultRef} role="status" tabIndex={-1}>
-            {t("humanCheck.sent")}
+            {rejected === null ? t("humanCheck.sent") : t(`humanCheck.rejected.${rejected}`)}
           </Text>
         </>
       ) : (
         <HumanCheckAnswer
           body={check.body}
-          onSend={(decision, note) => run(() => onHumanCheck(check.questionId, decision, note))}
+          onSend={(decision, note) => run(() => sendAnswer(decision, note))}
         />
       )}
     </Card>

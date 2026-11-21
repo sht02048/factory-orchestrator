@@ -84,7 +84,11 @@
   },
   "humanCheck": {
     "title": "확인해 주세요",
-    "sent": "답을 남겼어요. worker가 보내요."
+    "sent": "답을 남겼어요. worker가 보내요.",
+    "rejected": {
+      "already-answered": "다른 곳에서 이미 답한 요청이에요. 다시 보내지 않아도 돼요.",
+      "not-found": "요청을 찾지 못했어요. 런이 끝났는지 확인해 주세요."
+    }
   },
   "input": {
     "question": "{elapsed} 답을 기다려요",

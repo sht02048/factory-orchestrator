@@ -10,6 +10,6 @@ export const ASK_GUIDE = [
   "## 사람의 확인을 요청할 때",
   "",
   '- 사람이 확인해야 끝나는 일은 `orca orchestration send --type decision_gate --subject "<무엇을 확인할지>" --body "<확인할 내용과 링크>"`로 보낸다.',
-  "- 보낸 뒤에는 차례를 끝내지 않고 `orca orchestration check --wait --timeout-ms 540000`으로 답을 기다린다. 답 없이 시간이 지나면(`timedOut`) 같은 명령을 다시 돌린다. 이 요청은 `ask`와 달리 차례를 끝내면 답이 와도 깨어나지 않는다.",
+  "- 보낸 뒤에는 차례를 끝내지 않고 `orca orchestration check --wait --timeout-ms 540000`으로 답을 기다린다. 답 없이 명령이 끝나면(`timedOut`이거나 도구의 시간 제한에 걸렸을 때) 같은 명령을 다시 돌린다. 이 요청은 `ask`와 달리 차례를 끝내면 답이 와도 깨어나지 않는다.",
   "- 답은 `확인했어요` 또는 `고쳐 주세요`로 시작하고, 운영자가 함께 보낸 말이 뒤에 붙을 수 있다.",
 ].join("\n");

@@ -254,6 +254,38 @@ describe("migrate", () => {
     ).toThrow(/runs_pr_read_error/);
   });
 
+  it("0148 마이그레이션은 지운 알림 사건의 번호를 다시 쓰지 않고, 기존 질문은 Question 종류로 둔다", () => {
+    const db = openDatabase(":memory:");
+    const all = loadMigrations();
+    const added = all.findIndex((m) => m.name.endsWith("_human_check"));
+    expect(added).toBeGreaterThan(0);
+    migrate(db, all.slice(0, added));
+    db.$client.exec(`
+      INSERT INTO runners (id, kind, name, capacity, online, checked_at, created_at)
+        VALUES ('r', 'fake', 'r', 1, 1, 5, 0);
+      INSERT INTO notification_events (id, seq, kind, cause, runner_id, subject, created_at)
+        VALUES (5, 5, 'runner-offline', 'kept', 'r', 'r', 1),
+          (100, 100, 'runner-offline', 'purged', 'r', 'r', 2);
+      DELETE FROM notification_events WHERE id = 100;
+    `);
+
+    migrate(db);
+
+    db.$client.exec(`
+      INSERT INTO notification_events (seq, kind, cause, runner_id, subject, created_at)
+        VALUES (101, 'runner-offline', 'next', 'r', 'r', 3);
+    `);
+    expect(db.$client.prepare("SELECT id FROM notification_events ORDER BY id").all()).toEqual([
+      { id: 5 },
+      { id: 101 },
+    ]);
+    expect(
+      db.$client
+        .prepare("SELECT name FROM sqlite_sequence WHERE name LIKE '%notification_events'")
+        .all(),
+    ).toEqual([{ name: "notification_events" }]);
+  });
+
   it("0145 마이그레이션이 기존 런을 그대로 옮기고 워크트리를 남긴 이유와 지우기 요청 칸을 비워 더하며, Human Check 알림 사건을 지운다", () => {
     const db = openDatabase(":memory:");
     const all = loadMigrations();
