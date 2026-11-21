@@ -706,11 +706,13 @@ function ConfirmDanger({
 }) {
   const t = useTranslations(messages);
   const [failed, setFailed] = useState(false);
+  const [sending, setSending] = useState(false);
   return (
     <>
       <Dialog
         trigger={t("trigger")}
         triggerVariant="danger"
+        triggerBusy={{ active: sending, label: t("sending") }}
         title={t("title")}
         description={t("body")}
         actions={
@@ -719,8 +721,12 @@ function ConfirmDanger({
             <DialogClose
               variant="danger"
               onClick={() => {
+                if (sending) return;
                 setFailed(false);
-                onConfirm().then(focusAfter, () => setFailed(true));
+                setSending(true);
+                onConfirm()
+                  .then(focusAfter, () => setFailed(true))
+                  .finally(() => setSending(false));
               }}
             >
               {t("confirm")}

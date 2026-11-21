@@ -8,10 +8,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@ui-sdk/react/dialog";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { cx } from "../cx";
 import { windowRegion } from "../window-frame";
-import { buttonStyles, type ButtonVariant } from "./button";
+import { BusyLabels, buttonStyles, type ButtonVariant } from "./button";
 import {
   colors,
   fontSize,
@@ -26,6 +26,7 @@ import {
 export interface DialogProps {
   trigger: ReactNode;
   triggerVariant?: ButtonVariant;
+  triggerBusy?: { active: boolean; label: ReactNode };
   title: ReactNode;
   description?: ReactNode;
   children?: ReactNode;
@@ -39,6 +40,7 @@ export interface DialogProps {
 export function Dialog({
   trigger,
   triggerVariant = "secondary",
+  triggerBusy,
   title,
   description,
   children,
@@ -55,8 +57,26 @@ export function Dialog({
         ? {}
         : { onOpenChange: (next: boolean) => onOpenChange(next) })}
     >
-      <DialogTrigger data-variant={triggerVariant} className={cx(...buttonStyles(triggerVariant))}>
-        {trigger}
+      <DialogTrigger
+        {...(triggerBusy === undefined
+          ? {}
+          : { "aria-busy": triggerBusy.active, "aria-disabled": triggerBusy.active })}
+        {...(triggerBusy?.active === true
+          ? {
+              onClickCapture: (event: MouseEvent) => {
+                event.preventDefault();
+                event.stopPropagation();
+              },
+            }
+          : {})}
+        data-variant={triggerVariant}
+        className={cx(...buttonStyles(triggerVariant, triggerBusy?.active === true))}
+      >
+        {triggerBusy === undefined ? (
+          trigger
+        ) : (
+          <BusyLabels busy={triggerBusy}>{trigger}</BusyLabels>
+        )}
       </DialogTrigger>
       <DialogBackdrop {...windowRegion("no-drag")} className={cx(styles.backdrop)} />
       <DialogContent
