@@ -171,7 +171,11 @@ function continueOfferOf(
     sourceNumber: ticketRuns.findIndex((other) => other.id === run.id) + 1,
     nextNumber: ticketRuns.length + 1,
     runnerName,
-    place: records.worktreeRemovedAt === null ? "same-worktree" : "recreated",
+    place:
+      records.worktreeRemovedAt === null &&
+      !(run.state === "ended" && run.agentResult === "worktree-missing")
+        ? "same-worktree"
+        : "recreated",
     hasReport: (records.reportBody?.trim() ?? "") !== "",
   };
 }

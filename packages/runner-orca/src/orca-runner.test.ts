@@ -1750,6 +1750,39 @@ describe("prepareContinuation", () => {
     ).toMatchObject({ kind: "runner-error", code: "invalid_state" });
   });
 
+  test.each(["stopping", "stop_unknown", "starting", "start_unknown", "new_state"])(
+    "이전 에이전트가 %s 이고 종료가 증명되지 않으면 시작하지 않는다",
+    async (state) => {
+      const stopAgent = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
+      const exec = git(projectExec(), "worktree list", list(main, here(branch)))
+        .orca(
+          "orchestration worker-stop",
+          stdout(
+            JSON.stringify({ ok: false, error: { code: "invalid_state", message: "busy" } }),
+            1,
+          ),
+        )
+        .orca(
+          "orchestration worker-show",
+          stdout(
+            JSON.stringify({
+              ok: true,
+              result: {
+                dispatchId: "ctx_old",
+                taskId: "task_old",
+                runId: "run_1",
+                state,
+                liveness: "unverifiable",
+              },
+            }),
+          ),
+        );
+      expect(
+        await adapterError(runnerWith(exec).prepareContinuation({ ...input, stopAgent })),
+      ).toMatchObject({ kind: "runner-error", code: "invalid_state" });
+    },
+  );
+
   test("이전 에이전트의 기록이 없으면 멈춘 것으로 보고 이어 간다", async () => {
     const exec = git(projectExec(), "worktree list", list(main, here(branch))).orca(
       "orchestration worker-stop",

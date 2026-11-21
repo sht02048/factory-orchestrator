@@ -567,7 +567,7 @@ export class OrcaRunner implements Runner {
         ["orchestration", "worker-show", "--dispatch", agent.dispatchId],
         workerShowResultSchema,
       );
-      if (shown.ok && shown.result.state !== "ready" && shown.result.liveness !== "live") return;
+      if (shown.ok && provenEnded(shown.result)) return;
     }
     throw this.errorFor(stopped, {});
   }
@@ -1299,6 +1299,18 @@ export const orcaRunnerFactory: RunnerFactory = {
     return new OrcaRunner(parseOrcaRunnerConfig(config));
   },
 };
+
+const ENDED_WORKER_STATES: ReadonlySet<string> = new Set([
+  "succeeded",
+  "failed",
+  "stopped",
+  "abandoned",
+]);
+
+function provenEnded(worker: { state: string; liveness?: string | null | undefined }): boolean {
+  if (worker.liveness === "exited") return true;
+  return worker.liveness !== "live" && ENDED_WORKER_STATES.has(worker.state);
+}
 
 function withinRemoteTimeout(result: RemoteResult): RemoteResult {
   if (!result.timedOut) return result;

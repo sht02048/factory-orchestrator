@@ -1116,6 +1116,16 @@ describe("이어서 맡기기(0149)", () => {
     expect(found(db, id).continueOffer?.place).toBe("recreated");
   });
 
+  it("워크트리가 없어서 끝난 런은 같은 브랜치로 새 워크트리를 만든다고 알린다", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-41", 500);
+    walk(db, id, 500, [
+      startedOn("ACME-41"),
+      { to: "ended", agentResult: "worktree-missing", prState: "none" },
+    ]);
+    expect(found(db, id).continueOffer?.place).toBe("recreated");
+  });
+
   it("두 런을 잇고 양쪽 Run 상세와 지나온 일에 런 번호를 보인다", () => {
     const { db } = seedDatabase();
     const id = keptRun(db);
