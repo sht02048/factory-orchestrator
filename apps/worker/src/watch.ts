@@ -127,7 +127,7 @@ async function watchRun(
   }
   if (progress.kind === "active") {
     tryWrite(context, run.id, () => recordRunQuestions(db, run.id, progress.questions));
-    await sendAnswers(context, run, runner, onRunner, progress.activity);
+    await sendAnswers(context, run, runner, onRunner, progress);
     tryWrite(context, run.id, () =>
       inTransaction(db, () => {
         recordPermissionWaits(db, run.id, progress.permissionWaits);
@@ -480,10 +480,10 @@ async function sendAnswers(
   run: ActiveRun,
   runner: Runner,
   onRunner: RunOnRunner,
-  activity: Extract<RunProgress, { kind: "active" }>["activity"],
+  progress: Extract<RunProgress, { kind: "active" }>,
 ): Promise<void> {
   const { db, logger, unmarkedAnswers, unwokenHumanChecks } = context;
-  const agentMayBeStopped = activity?.kind !== "working";
+  const delivery = humanCheckDelivery(progress);
   for (const answer of listUnsentAnswers(db)) {
     if (answer.runId !== run.id) continue;
     const key = answerKey(run.id, answer.questionId);
@@ -503,7 +503,11 @@ async function sendAnswers(
       }
       unmarkedAnswers.add(key);
     }
-    if (answer.kind === "human-check" && agentMayBeStopped) {
+    if (answer.kind === "human-check" && delivery === "hold") {
+      unwokenHumanChecks.add(key);
+      continue;
+    }
+    if (answer.kind === "human-check" && delivery === "wake") {
       const message = humanCheckWakeMessage(answer.answer);
       try {
         const resumed = await runner.resumeAgent(onRunner, {
@@ -528,6 +532,22 @@ async function sendAnswers(
       markAnswerSent(db, { runId: run.id, questionId: answer.questionId }, context.now()),
     );
     if (marked !== undefined) unmarkedAnswers.delete(key);
+  }
+}
+
+function humanCheckDelivery(
+  progress: Extract<RunProgress, { kind: "active" }>,
+): "delivered" | "wake" | "hold" {
+  if (progress.permissionWaits.length > 0) return "hold";
+  switch (progress.activity?.kind) {
+    case "working":
+      return "delivered";
+    case "turn-ended":
+    case "interrupted":
+      return "wake";
+    case "unknown":
+    case undefined:
+      return "hold";
   }
 }
 

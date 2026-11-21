@@ -452,7 +452,8 @@ export class FakeRunner implements Runner {
     return this.reach(() => {
       this.mustHaveMailbox(run.mailbox);
       const found = this.runAt(run.worktree);
-      if (!found.questions.some((q) => q.id === input.questionId)) {
+      const question = found.questions.find((q) => q.id === input.questionId);
+      if (question === undefined) {
         throw new AdapterError<RunnerErrorDetail>({
           kind: "runner-error",
           code: "message_not_found",
@@ -460,6 +461,9 @@ export class FakeRunner implements Runner {
         });
       }
       found.answers.push({ ...input });
+      if (question.kind === "human-check" && found.activity.kind === "unknown") {
+        found.activity = { kind: "working", since: new Date() };
+      }
     });
   }
 

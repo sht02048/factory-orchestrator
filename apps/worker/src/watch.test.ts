@@ -153,10 +153,12 @@ describe("입력 기다림", () => {
       h.now,
     );
     await worker.tick();
+    await worker.tick();
     expect(stateOf(run)).toBe("running");
     expect(agentOf(run, runnerId).answers).toEqual([
       { questionId, answer: "고쳐 주세요\n\n시험을 더해 주세요" },
     ]);
+    expect(agentOf(run, runnerId).resumes).toEqual([]);
   });
 
   it("Human Check 를 보내고 차례를 끝낸 에이전트는 답을 보낼 때 깨우고, 깨우지 못하면 Waiting for Input 에 두고 다시 깨운다", async () => {
@@ -195,7 +197,7 @@ describe("입력 기다림", () => {
     ]);
   });
 
-  it("활동을 알 수 없으면 Human Check 답을 보낼 때 에이전트를 깨운다", async () => {
+  it("활동을 알 수 없으면 터미널에 입력하지 않고 Waiting for Input 에 둔 채 다음 차례에 다시 본다", async () => {
     const { run, runnerId, worker } = await startOne();
     const questionId = h
       .runner(runnerId)
@@ -207,8 +209,14 @@ describe("입력 기다림", () => {
       h.now,
     );
     await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+    expect(listRunQuestions(h.db, run.id)[0]?.answer?.sentAt).toBeNull();
+    expect(agentOf(run, runnerId).resumes).toEqual([]);
+
+    await worker.tick();
     expect(stateOf(run)).toBe("running");
-    expect(agentOf(run, runnerId).resumes).toHaveLength(1);
+    expect(agentOf(run, runnerId).answers).toHaveLength(1);
+    expect(agentOf(run, runnerId).resumes).toEqual([]);
   });
 
   it("깨우기가 다른 에이전트를 찾기만 했으면 답을 보낸 것으로 적지 않는다", async () => {
@@ -219,6 +227,7 @@ describe("입력 기다림", () => {
       body: "확인",
       at: h.now,
     });
+    fake.stopWithoutReport(worktreeOf(run), { at: h.now });
     await worker.tick();
     answerRunQuestion(
       h.db,
@@ -233,6 +242,29 @@ describe("입력 기다림", () => {
     expect(stateOf(run)).toBe("waiting-for-input");
     expect(listRunQuestions(h.db, run.id)[0]?.answer?.sentAt).toBeNull();
     expect(agentOf(run, runnerId).answers).toHaveLength(1);
+  });
+
+  it("권한 대기가 열려 있으면 차례가 끝나 보여도 터미널에 답을 넣지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    const questionId = fake.ask(worktreeOf(run), { kind: "human-check", body: "확인", at: h.now });
+    const permissionId = fake.requestPermission(worktreeOf(run), "Bash: rm -rf build", h.now);
+    fake.stopWithoutReport(worktreeOf(run), { at: h.now });
+    await worker.tick();
+    answerRunQuestion(
+      h.db,
+      { runId: run.id, questionId, answer: "확인했어요", kind: "human-check" },
+      h.now,
+    );
+
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+    expect(agentOf(run, runnerId).resumes).toEqual([]);
+
+    fake.allowPermission(worktreeOf(run), permissionId);
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).resumes).toHaveLength(1);
   });
 
   it("일하는 에이전트에게 간 Human Check 답은 터미널로 다시 넣지 않는다", async () => {
