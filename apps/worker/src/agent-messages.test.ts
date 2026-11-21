@@ -387,6 +387,19 @@ describe("에이전트에게 보내기(0147)", () => {
     expect(agent.agentMessages).toEqual(["아직 push하지 말아요", "이제 push해 주세요"]);
   });
 
+  it("이미 실패로 끝난 요청 ID로 다시 보내면 새로 저장하지 않고 실패했다고 답한다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const input = { requestId: toAgentMessageRequestId("failed-request"), body: "말" };
+    h.runner(runnerId).failNextControl = { kind: "runner-error", code: "x", message: "no" };
+    requestAgentMessage(h.db, run.id, input, h.now);
+    await worker.tick();
+    expect(requestAgentMessage(h.db, run.id, input, h.now)).toEqual({
+      ok: false,
+      reason: "previous-failed",
+    });
+    expect(listRunAgentMessages(h.db, run.id)).toHaveLength(1);
+  });
+
   it("끝난 런과 취소 중인 런은 요청을 받지 않는다", async () => {
     const { run } = await startOne();
     requestRunCancel(h.db, run.id, h.now);

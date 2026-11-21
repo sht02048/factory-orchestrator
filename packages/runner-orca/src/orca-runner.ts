@@ -115,6 +115,12 @@ export const ESCALATION_ANSWER_SUBJECT = "Answer from the operator";
 export const OPERATOR_MESSAGE_SUBJECT =
   "Message from the operator (not an answer to any open question)";
 
+const SEND_OUTCOME_UNKNOWN_CODES: ReadonlySet<string> = new Set([
+  "remote_runtime_unavailable",
+  "runtime_timeout",
+  "invalid_runtime_response",
+]);
+
 const SENDER_ERROR_CODES = new Set([
   "no_active_sender_terminal",
   "terminal_handle_stale",
@@ -688,22 +694,40 @@ export class OrcaRunner implements Runner {
   async sendToAgent(run: RunOnRunner, input: { body: string }): Promise<AgentSendResult> {
     const agent = this.agentOf(run);
     const mailbox = this.mailboxOf(run.mailbox);
-    const sent = await this.orca(
-      [
-        "orchestration",
-        "send",
-        "--from",
-        mailbox.terminal,
-        "--to",
-        `dispatch:${agent.dispatchId}`,
-        "--subject",
-        OPERATOR_MESSAGE_SUBJECT,
-        `--body=${input.body}`,
-      ],
-      operatorSendResultSchema,
-      { usesMailbox: true },
-      failedFollowUpEnvelopeSchema,
-    );
+    let sent: z.infer<typeof operatorSendResultSchema>;
+    try {
+      sent = await this.orca(
+        [
+          "orchestration",
+          "send",
+          "--from",
+          mailbox.terminal,
+          "--to",
+          `dispatch:${agent.dispatchId}`,
+          "--subject",
+          OPERATOR_MESSAGE_SUBJECT,
+          `--body=${input.body}`,
+        ],
+        operatorSendResultSchema,
+        { usesMailbox: true },
+        failedFollowUpEnvelopeSchema,
+      );
+    } catch (error) {
+      const detail = detailOf(error);
+      if (
+        detail.kind === "not-ready" ||
+        (detail.kind === "runner-error" && SEND_OUTCOME_UNKNOWN_CODES.has(detail.code))
+      ) {
+        throw new AdapterError<RunnerErrorDetail>(
+          {
+            kind: "start-outcome-unknown",
+            detail: detail.kind === "not-ready" ? detail.detail : detail.message,
+          },
+          { cause: error },
+        );
+      }
+      throw error;
+    }
     return "delivery" in sent
       ? { kind: "follow-up", followUpRef: toFollowUpRef(sent.dispatchId) }
       : { kind: "delivered" };

@@ -9,7 +9,7 @@ import { runAgentMessages, runs } from "./schema.js";
 
 export type RequestAgentMessageResult =
   | { ok: true; id: number; requestedAt: Date }
-  | { ok: false; reason: "not-found" | "not-accepting" | "cancelling" };
+  | { ok: false; reason: "not-found" | "not-accepting" | "cancelling" | "previous-failed" };
 
 export function requestAgentMessage(
   db: Database,
@@ -19,13 +19,23 @@ export function requestAgentMessage(
 ): RequestAgentMessageResult {
   return inTransaction(db, (): RequestAgentMessageResult => {
     const existing = db
-      .select({ id: runAgentMessages.id, requestedAt: runAgentMessages.requestedAt })
+      .select({
+        id: runAgentMessages.id,
+        requestedAt: runAgentMessages.requestedAt,
+        completedAt: runAgentMessages.completedAt,
+        error: runAgentMessages.error,
+      })
       .from(runAgentMessages)
       .where(
         and(eq(runAgentMessages.runId, runId), eq(runAgentMessages.requestId, input.requestId)),
       )
       .get();
-    if (existing !== undefined) return { ok: true, ...existing };
+    if (existing !== undefined) {
+      if (existing.completedAt !== null && existing.error !== null) {
+        return { ok: false, reason: "previous-failed" };
+      }
+      return { ok: true, id: existing.id, requestedAt: existing.requestedAt };
+    }
     const run = db.select({ state: runs.state }).from(runs).where(eq(runs.id, runId)).get();
     if (run === undefined) return { ok: false, reason: "not-found" };
     if (!acceptsAgentMessage(run.state)) return { ok: false, reason: "not-accepting" };

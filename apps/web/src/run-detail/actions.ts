@@ -73,6 +73,11 @@ export function runDetailPollMs(page: RunDetailPage, logPolls: number): number |
   return false;
 }
 
+function agentMessageOutcome(result: RunActionResult): AgentMessageOutcome {
+  if (result.ok) return "requested";
+  return result.reason === "previous-failed" ? "previous-failed" : "state-changed";
+}
+
 export function runDetailMutations(world: RunDetailWorld, runId: string) {
   const { queryClient, calls } = world;
   const refreshRun = async (): Promise<void> => {
@@ -112,7 +117,7 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
     }),
     sendAgentMessage: mutationOptions({
       mutationFn: async (input: AgentMessageRequest): Promise<AgentMessageOutcome> =>
-        (await calls.sendAgentMessage(toRunId(runId), input)).ok ? "requested" : "state-changed",
+        agentMessageOutcome(await calls.sendAgentMessage(toRunId(runId), input)),
       onSettled: refreshRun,
     }),
     refreshLog: mutationOptions({

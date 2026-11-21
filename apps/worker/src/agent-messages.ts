@@ -88,7 +88,9 @@ async function deliver(context: TickContext, message: PendingAgentMessage): Prom
     context.logger.warn("agent_message.send_failed", { runId: run.id, error });
     const detail = runnerErrorDetail(error);
     forgetMissingMailbox(context, message, stored, detail);
-    if (!retriableBeforeSend(detail)) finish(context, message, failureOf(detail));
+    if (!retriableBeforeSend(detail) && detail?.kind !== "mailbox-missing") {
+      finish(context, message, failureOf(detail));
+    }
     return;
   }
   const recheck = sendBlock(context, message);
@@ -188,7 +190,12 @@ function forgetMissingMailbox(
 }
 
 function failureAfterSendStarted(detail: RunnerErrorDetail | null): AgentMessageFailure {
-  if (detail === null || detail.kind === "unreachable" || detail.kind === "malformed-output") {
+  if (
+    detail === null ||
+    detail.kind === "unreachable" ||
+    detail.kind === "malformed-output" ||
+    detail.kind === "start-outcome-unknown"
+  ) {
     return "outcome-unknown";
   }
   return failureOf(detail);

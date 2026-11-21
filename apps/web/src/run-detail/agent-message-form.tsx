@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useTranslations } from "use-intl";
 
-export type AgentMessageOutcome = "requested" | "state-changed";
+export type AgentMessageOutcome = "requested" | "previous-failed" | "state-changed";
 
 export interface AgentMessageRequest {
   requestId: AgentMessageRequestId;
@@ -97,6 +97,9 @@ export function AgentMessageForm({
           setDraft((current) => (current.trim() === body ? "" : current));
           setEmptyTried(false);
           setSentHere(true);
+          setSubmit("idle");
+        } else if (outcome === "previous-failed") {
+          pendingRequestRef.current = null;
           setSubmit("idle");
         } else {
           setSubmit("state-changed");

@@ -890,6 +890,21 @@ describe("answerQuestion and denyPermission", () => {
     });
   });
 
+  test.each([
+    "runtime_unavailable",
+    "remote_runtime_unavailable",
+    "runtime_timeout",
+    "invalid_runtime_response",
+  ])("%s after a send means the outcome is unknown(0147)", async (code) => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(JSON.stringify({ ok: false, error: { code, message: "cut" } }), 1),
+    );
+    expect(await adapterError(runnerWith(exec).sendToAgent(RUN, { body: "x" }))).toMatchObject({
+      kind: "start-outcome-unknown",
+    });
+  });
+
   test("stopping a follow-up stops that dispatch(0147)", async () => {
     const exec = new ScriptedExec().orca(
       "orchestration worker-stop",

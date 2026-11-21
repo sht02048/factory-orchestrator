@@ -21,6 +21,7 @@ import {
   SecretBox,
   assignRun,
   changeRunState,
+  completeAgentMessage,
   listRunAgentMessages,
   listRunQuestions,
   migrate,
@@ -79,6 +80,7 @@ let rejectedRun: RunId;
 let failedSendRun: RunId;
 let retriedRun: RunId;
 let typingRun: RunId;
+let resentRun: RunId;
 
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
@@ -311,6 +313,38 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
     expect(await input.inputValue()).toBe("이어 쓴 말");
   });
 
+  it("응답이 끊긴 말이 실패로 끝났으면 실패를 보이고 다음 보내기를 새 말로 저장한다(0147)", async () => {
+    await open(resentRun);
+    const card = page.getByRole("region", { name: run.agentMessage.title });
+    const input = card.getByLabel(run.agentMessage.label);
+    await input.fill("다시 보낼 말");
+    await page.route("**/_serverFn/**", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      await route.fetch();
+      return route.abort();
+    });
+    await card.getByRole("button", { name: run.agentMessage.send }).press("Enter");
+    await card.getByRole("status").getByText(run.actionFailed).waitFor();
+    await page.unroute("**/_serverFn/**");
+    const [stored] = listRunAgentMessages(db, resentRun);
+    if (stored === undefined) throw new Error("not stored");
+    completeAgentMessage(db, {
+      id: stored.id,
+      runId: resentRun,
+      completedAt: new Date(),
+      error: "runner-error",
+    });
+
+    await card.getByRole("button", { name: run.agentMessage.send }).press("Enter");
+    await card.getByRole("status").getByText(run.agentMessage.failure["runner-error"]).waitFor();
+    expect(await input.inputValue()).toBe("다시 보낼 말");
+    expect(listRunAgentMessages(db, resentRun)).toHaveLength(1);
+
+    await card.getByRole("button", { name: run.agentMessage.send }).press("Enter");
+    await expect.poll(() => listRunAgentMessages(db, resentRun).length).toBe(2);
+    await expect.poll(() => input.inputValue()).toBe("");
+  });
+
   it("400px 에서도 에이전트에게 보내기가 가로로 넘치지 않는다(0147)", async () => {
     await page.setViewportSize({ width: 400, height: 844 });
     await open(narrowMessageRun);
@@ -426,6 +460,7 @@ function seed(db: Database): void {
   failedSendRun = startRun("ACME-23");
   retriedRun = startRun("ACME-27");
   typingRun = startRun("ACME-28");
+  resentRun = startRun("ACME-29");
 
   endedRun = startRun("ACME-15");
   ok(
