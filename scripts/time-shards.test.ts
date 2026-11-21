@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { assignShards, medianTimes, parseFileTimes, parseLogTimes } from "./time-shards.ts";
+import {
+  assignShards,
+  medianTimes,
+  parseFileTimes,
+  parseLogTimes,
+  refreshTimes,
+} from "./time-shards.ts";
 
 const file = (path: string) => ({ id: `e2e:${path}`, path });
 const paths = (shards: { path: string }[][]) => shards.map((s) => s.map((f) => f.path));
@@ -50,9 +56,29 @@ describe("assignShards", () => {
     expect(paths(shards)).toEqual([["long"], ["new", "short"]]);
   });
 
-  it("spreads files evenly when no file has a time", () => {
-    const shards = assignShards(["a", "b", "c", "d"].map(file), new Map(), 2);
-    expect(shards.map((shard) => shard.length)).toEqual([2, 2]);
+  it("fails when no file matches a time, so a path mismatch cannot pass unnoticed", () => {
+    const stale = new Map([["elsewhere", 10]]);
+    expect(() => assignShards([file("a"), file("b")], stale, 2)).toThrow(/no test file matches/);
+  });
+});
+
+describe("refreshTimes", () => {
+  it("keeps the old time of a file the log missed and drops deleted files", () => {
+    const previous = new Map([
+      ["kept", 50],
+      ["updated", 10],
+      ["deleted", 30],
+    ]);
+    const measured = new Map([
+      ["updated", 20],
+      ["added", 5],
+    ]);
+    const refreshed = refreshTimes(previous, measured, (path) => path !== "deleted");
+    expect([...refreshed]).toEqual([
+      ["added", 5],
+      ["kept", 50],
+      ["updated", 20],
+    ]);
   });
 });
 

@@ -9,7 +9,6 @@ export const BROWSER_TEST_TIMES_FILE = new URL("./browser-test-times.json", impo
 
 const PASSED_BROWSER_FILE = /✓\s+(e2e|demo)\s+(src\/\S+\.test\.ts)\s+\([^)]*\)\s+(\d+)ms/;
 const CARET_COLOR_CODE = /\^\[\[[0-9;]*m/g;
-const TIME_FOR_UNMEASURED_RUN = 1;
 
 export function parseFileTimes(value: unknown): Map<string, number> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -27,7 +26,9 @@ export function parseFileTimes(value: unknown): Map<string, number> {
 
 function estimateFor(files: readonly ShardFile[], times: ReadonlyMap<string, number>): number {
   const known = files.flatMap((file) => times.get(file.path) ?? []);
-  if (known.length === 0) return TIME_FOR_UNMEASURED_RUN;
+  if (known.length === 0) {
+    throw new Error("no test file matches a path in the browser test times");
+  }
   return known.reduce((sum, ms) => sum + ms, 0) / known.length;
 }
 
@@ -63,6 +64,17 @@ export function parseLogTimes(log: string): Map<string, number> {
     times.set(`${project}/${file}`, Math.max(Number(ms), 1));
   }
   return times;
+}
+
+export function refreshTimes(
+  previous: ReadonlyMap<string, number>,
+  measured: ReadonlyMap<string, number>,
+  fileExists: (path: string) => boolean,
+): Map<string, number> {
+  const merged = [...new Map([...previous, ...measured])]
+    .filter(([path]) => fileExists(path))
+    .sort(([a], [b]) => (a < b ? -1 : 1));
+  return new Map(merged);
 }
 
 export function medianTimes(runs: readonly ReadonlyMap<string, number>[]): Map<string, number> {

@@ -1,8 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { BROWSER_TEST_TIMES_FILE, medianTimes, parseLogTimes } from "./time-shards.ts";
+import {
+  BROWSER_TEST_TIMES_FILE,
+  medianTimes,
+  parseFileTimes,
+  parseLogTimes,
+  refreshTimes,
+} from "./time-shards.ts";
 
 const REPO_ROOT = new URL("../", import.meta.url);
 const MAX_LOG_BYTES = 256 * 1024 * 1024;
@@ -25,13 +31,16 @@ function main(runIds: string[]): void {
   if (runIds.length === 0 || runIds.some((id) => !/^\d+$/.test(id))) {
     throw new Error("usage: pnpm run update:browser-times <run-id> [<run-id>...]");
   }
-  const medians = medianTimes(runIds.map(readRunTimes));
-  const current = [...medians].filter(([path]) => existsSync(new URL(path, REPO_ROOT)));
+  const previous = parseFileTimes(JSON.parse(readFileSync(BROWSER_TEST_TIMES_FILE, "utf8")));
+  const measured = medianTimes(runIds.map(readRunTimes));
+  const refreshed = refreshTimes(previous, measured, (path) =>
+    existsSync(new URL(path, REPO_ROOT)),
+  );
   writeFileSync(
     BROWSER_TEST_TIMES_FILE,
-    `${JSON.stringify(Object.fromEntries(current), null, 2)}\n`,
+    `${JSON.stringify(Object.fromEntries(refreshed), null, 2)}\n`,
   );
-  console.log(`Wrote times for ${current.length} files from ${runIds.length} runs.`);
+  console.log(`Wrote times for ${refreshed.size} files from ${runIds.length} runs.`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
