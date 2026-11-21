@@ -1,7 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import { Actions, Button, Card, Field, Text, Textarea } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
-import { AGENT_MESSAGE_MAX_LENGTH } from "@ganger/core";
+import { AGENT_MESSAGE_MAX_LENGTH, toAgentMessageRequestId } from "@ganger/core";
+import type { AgentMessageRequestId } from "@ganger/core";
 import type { AgentMessageDelivery, AgentMessageView } from "@ganger/app/run-detail/model";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -10,13 +11,15 @@ import { useTranslations } from "use-intl";
 export type AgentMessageOutcome = "requested" | "state-changed";
 
 export interface AgentMessageRequest {
-  requestId: string;
+  requestId: AgentMessageRequestId;
   body: string;
 }
 
-function newRequestId(): string {
+function newRequestId(): AgentMessageRequestId {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return toAgentMessageRequestId(
+    Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(""),
+  );
 }
 
 type Submit = "idle" | "sending" | "state-changed" | "failed";
@@ -26,8 +29,10 @@ export function useDeliveryText(): (delivery: AgentMessageDelivery) => string {
   return (delivery) => {
     switch (delivery.status) {
       case "failed":
-        return delivery.reason === "outcome-unknown"
-          ? t("failure.outcome-unknown")
+        return delivery.reason === "outcome-unknown" ||
+          delivery.reason === "follow-up-stopped" ||
+          delivery.reason === "follow-up-not-stopped"
+          ? t(`failure.${delivery.reason}`)
           : t("delivery.failed", { reason: t(`failure.${delivery.reason}`) });
       case "sending":
       case "after-resume":
@@ -56,7 +61,7 @@ export function AgentMessageForm({
   const [emptyTried, setEmptyTried] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const closedRef = useRef<HTMLParagraphElement>(null);
-  const requestIdRef = useRef<string | null>(null);
+  const pendingRequestRef = useRef<AgentMessageRequest | null>(null);
   const latest = view.latest;
   const unsent = submit === "failed" || submit === "state-changed" || draft.trim() !== "";
   const undelivered = sentHere && latest !== null && latest.status !== "sent";
@@ -82,11 +87,13 @@ export function AgentMessageForm({
       return;
     }
     setSubmit("sending");
-    requestIdRef.current ??= newRequestId();
-    onSend({ requestId: requestIdRef.current, body }).then(
+    if (pendingRequestRef.current?.body !== body) {
+      pendingRequestRef.current = { requestId: newRequestId(), body };
+    }
+    onSend(pendingRequestRef.current).then(
       (outcome) => {
         if (outcome === "requested") {
-          requestIdRef.current = null;
+          pendingRequestRef.current = null;
           setDraft((current) => (current.trim() === body ? "" : current));
           setEmptyTried(false);
           setSentHere(true);
@@ -105,7 +112,6 @@ export function AgentMessageForm({
 
   const edit = (value: string): void => {
     setDraft(value);
-    requestIdRef.current = null;
     if (submit === "failed" || submit === "state-changed") setSubmit("idle");
   };
 
@@ -133,6 +139,11 @@ export function AgentMessageForm({
           >
             {closedText}
           </Text>
+          {unsent && submit === "idle" && latest?.status === "failed" ? (
+            <Text variant="body" as="p" tone="problem">
+              {deliveryText(latest)}
+            </Text>
+          ) : null}
           {unsent ? (
             <>
               <Text variant="meta" as="p">

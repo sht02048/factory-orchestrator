@@ -5,6 +5,7 @@ CREATE TABLE `run_agent_messages` (
 	`body` text NOT NULL,
 	`requested_at` integer NOT NULL,
 	`send_started_at` integer,
+	`follow_up_ref` text,
 	`completed_at` integer,
 	`error` text,
 	CONSTRAINT `fk_run_agent_messages_run_id_runs_id_fk` FOREIGN KEY (`run_id`) REFERENCES `runs`(`id`) ON DELETE CASCADE

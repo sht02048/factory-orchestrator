@@ -1,14 +1,9 @@
 import { log } from "@ganger/log";
 import type { Logger } from "@ganger/log";
 import { describeRunnerCall, logRunnerCall } from "./runner-call-log.js";
-import {
-  AGENT_ALREADY_FINISHED,
-  AdapterError,
-  toRunnerKind,
-  toRunnerProjectId,
-  toWorktreeRef,
-} from "@ganger/core";
+import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@ganger/core";
 import type {
+  AgentSendResult,
   AgentRef,
   MailboxRef,
   PermissionRequestId,
@@ -682,7 +677,7 @@ export class OrcaRunner implements Runner {
     );
   }
 
-  async sendToAgent(run: RunOnRunner, input: { body: string }): Promise<void> {
+  async sendToAgent(run: RunOnRunner, input: { body: string }): Promise<AgentSendResult> {
     const agent = this.agentOf(run);
     const mailbox = this.mailboxOf(run.mailbox);
     const sent = await this.orca(
@@ -700,16 +695,16 @@ export class OrcaRunner implements Runner {
       operatorSendResultSchema,
       { usesMailbox: true },
     );
-    if (!("delivery" in sent)) return;
+    return "delivery" in sent
+      ? { kind: "follow-up", followUpRef: sent.dispatchId }
+      : { kind: "delivered" };
+  }
+
+  async stopFollowUp(followUpRef: string): Promise<void> {
     await this.orca(
-      ["orchestration", "worker-stop", "--dispatch", sent.dispatchId],
+      ["orchestration", "worker-stop", "--dispatch", followUpRef],
       workerStopResultSchema,
     );
-    throw new AdapterError<RunnerErrorDetail>({
-      kind: "runner-error",
-      code: AGENT_ALREADY_FINISHED,
-      message: "the agent had finished, so Orca started a follow-up worker and Ganger stopped it",
-    });
   }
 
   async pauseAgent(run: RunOnRunner): Promise<void> {

@@ -150,6 +150,21 @@ describe("Run 상세의 에이전트에게 보내기 (0147)", () => {
     expect(html).toContain(runJson.agentMessage.delivery["after-resume"]);
   });
 
+  it("후속 워커를 멈추지 못하면 러너에서 직접 멈추라고 보인다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-96", 900);
+    const messageId = sent(db, id, "다시 시작된 말");
+    completeAgentMessage(db, {
+      id: messageId,
+      runId: id,
+      completedAt: minutes(911),
+      error: "follow-up-not-stopped",
+    });
+    expect(text(render(page(db, id)))).toContain(
+      runJson.agentMessage.failure["follow-up-not-stopped"],
+    );
+  });
+
   it("보내지 못하면 입력칸과 타임라인에 이유를 보인다", () => {
     const { db } = seedDatabase();
     const id = started(db, "ACME-95", 900);

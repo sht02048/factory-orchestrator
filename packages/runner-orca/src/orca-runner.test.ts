@@ -856,30 +856,29 @@ describe("answerQuestion and denyPermission", () => {
     );
   });
 
-  test("a follow-up Orca started for a finished agent is stopped and reported(0147)", async () => {
-    const exec = new ScriptedExec()
-      .orca(
-        "orchestration send",
-        stdout(
-          JSON.stringify({
-            ok: true,
-            result: {
-              delivery: "follow_up",
-              followUpOf: "ctx_a6e6a23a7132",
-              dispatchId: "ctx_new",
-            },
-          }),
-        ),
-      )
-      .orca(
-        "orchestration worker-stop",
-        stdout(JSON.stringify({ ok: true, result: { state: "stopped" } })),
-      );
-    expect(await adapterError(runnerWith(exec).sendToAgent(RUN, { body: "x" }))).toMatchObject({
-      kind: "runner-error",
-      code: "agent_already_finished",
+  test("a send that Orca turned into a follow-up returns its dispatch(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(
+        JSON.stringify({
+          ok: true,
+          result: { delivery: "follow_up", followUpOf: "ctx_a6e6a23a7132", dispatchId: "ctx_new" },
+        }),
+      ),
+    );
+    expect(await runnerWith(exec).sendToAgent(RUN, { body: "x" })).toEqual({
+      kind: "follow-up",
+      followUpRef: "ctx_new",
     });
-    expect(exec.commands()[1]).toContain("orchestration worker-stop --dispatch ctx_new");
+  });
+
+  test("stopping a follow-up stops that dispatch(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration worker-stop",
+      stdout(JSON.stringify({ ok: true, result: { state: "stopped" } })),
+    );
+    await runnerWith(exec).stopFollowUp("ctx_new");
+    expect(exec.commands()[0]).toContain("orchestration worker-stop --dispatch ctx_new");
   });
 
   test("broken send output for an operator message is malformed(0147)", async () => {

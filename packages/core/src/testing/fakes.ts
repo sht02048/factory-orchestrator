@@ -1,6 +1,7 @@
 import { AdapterError } from "../adapters.js";
 import type { ProviderUsageReading } from "../provider-usage.js";
 import type {
+  AgentSendResult,
   AgentActivity,
   AgentQuestion,
   CodeHost,
@@ -237,6 +238,8 @@ export class FakeRunner implements Runner {
   providerUsage: ProviderUsageReading = { kind: "read", providers: [] };
   failNextStart: RunnerErrorDetail | null = null;
   failNextControl: RunnerErrorDetail | null = null;
+  nextSendStartsFollowUp: string | null = null;
+  readonly stoppedFollowUps: string[] = [];
   loseNextResumeResponse = false;
   loseNextStartResponse = false;
   private readonly mailboxes = new Set<MailboxRef>();
@@ -475,11 +478,22 @@ export class FakeRunner implements Runner {
     });
   }
 
-  sendToAgent(run: RunOnRunner, input: { body: string }): Promise<void> {
-    return this.reach(() => {
+  sendToAgent(run: RunOnRunner, input: { body: string }): Promise<AgentSendResult> {
+    return this.reach((): AgentSendResult => {
       this.takeControlFailure();
       this.mustHaveMailbox(run.mailbox);
       this.runAt(run.worktree).agentMessages.push(input.body);
+      if (this.nextSendStartsFollowUp === null) return { kind: "delivered" };
+      const followUpRef = this.nextSendStartsFollowUp;
+      this.nextSendStartsFollowUp = null;
+      return { kind: "follow-up", followUpRef };
+    });
+  }
+
+  stopFollowUp(followUpRef: string): Promise<void> {
+    return this.reach(() => {
+      this.takeControlFailure();
+      this.stoppedFollowUps.push(followUpRef);
     });
   }
 

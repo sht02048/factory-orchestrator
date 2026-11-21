@@ -518,6 +518,7 @@ export const runAgentMessages = sqliteTable(
     body: text("body").notNull(),
     requestedAt: timeMs("requested_at").notNull(),
     sendStartedAt: timeMs("send_started_at"),
+    followUpRef: text("follow_up_ref"),
     completedAt: timeMs("completed_at"),
     error: text("error"),
   },

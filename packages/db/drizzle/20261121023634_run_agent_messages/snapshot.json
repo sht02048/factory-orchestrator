@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "39c82a45-890c-457d-960d-522cbe2b6764",
+  "id": "3d6a3625-8795-42db-a231-75974d45e6b3",
   "prevIds": ["8a484b68-c983-4a80-bbf0-db12748b54fc"],
   "ddl": [
     {
@@ -776,6 +776,16 @@
       "table": "run_agent_messages",
       "name": "send_started_at",
       "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "follow_up_ref",
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,

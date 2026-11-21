@@ -45,6 +45,7 @@ export interface PendingAgentMessage {
   runId: RunId;
   body: string;
   sendStartedAt: Date | null;
+  followUpRef: string | null;
 }
 
 export function listPendingAgentMessages(db: Database): PendingAgentMessage[] {
@@ -54,6 +55,7 @@ export function listPendingAgentMessages(db: Database): PendingAgentMessage[] {
       runId: runAgentMessages.runId,
       body: runAgentMessages.body,
       sendStartedAt: runAgentMessages.sendStartedAt,
+      followUpRef: runAgentMessages.followUpRef,
     })
     .from(runAgentMessages)
     .where(isNull(runAgentMessages.completedAt))
@@ -73,6 +75,16 @@ export function markAgentMessageSending(db: Database, id: number, now: Date): bo
           isNull(runAgentMessages.completedAt),
         ),
       )
+      .run().changes > 0
+  );
+}
+
+export function recordAgentMessageFollowUp(db: Database, id: number, followUpRef: string): boolean {
+  return (
+    db
+      .update(runAgentMessages)
+      .set({ followUpRef })
+      .where(and(eq(runAgentMessages.id, id), isNull(runAgentMessages.completedAt)))
       .run().changes > 0
   );
 }
