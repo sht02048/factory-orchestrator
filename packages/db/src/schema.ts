@@ -9,6 +9,7 @@ import {
   PR_STATES,
   QUESTION_KINDS,
   RUN_STATES,
+  TICKET_PRIORITIES,
   WORKTREE_KEPT_REASONS,
 } from "@ganger/core";
 import { CHANGE_KINDS, CHANGE_PARTS } from "./change-events-model.js";
@@ -283,6 +284,12 @@ export const runs = sqliteTable(
     reportBody: text("report_body"),
     agentBrief: text("agent_brief"),
     runnerChosen: integer("runner_chosen", { mode: "boolean" }).notNull().default(false),
+    ticketPriority: text("ticket_priority", { enum: TICKET_PRIORITIES }),
+    blockersReadAt: timeMs("blockers_read_at"),
+    blockersReadFailed: integer("blockers_read_failed", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    waitSkippedAt: timeMs("wait_skipped_at"),
     continuedFromRunId: text("continued_from_run_id").$type<RunId>(),
     continueMessage: text("continue_message"),
     continuePlace: text("continue_place", { enum: CONTINUATION_PLACES }),
@@ -545,6 +552,26 @@ export const runAgentMessages = sqliteTable(
     index("run_agent_messages_pending")
       .on(t.id)
       .where(sql`${t.completedAt} IS NULL`),
+  ],
+);
+
+export const runBlockers = sqliteTable(
+  "run_blockers",
+  {
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    blockerKey: text("blocker_key").notNull().$type<TicketKey>(),
+    title: text("title").notNull(),
+    stateName: text("state_name").notNull(),
+    stateCategory: text("state_category").notNull(),
+    inCycle: integer("in_cycle", { mode: "boolean" }).notNull().default(false),
+    readAt: timeMs("read_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.runId, t.blockerKey] }),
+    index("run_blockers_key").on(t.blockerKey),
   ],
 );
 

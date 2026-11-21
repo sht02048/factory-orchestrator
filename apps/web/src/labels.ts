@@ -4,6 +4,7 @@ import { useTranslations } from "use-intl";
 import domain from "../messages/ko/domain.json" with { type: "json" };
 import { useTime } from "./format/time";
 import type { QueuedReason } from "@ganger/app/runs/model";
+import { endsWithFinalConsonant } from "./home/particle";
 
 export function useAgentName(): (agent: string) => string {
   const t = useTranslations("domain.agent");
@@ -56,6 +57,10 @@ export function useUsageNames(): {
   };
 }
 
+function finalOf(word: string): "yes" | "no" {
+  return endsWithFinalConsonant(word) ? "yes" : "no";
+}
+
 export function useQueuedReasonText(): (reason: QueuedReason) => string {
   const t = useTranslations("domain.queuedReason");
   const names = useUsageNames();
@@ -75,6 +80,18 @@ export function useQueuedReasonText(): (reason: QueuedReason) => string {
       case "project-missing":
       case "assignment-blocked":
         return t(reason.kind);
+      case "blockers-waiting": {
+        const [first, ...rest] = reason.blockers;
+        if (first === undefined) return t("behind");
+        return rest.length > 0
+          ? t("blockers-waiting-more", { ticket: first.key, more: rest.length })
+          : t("blockers-waiting", { ticket: first.key, final: finalOf(first.key) });
+      }
+      case "blockers-stuck": {
+        if (reason.blocker === null) return t("blocker-unreadable-unknown");
+        const values = { ticket: reason.blocker.key, final: finalOf(reason.blocker.key) };
+        return t(`blocker-${reason.cause}`, values);
+      }
     }
   };
 }

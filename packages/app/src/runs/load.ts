@@ -7,18 +7,15 @@ import {
   toTrackerConnectionId,
   toTrackerProjectId,
 } from "@ganger/core";
-import type { QueuedRun, RunId } from "@ganger/core";
+import type { RunId } from "@ganger/core";
 import {
   getWorkspaceTrackerProject,
   listPendingCancelRequests,
-  listRunPlacements,
-  listRunnerSnapshots,
   listRunsWithRecords,
   listTakenOverRunIds,
   listRunners,
   listWorkspaces,
   toWorkspaceId,
-  isPinnedToRunner,
 } from "@ganger/db";
 import type { Database, EndedAxesFilter, RunRecords, StoredRun } from "@ganger/db";
 import { isWebUrl } from "../format/url.js";
@@ -29,7 +26,7 @@ import type { RunConditions } from "./conditions.js";
 import { ENDED_RUNS_PAGE_SIZE } from "./model.js";
 import type { QueuedReason, RunCondition, RunView, RunsPage } from "./model.js";
 import { withoutPauses } from "../run-control.js";
-import { describeQueuedReason, explainQueue } from "./queue-reasons.js";
+import { describeQueuedReason, loadQueueReasons } from "./queue-reasons.js";
 
 export function loadRunsPage(
   db: Database,
@@ -49,27 +46,7 @@ export function loadRunsPage(
   const runners = new Map(listRunners(db).map((r) => [r.id, r]));
   const cancelling = new Set<RunId>(listPendingCancelRequests(db).map((r) => r.runId));
   const takenOver = listTakenOverRunIds(db);
-  const queueReasons = explainQueue({
-    queued: listRunsWithRecords(db, { states: ["queued"] }).flatMap(
-      ({ run, records }): QueuedRun[] =>
-        run.state === "queued"
-          ? [
-              {
-                id: run.id,
-                assignedAt: run.assignedAt,
-                project: run.runnerProject,
-                agent: run.agent,
-                runnerId: run.runnerId,
-                unstartable: false,
-                pinnedToRunner: isPinnedToRunner(run),
-                startRequested: records.startRequestedAt !== null,
-              },
-            ]
-          : [],
-    ),
-    runners: listRunnerSnapshots(db, now),
-    runs: listRunPlacements(db),
-  });
+  const queueReasons = loadQueueReasons(db, now);
 
   const projectNames = new Map<string, string>();
   const projectName = (run: StoredRun): string => {

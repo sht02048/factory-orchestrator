@@ -10,6 +10,7 @@ import {
   answerRunQuestion,
   getMapping,
   getRunCancelRequest,
+  markRunRelationsUnread,
   latestChangeSeq,
   listChangesAfter,
   listRecentMcpActions,
@@ -380,6 +381,20 @@ describe("MCP 쓰기 도구", () => {
     expect(listRecentMcpActions(seeded.db, 10).map((a) => [a.tool, a.outcome, a.reason])).toEqual([
       ["request_runner_check", "rejected", "not-found"],
     ]);
+  });
+
+  it("start_run_without_waiting은 같은 요청 ID를 다시 보내도 같은 결과이고 기록을 남긴다", async () => {
+    await connect();
+    const queued = queueRun(seeded.db, "ACME-6", 40);
+    markRunRelationsUnread(seeded.db, queued, at(41));
+    const args = { runId: queued, requestId: "request-0159-0001" };
+
+    expect((await call("start_run_without_waiting", args)).json["outcome"]).toBe("done");
+    expect((await call("start_run_without_waiting", args)).json["outcome"]).toBe("done");
+    expect(listRunMcpActions(seeded.db, queued).map((a) => a.outcome)).toEqual(["done"]);
+
+    const short = await call("start_run_without_waiting", { runId: queued, requestId: "short" });
+    expect(short.isError).toBe(true);
   });
 
   it("서버가 꺼져 있으면 worker가 처리하는 쓰기의 결과에 서버가 켜지면 처리한다고 알린다", async () => {

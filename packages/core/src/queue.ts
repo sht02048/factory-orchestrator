@@ -1,5 +1,6 @@
 import { canRunnerTake, isProjectBlocked, pickRunner, remainingCapacity } from "./assignment.js";
 import type { RunnerSnapshot, RunPlacement } from "./assignment.js";
+import { priorityRank } from "./blockers.js";
 import type { AgentId, RunId, RunnerId, RunnerProjectId } from "./ids.js";
 import { usageLimitOf } from "./usage-limit.js";
 import type { UsageLimit } from "./usage-limit.js";
@@ -13,6 +14,7 @@ export interface QueuedRun {
   unstartable: boolean;
   pinnedToRunner?: boolean;
   startRequested?: boolean;
+  priorityRank?: number;
 }
 
 export interface RunnerChoice {
@@ -42,7 +44,7 @@ export function planQueue(input: {
   const placements: RunPlacement[] = [...input.runs];
   const waitedOn = new Set<RunnerId>();
 
-  for (const run of fifoOrder(input.queued)) {
+  for (const run of queueOrder(input.queued)) {
     if (run.unstartable) {
       if (run.runnerId === null || !waitedOn.has(run.runnerId)) plan.couldNotStart.push(run.id);
       continue;
@@ -143,6 +145,13 @@ function unplacedReason(
     : { reason: "usage-limit", limit: earliest };
 }
 
-function fifoOrder(queued: ReadonlyArray<QueuedRun>): QueuedRun[] {
-  return queued.toSorted((a, b) => a.assignedAt.getTime() - b.assignedAt.getTime());
+const NO_PRIORITY_RANK = priorityRank("none");
+
+export function queueOrder<T extends QueuedRun>(queued: ReadonlyArray<T>): T[] {
+  return queued.toSorted(
+    (a, b) =>
+      Number(b.startRequested === true) - Number(a.startRequested === true) ||
+      (a.priorityRank ?? NO_PRIORITY_RANK) - (b.priorityRank ?? NO_PRIORITY_RANK) ||
+      a.assignedAt.getTime() - b.assignedAt.getTime(),
+  );
 }

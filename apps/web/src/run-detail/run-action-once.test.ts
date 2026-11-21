@@ -4,6 +4,7 @@ import {
   continueRunOnce,
   controlRunOnce,
   removeWorktreeOnce,
+  skipBlockerWaitOnce,
   stopPreviousAgentOnce,
   submitAnswerOnce,
   submitHumanCheckOnce,
@@ -17,6 +18,7 @@ import {
   listPendingCancelRequests,
   listRunQuestions,
   listRuns,
+  markRunRelationsUnread,
   recordAgentCheck,
   recordRunQuestions,
   updateRunRecords,
@@ -62,6 +64,13 @@ function waitingRun(db: Database, kind: "question" | "human-check"): RunId {
   return id;
 }
 
+function stuckQueuedRun(db: Database): RunId {
+  const run = listRuns(db, { states: ["queued"] })[0];
+  if (run === undefined) throw new Error("no queued run");
+  markRunRelationsUnread(db, run.id, minutes(105));
+  return run.id;
+}
+
 function answersOf(db: Database, runId: RunId) {
   return listRunQuestions(db, runId).map((question) => question.answer?.text ?? null);
 }
@@ -85,6 +94,38 @@ describe("같은 요청 ID는 한 번만 처리한다(0156)", () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]?.requestedAt).toEqual(FIRST);
     expect(requestRows(db, runId)).toHaveLength(1);
+  });
+
+  it("기다리지 않고 시작: 런이 끝난 뒤 다시 보내도 같은 성공이고 다른 동작에 ID를 다시 쓰면 거절한다(0159)", () => {
+    const { db } = seedDatabase();
+    const runId = stuckQueuedRun(db);
+    const key = { runId, requestId: REQUEST };
+    const skippedAt = () =>
+      db.$client.prepare("SELECT wait_skipped_at AS at FROM runs WHERE id = ?").get(runId);
+
+    expect(skipBlockerWaitOnce(db, key, FIRST)).toEqual({ ok: true });
+    const first = skippedAt();
+    expect(skipBlockerWaitOnce(db, key, LATER)).toEqual({ ok: true });
+    expect(skippedAt()).toEqual(first);
+    expect(requestRows(db, runId)).toHaveLength(1);
+    expect(cancelRunOnce(db, key, LATER)).toEqual({ ok: false, reason: "request-reused" });
+
+    const second = { runId, requestId: OTHER_REQUEST };
+    expect(skipBlockerWaitOnce(db, second, LATER)).toEqual({ ok: true });
+    const ended = changeRunState(
+      db,
+      runId,
+      { to: "ended", agentResult: "canceled", prState: "none" },
+      LATER,
+    );
+    if (!ended.ok) throw new Error("state change failed");
+
+    expect(skipBlockerWaitOnce(db, key, LATER)).toEqual({ ok: true });
+    expect(skipBlockerWaitOnce(db, second, LATER)).toEqual({ ok: true });
+    expect(skipBlockerWaitOnce(db, { runId, requestId: "request-id-0156-c" }, LATER)).toEqual({
+      ok: false,
+      reason: "not-queued",
+    });
   });
 
   it("워크트리 지우기: 처리된 뒤 다시 보내도 처음과 같은 성공이다", () => {

@@ -19,6 +19,7 @@ import type {
   TrackerStateId,
   WorktreeRef,
 } from "./ids.js";
+import type { TicketPriority, TicketRelations } from "./blockers.js";
 import type { ProviderUsageReading } from "./provider-usage.js";
 
 export class AdapterError<D extends { kind: string }> extends Error {
@@ -72,6 +73,7 @@ export interface TrackerTicket {
   project: { id: TrackerProjectId; name: string } | null;
   state: TrackerState;
   updatedAt: Date;
+  priority?: TicketPriority;
 }
 
 export interface TrackerComment {
@@ -137,6 +139,7 @@ export interface Tracker {
   }): { ok: true; event: TrackerEvent } | { ok: false; error: WebhookVerifyError };
 
   getTicket(key: TicketKey): Promise<TrackerTicket | null>;
+  getTicketRelations?(key: TicketKey): Promise<TicketRelations | null>;
   listProjectTickets(projectId: TrackerProjectId, page?: Page): Promise<Paged<TrackerTicket>>;
   listLabeledTickets(input: {
     labelId: LabelId;

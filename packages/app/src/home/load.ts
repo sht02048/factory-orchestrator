@@ -5,23 +5,21 @@ import {
   runDurations,
   summarizeRunOutcome,
 } from "@ganger/core";
-import type { QueuedRun, RunId } from "@ganger/core";
+import type { RunId } from "@ganger/core";
 import {
   listPendingCancelRequests,
   listRunPermissionWaits,
   listRunQuestions,
   getWorkspaceTrackerProject,
   listRunPlacements,
-  listRunnerSnapshots,
   listRunners,
   listRunsWithRecords,
   listWorkspaces,
   toWorkspaceId,
-  isPinnedToRunner,
 } from "@ganger/db";
 import type { Database, RunRecords, StoredRun, StoredRunner } from "@ganger/db";
 import { runControlOf, withoutPauses } from "../run-control.js";
-import { describeQueuedReason, explainQueue } from "../runs/queue-reasons.js";
+import { describeQueuedReason, loadQueueReasons } from "../runs/queue-reasons.js";
 import { isWebUrl } from "../format/url.js";
 import { resolveWorkspace, runnerIssueCause } from "../shell/model.js";
 import { calendarDay } from "../time-zone.js";
@@ -56,27 +54,7 @@ export function loadHomePage(
   const runs = runsWithRecords.map(({ run }) => run);
 
   const placements = listRunPlacements(db);
-  const queueReasons = explainQueue({
-    queued: listRunsWithRecords(db, { states: ["queued"] }).flatMap(
-      ({ run, records }): QueuedRun[] =>
-        run.state === "queued"
-          ? [
-              {
-                id: run.id,
-                assignedAt: run.assignedAt,
-                project: run.runnerProject,
-                agent: run.agent,
-                runnerId: run.runnerId,
-                unstartable: false,
-                pinnedToRunner: isPinnedToRunner(run),
-                startRequested: records.startRequestedAt !== null,
-              },
-            ]
-          : [],
-    ),
-    runners: listRunnerSnapshots(db, now),
-    runs: placements,
-  });
+  const queueReasons = loadQueueReasons(db, now);
   const cancelling = new Set<string>(listPendingCancelRequests(db).map((r) => r.runId));
 
   const queuedReason = (id: RunId): QueuedReason =>

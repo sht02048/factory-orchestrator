@@ -15,6 +15,7 @@ import {
   requestPreviousAgentStop,
   requestRunCancel,
   requestWorktreeRemoval,
+  skipBlockerWait,
 } from "@ganger/db";
 import type { ContinueRunBlock } from "@ganger/db";
 import type { Database } from "@ganger/db";
@@ -111,6 +112,27 @@ export const agentMessageInput = z.object({
     .max(AGENT_MESSAGE_MAX_LENGTH)
     .refine((body) => !body.includes("\0")),
 });
+
+export function skipBlockerWaitRequest(db: Database, runId: string, now: Date): RunActionResult {
+  return skipBlockerWait(db, toRunId(runId), now);
+}
+
+export function skipBlockerWaitOnce(
+  db: Database,
+  key: RunActionKey,
+  now: Date,
+  onReplay?: () => void,
+): RunActionResult {
+  return onceForRun(
+    db,
+    key,
+    "skip-blocker-wait",
+    [],
+    now,
+    () => skipBlockerWaitRequest(db, key.runId, now),
+    onReplay === undefined ? {} : { onReplay },
+  );
+}
 
 export function sendAgentMessageRequest(
   db: Database,

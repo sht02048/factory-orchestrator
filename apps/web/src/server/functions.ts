@@ -15,6 +15,7 @@ import {
   removeWorktreeOnce,
   runActionRequestId,
   sendAgentMessageRequest,
+  skipBlockerWaitOnce,
   stopPreviousAgentOnce,
   submitAnswerOnce,
   submitHumanCheckOnce,
@@ -132,6 +133,10 @@ export const stopPreviousAgent = createServerFn({ method: "POST" })
 export const sendAgentMessage = createServerFn({ method: "POST" })
   .validator(agentMessageInput)
   .handler(({ data }) => sendAgentMessageRequest(getDatabase(), data, new Date()));
+
+export const startRunWithoutWaiting = createServerFn({ method: "POST" })
+  .validator(runActionKey)
+  .handler(({ data }) => skipBlockerWaitOnce(getDatabase(), data, new Date()));
 
 export const controlRun = createServerFn({ method: "POST" })
   .validator(runActionKey.extend({ control: z.enum(["pause", "resume"]) }))
