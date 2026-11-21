@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { RemoteResult } from "./ssh.js";
 
 const SSH_EXIT = 255;
+const BRANCH_REF_PREFIX = "refs/heads/";
 
 export function uncommittedChangesArgv(path: string): string[] {
   return ["git", "-C", path, "status", "--porcelain", "--untracked-files=all"];
@@ -41,13 +42,13 @@ interface WorktreeTarget {
 }
 
 export function currentBranchArgv(path: string): string[] {
-  return ["git", "-C", path, "symbolic-ref", "--quiet", "--short", "HEAD"];
+  return ["git", "-C", path, "symbolic-ref", "--quiet", "HEAD"];
 }
 
 export function parseCurrentBranch(result: RemoteResult): string | null {
   if (!result.timedOut && (result.exitCode === 1 || result.exitCode === 128)) return null;
-  const branch = parseGitOutput(result, z.string().trim().min(1), "git symbolic-ref");
-  return branch;
+  const ref = parseGitOutput(result, z.string().trim().min(1), "git symbolic-ref");
+  return ref.startsWith(BRANCH_REF_PREFIX) ? ref.slice(BRANCH_REF_PREFIX.length) : null;
 }
 
 export function worktreeListArgv(repoPath: string): string[] {

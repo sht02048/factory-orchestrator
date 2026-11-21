@@ -1588,13 +1588,21 @@ describe("prepareContinuation", () => {
     });
   });
 
+  test("같은 이름의 태그가 있어도 전체 ref에서 브랜치 이름을 읽는다", async () => {
+    const exec = new ScriptedExec().on(
+      `git -C ${path} symbolic-ref --quiet HEAD`,
+      stdout("refs/heads/work-1\n"),
+    );
+    expect(await runnerWith(exec).readWorktreeBranch(input.worktree)).toBe("work-1");
+  });
+
   test("끝난 때의 브랜치를 읽고, 워크트리가 없거나 브랜치가 아니면 null이다", async () => {
     const at = `git -C ${path} symbolic-ref`;
     expect(
-      await runnerWith(new ScriptedExec().on(at, stdout("feat/x\n"))).readWorktreeBranch(
-        input.worktree,
-      ),
-    ).toBe("feat/x");
+      await runnerWith(
+        new ScriptedExec().on(at, stdout("refs/heads/heads/feat/x\n")),
+      ).readWorktreeBranch(input.worktree),
+    ).toBe("heads/feat/x");
     for (const code of [1, 128]) {
       expect(
         await runnerWith(new ScriptedExec().on(at, stdout("", code))).readWorktreeBranch(

@@ -836,6 +836,7 @@ function ContinueRun({
             digit: offer.sourceNumber % 10,
           })}
         </DefinitionItem>
+        <DefinitionItem label={t("sendsLabel")}>{sends.join(" · ")}</DefinitionItem>
       </DefinitionList>
       {offer.place === "recreated" ? (
         <Text variant="meta" as="p">
@@ -845,14 +846,6 @@ function ContinueRun({
       <Field label={t("messageLabel")} {...(invalid === null ? {} : { error: invalid })}>
         <Textarea name="continue-message" rows={4} value={message} onValueChange={setMessage} />
       </Field>
-      <div {...stylex.props(styles.stack)}>
-        <Text variant="meta" as="p">
-          {t("sendsLabel")}
-        </Text>
-        <Text variant="body" as="p">
-          {sends.join(" · ")}
-        </Text>
-      </div>
     </Dialog>
   );
 }
