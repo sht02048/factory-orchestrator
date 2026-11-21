@@ -19,7 +19,7 @@ export function nextFirstDraw(
 }
 
 export function useFirstDrawKey(ws: string | undefined, isFetching: boolean): string {
-  const [draw, setDraw] = useState<FirstDraw>({ ws, catchingUp: isFetching, generation: 0 });
+  const [draw, setDraw] = useState<FirstDraw>({ ws, catchingUp: false, generation: 0 });
   const next = nextFirstDraw(draw, ws, isFetching);
   if (next !== draw) setDraw(next);
   return String(next.generation);
