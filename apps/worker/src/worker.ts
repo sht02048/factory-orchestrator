@@ -145,6 +145,7 @@ export function createWorker(options: WorkerOptions): Worker {
     pendingEndings: new Map(),
     prPolledAt: new Map(),
     prReadRetries: new Map(),
+    finalBranchRead: new Set(),
     unrecordedComments: new Map(),
     ticketsGone: new Set(),
     autoAssign: createAutoAssignState(),
@@ -542,7 +543,7 @@ function continuationSource(
   if (found?.run.state !== "ended" || found.run.startedAt === null) return "missing";
   return {
     worktree: found.run.worktree,
-    branch: found.run.branch,
+    branch: found.records.finalBranch ?? found.run.branch,
     report: found.records.reportBody,
     agentRef: found.run.agentRef,
     agentMayBeAlive: found.run.agentResult === "runner-disconnected" || found.run.runnerUnreached,

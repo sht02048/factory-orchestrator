@@ -1105,7 +1105,13 @@ describe("이어서 맡기기(0149)", () => {
       runnerName: "runner-a",
       place: "same-worktree",
       hasReport: true,
+      hasWorkspaceBrief: false,
     });
+    saveWorkspaceBrief(db, {
+      id: toWorkspaceId(found(db, id).workspace.id),
+      brief: { before: "먼저 규칙을 읽어요.", after: "" },
+    });
+    expect(found(db, id).continueOffer?.hasWorkspaceBrief).toBe(true);
     const running = ids.get("ACME-10");
     if (running === undefined) throw new Error("no ACME-10");
     expect(found(db, running).continueOffer).toBeNull();

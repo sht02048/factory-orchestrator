@@ -328,6 +328,7 @@ export interface Runner {
     continueIn?: WorktreeRef;
   }): Promise<StartedRun | null>;
   prepareContinuation(input: PrepareContinuationInput): Promise<ContinuationPlace>;
+  readWorktreeBranch(worktree: WorktreeRef): Promise<string | null>;
 
   pollRun(run: RunOnRunner): Promise<RunProgress>;
   answerQuestion(

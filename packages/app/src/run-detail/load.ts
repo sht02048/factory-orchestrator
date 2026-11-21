@@ -11,6 +11,7 @@ import {
   getLogTailRequest,
   getRun,
   getRunWithRecords,
+  getWorkspaceBrief,
   getWorkspaceTrackerProject,
   getRunCancelRequest,
   continueRunBlock,
@@ -167,6 +168,7 @@ function continueOfferOf(
   runnerName: string | null,
 ): ContinueOffer | null {
   if (continueRunBlock(db, run.id) !== null) return null;
+  const brief = getWorkspaceBrief(db, run.workspaceId);
   return {
     sourceNumber: ticketRuns.findIndex((other) => other.id === run.id) + 1,
     nextNumber: ticketRuns.length + 1,
@@ -177,6 +179,7 @@ function continueOfferOf(
         ? "same-worktree"
         : "recreated",
     hasReport: (records.reportBody?.trim() ?? "") !== "",
+    hasWorkspaceBrief: brief !== null && (brief.before.trim() !== "" || brief.after.trim() !== ""),
   };
 }
 

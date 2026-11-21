@@ -240,6 +240,7 @@ async function followWorktree(
   endedRecords: RunRecords,
   runnersById: ReadonlyMap<StoredRunner["id"], StoredRunner>,
 ): Promise<void> {
+  await rememberFinalBranch(context, ended, endedRecords, runnersById.get(ended.runnerId));
   if (endedRecords.worktreeRemovedAt === null && endedRecords.worktreeRemoveRequestedAt !== null) {
     await removeWorktree(context, ended, runnersById.get(ended.runnerId));
     return;
@@ -271,6 +272,26 @@ async function followWorktree(
     case "operator-decides":
     case "nothing-to-remove":
       return;
+  }
+}
+
+async function rememberFinalBranch(
+  context: TickContext,
+  run: StartedEndedRun,
+  records: RunRecords,
+  stored: StoredRunner | undefined,
+): Promise<void> {
+  if (stored === undefined || !stored.online) return;
+  if (records.finalBranch !== null || records.worktreeRemovedAt !== null) return;
+  if (context.finalBranchRead.has(run.id)) return;
+  if (worktreeTakenOverBy(context.db, run.id) !== null) return;
+  try {
+    const finalBranch = await context.adapters.runner(stored).readWorktreeBranch(run.worktree);
+    context.finalBranchRead.add(run.id);
+    if (finalBranch === null) return;
+    tryWrite(context, run.id, () => updateRunRecords(context.db, run.id, { finalBranch }));
+  } catch (error) {
+    context.logger.debug("run.final_branch_read_failed", { runId: run.id, error });
   }
 }
 

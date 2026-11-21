@@ -166,6 +166,24 @@ describe("이어서 맡기기", () => {
     expect(getRun(h.db, other.id)?.state).toBe("running");
   });
 
+  it("에이전트가 런 중에 바꾼 브랜치로 지워진 워크트리를 다시 만든다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    const fake = h.runner(source.runnerId);
+    fake.currentBranches.set(source.worktree, "acme/renamed");
+    const worker = h.worker();
+    await worker.tick();
+    expect(getRunWithRecords(h.db, source.id)?.records.finalBranch).toBe("acme/renamed");
+    fake.currentBranches.delete(source.worktree);
+    fake.deleteWorktree(source.worktree);
+
+    const next = continued(source.id);
+    await worker.tick();
+
+    expect(fake.prepareCalls.at(-1)?.branch).toBe("acme/renamed");
+    expect(getRun(h.db, next.id)).toMatchObject({ state: "running", branch: "acme/renamed" });
+  });
+
   it("브랜치도 없으면 새 워크트리에서 티켓과 함께 처음부터 시작한다", async () => {
     const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const source = await endedRun(runnerId);

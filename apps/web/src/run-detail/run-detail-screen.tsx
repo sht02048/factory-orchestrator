@@ -793,7 +793,7 @@ function ContinueRun({
   };
   const sends = [
     ...(offer.hasReport ? [t("sendsReport", { source: offer.sourceNumber })] : []),
-    t("sendsBrief"),
+    ...(offer.hasWorkspaceBrief ? [t("sendsBrief")] : []),
     t("sendsProtocol"),
   ];
   return (

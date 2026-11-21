@@ -224,6 +224,7 @@ export class FakeRunner implements Runner {
   readonly startCalls: StartRunInput[] = [];
   readonly prepareCalls: PrepareContinuationInput[] = [];
   readonly goneBranches = new Set<string>();
+  readonly currentBranches = new Map<WorktreeRef, string>();
   readonly recreatedWorktrees = new Map<WorktreeRef, string>();
   failNextPrepare: RunnerErrorDetail | null = null;
   online = true;
@@ -463,6 +464,15 @@ export class FakeRunner implements Runner {
     });
   }
 
+  readWorktreeBranch(worktree: WorktreeRef): Promise<string | null> {
+    return this.reach(() => {
+      const moved = this.currentBranches.get(worktree);
+      if (moved !== undefined) return moved;
+      const found = [...this.runs.values()].find((run) => run.started.worktree === worktree);
+      return found?.started.branch ?? null;
+    });
+  }
+
   private stopByRef(agentRef: AgentRef): void {
     for (const run of this.runs.values()) {
       if (run.started.agentRef !== agentRef) continue;
@@ -478,6 +488,8 @@ export class FakeRunner implements Runner {
 
   private branchOf(input: StartRunInput): string {
     if (input.continueIn === undefined) return `fake/${input.worktreeName}`;
+    const moved = this.currentBranches.get(input.continueIn);
+    if (moved !== undefined) return moved;
     const recreated = this.recreatedWorktrees.get(input.continueIn);
     if (recreated !== undefined) return recreated;
     const source = [...this.runs.values()].find((run) => run.started.worktree === input.continueIn);

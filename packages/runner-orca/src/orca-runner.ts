@@ -62,10 +62,12 @@ import {
   hasUncommittedChanges,
   addTrackingWorktreeArgv,
   addWorktreeArgv,
+  currentBranchArgv,
   fetchBranchArgv,
   gitSucceeded,
   hasUnpushedCommits,
   localBranchArgv,
+  parseCurrentBranch,
   parseWorktreeList,
   refFound,
   remoteBranchArgv,
@@ -498,16 +500,17 @@ export class OrcaRunner implements Runner {
     const entries = parseWorktreeList(await this.run(worktreeListArgv(repoPath)));
     const current = entries.find((entry) => entry.path === path && !entry.prunable);
     if (current !== undefined) {
-      if (current.branch === input.branch) {
-        if (input.stopAgent !== undefined)
-          await this.stopPreviousAgent(input.stopAgent, input.worktree);
-        return "same-worktree";
+      if (current.branch === null) {
+        throw new AdapterError<RunnerErrorDetail>({
+          kind: "runner-error",
+          code: "worktree_detached",
+          message: `worktree ${path} is not on a branch`,
+        });
       }
-      throw new AdapterError<RunnerErrorDetail>({
-        kind: "runner-error",
-        code: "worktree_branch_changed",
-        message: `worktree ${path} is no longer on branch ${input.branch}`,
-      });
+      if (input.stopAgent !== undefined) {
+        await this.stopPreviousAgent(input.stopAgent, input.worktree);
+      }
+      return "same-worktree";
     }
     const elsewhere = entries.find((entry) => entry.branch === input.branch && !entry.prunable);
     if (elsewhere !== undefined) {
@@ -547,6 +550,10 @@ export class OrcaRunner implements Runner {
       "git worktree add",
     );
     return "recreated";
+  }
+
+  async readWorktreeBranch(worktree: WorktreeRef): Promise<string | null> {
+    return parseCurrentBranch(await this.run(currentBranchArgv(worktreePathOf(worktree))));
   }
 
   private async stopPreviousAgent(agentRef: AgentRef, worktree: WorktreeRef): Promise<void> {

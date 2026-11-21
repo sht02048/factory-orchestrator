@@ -78,6 +78,7 @@ export interface RunRecords {
   agentBrief: string | null;
   continueMessage: string | null;
   continuePlace: ContinuationPlace | null;
+  finalBranch: string | null;
   pullRequest: {
     id: PullRequestId;
     displayId: string;
@@ -194,6 +195,7 @@ function toRunRecords(row: RunRow): RunRecords {
     agentBrief: row.agentBrief,
     continueMessage: row.continueMessage,
     continuePlace: row.continuePlace,
+    finalBranch: row.finalBranch,
     pullRequest:
       row.prId === null || row.prCheckedAt === null
         ? null
@@ -941,6 +943,7 @@ export function updateRunRecords(
     if (patch.worktreeRemovedAt !== null) set.worktreeRemoveRequestedAt = null;
   }
   if (patch.worktreeKept !== undefined) set.worktreeKept = patch.worktreeKept;
+  if (patch.finalBranch !== undefined) set.finalBranch = patch.finalBranch;
   if (patch.trackerStateSetAt !== undefined) set.trackerStateSetAt = patch.trackerStateSetAt;
   if (patch.trackerComment !== undefined) {
     set.trackerCommentId = patch.trackerComment?.id ?? null;

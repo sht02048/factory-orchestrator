@@ -118,6 +118,7 @@ export interface ContinueOffer {
   runnerName: string | null;
   place: "same-worktree" | "recreated";
   hasReport: boolean;
+  hasWorkspaceBrief: boolean;
 }
 
 export interface RunDetail {

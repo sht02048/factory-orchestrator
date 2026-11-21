@@ -40,6 +40,16 @@ interface WorktreeTarget {
   branch: string;
 }
 
+export function currentBranchArgv(path: string): string[] {
+  return ["git", "-C", path, "symbolic-ref", "--quiet", "--short", "HEAD"];
+}
+
+export function parseCurrentBranch(result: RemoteResult): string | null {
+  if (!result.timedOut && (result.exitCode === 1 || result.exitCode === 128)) return null;
+  const branch = parseGitOutput(result, z.string().trim().min(1), "git symbolic-ref");
+  return branch;
+}
+
 export function worktreeListArgv(repoPath: string): string[] {
   return ["git", "-C", repoPath, "worktree", "list", "--porcelain"];
 }

@@ -28,6 +28,7 @@ export const LOG_EVENTS = {
 
   "run.assigned": "assigned a ticket to a run",
   "run.continued": "started a new run that continues an ended run",
+  "run.final_branch_read_failed": "could not read the branch an ended run finished on",
   "run.runner_chosen": "chose a runner for a queued run",
   "run.state_changed": "changed run state",
   "run.state_change_failed": "could not change run state",

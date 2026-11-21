@@ -1574,12 +1574,34 @@ describe("prepareContinuation", () => {
     expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
   });
 
-  test("워크트리가 다른 브랜치로 바뀌었으면 그 자리에서 일하지 않는다", async () => {
+  test("에이전트가 브랜치를 바꿨어도 워크트리가 있으면 그 자리에서 이어 간다", async () => {
     const exec = git(projectExec(), "worktree list", list(main, here("other")));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("same-worktree");
+  });
+
+  test("워크트리가 브랜치에 있지 않으면 그 자리에서 일하지 않는다", async () => {
+    const detached = `worktree ${path}\nHEAD bbb\ndetached`;
+    const exec = git(projectExec(), "worktree list", list(main, detached));
     expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
       kind: "runner-error",
-      code: "worktree_branch_changed",
+      code: "worktree_detached",
     });
+  });
+
+  test("끝난 때의 브랜치를 읽고, 워크트리가 없거나 브랜치가 아니면 null이다", async () => {
+    const at = `git -C ${path} symbolic-ref`;
+    expect(
+      await runnerWith(new ScriptedExec().on(at, stdout("feat/x\n"))).readWorktreeBranch(
+        input.worktree,
+      ),
+    ).toBe("feat/x");
+    for (const code of [1, 128]) {
+      expect(
+        await runnerWith(new ScriptedExec().on(at, stdout("", code))).readWorktreeBranch(
+          input.worktree,
+        ),
+      ).toBeNull();
+    }
   });
 
   test("워크트리가 없고 로컬 브랜치가 있으면 같은 경로에 다시 만든다", async () => {

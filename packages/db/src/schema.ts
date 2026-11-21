@@ -283,6 +283,7 @@ export const runs = sqliteTable(
     continuedFromRunId: text("continued_from_run_id").$type<RunId>(),
     continueMessage: text("continue_message"),
     continuePlace: text("continue_place", { enum: CONTINUATION_PLACES }),
+    finalBranch: text("final_branch"),
     prId: text("pr_id").$type<PullRequestId>(),
     prDisplayId: text("pr_display_id"),
     prUrl: text("pr_url"),

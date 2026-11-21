@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "a35bd1d3-f6c5-4b7a-8ad5-aab3c0b17e5c",
+  "id": "0163c814-4c6f-466b-805a-6e06908c9703",
   "prevIds": ["ae5cd444-cfea-4a40-88d3-5b8f743f075b"],
   "ddl": [
     {
@@ -1645,6 +1645,16 @@
     {
       "table": "runs",
       "name": "continue_place",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "final_branch",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
