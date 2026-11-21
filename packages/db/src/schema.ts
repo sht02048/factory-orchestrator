@@ -17,6 +17,7 @@ import { NOTIFICATION_EVENT_KINDS } from "./notification-events-model.js";
 import type {
   FollowUpRef,
   AgentMessageRequestId,
+  RunActionRequestId,
   AgentId,
   AgentRef,
   CodeHostKind,
@@ -545,6 +546,22 @@ export const runAgentMessages = sqliteTable(
       .on(t.id)
       .where(sql`${t.completedAt} IS NULL`),
   ],
+);
+
+export const runActionRequests = sqliteTable(
+  "run_action_requests",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    requestId: text("request_id").notNull().$type<RunActionRequestId>(),
+    fingerprint: text("fingerprint").notNull(),
+    resultRunId: text("result_run_id").$type<RunId>(),
+    handledAt: timeMs("handled_at").notNull(),
+  },
+  (t) => [uniqueIndex("run_action_requests_once").on(t.runId, t.requestId)],
 );
 
 export const runCancelRequests = sqliteTable("run_cancel_requests", {

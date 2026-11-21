@@ -10,7 +10,12 @@ import { pendingInput } from "@ganger/app/home/load";
 import { mcpClientName } from "@ganger/app/mcp/actions";
 import type { McpWriteTool } from "@ganger/app/mcp/actions";
 import { powerSettingsStore } from "@ganger/app/power-settings";
-import { cancelRunRequest } from "@ganger/app/run-detail/actions";
+import {
+  cancelRunOnce,
+  cancelRunRequest,
+  runActionRequestId,
+  submitAnswerOnce,
+} from "@ganger/app/run-detail/actions";
 import { requestRunLogTail } from "@ganger/app/run-detail/load";
 import {
   RUNNER_CAPACITY_MAX,
@@ -97,6 +102,11 @@ const workspaceArg = z
   .optional()
   .describe("Workspace id or name. Leave it out when there is only one workspace.");
 const runIdArg = z.string().min(1).max(200).describe("Run id, as list_runs or get_run gives it.");
+const requestIdArg = runActionRequestId
+  .optional()
+  .describe(
+    "Optional id of 16 to 64 characters. Calling again with the same id and values does the action once and returns the same result.",
+  );
 const connectionArg = z
   .string()
   .min(1)
@@ -391,8 +401,9 @@ export function registerWriteTools(
       runId: runIdArg,
       questionId: z.string().min(1).max(200).optional(),
       answer: z.string().trim().min(1).max(10_000),
+      requestId: requestIdArg,
     },
-    ({ runId, questionId, answer }) => {
+    ({ runId, questionId, answer, requestId }) => {
       const run = findRun(runId);
       if (run === null) return noRun(runId);
       const base = { target: run.ticket.key, runId: run.id };
@@ -408,7 +419,8 @@ export function registerWriteTools(
       try {
         const input = screenChecked(answerInput, { runId: run.id, questionId: id, answer }, base);
         if (!input.ok) return input.outcome;
-        submitAnswer(context.db, input.data, context.now());
+        if (requestId === undefined) submitAnswer(context.db, input.data, context.now());
+        else submitAnswerOnce(context.db, { ...input.data, requestId }, context.now());
       } catch (error) {
         if (!(error instanceof AnswerRejectedError)) throw error;
         return rejected({
@@ -475,12 +487,15 @@ export function registerWriteTools(
         "Cancels a run that has not ended, the same as Cancel on Run detail. This cannot be undone.",
       annotations: DESTRUCTIVE,
     },
-    { runId: runIdArg },
-    ({ runId }) => {
+    { runId: runIdArg, requestId: requestIdArg },
+    ({ runId, requestId }) => {
       const run = findRun(runId);
       if (run === null) return noRun(runId);
       const base = { target: run.ticket.key, runId: run.id };
-      const canceled = cancelRunRequest(context.db, run.id, context.now());
+      const canceled =
+        requestId === undefined
+          ? cancelRunRequest(context.db, run.id, context.now())
+          : cancelRunOnce(context.db, { runId: run.id, requestId }, context.now());
       if (!canceled.ok) {
         return rejected({
           ...base,

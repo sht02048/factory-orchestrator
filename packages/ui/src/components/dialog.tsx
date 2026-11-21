@@ -26,6 +26,7 @@ import {
 export interface DialogProps {
   trigger: ReactNode;
   triggerVariant?: ButtonVariant;
+  triggerBusy?: boolean;
   title: ReactNode;
   description?: ReactNode;
   children?: ReactNode;
@@ -39,6 +40,7 @@ export interface DialogProps {
 export function Dialog({
   trigger,
   triggerVariant = "secondary",
+  triggerBusy = false,
   title,
   description,
   children,
@@ -55,7 +57,11 @@ export function Dialog({
         ? {}
         : { onOpenChange: (next: boolean) => onOpenChange(next) })}
     >
-      <DialogTrigger data-variant={triggerVariant} className={cx(...buttonStyles(triggerVariant))}>
+      <DialogTrigger
+        {...(triggerBusy ? { "aria-busy": true, "aria-disabled": true } : {})}
+        data-variant={triggerVariant}
+        className={cx(...buttonStyles(triggerVariant))}
+      >
         {trigger}
       </DialogTrigger>
       <DialogBackdrop {...windowRegion("no-drag")} className={cx(styles.backdrop)} />

@@ -1,7 +1,13 @@
-import { AGENT_MESSAGE_MAX_LENGTH, toAgentMessageRequestId, toRunId } from "@ganger/core";
-import type { RunId } from "@ganger/core";
+import {
+  AGENT_MESSAGE_MAX_LENGTH,
+  toAgentMessageRequestId,
+  toRunActionRequestId,
+  toRunId,
+} from "@ganger/core";
+import type { RunControl, RunId } from "@ganger/core";
 import {
   continueRun,
+  handleRunActionOnce,
   requestAgentMessage,
   requestPreviousAgentStop,
   requestRunCancel,
@@ -10,8 +16,46 @@ import {
 import type { ContinueRunBlock } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { z } from "zod";
+import {
+  AnswerRejectedError,
+  answerInput,
+  humanCheckAnswerInput,
+  submitAnswer,
+  submitHumanCheckAnswer,
+} from "../home/actions.js";
+import { requestControl } from "../run-control.js";
 
 export type RunActionResult = { ok: true } | { ok: false; reason: string };
+
+export const REQUEST_REUSED = "request-reused";
+
+export const runActionRequestId = z.string().min(16).max(64);
+
+interface RunActionKey {
+  runId: string;
+  requestId: string;
+}
+
+function onceForRun(
+  db: Database,
+  key: RunActionKey,
+  action: string,
+  payload: ReadonlyArray<string>,
+  now: Date,
+  act: () => RunActionResult,
+): RunActionResult {
+  return handleRunActionOnce<RunActionResult>(
+    db,
+    {
+      runId: toRunId(key.runId),
+      requestId: toRunActionRequestId(key.requestId),
+      action,
+      payload,
+    },
+    now,
+    { act, replay: () => ({ ok: true }), reused: () => ({ ok: false, reason: REQUEST_REUSED }) },
+  );
+}
 
 export function cancelRunRequest(db: Database, runId: string, now: Date): RunActionResult {
   const result = requestRunCancel(db, toRunId(runId), now);
@@ -24,7 +68,7 @@ export function removeWorktreeRequest(db: Database, runId: string, now: Date): R
 
 export type ContinueRunActionResult =
   | { ok: true; runId: RunId }
-  | { ok: false; reason: ContinueRunBlock };
+  | { ok: false; reason: ContinueRunBlock | typeof REQUEST_REUSED };
 
 export function continueRunRequest(
   db: Database,
@@ -63,4 +107,103 @@ export function sendAgentMessageRequest(
     now,
   );
   return result.ok ? { ok: true } : result;
+}
+
+export function cancelRunOnce(db: Database, key: RunActionKey, now: Date): RunActionResult {
+  return onceForRun(db, key, "cancel", [], now, () => cancelRunRequest(db, key.runId, now));
+}
+
+export function removeWorktreeOnce(db: Database, key: RunActionKey, now: Date): RunActionResult {
+  return onceForRun(db, key, "remove-worktree", [], now, () =>
+    removeWorktreeRequest(db, key.runId, now),
+  );
+}
+
+export function stopPreviousAgentOnce(db: Database, key: RunActionKey, now: Date): RunActionResult {
+  return onceForRun(db, key, "stop-previous-agent", [], now, () =>
+    stopPreviousAgentRequest(db, toRunId(key.runId), now),
+  );
+}
+
+export function controlRunOnce(
+  db: Database,
+  key: RunActionKey,
+  control: RunControl,
+  now: Date,
+): RunActionResult {
+  return onceForRun(db, key, "control", [control], now, () =>
+    requestControl(db, key.runId, control, now),
+  );
+}
+
+export function continueRunOnce(
+  db: Database,
+  key: RunActionKey,
+  message: string,
+  now: Date,
+): ContinueRunActionResult {
+  const from = toRunId(key.runId);
+  return handleRunActionOnce<ContinueRunActionResult>(
+    db,
+    {
+      runId: from,
+      requestId: toRunActionRequestId(key.requestId),
+      action: "continue",
+      payload: [message],
+    },
+    now,
+    {
+      act: () => continueRunRequest(db, from, message, now),
+      replay: (resultRunId) =>
+        resultRunId === null
+          ? { ok: false, reason: REQUEST_REUSED }
+          : { ok: true, runId: resultRunId },
+      reused: () => ({ ok: false, reason: REQUEST_REUSED }),
+      resultRunId: (result) => (result.ok ? result.runId : null),
+    },
+  );
+}
+
+export const answerOnceInput = answerInput.extend({ requestId: runActionRequestId });
+
+export function submitAnswerOnce(
+  db: Database,
+  { requestId, ...answer }: z.infer<typeof answerOnceInput>,
+  now: Date,
+): void {
+  const result = onceForRun(
+    db,
+    { runId: answer.runId, requestId },
+    "answer",
+    [answer.questionId, answer.answer],
+    now,
+    () => {
+      submitAnswer(db, answer, now);
+      return { ok: true };
+    },
+  );
+  if (!result.ok) throw new AnswerRejectedError("already-answered");
+}
+
+export const humanCheckOnceInput = humanCheckAnswerInput.extend({
+  requestId: runActionRequestId,
+});
+
+export function submitHumanCheckOnce(
+  db: Database,
+  { requestId, ...check }: z.infer<typeof humanCheckOnceInput>,
+  now: Date,
+): void {
+  const result = onceForRun(
+    db,
+    { runId: check.runId, requestId },
+    "human-check",
+    [check.questionId, check.decision, check.note],
+    now,
+    () => {
+      submitHumanCheckAnswer(db, check, now);
+      return { ok: true };
+    },
+  );
+  if (!result.ok) throw new AnswerRejectedError("already-answered");
 }

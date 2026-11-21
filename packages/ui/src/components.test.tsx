@@ -455,6 +455,25 @@ describe("서버 렌더", () => {
     ]);
   });
 
+  it("Dialog 의 triggerBusy 는 트리거를 막힌 상태로 드러내고, 없으면 그대로 둔다(0156)", () => {
+    const busy = renderToString(
+      <Dialog
+        trigger="지우기"
+        triggerBusy
+        title="지울까요?"
+        actions={<DialogClose>취소</DialogClose>}
+      />,
+    );
+    const idle = renderToString(
+      <Dialog trigger="지우기" title="지울까요?" actions={<DialogClose>취소</DialogClose>} />,
+    );
+
+    expect(busy).toContain('aria-busy="true"');
+    expect(busy).toContain('aria-disabled="true"');
+    expect(idle).not.toContain("aria-busy");
+    expect(idle).not.toContain("aria-disabled");
+  });
+
   it("레일 Menu 는 펼침 화살표 없이 트리거 내용만 그린다", () => {
     const rail = renderToString(
       <Menu variant="rail" label="Workspace 바꾸기" trigger="Acme">

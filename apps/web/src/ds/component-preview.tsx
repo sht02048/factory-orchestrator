@@ -534,6 +534,14 @@ export function ComponentSections() {
                 </>
               }
             />
+            <Dialog
+              trigger={t("dialog.busyTrigger")}
+              triggerBusy
+              open={false}
+              onOpenChange={() => undefined}
+              title={t("dialog.title")}
+              actions={<DialogClose>{t("dialog.cancel")}</DialogClose>}
+            />
           </Demo>
         </Section>
       </div>

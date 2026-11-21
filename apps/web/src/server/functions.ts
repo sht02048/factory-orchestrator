@@ -1,26 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
-import { CONTINUE_MESSAGE_MAX_LENGTH, toRunId } from "@ganger/core";
+import { CONTINUE_MESSAGE_MAX_LENGTH } from "@ganger/core";
 import { markAllTrackersChanged } from "@ganger/db";
 import { z } from "zod";
-import {
-  answerInput,
-  denyInput,
-  humanCheckAnswerInput,
-  submitAnswer,
-  submitDenial,
-  submitHumanCheckAnswer,
-} from "@ganger/app/home/actions";
+import { denyInput, submitDenial } from "@ganger/app/home/actions";
 import { loadHomePage } from "@ganger/app/home/load";
 import {
   agentMessageInput,
-  cancelRunRequest,
-  continueRunRequest,
-  removeWorktreeRequest,
+  answerOnceInput,
+  cancelRunOnce,
+  continueRunOnce,
+  controlRunOnce,
+  humanCheckOnceInput,
+  removeWorktreeOnce,
+  runActionRequestId,
   sendAgentMessageRequest,
-  stopPreviousAgentRequest,
+  stopPreviousAgentOnce,
+  submitAnswerOnce,
+  submitHumanCheckOnce,
 } from "@ganger/app/run-detail/actions";
-import { requestControl } from "@ganger/app/run-control";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
 import { loadRunnersPage } from "@ganger/app/runners/load";
 import { pickConditions, runConditionsSchema } from "@ganger/app/runs/conditions";
@@ -58,12 +56,12 @@ export const getHomePage = createServerFn({ method: "GET" })
   );
 
 export const answerQuestion = createServerFn({ method: "POST" })
-  .validator(answerInput)
-  .handler(({ data }) => submitAnswer(getDatabase(), data, new Date()));
+  .validator(answerOnceInput)
+  .handler(({ data }) => submitAnswerOnce(getDatabase(), data, new Date()));
 
 export const answerHumanCheck = createServerFn({ method: "POST" })
-  .validator(humanCheckAnswerInput)
-  .handler(({ data }) => submitHumanCheckAnswer(getDatabase(), data, new Date()));
+  .validator(humanCheckOnceInput)
+  .handler(({ data }) => submitHumanCheckOnce(getDatabase(), data, new Date()));
 
 export const denyPermission = createServerFn({ method: "POST" })
   .validator(denyInput)
@@ -107,13 +105,15 @@ export const requestRunLog = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string() }))
   .handler(({ data }) => requestRunLogTail(getDatabase(), data.runId, new Date()));
 
+const runActionKey = z.object({ runId: z.string().min(1), requestId: runActionRequestId });
+
 export const cancelRun = createServerFn({ method: "POST" })
-  .validator(z.object({ runId: z.string() }))
-  .handler(({ data }) => cancelRunRequest(getDatabase(), data.runId, new Date()));
+  .validator(runActionKey)
+  .handler(({ data }) => cancelRunOnce(getDatabase(), data, new Date()));
 
 export const removeRunWorktree = createServerFn({ method: "POST" })
-  .validator(z.object({ runId: z.string() }))
-  .handler(({ data }) => removeWorktreeRequest(getDatabase(), data.runId, new Date()));
+  .validator(runActionKey)
+  .handler(({ data }) => removeWorktreeOnce(getDatabase(), data, new Date()));
 
 const continueMessageSchema = z
   .string()
@@ -122,22 +122,20 @@ const continueMessageSchema = z
   .refine((text) => Array.from(text).length <= CONTINUE_MESSAGE_MAX_LENGTH);
 
 export const continueRunFrom = createServerFn({ method: "POST" })
-  .validator(z.object({ runId: z.string(), message: continueMessageSchema }))
-  .handler(({ data }) =>
-    continueRunRequest(getDatabase(), toRunId(data.runId), data.message, new Date()),
-  );
+  .validator(runActionKey.extend({ message: continueMessageSchema }))
+  .handler(({ data }) => continueRunOnce(getDatabase(), data, data.message, new Date()));
 
 export const stopPreviousAgent = createServerFn({ method: "POST" })
-  .validator(z.object({ runId: z.string() }))
-  .handler(({ data }) => stopPreviousAgentRequest(getDatabase(), toRunId(data.runId), new Date()));
+  .validator(runActionKey)
+  .handler(({ data }) => stopPreviousAgentOnce(getDatabase(), data, new Date()));
 
 export const sendAgentMessage = createServerFn({ method: "POST" })
   .validator(agentMessageInput)
   .handler(({ data }) => sendAgentMessageRequest(getDatabase(), data, new Date()));
 
 export const controlRun = createServerFn({ method: "POST" })
-  .validator(z.object({ runId: z.string(), control: z.enum(["pause", "resume"]) }))
-  .handler(({ data }) => requestControl(getDatabase(), data.runId, data.control, new Date()));
+  .validator(runActionKey.extend({ control: z.enum(["pause", "resume"]) }))
+  .handler(({ data }) => controlRunOnce(getDatabase(), data, data.control, new Date()));
 
 export const getTicketRuns = createServerFn({ method: "GET" })
   .validator(z.object({ ws: z.string().optional() }))
