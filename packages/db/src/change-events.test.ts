@@ -116,7 +116,6 @@ function world(): World {
       trackerProject,
       runnerProject: repoA,
       agent,
-      runnerId,
     });
     if (!result.ok) throw new Error(result.reason);
     return result.run.id;

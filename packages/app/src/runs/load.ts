@@ -18,6 +18,7 @@ import {
   listRunners,
   listWorkspaces,
   toWorkspaceId,
+  isPinnedToRunner,
 } from "@ganger/db";
 import type { Database, EndedAxesFilter, RunRecords, StoredRun } from "@ganger/db";
 import { isWebUrl } from "../format/url.js";
@@ -60,7 +61,7 @@ export function loadRunsPage(
                 agent: run.agent,
                 runnerId: run.runnerId,
                 unstartable: false,
-                pinnedToRunner: run.continuedFromRunId !== null,
+                pinnedToRunner: isPinnedToRunner(run),
                 startRequested: records.startRequestedAt !== null,
               },
             ]

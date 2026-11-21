@@ -183,7 +183,7 @@ export class Harness {
     return fake;
   }
 
-  assign(key: string, project: RunnerProjectId): StoredRun {
+  assign(key: string, project: RunnerProjectId, runnerId?: RunnerId): StoredRun {
     const ticketKey = toTicketKey(key);
     this.tracker.addTicket({
       key: ticketKey,
@@ -201,6 +201,7 @@ export class Harness {
       trackerProject,
       runnerProject: project,
       agent,
+      ...(runnerId === undefined ? {} : { runnerId }),
       now: this.now,
     });
     if (!result.ok) throw new Error(`assign failed: ${result.reason}`);

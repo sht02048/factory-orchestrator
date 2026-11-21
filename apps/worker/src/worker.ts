@@ -46,6 +46,7 @@ import {
   recordStartRequested,
   setQueuedRunRunner,
   setRunnerMailbox,
+  isPinnedToRunner,
 } from "@ganger/db";
 import type { RunRecords, SecretBox, StoredRun } from "@ganger/db";
 import { log, withLogContext } from "@ganger/log";
@@ -417,7 +418,7 @@ function toQueuedRun(context: TickContext, run: StoredRun): QueuedRun[] {
       agent: run.agent,
       runnerId: run.runnerId,
       unstartable: mapping === null,
-      pinnedToRunner: run.continuedFromRunId !== null,
+      pinnedToRunner: isPinnedToRunner(run),
     },
   ];
 }

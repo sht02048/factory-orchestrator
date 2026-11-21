@@ -611,6 +611,24 @@ describe("changeRunState", () => {
     expect(getRunWithRecords(db, id)?.run).toMatchObject({ startedAt: at(1), endedAt: at(5) });
   });
 
+  it("직접 고른 러너는 비우거나 바꿀 수 없고 자동으로 정한 러너는 바꿀 수 있다", () => {
+    const db = seededDatabase();
+    const first = addRunner(db, { id: "r1", capacity: 1, online: true, projects: [repoA] });
+    const second = addRunner(db, { id: "r2", capacity: 1, online: true, projects: [repoA] });
+
+    const chosen = assign(db, "ENG-1", { runnerId: first });
+    if (!chosen.ok) throw new Error(chosen.reason);
+    expect(chosen.run).toMatchObject({ runnerId: first, runnerChosen: true });
+    expect(setQueuedRunRunner(db, chosen.run.id, null)).toBe(false);
+    expect(setQueuedRunRunner(db, chosen.run.id, second)).toBe(false);
+    expect(getRunWithRecords(db, chosen.run.id)?.run.runnerId).toBe(first);
+
+    const automatic = assign(db, "ENG-2");
+    if (!automatic.ok) throw new Error(automatic.reason);
+    expect(automatic.run).toMatchObject({ runnerChosen: false });
+    expect(setQueuedRunRunner(db, automatic.run.id, second)).toBe(true);
+  });
+
   it("Queued 런의 러너를 비우고 다시 정해도 할당 시각(대기열 자리)은 그대로다", () => {
     const db = seededDatabase();
     const runner = addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });

@@ -28,6 +28,7 @@ import {
   listWorkspaces,
   requestLogTail,
   worktreeTakenOverBy,
+  isPinnedToRunner,
 } from "@ganger/db";
 import type {
   Database,
@@ -325,7 +326,7 @@ function queuedReasonOf(db: Database, runId: RunId, now: Date): QueuedReason {
                 agent: run.agent,
                 runnerId: run.runnerId,
                 unstartable: false,
-                pinnedToRunner: run.continuedFromRunId !== null,
+                pinnedToRunner: isPinnedToRunner(run),
                 startRequested: records.startRequestedAt !== null,
               },
             ]

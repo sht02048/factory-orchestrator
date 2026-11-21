@@ -253,6 +253,37 @@ describe("이어서 맡기기", () => {
     expect(getRun(h.db, other.id)).toMatchObject({ state: "running", runnerId: otherRunner });
   });
 
+  it("직접 고른 러너가 꽉 차면 그 런은 기다리고 다른 런은 빈 러너에서 시작한다", async () => {
+    const chosenRunner = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const blocker = h.assign("ENG-1", projectA, chosenRunner);
+    const worker = h.worker();
+    await worker.tick();
+    expect(getRun(h.db, blocker.id)).toMatchObject({ state: "running", runnerId: chosenRunner });
+
+    const freeRunner = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const chosen = h.assign("ENG-2", projectA, chosenRunner);
+    const other = h.assign("ENG-3", projectA);
+    await worker.tick();
+
+    expect(getRun(h.db, chosen.id)).toMatchObject({ state: "queued", runnerId: chosenRunner });
+    expect(getRun(h.db, other.id)).toMatchObject({ state: "running", runnerId: freeRunner });
+  });
+
+  it("자동으로 정한 러너가 꽉 차면 빈 러너로 옮겨 시작한다", async () => {
+    const fullRunner = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const blocker = h.assign("ENG-1", projectA);
+    const worker = h.worker();
+    await worker.tick();
+    expect(getRun(h.db, blocker.id)).toMatchObject({ state: "running", runnerId: fullRunner });
+
+    const automatic = h.assign("ENG-2", projectA);
+    expect(automatic).toMatchObject({ runnerId: fullRunner, runnerChosen: false });
+    const freeRunner = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    await worker.tick();
+
+    expect(getRun(h.db, automatic.id)).toMatchObject({ state: "running", runnerId: freeRunner });
+  });
+
   it("다시 만든 워크트리는 시작하지 못해도 이전 런의 남은 워크트리로 돌아온다", async () => {
     const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const source = await endedRun(runnerId);
