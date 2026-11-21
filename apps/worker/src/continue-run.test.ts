@@ -322,6 +322,28 @@ describe("이어서 맡기기", () => {
     expect(getRun(h.db, next.id)).toMatchObject({ state: "running", worktree });
   });
 
+  it("워크트리 없음으로 끝난 런의 에이전트도 멈춘 뒤 이어서 시작한다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    await h.worker().tick();
+    const ended = changeRunState(
+      h.db,
+      run.id,
+      { to: "ended", agentResult: "worktree-missing", prState: "none" },
+      h.now,
+    );
+    if (!ended.ok || ended.run.state !== "ended" || ended.run.agentRef === null) {
+      throw new Error("could not end run");
+    }
+    const fake = h.runner(runnerId);
+
+    continued(run.id);
+    await h.worker().tick();
+
+    expect(fake.prepareCalls.at(-1)?.stopAgent).toBe(ended.run.agentRef);
+    expect(fake.runs.get(run.worktreeName)?.agentStopped).toBe(true);
+  });
+
   it("이어 받은 뒤에는 이전 런이 워크트리를 지우지 못한다", async () => {
     const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const source = await endedRun(runnerId);

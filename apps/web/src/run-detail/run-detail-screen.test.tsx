@@ -1134,6 +1134,18 @@ describe("이어서 맡기기(0149)", () => {
     expect(found(db, id).continueOffer?.place).toBe("recreated");
   });
 
+  it("Queued 동안에는 기록한 곳이 있어도 아직 확인 중이라고 보인다", () => {
+    const { db } = seedDatabase();
+    const id = keptRun(db);
+    const result = continueRunRequest(db, id, "이어 주세요", minutes(560));
+    if (!result.ok) throw new Error(result.reason);
+    recordContinuePlace(db, result.runId, "recreated");
+
+    const body = text(render({ kind: "found", run: found(db, result.runId) }));
+    expect(body).toContain(runJson.continuation.place.pending);
+    expect(body).not.toContain(runJson.continuation.place.recreated);
+  });
+
   it("이어 받은 런이 시작하기 전에 끝나면 이어 받은 곳 대신 그 사실을 보인다", () => {
     const { db } = seedDatabase();
     const id = keptRun(db);
@@ -1198,6 +1210,7 @@ describe("이어서 맡기기(0149)", () => {
       const result = continueRunRequest(db, id, "이어 주세요", minutes(560));
       if (!result.ok) throw new Error(result.reason);
       recordContinuePlace(db, toRunId(result.runId), place);
+      walk(db, result.runId, 560, [startedOn("ACME-40-2")]);
 
       const body = text(render({ kind: "found", run: found(db, result.runId) }));
       expect(body).toContain(runJson.continuation.place[place]);

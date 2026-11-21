@@ -546,7 +546,10 @@ function continuationSource(
     branch: found.records.finalBranch ?? found.run.branch,
     report: found.records.reportBody,
     agentRef: found.run.agentRef,
-    agentMayBeAlive: found.run.agentResult === "runner-disconnected" || found.run.runnerUnreached,
+    agentMayBeAlive:
+      found.run.agentResult === "runner-disconnected" ||
+      found.run.agentResult === "worktree-missing" ||
+      found.run.runnerUnreached,
   };
 }
 

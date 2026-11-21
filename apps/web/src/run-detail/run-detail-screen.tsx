@@ -731,6 +731,11 @@ function Continuation({
   const { continuedFrom, continuedBy, continuePlace } = run;
   if (continuedFrom === null && continuedBy === null) return null;
   const endedBeforeStart = run.status.state === "ended" && run.startedAt === null;
+  const placeKey = endedBeforeStart
+    ? "notStarted"
+    : run.status.state === "queued"
+      ? "pending"
+      : (continuePlace ?? "pending");
   return (
     <>
       {continuedFrom === null ? null : (
@@ -741,7 +746,7 @@ function Continuation({
               digit: continuedFrom.number % 10,
             })}
           </TextLink>{" "}
-          {t(`place.${endedBeforeStart ? "notStarted" : (continuePlace ?? "pending")}`)}
+          {t(`place.${placeKey}`)}
         </Text>
       )}
       {continuedBy === null ? null : (
