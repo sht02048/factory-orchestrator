@@ -24,8 +24,8 @@ Tailscale Funnel 명령이 이 서버의 실제 바인드 주소와 비어 있�
 - `WEB_HOST=::1`과 `localhost`는 Node가 `::1`에만 바인드할 수 있어 `127.0.0.1`로 바꾸지 않고 그 주소를 넘긴다.
 - 운영자는 `localhost`·`::1`을 `127.0.0.1`로 바꾸지 않는 판단을 받아들였다(2026-11-21). Node가 `localhost`를 `::1`에만 바인드하면 `127.0.0.1`로 넘긴 Funnel이 닿지 않기 때문이다.
 - 자동 허용은 호스트 이름이 아니라 `<주소>:<서버 포트>`로 한다. 같은 이름의 Funnel 포트(443·8443·10000), 포트 생략, webhook 주소의 host:port는 webhook 경로만 받는다. 서버 포트가 Funnel 포트면 자동 허용하지 않는다.
-- Funnel은 SNI로 경로를 고르고 클라이언트의 `Host`를 그대로 넘기므로(Tailscale 1.104.4 `ipn/ipnlocal/serve.go`) `Host` 포트는 꾸밀 수 있다. Tailscale이 클라이언트 값을 지우고 직접 붙이는 `Tailscale-Funnel-Request`가 있는 요청에는 자동 허용을 주지 않는다.
-- 운영자가 "다른 기기에서 열 주소"에 넣은 호스트는 지금처럼 포트와 상관없이 받는다.
+- Funnel은 SNI로 경로를 고르고 클라이언트의 `Host`를 그대로 넘기므로(Tailscale 1.104.4 `ipn/ipnlocal/serve.go`) `Host` 포트는 꾸밀 수 있다. Tailscale이 클라이언트 값을 지우고 직접 붙이는 `Tailscale-Funnel-Request`가 있는 요청은 어떤 `Host`를 보내도(loopback, 운영자가 넣은 주소 포함) webhook 경로만 받는다. TCP Funnel은 이 표시가 없어 구분할 수 없으므로 README에 앱 포트로 열지 말라고 적는다.
+- 운영자가 "다른 기기에서 열 주소"에 넣은 호스트는 Funnel 표시가 없는 요청에서 지금처럼 포트와 상관없이 받는다.
 - 자동 허용 주소는 15초 동안 기억한다. 허용되지 않은 Host가 오면 다시 읽고 판단한다. Tailscale을 읽지 못하면 마지막 주소를 지키고, 꺼졌으면 비운다.
 - 403 안내는 스크립트 없는 정적 HTML이다. 막힌 Host에는 앱 번들과 데이터를 내주지 않는다.
 

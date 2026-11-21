@@ -216,6 +216,21 @@ describe("와일드카드 바인드의 tailnet 자동 허용(0157)", () => {
     expect(post(`http://${MAGIC}:3000`, true)).toMatchObject(rejected);
   });
 
+  it.each(["127.0.0.1", "127.0.0.1:3000", "localhost:3000", "[::1]", MAGIC, `${MAGIC}:443`])(
+    "Funnel 요청은 Host 를 %s 로 보내도 화면과 서버 함수에 닿지 못한다",
+    (host) => {
+      const operator = { ...wildcard, webAddress: `https://${MAGIC}` };
+      for (const input of [wildcard, operator]) {
+        expect(verdictOf(request("/settings", { host, funnel: true }), input)).toMatchObject(
+          rejected,
+        );
+        expect(
+          verdictOf(request("/_serverFn/x", { method: "POST", host, funnel: true }), input),
+        ).toMatchObject(rejected);
+      }
+    },
+  );
+
   it("운영자가 직접 넣은 다른 기기에서 열 주소는 어느 포트로 와도 그대로 받는다", () => {
     const operator = { ...wildcard, webAddress: `https://${MAGIC}` };
     for (const host of [MAGIC, `${MAGIC}:443`, `${MAGIC}:3000`]) {

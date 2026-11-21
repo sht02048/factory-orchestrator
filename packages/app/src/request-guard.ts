@@ -118,21 +118,22 @@ export function isHostAllowed(
   allowed: AllowedHosts,
   viaFunnel = false,
 ): boolean {
+  if (viaFunnel && !isWebhookPath(pathname)) return false;
   const hostname = hostnameOfHostHeader(hostHeader);
   if (hostname === null) return false;
   if (allowed.web.has(hostname)) return true;
   const hostPort = hostPortOfHostHeader(hostHeader);
-  if (!viaFunnel && hostPort !== null && allowed.tailnetWeb.has(hostPort)) return true;
+  if (hostPort !== null && allowed.tailnetWeb.has(hostPort)) return true;
   return isWebhookPath(pathname) && allowed.webhook.has(hostname);
 }
 
-function originAllowed(origin: string, allowed: AllowedHosts, viaFunnel: boolean): boolean {
+function originAllowed(origin: string, allowed: AllowedHosts): boolean {
   try {
     const url = new URL(origin);
     if (url.protocol !== "http:" && url.protocol !== "https:") return false;
     const hostname = normalizeHostname(url.hostname);
     if (allowed.web.has(hostname)) return true;
-    return !viaFunnel && url.port !== "" && allowed.tailnetWeb.has(`${hostname}:${url.port}`);
+    return url.port !== "" && allowed.tailnetWeb.has(`${hostname}:${url.port}`);
   } catch {
     return false;
   }
@@ -144,14 +145,13 @@ export function checkRequest(request: Request, allowed: AllowedHosts): GuardVerd
   const origin = request.headers.get("origin");
   const host = hostHeader ?? "";
   if (SAFE_METHODS.has(request.method) && isAnswerableOnAnyHost(pathname)) return { ok: true };
-  const viaFunnel = isFunnelRequest(request.headers);
-  if (!isHostAllowed(hostHeader, pathname, allowed, viaFunnel)) {
+  if (!isHostAllowed(hostHeader, pathname, allowed, isFunnelRequest(request.headers))) {
     return { ok: false, status: 403, reason: "host-not-allowed", host, origin };
   }
   if (SAFE_METHODS.has(request.method) || isWebhookPath(pathname) || origin === null) {
     return { ok: true };
   }
-  if (!originAllowed(origin, allowed, viaFunnel)) {
+  if (!originAllowed(origin, allowed)) {
     return { ok: false, status: 403, reason: "origin-not-allowed", host, origin };
   }
   return { ok: true };
