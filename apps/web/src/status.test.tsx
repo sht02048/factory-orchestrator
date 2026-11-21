@@ -36,6 +36,7 @@ const TERMS: Record<PillStatus, string> = {
   offline: "Offline",
   question: "Question",
   permission: "Permission",
+  "human-check": "Human Check",
   "runner-issue": "Runner Issue",
 };
 const TERM_NAMES = new Set(Object.values(TERMS));
@@ -60,6 +61,7 @@ describe("메시지 파일 낱말(ADR 0010 1·3번)", () => {
     expect(domain.attention).toEqual({
       question: TERMS.question,
       permission: TERMS.permission,
+      "human-check": TERMS["human-check"],
       failed: TERMS.failed,
       disconnected: TERMS.disconnected,
       "runner-issue": TERMS["runner-issue"],
@@ -108,6 +110,7 @@ describe("화면의 상태 알약", () => {
           <HomeScreen
             page={loadHomePage(db, "ws-commerce", now, "UTC")}
             onAnswer={() => Promise.resolve()}
+            onHumanCheck={() => Promise.resolve()}
             onDeny={() => Promise.resolve()}
             onControl={() => Promise.resolve("requested" as const)}
           />,

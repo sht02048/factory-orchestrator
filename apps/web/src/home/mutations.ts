@@ -5,8 +5,8 @@ import { toRunId } from "@ganger/core";
 import type { RunId } from "@ganger/core";
 import { ANSWER_REJECT_REASONS, DENY_REJECT_REASONS, rejectedAs } from "../query/mutation-error";
 import { keysChangedByRunWrite } from "../runs/queries";
-import { answerQuestion, controlRun, denyPermission } from "../server/functions";
-import type { AnswerInput, ControlInput, DenyInput } from "./home-screen";
+import { answerHumanCheck, answerQuestion, controlRun, denyPermission } from "../server/functions";
+import type { AnswerInput, ControlInput, DenyInput, HumanCheckInput } from "./home-screen";
 
 async function invalidateRunWrite(queryClient: QueryClient, runId: RunId): Promise<void> {
   await Promise.all(
@@ -16,6 +16,7 @@ async function invalidateRunWrite(queryClient: QueryClient, runId: RunId): Promi
 
 export interface DashboardActions {
   onAnswer: (input: AnswerInput) => Promise<void>;
+  onHumanCheck: (input: HumanCheckInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
   onControl: (input: ControlInput) => Promise<RunControlOutcome>;
 }
@@ -26,6 +27,11 @@ export function useDashboardActions(): DashboardActions {
   const answer = useMutation({
     mutationFn: (input: AnswerInput) =>
       rejectedAs(() => answerQuestion({ data: input }), ANSWER_REJECT_REASONS),
+    onSuccess: (_result, input) => afterWrite(toRunId(input.runId)),
+  });
+  const humanCheck = useMutation({
+    mutationFn: (input: HumanCheckInput) =>
+      rejectedAs(() => answerHumanCheck({ data: input }), ANSWER_REJECT_REASONS),
     onSuccess: (_result, input) => afterWrite(toRunId(input.runId)),
   });
   const deny = useMutation({
@@ -43,6 +49,9 @@ export function useDashboardActions(): DashboardActions {
   return {
     onAnswer: async (input) => {
       await answer.mutateAsync(input);
+    },
+    onHumanCheck: async (input) => {
+      await humanCheck.mutateAsync(input);
     },
     onDeny: async (input) => {
       await deny.mutateAsync(input);

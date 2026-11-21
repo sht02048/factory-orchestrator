@@ -8,6 +8,7 @@ export type RunnerStatus = "online" | "offline";
 export type AttentionStatus =
   | "question"
   | "permission"
+  | "human-check"
   | "failed"
   | "disconnected"
   | "runner-issue";
@@ -29,6 +30,7 @@ export const PILL_STATUSES = [
   "offline",
   "question",
   "permission",
+  "human-check",
   "runner-issue",
 ] as const satisfies ReadonlyArray<PillStatus>;
 
@@ -38,6 +40,8 @@ export function statusTone(status: PillStatus): StatusTone {
     case "permission":
     case "waiting-for-input":
       return "answer";
+    case "human-check":
+      return "check";
     case "failed":
     case "disconnected":
     case "runner-issue":

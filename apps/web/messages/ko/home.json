@@ -5,6 +5,7 @@
   "summary": {
     "sentence": "처리할 일은 {list}예요.",
     "separator": ", ",
+    "check": "확인할 일 {count}개",
     "answer": "답할 질문 {count}개",
     "stopped": "멈춘 런 {count}개",
     "inProgress": "처리할 일은 없고, 진행 중인 런이 {count}개 있어요.",
@@ -32,6 +33,7 @@
   },
   "board": {
     "more": "{count}개 더 보기",
+    "humanCheck": "확인해 주세요",
     "settled": "처리할 일 없이 끝났어요",
     "allRuns": "Runs에서 모두 보기"
   },
@@ -65,6 +67,7 @@
     "queuedOffline": "{runner}{subject, select, i {이} other {가}} Offline이라 기다려요",
     "queuedAnyOffline": "맞는 러너가 Offline이라 기다려요",
     "answer": "답하기",
+    "check": "확인하기",
     "answered": "답을 보냈어요",
     "denied": "거절을 보냈어요",
     "openPr": "PR 보기",
@@ -113,6 +116,14 @@
     "rejected": {
       "already-answered": "다른 곳에서 이미 답한 질문이에요. 다시 보내지 않아도 돼요.",
       "not-found": "질문을 찾지 못했어요. 런이 끝났는지 Run 상세에서 확인해 주세요."
+    }
+  },
+  "humanCheck": {
+    "title": "확인해 주세요",
+    "answered": "답을 보냈어요. worker가 에이전트에게 전해요.",
+    "rejected": {
+      "already-answered": "다른 곳에서 이미 답한 요청이에요. 다시 보내지 않아도 돼요.",
+      "not-found": "요청을 찾지 못했어요. 런이 끝났는지 Run 상세에서 확인해 주세요."
     }
   },
   "permission": {

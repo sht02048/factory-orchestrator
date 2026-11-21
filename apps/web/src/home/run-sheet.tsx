@@ -24,10 +24,11 @@ import type { HomeRun, InputWait } from "@ganger/app/home/model";
 import { todoTagOf } from "@ganger/app/home/model";
 import { availableRunControl } from "@ganger/app/run-control-view";
 import type { RunControl } from "@ganger/core";
+import { HumanCheckAnswer } from "../question/human-check-answer";
 import { QuestionAnswer } from "../question/question-answer";
 import type { SheetMode } from "./run-card";
 import { RunKey, cardStatus, runHref, ticketHref, useRunText } from "./run-text";
-import type { AnswerInput, DenyInput } from "./home-screen";
+import type { AnswerInput, DenyInput, HumanCheckInput } from "./home-screen";
 import { answerRejection, denyRejection } from "./rejection";
 import type { AnswerRejectReason, DenyRejectReason } from "./rejection";
 
@@ -48,6 +49,7 @@ export function RunSheet({
   finalFocus,
   all,
   onAnswer,
+  onHumanCheck,
   onDeny,
   onControl,
 }: {
@@ -57,6 +59,7 @@ export function RunSheet({
   finalFocus: () => HTMLElement | null;
   all: boolean;
   onAnswer: (input: AnswerInput) => Promise<void>;
+  onHumanCheck: (input: HumanCheckInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
   onControl: SheetControl;
 }) {
@@ -65,11 +68,15 @@ export function RunSheet({
   const { run, tagged } = target;
   const tag = tagged ? todoTagOf(run) : null;
   const status = cardStatus(run, tag);
-  const firstRadio = run.state === "waiting-for-input" && run.input?.kind === "question";
+  const inputKind = run.state === "waiting-for-input" ? run.input?.kind : undefined;
   const initialFocus =
-    target.mode === "answer" && firstRadio
-      ? '[data-question] input[type="radio"], [data-question] textarea'
-      : undefined;
+    target.mode !== "answer"
+      ? undefined
+      : inputKind === "question"
+        ? '[data-question] input[type="radio"], [data-question] textarea'
+        : inputKind === "human-check"
+          ? "[data-human-check] textarea"
+          : undefined;
   return (
     <Sheet
       open={open}
@@ -85,6 +92,7 @@ export function RunSheet({
           run={run}
           tagged={tag !== null}
           onAnswer={onAnswer}
+          onHumanCheck={onHumanCheck}
           onDeny={onDeny}
           onControl={onControl}
         />
@@ -133,12 +141,14 @@ function SheetBody({
   run,
   tagged,
   onAnswer,
+  onHumanCheck,
   onDeny,
   onControl,
 }: {
   run: HomeRun;
   tagged: boolean;
   onAnswer: (input: AnswerInput) => Promise<void>;
+  onHumanCheck: (input: HumanCheckInput) => Promise<void>;
   onDeny: (input: DenyInput) => Promise<void>;
   onControl: SheetControl;
 }) {
@@ -174,6 +184,15 @@ function SheetBody({
       switch (input.kind) {
         case "question":
           return <AnswerBlock run={run} question={input} onAnswer={onAnswer} />;
+        case "human-check":
+          return (
+            <HumanCheckBlock
+              key={input.questionId}
+              run={run}
+              check={input}
+              onHumanCheck={onHumanCheck}
+            />
+          );
         case "permission":
           return <DenyBlock run={run} permission={input} onDeny={onDeny} />;
       }
@@ -364,6 +383,43 @@ function AnswerBlock({
           onSend={async (answer) => {
             try {
               await onAnswer({ runId: run.id, questionId: question.questionId, answer });
+            } catch (error) {
+              const reason = answerRejection(error);
+              if (reason === null) throw error;
+              setRejected(reason);
+            }
+            result.markSent();
+          }}
+        />
+      )}
+    </PanelSection>
+  );
+}
+
+function HumanCheckBlock({
+  run,
+  check,
+  onHumanCheck,
+}: {
+  run: HomeRun;
+  check: Extract<InputWait, { kind: "human-check" }>;
+  onHumanCheck: (input: HumanCheckInput) => Promise<void>;
+}) {
+  const t = useTranslations("home.humanCheck");
+  const result = useResultFocus();
+  const [rejected, setRejected] = useState<AnswerRejectReason | null>(null);
+  return (
+    <PanelSection title={t("title")}>
+      {rejected !== null ? (
+        <ResultText resultRef={result.resultRef}>{t(`rejected.${rejected}`)}</ResultText>
+      ) : result.sent || check.answered ? (
+        <ResultText resultRef={result.resultRef}>{t("answered")}</ResultText>
+      ) : (
+        <HumanCheckAnswer
+          body={check.body}
+          onSend={async (decision, note) => {
+            try {
+              await onHumanCheck({ runId: run.id, questionId: check.questionId, decision, note });
             } catch (error) {
               const reason = answerRejection(error);
               if (reason === null) throw error;

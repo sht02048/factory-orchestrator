@@ -177,6 +177,23 @@ function useCardParts(
                   </Button>
                 ),
               };
+        case "human-check":
+          return input.answered
+            ? { detail: firstLineOf(input.body), meta: t("answered"), ...time }
+            : {
+                detail: firstLineOf(input.body),
+                meta: runner,
+                ...time,
+                action: (
+                  <Button
+                    variant="secondary"
+                    aria-describedby={titleId}
+                    onClick={() => onOpen("answer")}
+                  >
+                    {t("check")}
+                  </Button>
+                ),
+              };
         case "permission":
           return {
             detail: t("permission", { command: input.detail }),
@@ -202,6 +219,10 @@ function useCardParts(
       };
     }
   }
+}
+
+function firstLineOf(body: string): string {
+  return body.split("\n", 1)[0] ?? "";
 }
 
 function controlPendingKey(control: RunControlView | null): "pausing" | "resuming" | null {

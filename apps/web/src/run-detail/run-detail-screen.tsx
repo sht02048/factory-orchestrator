@@ -30,6 +30,9 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
+import { answerRejection } from "../home/rejection";
+import type { AnswerRejectReason } from "../home/rejection";
+import { HumanCheckAnswer, HumanCheckRequest } from "../question/human-check-answer";
 import { QuestionAnswer } from "../question/question-answer";
 import { AgentMessageForm, useDeliveryText } from "./agent-message-form";
 import type { AgentMessageOutcome, AgentMessageRequest } from "./agent-message-form";
@@ -39,6 +42,7 @@ import { canCancel } from "@ganger/app/run-detail/model";
 import { availableRunControl } from "@ganger/app/run-control-view";
 import type { RunControlOutcome, RunControlView } from "@ganger/app/run-control-view";
 import type { RunControl } from "@ganger/core";
+import type { HumanCheckDecision } from "@ganger/app/home/actions";
 import type {
   LogTailView,
   PendingInput,
@@ -49,6 +53,7 @@ import type {
 
 export interface RunDetailActions {
   onAnswer: (questionId: string, body: string) => Promise<void>;
+  onHumanCheck: (questionId: string, decision: HumanCheckDecision, note: string) => Promise<void>;
   onDeny: (promptId: string, reason: string) => Promise<void>;
   onCancel: () => Promise<void>;
   onRemoveWorktree: () => Promise<void>;
@@ -194,6 +199,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
                 input={run.status.input}
                 waitedMs={inputWaitedMs(run)}
                 onAnswer={props.onAnswer}
+                onHumanCheck={props.onHumanCheck}
                 onDeny={props.onDeny}
                 headRef={headRef}
               />
@@ -259,7 +265,8 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
 
 function agentMessageHint(run: RunDetail): "paused" | "waiting" | null {
   if (run.status.state === "paused") return "paused";
-  return run.status.state === "waiting-for-input" && run.status.input.kind === "question"
+  return run.status.state === "waiting-for-input" &&
+    (run.status.input.kind === "question" || run.status.input.kind === "human-check")
     ? "waiting"
     : null;
 }
@@ -357,10 +364,12 @@ function Reason({ run }: { run: RunDetail }) {
 
 function inputKey(
   input: PendingInput,
-): "question" | "answered" | "permission" | "denied" | "waiting-unknown" {
+): "question" | "human-check" | "answered" | "permission" | "denied" | "waiting-unknown" {
   switch (input.kind) {
     case "question":
       return input.answered ? "answered" : "question";
+    case "human-check":
+      return input.answered ? "answered" : "human-check";
     case "permission":
       return input.denied ? "denied" : "permission";
     case "unknown":
@@ -420,16 +429,28 @@ function InputBlock({
   input,
   waitedMs,
   onAnswer,
+  onHumanCheck,
   onDeny,
   headRef,
 }: {
   input: PendingInput;
   waitedMs: number | null;
   onAnswer: RunDetailActions["onAnswer"];
+  onHumanCheck: RunDetailActions["onHumanCheck"];
   onDeny: RunDetailActions["onDeny"];
   headRef: RefObject<HTMLElement | null>;
 }) {
   switch (input.kind) {
+    case "human-check":
+      return (
+        <HumanCheckForm
+          key={input.questionId}
+          check={input}
+          waitedMs={waitedMs}
+          onHumanCheck={onHumanCheck}
+          headRef={headRef}
+        />
+      );
     case "question":
       return (
         <QuestionForm
@@ -482,7 +503,7 @@ function InputHead({
   kind,
   waitedMs,
 }: {
-  kind: "question" | "permission";
+  kind: "question" | "permission" | "human-check";
   waitedMs: number | null;
 }) {
   const t = useTranslations("run.input");
@@ -528,6 +549,49 @@ function QuestionForm({
           body={question.body}
           options={question.choices}
           onSend={(answer) => run(() => onAnswer(question.questionId, answer))}
+        />
+      )}
+    </Card>
+  );
+}
+
+function HumanCheckForm({
+  check,
+  waitedMs,
+  onHumanCheck,
+  headRef,
+}: {
+  check: Extract<PendingInput, { kind: "human-check" }>;
+  waitedMs: number | null;
+  onHumanCheck: RunDetailActions["onHumanCheck"];
+  headRef: RefObject<HTMLElement | null>;
+}) {
+  const t = useTranslations("run");
+  const { submit, run, resultRef } = useSubmit(headRef);
+  const [rejected, setRejected] = useState<AnswerRejectReason | null>(null);
+  const sendAnswer = async (decision: HumanCheckDecision, note: string) => {
+    try {
+      await onHumanCheck(check.questionId, decision, note);
+    } catch (error) {
+      const reason = answerRejection(error);
+      if (reason === null) throw error;
+      setRejected(reason);
+    }
+  };
+  return (
+    <Card label={t("humanCheck.title")}>
+      <InputHead kind="human-check" waitedMs={waitedMs} />
+      {submit.kind === "sent" || check.answered ? (
+        <>
+          <HumanCheckRequest body={check.body} />
+          <Text variant="body" as="p" ref={resultRef} role="status" tabIndex={-1}>
+            {rejected === null ? t("humanCheck.sent") : t(`humanCheck.rejected.${rejected}`)}
+          </Text>
+        </>
+      ) : (
+        <HumanCheckAnswer
+          body={check.body}
+          onSend={(decision, note) => run(() => sendAnswer(decision, note))}
         />
       )}
     </Card>
@@ -695,6 +759,7 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
           ? event.body
           : `${event.body}\n${deliveryText(event.delivery)}`;
       case "question":
+      case "human-check":
       case "answer":
       case "permission":
         return event.body;
