@@ -1,11 +1,18 @@
 import { withLogContext } from "@ganger/log";
 import { agentMessageStep } from "@ganger/core";
-import type { AgentMessageFailure, MailboxRef, RunnerErrorDetail } from "@ganger/core";
+import type {
+  AgentMessageFailure,
+  FollowUpRef,
+  MailboxRef,
+  RunId,
+  RunnerErrorDetail,
+} from "@ganger/core";
 import {
   completeAgentMessage,
   getRunControlRequest,
   getRunWithRecords,
   hasPendingCancelRequest,
+  isAgentMessagePending,
   listPendingAgentMessages,
   markAgentMessageSending,
   recordAgentMessageFollowUp,
@@ -27,10 +34,14 @@ export async function processAgentMessages(context: TickContext): Promise<void> 
     context.logger.warn("agent_message.read_failed", { error });
     return;
   }
+  const runsWaiting = new Set<RunId>();
   for (const message of pending) {
+    if (runsWaiting.has(message.runId)) continue;
     try {
       await withLogContext({ runId: message.runId }, () => deliver(context, message));
+      if (isAgentMessagePending(context.db, message.id)) runsWaiting.add(message.runId);
     } catch (error) {
+      runsWaiting.add(message.runId);
       context.logger.warn("agent_message.read_failed", { runId: message.runId, error });
     }
   }
@@ -38,7 +49,7 @@ export async function processAgentMessages(context: TickContext): Promise<void> 
 
 async function deliver(context: TickContext, message: PendingAgentMessage): Promise<void> {
   if (message.followUpRef !== null) {
-    await stopFollowUp(context, message, message.followUpRef);
+    await stopFollowUp(context, message, message.followUpRef, true);
     return;
   }
   if (message.sendStartedAt !== null) {
@@ -107,8 +118,10 @@ async function deliver(context: TickContext, message: PendingAgentMessage): Prom
     return;
   }
   const { followUpRef } = sent;
-  tryWrite(context, run.id, () => recordAgentMessageFollowUp(context.db, message.id, followUpRef));
-  await stopFollowUp(context, message, followUpRef);
+  const remembered = tryWrite(context, run.id, () =>
+    recordAgentMessageFollowUp(context.db, message.id, followUpRef),
+  );
+  await stopFollowUp(context, message, followUpRef, remembered === true);
 }
 
 function sendBlock(
@@ -128,7 +141,8 @@ function sendBlock(
 async function stopFollowUp(
   context: TickContext,
   message: PendingAgentMessage,
-  followUpRef: string,
+  followUpRef: FollowUpRef,
+  canRetry: boolean,
 ): Promise<void> {
   const found = getRunWithRecords(context.db, message.runId);
   const runnerId = found?.run.runnerId ?? null;
@@ -150,7 +164,9 @@ async function stopFollowUp(
       error,
     });
     const detail = runnerErrorDetail(error);
-    if (!retriableBeforeSend(detail)) finish(context, message, "follow-up-not-stopped");
+    if (!canRetry || !retriableBeforeSend(detail)) {
+      finish(context, message, "follow-up-not-stopped");
+    }
     return;
   }
   finish(context, message, "follow-up-stopped");

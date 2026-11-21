@@ -49,6 +49,7 @@ import {
   toWorktreeRef,
 } from "../ids.js";
 import type {
+  FollowUpRef,
   CodeHostKind,
   CommentId,
   LabelId,
@@ -238,8 +239,8 @@ export class FakeRunner implements Runner {
   providerUsage: ProviderUsageReading = { kind: "read", providers: [] };
   failNextStart: RunnerErrorDetail | null = null;
   failNextControl: RunnerErrorDetail | null = null;
-  nextSendStartsFollowUp: string | null = null;
-  readonly stoppedFollowUps: string[] = [];
+  nextSendStartsFollowUp: FollowUpRef | null = null;
+  readonly stoppedFollowUps: FollowUpRef[] = [];
   loseNextResumeResponse = false;
   loseNextStartResponse = false;
   private readonly mailboxes = new Set<MailboxRef>();
@@ -490,7 +491,7 @@ export class FakeRunner implements Runner {
     });
   }
 
-  stopFollowUp(followUpRef: string): Promise<void> {
+  stopFollowUp(followUpRef: FollowUpRef): Promise<void> {
     return this.reach(() => {
       this.takeControlFailure();
       this.stoppedFollowUps.push(followUpRef);

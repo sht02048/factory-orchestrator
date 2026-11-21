@@ -1,5 +1,5 @@
 import { acceptsAgentMessage } from "@ganger/core";
-import type { AgentMessageRequestId, RunId } from "@ganger/core";
+import type { AgentMessageRequestId, FollowUpRef, RunId } from "@ganger/core";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { recordRunChange } from "./change-events.js";
 import type { Database } from "./database.js";
@@ -45,7 +45,7 @@ export interface PendingAgentMessage {
   runId: RunId;
   body: string;
   sendStartedAt: Date | null;
-  followUpRef: string | null;
+  followUpRef: FollowUpRef | null;
 }
 
 export function listPendingAgentMessages(db: Database): PendingAgentMessage[] {
@@ -79,13 +79,27 @@ export function markAgentMessageSending(db: Database, id: number, now: Date): bo
   );
 }
 
-export function recordAgentMessageFollowUp(db: Database, id: number, followUpRef: string): boolean {
+export function recordAgentMessageFollowUp(
+  db: Database,
+  id: number,
+  followUpRef: FollowUpRef,
+): boolean {
   return (
     db
       .update(runAgentMessages)
       .set({ followUpRef })
       .where(and(eq(runAgentMessages.id, id), isNull(runAgentMessages.completedAt)))
       .run().changes > 0
+  );
+}
+
+export function isAgentMessagePending(db: Database, id: number): boolean {
+  return (
+    db
+      .select({ id: runAgentMessages.id })
+      .from(runAgentMessages)
+      .where(and(eq(runAgentMessages.id, id), isNull(runAgentMessages.completedAt)))
+      .get() !== undefined
   );
 }
 

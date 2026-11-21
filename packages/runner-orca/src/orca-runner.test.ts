@@ -1,5 +1,6 @@
 import {
   AdapterError,
+  toFollowUpRef,
   blockedProjectsOf,
   isAssignmentBlocked,
   toAgentId,
@@ -872,12 +873,29 @@ describe("answerQuestion and denyPermission", () => {
     });
   });
 
+  test("a follow-up that did not become ready still returns its dispatch(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(
+        JSON.stringify({
+          ok: false,
+          result: { delivery: "follow_up", dispatchId: "ctx_new", state: "outcome_unknown" },
+        }),
+        1,
+      ),
+    );
+    expect(await runnerWith(exec).sendToAgent(RUN, { body: "x" })).toEqual({
+      kind: "follow-up",
+      followUpRef: "ctx_new",
+    });
+  });
+
   test("stopping a follow-up stops that dispatch(0147)", async () => {
     const exec = new ScriptedExec().orca(
       "orchestration worker-stop",
       stdout(JSON.stringify({ ok: true, result: { state: "stopped" } })),
     );
-    await runnerWith(exec).stopFollowUp("ctx_new");
+    await runnerWith(exec).stopFollowUp(toFollowUpRef("ctx_new"));
     expect(exec.commands()[0]).toContain("orchestration worker-stop --dispatch ctx_new");
   });
 

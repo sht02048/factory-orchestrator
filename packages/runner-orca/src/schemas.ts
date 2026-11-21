@@ -179,6 +179,12 @@ export const operatorSendResultSchema = z.union([
   z.object({ messageId: text }),
   z.object({ delivery: text, dispatchId: text }),
 ]);
+export const failedFollowUpEnvelopeSchema = z
+  .object({
+    ok: z.literal(false),
+    result: z.object({ delivery: text, dispatchId: text }),
+  })
+  .transform((envelope) => envelope.result);
 export const denyResultSchema = z.object({ approvalId: optionalText });
 export const workerStopResultSchema = z.object({ state: text });
 export const workerReleaseResultSchema = z.object({ state: text });

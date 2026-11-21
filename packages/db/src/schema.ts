@@ -11,6 +11,7 @@ import { CHANGE_KINDS, CHANGE_PARTS } from "./change-events-model.js";
 import { MCP_ACTION_OUTCOMES } from "./mcp-actions-model.js";
 import { NOTIFICATION_EVENT_KINDS } from "./notification-events-model.js";
 import type {
+  FollowUpRef,
   AgentMessageRequestId,
   AgentId,
   AgentRef,
@@ -518,7 +519,7 @@ export const runAgentMessages = sqliteTable(
     body: text("body").notNull(),
     requestedAt: timeMs("requested_at").notNull(),
     sendStartedAt: timeMs("send_started_at"),
-    followUpRef: text("follow_up_ref"),
+    followUpRef: text("follow_up_ref").$type<FollowUpRef>(),
     completedAt: timeMs("completed_at"),
     error: text("error"),
   },

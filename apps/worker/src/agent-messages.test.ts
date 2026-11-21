@@ -1,4 +1,4 @@
-import { AdapterError, toAgentMessageRequestId, toQuestionId } from "@ganger/core";
+import { AdapterError, toAgentMessageRequestId, toFollowUpRef, toQuestionId } from "@ganger/core";
 import type { RunnerErrorDetail, RunnerId, WorktreeRef } from "@ganger/core";
 import {
   changeRunState,
@@ -293,7 +293,7 @@ describe("에이전트에게 보내기(0147)", () => {
   it("끝난 에이전트에게 간 말로 후속 워커가 뜨면 멈추고 전해졌을 수 있다고 남긴다", async () => {
     const { run, runnerId, worker } = await startOne();
     const fake = h.runner(runnerId);
-    fake.nextSendStartsFollowUp = "ctx_follow_up";
+    fake.nextSendStartsFollowUp = toFollowUpRef("ctx_follow_up");
     requestAgentMessage(
       h.db,
       run.id,
@@ -301,7 +301,7 @@ describe("에이전트에게 보내기(0147)", () => {
       h.now,
     );
     await worker.tick();
-    expect(fake.stoppedFollowUps).toEqual(["ctx_follow_up"]);
+    expect(fake.stoppedFollowUps).toEqual([toFollowUpRef("ctx_follow_up")]);
     expect(only(run).error).toBe("follow-up-stopped");
   });
 
@@ -309,7 +309,7 @@ describe("에이전트에게 보내기(0147)", () => {
     const { run, runnerId, worker } = await startOne();
     const fake = h.runner(runnerId);
     const agent = fake.runAt(worktreeOf(run));
-    fake.nextSendStartsFollowUp = "ctx_follow_up";
+    fake.nextSendStartsFollowUp = toFollowUpRef("ctx_follow_up");
     vi.spyOn(fake, "stopFollowUp").mockImplementationOnce(() =>
       Promise.reject(new AdapterError<RunnerErrorDetail>({ kind: "unreachable", detail: "ssh" })),
     );
@@ -323,7 +323,7 @@ describe("에이전트에게 보내기(0147)", () => {
     expect(only(run).completedAt).toBeNull();
     expect(fake.stoppedFollowUps).toEqual([]);
     await worker.tick();
-    expect(fake.stoppedFollowUps).toEqual(["ctx_follow_up"]);
+    expect(fake.stoppedFollowUps).toEqual([toFollowUpRef("ctx_follow_up")]);
     expect(only(run).error).toBe("follow-up-stopped");
     expect(agent.agentMessages).toEqual(["말"]);
   });
@@ -331,7 +331,7 @@ describe("에이전트에게 보내기(0147)", () => {
   it("후속 워커를 멈출 수 없다고 확정되면 멈추지 못했다고 남긴다", async () => {
     const { run, runnerId, worker } = await startOne();
     const fake = h.runner(runnerId);
-    fake.nextSendStartsFollowUp = "ctx_follow_up";
+    fake.nextSendStartsFollowUp = toFollowUpRef("ctx_follow_up");
     vi.spyOn(fake, "stopFollowUp").mockRejectedValueOnce(
       new AdapterError<RunnerErrorDetail>({ kind: "runner-error", code: "x", message: "no" }),
     );
@@ -362,6 +362,29 @@ describe("에이전트에게 보내기(0147)", () => {
     await worker.tick();
     expect(agent.agentMessages).toEqual(["말"]);
     expect(only(run).error).toBeNull();
+  });
+
+  it("앞선 말이 일시 오류로 남으면 뒤의 말을 먼저 보내지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    const agent = fake.runAt(worktreeOf(run));
+    const poll = fake.pollRun.bind(fake);
+    let calls = 0;
+    vi.spyOn(fake, "pollRun").mockImplementation((onRunner) => {
+      calls += 1;
+      return calls === 2
+        ? Promise.reject(
+            new AdapterError<RunnerErrorDetail>({ kind: "unreachable", detail: "ssh" }),
+          )
+        : poll(onRunner);
+    });
+    for (const body of ["아직 push하지 말아요", "이제 push해 주세요"]) {
+      requestAgentMessage(h.db, run.id, { requestId: toAgentMessageRequestId(body), body }, h.now);
+    }
+    await worker.tick();
+    expect(agent.agentMessages).toEqual([]);
+    await worker.tick();
+    expect(agent.agentMessages).toEqual(["아직 push하지 말아요", "이제 push해 주세요"]);
   });
 
   it("끝난 런과 취소 중인 런은 요청을 받지 않는다", async () => {

@@ -1,8 +1,15 @@
 import { log } from "@ganger/log";
 import type { Logger } from "@ganger/log";
 import { describeRunnerCall, logRunnerCall } from "./runner-call-log.js";
-import { AdapterError, toRunnerKind, toRunnerProjectId, toWorktreeRef } from "@ganger/core";
+import {
+  AdapterError,
+  toFollowUpRef,
+  toRunnerKind,
+  toRunnerProjectId,
+  toWorktreeRef,
+} from "@ganger/core";
 import type {
+  FollowUpRef,
   AgentSendResult,
   AgentRef,
   MailboxRef,
@@ -66,6 +73,7 @@ import {
   replyResultSchema,
   runBindResultSchema,
   runCurrentResultSchema,
+  failedFollowUpEnvelopeSchema,
   operatorSendResultSchema,
   sendResultSchema,
   serviceStatusResultSchema,
@@ -694,13 +702,14 @@ export class OrcaRunner implements Runner {
       ],
       operatorSendResultSchema,
       { usesMailbox: true },
+      failedFollowUpEnvelopeSchema,
     );
     return "delivery" in sent
-      ? { kind: "follow-up", followUpRef: sent.dispatchId }
+      ? { kind: "follow-up", followUpRef: toFollowUpRef(sent.dispatchId) }
       : { kind: "delivered" };
   }
 
-  async stopFollowUp(followUpRef: string): Promise<void> {
+  async stopFollowUp(followUpRef: FollowUpRef): Promise<void> {
     await this.orca(
       ["orchestration", "worker-stop", "--dispatch", followUpRef],
       workerStopResultSchema,
@@ -1017,8 +1026,9 @@ export class OrcaRunner implements Runner {
     args: ReadonlyArray<string>,
     schema: z.ZodType<T>,
     options: CallOptions = {},
+    failedResultSchema?: z.ZodType<T>,
   ): Promise<T> {
-    const outcome = await this.orcaOutcome(args, schema, options);
+    const outcome = await this.orcaOutcome(args, schema, options, failedResultSchema);
     if (!outcome.ok) throw this.errorFor(outcome, options);
     return outcome.result;
   }
@@ -1027,6 +1037,7 @@ export class OrcaRunner implements Runner {
     args: ReadonlyArray<string>,
     schema: z.ZodType<T>,
     options: CallOptions = {},
+    failedResultSchema?: z.ZodType<T>,
   ): Promise<Outcome<T>> {
     const result = await this.run([this.config.orcaPath, ...args, "--json"], options);
     if (result.timedOut) {
@@ -1039,7 +1050,10 @@ export class OrcaRunner implements Runner {
         detail: result.stderr.trim() || `orca not found at ${this.config.orcaPath}`,
       });
     }
-    const envelope = envelopeSchema.safeParse(parseJson(result.stdout));
+    const output = parseJson(result.stdout);
+    const failedResult = failedResultSchema?.safeParse(output);
+    if (failedResult?.success === true) return { ok: true, result: failedResult.data };
+    const envelope = envelopeSchema.safeParse(output);
     if (!envelope.success) throw malformed(result);
     if (!envelope.data.ok) {
       return {
