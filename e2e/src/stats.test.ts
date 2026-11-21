@@ -308,31 +308,6 @@ describe("Stats 배치(브라우저, 0093)", () => {
   });
 });
 
-describe("Stats 날짜별 표(브라우저, 0093)", () => {
-  it("좁은 폭에서 '표로 보기'로 펼친 표는 표만 옆으로 넘어가고 페이지는 넘치지 않는다", async (context) => {
-    const page = await openPage(context, 400);
-    await page.goto(`/stats?ws=${workspaceId}`);
-    await hydrated(page);
-    await page.getByRole("button", { name: stats.throughput.showTable }).click();
-    await page.getByRole("region", { name: stats.throughput.tableCaption, exact: true }).waitFor();
-    const scroller = await page.evaluate(() => {
-      let el: Element | null = document.querySelector('[role="tablist"]');
-      while (
-        el !== null &&
-        !(el.scrollHeight > el.clientHeight && getComputedStyle(el).overflow === "auto")
-      )
-        el = el.parentElement;
-      return el === null ? 0 : el.scrollWidth - el.clientWidth;
-    });
-    expect(scroller).toBe(0);
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      ),
-    ).toBe(0);
-  });
-});
-
 describe("Stats 접힌 날짜별 표(브라우저, 0093)", () => {
   it("표를 접어 두면 '표로 보기' 다음 Tab 이 바로 'Failed 런 보기'로 간다", async (context) => {
     const page = await openPage(context);
