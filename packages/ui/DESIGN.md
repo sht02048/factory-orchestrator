@@ -207,7 +207,7 @@
 - `prefers-reduced-motion`에서는 이동·커지기를 빼고 150ms 이하 흐려지기만 남는다.
 - `MotionList`의 부모에 `gap`을 주지 않는다. 접힌 행도 `gap`을 차지해 빠짐 끝에 튄다. 행 사이는 항목 안의 여백으로 둔다.
 - 행 사이가 필요하면 `MotionList itemGap`(`card`·`row`)을 쓰고 부모는 `KanbanCards motionItems`·`TableRows motionItems`로 둔다. 여백이 항목과 함께 접히고 도착 비추기는 여백을 덮지 않는다. 항목 요소에 붙일 `data-*`는 `itemAttributes`로 준다. `TableRow`는 빠지는 동안 `disabled`를 줘 방향키가 건너뛰게 한다.
-- 닫히는 `Sheet`는 포인터를 받지 않는다. 닫는 도중 뒤의 카드를 누르면 그 클릭이 카드에 닿아 Sheet가 바로 다시 열린다.
+- 닫히는 `Sheet`는 포인터를 받지 않는다. 닫는 도중 뒤의 카드를 한 번 누르면 그 클릭이 카드에 닿아 Sheet가 바로 다시 열린다. Sheet가 열려 있거나 닫히는 동안 시작한 더블클릭의 둘째 클릭(`event.detail` 2 이상)은 닫힘이 끝난 뒤에 와도 무시한다. 둘째 클릭 때 Sheet가 열려 있으면 그대로 둔다.
 - 기본 상태는 늘 보이는 상태다. 움직임이 돌지 않아도 내용이 숨지 않는다.
 
 ## 시간 표기

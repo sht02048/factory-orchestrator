@@ -36,6 +36,7 @@ import {
   saveWorkspace,
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
+  toWorkspaceId,
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { chromium } from "playwright-core";
@@ -45,6 +46,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } fr
 import type { TestContext } from "vitest";
 import home from "../../apps/web/messages/ko/home.json" with { type: "json" };
 import runs from "../../apps/web/messages/ko/runs.json" with { type: "json" };
+import shell from "../../apps/web/messages/ko/shell.json" with { type: "json" };
 import { connection, fakeKind, trackerProject, workspaceId } from "./browser/fixtures.js";
 import { serverFnName, waitForRouterIdle } from "./navigation-timing.js";
 import { startWebServer } from "./web-server.js";
@@ -137,6 +139,8 @@ afterEach(() => {
   openRuns.clear();
 });
 
+const otherWorkspaceId = toWorkspaceId("ws-other");
+const otherWorkspaceName = "Beta";
 const dashboardPath = `/?ws=${workspaceId}`;
 const runsPath = `/runs?ws=${workspaceId}`;
 
@@ -156,6 +160,7 @@ function seed(database: Database): void {
     secrets: { token: "github_pat_example" },
   });
   saveWorkspace(database, { id: workspaceId, name: "Acme" });
+  saveWorkspace(database, { id: otherWorkspaceId, name: otherWorkspaceName });
   saveWorkspaceTrackerProject(database, {
     workspaceId,
     connection,
@@ -277,6 +282,50 @@ const cardButton = (target: Page | Locator, key: string) =>
 const tab = (page: Page, name: string) => page.getByRole("tab").filter({ hasText: name });
 const runRow = (page: Page, key: string) =>
   page.getByRole("option").filter({ has: page.getByText(key, { exact: true }) });
+
+async function switchWorkspace(page: Page, from: string, to: string): Promise<void> {
+  await page
+    .getByRole("button", { name: shell.workspace.switch.replace("{workspace}", from) })
+    .click();
+  await page.getByRole("menuitemradio", { name: to, exact: true }).click();
+  await page
+    .getByRole("button", { name: shell.workspace.switch.replace("{workspace}", to) })
+    .waitFor();
+}
+
+async function pressSecondOfDoubleClick(page: Page): Promise<void> {
+  await page.mouse.down({ clickCount: 2 });
+  await page.mouse.up({ clickCount: 2 });
+}
+
+async function openSheetOverCard(
+  page: Page,
+  openKey: string,
+  behindKey: string,
+): Promise<{ x: number; y: number }> {
+  const queued = column(page, home.column.queued);
+  const target = await cardButton(queued, behindKey).boundingBox();
+  if (target === null) throw new Error("no card box");
+  await cardButton(queued, openKey).click();
+  const opened = page.getByRole("dialog");
+  await opened.getByText(openKey, { exact: true }).waitFor();
+  await expect.poll(() => opened.evaluate((node) => getComputedStyle(node).transform)).toBe("none");
+  return { x: target.x + target.width / 2, y: target.y + target.height / 2 };
+}
+
+async function closeSheetSlowly(page: Page, close: () => Promise<void>): Promise<Locator> {
+  const sheet = page.locator('[role="dialog"]');
+  const slowed = sheet.evaluate(async (node) => {
+    for (let frame = 0; frame < 600 && !node.hasAttribute("data-ending-style"); frame += 1) {
+      await new Promise(requestAnimationFrame);
+    }
+    for (const animation of document.getAnimations()) animation.playbackRate = 0.02;
+    return node.hasAttribute("data-ending-style");
+  });
+  await close();
+  expect(await slowed).toBe(true);
+  return sheet;
+}
 
 async function expectQuiet(page: Page): Promise<void> {
   await page.waitForTimeout(QUIET_MS);
@@ -532,9 +581,101 @@ describe("Dashboard 움직임(브라우저, 0153)", () => {
       .poll(() => sheet.evaluate((node) => node.hasAttribute("data-ending-style")))
       .toBe(false);
   });
+
+  it("닫히는 Sheet 위 더블클릭의 둘째 클릭은 뒤 카드를 열지 않는다", async (context) => {
+    const first = assign();
+    const second = assign();
+    const page = await newPage(context);
+    await open(page, dashboardPath, "/");
+    const { x, y } = await openSheetOverCard(page, first.key, second.key);
+
+    const sheet = await closeSheetSlowly(page, () => page.mouse.click(x, y));
+    await pressSecondOfDoubleClick(page);
+
+    expect(await sheet.evaluate((node) => node.hasAttribute("data-ending-style"))).toBe(true);
+    expect(await sheet.getByText(second.key, { exact: true }).count()).toBe(0);
+    await page.evaluate(() => {
+      for (const animation of document.getAnimations()) animation.finish();
+    });
+    await expect.poll(() => sheet.count()).toBe(0);
+  });
+
+  it("Sheet 가 다 닫힌 뒤에 온 둘째 클릭도 뒤 카드를 열지 않는다", async (context) => {
+    const first = assign();
+    const second = assign();
+    const page = await newPage(context);
+    await open(page, dashboardPath, "/");
+    const { x, y } = await openSheetOverCard(page, first.key, second.key);
+    const sheet = page.locator('[role="dialog"]');
+
+    await page.mouse.click(x, y);
+    await expect.poll(() => sheet.count()).toBe(0);
+    await pressSecondOfDoubleClick(page);
+
+    await page.waitForTimeout(QUIET_MS);
+    expect(await sheet.count()).toBe(0);
+  });
+
+  it("Workspace 를 바꿨다 돌아오면 그사이 생긴 알약이 움직이지 않는다", async (context) => {
+    const run = assign();
+    start(run.id);
+    const page = await newPage(context);
+    await open(page, dashboardPath, "/");
+    await card(page, run.key).waitFor();
+
+    await switchWorkspace(page, "Acme", otherWorkspaceName);
+    await expect.poll(() => card(page, run.key).count()).toBe(0);
+    const paused = changeRunState(db, run.id, { to: "paused", source: "operator" });
+    if (!paused.ok) throw new Error("pause failed");
+    await page.waitForTimeout(QUIET_MS);
+    await clearCalls(page);
+
+    await switchWorkspace(page, otherWorkspaceName, "Acme");
+
+    await card(page, run.key).locator('[data-status="paused"]').waitFor();
+    await expectQuiet(page);
+  });
+
+  it("전체에서 한 Workspace 로 바꾸며 상태가 달라진 카드도 움직이지 않는다", async (context) => {
+    const run = assign();
+    start(run.id);
+    const page = await newPage(context);
+    await page.route("**/api/change-events/stream**", (route) => route.abort());
+    await open(page, "/?ws=all", "/");
+    await card(page, run.key).waitFor();
+    expect(await card(page, run.key).locator("[data-status]").count()).toBe(0);
+    const paused = changeRunState(db, run.id, { to: "paused", source: "operator" });
+    if (!paused.ok) throw new Error("pause failed");
+    await clearCalls(page);
+
+    await switchWorkspace(page, shell.workspace.all, "Acme");
+
+    await card(page, run.key).locator('[data-status="paused"]').waitFor();
+    await expectQuiet(page);
+  });
 });
 
 describe("Runs 움직임(브라우저, 0153)", () => {
+  it("Workspace 를 바꿨다 돌아오면 그사이 바뀐 상태와 새 행이 움직이지 않는다", async (context) => {
+    const changed = assign();
+    const page = await newPage(context);
+    await open(page, runsPath, "/runs");
+    await runRow(page, changed.key).waitFor();
+
+    await switchWorkspace(page, "Acme", otherWorkspaceName);
+    await expect.poll(() => runRow(page, changed.key).count()).toBe(0);
+    start(changed.id);
+    const added = assign();
+    await page.waitForTimeout(QUIET_MS);
+    await clearCalls(page);
+
+    await switchWorkspace(page, otherWorkspaceName, "Acme");
+
+    await runRow(page, changed.key).locator('[data-status="running"]').waitFor();
+    await runRow(page, added.key).waitFor();
+    await expectQuiet(page);
+  });
+
   it("첫 렌더와 필터 바꾸기에서는 움직이지 않는다", async (context) => {
     assign();
     const page = await newPage(context);

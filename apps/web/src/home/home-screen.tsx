@@ -79,6 +79,7 @@ export type DashboardView = (typeof DASHBOARD_VIEWS)[number];
 
 export interface HomeScreenProps {
   page: HomePage;
+  drawKey?: string;
   view?: DashboardView;
   onViewChange?: (view: DashboardView) => void;
   onAnswer: (input: AnswerInput) => Promise<void>;
@@ -107,6 +108,7 @@ interface CardHost {
 
 export function HomeScreen({
   page,
+  drawKey = "",
   view = "all",
   onViewChange = () => {},
   onAnswer,
@@ -118,7 +120,14 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const t = useTranslations("home");
   const cards = useRef(new Map<RunId, HTMLButtonElement>());
-  const lastTags = useRef(new Map<RunId, PillStatus | null>());
+  const workspaceScope = `${workspaceScopeOf(page)}:${drawKey}`;
+  const [tagMemory, setTagMemory] = useState(() => newTagMemory(workspaceScope));
+  let lastTags = tagMemory.tags;
+  if (tagMemory.scope !== workspaceScope) {
+    const cleared = newTagMemory(workspaceScope);
+    lastTags = cleared.tags;
+    setTagMemory(cleared);
+  }
   const [target, setTarget] = useState<SheetTarget | null>(null);
   const [open, setOpen] = useState(false);
   const [revealedId, setRevealedId] = useState<RunId | null>(null);
@@ -128,12 +137,12 @@ export function HomeScreen({
     if (page.workspace.kind === "none") return;
     const { queued, running, done } = dashboardBoard(page);
     for (const run of [...running.todo, ...done.todo]) {
-      lastTags.current.set(run.id, cardTag(run, true));
+      lastTags.set(run.id, cardTag(run, true));
     }
     for (const run of [...queued, ...running.rest, ...done.rest]) {
-      lastTags.current.set(run.id, cardTag(run, false));
+      lastTags.set(run.id, cardTag(run, false));
     }
-  }, [page]);
+  }, [page, lastTags]);
   useEffect(() => {
     if (openRunId === undefined || shownRunId.current === openRunId) return;
     if (page.workspace.kind === "none") return;
@@ -160,8 +169,8 @@ export function HomeScreen({
     target === null ? undefined : boardRuns(board).find((run) => run.id === target.run.id);
   const host: CardHost = {
     all,
-    lastTags: lastTags.current,
-    listKey: `${page.workspace.kind === "one" ? page.workspace.workspace.id : "all"}:${view}`,
+    lastTags,
+    listKey: `${workspaceScope}:${view}`,
     selectedId: open && target !== null ? target.run.id : null,
     revealedId,
     cardRef: (id) => (element) => {
@@ -225,7 +234,7 @@ export function HomeScreen({
       <div {...stylex.props(styles.page)}>
         <div {...stylex.props(styles.frame)}>
           <div {...stylex.props(styles.board)}>
-            <MotionScope move="card">
+            <MotionScope key={workspaceScope} move="card">
               <KanbanColumn title={t("column.queued")} count={todoOnly ? 0 : board.queued.length}>
                 <CardList
                   runs={todoOnly ? [] : board.queued}
@@ -319,6 +328,14 @@ export function HomeScreen({
       </div>
     </ScreenLayout>
   );
+}
+
+function workspaceScopeOf(page: HomePage): string {
+  return page.workspace.kind === "one" ? `one:${page.workspace.workspace.id}` : page.workspace.kind;
+}
+
+function newTagMemory(scope: string) {
+  return { scope, tags: new Map<RunId, PillStatus | null>() };
 }
 
 function boardRuns(board: ReturnType<typeof dashboardBoard>): HomeRun[] {
