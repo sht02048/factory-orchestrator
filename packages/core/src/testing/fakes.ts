@@ -13,7 +13,9 @@ import type {
   Page,
   Paged,
   PermissionWait,
+  FinishWorktreeSetupInput,
   PrepareContinuationInput,
+  WorktreeSetupResult,
   PullRequestSnapshot,
   ResumeAgentInput,
   ResumedAgent,
@@ -227,6 +229,9 @@ export class FakeRunner implements Runner {
   readonly liveAgents = new Set<AgentRef>();
   readonly recreatedWorktrees = new Map<WorktreeRef, string>();
   failNextPrepare: RunnerErrorDetail | null = null;
+  readonly setupCalls: FinishWorktreeSetupInput[] = [];
+  readonly pendingSetups = new Set<WorktreeRef>();
+  failNextSetup: string | null = null;
   online = true;
   prerequisites: RunnerPrerequisite[] = [
     {
@@ -458,7 +463,22 @@ export class FakeRunner implements Runner {
       if (this.liveWorktree(input.worktree)) return "same-worktree";
       if (this.goneBranches.has(input.branch)) return "from-scratch";
       this.recreatedWorktrees.set(input.worktree, input.branch);
+      this.pendingSetups.add(input.worktree);
       return "recreated";
+    });
+  }
+
+  finishWorktreeSetup(input: FinishWorktreeSetupInput): Promise<WorktreeSetupResult> {
+    return this.reach((): WorktreeSetupResult => {
+      if (!this.pendingSetups.has(input.worktree)) return { kind: "done" };
+      this.setupCalls.push(input);
+      const reason = this.failNextSetup;
+      if (reason !== null) {
+        this.failNextSetup = null;
+        return { kind: "failed", reason };
+      }
+      this.pendingSetups.delete(input.worktree);
+      return { kind: "done" };
     });
   }
 

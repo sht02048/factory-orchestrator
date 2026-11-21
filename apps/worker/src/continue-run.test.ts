@@ -113,6 +113,69 @@ describe("이어서 맡기기", () => {
     expect(records(next).continuePlace).toBe("recreated");
   });
 
+  it("다시 만든 워크트리에서 setup을 돌린 뒤 에이전트를 시작한다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    const fake = h.runner(source.runnerId);
+    fake.deleteWorktree(source.worktree);
+
+    const next = continued(source.id);
+    await h.worker().tick();
+
+    expect(fake.setupCalls).toEqual([{ project: projectA, worktree: source.worktree }]);
+    expect(getRun(h.db, next.id)?.state).toBe("running");
+  });
+
+  it("워크트리가 남아 있으면 setup을 돌리지 않는다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    const fake = h.runner(source.runnerId);
+
+    const next = continued(source.id);
+    await h.worker().tick();
+
+    expect(fake.setupCalls).toEqual([]);
+    expect(getRun(h.db, next.id)?.state).toBe("running");
+  });
+
+  it("setup이 실패하면 에이전트를 띄우지 않고 시작 실패로 끝내며 이유를 남긴다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    const fake = h.runner(source.runnerId);
+    fake.deleteWorktree(source.worktree);
+    fake.failNextSetup = "setup exited with 1\npnpm: not found";
+    const startsBefore = fake.startCalls.length;
+
+    const next = continued(source.id);
+    await h.worker().tick();
+
+    expect(fake.startCalls.length).toBe(startsBefore);
+    expect(getRun(h.db, next.id)).toMatchObject({
+      state: "ended",
+      agentResult: "could-not-start",
+    });
+    expect(records(next).startError).toBe(
+      `${messages.continuation.setupFailed}\nsetup exited with 1\npnpm: not found`,
+    );
+  });
+
+  it("고정 런이 꽉 찬 러너를 기다리는 동안 다른 런은 빈 러너에서 시작한다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    const blocker = h.assign("ENG-2", projectA);
+    const worker = h.worker();
+    await worker.tick();
+    expect(getRun(h.db, blocker.id)).toMatchObject({ state: "running", runnerId });
+
+    const pinned = continued(source.id);
+    const otherRunner = h.addRunner({ id: "runner-b", capacity: 1, projects: [projectA] });
+    const other = h.assign("ENG-3", projectA);
+    await worker.tick();
+
+    expect(getRun(h.db, pinned.id)).toMatchObject({ state: "queued", runnerId });
+    expect(getRun(h.db, other.id)).toMatchObject({ state: "running", runnerId: otherRunner });
+  });
+
   it("다시 만든 워크트리는 시작하지 못해도 이전 런의 남은 워크트리로 돌아온다", async () => {
     const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const source = await endedRun(runnerId);

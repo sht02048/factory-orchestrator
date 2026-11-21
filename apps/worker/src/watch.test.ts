@@ -860,13 +860,12 @@ describe("러너 상태 확인", () => {
     const behind = h.assign("ENG-3", projectB);
     await worker.tick();
     expect(current(head)).toMatchObject({ state: "queued", runnerId: runnerA });
-    expect(stateOf(behind)).toBe("queued");
+    expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
 
     h.runner(runnerA).setProjects([]);
     h.advance(RUNNER_CHECK_INTERVAL_MS);
     await worker.tick();
     expect(current(head)).toMatchObject({ state: "queued", runnerId: null });
-    expect(current(behind)).toMatchObject({ state: "running", runnerId: runnerB });
   });
 
   it("GitHub 인증이 깨진 러너로 정한 Queued 런은 러너 확인 뒤 러너를 비운다(Q82.22)", async () => {

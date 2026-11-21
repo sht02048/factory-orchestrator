@@ -234,6 +234,13 @@ export interface PrepareContinuationInput {
   branch: string;
 }
 
+export interface FinishWorktreeSetupInput {
+  project: RunnerProjectId;
+  worktree: WorktreeRef;
+}
+
+export type WorktreeSetupResult = { kind: "done" } | { kind: "failed"; reason: string };
+
 export interface StartedRun {
   worktree: WorktreeRef;
   branch: string;
@@ -331,6 +338,7 @@ export interface Runner {
     previousAgent?: AgentRef;
   }): Promise<StartedRun | null>;
   prepareContinuation(input: PrepareContinuationInput): Promise<ContinuationPlace>;
+  finishWorktreeSetup(input: FinishWorktreeSetupInput): Promise<WorktreeSetupResult>;
   isAgentAlive(run: Pick<RunOnRunner, "worktree" | "agentRef">): Promise<boolean>;
 
   pollRun(run: RunOnRunner): Promise<RunProgress>;

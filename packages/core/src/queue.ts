@@ -40,11 +40,11 @@ export function planQueue(input: {
   const plan: QueuePlan = { cleared: [], assigned: [], unplaced: [], couldNotStart: [], start: [] };
   const runnersById = new Map(input.runners.map((runner) => [runner.id, runner]));
   const placements: RunPlacement[] = [...input.runs];
-  let blocked = false;
+  const waitedOn = new Set<RunnerId>();
 
   for (const run of fifoOrder(input.queued)) {
     if (run.unstartable) {
-      if (!blocked) plan.couldNotStart.push(run.id);
+      if (run.runnerId === null || !waitedOn.has(run.runnerId)) plan.couldNotStart.push(run.id);
       continue;
     }
 
@@ -68,12 +68,12 @@ export function planQueue(input: {
     }
 
     if (runnerId === null) {
-      runnerId = pickRunner({
-        project: run.project,
-        agent: run.agent,
-        runners: input.runners,
-        runs: placements,
-      });
+      const freeRunners = input.runners.filter(
+        (candidate) => !waitedOn.has(candidate.id) && remainingCapacity(candidate, placements) > 0,
+      );
+      const choose = (runners: ReadonlyArray<RunnerSnapshot>): RunnerId | null =>
+        pickRunner({ project: run.project, agent: run.agent, runners, runs: placements });
+      runnerId = choose(freeRunners) ?? choose(input.runners);
       if (runnerId === null) {
         plan.unplaced.push({ runId: run.id, ...unplacedReason(input.runners, run) });
         continue;
@@ -81,14 +81,16 @@ export function planQueue(input: {
       plan.assigned.push({ runId: run.id, runnerId });
     }
 
-    if (blocked) continue;
-
     const runner = runnersById.get(runnerId);
-    if (runner !== undefined && remainingCapacity(runner, placements) > 0) {
+    if (
+      !waitedOn.has(runnerId) &&
+      runner !== undefined &&
+      remainingCapacity(runner, placements) > 0
+    ) {
       plan.start.push({ runId: run.id, runnerId });
       placements.push({ runnerId, state: "running" });
     } else {
-      blocked = true;
+      waitedOn.add(runnerId);
     }
   }
 

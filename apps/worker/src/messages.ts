@@ -8,6 +8,7 @@ export const messages = {
   },
   continuation: {
     previousAgentAlive: "이전 에이전트가 아직 떠 있어요 · 먼저 멈춰 주세요",
+    setupFailed: "다시 만든 워크트리에서 저장소 설정 스크립트가 끝나지 않았어요",
   },
   resultComment: {
     title: "Ganger 런이 끝났어요.",

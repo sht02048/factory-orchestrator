@@ -317,11 +317,13 @@ async function processQueue(context: TickContext): Promise<void> {
     return result.start;
   });
 
+  const blockedRunners = new Set<RunnerId>();
   for (const choice of plan ?? []) {
+    if (blockedRunners.has(choice.runnerId)) continue;
     const outcome = await withLogContext({ runId: choice.runId, runnerId: choice.runnerId }, () =>
       startQueuedRun(context, choice),
     );
-    if (outcome === "blocked") return;
+    if (outcome === "blocked") blockedRunners.add(choice.runnerId);
   }
 }
 
@@ -456,6 +458,22 @@ async function startOnRunner(
     const place =
       source === null ? null : await continuationPlace(context, run, runner, source, records);
     if (place === "write-failed") return { kind: "blocked" };
+    if (source !== null && place !== "previous-agent-alive" && place !== "from-scratch") {
+      const setup = await runner.finishWorktreeSetup({
+        project: run.runnerProject,
+        worktree: source.worktree,
+      });
+      if (setup.kind === "failed") {
+        logger.warn("run.start_failed", { runId: run.id, reason: "worktree-setup" });
+        tryWrite(context, run.id, () =>
+          recordStartFailure(db, run.id, {
+            failures: records.startFailures,
+            error: `${messages.continuation.setupFailed}\n${setup.reason}`,
+          }),
+        );
+        return endCouldNotStart(context, run);
+      }
+    }
     if (place === "previous-agent-alive") {
       const sourceRunId = run.continuedFromRunId;
       tryWrite(context, run.id, () =>
