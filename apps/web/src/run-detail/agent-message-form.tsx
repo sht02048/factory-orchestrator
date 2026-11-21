@@ -3,7 +3,7 @@ import { Actions, Button, Card, Field, Text, Textarea } from "@ganger/ui";
 import { space } from "@ganger/ui/tokens.stylex";
 import { AGENT_MESSAGE_MAX_LENGTH } from "@ganger/core";
 import type { AgentMessageDelivery, AgentMessageView } from "@ganger/app/run-detail/model";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useTranslations } from "use-intl";
 
@@ -45,6 +45,11 @@ export function AgentMessageForm({
   const [sentHere, setSentHere] = useState(false);
   const [emptyTried, setEmptyTried] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const rejectedRef = useRef<HTMLParagraphElement>(null);
+  const rejectedAfterClose = !view.accepting && submit === "state-changed";
+  useEffect(() => {
+    if (rejectedAfterClose) rejectedRef.current?.focus();
+  }, [rejectedAfterClose]);
   const body = draft.trim();
   const tooLong = body.length > AGENT_MESSAGE_MAX_LENGTH;
   const error = tooLong
@@ -81,18 +86,43 @@ export function AgentMessageForm({
     );
   };
 
+  if (rejectedAfterClose) {
+    return (
+      <Card label={t("title")}>
+        <div {...stylex.props(styles.form)}>
+          <Text variant="subheading" as="h2">
+            {t("title")}
+          </Text>
+          <Text variant="body" as="p" tone="problem" role="status" tabIndex={-1} ref={rejectedRef}>
+            {t("failure.state-changed")}
+          </Text>
+          <Text variant="meta" as="p">
+            {t("unsentLabel")}
+          </Text>
+          <Text variant="body" as="p" wrap="pre">
+            {draft}
+          </Text>
+        </div>
+      </Card>
+    );
+  }
   if (!view.accepting) return null;
 
   const latest = view.latest;
   const result =
-    submit === "failed"
-      ? actionFailed
-      : submit === "state-changed"
-        ? t("failure.state-changed")
-        : latest === null || (latest.status === "sent" && !sentHere)
-          ? ""
-          : deliveryText(latest);
-  const problem = submit === "failed" || submit === "state-changed" || latest?.status === "failed";
+    submit === "sending"
+      ? t("delivery.sending")
+      : submit === "failed"
+        ? actionFailed
+        : submit === "state-changed"
+          ? t("failure.state-changed")
+          : latest === null || (latest.status === "sent" && !sentHere)
+            ? ""
+            : deliveryText(latest);
+  const problem =
+    submit === "failed" ||
+    submit === "state-changed" ||
+    (submit !== "sending" && latest?.status === "failed");
 
   return (
     <Card label={t("title")}>

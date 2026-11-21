@@ -3,10 +3,12 @@ import { agentMessageStep } from "@ganger/core";
 import type { AgentMessageFailure, MailboxRef, RunnerErrorDetail } from "@ganger/core";
 import {
   completeAgentMessage,
+  getRunControlRequest,
   getRunWithRecords,
   hasPendingCancelRequest,
   listPendingAgentMessages,
   markAgentMessageSending,
+  setRunnerMailbox,
 } from "@ganger/db";
 import type { PendingAgentMessage } from "@ganger/db";
 import { findRunner, mailboxFor, runnerErrorDetail, tryWrite } from "./context.js";
@@ -43,6 +45,8 @@ async function deliver(context: TickContext, message: PendingAgentMessage): Prom
     return;
   }
   if (agentMessageStep(run.state) === "hold") return;
+  const control = getRunControlRequest(context.db, run.id);
+  if (control?.status === "pending" && control.control === "pause") return;
   const stored = findRunner(context.db, run.runnerId);
   if (stored === undefined) {
     finish(context, message, "runner-error");
@@ -69,7 +73,12 @@ async function deliver(context: TickContext, message: PendingAgentMessage): Prom
     );
   } catch (error) {
     context.logger.warn("agent_message.send_failed", { runId: run.id, error });
-    finish(context, message, failureAfterSendStarted(runnerErrorDetail(error)));
+    const detail = runnerErrorDetail(error);
+    if (detail?.kind === "mailbox-missing") {
+      context.mailboxes.delete(stored.id);
+      tryWrite(context, run.id, () => setRunnerMailbox(context.db, stored.id, null));
+    }
+    finish(context, message, failureAfterSendStarted(detail));
     return;
   }
   finish(context, message, null);

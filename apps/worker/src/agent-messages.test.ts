@@ -4,6 +4,7 @@ import {
   changeRunState,
   getRun,
   listRunAgentMessages,
+  listRunners,
   markAgentMessageSending,
   requestAgentMessage,
   requestRunCancel,
@@ -11,7 +12,7 @@ import {
   runTimeline,
 } from "@ganger/db";
 import type { StoredRun } from "@ganger/db";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Harness, projectA } from "./test-fixtures.js";
 import type { Worker } from "./worker.js";
 
@@ -48,6 +49,10 @@ async function startOne(): Promise<{ run: StoredRun; runnerId: RunnerId; worker:
 
 function sentTo(run: StoredRun, runnerId: RunnerId): string[] {
   return h.runner(runnerId).runAt(worktreeOf(run)).agentMessages;
+}
+
+function findStoredMailbox(runnerId: RunnerId) {
+  return listRunners(h.db).find((runner) => runner.id === runnerId)?.mailbox ?? null;
 }
 
 function only(run: StoredRun) {
@@ -143,6 +148,39 @@ describe("에이전트에게 보내기(0147)", () => {
     expect(only(run).error).toBe("outcome-unknown");
     await worker.tick();
     expect(sentTo(run, runnerId)).toEqual([]);
+  });
+
+  it("틱 도중 들어온 멈추기 요청이 있으면 말을 보내지 않고 재개 뒤로 미룬다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    const agent = fake.runAt(worktreeOf(run));
+    const poll = fake.pollRun.bind(fake);
+    vi.spyOn(fake, "pollRun").mockImplementationOnce((onRunner) => {
+      requestRunControl(h.db, run.id, "pause", h.now);
+      return poll(onRunner);
+    });
+    requestAgentMessage(h.db, run.id, "멈춘 뒤에 갈 말", h.now);
+    await worker.tick();
+    expect(agent.agentMessages).toEqual([]);
+    await worker.tick();
+    expect(stateOf(run)).toBe("paused");
+    expect(agent.agentMessages).toEqual([]);
+    requestRunControl(h.db, run.id, "resume", h.now);
+    await worker.tick();
+    expect(agent.agentMessages).toEqual(["멈춘 뒤에 갈 말"]);
+  });
+
+  it("메일함이 없어졌으면 저장한 메일함을 지워 다음 보내기에서 다시 만든다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    expect(findStoredMailbox(runnerId)).not.toBeNull();
+    h.runner(runnerId).failNextControl = { kind: "mailbox-missing", detail: "gone" };
+    requestAgentMessage(h.db, run.id, "안 닿는 말", h.now);
+    const ensure = vi.spyOn(h.runner(runnerId), "ensureMailbox");
+    await worker.tick();
+    expect(only(run).error).toBe("runner-error");
+    ensure.mockClear();
+    await worker.tick();
+    expect(ensure.mock.calls[0]?.[0]).toBeNull();
   });
 
   it("완료 보고를 받은 틱에는 끝난 에이전트에게 보내지 않는다", async () => {

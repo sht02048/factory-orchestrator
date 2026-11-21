@@ -102,7 +102,8 @@ export const LOG_CUT_MARKER = `[log tail cut: the transcript is longer than ${LO
 const RAW_LIMIT = 4000;
 export const INTERRUPT_KEY = "\u001b";
 export const ESCALATION_ANSWER_SUBJECT = "Answer from the operator";
-export const OPERATOR_MESSAGE_SUBJECT = "Message from the operator";
+export const OPERATOR_MESSAGE_SUBJECT =
+  "Message from the operator (not an answer to any open question)";
 
 const SENDER_ERROR_CODES = new Set([
   "no_active_sender_terminal",
