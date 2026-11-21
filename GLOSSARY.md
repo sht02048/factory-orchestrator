@@ -232,7 +232,7 @@ _Avoid_: 이벤트(단독으로), 알림 사건, 변경 로그(서버 로그와 
 ### 진단
 
 **서버 로그**:
-web·worker·`ganger mcp`·`ganger start`가 각자 `<home>/logs/{web,worker,mcp,cli}.jsonl`에 쓰는 진단 줄. 한 줄이 JSON 객체 하나이고 고정 키(`t`, `level`, `proc`, `pid`, `v`, `event`, `msg`)와 정해 둔 문맥 키(`runId`, `ticketKey`, `runnerId`, `deliveryId` 등)만 담는다. 수준은 error·warn·info·debug이고 기본은 info로 바뀐 것만 남긴다. 10MB에서 회전하고 회전본을 5개까지 둔다. DB에 넣지 않는다. 런에서 일어난 사실의 원천은 DB 표(런 상태 기록 등)이고, 서버 로그는 문제를 볼 때 읽는 문맥이다(스펙 0004, ADR 0021). `event` 이름은 이 용어집의 낱말을 쓴다(`run.*`, `runner.*`, `webhook.*`). Orca 쪽 실행은 `orcaRunId`·`worktreeName`으로 부르고 dispatch라고 쓰지 않는다. 화면·README에서는 "server log"로 쓴다.
+web·worker·`ganger mcp`·`ganger start`가 각자 `<home>/logs/{web,worker,mcp,cli}.jsonl`에 쓰는 진단 줄. 한 줄이 JSON 객체 하나이고 고정 키(`t`, `level`, `proc`, `pid`, `v`, `event`, `msg`)와 정해 둔 문맥 키(`runId`, `ticketKey`, `runnerId`, `deliveryId` 등)만 담는다. 수준은 error·warn·info·debug이고 기본은 info로 바뀐 것만 남긴다. 10MB에서 회전하고 회전본을 5개까지 둔다. DB에 넣지 않는다. 런에서 일어난 사실의 원천은 DB 표(런 상태 기록 등)이고, 서버 로그는 문제를 볼 때 읽는 문맥이다(스펙 0004, ADR 0021). `event` 이름은 이 용어집의 낱말을 쓴다(`run.*`, `runner.*`, `webhook.*`). Orca 쪽 실행은 `orcaRunId`·`worktreeName`으로 부르고 dispatch라고 쓰지 않는다. 화면·사용자 문서에서는 "server log"로 쓴다.
 _Avoid_: 로그(단독으로. Run 상세의 에이전트 로그와 헷갈린다), 변경 로그(변경 기록과 헷갈린다), 디버그 로그(수준 이름일 뿐이다), 이벤트 로그
 
 **런 타임라인**:
@@ -240,7 +240,7 @@ _Avoid_: 로그(단독으로. Run 상세의 에이전트 로그와 헷갈린다)
 _Avoid_: 런 히스토리, 활동 로그, 이벤트 타임라인
 
 **진단 묶음**:
-운영자가 이슈에 붙이려고 만드는 zip 하나. 버전과 실행 환경, 비밀을 뺀 설정 요약, 러너·최근 런·webhook 수신 기록, 고른 런의 런 타임라인, 최근 서버 로그를 담는다. 기본으로 ssh 대상·호스트·홈 경로·티켓 키 접두어를 익명화하고 끌 수 있다(티켓 0134). 화면·README에서는 "diagnostics bundle"로 쓴다.
+운영자가 이슈에 붙이려고 만드는 zip 하나. 버전과 실행 환경, 비밀을 뺀 설정 요약, 러너·최근 런·webhook 수신 기록, 고른 런의 런 타임라인, 최근 서버 로그를 담는다. 기본으로 ssh 대상·호스트·홈 경로·티켓 키 접두어를 익명화하고 끌 수 있다(티켓 0134). 화면·사용자 문서에서는 "diagnostics bundle"로 쓴다.
 _Avoid_: support dump, 버그 리포트, 로그 내보내기
 
 ### Tickets 필터
@@ -272,15 +272,15 @@ Runs 화면의 위 줄 필터도 같은 낱말 넷(모두, 처리할 일, 진행
 ### 설치
 
 **서버 배포물**:
-저장소 클론·pnpm 빌드 없이 도는 web·worker·CLI 한 덩어리. 운영 의존성까지 묶은 JS 폴더와 그 tarball이고, Node는 싣지 않는다(티켓 0029). 헤드리스 서비스와 데스크톱 앱(0046)이 같은 배포물을 띄운다. 화면·README에서는 "server bundle"로 쓴다.
+저장소 클론·pnpm 빌드 없이 도는 web·worker·CLI 한 덩어리. 운영 의존성까지 묶은 JS 폴더와 그 tarball이고, Node는 싣지 않는다(티켓 0029). 헤드리스 서비스와 데스크톱 앱(0046)이 같은 배포물을 띄운다. 화면·사용자 문서에서는 "server bundle"로 쓴다.
 _Avoid_: 패키지(npm 패키지와 헷갈린다), 빌드 산출물(앱 하나의 `dist`를 가리킨다)
 
 **다른 기기에서 열 주소**:
-운영자가 노트북·휴대폰에서 이 서버의 화면을 여는 주소(예: Tailscale Serve 주소). Settings의 주소에서 정하고 DB 설치 설정에 둔다. 서버는 이 주소의 호스트와 127.0.0.1·localhost·바인드 주소로 온 요청만 받는다(Host 검사, 티켓 0048). 화면·README에서는 "web address"로 쓴다.
+운영자가 노트북·휴대폰에서 이 서버의 화면을 여는 주소(예: Tailscale Serve 주소). Settings의 주소에서 정하고 DB 설치 설정에 둔다. 서버는 이 주소의 호스트와 127.0.0.1·localhost·바인드 주소로 온 요청만 받는다(Host 검사, 티켓 0048). 화면·사용자 문서에서는 "web address"로 쓴다.
 _Avoid_: 바인드 주소(`WEB_HOST`, 서버가 듣는 인터페이스다), 공개 주소(단독으로)
 
 **Linear가 이 서버에 닿을 주소**:
-트래커가 인터넷에서 webhook을 보내 이 서버에 닿는 주소(예: Tailscale Funnel `https://<기기>.<tailnet>.ts.net:8443`, Cloudflare Tunnel 주소). 서버에 하나이고 모든 트래커 연결이 같이 쓴다. 트래커 연결 상세의 Webhook 구역 1단계에서 정하고, 서버가 그 주소로 webhook 확인 경로를 물어 이 설치가 답할 때만 저장한다(티켓 0130). 이 주소의 호스트로는 webhook 경로만 받는다. 코드·DB에서는 `webhookAddress`, 영어 화면·README에서는 "address Linear reaches this server at"으로 쓴다. 온보딩은 webhook을 묻지 않고, 1단계에서 webhook 없이도 자동 할당이 도는 방식과 켜는 곳만 안내한다.
+트래커가 인터넷에서 webhook을 보내 이 서버에 닿는 주소(예: Tailscale Funnel `https://<기기>.<tailnet>.ts.net:8443`, Cloudflare Tunnel 주소). 서버에 하나이고 모든 트래커 연결이 같이 쓴다. 트래커 연결 상세의 Webhook 구역 1단계에서 정하고, 서버가 그 주소로 webhook 확인 경로를 물어 이 설치가 답할 때만 저장한다(티켓 0130). 이 주소의 호스트로는 webhook 경로만 받는다. 코드·DB에서는 `webhookAddress`, 영어 화면·사용자 문서에서는 "address Linear reaches this server at"으로 쓴다. 온보딩은 webhook을 묻지 않고, 1단계에서 webhook 없이도 자동 할당이 도는 방식과 켜는 곳만 안내한다.
 _Avoid_: 공개 주소(단독으로, 어느 주소인지 흐리다), webhook 공개 주소(예전 화면 이름), 터널 주소
 
 **webhook 확인 경로**:
