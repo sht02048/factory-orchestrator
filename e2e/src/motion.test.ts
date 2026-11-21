@@ -21,6 +21,7 @@ const text = ds.motionDemo;
 declare global {
   var motionCalls: string[];
   var viewTransitionCalls: number;
+  var motionSlow: boolean;
 }
 
 let dir: string;
@@ -87,10 +88,13 @@ async function openDs(
     Element.prototype.animate = function animate(keyframes, options) {
       const names = keyframes === null ? [] : Object.keys(keyframes);
       seen.push(names.join(","));
-      return original.call(this, keyframes, options);
+      const animation = original.call(this, keyframes, options);
+      if (globalThis.motionSlow) animation.playbackRate = 0.01;
+      return animation;
     };
     globalThis.motionCalls = seen;
     globalThis.viewTransitionCalls = 0;
+    globalThis.motionSlow = false;
   });
   await page.addInitScript((mode) => {
     if (mode === "absent") {
@@ -121,6 +125,18 @@ const cards = (page: Page, column: string) =>
   page
     .locator(`[data-motion-column="${column}"] [data-motion-card]`)
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-motion-card")));
+
+const slowMotion = (page: Page) =>
+  page.evaluate(() => {
+    globalThis.motionSlow = true;
+  });
+const hideTab = (page: Page) =>
+  page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+  });
+const exitedText = (count: number) => text.exited.replace("{count}", String(count));
+const exitedStatus = (page: Page) =>
+  page.locator("#motionPrimitives").getByRole("status").first().textContent();
 
 describe("공용 움직임(브라우저, 0152)", () => {
   it("첫 렌더에서는 목록이 움직이지 않는다", async (context) => {
@@ -265,6 +281,98 @@ describe("공용 움직임(브라우저, 0152)", () => {
       expect(closing.ending).toBe(true);
       expect(closing.duration).toBe(duration);
       expect(closing.moved).toBe(moves);
+      await page.context().close();
+    }
+  });
+
+  it("빠지던 행이 탭이 숨은 사이 돌아오면 보이고 빠짐 알림은 오지 않는다", async (context) => {
+    const page = await openDs(context.task.name, "no-preference");
+    await slowMotion(page);
+    await press(page, text.remove);
+    await hideTab(page);
+    await press(page, text.restore);
+    await expect.poll(() => cards(page, text.queued)).toEqual(["1", "2", "3", "4"]);
+    await expect
+      .poll(() =>
+        page.locator('[data-motion-key="card-1"]').evaluate((node) => ({
+          opacity: getComputedStyle(node).opacity,
+          tall: node.getBoundingClientRect().height > 0,
+          animations: node.getAnimations().length,
+        })),
+      )
+      .toEqual({ opacity: "1", tall: true, animations: 0 });
+    expect(await exitedStatus(page)).toBe(exitedText(0));
+    await page.context().close();
+  });
+
+  it("빠지는 중 탭이 숨고 다른 커밋이 와도 빠짐 알림은 한 번이다", async (context) => {
+    const page = await openDs(context.task.name, "no-preference");
+    await slowMotion(page);
+    await press(page, text.remove);
+    await hideTab(page);
+    await press(page, text.add);
+    await expect.poll(() => exitedStatus(page)).toBe(exitedText(1));
+    await press(page, text.add);
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 50))),
+    );
+    expect(await exitedStatus(page)).toBe(exitedText(1));
+    await page.context().close();
+  });
+
+  it("바뀌지 않은 목록은 위쪽 높이가 함께 바뀌어도 움직이지 않는다", async (context) => {
+    const page = await openDs(context.task.name, "no-preference", "absent");
+    await slowMotion(page);
+    await page.evaluate((queued) => {
+      const column = document.querySelector(`[data-motion-column="${queued}"]`);
+      const board = column?.parentElement?.parentElement;
+      if (!(column instanceof HTMLElement) || !(board instanceof HTMLElement)) return;
+      new MutationObserver(() => {
+        board.style.marginTop = "40px";
+      }).observe(column, { childList: true, subtree: true });
+    }, text.queued);
+    await press(page, text.reorder);
+    await expect.poll(() => cards(page, text.queued)).toEqual(["4", "1", "2", "3"]);
+    const running = await page
+      .locator('[data-motion-key="card-5"] > div')
+      .evaluate((node) => node.getAnimations().length);
+    expect(running).toBe(0);
+    await page.context().close();
+  });
+
+  it("Sheet 닫기는 같은 쪽으로 나가고, 움직임 줄이기에서는 이동 없이 흐려진다", async (context) => {
+    for (const [mode, duration, moves] of [
+      ["no-preference", "0.18s", true],
+      ["reduce", "0.15s", false],
+    ] as const) {
+      const page = await openDs(`${context.task.name}-${mode}`, mode);
+      const opener = page.getByRole("button", { name: ds.blocks.sheet.open, exact: true });
+      await opener.scrollIntoViewIfNeeded();
+      await opener.click();
+      const sheet = page.getByRole("dialog");
+      await expect
+        .poll(() =>
+          sheet.evaluate(
+            (node) =>
+              !node.hasAttribute("data-starting-style") &&
+              node.getAnimations().every((animation) => animation.playState === "finished"),
+          ),
+        )
+        .toBe(true);
+      const closing = await sheet.evaluate(async (node) => {
+        const left = node.getBoundingClientRect().left;
+        node.ownerDocument.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        );
+        for (let frame = 0; frame < 60 && !node.hasAttribute("data-ending-style"); frame += 1) {
+          await new Promise(requestAnimationFrame);
+        }
+        const style = getComputedStyle(node);
+        const durationValue = style.transitionDuration;
+        node.getAnimations().forEach((animation) => animation.finish());
+        return { duration: durationValue, moved: node.getBoundingClientRect().left > left };
+      });
+      expect(closing).toEqual({ duration, moved: moves });
       await page.context().close();
     }
   });

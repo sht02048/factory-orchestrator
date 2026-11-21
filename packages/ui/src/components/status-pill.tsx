@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef, type ReactNode } from "react";
 import { colors, fontSize, fontWeight, motion, radius, size, space } from "../tokens.stylex";
+import { motionTokenMs, motionTokenValue } from "./motion-token";
 
 export type RunStateStatus = "queued" | "running" | "waiting-for-input" | "paused" | "disconnected";
 export type SummaryStatus = "succeeded" | "failed" | "canceled";
@@ -71,12 +72,6 @@ const PILL_POP_KEYFRAMES: Keyframe[] = [
   { transform: "scale(1)", offset: 1 },
 ];
 
-function cssVariableValue(token: unknown): string {
-  const name = /var\((--[^,)]+)/.exec(String(token))?.[1];
-  if (name === undefined) return "";
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-
 function usePillPop(status: PillStatus, enabled: boolean) {
   const pillRef = useRef<HTMLSpanElement>(null);
   const shownStatus = useRef(status);
@@ -93,8 +88,8 @@ function usePillPop(status: PillStatus, enabled: boolean) {
       return;
     }
     pill.animate(PILL_POP_KEYFRAMES, {
-      duration: Number.parseFloat(cssVariableValue(motion.durationPillPop)) || 0,
-      easing: cssVariableValue(motion.easeOut),
+      duration: motionTokenMs(motion.durationPillPop),
+      easing: motionTokenValue(motion.easeOut),
     });
   }, [status, enabled]);
   return pillRef;

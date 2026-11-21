@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import {
   Button,
+  Card,
   MotionList,
   MotionScope,
   PILL_STATUSES,
@@ -9,7 +10,7 @@ import {
   Text,
   useMotionMove,
 } from "@ganger/ui";
-import { colors, radius, space } from "@ganger/ui/tokens.stylex";
+import { space } from "@ganger/ui/tokens.stylex";
 import { useRef, useState } from "react";
 import { useTranslations } from "use-intl";
 import { useStatusName } from "../status";
@@ -66,10 +67,13 @@ function BoardDemo() {
   const [board, setBoard] = useState(FIRST_BOARD);
   const [exited, setExited] = useState(0);
   const nextId = useRef(FIRST_NEW_ITEM);
+  const lastRemoved = useRef<number | null>(null);
 
   const renderCard = (id: number) => (
     <div data-motion-card={id} {...stylex.props(styles.card)}>
-      <Text variant="ui">{t("card", { id })}</Text>
+      <Card padding="compact">
+        <Text variant="ui">{t("card", { id })}</Text>
+      </Card>
     </div>
   );
   const column = (label: string, ids: readonly number[]) => (
@@ -81,7 +85,7 @@ function BoardDemo() {
         <MotionList
           items={ids}
           getKey={cardKey}
-          highlightRadius="control"
+          highlightRadius="card"
           onExited={() => setExited((count) => count + 1)}
         >
           {renderCard}
@@ -102,9 +106,26 @@ function BoardDemo() {
           {t("add")}
         </Button>
         <Button
-          onClick={() => setBoard((current) => ({ ...current, queued: current.queued.slice(1) }))}
+          onClick={() => {
+            lastRemoved.current = board.queued[0] ?? null;
+            setBoard((current) => ({ ...current, queued: current.queued.slice(1) }));
+          }}
         >
           {t("remove")}
+        </Button>
+        <Button
+          onClick={() => {
+            const id = lastRemoved.current;
+            if (id === null) return;
+            lastRemoved.current = null;
+            setBoard((current) =>
+              current.queued.includes(id)
+                ? current
+                : { ...current, queued: [id, ...current.queued] },
+            );
+          }}
+        >
+          {t("restore")}
         </Button>
         <Button onClick={() => move(() => setBoard(moveFirstQueued))}>{t("move")}</Button>
         <Button
@@ -167,12 +188,7 @@ const styles = stylex.create({
   board: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: space.s4 },
   column: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   cards: { display: "flex", flexDirection: "column", minHeight: 240 },
-  card: {
-    marginBottom: space.s1,
-    padding: space.s3,
-    borderRadius: radius.control,
-    backgroundColor: colors.bgCard,
-  },
+  card: { marginBottom: space.s1 },
   timeline: {
     display: "flex",
     flexDirection: "column",

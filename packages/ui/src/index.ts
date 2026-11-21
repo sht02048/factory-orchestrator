@@ -197,18 +197,7 @@ export {
   type MotionMove,
   type MotionScopeProps,
 } from "./components/motion";
-export {
-  MOTION_BURST_LIMIT,
-  chooseMoveStyle,
-  diffMotionOrders,
-  reconcileMotionRows,
-  type MotionBox,
-  type MotionChanges,
-  type MotionListOrder,
-  type MotionRow,
-  type MoveStyle,
-  type MoveStyleInput,
-} from "./components/motion-plan";
+export { MOTION_BURST_LIMIT } from "./components/motion-plan";
 export {
   RowReason,
   RowTitle,

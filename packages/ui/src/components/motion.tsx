@@ -23,6 +23,7 @@ import {
   type MotionRow,
   type MoveStyle,
 } from "./motion-plan";
+import { motionTokenMs, motionTokenValue } from "./motion-token";
 
 export type MotionEnter = "expand" | "rise";
 export type MotionMove = "row" | "card";
@@ -47,6 +48,14 @@ interface ListHandle {
 interface ExitRecord {
   animations: Animation[];
   returning: boolean;
+  parts: ItemParts;
+}
+
+interface DroppedRow {
+  listId: string;
+  key: string;
+  animations: readonly Animation[];
+  parts: ItemParts | undefined;
 }
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
@@ -66,15 +75,17 @@ function canAnimate(): boolean {
   );
 }
 
-function tokenValue(token: unknown): string {
-  const name = /var\((--[^,)]+)/.exec(String(token))?.[1];
-  if (name === undefined) return "";
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const exitIdOf = (listId: string, key: string) => `${listId}\0${key}`;
+
+function restoreItem(parts: ItemParts | undefined): void {
+  parts?.inner.style.removeProperty("overflow");
+  parts?.wrapper.style.removeProperty("display");
 }
 
-function tokenMs(token: unknown): number {
-  const value = Number.parseFloat(tokenValue(token));
-  return Number.isFinite(value) ? value : 0;
+function overlapsArea(box: DOMRect, area: MotionBox): boolean {
+  return (
+    box.left < area.right && area.left < box.right && box.top < area.bottom && area.top < box.bottom
+  );
 }
 
 function visibleAreaOf(element: HTMLElement): MotionBox {
@@ -104,6 +115,11 @@ function ensureViewTransitionStyle(): void {
   document.head.append(style);
 }
 
+function listContainer(list: ListHandle): HTMLElement | null {
+  for (const parts of list.parts.values()) return parts.wrapper.parentElement;
+  return null;
+}
+
 class MotionEngine {
   readonly lists = new Map<string, ListHandle>();
   move: MotionMove;
@@ -111,7 +127,9 @@ class MotionEngine {
   private resetKeys = new Map<string, string | undefined>();
   private firstBoxes: Map<string, DOMRect> | null = null;
   private flushQueued = false;
+  private firstListBoxes = new Map<string, DOMRect>();
   private readonly exits = new Map<string, ExitRecord>();
+  private readonly dropped = new Map<string, DroppedRow>();
   private readonly moves = new Map<string, Animation>();
   private readonly viewTransitionNames = new Map<string, string>();
   private nextViewTransitionName = 0;
@@ -124,7 +142,10 @@ class MotionEngine {
   capture(): void {
     if (this.firstBoxes !== null) return;
     const boxes = new Map<string, DOMRect>();
+    this.firstListBoxes = new Map();
     for (const list of this.lists.values()) {
+      const container = listContainer(list);
+      if (container !== null) this.firstListBoxes.set(list.id, container.getBoundingClientRect());
       for (const row of list.rows) {
         const parts = list.parts.get(row.key);
         if (parts !== undefined && !row.leaving) {
@@ -171,8 +192,8 @@ class MotionEngine {
       else transition.skipTransition();
     });
     this.activeTransition = transition;
-    const duration = tokenMs(this.moveToken());
-    const easing = tokenValue(motion.easeMove);
+    const duration = motionTokenMs(this.moveToken());
+    const easing = motionTokenValue(motion.easeMove);
     transition.ready
       .then(() => {
         for (const animation of document.getAnimations()) {
@@ -192,6 +213,7 @@ class MotionEngine {
         if (this.activeTransition !== transition) return;
         this.activeTransition = null;
         this.clearViewTransitionNames();
+        this.viewTransitionNames.clear();
         root.style.removeProperty("view-transition-name");
       });
   }
@@ -203,11 +225,13 @@ class MotionEngine {
   private nameVisibleItems(): void {
     this.clearViewTransitionNames();
     for (const list of this.lists.values()) {
+      const container = listContainer(list);
+      if (container === null) continue;
+      const area = visibleAreaOf(container);
       for (const row of list.rows) {
         const parts = list.parts.get(row.key);
         if (parts === undefined || row.leaving) continue;
-        const box = parts.inner.getBoundingClientRect();
-        if (box.bottom < 0 || box.top > window.innerHeight) continue;
+        if (!overlapsArea(parts.inner.getBoundingClientRect(), area)) continue;
         const name =
           this.viewTransitionNames.get(row.key) ?? `ganger-motion-${this.nextViewTransitionName++}`;
         this.viewTransitionNames.set(row.key, name);
@@ -228,6 +252,9 @@ class MotionEngine {
     this.flushQueued = false;
     const first = this.firstBoxes ?? new Map<string, DOMRect>();
     this.firstBoxes = null;
+    const firstListBoxes = this.firstListBoxes;
+    this.firstListBoxes = new Map();
+    this.releaseReturnedRows();
 
     const settled: ListHandle[] = [];
     const fresh: ListHandle[] = [];
@@ -246,6 +273,14 @@ class MotionEngine {
       keys: list.rows.filter((row) => !row.leaving).map((row) => row.key),
     }));
     const changes = diffMotionOrders(beforeOrders, afterOrders);
+    const changedLists = new Set(
+      afterOrders
+        .filter(({ keys }, index) => {
+          const previous = beforeOrders[index]?.keys ?? [];
+          return keys.length !== previous.length || keys.some((key, at) => key !== previous[at]);
+        })
+        .map(({ listId }) => listId),
+    );
     for (const list of this.lists.values()) {
       this.orders.set(
         list.id,
@@ -263,25 +298,55 @@ class MotionEngine {
     const quiet = reduced || changes.count > MOTION_BURST_LIMIT;
     this.hideCrossedLeavers(settled, changes);
     for (const list of settled) this.playPresence(list, changes, quiet);
-    return this.playMoves(settled, changes, first, reduced, insideViewTransition);
+    const moving = settled.filter((list) => changedLists.has(list.id));
+    return this.playMoves(moving, changes, first, firstListBoxes, reduced, insideViewTransition);
+  }
+
+  private releaseReturnedRows(): void {
+    for (const [exitId, entry] of this.dropped) {
+      const list = this.lists.get(entry.listId);
+      const row = list?.rows.find(({ key }) => key === entry.key);
+      if (row?.leaving === true) continue;
+      this.dropped.delete(exitId);
+      if (row === undefined) continue;
+      for (const animation of entry.animations) animation.cancel();
+      restoreItem(entry.parts);
+    }
+  }
+
+  private dropRow(list: ListHandle, key: string, exited: boolean, record?: ExitRecord): void {
+    const exitId = exitIdOf(list.id, key);
+    if (this.dropped.has(exitId)) return;
+    this.dropped.set(exitId, {
+      listId: list.id,
+      key,
+      animations: record?.animations ?? [],
+      parts: record?.parts ?? list.parts.get(key),
+    });
+    list.drop(key, exited);
+  }
+
+  private cancelExit(listId: string, key: string): void {
+    const exitId = exitIdOf(listId, key);
+    const record = this.exits.get(exitId);
+    if (record === undefined) return;
+    this.exits.delete(exitId);
+    for (const animation of record.animations) animation.cancel();
+    restoreItem(record.parts);
   }
 
   private settleFreshList(list: ListHandle): void {
     for (const row of list.rows) {
-      const exitId = `${list.id}\0${row.key}`;
-      const record = this.exits.get(exitId);
-      if (record !== undefined) {
-        this.exits.delete(exitId);
-        for (const animation of record.animations) animation.cancel();
-      }
-      if (row.leaving) list.drop(row.key, false);
+      this.cancelExit(list.id, row.key);
+      if (row.leaving) this.dropRow(list, row.key, false);
     }
   }
 
   private finishWithoutMotion(lists: readonly ListHandle[], changes: MotionChanges): void {
     for (const list of lists) {
       for (const row of list.rows) {
-        if (row.leaving) list.drop(row.key, !changes.crossed.has(row.key));
+        this.cancelExit(list.id, row.key);
+        if (row.leaving) this.dropRow(list, row.key, !changes.crossed.has(row.key));
       }
     }
   }
@@ -291,8 +356,9 @@ class MotionEngine {
       for (const row of list.rows) {
         if (!row.leaving || !changes.crossed.has(row.key)) continue;
         const parts = list.parts.get(row.key);
+        this.cancelExit(list.id, row.key);
         if (parts !== undefined) parts.wrapper.style.display = "none";
-        list.drop(row.key, false);
+        this.dropRow(list, row.key, false);
       }
     }
   }
@@ -301,10 +367,10 @@ class MotionEngine {
     for (const row of list.rows) {
       const parts = list.parts.get(row.key);
       if (parts === undefined) continue;
-      const exitId = `${list.id}\0${row.key}`;
+      const exitId = exitIdOf(list.id, row.key);
       const record = this.exits.get(exitId);
       if (row.leaving) {
-        if (changes.crossed.has(row.key)) continue;
+        if (changes.crossed.has(row.key) || this.dropped.has(exitId)) continue;
         if (record === undefined) this.startExit(list, row.key, parts, quiet);
         else if (record.returning) {
           record.returning = false;
@@ -318,48 +384,51 @@ class MotionEngine {
         continue;
       }
       if (changes.entered.has(row.key)) {
-        this.startEnter(list, parts, quiet);
+        this.startEnter(list, row.key, parts, quiet);
       }
     }
   }
 
-  private startEnter(list: ListHandle, parts: ItemParts, quiet: boolean): void {
-    const easing = tokenValue(motion.easeOut);
+  private startEnter(list: ListHandle, key: string, parts: ItemParts, quiet: boolean): void {
+    const easing = motionTokenValue(motion.easeOut);
     if (quiet) {
       parts.inner.animate(
         { opacity: [0, 1] },
-        { duration: tokenMs(motion.durationReducedFade), easing },
+        { duration: motionTokenMs(motion.durationReducedFade), easing },
       );
       return;
     }
     if (list.enter === "rise") {
       parts.inner.animate(
         { opacity: [0, 1], transform: ["translateY(6px)", "none"] },
-        { duration: tokenMs(motion.durationLineEnter), easing },
+        { duration: motionTokenMs(motion.durationLineEnter), easing },
       );
       return;
     }
-    const duration = tokenMs(motion.durationItemEnter);
+    const duration = motionTokenMs(motion.durationItemEnter);
     parts.inner.style.overflow = "hidden";
     const expansion = parts.wrapper.animate(
       { gridTemplateRows: ["0fr", "1fr"], opacity: [0, 1] },
       { duration, easing },
     );
     parts.inner.animate({ transform: ["translateY(-6px)", "none"] }, { duration, easing });
-    const unclip = () => parts.inner.style.removeProperty("overflow");
+    const exitId = exitIdOf(list.id, key);
+    const unclip = () => {
+      if (!this.exits.has(exitId)) parts.inner.style.removeProperty("overflow");
+    };
     expansion.finished.then(unclip).catch(unclip);
     if (list.highlight) this.playArrival(parts);
   }
 
   private startExit(list: ListHandle, key: string, parts: ItemParts, quiet: boolean): void {
-    const easing = tokenValue(motion.easeOut);
-    const exitId = `${list.id}\0${key}`;
+    const easing = motionTokenValue(motion.easeOut);
+    const exitId = exitIdOf(list.id, key);
     const animations: Animation[] = [];
     if (quiet) {
       animations.push(
         parts.wrapper.animate(
           { opacity: [1, 0] },
-          { duration: tokenMs(motion.durationReducedFade), easing, fill: "both" },
+          { duration: motionTokenMs(motion.durationReducedFade), easing, fill: "both" },
         ),
       );
     } else {
@@ -367,11 +436,11 @@ class MotionEngine {
       animations.push(
         parts.wrapper.animate(
           { gridTemplateRows: ["1fr", "0fr"], opacity: [1, 0] },
-          { duration: tokenMs(motion.durationItemExit), easing, fill: "both" },
+          { duration: motionTokenMs(motion.durationItemExit), easing, fill: "both" },
         ),
       );
     }
-    const record: ExitRecord = { animations, returning: false };
+    const record: ExitRecord = { animations, returning: false, parts };
     this.exits.set(exitId, record);
     Promise.all(animations.map((animation) => animation.finished))
       .then(() => {
@@ -382,7 +451,7 @@ class MotionEngine {
           parts.inner.style.removeProperty("overflow");
           return;
         }
-        list.drop(key, true);
+        this.dropRow(list, key, true, record);
       })
       .catch(() => {
         if (this.exits.get(exitId) === record) this.exits.delete(exitId);
@@ -392,7 +461,7 @@ class MotionEngine {
   private playArrival(parts: ItemParts): void {
     parts.flash.animate(
       { opacity: [1, 0] },
-      { duration: tokenMs(motion.durationArrival), easing: tokenValue(motion.easeOut) },
+      { duration: motionTokenMs(motion.durationArrival), easing: motionTokenValue(motion.easeOut) },
     );
   }
 
@@ -400,19 +469,26 @@ class MotionEngine {
     lists: readonly ListHandle[],
     changes: MotionChanges,
     first: ReadonlyMap<string, DOMRect>,
+    firstListBoxes: ReadonlyMap<string, DOMRect>,
     reduced: boolean,
     insideViewTransition: boolean,
   ): boolean {
     const planned: {
       key: string;
       parts: ItemParts;
-      from: DOMRect;
-      to: DOMRect;
+      dx: number;
+      dy: number;
       style: MoveStyle;
       crossed: boolean;
       changed: boolean;
     }[] = [];
     for (const list of lists) {
+      const container = listContainer(list);
+      const listFrom = firstListBoxes.get(list.id);
+      const listTo = container?.getBoundingClientRect();
+      const listDx =
+        listFrom !== undefined && listTo !== undefined ? listFrom.left - listTo.left : 0;
+      const listDy = listFrom !== undefined && listTo !== undefined ? listFrom.top - listTo.top : 0;
       for (const row of list.rows) {
         if (row.leaving) continue;
         const parts = list.parts.get(row.key);
@@ -423,9 +499,9 @@ class MotionEngine {
         const to = parts.inner.getBoundingClientRect();
         const crossed = changes.crossed.has(row.key);
         const changed = crossed || changes.displaced.has(row.key);
-        const shifted =
-          Math.abs(from.left - to.left) > MOVE_THRESHOLD ||
-          Math.abs(from.top - to.top) > MOVE_THRESHOLD;
+        const dx = from.left - to.left - (crossed ? 0 : listDx);
+        const dy = from.top - to.top - (crossed ? 0 : listDy);
+        const shifted = Math.abs(dx) > MOVE_THRESHOLD || Math.abs(dy) > MOVE_THRESHOLD;
         if (!shifted && !crossed) continue;
         const style = chooseMoveStyle({
           changeCount: changes.count,
@@ -435,31 +511,32 @@ class MotionEngine {
           to,
           visibleArea: visibleAreaOf(parts.inner),
         });
-        planned.push({ key: row.key, parts, from, to, style, crossed, changed });
+        planned.push({ key: row.key, parts, dx, dy, style, crossed, changed });
       }
     }
 
-    const slides = planned.every((move) => move.style === "slide");
+    const slides = planned.filter((move) => move.changed).every((move) => move.style === "slide");
     if (insideViewTransition && slides) {
       for (const move of planned) if (move.crossed) this.playArrival(move.parts);
       return true;
     }
 
-    const duration = tokenMs(this.moveToken());
-    const easing = tokenValue(motion.easeMove);
+    const duration = motionTokenMs(this.moveToken());
+    const easing = motionTokenValue(motion.easeMove);
     for (const move of planned) {
       if (move.style === "fade") {
         if (!move.changed) continue;
         move.parts.inner.animate(
           { opacity: [0, 1] },
-          { duration: tokenMs(motion.durationReducedFade), easing: tokenValue(motion.easeOut) },
+          {
+            duration: motionTokenMs(motion.durationReducedFade),
+            easing: motionTokenValue(motion.easeOut),
+          },
         );
         continue;
       }
-      const dx = move.from.left - move.to.left;
-      const dy = move.from.top - move.to.top;
       const animation = move.parts.inner.animate(
-        { transform: [`translate(${dx}px, ${dy}px)`, "none"] },
+        { transform: [`translate(${move.dx}px, ${move.dy}px)`, "none"] },
         { duration, easing },
       );
       this.moves.set(move.key, animation);
