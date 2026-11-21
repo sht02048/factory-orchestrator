@@ -310,7 +310,7 @@ describe("Stats 배치(브라우저, 0093)", () => {
 
 describe("Stats 날짜별 표(브라우저, 0093)", () => {
   it("좁은 폭에서 '표로 보기'로 펼친 표는 표만 옆으로 넘어가고 페이지는 넘치지 않는다", async (context) => {
-    const page = await openPage(context, 400);
+    const page = await openPage(context, 320);
     await page.goto(`/stats?ws=${workspaceId}`);
     await hydrated(page);
     await page.getByRole("button", { name: stats.throughput.showTable }).click();
