@@ -531,12 +531,25 @@ export class OrcaRunner implements Runner {
 
   private async stopPreviousAgent(agentRef: AgentRef): Promise<void> {
     const agent = decodeAgent(agentRef);
-    if (agent === null) return;
+    if (agent === null) {
+      throw new AdapterError<RunnerErrorDetail>({
+        kind: "runner-error",
+        code: "invalid_agent_ref",
+        message: "the agent reference was not made by the orca runner",
+      });
+    }
     const stopped = await this.orcaOutcome(
       ["orchestration", "worker-stop", "--dispatch", agent.dispatchId],
       workerStopResultSchema,
     );
     if (stopped.ok || stopped.code === "dispatch_not_found") return;
+    if (stopped.code !== "stop_unknown") {
+      const shown = await this.orcaOutcome(
+        ["orchestration", "worker-show", "--dispatch", agent.dispatchId],
+        workerShowResultSchema,
+      );
+      if (shown.ok && shown.result.state !== "ready") return;
+    }
     throw this.errorFor(stopped, {});
   }
 

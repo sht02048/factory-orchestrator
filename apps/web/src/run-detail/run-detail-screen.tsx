@@ -733,8 +733,12 @@ function ContinueRun({
       actions={
         <>
           <DialogClose>{t("dismiss")}</DialogClose>
-          <Button variant="primary" aria-disabled={sending} aria-busy={sending} onClick={submit}>
-            {sending ? t("sending") : t("confirm")}
+          <Button
+            variant="primary"
+            busy={{ active: sending, label: t("sending") }}
+            onClick={submit}
+          >
+            {t("confirm")}
           </Button>
         </>
       }
@@ -751,6 +755,11 @@ function ContinueRun({
           })}
         </DefinitionItem>
       </DefinitionList>
+      {offer.place === "recreated" ? (
+        <Text variant="meta" as="p">
+          {t("branchGoneNote")}
+        </Text>
+      ) : null}
       <Field label={t("messageLabel")} {...(invalid === null ? {} : { error: invalid })}>
         <Textarea name="continue-message" rows={4} value={message} onValueChange={setMessage} />
       </Field>

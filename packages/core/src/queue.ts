@@ -12,6 +12,7 @@ export interface QueuedRun {
   runnerId: RunnerId | null;
   unstartable: boolean;
   pinnedToRunner?: boolean;
+  startRequested?: boolean;
 }
 
 export interface RunnerChoice {
@@ -96,10 +97,11 @@ export function planQueue(input: {
 
 function pinnedRunnerHold(
   runner: RunnerSnapshot | undefined,
-  run: Pick<QueuedRun, "project" | "agent">,
+  run: Pick<QueuedRun, "project" | "agent" | "startRequested">,
 ): Unplaced | null {
   if (runner === undefined) return { reason: "runner-offline" };
   if (!canRunnerTake(runner, run.project)) return { reason: whyCannotTake(runner, run.project) };
+  if (run.startRequested === true) return null;
   const limit = usageLimitOf(runner.usageLimits, run.agent);
   return limit === null ? null : { reason: "usage-limit", limit };
 }

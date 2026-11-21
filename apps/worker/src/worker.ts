@@ -278,7 +278,9 @@ async function processQueue(context: TickContext): Promise<void> {
     }
     const candidates = queued
       .flatMap((run) => toQueuedRun(context, run))
-      .map((run) => (bound.has(run.id) ? { ...run, unstartable: false } : run))
+      .map((run) =>
+        bound.has(run.id) ? { ...run, unstartable: false, startRequested: true } : run,
+      )
       .filter((run) => !hasPendingCancelRequest(db, run.id))
       .filter((run) => {
         const runnerId = bound.get(run.id);

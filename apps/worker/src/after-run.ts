@@ -348,6 +348,7 @@ async function removeWorktreeWithoutWork(
   if (worktreeTakenOverBy(context.db, run.id) !== null) return;
   const kept = await unsavedWorkIn(context, run, stored);
   if (kept === "unreachable") return;
+  if (worktreeTakenOverBy(context.db, run.id) !== null) return;
   if (kept === null) {
     await removeWorktree(context, run, stored);
     return;

@@ -13,12 +13,14 @@ export function decidePrState(input: {
   ticketKey: TicketKey;
   runStartedAt: Date;
   continuesEarlierRun?: boolean;
+  handedOverAt?: Date;
   byBranch: ReadonlyArray<PullRequestSnapshot>;
   byTicketKey: ReadonlyArray<PullRequestSnapshot>;
 }): PrStateDecision {
   const belongs = (pr: PullRequestSnapshot): boolean =>
     pr.sourceRepo === input.repo &&
-    (input.baseBranch === undefined || pr.baseBranch === input.baseBranch);
+    (input.baseBranch === undefined || pr.baseBranch === input.baseBranch) &&
+    (input.handedOverAt === undefined || pr.createdAt.getTime() < input.handedOverAt.getTime());
   const createdDuringRun = (pr: PullRequestSnapshot): boolean =>
     pr.createdAt.getTime() >= input.runStartedAt.getTime();
 
@@ -26,7 +28,8 @@ export function decidePrState(input: {
     if (input.continuesEarlierRun !== true) return false;
     const startedAt = input.runStartedAt.getTime();
     if (pr.state === "merged") return pr.mergedAt !== null && pr.mergedAt.getTime() < startedAt;
-    return pr.state === "closed" && pr.createdAt.getTime() < startedAt;
+    if (pr.state !== "closed") return false;
+    return (pr.closedAt ?? pr.createdAt).getTime() < startedAt;
   };
 
   const first = latest(input.byBranch.filter((pr) => belongs(pr) && !settledBeforeRun(pr)));

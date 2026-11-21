@@ -424,6 +424,17 @@ describe("이어서 맡긴 런(러너 고정)", () => {
     ]);
   });
 
+  it("시작을 이미 요청한 런은 한도 중에도 시작 여부를 확인하러 간다", () => {
+    const pinned = { ...queued("pinned", app, r1), pinnedToRunner: true, startRequested: true };
+    const until = new Date("2099-01-01T00:00:00Z");
+    const plan = planQueue({
+      queued: [pinned],
+      runners: [runner({ id: r1, usageLimits: [{ provider: "claude", until }] })],
+      runs: [],
+    });
+    expect(plan.start).toEqual([{ runId: pinned.id, runnerId: r1 }]);
+  });
+
   it("러너에 자리가 있으면 그 러너에서 시작한다", () => {
     const pinned = { ...queued("pinned", app, r1), pinnedToRunner: true };
     const plan = planQueue({

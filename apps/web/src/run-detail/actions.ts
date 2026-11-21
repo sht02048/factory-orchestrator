@@ -6,7 +6,7 @@ import type { RunControlActionResult } from "@ganger/app/run-control";
 import type { ContinueRunActionResult, RunActionResult } from "@ganger/app/run-detail/actions";
 import type { RunDetailPage } from "@ganger/app/run-detail/model";
 import { toRunId } from "@ganger/core";
-import type { RunControl } from "@ganger/core";
+import type { RunControl, RunId } from "@ganger/core";
 import {
   ANSWER_REJECT_REASONS,
   DENY_REJECT_REASONS,
@@ -33,7 +33,7 @@ export interface RunDetailCalls {
   deny(input: { runId: string; promptId: string; reason: string }): Promise<unknown>;
   cancel(runId: string): Promise<RunActionResult>;
   removeWorktree(runId: string): Promise<RunActionResult>;
-  continueRun(runId: string, message: string): Promise<ContinueRunActionResult>;
+  continueRun(runId: RunId, message: string): Promise<ContinueRunActionResult>;
   control(runId: string, control: RunControl): Promise<RunControlActionResult>;
   requestLog(runId: string): Promise<boolean>;
 }
@@ -99,7 +99,7 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
     }),
     continueRun: mutationOptions({
       mutationFn: async (message: string) =>
-        okOrThrow<{ runId: string }, string>(await calls.continueRun(runId, message)),
+        okOrThrow<{ runId: string }, string>(await calls.continueRun(toRunId(runId), message)),
       onSuccess: refreshRun,
     }),
     control: mutationOptions({

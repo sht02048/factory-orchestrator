@@ -201,5 +201,19 @@ describe("이어서 맡긴 런의 PR", () => {
   it("런 중에 머지되거나 아직 열린 PR은 새 런의 결과다", () => {
     expect(decide(snapshot("merged", during))).toBe("merged");
     expect(decide(snapshot("open", null))).toBe("open");
+    expect(decide({ ...snapshot("closed", null), closedAt: during })).toBe("closed");
+  });
+
+  it("이전 런은 넘겨준 뒤에 만들어진 PR을 자기 PR로 삼지 않는다", () => {
+    const later = { ...snapshot("open", null), createdAt: during };
+    const decision = decidePrState({
+      repo,
+      ticketKey: toTicketKey("ENG-1"),
+      runStartedAt: before,
+      handedOverAt: startedAt,
+      byBranch: [later],
+      byTicketKey: [later],
+    });
+    expect(decision).toEqual({ prState: "none", pr: null });
   });
 });

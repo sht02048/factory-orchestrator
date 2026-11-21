@@ -362,6 +362,7 @@ export interface PullRequestSnapshot {
   state: "open" | "closed" | "merged" | (string & {});
   createdAt: Date;
   mergedAt: Date | null;
+  closedAt?: Date;
   headBranch: string;
   sourceRepo: RepoRef | null;
   headCommit: string;
