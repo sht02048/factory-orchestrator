@@ -1637,6 +1637,20 @@ describe("prepareContinuation", () => {
     expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
   });
 
+  test("지워진 워크트리를 다시 만들기 전에 살아 있을 수 있는 이전 에이전트를 멈춘다", async () => {
+    const stopAgent = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
+    const exec = projectExec();
+    git(exec, "worktree list", list(main));
+    exec.orca(
+      "orchestration worker-stop",
+      stdout(JSON.stringify({ ok: false, error: { code: "stop_unknown", message: "x" } }), 1),
+    );
+    expect(
+      await adapterError(runnerWith(exec).prepareContinuation({ ...input, stopAgent })),
+    ).toMatchObject({ kind: "runner-error", code: "stop_unknown" });
+    expect(exec.commands().some((c) => c.includes("worktree add"))).toBe(false);
+  });
+
   test("로컬에 없고 원격에만 있으면 받아서 추적 브랜치로 만든다", async () => {
     const exec = projectExec();
     git(exec, "worktree list", list(main));

@@ -591,12 +591,21 @@ export function listTakenOverRunIds(db: Database): Set<RunId> {
 
 export function reclaimSourceWorktree(db: Database, sourceRunId: RunId): void {
   inTransaction(db, () => {
-    const changed = db
-      .update(runs)
-      .set({ worktreeRemovedAt: null, worktreeRemoveRequestedAt: null })
-      .where(and(eq(runs.id, sourceRunId), isNotNull(runs.worktreeRemovedAt)))
-      .run().changes;
-    if (changed > 0) recordRunChange(db, sourceRunId);
+    const found = getRunWithRecords(db, sourceRunId);
+    if (found?.run.state !== "ended") return;
+    const { run, records } = found;
+    const unaccounted =
+      records.worktreeKept === null && summarizeRunOutcome(run).worktree === "nothing-to-remove";
+    if (records.worktreeRemovedAt === null && !unaccounted) return;
+    db.update(runs)
+      .set({
+        worktreeRemovedAt: null,
+        worktreeRemoveRequestedAt: null,
+        ...(unaccounted ? { worktreeKept: "check-failed" as const } : {}),
+      })
+      .where(eq(runs.id, sourceRunId))
+      .run();
+    recordRunChange(db, sourceRunId);
   });
 }
 

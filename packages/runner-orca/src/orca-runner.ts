@@ -520,6 +520,9 @@ export class OrcaRunner implements Runner {
         message: `branch ${input.branch} is checked out at ${elsewhere.path}`,
       });
     }
+    if (input.stopAgent !== undefined) {
+      await this.stopPreviousAgent(input.stopAgent, input.worktree);
+    }
     gitSucceeded(await this.run(worktreePruneArgv(repoPath)), "git worktree prune");
     const timeout = { timeoutMs: this.config.startTimeoutMs };
     const local = await this.run(localBranchArgv(repoPath, input.branch));
@@ -532,7 +535,11 @@ export class OrcaRunner implements Runner {
       gitSucceeded(added, "git worktree add");
       return "recreated";
     }
-    const remote = await this.remoteHolding(repoPath, project.remoteName, input.branch);
+    const remote = await this.remoteHolding({
+      repoPath,
+      projectRemote: project.remoteName,
+      branch: input.branch,
+    });
     if (remote === null) return "from-scratch";
     input.beforeRecreate?.();
     gitSucceeded(
@@ -551,11 +558,15 @@ export class OrcaRunner implements Runner {
     return "recreated";
   }
 
-  private async remoteHolding(
-    repoPath: string,
-    projectRemote: string,
-    branch: string,
-  ): Promise<string | null> {
+  private async remoteHolding({
+    repoPath,
+    projectRemote,
+    branch,
+  }: {
+    repoPath: string;
+    projectRemote: string;
+    branch: string;
+  }): Promise<string | null> {
     const config = await this.run(remoteConfigArgv(repoPath));
     const pushRemote = refFound(config, "git config", 1)
       ? choosePushRemote(config.stdout, projectRemote)

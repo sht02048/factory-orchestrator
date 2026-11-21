@@ -201,6 +201,33 @@ describe("이어서 맡기기", () => {
     expect(getRun(h.db, next.id)?.state).toBe("running");
   });
 
+  it("워크트리 없음으로 끝난 런도 다시 만든 워크트리가 시작 실패 뒤 남은 워크트리로 보인다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const run = h.assign("ENG-1", projectA);
+    await h.worker().tick();
+    const ended = changeRunState(
+      h.db,
+      run.id,
+      { to: "ended", agentResult: "worktree-missing", prState: "none" },
+      h.now,
+    );
+    if (!ended.ok || ended.run.state !== "ended" || ended.run.worktree === null) {
+      throw new Error("could not end run");
+    }
+    const fake = h.runner(runnerId);
+    fake.deleteWorktree(ended.run.worktree);
+    fake.failNextStart = { kind: "runner-error", code: "boom", message: "failed" };
+
+    continued(run.id);
+    await h.worker().tick();
+
+    expect(getRunWithRecords(h.db, run.id)?.records.worktreeKept).toBe("check-failed");
+    expect(requestWorktreeRemoval(h.db, run.id, h.now)).toEqual({
+      ok: false,
+      reason: "taken-over",
+    });
+  });
+
   it("브랜치도 없으면 새 워크트리에서 티켓과 함께 처음부터 시작한다", async () => {
     const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const source = await endedRun(runnerId);
