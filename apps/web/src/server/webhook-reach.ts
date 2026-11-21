@@ -1,9 +1,21 @@
-import { readThisTailnetDevice } from "@ganger/app/tailscale";
-import type { ThisTailnetDevice } from "@ganger/app/tailscale";
+import {
+  readServeStatusOutput,
+  readThisTailnetAddresses,
+  readThisTailnetDevice,
+} from "@ganger/app/tailscale";
+import type { ThisTailnetAddresses, ThisTailnetDevice } from "@ganger/app/tailscale";
 import type { PingFetch } from "@ganger/app/webhook-address";
 
 export function getThisTailnetDevice(): Promise<ThisTailnetDevice | null> {
   return readThisTailnetDevice();
+}
+
+export function getThisTailnetAddresses(): Promise<ThisTailnetAddresses> {
+  return readThisTailnetAddresses();
+}
+
+export function getServeStatusOutput(cli: string): Promise<string | undefined> {
+  return readServeStatusOutput(cli);
 }
 
 export function getWebhookPingFetch(): PingFetch {

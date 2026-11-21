@@ -660,6 +660,7 @@ describe("주소(0048)", () => {
       webAddress: null,
       webhookAddress: null,
       webhookAddressChecked: false,
+      autoAllowedHosts: [],
     });
     expect(
       saveAddresses(
@@ -677,6 +678,7 @@ describe("주소(0048)", () => {
       webAddress: "https://server.example.ts.net",
       webhookAddress: "https://hooks.example.com",
       webhookAddressChecked: false,
+      autoAllowedHosts: [],
     });
     const server = textOf(sectionOf(render(page), "server"));
     expect(server).toContain("다른 기기에서 열 주소");
@@ -690,7 +692,36 @@ describe("주소(0048)", () => {
       webAddress: null,
       webhookAddress: null,
       webhookAddressChecked: false,
+      autoAllowedHosts: [],
     });
+  });
+
+  it("와일드카드 바인드면 자동으로 허용한 tailnet 주소를 보이고, 그 주소로 연 화면은 저장해도 막히지 않는다", async () => {
+    const f = fixture();
+    const tailnetHosts = ["server.example.ts.net", "100.64.0.10"];
+    const page = await loadSettingsPage(
+      { ...f.context, autoAllowedHosts: tailnetHosts },
+      undefined,
+      now,
+    );
+    const server = textOf(sectionOf(render(page), "server"));
+    expect(server).toContain(settingsJson.addresses.autoAllowed);
+    expect(server).toContain("server.example.ts.net, 100.64.0.10");
+    const none = await loadSettingsPage(f.context, undefined, now);
+    expect(textOf(sectionOf(render(none), "server"))).not.toContain(
+      settingsJson.addresses.autoAllowed,
+    );
+    const from = { host: "server.example.ts.net:3000", bindHost: "0.0.0.0", webPort: 3000 };
+    const input = { webAddress: "", webhookAddress: "" };
+    expect(saveAddresses(f.context, input, now, { ...from, tailnetHosts })).toEqual({ ok: true });
+    expect(saveAddresses(f.context, input, now, from)).toEqual({ ok: false, reason: "locks-out" });
+    expect(
+      saveAddresses(f.context, input, now, {
+        ...from,
+        host: "server.example.ts.net:8443",
+        tailnetHosts,
+      }),
+    ).toEqual({ ok: false, reason: "locks-out" });
   });
 
   it("경로·사용자 정보가 붙거나 http·https 가 아닌 주소는 받지 않는다", () => {

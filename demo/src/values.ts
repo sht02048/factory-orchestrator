@@ -10,6 +10,7 @@ export const ASK_QUERY_DEVTOOLS = "ask-query-devtools";
 export const DEMO_WEB_ADDRESS = "https://orchestrator.example.ts.net";
 export const DEMO_WEBHOOK_ADDRESS = "https://hooks.example.com";
 export const DEMO_TAILNET_HOST = "ganger.example.ts.net";
+export const DEMO_TAILNET_IP = "100.64.0.10";
 
 export const PREFILL: Readonly<Record<string, string>> = {
   name: "Acme",

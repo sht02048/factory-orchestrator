@@ -61,7 +61,25 @@ export function savedFromFound(server: FoundServer): SavedServer {
   return { instanceId: server.instanceId, name: server.name, url: server.url };
 }
 
-export type ReopenResult = { kind: "open"; server: SavedServer } | { kind: "unreachable" };
+export type ReopenResult =
+  | { kind: "open"; server: SavedServer }
+  | { kind: "host-not-allowed" }
+  | { kind: "unreachable" };
+
+export function isAwaitingRemote(screen: string): boolean {
+  return screen === "unreachable" || screen === "host-blocked";
+}
+
+export function isServerForbidden(
+  httpResponseCode: number,
+  url: string,
+  serverUrl: string | undefined,
+): boolean {
+  if (httpResponseCode !== 403 || serverUrl === undefined) return false;
+  const page = URL.parse(url);
+  const server = URL.parse(serverUrl);
+  return page !== null && server !== null && page.origin === server.origin;
+}
 
 export async function reopenSaved(
   saved: SavedServer,
@@ -82,5 +100,9 @@ export async function reopenSaved(
     );
     if (same !== undefined) return { kind: "open", server: { ...saved, url: same.url } };
   }
-  return { kind: "unreachable" };
+  const blocked =
+    result.kind === "ours" &&
+    result.identity.instanceId === saved.instanceId &&
+    result.identity.webAccess !== "allowed";
+  return blocked ? { kind: "host-not-allowed" } : { kind: "unreachable" };
 }

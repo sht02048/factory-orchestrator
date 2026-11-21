@@ -77,6 +77,14 @@
       "host-not-allowed": "서버는 찾았지만 이 주소로는 열 수 없어요. 그 서버의 Settings > 주소에서 다른 기기에서 열 주소를 정해 주세요."
     }
   },
+  "hostBlocked": {
+    "title": "이 서버가 {host}를 허용하지 않아요",
+    "summary": "서버 맥에서 Settings › 주소의 다른 기기에서 열 주소에 넣어 주세요.",
+    "checking": "다시 확인하고 있어요",
+    "address": "서버 주소",
+    "retry": "다시 시도",
+    "other": "다른 서버 고르기"
+  },
   "unreachable": {
     "title": "{name}에 닿지 않아요",
     "summary": "닿으면 바로 열어요.",

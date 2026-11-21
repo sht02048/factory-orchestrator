@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { z } from "zod";
+import { normalizeHostname } from "./request-guard.js";
 
 export const TAILSCALE_CLI_ENV = "GANGER_TAILSCALE_CLI";
 
@@ -25,7 +26,10 @@ const peerSchema = z.object({
   TailscaleIPs: z.array(z.unknown()).nullish().catch(undefined),
 });
 
-const selfSchema = z.object({ DNSName: z.string().optional() });
+const selfSchema = z.object({
+  DNSName: z.string().optional(),
+  TailscaleIPs: z.array(z.unknown()).nullish().catch(undefined),
+});
 
 const statusSchema = z.object({
   BackendState: z.string(),
@@ -116,6 +120,45 @@ export const defaultTailnetDeps: TailnetDeps = {
 export interface ThisTailnetDevice {
   cli: string;
   host: string;
+}
+
+export type ThisTailnetAddresses =
+  | { kind: "known"; hosts: string[] }
+  | { kind: "none" }
+  | { kind: "unknown" };
+
+function tailnetIpHost(ip: unknown): string | null {
+  if (z.ipv4().safeParse(ip).success || z.ipv6().safeParse(ip).success) {
+    return typeof ip === "string" ? normalizeHostname(ip) : null;
+  }
+  return null;
+}
+
+export function parseThisTailnetAddresses(output: string): ThisTailnetAddresses {
+  const status = parseTailnetStatus(output);
+  if (status.kind === "unreadable") return { kind: "unknown" };
+  if (status.kind !== "running") return { kind: "none" };
+  const self = statusSchema.parse(JSON.parse(output)).Self;
+  const ips = (self?.TailscaleIPs ?? []).flatMap((ip) => tailnetIpHost(ip) ?? []);
+  const hosts = [...new Set([...(status.self === null ? [] : [status.self]), ...ips])];
+  return hosts.length === 0 ? { kind: "none" } : { kind: "known", hosts };
+}
+
+export async function readThisTailnetAddresses(
+  deps: TailnetDeps = defaultTailnetDeps,
+): Promise<ThisTailnetAddresses> {
+  const cli = findTailscaleCli(deps);
+  if (cli === undefined) return { kind: "none" };
+  const output = await deps.run(cli, ["status", "--json"], 3_000);
+  if (output === undefined) return { kind: "unknown" };
+  return parseThisTailnetAddresses(output);
+}
+
+export function readServeStatusOutput(
+  cli: string,
+  deps: TailnetDeps = defaultTailnetDeps,
+): Promise<string | undefined> {
+  return deps.run(cli, ["serve", "status", "--json"], 3_000);
 }
 
 export async function readThisTailnetDevice(
