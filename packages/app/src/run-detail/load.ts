@@ -83,6 +83,14 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
   };
   const continuedFrom = linkTo(run.continuedFromRunId);
   const continuedBy = linkTo(worktreeTakenOverBy(db, run.id));
+  const nextRun = ticketRuns.find((other) => other.id === continuedBy?.id);
+  const prHandedOver =
+    run.state === "ended" &&
+    run.prState === "open" &&
+    records.laterPrState === null &&
+    nextRun !== undefined &&
+    nextRun.state !== "queued" &&
+    nextRun.startedAt !== null;
   const cancelPending =
     run.state !== "ended" && cancelRequest !== null && cancelRequest.processedAt === null;
   const agentMessages = listRunAgentMessages(db, run.id).map((message) => ({
@@ -117,7 +125,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
             displayId: pr.displayId,
             url: pr.url,
             ci: toCiView(pr.ci),
-            signals: continuedBy === null ? prSignalsViewOf(run, records) : null,
+            signals: prHandedOver ? null : prSignalsViewOf(run, records),
           },
     report: records.reportBody,
     brief:
@@ -147,6 +155,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
     otherRuns: otherRunsOf(db, run),
     continuedFrom,
     continuedBy,
+    prHandedOver,
     continuePlace: records.continuePlace,
     continueOffer: continueOfferOf(db, run, records, ticketRuns, runner?.name ?? null),
   };

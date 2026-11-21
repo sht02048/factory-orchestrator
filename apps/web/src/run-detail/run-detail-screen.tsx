@@ -1327,7 +1327,7 @@ function usePrInfo(): (run: RunDetail) => string | null {
     if (run.status.state !== "ended") return null;
     const state = run.status.laterPrState?.state ?? run.status.prState;
     if (state === "none") return null;
-    if (state === "open" && run.continuedBy !== null && run.pullRequest !== null) {
+    if (run.prHandedOver && run.pullRequest !== null) {
       return t("prHandedOver", { pr: run.pullRequest.displayId });
     }
     const stateName = domain(`prState.${state}`);

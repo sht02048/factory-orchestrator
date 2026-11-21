@@ -29,6 +29,7 @@ import {
   toWorkspaceId,
   updateRunRecords,
 } from "@ganger/db";
+import type { RunId } from "@ganger/core";
 import type { Database } from "@ganger/db";
 import { createTranslator } from "use-intl";
 import { describe, expect, it } from "vitest";
@@ -1168,7 +1169,7 @@ describe("이어서 맡기기(0149)", () => {
 
   it("열린 PR은 다음 런으로 넘겼다고 보이고, 머지된 PR은 이전 런에 남긴다", () => {
     const { db } = seedDatabase();
-    const withPr = (key: string, prState: "open" | "merged") => {
+    const withPr = (key: string, prState: "open" | "merged"): RunId => {
       const id = assign(db, key, 500);
       walk(db, id, 500, [
         startedOn(key),
@@ -1187,13 +1188,19 @@ describe("이어서 맡기기(0149)", () => {
       recordAgentCheck(db, id, "gone", { stopHandled: true });
       const result = continueRunRequest(db, id, "이어 주세요", minutes(560));
       if (!result.ok) throw new Error(result.reason);
+      queuedNext = { source: id, next: result.runId };
       return id;
     };
+    let queuedNext: { source: RunId; next: RunId } | null = null;
     const handedOver = runJson.prHandedOver.replace("{pr}", "#7");
 
-    expect(text(render({ kind: "found", run: found(db, withPr("ACME-42", "open")) }))).toContain(
-      handedOver,
-    );
+    const open = withPr("ACME-42", "open");
+    expect(text(render({ kind: "found", run: found(db, open) }))).not.toContain(handedOver);
+    if (queuedNext === null) throw new Error("no continued run");
+    const { next } = queuedNext as { source: RunId; next: RunId };
+    walk(db, next, 560, [startedOn("ACME-42-2")]);
+    expect(text(render({ kind: "found", run: found(db, open) }))).toContain(handedOver);
+
     expect(
       text(render({ kind: "found", run: found(db, withPr("ACME-43", "merged")) })),
     ).not.toContain(handedOver);

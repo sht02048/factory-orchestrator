@@ -158,6 +158,7 @@ export interface RunDetail {
   otherRuns: OtherRun[];
   continuedFrom: RunLink | null;
   continuedBy: RunLink | null;
+  prHandedOver: boolean;
   continuePlace: ContinuationPlace | null;
   continueOffer: ContinueOffer | null;
 }

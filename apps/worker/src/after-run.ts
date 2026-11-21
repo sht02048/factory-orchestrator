@@ -5,6 +5,7 @@ import type { AgentCheck, PullRequestSnapshot, Tracker, WorktreeKeptReason } fro
 import {
   continueRunBlock,
   fillUnreadPrState,
+  getRun,
   getRunWithRecords,
   getWorkspaceTrackerProject,
   listRunners,
@@ -265,7 +266,7 @@ async function followWorktree(
       await removeWorktreeWithoutWork(context, run, runnersById.get(run.runnerId));
       return;
     case "keep-until-pr-settles":
-      if (worktreeTakenOverBy(context.db, run.id) !== null) {
+      if (prHandedOver(context, run, records)) {
         context.prPolledAt.delete(run.id);
         return;
       }
@@ -373,10 +374,34 @@ async function recordSettledPullRequest(
   recordPullRequest(context, run, pr);
   const state = pr.state === "merged" ? "merged" : pr.state === "closed" ? "closed" : null;
   if (state === null) return false;
+  if (settledAfterNextRunStarted(context, run, pr)) return false;
   const recorded = tryWrite(context, run.id, () =>
     updateRunRecords(context.db, run.id, { laterPrState: { state, at: context.now() } }),
   );
   return recorded === true;
+}
+
+function nextRunStartedAt(context: TickContext, run: StartedEndedRun): Date | null {
+  const nextId = worktreeTakenOverBy(context.db, run.id);
+  const next = nextId === null ? null : getRun(context.db, nextId);
+  return next === null || next.state === "queued" ? null : next.startedAt;
+}
+
+function prHandedOver(context: TickContext, run: StartedEndedRun, records: RunRecords): boolean {
+  const startedAt = nextRunStartedAt(context, run);
+  if (startedAt === null) return false;
+  const readAt = records.pullRequest?.checkedAt;
+  return readAt !== undefined && readAt.getTime() >= startedAt.getTime();
+}
+
+function settledAfterNextRunStarted(
+  context: TickContext,
+  run: StartedEndedRun,
+  pr: PullRequestSnapshot,
+): boolean {
+  const startedAt = nextRunStartedAt(context, run);
+  const settledAt = pr.mergedAt ?? pr.closedAt ?? null;
+  return startedAt !== null && settledAt !== null && settledAt.getTime() >= startedAt.getTime();
 }
 
 async function currentPullRequest(

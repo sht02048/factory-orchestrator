@@ -15,7 +15,7 @@ import {
 } from "@ganger/db";
 import type { StoredRun } from "@ganger/db";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AGENT_CHECK_INTERVAL_MS } from "./after-run.js";
+import { AGENT_CHECK_INTERVAL_MS, PR_POLL_INTERVAL_MS } from "./after-run.js";
 import { messages } from "./messages.js";
 import { Harness, projectA, workspaceId } from "./test-fixtures.js";
 
@@ -344,6 +344,55 @@ describe("이어서 맡기기", () => {
     expect(continueRun(h.db, { from: source.id, message: "go", now: h.now })).toEqual({
       ok: false,
       reason: "worktree-removing",
+    });
+  });
+
+  describe("PR은 브랜치를 따라간다(C5-4)", () => {
+    async function endedWithOpenPr(runnerId: RunnerId): Promise<StoredRun> {
+      const run = h.assign("ENG-1", projectA);
+      await h.worker().tick();
+      const ended = changeRunState(
+        h.db,
+        run.id,
+        { to: "ended", agentResult: "reported-success", prState: "open" },
+        h.now,
+      );
+      if (!ended.ok) throw new Error(`could not end run on ${runnerId}`);
+      return ended.run;
+    }
+
+    it("새 런이 시작하기 전에 머지된 PR은 이전 런에 남는다", async () => {
+      const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+      const source = await endedWithOpenPr(runnerId);
+      h.putPullRequest(source, "merged");
+      h.advance(1000);
+      h.setRunnerOnline(runnerId, false, [projectA], false);
+      const next = continued(source.id);
+      h.advance(PR_POLL_INTERVAL_MS);
+
+      await h.worker().tick();
+
+      expect(getRun(h.db, next.id)?.state).toBe("queued");
+      expect(records(source).laterPrState?.state).toBe("merged");
+    });
+
+    it("새 런이 시작한 뒤 머지된 PR은 이전 런의 기록이 되지 않는다", async () => {
+      const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+      const source = await endedWithOpenPr(runnerId);
+      h.putPullRequest(source, "open");
+      h.advance(PR_POLL_INTERVAL_MS);
+      const worker = h.worker();
+      await worker.tick();
+      const next = continued(source.id);
+      await worker.tick();
+      expect(getRun(h.db, next.id)?.state).toBe("running");
+      h.advance(1000);
+      h.putPullRequest(source, "merged");
+      h.advance(PR_POLL_INTERVAL_MS);
+
+      await worker.tick();
+
+      expect(records(source).laterPrState).toBeNull();
     });
   });
 
