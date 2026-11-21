@@ -349,7 +349,7 @@ async function worktreeSetupGate(
     const { outcome } = job;
     context.worktreeSetups.delete(run.id);
     if (outcome.kind === "threw") throw outcome.error;
-    return outcome.kind === "done" ? "ready" : { failed: outcome.reason };
+    if (outcome.kind === "failed") return { failed: outcome.reason };
   }
   const input = { project: run.runnerProject, worktree };
   if (!(await runner.worktreeSetupPending(input))) return "ready";

@@ -10,13 +10,34 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test, vi } from "vitest";
-import { effectiveSetupScript, parseSharedSetup, runSetupArgv } from "./worktree-setup.js";
+import {
+  effectiveSetupScript,
+  parseSharedSetup,
+  runSetupArgv,
+  setupMarkerPath,
+} from "./worktree-setup.js";
 
 describe("parseSharedSetup", () => {
   test("여러 줄 setup의 들여쓰기를 벗긴다", () => {
     expect(
       parseSharedSetup("scripts:\n  setup: |\n    pnpm install\n    cp a b\n  archive: |\n    x\n"),
     ).toEqual({ kind: "found", script: "pnpm install\ncp a b" });
+  });
+
+  test.each(["null", "~", "null # none"])("YAML null 값 %s는 스크립트가 없다", (value) => {
+    expect(parseSharedSetup(`scripts:\n  setup: ${value}\n`)).toEqual({
+      kind: "found",
+      script: null,
+    });
+  });
+
+  test("상대 경로로 받은 공용 git 디렉터리를 저장소 기준 절대 경로로 바꾼다", () => {
+    const marker = setupMarkerPath({
+      repoPath: "/repo",
+      commonDir: ".git\n",
+      worktreePath: "/worktrees/a",
+    });
+    expect(marker.startsWith("/repo/.git/ganger-setup-pending/")).toBe(true);
   });
 
   test("한 줄 값과 따옴표 값을 읽는다", () => {

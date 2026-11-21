@@ -131,6 +131,26 @@ describe("이어서 맡기기", () => {
     expect(getRun(h.db, next.id)?.state).toBe("running");
   });
 
+  it("setup이 끝난 뒤 워크트리가 다시 지워져 새로 만들면 setup을 다시 돌린다", async () => {
+    const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
+    const source = await endedRun(runnerId);
+    const fake = h.runner(source.runnerId);
+    fake.deleteWorktree(source.worktree);
+    const next = continued(source.id);
+    const worker = h.worker();
+    await worker.tick();
+    expect(fake.setupCalls).toHaveLength(1);
+
+    fake.recreatedWorktrees.delete(source.worktree);
+    await worker.tick();
+    expect(getRun(h.db, next.id)?.state).toBe("queued");
+    expect(fake.setupCalls).toHaveLength(2);
+
+    await worker.tick();
+    expect(fake.pendingSetups.has(source.worktree)).toBe(false);
+    expect(getRun(h.db, next.id)?.state).toBe("running");
+  });
+
   it("setup이 도는 동안 틱을 붙잡지 않아 다른 러너의 런이 시작하고 setup을 두 번 돌리지 않는다", async () => {
     const runnerId = h.addRunner({ id: "runner-a", capacity: 1, projects: [projectA] });
     const source = await endedRun(runnerId);

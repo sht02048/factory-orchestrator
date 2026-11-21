@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { basename } from "node:path";
+import { basename, posix } from "node:path";
 import type { RemoteResult } from "./ssh.js";
 
 const SETUP_MARKER_DIR = "ganger-setup-pending";
@@ -32,12 +32,17 @@ wait "$job"
 exit $?`;
 
 export function gitCommonDirArgv(repoPath: string): string[] {
-  return ["git", "-C", repoPath, "rev-parse", "--path-format=absolute", "--git-common-dir"];
+  return ["git", "-C", repoPath, "rev-parse", "--git-common-dir"];
 }
 
-export function setupMarkerPath(commonDir: string, worktreePath: string): string {
-  const key = createHash("sha256").update(worktreePath).digest("hex").slice(0, 32);
-  return `${commonDir.trim()}/${SETUP_MARKER_DIR}/${key}`;
+export function setupMarkerPath(input: {
+  repoPath: string;
+  commonDir: string;
+  worktreePath: string;
+}): string {
+  const key = createHash("sha256").update(input.worktreePath).digest("hex").slice(0, 32);
+  const commonDir = posix.resolve(input.repoPath, input.commonDir.trim());
+  return `${commonDir}/${SETUP_MARKER_DIR}/${key}`;
 }
 
 export function setupMarkerDirArgv(marker: string): string[] {
@@ -75,7 +80,7 @@ export function runSetupArgv(input: {
     `ORCA_WORKSPACE_NAME=${basename(worktreePath)}`,
     `CONDUCTOR_ROOT_PATH=${rootPath}`,
     `GHOSTX_ROOT_PATH=${rootPath}`,
-    "sh",
+    "bash",
     "-c",
     RUN_SETUP_SCRIPT,
     "ganger-setup",
@@ -144,6 +149,7 @@ function blockScalar(lines: ReadonlyArray<string>, keyIndent: number): string | 
 function inlineScalar(value: string): SharedSetup {
   const text = value.trim();
   if (text === "" || text.startsWith("#")) return { kind: "found", script: null };
+  if (/^(~|null|Null|NULL)(\s+#.*)?$/.test(text)) return { kind: "found", script: null };
   if (text.startsWith("'")) {
     const quoted = /^'((?:[^']|'')*)'\s*(#.*)?$/.exec(text);
     return quoted === null

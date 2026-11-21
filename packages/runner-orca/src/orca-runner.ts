@@ -557,7 +557,7 @@ export class OrcaRunner implements Runner {
   private async setupMarker(repoPath: string, worktreePath: string): Promise<string> {
     const commonDir = await this.run(gitCommonDirArgv(repoPath));
     gitSucceeded(commonDir, "git rev-parse");
-    return setupMarkerPath(commonDir.stdout, worktreePath);
+    return setupMarkerPath({ repoPath, commonDir: commonDir.stdout, worktreePath });
   }
 
   private async markSetupPending(repoPath: string, worktreePath: string): Promise<void> {
