@@ -24,7 +24,11 @@ export async function processAgentMessages(context: TickContext): Promise<void> 
     return;
   }
   for (const message of pending) {
-    await withLogContext({ runId: message.runId }, () => deliver(context, message));
+    try {
+      await withLogContext({ runId: message.runId }, () => deliver(context, message));
+    } catch (error) {
+      context.logger.warn("agent_message.read_failed", { runId: message.runId, error });
+    }
   }
 }
 

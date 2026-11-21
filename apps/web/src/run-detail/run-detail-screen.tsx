@@ -258,7 +258,9 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
 
 function agentMessageHint(run: RunDetail): "paused" | "waiting" | null {
   if (run.status.state === "paused") return "paused";
-  return run.status.state === "waiting-for-input" ? "waiting" : null;
+  return run.status.state === "waiting-for-input" && run.status.input.kind === "question"
+    ? "waiting"
+    : null;
 }
 
 function Block({

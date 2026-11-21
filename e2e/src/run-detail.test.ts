@@ -76,6 +76,7 @@ let messageRun: RunId;
 let narrowMessageRun: RunId;
 let draftRun: RunId;
 let rejectedRun: RunId;
+let failedSendRun: RunId;
 
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
@@ -206,9 +207,10 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
     await card.getByLabel(run.agentMessage.label).fill("쓰던 말");
 
     ok(changeRunState(db, draftRun, { to: "disconnected" }));
-    await card.waitFor({ state: "detached" });
+    await card.getByLabel(run.agentMessage.label).waitFor({ state: "detached" });
+    await card.getByText("쓰던 말").waitFor();
     ok(changeRunState(db, draftRun, { to: "running" }));
-    await card.waitFor();
+    await card.getByLabel(run.agentMessage.label).waitFor();
     expect(await card.getByLabel(run.agentMessage.label).inputValue()).toBe("쓰던 말");
   });
 
@@ -230,6 +232,30 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
     await card.getByText("늦게 보낸 말").waitFor();
     await expect.poll(focusedStatusText).toBe(run.agentMessage.failure["state-changed"]);
     expect(listRunAgentMessages(db, rejectedRun)).toEqual([]);
+  });
+
+  it("요청이 실패한 뒤 런이 끝나도 이유와 쓰던 말을 남긴다(0147)", async () => {
+    await open(failedSendRun);
+    const card = page.getByRole("region", { name: run.agentMessage.title });
+    await card.getByLabel(run.agentMessage.label).fill("실패한 말");
+    await page.route("**/_serverFn/**", (route) =>
+      route.request().method() === "POST" ? route.abort() : route.continue(),
+    );
+    await card.getByRole("button", { name: run.agentMessage.send }).press("Enter");
+    await card.getByRole("status").getByText(run.actionFailed).waitFor();
+    await page.unroute("**/_serverFn/**");
+
+    ok(
+      changeRunState(db, failedSendRun, {
+        to: "ended",
+        agentResult: "reported-success",
+        prState: "none",
+      }),
+    );
+    await card.getByLabel(run.agentMessage.label).waitFor({ state: "detached" });
+    await card.getByRole("status").getByText(run.actionFailed).waitFor();
+    await card.getByText("실패한 말").waitFor();
+    expect(listRunAgentMessages(db, failedSendRun)).toEqual([]);
   });
 
   it("400px 에서도 에이전트에게 보내기가 가로로 넘치지 않는다(0147)", async () => {
@@ -344,6 +370,7 @@ function seed(db: Database): void {
   narrowMessageRun = startRun("ACME-19");
   draftRun = startRun("ACME-20");
   rejectedRun = startRun("ACME-22");
+  failedSendRun = startRun("ACME-23");
 
   endedRun = startRun("ACME-15");
   ok(

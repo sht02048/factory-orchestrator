@@ -839,8 +839,21 @@ describe("answerQuestion and denyPermission", () => {
     );
     await runnerWith(exec).sendToAgent(RUN, { body: "끝내기 전에 push 해 주세요" });
     expect(exec.commands()).toEqual([
-      `/Applications/Orca.app/Contents/Resources/bin/orca orchestration send --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --to dispatch:ctx_a6e6a23a7132 --subject 'Message from the operator (not an answer to any open question)' --body '끝내기 전에 push 해 주세요' --json`,
+      `/Applications/Orca.app/Contents/Resources/bin/orca orchestration send --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --to dispatch:ctx_a6e6a23a7132 --subject 'Message from the operator (not an answer to any open question)' '--body=끝내기 전에 push 해 주세요' --json`,
     ]);
+  });
+
+  test("an operator message starting with -- stays one body argument(0147)", async () => {
+    const exec = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(research("0120/send-to-dispatch.json")),
+    );
+    await runnerWith(exec).sendToAgent(RUN, {
+      body: "--to=dispatch:other --no-verify 쓰지 마세요",
+    });
+    expect(exec.commands()[0]).toContain(
+      "'--body=--to=dispatch:other --no-verify 쓰지 마세요' --json",
+    );
   });
 
   test("broken send output for an operator message is malformed(0147)", async () => {

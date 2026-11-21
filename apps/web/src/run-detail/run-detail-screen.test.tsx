@@ -98,6 +98,10 @@ describe("Run 상세의 에이전트에게 보내기 (0147)", () => {
     expect(text(render(page(db, id)))).toContain(runJson.agentMessage.title);
 
     changeRunState(db, id, { to: "waiting-for-input" }, minutes(901));
+    expect(text(render(page(db, id)))).not.toContain(runJson.agentMessage.hint.waiting);
+    recordRunQuestions(db, id, [
+      { id: toQuestionId("q-91"), body: "어느 쪽?", options: [], askedAt: minutes(901) },
+    ]);
     const waiting = text(render(page(db, id)));
     expect(waiting).toContain(runJson.agentMessage.title);
     expect(waiting).toContain(runJson.agentMessage.hint.waiting);

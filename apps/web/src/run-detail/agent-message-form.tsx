@@ -45,11 +45,13 @@ export function AgentMessageForm({
   const [sentHere, setSentHere] = useState(false);
   const [emptyTried, setEmptyTried] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const rejectedRef = useRef<HTMLParagraphElement>(null);
-  const rejectedAfterClose = !view.accepting && submit === "state-changed";
+  const closedRef = useRef<HTMLParagraphElement>(null);
+  const closedWithWords =
+    !view.accepting && (submit === "failed" || submit === "state-changed" || draft.trim() !== "");
   useEffect(() => {
-    if (rejectedAfterClose) rejectedRef.current?.focus();
-  }, [rejectedAfterClose]);
+    if (!closedWithWords) return;
+    if (submit !== "idle" || document.activeElement === document.body) closedRef.current?.focus();
+  }, [closedWithWords, submit]);
   const body = draft.trim();
   const tooLong = body.length > AGENT_MESSAGE_MAX_LENGTH;
   const error = tooLong
@@ -86,15 +88,15 @@ export function AgentMessageForm({
     );
   };
 
-  if (rejectedAfterClose) {
+  if (closedWithWords) {
     return (
       <Card label={t("title")}>
         <div {...stylex.props(styles.form)}>
           <Text variant="subheading" as="h2">
             {t("title")}
           </Text>
-          <Text variant="body" as="p" tone="problem" role="status" tabIndex={-1} ref={rejectedRef}>
-            {t("failure.state-changed")}
+          <Text variant="body" as="p" tone="problem" role="status" tabIndex={-1} ref={closedRef}>
+            {submit === "failed" ? actionFailed : t("failure.state-changed")}
           </Text>
           <Text variant="meta" as="p">
             {t("unsentLabel")}
