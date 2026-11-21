@@ -1,5 +1,5 @@
 ---
-status: doing
+status: done
 ---
 
 # 0146 Workspace 티켓 앞뒤 지시와 런이 받은 지시서
