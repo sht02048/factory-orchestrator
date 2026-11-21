@@ -289,8 +289,13 @@ describe("공용 움직임(브라우저, 0152)", () => {
     const page = await openDs(context.task.name, "no-preference");
     await slowMotion(page);
     await press(page, text.remove);
-    await hideTab(page);
-    await press(page, text.restore);
+    await page
+      .locator("#motionPrimitives")
+      .getByRole("button", { name: text.restore, exact: true })
+      .evaluate((button) => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+        if (button instanceof HTMLElement) button.click();
+      });
     await expect.poll(() => cards(page, text.queued)).toEqual(["1", "2", "3", "4"]);
     await expect
       .poll(() =>
