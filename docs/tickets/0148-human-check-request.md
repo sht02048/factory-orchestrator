@@ -1,5 +1,5 @@
 ---
-status: todo
+status: done
 blocked_by: [0146]
 ---
 
@@ -22,6 +22,10 @@ blocked_by: [0146]
 5. 답: "확인했어요" / "고쳐 주세요" + 함께 보낼 말(선택). 답은 그 런의 에이전트에게 가고 런은 Running으로. Ganger는 머지하지 않는다.
 6. MCP 읽기 출력에 Human Check 종류와 요청 내용(`external` 칸)을 보인다. 쓰기 도구는 더하지 않는다.
 7. GLOSSARY의 To do·알림 사건 종류에 Human Check를 더한다(Human Check 낱말은 0146에서 정했다).
+
+## 스파이크 결과
+
+[research 0019](../research/0019-orca-decision-gate.md). `send --type decision_gate`는 `dispatchId`를 Orca가 채우지만, 보낸 뒤 차례를 끝내면 답이 와도 에이전트가 깨어나지 않는다. 그래서 통신 규약은 보낸 뒤 `check --wait`로 차례를 끝내지 않고 기다리게 한다.
 
 ## 완료 조건
 

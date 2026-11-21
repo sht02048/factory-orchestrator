@@ -9,5 +9,14 @@
   "shortcut": "⌘ Enter로 보낼 수 있어요",
   "send": "보내기",
   "sending": "보내는 중…",
-  "failed": "답을 보내지 못했어요. 다시 보내 주세요."
+  "failed": "답을 보내지 못했어요. 다시 보내 주세요.",
+  "humanCheck": {
+    "noteLabel": "에이전트에게 함께 보낼 말",
+    "noteHelp": "비워 둬도 돼요",
+    "confirm": "확인했어요",
+    "requestChanges": "고쳐 주세요",
+    "sending": "보내는 중…",
+    "after": "답을 보내면 런이 다시 Running이 돼요. Ganger는 머지하지 않아요.",
+    "failed": "답을 보내지 못했어요. 다시 보내 주세요."
+  }
 }

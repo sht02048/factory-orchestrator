@@ -128,6 +128,37 @@ describe("입력 기다림", () => {
     expect(agentOf(run, runnerId).answers).toHaveLength(1);
   });
 
+  it("Human Check 를 종류와 함께 저장해 Waiting for Input 으로 바꾸고, 답을 보내면 Running 으로 돌아간다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const questionId = h.runner(runnerId).ask(worktreeOf(run), {
+      kind: "human-check",
+      body: "PR #7 머지를 확인해 주세요",
+      at: h.now,
+    });
+
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+    expect(listRunQuestions(h.db, run.id)).toEqual([
+      expect.objectContaining({ id: questionId, kind: "human-check" }),
+    ]);
+
+    answerRunQuestion(
+      h.db,
+      {
+        runId: run.id,
+        questionId,
+        answer: "고쳐 주세요\n\n시험을 더해 주세요",
+        kind: "human-check",
+      },
+      h.now,
+    );
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).answers).toEqual([
+      { questionId, answer: "고쳐 주세요\n\n시험을 더해 주세요" },
+    ]);
+  });
+
   it("같은 질문의 답은 데몬을 다시 띄워도 한 번만 보낸다", async () => {
     const { run, runnerId, worker } = await startOne();
     const questionId = h.runner(runnerId).ask(worktreeOf(run), { body: "계속할까요?" });

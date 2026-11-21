@@ -4,6 +4,7 @@ import {
   PAUSE_SOURCES,
   PR_READ_ERRORS,
   PR_STATES,
+  QUESTION_KINDS,
   RUN_STATES,
   WORKTREE_KEPT_REASONS,
 } from "@ganger/core";
@@ -439,6 +440,7 @@ export const runQuestions = sqliteTable(
       .references(() => runs.id, { onDelete: "cascade" })
       .$type<RunId>(),
     questionId: text("question_id").notNull().$type<QuestionId>(),
+    kind: text("kind", { enum: QUESTION_KINDS }).notNull().default("question"),
     body: text("body").notNull(),
     options: text("options", { mode: "json" }).notNull().$type<string[]>(),
     askedAt: timeMs("asked_at").notNull(),
@@ -448,6 +450,7 @@ export const runQuestions = sqliteTable(
   },
   (t) => [
     primaryKey({ columns: [t.runId, t.questionId] }),
+    check("run_questions_kind", sql`${t.kind} IN ('question', 'human-check')`),
     check("run_questions_options_json", sql`json_valid(${t.options})`),
     check("run_questions_answered", sql`(${t.answer} IS NULL) = (${t.answeredAt} IS NULL)`),
     check(

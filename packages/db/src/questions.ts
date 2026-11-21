@@ -1,4 +1,4 @@
-import type { AgentQuestion, QuestionId, RunId } from "@ganger/core";
+import type { AgentQuestion, QuestionId, QuestionKind, RunId } from "@ganger/core";
 import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 import { recordRunChange } from "./change-events.js";
 import { inTransaction } from "./database.js";
@@ -8,6 +8,7 @@ import { runQuestions } from "./schema.js";
 export interface StoredRunQuestion {
   runId: RunId;
   id: QuestionId;
+  kind: QuestionKind;
   body: string;
   options: string[];
   askedAt: Date;
@@ -28,6 +29,7 @@ export function recordRunQuestions(
           .values({
             runId,
             questionId: question.id,
+            kind: question.kind ?? "question",
             body: question.body,
             options: [...question.options],
             askedAt: question.askedAt,
@@ -47,12 +49,13 @@ export type AnswerRunQuestionResult =
 
 export function answerRunQuestion(
   db: Database,
-  input: { runId: RunId; questionId: QuestionId; answer: string },
+  input: { runId: RunId; questionId: QuestionId; answer: string; kind?: QuestionKind },
   now: Date = new Date(),
 ): AnswerRunQuestionResult {
   const where = and(
     eq(runQuestions.runId, input.runId),
     eq(runQuestions.questionId, input.questionId),
+    eq(runQuestions.kind, input.kind ?? "question"),
   );
   return inTransaction(db, (): AnswerRunQuestionResult => {
     const changed = db
@@ -135,6 +138,7 @@ export function listRunQuestions(db: Database, runId: RunId): StoredRunQuestion[
     .map((row) => ({
       runId: row.runId,
       id: row.questionId,
+      kind: row.kind,
       body: row.body,
       options: row.options,
       askedAt: row.askedAt,

@@ -8,7 +8,7 @@
 2. **UI SDK(`@ui-sdk/react`)는 `packages/ui` 안에서만 import 한다.** 앱은 `@ganger/ui`의 컴포넌트를 쓴다. 필요한 동작이 없으면 `packages/ui`에 컴포넌트를 더한다(ADR 0003).
 3. **스타일은 StyleX로 쓴다.** `stylex.create` + `stylex.props`. 간격·글자·반경·모션도 토큰을 먼저 쓴다. 토큰에 없는 값(열 폭, 고정 높이)만 숫자로 쓴다.
 4. **화면 문구는 컴포넌트에 쓰지 않는다.** 모든 글은 `apps/web/messages/ko/*.json`에 두고 `useTranslations`로 가져온다. 접근 가능한 이름(`label`, `aria-label`)도 메시지에서 온다. `packages/ui` 컴포넌트는 문구를 props로만 받는다(ADR 0005).
-5. **색 하나에 뜻 하나다(ADR 0010 5번).** 상태 색은 여섯 뜻뿐이다: 보라 `answer`(사람이 답·허용), 청록 `check`(사람이 확인, 지금 쓰는 상태 없음), 빨강 `problem`(문제), 초록 `progress`(진행·정상), 파랑 `merged`(Succeeded), 회색 `idle`(대기·멈춤). 상태 색은 화면이 고르지 않고 `StatusPill`이 상태 값으로 고른다. 그 밖의 강조는 브랜드 노랑 Ganger Yellow(`accent*`) 하나다. 로고 취구·마스코트 모자도 같은 `accent`를 쓴다(티켓 0080).
+5. **색 하나에 뜻 하나다(ADR 0010 5번).** 상태 색은 여섯 뜻뿐이다: 보라 `answer`(사람이 답·허용), 청록 `check`(사람이 확인, Human Check), 빨강 `problem`(문제), 초록 `progress`(진행·정상), 파랑 `merged`(Succeeded), 회색 `idle`(대기·멈춤). 상태 색은 화면이 고르지 않고 `StatusPill`이 상태 값으로 고른다. 그 밖의 강조는 브랜드 노랑 Ganger Yellow(`accent*`) 하나다. 로고 취구·마스코트 모자도 같은 `accent`를 쓴다(티켓 0080).
 6. **상태는 `StatusPill` 하나로만 보인다(ADR 0010 4번).** 점 + GLOSSARY 영어 이름. 예외는 Dashboard다(ADR 0010 0100 갱신). 칸반 카드(`KanbanCard`)는 To do인 카드와 Paused 런 카드(티켓 0118)에만 꼬리표 알약(`tag`)을 달고, 나머지 카드는 칸 이름이 상태를 대신하거나 상태 이름을 글로 쓴다. 면 없는 Runners 열의 행은 알약 대신 상태 점(`StatusDot`) 하나로 상태를 보인다. 영역은 선이 아니라 면으로 나누고, 면은 아래 면 역할로 고른다.
 7. **변형을 새로 만들지 않는다.** 아래 표에 없는 변형이 필요하면 먼저 이 문서와 컴포넌트에 더하고, `/ds`에 미리보기를 넣는다.
 8. **화면은 역할과 컴포넌트만 쓰고 토큰을 직접 쓰지 않는다.** 글자는 `Text` 변형이나 `textStyles(역할)`, 면은 `Card surface`나 `surfaceStyles(역할)`, 구역 제목은 `Section titleRole`로 고른다. `apps/web`에서 `colors`·`fontSize`·`fontWeight`·`lineHeight`·`letterSpacing`·`radius`·`shadow`·`motion`을 가져오면 lint(`no-restricted-imports`)가 실패한다. 배치에 필요한 `space`·`size`·`breakpoints`만 직접 쓴다(티켓 0074).
@@ -42,7 +42,7 @@
 | 강조   | `accent`, `accentHover`                                                                       | 주 버튼 바탕, 체크박스, 탭 밑줄, 로고 취구                                                         |
 |        | `accentText`, `accentSoft`                                                                    | 링크·레일의 지금 화면·포커스 링, 선택 영역·포커스 링 바깥                                          |
 | 상태   | `answer`, `answerSoft`                                                                        | 보라. Question·Permission·Waiting for Input 알약 글·점, 알약 바탕                                  |
-|        | `check`, `checkSoft`                                                                          | 청록. 사람이 확인. 지금 쓰는 상태는 없다(0145). 노랑은 강조색이 쓴다                               |
+|        | `check`, `checkSoft`                                                                          | 청록. 사람이 확인(Human Check, 0148). 노랑은 강조색이 쓴다                                         |
 |        | `problem`, `problemSoft`, `problemBorder`                                                     | 빨강. Failed·Disconnected·Runner Issue·Offline, 위험 버튼 글, 입력 오류                            |
 |        | `progress`, `progressSoft`                                                                    | 초록. Running·Online                                                                               |
 |        | `merged`, `mergedSoft`                                                                        | 파랑. Succeeded(앞서 Merged, 0145). Stats의 Succeeded 막대                                         |

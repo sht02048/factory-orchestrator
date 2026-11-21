@@ -59,6 +59,7 @@ function pageWith(changes: Partial<RunDetail>): RunDetailPage {
 function okCalls(overrides: Partial<RunDetailCalls> = {}): RunDetailCalls {
   return {
     answer: () => Promise.resolve(undefined),
+    humanCheck: () => Promise.resolve(undefined),
     deny: () => Promise.resolve(undefined),
     cancel: () => Promise.resolve({ ok: true }),
     removeWorktree: () => Promise.resolve({ ok: true }),

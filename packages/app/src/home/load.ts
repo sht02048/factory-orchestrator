@@ -232,13 +232,21 @@ function oldestPendingInput(db: Database, runId: RunId): { at: Date; input: Inpu
     if (q.answer !== null && q.answer.sentAt !== null) continue;
     inputs.push({
       at: q.askedAt,
-      input: {
-        kind: "question",
-        questionId: q.id,
-        body: q.body,
-        choices: q.options,
-        answered: q.answer !== null,
-      },
+      input:
+        q.kind === "human-check"
+          ? {
+              kind: "human-check",
+              questionId: q.id,
+              body: q.body,
+              answered: q.answer !== null,
+            }
+          : {
+              kind: "question",
+              questionId: q.id,
+              body: q.body,
+              choices: q.options,
+              answered: q.answer !== null,
+            },
     });
   }
   for (const wait of listRunPermissionWaits(db, runId)) {

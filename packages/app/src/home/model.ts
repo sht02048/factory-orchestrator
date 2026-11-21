@@ -24,6 +24,12 @@ export type InputWait =
       promptId: string;
       detail: string;
       denied: boolean;
+    }
+  | {
+      kind: "human-check";
+      questionId: string;
+      body: string;
+      answered: boolean;
     };
 
 interface HomeRunBase {
@@ -154,7 +160,7 @@ export interface HomePage {
 
 export const DONE_TODAY_LIMIT = 5;
 
-export const TODO_GROUPS = ["answer", "stopped"] as const;
+export const TODO_GROUPS = ["check", "answer", "stopped"] as const;
 
 export type TodoGroupKind = (typeof TODO_GROUPS)[number];
 
@@ -166,7 +172,7 @@ export interface TodoGroup {
 export function todoGroupOf(run: HomeRun): TodoGroupKind | null {
   switch (run.state) {
     case "waiting-for-input":
-      return "answer";
+      return run.input?.kind === "human-check" ? "check" : "answer";
     case "disconnected":
       return "stopped";
     case "ended":
@@ -258,7 +264,13 @@ function endedTime(run: HomeRun): number {
   return run.state === "ended" ? Date.parse(run.endedAt) : 0;
 }
 
-export type TodoTag = "question" | "permission" | "waiting-for-input" | "disconnected" | "failed";
+export type TodoTag =
+  | "question"
+  | "permission"
+  | "human-check"
+  | "waiting-for-input"
+  | "disconnected"
+  | "failed";
 
 export function todoTagOf(run: HomeRun): TodoTag | null {
   switch (run.state) {

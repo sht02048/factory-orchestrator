@@ -2,7 +2,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { markAllTrackersChanged } from "@ganger/db";
 import { z } from "zod";
-import { answerInput, denyInput, submitAnswer, submitDenial } from "@ganger/app/home/actions";
+import {
+  answerInput,
+  denyInput,
+  humanCheckAnswerInput,
+  submitAnswer,
+  submitDenial,
+  submitHumanCheckAnswer,
+} from "@ganger/app/home/actions";
 import { loadHomePage } from "@ganger/app/home/load";
 import { cancelRunRequest, removeWorktreeRequest } from "@ganger/app/run-detail/actions";
 import { requestControl } from "@ganger/app/run-control";
@@ -45,6 +52,10 @@ export const getHomePage = createServerFn({ method: "GET" })
 export const answerQuestion = createServerFn({ method: "POST" })
   .validator(answerInput)
   .handler(({ data }) => submitAnswer(getDatabase(), data, new Date()));
+
+export const answerHumanCheck = createServerFn({ method: "POST" })
+  .validator(humanCheckAnswerInput)
+  .handler(({ data }) => submitHumanCheckAnswer(getDatabase(), data, new Date()));
 
 export const denyPermission = createServerFn({ method: "POST" })
   .validator(denyInput)

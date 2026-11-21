@@ -3,6 +3,7 @@ import type { QueryClient, QueryState } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { RunControlOutcome } from "@ganger/app/run-control-view";
 import type { RunControlActionResult } from "@ganger/app/run-control";
+import type { HumanCheckDecision } from "@ganger/app/home/actions";
 import type { RunActionResult } from "@ganger/app/run-detail/actions";
 import type { RunDetailPage } from "@ganger/app/run-detail/model";
 import { toRunId } from "@ganger/core";
@@ -15,6 +16,7 @@ import {
 } from "../query/mutation-error";
 import { keysChangedByRunWrite, runDetailKey } from "../runs/queries";
 import {
+  answerHumanCheck,
   answerQuestion,
   cancelRun,
   controlRun,
@@ -29,6 +31,12 @@ export const LOG_POLL_LIMIT = 15;
 
 export interface RunDetailCalls {
   answer(input: { runId: string; questionId: string; answer: string }): Promise<unknown>;
+  humanCheck(input: {
+    runId: string;
+    questionId: string;
+    decision: HumanCheckDecision;
+    note: string;
+  }): Promise<unknown>;
   deny(input: { runId: string; promptId: string; reason: string }): Promise<unknown>;
   cancel(runId: string): Promise<RunActionResult>;
   removeWorktree(runId: string): Promise<RunActionResult>;
@@ -38,6 +46,7 @@ export interface RunDetailCalls {
 
 export const serverRunDetailCalls: RunDetailCalls = {
   answer: (data) => answerQuestion({ data }),
+  humanCheck: (data) => answerHumanCheck({ data }),
   deny: (data) => denyPermission({ data }),
   cancel: (runId) => cancelRun({ data: { runId } }),
   removeWorktree: (runId) => removeRunWorktree({ data: { runId } }),
@@ -81,6 +90,11 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
         rejectedAs(() => calls.answer({ runId, ...input }), ANSWER_REJECT_REASONS),
       onSuccess: refreshRun,
     }),
+    humanCheck: mutationOptions({
+      mutationFn: (input: { questionId: string; decision: HumanCheckDecision; note: string }) =>
+        rejectedAs(() => calls.humanCheck({ runId, ...input }), ANSWER_REJECT_REASONS),
+      onSuccess: refreshRun,
+    }),
     deny: mutationOptions({
       mutationFn: (input: { promptId: string; reason: string }) =>
         rejectedAs(() => calls.deny({ runId, ...input }), DENY_REJECT_REASONS),
@@ -117,6 +131,7 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
     [queryClient, runId, logRequested],
   );
   const answer = useMutation(mutations.answer);
+  const humanCheck = useMutation(mutations.humanCheck);
   const deny = useMutation(mutations.deny);
   const cancel = useMutation(mutations.cancel);
   const removeWorktree = useMutation(mutations.removeWorktree);
@@ -126,6 +141,9 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
   const actions: RunDetailActions = {
     onAnswer: async (questionId, answerText) => {
       await answer.mutateAsync({ questionId, answer: answerText });
+    },
+    onHumanCheck: async (questionId, decision, note) => {
+      await humanCheck.mutateAsync({ questionId, decision, note });
     },
     onDeny: async (promptId, reason) => {
       await deny.mutateAsync({ promptId, reason });

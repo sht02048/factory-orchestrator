@@ -33,6 +33,7 @@
   "attention": {
     "question": "Question",
     "permission": "Permission",
+    "human-check": "Human Check",
     "failed": "Failed",
     "disconnected": "Disconnected",
     "runner-issue": "Runner Issue"

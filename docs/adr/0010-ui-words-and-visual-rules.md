@@ -16,7 +16,7 @@
    | 색   | 뜻             | 상태                                        |
    | ---- | -------------- | ------------------------------------------- |
    | 보라 | 사람이 답·허용 | Question, Permission, Waiting for Input     |
-   | 청록 | 사람이 확인    | (지금 쓰는 상태 없음, 0145 갱신)            |
+   | 청록 | 사람이 확인    | Human Check(0148 갱신)                      |
    | 빨강 | 문제           | Failed, Disconnected, Runner Issue, Offline |
    | 초록 | 진행·정상      | Running, Online                             |
    | 파랑 | 성공           | Succeeded                                   |
@@ -71,7 +71,7 @@
 **갱신(2026-11-21, 운영자 결정 R1·R5, 티켓 [0145](../tickets/0145-run-outcome-names.md)).** 요약 결과를 에이전트 보고로만 정하기로 했다(ADR [0022](0022-run-outcome-from-agent-report.md), 스펙 [0005](../spec/0005-run-outcome.md)). 위 1·5번에 반영했다.
 
 - **요약 결과 이름.** Merged·Human Check는 Succeeded가 된다. 완료 보고(성공)는 Succeeded, 완료 보고(실패)와 그 밖의 비정상 종료는 Failed, 운영자 취소는 Canceled다. Succeeded 색은 앞선 Merged의 파랑이다.
-- **To do 종류.** Human Check가 빠진다. Dashboard Done today 칸의 꼬리표는 Failed뿐이고, 머리 요약 문장의 "확인할 PR"도 빠진다. Human Check는 나중에 에이전트가 사람 확인을 요청하는 Waiting for Input 종류로 돌아온다(범위 밖). 그때까지 청록은 쓰는 상태가 없다.
+- **To do 종류.** Human Check가 빠진다. Dashboard Done today 칸의 꼬리표는 Failed뿐이고, 머리 요약 문장의 "확인할 PR"도 빠진다. Human Check는 0148에서 에이전트가 사람 확인을 요청하는 Waiting for Input 종류로 돌아왔다. 색은 청록이고, Dashboard Running 칸 맨 위에 "확인해 주세요"로 Question과 따로 묶으며, 머리 요약 문장은 "확인할 일"로 말한다(ADR [0023](0023-human-check-request.md)).
 - **PR 정보는 결과 곁에.** PR은 결과를 정하지 않고 "PR #n 열림·병합됨·닫힘·못 읽음"으로 결과 알약 곁에 보인다(Runs 행의 에이전트·결과 열, Run 상세 상태 줄, Tickets 마지막 런 상자). 이후 PR 상태가 있으면 그것을 보인다. PR 상태 없음은 보이지 않는다.
 - **Stats.** 결과(Succeeded·Failed·Canceled)로 세고, 병합률 대신 성공률을 보인다. PR 병합 수는 PR 정보(끝날 때나 그 뒤 병합)에서 따로 세어 숫자 카드 하나로 보인다. 앞선 "사람이 손댄 비율" 카드는 뺀다.
 - **남긴 워크트리.** Run 상세는 worker가 워크트리를 남긴 이유("PR이 없어 워크트리를 남겼어요" 등)를 다음 할 일 자리에 빨간 제목으로 보이고, 머리 행동에 위험 표시 "워크트리 지우기"(확인 대화상자)를 둔다.

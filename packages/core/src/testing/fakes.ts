@@ -3,6 +3,7 @@ import type { ProviderUsageReading } from "../provider-usage.js";
 import type {
   AgentActivity,
   AgentQuestion,
+  QuestionKind,
   CodeHost,
   CodeHostErrorDetail,
   CompletionReport,
@@ -266,12 +267,13 @@ export class FakeRunner implements Runner {
 
   ask(
     worktree: WorktreeRef,
-    question: { body: string; options?: string[]; at?: Date },
+    question: { body: string; options?: string[]; at?: Date; kind?: QuestionKind },
   ): QuestionId {
     const run = this.runAt(worktree);
     const id = toQuestionId(`fake-question-${this.next()}`);
     run.questions.push({
       id,
+      ...(question.kind === undefined ? {} : { kind: question.kind }),
       body: question.body,
       options: question.options ?? [],
       askedAt: question.at ?? new Date(),
