@@ -102,6 +102,7 @@ export function saveGeneral(
 
 const workspaceBriefText = z
   .string()
+  .max(WORKSPACE_BRIEF_MAX_LENGTH * 4)
   .transform((value) => value.trim())
   .refine((value) => workspaceBriefLength(value) <= WORKSPACE_BRIEF_MAX_LENGTH);
 

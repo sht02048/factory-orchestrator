@@ -185,7 +185,10 @@ function BriefTextField({
       error={tooLong ? t("tooLong", { max: WORKSPACE_BRIEF_MAX_LENGTH }) : undefined}
       description={
         <span id={countId}>
-          {t("count", { count: workspaceBriefLength(value), max: WORKSPACE_BRIEF_MAX_LENGTH })}
+          {t("count", {
+            count: workspaceBriefLength(value.trim()),
+            max: WORKSPACE_BRIEF_MAX_LENGTH,
+          })}
         </span>
       }
     >
@@ -213,7 +216,7 @@ export function BriefPreview({ brief, protocol }: { brief: WorkspaceBrief; proto
   return (
     <section aria-labelledby={headingId} {...stylex.props(styles.preview)}>
       <div {...stylex.props(styles.previewHead)}>
-        <Text variant="ui" as="p" id={headingId}>
+        <Text variant="label" as="p" id={headingId}>
           {t("preview.title")}
         </Text>
         <Text variant="meta" as="p">
@@ -223,10 +226,10 @@ export function BriefPreview({ brief, protocol }: { brief: WorkspaceBrief; proto
       <ol {...stylex.props(styles.parts)}>
         {parts.map((part) => (
           <li key={part.kind} {...stylex.props(styles.part)}>
-            <Text variant="meta" as="p">
+            <Text variant="label" as="p">
               {partLabel(t, part.kind)}
             </Text>
-            <CodeBlock scroll={part.kind === "protocol"} label={partLabel(t, part.kind)}>
+            <CodeBlock scroll label={partLabel(t, part.kind)}>
               {part.text}
             </CodeBlock>
           </li>

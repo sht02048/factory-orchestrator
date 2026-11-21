@@ -630,8 +630,8 @@ export function runningSince(db: Database, runId: RunId): Date | null {
 export function recordStartRequested(
   db: Database,
   runId: RunId,
-  now: Date = new Date(),
-  agentBrief: string | null = null,
+  now: Date,
+  agentBrief: string,
 ): boolean {
   return inTransaction(db, () => {
     db.update(runs)

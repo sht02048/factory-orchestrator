@@ -103,9 +103,12 @@ describe("Run 상세의 받은 지시서 (0146)", () => {
     expect(found(db, id).brief).toBe("Old rule.\n\nACME-91\n");
   });
 
-  it("지시서를 보내기 전인 런에는 받은 지시서 구역이 없다", () => {
+  it("지시서를 보내기 전이거나 시작하지 못한 런에는 받은 지시서 구역이 없다", () => {
     const { db } = seedDatabase();
     const id = assign(db, "ACME-92", 920);
+    recordStartRequested(db, id, minutes(920), "never received");
+    expect(found(db, id).brief).toBeNull();
+    walk(db, id, 920, [{ to: "ended", agentResult: "could-not-start", prState: "none" }]);
     expect(found(db, id).brief).toBeNull();
     expect(render(page(db, id))).not.toContain(runJson.brief.title);
   });

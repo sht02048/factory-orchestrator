@@ -1,5 +1,5 @@
 import { withLogContext } from "@ganger/log";
-import { planRunControl } from "@ganger/core";
+import { planRunControl, ticketBriefText } from "@ganger/core";
 import type { RunControlFailure, RunnerErrorDetail } from "@ganger/core";
 import {
   changeRunState,
@@ -69,9 +69,9 @@ async function applyRunControl(
 ): Promise<RunControlFailure | null> {
   const { db } = context;
   const found = getRunWithRecords(db, request.runId);
-  const run = found?.run;
-  if (found === null || run === undefined || run.state === "queued" || run.state === "ended")
-    return "state-changed";
+  if (found === null) return "state-changed";
+  const { run } = found;
+  if (run.state === "queued" || run.state === "ended") return "state-changed";
   const unknownResume =
     request.outcomeUnknown && (run.state === "paused" || run.state === "disconnected");
   if (!unknownResume && !planRunControl(run.state, request.control).ok) return "state-changed";
@@ -126,7 +126,7 @@ async function restartPromptFor(
   if (tracker !== null) {
     try {
       const ticket = await tracker.getTicket(run.ticket.key);
-      if (ticket !== null) ticketText = `${ticket.title}\n\n${ticket.body}`;
+      if (ticket !== null) ticketText = ticketBriefText(ticket);
     } catch (error) {
       context.logger.warn("run_control.ticket_read_failed", {
         runId: run.id,
