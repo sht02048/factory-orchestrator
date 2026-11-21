@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
-import { CONTINUE_MESSAGE_MAX_LENGTH } from "@ganger/core";
+import { CONTINUE_MESSAGE_MAX_LENGTH, toRunId } from "@ganger/core";
 import { markAllTrackersChanged } from "@ganger/db";
 import { z } from "zod";
 import { answerInput, denyInput, submitAnswer, submitDenial } from "@ganger/app/home/actions";
@@ -109,7 +109,9 @@ const continueMessageSchema = z
 
 export const continueRunFrom = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string(), message: continueMessageSchema }))
-  .handler(({ data }) => continueRunRequest(getDatabase(), data.runId, data.message, new Date()));
+  .handler(({ data }) =>
+    continueRunRequest(getDatabase(), toRunId(data.runId), data.message, new Date()),
+  );
 
 export const controlRun = createServerFn({ method: "POST" })
   .validator(z.object({ runId: z.string(), control: z.enum(["pause", "resume"]) }))

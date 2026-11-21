@@ -410,6 +410,20 @@ describe("이어서 맡긴 런(러너 고정)", () => {
     expect(plan.start).toEqual([]);
   });
 
+  it("러너가 그 에이전트의 사용량 한도에 닿았으면 시작하지 않고 한도 이유로 기다린다", () => {
+    const pinned = { ...queued("pinned", app, r1), pinnedToRunner: true };
+    const until = new Date("2099-01-01T00:00:00Z");
+    const plan = planQueue({
+      queued: [pinned],
+      runners: [runner({ id: r1, usageLimits: [{ provider: "claude", until }] })],
+      runs: [],
+    });
+    expect(plan.start).toEqual([]);
+    expect(plan.unplaced).toEqual([
+      { runId: pinned.id, reason: "usage-limit", limit: { provider: "claude", until } },
+    ]);
+  });
+
   it("러너에 자리가 있으면 그 러너에서 시작한다", () => {
     const pinned = { ...queued("pinned", app, r1), pinnedToRunner: true };
     const plan = planQueue({

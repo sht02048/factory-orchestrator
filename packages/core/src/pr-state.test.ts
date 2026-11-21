@@ -160,3 +160,46 @@ describe("mentionsTicketKey", () => {
     expect(mentionsTicketKey("ENG cleanup for 123 items", key)).toBe(false);
   });
 });
+
+describe("이어서 맡긴 런의 PR", () => {
+  const startedAt = new Date("2026-11-21T10:00:00Z");
+  const before = new Date("2026-11-21T09:00:00Z");
+  const during = new Date("2026-11-21T11:00:00Z");
+  const snapshot = (
+    state: "open" | "merged" | "closed",
+    mergedAt: Date | null,
+  ): PullRequestSnapshot => ({
+    id: toPullRequestId("pr-1"),
+    displayId: "#1",
+    url: "https://code.example.com/acme/pull/1",
+    title: "change",
+    body: "",
+    state,
+    createdAt: before,
+    mergedAt,
+    headBranch: "acme/branch",
+    sourceRepo: repo,
+    headCommit: "abc",
+    baseBranch: "main",
+    ci: "success",
+  });
+  const decide = (found: PullRequestSnapshot) =>
+    decidePrState({
+      repo,
+      ticketKey: toTicketKey("ENG-1"),
+      runStartedAt: startedAt,
+      continuesEarlierRun: true,
+      byBranch: [found],
+      byTicketKey: [],
+    }).prState;
+
+  it("이전 런 때 이미 머지되거나 닫힌 PR은 새 런의 결과로 삼지 않는다", () => {
+    expect(decide(snapshot("merged", before))).toBe("none");
+    expect(decide(snapshot("closed", null))).toBe("none");
+  });
+
+  it("런 중에 머지되거나 아직 열린 PR은 새 런의 결과다", () => {
+    expect(decide(snapshot("merged", during))).toBe("merged");
+    expect(decide(snapshot("open", null))).toBe("open");
+  });
+});

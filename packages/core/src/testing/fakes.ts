@@ -50,6 +50,7 @@ import {
   toWorktreeRef,
 } from "../ids.js";
 import type {
+  AgentRef,
   CodeHostKind,
   CommentId,
   LabelId,
@@ -444,11 +445,22 @@ export class FakeRunner implements Runner {
         this.failNextPrepare = null;
         throw new AdapterError(failure);
       }
-      if (this.liveWorktree(input.worktree)) return "same-worktree";
+      if (this.liveWorktree(input.worktree)) {
+        if (input.stopAgent !== undefined) this.stopByRef(input.stopAgent);
+        return "same-worktree";
+      }
       if (this.goneBranches.has(input.branch)) return "from-scratch";
       this.recreatedWorktrees.set(input.worktree, input.branch);
       return "recreated";
     });
+  }
+
+  private stopByRef(agentRef: AgentRef): void {
+    for (const run of this.runs.values()) {
+      if (run.started.agentRef !== agentRef) continue;
+      run.agentStopped = true;
+      run.endedWithoutReport ??= "stopped by the orchestrator";
+    }
   }
 
   private liveWorktree(worktree: WorktreeRef): boolean {

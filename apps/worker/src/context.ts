@@ -117,6 +117,7 @@ export async function decideRunPrState(
       repo,
       ticketKey: run.ticket.key,
       runStartedAt: run.startedAt,
+      continuesEarlierRun: run.continuedFromRunId !== null,
       byBranch,
       byTicketKey,
     });

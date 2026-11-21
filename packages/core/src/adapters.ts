@@ -228,6 +228,7 @@ export interface PrepareContinuationInput {
   project: RunnerProjectId;
   worktree: WorktreeRef;
   branch: string;
+  stopAgent?: AgentRef;
 }
 
 export interface StartedRun {

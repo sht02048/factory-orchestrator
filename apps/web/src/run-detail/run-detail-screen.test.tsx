@@ -22,6 +22,7 @@ import {
   updateRunRecords,
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
+import { createTranslator } from "use-intl";
 import { describe, expect, it } from "vitest";
 import domain from "../../messages/ko/domain.json" with { type: "json" };
 import runJson from "../../messages/ko/run.json" with { type: "json" };
@@ -33,7 +34,7 @@ import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
 import questionJson from "../../messages/ko/question.json" with { type: "json" };
 import { runMessages } from "./messages";
 import type { RunDetail, RunDetailPage } from "@ganger/app/run-detail/model";
-import { RunDetailScreen, objectParticle } from "./run-detail-screen";
+import { RunDetailScreen } from "./run-detail-screen";
 import { addExtraEnded, assign, extraEndedCases, startedOn, walk } from "./testing";
 import { answerInput, submitAnswer } from "@ganger/app/home/actions";
 import {
@@ -1032,8 +1033,13 @@ describe("이어서 맡기기(0149)", () => {
     [9, "를"],
     [10, "을"],
     [12, "를"],
-  ] as const)("런 #%i 뒤에 맞는 조사(%s)를 붙인다", (value, particle) => {
-    expect(objectParticle(value)).toBe(particle);
+  ] as const)("런 #%i 뒤에 맞는 조사(%s)를 붙인다", (number, particle) => {
+    const t = createTranslator({
+      locale: "ko",
+      messages: runMessages,
+      namespace: "run.continuation",
+    });
+    expect(t("from", { number, digit: number % 10 })).toBe(`런 #${number}${particle} 이어서`);
   });
 
   it.each(["same-worktree", "recreated", "from-scratch"] as const)(

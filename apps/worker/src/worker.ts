@@ -17,7 +17,6 @@ import type {
   QueuedRun,
   Runner,
   RunnerChoice,
-  RunOnRunner,
   RunId,
   RunnerId,
   StartedRun,
@@ -446,9 +445,7 @@ async function startOnRunner(
     const source = continuationSource(context, run);
     if (source === "missing") return endCouldNotStart(context, run);
     const place =
-      source === null
-        ? null
-        : await continuationPlace(context, run, { runner, mailbox }, source, records);
+      source === null ? null : await continuationPlace(context, run, runner, source, records);
     if (place === "write-failed") return { kind: "blocked" };
     const prompt =
       place === null || place === "from-scratch" ? await promptFor(context, run) : undefined;
@@ -552,24 +549,17 @@ function continueInOf(
 async function continuationPlace(
   context: TickContext,
   run: QueuedStoredRun,
-  target: { runner: Runner; mailbox: MailboxRef },
+  runner: Runner,
   source: ContinuationSource,
   records: RunRecords,
 ): Promise<ContinuationPlace | "write-failed"> {
   if (records.continuePlace === "from-scratch") return "from-scratch";
-  const { runner, mailbox } = target;
   const prepared = await runner.prepareContinuation({
     project: run.runnerProject,
     worktree: source.worktree,
     branch: source.branch,
+    ...(source.agentMayBeAlive ? { stopAgent: source.agentRef } : {}),
   });
-  if (prepared === "same-worktree" && source.agentMayBeAlive) {
-    await stopPreviousAgent(context, run, runner, {
-      mailbox,
-      worktree: source.worktree,
-      agentRef: source.agentRef,
-    });
-  }
   const place = prepared === "same-worktree" ? (records.continuePlace ?? prepared) : prepared;
   const written = tryWrite(context, run.id, () =>
     inTransaction(context.db, () => {
@@ -684,20 +674,6 @@ async function promptFor(
     text: ticketBriefText(ticket),
     ticket: { key: ticket.key, url: ticket.url },
   };
-}
-
-async function stopPreviousAgent(
-  context: TickContext,
-  run: QueuedStoredRun,
-  runner: Runner,
-  previous: RunOnRunner,
-): Promise<void> {
-  try {
-    await runner.stopAgent(previous);
-  } catch (error) {
-    if (runnerErrorDetail(error)?.kind !== "runner-error") throw error;
-    context.logger.info("run.previous_agent_not_stopped", { runId: run.id, error });
-  }
 }
 
 function recordStart(context: TickContext, runId: RunId, started: StartedRun): boolean {

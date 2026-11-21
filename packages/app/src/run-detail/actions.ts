@@ -21,10 +21,10 @@ export type ContinueRunActionResult =
 
 export function continueRunRequest(
   db: Database,
-  runId: string,
+  runId: RunId,
   message: string,
   now: Date,
 ): ContinueRunActionResult {
-  const result = continueRun(db, { from: toRunId(runId), message, now });
+  const result = continueRun(db, { from: runId, message, now });
   return result.ok ? { ok: true, runId: result.run.id } : result;
 }

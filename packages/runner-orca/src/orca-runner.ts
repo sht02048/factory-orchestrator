@@ -480,7 +480,10 @@ export class OrcaRunner implements Runner {
     const entries = parseWorktreeList(await this.run(worktreeListArgv(repoPath)));
     const current = entries.find((entry) => entry.path === path && !entry.prunable);
     if (current !== undefined) {
-      if (current.branch === input.branch) return "same-worktree";
+      if (current.branch === input.branch) {
+        if (input.stopAgent !== undefined) await this.stopPreviousAgent(input.stopAgent);
+        return "same-worktree";
+      }
       throw new AdapterError<RunnerErrorDetail>({
         kind: "runner-error",
         code: "worktree_branch_changed",
@@ -526,29 +529,33 @@ export class OrcaRunner implements Runner {
     return "recreated";
   }
 
+  private async stopPreviousAgent(agentRef: AgentRef): Promise<void> {
+    const agent = decodeAgent(agentRef);
+    if (agent === null) return;
+    const stopped = await this.orcaOutcome(
+      ["orchestration", "worker-stop", "--dispatch", agent.dispatchId],
+      workerStopResultSchema,
+    );
+    if (stopped.ok || stopped.code === "dispatch_not_found") return;
+    throw this.errorFor(stopped, {});
+  }
+
   private async findContinuedRun(
-    mailboxRef: MailboxRef,
     worktreeName: string,
     worktree: WorktreeRef,
   ): Promise<StartedRun | null> {
-    const mailbox = decodeMailbox(mailboxRef);
-    if (mailbox === null) return null;
-    const { tasks } = await this.orca(
-      ["orchestration", "task-list", "--run", mailbox.runId, "--brief"],
-      taskListResultSchema,
-    );
-    const taskIds = new Set(
-      tasks
-        .filter((task) => task.title === worktreeName && task.status !== "failed")
-        .map((t) => t.id),
-    );
-    if (taskIds.size === 0) return null;
-    const worker = await this.findWorkerOf(mailbox.runId, (row) => taskIds.has(row.taskId));
+    const worker = await this.findWorker(worktree, null);
     if (worker === undefined) return null;
     const shownWorker = await this.orca(
       ["orchestration", "worker-show", "--dispatch", worker.dispatchId],
       workerShowResultSchema,
     );
+    const { tasks } = await this.orca(
+      ["orchestration", "task-list", "--run", shownWorker.runId, "--brief"],
+      taskListResultSchema,
+    );
+    const task = tasks.find((candidate) => candidate.id === worker.taskId);
+    if (task?.title !== worktreeName || task.status === "failed") return null;
     return this.startedRunAt(`id:${worktree}`, {
       dispatchId: worker.dispatchId,
       taskId: worker.taskId,
@@ -562,7 +569,7 @@ export class OrcaRunner implements Runner {
     continueIn?: WorktreeRef;
   }): Promise<StartedRun | null> {
     if (input.continueIn !== undefined) {
-      return this.findContinuedRun(input.mailbox, input.worktreeName, input.continueIn);
+      return this.findContinuedRun(input.worktreeName, input.continueIn);
     }
     const shown = await this.orcaOutcome(
       ["worktree", "show", "--worktree", `name:${input.worktreeName}`],
@@ -603,13 +610,6 @@ export class OrcaRunner implements Runner {
     worktreeId: string,
     runId: string | null,
   ): Promise<{ dispatchId: string; taskId: string } | undefined> {
-    return this.findWorkerOf(runId, (row) => row.workspace === worktreeId);
-  }
-
-  private async findWorkerOf(
-    runId: string | null,
-    matches: (row: z.infer<typeof workerListResultSchema>["workers"][number]) => boolean,
-  ): Promise<{ dispatchId: string; taskId: string } | undefined> {
     let cursor: string | null = null;
     for (let page = 0; page < WORKER_LIST_MAX_PAGES; page += 1) {
       const result: z.infer<typeof workerListResultSchema> = await this.orca(
@@ -623,7 +623,7 @@ export class OrcaRunner implements Runner {
         ],
         workerListResultSchema,
       );
-      const found = result.workers.find(matches);
+      const found = result.workers.find((w) => w.workspace === worktreeId);
       if (found !== undefined) return found;
       const next = result.nextCursor ?? null;
       if (next === null || next === cursor || result.workers.length === 0) return undefined;

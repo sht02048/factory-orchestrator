@@ -152,7 +152,7 @@
     },
     "paused": "멈춤",
     "unpaused": "재개",
-    "continued-from": "런 #{number}{particle} 이어서 시작",
+    "continued-from": "런 #{number}{digit, plural, =2 {를} =4 {를} =5 {를} =9 {를} other {을}} 이어서 시작",
     "continued-by": "런 #{number}에 이어서 맡김"
   },
   "report": {
@@ -259,7 +259,7 @@
     "title": "이어서 맡기기",
     "where": "이어 받는 곳",
     "newRun": "새 런",
-    "newRunValue": "런 #{next} · 런 #{source}{particle} 이어서",
+    "newRunValue": "런 #{next} · 런 #{source}{digit, plural, =2 {를} =4 {를} =5 {를} =9 {를} other {을}} 이어서",
     "place": {
       "same-worktree": "{runner} · 같은 워크트리와 브랜치",
       "recreated": "{runner} · 같은 브랜치로 새 워크트리"
@@ -279,7 +279,7 @@
   },
   "continuation": {
     "title": "이어서 맡긴 런",
-    "from": "런 #{number}{particle} 이어서",
+    "from": "런 #{number}{digit, plural, =2 {를} =4 {를} =5 {를} =9 {를} other {을}} 이어서",
     "by": "런 #{number}에 이어서 맡겼어요",
     "place": {
       "pending": "시작할 때 워크트리와 브랜치를 확인해요.",

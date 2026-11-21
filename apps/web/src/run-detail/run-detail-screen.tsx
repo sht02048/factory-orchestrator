@@ -19,6 +19,7 @@ import {
   StatusPill,
   Text,
   Textarea,
+  TextLink,
   focusStyles,
   linkStyles,
   NoticeLayout,
@@ -101,7 +102,7 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
   const removable = keptWorktree !== null && !keptWorktree.removing;
   const headRef = useRef<HTMLDivElement>(null);
   const cancelStatusRef = useRef<HTMLSpanElement>(null);
-  const continuationRef = useRef<HTMLParagraphElement>(null);
+  const continuationRef = useRef<HTMLElement>(null);
   const continuedById = run.continuedBy?.id ?? null;
   const focusContinuation = useRef(false);
   useEffect(() => {
@@ -643,7 +644,7 @@ function Continuation({
 }: {
   run: RunDetail;
   runHref: (runId: string) => string;
-  statusRef: RefObject<HTMLParagraphElement | null>;
+  statusRef: RefObject<HTMLElement | null>;
 }) {
   const t = useTranslations("run.continuation");
   const { continuedFrom, continuedBy, continuePlace } = run;
@@ -651,29 +652,22 @@ function Continuation({
   return (
     <>
       {continuedFrom === null ? null : (
-        <p {...stylex.props(styles.flat)}>
-          <a href={runHref(continuedFrom.id)} {...stylex.props(linkStyles())}>
+        <Text variant="body" as="p">
+          <TextLink href={runHref(continuedFrom.id)}>
             {t("from", {
               number: continuedFrom.number,
-              particle: objectParticle(continuedFrom.number),
+              digit: continuedFrom.number % 10,
             })}
-          </a>{" "}
-          <Text variant="body" as="span">
-            {t(`place.${continuePlace ?? "pending"}`)}
-          </Text>
-        </p>
+          </TextLink>{" "}
+          {t(`place.${continuePlace ?? "pending"}`)}
+        </Text>
       )}
       {continuedBy === null ? null : (
-        <p
-          ref={statusRef}
-          role="status"
-          tabIndex={-1}
-          {...stylex.props(styles.flat, focusStyles.target)}
-        >
-          <a href={runHref(continuedBy.id)} {...stylex.props(linkStyles())}>
+        <Text variant="body" as="p" ref={statusRef} role="status" tabIndex={-1}>
+          <TextLink href={runHref(continuedBy.id)}>
             {t("by", { number: continuedBy.number })}
-          </a>
-        </p>
+          </TextLink>
+        </Text>
       )}
     </>
   );
@@ -753,7 +747,7 @@ function ContinueRun({
           {t("newRunValue", {
             next: offer.nextNumber,
             source: offer.sourceNumber,
-            particle: objectParticle(offer.sourceNumber),
+            digit: offer.sourceNumber % 10,
           })}
         </DefinitionItem>
       </DefinitionList>
@@ -770,12 +764,6 @@ function ContinueRun({
       </div>
     </Dialog>
   );
-}
-
-const VOWEL_ENDING_DIGITS = new Set([2, 4, 5, 9]);
-
-export function objectParticle(value: number): "을" | "를" {
-  return VOWEL_ENDING_DIGITS.has(value % 10) ? "를" : "을";
 }
 
 function ActionFailedText({ text }: { text: string }) {
@@ -845,7 +833,7 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
     event.kind === "mcp"
       ? t("mcp", { client: event.client })
       : event.kind === "continued-from" || event.kind === "continued-by"
-        ? t(event.kind, { number: event.runNumber, particle: objectParticle(event.runNumber) })
+        ? t(event.kind, { number: event.runNumber, digit: event.runNumber % 10 })
         : t(event.kind);
   const eventDetail = (event: TimelineEvent): string | null => {
     switch (event.kind) {

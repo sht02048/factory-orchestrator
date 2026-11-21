@@ -50,15 +50,12 @@ export function planQueue(input: {
     let runnerId = run.runnerId;
     if (runnerId !== null) {
       const runner = runnersById.get(runnerId);
-      if (
-        run.pinnedToRunner === true &&
-        (runner === undefined || !canRunnerTake(runner, run.project))
-      ) {
-        plan.unplaced.push({
-          runId: run.id,
-          reason: runner === undefined ? "runner-offline" : whyCannotTake(runner, run.project),
-        });
-        continue;
+      if (run.pinnedToRunner === true) {
+        const held = pinnedRunnerHold(runner, run);
+        if (held !== null) {
+          plan.unplaced.push({ runId: run.id, ...held });
+          continue;
+        }
       }
       if (runner === undefined || !canRunnerTake(runner, run.project)) {
         plan.cleared.push({
@@ -95,6 +92,16 @@ export function planQueue(input: {
   }
 
   return plan;
+}
+
+function pinnedRunnerHold(
+  runner: RunnerSnapshot | undefined,
+  run: Pick<QueuedRun, "project" | "agent">,
+): Unplaced | null {
+  if (runner === undefined) return { reason: "runner-offline" };
+  if (!canRunnerTake(runner, run.project)) return { reason: whyCannotTake(runner, run.project) };
+  const limit = usageLimitOf(runner.usageLimits, run.agent);
+  return limit === null ? null : { reason: "usage-limit", limit };
 }
 
 function whyCannotTake(runner: RunnerSnapshot, project: RunnerProjectId): UnplacedReason {

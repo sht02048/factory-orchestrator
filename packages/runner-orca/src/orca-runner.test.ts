@@ -1543,29 +1543,17 @@ describe("prepareContinuation", () => {
     }
   });
 
-  test("이어서 시작한 런은 이전 에이전트가 아니라 제목이 같은 작업으로 찾는다", async () => {
-    const tasks = {
-      ok: true,
-      result: {
-        tasks: [
-          { id: "task_old", status: "completed", title: "ganger-ENG-1-1" },
-          { id: "task_new", status: "dispatched", title: "ganger-ENG-1-2" },
-        ],
-      },
-    };
-    const exec = new ScriptedExec()
-      .orca("orchestration task-list", stdout(JSON.stringify(tasks)))
+  function recoveryExec(
+    newest: { dispatchId: string; taskId: string },
+    task: { id: string; status: string; title: string },
+  ): ScriptedExec {
+    return new ScriptedExec()
       .orca(
         "orchestration worker-list",
         stdout(
           JSON.stringify({
             ok: true,
-            result: {
-              workers: [
-                { dispatchId: "ctx_new", taskId: "task_new", workspace: WORKTREE },
-                { dispatchId: "ctx_old", taskId: "task_old", workspace: WORKTREE },
-              ],
-            },
+            result: { workers: [{ ...newest, workspace: WORKTREE }] },
           }),
         ),
       )
@@ -1574,36 +1562,68 @@ describe("prepareContinuation", () => {
         stdout(
           JSON.stringify({
             ok: true,
-            result: { dispatchId: "ctx_new", taskId: "task_new", runId: "run_1", state: "ready" },
+            result: { ...newest, runId: "run_other", state: "ready" },
           }),
         ),
       )
+      .orca(
+        "orchestration task-list --run run_other",
+        stdout(JSON.stringify({ ok: true, result: { tasks: [task] } })),
+      )
       .orca("worktree show", stdout(own("worktree-show.json")));
+  }
+  const lookup = {
+    mailbox: MAILBOX,
+    worktreeName: "ganger-ENG-1-2",
+    continueIn: WORKTREE,
+  };
 
-    const found = await runnerWith(exec).findStartedRun({
-      mailbox: MAILBOX,
-      worktreeName: "ganger-ENG-1-2",
-      continueIn: WORKTREE,
-    });
-
+  test("우편함의 Run이 바뀌어도 워크트리의 최신 에이전트 제목으로 이어 시작을 찾는다", async () => {
+    const exec = recoveryExec(
+      { dispatchId: "ctx_new", taskId: "task_new" },
+      { id: "task_new", status: "dispatched", title: "ganger-ENG-1-2" },
+    );
+    const found = await runnerWith(exec).findStartedRun(lookup);
     expect(found === null ? null : decodeAgent(found.agentRef)).toEqual({
       dispatchId: "ctx_new",
       taskId: "task_new",
-      runId: "run_1",
+      runId: "run_other",
     });
   });
 
-  test("이어서 시작한 작업이 없으면 이전 에이전트를 시작된 것으로 보지 않는다", async () => {
-    const exec = new ScriptedExec().orca(
-      "orchestration task-list",
-      stdout(JSON.stringify({ ok: true, result: { tasks: [] } })),
+  test("워크트리의 최신 에이전트가 이전 런의 것이면 시작되지 않은 것으로 본다", async () => {
+    const exec = recoveryExec(
+      { dispatchId: "ctx_old", taskId: "task_old" },
+      { id: "task_old", status: "completed", title: "ganger-ENG-1-1" },
     );
+    expect(await runnerWith(exec).findStartedRun(lookup)).toBeNull();
+  });
+
+  test("이전 에이전트가 멈췄는지 알 수 없으면 같은 워크트리에서 시작하지 않는다", async () => {
+    const exec = git(projectExec(), "worktree list", list(main, here(branch))).orca(
+      "orchestration worker-stop",
+      stdout(
+        JSON.stringify({ ok: false, error: { code: "stop_unknown", message: "not proven" } }),
+        1,
+      ),
+    );
+    const stopAgent = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
     expect(
-      await runnerWith(exec).findStartedRun({
-        mailbox: MAILBOX,
-        worktreeName: "ganger-ENG-1-2",
-        continueIn: WORKTREE,
-      }),
-    ).toBeNull();
+      await adapterError(runnerWith(exec).prepareContinuation({ ...input, stopAgent })),
+    ).toMatchObject({ kind: "runner-error", code: "stop_unknown" });
+  });
+
+  test("이전 에이전트의 기록이 없으면 멈춘 것으로 보고 이어 간다", async () => {
+    const exec = git(projectExec(), "worktree list", list(main, here(branch))).orca(
+      "orchestration worker-stop",
+      stdout(
+        JSON.stringify({ ok: false, error: { code: "dispatch_not_found", message: "gone" } }),
+        1,
+      ),
+    );
+    const stopAgent = encodeAgent({ dispatchId: "ctx_old", taskId: "task_old", runId: "run_1" });
+    expect(await runnerWith(exec).prepareContinuation({ ...input, stopAgent })).toBe(
+      "same-worktree",
+    );
   });
 });
