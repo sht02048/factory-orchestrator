@@ -1564,8 +1564,8 @@ describe("prepareContinuation", () => {
     return exec.on(`git -C ${repoPath} ${verb}`, ...replies);
   }
 
-  function projectExec(): ScriptedExec {
-    return withProjects(new ScriptedExec());
+  function projectExec(config = "remote.origin.url https://example.com/acme/sandbox.git\n") {
+    return git(withProjects(new ScriptedExec()), "config", stdout(config));
   }
 
   test("워크트리가 그 브랜치에 있으면 같은 워크트리다", async () => {
@@ -1649,6 +1649,48 @@ describe("prepareContinuation", () => {
     expect(exec.commands()).toContain(
       `git -C ${repoPath} worktree add --track -b ${branch} ${path} origin/${branch}`,
     );
+  });
+
+  test("push remote에만 있는 브랜치를 그 remote에서 받아 다시 만든다", async () => {
+    const exec = projectExec(
+      "remote.pushdefault fork\nremote.origin.url https://example.com/a.git\nremote.fork.url https://example.com/b.git\n",
+    );
+    git(exec, "worktree list", list(main));
+    git(exec, "worktree prune", stdout(""));
+    git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote --exit-code fork", stdout(`ccc\trefs/heads/${branch}\n`));
+    git(exec, "fetch", stdout(""));
+    git(exec, "worktree add", stdout(""));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
+    expect(exec.commands()).toContain(
+      `git -C ${repoPath} worktree add --track -b ${branch} ${path} fork/${branch}`,
+    );
+  });
+
+  test("push remote에 없어도 프로젝트 remote에 있으면 처음부터 시작하지 않는다", async () => {
+    const exec = projectExec(
+      "remote.pushdefault fork\nremote.origin.url https://example.com/a.git\nremote.fork.url https://example.com/b.git\n",
+    );
+    git(exec, "worktree list", list(main));
+    git(exec, "worktree prune", stdout(""));
+    git(exec, "show-ref", stdout("", 1));
+    git(exec, "ls-remote --exit-code fork", stdout("", 2));
+    git(exec, "ls-remote --exit-code origin", stdout(`ccc\trefs/heads/${branch}\n`));
+    git(exec, "fetch", stdout(""));
+    git(exec, "worktree add", stdout(""));
+    expect(await runnerWith(exec).prepareContinuation(input)).toBe("recreated");
+  });
+
+  test("remote 설정을 읽지 못하면 처음부터 시작하지 않고 실패로 돌려준다", async () => {
+    const exec = withProjects(new ScriptedExec());
+    git(exec, "config", stdout("", 128));
+    git(exec, "worktree list", list(main));
+    git(exec, "worktree prune", stdout(""));
+    git(exec, "show-ref", stdout("", 1));
+    expect(await adapterError(runnerWith(exec).prepareContinuation(input))).toMatchObject({
+      kind: "runner-error",
+      code: "git_failed",
+    });
   });
 
   test("브랜치가 어디에도 없으면 처음부터 시작한다", async () => {

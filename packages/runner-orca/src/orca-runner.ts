@@ -532,11 +532,8 @@ export class OrcaRunner implements Runner {
       gitSucceeded(added, "git worktree add");
       return "recreated";
     }
-    const remote = project.remoteName;
-    const onRemote = withinRemoteTimeout(
-      await this.run(remoteBranchArgv({ repoPath, remote, branch: input.branch }), timeout),
-    );
-    if (!refFound(onRemote, "git ls-remote", 2)) return "from-scratch";
+    const remote = await this.remoteHolding(repoPath, project.remoteName, input.branch);
+    if (remote === null) return "from-scratch";
     input.beforeRecreate?.();
     gitSucceeded(
       withinRemoteTimeout(
@@ -552,6 +549,26 @@ export class OrcaRunner implements Runner {
       "git worktree add",
     );
     return "recreated";
+  }
+
+  private async remoteHolding(
+    repoPath: string,
+    projectRemote: string,
+    branch: string,
+  ): Promise<string | null> {
+    const config = await this.run(remoteConfigArgv(repoPath));
+    const pushRemote = refFound(config, "git config", 1)
+      ? choosePushRemote(config.stdout, projectRemote)
+      : projectRemote;
+    for (const remote of new Set([pushRemote, projectRemote])) {
+      const found = withinRemoteTimeout(
+        await this.run(remoteBranchArgv({ repoPath, remote, branch }), {
+          timeoutMs: this.config.startTimeoutMs,
+        }),
+      );
+      if (refFound(found, "git ls-remote", 2)) return remote;
+    }
+    return null;
   }
 
   async readWorktreeBranch(worktree: WorktreeRef): Promise<string | null> {
