@@ -16,6 +16,11 @@ export interface AllowedHostsInput {
   bindHost: string | null;
   webAddress: string | null;
   webhookAddress: string | null;
+  tailnetHosts?: ReadonlyArray<string>;
+}
+
+export function isWildcardBind(bindHost: string | null): boolean {
+  return bindHost !== null && WILDCARD_BIND_HOSTS.has(normalizeHostname(bindHost));
 }
 
 export type RejectReason = "host-not-allowed" | "origin-not-allowed";
@@ -53,7 +58,11 @@ export function allowedHosts(input: AllowedHostsInput): AllowedHosts {
   const web = new Set(LOOPBACK_HOSTS);
   if (input.bindHost !== null) {
     const bind = normalizeHostname(input.bindHost);
-    if (!WILDCARD_BIND_HOSTS.has(bind)) web.add(bind);
+    if (WILDCARD_BIND_HOSTS.has(bind)) {
+      for (const host of input.tailnetHosts ?? []) web.add(normalizeHostname(host));
+    } else {
+      web.add(bind);
+    }
   }
   const webHost = hostnameOfAddress(input.webAddress);
   if (webHost !== null) web.add(webHost);

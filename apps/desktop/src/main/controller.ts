@@ -35,7 +35,13 @@ import type { DiscoveryResult, FoundServer } from "../core/discovery.js";
 import { probeIdentity } from "../core/identity.js";
 import type { EnsureHooks, EnsureResult, LocalServer } from "../core/local-server.js";
 import { openLog } from "../core/open-log.js";
-import { connectAddress, reopenSaved, savedFromFound } from "../core/remote.js";
+import {
+  CONNECT_TIMEOUT_MS,
+  connectAddress,
+  isServerForbidden,
+  reopenSaved,
+  savedFromFound,
+} from "../core/remote.js";
 import type { SavedServer } from "../core/remote.js";
 import type { SettingsStore } from "../core/settings.js";
 import { RunnerEnrollmentFlow } from "../core/runner-enrollment.js";
@@ -431,7 +437,11 @@ export class Controller {
       return this.openDevServer(this.options.devServerUrl);
     this.mode = "remote";
     this.remote = { server: saved, reachable: false };
-    this.setView({ screen: "unreachable", name: saved.name, url: saved.url, checking: true });
+    this.setView(
+      this.view.screen === "host-blocked"
+        ? { ...this.view, checking: true }
+        : { screen: "unreachable", name: saved.name, url: saved.url, checking: true },
+    );
     const port = this.options.settings.read().discoveryPort ?? DEFAULT_SERVER_PORT;
     const result = await reopenSaved(saved, {
       probe: (origin, timeoutMs) => probeIdentity(origin, timeoutMs),
@@ -444,13 +454,38 @@ export class Controller {
       return;
     }
     this.remote = { server: saved, reachable: false };
-    this.setView({ screen: "unreachable", name: saved.name, url: saved.url, checking: false });
+    this.setView(
+      result.kind === "host-not-allowed"
+        ? {
+            screen: "host-blocked",
+            host: new URL(saved.url).hostname,
+            url: saved.url,
+            checking: false,
+          }
+        : { screen: "unreachable", name: saved.name, url: saved.url, checking: false },
+    );
     this.refreshMenus();
     this.remoteTimer ??= setInterval(() => {
-      if (this.view.screen === "unreachable" && !this.view.checking && this.remote !== undefined) {
+      const view = this.view;
+      const waiting = view.screen === "unreachable" || view.screen === "host-blocked";
+      if (waiting && !view.checking && this.remote !== undefined) {
         void this.openRemote(this.remote.server);
       }
     }, REMOTE_RETRY_MS);
+  }
+
+  private async showHostBlockedIfRejected(): Promise<void> {
+    const server = this.remote?.server;
+    if (this.mode !== "remote" || server === undefined) return;
+    const probed = await probeIdentity(server.url, CONNECT_TIMEOUT_MS);
+    if (this.remote?.server.instanceId !== server.instanceId) return;
+    if (
+      probed.kind === "ours" &&
+      probed.identity.instanceId === server.instanceId &&
+      probed.identity.webAccess !== "allowed"
+    ) {
+      await this.openRemote(server);
+    }
   }
 
   private stopRemoteRetry(): void {
@@ -527,6 +562,10 @@ export class Controller {
         return;
       event.preventDefault();
       if (opensOutsideApp(url)) void shell.openExternal(url);
+    });
+    window.webContents.on("did-navigate", (_event, url, httpResponseCode) => {
+      if (!isServerForbidden(httpResponseCode, url, this.serverUrl)) return;
+      void this.showHostBlockedIfRejected();
     });
     window.webContents.on("did-fail-load", (_event, code, _description, url, isMainFrame) => {
       if (!isMainFrame || code === -3 || this.isAppScreen(url)) return;

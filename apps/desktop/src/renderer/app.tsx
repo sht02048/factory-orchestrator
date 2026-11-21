@@ -102,6 +102,8 @@ export function Screen({ view }: { view: ViewState }) {
       return <EnterAddress checking={view.checking} error={view.error} />;
     case "unreachable":
       return <Unreachable name={view.name} url={view.url} checking={view.checking} />;
+    case "host-blocked":
+      return <HostBlocked host={view.host} url={view.url} checking={view.checking} />;
     case "runner-enrollment":
       return <RunnerEnrollment server={view.server} enrollment={view.enrollment} />;
   }
@@ -630,6 +632,29 @@ function Unreachable({ name, url, checking }: { name: string; url: string; check
           <li {...stylex.props(styles.checkItem)}>{t("checkDevice")}</li>
           <li {...stylex.props(styles.checkItem)}>{t("checkTailscale")}</li>
         </ul>
+      </section>
+      <CenteredActions>
+        <ActionButton variant="primary" disabled={checking} onClick={() => void api().retry()}>
+          {t("retry")}
+        </ActionButton>
+        <ActionButton onClick={() => void api().chooseRemote()}>{t("other")}</ActionButton>
+      </CenteredActions>
+    </Frame>
+  );
+}
+
+function HostBlocked({ host, url, checking }: { host: string; url: string; checking: boolean }) {
+  const t = useTranslations("screens.hostBlocked");
+  return (
+    <Frame width="status" centered>
+      <Mascot mood="worried" />
+      <Header
+        title={t("title", { host })}
+        summary={checking ? t("checking") : t("summary")}
+        centered
+      />
+      <section aria-label={t("address")} {...stylex.props(styles.infoBox)}>
+        <span {...stylex.props(styles.url)}>{url}</span>
       </section>
       <CenteredActions>
         <ActionButton variant="primary" disabled={checking} onClick={() => void api().retry()}>

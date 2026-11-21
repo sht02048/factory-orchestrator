@@ -103,10 +103,28 @@ async function addConnection(
 const noTailscale: WebhookSetupView = { funnel: null };
 const withTailscale: WebhookSetupView = {
   funnel: {
+    kind: "ready",
+    port: 8443,
+    portState: "free",
     command:
       "tailscale funnel --bg --https=8443 --set-path /api/webhooks/ http://127.0.0.1:3000/api/webhooks/",
     address: "https://server.example.ts.net:8443",
   },
+};
+const portsFull: WebhookSetupView = {
+  funnel: {
+    kind: "ports-full",
+    ports: [443, 8443, 10000].map((port) => ({
+      port,
+      uses: [`/ → http://127.0.0.1:${String(port)}`],
+      isPublic: port === 8443,
+      command: `tailscale funnel --bg --https=${String(port)} --set-path /api/webhooks/ http://127.0.0.1:3000/api/webhooks/`,
+      address: `https://server.example.ts.net:${String(port)}`,
+    })),
+  },
+};
+const boundToTailnet: WebhookSetupView = {
+  funnel: { kind: "bind-tailnet", bindHost: "100.64.0.10" },
 };
 
 function renderDetail(
@@ -302,6 +320,33 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
     expect(stepOf(html, 1)).toContain(`${settings.webhook.address.reverseProxy} 도움말`);
   });
 
+  it("Funnel 포트가 다 차면 쓰는 곳을 보이고 고르기 전에는 명령과 주소를 내지 않는다", async () => {
+    const f = fixture();
+    const id = await addConnection(f);
+    const html = renderDetail(await loadSettingsPage(f.context, workspace, now), id, portsFull);
+    const step = stepOf(html, 1);
+    expect(textOf(step)).toContain(settings.webhook.address.funnelFull);
+    expect(textOf(step)).toContain("/ → http://127.0.0.1:443");
+    expect(textOf(step)).toContain("8443 포트 · 인터넷에 공개 중");
+    expect(step.match(/type="radio"/g)).toHaveLength(3);
+    expect(textOf(step)).not.toContain("tailscale funnel --bg");
+    expect(step).not.toContain('value="https://server.example.ts.net');
+  });
+
+  it("WEB_HOST 가 이 기기의 tailnet 주소면 명령 대신 127.0.0.1 에서도 받게 하라고 안내한다", async () => {
+    const f = fixture();
+    const id = await addConnection(f);
+    const html = renderDetail(
+      await loadSettingsPage(f.context, workspace, now),
+      id,
+      boundToTailnet,
+    );
+    const step = textOf(stepOf(html, 1));
+    expect(step).toContain("100.64.0.10");
+    expect(step).toContain("127.0.0.1에서도 받게 해 주세요");
+    expect(step).not.toContain("tailscale funnel --bg");
+  });
+
   it("Tailscale 이 있으면 명령과 처음 허용 안내를 보이고 주소를 미리 채운다", async () => {
     const f = fixture();
     const id = await addConnection(f);
@@ -309,6 +354,7 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
     const step = stepOf(html, 1);
     expect(textOf(step)).toContain(settings.webhook.address.funnelTitle);
     expect(textOf(step)).toContain(settings.webhook.address.funnelFirst);
+    expect(textOf(step)).toContain("비어 있는 8443 포트를 골랐어요.");
     expect(step).toContain('href="https://tailscale.com/kb/1223/funnel"');
     expect(textOf(step)).toContain("--https=8443 --set-path /api/webhooks/");
     expect(step).toContain('value="https://server.example.ts.net:8443"');

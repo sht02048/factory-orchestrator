@@ -177,6 +177,7 @@ export function SettingsScreen({
           <SettingsSection id="server" title={t("sections.server")}>
             <SettingsGroup>
               <WebAddressRow addresses={page.install.addresses} actions={actions} />
+              <AutoAllowedRow hosts={page.install.addresses.autoAllowedHosts} />
               <PowerRow power={page.install.power} actions={actions} />
               <UpdatesRows />
             </SettingsGroup>
@@ -1024,6 +1025,20 @@ function WebAddressRow({
           />
         ) : null
       }
+    />
+  );
+}
+
+function AutoAllowedRow({ hosts }: { hosts: ReadonlyArray<string> }) {
+  const t = useTranslations("settings");
+  if (hosts.length === 0) return null;
+  const label = t("addresses.autoAllowed");
+  return (
+    <SettingsRow
+      label={label}
+      info={<InfoTip label={t("infoLabel", { label })} content={t("addresses.autoAllowedInfo")} />}
+      detail={hosts.join(", ")}
+      detailMono
     />
   );
 }

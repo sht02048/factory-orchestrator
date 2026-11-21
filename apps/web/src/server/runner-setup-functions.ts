@@ -20,6 +20,7 @@ import {
   getThisMac,
 } from "./adapters";
 import { getDatabase } from "./database";
+import { autoAllowedHosts } from "./request-access";
 
 export const getThisMacStatus = createServerFn({ method: "GET" }).handler(() =>
   getThisMac().status(),
@@ -95,6 +96,10 @@ export const saveEnrollmentWebAddress = createServerFn({ method: "POST" })
       context,
       { webAddress: data.webAddress, webhookAddress: webhookAddress ?? "" },
       new Date(),
-      { host: getRequestHeader("host") ?? null, bindHost: parseBootConfig(process.env).host },
+      {
+        host: getRequestHeader("host") ?? null,
+        bindHost: parseBootConfig(process.env).host,
+        tailnetHosts: autoAllowedHosts(),
+      },
     );
   });

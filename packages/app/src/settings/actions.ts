@@ -661,6 +661,7 @@ export type AddressSaveReason = "invalid-web-address" | "invalid-webhook-address
 export interface RequestOrigin {
   host: string | null;
   bindHost: string | null;
+  tailnetHosts?: ReadonlyArray<string>;
 }
 
 export function saveAddresses(
@@ -675,7 +676,12 @@ export function saveAddresses(
   if (webhookAddress === undefined) return { ok: false, reason: "invalid-webhook-address" };
   const current = hostnameOfHostHeader(from.host);
   if (current !== null) {
-    const next = allowedHosts({ bindHost: from.bindHost, webAddress, webhookAddress });
+    const next = allowedHosts({
+      bindHost: from.bindHost,
+      webAddress,
+      webhookAddress,
+      tailnetHosts: from.tailnetHosts ?? [],
+    });
     if (!next.web.has(current)) return { ok: false, reason: "locks-out" };
   }
   saveInstallAddresses(context.db, { webAddress, webhookAddress }, now);

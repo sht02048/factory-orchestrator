@@ -33,6 +33,7 @@ export type ViewState =
   | { screen: "find-servers"; port: number; searching: boolean; result: FindResult | null }
   | { screen: "enter-address"; checking: boolean; error: ConnectError | null }
   | { screen: "unreachable"; name: string; url: string; checking: boolean }
+  | { screen: "host-blocked"; host: string; url: string; checking: boolean }
   | { screen: "runner-enrollment"; server: string; enrollment: EnrollmentPhase };
 
 export interface NotificationSettingsApi {

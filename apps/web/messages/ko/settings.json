@@ -328,6 +328,8 @@
     "web": "다른 기기에서 열 주소",
     "webInfo": "노트북·휴대폰에서 이 서버를 여는 주소예요(예: Tailscale Serve 주소). 이 기계에서 http://127.0.0.1 로 연 화면은 주소와 상관없이 늘 열려요. 잘못 넣었으면 거기서 고치면 돼요.",
     "webNone": "이 기계에서만 열려요",
+    "autoAllowed": "자동으로 허용했어요",
+    "autoAllowedInfo": "서버를 모든 주소(0.0.0.0)에서 받게 띄워서, 이 기기의 tailnet 주소는 따로 넣지 않아도 열려요.",
     "webPlaceholder": "https://server.example.ts.net",
     "set": "정하기",
     "error": {
@@ -524,7 +526,19 @@
       "funnelFirst": "처음이면 Tailscale 관리 화면에서 HTTPS 인증서와 Funnel을 허용해야 해요.",
       "funnelFirstLink": "허용하는 법",
       "funnelRun": "이 서버 맥의 터미널에서 아래 명령을 한 번 실행해요. webhook 경로만 열고 나머지 화면은 열지 않아요.",
+      "funnelRunShared": "이 서버 맥의 터미널에서 아래 명령을 한 번 실행해요.",
       "funnelThen": "명령이 끝나면 확인하기를 눌러요.",
+      "funnelBindTailnet": "이 서버는 tailnet 주소 {host}에서만 받고 있어요. Tailscale이 자기 tailnet 주소로 넘기면 멈춰서 Funnel 명령을 쓸 수 없어요. WEB_HOST를 바꿔 127.0.0.1에서도 받게 해 주세요.",
+      "funnelPort": {
+        "free": "비어 있는 {port} 포트를 골랐어요.",
+        "ours": "{port} 포트에 열어 둔 webhook 경로를 그대로 써요.",
+        "unknown": "포트 사용 현황을 읽지 못해 {port} 포트를 넣었어요. 실행 전에 tailscale serve status로 비어 있는지 확인해 주세요."
+      },
+      "funnelFull": "Funnel이 쓸 수 있는 443·8443·10000 포트가 모두 쓰이고 있어요. 어느 포트를 쓸지 골라 주세요.",
+      "funnelPortName": "{port} 포트",
+      "funnelPortPublic": "{port} 포트 · 인터넷에 공개 중",
+      "funnelPortInUse": "쓰는 곳을 읽지 못했어요",
+      "funnelPortWarning": "이 명령을 실행하면 {port} 포트에서 지금 여는 것도 함께 인터넷에 공개돼요.",
       "commandLabel": "Tailscale Funnel 명령",
       "field": "주소",
       "placeholder": "https://hooks.example.com",
