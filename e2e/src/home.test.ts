@@ -293,6 +293,13 @@ describe("Dashboard 상세 패널(브라우저, 0100)", () => {
     await openHome(page);
     await card(page, "ACME-3").getByRole("button", { name: home.card.answer }).click();
     const text = page.getByRole("dialog").getByText(longChoice, { exact: true });
+    await page.getByRole("dialog").evaluate(async (dialog) => {
+      while (dialog.hasAttribute("data-starting-style")) {
+        await new Promise(requestAnimationFrame);
+      }
+      await new Promise(requestAnimationFrame);
+      await Promise.all(dialog.getAnimations().map((animation) => animation.finished));
+    });
     const box = await text.evaluate((el) => {
       const rect = el.getBoundingClientRect();
       const lineHeight = Number.parseFloat(getComputedStyle(el).lineHeight);

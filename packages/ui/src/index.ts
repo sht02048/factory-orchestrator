@@ -188,6 +188,17 @@ export {
   type SummaryStatus,
 } from "./components/status-pill";
 export {
+  MotionList,
+  MotionScope,
+  useMotionMove,
+  type MotionEnter,
+  type MotionHighlightRadius,
+  type MotionListProps,
+  type MotionMove,
+  type MotionScopeProps,
+} from "./components/motion";
+export { MOTION_BURST_LIMIT } from "./components/motion-plan";
+export {
   RowReason,
   RowTitle,
   Table,

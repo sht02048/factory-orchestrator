@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
-import type { ReactNode } from "react";
-import { colors, fontSize, fontWeight, radius, size, space } from "../tokens.stylex";
+import { useEffect, useRef, type ReactNode } from "react";
+import { colors, fontSize, fontWeight, motion, radius, size, space } from "../tokens.stylex";
+import { motionTokenMs, motionTokenEasing } from "./motion-token";
 
 export type RunStateStatus = "queued" | "running" | "waiting-for-input" | "paused" | "disconnected";
 export type SummaryStatus = "succeeded" | "failed" | "canceled";
@@ -61,14 +62,53 @@ export function statusTone(status: PillStatus): StatusTone {
 
 export interface StatusPillProps {
   status: PillStatus;
+  changeMotion?: boolean;
   children: ReactNode;
 }
 
-export function StatusPill({ status, children }: StatusPillProps) {
+const PILL_POP_KEYFRAMES: Keyframe[] = [
+  { transform: "scale(1)", offset: 0 },
+  { transform: "scale(1.06)", offset: 0.4 },
+  { transform: "scale(1)", offset: 1 },
+];
+
+function usePillPop(status: PillStatus, enabled: boolean) {
+  const pillRef = useRef<HTMLSpanElement>(null);
+  const shownStatus = useRef(status);
+  useEffect(() => {
+    if (shownStatus.current === status) return;
+    shownStatus.current = status;
+    const pill = pillRef.current;
+    if (
+      !enabled ||
+      pill === null ||
+      typeof pill.animate !== "function" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+    pill.animate(PILL_POP_KEYFRAMES, {
+      duration: motionTokenMs(motion.durationPillPop),
+      easing: motionTokenEasing(motion.easeOut),
+    });
+  }, [status, enabled]);
+  return pillRef;
+}
+
+export function StatusPill({ status, changeMotion = false, children }: StatusPillProps) {
   const tone = statusTone(status);
+  const pillRef = usePillPop(status, changeMotion);
   return (
-    <span data-status={status} data-tone={tone} {...stylex.props(styles.pill, pillTone[tone])}>
-      <span aria-hidden="true" {...stylex.props(styles.dot, dotTone[tone])} />
+    <span
+      ref={pillRef}
+      data-status={status}
+      data-tone={tone}
+      {...stylex.props(styles.pill, pillTone[tone], changeMotion && styles.colorChange)}
+    >
+      <span
+        aria-hidden="true"
+        {...stylex.props(styles.dot, dotTone[tone], changeMotion && styles.colorChange)}
+      />
       {children}
     </span>
   );
@@ -94,6 +134,11 @@ const styles = stylex.create({
     width: size.dot,
     height: size.dot,
     borderRadius: radius.full,
+  },
+  colorChange: {
+    transitionProperty: "background-color, color",
+    transitionDuration: motion.durationPillColor,
+    transitionTimingFunction: motion.easeOut,
   },
 });
 
