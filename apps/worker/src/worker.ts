@@ -133,6 +133,7 @@ export function createWorker(options: WorkerOptions): Worker {
     mailboxes: new Map(),
     unreachableUntil: new Map(),
     unmarkedAnswers: new Set(),
+    unwokenHumanChecks: new Set(),
     unmarkedDenials: new Set(),
     pendingEndings: new Map(),
     prPolledAt: new Map(),

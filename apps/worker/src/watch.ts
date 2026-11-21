@@ -127,7 +127,7 @@ async function watchRun(
   }
   if (progress.kind === "active") {
     tryWrite(context, run.id, () => recordRunQuestions(db, run.id, progress.questions));
-    await sendAnswers(context, run, runner, onRunner);
+    await sendAnswers(context, run, runner, onRunner, progress.activity);
     tryWrite(context, run.id, () =>
       inTransaction(db, () => {
         recordPermissionWaits(db, run.id, progress.permissionWaits);
@@ -480,8 +480,10 @@ async function sendAnswers(
   run: ActiveRun,
   runner: Runner,
   onRunner: RunOnRunner,
+  activity: Extract<RunProgress, { kind: "active" }>["activity"],
 ): Promise<void> {
-  const { db, logger, unmarkedAnswers } = context;
+  const { db, logger, unmarkedAnswers, unwokenHumanChecks } = context;
+  const agentStopped = activity?.kind === "turn-ended" || activity?.kind === "interrupted";
   for (const answer of listUnsentAnswers(db)) {
     if (answer.runId !== run.id) continue;
     const key = answerKey(run.id, answer.questionId);
@@ -501,11 +503,35 @@ async function sendAnswers(
       }
       unmarkedAnswers.add(key);
     }
+    if (answer.kind === "human-check" && agentStopped) {
+      const message = humanCheckWakeMessage(answer.answer);
+      try {
+        await runner.resumeAgent(onRunner, {
+          agent: run.agent,
+          message,
+          restartPrompt: message,
+          startIfGone: false,
+        });
+      } catch (error) {
+        logger.warn("run.answer_failed", {
+          runId: run.id,
+          questionId: answer.questionId,
+          error,
+        });
+        unwokenHumanChecks.add(key);
+        continue;
+      }
+    }
+    unwokenHumanChecks.delete(key);
     const marked = tryWrite(context, run.id, () =>
       markAnswerSent(db, { runId: run.id, questionId: answer.questionId }, context.now()),
     );
     if (marked !== undefined) unmarkedAnswers.delete(key);
   }
+}
+
+function humanCheckWakeMessage(answer: string): string {
+  return `운영자가 Human Check에 답했어요: ${answer.replace(/\s*\n\s*/g, " ")}`;
 }
 
 async function sendDenials(
@@ -558,9 +584,11 @@ function deniedPermissions(context: TickContext, run: ActiveRun): Set<Permission
 function answeredQuestions(context: TickContext, run: ActiveRun): Set<QuestionId> {
   const answered = sentQuestionIds(context.db, run.id);
   for (const answer of listUnsentAnswers(context.db)) {
+    const key = answerKey(run.id, answer.questionId);
     if (
       answer.runId === run.id &&
-      context.unmarkedAnswers.has(answerKey(run.id, answer.questionId))
+      context.unmarkedAnswers.has(key) &&
+      !context.unwokenHumanChecks.has(key)
     ) {
       answered.add(answer.questionId);
     }

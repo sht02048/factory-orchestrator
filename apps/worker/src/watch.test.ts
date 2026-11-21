@@ -159,6 +159,58 @@ describe("입력 기다림", () => {
     ]);
   });
 
+  it("Human Check 를 보내고 차례를 끝낸 에이전트는 답을 보낼 때 깨우고, 깨우지 못하면 Waiting for Input 에 두고 다시 깨운다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    const questionId = fake.ask(worktreeOf(run), {
+      kind: "human-check",
+      body: "PR #7 머지를 확인해 주세요",
+      at: h.now,
+    });
+    fake.stopWithoutReport(worktreeOf(run), { at: h.now });
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+
+    answerRunQuestion(
+      h.db,
+      {
+        runId: run.id,
+        questionId,
+        answer: "고쳐 주세요\n\n시험을 더해 주세요",
+        kind: "human-check",
+      },
+      h.now,
+    );
+    const resume = vi.spyOn(fake, "resumeAgent");
+    resume.mockRejectedValueOnce(new Error("terminal busy"));
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+    expect(listRunQuestions(h.db, run.id)[0]?.answer?.sentAt).toBeNull();
+
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).answers).toHaveLength(1);
+    expect(agentOf(run, runnerId).resumes.map((r) => r.message)).toEqual([
+      "운영자가 Human Check에 답했어요: 고쳐 주세요 시험을 더해 주세요",
+    ]);
+  });
+
+  it("일하는 에이전트에게 간 Human Check 답은 터미널로 다시 넣지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    const questionId = fake.ask(worktreeOf(run), { kind: "human-check", body: "확인", at: h.now });
+    fake.continueOnRunner(worktreeOf(run), h.now);
+    await worker.tick();
+    answerRunQuestion(
+      h.db,
+      { runId: run.id, questionId, answer: "확인했어요", kind: "human-check" },
+      h.now,
+    );
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).resumes).toEqual([]);
+  });
+
   it("같은 질문의 답은 데몬을 다시 띄워도 한 번만 보낸다", async () => {
     const { run, runnerId, worker } = await startOne();
     const questionId = h.runner(runnerId).ask(worktreeOf(run), { body: "계속할까요?" });

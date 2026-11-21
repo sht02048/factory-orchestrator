@@ -72,13 +72,18 @@ export function answerRunQuestion(
   });
 }
 
-export function listUnsentAnswers(
-  db: Database,
-): Array<{ runId: RunId; questionId: QuestionId; answer: string; answeredAt: Date }> {
+export function listUnsentAnswers(db: Database): Array<{
+  runId: RunId;
+  questionId: QuestionId;
+  kind: QuestionKind;
+  answer: string;
+  answeredAt: Date;
+}> {
   return db
     .select({
       runId: runQuestions.runId,
       questionId: runQuestions.questionId,
+      kind: runQuestions.kind,
       answer: runQuestions.answer,
       answeredAt: runQuestions.answeredAt,
     })

@@ -32,6 +32,7 @@ export interface TickContext {
   mailboxes: Map<RunnerId, MailboxRef>;
   unreachableUntil: Map<RunnerId, number>;
   unmarkedAnswers: Set<string>;
+  unwokenHumanChecks: Set<string>;
   unmarkedDenials: Set<string>;
   pendingEndings: Map<RunId, PendingEnding>;
   prPolledAt: Map<RunId, number>;

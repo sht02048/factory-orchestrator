@@ -55,7 +55,8 @@ orca orchestration send --type decision_gate --subject "<무엇을 확인할지>
 - 통신 규약은 `send --type decision_gate`로 보낸 뒤 `check --wait`로 기다리게 한다. ID 인자는 넣지 않는다.
 - `gate-create`는 쓰지 않는다. 태스크를 막는 별도 기록이고 ADR 0023이 정한 메시지 종류가 아니다.
 - 답은 질문과 같은 `reply` 경로로 보낸다. 러너 어댑터에 새 명령을 더하지 않는다.
+- 에이전트가 규약을 어기고 차례를 끝낸 채(`turn-ended`, `interrupted`) 답을 받으면, worker가 `reply` 뒤에 재개와 같은 터미널 입력으로 답을 한 번 더 넣어 깨운다. 깨우지 못하면 답을 보낸 것으로 적지 않아 런은 Waiting for Input에 남고 다음 차례에 다시 깨운다.
 
 ## 남은 위험
 
-에이전트가 규약을 어기고 차례를 끝내면 런은 Waiting for Input에 남고, 운영자가 답해도 에이전트가 깨어나지 않을 수 있다. 이 경우 운영자는 러너에서 에이전트를 다시 움직여야 한다.
+터미널 입력으로 깨우는 경로는 가짜 러너 시험으로만 확인했고 실제 Orca 에이전트에서는 돌려 보지 않았다.
