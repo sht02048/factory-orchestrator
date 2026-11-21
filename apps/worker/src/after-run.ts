@@ -17,6 +17,7 @@ import type { RunRecords, StoredRun, StoredRunner } from "@ganger/db";
 import {
   decideRunPrState,
   prReadDue,
+  pullRequestRecord,
   readRunPrState,
   rememberPrReadFailure,
   runLogContext,
@@ -225,10 +226,9 @@ function recordPullRequest(
   run: StoredRun,
   pr: PullRequestSnapshot,
 ): boolean | undefined {
-  const { id, displayId, url, ci } = pr;
   return tryWrite(context, run.id, () =>
     updateRunRecords(context.db, run.id, {
-      pullRequest: { id, displayId, url, ci, checkedAt: context.now() },
+      pullRequest: pullRequestRecord(pr, context.now()),
     }),
   );
 }
@@ -288,16 +288,7 @@ async function readUnreadPullRequest(
   const filled = tryWrite(context, run.id, () =>
     inTransaction(context.db, () => {
       updateRunRecords(context.db, run.id, {
-        pullRequest:
-          pr === null
-            ? null
-            : {
-                id: pr.id,
-                displayId: pr.displayId,
-                url: pr.url,
-                ci: pr.ci,
-                checkedAt: context.now(),
-              },
+        pullRequest: pr === null ? null : pullRequestRecord(pr, context.now()),
       });
       return fillUnreadPrState(context.db, run.id, prState);
     }),

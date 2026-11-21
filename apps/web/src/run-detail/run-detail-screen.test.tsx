@@ -1,4 +1,10 @@
-import { toPermissionRequestId, toQuestionId, toRunId, toRunnerId } from "@ganger/core";
+import {
+  toPermissionRequestId,
+  toPullRequestId,
+  toQuestionId,
+  toRunId,
+  toRunnerId,
+} from "@ganger/core";
 import {
   changeRunState,
   completeRunControlRequest,
@@ -166,6 +172,206 @@ describe("Run 상세 화면", () => {
       expect(pillsOf(html).map((pill) => pill.label)).toEqual([domain.summary.succeeded]);
     },
   );
+
+  it("열린 PR 의 검사·충돌·뒤처짐을 PR 구역에 줄로 보이고 요약 결과는 그대로다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-42", 400);
+    walk(db, id, 400, [
+      startedOn("ACME-42"),
+      { to: "ended", agentResult: "reported-success", prState: "open" },
+    ]);
+    updateRunRecords(db, id, {
+      pullRequest: {
+        id: toPullRequestId("12"),
+        displayId: "#12",
+        url: "https://code.example.com/acme/web/pull/12",
+        ci: "failure",
+        checkedAt: minutes(403),
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 4,
+          failedCount: 2,
+          failedChecks: ["lint", "e2e"],
+          checksTruncated: false,
+          conflict: true,
+          behindBy: 3,
+        },
+      },
+    });
+    const html = render(page(db, id));
+    expect(valueOf(html, runJson.props.ci)).toBe(
+      `${runJson.ci.failure} ${runJson.props.failedChecks
+        .replace("{total}", "4")
+        .replace("{failed}", "2")
+        .replace("{names}", "lint, e2e")}`,
+    );
+    expect(valueOf(html, runJson.props.conflict)).toBe(runJson.props.hasConflict);
+    expect(valueOf(html, runJson.props.behind)).toBe(
+      runJson.props.behindBy.replace("{count}", "3"),
+    );
+    expect(valueOf(html, runJson.props.prReadAt)).toBeDefined();
+    expect(pillsOf(html).map((pill) => pill.label)).toEqual([domain.summary.succeeded]);
+    expect(text(html)).not.toContain("CI 다시");
+  });
+
+  it("도는 런의 열린 PR 은 보이고, 다시 읽지 않게 된 끝난 런은 지난 값을 보이지 않는다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-44", 400);
+    walk(db, id, 400, [startedOn("ACME-44")]);
+    updateRunRecords(db, id, {
+      pullRequest: {
+        id: toPullRequestId("14"),
+        displayId: "#14",
+        url: "https://code.example.com/acme/web/pull/14",
+        ci: "failure",
+        checkedAt: minutes(403),
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 4,
+          failedCount: 1,
+          failedChecks: ["lint"],
+          checksTruncated: false,
+          conflict: true,
+          behindBy: 3,
+        },
+      },
+    });
+    expect(valueOf(render(page(db, id)), runJson.props.conflict)).toBe(runJson.props.hasConflict);
+
+    walk(db, id, 410, [{ to: "ended", agentResult: "reported-success", prState: "open" }]);
+    expect(valueOf(render(page(db, id)), runJson.props.conflict)).toBe(runJson.props.hasConflict);
+
+    updateRunRecords(db, id, { worktreeRemovedAt: minutes(420) });
+    expect(valueOf(render(page(db, id)), runJson.props.conflict)).toBeUndefined();
+  });
+
+  it("같은 커밋에서 PR 정보만 못 읽으면 지난 검사 결과 대신 새 CI 값을 따른다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-46", 400);
+    walk(db, id, 400, [startedOn("ACME-46")]);
+    const pullRequest = {
+      id: toPullRequestId("16"),
+      displayId: "#16",
+      url: "https://code.example.com/acme/web/pull/16",
+      headCommit: "abc",
+    };
+    updateRunRecords(db, id, {
+      pullRequest: {
+        ...pullRequest,
+        ci: "failure",
+        checkedAt: minutes(403),
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 4,
+          failedCount: 1,
+          failedChecks: ["lint"],
+          checksTruncated: false,
+          conflict: true,
+          behindBy: 3,
+        },
+      },
+    });
+    updateRunRecords(db, id, {
+      pullRequest: { ...pullRequest, ci: "success", checkedAt: minutes(404), signals: null },
+    });
+    expect(found(db, id).pullRequest?.signals).toMatchObject({
+      ciFailed: false,
+      checkTotal: null,
+      failedCount: 0,
+      failedChecks: [],
+      conflict: true,
+      behindBy: 3,
+    });
+  });
+
+  it("같은 커밋에서 CI 를 아예 못 읽으면 지난 CI 실패 표시를 둔다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-47", 400);
+    walk(db, id, 400, [startedOn("ACME-47")]);
+    const pullRequest = {
+      id: toPullRequestId("17"),
+      displayId: "#17",
+      url: "https://code.example.com/acme/web/pull/17",
+      headCommit: "abc",
+    };
+    updateRunRecords(db, id, {
+      pullRequest: {
+        ...pullRequest,
+        ci: "failure",
+        checkedAt: minutes(403),
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 4,
+          failedCount: 1,
+          failedChecks: ["lint"],
+          checksTruncated: false,
+          conflict: false,
+          behindBy: 0,
+        },
+      },
+    });
+    updateRunRecords(db, id, {
+      pullRequest: { ...pullRequest, ci: "unavailable", checkedAt: minutes(404), signals: null },
+    });
+    expect(found(db, id).pullRequest?.signals).toMatchObject({ ciFailed: true, checkTotal: null });
+  });
+
+  it("PR 정보를 못 읽은 도는 런도 Actions 로 읽은 CI 실패는 표시한다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-45", 400);
+    walk(db, id, 400, [startedOn("ACME-45")]);
+    updateRunRecords(db, id, {
+      pullRequest: {
+        id: toPullRequestId("15"),
+        displayId: "#15",
+        url: "https://code.example.com/acme/web/pull/15",
+        ci: "failure",
+        checkedAt: minutes(403),
+        signals: null,
+      },
+    });
+    expect(found(db, id).pullRequest?.signals).toMatchObject({ ciFailed: true, conflict: null });
+  });
+
+  it("병합된 PR 에는 충돌과 뒤처짐 줄을 보이지 않는다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-43", 400);
+    walk(db, id, 400, [
+      startedOn("ACME-43"),
+      { to: "ended", agentResult: "reported-success", prState: "merged" },
+    ]);
+    updateRunRecords(db, id, {
+      pullRequest: {
+        id: toPullRequestId("13"),
+        displayId: "#13",
+        url: "https://code.example.com/acme/web/pull/13",
+        ci: "success",
+        checkedAt: minutes(403),
+        signals: {
+          open: false,
+          headCommit: "abc",
+          ciFailed: false,
+          checkTotal: 4,
+          failedCount: 0,
+          failedChecks: [],
+          checksTruncated: false,
+          conflict: null,
+          behindBy: null,
+        },
+      },
+    });
+    const html = render(page(db, id));
+    expect(valueOf(html, runJson.props.conflict)).toBeUndefined();
+    expect(valueOf(html, runJson.props.behind)).toBeUndefined();
+  });
 
   it("제목은 할당 때 저장한 티켓 제목이고, 회색 줄에 키를 함께 보인다(ADR 0010 9번, 0064)", () => {
     const { db } = seedDatabase();

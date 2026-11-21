@@ -37,6 +37,11 @@
   "noRunnerEnded": "러너 없이 끝남",
   "metaSeparator": " · ",
   "prWithState": "{pr} {state}",
+  "prMarks": {
+    "ciFailed": "CI 실패",
+    "conflict": "충돌",
+    "behind": "base보다 {count}커밋 뒤"
+  },
   "cancelling": "취소 중",
   "ended": {
     "partial": "끝난 런은 최근 {count}개까지 보여요. 그보다 오래된 런은 처리할 일만 보여요.",

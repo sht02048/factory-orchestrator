@@ -238,6 +238,38 @@ describe("ganger mcp 서버", () => {
     });
   });
 
+  it("런 읽기에 PR 의 검사·충돌·뒤처짐을 함께 주고 요약 결과는 그대로다 (0150)", async () => {
+    seeded.db.$client
+      .prepare(
+        `UPDATE runs SET pr_state = 'open', pr_read_error = NULL, later_pr_state = NULL,
+          later_pr_state_at = NULL, pr_id = '12', pr_display_id = '#12',
+          pr_url = 'https://code.example.com/acme/web/pull/12', pr_ci_state = 'failure',
+          pr_checked_at = 1000, pr_signals_read_at = 1000, worktree_removed_at = NULL,
+          worktree_kept = NULL, pr_signals = '{"open":true,"headCommit":"abc","ciFailed":true,"checkTotal":4,"failedCount":1,"failedChecks":["lint"],"checksTruncated":false,"conflict":true,"behindBy":3}'
+          WHERE id = ?`,
+      )
+      .run(seeded.ended);
+    const signals = {
+      ciFailed: true,
+      checkTotal: 4,
+      failedCount: 1,
+      conflict: true,
+      behindBy: 3,
+      [EXTERNAL_FIELD]: { failedChecks: ["lint"] },
+    };
+    const detail = await call("get_run", { runId: seeded.ended });
+    expect(detail.json).toMatchObject({
+      run: { status: { summary: "succeeded" }, pullRequest: { ci: "failure", signals } },
+    });
+    const list = z
+      .object({ runs: z.array(z.object({ id: z.string() }).passthrough()) })
+      .parse((await call("list_runs")).json);
+    expect(list.runs.find((run) => run.id === seeded.ended)).toMatchObject({
+      summary: "succeeded",
+      pullRequest: { signals },
+    });
+  });
+
   it("없는 런·러너는 오류로 알린다", async () => {
     expect((await call("get_run", { runId: "nope" })).isError).toBe(true);
     const runner = await call("get_runner", { runner: "nope" });

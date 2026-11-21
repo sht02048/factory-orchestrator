@@ -228,6 +228,7 @@ describe("loadRunDetail", () => {
       displayId: "#2",
       url: "https://example.com/acme/web/pull/2",
       ci: "success",
+      signals: null,
     });
     expect(toCiView("failure")).toBe("failure");
     expect(toCiView("unavailable")).toBe("unavailable");

@@ -1,4 +1,10 @@
-import { toAgentId, toRunnerProjectId, toTicketKey, toTrackerProjectId } from "@ganger/core";
+import {
+  toAgentId,
+  toPullRequestId,
+  toRunnerProjectId,
+  toTicketKey,
+  toTrackerProjectId,
+} from "@ganger/core";
 import { assignRun, changeRunState, requestRunCancel, updateRunRecords } from "@ganger/db";
 import type { Database } from "@ganger/db";
 import { describe, expect, it } from "vitest";
@@ -487,6 +493,53 @@ describe("Runs 화면", () => {
       `${runsJson.panel.reason.succeeded} ${runsJson.panel.prUnread["no-access"]}`,
     );
     expect(text).toContain(domain.prState.unknown);
+  });
+
+  it("열린 PR 의 CI 실패·충돌·뒤처짐을 행에 보이고 요약 결과는 그대로다 (0150)", () => {
+    const { db, ids } = seedDatabase();
+    const id = ids.get("ACME-10");
+    if (id === undefined) throw new Error("seed");
+    expect(
+      changeRunState(
+        db,
+        id,
+        { to: "ended", agentResult: "reported-success", prState: "open" },
+        minutes(110),
+      ).ok,
+    ).toBe(true);
+    const pullRequest = {
+      id: toPullRequestId("12"),
+      displayId: "#12",
+      url: "https://code.example.com/acme/web/pull/12",
+      ci: "failure",
+      checkedAt: minutes(111),
+    };
+    updateRunRecords(db, id, {
+      pullRequest: {
+        ...pullRequest,
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 4,
+          failedCount: 1,
+          failedChecks: ["lint"],
+          checksTruncated: false,
+          conflict: true,
+          behindBy: 3,
+        },
+      },
+    });
+    const html = render(loadRunsPage(db, undefined, now));
+    const row = html.split('role="option"').find((chunk) => chunk.includes(">ACME-10<"));
+    const marks = row?.slice(row.indexOf("data-pr-marks")).replace(/<[^>]+>/g, " ");
+    expect(marks).toContain(runsJson.prMarks.ciFailed);
+    expect(marks).toContain(runsJson.prMarks.conflict);
+    expect(marks).toContain(runsJson.prMarks.behind.replace("{count}", "3"));
+    expect(row).toContain(domain.summary.succeeded);
+
+    updateRunRecords(db, id, { laterPrState: { state: "merged", at: minutes(112) } });
+    expect(render(loadRunsPage(db, undefined, now))).not.toContain("data-pr-marks");
   });
 
   it("PR 정보를 읽지 못한 Failed 런도 제 이유 곁에 못 읽은 이유를 보인다 (0145)", () => {
