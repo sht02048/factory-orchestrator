@@ -195,6 +195,46 @@ describe("입력 기다림", () => {
     ]);
   });
 
+  it("활동을 알 수 없으면 Human Check 답을 보낼 때 에이전트를 깨운다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const questionId = h
+      .runner(runnerId)
+      .ask(worktreeOf(run), { kind: "human-check", body: "확인", at: h.now });
+    await worker.tick();
+    answerRunQuestion(
+      h.db,
+      { runId: run.id, questionId, answer: "확인했어요", kind: "human-check" },
+      h.now,
+    );
+    await worker.tick();
+    expect(stateOf(run)).toBe("running");
+    expect(agentOf(run, runnerId).resumes).toHaveLength(1);
+  });
+
+  it("깨우기가 다른 에이전트를 찾기만 했으면 답을 보낸 것으로 적지 않는다", async () => {
+    const { run, runnerId, worker } = await startOne();
+    const fake = h.runner(runnerId);
+    const questionId = fake.ask(worktreeOf(run), {
+      kind: "human-check",
+      body: "확인",
+      at: h.now,
+    });
+    await worker.tick();
+    answerRunQuestion(
+      h.db,
+      { runId: run.id, questionId, answer: "확인했어요", kind: "human-check" },
+      h.now,
+    );
+    vi.spyOn(fake, "resumeAgent").mockResolvedValueOnce({
+      agentRef: agentOf(run, runnerId).started.agentRef,
+      restarted: true,
+    });
+    await worker.tick();
+    expect(stateOf(run)).toBe("waiting-for-input");
+    expect(listRunQuestions(h.db, run.id)[0]?.answer?.sentAt).toBeNull();
+    expect(agentOf(run, runnerId).answers).toHaveLength(1);
+  });
+
   it("일하는 에이전트에게 간 Human Check 답은 터미널로 다시 넣지 않는다", async () => {
     const { run, runnerId, worker } = await startOne();
     const fake = h.runner(runnerId);

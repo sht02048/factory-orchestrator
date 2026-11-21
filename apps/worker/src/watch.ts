@@ -483,7 +483,7 @@ async function sendAnswers(
   activity: Extract<RunProgress, { kind: "active" }>["activity"],
 ): Promise<void> {
   const { db, logger, unmarkedAnswers, unwokenHumanChecks } = context;
-  const agentStopped = activity?.kind === "turn-ended" || activity?.kind === "interrupted";
+  const agentMayBeStopped = activity?.kind !== "working";
   for (const answer of listUnsentAnswers(db)) {
     if (answer.runId !== run.id) continue;
     const key = answerKey(run.id, answer.questionId);
@@ -503,15 +503,16 @@ async function sendAnswers(
       }
       unmarkedAnswers.add(key);
     }
-    if (answer.kind === "human-check" && agentStopped) {
+    if (answer.kind === "human-check" && agentMayBeStopped) {
       const message = humanCheckWakeMessage(answer.answer);
       try {
-        await runner.resumeAgent(onRunner, {
+        const resumed = await runner.resumeAgent(onRunner, {
           agent: run.agent,
           message,
           restartPrompt: message,
           startIfGone: false,
         });
+        if (resumed.restarted) throw new Error("the answer did not reach the run's agent");
       } catch (error) {
         logger.warn("run.answer_failed", {
           runId: run.id,

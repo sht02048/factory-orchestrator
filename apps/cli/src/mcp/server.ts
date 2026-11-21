@@ -179,7 +179,7 @@ export function createMcpServer(context: McpContext): GangerMcp {
     {
       title: "Dashboard summary",
       description:
-        'The Dashboard of a workspace: runs that need the operator ("todo", grouped as answer and stopped), running and queued runs, runners with used and total capacity and their highest provider usage and reached limits, and runs that ended today.',
+        'The Dashboard of a workspace: runs that need the operator ("todo", grouped as check, answer and stopped), running and queued runs, runners with used and total capacity and their highest provider usage and reached limits, and runs that ended today.',
       inputSchema: { workspace: workspaceArg },
       annotations: READ_ONLY,
     },
