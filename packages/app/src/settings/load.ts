@@ -1,5 +1,12 @@
 import { AdapterError, toTrackerConnectionId } from "@ganger/core";
-import type { AdapterRegistry, RunnerId, Tracker, TrackerConnectionId } from "@ganger/core";
+import type {
+  AdapterRegistry,
+  RunnerId,
+  Tracker,
+  TrackerConnectionId,
+  WorkspaceBrief,
+} from "@ganger/core";
+import { ASK_GUIDE } from "@ganger/runner-orca/agent-brief";
 import {
   getAutoAssignLabel,
   getInstallSettings,
@@ -282,7 +289,7 @@ function currentWorkspace<W extends { id: WorkspaceId; name: string }>(
 
 function workspaceDbSettings(
   db: Database,
-  workspace: { id: WorkspaceId; name: string; maxRunMs: number },
+  workspace: { id: WorkspaceId; name: string; maxRunMs: number; brief: WorkspaceBrief },
   connections: ReadonlyArray<StoredTrackerConnection>,
   workspaces: ReadonlyArray<{ id: WorkspaceId; name: string }>,
 ): WorkspaceDbSettings {
@@ -297,6 +304,8 @@ function workspaceDbSettings(
       id: workspace.id,
       name: workspace.name,
       maxRunMinutes: Math.round(workspace.maxRunMs / 60_000),
+      brief: workspace.brief,
+      agentProtocol: ASK_GUIDE,
     },
     connections: connections.map(toChoice),
     ownership: projectOwnership(db, workspace.id, workspaces),

@@ -10,6 +10,7 @@
     "@ganger/app": "workspace:*",
     "@ganger/core": "workspace:*",
     "@ganger/db": "workspace:*",
+    "@ganger/runner-orca": "workspace:*",
     "@ganger/web": "workspace:*",
     "@ganger/worker": "workspace:*",
     "playwright-core": "1.65.0",

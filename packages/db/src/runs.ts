@@ -67,6 +67,7 @@ export interface RunRecords {
   startFailures: number;
   startError: string | null;
   reportBody: string | null;
+  agentBrief: string | null;
   pullRequest: {
     id: PullRequestId;
     displayId: string;
@@ -176,6 +177,7 @@ function toRunRecords(row: RunRow): RunRecords {
     startFailures: row.startFailures,
     startError: row.startError,
     reportBody: row.reportBody,
+    agentBrief: row.agentBrief,
     pullRequest:
       row.prId === null || row.prCheckedAt === null
         ? null
@@ -625,11 +627,16 @@ export function runningSince(db: Database, runId: RunId): Date | null {
   return null;
 }
 
-export function recordStartRequested(db: Database, runId: RunId, now: Date = new Date()): boolean {
+export function recordStartRequested(
+  db: Database,
+  runId: RunId,
+  now: Date = new Date(),
+  agentBrief: string | null = null,
+): boolean {
   return (
     db
       .update(runs)
-      .set({ startRequestedAt: now })
+      .set({ startRequestedAt: now, agentBrief })
       .where(and(eq(runs.id, runId), eq(runs.state, "queued"), isNull(runs.startRequestedAt)))
       .run().changes > 0
   );
@@ -728,6 +735,7 @@ export function updateRunRecords(
       | "startFailures"
       | "startError"
       | "reportBody"
+      | "agentBrief"
       | "prReadError"
       | "worktreeRemoveRequestedAt"
     >

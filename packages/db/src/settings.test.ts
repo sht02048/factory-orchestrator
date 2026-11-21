@@ -2,8 +2,11 @@ import { toLabelId, toRunnerProjectId, toTicketKey, toTrackerProjectId } from "@
 import { describe, expect, it } from "vitest";
 import { toWorkspaceId } from "./ids.js";
 import { assignRun, changeRunState, getRun, listRuns } from "./runs.js";
+import { latestChangeSeq } from "./change-events.js";
 import {
   getInstallSettings,
+  getWorkspaceBrief,
+  listWorkspaces,
   getMapping,
   listRunnerSnapshots,
   listRunners,
@@ -16,6 +19,7 @@ import {
   saveInstallAddresses,
   saveMapping,
   saveWorkspace,
+  saveWorkspaceBrief,
   saveWorkspaceTrackerProject,
 } from "./settings.js";
 import {
@@ -430,5 +434,49 @@ describe("Linear가 이 서버에 닿을 주소의 확인 시각(0130)", () => {
       later,
     );
     expect(getInstallSettings(db).webhookAddressCheckedAt).toBeNull();
+  });
+});
+
+describe("Workspace 앞뒤 지시", () => {
+  it("새 Workspace는 앞뒤 지시가 비어 있다", () => {
+    const db = seededDatabase();
+    expect(getWorkspaceBrief(db, workspaceId)).toEqual({ before: "", after: "" });
+    expect(listWorkspaces(db)[0]?.brief).toEqual({ before: "", after: "" });
+  });
+
+  it("저장한 앞뒤 지시를 줄바꿈 그대로 읽는다", () => {
+    const db = seededDatabase();
+    const brief = { before: "- Read AGENTS.md\n- Use pnpm", after: "Open a PR to develop." };
+    expect(saveWorkspaceBrief(db, { id: workspaceId, brief })).toBe(true);
+    expect(getWorkspaceBrief(db, workspaceId)).toEqual(brief);
+    expect(listWorkspaces(db).find((w) => w.id === workspaceId)?.brief).toEqual(brief);
+  });
+
+  it("이름이나 최대 실행 시간을 저장해도 앞뒤 지시는 그대로 둔다", () => {
+    const db = seededDatabase();
+    const brief = { before: "Before.", after: "After." };
+    saveWorkspaceBrief(db, { id: workspaceId, brief });
+    saveWorkspace(db, { id: workspaceId, name: "Renamed", maxRunMs: 60_000 });
+    expect(getWorkspaceBrief(db, workspaceId)).toEqual(brief);
+  });
+
+  it("없는 Workspace에는 저장하지 않는다", () => {
+    const db = seededDatabase();
+    expect(
+      saveWorkspaceBrief(db, {
+        id: toWorkspaceId("ws-missing"),
+        brief: { before: "x", after: "" },
+      }),
+    ).toBe(false);
+    expect(getWorkspaceBrief(db, toWorkspaceId("ws-missing"))).toBeNull();
+  });
+
+  it("같은 값을 다시 저장하면 변경 기록을 남기지 않는다", () => {
+    const db = seededDatabase();
+    const brief = { before: "Before.", after: "" };
+    saveWorkspaceBrief(db, { id: workspaceId, brief });
+    const before = latestChangeSeq(db);
+    saveWorkspaceBrief(db, { id: workspaceId, brief });
+    expect(latestChangeSeq(db)).toBe(before);
   });
 });

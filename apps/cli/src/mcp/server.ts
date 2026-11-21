@@ -290,7 +290,7 @@ export function createMcpServer(context: McpContext): GangerMcp {
     {
       title: "Run detail",
       description:
-        'One run: its state, pending question, pull request and CI, timeline, the last stored lines of its log, and other runs of the same ticket. An ended run\'s "summary" is "succeeded", "failed", or "canceled", set by the agent\'s report alone; the pull request state is separate information. "keptWorktree" says why the worktree was left on the runner.',
+        'One run: its state, pending question, pull request and CI, timeline, the last stored lines of its log, the whole agent brief it was started with ("brief"), and other runs of the same ticket. An ended run\'s "summary" is "succeeded", "failed", or "canceled", set by the agent\'s report alone; the pull request state is separate information. "keptWorktree" says why the worktree was left on the runner.',
       inputSchema: { runId: z.string().min(1).max(200) },
       annotations: READ_ONLY,
     },
@@ -363,7 +363,7 @@ export function createMcpServer(context: McpContext): GangerMcp {
     {
       title: "Settings",
       description:
-        "Settings of the workspace and of this installation. Secret values are never returned: tracker keys, webhook secrets, and the GitHub token show only whether they are set, and runners show their last check.",
+        'Settings of the workspace and of this installation. Secret values are never returned: tracker keys, webhook secrets, and the GitHub token show only whether they are set, and runners show their last check. The workspace\'s "brief" holds what the operator adds before and after the ticket in every agent brief; "agentProtocol" is how Ganger tells agents to talk to it.',
       inputSchema: { workspace: workspaceArg },
       annotations: READ_ONLY_TRACKER,
     },

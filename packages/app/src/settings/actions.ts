@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   AUTO_ASSIGN_LABEL_NAME,
   AdapterError,
+  WORKSPACE_BRIEF_MAX_LENGTH,
   findLabelNamed,
   toAgentId,
   toLabelId,
@@ -11,6 +12,7 @@ import {
   toTrackerConnectionId,
   toTrackerProjectId,
   toTrackerStateId,
+  workspaceBriefLength,
 } from "@ganger/core";
 import type { RunnerId, RunnerKind, TrackerConnectionId } from "@ganger/core";
 import {
@@ -41,6 +43,7 @@ import {
   saveRunnerCapacity,
   saveTrackerConnection,
   saveWorkspace,
+  saveWorkspaceBrief,
   saveWorkspaceTrackerProject,
   toCodeHostConnectionId,
 } from "@ganger/db";
@@ -95,6 +98,29 @@ export function saveGeneral(
     maxRunMs: input.maxRunMinutes * 60_000,
   });
   return { ok: true };
+}
+
+const workspaceBriefText = z
+  .string()
+  .refine((value) => workspaceBriefLength(value) <= WORKSPACE_BRIEF_MAX_LENGTH);
+
+export const briefInput = z.object({
+  ws: id,
+  before: workspaceBriefText,
+  after: workspaceBriefText,
+});
+
+export function saveBrief(
+  context: SettingsContext,
+  input: z.infer<typeof briefInput>,
+): SaveResult<"not-found"> {
+  const workspaceId = workspaceOf(context, input.ws);
+  if (workspaceId === null) return { ok: false, reason: "not-found" };
+  const saved = saveWorkspaceBrief(context.db, {
+    id: workspaceId,
+    brief: { before: input.before.trim(), after: input.after.trim() },
+  });
+  return saved ? { ok: true } : { ok: false, reason: "not-found" };
 }
 
 export const trackerProjectInput = z.object({

@@ -1,6 +1,8 @@
 import {
   ACTIVE_RUN_STATES,
+  EMPTY_WORKSPACE_BRIEF,
   canRunnerTake,
+  composeAgentBrief,
   decideStartFailure,
   MAX_START_RETRIES,
   planQueue,
@@ -23,6 +25,7 @@ import {
   getMapping,
   getRun,
   getRunWithRecords,
+  getWorkspaceBrief,
   hasPendingCancelRequest,
   inTransaction,
   listPendingCancelRequests,
@@ -438,8 +441,14 @@ async function startOnRunner(
       );
       return endCouldNotStart(context, run);
     }
+    const brief = composeAgentBrief({
+      workspace: getWorkspaceBrief(db, run.workspaceId) ?? EMPTY_WORKSPACE_BRIEF,
+      ticket: prompt.text,
+      protocol: runner.agentProtocol,
+    });
     if (
-      tryWrite(context, run.id, () => recordStartRequested(db, run.id, context.now())) === undefined
+      tryWrite(context, run.id, () => recordStartRequested(db, run.id, context.now(), brief)) ===
+      undefined
     ) {
       return { kind: "blocked" };
     }
@@ -449,7 +458,7 @@ async function startOnRunner(
       worktreeName: run.worktreeName,
       agent: run.agent,
       ...(run.model === null ? {} : { model: run.model }),
-      prompt: prompt.text,
+      brief,
       ticket: prompt.ticket,
     });
     return { kind: "started", started };

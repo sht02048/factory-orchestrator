@@ -96,6 +96,7 @@ const page = (f: Fixture): Promise<SettingsPage> => loadSettingsPage(f.context, 
 const reject = () => Promise.reject(new Error("unused"));
 const noopActions: OnboardingActions = {
   saveGeneral: reject,
+  saveBrief: reject,
   addProject: reject,
   removeProject: reject,
   saveMapping: reject,
@@ -673,7 +674,13 @@ describe("다섯 단계를 마치기", () => {
       labels: { ok: true as const, items: [] },
     };
     const workspace = {
-      general: { id: toWorkspaceId("ws-1"), name: "Acme", maxRunMinutes: 120 },
+      general: {
+        id: toWorkspaceId("ws-1"),
+        name: "Acme",
+        maxRunMinutes: 120,
+        brief: { before: "", after: "" },
+        agentProtocol: "",
+      },
       trackerProjects: [],
       bound: [bound],
       labels: [

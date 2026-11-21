@@ -21,11 +21,13 @@ import {
   openDatabase,
 } from "@ganger/db";
 import type { Database } from "@ganger/db";
+import { ASK_GUIDE } from "@ganger/runner-orca/agent-brief";
 import { createWorker } from "@ganger/worker";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RUNNER_PROJECTS } from "./fixtures.js";
 import { hydrateWorld } from "./hydrate.js";
 import { HISTORY_DAYS, seedDemo } from "./seed.js";
+import { DEMO_WORKSPACE_BRIEF } from "./values.js";
 import { DemoWorld } from "./world.js";
 
 const now = new Date();
@@ -62,6 +64,22 @@ describe("seedDemo", () => {
       expect(project.inProgressStateId).not.toBeNull();
       expect(getAutoAssignLabel(db, project.workspaceId, project.connection)).not.toBeNull();
     }
+  });
+
+  it("첫 Workspace에 앞뒤 지시 예시를 두고, 시작한 런에는 받은 지시서를 남긴다 (0146)", async () => {
+    await seedDemo(db, box, new DemoWorld(() => now), now);
+    const [first, second] = listWorkspaces(db);
+    expect(first?.brief).toEqual(DEMO_WORKSPACE_BRIEF);
+    expect(second?.brief).toEqual({ before: "", after: "" });
+    const withRecords = listRunsWithRecords(db);
+    const started = withRecords.filter(({ run }) => run.state !== "queued");
+    expect(started.length).toBeGreaterThan(0);
+    for (const { records } of started) expect(records.agentBrief).toContain(ASK_GUIDE);
+    const inFirst = started.filter(({ run }) => run.workspaceId === first?.id);
+    expect(inFirst.length).toBeGreaterThan(0);
+    expect(
+      inFirst.every(({ records }) => records.agentBrief?.startsWith(DEMO_WORKSPACE_BRIEF.before)),
+    ).toBe(true);
   });
 
   it("런의 모든 상태와 요약 결과 셋, 질문·권한 대기, 남긴 워크트리를 만든다", async () => {

@@ -61,6 +61,7 @@ import {
 } from "./settings-screen";
 import type { UnsavedGuard } from "./navigation-guard";
 import { UpdatesRows } from "./updates-panel";
+import { WorkspaceBriefRow } from "./workspace-brief";
 
 export const SETTINGS_SECTIONS = [
   "workspace",
@@ -287,6 +288,11 @@ function WorkspaceRows({
     <SettingsGroup>
       <WorkspaceNameRow workspace={workspace} actions={actions} />
       <MaxRunRow workspace={workspace} actions={actions} />
+      <WorkspaceBriefRow
+        workspace={workspace}
+        actions={actions}
+        changeButton={(edit, label) => <ChangeButton edit={edit} label={label} />}
+      />
     </SettingsGroup>
   );
 }

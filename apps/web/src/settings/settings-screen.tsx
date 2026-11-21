@@ -58,6 +58,7 @@ export interface SettingsActions {
     name: string;
     maxRunMinutes: number;
   }) => Promise<ActionResult>;
+  saveBrief: (input: { ws: string; before: string; after: string }) => Promise<ActionResult>;
   addProject: (input: ProjectRef & { name: string }) => Promise<ActionResult>;
   removeProject: (input: ProjectRef) => Promise<ActionResult>;
   saveMapping: (

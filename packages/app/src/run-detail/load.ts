@@ -85,6 +85,7 @@ export function loadRunDetail(db: Database, runId: string, now: Date): RunDetail
         ? null
         : { displayId: pr.displayId, url: pr.url, ci: toCiView(pr.ci) },
     report: records.reportBody,
+    brief: records.agentBrief,
     startError:
       run.state === "ended" && run.agentResult === "could-not-start" ? records.startError : null,
     cancelPending:

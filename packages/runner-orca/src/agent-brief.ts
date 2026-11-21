@@ -7,7 +7,3 @@ export const ASK_GUIDE = [
   "- 막혀서 더 나아갈 수 없을 때도 `escalation`을 보내지 않고 `ask`로 묻는다. 무엇이 막혔는지 질문에 쓰고, 운영자가 고를 수 있는 다음 행동을 `--options`로 단다.",
   "- 질문을 보낸 뒤에는 차례를 끝내고 답을 기다린다. 질문이나 `worker_done` 없이 차례를 끝내면 운영자는 멈춘 것으로 본다.",
 ].join("\n");
-
-export function briefFor(ticketPrompt: string): string {
-  return `${ticketPrompt}\n\n${ASK_GUIDE}\n`;
-}

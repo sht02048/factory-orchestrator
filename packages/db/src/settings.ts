@@ -16,6 +16,7 @@ import type {
   TrackerKind,
   TrackerProjectId,
   TrackerStateId,
+  WorkspaceBrief,
 } from "@ganger/core";
 import {
   PREREQUISITE_FAILURE_KINDS,
@@ -526,6 +527,7 @@ export interface StoredWorkspace {
   id: WorkspaceId;
   name: string;
   maxRunMs: number;
+  brief: WorkspaceBrief;
 }
 
 export function saveWorkspace(
@@ -549,12 +551,55 @@ export function saveWorkspace(
   });
 }
 
+export function saveWorkspaceBrief(
+  db: Database,
+  input: { id: WorkspaceId; brief: WorkspaceBrief },
+  now: Date = new Date(),
+): boolean {
+  return inTransaction(db, () => {
+    const before = db
+      .select({ before: workspaces.briefBefore, after: workspaces.briefAfter })
+      .from(workspaces)
+      .where(eq(workspaces.id, input.id))
+      .get();
+    if (before === undefined) return false;
+    if (before.before === input.brief.before && before.after === input.brief.after) return true;
+    db.update(workspaces)
+      .set({ briefBefore: input.brief.before, briefAfter: input.brief.after })
+      .where(eq(workspaces.id, input.id))
+      .run();
+    recordChange(db, { kind: "workspace", targetId: input.id, workspaceId: input.id }, now);
+    return true;
+  });
+}
+
 export function listWorkspaces(db: Database): StoredWorkspace[] {
   return db
-    .select({ id: workspaces.id, name: workspaces.name, maxRunMs: workspaces.maxRunMs })
+    .select({
+      id: workspaces.id,
+      name: workspaces.name,
+      maxRunMs: workspaces.maxRunMs,
+      briefBefore: workspaces.briefBefore,
+      briefAfter: workspaces.briefAfter,
+    })
     .from(workspaces)
     .orderBy(asc(workspaces.createdAt), asc(workspaces.id))
-    .all();
+    .all()
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      maxRunMs: row.maxRunMs,
+      brief: { before: row.briefBefore, after: row.briefAfter },
+    }));
+}
+
+export function getWorkspaceBrief(db: Database, id: WorkspaceId): WorkspaceBrief | null {
+  const row = db
+    .select({ before: workspaces.briefBefore, after: workspaces.briefAfter })
+    .from(workspaces)
+    .where(eq(workspaces.id, id))
+    .get();
+  return row ?? null;
 }
 
 export interface StoredWorkspaceTrackerProject {

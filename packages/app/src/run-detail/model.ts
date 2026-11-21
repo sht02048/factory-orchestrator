@@ -112,6 +112,7 @@ export interface RunDetail {
   status: RunDetailStatus;
   pullRequest: { displayId: string; url: string; ci: CiView } | null;
   report: string | null;
+  brief: string | null;
   startError: string | null;
   cancelPending: boolean;
   control: RunControlView | null;

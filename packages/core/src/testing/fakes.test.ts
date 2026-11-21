@@ -35,7 +35,7 @@ async function startOne(runner: FakeRunner, worktreeName = "ganger-ENG-1-1") {
     project: app,
     worktreeName,
     agent: toAgentId("claude"),
-    prompt: "티켓 본문",
+    brief: "티켓 본문",
   });
   return { mailbox, started, run: { mailbox, ...started } };
 }
@@ -96,7 +96,7 @@ describe("FakeRunner", () => {
     runner.dropMailbox(mailbox);
 
     const error = await runner
-      .startRun({ mailbox, project: app, worktreeName: "w", agent: toAgentId("a"), prompt: "p" })
+      .startRun({ mailbox, project: app, worktreeName: "w", agent: toAgentId("a"), brief: "p" })
       .catch((e: unknown) => e);
     expect(error).toMatchObject({ detail: { kind: "mailbox-missing" } });
   });
@@ -120,7 +120,7 @@ describe("FakeRunner", () => {
       project: app,
       worktreeName: "ganger-ENG-1-1",
       agent: toAgentId("a"),
-      prompt: "p",
+      brief: "p",
     };
 
     const lost = await runner.startRun(input).catch((e: unknown) => e);

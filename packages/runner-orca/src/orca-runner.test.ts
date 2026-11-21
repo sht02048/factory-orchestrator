@@ -20,7 +20,6 @@ import {
   ORCA_RUNNER_KIND,
   orcaRunnerFactory,
 } from "./orca-runner.js";
-import { briefFor } from "./agent-brief.js";
 import { escalationQuestionId } from "./progress.js";
 import { decodeAgent, decodeMailbox, encodeAgent, encodeMailbox } from "./refs.js";
 import {
@@ -391,11 +390,11 @@ describe("startRun", () => {
     project: toRunnerProjectId("github:acme/sandbox"),
     worktreeName: "fo-t0013-probe1",
     agent: toAgentId("claude"),
-    prompt: `Fix "the bug"\nin it's $HOME \`code\``,
+    brief: `Fix "the bug"\nin it's $HOME \`code\``,
     ticket: { key: toTicketKey("ENG-1"), url: "https://linear.app/acme/issue/ENG-1" },
   };
 
-  test("starts a worker with the ticket on stdin and returns the runner's branch", async () => {
+  test("starts a worker with the whole agent brief on stdin and returns the runner's branch", async () => {
     const exec = withProjects(
       new ScriptedExec()
         .orca("orchestration worker-start", stdout(own("worker-start-spec-stdin.json")))
@@ -410,7 +409,7 @@ describe("startRun", () => {
       runId: "run_493ebb2f403d",
     });
     const start = exec.calls.find((c) => c.command.includes("worker-start"));
-    expect(start?.stdin).toBe(briefFor(input.prompt));
+    expect(start?.stdin).toBe(input.brief);
     expect(start?.command).toBe(
       "/Applications/Orca.app/Contents/Resources/bin/orca orchestration worker-start --from term_41ac5f6b-daad-43f3-9264-9e25ddd24ef7 --run run_493ebb2f403d --spec-file - --task-title fo-t0013-probe1 --worktree new-top-level --repo id:527aed9b-0eef-4404-9d8d-9a89d7fb1dc9 --name fo-t0013-probe1 --agent claude --comment 'ENG-1 https://linear.app/acme/issue/ENG-1' --json",
     );

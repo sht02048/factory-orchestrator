@@ -68,8 +68,10 @@ async function applyRunControl(
   request: PendingRunControlRequest,
 ): Promise<RunControlFailure | null> {
   const { db } = context;
-  const run = getRunWithRecords(db, request.runId)?.run;
-  if (run === undefined || run.state === "queued" || run.state === "ended") return "state-changed";
+  const found = getRunWithRecords(db, request.runId);
+  const run = found?.run;
+  if (found === null || run === undefined || run.state === "queued" || run.state === "ended")
+    return "state-changed";
   const unknownResume =
     request.outcomeUnknown && (run.state === "paused" || run.state === "disconnected");
   if (!unknownResume && !planRunControl(run.state, request.control).ok) return "state-changed";
@@ -90,7 +92,7 @@ async function applyRunControl(
     agent: run.agent,
     ...(run.model === null ? {} : { model: run.model }),
     message: messages.resume.message,
-    restartPrompt: await restartPromptFor(context, run),
+    restartPrompt: await restartPromptFor(context, run, found.records.agentBrief),
     startIfGone: !cancelling,
   });
   return recorded(context, run, () =>
@@ -112,7 +114,12 @@ function recorded(
   return "state-changed";
 }
 
-async function restartPromptFor(context: TickContext, run: ActiveRun): Promise<string> {
+async function restartPromptFor(
+  context: TickContext,
+  run: ActiveRun,
+  sentBrief: string | null,
+): Promise<string> {
+  if (sentBrief !== null) return `${messages.resume.restartPreamble}\n\n${sentBrief}`;
   const fallback = [run.ticket.key, run.ticketTitle].filter((part) => part !== null).join(" ");
   const tracker = context.adapters.tracker(context.db, run.ticket.connection);
   let ticketText = fallback;

@@ -77,6 +77,7 @@ import {
   saveRunnerCapacity,
   saveTrackerConnection,
   saveWorkspace,
+  saveWorkspaceBrief,
   saveWorkspaceTrackerProject,
   setRunnerMailbox,
 } from "./settings.js";
@@ -406,6 +407,15 @@ const writes: WriteCase[] = [
     name: "saveWorkspace",
     kinds: ["workspace"],
     write: (w) => saveWorkspace(w.db, { id: workspaceId, name: "Acme Web" }),
+  },
+  {
+    name: "saveWorkspaceBrief",
+    kinds: ["workspace"],
+    write: (w) =>
+      saveWorkspaceBrief(w.db, {
+        id: workspaceId,
+        brief: { before: "Read AGENTS.md.", after: "" },
+      }),
   },
   {
     name: "saveTrackerConnection",
