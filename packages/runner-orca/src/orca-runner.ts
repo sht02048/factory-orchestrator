@@ -102,6 +102,7 @@ export const LOG_CUT_MARKER = `[log tail cut: the transcript is longer than ${LO
 const RAW_LIMIT = 4000;
 export const INTERRUPT_KEY = "\u001b";
 export const ESCALATION_ANSWER_SUBJECT = "Answer from the operator";
+export const OPERATOR_MESSAGE_SUBJECT = "Message from the operator";
 
 const SENDER_ERROR_CODES = new Set([
   "no_active_sender_terminal",
@@ -669,6 +670,27 @@ export class OrcaRunner implements Runner {
         input.reason,
       ],
       denyResultSchema,
+      { usesMailbox: true },
+    );
+  }
+
+  async sendToAgent(run: RunOnRunner, input: { body: string }): Promise<void> {
+    const agent = this.agentOf(run);
+    const mailbox = this.mailboxOf(run.mailbox);
+    await this.orca(
+      [
+        "orchestration",
+        "send",
+        "--from",
+        mailbox.terminal,
+        "--to",
+        `dispatch:${agent.dispatchId}`,
+        "--subject",
+        OPERATOR_MESSAGE_SUBJECT,
+        "--body",
+        input.body,
+      ],
+      sendResultSchema,
       { usesMailbox: true },
     );
   }

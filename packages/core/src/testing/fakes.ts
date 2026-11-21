@@ -192,6 +192,7 @@ export interface FakeRunnerRun {
   answers: Array<{ questionId: QuestionId; answer: string }>;
   permissionWaits: PermissionWait[];
   denials: Array<{ permissionId: PermissionRequestId; reason: string }>;
+  agentMessages: string[];
   report: CompletionReport | null;
   endedWithoutReport: string | null;
   agentStopped: boolean;
@@ -400,6 +401,7 @@ export class FakeRunner implements Runner {
         answers: [],
         permissionWaits: [],
         denials: [],
+        agentMessages: [],
         report: null,
         endedWithoutReport: null,
         agentStopped: false,
@@ -470,6 +472,14 @@ export class FakeRunner implements Runner {
       const found = this.runAt(run.worktree);
       found.permissionWaits = found.permissionWaits.filter((p) => p.id !== input.permissionId);
       found.denials.push({ ...input });
+    });
+  }
+
+  sendToAgent(run: RunOnRunner, input: { body: string }): Promise<void> {
+    return this.reach(() => {
+      this.takeControlFailure();
+      this.mustHaveMailbox(run.mailbox);
+      this.runAt(run.worktree).agentMessages.push(input.body);
     });
   }
 

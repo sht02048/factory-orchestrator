@@ -1,4 +1,5 @@
 import type {
+  AgentMessageFailure,
   AgentResult,
   PauseSource,
   PrReadError,
@@ -20,6 +21,7 @@ export type TimelineEvent = { at: string } & (
   | { kind: "question" | "answer" | "permission"; body: string }
   | { kind: "denied"; body: string }
   | { kind: "cancel-requested" }
+  | { kind: "operator-message"; body: string; delivery: AgentMessageDelivery }
   | { kind: "ended"; agentResult: AgentResult }
   | { kind: "later-pr"; state: "merged" | "closed" }
   | {
@@ -30,6 +32,15 @@ export type TimelineEvent = { at: string } & (
       reason: string | null;
     }
 );
+
+export type AgentMessageDelivery =
+  | { status: "sending" | "after-resume" | "after-reconnect" | "sent" }
+  | { status: "failed"; reason: AgentMessageFailure | "unknown" };
+
+export interface AgentMessageView {
+  accepting: boolean;
+  latest: AgentMessageDelivery | null;
+}
 
 export type PendingInput = InputWait | { kind: "unknown" };
 
@@ -116,6 +127,7 @@ export interface RunDetail {
   startError: string | null;
   cancelPending: boolean;
   control: RunControlView | null;
+  agentMessage: AgentMessageView;
   timeline: TimelineEvent[];
   log: LogTailView;
   otherRuns: OtherRun[];

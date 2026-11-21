@@ -21,6 +21,7 @@ import {
   SecretBox,
   assignRun,
   changeRunState,
+  listRunAgentMessages,
   listRunQuestions,
   migrate,
   openDatabase,
@@ -71,6 +72,8 @@ let permissionRun: RunId;
 let cancelRun: RunId;
 let endedRun: RunId;
 let keptRun: RunId;
+let messageRun: RunId;
+let narrowMessageRun: RunId;
 
 const fakeAdapters: Plugin = {
   name: "e2e-fake-adapters",
@@ -177,6 +180,34 @@ describe("Run 상세 보내기 뒤 포커스와 안내(브라우저, 0051)", () 
     expect(await page.getByRole("button", { name: run.removeWorktree.trigger }).count()).toBe(0);
   });
 
+  it("에이전트에게 보내면 입력칸이 비고 포커스가 입력칸으로 돌아오며 결과와 타임라인이 보인다(0147)", async () => {
+    await open(messageRun);
+    const card = page.getByRole("region", { name: run.agentMessage.title });
+    const input = card.getByLabel(run.agentMessage.label);
+    await input.fill("끝내기 전에 push 해 주세요");
+    await card.getByRole("button", { name: run.agentMessage.send }).press("Enter");
+
+    await card.getByRole("status").getByText(run.agentMessage.delivery.sending).waitFor();
+    await expect.poll(() => input.inputValue()).toBe("");
+    await expect
+      .poll(() => input.evaluate((element) => element === document.activeElement))
+      .toBe(true);
+    await page.getByText(run.timeline["operator-message"], { exact: true }).waitFor();
+    expect(listRunAgentMessages(db, messageRun).map((message) => message.body)).toEqual([
+      "끝내기 전에 push 해 주세요",
+    ]);
+  });
+
+  it("400px 에서도 에이전트에게 보내기가 가로로 넘치지 않는다(0147)", async () => {
+    await page.setViewportSize({ width: 400, height: 844 });
+    await open(narrowMessageRun);
+    await page.getByRole("region", { name: run.agentMessage.title }).waitFor();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
   it("로그를 열면 마지막 줄이 보이고 키보드로 스크롤할 수 있다", async () => {
     await open(endedRun);
     const log = page.getByRole("region", { name: run.log.linesLabel });
@@ -275,6 +306,8 @@ function seed(db: Database): void {
   ]);
 
   cancelRun = startRun("ACME-13");
+  messageRun = startRun("ACME-18");
+  narrowMessageRun = startRun("ACME-19");
 
   endedRun = startRun("ACME-15");
   ok(

@@ -30,6 +30,8 @@ import type { ReactNode, RefObject } from "react";
 import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { QuestionAnswer } from "../question/question-answer";
+import { AgentMessageForm, useDeliveryText } from "./agent-message-form";
+import type { AgentMessageOutcome } from "./agent-message-form";
 import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import { canCancel } from "@ganger/app/run-detail/model";
@@ -50,6 +52,7 @@ export interface RunDetailActions {
   onCancel: () => Promise<void>;
   onRemoveWorktree: () => Promise<void>;
   onControl: (control: RunControl) => Promise<RunControlOutcome>;
+  onSendAgentMessage: (body: string) => Promise<AgentMessageOutcome>;
   onRefreshLog: () => Promise<void>;
 }
 
@@ -208,6 +211,14 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
               </Block>
             ) : null}
 
+            {run.agentMessage.accepting ? (
+              <AgentMessageForm
+                view={run.agentMessage}
+                hint={agentMessageHint(run)}
+                onSend={props.onSendAgentMessage}
+              />
+            ) : null}
+
             {run.startError === null ? null : (
               <Block title={t("startError.title")}>
                 <Text variant="body">{t("startError.body")}</Text>
@@ -244,6 +255,11 @@ function Main(props: RunDetailScreenProps & { run: RunDetail }) {
       </div>
     </ScreenLayout>
   );
+}
+
+function agentMessageHint(run: RunDetail): "paused" | "waiting" | null {
+  if (run.status.state === "paused") return "paused";
+  return run.status.state === "waiting-for-input" ? "waiting" : null;
 }
 
 function Block({
@@ -658,6 +674,7 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
   const domain = useTranslations("domain");
   const laterPr = useTranslations("run.laterPr");
   const { stamp } = useTime();
+  const deliveryText = useDeliveryText();
   const toolName = (tool: string): string => (isMcpRunTool(tool) ? t(`mcpTool.${tool}`) : tool);
   const eventTitle = (event: TimelineEvent): string =>
     event.kind === "mcp" ? t("mcp", { client: event.client }) : t(event.kind);
@@ -671,6 +688,10 @@ function Timeline({ events, now }: { events: ReadonlyArray<TimelineEvent>; now: 
               reason: t(`mcpReason.${event.reason}`),
             })
           : t("mcpRejectedUnknown", { tool: toolName(event.tool) });
+      case "operator-message":
+        return event.delivery.status === "sent"
+          ? event.body
+          : `${event.body}\n${deliveryText(event.delivery)}`;
       case "question":
       case "answer":
       case "permission":

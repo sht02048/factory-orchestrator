@@ -312,6 +312,8 @@ export interface Runner {
     input: { permissionId: PermissionRequestId; reason: string },
   ): Promise<void>;
 
+  sendToAgent(run: RunOnRunner, input: { body: string }): Promise<void>;
+
   pauseAgent(run: RunOnRunner): Promise<void>;
   resumeAgent(run: RunOnRunner, input: ResumeAgentInput): Promise<ResumedAgent>;
 

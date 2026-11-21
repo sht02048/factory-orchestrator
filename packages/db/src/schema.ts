@@ -505,6 +505,28 @@ export const runControlRequests = sqliteTable(
   (t) => [check("run_control_requests_control", sql`${t.control} IN ${inList(RUN_CONTROLS)}`)],
 );
 
+export const runAgentMessages = sqliteTable(
+  "run_agent_messages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" })
+      .$type<RunId>(),
+    body: text("body").notNull(),
+    requestedAt: timeMs("requested_at").notNull(),
+    sendStartedAt: timeMs("send_started_at"),
+    completedAt: timeMs("completed_at"),
+    error: text("error"),
+  },
+  (t) => [
+    index("run_agent_messages_run").on(t.runId, t.id),
+    index("run_agent_messages_pending")
+      .on(t.id)
+      .where(sql`${t.completedAt} IS NULL`),
+  ],
+);
+
 export const runCancelRequests = sqliteTable("run_cancel_requests", {
   runId: text("run_id")
     .primaryKey()
