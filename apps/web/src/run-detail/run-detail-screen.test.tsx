@@ -87,7 +87,12 @@ describe("Run 상세의 에이전트에게 보내기 (0147)", () => {
     return id;
   };
   const sent = (db: Database, id: Parameters<typeof requestAgentMessage>[1], body: string) => {
-    const result = requestAgentMessage(db, id, body, minutes(910));
+    const result = requestAgentMessage(
+      db,
+      id,
+      { requestId: `request-${body}`, body },
+      minutes(910),
+    );
     if (!result.ok) throw new Error("not requested");
     return result.id;
   };

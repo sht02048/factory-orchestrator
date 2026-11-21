@@ -14,17 +14,25 @@ export type RequestAgentMessageResult =
 export function requestAgentMessage(
   db: Database,
   runId: RunId,
-  body: string,
+  input: { requestId: string; body: string },
   now: Date = new Date(),
 ): RequestAgentMessageResult {
   return inTransaction(db, (): RequestAgentMessageResult => {
+    const existing = db
+      .select({ id: runAgentMessages.id, requestedAt: runAgentMessages.requestedAt })
+      .from(runAgentMessages)
+      .where(
+        and(eq(runAgentMessages.runId, runId), eq(runAgentMessages.requestId, input.requestId)),
+      )
+      .get();
+    if (existing !== undefined) return { ok: true, ...existing };
     const run = db.select({ state: runs.state }).from(runs).where(eq(runs.id, runId)).get();
     if (run === undefined) return { ok: false, reason: "not-found" };
     if (!acceptsAgentMessage(run.state)) return { ok: false, reason: "not-accepting" };
     if (hasPendingCancelRequest(db, runId)) return { ok: false, reason: "cancelling" };
     const inserted = db
       .insert(runAgentMessages)
-      .values({ runId, body, requestedAt: now })
+      .values({ runId, requestId: input.requestId, body: input.body, requestedAt: now })
       .returning({ id: runAgentMessages.id })
       .get();
     recordRunChange(db, runId, { now });

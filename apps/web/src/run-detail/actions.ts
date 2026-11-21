@@ -23,7 +23,7 @@ import {
   requestRunLog,
   sendAgentMessage,
 } from "../server/functions";
-import type { AgentMessageOutcome } from "./agent-message-form";
+import type { AgentMessageOutcome, AgentMessageRequest } from "./agent-message-form";
 import type { RunDetailActions } from "./run-detail-screen";
 
 export const RUN_POLL_MS = 2_000;
@@ -35,7 +35,7 @@ export interface RunDetailCalls {
   cancel(runId: string): Promise<RunActionResult>;
   removeWorktree(runId: string): Promise<RunActionResult>;
   control(runId: string, control: RunControl): Promise<RunControlActionResult>;
-  sendAgentMessage(runId: RunId, body: string): Promise<RunActionResult>;
+  sendAgentMessage(runId: RunId, input: AgentMessageRequest): Promise<RunActionResult>;
   requestLog(runId: string): Promise<boolean>;
 }
 
@@ -45,7 +45,7 @@ export const serverRunDetailCalls: RunDetailCalls = {
   cancel: (runId) => cancelRun({ data: { runId } }),
   removeWorktree: (runId) => removeRunWorktree({ data: { runId } }),
   control: (runId, control) => controlRun({ data: { runId, control } }),
-  sendAgentMessage: (runId, body) => sendAgentMessage({ data: { runId, body } }),
+  sendAgentMessage: (runId, input) => sendAgentMessage({ data: { runId, ...input } }),
   requestLog: (runId) => requestRunLog({ data: { runId } }),
 };
 
@@ -111,9 +111,9 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
       onSuccess: refreshRun,
     }),
     sendAgentMessage: mutationOptions({
-      mutationFn: async (body: string): Promise<AgentMessageOutcome> =>
-        (await calls.sendAgentMessage(toRunId(runId), body)).ok ? "requested" : "state-changed",
-      onSuccess: refreshRun,
+      mutationFn: async (input: AgentMessageRequest): Promise<AgentMessageOutcome> =>
+        (await calls.sendAgentMessage(toRunId(runId), input)).ok ? "requested" : "state-changed",
+      onSettled: refreshRun,
     }),
     refreshLog: mutationOptions({
       mutationFn: () => calls.requestLog(runId),
@@ -154,7 +154,7 @@ export function useRunDetailMutations(runId: string, logRequested: () => void) {
       await removeWorktree.mutateAsync();
     },
     onControl: (next) => control.mutateAsync(next),
-    onSendAgentMessage: (body) => agentMessage.mutateAsync(body),
+    onSendAgentMessage: (input) => agentMessage.mutateAsync(input),
     onRefreshLog: async () => {
       await refreshLog.mutateAsync();
     },

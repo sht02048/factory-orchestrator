@@ -31,7 +31,7 @@ import { useTranslations } from "use-intl";
 import { useTime } from "../format/time";
 import { QuestionAnswer } from "../question/question-answer";
 import { AgentMessageForm, useDeliveryText } from "./agent-message-form";
-import type { AgentMessageOutcome } from "./agent-message-form";
+import type { AgentMessageOutcome, AgentMessageRequest } from "./agent-message-form";
 import { useAgentName, useQueuedReasonText } from "../labels";
 import { runStatus, useStatusName } from "../status";
 import { canCancel } from "@ganger/app/run-detail/model";
@@ -52,7 +52,7 @@ export interface RunDetailActions {
   onCancel: () => Promise<void>;
   onRemoveWorktree: () => Promise<void>;
   onControl: (control: RunControl) => Promise<RunControlOutcome>;
-  onSendAgentMessage: (body: string) => Promise<AgentMessageOutcome>;
+  onSendAgentMessage: (input: AgentMessageRequest) => Promise<AgentMessageOutcome>;
   onRefreshLog: () => Promise<void>;
 }
 

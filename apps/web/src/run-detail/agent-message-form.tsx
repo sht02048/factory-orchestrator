@@ -9,6 +9,16 @@ import { useTranslations } from "use-intl";
 
 export type AgentMessageOutcome = "requested" | "state-changed";
 
+export interface AgentMessageRequest {
+  requestId: string;
+  body: string;
+}
+
+function newRequestId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 type Submit = "idle" | "sending" | "state-changed" | "failed";
 
 export function useDeliveryText(): (delivery: AgentMessageDelivery) => string {
@@ -35,7 +45,7 @@ export function AgentMessageForm({
 }: {
   view: AgentMessageView;
   hint: "paused" | "waiting" | null;
-  onSend: (body: string) => Promise<AgentMessageOutcome>;
+  onSend: (input: AgentMessageRequest) => Promise<AgentMessageOutcome>;
 }) {
   const t = useTranslations("run.agentMessage");
   const actionFailed = useTranslations("run")("actionFailed");
@@ -46,12 +56,15 @@ export function AgentMessageForm({
   const [emptyTried, setEmptyTried] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const closedRef = useRef<HTMLParagraphElement>(null);
-  const closedWithWords =
-    !view.accepting && (submit === "failed" || submit === "state-changed" || draft.trim() !== "");
+  const requestIdRef = useRef<string | null>(null);
+  const latest = view.latest;
+  const unsent = submit === "failed" || submit === "state-changed" || draft.trim() !== "";
+  const undelivered = sentHere && latest !== null && latest.status !== "sent";
+  const closed = !view.accepting && submit !== "sending" && (unsent || undelivered);
   useEffect(() => {
-    if (!closedWithWords) return;
+    if (!closed) return;
     if (submit !== "idle" || document.activeElement === document.body) closedRef.current?.focus();
-  }, [closedWithWords, submit]);
+  }, [closed, submit]);
   const body = draft.trim();
   const tooLong = body.length > AGENT_MESSAGE_MAX_LENGTH;
   const error = tooLong
@@ -69,9 +82,11 @@ export function AgentMessageForm({
       return;
     }
     setSubmit("sending");
-    onSend(body).then(
+    requestIdRef.current ??= newRequestId();
+    onSend({ requestId: requestIdRef.current, body }).then(
       (outcome) => {
         if (outcome === "requested") {
+          requestIdRef.current = null;
           setDraft("");
           setEmptyTried(false);
           setSentHere(true);
@@ -88,29 +103,52 @@ export function AgentMessageForm({
     );
   };
 
-  if (closedWithWords) {
+  const edit = (value: string): void => {
+    setDraft(value);
+    requestIdRef.current = null;
+    if (submit === "failed" || submit === "state-changed") setSubmit("idle");
+  };
+
+  if (closed) {
+    const closedText =
+      submit === "failed"
+        ? actionFailed
+        : unsent || latest === null
+          ? t("failure.state-changed")
+          : deliveryText(latest);
+    const closedProblem = unsent || latest?.status === "failed";
     return (
       <Card label={t("title")}>
         <div {...stylex.props(styles.form)}>
           <Text variant="subheading" as="h2">
             {t("title")}
           </Text>
-          <Text variant="body" as="p" tone="problem" role="status" tabIndex={-1} ref={closedRef}>
-            {submit === "failed" ? actionFailed : t("failure.state-changed")}
+          <Text
+            variant="body"
+            as="p"
+            role="status"
+            tabIndex={-1}
+            ref={closedRef}
+            {...(closedProblem ? { tone: "problem" as const } : {})}
+          >
+            {closedText}
           </Text>
-          <Text variant="meta" as="p">
-            {t("unsentLabel")}
-          </Text>
-          <Text variant="body" as="p" wrap="pre">
-            {draft}
-          </Text>
+          {unsent ? (
+            <>
+              <Text variant="meta" as="p">
+                {t("unsentLabel")}
+              </Text>
+              <Text variant="body" as="p" wrap="pre">
+                {draft}
+              </Text>
+            </>
+          ) : null}
         </div>
       </Card>
     );
   }
-  if (!view.accepting) return null;
+  if (!view.accepting && submit !== "sending") return null;
 
-  const latest = view.latest;
   const result =
     submit === "sending"
       ? t("delivery.sending")
@@ -142,7 +180,7 @@ export function AgentMessageForm({
             name="agent-message"
             rows={3}
             value={draft}
-            onValueChange={setDraft}
+            onValueChange={edit}
             placeholder={t("placeholder")}
           />
         </Field>
@@ -150,8 +188,7 @@ export function AgentMessageForm({
           <Button
             type="submit"
             variant="secondary"
-            aria-disabled={submit === "sending"}
-            aria-busy={submit === "sending"}
+            busy={{ active: submit === "sending", label: t("sending") }}
           >
             {t("send")}
           </Button>

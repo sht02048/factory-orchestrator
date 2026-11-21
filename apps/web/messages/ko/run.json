@@ -236,6 +236,7 @@
     "label": "보낼 말",
     "placeholder": "예: 끝내기 전에 push하고 PR까지 열어 줘요",
     "send": "보내기",
+    "sending": "보내는 중",
     "empty": "보낼 말을 적어 주세요.",
     "tooLong": "{max}자까지 보낼 수 있어요.",
     "unsentLabel": "보내지 못한 말",

@@ -16,6 +16,7 @@ export function removeWorktreeRequest(db: Database, runId: string, now: Date): R
 
 export const agentMessageInput = z.object({
   runId: z.string().min(1),
+  requestId: z.string().min(16).max(64),
   body: z.string().trim().min(1).max(AGENT_MESSAGE_MAX_LENGTH),
 });
 
@@ -24,6 +25,11 @@ export function sendAgentMessageRequest(
   input: z.infer<typeof agentMessageInput>,
   now: Date,
 ): RunActionResult {
-  const result = requestAgentMessage(db, toRunId(input.runId), input.body, now);
+  const result = requestAgentMessage(
+    db,
+    toRunId(input.runId),
+    { requestId: input.requestId, body: input.body },
+    now,
+  );
   return result.ok ? { ok: true } : result;
 }

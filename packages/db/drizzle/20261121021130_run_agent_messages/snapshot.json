@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "323b9b15-69bf-478d-a64b-0b5ba4746073",
+  "id": "39c82a45-890c-457d-960d-522cbe2b6764",
   "prevIds": ["8a484b68-c983-4a80-bbf0-db12748b54fc"],
   "ddl": [
     {
@@ -735,6 +735,16 @@
     {
       "table": "run_agent_messages",
       "name": "run_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "request_id",
       "type": "text",
       "notNull": true,
       "autoincrement": false,
@@ -2216,6 +2226,24 @@
         }
       ],
       "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "run_agent_messages",
+      "name": "run_agent_messages_request_once",
+      "columns": [
+        {
+          "value": "run_id",
+          "isExpression": false
+        },
+        {
+          "value": "request_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"

@@ -513,6 +513,7 @@ export const runAgentMessages = sqliteTable(
       .notNull()
       .references(() => runs.id, { onDelete: "cascade" })
       .$type<RunId>(),
+    requestId: text("request_id").notNull(),
     body: text("body").notNull(),
     requestedAt: timeMs("requested_at").notNull(),
     sendStartedAt: timeMs("send_started_at"),
@@ -520,6 +521,7 @@ export const runAgentMessages = sqliteTable(
     error: text("error"),
   },
   (t) => [
+    uniqueIndex("run_agent_messages_request_once").on(t.runId, t.requestId),
     index("run_agent_messages_run").on(t.runId, t.id),
     index("run_agent_messages_pending")
       .on(t.id)
