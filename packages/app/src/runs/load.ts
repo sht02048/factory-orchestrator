@@ -1,3 +1,4 @@
+import { prSignalsViewOf } from "../pr-signals-view.js";
 import {
   AGENT_RESULTS,
   PR_STATES,
@@ -145,7 +146,11 @@ export function loadRunsPage(
       pullRequest:
         pr === null || pr === undefined || !isWebUrl(pr.url)
           ? null
-          : { displayId: pr.displayId, url: pr.url },
+          : {
+              displayId: pr.displayId,
+              url: pr.url,
+              signals: prSignalsViewOf(run, records),
+            },
       attention: false,
     };
     switch (run.state) {

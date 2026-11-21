@@ -20,6 +20,7 @@ import type {
   PrReadError,
   PrState,
   PullRequestId,
+  PullRequestSignals,
   ReadPrState,
   Run,
   RunId,
@@ -74,6 +75,9 @@ export interface RunRecords {
     url: string;
     ci: CiState;
     checkedAt: Date;
+    signals?: PullRequestSignals | null;
+    signalsReadAt?: Date | null;
+    headCommit?: string;
   } | null;
   laterPrState: { state: (typeof LATER_PR_STATES)[number]; at: Date } | null;
   prReadError: PrReadError | null;
@@ -187,6 +191,8 @@ function toRunRecords(row: RunRow): RunRecords {
             url: row.prUrl ?? "",
             ci: row.prCiState ?? "none",
             checkedAt: row.prCheckedAt,
+            signals: row.prSignals,
+            signalsReadAt: row.prSignalsReadAt,
           },
     laterPrState:
       row.laterPrState === null || row.laterPrStateAt === null
@@ -755,6 +761,13 @@ export function updateRunRecords(
     set.prUrl = pr?.url ?? null;
     set.prCiState = pr?.ci ?? null;
     set.prCheckedAt = pr?.checkedAt ?? null;
+    if (pr === null || (pr.signals ?? null) !== null) {
+      set.prSignals = pr?.signals ?? null;
+      set.prSignalsReadAt = pr === null ? null : pr.checkedAt;
+    } else if (!sameCommitAsStored(getRunRow(db, runId), pr)) {
+      set.prSignals = null;
+      set.prSignalsReadAt = null;
+    }
   }
   if (patch.laterPrState !== undefined) {
     set.laterPrState = patch.laterPrState?.state ?? null;
@@ -862,7 +875,14 @@ export function countUnreadPrRuns(db: Database): Record<PrReadError, number> {
   return counts;
 }
 
-const UNSEEN_RUN_COLUMNS: ReadonlySet<string> = new Set(["prCheckedAt"]);
+function sameCommitAsStored(
+  row: RunRow | undefined,
+  pr: { id: PullRequestId; headCommit?: string },
+): boolean {
+  return row?.prId === pr.id && row.prSignals?.headCommit === pr.headCommit;
+}
+
+const UNSEEN_RUN_COLUMNS: ReadonlySet<string> = new Set(["prCheckedAt", "prSignalsReadAt"]);
 
 function visiblyChanged(set: Partial<typeof runs.$inferInsert>, before: RunRow, after: RunRow) {
   return Object.keys(set).some((column) => {

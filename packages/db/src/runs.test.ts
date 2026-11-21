@@ -822,6 +822,58 @@ describe("updateRunRecords", () => {
     expect(records?.lastLog?.[0]).toBe("line 50");
   });
 
+  it("PR 의 검사·충돌·뒤처짐과 읽은 때를 저장하고, 못 읽으면 같은 커밋의 지난 값만 둔다 (0150)", () => {
+    const db = seededDatabase();
+    addRunner(db, { id: "r", capacity: 1, online: true, projects: [repoA] });
+    const id = assignOk(db, "ENG-1");
+    moveTo(db, id, "ended");
+    const at = new Date("2026-11-21T01:00:00Z");
+    const pullRequest = {
+      id: toPullRequestId("PR_1"),
+      displayId: "#7",
+      url: "https://example.com/pr/7",
+      ci: "failure",
+      checkedAt: at,
+      headCommit: "abc",
+    };
+    const signals = {
+      open: true,
+      headCommit: "abc",
+      ciFailed: true,
+      checkTotal: 5,
+      failedCount: 1,
+      failedChecks: ["lint"],
+      checksTruncated: false,
+      conflict: true,
+      behindBy: 3,
+    };
+
+    updateRunRecords(db, id, { pullRequest: { ...pullRequest, signals } });
+    expect(getRunWithRecords(db, id)?.records.pullRequest?.signals).toEqual(signals);
+
+    const later = new Date("2026-11-21T02:00:00Z");
+    updateRunRecords(db, id, { pullRequest: { ...pullRequest, checkedAt: later, signals: null } });
+    expect(getRunWithRecords(db, id)?.records.pullRequest).toMatchObject({
+      checkedAt: later,
+      signals,
+      signalsReadAt: at,
+    });
+
+    updateRunRecords(db, id, {
+      pullRequest: { ...pullRequest, headCommit: "def", signals: null },
+    });
+    expect(getRunWithRecords(db, id)?.records.pullRequest?.signals).toBeNull();
+
+    updateRunRecords(db, id, { pullRequest: { ...pullRequest, signals } });
+    updateRunRecords(db, id, {
+      pullRequest: { ...pullRequest, id: toPullRequestId("PR_2"), signals: null },
+    });
+    expect(getRunWithRecords(db, id)?.records.pullRequest).toMatchObject({
+      signals: null,
+      signalsReadAt: null,
+    });
+  });
+
   it("이후 PR 상태는 Ended 런에만 적는다", () => {
     const db = seededDatabase();
     const id = assignOk(db, "ENG-1");

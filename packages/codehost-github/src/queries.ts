@@ -45,6 +45,46 @@ export const PULL_REQUEST_BY_NUMBER = `query PullRequestByNumber($owner: String!
     pullRequest(number: $number) {${PULL_REQUEST_FIELDS}}
   }${RATE_LIMIT}}`;
 
+export const PULL_REQUEST_SIGNALS = `query PullRequestSignals($owner: String!, $repo: String!, $number: Int!, $head: String!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      state
+      mergeable
+      baseRef {
+        compare(headRef: $head) {
+          behindBy
+        }
+      }
+      commits(last: 1) {
+        nodes {
+          commit {
+            oid
+            statusCheckRollup {
+              state
+              contexts(first: 100) {
+                totalCount
+                pageInfo {
+                  hasNextPage
+                }
+                nodes {
+                  __typename
+                  ... on CheckRun {
+                    name
+                    conclusion
+                  }
+                  ... on StatusContext {
+                    context
+                    state
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }${RATE_LIMIT}}`;
+
 export const VIEWER = `query Viewer {
   viewer {
     login

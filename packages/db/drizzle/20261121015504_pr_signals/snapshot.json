@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "3b4bad71-357f-4b4b-b41f-1d9f9f829336",
+  "id": "9ac5fcb0-a1cf-4c91-b2d0-1a8cfd7ebbc5",
   "prevIds": ["8a484b68-c983-4a80-bbf0-db12748b54fc"],
   "ddl": [
     {
@@ -900,16 +900,6 @@
     },
     {
       "table": "run_questions",
-      "name": "kind",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'question'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "run_questions",
       "name": "body",
       "type": "text",
       "notNull": true,
@@ -1571,6 +1561,26 @@
     {
       "table": "runs",
       "name": "pr_checked_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "pr_signals",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "runs",
+      "name": "pr_signals_read_at",
       "type": "integer",
       "notNull": false,
       "autoincrement": false,
@@ -2804,7 +2814,7 @@
     {
       "table": "notification_events",
       "name": "notification_events_kind",
-      "value": "\"kind\" IN ('question', 'permission', 'human-check', 'failed', 'disconnected', 'runner-offline', 'runner-auth', 'runner-usage-limit')",
+      "value": "\"kind\" IN ('question', 'permission', 'failed', 'disconnected', 'runner-offline', 'runner-auth', 'runner-usage-limit')",
       "entityType": "checks"
     },
     {
@@ -2835,12 +2845,6 @@
       "table": "run_permission_waits",
       "name": "run_permission_waits_sent_after_deny",
       "value": "\"deny_sent_at\" IS NULL OR \"denied_at\" IS NOT NULL",
-      "entityType": "checks"
-    },
-    {
-      "table": "run_questions",
-      "name": "run_questions_kind",
-      "value": "\"kind\" IN ('question', 'human-check')",
       "entityType": "checks"
     },
     {

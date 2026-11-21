@@ -232,7 +232,7 @@ export function createMcpServer(context: McpContext): GangerMcp {
     {
       title: "List runs",
       description:
-        'Runs of the workspace: every run that has not ended, then the most recently ended runs. An ended run\'s "summary" is "succeeded", "failed", or "canceled", set by the agent\'s report alone; its pull request state ("prState", "laterPrState") is separate information.',
+        'Runs of the workspace: every run that has not ended, then the most recently ended runs. An ended run\'s "summary" is "succeeded", "failed", or "canceled", set by the agent\'s report alone; its pull request state ("prState", "laterPrState") is separate information. For an open pull request, "pullRequest.signals" holds the last read of its checks, conflict, and commits behind base; it never changes the summary.',
       inputSchema: {
         workspace: workspaceArg,
         runner: z
@@ -290,7 +290,7 @@ export function createMcpServer(context: McpContext): GangerMcp {
     {
       title: "Run detail",
       description:
-        'One run: its state, pending question, pull request and CI, timeline, the last stored lines of its log, the whole agent brief it was started with ("brief"), and other runs of the same ticket. An ended run\'s "summary" is "succeeded", "failed", or "canceled", set by the agent\'s report alone; the pull request state is separate information. "keptWorktree" says why the worktree was left on the runner.',
+        'One run: its state, pending question, pull request and CI, timeline, the last stored lines of its log, the whole agent brief it was started with ("brief"), and other runs of the same ticket. An ended run\'s "summary" is "succeeded", "failed", or "canceled", set by the agent\'s report alone; the pull request state is separate information. "keptWorktree" says why the worktree was left on the runner. For an open pull request, "pullRequest.signals" holds the last read of its checks, conflict, and commits behind base; it never changes the summary.',
       inputSchema: { runId: z.string().min(1).max(200) },
       annotations: READ_ONLY,
     },
