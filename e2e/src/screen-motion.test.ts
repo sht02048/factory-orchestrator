@@ -40,7 +40,7 @@ import type { Database } from "@ganger/db";
 import { chromium } from "playwright-core";
 import type { Browser, Locator, Page } from "playwright-core";
 import type { Plugin, ViteDevServer } from "vite";
-import { afterAll, beforeAll, describe, expect, it, onTestFailed } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, onTestFailed } from "vitest";
 import type { TestContext } from "vitest";
 import home from "../../apps/web/messages/ko/home.json" with { type: "json" };
 import runs from "../../apps/web/messages/ko/runs.json" with { type: "json" };
@@ -77,6 +77,7 @@ let web: ViteDevServer;
 let baseUrl: string;
 let browser: Browser;
 let nextTicket = 100;
+const openRuns = new Set<RunId>();
 
 const fakeAdapters: Plugin = {
   name: "e2e-screen-motion-fake-adapters",
@@ -117,6 +118,21 @@ afterAll(async () => {
   delete process.env["DATABASE_PATH"];
   delete process.env["ENCRYPTION_KEY"];
   if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
+});
+
+afterEach(() => {
+  for (const run of openRuns) {
+    changeRunState(db, run, {
+      to: "running",
+      started: {
+        worktree: toWorktreeRef(`wt-${run}`),
+        branch: `acme/wt-${run}`,
+        agentRef: toAgentRef(`agent-${run}`),
+      },
+    });
+    changeRunState(db, run, { to: "ended", agentResult: "reported-success", prState: "none" });
+  }
+  openRuns.clear();
 });
 
 const dashboardPath = `/?ws=${workspaceId}`;
@@ -174,6 +190,7 @@ function assign(): { id: RunId; key: string } {
     runnerId,
   });
   if (!assigned.ok) throw new Error(`assign ${key} failed: ${assigned.reason}`);
+  openRuns.add(assigned.run.id);
   return { id: assigned.run.id, key };
 }
 
@@ -340,6 +357,49 @@ describe("Dashboard 움직임(브라우저, 0153)", () => {
     expect(calls.some((call) => call.pill && call.properties.includes("transform"))).toBe(true);
   });
 
+  it("사람 확인 묶음으로 건너가며 알약이 생겨도 한 번 커진다", async (context) => {
+    const run = assign();
+    start(run.id);
+    const page = await newPage(context);
+    await open(page, dashboardPath, "/");
+    await card(page, run.key).waitFor();
+    expect(await card(page, run.key).locator("[data-status]").count()).toBe(0);
+    await clearCalls(page);
+
+    recordRunQuestions(db, run.id, [
+      {
+        id: toQuestionId(`cross-${run.id}`),
+        kind: "human-check",
+        body: "Check the preview.",
+        options: [],
+        askedAt: new Date(),
+      },
+    ]);
+    pause(run.id);
+
+    await card(page.locator('[data-todo-group="check"]'), run.key).waitFor({
+      timeout: CHANGE_VISIBLE_MS,
+    });
+    await expect
+      .poll(
+        async () =>
+          (await motionCalls(page)).some(
+            (call) => call.key === run.id && call.pill && call.properties.includes("transform"),
+          ),
+        { timeout: CHANGE_VISIBLE_MS },
+      )
+      .toBe(true);
+
+    answerRunQuestion(db, {
+      runId: run.id,
+      questionId: toQuestionId(`cross-${run.id}`),
+      answer: "ok",
+      kind: "human-check",
+    });
+    const resumed = changeRunState(db, run.id, { to: "running" });
+    if (!resumed.ok) throw new Error("resume failed");
+  });
+
   it("묶음의 마지막 카드는 접히는 동안 보이고 끝나면 묶음이 숨는다", async (context) => {
     const run = assign();
     start(run.id);
@@ -498,6 +558,49 @@ describe("Runs 움직임(브라우저, 0153)", () => {
     await runRow(page, run.key).waitFor({ timeout: CHANGE_VISIBLE_MS });
     const calls = await callsFor(page, run.id);
     expect(calls.some((call) => call.properties.includes("gridTemplateRows"))).toBe(true);
+  });
+
+  it("빠지는 행은 방향키가 건너뛰어 선택되지 않는다", async (context) => {
+    const upper = assign();
+    const lower = assign();
+    start(upper.id);
+    start(lower.id);
+    const page = await newPage(context);
+    await open(page, `${runsPath}&f=in-progress`, "/runs");
+    await runRow(page, upper.key).waitFor();
+    await runRow(page, lower.key).waitFor();
+    const upperFirst = await runRow(page, upper.key).evaluate((node, lowerId) => {
+      const other = document.querySelector(`[data-motion-key="${lowerId}"]`);
+      return (
+        other !== null &&
+        (node.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+      );
+    }, lower.id);
+    const leaving = upperFirst ? lower : upper;
+    const above = page
+      .locator(`[data-motion-key="${leaving.id}"]`)
+      .locator("xpath=preceding-sibling::*[1]")
+      .getByRole("option");
+    await above.click();
+    await expect.poll(() => above.getAttribute("aria-selected")).toBe("true");
+    await page.evaluate(() => {
+      globalThis.screenMotionRate = 0.05;
+    });
+
+    const ended = changeRunState(db, leaving.id, {
+      to: "ended",
+      agentResult: "reported-success",
+      prState: "none",
+    });
+    if (!ended.ok) throw new Error(`end failed: ${JSON.stringify(ended.error)}`);
+    await page
+      .locator(`[data-motion-key="${leaving.id}"][inert]`)
+      .waitFor({ state: "attached", timeout: CHANGE_VISIBLE_MS });
+
+    await page.keyboard.press("ArrowDown");
+    await page.waitForTimeout(QUIET_MS);
+
+    expect(new URL(page.url()).searchParams.get("sel")).not.toBe(leaving.id);
   });
 
   it("움직임 줄이기에서는 새 행이 흐려지며 들어온다", async (context) => {

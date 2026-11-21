@@ -182,14 +182,16 @@ export interface TableRowProps {
   value: string;
   label?: string;
   onOpen?: () => void;
+  disabled?: boolean;
   children: ReactNode;
 }
 
-export function TableRow({ value, label, onOpen, children }: TableRowProps) {
+export function TableRow({ value, label, onOpen, disabled = false, children }: TableRowProps) {
   const { columns } = use(ColumnsContext);
   return (
     <ListboxItem<string>
       value={value}
+      disabled={disabled}
       {...(label === undefined ? {} : { label })}
       {...(onOpen === undefined
         ? {}

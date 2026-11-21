@@ -274,7 +274,9 @@ function RunsList({
                     itemGap="row"
                     resetKey={listKey}
                   >
-                    {(run) => <RunRow run={run} onOpen={() => onOpen(run.id)} />}
+                    {(run, { leaving }) => (
+                      <RunRow run={run} leaving={leaving} onOpen={() => onOpen(run.id)} />
+                    )}
                   </MotionList>
                 </TableRows>
               </Table>
@@ -369,7 +371,7 @@ function ConditionChips({
   );
 }
 
-function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
+function RunRow({ run, leaving, onOpen }: { run: RunView; leaving: boolean; onOpen: () => void }) {
   const t = useTranslations("runs");
   const { ago, elapsed } = useTime();
   const statusName = useStatusName();
@@ -378,7 +380,7 @@ function RunRow({ run, onOpen }: { run: RunView; onOpen: () => void }) {
   const result = useRunResultText(run);
 
   return (
-    <TableRow value={run.id} label={ticketName(run)} onOpen={onOpen}>
+    <TableRow value={run.id} label={ticketName(run)} onOpen={onOpen} disabled={leaving}>
       <TableCell hideWhen="stacked">
         {run.ticketTitle === null ? null : (
           <Text variant="meta" numeric>

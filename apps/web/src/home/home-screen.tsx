@@ -96,6 +96,7 @@ export const SETTLED_VISIBLE = 3;
 interface CardHost {
   all: boolean;
   listKey: string;
+  lastTags: Map<string, PillStatus | null>;
   selectedId: RunId | null;
   revealedId: RunId | null;
   cardRef: (id: RunId) => (element: HTMLButtonElement | null) => void;
@@ -117,6 +118,7 @@ export function HomeScreen({
 }: HomeScreenProps) {
   const t = useTranslations("home");
   const cards = useRef(new Map<RunId, HTMLButtonElement>());
+  const lastTags = useRef(new Map<string, PillStatus | null>());
   const [target, setTarget] = useState<SheetTarget | null>(null);
   const [open, setOpen] = useState(false);
   const [revealedId, setRevealedId] = useState<RunId | null>(null);
@@ -148,6 +150,7 @@ export function HomeScreen({
     target === null ? undefined : boardRuns(board).find((run) => run.id === target.run.id);
   const host: CardHost = {
     all,
+    lastTags: lastTags.current,
     listKey: `${page.workspace.kind === "one" ? page.workspace.workspace.id : "all"}:${view}`,
     selectedId: open && target !== null ? target.run.id : null,
     revealedId,
@@ -446,6 +449,8 @@ function AnimatedCards({
             tagged={tagged(run)}
             all={host.all}
             selected={!leaving && host.selectedId === run.id}
+            leaving={leaving}
+            lastTags={host.lastTags}
             openRef={leaving ? null : host.cardRef(run.id)}
             onOpen={(mode) => host.onOpen(run, tagged(run), mode)}
             onControl={(control) => host.onControl(run, control)}
