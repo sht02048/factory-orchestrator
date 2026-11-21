@@ -666,6 +666,7 @@ function Continuation({
   const t = useTranslations("run.continuation");
   const { continuedFrom, continuedBy, continuePlace } = run;
   if (continuedFrom === null && continuedBy === null) return null;
+  const endedBeforeStart = run.status.state === "ended" && run.startedAt === null;
   return (
     <>
       {continuedFrom === null ? null : (
@@ -676,7 +677,7 @@ function Continuation({
               digit: continuedFrom.number % 10,
             })}
           </TextLink>{" "}
-          {t(`place.${continuePlace ?? "pending"}`)}
+          {t(`place.${endedBeforeStart ? "notStarted" : (continuePlace ?? "pending")}`)}
         </Text>
       )}
       {continuedBy === null ? null : (

@@ -1126,6 +1126,19 @@ describe("이어서 맡기기(0149)", () => {
     expect(found(db, id).continueOffer?.place).toBe("recreated");
   });
 
+  it("이어 받은 런이 시작하기 전에 끝나면 이어 받은 곳 대신 그 사실을 보인다", () => {
+    const { db } = seedDatabase();
+    const id = keptRun(db);
+    const result = continueRunRequest(db, id, "이어 주세요", minutes(560));
+    if (!result.ok) throw new Error(result.reason);
+    recordContinuePlace(db, result.runId, "same-worktree");
+    walk(db, result.runId, 560, [{ to: "ended", agentResult: "canceled", prState: "none" }]);
+
+    const body = text(render({ kind: "found", run: found(db, result.runId) }));
+    expect(body).toContain(runJson.continuation.place.notStarted);
+    expect(body).not.toContain(runJson.continuation.place["same-worktree"]);
+  });
+
   it("두 런을 잇고 양쪽 Run 상세와 지나온 일에 런 번호를 보인다", () => {
     const { db } = seedDatabase();
     const id = keptRun(db);

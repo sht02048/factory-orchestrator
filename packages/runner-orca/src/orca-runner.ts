@@ -499,7 +499,8 @@ export class OrcaRunner implements Runner {
     const current = entries.find((entry) => entry.path === path && !entry.prunable);
     if (current !== undefined) {
       if (current.branch === input.branch) {
-        if (input.stopAgent !== undefined) await this.stopPreviousAgent(input.stopAgent);
+        if (input.stopAgent !== undefined)
+          await this.stopPreviousAgent(input.stopAgent, input.worktree);
         return "same-worktree";
       }
       throw new AdapterError<RunnerErrorDetail>({
@@ -548,7 +549,7 @@ export class OrcaRunner implements Runner {
     return "recreated";
   }
 
-  private async stopPreviousAgent(agentRef: AgentRef): Promise<void> {
+  private async stopPreviousAgent(agentRef: AgentRef, worktree: WorktreeRef): Promise<void> {
     const agent = decodeAgent(agentRef);
     if (agent === null) {
       throw new AdapterError<RunnerErrorDetail>({
@@ -567,7 +568,13 @@ export class OrcaRunner implements Runner {
         ["orchestration", "worker-show", "--dispatch", agent.dispatchId],
         workerShowResultSchema,
       );
-      if (shown.ok && provenEnded(shown.result)) return;
+      if (
+        shown.ok &&
+        settledState(shown.result) &&
+        (await this.liveAgentTerminal(agent, worktree)) === null
+      ) {
+        return;
+      }
     }
     throw this.errorFor(stopped, {});
   }
@@ -1307,9 +1314,8 @@ const ENDED_WORKER_STATES: ReadonlySet<string> = new Set([
   "abandoned",
 ]);
 
-function provenEnded(worker: { state: string; liveness?: string | null | undefined }): boolean {
-  if (worker.liveness === "exited") return true;
-  return worker.liveness !== "live" && ENDED_WORKER_STATES.has(worker.state);
+function settledState(worker: { state: string; liveness?: string | null | undefined }): boolean {
+  return worker.liveness === "exited" || ENDED_WORKER_STATES.has(worker.state);
 }
 
 function withinRemoteTimeout(result: RemoteResult): RemoteResult {
