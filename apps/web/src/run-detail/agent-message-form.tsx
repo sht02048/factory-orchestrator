@@ -37,6 +37,7 @@ export function useDeliveryText(): (delivery: AgentMessageDelivery) => string {
       case "sending":
       case "after-resume":
       case "after-reconnect":
+      case "stopping-follow-up":
       case "sent":
         return t(`delivery.${delivery.status}`);
     }

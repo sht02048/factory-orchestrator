@@ -905,6 +905,24 @@ describe("answerQuestion and denyPermission", () => {
     });
   });
 
+  test("a code Orca adds later is treated as an unknown outcome, a known refusal is not(0147)", async () => {
+    const later = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(JSON.stringify({ ok: false, error: { code: "some_new_code", message: "x" } }), 1),
+    );
+    expect(await adapterError(runnerWith(later).sendToAgent(RUN, { body: "x" }))).toMatchObject({
+      kind: "start-outcome-unknown",
+    });
+    const refused = new ScriptedExec().orca(
+      "orchestration send",
+      stdout(JSON.stringify({ ok: false, error: { code: "invalid_argument", message: "x" } }), 1),
+    );
+    expect(await adapterError(runnerWith(refused).sendToAgent(RUN, { body: "x" }))).toMatchObject({
+      kind: "runner-error",
+      code: "invalid_argument",
+    });
+  });
+
   test("stopping a follow-up stops that dispatch(0147)", async () => {
     const exec = new ScriptedExec().orca(
       "orchestration worker-stop",

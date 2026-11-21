@@ -133,6 +133,7 @@ export interface StoredAgentMessage {
   id: number;
   body: string;
   requestedAt: Date;
+  followUpRef: FollowUpRef | null;
   completedAt: Date | null;
   error: string | null;
 }
@@ -143,6 +144,7 @@ export function listRunAgentMessages(db: Database, runId: RunId): StoredAgentMes
       id: runAgentMessages.id,
       body: runAgentMessages.body,
       requestedAt: runAgentMessages.requestedAt,
+      followUpRef: runAgentMessages.followUpRef,
       completedAt: runAgentMessages.completedAt,
       error: runAgentMessages.error,
     })

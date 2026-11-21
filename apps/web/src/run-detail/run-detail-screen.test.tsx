@@ -1,5 +1,6 @@
 import {
   toAgentMessageRequestId,
+  toFollowUpRef,
   toPermissionRequestId,
   toQuestionId,
   toRunId,
@@ -8,6 +9,7 @@ import {
 import {
   changeRunState,
   completeAgentMessage,
+  recordAgentMessageFollowUp,
   completeRunControlRequest,
   requestAgentMessage,
   requestRunCancel,
@@ -33,6 +35,7 @@ import { renderWithMessages } from "../testing/render";
 import { addTitledRun, endedCases, minutes, now, seedDatabase } from "../testing/seed";
 import { loadRunDetail, requestRunLogTail } from "@ganger/app/run-detail/load";
 import questionJson from "../../messages/ko/question.json" with { type: "json" };
+import { runDetailPollMs } from "./actions";
 import { runMessages } from "./messages";
 import type { RunDetail, RunDetailPage } from "@ganger/app/run-detail/model";
 import { RunDetailScreen } from "./run-detail-screen";
@@ -148,6 +151,18 @@ describe("Run 상세의 에이전트에게 보내기 (0147)", () => {
     expect(html).toContain(runJson.timeline["operator-message"]);
     expect(html).toContain("끝내기 전에 PR 까지 열어 줘요");
     expect(html).toContain(runJson.agentMessage.delivery["after-resume"]);
+  });
+
+  it("후속 워커를 멈추는 동안에는 보내는 중이라고 하지 않고 다시 읽기를 돌리지 않는다", () => {
+    const { db } = seedDatabase();
+    const id = started(db, "ACME-97", 900);
+    const messageId = sent(db, id, "다시 시작된 말");
+    recordAgentMessageFollowUp(db, messageId, toFollowUpRef("ctx_follow_up"));
+    const detail = page(db, id);
+    const html = text(render(detail));
+    expect(html).toContain(runJson.agentMessage.delivery["stopping-follow-up"]);
+    expect(html).not.toContain(runJson.agentMessage.delivery.sending);
+    expect(runDetailPollMs(detail, 0)).toBe(false);
   });
 
   it("후속 워커를 멈추지 못하면 러너에서 직접 멈추라고 보인다", () => {

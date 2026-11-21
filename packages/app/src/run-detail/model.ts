@@ -34,7 +34,7 @@ export type TimelineEvent = { at: string } & (
 );
 
 export type AgentMessageDelivery =
-  | { status: "sending" | "after-resume" | "after-reconnect" | "sent" }
+  | { status: "sending" | "after-resume" | "after-reconnect" | "stopping-follow-up" | "sent" }
   | { status: "failed"; reason: AgentMessageFailure | "unknown" };
 
 export interface AgentMessageView {

@@ -248,6 +248,7 @@
       "sending": "에이전트에게 보내는 중이에요.",
       "after-resume": "재개하면 전해요.",
       "after-reconnect": "러너에 다시 닿으면 전해요.",
+      "stopping-follow-up": "에이전트가 이미 끝나 있어서 Orca가 이 말로 작업을 다시 시작했어요. 그 작업을 멈추는 중이에요.",
       "sent": "에이전트에게 보냈어요.",
       "failed": "보내지 못했어요. {reason}"
     },

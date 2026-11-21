@@ -115,10 +115,10 @@ export const ESCALATION_ANSWER_SUBJECT = "Answer from the operator";
 export const OPERATOR_MESSAGE_SUBJECT =
   "Message from the operator (not an answer to any open question)";
 
-const SEND_OUTCOME_UNKNOWN_CODES: ReadonlySet<string> = new Set([
-  "remote_runtime_unavailable",
-  "runtime_timeout",
-  "invalid_runtime_response",
+const SEND_NOT_APPLIED_CODES: ReadonlySet<string> = new Set([
+  "argument_too_long",
+  "invalid_argument",
+  "agent_not_running",
 ]);
 
 const SENDER_ERROR_CODES = new Set([
@@ -709,14 +709,14 @@ export class OrcaRunner implements Runner {
           `--body=${input.body}`,
         ],
         operatorSendResultSchema,
-        { usesMailbox: true },
+        { usesMailbox: true, timeoutMs: this.config.startTimeoutMs },
         failedFollowUpEnvelopeSchema,
       );
     } catch (error) {
       const detail = detailOf(error);
       if (
         detail.kind === "not-ready" ||
-        (detail.kind === "runner-error" && SEND_OUTCOME_UNKNOWN_CODES.has(detail.code))
+        (detail.kind === "runner-error" && !SEND_NOT_APPLIED_CODES.has(detail.code))
       ) {
         throw new AdapterError<RunnerErrorDetail>(
           {
