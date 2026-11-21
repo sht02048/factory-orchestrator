@@ -299,7 +299,11 @@ const styles = stylex.create({
     fontSize: fontSize.small,
   },
   rows: { display: "flex", flexDirection: "column", gap: space.px2, outline: "none" },
-  motionRows: { gap: 0, marginBottom: `calc(${space.px2} * -1)` },
+  motionRows: {
+    display: { default: "flex", ":empty": "none" },
+    gap: 0,
+    marginBottom: `calc(${space.px2} * -1)`,
+  },
   row: {
     position: "relative",
     minHeight: size.rowMinHeight,

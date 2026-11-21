@@ -261,23 +261,22 @@ function RunsList({
                         ? t("noRunsWithConditions")
                         : t("noRuns")}
                   </TableEmpty>
-                ) : (
-                  <TableRows
-                    label={t("listLabel")}
-                    value={selected?.id ?? null}
-                    onValueChange={onSelect}
-                    motionItems
+                ) : null}
+                <TableRows
+                  label={t("listLabel")}
+                  value={selected?.id ?? null}
+                  onValueChange={onSelect}
+                  motionItems
+                >
+                  <MotionList
+                    items={visible}
+                    getKey={(run) => run.id}
+                    itemGap="row"
+                    resetKey={listKey}
                   >
-                    <MotionList
-                      items={visible}
-                      getKey={(run) => run.id}
-                      itemGap="row"
-                      resetKey={listKey}
-                    >
-                      {(run) => <RunRow run={run} onOpen={() => onOpen(run.id)} />}
-                    </MotionList>
-                  </TableRows>
-                )}
+                    {(run) => <RunRow run={run} onOpen={() => onOpen(run.id)} />}
+                  </MotionList>
+                </TableRows>
               </Table>
             </Card>
             {page.moreEnded || page.recentEnded > ENDED_RUNS_PAGE_SIZE ? (

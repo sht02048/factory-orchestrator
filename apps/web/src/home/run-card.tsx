@@ -46,6 +46,8 @@ export function RunCard({
 }) {
   const todoTag = tagged ? todoTagOf(run) : null;
   const tag = cardTag(run, tagged);
+  const [seenWithoutTag, setSeenWithoutTag] = useState(tag === null);
+  if (tag === null && !seenWithoutTag) setSeenWithoutTag(true);
   const titleId = useId();
   const [sending, setSending] = useState(false);
   const [rejected, setRejected] = useState(false);
@@ -69,7 +71,7 @@ export function RunCard({
         ? {}
         : {
             tag: (
-              <StatusPill status={tag} changeMotion>
+              <StatusPill status={tag} changeMotion popOnMount={seenWithoutTag}>
                 {statusName(tag)}
               </StatusPill>
             ),

@@ -232,7 +232,7 @@ export function HomeScreen({
               >
                 <div
                   data-todo-group={humanChecks.length === 0 ? undefined : "check"}
-                  {...stylex.props(styles.settled, humanChecks.length === 0 && styles.emptyGroup)}
+                  {...stylex.props(styles.settled)}
                 >
                   {humanChecks.length === 0 ? null : (
                     <KanbanSubheading>{t("board.humanCheck")}</KanbanSubheading>
@@ -462,10 +462,7 @@ function SettledCards({ runs, page, host }: { runs: HomeRun[]; page: HomePage; h
   const revealed = runs.slice(SETTLED_VISIBLE).find((run) => run.id === host.revealedId);
   const visible = revealed === undefined ? first : [...first, revealed];
   return (
-    <div
-      data-settled={runs.length === 0 ? undefined : ""}
-      {...stylex.props(styles.settled, runs.length === 0 && styles.emptyGroup)}
-    >
+    <div data-settled={runs.length === 0 ? undefined : ""} {...stylex.props(styles.settled)}>
       {runs.length === 0 ? null : <KanbanSubheading>{t("settled")}</KanbanSubheading>}
       <AnimatedCards
         runs={visible}
@@ -672,8 +669,12 @@ const styles = stylex.create({
     },
     paddingTop: { default: space.s3, [breakpoints.kanbanStacked]: space.s4 },
   },
-  settled: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
-  emptyGroup: { display: "none" },
+  settled: {
+    display: { default: "flex", ":not(:has(li))": "none" },
+    flexDirection: "column",
+    gap: space.s2,
+    minWidth: 0,
+  },
   allRuns: { paddingInline: space.s1 },
   sideBlock: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },
   runnerText: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },

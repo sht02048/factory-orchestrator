@@ -199,7 +199,7 @@
 | `MotionList`              | 항목이 생기고 빠지는 목록. `items`·`getKey`와 항목을 그리는 함수를 준다. 기본은 펼치며 들어오고 접히며 빠진다. 타임라인 새 줄은 `enter="rise"`. 빠짐이 끝나면 `onExited(key)`가 온다. 필터·탭을 바꿀 때는 `resetKey`를 바꿔 움직이지 않게 한다 |
 | `MotionScope`             | 항목이 목록 사이를 옮겨 다니는 묶음(Dashboard 칸). 칸들을 함께 감싼다. 카드는 `move="card"`(300ms), 행은 기본 `row`(240ms)                                                                                                                     |
 | `useMotionMove`           | 갱신을 직접 쥔 곳(사용자 행동)에서 `move(() => setState(...))`로 부른다. View Transitions API를 쓰고, 없으면 FLIP, 둘 다 안 되면 바로 바뀐다. props로만 바뀌는 목록은 부르지 않아도 FLIP으로 움직인다                                          |
-| `StatusPill changeMotion` | 목록에서 상태가 바뀌는 알약. 색이 150ms에 바뀌고 한 번 1.06배로 커진다. 첫 렌더에는 움직이지 않는다                                                                                                                                            |
+| `StatusPill changeMotion` | 목록에서 상태가 바뀌는 알약. 색이 150ms에 바뀌고 한 번 1.06배로 커진다. 첫 렌더에는 움직이지 않는다. 화면을 연 뒤에 새로 생긴 알약은 `popOnMount`를 함께 준다                                                                                  |
 | `Dialog`, `Sheet`         | 열기·닫기 움직임이 들어 있어 화면에서 할 일이 없다. 닫는 도중 다시 열면 그 자리에서 되돌아간다                                                                                                                                                 |
 
 - 한꺼번에 `MOTION_BURST_LIMIT`(3)건보다 많이 바뀌면 미끄러지지 않고 흐려지며 바뀐다. 건수는 들어온 것·빠진 것·칸을 옮긴 것·순서가 실제로 바뀐 것만 센다. 밀려난 이웃은 세지 않는다.

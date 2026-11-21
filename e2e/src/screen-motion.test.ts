@@ -9,6 +9,7 @@ import {
   toAgentRef,
   toCodeHostKind,
   toLabelId,
+  toQuestionId,
   toRunnerId,
   toRunnerKind,
   toRunnerProjectId,
@@ -19,10 +20,12 @@ import {
 import type { RunId } from "@ganger/core";
 import {
   SecretBox,
+  answerRunQuestion,
   assignRun,
   changeRunState,
   migrate,
   openDatabase,
+  recordRunQuestions,
   recordRunnerCheck,
   saveAutoAssignLabel,
   saveCodeHostConnection,
@@ -53,6 +56,7 @@ interface MotionCall {
 
 declare global {
   var screenMotionCalls: MotionCall[];
+  var screenMotionRate: number;
 }
 
 const webRoot = fileURLToPath(new URL("../../apps/web", import.meta.url));
@@ -217,9 +221,12 @@ async function newPage(
           : Object.keys(keyframes ?? {}),
         pill: this.hasAttribute("data-status"),
       });
-      return original.call(this, keyframes, options);
+      const animation = original.call(this, keyframes, options);
+      animation.playbackRate = globalThis.screenMotionRate;
+      return animation;
     };
     globalThis.screenMotionCalls = calls;
+    globalThis.screenMotionRate = 1;
   });
   onTestFailed(async () => {
     mkdirSync(resultsDir, { recursive: true });
@@ -317,6 +324,71 @@ describe("Dashboard 움직임(브라우저, 0153)", () => {
     expect(calls.some((call) => call.pill && call.properties.includes("transform"))).toBe(true);
   });
 
+  it("알약이 없던 카드에 알약이 새로 생기면 한 번 커진다", async (context) => {
+    const run = assign();
+    start(run.id);
+    const page = await newPage(context);
+    await open(page, dashboardPath, "/");
+    await card(page, run.key).waitFor();
+    expect(await card(page, run.key).locator("[data-status]").count()).toBe(0);
+    await clearCalls(page);
+
+    pause(run.id);
+
+    await card(page, run.key).locator("[data-status]").waitFor({ timeout: CHANGE_VISIBLE_MS });
+    const calls = await callsFor(page, run.id);
+    expect(calls.some((call) => call.pill && call.properties.includes("transform"))).toBe(true);
+  });
+
+  it("묶음의 마지막 카드는 접히는 동안 보이고 끝나면 묶음이 숨는다", async (context) => {
+    const run = assign();
+    start(run.id);
+    pause(run.id);
+    recordRunQuestions(db, run.id, [
+      {
+        id: toQuestionId(`check-${run.id}`),
+        kind: "human-check",
+        body: "Check the preview.",
+        options: [],
+        askedAt: new Date(),
+      },
+    ]);
+    const page = await newPage(context);
+    await open(page, dashboardPath, "/");
+    await tab(page, home.view.todo).click();
+    await expect.poll(() => tab(page, home.view.todo).getAttribute("aria-selected")).toBe("true");
+    const group = page.locator('[data-todo-group="check"]');
+    await card(group, run.key).waitFor();
+    await page.evaluate(() => {
+      globalThis.screenMotionRate = 0.05;
+    });
+
+    answerRunQuestion(db, {
+      runId: run.id,
+      questionId: toQuestionId(`check-${run.id}`),
+      answer: "ok",
+      kind: "human-check",
+    });
+    const resumed = changeRunState(db, run.id, { to: "running" });
+    if (!resumed.ok) throw new Error("resume failed");
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate((key) => {
+            const row = document.querySelector(`li[data-motion-key="${key}"][inert]`);
+            return row !== null && row.getBoundingClientRect().height > 0;
+          }, run.id),
+        { timeout: CHANGE_VISIBLE_MS },
+      )
+      .toBe(true);
+    await page.evaluate(() => {
+      globalThis.screenMotionRate = 1;
+      for (const animation of document.getAnimations()) animation.finish();
+    });
+    await expect.poll(() => group.count(), { timeout: CHANGE_VISIBLE_MS }).toBe(0);
+  });
+
   it("움직임 줄이기에서는 칸을 옮겨도 흐려지기만 한다", async (context) => {
     const moved = assign();
     const page = await newPage(context, "reduce");
@@ -406,6 +478,26 @@ describe("Runs 움직임(브라우저, 0153)", () => {
       .waitFor({ timeout: CHANGE_VISIBLE_MS });
     const changed = await callsFor(page, existing.id);
     expect(changed.some((call) => call.pill)).toBe(true);
+  });
+
+  it("비어 있던 필터 목록에 처음 생긴 행도 들어온다", async (context) => {
+    const run = assign();
+    start(run.id);
+    const page = await newPage(context);
+    await open(page, `${runsPath}&f=canceled`, "/runs");
+    await page.getByText(runs.empty, { exact: true }).waitFor();
+    await clearCalls(page);
+
+    const ended = changeRunState(db, run.id, {
+      to: "ended",
+      agentResult: "canceled",
+      prState: "none",
+    });
+    if (!ended.ok) throw new Error(`end failed: ${JSON.stringify(ended.error)}`);
+
+    await runRow(page, run.key).waitFor({ timeout: CHANGE_VISIBLE_MS });
+    const calls = await callsFor(page, run.id);
+    expect(calls.some((call) => call.properties.includes("gridTemplateRows"))).toBe(true);
   });
 
   it("움직임 줄이기에서는 새 행이 흐려지며 들어온다", async (context) => {
