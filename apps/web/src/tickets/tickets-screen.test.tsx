@@ -295,6 +295,32 @@ describe("Tickets 화면", () => {
     expect(panel).toContain("ACME-20 뒤 티켓");
   });
 
+  it("첫 관계 읽기에 실패한 런은 선행 티켓이 없다고 말하지 않는다(0160)", async () => {
+    const { context } = setupTickets();
+    const loaded = await loadTicketsPage(context, undefined, now);
+    const page: TicketsPage = {
+      ...loaded,
+      tickets: loaded.tickets.map((ticket) =>
+        ticket.key === "ACME-3"
+          ? {
+              ...ticket,
+              blockerWait: {
+                kind: "blockers-stuck" as const,
+                cause: "unreadable" as const,
+                blocker: null,
+                blockers: [],
+              },
+            }
+          : ticket,
+      ),
+    };
+    const selected = page.tickets.find((ticket) => ticket.key === "ACME-3");
+    const panel = panelText(render(page, { selectedId: selected?.id ?? "" }));
+
+    expect(panel).toContain("먼저 끝나야 하는 티켓을 읽지 못했어요.");
+    expect(panel).not.toContain("먼저 끝나야 하는 티켓이 없어요.");
+  });
+
   it("패널은 키 · 트래커 프로젝트 · 트래커 상태 메타 줄과 제목, 마지막 런 상자를 보인다", async () => {
     const { context } = setupTickets();
     const page = await loadTicketsPage(context, undefined, now);

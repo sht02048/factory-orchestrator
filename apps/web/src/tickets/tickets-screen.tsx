@@ -540,9 +540,11 @@ function useTicketBlockers(
       current = false;
     };
   }, [ticket.id, stored === null, rereads]);
-  return stored === null
-    ? read
-    : { status: "done", result: { ok: true, blockers: allBlockersOf(stored) } };
+  if (stored === null) return read;
+  const blockers = allBlockersOf(stored);
+  const unread =
+    stored.kind === "blockers-stuck" && stored.cause === "unreadable" && blockers.length === 0;
+  return { status: "done", result: unread ? { ok: false } : { ok: true, blockers } };
 }
 
 function TicketRelations({

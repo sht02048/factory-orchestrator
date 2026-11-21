@@ -284,7 +284,12 @@ const styles = stylex.create({
     transitionTimingFunction: motion.easeOut,
     outline: { default: "none", ":focus-visible": `2px solid ${colors.textPrimary}` },
   },
-  stuck: { boxShadow: `inset 0 0 0 1px ${colors.problemBorder}` },
+  stuck: {
+    boxShadow: {
+      default: `inset 0 0 0 1px ${colors.problemBorder}`,
+      ":hover": { default: null, "@media (hover: hover)": `inset 0 0 0 1px ${colors.problem}` },
+    },
+  },
   stuckSelected: { boxShadow: `inset 0 0 0 1px ${colors.problem}` },
   contents: { display: "contents" },
   identity: {
