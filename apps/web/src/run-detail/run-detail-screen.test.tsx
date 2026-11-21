@@ -290,6 +290,40 @@ describe("Run 상세 화면", () => {
     });
   });
 
+  it("같은 커밋에서 CI 를 아예 못 읽으면 지난 CI 실패 표시를 둔다 (0150)", () => {
+    const { db } = seedDatabase();
+    const id = assign(db, "ACME-47", 400);
+    walk(db, id, 400, [startedOn("ACME-47")]);
+    const pullRequest = {
+      id: toPullRequestId("17"),
+      displayId: "#17",
+      url: "https://code.example.com/acme/web/pull/17",
+      headCommit: "abc",
+    };
+    updateRunRecords(db, id, {
+      pullRequest: {
+        ...pullRequest,
+        ci: "failure",
+        checkedAt: minutes(403),
+        signals: {
+          open: true,
+          headCommit: "abc",
+          ciFailed: true,
+          checkTotal: 4,
+          failedCount: 1,
+          failedChecks: ["lint"],
+          checksTruncated: false,
+          conflict: false,
+          behindBy: 0,
+        },
+      },
+    });
+    updateRunRecords(db, id, {
+      pullRequest: { ...pullRequest, ci: "unavailable", checkedAt: minutes(404), signals: null },
+    });
+    expect(found(db, id).pullRequest?.signals).toMatchObject({ ciFailed: true, checkTotal: null });
+  });
+
   it("PR 정보를 못 읽은 도는 런도 Actions 로 읽은 CI 실패는 표시한다 (0150)", () => {
     const { db } = seedDatabase();
     const id = assign(db, "ACME-45", 400);

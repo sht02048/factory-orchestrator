@@ -178,7 +178,8 @@ export class GitHubCodeHost implements CodeHost {
     };
     return Promise.all(
       nodes.map(async (node) => {
-        const read = await readPullRequestSignals(this.http, owner, name, node);
+        const read =
+          node.state === "OPEN" ? await readPullRequestSignals(this.http, owner, name, node) : null;
         const state = read?.ci ?? (await ciOf(node.headRefOid));
         return toSnapshot(node, state, read?.signals ?? null);
       }),

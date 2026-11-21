@@ -237,6 +237,16 @@ describe("PR 을 읽을 때 PR 정보 함께 읽기 (0150)", () => {
     expect(pr?.signals).toBeNull();
   });
 
+  it("열리지 않은 PR 은 PR 정보를 읽지 않는다", async () => {
+    const { fetch, sent } = fakeFetch(
+      route({ graphql: fixture("by-number-merged"), actions: fixture("actions-runs-none") }),
+    );
+    const pr = await new GitHubCodeHost({ token: "t", fetch }).getPullRequest(repo, id);
+    expect(pr?.state).toBe("merged");
+    expect(pr?.signals).toBeNull();
+    expect(sent.filter(isSignals)).toHaveLength(0);
+  });
+
   it("검사가 없다고 오면 Actions 로 CI 를 다시 본다", async () => {
     const { fetch, sent } = fakeFetch(
       route({

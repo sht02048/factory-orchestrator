@@ -30,7 +30,8 @@ export function prSignalsViewOf(run: StoredRun, records: RunRecords): PrSignalsV
   const signals = pr.signals ?? null;
   const readWithCi = pr.signalsReadAt?.getTime() === pr.checkedAt.getTime();
   const checks = readWithCi && signals?.checkTotal != null ? signals : null;
-  const ciFailed = checks === null ? pr.ci === "failure" : checks.ciFailed;
+  const lastKnownFailed = pr.ci === "unavailable" && signals?.ciFailed === true;
+  const ciFailed = checks === null ? pr.ci === "failure" || lastKnownFailed : checks.ciFailed;
   if (signals === null) {
     if (!ciFailed) return null;
   } else if (!signals.open) {
