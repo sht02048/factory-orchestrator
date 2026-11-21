@@ -170,6 +170,27 @@ describe("같은 요청 ID는 한 번만 처리한다(0156)", () => {
     expect(listRuns(db, { ticket })).toHaveLength(before + 1);
   });
 
+  it("이어서 맡긴 런이 시작 없이 끝났으면 같은 ID로 다시 맡길 수 있다", () => {
+    const { db } = seedDatabase();
+    const runId = endedRun(db, "gone");
+    const key = { runId, requestId: REQUEST };
+    const first = continueRunOnce(db, key, "이어 주세요", FIRST);
+    if (!first.ok) throw new Error(first.reason);
+    const ended = changeRunState(
+      db,
+      first.runId,
+      { to: "ended", agentResult: "canceled", prState: "none" },
+      minutes(112),
+    );
+    if (!ended.ok) throw new Error("state change failed");
+
+    const second = continueRunOnce(db, key, "이어 주세요", LATER);
+
+    expect(second.ok).toBe(true);
+    expect(second).not.toEqual(first);
+    expect(requestRows(db, runId)).toHaveLength(1);
+  });
+
   it("같은 ID로 다른 내용을 보내면 처리하지 않고 거절한다", () => {
     const { db } = seedDatabase();
     const runId = waitingRun(db, "question");

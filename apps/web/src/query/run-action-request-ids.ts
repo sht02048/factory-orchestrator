@@ -5,6 +5,7 @@ export const REQUEST_ID_RETRY_WINDOW_MS = 60_000;
 
 interface KeptRequestId {
   requestId: string;
+  content: string;
   keptAt: number;
   inFlight: number;
 }
@@ -26,43 +27,42 @@ export function newRunActionRequestId(): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function keptFor(kept: RunRequestIds, intent: string, nowMs: number): KeptRequestId {
-  const existing = kept.get(intent);
+function keptFor(kept: RunRequestIds, slot: string, content: string, nowMs: number): KeptRequestId {
+  const existing = kept.get(slot);
   if (
-    existing !== undefined &&
+    existing?.content === content &&
     (existing.inFlight > 0 || nowMs - existing.keptAt < REQUEST_ID_RETRY_WINDOW_MS)
   ) {
     return existing;
   }
-  const fresh = { requestId: newRunActionRequestId(), keptAt: nowMs, inFlight: 0 };
-  kept.set(intent, fresh);
+  const fresh = { requestId: newRunActionRequestId(), content, keptAt: nowMs, inFlight: 0 };
+  kept.set(slot, fresh);
   return fresh;
-}
-
-function forgetSettled(kept: RunRequestIds): void {
-  for (const [intent, entry] of kept) {
-    if (entry.inFlight === 0) kept.delete(intent);
-  }
 }
 
 export async function withRunActionRequestId<Value>(
   queryClient: QueryClient,
   runId: string,
-  intent: string,
+  slot: string,
+  content: string,
   call: (requestId: string) => Promise<Value>,
-  nowMs: number = Date.now(),
+  clock: () => number = Date.now,
 ): Promise<Value> {
   const kept = requestIdsOf(queryClient, runId);
-  const entry = keptFor(kept, intent, nowMs);
+  const entry = keptFor(kept, slot, content, clock());
+  const forget = (): void => {
+    if (entry.inFlight === 0 && kept.get(slot) === entry) kept.delete(slot);
+  };
   entry.inFlight += 1;
   try {
     const value = await call(entry.requestId);
     entry.inFlight -= 1;
-    forgetSettled(kept);
+    forget();
     return value;
   } catch (error) {
     entry.inFlight -= 1;
-    if (error instanceof MutationRejectedError && entry.inFlight === 0) kept.delete(intent);
+    if (error instanceof MutationRejectedError) forget();
+    else entry.keptAt = clock();
     throw error;
   }
 }

@@ -17,6 +17,7 @@ export interface RunActionHandlers<Result extends { ok: boolean }> {
   replay: (resultRunId: RunId | null) => Result;
   reused: () => Result;
   resultRunId?: (result: Result) => RunId | null;
+  replayIsStale?: (resultRunId: RunId | null) => boolean;
 }
 
 function fingerprintOf(request: RunActionRequest): string {
@@ -35,6 +36,7 @@ export function handleRunActionOnce<Result extends { ok: boolean }>(
   return inTransaction(db, (): Result => {
     const handled = db
       .select({
+        id: runActionRequests.id,
         fingerprint: runActionRequests.fingerprint,
         resultRunId: runActionRequests.resultRunId,
       })
@@ -47,9 +49,11 @@ export function handleRunActionOnce<Result extends { ok: boolean }>(
       )
       .get();
     if (handled !== undefined) {
-      return handled.fingerprint === fingerprint
-        ? handlers.replay(handled.resultRunId)
-        : handlers.reused();
+      if (handled.fingerprint !== fingerprint) return handlers.reused();
+      if (handlers.replayIsStale?.(handled.resultRunId) !== true) {
+        return handlers.replay(handled.resultRunId);
+      }
+      db.delete(runActionRequests).where(eq(runActionRequests.id, handled.id)).run();
     }
     const result = handlers.act();
     if (result.ok) {

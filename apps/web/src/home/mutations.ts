@@ -30,7 +30,8 @@ export function useDashboardActions(): DashboardActions {
       withRunActionRequestId(
         queryClient,
         input.runId,
-        `answer:${input.questionId}:${input.answer}`,
+        `answer:${input.questionId}`,
+        input.answer,
         (requestId) =>
           rejectedAs(
             () => answerQuestion({ data: { ...input, requestId } }),
@@ -44,7 +45,8 @@ export function useDashboardActions(): DashboardActions {
       withRunActionRequestId(
         queryClient,
         input.runId,
-        `human-check:${input.questionId}:${input.decision}:${input.note}`,
+        `human-check:${input.questionId}`,
+        `${input.decision}:${input.note}`,
         (requestId) =>
           rejectedAs(
             () => answerHumanCheck({ data: { ...input, requestId } }),
@@ -63,7 +65,8 @@ export function useDashboardActions(): DashboardActions {
       withRunActionRequestId(
         queryClient,
         input.runId,
-        `control:${input.control}`,
+        "control",
+        input.control,
         async (requestId) => {
           const result = await controlRun({ data: { ...input, requestId } });
           return result.ok ? "requested" : "state-changed";

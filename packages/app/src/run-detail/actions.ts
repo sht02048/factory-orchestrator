@@ -7,6 +7,7 @@ import {
 import type { RunControl, RunId } from "@ganger/core";
 import {
   continueRun,
+  getRun,
   handleRunActionOnce,
   requestAgentMessage,
   requestPreviousAgentStop,
@@ -36,7 +37,7 @@ interface RunActionKey {
   requestId: string;
 }
 
-function onceForRun(
+export function onceForRun(
   db: Database,
   key: RunActionKey,
   action: string,
@@ -160,9 +161,16 @@ export function continueRunOnce(
           : { ok: true, runId: resultRunId },
       reused: () => ({ ok: false, reason: REQUEST_REUSED }),
       resultRunId: (result) => (result.ok ? result.runId : null),
+      replayIsStale: (resultRunId) => {
+        if (resultRunId === null) return false;
+        const next = getRun(db, resultRunId);
+        return next === null || (next.state === "ended" && next.startedAt === null);
+      },
     },
   );
 }
+
+export const MCP_ANSWER_ACTION = "mcp-answer";
 
 export const answerOnceInput = answerInput.extend({ requestId: runActionRequestId });
 

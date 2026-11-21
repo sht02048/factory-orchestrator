@@ -294,6 +294,25 @@ describe("MCP 쓰기 도구", () => {
     expect(listRunQuestions(seeded.db, seeded.waiting).map((q) => q.answer?.text)).toEqual(["no"]);
   });
 
+  it("questionId 없이 답한 뒤 다음 질문이 와도 같은 requestId 는 처음 결과를 돌려주고 새 질문에 답하지 않는다(0156)", async () => {
+    await connect();
+    const args = { runId: seeded.waiting, answer: "no", requestId: "mcp-request-id-next" };
+    expect((await call("answer_question", args)).isError).toBe(false);
+    recordRunQuestions(seeded.db, seeded.waiting, [
+      { id: toQuestionId("q-next"), body: "next?", options: [], askedAt: at(61) },
+    ]);
+
+    const again = await call("answer_question", args);
+    const changed = await call("answer_question", { ...args, answer: "yes" });
+
+    expect(again.isError).toBe(false);
+    expect(changed.json["reason"]).toBe("request-reused");
+    expect(
+      listRunQuestions(seeded.db, seeded.waiting).find((q) => q.id === toQuestionId("q-next"))
+        ?.answer,
+    ).toBeNull();
+  });
+
   it("같은 requestId 로 다시 취소하면 같은 결과이고, requestId 는 없어도 된다(0156)", async () => {
     await connect();
     const args = { runId: seeded.waiting, requestId: "mcp-request-id-0156" };

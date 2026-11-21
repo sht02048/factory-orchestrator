@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@ui-sdk/react/dialog";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { cx } from "../cx";
 import { windowRegion } from "../window-frame";
 import { buttonStyles, type ButtonVariant } from "./button";
@@ -58,9 +58,18 @@ export function Dialog({
         : { onOpenChange: (next: boolean) => onOpenChange(next) })}
     >
       <DialogTrigger
-        {...(triggerBusy ? { "aria-busy": true, "aria-disabled": true } : {})}
+        {...(triggerBusy
+          ? {
+              "aria-busy": true,
+              "aria-disabled": true,
+              onClickCapture: (event: MouseEvent) => {
+                event.preventDefault();
+                event.stopPropagation();
+              },
+            }
+          : {})}
         data-variant={triggerVariant}
-        className={cx(...buttonStyles(triggerVariant))}
+        className={cx(...buttonStyles(triggerVariant, triggerBusy))}
       >
         {trigger}
       </DialogTrigger>

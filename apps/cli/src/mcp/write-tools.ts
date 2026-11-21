@@ -13,8 +13,10 @@ import { powerSettingsStore } from "@ganger/app/power-settings";
 import {
   cancelRunOnce,
   cancelRunRequest,
+  MCP_ANSWER_ACTION,
+  onceForRun,
+  REQUEST_REUSED,
   runActionRequestId,
-  submitAnswerOnce,
 } from "@ganger/app/run-detail/actions";
 import { requestRunLogTail } from "@ganger/app/run-detail/load";
 import {
@@ -407,29 +409,51 @@ export function registerWriteTools(
       const run = findRun(runId);
       if (run === null) return noRun(runId);
       const base = { target: run.ticket.key, runId: run.id };
-      const pending = pendingInput(context.db, run.id);
-      const id = questionId ?? (pending?.kind === "question" ? pending.questionId : undefined);
-      if (id === undefined) {
+      const answerNow = (): Outcome => {
+        const pending = pendingInput(context.db, run.id);
+        const id = questionId ?? (pending?.kind === "question" ? pending.questionId : undefined);
+        if (id === undefined) {
+          return rejected({
+            ...base,
+            reason: "no-question",
+            error: "The run has no pending question.",
+          });
+        }
+        try {
+          const input = screenChecked(answerInput, { runId: run.id, questionId: id, answer }, base);
+          if (!input.ok) return input.outcome;
+          submitAnswer(context.db, input.data, context.now());
+        } catch (error) {
+          if (!(error instanceof AnswerRejectedError)) throw error;
+          return rejected({
+            ...base,
+            reason: error.reason,
+            error: `Could not answer: ${error.reason}.`,
+          });
+        }
+        return done({ ...base, serverHandles: true });
+      };
+      if (requestId === undefined) return answerNow();
+      let outcome: Outcome = done({ ...base, serverHandles: true });
+      const handled = onceForRun(
+        context.db,
+        { runId: run.id, requestId },
+        MCP_ANSWER_ACTION,
+        [questionId ?? "", answer],
+        context.now(),
+        () => {
+          outcome = answerNow();
+          return outcome.ok ? { ok: true } : { ok: false, reason: outcome.reason };
+        },
+      );
+      if (!handled.ok && handled.reason === REQUEST_REUSED) {
         return rejected({
           ...base,
-          reason: "no-question",
-          error: "The run has no pending question.",
+          reason: REQUEST_REUSED,
+          error: "This requestId was already used with different values.",
         });
       }
-      try {
-        const input = screenChecked(answerInput, { runId: run.id, questionId: id, answer }, base);
-        if (!input.ok) return input.outcome;
-        if (requestId === undefined) submitAnswer(context.db, input.data, context.now());
-        else submitAnswerOnce(context.db, { ...input.data, requestId }, context.now());
-      } catch (error) {
-        if (!(error instanceof AnswerRejectedError)) throw error;
-        return rejected({
-          ...base,
-          reason: error.reason,
-          error: `Could not answer: ${error.reason}.`,
-        });
-      }
-      return done({ ...base, serverHandles: true });
+      return outcome;
     },
   );
 

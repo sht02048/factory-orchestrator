@@ -113,19 +113,22 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
     await queryClient.invalidateQueries({ queryKey: runDetailKey(runId) });
     world.logRequested();
   };
-  const once = <Value>(intent: string, call: (requestId: string) => Promise<Value>) =>
-    withRunActionRequestId(queryClient, runId, intent, call);
+  const once = <Value>(
+    slot: string,
+    content: string,
+    call: (requestId: string) => Promise<Value>,
+  ) => withRunActionRequestId(queryClient, runId, slot, content, call);
   return {
     answer: mutationOptions({
       mutationFn: (input: { questionId: string; answer: string }) =>
-        once(`answer:${input.questionId}:${input.answer}`, (requestId) =>
+        once(`answer:${input.questionId}`, input.answer, (requestId) =>
           rejectedAs(() => calls.answer({ runId, requestId, ...input }), ANSWER_REJECT_REASONS),
         ),
       onSuccess: refreshRun,
     }),
     humanCheck: mutationOptions({
       mutationFn: (input: { questionId: string; decision: HumanCheckDecision; note: string }) =>
-        once(`human-check:${input.questionId}:${input.decision}:${input.note}`, (requestId) =>
+        once(`human-check:${input.questionId}`, `${input.decision}:${input.note}`, (requestId) =>
           rejectedAs(() => calls.humanCheck({ runId, requestId, ...input }), ANSWER_REJECT_REASONS),
         ),
       onSuccess: refreshRun,
@@ -137,21 +140,21 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
     }),
     cancel: mutationOptions({
       mutationFn: () =>
-        once("cancel", async (requestId) =>
+        once("cancel", "", async (requestId) =>
           okOrThrow<object, string>(await calls.cancel(runId, requestId)),
         ),
       onSuccess: refreshRun,
     }),
     removeWorktree: mutationOptions({
       mutationFn: () =>
-        once("remove-worktree", async (requestId) =>
+        once("remove-worktree", "", async (requestId) =>
           okOrThrow<object, string>(await calls.removeWorktree(runId, requestId)),
         ),
       onSuccess: refreshRun,
     }),
     continueRun: mutationOptions({
       mutationFn: (message: string) =>
-        once(`continue:${message}`, async (requestId) =>
+        once("continue", message, async (requestId) =>
           okOrThrow<{ runId: RunId }, string>(
             await calls.continueRun(toRunId(runId), message, requestId),
           ),
@@ -160,14 +163,14 @@ export function runDetailMutations(world: RunDetailWorld, runId: string) {
     }),
     stopPreviousAgent: mutationOptions({
       mutationFn: () =>
-        once("stop-previous-agent", async (requestId) =>
+        once("stop-previous-agent", "", async (requestId) =>
           okOrThrow<object, string>(await calls.stopPreviousAgent(toRunId(runId), requestId)),
         ),
       onSuccess: refreshRun,
     }),
     control: mutationOptions({
       mutationFn: (control: RunControl): Promise<RunControlOutcome> =>
-        once(`control:${control}`, async (requestId) =>
+        once("control", control, async (requestId) =>
           (await calls.control(runId, control, requestId)).ok ? "requested" : "state-changed",
         ),
       onSuccess: refreshRun,

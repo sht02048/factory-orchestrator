@@ -116,8 +116,7 @@ describe("보내는 동안 버튼을 막는다(0156)", () => {
   it("런 취소: 확인한 뒤 응답 전에는 트리거가 막혀 대화상자가 다시 열리지 않는다", async () => {
     await open(startRun());
     const held = await holdActionRequests();
-    const trigger = page.getByRole("button", { name: run.cancel.trigger });
-    await trigger.click();
+    await page.getByRole("button", { name: run.cancel.trigger }).click();
     await page
       .getByRole("dialog", { name: run.cancel.title })
       .getByRole("button", { name: run.cancel.confirm })
@@ -125,6 +124,7 @@ describe("보내는 동안 버튼을 막는다(0156)", () => {
     await held.arrived(1);
     await page.getByRole("dialog").waitFor({ state: "detached" });
 
+    const trigger = page.getByRole("button", { name: run.cancel.sending });
     await expectBlocked(trigger);
     await trigger.click({ force: true });
     expect(await page.getByRole("dialog").count()).toBe(0);
@@ -137,8 +137,7 @@ describe("보내는 동안 버튼을 막는다(0156)", () => {
   it("워크트리 지우기: 확인한 뒤 응답 전에는 트리거가 막힌다", async () => {
     await open(endedRun("gone"));
     const held = await holdActionRequests();
-    const trigger = page.getByRole("button", { name: run.removeWorktree.trigger });
-    await trigger.click();
+    await page.getByRole("button", { name: run.removeWorktree.trigger }).click();
     await page
       .getByRole("dialog", { name: run.removeWorktree.title })
       .getByRole("button", { name: run.removeWorktree.confirm })
@@ -146,6 +145,7 @@ describe("보내는 동안 버튼을 막는다(0156)", () => {
     await held.arrived(1);
     await page.getByRole("dialog").waitFor({ state: "detached" });
 
+    const trigger = page.getByRole("button", { name: run.removeWorktree.sending });
     await expectBlocked(trigger);
     await trigger.click({ force: true });
     expect(await page.getByRole("dialog").count()).toBe(0);
