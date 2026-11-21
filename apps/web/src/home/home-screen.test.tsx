@@ -407,6 +407,35 @@ describe("Dashboard 칸반(티켓 0100)", () => {
     expect(titled.indexOf(">결제 실패 재시도<")).toBeGreaterThan(titled.indexOf(">ACME-30</span>"));
   });
 
+  it("선행 티켓을 기다리는 카드도 취소 중과 Workspace 이름을 보인다(0160)", () => {
+    const page = seededPage("all");
+    const queued = page.queued.map((run) =>
+      run.state === "queued"
+        ? {
+            ...run,
+            cancelling: true,
+            queuedReason: {
+              kind: "blockers-waiting" as const,
+              blockers: [
+                {
+                  key: "ACME-11",
+                  title: "앞 티켓",
+                  stateName: "In Progress",
+                  stateCategory: "started",
+                },
+              ],
+            },
+          }
+        : run,
+    );
+    const first = queued[0];
+    if (first === undefined) throw new Error("no queued run");
+    const body = text(section(render({ ...page, queued }), "Queued"));
+
+    expect(body).toContain(homeJson.card.cancelling);
+    expect(body).toContain(first.workspace.name);
+  });
+
   it("Queued 까닭은 러너 이름에 맞는 조사로 쓴다", () => {
     const page = seededPage();
     const queued = page.queued.map((run) =>

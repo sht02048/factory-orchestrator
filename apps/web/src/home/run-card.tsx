@@ -145,7 +145,13 @@ function useCardParts(
       return {
         ...(blockers.length === 0 ? {} : { blockers: <BlockerChipList blockers={blockers} /> }),
         stuck,
-        meta: text.queued(run),
+        meta: [
+          run.cancelling ? t("cancelling") : null,
+          text.queued(run),
+          all ? run.workspace.name : null,
+        ]
+          .filter((part) => part !== null)
+          .join(" · "),
         ...(stuck ? { metaTone: "problem" as const } : {}),
         time: elapsed(run.waitMs),
       };
