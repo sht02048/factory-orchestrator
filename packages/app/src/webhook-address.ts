@@ -184,16 +184,20 @@ export async function checkWebhookAddress(
   }
 }
 
-export function funnelCommand(cli: string, port: number): string {
-  const target = `http://127.0.0.1:${String(port)}/api/webhooks/`;
+export function funnelCommand(
+  cli: string,
+  port: number,
+  { host = "127.0.0.1", funnelPort = FUNNEL_PORT }: { host?: string; funnelPort?: number } = {},
+): string {
+  const target = `http://${host}:${String(port)}/api/webhooks/`;
   return [
     shellWord(cli),
     "funnel",
     "--bg",
-    `--https=${String(FUNNEL_PORT)}`,
+    `--https=${String(funnelPort)}`,
     "--set-path",
     "/api/webhooks/",
-    target,
+    shellWord(target),
   ].join(" ");
 }
 
@@ -201,6 +205,6 @@ function shellWord(value: string): string {
   return /^[A-Za-z0-9_./:=-]+$/u.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
-export function funnelAddress(host: string): string {
-  return `https://${host}:${String(FUNNEL_PORT)}`;
+export function funnelAddress(host: string, funnelPort: number = FUNNEL_PORT): string {
+  return funnelPort === 443 ? `https://${host}` : `https://${host}:${String(funnelPort)}`;
 }

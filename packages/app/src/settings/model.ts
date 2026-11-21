@@ -135,10 +135,26 @@ export interface TrackerConnectionView {
   webhookSettingsUrl: string | null;
 }
 
-export interface FunnelSetupView {
-  command: string;
-  address: string;
+interface FunnelPortUsage {
+  port: number;
+  uses: string[];
+  isPublic: boolean;
 }
+
+export type FunnelPortChoice =
+  | (FunnelPortUsage & { unavailable: null; command: string; address: string })
+  | (FunnelPortUsage & { unavailable: "serves-this-app" | "tcp-forward" });
+
+export type FunnelSetupView =
+  | {
+      kind: "ready";
+      port: number;
+      portState: "free" | "ours" | "unknown";
+      command: string;
+      address: string;
+    }
+  | { kind: "ports-full"; ports: FunnelPortChoice[] }
+  | { kind: "bind-tailnet"; bindHost: string };
 
 export interface WebhookSetupView {
   funnel: FunnelSetupView | null;
@@ -184,6 +200,7 @@ export interface AddressesView {
   webAddress: string | null;
   webhookAddress: string | null;
   webhookAddressChecked: boolean;
+  autoAllowedHosts: ReadonlyArray<string>;
 }
 
 export interface PowerView {

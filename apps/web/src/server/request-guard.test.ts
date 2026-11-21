@@ -17,11 +17,12 @@ const unset: AllowedHostsInput = { bindHost: "127.0.0.1", webAddress: null, webh
 
 function request(
   path: string,
-  init: { method?: string; host?: string; origin?: string } = {},
+  init: { method?: string; host?: string; origin?: string; funnel?: boolean } = {},
 ): Request {
   const headers = new Headers();
   if (init.host !== undefined) headers.set("host", init.host);
   if (init.origin !== undefined) headers.set("origin", init.origin);
+  if (init.funnel === true) headers.set("tailscale-funnel-request", "?1");
   return new Request(`http://127.0.0.1:3000${path}`, {
     method: init.method ?? "GET",
     headers,
@@ -139,6 +140,102 @@ describe("Host 검사", () => {
       ok: false,
       reason: "host-not-allowed",
     });
+  });
+});
+
+describe("와일드카드 바인드의 tailnet 자동 허용(0157)", () => {
+  const MAGIC = "server.example.ts.net";
+  const IP = "100.64.0.10";
+  const IPV6 = "[fd7a:115c:a1e0::10]";
+  const wildcard: AllowedHostsInput = {
+    bindHost: "0.0.0.0",
+    webAddress: null,
+    webhookAddress: null,
+    tailnetHosts: [MAGIC, IP, "fd7a:115c:a1e0::10"],
+    webPort: 3000,
+  };
+  const rejected = { ok: false, reason: "host-not-allowed" };
+
+  describe.each([MAGIC, IP, IPV6])("%s", (name) => {
+    it("서버 포트로 오면 화면을 받는다", () => {
+      expect(verdictOf(request("/settings", { host: `${name}:3000` }), wildcard)).toEqual({
+        ok: true,
+      });
+    });
+
+    it.each([`${name}:443`, `${name}:8443`, `${name}:10000`, name])(
+      "%s 는 화면을 막고 webhook 경로만 받는다",
+      (host) => {
+        expect(verdictOf(request("/settings", { host }), wildcard)).toMatchObject(rejected);
+        expect(
+          verdictOf(request("/api/webhooks/tracker/conn", { method: "POST", host }), wildcard),
+        ).toEqual({ ok: true });
+      },
+    );
+
+    it("Funnel 요청이 Host 를 서버 포트로 꾸며도 화면을 막고 webhook 경로만 받는다", () => {
+      const host = `${name}:3000`;
+      expect(verdictOf(request("/settings", { host, funnel: true }), wildcard)).toMatchObject(
+        rejected,
+      );
+      expect(
+        verdictOf(
+          request("/api/webhooks/tracker/conn", { method: "POST", host, funnel: true }),
+          wildcard,
+        ),
+      ).toEqual({ ok: true });
+    });
+  });
+
+  it("서버 포트가 Funnel 포트거나 webhook 주소의 host:port 면 자동 허용하지 않는다", () => {
+    const onFunnelPort = { ...wildcard, webPort: 8443 };
+    expect(verdictOf(request("/settings", { host: `${MAGIC}:8443` }), onFunnelPort)).toMatchObject(
+      rejected,
+    );
+    const sameAsWebhook = { ...wildcard, webhookAddress: `https://${MAGIC}:3000` };
+    expect(verdictOf(request("/settings", { host: `${MAGIC}:3000` }), sameAsWebhook)).toMatchObject(
+      rejected,
+    );
+    expect(verdictOf(request("/settings", { host: `${IP}:3000` }), sameAsWebhook)).toEqual({
+      ok: true,
+    });
+  });
+
+  it("상태를 바꾸는 요청의 Origin 도 서버 포트만 받는다", () => {
+    const post = (origin: string, funnel = false) =>
+      verdictOf(
+        request("/_serverFn/x", { method: "POST", host: `${MAGIC}:3000`, origin, funnel }),
+        wildcard,
+      );
+    expect(post(`http://${MAGIC}:3000`)).toEqual({ ok: true });
+    expect(post(`https://${MAGIC}`)).toMatchObject({ ok: false, reason: "origin-not-allowed" });
+    expect(post(`https://${MAGIC}:8443`)).toMatchObject({
+      ok: false,
+      reason: "origin-not-allowed",
+    });
+    expect(post(`http://${MAGIC}:3000`, true)).toMatchObject(rejected);
+  });
+
+  it.each(["127.0.0.1", "127.0.0.1:3000", "localhost:3000", "[::1]", MAGIC, `${MAGIC}:443`])(
+    "Funnel 요청은 Host 를 %s 로 보내도 화면과 서버 함수에 닿지 못한다",
+    (host) => {
+      const operator = { ...wildcard, webAddress: `https://${MAGIC}` };
+      for (const input of [wildcard, operator]) {
+        expect(verdictOf(request("/settings", { host, funnel: true }), input)).toMatchObject(
+          rejected,
+        );
+        expect(
+          verdictOf(request("/_serverFn/x", { method: "POST", host, funnel: true }), input),
+        ).toMatchObject(rejected);
+      }
+    },
+  );
+
+  it("운영자가 직접 넣은 다른 기기에서 열 주소는 어느 포트로 와도 그대로 받는다", () => {
+    const operator = { ...wildcard, webAddress: `https://${MAGIC}` };
+    for (const host of [MAGIC, `${MAGIC}:443`, `${MAGIC}:3000`]) {
+      expect(verdictOf(request("/settings", { host }), operator)).toEqual({ ok: true });
+    }
   });
 });
 

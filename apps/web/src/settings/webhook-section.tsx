@@ -8,6 +8,8 @@ import {
   InfoTip,
   Input,
   ProblemCallout,
+  RadioGroup,
+  RadioOption,
   SettingsGroup,
   SettingsRow,
   SettingsSection,
@@ -22,7 +24,10 @@ import {
 import { space } from "@ganger/ui/tokens.stylex";
 import { createContext, use, useEffect, useId, useRef, useState, type RefObject } from "react";
 import { useTranslations } from "use-intl";
+import { funnelPrefillAddress } from "@ganger/app/funnel-setup";
 import type {
+  FunnelPortChoice,
+  FunnelSetupView,
   TrackerConnectionView,
   WebhookSetupView,
   WebhookStateView,
@@ -167,7 +172,7 @@ function WebhookSteps({
         {addressDone ? null : edit.open ? (
           <FocusFirst>
             <AddressEditor
-              initial={webhookAddress ?? setup.funnel?.address ?? ""}
+              initial={webhookAddress ?? funnelPrefillAddress(setup.funnel) ?? ""}
               setup={setup}
               actions={actions}
               onClose={edit.close}
@@ -179,7 +184,7 @@ function WebhookSteps({
           </FocusFirst>
         ) : (
           <AddressEditor
-            initial={webhookAddress ?? setup.funnel?.address ?? ""}
+            initial={webhookAddress ?? funnelPrefillAddress(setup.funnel) ?? ""}
             setup={setup}
             actions={actions}
             onClose={undefined}
@@ -288,9 +293,14 @@ function CopyValue({
   );
 }
 
-function FunnelGuide({ command }: { command: string }) {
+function FunnelGuide({
+  funnel,
+  onPickAddress,
+}: {
+  funnel: FunnelSetupView;
+  onPickAddress: (address: string) => void;
+}) {
   const t = useTranslations("settings.webhook.address");
-  const tw = useTranslations("settings.webhook");
   const titleId = useId();
   return (
     <section aria-labelledby={titleId} {...stylex.props(styles.funnel)}>
@@ -300,18 +310,106 @@ function FunnelGuide({ command }: { command: string }) {
         </Text>
         <Text variant="meta">{t("funnelFound")}</Text>
       </span>
+      {funnel.kind === "bind-tailnet" ? (
+        <Text variant="meta" as="p">
+          {t("funnelBindTailnet", { host: funnel.bindHost })}
+        </Text>
+      ) : (
+        <>
+          <Text variant="meta" as="p">
+            {t("funnelFirst")}{" "}
+            <ExternalLink href={TAILSCALE_FUNNEL_GUIDE_URL}>{t("funnelFirstLink")}</ExternalLink>
+          </Text>
+          {funnel.kind === "ready" ? (
+            <>
+              <Text variant="meta" as="p">
+                {t(`funnelPort.${funnel.portState}`, { port: funnel.port })}
+              </Text>
+              <FunnelCommand command={funnel.command} sharedPort={funnel.portState === "unknown"} />
+            </>
+          ) : (
+            <FunnelPortPicker ports={funnel.ports} onPickAddress={onPickAddress} />
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function FunnelCommand({ command, sharedPort = false }: { command: string; sharedPort?: boolean }) {
+  const t = useTranslations("settings.webhook.address");
+  const tw = useTranslations("settings.webhook");
+  return (
+    <>
       <Text variant="meta" as="p">
-        {t("funnelFirst")}{" "}
-        <ExternalLink href={TAILSCALE_FUNNEL_GUIDE_URL}>{t("funnelFirstLink")}</ExternalLink>
-      </Text>
-      <Text variant="meta" as="p">
-        {t("funnelRun")}
+        {sharedPort ? t("funnelRunShared") : t("funnelRun")}
       </Text>
       <CopyValue label={t("commandLabel")} value={command} copied={tw("copiedCommand")} />
       <Text variant="meta" as="p">
         {t("funnelThen")}
       </Text>
-    </section>
+    </>
+  );
+}
+
+function FunnelPortPicker({
+  ports,
+  onPickAddress,
+}: {
+  ports: ReadonlyArray<FunnelPortChoice>;
+  onPickAddress: (address: string) => void;
+}) {
+  const t = useTranslations("settings.webhook.address");
+  const labelId = useId();
+  const name = useId();
+  const [picked, setPicked] = useState<number | null>(null);
+  const pickedPort = ports.find((port) => port.port === picked);
+  const choice = pickedPort?.unavailable === null ? pickedPort : undefined;
+  const anySelectable = ports.some((port) => port.unavailable === null);
+  return (
+    <>
+      <Text variant="meta" as="p" id={labelId}>
+        {anySelectable ? t("funnelFull") : t("funnelFullNone")}
+      </Text>
+      <RadioGroup labelledBy={labelId}>
+        {ports.map((port) => (
+          <RadioOption
+            key={port.port}
+            name={name}
+            value={String(port.port)}
+            checked={picked === port.port}
+            disabled={port.unavailable !== null}
+            onCheck={() => {
+              if (port.unavailable !== null) return;
+              setPicked(port.port);
+              onPickAddress(port.address);
+            }}
+          >
+            <span {...stylex.props(styles.funnelChoice)}>
+              <Text variant="ui">
+                {port.isPublic
+                  ? t("funnelPortPublic", { port: port.port })
+                  : t("funnelPortName", { port: port.port })}
+              </Text>
+              <Text variant="meta" mono wrap="anywhere">
+                {port.uses.length === 0 ? t("funnelPortInUse") : port.uses.join(", ")}
+              </Text>
+              {port.unavailable === null ? null : (
+                <Text variant="meta">{t(`funnelPortUnavailable.${port.unavailable}`)}</Text>
+              )}
+            </span>
+          </RadioOption>
+        ))}
+      </RadioGroup>
+      {choice === undefined ? null : (
+        <>
+          <Text variant="meta" tone="strong" as="p" role="status">
+            {t("funnelPortWarning", { port: choice.port })}
+          </Text>
+          <FunnelCommand command={choice.command} sharedPort />
+        </>
+      )}
+    </>
   );
 }
 
@@ -342,6 +440,7 @@ function AddressEditor({
   const [failed, setFailed] = useState<(typeof ADDRESS_ERRORS)[number] | null>(null);
   const [tried, setTried] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pickedAddress = useRef<string | null>(null);
   const submit = useSubmit();
   useReportUnsaved(onClose !== undefined && value !== initial);
   const reason = submit.state.kind === "failed" ? submit.state.reason : null;
@@ -354,13 +453,24 @@ function AddressEditor({
   }, [failedState]);
   const known = reason !== null && failed !== null;
   const errorKey =
-    failed === "unreachable" && setup.funnel === null ? "unreachableNoFunnel" : failed;
+    failed === "unreachable" && (setup.funnel === null || setup.funnel.kind === "bind-tailnet")
+      ? "unreachableNoFunnel"
+      : failed;
   return (
     <div {...stylex.props(styles.editor)}>
       <Text variant="meta" as="p">
         {t("description")}
       </Text>
-      {setup.funnel === null ? null : <FunnelGuide command={setup.funnel.command} />}
+      {setup.funnel === null ? null : (
+        <FunnelGuide
+          funnel={setup.funnel}
+          onPickAddress={(address) => {
+            const untouched = value === initial || value === pickedAddress.current;
+            if (value === "" || untouched) setValue(address);
+            pickedAddress.current = address;
+          }}
+        />
+      )}
       <CredentialFormFrame
         onClose={onClose}
         onSubmit={() => {
@@ -559,7 +669,7 @@ function WebhookOn({
               addressEdit.open ? (
                 <FocusFirst>
                   <AddressEditor
-                    initial={webhookAddress ?? setup.funnel?.address ?? ""}
+                    initial={webhookAddress ?? funnelPrefillAddress(setup.funnel) ?? ""}
                     setup={setup}
                     actions={actions}
                     onClose={addressEdit.close}
@@ -677,6 +787,7 @@ function TurnOffRow({
 const styles = stylex.create({
   copy: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
   funnel: { display: "flex", flexDirection: "column", gap: space.s2, minWidth: 0 },
+  funnelChoice: { display: "flex", flexDirection: "column", gap: space.px2, minWidth: 0 },
   funnelHead: { display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: space.s2 },
   on: { display: "flex", flexDirection: "column", gap: space.s3 },
   editor: { display: "flex", flexDirection: "column", gap: space.s4, minWidth: 0 },

@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { deviceOrigins, discoverServers } from "./discovery.js";
 import type { Identity, Probe, ProbeResult } from "./identity.js";
 import { identitySchema, probeIdentity } from "./identity.js";
-import { connectAddress, normalizeAddress, reopenSaved } from "./remote.js";
+import {
+  connectAddress,
+  isAwaitingRemote,
+  isServerForbidden,
+  normalizeAddress,
+  reopenSaved,
+} from "./remote.js";
 import { findTailscaleCli, parseTailnetStatus, readTailnet } from "@ganger/app/tailscale";
 
 const identity = (instanceId: string, extra: Partial<Identity> = {}): ProbeResult => ({
@@ -544,6 +550,31 @@ describe("저장한 서버 다시 열기", () => {
       kind: "open",
       server: { ...saved, url: "https://build-box.example.ts.net" },
     });
+  });
+
+  it("같은 서버가 이 주소를 막고 다른 허용 주소도 없으면 허용 안 됨이다", async () => {
+    expect(
+      await reopenSaved(saved, {
+        probe: fakeProbe({
+          [saved.url]: identity("inst-1", { webAccess: "host-not-allowed" }),
+        }),
+        discover: none,
+      }),
+    ).toEqual({ kind: "host-not-allowed" });
+  });
+
+  it("다른 서버를 고르러 간 뒤에는 끝난 확인이 화면을 덮지 않는다", () => {
+    expect(isAwaitingRemote("host-blocked")).toBe(true);
+    expect(isAwaitingRemote("unreachable")).toBe(true);
+    expect(isAwaitingRemote("find-servers")).toBe(false);
+    expect(isAwaitingRemote("enter-address")).toBe(false);
+  });
+
+  it("지금 서버 화면의 403 만 허용 안 됨 확인으로 보낸다", () => {
+    expect(isServerForbidden(403, `${saved.url}/runs`, saved.url)).toBe(true);
+    expect(isServerForbidden(200, `${saved.url}/runs`, saved.url)).toBe(false);
+    expect(isServerForbidden(403, "https://other.example.com/", saved.url)).toBe(false);
+    expect(isServerForbidden(403, `${saved.url}/runs`, undefined)).toBe(false);
   });
 
   it("다른 서버가 그 주소에 있거나 찾지 못하면 닿지 않음이다", async () => {

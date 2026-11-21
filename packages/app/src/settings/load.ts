@@ -73,6 +73,7 @@ export interface SettingsContext {
   power?: PowerSettingsStore;
   mcpLaunch?: McpLaunch;
   trackerReads?: TrackerReads;
+  autoAllowedHosts?: ReadonlyArray<string>;
 }
 
 function powerView(store: PowerSettingsStore | undefined): PowerView {
@@ -84,12 +85,16 @@ export function webhookPath(connectionId: string): string {
   return `/api/webhooks/tracker/${encodeURIComponent(connectionId)}`;
 }
 
-function addressesView(settings: StoredInstallSettings): AddressesView {
+function addressesView(
+  settings: StoredInstallSettings,
+  autoAllowedHosts: ReadonlyArray<string>,
+): AddressesView {
   return {
     webAddress: settings.webAddress,
     webhookAddress: settings.webhookAddress,
     webhookAddressChecked:
       settings.webhookAddress !== null && settings.webhookAddressCheckedAt !== null,
+    autoAllowedHosts,
   };
 }
 
@@ -251,7 +256,7 @@ export function loadSettingsDb(
       connections: connections.map((connection) => trackerConnectionView(db, connection, now)),
       githubToken: listCodeHostConnections(db, secretBox).length > 0,
       unreadPrRuns: countUnreadPrRuns(db),
-      addresses: addressesView(getInstallSettings(db)),
+      addresses: addressesView(getInstallSettings(db), context.autoAllowedHosts ?? []),
       power: powerView(context.power),
       mcp: {
         launch:
