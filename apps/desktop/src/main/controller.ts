@@ -439,7 +439,7 @@ export class Controller {
     this.mode = "remote";
     this.remote = { server: saved, reachable: false };
     this.setView(
-      this.view.screen === "host-blocked"
+      this.serverUrl === undefined && this.view.screen === "host-blocked"
         ? { ...this.view, checking: true }
         : { screen: "unreachable", name: saved.name, url: saved.url, checking: true },
     );

@@ -349,6 +349,24 @@ describe("트래커 연결 상세의 Webhook 단계", () => {
     expect(step).not.toContain('value="https://server.example.ts.net');
   });
 
+  it("포트 상태를 모르면 webhook 경로만 연다고 말하지 않는다", async () => {
+    const f = fixture();
+    const id = await addConnection(f);
+    const unknownPort: WebhookSetupView = {
+      funnel: {
+        kind: "ready",
+        port: 8443,
+        portState: "unknown",
+        command: "tailscale funnel --bg --https=8443",
+        address: "https://server.example.ts.net:8443",
+      },
+    };
+    const html = renderDetail(await loadSettingsPage(f.context, workspace, now), id, unknownPort);
+    const step = textOf(stepOf(html, 1));
+    expect(step).toContain(settings.webhook.address.funnelRunShared);
+    expect(step).not.toContain(settings.webhook.address.funnelRun);
+  });
+
   it("WEB_HOST 가 이 기기의 tailnet 주소면 명령 대신 127.0.0.1 에서도 받게 하라고 안내한다", async () => {
     const f = fixture();
     const id = await addConnection(f);

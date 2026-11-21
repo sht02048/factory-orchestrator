@@ -325,7 +325,7 @@ function FunnelGuide({
               <Text variant="meta" as="p">
                 {t(`funnelPort.${funnel.portState}`, { port: funnel.port })}
               </Text>
-              <FunnelCommand command={funnel.command} />
+              <FunnelCommand command={funnel.command} sharedPort={funnel.portState === "unknown"} />
             </>
           ) : (
             <FunnelPortPicker ports={funnel.ports} onPickAddress={onPickAddress} />
@@ -453,7 +453,9 @@ function AddressEditor({
   }, [failedState]);
   const known = reason !== null && failed !== null;
   const errorKey =
-    failed === "unreachable" && setup.funnel?.kind !== "ready" ? "unreachableNoFunnel" : failed;
+    failed === "unreachable" && (setup.funnel === null || setup.funnel.kind === "bind-tailnet")
+      ? "unreachableNoFunnel"
+      : failed;
   return (
     <div {...stylex.props(styles.editor)}>
       <Text variant="meta" as="p">
